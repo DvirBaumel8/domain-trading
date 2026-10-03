@@ -1,0 +1,74 @@
+# render.yaml: SKETCH for Dvir to review. Not deployed by any bot.
+# Syntax source: https://render.com/docs/blueprint-spec (fetched 2026-10-03).
+# Cost: UNVERIFIED. Check https://render.com/pricing before applying; this conflicts with the $0 tools cap,
+# so Dvir must approve the spend. A FREE Postgres is NOT acceptable (no backups, expires after 30 days).
+
+services:
+  - type: web
+    name: domain-trading-api
+    runtime: python
+    region: frankfurt            # closest Render region to Israel; change if you prefer
+    plan: 0.5c-512mb             # Blueprint default paid web plan (free web services spin down). VERIFY price
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: 'off'     # Dvir deploys deliberately after tests pass
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: domain-trading-db
+          property: connectionString
+      - key: APP_ENV
+        value: production
+      - key: LANDER_TARGET
+        value: afternic
+      - key: POC_CAP_CENTS
+        value: "50000"
+      - key: MAX_DOMAINS
+        value: "10"
+      - key: APPROVAL_MAX_AGE_HOURS
+        value: "72"
+      - key: ENABLED_REGISTRARS
+        value: porkbun
+      # Secrets: values entered in the Render Dashboard only (sync: false). Never in git.
+      - key: PORKBUN_API_KEY
+        sync: false
+      - key: PORKBUN_SECRET_API_KEY
+        sync: false
+      - key: DYNADOT_API_KEY
+        sync: false
+      - key: NAMECOM_USERNAME
+        sync: false
+      - key: NAMECOM_API_TOKEN
+        sync: false
+      # Namecheap / GoDaddy / Spaceship / NameSilo keys: add the same way when their adapters exist (see .env.example)
+
+  # Optional nightly data export to the repo's data-backup branch (docs/specs/backup.md)
+  - type: cron
+    name: domain-trading-backup
+    runtime: python
+    region: frankfurt
+    schedule: '30 23 * * *'      # 23:30 UTC = 02:30 IDT (01:30 IST in winter)
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.jobs.export_backup
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: domain-trading-db
+          property: connectionString
+      - key: GITHUB_BACKUP_TOKEN   # fine-grained PAT: this repo only, Contents read/write
+        sync: false
+      - key: GITHUB_BACKUP_REPO
+        value: DvirBaumel8/domain-trading
+      - key: GITHUB_BACKUP_BRANCH
+        value: data-backup
+
+databases:
+  - name: domain-trading-db
+    region: frankfurt
+    postgresMajorVersion: '16'
+    plan: 0.1c-256mb             # Blueprint default (smallest current plan); must be a PAID plan for PITR. VERIFY price
+    databaseName: domain_trading
+    ipAllowList: []              # private network only; the API and cron connect internally
