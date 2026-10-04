@@ -5,6 +5,7 @@ import type { Config } from './config.js';
 import type { Database } from './db/types.js';
 import { dbAuditWriter, auditFrameworkError, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
 import { registerAuth, registerScope } from './http/auth.js';
+import { registerIdempotency } from './http/idempotency.js';
 import { errorBody, registerErrorHandling } from './http/errors.js';
 
 declare module 'fastify' {
@@ -44,8 +45,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerAuditId(app); // onRequest (first)
   registerAuth(app, deps.db); // onRequest
   registerScope(app); // preHandler
-  // preHandler: [Task 7] registerRateLimit →  registerScope  →  [Task 6] registerIdempotency (preHandler part)
-  // [Task 6] registerIdempotency(app, deps.db) goes here (preHandler + onSend)
+  // preHandler: [Task 7] registerRateLimit →  registerScope  →  registerIdempotency (preHandler part)
+  registerIdempotency(app, deps.db); // preHandler (after scope) + onSend (before audit write)
   registerAuditWrite(app, auditWriter); // onSend (last)
 
   registerHealth(app, deps.config, deps.db);
