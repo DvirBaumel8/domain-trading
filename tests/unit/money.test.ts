@@ -26,3 +26,14 @@ describe('formatUsd', () => {
     expect(() => formatUsd(11.08)).toThrow();
   });
 });
+
+import { dollarsToCents } from '../../src/money.js';
+
+describe('dollarsToCents', () => {
+  it.each([[11.5, 1150], [11.08, 1108], [10, 1000], [1995, 199500], [0.01, 1]])('%d → %i', (d, c) => {
+    expect(dollarsToCents(d)).toBe(c);
+  });
+  it.each([0, -1, 11.085, Number.NaN, Number.POSITIVE_INFINITY, 1e21])('rejects %d', (d) => {
+    expect(() => dollarsToCents(d)).toThrow();
+  });
+});

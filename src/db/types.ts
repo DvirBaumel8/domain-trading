@@ -146,6 +146,9 @@ export interface PurchasesTable {
   approval_text: string;
   approval_at: Timestamp;
   response: Json | null;
+  expected_cents: number | null;
+  request: Json | null;
+  audit_id: string | null;
   created_at: TimestampDefault;
   updated_at: TimestampDefault;
 }

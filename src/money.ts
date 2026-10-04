@@ -16,3 +16,9 @@ export function formatUsd(cents: number): string {
   const rest = String(abs % 100).padStart(2, '0');
   return `${cents < 0 ? '-' : ''}$${dollars}.${rest}`;
 }
+
+/** A USD request amount (e.g. max_price 11.5) → cents, exactly. Rejects ≤0, non-finite, >2 decimals. */
+export function dollarsToCents(n: number): number {
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`Not a positive USD amount: ${n}`);
+  return usdStringToCents(String(n));
+}
