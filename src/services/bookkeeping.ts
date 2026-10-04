@@ -1,6 +1,6 @@
 import type { Kysely } from 'kysely';
 import { addOneYear } from '../dates.js';
-import type { Category, Database, RegistrarApi } from '../db/types.js';
+import type { Category, Database, PurchaseState, RegistrarApi } from '../db/types.js';
 import type { Capabilities } from '../registrars/types.js';
 
 export function registrarApiOf(c: Capabilities): RegistrarApi {
@@ -53,11 +53,15 @@ export async function bookPurchase(db: Kysely<Database>, b: BookInput): Promise<
   });
 }
 
-export async function failPurchase(db: Kysely<Database>, purchaseId: number, domain: string, response: { status: number; body: unknown }): Promise<void> {
+export async function failPurchase(db: Kysely<Database>, purchaseId: number, domain: string, response: { status: number; body: unknown },
+  opts: { fromStates?: PurchaseState[]; updatedBefore?: Date } = {}): Promise<void> {
   await db.transaction().execute(async (trx) => {
-    const r = await trx.updateTable('purchases')
+    let q = trx.updateTable('purchases')
       .set({ state: 'failed', response: JSON.stringify(response), updated_at: new Date() })
-      .where('id', '=', purchaseId).where('state', '!=', 'succeeded').executeTakeFirst();
+      .where('id', '=', purchaseId).where('state', '!=', 'succeeded');
+    if (opts.fromStates) q = q.where('state', 'in', opts.fromStates);
+    if (opts.updatedBefore) q = q.where('updated_at', '<', opts.updatedBefore);
+    const r = await q.executeTakeFirst();
     if (Number(r.numUpdatedRows) === 0) return;
     await trx.deleteFrom('domains').where('domain', '=', domain).where('status', '=', 'pending_purchase').execute();
   });

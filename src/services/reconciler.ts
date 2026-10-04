@@ -35,15 +35,25 @@ export class Reconciler {
     return this.deps.adapters.find((a) => a.name === name);
   }
 
+  private async isolated(purchaseId: number, fn: () => Promise<void>): Promise<void> {
+    try {
+      await fn();
+    } catch (e) {
+      this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'reconciler: row failed');
+    }
+  }
+
   private async abandonCreated(out: ReconcileResult): Promise<void> {
     const cutoff = new Date(this.deps.now() - 10 * 60_000);
     const rows = await this.deps.db.selectFrom('purchases').select(['id', 'domain'])
       .where('state', '=', 'created').where('dry_run', '=', false).where('updated_at', '<', cutoff).execute();
     for (const p of rows) {
-      await failPurchase(this.deps.db, p.id, p.domain, {
-        status: 409, body: errorBody('PURCHASE_ABANDONED', 'The purchase never reached the registrar; nothing was bought'),
+      await this.isolated(p.id, async () => {
+        await failPurchase(this.deps.db, p.id, p.domain, {
+          status: 409, body: errorBody('PURCHASE_ABANDONED', 'The purchase never reached the registrar; nothing was bought'),
+        }, { fromStates: ['created'], updatedBefore: cutoff });
+        out.abandoned++;
       });
-      out.abandoned++;
     }
   }
 
@@ -53,21 +63,22 @@ export class Reconciler {
     const rows = await db.selectFrom('purchases').selectAll()
       .where('state', 'in', ['register_sent', 'unknown']).where('updated_at', '<', new Date(now - 2 * 60_000)).execute();
     for (const p of rows) {
+      await this.isolated(p.id, async () => {
       const adapter = this.adapter(p.registrar);
       if (!adapter) {
         this.deps.log?.warn({ purchaseId: p.id, registrar: p.registrar }, 'reconciler: no adapter');
-        continue;
+        return;
       }
       let info;
       try {
         info = await adapter.findDomain(p.domain);
       } catch {
-        continue; // unknown stays unknown
+        return; // unknown stays unknown
       }
       if (info) {
         const rec = await adapter.findRegistration(p.domain, { since: jerusalemDate(new Date(p.created_at.getTime() - 86_400_000)) }).catch(() => null);
-        if (!rec) continue;
-        const req = (p.request ?? {}) as { category?: Category; deal_id?: string | null };
+        if (!rec) return;
+        const req = (p.request ?? {}) as { category?: Category; deal_id?: string | null; proposed_listing?: unknown };
         const q = await db.selectFrom('quotes').select('renewal_cents')
           .where('check_id', '=', p.check_id ?? '').where('registrar', '=', adapter.name).executeTakeFirst();
         const expiry = info.expiryDate ?? rec.expiryDate ?? addOneYear(rec.invoiceDate);
@@ -77,13 +88,19 @@ export class Reconciler {
           buyDate: rec.invoiceDate, category: req.category ?? 'other', dealId: req.deal_id ?? null, checkId: p.check_id,
           auditId: p.audit_id ?? 'reconciler', receiptRaw: rec.raw,
         });
-        if (r.booked) out.booked++;
+        if (r.booked) {
+          out.booked++;
+          if ((req as { proposed_listing?: unknown }).proposed_listing) {
+            this.deps.log?.warn({ purchaseId: p.id, domain: p.domain }, 'reconciler booked a purchase; proposed listing not applied — call /list');
+          }
+        }
       } else if (p.created_at.getTime() < now - 30 * 60_000 && (await this.deps.rdap(p.domain)) === 'not_registered') {
         await failPurchase(db, p.id, p.domain, {
           status: 409, body: errorBody('PURCHASE_FAILED', 'The registrar never registered the domain; nothing was bought'),
-        });
+        }, { fromStates: ['register_sent', 'unknown'] });
         out.failed++;
       }
+      });
     }
   }
 
@@ -93,13 +110,15 @@ export class Reconciler {
       .select(['p.id', 'p.registrar', 'p.order_id'])
       .where('p.state', '=', 'succeeded').where('p.order_id', 'is not', null).where('r.id', 'is', null).execute();
     for (const p of rows) {
+      await this.isolated(p.id, async () => {
       const adapter = this.adapter(p.registrar);
-      if (!adapter || !p.order_id) continue;
+      if (!adapter || !p.order_id) return;
       const raw = await adapter.getReceipt(p.order_id).catch(() => null);
-      if (raw === null) continue;
+      if (raw === null) return;
       await db.insertInto('receipts').values({ purchase_id: p.id, registrar: adapter.name, order_id: p.order_id, raw: JSON.stringify(raw) })
         .onConflict((oc) => oc.column('purchase_id').doNothing()).execute();
       out.receipts++;
+      });
     }
   }
 }

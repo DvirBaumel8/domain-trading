@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RdapFn } from '../../src/rdap.js';
+import { failPurchase } from '../../src/services/bookkeeping.js';
 import { Reconciler } from '../../src/services/reconciler.js';
 import { DOMAIN } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';
@@ -105,5 +106,51 @@ describe('Reconciler', () => {
     const r = rec(new FakeAdapter('porkbun', { alreadyOwned: true }));
     const [a, b] = await Promise.all([r.runOnce(), r.runOnce()]);
     expect([a.skipped, b.skipped].sort()).toEqual([false, true]);
+  });
+
+  it('failPurchase guard: a created-purchase fail does not touch a row that moved to register_sent', async () => {
+    const id = await seedPurchase('register_sent', 20);
+    await failPurchase(db, id, DOMAIN, { status: 409, body: {} }, { fromStates: ['created'], updatedBefore: minutesAgo(10) });
+    expect((await db.selectFrom('purchases').selectAll().executeTakeFirstOrThrow()).state).toBe('register_sent');
+    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(1);
+  });
+
+  it('failPurchase guard: a 30-min fail does not touch a row that became succeeded', async () => {
+    const id = await seedPurchase('register_sent', 40);
+    await db.updateTable('purchases').set({ state: 'succeeded' }).where('id', '=', id).execute();
+    await failPurchase(db, id, DOMAIN, { status: 409, body: {} }, { fromStates: ['register_sent', 'unknown'] });
+    expect((await db.selectFrom('purchases').selectAll().executeTakeFirstOrThrow()).state).toBe('succeeded');
+    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(1);
+  });
+
+  it('one bad row does not stop the run: the second purchase is still booked', async () => {
+    const bad = await seedPurchase('register_sent', 5, 'bad.com');
+    await db.updateTable('purchases').set({ request: JSON.stringify({ domain: 'bad.com', category: 'nonsense' }) }).where('id', '=', bad).execute();
+    await db.insertInto('quotes').values({
+      check_id: 'chk_2', domain: DOMAIN, registrar: 'porkbun', available: true, premium: false, first_year_cents: 1108, renewal_cents: 1108,
+      privacy_cents_per_year: 0, two_year_cents: 2216, eligible: true, exclusion_reason: null, raw: null,
+    }).execute();
+    await db.insertInto('purchases').values({
+      idempotency_key: 'k2', request_hash: 'h', domain: DOMAIN, state: 'register_sent', registrar: 'porkbun', check_id: 'chk_2',
+      max_price_cents: 1150, approval_text: DOMAIN, approval_at: minutesAgo(10), expected_cents: 1108,
+      request: JSON.stringify({ domain: DOMAIN, category: 'geo' }), audit_id: 'aud_' + 'b'.repeat(32), created_at: minutesAgo(5), updated_at: minutesAgo(5),
+    }).execute();
+    await db.insertInto('domains').values({ domain: DOMAIN, status: 'pending_purchase', registrar: 'porkbun', category: 'geo' }).execute();
+    const errors: object[] = [];
+    const r = new Reconciler({ db, adapters: [new FakeAdapter('porkbun', { alreadyOwned: true })], rdap: rdapFree, now: () => NOW,
+      log: { warn: () => {}, error: (o) => { errors.push(o); } } });
+    expect(await r.runOnce()).toMatchObject({ booked: 1 });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ purchaseId: bad });
+  });
+
+  it('warns when a booked purchase had a proposed listing', async () => {
+    const id = await seedPurchase('register_sent', 5);
+    await db.updateTable('purchases').set({ request: JSON.stringify({ domain: DOMAIN, category: 'geo', proposed_listing: { mode: 'bin' } }) }).where('id', '=', id).execute();
+    const warns: object[] = [];
+    const r = new Reconciler({ db, adapters: [new FakeAdapter('porkbun', { alreadyOwned: true })], rdap: rdapFree, now: () => NOW,
+      log: { warn: (o) => { warns.push(o); }, error: () => {} } });
+    await r.runOnce();
+    expect(warns).toContainEqual({ purchaseId: id, domain: DOMAIN });
   });
 });
