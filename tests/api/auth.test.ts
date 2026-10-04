@@ -58,7 +58,9 @@ describe('auth (AU)', () => {
     expect(res.json().error.code).toBe('SCOPE_FORBIDDEN');
     const { sideEffects } = await import('../helpers/app.js');
     expect(sideEffects.count).toBe(0);
-    // AU-3's "audit row written" assertion is added in Task 5.
+    const rows = await testDb.selectFrom('audit_log').selectAll().where('method', '=', 'POST').execute();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status_code: 403, scope: 'read', result_summary: 'SCOPE_FORBIDDEN' });
   });
 
   it('AU-4: READ token on GET → 200', async () => {

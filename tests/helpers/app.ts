@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
 import type { Database } from '../../src/db/types.js';
+import type { AuditWriter } from '../../src/http/audit.js';
 import { testDb } from './db.js';
 import { testEnv } from './env.js';
 
@@ -52,7 +53,7 @@ export function logCapture(): { stream: Writable; text: () => string } {
 export async function makeApp(
   opts: {
     now?: () => number;
-    audit?: unknown; // becomes AuditWriter in Task 5
+    audit?: AuditWriter;
     testRoutes?: boolean;
     logStream?: Writable;
     db?: Kysely<Database>;
