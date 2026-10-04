@@ -124,6 +124,7 @@ Porkbun conditions the code must handle:
 
 ## 7. Errors and conventions
 - JSON errors: `{ "error": { "code": "POC_CAP_EXCEEDED", "message": "...", "details": {...} } }`. Codes are stable; messages are not.
+- Cross-cutting codes (added by Dvir, 4 Oct 2026, step 1): `UNAUTHORIZED` 401; `SCOPE_FORBIDDEN` 403; `IDEMPOTENCY_KEY_REQUIRED` 400; `IDEMPOTENCY_KEY_MISMATCH` / `IDEMPOTENCY_KEY_IN_USE` 409; `RATE_LIMITED` 429 (with `Retry-After`); `VALIDATION_ERROR` 422 (body) or 400 (query/params schema); `INVALID_BODY` 400/413/415 (unparseable, too large, wrong media type); `INVALID_REQUEST` 4xx (malformed URL and other framework rejections); `NOT_FOUND` 404; `INTERNAL` 500; `AUDIT_WRITE_FAILED` 500 (processed but not audited: retry with the same `Idempotency-Key` to get the stored result).
 - `GET /health` (no auth) returns `{status, db: ok|down, version, adapters: [{name, enabled}]}`. It never reveals secrets or key prefixes.
 - Responses show money both in cents and as a display string (`"$11.08"`).
 - Times: stored in UTC; `/report` also renders IDT (`Asia/Jerusalem`).
