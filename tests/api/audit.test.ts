@@ -99,6 +99,17 @@ describe('audit (AL)', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error.code).toBe('INVALID_REQUEST');
-    expect(await httpAuditRows()).toHaveLength(1);
+    const rows = await httpAuditRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      status_code: 400, result_summary: 'INVALID_REQUEST', token_id: null, idempotency_key: 'k-fw',
+    });
+  });
+
+  it('a framework error whose audit write fails answers 500 AUDIT_WRITE_FAILED', async () => {
+    app = await makeApp({ audit: { write: async () => { throw new Error('db down'); } } });
+    const res = await app.inject({ method: 'POST', url: '/__test/echo%ZZ', payload: { value: 'x' } });
+    expect(res.statusCode).toBe(500);
+    expect(res.json().error.code).toBe('AUDIT_WRITE_FAILED');
   });
 });

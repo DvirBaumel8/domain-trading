@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
 import type { AuditRowInsert, Database } from '../db/types.js';
 import { errorBody } from './errors.js';
@@ -54,6 +54,11 @@ function extractApproval(body: Record<string, unknown> | null): { text: string |
   };
 }
 
+function idempotencyKeyOf(req: FastifyRequest): string | null {
+  const key = req.headers['idempotency-key'];
+  return typeof key === 'string' ? key.slice(0, 255) : null;
+}
+
 function summarize(status: number, payload: unknown): string {
   if (status < 400) return 'ok';
   try {
@@ -71,7 +76,6 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
     const body = bodyObject(req);
     const approval = extractApproval(body);
     const replayed = reply.getHeader('idempotent-replayed') === 'true';
-    const key = req.headers['idempotency-key'];
     const summary = req.auditSummary ?? summarize(reply.statusCode, payload);
     try {
       await writer.write({
@@ -80,7 +84,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
         scope: req.auth?.scope ?? null,
         method: req.method,
         path: req.url,
-        idempotency_key: typeof key === 'string' ? key.slice(0, 255) : null,
+        idempotency_key: idempotencyKeyOf(req),
         approval_text: approval.text,
         approval_at: approval.at,
         request: body ? JSON.stringify(redact(body)) : null,
@@ -102,4 +106,47 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
       );
     }
   });
+}
+
+/**
+ * Fastify `frameworkErrors` handler. Framework errors (bad URL encoding, param too long) are answered
+ * before any hook runs, so this replies with the error envelope and, for mutating methods, writes the
+ * audit row itself (token unknown, so null).
+ */
+export function auditFrameworkError(
+  writer: AuditWriter,
+  err: FastifyError,
+  req: FastifyRequest,
+  reply: FastifyReply,
+): void {
+  const r = reply as FastifyReply;
+  const status = err.statusCode ?? 400;
+  const send = (code: number, body: unknown): void => {
+    void r.code(code).type('application/json; charset=utf-8').send(JSON.stringify(body));
+  };
+  const refusal = errorBody('INVALID_REQUEST', err.message);
+  if (!isMutating(req.method)) return send(status, refusal);
+  const id = newAuditId();
+  writer
+    .write({
+      id,
+      token_id: null,
+      scope: null,
+      method: req.method,
+      path: req.url,
+      idempotency_key: idempotencyKeyOf(req),
+      approval_text: null,
+      approval_at: null,
+      request: null,
+      status_code: status,
+      result_summary: 'INVALID_REQUEST',
+      client_ip: req.ip,
+    })
+    .then(
+      () => send(status, refusal),
+      (e: unknown) => {
+        req.log.error({ auditId: id, errMessage: (e as Error).message }, 'audit write failed');
+        send(500, errorBody('AUDIT_WRITE_FAILED', 'The request was refused but could not be audited.'));
+      },
+    );
 }

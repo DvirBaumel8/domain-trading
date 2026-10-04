@@ -1,10 +1,9 @@
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyServerOptions } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Kysely } from 'kysely';
 import { registerHealth } from './api/health.js';
 import type { Config } from './config.js';
 import type { Database } from './db/types.js';
-import { isMutating } from './http/methods.js';
-import { dbAuditWriter, newAuditId, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
+import { dbAuditWriter, auditFrameworkError, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
 import { registerAuth, registerScope } from './http/auth.js';
 import { errorBody, registerErrorHandling } from './http/errors.js';
 
@@ -31,34 +30,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     logger: deps.logger ?? { level: deps.config.logLevel, redact: ['req.headers.authorization'] },
     trustProxy: true,
     bodyLimit: 64 * 1024,
-    // Framework errors (bad URL encoding, param too long) bypass all hooks and our error handler,
-    // so answer with the envelope and write the audit row for mutating requests right here.
-    frameworkErrors: (err, req, reply) => {
-      const r = reply as FastifyReply;
-      const status = err.statusCode ?? 400;
-      const send = (code: number, body: unknown) =>
-        void r.code(code).type('application/json; charset=utf-8').send(JSON.stringify(body));
-      if (!isMutating(req.method)) return send(status, errorBody('INVALID_REQUEST', err.message));
-      auditWriter
-        .write({
-          id: newAuditId(),
-          token_id: null,
-          scope: null,
-          method: req.method,
-          path: req.url,
-          idempotency_key: null,
-          approval_text: null,
-          approval_at: null,
-          request: null,
-          status_code: status,
-          result_summary: 'INVALID_REQUEST',
-          client_ip: req.ip,
-        })
-        .then(() => send(status, errorBody('INVALID_REQUEST', err.message)))
-        .catch(() =>
-          send(500, errorBody('AUDIT_WRITE_FAILED', 'The request was refused but could not be audited.')),
-        );
-    },
+    // Framework errors bypass all hooks; see auditFrameworkError.
+    frameworkErrors: (err, req, reply) => auditFrameworkError(auditWriter, err, req, reply),
   });
 
   const routeTable: { method: string; url: string }[] = [];
