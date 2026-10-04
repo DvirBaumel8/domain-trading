@@ -211,3 +211,34 @@ describe('PorkbunAdapter nameservers, auto-renew, receipts', () => {
     expect(recorded[0]!.path).toBe('/account/invoice/12345678');
   });
 });
+
+describe('fix round 1', () => {
+  it('findDomain: DOMAIN_NOT_FOUND on 5xx is ambiguous and throws', async () => {
+    mswServer.use(http.get(`${PORKBUN_BASE}/domain/get/:d`, () => pbError('DOMAIN_NOT_FOUND', {}, { status: 503 })));
+    expect(await errOf(pb().findDomain('x.com'))).toMatchObject({ code: 'DOMAIN_NOT_FOUND', ambiguous: true });
+  });
+  it('register refuses empty/whitespace idempotency key without calling Porkbun', async () => {
+    for (const idempotencyKey of ['', '  ']) {
+      expect(await errOf(pb().register('x.com', { costCents: 1108, idempotencyKey, dryRun: false })))
+        .toMatchObject({ code: 'INVALID_IDEMPOTENCY_KEY', ambiguous: false });
+    }
+    expect(recorded).toHaveLength(0);
+  });
+  it('real success with fractional cost -> ambiguous BAD_RESPONSE', async () => {
+    mswServer.use(http.post(`${PORKBUN_BASE}/domain/create/:d`, () => HttpResponse.json({ status: 'SUCCESS', cost: 11.08, orderId: 1 })));
+    expect(await errOf(pb().register('x.com', { costCents: 1108, idempotencyKey: 'k', dryRun: false })))
+      .toMatchObject({ code: 'REGISTRAR_BAD_RESPONSE', ambiguous: true });
+  });
+  it('dry run without cost -> ambiguous BAD_RESPONSE', async () => {
+    const { cost: _c, ...noCost } = dryRunOk;
+    mswServer.use(http.post(`${PORKBUN_BASE}/domain/create/:d`, () => HttpResponse.json(noCost)));
+    expect(await errOf(pb().register('x.com', { costCents: 1108, idempotencyKey: 'k', dryRun: true })))
+      .toMatchObject({ code: 'REGISTRAR_BAD_RESPONSE', ambiguous: true });
+  });
+  it('dry run without duration -> ambiguous BAD_RESPONSE', async () => {
+    const { duration: _d, ...noDur } = dryRunOk;
+    mswServer.use(http.post(`${PORKBUN_BASE}/domain/create/:d`, () => HttpResponse.json(noDur)));
+    expect(await errOf(pb().register('x.com', { costCents: 1108, idempotencyKey: 'k', dryRun: true })))
+      .toMatchObject({ code: 'REGISTRAR_BAD_RESPONSE', ambiguous: true });
+  });
+});

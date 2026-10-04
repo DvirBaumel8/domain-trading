@@ -138,6 +138,9 @@ export class PorkbunAdapter implements RegistrarAdapter {
     if (!Number.isInteger(input.costCents) || input.costCents <= 0) {
       throw new RegistrarError(NAME, 'INVALID_COST', 'cost must be a positive integer number of cents');
     }
+    if (typeof input.idempotencyKey !== 'string' || input.idempotencyKey.trim() === '') {
+      throw new RegistrarError(NAME, 'INVALID_IDEMPOTENCY_KEY', 'idempotency key must be a non-empty string');
+    }
     const body: Json = { cost: input.costCents, agreeToTerms: 'yes', whoisPrivacy: true };
     if (input.dryRun) body.dryRun = true;
     const r = await this.call('POST', `/domain/create/${encodeURIComponent(domain)}`, {
@@ -149,28 +152,30 @@ export class PorkbunAdapter implements RegistrarAdapter {
       throw this.bad(input.dryRun ? 'Dry run answered as a real registration' : 'Registration answered as a dry run');
     }
     if (isDry) {
+      if (typeof r.duration !== 'number') throw this.bad('Dry run without a numeric duration');
+      if (typeof r.cost !== 'number' || !Number.isSafeInteger(r.cost)) throw this.bad('Dry run without a safe-integer cost');
       if (r.duration !== 1) {
         throw new RegistrarError(NAME, 'MULTI_YEAR_TERM', `Registry minimum term is ${String(r.duration)} years; only 1-year registrations are allowed`);
       }
       return {
         kind: 'dry_run',
         wouldSucceed: r.wouldSucceed === true,
-        costCents: typeof r.cost === 'number' ? r.cost : input.costCents,
+        costCents: r.cost,
         durationYears: 1,
-        balanceCents: typeof r.balance === 'number' ? r.balance : null,
-        shortfallCents: typeof r.shortfall === 'number' ? r.shortfall : null,
+        balanceCents: Number.isSafeInteger(r.balance) ? (r.balance as number) : null,
+        shortfallCents: Number.isSafeInteger(r.shortfall) ? (r.shortfall as number) : null,
         withinMonthlySpendLimit: typeof r.withinMonthlySpendLimit === 'boolean' ? r.withinMonthlySpendLimit : null,
         raw: r,
       };
     }
-    if ((typeof r.orderId !== 'number' && typeof r.orderId !== 'string') || typeof r.cost !== 'number') {
+    if ((typeof r.orderId !== 'number' && typeof r.orderId !== 'string') || !Number.isSafeInteger(r.cost)) {
       throw this.bad('Registration success without orderId/cost');
     }
     return {
       kind: 'registered',
       orderId: String(r.orderId),
-      chargedCents: r.cost,
-      balanceCents: typeof r.balance === 'number' ? r.balance : null,
+      chargedCents: r.cost as number,
+      balanceCents: Number.isSafeInteger(r.balance) ? (r.balance as number) : null,
       raw: r,
     };
   }
@@ -180,7 +185,7 @@ export class PorkbunAdapter implements RegistrarAdapter {
     try {
       r = await this.call('GET', `/domain/get/${encodeURIComponent(domain)}`);
     } catch (e) {
-      if (e instanceof RegistrarError && e.code === 'DOMAIN_NOT_FOUND') return null; // S7: only this code means "not ours"
+      if (e instanceof RegistrarError && e.code === 'DOMAIN_NOT_FOUND' && !e.ambiguous) return null; // S7: only this code means "not ours"
       throw e;
     }
     const d = isObj(r.domain) ? r.domain : {};
