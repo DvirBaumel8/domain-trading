@@ -28,3 +28,14 @@ describe('redact', () => {
     expect(redact(3)).toBe(3);
   });
 });
+
+describe('redact (step 2 widening)', () => {
+  it('masks private keys, credentials and plural forms', () => {
+    expect(
+      redact({ private_key: 'a', privateKey: 'b', secret_key: 'c', credentials: 'd', api_keys: ['e'], tokens: 'f', ok: 'g' }),
+    ).toEqual({
+      private_key: '[REDACTED]', privateKey: '[REDACTED]', secret_key: '[REDACTED]', credentials: '[REDACTED]',
+      api_keys: '[REDACTED]', tokens: '[REDACTED]', ok: 'g',
+    });
+  });
+});

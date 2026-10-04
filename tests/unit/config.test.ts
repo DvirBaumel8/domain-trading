@@ -69,3 +69,15 @@ describe('adapterStatus', () => {
     expect(s.find((a) => a.name === 'dynadot')?.reason).toBe('not in ENABLED_REGISTRARS');
   });
 });
+
+describe('ENABLED_REGISTRARS validation (S8)', () => {
+  it('rejects unknown registrar names', () => {
+    expect(() => loadConfig(testEnv({ ENABLED_REGISTRARS: 'porkbun,porkbunn' }))).toThrow(/ENABLED_REGISTRARS.*porkbunn/);
+  });
+  it('rejects cloudflare explicitly (founder rule 5)', () => {
+    expect(() => loadConfig(testEnv({ ENABLED_REGISTRARS: 'cloudflare' }))).toThrow(/cloudflare/i);
+  });
+  it('accepts an empty list', () => {
+    expect(loadConfig(testEnv({ ENABLED_REGISTRARS: '' })).enabledRegistrars).toEqual([]);
+  });
+});

@@ -44,6 +44,15 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const strings: Record<string, string> = {};
   for (const [k, v] of Object.entries(env)) if (typeof v === 'string') strings[k] = v;
 
+  const enabledRegistrars = e.ENABLED_REGISTRARS.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (enabledRegistrars.includes('cloudflare')) {
+    throw new Error('Invalid environment: ENABLED_REGISTRARS: cloudflare is never supported (no third-party nameservers)');
+  }
+  const unknown = enabledRegistrars.filter((n) => !(n in REGISTRAR_ENV));
+  if (unknown.length > 0) {
+    throw new Error(`Invalid environment: ENABLED_REGISTRARS: unknown registrar(s) ${unknown.join(', ')}`);
+  }
+
   const secretValues = SECRET_ENV.map((k) => strings[k] ?? '').filter((v) => v.length > 0);
   const dbPassword = decodeURIComponent(new URL(e.DATABASE_URL).password);
   if (dbPassword) secretValues.push(dbPassword);
@@ -54,7 +63,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     port: e.PORT,
     host: e.HOST,
     logLevel: e.LOG_LEVEL,
-    enabledRegistrars: e.ENABLED_REGISTRARS.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    enabledRegistrars,
     version: readVersion(),
     env: Object.freeze(strings),
     secretValues,

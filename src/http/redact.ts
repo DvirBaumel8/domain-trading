@@ -1,4 +1,4 @@
-const SECRET_KEY = /(secret|password|passwd|token|api[-_]?key|authorization|(^|_)pat)$/i;
+const SECRET_KEY = /(secret|password|passwd|token|api[-_]?key|secret[-_]?key|authorization|credential|private[-_]?key|(^|_)pat)s?$/i;
 
 export function redact(value: unknown, depth = 0): unknown {
   if (depth > 10) return '[TRUNCATED]';
