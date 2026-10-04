@@ -7,11 +7,14 @@
 ## Request
 Header: `Idempotency-Key: <uuid>` (required).
 ```json
-{ "domain": "promptinjectionaudit.com",
+{ "domain": "examplecityroofing.com",      // illustrative geo name, not checked
   "max_price": 11.50,                 // USD cap on the FIRST-YEAR charge (required)
   "max_two_year_price": 23.00,        // optional cap on first year + one renewal
-  "approval_ref": { "text": "yes buy promptinjectionaudit.com up to $11.50", "approved_at": "2026-10-04T09:10:00+03:00" },
-  "deal_id": "D-001",                 // optional
+  "approval_ref": { "text": "yes buy examplecityroofing.com up to $11.50, list BIN $399", "approved_at": "2026-10-04T09:10:00+03:00" },
+  "deal_id": "D-002",                 // optional
+  "category": "geo",                  // REQUIRED: geo|trend|b2b|collision|regulation|buzzword|other (listing-strategy.md §1)
+  "proposed_listing": {"mode":"bin","bin":399},   // optional; validated BEFORE buying (V1–V8); applied after purchase if auto_list
+  "override": false, "override_reason": null,      // only if proposed_listing needs a guard override (same approval_ref)
   "registrar": null,                  // optional: pin one registrar (Dvir named it); no fallback then
   "dry_run": false,                   // default false
   "auto_list": true }                 // default true: point NS at the lander right after purchase (see list.md)
@@ -24,6 +27,7 @@ Header: `Idempotency-Key: <uuid>` (required).
 | 1 | Token scope is WRITE | 403 `SCOPE_FORBIDDEN` |
 | 2 | `Idempotency-Key` present. If seen before: same body → replay the stored response; different body → 409 | 400 `IDEMPOTENCY_KEY_REQUIRED` / 409 `IDEMPOTENCY_KEY_MISMATCH` |
 | 3 | `approval_ref.text` is non-empty, **contains the domain name** (case-insensitive), and `approved_at` is not in the future and is ≤ `approval_max_age_hours` (default 72) old | 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` |
+| 3b | `category` present and valid. If `proposed_listing` is given, it passes `listing-strategy.md` V1–V8 (an override uses this call's `approval_ref`) | 422 `CATEGORY_REQUIRED` / the listing error code (**no registrar call**) |
 | 4 | The domain isn't already in `domains` with status `pending_purchase`/`owned`/`listed`, and no open purchase exists for it | 409 `ALREADY_OWNED_OR_PENDING` |
 | 5 | **Domain cap:** count of `owned` + `listed` + `pending_purchase` < `max_domains` (10) | 409 `DOMAIN_CAP_REACHED` |
 | 6 | **Live re-check:** run the `/check` logic now, with no cache. `availability` must be `available`, and a winner (or the pinned registrar) must be eligible | 409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE` |
@@ -52,22 +56,22 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
      - otherwise `state=unknown`, return **202** `PURCHASE_STATE_UNKNOWN`. The reconciler resolves it (§6).
 6. **Bookkeeping, in ONE DB transaction:**
    - `ledger_entries`: `registration`, `-charged_cents`, `counterparty=<registrar>`, `receipt_ref=<registrar>:<order_id>`, note `"1yr; privacy on; check <check_id>; approval <audit_id>"`.
-   - `domains`: `status=owned`, `registrar`, `buy_date`, `cost_cents`, `expiry_date` (from the registrar), `renewal_price_cents` (from the quote), **`renewals_used=0`**, **`drop_date = expiry_date + 1 year`** (a 29 Feb expiry gives 28 Feb the next year).
+   - `domains`: `status=owned`, `registrar`, `buy_date`, `cost_cents`, `expiry_date` (from the registrar), `renewal_price_cents` (from the quote), **`renewals_used=0`**, **`drop_date = expiry_date + 1 year`**, `category`, `registrar_api` (from the adapter) (a 29 Feb expiry gives 28 Feb the next year).
    - `receipts`: the invoice JSON, if available now; otherwise the reconciler fetches it later. Billing address redacted.
    - `purchases.state=succeeded`.
    - `deals` upsert, if `deal_id` was given.
 7. **Post-buy steps** (outside the money transaction; each result goes in the response; a failure here never undoes the purchase):
    1. `find_domain`: confirm `whois_privacy=1`. If it's 0, add a warning: Porkbun has no privacy-on endpoint after registration, so Dvir fixes it in the dashboard.
    2. `set_auto_renew(false)`, then verify.
-   3. If `auto_list`: run the `/list` logic with the configured lander (see `list.md`).
+   3. If `auto_list`: run the `/list` logic with the configured lander (see `list.md`). With `proposed_listing`, it also stores the mode and prices and appends a `listing_history` row (`source=buy`); the domain becomes `listed`.
       - If `API_ACCESS_DISABLED`, add a warning telling Dvir to turn on "Opt In All Domains" at porkbun.com/account/api, then call `/list` again.
 
 ## Response (201)
 ```json
-{ "domain":"promptinjectionaudit.com", "registrar":"porkbun", "order_id":"12345678",
+{ "domain":"examplecityroofing.com", "registrar":"porkbun", "order_id":"12345678",
   "charged":"$11.08", "renewal":"$11.08", "two_year":"$22.16", "expiry_date":"2027-10-04", "drop_date":"2028-10-04",
   "renewals_used":0, "poc_spent_after":"$11.08", "poc_remaining":"$488.92", "domains_owned":1,
-  "post_buy":{"privacy":"on","auto_renew":"off","lander":"afternic ns set"}, "warnings":[], "audit_id":"aud_…" }
+  "post_buy":{"privacy":"on","auto_renew":"off","lander":"afternic ns set","listing":{"mode":"bin","bin":399}}, "warnings":[], "audit_id":"aud_…" }
 ```
 
 ## Never

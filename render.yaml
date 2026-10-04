@@ -31,7 +31,15 @@ services:
       - key: APPROVAL_MAX_AGE_HOURS
         value: "72"
       - key: ENABLED_REGISTRARS
-        value: porkbun
+        value: porkbun,godaddy_manage   # godaddy_manage = NS/details only (D-001)
+      - key: GEO_BIN_MIN_CENTS
+        value: "29900"
+      - key: GEO_BIN_MAX_CENTS
+        value: "49900"
+      - key: HIGH_VALUE_MIN_BIN_CENTS
+        value: "250000"
+      - key: HIGH_VALUE_GUARD_MODES
+        value: bin
       # Secrets: values entered in the Render Dashboard only (sync: false). Never in git.
       - key: PORKBUN_API_KEY
         sync: false
@@ -42,6 +50,8 @@ services:
       - key: NAMECOM_USERNAME
         sync: false
       - key: NAMECOM_API_TOKEN
+        sync: false
+      - key: GODADDY_PAT            # scopes: domains.domain:read, domains.nameserver:update
         sync: false
       # Namecheap / GoDaddy / Spaceship / NameSilo keys: add the same way when their adapters exist (see .env.example)
 

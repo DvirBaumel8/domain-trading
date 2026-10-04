@@ -6,20 +6,21 @@
 Source: the official template `bulk_upload_sample_v3.xlsx`, copied in `templates/`, from https://www.afternic.com/forms/bulk_upload_sample_v3.xlsx.
 - **Header, exactly, in this order:**
   `Domain,Buy Now Price,Floor Price,Min Offer,Lease to Own,Max Lease Period,Sale Lander,Show Buy Now Option,Show Lease to Own Option,Show Make Offer Option,Hidden`
-- **Rows:** every domain with status `owned` or `listed` and a BIN set. Sorted by domain.
+- **Rows:** every domain with status `listed` (i.e. a listing mode is set). Sorted by domain.
+- **Cell values depend on the domain's listing mode.** The per-mode table in `listing-strategy.md` §6 is binding; the table below gives the general format rules.
 
 | Column | Value |
 |---|---|
 | `Domain` | `display_name` if set (CamelCase), else the domain |
-| `Buy Now Price` | Integer USD, no `$`, no thousands separator |
+| `Buy Now Price` | Integer USD, no `$`, no thousands separator. `0` in offer mode |
 | `Floor Price` | Integer USD, or blank |
-| `Min Offer` | `min_offer`, else `floor`, else blank. **Must be ≥ 20** |
-| `Lease to Own` | `Y` if `lto_max_months` is set **and** BIN is 495–5,000,000; otherwise `N` |
+| `Min Offer` | `min_offer` (in bin mode = BIN). **Must be ≥ 20** |
+| `Lease to Own` | `Y` only in hybrid with LTO on (BIN 495–5,000,000); otherwise `N` |
 | `Max Lease Period` | `lto_max_months` (2–60), or blank |
-| `Sale Lander` | `settings.afternic_sale_lander`, default `Custom Lander`. Allowed values: `Request Price`, `Buy It Now`, `Custom Lander`, `Cashparking` |
-| `Show Buy Now Option` | `Y` |
+| `Sale Lander` | By mode: bin → `Buy It Now`; offer/hybrid → `Custom Lander`. Allowed values: `Request Price`, `Buy It Now`, `Custom Lander`, `Cashparking` |
+| `Show Buy Now Option` | bin/hybrid `Y`, offer `N` |
 | `Show Lease to Own Option` | `Y` if LTO is on, else `N` |
-| `Show Make Offer Option` | `Y` |
+| `Show Make Offer Option` | offer/hybrid `Y`, **bin `N`** |
 | `Hidden` | `N` (for sale through the reseller network) |
 
 - **Sold or dropped domains are not in the file.** Afternic "Update" doesn't delete listings, so the response header `X-Manual-Delist` lists domains sold or dropped since the last export. Dvir removes those by hand.
@@ -34,18 +35,18 @@ Fields documented by Sedo: **Domain, Selling Option, For Sale (yes/no), Price, M
   ```json
   {"headers": ["<exact header 1>", "..."],
    "map": {"domain":"<header>","selling_option":"<header>","for_sale":"<header>","price":"<header>","min_price":"<header>","currency":"<header>","action":"<header>"},
-   "values": {"buy_now":"<exact value>","for_sale_yes":"<exact value>","usd":"USD","action_add":"<exact value>"}}
+   "values": {"buy_now":"<exact value>","make_offer":"<exact value>","for_sale_yes":"<exact value>","usd":"USD","action_add":"<exact value>"}}
   ```
   Dvir fills this in once, from the downloaded example file.
 - **Until the template exists, the endpoint returns 501** `SEDO_TEMPLATE_MISSING`, with instructions. It never guesses.
-- **Rows:** Buy Now (fixed price) = BIN; Minimum Price blank; Currency USD; For Sale yes; Action = add/update.
+- **Rows by mode** (`listing-strategy.md` §6): bin → Buy Now + BIN + no minimum; offer → Make Offer + minimum = `min_offer`; hybrid → Buy Now + BIN (default `sedo_hybrid_as=buy_now`) or Make Offer + price expectation + minimum. Currency USD; For Sale yes; Action = add/update.
 
 ## Tests (pass/fail)
 
 | ID | Case | Pass | Fail |
 |---|---|---|---|
 | E-1 | Header, byte for byte | Matches the Afternic v3 header string exactly | Any difference |
-| E-2 | Fixture with 3 domains (one with LTO and BIN 1995; one with BIN 300 and LTO requested; one sold) | 2 rows; LTO `Y` / `N` correct; sold domain excluded and listed in `X-Manual-Delist` | Wrong rows |
+| E-2 | Fixture with 4 domains (geo bin 399; trend hybrid 4999 + LTO 24; buzzword offer min 500; one sold) | 3 rows matching LX-1/LX-4/LX-2 exactly; sold domain excluded and listed in `X-Manual-Delist` | Wrong rows |
 | E-3 | `Min Offer` below 20 in the DB | The domain is skipped and reported in `X-Export-Warnings` (DB validation should prevent this anyway) | A row with < 20 |
 | E-4 | Price formatting | `1995`, not `$1,995.00` | Any symbol or separator |
 | E-5 | Round trip | Parse the CSV with a strict RFC 4180 parser: 11 columns on every row | Parse error |

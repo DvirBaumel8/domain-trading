@@ -16,7 +16,7 @@ Answer any portfolio or money question on request. Buy a domain at the cheapest 
 | GET | `/health` | none | here §7 |
 | GET | `/check?domain=` | READ | `check.md` |
 | POST | `/buy` | WRITE | `buy.md` |
-| POST | `/list/{domain}` | WRITE | `list.md` |
+| POST | `/list/{domain}` | WRITE | `list.md` + `listing-strategy.md` (modes bin/offer/hybrid, guards) |
 | GET | `/export/afternic.csv`, `/export/sedo.csv` | READ | `export-csv.md` |
 | POST | `/sold/{domain}` | WRITE | `sold.md` |
 | GET | `/report` | READ | `report.md` |
@@ -57,15 +57,16 @@ All money is stored as **integer cents (USD)**. All timestamps are `timestamptz`
 
 | Table | Key columns | Rules |
 |---|---|---|
-| `domains` (portfolio) | `id`, `domain` (unique, lowercase), `deal_id` (nullable, `D-NNN`), `registrar`, `status` (`pending_purchase`, `owned`, `listed`, `sold`, `dropped`), `buy_date`, `cost_cents`, `expiry_date` (= next renewal date), `renewal_price_cents`, **`renewals_used` (0 or 1; CHECK 0..1)**, **`drop_date`**, `bin_cents`, `floor_cents`, `min_offer_cents`, `lto_max_months`, `display_name` (CamelCase), `lander`, `lander_ns` (text[]), `lander_set_at`, `sold_at`, timestamps | **Max-one-renewal rule:** at purchase, `renewals_used = 0` and `drop_date = expiry_date + 1 year`. `drop_date` is never pushed later |
+| `domains` (portfolio) | `id`, `domain` (unique, lowercase), `deal_id` (nullable, `D-NNN`), `registrar`, `status` (`pending_purchase`, `owned`, `listed`, `sold`, `dropped`), `buy_date`, `cost_cents`, `expiry_date` (= next renewal date), `renewal_price_cents`, **`renewals_used` (0 or 1; CHECK 0..1)**, **`drop_date`**, **`category`** (`geo`, `trend`, `b2b`, `collision`, `regulation`, `buzzword`, `other`; NOT NULL once owned), **`listing_mode`** (`bin`, `offer`, `hybrid`, or NULL = not listed), `bin_cents`, `floor_cents`, `min_offer_cents` (CHECK ≥ 2000 when set), `lto_max_months`, `display_name` (CamelCase), `lander`, `lander_ns` (text[]), `lander_set_at`, `ns_verified_at`, **`registrar_api`** (`full`, `manage`, `none`), `sold_at`, timestamps | **Max-one-renewal rule:** at purchase, `renewals_used = 0` and `drop_date = expiry_date + 1 year`. `drop_date` is never pushed later |
 | `ledger_entries` | `id`, `occurred_on`, `domain_id`, `deal_id`, `type` (`registration`, `renewal`, `fee`, `commission`, `sale`, `payout_fee`, `refund`, `tool`, `ai`, `adjustment`), `amount_cents` (signed: negative = money out), `currency`, `counterparty`, `receipt_ref`, `note`, `audit_id` | **Append-only:** a DB trigger rejects UPDATE and DELETE. Corrections are reversing rows |
+| `listing_history` | `id`, `domain_id`, `at`, `source` (`buy`, `import`, `list`), `category`, `mode`, `bin_cents`, `floor_cents`, `min_offer_cents`, `lto_max_months`, `lander`, `override`, `override_reason`, `approval_text`, `approval_at`, `audit_id` | **Append-only** (trigger). One row per accepted listing, mode, price or category change (`listing-strategy.md` §5) |
 | `quotes` | `id`, `check_id`, `domain`, `registrar`, `quoted_at`, `available`, `premium`, `first_year_cents`, `renewal_cents`, `privacy_cents_per_year`, `two_year_cents`, `eligible`, `exclusion_reason`, `raw` (jsonb, secrets stripped) | Every `/check` and `/buy` stores its full comparison |
 | `purchases` | `id`, `idempotency_key` (unique), `request_hash`, `domain`, `state` (`created`, `register_sent`, `succeeded`, `failed`, `unknown`), `dry_run`, `registrar`, `check_id`, `charged_cents`, `order_id`, `max_price_cents`, `approval_text`, `approval_at`, `response` (jsonb), timestamps | One row per `/buy` call. A unique partial index allows one `created`/`register_sent`/`succeeded` row per domain |
 | `receipts` | `id`, `purchase_id`, `registrar`, `order_id`, `raw` (jsonb, billing address redacted), `fetched_at` | The `ledger_entries.receipt_ref` of a registration = `<registrar>:<order_id>` |
 | `deals` | `id` (`D-NNN`), `domain`, `strategy`, `status_note`, `created_at` | Created or updated when `/buy` passes `deal_id` |
 | `audit_log` | `id`, `at`, `token_id`, `scope`, `method`, `path`, `idempotency_key`, `approval_text`, `approval_at`, `request` (jsonb, redacted), `status_code`, `result_summary`, `client_ip` | **Every** POST, including dry runs and refusals. Append-only (trigger) |
 | `api_tokens` | `id`, `name`, `scope` (`read`, `write`), `token_sha256`, `created_at`, `revoked_at`, `last_used_at` | Plain tokens are shown once, when created by the admin command |
-| `settings` | `poc_cap_cents` (default 50000), `max_domains` (10), `approval_max_age_hours` (72), `lander_target` (`afternic`), `allowed_registrars` | Changed only by Dvir's admin command or a migration, never via the API |
+| `settings` | `poc_cap_cents` (default 50000), `max_domains` (10), `approval_max_age_hours` (72), `lander_target` (`afternic`), `allowed_registrars`, `geo_bin_min_cents` (29900), `geo_bin_max_cents` (49900), `high_value_categories`, `high_value_min_bin_cents` (250000), `high_value_guard_modes` (`["bin"]`), `sedo_hybrid_as` (`buy_now`) | Changed only by Dvir's admin command or a migration, never via the API |
 
 ## 5. Registrar adapter interface
 ```
@@ -78,7 +79,10 @@ register(domain, quote, idem_key, dry_run, privacy=True, auto_renew=False)
 find_domain(domain)               -> {in_account, expiry_date, whois_privacy, auto_renew, api_access, ns} | None
 set_nameservers(domain, ns[])     ; get_nameservers(domain) -> set
 set_auto_renew(domain, on)        ; get_receipt(order_id) -> raw
-capabilities                      -> {custom_ns, prepaid, free_privacy, afternic_fast_transfer, sandbox}
+capabilities                      -> {can_register, can_quote, can_manage_ns, custom_ns, prepaid, free_privacy,
+                                      afternic_fast_transfer, sandbox}
+# registrar_api on a domain: full = Porkbun-style (quote+register+manage); manage = GoDaddy PAT
+# (NS/details only, no register/quote for accounts <50 domains); none = manual (NS verified via public DNS)
 ```
 Porkbun mapping, all verified in the official docs (snapshot in `system/specs/evidence/porkbun-docs-2026-10-03/` on Gavriel's box; live at https://porkbun.com/llms/domain):
 

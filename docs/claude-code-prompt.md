@@ -34,9 +34,10 @@ Work in phases. **At the end of each phase, stop.** Show me the test output (cou
 - `POST /buy` exactly as in `docs/specs/buy.md`: check order, `dry_run`, locks, purchase states, retries with the same registrar idempotency key, single-transaction bookkeeping, post-buy steps as warnings, and the reconciler at startup and every 10 min.
 - Tests: B-1 to B-25, CAP-*, ID-2/ID-4, DR-*, RN-2, RN-6.
 
-**Phase 4: list, exports, sold, reports.**
-- `POST /list/{domain}`, `GET /export/afternic.csv` (header byte-exact), `GET /export/sedo.csv` (template-driven, 501 without the template), `POST /sold/{domain}`, `/report` (json + md), `/portfolio`, `/ledger` (+csv), `/deals/{id}`, `/audit`, the `app.admin import-domain` command for manual buys, and the daily job that marks domains dropped.
-- Tests: L-1 to L-9, E-1 to E-8, S-1 to S-8, R-1 to R-12, IM-1 to IM-3, RN-4/RN-5, AU-8 (secret-leak grep over all responses and logs).
+**Phase 4: listing strategy, list, exports, sold, reports.**
+- Listing strategy exactly as `docs/specs/listing-strategy.md`: `category` on domains, modes `bin`/`offer`/`hybrid`, validation V1–V10 with the geo [$299, $499] and high-value ($2,500) guards from `settings`, overrides only with `approval_ref`, and the append-only `listing_history`. `/buy` validates `proposed_listing` **before** any registrar call.
+- `POST /list/{domain}` (including `dry_run`, the manual-NS path for `registrar_api=none`, and public-DNS NS verification), `GET /export/afternic.csv` (header byte-exact; cells per mode, §6), `GET /export/sedo.csv` (template-driven, 501 without the template), `POST /sold/{domain}`, `/report` (json + md), `/portfolio`, `/ledger` (+csv), `/deals/{id}`, `/audit`, the `app.admin import-domain` command for manual buys (Porkbun, and GoDaddy via PAT or `--manual`; D-001 is at GoDaddy), and the daily job that marks domains dropped.
+- Tests: LS-1 to LS-14, LG-1 to LG-17, LH-1 to LH-4, LX-1 to LX-7, L-1 to L-9, L-11 to L-13, E-1 to E-8, S-1 to S-8, R-1 to R-12, IM-1 to IM-3, IM-5 to IM-11, RN-4/RN-5, AU-8 (secret-leak grep over all responses and logs).
 
 **Phase 5: contract tests (Gate G2).**
 - Porkbun contract tests against Porkbun's mock server, plus the sandbox end-to-end B-26 (skipped when `PORKBUN_SANDBOX_*` is unset).
@@ -47,7 +48,7 @@ Work in phases. **At the end of each phase, stop.** Show me the test output (cou
 - Write `docs/runbook.md`: create tokens, set env secrets, the G3 live checklist (import D-001 with `app.admin import-domain`, IM-4; CK-12; `/buy` with `dry_run:true` on a free test .com; confirm balance and invoices are unchanged), and the restore drill (BK-3/BK-5).
 - Do **not** deploy yourself.
 
-**Phase 7 (optional): backup cron.**
+**Phase 7 (optional): backup cron, plus the thin CLI (`docs/specs/cli.md`, tests CLI-1 to CLI-4) if I ask for it.**
 - `app/jobs/export_backup.py` and `import_backup.py`.
 - Tests: BK-1 to BK-4.
 

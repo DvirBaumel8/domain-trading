@@ -20,19 +20,24 @@ You are building this service with **Dvir** (a senior backend developer, short o
 1. **Every purchase requires Dvir's explicit chat approval.** Gavriel passes it as `approval_ref {text, approved_at}`. The server validates it: present, ≤72 h old, not in the future, names the domain. The server **can't** prove a human said it; that trust boundary is accepted and documented.
 2. **Caps live on the server:** $500 POC cap, 10 domains, per-call `max_price`. Caps change only through the admin command or a migration, **never through the API**.
 3. **Max one renewal per domain.** Prices are compared on first year + one renewal. `renewals_used` is 0..1 (DB CHECK). `drop_date = expiry + 1 year`. 1-year registrations only.
-4. **Never Cloudflare Registrar** (no third-party nameservers, so no for-sale lander). Never premium or aftermarket names, auctions or backorders.
-5. **Never top up a registrar balance**, and never call any top-up endpoint. The prepaid balance is a second spending limit.
-6. **Registrar keys exist only as server env secrets.** They are never logged, never returned, never in git, and never in test fixtures (use fake values).
-7. **Every POST is idempotent** (`Idempotency-Key` required) and **audited** (`audit_log`, append-only). `ledger_entries` is append-only too; corrections are reversing rows.
-8. **No LLM calls inside the service.** Zero runtime tokens.
-9. **The service never sends email or chat and never contacts buyers.** Gavriel talks to Dvir.
-10. **Bots never add code to this repo.** Dvir (with you, Claude Code) writes the code. Gavriel only pushes spec docs that Dvir has reviewed. The optional backup cron pushes data only, to the `data-backup` branch.
-11. **No live registrar `create` call without Dvir present** and without his chat approval for that domain. Tests use mocks, Porkbun's mock server, or Porkbun's sandbox (`pk1_sb_` keys).
+4. **Listing strategy by category** (`docs/specs/listing-strategy.md`):
+   - Geo names: strict Buy It Now in [$299, $499], with no negotiation.
+   - Trend, B2B and other high-value names: `offer` or `hybrid` only. They are never a plain BIN below $2,500 unless there is an explicit override **plus** Dvir's `approval_ref`.
+   - Every domain has a `category`. Every mode or price change is validated, audited and appended to `listing_history`.
+5. **Never Cloudflare Registrar** (no third-party nameservers, so no for-sale lander). Never premium or aftermarket names, auctions or backorders.
+6. **Never top up a registrar balance**, and never call any top-up endpoint. The prepaid balance is a second spending limit.
+7. **Registrar keys exist only as server env secrets.** They are never logged, never returned, never in git, and never in test fixtures (use fake values).
+8. **Every POST is idempotent** (`Idempotency-Key` required) and **audited** (`audit_log`, append-only). `ledger_entries` is append-only too; corrections are reversing rows.
+9. **No LLM calls inside the service.** Zero runtime tokens.
+10. **The service never sends email or chat and never contacts buyers.** Gavriel talks to Dvir.
+11. **Bots never add code to this repo.** Dvir (with you, Claude Code) writes the code. Gavriel only pushes spec docs that Dvir has reviewed. The optional backup cron pushes data only, to the `data-backup` branch.
+12. **No live registrar `create` call without Dvir present** and without his chat approval for that domain. Tests use mocks, Porkbun's mock server, or Porkbun's sandbox (`pk1_sb_` keys).
 
 ## Decisions log (IDT, all 3 Oct 2026)
 - 18:58: the architecture is an **API service + Postgres on Render**, with READ/WRITE bearer tokens and server-side caps. This replaces the earlier local-CLI design; a thin CLI is optional for v1.1.
 - Max one renewal per domain, held 2 years at most.
-- 19:01: Dvir bought D-001 (promptinjectionaudit.com) **by hand** at Porkbun. The service imports manual buys with an admin command (`report.md` §Import).
+- 19:01 / 19:17: Dvir bought D-001 (promptinjectionaudit.com) **by hand at GoDaddy** (not Porkbun) on 2026-10-03; price and order number pending. The service imports manual buys with an admin command (`report.md` §Import). GoDaddy is a **management-only** adapter: it can change NS with a PAT, since the account has ≥1 domain, but it can't check availability or buy (that needs 50+ domains). Fallback: Dvir changes NS by hand.
+- 19:17: **listing strategy**: listing modes `bin` / `offer` / `hybrid` per category, with server guards. Dvir's `dt list … --bin/--offer` wording maps to `POST /list` fields; a thin CLI is optional (`docs/specs/cli.md`). D-001 is category trend, mode hybrid, BIN $1,995 / floor $950 (Dvir may raise the BIN).
 - Multi-registrar support via an adapter interface; the cheapest **first year + one renewal** wins; Porkbun is the first adapter.
 - Default lander is **Afternic** (`ns1/ns2.afternic.com`). **Dan.com was retired on 27 Jun 2025** and merged into Afternic. Sedo is a second listing (no Sedo nameservers by default).
 - Marketplace uploads stay manual: CSV exports, Dvir uploads weekly. There is no marketplace API.
@@ -60,7 +65,9 @@ You are building this service with **Dvir** (a senior backend developer, short o
 | `docs/specs/00-architecture.md` | Endpoints, data model, adapter interface, Porkbun mapping, auth, errors, hosting, risks |
 | `docs/specs/check.md` | `GET /check`: availability + price comparison |
 | `docs/specs/buy.md` | `POST /buy`: checks, purchase flow, reconciler |
-| `docs/specs/list.md` | `POST /list/{domain}`: lander nameservers |
+| `docs/specs/list.md` | `POST /list/{domain}`: lander nameservers, the manual-NS fallback, DNS verification |
+| `docs/specs/listing-strategy.md` | Categories, modes (bin/offer/hybrid), guards, Afternic/Sedo support per mode, export mapping, LS/LG/LH/LX tests |
+| `docs/specs/cli.md` | Optional thin `dt` CLI with Dvir's flags |
 | `docs/specs/export-csv.md` | Afternic and Sedo exports |
 | `docs/specs/sold.md` | `POST /sold/{domain}` |
 | `docs/specs/report.md` | `/report`, `/portfolio`, `/ledger`, `/deals`, `/audit`, `/health` |
@@ -75,7 +82,7 @@ You are building this service with **Dvir** (a senior backend developer, short o
 1. Skeleton, DB models, migrations (append-only triggers, CHECK constraints), auth, audit, idempotency middleware, `/health`. Then G0/G1 for these.
 2. Registrar adapter base + Porkbun adapter + selection logic + `/check`. Then G0/G1.
 3. `/buy` with all checks, the locks and the reconciler. Then G1 (B-1–B-25, CAP-*, ID-*, DR-*).
-4. `/list`, exports, `/sold`, `/report` and the read endpoints. Then G1.
+4. Listing strategy (`listing-strategy.md`: categories, modes, guards, `listing_history`), then `/list`, exports per mode, `/sold`, `/report`, the read endpoints, and `import-domain` (including GoDaddy `--manual`). Then G1.
 5. Porkbun mock-server and sandbox contract tests. Then **G2**.
 6. Deploy to Render (after Dvir approves the cost), create the tokens, run the live read-only checks. Then **G3**.
 7. First real API buy (the next approved deal; D-001 was bought by hand on 3 Oct and is imported at G3 with `app.admin import-domain`), only with Dvir present and his chat approval. Then **G4**. Post-acquisition checks follow (G5).

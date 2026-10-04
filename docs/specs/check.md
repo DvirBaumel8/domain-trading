@@ -21,7 +21,8 @@
    - not USD;
    - the renewal price is missing;
    - the adapter errored;
-   - the registrar isn't in `settings.allowed_registrars`.
+   - the registrar isn't in `settings.allowed_registrars`;
+   - the adapter is management-only (`can_quote`/`can_register` false, e.g. GoDaddy for an account with <50 domains): `NO_AVAILABILITY_ACCESS`.
 6. **Pick the winner:** the lowest `two_year_cents` among eligible registrars. Tie-break, in order:
    1. prepaid payment model;
    2. Afternic Fast Transfer verified;
@@ -35,6 +36,7 @@
 9. **Cache:** 60 s per domain, to respect Porkbun's 10 checks per 10 s.
 
 ## Response (200)
+Example from before D-001 was bought (it is now registered, so a live check returns `taken`).
 ```json
 { "domain":"promptinjectionaudit.com", "check_id":"chk_…", "checked_at":"2026-10-04T09:12:03+03:00",
   "availability":"available", "rdap":"not_registered",

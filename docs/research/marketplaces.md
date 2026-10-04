@@ -36,3 +36,16 @@ Checked 3 Oct 2026, 18:38–18:58 IDT.
 - With a fixed price (Buy Now), Sedo doesn't allow a Minimum Price: https://sedo.com/services/s_priceoption3.php3?language=e
 - **The exact header strings and allowed values are UNVERIFIED**, because the example file is inside the logged-in account.
 - **One-time step for Dvir:** download the example file and save it as `templates/sedo_example.csv` (or `.xlsx`). `dt export-csv` reads the header row from that file. It refuses to write a Sedo file until the template exists (see `docs/specs/export-csv.md`).
+
+
+## Listing modes (added 3 Oct 2026, 19:26 IDT)
+How Afternic and Sedo support strict Buy Now, make-offer-only and hybrid listings, with sources, the API-vs-bulk-CSV question, and the column mapping per mode: **`../specs/listing-strategy.md` §3 and §6** (facts A1–A8 and S1–S6).
+
+Short version:
+- **Afternic floor = auto-accept** by a broker, with no call to the seller.
+- **No BIN** means less network exposure and no Premium / Fast Transfer reach.
+- Make Offer on the Custom Lander exists (since Aug 2024).
+- There is **no seller listing API**, so listings go by bulk CSV or the dashboard.
+- **Sedo:** a fixed price can't have a minimum offer, but buyers may still send lower offers, which the seller can ignore. Make Offer listings can have a minimum offer (lower offers are auto-rejected). There is no floor. MLS distributes Buy Now listings only.
+- The Sedo API has exact mode fields (`price`, `minprice`, `fixedprice`) but needs the account password, so it isn't used in v1.
+- **Unverified:** whether Afternic accepts Min Offer = BIN (our geo "no negotiation" guard), and whether a blank cell in an Update upload clears an old value.
