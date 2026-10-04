@@ -49,7 +49,7 @@ const Query = z.object({ domain: z.string().min(1) });
 export function registerCheck(app: FastifyInstance, service: CheckService): void {
   app.get('/check', async (req) => {
     const q = Query.safeParse(req.query);
-    if (!q.success) throw new AppError(422, 'VALIDATION_ERROR', 'The domain query parameter is required');
+    if (!q.success) throw new AppError(400, 'VALIDATION_ERROR', 'The domain query parameter is required');
     return presentCheck(await service.check(normalizeDomain(q.data.domain)));
   });
 }

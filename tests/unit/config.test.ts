@@ -12,6 +12,14 @@ describe('loadConfig', () => {
     expect(c.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
+  it('PORKBUN_BASE_URL must be https outside test', () => {
+    expect(() => loadConfig(testEnv({ APP_ENV: 'development', PORKBUN_BASE_URL: 'http://evil.example' }))).toThrow(
+      'Invalid environment: PORKBUN_BASE_URL must be https');
+    expect(() => loadConfig(testEnv({ APP_ENV: 'development', PORKBUN_BASE_URL: 'https://api.porkbun.com/api/json/v3' }))).not.toThrow();
+    expect(() => loadConfig(testEnv({ APP_ENV: 'development' }))).not.toThrow();
+    expect(() => loadConfig(testEnv({ APP_ENV: 'test', PORKBUN_BASE_URL: 'http://localhost:1' }))).not.toThrow();
+  });
+
   it('rejects a missing DATABASE_URL', () => {
     const env = testEnv();
     delete env.DATABASE_URL;

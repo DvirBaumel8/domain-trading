@@ -21,6 +21,15 @@ async function errOf(p: Promise<unknown>): Promise<RegistrarError> {
 }
 
 describe('PorkbunAdapter.quote', () => {
+  it('nulls prices above the Postgres integer range instead of throwing', async () => {
+    mswServer.use(http.post(`${PORKBUN_BASE}/domain/checkDomain/:d`, async ({ request }) => {
+      await record(request);
+      return HttpResponse.json(checkDomainBody({ price: '99999999.99' }));
+    }));
+    const q = await pb().quote('examplecityroofing.com');
+    expect(q.firstYearCents).toBeNull();
+  });
+
   it('parses decimal-string prices into cents; privacy is free', async () => {
     mswServer.use(http.post(`${PORKBUN_BASE}/domain/checkDomain/:d`, async ({ request }) => {
       await record(request);

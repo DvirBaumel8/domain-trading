@@ -137,13 +137,13 @@ describe('GET /check', () => {
     expect(stored).toHaveLength(2);
   });
 
-  it('CK-10: .net → 422 TLD_NOT_SUPPORTED; subdomain → 422 DOMAIN_INVALID; missing param → 422', async () => {
+  it('CK-10: .net → 422 TLD_NOT_SUPPORTED; subdomain → 422 DOMAIN_INVALID; missing param → 400', async () => {
     app = await makeApp({ adapters: [new FakeAdapter('porkbun')], rdap: rdapFree });
     const { auth } = await issueToken('read');
     expect((await check('example.net', auth)).json().error.code).toBe('TLD_NOT_SUPPORTED');
     expect((await check('www.example.com', auth)).json().error.code).toBe('DOMAIN_INVALID');
     const res = await app.inject({ method: 'GET', url: '/check', headers: auth });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     expect(res.json().error.code).toBe('VALIDATION_ERROR');
   });
 

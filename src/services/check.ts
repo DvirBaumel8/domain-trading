@@ -66,8 +66,10 @@ export class CheckService {
         .execute();
     }
 
-    for (const [k, v] of this.cache) if (v.expires <= now) this.cache.delete(k);
-    this.cache.set(domain, { expires: now + CACHE_MS, result });
+    if (opts.useCache !== false) {
+      for (const [k, v] of this.cache) if (v.expires <= now) this.cache.delete(k);
+      this.cache.set(domain, { expires: now + CACHE_MS, result });
+    }
     return result;
   }
 

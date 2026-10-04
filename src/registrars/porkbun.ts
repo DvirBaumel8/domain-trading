@@ -6,6 +6,9 @@ import {
 } from './types.js';
 
 export const PORKBUN_DEFAULT_BASE = 'https://api.porkbun.com/api/json/v3';
+/** quotes.*_cents are Postgres integer columns. */
+const PG_INT_MAX = 2_147_483_647;
+
 const NAME = 'porkbun';
 
 type Json = Record<string, unknown>;
@@ -107,11 +110,12 @@ export class PorkbunAdapter implements RegistrarAdapter {
     const r = CheckResponse.safeParse(body.response);
     if (!r.success) throw this.bad('Unexpected checkDomain shape');
     try {
+      const cap = (c: number | null) => (c !== null && c > PG_INT_MAX ? null : c);
       return {
         available: r.data.avail === 'yes',
         premium: r.data.premium === 'yes',
-        firstYearCents: r.data.price !== undefined ? usdStringToCents(r.data.price) : null,
-        renewalCents: r.data.additional?.renewal ? usdStringToCents(r.data.additional.renewal.price) : null,
+        firstYearCents: cap(r.data.price !== undefined ? usdStringToCents(r.data.price) : null),
+        renewalCents: cap(r.data.additional?.renewal ? usdStringToCents(r.data.additional.renewal.price) : null),
         privacyCentsPerYear: 0,
         currency: 'USD',
         minDurationYears: r.data.minDuration ?? null,
