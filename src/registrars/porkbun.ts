@@ -10,6 +10,8 @@ const NAME = 'porkbun';
 
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => v !== null && typeof v === 'object' && !Array.isArray(v);
+const normNs = (n: string) => n.trim().toLowerCase().replace(/\.$/, '');
+const flag = (v: unknown): boolean | null => (v === 1 || v === '1' ? true : v === 0 || v === '0' ? false : null);
 
 const CheckResponse = z.object({
   avail: z.enum(['yes', 'no']),
@@ -132,10 +134,86 @@ export class PorkbunAdapter implements RegistrarAdapter {
   }
 
   // Implemented in Task 3.
-  async register(_d: string, _i: RegisterInput): Promise<RegisterSuccess | RegisterDryRun> { throw new Error('not implemented'); }
-  async findDomain(_d: string): Promise<DomainInfo | null> { throw new Error('not implemented'); }
-  async setNameservers(_d: string, _ns: string[]): Promise<void> { throw new Error('not implemented'); }
-  async getNameservers(_d: string): Promise<Set<string>> { throw new Error('not implemented'); }
-  async setAutoRenew(_d: string, _on: boolean): Promise<void> { throw new Error('not implemented'); }
-  async getReceipt(_o: string): Promise<unknown> { throw new Error('not implemented'); }
+  async register(domain: string, input: RegisterInput): Promise<RegisterSuccess | RegisterDryRun> {
+    if (!Number.isInteger(input.costCents) || input.costCents <= 0) {
+      throw new RegistrarError(NAME, 'INVALID_COST', 'cost must be a positive integer number of cents');
+    }
+    const body: Json = { cost: input.costCents, agreeToTerms: 'yes', whoisPrivacy: true };
+    if (input.dryRun) body.dryRun = true;
+    const r = await this.call('POST', `/domain/create/${encodeURIComponent(domain)}`, {
+      body, idempotencyKey: input.idempotencyKey,
+    });
+    const isDry = r.dryRun === true;
+    if (input.dryRun !== isDry) {
+      // Asked for a dry run and got a real answer (or vice versa): a charge may have happened.
+      throw this.bad(input.dryRun ? 'Dry run answered as a real registration' : 'Registration answered as a dry run');
+    }
+    if (isDry) {
+      if (r.duration !== 1) {
+        throw new RegistrarError(NAME, 'MULTI_YEAR_TERM', `Registry minimum term is ${String(r.duration)} years; only 1-year registrations are allowed`);
+      }
+      return {
+        kind: 'dry_run',
+        wouldSucceed: r.wouldSucceed === true,
+        costCents: typeof r.cost === 'number' ? r.cost : input.costCents,
+        durationYears: 1,
+        balanceCents: typeof r.balance === 'number' ? r.balance : null,
+        shortfallCents: typeof r.shortfall === 'number' ? r.shortfall : null,
+        withinMonthlySpendLimit: typeof r.withinMonthlySpendLimit === 'boolean' ? r.withinMonthlySpendLimit : null,
+        raw: r,
+      };
+    }
+    if ((typeof r.orderId !== 'number' && typeof r.orderId !== 'string') || typeof r.cost !== 'number') {
+      throw this.bad('Registration success without orderId/cost');
+    }
+    return {
+      kind: 'registered',
+      orderId: String(r.orderId),
+      chargedCents: r.cost,
+      balanceCents: typeof r.balance === 'number' ? r.balance : null,
+      raw: r,
+    };
+  }
+
+  async findDomain(domain: string): Promise<DomainInfo | null> {
+    let r: Json;
+    try {
+      r = await this.call('GET', `/domain/get/${encodeURIComponent(domain)}`);
+    } catch (e) {
+      if (e instanceof RegistrarError && e.code === 'DOMAIN_NOT_FOUND') return null; // S7: only this code means "not ours"
+      throw e;
+    }
+    const d = isObj(r.domain) ? r.domain : {};
+    const exp = typeof d.expireDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d.expireDate) ? d.expireDate.slice(0, 10) : null;
+    let ns: string[] | null = null;
+    try {
+      ns = [...(await this.getNameservers(domain))].sort();
+    } catch (e) {
+      if (!(e instanceof RegistrarError && e.code === 'API_ACCESS_DISABLED')) throw e;
+    }
+    return { expiryDate: exp, whoisPrivacy: flag(d.whoisPrivacy), autoRenew: flag(d.autoRenew), apiAccess: flag(d.apiAccess), ns };
+  }
+
+  async setNameservers(domain: string, ns: string[]): Promise<void> {
+    await this.call('POST', `/domain/updateNs/${encodeURIComponent(domain)}`, { body: { ns } });
+  }
+
+  async getNameservers(domain: string): Promise<Set<string>> {
+    const r = await this.call('POST', `/domain/getNs/${encodeURIComponent(domain)}`);
+    if (!Array.isArray(r.ns)) throw this.bad('getNs without ns array');
+    return new Set(r.ns.filter((n): n is string => typeof n === 'string').map(normNs));
+  }
+
+  async setAutoRenew(domain: string, on: boolean): Promise<void> {
+    const r = await this.call('POST', `/domain/updateAutoRenew/${encodeURIComponent(domain)}`, { body: { status: on ? 'on' : 'off' } });
+    const results = isObj(r.results) ? r.results : {};
+    const mine = results[domain];
+    if (isObj(mine) && mine.status !== 'SUCCESS') {
+      throw new RegistrarError(NAME, 'AUTO_RENEW_UPDATE_FAILED', 'Porkbun did not change auto-renew for this domain');
+    }
+  }
+
+  async getReceipt(orderId: string): Promise<unknown> {
+    return this.call('GET', `/account/invoice/${encodeURIComponent(orderId)}`);
+  }
 }
