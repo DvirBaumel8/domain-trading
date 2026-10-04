@@ -15,25 +15,28 @@
    - For GoDaddy (if enabled), the renewal is the **standard** manual-renewal rate, because the service keeps auto-renew off.
 5. **Mark each registrar eligible or not** (`docs/research/registrars.md`). A registrar is excluded if any of these holds:
    - no API or no adapter;
-   - no custom nameservers (so Cloudflare is always excluded);
-   - not available;
-   - premium;
-   - not USD;
-   - the renewal price is missing;
-   - the adapter errored;
-   - the registrar isn't in `settings.allowed_registrars`;
-   - the adapter is management-only (`can_quote`/`can_register` false, e.g. GoDaddy for an account with <50 domains): `NO_AVAILABILITY_ACCESS`.
+   - no custom nameservers (so Cloudflare is always excluded): `NO_CUSTOM_NAMESERVERS`;
+   - the adapter is management-only (`can_quote`/`can_register` false, e.g. GoDaddy for an account with <50 domains): `NO_AVAILABILITY_ACCESS`;
+   - the registrar isn't in `settings.allowed_registrars`: `REGISTRAR_NOT_ALLOWED`;
+   - the adapter errored: `ADAPTER_ERROR` (the quote carries `error_code`);
+   - not available: `NOT_AVAILABLE`;
+   - premium: `PREMIUM`;
+   - not USD: `NOT_USD`;
+   - the registry's minimum term is not 1 year: `MULTI_YEAR_MINIMUM` (founder rule 3);
+   - the first-year price is missing: `NO_FIRST_YEAR_PRICE`;
+   - the renewal price is missing: `NO_RENEWAL_PRICE`.
+   - The first three are known before quoting, so those adapters are **not called** (Dvir, 5 Oct 2026).
 6. **Pick the winner:** the lowest `two_year_cents` among eligible registrars. Tie-break, in order:
    1. prepaid payment model;
    2. Afternic Fast Transfer verified;
    3. adapter order `porkbun > dynadot > namecom > others`.
 7. **Overall availability:**
-   - `available` if RDAP says 404 and ≥1 adapter says available.
-   - `taken` if RDAP says 200 **or** any adapter says not available.
-   - Otherwise `unknown`.
-   - **Any disagreement means `unknown`, and the response shows no winner.**
+   - **Any disagreement means `unknown`, and the response shows no winner.** Disagreement = adapters disagree among themselves, or RDAP says 200 while an adapter says available, or RDAP says 404 while an adapter says not available (Dvir, 5 Oct 2026).
+   - Otherwise `taken` if RDAP says 200 **or** any adapter says not available.
+   - Otherwise `available` if RDAP says 404 and ≥1 adapter says available.
+   - Otherwise `unknown`. Only `available` shows a winner.
 8. **Store** every quote (`quotes`) under a new `check_id`.
-9. **Cache:** 60 s per domain, to respect Porkbun's 10 checks per 10 s.
+9. **Cache:** 60 s per domain, to respect Porkbun's 10 checks per 10 s. A cached answer is replayed whole (same `check_id`). `/buy`'s live re-check bypasses the cache and does not write to it.
 
 ## Response (200)
 Example from before D-001 was bought (it is now registered, so a live check returns `taken`).

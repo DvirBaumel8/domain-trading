@@ -74,9 +74,11 @@ quote(domain)                     -> Quote{available, premium, first_year_cents,
                                            privacy_cents_per_year, currency, raw}
 account_state()                   -> {balance_cents|None, spend_limit_remaining_cents|None,
                                       auto_topup_enabled|None}
-register(domain, quote, idem_key, dry_run, privacy=True, auto_renew=False)
-                                  -> {order_id, charged_cents, expiry_date, raw} | DryRun{would_succeed,...}
-find_domain(domain)               -> {in_account, expiry_date, whois_privacy, auto_renew, api_access, ns} | None
+register(domain, cost_cents, idem_key, dry_run)   # privacy always on; 1-year only; no auto-renew field (set after)
+                                  -> {order_id, charged_cents, balance_cents, raw} | DryRun{would_succeed,...}
+                                  # expiry_date is read afterwards with find_domain (Porkbun's create returns none)
+find_domain(domain)               -> {expiry_date, whois_privacy, auto_renew, api_access, ns|None} | None
+                                  # None = definitely not in our account (only a definite DOMAIN_NOT_FOUND); any other error throws
 set_nameservers(domain, ns[])     ; get_nameservers(domain) -> set
 set_auto_renew(domain, on)        ; get_receipt(order_id) -> raw
 capabilities                      -> {can_register, can_quote, can_manage_ns, custom_ns, prepaid, free_privacy,
@@ -89,14 +91,14 @@ Porkbun mapping, all verified in the official docs (snapshot in `system/specs/ev
 | Method | Porkbun endpoint |
 |---|---|
 | `quote` | `POST /domain/checkDomain/{d}` (`avail`, `price`, `regularPrice`, `premium`, `additional.renewal.price`) |
-| `account_state` | `GET /account/balance` + `GET /account/apiSettings` + `GET /account/autoTopup` |
+| `account_state` | `GET /account/balance` + `GET /account/apiSettings` (its `settings.autoTopup` gives `auto_topup_enabled`; Dvir, 5 Oct 2026: the code never calls any top-up path, B-25) |
 | `register` | `POST /domain/create/{d}` with `cost` (integer cents, must equal the quote), `agreeToTerms:"yes"`, `whoisPrivacy:true`, optional `dryRun:true`, and the `Idempotency-Key` header |
 | `find_domain` | `GET /domain/get/{d}` |
 | `set_nameservers` / `get_nameservers` | `POST /domain/updateNs/{d}` / `getNs` (compare as a **set**) |
 | `set_auto_renew` | `POST /domain/updateAutoRenew/{d}` |
 | `get_receipt` | `GET /account/invoices` + `/account/invoice/{orderId}` |
 
-Base URL: `https://api.porkbun.com/api/json/v3`; auth headers `X-API-Key` / `X-Secret-API-Key`. Branch on the error `code`, never on `message`.
+Base URL: `https://api.porkbun.com/api/json/v3`; auth headers `X-API-Key` / `X-Secret-API-Key`. Branch on the error `code`, never on `message`. A coded error on HTTP < 500 is a **definite** failure, except `IDEMPOTENCY_KEY_IN_USE`. Timeouts, network errors, any 5xx (coded or not), `IDEMPOTENCY_KEY_IN_USE` and unparseable responses are **ambiguous** (the registrar may have acted; never retry a purchase with a new key).
 
 Porkbun conditions the code must handle:
 - `VERIFICATION_REQUIRED`;
@@ -124,7 +126,7 @@ Porkbun conditions the code must handle:
 
 ## 7. Errors and conventions
 - JSON errors: `{ "error": { "code": "POC_CAP_EXCEEDED", "message": "...", "details": {...} } }`. Codes are stable; messages are not.
-- Cross-cutting codes (added by Dvir, 4 Oct 2026, step 1): `UNAUTHORIZED` 401; `SCOPE_FORBIDDEN` 403; `IDEMPOTENCY_KEY_REQUIRED` 400; `IDEMPOTENCY_KEY_MISMATCH` / `IDEMPOTENCY_KEY_IN_USE` 409; `RATE_LIMITED` 429 (with `Retry-After`); `VALIDATION_ERROR` 422 (body) or 400 (query/params schema); `INVALID_BODY` 400/413/415 (unparseable, too large, wrong media type); `INVALID_REQUEST` 4xx (malformed URL and other framework rejections); `NOT_FOUND` 404; `INTERNAL` 500; `AUDIT_WRITE_FAILED` 500 (processed but not audited: retry with the same `Idempotency-Key` to get the stored result).
+- Cross-cutting codes (added by Dvir, 4 Oct 2026, step 1): `UNAUTHORIZED` 401; `SCOPE_FORBIDDEN` 403; `IDEMPOTENCY_KEY_REQUIRED` 400; `IDEMPOTENCY_KEY_MISMATCH` / `IDEMPOTENCY_KEY_IN_USE` 409; `RATE_LIMITED` 429 (with `Retry-After`); `VALIDATION_ERROR` 422 (body) or 400 (query/params schema); `DOMAIN_INVALID` 422 (not a valid second-level name, e.g. `www.example.com`; step 2); `INVALID_BODY` 400/413/415 (unparseable, too large, wrong media type); `INVALID_REQUEST` 4xx (malformed URL and other framework rejections); `NOT_FOUND` 404; `INTERNAL` 500; `AUDIT_WRITE_FAILED` 500 (processed but not audited: retry with the same `Idempotency-Key` to get the stored result).
 - `GET /health` (no auth) returns `{status, db: ok|down, version, adapters: [{name, enabled}]}`. It never reveals secrets or key prefixes.
 - Responses show money both in cents and as a display string (`"$11.08"`).
 - Times: stored in UTC; `/report` also renders IDT (`Asia/Jerusalem`).
