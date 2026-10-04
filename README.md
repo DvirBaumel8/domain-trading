@@ -8,4 +8,14 @@ A backend service (HTTP API + Postgres, no frontend) for a small domain-trading 
 - **Hosting:** `render.yaml` (a sketch; the price is unverified and Dvir must approve the spend). Env vars: `.env.example`.
 - **Research behind the choices:** `docs/research/`.
 
-**Status (3 Oct 2026):** specs only, no code yet. Bots never commit code here.
+**Status (4 Oct 2026):** step 1 (foundation) built: schema, auth, audit, idempotency, rate limits, `/health`, admin CLI.
+
+## Run locally
+1. `npm install`
+2. `npm run db:up` (Postgres 16 in docker on port 5433; creates `domain_trading` and `domain_trading_test`)
+3. `cp .env.example .env` (fake/blank keys are fine for local work)
+4. `npm run migrate up`
+5. `npm run admin -- token create --scope write --name dvir-local` (the token is printed once)
+6. `npm run dev`, then `curl localhost:3000/health`
+
+Tests: `npm test` (unit + API; needs step 2). Network is blocked in tests.
