@@ -133,7 +133,6 @@ export class PorkbunAdapter implements RegistrarAdapter {
     };
   }
 
-  // Implemented in Task 3.
   async register(domain: string, input: RegisterInput): Promise<RegisterSuccess | RegisterDryRun> {
     if (!Number.isInteger(input.costCents) || input.costCents <= 0) {
       throw new RegistrarError(NAME, 'INVALID_COST', 'cost must be a positive integer number of cents');
