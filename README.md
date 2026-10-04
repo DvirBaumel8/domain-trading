@@ -8,7 +8,7 @@ A backend service (HTTP API + Postgres, no frontend) for a small domain-trading 
 - **Hosting:** `render.yaml` (a sketch; the price is unverified and Dvir must approve the spend). Env vars: `.env.example`.
 - **Research behind the choices:** `docs/research/`.
 
-**Status (5 Oct 2026):** steps 1 (foundation) and 2 (registrar adapters + `GET /check`) built. Next: step 3 (`/buy`).
+**Status (5 Oct 2026):** steps 1 (foundation), 2 (registrar adapters + `GET /check`) and 3 (`POST /buy` + reconciler) built. Next: step 4 (listing, `/list`, exports, `/sold`, `/report`, import).
 
 ## Run locally
 1. `npm install`

@@ -61,7 +61,7 @@ All money is stored as **integer cents (USD)**. All timestamps are `timestamptz`
 | `ledger_entries` | `id`, `occurred_on`, `domain_id`, `deal_id`, `type` (`registration`, `renewal`, `fee`, `commission`, `sale`, `payout_fee`, `refund`, `tool`, `ai`, `adjustment`), `amount_cents` (signed: negative = money out), `currency`, `counterparty`, `receipt_ref`, `note`, `audit_id` | **Append-only:** a DB trigger rejects UPDATE and DELETE. Corrections are reversing rows |
 | `listing_history` | `id`, `domain_id`, `at`, `source` (`buy`, `import`, `list`), `category`, `mode`, `bin_cents`, `floor_cents`, `min_offer_cents`, `lto_max_months`, `lander`, `override`, `override_reason`, `approval_text`, `approval_at`, `audit_id` | **Append-only** (trigger). One row per accepted listing, mode, price or category change (`listing-strategy.md` §5) |
 | `quotes` | `id`, `check_id`, `domain`, `registrar`, `quoted_at`, `available`, `premium`, `first_year_cents`, `renewal_cents`, `privacy_cents_per_year`, `two_year_cents`, `eligible`, `exclusion_reason`, `raw` (jsonb, secrets stripped) | Every `/check` and `/buy` stores its full comparison |
-| `purchases` | `id`, `idempotency_key` (unique), `request_hash`, `domain`, `state` (`created`, `register_sent`, `succeeded`, `failed`, `unknown`), `dry_run`, `registrar`, `check_id`, `charged_cents`, `order_id`, `max_price_cents`, `approval_text`, `approval_at`, `response` (jsonb), timestamps | One row per `/buy` call. A unique partial index allows one `created`/`register_sent`/`succeeded`/`unknown` row per domain (`unknown` added by Dvir, 4 Oct 2026: an unknown purchase may have charged) |
+| `purchases` | `id`, `idempotency_key` (unique), `request_hash`, `domain`, `state` (`created`, `register_sent`, `succeeded`, `failed`, `unknown`), `dry_run`, `registrar`, `check_id`, `charged_cents`, `expected_cents` (counts toward the cap while open), `order_id`, `max_price_cents`, `approval_text`, `approval_at`, `request` (jsonb, redacted), `response` (jsonb), `audit_id`, timestamps | One row per `/buy` call. A unique partial index allows one `created`/`register_sent`/`succeeded`/`unknown` row per domain (`unknown` added by Dvir, 4 Oct 2026: an unknown purchase may have charged) |
 | `receipts` | `id`, `purchase_id`, `registrar`, `order_id`, `raw` (jsonb, billing address redacted), `fetched_at` | The `ledger_entries.receipt_ref` of a registration = `<registrar>:<order_id>` |
 | `deals` | `id` (`D-NNN`), `domain`, `strategy`, `status_note`, `created_at` | Created or updated when `/buy` passes `deal_id` |
 | `audit_log` | `id`, `at`, `token_id`, `scope`, `method`, `path`, `idempotency_key`, `approval_text`, `approval_at`, `request` (jsonb, redacted), `status_code`, `result_summary`, `client_ip` | **Every** POST, including dry runs and refusals. Append-only (trigger) |
@@ -80,7 +80,8 @@ register(domain, cost_cents, idem_key, dry_run)   # privacy always on; 1-year on
 find_domain(domain)               -> {expiry_date, whois_privacy, auto_renew, api_access, ns|None} | None
                                   # None = definitely not in our account (only a definite DOMAIN_NOT_FOUND); any other error throws
 set_nameservers(domain, ns[])     ; get_nameservers(domain) -> set
-set_auto_renew(domain, on)        ; get_receipt(order_id) -> raw
+set_auto_renew(domain, on)        ; get_receipt(order_id) -> raw (billing identity redacted)
+find_registration(domain, since)  -> {order_id, charged_cents, expiry_date|None, invoice_date, raw} | None   # from the registrar's invoices
 capabilities                      -> {can_register, can_quote, can_manage_ns, custom_ns, prepaid, free_privacy,
                                       afternic_fast_transfer, sandbox}
 # registrar_api on a domain: full = Porkbun-style (quote+register+manage); manage = GoDaddy PAT
@@ -96,7 +97,8 @@ Porkbun mapping, all verified in the official docs (snapshot in `system/specs/ev
 | `find_domain` | `GET /domain/get/{d}` |
 | `set_nameservers` / `get_nameservers` | `POST /domain/updateNs/{d}` / `getNs` (compare as a **set**) |
 | `set_auto_renew` | `POST /domain/updateAutoRenew/{d}` |
-| `get_receipt` | `GET /account/invoices` + `/account/invoice/{orderId}` |
+| `get_receipt` | `GET /account/invoice/{orderId}` (redacted) |
+| `find_registration` | `GET /account/invoices?year=` + `/account/invoice/{orderId}` (the domain's SUCCESS registration line: `price_cents − discount_cents`, `expires`) |
 
 Base URL: `https://api.porkbun.com/api/json/v3`; auth headers `X-API-Key` / `X-Secret-API-Key`. Branch on the error `code`, never on `message`. A coded error on HTTP < 500 is a **definite** failure, except `IDEMPOTENCY_KEY_IN_USE`. Timeouts, network errors, any 5xx (coded or not), `IDEMPOTENCY_KEY_IN_USE` and unparseable responses are **ambiguous** (the registrar may have acted; never retry a purchase with a new key).
 

@@ -32,7 +32,7 @@ Header: `Idempotency-Key: <uuid>` (required).
 | 5 | **Domain cap:** count of `owned` + `listed` + `pending_purchase` < `max_domains` (10) | 409 `DOMAIN_CAP_REACHED` |
 | 6 | **Live re-check:** run the `/check` logic now, with no cache. `availability` must be `available`, and a winner (or the pinned registrar) must be eligible | 409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE` |
 | 7 | **Price caps:** among eligible quotes, keep only those with `first_year ≤ max_price` (and `two_year ≤ max_two_year_price` if given), then choose the lowest `two_year` | 409 `PRICE_ABOVE_MAX` (with the cheapest quote in `details`) |
-| 8 | **POC cap:** `spent + first_year ≤ poc_cap_cents` ($500). `spent` = −Σ amounts of `registration`, `renewal`, `fee` rows. Computed **under a global lock** (`SELECT … FOR UPDATE` on `settings`), so parallel buys can't overshoot | 409 `POC_CAP_EXCEEDED` (with spent, remaining) |
+| 8 | **POC cap:** `spent + pending + first_year ≤ poc_cap_cents` ($500). `spent` = −Σ amounts of `registration`, `renewal`, `fee` rows; `pending` = Σ `expected_cents` of purchases in `created`/`register_sent`/`unknown` (Dvir, 5 Oct 2026). Read in **one statement**, re-checked **under a global lock** (`SELECT … FOR UPDATE` on `settings`) in the reservation, so parallel buys can't overshoot | 409 `POC_CAP_EXCEEDED` (with spent, remaining) |
 | 9 | Registrar account state: balance ≥ cost, where known; spend-limit remaining ≥ cost, where known | 409 `REGISTRAR_FUNDS` (with the shortfall). **No top-up is ever attempted** |
 | 10 | Registrar dry run, where supported (Porkbun `dryRun:true` with the exact `cost`): `wouldSucceed` must be true | 409 `REGISTRAR_DRY_RUN_FAILED` (with the registrar's `code`) |
 
@@ -73,6 +73,18 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
   "renewals_used":0, "poc_spent_after":"$11.08", "poc_remaining":"$488.92", "domains_owned":1,
   "post_buy":{"privacy":"on","auto_renew":"off","lander":"afternic ns set","listing":{"mode":"bin","bin":399}}, "warnings":[], "audit_id":"aud_…" }
 ```
+
+## Decisions (Dvir, 5 Oct 2026, step 3)
+- **Listing (3b, 7.3):** `proposed_listing` is validated with V1–V8 before any registrar call. Post-buy `auto_list` sets the lander NS via the registrar (set, read back, compare as sets) and stores the listing (`listing_history`, `source=buy`, `status=listed`) even if the NS step fails (warning). Public-DNS verification is `/list`'s job.
+- **Check 9:** registrar auto top-up ON → 409 `REGISTRAR_AUTO_TOPUP_ON`; account state unreadable → 409 `REGISTRAR_STATE_UNKNOWN`.
+- **Check 10:** `COST_MISMATCH` on the dry run → re-quote once, re-check every cap (incl. check 9), retry the dry run. On the real create it is a definite failure (409 `REGISTRAR_REJECTED`). An *ambiguous* dry-run answer (e.g. answered as a real registration) → 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`, and an `unknown` purchase row is recorded so the cap counts it and the reconciler resolves it.
+- **Approval:** `approved_at` must carry a timezone offset; ≤ 60 s of future clock skew is accepted.
+- **Replay:** if `purchases` already holds the `Idempotency-Key`, its outcome is replayed (a succeeded purchase always as 201, rebuilt from the rows if needed); a different domain with the same key → 409 `IDEMPOTENCY_KEY_MISMATCH`. A stored 202 for `/buy` is re-evaluated on retry instead of replayed.
+- **Found in account / ambiguous:** a domain found in the account is booked **only** from the registrar's invoice (`find_registration`); no invoice yet → 202 `PURCHASE_STATE_UNKNOWN`. A definite error after an earlier ambiguous attempt is resolved by lookup, not trusted.
+- **Expiry:** from `find_domain`, else the invoice line, else `buy_date + 1 year` with warning `EXPIRY_ESTIMATED`. `buy_date` / ledger `occurred_on` use the Asia/Jerusalem date.
+- **Portfolio:** a domain already in `domains` as `sold`/`dropped` → 409 `ALREADY_IN_PORTFOLIO`.
+- **Reconciler:** also fails `created` purchases older than 10 min (never sent) and deletes their pending row; every fail is guarded by the selected state; it does not run post-buy steps (`/report` flags them).
+- **New codes:** `REGISTRAR_REJECTED` (details.registrar_code), `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `ALREADY_IN_PORTFOLIO`, `PURCHASE_FAILED`, `PURCHASE_ABANDONED`, `LISTING_PRICE_INVALID`.
 
 ## Never
 - Never call a registrar's top-up or auto-top-up endpoints.
