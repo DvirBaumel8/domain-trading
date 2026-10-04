@@ -71,7 +71,7 @@ export class BuyService {
     // B4: purchase-level replay (real buys only), before the approval check so a same-key retry
     // gets the stored outcome even if the approval has since expired
     if (!input.dryRun) {
-      const prior = await this.priorOutcome(ctx);
+      const prior = await this.priorOutcome(ctx, input.domain);
       if (prior) return prior;
     }
 
@@ -147,15 +147,37 @@ export class BuyService {
     return (this.deps.sleep ?? ((t) => new Promise((r) => setTimeout(r, t))))(ms);
   }
 
-  protected async priorOutcome(ctx: BuyCtx): Promise<BuyResult | null> {
-    const p = await this.deps.db.selectFrom('purchases').select(['id', 'domain', 'response', 'audit_id'])
+  protected async priorOutcome(ctx: BuyCtx, domain: string): Promise<BuyResult | null> {
+    const { db } = this.deps;
+    const p = await db.selectFrom('purchases').select(['id', 'domain', 'state', 'response', 'audit_id', 'charged_cents', 'order_id'])
       .where('idempotency_key', '=', ctx.idempotencyKey).executeTakeFirst();
     if (!p) return null;
-    if (p.response) {
-      const r = p.response as { status: number; body: Record<string, unknown> };
-      return { status: r.status, body: r.body };
+    if (p.domain !== domain) throw new AppError(409, 'IDEMPOTENCY_KEY_MISMATCH', 'This Idempotency-Key was used for a different domain');
+    const r = p.response as { status: number; body: Record<string, unknown> } | null;
+    if (p.state === 'succeeded') {
+      if (r && r.status === 201) return { status: 201, body: r.body };
+      return this.reconstructed(p);
     }
+    if (r) return { status: r.status, body: r.body };
     return this.unknownBody(p.id, p.domain, p.audit_id ?? ctx.auditId);
+  }
+
+  /** A booked purchase is always reported as 201, even if its stored response is missing or stale (e.g. booked by the reconciler). */
+  private async reconstructed(p: { domain: string; audit_id: string | null; charged_cents: number | null; order_id: string | null }): Promise<BuyResult> {
+    const dom = await this.deps.db.selectFrom('domains').selectAll().where('domain', '=', p.domain).executeTakeFirst();
+    const charged = p.charged_cents ?? dom?.cost_cents ?? null;
+    const renewal = dom?.renewal_price_cents ?? null;
+    return {
+      status: 201,
+      body: {
+        domain: p.domain, registrar: dom?.registrar ?? null, order_id: p.order_id,
+        ...(charged !== null ? { charged: formatUsd(charged), charged_cents: charged } : {}),
+        ...(renewal !== null ? { renewal: formatUsd(renewal), renewal_cents: renewal } : {}),
+        expiry_date: dom?.expiry_date ?? null, drop_date: dom?.drop_date ?? null, renewals_used: dom?.renewals_used ?? 0,
+        post_buy: { privacy: 'unknown', auto_renew: 'unconfirmed', lander: dom?.lander ? `${dom.lander} ns set` : 'skipped', listing: null },
+        warnings: ['RECONSTRUCTED: original response unavailable; figures from the ledger'], audit_id: p.audit_id,
+      },
+    };
   }
 
   private unknownBody(purchaseId: number, domain: string, auditId: string): BuyResult {
@@ -256,6 +278,7 @@ export class BuyService {
     markSent();
     const key = `dt-${purchaseId}`;
     let lastErr: RegistrarError | null = null;
+    let sawAmbiguous = false;
     for (let i = 0; i <= RETRY_DELAYS_MS.length; i++) {
       if (i > 0) await this.sleep(RETRY_DELAYS_MS[i - 1]!);
       try {
@@ -264,12 +287,14 @@ export class BuyService {
         return this.finishRegistered(a, purchaseId, r);
       } catch (e) {
         if (!(e instanceof RegistrarError)) throw e; // → outer catch → unknown (202)
-        if (!e.ambiguous) {
+        if (!e.ambiguous && !sawAmbiguous) {
           return this.rejected(a, purchaseId, 'REGISTRAR_REJECTED', `The registrar refused the registration (${e.code})`, {
             registrar: adapter.name, registrar_code: e.code,
           });
         }
         lastErr = e;
+        if (!e.ambiguous) break; // definite error after an earlier ambiguous attempt: resolve by looking, never assume
+        sawAmbiguous = true;
       }
     }
 
@@ -340,21 +365,34 @@ export class BuyService {
       this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'post-buy failed');
       warnings.push('POST_BUY_FAILED: the purchase is booked; post-buy steps did not finish — check privacy, auto-renew and NS');
     }
-    const spent = await spentCents(db);
-    const owned = await db.selectFrom('domains').select(sql<number>`count(*)::int`.as('n'))
-      .where('status', 'in', ['owned', 'listed']).executeTakeFirstOrThrow();
-    const body = {
+    // Everything below is non-throwing: the purchase is booked and must be reported as 201.
+    const body: Record<string, unknown> = {
       domain: a.input.domain, registrar: a.adapter.name, order_id: x.orderId,
       charged: formatUsd(x.chargedCents), charged_cents: x.chargedCents,
       renewal: formatUsd(a.winner.renewalCents!), renewal_cents: a.winner.renewalCents,
       two_year: formatUsd(a.winner.twoYearCents!), two_year_cents: a.winner.twoYearCents,
       expiry_date: expiry, drop_date: addOneYear(expiry), renewals_used: 0,
-      poc_spent_after: formatUsd(spent), poc_spent_after_cents: spent,
-      poc_remaining: formatUsd(a.settings.poc_cap_cents - spent), poc_remaining_cents: a.settings.poc_cap_cents - spent,
-      domains_owned: Number(owned.n), post_buy: post, warnings, audit_id: a.ctx.auditId,
     };
+    try {
+      const spent = await spentCents(db);
+      const owned = await db.selectFrom('domains').select(sql<number>`count(*)::int`.as('n'))
+        .where('status', 'in', ['owned', 'listed']).executeTakeFirstOrThrow();
+      Object.assign(body, {
+        poc_spent_after: formatUsd(spent), poc_spent_after_cents: spent,
+        poc_remaining: formatUsd(a.settings.poc_cap_cents - spent), poc_remaining_cents: a.settings.poc_cap_cents - spent,
+        domains_owned: Number(owned.n),
+      });
+    } catch (e) {
+      this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'post-buy totals failed');
+      warnings.push('TOTALS_UNAVAILABLE: the purchase is booked; budget totals could not be computed');
+    }
+    Object.assign(body, { post_buy: post, warnings, audit_id: a.ctx.auditId });
     const result = { status: 201, body };
-    await storeResponse(db, purchaseId, result);
+    try {
+      await storeResponse(db, purchaseId, result);
+    } catch (e) {
+      this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'storing the purchase response failed');
+    }
     return result;
   }
 

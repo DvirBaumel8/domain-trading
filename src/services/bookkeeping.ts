@@ -55,9 +55,10 @@ export async function bookPurchase(db: Kysely<Database>, b: BookInput): Promise<
 
 export async function failPurchase(db: Kysely<Database>, purchaseId: number, domain: string, response: { status: number; body: unknown }): Promise<void> {
   await db.transaction().execute(async (trx) => {
-    await trx.updateTable('purchases')
+    const r = await trx.updateTable('purchases')
       .set({ state: 'failed', response: JSON.stringify(response), updated_at: new Date() })
-      .where('id', '=', purchaseId).execute();
+      .where('id', '=', purchaseId).where('state', '!=', 'succeeded').executeTakeFirst();
+    if (Number(r.numUpdatedRows) === 0) return;
     await trx.deleteFrom('domains').where('domain', '=', domain).where('status', '=', 'pending_purchase').execute();
   });
 }

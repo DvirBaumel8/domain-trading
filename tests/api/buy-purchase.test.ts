@@ -122,7 +122,7 @@ describe('POST /buy purchase', () => {
     expect(await db.selectFrom('ledger_entries').selectAll().execute()).toHaveLength(1);
   });
 
-  it('retries ambiguous failures at 2 s, 5 s, 10 s with the same key, then resolves via findDomain', async () => {
+  it('first attempt ambiguous but charged; the 2 s retry with the same key returns the stored result → 201', async () => {
     const pb = new FakeAdapter('porkbun', { register: () => timeout(), chargesOnAmbiguous: true });
     const { auth, sleeps } = await setup(pb);
     const res = await postBuy(app, buyBody(), auth);
@@ -291,6 +291,68 @@ describe('POST /buy purchase', () => {
     const b = await postBuy(app, stale, auth, 'k-ra');
     expect(b.statusCode).toBe(201);
     expect(b.json()).toEqual(a.json());
+    expect(pb.realRegisterCalls).toBe(1);
+  });
+
+  it('all 4 attempts ambiguous, no charge, then findDomain finds the domain with an invoice → booked via finishFound', async () => {
+    const pb = new FakeAdapter('porkbun', {
+      register: () => timeout(),
+      findDomain: (_d, n) => (n === 0 ? null : { expiryDate: '2027-10-05', whoisPrivacy: true, autoRenew: false, apiAccess: true, ns: null }),
+      findRegistration: { orderId: 'ord-x', chargedCents: 1108, expiryDate: '2027-10-05', invoiceDate: '2026-10-05', raw: {} },
+    });
+    const { auth, sleeps } = await setup(pb);
+    const res = await postBuy(app, buyBody(), auth);
+    expect(res.statusCode).toBe(201);
+    expect(sleeps).toEqual([2000, 5000, 10000]);
+    expect(pb.realRegisterCalls).toBe(4);
+    expect(one(await db.selectFrom('ledger_entries').selectAll().execute()).receipt_ref).toBe('porkbun:ord-x');
+  });
+
+  it('definite error after an earlier ambiguous attempt is not trusted: resolves via findDomain → 201, one ledger row', async () => {
+    const pb = new FakeAdapter('porkbun', {
+      register: (n) => (n === 0 ? timeout() : new RegistrarError('porkbun', 'DOMAIN_NOT_AVAILABLE', 'x')),
+      findDomain: (_d, n) => (n === 0 ? null : { expiryDate: '2027-10-05', whoisPrivacy: true, autoRenew: false, apiAccess: true, ns: null }),
+      findRegistration: { orderId: 'ord-x', chargedCents: 1108, expiryDate: '2027-10-05', invoiceDate: '2026-10-05', raw: {} },
+    });
+    const { auth } = await setup(pb);
+    const res = await postBuy(app, buyBody(), auth);
+    expect(res.statusCode).toBe(201);
+    expect(pb.realRegisterCalls).toBe(2);
+    expect(one(await db.selectFrom('ledger_entries').selectAll().execute()).receipt_ref).toBe('porkbun:ord-x');
+    expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('succeeded');
+  });
+
+  it('succeeded purchase with NULL response column → same-key replay rebuilds a 201', async () => {
+    const pb = new FakeAdapter('porkbun');
+    const { auth } = await setup(pb);
+    await postBuy(app, buyBody(), auth, 'k-null');
+    await db.updateTable('purchases').set({ response: null }).execute();
+    await db.deleteFrom('idempotency_keys').where('key', '=', 'k-null').execute();
+    const b = await postBuy(app, buyBody(), auth, 'k-null');
+    expect(b.statusCode).toBe(201);
+    expect(b.json()).toMatchObject({ order_id: 'ord-1', charged_cents: 1108, domain: DOMAIN });
+    expect(pb.realRegisterCalls).toBe(1);
+  });
+
+  it('succeeded purchase with a stored 202 response (reconciler case) → same-key replay returns 201', async () => {
+    const pb = new FakeAdapter('porkbun');
+    const { auth } = await setup(pb);
+    await postBuy(app, buyBody(), auth, 'k-202');
+    await db.updateTable('purchases').set({ response: JSON.stringify({ status: 202, body: { status: 'unknown' } }) }).execute();
+    await db.deleteFrom('idempotency_keys').where('key', '=', 'k-202').execute();
+    const b = await postBuy(app, buyBody(), auth, 'k-202');
+    expect(b.statusCode).toBe(201);
+    expect(b.json()).toMatchObject({ order_id: 'ord-1', charged_cents: 1108 });
+  });
+
+  it('same Idempotency-Key reused for a different domain → 409 IDEMPOTENCY_KEY_MISMATCH, no new register', async () => {
+    const pb = new FakeAdapter('porkbun');
+    const { auth } = await setup(pb);
+    await postBuy(app, buyBody(), auth, 'k-dom');
+    await db.deleteFrom('idempotency_keys').where('key', '=', 'k-dom').execute();
+    const b = await postBuy(app, buyBody({ domain: 'other.com' }), auth, 'k-dom');
+    expect(b.statusCode).toBe(409);
+    expect(b.json().error.code).toBe('IDEMPOTENCY_KEY_MISMATCH');
     expect(pb.realRegisterCalls).toBe(1);
   });
 });
