@@ -30,7 +30,7 @@ Every money field appears twice: in cents (`*_cents`) and as a display string ("
 
 ## Import of domains bought by hand (admin command, not an API endpoint)
 D-001 (promptinjectionaudit.com) was bought **by hand at GoDaddy** (not Porkbun) on **2026-10-03**, before the service existed. **Price and order number are pending.** Any manual buy enters the DB like this:
-- `python -m app.admin import-domain --domain promptinjectionaudit.com --registrar godaddy --buy-date 2026-10-03 --cost <USD from the GoDaddy receipt> --order <GoDaddy order no> --deal D-001 --category trend --listing-mode hybrid --bin 1995 --floor 950 --min-offer <Dvir's choice> --approval-text "<Dvir's words>" --approval-at <ISO>`
+- `npm run admin -- import-domain --domain promptinjectionaudit.com --registrar godaddy --buy-date 2026-10-03 --cost <USD from the GoDaddy receipt> --order <GoDaddy order no> --deal D-001 --category trend --listing-mode hybrid --bin 1995 --floor 950 --min-offer <Dvir's choice> --approval-text "<Dvir's words>" --approval-at <ISO>`
 - The `--category` and listing flags follow `listing-strategy.md`. The listing is validated with the same rules (V1–V10) and written to `listing_history` with `source=import`.
 - **Registrar data, two ways:**
   - **With a registrar API** (Porkbun keys, or a `GODADDY_PAT` with scopes `domains.domain:read` + `domains.nameserver:update`): it reads `expiry_date`, privacy, auto-renew and NS via `find_domain`, and sets `registrar_api = full` (Porkbun) or `manage` (GoDaddy: management only, no buying).

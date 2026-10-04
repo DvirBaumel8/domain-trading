@@ -42,15 +42,16 @@ You are building this service with **Dvir** (a senior backend developer, short o
 - Default lander is **Afternic** (`ns1/ns2.afternic.com`). **Dan.com was retired on 27 Jun 2025** and merged into Afternic. Sedo is a second listing (no Sedo nameservers by default).
 - Marketplace uploads stay manual: CSV exports, Dvir uploads weekly. There is no marketplace API.
 - No Gmail/mail-watching: marketplaces notify Dvir directly.
+- 4 Oct 2026: stack switched from Python to **TypeScript** (Node 22, Fastify, Kysely, Vitest, MSW). Docs updated; no behaviour change.
 
 ## Conventions
 - **Money:** integer **cents, USD**. Responses carry `*_cents` plus a display string (`"$11.08"`). Never use floats for money.
 - **Time:** stored as `timestamptz` in UTC. API output is ISO 8601 with an offset; reports render Asia/Jerusalem (IDT/IST).
 - **Errors:** `{"error":{"code":"UPPER_SNAKE","message":"…","details":{}}}`. Codes are stable and listed in the specs. Branch on registrar error **codes**, never on messages.
 - **Domains:** lowercase in the DB; `display_name` holds the CamelCase form for marketplaces.
-- **Stack (default; Dvir may change it):** Python 3.12, FastAPI, SQLAlchemy 2, Alembic, httpx, pydantic, pytest, respx. Postgres 16 (docker locally).
-- **Layout (suggested):** `app/main.py`, `app/api/*`, `app/db/*` (models + migrations), `app/registrars/{base,porkbun,…}.py`, `app/services/{selection,buy,listing,report,export}.py`, `app/admin.py`, `app/jobs/*`, `tests/{unit,api,contract}`.
-- **No network calls in unit and API tests** (a socket-blocking fixture). Contract tests are marked and opt-in.
+- **Stack (chosen by Dvir, 4 Oct 2026):** Node 22 LTS, TypeScript (strict), Fastify, zod, Kysely + pg, node-pg-migrate (plain SQL migrations), native fetch, Vitest, MSW. Postgres 16 (docker locally).
+- **Layout (suggested):** `src/main.ts`, `src/api/*`, `src/db/*` (schema types + queries), `migrations/*.sql`, `src/registrars/{base,porkbun,…}.ts`, `src/services/{selection,buy,listing,report,export}.ts`, `src/admin.ts`, `src/jobs/*`, `tests/{unit,api,contract}`.
+- **No network calls in unit and API tests** (network blocked via MSW `onUnhandledRequest: 'error'`). Contract tests are marked and opt-in.
 
 ## Data formats that must match exactly
 - **Afternic bulk CSV header** (from the official template in `templates/afternic_bulk_upload_sample_v3.xlsx`):
@@ -85,7 +86,7 @@ You are building this service with **Dvir** (a senior backend developer, short o
 4. Listing strategy (`listing-strategy.md`: categories, modes, guards, `listing_history`), then `/list`, exports per mode, `/sold`, `/report`, the read endpoints, and `import-domain` (including GoDaddy `--manual`). Then G1.
 5. Porkbun mock-server and sandbox contract tests. Then **G2**.
 6. Deploy to Render (after Dvir approves the cost), create the tokens, run the live read-only checks. Then **G3**.
-7. First real API buy (the next approved deal; D-001 was bought by hand on 3 Oct and is imported at G3 with `app.admin import-domain`), only with Dvir present and his chat approval. Then **G4**. Post-acquisition checks follow (G5).
+7. First real API buy (the next approved deal; D-001 was bought by hand on 3 Oct and is imported at G3 with `npm run admin -- import-domain`), only with Dvir present and his chat approval. Then **G4**. Post-acquisition checks follow (G5).
 8. Optional: the backup cron + restore drill (the BK-5 drill is required before G4).
 
 ## Don't

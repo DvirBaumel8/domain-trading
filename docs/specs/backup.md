@@ -11,7 +11,7 @@ Source: https://render.com/docs/postgresql-backups.
 - The smallest paid instance plan and its price must be checked in the dashboard: **price UNVERIFIED here**. That price conflicts with the "$0 tools" rule, so **it needs Dvir's approval.**
 
 ## Layer 2: nightly export to git (optional, recommended)
-A Render **cron job** (`render.yaml`, 02:30 IDT = 23:30 UTC) runs `python -m app.jobs.export_backup`. It:
+A Render **cron job** (`render.yaml`, 02:30 IDT = 23:30 UTC) runs `npm run job:export-backup`. It:
 1. Writes `backup/portfolio.csv`, `backup/ledger.csv`, `backup/purchases.json`, `backup/receipts.json` (addresses redacted) and `backup/audit.jsonl` (approval text kept; IPs dropped).
 2. Commits to the **`data-backup` branch** of the domain-trading repo, using the GitHub contents API with `GITHUB_BACKUP_TOKEN`.
    - That token is a fine-grained PAT scoped to **this repo only**, permission *Contents: read/write*, expiring after 1 year.
@@ -25,7 +25,7 @@ Monthly, Dvir downloads a Render logical backup (or runs `pg_dump`) to his own d
 
 ## Restore drill (before the first real purchase, then quarterly)
 1. Create a scratch Postgres (local docker is fine).
-2. Restore the latest logical backup **or** import the `data-backup` CSVs with `python -m app.jobs.import_backup`.
+2. Restore the latest logical backup **or** import the `data-backup` CSVs with `npm run job:import-backup`.
 3. Run the `/report` math against it.
 
 ## Tests (pass/fail)

@@ -19,9 +19,9 @@ Hard rules (details are in CLAUDE.md):
 Work in phases. **At the end of each phase, stop.** Show me the test output (counts plus any failures), list the spec items you couldn't meet or found ambiguous, and wait for me to say "continue".
 
 **Phase 1: foundation.**
-- Project skeleton (FastAPI, SQLAlchemy 2, Alembic, pytest, docker-compose with Postgres 16).
+- Project skeleton (Fastify, Kysely, node-pg-migrate, Vitest, docker-compose with Postgres 16).
 - All tables from 00-architecture §4, with the CHECK constraints, unique partial index and append-only triggers.
-- Bearer auth with READ/WRITE scopes, plus `python -m app.admin token create|revoke|list` and `python -m app.admin doctor`.
+- Bearer auth with READ/WRITE scopes, plus `npm run admin -- token create|revoke|list` and `npm run admin -- doctor`.
 - Idempotency middleware, the audit row on every POST, the error format, rate limits and `/health`.
 - Tests: AU-*, ID-1/ID-3, AL-*, RN-3.
 
@@ -36,7 +36,7 @@ Work in phases. **At the end of each phase, stop.** Show me the test output (cou
 
 **Phase 4: listing strategy, list, exports, sold, reports.**
 - Listing strategy exactly as `docs/specs/listing-strategy.md`: `category` on domains, modes `bin`/`offer`/`hybrid`, validation V1–V10 with the geo [$299, $499] and high-value ($2,500) guards from `settings`, overrides only with `approval_ref`, and the append-only `listing_history`. `/buy` validates `proposed_listing` **before** any registrar call.
-- `POST /list/{domain}` (including `dry_run`, the manual-NS path for `registrar_api=none`, and public-DNS NS verification), `GET /export/afternic.csv` (header byte-exact; cells per mode, §6), `GET /export/sedo.csv` (template-driven, 501 without the template), `POST /sold/{domain}`, `/report` (json + md), `/portfolio`, `/ledger` (+csv), `/deals/{id}`, `/audit`, the `app.admin import-domain` command for manual buys (Porkbun, and GoDaddy via PAT or `--manual`; D-001 is at GoDaddy), and the daily job that marks domains dropped.
+- `POST /list/{domain}` (including `dry_run`, the manual-NS path for `registrar_api=none`, and public-DNS NS verification), `GET /export/afternic.csv` (header byte-exact; cells per mode, §6), `GET /export/sedo.csv` (template-driven, 501 without the template), `POST /sold/{domain}`, `/report` (json + md), `/portfolio`, `/ledger` (+csv), `/deals/{id}`, `/audit`, the `npm run admin -- import-domain` command for manual buys (Porkbun, and GoDaddy via PAT or `--manual`; D-001 is at GoDaddy), and the daily job that marks domains dropped.
 - Tests: LS-1 to LS-14, LG-1 to LG-17, LH-1 to LH-4, LX-1 to LX-7, L-1 to L-9, L-11 to L-13, E-1 to E-8, S-1 to S-8, R-1 to R-12, IM-1 to IM-3, IM-5 to IM-11, RN-4/RN-5, AU-8 (secret-leak grep over all responses and logs).
 
 **Phase 5: contract tests (Gate G2).**
@@ -45,11 +45,11 @@ Work in phases. **At the end of each phase, stop.** Show me the test output (cou
 
 **Phase 6: deploy prep (Gate G3 is run by me).**
 - Finalise `render.yaml` and the README deploy steps.
-- Write `docs/runbook.md`: create tokens, set env secrets, the G3 live checklist (import D-001 with `app.admin import-domain`, IM-4; CK-12; `/buy` with `dry_run:true` on a free test .com; confirm balance and invoices are unchanged), and the restore drill (BK-3/BK-5).
+- Write `docs/runbook.md`: create tokens, set env secrets, the G3 live checklist (import D-001 with `npm run admin -- import-domain`, IM-4; CK-12; `/buy` with `dry_run:true` on a free test .com; confirm balance and invoices are unchanged), and the restore drill (BK-3/BK-5).
 - Do **not** deploy yourself.
 
 **Phase 7 (optional): backup cron, plus the thin CLI (`docs/specs/cli.md`, tests CLI-1 to CLI-4) if I ask for it.**
-- `app/jobs/export_backup.py` and `import_backup.py`.
+- `src/jobs/export-backup.ts` and `src/jobs/import-backup.ts`.
 - Tests: BK-1 to BK-4.
 
 At the end of every phase, give me:

@@ -10,16 +10,13 @@
 *.sql.gz
 backup-local/
 
-# Python / tooling
-__pycache__/
-*.pyc
-.venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+# Node / tooling
+node_modules/
 dist/
 build/
-*.egg-info/
+coverage/
+*.tsbuildinfo
+.vitest/
 
 # OS / editors
 .DS_Store

@@ -48,7 +48,7 @@ Gavriel (box) --HTTPS + Bearer--> [Render web service: API]
                                         |-- RDAP (rdap.verisign.com) : independent availability check
                                         `-- (optional cron) nightly export --> GitHub repo (data backup)
 ```
-- **Language and stack:** language-agnostic spec. Default suggestion: Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, httpx, pydantic, pytest + respx. Dvir may choose otherwise.
+- **Language and stack:** language-agnostic spec. Chosen stack (4 Oct 2026): TypeScript on Node 22, Fastify, zod, Kysely + pg, node-pg-migrate, native fetch, Vitest + MSW.
 - **Registrar adapters:** each implements one interface (§5). v1 ships **Porkbun fully** (documented, verified 3 Oct 2026). Others are enabled only when their keys are set **and** their contract tests pass (`docs/research/registrars.md`).
 - **Secrets:** registrar keys, the DB URL and the GitHub backup token live **only** in server environment variables (Render secret env, `sync: false`). They are never returned by any endpoint, never logged, and never in the repo.
 
@@ -114,7 +114,7 @@ Porkbun conditions the code must handle:
 - `Authorization: Bearer <token>`. Tokens are random, at least 32 bytes, and stored as SHA-256.
 - **READ** tokens may call GET only. **WRITE** tokens may call everything.
 - Wrong or absent token: **401**. A READ token on a POST: **403** `SCOPE_FORBIDDEN`. A revoked token: 401.
-- Tokens are created and revoked by Dvir's admin command (`python -m app.admin token create --scope read --name gavriel-read`), run in the Render shell or locally against the DB. **No API endpoint creates tokens.** The same admin tool imports domains bought by hand (`import-domain`, see `report.md` §Import; D-001 was bought this way).
+- Tokens are created and revoked by Dvir's admin command (`npm run admin -- token create --scope read --name gavriel-read`), run in the Render shell or locally against the DB. **No API endpoint creates tokens.** The same admin tool imports domains bought by hand (`import-domain`, see `report.md` §Import; D-001 was bought this way).
 - **Every POST** (success, refusal, dry run, error) writes one `audit_log` row: token id and scope, approval text and timestamp, idempotency key, and the redacted request and result.
 - `Idempotency-Key` header is **required on every POST** (400 if missing).
   - Same key and same body: the stored response is replayed (header `Idempotent-Replayed: true`).
@@ -130,7 +130,7 @@ Porkbun conditions the code must handle:
 - No LLM calls anywhere in the service. **0 tokens at runtime.**
 
 ## 8. Hosting (Render)
-- **Web service** (Docker or native Python), plus **Render Postgres on a paid instance type**:
+- **Web service** (Docker or native Node), plus **Render Postgres on a paid instance type**:
   - Free Postgres expires after 30 days and has **no** backups or PITR.
   - Paid instances get PITR: **3 days on Hobby, 7 days on Pro+**.
   - Logical backups are kept 7 days. Source: https://render.com/docs/postgresql-backups.md

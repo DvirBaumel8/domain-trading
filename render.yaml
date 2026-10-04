@@ -6,13 +6,13 @@
 services:
   - type: web
     name: domain-trading-api
-    runtime: python
+    runtime: node
     region: frankfurt            # closest Render region to Israel; change if you prefer
     plan: 0.5c-512mb             # Blueprint default paid web plan (free web services spin down). VERIFY price
     branch: main
-    buildCommand: pip install -r requirements.txt
-    preDeployCommand: alembic upgrade head
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npm run migrate up
+    startCommand: node dist/main.js
     healthCheckPath: /health
     autoDeployTrigger: 'off'     # Dvir deploys deliberately after tests pass
     envVars:
@@ -58,11 +58,11 @@ services:
   # Optional nightly data export to the repo's data-backup branch (docs/specs/backup.md)
   - type: cron
     name: domain-trading-backup
-    runtime: python
+    runtime: node
     region: frankfurt
     schedule: '30 23 * * *'      # 23:30 UTC = 02:30 IDT (01:30 IST in winter)
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m app.jobs.export_backup
+    buildCommand: npm ci && npm run build
+    startCommand: npm run job:export-backup
     envVars:
       - key: DATABASE_URL
         fromDatabase:

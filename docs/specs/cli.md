@@ -23,7 +23,7 @@ A ~150-line wrapper over the HTTP API, so Dvir can type the commands he already 
 
 | ID | Case | Pass | Fail |
 |---|---|---|---|
-| CLI-1 | `dt list x.com --bin 299` | Sends exactly `{"mode":"bin","bin":299}` (respx mock) | Any other body |
+| CLI-1 | `dt list x.com --bin 299` | Sends exactly `{"mode":"bin","bin":299}` (MSW mock) | Any other body |
 | CLI-2 | `--offer --min-offer 500` / `--bin 4999 --offer --floor 2500 --min-offer 1000` | `offer` / `hybrid` bodies as in the table | Wrong mode |
 | CLI-3 | A server 422 | The error code and message are printed; exit code 2 | Swallowed |
 | CLI-4 | No secrets | The CLI never reads registrar env vars (static grep) | Found |
