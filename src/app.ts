@@ -30,7 +30,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const auditWriter = deps.audit ?? dbAuditWriter(deps.db);
   const app = Fastify({
     logger: deps.logger ?? { level: deps.config.logLevel, redact: ['req.headers.authorization'] },
-    trustProxy: true,
+    trustProxy: (_addr: string, hop: number) => hop < 1, // trust exactly 1 proxy hop (Render); 'true' would trust a forged X-Forwarded-For in audit client_ip
     bodyLimit: 64 * 1024,
     // Framework errors bypass all hooks; see auditFrameworkError.
     frameworkErrors: (err, req, reply) => auditFrameworkError(auditWriter, err, req, reply),

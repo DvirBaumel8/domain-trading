@@ -59,13 +59,17 @@ async function main(argv: string[]): Promise<number> {
 }
 
 main(process.argv.slice(2)).then(
-  (code) => process.exit(code),
+  (code) => {
+    process.exitCode = code; // no process.exit(): lets stdout flush when piped
+  },
   (err: unknown) => {
-    if (err instanceof UsageError || (err as { code?: string }).code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION') {
+    const code = (err as { code?: unknown }).code;
+    if (err instanceof UsageError || (typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS_'))) {
       console.error(`${(err as Error).message}\n${USAGE}`);
-      process.exit(2);
+      process.exitCode = 2;
+      return;
     }
     console.error(`error: ${(err as Error).message}`);
-    process.exit(1);
+    process.exitCode = 1;
   },
 );

@@ -18,4 +18,4 @@ A backend service (HTTP API + Postgres, no frontend) for a small domain-trading 
 5. `npm run admin -- token create --scope write --name dvir-local` (the token is printed once)
 6. `npm run dev`, then `curl localhost:3000/health`
 
-Tests: `npm test` (unit + API; needs step 2). Network is blocked in tests.
+Tests: `npm test` (unit + API; needs the docker Postgres from run step 2 above to be running). Network is blocked in tests.

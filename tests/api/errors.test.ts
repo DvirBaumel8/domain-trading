@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { makeApp } from '../helpers/app.js';
+import { issueToken } from '../helpers/tokens.js';
 
 let app: FastifyInstance;
 afterEach(async () => app?.close());
@@ -18,5 +19,13 @@ describe('error format', () => {
   it('exposes a route table of every registered route', async () => {
     app = await makeApp({ testRoutes: false });
     expect(app.routeTable).toEqual(expect.arrayContaining([{ method: 'GET', url: '/health' }]));
+  });
+
+  it('Fastify schema validation failure → 400 VALIDATION_ERROR (not 500)', async () => {
+    app = await makeApp();
+    const { token } = await issueToken('read');
+    const res = await app.inject({ method: 'GET', url: '/__test/schema', headers: { authorization: `Bearer ${token}` } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatchObject({ code: 'VALIDATION_ERROR', details: {} });
   });
 });

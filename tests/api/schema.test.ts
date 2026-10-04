@@ -96,6 +96,10 @@ describe('schema: domains CHECKs', () => {
     await expect(insertOwnedDomain(db, { registrar: 'cloudflare' })).rejects.toThrow(/registrar/);
   });
 
+  it('cloudflare guard is case-insensitive (domains.registrar)', async () => {
+    await expect(insertOwnedDomain(db, { registrar: 'Cloudflare' })).rejects.toThrow(/registrar/);
+  });
+
   it('dates come back as YYYY-MM-DD strings', async () => {
     const id = await insertOwnedDomain(db);
     const row = await db.selectFrom('domains').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
@@ -156,6 +160,12 @@ describe('schema: settings', () => {
 
   it('a second settings row is impossible', async () => {
     await expect(sql`INSERT INTO settings DEFAULT VALUES`.execute(db)).rejects.toThrow(/settings_pkey/);
+  });
+
+  it('cloudflare cannot be allowed in any casing', async () => {
+    await expect(
+      db.updateTable('settings').set({ allowed_registrars: ['porkbun', 'Cloudflare'] }).execute(),
+    ).rejects.toThrow(/allowed_registrars/);
   });
 
   it('cloudflare cannot be allowed', async () => {

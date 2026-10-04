@@ -27,6 +27,12 @@ export function registerTestRoutes(app: FastifyInstance): void {
     return reply.code(201).send({ echo: body.value, n: sideEffects.count });
   });
 
+  app.get(
+    '/__test/schema',
+    { schema: { querystring: { type: 'object', required: ['q'], properties: { q: { type: 'string' } } } } },
+    async () => ({ ok: true }),
+  );
+
   app.post('/__test/boom', async () => {
     sideEffects.count += 1;
     throw new Error('boom');

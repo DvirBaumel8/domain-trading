@@ -27,7 +27,7 @@ export function pathOf(url: string): string {
 export function registerAuth(app: FastifyInstance, db: Kysely<Database>): void {
   app.decorateRequest('auth', null);
   app.addHook('onRequest', async (req) => {
-    if (PUBLIC_PATHS.has(pathOf(req.url))) return;
+    if (PUBLIC_PATHS.has(pathOf(req.url)) && !isMutating(req.method)) return;
     const m = BEARER.exec(req.headers.authorization ?? '');
     if (!m?.[1]) throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
     const row = await db
@@ -44,7 +44,11 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>): void {
 
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
-    if (!req.auth) return; // public route
+    if (!req.auth) {
+      // Only public GET/HEAD/OPTIONS routes reach here without auth; fail closed for mutations.
+      if (isMutating(req.method)) throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
+      return;
+    }
     if (isMutating(req.method) && req.auth.scope !== 'write') {
       throw new AppError(403, 'SCOPE_FORBIDDEN', 'This token may only call GET endpoints');
     }

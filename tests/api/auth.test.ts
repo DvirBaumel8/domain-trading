@@ -27,6 +27,32 @@ describe('auth (AU)', () => {
     await t.close();
   });
 
+  it('POST /health (with or without query) and no token → 401, no idempotency row, one audit row', async () => {
+    app = await makeApp({ testRoutes: false });
+    for (const url of ['/health', '/health?x=1']) {
+      const key = `health-post-${url.length}-${Math.random()}`;
+      const auditBefore = Number((await testDb.selectFrom('audit_log').select((e) => e.fn.countAll().as('c')).executeTakeFirstOrThrow()).c);
+      const res = await app.inject({ method: 'POST', url, headers: { 'idempotency-key': key } });
+      expect(res.statusCode, url).toBe(401);
+      expect(res.json().error.code).toBe('UNAUTHORIZED');
+      const idem = await testDb.selectFrom('idempotency_keys').selectAll().where('key', '=', key).execute();
+      expect(idem).toHaveLength(0);
+      const auditAfter = Number((await testDb.selectFrom('audit_log').select((e) => e.fn.countAll().as('c')).executeTakeFirstOrThrow()).c);
+      expect(auditAfter - auditBefore, url).toBe(1);
+    }
+  });
+
+  it('every mutating method without a token → 401 on every route and public path', async () => {
+    app = await makeApp({ testRoutes: false });
+    const urls = new Set([...app.routeTable.map((r) => concrete(r.url)), '/health', '/nope']);
+    for (const url of urls) {
+      for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'] as const) {
+        const res = await app.inject({ method, url, headers: { 'idempotency-key': 'k-rt' } });
+        expect(res.statusCode, `${method} ${url}`).toBe(401);
+      }
+    }
+  });
+
   it('AU-1: unknown routes also answer 401 without a token (no route probing)', async () => {
     app = await makeApp();
     expect((await app.inject({ method: 'GET', url: '/nope' })).statusCode).toBe(401);

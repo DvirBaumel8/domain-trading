@@ -29,6 +29,11 @@ export function registerErrorHandling(app: FastifyInstance): void {
     if (typeof fe.code === 'string' && fe.code.startsWith('FST_ERR_CTP_')) {
       return reply.code(fe.statusCode ?? 400).send(errorBody('INVALID_BODY', fe.message));
     }
+    if (typeof fe.statusCode === 'number' && fe.statusCode >= 400 && fe.statusCode <= 499) {
+      req.log.warn({ err }, 'client error');
+      const code = fe.code === 'FST_ERR_VALIDATION' ? 'VALIDATION_ERROR' : 'INVALID_REQUEST';
+      return reply.code(fe.statusCode).send(errorBody(code, fe.message));
+    }
     req.log.error({ err }, 'unhandled error');
     return reply.code(500).send(errorBody('INTERNAL', 'Internal error'));
   });
