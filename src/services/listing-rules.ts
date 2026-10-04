@@ -57,6 +57,7 @@ export function validateListing(
     if (bin === null) return fail('BIN_REQUIRED', 'bin mode needs a bin price');
     if ((floor !== null && floor !== bin) || (min !== null && min !== bin)) return fail('BIN_MODE_NO_NEGOTIATION', 'bin mode: floor and min_offer must be empty or equal to bin');
     if (lto !== null) return fail('LTO_NOT_ALLOWED', 'Lease-to-own is only allowed in hybrid mode');
+    if (bin < MIN_OFFER_FLOOR) return fail('MIN_OFFER_TOO_LOW', 'bin mode needs a BIN of at least $20');
     floor = bin;
     min = bin;
   } else if (mode === 'offer') {
@@ -66,6 +67,7 @@ export function validateListing(
     if (floor !== null && floor < min) return fail('FLOOR_BELOW_MIN_OFFER', 'floor must be ≥ min_offer');
     if (lto !== null) return fail('LTO_NOT_ALLOWED', 'Lease-to-own is only allowed in hybrid mode');
     warnings.push('NO_BIN_LESS_EXPOSURE');
+    if (floor !== null) warnings.push('FLOOR_AUTO_ACCEPT');
   } else {
     if (bin === null || floor === null || min === null) return fail('HYBRID_FIELDS_REQUIRED', 'hybrid needs bin, floor and min_offer');
     if (!(MIN_OFFER_FLOOR <= min && min <= floor && floor <= bin)) return fail('HYBRID_PRICES_INVALID', 'hybrid needs $20 ≤ min_offer ≤ floor ≤ bin');

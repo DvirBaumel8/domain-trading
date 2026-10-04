@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Category } from '../../src/db/types.js';
-import { presentListing, validateListing, type ListingInput, type ListingSettings } from '../../src/services/listing-rules.js';
+import { isCategory, presentListing, validateListing, type ListingInput, type ListingSettings } from '../../src/services/listing-rules.js';
 
 const S: ListingSettings = {
   geoBinMinCents: 29900, geoBinMaxCents: 49900,
@@ -99,5 +99,48 @@ describe('presentListing', () => {
   it('whole dollars', () => {
     expect(presentListing({ mode: 'hybrid', binCents: 199500, floorCents: 95000, minOfferCents: 95000, ltoMaxMonths: null }))
       .toEqual({ mode: 'hybrid', bin: 1995, floor: 950, min_offer: 950, lto_max_months: null });
+  });
+});
+
+describe('validateListing: fix round 1', () => {
+  const w = (r: ReturnType<typeof v>) => (r.ok ? r.warnings : []);
+  const ov = { override: true, overrideReason: 'r', approvalValid: true };
+  it('offer with floor → NO_BIN_LESS_EXPOSURE + FLOOR_AUTO_ACCEPT; without floor no FLOOR_AUTO_ACCEPT', () => {
+    const r = v({ mode: 'offer', min_offer: 500, floor: 800 }, 'trend');
+    expect(code(r)).toBe('OK');
+    expect(w(r)).toEqual(expect.arrayContaining(['NO_BIN_LESS_EXPOSURE', 'FLOOR_AUTO_ACCEPT']));
+    expect(w(v({ mode: 'offer', min_offer: 500 }, 'trend'))).not.toContain('FLOOR_AUTO_ACCEPT');
+  });
+  it('bin < $20 → MIN_OFFER_TOO_LOW; bin 20 OK', () => {
+    expect(code(v({ mode: 'bin', bin: 5 }, 'other'))).toBe('MIN_OFFER_TOO_LOW');
+    expect(code(v({ mode: 'bin', bin: 20 }, 'other'))).toBe('OK');
+  });
+  it('LTO months edges', () => {
+    const h = (m: number) => code(v({ mode: 'hybrid', bin: 4999, floor: 2500, min_offer: 1000, lto_max_months: m }, 'trend'));
+    expect(h(2)).toBe('OK');
+    expect(h(60)).toBe('OK');
+    expect(h(1)).toBe('LTO_INVALID');
+    expect(h(12.5)).toBe('LTO_INVALID');
+  });
+  it('LTO bin edges $495 and $5,000,000', () => {
+    expect(code(v({ mode: 'hybrid', bin: 495, floor: 400, min_offer: 300, lto_max_months: 12 }, 'trend'))).toBe('OK');
+    expect(code(v({ mode: 'hybrid', bin: 5000000, floor: 400, min_offer: 300, lto_max_months: 12 }, 'trend'))).toBe('OK');
+  });
+  it('min_offer edges', () => {
+    expect(code(v({ mode: 'offer', min_offer: 20 }, 'trend'))).toBe('OK');
+    expect(code(v({ mode: 'hybrid', bin: 1995, floor: 950, min_offer: 19 }, 'trend'))).toBe('HYBRID_PRICES_INVALID');
+  });
+  it('bin 99999.99 → no BIN_OVER_FAST_TRANSFER_MAX', () =>
+    expect(w(v({ mode: 'bin', bin: 99999.99 }, 'trend'))).not.toContain('BIN_OVER_FAST_TRANSFER_MAX'));
+  it('geo offer with override + reason + approval → OK, overrideUsed', () => {
+    const r = v({ mode: 'offer', min_offer: 500 }, 'geo', ov);
+    expect(r.ok && r.overrideUsed).toBe(true);
+  });
+  it('override with null reason → OVERRIDE_NEEDS_APPROVAL', () =>
+    expect(code(v({ mode: 'bin', bin: 650 }, 'geo', { override: true, overrideReason: null, approvalValid: true }))).toBe('OVERRIDE_NEEDS_APPROVAL'));
+  it('isCategory', () => {
+    expect(isCategory('geo')).toBe(true);
+    expect(isCategory('foo')).toBe(false);
+    expect(isCategory(3)).toBe(false);
   });
 });
