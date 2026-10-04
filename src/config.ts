@@ -1,0 +1,62 @@
+import { readFileSync } from 'node:fs';
+import { z } from 'zod';
+import { REGISTRAR_ENV } from './registrars/registry.js';
+
+const EnvSchema = z.object({
+  DATABASE_URL: z
+    .string({ error: 'DATABASE_URL is required' })
+    .refine((v) => /^postgres(ql)?:\/\//.test(v), 'DATABASE_URL must be a postgres:// URL'),
+  APP_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  HOST: z.string().default('0.0.0.0'),
+  LOG_LEVEL: z.string().default('info'),
+  ENABLED_REGISTRARS: z.string().default(''),
+});
+
+export interface Config {
+  databaseUrl: string;
+  appEnv: 'development' | 'test' | 'production';
+  port: number;
+  host: string;
+  logLevel: string;
+  enabledRegistrars: string[];
+  version: string;
+  /** Raw env (strings only). Read secrets from here; never log it. */
+  env: Readonly<Record<string, string>>;
+  /** Every non-empty secret value, for leak tests (AU-8) and log redaction. */
+  secretValues: string[];
+}
+
+const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', ...Object.values(REGISTRAR_ENV).flat()];
+
+function readVersion(): string {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
+  return pkg.version;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv): Config {
+  const parsed = EnvSchema.safeParse(env);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    throw new Error(`Invalid environment: ${msg}`);
+  }
+  const e = parsed.data;
+  const strings: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) if (typeof v === 'string') strings[k] = v;
+
+  const secretValues = SECRET_ENV.map((k) => strings[k] ?? '').filter((v) => v.length > 0);
+  const dbPassword = decodeURIComponent(new URL(e.DATABASE_URL).password);
+  if (dbPassword) secretValues.push(dbPassword);
+
+  return {
+    databaseUrl: e.DATABASE_URL,
+    appEnv: e.APP_ENV,
+    port: e.PORT,
+    host: e.HOST,
+    logLevel: e.LOG_LEVEL,
+    enabledRegistrars: e.ENABLED_REGISTRARS.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    version: readVersion(),
+    env: Object.freeze(strings),
+    secretValues,
+  };
+}

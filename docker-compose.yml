@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dt
+      POSTGRES_PASSWORD: dt
+      POSTGRES_DB: domain_trading
+    ports:
+      - "5433:5432"   # 5432 is taken by a native Postgres on Dvir's Mac
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dt -d domain_trading"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  pgdata: {}
