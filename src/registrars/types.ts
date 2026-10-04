@@ -15,6 +15,7 @@ export interface RegisterDryRun {
   balanceCents: number | null; shortfallCents: number | null; withinMonthlySpendLimit: boolean | null; raw: unknown;
 }
 export interface DomainInfo { expiryDate: string | null; whoisPrivacy: boolean | null; autoRenew: boolean | null; apiAccess: boolean | null; ns: string[] | null }
+export interface RegistrationRecord { orderId: string; chargedCents: number; expiryDate: string | null; invoiceDate: string; raw: unknown }
 export interface RegistrarAdapter {
   readonly name: string;
   readonly capabilities: Capabilities;
@@ -26,6 +27,8 @@ export interface RegistrarAdapter {
   getNameservers(domain: string): Promise<Set<string>>;
   setAutoRenew(domain: string, on: boolean): Promise<void>;
   getReceipt(orderId: string): Promise<unknown>;
+  /** The registration invoice for a domain in our account, on or after `since` (YYYY-MM-DD); null if none. */
+  findRegistration(domain: string, opts: { since: string }): Promise<RegistrationRecord | null>;
 }
 
 /** Codes for outcomes where the registrar may or may not have acted (never retry a purchase with a new key). */

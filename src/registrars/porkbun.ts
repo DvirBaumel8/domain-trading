@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { usdStringToCents } from '../money.js';
 import {
   RegistrarError, type AccountState, type Capabilities, type DomainInfo, type Quote, type RegisterDryRun,
-  type RegisterInput, type RegisterSuccess, type RegistrarAdapter,
+  type RegisterInput, type RegisterSuccess, type RegistrarAdapter, type RegistrationRecord,
 } from './types.js';
 
 export const PORKBUN_DEFAULT_BASE = 'https://api.porkbun.com/api/json/v3';
@@ -29,6 +29,15 @@ function errorDetails(obj: Json): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const k of ['cost', 'balance', 'shortfall', 'ttlRemaining', 'limitSource']) if (k in obj) out[k] = obj[k];
   return out;
+}
+
+const INVOICE_DROP = new Set(['billTo', 'paymentMethods', 'url', 'pdfUrl', 'downloadUrl', 'downloadExpires']);
+
+/** Strip billing identity and sign-in-free download links before an invoice is stored anywhere. */
+export function redactInvoice(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(redactInvoice);
+  if (isObj(v)) return Object.fromEntries(Object.entries(v).filter(([k]) => !INVOICE_DROP.has(k)).map(([k, x]) => [k, redactInvoice(x)]));
+  return v;
 }
 
 export class PorkbunAdapter implements RegistrarAdapter {
@@ -222,6 +231,32 @@ export class PorkbunAdapter implements RegistrarAdapter {
   }
 
   async getReceipt(orderId: string): Promise<unknown> {
-    return this.call('GET', `/account/invoice/${encodeURIComponent(orderId)}`);
+    return redactInvoice(await this.call('GET', `/account/invoice/${encodeURIComponent(orderId)}`));
+  }
+
+  async findRegistration(domain: string, opts: { since: string }): Promise<RegistrationRecord | null> {
+    const fromYear = Number(opts.since.slice(0, 4));
+    const toYear = new Date().getUTCFullYear();
+    for (let year = toYear; year >= fromYear; year--) {
+      const list = await this.call('GET', `/account/invoices?year=${year}&limit=100`);
+      const invoices = Array.isArray(list.invoices) ? list.invoices.filter(isObj) : [];
+      for (const inv of invoices) {
+        const date = typeof inv.date === 'string' ? inv.date.slice(0, 10) : '';
+        const domains = Array.isArray(inv.domains) ? inv.domains : [];
+        if (date < opts.since || !domains.includes(domain)) continue;
+        if (inv.state !== 'PAID' && inv.state !== 'PARTIALLY_REFUNDED') continue;
+        const body = await this.call('GET', `/account/invoice/${encodeURIComponent(String(inv.id))}`);
+        const detail = isObj(body.invoice) ? body.invoice : {};
+        const items = Array.isArray(detail.items) ? detail.items.filter(isObj) : [];
+        const line = items.find(
+          (i) => i.domain === domain && i.status === 'SUCCESS' && typeof i.product === 'string' && /registration/i.test(i.product),
+        );
+        if (!line || !Number.isSafeInteger(line.price_cents)) continue;
+        const discount = Number.isSafeInteger(line.discount_cents) ? (line.discount_cents as number) : 0;
+        const exp = typeof line.expires === 'string' && /^\d{4}-\d{2}-\d{2}/.test(line.expires) ? line.expires.slice(0, 10) : null;
+        return { orderId: String(inv.id), chargedCents: (line.price_cents as number) - discount, expiryDate: exp, invoiceDate: date, raw: redactInvoice(body) };
+      }
+    }
+    return null;
   }
 }
