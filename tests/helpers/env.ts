@@ -11,6 +11,8 @@ export function testEnv(overrides: Record<string, string> = {}): NodeJS.ProcessE
     PORKBUN_SECRET_API_KEY: 'sk1_fake_test_secret_00000000',
     GODADDY_PAT: 'fake_godaddy_pat_0000000000',
     GITHUB_BACKUP_TOKEN: 'github_pat_fake_000000000000',
+    PORKBUN_SANDBOX_API_KEY: 'pk1_sb_fake_test_key_0000000',
+    PORKBUN_SANDBOX_SECRET_API_KEY: 'sk1_sb_fake_test_secret_00000',
     ...overrides,
   };
 }

@@ -30,6 +30,8 @@ describe('loadConfig', () => {
         'sk1_fake_test_secret_00000000',
         'fake_godaddy_pat_0000000000',
         'github_pat_fake_000000000000',
+        'pk1_sb_fake_test_key_0000000',
+        'sk1_sb_fake_test_secret_00000',
         'dt',
       ]),
     );

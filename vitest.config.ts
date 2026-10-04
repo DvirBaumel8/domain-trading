@@ -13,7 +13,7 @@ export default defineConfig({
           name: 'api',
           include: ['tests/api/**/*.test.ts'],
           globalSetup: ['tests/setup/global-db.ts'],
-          setupFiles: ['tests/setup/network.ts', 'tests/setup/api.ts'],
+          setupFiles: ['tests/setup/api.ts'],
         },
       },
     ],
