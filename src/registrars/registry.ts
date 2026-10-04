@@ -1,4 +1,6 @@
 import type { Config } from '../config.js';
+import { PorkbunAdapter } from './porkbun.js';
+import type { RegistrarAdapter } from './types.js';
 
 /** Env vars each registrar adapter needs. Cloudflare is deliberately absent (founder rule 5). */
 export const REGISTRAR_ENV: Record<string, readonly string[]> = {
@@ -11,8 +13,8 @@ export const REGISTRAR_ENV: Record<string, readonly string[]> = {
   namesilo: ['NAMESILO_API_KEY'],
 };
 
-/** Adapters with code behind them. Step 2 adds 'porkbun'. */
-export const IMPLEMENTED_ADAPTERS: ReadonlySet<string> = new Set<string>();
+/** Adapters with code behind them. */
+export const IMPLEMENTED_ADAPTERS: ReadonlySet<string> = new Set<string>(['porkbun']);
 
 export function adapterStatus(config: Config): { name: string; enabled: boolean; reason: string | null }[] {
   return Object.entries(REGISTRAR_ENV).map(([name, keys]) => {
@@ -22,4 +24,21 @@ export function adapterStatus(config: Config): { name: string; enabled: boolean;
     else if (!IMPLEMENTED_ADAPTERS.has(name)) reason = 'not implemented';
     return { name, enabled: reason === null, reason };
   });
+}
+
+export function createAdapters(config: Config): RegistrarAdapter[] {
+  return adapterStatus(config)
+    .filter((a) => a.enabled)
+    .map((a) => {
+      switch (a.name) {
+        case 'porkbun':
+          return new PorkbunAdapter({
+            apiKey: config.env.PORKBUN_API_KEY!,
+            secretKey: config.env.PORKBUN_SECRET_API_KEY!,
+            baseUrl: config.env.PORKBUN_BASE_URL || undefined,
+          });
+        default:
+          throw new Error(`No adapter implementation for ${a.name}`);
+      }
+    });
 }

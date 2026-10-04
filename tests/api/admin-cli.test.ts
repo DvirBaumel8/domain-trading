@@ -37,7 +37,7 @@ describe('admin CLI', () => {
     const { stdout } = await cli(['doctor']);
     expect(stdout).toMatch(/db: ok/);
     expect(stdout).toMatch(/migrations: 1 applied/);
-    expect(stdout).toMatch(/porkbun: disabled \(not implemented\)/);
+    expect(stdout).toMatch(/porkbun: enabled/);
     for (const secret of ['pk1_', 'sk1_', 'fake_godaddy_pat', 'github_pat_fake', ':dt@']) {
       expect(stdout).not.toContain(secret);
     }

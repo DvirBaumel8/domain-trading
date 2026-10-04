@@ -48,7 +48,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   if (enabledRegistrars.includes('cloudflare')) {
     throw new Error('Invalid environment: ENABLED_REGISTRARS: cloudflare is never supported (no third-party nameservers)');
   }
-  const unknown = enabledRegistrars.filter((n) => !(n in REGISTRAR_ENV));
+  const unknown = enabledRegistrars.filter((n) => !Object.hasOwn(REGISTRAR_ENV, n));
   if (unknown.length > 0) {
     throw new Error(`Invalid environment: ENABLED_REGISTRARS: unknown registrar(s) ${unknown.join(', ')}`);
   }

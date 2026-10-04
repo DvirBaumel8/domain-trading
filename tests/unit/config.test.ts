@@ -46,22 +46,29 @@ describe('loadConfig', () => {
 });
 
 describe('adapterStatus', () => {
-  it('lists every known registrar, all disabled in step 1 (no adapter implemented)', () => {
+  it('porkbun is enabled with keys; every other registrar is disabled', () => {
     const s = adapterStatus(loadConfig(testEnv()));
     expect(s.map((a) => a.name)).toEqual(
       expect.arrayContaining(['porkbun', 'dynadot', 'namecom', 'namecheap', 'godaddy', 'spaceship', 'namesilo']),
     );
-    expect(s.every((a) => a.enabled === false)).toBe(true);
-    expect(s.find((a) => a.name === 'porkbun')?.reason).toBe('not implemented');
+    expect(s.find((a) => a.name === 'porkbun')).toMatchObject({ enabled: true, reason: null });
+    expect(s.filter((a) => a.name !== 'porkbun').every((a) => a.enabled === false)).toBe(true);
   });
 
   it('never lists cloudflare', () => {
     expect(adapterStatus(loadConfig(testEnv())).some((a) => a.name === 'cloudflare')).toBe(false);
   });
 
-  it('reports missing keys before "not implemented"', () => {
+  it('reports porkbun keys missing', () => {
     const s = adapterStatus(loadConfig(testEnv({ PORKBUN_API_KEY: '' })));
     expect(s.find((a) => a.name === 'porkbun')?.reason).toBe('keys missing');
+  });
+
+  it('reports "not implemented" for an enabled registrar with keys but no adapter', () => {
+    const s = adapterStatus(
+      loadConfig(testEnv({ ENABLED_REGISTRARS: 'porkbun,dynadot', DYNADOT_API_KEY: 'fake_dyn_key_000000', DYNADOT_API_SECRET: 'fake_dyn_secret_0000' })),
+    );
+    expect(s.find((a) => a.name === 'dynadot')?.reason).toBe('not implemented');
   });
 
   it('reports registrars not in ENABLED_REGISTRARS', () => {
@@ -73,6 +80,9 @@ describe('adapterStatus', () => {
 describe('ENABLED_REGISTRARS validation (S8)', () => {
   it('rejects unknown registrar names', () => {
     expect(() => loadConfig(testEnv({ ENABLED_REGISTRARS: 'porkbun,porkbunn' }))).toThrow(/ENABLED_REGISTRARS.*porkbunn/);
+  });
+  it('rejects prototype-chain names like constructor', () => {
+    expect(() => loadConfig(testEnv({ ENABLED_REGISTRARS: 'constructor' }))).toThrow(/unknown registrar/);
   });
   it('rejects cloudflare explicitly (founder rule 5)', () => {
     expect(() => loadConfig(testEnv({ ENABLED_REGISTRARS: 'cloudflare' }))).toThrow(/cloudflare/i);

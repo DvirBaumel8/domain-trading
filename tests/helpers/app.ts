@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { Writable } from 'node:stream';
 import { z } from 'zod';
+import type { RdapFn } from '../../src/rdap.js';
+import type { RegistrarAdapter } from '../../src/registrars/types.js';
 import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
 import type { Database } from '../../src/db/types.js';
@@ -64,6 +66,9 @@ export async function makeApp(
     logStream?: Writable;
     db?: Kysely<Database>;
     env?: Record<string, string>;
+    adapters?: RegistrarAdapter[];
+    rdap?: RdapFn;
+    quoteTimeoutMs?: number;
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -72,6 +77,9 @@ export async function makeApp(
     db: opts.db ?? testDb,
     now: opts.now,
     audit: opts.audit,
+    adapters: opts.adapters,
+    rdap: opts.rdap,
+    quoteTimeoutMs: opts.quoteTimeoutMs,
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
     registerExtraRoutes: opts.testRoutes === false ? undefined : registerTestRoutes,
   });

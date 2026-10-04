@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Kysely } from 'kysely';
+import { registerCheck } from './api/check.js';
 import { registerHealth } from './api/health.js';
 import type { Config } from './config.js';
 import type { Database } from './db/types.js';
@@ -8,6 +9,10 @@ import { registerAuth, registerScope } from './http/auth.js';
 import { registerIdempotency } from './http/idempotency.js';
 import { registerRateLimit } from './http/rate-limit.js';
 import { errorBody, registerErrorHandling } from './http/errors.js';
+import { rdapStatus, type RdapFn } from './rdap.js';
+import { createAdapters } from './registrars/registry.js';
+import type { RegistrarAdapter } from './registrars/types.js';
+import { CheckService } from './services/check.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -24,6 +29,9 @@ export interface AppDeps {
   logger?: FastifyServerOptions['logger'];
   /** Test-only routes. Production never passes this. */
   registerExtraRoutes?: (app: FastifyInstance) => void;
+  adapters?: RegistrarAdapter[];
+  rdap?: RdapFn;
+  quoteTimeoutMs?: number;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -51,6 +59,15 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerAuditWrite(app, auditWriter); // onSend (last)
 
   registerHealth(app, deps.config, deps.db);
+  const checkService = new CheckService({
+    db: deps.db,
+    adapters: deps.adapters ?? createAdapters(deps.config),
+    rdap: deps.rdap ?? rdapStatus,
+    now: deps.now ?? Date.now,
+    quoteTimeoutMs: deps.quoteTimeoutMs,
+    log: app.log,
+  });
+  registerCheck(app, checkService);
   deps.registerExtraRoutes?.(app);
   return app;
 }
