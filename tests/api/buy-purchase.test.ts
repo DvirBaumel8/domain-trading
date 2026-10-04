@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { RdapFn } from '../../src/rdap.js';
 import { RegistrarError } from '../../src/registrars/types.js';
+import { markUnknown } from '../../src/services/bookkeeping.js';
+import { Reconciler } from '../../src/services/reconciler.js';
 import { makeApp } from '../helpers/app.js';
 import { DOMAIN, approvalNow, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';
@@ -385,5 +387,107 @@ describe('POST /buy concurrent reconciler', () => {
     expect(res.statusCode).toBe(201);
     expect(res.json()).toMatchObject({ domain: DOMAIN, order_id: 'ord-race', charged_cents: 1108 });
     expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('succeeded');
+  });
+});
+
+describe('POST /buy final-review fixes', () => {
+  const stuck = () => new FakeAdapter('porkbun', { register: () => timeout(), findDomain: (_d, n) => (n === 0 ? null : new Error('down')) });
+
+  it('same-key retry after a 202 reaches priorOutcome: reconciler booked it → 201, no extra register; stored 201/409 still replay', async () => {
+    const pb = stuck();
+    const { auth } = await setup(pb);
+    const a = await postBuy(app, buyBody(), auth, 'k-202r');
+    expect(a.statusCode).toBe(202);
+    const calls = pb.realRegisterCalls;
+    // while still unknown, a same-key retry is answered by the purchase (202), not registered again
+    const again = await postBuy(app, buyBody(), auth, 'k-202r');
+    expect(again.statusCode).toBe(202);
+    expect(pb.realRegisterCalls).toBe(calls);
+    const owned = new FakeAdapter('porkbun', { alreadyOwned: true });
+    const r = await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => Date.now() + 10 * 60_000 }).runOnce();
+    expect(r.booked).toBe(1);
+    const b = await postBuy(app, buyBody(), auth, 'k-202r');
+    expect(b.statusCode).toBe(201);
+    expect(b.json()).toMatchObject({ domain: DOMAIN, charged_cents: 1108 });
+    expect(b.headers['idempotent-replayed']).toBeUndefined();
+    expect(pb.realRegisterCalls).toBe(calls);
+    // the new outcome replaced the stored 202: the next retry is a plain replay of the 201
+    const c = await postBuy(app, buyBody(), auth, 'k-202r');
+    expect(c.statusCode).toBe(201);
+    expect(c.headers['idempotent-replayed']).toBe('true');
+    // a stored 409 is still replayed
+    const d1 = await postBuy(app, buyBody(), auth, 'k-409');
+    expect(d1.statusCode).toBe(409);
+    const d2 = await postBuy(app, buyBody(), auth, 'k-409');
+    expect(d2.statusCode).toBe(409);
+    expect(d2.headers['idempotent-replayed']).toBe('true');
+  });
+
+  it('ambiguous dry run → 409 REGISTRAR_DRY_RUN_AMBIGUOUS, unknown purchase recorded, no domain row, no real register; re-buy blocked; reconciler books it', async () => {
+    const amb = new RegistrarError('porkbun', 'REGISTRAR_BAD_RESPONSE', 'dry run answered as real', { ambiguous: true });
+    const pb = new FakeAdapter('porkbun', { dryRun: () => amb });
+    const { auth } = await setup(pb);
+    const res = await postBuy(app, buyBody({ deal_id: 'D-009' }), auth);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatchObject({ code: 'REGISTRAR_DRY_RUN_AMBIGUOUS', details: { registrar: 'porkbun', registrar_code: 'REGISTRAR_BAD_RESPONSE' } });
+    expect(pb.realRegisterCalls).toBe(0);
+    const p = one(await db.selectFrom('purchases').selectAll().execute());
+    expect(p).toMatchObject({ state: 'unknown', expected_cents: 1108, dry_run: false, domain: DOMAIN, registrar: 'porkbun' });
+    expect(p.idempotency_key).toMatch(/^.+#dry-ambiguous-[0-9a-f-]{36}$/);
+    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(0);
+    // (b)
+    const again = await postBuy(app, buyBody(), auth);
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error.code).toBe('ALREADY_OWNED_OR_PENDING');
+    // (c)
+    const owned = new FakeAdapter('porkbun', { alreadyOwned: true });
+    const r = await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => Date.now() + 10 * 60_000 }).runOnce();
+    expect(r.booked).toBe(1);
+    expect(one(await db.selectFrom('ledger_entries').selectAll().execute())).toMatchObject({ amount_cents: -1108, deal_id: 'D-009' });
+    expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ domain: DOMAIN, status: 'owned' });
+    expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('succeeded');
+  });
+
+  it('execute guard: purchase abandoned before register_sent → 409 PURCHASE_ABANDONED, nothing registered', async () => {
+    const pb = new FakeAdapter('porkbun', {
+      findDomain: () => {
+        throw new Error('replaced below');
+      },
+    });
+    const { auth } = await setup(pb);
+    pb.findDomain = async () => {
+      await db.updateTable('purchases').set({ state: 'failed' }).execute();
+      return null;
+    };
+    const res = await postBuy(app, buyBody(), auth);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe('PURCHASE_ABANDONED');
+    expect(pb.realRegisterCalls).toBe(0);
+    expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('failed');
+  });
+
+  it('found-in-account path persists register_sent before booking (a crash there is reconciled)', async () => {
+    const pb = new FakeAdapter('porkbun', { alreadyOwned: true });
+    const { auth } = await setup(pb);
+    let seen: string | undefined;
+    const orig = pb.findRegistration.bind(pb);
+    pb.findRegistration = async (d: string, o: { since: string }) => {
+      seen = (await db.selectFrom('purchases').select('state').executeTakeFirstOrThrow()).state;
+      return orig(d, o);
+    };
+    expect((await postBuy(app, buyBody(), auth)).statusCode).toBe(201);
+    expect(seen).toBe('register_sent');
+  });
+
+  it('markUnknown never moves a failed or succeeded purchase', async () => {
+    const pb = new FakeAdapter('porkbun');
+    const { auth } = await setup(pb);
+    await postBuy(app, buyBody(), auth);
+    const p = one(await db.selectFrom('purchases').select('id').execute());
+    await markUnknown(db, p.id, { status: 202, body: {} });
+    expect((await db.selectFrom('purchases').select('state').executeTakeFirstOrThrow()).state).toBe('succeeded');
+    await db.updateTable('purchases').set({ state: 'failed' }).execute();
+    await markUnknown(db, p.id, { status: 202, body: {} });
+    expect((await db.selectFrom('purchases').select('state').executeTakeFirstOrThrow()).state).toBe('failed');
   });
 });

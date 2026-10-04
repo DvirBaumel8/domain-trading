@@ -60,6 +60,21 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
     if (!existing || existing.state !== 'completed' || existing.status_code === null) {
       throw new AppError(409, 'IDEMPOTENCY_KEY_IN_USE', 'A request with this Idempotency-Key is still in progress');
     }
+    // A stored 202 on POST /buy is "purchase state unknown": the reconciler may have booked it since, so the
+    // handler must run again (BuyService.priorOutcome never re-registers) and its answer replaces the stored one.
+    if (existing.status_code === 202 && req.url.split('?')[0] === '/buy') {
+      const reopened = await db
+        .updateTable('idempotency_keys')
+        .set({ state: 'in_progress', completed_at: null })
+        .where('key', '=', key)
+        .where('state', '=', 'completed')
+        .where('status_code', '=', 202)
+        .returning('key')
+        .executeTakeFirst();
+      if (!reopened) throw new AppError(409, 'IDEMPOTENCY_KEY_IN_USE', 'A request with this Idempotency-Key is still in progress');
+      req.idem = { key, claimed: true };
+      return;
+    }
     reply
       .code(existing.status_code)
       .header('idempotent-replayed', 'true')

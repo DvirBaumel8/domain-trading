@@ -132,7 +132,8 @@ export class BuyService {
     await this.assertAccountState(adapter, winner.firstYearCents!);
 
     // 10. registrar dry run (re-quote once on COST_MISMATCH)
-    const dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars);
+    const dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars,
+      { input, ctx, approvedAt: appr.approvedAt, check });
     winner = dry.winner;
 
     const approved: Approved = {
@@ -276,12 +277,13 @@ export class BuyService {
       });
     }
     if (existing) {
+      await this.markRegisterSent(purchaseId); // persisted first, so a crash from here is reconciled, not abandoned
       markSent(); // from here on, treat as money-relevant
       return this.finishFound(a, purchaseId, existing, ['FOUND_IN_ACCOUNT: the domain was already in the registrar account; booked from its invoice']);
     }
 
     // step 4: persist register_sent BEFORE calling the registrar
-    await db.updateTable('purchases').set({ state: 'register_sent', updated_at: new Date() }).where('id', '=', purchaseId).execute();
+    await this.markRegisterSent(purchaseId);
     markSent();
     const key = `dt-${purchaseId}`;
     let lastErr: RegistrarError | null = null;
@@ -291,6 +293,9 @@ export class BuyService {
       try {
         const r = await adapter.register(d, { costCents: a.cost, idempotencyKey: key, dryRun: false });
         if (r.kind !== 'registered') throw new RegistrarError(adapter.name, 'REGISTRAR_BAD_RESPONSE', 'not a registration', { ambiguous: true });
+        // Deliberately NOT awaited: the registrar call succeeded, so an error thrown by a post-register step must
+        // not be caught here (it would be treated as a failed attempt and trigger a second register). The promise
+        // is returned to the caller's catch (purchase()), which maps any error to state=unknown / 202.
         return this.finishRegistered(a, purchaseId, r);
       } catch (e) {
         if (!(e instanceof RegistrarError)) throw e; // → outer catch → unknown (202)
@@ -319,6 +324,15 @@ export class BuyService {
       });
     }
     return this.unknown(a, purchaseId);
+  }
+
+  /** created → register_sent, guarded: if the purchase was abandoned/failed meanwhile, nothing has been sent yet. */
+  private async markRegisterSent(purchaseId: number): Promise<void> {
+    const r = await this.deps.db.updateTable('purchases').set({ state: 'register_sent', updated_at: new Date() })
+      .where('id', '=', purchaseId).where('state', '=', 'created').executeTakeFirst();
+    if (Number(r.numUpdatedRows) === 0) {
+      throw new AppError(409, 'PURCHASE_ABANDONED', 'The purchase was abandoned before it reached the registrar; nothing was bought');
+    }
   }
 
   /** Domain is in our account but we have no register result: book only from the registrar's invoice. */
@@ -532,6 +546,7 @@ export class BuyService {
 
   private async registrarDryRun(
     adapter: RegistrarAdapter, domain: string, winner: EvaluatedQuote, caps: Caps, pocCap: number, allowed: string[],
+    rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult },
   ): Promise<{ winner: EvaluatedQuote; cost: number }> {
     let w = winner;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -552,6 +567,7 @@ export class BuyService {
         return { winner: w, cost };
       } catch (e) {
         if (!(e instanceof RegistrarError)) throw e;
+        if (e.ambiguous) await this.recordDryRunAmbiguous(adapter, e, cost, rec);
         if (e.code === 'COST_MISMATCH' && attempt === 0) {
           w = await this.requote(adapter, domain, caps, pocCap, allowed);
           continue;
@@ -564,6 +580,22 @@ export class BuyService {
       }
     }
     throw new AppError(409, 'REGISTRAR_DRY_RUN_FAILED', 'The registrar price kept changing', { registrar: adapter.name });
+  }
+
+  /** An ambiguous dry run may have been a real registration: record an `unknown` purchase so the cap counts it and the reconciler resolves it. */
+  private async recordDryRunAmbiguous(
+    adapter: RegistrarAdapter, e: RegistrarError, cost: number, rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult },
+  ): Promise<never> {
+    this.deps.log?.error({ domain: rec.input.domain, registrar: adapter.name, registrar_code: e.code }, 'dry run ambiguous — possible real charge');
+    await this.deps.db.insertInto('purchases').values({
+      idempotency_key: `${rec.ctx.idempotencyKey}#dry-ambiguous-${randomUUID()}`, request_hash: rec.ctx.requestHash, domain: rec.input.domain,
+      state: 'unknown', dry_run: false, registrar: adapter.name, check_id: rec.check.checkId, max_price_cents: rec.input.maxPriceCents,
+      approval_text: String(rec.input.approval?.text), approval_at: rec.approvedAt, expected_cents: cost,
+      request: JSON.stringify(redact(rec.input.requestBody)), audit_id: rec.ctx.auditId,
+    }).execute();
+    throw new AppError(409, 'REGISTRAR_DRY_RUN_AMBIGUOUS',
+      'The registrar dry run gave an ambiguous answer; a real charge may have happened. Check the registrar account; the reconciler will book it if it was registered.',
+      { registrar: adapter.name, registrar_code: e.code });
   }
 
   private async requote(adapter: RegistrarAdapter, domain: string, caps: Caps, pocCap: number, allowed: string[]): Promise<EvaluatedQuote> {

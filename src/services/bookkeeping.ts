@@ -70,7 +70,7 @@ export async function failPurchase(db: Kysely<Database>, purchaseId: number, dom
 export async function markUnknown(db: Kysely<Database>, purchaseId: number, response: { status: number; body: unknown }): Promise<void> {
   await db.updateTable('purchases')
     .set({ state: 'unknown', response: JSON.stringify(response), updated_at: new Date() })
-    .where('id', '=', purchaseId).where('state', '!=', 'succeeded').execute();
+    .where('id', '=', purchaseId).where('state', 'in', ['created', 'register_sent', 'unknown']).execute();
 }
 
 export async function storeResponse(db: Kysely<Database>, purchaseId: number, response: { status: number; body: unknown }): Promise<void> {
