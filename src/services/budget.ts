@@ -30,3 +30,17 @@ export async function activeDomainCount(db: Kysely<Database>): Promise<number> {
     .executeTakeFirstOrThrow();
   return Number(r.n);
 }
+
+/**
+ * spent and pending from ONE statement (one snapshot). Two separate reads can straddle a booking commit
+ * (purchase leaves "pending" and its ledger row appears "spent" in between), under-counting the purchase.
+ */
+export async function spentAndPending(db: Kysely<Database>): Promise<{ spent: number; pending: number }> {
+  const r = await sql<{ spent: string; pending: string }>`
+    select
+      (select coalesce(-sum(amount_cents), 0)::bigint from ledger_entries where type in ('registration', 'renewal', 'fee')) as spent,
+      (select coalesce(sum(expected_cents), 0)::bigint from purchases where state in ('created', 'register_sent', 'unknown') and dry_run = false) as pending
+  `.execute(db);
+  const row = r.rows[0]!;
+  return { spent: Number(row.spent), pending: Number(row.pending) };
+}

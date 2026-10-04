@@ -356,3 +356,34 @@ describe('POST /buy purchase', () => {
     expect(pb.realRegisterCalls).toBe(1);
   });
 });
+
+describe('POST /buy concurrent reconciler', () => {
+  it('reconciler books the purchase while /buy is resolving an ambiguous outcome → reconstructed 201, not 202', async () => {
+    let id = 0;
+    const pb = new FakeAdapter('porkbun', {
+      register: () => timeout(),
+      findDomain: (d, n) => {
+        if (n === 0) return null; // pre-purchase availability lookup
+        throw new Error('booked-by-reconciler'); // post-retry lookup fails, but meanwhile the reconciler books
+      },
+    });
+    const { auth } = await setup(pb);
+    const orig = pb.findDomain.bind(pb);
+    pb.findDomain = async (d: string) => {
+      try {
+        return await orig(d);
+      } catch (e) {
+        const p = await db.selectFrom('purchases').select('id').executeTakeFirstOrThrow();
+        id = p.id;
+        await db.updateTable('purchases').set({ state: 'succeeded', charged_cents: 1108, order_id: 'ord-race' }).where('id', '=', p.id).execute();
+        await db.updateTable('domains').set({ status: 'owned', cost_cents: 1108, renewal_price_cents: 1108, expiry_date: '2027-10-05', drop_date: '2028-10-05', buy_date: '2026-10-05', renewals_used: 0 }).execute();
+        throw e;
+      }
+    };
+    const res = await postBuy(app, buyBody(), auth);
+    expect(id).toBeGreaterThan(0);
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ domain: DOMAIN, order_id: 'ord-race', charged_cents: 1108 });
+    expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('succeeded');
+  });
+});

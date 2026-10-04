@@ -10,7 +10,7 @@ import { RegistrarError, type AccountState, type DomainInfo, type RegisterSucces
 import { checkApproval } from './approval.js';
 import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
 import { landerNameservers, sameNsSet } from './lander.js';
-import { activeDomainCount, pendingCents, spentCents } from './budget.js';
+import { activeDomainCount, spentAndPending, spentCents } from './budget.js';
 import type { CheckResult, CheckService } from './check.js';
 import { isCategory, listingSettings, presentListing, validateListing, type ListingInput, type ListingResult } from './listing-rules.js';
 import { evaluateQuote, pickWinner, type EvaluatedQuote } from './selection.js';
@@ -193,13 +193,20 @@ export class BuyService {
   private async unknown(a: Approved, purchaseId: number): Promise<BuyResult> {
     const r = this.unknownBody(purchaseId, a.input.domain, a.ctx.auditId);
     await markUnknown(this.deps.db, purchaseId, r);
-    return r;
+    return (await this.ifBooked(purchaseId)) ?? r;
+  }
+
+  /** A concurrent reconciler may have booked the purchase; if so report the booked 201, never a 409/202. */
+  private async ifBooked(purchaseId: number): Promise<BuyResult | null> {
+    const p = await this.deps.db.selectFrom('purchases').select(['domain', 'state', 'audit_id', 'charged_cents', 'order_id'])
+      .where('id', '=', purchaseId).executeTakeFirst();
+    return p?.state === 'succeeded' ? this.reconstructed(p) : null;
   }
 
   private async rejected(a: Approved, purchaseId: number, code: string, message: string, details: Record<string, unknown>): Promise<BuyResult> {
     const r = { status: 409, body: errorBody(code, message, details) as Record<string, unknown> };
     await failPurchase(this.deps.db, purchaseId, a.input.domain, r);
-    return r;
+    return (await this.ifBooked(purchaseId)) ?? r;
   }
 
   /** Reservation: per-domain advisory lock + global settings lock; authoritative re-checks 4, 5, 8. */
@@ -491,7 +498,7 @@ export class BuyService {
   }
 
   protected async assertPocCap(db: Kysely<Database>, capCents: number, costCents: number): Promise<void> {
-    const [spent, pending] = await Promise.all([spentCents(db), pendingCents(db)]);
+    const { spent, pending } = await spentAndPending(db);
     const remaining = capCents - spent - pending;
     if (costCents > remaining) {
       throw new AppError(409, 'POC_CAP_EXCEEDED', 'This purchase would exceed the $500 POC cap', {
@@ -576,8 +583,7 @@ export class BuyService {
   }
 
   private async dryRunBody(a: Approved): Promise<Record<string, unknown>> {
-    const spent = await spentCents(this.deps.db);
-    const pending = await pendingCents(this.deps.db);
+    const { spent, pending } = await spentAndPending(this.deps.db);
     const w = a.winner;
     return {
       dry_run: true, domain: a.input.domain, check_id: a.check.checkId, registrar: w.registrar,

@@ -15,10 +15,12 @@ import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
 import { BuyService } from './services/buy.js';
 import { CheckService } from './services/check.js';
+import { Reconciler } from './services/reconciler.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     routeTable: { method: string; url: string }[];
+    reconciler: Reconciler;
   }
 }
 
@@ -77,6 +79,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     sleep: deps.sleep, log: app.log,
   });
   registerBuy(app, buyService);
+  app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   deps.registerExtraRoutes?.(app);
   return app;
 }
