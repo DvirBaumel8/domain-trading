@@ -4,8 +4,11 @@ import { insertOwnedDomain, testDb } from './db.js';
 
 export const DOMAIN = 'examplecityroofing.com';
 
+// Fixed per module load so two buyBody() calls in one test are byte-identical (same-key replay tests).
+const T0 = Date.now();
+
 export function approvalNow(domain = DOMAIN, hoursAgo = 1) {
-  return { text: `yes buy ${domain} up to $11.50, list BIN $399`, approved_at: new Date(Date.now() - hoursAgo * 3_600_000).toISOString() };
+  return { text: `yes buy ${domain} up to $11.50, list BIN $399`, approved_at: new Date(T0 - hoursAgo * 3_600_000).toISOString() };
 }
 
 export function buyBody(over: Record<string, unknown> = {}) {

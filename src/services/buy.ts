@@ -1,11 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Category, Database } from '../db/types.js';
-import { AppError } from '../http/errors.js';
+import { AppError, errorBody } from '../http/errors.js';
+import { redact } from '../http/redact.js';
+import { addOneYear, jerusalemDate } from '../dates.js';
 import { formatUsd } from '../money.js';
 import type { RdapFn } from '../rdap.js';
-import { RegistrarError, type AccountState, type RegistrarAdapter } from '../registrars/types.js';
+import { RegistrarError, type AccountState, type DomainInfo, type RegisterSuccess, type RegistrarAdapter } from '../registrars/types.js';
 import { checkApproval } from './approval.js';
+import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
+import { landerNameservers, sameNsSet } from './lander.js';
 import { activeDomainCount, pendingCents, spentCents } from './budget.js';
 import type { CheckResult, CheckService } from './check.js';
 import { isCategory, listingSettings, presentListing, validateListing, type ListingInput, type ListingResult } from './listing-rules.js';
@@ -41,11 +45,14 @@ const priceDetails = (q: EvaluatedQuote) => ({
   two_year: formatUsd(q.twoYearCents!), two_year_cents: q.twoYearCents,
 });
 
-function funds(shortfallCents: number): AppError {
-  return new AppError(409, 'REGISTRAR_FUNDS', 'Not enough prepaid credit at the registrar (no top-up is ever attempted)', {
-    shortfall_cents: shortfallCents, shortfall: formatUsd(shortfallCents),
-  });
+function funds(shortfallCents?: number | null): AppError {
+  const known = typeof shortfallCents === 'number' && Number.isSafeInteger(shortfallCents) && shortfallCents > 0;
+  return new AppError(409, 'REGISTRAR_FUNDS', 'Not enough prepaid credit at the registrar (no top-up is ever attempted)',
+    known ? { shortfall_cents: shortfallCents, shortfall: formatUsd(shortfallCents) } : {});
 }
+
+const RETRY_DELAYS_MS = [2000, 5000, 10000];
+const isUniqueViolation = (e: unknown) => (e as { code?: string }).code === '23505';
 
 export class BuyService {
   constructor(protected readonly deps: BuyDeps) {}
@@ -60,6 +67,13 @@ export class BuyService {
     const { db } = this.deps;
     const now = new Date(this.deps.now());
     const settings = await db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
+
+    // B4: purchase-level replay (real buys only), before the approval check so a same-key retry
+    // gets the stored outcome even if the approval has since expired
+    if (!input.dryRun) {
+      const prior = await this.priorOutcome(ctx);
+      if (prior) return prior;
+    }
 
     // 3. approval
     const appr = checkApproval(input.approval, input.domain, now, settings.approval_max_age_hours);
@@ -77,12 +91,6 @@ export class BuyService {
       });
       if (!r.ok) throw new AppError(422, r.code, r.message);
       listing = r;
-    }
-
-    // B4: purchase-level replay (real buys only)
-    if (!input.dryRun) {
-      const prior = await this.priorOutcome(ctx);
-      if (prior) return prior;
     }
 
     // 4, 5
@@ -135,14 +143,297 @@ export class BuyService {
     return this.purchase(approved);
   }
 
-  /** Implemented in Task 5. */
-  protected async purchase(_a: Approved): Promise<BuyResult> {
-    throw new AppError(501, 'NOT_IMPLEMENTED', 'Real purchases arrive in Task 5');
+  private sleep(ms: number): Promise<void> {
+    return (this.deps.sleep ?? ((t) => new Promise((r) => setTimeout(r, t))))(ms);
   }
 
-  /** Implemented in Task 5 (returns null until then). */
-  protected async priorOutcome(_ctx: BuyCtx): Promise<BuyResult | null> {
-    return null;
+  protected async priorOutcome(ctx: BuyCtx): Promise<BuyResult | null> {
+    const p = await this.deps.db.selectFrom('purchases').select(['id', 'domain', 'response', 'audit_id'])
+      .where('idempotency_key', '=', ctx.idempotencyKey).executeTakeFirst();
+    if (!p) return null;
+    if (p.response) {
+      const r = p.response as { status: number; body: Record<string, unknown> };
+      return { status: r.status, body: r.body };
+    }
+    return this.unknownBody(p.id, p.domain, p.audit_id ?? ctx.auditId);
+  }
+
+  private unknownBody(purchaseId: number, domain: string, auditId: string): BuyResult {
+    return {
+      status: 202,
+      body: {
+        status: 'unknown', code: 'PURCHASE_STATE_UNKNOWN', domain, purchase_id: purchaseId, audit_id: auditId,
+        message: 'The registrar may or may not have registered the domain. The reconciler finishes the bookkeeping within 10 minutes. Do not retry with a new Idempotency-Key.',
+      },
+    };
+  }
+
+  private async unknown(a: Approved, purchaseId: number): Promise<BuyResult> {
+    const r = this.unknownBody(purchaseId, a.input.domain, a.ctx.auditId);
+    await markUnknown(this.deps.db, purchaseId, r);
+    return r;
+  }
+
+  private async rejected(a: Approved, purchaseId: number, code: string, message: string, details: Record<string, unknown>): Promise<BuyResult> {
+    const r = { status: 409, body: errorBody(code, message, details) as Record<string, unknown> };
+    await failPurchase(this.deps.db, purchaseId, a.input.domain, r);
+    return r;
+  }
+
+  /** Reservation: per-domain advisory lock + global settings lock; authoritative re-checks 4, 5, 8. */
+  private async reserve(a: Approved): Promise<number> {
+    const { db } = this.deps;
+    try {
+      return await db.transaction().execute(async (trx) => {
+        await sql`select pg_advisory_xact_lock(hashtext(${a.input.domain}))`.execute(trx);
+        const s = await trx.selectFrom('settings').select(['poc_cap_cents', 'max_domains']).forUpdate().executeTakeFirstOrThrow();
+        await this.assertNotOwned(trx, a.input.domain);
+        await this.assertDomainCap(trx, s.max_domains);
+        await this.assertPocCap(trx, s.poc_cap_cents, a.cost);
+        const { id } = await trx.insertInto('purchases').values({
+          idempotency_key: a.ctx.idempotencyKey, request_hash: a.ctx.requestHash, domain: a.input.domain, state: 'created',
+          dry_run: false, registrar: a.winner.registrar, check_id: a.check.checkId, max_price_cents: a.input.maxPriceCents,
+          approval_text: String(a.input.approval?.text), approval_at: a.approvedAt, expected_cents: a.cost,
+          request: JSON.stringify(redact(a.input.requestBody)), audit_id: a.ctx.auditId,
+        }).returning('id').executeTakeFirstOrThrow();
+        await trx.insertInto('domains').values({
+          domain: a.input.domain, status: 'pending_purchase', registrar: a.winner.registrar, category: a.category, deal_id: a.input.dealId,
+        }).execute();
+        return id;
+      });
+    } catch (e) {
+      if (isUniqueViolation(e)) throw new AppError(409, 'ALREADY_OWNED_OR_PENDING', `${a.input.domain} is already owned or being bought`);
+      throw e;
+    }
+  }
+
+  protected async purchase(a: Approved): Promise<BuyResult> {
+    const purchaseId = await this.reserve(a);
+    let sent = false;
+    try {
+      return await this.execute(a, purchaseId, () => {
+        sent = true;
+      });
+    } catch (e) {
+      if (!sent) {
+        // Nothing reached the registrar: release the reservation, surface the error.
+        const status = e instanceof AppError ? e.status : 500;
+        const body = e instanceof AppError ? errorBody(e.code, e.message, e.details) : errorBody('INTERNAL', 'Internal error');
+        await failPurchase(this.deps.db, purchaseId, a.input.domain, { status, body });
+        throw e;
+      }
+      // After register_sent: NEVER 5xx (the money invariant).
+      this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'purchase error after register_sent');
+      try {
+        return await this.unknown(a, purchaseId);
+      } catch {
+        return this.unknownBody(purchaseId, a.input.domain, a.ctx.auditId);
+      }
+    }
+  }
+
+  private async execute(a: Approved, purchaseId: number, markSent: () => void): Promise<BuyResult> {
+    const { db } = this.deps;
+    const { adapter } = a;
+    const d = a.input.domain;
+
+    // step 3: already in our account (crashed earlier run, or bought by hand)?
+    let existing: DomainInfo | null;
+    try {
+      existing = await adapter.findDomain(d);
+    } catch (e) {
+      throw new AppError(409, 'REGISTRAR_STATE_UNKNOWN', 'Could not confirm the domain is not already in the account; not buying', {
+        registrar: adapter.name, registrar_code: e instanceof RegistrarError ? e.code : 'UNKNOWN',
+      });
+    }
+    if (existing) {
+      markSent(); // from here on, treat as money-relevant
+      return this.finishFound(a, purchaseId, existing, ['FOUND_IN_ACCOUNT: the domain was already in the registrar account; booked from its invoice']);
+    }
+
+    // step 4: persist register_sent BEFORE calling the registrar
+    await db.updateTable('purchases').set({ state: 'register_sent', updated_at: new Date() }).where('id', '=', purchaseId).execute();
+    markSent();
+    const key = `dt-${purchaseId}`;
+    let lastErr: RegistrarError | null = null;
+    for (let i = 0; i <= RETRY_DELAYS_MS.length; i++) {
+      if (i > 0) await this.sleep(RETRY_DELAYS_MS[i - 1]!);
+      try {
+        const r = await adapter.register(d, { costCents: a.cost, idempotencyKey: key, dryRun: false });
+        if (r.kind !== 'registered') throw new RegistrarError(adapter.name, 'REGISTRAR_BAD_RESPONSE', 'not a registration', { ambiguous: true });
+        return this.finishRegistered(a, purchaseId, r);
+      } catch (e) {
+        if (!(e instanceof RegistrarError)) throw e; // → outer catch → unknown (202)
+        if (!e.ambiguous) {
+          return this.rejected(a, purchaseId, 'REGISTRAR_REJECTED', `The registrar refused the registration (${e.code})`, {
+            registrar: adapter.name, registrar_code: e.code,
+          });
+        }
+        lastErr = e;
+      }
+    }
+
+    // step 5, ambiguous after retries: ask the registrar, then RDAP
+    let info: DomainInfo | null | undefined;
+    try {
+      info = await adapter.findDomain(d);
+    } catch {
+      info = undefined;
+    }
+    if (info) return this.finishFound(a, purchaseId, info, []);
+    if (info === null && (await this.deps.rdap(d)) === 'not_registered') {
+      return this.rejected(a, purchaseId, 'PURCHASE_FAILED', 'The registrar never confirmed the registration and the domain is still unregistered; nothing was bought', {
+        registrar: adapter.name, registrar_code: lastErr?.code ?? 'UNKNOWN',
+      });
+    }
+    return this.unknown(a, purchaseId);
+  }
+
+  /** Domain is in our account but we have no register result: book only from the registrar's invoice. */
+  private async finishFound(a: Approved, purchaseId: number, info: DomainInfo, warnings: string[]): Promise<BuyResult> {
+    const since = jerusalemDate(new Date(this.deps.now() - 2 * 86_400_000));
+    const rec = await a.adapter.findRegistration(a.input.domain, { since }).catch(() => null);
+    if (!rec) return this.unknown(a, purchaseId);
+    return this.complete(a, purchaseId, {
+      orderId: rec.orderId, chargedCents: rec.chargedCents, info,
+      fallbackExpiry: rec.expiryDate, receiptRaw: rec.raw, buyDate: rec.invoiceDate,
+    }, warnings);
+  }
+
+  private async finishRegistered(a: Approved, purchaseId: number, r: RegisterSuccess): Promise<BuyResult> {
+    const info = await a.adapter.findDomain(a.input.domain).catch(() => null);
+    let fallbackExpiry: string | null = null;
+    if (!info?.expiryDate) {
+      const rec = await a.adapter.findRegistration(a.input.domain, { since: jerusalemDate(new Date(this.deps.now() - 86_400_000)) }).catch(() => null);
+      fallbackExpiry = rec?.expiryDate ?? null;
+    }
+    const receiptRaw = await a.adapter.getReceipt(r.orderId).catch(() => null); // the reconciler fetches it later if missing
+    const warnings = r.chargedCents > a.input.maxPriceCents ? [`CHARGE_ABOVE_MAX: charged ${formatUsd(r.chargedCents)} above max_price`] : [];
+    return this.complete(a, purchaseId, {
+      orderId: r.orderId, chargedCents: r.chargedCents, info, fallbackExpiry, receiptRaw, buyDate: jerusalemDate(new Date(this.deps.now())),
+    }, warnings);
+  }
+
+  private async complete(
+    a: Approved, purchaseId: number,
+    x: { orderId: string; chargedCents: number; info: DomainInfo | null; fallbackExpiry: string | null; receiptRaw: unknown; buyDate: string },
+    warnings: string[],
+  ): Promise<BuyResult> {
+    const { db } = this.deps;
+    let expiry = x.info?.expiryDate ?? x.fallbackExpiry;
+    if (!expiry) {
+      expiry = addOneYear(x.buyDate);
+      warnings.push('EXPIRY_ESTIMATED: the registrar did not report an expiry; using buy date + 1 year until the reconciler or a report corrects it');
+    }
+    await bookPurchase(db, {
+      purchaseId, domain: a.input.domain, registrar: a.adapter.name, registrarApi: registrarApiOf(a.adapter.capabilities),
+      orderId: x.orderId, chargedCents: x.chargedCents, renewalCents: a.winner.renewalCents, expiryDate: expiry, buyDate: x.buyDate,
+      category: a.category, dealId: a.input.dealId, checkId: a.check.checkId, auditId: a.ctx.auditId, receiptRaw: x.receiptRaw ?? null,
+    });
+    this.deps.checkService.invalidate(a.input.domain);
+
+    // Everything after bookPurchase is best-effort: the purchase is booked and must be reported as 201.
+    let post: { privacy: string; auto_renew: string; lander: string; listing: unknown } = { privacy: 'unknown', auto_renew: 'unconfirmed', lander: 'skipped', listing: null };
+    try {
+      post = await this.postBuy(a, x.info, warnings);
+    } catch (e) {
+      this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'post-buy failed');
+      warnings.push('POST_BUY_FAILED: the purchase is booked; post-buy steps did not finish — check privacy, auto-renew and NS');
+    }
+    const spent = await spentCents(db);
+    const owned = await db.selectFrom('domains').select(sql<number>`count(*)::int`.as('n'))
+      .where('status', 'in', ['owned', 'listed']).executeTakeFirstOrThrow();
+    const body = {
+      domain: a.input.domain, registrar: a.adapter.name, order_id: x.orderId,
+      charged: formatUsd(x.chargedCents), charged_cents: x.chargedCents,
+      renewal: formatUsd(a.winner.renewalCents!), renewal_cents: a.winner.renewalCents,
+      two_year: formatUsd(a.winner.twoYearCents!), two_year_cents: a.winner.twoYearCents,
+      expiry_date: expiry, drop_date: addOneYear(expiry), renewals_used: 0,
+      poc_spent_after: formatUsd(spent), poc_spent_after_cents: spent,
+      poc_remaining: formatUsd(a.settings.poc_cap_cents - spent), poc_remaining_cents: a.settings.poc_cap_cents - spent,
+      domains_owned: Number(owned.n), post_buy: post, warnings, audit_id: a.ctx.auditId,
+    };
+    const result = { status: 201, body };
+    await storeResponse(db, purchaseId, result);
+    return result;
+  }
+
+  /** buy.md step 7: each failure is a warning; nothing here undoes the purchase. */
+  private async postBuy(a: Approved, info: DomainInfo | null, warnings: string[]) {
+    const { db } = this.deps;
+    const d = a.input.domain;
+    const hint = (e: unknown, what: string) =>
+      e instanceof RegistrarError && e.code === 'API_ACCESS_DISABLED'
+        ? 'API_ACCESS_DISABLED: turn on "Opt In All Domains" at porkbun.com/account/api, then call /list again'
+        : `${what}: ${e instanceof RegistrarError ? e.code : 'error'}`;
+    const post: { privacy: string; auto_renew: string; lander: string; listing: unknown } = {
+      privacy: 'unknown', auto_renew: 'unconfirmed', lander: 'skipped', listing: null,
+    };
+
+    // 7.1 privacy
+    if (info?.whoisPrivacy === true) post.privacy = 'on';
+    else if (info?.whoisPrivacy === false) {
+      post.privacy = 'off';
+      warnings.push('PRIVACY_OFF: WHOIS privacy is off and Porkbun has no API to turn it on after registration; turn it on in the Porkbun dashboard');
+    } else warnings.push('PRIVACY_UNKNOWN: could not confirm WHOIS privacy; check the registrar dashboard');
+
+    // 7.2 auto-renew off, then verify
+    try {
+      await a.adapter.setAutoRenew(d, false);
+      const after = await a.adapter.findDomain(d);
+      if (after?.autoRenew === false) post.auto_renew = 'off';
+      else warnings.push('AUTO_RENEW_NOT_CONFIRMED: auto-renew may still be on; turn it off in the registrar dashboard');
+    } catch (e) {
+      warnings.push(hint(e, 'AUTO_RENEW_FAILED'));
+    }
+
+    // 7.3 auto_list
+    if (a.input.autoList) {
+      const target = a.settings.lander_target;
+      const ns = landerNameservers(target);
+      if (!ns) warnings.push('LANDER_CUSTOM: lander_target is custom; call /list with explicit nameservers');
+      else {
+        try {
+          await a.adapter.setNameservers(d, [...ns]);
+          const got = await a.adapter.getNameservers(d);
+          if (sameNsSet(got, ns)) {
+            post.lander = `${target} ns set`;
+            await db.updateTable('domains').set({ lander: target, lander_ns: [...ns], lander_set_at: new Date(), updated_at: new Date() })
+              .where('domain', '=', d).execute();
+          } else {
+            post.lander = 'mismatch';
+            warnings.push('LANDER_MISMATCH: the registrar reports different nameservers; call /list again');
+          }
+        } catch (e) {
+          post.lander = 'failed';
+          warnings.push(hint(e, 'LANDER_FAILED'));
+        }
+      }
+      if (a.listing) {
+        const l = a.listing.listing;
+        try {
+        await db.transaction().execute(async (trx) => {
+          const row = await trx.updateTable('domains').set({
+            listing_mode: l.mode, bin_cents: l.binCents, floor_cents: l.floorCents, min_offer_cents: l.minOfferCents,
+            lto_max_months: l.ltoMaxMonths, status: 'listed', updated_at: new Date(),
+          }).where('domain', '=', d).returning('id').executeTakeFirstOrThrow();
+          await trx.insertInto('listing_history').values({
+            domain_id: row.id, source: 'buy', category: a.category, mode: l.mode, bin_cents: l.binCents, floor_cents: l.floorCents,
+            min_offer_cents: l.minOfferCents, lto_max_months: l.ltoMaxMonths, lander: target, override: a.listing!.overrideUsed,
+            override_reason: a.listing!.overrideUsed ? a.input.overrideReason : null,
+            approval_text: String(a.input.approval?.text), approval_at: a.approvedAt, audit_id: a.ctx.auditId,
+          }).execute();
+        });
+        post.listing = presentListing(l);
+        warnings.push(...a.listing.warnings);
+        } catch (e) {
+          // Post-buy never undoes or masks a booked purchase (controller ruling, step 3 Task 2 review).
+          this.deps.log?.error({ errMessage: (e as Error).message }, 'post-buy listing save failed');
+          warnings.push('LISTING_SAVE_FAILED: the purchase is booked but the proposed listing was not saved; call /list');
+        }
+      }
+    }
+    return post;
   }
 
   protected async assertNotOwned(db: Kysely<Database>, domain: string): Promise<void> {
@@ -220,7 +511,7 @@ export class BuyService {
           w = await this.requote(adapter, domain, caps, pocCap, allowed);
           continue;
         }
-        if (e.code === 'INSUFFICIENT_FUNDS') throw funds(Number.isSafeInteger(e.details.shortfall) ? (e.details.shortfall as number) : 0);
+        if (e.code === 'INSUFFICIENT_FUNDS') throw funds(e.details.shortfall as number | undefined);
         if (e.code === 'MONTHLY_SPEND_LIMIT_EXCEEDED') {
           throw new AppError(409, 'REGISTRAR_FUNDS', "The registrar's monthly API spend limit would be exceeded", { reason: 'MONTHLY_SPEND_LIMIT' });
         }
@@ -242,6 +533,7 @@ export class BuyService {
     if (!ev.eligible) throw new AppError(409, 'NO_ELIGIBLE_REGISTRAR', 'After a price change the registrar is no longer eligible', { exclusion_reason: ev.exclusionReason });
     if (!pickWinner([ev], caps)) throw new AppError(409, 'PRICE_ABOVE_MAX', 'The price changed and is now above your cap', { cheapest: priceDetails(ev) });
     await this.assertPocCap(this.deps.db, pocCap, ev.firstYearCents!);
+    await this.assertAccountState(adapter, ev.firstYearCents!);
     return ev;
   }
 

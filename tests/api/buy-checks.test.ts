@@ -4,7 +4,7 @@ import type { RdapFn } from '../../src/rdap.js';
 import { RegistrarError } from '../../src/registrars/types.js';
 import { makeApp } from '../helpers/app.js';
 import { DOMAIN, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
-import { testDb as db } from '../helpers/db.js';
+import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { issueToken } from '../helpers/tokens.js';
 
@@ -134,9 +134,49 @@ describe('POST /buy checks (no money moves)', () => {
   });
 
   it('B-13/CAP-2: 10 domains owned → 409 DOMAIN_CAP_REACHED', async () => {
-    const auth = await setup();
+    const pb = new FakeAdapter('porkbun');
+    const auth = await setup([pb]);
     await seedOwnedDomains(10);
     expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
+    expect(pb.calls).toEqual([]);
+  });
+
+  it('check 4: domain already owned → 409 ALREADY_OWNED_OR_PENDING, zero registrar calls', async () => {
+    const pb = new FakeAdapter('porkbun');
+    const auth = await setup([pb]);
+    await insertOwnedDomain(db, { domain: DOMAIN });
+    expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('ALREADY_OWNED_OR_PENDING');
+    expect(pb.calls).toEqual([]);
+  });
+
+  it('check 4: open purchase row in register_sent → 409 ALREADY_OWNED_OR_PENDING, zero registrar calls', async () => {
+    const pb = new FakeAdapter('porkbun');
+    const auth = await setup([pb]);
+    await db.insertInto('purchases').values({
+      idempotency_key: 'other-key', request_hash: 'h', domain: DOMAIN, state: 'register_sent', dry_run: false, registrar: 'porkbun',
+      max_price_cents: 1150, approval_text: `yes buy ${DOMAIN}`, approval_at: new Date(), expected_cents: 1108,
+      request: JSON.stringify({}), audit_id: null,
+    }).execute();
+    expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('ALREADY_OWNED_OR_PENDING');
+    expect(pb.calls).toEqual([]);
+  });
+
+  it('check 4: domain row with status sold → 409 ALREADY_IN_PORTFOLIO, zero registrar calls', async () => {
+    const pb = new FakeAdapter('porkbun');
+    const auth = await setup([pb]);
+    await insertOwnedDomain(db, { domain: DOMAIN, status: 'sold' });
+    expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('ALREADY_IN_PORTFOLIO');
+    expect(pb.calls).toEqual([]);
+  });
+
+  it('INSUFFICIENT_FUNDS without details.shortfall → 409 REGISTRAR_FUNDS with no shortfall keys', async () => {
+    const err = new RegistrarError('porkbun', 'INSUFFICIENT_FUNDS', 'x');
+    const auth = await setup([new FakeAdapter('porkbun', { dryRun: () => err })]);
+    const res = await postBuy(app, buyBody(), auth);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe('REGISTRAR_FUNDS');
+    expect(res.json().error.details).not.toHaveProperty('shortfall');
+    expect(res.json().error.details).not.toHaveProperty('shortfall_cents');
   });
 
   it('B-15: pinned registrar ineligible → 409 PINNED_REGISTRAR_INELIGIBLE, no fallback', async () => {
