@@ -69,6 +69,7 @@ export async function makeApp(
     adapters?: RegistrarAdapter[];
     rdap?: RdapFn;
     quoteTimeoutMs?: number;
+    sleep?: (ms: number) => Promise<void>;
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -80,6 +81,7 @@ export async function makeApp(
     adapters: opts.adapters,
     rdap: opts.rdap,
     quoteTimeoutMs: opts.quoteTimeoutMs,
+    sleep: opts.sleep ?? (async () => {}),
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
     registerExtraRoutes: opts.testRoutes === false ? undefined : registerTestRoutes,
   });

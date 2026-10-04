@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Kysely } from 'kysely';
+import { registerBuy } from './api/buy.js';
 import { registerCheck } from './api/check.js';
 import { registerHealth } from './api/health.js';
 import type { Config } from './config.js';
@@ -12,6 +13,7 @@ import { errorBody, registerErrorHandling } from './http/errors.js';
 import { rdapStatus, type RdapFn } from './rdap.js';
 import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
+import { BuyService } from './services/buy.js';
 import { CheckService } from './services/check.js';
 
 declare module 'fastify' {
@@ -32,6 +34,7 @@ export interface AppDeps {
   adapters?: RegistrarAdapter[];
   rdap?: RdapFn;
   quoteTimeoutMs?: number;
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -59,15 +62,21 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerAuditWrite(app, auditWriter); // onSend (last)
 
   registerHealth(app, deps.config, deps.db);
+  const adapters = deps.adapters ?? createAdapters(deps.config);
   const checkService = new CheckService({
     db: deps.db,
-    adapters: deps.adapters ?? createAdapters(deps.config),
+    adapters,
     rdap: deps.rdap ?? rdapStatus,
     now: deps.now ?? Date.now,
     quoteTimeoutMs: deps.quoteTimeoutMs,
     log: app.log,
   });
   registerCheck(app, checkService);
+  const buyService = new BuyService({
+    db: deps.db, adapters, checkService, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now,
+    sleep: deps.sleep, log: app.log,
+  });
+  registerBuy(app, buyService);
   deps.registerExtraRoutes?.(app);
   return app;
 }

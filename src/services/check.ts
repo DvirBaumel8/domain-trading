@@ -88,4 +88,9 @@ export class CheckService {
       clearTimeout(timer);
     }
   }
+
+  /** Drop a cached answer (after a purchase changes the domain's state). */
+  invalidate(domain: string): void {
+    this.cache.delete(domain);
+  }
 }
