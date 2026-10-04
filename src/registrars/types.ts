@@ -29,7 +29,7 @@ export interface RegistrarAdapter {
 }
 
 /** Codes for outcomes where the registrar may or may not have acted (never retry a purchase with a new key). */
-export const AMBIGUOUS_CODES = ['REGISTRAR_TIMEOUT', 'REGISTRAR_NETWORK', 'REGISTRAR_HTTP_5XX', 'REGISTRAR_BAD_RESPONSE'] as const;
+export const AMBIGUOUS_CODES: readonly string[] = ['REGISTRAR_TIMEOUT', 'REGISTRAR_NETWORK', 'REGISTRAR_HTTP_5XX', 'REGISTRAR_BAD_RESPONSE', 'IDEMPOTENCY_KEY_IN_USE'];
 
 export class RegistrarError extends Error {
   readonly httpStatus: number | undefined;
@@ -47,7 +47,7 @@ export class RegistrarError extends Error {
     this.name = 'RegistrarError';
     this.httpStatus = opts.httpStatus;
     this.retryAfterSeconds = opts.retryAfterSeconds;
-    this.ambiguous = opts.ambiguous ?? false;
+    this.ambiguous = opts.ambiguous ?? AMBIGUOUS_CODES.includes(code);
     this.details = opts.details ?? {};
   }
 }

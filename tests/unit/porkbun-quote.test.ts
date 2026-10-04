@@ -71,6 +71,16 @@ describe('PorkbunAdapter.quote', () => {
     expect(e).toMatchObject({ registrar: 'porkbun', code: 'INVALID_API_KEYS_001', httpStatus: 403, ambiguous: false });
   });
 
+  it('a coded error on HTTP 503 is ambiguous', async () => {
+    mswServer.use(http.post(`${PORKBUN_BASE}/domain/checkDomain/:d`, () => pbError('SOME_CODE', {}, { status: 503 })));
+    expect(await errOf(pb().quote('x.com'))).toMatchObject({ code: 'SOME_CODE', httpStatus: 503, ambiguous: true });
+  });
+
+  it('IDEMPOTENCY_KEY_IN_USE is ambiguous even at HTTP 409', async () => {
+    mswServer.use(http.post(`${PORKBUN_BASE}/domain/checkDomain/:d`, () => pbError('IDEMPOTENCY_KEY_IN_USE', {}, { status: 409 })));
+    expect(await errOf(pb().quote('x.com'))).toMatchObject({ code: 'IDEMPOTENCY_KEY_IN_USE', ambiguous: true });
+  });
+
   it('RATE_LIMIT_EXCEEDED carries Retry-After seconds', async () => {
     mswServer.use(http.post(`${PORKBUN_BASE}/domain/checkDomain/:d`, () =>
       pbError('RATE_LIMIT_EXCEEDED', { ttlRemaining: 7 }, { status: 429, headers: { 'Retry-After': '7' } })));
@@ -149,6 +159,14 @@ describe('PorkbunAdapter.accountState', () => {
     );
     expect(await pb().accountState()).toEqual({ balanceCents: 5000, spendLimitRemainingCents: 8892, autoTopupEnabled: false });
     expect(recorded.map((r) => `${r.method} ${r.path}`).sort()).toEqual(['GET /account/apiSettings', 'GET /account/balance']);
+  });
+
+  it('non-integer balance → null', async () => {
+    mswServer.use(
+      http.get(`${PORKBUN_BASE}/account/balance`, () => HttpResponse.json({ status: 'SUCCESS', balance: 50.5 })),
+      http.get(`${PORKBUN_BASE}/account/apiSettings`, () => HttpResponse.json({ status: 'SUCCESS', settings: {}, spendLimit: { remaining: 1.5 } })),
+    );
+    expect(await pb().accountState()).toEqual({ balanceCents: null, spendLimitRemainingCents: null, autoTopupEnabled: null });
   });
 
   it('no cap → spendLimitRemainingCents null', async () => {

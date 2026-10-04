@@ -76,7 +76,11 @@ export class PorkbunAdapter implements RegistrarAdapter {
     let parsed: unknown = null;
     try {
       parsed = JSON.parse(await res.text());
-    } catch {
+    } catch (err) {
+      const n = (err as Error).name;
+      if (n === 'TimeoutError' || n === 'AbortError') {
+        throw new RegistrarError(NAME, 'REGISTRAR_TIMEOUT', 'Porkbun did not answer in time', { ambiguous: true });
+      }
       parsed = null;
     }
     if (isObj(parsed) && parsed.status === 'SUCCESS' && res.ok) return parsed;
@@ -85,6 +89,7 @@ export class PorkbunAdapter implements RegistrarAdapter {
       const retry = Number(res.headers.get('retry-after'));
       throw new RegistrarError(NAME, code, `Porkbun error ${code}`, {
         httpStatus: res.status,
+        ambiguous: res.status >= 500 || undefined,
         retryAfterSeconds: Number.isFinite(retry) && retry > 0 ? retry : undefined,
         details: errorDetails(parsed),
       });
@@ -120,8 +125,8 @@ export class PorkbunAdapter implements RegistrarAdapter {
     const settings = isObj(api.settings) ? api.settings : {};
     const spend = isObj(api.spendLimit) ? api.spendLimit : {};
     return {
-      balanceCents: typeof bal.balance === 'number' ? bal.balance : null,
-      spendLimitRemainingCents: typeof spend.remaining === 'number' ? spend.remaining : null,
+      balanceCents: Number.isSafeInteger(bal.balance) ? (bal.balance as number) : null,
+      spendLimitRemainingCents: Number.isSafeInteger(spend.remaining) ? (spend.remaining as number) : null,
       autoTopupEnabled: typeof settings.autoTopup === 'boolean' ? settings.autoTopup : null,
     };
   }
