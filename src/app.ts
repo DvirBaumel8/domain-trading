@@ -3,6 +3,7 @@ import type { Kysely } from 'kysely';
 import { registerHealth } from './api/health.js';
 import type { Config } from './config.js';
 import type { Database } from './db/types.js';
+import { registerAuth, registerScope } from './http/auth.js';
 import { registerErrorHandling } from './http/errors.js';
 
 declare module 'fastify' {
@@ -36,6 +37,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   registerErrorHandling(app);
+  registerAuth(app, deps.db); // onRequest
+  registerScope(app); // preHandler
   // onRequest:  [Task 5] registerAuditId  →  [Task 4] registerAuth
   // preHandler: [Task 7] registerRateLimit →  [Task 4] registerScope  →  [Task 6] registerIdempotency (preHandler part)
   // onSend:     [Task 6] idempotency store →  [Task 5] registerAuditWrite
