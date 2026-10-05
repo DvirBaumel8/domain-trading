@@ -13,6 +13,7 @@ import { addMonthsClamped, buildSchedule } from '../pricing/schedule.js';
 import { currentSettings } from '../pricing/settings.js';
 import { afternicRow } from '../services/export.js';
 import { isCategory } from '../services/listing-rules.js';
+import { scheduleView } from '../services/plan-view.js';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MONEY = /^\d+(\.\d{1,2})?$/;
@@ -90,9 +91,7 @@ export function registerPricing(app: FastifyInstance, deps: { db: Kysely<Databas
       bin_cents: plan.binCents, floor_cents: plan.floorCents, walkaway_cents: plan.walkawayCents, min_offer_cents: plan.minOfferCents,
       display: { bin: wholeUsd(plan.binCents), floor: wholeUsd(plan.floorCents), walkaway: `${wholeUsd(plan.walkawayCents)} (private)`, min_offer: wholeUsd(plan.minOfferCents) },
       net_at_15pct: { bin: formatUsd(pct(plan.binCents, NET_BPS)), floor: formatUsd(pct(plan.floorCents, NET_BPS)), walkaway: formatUsd(pct(plan.walkawayCents, NET_BPS)) },
-      schedule: schedule.map((e) => (e.event === 'delist' || e.status === 'superseded_by_final_push' || e.binCents === null
-        ? { event: e.event, due_on: e.dueOn, status: e.status }
-        : { event: e.event, due_on: e.dueOn, bin: wholeUsd(e.binCents), floor: wholeUsd(e.floorCents!), walkaway: wholeUsd(e.walkawayCents!), status: e.status })),
+      schedule: scheduleView(schedule),
       afternic_row: 'cells' in a.row ? a.row.cells.join(',') : null,
       sell_plan_line: sellPlanLine(plan, schedule),
       warnings: plan.warnings,

@@ -34,6 +34,7 @@ export async function insertOwnedDomain(db: Kysely<Database>, overrides: Partial
     renewal_price_cents: 1108,
     drop_date: '2028-10-04',
     category: 'geo',
+    price_grade: 'weaker',
     deal_id: null,
     display_name: null,
     listing_mode: null,
