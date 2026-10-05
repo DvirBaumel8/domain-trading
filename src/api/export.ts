@@ -15,6 +15,8 @@ function changedOnly(req: FastifyRequest): boolean {
 const BodySchema = z.object({
   export_id: z.string().min(1),
   approval_ref: z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict().nullable().optional(),
+  uploaded_at: z.unknown().optional(),
+  note: z.string().max(500).nullable().optional(),
 }).strict();
 
 function send(reply: FastifyReply, r: ExportResult) {

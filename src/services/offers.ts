@@ -92,11 +92,12 @@ export class OffersService {
     if (hold) {
       if (d.status !== 'owned' && d.status !== 'listed') throw new AppError(404, 'NOT_IN_PORTFOLIO', `${body.domain} is not an owned or listed domain`);
       if (!body.pricing_hold_reason?.trim()) throw new AppError(422, 'HOLD_REASON_REQUIRED', 'pricing_hold needs pricing_hold_reason');
-      if (!body.approval_ref) throw new AppError(422, 'APPROVAL_REQUIRED', "pricing_hold needs approval_ref (Dvir's words)");
-      const settings = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
-      const a = checkApproval(body.approval_ref, body.domain, now, settings.approval_max_age_hours);
-      if (!a.ok) throw new AppError(422, a.code, a.reason);
-      approvedAt = a.approvedAt;
+      if (body.approval_ref) {
+        const settings = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
+        const a = checkApproval(body.approval_ref, body.domain, now, settings.approval_max_age_hours);
+        if (!a.ok) throw new AppError(422, a.code, a.reason);
+        approvedAt = a.approvedAt;
+      }
     }
 
     const externalRef = body.external_ref ?? null;
@@ -117,7 +118,7 @@ export class OffersService {
             const cur = await trx.selectFrom('domains').selectAll().where('id', '=', d.id).forUpdate().executeTakeFirstOrThrow();
             if (cur.status !== 'owned' && cur.status !== 'listed') throw new AppError(404, 'NOT_IN_PORTFOLIO', `${body.domain} is not an owned or listed domain`);
             await applyHold(trx, cur, {
-              hold: true, reason: body.pricing_hold_reason ?? null, approvalText: String(body.approval_ref!.text), approvalAt: approvedAt,
+              hold: true, reason: body.pricing_hold_reason ?? null, approvalText: body.approval_ref ? String(body.approval_ref.text) : null, approvalAt: approvedAt,
               auditId: ctx.auditId, now,
             });
           }

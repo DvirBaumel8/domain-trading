@@ -160,13 +160,12 @@ describe('daily price job', () => {
     expect((await jobAudits()).map((a) => a.status_code)).toEqual([422]);
   });
 
-  it('PR-29: scheduled change carries no approval; manual price change without approval is refused', async () => {
+  it('PR-29: scheduled change carries no approval; a manual /list change within the rules needs none either', async () => {
     const { list } = await setup();
     await job().runOnce({ today: '2027-04-12' });
     expect((await hist())[0]!.approval_text).toBeNull();
     const res = await list({ mode: 'hybrid', bin: 2495 });
-    expect(res.statusCode).toBe(422);
-    expect(res.json().error.code).toBe('APPROVAL_REQUIRED');
+    expect(res.statusCode).toBe(200);
   });
 
   it('dry run reports but writes nothing', async () => {

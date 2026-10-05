@@ -145,13 +145,11 @@ describe('POST /offers', () => {
     expect(res.json()).toMatchObject({ band: 'mid_range', warnings: ['OFFER_ON_UNLISTED'], snapshot: { floor_cents: 129500 } });
   });
 
-  it('O7: pricing_hold with reason + approval sets the hold and one history row; without approval -> 422, nothing written', async () => {
+  it('O7: pricing_hold needs a reason, not an approval; sets the hold and one history row', async () => {
     const { w } = await setup();
     const tid = (await db.selectFrom('domains').select('id').where('domain', '=', T).executeTakeFirstOrThrow()).id;
     const hist = () => db.selectFrom('listing_history').selectAll().where('domain_id', '=', tid).execute();
     const before = (await hist()).length;
-    const no = await post(w, offer({ pricing_hold: true, pricing_hold_reason: 'buyer in talks' }));
-    expect([no.statusCode, no.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
     const neither = await post(w, offer({ pricing_hold: true }));
     expect([neither.statusCode, neither.json().error.code]).toEqual([422, 'HOLD_REASON_REQUIRED']);
     const nr = await post(w, offer({ pricing_hold: true, approval_ref: approval(T) }));
@@ -159,11 +157,12 @@ describe('POST /offers', () => {
     expect(await rows()).toHaveLength(0);
     expect((await db.selectFrom('domains').select('pricing_hold').where('domain', '=', T).executeTakeFirstOrThrow()).pricing_hold).toBe(false);
     expect(await hist()).toHaveLength(before);
-    const ok = await post(w, offer({ pricing_hold: true, pricing_hold_reason: 'buyer in talks', approval_ref: approval(T) }));
+    const ok = await post(w, offer({ pricing_hold: true, pricing_hold_reason: 'buyer in talks' }));
     expect(ok.statusCode).toBe(201);
     expect(await db.selectFrom('domains').select(['pricing_hold', 'pricing_hold_reason']).where('domain', '=', T).executeTakeFirstOrThrow())
       .toEqual({ pricing_hold: true, pricing_hold_reason: 'buyer in talks' });
     expect(await hist()).toHaveLength(before + 1);
+    expect((await hist()).at(-1)).toMatchObject({ approval_text: null, approval_at: null });
   });
 });
 

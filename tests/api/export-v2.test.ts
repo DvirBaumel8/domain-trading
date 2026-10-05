@@ -199,6 +199,34 @@ describe('exports v2', () => {
       expect((await post(app, '/export/afternic/uploaded', auth, { export_id: id, approval_ref: { text: 'ok', approved_at: new Date(NOW - 30_000).toISOString() } })).statusCode).toBe(200);
     });
 
+    it('no approval_ref → 200, approval_text null, uploaded_at now (or the one sent); a bad uploaded_at → 422; @ in note → NO_PII', async () => {
+      const { app, auth, id } = await withFile();
+      const bad: [object, string][] = [
+        [{ export_id: id, uploaded_at: new Date(NOW + 2 * 60_000).toISOString() }, 'UPLOADED_AT_INVALID'],
+        [{ export_id: id, uploaded_at: new Date(NOW - 3_600_000 * 24).toISOString() }, 'UPLOADED_AT_INVALID'],
+        [{ export_id: id, uploaded_at: '2026-10-12 08:00' }, 'UPLOADED_AT_INVALID'],
+        [{ export_id: id, note: 'by me@example.com' }, 'NO_PII'],
+      ];
+      for (const [payload, code] of bad) {
+        const res = await post(app, '/export/afternic/uploaded', auth, payload);
+        expect(res.statusCode, JSON.stringify(payload)).toBe(422);
+        expect(res.json().error.code).toBe(code);
+      }
+      expect(await count('export_uploads')).toBe(0);
+      const ok = await post(app, '/export/afternic/uploaded', auth, { export_id: id, note: 'uploaded by the bot' });
+      expect(ok.statusCode).toBe(200);
+      expect(ok.json().uploaded_at).toBe(new Date(NOW).toISOString());
+      expect(await db.selectFrom('export_uploads').select(['approval_text', 'note']).executeTakeFirstOrThrow()).toEqual({ approval_text: null, note: 'uploaded by the bot' });
+    });
+
+    it('an uploaded_at sent without approval_ref is stored', async () => {
+      const { app, auth, id } = await withFile();
+      const at = new Date(NOW - 30_000).toISOString();
+      const ok = await post(app, '/export/afternic/uploaded', auth, { export_id: id, uploaded_at: at });
+      expect(ok.statusCode).toBe(200);
+      expect(ok.json().uploaded_at).toBe(at);
+    });
+
     it('a clear hitting DOMAIN_BUSY → 503 and no export_uploads row; a retry with the same key after release → 200, one row', async () => {
       const app = await makeApp({ now: () => NOW, adapters: [new FakeAdapter('porkbun')], env: { SEDO_TEMPLATE_PATH: TEMPLATE }, exportLockTimeoutMs: 150 });
       apps.push(app);
@@ -230,11 +258,10 @@ describe('exports v2', () => {
       expect(res.json().error.code).toBe('NOT_FOUND');
     });
 
-    it('a missing, blank, stale, future or non-ISO approval → 422', async () => {
+    it('a blank, stale, future or non-ISO approval_ref that is sent → 422', async () => {
       const { app, auth, id } = await withFile();
       const at = new Date(NOW - HOUR).toISOString();
       const cases: [object, string][] = [
-        [{ export_id: id }, 'APPROVAL_INVALID'],
         [{ export_id: id, approval_ref: { text: '   ', approved_at: at } }, 'APPROVAL_INVALID'],
         [{ export_id: id, approval_ref: { text: 'ok', approved_at: '2026-10-12 08:00' } }, 'APPROVAL_INVALID'],
         [{ export_id: id, approval_ref: { text: 'ok', approved_at: new Date(NOW + 2 * 60_000).toISOString() } }, 'APPROVAL_INVALID'],

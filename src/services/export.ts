@@ -203,14 +203,31 @@ export class ExportService {
   }
 
   /** POST /export/{venue}/uploaded: record a confirmed upload; for Afternic also clear the pending flag (R1). */
-  async confirm(venue: Venue, body: { export_id: string; approval_ref?: { text?: unknown; approved_at?: unknown } | null }, ctx: { auditId: string }) {
+  async confirm(venue: Venue, body: { export_id: string; approval_ref?: { text?: unknown; approved_at?: unknown } | null; uploaded_at?: unknown; note?: string | null }, ctx: { auditId: string }) {
     const { db } = this.deps;
     const settings = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
-    const a = checkTimedApproval(body.approval_ref, new Date(this.deps.now()), settings.approval_max_age_hours);
-    if (!a.ok) throw new AppError(422, a.code, a.reason);
+    const now = new Date(this.deps.now());
+    let approvalText: string | null = null;
+    let uploadedAt = now;
+    if (body.approval_ref) {
+      const a = checkTimedApproval(body.approval_ref, now, settings.approval_max_age_hours);
+      if (!a.ok) throw new AppError(422, a.code, a.reason);
+      approvalText = String(body.approval_ref.text).trim();
+      uploadedAt = a.approvedAt;
+    } else if (body.uploaded_at != null) {
+      if (typeof body.uploaded_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/.test(body.uploaded_at)
+        || Number.isNaN(new Date(body.uploaded_at).getTime())) {
+        throw new AppError(422, 'UPLOADED_AT_INVALID', 'uploaded_at must be ISO 8601 with a timezone offset');
+      }
+      uploadedAt = new Date(body.uploaded_at);
+      if (uploadedAt.getTime() > now.getTime() + 60_000) throw new AppError(422, 'UPLOADED_AT_INVALID', 'uploaded_at is in the future');
+    }
+    if (body.note != null && body.note.includes('@')) throw new AppError(422, 'NO_PII', "note must not contain an email address or '@'");
     const run = await db.selectFrom('export_runs').selectAll().where('export_id', '=', body.export_id).executeTakeFirst();
     if (!run || run.marketplace !== venue) throw new AppError(404, 'EXPORT_NOT_FOUND', 'No such export for this venue');
-    if (a.approvedAt.getTime() < run.at.getTime() - 60_000) throw new AppError(422, 'APPROVAL_INVALID', 'the upload approval predates the file');
+    if (uploadedAt.getTime() < run.at.getTime() - 60_000) {
+      throw new AppError(422, approvalText ? 'APPROVAL_INVALID' : 'UPLOADED_AT_INVALID', approvalText ? 'the upload approval predates the file' : 'uploaded_at predates the file');
+    }
     const already = () => new AppError(409, 'EXPORT_ALREADY_CONFIRMED', 'This export was already confirmed as uploaded');
     if (await db.selectFrom('export_uploads').select('id').where('export_id', '=', run.export_id).executeTakeFirst()) throw already();
     // Clears first, the upload record last: a failed clear leaves no upload, so a retry re-runs cleanly.
@@ -227,8 +244,8 @@ export class ExportService {
     }
     try {
       await db.insertInto('export_uploads').values({
-        venue, export_id: run.export_id, domains: run.domains, uploaded_at: a.approvedAt,
-        approval_text: String(body.approval_ref!.text).trim(), audit_id: ctx.auditId,
+        venue, export_id: run.export_id, domains: run.domains, uploaded_at: uploadedAt,
+        approval_text: approvalText, note: body.note?.trim() || null, audit_id: ctx.auditId,
       }).execute();
     } catch (e) {
       if ((e as { code?: string }).code === '23505') throw already();
@@ -237,7 +254,7 @@ export class ExportService {
     const pending = await pendingDomains(db, venue);
     const inFile = new Set(run.domains);
     return {
-      venue, export_id: run.export_id, domains: run.domains.length, uploaded_at: a.approvedAt.toISOString(),
+      venue, export_id: run.export_id, domains: run.domains.length, uploaded_at: uploadedAt.toISOString(),
       pending_after: pending.length, still_pending: pending.filter((d) => inFile.has(d)),
     };
   }

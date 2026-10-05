@@ -302,7 +302,8 @@ export interface ExportUploadsTable {
   export_id: string;
   domains: string[];
   uploaded_at: Timestamp;
-  approval_text: string;
+  approval_text: string | null;
+  note: string | null;
   audit_id: string | null;
   created_at: TimestampDefault;
 }

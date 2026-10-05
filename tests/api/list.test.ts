@@ -139,13 +139,17 @@ describe('POST /list/{domain}', () => {
     expect(await dom()).toMatchObject({ listing_mode: null, first_listed_at: null, export_pending_since: null });
   });
 
-  it('LG-13: a price change without approval_ref -> 422 APPROVAL_REQUIRED; 0 history, 0 schedule rows, 1 audit row', async () => {
+  it('LG-13: a price change without approval_ref -> 200 (bot autonomy); history row with null approval; an invalid approval_ref sent is still refused', async () => {
     const { auth } = await setup();
     await insertOwnedDomain(db, { domain: D, category: 'trend', price_grade: null });
-    expect((await list({ mode: 'hybrid', bin: 1995 }, auth)).json().error.code).toBe('APPROVAL_REQUIRED');
+    const bad = await list({ mode: 'hybrid', bin: 1995, approval_ref: { text: 'nope', approved_at: new Date().toISOString() } }, auth);
+    expect([bad.statusCode, bad.json().error.code]).toEqual([422, 'APPROVAL_INVALID']);
     expect(await history()).toHaveLength(0);
-    expect(await schedule()).toHaveLength(0);
-    expect(await db.selectFrom('audit_log').selectAll().where('path', 'like', '/list/%').execute()).toHaveLength(1);
+    expect((await list({ mode: 'hybrid', bin: 1995 }, auth)).statusCode).toBe(200);
+    const h = await history();
+    expect(h).toHaveLength(1);
+    expect(h[0]).toMatchObject({ approval_text: null, approval_at: null });
+    expect(await schedule()).not.toHaveLength(0);
   });
 
   it('LG-14: NS-only re-point without approval_ref → 200', async () => {
@@ -182,10 +186,23 @@ describe('POST /list/{domain}', () => {
     expect((await list({ category: 'trend', approval_ref: approval() }, auth)).json().error.code).toBe('MODE_NOT_ALLOWED_FOR_CATEGORY');
   });
 
-  it('a category change without approval → 422 APPROVAL_REQUIRED (V9)', async () => {
+  it('a category change within the rules without approval → 200 (bot autonomy)', async () => {
     const { auth } = await setup();
     await insertOwnedDomain(db, { domain: D, category: 'geo' });
-    expect((await list({ category: 'b2b' }, auth)).json().error.code).toBe('APPROVAL_REQUIRED');
+    expect((await list({ category: 'b2b' }, auth)).statusCode).toBe(200);
+    expect((await history())[0]).toMatchObject({ approval_text: null, approval_at: null });
+  });
+
+  it('relabelling a name to geo without approval → 422 OVERRIDE_NEEDS_APPROVAL; a geo override without approval → 422 OVERRIDE_NEEDS_APPROVAL', async () => {
+    const { auth } = await setup();
+    await insertOwnedDomain(db, { domain: D, category: 'trend', price_grade: null });
+    const a = await list({ category: 'geo', price_grade: 'strong', override: true, override_reason: 'city' }, auth);
+    expect([a.statusCode, a.json().error.code]).toEqual([422, 'OVERRIDE_NEEDS_APPROVAL']);
+    const b = await list({ category: 'geo', price_grade: 'strong' }, auth);
+    expect([b.statusCode, b.json().error.code]).toEqual([422, 'OVERRIDE_NEEDS_APPROVAL']);
+    await db.updateTable('domains').set({ category: 'geo', price_grade: 'weaker' }).execute();
+    const c = await list({ mode: 'bin', bin: 650, override: true, override_reason: 'premium city' }, auth);
+    expect([c.statusCode, c.json().error.code]).toEqual([422, 'OVERRIDE_NEEDS_APPROVAL']);
   });
 
   it('LG-4: geo bin 650 with override + reason + approval → 200; override recorded', async () => {
@@ -398,15 +415,15 @@ describe('POST /list/{domain}', () => {
     expect((await list({ ...base, approval_ref: approval() }, auth)).json().error.code).toBe('EXCEPTION_REASON_REQUIRED');
   });
 
-  it('L-15 / Review Focus 2: hold needs approval and a reason; schedule rows untouched by hold on and off; each change is a history row', async () => {
+  it('L-15 / Review Focus 2: hold needs a reason, not an approval; schedule rows untouched by hold on and off; each change is a history row', async () => {
     const { auth } = await setup();
     await trendOwned();
     await list({ mode: 'hybrid', bin: 1995, approval_ref: approval() }, auth);
     const before = await schedule();
-    expect((await list({ pricing_hold: true, pricing_hold_reason: 'buyer in talks' }, auth)).json().error.code).toBe('APPROVAL_REQUIRED');
+    expect((await list({ pricing_hold: true }, auth)).json().error.code).toBe('HOLD_REASON_REQUIRED');
     expect((await list({ pricing_hold: true, approval_ref: approval() }, auth)).json().error.code).toBe('HOLD_REASON_REQUIRED');
     expect(await history()).toHaveLength(1);
-    const on = await list({ pricing_hold: true, pricing_hold_reason: 'buyer in talks', approval_ref: approval() }, auth);
+    const on = await list({ pricing_hold: true, pricing_hold_reason: 'buyer in talks' }, auth);
     expect(on.statusCode).toBe(200);
     expect(on.json().pricing_hold).toBe(true);
     expect(await dom()).toMatchObject({ pricing_hold: true, pricing_hold_reason: 'buyer in talks' });
@@ -414,7 +431,7 @@ describe('POST /list/{domain}', () => {
     expect(h).toHaveLength(2);
     expect(h[1]).toMatchObject({ bin_cents: 199500, floor_cents: 129500, walkaway_cents: 96000, mode: 'hybrid' });
     expect(await schedule()).toEqual(before);
-    const off = await list({ pricing_hold: false, approval_ref: approval() }, auth);
+    const off = await list({ pricing_hold: false }, auth);
     expect(off.statusCode).toBe(200);
     expect(await dom()).toMatchObject({ pricing_hold: false, pricing_hold_reason: null });
     h = await history();
@@ -637,11 +654,10 @@ describe('POST /list/{domain}', () => {
     expect(await dom()).toMatchObject({ category: 'b2b', lto_max_months: 12, bin_cents: 199500 });
   });
 
-  it('grade-only change on a listed geo domain needs approval and writes a history row', async () => {
+  it('grade-only change on a listed geo domain (no approval needed) writes a history row', async () => {
     const { auth } = await setup();
     await listedDomain({ domain: D, category: 'geo', price_grade: 'weaker', listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, walkaway_cents: 39900, min_offer_cents: 39900 });
-    expect((await list({ price_grade: 'strong' }, auth)).json().error.code).toBe('APPROVAL_REQUIRED');
-    expect((await list({ price_grade: 'strong', approval_ref: approval() }, auth)).statusCode).toBe(200);
+    expect((await list({ price_grade: 'strong' }, auth)).statusCode).toBe(200);
     expect(await dom()).toMatchObject({ price_grade: 'strong', bin_cents: 39900 });
     const h = await history();
     expect(h).toHaveLength(1);

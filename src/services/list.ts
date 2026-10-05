@@ -138,9 +138,7 @@ export class ListService {
 
     // V9/V10
     if (approvalFailure) throw new AppError(422, approvalFailure.code, approvalFailure.reason);
-    if (changing && !body.approval_ref) {
-      throw new AppError(422, 'APPROVAL_REQUIRED', "Changing the mode, a price, the category, the grade or the pricing hold needs approval_ref (Dvir's words)");
-    }
+    // Bot autonomy (5 Oct 2026): no approval for a change inside the rules; exceptions and overrides need it (engine / V8)
 
     // Schedule anchor: the first listing starts the clock; later plans keep it and only schedule events after today
     const firstListing = row.first_listed_at === null;
