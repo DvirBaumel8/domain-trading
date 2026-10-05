@@ -76,7 +76,7 @@ export async function writePlan(trx: Transaction<Database>, o: {
 }
 
 export function historyRow(o: {
-  domainId: number; source: 'buy' | 'list'; plan: ListingPlan | null; category: Category | null; grade: 'strong' | 'weaker' | null;
+  domainId: number; source: 'buy' | 'import' | 'list'; plan: ListingPlan | null; category: Category | null; grade: 'strong' | 'weaker' | null;
   lander: string | null; override: boolean; overrideReason: string | null;
   approvalText: string | null; approvalAt: Date | null; auditId: string; planAuditId: string | null; at: Date;
 }): Insertable<ListingHistoryTable> {

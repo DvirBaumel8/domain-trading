@@ -3,6 +3,9 @@ import { createApiToken, listApiTokens, revokeApiToken } from './admin/tokens.js
 import { newPricingSettings, showPricingSettings } from './admin/pricing-settings.js';
 import { DropDateInputError, dropAtFirstExpiry } from './admin/drop-date.js';
 import { runDoctor } from './admin/doctor.js';
+import { ImportInputError, importDomain, type ImportInput } from './admin/import-domain.js';
+import { createAdapters } from './registrars/registry.js';
+import { readFileSync } from 'node:fs';
 import { AppError } from './http/errors.js';
 import { loadConfig } from './config.js';
 import { createDb } from './db/client.js';
@@ -14,6 +17,9 @@ const USAGE = `usage:
   npm run admin -- pricing-settings new [--from-current] --set key=value [--set ...] --approval-text "<words>" --approval-at <ISO> [--note <text>]
   npm run admin -- pricing-settings show [--version N]
   npm run admin -- drop-at-first-expiry --domain <d> --approval-text "<words>" --approval-at <ISO>
+  npm run admin -- import-domain --domain <d> --registrar porkbun|godaddy|other --buy-date YYYY-MM-DD --cost 13.73 --category <c> [--grade strong|weaker]
+      [--cost-note "<text>"] [--order <id>|none] [--deal D-NNN] [--listing-mode bin|hybrid|offer --bin N [--floor N --walkaway N --pricing-exception "<reason>"] [--min-offer N] [--override --override-reason "<why>"]]
+      [--comps-file comps.json | --legacy-no-comps "<reason>"] [--approval-text "<words>" --approval-at <ISO>] [--manual --expiry YYYY-MM-DD] [--renewal-price N] [--dry-run]
   npm run admin -- doctor`;
 
 class UsageError extends Error {}
@@ -27,6 +33,11 @@ async function main(argv: string[]): Promise<number> {
       set: { type: 'string', multiple: true }, 'from-current': { type: 'boolean' },
       'approval-text': { type: 'string' }, domain: { type: 'string' }, 'approval-at': { type: 'string' },
       note: { type: 'string' }, version: { type: 'string' },
+      registrar: { type: 'string' }, 'buy-date': { type: 'string' }, cost: { type: 'string' }, 'cost-note': { type: 'string' }, order: { type: 'string' },
+      deal: { type: 'string' }, category: { type: 'string' }, grade: { type: 'string' }, 'listing-mode': { type: 'string' }, bin: { type: 'string' },
+      floor: { type: 'string' }, walkaway: { type: 'string' }, 'min-offer': { type: 'string' }, 'pricing-exception': { type: 'string' },
+      override: { type: 'boolean' }, 'override-reason': { type: 'string' }, 'comps-file': { type: 'string' }, 'legacy-no-comps': { type: 'string' },
+      manual: { type: 'boolean' }, expiry: { type: 'string' }, 'renewal-price': { type: 'string' }, 'dry-run': { type: 'boolean' },
     },
   });
   const [cmd, sub] = positionals;
@@ -62,6 +73,36 @@ async function main(argv: string[]): Promise<number> {
         );
       }
       return 0;
+    }
+    if (cmd === 'import-domain') {
+      for (const f of ['domain', 'registrar', 'buy-date', 'cost'] as const) if (!values[f]) throw new UsageError(`--${f} is required`);
+      let evidence: ImportInput['evidence'];
+      if (values['comps-file'] !== undefined) {
+        let raw: unknown;
+        try {
+          raw = JSON.parse(readFileSync(values['comps-file'], 'utf8'));
+        } catch {
+          throw new UsageError('--comps-file must be a readable JSON file');
+        }
+        evidence = Array.isArray(raw) ? { comps: raw } : (raw as ImportInput['evidence']);
+      }
+      const input: ImportInput = {
+        domain: values.domain!, registrar: values.registrar!, buyDate: values['buy-date']!, cost: values.cost!, costNote: values['cost-note'], order: values.order,
+        deal: values.deal, category: values.category, grade: values.grade, listingMode: values['listing-mode'], bin: values.bin, floor: values.floor,
+        walkaway: values.walkaway, minOffer: values['min-offer'], pricingException: values['pricing-exception'], override: values.override,
+        overrideReason: values['override-reason'], evidence, legacyNoComps: values['legacy-no-comps'], approvalText: values['approval-text'],
+        approvalAt: values['approval-at'], manual: values.manual, expiry: values.expiry, renewalPrice: values['renewal-price'], dryRun: values['dry-run'],
+      };
+      try {
+        const r = await importDomain(db, input, { adapters: createAdapters(config), now: new Date() });
+        console.log(JSON.stringify(r, null, 2));
+        return 0;
+      } catch (e) {
+        if (e instanceof ImportInputError) throw new UsageError(e.message);
+        if (!(e instanceof AppError)) throw e;
+        console.error(`${e.code}: ${e.message}`);
+        return 1;
+      }
     }
     if (cmd === 'drop-at-first-expiry') {
       if (!values.domain) throw new UsageError('--domain is required');
