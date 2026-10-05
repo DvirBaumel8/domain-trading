@@ -52,11 +52,13 @@ Example from before D-001 was bought (it is now registered, so a live check retu
 ```
 The numbers above are an example; in practice Name.com isn't enabled until its adapter exists.
 
-## Phase-later (docs only; not built until Dvir says so): `GET /check/batch` (READ)
-- **What:** scouts run this **first**, on a list of candidate names (≤50 per call), before any card is written. No pricing, no registrar quote.
-- **Per name, three checks:** (1) **RDAP availability** (Verisign RDAP; 404 = available); (2) **Wayback history**: CDX query for `http://<name>` first, then `https://` (old sites were mostly http), returning the first/last capture years and capture count; (3) **SURBL** listing (DNS lookup `<name>.multi.surbl.org`).
-- **Response:** `[{"domain","available","rdap_status","wayback":{"first","last","captures"},"surbl_listed","checked_at"}]`, plus per-check errors (one failed check doesn't fail the name). Rate-limited like other GETs; results cached 24 h.
-- **Then** the full `GET /check` (quotes) runs only on names that are available, have no bad history and aren't listed.
+## Selection checks (selection v9.1, Dvir approved 6 Oct 2026; built after step 6; contract in `selection.md` §4)
+*Replaces the 5 Oct phase-later `GET /check/batch` (RDAP + Wayback + SURBL in one call, where one failed check didn't fail the name). v9.1 splits it and makes history blocking:*
+- **`POST /check/batch`** (names → RDAP only): scouts' first step on candidate names; no quotes, no history. SEL-2.
+- **`POST /check/history`** (names → CDX, SURBL, Web Risk, `hist1`): **blocking**, complete or fail; an incomplete history can't pass Gate A (HIST-1). Wayback CDX for `http://` first, then `https://`. **WEB-RISK-1 interim** until a Web Risk / Safe Browsing API key exists: PASS iff the Transparency Report status is "no unsafe content" or "no data" **and** HIST-1 is clean; the raw status is recorded. With a key: Lookup API no-match = PASS. SEL-3, SEL9-14.
+- **`GET /check/quote`** (name → price): the quote used by `/score`, and the **live renewal price (ARA)** used by `GET /renewal/decision/{domain}` at the name's current registrar (C17; SEL9-10). Same quote logic as `GET /check` above.
+- **`POST /check/tm`**: USPTO + control phrase (SEL-4).
+- **Then** `GET /check` (full quotes) runs only on names that pass. Bots never call RDAP, CDX, SURBL or NameBio themselves.
 
 ## Tests (pass/fail)
 

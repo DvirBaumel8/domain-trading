@@ -3,23 +3,31 @@
 **Decision (Dvir, 3 Oct 2026, 19:17 IDT):** the way a name is listed depends on its **category**. Geo names are strict Buy It Now with no negotiation. Trend, B2B and similar names are high-value holds.
 
 **Decision (Dvir, 5 Oct 2026, 00:46 IDT): pricing process ADOPTED.** It replaces every earlier pricing rule in this file.
-1. **Evidence:** the scout proposes the BIN on every buy card with **2–3 real comparable sales**. A card with no comps is rejected.
+1. **Evidence:** the scout proposes the BIN on every buy card with **2–3 real comparable sales**. A card with no comps is rejected. *(Replaced 6 Oct 2026: demand proof, not comps; see "Selection v9.1" below.)*
 2. **Geo:** prices are fixed at **$499 (strong) / $399 (weaker)**. Mode `bin` only, with no offers and no negotiation.
 3. **Trend, B2B and every other non-geo category:**
    - Mode `hybrid`. **Floor (Afternic auto-accept) = 65% of BIN, never below $750.** **Walk-away = 48% of BIN.**
    - **Marketplace minimum offer = $100** on every non-geo listing (Dvir, 5 Oct 2026, 01:03 IDT, decision #2). The **walk-away is a private threshold**: it is never exported, never shown on a lander and never told to a buyer.
    - Offers ≥ floor: Afternic auto-accepts. Offers from walk-away up to the floor go to Dvir. Offers from $100 up to the walk-away are **declined automatically** (Sochen's standard template, or no action where the marketplace closes them itself), but **every offer is logged** in the `offers` table as a demand signal (§10.11).
    - Lease-to-own is off on public listings.
-4. **Scheduled price drops:** −20% at month 6 and −20% at month 18, with floor and walk-away recalculated. Final push 90 days before `drop_date`; delist 7 days before. **Dvir gets a heads-up only.** His yes on the buy card covers the whole schedule.
+4. **Scheduled price drops:** −20% at month 6 and −20% at month 18, with floor and walk-away recalculated *(v1/v2 plans; v3 steps down the allowed price list, §10.13)*. Final push 90 days before `drop_date`; delist 7 days before. **Dvir gets a heads-up only.** His yes on the buy card covers the whole schedule.
 5. **One approval:** Dvir approves the buy and the full sell plan (BIN, floor, walk-away, drop schedule) **once**, on the buy card. He is asked again only for mid-range offers and email negotiations (Sochen drafts the reply).
 6. **Quarterly review:** Gizbar compares sale prices with BIN, Gavriel proposes % changes, Dvir approves. Percentages and geo prices live in a **versioned settings table**, so changing them needs no code.
 
 **Decisions v2 (Dvir, 5 Oct 2026, 09:17 IDT; `pricing_settings` version 2).** They replace the v1 numbers wherever this file differs:
 1. **Walk-away floor:** the private walk-away is never below **$500**, including after price drops, and never above the floor: `walkaway = min(floor, max(48% of BIN, $500))`.
-2. **Geo drops:** at most **one** drop, **$499 → $399 at month 12**. A $399 geo name never drops. There is no $299 step and no geo final push.
+2. **Geo drops:** at most **one** drop, **$499 → $399 at month 12**. A $399 geo name never drops. There is no $299 step and no geo final push. *(v2 plans only. v3, 6 Oct 2026: the geo ladder is 499 → 399 → 299, §10.13.)*
 3. **Sedo:** every Sedo listing is **Make Offer** (never fixed price). Non-geo: minimum $100, BIN shown as a non-binding price expectation. This resolves the old `SEDO_NO_FLOOR` item.
 4. **Drop clock:** months count from the **first listing date** (decided; unchanged).
 - **Calculator fixes from the dry run:** (a) the settings version label must change whenever any output rule changes, so these rules are **v2**; (b) the hybrid final push follows `system/operating-model.md` §3a ("BIN drops to the floor"): new BIN = the floor rounded **up** to a price ending in 95 (never below the floor, never above the current BIN, min $795). Floor and walk-away stay as they are, so the walk-away stays ≥ $500. The earlier v1 rule rounded to the nearest x95 and set floor = BIN, which gave a flat $795 and pushed the BIN below the floor.
+
+**Selection v9.1 (Dvir approved, 6 Oct 2026; `selection.md`): `pricing_settings` version 3 for new plans.** Where v9.1 contradicts the rules above, v9.1 wins for every **new** plan. Existing plans keep their version (§10.1), so **D-001 stays on v2** (1995 / 1295 / 950 and its −20% schedule). Changes (detail and vectors in §10.13 and `test-plan.md` PR3-*):
+1. **Comps → demand proof.** Comps are no longer required on any buy or import (`COMPS-1` replaced by `DEMAND-1`: frozen sibling census `pattern_id@version` with `in_use_share ≥ 0.25` plus a NameBio retailstats keyword start/end count ≥ 1, carried in the `screening_pack`). `/buy` instead requires a `screening_pack` (400 `SCREENING_PACK_REQUIRED` if missing, SEL7-1; `buy.md` check 3c). V11 becomes "comps optional, shape-checked if sent"; `COMPS_REQUIRED` and `LEGACY_NO_COMPS` are retired.
+2. **Allowed BIN price list** {$299, $399, $499, $788, $1,088, $1,488, $1,988, $2,488} replaces "non-geo BIN ends in 95" and the $795 minimum. Non-geo: default **$1,488**, minimum $788; **$1,988 / $2,488 only with the LANDER-1 exception** (≥30 A/B leads and retailstats end count ≥20, evidenced in the screening pack). Bands $800–$999 and $1,950–$1,999 and x95/x99 endings are forbidden for non-geo (all implied by the list). No price A/B tests.
+3. **Floor** = 65% of BIN rounded to the **whole dollar** (not $5), never below $750: $1,488 → **$967**. Walk-away rule unchanged (max(48%, $500) ≤ floor, nearest $5).
+4. **Drops step down the list, not −20%:** non-geo one rung at M6 and one at M18 (2488 → 1988 → 1488 → 1088 → 788; from $1,488: $1,088 then $788, SEL9-9). Floor and walk-away are **recomputed** from the new BIN (not scaled). Geo: one rung at M12 (499 → 399 **and 399 → 299**), which reverses v2 decision 2 for v3 plans.
+5. **Final push** stays at `drop_date − 90`, but must land on the list: BIN = the lowest list price ≥ the floor (proposed `bin_to_lowest_listed_ge_floor`; v9.1 doesn't define the final push).
+6. **Geo grade prices stay $499 / $399** (D2 still open in v9.1; it suggests revisiting $788/$299 after ≥60 E1).
 
 **Exception (Dvir, 5 Oct 2026, 00:39 IDT):** D-001 is recorded with its **approved values**: BIN $1,995, floor $1,295, walk-away $950 (§8). Its marketplace min offer is $100 like every non-geo name.
 
@@ -98,17 +106,18 @@ All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_
 | V2 | The domain has a category. Geo also has `price_grade` ∈ {strong, weaker} | `CATEGORY_REQUIRED` / `GEO_GRADE_REQUIRED` |
 | V3 | **bin:** `bin` present. `floor`, `min_offer` and `walkaway` are empty or equal to `bin` (the server stores them = `bin`). No lease-to-own | `BIN_REQUIRED` / `BIN_MODE_NO_NEGOTIATION` / `LTO_NOT_ALLOWED` |
 | V4 | **offer** (override only, V7): no `bin`; `min_offer` ≥ 20; `floor`, if given, ≥ `min_offer`; no lease-to-own | `OFFER_MODE_HAS_BIN` / `MIN_OFFER_REQUIRED` / `MIN_OFFER_TOO_LOW` / `FLOOR_BELOW_MIN_OFFER` / `LTO_NOT_ALLOWED` |
-| V5 | **hybrid:** see the hybrid rules below the table | `HYBRID_FIELDS_REQUIRED` / `BIN_NOT_NICE` / `BIN_BELOW_FLOOR_MIN` / `PRICING_FORMULA_MISMATCH` / `HYBRID_PRICES_INVALID` / `FLOOR_BELOW_MIN` / `WALKAWAY_BELOW_MIN` / `MIN_OFFER_FIXED` / `LTO_NOT_ALLOWED` / `LTO_INVALID` |
+| V5 | **hybrid:** see the hybrid rules below the table | `HYBRID_FIELDS_REQUIRED` / `BIN_NOT_NICE` / `BIN_BELOW_FLOOR_MIN` / **v3:** `BIN_NOT_IN_PRICE_LIST` / `LANDER_EXCEPTION_REQUIRED` / `PRICING_FORMULA_MISMATCH` / `HYBRID_PRICES_INVALID` / `FLOOR_BELOW_MIN` / `WALKAWAY_BELOW_MIN` / `MIN_OFFER_FIXED` / `LTO_NOT_ALLOWED` / `LTO_INVALID` |
 | V6 | **Geo:** the mode must be `bin`. At buy/import, `bin` = the grade price (`geo_bin_strong` or `geo_bin_weaker`). On any later manual change, `geo_bin_min` ≤ `bin` ≤ `geo_bin_max` ($299–$499) | `GEO_MODE_NOT_ALLOWED` / `GEO_BIN_NOT_GRADE_PRICE` / `GEO_BIN_OUT_OF_RANGE` |
 | V7 | **Non-geo:** see the non-geo rules below the table | `MODE_NOT_ALLOWED_FOR_CATEGORY` / `HIGH_VALUE_LOW_BIN` |
 | V8 | **Override:** V6, V7 and the LTO switch may be passed only with `override: true`, a non-empty `override_reason` **and** a valid `approval_ref` that names the domain and is ≤72 h old. V1–V5 (except LTO), V11 and V12 can **never** be overridden | `OVERRIDE_NEEDS_APPROVAL` |
 | V9 | Category change: allowed without `approval_ref` within the rules. A non-geo → `geo` change needs `override` (hence `approval_ref`, V8) | `OVERRIDE_NEEDS_APPROVAL` |
 | V10 | A **manual** change needs **no** approval unless it's an **exception** (V5) or an **override** (V8) (Dvir, 5 Oct 2026, 20:07: bot autonomy). If an `approval_ref` is sent anyway, it is validated (an invalid one → its code) and stored in the `listing_history` row; otherwise `approval_text`/`approval_at` are null. Scheduled job changes (`source=schedule`, §10.5) carry `plan_audit_id` | `APPROVAL_REQUIRED` (exception without approval) / the `approval_ref` codes |
-| V11 | **Comps** (on `/buy`, and on import unless legacy): see the comps rules below the table | `COMPS_REQUIRED` / `COMPS_INVALID` |
+| V11 | **Comps:** optional since 6 Oct 2026 (selection v9.1; demand proof lives in the `screening_pack`, `buy.md` 3c). If sent, shape-checked: see the comps rules below the table | `COMPS_INVALID` *(`COMPS_REQUIRED` retired 6 Oct)* |
 | V12 | **Settings version:** if the request carries `expected_settings_version` (the version the buy card's preview used), it must equal the current `pricing_settings` version | 409 `SETTINGS_VERSION_CHANGED` (re-run the preview, re-ask Dvir) |
 
 **Hybrid rules (V5):**
-- `bin` is required. It must be a whole-dollar price **ending in 95** and at least `hybrid_bin_min` ($795, §10.3).
+- `bin` is required. It must be a whole-dollar price **ending in 95** and at least `hybrid_bin_min` ($795, §10.3). *(v2.)*
+- **v3 (6 Oct 2026, §10.13):** `bin` must be in `allowed_bins_cents` and ≥ `nongeo_bin_min` ($788), else 422 `BIN_NOT_IN_PRICE_LIST` (replaces `BIN_NOT_NICE` / `BIN_BELOW_FLOOR_MIN` under v3). $1,988 / $2,488 need the LANDER-1 exception evidence in the screening pack, else 422 `LANDER_EXCEPTION_REQUIRED`. A pricing exception may change floor/walk-away but **never** waives the price list.
 - `floor` and `walkaway` are optional:
   - **Omitted:** the server computes them (§10.3).
   - **Sent:** they must equal the computed values, **unless** `pricing_exception: true` comes with a reason and `approval_ref`. An exception is stored as `pricing_source = approved_exception`. An exception may also waive the "ends in 95" rule.
@@ -121,17 +130,17 @@ All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_
 - `offer` mode, or a plain `bin`, is allowed only with an override (V8).
 - Under an override, a plain `bin` below `high_value_min_bin` ($2,500) is also reported (`HIGH_VALUE_LOW_BIN`). The same override covers it.
 
-**Comps rules (V11):**
-- `pricing_evidence.comps` has between `comps_min` (2) and `comps_max` (3) entries.
+**Comps rules (V11; optional since 6 Oct 2026, selection v9.1):**
+- `pricing_evidence` may be omitted. If sent, `comps` has 0 to `comps_max` (3) entries (`comps_min` is 0 in v3; was 2).
 - Each entry has `domain`, `price_usd` > 0, `sold_on` (not in the future), `venue`, and a `source_url` (https).
 - The server checks the shape only. **Shomer checks that the comps are real sales.**
-- An import may use `legacy_no_comps` with a reason, only for names bought before 5 Oct 2026 (D-001).
+- An import may use `legacy_no_comps` with a reason, only for names bought before 5 Oct 2026 (D-001). *(Since 6 Oct no longer needed: accepted and stored, no effect.)*
 
 **Warnings** (200 with `warnings[]`):
 - `FLOOR_AUTO_ACCEPT`: "Afternic will close any deal ≥ floor without asking you" (any floor below the BIN).
 - `FLOOR_RAISED_TO_MIN`: 65% of the BIN was below $750, so the floor was raised to $750.
 - `PRICING_EXCEPTION`: the stored floor or walk-away differs from the formula. Both values are shown.
-- `LEGACY_NO_COMPS`: D-001 only.
+- `LEGACY_NO_COMPS`: D-001 only. *(Retired 6 Oct 2026 with the comps requirement; not emitted for new calls.)*
 - *(Retired in v2: `WALKAWAY_BELOW_500`. The walk-away can no longer go below $500; an exception below $500 is refused with 422 `WALKAWAY_BELOW_MIN`.)*
 - `NO_BIN_LESS_EXPOSURE`: offer mode (A5). No Premium or Fast Transfer reach.
 - `BIN_OVER_FAST_TRANSFER_MAX`: BIN ≥ $100,000.
@@ -178,10 +187,10 @@ All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_
 - *Interpretation:* the decision named the $100 minimum; for geo names the Sedo minimum is the BIN, to keep the geo no-negotiation rule.
 
 ## 7. Buy-time approval of the full sell plan (one approval)
-1. **The scout proposes the BIN with 2–3 real comparable sales** (domain, price, date, venue, URL).
+1. **The scout proposes the BIN with 2–3 real comparable sales** (domain, price, date, venue, URL). *(Replaced 6 Oct 2026 by selection v9.1: the backend builds the `screening_pack` (demand proof, lead gate, EV, Ratio, BIN from the price list; `selection.md` §1–§4). Comps are optional context.)*
    - Geo: the scout picks the grade (`strong` → $499, `weaker` → $399) and still cites comps.
-   - Non-geo: the BIN must end in 95.
-   - No comps → Shomer REJECTs the card (`COMPS-1`, `system/operating-model.md` §7.1), and the server would refuse it anyway (V11).
+   - Non-geo: the BIN must end in 95 *(v2; v3: a price-list value, default $1,488)*.
+   - No comps → Shomer REJECTs the card (`COMPS-1`, `system/operating-model.md` §7.1), and the server would refuse it anyway (V11). *(Retired 6 Oct: no screening pack → refused, `buy.md` 3c.)*
 2. **Gavriel calls `GET /pricing/preview`** with the BIN, category and grade (§10.6). He pastes the returned `sell_plan_line` (with its `settings_version`) into the card's **"Sell plan (computed)"** row.
    - Before the API exists, the reference calculator `system/tools/pricing_calc.py` (on Gavriel's box, outside this repo) gives the same numbers.
 3. **Dvir approves the buy and the full sell plan in one message.** That covers the BIN, floor, walk-away, the drop schedule, the final push and the delist. **There is no further price approval for this name**, except:
@@ -192,7 +201,8 @@ All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_
 4. **Gavriel sends `/buy`** with the following fields. The server **re-computes the plan and validates it before buying**. A buy whose plan breaks a rule, or doesn't match the card's numbers, is refused **before any money is spent**.
    - `category` (and `price_grade` for geo);
    - `proposed_listing` `{mode, bin, floor, walkaway}` with the card's numbers;
-   - `pricing_evidence`;
+   - `pricing_evidence` (optional since 6 Oct);
+   - `screening_pack` (required since 6 Oct, `buy.md` 3c);
    - `expected_settings_version`.
 5. **On a successful listing** (`auto_list`), the server stores the plan and creates the `price_schedule` rows (§10.4). The anchor is the date of the first accepted listing (decided: Dvir, 5 Oct 09:17).
 
@@ -242,6 +252,7 @@ All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_
 | LS-14 | Contradiction: `mode:"bin"` with `"offer":true`-style extra fields | 422 (strict schema: unknown or contradictory fields are rejected) | Silently ignored |
 | LS-15 | hybrid bin 1995 + `min_offer` 800 / `min_offer` 960 / `min_offer` 100 | 422 `MIN_OFFER_FIXED` / 422 `MIN_OFFER_FIXED` / 200 | Accepted, or 100 refused |
 | LS-16 | hybrid bin 1990 / bin 695 | 422 `BIN_NOT_NICE` / `BIN_BELOW_FLOOR_MIN` | Accepted |
+| LS-16b | **v3** (6 Oct 2026, §10.13): hybrid bin 1495 / 995 / 1999 / 699 / 1488 / 788 / 1988 without and with LANDER-1 exception evidence | 422 `BIN_NOT_IN_PRICE_LIST` ×4; 200; 200; 422 `LANDER_EXCEPTION_REQUIRED` / 200 | Any off-list price accepted |
 | LS-17 | hybrid bin 1995 + floor 1200 (no exception) | 422 `PRICING_FORMULA_MISMATCH` (details show computed 1295/960) | Accepted |
 | LS-18 | hybrid bin 1995 + floor 1295 + walkaway 950 + exception + approval_ref | 200; `pricing_source=approved_exception`; `PRICING_EXCEPTION` warning with formula 960 | Rejected |
 | LS-19 | Exception with floor 700 | 422 `FLOOR_BELOW_MIN` | Accepted |
@@ -270,7 +281,7 @@ All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_
 | LG-17 | `/buy` without `category` | 422 `CATEGORY_REQUIRED`, 0 registrar calls | Bought |
 | LG-18 | `/buy` geo without `price_grade` | 422 `GEO_GRADE_REQUIRED`, 0 registrar calls | Bought |
 | LG-19 | `/buy` geo `strong` with bin 399 | 422 `GEO_BIN_NOT_GRADE_PRICE` | Bought |
-| LG-20 | `/buy` with 1 comp / 4 comps / a comp without `source_url` / `sold_on` in the future | 422 `COMPS_REQUIRED` / `COMPS_INVALID` ×3, 0 registrar calls | Bought |
+| LG-20 | *(Changed 6 Oct 2026, selection v9.1: comps optional.)* `/buy` with no comps / 1 comp / 4 comps / a comp without `source_url` / `sold_on` in the future | no comps and 1 comp accepted (if the screening pack passes); 422 `COMPS_INVALID` ×3, 0 registrar calls | `COMPS_REQUIRED` still emitted, or an invalid comp accepted |
 | LG-21 | `/buy` with `expected_settings_version` = current − 1 | 409 `SETTINGS_VERSION_CHANGED`, 0 registrar calls | Bought |
 
 **History and audit (LH)**
@@ -304,6 +315,8 @@ The **server** computes every derived price from three inputs: **BIN + category 
 
 ### 10.1 `pricing_settings` (versioned, append-only)
 
+*The v3 fields and values (selection v9.1, 6 Oct 2026) are in §10.13. The table below is v2.*
+
 | Field | v2 value | Meaning |
 |---|---|---|
 | `version` | **2** (v1 = 00:46 rules, superseded) | Integer, increments by 1. Rows are never updated or deleted (DB trigger) |
@@ -326,6 +339,8 @@ The **server** computes every derived price from three inputs: **BIN + category 
 - **A new version applies to new plans only.** Existing names keep their approved plan; Dvir approved those exact numbers. Re-pricing an existing name with the new version is a manual `POST /list` with `"replan":true` (bot-only, no `approval_ref` unless it carries an exception or override; (Dvir, 5 Oct 2026, 20:07: bot autonomy)).
 
 ### 10.2 Rounding to nice prices (decided)
+
+*v2 rules. v3 (§10.13): BINs come from the price list (no rounding); floor = whole dollar; walk-away still `round5`.*
 
 | What | Rule | Why | Examples |
 |---|---|---|---|
@@ -374,6 +389,8 @@ The **server** computes every derived price from three inputs: **BIN + category 
 | geo weaker | $399 | $399 | $399 |
 
 ### 10.4 Drop schedule (pre-approved on the buy card; Dvir gets heads-ups only)
+
+*v2 plans (incl. D-001). v3 plans step down the price list instead (§10.13).*
 
 | Event | Due on | What changes |
 |---|---|---|
@@ -543,10 +560,48 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 **Tests:** OF-1 to OF-20 in `test-plan.md`.
 
 ### 10.12 Implementation decisions (Dvir, 5 Oct 2026, steps 4b-1 and 4b-2; confirmed "Confirm all")
-- **Settings:** only version 2 is seeded (no v1 plan was ever computed). Each settings version's cross-field rules are enforced on load and by the admin command: ≤ 2 drops in ascending months < 24; ≤ 1 geo drop, from the strong to the weaker grade price; `hybrid_min_offer` ≤ `walkaway_min`. `--from-current` is optional; at least one `--set` is required; a version that changes nothing is refused. `drops`/`geo_drops` use snake_case keys (`after_months`, `pct_bps`, `from_cents`, `to_cents`).
+- **Settings:** only version 2 is seeded (no v1 plan was ever computed). Each settings version's cross-field rules are enforced on load and by the admin command: ≤ 2 drops in ascending months < 24; ≤ 1 geo drop, from the strong to the weaker grade price *(v2; v3 allows one geo rung per plan from either grade, §10.13)*; `hybrid_min_offer` ≤ `walkaway_min`. `--from-current` is optional; at least one `--set` is required; a version that changes nothing is refused. `drops`/`geo_drops` use snake_case keys (`after_months`, `pct_bps`, `from_cents`, `to_cents`).
 - **Exceptions:** a request with `pricing_exception: true` is always stored as `approved_exception` (even if the values equal the formula); `PRICING_EXCEPTION` is warned when they differ or the BIN doesn't end in 95. It needs `pricing_exception_reason` (`EXCEPTION_REASON_REQUIRED`) and a valid approval (`APPROVAL_REQUIRED`).
 - **Codes added:** `WALKAWAY_NOT_ALLOWED` (walk-away or exception in offer mode; in bin mode a walk-away ≠ BIN is `BIN_MODE_NO_NEGOTIATION`), `LISTING_PRICE_INVALID` (not a positive whole-dollar amount), `GRADE_NOT_GEO`, `HOLD_REASON_REQUIRED`, `REPLAN_NOTHING_LISTED`, 503 `DOMAIN_BUSY`, 503 `REGISTRAR_UNAVAILABLE`, 500 `PRICING_SETTINGS_MISSING`. Lease-to-own always needs an override (V8), whatever `public_lto` says.
 - **Override plans** (non-geo plain `bin`, `offer`, a geo BIN off the grade price, or geo `hybrid`) get only a `delist` row: no drops and no final push.
 - **Geo M12** due on or after the delist date is created as `superseded_by_final_push` (status name reused; geo has no final push).
 - **A delisted domain** still counts toward the domain cap until it is sold or dropped.
 - **Preview:** `afternic_row` uses the given domain's validated `display_name` (else the domain; `example.com` with no domain). The response adds `grade`. Prices display as whole dollars (`$1,995`); `net_at_15pct` keeps cents. The `sell_plan_line` shows skipped events as `M6 skipped (minimum)` / `(no change)` / `(disabled)`, omits superseded ones, prints `LTO <n> mo` when set, and starts `bin (geo strong) · BIN $499 · no offers` for geo. Query errors (unknown parameter, bad date, non-decimal amount, `drop_date` not after `listed_on`) → 400 `VALIDATION_ERROR`; rule errors stay 422; an unknown `domain` → 404 `DOMAIN_NOT_FOUND`; with `domain`, sending `drop_date` too → 400.
+
+### 10.13 `pricing_settings` v3: selection v9.1 price list and step-down drops (Dvir approved v9.1, 6 Oct 2026)
+
+**Applies to new plans only** (§10.1). v2 plans, including D-001, keep their numbers and schedules. The admin command creates v3 with Dvir's v9.1 approval as `approval_text`; until then v2 stays current. Rules v9.1 states are marked **[v9.1]**; rules it leaves open and this spec proposes are marked **[proposed]** and need Dvir's OK at the build gate.
+
+| Field (new or changed) | v3 value | Meaning |
+|---|---|---|
+| `allowed_bins_cents` | `[29900,39900,49900,78800,108800,148800,198800,248800]` | **[v9.1]** Every listed or scheduled BIN must be in this list (geo and non-geo). Implies the forbidden bands $800–$999 / $1,950–$1,999 and no x95/x99 non-geo endings |
+| `nongeo_bin_min_cents` / `nongeo_default_bin_cents` | 78800 / 148800 | **[v9.1]** Non-geo uses list values ≥ $788; default $1,488. Replaces the derived `hybrid_bin_min` ($795) |
+| `lander_exception_bins_cents` | `[198800,248800]` | **[v9.1]** Need LANDER-1 exception evidence (≥30 A/B leads ∧ retailstats end count ≥20) in the screening pack |
+| `floor_bps` / `floor_min_cents` / `floor_rounding` | 6500 / 75000 / `dollar` | **[v9.1]** Floor = 65% of BIN, half-up to the whole dollar ($1,488 → $967), never below $750, never above BIN |
+| `walkaway_bps` / `walkaway_min_cents` | 4800 / 50000 | Unchanged (v2 rule, `round5`) |
+| `hybrid_min_offer_cents` | 10000 | Unchanged |
+| `drop_mode` / `drops` | `ladder` / `[{"after_months":6,"steps":1},{"after_months":18,"steps":1}]` | **[v9.1]** ladder; the months are kept from v2 **[proposed]**. Replaces `pct_bps` 2000 |
+| `geo_drops` | `[{"after_months":12,"steps":1}]` | **[v9.1]** geo ladder 499 → 399 → 299; one rung at M12 **[proposed]** (so a $399 name drops to $299 at M12). Reverses v2 decision 2 for v3 plans |
+| `final_push_mode` | `bin_to_lowest_listed_ge_floor` | **[proposed]** BIN = the lowest list value ≥ floor and ≤ current BIN; floor and walk-away unchanged. Replaces `bin_to_floor_ceil95` (which can give off-list prices such as $995). Geo: none |
+| `comps_min` / `comps_max` | 0 / 3 | **[v9.1]** comps optional (V11) |
+| `geo_bin_min_cents` / `geo_bin_max_cents` | 29900 / 49900 | A manual geo change must also be in the list ($299 / $399 / $499) |
+
+**Calculation (integer cents):**
+- `round_dollar(c) = ((c + 50) div 100) × 100`; `floor = min(BIN, max(round_dollar((BIN × 6500 + 5000) div 10000), 75000))`; `walkaway = min(floor, max(round5((BIN × 4800 + 5000) div 10000), 50000))`.
+- **Ladder step:** the next lower value in `allowed_bins_cents` within the name's lane (non-geo ≥ $788; geo ≤ $499). At the bottom of the lane the event is `skipped_at_minimum` (values unchanged).
+- **After each step, floor and walk-away are recomputed from the new BIN** **[v9.1]** (not scaled as in v2 §10.4). For an approved-exception plan this means the exception does not carry through drops **[proposed; v9.1 is silent]**.
+- Schedule events, anchor, holds, regeneration, delist and the job (§10.4–§10.5) are unchanged.
+
+**Vectors (v3; also `test-plan.md` PR3-*):**
+
+| BIN | Floor | Walk-away | M6 | M18 | Final push |
+|---|---|---|---|---|---|
+| $2,488 (exception) | $1,617 | $1,195 | 1988/1292/955 | 1488/967/715 | 1088/967/715 |
+| $1,988 (exception) | $1,292 | $955 | 1488/967/715 | 1088/750/520 | 788/750/520 |
+| **$1,488 (default)** | **$967** | $715 | **1088**/750/520 | **788**/750/500 | `skipped_no_change` |
+| $1,088 | $750 (raised) | $520 | 788/750/500 | `skipped_at_minimum` | `skipped_no_change` |
+| $788 | $750 (raised) | $500 | `skipped_at_minimum` | `skipped_at_minimum` | `skipped_no_change` |
+| geo $499 / $399 | = BIN | = BIN | — | — | none; M12: 499 → 399 / 399 → 299 |
+
+**Validation codes (v3; names proposed):** `BIN_NOT_IN_PRICE_LIST` (422), `LANDER_EXCEPTION_REQUIRED` (422). `BIN_NOT_NICE` and `BIN_BELOW_FLOOR_MIN` remain for v2 plans only.
+

@@ -10,17 +10,18 @@ Header: `Idempotency-Key: <uuid>` (required).
 { "domain": "examplecityroofing.com",      // illustrative geo name, not checked
   "max_price": 11.50,                 // USD cap on the FIRST-YEAR charge (required)
   "max_two_year_price": 23.00,        // optional cap on first year + one renewal
-  "approval_ref": { "text": "APPROVE D-002 BUY examplecityroofing.com 1yr max $11.50, sell plan as on card (bin $399, settings v2)", "approved_at": "2026-10-06T09:10:00+03:00" },
+  "approval_ref": { "text": "APPROVE D-002 BUY examplecityroofing.com 1yr max $11.50, sell plan as on card (bin $399, settings v3)", "approved_at": "2026-10-06T09:10:00+03:00" },
   "deal_id": "D-002",                 // optional
   "category": "geo",                  // REQUIRED: geo|trend|b2b|collision|regulation|buzzword|other (listing-strategy.md §1)
   "price_grade": "weaker",            // REQUIRED for geo: strong ($499) | weaker ($399), from pricing_settings
-  "proposed_listing": {"mode":"bin","bin":399},   // the buy card's numbers; non-geo: {"mode":"hybrid","bin":1995,"floor":1295,"walkaway":960}
+  "proposed_listing": {"mode":"bin","bin":399},   // the buy card's numbers; non-geo (settings v3): {"mode":"hybrid","bin":1488,"floor":967,"walkaway":715}
                                                   // the server RE-COMPUTES the plan (listing-strategy.md §10) and refuses a mismatch BEFORE buying
-  "pricing_evidence": {"comps":[                  // REQUIRED, 2–3 real comparable sales (V11); placeholders shown, never invent comps
+  "screening_pack": {"id":"sp_…"},               // REQUIRED since 6 Oct 2026 (selection v9.1, SEL7-1): the id POST /screening_pack returned; check 3c
+  "pricing_evidence": {"comps":[                  // OPTIONAL since 6 Oct 2026 (was REQUIRED 2–3 comps, V11); shape-checked if sent; never invent comps
       {"domain":"<comp1>.com","price_usd":0,"sold_on":"YYYY-MM-DD","venue":"<venue>","source_url":"https://…"},
       {"domain":"<comp2>.com","price_usd":0,"sold_on":"YYYY-MM-DD","venue":"<venue>","source_url":"https://…"}],
     "rationale":"one line"},
-  "expected_settings_version": 2,                 // the version GET /pricing/preview used on the card (V12)
+  "expected_settings_version": 3,                 // the version GET /pricing/preview used on the card (V12); 3 once the v9.1 settings exist (listing-strategy.md §10.13)
   "override": false, "override_reason": null,      // only if proposed_listing needs a guard override (same approval_ref)
   "registrar": null,                  // optional: pin one registrar (Dvir named it); no fallback then
   "dry_run": false,                   // default false
@@ -34,7 +35,8 @@ Header: `Idempotency-Key: <uuid>` (required).
 | 1 | Token scope is WRITE | 403 `SCOPE_FORBIDDEN` |
 | 2 | `Idempotency-Key` present. If seen before: same body → replay the stored response; different body → 409 | 400 `IDEMPOTENCY_KEY_REQUIRED` / 409 `IDEMPOTENCY_KEY_MISMATCH` |
 | 3 | `approval_ref.text` is non-empty, **names the domain** on label boundaries (case-insensitive; `ba.com`, `x.com.au`, `www.x.com` or `x.company` do not name `x.com`; Dvir, 5 Oct 2026), and `approved_at` is not in the future and is ≤ `approval_max_age_hours` (default 72) old | 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` |
-| 3b | `category` present and valid (geo: `price_grade` too). `pricing_evidence` passes V11. `expected_settings_version` matches (V12). If `proposed_listing` is given, it passes `listing-strategy.md` V1–V8 **and equals the server-computed plan** (§10.3; an approved exception or override uses this call's `approval_ref`) | 422 `CATEGORY_REQUIRED` / `GEO_GRADE_REQUIRED` / `COMPS_REQUIRED` / `COMPS_INVALID` / `PRICING_FORMULA_MISMATCH` / the listing error code; 409 `SETTINGS_VERSION_CHANGED` (**no registrar call**) |
+| 3b | `category` present and valid (geo: `price_grade` too). `pricing_evidence`, if sent, passes V11 (optional since 6 Oct 2026). `expected_settings_version` matches (V12). If `proposed_listing` is given, it passes `listing-strategy.md` V1–V8 **and equals the server-computed plan** (§10.3; an approved exception or override uses this call's `approval_ref`) | 422 `CATEGORY_REQUIRED` / `GEO_GRADE_REQUIRED` / `COMPS_INVALID` / (v3) `BIN_NOT_IN_PRICE_LIST` / `LANDER_EXCEPTION_REQUIRED` / `PRICING_FORMULA_MISMATCH` / the listing error code; 409 `SETTINGS_VERSION_CHANGED` (**no registrar call**) |
+| 3c | **Screening pack (selection v9.1, 6 Oct 2026; `selection.md` SCREEN-1, §4, SEL7-1):** `screening_pack` present, else **400**. It names a pack stored by `POST /screening_pack` for **this domain**, complete, validated ≤ `approval_max_age_hours` before the call, with every hard gate passing: for non-geo **DEMAND-1** (census `pattern_id@version`, `in_use_share ≥ 0.25`, retailstats start/end count ≥ 1 with `cache_date`), LEAD-1 (A/B tiers), RATIO-1 at BIN and floor, EV-1, LANDER-1 (`bin_in_allowed_set`, and the pack BIN = `proposed_listing.bin`), `registrar_ft_capable` (FT-1 eligibility), WEB-RISK-1 / HIST-1 / SURBL-1 / TM-1. Comps are **not** required | 400 `SCREENING_PACK_REQUIRED` / 422 `SCREENING_PACK_INVALID` (`details.failed_gates`) (**no registrar call**) |
 | 4 | The domain isn't already in `domains` with status `pending_purchase`/`owned`/`listed`, and no open purchase exists for it | 409 `ALREADY_OWNED_OR_PENDING` |
 | 5 | **Domain cap:** count of `owned` + `listed` + `pending_purchase` < `max_domains` (50) | 409 `DOMAIN_CAP_REACHED` |
 | 6 | **Live re-check:** run the `/check` logic now, with no cache. `availability` must be `available`, and a winner (or the pinned registrar) must be eligible | 409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE` |
@@ -72,6 +74,7 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
    2. `set_auto_renew(false)`, then verify.
    3. If `auto_list`: run the `/list` logic with the configured lander (see `list.md`). With `proposed_listing`, it also stores the mode and the computed prices (BIN, floor, private walk-away, min offer $100), stores `pricing_evidence`, appends a `listing_history` row (`source=buy`), sets `first_listed_at`, and **creates the `price_schedule` rows** (`listing-strategy.md` §10.4); the domain becomes `listed`. Dvir's buy approval is the plan approval (`plan_audit_id`).
       - If `API_ACCESS_DISABLED`, add a warning telling Dvir to turn on "Opt In All Domains" at porkbun.com/account/api, then call `/list` again.
+   4. **FT-1 (selection v9.1, 6 Oct 2026):** open a distribution check due `buy_date + 7 days`. Afternic Fast Transfer opt-in and the Afternic listing at the **same BIN** must be confirmed with `POST /distribution/confirm` (`ft_optin_at`, `afternic_listed_at`, `bin`; evidence pasted by a bot) by then. Otherwise the daily job flags the name `distribution_incomplete` (`/report` warning `DISTRIBUTION_INCOMPLETE`; counts as failed in pattern health, SEL9-6). Note: Afternic's Fast Transfer **eligibility** still needs ≥60 days at the registrar (`system/post-acquisition.md` F3); FT-1 confirms the opt-in setting and the listing, not eligibility.
 
 ## Response (201)
 ```json
@@ -99,15 +102,24 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
 
 ## Decisions (Dvir, 5 Oct 2026, step 4b-2; confirmed "Confirm all")
 - **Exception fields at buy:** `pricing_exception`, `pricing_exception_reason` and `walkaway` go **inside** `proposed_listing`.
-- **Check 3b order:** an invalid `proposed_listing.mode` → `MODE_INVALID` first; then category / `price_grade` (`GRADE_NOT_GEO` if a grade is sent for a non-geo name); then V1–V8 (`phase=buy`: a geo BIN must be the grade price); then V11 comps; then V12. All before any registrar contact.
-- **Comps (V11) are stored on every successful buy** (not only with `auto_list`), as the first post-buy step; a failure is a warning (`EVIDENCE_SAVE_FAILED`) and never undoes the purchase. Comp prices may have cents; listing prices are whole dollars.
+- **Check 3b order:** an invalid `proposed_listing.mode` → `MODE_INVALID` first; then category / `price_grade` (`GRADE_NOT_GEO` if a grade is sent for a non-geo name); then V1–V8 (`phase=buy`: a geo BIN must be the grade price); then V11 comps (optional since 6 Oct); then V12; then 3c (screening pack, 6 Oct). All before any registrar contact.
+- **Comps (V11), when sent, are stored on every successful buy** (optional since 6 Oct 2026; the screening pack id is stored too) (not only with `auto_list`), as the first post-buy step; a failure is a warning (`EVIDENCE_SAVE_FAILED`) and never undoes the purchase. Comp prices may have cents; listing prices are whole dollars.
 - **Post-buy listing** is saved under the per-domain lock after the money transactions commit. A failure is the warning `LISTING_SAVE_FAILED`. `post_buy.listing` uses the plan view (`*_cents` + display strings, walk-away marked "(private)", `pricing_source`, `settings_version`, `schedule`, `sell_plan_line`).
 - **Dry run** returns `proposed_listing` with the full schedule computed as `GET /pricing/preview` does with no domain (anchor today IDT, drop date + 24 months), so the card, the preview and the stored plan match (PR-17).
-- **Reconciler-booked purchases** (B-20, a 202 later booked) get no comps or plan, since the reconciler doesn't run post-buy; `/report` flags them (step 4d) and the comps remain in `purchases.request`.
+- **Reconciler-booked purchases** (B-20, a 202 later booked) get no comps or plan, since the reconciler doesn't run post-buy; `/report` flags them (step 4d) and the comps and screening pack id remain in `purchases.request`.
 - **B-28 clock:** the test runs at 2026-10-05 10:00Z (v2 takes effect 09:17 IDT that day); the dates follow the buy date.
 - `PRICING_SETTINGS_MISSING` (500) if no `pricing_settings` version is in effect.
 
-## Phase-later (docs only; not built until Dvir says so): auction max bid for S7
+## Decisions (selection v9.1, Dvir approved 6 Oct 2026; `selection.md`)
+- **Screening pack replaces comps** as the buy evidence (check 3c). Missing → 400 (SEL7-1); comps optional (V11).
+- **FT-capable registrar only** (FT-1): at check 6 the winner must come from an adapter marked `ft_capable` (Porkbun: yes, KB 163; others only once verified). Others are excluded with `NOT_FT_CAPABLE` *(code name proposed)*.
+- **FT-1 post-buy check** (step 7.4): confirmation ≤ 7 days via `POST /distribution/confirm`, else `distribution_incomplete`.
+- **Prices:** `proposed_listing.bin` follows `pricing_settings` v3 (price list, `listing-strategy.md` §10.13) once v3 exists; v2 plans are unchanged.
+- **Renewal price** stored at buy is the live quote (unchanged); the renewal decision itself uses the live `/check/quote` renewal at that time (`GET /renewal/decision/{domain}`, `report.md`).
+- **S7** names come only from zone diff + RDAP 404 ×2 or names Dvir pastes (`GET /s7/candidates`); no auctions.
+
+## ~~Phase-later: auction max bid for S7~~ (retired 6 Oct 2026)
+- **Retired:** selection v9.1 `S7-ONLY` says fully dropped names only (RDAP 404 ×2), **no auctions**, and founder rule 5 already forbids auctions. Kept below for history; don't build it.
 - Buy cards for **S7 (expiring/auction names)** carry a **`max_bid`** field: **max bid = 10% of the card's proposed BIN** (e.g. BIN $1,995 → max bid $199.50, shown rounded down to whole dollars: $199). Dvir approves the max bid on the card (his yes names it). Bots never bid above it.
 - Auctions stay out of scope for v1 (`00-architecture.md` §2), so the API doesn't place bids. When built: `/buy` (or a future `/bid`) refuses any amount > the approved `max_bid` with 422 `MAX_BID_EXCEEDED`, and the `max_bid` counts against the POC cap like a quote.
 
@@ -162,4 +174,9 @@ Runs **hourly** in production (the `tick` job, `00-architecture.md` §6; every 1
 | B-25 | Never top up | Static test: the code has no reference to `/account/topup*` endpoints | Reference found |
 | B-26 | Sandbox E2E (gate G2, Porkbun `pk1_sb_` key) | Full buy of a random free .com in the sandbox; rows correct; a re-call with the same key replays | Any failure |
 | B-27 | **Live acceptance (gate G4): the first deal bought through the API** (D-001 was bought by hand at GoDaddy, registered 4 Oct 2026, and is imported instead, see `report.md` §Import) | After Dvir's chat approval for that domain: one charge ≤ the approved `max_price`; Porkbun shows the domain with privacy on and auto-renew off; ledger/domain/receipt rows correct; `/report` spend rises by exactly the charge, domain count +1, `drop_date` set; NS = lander within 5 min | Any of these false |
-| B-28 | Successful buy with a hybrid `proposed_listing` {bin 1995} + 2 comps + `expected_settings_version: 2` (corrected 5 Oct: the current version is 2; 1 would be refused by V12) | Domain stored 1995 / 1295 / 960 (min offer 100); `pricing_evidence` row; `first_listed_at` set; 4 `price_schedule` rows exactly as PR-12 (dates from the buy date); `plan_audit_id` = this call's audit id | Missing or different rows |
+| B-28 | *(v2 fixture settings; a valid screening pack added since 6 Oct)* Successful buy with a hybrid `proposed_listing` {bin 1995} + 2 comps + `expected_settings_version: 2` (corrected 5 Oct: the current version is 2; 1 would be refused by V12) | Domain stored 1995 / 1295 / 960 (min offer 100); `pricing_evidence` row; `first_listed_at` set; 4 `price_schedule` rows exactly as PR-12 (dates from the buy date); `plan_audit_id` = this call's audit id | Missing or different rows |
+| B-29 | **v3 (6 Oct 2026):** hybrid {bin 1488}, valid screening pack, **no comps**, `expected_settings_version: 3` | Domain stored 1488 / 967 / 715 (min offer 100); schedule as PR3-3; FT-1 check due buy + 7 days | Refused for missing comps, or other values |
+| B-30 | No `screening_pack` / pack for another domain / pack with DEMAND-1 failed / pack BIN 1488 vs `proposed_listing.bin` 1088 | 400 `SCREENING_PACK_REQUIRED` / 422 `SCREENING_PACK_INVALID` ×3; **0 registrar calls** (SEL7-1) | Any registrar call or purchase |
+| B-31 | v3: hybrid bin 1495 / 1988 without LANDER-1 evidence | 422 `BIN_NOT_IN_PRICE_LIST` / `LANDER_EXCEPTION_REQUIRED`, 0 registrar calls (SEL9-3) | Bought |
+| B-32 | FT-1: no `/distribution/confirm` 8 days after the buy; then a confirm with a different BIN | `DISTRIBUTION_INCOMPLETE` + `distribution_incomplete` flag (SEL9-6); the mismatched confirm → 422 `DISTRIBUTION_BIN_MISMATCH` | Not flagged, or mismatch accepted |
+

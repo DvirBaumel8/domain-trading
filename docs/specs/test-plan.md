@@ -84,7 +84,7 @@ The per-endpoint test IDs live in each spec: `check.md` CK-*, `buy.md` B-*, `lis
 
 ## Pricing calculator, drop schedule and settings versioning (PR; adopted 5 Oct 2026, 00:46 IDT; **settings v2 since 09:17 IDT**; rules in `listing-strategy.md` §10)
 
-All amounts are USD. The code works in integer cents. Settings are **v2** unless stated (v1 is superseded; every vector below is v2). Vectors were generated with the reference calculator `system/tools/pricing_calc.py` (outside the repo). **If the code disagrees with a vector, stop and ask Dvir; never edit the vector to match the code.**
+All amounts are USD. The code works in integer cents. Settings are **v2** unless stated (v1 is superseded; every PR-* vector below is v2 and stays valid for v2 plans such as D-001). **v3 vectors (selection v9.1, 6 Oct 2026) are PR3-* below.** Vectors were generated with the reference calculator `system/tools/pricing_calc.py` (outside the repo). **If the code disagrees with a vector, stop and ask Dvir; never edit the vector to match the code.**
 
 **Formula and minimums (G0 unit)**
 
@@ -110,7 +110,7 @@ All amounts are USD. The code works in integer cents. Settings are **v2** unless
 | PR-13 | Formula 2495 | M6 1995/1295/960; M18 1595/1035/770; final **1095/1035/770** | Differs |
 | PR-14 | Formula 1195 | M6 995/750/**500**; M18 795/750/**500**; final `skipped_no_change` (795/750/500) | Differs |
 | PR-15 | Formula 795 | M6 and M18 `skipped_at_minimum` (values stay 795/750/500); final push `skipped_no_change` | A drop applied, or floor/walk-away lowered while BIN can't drop |
-| PR-16 | Geo strong, listed 2026-11-01, drop 2028-11-01 / geo weaker / `geo_drops_enabled=false` | Strong: **one** row `geo_drop_m12` 2027-11-01 499 → 399, then delist 2028-10-25; **no M6, M18 or final push rows**. Weaker: only the delist row (never drops). Disabled: `geo_drop_m12` `skipped_disabled` | Any $299, any M6/M18/final-push row for geo, or a weaker drop |
+| PR-16 | *(v2 plans)* Geo strong, listed 2026-11-01, drop 2028-11-01 / geo weaker / `geo_drops_enabled=false` | Strong: **one** row `geo_drop_m12` 2027-11-01 499 → 399, then delist 2028-10-25; **no M6, M18 or final push rows**. Weaker: only the delist row (never drops). Disabled: `geo_drop_m12` `skipped_disabled` | Any $299, any M6/M18/final-push row for geo, or a weaker drop |
 | PR-17 | The same inputs through `GET /pricing/preview`, `/buy` dry run, `/list` dry run and `import-domain --dry-run` | Identical plan and schedule fields in all four | Any drift |
 | PR-18 | Month ends | Listed 2026-08-31 → M6 2027-02-28, M18 2028-02-29; listed 2027-08-31 → M6 2028-02-29 | Other dates |
 | PR-19 | M-event after the final push: listed 2027-06-01, drop 2028-10-04 | M18 (2028-12-01) = `superseded_by_final_push`; the final push is computed from the M6 values | M18 planned |
@@ -135,11 +135,11 @@ All amounts are USD. The code works in integer cents. Settings are **v2** unless
 | ID | Case | Pass | Fail |
 |---|---|---|---|
 | PR-30 | `UPDATE`/`DELETE` on `pricing_settings` | DB error | Succeeds |
-| PR-31 | `npm run admin -- pricing-settings new --set floor_bps=6000 --approval-text … --approval-at …` | Version 3 created with the approval; without approval text → refused. Route-table test: no API route writes `pricing_settings` | Created without approval, or an API route exists |
-| PR-32 | After v3 exists | Existing plans and schedules unchanged (still v2); a new preview uses v3 (1995 → floor 1195); `listing_history` records the version | Existing plan re-priced |
-| PR-33 | `/buy` with `expected_settings_version: 2` after v3 | 409 `SETTINGS_VERSION_CHANGED`, 0 registrar calls (= LG-21) | Bought |
-| PR-34 | `POST /list` `replan:true` (no `approval_ref`) on a v2 domain | Schedule regenerated with v3 numbers; old rows `superseded` | Not regenerated |
-| PR-35 | v3 with `floor_min_cents` 90000 | `hybrid_bin_min` becomes 995 (derived); preview BIN 795 → `BIN_BELOW_FLOOR_MIN` | 795 accepted |
+| PR-31 | `npm run admin -- pricing-settings new --set floor_bps=6000 --approval-text … --approval-at …` | Version N+1 created (N = current; *renamed 6 Oct: "v3" is now the real selection v9.1 version, so PR-31–PR-35 use a test-only N+1*) with the approval; without approval text → refused. Route-table test: no API route writes `pricing_settings` | Created without approval, or an API route exists |
+| PR-32 | After N+1 exists (fixture from v2, `floor_bps=6000`) | Existing plans and schedules unchanged (still N); a new preview uses N+1 (1995 → floor 1195); `listing_history` records the version | Existing plan re-priced |
+| PR-33 | `/buy` with `expected_settings_version: N` after N+1 | 409 `SETTINGS_VERSION_CHANGED`, 0 registrar calls (= LG-21) | Bought |
+| PR-34 | `POST /list` `replan:true` (no `approval_ref`) on a version-N domain | Schedule regenerated with N+1 numbers; old rows `superseded` | Not regenerated |
+| PR-35 | N+1 (from v2) with `floor_min_cents` 90000 | `hybrid_bin_min` becomes 995 (derived); preview BIN 795 → `BIN_BELOW_FLOOR_MIN` | 795 accepted |
 
 **Export flags and reports (G1)**
 
@@ -152,9 +152,25 @@ All amounts are USD. The code works in integer cents. Settings are **v2** unless
 | PR-40 | Walk-away floor (v2): BIN 795 / 995 / 1095 / 1495 | walkaway 500 / 500 / 525 / 720; exception walkaway 450 → 422 `WALKAWAY_BELOW_MIN` (= LS-20) | Any walk-away < 500 accepted |
 | PR-41 | Walk-away floor after drops: formula 1495 and 1195, listed 2026-10-12, drop 2028-10-04 | 1495: M6 1195/775/575, M18 995/750/**500**, final 795/750/500. 1195: M6 995/750/**500** (48%×0.8 would give 460), M18 795/750/500 | A scheduled walk-away < 500 |
 | PR-42 | Final push follows operating-model §3a ("BIN drops to the floor"): M18 values 1295/830/x, 1595/1035/x, 995/750/x, 795/750/x | BIN 895 / 1095 / 795 / unchanged (`skipped_no_change`); floor and walk-away unchanged; BIN ≥ floor always | 795 for all, BIN < floor, or floor set = BIN |
-| PR-43 | Geo property: every geo plan (strong, weaker) over any listing date | No scheduled BIN other than 499 and 399; at most one geo row; a 399 plan has no price rows | $299, or two geo drops |
-| PR-44 | Settings version label | Every `GET /pricing/preview`, `sell_plan_line` and `listing_history` row under these rules says version **2**. The PR vector file is keyed by settings version: changing any output rule or vector without adding a new `pricing_settings` version fails the test | A rule change still labelled v1/v2 unchanged |
+| PR-43 | *(v2 plans; v3: PR3-6)* Geo property: every geo plan (strong, weaker) over any listing date | No scheduled BIN other than 499 and 399; at most one geo row; a 399 plan has no price rows | $299, or two geo drops |
+| PR-44 | Settings version label | Every `GET /pricing/preview`, `sell_plan_line` and `listing_history` row under these rules says version **2** (v3 rules: version **3**). The PR vector file is keyed by settings version: changing any output rule or vector without adding a new `pricing_settings` version fails the test | A rule change still labelled v1/v2 unchanged |
 | PR-L1 | **Live (G5):** the first scheduled drop on a real name | The bot uploads the changed-only file; within 48 h the lander shows the new BIN (Gavriel's headless capture) | Old price after 48 h → Dvir checks the Afternic listing |
+
+**Pricing settings v3: price list and step-down drops (PR3; selection v9.1, Dvir approved 6 Oct 2026; rules in `listing-strategy.md` §10.13).** Vectors computed by hand from §10.13 (the reference calculator `pricing_calc.py` doesn't have v3 yet). Same rule: if the code disagrees, stop and ask Dvir. Dates: listed 2026-10-12, `drop_date` 2028-10-04 → M6 2027-04-12, M18 2028-04-12, final push 2028-07-06.
+
+| ID | Input | Pass | Fail |
+|---|---|---|---|
+| PR3-1 | hybrid 1488 / 1988 / 2488 / 1088 / 788 | floor/walk-away 967/715 · 1292/955 · 1617/1195 · 750/520 (+`FLOOR_RAISED_TO_MIN`) · 750/500; min offer 100 | Other (e.g. floor 965 from `round5`) |
+| PR3-2 | BIN validation (v3) | 1495, 995, 1999, 950, 699, 1990 → `BIN_NOT_IN_PRICE_LIST`; 788, 1088, 1488 ok; 1988/2488 without LANDER-1 evidence → `LANDER_EXCEPTION_REQUIRED`, with it ok | Other |
+| PR3-3 | Formula 1488 (= SEL9-9) | M6 **1088**/750/520; M18 **788**/750/500; final `skipped_no_change` | 1190/952 (−20%), or any off-list BIN |
+| PR3-4 | Formula 2488 / 1988 | 2488: M6 1988/1292/955, M18 1488/967/715, final 1088/967/715. 1988: M6 1488/967/715, M18 1088/750/520, final 788/750/520 | Differs |
+| PR3-5 | Formula 1088 / 788 | 1088: M6 788/750/500, M18 `skipped_at_minimum`, final `skipped_no_change`. 788: M6 and M18 `skipped_at_minimum`, final `skipped_no_change` | A BIN below 788 |
+| PR3-6 | Geo strong / weaker, listed 2026-11-01, drop 2028-11-01 | Strong: `geo_drop_m12` 2027-11-01 499 → 399; weaker: `geo_drop_m12` 399 → 299; then delist 2028-10-25; no M6/M18/final push | A second geo drop, or a geo price off {299,399,499} |
+| PR3-7 | Property: every v3 plan (all list BINs, any listing date) | Every scheduled BIN ∈ `allowed_bins_cents`; 500 ≤ walk-away ≤ floor ≤ BIN; floor ≥ 750 for non-geo; floor = recomputed 65% (whole dollar) of the current BIN unless raised | Any violation |
+| PR3-8 | Version isolation | D-001 (v2 exception 1995/1295/950) keeps PR-11 after v3 is created; a new 1488 preview says version 3 | D-001 re-priced |
+
+## Selection (SEL; selection v9.1, Dvir approved 6 Oct 2026)
+The selection tests are defined in `selection.md` §7 (SEL-1–SEL-4, SEL3-*, SEL4-*, SEL5-*, SEL6-*, SEL7-*, SEL8-*, SEL9-1–SEL9-15, SEL10-1, SEL-T) and run in G0/G1 when the selection backend is built (`CLAUDE.md` build step 9; `selection.md` §8 order). Any fail → no live Gate A until fixed or Dvir waives it. The `/buy` side is also covered by B-29–B-32 (`buy.md`) and LS-16b / LG-20 (`listing-strategy.md`).
 
 ## Offers log and minimum offer (OF; Dvir, 5 Oct 2026, 01:03 IDT, decision #2; rules in `listing-strategy.md` §10.11)
 Fixtures: D-001 imported as hybrid 1995 / 1295 / walk-away 950 / min offer 100, listed 2026-10-12; a geo name at $399; a second trend name at the formula 2495 / 1620 / 1200. G1 (real Postgres; no network) unless marked.

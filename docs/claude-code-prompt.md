@@ -42,7 +42,7 @@ Work in phases. **At the end of each phase, stop.** Show me the test output (cou
   - validation V1–V12;
   - `approval_ref` only for buy and sell decisions: pricing exceptions, overrides, `/buy`, non-pre-approved offer counters/accepts; every other `/list`, hold, upload confirmation and `/sold` call is bot-only (Dvir, 5 Oct 2026, 20:07);
   - the append-only `listing_history`.
-  - `/buy` validates `proposed_listing`, `pricing_evidence` (2–3 comps) and `expected_settings_version` **before** any registrar call.
+  - `/buy` validates `proposed_listing`, `pricing_evidence` and `expected_settings_version` **before** any registrar call. *(Since 6 Oct 2026, selection v9.1: comps are optional and `/buy` requires a `screening_pack` instead; settings v3 adds the price list and step-down drops. See `docs/specs/selection.md`, `buy.md` 3c, `listing-strategy.md` §10.13.)*
 - **Pricing (§10):**
   - the versioned, append-only `pricing_settings` table (seed **v2**: v1 is superseded) and `npm run admin -- pricing-settings new|show`;
   - the calculator (formula, rounding, minimums);
