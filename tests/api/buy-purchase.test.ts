@@ -105,7 +105,7 @@ describe('POST /buy purchase', () => {
     expect(pb.charges).toBe(1);
   });
 
-  it('CAP-2: an unresolved (unknown) purchase counts toward the 10-domain cap', async () => {
+  it('CAP-2: an unresolved (unknown) purchase counts toward the 50-domain cap', async () => {
     const stuck = new FakeAdapter('porkbun', { register: () => timeout(), findDomain: (_d, n) => (n === 0 ? null : new Error('down')) });
     const { auth } = await setup(stuck);
     await seedOwnedDomains(49);
@@ -448,7 +448,7 @@ describe('POST /buy final-review fixes', () => {
     expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('succeeded');
   });
 
-  it('ambiguous dry run counts toward the 10-domain cap: 9 owned + ambiguous A → buy of B is DOMAIN_CAP_REACHED', async () => {
+  it('ambiguous dry run counts toward the 50-domain cap: 49 owned + ambiguous A → buy of B is DOMAIN_CAP_REACHED', async () => {
     const amb = new RegistrarError('porkbun', 'REGISTRAR_BAD_RESPONSE', 'x', { ambiguous: true });
     const pb = new FakeAdapter('porkbun', { dryRun: (n) => (n === 0 ? amb : undefined) });
     const { auth } = await setup(pb);

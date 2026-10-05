@@ -181,10 +181,16 @@ describe('schema: pricing (PR-30, migration 4)', () => {
     await expect(db.deleteFrom('pricing_settings').execute()).rejects.toThrow(/append-only/);
   });
 
+  it('TRUNCATE pricing_settings CASCADE raises in normal session mode', async () => {
+    await expect(sql`TRUNCATE pricing_settings CASCADE`.execute(db)).rejects.toThrow(/append-only/);
+  });
+
   it('seeds exactly one pricing_settings row: v2', async () => {
     const rows = await db.selectFrom('pricing_settings').selectAll().execute();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ version: 2, floor_bps: 6500, walkaway_min_cents: 50000 });
+    expect(rows[0]!.geo_drops).toEqual([{ after_months: 12, from_cents: 49900, to_cents: 39900 }]);
+    expect(rows[0]!.drops).toEqual([{ after_months: 6, pct_bps: 2000 }, { after_months: 18, pct_bps: 2000 }]);
   });
 
   it('price_schedule rejects a duplicate (domain_id, event, plan_id)', async () => {

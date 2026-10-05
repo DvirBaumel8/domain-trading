@@ -50,9 +50,9 @@ CREATE FUNCTION seed_pricing_settings_v2() RETURNS void LANGUAGE sql AS $$
     'v2: $500 walk-away floor, one geo drop, Sedo make-offer, final push to floor', '2026-10-05T09:17:00+03:00',
     'pricing rules v2 (Gavriel spec commit 3488942, approved by Dvir)',
     49900, 39900, 29900, 49900,
-    true, '[{"afterMonths":12,"fromCents":49900,"toCents":39900}]'::jsonb,
+    true, '[{"after_months":12,"from_cents":49900,"to_cents":39900}]'::jsonb,
     6500, 75000, 4800, 50000,
-    10000, '[{"afterMonths":6,"pctBps":2000},{"afterMonths":18,"pctBps":2000}]'::jsonb, 90, 'bin_to_floor_ceil95',
+    10000, '[{"after_months":6,"pct_bps":2000},{"after_months":18,"pct_bps":2000}]'::jsonb, 90, 'bin_to_floor_ceil95',
     7, 7, 2, 3, false
   );
 $$;
@@ -87,6 +87,7 @@ ALTER TABLE listing_history
   ADD COLUMN walkaway_cents integer CHECK (walkaway_cents > 0),
   ADD COLUMN pricing_source text CHECK (pricing_source IN ('formula', 'approved_exception')),
   ADD COLUMN pricing_settings_version integer REFERENCES pricing_settings (version),
+  -- no FK on purpose: price_schedule.listing_history_id already links the other way; a two-way FK would be circular
   ADD COLUMN schedule_event_id bigint,
   ADD COLUMN plan_audit_id text;
 

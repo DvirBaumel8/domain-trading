@@ -586,7 +586,7 @@ export class BuyService {
   ): Promise<never> {
     this.deps.log?.error({ domain: rec.input.domain, registrar: adapter.name, registrar_code: e.code }, 'dry run ambiguous — possible real charge');
     try {
-      // The pending domains row makes the 10-domain cap count this possible purchase; both rows or neither.
+      // The pending domains row makes the domain cap count this possible purchase; both rows or neither.
       await this.deps.db.transaction().execute(async (trx) => {
         await sql`select pg_advisory_xact_lock(hashtext(${rec.input.domain}))`.execute(trx);
         await trx.insertInto('purchases').values({
