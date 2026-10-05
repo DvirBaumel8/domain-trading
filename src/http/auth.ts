@@ -22,6 +22,11 @@ declare module 'fastify' {
 
 export const PUBLIC_PATHS: ReadonlySet<string> = new Set(['/health', '/health/ping']);
 export const JOB_PATH = '/jobs/run';
+
+/** True when the request MATCHED the job route. Uses the routed (decoded) pattern, never the raw URL, so /jobs/%72un cannot slip past. */
+export function isJobRoute(req: { routeOptions?: { url?: string } }): boolean {
+  return req.routeOptions?.url === JOB_PATH;
+}
 const BEARER = /^Bearer ([A-Za-z0-9_-]+)$/i;
 
 export function pathOf(url: string): string {
@@ -38,7 +43,7 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
   app.decorateRequest('auth', null);
   app.decorateRequest('jobAuth', false);
   app.addHook('onRequest', async (req) => {
-    if (pathOf(req.url) === JOB_PATH) {
+    if (isJobRoute(req) && req.method === 'POST') {
       // Dedicated bearer, never a READ/WRITE API token.
       if (!jobTriggerToken) throw new AppError(503, 'JOBS_DISABLED', 'The job endpoint is not configured');
       const jm = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '');
@@ -63,6 +68,7 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
 
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
+    if (isJobRoute(req) && !req.jobAuth) throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
     if (req.jobAuth) return; // POST /jobs/run: authenticated by the job-trigger bearer, no API-token scope
     if (!req.auth) {
       // Only public GET/HEAD/OPTIONS routes reach here without auth; fail closed for mutations.

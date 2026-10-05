@@ -6,8 +6,20 @@ import type { Database } from './types.js';
 pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v));
 pg.types.setTypeParser(pg.types.builtins.DATE, (v) => v);
 
+const SSLMODE = /([?&])sslmode=([^&]*)(&|$)/i;
+
+/**
+ * With ssl on, pg lets a sslmode in the URL override the ssl config, so we validate it and strip it:
+ * absent / require / verify-full are accepted (all mean verified TLS here); anything else is refused.
+ */
 export function poolConfig(url: string, opts: { ssl?: boolean } = {}): pg.PoolConfig {
-  return { connectionString: url, max: 10, ...(opts.ssl ? { ssl: { rejectUnauthorized: true } } : {}) };
+  if (!opts.ssl) return { connectionString: url, max: 10 };
+  const m = SSLMODE.exec(url);
+  if (m && !['require', 'verify-full'].includes(m[2]!.toLowerCase())) {
+    throw new Error(`DATABASE_SSL=true requires sslmode=verify-full (or require, or none) in DATABASE_URL; got sslmode=${m[2]}`);
+  }
+  const clean = url.replace(SSLMODE, (_x, pre: string, _v: string, post: string) => (post === '&' ? pre : '')).replace(/[?&]$/, '');
+  return { connectionString: clean, max: 10, ssl: { rejectUnauthorized: true } };
 }
 
 export function createDb(url: string, opts: { ssl?: boolean } = {}): Kysely<Database> {

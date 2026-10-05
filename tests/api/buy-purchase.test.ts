@@ -434,6 +434,18 @@ describe('POST /buy final-review fixes', () => {
     expect(d2.headers['idempotent-replayed']).toBe('true');
   });
 
+  it('the 202 reopen also applies on an encoded path (/%62uy routes to /buy)', async () => {
+    const pb = stuck();
+    const { auth } = await setup(pb);
+    const send = () => app.inject({ method: 'POST', url: '/%62uy', headers: { ...auth, 'idempotency-key': 'k-enc202' }, payload: buyBody() as object });
+    expect((await send()).statusCode).toBe(202);
+    const owned = new FakeAdapter('porkbun', { alreadyOwned: true });
+    expect((await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => T0 + 10 * 60_000 }).runOnce()).booked).toBe(1);
+    const b = await send();
+    expect(b.statusCode).toBe(201);
+    expect(b.headers['idempotent-replayed']).toBeUndefined();
+  });
+
   it('ambiguous dry run → 409 REGISTRAR_DRY_RUN_AMBIGUOUS, unknown purchase + pending domain row recorded, no real register; re-buy blocked; reconciler books it', async () => {
     const amb = new RegistrarError('porkbun', 'REGISTRAR_BAD_RESPONSE', 'dry run answered as real', { ambiguous: true });
     const pb = new FakeAdapter('porkbun', { dryRun: () => amb });

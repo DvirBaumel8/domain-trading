@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
 import type { AuditRowInsert, Database } from '../db/types.js';
-import { JOB_PATH, pathOf } from './auth.js';
+import { isJobRoute } from './auth.js';
 import { errorBody } from './errors.js';
 import { isMutating } from './methods.js';
 import { redact } from './redact.js';
@@ -82,7 +82,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
       await writer.write({
         id: req.auditId,
         token_id: req.auth?.tokenId ?? null,
-        scope: req.auth?.scope ?? (pathOf(req.url) === JOB_PATH ? 'job' : null),
+        scope: req.auth?.scope ?? (isJobRoute(req) ? 'job' : null),
         method: req.method,
         path: req.url,
         idempotency_key: idempotencyKeyOf(req),

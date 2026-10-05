@@ -34,6 +34,8 @@ export interface JobRunnerDeps {
   dropJob: Runnable;
   registrarCheckJob: Runnable;
   backupExport?: BackupExport;
+  /** Secret values scrubbed from step error messages. */
+  secretValues?: string[];
 }
 
 const NS_VERIFY_EVERY_MS = 24 * 3_600_000;
@@ -60,10 +62,17 @@ export class JobRunner {
       const skipped = typeof summary === 'object' && summary !== null && (summary as { skipped?: unknown }).skipped === true;
       return skipped ? { ok: true, skipped: true, summary } : { ok: true, summary };
     } catch (e) {
-      return { ok: false, error: (e as Error).message, summary: null };
+      return { ok: false, error: this.clean((e as Error).message), summary: null };
     }
   }
 
+  private clean(message: string): string {
+    let m = message;
+    for (const v of this.deps.secretValues ?? []) if (v) m = m.split(v).join('[REDACTED]');
+    return m.length > 200 ? `${m.slice(0, 200)}...` : m;
+  }
+
+  /** A verifier that throws writes no marker, so it is retried on the next hourly tick by design. */
   private async nsVerifyDue(): Promise<boolean> {
     const last = await this.deps.db.selectFrom('audit_log').select('at').where('path', '=', 'ns-verify')
       .orderBy('at', 'desc').limit(1).executeTakeFirst();

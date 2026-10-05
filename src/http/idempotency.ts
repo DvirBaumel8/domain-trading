@@ -62,7 +62,7 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
     }
     // A stored 202 on POST /buy is "purchase state unknown": the reconciler may have booked it since, so the
     // handler must run again (BuyService.priorOutcome never re-registers) and its answer replaces the stored one.
-    if (existing.status_code === 202 && req.url.split('?')[0] === '/buy') {
+    if (existing.status_code === 202 && req.routeOptions.url === '/buy') {
       const reopened = await db
         .updateTable('idempotency_keys')
         .set({ state: 'in_progress', completed_at: null })

@@ -125,6 +125,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
     dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, backupExport: deps.backupExport,
+    secretValues: deps.config.secretValues,
   }));
   registerJobs(app, app.jobRunner);
   deps.registerExtraRoutes?.(app);

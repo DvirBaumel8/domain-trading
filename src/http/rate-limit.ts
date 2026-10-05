@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { isJobRoute } from './auth.js';
 import { AppError } from './errors.js';
 import { isMutating } from './methods.js';
 
@@ -29,8 +30,9 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
   const reads = new SlidingWindowLimiter(60, 60_000, now);
   const writes = new SlidingWindowLimiter(10, 60_000, now);
   app.addHook('preHandler', async (req, reply) => {
-    if (!req.auth) return; // public routes (/health) are not limited
-    const wait = (isMutating(req.method) ? writes : reads).take(String(req.auth.tokenId));
+    const key = req.auth ? String(req.auth.tokenId) : req.jobAuth && isJobRoute(req) ? 'job' : null;
+    if (key === null) return; // public routes (/health) are not limited
+    const wait = (isMutating(req.method) ? writes : reads).take(key);
     if (wait > 0) {
       const seconds = Math.ceil(wait / 1000);
       reply.header('retry-after', String(seconds));

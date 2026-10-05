@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
+import { poolConfig } from './db/client.js';
 import { REGISTRAR_ENV } from './registrars/registry.js';
 
 const EnvSchema = z.object({
@@ -14,7 +15,7 @@ const EnvSchema = z.object({
   SEDO_TEMPLATE_PATH: z.string().default('templates/sedo_template.json'),
   DNS_NS_SERVER: z.string().default('192.5.6.30'),
   JOBS_MODE: z.enum(['internal', 'external']).default('internal'),
-  JOB_TRIGGER_TOKEN: z.string().optional(),
+  JOB_TRIGGER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\S{32,}$/, 'JOB_TRIGGER_TOKEN must be at least 32 non-space characters (openssl rand -hex 32)').optional()),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
 });
 
@@ -79,6 +80,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       + 'which breaks behind a transaction-mode pooler. Use the direct (non-pooler) connection string.',
     );
   }
+
+  if (e.DATABASE_SSL === 'true') poolConfig(e.DATABASE_URL, { ssl: true }); // throws on a conflicting sslmode
 
   const secretValues = SECRET_ENV.map((k) => strings[k] ?? '').filter((v) => v.length > 0);
   const dbPassword = decodeURIComponent(new URL(e.DATABASE_URL).password);

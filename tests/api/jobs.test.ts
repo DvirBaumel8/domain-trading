@@ -5,7 +5,7 @@ import { makeApp } from '../helpers/app.js';
 import { testDb } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';
 
-const JOB_TOKEN = 'job_token_fake_0123456789abcdef';
+const JOB_TOKEN = 'job_token_fake_0123456789abcdef0123456789';
 const bearer = { authorization: `Bearer ${JOB_TOKEN}` };
 let n = 0;
 const post = (app: FastifyInstance, job: unknown, headers: Record<string, string> = bearer, key = `k-${++n}`) =>
@@ -50,6 +50,8 @@ describe('POST /jobs/run auth', () => {
     const res = await post(app, 'tick');
     expect(res.statusCode).toBe(503);
     expect(res.json().error.code).toBe('JOBS_DISABLED');
+    const row = await testDb.selectFrom('audit_log').selectAll().where('path', '=', '/jobs/run').executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ scope: 'job', token_id: null, status_code: 503, result_summary: 'JOBS_DISABLED' });
   });
 
   it('requires an Idempotency-Key and a valid body', async () => {
@@ -77,6 +79,44 @@ describe('POST /jobs/run auth', () => {
     expect(rows[1]!.result_summary).toBe('replayed:ok');
     const idem = await testDb.selectFrom('idempotency_keys').selectAll().where('key', '=', 'same-key').executeTakeFirstOrThrow();
     expect(idem.token_id).toBeNull();
+  });
+});
+
+describe('encoded paths cannot bypass the job route', () => {
+  const enc = (app: FastifyInstance, url: string, headers: Record<string, string>) =>
+    app.inject({ method: 'POST', url, headers: { ...headers, 'idempotency-key': `enc-${++n}` }, payload: { job: 'tick' } });
+
+  it.each(['/jobs/%72un', '/%6Aobs/run'])('WRITE token on %s → 401; the job token → 200', async (url) => {
+    app = await make();
+    const write = await issueToken('write');
+    expect((await enc(app, url, write.auth)).statusCode).toBe(401);
+    expect((await enc(app, url, bearer)).statusCode).toBe(200);
+  });
+
+  it('with no JOB_TRIGGER_TOKEN a WRITE token on the encoded path is never 200', async () => {
+    app = await makeApp({ testRoutes: false });
+    const write = await issueToken('write');
+    const res = await enc(app, '/jobs/%72un', write.auth);
+    expect([401, 503]).toContain(res.statusCode);
+  });
+
+  it('is rate limited under its own key', async () => {
+    app = await make();
+    const codes: number[] = [];
+    for (let i = 0; i < 11; i++) codes.push((await post(app, 'tick')).statusCode);
+    expect(codes.slice(0, 10).every((c) => c === 200)).toBe(true);
+    expect(codes[10]).toBe(429);
+  });
+});
+
+describe('step errors', () => {
+  it('are redacted of secret values and truncated to 200 chars', async () => {
+    app = await make({ env: { JOB_TRIGGER_TOKEN: JOB_TOKEN, PORKBUN_API_KEY: 'pk1_fake_leaky_0000000000' } });
+    vi.spyOn(app.reconciler, 'runOnce').mockRejectedValue(new Error(`bad key pk1_fake_leaky_0000000000 ${'x'.repeat(500)}`));
+    const err = (await post(app, 'tick')).json().steps.reconciler.error as string;
+    expect(err).not.toContain('pk1_fake_leaky');
+    expect(err).toContain('[REDACTED]');
+    expect(err.length).toBeLessThanOrEqual(203);
   });
 });
 
