@@ -286,10 +286,6 @@ describe('schema: offers (OF-11)', () => {
     await db.updateTable('offers').set({ outcome: 'declined' }).execute();
     await expect(db.deleteFrom('offers').execute()).rejects.toThrow(/DELETE is not allowed/);
   });
-  it('offer_imports is append-only', async () => {
-    await db.insertInto('offer_imports').values({ file_sha256: 'a'.repeat(64), rows: 1, inserted: 1, duplicates: 0, recorded_by: 'test' }).execute();
-    await expect(db.updateTable('offer_imports').set({ rows: 2 }).execute()).rejects.toThrow(/append-only/);
-  });
   it('dedupe indexes reject duplicates', async () => {
     const id = await insertOwnedDomain(db);
     await db.insertInto('offers').values(offerRow(id)).execute();
@@ -314,10 +310,7 @@ describe('schema: offers (OF-11)', () => {
     await db.insertInto('offers').values(offerRow(id, { walkaway_cents_at: 95000 })).execute();
     await expect(db.updateTable('offers').set({ walkaway_cents_at: 1 }).execute()).rejects.toThrow(/immutable/);
   });
-  it('TRUNCATE is refused on offers and offer_imports; DELETE refused on offer_imports', async () => {
+  it('TRUNCATE is refused on offers', async () => {
     await expect(sql`TRUNCATE offers`.execute(db)).rejects.toThrow();
-    await expect(sql`TRUNCATE offer_imports CASCADE`.execute(db)).rejects.toThrow();
-    await db.insertInto('offer_imports').values({ file_sha256: 'b'.repeat(64), rows: 1, inserted: 1, duplicates: 0, recorded_by: 'test' }).execute();
-    await expect(db.deleteFrom('offer_imports').execute()).rejects.toThrow(/append-only/);
   });
 });

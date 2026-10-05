@@ -21,8 +21,6 @@ import { registerIdempotency } from './http/idempotency.js';
 import { registerRateLimit } from './http/rate-limit.js';
 import { errorBody, registerErrorHandling } from './http/errors.js';
 import { rdapStatus, type RdapFn } from './rdap.js';
-import { registerPayouts } from './api/payouts.js';
-import { PayoutsService } from './services/payouts.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
 import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
@@ -116,7 +114,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerReport(app, { db: deps.db, now: deps.now ?? Date.now });
   registerReads(app, { db: deps.db, now: deps.now ?? Date.now });
   registerSold(app, new SoldService({ db: deps.db, now: deps.now ?? Date.now }));
-  registerPayouts(app, new PayoutsService({ db: deps.db, now: deps.now ?? Date.now }));
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));

@@ -10,7 +10,7 @@ A ~150-line wrapper over the HTTP API, so **Gavriel** can use the command wordin
 | `dt list <domain> --bin 299` | `POST /list/<domain>` `{"mode":"bin","bin":299}` |
 | `dt list <domain> --bin 1995 --offer` | `{"mode":"hybrid","bin":1995}` (server computes floor and walk-away; min offer $100) |
 | `dt offers add <domain> <amount> --source afternic [--received-at <iso>] [--buyer-type end_user] [--ref <id>]` | `POST /offers` (`listing-strategy.md` §10.11) |
-| `dt offers import offers.csv [--dry-run]` / `dt offers list [--domain d]` / `dt offers outcome <id> <outcome> [--approval "<text>" --approved-at <iso>]` | `POST /offers/import` / `GET /offers` / `POST /offers/{id}/outcome` |
+| `dt offers list [--domain d]` / `dt offers outcome <id> <outcome> [--approval "<text>" --approved-at <iso>]` | `GET /offers` / `POST /offers/{id}/outcome` (the `dt offers import` CSV command was removed 6 Oct 2026 (Dvir)) |
 | `dt list <domain> --bin 1995 --offer --floor 1295 --walkaway 950 --exception "<why>"` | `{"mode":"hybrid","bin":1995,"floor":1295,"walkaway":950,"pricing_exception":true,…}` |
 | `dt list <domain> --offer --min-offer 500 [--floor 900] --override --reason "<why>"` | `{"mode":"offer",…}` (override only) |
 | `dt list <domain> --hold "<why>"` / `--unhold` / `--replan` | `pricing_hold` true/false / `replan:true` |

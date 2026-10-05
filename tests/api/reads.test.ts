@@ -85,7 +85,6 @@ describe('GET /portfolio', () => {
     expect(b.ledger).toHaveLength(1);
     expect(b.ledger[0]).toMatchObject({ type: 'registration', amount_usd: '-13.73', deal_id: 'D-001' });
     expect(b.sale).toBeNull();
-    expect(b.payout).toBeNull();
   });
 
   it('404 DOMAIN_NOT_FOUND', async () => {

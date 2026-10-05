@@ -38,18 +38,6 @@ export async function perDomain(db: Kysely<Database>, now: Date) {
   });
 }
 
-export async function payoutsPending(db: Kysely<Database>, now: Date) {
-  const today = jerusalemDate(now);
-  const rows = await db.selectFrom('payouts')
-    .innerJoin('sales', 'sales.sale_ledger_id', 'payouts.sale_ledger_id').innerJoin('domains', 'domains.id', 'payouts.domain_id')
-    .select(['domains.domain', 'payouts.venue', 'payouts.amount_cents', 'payouts.fee_cents', 'payouts.method', 'sales.sold_at'])
-    .where('payouts.received_on', 'is', null).orderBy('sales.sold_at').orderBy('payouts.id').execute();
-  return rows.map((r) => ({
-    domain: r.domain, venue: r.venue, ...pair('amount', r.amount_cents), ...pair('fee', r.fee_cents), method: r.method,
-    sold_at: toJerusalemIso(r.sold_at), days_pending: dayNumber(today) - dayNumber(jerusalemDate(r.sold_at)),
-  }));
-}
-
 export async function applied7d(db: Kysely<Database>, now: Date) {
   const since = new Date(now.getTime() - 7 * 86_400_000);
   const rows = await db.selectFrom('price_schedule').innerJoin('domains', 'domains.id', 'price_schedule.domain_id')

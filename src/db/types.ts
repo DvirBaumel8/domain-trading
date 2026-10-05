@@ -128,37 +128,11 @@ export interface ListingHistoryTable {
   plan_audit_id: string | null;
 }
 
-export interface OfferImportsTable {
-  id: Generated<number>;
-  file_sha256: string;
-  rows: number;
-  inserted: number;
-  duplicates: number;
-  recorded_by: string;
-  audit_id: string | null;
-  created_at: TimestampDefault;
-}
-
 export interface RegistrarPresenceTable {
   domain_id: number;
   status: 'present' | 'absent';
   first_absent_at: Date | null;
   last_checked_at: Date;
-}
-
-export interface PayoutsTable {
-  id: Generated<number>;
-  domain_id: number;
-  sale_ledger_id: number;
-  fee_ledger_id: number | null;
-  venue: string;
-  amount_cents: number;
-  fee_cents: Generated<number>;
-  method: string;
-  received_on: DateString | null;
-  transaction_ref: string | null;
-  audit_id: string | null;
-  created_at: TimestampDefault;
 }
 
 export interface SalesTable {
@@ -204,7 +178,6 @@ export interface OffersTable {
   outcome_approval_text: string | null;
   note: string | null;
   recorded_by: string;
-  import_id: number | null;
   audit_id: string | null;
   created_at: TimestampDefault;
 }
@@ -395,10 +368,8 @@ export interface Database {
   price_schedule: PriceScheduleTable;
   pricing_evidence: PricingEvidenceTable;
   offers: OffersTable;
-  payouts: PayoutsTable;
   registrar_presence: RegistrarPresenceTable;
   sales: SalesTable;
-  offer_imports: OfferImportsTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

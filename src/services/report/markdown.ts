@@ -16,7 +16,6 @@ export function reportMarkdown(r: Report): string {
   parts.push(`## Domains\n\n${table(['Domain', 'Status', 'Mode', 'BIN', 'Floor', 'Next event'],
     r.per_domain.map((d) => [d.domain, d.status, d.listing_mode ?? '', d.bin ?? '', d.floor ?? '', d.next_price_event ? `${d.next_price_event.event} ${d.next_price_event.due_on}` : '']))}`);
   parts.push(`## Upcoming (90 days)\n\n${table(['Date', 'Domain', 'Kind', 'Note'], r.upcoming_90d.map((e) => [e.date, e.domain, e.kind, e.note]))}`);
-  parts.push(`## Pending payouts\n\n${table(['Domain', 'Venue', 'Amount', 'Days pending'], r.payouts_pending.map((p) => [p.domain, p.venue, p.amount, p.days_pending]))}`);
   const w = r.warnings;
   parts.push(`## Warnings\n`);
   if (w.length === 0) parts.push('_None._\n');

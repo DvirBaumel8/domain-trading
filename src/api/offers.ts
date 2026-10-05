@@ -42,21 +42,7 @@ function bound(v: string | undefined, f: string): { date?: string; at?: Date } |
   throw bad(`${f} must be a date (YYYY-MM-DD, IDT day) or an ISO time with an offset`);
 }
 
-const CSV_LIMIT = 1024 * 1024;
-
 export function registerOffers(app: FastifyInstance, service: OffersService, stats: { db: Kysely<Database>; now: () => number }): void {
-  // The CSV import lives in its own plugin so the text/csv parser and the 1 MB limit apply to this route only.
-  void app.register(async (csv) => {
-    csv.addContentTypeParser('text/csv', { parseAs: 'string', bodyLimit: CSV_LIMIT }, (_req, body, done) => done(null, body));
-    csv.post<{ Querystring: Record<string, string> }>('/offers/import', { bodyLimit: CSV_LIMIT }, async (req, reply) => {
-      const q = z.object({ dry_run: z.enum(['true', 'false']).optional() }).strict().safeParse(req.query);
-      if (!q.success) throw bad('dry_run must be true or false');
-      if (typeof req.body !== 'string') throw new AppError(415, 'INVALID_BODY', 'Content-Type must be text/csv');
-      const r = await service.importCsv(req.body, { dryRun: q.data.dry_run === 'true' }, { auditId: req.auditId!, recordedBy: req.auth!.name, setSummary: (m) => { req.auditSummary = m; } });
-      return reply.code(r.status).send(r.body);
-    });
-  });
-
   app.post('/offers', async (req, reply) => {
     const body = RecordSchema.parse(req.body ?? {});
     const r = await service.record({ ...body, domain: normalizeDomain(body.domain) }, { auditId: req.auditId!, recordedBy: req.auth!.name });

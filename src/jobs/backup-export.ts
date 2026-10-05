@@ -9,7 +9,7 @@ import { toCsv } from '../services/export.js';
 /** Tables written in full (all columns, every row) under backup/tables/ so a restore is lossless. */
 export const TABLE_FILES = [
   'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'listing_history', 'quotes', 'price_schedule',
-  'pricing_evidence', 'offer_imports', 'offers', 'export_runs', 'export_run_domains', 'export_uploads', 'registrar_presence',
+  'pricing_evidence', 'offers', 'export_runs', 'export_run_domains', 'export_uploads', 'registrar_presence',
 ] as const;
 type Row = Record<string, unknown>;
 
@@ -60,7 +60,7 @@ export async function collectBackupFiles(db: Kysely<Database>): Promise<Map<stri
     await sql`select set_config('TimeZone', 'UTC', true)`.execute(trx);
     const files = new Map<string, string>();
     const t: Record<string, Row[]> = {};
-    for (const name of [...TABLE_FILES, 'purchases', 'receipts', 'sales', 'payouts', 'audit_log']) t[name] = await dump(trx, name);
+    for (const name of [...TABLE_FILES, 'purchases', 'receipts', 'sales', 'audit_log']) t[name] = await dump(trx, name);
     t.purchases = t.purchases!.map((p) => ({ ...p, response: scrub(p.response), request: scrub(p.request) }));
     t.quotes = t.quotes!.map((q) => ({ ...q, raw: scrub(q.raw) }));
 
@@ -84,7 +84,6 @@ export async function collectBackupFiles(db: Kysely<Database>): Promise<Map<stri
     files.set('backup/purchases.json', json(t.purchases));
     files.set('backup/receipts.json', json(t.receipts!.map((r) => ({ ...r, raw: scrub(redactInvoice(r.raw)) }))));
     files.set('backup/sales.json', json(t.sales));
-    files.set('backup/payouts.json', json(t.payouts));
     // Approval text stays (it is the audit trail); client_ip is dropped (personal data).
     files.set('backup/audit.jsonl', t.audit_log!.map((a) => { const { client_ip: _ip, ...rest } = a; return JSON.stringify(rest); }).map((l) => `${l}\n`).join(''));
     for (const name of TABLE_FILES) files.set(`backup/tables/${name}.json`, json(t[name]));

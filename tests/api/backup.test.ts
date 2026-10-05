@@ -93,7 +93,7 @@ function fakeGithub(opts: { meta?: { status?: number; body?: object }; truncated
 const exporter = (over: Record<string, string> = {}, log = { warn: (_m: string) => {} }) =>
   new BackupExporter({ db, config: loadConfig(testEnv({ GITHUB_BACKUP_REPO: REPO, ...over })), now: () => Date.parse('2026-12-03T00:00:00Z'), log });
 
-// ---- a realistic fixture: buy + listing, an offer, a sale with a payout, a receipt with a billing address ----
+// ---- a realistic fixture: buy + listing, an offer, a sale with a payout fee, a receipt with a billing address ----
 let app: FastifyInstance;
 afterEach(async () => app?.close());
 let clock = 0;
@@ -126,7 +126,7 @@ async function seed() {
     payload: {
       venue: 'afternic', sale_price: 1995, commission: 299.25, sold_at: '2026-12-01T11:00:00+02:00', transaction_ref: 'AFN-1',
       approval_ref: { text: `it sold on afternic for 1995 (${G})`, approved_at: new Date(clock - 30_000).toISOString() },
-      payout: { amount: 1680.75, method: 'wire', fee: 15, received_on: null },
+      payout_fee: 15,
     },
   });
   expect(sold.statusCode).toBe(200);
@@ -143,11 +143,10 @@ describe('BK-1 backup export files', () => {
   it('writes every file with exact headers, deterministic bytes, and no secrets', async () => {
     await seed();
     const a = await collectBackupFiles(db);
-    for (const f of ['portfolio.csv', 'ledger.csv', 'purchases.json', 'receipts.json', 'audit.jsonl', 'offers.csv', 'sales.json', 'payouts.json']) expect(a.has(`backup/${f}`)).toBe(true);
+    for (const f of ['portfolio.csv', 'ledger.csv', 'purchases.json', 'receipts.json', 'audit.jsonl', 'offers.csv', 'sales.json']) expect(a.has(`backup/${f}`)).toBe(true);
     for (const [f, h] of Object.entries(HEADERS)) expect(a.get(f)!.split('\r\n')[0]).toBe(h);
     expect(a.get('backup/ledger.csv')).toContain('"has, ""quotes""\nand a newline"');
     expect(JSON.parse(a.get('backup/sales.json')!)).toHaveLength(1);
-    expect(JSON.parse(a.get('backup/payouts.json')!)).toHaveLength(1);
     expect(a.get('backup/offers.csv')).toContain('450.00');
     const dbNames = (await sql<{ name: string }>`select name from pgmigrations order by id`.execute(db)).rows.map((r) => r.name);
     expect(dbNames.length).toBeGreaterThan(0);
@@ -343,7 +342,7 @@ describe('BK-3 import round trip', () => {
 
     await resetDb(db);
     const counts = await importBackup(db, dir);
-    expect(counts).toMatchObject({ domains: 2, sales: 1, payouts: 1, offers: 1 });
+    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1 });
     expect(await buildReport(db, REPORT_AT)).toEqual(reportBefore);
 
     // Everything re-exports byte-identically; audit rows differ only in token_id (api_tokens are not restored).

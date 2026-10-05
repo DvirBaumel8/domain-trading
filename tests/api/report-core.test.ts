@@ -75,7 +75,7 @@ describe('GET /report core: money', () => {
     expect(r.profit_cents).toBe(0);
   });
 
-  it('R-2 / S-7 / SL-5 / Q12: every ledger type; money equals independent SQL sums; confirmed and unconfirmed count; payouts add nothing', async () => {
+  it('R-2 / S-7 / SL-5 / Q12: every ledger type; money equals independent SQL sums; confirmed and unconfirmed count', async () => {
     const a = await insertOwnedDomain(db, { domain: 'alpha-one.com' });
     const b = await insertOwnedDomain(db, { domain: 'beta-two.com' });
     const c = await insertOwnedDomain(db, { domain: 'gamma-three.com' });
@@ -87,9 +87,8 @@ describe('GET /report core: money', () => {
     await ledger(c, 'tool', -200);
     await ledger(c, 'ai', -150);
     await ledger(c, 'adjustment', -75); // non-sale adjustment: a cost
-    const s1 = await sale(a, 199500, 29925, { ref: 'T1', other: 500, payoutFee: 1500, linkedAdjustment: 100 });
+    await sale(a, 199500, 29925, { ref: 'T1', other: 500, payoutFee: 1500, linkedAdjustment: 100 });
     await sale(b, 50000, 7500, { ref: 'T2', confirmed: false });
-    await db.insertInto('payouts').values({ domain_id: a, sale_ledger_id: s1, venue: 'afternic', amount_cents: 167075, fee_cents: 1500, method: 'wire' }).execute();
     const t = await boot();
     const before = await t.report();
     const sum = async (q: string) => Number((await sql.raw<{ v: string }>(q).execute(db)).rows[0]!.v);
@@ -108,12 +107,6 @@ describe('GET /report core: money', () => {
     expect(before.budget.remaining_cents).toBe(150000 - spent);
     expect(before.per_domain.find((d: { domain: string }) => d.domain === 'beta-two.com').cost_cents).toBe(
       await sum(`select -sum(amount_cents) v from ledger_entries where type in ('registration','renewal') and domain_id = ${b}`));
-    // a payout row (and marking it received) changes nothing
-    await db.updateTable('payouts').set({ received_on: '2026-10-15' }).execute();
-    const after = await t.report();
-    expect(after.sales).toEqual(before.sales);
-    expect(after.profit_cents).toEqual(before.profit_cents);
-    expect(after.roi).toEqual(before.roi);
   });
 });
 
@@ -244,7 +237,7 @@ describe('GET /report core: committed_forward, upcoming', () => {
   });
 });
 
-describe('GET /report core: per-domain, payouts, timezone, offers, auth', () => {
+describe('GET /report core: per-domain, timezone, offers, auth', () => {
   it('per_domain: excludes pending_purchase, sorted, cost/days_held/ns_verified/walk-away marked private', async () => {
     const id = await listedDomain({ domain: 'zeta.com', ns_verified_at: new Date('2026-10-05T00:00:00Z'), lander: 'afternic', buy_date: '2026-10-04' });
     await insertOwnedDomain(db, { domain: 'alpha.com', status: 'pending_purchase' });
@@ -271,24 +264,6 @@ describe('GET /report core: per-domain, payouts, timezone, offers, auth', () => 
     const r = await t.report();
     expect(by(r, 'sold-held.com')).toBe(10);
     expect(by(r, 'dropped-held.com')).toBe(Math.floor((Date.parse('2027-01-01') - Date.parse('2025-01-01')) / 86_400_000));
-  });
-
-  it('PO-5 (list): pending payouts 10 and 31 days old are listed; profit unchanged', async () => {
-    const a = await insertOwnedDomain(db, { domain: 'pay-a.com' });
-    const b = await insertOwnedDomain(db, { domain: 'pay-b.com' });
-    await ledger(a, 'registration', -1000);
-    const sa = await sale(a, 100000, 0, { ref: 'A', soldAt: '2026-10-10T09:00:00Z' });
-    const sb = await sale(b, 100000, 0, { ref: 'B', soldAt: '2026-09-19T09:00:00Z' });
-    const t = await boot();
-    const before = await t.report();
-    expect(before.payouts_pending).toEqual([]);
-    await db.insertInto('payouts').values({ domain_id: a, sale_ledger_id: sa, venue: 'afternic', amount_cents: 100000, method: 'wire' }).execute();
-    await db.insertInto('payouts').values({ domain_id: b, sale_ledger_id: sb, venue: 'afternic', amount_cents: 100000, fee_cents: 1500, method: 'paypal' }).execute();
-    const after = await t.report();
-    expect(after.payouts_pending.map((p: { domain: string; days_pending: number }) => [p.domain, p.days_pending])).toEqual([['pay-b.com', 31], ['pay-a.com', 10]]);
-    expect(after.payouts_pending[0]).toMatchObject({ venue: 'afternic', amount_cents: 100000, amount: '$1,000.00', fee_cents: 1500, fee: '$15.00', method: 'paypal', sold_at: '2026-09-19T12:00:00+03:00' });
-    expect(after.profit_cents).toEqual(before.profit_cents);
-    expect(after.sales).toEqual(before.sales);
   });
 
   it('R-10: sold_at is +03:00 in summer and +02:00 in winter', async () => {

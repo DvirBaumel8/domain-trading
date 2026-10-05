@@ -31,7 +31,7 @@
 
 **Exception (Dvir, 5 Oct 2026, 00:39 IDT):** D-001 is recorded with its **approved values**: BIN $1,995, floor $1,295, walk-away $950 (§8). Its marketplace min offer is $100 like every non-geo name.
 
-**Offers log (Dvir, 5 Oct 2026, 01:03 IDT):** Afternic has no seller API, so Gavriel records every offer from marketplace emails or dashboards with `POST /offers` (WRITE), or in bulk with a CSV import. `/report` shows offer counts and the highest offer per domain and period, plus per-strategy aggregates. These are the demand signal for the quarterly review (§10.11).
+**Offers log (Dvir, 5 Oct 2026, 01:03 IDT):** Afternic has no seller API, so Gavriel records every offer from marketplace emails or dashboards with `POST /offers` (WRITE). (Removed 6 Oct 2026 (Dvir): the CSV import `POST /offers/import` and the `offer_imports` table.) `/report` shows offer counts and the highest offer per domain and period, plus per-strategy aggregates. These are the demand signal for the quarterly review (§10.11).
 
 **Dvir's CLI wording maps to the API.** He wrote the rules as CLI commands (`dt list <domain> --bin 299`); the system is an HTTP API, so these become the body of `POST /list/{domain}` (§4). An optional thin CLI keeps the flags (`cli.md`). **The server computes every derived price** (floor, walk-away, min offer, the drop schedule) from BIN + category + `pricing_settings` (§10). Bots never do the arithmetic by hand.
 
@@ -514,10 +514,10 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
   - `price_schedule` (`id`, `domain_id`, `plan_id`, `event`, `due_on`, `bin_cents`, `floor_cents`, `walkaway_cents`, `settings_version`, `status` ∈ planned/applied/skipped_at_minimum/skipped_no_change/skipped_disabled/superseded/superseded_by_final_push/cancelled/failed, `applied_at`, `listing_history_id`, `note`);
   - `pricing_evidence` (`domain_id`, `comps` jsonb, `rationale`, `legacy_no_comps_reason`, `audit_id`);
   - `export_uploads` (`id`, `venue`, `export_id`, `domains[]`, `uploaded_at`, `approval_text` (nullable), `note`, `audit_id`);
-  - `offers` and `offer_imports` (§10.11).
+  - `offers` (§10.11).
 - **The reference implementation** used to generate the test vectors is `system/tools/pricing_calc.py` on Gavriel's box (not in this repo; bots don't add code here). The PR tests in `test-plan.md` are the contract.
 
-### 10.11 Offers log: `POST /offers`, CSV import, `/report` demand signal (Dvir, 5 Oct 2026, 01:03 IDT, decision #2)
+### 10.11 Offers log: `POST /offers`, `/report` demand signal (Dvir, 5 Oct 2026, 01:03 IDT, decision #2)
 **Why:** Afternic has no seller API, and offers below the walk-away never reach a decision. Without a log they'd be lost, but they are the best demand signal for the quarterly review.
 
 **Table `offers`** (one row per offer received; amounts in integer cents):
@@ -535,7 +535,7 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 | `band` (server) | `below_min` (< min offer) / `below_walkaway` (min offer ≤ x < walk-away) / `mid_range` (walk-away ≤ x < floor) / `at_or_above_floor` (floor ≤ x < BIN) / `at_or_above_bin`. Geo: `geo_below_bin` / `at_or_above_bin` |
 | `routing` (server) | `auto_decline` (below_min, below_walkaway, geo_below_bin) / `dvir` (mid_range; and every `email_inbound` or `outbound_reply` offer ≥ walk-away) / `auto_accept` (≥ floor on afternic/godaddy) / `accept_preapproved` (≥ floor on other venues) |
 | `outcome`, `outcome_at`, `outcome_note`, `outcome_approval_text` | `declined_auto` (set at record time for `auto_decline`) / `open` (all others) → `declined` / `countered` / `accepted` / `expired` / `withdrawn` / `sold` |
-| `recorded_by`, `import_id`, `audit_id`, `created_at` | Who recorded it (from the token's agent name), and the import batch if any |
+| `recorded_by`, `audit_id`, `created_at` | Who recorded it (from the token's agent name) |
 
 - **Immutable facts:** a DB trigger refuses updates to `domain_id`, `amount_cents`, `source`, `received_at`, the snapshot and `band`. Only the outcome fields change, each change through the API with an `audit_log` row.
 - **No side effects:** recording an offer never calls a marketplace or registrar, never sends anything, and never changes a price. It may set `pricing_hold` only if the request asks for it (reason required; no `approval_ref`, as with `POST /list`; (Dvir, 5 Oct 2026, 20:07: bot autonomy)).
@@ -554,10 +554,7 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 - `countered` or `accepted` on any offer that isn't pre-approved (routing not `auto_accept`/`accept_preapproved`, i.e. `dvir`: mid-range, or any email offer ≥ walk-away) **needs `approval_ref`** with Dvir's words (a sell decision, Gate D); otherwise 422 `APPROVAL_REQUIRED`.
 - `declined` on an `auto_decline` offer needs none. `sold` must match a `POST /sold` for the same domain.
 
-**CSV import** `POST /offers/import` (WRITE, `Content-Type: text/csv`, `?dry_run=true` supported); CLI `dt offers import offers.csv [--dry-run]`:
-- Header (exact): `domain,amount_usd,source,received_at,buyer_type,external_ref,outcome,note`.
-- **All or nothing:** every row is validated first. Any invalid row → 422 with `{row, field, code}` for each problem, and nothing is written. Duplicates are skipped and counted, not errors.
-- Response: `{"import_id":…, "rows":n, "inserted":i, "duplicates":d, "by_band":{…}}`. `offer_imports` stores the file's SHA-256, row count, `recorded_by` and time; re-importing the same file inserts nothing.
+**CSV import:** Removed 6 Oct 2026 (Dvir): `POST /offers/import`, the `offer_imports` table and `offers.import_id`. Gavriel records offers one at a time with `POST /offers`.
 
 **`GET /offers?domain=&from=&to=&band=&source=`** (READ): the rows, newest first.
 

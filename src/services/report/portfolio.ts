@@ -69,7 +69,6 @@ export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: s
   const history = await db.selectFrom('listing_history').selectAll().where('domain_id', '=', d.id).orderBy('id', 'desc').execute();
   const sched = d.plan_id ? await db.selectFrom('price_schedule').selectAll().where('domain_id', '=', d.id).where('plan_id', '=', d.plan_id).orderBy('due_on').orderBy('id').execute() : [];
   const sale = await db.selectFrom('sales').selectAll().where('domain_id', '=', d.id).orderBy('id', 'desc').limit(1).executeTakeFirst();
-  const payout = await db.selectFrom('payouts').selectAll().where('domain_id', '=', d.id).orderBy('id', 'desc').limit(1).executeTakeFirst();
   const offers = await db.selectFrom('offers').select(['id', 'amount_cents', 'source', 'received_at', 'buyer_type', 'band', 'routing', 'outcome', 'note'])
     .where('domain_id', '=', d.id).orderBy('received_at', 'desc').orderBy('id', 'desc').limit(50).execute();
   const ex: Record<string, unknown> = {};
@@ -91,7 +90,6 @@ export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: s
       ...pair('other_fees', sale.other_fees_cents), sold_at: iso(sale.sold_at), evidence_source: sale.evidence_source, evidence_ref: sale.evidence_ref,
       confirmed: sale.confirmed, recorded_by: sale.recorded_by, offer_id: sale.offer_id,
     } : null,
-    payout: payout ? { ...pair('amount', payout.amount_cents), ...pair('fee', payout.fee_cents), method: payout.method, received_on: payout.received_on, status: payout.received_on ? 'received' : 'pending' } : null,
     export: ex,
     offers: offers.map((o) => ({ id: o.id, ...pair('amount', o.amount_cents), source: o.source, received_at: iso(o.received_at), buyer_type: o.buyer_type, band: o.band, routing: o.routing, outcome: o.outcome, note: o.note })),
   };

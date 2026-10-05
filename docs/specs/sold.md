@@ -1,6 +1,6 @@
 # POST /sold/{domain}  (WRITE)
 
-**Goal:** record a sale, its commission and fees, and optionally the payout, so `/report` shows profit and ROI. **System-triggered (Dvir, 5 Oct 2026, 19:47 IDT):** Gavriel calls it **automatically** when a marketplace sale notification arrives; no approval from Dvir is needed. Gavriel may also send Dvir's words in `approval_ref` (relayed from chat), which marks the sale `confirmed`. **Gavriel calls every endpoint; Dvir never calls the API** (5 Oct 2026).
+**Goal:** record a sale, its commission and fees (and an optional payout fee), so `/report` shows profit and ROI. **System-triggered (Dvir, 5 Oct 2026, 19:47 IDT):** Gavriel calls it **automatically** when a marketplace sale notification arrives; no approval from Dvir is needed. Gavriel may also send Dvir's words in `approval_ref` (relayed from chat), which marks the sale `confirmed`. **Gavriel calls every endpoint; Dvir never calls the API** (5 Oct 2026).
 
 ## Request
 `Idempotency-Key` header required.
@@ -8,7 +8,7 @@
 { "venue": "afternic",            // afternic | sedo | afternic_checkout | escrow | other
   "sale_price": 1995.00, "commission": 299.25, "other_fees": 0,
   "sold_at": "2027-02-11T14:02:00+02:00",
-  "payout": { "amount": 1680.75, "method": "wire", "fee": 15.00, "received_on": null },   // optional; stored in `payouts` (below)
+  "payout_fee": 15.00,              // optional; becomes the `payout_fee` ledger row
   "offer_id": 42,                   // optional: the `offers` row this sale came from
   "transaction_ref": "AFN-123456",   // required when approval_ref is absent
   "evidence": { "source": "afternic_email", "ref": "<a1b2c3@mail.afternic.com>" },   // required when approval_ref is absent
@@ -27,15 +27,12 @@
   - `sale` +sale_price;
   - `commission` −commission;
   - `fee` −other_fees, if > 0;
-  - `payout_fee` −payout.fee, if given.
-  - The payout **amount** is never a ledger row: the `sale` row already counts that money.
+  - `payout_fee` −`payout_fee`, if given.
+  - The payout amount is never a ledger row (the `sale` row already counts that money) and is not tracked at all.
   - `counterparty` = venue; `receipt_ref` = `transaction_ref`.
 - Sets `status=sold` and `sold_at`.
 - Writes one **`sales`** row (`00-architecture.md` §4): `sale_ledger_id` = the `sale` ledger row, `venue`, `transaction_ref`, amounts, `sold_at`, `offer_id`, **`recorded_by`** = the calling token's name, **`confirmed`** = `approval_ref` given, `approval_text`/`approval_at`, `evidence_source`, `evidence_ref`, `audit_id`.
-- **Payout (optional; Dvir, 5 Oct 2026, 19:42 IDT):** in the same transaction, one `payouts` row (`00-architecture.md` §4) with `sale_ledger_id` = the `sale` row just written, `fee_ledger_id` = the `payout_fee` row (or null), `venue`, `amount_cents`, `fee_cents`, `method`, `received_on` (null = not yet received), `transaction_ref`, `audit_id`. One payout per sale (UNIQUE `sale_ledger_id`).
-  - **Validation (422, nothing written):** `amount` > 0; `received_on` not in the future (IDT date) and not before the `sold_at` date → `VALIDATION_ERROR`; `method` containing `@` → `NO_PII`.
-  - **Consistency check (a warning, never a block):** `PAYOUT_MISMATCH` when |`amount` + `fee` − (sale − commission − other_fees)| > $1. The sale is still recorded.
-  - **Marking it received later (v1; (spec sync 4d-2, Dvir, 5 Oct 2026, 22:02)):** `POST /payouts/{id}/received {received_on, approval_ref?}` (WRITE, idempotent, audited, **bot-only**; an `approval_ref`, if sent, is validated) sets `received_on` once (null → date, same date rules, else 422 `VALIDATION_ERROR`). Already received → 409 `PAYOUT_ALREADY_RECEIVED`; unknown id → 404 `PAYOUT_NOT_FOUND`.
+- **Removed 6 Oct 2026 (Dvir):** the `payouts` table, `POST /payouts/{id}/received`, the `payout {amount, method, received_on}` request object, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE` and the response `payout` block. The request takes only `payout_fee` (USD, 2 decimals, ≥ 0); `commission + other_fees + payout_fee` must not exceed `sale_price` (422 `VALIDATION_ERROR`). A request that still sends a `payout` object is refused as an unknown field (422 `VALIDATION_ERROR`).
 - **Commission check (a warning, not a block):** compares the commission to the expected rate.
   - Afternic: 15% if the lander NS was afternic at `sold_at`, else 25%, with a $15 minimum.
   - Sedo: 10%, 15% or 20%.
@@ -48,7 +45,6 @@
     2. "Do not send an auth code outside the marketplace flow".
     3. "Auto-renew stays off".
   - `sale: {id, confirmed, recorded_by, evidence_source, evidence_ref}`;
-  - `payout`, if given: `{amount, fee, method, received_on, status: received|pending}` (`received` when `received_on` is set), plus any `PAYOUT_MISMATCH` warning.
 - `approval_ref` is **optional** (Dvir, 5 Oct 2026, 19:47). Without it the sale is recorded with `confirmed: false` on the evidence, and `/report` lists it as `SALE_UNCONFIRMED` (information only).
 
 ## Tests (pass/fail)
@@ -66,7 +62,5 @@
 | S-9 | Sale of a `delisted` domain | 200; status `sold`; same ledger rows as S-1 | 409 |
 | S-10 | `offer_id` of an open offer on this domain | 200; the offer's outcome `sold`; one transaction | Offer unchanged |
 | S-11 | `offer_id` of another domain's offer, or a declined one | 422 `OFFER_MISMATCH`; nothing written | Sale recorded |
-| S-12 | S-1 sale + payout `{1680.75, wire, 15.00, null}` | One `payouts` row: `sale_ledger_id` = the sale row, `fee_ledger_id` = the `payout_fee` row (−1500); response `payout.status` `pending`; no `PAYOUT_MISMATCH` (1680.75 + 15 = 1995 − 299.25); no ledger row for the amount | Missing row, wrong links, or an amount ledger row |
-| S-13 | Payout `amount` 1500 | 200 with `PAYOUT_MISMATCH`; sale and payout recorded | Blocked, or no warning |
-| S-14 | S-12 replayed with the same key | Still one `payouts` row | 2 rows |
-| S-15 | `received_on` tomorrow (IDT) / before `sold_at`; `method` `a@b.com` | 422 `VALIDATION_ERROR` / `VALIDATION_ERROR` / 422 `NO_PII`; nothing written | Accepted |
+| S-12 | S-1 sale with `payout_fee` 15.00 | A `payout_fee` ledger row of −1500 (note `payout fee`); no ledger row for the payout amount; replaying the same key writes nothing new | Missing row, or an amount row |
+| S-13 to S-15 | Removed 6 Oct 2026 (Dvir): payout amount, `PAYOUT_MISMATCH`, `payouts` row, `received_on` validation | n/a | n/a |

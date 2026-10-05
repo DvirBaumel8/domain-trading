@@ -19,7 +19,7 @@ export interface SoldInput {
   commissionCents: number;
   otherFeesCents: number;
   soldAt: Date;
-  payout: { amountCents: number; method: string; feeCents: number; receivedOn: string | null } | null;
+  payoutFeeCents: number;
   transactionRef: string | null;
   approvalRef: { text?: unknown; approved_at?: unknown } | null;
   evidence: { source: (typeof EVIDENCE_SOURCES)[number]; ref: string } | null;
@@ -61,10 +61,6 @@ export class SoldService {
   async sold(domain: string, i: SoldInput, ctx: { auditId: string; recordedBy: string }): Promise<Record<string, unknown>> {
     const now = new Date(this.deps.now());
     if (i.soldAt.getTime() > now.getTime() + FUTURE_SKEW_MS) throw new AppError(422, 'SOLD_AT_IN_FUTURE', 'sold_at is in the future');
-    const receivedOn = i.payout?.receivedOn ?? null;
-    if (receivedOn !== null && (receivedOn > jerusalemDate(now) || receivedOn < jerusalemDate(i.soldAt))) {
-      throw new AppError(422, 'VALIDATION_ERROR', 'payout.received_on must not be in the future or before the sold_at date');
-    }
     const settings = await this.deps.db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
     let approvedAt: Date | null = null;
     if (i.approvalRef) {
@@ -104,13 +100,12 @@ export class SoldService {
       const rows: Omit<LedgerEntriesTable, 'id' | 'currency' | 'created_at'>[] = [{ ...base, type: 'sale', amount_cents: i.saleCents, note: null }];
       if (i.commissionCents > 0) rows.push({ ...base, type: 'commission', amount_cents: -i.commissionCents, note: null });
       if (i.otherFeesCents > 0) rows.push({ ...base, type: 'fee', amount_cents: -i.otherFeesCents, note: null });
-      const payoutFee = i.payout?.feeCents ?? 0;
+      const payoutFee = i.payoutFeeCents;
       if (payoutFee > 0) {
         rows.push({ ...base, type: 'payout_fee', amount_cents: -payoutFee, note: 'payout fee' });
       }
       const inserted = await trx.insertInto('ledger_entries').values(rows).returning(['id', 'type']).execute();
       const saleLedgerId = inserted.find((r) => r.type === 'sale')!.id;
-      const feeLedgerId = inserted.find((r) => r.type === 'payout_fee')?.id ?? null;
       let saleRecord: { id: number };
       try {
         saleRecord = await trx.insertInto('sales').values({
@@ -137,23 +132,9 @@ export class SoldService {
           .where('id', '=', i.offerId).execute();
       }
 
-      if (i.payout) {
-        await trx.insertInto('payouts').values({
-          domain_id: row.id, sale_ledger_id: saleLedgerId, fee_ledger_id: feeLedgerId, venue: i.venue,
-          amount_cents: i.payout.amountCents, fee_cents: payoutFee, method: i.payout.method, received_on: receivedOn,
-          transaction_ref: i.transactionRef, audit_id: ctx.auditId,
-        }).execute();
-      }
-
       const warnings: string[] = [];
       const w = commissionWarning(i, row.lander, row.lander_set_at);
       if (w) warnings.push(w);
-      if (i.payout) {
-        const expected = i.saleCents - i.commissionCents - i.otherFeesCents;
-        if (Math.abs(i.payout.amountCents + payoutFee - expected) > 100) {
-          warnings.push(`PAYOUT_MISMATCH: expected ${formatUsd(expected)} before the payout fee, got ${formatUsd(i.payout.amountCents)} + fee ${formatUsd(payoutFee)}`);
-        }
-      }
 
       const fees = i.otherFeesCents + payoutFee;
       const saleCosts = i.commissionCents + fees;
@@ -174,7 +155,6 @@ export class SoldService {
         ...pair('sale_price', i.saleCents), ...pair('commission', i.commissionCents), ...pair('fees', fees),
         ...pair('sale_costs', saleCosts), ...pair('net_proceeds', netProceeds),
         ...pair('acquisition_costs', acquisitionCosts), ...pair('profit', netProceeds - acquisitionCosts),
-        ...(i.payout ? { payout: { ...pair('amount', i.payout.amountCents), ...pair('fee', payoutFee), method: i.payout.method, received_on: receivedOn, status: receivedOn ? 'received' : 'pending' } } : {}),
         checklist, warnings,
       };
     }));

@@ -1,7 +1,5 @@
-import { createHash } from 'node:crypto';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import type { Database, DomainRow, OffersTable } from '../db/types.js';
-import { parseCsv } from '../csv-parse.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { formatUsd, usdStringToCents } from '../money.js';
@@ -34,8 +32,6 @@ const AFTER: Record<string, readonly string[]> = {
   countered: ['countered', 'accepted', 'declined', 'expired', 'withdrawn'],
   accepted: ['sold', 'withdrawn'],
 };
-const IMPORT_HEADER: readonly string[] = ['domain', 'amount_usd', 'source', 'received_at', 'buyer_type', 'external_ref', 'outcome', 'note'];
-const IMPORT_OUTCOMES: readonly string[] = ['declined', 'expired', 'withdrawn'];
 const APPROVAL_OUTCOMES: readonly string[] = ['countered', 'accepted', 'sold'];
 
 const money = (cents: number | null) => (cents === null ? { cents: null, display: null } : { cents, display: formatUsd(cents) });
@@ -136,129 +132,6 @@ export class OffersService {
     const r = hold ? await withDomainLock(db, d.domain, insert) : await insert(db);
     if (r.duplicate) return this.duplicate(r.row, d.id);
     return { status: 201 as const, body: { ...offerView(r.row, d.domain), next_step: c.nextStep, warnings: c.warnings } };
-  }
-
-  /** POST /offers/import: all-or-nothing validation of a whole CSV, dedupe in the DB and in the file, one transaction. */
-  async importCsv(raw: string, opts: { dryRun: boolean }, ctx: { auditId: string; recordedBy: string; setSummary?: (s: string) => void }, attempt = 0): Promise<{ status: 200 | 422; body: Record<string, unknown> }> {
-    const { db } = this.deps;
-    const now = new Date(this.deps.now());
-    const sha = createHash('sha256').update(raw, 'utf8').digest('hex');
-    const countBands = (rows: { band: string }[]) => {
-      const m: Record<string, number> = {};
-      for (const r of rows) m[r.band] = (m[r.band] ?? 0) + 1;
-      return m;
-    };
-    if (!opts.dryRun) {
-      const prior = await db.selectFrom('offer_imports').selectAll().where('file_sha256', '=', sha).executeTakeFirst();
-      if (prior) ctx.setSummary?.(`import sha=${sha.slice(0, 12)} rows=${prior.rows} inserted=0 duplicates=${prior.rows}`);
-      if (prior) return { status: 200, body: { import_id: prior.id, rows: prior.rows, inserted: 0, duplicates: prior.rows, by_band: {} } };
-    }
-
-    const parsed = parseCsv(raw);
-    const table = parsed.rows;
-    const headerOk = table.length > 0 && table[0]!.length === IMPORT_HEADER.length && IMPORT_HEADER.every((h, k) => table[0]![k] === h);
-    if (!headerOk) {
-      throw new AppError(422, 'CSV_HEADER_INVALID', parsed.badRecord === 0 ? 'The CSV is malformed (quoting) in the header' : `The header must be exactly ${IMPORT_HEADER.join(',')}`, { expected: IMPORT_HEADER.join(',') });
-    }
-
-    const errors: { row: number; field: string; code: string }[] = [];
-    type Pending = { row: number; domain: DomainRow; p: NonNullable<ReturnType<typeof validateOfferAll>['value']>; externalRef: string | null; note: string | null; outcome: string | null };
-    const pending: Pending[] = [];
-    const domains = new Map<string, DomainRow | null>();
-    let rows = 0;
-    for (let i = 1; i < table.length; i++) {
-      const cells = table[i]!;
-      const row = i; // 1-based data row (the header is table[0]); blank rows keep their number but are skipped
-      if (cells.every((c) => c === '') && cells.length <= IMPORT_HEADER.length) continue;
-      rows++;
-      if (cells.length !== IMPORT_HEADER.length) { errors.push({ row, field: 'row', code: 'COLUMN_COUNT' }); continue; }
-      const [domainRaw, amount, source, receivedAt, buyerType, externalRef, outcome, note] = cells as [string, string, string, string, string, string, string, string];
-      const rowErrors: { field: string; code: string }[] = [];
-      let domain: DomainRow | null = null;
-      try {
-        const domainName = normalizeDomain(domainRaw);
-        if (!domains.has(domainName)) {
-          const d = await db.selectFrom('domains').selectAll().where('domain', '=', domainName).executeTakeFirst();
-          domains.set(domainName, d && d.status !== 'pending_purchase' ? d : null);
-        }
-        domain = domains.get(domainName) ?? null;
-        if (!domain) rowErrors.push({ field: 'domain', code: 'DOMAIN_NOT_FOUND' });
-      } catch (e) {
-        if (!(e instanceof AppError)) throw e;
-        rowErrors.push({ field: 'domain', code: e.code });
-      }
-      const v = validateOfferAll({ amount_usd: amount, source, received_at: receivedAt, buyer_type: buyerType === '' ? null : buyerType, note: note === '' ? null : note }, now);
-      for (const e of v.errors) rowErrors.push({ field: e.field, code: e.code });
-      if (outcome !== '' && !IMPORT_OUTCOMES.includes(outcome)) {
-        rowErrors.push({ field: 'outcome', code: APPROVAL_OUTCOMES.includes(outcome) ? 'OUTCOME_NEEDS_APPROVAL' : 'OUTCOME_INVALID' });
-      }
-      if (rowErrors.length > 0 || !domain || !v.value) { for (const e of rowErrors) errors.push({ row, ...e }); continue; }
-      pending.push({ row, domain, p: v.value, externalRef: externalRef === '' ? null : externalRef, note: note === '' ? null : note, outcome: outcome === '' ? null : outcome });
-    }
-    if (parsed.badRecord !== null && parsed.badRecord > 0) {
-      rows++;
-      errors.push({ row: parsed.badRecord, field: 'row', code: 'CSV_QUOTING' });
-    }
-
-    // Dedupe (only rows whose fields are valid): against the DB (the single-offer rules) and within the file, with the same two keys.
-    const seen = new Map<string, number>(); // key -> domain_id
-    const fresh: (Pending & { snap: OfferSnapshot; c: ReturnType<typeof classify> })[] = [];
-    let duplicates = 0;
-    for (const x of pending) {
-      const eKey = x.externalRef !== null ? `e|${x.p.source}|${x.externalRef}` : null;
-      const nKey = `n|${x.domain.id}|${x.p.amountCents}|${x.p.source}|${x.p.receivedAt.getTime()}`;
-      const inFile = eKey !== null ? seen.get(eKey) : seen.get(nKey);
-      if (inFile !== undefined) {
-        if (inFile !== x.domain.id) errors.push({ row: x.row, field: 'external_ref', code: 'EXTERNAL_REF_CONFLICT' }); else duplicates++;
-        continue;
-      }
-      const existing = await this.findDuplicate(db, x.domain.id, x.p.source, x.p.amountCents, x.p.receivedAt, x.externalRef);
-      if (eKey !== null) seen.set(eKey, x.domain.id);
-      seen.set(nKey, x.domain.id);
-      if (existing) {
-        if (existing.domain_id !== x.domain.id) errors.push({ row: x.row, field: 'external_ref', code: 'EXTERNAL_REF_CONFLICT' }); else duplicates++;
-        continue;
-      }
-      const snap = await snapshotAt(db, x.domain, x.p.receivedAt);
-      fresh.push({ ...x, snap, c: classify(snap, x.p.amountCents, x.p.source) });
-    }
-
-    if (errors.length > 0) {
-      errors.sort((a, b) => a.row - b.row);
-      ctx.setSummary?.(`IMPORT_INVALID errors=${errors.length}`);
-      return { status: 422, body: { error: { code: 'IMPORT_INVALID', message: `${errors.length} problem(s) in the file; nothing was imported`, details: { errors } } } };
-    }
-    const by_band = countBands(fresh.map((f) => ({ band: f.c.band })));
-    if (opts.dryRun) {
-      ctx.setSummary?.(`dry_run sha=${sha.slice(0, 12)} rows=${rows} would_insert=${fresh.length}`);
-      return { status: 200, body: { dry_run: true, rows, inserted: 0, would_insert: fresh.length, duplicates, by_band } };
-    }
-    if (rows === 0) {
-      ctx.setSummary?.(`import sha=${sha.slice(0, 12)} rows=0 inserted=0 duplicates=0`);
-      return { status: 200, body: { rows: 0, inserted: 0, duplicates: 0, by_band: {} } };
-    }
-
-    try {
-      const importId = await db.transaction().execute(async (trx) => {
-        const imp = await trx.insertInto('offer_imports').values({
-          file_sha256: sha, rows, inserted: fresh.length, duplicates, recorded_by: ctx.recordedBy, audit_id: ctx.auditId,
-        }).returning('id').executeTakeFirstOrThrow();
-        for (const f of fresh) {
-          await trx.insertInto('offers').values({
-            ...offerValues(f.domain.id, { ...f.p, buyerRef: null, externalRef: f.externalRef, note: f.note }, f.snap, f.c),
-            ...(f.outcome ? { outcome: f.outcome as OffersTable['outcome'], outcome_at: now } : {}),
-            recorded_by: ctx.recordedBy, audit_id: ctx.auditId, import_id: imp.id,
-          }).execute();
-        }
-        return imp.id;
-      });
-      ctx.setSummary?.(`import sha=${sha.slice(0, 12)} rows=${rows} inserted=${fresh.length} duplicates=${duplicates}`);
-      return { status: 200, body: { import_id: importId, rows, inserted: fresh.length, duplicates, by_band } };
-    } catch (e) {
-      // A concurrent writer won a unique race (same file, or one of the offers): start over once; the re-run sees it as a duplicate.
-      if ((e as { code?: string }).code === '23505' && attempt === 0) return this.importCsv(raw, opts, ctx, 1);
-      throw e;
-    }
   }
 
   /** A genuine duplicate shows the row's real domain; an external_ref already used for another domain is a conflict. */

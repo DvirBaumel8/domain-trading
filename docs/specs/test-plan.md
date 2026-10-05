@@ -190,24 +190,18 @@ Fixtures: D-001 imported as hybrid 1995 / 1295 / walk-away 950 / min offer 100, 
 | OF-10 | Offer on a domain that is `owned` but not listed | 201 + `OFFER_ON_UNLISTED`; band against the plan prices (or `unpriced`) | Refused, or no warning |
 | OF-11 | Immutability: raw SQL `UPDATE offers SET amount_cents=…` (and `band`, `received_at`) | DB trigger error | Update succeeds |
 | OF-12 | `POST /offers/{id}/outcome`: `countered` on a mid-range offer without / with `approval_ref`; `declined` on an `auto_decline` offer without | 422 `APPROVAL_REQUIRED` / 200 / 200; each change writes one `audit_log` row | Other |
-| OF-13 | CSV import `?dry_run=true` with 5 valid rows | 200 counts (`rows 5`, `inserted 0` + would-insert 5, `by_band`); table unchanged | Rows written |
+| OF-13 | Removed 6 Oct 2026 (Dvir): offers CSV import dry run | n/a | n/a |
 | OF-14 | **Walk-away never leaks:** export Afternic + Sedo (`make_offer`) for D-001, `GET /pricing/preview`, lander-check output | Afternic row `PromptInjectionAudit.com,1995,1295,100,N,,Custom Lander,Y,N,Y,N`; Sedo minimum 100; the value 950 appears in no export, no `afternic_row` and no buyer-facing field | 950 (or any walk-away) exported |
-| OF-15 | CSV import, real: 5 valid rows + 1 row with an unknown domain; then the 5 valid rows only, twice | First: 422 listing row 6 `DOMAIN_NOT_FOUND`, nothing written. Second: `inserted 5`. Third (same file): `inserted 0, duplicates 5` | Partial write, or duplicates inserted |
+| OF-15 | Removed 6 Oct 2026 (Dvir): offers CSV import | n/a | n/a |
 | OF-16 | Min offer setting: hybrid `POST /list` with `min_offer` 950; then settings v2 `hybrid_min_offer_cents=15000`, new plan vs existing D-001 | 422 `MIN_OFFER_FIXED`; new plan min 150, D-001 keeps 100 until a `replan` | Other |
 | OF-17 | The price job applies M6, M18 and the final push to D-001 | `min_offer` stays 100 in `domains`, `listing_history` and the export each time; geo M6 sets min offer = new BIN | Min offer changed for hybrid |
 | OF-18 | `/report` per domain: D-001 offers at −5 d ($450), −40 d ($1,000), −200 d ($1,500) | `count_30d 1, highest_30d $450; count_90d 2, highest_90d $1,000; count_all 3, highest_all $1,500, highest_all_pct_of_bin` = 1500/1995; a domain without offers shows 0 / null (keys present) | Wrong counts or missing keys |
 | OF-19 | `/report` `offers_by_strategy`: two trend names (3 and 0 offers in 90 d), one geo (1) | trend: `names_listed 2`, `names_with_offers 1`, `offers_90d 3`, `offers_per_listed_name_per_month 0.50`, median and max pct of BIN, band shares sum to 1.00; geo row separate. `GET /report/offers?group_by=source` matches the same rows | Other |
-| OF-20 | No side effects: `POST /offers`, `/outcome` and the import with the registrar and marketplace mocks armed; plus a mid-range offer open for 49 h | Zero outbound calls, no price or `pricing_hold` change (unless the request asks for a hold, with a reason); `/report` shows `OFFER_NEEDS_DVIR` after 48 h | Any call or price change; no warning |
+| OF-20 | No side effects: `POST /offers`, and `/outcome` with the registrar and marketplace mocks armed; plus a mid-range offer open for 49 h | Zero outbound calls, no price or `pricing_hold` change (unless the request asks for a hold, with a reason); `/report` shows `OFFER_NEEDS_DVIR` after 48 h | Any call or price change; no warning |
 
-## Payouts (PO; Dvir, 5 Oct 2026, 19:42 IDT; rules in `sold.md`, `report.md`, `00-architecture.md` §4)
+## Payouts (PO-1 to PO-5): removed
 
-| ID | Case | Pass | Fail |
-|---|---|---|---|
-| PO-1 | `/sold` S-1 sale with payout `{1680.75, wire, 15.00, received_on null}` | One `payouts` row linked to the `sale` row (`sale_ledger_id`) and the `payout_fee` row (`fee_ledger_id`, −1500); response `payout.status` `pending`; no ledger row for the amount | Missing row, wrong links, or the amount in the ledger |
-| PO-2 | Payout `amount` 1500 on the same sale | 200 with `PAYOUT_MISMATCH`; sale, ledger rows and payout still recorded | Blocked, or no warning |
-| PO-3 | Immutability (SQL) | UPDATE `amount_cents` → error; `received_on` null → date OK, date → another date → error; DELETE and TRUNCATE → error; a duplicate `sale_ledger_id` → error | Any change accepted |
-| PO-4 | `POST /payouts/{id}/received` (v1, bot-only; no `approval_ref` needed; an invalid one is refused; unknown id → 404 `PAYOUT_NOT_FOUND`) | `received_on` set; `payout.status` `received` in `/portfolio/{domain}`; same-key replay → same response; a second attempt with a new key → 409 `PAYOUT_ALREADY_RECEIVED`; a future date → 422 | Overwritten, or double write |
-| PO-5 | `/report` with a pending payout sold 10 days ago and another 31 days ago | Both in `payouts_pending` with `days_pending` 10 and 31; `PAYOUT_OVERDUE` only for the 31-day one; `sales`, `profit`, `roi` equal R-1/R-2 sums (no payout money added) | Missing, wrong days, or profit changed |
+Removed 6 Oct 2026 (Dvir): the `payouts` table, `POST /payouts/{id}/received`, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE` and `payouts_pending`. PO-1 to PO-5 are deleted. `/sold` keeps booking the `payout_fee` ledger row (S-12).
 
 ## System-triggered sales (SL; Dvir, 5 Oct 2026, 19:47 IDT; rules in `sold.md`, `report.md`, `00-architecture.md` §4/§6)
 

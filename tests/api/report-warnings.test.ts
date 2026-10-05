@@ -36,9 +36,6 @@ async function saleFor(domainId: number, o: { confirmed?: boolean; ref: string; 
   await db.updateTable('domains').set({ status: 'sold', sold_at: o.soldAt }).where('id', '=', domainId).execute();
   return s.id;
 }
-const payout = (domainId: number, saleLedgerId: number) =>
-  db.insertInto('payouts').values({ domain_id: domainId, sale_ledger_id: saleLedgerId, venue: 'afternic', amount_cents: 169575, method: 'wire' }).execute();
-
 describe('GET /report warnings', () => {
   it('a clean fixture has none of the warnings', async () => {
     await insertOwnedDomain(db, { domain: 'clean-one.com' });
@@ -103,15 +100,6 @@ describe('GET /report warnings', () => {
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e2', domains: [], uploaded_at: ago(DAY) }).execute();
     w = (await t.warnings()).filter((x) => x.code === 'MANUAL_DELIST');
     expect(w).toEqual([]);
-  });
-
-  it('PO-5: PAYOUT_OVERDUE only for the payout pending more than 30 days (31 d, not 30 d)', async () => {
-    const a = await insertOwnedDomain(db, { domain: 'old-one.com' });
-    const b = await insertOwnedDomain(db, { domain: 'new-two.com' });
-    await payout(a, await saleFor(a, { ref: 'P1', soldAt: ago(31 * DAY) }));
-    await payout(b, await saleFor(b, { ref: 'P2', soldAt: ago(30 * DAY) }));
-    const w = (await (await boot()).warnings()).filter((x) => x.code === 'PAYOUT_OVERDUE');
-    expect(w.map((x) => [x.domain, x.level, x.details.days_pending])).toEqual([['old-one.com', 'warn', 31]]);
   });
 
   it('R-7 / NS_UNVERIFIED: lander NS set but not verified, on an owned domain', async () => {
@@ -252,7 +240,7 @@ describe('GET /report?format=md', () => {
     expect(r.statusCode).toBe(200);
     expect(r.headers['content-type']).toBe('text/markdown; charset=utf-8');
     const md = r.body;
-    for (const h of ['## Budget', '## Sales & ROI', '## Domains', '## Upcoming (90 days)', '## Pending payouts', '## Warnings']) expect(md).toContain(h);
+    for (const h of ['## Budget', '## Sales & ROI', '## Domains', '## Upcoming (90 days)', '## Warnings']) expect(md).toContain(h);
     expect(md).toContain('$1,995');
     expect(md).toContain('$1,500.00');
     expect(md).not.toMatch(/960|walk/i);

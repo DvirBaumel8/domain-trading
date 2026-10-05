@@ -56,19 +56,10 @@ describe('POST /sold/{domain}', () => {
     expect((await dom()).sold_at!.toISOString()).toBe('2026-10-12T09:00:00.000Z');
   });
 
-  it('invalid payout.received_on date string -> 422 VALIDATION_ERROR, never 500', async () => {
-    const auth = await setup();
-    const r = await sold(good({ payout: { amount: 1600, method: 'wire', received_on: '2026-13-45' } }), auth);
-    expect(r.statusCode).toBe(422);
-    expect(r.json().error.code).toBe('VALIDATION_ERROR');
-    const r2 = await sold(good({ payout: { amount: 1600, method: 'wire', received_on: 'nope' } }), auth);
-    expect(r2.statusCode).toBe(422);
-  });
-
   it('fees and payout fee become rows', async () => {
     const auth = await setup();
     await afternicListed();
-    const res = await sold(good({ other_fees: 5.5, payout: { amount: 1600, method: 'wire', fee: 15, received_on: null } }), auth);
+    const res = await sold(good({ other_fees: 5.5, payout_fee: 15 }), auth);
     expect(res.statusCode).toBe(200);
     expect((await ledger()).map((r) => [r.type, r.amount_cents])).toEqual([
       ['registration', -1108], ['sale', 199500], ['commission', -29925], ['fee', -550], ['payout_fee', -1500]]);
@@ -414,12 +405,10 @@ describe('POST /sold/{domain}', () => {
     expect((await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E)).json().checklist).toHaveLength(3);
   });
 
-  it('PII in payout.method → NO_PII; payout_fee note is fixed text', async () => {
+  it('payout_fee note is fixed text', async () => {
     const auth = await setup();
     await afternicListed();
-    const r = await sold(good({ payout: { amount: 1, method: 'wire to a@b.com', fee: 1 } }), auth);
-    expect([r.statusCode, r.json().error.code]).toEqual([422, 'NO_PII']);
-    await sold(good({ payout: { amount: 1600, method: 'wire', fee: 15 } }), (await issueToken('write')).auth);
+    await sold(good({ payout_fee: 15 }), auth);
     const n = await db.selectFrom('ledger_entries').select('note').where('type', '=', 'payout_fee').executeTakeFirstOrThrow();
     expect(n.note).toBe('payout fee');
   });
@@ -430,7 +419,7 @@ describe('POST /sold/{domain}', () => {
     const t = async (over: Record<string, unknown>) => sold(good(over), (await issueToken('write')).auth);
     for (const over of [
       { sale_price: 10_000_000.01 }, { commission: 10_000_001 }, { sale_price: 100, commission: 90, other_fees: 10.01 },
-      { sale_price: 100, commission: 50, other_fees: 20, payout: { amount: 1, method: 'wire', fee: 30.01 } },
+      { sale_price: 100, commission: 50, other_fees: 20, payout_fee: 30.01 },
       { sold_at: '2026-10-10T11:00:00+02:00' },
     ]) {
       const r = await t(over);
@@ -440,7 +429,7 @@ describe('POST /sold/{domain}', () => {
     const r = await t({ approval_ref: { text: `sold ${D}`, approved_at: '2026-10-12T08:50:00Z' } }); // sold_at 09:00Z; 10 min earlier
     expect([r.statusCode, r.json().error.code]).toEqual([422, 'APPROVAL_INVALID']);
     expect(r.json().error.message).toMatch(/predates the sale/);
-    expect((await t({ sale_price: 100, commission: 50, other_fees: 20, payout: { amount: 1, method: 'wire', fee: 30 } })).statusCode).toBe(200);
+    expect((await t({ sale_price: 100, commission: 50, other_fees: 20, payout_fee: 30 })).statusCode).toBe(200);
     expect(await ledger()).toHaveLength(5);
   });
 
@@ -449,7 +438,7 @@ describe('POST /sold/{domain}', () => {
     await afternicListed();
     for (const over of [
       { sale_price: 0 }, { sale_price: -5 }, { sale_price: 10.123 }, { commission: -1 }, { other_fees: -1 }, { commission: 1.005 },
-      { payout: { amount: 5, method: 'wire', fee: -1 } }, { venue: 'ebay' }, { extra: 1 }, { sold_at: '2026-10-12 11:00' },
+      { payout_fee: -1 }, { payout: { amount: 5, method: 'wire', fee: 1 } }, { venue: 'ebay' }, { extra: 1 }, { sold_at: '2026-10-12 11:00' },
     ]) {
       const r = await sold(good(over), (await issueToken('write')).auth); // fresh token: the write rate limit is 10/min
       expect([over, r.statusCode, r.json().error.code]).toEqual([over, 422, 'VALIDATION_ERROR']);

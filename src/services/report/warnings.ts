@@ -5,7 +5,6 @@ import { computePlan } from '../../pricing/plan.js';
 import { settingsByVersion } from '../../pricing/settings.js';
 import { toJerusalemIso } from '../../time.js';
 import { manualDelist, pendingDomains, VENUES } from '../export-state.js';
-import { payoutsPending } from './domains.js';
 import { pair, priceValues } from './money.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
@@ -42,9 +41,6 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
       registrar: registrarOf.get(p.domain_id) ?? null,
       first_absent_at: p.first_absent_at ? toJerusalemIso(p.first_absent_at) : null, last_checked_at: toJerusalemIso(p.last_checked_at),
     });
-  }
-  for (const p of await payoutsPending(db, now)) {
-    if (p.days_pending > 30) add('PAYOUT_OVERDUE', 'warn', `The ${p.venue} payout for ${p.domain} has been pending ${p.days_pending} days.`, p.domain, { venue: p.venue, amount_cents: p.amount_cents, amount: p.amount, days_pending: p.days_pending, sold_at: p.sold_at });
   }
 
   // domains
