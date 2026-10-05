@@ -11,6 +11,29 @@ const PG_INT_MAX = 2_147_483_647;
 
 const NAME = 'porkbun';
 
+/**
+ * Every Porkbun operation the adapter calls: the single source for method + path template.
+ * The offline contract test (tests/unit/porkbun-contract.test.ts) checks each entry against the
+ * pinned OpenAPI snapshot. No top-up endpoint may ever appear here (founder rule 6).
+ */
+export const PORKBUN_ENDPOINTS = {
+  checkDomain: { method: 'POST', path: '/domain/checkDomain/{domain}' },
+  create: { method: 'POST', path: '/domain/create/{domain}' },
+  getDomain: { method: 'GET', path: '/domain/get/{domain}' },
+  getNs: { method: 'POST', path: '/domain/getNs/{domain}' },
+  updateNs: { method: 'POST', path: '/domain/updateNs/{domain}' },
+  updateAutoRenew: { method: 'POST', path: '/domain/updateAutoRenew/{domain}' },
+  balance: { method: 'GET', path: '/account/balance' },
+  apiSettings: { method: 'GET', path: '/account/apiSettings' },
+  invoices: { method: 'GET', path: '/account/invoices' },
+  invoice: { method: 'GET', path: '/account/invoice/{orderId}' },
+} as const satisfies Record<string, { method: 'GET' | 'POST'; path: string }>;
+export type PorkbunEndpoint = keyof typeof PORKBUN_ENDPOINTS;
+
+function expandPath(template: string, params: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => encodeURIComponent(params[k] ?? ''));
+}
+
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => v !== null && typeof v === 'object' && !Array.isArray(v);
 const normNs = (n: string) => n.trim().toLowerCase().replace(/\.$/, '');
@@ -60,10 +83,12 @@ export class PorkbunAdapter implements RegistrarAdapter {
 
   /** One HTTP call. Returns the SUCCESS body or throws RegistrarError. Keys travel only in headers. */
   protected async call(
-    method: 'GET' | 'POST',
-    path: string,
-    o: { body?: Json; idempotencyKey?: string; signal?: AbortSignal } = {},
+    endpoint: PorkbunEndpoint,
+    o: { params?: Record<string, string>; query?: Record<string, string | number>; body?: Json; idempotencyKey?: string; signal?: AbortSignal } = {},
   ): Promise<Json> {
+    const { method, path: template } = PORKBUN_ENDPOINTS[endpoint];
+    const qs = o.query ? `?${new URLSearchParams(Object.entries(o.query).map(([k, v]) => [k, String(v)])).toString()}` : '';
+    const path = expandPath(template, o.params ?? {}) + qs;
     const headers: Record<string, string> = {
       accept: 'application/json',
       'X-API-Key': this.opts.apiKey,
@@ -115,7 +140,7 @@ export class PorkbunAdapter implements RegistrarAdapter {
   }
 
   async quote(domain: string, o: { signal?: AbortSignal } = {}): Promise<Quote> {
-    const body = await this.call('POST', `/domain/checkDomain/${encodeURIComponent(domain)}`, { signal: o.signal });
+    const body = await this.call('checkDomain', { params: { domain }, signal: o.signal });
     const r = CheckResponse.safeParse(body.response);
     if (!r.success) throw this.bad('Unexpected checkDomain shape');
     try {
@@ -136,7 +161,7 @@ export class PorkbunAdapter implements RegistrarAdapter {
   }
 
   async accountState(): Promise<AccountState> {
-    const [bal, api] = await Promise.all([this.call('GET', '/account/balance'), this.call('GET', '/account/apiSettings')]);
+    const [bal, api] = await Promise.all([this.call('balance'), this.call('apiSettings')]);
     const settings = isObj(api.settings) ? api.settings : {};
     const spend = isObj(api.spendLimit) ? api.spendLimit : {};
     return {
@@ -155,8 +180,8 @@ export class PorkbunAdapter implements RegistrarAdapter {
     }
     const body: Json = { cost: input.costCents, agreeToTerms: 'yes', whoisPrivacy: true };
     if (input.dryRun) body.dryRun = true;
-    const r = await this.call('POST', `/domain/create/${encodeURIComponent(domain)}`, {
-      body, idempotencyKey: input.idempotencyKey,
+    const r = await this.call('create', {
+      params: { domain }, body, idempotencyKey: input.idempotencyKey,
     });
     const isDry = r.dryRun === true;
     if (input.dryRun !== isDry) {
@@ -195,7 +220,7 @@ export class PorkbunAdapter implements RegistrarAdapter {
   async findDomain(domain: string): Promise<DomainInfo | null> {
     let r: Json;
     try {
-      r = await this.call('GET', `/domain/get/${encodeURIComponent(domain)}`);
+      r = await this.call('getDomain', { params: { domain } });
     } catch (e) {
       if (e instanceof RegistrarError && e.code === 'DOMAIN_NOT_FOUND' && !e.ambiguous) return null; // S7: only this code means "not ours"
       throw e;
@@ -212,17 +237,17 @@ export class PorkbunAdapter implements RegistrarAdapter {
   }
 
   async setNameservers(domain: string, ns: string[]): Promise<void> {
-    await this.call('POST', `/domain/updateNs/${encodeURIComponent(domain)}`, { body: { ns } });
+    await this.call('updateNs', { params: { domain }, body: { ns } });
   }
 
   async getNameservers(domain: string): Promise<Set<string>> {
-    const r = await this.call('POST', `/domain/getNs/${encodeURIComponent(domain)}`);
+    const r = await this.call('getNs', { params: { domain } });
     if (!Array.isArray(r.ns)) throw this.bad('getNs without ns array');
     return new Set(r.ns.filter((n): n is string => typeof n === 'string').map(normNs));
   }
 
   async setAutoRenew(domain: string, on: boolean): Promise<void> {
-    const r = await this.call('POST', `/domain/updateAutoRenew/${encodeURIComponent(domain)}`, { body: { status: on ? 'on' : 'off' } });
+    const r = await this.call('updateAutoRenew', { params: { domain }, body: { status: on ? 'on' : 'off' } });
     const results = isObj(r.results) ? r.results : {};
     const mine = results[domain];
     if (isObj(mine) && mine.status !== 'SUCCESS') {
@@ -231,21 +256,21 @@ export class PorkbunAdapter implements RegistrarAdapter {
   }
 
   async getReceipt(orderId: string): Promise<unknown> {
-    return redactInvoice(await this.call('GET', `/account/invoice/${encodeURIComponent(orderId)}`));
+    return redactInvoice(await this.call('invoice', { params: { orderId } }));
   }
 
   async findRegistration(domain: string, opts: { since: string }): Promise<RegistrationRecord | null> {
     const fromYear = Number(opts.since.slice(0, 4));
     const toYear = new Date().getUTCFullYear();
     for (let year = toYear; year >= fromYear; year--) {
-      const list = await this.call('GET', `/account/invoices?year=${year}&limit=100`);
+      const list = await this.call('invoices', { query: { year, limit: 100 } });
       const invoices = Array.isArray(list.invoices) ? list.invoices.filter(isObj) : [];
       for (const inv of invoices) {
         const date = typeof inv.date === 'string' ? inv.date.slice(0, 10) : '';
         const domains = Array.isArray(inv.domains) ? inv.domains : [];
         if (date < opts.since || !domains.includes(domain)) continue;
         if (inv.state !== 'PAID' && inv.state !== 'PARTIALLY_REFUNDED') continue;
-        const body = await this.call('GET', `/account/invoice/${encodeURIComponent(String(inv.id))}`);
+        const body = await this.call('invoice', { params: { orderId: String(inv.id) } });
         const detail = isObj(body.invoice) ? body.invoice : {};
         const items = Array.isArray(detail.items) ? detail.items.filter(isObj) : [];
         const line = items.find(
