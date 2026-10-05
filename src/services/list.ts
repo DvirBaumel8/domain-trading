@@ -8,7 +8,7 @@ import { checkApproval } from './approval.js';
 import { afternicRow, loadSedoTemplate, sedoRow, type ExportDomain } from './export.js';
 import { landerNameservers, sameNsSet } from './lander.js';
 import { jerusalemDate } from '../dates.js';
-import { buildSchedule } from '../pricing/schedule.js';
+import { buildSchedule, type ScheduleEvent } from '../pricing/schedule.js';
 import { currentSettings, settingsByVersion } from '../pricing/settings.js';
 import { isCategory, validateListing, type ListingPlan, type ListingRequest } from './listing-v2.js';
 import { domainPlanColumns, historyRow, writePlan } from './plan-store.js';
@@ -91,7 +91,8 @@ export class ListService {
 
     // Settings: the version the plan was made under, unless replanning or never listed
     const useCurrent = replan || row.pricing_settings_version === null || row.first_listed_at === null;
-    const s = (useCurrent ? await currentSettings(db, now) : await settingsByVersion(db, row.pricing_settings_version!)) ?? await currentSettings(db, now);
+    const s = useCurrent ? await currentSettings(db, now) : await settingsByVersion(db, row.pricing_settings_version!);
+    if (!s) throw new Error(`pricing_settings v${row.pricing_settings_version} is missing for ${domain}`);
 
     // Relabel guard: any non-geo -> geo is an override
     let categoryOverride = false;
@@ -101,6 +102,7 @@ export class ListService {
         throw new AppError(422, 'OVERRIDE_NEEDS_APPROVAL', 'Relabelling a name as geo is an override: needs override, a reason and a valid approval_ref');
       }
       categoryOverride = relabelToGeo;
+      if (category === 'geo' && grade === null) throw new AppError(422, 'GEO_GRADE_REQUIRED', 'Geo names need price_grade strong or weaker');
     }
 
     // Engine
@@ -112,10 +114,11 @@ export class ListService {
       };
     } else if (listingChange && row.listing_mode) {
       if (row.listing_mode === 'hybrid') {
-        req = row.pricing_source === 'approved_exception' && !replan
-          ? { mode: 'hybrid', bin: dollars(row.bin_cents), floor: dollars(row.floor_cents), walkaway: dollars(row.walkaway_cents),
-              pricing_exception: true, pricing_exception_reason: 'carried from the approved plan' }
-          : { mode: 'hybrid', bin: dollars(row.bin_cents) };
+        // replan recomputes from the formula (Q10); anything else carries the stored values (§10.4)
+        req = replan
+          ? { mode: 'hybrid', bin: dollars(row.bin_cents), lto_max_months: row.lto_max_months }
+          : { mode: 'hybrid', bin: dollars(row.bin_cents), floor: dollars(row.floor_cents), walkaway: dollars(row.walkaway_cents),
+              min_offer: dollars(row.min_offer_cents), lto_max_months: row.lto_max_months };
       } else if (row.listing_mode === 'bin') req = { mode: 'bin', bin: dollars(row.bin_cents) };
       else req = { mode: 'offer', min_offer: dollars(row.min_offer_cents), floor: dollars(row.floor_cents) };
     }
@@ -126,6 +129,7 @@ export class ListService {
         category, grade, phase: 'change', settings: s, highValueMinBinCents: settings.high_value_min_bin_cents,
         override: body.override ?? false, overrideReason: body.override_reason ?? null, approvalValid,
         today: jerusalemDate(now), dropDate: row.drop_date,
+        ...(!priceChange && !replan && row.listing_mode === 'hybrid' ? { carried: { pricingSource: row.pricing_source ?? 'formula' } } : {}),
       });
       if (!r.ok) throw new AppError(r.status, r.code, r.message, r.details ?? {});
       plan = r.plan;
@@ -174,7 +178,7 @@ export class ListService {
     if (body.dry_run) {
       const a = exportDomain ? afternicRow(exportDomain) : null;
       const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath).catch(() => null);
-      const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter }) : [];
+      const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter }) : await this.currentEvents(row.id, row.plan_id);
       return {
         dry_run: true, valid: true, domain, category, listing: shown ? planView(shown, previewEvents) : null, lander, ns,
         preview: {
@@ -211,7 +215,7 @@ export class ListService {
           ...domainPlanColumns(plan), status: 'listed' as const, category: plan.category, price_grade: plan.category === 'geo' ? plan.grade : null,
           first_listed_at: cur.first_listed_at ?? now,
         } : {
-          ...(categoryChange ? { category } : {}),
+          ...(categoryChange ? { category, price_grade: category === 'geo' ? grade : null } : {}),
           ...(gradeChange ? { price_grade: body.price_grade } : {}),
         }),
         ...(plan || displayChanged ? { export_pending_since: cur.export_pending_since ?? now } : {}),
@@ -235,9 +239,7 @@ export class ListService {
     });
 
     const after = await db.selectFrom('domains').select(['plan_id', 'pricing_hold']).where('id', '=', row.id).executeTakeFirstOrThrow();
-    const events = after.plan_id === null ? [] : (await db.selectFrom('price_schedule').selectAll()
-      .where('domain_id', '=', row.id).where('plan_id', '=', after.plan_id).where('status', '!=', 'superseded').orderBy('due_on').orderBy('id').execute())
-      .map((e) => ({ event: e.event, dueOn: e.due_on, binCents: e.bin_cents, floorCents: e.floor_cents, walkawayCents: e.walkaway_cents, status: e.status }));
+    const events = await this.currentEvents(row.id, after.plan_id);
 
     const checklist = [
       'Add/update at Afternic: download /export/afternic.csv and upload it at afternic.com/domains/add with **Update** (never Replace)',
@@ -248,10 +250,18 @@ export class ListService {
 
     return {
       domain, status: plan ? 'listed' : row.status, category,
-      listing: shown ? planView(shown, events as never) : null, pricing_hold: after.pricing_hold,
+      listing: shown ? planView(shown, events) : null, pricing_hold: after.pricing_hold,
       lander, ns, ns_status: ns_result.status, ...(ns_result.steps ? { manual_steps: ns_result.steps } : {}), ns_public,
       checklist, warnings,
     };
+  }
+
+  /** Rows of the current plan that still count (not superseded), as schedule events. */
+  private async currentEvents(domainId: number, planId: string | null): Promise<ScheduleEvent[]> {
+    if (planId === null) return [];
+    const rows = await this.deps.db.selectFrom('price_schedule').selectAll()
+      .where('domain_id', '=', domainId).where('plan_id', '=', planId).where('status', '!=', 'superseded').orderBy('due_on').orderBy('id').execute();
+    return rows.map((e) => ({ event: e.event, dueOn: e.due_on, binCents: e.bin_cents, floorCents: e.floor_cents, walkawayCents: e.walkaway_cents, status: e.status }));
   }
 
   private async setNameservers(row: DomainRow, ns: string[]): Promise<{ status: 'set' | 'mismatch' | 'unverified' | 'manual'; steps?: string[] }> {

@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import { RegistrarError } from '../../src/registrars/types.js';
 import { makeApp } from '../helpers/app.js';
 import { newPricingSettings } from '../../src/admin/pricing-settings.js';
-import { buildSchedule } from '../../src/pricing/schedule.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
@@ -361,7 +360,7 @@ describe('POST /list/{domain}', () => {
     expect(res.json().listing.schedule).toHaveLength(4);
     const d = await dom();
     expect(d.first_listed_at?.getTime()).toBe(NOW);
-    expect(d.export_pending_since).not.toBeNull();
+    expect(d.export_pending_since?.getTime()).toBe(NOW);
     expect(rowsOf(await schedule())).toEqual(PR12);
     const audit = await db.selectFrom('audit_log').select('id').where('path', 'like', '/list/%').executeTakeFirstOrThrow();
     expect(d.plan_audit_id).toBe(audit.id);
@@ -432,13 +431,13 @@ describe('POST /list/{domain}', () => {
     expect(now2.plan_id).not.toBe(first.plan_id);
     expect(now2.first_listed_at?.getTime()).toBe(NOW);
     const fresh = rows.filter((r) => r.plan_id === now2.plan_id);
-    const expected = buildSchedule({
-      plan: { category: 'trend', mode: 'hybrid', grade: null, binCents: now2.bin_cents, floorCents: now2.floor_cents, walkawayCents: now2.walkaway_cents },
-      anchor: '2026-10-12', dropDate: '2028-10-04', settings: (await import('../helpers/pricing.js')).V2, startAfter: '2027-05-01',
-    });
-    expect(rowsOf(fresh)).toEqual(expected.map((e) => [e.event, e.dueOn, e.binCents, e.floorCents, e.walkawayCents, e.status]));
+    expect(rowsOf(fresh)).toEqual([
+      ['drop2_m18', '2028-04-12', 139500, 93000, 69000, 'planned'],
+      ['final_push', '2028-07-06', 99500, 93000, 69000, 'planned'],
+      ['delist', '2028-09-27', null, null, null, 'planned'],
+    ]);
     expect(fresh.map((r) => r.event)).toEqual(['drop2_m18', 'final_push', 'delist']);
-    expect(now2).toMatchObject({ bin_cents: 179500, floor_cents: 116500 });
+    expect(now2).toMatchObject({ bin_cents: 179500, floor_cents: 116500, walkaway_cents: 86000 });
   });
 
   it('replan: a new settings version applies only with replan:true; a manual BIN change keeps the listed version', async () => {
@@ -577,5 +576,68 @@ describe('POST /list/{domain}', () => {
     await list({ display_name: 'ExampleCityRoofing.com' }, auth);
     expect((await dom()).export_pending_since).not.toBeNull();
     expect(await history()).toHaveLength(0);
+  });
+
+  it('carry: a category change keeps the stored final-push values and source (no formula recompute)', async () => {
+    const { auth } = await setup();
+    await listedDomain({ domain: D, bin_cents: 89500, floor_cents: 83000, walkaway_cents: 61500, min_offer_cents: 10000, pricing_source: 'formula' });
+    const res = await list({ category: 'b2b', approval_ref: approval() }, auth);
+    expect(res.statusCode).toBe(200);
+    expect(await dom()).toMatchObject({ category: 'b2b', bin_cents: 89500, floor_cents: 83000, walkaway_cents: 61500, min_offer_cents: 10000, pricing_source: 'formula' });
+    expect(res.json().warnings).not.toContain('PRICING_EXCEPTION');
+    expect(rowsOf(await schedule())).toEqual([
+      ['drop1_m6', '2027-04-12', 79500, 75000, 50000, 'planned'],
+      ['drop2_m18', '2028-04-12', 79500, 75000, 50000, 'skipped_at_minimum'],
+      ['final_push', '2028-07-06', 79500, 75000, 50000, 'skipped_no_change'],
+      ['delist', '2028-09-27', null, null, null, 'planned'],
+    ]);
+  });
+
+  it('LTO carry: category change on an LTO listing needs override (LTO_NOT_ALLOWED first); with override + reason + approval LTO stays 12; replan without override -> 422', async () => {
+    const { auth } = await setup();
+    await listedDomain({ domain: D, lto_max_months: 12 });
+    expect((await list({ category: 'b2b', approval_ref: approval() }, auth)).json().error.code).toBe('LTO_NOT_ALLOWED');
+    expect((await list({ replan: true, approval_ref: approval() }, auth)).json().error.code).toBe('LTO_NOT_ALLOWED');
+    const ok = await list({ category: 'b2b', override: true, override_reason: 'keep LTO', approval_ref: approval() }, auth);
+    expect(ok.statusCode).toBe(200);
+    expect(await dom()).toMatchObject({ category: 'b2b', lto_max_months: 12, bin_cents: 199500 });
+  });
+
+  it('grade-only change on a listed geo domain needs approval and writes a history row', async () => {
+    const { auth } = await setup();
+    await listedDomain({ domain: D, category: 'geo', price_grade: 'weaker', listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, walkaway_cents: 39900, min_offer_cents: 39900 });
+    expect((await list({ price_grade: 'strong' }, auth)).json().error.code).toBe('APPROVAL_REQUIRED');
+    expect((await list({ price_grade: 'strong', approval_ref: approval() }, auth)).statusCode).toBe(200);
+    expect(await dom()).toMatchObject({ price_grade: 'strong', bin_cents: 39900 });
+    const h = await history();
+    expect(h).toHaveLength(1);
+    expect(h[0]).toMatchObject({ price_grade: 'strong', bin_cents: 39900 });
+  });
+
+  it('a category change to geo without a grade -> 422 GEO_GRADE_REQUIRED; to non-geo stores price_grade null', async () => {
+    const { auth } = await setup();
+    await trendOwned();
+    expect((await list({ category: 'geo', override: true, override_reason: 'city', approval_ref: approval() }, auth)).json().error.code).toBe('GEO_GRADE_REQUIRED');
+    await db.updateTable('domains').set({ category: 'geo', price_grade: 'weaker' }).execute();
+    expect((await list({ category: 'b2b', approval_ref: approval() }, auth)).statusCode).toBe(200);
+    expect(await dom()).toMatchObject({ category: 'b2b', price_grade: null });
+  });
+
+  it('lander-only change on a listed domain: history row carries the current prices and the existing plan_audit_id', async () => {
+    const { auth } = await setup();
+    await listedDomain({ domain: D, lander: 'sedo', lander_ns: ['ns1.sedoparking.com', 'ns2.sedoparking.com'], plan_audit_id: 'aud_old' });
+    expect((await list({ lander: 'afternic' }, auth)).statusCode).toBe(200);
+    const h = await history();
+    expect(h).toHaveLength(1);
+    expect(h[0]).toMatchObject({ mode: 'hybrid', bin_cents: 199500, floor_cents: 129500, walkaway_cents: 96000, plan_audit_id: 'aud_old', lander: 'afternic' });
+    expect((await dom()).plan_audit_id).toBe('aud_old');
+  });
+
+  it('a dry run with no plan change shows the current plan schedule', async () => {
+    const { auth } = await setup();
+    await trendOwned();
+    await list({ mode: 'hybrid', bin: 1995, approval_ref: approval() }, auth);
+    const res = await list({ dry_run: true }, auth);
+    expect(res.json().listing.schedule).toHaveLength(4);
   });
 });

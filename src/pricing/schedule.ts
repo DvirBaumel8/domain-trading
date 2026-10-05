@@ -8,7 +8,7 @@ export type ScheduleEventName = PriceScheduleEvent;
 export type ScheduleStatus = Extract<PriceScheduleStatus, 'planned' | 'skipped_at_minimum' | 'skipped_no_change' | 'skipped_disabled' | 'superseded_by_final_push'>;
 export interface ScheduleEvent {
   event: ScheduleEventName; dueOn: string;
-  binCents: Cents | null; floorCents: Cents | null; walkawayCents: Cents | null; status: ScheduleStatus;
+  binCents: Cents | null; floorCents: Cents | null; walkawayCents: Cents | null; status: ScheduleStatus | PriceScheduleStatus;
 }
 
 const DATE = new RegExp('^(\\d{4})-(\\d{2})-(\\d{2})$');

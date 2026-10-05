@@ -25,6 +25,8 @@ export interface ListingContext {
   settings: PricingSettings; highValueMinBinCents: number;
   override: boolean; overrideReason: string | null; approvalValid: boolean;
   today: string; dropDate: string | null; // LTO must end before dropDate
+  /** Re-validating the stored plan unchanged (category/grade change): keep the stored hybrid values and source, skip the formula match. */
+  carried?: { pricingSource: 'formula' | 'approved_exception' };
 }
 export interface ListingPlan {
   mode: ListingMode; category: Category; grade: 'strong' | 'weaker' | null;
@@ -62,6 +64,7 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
   }
   const lto = req.lto_max_months ?? null;
   const exception = req.pricing_exception === true;
+  const carried = ctx.carried !== undefined;
   const s = ctx.settings;
   const warnings: string[] = [];
   const guards: { code: string; message: string }[] = [];
@@ -107,7 +110,7 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
       : { code: 'MODE_NOT_ALLOWED_FOR_CATEGORY', message: 'offer mode needs an override' });
   } else {
     // V5
-    const r = computePlan({ category: ctx.category, mode: 'hybrid', grade: ctx.grade, binCents: bin, floorCents: floor, walkawayCents: walk, exception }, s);
+    const r = computePlan({ category: ctx.category, mode: 'hybrid', grade: ctx.grade, binCents: bin, floorCents: floor, walkawayCents: walk, exception: exception || carried }, s);
     if (!r.ok) {
       const d = r.details ?? {};
       const display = Object.fromEntries(Object.entries(d).filter(([k]) => k.endsWith('_cents') && typeof d[k] === 'number')
@@ -125,9 +128,11 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
       }
       guards.push({ code: 'LTO_NOT_ALLOWED', message: 'Public lease-to-own is off; it needs an override' });
     }
-    warnings.push(...p.warnings);
+    const pw = p.warnings.filter((w) => w !== 'PRICING_EXCEPTION');
+    if (ctx.carried ? ctx.carried.pricingSource === 'approved_exception' : p.warnings.includes('PRICING_EXCEPTION')) pw.push('PRICING_EXCEPTION');
+    warnings.push(...pw);
     out = { mode, category: ctx.category, grade: p.grade, binCents: p.binCents, floorCents: p.floorCents, walkawayCents: p.walkawayCents,
-      minOfferCents: p.minOfferCents, ltoMaxMonths: lto, pricingSource: p.pricingSource, settingsVersion: p.settingsVersion, formula: p.formula };
+      minOfferCents: p.minOfferCents, ltoMaxMonths: lto, pricingSource: ctx.carried ? ctx.carried.pricingSource : p.pricingSource, settingsVersion: p.settingsVersion, formula: p.formula };
     if (ctx.category === 'geo') guards.unshift({ code: 'GEO_MODE_NOT_ALLOWED', message: 'Geo names are strict Buy It Now' });
   }
 

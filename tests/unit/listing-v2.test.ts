@@ -182,3 +182,28 @@ describe('review fixes (round 1)', () => {
     expect(vc({ comps: [c(), c()], rationale: 'x'.repeat(500) })).toMatchObject({ ok: true });
   });
 });
+
+describe('carried plans (category/grade change keeps stored values, §10.4)', () => {
+  const stored: ListingRequest = { mode: 'hybrid', bin: 895, floor: 830, walkaway: 615, min_offer: 100 };
+  it('final-push values pass unchanged with source formula; no PRICING_EXCEPTION, no reason or approval needed', () => {
+    const p = plan(v(stored, { carried: { pricingSource: 'formula' }, approvalValid: false }));
+    expect(p).toMatchObject({ binCents: 89500, floorCents: 83000, walkawayCents: 61500, minOfferCents: 10000, pricingSource: 'formula' });
+    expect(p.warnings).not.toContain('PRICING_EXCEPTION');
+    expect(p.warnings).toContain('FLOOR_AUTO_ACCEPT');
+  });
+  it('the same values without carried are a formula mismatch', () => {
+    expect(code(v({ mode: 'hybrid', bin: 895, floor: 830, walkaway: 615 }))).toBe('PRICING_FORMULA_MISMATCH');
+  });
+  it('an approved_exception source stays approved_exception and warns', () => {
+    const p = plan(v({ mode: 'hybrid', bin: 1995, floor: 1295, walkaway: 950 }, { carried: { pricingSource: 'approved_exception' } }));
+    expect(p).toMatchObject({ pricingSource: 'approved_exception', walkawayCents: 95000 });
+    expect(p.warnings).toContain('PRICING_EXCEPTION');
+  });
+  it('structural checks still run: walkaway above floor -> HYBRID_PRICES_INVALID; floor below the minimum -> FLOOR_BELOW_MIN', () => {
+    expect(code(v({ mode: 'hybrid', bin: 1995, floor: 900, walkaway: 950 }, { carried: { pricingSource: 'formula' } }))).toBe('HYBRID_PRICES_INVALID');
+    expect(code(v({ mode: 'hybrid', bin: 1995, floor: 700, walkaway: 600 }, { carried: { pricingSource: 'formula' } }))).toBe('FLOOR_BELOW_MIN');
+  });
+  it('carried LTO still needs an override', () => {
+    expect(code(v({ ...stored, bin: 1995, floor: 1295, walkaway: 960, lto_max_months: 12 }, { carried: { pricingSource: 'formula' } }))).toBe('LTO_NOT_ALLOWED');
+  });
+});
