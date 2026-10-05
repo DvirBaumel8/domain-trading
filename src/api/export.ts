@@ -1,22 +1,41 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import { AppError } from '../http/errors.js';
-import { SedoTemplateInvalid, type ExportService } from '../services/export.js';
+import { VENUES, type Venue } from '../services/export-state.js';
+import { SedoTemplateInvalid, type ExportResult, type ExportService } from '../services/export.js';
+
+const QuerySchema = z.object({ changed_only: z.enum(['true', 'false']).optional() }).strict();
+
+function changedOnly(req: FastifyRequest): boolean {
+  const p = QuerySchema.safeParse(req.query ?? {});
+  if (!p.success) throw new AppError(400, 'VALIDATION_ERROR', 'Query must be empty or changed_only=true|false');
+  return p.data.changed_only === 'true';
+}
+
+const BodySchema = z.object({
+  export_id: z.string().min(1),
+  approval_ref: z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict().nullable().optional(),
+}).strict();
+
+function send(reply: FastifyReply, r: ExportResult) {
+  return reply
+    .header('content-type', 'text/csv; charset=utf-8')
+    .header('content-disposition', `attachment; filename="${r.filename}"`)
+    .header('x-export-id', r.exportId)
+    .header('x-pending-changes', String(r.pendingChanges))
+    .header('x-manual-delist', r.manualDelist.join(','))
+    .header('x-export-warnings', r.warnings.join(';'))
+    .send(r.csv);
+}
 
 export function registerExport(app: FastifyInstance, service: ExportService): void {
-  app.get('/export/afternic.csv', async (_req, reply) => {
-    const r = await service.afternic();
-    return reply
-      .header('content-type', 'text/csv; charset=utf-8')
-      .header('content-disposition', `attachment; filename="${r.filename}"`)
-      .header('x-manual-delist', r.delist.join(','))
-      .header('x-export-warnings', r.warnings.join(';'))
-      .send(r.csv);
-  });
+  app.get('/export/afternic.csv', async (req, reply) => send(reply, await service.afternic(changedOnly(req))));
 
-  app.get('/export/sedo.csv', async (_req, reply) => {
+  app.get('/export/sedo.csv', async (req, reply) => {
+    const co = changedOnly(req);
     let r;
     try {
-      r = await service.sedo();
+      r = await service.sedo(co);
     } catch (e) {
       if (e instanceof SedoTemplateInvalid) {
         throw new AppError(501, 'SEDO_TEMPLATE_INVALID', `templates/sedo_template.json is invalid: ${e.message}`);
@@ -27,10 +46,13 @@ export function registerExport(app: FastifyInstance, service: ExportService): vo
       throw new AppError(501, 'SEDO_TEMPLATE_MISSING',
         "Sedo's bulk-upload headers aren't public. Download Sedo's example file from your Sedo account and fill templates/sedo_template.json (see docs/specs/export-csv.md).");
     }
-    return reply
-      .header('content-type', 'text/csv; charset=utf-8')
-      .header('content-disposition', `attachment; filename="${r.filename}"`)
-      .header('x-export-warnings', r.warnings.join(';'))
-      .send(r.csv);
+    return send(reply, r);
+  });
+
+  app.post<{ Params: { venue: string } }>('/export/:venue/uploaded', async (req) => {
+    const venue = VENUES.find((v) => v === req.params.venue) as Venue | undefined;
+    if (!venue) throw new AppError(404, 'NOT_FOUND', 'Unknown venue');
+    const body = BodySchema.parse(req.body ?? {});
+    return service.confirm(venue, body, { auditId: req.auditId! });
   });
 }

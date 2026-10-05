@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { sql, type Kysely } from 'kysely';
+import type { Kysely } from 'kysely';
+import { AppError } from '../http/errors.js';
+import { checkTimedApproval } from './approval.js';
+import { manualDelist, pendingDomains, type Venue } from './export-state.js';
+import { withDomainLock } from './plan-store.js';
 import { z } from 'zod';
 import type { Config } from '../config.js';
 import { jerusalemDate } from '../dates.js';
@@ -116,61 +120,116 @@ function sedoDropsCents(d: ExportDomain, hybridAs: 'buy_now' | 'make_offer'): bo
   return [priceCents, minCents].some((c) => c !== null && c % 100 !== 0);
 }
 
+export interface ExportResult {
+  csv: string; filename: string; exportId: string; pendingChanges: number; manualDelist: string[]; warnings: string[];
+}
+
 export class ExportService {
   constructor(private readonly deps: { db: Kysely<Database>; config: Config; now: () => number }) {}
 
-  /** Listed domains safe for headers/rows; unsafe ones become index-only warnings (no raw value). */
-  private async listed(warnings: string[]): Promise<ExportDomain[]> {
-    const all = await this.deps.db.selectFrom('domains').select(EXPORT_COLS).where('status', '=', 'listed').orderBy('domain').execute();
-    return all.filter((d, i) => {
-      if (SAFE_DOMAIN.test(d.domain)) return true;
-      warnings.push(`${i}:DOMAIN_NOT_ASCII`);
-      return false;
-    });
-  }
-
-  async afternic(): Promise<{ csv: string; filename: string; delist: string[]; warnings: string[] }> {
-    const { db } = this.deps;
-    const rows: string[][] = [[...AFTERNIC_HEADER]];
+  /**
+   * One repeatable-read transaction: read pending / manual-delist / listed rows and insert the snapshot (the only write),
+   * so a /list commit cannot fall between the read and the insert. `at` is the app clock taken before any read.
+   */
+  private async snapshot(
+    venue: Venue, changedOnly: boolean,
+    build: (listed: ExportDomain[], warnings: string[]) => { csv: string; exported: string[] },
+  ): Promise<ExportResult> {
+    const fileAt = new Date(this.deps.now());
+    const exportId = `exp_${randomUUID()}`;
     const warnings: string[] = [];
-    const exported: string[] = [];
-    for (const d of await this.listed(warnings)) {
-      const r = afternicRow(d);
-      warnings.push(...r.warnings);
-      if ('cells' in r.row) {
-        rows.push(r.row.cells);
-        exported.push(d.domain);
-      }
-    }
-    const gone = await sql<{ domain: string }>`
-      select d.domain from domains d
-      where d.status in ('sold', 'dropped')
-        and exists (select 1 from export_runs r where r.marketplace = 'afternic' and d.domain = any(r.domains))
-      order by d.domain`.execute(db);
-    const delist = gone.rows.map((r) => r.domain).filter((dom, i) => {
-      if (SAFE_DOMAIN.test(dom)) return true;
-      warnings.push(`${i}:DOMAIN_NOT_ASCII`);
-      return false;
+    const out = await this.deps.db.transaction().setIsolationLevel('repeatable read').execute(async (trx) => {
+      const pending = await pendingDomains(trx, venue);
+      const gone = await manualDelist(trx, venue);
+      let q = trx.selectFrom('domains').select(EXPORT_COLS).where('status', '=', 'listed').orderBy('domain');
+      if (changedOnly) q = q.where('domain', 'in', pending.length > 0 ? pending : ['']);
+      const all = await q.execute();
+      const listed = all.filter((d, i) => {
+        if (SAFE_DOMAIN.test(d.domain)) return true;
+        warnings.push(`${i}:DOMAIN_NOT_ASCII`);
+        return false;
+      });
+      const delist = gone.filter((dom, i) => {
+        if (SAFE_DOMAIN.test(dom)) return true;
+        warnings.push(`${i}:DOMAIN_NOT_ASCII`);
+        return false;
+      });
+      const built = build(listed, warnings);
+      await trx.insertInto('export_runs').values({ marketplace: venue, at: fileAt, domains: built.exported, export_id: exportId, changed_only: changedOnly }).execute();
+      return { csv: built.csv, pendingChanges: pending.length, manualDelist: delist };
     });
-    // Last DB step.
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: exported, export_id: `exp_${randomUUID()}` }).execute();
-    return { csv: toCsv(rows), filename: `afternic-${jerusalemDate(new Date(this.deps.now()))}.csv`, delist, warnings };
+    const day = jerusalemDate(fileAt);
+    return { csv: out.csv, filename: `${venue}-${day}.csv`, exportId, pendingChanges: out.pendingChanges, manualDelist: out.manualDelist, warnings };
   }
 
-  async sedo(): Promise<{ csv: string; filename: string; warnings: string[] } | null> {
+  afternic(changedOnly = false): Promise<ExportResult> {
+    return this.snapshot('afternic', changedOnly, (listed, warnings) => {
+      const rows: string[][] = [[...AFTERNIC_HEADER]];
+      const exported: string[] = [];
+      for (const d of listed) {
+        const r = afternicRow(d);
+        warnings.push(...r.warnings);
+        if ('cells' in r.row) {
+          rows.push(r.row.cells);
+          exported.push(d.domain);
+        }
+      }
+      return { csv: toCsv(rows), exported };
+    });
+  }
+
+  /** null when there is no Sedo template (nothing is written). */
+  async sedo(changedOnly = false): Promise<ExportResult | null> {
     const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath);
     if (!t) return null;
     const s = await this.deps.db.selectFrom('settings').select('sedo_hybrid_as').executeTakeFirstOrThrow();
-    const warnings: string[] = [];
-    const rows: string[][] = [t.headers];
-    const exported: string[] = [];
-    for (const d of await this.listed(warnings)) {
-      if (d.display_name !== null && !isValidDisplayName(d.domain, d.display_name)) warnings.push(`DISPLAY_NAME_IGNORED:${d.domain}`); // the Sedo row always uses the lowercase domain
-      if (sedoDropsCents(d, s.sedo_hybrid_as)) warnings.push(`${d.domain}:SEDO_ROUNDS_DOWN`);
-      rows.push(sedoRow(d, t, s.sedo_hybrid_as));
-      exported.push(d.domain);
+    return this.snapshot('sedo', changedOnly, (listed, warnings) => {
+      const rows: string[][] = [t.headers];
+      const exported: string[] = [];
+      for (const d of listed) {
+        if (d.display_name !== null && !isValidDisplayName(d.domain, d.display_name)) warnings.push(`DISPLAY_NAME_IGNORED:${d.domain}`); // the Sedo row always uses the lowercase domain
+        if (sedoDropsCents(d, s.sedo_hybrid_as)) warnings.push(`${d.domain}:SEDO_ROUNDS_DOWN`);
+        rows.push(sedoRow(d, t, s.sedo_hybrid_as));
+        exported.push(d.domain);
+      }
+      return { csv: toCsv(rows), exported };
+    });
+  }
+
+  /** POST /export/{venue}/uploaded: record a confirmed upload; for Afternic also clear the pending flag (R1). */
+  async confirm(venue: Venue, body: { export_id: string; approval_ref?: { text?: unknown; approved_at?: unknown } | null }, ctx: { auditId: string }) {
+    const { db } = this.deps;
+    const settings = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
+    const a = checkTimedApproval(body.approval_ref, new Date(this.deps.now()), settings.approval_max_age_hours);
+    if (!a.ok) throw new AppError(422, a.code, a.reason);
+    const run = await db.selectFrom('export_runs').selectAll().where('export_id', '=', body.export_id).executeTakeFirst();
+    if (!run || run.marketplace !== venue) throw new AppError(404, 'EXPORT_NOT_FOUND', 'No such export for this venue');
+    const already = () => new AppError(409, 'EXPORT_ALREADY_CONFIRMED', 'This export was already confirmed as uploaded');
+    if (await db.selectFrom('export_uploads').select('id').where('export_id', '=', run.export_id).executeTakeFirst()) throw already();
+    try {
+      await db.insertInto('export_uploads').values({
+        venue, export_id: run.export_id, domains: run.domains, uploaded_at: a.approvedAt,
+        approval_text: String(body.approval_ref!.text).trim(), audit_id: ctx.auditId,
+      }).execute();
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') throw already();
+      throw e;
     }
-    await this.deps.db.insertInto('export_runs').values({ marketplace: 'sedo', domains: exported, export_id: `exp_${randomUUID()}` }).execute();
-    return { csv: toCsv(rows), filename: `sedo-${jerusalemDate(new Date(this.deps.now()))}.csv`, warnings };
+    if (venue === 'afternic') {
+      for (const domain of [...run.domains].sort()) {
+        await withDomainLock(db, domain, async (conn) => {
+          await conn.updateTable('domains').set({ export_pending_since: null })
+            .where('domain', '=', domain)
+            .where((eb) => eb.or([eb('listing_changed_at', 'is', null), eb('listing_changed_at', '<=', run.at)]))
+            .execute();
+        });
+      }
+    }
+    const pending = await pendingDomains(db, venue);
+    const inFile = new Set(run.domains);
+    return {
+      venue, export_id: run.export_id, domains: run.domains.length, uploaded_at: a.approvedAt.toISOString(),
+      pending_after: pending.length, still_pending: pending.filter((d) => inFile.has(d)),
+    };
   }
 }

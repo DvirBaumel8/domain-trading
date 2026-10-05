@@ -11,6 +11,17 @@ function namesDomain(text: string, domain: string): boolean {
   return new RegExp(`(?<![a-z0-9.-])${esc}(?![a-z0-9-]|\\.[a-z0-9])`, 'i').test(text);
 }
 
+/** Text present, ISO time with an offset, not in the future (60 s skew), not older than `maxAgeHours`. Does not look for a domain name. */
+export function checkTimedApproval(
+  ref: { text?: unknown; approved_at?: unknown } | null | undefined,
+  now: Date,
+  maxAgeHours: number,
+): ApprovalCheck {
+  const bad = (reason: string): ApprovalCheck => ({ ok: false, code: 'APPROVAL_INVALID', reason });
+  if (!ref || typeof ref.text !== 'string' || ref.text.trim() === '') return bad('approval_ref.text is required');
+  return checkTime(ref, now, maxAgeHours);
+}
+
 export function checkApproval(
   ref: { text?: unknown; approved_at?: unknown } | null | undefined,
   domain: string,
@@ -20,6 +31,11 @@ export function checkApproval(
   const bad = (reason: string): ApprovalCheck => ({ ok: false, code: 'APPROVAL_INVALID', reason });
   if (!ref || typeof ref.text !== 'string' || ref.text.trim() === '') return bad('approval_ref.text is required');
   if (!namesDomain(ref.text, domain)) return bad('approval_ref.text must name the domain');
+  return checkTime(ref, now, maxAgeHours);
+}
+
+function checkTime(ref: { approved_at?: unknown }, now: Date, maxAgeHours: number): ApprovalCheck {
+  const bad = (reason: string): ApprovalCheck => ({ ok: false, code: 'APPROVAL_INVALID', reason });
   if (typeof ref.approved_at !== 'string' || !ISO_WITH_TZ.test(ref.approved_at)) {
     return bad('approval_ref.approved_at must be ISO 8601 with a timezone offset');
   }
