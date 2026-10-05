@@ -88,7 +88,7 @@ describe('POST /sold/{domain}', () => {
     for (const [i, [venue, commission, warn]] of cases.entries()) {
       const d = `commissioncase${'abcdef'[i]}.com`;
       await listedDomain({ domain: d });
-      const r = await sold(good({ venue, commission, approval_ref: approval(d) }), auth, d);
+      const r = await sold(good({ venue, commission, approval_ref: approval(d), transaction_ref: `REF-${i}` }), auth, d);
       expect(r.statusCode).toBe(200);
       const w = r.json().warnings as string[];
       if (warn === null) expect(w).toEqual([]); else expect(w[0]).toMatch(warn);
@@ -106,14 +106,71 @@ describe('POST /sold/{domain}', () => {
     expect(await ledger()).toHaveLength(n);
   });
 
-  it('S-4: missing approval_ref → 422 APPROVAL_REQUIRED', async () => {
+  it('S-4 (superseded): no approval and no evidence → 422 EVIDENCE_REQUIRED; evidence without transaction_ref → same', async () => {
     const auth = await setup();
     await afternicListed();
     const { approval_ref: _a, ...rest } = good();
     const r = await sold(rest, auth);
-    expect(r.statusCode).toBe(422);
-    expect(r.json().error.code).toBe('APPROVAL_REQUIRED');
+    expect([r.statusCode, r.json().error.code]).toEqual([422, 'EVIDENCE_REQUIRED']);
+    const { transaction_ref: _t, ...noRef } = rest;
+    const r2 = await sold({ ...noRef, evidence: { source: 'afternic_email', ref: '<m1@afternic.com>' } }, (await issueToken('write')).auth);
+    expect([r2.statusCode, r2.json().error.code]).toEqual([422, 'EVIDENCE_REQUIRED']);
+    const r3 = await sold({ ...rest, evidence: { source: 'afternic_email', ref: ' ' } }, (await issueToken('write')).auth);
+    expect([r3.statusCode, r3.json().error.code]).toEqual([422, 'VALIDATION_ERROR']);
     expect(await dom()).toMatchObject({ status: 'listed' });
+    expect(await db.selectFrom('sales').selectAll().execute()).toHaveLength(0);
+  });
+
+  it('S-4b: no approval but transaction_ref + evidence → 200, unconfirmed, recorded_by = token name, evidence stored (ref may contain @)', async () => {
+    await setup();
+    await afternicListed();
+    const { auth } = await issueToken('write', 'gavriel');
+    const { approval_ref: _a, ...rest } = good();
+    const r = await sold({ ...rest, evidence: { source: 'afternic_email', ref: '<abc123@mail.afternic.com>' } }, auth);
+    expect(r.statusCode).toBe(200);
+    expect(r.json().confirmed).toBe(false);
+    const sales = await db.selectFrom('sales').selectAll().execute();
+    expect(sales).toHaveLength(1);
+    expect(sales[0]).toMatchObject({
+      recorded_by: 'gavriel', confirmed: false, venue: 'afternic', transaction_ref: 'AFN-1', evidence_source: 'afternic_email',
+      evidence_ref: '<abc123@mail.afternic.com>', approval_text: null, approval_at: null,
+    });
+    const sale = (await ledger()).find((l) => l.type === 'sale')!;
+    expect(sales[0]!.sale_ledger_id).toBe((await db.selectFrom('ledger_entries').select('id').where('type', '=', 'sale').executeTakeFirstOrThrow()).id);
+    void sale;
+  });
+
+  it('with approval: confirmed = true, approval stored; the predates rule still applies', async () => {
+    const auth = await setup();
+    await afternicListed();
+    const stale = await sold(good({ approval_ref: { text: `sold ${D}`, approved_at: new Date(NOW - 600_000).toISOString() } }), auth);
+    expect([stale.statusCode, stale.json().error.code]).toEqual([422, 'APPROVAL_INVALID']);
+    const r = await sold(good(), (await issueToken('write')).auth);
+    expect(r.json().confirmed).toBe(true);
+    expect(await db.selectFrom('sales').selectAll().execute()).toMatchObject([{ confirmed: true, approval_text: approval().text, evidence_source: null }]);
+  });
+
+  it('duplicate (venue, transaction_ref) on another domain → 409 SALE_ALREADY_RECORDED, nothing written', async () => {
+    const auth = await setup();
+    await afternicListed();
+    expect((await sold(good(), auth)).statusCode).toBe(200);
+    const E = 'othercityplumbing.com';
+    await listedDomain({ domain: E });
+    const n = (await ledger()).length;
+    const r = await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-1' }), (await issueToken('write')).auth, E);
+    expect([r.statusCode, r.json().error.code]).toEqual([409, 'SALE_ALREADY_RECORDED']);
+    expect(await ledger()).toHaveLength(n);
+    expect(await dom(E)).toMatchObject({ status: 'listed' });
+    const ok = await sold(good({ venue: 'sedo', commission: 199.5, approval_ref: approval(E) }), (await issueToken('write')).auth, E);
+    expect(ok.statusCode).toBe(200);
+  });
+
+  it('sales rows are append-only', async () => {
+    const auth = await setup();
+    await afternicListed();
+    await sold(good(), auth);
+    await expect(db.updateTable('sales').set({ confirmed: false }).execute()).rejects.toThrow(/append-only|not allowed/i);
+    await expect(db.deleteFrom('sales').execute()).rejects.toThrow(/append-only|not allowed/i);
   });
 
   it('approval that does not name the domain → 422 APPROVAL_INVALID', async () => {
@@ -157,7 +214,7 @@ describe('POST /sold/{domain}', () => {
     await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [E], export_id: 'e1' }).execute();
     await db.insertInto('export_run_domains').values({ export_id: 'e1', domain: E }).execute();
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: [E], uploaded_at: new Date(NOW), approval_text: 'uploaded' }).execute();
-    const r2 = (await sold(good({ approval_ref: approval(E) }), auth, E)).json();
+    const r2 = (await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E)).json();
     expect(r2.checklist).toHaveLength(4);
     expect(r2.checklist[3]).toBe('Remove the listing at Afternic (see X-Manual-Delist)');
   });
@@ -181,13 +238,13 @@ describe('POST /sold/{domain}', () => {
     expect([after.bin_cents, after.floor_cents, after.walkaway_cents]).toEqual([before.bin_cents, before.floor_cents, before.walkaway_cents]);
   });
 
-  it('D1: delisted can be sold; dropped → 409', async () => {
+  it('S-9 / D1: delisted can be sold; dropped → 409', async () => {
     const auth = await setup();
     await afternicListed({ status: 'delisted' });
     expect((await sold(good(), auth)).statusCode).toBe(200);
     const E = 'othercityplumbing.com';
     await insertOwnedDomain(db, { domain: E, status: 'dropped' });
-    const r = await sold(good({ approval_ref: approval(E) }), auth, E);
+    const r = await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E);
     expect(r.statusCode).toBe(409);
     expect(r.json().error.code).toBe('NOT_SELLABLE_STATE');
   });
@@ -203,11 +260,11 @@ describe('POST /sold/{domain}', () => {
     const E = 'othercityplumbing.com';
     const was = new Date('2026-10-11T12:00:00Z');
     await listedDomain({ domain: E, delisted_at: was });
-    await sold(good({ approval_ref: approval(E) }), auth, E);
+    await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E);
     expect((await dom(E)).delisted_at!.toISOString()).toBe(was.toISOString());
   });
 
-  it('D3: offer_id of this domain → outcome sold; another domain → 422 OFFER_MISMATCH, nothing written', async () => {
+  it('S-10 / S-11 / D3: offer_id of this domain → outcome sold; another domain → 422 OFFER_MISMATCH, nothing written', async () => {
     const auth = await setup();
     const id = await afternicListed();
     const E = 'othercityplumbing.com';
@@ -267,7 +324,7 @@ describe('POST /sold/{domain}', () => {
     expect(r.json().warnings).toEqual(['COMMISSION_UNEXPECTED: expected 25% ($498.75), got $299.25']);
     const E = 'othercityplumbing.com';
     await listedDomain({ domain: E, lander: 'afternic', lander_set_at: new Date('2026-10-10T00:00:00Z') });
-    const r2 = await sold(good({ commission: 498.75, approval_ref: approval(E) }), auth, E);
+    const r2 = await sold(good({ commission: 498.75, approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E);
     expect(r2.json().warnings).toEqual(['COMMISSION_UNEXPECTED: expected 15% ($299.25), got $498.75']);
   });
 
@@ -284,7 +341,7 @@ describe('POST /sold/{domain}', () => {
       { venue: 'afternic', export_id: 'e1', domains: [E], uploaded_at: new Date(NOW), approval_text: 'uploaded' },
       { venue: 'afternic', export_id: 'e2', domains: [], uploaded_at: new Date(NOW), approval_text: 'uploaded' },
     ]).execute();
-    expect((await sold(good({ approval_ref: approval(E) }), auth, E)).json().checklist).toHaveLength(3);
+    expect((await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E)).json().checklist).toHaveLength(3);
   });
 
   it('PII in payout.method → NO_PII; payout_fee note is fixed text', async () => {

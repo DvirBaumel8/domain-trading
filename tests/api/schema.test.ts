@@ -47,7 +47,7 @@ describe('schema: append-only (AL-2, B-23, LH-3)', () => {
   });
 
   it('TRUNCATE on append-only tables raises (outside the test reset)', async () => {
-    await expect(sql`TRUNCATE ledger_entries`.execute(db)).rejects.toThrow(/append-only/);
+    await expect(sql`TRUNCATE ledger_entries CASCADE`.execute(db)).rejects.toThrow(/append-only/);
     await expect(sql`TRUNCATE audit_log CASCADE`.execute(db)).rejects.toThrow(/append-only/);
   });
 });

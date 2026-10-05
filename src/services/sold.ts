@@ -9,6 +9,7 @@ import { manualDelist } from './export-state.js';
 import { withDomainLock } from './plan-store.js';
 
 export const VENUES = ['afternic', 'sedo', 'afternic_checkout', 'escrow', 'other'] as const;
+export const EVIDENCE_SOURCES = ['afternic_email', 'sedo_email', 'afternic_dashboard', 'sedo_dashboard', 'escrow', 'other'] as const;
 export type Venue = (typeof VENUES)[number];
 
 export interface SoldInput {
@@ -19,7 +20,8 @@ export interface SoldInput {
   soldAt: Date;
   payout: { amountCents: number; method: string; feeCents: number; receivedOn: string | null } | null;
   transactionRef: string | null;
-  approvalRef: { text?: unknown; approved_at?: unknown };
+  approvalRef: { text?: unknown; approved_at?: unknown } | null;
+  evidence: { source: (typeof EVIDENCE_SOURCES)[number]; ref: string } | null;
   offerId: number | null;
 }
 
@@ -54,13 +56,22 @@ function commissionWarning(i: SoldInput, lander: string | null, landerSetAt: Dat
 export class SoldService {
   constructor(private readonly deps: { db: Kysely<Database>; now: () => number }) {}
 
-  async sold(domain: string, i: SoldInput, ctx: { auditId: string }): Promise<Record<string, unknown>> {
+  async sold(domain: string, i: SoldInput, ctx: { auditId: string; recordedBy: string }): Promise<Record<string, unknown>> {
     const now = new Date(this.deps.now());
     if (i.soldAt.getTime() > now.getTime() + FUTURE_SKEW_MS) throw new AppError(422, 'SOLD_AT_IN_FUTURE', 'sold_at is in the future');
+    const receivedOn = i.payout?.receivedOn ?? null;
+    if (receivedOn !== null && (receivedOn > jerusalemDate(now) || receivedOn < jerusalemDate(i.soldAt))) {
+      throw new AppError(422, 'VALIDATION_ERROR', 'payout.received_on must not be in the future or before the sold_at date');
+    }
     const settings = await this.deps.db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
-    const a = checkApproval(i.approvalRef, domain, now, settings.approval_max_age_hours);
-    if (!a.ok) throw new AppError(422, a.code, a.reason);
-    if (a.approvedAt.getTime() < i.soldAt.getTime() - 60_000) throw new AppError(422, 'APPROVAL_INVALID', 'the sale approval predates the sale');
+    let approvedAt: Date | null = null;
+    if (i.approvalRef) {
+      const a = checkApproval(i.approvalRef, domain, now, settings.approval_max_age_hours);
+      if (!a.ok) throw new AppError(422, a.code, a.reason);
+      if (a.approvedAt.getTime() < i.soldAt.getTime() - 60_000) throw new AppError(422, 'APPROVAL_INVALID', 'the sale approval predates the sale');
+      approvedAt = a.approvedAt;
+    }
+    const approvalText = i.approvalRef ? String(i.approvalRef.text) : null;
 
     return withDomainLock(this.deps.db, domain, (conn) => conn.transaction().execute(async (trx) => {
       const row = await trx.selectFrom('domains').selectAll().where('domain', '=', domain).forUpdate().executeTakeFirst();
@@ -70,6 +81,11 @@ export class SoldService {
       }
       if (row.buy_date !== null && jerusalemDate(i.soldAt) < row.buy_date) {
         throw new AppError(422, 'VALIDATION_ERROR', 'sold_at is before the domain was bought', { buy_date: row.buy_date });
+      }
+      if (i.transactionRef !== null) {
+        const dup = await trx.selectFrom('ledger_entries').select('id').where('type', '=', 'sale')
+          .where('counterparty', '=', i.venue).where('receipt_ref', '=', i.transactionRef).limit(1).executeTakeFirst();
+        if (dup) throw new AppError(409, 'SALE_ALREADY_RECORDED', `A sale with ${i.venue} transaction_ref ${i.transactionRef} is already recorded`);
       }
       if (i.offerId !== null) {
         const o = await trx.selectFrom('offers').select(['id', 'domain_id', 'outcome']).where('id', '=', i.offerId).forUpdate().executeTakeFirst();
@@ -91,7 +107,14 @@ export class SoldService {
       if (payoutFee > 0) {
         rows.push({ ...base, type: 'payout_fee', amount_cents: -payoutFee, note: 'payout fee' });
       }
-      await trx.insertInto('ledger_entries').values(rows).execute();
+      const inserted = await trx.insertInto('ledger_entries').values(rows).returning(['id', 'type']).execute();
+      const saleLedgerId = inserted.find((r) => r.type === 'sale')!.id;
+      const feeLedgerId = inserted.find((r) => r.type === 'payout_fee')?.id ?? null;
+      await trx.insertInto('sales').values({
+        domain_id: row.id, sale_ledger_id: saleLedgerId, venue: i.venue, transaction_ref: i.transactionRef,
+        evidence_source: i.evidence?.source ?? null, evidence_ref: i.evidence?.ref ?? null,
+        approval_text: approvalText, approval_at: approvedAt, recorded_by: ctx.recordedBy, confirmed: i.approvalRef !== null, audit_id: ctx.auditId,
+      }).execute();
 
       await trx.updateTable('domains').set({
         status: 'sold', sold_at: i.soldAt, delisted_at: row.delisted_at ?? i.soldAt, listing_changed_at: now, updated_at: now,
@@ -101,13 +124,27 @@ export class SoldService {
         .where('domain_id', '=', row.id).where('status', '=', 'planned').execute();
 
       if (i.offerId !== null) {
-        await trx.updateTable('offers').set({ outcome: 'sold', outcome_at: now, outcome_note: 'via /sold', outcome_approval_text: String(i.approvalRef.text) })
+        await trx.updateTable('offers').set({ outcome: 'sold', outcome_at: now, outcome_note: 'via /sold', outcome_approval_text: approvalText })
           .where('id', '=', i.offerId).execute();
+      }
+
+      if (i.payout) {
+        await trx.insertInto('payouts').values({
+          domain_id: row.id, sale_ledger_id: saleLedgerId, fee_ledger_id: feeLedgerId, venue: i.venue,
+          amount_cents: i.payout.amountCents, fee_cents: payoutFee, method: i.payout.method, received_on: receivedOn,
+          transaction_ref: i.transactionRef, audit_id: ctx.auditId,
+        }).execute();
       }
 
       const warnings: string[] = [];
       const w = commissionWarning(i, row.lander, row.lander_set_at);
       if (w) warnings.push(w);
+      if (i.payout) {
+        const expected = i.saleCents - i.commissionCents - i.otherFeesCents;
+        if (Math.abs(i.payout.amountCents + payoutFee - expected) > 100) {
+          warnings.push(`PAYOUT_MISMATCH: expected ${formatUsd(expected)} before the payout fee, got ${formatUsd(i.payout.amountCents)} + fee ${formatUsd(payoutFee)}`);
+        }
+      }
 
       const fees = i.otherFeesCents + payoutFee;
       const saleCosts = i.commissionCents + fees;
@@ -123,10 +160,11 @@ export class SoldService {
       ];
 
       return {
-        domain, status: 'sold',
+        domain, status: 'sold', confirmed: i.approvalRef !== null,
         sale: money(i.saleCents), commission: money(i.commissionCents), fees: money(fees),
         sale_costs: money(saleCosts), net_proceeds: money(netProceeds),
         acquisition_costs: money(acquisitionCosts), profit: money(netProceeds - acquisitionCosts),
+        ...(i.payout ? { payout: { amount: money(i.payout.amountCents), fee: money(payoutFee), method: i.payout.method, received_on: receivedOn, status: receivedOn ? 'received' : 'pending' } } : {}),
         checklist, warnings,
       };
     }));

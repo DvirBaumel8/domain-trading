@@ -139,6 +139,37 @@ export interface OfferImportsTable {
   created_at: TimestampDefault;
 }
 
+export interface PayoutsTable {
+  id: Generated<number>;
+  domain_id: number;
+  sale_ledger_id: number;
+  fee_ledger_id: number | null;
+  venue: string;
+  amount_cents: number;
+  fee_cents: Generated<number>;
+  method: string;
+  received_on: DateString | null;
+  transaction_ref: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+export interface SalesTable {
+  id: Generated<number>;
+  domain_id: number;
+  sale_ledger_id: number;
+  venue: string;
+  transaction_ref: string | null;
+  evidence_source: 'afternic_email' | 'sedo_email' | 'afternic_dashboard' | 'sedo_dashboard' | 'escrow' | 'other' | null;
+  evidence_ref: string | null;
+  approval_text: string | null;
+  approval_at: Timestamp | null;
+  recorded_by: string;
+  confirmed: Generated<boolean>;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface OffersTable {
   id: Generated<number>;
   domain_id: number;
@@ -351,6 +382,8 @@ export interface Database {
   price_schedule: PriceScheduleTable;
   pricing_evidence: PricingEvidenceTable;
   offers: OffersTable;
+  payouts: PayoutsTable;
+  sales: SalesTable;
   offer_imports: OfferImportsTable;
 }
 
