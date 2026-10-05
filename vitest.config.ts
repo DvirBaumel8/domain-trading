@@ -2,20 +2,44 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    setupFiles: ['tests/setup/network.ts'],
     fileParallelism: false,
     env: { APP_ENV: 'test' },
     projects: [
-      { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts'] } },
+      { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts'], setupFiles: ['tests/setup/network.ts'] } },
       {
         extends: true,
         test: {
           name: 'api',
           include: ['tests/api/**/*.test.ts'],
           globalSetup: ['tests/setup/global-db.ts'],
-          setupFiles: ['tests/setup/api.ts'],
+          setupFiles: ['tests/setup/network.ts', 'tests/setup/api.ts'],
         },
       },
+      // Opt-in network projects: present only when VITEST_CONTRACT is set (the npm scripts set it), so plain
+      // `npx vitest run` never runs them and never touches the network.
+      ...(process.env.VITEST_CONTRACT
+        ? [
+            {
+              extends: true as const,
+              test: {
+                name: 'porkbun-mock',
+                env: { CONTRACT_MOCK_ONLY: '1' },
+                include: ['tests/contract/porkbun-mock*.test.ts'],
+                setupFiles: ['tests/contract/setup.ts'],
+                testTimeout: 60_000,
+              },
+            },
+            {
+              extends: true as const,
+              test: {
+                name: 'porkbun-sandbox',
+                include: ['tests/contract/porkbun-sandbox*.test.ts'],
+                setupFiles: ['tests/contract/setup.ts'],
+                testTimeout: 60_000,
+              },
+            },
+          ]
+        : []),
     ],
   },
 });
