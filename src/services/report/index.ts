@@ -5,6 +5,7 @@ import { offersByStrategy } from '../offer-stats.js';
 import { applied7d, payoutsPending, perDomain } from './domains.js';
 import { reportMoney } from './money.js';
 import { upcoming90d } from './upcoming.js';
+import { buildWarnings } from './warnings.js';
 
 export async function buildReport(db: Kysely<Database>, now: Date) {
   const m = await reportMoney(db);
@@ -16,6 +17,6 @@ export async function buildReport(db: Kysely<Database>, now: Date) {
     offers_by_strategy: await offersByStrategy(db, now),
     payouts_pending: await payoutsPending(db, now),
     applied_7d: await applied7d(db, now),
-    warnings: [] as unknown[],
+    warnings: await buildWarnings(db, now),
   };
 }
