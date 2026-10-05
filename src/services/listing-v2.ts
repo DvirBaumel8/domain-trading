@@ -11,6 +11,8 @@ const MODES: readonly ListingMode[] = ['bin', 'offer', 'hybrid'];
 const MIN_OFFER_FLOOR = 2000; // $20: Afternic's minimum (A3), not a pricing setting
 const LTO_BIN_MIN = 49_500; // $495: Afternic LTO rule
 const LTO_BIN_MAX = 500_000_000; // $5,000,000: Afternic LTO rule
+const FAST_TRANSFER_MAX_CENTS = 10_000_000; // Afternic Fast Transfer limit ($100,000)
+const RATIONALE_MAX = 500;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface ListingRequest {
@@ -54,6 +56,7 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
   try {
     const c = (x: number | null | undefined) => (x === null || x === undefined ? null : dollarsToCents(x));
     [bin, floor, walk, min] = [c(req.bin), c(req.floor), c(req.walkaway), c(req.min_offer)];
+    if ([bin, floor, walk, min].some((x) => x !== null && x % 100 !== 0)) throw new Error('not whole dollars');
   } catch {
     return fail('LISTING_PRICE_INVALID', 'Prices must be positive USD amounts with at most 2 decimals');
   }
@@ -67,10 +70,9 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
   if (mode === 'bin') {
     // V3
     if (bin === null) return fail('BIN_REQUIRED', 'bin mode needs a bin price');
-    if ((floor !== null && floor !== bin) || (min !== null && min !== bin) || exception) {
+    if ((floor !== null && floor !== bin) || (walk !== null && walk !== bin) || (min !== null && min !== bin) || exception) {
       return fail('BIN_MODE_NO_NEGOTIATION', 'bin mode: floor, walkaway and min_offer must be empty or equal to bin');
     }
-    if (walk !== null && walk !== bin) return fail('WALKAWAY_NOT_ALLOWED', 'bin mode: walkaway must be empty or equal to bin');
     if (lto !== null) return fail('LTO_NOT_ALLOWED', 'Lease-to-own is only allowed in hybrid mode');
     if (bin < MIN_OFFER_FLOOR) return fail('MIN_OFFER_TOO_LOW', 'bin mode needs a BIN of at least $20');
     out = { mode, category: ctx.category, grade: ctx.category === 'geo' ? ctx.grade : null, binCents: bin, floorCents: bin, walkawayCents: bin,
@@ -87,6 +89,7 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
       guards.push({ code: 'MODE_NOT_ALLOWED_FOR_CATEGORY', message: 'Non-geo names are hybrid; plain bin needs an override' });
       if (bin < ctx.highValueMinBinCents) warnings.push('HIGH_VALUE_LOW_BIN');
     }
+    if (bin >= FAST_TRANSFER_MAX_CENTS) warnings.push('BIN_OVER_FAST_TRANSFER_MAX');
   } else if (mode === 'offer') {
     // V4
     if (bin !== null) return fail('OFFER_MODE_HAS_BIN', 'offer mode has no bin price');
@@ -104,8 +107,6 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
       : { code: 'MODE_NOT_ALLOWED_FOR_CATEGORY', message: 'offer mode needs an override' });
   } else {
     // V5
-    if (exception && !req.pricing_exception_reason?.trim()) return fail('EXCEPTION_REASON_REQUIRED', 'A pricing exception needs pricing_exception_reason');
-    if (exception && !ctx.approvalValid) return fail('APPROVAL_REQUIRED', "A pricing exception needs a valid approval_ref (Dvir's words)");
     const r = computePlan({ category: ctx.category, mode: 'hybrid', grade: ctx.grade, binCents: bin, floorCents: floor, walkawayCents: walk, exception }, s);
     if (!r.ok) {
       const d = r.details ?? {};
@@ -114,13 +115,15 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
       return fail(r.code, r.message, { ...d, ...display });
     }
     const p = r.plan;
+    if (exception && !req.pricing_exception_reason?.trim()) return fail('EXCEPTION_REASON_REQUIRED', 'A pricing exception needs pricing_exception_reason');
+    if (exception && !ctx.approvalValid) return fail('APPROVAL_REQUIRED', "A pricing exception needs a valid approval_ref (Dvir's words)");
     if (min !== null && min !== p.minOfferCents) return fail('MIN_OFFER_FIXED', 'min_offer is set by the server', { min_offer_cents: p.minOfferCents, min_offer: wholeDollars(p.minOfferCents) });
     if (lto !== null) {
       if (!Number.isInteger(lto) || lto < 2 || lto > 60 || p.binCents < LTO_BIN_MIN || p.binCents > LTO_BIN_MAX
         || (ctx.dropDate !== null && addMonthsClamped(ctx.today, lto) >= ctx.dropDate)) {
         return fail('LTO_INVALID', 'Lease-to-own needs 2-60 months, a BIN of $495-$5,000,000, and must end before drop_date');
       }
-      if (!s.publicLto) guards.push({ code: 'LTO_NOT_ALLOWED', message: 'Public lease-to-own is off; it needs an override' });
+      guards.push({ code: 'LTO_NOT_ALLOWED', message: 'Public lease-to-own is off; it needs an override' });
     }
     warnings.push(...p.warnings);
     out = { mode, category: ctx.category, grade: p.grade, binCents: p.binCents, floorCents: p.floorCents, walkawayCents: p.walkawayCents,
@@ -137,10 +140,6 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
     }
     overrideUsed = true;
   }
-  if (!overrideUsed) {
-    const i = warnings.indexOf('HIGH_VALUE_LOW_BIN');
-    if (i >= 0) warnings.splice(i, 1);
-  }
   if (ctx.category === 'other' && !warnings.includes('CATEGORY_OTHER')) warnings.push('CATEGORY_OTHER');
   return { ok: true, plan: { ...out, overrideUsed, warnings } };
 }
@@ -148,9 +147,17 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
 export interface Comp { domain: string; price_usd: number; sold_on: string; venue: string; source_url: string }
 export interface Evidence { comps?: unknown; rationale?: unknown }
 
+function isUsd(n: number): boolean {
+  try {
+    return dollarsToCents(n) > 0;
+  } catch {
+    return false;
+  }
+}
+
 const CompSchema = z.object({
   domain: z.string().trim().min(3).max(253),
-  price_usd: z.number().positive().refine((n) => Number.isFinite(n) && Math.round(n * 100) === n * 100, 'at most 2 decimals'),
+  price_usd: z.number().refine(isUsd, 'a positive USD amount with at most 2 decimals'),
   sold_on: z.string().regex(DATE),
   venue: z.string().trim().min(1).max(100),
   source_url: z.string().url().refine((u) => u.startsWith('https://'), 'https only'),
@@ -158,6 +165,7 @@ const CompSchema = z.object({
 
 export function validateComps(e: Evidence | null | undefined, s: PricingSettings, today: string):
   { ok: true; comps: Comp[]; rationale: string | null } | Fail {
+  if (e && Object.keys(e).some((k) => k !== 'comps' && k !== 'rationale')) return fail('COMPS_INVALID', 'pricing_evidence allows only comps and rationale');
   const list = e && Array.isArray(e.comps) ? e.comps : [];
   if (list.length < s.compsMin) return fail('COMPS_REQUIRED', `Every buy needs ${s.compsMin}-${s.compsMax} comparable sales`, { comps_min: s.compsMin, comps_max: s.compsMax });
   if (list.length > s.compsMax) return fail('COMPS_INVALID', `At most ${s.compsMax} comparable sales`, { comps_max: s.compsMax });
@@ -171,6 +179,7 @@ export function validateComps(e: Evidence | null | undefined, s: PricingSettings
     comps.push(r.data);
   }
   if (e && e.rationale !== undefined && e.rationale !== null && typeof e.rationale !== 'string') return fail('COMPS_INVALID', 'rationale must be text');
+  if (typeof e?.rationale === 'string' && e.rationale.trim().length > RATIONALE_MAX) return fail('COMPS_INVALID', `rationale is at most ${RATIONALE_MAX} characters`);
   const rationale = e && typeof e.rationale === 'string' && e.rationale.trim() ? e.rationale.trim() : null;
   return { ok: true as const, comps, rationale };
 }

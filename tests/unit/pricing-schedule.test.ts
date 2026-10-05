@@ -146,11 +146,11 @@ describe('PR-9: property — every x95 BIN from $795 to $100,000', () => {
 });
 
 describe('SchedulePlan paths and startAfter (4b-2)', () => {
-const sp = (o: Partial<SchedulePlan>): SchedulePlan => ({ category: 'trend', mode: 'hybrid', grade: null, binCents: 199500, floorCents: 129500, walkawayCents: 96000, ...o });
-it('Q1: non-geo bin override, offer, and geo hybrid override → delist only', () => {
-  for (const p of [sp({ mode: 'bin', floorCents: 99900, walkawayCents: 99900, binCents: 99900 }), sp({ mode: 'offer', binCents: null, floorCents: null, walkawayCents: null }), sp({ category: 'geo', grade: 'strong' })]) {
-    expect(buildSchedule({ plan: p, anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2 }).map((e) => e.event)).toEqual(['delist']);
-  }
+  const sp = (o: Partial<SchedulePlan>): SchedulePlan => ({ category: 'trend', mode: 'hybrid', grade: null, binCents: 199500, floorCents: 129500, walkawayCents: 96000, ...o });
+  it('Q1: non-geo bin override, offer, and geo hybrid override → delist only', () => {
+    for (const p of [sp({ mode: 'bin', floorCents: 99900, walkawayCents: 99900, binCents: 99900 }), sp({ mode: 'offer', binCents: null, floorCents: null, walkawayCents: null }), sp({ category: 'geo', grade: 'strong' }), sp({ category: 'geo', mode: 'offer', grade: 'strong', binCents: null, floorCents: null, walkawayCents: null })]) {
+      expect(buildSchedule({ plan: p, anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2 }).map((e) => e.event)).toEqual(['delist']);
+    }
 });
 it('geo bin off the grade price (manual 450) → delist only', () => {
   expect(buildSchedule({ plan: sp({ category: 'geo', mode: 'bin', grade: 'strong', binCents: 45000, floorCents: 45000, walkawayCents: 45000 }), anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2 }).map((e) => e.event)).toEqual(['delist']);

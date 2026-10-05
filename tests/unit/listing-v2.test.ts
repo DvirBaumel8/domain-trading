@@ -151,3 +151,34 @@ describe('V11 comps / V12 version', () => {
     expect(checkSettingsVersion(undefined, V2)).toBeNull();
   });
 });
+
+describe('review fixes (round 1)', () => {
+  const c = (o: object = {}) => ({ domain: 'compa.com', price_usd: 1500, sold_on: '2026-09-01', venue: 'NameBio', source_url: 'https://namebio.com/compa.com', ...o });
+  const vc = (e: unknown) => validateComps(e as never, V2, '2026-10-12');
+  it('comps accept cents prices 19.99 and 1100.10; reject 3 decimals', () => {
+    expect(vc({ comps: [c({ price_usd: 19.99 }), c({ price_usd: 1100.1 })] })).toMatchObject({ ok: true });
+    expect(vc({ comps: [c(), c({ price_usd: 1.005 })] })).toMatchObject({ ok: false, code: 'COMPS_INVALID' });
+  });
+  it('listing prices must be whole dollars', () => {
+    expect(code(v({ mode: 'bin', bin: 399.5 }, geo()))).toBe('LISTING_PRICE_INVALID');
+    expect(code(v({ mode: 'offer', min_offer: 500.25 }, OV))).toBe('LISTING_PRICE_INVALID');
+    expect(code(v({ mode: 'hybrid', bin: 1995.5, floor: 1295, walkaway: 950, pricing_exception: true, pricing_exception_reason: 'x' }))).toBe('LISTING_PRICE_INVALID');
+  });
+  it('bin mode walkaway differing from bin → BIN_MODE_NO_NEGOTIATION', () => {
+    expect(code(v({ mode: 'bin', bin: 399, walkaway: 300 }, geo()))).toBe('BIN_MODE_NO_NEGOTIATION');
+  });
+  it('hybrid without bin reports HYBRID_FIELDS_REQUIRED before exception checks', () => {
+    expect(code(v({ mode: 'hybrid', pricing_exception: true }))).toBe('HYBRID_FIELDS_REQUIRED');
+  });
+  it('LTO needs an override even when publicLto is on', () => {
+    expect(code(validateListing({ mode: 'hybrid', bin: 1995, lto_max_months: 12 }, ctx({ settings: { ...V2, publicLto: true } })))).toBe('LTO_NOT_ALLOWED');
+  });
+  it('bin mode BIN >= $100,000 warns BIN_OVER_FAST_TRANSFER_MAX', () => {
+    expect(plan(v({ mode: 'bin', bin: 100000 }, OV)).warnings).toContain('BIN_OVER_FAST_TRANSFER_MAX');
+  });
+  it('evidence: unknown top-level key and rationale over 500 chars → COMPS_INVALID', () => {
+    expect(vc({ comps: [c(), c()], extra: 1 })).toMatchObject({ ok: false, code: 'COMPS_INVALID' });
+    expect(vc({ comps: [c(), c()], rationale: 'x'.repeat(501) })).toMatchObject({ ok: false, code: 'COMPS_INVALID' });
+    expect(vc({ comps: [c(), c()], rationale: 'x'.repeat(500) })).toMatchObject({ ok: true });
+  });
+});
