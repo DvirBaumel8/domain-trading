@@ -4,7 +4,7 @@
 //    both prefixes (pk1_sb_ / sk1_sb_) are asserted before ANY other request, else the project aborts;
 //  - the real-account env vars (PORKBUN_API_KEY / PORKBUN_SECRET_API_KEY) are never read here;
 //  - installGuardFetch() wraps fetch: a request carrying a non-sandbox key never leaves, only an allowlist of
-//    Porkbun paths may be called (the adapter's own plus the sandbox-only /sandbox/topup and /sandbox/reset),
+//    Porkbun paths may be called (the adapter's own plus the sandbox-only /sandbox/reset; no top-up of any kind, founder rule 6),
 //    and every response must say it is a sandbox (header and, where documented, body.sandbox === true).
 //  - no top-up of a real account: /account/topup*, /account/autoTopup are never allowed.
 import { PORKBUN_ENDPOINTS } from '../../src/registrars/porkbun.js';
@@ -12,7 +12,7 @@ import { PORKBUN_ENDPOINTS } from '../../src/registrars/porkbun.js';
 export const SANDBOX_BASE = 'https://api.porkbun.com/api/json/v3';
 const API_PREFIX = '/api/json/v3';
 // The sandbox-only endpoints; whitelisted by exact name. These never touch a real account (a non-sandbox key never gets here).
-const SANDBOX_ONLY = new Set(['/sandbox/reset', '/sandbox/topup']);
+const SANDBOX_ONLY = new Set(['/sandbox/reset']);
 const KEY_REQUEST = '/apikey/request';
 
 export interface SandboxKeys { apiKey: string; secretKey: string }
@@ -37,6 +37,22 @@ let installed = false;
 const sandboxSeen: string[] = [];
 export const guardLog: string[] = []; // "METHOD /path -> status" lines, never keys
 
+/** The unauthenticated key-minting call must carry no credentials at all (header or body); else refuse. */
+export function assertCredentialFreeKeyRequest(init?: RequestInit): void {
+  const headers = new Headers(init?.headers);
+  let bad = headers.has('x-api-key') || headers.has('x-secret-api-key');
+  const b = init?.body;
+  if (typeof b === 'string' && b.length > 0) {
+    try {
+      const j = JSON.parse(b) as Record<string, unknown>;
+      if (j && typeof j === 'object' && ('apikey' in j || 'secretapikey' in j)) bad = true;
+    } catch { bad = true; } // an unparseable body cannot be shown credential-free
+  } else if (b !== undefined && b !== null && typeof b !== 'string') {
+    bad = true;
+  }
+  if (bad) throw new Error('SANDBOX GUARD: /apikey/request must carry no credentials; refused');
+}
+
 export function installGuardFetch(): void {
   if (installed) return;
   installed = true;
@@ -49,9 +65,8 @@ export function installGuardFetch(): void {
       throw new Error(`SANDBOX GUARD: path not allowed: ${path}`);
     }
     const headers = new Headers(init?.headers);
-    if (path !== KEY_REQUEST) {
-      assertSandboxKeys({ apiKey: headers.get('x-api-key'), secretKey: headers.get('x-secret-api-key') });
-    }
+    if (path === KEY_REQUEST) assertCredentialFreeKeyRequest(init);
+    else assertSandboxKeys({ apiKey: headers.get('x-api-key'), secretKey: headers.get('x-secret-api-key') });
     const res = await inner(input, init);
     guardLog.push(`${init?.method ?? 'GET'} ${path} -> ${res.status}`);
     // /apikey/request is the unauthenticated key-minting call: it has no sandbox header, so getSandboxKeys()

@@ -73,8 +73,28 @@ function merge(base: unknown, over: unknown): unknown {
   for (const [k, v] of Object.entries(over as Json)) out[k] = merge(b[k], v);
   return out;
 }
+/**
+ * Every override key path must exist in the response schema's `properties` (descending through properties/items),
+ * so a field renamed in a refreshed snapshot fails here instead of being silently merged in. Map-like objects
+ * (additionalProperties schema, no properties, e.g. `results`) are skipped.
+ */
+function assertOverridePaths(schema: Json, over: unknown, at: string): void {
+  if (Array.isArray(over)) {
+    for (const el of over) assertOverridePaths((schema.items ?? {}) as Json, el, `${at}[]`);
+    return;
+  }
+  if (over === null || typeof over !== 'object') return;
+  const branches: Json[] = [schema, ...((schema.allOf ?? []) as Json[]), ...((schema.oneOf ?? []) as Json[])];
+  const props: Json = Object.assign({}, ...branches.map((b) => (b.properties ?? {}) as Json));
+  if (Object.keys(props).length === 0 && typeof schema.additionalProperties === 'object') return; // map-like
+  for (const [k, v] of Object.entries(over as Json)) {
+    if (!(k in props)) throw new Error(`override path ${at}.${k} does not exist in the response schema`);
+    assertOverridePaths(props[k] as Json, v, `${at}.${k}`);
+  }
+}
 /** Sample response for an endpoint: synthesised, overridden with the values the test asserts on, and itself validated against the spec. */
 function sample(ep: PorkbunEndpoint, over: Json, schema: Json = respSchema(ep)): Json {
+  assertOverridePaths(schema, over, ep);
   const body = merge(synth(schema), over) as Json;
   const v = validator(schema);
   expect(v(body), `sample for ${ep} must satisfy the spec schema: ${errs(v)}`).toBe(true);
@@ -258,6 +278,17 @@ describe('Porkbun contract (pinned OpenAPI v3.53, offline)', () => {
     expect(recorded.pop()!.headers[specName.toLowerCase()]).toBe('dt-key-9');
     // maxLength 255 documented: the schema is the contract for the key we generate.
     expect((raw.components.parameters.IdempotencyKeyHeader as Json).schema.maxLength).toBe(255);
+  });
+
+  it('PK-C3b: sample() rejects an override path that is not in the response schema', () => {
+    expect(() => sample('balance', { balanceRenamed: 1 })).toThrow(/does not exist in the response schema/);
+    expect(() => sample('checkDomain', { response: { nope: 'x' } })).toThrow(/does not exist/);
+  });
+
+  it('PK-C7: expandPath throws on a missing template param', async () => {
+    const { expandPath } = await import('../../src/registrars/porkbun.js');
+    expect(expandPath('/domain/get/{domain}', { domain: 'a.com' })).toBe('/domain/get/a.com');
+    expect(() => expandPath('/domain/get/{domain}', {})).toThrow(/missing path param: domain/);
   });
 
   it('PK-C6: snapshot integrity: sha256 matches the .sha256 file; spec version is 3.53', () => {

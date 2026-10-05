@@ -30,8 +30,12 @@ export const PORKBUN_ENDPOINTS = {
 } as const satisfies Record<string, { method: 'GET' | 'POST'; path: string }>;
 export type PorkbunEndpoint = keyof typeof PORKBUN_ENDPOINTS;
 
-function expandPath(template: string, params: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (_, k: string) => encodeURIComponent(params[k] ?? ''));
+export function expandPath(template: string, params: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => {
+    const v = params[k];
+    if (v === undefined) throw new Error(`missing path param: ${k}`);
+    return encodeURIComponent(v);
+  });
 }
 
 type Json = Record<string, unknown>;

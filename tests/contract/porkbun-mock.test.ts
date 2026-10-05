@@ -52,8 +52,11 @@ async function withInvoiceStatusFixed<T>(fn: () => Promise<T>): Promise<T> {
   globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const res = await guarded(input, init);
     const text = await res.text();
-    const body = JSON.parse(text) as { status?: string };
-    if (body.status === 'string') {
+    let body: { status?: string };
+    try { body = JSON.parse(text) as { status?: string }; } catch {
+      return new Response(text, { status: res.status, headers: res.headers }); // non-JSON: the adapter's own error mapping applies
+    }
+    if (body && body.status === 'string') {
       console.warn('[mock] invoice endpoint: mock status is the placeholder "string"; rewritten to SUCCESS for this test only');
       body.status = 'SUCCESS';
     }
@@ -80,6 +83,14 @@ const CALLS: Record<PorkbunEndpoint, (a: PorkbunAdapter) => Promise<unknown>> = 
   invoice: (a) => withInvoiceStatusFixed(() => a.getReceipt('123')),
 };
 
+/** True only when the raw mock body really has the literal placeholder "string" as the renewal price. */
+async function mockHasPlaceholderRenewal(path: string): Promise<boolean> {
+  try {
+    const j = (await (await fetch(`${MOCK_BASE}${concretePath(path)}`)).json()) as { response?: { additional?: { renewal?: { price?: unknown } } } };
+    return j?.response?.additional?.renewal?.price === 'string';
+  } catch { return false; }
+}
+
 /** Mock bodies carry the literal "string" in money-string fields. That is placeholder data, not drift. */
 const isPlaceholderPrice = (e: unknown) => e instanceof RegistrarError && e.code === 'REGISTRAR_BAD_RESPONSE';
 
@@ -104,7 +115,7 @@ describe('porkbun mock: success bodies through the adapter parsers (2, 4)', () =
       out = await CALLS[name](adapter());
     } catch (err) {
       // checkDomain's mock renewal price is the literal "string": accept only that, and only for quote.
-      if (name === 'checkDomain' && isPlaceholderPrice(err)) {
+      if (name === 'checkDomain' && isPlaceholderPrice(err) && (await mockHasPlaceholderRenewal(e.path))) {
         console.warn('[mock] checkDomain: mock renewal price is the placeholder "string"; parse rejected it as designed');
         return;
       }

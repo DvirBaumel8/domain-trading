@@ -36,7 +36,8 @@ export default defineConfig({
                 include: ['tests/contract/porkbun-sandbox*.test.ts'],
                 // Same DB bootstrap as the api project (B-26 runs /buy against the local test DB); no per-test reset here.
                 globalSetup: ['tests/setup/global-db.ts'],
-                setupFiles: ['tests/contract/setup.ts'],
+                // The guard wraps fetch for every sandbox test file (idempotent if a file also calls it).
+                setupFiles: ['tests/contract/setup.ts', 'tests/contract/sandbox-guard-setup.ts'],
                 testTimeout: 60_000,
               },
             },
