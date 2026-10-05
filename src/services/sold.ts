@@ -120,7 +120,8 @@ export class SoldService {
       }
 
       await trx.updateTable('domains').set({
-        status: 'sold', sold_at: i.soldAt, delisted_at: row.delisted_at ?? i.soldAt, listing_changed_at: now, updated_at: now,
+        status: 'sold', sold_at: i.soldAt, delisted_at: row.delisted_at ?? i.soldAt, updated_at: now,
+        ...(row.status === 'listed' ? { listing_changed_at: now } : {}), // see DropJob: a delisted name keeps its original change time
       }).where('id', '=', row.id).execute();
 
       await trx.updateTable('price_schedule').set({ status: 'cancelled', note: 'sold', updated_at: now })

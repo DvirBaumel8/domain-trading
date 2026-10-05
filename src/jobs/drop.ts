@@ -69,7 +69,8 @@ export class DropJob {
     if (!cur || !['owned', 'listed', 'delisted'].includes(cur.status) || cur.drop_date === null || !(cur.drop_date < today)) return false;
     if (dry) return true;
     await q.updateTable('domains').set({
-      status: 'dropped', delisted_at: cur.delisted_at ?? now, listing_changed_at: now, updated_at: now,
+      status: 'dropped', delisted_at: cur.delisted_at ?? now, updated_at: now,
+      ...(cur.status === 'listed' ? { listing_changed_at: now } : {}), // only a leave-from-listed is an export change; a delisted name keeps the time its removal task started
     }).where('id', '=', domainId).execute();
     const cancelled = await q.updateTable('price_schedule').set({ status: 'cancelled', note: 'dropped', updated_at: now })
       .where('domain_id', '=', domainId).where('status', '=', 'planned').returning('id').execute();

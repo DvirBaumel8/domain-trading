@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DropJob } from '../../src/jobs/drop.js';
+import { manualDelist } from '../../src/services/export-state.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 
 const D = 'examplecityroofing.com';
@@ -82,5 +83,18 @@ describe('drop job', () => {
     const j = job();
     const [a, b] = await Promise.all([j.runOnce({ today: '2028-10-05' }), j.runOnce({ today: '2028-10-05' })]);
     expect([a.skipped, b.skipped].sort()).toEqual([false, true]);
+  });
+
+  it('a delisted name keeps its listing_changed_at when dropped, so a confirmed file after the delist clears the removal task for good', async () => {
+    const delistedAt = new Date('2028-09-27T09:00:00Z');
+    const id = await listed({ status: 'delisted', delisted_at: delistedAt, listing_changed_at: delistedAt });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: new Date('2028-10-01T09:00:00Z'), domains: [], export_id: 'e_after' }).execute();
+    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e_after', domains: [], uploaded_at: new Date('2028-10-01T09:05:00Z'), approval_text: 'uploaded' }).execute();
+    expect(await manualDelist(db, 'afternic')).toEqual([]);
+    await job().runOnce({ today: '2028-10-05' });
+    expect((await dom()).status).toBe('dropped');
+    expect((await dom()).listing_changed_at?.getTime()).toBe(delistedAt.getTime());
+    expect(await manualDelist(db, 'afternic')).toEqual([]);
+    expect(id).toBeGreaterThan(0);
   });
 });

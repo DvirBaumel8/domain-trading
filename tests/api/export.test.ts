@@ -49,15 +49,18 @@ describe('GET /export/afternic.csv', () => {
   });
 
   it('X-Manual-Delist: sold after a confirmed upload is listed, and keeps being listed; an unconfirmed export does not count', async () => {
-    app = await makeApp();
+    const T0 = Date.parse('2026-10-05T10:00:00Z');
+    const clock = { t: T0 };
+    app = await makeApp({ now: () => clock.t });
     const { auth } = await issueToken('write');
     await listedDomain({ domain: 'x.com' });
     const f = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
-    await db.updateTable('domains').set({ status: 'sold', sold_at: new Date(), delisted_at: new Date(), listing_changed_at: new Date(Date.now() + 1000), first_listed_at: new Date(Date.now() - 3_600_000) }).where('domain', '=', 'x.com').execute();
+    await db.updateTable('domains').set({ status: 'sold', sold_at: new Date(T0 + 1000), delisted_at: new Date(T0 + 1000), listing_changed_at: new Date(T0 + 1000), first_listed_at: new Date(T0 - 3_600_000) }).where('domain', '=', 'x.com').execute();
     expect((await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth })).headers['x-manual-delist'] ?? '').toBe('');
+    clock.t = T0 + 120_000;
     const res0 = await app.inject({
       method: 'POST', url: '/export/afternic/uploaded', headers: { ...auth, 'idempotency-key': 'k-x-1' },
-      payload: { export_id: f.headers['x-export-id'], approval_ref: { text: 'uploaded', approved_at: new Date(Date.now() - 60_000).toISOString() } },
+      payload: { export_id: f.headers['x-export-id'], approval_ref: { text: 'uploaded', approved_at: new Date(T0 + 60_000).toISOString() } },
     });
     expect(res0.statusCode, res0.body).toBe(200);
     for (let i = 0; i < 2; i++) {

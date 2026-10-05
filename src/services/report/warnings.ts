@@ -94,7 +94,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     if (!up) add('EXPORT_STALE', 'warn', 'No confirmed Afternic upload in the last 7 days while listings have changed.', undefined, { pending: [...pending] });
   }
 
-  // manual removal task (PR-27): names that went live in a confirmed file and whose removal no confirmed file asked for
+  // manual removal task (PR-27): names first listed before the venue's last confirmed file whose status changed after that file's snapshot
   const venuesBy = new Map<string, string[]>();
   for (const v of VENUES) for (const name of await manualDelist(db, v)) venuesBy.set(name, [...(venuesBy.get(name) ?? []), v]);
   const statusByName = new Map(domains.map((d) => [d.domain, d.status]));

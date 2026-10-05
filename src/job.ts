@@ -9,6 +9,7 @@ import { PriceScheduleJob } from './jobs/price-schedule.js';
 import { BackupExporter } from './jobs/backup-export.js';
 import { importBackup } from './jobs/backup-import.js';
 import { buildApp } from './app.js';
+import { newAuditId } from './http/audit.js';
 
 const USAGE = `usage:
   npm run job -- tick | daily     (the same runner and steps as POST /jobs/run)
@@ -37,8 +38,16 @@ async function main(argv: string[]): Promise<number> {
       const app = await buildApp({ config, db, backupExport: new BackupExporter({ db, config, now: Date.now, log }) });
       try {
         const r = await app.jobRunner.run(positionals[0]);
+        const failed = Object.entries(r.steps).filter(([, st]) => !st.ok).map(([k]) => k);
+        // The run-level audit row POST /jobs/run gets from the middleware (a skipped overlap is recorded too).
+        await db.insertInto('audit_log').values({
+          id: newAuditId(), scope: 'job', method: 'CLI', path: `job ${positionals[0]}`,
+          request: JSON.stringify({ job: positionals[0], steps: Object.fromEntries(Object.entries(r.steps).map(([k, st]) => [k, st.ok ? (st.skipped ? 'skipped' : 'ok') : 'failed'])) }),
+          status_code: failed.length ? 500 : 200,
+          result_summary: r.skipped ? `${positionals[0]}: skipped` : failed.length ? `${positionals[0]}: failed ${failed.join(',')}` : `${positionals[0]}: ok`,
+        }).execute();
         console.log(JSON.stringify(r, null, 2));
-        return Object.values(r.steps).some((st) => !st.ok) ? 1 : 0;
+        return failed.length ? 1 : 0;
       } finally {
         await app.close();
       }

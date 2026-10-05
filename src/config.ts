@@ -35,7 +35,6 @@ export interface Config {
   enabledRegistrars: string[];
   sedoTemplatePath: string;
   dnsNsServer: string;
-  /** internal: in-process timers + startup runs (dev). external: none; a trigger calls POST /jobs/run (production). */
   /** Bearer token for POST /jobs/run; undefined → the route answers 503 JOBS_DISABLED. */
   jobTriggerToken: string | undefined;
   databaseSsl: boolean;

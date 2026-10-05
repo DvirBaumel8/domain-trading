@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { manualDelist } from '../../src/services/export-state.js';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { buyBody, postBuy } from '../helpers/buy.js';
@@ -397,6 +398,19 @@ describe('POST /sold/{domain}', () => {
     await db.insertInto('export_runs').values({ marketplace: 'afternic', at: new Date(NOW - 1_800_000), domains: [], export_id: 'e1' }).execute();
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: [], uploaded_at: new Date(NOW - 1_700_000), approval_text: 'uploaded' }).execute();
     expect((await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E)).json().checklist).toHaveLength(3);
+  });
+
+  it('a delisted name sold after a confirmed file keeps its change time: no manual-delist line and nothing in manualDelist', async () => {
+    const auth = await setup();
+    const delistedAt = new Date(NOW - 10 * 86_400_000);
+    await afternicListed({ status: 'delisted', delisted_at: delistedAt, listing_changed_at: delistedAt, first_listed_at: new Date(NOW - 30 * 86_400_000) });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: new Date(NOW - 5 * 86_400_000), domains: [], export_id: 'e1' }).execute();
+    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: [], uploaded_at: new Date(NOW - 5 * 86_400_000 + 60_000), approval_text: 'uploaded' }).execute();
+    const r = (await sold(good(), auth)).json();
+    expect(r.checklist).toHaveLength(3);
+    expect(r.checklist.join('\n')).not.toContain('Remove the listing at');
+    expect((await dom()).listing_changed_at?.getTime()).toBe(delistedAt.getTime());
+    expect(await manualDelist(db, 'afternic')).toEqual([]);
   });
 
   it('payout_fee note is fixed text', async () => {

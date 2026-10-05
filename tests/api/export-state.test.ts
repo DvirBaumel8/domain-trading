@@ -88,6 +88,18 @@ describe('manualDelist (went away after the last confirmed file, and was first l
     await file('afternic', T(5));
     expect(await manualDelist(db, 'afternic')).toEqual([]);
   });
+  it('a Sedo confirmation does not clear the Afternic removal task, and the reverse', async () => {
+    await gone('a.com', 'delisted', T(10));
+    await file('afternic', T(5));
+    await file('sedo', T(5));
+    await file('sedo', T(12));
+    expect(await manualDelist(db, 'afternic')).toEqual(['a.com']);
+    expect(await manualDelist(db, 'sedo')).toEqual([]);
+    await gone('b.com', 'delisted', T(20));
+    await file('afternic', T(25));
+    expect(await manualDelist(db, 'afternic')).toEqual([]);
+    expect(await manualDelist(db, 'sedo')).toEqual(['b.com']);
+  });
   it('no confirmed upload at the venue: nothing to remove', async () => {
     await gone('a.com', 'sold', T(10));
     await unconfirmed('afternic', T(5));
