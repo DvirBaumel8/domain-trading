@@ -97,6 +97,16 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
 - **Ambiguous dry run** also writes a `pending_purchase` domain row, so the 10-domain cap counts it.
 - **New codes:** `REGISTRAR_REJECTED` (details.registrar_code), `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `ALREADY_IN_PORTFOLIO`, `PURCHASE_FAILED`, `PURCHASE_ABANDONED`, `LISTING_PRICE_INVALID`.
 
+## Decisions (Dvir, 5 Oct 2026, step 4b-2; confirmed "Confirm all")
+- **Exception fields at buy:** `pricing_exception`, `pricing_exception_reason` and `walkaway` go **inside** `proposed_listing`.
+- **Check 3b order:** an invalid `proposed_listing.mode` → `MODE_INVALID` first; then category / `price_grade` (`GRADE_NOT_GEO` if a grade is sent for a non-geo name); then V1–V8 (`phase=buy`: a geo BIN must be the grade price); then V11 comps; then V12. All before any registrar contact.
+- **Comps (V11) are stored on every successful buy** (not only with `auto_list`), as the first post-buy step; a failure is a warning (`EVIDENCE_SAVE_FAILED`) and never undoes the purchase. Comp prices may have cents; listing prices are whole dollars.
+- **Post-buy listing** is saved under the per-domain lock after the money transactions commit. A failure is the warning `LISTING_SAVE_FAILED`. `post_buy.listing` uses the plan view (`*_cents` + display strings, walk-away marked "(private)", `pricing_source`, `settings_version`, `schedule`, `sell_plan_line`).
+- **Dry run** returns `proposed_listing` with the full schedule computed as `GET /pricing/preview` does with no domain (anchor today IDT, drop date + 24 months), so the card, the preview and the stored plan match (PR-17).
+- **Reconciler-booked purchases** (B-20, a 202 later booked) get no comps or plan, since the reconciler doesn't run post-buy; `/report` flags them (step 4d) and the comps remain in `purchases.request`.
+- **B-28 clock:** the test runs at 2026-10-05 10:00Z (v2 takes effect 09:17 IDT that day); the dates follow the buy date.
+- `PRICING_SETTINGS_MISSING` (500) if no `pricing_settings` version is in effect.
+
 ## Phase-later (docs only; not built until Dvir says so): auction max bid for S7
 - Buy cards for **S7 (expiring/auction names)** carry a **`max_bid`** field: **max bid = 10% of the card's proposed BIN** (e.g. BIN $1,995 → max bid $199.50, shown rounded down to whole dollars: $199). Dvir approves the max bid on the card (his yes names it). Bots never bid above it.
 - Auctions stay out of scope for v1 (`00-architecture.md` §2), so the API doesn't place bids. When built: `/buy` (or a future `/bid`) refuses any amount > the approved `max_bid` with 422 `MAX_BID_EXCEEDED`, and the `max_bid` counts against the POC cap like a quote.
@@ -152,4 +162,4 @@ Runs at startup and every 10 min. For every `purchases.state in (register_sent, 
 | B-25 | Never top up | Static test: the code has no reference to `/account/topup*` endpoints | Reference found |
 | B-26 | Sandbox E2E (gate G2, Porkbun `pk1_sb_` key) | Full buy of a random free .com in the sandbox; rows correct; a re-call with the same key replays | Any failure |
 | B-27 | **Live acceptance (gate G4): the first deal bought through the API** (D-001 was bought by hand at GoDaddy, registered 4 Oct 2026, and is imported instead, see `report.md` §Import) | After Dvir's chat approval for that domain: one charge ≤ the approved `max_price`; Porkbun shows the domain with privacy on and auto-renew off; ledger/domain/receipt rows correct; `/report` spend rises by exactly the charge, domain count +1, `drop_date` set; NS = lander within 5 min | Any of these false |
-| B-28 | Successful buy with a hybrid `proposed_listing` {bin 1995} + 2 comps + `expected_settings_version: 1` | Domain stored 1995 / 1295 / 960 (min offer 100); `pricing_evidence` row; `first_listed_at` set; 4 `price_schedule` rows exactly as PR-12 (dates from the buy date); `plan_audit_id` = this call's audit id | Missing or different rows |
+| B-28 | Successful buy with a hybrid `proposed_listing` {bin 1995} + 2 comps + `expected_settings_version: 2` (corrected 5 Oct: the current version is 2; 1 would be refused by V12) | Domain stored 1995 / 1295 / 960 (min offer 100); `pricing_evidence` row; `first_listed_at` set; 4 `price_schedule` rows exactly as PR-12 (dates from the buy date); `plan_audit_id` = this call's audit id | Missing or different rows |

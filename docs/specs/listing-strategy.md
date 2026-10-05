@@ -237,7 +237,7 @@ All prices are whole USD. `approval_ref` is **required whenever the mode, a pric
 | LS-9 | offer (with override), min_offer 500 | 200 + `NO_BIN_LESS_EXPOSURE` | No warning |
 | LS-10 | hybrid without `bin` | 422 `HYBRID_FIELDS_REQUIRED` | Accepted |
 | LS-11 | hybrid bin 1995 + exception floor 2100 / exception walkaway 1000 with floor 950 | 422 `HYBRID_PRICES_INVALID` (both) | Accepted |
-| LS-12 | hybrid + LTO 12 without override / with override and bin 495 → ok; bin 395 or LTO 61 | 422 `LTO_NOT_ALLOWED` / 200 / 422 `LTO_INVALID` | Other |
+| LS-12 | hybrid 1995 + LTO 12 without override / with override → ok; LTO 61, or a lease ending on or after `drop_date` (*corrected 5 Oct: under v2 a hybrid BIN below $795 is `BIN_BELOW_FLOOR_MIN`, so the old "bin 495 / 395" cases can't occur*) | 422 `LTO_NOT_ALLOWED` / 200 / 422 `LTO_INVALID` | Other |
 | LS-13 | hybrid bin 4995, nothing else | 200; floor 3245, walkaway 2400, min_offer 100; `FLOOR_AUTO_ACCEPT` | Other values, or no warning |
 | LS-14 | Contradiction: `mode:"bin"` with `"offer":true`-style extra fields | 422 (strict schema: unknown or contradictory fields are rejected) | Silently ignored |
 | LS-15 | hybrid bin 1995 + `min_offer` 800 / `min_offer` 960 / `min_offer` 100 | 422 `MIN_OFFER_FIXED` / 422 `MIN_OFFER_FIXED` / 200 | Accepted, or 100 refused |
@@ -541,3 +541,12 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 - **Warning** `OFFER_NEEDS_DVIR`: a mid-range or email offer has been `open` for more than 48 h.
 
 **Tests:** OF-1 to OF-20 in `test-plan.md`.
+
+### 10.12 Implementation decisions (Dvir, 5 Oct 2026, steps 4b-1 and 4b-2; confirmed "Confirm all")
+- **Settings:** only version 2 is seeded (no v1 plan was ever computed). Each settings version's cross-field rules are enforced on load and by the admin command: ≤ 2 drops in ascending months < 24; ≤ 1 geo drop, from the strong to the weaker grade price; `hybrid_min_offer` ≤ `walkaway_min`. `--from-current` is optional; at least one `--set` is required; a version that changes nothing is refused. `drops`/`geo_drops` use snake_case keys (`after_months`, `pct_bps`, `from_cents`, `to_cents`).
+- **Exceptions:** a request with `pricing_exception: true` is always stored as `approved_exception` (even if the values equal the formula); `PRICING_EXCEPTION` is warned when they differ or the BIN doesn't end in 95. It needs `pricing_exception_reason` (`EXCEPTION_REASON_REQUIRED`) and a valid approval (`APPROVAL_REQUIRED`).
+- **Codes added:** `WALKAWAY_NOT_ALLOWED` (walk-away or exception in offer mode; in bin mode a walk-away ≠ BIN is `BIN_MODE_NO_NEGOTIATION`), `LISTING_PRICE_INVALID` (not a positive whole-dollar amount), `GRADE_NOT_GEO`, `HOLD_REASON_REQUIRED`, `REPLAN_NOTHING_LISTED`, 503 `DOMAIN_BUSY`, 503 `REGISTRAR_UNAVAILABLE`, 500 `PRICING_SETTINGS_MISSING`. Lease-to-own always needs an override (V8), whatever `public_lto` says.
+- **Override plans** (non-geo plain `bin`, `offer`, a geo BIN off the grade price, or geo `hybrid`) get only a `delist` row: no drops and no final push.
+- **Geo M12** due on or after the delist date is created as `superseded_by_final_push` (status name reused; geo has no final push).
+- **A delisted domain** still counts toward the domain cap until it is sold or dropped.
+- **Preview:** `afternic_row` uses the given domain's validated `display_name` (else the domain; `example.com` with no domain). The response adds `grade`. Prices display as whole dollars (`$1,995`); `net_at_15pct` keeps cents. The `sell_plan_line` shows skipped events as `M6 skipped (minimum)` / `(no change)` / `(disabled)`, omits superseded ones, prints `LTO <n> mo` when set, and starts `bin (geo strong) · BIN $499 · no offers` for geo. Query errors (unknown parameter, bad date, non-decimal amount, `drop_date` not after `listed_on`) → 400 `VALIDATION_ERROR`; rule errors stay 422; an unknown `domain` → 404 `DOMAIN_NOT_FOUND`; with `domain`, sending `drop_date` too → 400.
