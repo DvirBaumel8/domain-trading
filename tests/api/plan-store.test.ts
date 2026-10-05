@@ -125,7 +125,7 @@ describe('historyRow and domainPlanColumns', () => {
     const { plan } = await mk({ mode: 'hybrid', bin: 1995 });
     await db.insertInto('listing_history').values(historyRow({
       domainId: id, source: 'list', plan, category: 'trend', grade: null, lander: null, override: false, overrideReason: null,
-      approvalText: null, approvalAt: null, auditId: 'aud_h', planAuditId: 'aud_p',
+      approvalText: null, approvalAt: null, auditId: 'aud_h', planAuditId: 'aud_p', at: new Date('2026-10-12T09:00:00Z'),
     })).execute();
     const h = await db.selectFrom('listing_history').selectAll().where('domain_id', '=', id).executeTakeFirstOrThrow();
     expect(h).toMatchObject({ mode: 'hybrid', bin_cents: 199500, walkaway_cents: 96000, pricing_source: 'formula', pricing_settings_version: 2, price_grade: null, plan_audit_id: 'aud_p' });

@@ -53,6 +53,15 @@ describe('daily price job', () => {
     expect(pb.calls).toEqual(callsBefore);
   });
 
+  it('history `at` is the job clock', async () => {
+    await setup();
+    const t = Date.parse('2027-04-12T00:30:00Z');
+    await new PriceScheduleJob({ db, now: () => t }).runOnce({ today: '2027-04-12' });
+    const h = await hist();
+    expect(h).toHaveLength(1);
+    expect(h[0]!.at.getTime()).toBe(t);
+  });
+
   it('PR-21: before the due date nothing changes', async () => {
     await setup();
     const before = await dom();

@@ -265,3 +265,34 @@ describe('schema: pricing (PR-30, migration 4)', () => {
     expect((await db.selectFrom('domains').select('status').where('id', '=', id).executeTakeFirstOrThrow()).status).toBe('delisted');
   });
 });
+
+describe('schema: offers (OF-11)', () => {
+  const offerRow = (domainId: number, over: Record<string, unknown> = {}) => ({
+    domain_id: domainId, amount_cents: 45000, source: 'afternic' as const, received_at: '2026-10-10T10:00:00Z',
+    band: 'below_walkaway' as const, routing: 'auto_decline' as const, outcome: 'declined_auto' as const, recorded_by: 'test', ...over,
+  });
+  it('OF-11: facts immutable, outcome mutable, no delete', async () => {
+    const id = await insertOwnedDomain(db);
+    await db.insertInto('offers').values(offerRow(id)).execute();
+    await expect(db.updateTable('offers').set({ amount_cents: 1 }).execute()).rejects.toThrow(/immutable/);
+    await expect(db.updateTable('offers').set({ band: 'mid_range' }).execute()).rejects.toThrow(/immutable/);
+    await expect(db.updateTable('offers').set({ received_at: '2026-10-11T10:00:00Z' }).execute()).rejects.toThrow(/immutable/);
+    await db.updateTable('offers').set({ outcome: 'declined' }).execute();
+    await expect(db.deleteFrom('offers').execute()).rejects.toThrow(/DELETE is not allowed/);
+  });
+  it('offer_imports is append-only', async () => {
+    await db.insertInto('offer_imports').values({ file_sha256: 'a'.repeat(64), rows: 1, inserted: 1, duplicates: 0, recorded_by: 'test' }).execute();
+    await expect(db.updateTable('offer_imports').set({ rows: 2 }).execute()).rejects.toThrow(/append-only/);
+  });
+  it('dedupe indexes reject duplicates', async () => {
+    const id = await insertOwnedDomain(db);
+    await db.insertInto('offers').values(offerRow(id)).execute();
+    await expect(db.insertInto('offers').values(offerRow(id)).execute()).rejects.toThrow(/offers_natural_key/);
+    await db.insertInto('offers').values(offerRow(id, { external_ref: 'X1' })).execute();
+    await expect(db.insertInto('offers').values(offerRow(id, { external_ref: 'X1', amount_cents: 50000 })).execute()).rejects.toThrow(/offers_source_external_ref/);
+  });
+  it('buyer_ref CHECK rejects an email address', async () => {
+    const id = await insertOwnedDomain(db);
+    await expect(db.insertInto('offers').values(offerRow(id, { buyer_ref: 'a@b.com' })).execute()).rejects.toThrow(/buyer_ref/);
+  });
+});

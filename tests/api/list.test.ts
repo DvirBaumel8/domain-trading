@@ -351,6 +351,15 @@ describe('POST /list/{domain}', () => {
     ['delist', '2028-09-27', null, null, null, 'planned'],
   ];
 
+  it('history `at` is the app clock', async () => {
+    const { auth } = await setup();
+    await trendOwned();
+    expect((await list({ mode: 'hybrid', bin: 1995, approval_ref: approval() }, auth)).statusCode).toBe(200);
+    const h = await history();
+    expect(h).toHaveLength(1);
+    expect(h[0]!.at.getTime()).toBe(NOW);
+  });
+
   it('L-14: first /list hybrid 1995 -> computed 1995/1295/960/100, first_listed_at = now, schedule = PR-12, plan_audit_id = this call', async () => {
     const { auth } = await setup();
     await trendOwned();

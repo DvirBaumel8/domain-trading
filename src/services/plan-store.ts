@@ -78,11 +78,11 @@ export async function writePlan(trx: Transaction<Database>, o: {
 export function historyRow(o: {
   domainId: number; source: 'buy' | 'list'; plan: ListingPlan | null; category: Category | null; grade: 'strong' | 'weaker' | null;
   lander: string | null; override: boolean; overrideReason: string | null;
-  approvalText: string | null; approvalAt: Date | null; auditId: string; planAuditId: string | null;
+  approvalText: string | null; approvalAt: Date | null; auditId: string; planAuditId: string | null; at: Date;
 }): Insertable<ListingHistoryTable> {
   const p = o.plan;
   return {
-    domain_id: o.domainId, source: o.source, category: p?.category ?? o.category, mode: p?.mode ?? null,
+    domain_id: o.domainId, at: o.at, source: o.source, category: p?.category ?? o.category, mode: p?.mode ?? null,
     bin_cents: p?.binCents ?? null, floor_cents: p?.floorCents ?? null, min_offer_cents: p?.minOfferCents ?? null,
     lto_max_months: p?.ltoMaxMonths ?? null, lander: o.lander, override: o.override, override_reason: o.overrideReason,
     approval_text: o.approvalText, approval_at: o.approvalAt, audit_id: o.auditId,

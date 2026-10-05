@@ -128,6 +128,44 @@ export interface ListingHistoryTable {
   plan_audit_id: string | null;
 }
 
+export interface OfferImportsTable {
+  id: Generated<number>;
+  file_sha256: string;
+  rows: number;
+  inserted: number;
+  duplicates: number;
+  recorded_by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+export interface OffersTable {
+  id: Generated<number>;
+  domain_id: number;
+  amount_cents: number;
+  source: 'afternic' | 'godaddy' | 'sedo' | 'domainagents' | 'email_inbound' | 'outbound_reply' | 'other';
+  received_at: Timestamp;
+  buyer_type: Generated<'end_user' | 'investor' | 'broker' | 'unknown'>;
+  buyer_ref: string | null;
+  external_ref: string | null;
+  bin_cents_at: number | null;
+  floor_cents_at: number | null;
+  walkaway_cents_at: number | null;
+  min_offer_cents_at: number | null;
+  listing_history_id: number | null;
+  band: 'below_min' | 'below_walkaway' | 'mid_range' | 'at_or_above_floor' | 'at_or_above_bin' | 'geo_below_bin' | 'unpriced';
+  routing: 'auto_decline' | 'dvir' | 'auto_accept' | 'accept_preapproved';
+  outcome: 'declined_auto' | 'open' | 'declined' | 'countered' | 'accepted' | 'expired' | 'withdrawn' | 'sold';
+  outcome_at: Timestamp | null;
+  outcome_note: string | null;
+  outcome_approval_text: string | null;
+  note: string | null;
+  recorded_by: string;
+  import_id: number | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface QuotesTable {
   id: Generated<number>;
   check_id: string;
@@ -312,6 +350,8 @@ export interface Database {
   pricing_settings: PricingSettingsTable;
   price_schedule: PriceScheduleTable;
   pricing_evidence: PricingEvidenceTable;
+  offers: OffersTable;
+  offer_imports: OfferImportsTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

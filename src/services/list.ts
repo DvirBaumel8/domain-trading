@@ -244,7 +244,7 @@ export class ListService {
           domainId: row.id, source: 'list', plan: shown, category, grade, lander, override: overrideUsed,
           overrideReason: overrideUsed ? (body.override_reason ?? null) : null,
           approvalText: body.approval_ref ? String(body.approval_ref.text) : null, approvalAt: approvedAt, auditId: ctx.auditId,
-          planAuditId: plan ? ctx.auditId : row.plan_audit_id,
+          planAuditId: plan ? ctx.auditId : row.plan_audit_id, at: now,
         })).execute();
       }
     });

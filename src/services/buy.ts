@@ -515,7 +515,7 @@ export class BuyService {
         await trx.insertInto('listing_history').values(historyRow({
           domainId: row.id, source: 'buy', plan, category: a.category, grade: plan.grade, lander: a.settings.lander_target,
           override: plan.overrideUsed, overrideReason: plan.overrideUsed ? a.input.overrideReason : null,
-          approvalText: String(a.input.approval?.text), approvalAt: a.approvedAt, auditId: a.ctx.auditId, planAuditId: a.ctx.auditId,
+          approvalText: String(a.input.approval?.text), approvalAt: a.approvedAt, auditId: a.ctx.auditId, planAuditId: a.ctx.auditId, at: now,
         })).execute();
         return (await writePlan(trx, {
           domainId: row.id, plan, anchor: jerusalemDate(now), dropDate: row.drop_date, settings: a.pricing, planAuditId: a.ctx.auditId, now,
