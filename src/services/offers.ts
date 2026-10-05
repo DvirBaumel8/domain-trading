@@ -34,7 +34,7 @@ const AFTER: Record<string, readonly string[]> = {
   countered: ['countered', 'accepted', 'declined', 'expired', 'withdrawn'],
   accepted: ['sold', 'withdrawn'],
 };
-const IMPORT_HEADER = ['domain', 'amount_usd', 'source', 'received_at', 'buyer_type', 'external_ref', 'outcome', 'note'] as const;
+const IMPORT_HEADER: readonly string[] = ['domain', 'amount_usd', 'source', 'received_at', 'buyer_type', 'external_ref', 'outcome', 'note'];
 const IMPORT_OUTCOMES: readonly string[] = ['declined', 'expired', 'withdrawn'];
 const APPROVAL_OUTCOMES: readonly string[] = ['countered', 'accepted', 'sold'];
 const isEmailSource = (s: string) => s === 'email_inbound' || s === 'outbound_reply';
@@ -139,7 +139,7 @@ export class OffersService {
   }
 
   /** POST /offers/import: all-or-nothing validation of a whole CSV, dedupe in the DB and in the file, one transaction. */
-  async importCsv(raw: string, opts: { dryRun: boolean }, ctx: { auditId: string; recordedBy: string }, attempt = 0): Promise<{ status: 200 | 422; body: Record<string, unknown> }> {
+  async importCsv(raw: string, opts: { dryRun: boolean }, ctx: { auditId: string; recordedBy: string; setSummary?: (s: string) => void }, attempt = 0): Promise<{ status: 200 | 422; body: Record<string, unknown> }> {
     const { db } = this.deps;
     const now = new Date(this.deps.now());
     const sha = createHash('sha256').update(raw, 'utf8').digest('hex');
@@ -150,60 +150,71 @@ export class OffersService {
     };
     if (!opts.dryRun) {
       const prior = await db.selectFrom('offer_imports').selectAll().where('file_sha256', '=', sha).executeTakeFirst();
+      if (prior) ctx.setSummary?.(`import sha=${sha.slice(0, 12)} rows=${prior.rows} inserted=0 duplicates=${prior.rows}`);
       if (prior) return { status: 200, body: { import_id: prior.id, rows: prior.rows, inserted: 0, duplicates: prior.rows, by_band: {} } };
     }
 
-    const table = parseCsv(raw);
-    if (!table) throw new AppError(422, 'CSV_HEADER_INVALID', 'The CSV is malformed (quoting)');
-    if (table.length === 0 || table[0]!.join(',') !== IMPORT_HEADER.join(',')) {
-      throw new AppError(422, 'CSV_HEADER_INVALID', `The header must be exactly ${IMPORT_HEADER.join(',')}`, { expected: IMPORT_HEADER.join(',') });
+    const parsed = parseCsv(raw);
+    const table = parsed.rows;
+    const headerOk = table.length > 0 && table[0]!.length === IMPORT_HEADER.length && IMPORT_HEADER.every((h, k) => table[0]![k] === h);
+    if (!headerOk) {
+      throw new AppError(422, 'CSV_HEADER_INVALID', parsed.badRecord === 0 ? 'The CSV is malformed (quoting) in the header' : `The header must be exactly ${IMPORT_HEADER.join(',')}`, { expected: IMPORT_HEADER.join(',') });
     }
 
     const errors: { row: number; field: string; code: string }[] = [];
-    type Pending = { row: number; domain: DomainRow; p: ReturnType<typeof validateOffer>; externalRef: string | null; note: string | null; outcome: string | null };
+    type Pending = { row: number; domain: DomainRow; p: NonNullable<ReturnType<typeof validateOfferAll>['value']>; externalRef: string | null; note: string | null; outcome: string | null };
     const pending: Pending[] = [];
     const domains = new Map<string, DomainRow | null>();
+    let rows = 0;
     for (let i = 1; i < table.length; i++) {
       const cells = table[i]!;
-      const row = i; // 1-based data row (the header is table[0]); blank lines keep their number but are skipped
-      if (cells.length === 1 && cells[0] === '') continue;
+      const row = i; // 1-based data row (the header is table[0]); blank rows keep their number but are skipped
+      if (cells.every((c) => c === '') && cells.length <= IMPORT_HEADER.length) continue;
+      rows++;
       if (cells.length !== IMPORT_HEADER.length) { errors.push({ row, field: 'row', code: 'COLUMN_COUNT' }); continue; }
       const [domainRaw, amount, source, receivedAt, buyerType, externalRef, outcome, note] = cells as [string, string, string, string, string, string, string, string];
-      let domainName: string;
-      try { domainName = normalizeDomain(domainRaw); } catch (e) { errors.push({ row, field: 'domain', code: (e as AppError).code }); continue; }
-      if (!domains.has(domainName)) {
-        const d = await db.selectFrom('domains').selectAll().where('domain', '=', domainName).executeTakeFirst();
-        domains.set(domainName, d && d.status !== 'pending_purchase' ? d : null);
-      }
-      const d = domains.get(domainName);
-      if (!d) { errors.push({ row, field: 'domain', code: 'DOMAIN_NOT_FOUND' }); continue; }
-      let p: ReturnType<typeof validateOffer>;
+      const rowErrors: { field: string; code: string }[] = [];
+      let domain: DomainRow | null = null;
       try {
-        p = validateOffer({ amount_usd: amount, source, received_at: receivedAt, buyer_type: buyerType === '' ? null : buyerType, note: note === '' ? null : note }, now);
+        const domainName = normalizeDomain(domainRaw);
+        if (!domains.has(domainName)) {
+          const d = await db.selectFrom('domains').selectAll().where('domain', '=', domainName).executeTakeFirst();
+          domains.set(domainName, d && d.status !== 'pending_purchase' ? d : null);
+        }
+        domain = domains.get(domainName) ?? null;
+        if (!domain) rowErrors.push({ field: 'domain', code: 'DOMAIN_NOT_FOUND' });
       } catch (e) {
-        if (e instanceof FieldError) { errors.push({ row, field: e.field, code: e.code }); continue; }
-        throw e;
+        if (!(e instanceof AppError)) throw e;
+        rowErrors.push({ field: 'domain', code: e.code });
       }
+      const v = validateOfferAll({ amount_usd: amount, source, received_at: receivedAt, buyer_type: buyerType === '' ? null : buyerType, note: note === '' ? null : note }, now);
+      for (const e of v.errors) rowErrors.push({ field: e.field, code: e.code });
       if (outcome !== '' && !IMPORT_OUTCOMES.includes(outcome)) {
-        errors.push({ row, field: 'outcome', code: APPROVAL_OUTCOMES.includes(outcome) ? 'OUTCOME_NEEDS_APPROVAL' : 'OUTCOME_INVALID' });
-        continue;
+        rowErrors.push({ field: 'outcome', code: APPROVAL_OUTCOMES.includes(outcome) ? 'OUTCOME_NEEDS_APPROVAL' : 'OUTCOME_INVALID' });
       }
-      pending.push({ row, domain: d, p, externalRef: externalRef === '' ? null : externalRef, note: note === '' ? null : note, outcome: outcome === '' ? null : outcome });
+      if (rowErrors.length > 0 || !domain || !v.value) { for (const e of rowErrors) errors.push({ row, ...e }); continue; }
+      pending.push({ row, domain, p: v.value, externalRef: externalRef === '' ? null : externalRef, note: note === '' ? null : note, outcome: outcome === '' ? null : outcome });
+    }
+    if (parsed.badRecord !== null && parsed.badRecord > 0) {
+      rows++;
+      errors.push({ row: parsed.badRecord, field: 'row', code: 'CSV_QUOTING' });
     }
 
-    // Dedupe: against the DB (the single-offer rules) and within the file.
-    const seen = new Map<string, number>(); // natural key -> domain_id
+    // Dedupe (only rows whose fields are valid): against the DB (the single-offer rules) and within the file, with the same two keys.
+    const seen = new Map<string, number>(); // key -> domain_id
     const fresh: (Pending & { snap: OfferSnapshot; c: ReturnType<typeof classify> })[] = [];
     let duplicates = 0;
     for (const x of pending) {
-      const key = x.externalRef !== null ? `e|${x.p.source}|${x.externalRef}` : `n|${x.domain.id}|${x.p.amountCents}|${x.p.source}|${x.p.receivedAt.getTime()}`;
-      const inFile = seen.get(key);
+      const eKey = x.externalRef !== null ? `e|${x.p.source}|${x.externalRef}` : null;
+      const nKey = `n|${x.domain.id}|${x.p.amountCents}|${x.p.source}|${x.p.receivedAt.getTime()}`;
+      const inFile = eKey !== null ? seen.get(eKey) : seen.get(nKey);
       if (inFile !== undefined) {
         if (inFile !== x.domain.id) errors.push({ row: x.row, field: 'external_ref', code: 'EXTERNAL_REF_CONFLICT' }); else duplicates++;
         continue;
       }
-      seen.set(key, x.domain.id);
       const existing = await this.findDuplicate(db, x.domain.id, x.p.source, x.p.amountCents, x.p.receivedAt, x.externalRef);
+      if (eKey !== null) seen.set(eKey, x.domain.id);
+      seen.set(nKey, x.domain.id);
       if (existing) {
         if (existing.domain_id !== x.domain.id) errors.push({ row: x.row, field: 'external_ref', code: 'EXTERNAL_REF_CONFLICT' }); else duplicates++;
         continue;
@@ -214,11 +225,18 @@ export class OffersService {
 
     if (errors.length > 0) {
       errors.sort((a, b) => a.row - b.row);
+      ctx.setSummary?.(`IMPORT_INVALID errors=${errors.length}`);
       return { status: 422, body: { error: { code: 'IMPORT_INVALID', message: `${errors.length} problem(s) in the file; nothing was imported`, details: { errors } } } };
     }
-    const rows = table.slice(1).filter((c) => !(c.length === 1 && c[0] === '')).length;
     const by_band = countBands(fresh.map((f) => ({ band: f.c.band })));
-    if (opts.dryRun) return { status: 200, body: { dry_run: true, rows, would_insert: fresh.length, duplicates, by_band } };
+    if (opts.dryRun) {
+      ctx.setSummary?.(`dry_run sha=${sha.slice(0, 12)} rows=${rows} would_insert=${fresh.length}`);
+      return { status: 200, body: { dry_run: true, rows, inserted: 0, would_insert: fresh.length, duplicates, by_band } };
+    }
+    if (rows === 0) {
+      ctx.setSummary?.(`import sha=${sha.slice(0, 12)} rows=0 inserted=0 duplicates=0`);
+      return { status: 200, body: { rows: 0, inserted: 0, duplicates: 0, by_band: {} } };
+    }
 
     try {
       const importId = await db.transaction().execute(async (trx) => {
@@ -234,6 +252,7 @@ export class OffersService {
         }
         return imp.id;
       });
+      ctx.setSummary?.(`import sha=${sha.slice(0, 12)} rows=${rows} inserted=${fresh.length} duplicates=${duplicates}`);
       return { status: 200, body: { import_id: importId, rows, inserted: fresh.length, duplicates, by_band } };
     } catch (e) {
       // A concurrent writer won a unique race (same file, or one of the offers): start over once; the re-run sees it as a duplicate.
@@ -311,26 +330,39 @@ export class FieldError extends AppError {
   constructor(public readonly field: string, status: number, code: string, message: string) { super(status, code, message); }
 }
 
-/** The one set of field rules for an offer, shared by POST /offers and the CSV import. */
-export function validateOffer(
+/** The one set of field rules for an offer, shared by POST /offers and the CSV import: every problem, in field order. */
+export function validateOfferAll(
   body: { amount_usd: string; source: string; received_at: string; buyer_type?: string | null; buyer_ref?: string | null; note?: string | null },
   now: Date,
-): { amountCents: number; source: OfferSource; buyerType: BuyerType; receivedAt: Date } {
-  const amountCents = parseAmount(body.amount_usd);
-  if (!(OFFER_SOURCES as readonly string[]).includes(body.source)) throw new FieldError('source', 422, 'SOURCE_INVALID', `source must be one of ${OFFER_SOURCES.join(', ')}`);
+): { errors: FieldError[]; value: { amountCents: number; source: OfferSource; buyerType: BuyerType; receivedAt: Date } | null } {
+  const errors: FieldError[] = [];
+  const fail = (field: string, code: string, msg: string) => { errors.push(new FieldError(field, 422, code, msg)); };
+  let amountCents = 0;
+  try { amountCents = parseAmount(body.amount_usd); } catch (e) { if (e instanceof FieldError) errors.push(e); else throw e; }
+  if (!(OFFER_SOURCES as readonly string[]).includes(body.source)) fail('source', 'SOURCE_INVALID', `source must be one of ${OFFER_SOURCES.join(', ')}`);
   const buyerType = body.buyer_type ?? 'unknown';
-  if (!(BUYER_TYPES as readonly string[]).includes(buyerType)) throw new FieldError('buyer_type', 422, 'BUYER_TYPE_INVALID', `buyer_type must be one of ${BUYER_TYPES.join(', ')}`);
+  if (!(BUYER_TYPES as readonly string[]).includes(buyerType)) fail('buyer_type', 'BUYER_TYPE_INVALID', `buyer_type must be one of ${BUYER_TYPES.join(', ')}`);
+  let receivedAt = new Date(0);
   if (!ISO_WITH_OFFSET.test(body.received_at) || Number.isNaN(Date.parse(body.received_at))) {
-    throw new FieldError('received_at', 422, 'VALIDATION_ERROR', 'received_at must be ISO 8601 with a timezone offset');
+    fail('received_at', 'VALIDATION_ERROR', 'received_at must be ISO 8601 with a timezone offset');
+  } else if (!realDate(body.received_at)) {
+    fail('received_at', 'VALIDATION_ERROR', 'received_at is not a real calendar date');
+  } else {
+    receivedAt = new Date(body.received_at);
+    if (receivedAt.getTime() > now.getTime() + FUTURE_SKEW_MS) fail('received_at', 'RECEIVED_AT_IN_FUTURE', 'received_at is more than 5 minutes in the future');
   }
-  const receivedAt = new Date(body.received_at);
-  if (!realDate(body.received_at)) throw new FieldError('received_at', 422, 'VALIDATION_ERROR', 'received_at is not a real calendar date');
-  if (receivedAt.getTime() > now.getTime() + FUTURE_SKEW_MS) throw new FieldError('received_at', 422, 'RECEIVED_AT_IN_FUTURE', 'received_at is more than 5 minutes in the future');
   // external_ref may legitimately be an email Message-ID, so it is exempt from the '@' rule
   for (const [f, v] of [['buyer_ref', body.buyer_ref], ['note', body.note]] as const) {
-    if (v != null && v.includes('@')) throw new FieldError(f, 422, 'NO_PII', `${f} must not contain an email address or '@'`);
+    if (v != null && v.includes('@')) fail(f, 'NO_PII', `${f} must not contain an email address or '@'`);
   }
-  return { amountCents, source: body.source as OfferSource, buyerType: buyerType as BuyerType, receivedAt };
+  return { errors, value: errors.length ? null : { amountCents, source: body.source as OfferSource, buyerType: buyerType as BuyerType, receivedAt } };
+}
+
+/** POST /offers: the first problem is thrown. */
+export function validateOffer(body: Parameters<typeof validateOfferAll>[0], now: Date): NonNullable<ReturnType<typeof validateOfferAll>['value']> {
+  const r = validateOfferAll(body, now);
+  if (r.errors[0]) throw r.errors[0];
+  return r.value!;
 }
 
 /** The offer row values common to POST /offers and the CSV import (the facts, the snapshot at receipt, the classification). */

@@ -45,7 +45,7 @@ export function registerOffers(app: FastifyInstance, service: OffersService): vo
       const q = z.object({ dry_run: z.enum(['true', 'false']).optional() }).strict().safeParse(req.query);
       if (!q.success) throw bad('dry_run must be true or false');
       if (typeof req.body !== 'string') throw new AppError(415, 'INVALID_BODY', 'Content-Type must be text/csv');
-      const r = await service.importCsv(req.body, { dryRun: q.data.dry_run === 'true' }, { auditId: req.auditId!, recordedBy: req.auth!.name });
+      const r = await service.importCsv(req.body, { dryRun: q.data.dry_run === 'true' }, { auditId: req.auditId!, recordedBy: req.auth!.name, setSummary: (m) => { req.auditSummary = m; } });
       return reply.code(r.status).send(r.body);
     });
   });

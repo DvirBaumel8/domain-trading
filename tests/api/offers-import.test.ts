@@ -43,7 +43,8 @@ describe('POST /offers/import', () => {
     const res = await imp(w, file(...five()), '?dry_run=true');
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ dry_run: true, rows: 5, would_insert: 5, duplicates: 0 });
-    expect(Object.values(res.json().by_band as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(5);
+    expect(res.json().inserted).toBe(0);
+    expect(res.json().by_band).toEqual({ below_walkaway: 5 }); // $500..$900 against walk-away $950
     expect(await count()).toBe(0);
     expect(await imports()).toHaveLength(0);
   });
@@ -198,5 +199,78 @@ describe('POST /offers/import', () => {
     const { w } = await setup();
     const res = await app.inject({ method: 'POST', url: '/offers', headers: { ...w, 'idempotency-key': randomUUID(), 'content-type': 'text/csv' }, payload: 'a' });
     expect(res.statusCode).toBe(415);
+  });
+
+  it('in-file dedupe matches findDuplicate: a ref row then the same natural key without a ref is a duplicate', async () => {
+    const { w } = await setup();
+    const res = await imp(w, file(line({ external_ref: 'AFN-1' }), line({ external_ref: '' })));
+    expect(res.json()).toMatchObject({ rows: 2, inserted: 1, duplicates: 1 });
+    expect(await count()).toBe(1);
+  });
+
+  it('reports every problem in a row', async () => {
+    const { w } = await setup();
+    const res = await imp(w, file(line({ amount: 'abc', source: 'nope', note: 'a@b' })));
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.details.errors).toEqual([
+      { row: 1, field: 'amount_usd', code: 'AMOUNT_INVALID' }, { row: 1, field: 'source', code: 'SOURCE_INVALID' }, { row: 1, field: 'note', code: 'NO_PII' },
+    ]);
+  });
+
+  it('a header with a missing or extra column is CSV_HEADER_INVALID; a quoting break in the header too', async () => {
+    const { w } = await setup();
+    expect((await imp(w, HEADER + ',extra\n' + line() + '\n')).json().error.code).toBe('CSV_HEADER_INVALID');
+    expect((await imp(w, 'domain,amount_usd,source,received_at,buyer_type,external_ref,outcome\n')).json().error.code).toBe('CSV_HEADER_INVALID');
+    expect((await imp(w, '"domain,amount_usd\n')).json().error.code).toBe('CSV_HEADER_INVALID');
+  });
+
+  it('a quoting break in a data row is a CSV_QUOTING row error', async () => {
+    const { w } = await setup();
+    const res = await imp(w, file(line({ external_ref: 'A' }), line({ external_ref: 'B', note: 'x"y"' })));
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.details.errors).toEqual([{ row: 2, field: 'row', code: 'CSV_QUOTING' }]);
+  });
+
+  it('all-empty rows (Excel ",,,,,,,") are skipped and do not count', async () => {
+    const { w } = await setup();
+    const res = await imp(w, file(line({ external_ref: 'A' }), ',,,,,,,', '', line({ external_ref: 'B' }), line({ domain: 'nothere.com' })));
+    expect(res.json().error.details.errors).toEqual([{ row: 5, field: 'domain', code: 'DOMAIN_NOT_FOUND' }]);
+    const ok = await imp(w, file(line({ external_ref: 'A' }), ',,,,,,,', line({ external_ref: 'B' })));
+    expect(ok.json()).toMatchObject({ rows: 2, inserted: 2 });
+  });
+
+  it('a header-only file is a 200 no-op with no offer_imports row', async () => {
+    const { w } = await setup();
+    const res = await imp(w, HEADER + '\r\n');
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ rows: 0, inserted: 0, duplicates: 0, by_band: {} });
+    expect(await imports()).toHaveLength(0);
+  });
+
+  it('accepts Content-Type text/csv; charset=utf-8', async () => {
+    const { w } = await setup();
+    const res = await imp(w, file(line({ external_ref: 'CS' })), '', randomUUID(), 'text/csv; charset=utf-8');
+    expect(res.statusCode).toBe(200);
+    expect(res.json().inserted).toBe(1);
+  });
+
+  it('a quoted note containing CRLF keeps row numbering right', async () => {
+    const { w } = await setup();
+    const res = await imp(w, file(line({ external_ref: 'A', note: '"two\r\nlines"' }), line({ domain: 'nothere.com' })));
+    expect(res.json().error.details.errors).toEqual([{ row: 2, field: 'domain', code: 'DOMAIN_NOT_FOUND' }]);
+  });
+
+  it('the audit row carries a useful summary', async () => {
+    const { w } = await setup();
+    const summaries = async () => (await db.selectFrom('audit_log').select('result_summary').where('path', 'like', '/offers/import%').orderBy('at').execute()).map((r) => r.result_summary);
+    await imp(w, file(...five()), '?dry_run=true');
+    await imp(w, file(line({ domain: 'nothere.com' })));
+    await imp(w, file(...five()));
+    await imp(w, file(...five()));
+    const s = await summaries();
+    expect(s[0]).toMatch(/^dry_run sha=[0-9a-f]{12} rows=5 would_insert=5$/);
+    expect(s[1]).toBe('IMPORT_INVALID errors=1');
+    expect(s[2]).toMatch(/^import sha=[0-9a-f]{12} rows=5 inserted=5 duplicates=0$/);
+    expect(s[3]).toMatch(/^import sha=[0-9a-f]{12} rows=5 inserted=0 duplicates=5$/);
   });
 });
