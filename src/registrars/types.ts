@@ -23,7 +23,8 @@ export interface RegistrarAdapter {
   accountState(): Promise<AccountState>;
   register(domain: string, input: RegisterInput): Promise<RegisterSuccess | RegisterDryRun>;
   findDomain(domain: string): Promise<DomainInfo | null>;
-  setNameservers(domain: string, ns: string[]): Promise<void>;
+  /** `{ pending: true }`: the registrar accepted the change but is still applying it (GoDaddy v3 operations). */
+  setNameservers(domain: string, ns: string[]): Promise<void | { pending: boolean }>;
   getNameservers(domain: string): Promise<Set<string>>;
   setAutoRenew(domain: string, on: boolean): Promise<void>;
   getReceipt(orderId: string): Promise<unknown>;

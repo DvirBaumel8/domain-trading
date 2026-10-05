@@ -264,7 +264,7 @@ export class ListService {
     return rows.map((e) => ({ event: e.event, dueOn: e.due_on, binCents: e.bin_cents, floorCents: e.floor_cents, walkawayCents: e.walkaway_cents, status: e.status }));
   }
 
-  private async setNameservers(row: DomainRow, ns: string[], warnings: string[]): Promise<{ status: 'set' | 'mismatch' | 'unverified' | 'manual'; steps?: string[] }> {
+  private async setNameservers(row: DomainRow, ns: string[], warnings: string[]): Promise<{ status: 'set' | 'mismatch' | 'unverified' | 'manual' | 'pending'; steps?: string[] }> {
     const adapter = this.deps.adapters.find((a) => a.name === row.registrar);
     if (row.registrar_api === 'none' || !adapter || !adapter.capabilities.canManageNs) {
       return {
@@ -276,7 +276,12 @@ export class ListService {
       };
     }
     try {
-      await adapter.setNameservers(row.domain, ns);
+      const res = await adapter.setNameservers(row.domain, ns);
+      if (res && res.pending) {
+        // The registrar is still applying the change: no read-back compare; the daily DNS check confirms it.
+        warnings.push('NS_PENDING: GoDaddy is still applying the change; the daily DNS check will confirm it');
+        return { status: 'pending' };
+      }
     } catch (e) {
       if (!(e instanceof RegistrarError)) throw e;
       if (e.code === 'API_ACCESS_DISABLED') {

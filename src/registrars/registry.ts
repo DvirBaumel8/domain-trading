@@ -1,4 +1,5 @@
 import type { Config } from '../config.js';
+import { GoDaddyAdapter } from './godaddy.js';
 import { PorkbunAdapter } from './porkbun.js';
 import type { RegistrarAdapter } from './types.js';
 
@@ -14,7 +15,7 @@ export const REGISTRAR_ENV: Record<string, readonly string[]> = {
 };
 
 /** Adapters with code behind them. */
-export const IMPLEMENTED_ADAPTERS: ReadonlySet<string> = new Set<string>(['porkbun']);
+export const IMPLEMENTED_ADAPTERS: ReadonlySet<string> = new Set<string>(['porkbun', 'godaddy']);
 
 export function adapterStatus(config: Config): { name: string; enabled: boolean; reason: string | null }[] {
   return Object.entries(REGISTRAR_ENV).map(([name, keys]) => {
@@ -37,6 +38,8 @@ export function createAdapters(config: Config): RegistrarAdapter[] {
             secretKey: config.env.PORKBUN_SECRET_API_KEY!,
             baseUrl: config.env.PORKBUN_BASE_URL || undefined,
           });
+        case 'godaddy':
+          return new GoDaddyAdapter({ pat: config.env.GODADDY_PAT!, baseUrl: config.env.GODADDY_BASE_URL || undefined });
         default:
           throw new Error(`No adapter implementation for ${a.name}`);
       }

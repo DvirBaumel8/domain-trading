@@ -49,6 +49,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   if (pbUrl && e.APP_ENV !== 'test' && !pbUrl.startsWith('https://')) {
     throw new Error('Invalid environment: PORKBUN_BASE_URL must be https');
   }
+  const gdUrl = env.GODADDY_BASE_URL;
+  if (gdUrl && e.APP_ENV !== 'test' && !gdUrl.startsWith('https://')) {
+    throw new Error('Invalid environment: GODADDY_BASE_URL must be https');
+  }
   const strings: Record<string, string> = {};
   for (const [k, v] of Object.entries(env)) if (typeof v === 'string') strings[k] = v;
 

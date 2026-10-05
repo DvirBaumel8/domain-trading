@@ -479,9 +479,14 @@ export class BuyService {
       if (!ns) warnings.push('LANDER_CUSTOM: lander_target is custom; call /list with explicit nameservers');
       else {
         try {
-          await a.adapter.setNameservers(d, [...ns]);
-          const got = await a.adapter.getNameservers(d);
-          if (sameNsSet(got, ns)) {
+          const nsRes = await a.adapter.setNameservers(d, [...ns]);
+          const got = nsRes && nsRes.pending ? null : await a.adapter.getNameservers(d);
+          if (got === null) {
+            post.lander = 'pending';
+            warnings.push('NS_PENDING: the registrar is still applying the nameserver change; the daily DNS check will confirm it');
+            await db.updateTable('domains').set({ lander: target, lander_ns: [...ns], lander_set_at: new Date(), updated_at: new Date() })
+              .where('domain', '=', d).execute();
+          } else if (sameNsSet(got, ns)) {
             post.lander = `${target} ns set`;
             await db.updateTable('domains').set({ lander: target, lander_ns: [...ns], lander_set_at: new Date(), updated_at: new Date() })
               .where('domain', '=', d).execute();

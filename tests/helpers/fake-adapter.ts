@@ -29,6 +29,8 @@ export interface FakeOptions {
   findRegistration?: Maybe<RegistrationRecord | null>;
   receipt?: Maybe<unknown>;
   setNs?: RegistrarError;
+  /** setNameservers resolves with this result instead of void (e.g. { pending: true }). */
+  setNsResult?: { pending: boolean };
   getNs?: string[];
   getNsError?: RegistrarError;
   /** Runs inside setNameservers, before it returns. */
@@ -144,11 +146,12 @@ export class FakeAdapter implements RegistrarAdapter {
     return { orderId: rec.orderId, chargedCents: rec.chargedCents, expiryDate: '2027-10-05', invoiceDate: '2026-10-05', raw: { invoice: { id: rec.orderId } } };
   }
 
-  async setNameservers(domain: string, ns: string[]): Promise<void> {
+  async setNameservers(domain: string, ns: string[]): Promise<void | { pending: boolean }> {
     this.calls.push(`setNameservers ${domain} ${ns.join(',')}`);
     if (this.o.setNs) throw this.o.setNs;
     await this.o.onSetNs?.();
     this.ns.set(domain, ns);
+    return this.o.setNsResult;
   }
 
   async getNameservers(domain: string): Promise<Set<string>> {
