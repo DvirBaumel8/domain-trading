@@ -128,7 +128,7 @@ export class ListService {
         category, grade, phase: 'change', settings: s, highValueMinBinCents: settings.high_value_min_bin_cents,
         override: body.override ?? false, overrideReason: body.override_reason ?? null, approvalValid,
         today: jerusalemDate(now), dropDate: row.drop_date,
-        ...(!priceChange && !replan && row.listing_mode === 'hybrid' ? { carried: { pricingSource: row.pricing_source ?? 'formula' } } : {}),
+        ...(!priceChange && !replan && (row.listing_mode === 'hybrid' || row.listing_mode === 'bin') ? { carried: { pricingSource: row.pricing_source ?? 'formula' } } : {}),
       });
       if (!r.ok) throw new AppError(r.status, r.code, r.message, r.details ?? {});
       plan = r.plan;

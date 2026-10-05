@@ -684,6 +684,15 @@ describe('POST /list/{domain}', () => {
     expect([b.statusCode, b.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
   });
 
+  it('geo stored off-grade at 350: a grade-only change carries it (200, bin stays); replan without approval -> APPROVAL_REQUIRED', async () => {
+    const { auth } = await setup();
+    await listedDomain({ domain: D, category: 'geo', price_grade: 'weaker', listing_mode: 'bin', bin_cents: 35000, floor_cents: 35000, walkaway_cents: 35000, min_offer_cents: 35000 });
+    expect((await list({ price_grade: 'strong' }, auth)).statusCode).toBe(200);
+    expect(await dom()).toMatchObject({ price_grade: 'strong', bin_cents: 35000 });
+    const r = await list({ replan: true }, auth);
+    expect([r.statusCode, r.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
+  });
+
   it('a category change to geo without a grade -> 422 GEO_GRADE_REQUIRED; to non-geo stores price_grade null', async () => {
     const { auth } = await setup();
     await trendOwned();

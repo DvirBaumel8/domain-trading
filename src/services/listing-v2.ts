@@ -87,10 +87,11 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
       } else if (bin < s.geoBinMinCents || bin > s.geoBinMaxCents) {
         guards.push({ code: 'GEO_BIN_OUT_OF_RANGE', message: 'A geo BIN must be within the configured range' });
       } else {
+        // A carried (stored) price was approved when it was set; replan re-decides and is not carried
         // In range: the grade price (or the scheduled strong -> weaker step) is bot-autonomous; any other price is a sell decision
         const gradePrice = ctx.grade === 'strong' ? s.geoBinStrongCents : s.geoBinWeakerCents;
         const onGrade = bin === gradePrice || (ctx.grade === 'strong' && bin === s.geoBinWeakerCents);
-        if (!onGrade && !ctx.approvalValid) return fail('APPROVAL_REQUIRED', 'An off-grade geo price is a sell decision: needs approval_ref');
+        if (!onGrade && !carried && !ctx.approvalValid) return fail('APPROVAL_REQUIRED', 'An off-grade geo price is a sell decision: needs approval_ref');
       }
     } else {
       guards.push({ code: 'MODE_NOT_ALLOWED_FOR_CATEGORY', message: 'Non-geo names are hybrid; plain bin needs an override' });
