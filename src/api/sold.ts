@@ -8,7 +8,7 @@ import { EVIDENCE_SOURCES, VENUES, type SoldService } from '../services/sold.js'
 
 const usd = z.number().refine((n) => Number.isFinite(n) && /^\d+(\.\d{1,2})?$/.test(String(n)) && n <= 10_000_000, 'must be a USD amount with at most 2 decimals and at most 10,000,000');
 const positive = usd.refine((n) => n > 0, 'must be > 0');
-const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v, 'must be a real date');
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => { const t = Date.parse(`${v}T00:00:00Z`); return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === v; }, 'must be a real date');
 
 const SoldSchema = z.object({
   venue: z.enum(VENUES),

@@ -35,7 +35,7 @@ describe('POST /payouts/{id}/received', () => {
     const key = randomUUID();
     const r = await post(pid, { received_on: '2026-10-15' }, write, key);
     expect(r.statusCode).toBe(200);
-    expect(r.json()).toMatchObject({ id: pid, domain: D, payout: { amount: { cents: 168075 }, fee: { cents: 1500 }, method: 'wire', received_on: '2026-10-15', status: 'received' } });
+    expect(r.json()).toMatchObject({ id: pid, domain: D, payout: { amount_cents: 168075, amount: '$1,680.75', fee_cents: 1500, fee: '$15.00', method: 'wire', received_on: '2026-10-15', status: 'received' } });
     expect((await db.selectFrom('payouts').select('received_on').executeTakeFirstOrThrow()).received_on).toBe('2026-10-15');
     const again = await post(pid, { received_on: '2026-10-15' }, write, key);
     expect(again.statusCode).toBe(200);
@@ -68,5 +68,15 @@ describe('POST /payouts/{id}/received', () => {
     const noKey = await app.inject({ method: 'POST', url: `/payouts/${pid}/received`, headers: write, payload: { received_on: '2026-10-15' } });
     expect(noKey.statusCode).toBeGreaterThanOrEqual(400);
     expect((await db.selectFrom('payouts').select('received_on').executeTakeFirstOrThrow()).received_on).toBeNull();
+  });
+
+  it('PO-4: optional approval_ref is validated; invalid -> 422 APPROVAL_INVALID, nothing written; valid or absent -> 200', async () => {
+    const { write, pid } = await setup();
+    const bad = await post(pid, { received_on: '2026-10-15', approval_ref: { text: 'ok received', approved_at: new Date(NOW - 30_000).toISOString() } }, write);
+    expect(bad.statusCode).toBe(422);
+    expect(bad.json().error.code).toBe('APPROVAL_INVALID');
+    expect((await db.selectFrom('payouts').select('received_on').executeTakeFirstOrThrow()).received_on).toBeNull();
+    const good = await post(pid, { received_on: '2026-10-15', approval_ref: { text: `the payout for ${D} arrived`, approved_at: new Date(NOW - 30_000).toISOString() } }, write);
+    expect(good.statusCode).toBe(200);
   });
 });

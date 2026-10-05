@@ -46,14 +46,23 @@ describe('POST /sold/{domain}', () => {
     expect(res.statusCode).toBe(200);
     const b = res.json();
     expect(b).toMatchObject({
-      domain: D, status: 'sold', sale_price: { cents: 199500 }, commission: { cents: 29925 }, fees: { cents: 0 },
-      sale_costs: { cents: 29925 }, net_proceeds: { cents: 169575 }, acquisition_costs: { cents: 1108, display: '$11.08' }, profit: { cents: 168467, display: '$1,684.67' }, warnings: [],
+      domain: D, status: 'sold', sale_price_cents: 199500, commission_cents: 29925, fees_cents: 0,
+      sale_costs_cents: 29925, net_proceeds_cents: 169575, acquisition_costs_cents: 1108, acquisition_costs: '$11.08', profit_cents: 168467, profit: '$1,684.67', warnings: [],
     });
     expect((await ledger()).map((r) => [r.type, r.amount_cents])).toEqual([['registration', -1108], ['sale', 199500], ['commission', -29925]]);
     const l = (await ledger())[1]!;
     expect(l).toMatchObject({ occurred_on: '2026-10-12', counterparty: 'afternic', receipt_ref: 'AFN-1' });
     expect(await dom()).toMatchObject({ status: 'sold' });
     expect((await dom()).sold_at!.toISOString()).toBe('2026-10-12T09:00:00.000Z');
+  });
+
+  it('invalid payout.received_on date string -> 422 VALIDATION_ERROR, never 500', async () => {
+    const auth = await setup();
+    const r = await sold(good({ payout: { amount: 1600, method: 'wire', received_on: '2026-13-45' } }), auth);
+    expect(r.statusCode).toBe(422);
+    expect(r.json().error.code).toBe('VALIDATION_ERROR');
+    const r2 = await sold(good({ payout: { amount: 1600, method: 'wire', received_on: 'nope' } }), auth);
+    expect(r2.statusCode).toBe(422);
   });
 
   it('fees and payout fee become rows', async () => {
@@ -63,7 +72,7 @@ describe('POST /sold/{domain}', () => {
     expect(res.statusCode).toBe(200);
     expect((await ledger()).map((r) => [r.type, r.amount_cents])).toEqual([
       ['registration', -1108], ['sale', 199500], ['commission', -29925], ['fee', -550], ['payout_fee', -1500]]);
-    expect(res.json().fees.cents).toBe(2050);
+    expect(res.json().fees_cents).toBe(2050);
   });
 
   it('S-2: wrong commission on an Afternic-NS domain warns, does not block', async () => {
@@ -144,7 +153,7 @@ describe('POST /sold/{domain}', () => {
     const sales = await db.selectFrom('sales').selectAll().execute();
     expect(sales).toHaveLength(1);
     expect(r.json().sale).toEqual({ id: sales[0]!.id, confirmed: false, recorded_by: 'gavriel', evidence_source: 'afternic_email', evidence_ref: '<abc123@mail.afternic.com>' });
-    expect(r.json().profit.cents).toBe(168467);
+    expect(r.json().profit_cents).toBe(168467);
     expect(sales[0]).toMatchObject({
       recorded_by: 'gavriel', confirmed: false, venue: 'afternic', transaction_ref: 'AFN-1', evidence_source: 'afternic_email',
       evidence_ref: '<abc123@mail.afternic.com>', approval_text: null, approval_at: null,

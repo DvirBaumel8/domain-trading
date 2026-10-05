@@ -35,7 +35,7 @@ describe('payouts persisted by /sold', () => {
     expect(r.statusCode).toBe(200);
     const b = r.json();
     expect(b.warnings).toEqual([]);
-    expect(b.payout).toMatchObject({ amount: { cents: 168075 }, fee: { cents: 1500, display: '$15.00' }, method: 'wire', received_on: null, status: 'pending' });
+    expect(b.payout).toMatchObject({ amount_cents: 168075, amount: '$1,680.75', fee_cents: 1500, fee: '$15.00', method: 'wire', received_on: null, status: 'pending' });
     const l = await ledger();
     const sale = l.find((x) => x.type === 'sale')!;
     const fee = l.find((x) => x.type === 'payout_fee')!;

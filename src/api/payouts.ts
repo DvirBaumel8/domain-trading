@@ -13,6 +13,6 @@ export function registerPayouts(app: FastifyInstance, service: PayoutsService): 
   app.post<{ Params: { id: string } }>('/payouts/:id/received', async (req) => {
     if (!/^[1-9]\d{0,17}$/.test(req.params.id)) throw new AppError(404, 'PAYOUT_NOT_FOUND', 'No such payout');
     const b = Body.parse(req.body ?? {});
-    return service.markReceived(Number(req.params.id), b.received_on);
+    return service.markReceived(Number(req.params.id), b.received_on, b.approval_ref);
   });
 }

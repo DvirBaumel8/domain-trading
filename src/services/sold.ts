@@ -30,7 +30,7 @@ const OFFER_LINKABLE = ['open', 'countered', 'accepted'];
 const FUTURE_SKEW_MS = 5 * 60_000;
 const SEDO_RATES = [10, 15, 20];
 const AFNIC_MIN_COMMISSION_CENTS = 1500;
-const money = (c: number) => ({ cents: c, display: formatUsd(c) });
+export const pair = (name: string, c: number) => ({ [`${name}_cents`]: c, [name]: formatUsd(c) });
 const pct = (cents: number, rate: number) => Math.round((cents * rate) / 100);
 
 function commissionWarning(i: SoldInput, lander: string | null, landerSetAt: Date | null): string | null {
@@ -171,10 +171,10 @@ export class SoldService {
       return {
         domain, status: 'sold',
         sale: { id: saleRecord.id, confirmed: i.approvalRef !== null, recorded_by: ctx.recordedBy, evidence_source: i.evidence?.source ?? null, evidence_ref: i.evidence?.ref ?? null },
-        sale_price: money(i.saleCents), commission: money(i.commissionCents), fees: money(fees),
-        sale_costs: money(saleCosts), net_proceeds: money(netProceeds),
-        acquisition_costs: money(acquisitionCosts), profit: money(netProceeds - acquisitionCosts),
-        ...(i.payout ? { payout: { amount: money(i.payout.amountCents), fee: money(payoutFee), method: i.payout.method, received_on: receivedOn, status: receivedOn ? 'received' : 'pending' } } : {}),
+        ...pair('sale_price', i.saleCents), ...pair('commission', i.commissionCents), ...pair('fees', fees),
+        ...pair('sale_costs', saleCosts), ...pair('net_proceeds', netProceeds),
+        ...pair('acquisition_costs', acquisitionCosts), ...pair('profit', netProceeds - acquisitionCosts),
+        ...(i.payout ? { payout: { ...pair('amount', i.payout.amountCents), ...pair('fee', payoutFee), method: i.payout.method, received_on: receivedOn, status: receivedOn ? 'received' : 'pending' } } : {}),
         checklist, warnings,
       };
     }));
