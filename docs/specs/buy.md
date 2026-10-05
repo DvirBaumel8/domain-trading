@@ -2,7 +2,7 @@
 
 **Goal:** register a domain at the cheapest qualifying registrar (first year + one renewal), **only** after Dvir's explicit chat approval. The server enforces caps, never double-buys, and records everything (ledger, portfolio, receipt, audit) in the DB.
 
-**Who calls it:** Gavriel, **only** after Dvir has explicitly approved the purchase in chat. Gavriel puts Dvir's verbatim words and their timestamp in `approval_ref`. Dvir can also call it himself, e.g. with curl.
+**Who calls it:** Gavriel, **only** after Dvir has explicitly approved the purchase in chat. Gavriel puts Dvir's verbatim words and their timestamp in `approval_ref`. (Dvir never calls the API himself; 5 Oct 2026, 20:07.)
 
 ## Request
 Header: `Idempotency-Key: <uuid>` (required).

@@ -13,7 +13,7 @@ Hard rules (details are in CLAUDE.md):
 - Never call a registrar's top-up endpoints. Never use Cloudflare Registrar. Never register premium names.
 - Registrar keys come only from env vars. Never put a real key in code, fixtures or logs. Use fake values in tests.
 - Unit and API tests make **no network calls** (block sockets). Contract tests are opt-in markers.
-- **Never run a live (non-sandbox) Porkbun `domain/create` call.** Only Dvir runs the first live buy, through the deployed API, after he has approved it in chat.
+- **Never run a live (non-sandbox) Porkbun `domain/create` call.** The first live buy is made by Gavriel through the deployed API, only after Dvir has approved it in chat (Dvir never calls the API; 5 Oct 2026, 20:07).
 - Don't add a frontend, token-creation or settings endpoints (including `pricing_settings`), or any LLM calls.
 - Pricing numbers (65%, 48%, $750, the $500 walk-away floor, $100 min offer, −20%, months 6/18, geo month 12, 90/7 days, $499/$399) come **only** from the versioned `pricing_settings` table, never from constants in logic. Integer cents; the PR-* vectors are the contract.
 
@@ -40,7 +40,7 @@ Work in phases. **At the end of each phase, stop.** Show me the test output (cou
   - `category` and geo `price_grade` on domains;
   - modes `bin` (geo) / `hybrid` (all others) / `offer` (override only);
   - validation V1–V12;
-  - overrides only with `approval_ref`;
+  - `approval_ref` only for buy and sell decisions: pricing exceptions, overrides, `/buy`, non-pre-approved offer counters/accepts; every other `/list`, hold, upload confirmation and `/sold` call is bot-only (Dvir, 5 Oct 2026, 20:07);
   - the append-only `listing_history`.
   - `/buy` validates `proposed_listing`, `pricing_evidence` (2–3 comps) and `expected_settings_version` **before** any registrar call.
 - **Pricing (§10):**
@@ -55,7 +55,7 @@ Work in phases. **At the end of each phase, stop.** Show me the test output (cou
   - `GET /report/pricing-review`.
 - **Offers log (§10.11; Dvir, 5 Oct 01:03):** hybrid min offer = `hybrid_min_offer` ($100), never the walk-away (which is never exported); the `offers` + `offer_imports` tables; `POST /offers`, `POST /offers/import` (CSV, all-or-nothing, `dry_run`), `POST /offers/{id}/outcome`, `GET /offers`, `GET /report/offers`, and the per-domain and per-strategy offer aggregates in `/report`.
 - `POST /list/{domain}` (including `dry_run`, the manual-NS path for `registrar_api=none`, and public-DNS NS verification), `GET /export/afternic.csv` (header byte-exact; cells per mode, §6), `GET /export/sedo.csv` (template-driven, 501 without the template), `POST /sold/{domain}`, `/report` (json + md), `/portfolio`, `/ledger` (+csv), `/deals/{id}`, `/audit`, the `npm run admin -- import-domain` command for manual buys (Porkbun, and GoDaddy via PAT or `--manual`; D-001 is at GoDaddy), and the daily job that marks domains dropped.
-- Tests: LS-1 to LS-20, LG-1 to LG-21, LH-1 to LH-5, LX-1 to LX-7 (incl. LX-3b), **PR-1 to PR-44**, **OF-1 to OF-20**, B-28, L-1 to L-9, L-11 to L-15, E-1 to E-8, E-10 to E-12, S-1 to S-8, R-1 to R-12, IM-1 to IM-3, IM-5 to IM-11, RN-4/RN-5, AU-8 (secret-leak grep over all responses and logs).
+- Tests: LS-1 to LS-20, LG-1 to LG-21, LH-1 to LH-5, LX-1 to LX-7 (incl. LX-3b), **PR-1 to PR-44**, **OF-1 to OF-20**, B-28, L-1 to L-9, L-11 to L-15, E-1 to E-8, E-10 to E-13, S-1 to S-8, R-1 to R-12, IM-1 to IM-3, IM-5 to IM-11, RN-4/RN-5, AU-8 (secret-leak grep over all responses and logs).
 - Phase 4 is now the largest phase. If it runs long, split it: **4a** = listing strategy + pricing calculator + preview + schedule + job (LS/LG/LH/PR); **4b** = `/list`, exports, `/sold`, reports, import, and the offers log (OF). Stop and report after 4a.
 
 **Phase 5: contract tests (Gate G2).**

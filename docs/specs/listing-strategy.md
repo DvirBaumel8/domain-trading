@@ -41,7 +41,7 @@
 
 - **Required:** `/buy` and `import-domain` refuse to proceed without a category (422 `CATEGORY_REQUIRED`). Geo also needs `price_grade` (422 `GEO_GRADE_REQUIRED`).
 - **Other modes need an override:** `offer`, or a plain `bin` on a non-geo name, is allowed only with an override plus `approval_ref` (V7, V8).
-- **Changing the category later:** goes through `POST /list` with `category` plus `approval_ref`. Moving a non-geo name to `geo` counts as an **override**, because otherwise the guard could be dodged by relabelling.
+- **Changing the category later:** goes through `POST /list` with `category`; no `approval_ref` is needed within the rules (Dvir, 5 Oct 2026, 20:07: bot autonomy). Moving a non-geo name to `geo` counts as an **override** (needs `approval_ref`), because otherwise the guard could be dodged by relabelling.
 
 ## 2. Modes
 
@@ -80,15 +80,15 @@
 | `dt list promptinjectionaudit.com --bin 1995 --offer` | `{"mode":"hybrid","bin":1995}`. The server computes floor $1,295 and the private walk-away $960, and sets min offer $100 |
 | `… --floor 1295 --walkaway 950 --exception "Dvir approved 00:39"` | `{"mode":"hybrid","bin":1995,"floor":1295,"walkaway":950,"pricing_exception":true,"pricing_exception_reason":"…"}` (+ `approval_ref`, required) |
 | `dt list x.com --offer --min-offer 500 --override --reason "…"` | `{"mode":"offer","min_offer":500,"override":true,"override_reason":"…"}` (+ `approval_ref`) |
-| `… --hold` / `… --unhold` | `{"pricing_hold":true,"pricing_hold_reason":"…"}` / `{"pricing_hold":false}` (+ `approval_ref`; pauses the drop schedule, §10.4) |
+| `… --hold` / `… --unhold` | `{"pricing_hold":true,"pricing_hold_reason":"…"}` / `{"pricing_hold":false}` (reason required; no `approval_ref`; pauses the drop schedule, §10.4) |
 | `… --lto 12 --override --reason "…"` (hybrid only) | `"lto_max_months":12` (public LTO is off by default) |
-| `… --category trend` | `"category":"trend"` (+ `approval_ref`) |
+| `… --category trend` | `"category":"trend"` (no `approval_ref` unless it relabels a name to `geo`, an override) |
 | `… --dry-run` | `"dry_run":true` (validates; previews the export rows **and the full drop schedule**; no changes) |
 
 - The API **requires `mode`** when any price is sent. The CLI works it out from the flags: `--bin` alone means `bin`, and `--bin --offer` means `hybrid`. `--offer` alone means `offer`, which needs an override.
 - In `hybrid` the client **never sends `min_offer`**. The server sets it to `min(hybrid_min_offer, walkaway)` = $100 under settings v2.
 
-All prices are whole USD. `approval_ref` is **required whenever the mode, a price, the category, the geo grade, a pricing exception or a hold changes** (Gate B). It is optional when only the nameservers are re-pointed. Changes made by the scheduled price job need no new approval (V10).
+All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_ref` (Dvir's words, relayed by Gavriel) is **required only for buy and sell decisions**: a **pricing exception** (V5) and an **override** (V8), plus `/buy` and non-pre-approved offer counters/accepts (§10.11). Mode, price, category and grade changes within the rules, holds/unholds (reason still required), `replan` and NS re-points need **no** approval; the calling token is recorded in `audit_log`, and every rule still applies. An `approval_ref` sent anyway is validated and stored (V10).
 
 ## 5. Server validation and guards (in this order; the first failure → 422, plus an audit row)
 
@@ -102,8 +102,8 @@ All prices are whole USD. `approval_ref` is **required whenever the mode, a pric
 | V6 | **Geo:** the mode must be `bin`. At buy/import, `bin` = the grade price (`geo_bin_strong` or `geo_bin_weaker`). On any later manual change, `geo_bin_min` ≤ `bin` ≤ `geo_bin_max` ($299–$499) | `GEO_MODE_NOT_ALLOWED` / `GEO_BIN_NOT_GRADE_PRICE` / `GEO_BIN_OUT_OF_RANGE` |
 | V7 | **Non-geo:** see the non-geo rules below the table | `MODE_NOT_ALLOWED_FOR_CATEGORY` / `HIGH_VALUE_LOW_BIN` |
 | V8 | **Override:** V6, V7 and the LTO switch may be passed only with `override: true`, a non-empty `override_reason` **and** a valid `approval_ref` that names the domain and is ≤72 h old. V1–V5 (except LTO), V11 and V12 can **never** be overridden | `OVERRIDE_NEEDS_APPROVAL` |
-| V9 | Category change: needs `approval_ref`. A non-geo → `geo` change also needs `override` | `APPROVAL_REQUIRED` / `OVERRIDE_NEEDS_APPROVAL` |
-| V10 | Any **manual** change to mode, price, category, grade, exception or hold needs `approval_ref`. **Changes applied by the scheduled price job** (`source=schedule`, §10.5) need none: they carry the plan's original approval (`plan_audit_id`) | `APPROVAL_REQUIRED` |
+| V9 | Category change: allowed without `approval_ref` within the rules. A non-geo → `geo` change needs `override` (hence `approval_ref`, V8) | `OVERRIDE_NEEDS_APPROVAL` |
+| V10 | A **manual** change needs **no** approval unless it's an **exception** (V5) or an **override** (V8) (Dvir, 5 Oct 2026, 20:07: bot autonomy). If an `approval_ref` is sent anyway, it is validated (an invalid one → its code) and stored in the `listing_history` row; otherwise `approval_text`/`approval_at` are null. Scheduled job changes (`source=schedule`, §10.5) carry `plan_audit_id` | `APPROVAL_REQUIRED` (exception without approval) / the `approval_ref` codes |
 | V11 | **Comps** (on `/buy`, and on import unless legacy): see the comps rules below the table | `COMPS_REQUIRED` / `COMPS_INVALID` |
 | V12 | **Settings version:** if the request carries `expected_settings_version` (the version the buy card's preview used), it must equal the current `pricing_settings` version | 409 `SETTINGS_VERSION_CHANGED` (re-run the preview, re-ask Dvir) |
 
@@ -188,7 +188,7 @@ All prices are whole USD. `approval_ref` is **required whenever the mode, a pric
    - offers between walk-away and floor;
    - every email negotiation;
    - (offers below the walk-away need nothing from Dvir: they are declined automatically and logged.)
-   - any change away from the plan (a new Gate B).
+   - a pricing exception or an override (Dvir's words; other changes within the rules are bot-only, (Dvir, 5 Oct 2026, 20:07: bot autonomy)).
 4. **Gavriel sends `/buy`** with the following fields. The server **re-computes the plan and validates it before buying**. A buy whose plan breaks a rule, or doesn't match the card's numbers, is refused **before any money is spent**.
    - `category` (and `price_grade` for geo);
    - `proposed_listing` `{mode, bin, floor, walkaway}` with the card's numbers;
@@ -263,7 +263,7 @@ All prices are whole USD. `approval_ref` is **required whenever the mode, a pric
 | LG-10 | trend hybrid bin 1995, no floor/walkaway sent (**replaces** the retired `high_value_guard_modes` test) | 200; stored 1995 / 1295 / 960; `pricing_source=formula`; settings version recorded | Other values |
 | LG-11 | Relabel trick: change category trend→geo without override | 422 `OVERRIDE_NEEDS_APPROVAL` | Accepted |
 | LG-12 | Settings via the API (`floor_bps`, `geo_bin_max` in the body) | Ignored or 422; the settings are unchanged | Changed |
-| LG-13 | Manual price change without `approval_ref` | 422 `APPROVAL_REQUIRED` | Accepted |
+| LG-13 | Manual price change (within the rules) without `approval_ref` | 200; `listing_history.approval_text` null | 422 |
 | LG-14 | NS-only re-point without `approval_ref` | 200 | Rejected |
 | LG-15 | Overrides can't bypass V1–V5 (e.g. hybrid exception with floor > bin + override) | 422 `HYBRID_PRICES_INVALID` | Accepted |
 | LG-16 | `/buy` with `proposed_listing` that breaks V5–V7, V11 or V12, or doesn't match the computed plan | 422/409 **before** any registrar call (mock shows 0 `register` calls) | Domain bought |
@@ -323,7 +323,7 @@ The **server** computes every derived price from three inputs: **BIN + category 
 
 - **The current version** is the highest `version` with `effective_at` ≤ now. It is created only by `npm run admin -- pricing-settings new --from-current --set floor_bps=6000 … --approval-text "<Dvir's words>" --approval-at <ISO>`, never by the API.
 - **Every plan stores the version it was computed with** (`domains.pricing_settings_version`, `price_schedule.settings_version`, `listing_history.pricing_settings_version`).
-- **A new version applies to new plans only.** Existing names keep their approved plan; Dvir approved those exact numbers. Re-pricing an existing name with the new version is a manual `POST /list` with `"replan":true` and `approval_ref` (a new Gate B).
+- **A new version applies to new plans only.** Existing names keep their approved plan; Dvir approved those exact numbers. Re-pricing an existing name with the new version is a manual `POST /list` with `"replan":true` (bot-only, no `approval_ref` unless it carries an exception or override; (Dvir, 5 Oct 2026, 20:07: bot autonomy)).
 
 ### 10.2 Rounding to nice prices (decided)
 
@@ -423,7 +423,7 @@ The **server** computes every derived price from three inputs: **BIN + category 
   - changes nameservers;
   - sends anything;
   - applies a row whose values break V5/V6 (it marks it `failed`, adds a `/report` warning, and changes nothing).
-- **The marketplaces only change when Dvir uploads the export file** (§10.7).
+- **The marketplaces only change when a bot uploads the export file** on the marketplace website (§10.7; (Dvir, 5 Oct 2026, 20:07: bot autonomy)).
 
 ### 10.6 `GET /pricing/preview` (READ)
 - **Query:** `category` (required), `bin` (USD; required unless geo), `grade` (geo), optional `floor` + `walkaway` (to preview an exception), `listed_on` (date; default today), `drop_date` (default today + 2 years), `domain` (optional; then `drop_date` is taken from the DB).
@@ -450,7 +450,7 @@ The **server** computes every derived price from three inputs: **BIN + category 
 - **`GET /export/afternic.csv`** (and `sedo.csv`) gains these:
   - **`?changed_only=true`:** only the rows changed since the last confirmed upload. Afternic's **Update** mode accepts partial files.
   - **Headers:** `X-Export-Id`, `X-Pending-Changes: <n>` and `X-Manual-Delist`. `X-Manual-Delist` now also lists `delisted` domains.
-- **`POST /export/{venue}/uploaded`** `{"export_id":"…","approval_ref":{…Dvir's "uploaded" words…}}` (WRITE; Gavriel calls it after Dvir says he uploaded). It records `export_uploads` and clears `export_pending_since` for the domains in that export.
+- **`POST /export/{venue}/uploaded`** `{"export_id":"…","uploaded_at":"…","note":"…"}` (WRITE; the bot calls it after it uploaded the file; `approval_ref` optional, `export-csv.md`). It records `export_uploads` and clears `export_pending_since` for the domains in that export.
 - **`/report` warnings:**
   - `EXPORT_PENDING` lists every domain whose live marketplace price is now stale, with days pending. It becomes an error-level warning after 7 days.
   - The weekly lander check compares the page with the **last uploaded** values, so a drop that's waiting for upload shows as "pending upload", not as a broken lander.
@@ -486,7 +486,7 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
   - `pricing_settings` (versioned, append-only);
   - `price_schedule` (`id`, `domain_id`, `plan_id`, `event`, `due_on`, `bin_cents`, `floor_cents`, `walkaway_cents`, `settings_version`, `status` ∈ planned/applied/skipped_at_minimum/skipped_no_change/skipped_disabled/superseded/superseded_by_final_push/cancelled/failed, `applied_at`, `listing_history_id`, `note`);
   - `pricing_evidence` (`domain_id`, `comps` jsonb, `rationale`, `legacy_no_comps_reason`, `audit_id`);
-  - `export_uploads` (`id`, `venue`, `export_id`, `domains[]`, `uploaded_at`, `approval_text`, `audit_id`);
+  - `export_uploads` (`id`, `venue`, `export_id`, `domains[]`, `uploaded_at`, `approval_text` (nullable), `note`, `audit_id`);
   - `offers` and `offer_imports` (§10.11).
 - **The reference implementation** used to generate the test vectors is `system/tools/pricing_calc.py` on Gavriel's box (not in this repo; bots don't add code here). The PR tests in `test-plan.md` are the contract.
 
@@ -511,7 +511,7 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 | `recorded_by`, `import_id`, `audit_id`, `created_at` | Who recorded it (from the token's agent name), and the import batch if any |
 
 - **Immutable facts:** a DB trigger refuses updates to `domain_id`, `amount_cents`, `source`, `received_at`, the snapshot and `band`. Only the outcome fields change, each change through the API with an `audit_log` row.
-- **No side effects:** recording an offer never calls a marketplace or registrar, never sends anything, and never changes a price. It may set `pricing_hold` only if the request asks for it with `approval_ref` (Dvir's words), as with `POST /list`.
+- **No side effects:** recording an offer never calls a marketplace or registrar, never sends anything, and never changes a price. It may set `pricing_hold` only if the request asks for it (reason required; no `approval_ref`, as with `POST /list`; (Dvir, 5 Oct 2026, 20:07: bot autonomy)).
 
 **`POST /offers`** (WRITE; Gavriel or Dvir, from a marketplace email or dashboard):
 ```json
@@ -524,7 +524,7 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 - **Warnings:** `OFFER_ON_UNLISTED` (domain not `listed` at `received_at`; stored with band against the plan's prices, or `unpriced` if there are none); `OFFER_AT_OR_ABOVE_FLOOR` ("Afternic may already have closed this; check the dashboard").
 
 **`POST /offers/{id}/outcome`** (WRITE) `{"outcome":"countered","note":"…","approval_ref":{…}}`:
-- `countered` or `accepted` on a `mid_range` offer, or on any email offer, **needs `approval_ref`** with Dvir's words (Gate D); otherwise 422 `APPROVAL_REQUIRED`.
+- `countered` or `accepted` on any offer that isn't pre-approved (routing not `auto_accept`/`accept_preapproved`, i.e. `dvir`: mid-range, or any email offer ≥ walk-away) **needs `approval_ref`** with Dvir's words (a sell decision, Gate D); otherwise 422 `APPROVAL_REQUIRED`.
 - `declined` on an `auto_decline` offer needs none. `sold` must match a `POST /sold` for the same domain.
 
 **CSV import** `POST /offers/import` (WRITE, `Content-Type: text/csv`, `?dry_run=true` supported); CLI `dt offers import offers.csv [--dry-run]`:

@@ -23,14 +23,14 @@ One domain can have **only one** nameserver set, so it shows one lander. It can 
   "bin": 1995,                           // hybrid: floor and walkaway are COMPUTED; min_offer = hybrid_min_offer ($100) (listing-strategy.md §10)
   "floor": null, "walkaway": null,       // only with "pricing_exception": true + reason + approval_ref (e.g. D-001: 1295 / 950)
   "pricing_exception": false, "pricing_exception_reason": null,
-  "replan": false,                       // true = recompute with the CURRENT pricing_settings version (needs approval_ref)
-  "pricing_hold": null, "pricing_hold_reason": null,   // true/false pauses/resumes the drop schedule (needs approval_ref)
+  "replan": false,                       // true = recompute with the CURRENT pricing_settings version (no approval_ref)
+  "pricing_hold": null, "pricing_hold_reason": null,   // true/false pauses/resumes the drop schedule (reason required; no approval_ref)
   "lto_max_months": null,                // override only (public LTO is off)
-  "category": null,                      // only to change it (needs approval_ref; see V9)
+  "category": null,                      // only to change it (approval_ref only when relabelling to geo, an override; V9)
   "override": false, "override_reason": null,
   "lander": "afternic", "ns": null, "display_name": "PromptInjectionAudit.com",
   "dry_run": false,
-  "approval_ref": { "text": "...", "approved_at": "..." } }   // required if mode/price/category changes
+  "approval_ref": { "text": "...", "approved_at": "..." } }   // required only for exceptions and overrides
 ```
 - The schema is strict: unknown fields → 422.
 - Omitting every price field means "NS/lander only". If any price is sent, `mode` and `bin` must be sent (offer mode: `min_offer`). In hybrid, `min_offer` is never sent; the server sets it to `hybrid_min_offer` ($100). The walk-away is private and is never exported.
@@ -69,11 +69,11 @@ One domain can have **only one** nameserver set, so it shows one lander. It can 
 | L-13 | DNS verification job: mock DNS returns afternic NS | `ns_verified_at` set; warning cleared | Not set |
 | L-10 | Live (gate G5) | After D-001 is imported and `POST /list/promptinjectionaudit.com` is called (bought by hand at GoDaddy, so `/buy` didn't set NS; the NS change comes via the GoDaddy PAT or Dvir's manual change): `dig NS promptinjectionaudit.com @a.gtld-servers.net` shows the afternic.com pair **within 24 h**. The lander at `https://promptinjectionaudit.com` loads and shows the **exact BIN ($1,995)** within **48 h** of the Afternic upload (checked with a headless browser: plain curl only gets a JavaScript redirect stub) | Not by 24 h / 48 h (then Dvir checks the Afternic listing; at 96 h, Afternic support) |
 | L-14 | First `POST /list` with hybrid bin 1995 on an owned domain | 200; stored 1995/1295/960; `first_listed_at` = today; 4 `price_schedule` rows (PR-12 values); `export_pending_since` set | Missing schedule |
-| L-15 | `pricing_hold:true` without / with `approval_ref` | 422 `APPROVAL_REQUIRED` / 200, `listing_history` row, schedule rows stay planned past their due date (PR-23) | Other |
+| L-15 | `pricing_hold:true` without `approval_ref` / without a reason | 200, `listing_history` row (`approval_text` null), schedule rows stay planned past their due date (PR-23) / 422 `HOLD_REASON_REQUIRED` | Other |
 | L-16 | GoDaddy NS via mock: the operation stays running past the (injected, short) poll timeout | 200, `ns_status:"pending"` + `NS_PENDING`; no read-back compare; prices, `lander_ns` and `listing_history` saved; `/report` NS warning until the DNS check matches | Error, or listing not saved |
 
 ## Decisions (Dvir, 5 Oct 2026, steps 4a–4b-2; confirmed "Confirm all")
-- **Change classification:** any of `mode`, a price, `walkaway`, `lto_max_months`, `pricing_exception`, a different `category` or `price_grade`, a `pricing_hold` change or `replan: true` is a change and needs `approval_ref`. Anything else (lander, `ns`, `display_name`) is NS-only and needs none. Unknown body fields → 422 `VALIDATION_ERROR` (LS-14).
+- **Change classification:** any of `mode`, a price, `walkaway`, `lto_max_months`, `pricing_exception`, a different `category` or `price_grade`, a `pricing_hold` change or `replan: true` is a change (a history row, re-validated). **Superseded 5 Oct 2026, 20:07 (bot autonomy):** a change needs `approval_ref` only for a pricing exception or an override; anything else, including NS-only fields, needs none. Unknown body fields → 422 `VALIDATION_ERROR` (LS-14).
 - **Order:** an invalid `mode` → `MODE_INVALID` first; then the field checks (`CATEGORY_REQUIRED`, `GRADE_NOT_GEO` (grade on a non-geo name), `GEO_GRADE_REQUIRED` (becoming geo without a grade), `HOLD_REASON_REQUIRED`, `REPLAN_NOTHING_LISTED`, the relabel-to-geo override); then V1–V8; then V9/V10.
 - **`price_grade`** is accepted in the body (geo only). Moving to a non-geo category clears it.
 - **A category or grade change without a price change** keeps every stored value (BIN, floor, walk-away, min offer, LTO, `pricing_source`) and re-validates them structurally under the new category; nothing is recomputed. If the listing has LTO, the call needs the override again. `replan: true` recomputes from the stored BIN with the current settings (an earlier exception is dropped unless re-sent) and also carries LTO.

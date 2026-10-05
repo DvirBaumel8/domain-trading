@@ -1,6 +1,6 @@
 # GET /export/afternic.csv and GET /export/sedo.csv  (READ)
 
-**Goal:** produce bulk-upload files in exactly the format each marketplace expects. Dvir uploads them **by hand, weekly** (neither marketplace has a seller API we can use).
+**Goal:** produce bulk-upload files in exactly the format each marketplace expects. A bot uploads them **by hand on the marketplace website, weekly** (neither marketplace has a seller API we can use; Dvir, 5 Oct 2026, 20:07: bots act on the marketplace sites).
 
 ## Afternic (format verified)
 Source: the official template `bulk_upload_sample_v3.xlsx`, copied in `templates/`, from https://www.afternic.com/forms/bulk_upload_sample_v3.xlsx.
@@ -28,7 +28,7 @@ Source: the official template `bulk_upload_sample_v3.xlsx`, copied in `templates
   - `X-Export-Id` (an id for this file);
   - `X-Pending-Changes` (the count of listed domains whose marketplace price is stale);
   - `X-Export-Warnings`.
-- **Confirming an upload:** after Dvir says he uploaded a file, Gavriel calls `POST /export/{venue}/uploaded` `{"export_id":"…","approval_ref":{…}}` (WRITE, idempotent). The server records an `export_uploads` row and clears `export_pending_since` for the domains in that file. `/report` warns `EXPORT_PENDING` until then (error level after 7 days).
+- **Confirming an upload:** after the bot uploads a file, Gavriel calls `POST /export/{venue}/uploaded` `{"export_id":"…","uploaded_at":"…","note":"…"}` (WRITE, idempotent). **`approval_ref` is optional** (bot autonomy, 20:07); if sent, it is validated and its time becomes `uploaded_at`. `uploaded_at` (optional, ISO with offset): default now; not in the future; not before the file's `at` (−60 s tolerance) → else 422 `VALIDATION_ERROR`. `note` (optional): no `@` → else 422 `NO_PII`. The server records an `export_uploads` row and clears `export_pending_since` for the domains in that file. `/report` warns `EXPORT_PENDING` until then (error level after 7 days).
 - **Never generate a file meant for "Replace"**: Replace deletes every listing that isn't in the file.
 - Encoding UTF-8, line ending CRLF, RFC 4180 quoting, `Content-Disposition: attachment; filename="afternic-YYYY-MM-DD.csv"`.
 
@@ -58,7 +58,8 @@ Fields documented by Sedo: **Domain, Selling Option, For Sale (yes/no), Price, M
 | E-6 | Sedo template missing | 501 `SEDO_TEMPLATE_MISSING` | A guessed file |
 | E-7 | Sedo with a test template | Headers and values exactly as configured; every row Make Offer (v2): hybrid minimum 100, geo minimum = BIN; no fixed-price rows unless `sedo_hybrid_as=buy_now` (then no Minimum Price) | Mismatch |
 | E-8 | Auth | READ ok; no token 401 | Other |
-| E-9 | Live (gate G5) | Dvir uploads the Afternic file with **Update**. Afternic accepts it with 0 errors, and the listing shows the BIN within 48 h | Rejected, or the price differs |
+| E-9 | Live (gate G5) | The bot uploads the Afternic file with **Update**. Afternic accepts it with 0 errors, and the listing shows the BIN within 48 h | Rejected, or the price differs |
 | E-10 | `changed_only=true` with 3 listed domains, 1 changed by a scheduled drop | 1 row; `X-Pending-Changes: 1` (= PR-36) | Other |
 | E-11 | `POST /export/afternic/uploaded` with an unknown `export_id` / a READ token / a replay | 404 / 403 / replayed once | Other |
+| E-13 | Confirm without `approval_ref`; with `uploaded_at` in the future / before the file; `note` with `@`; with `approval_ref` | 200, `export_uploads.approval_text` null, `uploaded_at` = now (or the value sent) / 422 / 422 `NO_PII` / 200, approval stored, `uploaded_at` = its time | Other |
 | E-12 | A domain hits its `delist` event | Absent from both files; listed in `X-Manual-Delist` until an upload is confirmed | Still exported |
