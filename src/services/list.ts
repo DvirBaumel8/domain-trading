@@ -3,7 +3,7 @@ import type { Config } from '../config.js';
 import type { Category, Database, DomainRow } from '../db/types.js';
 import type { NsLookup } from '../dns/ns-lookup.js';
 import { AppError } from '../http/errors.js';
-import { RegistrarError, type RegistrarAdapter } from '../registrars/types.js';
+import { nsPendingWarning, RegistrarError, type RegistrarAdapter } from '../registrars/types.js';
 import { checkApproval } from './approval.js';
 import { changedColumns } from './export-state.js';
 import { afternicRow, loadSedoTemplate, sedoRow, type ExportDomain } from './export.js';
@@ -279,7 +279,7 @@ export class ListService {
       const res = await adapter.setNameservers(row.domain, ns);
       if (res && res.pending) {
         // The registrar is still applying the change: no read-back compare; the daily DNS check confirms it.
-        warnings.push('NS_PENDING: GoDaddy is still applying the change; the daily DNS check will confirm it');
+        warnings.push(nsPendingWarning(adapter.name));
         return { status: 'pending' };
       }
     } catch (e) {

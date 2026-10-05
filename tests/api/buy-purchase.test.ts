@@ -255,6 +255,17 @@ describe('POST /buy purchase', () => {
     expect(lh.approval_text).toContain(DOMAIN);
   });
 
+  it('postBuy: setNameservers returning { pending: true } → lander pending, lander_ns saved, NS_PENDING warning', async () => {
+    const pb = new FakeAdapter('porkbun', { setNsResult: { pending: true } });
+    const { auth } = await setup(pb);
+    const res = await postBuy(app, buyBody({ proposed_listing: { mode: 'bin', bin: 399 } }), auth);
+    expect(res.statusCode).toBe(201);
+    expect(res.json().post_buy.lander).toBe('pending');
+    expect(res.json().warnings).toEqual(expect.arrayContaining([expect.stringMatching(/^NS_PENDING: porkbun is still applying/)]));
+    expect(pb.calls.some((c) => c.startsWith('getNameservers'))).toBe(false);
+    expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ lander: 'afternic', lander_ns: ['ns1.afternic.com', 'ns2.afternic.com'] });
+  });
+
   it('auto_list:false → no NS calls, status owned, no listing', async () => {
     const pb = new FakeAdapter('porkbun');
     const { auth } = await setup(pb);

@@ -6,7 +6,7 @@ import { redact } from '../http/redact.js';
 import { addOneYear, jerusalemDate } from '../dates.js';
 import { formatUsd } from '../money.js';
 import type { RdapFn } from '../rdap.js';
-import { RegistrarError, type AccountState, type DomainInfo, type RegisterSuccess, type RegistrarAdapter } from '../registrars/types.js';
+import { nsPendingWarning, RegistrarError, type AccountState, type DomainInfo, type RegisterSuccess, type RegistrarAdapter } from '../registrars/types.js';
 import { checkApproval } from './approval.js';
 import { changedColumns } from './export-state.js';
 import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
@@ -483,7 +483,7 @@ export class BuyService {
           const got = nsRes && nsRes.pending ? null : await a.adapter.getNameservers(d);
           if (got === null) {
             post.lander = 'pending';
-            warnings.push('NS_PENDING: the registrar is still applying the nameserver change; the daily DNS check will confirm it');
+            warnings.push(nsPendingWarning(a.adapter.name));
             await db.updateTable('domains').set({ lander: target, lander_ns: [...ns], lander_set_at: new Date(), updated_at: new Date() })
               .where('domain', '=', d).execute();
           } else if (sameNsSet(got, ns)) {

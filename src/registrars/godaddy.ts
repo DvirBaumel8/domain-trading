@@ -26,7 +26,7 @@ const normNs = (n: string) => n.trim().toLowerCase().replace(/\.$/, '');
 export interface GoDaddyOptions {
   pat: string; baseUrl?: string; timeoutMs?: number;
   /** Operation polling: production defaults 5 s interval, 5 min timeout. Tests inject a no-op `sleep`. */
-  pollIntervalMs?: number; pollTimeoutMs?: number; sleep?: (ms: number) => Promise<void>;
+  pollIntervalMs?: number; pollTimeoutMs?: number; sleep?: (ms: number) => Promise<void>; now?: () => number;
 }
 
 interface Reply { status: number; body: unknown; headers: Headers }
@@ -118,21 +118,32 @@ export class GoDaddyAdapter implements RegistrarAdapter {
     if (r.status !== 202 && r.status !== 200 && r.status !== 204) throw r.status >= 400 ? this.reject(r) : this.bad('Unexpected nameserver response', r.status);
     if (r.status !== 202) return { pending: false };
     const id = this.operationId(r);
-    if (!id) throw this.bad('Nameserver change accepted without an operation id', r.status);
+    if (!id) return { pending: true }; // accepted but untrackable
 
     const interval = this.opts.pollIntervalMs ?? 5_000;
     const timeout = this.opts.pollTimeoutMs ?? 300_000;
     const sleep = this.opts.sleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
-    let waited = 0;
+    const now = this.opts.now ?? Date.now;
+    const deadline = now() + timeout;
     for (;;) {
-      const p = await this.http('GET', GODADDY_OPERATION_PATH(id));
-      if (p.status < 200 || p.status >= 300) throw this.reject(p);
+      // After an accepted PUT, a failed poll is not a failed change: report it as still pending.
+      let p: Reply;
+      try {
+        p = await this.http('GET', GODADDY_OPERATION_PATH(id));
+      } catch (e) {
+        if (e instanceof RegistrarError) return { pending: true };
+        throw e;
+      }
+      if (p.status < 200 || p.status >= 300) return { pending: true };
       const status = isObj(p.body) && typeof p.body.status === 'string' ? p.body.status.toUpperCase() : '';
       if (DONE.has(status)) return { pending: false };
-      if (status === 'FAILED') throw new RegistrarError(NAME, 'GODADDY_OPERATION_FAILED', 'GoDaddy reported the nameserver change as failed', { ambiguous: false });
-      if (waited >= timeout) return { pending: true };
+      if (status === 'FAILED') {
+        const c = isObj(p.body) && typeof p.body.code === 'string' && /^[A-Z0-9_]{1,64}$/.test(p.body.code) ? p.body.code : 'GODADDY_OPERATION_FAILED';
+        throw new RegistrarError(NAME, c, 'GoDaddy reported the nameserver change as failed', { ambiguous: false });
+      }
+      if (now() >= deadline) return { pending: true };
       await sleep(interval);
-      waited += interval;
+      if (now() >= deadline) return { pending: true };
     }
   }
 
@@ -144,9 +155,8 @@ export class GoDaddyAdapter implements RegistrarAdapter {
         if (typeof v === 'number') return String(v);
       }
     }
-    const loc = r.headers.get('location');
-    const last = loc?.split('?')[0]?.split('/').filter(Boolean).pop();
-    return last ?? null;
+    const m = /\/operations\/([^/?#]+)/.exec(r.headers.get('location') ?? '');
+    return m?.[1] ?? null;
   }
 
   async quote(_domain: string, _opts?: { signal?: AbortSignal }): Promise<Quote> { throw this.unsupported('price quotes'); }

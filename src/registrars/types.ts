@@ -55,3 +55,7 @@ export class RegistrarError extends Error {
     this.details = opts.details ?? {};
   }
 }
+
+/** The warning for a nameserver change the registrar accepted but is still applying. */
+export const nsPendingWarning = (registrar: string): string =>
+  `NS_PENDING: ${registrar} is still applying the change; the daily DNS check will confirm it`;

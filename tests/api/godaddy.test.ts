@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { GoDaddyAdapter } from '../../src/registrars/godaddy.js';
 import { RegistrarError } from '../../src/registrars/types.js';
-import { makeApp } from '../helpers/app.js';
+import { logCapture, makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { FAKE_PAT, GODADDY_BASE, godaddyNsHandlers, type GdRequest } from '../helpers/godaddy-msw.js';
@@ -16,11 +16,17 @@ afterEach(async () => app?.close());
 const D = 'examplecityroofing.com';
 const AFTERNIC = ['ns1.afternic.com', 'ns2.afternic.com'];
 
-const adapter = (o: { pollTimeoutMs?: number } = {}) =>
-  new GoDaddyAdapter({ pat: FAKE_PAT, baseUrl: GODADDY_BASE, pollIntervalMs: 10, pollTimeoutMs: o.pollTimeoutMs ?? 1000, sleep: async () => {} });
+/** A fake clock that only moves when the adapter sleeps (or `jump` is called). */
+const adapter = (o: { pollTimeoutMs?: number; jumpPerPoll?: number } = {}) => {
+  let t = 0;
+  return new GoDaddyAdapter({
+    pat: FAKE_PAT, baseUrl: GODADDY_BASE, pollIntervalMs: 10, pollTimeoutMs: o.pollTimeoutMs ?? 1000,
+    now: () => t, sleep: async (ms) => { t += ms + (o.jumpPerPoll ?? 0); },
+  });
+};
 
-async function setup(gd: GoDaddyAdapter) {
-  app = await makeApp({ adapters: [gd], nsLookup: async () => null });
+async function setup(gd: GoDaddyAdapter, logStream?: Parameters<typeof makeApp>[0] extends infer O ? (O extends { logStream?: infer L } ? L : never) : never) {
+  app = await makeApp({ adapters: [gd], nsLookup: async () => null, ...(logStream ? { logStream } : {}) });
   await insertOwnedDomain(db, { domain: D, registrar: 'godaddy', registrar_api: 'manage', category: 'trend' });
   return (await issueToken('write')).auth;
 }
@@ -38,10 +44,12 @@ describe('GoDaddy NS through /list', () => {
         return HttpResponse.json({ domain: D, nameServers: AFTERNIC });
       }),
     );
-    const auth = await setup(adapter());
+    const logs = logCapture();
+    const auth = await setup(adapter(), logs.stream);
     const res = await list(auth);
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ ns_status: 'set', lander: 'afternic' });
+    expect(logs.text()).not.toContain(FAKE_PAT);
     const put = rec.find((r) => r.method === 'PUT')!;
     expect(put.body).toEqual({ nameServers: AFTERNIC });
     expect(put.auth).toBe(`Bearer ${FAKE_PAT}`);
@@ -72,6 +80,43 @@ describe('GoDaddy NS through /list', () => {
     expect(rec.filter((r) => r.method === 'GET' && !r.path.includes('/operations/'))).toHaveLength(0);
     expect(await dom()).toMatchObject({ status: 'listed', lander: 'afternic', lander_ns: AFTERNIC, bin_cents: 199500 });
     expect(await db.selectFrom('listing_history').selectAll().execute()).toHaveLength(1);
+  });
+
+  it('L-16: wall-clock deadline: a slow poll that jumps the clock past the timeout stops polling', async () => {
+    const rec: GdRequest[] = [];
+    mswServer.use(...godaddyNsHandlers({ operationStatuses: ['PENDING'], recorded: rec }));
+    const auth = await setup(adapter({ pollTimeoutMs: 1000, jumpPerPoll: 5000 }));
+    expect((await list(auth)).json().ns_status).toBe('pending');
+    expect(rec.filter((r) => r.path.includes('/operations/'))).toHaveLength(1);
+  });
+
+  it('L-16: PUT 202 then the poll returns 404 / 503 → pending, listing saved', async () => {
+    for (const status of [404, 503]) {
+      mswServer.use(
+        http.put(`${GODADDY_BASE}/v3/domains/domain-names/:d/nameservers`, () => HttpResponse.json({ operationId: 'op1' }, { status: 202 })),
+        http.get(`${GODADDY_BASE}/v3/domains/operations/:id`, () => new HttpResponse(null, { status })),
+      );
+      const auth = await setup(adapter());
+      const res = await list(auth);
+      expect(res.statusCode, String(status)).toBe(200);
+      expect(res.json().ns_status).toBe('pending');
+      expect(await dom()).toMatchObject({ lander: 'afternic', lander_ns: AFTERNIC });
+      await app.close();
+      await db.deleteFrom('domains').execute().catch(() => undefined);
+    }
+  });
+
+  it('202 without any operation id → pending (accepted but untrackable)', async () => {
+    mswServer.use(http.put(`${GODADDY_BASE}/v3/domains/domain-names/:d/nameservers`, () => new HttpResponse(null, { status: 202, headers: { location: 'https://x.test/other/1' } })));
+    expect(await adapter().setNameservers(D, AFTERNIC)).toEqual({ pending: true });
+  });
+
+  it('FAILED uses the operation body code when valid, else GODADDY_OPERATION_FAILED', async () => {
+    const put = http.put(`${GODADDY_BASE}/v3/domains/domain-names/:d/nameservers`, () => HttpResponse.json({ operationId: 'op1' }, { status: 202 }));
+    mswServer.use(put, http.get(`${GODADDY_BASE}/v3/domains/operations/:id`, () => HttpResponse.json({ status: 'FAILED', code: 'NS_NOT_ALLOWED' })));
+    expect(await adapter().setNameservers(D, AFTERNIC).catch((x: unknown) => x)).toMatchObject({ code: 'NS_NOT_ALLOWED', ambiguous: false });
+    mswServer.use(http.get(`${GODADDY_BASE}/v3/domains/operations/:id`, () => HttpResponse.json({ status: 'FAILED', code: 'bad code!' })));
+    expect(await adapter().setNameservers(D, AFTERNIC).catch((x: unknown) => x)).toMatchObject({ code: 'GODADDY_OPERATION_FAILED' });
   });
 
   it('L-12: operation FAILED → 409 REGISTRAR_REJECTED, nothing saved', async () => {

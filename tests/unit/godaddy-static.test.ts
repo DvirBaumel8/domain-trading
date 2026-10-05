@@ -6,7 +6,7 @@ import { testEnv } from '../helpers/env.js';
 describe('IM-11 (static): the GoDaddy adapter is management-only', () => {
   it('src/registrars/godaddy.ts has no purchase, register, availability, top-up or billing path', () => {
     const src = readFileSync('src/registrars/godaddy.ts', 'utf8');
-    for (const banned of ['/purchase', '/register', 'availab', 'topup', 'top-up', 'billing']) {
+    for (const banned of ['/purchase', '/register', 'availab', 'topup', 'top-up', 'billing', "method: 'post'", "'post'", '/renew']) {
       expect(src.toLowerCase(), banned).not.toContain(banned);
     }
   });
