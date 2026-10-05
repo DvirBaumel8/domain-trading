@@ -55,6 +55,9 @@ export function registerOffers(app: FastifyInstance, service: OffersService): vo
     if (p.data.domain !== undefined) {
       try { domain = normalizeDomain(p.data.domain); } catch { throw bad('domain is not a valid domain name'); }
     }
-    return service.list({ domain, from: bound(p.data.from, 'from'), to: bound(p.data.to, 'to'), band: p.data.band, source: p.data.source });
+    const from = bound(p.data.from, 'from');
+    const to = bound(p.data.to, 'to');
+    if ((from?.date && to?.date && from.date > to.date) || (from?.at && to?.at && from.at > to.at)) throw bad('from must not be after to');
+    return service.list({ domain, from, to, band: p.data.band, source: p.data.source });
   });
 }

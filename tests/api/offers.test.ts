@@ -46,7 +46,7 @@ describe('POST /offers', () => {
     expect(j).toMatchObject({
       domain: T, amount_cents: 45000, amount: '$450.00', source: 'afternic', band: 'below_walkaway', routing: 'auto_decline', outcome: 'declined_auto',
       received_at: '2026-12-01T09:12:00+02:00', recorded_by: 'gavriel', external_ref: 'AFN-OFFER-123', warnings: [],
-      snapshot: { bin_cents: 199500, bin: '$1,995.00', floor_cents: 129500, floor: '$1,295.00', walkaway_cents: 95000, walkaway: '(private)', min_offer_cents: 10000, min_offer: '$100.00' },
+      snapshot: { bin_cents: 199500, bin: '$1,995.00', floor_cents: 129500, floor: '$1,295.00', walkaway_cents: 95000, walkaway: '$950 (private)', min_offer_cents: 10000, min_offer: '$100.00' },
     });
     expect(j.next_step).toMatch(/decline/i);
     expect(j.next_step).toMatch(/no Gate D/);
@@ -147,10 +147,13 @@ describe('POST /offers', () => {
 
   it('O7: pricing_hold with reason + approval sets the hold and one history row; without approval -> 422, nothing written', async () => {
     const { w } = await setup();
-    const hist = () => db.selectFrom('listing_history').selectAll().where('domain_id', '=', 1).execute();
+    const tid = (await db.selectFrom('domains').select('id').where('domain', '=', T).executeTakeFirstOrThrow()).id;
+    const hist = () => db.selectFrom('listing_history').selectAll().where('domain_id', '=', tid).execute();
     const before = (await hist()).length;
     const no = await post(w, offer({ pricing_hold: true, pricing_hold_reason: 'buyer in talks' }));
     expect([no.statusCode, no.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
+    const neither = await post(w, offer({ pricing_hold: true }));
+    expect([neither.statusCode, neither.json().error.code]).toEqual([422, 'HOLD_REASON_REQUIRED']);
     const nr = await post(w, offer({ pricing_hold: true, approval_ref: approval(T) }));
     expect([nr.statusCode, nr.json().error.code]).toEqual([422, 'HOLD_REASON_REQUIRED']);
     expect(await rows()).toHaveLength(0);
@@ -237,5 +240,90 @@ describe('GET /offers and no side effects', () => {
     expect(pb.calls).toEqual(calls);
     const after = await db.selectFrom('domains').selectAll().where('domain', '=', T).executeTakeFirstOrThrow();
     expect(after).toEqual(before);
+  });
+});
+
+describe('fix round 1', () => {
+  it('external_ref reused for another domain -> 409 EXTERNAL_REF_CONFLICT; a real duplicate shows its own domain', async () => {
+    const { w } = await setup();
+    const a = await post(w, offer({ external_ref: 'Z1' }));
+    const c = await post(w, offer({ domain: G, external_ref: 'Z1' }));
+    expect(c.statusCode).toBe(409);
+    expect(c.json().error).toMatchObject({ code: 'EXTERNAL_REF_CONFLICT', details: { offer_id: a.json().id } });
+    expect(JSON.stringify(c.json())).not.toContain(T);
+    const dup = await post(w, offer({ external_ref: 'Z1' }));
+    expect(dup.json()).toMatchObject({ duplicate: true, domain: T });
+    expect(await rows()).toHaveLength(1);
+  });
+
+  it('hold: second held offer adds no history row; duplicate with hold applies nothing; delisted -> 404', async () => {
+    const { w } = await setup();
+    const hist = async () => (await db.selectFrom('listing_history').select('id').execute()).length;
+    const held = (extra: object) => post(w, offer({ pricing_hold: true, pricing_hold_reason: 'talks', approval_ref: approval(T), ...extra }));
+    const dupFirst = await post(w, offer({ amount_usd: '470' }));
+    expect(dupFirst.statusCode).toBe(201);
+    const h0 = await hist();
+    const dup = await held({ amount_usd: '470' });
+    expect(dup.statusCode).toBe(200);
+    expect(dup.json().duplicate).toBe(true);
+    expect(await hist()).toBe(h0);
+    expect((await db.selectFrom('domains').select('pricing_hold').where('domain', '=', T).executeTakeFirstOrThrow()).pricing_hold).toBe(false);
+    expect((await held({ amount_usd: '480' })).statusCode).toBe(201);
+    expect(await hist()).toBe(h0 + 1);
+    expect((await held({ amount_usd: '490' })).statusCode).toBe(201);
+    expect(await hist()).toBe(h0 + 1);
+    await db.updateTable('domains').set({ status: 'delisted', delisted_at: new Date('2026-11-15T00:00:00Z') }).where('domain', '=', T).execute();
+    const nd = await held({ amount_usd: '495' });
+    expect([nd.statusCode, nd.json().error.code]).toEqual([404, 'NOT_IN_PORTFOLIO']);
+  });
+
+  it('unpriced offer countered without approval -> 422 APPROVAL_REQUIRED', async () => {
+    const { w } = await setup();
+    await insertOwnedDomain(db, { domain: 'neverlisted.com', category: 'trend', price_grade: null });
+    const id = (await post(w, offer({ domain: 'neverlisted.com' }))).json().id;
+    const r = await outcome(w, id, { outcome: 'countered' });
+    expect([r.statusCode, r.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
+  });
+
+  it('received_at must be a real calendar date', async () => {
+    const { w } = await setup();
+    const r = await post(w, offer({ received_at: '2026-02-30T10:00:00+02:00' }));
+    expect([r.statusCode, r.json().error.code]).toEqual([422, 'VALIDATION_ERROR']);
+  });
+
+  it('an offer received exactly at a history row\'s at uses the new prices', async () => {
+    const { w } = await setup();
+    await new PriceScheduleJob({ db, now: () => Date.parse('2027-04-12T00:30:00Z') }).runOnce({ today: '2027-04-12' });
+    clock = Date.parse('2027-04-14T09:00:00Z');
+    const r = await post(w, offer({ amount_usd: '1100', received_at: '2027-04-12T00:30:00Z' }));
+    expect(r.json()).toMatchObject({ band: 'at_or_above_floor', snapshot: { floor_cents: 103500 } });
+  });
+
+  it('delisted domain, offer after delisted_at: old prices plus OFFER_ON_UNLISTED', async () => {
+    const { w } = await setup();
+    await db.updateTable('domains').set({ status: 'delisted', delisted_at: new Date('2026-11-15T00:00:00Z') }).where('domain', '=', T).execute();
+    const r = await post(w, offer({ amount_usd: '1000', received_at: '2026-11-20T10:00:00+02:00' }));
+    expect(r.json()).toMatchObject({ band: 'mid_range', warnings: ['OFFER_ON_UNLISTED'], snapshot: { floor_cents: 129500 } });
+  });
+
+  it('GET from/to around IDT midnight; from > to -> 400; truncated flag', async () => {
+    const { w, r } = await setup();
+    const a = (await post(w, offer({ received_at: '2026-11-20T23:30:00+02:00', amount_usd: '300' }))).json().id;
+    await post(w, offer({ received_at: '2026-11-21T00:10:00+02:00', amount_usd: '310' }));
+    const res = await app.inject({ method: 'GET', url: '/offers?from=2026-11-20&to=2026-11-20', headers: r });
+    expect(res.json().offers.map((o: { id: number }) => o.id)).toEqual([a]);
+    expect(res.json().truncated).toBe(false);
+    for (const q of ['from=2026-11-21&to=2026-11-20', 'from=2026-11-21T00:00:00Z&to=2026-11-20T00:00:00Z']) {
+      const bad = await app.inject({ method: 'GET', url: `/offers?${q}`, headers: r });
+      expect([bad.statusCode, bad.json().error.code]).toEqual([400, 'VALIDATION_ERROR']);
+    }
+    const dom = await db.selectFrom('domains').select('id').where('domain', '=', T).executeTakeFirstOrThrow();
+    await db.insertInto('offers').values(Array.from({ length: 500 }, (_, i) => ({
+      domain_id: dom.id, amount_cents: 1000 + i, source: 'other' as const, received_at: new Date('2026-10-20T00:00:00Z'),
+      band: 'below_min' as const, routing: 'auto_decline' as const, outcome: 'declined_auto' as const, recorded_by: 'x',
+    }))).execute();
+    const all = await app.inject({ method: 'GET', url: '/offers', headers: r });
+    expect(all.json().offers).toHaveLength(500);
+    expect(all.json().truncated).toBe(true);
   });
 });

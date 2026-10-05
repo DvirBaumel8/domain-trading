@@ -12,7 +12,7 @@ import { jerusalemDate } from '../dates.js';
 import { buildSchedule, type ScheduleEvent } from '../pricing/schedule.js';
 import { currentSettings, settingsByVersion } from '../pricing/settings.js';
 import { isCategory, validateListing, type ListingPlan, type ListingRequest } from './listing-v2.js';
-import { domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
+import { applyHold, currentPlan, domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
 import { isValidDisplayName } from '../domain-name.js';
 import { planView } from './plan-view.js';
 
@@ -36,17 +36,6 @@ function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-/** The listing stored on the row, as a plan (for views and history rows of calls that change no price). */
-export function currentPlan(row: DomainRow, fallbackVersion: number): ListingPlan | null {
-  if (!row.listing_mode || !row.category) return null;
-  return {
-    mode: row.listing_mode, category: row.category, grade: row.category === 'geo' ? row.price_grade : null,
-    binCents: row.bin_cents, floorCents: row.floor_cents, walkawayCents: row.walkaway_cents, minOfferCents: row.min_offer_cents ?? 0,
-    ltoMaxMonths: row.lto_max_months, pricingSource: row.pricing_source ?? 'formula', settingsVersion: row.pricing_settings_version ?? fallbackVersion,
-    overrideUsed: false, warnings: [], formula: null,
-  };
 }
 
 export class ListService {
@@ -230,12 +219,14 @@ export class ListService {
           ...(gradeChange ? { price_grade: body.price_grade } : {}),
         }),
         ...(plan || displayChanged ? changedColumns(cur, now) : {}),
-        ...(holdChange ? { pricing_hold: body.pricing_hold!, pricing_hold_reason: body.pricing_hold ? body.pricing_hold_reason!.trim() : null } : {}),
         ...(body.display_name != null ? { display_name: body.display_name } : {}),
         lander, lander_ns: ns, lander_set_at: now,
         ns_verified_at: ns_public === 'match' ? now : nsChanged ? null : row.ns_verified_at,
         updated_at: now,
       }).where('id', '=', row.id).execute();
+      if (holdChange) {
+        await applyHold(trx, cur, { hold: body.pricing_hold!, reason: body.pricing_hold_reason ?? null, approvalText: null, approvalAt: null, auditId: ctx.auditId, now, history: false });
+      }
       if (plan) {
         await writePlan(trx, { domainId: row.id, plan, anchor, dropDate: row.drop_date!, settings: s, planAuditId: ctx.auditId, startAfter, now });
       }

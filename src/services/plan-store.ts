@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type Insertable, type Kysely, type Transaction, type Updateable } from 'kysely';
-import type { Category, Database, DomainsTable, ListingHistoryTable } from '../db/types.js';
+import type { Category, Database, DomainRow, DomainsTable, ListingHistoryTable } from '../db/types.js';
 import { buildSchedule, type ScheduleEvent } from '../pricing/schedule.js';
 import type { PricingSettings } from '../pricing/settings.js';
 import { AppError } from '../http/errors.js';
@@ -96,5 +96,36 @@ export function domainPlanColumns(plan: ListingPlan): Updateable<DomainsTable> {
     listing_mode: plan.mode, bin_cents: plan.binCents, floor_cents: plan.floorCents, walkaway_cents: plan.walkawayCents,
     min_offer_cents: plan.minOfferCents, lto_max_months: plan.ltoMaxMonths, price_grade: plan.grade,
     pricing_source: plan.pricingSource, pricing_settings_version: plan.settingsVersion,
+  };
+}
+
+/**
+ * Set or clear the pricing hold on a locked domain row (`cur`, selected FOR UPDATE in `trx`). A no-op when the hold already has that value.
+ * Writes the hold's own history row unless the caller writes one for the whole change (`history: false`).
+ */
+export async function applyHold(trx: Transaction<Database>, cur: DomainRow, o: {
+  hold: boolean; reason: string | null; approvalText: string | null; approvalAt: Date | null; auditId: string; now: Date; history?: boolean;
+}): Promise<boolean> {
+  if (cur.pricing_hold === o.hold) return false;
+  await trx.updateTable('domains').set({ pricing_hold: o.hold, pricing_hold_reason: o.hold ? (o.reason?.trim() ?? null) : null, updated_at: o.now })
+    .where('id', '=', cur.id).execute();
+  if (o.history !== false) {
+    await trx.insertInto('listing_history').values(historyRow({
+      domainId: cur.id, source: 'list', plan: currentPlan(cur, cur.pricing_settings_version ?? 0), category: cur.category, grade: cur.price_grade,
+      lander: cur.lander, override: false, overrideReason: null, approvalText: o.approvalText, approvalAt: o.approvalAt,
+      auditId: o.auditId, planAuditId: cur.plan_audit_id, at: o.now,
+    })).execute();
+  }
+  return true;
+}
+
+/** The listing stored on the row, as a plan (for views and history rows of calls that change no price). */
+export function currentPlan(row: DomainRow, fallbackVersion: number): ListingPlan | null {
+  if (!row.listing_mode || !row.category) return null;
+  return {
+    mode: row.listing_mode, category: row.category, grade: row.category === 'geo' ? row.price_grade : null,
+    binCents: row.bin_cents, floorCents: row.floor_cents, walkawayCents: row.walkaway_cents, minOfferCents: row.min_offer_cents ?? 0,
+    ltoMaxMonths: row.lto_max_months, pricingSource: row.pricing_source ?? 'formula', settingsVersion: row.pricing_settings_version ?? fallbackVersion,
+    overrideUsed: false, warnings: [], formula: null,
   };
 }

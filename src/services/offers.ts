@@ -2,11 +2,11 @@ import { sql, type Kysely, type Selectable } from 'kysely';
 import type { Database, DomainRow, OffersTable } from '../db/types.js';
 import { AppError } from '../http/errors.js';
 import { formatUsd, usdStringToCents } from '../money.js';
+import { wholeUsd } from '../pricing/present.js';
 import { toJerusalemIso } from '../time.js';
 import { checkApproval } from './approval.js';
-import { currentPlan } from './list.js';
 import { classify, BUYER_TYPES, OFFER_SOURCES, type BuyerType, type OfferSnapshot, type OfferSource } from './offer-rules.js';
-import { historyRow, withDomainLock } from './plan-store.js';
+import { applyHold, withDomainLock } from './plan-store.js';
 
 type OfferRow = Selectable<OffersTable>;
 
@@ -23,6 +23,7 @@ export interface OutcomeBody {
 
 export const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 export const OFFER_BANDS = ['below_min', 'below_walkaway', 'mid_range', 'at_or_above_floor', 'at_or_above_bin', 'geo_below_bin', 'unpriced'] as const;
+const OFFERS_LIMIT = 500;
 const FUTURE_SKEW_MS = 5 * 60_000;
 const OUTCOMES = ['declined', 'countered', 'accepted', 'expired', 'withdrawn', 'sold'] as const;
 const FINAL = new Set(['declined', 'expired', 'withdrawn', 'sold']);
@@ -43,7 +44,7 @@ export function offerView(o: OfferRow, domain: string) {
     outcome_at: o.outcome_at ? toJerusalemIso(o.outcome_at) : null, outcome_note: o.outcome_note,
     snapshot: {
       bin_cents: bin.cents, bin: bin.display, floor_cents: floor.cents, floor: floor.display,
-      walkaway_cents: o.walkaway_cents_at, walkaway: o.walkaway_cents_at === null ? null : '(private)',
+      walkaway_cents: o.walkaway_cents_at, walkaway: o.walkaway_cents_at === null ? null : `${wholeUsd(o.walkaway_cents_at)} (private)`,
       min_offer_cents: min.cents, min_offer: min.display,
     },
     listing_history_id: o.listing_history_id, recorded_by: o.recorded_by,
@@ -87,6 +88,7 @@ export class OffersService {
       throw new AppError(422, 'VALIDATION_ERROR', 'received_at must be ISO 8601 with a timezone offset');
     }
     const receivedAt = new Date(body.received_at);
+    if (!realDate(body.received_at)) throw new AppError(422, 'VALIDATION_ERROR', 'received_at is not a real calendar date');
     if (receivedAt.getTime() > now.getTime() + FUTURE_SKEW_MS) throw new AppError(422, 'RECEIVED_AT_IN_FUTURE', 'received_at is more than 5 minutes in the future');
     // external_ref may legitimately be an email Message-ID, so it is exempt from the '@' rule
     for (const [f, v] of [['buyer_ref', body.buyer_ref], ['note', body.note]] as const) {
@@ -96,18 +98,19 @@ export class OffersService {
     const hold = body.pricing_hold === true;
     let approvedAt: Date | null = null;
     if (hold) {
+      if (d.status !== 'owned' && d.status !== 'listed') throw new AppError(404, 'NOT_IN_PORTFOLIO', `${body.domain} is not an owned or listed domain`);
+      if (!body.pricing_hold_reason?.trim()) throw new AppError(422, 'HOLD_REASON_REQUIRED', 'pricing_hold needs pricing_hold_reason');
       if (!body.approval_ref) throw new AppError(422, 'APPROVAL_REQUIRED', "pricing_hold needs approval_ref (Dvir's words)");
       const settings = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
       const a = checkApproval(body.approval_ref, body.domain, now, settings.approval_max_age_hours);
       if (!a.ok) throw new AppError(422, a.code, a.reason);
       approvedAt = a.approvedAt;
-      if (!body.pricing_hold_reason?.trim()) throw new AppError(422, 'HOLD_REASON_REQUIRED', 'pricing_hold needs pricing_hold_reason');
     }
 
     const source = body.source as OfferSource;
     const externalRef = body.external_ref ?? null;
     const existing = await this.findDuplicate(db, d.id, source, amountCents, receivedAt, externalRef);
-    if (existing) return { status: 200 as const, body: { ...offerView(existing, d.domain), duplicate: true } };
+    if (existing) return this.duplicate(existing, d.id);
 
     const snap = await snapshotAt(db, d, receivedAt);
     const c = classify(snap, amountCents, source);
@@ -124,13 +127,11 @@ export class OffersService {
           }).returningAll().executeTakeFirstOrThrow();
           if (hold) {
             const cur = await trx.selectFrom('domains').selectAll().where('id', '=', d.id).forUpdate().executeTakeFirstOrThrow();
-            await trx.updateTable('domains').set({ pricing_hold: true, pricing_hold_reason: body.pricing_hold_reason!.trim(), updated_at: now })
-              .where('id', '=', d.id).execute();
-            await trx.insertInto('listing_history').values(historyRow({
-              domainId: d.id, source: 'list', plan: currentPlan(cur, cur.pricing_settings_version ?? 0), category: cur.category, grade: cur.price_grade,
-              lander: cur.lander, override: false, overrideReason: null, approvalText: String(body.approval_ref!.text), approvalAt: approvedAt,
-              auditId: ctx.auditId, planAuditId: cur.plan_audit_id, at: now,
-            })).execute();
+            if (cur.status !== 'owned' && cur.status !== 'listed') throw new AppError(404, 'NOT_IN_PORTFOLIO', `${body.domain} is not an owned or listed domain`);
+            await applyHold(trx, cur, {
+              hold: true, reason: body.pricing_hold_reason ?? null, approvalText: String(body.approval_ref!.text), approvalAt: approvedAt,
+              auditId: ctx.auditId, now,
+            });
           }
           return r;
         });
@@ -144,8 +145,17 @@ export class OffersService {
       }
     };
     const r = hold ? await withDomainLock(db, d.domain, insert) : await insert(db);
-    if (r.duplicate) return { status: 200 as const, body: { ...offerView(r.row, d.domain), duplicate: true } };
+    if (r.duplicate) return this.duplicate(r.row, d.id);
     return { status: 201 as const, body: { ...offerView(r.row, d.domain), next_step: c.nextStep, warnings: c.warnings } };
+  }
+
+  /** A genuine duplicate shows the row's real domain; an external_ref already used for another domain is a conflict. */
+  private async duplicate(row: OfferRow, domainId: number) {
+    if (row.domain_id !== domainId) {
+      throw new AppError(409, 'EXTERNAL_REF_CONFLICT', 'external_ref is already recorded for a different offer', { offer_id: row.id });
+    }
+    const dom = await this.deps.db.selectFrom('domains').select('domain').where('id', '=', row.domain_id).executeTakeFirstOrThrow();
+    return { status: 200 as const, body: { ...offerView(row, dom.domain), duplicate: true } };
   }
 
   private async findDuplicate(db: Kysely<Database>, domainId: number, source: OfferSource, amountCents: number, receivedAt: Date, externalRef: string | null) {
@@ -171,7 +181,7 @@ export class OffersService {
     }
 
     let approvalText: string | null = null;
-    if ((body.outcome === 'countered' || body.outcome === 'accepted') && (o.band === 'mid_range' || isEmailSource(o.source))) {
+    if ((body.outcome === 'countered' || body.outcome === 'accepted') && (o.routing === 'dvir' || isEmailSource(o.source))) {
       if (!body.approval_ref) throw new AppError(422, 'APPROVAL_REQUIRED', "This outcome needs approval_ref (Dvir's words)");
       const settings = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
       const a = checkApproval(body.approval_ref, d.domain, now, settings.approval_max_age_hours);
@@ -198,8 +208,8 @@ export class OffersService {
     if (f.from?.at) q = q.where('offers.received_at', '>=', f.from.at);
     if (f.to?.date) q = q.where(sql<boolean>`offers.received_at < ((${f.to.date}::date + 1)::timestamp at time zone 'Asia/Jerusalem')`);
     if (f.to?.at) q = q.where('offers.received_at', '<=', f.to.at);
-    const rows = await q.orderBy('offers.received_at', 'desc').orderBy('offers.id', 'desc').limit(500).execute();
-    return { offers: rows.map((r) => offerView(r, r.domain_name)) };
+    const rows = await q.orderBy('offers.received_at', 'desc').orderBy('offers.id', 'desc').limit(OFFERS_LIMIT + 1).execute();
+    return { offers: rows.slice(0, OFFERS_LIMIT).map((r) => offerView(r, r.domain_name)), truncated: rows.length > OFFERS_LIMIT };
   }
 }
 
@@ -210,4 +220,11 @@ function parseAmount(s: string): number {
   try { c = usdStringToCents(s); } catch { throw bad(); }
   if (c <= 0 || c > 2_000_000_000) throw bad();
   return c;
+}
+
+/** The date part must be a real calendar day (JS would roll 02-30 into March). */
+function realDate(iso: string): boolean {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number) as [number, number, number];
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
 }
