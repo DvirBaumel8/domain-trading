@@ -10,7 +10,7 @@ export async function buildReport(db: Kysely<Database>, now: Date) {
   const m = await reportMoney(db);
   return {
     generated_at: toJerusalemIso(now),
-    budget: m.budget, sales: m.sales, profit: m.profit, roi: m.roi, roi_pct: m.roi_pct,
+    ...m,
     per_domain: await perDomain(db, now),
     upcoming_90d: await upcoming90d(db, now),
     offers_by_strategy: await offersByStrategy(db, now),
