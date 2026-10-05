@@ -83,6 +83,7 @@ export interface DomainsTable {
   plan_id: string | null;
   plan_audit_id: string | null;
   export_pending_since: Timestamp | null;
+  listing_changed_at: Timestamp | null;
   created_at: TimestampDefault;
   updated_at: TimestampDefault;
 }
@@ -179,7 +180,7 @@ export interface AuditLogTable {
   id: string;
   at: TimestampDefault;
   token_id: number | null;
-  scope: Scope | 'admin' | null;
+  scope: Scope | 'admin' | 'job' | null;
   method: string;
   path: string;
   idempotency_key: string | null;
@@ -210,6 +211,19 @@ export interface ExportRunsTable {
   marketplace: 'afternic' | 'sedo';
   at: TimestampDefault;
   domains: string[];
+  export_id: string;
+  changed_only: Generated<boolean>;
+}
+
+export interface ExportUploadsTable {
+  id: Generated<number>;
+  venue: 'afternic' | 'sedo';
+  export_id: string;
+  domains: string[];
+  uploaded_at: Timestamp;
+  approval_text: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
 }
 
 export interface PricingSettingsTable {
@@ -286,6 +300,7 @@ export interface Database {
   audit_log: AuditLogTable;
   idempotency_keys: IdempotencyKeysTable;
   export_runs: ExportRunsTable;
+  export_uploads: ExportUploadsTable;
   pricing_settings: PricingSettingsTable;
   price_schedule: PriceScheduleTable;
   pricing_evidence: PricingEvidenceTable;

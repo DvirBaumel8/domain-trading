@@ -1,3 +1,4 @@
+import { changedColumns } from './export-state.js';
 import type { Kysely } from 'kysely';
 import type { Config } from '../config.js';
 import type { Category, Database, DomainRow } from '../db/types.js';
@@ -228,7 +229,7 @@ export class ListService {
           ...(categoryChange ? { category, price_grade: category === 'geo' ? grade : null } : {}),
           ...(gradeChange ? { price_grade: body.price_grade } : {}),
         }),
-        ...(plan || displayChanged ? { export_pending_since: cur.export_pending_since ?? now } : {}),
+        ...(plan || displayChanged ? changedColumns(cur, now) : {}),
         ...(holdChange ? { pricing_hold: body.pricing_hold!, pricing_hold_reason: body.pricing_hold ? body.pricing_hold_reason!.trim() : null } : {}),
         ...(body.display_name != null ? { display_name: body.display_name } : {}),
         lander, lander_ns: ns, lander_set_at: now,

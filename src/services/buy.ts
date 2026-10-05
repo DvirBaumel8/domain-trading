@@ -1,3 +1,4 @@
+import { changedColumns } from './export-state.js';
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import type { Category, Database } from '../db/types.js';
@@ -509,7 +510,7 @@ export class BuyService {
         if (row.status !== 'owned' || !row.drop_date) throw new Error(`domain is ${row.status}, not owned`);
         await trx.updateTable('domains').set({
           ...domainPlanColumns(plan), status: 'listed', category: a.category, price_grade: plan.grade,
-          first_listed_at: now, export_pending_since: now, updated_at: now,
+          first_listed_at: now, ...changedColumns(row, now), updated_at: now,
         }).where('id', '=', row.id).execute();
         await trx.insertInto('listing_history').values(historyRow({
           domainId: row.id, source: 'buy', plan, category: a.category, grade: plan.grade, lander: a.settings.lander_target,

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
@@ -152,7 +153,7 @@ export class ExportService {
       return false;
     });
     // Last DB step.
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: exported }).execute();
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: exported, export_id: `exp_${randomUUID()}` }).execute();
     return { csv: toCsv(rows), filename: `afternic-${jerusalemDate(new Date(this.deps.now()))}.csv`, delist, warnings };
   }
 
@@ -169,7 +170,7 @@ export class ExportService {
       rows.push(sedoRow(d, t, s.sedo_hybrid_as));
       exported.push(d.domain);
     }
-    await this.deps.db.insertInto('export_runs').values({ marketplace: 'sedo', domains: exported }).execute();
+    await this.deps.db.insertInto('export_runs').values({ marketplace: 'sedo', domains: exported, export_id: `exp_${randomUUID()}` }).execute();
     return { csv: toCsv(rows), filename: `sedo-${jerusalemDate(new Date(this.deps.now()))}.csv`, warnings };
   }
 }

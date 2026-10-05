@@ -52,6 +52,31 @@ describe('schema: append-only (AL-2, B-23, LH-3)', () => {
   });
 });
 
+describe('schema: export_uploads and job scope (migration 6)', () => {
+  const seedUpload = async () => {
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: ['a.com'], export_id: 'exp_1' }).execute();
+    await db.insertInto('export_uploads').values({
+      venue: 'afternic', export_id: 'exp_1', domains: ['a.com'], uploaded_at: new Date('2026-10-05T10:00:00Z'), approval_text: 'uploaded', audit_id: null,
+    }).execute();
+  };
+  it('UPDATE, DELETE and TRUNCATE on export_uploads raise', async () => {
+    await seedUpload();
+    await expect(db.updateTable('export_uploads').set({ approval_text: 'x' }).execute()).rejects.toThrow(/append-only/);
+    await expect(db.deleteFrom('export_uploads').execute()).rejects.toThrow(/append-only/);
+    await expect(sql`TRUNCATE export_uploads`.execute(db)).rejects.toThrow(/append-only/);
+  });
+  it('a duplicate export_id raises', async () => {
+    await seedUpload();
+    await expect(db.insertInto('export_runs').values({ marketplace: 'sedo', domains: [], export_id: 'exp_1' }).execute()).rejects.toThrow(/export_runs_export_id_key/);
+    await expect(db.insertInto('export_uploads').values({
+      venue: 'afternic', export_id: 'exp_1', domains: [], uploaded_at: new Date(), approval_text: 'again', audit_id: null,
+    }).execute()).rejects.toThrow(/export_uploads_export_id_key/);
+  });
+  it('audit scope job is accepted', async () => {
+    await db.insertInto('audit_log').values({ id: 'aud_' + '1'.repeat(32), method: 'JOB', path: '/job/price', status_code: 200, scope: 'job' }).execute();
+  });
+});
+
 describe('schema: domains CHECKs', () => {
   it('RN-3: renewals_used = 2 fails', async () => {
     await expect(insertOwnedDomain(db, { renewals_used: 2 })).rejects.toThrow(/renewals_used/);
@@ -150,7 +175,7 @@ describe('schema: settings', () => {
       lander_target: 'afternic',
       allowed_registrars: ['porkbun'],
       high_value_min_bin_cents: 250000,
-      sedo_hybrid_as: 'buy_now',
+      sedo_hybrid_as: 'make_offer',
     });
     for (const k of ['geo_bin_min_cents', 'geo_bin_max_cents', 'high_value_categories', 'high_value_guard_modes']) expect(rows[0]).not.toHaveProperty(k);
   });

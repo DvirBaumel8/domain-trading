@@ -361,6 +361,7 @@ describe('POST /list/{domain}', () => {
     const d = await dom();
     expect(d.first_listed_at?.getTime()).toBe(NOW);
     expect(d.export_pending_since?.getTime()).toBe(NOW);
+    expect(d.listing_changed_at?.getTime()).toBe(NOW);
     expect(rowsOf(await schedule())).toEqual(PR12);
     const audit = await db.selectFrom('audit_log').select('id').where('path', 'like', '/list/%').executeTakeFirstOrThrow();
     expect(d.plan_audit_id).toBe(audit.id);

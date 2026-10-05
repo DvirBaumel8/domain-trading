@@ -46,6 +46,8 @@ describe('POST /buy v2 listing', () => {
       pricing_source: 'formula', pricing_settings_version: 2, category: 'trend', plan_audit_id: b.audit_id, drop_date: '2028-10-05',
     });
     expect(dom.first_listed_at?.toISOString()).toBe('2026-10-05T10:00:00.000Z');
+    expect(dom.listing_changed_at?.getTime()).toBe(NOW);
+    expect(dom.export_pending_since?.getTime()).toBe(NOW);
     const ev = one(await db.selectFrom('pricing_evidence').selectAll().execute());
     expect(ev).toMatchObject({ audit_id: b.audit_id, rationale: 'fixture', domain_id: dom.id });
     expect(ev.comps).toHaveLength(2);

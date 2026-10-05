@@ -113,7 +113,7 @@ describe('GET /export/sedo.csv', () => {
     expect(res.json().error.code).toBe('SEDO_TEMPLATE_MISSING');
   });
 
-  it('E-7: headers and values exactly as configured; no minimum on fixed-price rows', async () => {
+  it('E-7: headers and values exactly as configured; hybrid is make offer by default (sedo_hybrid_as make_offer)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'sedo-'));
     const path = join(dir, 'sedo_template.json');
     writeFileSync(path, JSON.stringify({
@@ -130,8 +130,24 @@ describe('GET /export/sedo.csv', () => {
       'Domain Name,Option,Sale,Price,Min,Cur,Action',
       'austinroofrepair.com,FIXED,yes,399,,USD,ADD',
       'buzz.com,OFFER,yes,,500,USD,ADD',
-      'trendname.com,FIXED,yes,4999,,USD,ADD',
+      'trendname.com,OFFER,yes,4999,1000,USD,ADD',
     ]);
+  });
+
+  it('E-7: hybrid is a fixed-price row only when an admin sets sedo_hybrid_as = buy_now', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sedo-'));
+    const path = join(dir, 'sedo_template.json');
+    writeFileSync(path, JSON.stringify({
+      headers: ['Domain Name', 'Option', 'Sale', 'Price', 'Min', 'Cur', 'Action'],
+      map: { domain: 'Domain Name', selling_option: 'Option', for_sale: 'Sale', price: 'Price', min_price: 'Min', currency: 'Cur', action: 'Action' },
+      values: { buy_now: 'FIXED', make_offer: 'OFFER', for_sale_yes: 'yes', usd: 'USD', action_add: 'ADD' },
+    }));
+    app = await makeApp({ env: { SEDO_TEMPLATE_PATH: path } });
+    const { auth } = await issueToken('read');
+    await fixture4();
+    await db.updateTable('settings').set({ sedo_hybrid_as: 'buy_now' }).execute();
+    const res = await app.inject({ method: 'GET', url: '/export/sedo.csv', headers: auth });
+    expect(parseCsvStrict(res.body).map((r) => r.join(','))).toContain('trendname.com,FIXED,yes,4999,,USD,ADD');
   });
 
   it('an invalid template file → 501 SEDO_TEMPLATE_INVALID, never a guessed file', async () => {
