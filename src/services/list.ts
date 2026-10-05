@@ -89,7 +89,8 @@ export class ListService {
       if (a.ok) { approvalValid = true; approvedAt = a.approvedAt; } else approvalFailure = { code: a.code, reason: a.reason };
     }
 
-    // Field checks
+    // Field checks (V1 first: §5 order)
+    if (body.mode != null && !['bin', 'offer', 'hybrid'].includes(body.mode)) throw new AppError(422, 'MODE_INVALID', 'mode must be bin, offer or hybrid');
     if (body.category !== undefined && body.category !== null && !isCategory(body.category)) throw new AppError(422, 'CATEGORY_REQUIRED', 'Unknown category');
     const category: Category | null = body.category !== undefined && body.category !== null && isCategory(body.category) ? body.category : row.category;
     if (body.price_grade != null && category !== 'geo') throw new AppError(422, 'GRADE_NOT_GEO', 'price_grade only applies to geo names');

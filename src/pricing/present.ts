@@ -28,10 +28,10 @@ function eventText(plan: Plan, e: ScheduleEvent): string | null {
   return `${eventLabel(e.event)} ${e.dueOn} ${wholeUsd(e.binCents!)}/${wholeUsd(e.floorCents!)}/${wholeUsd(e.walkawayCents!)}`;
 }
 
-export function sellPlanLine(plan: Plan, schedule: ScheduleEvent[]): string {
+export function sellPlanLine(plan: Plan, schedule: ScheduleEvent[], ltoMaxMonths?: number | null): string {
   const head = plan.mode === 'bin'
     ? [`bin (geo ${plan.grade}) · BIN ${wholeUsd(plan.binCents)} · no offers`]
-    : [`hybrid · BIN ${wholeUsd(plan.binCents)} · floor (auto-accept) ${wholeUsd(plan.floorCents)} · walk-away (private) ${wholeUsd(plan.walkawayCents)} · min offer ${wholeUsd(plan.minOfferCents)} · LTO off`];
+    : [`hybrid · BIN ${wholeUsd(plan.binCents)} · floor (auto-accept) ${wholeUsd(plan.floorCents)} · walk-away (private) ${wholeUsd(plan.walkawayCents)} · min offer ${wholeUsd(plan.minOfferCents)} · ${ltoMaxMonths ? `LTO ${ltoMaxMonths} mo` : 'LTO off'}`];
   const events = schedule.map((e) => eventText(plan, e)).filter((t): t is string => t !== null);
   return [...head, ...events, `settings v${plan.settingsVersion}`].join(' · ');
 }

@@ -17,7 +17,7 @@ export interface Plan {
 }
 export type PlanResult = { ok: true; plan: Plan } | { ok: false; code: string; message: string; details?: Record<string, unknown> };
 
-const FAST_TRANSFER_MAX_CENTS = 10_000_000; // Afternic Premium network limit ($100,000); an Afternic rule, not a pricing setting
+export const FAST_TRANSFER_MAX_CENTS = 10_000_000; // Afternic Premium network limit ($100,000); an Afternic rule, not a pricing setting
 const BAND = 10000;
 const ENDING_95 = 9500;
 

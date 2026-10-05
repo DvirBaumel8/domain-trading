@@ -4,8 +4,8 @@ import { insertOwnedDomain, testDb } from './db.js';
 
 export const DOMAIN = 'examplecityroofing.com';
 
-// Fixed per module load so two buyBody() calls in one test are byte-identical (same-key replay tests).
-const T0 = Date.now();
+// A fixed instant: buy suites run on this app clock (makeApp({ now: () => T0 })), so approvals never age with the wall clock.
+export const T0 = Date.parse('2026-10-06T09:00:00Z');
 
 export function approvalNow(domain = DOMAIN, hoursAgo = 1) {
   return { text: `yes buy ${domain} up to $11.50, list BIN $399`, approved_at: new Date(T0 - hoursAgo * 3_600_000).toISOString() };

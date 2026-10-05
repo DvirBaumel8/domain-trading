@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { RdapFn } from '../../src/rdap.js';
 import { RegistrarError } from '../../src/registrars/types.js';
 import { makeApp } from '../helpers/app.js';
-import { DOMAIN, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
+import { DOMAIN, T0, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { issueToken } from '../helpers/tokens.js';
@@ -14,7 +14,7 @@ const rdapFree: RdapFn = async () => 'not_registered';
 const rdapTaken: RdapFn = async () => 'registered';
 
 async function setup(adapters: FakeAdapter[] = [new FakeAdapter('porkbun')], rdap: RdapFn = rdapFree) {
-  app = await makeApp({ adapters, rdap });
+  app = await makeApp({ adapters, rdap, now: () => T0 });
   return (await issueToken('write')).auth;
 }
 const rows = async () => ({
@@ -27,7 +27,7 @@ const registerCalls = (a: FakeAdapter) => a.calls.filter((c) => c.startsWith('re
 describe('POST /buy checks (no money moves)', () => {
   it('B-1/AU-3: READ token → 403, audit row, zero registrar calls', async () => {
     const pb = new FakeAdapter('porkbun');
-    app = await makeApp({ adapters: [pb], rdap: rdapFree });
+    app = await makeApp({ adapters: [pb], rdap: rdapFree, now: () => T0 });
     const { auth } = await issueToken('read');
     const res = await postBuy(app, buyBody(), auth);
     expect(res.statusCode).toBe(403);
@@ -52,9 +52,9 @@ describe('POST /buy checks (no money moves)', () => {
     const pb = new FakeAdapter('porkbun');
     const auth = await setup([pb]);
     const cases = [
-      { text: 'yes buy it', approved_at: new Date().toISOString() },
-      { text: `buy ${DOMAIN}`, approved_at: new Date(Date.now() - 73 * 3_600_000).toISOString() },
-      { text: `buy ${DOMAIN}`, approved_at: new Date(Date.now() + 3_600_000).toISOString() },
+      { text: 'yes buy it', approved_at: new Date(T0).toISOString() },
+      { text: `buy ${DOMAIN}`, approved_at: new Date(T0 - 73 * 3_600_000).toISOString() },
+      { text: `buy ${DOMAIN}`, approved_at: new Date(T0 + 3_600_000).toISOString() },
     ];
     const codes = [];
     for (const approval_ref of cases) {

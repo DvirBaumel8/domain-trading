@@ -4,7 +4,7 @@ import { BuyService } from '../../src/services/buy.js';
 import { spentCents } from '../../src/services/budget.js';
 import { resetDb, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
-import { COMPS, seedSpent } from '../helpers/buy.js';
+import { COMPS, T0, seedSpent } from '../helpers/buy.js';
 
 describe('CAP-6: −Σ(registration+renewal+fee) ≤ poc_cap_cents after any sequence', () => {
   it('200 random sequences of parallel buys', { timeout: 180_000 }, async () => {
@@ -18,13 +18,13 @@ describe('CAP-6: −Σ(registration+renewal+fee) ≤ poc_cap_cents after any seq
       if (start > 0) await seedSpent(start);
       const price = 500 + rnd(20000);
       const pb = new FakeAdapter('porkbun', { quote: { firstYearCents: price, renewalCents: price }, account: { spendLimitRemainingCents: null } });
-      const checkService = new CheckService({ db, adapters: [pb], rdap: async () => 'not_registered', now: Date.now });
-      const svc = new BuyService({ db, adapters: [pb], checkService, rdap: async () => 'not_registered', now: Date.now, sleep: async () => {} });
+      const checkService = new CheckService({ db, adapters: [pb], rdap: async () => 'not_registered', now: () => T0 });
+      const svc = new BuyService({ db, adapters: [pb], checkService, rdap: async () => 'not_registered', now: () => T0, sleep: async () => {} });
       const n = 1 + rnd(4);
       const results = await Promise.allSettled(Array.from({ length: n }, (_, i) => {
         const domain = `p${s}x${i}.com`;
         return svc.buy(
-          { domain, maxPriceCents: 100_000, maxTwoYearCents: null, approval: { text: domain, approved_at: new Date().toISOString() },
+          { domain, maxPriceCents: 100_000, maxTwoYearCents: null, approval: { text: domain, approved_at: new Date(T0).toISOString() },
             dealId: null, category: 'geo', priceGrade: 'weaker', pricingEvidence: { comps: COMPS }, expectedSettingsVersion: null, proposedListing: null, override: false, overrideReason: null, registrar: null,
             dryRun: false, autoList: false, requestBody: { domain } },
           { idempotencyKey: `cap-${s}-${i}`, requestHash: 'h', auditId: `aud_${'0'.repeat(32)}` },

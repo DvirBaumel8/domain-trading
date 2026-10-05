@@ -132,9 +132,31 @@ describe('POST /buy v2 listing', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       settings_version: 2,
-      proposed_listing: { mode: 'hybrid', bin_cents: 199500, bin: '$1,995', floor_cents: 129500, floor: '$1,295', walkaway_cents: 96000, min_offer_cents: 10000, schedule: [] },
+      proposed_listing: { mode: 'hybrid', bin_cents: 199500, bin: '$1,995', floor_cents: 129500, floor: '$1,295', walkaway_cents: 96000, min_offer_cents: 10000 },
     });
     expect(await db.selectFrom('pricing_evidence').selectAll().execute()).toHaveLength(0);
     expect(await db.selectFrom('price_schedule').selectAll().execute()).toHaveLength(0);
+  });
+
+  it('PR-17 parity: /buy dry run shows the same plan and schedule as GET /pricing/preview on the same clock', async () => {
+    const { auth, pb } = await setup();
+    const res = await postBuy(app, trend({ dry_run: true, proposed_listing: HYBRID }), auth);
+    expect(res.statusCode).toBe(200);
+    const prev = await app.inject({ method: 'GET', url: '/pricing/preview?category=trend&bin=1995', headers: auth });
+    expect(prev.statusCode).toBe(200);
+    const a = res.json().proposed_listing;
+    const b = prev.json();
+    expect(a.schedule).toHaveLength(4);
+    for (const k of ['bin_cents', 'floor_cents', 'walkaway_cents', 'min_offer_cents', 'schedule', 'sell_plan_line']) expect(a[k]).toEqual(b[k]);
+    expect(registers(pb).every((c) => c.includes('dry=true'))).toBe(true);
+  });
+
+  it('V1 first: proposed_listing mode auction with no category -> MODE_INVALID and no adapter call', async () => {
+    const { auth, pb } = await setup();
+    const { category: _c, ...b } = trend({ proposed_listing: { mode: 'auction', bin: 1995 } });
+    const res = await postBuy(app, b, auth);
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe('MODE_INVALID');
+    expect(pb.calls).toHaveLength(0);
   });
 });

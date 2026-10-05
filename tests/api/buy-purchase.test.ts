@@ -5,7 +5,7 @@ import { RegistrarError } from '../../src/registrars/types.js';
 import { failPurchase, markUnknown } from '../../src/services/bookkeeping.js';
 import { Reconciler } from '../../src/services/reconciler.js';
 import { makeApp } from '../helpers/app.js';
-import { DOMAIN, approvalNow, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
+import { DOMAIN, T0, approvalNow, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { issueToken } from '../helpers/tokens.js';
@@ -17,7 +17,7 @@ const timeout = () => new RegistrarError('porkbun', 'REGISTRAR_TIMEOUT', 't', { 
 
 async function setup(pb: FakeAdapter, rdap: RdapFn = rdapFree) {
   const sleeps: number[] = [];
-  app = await makeApp({ adapters: [pb], rdap, sleep: async (ms) => { sleeps.push(ms); } });
+  app = await makeApp({ adapters: [pb], rdap, now: () => T0, sleep: async (ms) => { sleeps.push(ms); } });
   return { auth: (await issueToken('write')).auth, sleeps };
 }
 const one = <T>(xs: T[]) => {
@@ -404,7 +404,7 @@ describe('POST /buy final-review fixes', () => {
     expect(again.statusCode).toBe(202);
     expect(pb.realRegisterCalls).toBe(calls);
     const owned = new FakeAdapter('porkbun', { alreadyOwned: true });
-    const r = await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => Date.now() + 10 * 60_000 }).runOnce();
+    const r = await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => T0 + 10 * 60_000 }).runOnce();
     expect(r.booked).toBe(1);
     const b = await postBuy(app, buyBody(), auth, 'k-202r');
     expect(b.statusCode).toBe(201);
@@ -441,7 +441,7 @@ describe('POST /buy final-review fixes', () => {
     expect(again.json().error.code).toBe('ALREADY_OWNED_OR_PENDING');
     // (c)
     const owned = new FakeAdapter('porkbun', { alreadyOwned: true });
-    const r = await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => Date.now() + 10 * 60_000 }).runOnce();
+    const r = await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => T0 + 10 * 60_000 }).runOnce();
     expect(r.booked).toBe(1);
     expect(one(await db.selectFrom('ledger_entries').selectAll().execute())).toMatchObject({ amount_cents: -1108, deal_id: 'D-009' });
     expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ domain: DOMAIN, status: 'owned' });

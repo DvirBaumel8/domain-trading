@@ -14,6 +14,7 @@ import { activeDomainCount, spentAndPending, spentCents } from './budget.js';
 import type { CheckResult, CheckService } from './check.js';
 import { checkSettingsVersion, isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from './listing-v2.js';
 import { planView } from './plan-view.js';
+import { addMonthsClamped, buildSchedule } from '../pricing/schedule.js';
 import { domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
 import { currentSettings, type PricingSettings } from '../pricing/settings.js';
 import { evaluateQuote, pickWinner, type EvaluatedQuote } from './selection.js';
@@ -83,6 +84,8 @@ export class BuyService {
     if (!appr.ok) throw new AppError(422, appr.code, appr.reason);
 
     // 3b. category + proposed listing (V1–V8), before any registrar call
+    const pm = input.proposedListing?.mode;
+    if (input.proposedListing && (typeof pm !== 'string' || !['bin', 'offer', 'hybrid'].includes(pm))) throw new AppError(422, 'MODE_INVALID', 'mode must be bin, offer or hybrid');
     if (!isCategory(input.category)) {
       throw new AppError(422, 'CATEGORY_REQUIRED', 'A valid category is required: geo, trend, b2b, collision, regulation, buzzword or other');
     }
@@ -660,6 +663,9 @@ export class BuyService {
   private async dryRunBody(a: Approved): Promise<Record<string, unknown>> {
     const { spent, pending } = await spentAndPending(this.deps.db);
     const w = a.winner;
+    // Same default as GET /pricing/preview with no domain: anchor today (Jerusalem), drop date 24 months later
+    const anchor = jerusalemDate(new Date(this.deps.now()));
+    const events = a.plan ? buildSchedule({ plan: a.plan, anchor, dropDate: addMonthsClamped(anchor, 24), settings: a.pricing }) : [];
     return {
       dry_run: true, domain: a.input.domain, check_id: a.check.checkId, registrar: w.registrar,
       first_year: formatUsd(w.firstYearCents!), first_year_cents: w.firstYearCents,
@@ -670,7 +676,7 @@ export class BuyService {
       poc_remaining_after_cents: a.settings.poc_cap_cents - spent - pending - a.cost,
       domains_owned: await activeDomainCount(this.deps.db),
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
-      proposed_listing: a.plan ? planView(a.plan) : null, settings_version: a.pricing.version,
+      proposed_listing: a.plan ? planView(a.plan, events) : null, settings_version: a.pricing.version,
       warnings: [...a.check.warnings, ...(a.plan?.warnings ?? [])],
     };
   }

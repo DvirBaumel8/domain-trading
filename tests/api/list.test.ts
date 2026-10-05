@@ -440,6 +440,30 @@ describe('POST /list/{domain}', () => {
     expect(now2).toMatchObject({ bin_cents: 179500, floor_cents: 116500, walkaway_cents: 86000 });
   });
 
+  it('delist is never lost: a price change after the final-push date keeps a planned delist row and no drops', async () => {
+    const { auth } = await setup();
+    await trendOwned();
+    await list({ mode: 'hybrid', bin: 1995, approval_ref: approval() }, auth);
+    const first = await dom();
+    const later = Date.parse('2028-09-30T09:00:00Z');
+    await app.close();
+    const { auth: auth2 } = await setup(new FakeAdapter('porkbun'), async () => null, later);
+    const res = await list({ mode: 'hybrid', bin: 1795, approval_ref: approval(D, later) }, auth2);
+    expect(res.statusCode).toBe(200);
+    const now2 = await dom();
+    expect(now2.plan_id).not.toBe(first.plan_id);
+    const fresh = (await schedule()).filter((r) => r.plan_id === now2.plan_id);
+    expect(rowsOf(fresh)).toEqual([['delist', '2028-09-27', null, null, null, 'planned']]);
+  });
+
+  it('V1 first: mode auction with category geo on a trend domain -> MODE_INVALID', async () => {
+    const { auth } = await setup();
+    await trendOwned();
+    const res = await list({ mode: 'auction', category: 'geo' }, auth);
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe('MODE_INVALID');
+  });
+
   it('replan: a new settings version applies only with replan:true; a manual BIN change keeps the listed version', async () => {
     const { auth } = await setup();
     await trendOwned();

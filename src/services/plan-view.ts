@@ -25,7 +25,7 @@ export function planView(plan: ListingPlan, events: ScheduleEvent[] = []): objec
       walkawayCents: plan.walkawayCents, minOfferCents: plan.minOfferCents, pricingSource: plan.pricingSource,
       settingsVersion: plan.settingsVersion, warnings: plan.warnings, formula: plan.formula,
     };
-    line = sellPlanLine(p, events);
+    line = sellPlanLine(p, events, plan.ltoMaxMonths);
   }
   return {
     mode: plan.mode, category: plan.category, price_grade: plan.grade,

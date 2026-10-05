@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Category, ListingMode } from '../db/types.js';
 import { dollarsToCents, formatUsd } from '../money.js';
-import { computePlan } from '../pricing/plan.js';
+import { computePlan, FAST_TRANSFER_MAX_CENTS } from '../pricing/plan.js';
 import { addMonthsClamped } from '../pricing/schedule.js';
 import type { PricingSettings } from '../pricing/settings.js';
 
@@ -11,7 +11,6 @@ const MODES: readonly ListingMode[] = ['bin', 'offer', 'hybrid'];
 const MIN_OFFER_FLOOR = 2000; // $20: Afternic's minimum (A3), not a pricing setting
 const LTO_BIN_MIN = 49_500; // $495: Afternic LTO rule
 const LTO_BIN_MAX = 500_000_000; // $5,000,000: Afternic LTO rule
-const FAST_TRANSFER_MAX_CENTS = 10_000_000; // Afternic Fast Transfer limit ($100,000)
 const RATIONALE_MAX = 500;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 

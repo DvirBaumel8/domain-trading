@@ -164,7 +164,7 @@ it('Review Focus 1 / Q4: startAfter omits due events and chains future ones from
     ['delist', '2028-09-27', null, null, null, 'planned'],
   ]);
 });
-it('startAfter after the final push and delist dates → empty list', () => {
-  expect(buildSchedule({ plan: sp({}), anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2, startAfter: '2028-09-30' })).toEqual([]);
+it('startAfter after the final push and delist dates → only the delist row (never lost)', () => {
+  expect(buildSchedule({ plan: sp({}), anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2, startAfter: '2028-09-30' }).map((e) => [e.event, e.dueOn, e.binCents, e.floorCents, e.walkawayCents, e.status])).toEqual([['delist', '2028-09-27', null, null, null, 'planned']]);
 });
 });

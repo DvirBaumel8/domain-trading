@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computePlan, hybridBinMin } from '../../src/pricing/plan.js';
+import { sellPlanLine } from '../../src/pricing/present.js';
 import { V2 } from '../helpers/pricing.js';
 const hy = (bin: number, extra: object = {}) => computePlan({ category: 'trend', binCents: bin, ...extra }, V2);
 const ok = (r: ReturnType<typeof computePlan>) => {
@@ -115,5 +116,16 @@ describe('computePlan: settings-driven, no hard-coded numbers', () => {
 describe('geo override (4b-2)', () => {
   it('mode hybrid on a geo category uses the hybrid formula (geo override path)', () => {
     expect(ok(computePlan({ category: 'geo', mode: 'hybrid', binCents: 199500 }, V2))).toMatchObject({ mode: 'hybrid', floorCents: 129500, walkawayCents: 96000, grade: null });
+  });
+});
+
+describe('sellPlanLine LTO (4b-2 final)', () => {
+  it('prints LTO off by default and LTO n mo when set', () => {
+    const p = ok(hy(199500));
+    expect(sellPlanLine(p, [])).toContain('LTO off');
+    expect(sellPlanLine(p, [], null)).toContain('LTO off');
+    const line = sellPlanLine(p, [], 36);
+    expect(line).toContain('LTO 36 mo');
+    expect(line).not.toContain('LTO off');
   });
 });

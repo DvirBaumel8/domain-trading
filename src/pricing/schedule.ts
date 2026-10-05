@@ -58,7 +58,7 @@ export function buildSchedule(input: {
   plan: SchedulePlan; anchor: string; dropDate: string; settings: PricingSettings; startAfter?: string;
 }): ScheduleEvent[] {
   const { plan, anchor, dropDate, settings: s, startAfter } = input;
-  const keep = (list: ScheduleEvent[]) => (startAfter ? list.filter((e) => e.dueOn > startAfter) : list);
+  const keep = (list: ScheduleEvent[]) => (startAfter ? list.filter((e) => e.event === 'delist' || e.dueOn > startAfter) : list);
   const out: ScheduleEvent[] = [];
   const delistOn = addDays(dropDate, -s.delistDaysBeforeDrop);
   const ev = (event: ScheduleEventName, dueOn: string, v: Values | null, status: ScheduleStatus): ScheduleEvent => ({
