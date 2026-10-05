@@ -149,13 +149,10 @@ describe('schema: settings', () => {
       approval_max_age_hours: 72,
       lander_target: 'afternic',
       allowed_registrars: ['porkbun'],
-      geo_bin_min_cents: 29900,
-      geo_bin_max_cents: 49900,
-      high_value_categories: ['trend', 'b2b', 'collision', 'regulation', 'buzzword'],
       high_value_min_bin_cents: 250000,
-      high_value_guard_modes: ['bin'],
       sedo_hybrid_as: 'buy_now',
     });
+    for (const k of ['geo_bin_min_cents', 'geo_bin_max_cents', 'high_value_categories', 'high_value_guard_modes']) expect(rows[0]).not.toHaveProperty(k);
   });
 
   it('a second settings row is impossible', async () => {

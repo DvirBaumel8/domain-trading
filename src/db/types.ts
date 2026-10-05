@@ -33,11 +33,7 @@ export interface SettingsTable {
   approval_max_age_hours: Generated<number>;
   lander_target: Generated<'afternic' | 'sedo' | 'custom'>;
   allowed_registrars: Generated<string[]>;
-  geo_bin_min_cents: Generated<number>;
-  geo_bin_max_cents: Generated<number>;
-  high_value_categories: Generated<Category[]>;
   high_value_min_bin_cents: Generated<number>;
-  high_value_guard_modes: Generated<ListingMode[]>;
   sedo_hybrid_as: Generated<'buy_now' | 'make_offer'>;
   updated_at: TimestampDefault;
 }
