@@ -1,10 +1,11 @@
 import { ceil95, nice95, pct, round5 } from './round.js';
+import type { PriceScheduleEvent, PriceScheduleStatus } from '../db/types.js';
 import type { Cents } from './int.js';
 import { hybridBinMin, type Plan } from './plan.js';
 import type { PricingSettings } from './settings.js';
 
-export type ScheduleEventName = 'drop1_m6' | 'drop2_m18' | 'geo_drop_m12' | 'final_push' | 'delist';
-export type ScheduleStatus = 'planned' | 'skipped_at_minimum' | 'skipped_no_change' | 'skipped_disabled' | 'superseded_by_final_push';
+export type ScheduleEventName = PriceScheduleEvent;
+export type ScheduleStatus = Extract<PriceScheduleStatus, 'planned' | 'skipped_at_minimum' | 'skipped_no_change' | 'skipped_disabled' | 'superseded_by_final_push'>;
 export interface ScheduleEvent {
   event: ScheduleEventName; dueOn: string;
   binCents: Cents | null; floorCents: Cents | null; walkawayCents: Cents | null; status: ScheduleStatus;
@@ -17,7 +18,10 @@ const DROP_NAMES: readonly ScheduleEventName[] = ['drop1_m6', 'drop2_m18'];
 function parse(date: string): [number, number, number] {
   const m = DATE.exec(date);
   if (!m) throw new Error(`Not a date: ${date}`);
-  return [Number(m[1]), Number(m[2]), Number(m[3])];
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const back = new Date(Date.UTC(y, mo - 1, d));
+  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) throw new Error(`Not a date: ${date}`);
+  return [y, mo, d];
 }
 const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -46,7 +50,7 @@ function applyDrop(v: Values, pctBps: number, s: PricingSettings): Values | null
 }
 
 export function buildSchedule(input: {
-  plan: Pick<Plan, 'mode' | 'grade' | 'binCents' | 'floorCents' | 'walkawayCents'>; anchor: string; dropDate: string; settings: PricingSettings;
+  plan: Pick<Plan, 'category' | 'grade' | 'binCents' | 'floorCents' | 'walkawayCents'>; anchor: string; dropDate: string; settings: PricingSettings;
 }): ScheduleEvent[] {
   const { plan, anchor, dropDate, settings: s } = input;
   const out: ScheduleEvent[] = [];
@@ -55,7 +59,7 @@ export function buildSchedule(input: {
     event, dueOn, binCents: v?.bin ?? null, floorCents: v?.floor ?? null, walkawayCents: v?.walk ?? null, status,
   });
 
-  if (plan.mode === 'bin') {
+  if (plan.category === 'geo') {
     const rule = s.geoDrops[0];
     if (plan.grade === 'strong' && rule && plan.binCents === rule.fromCents) {
       const due = addMonthsClamped(anchor, rule.afterMonths);

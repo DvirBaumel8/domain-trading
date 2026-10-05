@@ -2,7 +2,8 @@ import { z } from 'zod';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { newAuditId } from '../http/audit.js';
-import { rowToSettings } from '../pricing/settings.js';
+import { canonicalJson } from '../http/canonical-json.js';
+import { ruleFields, rowToSettings } from '../pricing/settings.js';
 
 const INT_KEYS = [
   'geo_bin_strong_cents', 'geo_bin_weaker_cents', 'geo_bin_min_cents', 'geo_bin_max_cents', 'floor_bps', 'floor_min_cents',
@@ -58,7 +59,10 @@ export async function newPricingSettings(
       if ((e as { code?: string }).code === '23505') throw new Error('another pricing-settings version was created concurrently; re-run');
       throw e;
     }
-    rowToSettings(inserted); // validates the jsonb shapes; throws (and rolls back) on a bad value
+    const next = rowToSettings(inserted); // validates the jsonb shapes; throws (and rolls back) on a bad value
+    if (canonicalJson(ruleFields(next)) === canonicalJson(ruleFields(rowToSettings(cur)))) {
+      throw new Error('no rule changed; a new version needs at least one different value');
+    }
     await trx.insertInto('audit_log').values({
       id: newAuditId(), scope: 'admin', method: 'ADMIN', path: 'pricing-settings new',
       request: JSON.stringify({ set: o.set, note: o.note ?? null }), approval_text: o.approvalText, approval_at: approvalAt,

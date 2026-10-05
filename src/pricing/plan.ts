@@ -1,8 +1,9 @@
 import { ceil95, pct, round5 } from './round.js';
+import type { Category } from '../db/types.js';
 import type { Cents } from './int.js';
 import type { PricingSettings } from './settings.js';
 
-export type PlanCategory = 'geo' | 'trend' | 'b2b' | 'collision' | 'regulation' | 'buzzword' | 'other';
+export type PlanCategory = Category;
 export interface PlanInput {
   category: PlanCategory; grade?: 'strong' | 'weaker' | null; binCents?: Cents | null;
   floorCents?: Cents | null; walkawayCents?: Cents | null; exception?: boolean;

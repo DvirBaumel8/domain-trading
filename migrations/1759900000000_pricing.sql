@@ -108,7 +108,13 @@ CREATE TABLE price_schedule (
   note                text,
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (domain_id, event, plan_id)
+  UNIQUE (domain_id, event, plan_id),
+  CONSTRAINT price_schedule_planned_shape CHECK (
+    status <> 'planned'
+    OR (event = 'delist' AND bin_cents IS NULL AND floor_cents IS NULL AND walkaway_cents IS NULL)
+    OR (event <> 'delist' AND bin_cents IS NOT NULL AND floor_cents IS NOT NULL AND walkaway_cents IS NOT NULL
+        AND walkaway_cents <= floor_cents AND floor_cents <= bin_cents)
+  )
 );
 CREATE INDEX price_schedule_due ON price_schedule (status, due_on);
 
@@ -122,6 +128,10 @@ CREATE TABLE pricing_evidence (
   created_at              timestamptz NOT NULL DEFAULT now(),
   CHECK (comps IS NOT NULL OR legacy_no_comps_reason IS NOT NULL)
 );
+CREATE TRIGGER pricing_evidence_append_only BEFORE UPDATE OR DELETE ON pricing_evidence
+  FOR EACH ROW EXECUTE FUNCTION reject_mutation();
+CREATE TRIGGER pricing_evidence_no_truncate BEFORE TRUNCATE ON pricing_evidence
+  FOR EACH STATEMENT EXECUTE FUNCTION reject_mutation();
 
 -- Caps raised (Dvir, 5 Oct 2026, 01:04 IDT; confirmed in chat with Claude Code)
 ALTER TABLE settings ALTER COLUMN poc_cap_cents SET DEFAULT 150000;

@@ -85,6 +85,13 @@ describe('GET /pricing/preview (§10.6)', () => {
     }
   });
 
+  it('M4: a default drop date at or before listed_on is 400', async () => {
+    app = await makeApp();
+    const { auth } = await issueToken('read');
+    const res = await get('category=trend&bin=1995&listed_on=2030-01-01', auth);
+    expect([res.statusCode, res.json().error.code]).toEqual([400, 'VALIDATION_ERROR']);
+  });
+
   it('domain param: normalised lookup, 404, drop_date conflict, invalid name', async () => {
     app = await makeApp();
     const { auth } = await issueToken('read');

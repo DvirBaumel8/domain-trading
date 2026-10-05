@@ -77,7 +77,7 @@ export function registerPricing(app: FastifyInstance, deps: { db: Kysely<Databas
       dropDate = validDate(q.drop_date, 'drop_date');
     }
     dropDate = dropDate ?? addMonthsClamped(today, 24);
-    if (q.drop_date && dropDate <= listedOn) throw new AppError(400, 'VALIDATION_ERROR', 'drop_date must be after listed_on');
+    if (dropDate <= listedOn) throw new AppError(400, 'VALIDATION_ERROR', 'drop_date must be after listed_on');
     const schedule = buildSchedule({ plan, anchor: listedOn, dropDate, settings: s });
 
     const a = afternicRow({

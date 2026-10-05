@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDb, testDb as db } from '../helpers/db.js';
+import { V2 } from '../helpers/pricing.js';
 import { currentSettings, rowToSettings, settingsByVersion } from '../../src/pricing/settings.js';
 
 async function insertV3(effectiveAt: Date): Promise<void> {
@@ -19,6 +20,8 @@ describe('pricing settings loader', () => {
     expect(s.drops).toEqual([{ afterMonths: 6, pctBps: 2000 }, { afterMonths: 18, pctBps: 2000 }]);
     expect(s.geoDrops).toEqual([{ afterMonths: 12, fromCents: 49900, toCents: 39900 }]);
     expect(s.finalPushMode).toBe('bin_to_floor_ceil95');
+    expect(s.effectiveAt).toEqual(new Date('2026-10-05T06:17:00Z'));
+    expect(await currentSettings(db, new Date())).toEqual({ ...V2, effectiveAt: expect.any(Date) });
   });
   it('a future v3 is not yet in effect', async () => {
     await insertV3(new Date(Date.now() + 86_400_000));

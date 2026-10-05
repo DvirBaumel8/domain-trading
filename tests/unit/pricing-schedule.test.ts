@@ -24,6 +24,10 @@ describe('dates', () => {
     expect(addMonthsClamped('2027-08-31', 6)).toBe('2028-02-29');
     expect(addMonthsClamped('2026-10-12', 6)).toBe('2027-04-12');
   });
+  it('impossible dates throw', () => {
+    expect(() => addDays('2026-13-40', 1)).toThrow(/Not a date/);
+    expect(() => addMonthsClamped('2026-02-30', 1)).toThrow(/Not a date/);
+  });
   it('addDays crosses months and years', () => {
     expect(addDays('2028-10-04', -90)).toBe('2028-07-06');
     expect(addDays('2028-10-04', -7)).toBe('2028-09-27');
@@ -100,6 +104,12 @@ describe('geo schedules (PR-16, PR-43)', () => {
       ['delist', '2028-10-25', null, null, null, 'planned'],
     ]);
   });
+  it('geo drop due on/after the delist → superseded_by_final_push, then delist planned', () => {
+    expect(rows(S(geo('strong'), '2027-10-20', '2028-10-04'))).toEqual([
+      ['geo_drop_m12', '2028-10-20', null, null, null, 'superseded_by_final_push'],
+      ['delist', '2028-09-27', null, null, null, 'planned'],
+    ]);
+  });
   it('PR-16: weaker → only delist', () => {
     expect(rows(S(geo('weaker'), '2026-11-01', '2028-11-01'))).toEqual([['delist', '2028-10-25', null, null, null, 'planned']]);
   });
@@ -125,7 +135,7 @@ describe('PR-9: property — every x95 BIN from $795 to $100,000', () => {
     for (let bin = 79500; bin <= 10_000_000; bin += 10000) {
       const p = plan(bin);
       const check = (b: number, f: number, w: number) => {
-        expect(2000 <= p.minOfferCents && p.minOfferCents <= 50000 && 50000 <= w && w <= f && f <= b && f >= 75000, `bin ${bin}: ${b}/${f}/${w}`).toBe(true);
+        expect(p.minOfferCents === V2.hybridMinOfferCents && 50000 <= w && w <= f && f <= b && f >= 75000, `bin ${bin}: ${b}/${f}/${w}`).toBe(true);
       };
       check(p.binCents, p.floorCents, p.walkawayCents);
       if (p.floorCents > 75000) expect(Math.abs(p.floorCents * 10000 - bin * 6500)).toBeLessThanOrEqual(250 * 10000);

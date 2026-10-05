@@ -195,7 +195,7 @@ describe('schema: pricing (PR-30, migration 4)', () => {
 
   it('price_schedule rejects a duplicate (domain_id, event, plan_id)', async () => {
     const id = await insertOwnedDomain(db);
-    const row = { domain_id: id, plan_id: 'plan_1', event: 'drop1_m6' as const, due_on: '2027-04-04', settings_version: 2, status: 'planned' as const };
+    const row = { domain_id: id, plan_id: 'plan_1', event: 'drop1_m6' as const, due_on: '2027-04-04', settings_version: 2, status: 'planned' as const, bin_cents: 79500, floor_cents: 75000, walkaway_cents: 50000 };
     await db.insertInto('price_schedule').values(row).execute();
     await expect(db.insertInto('price_schedule').values(row).execute()).rejects.toThrow(/price_schedule_domain_id_event_plan_id_key/);
   });
@@ -205,6 +205,26 @@ describe('schema: pricing (PR-30, migration 4)', () => {
       .rejects.toThrow(/domains_price_order/);
     await expect(insertOwnedDomain(db, { domain: 'b.com', bin_cents: 100000, floor_cents: 110000 }))
       .rejects.toThrow(/domains_price_order/);
+  });
+
+  it('price_schedule_planned_shape: planned rows need prices (except delist); other statuses are free', async () => {
+    const id = await insertOwnedDomain(db);
+    const base = { domain_id: id, plan_id: 'p1', due_on: '2027-04-04', settings_version: 2 };
+    await expect(db.insertInto('price_schedule').values({ ...base, event: 'drop1_m6', status: 'planned' }).execute())
+      .rejects.toThrow(/price_schedule_planned_shape/);
+    await expect(db.insertInto('price_schedule').values({ ...base, event: 'delist', status: 'planned', bin_cents: 79500, floor_cents: 75000, walkaway_cents: 50000 }).execute())
+      .rejects.toThrow(/price_schedule_planned_shape/);
+    await db.insertInto('price_schedule').values({ ...base, event: 'drop2_m18', status: 'skipped_at_minimum' }).execute();
+    await db.insertInto('price_schedule').values({ ...base, event: 'delist', status: 'planned' }).execute();
+    await db.insertInto('price_schedule').values({ ...base, event: 'drop1_m6', status: 'planned', bin_cents: 79500, floor_cents: 75000, walkaway_cents: 50000 }).execute();
+  });
+
+  it('pricing_evidence is append-only', async () => {
+    const id = await insertOwnedDomain(db);
+    await db.insertInto('pricing_evidence').values({ domain_id: id, comps: JSON.stringify([]), rationale: 'x' } as never).execute();
+    await expect(sql`UPDATE pricing_evidence SET rationale = 'y'`.execute(db)).rejects.toThrow(/append-only/);
+    await expect(sql`DELETE FROM pricing_evidence`.execute(db)).rejects.toThrow(/append-only/);
+    await expect(sql`TRUNCATE pricing_evidence CASCADE`.execute(db)).rejects.toThrow(/append-only/);
   });
 
   it('status delisted is accepted', async () => {

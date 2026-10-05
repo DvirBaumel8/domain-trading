@@ -30,6 +30,13 @@ describe('pricing-settings admin (PR-31, PR-32)', () => {
     expect(JSON.stringify(audit[0]!.request)).toContain('"floor_bps":"6000"');
   });
 
+  it('M9: a --set that changes no rule is rejected; nothing written, no audit row', async () => {
+    const before = await db.selectFrom('pricing_settings').select('version').execute();
+    await expect(newPricingSettings(db, { set: { floor_bps: '6500' }, ...approval, now })).rejects.toThrow(/no rule changed/);
+    expect(await db.selectFrom('pricing_settings').select('version').execute()).toEqual(before);
+    expect(await db.selectFrom('audit_log').selectAll().where('path', '=', 'pricing-settings new').execute()).toHaveLength(0);
+  });
+
   it('refuses without approval text, with an unknown key, or with values that break an invariant', async () => {
     await expect(newPricingSettings(db, { set: { floor_bps: '6000' }, approvalText: '  ', approvalAt: approval.approvalAt, now })).rejects.toThrow(/approval/i);
     await expect(newPricingSettings(db, { set: { nope: '1' }, ...approval, now })).rejects.toThrow(/unknown/i);
