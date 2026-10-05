@@ -4,6 +4,8 @@ import { registerBuy } from './api/buy.js';
 import { registerPricing } from './api/pricing.js';
 import { registerList } from './api/list.js';
 import { registerOffers } from './api/offers.js';
+import { registerSold } from './api/sold.js';
+import { SoldService } from './services/sold.js';
 import { OffersService } from './services/offers.js';
 import { registerExport } from './api/export.js';
 import { registerCheck } from './api/check.js';
@@ -98,6 +100,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const nsLookup: NsLookup = deps.nsLookup ?? ((d: string) => queryNs(d, { server: deps.config.dnsNsServer }));
   registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now: deps.now ?? Date.now }));
   registerOffers(app, new OffersService({ db: deps.db, now: deps.now ?? Date.now }), { db: deps.db, now: deps.now ?? Date.now });
+  registerSold(app, new SoldService({ db: deps.db, now: deps.now ?? Date.now }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));

@@ -100,6 +100,12 @@ describe('schema: domains CHECKs', () => {
     await expect(insertOwnedDomain(db, { drop_date: '2029-10-04' })).rejects.toThrow(/domains_drop_date_rule/);
   });
 
+  it('drop_date = expiry_date is accepted (Gate F); expiry + 2 years and a day past expiry are still rejected', async () => {
+    await expect(insertOwnedDomain(db, { drop_date: '2027-10-04' })).resolves.toBeTypeOf('number');
+    await expect(insertOwnedDomain(db, { domain: 'two.com', drop_date: '2029-10-04' })).rejects.toThrow(/domains_drop_date_rule/);
+    await expect(insertOwnedDomain(db, { domain: 'three.com', drop_date: '2027-10-05' })).rejects.toThrow(/domains_drop_date_rule/);
+  });
+
   it('29 Feb expiry → 28 Feb drop_date is accepted', async () => {
     await expect(
       insertOwnedDomain(db, { expiry_date: '2028-02-29', drop_date: '2029-02-28' }),
