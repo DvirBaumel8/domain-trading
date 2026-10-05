@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sql, type Kysely } from 'kysely';
+import { MIGRATIONS_FILE, migrationNames } from './backup-export.js';
 import { newAuditId } from '../http/audit.js';
 import type { Database } from '../db/types.js';
 
@@ -51,10 +52,26 @@ async function readRows(dir: string, f: { file: string; jsonl?: true }): Promise
   return rows;
 }
 
+async function readMigrationNames(dir: string): Promise<string[]> {
+  let text: string;
+  try {
+    text = await readFile(join(dir, MIGRATIONS_FILE), 'utf8');
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new ImportError(`MIGRATION_LEVEL_MISMATCH: ${MIGRATIONS_FILE} is missing in ${dir}; this backup predates the migration-level check. Nothing was written.`);
+    }
+    throw e;
+  }
+  const names = JSON.parse(text) as unknown;
+  if (!Array.isArray(names) || !names.every((x) => typeof x === 'string')) throw new ImportError(`${MIGRATIONS_FILE} is not a list of migration names`);
+  return names;
+}
+
 /**
  * Restore a backup directory (a checkout of the data branch, containing backup/) into an EMPTY database, in one transaction.
  * Normal inserts only: the append-only triggers reject UPDATE/DELETE/TRUNCATE, not INSERT, so no trigger bypass is needed.
- * The target must be at the same migration level as the source (same columns; pricing_settings versions that the migrations seed must match).
+ * The target must be at the same migration level as the source: backup/migrations.json must equal the target's pgmigrations names, in order (MIGRATION_LEVEL_MISMATCH).
+ * Then pricing_settings versions that the migrations seed must also match.
  * Empty means domains, ledger_entries, deals, purchases, sales, offers and audit_log: restore first, then create tokens.
  * Writes one admin audit_log row in the same transaction.
  * Not restored: api_tokens (create new ones with the admin command; audit_log.token_id is set to null) and idempotency_keys.
@@ -62,8 +79,17 @@ async function readRows(dir: string, f: { file: string; jsonl?: true }): Promise
 export async function importBackup(db: Kysely<Database>, dir: string): Promise<Record<string, number>> {
   const data = new Map<string, Row[]>();
   for (const f of ORDER) data.set(f.table, await readRows(dir, f));
+  const source = await readMigrationNames(dir); // all reads happen before the transaction: a refusal writes nothing
 
   return db.transaction().execute(async (trx) => {
+    const target = await migrationNames(trx);
+    const diffs: string[] = [];
+    for (let i = 0; i < Math.max(source.length, target.length) && diffs.length < 3; i++) {
+      if (source[i] !== target[i]) diffs.push(`${i + 1}: ${source[i] ?? '(none)'} / ${target[i] ?? '(none)'}`);
+    }
+    if (diffs.length > 0) {
+      throw new ImportError(`MIGRATION_LEVEL_MISMATCH: the backup and this database are at different migration levels; first differences (position: backup / database): ${diffs.join('; ')}. Nothing was written.`);
+    }
     for (const t of MUST_BE_EMPTY) {
       const n = await sql<{ n: string }>`select count(*)::text as n from ${sql.table(t)}`.execute(trx);
       if (n.rows[0]!.n !== '0') throw new ImportError(`refusing to import: ${t} is not empty (restore only into an empty database)`);

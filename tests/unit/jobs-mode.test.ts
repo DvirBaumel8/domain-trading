@@ -3,17 +3,19 @@ import type { FastifyInstance } from 'fastify';
 import { loadConfig } from '../../src/config.js';
 import pg from 'pg';
 import { poolConfig } from '../../src/db/client.js';
+import { JobRunner } from '../../src/jobs/runner.js';
+import { BackupExporter } from '../../src/jobs/backup-export.js';
 import { startJobScheduling } from '../../src/jobs/schedule.js';
 import { testEnv } from '../helpers/env.js';
 
 afterEach(() => vi.useRealTimers());
 
-function fakeApp() {
+function fakeApp(backupExport?: { runOnce(): Promise<unknown> }) {
   const ok = () => ({ runOnce: vi.fn(async () => ({})) });
-  const app = {
-    reconciler: ok(), nsVerifier: ok(), priceJob: ok(), dropJob: ok(), registrarCheckJob: ok(),
-    log: { error: vi.fn() },
-  };
+  const jobs = { reconciler: ok(), nsVerifier: ok(), priceJob: ok(), dropJob: ok(), registrarCheckJob: ok() };
+  // The real runner (the one POST /jobs/run uses); only its jobs are fakes. db is unused by `daily`.
+  const jobRunner = new JobRunner({ db: undefined as never, now: Date.now, ...jobs, backupExport });
+  const app = { ...jobs, jobRunner, log: { error: vi.fn() } };
   return app as unknown as FastifyInstance & typeof app;
 }
 
@@ -41,6 +43,41 @@ describe('startJobScheduling', () => {
   });
 });
 
+describe('internal daily = the production daily runner', () => {
+  it('runs price, drop, registrar check, backup export in order through app.jobRunner', async () => {
+    vi.useFakeTimers();
+    const order: string[] = [];
+    const backup = { runOnce: vi.fn(async () => { order.push('backup'); return {}; }) };
+    const app = fakeApp(backup);
+    const run = vi.spyOn(app.jobRunner, 'run');
+    for (const [k, j] of [['price', app.priceJob], ['drop', app.dropJob], ['registrar', app.registrarCheckJob]] as const) {
+      j.runOnce.mockImplementation(async () => { order.push(k); return {}; });
+    }
+    const stop = startJobScheduling(app, loadConfig(testEnv()));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(run).toHaveBeenCalledWith('daily');
+    expect(order).toEqual(['price', 'drop', 'registrar', 'backup']);
+    stop();
+  });
+
+  it('with no backup token or repo the backup step is skipped and one warn line is logged', async () => {
+    vi.useFakeTimers();
+    const info: string[] = [];
+    const warn: string[] = [];
+    const exporter = new BackupExporter({
+      db: undefined as never, config: { backup: { token: undefined, repo: undefined } }, now: Date.now, log: { warn: (m) => warn.push(m), info: (m) => info.push(m) },
+    });
+    const app = fakeApp(exporter);
+    const run = vi.spyOn(app.jobRunner, 'run');
+    const stop = startJobScheduling(app, loadConfig(testEnv()));
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await run.mock.results[0]!.value).steps.backupExport).toMatchObject({ ok: true, skipped: true });
+    expect(warn).toEqual(['backup export skipped: GITHUB_BACKUP_TOKEN/GITHUB_BACKUP_REPO not set']);
+    expect(info).toEqual([]);
+    stop();
+  });
+});
+
 describe('config', () => {
   it('JOB_TRIGGER_TOKEN: unset → undefined; set → exposed and counted as a secret', () => {
     expect(loadConfig(testEnv()).jobTriggerToken).toBeUndefined();
@@ -60,7 +97,8 @@ describe('config', () => {
   });
 
   it('H6: the direct host is accepted in production; a pooler host is not checked outside production', () => {
-    expect(loadConfig(testEnv({ APP_ENV: 'production', DATABASE_URL: 'postgres://u:p@ep-cool-123.eu-central-1.aws.neon.tech/db' })).appEnv).toBe('production');
+    // Spec change (2d6dbaf): production also needs DATABASE_SSL=true and sslmode=verify-full, so this URL now carries them.
+    expect(loadConfig(testEnv({ APP_ENV: 'production', DATABASE_SSL: 'true', DATABASE_URL: 'postgres://u:p@ep-cool-123.eu-central-1.aws.neon.tech/db?sslmode=verify-full' })).appEnv).toBe('production');
     expect(loadConfig(testEnv({ DATABASE_URL: 'postgres://u:p@ep-x-pooler.eu.neon.tech/db' })).appEnv).toBe('test');
   });
 
@@ -105,5 +143,34 @@ describe('poolConfig', () => {
     expect(poolConfig('postgres://u:p@h/db').ssl).toBeUndefined();
     expect(poolConfig('postgres://u:p@h/db', { ssl: false }).ssl).toBeUndefined();
     expect(poolConfig('postgres://u:p@h/db', { ssl: true }).ssl).toEqual({ rejectUnauthorized: true });
+  });
+});
+
+describe('DB TLS: production requires sslmode=verify-full', () => {
+  const prod = (url: string, ssl: string | null = 'true') =>
+    testEnv({ APP_ENV: 'production', DATABASE_URL: url, ...(ssl === null ? {} : { DATABASE_SSL: ssl }) });
+  const effective = (url: string) => (new pg.Client(poolConfig(url, { ssl: true })) as unknown as { connectionParameters: { ssl: unknown } }).connectionParameters.ssl;
+  const GOOD = 'postgres://u:p@ep-x.eu.neon.tech/db?sslmode=verify-full';
+
+  it('production + verify-full → ok, and the effective pg config verifies the certificate', () => {
+    const c = loadConfig(prod(GOOD));
+    expect(c.databaseSsl).toBe(true);
+    expect(effective(c.databaseUrl)).toEqual({ rejectUnauthorized: true });
+  });
+  it('production + require → refused, naming the fix', () => {
+    expect(() => loadConfig(prod('postgres://u:p@ep-x.eu.neon.tech/db?sslmode=require'))).toThrow(/Neon direct string with \?sslmode=verify-full/);
+  });
+  it.each(['disable', 'prefer', 'no-verify'])('production + sslmode=%s → refused', (m) => {
+    expect(() => loadConfig(prod(`postgres://u:p@ep-x.eu.neon.tech/db?sslmode=${m}`))).toThrow(/verify-full/);
+  });
+  it('production + no sslmode → refused', () => {
+    expect(() => loadConfig(prod('postgres://u:p@ep-x.eu.neon.tech/db'))).toThrow(/verify-full/);
+  });
+  it('production + DATABASE_SSL unset or false → refused', () => {
+    expect(() => loadConfig(prod(GOOD, null))).toThrow(/DATABASE_SSL=true/);
+    expect(() => loadConfig(prod(GOOD, 'false'))).toThrow(/DATABASE_SSL=true/);
+  });
+  it('non-production + require → accepted', () => {
+    expect(loadConfig(testEnv({ DATABASE_SSL: 'true', DATABASE_URL: 'postgres://u:p@h/db?sslmode=require' })).databaseSsl).toBe(true);
   });
 });

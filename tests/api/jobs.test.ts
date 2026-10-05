@@ -4,6 +4,8 @@ import { createDb } from '../../src/db/client.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';
+import { DOMAIN } from '../helpers/buy.js';
+import { FakeAdapter } from '../helpers/fake-adapter.js';
 
 const JOB_TOKEN = 'job_token_fake_0123456789abcdef0123456789';
 const bearer = { authorization: `Bearer ${JOB_TOKEN}` };
@@ -153,6 +155,59 @@ describe('tick', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().steps.reconciler).toMatchObject({ ok: false, error: 'rec boom' });
     expect(ns).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('tick: reconciler cutoffs through the production path (buy.md §6, B-20)', () => {
+  const NOW = Date.parse('2026-10-05T12:00:00Z');
+  const ago = (m: number) => new Date(NOW - m * 60_000);
+  async function seedPurchase(state: 'created' | 'register_sent', ageMin: number, domain = DOMAIN) {
+    await testDb.insertInto('quotes').values({
+      check_id: `chk_${domain}`, domain, registrar: 'porkbun', available: true, premium: false, first_year_cents: 1108, renewal_cents: 1108,
+      privacy_cents_per_year: 0, two_year_cents: 2216, eligible: true, exclusion_reason: null, raw: null,
+    }).execute();
+    await testDb.insertInto('purchases').values({
+      idempotency_key: `k-${domain}`, request_hash: 'h', domain, state, registrar: 'porkbun', check_id: `chk_${domain}`,
+      max_price_cents: 1150, approval_text: `buy ${domain}`, approval_at: ago(ageMin + 5), expected_cents: 1108,
+      request: JSON.stringify({ domain, category: 'geo', deal_id: 'D-003' }), audit_id: `aud_${'a'.repeat(32)}`,
+      created_at: ago(ageMin), updated_at: ago(ageMin),
+    }).execute();
+    await testDb.insertInto('domains').values({ domain, status: 'pending_purchase', registrar: 'porkbun', category: 'geo', deal_id: 'D-003' }).execute();
+  }
+  const tick = async (adapters: FakeAdapter[] = [new FakeAdapter('porkbun')]) => {
+    await app?.close();
+    app = await make({ now: () => NOW, adapters, rdap: async () => 'not_registered' });
+    const res = await post(app, 'tick');
+    expect(res.statusCode).toBe(200);
+    return res.json();
+  };
+
+  it('(a) B-20: register_sent with the registrar showing it present is completed by a tick; 1 registration row; a second tick still 1', async () => {
+    await seedPurchase('register_sent', 5);
+    const body = await tick([new FakeAdapter('porkbun', { alreadyOwned: true })]);
+    expect(body.steps.reconciler).toMatchObject({ ok: true, summary: { booked: 1 } });
+    expect(await testDb.selectFrom('ledger_entries').selectAll().where('type', '=', 'registration').execute()).toHaveLength(1);
+    expect((await testDb.selectFrom('purchases').selectAll().executeTakeFirstOrThrow()).state).toBe('succeeded');
+    await tick([new FakeAdapter('porkbun', { alreadyOwned: true })]);
+    expect(await testDb.selectFrom('ledger_entries').selectAll().where('type', '=', 'registration').execute()).toHaveLength(1);
+  });
+
+  it('(b) a created purchase 11 min old is failed and its pending domain removed; one 5 min old is untouched', async () => {
+    await seedPurchase('created', 11);
+    await seedPurchase('created', 5, 'fresh.com');
+    const body = await tick();
+    expect(body.steps.reconciler.summary).toMatchObject({ abandoned: 1 });
+    const states = await testDb.selectFrom('purchases').select(['domain', 'state']).orderBy('domain').execute();
+    expect(states).toEqual([{ domain: DOMAIN, state: 'failed' }, { domain: 'fresh.com', state: 'created' }].sort((x, y) => x.domain.localeCompare(y.domain)));
+    expect((await testDb.selectFrom('domains').select('domain').execute()).map((r) => r.domain)).toEqual(['fresh.com']);
+  });
+
+  it('(c) a register_sent purchase 1 min old is untouched', async () => {
+    await seedPurchase('register_sent', 1);
+    const body = await tick([new FakeAdapter('porkbun', { alreadyOwned: true })]);
+    expect(body.steps.reconciler.summary).toMatchObject({ booked: 0, failed: 0, abandoned: 0 });
+    expect((await testDb.selectFrom('purchases').selectAll().executeTakeFirstOrThrow()).state).toBe('register_sent');
+    expect(await testDb.selectFrom('ledger_entries').selectAll().execute()).toHaveLength(0);
   });
 });
 

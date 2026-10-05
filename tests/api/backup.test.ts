@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { sql } from 'kysely';
 import { http, HttpResponse } from 'msw';
 import type { FastifyInstance } from 'fastify';
 import { BackupExporter, collectBackupFiles, gitBlobSha } from '../../src/jobs/backup-export.js';
@@ -148,6 +149,9 @@ describe('BK-1 backup export files', () => {
     expect(JSON.parse(a.get('backup/sales.json')!)).toHaveLength(1);
     expect(JSON.parse(a.get('backup/payouts.json')!)).toHaveLength(1);
     expect(a.get('backup/offers.csv')).toContain('450.00');
+    const dbNames = (await sql<{ name: string }>`select name from pgmigrations order by id`.execute(db)).rows.map((r) => r.name);
+    expect(dbNames.length).toBeGreaterThan(0);
+    expect(JSON.parse(a.get('backup/migrations.json')!)).toEqual(dbNames); // names only, in run order
 
     const receipts = JSON.parse(a.get('backup/receipts.json')!) as { raw: { invoice: Record<string, unknown> } }[];
     expect(receipts[0]!.raw.invoice).toEqual({ id: 'ORD-1', items: [{ domain: T, price_cents: 1108 }] });
@@ -387,5 +391,77 @@ describe('BK-3 import round trip', () => {
     await resetDb(db);
     await expect(importBackup(db, await mkdtemp(join(tmpdir(), 'dt-empty-')))).rejects.toThrow(/missing backup file/);
     expect((await readFile(join(dir, 'backup/ledger.csv'), 'utf8')).length).toBeGreaterThan(10);
+  });
+});
+
+describe('BK-8 import refusals', () => {
+  async function dirOf(files: Map<string, string>) {
+    const dir = await mkdtemp(join(tmpdir(), 'dt-backup-'));
+    for (const [p, c] of files) {
+      await mkdir(dirname(join(dir, p)), { recursive: true });
+      await writeFile(join(dir, p), c);
+    }
+    return dir;
+  }
+  const count = async (t: 'domains' | 'ledger_entries' | 'audit_log' | 'offers' | 'deals' | 'purchases' | 'sales') =>
+    Number((await db.selectFrom(t).select(db.fn.countAll().as('n')).executeTakeFirstOrThrow()).n);
+  const nothingWritten = async (domains = 0) => {
+    expect(await count('domains')).toBe(domains);
+    for (const t of ['ledger_entries', 'audit_log', 'offers', 'deals', 'purchases', 'sales'] as const) expect(await count(t), t).toBe(0);
+  };
+  const migrations = (f: Map<string, string>) => JSON.parse(f.get('backup/migrations.json')!) as string[];
+
+  async function backupOfSeed() {
+    await seed();
+    const files = await collectBackupFiles(db);
+    await resetDb(db);
+    return files;
+  }
+
+  it('(a) a database with one domains row is refused', async () => {
+    const files = await backupOfSeed();
+    const dir = await dirOf(files);
+    await listedDomain({ domain: G, lander: 'afternic', lander_set_at: new Date('2026-10-10T00:00:00Z') });
+    await expect(importBackup(db, dir)).rejects.toThrow(/domains is not empty/);
+    expect(await count('domains')).toBe(1);
+    for (const t of ['ledger_entries', 'audit_log', 'offers', 'deals', 'purchases', 'sales'] as const) expect(await count(t), t).toBe(0);
+  });
+
+  it('(b) a backup whose seeded pricing_settings version differs is refused', async () => {
+    const files = await backupOfSeed();
+    const rows = JSON.parse(files.get('backup/tables/pricing_settings.json')!) as Record<string, unknown>[];
+    rows[0]!.floor_bps = 6000;
+    files.set('backup/tables/pricing_settings.json', JSON.stringify(rows));
+    await expect(importBackup(db, await dirOf(files))).rejects.toThrow(/pricing_settings version 2 differs/);
+    await nothingWritten();
+  });
+
+  it('(c) migrations.json with an extra name is refused with MIGRATION_LEVEL_MISMATCH', async () => {
+    const files = await backupOfSeed();
+    files.set('backup/migrations.json', JSON.stringify([...migrations(files), '9999999999999_future']));
+    await expect(importBackup(db, await dirOf(files))).rejects.toThrow(/MIGRATION_LEVEL_MISMATCH.*9999999999999_future/s);
+    await nothingWritten();
+  });
+
+  it('(d) migrations.json missing a name is refused with MIGRATION_LEVEL_MISMATCH', async () => {
+    const files = await backupOfSeed();
+    const names = migrations(files);
+    files.set('backup/migrations.json', JSON.stringify(names.slice(0, -1)));
+    await expect(importBackup(db, await dirOf(files))).rejects.toThrow(new RegExp(`MIGRATION_LEVEL_MISMATCH.*${names.at(-1)}`, 's'));
+    await nothingWritten();
+  });
+
+  it('(e) an absent migrations.json is refused', async () => {
+    const files = await backupOfSeed();
+    files.delete('backup/migrations.json');
+    await expect(importBackup(db, await dirOf(files))).rejects.toThrow(/MIGRATION_LEVEL_MISMATCH.*predates/s);
+    await nothingWritten();
+  });
+
+  it('a reordered migrations.json is refused too', async () => {
+    const files = await backupOfSeed();
+    files.set('backup/migrations.json', JSON.stringify([...migrations(files)].reverse()));
+    await expect(importBackup(db, await dirOf(files))).rejects.toThrow(/MIGRATION_LEVEL_MISMATCH/);
+    await nothingWritten();
   });
 });

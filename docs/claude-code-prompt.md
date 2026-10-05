@@ -63,13 +63,14 @@ Work in phases. **At the end of each phase, stop.** Show me the test output (cou
 - Re-check every endpoint and field against https://porkbun.com/llms/domain, and report any difference from 00-architecture §5.
 
 **Phase 6: deploy prep (Gate G3 is run by me).**
-- Finalise `render.yaml` and the README deploy steps.
+- Free hosting (backup.md, `00-architecture.md` §8): finalise `render.yaml` (free plan), `docs/DEPLOYMENT.md` (Neon, Render, Cloudflare, Porkbun, GitHub setup) and the Cloudflare Worker in `jobs-trigger/` that calls `POST /jobs/run`.
+- Tests: JOB-1 to JOB-6.
 - Write `docs/runbook.md`: create tokens, set env secrets, the G3 live checklist (import D-001 with `npm run admin -- import-domain` using the exact command in `report.md` §Import, IM-4; CK-12; `/buy` with `dry_run:true` on a free test .com; confirm balance and invoices are unchanged), and the restore drill (BK-3/BK-5).
 - Do **not** deploy yourself.
 
-**Phase 7 (optional): backup cron, plus the thin CLI (`docs/specs/cli.md`, tests CLI-1 to CLI-4) if I ask for it.**
-- `src/jobs/export-backup.ts` and `src/jobs/import-backup.ts`.
-- Tests: BK-1 to BK-4.
+**Phase 7: the backup (required under free hosting; `docs/specs/backup.md`, BK-5 before G4). The thin CLI (`docs/specs/cli.md`, tests CLI-1 to CLI-4) stays optional: build it only if I ask for it.**
+- `src/jobs/backup-export.ts` and `src/jobs/backup-import.ts`; the export runs in the daily job.
+- Tests: BK-1 to BK-4, BK-7, BK-8.
 
 At the end of every phase, give me:
 - test counts;

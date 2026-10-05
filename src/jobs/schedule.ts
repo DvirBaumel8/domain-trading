@@ -19,13 +19,17 @@ export function startJobScheduling(app: FastifyInstance, config: Pick<Config, 'j
   void runNsVerifier(); // at startup
   timers.push(setInterval(runNsVerifier, 24 * 3_600_000).unref()); // and every 24 hours
 
+  // The same runner as POST /jobs/run daily (price, drop, registrar check, backup export; each step isolated).
   const runDaily = async () => {
-    await app.priceJob.runOnce().catch(err('price job'));
-    await app.dropJob.runOnce().catch(err('drop job'));
-    await app.registrarCheckJob.runOnce().catch(err('registrar check'));
+    try {
+      const r = await app.jobRunner.run('daily');
+      for (const [name, step] of Object.entries(r.steps)) if (!step.ok) app.log.error({ errMessage: step.error }, `daily step ${name} failed`);
+    } catch (e) {
+      err('daily')(e);
+    }
   };
   void runDaily(); // at startup (catches up after downtime; idempotent)
-  const stopDaily = scheduleDailyUtc(runDaily, 0, 30); // and daily at 00:30 UTC: price job, drop job, then registrar check
+  const stopDaily = scheduleDailyUtc(runDaily, 0, 30); // and daily at 00:30 UTC: the shared daily runner
 
   return () => {
     for (const t of timers) clearInterval(t);

@@ -18,7 +18,7 @@ Never paste a secret into chat, a commit, an issue or a log.
 2. Connect -> turn the **Connection pooling toggle OFF** and copy the **direct** string:
    `postgresql://user:pass@ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=verify-full`
    (no `-pooler` in the host).
-3. Make sure it ends with exactly `?sslmode=verify-full`: remove `&channel_binding=require` if Neon added it, and replace `sslmode=require` with `verify-full`.
+3. Make sure it ends with exactly `?sslmode=verify-full` (production refuses to start with `require` or no sslmode; `verify-full` also makes `npm run migrate` verify the certificate): remove `&channel_binding=require` if Neon added it, and replace `sslmode=require` with `verify-full`.
    Why direct: the per-domain lock is a **session** advisory lock, which breaks behind Neon's transaction-mode pooler.
    The server refuses a `-pooler.` host when `APP_ENV=production`. Why TLS: Neon requires it, and `node-pg-migrate`
    reads TLS settings only from this URL.

@@ -41,7 +41,7 @@ services:
       - key: ENABLED_REGISTRARS
         value: porkbun,godaddy   # godaddy = NS/details only (D-001); buying is Porkbun only
       # Secrets: values entered in the Render Dashboard only (sync: false). Never in git.
-      - key: DATABASE_URL        # Neon DIRECT string, ?sslmode=verify-full
+      - key: DATABASE_URL        # Neon DIRECT string, ?sslmode=verify-full (required in production; `require` is refused)
         sync: false
       - key: PORKBUN_API_KEY
         sync: false

@@ -91,6 +91,17 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     );
   }
 
+  if (e.APP_ENV === 'production') {
+    // Production verifies the server certificate and says so in the URL. node-pg-migrate reads the URL's sslmode itself
+    // (poolConfig strips it only for the app's pg pool), so verify-full here also makes migrations verify the certificate.
+    const mode = /[?&]sslmode=([^&]*)/i.exec(e.DATABASE_URL)?.[1]?.toLowerCase();
+    if (e.DATABASE_SSL !== 'true' || mode !== 'verify-full') {
+      throw new Error(
+        'Invalid environment: production requires DATABASE_SSL=true and sslmode=verify-full in DATABASE_URL '
+        + `(got DATABASE_SSL=${e.DATABASE_SSL}, sslmode=${mode ?? 'none'}); use the Neon direct string with ?sslmode=verify-full`,
+      );
+    }
+  }
   if (e.DATABASE_SSL === 'true') poolConfig(e.DATABASE_URL, { ssl: true }); // throws on a conflicting sslmode
 
   const secretValues = SECRET_ENV.map((k) => strings[k] ?? '').filter((v) => v.length > 0);

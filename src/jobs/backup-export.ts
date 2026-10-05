@@ -32,6 +32,14 @@ function scrub(v: unknown): unknown {
   return v;
 }
 
+export const MIGRATIONS_FILE = 'backup/migrations.json';
+
+/** node-pg-migrate's table is `pgmigrations` (id serial, name, run_on). Names in run order. */
+export async function migrationNames(db: Kysely<Database>): Promise<string[]> {
+  const r = await sql<{ name: string }>`select name from pgmigrations order by id`.execute(db);
+  return r.rows.map((x) => x.name);
+}
+
 const json = (v: unknown) => `${JSON.stringify(v, null, 2)}\n`;
 const dollars = (c: unknown) => (typeof c === 'number' ? usdSigned(c) : '');
 const str = (v: unknown) => (v === null || v === undefined ? '' : String(v));
@@ -80,6 +88,8 @@ export async function collectBackupFiles(db: Kysely<Database>): Promise<Map<stri
     // Approval text stays (it is the audit trail); client_ip is dropped (personal data).
     files.set('backup/audit.jsonl', t.audit_log!.map((a) => { const { client_ip: _ip, ...rest } = a; return JSON.stringify(rest); }).map((l) => `${l}\n`).join(''));
     for (const name of TABLE_FILES) files.set(`backup/tables/${name}.json`, json(t[name]));
+    // The migration level (names only, no run_on: deterministic bytes). import-backup compares it with the target's pgmigrations (BK-8).
+    files.set(MIGRATIONS_FILE, json(await migrationNames(trx)));
     return files;
   });
 }
@@ -134,7 +144,8 @@ export class BackupExporter {
     const { token, repo } = this.deps.config.backup;
     if (!token || !repo) {
       const reason = `${!token ? 'GITHUB_BACKUP_TOKEN' : 'GITHUB_BACKUP_REPO'} is not set`;
-      this.deps.log?.warn(`backup export skipped: ${reason}`);
+      // backup.md line 15 / BK-4: always a warning, on every path.
+      this.deps.log?.warn('backup export skipped: GITHUB_BACKUP_TOKEN/GITHUB_BACKUP_REPO not set');
       return { skipped: true, reason };
     }
     const base = `/repos/${repo.split('/').map(enc).join('/')}`;
