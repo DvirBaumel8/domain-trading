@@ -35,7 +35,7 @@
 - **Payout (optional; Dvir, 5 Oct 2026, 19:42 IDT):** in the same transaction, one `payouts` row (`00-architecture.md` §4) with `sale_ledger_id` = the `sale` row just written, `fee_ledger_id` = the `payout_fee` row (or null), `venue`, `amount_cents`, `fee_cents`, `method`, `received_on` (null = not yet received), `transaction_ref`, `audit_id`. One payout per sale (UNIQUE `sale_ledger_id`).
   - **Validation (422, nothing written):** `amount` > 0; `received_on` not in the future (IDT date) and not before the `sold_at` date → `VALIDATION_ERROR`; `method` containing `@` → `NO_PII`.
   - **Consistency check (a warning, never a block):** `PAYOUT_MISMATCH` when |`amount` + `fee` − (sale − commission − other_fees)| > $1. The sale is still recorded.
-  - **Marking it received later:** `POST /payouts/{id}/received {received_on, approval_ref}` (WRITE, idempotent, audited) sets `received_on` once (null → date, same date rules); a second attempt with a new key → 409 `PAYOUT_ALREADY_RECEIVED`. **v1 pending Dvir confirmation at the 4d-1 gate** (`00-architecture.md` §2).
+  - **Marking it received later (v1; (spec sync 4d-2, Dvir, 5 Oct 2026, 22:02)):** `POST /payouts/{id}/received {received_on, approval_ref?}` (WRITE, idempotent, audited, **bot-only**; an `approval_ref`, if sent, is validated) sets `received_on` once (null → date, same date rules, else 422 `VALIDATION_ERROR`). Already received → 409 `PAYOUT_ALREADY_RECEIVED`; unknown id → 404 `PAYOUT_NOT_FOUND`.
 - **Commission check (a warning, not a block):** compares the commission to the expected rate.
   - Afternic: 15% if the lander NS was afternic at `sold_at`, else 25%, with a $15 minimum.
   - Sedo: 10%, 15% or 20%.
