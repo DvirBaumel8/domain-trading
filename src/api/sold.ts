@@ -6,7 +6,7 @@ import { usdStringToCents } from '../money.js';
 import { ISO_WITH_OFFSET } from '../services/offers.js';
 import { VENUES, type SoldService } from '../services/sold.js';
 
-const usd = z.number().refine((n) => Number.isFinite(n) && /^\d+(\.\d{1,2})?$/.test(String(n)), 'must be a USD amount with at most 2 decimals');
+const usd = z.number().refine((n) => Number.isFinite(n) && /^\d+(\.\d{1,2})?$/.test(String(n)) && n <= 10_000_000, 'must be a USD amount with at most 2 decimals and at most 10,000,000');
 const positive = usd.refine((n) => n > 0, 'must be > 0');
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v, 'must be a real date');
 
@@ -30,6 +30,10 @@ export function registerSold(app: FastifyInstance, service: SoldService): void {
     const b = SoldSchema.parse(req.body ?? {});
     if (!b.approval_ref) throw new AppError(422, 'APPROVAL_REQUIRED', "approval_ref is required (Dvir's word that the sale happened)");
     if (b.transaction_ref?.includes('@')) throw new AppError(422, 'NO_PII', 'transaction_ref must not contain an email address');
+    if (b.payout?.method.includes('@')) throw new AppError(422, 'NO_PII', 'payout.method must not contain an email address');
+    if (cents(b.commission) + cents(b.other_fees ?? 0) + cents(b.payout?.fee ?? 0) > cents(b.sale_price)) {
+      throw new AppError(422, 'VALIDATION_ERROR', 'commission + other_fees + payout.fee must not exceed sale_price');
+    }
     return service.sold(domain, {
       venue: b.venue, saleCents: cents(b.sale_price), commissionCents: cents(b.commission), otherFeesCents: cents(b.other_fees ?? 0),
       soldAt: new Date(b.sold_at),

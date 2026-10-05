@@ -5,6 +5,7 @@ import { jerusalemDate } from '../dates.js';
 import { AppError } from '../http/errors.js';
 import { formatUsd } from '../money.js';
 import { checkApproval } from './approval.js';
+import { manualDelist } from './export-state.js';
 import { withDomainLock } from './plan-store.js';
 
 export const VENUES = ['afternic', 'sedo', 'afternic_checkout', 'escrow', 'other'] as const;
@@ -23,7 +24,7 @@ export interface SoldInput {
 }
 
 const SELLABLE = ['owned', 'listed', 'delisted'];
-const OFFER_FINAL = ['declined', 'expired', 'withdrawn', 'sold'] as const;
+const OFFER_LINKABLE = ['open', 'countered', 'accepted'];
 const FUTURE_SKEW_MS = 5 * 60_000;
 const SEDO_RATES = [10, 15, 20];
 const AFNIC_MIN_COMMISSION_CENTS = 1500;
@@ -59,6 +60,7 @@ export class SoldService {
     const settings = await this.deps.db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
     const a = checkApproval(i.approvalRef, domain, now, settings.approval_max_age_hours);
     if (!a.ok) throw new AppError(422, a.code, a.reason);
+    if (a.approvedAt.getTime() < i.soldAt.getTime() - 60_000) throw new AppError(422, 'APPROVAL_INVALID', 'the sale approval predates the sale');
 
     return withDomainLock(this.deps.db, domain, (conn) => conn.transaction().execute(async (trx) => {
       const row = await trx.selectFrom('domains').selectAll().where('domain', '=', domain).forUpdate().executeTakeFirst();
@@ -66,10 +68,19 @@ export class SoldService {
       if (!SELLABLE.includes(row.status)) {
         throw new AppError(409, 'NOT_SELLABLE_STATE', `${domain} is ${row.status}; only owned, listed or delisted domains can be sold`);
       }
+      if (row.buy_date !== null && jerusalemDate(i.soldAt) < row.buy_date) {
+        throw new AppError(422, 'VALIDATION_ERROR', 'sold_at is before the domain was bought', { buy_date: row.buy_date });
+      }
       if (i.offerId !== null) {
         const o = await trx.selectFrom('offers').select(['id', 'domain_id', 'outcome']).where('id', '=', i.offerId).forUpdate().executeTakeFirst();
-        if (!o || o.domain_id !== row.id) throw new AppError(422, 'OFFER_MISMATCH', 'offer_id does not belong to this domain');
+        if (!o || o.domain_id !== row.id || !OFFER_LINKABLE.includes(o.outcome)) {
+          throw new AppError(422, 'OFFER_MISMATCH', 'offer_id must be an open, countered or accepted offer on this domain');
+        }
       }
+      const acq = await trx.selectFrom('ledger_entries')
+        .select(sql<string>`coalesce(sum(-amount_cents), 0)`.as('c'))
+        .where('domain_id', '=', row.id).where('type', 'in', ['registration', 'renewal', 'fee']).executeTakeFirstOrThrow();
+      const acquisitionCosts = Number(acq.c);
 
       const occurredOn = jerusalemDate(i.soldAt);
       const base = { occurred_on: occurredOn, domain_id: row.id, deal_id: row.deal_id, counterparty: i.venue, receipt_ref: i.transactionRef, audit_id: ctx.auditId };
@@ -78,7 +89,7 @@ export class SoldService {
       if (i.otherFeesCents > 0) rows.push({ ...base, type: 'fee', amount_cents: -i.otherFeesCents, note: null });
       const payoutFee = i.payout?.feeCents ?? 0;
       if (payoutFee > 0) {
-        rows.push({ ...base, type: 'payout_fee', amount_cents: -payoutFee, note: i.payout ? `payout via ${i.payout.method}` : null });
+        rows.push({ ...base, type: 'payout_fee', amount_cents: -payoutFee, note: 'payout fee' });
       }
       await trx.insertInto('ledger_entries').values(rows).execute();
 
@@ -90,34 +101,32 @@ export class SoldService {
         .where('domain_id', '=', row.id).where('status', '=', 'planned').execute();
 
       if (i.offerId !== null) {
-        await trx.updateTable('offers').set({ outcome: 'sold', outcome_at: now, outcome_note: 'via /sold' })
-          .where('id', '=', i.offerId).where('outcome', 'not in', [...OFFER_FINAL]).execute();
+        await trx.updateTable('offers').set({ outcome: 'sold', outcome_at: now, outcome_note: 'via /sold', outcome_approval_text: String(i.approvalRef.text) })
+          .where('id', '=', i.offerId).execute();
       }
 
       const warnings: string[] = [];
       const w = commissionWarning(i, row.lander, row.lander_set_at);
       if (w) warnings.push(w);
 
-      const sums = await trx.selectFrom('ledger_entries')
-        .select([sql<string>`coalesce(sum(amount_cents), 0)`.as('profit'), sql<string>`coalesce(sum(-amount_cents) filter (where type <> 'sale'), 0)`.as('costs')])
-        .where('domain_id', '=', row.id).executeTakeFirstOrThrow();
-      const profit = Number(sums.profit);
-      const totalCosts = Number(sums.costs);
       const fees = i.otherFeesCents + payoutFee;
+      const saleCosts = i.commissionCents + fees;
+      const netProceeds = i.saleCents - saleCosts;
 
-      const uploaded = await trx.selectFrom('export_uploads').select('id').where(sql<boolean>`${domain} = any(domains)`).limit(1).executeTakeFirst();
+      const venues: Venue[] = [];
+      for (const v of ['afternic', 'sedo'] as const) if ((await manualDelist(trx, v)).includes(domain)) venues.push(v);
       const checklist = [
         'Remove the listing on the *other* marketplace now (double-sale risk)',
         'Do not send an auth code outside the marketplace flow',
         'Auto-renew stays off',
-        ...(uploaded ? ['Remove the listing at Afternic/Sedo (see X-Manual-Delist)'] : []),
+        ...(venues.length ? [`Remove the listing at ${venues.map((v) => (v === 'afternic' ? 'Afternic' : 'Sedo')).join(' and ')} (see X-Manual-Delist)`] : []),
       ];
 
       return {
         domain, status: 'sold',
         sale: money(i.saleCents), commission: money(i.commissionCents), fees: money(fees),
-        net_proceeds: money(i.saleCents - i.commissionCents - fees),
-        total_costs: money(totalCosts), profit: money(profit),
+        sale_costs: money(saleCosts), net_proceeds: money(netProceeds),
+        acquisition_costs: money(acquisitionCosts), profit: money(netProceeds - acquisitionCosts),
         checklist, warnings,
       };
     }));

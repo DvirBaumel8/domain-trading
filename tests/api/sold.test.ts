@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { sql } from 'kysely';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
@@ -14,7 +15,7 @@ afterEach(async () => app?.close());
 const D = 'examplecityroofing.com';
 const NOW = Date.parse('2026-10-12T09:00:00Z');
 const SOLD_AT = '2026-10-12T11:00:00+02:00';
-const approval = (domain = D) => ({ text: `it sold on afternic for 1995 (${domain})`, approved_at: new Date(NOW - 3_600_000).toISOString() });
+const approval = (domain = D) => ({ text: `it sold on afternic for 1995 (${domain})`, approved_at: new Date(NOW - 30_000).toISOString() });
 const good = (over: Record<string, unknown> = {}) => ({
   venue: 'afternic', sale_price: 1995, commission: 299.25, sold_at: SOLD_AT, transaction_ref: 'AFN-1', approval_ref: approval(), ...over,
 });
@@ -45,7 +46,7 @@ describe('POST /sold/{domain}', () => {
     const b = res.json();
     expect(b).toMatchObject({
       domain: D, status: 'sold', sale: { cents: 199500 }, commission: { cents: 29925 }, fees: { cents: 0 },
-      net_proceeds: { cents: 169575 }, total_costs: { cents: 31033 }, profit: { cents: 168467, display: '$1,684.67' }, warnings: [],
+      sale_costs: { cents: 29925 }, net_proceeds: { cents: 169575 }, acquisition_costs: { cents: 1108, display: '$11.08' }, profit: { cents: 168467, display: '$1,684.67' }, warnings: [],
     });
     expect((await ledger()).map((r) => [r.type, r.amount_cents])).toEqual([['registration', -1108], ['sale', 199500], ['commission', -29925]]);
     const l = (await ledger())[1]!;
@@ -154,10 +155,11 @@ describe('POST /sold/{domain}', () => {
     const E = 'othercityplumbing.com';
     await listedDomain({ domain: E });
     await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [E], export_id: 'e1' }).execute();
+    await db.insertInto('export_run_domains').values({ export_id: 'e1', domain: E }).execute();
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: [E], uploaded_at: new Date(NOW), approval_text: 'uploaded' }).execute();
     const r2 = (await sold(good({ approval_ref: approval(E) }), auth, E)).json();
     expect(r2.checklist).toHaveLength(4);
-    expect(r2.checklist[3]).toMatch(/X-Manual-Delist/);
+    expect(r2.checklist[3]).toBe('Remove the listing at Afternic (see X-Manual-Delist)');
   });
 
   it('PR-26: sold cancels the planned schedule; the price job then changes nothing', async () => {
@@ -210,8 +212,8 @@ describe('POST /sold/{domain}', () => {
     const id = await afternicListed();
     const E = 'othercityplumbing.com';
     const eid = await listedDomain({ domain: E });
-    const offer = (domain_id: number, amount_cents: number) => db.insertInto('offers').values({
-      domain_id, amount_cents, source: 'afternic', received_at: '2026-10-10T10:00:00Z', band: 'mid_range', routing: 'dvir', outcome: 'open', recorded_by: 'test',
+    const offer = (domain_id: number, amount_cents: number, outcome: 'open' | 'declined_auto' | 'declined' | 'expired' | 'withdrawn' | 'sold' = 'open') => db.insertInto('offers').values({
+      domain_id, amount_cents, source: 'afternic', received_at: '2026-10-10T10:00:00Z', band: 'mid_range', routing: 'dvir', outcome, recorded_by: 'test',
     }).returning('id').executeTakeFirstOrThrow();
     const mine = await offer(id, 150000);
     const other = await offer(eid, 90000);
@@ -221,9 +223,16 @@ describe('POST /sold/{domain}', () => {
     expect(await dom()).toMatchObject({ status: 'listed' });
     expect(await ledger()).toHaveLength(1);
     expect((await sold(good({ offer_id: 999999 }), auth)).json().error.code).toBe('OFFER_MISMATCH');
+    for (const outcome of ['declined_auto', 'declined', 'expired', 'withdrawn', 'sold'] as const) {
+      const o = await offer(id, 100000 + Math.floor(Math.random() * 1000), outcome);
+      const r = await sold(good({ offer_id: o.id }), (await issueToken('write')).auth);
+      expect([outcome, r.statusCode, r.json().error.code]).toEqual([outcome, 422, 'OFFER_MISMATCH']);
+      expect(await ledger()).toHaveLength(1);
+      expect(await dom()).toMatchObject({ status: 'listed' });
+    }
     expect((await sold(good({ offer_id: mine.id }), auth)).statusCode).toBe(200);
     const o = await db.selectFrom('offers').selectAll().where('id', '=', mine.id).executeTakeFirstOrThrow();
-    expect(o).toMatchObject({ outcome: 'sold', outcome_note: 'via /sold' });
+    expect(o).toMatchObject({ outcome: 'sold', outcome_note: 'via /sold', outcome_approval_text: approval().text });
     expect(o.outcome_at).not.toBeNull();
     expect((await db.selectFrom('offers').select('outcome').where('id', '=', other.id).executeTakeFirstOrThrow()).outcome).toBe('open');
   });
@@ -239,12 +248,73 @@ describe('POST /sold/{domain}', () => {
     await lockedP;
     let done = false;
     const p = sold(good(), auth).then((r) => { done = true; return r; });
-    await new Promise((r) => setTimeout(r, 400));
+    for (let n = 0; n < 200; n++) { // wait until /sold is blocked on the advisory lock
+      const w = await sql<{ c: string }>`select count(*)::text as c from pg_locks where locktype = 'advisory' and not granted`.execute(db);
+      if (Number(w.rows[0]!.c) > 0) break;
+      await new Promise((r) => setTimeout(r, 10));
+    }
     expect(done).toBe(false);
     expect(await dom()).toMatchObject({ status: 'listed' });
     release();
     await holder;
     expect((await p).statusCode).toBe(200);
+  });
+
+  it('commission: owned never-listed domain (null lander) at Afternic expects 25%; Afternic-NS at 25% warns expected 15%', async () => {
+    const auth = await setup();
+    await insertOwnedDomain(db, { domain: D });
+    const r = await sold(good({ commission: 299.25 }), auth);
+    expect(r.json().warnings).toEqual(['COMMISSION_UNEXPECTED: expected 25% ($498.75), got $299.25']);
+    const E = 'othercityplumbing.com';
+    await listedDomain({ domain: E, lander: 'afternic', lander_set_at: new Date('2026-10-10T00:00:00Z') });
+    const r2 = await sold(good({ commission: 498.75, approval_ref: approval(E) }), auth, E);
+    expect(r2.json().warnings).toEqual(['COMMISSION_UNEXPECTED: expected 15% ($299.25), got $498.75']);
+  });
+
+  it('S-8b: a domain never in a confirmed file gets no manual-delist line, and neither does one whose upload asked for its delist', async () => {
+    const auth = await setup();
+    await listedDomain({ domain: D });
+    expect((await sold(good(), auth)).json().checklist).toHaveLength(3);
+    const E = 'othercityplumbing.com';
+    await listedDomain({ domain: E });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [E], export_id: 'e1' }).execute();
+    await db.insertInto('export_run_domains').values({ export_id: 'e1', domain: E }).execute();
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [], delist: [E], export_id: 'e2' }).execute();
+    await db.insertInto('export_uploads').values([
+      { venue: 'afternic', export_id: 'e1', domains: [E], uploaded_at: new Date(NOW), approval_text: 'uploaded' },
+      { venue: 'afternic', export_id: 'e2', domains: [], uploaded_at: new Date(NOW), approval_text: 'uploaded' },
+    ]).execute();
+    expect((await sold(good({ approval_ref: approval(E) }), auth, E)).json().checklist).toHaveLength(3);
+  });
+
+  it('PII in payout.method → NO_PII; payout_fee note is fixed text', async () => {
+    const auth = await setup();
+    await afternicListed();
+    const r = await sold(good({ payout: { amount: 1, method: 'wire to a@b.com', fee: 1 } }), auth);
+    expect([r.statusCode, r.json().error.code]).toEqual([422, 'NO_PII']);
+    await sold(good({ payout: { amount: 1600, method: 'wire', fee: 15 } }), (await issueToken('write')).auth);
+    const n = await db.selectFrom('ledger_entries').select('note').where('type', '=', 'payout_fee').executeTakeFirstOrThrow();
+    expect(n.note).toBe('payout fee');
+  });
+
+  it('validation: > $10M, costs > sale, sold_at before buy_date → 422 VALIDATION_ERROR; stale approval → APPROVAL_INVALID', async () => {
+    await setup();
+    await afternicListed({ buy_date: '2026-10-11' });
+    const t = async (over: Record<string, unknown>) => sold(good(over), (await issueToken('write')).auth);
+    for (const over of [
+      { sale_price: 10_000_000.01 }, { commission: 10_000_001 }, { sale_price: 100, commission: 90, other_fees: 10.01 },
+      { sale_price: 100, commission: 50, other_fees: 20, payout: { amount: 1, method: 'wire', fee: 30.01 } },
+      { sold_at: '2026-10-10T11:00:00+02:00' },
+    ]) {
+      const r = await t(over);
+      if (r.statusCode === 200) throw new Error(JSON.stringify(over));
+      expect([over, r.statusCode, r.json().error.code]).toEqual([over, 422, 'VALIDATION_ERROR']);
+    }
+    const r = await t({ approval_ref: { text: `sold ${D}`, approved_at: '2026-10-12T08:50:00Z' } }); // sold_at 09:00Z; 10 min earlier
+    expect([r.statusCode, r.json().error.code]).toEqual([422, 'APPROVAL_INVALID']);
+    expect(r.json().error.message).toMatch(/predates the sale/);
+    expect((await t({ sale_price: 100, commission: 50, other_fees: 20, payout: { amount: 1, method: 'wire', fee: 30 } })).statusCode).toBe(200);
+    expect(await ledger()).toHaveLength(5);
   });
 
   it('validation: money, sold_at, PII, strict body', async () => {
