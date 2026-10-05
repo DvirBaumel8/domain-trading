@@ -54,4 +54,30 @@ describe('offer classifier', () => {
   it('unlisted warning', () => {
     expect(classify({ ...d001, listedAtReceipt: false }, 100000, 'afternic').warnings).toContain('OFFER_ON_UNLISTED');
   });
+
+  it('review additions: routing and exact texts', () => {
+    const r3 = classify(d001, 199500, 'afternic');
+    expect(r3).toMatchObject({ band: 'at_or_above_bin', routing: 'auto_accept' });
+    expect(r3.warnings).not.toContain('OFFER_AT_OR_ABOVE_FLOOR');
+    expect(r3.nextStep).toBe('At or above the floor: Afternic may already have closed this; check the dashboard.');
+    expect(classify(d001, 130000, 'godaddy').routing).toBe('auto_accept');
+    const offerF: OfferSnapshot = { mode: 'offer', binCents: null, floorCents: 90000, walkawayCents: null, minOfferCents: 50000, listingHistoryId: 5, listedAtReceipt: true };
+    expect(classify(offerF, 90000, 'sedo').band).toBe('at_or_above_floor');
+    expect(classify({ ...d001, walkawayCents: null }, 100000, 'afternic').band).toBe('unpriced');
+    expect(classify(d001, 130000, 'sedo').nextStep).toBe('At or above the floor: accept (pre-approved by the buy card).');
+    expect(classify(d001, 45000, 'sedo').nextStep).toBe("Below the walk-away: Sochen's standard decline template; no Gate D.");
+    expect(classify(d001, 45000, 'other').nextStep).toBe("Below the walk-away: Sochen's standard decline template; no Gate D.");
+    expect(classify(d001, 45000, 'afternic').nextStep).toBe('Below the walk-away: decline in the Afternic dashboard (or let it expire); no Gate D.');
+    expect(classify(d001, 45000, 'email_inbound').nextStep).toBe("Below the walk-away: Sochen's standard decline template; Dvir sends it (pre-approved text, no Gate D).");
+    for (const a of [100000, 129500, 199500]) {
+      expect(classify(d001, a, 'email_inbound').nextStep).toBe('Email offer: Sochen drafts; Dvir decides and sends.');
+    }
+    expect(classify(d001, 5000, 'afternic').nextStep).toBe('Below the minimum offer: decline in the Afternic dashboard (or let it expire); no Gate D.');
+    expect(classify(d001, 5000, 'sedo').nextStep).toBe("Below the minimum offer: Sochen's standard decline template; no Gate D.");
+    expect(classify(d001, 5000, 'outbound_reply').nextStep).toBe("Below the minimum offer: Sochen's standard decline template; Dvir sends it (pre-approved text, no Gate D).");
+    const plain: OfferSnapshot = { mode: 'bin', binCents: 99900, floorCents: null, walkawayCents: null, minOfferCents: 99900, listingHistoryId: 4, listedAtReceipt: true, category: 'trend' };
+    expect(classify(plain, 90000, 'afternic').nextStep).toBe("Price is fixed: reply 'The price is $999, fixed'.");
+    expect(classify({ ...plain, category: 'geo' }, 90000, 'afternic').nextStep).toBe("Geo price is fixed: reply 'The price is $999, fixed'.");
+    expect(classify(geo, 35000, 'afternic').nextStep).toBe("Geo price is fixed: reply 'The price is $399, fixed'.");
+  });
 });

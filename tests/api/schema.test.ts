@@ -295,4 +295,23 @@ describe('schema: offers (OF-11)', () => {
     const id = await insertOwnedDomain(db);
     await expect(db.insertInto('offers').values(offerRow(id, { buyer_ref: 'a@b.com' })).execute()).rejects.toThrow(/buyer_ref/);
   });
+  it('external_ref may be an email Message-ID', async () => {
+    const id = await insertOwnedDomain(db);
+    await db.insertInto('offers').values(offerRow(id, { external_ref: '<abc@mail.gmail.com>' })).execute();
+  });
+  it('note CHECK rejects an email address', async () => {
+    const id = await insertOwnedDomain(db);
+    await expect(db.insertInto('offers').values(offerRow(id, { note: 'a@b.com' })).execute()).rejects.toThrow(/note/);
+  });
+  it('walkaway_cents_at is immutable', async () => {
+    const id = await insertOwnedDomain(db);
+    await db.insertInto('offers').values(offerRow(id, { walkaway_cents_at: 95000 })).execute();
+    await expect(db.updateTable('offers').set({ walkaway_cents_at: 1 }).execute()).rejects.toThrow(/immutable/);
+  });
+  it('TRUNCATE is refused on offers and offer_imports; DELETE refused on offer_imports', async () => {
+    await expect(sql`TRUNCATE offers`.execute(db)).rejects.toThrow();
+    await expect(sql`TRUNCATE offer_imports CASCADE`.execute(db)).rejects.toThrow();
+    await db.insertInto('offer_imports').values({ file_sha256: 'b'.repeat(64), rows: 1, inserted: 1, duplicates: 0, recorded_by: 'test' }).execute();
+    await expect(db.deleteFrom('offer_imports').execute()).rejects.toThrow(/append-only/);
+  });
 });

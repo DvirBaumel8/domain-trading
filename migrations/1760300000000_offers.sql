@@ -20,7 +20,7 @@ CREATE TABLE offers (
   received_at            timestamptz NOT NULL,
   buyer_type             text NOT NULL DEFAULT 'unknown' CHECK (buyer_type IN ('end_user','investor','broker','unknown')),
   buyer_ref              text CHECK (buyer_ref IS NULL OR position('@' in buyer_ref) = 0),
-  external_ref           text CHECK (external_ref IS NULL OR position('@' in external_ref) = 0),
+  external_ref           text,
   bin_cents_at           integer, floor_cents_at integer, walkaway_cents_at integer, min_offer_cents_at integer,
   listing_history_id     bigint REFERENCES listing_history (id),
   band                   text NOT NULL CHECK (band IN ('below_min','below_walkaway','mid_range','at_or_above_floor','at_or_above_bin','geo_below_bin','unpriced')),

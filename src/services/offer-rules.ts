@@ -15,6 +15,8 @@ export interface OfferSnapshot {
   minOfferCents: number | null;
   listingHistoryId: number | null;
   listedAtReceipt: boolean;
+  /** Optional; for mode 'bin' a missing category is treated as geo. */
+  category?: string | null;
 }
 
 export interface Classification {
@@ -58,17 +60,24 @@ function routingOf(band: Band, source: OfferSource): Routing {
   return isAutoVenue(source) ? 'auto_accept' : 'accept_preapproved';
 }
 
-function nextStepOf(band: Band, routing: Routing, source: OfferSource, bin: number | null): string {
+function nextStepOf(s: OfferSnapshot, band: Band, routing: Routing, source: OfferSource): string {
+  const bin = s.binCents;
   switch (routing) {
-    case 'auto_decline':
-      if (band === 'geo_below_bin') return `Geo price is fixed: reply 'The price is ${formatUsd(bin ?? 0).replace(/\.00$/, '')}, fixed'.`;
-      if (isAutoVenue(source)) return 'Below the walk-away: decline in the Afternic dashboard (or let it expire); no Gate D.';
-      if (isEmail(source)) return "Below the walk-away: Sochen's standard decline template; Dvir sends it (pre-approved text, no Gate D).";
-      return "Below the walk-away: Sochen's standard decline template; no Gate D.";
+    case 'auto_decline': {
+      if (band === 'geo_below_bin') {
+        const price = formatUsd(bin ?? 0).replace(/\.00$/, '');
+        const geo = s.category === undefined || s.category === null || s.category === 'geo';
+        return `${geo ? 'Geo price' : 'Price'} is fixed: reply 'The price is ${price}, fixed'.`;
+      }
+      const head = band === 'below_min' ? 'Below the minimum offer' : 'Below the walk-away';
+      if (isAutoVenue(source)) return `${head}: decline in the Afternic dashboard (or let it expire); no Gate D.`;
+      if (isEmail(source)) return `${head}: Sochen's standard decline template; Dvir sends it (pre-approved text, no Gate D).`;
+      return `${head}: Sochen's standard decline template; no Gate D.`;
+    }
     case 'dvir':
+      if (isEmail(source)) return 'Email offer: Sochen drafts; Dvir decides and sends.';
       if (band === 'unpriced') return 'No prices in force: ask Dvir.';
-      if (band === 'mid_range') return "Mid-range: Sochen drafts; needs Dvir's Gate D line.";
-      return 'Email offer: Sochen drafts; Dvir decides and sends.';
+      return "Mid-range: Sochen drafts; needs Dvir's Gate D line.";
     case 'auto_accept':
       return 'At or above the floor: Afternic may already have closed this; check the dashboard.';
     case 'accept_preapproved':
@@ -84,6 +93,6 @@ export function classify(s: OfferSnapshot, amountCents: number, source: OfferSou
   if (band === 'at_or_above_floor' && isAutoVenue(source)) warnings.push('OFFER_AT_OR_ABOVE_FLOOR');
   return {
     band, routing, outcome: routing === 'auto_decline' ? 'declined_auto' : 'open',
-    nextStep: nextStepOf(band, routing, source, s.binCents), warnings,
+    nextStep: nextStepOf(s, band, routing, source), warnings,
   };
 }
