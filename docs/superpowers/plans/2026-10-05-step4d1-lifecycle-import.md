@@ -230,6 +230,50 @@ DROP FUNCTION payouts_facts_immutable();
 
 ---
 
+### Task 1c: Bot autonomy: Dvir's words only for buy and sell decisions (Dvir, 5 Oct 2026)
+
+**Operating model** (Dvir): Dvir talks only to the primary bot (Gavriel). Scout bots propose domains, and Dvir decides only **buy** or **sell**. The bots then call this API, and also act on the marketplace and registrar websites themselves. So `approval_ref` (Dvir's words relayed by Gavriel) is **required only** for:
+1. **Buy:** `/buy` (unchanged), and the future one-renewal.
+2. **Sell decisions:**
+   - `POST /offers/{id}/outcome` `countered`/`accepted` when the routing is not `auto_accept`/`accept_preapproved` (unchanged);
+   - a pricing **exception** (an off-formula floor or walk-away, V5);
+   - an **override** (V8: geo off the grade price or range, a non-geo plain `bin` or `offer`, LTO, relabelling a name to `geo`).
+
+Everything else is **bot-autonomous**: no `approval_ref` is needed. The calling token is recorded through the `audit_log` row (`token_id`), and the rules still apply in full.
+
+**Changes:**
+- **`/list`** (src/services/list.ts):
+  - Drop the V10 "any change needs approval" rule. These are allowed without `approval_ref`: a price, mode, category or grade change that passes V1–V7 without an override or exception; a hold or unhold (the reason is still required); `replan`; lander/NS.
+  - Keep the approval requirement for exceptions (engine, `listing-v2.ts:121`) and overrides (V8 `OVERRIDE_NEEDS_APPROVAL`, including relabelling to geo).
+  - If an `approval_ref` is **sent**, it is still validated (an invalid one → its code), and its text and time are stored in the history row. If it's absent, the history `approval_text` and `approval_at` are null.
+- **`POST /offers` with `pricing_hold`** (src/services/offers.ts:95-97): no approval needed; the reason is still required.
+- **`POST /export/{venue}/uploaded`** (src/services/export.ts:209):
+  - `approval_ref` becomes optional. The bot confirms the upload, with an optional `uploaded_at` (ISO with offset; default now; not in the future; not before the file's `at` − 60 s) and an optional `note` (no `@`).
+  - If an `approval_ref` is sent, the current rules apply and its time becomes `uploaded_at`.
+  - Migration (a new file, `1760600000000_bot-autonomy.sql`): make `export_uploads.approval_text` nullable (drop NOT NULL and the non-empty CHECK, then add `CHECK (approval_text IS NULL OR length(trim(approval_text)) > 0)`), and add `note text CHECK (note IS NULL OR position('@' in note) = 0)`.
+- **Not changed:** `/buy`, the offer accept/counter gate, `/sold` (already system-triggered), and the admin commands (`pricing-settings`, `import-domain`, `drop-at-first-expiry`). Those are run server-side by Claude Code, and their `--approval-text` stays mandatory only where the action is a buy or sell decision (pricing settings and exceptions).
+- **The `import-domain` brief (Task 4) is amended:** `--approval-text`/`--approval-at` are needed only when the import carries a pricing exception or an override. A plain formula listing needs none.
+
+- [ ] **Step 1: Update or replace tests** (these are our own tests that encoded the old rule; the spec rule is being changed by Dvir's decision and will be synced through Gavriel):
+  - **LG-13:** a manual price change without `approval_ref` → **200** (formerly 422), with a history row whose `approval_text` is null.
+  - **L-15:** a hold without approval → 200; without a reason → 422 `HOLD_REASON_REQUIRED`.
+  - **Still 422:**
+    - an exception without approval → `APPROVAL_REQUIRED`;
+    - an override without approval → `OVERRIDE_NEEDS_APPROVAL`;
+    - relabelling to geo without approval → `OVERRIDE_NEEDS_APPROVAL`;
+    - an invalid `approval_ref` when one is sent → its code.
+  - **Offers:** `pricing_hold` without approval → 200 and the hold is applied.
+  - **Export confirm:**
+    - without `approval_ref` → 200, `export_uploads.approval_text` null, `uploaded_at` = now (or the `uploaded_at` sent);
+    - an `uploaded_at` in the future or before the file → 422;
+    - `@` in `note` → `NO_PII`;
+    - with `approval_ref`, the old behaviour applies.
+  - **PR-29:** the job's change needs no approval, and neither does a `/list` change within the rules.
+- [ ] **Step 2–4:** Implement, then `npx vitest run && npx tsc --noEmit`, then migrate up/down/up.
+- [ ] **Step 5: Commit** `feat: bot autonomy (approval only for buy/sell decisions: exceptions, overrides, non-pre-approved offer accepts; /list, holds and upload confirmations are bot-only)`
+
+---
+
 ### Task 2: Drop job + `drop-at-first-expiry` (PR-25)
 
 **Files:** Create `src/jobs/drop.ts`, `src/admin/drop-date.ts`, `tests/api/drop-job.test.ts`, `tests/api/drop-date.test.ts`. Modify `src/app.ts` (`app.dropJob`), `src/main.ts` (run after the price job at startup and daily), `src/job.ts` (`npm run job -- drop [--dry-run] [--today]`), `src/admin.ts`.
