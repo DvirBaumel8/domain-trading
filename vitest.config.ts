@@ -34,6 +34,8 @@ export default defineConfig({
               test: {
                 name: 'porkbun-sandbox',
                 include: ['tests/contract/porkbun-sandbox*.test.ts'],
+                // Same DB bootstrap as the api project (B-26 runs /buy against the local test DB); no per-test reset here.
+                globalSetup: ['tests/setup/global-db.ts'],
                 setupFiles: ['tests/contract/setup.ts'],
                 testTimeout: 60_000,
               },
