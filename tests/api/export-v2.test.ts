@@ -69,7 +69,7 @@ describe('exports v2', () => {
     expect(parseCsvStrict(first.body)).toHaveLength(5);
     expect((await post(app, '/export/afternic/uploaded', auth, confirmBody(first.headers['x-export-id'] as string, NOW))).statusCode).toBe(200);
     const later = await appAt(NOW + 24 * HOUR);
-    await db.updateTable('domains').set({ status: 'sold', sold_at: new Date(NOW + 20 * HOUR), delisted_at: new Date(NOW + 20 * HOUR) }).where('domain', '=', 'gone.com').execute();
+    await db.updateTable('domains').set({ status: 'sold', sold_at: new Date(NOW + 20 * HOUR), delisted_at: new Date(NOW + 20 * HOUR), listing_changed_at: new Date(NOW + 20 * HOUR) }).where('domain', '=', 'gone.com').execute();
     const res = await get(later, 'afternic', auth);
     expect(parseCsvStrict(res.body).map((r) => r.join(','))).toEqual([
       'Domain,Buy Now Price,Floor Price,Min Offer,Lease to Own,Max Lease Period,Sale Lander,Show Buy Now Option,Show Lease to Own Option,Show Make Offer Option,Hidden',
@@ -80,7 +80,7 @@ describe('exports v2', () => {
     expect(res.headers['x-manual-delist']).toBe('gone.com');
   });
 
-  it('PR-36 / E-10: changed_only after a scheduled drop; 1 row with the M6 values; confirming clears it', async () => {
+  it('PR-36 / E-10: after a scheduled drop the file is still the full file (3 rows, M6 values for the dropped name); 1 pending; confirming clears it', async () => {
     const a1 = await appAt(NOW);
     const { auth } = await issueToken('write');
     await listVia(a1, auth, NOW, 'alpharoof.com');
@@ -97,17 +97,15 @@ describe('exports v2', () => {
     expect(r.applied.map((x) => x.domain)).toEqual(['alpharoof.com']);
 
     const a3 = await appAt(LATER + HOUR);
-    const changed = await get(a3, 'afternic', auth, '?changed_only=true');
-    expect(parseCsvStrict(changed.body).map((x) => x.join(','))).toEqual([
-      expect.stringMatching(/^Domain,/),
-      'alpharoof.com,1595,1035,100,N,,Custom Lander,Y,N,Y,N',
-    ]);
+    const changed = await get(a3, 'afternic', auth);
+    expect(parseCsvStrict(changed.body).map((x) => x[0])).toEqual(['Domain', 'alpharoof.com', 'betaroof.com', 'gammaroof.com']);
+    expect(parseCsvStrict(changed.body).map((x) => x.join(','))[1]).toBe('alpharoof.com,1595,1035,100,N,,Custom Lander,Y,N,Y,N');
     expect(changed.headers['x-pending-changes']).toBe('1');
     expect((await row('alpharoof.com')).export_pending_since).not.toBeNull();
 
     const ok = await post(a3, '/export/afternic/uploaded', auth, confirmBody(changed.headers['x-export-id'] as string, LATER + HOUR));
     expect(ok.statusCode, ok.body).toBe(200);
-    expect(ok.json()).toMatchObject({ venue: 'afternic', export_id: changed.headers['x-export-id'], domains: 1, pending_after: 0, still_pending: [] });
+    expect(ok.json()).toMatchObject({ venue: 'afternic', export_id: changed.headers['x-export-id'], domains: 3, pending_after: 0, still_pending: [] });
     expect((await get(a3, 'afternic', auth)).headers['x-pending-changes']).toBe('0');
     expect((await row('alpharoof.com')).export_pending_since).toBeNull();
   });
@@ -134,7 +132,7 @@ describe('exports v2', () => {
     const A = await get(app, 'afternic', auth);
     await post(app, '/export/afternic/uploaded', auth, confirmBody(A.headers['x-export-id'] as string, NOW));
     expect((await get(app, 'afternic', auth)).headers['x-pending-changes']).toBe('0');
-    const s = await get(app, 'sedo', auth, '?changed_only=true');
+    const s = await get(app, 'sedo', auth);
     expect(s.statusCode).toBe(200);
     expect(s.headers['x-pending-changes']).toBe('1');
     expect(parseCsvStrict(s.body)).toHaveLength(2);
@@ -333,13 +331,13 @@ describe('exports v2', () => {
     }
   });
 
-  it('changed_only=maybe and unknown query parameters → 400 VALIDATION_ERROR', async () => {
+  it('any query parameter (including the removed changed_only) → 422 VALIDATION_ERROR and no snapshot', async () => {
     const app = await appAt(NOW);
     const { auth } = await issueToken('read');
     for (const v of ['afternic', 'sedo'] as const) {
-      for (const q of ['?changed_only=maybe', '?foo=1', '?changed_only=true&foo=1']) {
+      for (const q of ['?changed_only=true', '?changed_only=false', '?foo=1']) {
         const res = await get(app, v, auth, q);
-        expect(res.statusCode, `${v}${q}`).toBe(400);
+        expect(res.statusCode, `${v}${q}`).toBe(422);
         expect(res.json().error.code).toBe('VALIDATION_ERROR');
       }
     }
@@ -365,6 +363,5 @@ describe('exports v2', () => {
     const res = await get(app, 'afternic', auth);
     const run = await db.selectFrom('export_runs').selectAll().where('export_id', '=', res.headers['x-export-id'] as string).executeTakeFirstOrThrow();
     expect(run.at.getTime()).toBe(NOW);
-    expect(run.changed_only).toBe(false);
   });
 });

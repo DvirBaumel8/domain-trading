@@ -58,7 +58,7 @@ The scratch DB is local docker (service `db`, user `dt`, password `dt`, port 543
 1. `npm run db:up`, then `docker compose exec db createdb -U dt restore_drill`.
 2. Define the scratch environment once per shell (explicit values; nothing from `.env`):
    ```bash
-   SCRATCH='env -i HOME="$HOME" PATH="$PATH" DATABASE_URL=postgres://dt:dt@localhost:5433/restore_drill DATABASE_SSL=false JOBS_MODE=external APP_ENV=development PORT=3100'
+   SCRATCH='env -i HOME="$HOME" PATH="$PATH" DATABASE_URL=postgres://dt:dt@localhost:5433/restore_drill DATABASE_SSL=false APP_ENV=development PORT=3100'
    ```
    (`env -i` starts from an empty environment, so no `PORKBUN_*`, `GODADDY_PAT` or `GITHUB_BACKUP_*` can reach it. `npm run job`/`admin` also load `.env` if present, so move it aside or run from a copy without one.)
 3. Migrate: `eval "$SCRATCH npm run migrate up"`.

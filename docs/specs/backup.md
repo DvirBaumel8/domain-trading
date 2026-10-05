@@ -18,7 +18,7 @@ Runs as the last step of the `daily` job (`POST /jobs/run {"job":"daily"}`, 00:0
 - `portfolio.csv` (no walk-away), `ledger.csv` (the `report.md`/`cfo-ledger.md` header), `offers.csv`;
 - `purchases.json` and `receipts.json` (registrar billing/account fields and addresses dropped), `sales.json`;
 - `audit.jsonl` (approval text kept; client IPs dropped);
-- **lossless** `tables/*.json` (every column and row) for `settings`, `deals`, `pricing_settings`, `domains`, `ledger_entries`, `listing_history`, `quotes`, `price_schedule`, `pricing_evidence`, `offers`, `export_runs`, `export_run_domains`, `export_uploads`, `registrar_presence`.
+- **lossless** `tables/*.json` (every column and row) for `settings`, `deals`, `pricing_settings`, `domains`, `ledger_entries`, `listing_history`, `quotes`, `price_schedule`, `pricing_evidence`, `offers`, `export_runs`, `export_uploads`, `registrar_presence`.
 - Removed 6 Oct 2026 (Dvir): `payouts.json` and `tables/offer_imports.json` (both tables dropped).
 - **The tables include the private walk-away** (`domains.walkaway_cents`, history and schedule rows): a restore needs it. This is **internal storage only**, never a marketplace export; that is why the repo must stay private.
 - Never exported: `api_tokens` and `idempotency_keys`.

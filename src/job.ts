@@ -8,8 +8,10 @@ import { createAdapters } from './registrars/registry.js';
 import { PriceScheduleJob } from './jobs/price-schedule.js';
 import { BackupExporter } from './jobs/backup-export.js';
 import { importBackup } from './jobs/backup-import.js';
+import { buildApp } from './app.js';
 
 const USAGE = `usage:
+  npm run job -- tick | daily     (the same runner and steps as POST /jobs/run)
   npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]
   npm run job -- drop [--dry-run] [--today YYYY-MM-DD]
   npm run job -- registrar-check [--dry-run]
@@ -24,6 +26,26 @@ async function main(argv: string[]): Promise<number> {
     allowPositionals: true,
     options: { 'dry-run': { type: 'boolean' }, today: { type: 'string' } },
   });
+  if (positionals[0] === 'tick' || positionals[0] === 'daily') {
+    if (positionals.length !== 1) throw new UsageError(`wrong arguments for ${positionals[0]}`);
+    if (values['dry-run'] || values.today !== undefined) throw new UsageError('--dry-run and --today do not apply to tick or daily');
+    const config = loadConfig(process.env);
+    const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });
+    const log = { warn: (m: string) => console.warn(`warning: ${m}`) };
+    try {
+      // The same app wiring as the server (never listening), so the runner has the server's adapters, locks and scrubbing.
+      const app = await buildApp({ config, db, backupExport: new BackupExporter({ db, config, now: Date.now, log }) });
+      try {
+        const r = await app.jobRunner.run(positionals[0]);
+        console.log(JSON.stringify(r, null, 2));
+        return Object.values(r.steps).some((st) => !st.ok) ? 1 : 0;
+      } finally {
+        await app.close();
+      }
+    } finally {
+      await db.destroy();
+    }
+  }
   const backupCmd = positionals[0] === 'export-backup' || positionals[0] === 'import-backup';
   if (backupCmd) {
     if (positionals[0] === 'export-backup' ? positionals.length !== 1 : positionals.length !== 2) throw new UsageError(`wrong arguments for ${positionals[0]}`);

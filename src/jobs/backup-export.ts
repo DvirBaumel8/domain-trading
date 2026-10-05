@@ -9,12 +9,12 @@ import { toCsv } from '../services/export.js';
 /** Tables written in full (all columns, every row) under backup/tables/ so a restore is lossless. */
 export const TABLE_FILES = [
   'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'listing_history', 'quotes', 'price_schedule',
-  'pricing_evidence', 'offers', 'export_runs', 'export_run_domains', 'export_uploads', 'registrar_presence',
+  'pricing_evidence', 'offers', 'export_runs', 'export_uploads', 'registrar_presence',
 ] as const;
 type Row = Record<string, unknown>;
 
 const PK: Record<string, string> = {
-  settings: 'id', deals: 'id', pricing_settings: 'version', export_run_domains: 'export_id, domain', registrar_presence: 'domain_id', audit_log: 'at, id',
+  settings: 'id', deals: 'id', pricing_settings: 'version', registrar_presence: 'domain_id', audit_log: 'at, id',
 };
 
 /** Every row of a table as the database's own JSON (exact timestamp precision), in primary-key order. */

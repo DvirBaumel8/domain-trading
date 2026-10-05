@@ -128,11 +128,11 @@ export class ExportService {
   constructor(private readonly deps: { db: Kysely<Database>; config: Config; now: () => number; lockTimeoutMs?: number }) {}
 
   /**
-   * One repeatable-read transaction: read pending / manual-delist / listed rows and insert the snapshot (the only write),
-   * so a /list commit cannot fall between the read and the insert. `at` is the app clock taken before any read.
+   * One repeatable-read transaction: read pending / manual-delist / listed rows and insert the export_runs row (the only
+   * write: the file's id, snapshot time and names, which POST /export/{venue}/uploaded refers to). `at` is the app clock taken before any read.
    */
   private async snapshot(
-    venue: Venue, changedOnly: boolean,
+    venue: Venue,
     build: (listed: ExportDomain[], warnings: string[], settings: { sedo_hybrid_as: 'buy_now' | 'make_offer' }) => { csv: string; exported: string[] },
   ): Promise<ExportResult> {
     const fileAt = new Date(this.deps.now());
@@ -142,9 +142,7 @@ export class ExportService {
       const settings = await trx.selectFrom('settings').select('sedo_hybrid_as').executeTakeFirstOrThrow();
       const pending = await pendingDomains(trx, venue);
       const gone = await manualDelist(trx, venue);
-      let q = trx.selectFrom('domains').select(EXPORT_COLS).where('status', '=', 'listed').orderBy('domain');
-      if (changedOnly) q = q.where('domain', 'in', pending.length > 0 ? pending : ['']);
-      const all = await q.execute();
+      const all = await trx.selectFrom('domains').select(EXPORT_COLS).where('status', '=', 'listed').orderBy('domain').execute();
       const listed = all.filter((d, i) => {
         if (SAFE_DOMAIN.test(d.domain)) return true;
         warnings.push(`row:${i}:DOMAIN_NOT_ASCII`);
@@ -157,20 +155,16 @@ export class ExportService {
       });
       const built = build(listed, warnings, settings);
       await trx.insertInto('export_runs').values({
-        marketplace: venue, at: fileAt, domains: built.exported, export_id: exportId, changed_only: changedOnly, delist,
+        marketplace: venue, at: fileAt, domains: built.exported, export_id: exportId,
       }).execute();
-      if (built.exported.length > 0) {
-        const seen = await trx.selectFrom('domains').select(['domain', 'listing_changed_at']).where('domain', 'in', built.exported).execute();
-        await trx.insertInto('export_run_domains').values(seen.map((x) => ({ export_id: exportId, domain: x.domain, listing_changed_at: x.listing_changed_at }))).execute();
-      }
       return { csv: built.csv, pendingChanges: pending.length, manualDelist: delist };
     });
     const day = jerusalemDate(fileAt);
     return { csv: out.csv, filename: `${venue}-${day}.csv`, exportId, pendingChanges: out.pendingChanges, manualDelist: out.manualDelist, warnings };
   }
 
-  afternic(changedOnly = false): Promise<ExportResult> {
-    return this.snapshot('afternic', changedOnly, (listed, warnings) => {
+  afternic(): Promise<ExportResult> {
+    return this.snapshot('afternic', (listed, warnings) => {
       const rows: string[][] = [[...AFTERNIC_HEADER]];
       const exported: string[] = [];
       for (const d of listed) {
@@ -186,10 +180,10 @@ export class ExportService {
   }
 
   /** null when there is no Sedo template (nothing is written). */
-  async sedo(changedOnly = false): Promise<ExportResult | null> {
+  async sedo(): Promise<ExportResult | null> {
     const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath);
     if (!t) return null;
-    return this.snapshot('sedo', changedOnly, (listed, warnings, s) => {
+    return this.snapshot('sedo', (listed, warnings, s) => {
       const rows: string[][] = [t.headers];
       const exported: string[] = [];
       for (const d of listed) {
@@ -232,12 +226,11 @@ export class ExportService {
     if (await db.selectFrom('export_uploads').select('id').where('export_id', '=', run.export_id).executeTakeFirst()) throw already();
     // Clears first, the upload record last: a failed clear leaves no upload, so a retry re-runs cleanly.
     if (venue === 'afternic') {
-      const recorded = await db.selectFrom('export_run_domains').select(['domain', 'listing_changed_at']).where('export_id', '=', run.export_id).orderBy('domain').execute();
-      for (const rd of recorded) {
-        await withDomainLock(db, rd.domain, async (conn) => {
+      for (const domain of [...run.domains].sort()) {
+        await withDomainLock(db, domain, async (conn) => {
           await conn.updateTable('domains').set({ export_pending_since: null })
-            .where('domain', '=', rd.domain)
-            .where((eb) => eb.or([eb('listing_changed_at', 'is', null), ...(rd.listing_changed_at ? [eb('listing_changed_at', '<=', rd.listing_changed_at)] : [])]))
+            .where('domain', '=', domain)
+            .where((eb) => eb.or([eb('listing_changed_at', 'is', null), eb('listing_changed_at', '<=', run.at)]))
             .execute();
         }, { timeoutMs: this.deps.lockTimeoutMs });
       }

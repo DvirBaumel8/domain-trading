@@ -4,12 +4,11 @@ import { AppError } from '../http/errors.js';
 import { VENUES, type Venue } from '../services/export-state.js';
 import { SedoTemplateInvalid, type ExportResult, type ExportService } from '../services/export.js';
 
-const QuerySchema = z.object({ changed_only: z.enum(['true', 'false']).optional() }).strict();
+const QuerySchema = z.object({}).strict();
 
-function changedOnly(req: FastifyRequest): boolean {
-  const p = QuerySchema.safeParse(req.query ?? {});
-  if (!p.success) throw new AppError(400, 'VALIDATION_ERROR', 'Query must be empty or changed_only=true|false');
-  return p.data.changed_only === 'true';
+/** The export is always the full current file: any query parameter (including the removed changed_only) is a 422. */
+function noQuery(req: FastifyRequest): void {
+  QuerySchema.parse(req.query ?? {});
 }
 
 const BodySchema = z.object({
@@ -31,13 +30,16 @@ function send(reply: FastifyReply, r: ExportResult) {
 }
 
 export function registerExport(app: FastifyInstance, service: ExportService): void {
-  app.get('/export/afternic.csv', async (req, reply) => send(reply, await service.afternic(changedOnly(req))));
+  app.get('/export/afternic.csv', async (req, reply) => {
+    noQuery(req);
+    return send(reply, await service.afternic());
+  });
 
   app.get('/export/sedo.csv', async (req, reply) => {
-    const co = changedOnly(req);
+    noQuery(req);
     let r;
     try {
-      r = await service.sedo(co);
+      r = await service.sedo();
     } catch (e) {
       if (e instanceof SedoTemplateInvalid) {
         throw new AppError(501, 'SEDO_TEMPLATE_INVALID', `templates/sedo_template.json is invalid: ${e.message}`);

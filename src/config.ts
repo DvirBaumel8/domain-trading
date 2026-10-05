@@ -17,7 +17,6 @@ const EnvSchema = z.object({
   ENABLED_REGISTRARS: z.string().default(''),
   SEDO_TEMPLATE_PATH: z.string().default('templates/sedo_template.json'),
   DNS_NS_SERVER: z.string().default('192.5.6.30'),
-  JOBS_MODE: z.enum(['internal', 'external']).default('internal'),
   JOB_TRIGGER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\S{32,}$/, 'JOB_TRIGGER_TOKEN must be at least 32 non-space characters (openssl rand -hex 32)').optional()),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
   GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string()
@@ -37,7 +36,6 @@ export interface Config {
   sedoTemplatePath: string;
   dnsNsServer: string;
   /** internal: in-process timers + startup runs (dev). external: none; a trigger calls POST /jobs/run (production). */
-  jobsMode: 'internal' | 'external';
   /** Bearer token for POST /jobs/run; undefined → the route answers 503 JOBS_DISABLED. */
   jobTriggerToken: string | undefined;
   databaseSsl: boolean;
@@ -117,7 +115,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     enabledRegistrars,
     sedoTemplatePath: e.SEDO_TEMPLATE_PATH,
     dnsNsServer: e.DNS_NS_SERVER,
-    jobsMode: e.JOBS_MODE,
     jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
     databaseSsl: e.DATABASE_SSL === 'true',
     backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },

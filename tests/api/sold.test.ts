@@ -271,10 +271,9 @@ describe('POST /sold/{domain}', () => {
       'Auto-renew stays off',
     ]);
     const E = 'othercityplumbing.com';
-    await listedDomain({ domain: E });
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [E], export_id: 'e1' }).execute();
-    await db.insertInto('export_run_domains').values({ export_id: 'e1', domain: E }).execute();
-    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: [E], uploaded_at: new Date(NOW), approval_text: 'uploaded' }).execute();
+    await listedDomain({ domain: E, first_listed_at: new Date(NOW - 3_600_000) });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: new Date(NOW - 1_800_000), domains: [E], export_id: 'e1' }).execute();
+    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: [E], uploaded_at: new Date(NOW - 1_700_000), approval_text: 'uploaded' }).execute();
     const r2 = (await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E)).json();
     expect(r2.checklist).toHaveLength(4);
     expect(r2.checklist[3]).toBe('Remove the listing at Afternic (see X-Manual-Delist)');
@@ -389,19 +388,14 @@ describe('POST /sold/{domain}', () => {
     expect(r2.json().warnings).toEqual(['COMMISSION_UNEXPECTED: expected 15% ($299.25), got $498.75']);
   });
 
-  it('S-8b: a domain never in a confirmed file gets no manual-delist line, and neither does one whose upload asked for its delist', async () => {
+  it('S-8b: a domain first listed after the last confirmed file gets no manual-delist line', async () => {
     const auth = await setup();
     await listedDomain({ domain: D });
     expect((await sold(good(), auth)).json().checklist).toHaveLength(3);
     const E = 'othercityplumbing.com';
-    await listedDomain({ domain: E });
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [E], export_id: 'e1' }).execute();
-    await db.insertInto('export_run_domains').values({ export_id: 'e1', domain: E }).execute();
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [], delist: [E], export_id: 'e2' }).execute();
-    await db.insertInto('export_uploads').values([
-      { venue: 'afternic', export_id: 'e1', domains: [E], uploaded_at: new Date(NOW), approval_text: 'uploaded' },
-      { venue: 'afternic', export_id: 'e2', domains: [], uploaded_at: new Date(NOW), approval_text: 'uploaded' },
-    ]).execute();
+    await listedDomain({ domain: E, first_listed_at: new Date(NOW - 600_000) });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: new Date(NOW - 1_800_000), domains: [], export_id: 'e1' }).execute();
+    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: [], uploaded_at: new Date(NOW - 1_700_000), approval_text: 'uploaded' }).execute();
     expect((await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-E' }), auth, E)).json().checklist).toHaveLength(3);
   });
 

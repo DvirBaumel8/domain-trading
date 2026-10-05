@@ -53,14 +53,13 @@ describe('GET /export/afternic.csv', () => {
     const { auth } = await issueToken('write');
     await listedDomain({ domain: 'x.com' });
     const f = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
-    await db.updateTable('domains').set({ status: 'sold', sold_at: new Date(), delisted_at: new Date() }).where('domain', '=', 'x.com').execute();
+    await db.updateTable('domains').set({ status: 'sold', sold_at: new Date(), delisted_at: new Date(), listing_changed_at: new Date(Date.now() + 1000), first_listed_at: new Date(Date.now() - 3_600_000) }).where('domain', '=', 'x.com').execute();
     expect((await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth })).headers['x-manual-delist'] ?? '').toBe('');
     const res0 = await app.inject({
       method: 'POST', url: '/export/afternic/uploaded', headers: { ...auth, 'idempotency-key': 'k-x-1' },
       payload: { export_id: f.headers['x-export-id'], approval_ref: { text: 'uploaded', approved_at: new Date(Date.now() - 60_000).toISOString() } },
     });
     expect(res0.statusCode, res0.body).toBe(200);
-    await db.updateTable('domains').set({ delisted_at: new Date(Date.now() + 3_600_000) }).where('domain', '=', 'x.com').execute();
     for (let i = 0; i < 2; i++) {
       const res = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
       expect(res.headers['x-manual-delist']).toBe('x.com');

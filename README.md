@@ -16,6 +16,6 @@ A backend service (HTTP API + Postgres, no frontend) for a small domain-trading 
 3. `cp .env.example .env` (fake/blank keys are fine for local work)
 4. `npm run migrate up`
 5. `npm run admin -- token create --scope write --name dvir-local` (the token is printed once)
-6. `npm run dev` runs in `JOBS_MODE=internal`: the jobs run at startup and on timers (the backup is skipped without a token). Check `curl localhost:3000/health/ping` and `curl -H "Authorization: Bearer $READ_TOKEN" localhost:3000/health` (a token is required; `/health/ping` is the only public route).
+6. `npm run dev` only serves the API: nothing runs on timers. Run scheduled work by hand with `npm run job -- tick` or `npm run job -- daily` (the same runner and steps as `POST /jobs/run`; the backup step is skipped with a warning without a token). Check `curl localhost:3000/health/ping` and `curl -H "Authorization: Bearer $READ_TOKEN" localhost:3000/health` (a token is required; `/health/ping` is the only public route).
 
 Tests: `npm test` (unit + API; needs the docker Postgres from run step 2 above to be running). Network is blocked in tests.

@@ -103,9 +103,8 @@ describe('GET /portfolio', () => {
       domain_id: id, at, source: 'list', category: 'trend', mode: 'hybrid', bin_cents: bin, floor_cents: floor, walkaway_cents: walkaway, min_offer_cents: 10000, pricing_settings_version: 2,
     }).execute();
     await hist(T(0), 199500, 129500, 96000);
-    await hist(T(3), 179500, 116500, 86000); // changed after the exported values, before the file was built (run at T(5))
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: T(5), domains: ['beta-two.com'], export_id: 'exp_a1', delist: [] }).execute();
-    await db.insertInto('export_run_domains').values({ export_id: 'exp_a1', domain: 'beta-two.com', listing_changed_at: T(0) }).execute();
+    await hist(T(3), 179500, 116500, 86000); // changed after the file snapshot (run at T(2))
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: T(2), domains: ['beta-two.com'], export_id: 'exp_a1' }).execute();
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'exp_a1', domains: ['beta-two.com'], uploaded_at: T(8), approval_text: 'uploaded', audit_id: null }).execute();
     await db.updateTable('domains').set({ listing_changed_at: T(0) }).where('id', '=', id).execute();
     let b = (await t.get('/portfolio/beta-two.com')).json();

@@ -131,7 +131,7 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
 - Never retry a definite failure with a new idempotency key inside the same call.
 
 ## Reconciler (§6)
-Runs **hourly** in production (the `tick` job, `00-architecture.md` §6; every 10 min under local in-process timers). For every `purchases.state in (register_sent, unknown)` older than 2 min:
+Runs **hourly** in production (the `tick` job, `00-architecture.md` §6; locally `npm run job -- tick`). For every `purchases.state in (register_sent, unknown)` older than 2 min:
 - Call `find_domain` at that registrar.
   - Present: finish the bookkeeping (step 6), then `state=succeeded`.
   - Absent, RDAP 404, and older than 30 min: `failed`.

@@ -169,7 +169,7 @@ All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_
 | `offer` (override only) | `0` (not set, A1) | floor or (blank) | min_offer | N | (blank) | `Custom Lander` | N | N | Y | N |
 
 - **Mode-switch caveat (UNVERIFIED):** on an Afternic **Update** upload, it isn't documented whether a blank cell clears the old value or keeps it. That's why offer mode writes `0` for the BIN (the template says "zero or blank" = not set). After any mode change, Dvir checks the listing in the Afternic dashboard (LX-8).
-- **Scheduled drops change rows:** the export marks which rows changed since Dvir's last confirmed upload (§10.7, `export-csv.md`). Drops never change the $100 min offer.
+- **Scheduled drops change rows:** the next export is still the full file; `X-Pending-Changes` and `/report` count the rows changed since the last confirmed upload (§10.7, `export-csv.md`). Drops never change the $100 min offer.
 - **The walk-away is never written to any export**, to the preview's `afternic_row`, or to any lander or buyer-facing text (OF-14).
 
 **Sedo** (`/export/sedo.csv`; the strings come from Dvir's template map):
@@ -434,7 +434,7 @@ The **server** computes every derived price from three inputs: **BIN + category 
 | Delist | 2028-09-27 | — |
 
 ### 10.5 Scheduled job `src/jobs/price-schedule.ts`
-- **When it runs:** once a day as the first step of the `daily` job (`POST /jobs/run`, 00:05 UTC, triggered by the Cloudflare Worker cron; `00-architecture.md` §6), before the drop job, registrar check and backup export. No extra service, so no extra cost (local dev: in-process timer at 00:30 UTC). It can also be run by hand: `npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]`.
+- **When it runs:** once a day as the first step of the `daily` job (`POST /jobs/run`, 00:05 UTC, triggered by the Cloudflare Worker cron; `00-architecture.md` §6), before the drop job, registrar check and backup export. No extra service, so no extra cost (local dev: `npm run job -- daily`). It can also be run by hand: `npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]`.
 - **For each `price_schedule` row with status `planned` and `due_on ≤ today` (IDT)**, in one transaction per domain, under the per-domain advisory lock:
   - **Skip** if the domain isn't `listed`, or if `pricing_hold` is set.
   - **Otherwise:**
@@ -475,9 +475,10 @@ The **server** computes every derived price from three inputs: **BIN + category 
 
 ### 10.7 Export flags for the weekly upload
 - **`GET /export/afternic.csv`** (and `sedo.csv`) gains these:
-  - **`?changed_only=true`:** only the rows changed since the last confirmed upload. Afternic's **Update** mode accepts partial files.
-  - **Headers:** `X-Export-Id`, `X-Pending-Changes: <n>` and `X-Manual-Delist`. `X-Manual-Delist` now also lists `delisted` domains.
-- **`POST /export/{venue}/uploaded`** `{"export_id":"…","uploaded_at":"…","note":"…"}` (WRITE; the bot calls it after it uploaded the file; `approval_ref` optional, `export-csv.md`). It records `export_uploads` and clears `export_pending_since` for the domains in that export.
+  - **Always the full current file.** `changed_only` is removed (a query parameter of any kind is a 422 `VALIDATION_ERROR`); Afternic's upload is always a full-file Update.
+  - **Headers:** `X-Export-Id`, `X-Pending-Changes: <n>` and `X-Manual-Delist`. `X-Manual-Delist` also lists `delisted` domains.
+  - **Pending** = listed names with `listing_changed_at` after the snapshot time of the venue's newest confirmed upload (all listed names while none was confirmed). **Manual delist** = sold/delisted/dropped names first listed at or before that snapshot whose status changed after it.
+- **`POST /export/{venue}/uploaded`** `{"export_id":"…","uploaded_at":"…","note":"…"}` (WRITE; the bot calls it after it uploaded the file; `approval_ref` optional, `export-csv.md`). It records `export_uploads` (which moves the venue's pending boundary to that file's snapshot time) and clears `export_pending_since` for the file's domains unchanged since the snapshot.
 - **`/report` warnings:**
   - `EXPORT_PENDING` lists every domain whose live marketplace price is now stale, with days pending. It becomes an error-level warning after 7 days.
   - The weekly lander check compares the page with the **last uploaded** values, so a drop that's waiting for upload shows as "pending upload", not as a broken lander.

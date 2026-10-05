@@ -78,7 +78,6 @@ describe('GET /report warnings', () => {
   it('SL-6: RegistrarCheckJob finds the domain absent, then /report shows DOMAIN_LEFT_ACCOUNT', async () => {
     await listedDomain({ domain: 'job-gone.com', registrar: 'porkbun', registrar_api: 'full', listing_changed_at: ago(DAY), export_pending_since: null });
     await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: ['job-gone.com'], export_id: 'e_job' }).execute();
-    await db.insertInto('export_run_domains').values({ export_id: 'e_job', domain: 'job-gone.com', listing_changed_at: ago(DAY) }).execute();
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e_job', domains: ['job-gone.com'], uploaded_at: ago(DAY) }).execute();
     const r = await new RegistrarCheckJob({ db, adapters: [new FakeAdapter('porkbun', { findDomain: () => null })], now: () => NOW }).runOnce();
     expect(r.newlyAbsent).toEqual(['job-gone.com']);
@@ -87,17 +86,16 @@ describe('GET /report warnings', () => {
   });
 
   it('PR-27 MANUAL_DELIST: a delisted name that was in a confirmed Afternic upload shows the removal task until a confirmed file delists it', async () => {
-    await insertOwnedDomain(db, { domain: 'gone-live.com', status: 'delisted' });
-    await insertOwnedDomain(db, { domain: 'never-live.com', status: 'delisted' });
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: ['gone-live.com'], export_id: 'e1', delist: [] }).execute();
-    await db.insertInto('export_run_domains').values({ export_id: 'e1', domain: 'gone-live.com' }).execute();
+    await insertOwnedDomain(db, { domain: 'gone-live.com', status: 'delisted', first_listed_at: ago(5 * DAY), listing_changed_at: ago(DAY) });
+    await insertOwnedDomain(db, { domain: 'never-live.com', status: 'delisted', first_listed_at: ago(DAY / 2), listing_changed_at: ago(DAY / 4) });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: ago(2 * DAY), domains: ['gone-live.com'], export_id: 'e1' }).execute();
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: ['gone-live.com'], uploaded_at: ago(2 * DAY) }).execute();
     const t = await boot();
     let w = (await t.warnings()).filter((x) => x.code === 'MANUAL_DELIST');
     expect(w).toHaveLength(1);
     expect(w[0]).toMatchObject({ level: 'warn', domain: 'gone-live.com', details: { status: 'delisted', venues: ['afternic'] }, message: 'Remove the listing at afternic (the name is delisted)' });
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [], export_id: 'e2', delist: ['gone-live.com'] }).execute();
-    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e2', domains: [], uploaded_at: ago(DAY) }).execute();
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: ago(DAY / 8), domains: [], export_id: 'e2' }).execute();
+    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e2', domains: [], uploaded_at: ago(DAY / 8) }).execute();
     w = (await t.warnings()).filter((x) => x.code === 'MANUAL_DELIST');
     expect(w).toEqual([]);
   });

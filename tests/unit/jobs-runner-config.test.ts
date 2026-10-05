@@ -1,51 +1,21 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { FastifyInstance } from 'fastify';
+import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../../src/config.js';
 import pg from 'pg';
 import { poolConfig } from '../../src/db/client.js';
 import { JobRunner } from '../../src/jobs/runner.js';
 import { BackupExporter } from '../../src/jobs/backup-export.js';
-import { startJobScheduling } from '../../src/jobs/schedule.js';
 import { testEnv } from '../helpers/env.js';
-
-afterEach(() => vi.useRealTimers());
 
 function fakeApp(backupExport?: { runOnce(): Promise<unknown> }) {
   const ok = () => ({ runOnce: vi.fn(async () => ({})) });
   const jobs = { reconciler: ok(), nsVerifier: ok(), priceJob: ok(), dropJob: ok(), registrarCheckJob: ok() };
   // The real runner (the one POST /jobs/run uses); only its jobs are fakes. db is unused by `daily`.
   const jobRunner = new JobRunner({ db: undefined as never, now: Date.now, ...jobs, backupExport });
-  const app = { ...jobs, jobRunner, log: { error: vi.fn() } };
-  return app as unknown as FastifyInstance & typeof app;
+  return { ...jobs, jobRunner };
 }
 
-describe('startJobScheduling', () => {
-  it('external: starts no timers and runs nothing at startup', () => {
-    vi.useFakeTimers();
-    const app = fakeApp();
-    const stop = startJobScheduling(app, loadConfig(testEnv({ JOBS_MODE: 'external' })));
-    expect(vi.getTimerCount()).toBe(0);
-    for (const j of [app.reconciler, app.nsVerifier, app.priceJob, app.dropJob, app.registrarCheckJob]) expect(j.runOnce).not.toHaveBeenCalled();
-    stop();
-  });
-
-  it('internal (the default): runs everything at startup and arms the timers', async () => {
-    vi.useFakeTimers();
-    const app = fakeApp();
-    const cfg = loadConfig(testEnv());
-    expect(cfg.jobsMode).toBe('internal');
-    const stop = startJobScheduling(app, cfg);
-    await vi.advanceTimersByTimeAsync(0);
-    for (const j of [app.reconciler, app.nsVerifier, app.priceJob, app.dropJob, app.registrarCheckJob]) expect(j.runOnce).toHaveBeenCalledTimes(1);
-    expect(vi.getTimerCount()).toBe(3);
-    stop();
-    expect(vi.getTimerCount()).toBe(0);
-  });
-});
-
-describe('internal daily = the production daily runner', () => {
+describe('npm run job -- daily (the shared runner)', () => {
   it('runs price, drop, registrar check, backup export in order through app.jobRunner', async () => {
-    vi.useFakeTimers();
     const order: string[] = [];
     const backup = { runOnce: vi.fn(async () => { order.push('backup'); return {}; }) };
     const app = fakeApp(backup);
@@ -53,15 +23,11 @@ describe('internal daily = the production daily runner', () => {
     for (const [k, j] of [['price', app.priceJob], ['drop', app.dropJob], ['registrar', app.registrarCheckJob]] as const) {
       j.runOnce.mockImplementation(async () => { order.push(k); return {}; });
     }
-    const stop = startJobScheduling(app, loadConfig(testEnv()));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(run).toHaveBeenCalledWith('daily');
+    await app.jobRunner.run('daily');
     expect(order).toEqual(['price', 'drop', 'registrar', 'backup']);
-    stop();
   });
 
   it('with no backup token or repo the backup step is skipped and one warn line is logged', async () => {
-    vi.useFakeTimers();
     const info: string[] = [];
     const warn: string[] = [];
     const exporter = new BackupExporter({
@@ -69,12 +35,10 @@ describe('internal daily = the production daily runner', () => {
     });
     const app = fakeApp(exporter);
     const run = vi.spyOn(app.jobRunner, 'run');
-    const stop = startJobScheduling(app, loadConfig(testEnv()));
-    await vi.advanceTimersByTimeAsync(0);
+    await app.jobRunner.run('daily');
     expect((await run.mock.results[0]!.value).steps.backupExport).toMatchObject({ ok: true, skipped: true });
     expect(warn).toEqual(['backup export skipped: GITHUB_BACKUP_TOKEN/GITHUB_BACKUP_REPO not set']);
     expect(info).toEqual([]);
-    stop();
   });
 });
 
@@ -84,10 +48,6 @@ describe('config', () => {
     const c = loadConfig(testEnv({ JOB_TRIGGER_TOKEN: 'tok_fake_0123456789abcdef0123456789abcdef' }));
     expect(c.jobTriggerToken).toBe('tok_fake_0123456789abcdef0123456789abcdef');
     expect(c.secretValues).toContain('tok_fake_0123456789abcdef0123456789abcdef');
-  });
-
-  it('rejects an unknown JOBS_MODE', () => {
-    expect(() => loadConfig(testEnv({ JOBS_MODE: 'sometimes' }))).toThrow(/JOBS_MODE/);
   });
 
   it('H6: a -pooler host is refused in production, with an explanation', () => {

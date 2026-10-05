@@ -79,7 +79,7 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `GITHUB_BACKUP_REPO` | `DvirBaumel8/domain-trading-data` |
    | `JOB_TRIGGER_TOKEN` | the value from step 3 |
 
-   The blueprint already sets `APP_ENV=production`, `JOBS_MODE=external`, `DATABASE_SSL=true`, `LANDER_TARGET=afternic`,
+   The blueprint already sets `APP_ENV=production`, `DATABASE_SSL=true`, `LANDER_TARGET=afternic`,
    `ENABLED_REGISTRARS=porkbun,godaddy`. Later pushes do not deploy by themselves: use Manual Deploy.
 3. The first start runs the migrations (`npm run migrate up`) and then boots. Watch the logs for `Migrations complete!` and `Server listening`.
 4. Check, replacing the URL with yours (the first request may take ~50 s):

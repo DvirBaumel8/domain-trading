@@ -20,7 +20,7 @@ Answer any portfolio or money question on request. Buy a domain at the cheapest 
 | POST | `/buy` | WRITE | `buy.md` |
 | POST | `/list/{domain}` | WRITE | `list.md` + `listing-strategy.md` (modes, guards, computed prices, holds) |
 | GET | `/pricing/preview?category=&bin=&grade=&listed_on=&drop_date=` | READ | `listing-strategy.md` §10.6 (floor, walk-away, drop schedule from BIN + category + `pricing_settings`) |
-| GET | `/export/afternic.csv`, `/export/sedo.csv` (`?changed_only=true`) | READ | `export-csv.md` |
+| GET | `/export/afternic.csv`, `/export/sedo.csv` (always the full file; any query parameter is a 422) | READ | `export-csv.md` |
 | POST | `/export/{venue}/uploaded` | WRITE | `export-csv.md` (records the bot's upload on the marketplace site; clears the pending flags) |
 | POST | `/sold/{domain}` | WRITE | `sold.md` |
 | POST | `/offers`, `/offers/{id}/outcome` | WRITE | `listing-strategy.md` §10.11 (Gavriel records offers from marketplace emails/dashboards; Afternic has no API). Removed 6 Oct 2026 (Dvir): `POST /payouts/{id}/received` and `POST /offers/import`. |
@@ -160,7 +160,7 @@ Porkbun conditions the code must handle:
 - **Render free web service** (Docker or native Node; it sleeps when idle). `render.yaml` in the repo root (Blueprint: https://render.com/docs/blueprint-spec.md); setup steps in `docs/DEPLOYMENT.md`.
 - **Neon free Postgres**, over the **direct** (non-pooler) connection with **TLS `sslmode=verify-full`** (`DATABASE_SSL=true`). In production the server refuses a `-pooler` host, because the per-domain lock is a session advisory lock.
 - **No paid PITR.** Recovery = the nightly export to the private data repo + the restore drill (`backup.md`; BK-5 before G4).
-- **Cloudflare Worker cron** (`jobs-trigger/`) wakes the service and calls `POST /jobs/run` (§6): hourly `tick` (`0 * * * *`) and `daily` at **00:05 UTC** (`5 0 * * *`). Production runs with **`JOBS_MODE=external`** (no in-process timers). In-process timers (`JOBS_MODE=internal`: reconciler every 10 min, NS verifier every 24 h, daily at 00:30 UTC) are for **local dev only**.
+- **Cloudflare Worker cron** (`jobs-trigger/`) wakes the service and calls `POST /jobs/run` (§6): hourly `tick` (`0 * * * *`) and `daily` at **00:05 UTC** (`5 0 * * *`). The service runs **no timers of its own** (no internal mode): `main.ts` only builds the app and listens. For local dev, or a manual run, `npm run job -- tick` and `npm run job -- daily` call the same `JobRunner` as `POST /jobs/run` (same steps, same isolation; the backup step is skipped with a warning when no token or repo is configured; exit 1 if any step failed).
 - Monthly cost: **$0**.
 - **Outbound IPs:** Render egress uses shared regional CIDR ranges (no Dedicated IP set on free). Porkbun's key IP allowlist accepts CIDR, so shared ranges work. Namecheap needs specific whitelisted IPv4s (a paid Dedicated IP set), so it stays out.
 
