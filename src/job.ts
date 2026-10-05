@@ -3,11 +3,14 @@ import { loadConfig } from './config.js';
 import { createDb } from './db/client.js';
 import { jerusalemDate } from './dates.js';
 import { DropJob } from './jobs/drop.js';
+import { RegistrarCheckJob } from './jobs/registrar-check.js';
+import { createAdapters } from './registrars/registry.js';
 import { PriceScheduleJob } from './jobs/price-schedule.js';
 
 const USAGE = `usage:
   npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]
-  npm run job -- drop [--dry-run] [--today YYYY-MM-DD]`;
+  npm run job -- drop [--dry-run] [--today YYYY-MM-DD]
+  npm run job -- registrar-check [--dry-run]`;
 
 class UsageError extends Error {}
 
@@ -17,7 +20,7 @@ async function main(argv: string[]): Promise<number> {
     allowPositionals: true,
     options: { 'dry-run': { type: 'boolean' }, today: { type: 'string' } },
   });
-  if ((positionals[0] !== 'price-schedule' && positionals[0] !== 'drop') || positionals.length > 1) {
+  if ((positionals[0] !== 'price-schedule' && positionals[0] !== 'drop' && positionals[0] !== 'registrar-check') || positionals.length > 1) {
     throw new UsageError(`unknown command: ${positionals.join(' ') || '(none)'}`);
   }
   const today = values.today;
@@ -33,6 +36,12 @@ async function main(argv: string[]): Promise<number> {
   const config = loadConfig(process.env);
   const db = createDb(config.databaseUrl);
   try {
+    if (positionals[0] === 'registrar-check') {
+      if (today !== undefined) throw new UsageError('--today does not apply to registrar-check');
+      const r = await new RegistrarCheckJob({ db, adapters: createAdapters(config), now: Date.now }).runOnce({ dryRun: values['dry-run'] ?? false });
+      console.log(JSON.stringify(r, null, 2));
+      return 0;
+    }
     const job = positionals[0] === 'drop' ? new DropJob({ db, now: Date.now }) : new PriceScheduleJob({ db, now: Date.now });
     const result = await job.runOnce({ today, dryRun: values['dry-run'] ?? false });
     console.log(JSON.stringify(result, null, 2));

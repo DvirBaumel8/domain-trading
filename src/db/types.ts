@@ -139,6 +139,13 @@ export interface OfferImportsTable {
   created_at: TimestampDefault;
 }
 
+export interface RegistrarPresenceTable {
+  domain_id: number;
+  status: 'present' | 'absent';
+  first_absent_at: Date | null;
+  last_checked_at: Date;
+}
+
 export interface PayoutsTable {
   id: Generated<number>;
   domain_id: number;
@@ -389,6 +396,7 @@ export interface Database {
   pricing_evidence: PricingEvidenceTable;
   offers: OffersTable;
   payouts: PayoutsTable;
+  registrar_presence: RegistrarPresenceTable;
   sales: SalesTable;
   offer_imports: OfferImportsTable;
 }

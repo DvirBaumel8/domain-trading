@@ -28,8 +28,9 @@ setInterval(runNsVerifier, 24 * 3_600_000).unref(); // and every 24 hours
 const runDaily = async () => {
   await app.priceJob.runOnce().catch((e: unknown) => app.log.error({ errMessage: (e as Error).message }, 'price job failed'));
   await app.dropJob.runOnce().catch((e: unknown) => app.log.error({ errMessage: (e as Error).message }, 'drop job failed'));
+  await app.registrarCheckJob.runOnce().catch((e: unknown) => app.log.error({ errMessage: (e as Error).message }, 'registrar check failed'));
 };
 void runDaily(); // at startup (catches up after downtime; idempotent)
-scheduleDailyUtc(runDaily, 0, 30); // and daily at 00:30 UTC: price job, then drop job
+scheduleDailyUtc(runDaily, 0, 30); // and daily at 00:30 UTC: price job, drop job, then registrar check
 
 await app.listen({ port: config.port, host: config.host });
