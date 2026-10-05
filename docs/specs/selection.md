@@ -4,6 +4,7 @@
 > - **Paths:** `system/census/<pattern_id>.csv` and `system/data/namebio/` are paths on Gavriel's box. In this repo the READMEs are `docs/specs/selection/census-README.md` and `docs/specs/selection/namebio-README.md`. **Open build decision:** where the frozen census CSVs and the nightly NameBio cache live. Suggestion: census lists committed by Dvir under `data/census/` (versioned); the NameBio CSVs ("never deleted") in Postgres or the private data repo, because a Render free web service has no persistent disk.
 > - **Baseline docs** named below (`selection-v2-proposal.md`, `selection-v3-review.md`, R4–R9, DR-001/DR-002) are on Gavriel's box, not in this repo.
 > - **Rule changes this spec makes to existing specs** (comps → demand proof, the allowed BIN set and step-down drops as `pricing_settings` **v3**, live renewal price, FT-1, `/check/batch` split): applied in `listing-strategy.md` (header + §10.13), `buy.md`, `report.md`, `check.md`, `00-architecture.md`, `test-plan.md` and `CLAUDE.md` (decision log, 6 Oct 2026).
+> - **Amendments after push (marked inline):** FT-1 counts 7 days from the Fast Transfer eligibility date, not the buy (Dvir, 6 Oct 2026, 01:01).
 > - **Build order:** after step 6 (`CLAUDE.md` build step 9), in the order of §8 below. Tests: §7 (SEL-*, SEL3–SEL10, SEL-T); they are part of the gates.
 
 # Selection v9.1 final: spec for Claude Code
@@ -25,7 +26,7 @@
 | C3 | **Non-geo p_lead_low**: S3/S4 0.004 → **0.002**; S6 0.005 → **0.003** [est.] | Every comparing source says non-geo outbound converts worse than geo [R9 §Q3] |
 | C4 | **Default non-geo BIN $1,495 → $1,488**; exception steps $1,988 / $2,488; banned price bands $800–$999 and $1,950–$1,999 | x88 endings convert best; $1,495 is the "worst" [A]. A 31%-of-portfolio-at-$1,988 seller had 8 of 22 sales there [A] [R9 §Q6] |
 | C5 | **Geo Ratio-stress floor $399 → $299** | Outbound geo deals close at $100–$500 (69% ≤$399 in the 2018 analysis) [R9 §Q3] |
-| C6 | **New gate FT-1**: Afternic Fast Transfer opt-in confirmed within 7 days of buying | Most hand-reg sales come via the registrar network, not the lander (>80%; 17 of 22) [A]; Porkbun requires manual opt-in [V] [R9 §Q6] |
+| C6 | **New gate FT-1**: Afternic Fast Transfer opt-in confirmed within 7 days of buying *(repo amendment, Dvir 2026-10-06 01:01: within 7 days of the name becoming Fast Transfer eligible, not of the buy)* | Most hand-reg sales come via the registrar network, not the lander (>80%; 17 of 22) [A]; Porkbun requires manual opt-in [V] [R9 §Q6] |
 | C7 | **DEMAND-1 / `/comps/keyword`** reads a nightly NameBio retailstats **CSV cache** with attribution; API for spot checks only (≤4/min) | NameBio API docs [V] |
 | C8 | **S7: no ExpiredDomains automation.** Candidates from the zone/RDAP route only. ED stays an optional manual tool for Dvir | ED has no API and bans bots/AI agents [V] [R9 §Q5] |
 | C9 | **Geo score:** D-Liquidity comes from NameBio trade-term counts; A-Form by length bands; **city + lawyer/attorney = FLAG** | NameBio CSV (hvac 11 vs roofing 95 sales); WTB ≤12 chars, no lawyer/attorney [A] [R9 §Q1] |
@@ -80,7 +81,7 @@ Geo names now need about 10–12 owner-level leads to pay. Non-geo names need �
 | CAPACITY-1 | `weeks_to_cover` ≤ min(12, weeks to 2027-04-03); total pledged leads ≤ 20 × weeks_left | — |
 | RATIO-1 | `renew_ratio ≥ 1` at `bin_eff = min(BIN, lane_cap)` **and** at the floor price, **with `STRe_eff_y1`** (§2.1) | **Formula fixed (C1)** |
 | LANDER-1 | `lander = BIN` and (BIN ≤ 1,488 OR exception: ≥30 A/B leads ∧ retailstats end ≥ 20). BIN must be in the **allowed price set** (§1.5). No Make-Offer-only landers | x88 set (C4) |
-| FT-1 | Registrar supports Afternic Fast Transfer; opt-in + Afternic listing with the same BIN confirmed **≤7 days after `/buy`**. Missing → name flagged `distribution_incomplete`; counts as failed in pattern health | **New (C6)** |
+| FT-1 | Registrar supports Afternic Fast Transfer; opt-in + Afternic listing with the same BIN confirmed **≤7 days after `/buy`** *(repo amendment, Dvir 2026-10-06 01:01: **≤7 days after the name's **Fast Transfer eligibility date** (`ft_eligible_on`: after any registrar lock, e.g. 60 days after the buy at GoDaddy, and after Afternic's ≥60-day rule, `system/post-acquisition.md` F3)**, not after `/buy`)*. Missing → name flagged `distribution_incomplete`; counts as failed in pattern health | **New (C6)** |
 | EV-1 | `EV = P_sale × net_price − lifetime_cost > 0` at **low** priors, with BIN (not floor) | — |
 | SCREEN-1 | `screening_pack` complete | — |
 | EVENT-1 | Sensitive-event blocklist | — |
@@ -253,7 +254,7 @@ GENERATE (bot)
  → S9 screening_pack assemble (incl. registrar FT capability)
  → S10 Shomer 12-item checklist
  → S11 Dvir Gate A
- → post-buy: FT-1 confirmation ≤7 days
+ → post-buy: FT-1 confirmation ≤7 days after the FT eligibility date (amended 6 Oct 01:01)
 ```
 
 ---
@@ -275,7 +276,7 @@ GENERATE (bot)
 | `POST /leads/verify` | leads → tier, weaker enum, never_pitch | Keep |
 | `POST /score` | features_v1 → score, P_sale, EV, STRe_eff_y1, Ratio@BIN, Ratio@floor, coverage, pass bools | **Change** (C1) |
 | `POST /screening_pack` | domain → pack / validate | + `registrar_ft_capable`, `bin_in_allowed_set` |
-| `POST /distribution/confirm` | domain → ft_optin_at, afternic_listed_at, bin | **New** (FT-1); Dvir/ops pastes evidence; job flags >7 days |
+| `POST /distribution/confirm` | domain → ft_optin_at, afternic_listed_at, bin | **New** (FT-1); Dvir/ops pastes evidence; job flags >7 days *(after `ft_eligible_on`; amended 6 Oct 01:01)* |
 | `GET /renewal/decision/{domain}` | → RENEW/DROP + Ratio (STRe_renew) | Formula per §1.4; ARA = live `/check/quote` renewal; compare renew-in-place vs transfer (C17) |
 | `GET /patterns/{id}/health` | → pause/promote flags | Keep |
 | `POST /labels` | domain, label, at | Calibration |
@@ -364,7 +365,7 @@ Paste ≤10 names into `/s7/candidates`. Those names then go through the full pi
 | **SEL9-3** | Allowed BIN set | BIN ∉ set (e.g. 1495, 999, 1999) → LANDER-1 fail |
 | **SEL9-4** | Retailstats cache | `/comps/keyword` serves from CSV with cache_date ≤48 h; no more than 4 API calls/min; card shows NameBio attribution |
 | **SEL9-5** | No ED automation | Egress log/allowlist: 0 requests to `*.expireddomains.net` from backend or bot sandboxes over a 7-day run |
-| **SEL9-6** | FT-1 | Bought name without `/distribution/confirm` after 7 days → flagged + counted in pattern health |
+| **SEL9-6** | FT-1 | Bought name without `/distribution/confirm` after 7 days → flagged + counted in pattern health *(amended 6 Oct 01:01: 7 days after `ft_eligible_on`. Fixtures: GoDaddy name bought 2026-10-04 → eligible 2026-12-03 → not flagged on 2026-12-10, flagged on 2026-12-11; no flag at buy + 8 days)* |
 | **SEL9-7** | prospect_type gating (D1 ON) | `exact_sld_other_tld` / `prefix_suffix_variant` count toward LEAD-1 only when plainly descriptive + ≥3 business/service-description URLs + TM-clean + standard BIN; **product-name-only** URLs → count 0 |
 | **SEL9-8** | Geo score tweaks | City+lawyer → G FLAG; 21-char geo → A raw 1; hvac trade count <10 → D raw 2 |
 | **SEL9-9** | Price drops ∈ allowed set | From BIN $1,488, next scheduled prices are $1,088 then $788 (not −20% → $1,190/$952); floor = 65% of new BIN (≥$750); every price ∈ {299,399,499,788,1088,1488,1988,2488} |

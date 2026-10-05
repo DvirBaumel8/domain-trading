@@ -16,16 +16,16 @@
 
 **Decisions v2 (Dvir, 5 Oct 2026, 09:17 IDT; `pricing_settings` version 2).** They replace the v1 numbers wherever this file differs:
 1. **Walk-away floor:** the private walk-away is never below **$500**, including after price drops, and never above the floor: `walkaway = min(floor, max(48% of BIN, $500))`.
-2. **Geo drops:** at most **one** drop, **$499 → $399 at month 12**. A $399 geo name never drops. There is no $299 step and no geo final push. *(v2 plans only. v3, 6 Oct 2026: the geo ladder is 499 → 399 → 299, §10.13.)*
+2. **Geo drops:** at most **one** drop, **$499 → $399 at month 12**. A $399 geo name never drops. There is no $299 step and no geo final push. *(Replaced 6 Oct 2026, 01:01: Dvir confirmed a $399 geo name **may** drop to $299; the geo ladder is 499 → 399 → 299, §10.13.)*
 3. **Sedo:** every Sedo listing is **Make Offer** (never fixed price). Non-geo: minimum $100, BIN shown as a non-binding price expectation. This resolves the old `SEDO_NO_FLOOR` item.
 4. **Drop clock:** months count from the **first listing date** (decided; unchanged).
 - **Calculator fixes from the dry run:** (a) the settings version label must change whenever any output rule changes, so these rules are **v2**; (b) the hybrid final push follows `system/operating-model.md` §3a ("BIN drops to the floor"): new BIN = the floor rounded **up** to a price ending in 95 (never below the floor, never above the current BIN, min $795). Floor and walk-away stay as they are, so the walk-away stays ≥ $500. The earlier v1 rule rounded to the nearest x95 and set floor = BIN, which gave a flat $795 and pushed the BIN below the floor.
 
-**Selection v9.1 (Dvir approved, 6 Oct 2026; `selection.md`): `pricing_settings` version 3 for new plans.** Where v9.1 contradicts the rules above, v9.1 wins for every **new** plan. Existing plans keep their version (§10.1), so **D-001 stays on v2** (1995 / 1295 / 950 and its −20% schedule). Changes (detail and vectors in §10.13 and `test-plan.md` PR3-*):
+**Selection v9.1 (Dvir approved, 6 Oct 2026; `selection.md`): `pricing_settings` version 3 for new plans.** Where v9.1 contradicts the rules above, v9.1 wins for every **new** plan. Existing plans keep their version (§10.1). **D-001 is repriced separately** (Dvir, 6 Oct 2026, 00:32: 1488 / 967 / 950, drop at the first renewal date 2027-10-04; §8). Changes (detail and vectors in §10.13 and `test-plan.md` PR3-*):
 1. **Comps → demand proof.** Comps are no longer required on any buy or import (`COMPS-1` replaced by `DEMAND-1`: frozen sibling census `pattern_id@version` with `in_use_share ≥ 0.25` plus a NameBio retailstats keyword start/end count ≥ 1, carried in the `screening_pack`). `/buy` instead requires a `screening_pack` (400 `SCREENING_PACK_REQUIRED` if missing, SEL7-1; `buy.md` check 3c). V11 becomes "comps optional, shape-checked if sent"; `COMPS_REQUIRED` and `LEGACY_NO_COMPS` are retired.
 2. **Allowed BIN price list** {$299, $399, $499, $788, $1,088, $1,488, $1,988, $2,488} replaces "non-geo BIN ends in 95" and the $795 minimum. Non-geo: default **$1,488**, minimum $788; **$1,988 / $2,488 only with the LANDER-1 exception** (≥30 A/B leads and retailstats end count ≥20, evidenced in the screening pack). Bands $800–$999 and $1,950–$1,999 and x95/x99 endings are forbidden for non-geo (all implied by the list). No price A/B tests.
 3. **Floor** = 65% of BIN rounded to the **whole dollar** (not $5), never below $750: $1,488 → **$967**. Walk-away rule unchanged (max(48%, $500) ≤ floor, nearest $5).
-4. **Drops step down the list, not −20%:** non-geo one rung at M6 and one at M18 (2488 → 1988 → 1488 → 1088 → 788; from $1,488: $1,088 then $788, SEL9-9). Floor and walk-away are **recomputed** from the new BIN (not scaled). Geo: one rung at M12 (499 → 399 **and 399 → 299**), which reverses v2 decision 2 for v3 plans.
+4. **Drops step down the list, not −20%:** non-geo one rung at M6 and one at M18 (2488 → 1988 → 1488 → 1088 → 788; from $1,488: $1,088 then $788, SEL9-9). Floor and walk-away are **recomputed** from the new BIN (not scaled). Geo: one rung at M12 (499 → 399 **and 399 → 299**), which reverses v2 decision 2 (**confirmed by Dvir, 6 Oct 2026, 01:01**: a $399 name may drop to $299).
 5. **Final push** stays at `drop_date − 90`, but must land on the list: BIN = the lowest list price ≥ the floor (proposed `bin_to_lowest_listed_ge_floor`; v9.1 doesn't define the final push).
 6. **Geo grade prices stay $499 / $399** (D2 still open in v9.1; it suggests revisiting $788/$299 after ≥60 E1).
 
@@ -206,7 +206,17 @@ All prices are whole USD. **Bot autonomy (Dvir, 5 Oct 2026, 20:07):** `approval_
    - `expected_settings_version`.
 5. **On a successful listing** (`auto_list`), the server stores the plan and creates the `price_schedule` rows (§10.4). The anchor is the date of the first accepted listing (decided: Dvir, 5 Oct 09:17).
 
-## 8. D-001 (current state, 5 Oct 2026)
+## 8. D-001 (current state, 5 Oct 2026; **repriced 6 Oct 2026, 00:32**)
+
+**Reprice (Dvir, 6 Oct 2026, 00:32 IDT; replaces the 5 Oct plan below):**
+- BIN **$1,488**, floor **$967** (= the v3 formula), walk-away **$950** (private; **approved exception**, the v3 formula gives $715), marketplace min offer **$100**, lease-to-own off. `pricing_source = approved_exception`.
+- **Drop at the first renewal date, 2027-10-04, unless a real inquiry or offer arrives** (Gate F: `npm run admin -- drop-at-first-expiry`, so `drop_date` = 2027-10-04 → final push 2027-07-06, delist 2027-09-27).
+- Bands: $100–$949 declined automatically and logged; $950–$966 → Dvir; ≥ $967 Afternic auto-accepts.
+- Afternic row: `PromptInjectionAudit.com,1488,967,100,N,,Custom Lander,Y,N,Y,N`.
+- **Gavriel applies it via the API once live:** import at G3 with these values (or import, then `POST /list` `replan:true` with `pricing_exception`, reason and `approval_ref` = Dvir's 00:32 words), then `drop-at-first-expiry` with the same approval. Test PR3-9.
+- **Open for Dvir:** (a) whether scheduled drops apply before 2027-10-04. Under v3 the M6 row would be 1088 / 750 / 520 (the exception isn't carried, §10.13) and the final push 788; under v2 it would be off-list 1195 / 775 / 760 and a final push to 795. So plan it under v3 or with drops off. (b) No command exists to undo `drop-at-first-expiry` (move `drop_date` back to expiry + 1 year) if a real inquiry or offer arrives.
+
+*The 5 Oct record (kept for history; test fixtures still use these values):*
 - **Domain:** `promptinjectionaudit.com` is **OWNED**.
   - Registered by hand at **GoDaddy** on **2026-10-04** (RDAP creation 13:16Z = 16:16 IDT). An earlier note said 3 Oct; that was the order attempt.
   - Cost **$13.73** (42 ILS at 0.3269 USD/ILS; no order number). Expires 2027-10-04. `drop_date` 2028-10-04.
@@ -390,7 +400,7 @@ The **server** computes every derived price from three inputs: **BIN + category 
 
 ### 10.4 Drop schedule (pre-approved on the buy card; Dvir gets heads-ups only)
 
-*v2 plans (incl. D-001). v3 plans step down the price list instead (§10.13).*
+*v2 plans. v3 plans step down the price list instead (§10.13). The D-001 example below is its 5 Oct plan, superseded by the 6 Oct 00:32 reprice (§8).*
 
 | Event | Due on | What changes |
 |---|---|---|
@@ -570,7 +580,7 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 
 ### 10.13 `pricing_settings` v3: selection v9.1 price list and step-down drops (Dvir approved v9.1, 6 Oct 2026)
 
-**Applies to new plans only** (§10.1). v2 plans, including D-001, keep their numbers and schedules. The admin command creates v3 with Dvir's v9.1 approval as `approval_text`; until then v2 stays current. Rules v9.1 states are marked **[v9.1]**; rules it leaves open and this spec proposes are marked **[proposed]** and need Dvir's OK at the build gate.
+**Applies to new plans only** (§10.1). v2 plans keep their numbers and schedules. **D-001** is repriced by Dvir's 6 Oct 00:32 decision (§8), applied by Gavriel via the API once live. The admin command creates v3 with Dvir's v9.1 approval as `approval_text`; until then v2 stays current. Rules v9.1 states are marked **[v9.1]**; rules it leaves open and this spec proposes are marked **[proposed]** and need Dvir's OK at the build gate.
 
 | Field (new or changed) | v3 value | Meaning |
 |---|---|---|
@@ -581,7 +591,7 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 | `walkaway_bps` / `walkaway_min_cents` | 4800 / 50000 | Unchanged (v2 rule, `round5`) |
 | `hybrid_min_offer_cents` | 10000 | Unchanged |
 | `drop_mode` / `drops` | `ladder` / `[{"after_months":6,"steps":1},{"after_months":18,"steps":1}]` | **[v9.1]** ladder; the months are kept from v2 **[proposed]**. Replaces `pct_bps` 2000 |
-| `geo_drops` | `[{"after_months":12,"steps":1}]` | **[v9.1]** geo ladder 499 → 399 → 299; one rung at M12 **[proposed]** (so a $399 name drops to $299 at M12). Reverses v2 decision 2 for v3 plans |
+| `geo_drops` | `[{"after_months":12,"steps":1}]` | **[v9.1; confirmed by Dvir 6 Oct 2026, 01:01]** geo ladder 499 → 399 → 299, one rung at M12 as written here (a $399 name drops to $299 at M12). Replaces v2 decision 2 ("a $399 name never drops") |
 | `final_push_mode` | `bin_to_lowest_listed_ge_floor` | **[proposed]** BIN = the lowest list value ≥ floor and ≤ current BIN; floor and walk-away unchanged. Replaces `bin_to_floor_ceil95` (which can give off-list prices such as $995). Geo: none |
 | `comps_min` / `comps_max` | 0 / 3 | **[v9.1]** comps optional (V11) |
 | `geo_bin_min_cents` / `geo_bin_max_cents` | 29900 / 49900 | A manual geo change must also be in the list ($299 / $399 / $499) |

@@ -110,7 +110,7 @@ All amounts are USD. The code works in integer cents. Settings are **v2** unless
 | PR-13 | Formula 2495 | M6 1995/1295/960; M18 1595/1035/770; final **1095/1035/770** | Differs |
 | PR-14 | Formula 1195 | M6 995/750/**500**; M18 795/750/**500**; final `skipped_no_change` (795/750/500) | Differs |
 | PR-15 | Formula 795 | M6 and M18 `skipped_at_minimum` (values stay 795/750/500); final push `skipped_no_change` | A drop applied, or floor/walk-away lowered while BIN can't drop |
-| PR-16 | *(v2 plans)* Geo strong, listed 2026-11-01, drop 2028-11-01 / geo weaker / `geo_drops_enabled=false` | Strong: **one** row `geo_drop_m12` 2027-11-01 499 → 399, then delist 2028-10-25; **no M6, M18 or final push rows**. Weaker: only the delist row (never drops). Disabled: `geo_drop_m12` `skipped_disabled` | Any $299, any M6/M18/final-push row for geo, or a weaker drop |
+| PR-16 | *(v2 settings vectors only; the "$399 never drops" rule itself was replaced on 6 Oct 2026, 01:01, see PR3-6)* Geo strong, listed 2026-11-01, drop 2028-11-01 / geo weaker / `geo_drops_enabled=false` | Strong: **one** row `geo_drop_m12` 2027-11-01 499 → 399, then delist 2028-10-25; **no M6, M18 or final push rows**. Weaker: only the delist row (never drops). Disabled: `geo_drop_m12` `skipped_disabled` | Any $299, any M6/M18/final-push row for geo, or a weaker drop |
 | PR-17 | The same inputs through `GET /pricing/preview`, `/buy` dry run, `/list` dry run and `import-domain --dry-run` | Identical plan and schedule fields in all four | Any drift |
 | PR-18 | Month ends | Listed 2026-08-31 → M6 2027-02-28, M18 2028-02-29; listed 2027-08-31 → M6 2028-02-29 | Other dates |
 | PR-19 | M-event after the final push: listed 2027-06-01, drop 2028-10-04 | M18 (2028-12-01) = `superseded_by_final_push`; the final push is computed from the M6 values | M18 planned |
@@ -167,13 +167,14 @@ All amounts are USD. The code works in integer cents. Settings are **v2** unless
 | PR3-5 | Formula 1088 / 788 | 1088: M6 788/750/500, M18 `skipped_at_minimum`, final `skipped_no_change`. 788: M6 and M18 `skipped_at_minimum`, final `skipped_no_change` | A BIN below 788 |
 | PR3-6 | Geo strong / weaker, listed 2026-11-01, drop 2028-11-01 | Strong: `geo_drop_m12` 2027-11-01 499 → 399; weaker: `geo_drop_m12` 399 → 299; then delist 2028-10-25; no M6/M18/final push | A second geo drop, or a geo price off {299,399,499} |
 | PR3-7 | Property: every v3 plan (all list BINs, any listing date) | Every scheduled BIN ∈ `allowed_bins_cents`; 500 ≤ walk-away ≤ floor ≤ BIN; floor ≥ 750 for non-geo; floor = recomputed 65% (whole dollar) of the current BIN unless raised | Any violation |
-| PR3-8 | Version isolation | D-001 (v2 exception 1995/1295/950) keeps PR-11 after v3 is created; a new 1488 preview says version 3 | D-001 re-priced |
+| PR3-8 | Version isolation | A v2 fixture plan (exception 1995/1295/950) keeps PR-11 after v3 is created; a new 1488 preview says version 3 *(the real D-001 was repriced by Dvir on 6 Oct 00:32, see PR3-9)* | Fixture re-priced |
+| PR3-9 | **D-001 reprice** (Dvir, 6 Oct 2026, 00:32): `POST /list` `replan:true` with `pricing_exception` (walk-away 950) + `approval_ref`, then `drop-at-first-expiry` | Stored 1488 / 967 / 950 (private) / min offer 100, `approved_exception`; `drop_date` 2027-10-04; final push 2027-07-06 and delist 2027-09-27 rows; Afternic row `PromptInjectionAudit.com,1488,967,100,N,,Custom Lander,Y,N,Y,N`. Values of any M6 row: **open for Dvir** (see `listing-strategy.md` §8) | Other stored values or drop date |
 
 ## Selection (SEL; selection v9.1, Dvir approved 6 Oct 2026)
-The selection tests are defined in `selection.md` §7 (SEL-1–SEL-4, SEL3-*, SEL4-*, SEL5-*, SEL6-*, SEL7-*, SEL8-*, SEL9-1–SEL9-15, SEL10-1, SEL-T) and run in G0/G1 when the selection backend is built (`CLAUDE.md` build step 9; `selection.md` §8 order). Any fail → no live Gate A until fixed or Dvir waives it. The `/buy` side is also covered by B-29–B-32 (`buy.md`) and LS-16b / LG-20 (`listing-strategy.md`).
+The selection tests are defined in `selection.md` §7 (SEL-1–SEL-4, SEL3-*, SEL4-*, SEL5-*, SEL6-*, SEL7-*, SEL8-*, SEL9-1–SEL9-15, SEL10-1, SEL-T) and run in G0/G1 when the selection backend is built (`CLAUDE.md` build step 9; `selection.md` §8 order). Any fail → no live Gate A until fixed or Dvir waives it. The `/buy` side is also covered by B-29–B-32 (`buy.md`) and LS-16b / LG-20 (`listing-strategy.md`). **FT-1 amendment (Dvir, 6 Oct 2026, 01:01):** B-32 and SEL9-6 count the 7 days from `ft_eligible_on` (the Fast Transfer eligibility date, e.g. buy + 60 days at GoDaddy), not from the buy.
 
 ## Offers log and minimum offer (OF; Dvir, 5 Oct 2026, 01:03 IDT, decision #2; rules in `listing-strategy.md` §10.11)
-Fixtures: D-001 imported as hybrid 1995 / 1295 / walk-away 950 / min offer 100, listed 2026-10-12; a geo name at $399; a second trend name at the formula 2495 / 1620 / 1200. G1 (real Postgres; no network) unless marked.
+Fixtures: D-001 imported as hybrid 1995 / 1295 / walk-away 950 / min offer 100, listed 2026-10-12 *(test fixture values from the 5 Oct plan; the real D-001 is repriced to 1488 / 967 / 950 since 6 Oct 00:32, PR3-9)*; a geo name at $399; a second trend name at the formula 2495 / 1620 / 1200. G1 (real Postgres; no network) unless marked.
 
 | ID | Case | Pass | Fail |
 |---|---|---|---|

@@ -21,7 +21,7 @@ One domain can have **only one** nameserver set, so it shows one lander. It can 
 ```json
 { "mode": "hybrid",                      // bin | hybrid | offer (offer = override only); required when any price is sent
   "bin": 1995,                           // hybrid: floor and walkaway are COMPUTED; min_offer = hybrid_min_offer ($100) (listing-strategy.md §10)
-  "floor": null, "walkaway": null,       // only with "pricing_exception": true + reason + approval_ref (e.g. D-001: 1295 / 950)
+  "floor": null, "walkaway": null,       // only with "pricing_exception": true + reason + approval_ref (e.g. D-001: 967 / 950 since the 6 Oct 00:32 reprice; was 1295 / 950)
   "pricing_exception": false, "pricing_exception_reason": null,
   "replan": false,                       // true = recompute with the CURRENT pricing_settings version (no approval_ref)
   "pricing_hold": null, "pricing_hold_reason": null,   // true/false pauses/resumes the drop schedule (reason required; no approval_ref)
