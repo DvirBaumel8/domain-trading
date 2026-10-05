@@ -1,7 +1,8 @@
 # Runbook
 
 Short ops page. Setup is in `docs/DEPLOYMENT.md`. All commands run from the repo root. For anything that talks to
-production, set `DATABASE_URL` (Neon **direct** string) and `DATABASE_SSL=true` in the environment or a `chmod 600` `.env`.
+production, put `DATABASE_URL` (Neon **direct** string) and `DATABASE_SSL=true` in `.env.neon` (gitignored, `chmod 600`; never in `.env`) and run in a subshell:
+`(set -a; . ./.env.neon; set +a; npm run admin -- ...)`. Never inline the URL on a command line.
 
 ## Tests
 
@@ -17,19 +18,23 @@ npm run test:contract:sandbox    # G2: VITEST_CONTRACT=1, Porkbun sandbox; needs
 npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]   # compute/apply scheduled price changes (--today in the future only with --dry-run)
 npm run job -- drop          [--dry-run] [--today YYYY-MM-DD]    # apply due scheduled drops
 npm run job -- registrar-check [--dry-run]                       # compare registrar state with the DB
-npm run job -- export-backup                                     # push the data export to the data-backup branch (no token -> warning, exit 0)
+npm run job -- export-backup                                     # LOCAL dev only: needs GITHUB_BACKUP_TOKEN; in production use POST /jobs/run {"job":"daily"} (the PAT stays in Render)
 npm run job -- import-backup <dir>                               # restore into an EMPTY database (see Restore drill)
 ```
 
 ## Trigger a job over HTTP (what the Worker does)
 
 ```bash
-curl -sS -X POST https://domain-trading-api.onrender.com/jobs/run \
+API=https://domain-trading-api.onrender.com
+read -rs JOB_TRIGGER_TOKEN
+curl -sS -X POST "$API/jobs/run" \
   -H "Authorization: Bearer $JOB_TRIGGER_TOKEN" \
   -H "Idempotency-Key: manual-$(date +%s)" \
   -H 'Content-Type: application/json' \
   -d '{"job":"tick"}'          # or {"job":"daily"}
 ```
+
+The Worker's crons are `0 * * * *` (tick) and `5 0 * * *` (daily). A Worker log saying "timed out" does **not** mean the job failed (the cold start can exceed the Worker's wait while the job still runs): check `GET /audit` for the `jobs/run` row and its summary.
 
 The reply has a per-step result. A second run while one is still running returns `skipped`. 401 = wrong token, 503 `JOBS_DISABLED` = `JOB_TRIGGER_TOKEN` not set in Render.
 Allow up to ~60 s for a cold start.
@@ -48,12 +53,20 @@ Never put a secret in the repo, a log or chat.
 
 ## Restore drill (BK-5; before the first real buy, then quarterly)
 
-1. Scratch Postgres: `npm run db:up` (docker, port 5433), then create an empty DB: `createdb -h localhost -p 5433 -U dt restore_drill` (password `dt`).
-2. Migrate it: `DATABASE_URL=postgres://dt:dt@localhost:5433/restore_drill npm run migrate up`.
-3. Get the data: `git clone --branch data-backup --single-branch git@github.com:DvirBaumel8/domain-trading-data.git /tmp/dt-data` (private repo).
-4. Import (the target must be empty and at the same migration level): `DATABASE_URL=postgres://dt:dt@localhost:5433/restore_drill npm run job -- import-backup /tmp/dt-data`.
-5. Compare `/report` from a local `node dist/main.js` (or `npm run dev`) on the restored DB with production `/report`: the money totals and counts must be identical. Create tokens only **after** the import.
-6. Record the date and the result for Dvir. Delete `/tmp/dt-data` and the scratch DB afterwards.
+The scratch DB is local docker (service `db`, user `dt`, password `dt`, port 5433). Use a clean subshell with no registrar keys and no production values.
+
+1. `npm run db:up`, then `docker compose exec db createdb -U dt restore_drill`.
+2. Define the scratch environment once per shell (explicit values; nothing from `.env`):
+   ```bash
+   SCRATCH='env -i HOME="$HOME" PATH="$PATH" DATABASE_URL=postgres://dt:dt@localhost:5433/restore_drill DATABASE_SSL=false JOBS_MODE=external APP_ENV=development PORT=3100'
+   ```
+   (`env -i` starts from an empty environment, so no `PORKBUN_*`, `GODADDY_PAT` or `GITHUB_BACKUP_*` can reach it. `npm run job`/`admin` also load `.env` if present, so move it aside or run from a copy without one.)
+3. Migrate: `eval "$SCRATCH npm run migrate up"`.
+4. Get the data: `git clone --branch data-backup --single-branch git@github.com:DvirBaumel8/domain-trading-data.git /tmp/dt-data` (private repo).
+5. Import (the target must be empty and at the same migration level): `eval "$SCRATCH npm run job -- import-backup /tmp/dt-data"`.
+6. Create a token on the scratch DB **after** the import: `eval "$SCRATCH npm run admin -- token create --scope read --name drill"` (copy the printed token).
+7. Start the API on it: `eval "$SCRATCH node dist/main.js"` (after `npm run build`), then `curl -s -H "Authorization: Bearer <drill token>" localhost:3100/report` and compare with production `/report`: the money totals and counts must be identical.
+8. Record the date and the result for Dvir. Delete `/tmp/dt-data` and drop the scratch DB (`docker compose exec db dropdb -U dt restore_drill`).
 
 ## Where warnings show
 

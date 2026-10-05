@@ -119,6 +119,8 @@ export class BackupExporter {
       signal: AbortSignal.timeout(30_000),
     });
     const body = await res.json().catch(() => null);
+    // GitHub's git data API answers 409 "Git Repository is empty" on a repo with no commits.
+    if (res.status === 409) throw new BackupError('backup repo has no commits; initialize it with a README');
     return { status: res.status, body };
   }
 

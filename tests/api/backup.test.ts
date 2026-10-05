@@ -287,6 +287,15 @@ describe('GitHub commit', () => {
   });
 });
 
+describe('empty data repo', () => {
+  it('a 409 "Git Repository is empty" gives a clear BackupError', async () => {
+    await seed();
+    fakeGithub();
+    mswServer.use(http.get(`https://api.github.com/repos/${REPO}/git/ref/heads/data-backup`, () => HttpResponse.json({ message: 'Git Repository is empty.' }, { status: 409 })));
+    await expect(exporter().runOnce()).rejects.toThrow('backup repo has no commits; initialize it with a README');
+  });
+});
+
 describe('BK-4 missing token', () => {
   it('skips with a warning and does not throw; the daily runner step stays ok', async () => {
     const warnings: string[] = [];

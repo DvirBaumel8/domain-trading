@@ -13,7 +13,7 @@ export const TIMEOUT_MS = 90_000;
 
 const CRON_JOBS: Record<string, Job> = {
   '0 * * * *': 'tick',
-  '30 0 * * *': 'daily',
+  '5 0 * * *': 'daily',
 };
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;

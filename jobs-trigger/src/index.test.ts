@@ -102,7 +102,7 @@ describe('scheduled', () => {
   });
 
   it('maps the daily cron to daily', async () => {
-    const { fetchMock } = await run('30 0 * * *');
+    const { fetchMock } = await run('5 0 * * *');
     expect(fetchMock.mock.calls[0]![1].body).toBe('{"job":"daily"}');
   });
 

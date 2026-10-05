@@ -7,8 +7,10 @@
 #     when APP_ENV=production.
 #   - Scheduled work: a free Cloudflare Worker cron (jobs-trigger/) calls POST /jobs/run hourly (tick) and daily
 #     (daily jobs + nightly backup export). JOBS_MODE=external means the service starts no timers.
-#   - Render free allows 750 instance hours per WORKSPACE per month, shared with trader/sapako. This service is
-#     NOT kept warm: the hourly wake uses about 180 h/month. Do not add a keep-warm ping.
+#   - Render free allows 750 instance hours per WORKSPACE per month. trader and sapako each run a 24/7 keep-alive
+#     (~730 h each), so deploy this Blueprint in its OWN (new, free) workspace, or one with no always-on service.
+#     This service is NOT kept warm: the hourly wake uses about 180 h/month. Do not add a keep-warm ping.
+#   - LANDER_TARGET is not an env var the server reads (it is a DB setting, default afternic).
 #   - Render crons and Postgres are billed, so neither is used. Backups go to a private data repo (backup.md).
 # Setup steps: docs/DEPLOYMENT.md.
 # healthCheckPath is /health/ping (no auth, no DB) so Render's checks never wake Neon.
@@ -36,8 +38,6 @@ services:
         value: external
       - key: DATABASE_SSL
         value: 'true'
-      - key: LANDER_TARGET
-        value: afternic
       - key: ENABLED_REGISTRARS
         value: porkbun,godaddy   # godaddy = NS/details only (D-001); buying is Porkbun only
       # Secrets: values entered in the Render Dashboard only (sync: false). Never in git.
