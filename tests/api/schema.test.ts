@@ -144,8 +144,8 @@ describe('schema: settings', () => {
     const rows = await db.selectFrom('settings').selectAll().execute();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      poc_cap_cents: 50000,
-      max_domains: 10,
+      poc_cap_cents: 150000,
+      max_domains: 50,
       approval_max_age_hours: 72,
       lander_target: 'afternic',
       allowed_registrars: ['porkbun'],
@@ -172,5 +172,37 @@ describe('schema: settings', () => {
     await expect(
       db.updateTable('settings').set({ allowed_registrars: ['porkbun', 'cloudflare'] }).execute(),
     ).rejects.toThrow(/allowed_registrars/);
+  });
+});
+
+describe('schema: pricing (PR-30, migration 4)', () => {
+  it('PR-30: UPDATE and DELETE pricing_settings raise', async () => {
+    await expect(db.updateTable('pricing_settings').set({ note: 'x' }).execute()).rejects.toThrow(/append-only/);
+    await expect(db.deleteFrom('pricing_settings').execute()).rejects.toThrow(/append-only/);
+  });
+
+  it('seeds exactly one pricing_settings row: v2', async () => {
+    const rows = await db.selectFrom('pricing_settings').selectAll().execute();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ version: 2, floor_bps: 6500, walkaway_min_cents: 50000 });
+  });
+
+  it('price_schedule rejects a duplicate (domain_id, event, plan_id)', async () => {
+    const id = await insertOwnedDomain(db);
+    const row = { domain_id: id, plan_id: 'plan_1', event: 'drop1_m6' as const, due_on: '2027-04-04', settings_version: 2, status: 'planned' as const };
+    await db.insertInto('price_schedule').values(row).execute();
+    await expect(db.insertInto('price_schedule').values(row).execute()).rejects.toThrow(/price_schedule_domain_id_event_plan_id_key/);
+  });
+
+  it('domains_price_order rejects walkaway > floor and floor > bin', async () => {
+    await expect(insertOwnedDomain(db, { domain: 'a.com', bin_cents: 100000, floor_cents: 80000, walkaway_cents: 90000 }))
+      .rejects.toThrow(/domains_price_order/);
+    await expect(insertOwnedDomain(db, { domain: 'b.com', bin_cents: 100000, floor_cents: 110000 }))
+      .rejects.toThrow(/domains_price_order/);
+  });
+
+  it('status delisted is accepted', async () => {
+    const id = await insertOwnedDomain(db, { status: 'delisted' });
+    expect((await db.selectFrom('domains').select('status').where('id', '=', id).executeTakeFirstOrThrow()).status).toBe('delisted');
   });
 });

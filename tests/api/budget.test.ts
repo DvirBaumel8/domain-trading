@@ -29,16 +29,17 @@ describe('budget queries', () => {
     await purchase('k5', 'failed', 5000, 'e.com');
     expect(await pendingCents(db)).toBe(1108 + 999 + 1000);
   });
-  it('active domains = owned + listed + pending_purchase', async () => {
+  it('active domains = owned + listed + delisted + pending_purchase', async () => {
     await insertOwnedDomain(db, { domain: 'a.com' });
     await insertOwnedDomain(db, { domain: 'b.com', status: 'listed' });
     await insertOwnedDomain(db, { domain: 'c.com', status: 'sold' });
+    await insertOwnedDomain(db, { domain: 'f.com', status: 'delisted' });
     await insertOwnedDomain(db, { domain: 'd.com', status: 'dropped' });
     await insertOwnedDomain(db, {
       domain: 'e.com', status: 'pending_purchase', registrar: null, registrar_api: null, buy_date: null,
       cost_cents: null, expiry_date: null, drop_date: null, renewal_price_cents: null,
     });
-    expect(await activeDomainCount(db)).toBe(3);
+    expect(await activeDomainCount(db)).toBe(4);
   });
   it('migration 2 columns exist; receipts.purchase_id is unique', async () => {
     await purchase('k1', 'succeeded', 1108, 'a.com');

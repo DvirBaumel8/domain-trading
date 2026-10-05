@@ -9,7 +9,7 @@ type Json = ColumnType<unknown, string, string>; // insert/update with JSON.stri
 export type Scope = 'read' | 'write';
 export type Category = 'geo' | 'trend' | 'b2b' | 'collision' | 'regulation' | 'buzzword' | 'other';
 export type ListingMode = 'bin' | 'offer' | 'hybrid';
-export type DomainStatus = 'pending_purchase' | 'owned' | 'listed' | 'sold' | 'dropped';
+export type DomainStatus = 'pending_purchase' | 'owned' | 'listed' | 'delisted' | 'sold' | 'dropped';
 export type RegistrarApi = 'full' | 'manage' | 'none';
 export type LedgerType =
   | 'registration' | 'renewal' | 'fee' | 'commission' | 'sale'
@@ -77,6 +77,16 @@ export interface DomainsTable {
   registrar_api: RegistrarApi | null;
   sold_at: Timestamp | null;
   delisted_at: Timestamp | null;
+  walkaway_cents: number | null;
+  price_grade: 'strong' | 'weaker' | null;
+  pricing_source: 'formula' | 'approved_exception' | null;
+  pricing_settings_version: number | null;
+  first_listed_at: Timestamp | null;
+  pricing_hold: Generated<boolean>;
+  pricing_hold_reason: string | null;
+  plan_id: string | null;
+  plan_audit_id: string | null;
+  export_pending_since: Timestamp | null;
   created_at: TimestampDefault;
   updated_at: TimestampDefault;
 }
@@ -100,7 +110,7 @@ export interface ListingHistoryTable {
   id: Generated<number>;
   domain_id: number;
   at: TimestampDefault;
-  source: 'buy' | 'import' | 'list';
+  source: 'buy' | 'import' | 'list' | 'schedule';
   category: Category | null;
   mode: ListingMode | null;
   bin_cents: number | null;
@@ -113,6 +123,12 @@ export interface ListingHistoryTable {
   approval_text: string | null;
   approval_at: Timestamp | null;
   audit_id: string | null;
+  price_grade: 'strong' | 'weaker' | null;
+  walkaway_cents: number | null;
+  pricing_source: 'formula' | 'approved_exception' | null;
+  pricing_settings_version: number | null;
+  schedule_event_id: number | null;
+  plan_audit_id: string | null;
 }
 
 export interface QuotesTable {
@@ -200,6 +216,67 @@ export interface ExportRunsTable {
   domains: string[];
 }
 
+export interface PricingSettingsTable {
+  version: number;
+  effective_at: Timestamp;
+  created_at: TimestampDefault;
+  approval_text: string;
+  approval_at: Timestamp;
+  note: string | null;
+  geo_bin_strong_cents: number;
+  geo_bin_weaker_cents: number;
+  geo_bin_min_cents: number;
+  geo_bin_max_cents: number;
+  geo_drops_enabled: boolean;
+  geo_drops: Json;
+  floor_bps: number;
+  floor_min_cents: number;
+  walkaway_bps: number;
+  walkaway_min_cents: number;
+  hybrid_min_offer_cents: number;
+  drops: Json;
+  final_push_days_before_drop: number;
+  final_push_mode: 'bin_to_floor_ceil95';
+  delist_days_before_drop: number;
+  headsup_days_before: number;
+  comps_min: number;
+  comps_max: number;
+  public_lto: boolean;
+}
+
+export type PriceScheduleEvent = 'drop1_m6' | 'drop2_m18' | 'geo_drop_m12' | 'final_push' | 'delist';
+export type PriceScheduleStatus =
+  | 'planned' | 'applied' | 'skipped_at_minimum' | 'skipped_no_change' | 'skipped_disabled'
+  | 'superseded' | 'superseded_by_final_push' | 'cancelled' | 'failed';
+
+export interface PriceScheduleTable {
+  id: Generated<number>;
+  domain_id: number;
+  plan_id: string;
+  event: PriceScheduleEvent;
+  due_on: DateString;
+  bin_cents: number | null;
+  floor_cents: number | null;
+  walkaway_cents: number | null;
+  settings_version: number;
+  status: PriceScheduleStatus;
+  applied_at: Timestamp | null;
+  listing_history_id: number | null;
+  note: string | null;
+  created_at: TimestampDefault;
+  updated_at: TimestampDefault;
+}
+
+export interface PricingEvidenceTable {
+  id: Generated<number>;
+  domain_id: number;
+  comps: Json | null;
+  rationale: string | null;
+  legacy_no_comps_reason: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface Database {
   api_tokens: ApiTokensTable;
   settings: SettingsTable;
@@ -213,6 +290,9 @@ export interface Database {
   audit_log: AuditLogTable;
   idempotency_keys: IdempotencyKeysTable;
   export_runs: ExportRunsTable;
+  pricing_settings: PricingSettingsTable;
+  price_schedule: PriceScheduleTable;
+  pricing_evidence: PricingEvidenceTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

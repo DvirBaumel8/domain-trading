@@ -26,7 +26,7 @@ export async function activeDomainCount(db: Kysely<Database>): Promise<number> {
   const r = await db
     .selectFrom('domains')
     .select(sql<number>`count(*)::int`.as('n'))
-    .where('status', 'in', ['owned', 'listed', 'pending_purchase'])
+    .where('status', 'in', ['owned', 'listed', 'delisted', 'pending_purchase'])
     .executeTakeFirstOrThrow();
   return Number(r.n);
 }

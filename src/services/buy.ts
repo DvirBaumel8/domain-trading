@@ -395,7 +395,7 @@ export class BuyService {
     try {
       const spent = await spentCents(db);
       const owned = await db.selectFrom('domains').select(sql<number>`count(*)::int`.as('n'))
-        .where('status', 'in', ['owned', 'listed']).executeTakeFirstOrThrow();
+        .where('status', 'in', ['owned', 'listed', 'delisted']).executeTakeFirstOrThrow();
       Object.assign(body, {
         poc_spent_after: formatUsd(spent), poc_spent_after_cents: spent,
         poc_remaining: formatUsd(a.settings.poc_cap_cents - spent), poc_remaining_cents: a.settings.poc_cap_cents - spent,
@@ -495,7 +495,7 @@ export class BuyService {
 
   protected async assertNotOwned(db: Kysely<Database>, domain: string): Promise<void> {
     const row = await db.selectFrom('domains').select('status').where('domain', '=', domain).executeTakeFirst();
-    if (row && ['pending_purchase', 'owned', 'listed'].includes(row.status)) {
+    if (row && ['pending_purchase', 'owned', 'listed', 'delisted'].includes(row.status)) {
       throw new AppError(409, 'ALREADY_OWNED_OR_PENDING', `${domain} is already owned or being bought`, { status: row.status });
     }
     if (row) throw new AppError(409, 'ALREADY_IN_PORTFOLIO', `${domain} is in the portfolio as ${row.status}`, { status: row.status });

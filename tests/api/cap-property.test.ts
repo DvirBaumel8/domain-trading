@@ -14,7 +14,7 @@ describe('CAP-6: −Σ(registration+renewal+fee) ≤ poc_cap_cents after any seq
     const rnd = (n: number) => (seed = (seed * 48271) % 2147483647) % n;
     for (let s = 0; s < 200; s++) {
       await resetDb(db);
-      const start = rnd(50001);
+      const start = rnd(150001);
       if (start > 0) await seedSpent(start);
       const price = 500 + rnd(20000);
       const pb = new FakeAdapter('porkbun', { quote: { firstYearCents: price, renewalCents: price }, account: { spendLimitRemainingCents: null } });

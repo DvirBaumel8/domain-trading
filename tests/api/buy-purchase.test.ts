@@ -35,7 +35,7 @@ describe('POST /buy purchase', () => {
     expect(b).toMatchObject({
       domain: DOMAIN, registrar: 'porkbun', order_id: 'ord-1', charged: '$11.08', charged_cents: 1108,
       renewal: '$11.08', two_year: '$22.16', expiry_date: '2027-10-05', drop_date: '2028-10-05', renewals_used: 0,
-      poc_spent_after: '$11.08', poc_remaining: '$488.92', domains_owned: 1,
+      poc_spent_after: '$11.08', poc_remaining: '$1,488.92', domains_owned: 1,
       post_buy: { privacy: 'on', auto_renew: 'off', lander: 'afternic ns set', listing: null },
       warnings: [],
     });
@@ -98,7 +98,7 @@ describe('POST /buy purchase', () => {
   it('B-12/CAP-1: spent $480, two parallel $11.08 buys of different domains → exactly one succeeds', async () => {
     const pb = new FakeAdapter('porkbun');
     const { auth } = await setup(pb);
-    await seedSpent(48000);
+    await seedSpent(148000);
     const res = await Promise.all([postBuy(app, buyBody({ domain: 'alpha.com' }), auth), postBuy(app, buyBody({ domain: 'bravo.com' }), auth)]);
     expect(res.map((r) => r.statusCode).sort()).toEqual([201, 409]);
     expect(res.find((r) => r.statusCode === 409)!.json().error.code).toBe('POC_CAP_EXCEEDED');
@@ -108,7 +108,7 @@ describe('POST /buy purchase', () => {
   it('CAP-2: an unresolved (unknown) purchase counts toward the 10-domain cap', async () => {
     const stuck = new FakeAdapter('porkbun', { register: () => timeout(), findDomain: (_d, n) => (n === 0 ? null : new Error('down')) });
     const { auth } = await setup(stuck);
-    await seedOwnedDomains(9);
+    await seedOwnedDomains(49);
     expect((await postBuy(app, buyBody({ domain: 'stuck.com' }), auth)).statusCode).toBe(202);
     expect((await postBuy(app, buyBody({ domain: 'next.com' }), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
   });
@@ -452,7 +452,7 @@ describe('POST /buy final-review fixes', () => {
     const amb = new RegistrarError('porkbun', 'REGISTRAR_BAD_RESPONSE', 'x', { ambiguous: true });
     const pb = new FakeAdapter('porkbun', { dryRun: (n) => (n === 0 ? amb : undefined) });
     const { auth } = await setup(pb);
-    await seedOwnedDomains(9);
+    await seedOwnedDomains(49);
     expect((await postBuy(app, buyBody({ domain: 'a-amb.com' }), auth)).json().error.code).toBe('REGISTRAR_DRY_RUN_AMBIGUOUS');
     expect((await postBuy(app, buyBody({ domain: 'b-next.com' }), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
   });

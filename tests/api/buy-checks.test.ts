@@ -94,7 +94,7 @@ describe('POST /buy checks (no money moves)', () => {
     const auth = await setup();
     const res = await postBuy(app, buyBody({ poc_cap: 999999 }), auth);
     expect(res.statusCode).toBe(422);
-    expect((await db.selectFrom('settings').select('poc_cap_cents').executeTakeFirstOrThrow()).poc_cap_cents).toBe(50000);
+    expect((await db.selectFrom('settings').select('poc_cap_cents').executeTakeFirstOrThrow()).poc_cap_cents).toBe(150000);
   });
 
   it('B-14: RDAP says registered → 409 NOT_AVAILABLE, zero register calls', async () => {
@@ -128,15 +128,15 @@ describe('POST /buy checks (no money moves)', () => {
 
   it('B-11/CAP-1: spent $495.00 + $11.08 → 409 POC_CAP_EXCEEDED with remaining $5.00', async () => {
     const auth = await setup();
-    await seedSpent(49500);
+    await seedSpent(149500);
     const res = await postBuy(app, buyBody(), auth);
     expect(res.json().error).toMatchObject({ code: 'POC_CAP_EXCEEDED', details: { remaining: '$5.00', remaining_cents: 500 } });
   });
 
-  it('B-13/CAP-2: 10 domains owned → 409 DOMAIN_CAP_REACHED', async () => {
+  it('B-13/CAP-2: 50 domains owned → 409 DOMAIN_CAP_REACHED', async () => {
     const pb = new FakeAdapter('porkbun');
     const auth = await setup([pb]);
-    await seedOwnedDomains(10);
+    await seedOwnedDomains(50);
     expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
     expect(pb.calls).toEqual([]);
   });
@@ -145,6 +145,14 @@ describe('POST /buy checks (no money moves)', () => {
     const pb = new FakeAdapter('porkbun');
     const auth = await setup([pb]);
     await insertOwnedDomain(db, { domain: DOMAIN });
+    expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('ALREADY_OWNED_OR_PENDING');
+    expect(pb.calls).toEqual([]);
+  });
+
+  it('check 4: delisted domain is still held → 409 ALREADY_OWNED_OR_PENDING, zero registrar calls', async () => {
+    const pb = new FakeAdapter('porkbun');
+    const auth = await setup([pb]);
+    await insertOwnedDomain(db, { domain: DOMAIN, status: 'delisted' });
     expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('ALREADY_OWNED_OR_PENDING');
     expect(pb.calls).toEqual([]);
   });
@@ -258,7 +266,7 @@ describe('POST /buy checks (no money moves)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       dry_run: true, domain: DOMAIN, registrar: 'porkbun', first_year: '$11.08', renewal: '$11.08', two_year: '$22.16',
-      poc_spent: '$0.00', poc_remaining_after: '$488.92', registrar_dry_run: { would_succeed: true, cost: '$11.08', cost_cents: 1108 },
+      poc_spent: '$0.00', poc_remaining_after: '$1,488.92', registrar_dry_run: { would_succeed: true, cost: '$11.08', cost_cents: 1108 },
       proposed_listing: { mode: 'bin', bin: 399, floor: 399, min_offer: 399, lto_max_months: null },
     });
     expect(registerCalls(pb)).toEqual([expect.stringMatching(/^register examplecityroofing\.com dry=true key=dtdry-[0-9a-f-]{36} cost=1108$/)]);
@@ -270,7 +278,7 @@ describe('POST /buy checks (no money moves)', () => {
 
   it('DR-2: dry run enforces every check (POC cap)', async () => {
     const auth = await setup();
-    await seedSpent(49500);
+    await seedSpent(149500);
     expect((await postBuy(app, buyBody({ dry_run: true }), auth)).json().error.code).toBe('POC_CAP_EXCEEDED');
   });
 
