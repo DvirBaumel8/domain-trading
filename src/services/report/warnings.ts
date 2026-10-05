@@ -22,6 +22,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   const today = jerusalemDate(now);
   const domains = await db.selectFrom('domains').selectAll().where('status', '!=', 'pending_purchase').orderBy('domain').execute();
   const nameOf = new Map(domains.map((d) => [d.id, d.domain]));
+  const statusOf = new Map(domains.map((d) => [d.id, d.status]));
   const live = (s: string) => (LIVE as readonly string[]).includes(s);
 
   // sales
@@ -50,6 +51,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     if (d.lander_ns && d.ns_verified_at === null && (d.status === 'owned' || d.status === 'listed')) {
       add('NS_UNVERIFIED', 'warn', `${d.domain}: the nameservers are not verified as the lander's.`, d.domain, { lander: d.lander, lander_ns: d.lander_ns });
     }
+    // unreachable under the domains_category_once_owned CHECK; kept as a defensive rule
     if (d.status === 'listed' && d.category === null) add('CATEGORY_MISSING', 'warn', `${d.domain} is listed without a category.`, d.domain);
     if (d.renewals_used === 0 && d.renewal_price_cents === null && d.status !== 'sold' && d.status !== 'dropped') {
       add('RENEWAL_PRICE_UNKNOWN', 'warn', `${d.domain} has no renewal price on record.`, d.domain);
@@ -126,6 +128,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     .where('routing', '=', 'dvir').where('outcome', 'in', ['open', 'countered']).where('created_at', '<', cutoff).orderBy('created_at').orderBy('id').execute();
   for (const o of offers) {
     const d = nameOf.get(o.domain_id);
+    if (statusOf.get(o.domain_id) === 'sold' || statusOf.get(o.domain_id) === 'dropped') continue;
     add('OFFER_NEEDS_DVIR', 'warn', `An offer of ${pair('amount', o.amount_cents).amount} on ${d} has waited over 48 hours for Dvir.`, d, {
       offer_id: o.id, ...pair('amount', o.amount_cents), source: o.source, outcome: o.outcome, logged_at: toJerusalemIso(o.created_at),
     });

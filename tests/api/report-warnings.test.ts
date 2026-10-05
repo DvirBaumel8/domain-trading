@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { makeApp } from '../helpers/app.js';
-import { sql } from 'kysely';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
@@ -86,20 +85,10 @@ describe('GET /report warnings', () => {
     expect(w.map((x) => [x.domain, x.level])).toEqual([['ns-bad.com', 'warn']]);
   });
 
-  it('CATEGORY_MISSING, BIN_MISSING and FLOOR_AUTO_ACCEPT on listed names', async () => {
+  it('BIN_MISSING and FLOOR_AUTO_ACCEPT on listed names', async () => {
     await insertOwnedDomain(db, { domain: 'nobin.com', status: 'listed', category: 'trend', price_grade: null, listing_mode: 'hybrid', bin_cents: null });
     await listedDomain({ domain: 'hyb.com' });
-    // the DB forbids an owned domain without a category; lift the CHECK for this fixture only (the warning is defensive)
-    await sql`ALTER TABLE domains DROP CONSTRAINT domains_category_once_owned`.execute(db);
-    let w;
-    try {
-      await insertOwnedDomain(db, { domain: 'nocat.com', status: 'listed', category: null, price_grade: null });
-      w = await (await boot()).warnings();
-    } finally {
-      await db.deleteFrom('domains').where('domain', '=', 'nocat.com').execute();
-      await sql`ALTER TABLE domains ADD CONSTRAINT domains_category_once_owned CHECK (status = 'pending_purchase' OR category IS NOT NULL)`.execute(db);
-    }
-    expect(w.filter((x) => x.code === 'CATEGORY_MISSING').map((x) => [x.domain, x.level])).toEqual([['nocat.com', 'warn']]);
+    const w = await (await boot()).warnings();
     expect(w.filter((x) => x.code === 'BIN_MISSING').map((x) => [x.domain, x.level])).toEqual([['nobin.com', 'warn']]);
     const f = w.filter((x) => x.code === 'FLOOR_AUTO_ACCEPT');
     expect(f.map((x) => [x.domain, x.level])).toEqual([['hyb.com', 'info']]);
@@ -184,11 +173,17 @@ describe('GET /report warnings', () => {
     const offer = (domainId: number, createdAt: Date, extra: Record<string, unknown> = {}) => db.insertInto('offers').values({
       domain_id: domainId, amount_cents: 100000, source: 'afternic', received_at: createdAt, band: 'mid_range', routing: 'dvir', outcome: 'open', recorded_by: 'gavriel', created_at: createdAt, ...extra,
     }).execute();
-    it('49 h fires; 47 h does not; an old imported offer created 1 h ago does not; a decided offer does not', async () => {
+    it('49 h fires; 47 h does not; an old imported offer created 1 h ago does not; a decided offer does not; sold and dropped domains are skipped', async () => {
       const a = await listedDomain({ domain: 'o-49.com' });
       const b = await listedDomain({ domain: 'o-47.com' });
       const c = await listedDomain({ domain: 'o-imp.com' });
       const d = await listedDomain({ domain: 'o-done.com' });
+      const sold = await listedDomain({ domain: 'o-sold.com' });
+      const dropped = await listedDomain({ domain: 'o-dropped.com' });
+      await db.updateTable('domains').set({ status: 'sold' }).where('id', '=', sold).execute();
+      await db.updateTable('domains').set({ status: 'dropped' }).where('id', '=', dropped).execute();
+      await offer(sold, new Date(NOW - 60 * 3_600_000));
+      await offer(dropped, new Date(NOW - 60 * 3_600_000));
       await offer(a, new Date(NOW - 49 * 3_600_000));
       await offer(b, new Date(NOW - 47 * 3_600_000));
       await offer(c, new Date(NOW - 1 * 3_600_000), { received_at: ago(60 * DAY) });
