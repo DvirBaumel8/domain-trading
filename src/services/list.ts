@@ -39,7 +39,7 @@ function addDays(date: string, days: number): string {
 }
 
 /** The listing stored on the row, as a plan (for views and history rows of calls that change no price). */
-function currentPlan(row: DomainRow, fallbackVersion: number): ListingPlan | null {
+export function currentPlan(row: DomainRow, fallbackVersion: number): ListingPlan | null {
   if (!row.listing_mode || !row.category) return null;
   return {
     mode: row.listing_mode, category: row.category, grade: row.category === 'geo' ? row.price_grade : null,
