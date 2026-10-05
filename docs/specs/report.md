@@ -59,9 +59,14 @@ D-001 (promptinjectionaudit.com) was bought **by hand at GoDaddy** (not Porkbun)
   - GoDaddy's discounted renewal applies only with auto-renew ON (`../research/registrars.md`). The one allowed renewal will cost GoDaddy's rate; Dvir enters it as `--renewal-price`.
   - WHOIS privacy status: Dvir checks it in the dashboard (UNVERIFIED whether privacy is free at GoDaddy).
   - Fast Transfer: GoDaddy is a Premium partner. Eligible listings are opted in automatically at the end of the 60-day lock (GoDaddy Help 27761).
-- It writes the same rows as a `/buy` success.
-- It writes the same rows as a `/buy` success (ledger `registration` row, domain row with `renewals_used=0`, `drop_date = expiry + 1y`, `category`, the listing fields, and an audit row with scope `admin`). The POC cap and 10-domain cap count it.
+- It writes the same rows as a `/buy` success (ledger `registration` row, domain row with `renewals_used=0`, `drop_date = expiry + 1y`, `category`, the listing fields, and an audit row with scope `admin`). The POC cap and 50-domain cap count it.
 - It refuses if the domain isn't in the registrar account, or is already in `domains`.
+- **Flags and codes** (spec sync, Dvir, 5 Oct 2026, 21:02; step 4d-1 code):
+  - `--registrar` must be `porkbun`, `godaddy` or `other` (`other` needs `--manual`). `--order` defaults to `none` and must not contain `@` (422 `NO_PII`).
+  - `--approval-text` / `--approval-at` (together) are needed **only** when the import carries a pricing exception or an override; if given, they are always validated.
+  - `--comps-file` takes `{comps, rationale}` or a bare array of comps. `--legacy-no-comps "<reason>"` is allowed only for buy dates before 2026-10-05 (else 422 `COMPS_REQUIRED`); not together with `--comps-file`.
+  - **Refusals:** `REGISTRATION_TERM_INVALID` (expiry later than buy date + 1 year + 7 days; founder rule 3); `DROP_DATE_PASSED` (the import carries a listing but `drop_date` is not in the future); `ADAPTER_NOT_ENABLED`; `ACCOUNT_NOT_ELIGIBLE`; `REGISTRAR_ERROR`; `EXPIRY_UNKNOWN`; `NOT_IN_ACCOUNT` (for GoDaddy the message suggests `--manual`); `ALREADY_IN_PORTFOLIO`. All suggest `--manual --expiry` where it applies.
+  - **Warnings (never block):** `AUTO_RENEW_ON` (the registrar reports auto-renew on); `PRIVACY_OFF`; `AUTO_RENEW_UNCONFIRMED` (always for `--manual` and GoDaddy, and when the registrar doesn't report it: check auto-renew is OFF in the dashboard, since renewals there are billed outside the $1,500 cap); `EXPIRY_MISMATCH` (`--expiry` differs from the registrar's; the registrar's is used); `EXPIRY_IN_PAST`; `LEGACY_NO_COMPS`; and the cap warnings `POC_CAP_EXCEEDED_BY_IMPORT` / `DOMAIN_CAP_EXCEEDED_BY_IMPORT` (**an import is never refused for the caps**; `/buy` is refused until under them).
 - Alternative bulk seed: `--from-csv ledger/portfolio.csv` (the pre-service portfolio file).
 
 | ID | Case | Pass | Fail |
@@ -76,6 +81,12 @@ D-001 (promptinjectionaudit.com) was bought **by hand at GoDaddy** (not Porkbun)
 | IM-8 | `--manual` with expiry, no renewal price | Imported; `registrar_api=none`; `/report` warns `RENEWAL_PRICE_UNKNOWN`; `drop_date` = expiry + 1 y | Missing warning |
 | IM-9 | Import without `--category` / with a listing that breaks a guard | Refused (`CATEGORY_REQUIRED` / guard code) | Imported |
 | IM-10 | Import counts toward the caps | After the import, `/report` spend and domain count include D-001; a `/buy` over the remaining cap is refused | Not counted |
+| IM-12 | Registrar mock reports auto-renew on and privacy off; a GoDaddy import; a `--manual` import | `AUTO_RENEW_ON` + `PRIVACY_OFF` / `AUTO_RENEW_UNCONFIRMED` / `AUTO_RENEW_UNCONFIRMED`; all imported | Missing warning, or refused |
+| IM-13 | `--expiry` ≠ the registrar's; an expiry in the past (no listing) | `EXPIRY_MISMATCH` (registrar's date stored) / `EXPIRY_IN_PAST`; imported | Missing warning |
+| IM-14 | Expiry > buy date + 1 y + 7 d; a listing with `drop_date` ≤ today | 422 `REGISTRATION_TERM_INVALID` / 422 `DROP_DATE_PASSED`; no rows | Imported |
+| IM-15 | `--registrar namecheap`; `--order a@b`; `--legacy-no-comps` with buy date 2026-10-05; an exception without `--approval-text`; a plain formula listing without it | exit 2 / 422 `NO_PII` / 422 `COMPS_REQUIRED` / refused / imported | Other |
+| IM-16 | Adapter disabled; registrar error; no expiry reported; not in the account (GoDaddy) | `ADAPTER_NOT_ENABLED` / `REGISTRAR_ERROR` / `EXPIRY_UNKNOWN` / `NOT_IN_ACCOUNT` with a `--manual` hint; no rows | Rows written |
+| IM-17 | Import that takes spend over $1,500 or the count over 50 | Imported with `POC_CAP_EXCEEDED_BY_IMPORT` / `DOMAIN_CAP_EXCEEDED_BY_IMPORT`; a later `/buy` refused | Import refused, or no warning |
 | IM-11 | GoDaddy adapter never registers | Static test: the GoDaddy adapter has no `register` implementation, and `/check` excludes GoDaddy with `NO_AVAILABILITY_ACCESS` | Can register |
 
 ## Daily registrar check (`DOMAIN_LEFT_ACCOUNT`; Dvir, 5 Oct 2026, 19:47)
@@ -86,7 +97,8 @@ D-001 (promptinjectionaudit.com) was bought **by hand at GoDaddy** (not Porkbun)
 
 ## Status lifecycle
 `pending_purchase → owned → listed → sold` (also `owned → sold` and `delisted → sold`), or `listed → delisted → dropped` (the scheduled delist at `drop_date − 7`), or `→ dropped`.
-- A domain becomes `dropped` when a daily job finds `today > drop_date`, or when an `owned`/`listed` domain expires without renewal.
+- A domain becomes `dropped` only when the daily drop job (`npm run job -- drop`) finds `today > drop_date` (status `owned`, `listed` or `delisted`; planned schedule rows → `cancelled`).
+- An `owned`/`listed` name that has **expired without renewal is not auto-dropped**, because the registrar's grace period applies. `/report` will warn `EXPIRED_NOT_RENEWED` instead (spec sync, Dvir, 5 Oct 2026, 21:02; step 4d-1 code); *not yet in the code on main*.
 - `renewals_used` is never above 1 (DB CHECK).
 
 ## Tests (pass/fail)

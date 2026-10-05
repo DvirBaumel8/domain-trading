@@ -22,7 +22,7 @@
   - `evidence` may also be sent with `approval_ref` (stored either way).
 - **Duplicate check:** a sale with the same `venue` + `transaction_ref` already in `sales` → 409 `SALE_ALREADY_RECORDED` (checked before the state check; any domain). A same-key replay still returns the stored response.
 - The domain must be `owned`, `listed` or **`delisted`** (a delisted name can still sell, e.g. via outreach or a late marketplace buyer); otherwise 409 `NOT_SELLABLE_STATE`.
-- **`offer_id` (optional):** must be an `open`, `countered` or `accepted` offer on this domain, else 422 `OFFER_MISMATCH`. In the same transaction the offer's outcome becomes `sold` (note `via /sold`, with Dvir's approval text, or `system: <evidence.source> <evidence.ref>` when unconfirmed).
+- **`offer_id` (optional):** must be an `open`, `countered` or `accepted` offer on this domain, else 422 `OFFER_MISMATCH`. In the same transaction the offer's outcome becomes `sold` (note `via /sold`, with Dvir's approval text, or, when unconfirmed, `system: <evidence.source> <evidence.ref>` with each `@` written as ` at ` because offer notes can't contain `@`; the exact reference stays in `sales.evidence_ref`).
 - One DB transaction writes ledger rows:
   - `sale` +sale_price;
   - `commission` −commission;
