@@ -96,6 +96,7 @@ describe('POST /list concurrency and NS hardening', () => {
     const res = await list({ mode: 'hybrid', bin: 2495, approval_ref: approval() }, auth, key);
     expect(res.statusCode).toBe(503);
     expect(res.json().error).toMatchObject({ code: 'REGISTRAR_UNAVAILABLE', details: { registrar: 'porkbun', registrar_code: 'REGISTRAR_TIMEOUT' } });
+    expect(await db.selectFrom('audit_log').selectAll().where('status_code', '=', 503).execute()).toHaveLength(1);
     expect(await history()).toHaveLength(0);
     expect(await dom()).toMatchObject({ lander: null, bin_cents: 199500 });
     await app.close();
@@ -123,6 +124,7 @@ describe('POST /list concurrency and NS hardening', () => {
     await listedDomain({ domain: D, registrar: 'godaddy', registrar_api: 'manage' });
     const res = await list({}, auth);
     expect(res.statusCode).toBe(409);
+    expect(await db.selectFrom('audit_log').selectAll().where('status_code', '=', 409).execute()).toHaveLength(1);
     const msg = res.json().error.message as string;
     expect(res.json().error.code).toBe('API_ACCESS_DISABLED');
     expect(msg).toContain('godaddy');

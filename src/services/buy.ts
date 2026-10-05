@@ -440,6 +440,17 @@ export class BuyService {
       privacy: 'unknown', auto_renew: 'unconfirmed', lander: 'skipped', listing: null,
     };
 
+    // 7.0 pricing evidence (first: nothing below may keep it from being saved) (the comps behind this buy); a failure is a warning, never an undo
+    try {
+      await db.insertInto('pricing_evidence').values({
+        domain_id: (await db.selectFrom('domains').select('id').where('domain', '=', d).executeTakeFirstOrThrow()).id,
+        comps: JSON.stringify(a.comps), rationale: a.rationale, audit_id: a.ctx.auditId,
+      }).execute();
+    } catch (e) {
+      this.deps.log?.error({ errMessage: (e as Error).message }, 'post-buy evidence save failed');
+      warnings.push('EVIDENCE_SAVE_FAILED: the purchase is booked but the comps were not saved; record them with a pricing note');
+    }
+
     // 7.1 privacy
     if (info?.whoisPrivacy === true) post.privacy = 'on';
     else if (info?.whoisPrivacy === false) {
@@ -455,17 +466,6 @@ export class BuyService {
       else warnings.push('AUTO_RENEW_NOT_CONFIRMED: auto-renew may still be on; turn it off in the registrar dashboard');
     } catch (e) {
       warnings.push(hint(e, 'AUTO_RENEW_FAILED'));
-    }
-
-    // 7.2b pricing evidence (the comps behind this buy); a failure is a warning, never an undo
-    try {
-      await db.insertInto('pricing_evidence').values({
-        domain_id: (await db.selectFrom('domains').select('id').where('domain', '=', d).executeTakeFirstOrThrow()).id,
-        comps: JSON.stringify(a.comps), rationale: a.rationale, audit_id: a.ctx.auditId,
-      }).execute();
-    } catch (e) {
-      this.deps.log?.error({ errMessage: (e as Error).message }, 'post-buy evidence save failed');
-      warnings.push('EVIDENCE_SAVE_FAILED: the purchase is booked but the comps were not saved; record them with a pricing note');
     }
 
     // 7.3 auto_list
@@ -499,6 +499,7 @@ export class BuyService {
   private async saveListing(a: Approved, plan: ListingPlan, post: { listing: unknown }, warnings: string[]): Promise<void> {
     const d = a.input.domain;
     const now = new Date(this.deps.now());
+    warnings.push(...plan.warnings);
     try {
       const events = await withDomainLock(this.deps.db, d, (conn) => conn.transaction().execute(async (trx) => {
         const row = await trx.selectFrom('domains').selectAll().where('domain', '=', d).forUpdate().executeTakeFirstOrThrow();
@@ -517,7 +518,6 @@ export class BuyService {
         })).events;
       }));
       post.listing = planView(plan, events);
-      warnings.push(...plan.warnings);
     } catch (e) {
       // Post-buy never undoes or masks a booked purchase (controller ruling, step 3 Task 2 review).
       this.deps.log?.error({ errMessage: (e as Error).message }, 'post-buy listing save failed');

@@ -1,6 +1,7 @@
 import type { Kysely, Selectable } from 'kysely';
 import { z } from 'zod';
 import type { Database, PricingSettingsTable } from '../db/types.js';
+import { AppError } from '../http/errors.js';
 import type { Cents } from './int.js';
 
 export interface PricingSettings {
@@ -63,7 +64,7 @@ export function rowToSettings(r: Selectable<PricingSettingsTable>): PricingSetti
 
 export async function currentSettings(db: Kysely<Database>, now: Date): Promise<PricingSettings> {
   const r = await db.selectFrom('pricing_settings').selectAll().where('effective_at', '<=', now).orderBy('version', 'desc').executeTakeFirst();
-  if (!r) throw new Error('No pricing_settings version is in effect');
+  if (!r) throw new AppError(500, 'PRICING_SETTINGS_MISSING', 'No pricing_settings version is in effect');
   return rowToSettings(r);
 }
 

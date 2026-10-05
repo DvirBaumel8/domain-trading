@@ -12,7 +12,7 @@ import { pct } from '../pricing/round.js';
 import { addMonthsClamped, buildSchedule } from '../pricing/schedule.js';
 import { currentSettings } from '../pricing/settings.js';
 import { afternicRow } from '../services/export.js';
-import { isCategory } from '../services/listing-rules.js';
+import { isCategory } from '../services/listing-v2.js';
 import { scheduleView } from '../services/plan-view.js';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -65,6 +65,7 @@ export function registerPricing(app: FastifyInstance, deps: { db: Kysely<Databas
 
     const today = jerusalemDate(now);
     const listedOn = q.listed_on ? validDate(q.listed_on, 'listed_on') : today;
+    let domainKey = 'example.com';
     let name = 'example.com';
     let dropDate: string | undefined;
     if (q.domain) {
@@ -72,6 +73,7 @@ export function registerPricing(app: FastifyInstance, deps: { db: Kysely<Databas
       const key = normalizeDomain(q.domain);
       const row = await deps.db.selectFrom('domains').select(['domain', 'display_name', 'drop_date']).where('domain', '=', key).executeTakeFirst();
       if (!row) throw new AppError(404, 'DOMAIN_NOT_FOUND', 'No such domain', { domain: key });
+      domainKey = row.domain;
       name = row.display_name ?? row.domain;
       dropDate = row.drop_date ?? undefined;
     } else if (q.drop_date) {
@@ -82,7 +84,7 @@ export function registerPricing(app: FastifyInstance, deps: { db: Kysely<Databas
     const schedule = buildSchedule({ plan, anchor: listedOn, dropDate, settings: s });
 
     const a = afternicRow({
-      domain: name.toLowerCase(), display_name: name, listing_mode: plan.mode, bin_cents: plan.binCents,
+      domain: domainKey, display_name: name, listing_mode: plan.mode, bin_cents: plan.binCents,
       floor_cents: plan.floorCents, min_offer_cents: plan.minOfferCents, lto_max_months: null,
     });
 

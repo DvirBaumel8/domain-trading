@@ -43,6 +43,14 @@ describe('GET /pricing/preview (§10.6)', () => {
     expect(b.schedule[2]).toMatchObject({ event: 'final_push', due_on: '2028-07-06', bin: '$895', floor: '$830', walkaway: '$610' });
   });
 
+  it('stored display_name that is invalid (Kelvin sign) → afternic_row uses the lowercase domain', async () => {
+    app = await makeApp();
+    const { auth } = await issueToken('read');
+    await insertOwnedDomain(db, { domain: 'kelvin.com', display_name: '\u212Aelvin.com', category: 'trend', drop_date: '2028-10-04' });
+    const b = (await get('category=trend&bin=1995&floor=1295&walkaway=950&listed_on=2026-10-12&domain=kelvin.com', auth)).json();
+    expect(b.afternic_row).toMatch(/^kelvin\.com,/);
+  });
+
   it('geo strong preview: bin row, M12 + delist, sell_plan_line starts with the geo prefix', async () => {
     app = await makeApp();
     const { auth } = await issueToken('read');
