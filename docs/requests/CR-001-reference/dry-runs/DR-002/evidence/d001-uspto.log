@@ -1,0 +1,21 @@
+import json, urllib.request, time, sys
+def q(s):
+    body={"query":{"bool":{"must":[{"query_string":{"query":s,"default_operator":"AND","fields":["wordmark"]}}]}},"size":25,
+          "_source":["wordmark","alive","ownerName","internationalClass","statusDescription","registrationId","id"]}
+    req=urllib.request.Request("https://tmsearch.uspto.gov/prod-stage-v1-0-0/tmsearch",data=json.dumps(body).encode(),headers={"Content-Type":"application/json"})
+    d=json.loads(urllib.request.urlopen(req,timeout=30).read())
+    hits=[h['source']|{"serial":h['id']} for h in d['hits']['hits']]
+    return d['hits']['totalValue'], hits
+checks=json.load(open(sys.argv[1])); out={}
+for dom,phrases in checks.items():
+    out[dom]={}
+    for p in phrases:
+        try:
+            n,h=q(p)
+            alive=[{"mark":x.get('wordmark'),"serial":x['serial'],"status":x.get('statusDescription'),"owner":(x.get('ownerName') or [''])[0][:60],"class":x.get('internationalClass')} for x in h if x.get('alive')]
+            out[dom][p]={"total":n,"alive_in_top25":alive}
+        except Exception as e: out[dom][p]={"error":str(e)}
+        time.sleep(0.7)
+    print(dom, {p:(v.get('total'),len(v.get('alive_in_top25',[]))) for p,v in out[dom].items()},flush=True)
+json.dump(out,open(sys.argv[2],'w'),indent=1)
+

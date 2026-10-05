@@ -1,0 +1,63 @@
+{
+"promptinjectionaudit.com":[
+ {"name":"TestMy.AI","url":"https://testmy.ai/","service_rx":"prompt injection"},
+ {"name":"SecurityWall","url":"https://securitywall.co/blog/prompt-injection-testing-guide","service_rx":"prompt injection"},
+ {"name":"Bluefire Redteam","url":"https://bluefire-redteam.com/programs/ai-assurance/","service_rx":"prompt injection"},
+ {"name":"CodeIT","url":"https://codeit.us/llm-security-audit","service_rx":"prompt injection"},
+ {"name":"TrustEdge.ai","url":"https://trustedge.ai/services/ai-governance/red-teaming/","service_rx":"prompt injection"},
+ {"name":"Zealynx","url":"https://www.zealynx.io/services/ai-audits/ai-red-team-audit","service_rx":"prompt injection"},
+ {"name":"Swarm","url":"https://swarmsec.ai/ai-penetration-testing","service_rx":"prompt injection"},
+ {"name":"Stingrai","url":"https://www.stingrai.io/services/ai-llm-penetration-testing","service_rx":"prompt injection"},
+ {"name":"ZeroLeaks","url":"https://zeroleaks.ai/prompt-injection-testing","service_rx":"prompt injection"},
+ {"name":"Phixe","url":"https://phixe.io/services/llm-red-teaming-service","service_rx":"prompt injection"},
+ {"name":"Adversary Insights","url":"https://adversaryinsights.ai/","service_rx":"prompt injection"},
+ {"name":"SecureLayer7","url":"https://securelayer7.net/services/ai-security-assessment","service_rx":"prompt injection"},
+ {"name":"Velora Consulting","url":"https://www.veloraconsulting.co.uk/services/llm-evaluation-red-team","service_rx":"prompt injection"},
+ {"name":"CodeWheel (never_pitch per Shomer 2026-10-03)","url":"https://codewheel.ai/services/ai-security/","service_rx":"prompt injection audit","note":"never_pitch"}
+],
+"ragsecurityaudit.com":[
+ {"name":"Phixe","url":"https://phixe.io/services/rag-security-assessment","service_rx":"RAG security"},
+ {"name":"IronProbe","url":"https://www.ironprobe.net/services/rag-security-testing","service_rx":"RAG security"},
+ {"name":"AI Security LLC","url":"https://aisecurity.llc/services","service_rx":"RAG security"},
+ {"name":"AgentOffense","url":"https://agentoffense.com/services/ai-llm-security/rag-pipeline-security-assessment/","service_rx":"RAG"},
+ {"name":"ServQual (srql.com)","url":"https://srql.com/services/rag-security-assessment/","service_rx":"RAG security"},
+ {"name":"Adversary Insights","url":"https://adversaryinsights.ai/","service_rx":"RAG"},
+ {"name":"SecureLayer7","url":"https://securelayer7.net/services/ai-security-assessment","service_rx":"RAG"},
+ {"name":"Stingrai","url":"https://www.stingrai.io/services/ai-llm-penetration-testing","service_rx":"RAG"}
+],
+"llmredteamaudit.com":[
+ {"name":"Adversary Insights","url":"https://adversaryinsights.ai/","service_rx":"red team"},
+ {"name":"Valtik Studios","url":"https://www.valtikstudios.com/services/ai-security-audit","service_rx":"red team|pentest"},
+ {"name":"Velora Consulting","url":"https://www.veloraconsulting.co.uk/services/llm-evaluation-red-team","service_rx":"red team"},
+ {"name":"Phixe","url":"https://phixe.io/services/llm-red-teaming-service","service_rx":"red team"},
+ {"name":"Zealynx","url":"https://www.zealynx.io/services/ai-audits/ai-red-team-audit","service_rx":"red team"},
+ {"name":"TrustEdge.ai","url":"https://trustedge.ai/services/ai-governance/red-teaming/","service_rx":"red team"},
+ {"name":"Petronella Technology","url":"https://petronellatech.com/ai-red-teaming/","service_rx":"red team"},
+ {"name":"Bluefire Redteam","url":"https://bluefire-redteam.com/ai-red-teaming-services/","service_rx":"red team"}
+],
+"voiceagentplumbing.com":[
+ {"name":"ServiceAgent","url":"https://serviceagent.ai/industries/plumbing/ai-receptionist","service_rx":"plumb"},
+ {"name":"AllHours.ai","url":"https://www.allhours.ai/","service_rx":"plumb"},
+ {"name":"KAPOW AI","url":"https://kapow.ai/","service_rx":"plumb"},
+ {"name":"Call Monkey AI","url":"https://www.callmonkey.ai/plumbing","service_rx":"plumb"},
+ {"name":"Receptico","url":"https://receptico.com/industries/plumbing/","service_rx":"plumb"}
+],
+"paytransparencyaudit.com":[
+ {"name":"Nordic Reward Partners","url":"https://nordicrewardpartners.com/services/pay-transparency","service_rx":"pay transparency audit"},
+ {"name":"Sysarb","url":"https://www.sysarb.se/en/book-a-pay-transparency-audit","service_rx":"pay transparency audit"},
+ {"name":"UPFLINX","url":"https://www.upflinx.com/starterkit/eu-pay-transparency-readiness-audit/","service_rx":"pay transparency"},
+ {"name":"MKM Legal","url":"https://mkm.legal/en/legal-advice/entgelttransparenzrichtlinie-fuer-arbeitgeber","service_rx":"pay transparency audit"}
+],
+"aiactconformity.com":[
+ {"name":"BMC (bm.consulting)","url":"https://bm.consulting/en/privacy-ai/high-risk-ai/","service_rx":"conformity assessment"},
+ {"name":"Confir","url":"https://confir.eu/conformity-assessment","service_rx":"conformity assessment"},
+ {"name":"euaiactchecklist.com","url":"https://euaiactchecklist.com/eu-ai-act-for-consultant.html","service_rx":"conformity assessment"}
+],
+"doraictcompliance.com":[
+ {"name":"regulation-dora.eu","url":"https://www.regulation-dora.eu/services","service_rx":"DORA"},
+ {"name":"ADVISORI","url":"https://www.advisori.de/services/regulatory-compliance-management/dora-digital-operational-resilience-act/dora-compliance","service_rx":"DORA"},
+ {"name":"Shatov Consulting","url":"https://shatov-consulting.com/dora","service_rx":"DORA"},
+ {"name":"Doracompliant","url":"https://www.doracompliant.com/our-services","service_rx":"DORA"},
+ {"name":"securitydocs.de","url":"https://securitydocs.de/en/services/dora-consulting/","service_rx":"DORA"}
+]
+}
