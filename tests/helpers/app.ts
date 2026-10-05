@@ -72,6 +72,7 @@ export async function makeApp(
     quoteTimeoutMs?: number;
     sleep?: (ms: number) => Promise<void>;
     nsLookup?: NsLookup;
+    exportLockTimeoutMs?: number;
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -84,6 +85,7 @@ export async function makeApp(
     rdap: opts.rdap,
     nsLookup: opts.nsLookup ?? (async () => null),
     quoteTimeoutMs: opts.quoteTimeoutMs,
+    exportLockTimeoutMs: opts.exportLockTimeoutMs,
     sleep: opts.sleep ?? (async () => {}),
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
     registerExtraRoutes: opts.testRoutes === false ? undefined : registerTestRoutes,

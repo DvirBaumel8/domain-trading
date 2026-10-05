@@ -48,6 +48,7 @@ export interface AppDeps {
   quoteTimeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
   nsLookup?: NsLookup;
+  exportLockTimeoutMs?: number;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -90,7 +91,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     sleep: deps.sleep, log: app.log,
   });
   registerBuy(app, buyService);
-  registerExport(app, new ExportService({ db: deps.db, config: deps.config, now: deps.now ?? Date.now }));
+  registerExport(app, new ExportService({ db: deps.db, config: deps.config, now: deps.now ?? Date.now, lockTimeoutMs: deps.exportLockTimeoutMs }));
   registerPricing(app, { db: deps.db, now: deps.now ?? Date.now });
   const nsLookup: NsLookup = deps.nsLookup ?? ((d: string) => queryNs(d, { server: deps.config.dnsNsServer }));
   registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now: deps.now ?? Date.now }));

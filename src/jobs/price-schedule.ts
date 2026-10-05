@@ -131,7 +131,7 @@ export class PriceScheduleJob {
     if (delist) {
       const others = planned.filter((r) => r.id !== delist.id && !strayIds.has(r.id)).map((r) => r.id);
       if (!dry) {
-        await q.updateTable('domains').set({ status: 'delisted', delisted_at: now, updated_at: now, ...changedColumns(cur, now) }).where('id', '=', domainId).execute();
+        await q.updateTable('domains').set({ status: 'delisted', delisted_at: now, updated_at: now, listing_changed_at: now }).where('id', '=', domainId).execute();
         const h = await q.insertInto('listing_history').values({
           domain_id: domainId, source: 'schedule', category: cur.category, mode: cur.listing_mode, bin_cents: cur.bin_cents, floor_cents: cur.floor_cents,
           min_offer_cents: cur.min_offer_cents, lto_max_months: cur.lto_max_months, lander: cur.lander, override: false, override_reason: null,

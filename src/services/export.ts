@@ -125,7 +125,7 @@ export interface ExportResult {
 }
 
 export class ExportService {
-  constructor(private readonly deps: { db: Kysely<Database>; config: Config; now: () => number }) {}
+  constructor(private readonly deps: { db: Kysely<Database>; config: Config; now: () => number; lockTimeoutMs?: number }) {}
 
   /**
    * One repeatable-read transaction: read pending / manual-delist / listed rows and insert the snapshot (the only write),
@@ -133,12 +133,13 @@ export class ExportService {
    */
   private async snapshot(
     venue: Venue, changedOnly: boolean,
-    build: (listed: ExportDomain[], warnings: string[]) => { csv: string; exported: string[] },
+    build: (listed: ExportDomain[], warnings: string[], settings: { sedo_hybrid_as: 'buy_now' | 'make_offer' }) => { csv: string; exported: string[] },
   ): Promise<ExportResult> {
     const fileAt = new Date(this.deps.now());
     const exportId = `exp_${randomUUID()}`;
     const warnings: string[] = [];
     const out = await this.deps.db.transaction().setIsolationLevel('repeatable read').execute(async (trx) => {
+      const settings = await trx.selectFrom('settings').select('sedo_hybrid_as').executeTakeFirstOrThrow();
       const pending = await pendingDomains(trx, venue);
       const gone = await manualDelist(trx, venue);
       let q = trx.selectFrom('domains').select(EXPORT_COLS).where('status', '=', 'listed').orderBy('domain');
@@ -146,16 +147,22 @@ export class ExportService {
       const all = await q.execute();
       const listed = all.filter((d, i) => {
         if (SAFE_DOMAIN.test(d.domain)) return true;
-        warnings.push(`${i}:DOMAIN_NOT_ASCII`);
+        warnings.push(`row:${i}:DOMAIN_NOT_ASCII`);
         return false;
       });
       const delist = gone.filter((dom, i) => {
         if (SAFE_DOMAIN.test(dom)) return true;
-        warnings.push(`${i}:DOMAIN_NOT_ASCII`);
+        warnings.push(`delist:${i}:DOMAIN_NOT_ASCII`);
         return false;
       });
-      const built = build(listed, warnings);
-      await trx.insertInto('export_runs').values({ marketplace: venue, at: fileAt, domains: built.exported, export_id: exportId, changed_only: changedOnly }).execute();
+      const built = build(listed, warnings, settings);
+      await trx.insertInto('export_runs').values({
+        marketplace: venue, at: fileAt, domains: built.exported, export_id: exportId, changed_only: changedOnly, delist,
+      }).execute();
+      if (built.exported.length > 0) {
+        const seen = await trx.selectFrom('domains').select(['domain', 'listing_changed_at']).where('domain', 'in', built.exported).execute();
+        await trx.insertInto('export_run_domains').values(seen.map((x) => ({ export_id: exportId, domain: x.domain, listing_changed_at: x.listing_changed_at }))).execute();
+      }
       return { csv: built.csv, pendingChanges: pending.length, manualDelist: delist };
     });
     const day = jerusalemDate(fileAt);
@@ -182,8 +189,7 @@ export class ExportService {
   async sedo(changedOnly = false): Promise<ExportResult | null> {
     const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath);
     if (!t) return null;
-    const s = await this.deps.db.selectFrom('settings').select('sedo_hybrid_as').executeTakeFirstOrThrow();
-    return this.snapshot('sedo', changedOnly, (listed, warnings) => {
+    return this.snapshot('sedo', changedOnly, (listed, warnings, s) => {
       const rows: string[][] = [t.headers];
       const exported: string[] = [];
       for (const d of listed) {
@@ -204,8 +210,21 @@ export class ExportService {
     if (!a.ok) throw new AppError(422, a.code, a.reason);
     const run = await db.selectFrom('export_runs').selectAll().where('export_id', '=', body.export_id).executeTakeFirst();
     if (!run || run.marketplace !== venue) throw new AppError(404, 'EXPORT_NOT_FOUND', 'No such export for this venue');
+    if (a.approvedAt.getTime() < run.at.getTime() - 60_000) throw new AppError(422, 'APPROVAL_INVALID', 'the upload approval predates the file');
     const already = () => new AppError(409, 'EXPORT_ALREADY_CONFIRMED', 'This export was already confirmed as uploaded');
     if (await db.selectFrom('export_uploads').select('id').where('export_id', '=', run.export_id).executeTakeFirst()) throw already();
+    // Clears first, the upload record last: a failed clear leaves no upload, so a retry re-runs cleanly.
+    if (venue === 'afternic') {
+      const recorded = await db.selectFrom('export_run_domains').select(['domain', 'listing_changed_at']).where('export_id', '=', run.export_id).orderBy('domain').execute();
+      for (const rd of recorded) {
+        await withDomainLock(db, rd.domain, async (conn) => {
+          await conn.updateTable('domains').set({ export_pending_since: null })
+            .where('domain', '=', rd.domain)
+            .where((eb) => eb.or([eb('listing_changed_at', 'is', null), ...(rd.listing_changed_at ? [eb('listing_changed_at', '<=', rd.listing_changed_at)] : [])]))
+            .execute();
+        }, { timeoutMs: this.deps.lockTimeoutMs });
+      }
+    }
     try {
       await db.insertInto('export_uploads').values({
         venue, export_id: run.export_id, domains: run.domains, uploaded_at: a.approvedAt,
@@ -214,16 +233,6 @@ export class ExportService {
     } catch (e) {
       if ((e as { code?: string }).code === '23505') throw already();
       throw e;
-    }
-    if (venue === 'afternic') {
-      for (const domain of [...run.domains].sort()) {
-        await withDomainLock(db, domain, async (conn) => {
-          await conn.updateTable('domains').set({ export_pending_since: null })
-            .where('domain', '=', domain)
-            .where((eb) => eb.or([eb('listing_changed_at', 'is', null), eb('listing_changed_at', '<=', run.at)]))
-            .execute();
-        });
-      }
     }
     const pending = await pendingDomains(db, venue);
     const inFile = new Set(run.domains);

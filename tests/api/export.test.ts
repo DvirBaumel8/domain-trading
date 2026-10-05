@@ -75,7 +75,7 @@ describe('GET /export/afternic.csv', () => {
     const res = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
     expect(res.statusCode).toBe(200);
     expect(parseCsvStrict(res.body)).toHaveLength(1);
-    expect(res.headers['x-export-warnings']).toBe('0:DOMAIN_NOT_ASCII');
+    expect(res.headers['x-export-warnings']).toBe('row:0:DOMAIN_NOT_ASCII');
   });
 
   it('cents are rounded down with an AFTERNIC_ROUNDS_DOWN warning in the header', async () => {

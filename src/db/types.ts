@@ -213,6 +213,13 @@ export interface ExportRunsTable {
   domains: string[];
   export_id: string;
   changed_only: Generated<boolean>;
+  delist: Generated<string[]>;
+}
+
+export interface ExportRunDomainsTable {
+  export_id: string;
+  domain: string;
+  listing_changed_at: Timestamp | null;
 }
 
 export interface ExportUploadsTable {
@@ -301,6 +308,7 @@ export interface Database {
   idempotency_keys: IdempotencyKeysTable;
   export_runs: ExportRunsTable;
   export_uploads: ExportUploadsTable;
+  export_run_domains: ExportRunDomainsTable;
   pricing_settings: PricingSettingsTable;
   price_schedule: PriceScheduleTable;
   pricing_evidence: PricingEvidenceTable;

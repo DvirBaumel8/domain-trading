@@ -17,6 +17,7 @@ describe('job CLI', () => {
 
   it('bad --today, no subcommand and unknown subcommand exit 2', async () => {
     await expect(cli(['price-schedule', '--today', '2027-13-01'])).rejects.toMatchObject({ code: 2 });
+    await expect(cli(['price-schedule', '--today', '2999-01-01'])).rejects.toMatchObject({ code: 2, stderr: expect.stringContaining('only allowed with --dry-run') });
     await expect(cli([])).rejects.toMatchObject({ code: 2 });
     await expect(cli(['nope'])).rejects.toMatchObject({ code: 2 });
   });

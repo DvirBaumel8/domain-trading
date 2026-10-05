@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { PriceScheduleJob } from '../../src/jobs/price-schedule.js';
@@ -50,7 +51,7 @@ async function listVia(app: FastifyInstance, auth: Record<string, string>, clock
   expect(res.statusCode, res.body).toBe(200);
 }
 const confirmBody = (exportId: string, clock: number, text = 'Dvir uploaded the file') =>
-  ({ export_id: exportId, approval_ref: { text, approved_at: new Date(clock - HOUR).toISOString() } });
+  ({ export_id: exportId, approval_ref: { text, approved_at: new Date(clock - 30_000).toISOString() } });
 const row = (domain: string) => db.selectFrom('domains').selectAll().where('domain', '=', domain).executeTakeFirstOrThrow();
 const count = async (table: 'domains' | 'listing_history' | 'export_uploads' | 'audit_log' | 'export_runs') =>
   Number((await db.selectFrom(table).select((eb) => eb.fn.countAll().as('n')).executeTakeFirstOrThrow()).n);
@@ -61,7 +62,7 @@ describe('exports v2', () => {
     const { auth } = await issueToken('write');
     const base = { first_listed_at: new Date('2026-10-12T09:00:00Z') };
     await insertOwnedDomain(db, { domain: 'austinroofrepair.com', display_name: 'AustinRoofRepair.com', status: 'listed', category: 'geo', price_grade: 'weaker', listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, walkaway_cents: 39900, min_offer_cents: 39900, ...base });
-    await insertOwnedDomain(db, { domain: 'trendname.com', status: 'listed', category: 'trend', price_grade: null, listing_mode: 'hybrid', bin_cents: 499500, floor_cents: 250000, walkaway_cents: 100000, min_offer_cents: 100000, lto_max_months: 24, ...base });
+    await insertOwnedDomain(db, { domain: 'trendname.com', status: 'listed', category: 'trend', price_grade: null, listing_mode: 'hybrid', bin_cents: 499500, floor_cents: 324500, walkaway_cents: 240000, min_offer_cents: 10000, lto_max_months: 24, ...base });
     await insertOwnedDomain(db, { domain: 'buzz.com', status: 'listed', category: 'buzzword', price_grade: null, listing_mode: 'offer', bin_cents: null, floor_cents: null, walkaway_cents: null, min_offer_cents: 50000, ...base });
     await insertOwnedDomain(db, { domain: 'gone.com', status: 'listed', category: 'trend', price_grade: null, listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 129500, walkaway_cents: 96000, min_offer_cents: 10000, ...base });
     const first = await get(app, 'afternic', auth);
@@ -74,7 +75,7 @@ describe('exports v2', () => {
       'Domain,Buy Now Price,Floor Price,Min Offer,Lease to Own,Max Lease Period,Sale Lander,Show Buy Now Option,Show Lease to Own Option,Show Make Offer Option,Hidden',
       'AustinRoofRepair.com,399,399,399,N,,Buy It Now,Y,N,N,N',
       'buzz.com,0,,500,N,,Custom Lander,N,N,Y,N',
-      'trendname.com,4995,2500,1000,Y,24,Custom Lander,Y,Y,Y,N',
+      'trendname.com,4995,3245,100,Y,24,Custom Lander,Y,Y,Y,N',
     ]);
     expect(res.headers['x-manual-delist']).toBe('gone.com');
   });
@@ -187,6 +188,39 @@ describe('exports v2', () => {
       expect(res.statusCode).toBe(409);
       expect(res.json().error.code).toBe('EXPORT_ALREADY_CONFIRMED');
       expect(await count('export_uploads')).toBe(1);
+    });
+
+    it('an approval that predates the file by more than 60 s → 422 APPROVAL_INVALID; 30 s before is accepted', async () => {
+      const { app, auth, id } = await withFile();
+      const early = await post(app, '/export/afternic/uploaded', auth, { export_id: id, approval_ref: { text: 'ok', approved_at: new Date(NOW - 61_000).toISOString() } });
+      expect(early.statusCode).toBe(422);
+      expect(early.json().error).toMatchObject({ code: 'APPROVAL_INVALID', message: 'the upload approval predates the file' });
+      expect(await count('export_uploads')).toBe(0);
+      expect((await post(app, '/export/afternic/uploaded', auth, { export_id: id, approval_ref: { text: 'ok', approved_at: new Date(NOW - 30_000).toISOString() } })).statusCode).toBe(200);
+    });
+
+    it('a clear hitting DOMAIN_BUSY → 503 and no export_uploads row; a retry with the same key after release → 200, one row', async () => {
+      const app = await makeApp({ now: () => NOW, adapters: [new FakeAdapter('porkbun')], env: { SEDO_TEMPLATE_PATH: TEMPLATE }, exportLockTimeoutMs: 150 });
+      apps.push(app);
+      const { auth } = await issueToken('write');
+      await listVia(app, auth, NOW, 'alpharoof.com');
+      const id = (await get(app, 'afternic', auth)).headers['x-export-id'] as string;
+      const key = randomUUID();
+      await db.connection().execute(async (conn) => {
+        await sql`select pg_advisory_lock(hashtext('alpharoof.com'))`.execute(conn);
+        try {
+          const busy = await post(app, '/export/afternic/uploaded', auth, confirmBody(id, NOW), key);
+          expect(busy.statusCode, busy.body).toBe(503);
+          expect(busy.json().error.code).toBe('DOMAIN_BUSY');
+          expect(await count('export_uploads')).toBe(0);
+        } finally {
+          await sql`select pg_advisory_unlock(hashtext('alpharoof.com'))`.execute(conn);
+        }
+      });
+      const ok = await post(app, '/export/afternic/uploaded', auth, confirmBody(id, NOW), key);
+      expect(ok.statusCode, ok.body).toBe(200);
+      expect(await count('export_uploads')).toBe(1);
+      expect((await row('alpharoof.com')).export_pending_since).toBeNull();
     });
 
     it('/export/dan/uploaded → 404 NOT_FOUND', async () => {

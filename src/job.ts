@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { loadConfig } from './config.js';
 import { createDb } from './db/client.js';
+import { jerusalemDate } from './dates.js';
 import { PriceScheduleJob } from './jobs/price-schedule.js';
 
 const USAGE = `usage:
@@ -22,6 +23,9 @@ async function main(argv: string[]): Promise<number> {
     const d = new Date(`${today}T00:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== today) {
       throw new UsageError('--today must be a valid YYYY-MM-DD date');
+    }
+    if (!values['dry-run'] && today > jerusalemDate(new Date())) {
+      throw new UsageError('--today in the future is only allowed with --dry-run');
     }
   }
   const config = loadConfig(process.env);
