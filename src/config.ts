@@ -11,6 +11,8 @@ const EnvSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   LOG_LEVEL: z.string().default('info'),
   ENABLED_REGISTRARS: z.string().default(''),
+  SEDO_TEMPLATE_PATH: z.string().default('templates/sedo_template.json'),
+  DNS_NS_SERVER: z.string().default('192.5.6.30'),
 });
 
 export interface Config {
@@ -20,6 +22,8 @@ export interface Config {
   host: string;
   logLevel: string;
   enabledRegistrars: string[];
+  sedoTemplatePath: string;
+  dnsNsServer: string;
   version: string;
   /** Raw env (strings only). Read secrets from here; never log it. */
   env: Readonly<Record<string, string>>;
@@ -68,6 +72,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     host: e.HOST,
     logLevel: e.LOG_LEVEL,
     enabledRegistrars,
+    sedoTemplatePath: e.SEDO_TEMPLATE_PATH,
+    dnsNsServer: e.DNS_NS_SERVER,
     version: readVersion(),
     env: Object.freeze(strings),
     secretValues,

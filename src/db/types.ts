@@ -76,6 +76,7 @@ export interface DomainsTable {
   ns_verified_at: Timestamp | null;
   registrar_api: RegistrarApi | null;
   sold_at: Timestamp | null;
+  delisted_at: Timestamp | null;
   created_at: TimestampDefault;
   updated_at: TimestampDefault;
 }
@@ -192,6 +193,13 @@ export interface IdempotencyKeysTable {
   completed_at: Timestamp | null;
 }
 
+export interface ExportRunsTable {
+  id: Generated<number>;
+  marketplace: 'afternic' | 'sedo';
+  at: TimestampDefault;
+  domains: string[];
+}
+
 export interface Database {
   api_tokens: ApiTokensTable;
   settings: SettingsTable;
@@ -204,6 +212,7 @@ export interface Database {
   receipts: ReceiptsTable;
   audit_log: AuditLogTable;
   idempotency_keys: IdempotencyKeysTable;
+  export_runs: ExportRunsTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

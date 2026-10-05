@@ -12,6 +12,12 @@ describe('loadConfig', () => {
     expect(c.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
+  it('defaults sedoTemplatePath and dnsNsServer', () => {
+    const c = loadConfig(testEnv());
+    expect(c.sedoTemplatePath).toBe('templates/sedo_template.json');
+    expect(c.dnsNsServer).toBe('192.5.6.30');
+  });
+
   it('PORKBUN_BASE_URL must be https outside test', () => {
     expect(() => loadConfig(testEnv({ APP_ENV: 'development', PORKBUN_BASE_URL: 'http://evil.example' }))).toThrow(
       'Invalid environment: PORKBUN_BASE_URL must be https');

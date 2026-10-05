@@ -6,7 +6,7 @@ import { TEST_DATABASE_URL } from './env.js';
 export const testDb: Kysely<Database> = createDb(TEST_DATABASE_URL);
 
 const TABLES = [
-  'idempotency_keys', 'audit_log', 'receipts', 'purchases', 'quotes', 'listing_history',
+  'export_runs', 'idempotency_keys', 'audit_log', 'receipts', 'purchases', 'quotes', 'listing_history',
   'ledger_entries', 'domains', 'deals', 'api_tokens',
 ];
 
