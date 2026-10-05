@@ -25,8 +25,9 @@ The per-endpoint test IDs live in each spec: `check.md` CK-*, `buy.md` B-*, `lis
 | ID | Case | Pass | Fail |
 |---|---|---|---|
 | AU-1 | No or a bad `Authorization` on every endpoint except `/health/ping` (`/health` and unknown routes included; Dvir, 6 Oct 2026: bots are the only customers) | 401 for all, and the `audit_log` and `idempotency_keys` row counts are unchanged | Any 2xx, or any DB write |
-| AU-10 | A valid token with the wrong scope (403) | Still audited (it is a bot) | No audit row |
-| AU-11 | 21st failed auth from one IP within 10 min (Dvir, 6 Oct 2026) | 429 `RATE_LIMITED`, no token lookup, no DB access; another IP unaffected; the window rolls | Lookup or write on a blocked IP |
+| AU-11 | 21st failed auth from one IP within 10 min (Dvir, 6 Oct 2026); the IP is the right-most `X-Forwarded-For` entry (one trusted hop) | 429 `RATE_LIMITED` with `Retry-After`, zero DB access (builders and executor spied); another IP unaffected; the window rolls | Lookup or write on a blocked IP, or the limiter keyed on a forgeable header entry |
+| AU-12 | Blocked IP: a bot token verified in the last 10 min; a never-seen valid token; the correct and a wrong job token; a cached token revoked meanwhile; a revoked token on the normal path | Cached token passes only through the normal DB lookup; unseen → 429; correct job token → 200, wrong → 429; revoked while blocked → 429; revoked normal path → 401 at once | A cache hit that authenticates without the lookup (revocation bypass) |
+| AU-13 | A valid token with the wrong scope (403) | Still audited (it is a bot) | No audit row |
 | AU-2 | Malformed / unknown token | 401 | Other |
 | AU-3 | READ token on `POST /buy`, `/list/x`, `/sold/x` | 403 `SCOPE_FORBIDDEN`, audit row written, **zero** registrar calls | Executed |
 | AU-4 | READ token on every GET | 200 | Other |
@@ -69,7 +70,7 @@ The per-endpoint test IDs live in each spec: `check.md` CK-*, `buy.md` B-*, `lis
 
 | ID | Case | Pass | Fail |
 |---|---|---|---|
-| AL-1 | Every authenticated POST in the G1 suite (Dvir, 6 Oct 2026: unauthenticated requests write nothing) | Exactly one `audit_log` row per request, including a valid token's 4xx | Missing or duplicate |
+| AL-1 | Every authenticated POST in the G1 suite (Dvir, 6 Oct 2026: unauthenticated requests write nothing) | Exactly one `audit_log` row per request, including a valid-token POST 4xx; framework errors (answered before auth) write nothing, token or not | Missing or duplicate |
 | AL-2 | `UPDATE`/`DELETE` on `ledger_entries` and `audit_log` | DB error | Succeeds |
 | AL-3 | Audit row content | Scope, token id, `approval_text`, `approval_at`, status code; no secrets | Missing field or secret |
 

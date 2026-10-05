@@ -83,7 +83,7 @@ function sameSecret(a: string, b: string): boolean {
 const CACHE_TTL_MS = 10 * 60_000;
 const CACHE_MAX = 100;
 
-/** Recently verified bot credentials (sha256 -> auth). Consulted ONLY while the caller's IP is blocked, so a wrong IP derivation can't lock the bots out; normal requests always hit the DB (revocation is immediate). */
+/** Recently verified bot credentials (sha256 -> auth). Consulted ONLY while the caller's IP is blocked, and a hit only permits the normal DB lookup (so revocation always bites); it never authenticates by itself. */
 class RecentCredentials {
   private readonly m = new Map<string, { auth: AuthContext; at: number }>();
   constructor(private readonly now: () => number) {}
@@ -106,37 +106,32 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
   const recent = new RecentCredentials(now);
   app.decorateRequest('auth', null);
   app.decorateRequest('jobAuth', false);
-  app.addHook('onRequest', async (req) => {
+  app.addHook('onRequest', async (req, reply) => {
     const refuse = (): never => {
       failed.fail(req.ip);
       throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
     };
     if (PUBLIC_PATHS.has(pathOf(req.url)) && !isMutating(req.method)) return;
     const wait = failed.blockedFor(req.ip);
-    if (wait > 0) {
-      // Blocked IP: only a correct job token (constant-time compare, no DB) or a recently verified bot token passes.
-      const bm = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '');
-      if (bm?.[1]) {
-        if (isJobRoute(req) && req.method === 'POST') {
-          if (jobTriggerToken && sameSecret(bm[1], jobTriggerToken)) { req.jobAuth = true; return; }
-        } else {
-          const cached = recent.get(hashToken(bm[1]));
-          if (cached) { req.auth = cached; return; }
-        }
-      }
+    const tooMany = (): never => {
+      reply.header('retry-after', String(wait));
       throw new AppError(429, 'RATE_LIMITED', 'Too many failed authentication attempts', { retry_after_seconds: wait });
-    }
-    if (isJobRoute(req) && req.method === 'POST') {
-      // Dedicated bearer, never a READ/WRITE API token.
+    };
+    const jobRoute = isJobRoute(req) && req.method === 'POST';
+    if (jobRoute) {
+      // Dedicated bearer, never a READ/WRITE API token. A constant-time compare needs no DB, so the correct one passes even a blocked IP.
+      if (wait > 0 && !jobTriggerToken) return tooMany();
       if (!jobTriggerToken) throw new AppError(503, 'JOBS_DISABLED', 'The job endpoint is not configured');
       const jm = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '');
-      if (!jm?.[1] || !sameSecret(jm[1], jobTriggerToken)) return refuse();
+      if (!jm?.[1] || !sameSecret(jm[1], jobTriggerToken)) return wait > 0 ? tooMany() : refuse();
       req.jobAuth = true;
       return;
     }
     const m = BEARER.exec(req.headers.authorization ?? '');
-    if (!m?.[1]) return refuse();
-    const hash = hashToken(m[1]);
+    const hash = m?.[1] ? hashToken(m[1]) : null;
+    // Blocked IP: only a recently verified token may proceed, and only to the normal DB lookup (revocation still bites).
+    if (wait > 0 && (!hash || !recent.get(hash))) return tooMany();
+    if (!hash) return refuse();
     const row = await db
       .updateTable('api_tokens')
       .set({ last_used_at: new Date() })
@@ -146,7 +141,7 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
       .executeTakeFirst();
     if (!row) {
       recent.drop(hash);
-      return refuse();
+      return wait > 0 ? tooMany() : refuse();
     }
     req.auth = { tokenId: row.id, scope: row.scope, name: row.name };
     recent.set(hash, req.auth);
