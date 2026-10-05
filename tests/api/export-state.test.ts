@@ -37,6 +37,19 @@ describe('pendingDomains', () => {
   });
 });
 
+describe('pendingDomains edge cases', () => {
+  it('max semantics: older file confirmed last does not re-pend', async () => {
+    await listed('a.com', T(5));
+    await file('afternic', ['a.com'], T(10), T(11));
+    await file('afternic', ['a.com'], T(2), T(30));
+    expect(await pendingDomains(db, 'afternic')).toEqual([]);
+  });
+  it('an owned domain with a recent listing_changed_at is not pending', async () => {
+    await insertOwnedDomain(db, { domain: 'a.com', status: 'owned', listing_changed_at: T(5) });
+    expect(await pendingDomains(db, 'afternic')).toEqual([]);
+  });
+});
+
 describe('manualDelist', () => {
   const gone = (domain: string, status: 'delisted' | 'sold', delistedAt: Date | null) =>
     insertOwnedDomain(db, { domain, status, delisted_at: delistedAt });
@@ -45,6 +58,11 @@ describe('manualDelist', () => {
     await file('afternic', ['a.com'], T(1), T(2));
     expect(await manualDelist(db, 'afternic')).toEqual(['a.com']);
     expect(await manualDelist(db, 'sedo')).toEqual([]);
+  });
+  it('a dropped domain uploaded then delisted_at after is listed', async () => {
+    await insertOwnedDomain(db, { domain: 'a.com', status: 'dropped', delisted_at: T(20) });
+    await file('afternic', ['a.com'], T(1), T(2));
+    expect(await manualDelist(db, 'afternic')).toEqual(['a.com']);
   });
   it('6: gone after a later confirmed upload', async () => {
     await gone('a.com', 'delisted', T(20));

@@ -128,7 +128,7 @@ describe('GET /export/sedo.csv', () => {
     expect(res.statusCode).toBe(200);
     expect(parseCsvStrict(res.body).map((r) => r.join(','))).toEqual([
       'Domain Name,Option,Sale,Price,Min,Cur,Action',
-      'austinroofrepair.com,FIXED,yes,399,,USD,ADD',
+      'austinroofrepair.com,OFFER,yes,399,399,USD,ADD',
       'buzz.com,OFFER,yes,,500,USD,ADD',
       'trendname.com,OFFER,yes,4999,1000,USD,ADD',
     ]);

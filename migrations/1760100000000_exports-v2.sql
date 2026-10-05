@@ -1,17 +1,18 @@
 -- Up Migration
 ALTER TABLE export_runs ADD COLUMN export_id text, ADD COLUMN changed_only boolean NOT NULL DEFAULT false;
 UPDATE export_runs SET export_id = 'exp_legacy_' || id WHERE export_id IS NULL;
-ALTER TABLE export_runs ALTER COLUMN export_id SET NOT NULL, ADD CONSTRAINT export_runs_export_id_key UNIQUE (export_id);
+ALTER TABLE export_runs ALTER COLUMN export_id SET NOT NULL, ADD CONSTRAINT export_runs_export_id_key UNIQUE (export_id), ADD CONSTRAINT export_runs_export_id_marketplace_key UNIQUE (export_id, marketplace);
 
 CREATE TABLE export_uploads (
   id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   venue         text NOT NULL CHECK (venue IN ('afternic', 'sedo')),
-  export_id     text NOT NULL UNIQUE REFERENCES export_runs (export_id),
+  export_id     text NOT NULL UNIQUE,
   domains       text[] NOT NULL,
   uploaded_at   timestamptz NOT NULL,
   approval_text text NOT NULL CHECK (length(trim(approval_text)) > 0),
   audit_id      text,
-  created_at    timestamptz NOT NULL DEFAULT now()
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT export_uploads_run_fk FOREIGN KEY (export_id, venue) REFERENCES export_runs (export_id, marketplace)
 );
 CREATE INDEX export_uploads_venue_at ON export_uploads (venue, uploaded_at);
 CREATE TRIGGER export_uploads_append_only BEFORE UPDATE OR DELETE ON export_uploads FOR EACH ROW EXECUTE FUNCTION reject_mutation();
@@ -34,4 +35,4 @@ ALTER TABLE audit_log DROP CONSTRAINT audit_log_scope_check;
 ALTER TABLE audit_log ADD CONSTRAINT audit_log_scope_check CHECK (scope IN ('read', 'write', 'admin'));
 ALTER TABLE domains DROP COLUMN listing_changed_at;
 DROP TABLE export_uploads;
-ALTER TABLE export_runs DROP CONSTRAINT export_runs_export_id_key, DROP COLUMN changed_only, DROP COLUMN export_id;
+ALTER TABLE export_runs DROP CONSTRAINT export_runs_export_id_marketplace_key, DROP CONSTRAINT export_runs_export_id_key, DROP COLUMN changed_only, DROP COLUMN export_id;

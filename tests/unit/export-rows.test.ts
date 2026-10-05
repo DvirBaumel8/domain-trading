@@ -54,10 +54,10 @@ const T: SedoTemplate = {
 };
 
 describe('Sedo rows (LX-5)', () => {
-  it('bin → fixed + price + no min', () => expect(sedoRow(d({}), T, 'buy_now')).toEqual(['example.com', 'FIXED', 'yes', '399', '', 'USD', 'ADD', '']));
+  it('bin (geo) → make offer, price = BIN, min = BIN', () => expect(sedoRow(d({}), T, 'make_offer')).toEqual(['example.com', 'OFFER', 'yes', '399', '399', 'USD', 'ADD', '']));
   it('offer → make offer + min, no price', () =>
     expect(sedoRow(d({ listing_mode: 'offer', bin_cents: null, floor_cents: null, min_offer_cents: 50000 }), T, 'buy_now')).toEqual(['example.com', 'OFFER', 'yes', '', '500', 'USD', 'ADD', '']));
-  it('hybrid default (buy_now) → fixed + BIN + no min', () =>
+  it('hybrid with sedo_hybrid_as buy_now → fixed + BIN + no min', () =>
     expect(sedoRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 95000, min_offer_cents: 95000 }), T, 'buy_now')).toEqual(['example.com', 'FIXED', 'yes', '1995', '', 'USD', 'ADD', '']));
   it('hybrid make_offer → make offer + price expectation + min', () =>
     expect(sedoRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 95000, min_offer_cents: 95000 }), T, 'make_offer')).toEqual(['example.com', 'OFFER', 'yes', '1995', '950', 'USD', 'ADD', '']));

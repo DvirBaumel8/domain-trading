@@ -1,4 +1,3 @@
-import { changedColumns } from './export-state.js';
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import type { Category, Database } from '../db/types.js';
@@ -9,6 +8,7 @@ import { formatUsd } from '../money.js';
 import type { RdapFn } from '../rdap.js';
 import { RegistrarError, type AccountState, type DomainInfo, type RegisterSuccess, type RegistrarAdapter } from '../registrars/types.js';
 import { checkApproval } from './approval.js';
+import { changedColumns } from './export-state.js';
 import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
 import { landerNameservers, sameNsSet } from './lander.js';
 import { activeDomainCount, spentAndPending, spentCents } from './budget.js';

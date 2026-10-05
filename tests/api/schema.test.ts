@@ -72,6 +72,12 @@ describe('schema: export_uploads and job scope (migration 6)', () => {
       venue: 'afternic', export_id: 'exp_1', domains: [], uploaded_at: new Date(), approval_text: 'again', audit_id: null,
     }).execute()).rejects.toThrow(/export_uploads_export_id_key/);
   });
+  it('an upload whose venue differs from the run marketplace is rejected', async () => {
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [], export_id: 'exp_v' }).execute();
+    await expect(db.insertInto('export_uploads').values({
+      venue: 'sedo', export_id: 'exp_v', domains: [], uploaded_at: new Date(), approval_text: 'x', audit_id: null,
+    }).execute()).rejects.toThrow(/export_uploads_run_fk/);
+  });
   it('audit scope job is accepted', async () => {
     await db.insertInto('audit_log').values({ id: 'aud_' + '1'.repeat(32), method: 'JOB', path: '/job/price', status_code: 200, scope: 'job' }).execute();
   });
@@ -178,6 +184,11 @@ describe('schema: settings', () => {
       sedo_hybrid_as: 'make_offer',
     });
     for (const k of ['geo_bin_min_cents', 'geo_bin_max_cents', 'high_value_categories', 'high_value_guard_modes']) expect(rows[0]).not.toHaveProperty(k);
+  });
+
+  it('sedo_hybrid_as column default is make_offer', async () => {
+    const r = await sql<{ column_default: string }>`select column_default from information_schema.columns where table_name = 'settings' and column_name = 'sedo_hybrid_as'`.execute(db);
+    expect(r.rows[0]!.column_default).toContain('make_offer');
   });
 
   it('a second settings row is impossible', async () => {

@@ -1,4 +1,3 @@
-import { changedColumns } from './export-state.js';
 import type { Kysely } from 'kysely';
 import type { Config } from '../config.js';
 import type { Category, Database, DomainRow } from '../db/types.js';
@@ -6,6 +5,7 @@ import type { NsLookup } from '../dns/ns-lookup.js';
 import { AppError } from '../http/errors.js';
 import { RegistrarError, type RegistrarAdapter } from '../registrars/types.js';
 import { checkApproval } from './approval.js';
+import { changedColumns } from './export-state.js';
 import { afternicRow, loadSedoTemplate, sedoRow, type ExportDomain } from './export.js';
 import { landerNameservers, sameNsSet } from './lander.js';
 import { jerusalemDate } from '../dates.js';

@@ -86,13 +86,13 @@ export async function loadSedoTemplate(path: string): Promise<SedoTemplate | nul
 
 export function sedoRow(d: ExportDomain, t: SedoTemplate, hybridAs: 'buy_now' | 'make_offer'): string[] {
   const round = { dropped: false };
-  const fixed = d.listing_mode === 'bin' || (d.listing_mode === 'hybrid' && hybridAs === 'buy_now');
+  const fixed = d.listing_mode === 'hybrid' && hybridAs === 'buy_now';
   const fields: Record<keyof SedoTemplate['map'], string> = {
     domain: d.domain,
     selling_option: fixed ? t.values.buy_now : t.values.make_offer,
     for_sale: t.values.for_sale_yes,
     price: d.listing_mode === 'offer' ? '' : usd(d.bin_cents, round),
-    min_price: fixed ? '' : usd(d.min_offer_cents, round),
+    min_price: fixed ? '' : usd(d.listing_mode === 'bin' ? d.bin_cents : d.min_offer_cents, round),
     currency: t.values.usd,
     action: t.values.action_add,
   };
@@ -110,9 +110,9 @@ const SAFE_DOMAIN = /^[a-z0-9.-]+$/;
 
 /** True when Sedo's integer-USD cells drop cents for this domain. */
 function sedoDropsCents(d: ExportDomain, hybridAs: 'buy_now' | 'make_offer'): boolean {
-  const fixed = d.listing_mode === 'bin' || (d.listing_mode === 'hybrid' && hybridAs === 'buy_now');
+  const fixed = d.listing_mode === 'hybrid' && hybridAs === 'buy_now';
   const priceCents = d.listing_mode === 'offer' ? null : d.bin_cents;
-  const minCents = fixed ? null : d.min_offer_cents;
+  const minCents = fixed ? null : d.listing_mode === 'bin' ? d.bin_cents : d.min_offer_cents;
   return [priceCents, minCents].some((c) => c !== null && c % 100 !== 0);
 }
 
