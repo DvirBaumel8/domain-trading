@@ -39,11 +39,14 @@ export function rowValid(row: Pick<Row, 'bin_cents' | 'floor_cents' | 'walkaway_
   return `mode ${mode ?? 'none'} cannot take scheduled prices`;
 }
 
+type Partial_ = Omit<PriceJobResult, 'today' | 'dryRun' | 'skipped'>;
+const emptyPartial = (): Partial_ => ({ applied: [], superseded: [], failed: [], held: [], delisted: [], cancelled: [] });
+
 export class PriceScheduleJob {
   private running = false;
 
   constructor(private readonly deps: {
-    db: Kysely<Database>; now: () => number;
+    db: Kysely<Database>; now: () => number; lockTimeoutMs?: number;
     log?: { warn(o: object, m: string): void; error(o: object, m: string): void };
   }) {}
 
@@ -51,7 +54,7 @@ export class PriceScheduleJob {
     const today = opts.today ?? jerusalemDate(new Date(this.deps.now()));
     if (!DATE.test(today)) throw new Error(`today must be YYYY-MM-DD, got ${today}`);
     const dryRun = opts.dryRun ?? false;
-    const out: PriceJobResult = { today, dryRun, skipped: false, applied: [], superseded: [], failed: [], held: [], delisted: [], cancelled: [] };
+    const out: PriceJobResult = { today, dryRun, skipped: false, ...emptyPartial() };
     if (this.running) return { ...out, skipped: true };
     this.running = true;
     try {
@@ -60,11 +63,27 @@ export class PriceScheduleJob {
         .where('price_schedule.status', '=', 'planned').where('price_schedule.due_on', '<=', today).orderBy('domains.domain').execute();
       for (const d of doms) {
         try {
-          if (dryRun) await this.processDomain(this.deps.db, d.id, d.domain, today, true, out);
-          else await withDomainLock(this.deps.db, d.domain, (conn) => conn.transaction().execute((trx) => this.processDomain(trx, d.id, d.domain, today, false, out)));
+          const part = dryRun
+            ? await this.processDomain(this.deps.db, d.id, d.domain, today, true)
+            : await withDomainLock(this.deps.db, d.domain, (conn) => conn.transaction().execute((trx) => this.processDomain(trx, d.id, d.domain, today, false)),
+              { timeoutMs: this.deps.lockTimeoutMs });
+          // merged only after the transaction committed
+          out.applied.push(...part.applied); out.superseded.push(...part.superseded); out.failed.push(...part.failed);
+          out.held.push(...part.held); out.delisted.push(...part.delisted); out.cancelled.push(...part.cancelled);
         } catch (e) {
-          this.deps.log?.error({ domain: d.domain, errMessage: (e as Error).message }, 'price job failed for domain');
+          const message = (e as Error).message;
+          this.deps.log?.error({ domain: d.domain, errMessage: message }, 'price job failed for domain');
           out.failed.push({ domain: d.domain, rowId: 0, reason: 'error' });
+          if (!dryRun) {
+            try {
+              await this.deps.db.insertInto('audit_log').values({
+                id: newAuditId(), scope: 'job', method: 'JOB', path: 'price-schedule',
+                request: JSON.stringify({ domain: d.domain, today }), status_code: 500, result_summary: `error: ${message}`,
+              }).execute();
+            } catch (ae) {
+              this.deps.log?.error({ domain: d.domain, errMessage: (ae as Error).message }, 'price job error audit failed');
+            }
+          }
         }
       }
       return out;
@@ -73,15 +92,14 @@ export class PriceScheduleJob {
     }
   }
 
-  private async processDomain(q: Q, domainId: number, domain: string, today: string, dry: boolean, out: PriceJobResult): Promise<void> {
+  private async processDomain(q: Q, domainId: number, domain: string, today: string, dry: boolean): Promise<Partial_> {
     const now = new Date(this.deps.now());
     let base = q.selectFrom('domains').selectAll().where('id', '=', domainId);
     if (!dry) base = base.forUpdate();
     const cur: DomainRow | undefined = await base.executeTakeFirst();
-    if (!cur) return;
+    const res = emptyPartial();
+    if (!cur) return res;
     const planned = await q.selectFrom('price_schedule').selectAll().where('domain_id', '=', domainId).where('status', '=', 'planned').orderBy('due_on').orderBy('id').execute();
-    // Collect results locally so a rolled-back transaction leaves `out` untouched.
-    const res: PriceJobResult = { ...out, applied: [], superseded: [], failed: [], held: [], delisted: [], cancelled: [] };
     const setStatus = async (ids: number[], status: Row['status'], note?: string) => {
       if (dry || ids.length === 0) return;
       await q.updateTable('price_schedule').set({ status, updated_at: now, ...(note !== undefined ? { note } : {}) }).where('id', 'in', ids).execute();
@@ -93,28 +111,25 @@ export class PriceScheduleJob {
         request: JSON.stringify({ domain, event, row_id: rowId, today }), status_code: code, result_summary: summary,
       }).execute();
     };
-    const finish = () => {
-      out.applied.push(...res.applied); out.superseded.push(...res.superseded); out.failed.push(...res.failed);
-      out.held.push(...res.held); out.delisted.push(...res.delisted); out.cancelled.push(...res.cancelled);
-    };
 
     // other plans' planned rows should not exist; retire them
     const stray = planned.filter((r) => r.plan_id !== cur.plan_id && r.due_on <= today).map((r) => r.id);
     await setStatus(stray, 'superseded');
     res.superseded.push(...stray);
+    const strayIds = new Set(stray);
 
     if (cur.status === 'sold' || cur.status === 'dropped') {
-      const ids = planned.map((r) => r.id);
+      const ids = planned.filter((r) => !strayIds.has(r.id)).map((r) => r.id);
       await setStatus(ids, 'cancelled');
       res.cancelled.push(...ids);
-      return finish();
+      return res;
     }
-    if (cur.status !== 'listed') return finish();
+    if (cur.status !== 'listed') return res;
 
     const due = planned.filter((r) => r.plan_id === cur.plan_id && r.due_on <= today);
     const delist = due.find((r) => r.event === 'delist');
     if (delist) {
-      const others = planned.filter((r) => r.id !== delist.id).map((r) => r.id);
+      const others = planned.filter((r) => r.id !== delist.id && !strayIds.has(r.id)).map((r) => r.id);
       if (!dry) {
         await q.updateTable('domains').set({ status: 'delisted', delisted_at: now, updated_at: now, ...changedColumns(cur, now) }).where('id', '=', domainId).execute();
         const h = await q.insertInto('listing_history').values({
@@ -129,28 +144,35 @@ export class PriceScheduleJob {
       await audit('delist', delist.id, 'delist delisted');
       res.delisted.push(domain);
       res.cancelled.push(...others);
-      return finish();
+      return res;
     }
-    if (due.length === 0) return finish();
+    if (due.length === 0) return res;
     if (cur.pricing_hold) {
       res.held.push(domain);
-      return finish();
+      return res;
     }
 
-    const last = due[due.length - 1]!;
-    const earlier = due.slice(0, -1).map((r) => r.id);
-    await setStatus(earlier, 'superseded');
-    res.superseded.push(...earlier);
-
-    const settings = await settingsByVersion(this.deps.db, last.settings_version);
-    const reason = settings ? rowValid(last, settings, cur.listing_mode) : `pricing settings v${last.settings_version} not found`;
-    if (reason) {
-      await setStatus([last.id], 'failed', reason);
-      await audit(last.event, last.id, reason, 422);
-      res.failed.push({ domain, rowId: last.id, reason });
-      this.deps.log?.warn({ domain, rowId: last.id, reason }, 'price schedule row failed validation');
-      return finish();
+    // newest to oldest: invalid rows fail, the newest valid row applies, older rows are superseded
+    let chosen: Row | null = null;
+    const olderIdx: number[] = [];
+    for (let i = due.length - 1; i >= 0; i--) {
+      const row = due[i]!;
+      if (chosen) { olderIdx.push(row.id); continue; }
+      const settings = await settingsByVersion(q, row.settings_version);
+      const reason = settings ? rowValid(row, settings, cur.listing_mode) : `pricing settings v${row.settings_version} not found`;
+      if (reason) {
+        await setStatus([row.id], 'failed', reason);
+        await audit(row.event, row.id, reason, 422);
+        res.failed.push({ domain, rowId: row.id, reason });
+        this.deps.log?.warn({ domain, rowId: row.id, reason }, 'price schedule row failed validation');
+      } else {
+        chosen = row;
+      }
     }
+    await setStatus(olderIdx, 'superseded');
+    res.superseded.push(...olderIdx);
+    if (!chosen) return res;
+    const last = chosen;
     if (!dry) {
       await q.updateTable('domains').set({
         bin_cents: last.bin_cents, floor_cents: last.floor_cents, walkaway_cents: last.walkaway_cents,
@@ -168,6 +190,6 @@ export class PriceScheduleJob {
     }
     await audit(last.event, last.id, `${last.event} applied`);
     res.applied.push({ domain, event: last.event, rowId: last.id, bin_cents: last.bin_cents, floor_cents: last.floor_cents, walkaway_cents: last.walkaway_cents });
-    finish();
+    return res;
   }
 }

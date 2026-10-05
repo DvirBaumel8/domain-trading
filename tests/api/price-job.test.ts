@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { withDomainLock } from '../../src/services/plan-store.js';
 import { PriceScheduleJob } from '../../src/jobs/price-schedule.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
@@ -88,7 +89,10 @@ describe('daily price job', () => {
     expect(r1.applied).toEqual([]);
     expect(r1.held).toEqual([D]);
     expect((await sched()).every((r) => r.status === 'planned')).toBe(true);
-    expect((await job().runOnce({ today: '2028-04-20' })).applied).toEqual([]);
+    const r3 = await job().runOnce({ today: '2028-04-20' });
+    expect(r3.applied).toEqual([]);
+    expect(r3.held).toEqual([D]);
+    expect((await sched()).every((r) => r.status === 'planned')).toBe(true);
     expect((await list({ pricing_hold: false, approval_ref: approval() })).statusCode).toBe(200);
     const r2 = await job().runOnce({ today: '2028-04-20' });
     expect(r2.applied.map((a) => a.event)).toEqual(['drop2_m18']);
@@ -153,6 +157,7 @@ describe('daily price job', () => {
     expect((await hist())[0]!.approval_text).toBeNull();
     const res = await list({ mode: 'hybrid', bin: 2495 });
     expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe('APPROVAL_REQUIRED');
   });
 
   it('dry run reports but writes nothing', async () => {
@@ -172,5 +177,95 @@ describe('daily price job', () => {
     const r = await job().runOnce({ today: '2027-10-12' });
     expect(r.applied.map((a) => a.event)).toEqual(['geo_drop_m12']);
     expect(await dom()).toMatchObject({ bin_cents: 39900, floor_cents: 39900, walkaway_cents: 39900, min_offer_cents: 39900 });
+  });
+
+  it('fallback: invalid newest due row fails, the newest valid row applies', async () => {
+    const { list } = await setup();
+    await list({ pricing_hold: true, pricing_hold_reason: 'talks', approval_ref: approval() });
+    await job().runOnce({ today: '2028-04-20' });
+    await list({ pricing_hold: false, approval_ref: approval() });
+    await db.updateTable('price_schedule').set({ floor_cents: 70000, walkaway_cents: 60000 }).where('event', '=', 'drop2_m18').execute();
+    const r = await job().runOnce({ today: '2028-04-20' });
+    expect(r.failed).toHaveLength(1);
+    expect(r.applied.map((a) => a.event)).toEqual(['drop1_m6']);
+    expect(triple(await dom())).toEqual([159500, 103500, 77000]);
+    const rows = await sched();
+    expect(rows.find((x) => x.event === 'drop2_m18')!.status).toBe('failed');
+    expect(rows.find((x) => x.event === 'drop1_m6')!.status).toBe('applied');
+    expect(await hist()).toHaveLength(1);
+    expect((await jobAudits()).map((a) => a.status_code).sort()).toEqual([200, 422]);
+  });
+
+  it('no valid due row: every due row fails and nothing applies', async () => {
+    await setup();
+    await db.updateTable('price_schedule').set({ floor_cents: 70000, walkaway_cents: 60000 }).where('event', '=', 'drop1_m6').execute();
+    const r = await job().runOnce({ today: '2027-04-12' });
+    expect(r.applied).toEqual([]);
+    expect(r.failed).toHaveLength(1);
+  });
+
+  it('per-domain isolation: a locked domain errors with a 500 audit row; the other domain applies', async () => {
+    const { list } = await setup();
+    const E = 'examplecityplumbing.com';
+    await insertOwnedDomain(db, { domain: E, category: 'trend', price_grade: null });
+    const { auth } = await issueToken('write');
+    const r0 = await app.inject({ method: 'POST', url: `/list/${E}`, headers: { ...auth, 'idempotency-key': randomUUID() },
+      payload: { mode: 'hybrid', bin: 1995, approval_ref: { text: `yes list ${E}`, approved_at: new Date(NOW - 3_600_000).toISOString() } } });
+    expect(r0.statusCode).toBe(200);
+    void list;
+    const j = new PriceScheduleJob({ db, now: () => NOW, lockTimeoutMs: 100 });
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    let locked!: () => void;
+    const lockedP = new Promise<void>((r) => { locked = r; });
+    const holder = withDomainLock(db, D, async () => { locked(); await held; });
+    await lockedP;
+    const r = await j.runOnce({ today: '2027-04-12' });
+    release();
+    await holder;
+    expect(r.applied.map((a) => a.domain)).toEqual([E]);
+    expect(r.failed).toEqual([{ domain: D, rowId: 0, reason: 'error' }]);
+    const a = (await jobAudits()).filter((x) => x.status_code === 500);
+    expect(a).toHaveLength(1);
+    expect(a[0]!.result_summary).toMatch(/^error: /);
+    expect(triple(await dom())).toEqual([199500, 129500, 96000]);
+  });
+
+  it('stray other-plan planned row is superseded and reported once', async () => {
+    await setup();
+    const d = await dom();
+    await db.insertInto('price_schedule').values({ domain_id: d.id, plan_id: 'pl_stray', event: 'drop1_m6', due_on: '2027-04-01', bin_cents: 100000, floor_cents: 80000, walkaway_cents: 60000, settings_version: 2, status: 'planned' }).execute();
+    const r = await job().runOnce({ today: '2027-04-12' });
+    const stray = (await sched()).find((x) => x.plan_id === 'pl_stray')!;
+    expect(stray.status).toBe('superseded');
+    expect(r.superseded.filter((id) => id === stray.id)).toHaveLength(1);
+    expect(r.applied).toHaveLength(1);
+  });
+
+  it('dropped domain: planned rows cancelled', async () => {
+    await setup();
+    await db.updateTable('domains').set({ status: 'dropped' }).where('domain', '=', D).execute();
+    const r = await job().runOnce({ today: '2027-04-12' });
+    expect(r.cancelled).toHaveLength(4);
+    expect((await sched()).every((x) => x.status === 'cancelled')).toBe(true);
+  });
+
+  it('dry run on a due delist reports it and writes nothing', async () => {
+    await setup();
+    const rowsBefore = await sched();
+    const before = await dom();
+    const r = await job().runOnce({ today: '2028-09-27', dryRun: true });
+    expect(r.delisted).toEqual([D]);
+    expect(await dom()).toEqual(before);
+    expect(await sched()).toEqual(rowsBefore);
+    expect(await jobAudits()).toHaveLength(0);
+  });
+
+  it('default today uses the Jerusalem date of now', async () => {
+    await setup();
+    const j = new PriceScheduleJob({ db, now: () => Date.parse('2027-04-11T22:30:00Z') });
+    const r = await j.runOnce();
+    expect(r.today).toBe('2027-04-12');
+    expect(r.applied.map((a) => a.event)).toEqual(['drop1_m6']);
   });
 });
