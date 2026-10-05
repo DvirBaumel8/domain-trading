@@ -17,6 +17,8 @@ const EnvSchema = z.object({
   JOBS_MODE: z.enum(['internal', 'external']).default('internal'),
   JOB_TRIGGER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\S{32,}$/, 'JOB_TRIGGER_TOKEN must be at least 32 non-space characters (openssl rand -hex 32)').optional()),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
+  GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'GITHUB_BACKUP_REPO must be owner/name').optional()),
+  GITHUB_BACKUP_BRANCH: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^[\w./-]+$/, 'GITHUB_BACKUP_BRANCH has invalid characters').default('data-backup')),
 });
 
 export interface Config {
@@ -33,6 +35,8 @@ export interface Config {
   /** Bearer token for POST /jobs/run; undefined → the route answers 503 JOBS_DISABLED. */
   jobTriggerToken: string | undefined;
   databaseSsl: boolean;
+  /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
+  backup: { token: string | undefined; repo: string | undefined; branch: string };
   version: string;
   /** Raw env (strings only). Read secrets from here; never log it. */
   env: Readonly<Record<string, string>>;
@@ -99,6 +103,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     jobsMode: e.JOBS_MODE,
     jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
     databaseSsl: e.DATABASE_SSL === 'true',
+    backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO, branch: e.GITHUB_BACKUP_BRANCH },
     version: readVersion(),
     env: Object.freeze(strings),
     secretValues,

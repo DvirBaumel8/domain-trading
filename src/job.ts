@@ -6,11 +6,15 @@ import { DropJob } from './jobs/drop.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
 import { createAdapters } from './registrars/registry.js';
 import { PriceScheduleJob } from './jobs/price-schedule.js';
+import { BackupExporter } from './jobs/backup-export.js';
+import { importBackup } from './jobs/backup-import.js';
 
 const USAGE = `usage:
   npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]
   npm run job -- drop [--dry-run] [--today YYYY-MM-DD]
-  npm run job -- registrar-check [--dry-run]`;
+  npm run job -- registrar-check [--dry-run]
+  npm run job -- export-backup
+  npm run job -- import-backup <dir containing backup/>`;
 
 class UsageError extends Error {}
 
@@ -20,6 +24,25 @@ async function main(argv: string[]): Promise<number> {
     allowPositionals: true,
     options: { 'dry-run': { type: 'boolean' }, today: { type: 'string' } },
   });
+  const backupCmd = positionals[0] === 'export-backup' || positionals[0] === 'import-backup';
+  if (backupCmd) {
+    if (positionals[0] === 'export-backup' ? positionals.length !== 1 : positionals.length !== 2) throw new UsageError(`wrong arguments for ${positionals[0]}`);
+    if (values['dry-run'] || values.today !== undefined) throw new UsageError('--dry-run and --today do not apply to backup commands');
+    const config = loadConfig(process.env);
+    const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });
+    try {
+      if (positionals[0] === 'import-backup') {
+        console.log(JSON.stringify({ imported: await importBackup(db, positionals[1]!) }, null, 2));
+      } else {
+        // A missing token or repo is a warning and a result of {skipped:true}, never a failure (BK-4).
+        const log = { warn: (m: string) => console.warn(`warning: ${m}`) };
+        console.log(JSON.stringify(await new BackupExporter({ db, config, now: Date.now, log }).runOnce(), null, 2));
+      }
+      return 0;
+    } finally {
+      await db.destroy();
+    }
+  }
   if ((positionals[0] !== 'price-schedule' && positionals[0] !== 'drop' && positionals[0] !== 'registrar-check') || positionals.length > 1) {
     throw new UsageError(`unknown command: ${positionals.join(' ') || '(none)'}`);
   }
