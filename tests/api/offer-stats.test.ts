@@ -85,6 +85,35 @@ describe('offer aggregates', () => {
     expect(p.count_90d).toBe(2);
   });
 
+  it('OF-18: BIN changes between offers; highest_all_pct_of_bin uses the highest offer own bin_cents_at', async () => {
+    const t = await boot('2026-10-12T09:00:00Z');
+    await t.list(D1, { ...d1Plan, display_name: 'PromptInjectionAudit.com' });
+    clock = Date.parse('2027-04-10T09:00:00Z');
+    await t.offer(D1, '1000', '2027-04-09T12:00:00+03:00'); // BIN 1995 at receipt
+    clock = Date.parse('2027-04-12T00:30:00Z');
+    const r = await new PriceScheduleJob({ db, now: () => clock }).runOnce({ today: '2027-04-12' });
+    expect(r.applied).toHaveLength(1);
+    const bin2 = (await db.selectFrom('domains').select('bin_cents').where('domain', '=', D1).executeTakeFirstOrThrow()).bin_cents!;
+    expect(bin2).toBeLessThan(199500);
+    clock = Date.parse('2027-04-20T09:00:00Z');
+    await t.offer(D1, '900', '2027-04-19T12:00:00+03:00'); // lower amount, new BIN
+    const m = await perDomainOffers(db, new Date(clock));
+    expect(m.get(await id(D1))).toMatchObject({ highest_all: { cents: 100000 }, highest_all_pct_of_bin: 0.5013 });
+  });
+
+  it('offers_90d ignores offers on names no longer listed (consistent per-listed-name rate)', async () => {
+    const t = await boot('2026-10-12T09:00:00Z');
+    await t.list(D1, d1Plan);
+    await t.list('kelvinaudit.com', { mode: 'hybrid', bin: 1995 });
+    clock = Date.parse('2026-12-02T09:00:00Z');
+    await t.offer(D1, '450', '2026-11-20T12:00:00+02:00');
+    await t.offer('kelvinaudit.com', '450', '2026-11-20T12:00:00+02:00');
+    await db.updateTable('domains').set({ status: 'delisted', delisted_at: new Date(clock) }).where('domain', '=', 'kelvinaudit.com').execute();
+    const trend = (await offersByStrategy(db, new Date(clock))).find((r) => r.category === 'trend')!;
+    expect(trend).toMatchObject({ names_listed: 1, names_with_offers: 1, offers_90d: 1, offers_per_listed_name_per_month: 0.33 });
+    expect(trend.band_shares.below_walkaway).toBe(1);
+  });
+
   it('OF-19: strategy rows, shares sum to 1, geo separate, group_by=source totals match', async () => {
     const t = await boot('2026-10-12T09:00:00Z');
     await t.list(D1, d1Plan);
@@ -128,7 +157,7 @@ describe('offer aggregates', () => {
     expect((await t.get('/report/offers?group_by=category')).json().rows[0]).toMatchObject({ key: 'trend', count: 2 });
     expect((await t.get('/report/offers?from=2026-11-01&to=2026-11-30')).json().rows[0].count).toBe(1);
     expect((await t.get('/report/offers?from=2026-11-21&to=2026-11-21')).json().rows[0].count).toBe(1);
-    for (const q of ['from=2026-02-30', 'to=yesterday', 'group_by=nope', 'x=1', 'from=2026-12-01&to=2026-11-01']) {
+    for (const q of ['from=2026-02-30', 'from=2026-13-01', 'from=2026-01-32', 'to=2026-00-10', 'to=2026-02-30', 'to=yesterday', 'group_by=nope', 'x=1', 'from=2026-12-01&to=2026-11-01']) {
       const r = await t.get(`/report/offers?${q}`);
       expect(r.statusCode, q).toBe(400);
     }
@@ -162,6 +191,7 @@ describe('walk-away and min-offer guards', () => {
     await t.list(D1, { ...d1Plan, display_name: 'PromptInjectionAudit.com' });
     const job = new PriceScheduleJob({ db, now: () => clock });
     for (const today of ['2027-04-12', '2028-04-12', '2028-07-06']) {
+      clock = Date.parse(`${today}T00:30:00Z`);
       const before = (await db.selectFrom('listing_history').select('id').where('source', '=', 'schedule').execute()).length;
       const r = await job.runOnce({ today });
       expect(r.applied, today).toHaveLength(1);
@@ -180,6 +210,7 @@ describe('walk-away and min-offer guards', () => {
     const t = await boot('2026-10-12T09:00:00Z');
     await t.list('examplecityroofing.com', { mode: 'bin', bin: 499 }, { category: 'geo', price_grade: 'strong' });
     expect((await db.selectFrom('domains').select('min_offer_cents').executeTakeFirstOrThrow()).min_offer_cents).toBe(49900);
+    clock = Date.parse('2027-10-12T00:30:00Z');
     const r = await new PriceScheduleJob({ db, now: () => clock }).runOnce({ today: '2027-10-12' });
     expect(r.applied).toHaveLength(1);
     const d = await db.selectFrom('domains').selectAll().executeTakeFirstOrThrow();

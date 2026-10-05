@@ -37,7 +37,6 @@ const AFTER: Record<string, readonly string[]> = {
 const IMPORT_HEADER: readonly string[] = ['domain', 'amount_usd', 'source', 'received_at', 'buyer_type', 'external_ref', 'outcome', 'note'];
 const IMPORT_OUTCOMES: readonly string[] = ['declined', 'expired', 'withdrawn'];
 const APPROVAL_OUTCOMES: readonly string[] = ['countered', 'accepted', 'sold'];
-const isEmailSource = (s: string) => s === 'email_inbound' || s === 'outbound_reply';
 
 const money = (cents: number | null) => (cents === null ? { cents: null, display: null } : { cents, display: formatUsd(cents) });
 
@@ -293,7 +292,7 @@ export class OffersService {
     }
 
     let approvalText: string | null = null;
-    if ((body.outcome === 'countered' || body.outcome === 'accepted') && (o.routing === 'dvir' || isEmailSource(o.source))) {
+    if ((body.outcome === 'countered' || body.outcome === 'accepted') && o.routing !== 'auto_accept' && o.routing !== 'accept_preapproved') {
       if (!body.approval_ref) throw new AppError(422, 'APPROVAL_REQUIRED', "This outcome needs approval_ref (Dvir's words)");
       const settings = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
       const a = checkApproval(body.approval_ref, d.domain, now, settings.approval_max_age_hours);

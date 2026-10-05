@@ -168,6 +168,21 @@ describe('POST /offers', () => {
 });
 
 describe('POST /offers/{id}/outcome', () => {
+  it('Gate D: accepting a below_walkaway auto_decline offer needs approval; an auto_accept offer does not', async () => {
+    const { w } = await setup();
+    const low = (await post(w, offer({ amount_usd: '150' }))).json();
+    expect([low.band, low.routing]).toEqual(['below_walkaway', 'auto_decline']);
+    const no = await outcome(w, low.id, { outcome: 'accepted' });
+    expect([no.statusCode, no.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
+    const noC = await outcome(w, low.id, { outcome: 'countered' });
+    expect([noC.statusCode, noC.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
+    const ok = await outcome(w, low.id, { outcome: 'accepted', approval_ref: approval(T) });
+    expect(ok.statusCode, ok.body).toBe(200);
+    const auto = (await post(w, offer({ amount_usd: '1295' }))).json();
+    expect(auto.routing).toBe('auto_accept');
+    expect((await outcome(w, auto.id, { outcome: 'accepted' })).statusCode).toBe(200);
+  });
+
   it('OF-12: approvals, audit rows, finality, sold mismatch', async () => {
     const { w } = await setup();
     const mid = (await post(w, offer({ amount_usd: '1000' }))).json().id as number;
@@ -313,7 +328,8 @@ describe('fix round 1', () => {
     const res = await app.inject({ method: 'GET', url: '/offers?from=2026-11-20&to=2026-11-20', headers: r });
     expect(res.json().offers.map((o: { id: number }) => o.id)).toEqual([a]);
     expect(res.json().truncated).toBe(false);
-    for (const q of ['from=2026-11-21&to=2026-11-20', 'from=2026-11-21T00:00:00Z&to=2026-11-20T00:00:00Z']) {
+    for (const q of ['from=2026-11-21&to=2026-11-20', 'from=2026-11-21T00:00:00Z&to=2026-11-20T00:00:00Z',
+      'from=2026-13-01', 'from=2026-01-32', 'to=2026-00-10', 'to=2026-02-30', 'from=2026-02-30T10:00:00%2B02:00']) {
       const bad = await app.inject({ method: 'GET', url: `/offers?${q}`, headers: r });
       expect([bad.statusCode, bad.json().error.code]).toEqual([400, 'VALIDATION_ERROR']);
     }

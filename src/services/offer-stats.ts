@@ -96,6 +96,10 @@ export async function perDomainOffers(db: Kysely<Database>, now: Date): Promise<
   return out;
 }
 
+/**
+ * Per category. offers_90d and names_with_offers count only names currently `listed` (same set as names_listed, so the
+ * per-listed-name rate is consistent); median/max/band shares are all-time over every offer of the category.
+ */
 export async function offersByStrategy(db: Kysely<Database>, now: Date): Promise<StrategyRow[]> {
   const s90 = await idtDayStart(db, jerusalemDate(now), -89);
   const offers = await loadOffers(db);
@@ -106,10 +110,12 @@ export async function offersByStrategy(db: Kysely<Database>, now: Date): Promise
     const all = offers.filter((o) => (o.category ?? 'other') === category);
     const r90 = all.filter((o) => o.received_at >= s90);
     const ids = new Set(names.map((d) => d.id));
-    const withOffers = new Set(r90.filter((o) => ids.has(o.domain_id)).map((o) => o.domain_id)).size;
+    const r90L = r90.filter((o) => ids.has(o.domain_id));
+    const r90Listed = r90L.length;
+    const withOffers = new Set(r90L.map((o) => o.domain_id)).size;
     return {
-      category, strategy: STRATEGY[category] ?? 'S7', names_listed: names.length, names_with_offers: withOffers, offers_90d: r90.length,
-      offers_per_listed_name_per_month: names.length ? round(r90.length / names.length / 3, 2) : 0,
+      category, strategy: STRATEGY[category] ?? 'S7', names_listed: names.length, names_with_offers: withOffers, offers_90d: r90Listed,
+      offers_per_listed_name_per_month: names.length ? round(r90Listed / names.length / 3, 2) : 0,
       median_offer_pct_of_bin: medianPct(all), max_offer_pct_of_bin: maxPct(all), band_shares: bandShares(all),
     };
   });
