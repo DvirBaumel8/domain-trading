@@ -18,7 +18,7 @@ Every money field appears twice: in cents (`*_cents`) and as a display string ("
 | `offers_by_strategy` | One row per category/strategy: `names_listed`, `names_with_offers`, `offers_90d`, `offers_per_listed_name_per_month`, `median_offer_pct_of_bin`, `max_offer_pct_of_bin`, share per band (`listing-strategy.md` §10.11). The demand signal for the quarterly review |
 | `payouts_pending` | Sold domains whose `payouts` row has `received_on` null: domain, venue, amount, fee, method, `sold_at`, `days_pending` (IDT days since `sold_at`). Payouts add **no** ledger money, so `sales`, `profit` and `roi` are unchanged (R-1, R-2) |
 | `applied_7d` | Price events the job applied in the last 7 days, with old → new values and whether the export is still pending upload |
-| `warnings` | `PAYOUT_OVERDUE` (a pending payout older than 30 days); NS not on the configured lander (public-DNS check); listed without a category; `RENEWAL_PRICE_UNKNOWN` (imports); a hybrid/offer listing with a floor below the BIN (`FLOOR_AUTO_ACCEPT` reminder); BIN missing; Afternic export older than 7 days while listings changed; purchases in `unknown` state; domains past `drop_date` still `owned` (→ mark as `dropped`); missing receipts; registrar balance below `$15` (if known); **`EXPORT_PENDING`** (marketplace price stale since a change; error level after 7 days); **`PRICE_EVENT_FAILED`**; a `pricing_hold` older than 30 days; `PRICING_EXCEPTION` (plan differs from the formula; informational); `OFFER_NEEDS_DVIR` (a mid-range or email offer open > 48 h) |
+| `warnings` | `SALE_UNCONFIRMED` (**information only**: each `sales` row with `confirmed = false`: domain, venue, `transaction_ref`, evidence source + ref, `recorded_by`, `sold_at`); `DOMAIN_LEFT_ACCOUNT` (the daily registrar check below found a name gone from the account with no recorded sale); `PAYOUT_OVERDUE` (a pending payout older than 30 days); NS not on the configured lander (public-DNS check); listed without a category; `RENEWAL_PRICE_UNKNOWN` (imports); a hybrid/offer listing with a floor below the BIN (`FLOOR_AUTO_ACCEPT` reminder); BIN missing; Afternic export older than 7 days while listings changed; purchases in `unknown` state; domains past `drop_date` still `owned` (→ mark as `dropped`); missing receipts; registrar balance below `$15` (if known); **`EXPORT_PENDING`** (marketplace price stale since a change; error level after 7 days); **`PRICE_EVENT_FAILED`**; a `pricing_hold` older than 30 days; `PRICING_EXCEPTION` (plan differs from the formula; informational); `OFFER_NEEDS_DVIR` (a mid-range or email offer open > 48 h) |
 
 ## Other GETs
 
@@ -77,6 +77,12 @@ D-001 (promptinjectionaudit.com) was bought **by hand at GoDaddy** (not Porkbun)
 | IM-9 | Import without `--category` / with a listing that breaks a guard | Refused (`CATEGORY_REQUIRED` / guard code) | Imported |
 | IM-10 | Import counts toward the caps | After the import, `/report` spend and domain count include D-001; a `/buy` over the remaining cap is refused | Not counted |
 | IM-11 | GoDaddy adapter never registers | Static test: the GoDaddy adapter has no `register` implementation, and `/check` excludes GoDaddy with `NO_AVAILABILITY_ACCESS` | Can register |
+
+## Daily registrar check (`DOMAIN_LEFT_ACCOUNT`; Dvir, 5 Oct 2026, 19:47)
+- Runs daily with the other jobs, for every domain with status `owned`, `listed` or `delisted` and `registrar_api` `full` or `manage`: `adapter.find_domain(domain)`.
+- A definite `None` (not in our account; e.g. transferred out) and **no** `sales` row → `/report` warning `DOMAIN_LEFT_ACCOUNT` (domain, registrar, first seen). The status is **not** changed and no sale is invented; Gavriel tells Dvir.
+- Registrar errors or timeouts → no warning (retry next day); `registrar_api = none` names are skipped (no API to ask).
+- Read-only: no registrar writes. Audit row scope `job`.
 
 ## Status lifecycle
 `pending_purchase → owned → listed → sold` (also `owned → sold` and `delisted → sold`), or `listed → delisted → dropped` (the scheduled delist at `drop_date − 7`), or `→ dropped`.

@@ -19,7 +19,7 @@ A ~150-line wrapper over the HTTP API, so Dvir can type the commands he already 
 | `… --category <c>` | `"category":"<c>"` |
 | `… --approval "<text>" --approved-at <iso>` | `"approval_ref":{…}` |
 | `… --dry-run` | `"dry_run":true` |
-| `dt sold <domain> --venue afternic --price 1995 --commission 299.25 --approval "<text>"` | `POST /sold/<domain>` |
+| `dt sold <domain> --venue afternic --price 1995 --commission 299.25 --ref AFN-123456 (--evidence afternic_email --evidence-ref "<Message-ID>" \| --approval "<text>")` | `POST /sold/<domain>` (approval optional; without it `transaction_ref` + `evidence` are required) |
 | `dt report [--md]` / `dt portfolio [<domain>]` / `dt export afternic\|sedo` | the GETs |
 
 - **Mode inference:** `--bin` alone → `bin`; `--offer` alone → `offer` (needs `--override`); both → `hybrid`. Neither, on `list`, means an NS-only re-point.
