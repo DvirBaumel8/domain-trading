@@ -1,0 +1,26 @@
+{
+  "settings_version": 2,
+  "settings_sha256": "a0636bbd9daf7cf5b50b41efda54cc027c66b4d7e66ccfb338d24e5b26c4a0e4",
+  "plans": [
+    { "input": { "category": "trend", "binCents": 199500 }, "floor": 129500, "walkaway": 96000, "min_offer": 10000 },
+    { "input": { "category": "trend", "binCents": 249500 }, "floor": 162000, "walkaway": 120000, "min_offer": 10000 },
+    { "input": { "category": "trend", "binCents": 499500 }, "floor": 324500, "walkaway": 240000, "min_offer": 10000 },
+    { "input": { "category": "trend", "binCents": 119500 }, "floor": 77500, "walkaway": 57500, "min_offer": 10000 },
+    { "input": { "category": "trend", "binCents": 79500 }, "floor": 75000, "walkaway": 50000, "min_offer": 10000 },
+    { "input": { "category": "trend", "binCents": 99500 }, "floor": 75000, "walkaway": 50000, "min_offer": 10000 },
+    { "input": { "category": "trend", "binCents": 109500 }, "floor": 75000, "walkaway": 52500, "min_offer": 10000 },
+    { "input": { "category": "trend", "binCents": 149500 }, "floor": 97000, "walkaway": 72000, "min_offer": 10000 },
+    { "input": { "category": "geo", "grade": "strong" }, "floor": 49900, "walkaway": 49900, "min_offer": 49900 },
+    { "input": { "category": "geo", "grade": "weaker" }, "floor": 39900, "walkaway": 39900, "min_offer": 39900 }
+  ],
+  "schedules": [
+    { "input": { "category": "trend", "binCents": 199500, "floorCents": 129500, "walkawayCents": 95000, "exception": true }, "anchor": "2026-10-12", "drop_date": "2028-10-04",
+      "events": [["drop1_m6","2027-04-12",159500,103500,76000,"planned"],["drop2_m18","2028-04-12",129500,83000,61000,"planned"],["final_push","2028-07-06",89500,83000,61000,"planned"],["delist","2028-09-27",null,null,null,"planned"]] },
+    { "input": { "category": "trend", "binCents": 199500 }, "anchor": "2026-10-12", "drop_date": "2028-10-04",
+      "events": [["drop1_m6","2027-04-12",159500,103500,77000,"planned"],["drop2_m18","2028-04-12",129500,83000,61500,"planned"],["final_push","2028-07-06",89500,83000,61500,"planned"],["delist","2028-09-27",null,null,null,"planned"]] },
+    { "input": { "category": "trend", "binCents": 79500 }, "anchor": "2026-10-12", "drop_date": "2028-10-04",
+      "events": [["drop1_m6","2027-04-12",79500,75000,50000,"skipped_at_minimum"],["drop2_m18","2028-04-12",79500,75000,50000,"skipped_at_minimum"],["final_push","2028-07-06",79500,75000,50000,"skipped_no_change"],["delist","2028-09-27",null,null,null,"planned"]] },
+    { "input": { "category": "geo", "grade": "strong" }, "anchor": "2026-11-01", "drop_date": "2028-11-01",
+      "events": [["geo_drop_m12","2027-11-01",39900,39900,39900,"planned"],["delist","2028-10-25",null,null,null,"planned"]] }
+  ]
+}
