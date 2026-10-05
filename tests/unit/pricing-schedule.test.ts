@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computePlan } from '../../src/pricing/plan.js';
-import { addDays, addMonthsClamped, buildSchedule, type ScheduleEvent } from '../../src/pricing/schedule.js';
+import { addDays, addMonthsClamped, buildSchedule, type ScheduleEvent, type SchedulePlan } from '../../src/pricing/schedule.js';
 import type { Plan } from '../../src/pricing/plan.js';
 import { V2 } from '../helpers/pricing.js';
 
@@ -143,4 +143,28 @@ describe('PR-9: property — every x95 BIN from $795 to $100,000', () => {
       for (const e of S(p)) if (e.binCents !== null) check(e.binCents, e.floorCents!, e.walkawayCents!);
     }
   });
+});
+
+describe('SchedulePlan paths and startAfter (4b-2)', () => {
+const sp = (o: Partial<SchedulePlan>): SchedulePlan => ({ category: 'trend', mode: 'hybrid', grade: null, binCents: 199500, floorCents: 129500, walkawayCents: 96000, ...o });
+it('Q1: non-geo bin override, offer, and geo hybrid override → delist only', () => {
+  for (const p of [sp({ mode: 'bin', floorCents: 99900, walkawayCents: 99900, binCents: 99900 }), sp({ mode: 'offer', binCents: null, floorCents: null, walkawayCents: null }), sp({ category: 'geo', grade: 'strong' })]) {
+    expect(buildSchedule({ plan: p, anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2 }).map((e) => e.event)).toEqual(['delist']);
+  }
+});
+it('geo bin off the grade price (manual 450) → delist only', () => {
+  expect(buildSchedule({ plan: sp({ category: 'geo', mode: 'bin', grade: 'strong', binCents: 45000, floorCents: 45000, walkawayCents: 45000 }), anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2 }).map((e) => e.event)).toEqual(['delist']);
+});
+it('Review Focus 1 / Q4: startAfter omits due events and chains future ones from the given values', () => {
+  // new values 1795/1165/865 approved on 2027-05-01 (after M6 2027-04-12): M18 = one drop from the new values
+  const ev = buildSchedule({ plan: sp({ binCents: 179500, floorCents: 116500, walkawayCents: 86500 }), anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2, startAfter: '2027-05-01' });
+  expect(ev.map((e) => [e.event, e.dueOn, e.binCents, e.floorCents, e.walkawayCents, e.status])).toEqual([
+    ['drop2_m18', '2028-04-12', 139500, 93000, 69000, 'planned'],
+    ['final_push', '2028-07-06', 99500, 93000, 69000, 'planned'],
+    ['delist', '2028-09-27', null, null, null, 'planned'],
+  ]);
+});
+it('startAfter after the final push and delist dates → empty list', () => {
+  expect(buildSchedule({ plan: sp({}), anchor: '2026-10-12', dropDate: '2028-10-04', settings: V2, startAfter: '2028-09-30' })).toEqual([]);
+});
 });

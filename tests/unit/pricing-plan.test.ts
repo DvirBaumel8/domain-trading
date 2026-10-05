@@ -111,3 +111,9 @@ describe('computePlan: settings-driven, no hard-coded numbers', () => {
     expect(ok(computePlan({ category: 'trend', binCents: 199500 }, { ...V2, hybridMinOfferCents: 15000 })).minOfferCents).toBe(15000);
   });
 });
+
+describe('geo override (4b-2)', () => {
+  it('mode hybrid on a geo category uses the hybrid formula (geo override path)', () => {
+    expect(ok(computePlan({ category: 'geo', mode: 'hybrid', binCents: 199500 }, V2))).toMatchObject({ mode: 'hybrid', floorCents: 129500, walkawayCents: 96000, grade: null });
+  });
+});

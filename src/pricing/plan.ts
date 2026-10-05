@@ -7,6 +7,7 @@ export type PlanCategory = Category;
 export interface PlanInput {
   category: PlanCategory; grade?: 'strong' | 'weaker' | null; binCents?: Cents | null;
   floorCents?: Cents | null; walkawayCents?: Cents | null; exception?: boolean;
+  mode?: 'hybrid'; // 'hybrid' on a geo category = hybrid math (geo override)
 }
 export interface Plan {
   mode: 'bin' | 'hybrid'; category: PlanCategory; grade: 'strong' | 'weaker' | null;
@@ -40,7 +41,7 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
   const warnings: string[] = [];
   if (input.category === 'other') warnings.push('CATEGORY_OTHER');
 
-  if (input.category === 'geo') {
+  if (input.category === 'geo' && input.mode !== 'hybrid') {
     if (input.grade !== 'strong' && input.grade !== 'weaker') return fail('GEO_GRADE_REQUIRED', 'Geo names need price_grade strong or weaker');
     const bin = input.grade === 'strong' ? s.geoBinStrongCents : s.geoBinWeakerCents;
     const sentBin = input.binCents ?? bin;
@@ -92,7 +93,7 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
   if (bin >= FAST_TRANSFER_MAX_CENTS) warnings.push('BIN_OVER_FAST_TRANSFER_MAX');
 
   return { ok: true, plan: {
-    mode: 'hybrid', category: input.category, grade: null, binCents: bin, floorCents, walkawayCents,
+    mode: 'hybrid', category: input.category, grade: input.category === 'geo' ? (input.grade ?? null) : null, binCents: bin, floorCents, walkawayCents,
     minOfferCents: Math.min(s.hybridMinOfferCents, walkawayCents),
     pricingSource, settingsVersion: s.version, warnings, formula: { floorCents: f.floorCents, walkawayCents: f.walkawayCents },
   } };

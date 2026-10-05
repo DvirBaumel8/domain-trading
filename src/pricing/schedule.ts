@@ -1,7 +1,7 @@
 import { ceil95, nice95, pct, round5 } from './round.js';
-import type { PriceScheduleEvent, PriceScheduleStatus } from '../db/types.js';
+import type { Category, ListingMode, PriceScheduleEvent, PriceScheduleStatus } from '../db/types.js';
 import type { Cents } from './int.js';
-import { hybridBinMin, type Plan } from './plan.js';
+import { hybridBinMin } from './plan.js';
 import type { PricingSettings } from './settings.js';
 
 export type ScheduleEventName = PriceScheduleEvent;
@@ -38,6 +38,11 @@ export function addDays(date: string, days: number): string {
   return fmt(new Date(Date.UTC(y, mo - 1, d + days)));
 }
 
+export interface SchedulePlan {
+  category: Category; mode: ListingMode; grade: 'strong' | 'weaker' | null;
+  binCents: Cents | null; floorCents: Cents | null; walkawayCents: Cents | null;
+}
+
 interface Values { bin: Cents; floor: Cents; walk: Cents }
 
 function applyDrop(v: Values, pctBps: number, s: PricingSettings): Values | null {
@@ -50,16 +55,21 @@ function applyDrop(v: Values, pctBps: number, s: PricingSettings): Values | null
 }
 
 export function buildSchedule(input: {
-  plan: Pick<Plan, 'category' | 'grade' | 'binCents' | 'floorCents' | 'walkawayCents'>; anchor: string; dropDate: string; settings: PricingSettings;
+  plan: SchedulePlan; anchor: string; dropDate: string; settings: PricingSettings; startAfter?: string;
 }): ScheduleEvent[] {
-  const { plan, anchor, dropDate, settings: s } = input;
+  const { plan, anchor, dropDate, settings: s, startAfter } = input;
+  const keep = (list: ScheduleEvent[]) => (startAfter ? list.filter((e) => e.dueOn > startAfter) : list);
   const out: ScheduleEvent[] = [];
   const delistOn = addDays(dropDate, -s.delistDaysBeforeDrop);
   const ev = (event: ScheduleEventName, dueOn: string, v: Values | null, status: ScheduleStatus): ScheduleEvent => ({
     event, dueOn, binCents: v?.bin ?? null, floorCents: v?.floor ?? null, walkawayCents: v?.walk ?? null, status,
   });
 
-  if (plan.category === 'geo') {
+  const standardGeo = plan.category === 'geo' && plan.mode === 'bin';
+  const standardHybrid = plan.category !== 'geo' && plan.mode === 'hybrid';
+  if (!standardGeo && !standardHybrid) return keep([ev('delist', delistOn, null, 'planned')]);
+
+  if (standardGeo) {
     const rule = s.geoDrops[0];
     if (plan.grade === 'strong' && rule && plan.binCents === rule.fromCents) {
       const due = addMonthsClamped(anchor, rule.afterMonths);
@@ -69,15 +79,17 @@ export function buildSchedule(input: {
       else out.push(ev('geo_drop_m12', due, v, 'planned'));
     }
     out.push(ev('delist', delistOn, null, 'planned'));
-    return out;
+    return keep(out);
   }
 
   const finalOn = addDays(dropDate, -s.finalPushDaysBeforeDrop);
+  if (plan.binCents === null || plan.floorCents === null || plan.walkawayCents === null) throw new Error('hybrid plan without prices');
   let cur: Values = { bin: plan.binCents, floor: plan.floorCents, walk: plan.walkawayCents };
   s.drops.forEach((d, i) => {
     const name = DROP_NAMES[i];
     if (!name) return;
     const due = addMonthsClamped(anchor, d.afterMonths);
+    if (startAfter && due <= startAfter) return;
     if (due >= finalOn) {
       out.push(ev(name, due, null, 'superseded_by_final_push'));
       return;
@@ -93,5 +105,5 @@ export function buildSchedule(input: {
   const pushedBin = Math.min(cur.bin, Math.max(ceil95(cur.floor), hybridBinMin(s)));
   out.push(pushedBin === cur.bin ? ev('final_push', finalOn, cur, 'skipped_no_change') : ev('final_push', finalOn, { ...cur, bin: pushedBin }, 'planned'));
   out.push(ev('delist', delistOn, null, 'planned'));
-  return out;
+  return keep(out);
 }
