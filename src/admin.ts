@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { createApiToken, listApiTokens, revokeApiToken } from './admin/tokens.js';
+import { newPricingSettings, showPricingSettings } from './admin/pricing-settings.js';
 import { runDoctor } from './admin/doctor.js';
 import { loadConfig } from './config.js';
 import { createDb } from './db/client.js';
@@ -8,6 +9,8 @@ const USAGE = `usage:
   npm run admin -- token create --scope read|write --name <name>
   npm run admin -- token revoke --id <id>
   npm run admin -- token list
+  npm run admin -- pricing-settings new --from-current --set key=value [--set ...] --approval-text "<words>" --approval-at <ISO> [--note <text>]
+  npm run admin -- pricing-settings show [--version N]
   npm run admin -- doctor`;
 
 class UsageError extends Error {}
@@ -16,7 +19,12 @@ async function main(argv: string[]): Promise<number> {
   const { positionals, values } = parseArgs({
     args: argv,
     allowPositionals: true,
-    options: { scope: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' } },
+    options: {
+      scope: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' },
+      set: { type: 'string', multiple: true }, 'from-current': { type: 'boolean' },
+      'approval-text': { type: 'string' }, 'approval-at': { type: 'string' },
+      note: { type: 'string' }, version: { type: 'string' },
+    },
   });
   const [cmd, sub] = positionals;
   const config = loadConfig(process.env);
@@ -50,6 +58,31 @@ async function main(argv: string[]): Promise<number> {
            `last used ${t.last_used_at?.toISOString() ?? 'never'}`].join('  '),
         );
       }
+      return 0;
+    }
+    if (cmd === 'pricing-settings' && sub === 'new') {
+      if (!values['from-current']) throw new UsageError('--from-current is required');
+      if (!values['approval-text']?.trim()) throw new UsageError('--approval-text is required');
+      if (!values['approval-at']) throw new UsageError('--approval-at is required');
+      const set: Record<string, string> = {};
+      for (const kv of values.set ?? []) {
+        const i = kv.indexOf('=');
+        if (i <= 0) throw new UsageError(`--set expects key=value, got: ${kv}`);
+        set[kv.slice(0, i)] = kv.slice(i + 1);
+      }
+      const { version } = await newPricingSettings(db, {
+        set, approvalText: values['approval-text'], approvalAt: values['approval-at'], note: values.note, now: new Date(),
+      });
+      console.log(`Created pricing_settings version ${version}`);
+      return 0;
+    }
+    if (cmd === 'pricing-settings' && sub === 'show') {
+      let version: number | undefined;
+      if (values.version !== undefined) {
+        version = Number(values.version);
+        if (!Number.isInteger(version) || version <= 0) throw new UsageError('--version must be a positive integer');
+      }
+      console.log(JSON.stringify(await showPricingSettings(db, version), null, 2));
       return 0;
     }
     throw new UsageError(`unknown command: ${positionals.join(' ') || '(none)'}`);
