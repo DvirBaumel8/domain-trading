@@ -1,84 +1,57 @@
-# render.yaml: SKETCH for Dvir to review. Not deployed by any bot.
-# Syntax source: https://render.com/docs/blueprint-spec (fetched 2026-10-03).
-# Cost: UNVERIFIED. Check https://render.com/pricing before applying; this conflicts with the $0 tools cap,
-# so Dvir must approve the spend. A FREE Postgres is NOT acceptable (no backups, expires after 30 days).
+# render.yaml: FREE hosting blueprint for the domain-trading API ($0/month).
+#
+# Free design (Dvir, 5 Oct 2026; same pattern as trader and sapako):
+#   - API: Render free web service. It sleeps after ~15 min idle and wakes on the next request (~50 s).
+#   - Postgres: Neon free (NOT declared here; DATABASE_URL is set by hand). Use the DIRECT (non-pooler)
+#     connection string: the per-domain lock is a session advisory lock. The server refuses a "-pooler." host
+#     when APP_ENV=production.
+#   - Scheduled work: a free Cloudflare Worker cron (jobs-trigger/) calls POST /jobs/run hourly (tick) and daily
+#     (daily jobs + nightly backup export). JOBS_MODE=external means the service starts no timers.
+#   - Render free allows 750 instance hours per WORKSPACE per month, shared with trader/sapako. This service is
+#     NOT kept warm: the hourly wake uses about 180 h/month. Do not add a keep-warm ping.
+#   - Render crons and Postgres are billed, so neither is used. Backups go to a private data repo (backup.md).
+# Setup steps: docs/DEPLOYMENT.md.
+# healthCheckPath is /health/ping (no auth, no DB) so Render's checks never wake Neon.
 
 services:
   - type: web
     name: domain-trading-api
     runtime: node
-    region: frankfurt            # closest Render region to Israel; change if you prefer
-    plan: 0.5c-512mb             # Blueprint default paid web plan (free web services spin down). VERIFY price
+    plan: free
+    region: frankfurt
     branch: main
-    buildCommand: npm ci && npm run build
-    preDeployCommand: npm run migrate up
-    startCommand: node dist/main.js
-    healthCheckPath: /health
+    # devDependencies are needed to compile (tsc), then pruned. node-pg-migrate, tsx and everything the
+    # runtime and `migrate` need are in "dependencies".
+    buildCommand: npm ci --include=dev && npm run build && npm prune --omit=dev
+    # Migrations run from plain SQL files at start (no pre-deploy step on the free plan).
+    startCommand: npm run migrate up && node dist/main.js
+    healthCheckPath: /health/ping
     autoDeployTrigger: 'off'     # Dvir deploys deliberately after tests pass
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: domain-trading-db
-          property: connectionString
+      - key: NODE_VERSION
+        value: 22.23.2           # a recent 22.x patch (same as trader)
       - key: APP_ENV
         value: production
+      - key: JOBS_MODE
+        value: external
+      - key: DATABASE_SSL
+        value: 'true'
       - key: LANDER_TARGET
         value: afternic
-      - key: POC_CAP_CENTS
-        value: "50000"
-      - key: MAX_DOMAINS
-        value: "10"
-      - key: APPROVAL_MAX_AGE_HOURS
-        value: "72"
       - key: ENABLED_REGISTRARS
-        value: porkbun,godaddy_manage   # godaddy_manage = NS/details only (D-001)
-      - key: GEO_BIN_MIN_CENTS
-        value: "29900"
-      - key: GEO_BIN_MAX_CENTS
-        value: "49900"
-      - key: HIGH_VALUE_MIN_BIN_CENTS
-        value: "250000"
-      - key: HIGH_VALUE_GUARD_MODES
-        value: bin
+        value: porkbun,godaddy   # godaddy = NS/details only (D-001); buying is Porkbun only
       # Secrets: values entered in the Render Dashboard only (sync: false). Never in git.
+      - key: DATABASE_URL        # Neon DIRECT string, ?sslmode=verify-full
+        sync: false
       - key: PORKBUN_API_KEY
         sync: false
       - key: PORKBUN_SECRET_API_KEY
         sync: false
-      - key: DYNADOT_API_KEY
+      - key: GODADDY_PAT         # scopes: domains.domain:read, domains.nameserver:update
         sync: false
-      - key: NAMECOM_USERNAME
+      - key: GITHUB_BACKUP_TOKEN # fine-grained PAT: the private DATA repo only, Contents read/write
         sync: false
-      - key: NAMECOM_API_TOKEN
+      - key: GITHUB_BACKUP_REPO  # e.g. DvirBaumel8/domain-trading-data (never the code repo)
         sync: false
-      - key: GODADDY_PAT            # scopes: domains.domain:read, domains.nameserver:update
+      - key: JOB_TRIGGER_TOKEN   # same value as the GitHub repo secret used by the Worker
         sync: false
-      # Namecheap / GoDaddy / Spaceship / NameSilo keys: add the same way when their adapters exist (see .env.example)
-
-  # Optional nightly data export to the repo's data-backup branch (docs/specs/backup.md)
-  - type: cron
-    name: domain-trading-backup
-    runtime: node
-    region: frankfurt
-    schedule: '30 23 * * *'      # 23:30 UTC = 02:30 IDT (01:30 IST in winter)
-    buildCommand: npm ci && npm run build
-    startCommand: npm run job:export-backup
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: domain-trading-db
-          property: connectionString
-      - key: GITHUB_BACKUP_TOKEN   # fine-grained PAT: this repo only, Contents read/write
-        sync: false
-      - key: GITHUB_BACKUP_REPO
-        value: DvirBaumel8/domain-trading
-      - key: GITHUB_BACKUP_BRANCH
-        value: data-backup
-
-databases:
-  - name: domain-trading-db
-    region: frankfurt
-    postgresMajorVersion: '16'
-    plan: 0.1c-256mb             # Blueprint default (smallest current plan); must be a PAID plan for PITR. VERIFY price
-    databaseName: domain_trading
-    ipAllowList: []              # private network only; the API and cron connect internally
