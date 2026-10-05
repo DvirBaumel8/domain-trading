@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { dropAtFirstExpiry } from '../../src/admin/drop-date.js';
+import { PriceScheduleJob } from '../../src/jobs/price-schedule.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { testEnv } from '../helpers/env.js';
@@ -53,7 +54,7 @@ describe('admin drop-at-first-expiry', () => {
     expect(r.schedule).toHaveLength(4);
     expect(d.plan_id).toBe(all.find((x) => !oldIds.includes(x.id))!.plan_id);
     const audit = await db.selectFrom('audit_log').selectAll().where('scope', '=', 'admin').where('path', '=', 'drop-at-first-expiry').executeTakeFirstOrThrow();
-    expect(audit).toMatchObject({ approval_text: APPROVAL.approvalText, method: 'ADMIN' });
+    expect(audit).toMatchObject({ approval_text: APPROVAL.approvalText, approval_at: new Date(APPROVAL.approvalAt), method: 'ADMIN' });
     expect(d.plan_audit_id).toBe(audit.id);
     expect(JSON.parse(JSON.stringify(audit.request))).toEqual({ domain: D, from: '2028-10-04', to: '2027-10-04' });
   });
@@ -93,5 +94,41 @@ describe('admin drop-at-first-expiry', () => {
     await insertOwnedDomain(db, { domain: D });
     await db.updateTable('domains').set({ drop_date: '2027-10-04' }).execute();
     await expect(db.updateTable('domains').set({ drop_date: '2029-10-04' }).execute()).rejects.toThrow(/domains_drop_date_rule/);
+  });
+
+  const LATE = new Date('2027-05-01T09:00:00Z');
+  const FIN = [
+    ['drop1_m6', '2027-04-12', 159500, 103500, 76000, 'planned'],
+    ['drop2_m18', '2028-04-12', null, null, null, 'superseded_by_final_push'],
+    ['final_push', '2027-07-06', 109500, 103500, 76000, 'planned'],
+    ['delist', '2027-09-27', null, null, null, 'planned'],
+  ];
+
+  it('fix 1a: a due but unapplied M6 (hold) is regenerated as planned, not lost', async () => {
+    await d001();
+    await db.updateTable('domains').set({ pricing_hold: true, pricing_hold_reason: 'talks' }).execute();
+    await dropAtFirstExpiry(db, { ...APPROVAL, now: LATE });
+    expect(view((await rows()).filter((x) => x.status !== 'superseded'))).toEqual(FIN);
+  });
+
+  it('fix 1b: an applied M6 is not regenerated; the final push comes from the post-M6 values', async () => {
+    await d001();
+    await new PriceScheduleJob({ db, now: () => LATE.getTime() }).runOnce({ today: '2027-05-01' });
+    await dropAtFirstExpiry(db, { ...APPROVAL, now: LATE });
+    const live = (await rows()).filter((x) => x.status !== 'superseded');
+    expect(view(live)).toEqual([
+      ['drop1_m6', '2027-04-12', 159500, 103500, 76000, 'applied'],
+      ['drop2_m18', '2028-04-12', null, null, null, 'superseded_by_final_push'],
+      ['final_push', '2027-07-06', 109500, 103500, 76000, 'planned'],
+      ['delist', '2027-09-27', null, null, null, 'planned'],
+    ]);
+  });
+
+  it('fix 3: a first expiry already in the past warns DROP_DATE_IN_PAST', async () => {
+    await insertOwnedDomain(db, { domain: D });
+    const r = await dropAtFirstExpiry(db, { ...APPROVAL, now: new Date('2027-11-01T09:00:00Z'), approvalAt: '2027-11-01T08:00:00Z' });
+    expect(r.warnings).toEqual(['DROP_DATE_IN_PAST: the next daily run will mark it dropped']);
+    const ok = await dropAtFirstExpiry(db, APPROVAL).catch((e) => e);
+    expect(ok.code).toBe('NO_CHANGE');
   });
 });

@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import { createApiToken, listApiTokens, revokeApiToken } from './admin/tokens.js';
 import { newPricingSettings, showPricingSettings } from './admin/pricing-settings.js';
-import { dropAtFirstExpiry } from './admin/drop-date.js';
+import { DropDateInputError, dropAtFirstExpiry } from './admin/drop-date.js';
 import { runDoctor } from './admin/doctor.js';
 import { AppError } from './http/errors.js';
 import { loadConfig } from './config.js';
@@ -71,11 +71,13 @@ async function main(argv: string[]): Promise<number> {
       try {
         r = await dropAtFirstExpiry(db, { domain: values.domain, approvalText: values['approval-text'], approvalAt: values['approval-at'], now: new Date() });
       } catch (e) {
-        if (!(e instanceof AppError)) throw new UsageError((e as Error).message);
+        if (e instanceof DropDateInputError) throw new UsageError(e.message);
+        if (!(e instanceof AppError)) throw e;
         console.error(`${e.code}: ${e.message}`);
         return 1;
       }
       console.log(`drop_date for ${r.domain}: ${r.from ?? '(none)'} -> ${r.dropDate}`);
+      for (const w of r.warnings) console.log(`warning: ${w}`);
       for (const e of r.schedule) console.log(`  ${e.event} ${e.due_on} ${e.status}${e.bin_cents === null ? '' : ` ${e.bin_cents / 100}/${e.floor_cents! / 100}/${e.walkaway_cents! / 100}`}`);
       return 0;
     }

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { DropJob } from '../../src/jobs/drop.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 
@@ -19,8 +19,6 @@ async function listed(over: Record<string, unknown> = {}) {
 }
 
 describe('drop job', () => {
-  afterEach(() => undefined);
-
   it('PR-25 drop: listed past drop_date -> dropped, delisted_at set, planned rows cancelled, audit row', async () => {
     const id = await listed();
     const r = await job().runOnce({ today: '2028-10-05' });
