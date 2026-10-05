@@ -36,6 +36,15 @@ async function d001() {
 }
 
 describe('admin drop-at-first-expiry', () => {
+  it('a delisted domain only gets drop_date + audit: no schedule is regenerated (schedule null)', async () => {
+    await insertOwnedDomain(db, { domain: D, status: 'delisted', category: 'trend', price_grade: null });
+    const r = await dropAtFirstExpiry(db, APPROVAL);
+    expect(r).toMatchObject({ dropDate: '2027-10-04', schedule: null });
+    expect(await dom()).toMatchObject({ drop_date: '2027-10-04', plan_id: null });
+    expect(await rows()).toHaveLength(0);
+    expect(await db.selectFrom('audit_log').selectAll().where('path', '=', 'drop-at-first-expiry').execute()).toHaveLength(1);
+  });
+
   it('PR-25 / ADM-1: D-001-like listing regenerates final push and delist', async () => {
     await d001();
     const oldIds = (await rows()).map((r) => r.id);
@@ -62,7 +71,7 @@ describe('admin drop-at-first-expiry', () => {
   it('an owned domain without a plan only moves drop_date', async () => {
     await insertOwnedDomain(db, { domain: D });
     const r = await dropAtFirstExpiry(db, APPROVAL);
-    expect(r.schedule).toEqual([]);
+    expect(r.schedule).toBeNull();
     expect((await dom()).drop_date).toBe('2027-10-04');
   });
 

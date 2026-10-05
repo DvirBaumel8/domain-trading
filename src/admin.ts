@@ -119,7 +119,7 @@ async function main(argv: string[]): Promise<number> {
       }
       console.log(`drop_date for ${r.domain}: ${r.from ?? '(none)'} -> ${r.dropDate}`);
       for (const w of r.warnings) console.log(`warning: ${w}`);
-      for (const e of r.schedule) console.log(`  ${e.event} ${e.due_on} ${e.status}${e.bin_cents === null ? '' : ` ${e.bin_cents / 100}/${e.floor_cents! / 100}/${e.walkaway_cents! / 100}`}`);
+      for (const e of r.schedule ?? []) console.log(`  ${e.event} ${e.due_on} ${e.status}${e.bin_cents === null ? '' : ` ${e.bin_cents / 100}/${e.floor_cents! / 100}/${e.walkaway_cents! / 100}`}`);
       return 0;
     }
     if (cmd === 'pricing-settings' && sub === 'new') {

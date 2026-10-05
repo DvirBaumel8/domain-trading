@@ -12,7 +12,7 @@ export class DropDateInputError extends Error {}
 export interface DropAtFirstExpiryResult {
   warnings: string[];
   domain: string; from: string | null; dropDate: string;
-  schedule: { event: string; due_on: string; bin_cents: number | null; floor_cents: number | null; walkaway_cents: number | null; status: string }[];
+  schedule: { event: string; due_on: string; bin_cents: number | null; floor_cents: number | null; walkaway_cents: number | null; status: string }[] | null;
 }
 
 /** Gate F: move drop_date to the first expiry (never renewed), regenerating the schedule from the current values. */
@@ -43,7 +43,7 @@ export async function dropAtFirstExpiry(
     }).execute();
     await trx.updateTable('domains').set({ drop_date: cur.expiry_date, updated_at: now }).where('id', '=', cur.id).execute();
     let planId: string | null = cur.plan_id;
-    if (cur.plan_id && cur.first_listed_at) {
+    if (cur.status === 'listed' && cur.plan_id && cur.first_listed_at) {
       const settings = await settingsByVersion(trx, cur.pricing_settings_version ?? 0);
       const plan = currentPlan(cur, cur.pricing_settings_version ?? 0);
       if (!settings || !plan) throw new AppError(422, 'PLAN_UNAVAILABLE', 'Cannot regenerate the schedule: pricing settings or listing missing');
@@ -55,13 +55,13 @@ export async function dropAtFirstExpiry(
         settings, planAuditId: auditId, startAfter: done?.d ?? undefined, now,
       })).planId;
     }
-    const rows = planId
+    const rows = cur.status === 'listed' && planId
       ? await trx.selectFrom('price_schedule').selectAll().where('domain_id', '=', cur.id).where('plan_id', '=', planId).orderBy('due_on').orderBy('id').execute()
-      : [];
+      : null;
     const warnings = cur.expiry_date < jerusalemDate(now) ? ['DROP_DATE_IN_PAST: the next daily run will mark it dropped'] : [];
     return {
       warnings, domain, from: cur.drop_date, dropDate: cur.expiry_date,
-      schedule: rows.map((r) => ({ event: r.event, due_on: r.due_on, bin_cents: r.bin_cents, floor_cents: r.floor_cents, walkaway_cents: r.walkaway_cents, status: r.status })),
+      schedule: rows && rows.map((r) => ({ event: r.event, due_on: r.due_on, bin_cents: r.bin_cents, floor_cents: r.floor_cents, walkaway_cents: r.walkaway_cents, status: r.status })),
     };
   }));
 }

@@ -14,6 +14,7 @@ import { mswServer } from '../setup/network.js';
 let app: FastifyInstance;
 afterEach(async () => app?.close());
 const D = 'examplecityroofing.com';
+const T0 = Date.parse('2026-10-06T09:00:00Z'); // fixed clock: the suite must not depend on the calendar
 const AFTERNIC = ['ns1.afternic.com', 'ns2.afternic.com'];
 
 /** A fake clock that only moves when the adapter sleeps (or `jump` is called). */
@@ -26,7 +27,7 @@ const adapter = (o: { pollTimeoutMs?: number; jumpPerPoll?: number } = {}) => {
 };
 
 async function setup(gd: GoDaddyAdapter, logStream?: Parameters<typeof makeApp>[0] extends infer O ? (O extends { logStream?: infer L } ? L : never) : never) {
-  app = await makeApp({ adapters: [gd], nsLookup: async () => null, ...(logStream ? { logStream } : {}) });
+  app = await makeApp({ adapters: [gd], nsLookup: async () => null, now: () => T0, ...(logStream ? { logStream } : {}) });
   await insertOwnedDomain(db, { domain: D, registrar: 'godaddy', registrar_api: 'manage', category: 'trend' });
   return (await issueToken('write')).auth;
 }
@@ -72,7 +73,7 @@ describe('GoDaddy NS through /list', () => {
     const rec: GdRequest[] = [];
     mswServer.use(...godaddyNsHandlers({ operationStatuses: ['PENDING'], recorded: rec })); // a read-back would hit an unhandled route and error
     const auth = await setup(adapter({ pollTimeoutMs: 30 }));
-    const res = await list(auth, { mode: 'hybrid', bin: 1995, approval_ref: { text: `yes list ${D}`, approved_at: new Date(Date.now() - 3_600_000).toISOString() } });
+    const res = await list(auth, { mode: 'hybrid', bin: 1995 });
     expect(res.statusCode).toBe(200);
     const b = res.json();
     expect(b.ns_status).toBe('pending');
@@ -130,7 +131,7 @@ describe('GoDaddy NS through /list', () => {
 
   it('a FakeAdapter returning { pending: true } is handled the same way', async () => {
     const fake = new FakeAdapter('godaddy', { setNsResult: { pending: true } });
-    app = await makeApp({ adapters: [fake], nsLookup: async () => null });
+    app = await makeApp({ adapters: [fake], nsLookup: async () => null, now: () => T0 });
     await insertOwnedDomain(db, { domain: D, registrar: 'godaddy', registrar_api: 'manage', category: 'trend' });
     const auth = (await issueToken('write')).auth;
     const res = await list(auth);

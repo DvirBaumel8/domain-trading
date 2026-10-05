@@ -484,12 +484,10 @@ export class BuyService {
           if (got === null) {
             post.lander = 'pending';
             warnings.push(nsPendingWarning(a.adapter.name));
-            await db.updateTable('domains').set({ lander: target, lander_ns: [...ns], lander_set_at: new Date(), updated_at: new Date() })
-              .where('domain', '=', d).execute();
+            await this.saveLander(d, target, ns);
           } else if (sameNsSet(got, ns)) {
             post.lander = `${target} ns set`;
-            await db.updateTable('domains').set({ lander: target, lander_ns: [...ns], lander_set_at: new Date(), updated_at: new Date() })
-              .where('domain', '=', d).execute();
+            await this.saveLander(d, target, ns);
           } else {
             post.lander = 'mismatch';
             warnings.push('LANDER_MISMATCH: the registrar reports different nameservers; call /list again');
@@ -502,6 +500,15 @@ export class BuyService {
       if (a.plan) await this.saveListing(a, a.plan, post, warnings);
     }
     return post;
+  }
+
+  /** The lander columns, written under the per-domain lock so a concurrent /list can't be overwritten. */
+  private async saveLander(d: string, target: string, ns: readonly string[]): Promise<void> {
+    await withDomainLock(this.deps.db, d, async (conn) => {
+      const at = new Date();
+      await conn.updateTable('domains').set({ lander: target, lander_ns: [...ns], lander_set_at: at, updated_at: at })
+        .where('domain', '=', d).execute();
+    });
   }
 
   /** Plan + schedule + history under the per-domain lock. Runs after the reservation and bookkeeping transactions committed, so it can't deadlock with /buy's xact lock. */

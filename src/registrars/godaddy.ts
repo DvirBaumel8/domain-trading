@@ -25,7 +25,7 @@ const normNs = (n: string) => n.trim().toLowerCase().replace(/\.$/, '');
 
 export interface GoDaddyOptions {
   pat: string; baseUrl?: string; timeoutMs?: number;
-  /** Operation polling: production defaults 5 s interval, 5 min timeout. Tests inject a no-op `sleep`. */
+  /** Operation polling: production defaults 5 s interval, 60 s timeout (pending after 60 s; the daily DNS check confirms). Tests inject a no-op `sleep`. */
   pollIntervalMs?: number; pollTimeoutMs?: number; sleep?: (ms: number) => Promise<void>; now?: () => number;
 }
 
@@ -121,7 +121,7 @@ export class GoDaddyAdapter implements RegistrarAdapter {
     if (!id) return { pending: true }; // accepted but untrackable
 
     const interval = this.opts.pollIntervalMs ?? 5_000;
-    const timeout = this.opts.pollTimeoutMs ?? 300_000;
+    const timeout = this.opts.pollTimeoutMs ?? 60_000;
     const sleep = this.opts.sleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
     const now = this.opts.now ?? Date.now;
     const deadline = now() + timeout;

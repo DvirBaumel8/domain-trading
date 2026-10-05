@@ -62,6 +62,7 @@ function parseInput(i: ImportInput, now: Date) {
   if (!i.registrar?.trim()) throw new ImportInputError('--registrar is required');
   const registrar = i.registrar.trim().toLowerCase();
   if (registrar === 'cloudflare') throw new ImportInputError('Cloudflare Registrar is never used (founder rule 5)');
+  if (!['porkbun', 'godaddy', 'other'].includes(registrar)) throw new ImportInputError('--registrar must be porkbun, godaddy or other');
   const manual = i.manual === true;
   if (!manual && registrar === 'other') throw new ImportInputError('--registrar other needs --manual');
   const today = jerusalemDate(now);
@@ -75,6 +76,7 @@ function parseInput(i: ImportInput, now: Date) {
   if (i.deal !== undefined && !DEAL.test(i.deal)) throw new ImportInputError('--deal must look like D-001');
   const order = (i.order ?? 'none').trim();
   if (!order) throw new ImportInputError('--order must not be empty (use none)');
+  if (order.includes('@')) throw new AppError(422, 'NO_PII', 'The order reference must not contain an email address or "@"');
 
   if (!i.category || !isCategory(i.category)) {
     throw new AppError(422, 'CATEGORY_REQUIRED', 'A valid category is required: geo, trend, b2b, collision, regulation, buzzword or other');
@@ -149,6 +151,7 @@ export async function importDomain(
   const existing = await db.selectFrom('domains').select('status').where('domain', '=', domain).executeTakeFirst();
   if (existing) throw new AppError(409, 'ALREADY_IN_PORTFOLIO', `${domain} is already in the portfolio as ${existing.status}`, { status: existing.status });
 
+  const warnings: string[] = [];
   // Registrar data
   let registrarApi: 'full' | 'manage' | 'none' = 'none';
   let expiry = p.expiry;
@@ -164,17 +167,33 @@ export async function importDomain(
       }
       throw new AppError(502, 'REGISTRAR_ERROR', `${p.registrar} lookup failed${e instanceof RegistrarError ? ` (${e.code})` : ''}; retry, or use --manual with --expiry YYYY-MM-DD`);
     }
-    if (!info) throw new AppError(409, 'NOT_IN_ACCOUNT', `${domain} is not in the ${p.registrar} account`);
+    if (!info) {
+      throw new AppError(409, 'NOT_IN_ACCOUNT', `${domain} is not in the ${p.registrar} account${p.registrar === 'godaddy'
+        ? ' (if the domain is in your GoDaddy account, the lookup path may differ — use --manual with --expiry)' : ''}`);
+    }
     registrarApi = registrarApiOf(adapter.capabilities);
+    if (info.expiryDate && p.expiry && info.expiryDate !== p.expiry) {
+      warnings.push(`EXPIRY_MISMATCH: --expiry ${p.expiry} differs from the registrar's ${info.expiryDate}; using the registrar's`);
+    }
     expiry = info.expiryDate ?? p.expiry;
+    if (info.autoRenew === true) warnings.push(`AUTO_RENEW_ON: turn auto-renew OFF at ${p.registrar} (renewals there are billed outside the $1,500 cap)`);
+    else if (p.registrar === 'godaddy' || info.autoRenew == null) warnings.push(`AUTO_RENEW_UNCONFIRMED: check auto-renew is OFF in the ${p.registrar} dashboard`);
+    if (info.whoisPrivacy === false) warnings.push(`PRIVACY_OFF: WHOIS privacy is off at ${p.registrar}; turn it on in the dashboard`);
+    if (p.registrar === 'porkbun' && info.apiAccess === false) warnings.push('API_ACCESS_DISABLED: turn on API access for this domain at porkbun.com/account/api');
     if (!expiry) throw new AppError(422, 'EXPIRY_UNKNOWN', `${p.registrar} did not report an expiry date; use --manual with --expiry YYYY-MM-DD`);
   }
+  if (p.manual) warnings.push(`AUTO_RENEW_UNCONFIRMED: check auto-renew is OFF in the ${p.registrar} dashboard`);
   const expiryDate = expiry!;
+  // Founder rule 3: 1-year registrations only. Allow 7 days of slack for registry rounding and time zones.
+  const maxExpiry = new Date(`${addOneYear(p.buyDate)}T00:00:00Z`);
+  maxExpiry.setUTCDate(maxExpiry.getUTCDate() + 7);
+  if (expiryDate > maxExpiry.toISOString().slice(0, 10)) {
+    throw new AppError(422, 'REGISTRATION_TERM_INVALID', `expiry ${expiryDate} is more than one year after the buy date ${p.buyDate}; only 1-year registrations are allowed (founder rule 3)`);
+  }
   const dropDate = addOneYear(expiryDate);
 
   const settings = await db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
   const s = await currentSettings(db, now);
-  const warnings: string[] = [];
 
   let plan: ListingPlan | null = null;
   if (p.listing) {

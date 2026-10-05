@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { addOneYear, jerusalemDate } from '../../src/dates.js';
 import { http, HttpResponse } from 'msw';
 import { importDomain, type ImportInput } from '../../src/admin/import-domain.js';
 import { GoDaddyAdapter } from '../../src/registrars/godaddy.js';
@@ -237,14 +241,73 @@ describe('admin import-domain', () => {
     for (const k of keys.slice(0, 4)) expect(buy[k], k).toEqual(prev[k]);
   });
 
+  it('registrar status warnings (dry run, one per case)', async () => {
+    const dry = (info: object) => go({ ...MANUAL, registrar: 'porkbun', manual: false, expiry: undefined, dryRun: true }, [pb(info as never)]);
+    const cases: [string, object, (x: string) => boolean][] = [
+      ['auto-renew on', { autoRenew: true }, (x) => x === 'AUTO_RENEW_ON: turn auto-renew OFF at porkbun (renewals there are billed outside the $1,500 cap)'],
+      ['privacy off', { whoisPrivacy: false }, (x) => x.startsWith('PRIVACY_OFF')],
+      ['auto-renew null', { autoRenew: null }, (x) => x === 'AUTO_RENEW_UNCONFIRMED: check auto-renew is OFF in the porkbun dashboard'],
+      ['api access off', { apiAccess: false }, (x) => x.startsWith('API_ACCESS_DISABLED: turn on API access for this domain at porkbun.com/account/api')],
+    ];
+    for (const [label, info, match] of cases) expect((await dry(info)).warnings.some(match), label).toBe(true);
+    expect((await dry({ autoRenew: true })).warnings.some((x) => x.startsWith('AUTO_RENEW_UNCONFIRMED'))).toBe(false);
+    expect((await dry({})).warnings.some((x) => /^(AUTO_RENEW|PRIVACY_OFF|API_ACCESS)/.test(x))).toBe(false);
+    expect((await go({ ...MANUAL, dryRun: true })).warnings).toContain('AUTO_RENEW_UNCONFIRMED: check auto-renew is OFF in the other dashboard');
+  });
+
+  it('a GoDaddy import always asks to confirm auto-renew', async () => {
+    mswServer.use(http.get(`${GODADDY_BASE}/v3/domains/domain-names/:d`, () => HttpResponse.json({ expiresAt: '2027-10-04T13:16:00.000Z', privacy: true, renewAuto: false })));
+    const gd = new GoDaddyAdapter({ pat: FAKE_PAT, baseUrl: GODADDY_BASE });
+    const r = await go({ ...MANUAL, registrar: 'godaddy', manual: false, expiry: undefined }, [gd]);
+    expect(r.warnings).toContain('AUTO_RENEW_UNCONFIRMED: check auto-renew is OFF in the godaddy dashboard');
+  });
+
+  it('GoDaddy NOT_IN_ACCOUNT carries the lookup-path hint', async () => {
+    mswServer.use(http.get(`${GODADDY_BASE}/v3/domains/domain-names/:d`, () => new HttpResponse(null, { status: 404 })));
+    const gd = new GoDaddyAdapter({ pat: FAKE_PAT, baseUrl: GODADDY_BASE });
+    const e = await refused(go({ ...MANUAL, registrar: 'godaddy', manual: false, expiry: undefined }, [gd]));
+    expect(e?.code).toBe('NOT_IN_ACCOUNT');
+    expect(e?.message).toContain('the lookup path may differ');
+  });
+
+  it('one-year term: D-001 with expiry 2028-10-04 is refused (also dry run); 2027-10-04 and 2027-10-10 are fine', async () => {
+    expect((await refused(go({ ...D001, expiry: '2028-10-04' })))?.code).toBe('REGISTRATION_TERM_INVALID');
+    expect((await refused(go({ ...D001, expiry: '2028-10-04', dryRun: true })))?.code).toBe('REGISTRATION_TERM_INVALID');
+    expect(await count('domains')).toBe(0);
+    expect((await go({ ...D001, expiry: '2027-10-10', dryRun: true })).expiry_date).toBe('2027-10-10');
+    expect((await go({ ...D001, expiry: '2027-10-04' })).status).toBe('listed');
+  });
+
+  it('a registrar term over one year is refused too', async () => {
+    const e = await refused(go({ ...MANUAL, registrar: 'porkbun', manual: false, expiry: undefined }, [pb({ expiryDate: '2028-10-04' })]));
+    expect(e?.code).toBe('REGISTRATION_TERM_INVALID');
+  });
+
+  it('EXPIRY_MISMATCH when --expiry and the registrar differ; the registrar wins', async () => {
+    const r = await go({ ...MANUAL, registrar: 'porkbun', manual: false, expiry: '2027-10-05' }, [pb()]);
+    expect(r.expiry_date).toBe('2027-10-04');
+    expect(r.warnings.some((x) => x.startsWith('EXPIRY_MISMATCH'))).toBe(true);
+  });
+
+  it('--registrar must be porkbun, godaddy or other; --order must not contain @', async () => {
+    for (const registrar of ['namecheap', 'cloudflare']) expect((await refused(go({ ...MANUAL, registrar })))?.constructor.name, registrar).toBe('ImportInputError');
+    expect((await refused(go({ ...MANUAL, order: 'me@example.com' })))?.code).toBe('NO_PII');
+    expect(await count('domains')).toBe(0);
+  });
+
   it('CLI: the D-001 command with --dry-run exits 0 with JSON and prints no secret', async () => {
-    const args = ['--domain', D, '--registrar', 'godaddy', '--buy-date', '2026-10-04', '--cost', '13.73', '--cost-note', '42 ILS @0.3269', '--order', 'none',
+    // clock-independent: the CLI uses the real clock, so the dates derive from today
+    const buy = jerusalemDate(new Date(Date.now() - 86_400_000));
+    const expiry = addOneYear(buy);
+    const compsFile = join(mkdtempSync(join(tmpdir(), 'imp-')), 'comps.json');
+    writeFileSync(compsFile, JSON.stringify({ comps: COMPS, rationale: 'r' }));
+    const args = ['--domain', D, '--registrar', 'godaddy', '--buy-date', buy, '--cost', '13.73', '--cost-note', '42 ILS @0.3269', '--order', 'none',
       '--deal', 'D-001', '--category', 'trend', '--listing-mode', 'hybrid', '--bin', '1995', '--floor', '1295', '--walkaway', '950',
-      '--pricing-exception', 'Dvir approved 2026-10-05 00:39 IDT', '--legacy-no-comps', 'bought before the comps rule; card found no comps',
-      '--approval-text', 'Approve the prices, but wait for the software to list it', '--approval-at', '2026-10-05T00:39:00+03:00', '--manual', '--expiry', '2027-10-04', '--dry-run'];
+      '--pricing-exception', 'Dvir approved 2026-10-05 00:39 IDT', '--comps-file', compsFile,
+      '--approval-text', 'Approve the prices, but wait for the software to list it', '--approval-at', '2026-10-05T00:39:00+03:00', '--manual', '--expiry', expiry, '--dry-run'];
     const { stdout } = await run('npx', ['tsx', 'src/admin.ts', 'import-domain', ...args], { env: { ...process.env, ...testEnv() } });
     const j = JSON.parse(stdout);
-    expect(j).toMatchObject({ dry_run: true, domain: D, status: 'listed', drop_date: '2028-10-04' });
+    expect(j).toMatchObject({ dry_run: true, domain: D, status: 'listed', drop_date: addOneYear(expiry) });
     for (const secret of ['pk1_', 'sk1_', 'fake_godaddy_pat', 'github_pat_fake']) expect(stdout).not.toContain(secret);
     expect(await count('domains')).toBe(0);
     await expect(run('npx', ['tsx', 'src/admin.ts', 'import-domain', '--domain', D], { env: { ...process.env, ...testEnv() } })).rejects.toMatchObject({ code: 2 });
