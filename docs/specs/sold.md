@@ -1,6 +1,6 @@
 # POST /sold/{domain}  (WRITE)
 
-**Goal:** record a sale, its commission and fees, and optionally the payout, so `/report` shows profit and ROI. **System-triggered (Dvir, 5 Oct 2026, 19:47 IDT):** Gavriel calls it **automatically** when a marketplace sale notification arrives; no approval from Dvir is needed. Dvir (or Gavriel quoting him) may still call it with `approval_ref`, which marks the sale `confirmed`.
+**Goal:** record a sale, its commission and fees, and optionally the payout, so `/report` shows profit and ROI. **System-triggered (Dvir, 5 Oct 2026, 19:47 IDT):** Gavriel calls it **automatically** when a marketplace sale notification arrives; no approval from Dvir is needed. Gavriel may also send Dvir's words in `approval_ref` (relayed from chat), which marks the sale `confirmed`. **Gavriel calls every endpoint; Dvir never calls the API** (5 Oct 2026).
 
 ## Request
 `Idempotency-Key` header required.

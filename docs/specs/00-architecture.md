@@ -13,7 +13,9 @@ Answer any portfolio or money question on request. Buy a domain at the cheapest 
 
 | Method | Path | Scope | Spec |
 |---|---|---|---|
-| GET | `/health` | none | here §7 |
+| GET | `/health` | none | here §7 (checks the DB) |
+| GET | `/health/ping` | none | here §7 (no DB; liveness) |
+| POST | `/jobs/run` | job token | here §6 (`{"job":"tick"\|"daily"}`; the Cloudflare Worker cron) |
 | GET | `/check?domain=` | READ | `check.md` |
 | POST | `/buy` | WRITE | `buy.md` |
 | POST | `/list/{domain}` | WRITE | `list.md` + `listing-strategy.md` (modes, guards, computed prices, holds) |
@@ -22,7 +24,7 @@ Answer any portfolio or money question on request. Buy a domain at the cheapest 
 | POST | `/export/{venue}/uploaded` | WRITE | `export-csv.md` (records the bot's upload on the marketplace site; clears the pending flags) |
 | POST | `/sold/{domain}` | WRITE | `sold.md` |
 | POST | `/payouts/{id}/received` | WRITE | `sold.md` (bot-only; v1 since 5 Oct 2026, 22:02) |
-| POST | `/offers`, `/offers/import` (CSV), `/offers/{id}/outcome` | WRITE | `listing-strategy.md` §10.11 (Gavriel or Dvir records offers from marketplace emails/dashboards; Afternic has no API) |
+| POST | `/offers`, `/offers/import` (CSV), `/offers/{id}/outcome` | WRITE | `listing-strategy.md` §10.11 (Gavriel records offers from marketplace emails/dashboards; Afternic has no API) |
 | GET | `/offers`, `/report/offers` | READ | `listing-strategy.md` §10.11, `report.md` |
 | GET | `/report`, `/report/pricing-review` | READ | `report.md` |
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | `report.md` |
@@ -133,7 +135,10 @@ Porkbun conditions the code must handle:
 - `Authorization: Bearer <token>`. Tokens are random, at least 32 bytes, and stored as SHA-256.
 - **READ** tokens may call GET only. **WRITE** tokens may call everything.
 - Wrong or absent token: **401**. A READ token on a POST: **403** `SCOPE_FORBIDDEN`. A revoked token: 401.
-- Tokens are created and revoked by Dvir's admin command (`npm run admin -- token create --scope read --name gavriel-read`), run in the Render shell or locally against the DB. **No API endpoint creates tokens.** The same admin tool imports domains bought by hand (`import-domain`, see `report.md` §Import; D-001 was bought this way).
+- Tokens are created and revoked by Dvir's admin command (`npm run admin -- token create --scope read --name gavriel-read`), run locally against the Neon DB (`.env.neon`; `docs/DEPLOYMENT.md`). **No API endpoint creates tokens.** The same admin tool imports domains bought by hand (`import-domain`, see `report.md` §Import; D-001 was bought this way).
+- **Job trigger (step 6 free hosting, Dvir, 5 Oct 2026):** `POST /jobs/run {"job":"tick"|"daily"}` accepts **only** the dedicated `JOB_TRIGGER_TOKEN` bearer (≥ 32 chars, an env secret held by the Cloudflare Worker). READ and WRITE tokens are refused there (401), and the job token works nowhere else. Not configured → 503 `JOBS_DISABLED`. Idempotent (the Worker sends `Idempotency-Key: <job>-<scheduled time>`; an overlapping run of the same job reports `skipped`) and audited with scope `job`.
+  - **`tick`** (hourly): the reconciler (`buy.md` §6), then the NS verifier if it last ran ≥ 24 h ago.
+  - **`daily`** (00:05 UTC): price job → drop job → registrar check → backup export (`backup.md`). Each step is isolated; the response lists every step's result.
 - **Every POST** (success, refusal, dry run, error) writes one `audit_log` row: token id and scope, approval text and timestamp, idempotency key, and the redacted request and result.
 - `Idempotency-Key` header is **required on every POST** (400 if missing).
   - Same key and same body: the stored response is replayed (header `Idempotent-Replayed: true`).
@@ -145,22 +150,19 @@ Porkbun conditions the code must handle:
 ## 7. Errors and conventions
 - JSON errors: `{ "error": { "code": "POC_CAP_EXCEEDED", "message": "...", "details": {...} } }`. Codes are stable; messages are not.
 - Cross-cutting codes (added by Dvir, 4 Oct 2026, step 1): `UNAUTHORIZED` 401; `SCOPE_FORBIDDEN` 403; `IDEMPOTENCY_KEY_REQUIRED` 400; `IDEMPOTENCY_KEY_MISMATCH` / `IDEMPOTENCY_KEY_IN_USE` 409; `RATE_LIMITED` 429 (with `Retry-After`); `VALIDATION_ERROR` 422 (body) or 400 (query/params schema); `DOMAIN_INVALID` 422 (not a valid second-level name, e.g. `www.example.com`; step 2); `INVALID_BODY` 400/413/415 (unparseable, too large, wrong media type); `INVALID_REQUEST` 4xx (malformed URL and other framework rejections); `NOT_FOUND` 404; `INTERNAL` 500; `AUDIT_WRITE_FAILED` 500 (processed but not audited: retry with the same `Idempotency-Key` to get the stored result).
-- `GET /health` (no auth) returns `{status, db: ok|down, version, adapters: [{name, enabled}]}`. It never reveals secrets or key prefixes.
+- `GET /health` (no auth) returns `{status, db: ok|down, version, adapters: [{name, enabled}]}` (503 `degraded` when the DB is down). It never reveals secrets or key prefixes.
+- `GET /health/ping` (no auth, **no DB access**) returns `{status: "ok"}`: a cheap liveness probe.
 - Responses show money both in cents and as a display string (`"$11.08"`).
 - Times: stored in UTC; `/report` also renders IDT (`Asia/Jerusalem`).
 - No LLM calls anywhere in the service. **0 tokens at runtime.**
 
-## 8. Hosting (Render)
-- **Web service** (Docker or native Node), plus **Render Postgres on a paid instance type**:
-  - Free Postgres expires after 30 days and has **no** backups or PITR.
-  - Paid instances get PITR: **3 days on Hobby, 7 days on Pro+**.
-  - Logical backups are kept 7 days. Source: https://render.com/docs/postgresql-backups.md
-- Optional **cron job** for the nightly export to GitHub (`backup.md`).
-- Sketch: `render.yaml` in the repo root (Blueprint spec: https://render.com/docs/blueprint-spec.md).
-- **Monthly cost is UNKNOWN to me:** check https://render.com/pricing. It conflicts with the current $0 tools cap in `cfo-ledger.md`, so **Dvir must approve the hosting spend.**
-- **Outbound IPs:** Render egress uses shared regional CIDR ranges, unless you buy a **Dedicated IP set** (3 static IPv4s) (https://render.com/docs/dedicated-ips).
-  - Porkbun's key IP allowlist accepts CIDR, so shared ranges work.
-  - Namecheap needs specific whitelisted IPv4s, which means a Dedicated IP set.
+## 8. Hosting (free; step 6 free hosting, Dvir, 5 Oct 2026)
+- **Render free web service** (Docker or native Node; it sleeps when idle). `render.yaml` in the repo root (Blueprint: https://render.com/docs/blueprint-spec.md); setup steps in `docs/DEPLOYMENT.md`.
+- **Neon free Postgres**, over the **direct** (non-pooler) connection with **TLS `sslmode=verify-full`** (`DATABASE_SSL=true`). In production the server refuses a `-pooler` host, because the per-domain lock is a session advisory lock.
+- **No paid PITR.** Recovery = the nightly export to the private data repo + the restore drill (`backup.md`; BK-5 before G4).
+- **Cloudflare Worker cron** (`jobs-trigger/`) wakes the service and calls `POST /jobs/run` (§6): hourly `tick` (`0 * * * *`) and `daily` at **00:05 UTC** (`5 0 * * *`). Production runs with **`JOBS_MODE=external`** (no in-process timers). In-process timers (`JOBS_MODE=internal`: reconciler every 10 min, NS verifier every 24 h, daily at 00:30 UTC) are for **local dev only**.
+- Monthly cost: **$0**.
+- **Outbound IPs:** Render egress uses shared regional CIDR ranges (no Dedicated IP set on free). Porkbun's key IP allowlist accepts CIDR, so shared ranges work. Namecheap needs specific whitelisted IPv4s (a paid Dedicated IP set), so it stays out.
 
 ## 9. Risks and how v1 bounds them
 
@@ -171,5 +173,5 @@ Porkbun conditions the code must handle:
 | WRITE token leak | Rotate every 90 days. Revoke immediately on suspicion. The caps above limit the damage to ≤ $1,500 total |
 | Double purchase | Idempotency key, a unique purchase per domain, a per-domain advisory lock, a registrar-side `Idempotency-Key`, and a `find_domain` check before registering |
 | Lost bookkeeping after a crash | `purchases.state = register_sent` + the reconciler (`buy.md` §6) |
-| Data loss | Render PITR + the nightly export to git (`backup.md`) |
+| Data loss | No PITR on the free tier: the nightly export to the private data repo + the restore drill before G4 (`backup.md`) |
 | The scheduled price job cuts a price wrongly or twice | Rows are computed and shown on the buy card before Dvir approves; the job only applies `planned` rows with exact amounts, is idempotent (unique row per event), re-validates V5/V6 before applying, never calls a registrar or marketplace, and every change is a `listing_history` row. The live price only changes when Dvir uploads the export (`listing-strategy.md` §10) |

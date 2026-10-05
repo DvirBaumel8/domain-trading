@@ -23,7 +23,7 @@
 
 **Exception (Dvir, 5 Oct 2026, 00:39 IDT):** D-001 is recorded with its **approved values**: BIN $1,995, floor $1,295, walk-away $950 (§8). Its marketplace min offer is $100 like every non-geo name.
 
-**Offers log (Dvir, 5 Oct 2026, 01:03 IDT):** Afternic has no seller API, so Gavriel or Dvir records every offer from marketplace emails or dashboards with `POST /offers` (WRITE), or in bulk with a CSV import. `/report` shows offer counts and the highest offer per domain and period, plus per-strategy aggregates. These are the demand signal for the quarterly review (§10.11).
+**Offers log (Dvir, 5 Oct 2026, 01:03 IDT):** Afternic has no seller API, so Gavriel records every offer from marketplace emails or dashboards with `POST /offers` (WRITE), or in bulk with a CSV import. `/report` shows offer counts and the highest offer per domain and period, plus per-strategy aggregates. These are the demand signal for the quarterly review (§10.11).
 
 **Dvir's CLI wording maps to the API.** He wrote the rules as CLI commands (`dt list <domain> --bin 299`); the system is an HTTP API, so these become the body of `POST /list/{domain}` (§4). An optional thin CLI keeps the flags (`cli.md`). **The server computes every derived price** (floor, walk-away, min offer, the drop schedule) from BIN + category + `pricing_settings` (§10). Bots never do the arithmetic by hand.
 
@@ -407,7 +407,7 @@ The **server** computes every derived price from three inputs: **BIN + category 
 | Delist | 2028-09-27 | — |
 
 ### 10.5 Scheduled job `src/jobs/price-schedule.ts`
-- **When it runs:** once a day at 00:30 UTC, in the same in-process daily job runner that already marks `dropped` domains and re-checks DNS. No extra Render service, so no extra cost. It can also be run by hand: `npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]`.
+- **When it runs:** once a day as the first step of the `daily` job (`POST /jobs/run`, 00:05 UTC, triggered by the Cloudflare Worker cron; `00-architecture.md` §6), before the drop job, registrar check and backup export. No extra service, so no extra cost (local dev: in-process timer at 00:30 UTC). It can also be run by hand: `npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]`.
 - **For each `price_schedule` row with status `planned` and `due_on ≤ today` (IDT)**, in one transaction per domain, under the per-domain advisory lock:
   - **Skip** if the domain isn't `listed`, or if `pricing_hold` is set.
   - **Otherwise:**
@@ -513,7 +513,7 @@ Offer counts and amounts feed the quarterly review from the `offers` table (§10
 - **Immutable facts:** a DB trigger refuses updates to `domain_id`, `amount_cents`, `source`, `received_at`, the snapshot and `band`. Only the outcome fields change, each change through the API with an `audit_log` row.
 - **No side effects:** recording an offer never calls a marketplace or registrar, never sends anything, and never changes a price. It may set `pricing_hold` only if the request asks for it (reason required; no `approval_ref`, as with `POST /list`; (Dvir, 5 Oct 2026, 20:07: bot autonomy)).
 
-**`POST /offers`** (WRITE; Gavriel or Dvir, from a marketplace email or dashboard):
+**`POST /offers`** (WRITE; Gavriel, from a marketplace email or dashboard):
 ```json
 {"domain":"promptinjectionaudit.com","amount_usd":"450.00","source":"afternic",
  "received_at":"2026-12-01T09:12:00+02:00","buyer_type":"unknown","external_ref":"AFN-OFFER-123"}

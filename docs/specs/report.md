@@ -90,7 +90,7 @@ D-001 (promptinjectionaudit.com) was bought **by hand at GoDaddy** (not Porkbun)
 | IM-11 | GoDaddy adapter never registers | Static test: the GoDaddy adapter has no `register` implementation, and `/check` excludes GoDaddy with `NO_AVAILABILITY_ACCESS` | Can register |
 
 ## Daily registrar check (`DOMAIN_LEFT_ACCOUNT`; Dvir, 5 Oct 2026, 19:47)
-- Runs daily **after the price and drop jobs** (00:30 UTC), and by hand with `npm run job -- registrar-check [--dry-run]`. Each result is upserted into **`registrar_presence`** (`present`/`absent`, `first_absent_at` kept while absent, cleared when present again; `00-architecture.md` §4) (spec sync 4d-2, Dvir, 5 Oct 2026, 22:02).
+- Runs daily **after the price and drop jobs** (the `daily` job, 00:05 UTC in production), and by hand with `npm run job -- registrar-check [--dry-run]`. Each result is upserted into **`registrar_presence`** (`present`/`absent`, `first_absent_at` kept while absent, cleared when present again; `00-architecture.md` §4) (spec sync 4d-2, Dvir, 5 Oct 2026, 22:02).
 - Scope: for every domain with status `owned`, `listed` or `delisted` and `registrar_api` `full` or `manage`: `adapter.find_domain(domain)`.
 - A definite `None` (not in our account; e.g. transferred out) and **no** `sales` row → `/report` warning `DOMAIN_LEFT_ACCOUNT` (domain, registrar, `first_absent_at`). The status is **not** changed and no sale is invented; Gavriel tells Dvir.
 - Registrar errors or timeouts → no warning (retry next day); `registrar_api = none` names are skipped (no API to ask).

@@ -119,7 +119,7 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
 - Never retry a definite failure with a new idempotency key inside the same call.
 
 ## Reconciler (§6)
-Runs at startup and every 10 min. For every `purchases.state in (register_sent, unknown)` older than 2 min:
+Runs **hourly** in production (the `tick` job, `00-architecture.md` §6; every 10 min under local in-process timers). For every `purchases.state in (register_sent, unknown)` older than 2 min:
 - Call `find_domain` at that registrar.
   - Present: finish the bookkeeping (step 6), then `state=succeeded`.
   - Absent, RDAP 404, and older than 30 min: `failed`.
@@ -154,7 +154,7 @@ Runs at startup and every 10 min. For every `purchases.state in (register_sent, 
 | B-17 | Registrar `INSUFFICIENT_FUNDS` on the dry run | 409 `REGISTRAR_FUNDS` with the shortfall; no top-up call | Top-up attempted, or a 500 |
 | B-18 | `COST_MISMATCH` (price changed between check and create) | Re-quote once; if still ≤ caps, proceed with the new cost; else 409 | Buys above the cap |
 | B-19 | Timeout on `register`, then the replay returns success | Exactly one charge, bookkeeping done, 201 | Two charges, or no bookkeeping |
-| B-20 | Process killed after `register_sent`, before bookkeeping | The reconciler completes the rows within 10 min; the ledger has exactly 1 registration row | 0 or 2 rows |
+| B-20 | Process killed after `register_sent`, before bookkeeping | The next reconciler run (hourly in production) completes the rows; the ledger has exactly 1 registration row | 0 or 2 rows |
 | B-21 | Successful buy: rows | 1 ledger row (−1108, `porkbun:<order>`); domain row with `renewals_used=0`, `drop_date=expiry+1y`; receipt; audit; purchase `succeeded` | Any missing or wrong |
 | B-22 | 29 Feb expiry | `drop_date` = 28 Feb next year | Invalid date or error |
 | B-23 | Ledger append-only | `UPDATE ledger_entries` raises | Succeeds |

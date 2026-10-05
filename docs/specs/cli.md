@@ -1,6 +1,6 @@
 # Optional thin CLI `dt` (v1.1, not required for v1)
 
-A ~150-line wrapper over the HTTP API, so Dvir can type the commands he already uses. **It holds no registrar keys and has no logic of its own**. It reads `DT_API_URL` and `DT_TOKEN` (his own WRITE token) from his shell, builds the JSON body, sends it, and prints the response. Every rule is enforced by the server.
+A ~150-line wrapper over the HTTP API, so **Gavriel** can use the command wording Dvir's approvals already use. **Gavriel calls every endpoint; Dvir never calls the API** (5 Oct 2026). **It holds no registrar keys and has no logic of its own**. It reads `DT_API_URL` and `DT_TOKEN` (Gavriel's WRITE token) from the shell, builds the JSON body, sends it, and prints the response. Every rule is enforced by the server.
 
 | Command | HTTP call |
 |---|---|
