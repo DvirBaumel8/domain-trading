@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { RdapFn } from '../../src/rdap.js';
 import { RegistrarError } from '../../src/registrars/types.js';
-import { markUnknown } from '../../src/services/bookkeeping.js';
+import { failPurchase, markUnknown } from '../../src/services/bookkeeping.js';
 import { Reconciler } from '../../src/services/reconciler.js';
 import { makeApp } from '../helpers/app.js';
 import { DOMAIN, approvalNow, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
@@ -134,16 +134,16 @@ describe('POST /buy purchase', () => {
     expect(pb.charges).toBe(1);
   });
 
-  it('all attempts ambiguous, registrar never acted, RDAP still 404 → 409 PURCHASE_FAILED, purchase failed, domain row gone', async () => {
+  it('all attempts ambiguous, registrar never acted, RDAP still 404 → never released in-call: 202 PURCHASE_STATE_UNKNOWN, purchase unknown, pending row kept', async () => {
     const pb = new FakeAdapter('porkbun', { register: () => timeout() });
     const { auth, sleeps } = await setup(pb);
     const res = await postBuy(app, buyBody(), auth);
-    expect(res.statusCode).toBe(409);
-    expect(res.json().error).toMatchObject({ code: 'PURCHASE_FAILED', details: { registrar_code: 'REGISTRAR_TIMEOUT' } });
+    expect(res.statusCode).toBe(202);
+    expect(res.json()).toMatchObject({ status: 'unknown', code: 'PURCHASE_STATE_UNKNOWN' });
     expect(sleeps).toEqual([2000, 5000, 10000]);
     expect(pb.realRegisterCalls).toBe(4);
-    expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('failed');
-    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(0);
+    expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('unknown');
+    expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ domain: DOMAIN, status: 'pending_purchase' });
   });
 
   it('all attempts ambiguous and findDomain errors → 202 PURCHASE_STATE_UNKNOWN; purchase unknown; pending counts', async () => {
@@ -423,7 +423,7 @@ describe('POST /buy final-review fixes', () => {
     expect(d2.headers['idempotent-replayed']).toBe('true');
   });
 
-  it('ambiguous dry run → 409 REGISTRAR_DRY_RUN_AMBIGUOUS, unknown purchase recorded, no domain row, no real register; re-buy blocked; reconciler books it', async () => {
+  it('ambiguous dry run → 409 REGISTRAR_DRY_RUN_AMBIGUOUS, unknown purchase + pending domain row recorded, no real register; re-buy blocked; reconciler books it', async () => {
     const amb = new RegistrarError('porkbun', 'REGISTRAR_BAD_RESPONSE', 'dry run answered as real', { ambiguous: true });
     const pb = new FakeAdapter('porkbun', { dryRun: () => amb });
     const { auth } = await setup(pb);
@@ -434,7 +434,7 @@ describe('POST /buy final-review fixes', () => {
     const p = one(await db.selectFrom('purchases').selectAll().execute());
     expect(p).toMatchObject({ state: 'unknown', expected_cents: 1108, dry_run: false, domain: DOMAIN, registrar: 'porkbun' });
     expect(p.idempotency_key).toMatch(/^.+#dry-ambiguous-[0-9a-f-]{36}$/);
-    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(0);
+    expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ domain: DOMAIN, status: 'pending_purchase', category: 'geo', deal_id: 'D-009' });
     // (b)
     const again = await postBuy(app, buyBody(), auth);
     expect(again.statusCode).toBe(409);
@@ -446,6 +446,27 @@ describe('POST /buy final-review fixes', () => {
     expect(one(await db.selectFrom('ledger_entries').selectAll().execute())).toMatchObject({ amount_cents: -1108, deal_id: 'D-009' });
     expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ domain: DOMAIN, status: 'owned' });
     expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('succeeded');
+  });
+
+  it('ambiguous dry run counts toward the 10-domain cap: 9 owned + ambiguous A → buy of B is DOMAIN_CAP_REACHED', async () => {
+    const amb = new RegistrarError('porkbun', 'REGISTRAR_BAD_RESPONSE', 'x', { ambiguous: true });
+    const pb = new FakeAdapter('porkbun', { dryRun: (n) => (n === 0 ? amb : undefined) });
+    const { auth } = await setup(pb);
+    await seedOwnedDomains(9);
+    expect((await postBuy(app, buyBody({ domain: 'a-amb.com' }), auth)).json().error.code).toBe('REGISTRAR_DRY_RUN_AMBIGUOUS');
+    expect((await postBuy(app, buyBody({ domain: 'b-next.com' }), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
+  });
+
+  it('failPurchase with fromStates [created] on an already-failed purchase does not delete another purchase\'s pending row', async () => {
+    const mk = async (state: 'failed' | 'created', key: string) => (await db.insertInto('purchases').values({
+      idempotency_key: key, request_hash: 'h', domain: DOMAIN, state, dry_run: false, registrar: 'porkbun', max_price_cents: 2000,
+      approval_text: DOMAIN, approval_at: new Date(), expected_cents: 1108, request: '{}', audit_id: 'aud_x',
+    }).returning('id').executeTakeFirstOrThrow()).id;
+    const failedId = await mk('failed', 'k-old');
+    await mk('created', 'k-new');
+    await db.insertInto('domains').values({ domain: DOMAIN, status: 'pending_purchase', registrar: 'porkbun', category: 'geo' }).execute();
+    await failPurchase(db, failedId, DOMAIN, { status: 409, body: {} }, { fromStates: ['created'] });
+    expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ domain: DOMAIN, status: 'pending_purchase' });
   });
 
   it('execute guard: purchase abandoned before register_sent → 409 PURCHASE_ABANDONED, nothing registered', async () => {

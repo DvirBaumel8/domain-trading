@@ -37,3 +37,15 @@ describe('checkApproval (founder rule 1)', () => {
     expect(checkApproval({ text: D, approved_at: at(72) }, D, now, 72).ok).toBe(true);
   });
 });
+
+describe('approval text names the domain on label boundaries', () => {
+  const ok = (text: string) => checkApproval({ text, approved_at: at(1) }, 'x.com', now, 72);
+  it.each(['yes buy x.com up to $11.50', 'buy X.COM.', '(x.com)', 'buy x.com, list BIN $399', 'x.com'])('accepts %j', (t) => {
+    expect(ok(t).ok).toBe(true);
+  });
+  it.each(['buy ba.com', 'buy x.com.au', 'buy www.x.com', 'buy x.company', 'buy x-com', 'buy xcom'])('rejects %j', (t) => {
+    const r = ok(t);
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.code).toBe('APPROVAL_INVALID');
+  });
+});

@@ -133,7 +133,7 @@ export class BuyService {
 
     // 10. registrar dry run (re-quote once on COST_MISMATCH)
     const dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars,
-      { input, ctx, approvedAt: appr.approvedAt, check });
+      { input, ctx, approvedAt: appr.approvedAt, check, category });
     winner = dry.winner;
 
     const approved: Approved = {
@@ -249,7 +249,9 @@ export class BuyService {
         // Nothing reached the registrar: release the reservation, surface the error.
         const status = e instanceof AppError ? e.status : 500;
         const body = e instanceof AppError ? errorBody(e.code, e.message, e.details) : errorBody('INTERNAL', 'Internal error');
-        await failPurchase(this.deps.db, purchaseId, a.input.domain, { status, body });
+        if (!(e instanceof AppError && e.code === 'PURCHASE_ABANDONED')) {
+          await failPurchase(this.deps.db, purchaseId, a.input.domain, { status, body }, { fromStates: ['created'] });
+        }
         throw e;
       }
       // After register_sent: NEVER 5xx (the money invariant).
@@ -318,11 +320,7 @@ export class BuyService {
       info = undefined;
     }
     if (info) return this.finishFound(a, purchaseId, info, []);
-    if (info === null && (await this.deps.rdap(d)) === 'not_registered') {
-      return this.rejected(a, purchaseId, 'PURCHASE_FAILED', 'The registrar never confirmed the registration and the domain is still unregistered; nothing was bought', {
-        registrar: adapter.name, registrar_code: lastErr?.code ?? 'UNKNOWN',
-      });
-    }
+    // Never release in-call (owner decision 5 Oct 2026): even "not found + RDAP 404" may be registrar lag. The reconciler fails it after 30 min.
     return this.unknown(a, purchaseId);
   }
 
@@ -546,7 +544,7 @@ export class BuyService {
 
   private async registrarDryRun(
     adapter: RegistrarAdapter, domain: string, winner: EvaluatedQuote, caps: Caps, pocCap: number, allowed: string[],
-    rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult },
+    rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category },
   ): Promise<{ winner: EvaluatedQuote; cost: number }> {
     let w = winner;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -584,15 +582,28 @@ export class BuyService {
 
   /** An ambiguous dry run may have been a real registration: record an `unknown` purchase so the cap counts it and the reconciler resolves it. */
   private async recordDryRunAmbiguous(
-    adapter: RegistrarAdapter, e: RegistrarError, cost: number, rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult },
+    adapter: RegistrarAdapter, e: RegistrarError, cost: number, rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category },
   ): Promise<never> {
     this.deps.log?.error({ domain: rec.input.domain, registrar: adapter.name, registrar_code: e.code }, 'dry run ambiguous — possible real charge');
-    await this.deps.db.insertInto('purchases').values({
-      idempotency_key: `${rec.ctx.idempotencyKey}#dry-ambiguous-${randomUUID()}`, request_hash: rec.ctx.requestHash, domain: rec.input.domain,
-      state: 'unknown', dry_run: false, registrar: adapter.name, check_id: rec.check.checkId, max_price_cents: rec.input.maxPriceCents,
-      approval_text: String(rec.input.approval?.text), approval_at: rec.approvedAt, expected_cents: cost,
-      request: JSON.stringify(redact(rec.input.requestBody)), audit_id: rec.ctx.auditId,
-    }).execute();
+    try {
+      // The pending domains row makes the 10-domain cap count this possible purchase; both rows or neither.
+      await this.deps.db.transaction().execute(async (trx) => {
+        await sql`select pg_advisory_xact_lock(hashtext(${rec.input.domain}))`.execute(trx);
+        await trx.insertInto('purchases').values({
+          idempotency_key: `${rec.ctx.idempotencyKey}#dry-ambiguous-${randomUUID()}`, request_hash: rec.ctx.requestHash, domain: rec.input.domain,
+          state: 'unknown', dry_run: false, registrar: adapter.name, check_id: rec.check.checkId, max_price_cents: rec.input.maxPriceCents,
+          approval_text: String(rec.input.approval?.text), approval_at: rec.approvedAt, expected_cents: cost,
+          request: JSON.stringify(redact(rec.input.requestBody)), audit_id: rec.ctx.auditId,
+        }).execute();
+        await trx.insertInto('domains').values({
+          domain: rec.input.domain, status: 'pending_purchase', registrar: adapter.name, category: rec.category, deal_id: rec.input.dealId,
+        }).execute();
+      });
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      // another purchase already holds the domain: it is tracked there; still answer 409, never 500
+      this.deps.log?.error({ domain: rec.input.domain }, 'dry-ambiguous record hit a unique violation; another purchase holds the domain');
+    }
     throw new AppError(409, 'REGISTRAR_DRY_RUN_AMBIGUOUS',
       'The registrar dry run gave an ambiguous answer; a real charge may have happened. Check the registrar account; the reconciler will book it if it was registered.',
       { registrar: adapter.name, registrar_code: e.code });
