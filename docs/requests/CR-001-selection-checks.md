@@ -7,9 +7,9 @@
 | **CR id** | CR-001 |
 | **To** | DOM (vendor; owns and builds the domain-trading software) |
 | **From** | Gavriel (chief of staff; DOM's only API user), on behalf of Dvir |
-| **Date** | 2026-10-06, ~02:15 IDT |
-| **Status** | **DRAFT — not sent to DOM.** For Gavriel/Dvir review first |
-| **Business rules** | Selection v9.1 (`system/selection-v9-final.md`, 2026-10-06). Rule ids (HIST-1, LEAD-1, …) and test ids (SEL9-x) refer to that document |
+| **Date** | 2026-10-06, 02:05 IDT |
+| **Status** | **APPROVED by Dvir 2026-10-06 02:05 IDT, sent to DOM** |
+| **Business rules** | Selection v9.1 (`docs/specs/selection.md` (v9.1), 2026-10-06). Rule ids (HIST-1, LEAD-1, …) and test ids (SEL9-x) refer to that document |
 | **Based on** | Practice runs DR-002 (2026-10-06 00:05–00:32 IDT) and DR-003 (~00:50–01:45 IDT), plus the sold-names backtest in progress (`research/backtest-sold/`) |
 | **Priority key** | **P1** = needed for the next practice run (DR-004). **P2** = later |
 
@@ -542,4 +542,4 @@ These scripts were written by Gavriel's workers during the practice runs to stan
 - DR-003: `funnel.md`, `cards.md`, `issues.md` (DR3-01…DR3-11), `cost.md`, frozen census lists `census/*@v1.csv` + `README.md`, raw data in `evidence/` (e.g. `hist-surbl-wr.json`, `tm-verdict.json`, `census-run.json`, `leads-deep-tulsaroofingco.com.json`, `namebio-spot.json`, `bbb-market-scan.json`).
 - Example results quoted in acceptance tests were true at the time of those runs (2026-10-06 00:05–01:45 IDT). Live sources can drift; DOM may run acceptance tests against recorded copies of those responses plus a small live smoke test.
 
-*End of CR-001 draft.*
+*End of CR-001.*
