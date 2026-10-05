@@ -9,7 +9,7 @@ const USAGE = `usage:
   npm run admin -- token create --scope read|write --name <name>
   npm run admin -- token revoke --id <id>
   npm run admin -- token list
-  npm run admin -- pricing-settings new --from-current --set key=value [--set ...] --approval-text "<words>" --approval-at <ISO> [--note <text>]
+  npm run admin -- pricing-settings new [--from-current] --set key=value [--set ...] --approval-text "<words>" --approval-at <ISO> [--note <text>]
   npm run admin -- pricing-settings show [--version N]
   npm run admin -- doctor`;
 
@@ -61,7 +61,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     if (cmd === 'pricing-settings' && sub === 'new') {
-      if (!values['from-current']) throw new UsageError('--from-current is required');
+      if (!values.set?.length) throw new UsageError('at least one --set is required');
       if (!values['approval-text']?.trim()) throw new UsageError('--approval-text is required');
       if (!values['approval-at']) throw new UsageError('--approval-at is required');
       const set: Record<string, string> = {};

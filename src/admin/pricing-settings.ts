@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { newAuditId } from '../http/audit.js';
@@ -28,11 +29,12 @@ function parseValue(key: string, raw: string): unknown {
 
 export async function newPricingSettings(
   db: Kysely<Database>,
-  o: { set: Record<string, string>; approvalText: string; approvalAt: string; note?: string; effectiveAt?: Date; now: Date },
+  o: { set: Record<string, string>; approvalText: string; approvalAt: string; note?: string; now: Date },
 ): Promise<{ version: number }> {
   if (!o.approvalText.trim()) throw new Error('approval text (Dvir\'s words) is required');
+  if (Object.keys(o.set).length === 0) throw new Error('at least one --set is required');
+  if (!z.iso.datetime({ offset: true }).safeParse(o.approvalAt).success) throw new Error('approval-at must be ISO 8601 with an offset or Z');
   const approvalAt = new Date(o.approvalAt);
-  if (Number.isNaN(approvalAt.getTime())) throw new Error('approval-at must be an ISO 8601 time');
   if (approvalAt.getTime() > o.now.getTime()) throw new Error('approval-at must not be in the future');
   const changes = Object.fromEntries(Object.entries(o.set).map(([k, v]) => [k, parseValue(k, v)]));
   return db.transaction().execute(async (trx) => {
@@ -44,12 +46,18 @@ export async function newPricingSettings(
       drops: JSON.stringify(cur.drops),
       ...changes,
       version: version + 1,
-      effective_at: o.effectiveAt ?? o.now,
+      effective_at: o.now,
       approval_text: o.approvalText,
       approval_at: approvalAt,
       note: o.note ?? null,
     };
-    const inserted = await trx.insertInto('pricing_settings').values(row as never).returningAll().executeTakeFirstOrThrow();
+    let inserted;
+    try {
+      inserted = await trx.insertInto('pricing_settings').values(row as never).returningAll().executeTakeFirstOrThrow();
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') throw new Error('another pricing-settings version was created concurrently; re-run');
+      throw e;
+    }
     rowToSettings(inserted); // validates the jsonb shapes; throws (and rolls back) on a bad value
     await trx.insertInto('audit_log').values({
       id: newAuditId(), scope: 'admin', method: 'ADMIN', path: 'pricing-settings new',

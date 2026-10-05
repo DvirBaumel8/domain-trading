@@ -36,4 +36,18 @@ describe('pricing settings loader', () => {
     expect(() => rowToSettings({ ...v2, drops: [{ afterMonths: 6, pctBps: 2000 }] })).toThrow();
     expect(() => rowToSettings({ ...v2, drops: [{ after_months: 6, pct_bps: 2000, extra: 1 }] })).toThrow();
   });
+  it('rowToSettings enforces cross-field rules', async () => {
+    const v2 = await db.selectFrom('pricing_settings').selectAll().where('version', '=', 2).executeTakeFirstOrThrow();
+    const d = (a: number) => ({ after_months: a, pct_bps: 2000 });
+    expect(() => rowToSettings({ ...v2, drops: [d(4), d(8), d(18)] })).toThrow(/at most 2/);
+    expect(() => rowToSettings({ ...v2, drops: [d(18), d(6)] })).toThrow(/ascending/);
+    expect(() => rowToSettings({ ...v2, drops: [d(6), d(24)] })).toThrow(/< 24/);
+    const g = { after_months: 12, from_cents: 49900, to_cents: 39900 };
+    expect(() => rowToSettings({ ...v2, geo_drops: [g, g] })).toThrow(/at most 1/);
+    expect(() => rowToSettings({ ...v2, geo_drops: [{ ...g, from_cents: 45900 }] })).toThrow(/from_cents/);
+    expect(() => rowToSettings({ ...v2, geo_drops: [{ ...g, to_cents: 29900 }] })).toThrow(/to_cents/);
+    expect(() => rowToSettings({ ...v2, geo_bin_weaker_cents: 49900, geo_drops: [{ ...g, to_cents: 49900 }] })).toThrow(/below/);
+    expect(() => rowToSettings({ ...v2, hybrid_min_offer_cents: 60000 })).toThrow(/hybrid_min_offer/);
+    expect(rowToSettings(v2).version).toBe(2);
+  });
 });

@@ -30,8 +30,25 @@ const GeoDrops = z.array(z.object({ after_months: Int.positive(), from_cents: In
 const Drops = z.array(z.object({ after_months: Int.positive(), pct_bps: Int.min(1).max(9999) }).strict())
   .transform((a) => a.map((d) => ({ afterMonths: d.after_months, pctBps: d.pct_bps })));
 
+function checkCrossFields(s: PricingSettings): PricingSettings {
+  if (s.drops.length > 2) throw new Error('pricing_settings.drops: at most 2 entries');
+  s.drops.forEach((d, i) => {
+    if (d.afterMonths >= 24) throw new Error('pricing_settings.drops: after_months must be < 24');
+    if (i > 0 && d.afterMonths <= s.drops[i - 1]!.afterMonths) throw new Error('pricing_settings.drops: after_months must be strictly ascending');
+  });
+  if (s.geoDrops.length > 1) throw new Error('pricing_settings.geo_drops: at most 1 entry');
+  const g = s.geoDrops[0];
+  if (g) {
+    if (g.fromCents !== s.geoBinStrongCents) throw new Error('pricing_settings.geo_drops: from_cents must equal geo_bin_strong_cents');
+    if (g.toCents !== s.geoBinWeakerCents) throw new Error('pricing_settings.geo_drops: to_cents must equal geo_bin_weaker_cents');
+    if (g.toCents >= g.fromCents) throw new Error('pricing_settings.geo_drops: to_cents must be below from_cents');
+  }
+  if (s.hybridMinOfferCents > s.walkawayMinCents) throw new Error('pricing_settings: hybrid_min_offer_cents must be <= walkaway_min_cents');
+  return s;
+}
+
 export function rowToSettings(r: Selectable<PricingSettingsTable>): PricingSettings {
-  return {
+  return checkCrossFields({
     version: r.version, effectiveAt: r.effective_at,
     geoBinStrongCents: r.geo_bin_strong_cents, geoBinWeakerCents: r.geo_bin_weaker_cents,
     geoBinMinCents: r.geo_bin_min_cents, geoBinMaxCents: r.geo_bin_max_cents,
@@ -41,7 +58,7 @@ export function rowToSettings(r: Selectable<PricingSettingsTable>): PricingSetti
     finalPushDaysBeforeDrop: r.final_push_days_before_drop, finalPushMode: r.final_push_mode,
     delistDaysBeforeDrop: r.delist_days_before_drop, headsupDaysBefore: r.headsup_days_before,
     compsMin: r.comps_min, compsMax: r.comps_max, publicLto: r.public_lto,
-  };
+  });
 }
 
 export async function currentSettings(db: Kysely<Database>, now: Date): Promise<PricingSettings> {
