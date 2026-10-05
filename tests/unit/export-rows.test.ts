@@ -26,12 +26,18 @@ describe('Afternic rows (listing-strategy §6)', () => {
     expect(cells(r)).toBe('example.com,399,399,399,N,,Buy It Now,Y,N,N,N');
     expect(r.warnings).toEqual(['example.com:AFTERNIC_ROUNDS_DOWN']);
   });
+  it('a display name that is not the domain in ASCII case is ignored with a warning (Kelvin sign)', () => {
+    const r = afternicRow(d({ domain: 'kelvin.com', display_name: '\u212Aelvin.com' }));
+    expect(cells(r)).toBe('kelvin.com,399,399,399,N,,Buy It Now,Y,N,N,N');
+    expect(r.warnings).toEqual(['DISPLAY_NAME_IGNORED:kelvin.com']);
+    expect(afternicRow(d({ domain: 'kelvin.com', display_name: 'KelVin.com' })).warnings).toEqual([]);
+  });
   it('E-3/LX-6: Min Offer below 20 → skipped with a warning', () => {
     const r = afternicRow(d({ listing_mode: 'offer', bin_cents: null, floor_cents: null, min_offer_cents: 1999 }));
     expect(cells(r)).toBe('SKIP:MIN_OFFER_BELOW_20');
     expect(r.warnings).toEqual(['example.com:MIN_OFFER_BELOW_20']);
   });
-  it('uses display_name when set', () => expect(cells(afternicRow(d({ display_name: 'ExampleCityRoofing.com' })))).toMatch(/^ExampleCityRoofing\.com,/));
+  it('uses display_name when set', () => expect(cells(afternicRow(d({ domain: 'examplecityroofing.com', display_name: 'ExampleCityRoofing.com' })))).toMatch(/^ExampleCityRoofing\.com,/));
   it('no listing mode → skipped', () => expect(cells(afternicRow(d({ listing_mode: null })))).toBe('SKIP:NOT_LISTED'));
 });
 

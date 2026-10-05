@@ -17,3 +17,8 @@ export function normalizeDomain(input: string): string {
   }
   return d;
 }
+
+/** A display name is the domain with different ASCII capitalisation only (Unicode folds such as the Kelvin sign are refused). */
+export function isValidDisplayName(domain: string, name: string): boolean {
+  return /^[A-Za-z0-9.-]+$/.test(name) && name.toLowerCase() === domain;
+}

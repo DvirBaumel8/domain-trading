@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Config } from '../config.js';
 import { jerusalemDate } from '../dates.js';
 import type { Database, DomainRow } from '../db/types.js';
+import { isValidDisplayName } from '../domain-name.js';
 
 export const AFTERNIC_HEADER = [
   'Domain', 'Buy Now Price', 'Floor Price', 'Min Offer', 'Lease to Own', 'Max Lease Period', 'Sale Lander',
@@ -24,7 +25,12 @@ export function afternicRow(d: ExportDomain): { row: { cells: string[] } | { ski
   const round = { dropped: false };
   const min = usd(d.min_offer_cents, round);
   if (min === '' || Number(min) < 20) return { row: { skip: 'MIN_OFFER_BELOW_20' }, warnings: [`${d.domain}:MIN_OFFER_BELOW_20`] };
-  const name = d.display_name ?? d.domain;
+  const warnings: string[] = [];
+  let name = d.domain;
+  if (d.display_name !== null) {
+    if (isValidDisplayName(d.domain, d.display_name)) name = d.display_name;
+    else warnings.push(`DISPLAY_NAME_IGNORED:${d.domain}`);
+  }
   let cells: string[];
   if (d.listing_mode === 'bin') {
     const bin = usd(d.bin_cents, round);
@@ -35,7 +41,7 @@ export function afternicRow(d: ExportDomain): { row: { cells: string[] } | { ski
     const lto = d.lto_max_months !== null;
     cells = [name, usd(d.bin_cents, round), usd(d.floor_cents, round), min, lto ? 'Y' : 'N', lto ? String(d.lto_max_months) : '', 'Custom Lander', 'Y', lto ? 'Y' : 'N', 'Y', 'N'];
   }
-  return { row: { cells }, warnings: round.dropped ? [`${d.domain}:AFTERNIC_ROUNDS_DOWN`] : [] };
+  return { row: { cells }, warnings: round.dropped ? [...warnings, `${d.domain}:AFTERNIC_ROUNDS_DOWN`] : warnings };
 }
 
 const noPlaceholder = (v: string) => !(v.startsWith('<') && v.endsWith('>'));
@@ -158,6 +164,7 @@ export class ExportService {
     const rows: string[][] = [t.headers];
     const exported: string[] = [];
     for (const d of await this.listed(warnings)) {
+      if (d.display_name !== null && !isValidDisplayName(d.domain, d.display_name)) warnings.push(`DISPLAY_NAME_IGNORED:${d.domain}`); // the Sedo row always uses the lowercase domain
       if (sedoDropsCents(d, s.sedo_hybrid_as)) warnings.push(`${d.domain}:SEDO_ROUNDS_DOWN`);
       rows.push(sedoRow(d, t, s.sedo_hybrid_as));
       exported.push(d.domain);

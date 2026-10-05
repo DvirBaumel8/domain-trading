@@ -11,7 +11,8 @@ import { jerusalemDate } from '../dates.js';
 import { buildSchedule, type ScheduleEvent } from '../pricing/schedule.js';
 import { currentSettings, settingsByVersion } from '../pricing/settings.js';
 import { isCategory, validateListing, type ListingPlan, type ListingRequest } from './listing-v2.js';
-import { domainPlanColumns, historyRow, writePlan } from './plan-store.js';
+import { domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
+import { isValidDisplayName } from '../domain-name.js';
 import { planView } from './plan-view.js';
 
 export interface ListBody {
@@ -27,6 +28,7 @@ export interface ListBody {
 const HOST = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const PRICE_FIELDS = ['mode', 'bin', 'floor', 'walkaway', 'min_offer', 'lto_max_months', 'pricing_exception'] as const;
 
+const sameNullableNs = (a: string[] | null, b: string[] | null): boolean => (a === null || b === null ? a === b : sameNsSet(a, b));
 const dollars = (c: number | null): number | null => (c === null ? null : c / 100);
 
 function addDays(date: string, days: number): string {
@@ -50,7 +52,13 @@ export class ListService {
   constructor(private readonly deps: { db: Kysely<Database>; adapters: RegistrarAdapter[]; config: Config; nsLookup: NsLookup; now: () => number }) {}
 
   async list(domain: string, body: ListBody, ctx: { auditId: string }): Promise<Record<string, unknown>> {
-    const { db } = this.deps;
+    // The dry run changes nothing, so it stays outside the lock; everything else runs under the per-domain lock (shared with /buy).
+    if (body.dry_run) return this.run(this.deps.db, domain, body, ctx);
+    return withDomainLock(this.deps.db, domain, (conn) => this.run(conn, domain, body, ctx));
+  }
+
+  /** `db` is the plain pool for dry runs, or the lock-holding connection: every query goes through it. */
+  private async run(db: Kysely<Database>, domain: string, body: ListBody, ctx: { auditId: string }): Promise<Record<string, unknown>> {
     const now = new Date(this.deps.now());
     const row = await db.selectFrom('domains').selectAll().where('domain', '=', domain).executeTakeFirst();
     if (!row || (row.status !== 'owned' && row.status !== 'listed')) {
@@ -68,8 +76,8 @@ export class ListService {
     const changing = listingChange || holdChange;
 
     // display name
-    if (body.display_name != null && body.display_name.toLowerCase() !== domain) {
-      throw new AppError(422, 'DISPLAY_NAME_MISMATCH', 'display_name must be the domain with different capitalisation only');
+    if (body.display_name != null && !isValidDisplayName(domain, body.display_name)) {
+      throw new AppError(422, 'DISPLAY_NAME_MISMATCH', 'display_name must be the domain with different ASCII capitalisation only');
     }
 
     // Approval: evaluated now, enforced after the engine (listing-strategy §5 order)
@@ -178,7 +186,7 @@ export class ListService {
     if (body.dry_run) {
       const a = exportDomain ? afternicRow(exportDomain) : null;
       const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath).catch(() => null);
-      const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter }) : await this.currentEvents(row.id, row.plan_id);
+      const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter }) : await this.currentEvents(db, row.id, row.plan_id);
       return {
         dry_run: true, valid: true, domain, category, listing: shown ? planView(shown, previewEvents) : null, lander, ns,
         preview: {
@@ -190,7 +198,7 @@ export class ListService {
     }
 
     // Nameservers (before saving; L5)
-    const ns_result = await this.setNameservers(row, ns);
+    const ns_result = await this.setNameservers(row, ns, warnings);
     let ns_public: 'match' | 'pending' | 'unknown' = 'unknown';
     const seen = await this.deps.nsLookup(domain).catch(() => null);
     if (seen) ns_public = sameNsSet(seen, ns) ? 'match' : 'pending';
@@ -206,6 +214,7 @@ export class ListService {
       if (cur.category !== row.category || cur.listing_mode !== row.listing_mode || cur.bin_cents !== row.bin_cents
         || cur.floor_cents !== row.floor_cents || cur.walkaway_cents !== row.walkaway_cents || cur.min_offer_cents !== row.min_offer_cents
         || cur.lto_max_months !== row.lto_max_months || cur.plan_id !== row.plan_id || cur.pricing_hold !== row.pricing_hold
+        || cur.lander !== row.lander || !sameNullableNs(cur.lander_ns, row.lander_ns) || cur.status !== row.status
         || (cur.first_listed_at?.getTime() ?? null) !== (row.first_listed_at?.getTime() ?? null)) {
         throw new AppError(409, 'LISTING_CHANGED_CONCURRENTLY', 'The listing changed while this request was running; retry');
       }
@@ -239,7 +248,7 @@ export class ListService {
     });
 
     const after = await db.selectFrom('domains').select(['plan_id', 'pricing_hold']).where('id', '=', row.id).executeTakeFirstOrThrow();
-    const events = await this.currentEvents(row.id, after.plan_id);
+    const events = await this.currentEvents(db, row.id, after.plan_id);
 
     const checklist = [
       'Add/update at Afternic: download /export/afternic.csv and upload it at afternic.com/domains/add with **Update** (never Replace)',
@@ -257,14 +266,14 @@ export class ListService {
   }
 
   /** Rows of the current plan that still count (not superseded), as schedule events. */
-  private async currentEvents(domainId: number, planId: string | null): Promise<ScheduleEvent[]> {
+  private async currentEvents(db: Kysely<Database>, domainId: number, planId: string | null): Promise<ScheduleEvent[]> {
     if (planId === null) return [];
-    const rows = await this.deps.db.selectFrom('price_schedule').selectAll()
+    const rows = await db.selectFrom('price_schedule').selectAll()
       .where('domain_id', '=', domainId).where('plan_id', '=', planId).where('status', '!=', 'superseded').orderBy('due_on').orderBy('id').execute();
     return rows.map((e) => ({ event: e.event, dueOn: e.due_on, binCents: e.bin_cents, floorCents: e.floor_cents, walkawayCents: e.walkaway_cents, status: e.status }));
   }
 
-  private async setNameservers(row: DomainRow, ns: string[]): Promise<{ status: 'set' | 'mismatch' | 'unverified' | 'manual'; steps?: string[] }> {
+  private async setNameservers(row: DomainRow, ns: string[], warnings: string[]): Promise<{ status: 'set' | 'mismatch' | 'unverified' | 'manual'; steps?: string[] }> {
     const adapter = this.deps.adapters.find((a) => a.name === row.registrar);
     if (row.registrar_api === 'none' || !adapter || !adapter.capabilities.canManageNs) {
       return {
@@ -280,7 +289,22 @@ export class ListService {
     } catch (e) {
       if (!(e instanceof RegistrarError)) throw e;
       if (e.code === 'API_ACCESS_DISABLED') {
-        throw new AppError(409, 'API_ACCESS_DISABLED', 'The registrar refused: API access is off for this domain. Turn on "Opt In All Domains" at porkbun.com/account/api, then call /list again.');
+        throw new AppError(409, 'API_ACCESS_DISABLED', adapter.name === 'porkbun'
+          ? 'The registrar refused: API access is off for this domain. Turn on "Opt In All Domains" at porkbun.com/account/api, then call /list again.'
+          : `The registrar refused: API access is off for this domain at ${adapter.name}. Enable API access for it, then call /list again.`);
+      }
+      if (e.ambiguous) {
+        // The change may have gone through: read it back before deciding.
+        const unavailable = new AppError(503, 'REGISTRAR_UNAVAILABLE', 'The registrar did not confirm the nameserver change; retry later', { registrar: adapter.name, registrar_code: e.code });
+        let got: Set<string>;
+        try {
+          got = await adapter.getNameservers(row.domain);
+        } catch {
+          throw unavailable;
+        }
+        if (!sameNsSet(got, ns)) throw unavailable;
+        warnings.push('NS_SET_AFTER_AMBIGUOUS');
+        return { status: 'set' };
       }
       throw new AppError(409, 'REGISTRAR_REJECTED', 'The registrar refused the nameserver change', { registrar: adapter.name, registrar_code: e.code });
     }

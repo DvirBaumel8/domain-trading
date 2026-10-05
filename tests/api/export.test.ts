@@ -89,12 +89,12 @@ describe('GET /export/afternic.csv', () => {
     expect(res.headers['x-export-warnings'] ?? '').toBe('');
   });
 
-  it('Review Focus 4: a display name with a comma is quoted and still parses to 11 columns', async () => {
+  it('Review Focus 4: a display name with a comma is ignored (not the domain in ASCII case); the row still parses to 11 columns', async () => {
     app = await makeApp();
     const { auth } = await issueToken('read');
     await listedDomain({ domain: 'example.com', display_name: 'Ex,ample.com' });
     const rows = parseCsvStrict((await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth })).body);
-    expect(rows[1]![0]).toBe('Ex,ample.com');
+    expect(rows[1]![0]).toBe('example.com');
     expect(rows[1]).toHaveLength(11);
   });
 
