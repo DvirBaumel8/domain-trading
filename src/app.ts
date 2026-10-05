@@ -4,6 +4,7 @@ import { registerBuy } from './api/buy.js';
 import { registerPricing } from './api/pricing.js';
 import { registerList } from './api/list.js';
 import { registerOffers } from './api/offers.js';
+import { registerReads } from './api/reads.js';
 import { registerReport } from './api/report.js';
 import { registerSold } from './api/sold.js';
 import { SoldService } from './services/sold.js';
@@ -108,6 +109,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now: deps.now ?? Date.now }));
   registerOffers(app, new OffersService({ db: deps.db, now: deps.now ?? Date.now }), { db: deps.db, now: deps.now ?? Date.now });
   registerReport(app, { db: deps.db, now: deps.now ?? Date.now });
+  registerReads(app, { db: deps.db, now: deps.now ?? Date.now });
   registerSold(app, new SoldService({ db: deps.db, now: deps.now ?? Date.now }));
   registerPayouts(app, new PayoutsService({ db: deps.db, now: deps.now ?? Date.now }));
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
