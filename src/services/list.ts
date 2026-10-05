@@ -136,7 +136,7 @@ export class ListService {
     }
     const overrideUsed = (plan?.overrideUsed ?? false) || categoryOverride;
 
-    // V9/V10
+    // V9: an approval_ref that was sent must be valid (a change inside the rules needs none)
     if (approvalFailure) throw new AppError(422, approvalFailure.code, approvalFailure.reason);
     // Bot autonomy (5 Oct 2026): no approval for a change inside the rules; exceptions and overrides need it (engine / V8)
 

@@ -157,6 +157,10 @@ describe('POST /offers', () => {
     expect(await rows()).toHaveLength(0);
     expect((await db.selectFrom('domains').select('pricing_hold').where('domain', '=', T).executeTakeFirstOrThrow()).pricing_hold).toBe(false);
     expect(await hist()).toHaveLength(before);
+    const wrong = await post(w, offer({ pricing_hold: true, pricing_hold_reason: 'buyer in talks', approval_ref: approval('other.com') }));
+    expect([wrong.statusCode, wrong.json().error.code]).toEqual([422, 'APPROVAL_INVALID']);
+    expect(await rows()).toHaveLength(0);
+    expect(await hist()).toHaveLength(before);
     const ok = await post(w, offer({ pricing_hold: true, pricing_hold_reason: 'buyer in talks' }));
     expect(ok.statusCode).toBe(201);
     expect(await db.selectFrom('domains').select(['pricing_hold', 'pricing_hold_reason']).where('domain', '=', T).executeTakeFirstOrThrow())

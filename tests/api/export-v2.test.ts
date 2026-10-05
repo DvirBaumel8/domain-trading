@@ -227,6 +227,14 @@ describe('exports v2', () => {
       expect(ok.json().uploaded_at).toBe(at);
     });
 
+    it('approval_ref and uploaded_at both sent: the approval time wins', async () => {
+      const { app, auth, id } = await withFile();
+      const at = new Date(NOW - 30_000).toISOString();
+      const ok = await post(app, '/export/afternic/uploaded', auth, { export_id: id, approval_ref: { text: 'ok', approved_at: at }, uploaded_at: new Date(NOW - 10_000).toISOString() });
+      expect(ok.statusCode).toBe(200);
+      expect(ok.json().uploaded_at).toBe(at);
+    });
+
     it('a clear hitting DOMAIN_BUSY → 503 and no export_uploads row; a retry with the same key after release → 200, one row', async () => {
       const app = await makeApp({ now: () => NOW, adapters: [new FakeAdapter('porkbun')], env: { SEDO_TEMPLATE_PATH: TEMPLATE }, exportLockTimeoutMs: 150 });
       apps.push(app);

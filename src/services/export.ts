@@ -213,7 +213,7 @@ export class ExportService {
       const a = checkTimedApproval(body.approval_ref, now, settings.approval_max_age_hours);
       if (!a.ok) throw new AppError(422, a.code, a.reason);
       approvalText = String(body.approval_ref.text).trim();
-      uploadedAt = a.approvedAt;
+      uploadedAt = a.approvedAt; // when both are sent, the approval time wins and uploaded_at is ignored
     } else if (body.uploaded_at != null) {
       if (typeof body.uploaded_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/.test(body.uploaded_at)
         || Number.isNaN(new Date(body.uploaded_at).getTime())) {

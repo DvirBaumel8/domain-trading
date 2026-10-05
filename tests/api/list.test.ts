@@ -664,6 +664,26 @@ describe('POST /list/{domain}', () => {
     expect(h[0]).toMatchObject({ price_grade: 'strong', bin_cents: 39900 });
   });
 
+  it('geo change-phase BIN: grade price and strong->weaker step need no approval; other in-range prices need approval; out of range is a guard', async () => {
+    const { auth } = await setup();
+    const geo = (grade: 'strong' | 'weaker') => listedDomain({ domain: D, category: 'geo', price_grade: grade, listing_mode: 'bin',
+      bin_cents: grade === 'strong' ? 49900 : 39900, floor_cents: grade === 'strong' ? 49900 : 39900, walkaway_cents: grade === 'strong' ? 49900 : 39900,
+      min_offer_cents: grade === 'strong' ? 49900 : 39900 });
+    await geo('weaker');
+    const a = await list({ mode: 'bin', bin: 299 }, auth);
+    expect([a.statusCode, a.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
+    expect((await list({ mode: 'bin', bin: 299, approval_ref: approval() }, auth)).statusCode).toBe(200);
+    expect((await list({ mode: 'bin', bin: 350, approval_ref: approval() }, auth)).statusCode).toBe(200);
+    const o = await list({ mode: 'bin', bin: 298, approval_ref: approval() }, auth);
+    expect([o.statusCode, o.json().error.code]).toEqual([422, 'GEO_BIN_OUT_OF_RANGE']);
+    expect((await list({ mode: 'bin', bin: 399 }, auth)).statusCode).toBe(200);
+    await db.updateTable('domains').set({ price_grade: 'strong', bin_cents: 49900 }).execute();
+    expect((await list({ mode: 'bin', bin: 399 }, auth)).statusCode).toBe(200);
+    await db.updateTable('domains').set({ price_grade: 'strong', bin_cents: 49900 }).execute();
+    const b = await list({ mode: 'bin', bin: 449 }, auth);
+    expect([b.statusCode, b.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
+  });
+
   it('a category change to geo without a grade -> 422 GEO_GRADE_REQUIRED; to non-geo stores price_grade null', async () => {
     const { auth } = await setup();
     await trendOwned();
