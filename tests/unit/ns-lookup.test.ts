@@ -14,17 +14,17 @@ function nsRecord(owner: Buffer, target: Buffer): Buffer {
   fixed.writeUInt16BE(target.length, 8);
   return Buffer.concat([owner, fixed, target]);
 }
-function response(id: number, domain: string, ns: string[], section: 'answer' | 'authority', opts: { rcode?: number; compress?: boolean; tc?: boolean } = {}): Buffer {
+function response(id: number, domain: string, ns: string[], section: 'answer' | 'authority', opts: { rcode?: number; compress?: boolean; tc?: boolean; owner?: string; qd?: number } = {}): Buffer {
   const header = Buffer.alloc(12);
   header.writeUInt16BE(id, 0);
   header.writeUInt16BE(0x8000 | (opts.tc ? 0x0200 : 0) | (opts.rcode ?? 0), 2);
-  header.writeUInt16BE(1, 4); // qdcount
+  header.writeUInt16BE(opts.qd ?? 1, 4); // qdcount
   header.writeUInt16BE(section === 'answer' ? ns.length : 0, 6);
   header.writeUInt16BE(section === 'authority' ? ns.length : 0, 8);
   const qname = encodeName(domain);
   const qfixed = Buffer.from([0, 2, 0, 1]);
   // Owner name: a compression pointer to the question name at offset 12, or the full name.
-  const owner = opts.compress ? Buffer.from([0xc0, 12]) : qname;
+  const owner = opts.owner ? encodeName(opts.owner) : opts.compress ? Buffer.from([0xc0, 12]) : qname;
   const rrs = ns.map((n) => nsRecord(owner, encodeName(n)));
   return Buffer.concat([header, qname, qfixed, ...rrs]);
 }
@@ -56,8 +56,12 @@ describe('parseNsResponse', () => {
     expect(parseNsResponse(cut.subarray(0, cut.length - 4), 'example.com', 5)).toBeNull();
   });
   it('ignores NS records owned by another name', () => {
-    const r = response(6, 'other.com', ['ns1.x.com'], 'authority');
+    const r = response(6, 'example.com', ['ns1.x.com'], 'authority', { owner: 'other.com' });
     expect(parseNsResponse(r, 'example.com', 6)).toEqual([]);
+  });
+  it('a question for another name, or qdcount 0, → null', () => {
+    expect(parseNsResponse(response(6, 'other.com', ['ns1.x.com'], 'authority'), 'example.com', 6)).toBeNull();
+    expect(parseNsResponse(response(6, 'example.com', ['ns1.x.com'], 'authority', { qd: 0 }), 'example.com', 6)).toBeNull();
   });
   it('a pointer loop does not hang → null', () => {
     const r = response(8, 'example.com', ['ns1.x.com'], 'authority');

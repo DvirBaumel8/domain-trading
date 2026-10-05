@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 import dgram from 'node:dgram';
+import { isIP } from 'node:net';
 
 /** NS names (lowercase, no trailing dot) as seen by the .com registry; null = couldn't tell. */
 export type NsLookup = (domain: string) => Promise<string[] | null>;
@@ -49,22 +50,30 @@ export function parseNsResponse(buf: Buffer, domain: string, id: number): string
     if (buf.length < 12 || buf.readUInt16BE(0) !== id) return null;
     const flags = buf.readUInt16BE(2);
     if (!(flags & 0x8000) || flags & 0x0200 || (flags & 0x000f) !== 0) return null; // not a response, truncated, or rcode≠0
-    const qd = buf.readUInt16BE(4);
+    if (buf.readUInt16BE(4) !== 1) return null;
     const an = buf.readUInt16BE(6);
     const ns = buf.readUInt16BE(8);
-    let pos = 12;
-    for (let i = 0; i < qd; i++) pos = readName(buf, pos).next + 4;
     const want = domain.toLowerCase().replace(/\.$/, '');
+    // The question must be exactly what we asked: <domain> NS IN.
+    const q = readName(buf, 12);
+    if (q.name !== want || q.next + 4 > buf.length) return null;
+    if (buf.readUInt16BE(q.next) !== TYPE_NS || buf.readUInt16BE(q.next + 2) !== CLASS_IN) return null;
+    let pos = q.next + 4;
     const out = new Set<string>();
     for (let i = 0; i < an + ns; i++) {
       const owner = readName(buf, pos);
       pos = owner.next;
       if (pos + 10 > buf.length) return null;
       const type = buf.readUInt16BE(pos);
+      const cls = buf.readUInt16BE(pos + 2);
       const rdlen = buf.readUInt16BE(pos + 8);
       const rdata = pos + 10;
       if (rdata + rdlen > buf.length) return null;
-      if (type === TYPE_NS && owner.name === want) out.add(readName(buf, rdata).name);
+      if (type === TYPE_NS && cls === CLASS_IN && owner.name === want) {
+        const target = readName(buf, rdata);
+        if (target.next > rdata + rdlen) return null; // name ran past its rdata
+        out.add(target.name);
+      }
       pos = rdata + rdlen;
     }
     return [...out];
@@ -79,15 +88,29 @@ export function queryNs(domain: string, opts: { server?: string; timeoutMs?: num
   const msg = encodeNsQuery(domain, id);
   return new Promise((resolve) => {
     const sock = dgram.createSocket('udp4');
+    let settled = false;
     const done = (v: string[] | null) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      sock.close();
+      try {
+        sock.close();
+      } catch {
+        /* already closed */
+      }
       resolve(v);
     };
     const timer = setTimeout(() => done(null), opts.timeoutMs ?? 3000);
     sock.on('error', () => done(null));
-    sock.on('message', (buf) => done(parseNsResponse(buf, domain, id)));
-    sock.send(msg, 53, opts.server ?? '192.5.6.30', (err) => {
+    const server = opts.server ?? '192.5.6.30';
+    // Ignore datagrams from the wrong source or with a different id (spoof/stray); keep waiting until the timeout.
+    sock.on('message', (buf, rinfo) => {
+      if (rinfo.port !== 53) return;
+      if (isIP(server) && rinfo.address !== server) return;
+      if (buf.length < 2 || buf.readUInt16BE(0) !== id) return;
+      done(parseNsResponse(buf, domain, id));
+    });
+    sock.send(msg, 53, server, (err) => {
       if (err) done(null);
     });
   });
