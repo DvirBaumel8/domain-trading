@@ -52,6 +52,12 @@ Example from before D-001 was bought (it is now registered, so a live check retu
 ```
 The numbers above are an example; in practice Name.com isn't enabled until its adapter exists.
 
+## Phase-later (docs only; not built until Dvir says so): `GET /check/batch` (READ)
+- **What:** scouts run this **first**, on a list of candidate names (≤50 per call), before any card is written. No pricing, no registrar quote.
+- **Per name, three checks:** (1) **RDAP availability** (Verisign RDAP; 404 = available); (2) **Wayback history**: CDX query for `http://<name>` first, then `https://` (old sites were mostly http), returning the first/last capture years and capture count; (3) **SURBL** listing (DNS lookup `<name>.multi.surbl.org`).
+- **Response:** `[{"domain","available","rdap_status","wayback":{"first","last","captures"},"surbl_listed","checked_at"}]`, plus per-check errors (one failed check doesn't fail the name). Rate-limited like other GETs; results cached 24 h.
+- **Then** the full `GET /check` (quotes) runs only on names that are available, have no bad history and aren't listed.
+
 ## Tests (pass/fail)
 
 | ID | Case | Pass | Fail |
@@ -67,5 +73,5 @@ The numbers above are an example; in practice Name.com isn't enabled until its a
 | CK-9 | Two-year rule | `two_year` = first year + **1** renewal (never 2), checked on 20 random fixtures | Any mismatch |
 | CK-10 | `.net` input | 422 `TLD_NOT_SUPPORTED` | Accepted |
 | CK-11 | READ token / no token | 200 / 401 | Other |
-| CK-12 | Live, read-only (gate G3) | `GET /check` on (a) a random unregistered .com → Porkbun first year and renewal equal the public `pricing/get` .com prices within $0.01, `availability: available`; (b) promptinjectionaudit.com (bought by hand on 3 Oct) → `availability: taken`, no winner | Mismatch, or a live call errors |
+| CK-12 | Live, read-only (gate G3) | `GET /check` on (a) a random unregistered .com → Porkbun first year and renewal equal the public `pricing/get` .com prices within $0.01, `availability: available`; (b) promptinjectionaudit.com (bought by hand at GoDaddy, registered 4 Oct) → `availability: taken`, no winner | Mismatch, or a live call errors |
 | CK-13 | Response hygiene | No secret, key prefix or account balance in the body | Any leak |

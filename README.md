@@ -1,6 +1,6 @@
 # domain-trading
 
-A backend service (HTTP API + Postgres, no frontend) for a small domain-trading proof of concept: at most 10 .com names, a $500 cap, and each name held at most 2 years. Dvir's bot Gavriel calls it over HTTPS with READ/WRITE bearer tokens. Every purchase requires Dvir's explicit approval in chat.
+A backend service (HTTP API + Postgres, no frontend) for a small domain-trading proof of concept: at most 50 .com names, a $1,500 cap (both confirmed by Dvir on 5 Oct 2026, 01:04 IDT), and each name held at most 2 years. Dvir's bot Gavriel calls it over HTTPS with READ/WRITE bearer tokens. Every purchase requires Dvir's explicit approval in chat.
 
 - **Start here:** `CLAUDE.md` (rules, conventions, build order), then `docs/specs/00-architecture.md`.
 - **Build:** paste `docs/claude-code-prompt.md` into Claude Code.
@@ -8,7 +8,7 @@ A backend service (HTTP API + Postgres, no frontend) for a small domain-trading 
 - **Hosting:** `render.yaml` (a sketch; the price is unverified and Dvir must approve the spend). Env vars: `.env.example`.
 - **Research behind the choices:** `docs/research/`.
 
-**Status (5 Oct 2026):** steps 1 (foundation), 2 (registrar adapters + `GET /check`) and 3 (`POST /buy` + reconciler) built. Next: step 4 (listing, `/list`, exports, `/sold`, `/report`, import).
+**Status (5 Oct 2026):** pricing spec v2 adopted (computed floor/walk-away, scheduled drops, versioned `pricing_settings`, offers log; `docs/specs/listing-strategy.md` §10); code for it comes in step 4. Steps 1 (foundation), 2 (registrar adapters + `GET /check`) and 3 (`POST /buy` + reconciler) built. Next: step 4 (listing, `/list`, exports, `/sold`, `/report`, import).
 
 ## Run locally
 1. `npm install`

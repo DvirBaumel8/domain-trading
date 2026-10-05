@@ -6,7 +6,7 @@
 Source: the official template `bulk_upload_sample_v3.xlsx`, copied in `templates/`, from https://www.afternic.com/forms/bulk_upload_sample_v3.xlsx.
 - **Header, exactly, in this order:**
   `Domain,Buy Now Price,Floor Price,Min Offer,Lease to Own,Max Lease Period,Sale Lander,Show Buy Now Option,Show Lease to Own Option,Show Make Offer Option,Hidden`
-- **Rows:** every domain with status `listed` (i.e. a listing mode is set). Sorted by domain.
+- **Rows:** every domain with status `listed` (i.e. a listing mode is set). Sorted by domain. With **`?changed_only=true`**, only the domains whose listing changed since the last confirmed upload (`export_pending_since` set): e.g. after a scheduled drop. Afternic's **Update** mode accepts partial files.
 - **Cell values depend on the domain's listing mode.** The per-mode table in `listing-strategy.md` §6 is binding; the table below gives the general format rules.
 
 | Column | Value |
@@ -14,8 +14,8 @@ Source: the official template `bulk_upload_sample_v3.xlsx`, copied in `templates
 | `Domain` | `display_name` if set (CamelCase), else the domain |
 | `Buy Now Price` | Integer USD, no `$`, no thousands separator. `0` in offer mode |
 | `Floor Price` | Integer USD, or blank |
-| `Min Offer` | `min_offer` (in bin mode = BIN). **Must be ≥ 20** |
-| `Lease to Own` | `Y` only in hybrid with LTO on (BIN 495–5,000,000); otherwise `N` |
+| `Min Offer` | `min_offer`: in bin mode = BIN; **in hybrid = `hybrid_min_offer` ($100; Dvir, 5 Oct 2026, 01:03 IDT)**, never the walk-away. The walk-away is a private threshold and is **never exported** (`listing-strategy.md` §10.8, test OF-14). **Must be ≥ 20** |
+| `Lease to Own` | `Y` only in hybrid with an LTO override (BIN 495–5,000,000; public LTO is off by default); otherwise `N` |
 | `Max Lease Period` | `lto_max_months` (2–60), or blank |
 | `Sale Lander` | By mode: bin → `Buy It Now`; offer/hybrid → `Custom Lander`. Allowed values: `Request Price`, `Buy It Now`, `Custom Lander`, `Cashparking` |
 | `Show Buy Now Option` | bin/hybrid `Y`, offer `N` |
@@ -23,7 +23,12 @@ Source: the official template `bulk_upload_sample_v3.xlsx`, copied in `templates
 | `Show Make Offer Option` | offer/hybrid `Y`, **bin `N`** |
 | `Hidden` | `N` (for sale through the reseller network) |
 
-- **Sold or dropped domains are not in the file.** Afternic "Update" doesn't delete listings, so the response header `X-Manual-Delist` lists domains sold or dropped since the last export. Dvir removes those by hand.
+- **Sold, delisted or dropped domains are not in the file.** Afternic "Update" doesn't delete listings, so the response header `X-Manual-Delist` lists domains sold, **delisted (the scheduled `drop_date − 7` event)** or dropped since the last confirmed upload. Dvir removes those by hand.
+- **More response headers:**
+  - `X-Export-Id` (an id for this file);
+  - `X-Pending-Changes` (the count of listed domains whose marketplace price is stale);
+  - `X-Export-Warnings`.
+- **Confirming an upload:** after Dvir says he uploaded a file, Gavriel calls `POST /export/{venue}/uploaded` `{"export_id":"…","approval_ref":{…}}` (WRITE, idempotent). The server records an `export_uploads` row and clears `export_pending_since` for the domains in that file. `/report` warns `EXPORT_PENDING` until then (error level after 7 days).
 - **Never generate a file meant for "Replace"**: Replace deletes every listing that isn't in the file.
 - Encoding UTF-8, line ending CRLF, RFC 4180 quoting, `Content-Disposition: attachment; filename="afternic-YYYY-MM-DD.csv"`.
 
@@ -39,18 +44,21 @@ Fields documented by Sedo: **Domain, Selling Option, For Sale (yes/no), Price, M
   ```
   Dvir fills this in once, from the downloaded example file.
 - **Until the template exists, the endpoint returns 501** `SEDO_TEMPLATE_MISSING`, with instructions. It never guesses.
-- **Rows by mode** (`listing-strategy.md` §6): bin → Buy Now + BIN + no minimum; offer → Make Offer + minimum = `min_offer`; hybrid → Buy Now + BIN (default `sedo_hybrid_as=buy_now`) or Make Offer + price expectation + minimum. Currency USD; For Sale yes; Action = add/update.
+- **Rows by mode** (`listing-strategy.md` §6; **Sedo is Make Offer for every mode since v2**, Dvir 5 Oct 09:17): bin (geo) → Make Offer + price expectation = BIN + minimum = BIN; offer → Make Offer + minimum = `min_offer`; hybrid → Make Offer + price expectation = BIN + **minimum = `min_offer` ($100)** (default `sedo_hybrid_as=make_offer`; `buy_now` only by admin change); the walk-away is never exported. Currency USD; For Sale yes; Action = add/update. `changed_only`, `X-Export-Id` and the upload confirmation work as for Afternic.
 
 ## Tests (pass/fail)
 
 | ID | Case | Pass | Fail |
 |---|---|---|---|
 | E-1 | Header, byte for byte | Matches the Afternic v3 header string exactly | Any difference |
-| E-2 | Fixture with 4 domains (geo bin 399; trend hybrid 4999 + LTO 24; buzzword offer min 500; one sold) | 3 rows matching LX-1/LX-4/LX-2 exactly; sold domain excluded and listed in `X-Manual-Delist` | Wrong rows |
+| E-2 | Fixture with 4 domains (geo bin 399; trend hybrid 4995 + LTO 24 by override; buzzword offer min 500 by override; one sold) | 3 rows matching LX-1/LX-4/LX-2 exactly; sold domain excluded and listed in `X-Manual-Delist` | Wrong rows |
 | E-3 | `Min Offer` below 20 in the DB | The domain is skipped and reported in `X-Export-Warnings` (DB validation should prevent this anyway) | A row with < 20 |
 | E-4 | Price formatting | `1995`, not `$1,995.00` | Any symbol or separator |
 | E-5 | Round trip | Parse the CSV with a strict RFC 4180 parser: 11 columns on every row | Parse error |
 | E-6 | Sedo template missing | 501 `SEDO_TEMPLATE_MISSING` | A guessed file |
-| E-7 | Sedo with a test template | Headers and values exactly as configured; no Minimum Price on fixed-price rows | Mismatch |
+| E-7 | Sedo with a test template | Headers and values exactly as configured; every row Make Offer (v2): hybrid minimum 100, geo minimum = BIN; no fixed-price rows unless `sedo_hybrid_as=buy_now` (then no Minimum Price) | Mismatch |
 | E-8 | Auth | READ ok; no token 401 | Other |
 | E-9 | Live (gate G5) | Dvir uploads the Afternic file with **Update**. Afternic accepts it with 0 errors, and the listing shows the BIN within 48 h | Rejected, or the price differs |
+| E-10 | `changed_only=true` with 3 listed domains, 1 changed by a scheduled drop | 1 row; `X-Pending-Changes: 1` (= PR-36) | Other |
+| E-11 | `POST /export/afternic/uploaded` with an unknown `export_id` / a READ token / a replay | 404 / 403 / replayed once | Other |
+| E-12 | A domain hits its `delist` event | Absent from both files; listed in `X-Manual-Delist` until an upload is confirmed | Still exported |

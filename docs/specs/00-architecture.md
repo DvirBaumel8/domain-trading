@@ -16,10 +16,14 @@ Answer any portfolio or money question on request. Buy a domain at the cheapest 
 | GET | `/health` | none | here §7 |
 | GET | `/check?domain=` | READ | `check.md` |
 | POST | `/buy` | WRITE | `buy.md` |
-| POST | `/list/{domain}` | WRITE | `list.md` + `listing-strategy.md` (modes bin/offer/hybrid, guards) |
-| GET | `/export/afternic.csv`, `/export/sedo.csv` | READ | `export-csv.md` |
+| POST | `/list/{domain}` | WRITE | `list.md` + `listing-strategy.md` (modes, guards, computed prices, holds) |
+| GET | `/pricing/preview?category=&bin=&grade=&listed_on=&drop_date=` | READ | `listing-strategy.md` §10.6 (floor, walk-away, drop schedule from BIN + category + `pricing_settings`) |
+| GET | `/export/afternic.csv`, `/export/sedo.csv` (`?changed_only=true`) | READ | `export-csv.md` |
+| POST | `/export/{venue}/uploaded` | WRITE | `export-csv.md` (records Dvir's manual upload; clears the pending flags) |
 | POST | `/sold/{domain}` | WRITE | `sold.md` |
-| GET | `/report` | READ | `report.md` |
+| POST | `/offers`, `/offers/import` (CSV), `/offers/{id}/outcome` | WRITE | `listing-strategy.md` §10.11 (Gavriel or Dvir records offers from marketplace emails/dashboards; Afternic has no API) |
+| GET | `/offers`, `/report/offers` | READ | `listing-strategy.md` §10.11, `report.md` |
+| GET | `/report`, `/report/pricing-review` | READ | `report.md` |
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | `report.md` |
 
 Backups are covered in `backup.md`.
@@ -27,12 +31,14 @@ Backups are covered in `backup.md`.
 **Out of scope (v1):**
 - a frontend;
 - marketplace APIs (Afternic has no public seller API; Sedo's needs account credentials);
-- automatic delisting;
+- automatic delisting **at the marketplaces** (the scheduled `delist` event only flags the domain for Dvir's manual removal; `listing-strategy.md` §10.4);
 - email or chat sending (Gavriel talks to Dvir; the service never contacts anyone);
 - auctions and backorders;
 - multi-year registrations;
 - non-USD prices;
 - TLDs other than .com (the code is TLD-generic, but v1 is tested on .com only).
+
+**Phase-later (docs only, 5 Oct 2026 dry-run findings):** `GET /check/batch` (RDAP + Wayback over http first + SURBL; `check.md`) and an S7 auction `max_bid` on buy cards (10% of BIN; `buy.md`).
 
 **Proposed v1.1 (not built until Dvir says so):**
 - `POST /renew/{domain}`: the one allowed renewal, with `renewals_used` enforcement;
@@ -57,16 +63,22 @@ All money is stored as **integer cents (USD)**. All timestamps are `timestamptz`
 
 | Table | Key columns | Rules |
 |---|---|---|
-| `domains` (portfolio) | `id`, `domain` (unique, lowercase), `deal_id` (nullable, `D-NNN`), `registrar`, `status` (`pending_purchase`, `owned`, `listed`, `sold`, `dropped`), `buy_date`, `cost_cents`, `expiry_date` (= next renewal date), `renewal_price_cents`, **`renewals_used` (0 or 1; CHECK 0..1)**, **`drop_date`**, **`category`** (`geo`, `trend`, `b2b`, `collision`, `regulation`, `buzzword`, `other`; NOT NULL once owned), **`listing_mode`** (`bin`, `offer`, `hybrid`, or NULL = not listed), `bin_cents`, `floor_cents`, `min_offer_cents` (CHECK ≥ 2000 when set), `lto_max_months`, `display_name` (CamelCase), `lander`, `lander_ns` (text[]), `lander_set_at`, `ns_verified_at`, **`registrar_api`** (`full`, `manage`, `none`), `sold_at`, timestamps | **Max-one-renewal rule:** at purchase, `renewals_used = 0` and `drop_date = expiry_date + 1 year`. `drop_date` is never pushed later |
+| `domains` (portfolio) | `id`, `domain` (unique, lowercase), `deal_id` (nullable, `D-NNN`), `registrar`, `status` (`pending_purchase`, `owned`, `listed`, `delisted`, `sold`, `dropped`), `buy_date`, `cost_cents`, `expiry_date` (= next renewal date), `renewal_price_cents`, **`renewals_used` (0 or 1; CHECK 0..1)**, **`drop_date`**, **`category`** (`geo`, `trend`, `b2b`, `collision`, `regulation`, `buzzword`, `other`; NOT NULL once owned), **`listing_mode`** (`bin`, `offer`, `hybrid`, or NULL = not listed), `bin_cents`, `floor_cents`, `min_offer_cents` (CHECK ≥ 2000 when set), **`walkaway_cents`** (hybrid: = `min_offer_cents`; CHECK `walkaway ≤ floor ≤ bin`), **`price_grade`** (`strong`/`weaker`, geo only), **`pricing_source`** (`formula`/`approved_exception`), **`pricing_settings_version`**, **`first_listed_at`** (schedule anchor), **`pricing_hold`** + `pricing_hold_reason`, `plan_id`, `plan_audit_id`, **`export_pending_since`**, `lto_max_months`, `display_name` (CamelCase), `lander`, `lander_ns` (text[]), `lander_set_at`, `ns_verified_at`, **`registrar_api`** (`full`, `manage`, `none`), `sold_at`, timestamps | **Max-one-renewal rule:** at purchase, `renewals_used = 0` and `drop_date = expiry_date + 1 year`. `drop_date` is never pushed later |
 | `ledger_entries` | `id`, `occurred_on`, `domain_id`, `deal_id`, `type` (`registration`, `renewal`, `fee`, `commission`, `sale`, `payout_fee`, `refund`, `tool`, `ai`, `adjustment`), `amount_cents` (signed: negative = money out), `currency`, `counterparty`, `receipt_ref`, `note`, `audit_id` | **Append-only:** a DB trigger rejects UPDATE and DELETE. Corrections are reversing rows |
-| `listing_history` | `id`, `domain_id`, `at`, `source` (`buy`, `import`, `list`), `category`, `mode`, `bin_cents`, `floor_cents`, `min_offer_cents`, `lto_max_months`, `lander`, `override`, `override_reason`, `approval_text`, `approval_at`, `audit_id` | **Append-only** (trigger). One row per accepted listing, mode, price or category change (`listing-strategy.md` §5) |
+| `listing_history` | `id`, `domain_id`, `at`, `source` (`buy`, `import`, `list`, **`schedule`**), `category`, `price_grade`, `mode`, `bin_cents`, `floor_cents`, `walkaway_cents`, `min_offer_cents`, `lto_max_months`, `lander`, `pricing_source`, `pricing_settings_version`, `schedule_event_id`, `plan_audit_id`, `override`, `override_reason`, `approval_text`, `approval_at`, `audit_id` | **Append-only** (trigger). One row per accepted listing, mode, price, category, hold or **scheduled** change (`listing-strategy.md` §5, §10.5) |
+| `pricing_settings` | `version` (PK), `effective_at`, geo grade prices + range, `geo_drops_enabled`, `geo_drops` (jsonb), `floor_bps`, `floor_min_cents`, `walkaway_bps`, `walkaway_min_cents`, `hybrid_min_offer_cents` (10000), `drops` (jsonb), `final_push_days_before_drop`, `final_push_mode`, `delist_days_before_drop`, `headsup_days_before`, `comps_min`, `comps_max`, `public_lto`, `approval_text`, `approval_at`, `note` | **Versioned, append-only** (trigger). v1 = Dvir's adopted rules (5 Oct 2026, 00:46 IDT). Written only by `npm run admin -- pricing-settings new` (`listing-strategy.md` §10.1) |
+| `price_schedule` | `id`, `domain_id`, `plan_id`, `event` (`drop1_m6`, `drop2_m18`, `final_push`, `delist`), `due_on`, `bin_cents`, `floor_cents`, `walkaway_cents`, `settings_version`, `status`, `applied_at`, `listing_history_id`, `note` | Rows created with exact amounts when a plan is created; applied by the daily job (`listing-strategy.md` §10.5). Unique `(domain_id, event, plan_id)` |
+| `pricing_evidence` | `id`, `domain_id`, `comps` (jsonb: 2–3 × {domain, price_usd, sold_on, venue, source_url}), `rationale`, `legacy_no_comps_reason`, `audit_id` | One row per buy/import (V11) |
+| `export_uploads` | `id`, `venue`, `export_id`, `domains` (text[]), `uploaded_at`, `approval_text`, `audit_id` | Written by `POST /export/{venue}/uploaded` |
+| `offers` | `id`, `domain_id`, `amount_cents`, `source`, `received_at`, `buyer_type`, `buyer_ref`, `external_ref`, `bin_cents_at`, `floor_cents_at`, `walkaway_cents_at`, `min_offer_cents_at`, `listing_history_id`, `band`, `routing`, `outcome`, `outcome_at`, `outcome_note`, `outcome_approval_text`, `recorded_by`, `import_id`, `audit_id`, `created_at` | Facts immutable (trigger); only outcome fields change, via the API. UNIQUE (`source`, `external_ref`). No buyer emails or names (`NO_PII`). `listing-strategy.md` §10.11 |
+| `offer_imports` | `id`, `file_sha256` (unique), `rows`, `inserted`, `duplicates`, `recorded_by`, `created_at`, `audit_id` | One row per real CSV import |
 | `quotes` | `id`, `check_id`, `domain`, `registrar`, `quoted_at`, `available`, `premium`, `first_year_cents`, `renewal_cents`, `privacy_cents_per_year`, `two_year_cents`, `eligible`, `exclusion_reason`, `raw` (jsonb, secrets stripped) | Every `/check` and `/buy` stores its full comparison |
 | `purchases` | `id`, `idempotency_key` (unique), `request_hash`, `domain`, `state` (`created`, `register_sent`, `succeeded`, `failed`, `unknown`), `dry_run`, `registrar`, `check_id`, `charged_cents`, `expected_cents` (counts toward the cap while open), `order_id`, `max_price_cents`, `approval_text`, `approval_at`, `request` (jsonb, redacted), `response` (jsonb), `audit_id`, timestamps | One row per `/buy` call. A unique partial index allows one `created`/`register_sent`/`succeeded`/`unknown` row per domain (`unknown` added by Dvir, 4 Oct 2026: an unknown purchase may have charged) |
 | `receipts` | `id`, `purchase_id`, `registrar`, `order_id`, `raw` (jsonb, billing address redacted), `fetched_at` | The `ledger_entries.receipt_ref` of a registration = `<registrar>:<order_id>` |
 | `deals` | `id` (`D-NNN`), `domain`, `strategy`, `status_note`, `created_at` | Created or updated when `/buy` passes `deal_id` |
 | `audit_log` | `id`, `at`, `token_id`, `scope`, `method`, `path`, `idempotency_key`, `approval_text`, `approval_at`, `request` (jsonb, redacted), `status_code`, `result_summary`, `client_ip` | **Every** POST, including dry runs and refusals. Append-only (trigger) |
 | `api_tokens` | `id`, `name`, `scope` (`read`, `write`), `token_sha256`, `created_at`, `revoked_at`, `last_used_at` | Plain tokens are shown once, when created by the admin command |
-| `settings` | `poc_cap_cents` (default 50000), `max_domains` (10), `approval_max_age_hours` (72), `lander_target` (`afternic`), `allowed_registrars`, `geo_bin_min_cents` (29900), `geo_bin_max_cents` (49900), `high_value_categories`, `high_value_min_bin_cents` (250000), `high_value_guard_modes` (`["bin"]`), `sedo_hybrid_as` (`buy_now`) | Changed only by Dvir's admin command or a migration, never via the API |
+| `settings` | `poc_cap_cents` (default 150000; raised from 50000 on 5 Oct 2026), `max_domains` (50; raised from 10), `approval_max_age_hours` (72), `lander_target` (`afternic`), `allowed_registrars`, `high_value_min_bin_cents` (250000), `sedo_hybrid_as` (`buy_now`). *(5 Oct 2026: `geo_bin_min/max` moved to `pricing_settings`; `high_value_categories` and `high_value_guard_modes` retired, since every non-geo category is hybrid)* | Changed only by Dvir's admin command or a migration, never via the API |
 
 ## 5. Registrar adapter interface
 ```
@@ -150,8 +162,9 @@ Porkbun conditions the code must handle:
 
 | Risk | Bound |
 |---|---|
-| A bot spends without real approval (prompt injection, a bug) | Gavriel's rules (call `/buy` only after Dvir's explicit chat yes; quote it verbatim). Server caps: **$500 POC total, 10 domains, per-call `max_price`, approval ≤ 72 h old, approval text must contain the domain**. Registrar-side limits: Porkbun's monthly API spend limit and a small prepaid credit, set by Dvir. Full audit log. **Residual:** the server can't prove the approval text came from Dvir. Mitigations: an audit row for every buy, Dvir sees every buy in `/report`, and the WRITE token can be revoked in seconds |
-| WRITE token leak | Rotate every 90 days. Revoke immediately on suspicion. The caps above limit the damage to ≤ $500 total |
+| A bot spends without real approval (prompt injection, a bug) | Gavriel's rules (call `/buy` only after Dvir's explicit chat yes; quote it verbatim). Server caps: **$1,500 POC total, 50 domains, per-call `max_price`, approval ≤ 72 h old, approval text must contain the domain**. Registrar-side limits: Porkbun's monthly API spend limit and a small prepaid credit, set by Dvir. Full audit log. **Residual:** the server can't prove the approval text came from Dvir. Mitigations: an audit row for every buy, Dvir sees every buy in `/report`, and the WRITE token can be revoked in seconds |
+| WRITE token leak | Rotate every 90 days. Revoke immediately on suspicion. The caps above limit the damage to ≤ $1,500 total |
 | Double purchase | Idempotency key, a unique purchase per domain, a per-domain advisory lock, a registrar-side `Idempotency-Key`, and a `find_domain` check before registering |
 | Lost bookkeeping after a crash | `purchases.state = register_sent` + the reconciler (`buy.md` §6) |
 | Data loss | Render PITR + the nightly export to git (`backup.md`) |
+| The scheduled price job cuts a price wrongly or twice | Rows are computed and shown on the buy card before Dvir approves; the job only applies `planned` rows with exact amounts, is idempotent (unique row per event), re-validates V5/V6 before applying, never calls a registrar or marketplace, and every change is a `listing_history` row. The live price only changes when Dvir uploads the export (`listing-strategy.md` §10) |
