@@ -20,12 +20,14 @@ import { BuyService } from './services/buy.js';
 import { CheckService } from './services/check.js';
 import { ExportService } from './services/export.js';
 import { ListService } from './services/list.js';
+import { NsVerifier } from './jobs/ns-verify.js';
 import { Reconciler } from './services/reconciler.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     routeTable: { method: string; url: string }[];
     reconciler: Reconciler;
+    nsVerifier: NsVerifier;
   }
 }
 
@@ -89,6 +91,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const nsLookup: NsLookup = deps.nsLookup ?? ((d: string) => queryNs(d, { server: deps.config.dnsNsServer }));
   registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now: deps.now ?? Date.now }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
+  app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
   deps.registerExtraRoutes?.(app);
   return app;
 }

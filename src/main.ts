@@ -19,4 +19,9 @@ const runReconciler = () =>
 void runReconciler(); // at startup
 setInterval(runReconciler, 10 * 60_000).unref(); // and every 10 minutes
 
+const runNsVerifier = () =>
+  app.nsVerifier.runOnce().catch((e: unknown) => app.log.error({ errMessage: (e as Error).message }, 'ns verifier failed'));
+void runNsVerifier(); // at startup
+setInterval(runNsVerifier, 24 * 3_600_000).unref(); // and every 24 hours
+
 await app.listen({ port: config.port, host: config.host });
