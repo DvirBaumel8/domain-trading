@@ -1,4 +1,4 @@
-> **Approved by Dvir 2026-10-06 02:05 IDT. Priority: P1 first; please reply with answers to the open questions and a P1 estimate in this file or docs/releases/ before building.**
+> **Approved by Dvir 2026-10-06 02:05 IDT. Priority: P1 first; please reply with answers to the open questions in this file or docs/releases/ before building.**
 
 # CR-001 — Selection checks as a service (screening API)
 
@@ -493,7 +493,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
 13. **Firm-size evidence (C15).** Which ≤10-person signals can you detect reliably from firms' own sites and official records without LinkedIn automation? What share of DR-003's Tulsa B? leads would that resolve?
 14. **Personal data.** Lead rows contain named people's emails (some EU). Where is it stored, can you delete per firm/address on request, and can you mark rows from EU firms?
 15. **Word lists.** Which free dictionary and US city gazetteer will CAP-01 use, and how do we add terms (regimes, trades) through the API?
-16. **Delivery.** Your estimate and sequence for the P1 set. Can a subset (CAP-00, 01, 03, 05, 06, 07, 08, 10, 11, 18, 20) be ready first, so DR-004 runs on the API with bots doing leads by hand for one more round?
+16. **Delivery.** Your sequence for the P1 set. Can a subset (CAP-00, 01, 03, 05, 06, 07, 08, 10, 11, 18, 20) be ready first, so DR-004 runs on the API with bots doing leads by hand for one more round?
 
 ## 10. Pending on our side (settings with open defaults — DOM builds them as settings; we fill the values)
 
