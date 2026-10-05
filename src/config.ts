@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { poolConfig } from './db/client.js';
 import { REGISTRAR_ENV } from './registrars/registry.js';
 
+/** The code repo. The backup token must never be able to touch it. */
+const CODE_REPO = 'DvirBaumel8/domain-trading';
+
 const EnvSchema = z.object({
   DATABASE_URL: z
     .string({ error: 'DATABASE_URL is required' })
@@ -17,8 +20,11 @@ const EnvSchema = z.object({
   JOBS_MODE: z.enum(['internal', 'external']).default('internal'),
   JOB_TRIGGER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\S{32,}$/, 'JOB_TRIGGER_TOKEN must be at least 32 non-space characters (openssl rand -hex 32)').optional()),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
-  GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'GITHUB_BACKUP_REPO must be owner/name').optional()),
-  GITHUB_BACKUP_BRANCH: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^[\w./-]+$/, 'GITHUB_BACKUP_BRANCH has invalid characters').default('data-backup')),
+  GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string()
+    .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/, 'GITHUB_BACKUP_REPO must be owner/name')
+    .refine((v) => !v.split('/').some((x) => x === '.' || x === '..'), 'GITHUB_BACKUP_REPO must not contain . or .. segments')
+    .refine((v) => v.toLowerCase() !== CODE_REPO.toLowerCase(), `GITHUB_BACKUP_REPO must be a separate private data repo, never the code repo ${CODE_REPO} (founder rule 11)`)
+    .optional()),
 });
 
 export interface Config {
@@ -36,7 +42,7 @@ export interface Config {
   jobTriggerToken: string | undefined;
   databaseSsl: boolean;
   /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
-  backup: { token: string | undefined; repo: string | undefined; branch: string };
+  backup: { token: string | undefined; repo: string | undefined };
   version: string;
   /** Raw env (strings only). Read secrets from here; never log it. */
   env: Readonly<Record<string, string>>;
@@ -103,7 +109,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     jobsMode: e.JOBS_MODE,
     jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
     databaseSsl: e.DATABASE_SSL === 'true',
-    backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO, branch: e.GITHUB_BACKUP_BRANCH },
+    backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },
     version: readVersion(),
     env: Object.freeze(strings),
     secretValues,

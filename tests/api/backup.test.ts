@@ -9,6 +9,7 @@ import { http, HttpResponse } from 'msw';
 import type { FastifyInstance } from 'fastify';
 import { BackupExporter, collectBackupFiles, gitBlobSha } from '../../src/jobs/backup-export.js';
 import { importBackup } from '../../src/jobs/backup-import.js';
+import { newAuditId } from '../../src/http/audit.js';
 import { loadConfig } from '../../src/config.js';
 import { buildReport } from '../../src/services/report/index.js';
 import { makeApp } from '../helpers/app.js';
@@ -21,14 +22,14 @@ import { issueToken } from '../helpers/tokens.js';
 import { mswServer } from '../setup/network.js';
 
 const TOKEN = 'github_pat_fake_000000000000';
-const REPO = 'dvir/domain-trading';
+const REPO = 'dvir/domain-trading-data';
 const BILLING = '12 Secret Street, Tel Aviv';
 const T = 'promptinjectionaudit.com';
 const G = 'examplecityroofing.com';
 
 // ---- a stateful fake of the GitHub git data API ----
-function fakeGithub(opts: { branch?: string } = {}) {
-  const branch = opts.branch ?? 'data-backup';
+function fakeGithub(opts: { meta?: { status?: number; body?: object }; truncated?: boolean; seedStale?: boolean } = {}) {
+  const branch = 'data-backup';
   const st = {
     ref: null as string | null,
     commits: new Map<string, { tree: string; parents: string[] }>(),
@@ -44,10 +45,11 @@ function fakeGithub(opts: { branch?: string } = {}) {
       st.requests.push({ method: request.method, url: request.url, auth: request.headers.get('authorization'), body: request.method === 'GET' ? '' : await request.clone().text() });
       return undefined; // fall through to the specific handlers
     }),
+    http.get(base, () => HttpResponse.json(opts.meta?.body ?? { private: true, visibility: 'private' }, { status: opts.meta?.status ?? 200 })),
     http.get(`${base}/git/ref/heads/${branch}`, () => (st.ref ? HttpResponse.json({ object: { sha: st.ref } }) : HttpResponse.json({ message: 'Not Found' }, { status: 404 }))),
     http.get(`${base}/git/commits/:sha`, ({ params }) => HttpResponse.json({ tree: { sha: st.commits.get(params.sha as string)!.tree } })),
     http.get(`${base}/git/trees/:sha`, ({ params }) =>
-      HttpResponse.json({ tree: [...st.trees.get(params.sha as string)!].map(([path, s]) => ({ path, type: 'blob', sha: s })), truncated: false })),
+      HttpResponse.json({ tree: [...st.trees.get(params.sha as string)!].map(([path, s]) => ({ path, type: 'blob', sha: s })), truncated: opts.truncated ?? false })),
     http.post(`${base}/git/blobs`, async ({ request }) => {
       const b = (await request.json()) as { content: string; encoding: string };
       const content = Buffer.from(b.content, 'base64').toString('utf8');
@@ -56,9 +58,9 @@ function fakeGithub(opts: { branch?: string } = {}) {
       return HttpResponse.json({ sha: s }, { status: 201 });
     }),
     http.post(`${base}/git/trees`, async ({ request }) => {
-      const b = (await request.json()) as { base_tree?: string; tree: { path: string; sha: string }[] };
+      const b = (await request.json()) as { base_tree?: string; tree: { path: string; sha: string | null }[] };
       const m = new Map(b.base_tree ? st.trees.get(b.base_tree)! : []);
-      for (const e of b.tree) m.set(e.path, e.sha);
+      for (const e of b.tree) (e.sha === null ? m.delete(e.path) : m.set(e.path, e.sha));
       const s = sha(JSON.stringify([...m]));
       st.trees.set(s, m);
       return HttpResponse.json({ sha: s }, { status: 201 });
@@ -107,6 +109,12 @@ async function seed() {
     order_id: 'ORD-1',
     raw: JSON.stringify({ invoice: { id: 'ORD-1', billTo: { address1: BILLING }, url: 'https://x/pdf', items: [{ domain: T, price_cents: 1108 }] } }),
   }).where('purchase_id', '=', purchase.id).execute();
+  // Realistic Porkbun payloads (OpenAPI v3.53 examples): create returns the prepaid `balance`; check returns `limits`.
+  await db.updateTable('purchases').set({ response: JSON.stringify({ status: 'SUCCESS', domain: T, cost: 973, orderId: 12345678, balance: 4027, ttlRemaining: 86400, requestId: '019e04fa-258d-7d11-aa86-4d5795c3fe8f', limits: { success: { TTL: 86400, limit: 50, used: 1 } } }) }).where('id', '=', purchase.id).execute();
+  await db.insertInto('quotes').values({
+    check_id: 'chk_fixture', domain: T, registrar: 'porkbun', eligible: true,
+    raw: JSON.stringify({ status: 'SUCCESS', response: { avail: 'yes', type: 'registration', price: '9.73', regularPrice: '9.73', premium: 'no', additional: { renewal: { price: '9.73' } } }, limits: { TTL: 10, limit: 1, used: 1 }, balance: 4027 }),
+  }).execute();
   clock = Date.parse('2026-12-02T09:00:00Z');
   const offer = await app.inject({ method: 'POST', url: '/offers', headers: { ...w, 'idempotency-key': randomUUID() }, payload: { domain: T, amount_usd: '450.00', source: 'afternic', received_at: '2026-12-01T09:12:00+02:00' } });
   expect(offer.statusCode).toBe(201);
@@ -148,7 +156,9 @@ describe('BK-1 backup export files', () => {
     expect(audit).not.toContain('client_ip');
     expect(audit).not.toContain('127.0.0.1');
     const all = [...a.values()].join('\n');
-    for (const leak of ['pk1_', 'sk1_', TOKEN, BILLING, 'token_sha256']) expect(all).not.toContain(leak);
+    for (const leak of ['pk1_', 'sk1_', TOKEN, BILLING, 'token_sha256', 'billTo', '"balance"', 'apikey']) expect(all).not.toContain(leak);
+    expect(a.get('backup/purchases.json')).toContain('12345678'); // the order id stays
+    expect(a.get('backup/tables/quotes.json')).toContain('"price": "9.73"');
     expect(all).not.toMatch(/Bearer /);
 
     const b = await collectBackupFiles(db);
@@ -202,11 +212,70 @@ describe('GitHub commit', () => {
     }
   });
 
-  it('refuses main and master without any request', async () => {
+  it('the branch is fixed: GITHUB_BACKUP_BRANCH is ignored, every path uses heads/data-backup, none touches main', async () => {
     await seed();
     const gh = fakeGithub();
-    for (const branch of ['main', 'master', 'Main']) await expect(exporter({ GITHUB_BACKUP_BRANCH: branch }).runOnce()).rejects.toThrow(/refusing to write to branch/);
-    expect(gh.st.requests).toHaveLength(0);
+    for (const branch of ['../heads/main', 'main', 'master']) {
+      await exporter({ GITHUB_BACKUP_BRANCH: branch }).runOnce();
+      await db.insertInto('ledger_entries').values({ occurred_on: '2026-12-03', type: 'tool', amount_cents: -1, note: branch }).execute();
+    }
+    const urls = gh.st.requests.map((q) => new URL(q.url).pathname);
+    expect(urls.length).toBeGreaterThan(10);
+    for (const u of urls) {
+      expect(u.startsWith(`/repos/${REPO}`)).toBe(true);
+      expect(u).not.toMatch(/heads\/(main|master)/);
+      expect(u).not.toContain('..');
+      if (u.includes('/heads/')) expect(u).toMatch(/heads\/data-backup$/);
+    }
+    for (const q of gh.st.requests.filter((r) => r.method === 'POST' && r.url.endsWith('/git/refs'))) expect(JSON.parse(q.body).ref).toBe('refs/heads/data-backup');
+  });
+
+  it('config refuses the code repo, dot segments and a malformed repo', () => {
+    for (const repo of ['DvirBaumel8/domain-trading', 'dvirbaumel8/Domain-Trading', 'a/..', '../x', 'a/b/c', 'a b/c']) {
+      expect(() => loadConfig(testEnv({ GITHUB_BACKUP_REPO: repo })), repo).toThrow(/GITHUB_BACKUP_REPO/);
+    }
+    expect(loadConfig(testEnv({ GITHUB_BACKUP_REPO: 'DvirBaumel8/domain-trading-data' })).backup.repo).toBe('DvirBaumel8/domain-trading-data');
+  });
+
+  it('checks the repo is private on every run, before collecting or uploading anything', async () => {
+    await seed();
+    const cases: [string, { status?: number; body?: object }][] = [
+      ['public', { body: { private: false, visibility: 'public' } }],
+      ['internal', { body: { private: true, visibility: 'internal' } }],
+      ['no private flag', { body: { name: 'x' } }],
+      ['404', { status: 404, body: { message: 'Not Found' } }],
+    ];
+    for (const [name, meta] of cases) {
+      const gh = fakeGithub({ meta });
+      await expect(exporter().runOnce(), name).rejects.toThrow(meta.status === 404 ? /cannot read the backup repo/ : /backup repo is not private/);
+      expect(gh.st.requests.every((q) => q.method === 'GET' && q.url.endsWith(`/repos/${REPO}`)), name).toBe(true);
+    }
+    const gh = fakeGithub();
+    await exporter().runOnce();
+    const metaCalls = () => gh.st.requests.filter((q) => q.url.endsWith(`/repos/${REPO}`)).length;
+    expect(metaCalls()).toBe(1);
+    await exporter().runOnce();
+    expect(metaCalls()).toBe(2); // again on the next run
+  });
+
+  it('deletes files on the branch that are no longer exported; refuses a truncated tree', async () => {
+    await seed();
+    const gh = fakeGithub();
+    await exporter().runOnce();
+    const tree = gh.st.trees.get(gh.st.commits.get(gh.st.ref!)!.tree)!;
+    tree.set('backup/old-table.json', gitBlobSha('x'));
+    tree.set('README.md', gitBlobSha('keep'));
+    gh.st.blobs.set(gitBlobSha('x'), 'x');
+    const r = await exporter().runOnce();
+    expect(r).toMatchObject({ committed: true, changed: 1 });
+    const after = gh.files();
+    expect(after.has('backup/old-table.json')).toBe(false);
+    expect(after.has('README.md')).toBe(true); // only backup/* is managed
+
+    fakeGithub({ truncated: true });
+    const gh2 = fakeGithub({ truncated: true });
+    gh2.st.ref = gh.st.ref; gh2.st.commits = gh.st.commits; gh2.st.trees = gh.st.trees; gh2.st.blobs = gh.st.blobs;
+    await expect(exporter().runOnce()).rejects.toThrow(/truncated/);
   });
 
   it('a GitHub failure rejects with a message that has no token', async () => {
@@ -268,7 +337,13 @@ describe('BK-3 import round trip', () => {
     const after = await collectBackupFiles(db);
     const noTok = (t: string) => t.replace(/"token_id":\d+/g, '"token_id":null');
     // pricing_settings: the migration-seeded rows keep the new database's own created_at (append-only; not replaced).
-    for (const [p, c] of files) if (p !== 'backup/tables/pricing_settings.json') expect(after.get(p), p).toBe(p === 'backup/audit.jsonl' ? noTok(c) : c);
+    const noImportRow = (t: string) => t.split('\n').filter((l) => l && !l.includes('"path":"import-backup"')).map((l) => `${l}\n`).join('');
+    for (const [p, c] of files) {
+      if (p === 'backup/tables/pricing_settings.json') continue;
+      expect(p === 'backup/audit.jsonl' ? noImportRow(after.get(p)!) : after.get(p), p).toBe(p === 'backup/audit.jsonl' ? noTok(c) : c);
+    }
+    const audit = JSON.parse((after.get('backup/audit.jsonl')!.trim().split('\n').at(-1))!);
+    expect(audit).toMatchObject({ scope: 'admin', method: 'ADMIN', path: 'import-backup', request: { source_dir: dir, counts: { domains: 2 } } });
 
     // sequences continue after the restored ids
     const id = await db.insertInto('ledger_entries').values({ occurred_on: '2026-12-04', type: 'tool', amount_cents: -1 }).returning('id').executeTakeFirstOrThrow();
@@ -277,10 +352,29 @@ describe('BK-3 import round trip', () => {
     expect(Number((await db.selectFrom('ledger_entries').select(db.fn.countAll().as('n')).executeTakeFirstOrThrow()).n)).toBe(ledgerCount + 1);
   });
 
+  it('refuses when a migration-seeded pricing_settings version differs from the backup', async () => {
+    await seed();
+    const files = await collectBackupFiles(db);
+    const rows = JSON.parse(files.get('backup/tables/pricing_settings.json')!) as Record<string, unknown>[];
+    rows[0]!.floor_bps = 6000;
+    files.set('backup/tables/pricing_settings.json', JSON.stringify(rows));
+    const dir = await writeDir(files);
+    await resetDb(db);
+    await expect(importBackup(db, dir)).rejects.toThrow(/pricing_settings version 2 differs/);
+    expect(Number((await db.selectFrom('domains').select(db.fn.countAll().as('n')).executeTakeFirstOrThrow()).n)).toBe(0);
+  });
+
   it('refuses a non-empty database and a directory without backup files', async () => {
     await seed();
     const dir = await writeDir(await collectBackupFiles(db));
     await expect(importBackup(db, dir)).rejects.toThrow(/not empty/);
+    for (const t of ['deals', 'purchases', 'sales', 'offers', 'audit_log']) {
+      await resetDb(db);
+      if (t === 'deals') await db.insertInto('deals').values({ id: 'D-001', domain: null, strategy: null, status_note: null }).execute();
+      else if (t === 'audit_log') await db.insertInto('audit_log').values({ id: newAuditId(), scope: 'admin', method: 'ADMIN', path: 'x', status_code: 200 }).execute();
+      else continue; // purchases/sales/offers need a domain; the domains check already covers those rows
+      await expect(importBackup(db, dir), t).rejects.toThrow(new RegExp(`${t} is not empty`));
+    }
     await resetDb(db);
     await expect(importBackup(db, await mkdtemp(join(tmpdir(), 'dt-empty-')))).rejects.toThrow(/missing backup file/);
     expect((await readFile(join(dir, 'backup/ledger.csv'), 'utf8')).length).toBeGreaterThan(10);

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sql, type Kysely } from 'kysely';
+import { newAuditId } from '../http/audit.js';
 import type { Database } from '../db/types.js';
 
 export class ImportError extends Error {}
@@ -31,6 +32,9 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 
+/** A restore targets a fresh database: restore first, THEN create tokens (the admin command writes audit rows). */
+const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log'];
+
 /** Tables without a serial `id` column. */
 const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'export_run_domains', 'registrar_presence', 'audit_log']);
 
@@ -50,6 +54,9 @@ async function readRows(dir: string, f: { file: string; jsonl?: true }): Promise
 /**
  * Restore a backup directory (a checkout of the data branch, containing backup/) into an EMPTY database, in one transaction.
  * Normal inserts only: the append-only triggers reject UPDATE/DELETE/TRUNCATE, not INSERT, so no trigger bypass is needed.
+ * The target must be at the same migration level as the source (same columns; pricing_settings versions that the migrations seed must match).
+ * Empty means domains, ledger_entries, deals, purchases, sales, offers and audit_log: restore first, then create tokens.
+ * Writes one admin audit_log row in the same transaction.
  * Not restored: api_tokens (create new ones with the admin command; audit_log.token_id is set to null) and idempotency_keys.
  */
 export async function importBackup(db: Kysely<Database>, dir: string): Promise<Record<string, number>> {
@@ -57,7 +64,7 @@ export async function importBackup(db: Kysely<Database>, dir: string): Promise<R
   for (const f of ORDER) data.set(f.table, await readRows(dir, f));
 
   return db.transaction().execute(async (trx) => {
-    for (const t of ['domains', 'ledger_entries']) {
+    for (const t of MUST_BE_EMPTY) {
       const n = await sql<{ n: string }>`select count(*)::text as n from ${sql.table(t)}`.execute(trx);
       if (n.rows[0]!.n !== '0') throw new ImportError(`refusing to import: ${t} is not empty (restore only into an empty database)`);
     }
@@ -67,6 +74,14 @@ export async function importBackup(db: Kysely<Database>, dir: string): Promise<R
       if (table === 'audit_log') rows = rows.map((r) => ({ ...r, token_id: null, client_ip: null }));
       counts[table] = rows.length;
       if (rows.length === 0) continue;
+      if (table === 'pricing_settings') {
+        // A version the migrations already seeded must match the backup's exactly (created_at aside); else the rules differ.
+        for (const row of rows) {
+          const r = await sql<{ same: boolean }>`select (to_jsonb(p) - 'created_at') = (to_jsonb(r) - 'created_at') as same
+            from pricing_settings p, jsonb_populate_record(null::pricing_settings, ${JSON.stringify(row)}::jsonb) r where p.version = r.version`.execute(trx);
+          if (r.rows[0] && !r.rows[0].same) throw new ImportError(`refusing to import: pricing_settings version ${String(row.version)} differs from the one this database was migrated with (restore needs the same migration level)`);
+        }
+      }
       if (table === 'settings') await sql`delete from settings`.execute(trx); // the migrated default row; the backup's caps replace it
       // OVERRIDING SYSTEM VALUE keeps the original ids (the id columns are GENERATED ALWAYS); the sequences are reset below.
       // jsonb_populate_recordset maps JSON text/numbers/arrays to each column's own type, so timestamps keep full precision.
@@ -77,6 +92,10 @@ export async function importBackup(db: Kysely<Database>, dir: string): Promise<R
       const seq = await sql<{ s: string | null }>`select pg_get_serial_sequence(${table}, 'id') as s`.execute(trx);
       if (seq.rows[0]?.s) await sql`select setval(${seq.rows[0].s}, (select coalesce(max(id), 1) from ${sql.table(table)}), (select count(*) > 0 from ${sql.table(table)}))`.execute(trx);
     }
+    await trx.insertInto('audit_log').values({
+      id: newAuditId(), scope: 'admin', method: 'ADMIN', path: 'import-backup',
+      request: JSON.stringify({ source_dir: dir, counts }), status_code: 200, result_summary: `imported backup into an empty database`,
+    }).execute();
     return counts;
   });
 }

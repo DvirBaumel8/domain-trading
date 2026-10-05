@@ -24,6 +24,14 @@ async function dump(trx: Kysely<Database>, table: string): Promise<Row[]> {
   return r.rows.map((x) => x.j);
 }
 
+/** Account/billing fields dropped from stored registrar payloads before export (Porkbun create returns the prepaid `balance`). */
+const PAYLOAD_DROP = new Set(['balance', 'billTo', 'paymentMethods', 'url', 'pdfUrl', 'downloadUrl', 'downloadExpires', 'apikey', 'secretapikey']);
+function scrub(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(scrub);
+  if (v !== null && typeof v === 'object') return Object.fromEntries(Object.entries(v).filter(([k]) => !PAYLOAD_DROP.has(k)).map(([k, x]) => [k, scrub(x)]));
+  return v;
+}
+
 const json = (v: unknown) => `${JSON.stringify(v, null, 2)}\n`;
 const dollars = (c: unknown) => (typeof c === 'number' ? usdSigned(c) : '');
 const str = (v: unknown) => (v === null || v === undefined ? '' : String(v));
@@ -45,6 +53,8 @@ export async function collectBackupFiles(db: Kysely<Database>): Promise<Map<stri
     const files = new Map<string, string>();
     const t: Record<string, Row[]> = {};
     for (const name of [...TABLE_FILES, 'purchases', 'receipts', 'sales', 'payouts', 'audit_log']) t[name] = await dump(trx, name);
+    t.purchases = t.purchases!.map((p) => ({ ...p, response: scrub(p.response), request: scrub(p.request) }));
+    t.quotes = t.quotes!.map((q) => ({ ...q, raw: scrub(q.raw) }));
 
     const names = new Map(t.domains!.map((d) => [d.id as number, d.domain as string]));
     files.set('backup/portfolio.csv', toCsv([
@@ -64,7 +74,7 @@ export async function collectBackupFiles(db: Kysely<Database>): Promise<Map<stri
       ]),
     ]));
     files.set('backup/purchases.json', json(t.purchases));
-    files.set('backup/receipts.json', json(t.receipts!.map((r) => ({ ...r, raw: redactInvoice(r.raw) }))));
+    files.set('backup/receipts.json', json(t.receipts!.map((r) => ({ ...r, raw: scrub(redactInvoice(r.raw)) }))));
     files.set('backup/sales.json', json(t.sales));
     files.set('backup/payouts.json', json(t.payouts));
     // Approval text stays (it is the audit trail); client_ip is dropped (personal data).
@@ -79,7 +89,9 @@ export class BackupError extends Error {}
 export interface BackupResult { skipped?: boolean; reason?: string; committed?: boolean; commit?: string; files?: number; changed?: number }
 
 const API = 'https://api.github.com';
-const PROTECTED = new Set(['main', 'master']);
+/** The only branch the job ever writes. Fixed in code, not configurable: no env value can steer a write to main. */
+export const BACKUP_BRANCH = 'data-backup';
+const enc = encodeURIComponent;
 
 /** git blob sha: sha1("blob <bytes>\0<content>"). */
 export const gitBlobSha = (content: string) => {
@@ -89,7 +101,10 @@ export const gitBlobSha = (content: string) => {
 
 interface Log { warn(msg: string): void; info?(msg: string): void }
 
-/** Nightly data-only export to one branch of the repo through the git data API (blobs, tree, commit, ref). */
+/**
+ * Nightly data-only export to the fixed branch `data-backup` of a separate PRIVATE data repo (config refuses the code repo)
+ * through the git data API (blobs, tree, commit, ref). Every run first checks the repo is private.
+ */
 export class BackupExporter {
   constructor(private readonly deps: { db: Kysely<Database>; config: Pick<Config, 'backup'>; now: () => number; log?: Log }) {}
 
@@ -114,45 +129,52 @@ export class BackupExporter {
   }
 
   async runOnce(): Promise<BackupResult> {
-    const { token, repo, branch } = this.deps.config.backup;
+    const { token, repo } = this.deps.config.backup;
     if (!token || !repo) {
       const reason = `${!token ? 'GITHUB_BACKUP_TOKEN' : 'GITHUB_BACKUP_REPO'} is not set`;
       this.deps.log?.warn(`backup export skipped: ${reason}`);
       return { skipped: true, reason };
     }
-    if (PROTECTED.has(branch.toLowerCase())) throw new BackupError(`refusing to write to branch "${branch}": the backup job only writes to its data branch`);
+    const base = `/repos/${repo.split('/').map(enc).join('/')}`;
+    const meta = await this.gh(base);
+    if (meta.status !== 200) throw new BackupError(`cannot read the backup repo (HTTP ${meta.status}); it must exist and the token must reach it`);
+    if (meta.body?.private !== true || (meta.body.visibility !== undefined && meta.body.visibility !== 'private')) {
+      throw new BackupError('backup repo is not private; refusing to export (the backup holds financial data and the private walk-away)');
+    }
 
     const files = await collectBackupFiles(this.deps.db);
     const shas = new Map([...files].map(([p, c]) => [p, gitBlobSha(c)]));
-    const base = `/repos/${repo}`;
-    const ref = await this.gh(`${base}/git/ref/heads/${branch}`);
+    const ref = await this.gh(`${base}/git/ref/heads/${enc(BACKUP_BRANCH)}`);
     let parent: string | null = null;
     let baseTree: string | null = null;
     const existing = new Map<string, string>();
     if (ref.status === 200) {
       parent = ref.body.object.sha as string;
-      baseTree = (await this.ok(`${base}/git/commits/${parent}`)).tree.sha as string;
-      const tree = await this.ok(`${base}/git/trees/${baseTree}?recursive=1`);
+      baseTree = (await this.ok(`${base}/git/commits/${enc(parent)}`)).tree.sha as string;
+      const tree = await this.ok(`${base}/git/trees/${enc(baseTree)}?recursive=1`);
+      if (tree.truncated) throw new BackupError('GitHub returned a truncated tree; refusing to compare against a partial listing');
       for (const e of tree.tree as { path: string; type: string; sha: string }[]) if (e.type === 'blob') existing.set(e.path, e.sha);
     } else if (ref.status !== 404) {
       throw new BackupError(`GitHub GET ref failed: HTTP ${ref.status}`);
     }
 
     const changed = [...files.keys()].filter((p) => existing.get(p) !== shas.get(p));
-    if (parent && changed.length === 0) return { skipped: true, reason: 'unchanged', committed: false, files: files.size, changed: 0 };
+    const stale = [...existing.keys()].filter((p) => p.startsWith('backup/') && !files.has(p));
+    if (parent && changed.length === 0 && stale.length === 0) return { skipped: true, reason: 'unchanged', committed: false, files: files.size, changed: 0 };
 
-    const entries: { path: string; mode: string; type: string; sha: string }[] = [];
+    const entries: { path: string; mode: string; type: string; sha: string | null }[] = [];
     for (const path of changed) {
       const blob = await this.ok(`${base}/git/blobs`, { method: 'POST', body: { content: Buffer.from(files.get(path)!, 'utf8').toString('base64'), encoding: 'base64' } });
       entries.push({ path, mode: '100644', type: 'blob', sha: blob.sha as string });
     }
+    for (const path of stale) entries.push({ path, mode: '100644', type: 'blob', sha: null }); // deletes a file no longer exported
     const tree = await this.ok(`${base}/git/trees`, { method: 'POST', body: { ...(baseTree ? { base_tree: baseTree } : {}), tree: entries } });
     const commit = await this.ok(`${base}/git/commits`, {
       method: 'POST',
       body: { message: `backup ${new Date(this.deps.now()).toISOString()}`, tree: tree.sha, parents: parent ? [parent] : [] },
     });
-    if (parent) await this.ok(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha, force: false } });
-    else await this.ok(`${base}/git/refs`, { method: 'POST', body: { ref: `refs/heads/${branch}`, sha: commit.sha } });
-    return { committed: true, commit: commit.sha as string, files: files.size, changed: changed.length };
+    if (parent) await this.ok(`${base}/git/refs/heads/${enc(BACKUP_BRANCH)}`, { method: 'PATCH', body: { sha: commit.sha, force: false } });
+    else await this.ok(`${base}/git/refs`, { method: 'POST', body: { ref: `refs/heads/${BACKUP_BRANCH}`, sha: commit.sha } });
+    return { committed: true, commit: commit.sha as string, files: files.size, changed: changed.length + stale.length };
   }
 }
