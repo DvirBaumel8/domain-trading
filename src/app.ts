@@ -1,9 +1,11 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Kysely } from 'kysely';
 import { registerBuy } from './api/buy.js';
+import { registerList } from './api/list.js';
 import { registerExport } from './api/export.js';
 import { registerCheck } from './api/check.js';
 import { registerHealth } from './api/health.js';
+import { queryNs, type NsLookup } from './dns/ns-lookup.js';
 import type { Config } from './config.js';
 import type { Database } from './db/types.js';
 import { dbAuditWriter, auditFrameworkError, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
@@ -17,6 +19,7 @@ import type { RegistrarAdapter } from './registrars/types.js';
 import { BuyService } from './services/buy.js';
 import { CheckService } from './services/check.js';
 import { ExportService } from './services/export.js';
+import { ListService } from './services/list.js';
 import { Reconciler } from './services/reconciler.js';
 
 declare module 'fastify' {
@@ -39,6 +42,7 @@ export interface AppDeps {
   rdap?: RdapFn;
   quoteTimeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
+  nsLookup?: NsLookup;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -82,6 +86,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   registerBuy(app, buyService);
   registerExport(app, new ExportService({ db: deps.db, config: deps.config, now: deps.now ?? Date.now }));
+  const nsLookup: NsLookup = deps.nsLookup ?? ((d: string) => queryNs(d, { server: deps.config.dnsNsServer }));
+  registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now: deps.now ?? Date.now }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   deps.registerExtraRoutes?.(app);
   return app;

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { Writable } from 'node:stream';
 import { z } from 'zod';
+import type { NsLookup } from '../../src/dns/ns-lookup.js';
 import type { RdapFn } from '../../src/rdap.js';
 import type { RegistrarAdapter } from '../../src/registrars/types.js';
 import { buildApp } from '../../src/app.js';
@@ -70,6 +71,7 @@ export async function makeApp(
     rdap?: RdapFn;
     quoteTimeoutMs?: number;
     sleep?: (ms: number) => Promise<void>;
+    nsLookup?: NsLookup;
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -80,6 +82,7 @@ export async function makeApp(
     audit: opts.audit,
     adapters: opts.adapters,
     rdap: opts.rdap,
+    nsLookup: opts.nsLookup ?? (async () => null),
     quoteTimeoutMs: opts.quoteTimeoutMs,
     sleep: opts.sleep ?? (async () => {}),
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
