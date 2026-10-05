@@ -22,15 +22,15 @@ const make = (extra: Parameters<typeof makeApp>[0] = {}) =>
   makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: JOB_TOKEN }, ...extra });
 
 describe('POST /jobs/run auth', () => {
-  it('401 without a bearer and with a wrong bearer, both audited with scope job', async () => {
+  it('401 without a bearer and with a wrong bearer, nothing audited (unauthenticated: zero DB writes)', async () => {
     app = await make();
     expect((await post(app, 'tick', {}, 'k-none')).statusCode).toBe(401);
     const wrong = await post(app, 'tick', { authorization: 'Bearer wrong_token' }, 'k-wrong');
     expect(wrong.statusCode).toBe(401);
     expect(wrong.json().error.code).toBe('UNAUTHORIZED');
     const rows = await testDb.selectFrom('audit_log').selectAll().where('path', '=', '/jobs/run').orderBy('at').execute();
-    expect(rows).toHaveLength(2);
-    for (const r of rows) expect(r).toMatchObject({ scope: 'job', token_id: null, status_code: 401, result_summary: 'UNAUTHORIZED' });
+    expect(rows).toHaveLength(0);
+    expect(await testDb.selectFrom('idempotency_keys').selectAll().execute()).toHaveLength(0);
   });
 
   it('does not accept READ or WRITE API tokens', async () => {
@@ -47,13 +47,12 @@ describe('POST /jobs/run auth', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('503 JOBS_DISABLED when JOB_TRIGGER_TOKEN is not configured', async () => {
+  it('503 JOBS_DISABLED when JOB_TRIGGER_TOKEN is not configured (no audit row)', async () => {
     app = await makeApp({ testRoutes: false });
     const res = await post(app, 'tick');
     expect(res.statusCode).toBe(503);
     expect(res.json().error.code).toBe('JOBS_DISABLED');
-    const row = await testDb.selectFrom('audit_log').selectAll().where('path', '=', '/jobs/run').executeTakeFirstOrThrow();
-    expect(row).toMatchObject({ scope: 'job', token_id: null, status_code: 503, result_summary: 'JOBS_DISABLED' });
+    expect(await testDb.selectFrom('audit_log').selectAll().where('path', '=', '/jobs/run').execute()).toHaveLength(0);
   });
 
   it('requires an Idempotency-Key and a valid body', async () => {

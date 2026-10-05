@@ -30,7 +30,7 @@ Every money field is a **flat pair**: `<key>_cents` (integer) plus `<key>` (disp
 | `GET /ledger?type=&domain=&from=&to=&format=json\|csv` | JSON: `{count, rows}` with `amount_usd` signed (negative = money out). CSV columns `date,type,domain,deal_id,amount_usd,counterparty,receipt_ref,note` (same as `cfo-ledger.md`) |
 | `GET /deals/{id}` | Deal row: domain, stage, decision, approvals (audit rows whose `approval_ref` cites it). Unknown deal → 404 `DEAL_NOT_FOUND` |
 | `GET /audit?since=&limit=` | `{rows}`; `limit` 1–500 (default 100), else 400. Audit rows (approval text included; request bodies redacted of nothing secret, since bodies never contain secrets) |
-| `GET /health` | Shape in `00-architecture.md` §7; **no auth**, no business data |
+| `GET /health` | Shape in `00-architecture.md` §7; **any valid bot token** (READ or WRITE; Dvir, 6 Oct 2026: bots are the only customers; `/health/ping` is the one public route), no business data |
 | `GET /report/pricing-review?from=&to=` | For Gizbar's quarterly review (`listing-strategy.md` §10.9). Per sale: gross, BIN at the time of sale, `ratio = gross / BIN`, venue, schedule stage (the last **applied** `M6`, `M12`, `M18` or `final` event, else `M0`), days listed, `at_floor`. Default window: the **last 90 days** (IDT); `ratio` has 2 decimals; `held_domains_now` is a snapshot (holds now, not events in the window). Also: offers logged (when available), counts of skipped/held events, the settings versions in use, and `insufficient_data: true` with fewer than 3 sales |
 | `GET /pricing/preview` | See `listing-strategy.md` §10.6 |
 | `GET /offers?domain=&from=&to=&band=&source=` | Logged offers, newest first (`listing-strategy.md` §10.11) |
@@ -121,5 +121,5 @@ D-001 (promptinjectionaudit.com) was bought **by hand at GoDaddy** (not Porkbun)
 | R-14 | Money shape | Every money field is a `*_cents` + display pair; `roi` 2 decimals + `roi_pct`; a refund row lowers costs; a `/sold` fee row counts as a sale fee, not a cost; `committed_forward.complete` false with the domain in `missing` when a renewal price is unknown | Other |
 | R-15 | Read shapes: `/portfolio?status=pending_purchase`; `/ledger` JSON; `/audit?limit=0` / `501`; `/deals/D-999`; `/portfolio/{domain}` after an upload | 400 / `{count, rows}`, signed `amount_usd` / 400 / 404 `DEAL_NOT_FOUND` / `export.afternic.last_uploaded` = uploaded BIN/floor/min offer, no walk-away | Other |
 | R-10 | Timezone | `sold_at` stored in UTC, returned as `+03:00` (IDT) or `+02:00` (IST), whichever applies | Wrong offset |
-| R-11 | `/health` | No auth, no data fields | Leaks data |
+| R-11 | `/health` | 401 without a token, 200 with READ; no data fields | Public, or leaks data |
 | R-12 | `/ledger?format=csv` | Header equals the `cfo-ledger.md` header | Differs |

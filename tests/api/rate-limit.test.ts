@@ -71,8 +71,8 @@ describe('rate limit (AU-9)', () => {
     expect(res.statusCode).toBe(201);
   });
 
-  it('/health is never rate limited', async () => {
+  it('/health/ping (public) is never rate limited', async () => {
     app = await makeApp({ now: () => 0 });
-    for (let i = 0; i < 70; i++) expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(200);
+    for (let i = 0; i < 70; i++) expect((await app.inject({ method: 'GET', url: '/health/ping' })).statusCode).toBe(200);
   });
 });

@@ -13,7 +13,7 @@ Answer any portfolio or money question on request. Buy a domain at the cheapest 
 
 | Method | Path | Scope | Spec |
 |---|---|---|---|
-| GET | `/health` | none | here §7 (checks the DB) |
+| GET | `/health` | READ or WRITE | here §7 (checks the DB) |
 | GET | `/health/ping` | none | here §7 (no DB; liveness) |
 | POST | `/jobs/run` | job token | here §6 (`{"job":"tick"\|"daily"}`; the Cloudflare Worker cron) |
 | GET | `/check?domain=` | READ | `check.md` |
@@ -132,12 +132,14 @@ Porkbun conditions the code must handle:
 ## 6. Auth, scopes, audit
 - `Authorization: Bearer <token>`. Tokens are random, at least 32 bytes, and stored as SHA-256.
 - **READ** tokens may call GET only. **WRITE** tokens may call everything.
+- **Bots are the only customers (Dvir, 6 Oct 2026):** a request without a valid credential (bot token, or the job token on `/jobs/run`) is refused (401, or 429 below) with **zero DB writes**: no `audit_log` row, no `idempotency_keys` row, nothing else; unknown routes too. The only public route is `GET /health/ping`.
+- **Failed-auth limiter (Dvir, 6 Oct 2026):** in memory per client IP (trustProxy, one hop): more than 20 failed attempts in a rolling 10 minutes → **429** `RATE_LIMITED` before any token lookup, with no DB access. Valid-token 403/4xx responses are still audited (the caller is a bot).
 - Wrong or absent token: **401**. A READ token on a POST: **403** `SCOPE_FORBIDDEN`. A revoked token: 401.
 - Tokens are created and revoked by Dvir's admin command (`npm run admin -- token create --scope read --name gavriel-read`), run locally against the Neon DB (`.env.neon`; `docs/DEPLOYMENT.md`). **No API endpoint creates tokens.** The same admin tool imports domains bought by hand (`import-domain`, see `report.md` §Import; D-001 was bought this way).
 - **Job trigger (step 6 free hosting, Dvir, 5 Oct 2026):** `POST /jobs/run {"job":"tick"|"daily"}` accepts **only** the dedicated `JOB_TRIGGER_TOKEN` bearer (≥ 32 chars, an env secret held by the Cloudflare Worker). READ and WRITE tokens are refused there (401), and the job token works nowhere else. Not configured → 503 `JOBS_DISABLED`. Idempotent (the Worker sends `Idempotency-Key: <job>-<scheduled time>`; an overlapping run of the same job reports `skipped`) and audited with scope `job`.
   - **`tick`** (hourly): the reconciler (`buy.md` §6), then the NS verifier if it last ran ≥ 24 h ago.
   - **`daily`** (00:05 UTC): price job → drop job → registrar check → backup export (`backup.md`). Each step is isolated; the response lists every step's result.
-- **Every POST** (success, refusal, dry run, error) writes one `audit_log` row: token id and scope, approval text and timestamp, idempotency key, and the redacted request and result.
+- **Every authenticated POST** (success, refusal, dry run, error; Dvir, 6 Oct 2026) writes one `audit_log` row: token id and scope, approval text and timestamp, idempotency key, and the redacted request and result.
 - `Idempotency-Key` header is **required on every POST** (400 if missing).
   - Same key and same body: the stored response is replayed (header `Idempotent-Replayed: true`).
   - Same key, different body: **409** `IDEMPOTENCY_KEY_MISMATCH`.
@@ -148,7 +150,7 @@ Porkbun conditions the code must handle:
 ## 7. Errors and conventions
 - JSON errors: `{ "error": { "code": "POC_CAP_EXCEEDED", "message": "...", "details": {...} } }`. Codes are stable; messages are not.
 - Cross-cutting codes (added by Dvir, 4 Oct 2026, step 1): `UNAUTHORIZED` 401; `SCOPE_FORBIDDEN` 403; `IDEMPOTENCY_KEY_REQUIRED` 400; `IDEMPOTENCY_KEY_MISMATCH` / `IDEMPOTENCY_KEY_IN_USE` 409; `RATE_LIMITED` 429 (with `Retry-After`); `VALIDATION_ERROR` 422 (body) or 400 (query/params schema); `DOMAIN_INVALID` 422 (not a valid second-level name, e.g. `www.example.com`; step 2); `INVALID_BODY` 400/413/415 (unparseable, too large, wrong media type); `INVALID_REQUEST` 4xx (malformed URL and other framework rejections); `NOT_FOUND` 404; `INTERNAL` 500; `AUDIT_WRITE_FAILED` 500 (processed but not audited: retry with the same `Idempotency-Key` to get the stored result).
-- `GET /health` (no auth) returns `{status, db: ok|down, version, adapters: [{name, enabled}]}` (503 `degraded` when the DB is down). It never reveals secrets or key prefixes.
+- `GET /health` (any valid bot token; Dvir, 6 Oct 2026: bots are the only customers) returns `{status, db: ok|down, version, adapters: [{name, enabled}]}` (503 `degraded` when the DB is down). It never reveals secrets or key prefixes.
 - `GET /health/ping` (no auth, **no DB access**) returns `{status: "ok"}`: a cheap liveness probe.
 - Responses show money both in cents and as a display string (`"$11.08"`).
 - Times: stored in UTC; `/report` also renders IDT (`Asia/Jerusalem`).

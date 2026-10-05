@@ -73,7 +73,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     trustProxy: (_addr: string, hop: number) => hop < 1, // trust exactly 1 proxy hop (Render); 'true' would trust a forged X-Forwarded-For in audit client_ip
     bodyLimit: 64 * 1024,
     // Framework errors bypass all hooks; see auditFrameworkError.
-    frameworkErrors: (err, req, reply) => auditFrameworkError(auditWriter, err, req, reply),
+    frameworkErrors: (err, req, reply) => auditFrameworkError(err, req, reply),
   });
 
   const routeTable: { method: string; url: string }[] = [];
@@ -84,7 +84,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   registerErrorHandling(app);
   registerAuditId(app); // onRequest (first)
-  registerAuth(app, deps.db, deps.config.jobTriggerToken); // onRequest
+  registerAuth(app, deps.db, deps.config.jobTriggerToken, deps.now); // onRequest
   registerRateLimit(app, deps.now); // preHandler (first, so a 429 never claims an idempotency key)
   registerScope(app); // preHandler
   registerIdempotency(app, deps.db); // preHandler (after scope) + onSend (before audit write)

@@ -6,9 +6,10 @@ import type { Database } from '../db/types.js';
 import { adapterStatus } from '../registrars/registry.js';
 
 export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>): void {
-  // Liveness only: no auth, no DB (so Render's health checks never wake Neon).
+  // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
   app.get('/health/ping', async () => ({ status: 'ok' }));
 
+  // Needs any valid bot token (global auth hook).
   app.get('/health', async (_req, reply) => {
     const dbOk = await pingDb(db);
     return reply.code(dbOk ? 200 : 503).send({

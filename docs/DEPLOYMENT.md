@@ -85,7 +85,7 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
 4. Check, replacing the URL with yours (the first request may take ~50 s):
    ```bash
    curl -s https://domain-trading-api.onrender.com/health/ping   # {"status":"ok"}
-   curl -s https://domain-trading-api.onrender.com/health        # "db":"ok", adapters listed
+   curl -s -H "Authorization: Bearer $READ_TOKEN" https://domain-trading-api.onrender.com/health        # "db":"ok", adapters listed
    ```
 5. Note the service URL.
 
@@ -129,7 +129,7 @@ Optional: add `--renewal-price <GoDaddy renewal price, auto-renew off>` once kno
 
 Use the READ and WRITE tokens (Gavriel runs these; see `docs/specs/test-plan.md` G3). Note the Porkbun balance and invoice list first. The Porkbun credit must be **$0** (see step 4).
 
-1. `GET /health` -> `db: ok`; `GET /health/ping` -> ok.
+1. `GET /health` (with a READ token) -> `db: ok`; `GET /health/ping` -> ok.
 2. **CK-12:** `GET /check?domain=<a random unregistered .com>` -> `available`, Porkbun first-year and renewal equal Porkbun's public `pricing/get` .com prices (within $0.01). `GET /check?domain=promptinjectionaudit.com` -> `taken`, no winner.
 3. **IM-4:** `GET /portfolio/promptinjectionaudit.com` -> registrar `godaddy`, cost $13.73, expiry 2027-10-04, `drop_date` 2028-10-04, category `trend`, hybrid 1995 / 1295 / walk-away 950 (private) / min offer 100, `pricing_source=approved_exception`, 4 schedule rows. `/ledger` holds only the D-001 row.
 4. `GET /report` -> sane totals, no unexpected warnings.

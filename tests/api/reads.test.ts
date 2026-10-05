@@ -43,9 +43,10 @@ describe('read endpoints: auth', () => {
     }
   });
 
-  it('R-11: /health needs no auth and carries no business data', async () => {
+  it('R-11: /health needs a token (401 without) and carries no business data', async () => {
     const t = await boot();
-    const r = await t.get('/health', {});
+    expect((await t.get('/health', {})).statusCode).toBe(401);
+    const r = await t.get('/health');
     expect(r.statusCode).toBe(200);
     for (const k of ['domain', 'domains', 'ledger', 'per_domain', 'budget', 'sales']) expect(Object.keys(r.json())).not.toContain(k);
   });

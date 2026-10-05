@@ -72,4 +72,4 @@ The scratch DB is local docker (service `db`, user `dt`, password `dt`, port 543
 
 `GET /report` (READ) lists warnings, for example `RENEWAL_PRICE_UNKNOWN`, `HIGH_VALUE_LOW_BIN`, upcoming renewal/drop dates, and the
 budget and cap headroom. `GET /audit` shows every POST including `jobs/run` rows (a failed step is in the summary, e.g. `daily: failed export`).
-`GET /health` shows the DB and adapter state. Render logs (Dashboard -> Logs) hold startup and migration output.
+`GET /health` (needs a READ or WRITE token) shows the DB and adapter state. Render logs (Dashboard -> Logs) hold startup and migration output.

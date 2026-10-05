@@ -13,19 +13,19 @@ const httpAuditRows = () =>
 const approval = { text: 'yes buy examplecityroofing.com', approved_at: '2026-10-04T09:10:00+03:00' };
 
 describe('audit (AL)', () => {
-  it('AL-1: exactly one audit row per POST: success, 401, 403, 400, 422, 500', async () => {
+  it('AL-1: exactly one audit row per authenticated POST: success, 403, 400, 422, 500 (an unauthenticated 401 writes none)', async () => {
     app = await makeApp();
     const w = await issueToken('write');
     const r = await issueToken('read');
     const calls = [
       { headers: { ...w.auth, 'idempotency-key': 'a1' }, payload: { value: 'ok' }, url: '/__test/echo' },  // 201
-      { headers: {}, payload: { value: 'x' }, url: '/__test/echo' },                                          // 401
       { headers: { ...r.auth, 'idempotency-key': 'a2' }, payload: { value: 'x' }, url: '/__test/echo' },  // 403
       { headers: { ...w.auth }, payload: { value: 'x' }, url: '/__test/echo' },                              // 400 (Task 6)
       { headers: { ...w.auth, 'idempotency-key': 'a3' }, payload: { nope: 1 }, url: '/__test/echo' },     // 422
       { headers: { ...w.auth, 'idempotency-key': 'a4' }, payload: {}, url: '/__test/boom' },               // 500
     ];
     for (const c of calls) await app.inject({ method: 'POST', ...c });
+    await app.inject({ method: 'POST', url: '/__test/echo', payload: { value: 'x' } }); // 401: not a bot, not audited
     const rows = await httpAuditRows();
     expect(rows).toHaveLength(calls.length);
     expect(new Set(rows.map((x) => x.id)).size).toBe(calls.length);
@@ -73,11 +73,12 @@ describe('audit (AL)', () => {
     expect(row).toMatchObject({ status_code: 422, result_summary: 'VALIDATION_ERROR' });
   });
 
-  it('a 401 row has no token and scope', async () => {
+  it('a 401 (no token) writes no audit row and no idempotency row (bots only)', async () => {
     app = await makeApp();
-    await app.inject({ method: 'POST', url: '/__test/echo', payload: { value: 'x' } });
-    const [row] = await httpAuditRows();
-    expect(row).toMatchObject({ token_id: null, scope: null, status_code: 401, result_summary: 'UNAUTHORIZED' });
+    const res = await app.inject({ method: 'POST', url: '/__test/echo', headers: { 'idempotency-key': 'k-anon' }, payload: { value: 'x' } });
+    expect(res.statusCode).toBe(401);
+    expect(await httpAuditRows()).toHaveLength(0);
+    expect(await db.selectFrom('idempotency_keys').selectAll().execute()).toHaveLength(0);
   });
 
   it('an unparseable approved_at keeps the text and stores a null time', async () => {
@@ -91,7 +92,7 @@ describe('audit (AL)', () => {
     expect(row).toMatchObject({ approval_text: 'yes', approval_at: null });
   });
 
-  it('a Fastify framework error (bad percent-encoding) gets the error envelope and exactly one audit row', async () => {
+  it('a Fastify framework error (bad percent-encoding) gets the error envelope and writes nothing', async () => {
     app = await makeApp();
     const w = await issueToken('write');
     const res = await app.inject({
@@ -99,17 +100,7 @@ describe('audit (AL)', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error.code).toBe('INVALID_REQUEST');
-    const rows = await httpAuditRows();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      status_code: 400, result_summary: 'INVALID_REQUEST', token_id: null, idempotency_key: 'k-fw',
-    });
-  });
-
-  it('a framework error whose audit write fails answers 500 AUDIT_WRITE_FAILED', async () => {
-    app = await makeApp({ audit: { write: async () => { throw new Error('db down'); } } });
-    const res = await app.inject({ method: 'POST', url: '/__test/echo%ZZ', payload: { value: 'x' } });
-    expect(res.statusCode).toBe(500);
-    expect(res.json().error.code).toBe('AUDIT_WRITE_FAILED');
+    expect(await httpAuditRows()).toHaveLength(0);
+    expect(await db.selectFrom('idempotency_keys').selectAll().execute()).toHaveLength(0);
   });
 });

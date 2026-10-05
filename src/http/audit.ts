@@ -73,7 +73,8 @@ function summarize(status: number, payload: unknown): string {
 /** onSend, registered LAST (after the idempotency store), so it records the final status. */
 export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): void {
   app.addHook('onSend', async (req, reply, payload) => {
-    if (!req.auditId) return payload;
+    // Bots only (Dvir, 6 Oct 2026): a request that never authenticated writes nothing.
+    if (!req.auditId || (!req.auth && !req.jobAuth)) return payload;
     const body = bodyObject(req);
     const approval = extractApproval(body);
     const replayed = reply.getHeader('idempotent-replayed') === 'true';
@@ -111,43 +112,12 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
 
 /**
  * Fastify `frameworkErrors` handler. Framework errors (bad URL encoding, param too long) are answered
- * before any hook runs, so this replies with the error envelope and, for mutating methods, writes the
- * audit row itself (token unknown, so null).
+ * before any hook runs, so the caller is not authenticated: reply with the error envelope and write
+ * nothing (bots-only access, Dvir 6 Oct 2026).
  */
-export function auditFrameworkError(
-  writer: AuditWriter,
-  err: FastifyError,
-  req: FastifyRequest,
-  reply: FastifyReply,
-): void {
-  const r = reply as FastifyReply;
-  const status = err.statusCode ?? 400;
-  const send = (code: number, body: unknown): void => {
-    void r.code(code).type('application/json; charset=utf-8').send(JSON.stringify(body));
-  };
-  const refusal = errorBody('INVALID_REQUEST', err.message);
-  if (!isMutating(req.method)) return send(status, refusal);
-  const id = newAuditId();
-  writer
-    .write({
-      id,
-      token_id: null,
-      scope: null,
-      method: req.method,
-      path: req.url,
-      idempotency_key: idempotencyKeyOf(req),
-      approval_text: null,
-      approval_at: null,
-      request: null,
-      status_code: status,
-      result_summary: 'INVALID_REQUEST',
-      client_ip: req.ip,
-    })
-    .then(
-      () => send(status, refusal),
-      (e: unknown) => {
-        req.log.error({ auditId: id, errMessage: (e as Error).message }, 'audit write failed');
-        send(500, errorBody('AUDIT_WRITE_FAILED', 'The request was refused but could not be audited.'));
-      },
-    );
+export function auditFrameworkError(err: FastifyError, _req: FastifyRequest, reply: FastifyReply): void {
+  void reply
+    .code(err.statusCode ?? 400)
+    .type('application/json; charset=utf-8')
+    .send(JSON.stringify(errorBody('INVALID_REQUEST', err.message)));
 }

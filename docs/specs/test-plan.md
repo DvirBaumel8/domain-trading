@@ -24,7 +24,9 @@ The per-endpoint test IDs live in each spec: `check.md` CK-*, `buy.md` B-*, `lis
 
 | ID | Case | Pass | Fail |
 |---|---|---|---|
-| AU-1 | No `Authorization` on every endpoint except `/health` and `/health/ping` | 401 for all | Any 2xx |
+| AU-1 | No or a bad `Authorization` on every endpoint except `/health/ping` (`/health` and unknown routes included; Dvir, 6 Oct 2026: bots are the only customers) | 401 for all, and the `audit_log` and `idempotency_keys` row counts are unchanged | Any 2xx, or any DB write |
+| AU-10 | A valid token with the wrong scope (403) | Still audited (it is a bot) | No audit row |
+| AU-11 | 21st failed auth from one IP within 10 min (Dvir, 6 Oct 2026) | 429 `RATE_LIMITED`, no token lookup, no DB access; another IP unaffected; the window rolls | Lookup or write on a blocked IP |
 | AU-2 | Malformed / unknown token | 401 | Other |
 | AU-3 | READ token on `POST /buy`, `/list/x`, `/sold/x` | 403 `SCOPE_FORBIDDEN`, audit row written, **zero** registrar calls | Executed |
 | AU-4 | READ token on every GET | 200 | Other |
@@ -67,7 +69,7 @@ The per-endpoint test IDs live in each spec: `check.md` CK-*, `buy.md` B-*, `lis
 
 | ID | Case | Pass | Fail |
 |---|---|---|---|
-| AL-1 | Every POST in the G1 suite | Exactly one `audit_log` row per request, including 4xx | Missing or duplicate |
+| AL-1 | Every authenticated POST in the G1 suite (Dvir, 6 Oct 2026: unauthenticated requests write nothing) | Exactly one `audit_log` row per request, including a valid token's 4xx | Missing or duplicate |
 | AL-2 | `UPDATE`/`DELETE` on `ledger_entries` and `audit_log` | DB error | Succeeds |
 | AL-3 | Audit row content | Scope, token id, `approval_text`, `approval_at`, status code; no secrets | Missing field or secret |
 
@@ -224,7 +226,7 @@ Removed 6 Oct 2026 (Dvir): the `payouts` table, `POST /payouts/{id}/received`, `
 | JOB-3 | `{"job":"tick"}` twice with the same `Idempotency-Key`; a concurrent second `tick`; a body other than `tick`/`daily` | Replayed response, the reconciler runs once / `skipped: true` / 400 | Double run |
 | JOB-4 | `tick`: NS verifier ran 2 h ago / 25 h ago | Reconciler runs; NS verifier `skipped` / runs | Other |
 | JOB-5 | `daily` with the backup step throwing | Steps run in order price → drop → registrar check → backup; the backup step `ok:false` with a redacted error; the others `ok`; one `audit_log` row with scope `job` | Order wrong, a failure stops later steps, or a secret in the error |
-| JOB-6 | `GET /health/ping` with the DB down; `GET /health` with the DB down | 200 `{status:"ok"}`, zero DB queries / 503 `degraded`, `db: down` | Ping touches the DB, or health hides the outage |
+| JOB-6 | `GET /health/ping` with the DB down; `GET /health` (valid token) with the DB down | 200 `{status:"ok"}`, zero DB queries / 503 `degraded`, `db: down` | Ping touches the DB, or health hides the outage |
 
 ## Kill criteria (stop building; return to Dvir)
 - G2 shows Porkbun's API **can't** register without a manual step that the docs don't mention, and the sandbox can't settle it → stop. Dvir keeps buying by hand (as with D-001) and records each buy with `npm run admin -- import-domain`.
