@@ -25,9 +25,11 @@ const runNsVerifier = () =>
 void runNsVerifier(); // at startup
 setInterval(runNsVerifier, 24 * 3_600_000).unref(); // and every 24 hours
 
-const runPriceJob = () =>
-  app.priceJob.runOnce().catch((e: unknown) => app.log.error({ errMessage: (e as Error).message }, 'price job failed'));
-void runPriceJob(); // at startup (catches up after downtime; idempotent)
-scheduleDailyUtc(runPriceJob, 0, 30); // and daily at 00:30 UTC
+const runDaily = async () => {
+  await app.priceJob.runOnce().catch((e: unknown) => app.log.error({ errMessage: (e as Error).message }, 'price job failed'));
+  await app.dropJob.runOnce().catch((e: unknown) => app.log.error({ errMessage: (e as Error).message }, 'drop job failed'));
+};
+void runDaily(); // at startup (catches up after downtime; idempotent)
+scheduleDailyUtc(runDaily, 0, 30); // and daily at 00:30 UTC: price job, then drop job
 
 await app.listen({ port: config.port, host: config.host });

@@ -22,3 +22,11 @@ describe('job CLI', () => {
     await expect(cli(['nope'])).rejects.toMatchObject({ code: 2 });
   });
 });
+
+describe('job CLI drop', () => {
+  it('drop --dry-run --today exits 0 and prints JSON; the future-today guard applies', async () => {
+    const { stdout } = await cli(['drop', '--dry-run', '--today', '2028-10-05']);
+    expect(JSON.parse(stdout)).toMatchObject({ dryRun: true, today: '2028-10-05', dropped: [] });
+    await expect(cli(['drop', '--today', '2999-01-01'])).rejects.toMatchObject({ code: 2 });
+  });
+});
