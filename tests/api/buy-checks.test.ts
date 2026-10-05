@@ -86,7 +86,7 @@ describe('POST /buy checks (no money moves)', () => {
     const pb = new FakeAdapter('porkbun');
     const auth = await setup([pb]);
     const res = await postBuy(app, buyBody({ proposed_listing: { mode: 'bin', bin: 650 } }), auth);
-    expect(res.json().error.code).toBe('GEO_BIN_OUT_OF_RANGE');
+    expect(res.json().error.code).toBe('GEO_BIN_NOT_GRADE_PRICE');
     expect(pb.calls).toEqual([]);
   });
 
@@ -267,7 +267,8 @@ describe('POST /buy checks (no money moves)', () => {
     expect(res.json()).toMatchObject({
       dry_run: true, domain: DOMAIN, registrar: 'porkbun', first_year: '$11.08', renewal: '$11.08', two_year: '$22.16',
       poc_spent: '$0.00', poc_remaining_after: '$1,488.92', registrar_dry_run: { would_succeed: true, cost: '$11.08', cost_cents: 1108 },
-      proposed_listing: { mode: 'bin', bin: 399, floor: 399, min_offer: 399, lto_max_months: null },
+      proposed_listing: { mode: 'bin', bin: '$399', floor: '$399', min_offer: '$399', lto_max_months: null, settings_version: 2 },
+      settings_version: 2,
     });
     expect(registerCalls(pb)).toEqual([expect.stringMatching(/^register examplecityroofing\.com dry=true key=dtdry-[0-9a-f-]{36} cost=1108$/)]);
     const r = await rows();

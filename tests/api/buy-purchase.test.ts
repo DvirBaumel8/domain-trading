@@ -248,7 +248,7 @@ describe('POST /buy purchase', () => {
     const pb = new FakeAdapter('porkbun');
     const { auth } = await setup(pb);
     const res = await postBuy(app, buyBody({ proposed_listing: { mode: 'bin', bin: 399 } }), auth);
-    expect(res.json().post_buy.listing).toEqual({ mode: 'bin', bin: 399, floor: 399, min_offer: 399, lto_max_months: null });
+    expect(res.json().post_buy.listing).toMatchObject({ mode: 'bin', bin: '$399', floor: '$399', min_offer: '$399', lto_max_months: null, settings_version: 2 });
     expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ status: 'listed', listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, min_offer_cents: 39900 });
     const lh = one(await db.selectFrom('listing_history').selectAll().execute());
     expect(lh).toMatchObject({ source: 'buy', category: 'geo', mode: 'bin', bin_cents: 39900, lander: 'afternic', override: false, audit_id: res.json().audit_id });

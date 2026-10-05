@@ -4,7 +4,7 @@ import { BuyService } from '../../src/services/buy.js';
 import { spentCents } from '../../src/services/budget.js';
 import { resetDb, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
-import { seedSpent } from '../helpers/buy.js';
+import { COMPS, seedSpent } from '../helpers/buy.js';
 
 describe('CAP-6: −Σ(registration+renewal+fee) ≤ poc_cap_cents after any sequence', () => {
   it('200 random sequences of parallel buys', { timeout: 180_000 }, async () => {
@@ -25,7 +25,7 @@ describe('CAP-6: −Σ(registration+renewal+fee) ≤ poc_cap_cents after any seq
         const domain = `p${s}x${i}.com`;
         return svc.buy(
           { domain, maxPriceCents: 100_000, maxTwoYearCents: null, approval: { text: domain, approved_at: new Date().toISOString() },
-            dealId: null, category: 'geo', proposedListing: null, override: false, overrideReason: null, registrar: null,
+            dealId: null, category: 'geo', priceGrade: 'weaker', pricingEvidence: { comps: COMPS }, expectedSettingsVersion: null, proposedListing: null, override: false, overrideReason: null, registrar: null,
             dryRun: false, autoList: false, requestBody: { domain } },
           { idempotencyKey: `cap-${s}-${i}`, requestHash: 'h', auditId: `aud_${'0'.repeat(32)}` },
         );

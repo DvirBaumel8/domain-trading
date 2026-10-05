@@ -10,8 +10,11 @@ const Listing = z.object({
   mode: z.string(),
   bin: z.number().nullable().optional(),
   floor: z.number().nullable().optional(),
+  walkaway: z.number().nullable().optional(),
   min_offer: z.number().nullable().optional(),
   lto_max_months: z.number().int().nullable().optional(),
+  pricing_exception: z.boolean().nullable().optional(),
+  pricing_exception_reason: z.string().nullable().optional(),
 }).strict();
 
 const BuyBody = z.object({
@@ -21,6 +24,9 @@ const BuyBody = z.object({
   approval_ref: z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict().nullable().optional(),
   deal_id: z.string().regex(/^D-\d{3,}$/).nullable().optional(),
   category: z.string().nullable().optional(),
+  price_grade: z.enum(['strong', 'weaker']).nullable().optional(),
+  pricing_evidence: z.unknown().optional(),
+  expected_settings_version: z.number().int().nullable().optional(),
   proposed_listing: Listing.nullable().optional(),
   override: z.boolean().optional(),
   override_reason: z.string().nullable().optional(),
@@ -49,6 +55,9 @@ export function registerBuy(app: FastifyInstance, service: BuyService): void {
         approval: b.approval_ref ?? null,
         dealId: b.deal_id ?? null,
         category: b.category ?? null,
+        priceGrade: b.price_grade ?? null,
+        pricingEvidence: b.pricing_evidence ?? null,
+        expectedSettingsVersion: b.expected_settings_version ?? null,
         proposedListing: b.proposed_listing ?? null,
         override: b.override ?? false,
         overrideReason: b.override_reason ?? null,

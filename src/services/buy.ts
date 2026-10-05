@@ -12,14 +12,18 @@ import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse 
 import { landerNameservers, sameNsSet } from './lander.js';
 import { activeDomainCount, spentAndPending, spentCents } from './budget.js';
 import type { CheckResult, CheckService } from './check.js';
-import { isCategory, listingSettings, presentListing, validateListing, type ListingInput, type ListingResult } from './listing-rules.js';
+import { checkSettingsVersion, isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from './listing-v2.js';
+import { planView } from './plan-view.js';
+import { domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
+import { currentSettings, type PricingSettings } from '../pricing/settings.js';
 import { evaluateQuote, pickWinner, type EvaluatedQuote } from './selection.js';
 
 export interface BuyInput {
   domain: string; maxPriceCents: number; maxTwoYearCents: number | null;
   approval: { text?: unknown; approved_at?: unknown } | null;
   dealId: string | null; category: string | null;
-  proposedListing: ListingInput | null; override: boolean; overrideReason: string | null;
+  priceGrade: 'strong' | 'weaker' | null; pricingEvidence: unknown; expectedSettingsVersion: number | null;
+  proposedListing: ListingRequest | null; override: boolean; overrideReason: string | null;
   registrar: string | null; dryRun: boolean; autoList: boolean; requestBody: unknown;
 }
 export interface BuyCtx { idempotencyKey: string; requestHash: string; auditId: string }
@@ -30,11 +34,10 @@ export interface BuyDeps {
   log?: { warn(o: object, m: string): void; error(o: object, m: string): void };
 }
 type Caps = { maxFirstYearCents: number; maxTwoYearCents?: number };
-type OkListing = Extract<ListingResult, { ok: true }>;
 
 /** Everything the purchase phase needs once checks 1–10 passed. */
 export interface Approved {
-  input: BuyInput; ctx: BuyCtx; category: Category; listing: OkListing | null; approvedAt: Date;
+  input: BuyInput; ctx: BuyCtx; category: Category; plan: ListingPlan | null; comps: Comp[]; rationale: string | null; pricing: PricingSettings; approvedAt: Date;
   check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter;
   settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
 }
@@ -84,14 +87,24 @@ export class BuyService {
       throw new AppError(422, 'CATEGORY_REQUIRED', 'A valid category is required: geo, trend, b2b, collision, regulation, buzzword or other');
     }
     const category = input.category;
-    let listing: OkListing | null = null;
+    if (category === 'geo' && !input.priceGrade) throw new AppError(422, 'GEO_GRADE_REQUIRED', 'Geo names need price_grade strong or weaker');
+    if (category !== 'geo' && input.priceGrade) throw new AppError(422, 'GRADE_NOT_GEO', 'price_grade is only for geo names');
+    const pricing = await currentSettings(db, now);
+    const today = jerusalemDate(now);
+    let plan: ListingPlan | null = null;
     if (input.proposedListing) {
       const r = validateListing(input.proposedListing, {
-        category, settings: listingSettings(settings), override: input.override, overrideReason: input.overrideReason, approvalValid: true,
+        category, grade: input.priceGrade, phase: 'buy', settings: pricing, highValueMinBinCents: settings.high_value_min_bin_cents,
+        override: input.override, overrideReason: input.overrideReason, approvalValid: true,
+        today, dropDate: addOneYear(addOneYear(today)), // registered today + 1 y; the drop is 1 y later
       });
-      if (!r.ok) throw new AppError(422, r.code, r.message);
-      listing = r;
+      if (!r.ok) throw new AppError(r.status, r.code, r.message, r.details);
+      plan = r.plan;
     }
+    const ev = validateComps(input.pricingEvidence as { comps?: unknown; rationale?: unknown } | null, pricing, today);
+    if (!ev.ok) throw new AppError(ev.status, ev.code, ev.message, ev.details);
+    const ver = checkSettingsVersion(input.expectedSettingsVersion, pricing);
+    if (ver) throw new AppError(ver.status, ver.code, ver.message, ver.details);
 
     // 4, 5
     await this.assertNotOwned(db, input.domain);
@@ -137,7 +150,7 @@ export class BuyService {
     winner = dry.winner;
 
     const approved: Approved = {
-      input, ctx, category, listing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter,
+      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter,
       settings: { poc_cap_cents: settings.poc_cap_cents, max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
     if (input.dryRun) return { status: 200, body: await this.dryRunBody(approved) };
@@ -227,7 +240,7 @@ export class BuyService {
           request: JSON.stringify(redact(a.input.requestBody)), audit_id: a.ctx.auditId,
         }).returning('id').executeTakeFirstOrThrow();
         await trx.insertInto('domains').values({
-          domain: a.input.domain, status: 'pending_purchase', registrar: a.winner.registrar, category: a.category, deal_id: a.input.dealId,
+          domain: a.input.domain, status: 'pending_purchase', registrar: a.winner.registrar, category: a.category, price_grade: a.input.priceGrade, deal_id: a.input.dealId,
         }).execute();
         return id;
       });
@@ -444,6 +457,17 @@ export class BuyService {
       warnings.push(hint(e, 'AUTO_RENEW_FAILED'));
     }
 
+    // 7.2b pricing evidence (the comps behind this buy); a failure is a warning, never an undo
+    try {
+      await db.insertInto('pricing_evidence').values({
+        domain_id: (await db.selectFrom('domains').select('id').where('domain', '=', d).executeTakeFirstOrThrow()).id,
+        comps: JSON.stringify(a.comps), rationale: a.rationale, audit_id: a.ctx.auditId,
+      }).execute();
+    } catch (e) {
+      this.deps.log?.error({ errMessage: (e as Error).message }, 'post-buy evidence save failed');
+      warnings.push('EVIDENCE_SAVE_FAILED: the purchase is booked but the comps were not saved; record them with a pricing note');
+    }
+
     // 7.3 auto_list
     if (a.input.autoList) {
       const target = a.settings.lander_target;
@@ -466,31 +490,39 @@ export class BuyService {
           warnings.push(hint(e, 'LANDER_FAILED'));
         }
       }
-      if (a.listing) {
-        const l = a.listing.listing;
-        try {
-        await db.transaction().execute(async (trx) => {
-          const row = await trx.updateTable('domains').set({
-            listing_mode: l.mode, bin_cents: l.binCents, floor_cents: l.floorCents, min_offer_cents: l.minOfferCents,
-            lto_max_months: l.ltoMaxMonths, status: 'listed', updated_at: new Date(),
-          }).where('domain', '=', d).returning('id').executeTakeFirstOrThrow();
-          await trx.insertInto('listing_history').values({
-            domain_id: row.id, source: 'buy', category: a.category, mode: l.mode, bin_cents: l.binCents, floor_cents: l.floorCents,
-            min_offer_cents: l.minOfferCents, lto_max_months: l.ltoMaxMonths, lander: target, override: a.listing!.overrideUsed,
-            override_reason: a.listing!.overrideUsed ? a.input.overrideReason : null,
-            approval_text: String(a.input.approval?.text), approval_at: a.approvedAt, audit_id: a.ctx.auditId,
-          }).execute();
-        });
-        post.listing = presentListing(l);
-        warnings.push(...a.listing.warnings);
-        } catch (e) {
-          // Post-buy never undoes or masks a booked purchase (controller ruling, step 3 Task 2 review).
-          this.deps.log?.error({ errMessage: (e as Error).message }, 'post-buy listing save failed');
-          warnings.push('LISTING_SAVE_FAILED: the purchase is booked but the proposed listing was not saved; call /list');
-        }
-      }
+      if (a.plan) await this.saveListing(a, a.plan, post, warnings);
     }
     return post;
+  }
+
+  /** Plan + schedule + history under the per-domain lock. Runs after the reservation and bookkeeping transactions committed, so it can't deadlock with /buy's xact lock. */
+  private async saveListing(a: Approved, plan: ListingPlan, post: { listing: unknown }, warnings: string[]): Promise<void> {
+    const d = a.input.domain;
+    const now = new Date(this.deps.now());
+    try {
+      const events = await withDomainLock(this.deps.db, d, (conn) => conn.transaction().execute(async (trx) => {
+        const row = await trx.selectFrom('domains').selectAll().where('domain', '=', d).forUpdate().executeTakeFirstOrThrow();
+        if (row.status !== 'owned' || !row.drop_date) throw new Error(`domain is ${row.status}, not owned`);
+        await trx.updateTable('domains').set({
+          ...domainPlanColumns(plan), status: 'listed', category: a.category, price_grade: plan.grade,
+          first_listed_at: now, export_pending_since: now, updated_at: now,
+        }).where('id', '=', row.id).execute();
+        await trx.insertInto('listing_history').values(historyRow({
+          domainId: row.id, source: 'buy', plan, category: a.category, grade: plan.grade, lander: a.settings.lander_target,
+          override: plan.overrideUsed, overrideReason: plan.overrideUsed ? a.input.overrideReason : null,
+          approvalText: String(a.input.approval?.text), approvalAt: a.approvedAt, auditId: a.ctx.auditId, planAuditId: a.ctx.auditId,
+        })).execute();
+        return (await writePlan(trx, {
+          domainId: row.id, plan, anchor: jerusalemDate(now), dropDate: row.drop_date, settings: a.pricing, planAuditId: a.ctx.auditId, now,
+        })).events;
+      }));
+      post.listing = planView(plan, events);
+      warnings.push(...plan.warnings);
+    } catch (e) {
+      // Post-buy never undoes or masks a booked purchase (controller ruling, step 3 Task 2 review).
+      this.deps.log?.error({ errMessage: (e as Error).message }, 'post-buy listing save failed');
+      warnings.push('LISTING_SAVE_FAILED: the purchase is booked but the proposed listing was not saved; call /list');
+    }
   }
 
   protected async assertNotOwned(db: Kysely<Database>, domain: string): Promise<void> {
@@ -596,7 +628,7 @@ export class BuyService {
           request: JSON.stringify(redact(rec.input.requestBody)), audit_id: rec.ctx.auditId,
         }).execute();
         await trx.insertInto('domains').values({
-          domain: rec.input.domain, status: 'pending_purchase', registrar: adapter.name, category: rec.category, deal_id: rec.input.dealId,
+          domain: rec.input.domain, status: 'pending_purchase', registrar: adapter.name, category: rec.category, price_grade: rec.input.priceGrade, deal_id: rec.input.dealId,
         }).execute();
       });
     } catch (err) {
@@ -638,8 +670,8 @@ export class BuyService {
       poc_remaining_after_cents: a.settings.poc_cap_cents - spent - pending - a.cost,
       domains_owned: await activeDomainCount(this.deps.db),
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
-      proposed_listing: a.listing ? presentListing(a.listing.listing) : null,
-      warnings: [...a.check.warnings, ...(a.listing?.warnings ?? [])],
+      proposed_listing: a.plan ? planView(a.plan) : null, settings_version: a.pricing.version,
+      warnings: [...a.check.warnings, ...(a.plan?.warnings ?? [])],
     };
   }
 }
