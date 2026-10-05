@@ -7,22 +7,43 @@ import { RegistrarError, type RegistrarAdapter } from '../registrars/types.js';
 import { checkApproval } from './approval.js';
 import { afternicRow, loadSedoTemplate, sedoRow, type ExportDomain } from './export.js';
 import { landerNameservers, sameNsSet } from './lander.js';
-import { isCategory, listingSettings, presentListing, validateListing, type NormalizedListing } from './listing-rules.js';
+import { jerusalemDate } from '../dates.js';
+import { buildSchedule } from '../pricing/schedule.js';
+import { currentSettings, settingsByVersion } from '../pricing/settings.js';
+import { isCategory, validateListing, type ListingPlan, type ListingRequest } from './listing-v2.js';
+import { domainPlanColumns, historyRow, writePlan } from './plan-store.js';
+import { planView } from './plan-view.js';
 
 export interface ListBody {
-  mode?: string; bin?: number | null; floor?: number | null; min_offer?: number | null; lto_max_months?: number | null;
-  category?: string | null; override?: boolean; override_reason?: string | null;
+  mode?: string | null; bin?: number | null; floor?: number | null; walkaway?: number | null; min_offer?: number | null; lto_max_months?: number | null;
+  pricing_exception?: boolean | null; pricing_exception_reason?: string | null;
+  category?: string | null; price_grade?: 'strong' | 'weaker' | null; replan?: boolean;
+  pricing_hold?: boolean | null; pricing_hold_reason?: string | null;
+  override?: boolean; override_reason?: string | null;
   lander?: string; ns?: string[] | null; display_name?: string | null; dry_run?: boolean;
   approval_ref?: { text?: unknown; approved_at?: unknown } | null;
 }
 
 const HOST = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
-const PRICE_FIELDS = ['mode', 'bin', 'floor', 'min_offer', 'lto_max_months'] as const;
+const PRICE_FIELDS = ['mode', 'bin', 'floor', 'walkaway', 'min_offer', 'lto_max_months', 'pricing_exception'] as const;
+
+const dollars = (c: number | null): number | null => (c === null ? null : c / 100);
 
 function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/** The listing stored on the row, as a plan (for views and history rows of calls that change no price). */
+function currentPlan(row: DomainRow, fallbackVersion: number): ListingPlan | null {
+  if (!row.listing_mode || !row.category) return null;
+  return {
+    mode: row.listing_mode, category: row.category, grade: row.category === 'geo' ? row.price_grade : null,
+    binCents: row.bin_cents, floorCents: row.floor_cents, walkawayCents: row.walkaway_cents, minOfferCents: row.min_offer_cents ?? 0,
+    ltoMaxMonths: row.lto_max_months, pricingSource: row.pricing_source ?? 'formula', settingsVersion: row.pricing_settings_version ?? fallbackVersion,
+    overrideUsed: false, warnings: [], formula: null,
+  };
 }
 
 export class ListService {
@@ -37,17 +58,21 @@ export class ListService {
     }
     const settings = await db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
 
-    // Classify (L2)
+    // Classify
     const priceChange = PRICE_FIELDS.some((f) => body[f] !== undefined && body[f] !== null);
-    const categoryChange = body.category !== undefined && body.category !== null;
-    const changing = priceChange || categoryChange;
+    const categoryChange = body.category !== undefined && body.category !== null && body.category !== row.category;
+    const gradeChange = body.price_grade !== undefined && body.price_grade !== null && body.price_grade !== row.price_grade;
+    const holdChange = body.pricing_hold !== undefined && body.pricing_hold !== null && body.pricing_hold !== row.pricing_hold;
+    const replan = body.replan === true;
+    const listingChange = priceChange || categoryChange || gradeChange || replan;
+    const changing = listingChange || holdChange;
 
-    // display name (L4)
+    // display name
     if (body.display_name != null && body.display_name.toLowerCase() !== domain) {
       throw new AppError(422, 'DISPLAY_NAME_MISMATCH', 'display_name must be the domain with different capitalisation only');
     }
 
-    // Approval: evaluated now, enforced after V1–V8 (listing-strategy §5 order)
+    // Approval: evaluated now, enforced after the engine (listing-strategy §5 order)
     let approvalValid = false;
     let approvedAt: Date | null = null;
     let approvalFailure: { code: string; reason: string } | null = null;
@@ -56,50 +81,70 @@ export class ListService {
       if (a.ok) { approvalValid = true; approvedAt = a.approvedAt; } else approvalFailure = { code: a.code, reason: a.reason };
     }
 
-    // Category (relabel guard: any non-geo -> geo is an override)
-    let category: Category | null = row.category;
+    // Field checks
+    if (body.category !== undefined && body.category !== null && !isCategory(body.category)) throw new AppError(422, 'CATEGORY_REQUIRED', 'Unknown category');
+    const category: Category | null = body.category !== undefined && body.category !== null && isCategory(body.category) ? body.category : row.category;
+    if (body.price_grade != null && category !== 'geo') throw new AppError(422, 'GRADE_NOT_GEO', 'price_grade only applies to geo names');
+    if (body.pricing_hold === true && !body.pricing_hold_reason?.trim()) throw new AppError(422, 'HOLD_REASON_REQUIRED', 'pricing_hold needs pricing_hold_reason');
+    if (replan && !row.listing_mode && !priceChange) throw new AppError(422, 'REPLAN_NOTHING_LISTED', 'replan needs a listed domain');
+    const grade = category === 'geo' ? (body.price_grade ?? row.price_grade) : null;
+
+    // Settings: the version the plan was made under, unless replanning or never listed
+    const useCurrent = replan || row.pricing_settings_version === null || row.first_listed_at === null;
+    const s = (useCurrent ? await currentSettings(db, now) : await settingsByVersion(db, row.pricing_settings_version!)) ?? await currentSettings(db, now);
+
+    // Relabel guard: any non-geo -> geo is an override
     let categoryOverride = false;
     if (categoryChange) {
-      if (!isCategory(body.category)) throw new AppError(422, 'CATEGORY_REQUIRED', 'Unknown category');
-      const relabelToGeo = body.category === 'geo' && row.category !== null && row.category !== 'geo';
+      const relabelToGeo = category === 'geo' && row.category !== null && row.category !== 'geo';
       if (relabelToGeo && !(body.override && body.override_reason?.trim() && approvalValid)) {
         throw new AppError(422, 'OVERRIDE_NEEDS_APPROVAL', 'Relabelling a name as geo is an override: needs override, a reason and a valid approval_ref');
       }
       categoryOverride = relabelToGeo;
-      category = body.category;
     }
 
-    // Listing (V1–V8); a category change alone re-validates the current listing (L3)
-    let listing: NormalizedListing | null = null;
-    let overrideUsed = false;
-    const warnings: string[] = [];
-    const lsettings = listingSettings(settings);
+    // Engine
+    let req: ListingRequest | null = null;
     if (priceChange) {
-      if (body.mode === undefined || body.mode === null) throw new AppError(422, 'MODE_INVALID', 'mode is required when any price is sent');
-      const r = validateListing(body, { category, settings: lsettings, override: body.override ?? false, overrideReason: body.override_reason ?? null, approvalValid });
-      if (!r.ok) throw new AppError(422, r.code, r.message);
-      listing = r.listing;
-      overrideUsed = r.overrideUsed;
-      warnings.push(...r.warnings);
-    } else if (categoryChange && row.listing_mode) {
-      const current = {
-        mode: row.listing_mode, bin: row.bin_cents === null ? null : row.bin_cents / 100,
-        floor: row.floor_cents === null ? null : row.floor_cents / 100, min_offer: row.min_offer_cents === null ? null : row.min_offer_cents / 100,
-        lto_max_months: row.lto_max_months,
+      req = {
+        mode: body.mode, bin: body.bin, floor: body.floor, walkaway: body.walkaway, min_offer: body.min_offer, lto_max_months: body.lto_max_months,
+        pricing_exception: body.pricing_exception, pricing_exception_reason: body.pricing_exception_reason,
       };
-      const r = validateListing(current, { category, settings: lsettings, override: body.override ?? false, overrideReason: body.override_reason ?? null, approvalValid });
-      if (!r.ok) throw new AppError(422, r.code, r.message);
-      overrideUsed = r.overrideUsed;
-      warnings.push(...r.warnings);
+    } else if (listingChange && row.listing_mode) {
+      if (row.listing_mode === 'hybrid') {
+        req = row.pricing_source === 'approved_exception' && !replan
+          ? { mode: 'hybrid', bin: dollars(row.bin_cents), floor: dollars(row.floor_cents), walkaway: dollars(row.walkaway_cents),
+              pricing_exception: true, pricing_exception_reason: 'carried from the approved plan' }
+          : { mode: 'hybrid', bin: dollars(row.bin_cents) };
+      } else if (row.listing_mode === 'bin') req = { mode: 'bin', bin: dollars(row.bin_cents) };
+      else req = { mode: 'offer', min_offer: dollars(row.min_offer_cents), floor: dollars(row.floor_cents) };
     }
-
-    overrideUsed = overrideUsed || categoryOverride;
+    let plan: ListingPlan | null = null;
+    const warnings: string[] = [];
+    if (req) {
+      const r = validateListing(req, {
+        category, grade, phase: 'change', settings: s, highValueMinBinCents: settings.high_value_min_bin_cents,
+        override: body.override ?? false, overrideReason: body.override_reason ?? null, approvalValid,
+        today: jerusalemDate(now), dropDate: row.drop_date,
+      });
+      if (!r.ok) throw new AppError(r.status, r.code, r.message, r.details ?? {});
+      plan = r.plan;
+      warnings.push(...plan.warnings);
+    }
+    const overrideUsed = (plan?.overrideUsed ?? false) || categoryOverride;
 
     // V9/V10
     if (approvalFailure) throw new AppError(422, approvalFailure.code, approvalFailure.reason);
     if (changing && !body.approval_ref) {
-      throw new AppError(422, 'APPROVAL_REQUIRED', "Changing the mode, a price or the category needs approval_ref (Dvir's words)");
+      throw new AppError(422, 'APPROVAL_REQUIRED', "Changing the mode, a price, the category, the grade or the pricing hold needs approval_ref (Dvir's words)");
     }
+
+    // Schedule anchor: the first listing starts the clock; later plans keep it and only schedule events after today
+    const firstListing = row.first_listed_at === null;
+    const today = jerusalemDate(now);
+    const anchor = firstListing ? today : jerusalemDate(row.first_listed_at!);
+    const startAfter = firstListing ? undefined : today;
+    if (plan && row.drop_date === null) throw new AppError(422, 'DROP_DATE_UNKNOWN', 'The domain has no drop_date; a schedule cannot be built');
 
     // Lander target
     const lander = body.lander ?? settings.lander_target;
@@ -118,27 +163,23 @@ export class ListService {
       ns = [...known];
     }
 
-    const effective = listing ?? (row.listing_mode ? {
-      mode: row.listing_mode, binCents: row.bin_cents, floorCents: row.floor_cents, minOfferCents: row.min_offer_cents, ltoMaxMonths: row.lto_max_months,
-    } : null);
-    const exportDomain: ExportDomain = {
-      domain, display_name: body.display_name ?? row.display_name, listing_mode: effective?.mode ?? null,
-      bin_cents: effective?.binCents ?? null, floor_cents: effective?.floorCents ?? null,
-      min_offer_cents: effective?.minOfferCents ?? null, lto_max_months: effective?.ltoMaxMonths ?? null,
-    };
-    if (listing && [listing.binCents, listing.floorCents, listing.minOfferCents].some((c) => c !== null && c % 100 !== 0)) {
-      warnings.push('AFTERNIC_ROUNDS_DOWN');
-    }
+    const shown = plan ?? currentPlan(row, s.version);
+    const displayName = body.display_name ?? row.display_name;
+    const exportDomain: ExportDomain | null = shown ? {
+      domain, display_name: displayName, listing_mode: shown.mode, bin_cents: shown.binCents, floor_cents: shown.floorCents,
+      min_offer_cents: shown.minOfferCents, lto_max_months: shown.ltoMaxMonths,
+    } : null;
 
     // Dry run: validation + preview only
     if (body.dry_run) {
-      const a = effective ? afternicRow(exportDomain) : null;
+      const a = exportDomain ? afternicRow(exportDomain) : null;
       const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath).catch(() => null);
+      const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter }) : [];
       return {
-        dry_run: true, valid: true, domain, category, listing: effective ? presentListing(effective) : null, lander, ns,
+        dry_run: true, valid: true, domain, category, listing: shown ? planView(shown, previewEvents) : null, lander, ns,
         preview: {
           afternic: a && 'cells' in a.row ? a.row.cells.join(',') : null,
-          sedo: t && effective ? sedoRow(exportDomain, t, settings.sedo_hybrid_as).join(',') : null,
+          sedo: t && exportDomain ? sedoRow(exportDomain, t, settings.sedo_hybrid_as).join(',') : null,
         },
         warnings,
       };
@@ -151,38 +192,52 @@ export class ListService {
     if (seen) ns_public = sameNsSet(seen, ns) ? 'match' : 'pending';
 
     // Save + history (one transaction)
-    const historyChange = priceChange || categoryChange || (row.lander !== null && row.lander !== lander);
+    const historyChange = changing || (row.lander !== null && row.lander !== lander);
+    const displayChanged = body.display_name != null && body.display_name !== row.display_name;
     await db.transaction().execute(async (trx) => {
       const cur = await trx.selectFrom('domains').selectAll().where('id', '=', row.id).forUpdate().executeTakeFirst();
       if (!cur || (cur.status !== 'owned' && cur.status !== 'listed')) {
         throw new AppError(404, 'NOT_IN_PORTFOLIO', `${domain} is not an owned or listed domain`);
       }
       if (cur.category !== row.category || cur.listing_mode !== row.listing_mode || cur.bin_cents !== row.bin_cents
-        || cur.floor_cents !== row.floor_cents || cur.min_offer_cents !== row.min_offer_cents || cur.lto_max_months !== row.lto_max_months) {
+        || cur.floor_cents !== row.floor_cents || cur.walkaway_cents !== row.walkaway_cents || cur.min_offer_cents !== row.min_offer_cents
+        || cur.lto_max_months !== row.lto_max_months || cur.plan_id !== row.plan_id || cur.pricing_hold !== row.pricing_hold
+        || (cur.first_listed_at?.getTime() ?? null) !== (row.first_listed_at?.getTime() ?? null)) {
         throw new AppError(409, 'LISTING_CHANGED_CONCURRENTLY', 'The listing changed while this request was running; retry');
       }
       const nsChanged = !row.lander_ns || !sameNsSet(row.lander_ns, ns);
       await trx.updateTable('domains').set({
-        ...(listing ? {
-          listing_mode: listing.mode, bin_cents: listing.binCents, floor_cents: listing.floorCents,
-          min_offer_cents: listing.minOfferCents, lto_max_months: listing.ltoMaxMonths, status: 'listed' as const,
-        } : {}),
-        ...(categoryChange ? { category } : {}),
+        ...(plan ? {
+          ...domainPlanColumns(plan), status: 'listed' as const, category: plan.category, price_grade: plan.category === 'geo' ? plan.grade : null,
+          first_listed_at: cur.first_listed_at ?? now,
+        } : {
+          ...(categoryChange ? { category } : {}),
+          ...(gradeChange ? { price_grade: body.price_grade } : {}),
+        }),
+        ...(plan || displayChanged ? { export_pending_since: cur.export_pending_since ?? now } : {}),
+        ...(holdChange ? { pricing_hold: body.pricing_hold!, pricing_hold_reason: body.pricing_hold ? body.pricing_hold_reason!.trim() : null } : {}),
         ...(body.display_name != null ? { display_name: body.display_name } : {}),
         lander, lander_ns: ns, lander_set_at: now,
         ns_verified_at: ns_public === 'match' ? now : nsChanged ? null : row.ns_verified_at,
         updated_at: now,
       }).where('id', '=', row.id).execute();
+      if (plan) {
+        await writePlan(trx, { domainId: row.id, plan, anchor, dropDate: row.drop_date!, settings: s, planAuditId: ctx.auditId, startAfter, now });
+      }
       if (historyChange) {
-        const h = effective;
-        await trx.insertInto('listing_history').values({
-          domain_id: row.id, source: 'list', category, mode: h?.mode ?? null, bin_cents: h?.binCents ?? null,
-          floor_cents: h?.floorCents ?? null, min_offer_cents: h?.minOfferCents ?? null, lto_max_months: h?.ltoMaxMonths ?? null,
-          lander, override: overrideUsed, override_reason: overrideUsed ? (body.override_reason ?? null) : null,
-          approval_text: body.approval_ref ? String(body.approval_ref.text) : null, approval_at: approvedAt, audit_id: ctx.auditId,
-        }).execute();
+        await trx.insertInto('listing_history').values(historyRow({
+          domainId: row.id, source: 'list', plan: shown, category, grade, lander, override: overrideUsed,
+          overrideReason: overrideUsed ? (body.override_reason ?? null) : null,
+          approvalText: body.approval_ref ? String(body.approval_ref.text) : null, approvalAt: approvedAt, auditId: ctx.auditId,
+          planAuditId: plan ? ctx.auditId : row.plan_audit_id,
+        })).execute();
       }
     });
+
+    const after = await db.selectFrom('domains').select(['plan_id', 'pricing_hold']).where('id', '=', row.id).executeTakeFirstOrThrow();
+    const events = after.plan_id === null ? [] : (await db.selectFrom('price_schedule').selectAll()
+      .where('domain_id', '=', row.id).where('plan_id', '=', after.plan_id).where('status', '!=', 'superseded').orderBy('due_on').orderBy('id').execute())
+      .map((e) => ({ event: e.event, dueOn: e.due_on, binCents: e.bin_cents, floorCents: e.floor_cents, walkawayCents: e.walkaway_cents, status: e.status }));
 
     const checklist = [
       'Add/update at Afternic: download /export/afternic.csv and upload it at afternic.com/domains/add with **Update** (never Replace)',
@@ -192,8 +247,8 @@ export class ListService {
     if (row.registrar === 'godaddy') checklist.push("GoDaddy-registered: GoDaddy's own List for Sale is an alternative to the Afternic upload");
 
     return {
-      domain, status: listing ? 'listed' : row.status, category,
-      listing: effective ? presentListing(effective) : null,
+      domain, status: plan ? 'listed' : row.status, category,
+      listing: shown ? planView(shown, events as never) : null, pricing_hold: after.pricing_hold,
       lander, ns, ns_status: ns_result.status, ...(ns_result.steps ? { manual_steps: ns_result.steps } : {}), ns_public,
       checklist, warnings,
     };

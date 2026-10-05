@@ -13,9 +13,9 @@ let app: FastifyInstance;
 afterEach(async () => app?.close());
 
 async function fixture4() {
-  await listedDomain({ domain: 'austinroofrepair.com', display_name: 'AustinRoofRepair.com', category: 'geo' });
-  await listedDomain({ domain: 'trendname.com', category: 'trend', listing_mode: 'hybrid', bin_cents: 499900, floor_cents: 250000, min_offer_cents: 100000, lto_max_months: 24 });
-  await listedDomain({ domain: 'buzz.com', category: 'buzzword', listing_mode: 'offer', bin_cents: null, floor_cents: null, min_offer_cents: 50000 });
+  await listedDomain({ domain: 'austinroofrepair.com', display_name: 'AustinRoofRepair.com', category: 'geo', price_grade: 'weaker', listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, walkaway_cents: 39900, min_offer_cents: 39900 });
+  await listedDomain({ domain: 'trendname.com', category: 'trend', listing_mode: 'hybrid', bin_cents: 499900, floor_cents: 250000, walkaway_cents: 100000, min_offer_cents: 100000, lto_max_months: 24 });
+  await listedDomain({ domain: 'buzz.com', category: 'buzzword', listing_mode: 'offer', bin_cents: null, floor_cents: null, walkaway_cents: null, min_offer_cents: 50000 });
   await listedDomain({ domain: 'gone.com', status: 'sold', sold_at: new Date(), delisted_at: new Date() });
 }
 
@@ -74,7 +74,7 @@ describe('GET /export/afternic.csv', () => {
   it('cents are rounded down with an AFTERNIC_ROUNDS_DOWN warning in the header', async () => {
     app = await makeApp();
     const { auth } = await issueToken('read');
-    await listedDomain({ domain: 'cents.com', bin_cents: 39950, floor_cents: 39950, min_offer_cents: 39950 });
+    await listedDomain({ domain: 'cents.com', listing_mode: 'bin', bin_cents: 39950, floor_cents: 39950, walkaway_cents: 39950, min_offer_cents: 39950 });
     const res = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
     expect(res.headers['x-export-warnings']).toContain('cents.com:AFTERNIC_ROUNDS_DOWN');
   });
@@ -181,7 +181,7 @@ describe('GET /export/sedo.csv', () => {
     const res0 = await badTemplate(JSON.stringify(good));
     expect(res0.statusCode).toBe(200);
     const { auth } = await issueToken('read');
-    await listedDomain({ domain: 'cents.com', bin_cents: 39950, floor_cents: 39950, min_offer_cents: 39950 });
+    await listedDomain({ domain: 'cents.com', listing_mode: 'bin', bin_cents: 39950, floor_cents: 39950, walkaway_cents: 39950, min_offer_cents: 39950 });
     const res = await app.inject({ method: 'GET', url: '/export/sedo.csv', headers: auth });
     expect(res.headers['x-export-warnings']).toBe('cents.com:SEDO_ROUNDS_DOWN');
   });
