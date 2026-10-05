@@ -8,20 +8,27 @@
 { "venue": "afternic",            // afternic | sedo | afternic_checkout | escrow | other
   "sale_price": 1995.00, "commission": 299.25, "other_fees": 0,
   "sold_at": "2027-02-11T14:02:00+02:00",
-  "payout": { "amount": 1680.75, "method": "wire", "fee": 15.00, "received_on": null },   // optional
+  "payout": { "amount": 1680.75, "method": "wire", "fee": 15.00, "received_on": null },   // optional; stored in `payouts` (below)
+  "offer_id": 42,                   // optional: the `offers` row this sale came from
   "transaction_ref": "AFN-123456",
   "approval_ref": { "text": "it sold on afternic for 1995", "approved_at": "..." } }
 ```
 
 ## Behaviour
-- The domain must be `owned` or `listed`; otherwise 409 `NOT_SELLABLE_STATE`.
+- The domain must be `owned`, `listed` or **`delisted`** (a delisted name can still sell, e.g. via outreach or a late marketplace buyer); otherwise 409 `NOT_SELLABLE_STATE`.
+- **`offer_id` (optional):** must be an `open`, `countered` or `accepted` offer on this domain, else 422 `OFFER_MISMATCH`. In the same transaction the offer's outcome becomes `sold` (note `via /sold`, Dvir's approval text).
 - One DB transaction writes ledger rows:
   - `sale` +sale_price;
   - `commission` −commission;
   - `fee` −other_fees, if > 0;
   - `payout_fee` −payout.fee, if given.
+  - The payout **amount** is never a ledger row: the `sale` row already counts that money.
   - `counterparty` = venue; `receipt_ref` = `transaction_ref`.
 - Sets `status=sold` and `sold_at`.
+- **Payout (optional; Dvir, 5 Oct 2026, 19:42 IDT):** in the same transaction, one `payouts` row (`00-architecture.md` §4) with `sale_ledger_id` = the `sale` row just written, `fee_ledger_id` = the `payout_fee` row (or null), `venue`, `amount_cents`, `fee_cents`, `method`, `received_on` (null = not yet received), `transaction_ref`, `audit_id`. One payout per sale (UNIQUE `sale_ledger_id`).
+  - **Validation (422, nothing written):** `amount` > 0; `received_on` not in the future (IDT date) and not before the `sold_at` date → `VALIDATION_ERROR`; `method` containing `@` → `NO_PII`.
+  - **Consistency check (a warning, never a block):** `PAYOUT_MISMATCH` when |`amount` + `fee` − (sale − commission − other_fees)| > $1. The sale is still recorded.
+  - **Marking it received later:** `POST /payouts/{id}/received {received_on, approval_ref}` (WRITE, idempotent, audited) sets `received_on` once (null → date, same date rules); a second attempt with a new key → 409 `PAYOUT_ALREADY_RECEIVED`. **v1 pending Dvir confirmation at the 4d-1 gate** (`00-architecture.md` §2).
 - **Commission check (a warning, not a block):** compares the commission to the expected rate.
   - Afternic: 15% if the lander NS was afternic at `sold_at`, else 25%, with a $15 minimum.
   - Sedo: 10%, 15% or 20%.
@@ -33,6 +40,7 @@
     1. "Remove the listing on the *other* marketplace now (double-sale risk)".
     2. "Do not send an auth code outside the marketplace flow".
     3. "Auto-renew stays off".
+  - `payout`, if given: `{amount, fee, method, received_on, status: received|pending}` (`received` when `received_on` is set), plus any `PAYOUT_MISMATCH` warning.
 - `approval_ref` is **required** (it is Dvir's word that the sale happened).
 
 ## Tests (pass/fail)
@@ -47,3 +55,10 @@
 | S-6 | READ token | 403 | Executed |
 | S-7 | Report after sale | `/report` sales and ROI include it | Missing |
 | S-8 | Checklist | The response includes the "remove the other listing" step | Missing |
+| S-9 | Sale of a `delisted` domain | 200; status `sold`; same ledger rows as S-1 | 409 |
+| S-10 | `offer_id` of an open offer on this domain | 200; the offer's outcome `sold`; one transaction | Offer unchanged |
+| S-11 | `offer_id` of another domain's offer, or a declined one | 422 `OFFER_MISMATCH`; nothing written | Sale recorded |
+| S-12 | S-1 sale + payout `{1680.75, wire, 15.00, null}` | One `payouts` row: `sale_ledger_id` = the sale row, `fee_ledger_id` = the `payout_fee` row (−1500); response `payout.status` `pending`; no `PAYOUT_MISMATCH` (1680.75 + 15 = 1995 − 299.25); no ledger row for the amount | Missing row, wrong links, or an amount ledger row |
+| S-13 | Payout `amount` 1500 | 200 with `PAYOUT_MISMATCH`; sale and payout recorded | Blocked, or no warning |
+| S-14 | S-12 replayed with the same key | Still one `payouts` row | 2 rows |
+| S-15 | `received_on` tomorrow (IDT) / before `sold_at`; `method` `a@b.com` | 422 `VALIDATION_ERROR` / `VALIDATION_ERROR` / 422 `NO_PII`; nothing written | Accepted |

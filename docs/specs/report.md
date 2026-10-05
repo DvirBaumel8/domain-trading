@@ -16,15 +16,16 @@ Every money field appears twice: in cents (`*_cents`) and as a display string ("
 | `per_domain` | domain, status, registrar, `registrar_api`, **category, grade, listing mode, BIN, floor, walk-away (private), min offer, pricing source + settings version, **offers (`count_30d`, `highest_30d`, `count_90d`, `highest_90d`, `count_all`, `highest_all`, `highest_all_pct_of_bin`, `last_offer_at`, `open_for_dvir`)**, next price event (date + values), hold, export pending since**, cost, renewal price, `renewals_used`, expiry, `drop_date`, lander, NS verified, days held |
 | `upcoming_90d` | For each domain, the events within 90 days: **first renewal decision** (expiry, where `renewals_used=0`; alert stages 60/30/7); **final expiry** (where `renewals_used=1`: "won't be renewed again; the final push price is already scheduled at `drop_date − 90`; consider an outreach push (Gate C)"; stages 60/30); **Fast Transfer opt-in date** (`buy_date+60`, where `buy_date` is the registry creation date); `drop_date`; **price events** from `price_schedule` (`drop1_m6`, `drop2_m18`, `final_push`, `delist`) with exact values. Events due within `headsup_days_before` (7) are flagged `headsup: true`; Gavriel relays them to Dvir as information (no approval needed) |
 | `offers_by_strategy` | One row per category/strategy: `names_listed`, `names_with_offers`, `offers_90d`, `offers_per_listed_name_per_month`, `median_offer_pct_of_bin`, `max_offer_pct_of_bin`, share per band (`listing-strategy.md` §10.11). The demand signal for the quarterly review |
+| `payouts_pending` | Sold domains whose `payouts` row has `received_on` null: domain, venue, amount, fee, method, `sold_at`, `days_pending` (IDT days since `sold_at`). Payouts add **no** ledger money, so `sales`, `profit` and `roi` are unchanged (R-1, R-2) |
 | `applied_7d` | Price events the job applied in the last 7 days, with old → new values and whether the export is still pending upload |
-| `warnings` | NS not on the configured lander (public-DNS check); listed without a category; `RENEWAL_PRICE_UNKNOWN` (imports); a hybrid/offer listing with a floor below the BIN (`FLOOR_AUTO_ACCEPT` reminder); BIN missing; Afternic export older than 7 days while listings changed; purchases in `unknown` state; domains past `drop_date` still `owned` (→ mark as `dropped`); missing receipts; registrar balance below `$15` (if known); **`EXPORT_PENDING`** (marketplace price stale since a change; error level after 7 days); **`PRICE_EVENT_FAILED`**; a `pricing_hold` older than 30 days; `PRICING_EXCEPTION` (plan differs from the formula; informational); `OFFER_NEEDS_DVIR` (a mid-range or email offer open > 48 h) |
+| `warnings` | `PAYOUT_OVERDUE` (a pending payout older than 30 days); NS not on the configured lander (public-DNS check); listed without a category; `RENEWAL_PRICE_UNKNOWN` (imports); a hybrid/offer listing with a floor below the BIN (`FLOOR_AUTO_ACCEPT` reminder); BIN missing; Afternic export older than 7 days while listings changed; purchases in `unknown` state; domains past `drop_date` still `owned` (→ mark as `dropped`); missing receipts; registrar balance below `$15` (if known); **`EXPORT_PENDING`** (marketplace price stale since a change; error level after 7 days); **`PRICE_EVENT_FAILED`**; a `pricing_hold` older than 30 days; `PRICING_EXCEPTION` (plan differs from the formula; informational); `OFFER_NEEDS_DVIR` (a mid-range or email offer open > 48 h) |
 
 ## Other GETs
 
 | Endpoint | Returns |
 |---|---|
 | `GET /portfolio?status=` | Domains list (same fields as `per_domain`) |
-| `GET /portfolio/{domain}` | One domain, plus its ledger rows, purchases, quotes from the last check, lander status and **`listing_history`** |
+| `GET /portfolio/{domain}` | One domain, plus its ledger rows, purchases, quotes from the last check, lander status, **`listing_history`** and, once sold, its **`payout`** (`{amount, fee, method, received_on, status: received\|pending}` or null) |
 | `GET /ledger?type=&domain=&from=&to=&format=json\|csv` | Ledger rows; CSV columns `date,type,domain,deal_id,amount_usd,counterparty,receipt_ref,note` (same as `cfo-ledger.md`) |
 | `GET /deals/{id}` | Deal row: domain, stage, decision, approvals (audit rows whose `approval_ref` cites it) |
 | `GET /audit?since=&limit=` | Audit rows (approval text included; request bodies redacted of nothing secret, since bodies never contain secrets) |
@@ -78,7 +79,7 @@ D-001 (promptinjectionaudit.com) was bought **by hand at GoDaddy** (not Porkbun)
 | IM-11 | GoDaddy adapter never registers | Static test: the GoDaddy adapter has no `register` implementation, and `/check` excludes GoDaddy with `NO_AVAILABILITY_ACCESS` | Can register |
 
 ## Status lifecycle
-`pending_purchase → owned → listed → sold`, or `listed → delisted → dropped` (the scheduled delist at `drop_date − 7`), or `→ dropped`.
+`pending_purchase → owned → listed → sold` (also `owned → sold` and `delisted → sold`), or `listed → delisted → dropped` (the scheduled delist at `drop_date − 7`), or `→ dropped`.
 - A domain becomes `dropped` when a daily job finds `today > drop_date`, or when an `owned`/`listed` domain expires without renewal.
 - `renewals_used` is never above 1 (DB CHECK).
 

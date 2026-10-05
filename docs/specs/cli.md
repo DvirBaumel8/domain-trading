@@ -33,3 +33,15 @@ A ~150-line wrapper over the HTTP API, so Dvir can type the commands he already 
 | CLI-2 | `--offer --min-offer 500 --override --reason x` / `--bin 1995 --offer` | `offer` / `hybrid` bodies as in the table (hybrid sends no floor, walk-away or min offer) | Wrong mode or extra fields |
 | CLI-3 | A server 422 | The error code and message are printed; exit code 2 | Swallowed |
 | CLI-4 | No secrets | The CLI never reads registrar env vars (static grep) | Found |
+
+## Server-side admin commands (`npm run admin -- …`; not part of `dt`)
+
+| Command | What |
+|---|---|
+| `npm run admin -- drop-at-first-expiry --domain d --approval-text "<Dvir's words>" --approval-at <ISO>` | **Gate F "drop at first expiry"** (Dvir, 5 Oct 2026). Needs `renewals_used = 0`, status `owned`, `listed` or `delisted`, and an `expiry_date`. Sets `drop_date = expiry_date` (the DB CHECK allows `expiry_date` or `expiry_date + 1 year`; `00-architecture.md` §4). If the domain has a plan, regenerates the schedule from the current values (same anchor, from today; M-rows on or after the new final push → `superseded_by_final_push`; old rows `superseded`; PR-25). Writes an admin audit row with the approval. Prints the new `drop_date` and schedule |
+
+| ID | Case | Pass | Fail |
+|---|---|---|---|
+| ADM-1 | `drop-at-first-expiry` on a D-001-like domain (listed 2026-10-12, hybrid 1995/1295/950, expiry 2027-10-04, drop 2028-10-04), clock 2026-10-20 | `drop_date` 2027-10-04; M6 2027-04-12 1595/1035/760 kept; M18 `superseded_by_final_push`; final push 2027-07-06 1095/1035/760; delist 2027-09-27; old rows `superseded`; admin audit row | Old dates kept, or wrong values |
+| ADM-2 | Refusals: `renewals_used = 1`; a sold domain; a second run; `--approval-at` in the future | Refused (`MAX_ONE_RENEWAL_USED` / state error / `NO_CHANGE` / exit 2); nothing changed | Changed |
+| ADM-3 | DB CHECK | `drop_date = expiry_date` accepted; `drop_date = expiry_date + 2 years` (with `renewals_used = 0`) rejected | Other |
