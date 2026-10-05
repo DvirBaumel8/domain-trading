@@ -26,7 +26,7 @@ Header: `Idempotency-Key: <uuid>` (required).
 |---|---|---|
 | 1 | Token scope is WRITE | 403 `SCOPE_FORBIDDEN` |
 | 2 | `Idempotency-Key` present. If seen before: same body → replay the stored response; different body → 409 | 400 `IDEMPOTENCY_KEY_REQUIRED` / 409 `IDEMPOTENCY_KEY_MISMATCH` |
-| 3 | `approval_ref.text` is non-empty, **contains the domain name** (case-insensitive), and `approved_at` is not in the future and is ≤ `approval_max_age_hours` (default 72) old | 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` |
+| 3 | `approval_ref.text` is non-empty, **names the domain** on label boundaries (case-insensitive; `ba.com`, `x.com.au`, `www.x.com` or `x.company` do not name `x.com`; Dvir, 5 Oct 2026), and `approved_at` is not in the future and is ≤ `approval_max_age_hours` (default 72) old | 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` |
 | 3b | `category` present and valid. If `proposed_listing` is given, it passes `listing-strategy.md` V1–V8 (an override uses this call's `approval_ref`) | 422 `CATEGORY_REQUIRED` / the listing error code (**no registrar call**) |
 | 4 | The domain isn't already in `domains` with status `pending_purchase`/`owned`/`listed`, and no open purchase exists for it | 409 `ALREADY_OWNED_OR_PENDING` |
 | 5 | **Domain cap:** count of `owned` + `listed` + `pending_purchase` < `max_domains` (10) | 409 `DOMAIN_CAP_REACHED` |
@@ -52,7 +52,7 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
    - **Definite failure** (an error `code`, nothing charged): set `state=failed` and delete the `pending_purchase` row (or mark it `failed`). Return 409 with the registrar code.
    - **Ambiguous** (timeout, 5xx, connection reset): retry the **same request with the same idempotency key** up to 3 times (2 s, 5 s, 10 s). Porkbun replays within 24 h. Then call `find_domain`:
      - present → success path;
-     - absent and RDAP 404 → `failed`;
+     - absent and RDAP 404 → `unknown` (202) as well; the reconciler fails it after 30 min if it is still absent (Dvir, 5 Oct 2026: never release in-call after ambiguous attempts, so a late registration is still booked);
      - otherwise `state=unknown`, return **202** `PURCHASE_STATE_UNKNOWN`. The reconciler resolves it (§6).
 6. **Bookkeeping, in ONE DB transaction:**
    - `ledger_entries`: `registration`, `-charged_cents`, `counterparty=<registrar>`, `receipt_ref=<registrar>:<order_id>`, note `"1yr; privacy on; check <check_id>; approval <audit_id>"`.
@@ -84,6 +84,7 @@ If `dry_run: true`, the call **stops here**. It returns 200 with everything that
 - **Expiry:** from `find_domain`, else the invoice line, else `buy_date + 1 year` with warning `EXPIRY_ESTIMATED`. `buy_date` / ledger `occurred_on` use the Asia/Jerusalem date.
 - **Portfolio:** a domain already in `domains` as `sold`/`dropped` → 409 `ALREADY_IN_PORTFOLIO`.
 - **Reconciler:** also fails `created` purchases older than 10 min (never sent) and deletes their pending row; every fail is guarded by the selected state; it does not run post-buy steps (`/report` flags them).
+- **Ambiguous dry run** also writes a `pending_purchase` domain row, so the 10-domain cap counts it.
 - **New codes:** `REGISTRAR_REJECTED` (details.registrar_code), `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `ALREADY_IN_PORTFOLIO`, `PURCHASE_FAILED`, `PURCHASE_ABANDONED`, `LISTING_PRICE_INVALID`.
 
 ## Never
