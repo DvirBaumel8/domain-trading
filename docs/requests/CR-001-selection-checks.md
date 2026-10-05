@@ -1,3 +1,5 @@
+> **DOM response: §11 (2026-10-06): accepted with changes; P1a/P1b plan; DVIR decisions in §11.3.**
+>
 > **Approved by Dvir 2026-10-06 02:05 IDT. Priority: P1 first; please reply with answers to the open questions in this file or docs/releases/ before building.**
 
 # CR-001 — Selection checks as a service (screening API)
@@ -511,6 +513,85 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
 | Web Risk API key | interim rule C16 | Dvir |
 | Unknown-token rule in SPELL-1 (V9-15) | proposed FAIL | Dvir |
 | v9.1 SEL9-8 says "hvac trade count <10 → D raw 2", but the NameBio count for hvac is 11 (band 10–29 → 6) | follow the bands | Gavriel to correct v9.1 test text |
+
+---
+
+## 11. DOM response (2026-10-06)
+
+**Verdict: accepted with changes.** DOM builds CR-001 in two P1 releases (P1a, P1b, see Q16). Items marked **DVIR** need Dvir's decision; nothing that depends on them is blocked except the capability named.
+
+### 11.1 Pushback
+
+| # | Topic | DOM position |
+|---|---|---|
+| P-1 | **Scope** | CR-001 roughly doubles the system, and Dvir asked on 6 Oct to keep it small. DOM keeps P1 to what DR-004 needs: deterministic checks over sources DOM can use compliantly. **Lead discovery (CAP-14) is not built.** Bots supply candidate firm and seller URLs; DOM verifies, tiers and gates them (CAP-15, CAP-16). See Q1 and Q2. |
+| P-2 | **Undocumented endpoints** | Three sources used in the dry runs are the **internal backends of websites**, not published APIs: BBB search (the CR already found it disallowed), the USPTO search site's backend (`tmsearch.uspto.gov/prod-stage-v1-0-0/tmsearch`, used in DR-002) and Google Transparency Report status. Under ground rule 4, **DOM does not automate undocumented website endpoints.** Each becomes an official API (with a credential where one is required, owned by Dvir) or a `MANUAL_REQUIRED` field with a recorded human result. See Q1, Q3 and Q5. |
+| P-3 | **Free hosting** | Hosting stays $0. Screening runs as a persisted job in the API service, so every check's state is in the DB. Render free sleeps after about 15 min with no inbound request. Gavriel's progress polling keeps it awake, and a run that was interrupted resumes on the next wake (the hourly tick also resumes stalled runs). |
+| P-4 | **Evidence storage** | Neon free is 1 GB, so DOM does **not** store full raw HTML. Each item stores the source URL, retrieval time, sha256 of the full response, and the extracted visible text (gzip, capped per item). Archive evidence is the Wayback capture URL, a permanent public snapshot, plus the classified excerpt. See Q12. |
+| P-5 | **Personal data vs append-only** | Lead rows hold named people's emails, some in the EU. Results stay append-only, but personal fields live in a separate erasable table that results reference. Erasure replaces them with a tombstone and keeps the rest of the record. See Q14. |
+| P-6 | **Dependencies** | CAP-18 and CAP-19 depend on parts of selection v9.1 that Dvir approved on 6 Oct but that are **not built yet**: `pricing_settings` v3 (price list, step-down drops, geo ladder to $299) and `/buy` refusing without a complete screening pack (SEL7-1). DOM builds both inside CR-001, and the gap is listed in `docs/internal/gaps.md`. Until the CR-001 release, `/buy` keeps today's rules. |
+| P-7 | **Live-data acceptance tests** | Tests that cite live facts (trademark serials, capture dates, census shares) are checked by DOM against **recorded responses**. Gavriel re-runs them live, and drift is accepted when the evidence explains it (as the CR already says for the census). |
+| P-8 | **Settings writes** | CAP-00 needs an API path to settings. DOM allows **selection settings**: Gavriel proposes a draft (WRITE), and activation requires Dvir's `approval_ref`. `pricing_settings` stays admin-command only (founder rule 4). |
+| P-9 | **Gate order** | Accepted as written. |
+
+### 11.2 Answers to §9
+
+1. **Geo business source.** DOM will not use BBB. DOM knows of no free, compliant source with BBB-like coverage of small trade firms.
+   - OpenStreetMap (Overpass API, ODbL) is compliant but likely sparse for small roofers. DOM will measure Tulsa roofing coverage before relying on it.
+   - State contractor-licence registries differ by state. DOM checks each state's terms when a market is chosen.
+   - **Proposed long-term contract:** Gavriel supplies candidate firm URLs found by bot web search, and DOM verifies them mechanically (CAP-15).
+   - DOM confirms in writing, per source, that automated access is permitted (quote + URL) in the release note before that source goes live. DOM does not promise coverage numbers until it has measured them.
+2. **Non-geo sellers.** Yes, bot-supplied seller URLs verified by DOM is acceptable as the long-term contract. A search API (for example Brave Search or Google Programmable Search) would need a key (**DVIR**). It isn't needed for P1.
+3. **USPTO.** The DR-002 route is the search website's internal backend, so DOM will not use it. DOM uses only an officially documented USPTO API; that USPTO terms permit wordmark search is being verified as the first step of CAP-08.
+   - If the official API needs a free API key → **DVIR** (account owner).
+   - If there is no official wordmark search, CAP-08 becomes `MANUAL_REQUIRED`, with a recorded manual result (same shape as CAP-09 P1) and the control query still required.
+4. **EUIPO.** Yes, for P2, with the account in Dvir's name (**DVIR**). WIPO and UK IPO stay manual unless an official API is confirmed at P2.
+5. **Web Risk.** DOM recommends the Lookup API with a key. Dvir creates the Google Cloud project (**DVIR**).
+   - If Google requires a billing account, Dvir decides whether to accept that risk; DOM would set the quota so usage stays inside the free tier.
+   - The Transparency Report status endpoint is internal, so DOM will not automate it. **Until a key exists, WEB-RISK-1 = `MANUAL_REQUIRED`:** Gavriel records the status seen by hand. This changes v9.1 C16's interim automation (**DVIR**).
+6. **SURBL / Spamhaus.** Public resolvers refuse these lookups. DOM queries SURBL's authoritative DNS servers directly with its own DNS client, plus a control lookup in every run. DOM verifies that our volume (a few hundred lookups a week) fits SURBL's free-use policy before enabling it. Spamhaus DBL needs a free DQS key for this kind of use → P2, **DVIR**.
+7. **Web archive.** Sequential, polite calls: one CDX query per name, then only the decisive captures, with backoff and a retry before any verdict.
+   - Commitment: a 50-name batch finishes HIST-1 within the 30-min budget, **or** returns partial results with the rest `UNKNOWN TIMEOUT`, re-queued once automatically.
+   - DOM measures on the DR-003 names in the first build and reports the real figure.
+8. **NameBio.** One nightly download is within "1 per hour", and attribution is shown. DOM confirms the storage and caching rights in NameBio's terms before enabling it.
+   - As-of counts: the CSV is a current snapshot. Counts as of dates **after DOM's first download** come from DOM's own nightly copies (`approximate`); earlier dates are `not_possible`.
+9. **Manual renewal price.** Accepted as the contract: a Dvir-entered price with timestamp and source, valid for ≤ `quote.manual_max_age_days` (30).
+10. **Performance and cost.** Hosting cost: **$0** (Render free + Neon free). P1 has no paid component. The only possible paid exposure is the Web Risk billing account (Q5). DOM treats the per-capability targets as goals and confirms or counters each one in the P1a release note, from measured runs.
+11. **As-of support.**
+
+    | Check | As-of support |
+    |---|---|
+    | History | `exact`: only captures before the date |
+    | Registry creation date | `exact` |
+    | Availability on a past date | `approximate`: inferred from creation and expiry dates |
+    | Trademarks | `approximate`: filing and status dates allow a partial view |
+    | NameBio | `approximate`: from DOM's own copies only |
+    | Census, SURBL, Web Risk, leads | `not_possible` |
+
+12. **Evidence storage.** Estimate: about 5 MB per 50-name batch (compressed text plus hashes and URLs).
+    - At one batch a week, that is about 260 MB a year. With rejected-name evidence purged after 400 days, this fits Neon's 1 GB for about 2–3 years at $0.
+    - If more is needed, older evidence moves to the private data repo. Retention stays Dvir's decision (§10).
+13. **Firm size (C15).**
+    - **Signals:** the number of named people on team or about pages, owner-operated or family-owned statements, and staff counts stated on the firm's own site. No LinkedIn automation.
+    - **Reliability:** medium at best. DOM reports the share of DR-003's Tulsa B? leads it resolves, from the replay, in the P1b note.
+14. **Personal data.**
+    - **Storage:** Neon EU (Frankfurt region).
+    - **Erasure:** a separate erasable table, with delete by firm domain or by address (WRITE, audited; the audit stores a hash, not the address).
+    - **EU marking:** an `eu_firm` flag from the country of the firm's ccTLD or address.
+15. **Word lists.** English dictionary: SCOWL (permissive licence; checked before use). US cities: US Census Gazetteer (public domain). Trades, regimes, brands and big companies are versioned lists that Gavriel adds to through the API (audited); each result stamps the list versions it used.
+16. **Delivery.** Contract v1.0.0 (today's API) ships first.
+
+    | Release | Contract | Contents |
+    |---|---|---|
+    | **P1a** (for DR-004) | v1.1.0 | CAP-00, 01, 02, 03, 04, 05, 07, 10, 11, 17, 18 (with `pricing_settings` v3) and 20. CAP-06 and CAP-08 ship as `MANUAL_REQUIRED` record fields until Q3/Q5 are settled. Leads stay with the bots for DR-004 |
+    | **P1b** | v1.2.0 | CAP-15 and 16 (verify supplied leads), 19 with `/buy` enforcement (SEL7-1), the CAP-09 manual record, CAP-12 |
+    | **P2** | later | The rest |
+
+### 11.3 Decisions needed from Dvir (DVIR)
+1. **USPTO:** an API key, if the official route needs one (Q3).
+2. **Web Risk:** a Google Cloud project (and billing account?) for the key. Until then, accept `MANUAL_REQUIRED` for WEB-RISK-1 (Q5).
+3. **P2 credentials:** a Spamhaus DQS key and an EUIPO account.
+4. **The §10 items:** they remain open on your side.
 
 ---
 
