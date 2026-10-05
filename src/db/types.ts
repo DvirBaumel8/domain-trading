@@ -160,6 +160,11 @@ export interface SalesTable {
   sale_ledger_id: number;
   venue: string;
   transaction_ref: string | null;
+  sale_price_cents: number;
+  commission_cents: number;
+  other_fees_cents: Generated<number>;
+  sold_at: Timestamp;
+  offer_id: number | null;
   evidence_source: 'afternic_email' | 'sedo_email' | 'afternic_dashboard' | 'sedo_dashboard' | 'escrow' | 'other' | null;
   evidence_ref: string | null;
   approval_text: string | null;

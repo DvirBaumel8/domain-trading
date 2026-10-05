@@ -53,6 +53,8 @@ function commissionWarning(i: SoldInput, lander: string | null, landerSetAt: Dat
   return null;
 }
 
+const alreadyRecorded = (i: SoldInput) => new AppError(409, 'SALE_ALREADY_RECORDED', `A sale with ${i.venue} transaction_ref ${i.transactionRef} is already recorded`);
+
 export class SoldService {
   constructor(private readonly deps: { db: Kysely<Database>; now: () => number }) {}
 
@@ -74,6 +76,10 @@ export class SoldService {
     const approvalText = i.approvalRef ? String(i.approvalRef.text) : null;
 
     return withDomainLock(this.deps.db, domain, (conn) => conn.transaction().execute(async (trx) => {
+      if (i.transactionRef !== null) {
+        const dup = await trx.selectFrom('sales').select('id').where('venue', '=', i.venue).where('transaction_ref', '=', i.transactionRef).limit(1).executeTakeFirst();
+        if (dup) throw alreadyRecorded(i);
+      }
       const row = await trx.selectFrom('domains').selectAll().where('domain', '=', domain).forUpdate().executeTakeFirst();
       if (!row) throw new AppError(404, 'NOT_IN_PORTFOLIO', `${domain} is not in the portfolio`);
       if (!SELLABLE.includes(row.status)) {
@@ -81,11 +87,6 @@ export class SoldService {
       }
       if (row.buy_date !== null && jerusalemDate(i.soldAt) < row.buy_date) {
         throw new AppError(422, 'VALIDATION_ERROR', 'sold_at is before the domain was bought', { buy_date: row.buy_date });
-      }
-      if (i.transactionRef !== null) {
-        const dup = await trx.selectFrom('ledger_entries').select('id').where('type', '=', 'sale')
-          .where('counterparty', '=', i.venue).where('receipt_ref', '=', i.transactionRef).limit(1).executeTakeFirst();
-        if (dup) throw new AppError(409, 'SALE_ALREADY_RECORDED', `A sale with ${i.venue} transaction_ref ${i.transactionRef} is already recorded`);
       }
       if (i.offerId !== null) {
         const o = await trx.selectFrom('offers').select(['id', 'domain_id', 'outcome']).where('id', '=', i.offerId).forUpdate().executeTakeFirst();
@@ -110,11 +111,18 @@ export class SoldService {
       const inserted = await trx.insertInto('ledger_entries').values(rows).returning(['id', 'type']).execute();
       const saleLedgerId = inserted.find((r) => r.type === 'sale')!.id;
       const feeLedgerId = inserted.find((r) => r.type === 'payout_fee')?.id ?? null;
-      await trx.insertInto('sales').values({
-        domain_id: row.id, sale_ledger_id: saleLedgerId, venue: i.venue, transaction_ref: i.transactionRef,
-        evidence_source: i.evidence?.source ?? null, evidence_ref: i.evidence?.ref ?? null,
-        approval_text: approvalText, approval_at: approvedAt, recorded_by: ctx.recordedBy, confirmed: i.approvalRef !== null, audit_id: ctx.auditId,
-      }).execute();
+      let saleRecord: { id: number };
+      try {
+        saleRecord = await trx.insertInto('sales').values({
+          domain_id: row.id, sale_ledger_id: saleLedgerId, venue: i.venue, transaction_ref: i.transactionRef,
+          sale_price_cents: i.saleCents, commission_cents: i.commissionCents, other_fees_cents: i.otherFeesCents, sold_at: i.soldAt, offer_id: i.offerId,
+          evidence_source: i.evidence?.source ?? null, evidence_ref: i.evidence?.ref ?? null,
+          approval_text: approvalText, approval_at: approvedAt, recorded_by: ctx.recordedBy, confirmed: i.approvalRef !== null, audit_id: ctx.auditId,
+        }).returning('id').executeTakeFirstOrThrow();
+      } catch (e) {
+        if ((e as { code?: string }).code === '23505' && (e as { constraint?: string }).constraint === 'sales_venue_transaction_ref_key') throw alreadyRecorded(i);
+        throw e;
+      }
 
       await trx.updateTable('domains').set({
         status: 'sold', sold_at: i.soldAt, delisted_at: row.delisted_at ?? i.soldAt, listing_changed_at: now, updated_at: now,
@@ -124,7 +132,8 @@ export class SoldService {
         .where('domain_id', '=', row.id).where('status', '=', 'planned').execute();
 
       if (i.offerId !== null) {
-        await trx.updateTable('offers').set({ outcome: 'sold', outcome_at: now, outcome_note: 'via /sold', outcome_approval_text: approvalText })
+        // offers.outcome_note forbids '@' (Message-IDs have one), hence the ' at '
+        await trx.updateTable('offers').set({ outcome: 'sold', outcome_at: now, outcome_note: i.approvalRef ? 'via /sold' : `system: ${i.evidence!.source} ${i.evidence!.ref.replaceAll('@', ' at ')}`, outcome_approval_text: approvalText })
           .where('id', '=', i.offerId).execute();
       }
 
@@ -160,8 +169,9 @@ export class SoldService {
       ];
 
       return {
-        domain, status: 'sold', confirmed: i.approvalRef !== null,
-        sale: money(i.saleCents), commission: money(i.commissionCents), fees: money(fees),
+        domain, status: 'sold',
+        sale: { id: saleRecord.id, confirmed: i.approvalRef !== null, recorded_by: ctx.recordedBy, evidence_source: i.evidence?.source ?? null, evidence_ref: i.evidence?.ref ?? null },
+        sale_price: money(i.saleCents), commission: money(i.commissionCents), fees: money(fees),
         sale_costs: money(saleCosts), net_proceeds: money(netProceeds),
         acquisition_costs: money(acquisitionCosts), profit: money(netProceeds - acquisitionCosts),
         ...(i.payout ? { payout: { amount: money(i.payout.amountCents), fee: money(payoutFee), method: i.payout.method, received_on: receivedOn, status: receivedOn ? 'received' : 'pending' } } : {}),

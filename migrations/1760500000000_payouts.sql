@@ -37,7 +37,12 @@ CREATE TABLE sales (
   domain_id        bigint NOT NULL REFERENCES domains (id),
   sale_ledger_id   bigint NOT NULL UNIQUE REFERENCES ledger_entries (id),
   venue            text NOT NULL,
-  transaction_ref  text,
+  transaction_ref  text CHECK (transaction_ref IS NULL OR position('@' in transaction_ref) = 0),
+  sale_price_cents integer NOT NULL,
+  commission_cents integer NOT NULL,
+  other_fees_cents integer NOT NULL DEFAULT 0,
+  sold_at          timestamptz NOT NULL,
+  offer_id         bigint REFERENCES offers (id),
   evidence_source  text CHECK (evidence_source IN ('afternic_email', 'sedo_email', 'afternic_dashboard', 'sedo_dashboard', 'escrow', 'other')),
   evidence_ref     text CHECK (evidence_ref IS NULL OR length(trim(evidence_ref)) > 0),
   approval_text    text,
@@ -46,6 +51,7 @@ CREATE TABLE sales (
   confirmed        boolean NOT NULL DEFAULT false,                          -- true when Dvir's approval_ref was given
   audit_id         text,
   created_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT sales_venue_transaction_ref_key UNIQUE (venue, transaction_ref),
   CONSTRAINT sales_evidence_or_approval CHECK (confirmed OR (evidence_source IS NOT NULL AND evidence_ref IS NOT NULL AND transaction_ref IS NOT NULL))
 );
 CREATE TRIGGER sales_append_only BEFORE UPDATE OR DELETE ON sales FOR EACH ROW EXECUTE FUNCTION reject_mutation();

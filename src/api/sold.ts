@@ -19,10 +19,11 @@ const SoldSchema = z.object({
   payout: z.object({ amount: positive, method: z.string().min(1), fee: usd.optional(), received_on: day.nullable().optional() }).strict().optional(),
   transaction_ref: z.string().optional(),
   approval_ref: z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict().nullable().optional(),
-  evidence: z.object({ source: z.enum(EVIDENCE_SOURCES), ref: z.string().refine((v) => v.trim().length > 0, 'must not be empty') }).strict().optional(),
+  evidence: z.object({ source: z.enum(EVIDENCE_SOURCES), ref: z.string().refine((v) => v.trim().length > 0, 'must not be empty').refine((v) => v.length <= 200, 'at most 200 characters') }).strict().optional(),
   offer_id: z.number().int().positive().optional(),
 }).strict();
 
+const MESSAGE_ID = /^<[^<>\s@]+@[^<>\s@]+>$/;
 const cents = (n: number) => usdStringToCents(String(n));
 
 export function registerSold(app: FastifyInstance, service: SoldService): void {
@@ -36,6 +37,12 @@ export function registerSold(app: FastifyInstance, service: SoldService): void {
     if (b.payout?.method.includes('@')) throw new AppError(422, 'NO_PII', 'payout.method must not contain an email address');
     if (cents(b.commission) + cents(b.other_fees ?? 0) + cents(b.payout?.fee ?? 0) > cents(b.sale_price)) {
       throw new AppError(422, 'VALIDATION_ERROR', 'commission + other_fees + payout.fee must not exceed sale_price');
+    }
+    if (b.evidence) {
+      const email = b.evidence.source.endsWith('_email');
+      if (email ? !MESSAGE_ID.test(b.evidence.ref) : b.evidence.ref.includes('@')) {
+        throw new AppError(422, 'NO_PII', email ? 'evidence.ref must be a Message-ID like <id@host>' : 'evidence.ref must not contain @');
+      }
     }
     return service.sold(domain, {
       venue: b.venue, saleCents: cents(b.sale_price), commissionCents: cents(b.commission), otherFeesCents: cents(b.other_fees ?? 0),

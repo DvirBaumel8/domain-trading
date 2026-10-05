@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
+import { buyBody, postBuy } from '../helpers/buy.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
@@ -45,7 +46,7 @@ describe('POST /sold/{domain}', () => {
     expect(res.statusCode).toBe(200);
     const b = res.json();
     expect(b).toMatchObject({
-      domain: D, status: 'sold', sale: { cents: 199500 }, commission: { cents: 29925 }, fees: { cents: 0 },
+      domain: D, status: 'sold', sale_price: { cents: 199500 }, commission: { cents: 29925 }, fees: { cents: 0 },
       sale_costs: { cents: 29925 }, net_proceeds: { cents: 169575 }, acquisition_costs: { cents: 1108, display: '$11.08' }, profit: { cents: 168467, display: '$1,684.67' }, warnings: [],
     });
     expect((await ledger()).map((r) => [r.type, r.amount_cents])).toEqual([['registration', -1108], ['sale', 199500], ['commission', -29925]]);
@@ -100,77 +101,137 @@ describe('POST /sold/{domain}', () => {
     await afternicListed();
     expect((await sold(good(), auth)).statusCode).toBe(200);
     const n = (await ledger()).length;
-    const r = await sold(good(), auth);
+    const r = await sold(good({ transaction_ref: 'AFN-9' }), auth);
     expect(r.statusCode).toBe(409);
     expect(r.json().error.code).toBe('NOT_SELLABLE_STATE');
     expect(await ledger()).toHaveLength(n);
   });
 
-  it('S-4 (superseded): no approval and no evidence → 422 EVIDENCE_REQUIRED; evidence without transaction_ref → same', async () => {
-    const auth = await setup();
+  const noApproval = () => { const { approval_ref: _a, ...rest } = good(); return rest; };
+  const ev = (over: Record<string, unknown> = {}) => ({ source: 'afternic_email', ref: '<x@mail.afternic.com>', ...over });
+
+  it('SL-1 (supersedes S-4): no evidence → EVIDENCE_REQUIRED; evidence without transaction_ref → EVIDENCE_REQUIRED; bad source → VALIDATION_ERROR; nothing written', async () => {
+    await setup();
     await afternicListed();
-    const { approval_ref: _a, ...rest } = good();
-    const r = await sold(rest, auth);
-    expect([r.statusCode, r.json().error.code]).toEqual([422, 'EVIDENCE_REQUIRED']);
-    const { transaction_ref: _t, ...noRef } = rest;
-    const r2 = await sold({ ...noRef, evidence: { source: 'afternic_email', ref: '<m1@afternic.com>' } }, (await issueToken('write')).auth);
-    expect([r2.statusCode, r2.json().error.code]).toEqual([422, 'EVIDENCE_REQUIRED']);
-    const r3 = await sold({ ...rest, evidence: { source: 'afternic_email', ref: ' ' } }, (await issueToken('write')).auth);
-    expect([r3.statusCode, r3.json().error.code]).toEqual([422, 'VALIDATION_ERROR']);
+    const t = async (body: object) => { const r = await sold(body, (await issueToken('write')).auth); return [r.statusCode, r.json().error.code]; };
+    const { transaction_ref: _t, ...noRef } = noApproval();
+    expect(await t(noApproval())).toEqual([422, 'EVIDENCE_REQUIRED']);
+    expect(await t({ ...noRef, evidence: ev() })).toEqual([422, 'EVIDENCE_REQUIRED']);
+    expect(await t({ ...noApproval(), evidence: ev({ source: 'carrier_pigeon' }) })).toEqual([422, 'VALIDATION_ERROR']);
+    expect(await t({ ...noApproval(), evidence: ev({ ref: ' ' }) })).toEqual([422, 'VALIDATION_ERROR']);
+    expect(await t({ ...noApproval(), evidence: ev({ ref: `<${'a'.repeat(200)}@x.com>` }) })).toEqual([422, 'VALIDATION_ERROR']);
     expect(await dom()).toMatchObject({ status: 'listed' });
     expect(await db.selectFrom('sales').selectAll().execute()).toHaveLength(0);
+    expect(await ledger()).toHaveLength(1);
   });
 
-  it('S-4b: no approval but transaction_ref + evidence → 200, unconfirmed, recorded_by = token name, evidence stored (ref may contain @)', async () => {
+  it('evidence.ref: email sources need Message-ID form (jane@gmail.com → NO_PII); other sources must not contain @', async () => {
+    await setup();
+    await afternicListed();
+    const t = async (e: object) => { const r = await sold({ ...noApproval(), evidence: e }, (await issueToken('write')).auth); return [r.statusCode, r.json().error?.code]; };
+    expect(await t(ev({ ref: 'jane@gmail.com' }))).toEqual([422, 'NO_PII']);
+    expect(await t(ev({ ref: '<a b@x.com>' }))).toEqual([422, 'NO_PII']);
+    expect(await t({ source: 'afternic_dashboard', ref: 'order@123' })).toEqual([422, 'NO_PII']);
+    expect(await t(ev({ ref: '<a1@mail.afternic.com>' }))).toEqual([200, undefined]);
+  });
+
+  it('SL-2: evidence-only sale → 200, sale.confirmed false; sales row with recorded_by = token name, evidence, sale_ledger_id, amounts', async () => {
     await setup();
     await afternicListed();
     const { auth } = await issueToken('write', 'gavriel');
-    const { approval_ref: _a, ...rest } = good();
-    const r = await sold({ ...rest, evidence: { source: 'afternic_email', ref: '<abc123@mail.afternic.com>' } }, auth);
+    const r = await sold({ ...noApproval(), evidence: ev({ ref: '<abc123@mail.afternic.com>' }) }, auth);
     expect(r.statusCode).toBe(200);
-    expect(r.json().confirmed).toBe(false);
     const sales = await db.selectFrom('sales').selectAll().execute();
     expect(sales).toHaveLength(1);
+    expect(r.json().sale).toEqual({ id: sales[0]!.id, confirmed: false, recorded_by: 'gavriel', evidence_source: 'afternic_email', evidence_ref: '<abc123@mail.afternic.com>' });
+    expect(r.json().profit.cents).toBe(168467);
     expect(sales[0]).toMatchObject({
       recorded_by: 'gavriel', confirmed: false, venue: 'afternic', transaction_ref: 'AFN-1', evidence_source: 'afternic_email',
       evidence_ref: '<abc123@mail.afternic.com>', approval_text: null, approval_at: null,
+      sale_price_cents: 199500, commission_cents: 29925, other_fees_cents: 0, offer_id: null,
     });
-    const sale = (await ledger()).find((l) => l.type === 'sale')!;
+    expect(sales[0]!.sold_at.toISOString()).toBe('2026-10-12T09:00:00.000Z');
     expect(sales[0]!.sale_ledger_id).toBe((await db.selectFrom('ledger_entries').select('id').where('type', '=', 'sale').executeTakeFirstOrThrow()).id);
-    void sale;
   });
 
-  it('with approval: confirmed = true, approval stored; the predates rule still applies', async () => {
+  it('SL-3: with approval (no evidence) → confirmed true, approval stored; the predates rule still applies', async () => {
     const auth = await setup();
     await afternicListed();
     const stale = await sold(good({ approval_ref: { text: `sold ${D}`, approved_at: new Date(NOW - 600_000).toISOString() } }), auth);
     expect([stale.statusCode, stale.json().error.code]).toEqual([422, 'APPROVAL_INVALID']);
     const r = await sold(good(), (await issueToken('write')).auth);
-    expect(r.json().confirmed).toBe(true);
+    expect(r.json().sale).toMatchObject({ confirmed: true, evidence_source: null, evidence_ref: null });
     expect(await db.selectFrom('sales').selectAll().execute()).toMatchObject([{ confirmed: true, approval_text: approval().text, evidence_source: null }]);
   });
 
-  it('duplicate (venue, transaction_ref) on another domain → 409 SALE_ALREADY_RECORDED, nothing written', async () => {
+  it('SL-4: same venue+ref with a NEW key → 409 SALE_ALREADY_RECORDED on the same domain and on another; same key → replay', async () => {
     const auth = await setup();
     await afternicListed();
-    expect((await sold(good(), auth)).statusCode).toBe(200);
+    const key = randomUUID();
+    const first = await sold(good(), auth, D, key);
+    expect(first.statusCode).toBe(200);
+    expect((await sold(good(), auth, D, key)).json()).toEqual(first.json());
+    const n = (await ledger()).length;
+    const same = await sold(good(), (await issueToken('write')).auth);
+    expect([same.statusCode, same.json().error.code]).toEqual([409, 'SALE_ALREADY_RECORDED']);
     const E = 'othercityplumbing.com';
     await listedDomain({ domain: E });
-    const n = (await ledger()).length;
-    const r = await sold(good({ approval_ref: approval(E), transaction_ref: 'AFN-1' }), (await issueToken('write')).auth, E);
+    const r = await sold(good({ approval_ref: approval(E) }), (await issueToken('write')).auth, E);
     expect([r.statusCode, r.json().error.code]).toEqual([409, 'SALE_ALREADY_RECORDED']);
     expect(await ledger()).toHaveLength(n);
     expect(await dom(E)).toMatchObject({ status: 'listed' });
+    expect(await db.selectFrom('sales').selectAll().execute()).toHaveLength(1);
     const ok = await sold(good({ venue: 'sedo', commission: 199.5, approval_ref: approval(E) }), (await issueToken('write')).auth, E);
     expect(ok.statusCode).toBe(200);
   });
 
-  it('sales rows are append-only', async () => {
+  it('SL-7 (SQL): UPDATE, DELETE, TRUNCATE on sales fail; duplicate (venue, ref) fails; unconfirmed without evidence fails the CHECK', async () => {
     const auth = await setup();
-    await afternicListed();
+    const id = await afternicListed();
     await sold(good(), auth);
-    await expect(db.updateTable('sales').set({ confirmed: false }).execute()).rejects.toThrow(/append-only|not allowed/i);
-    await expect(db.deleteFrom('sales').execute()).rejects.toThrow(/append-only|not allowed/i);
+    const s = await db.selectFrom('sales').selectAll().executeTakeFirstOrThrow();
+    await expect(db.updateTable('sales').set({ confirmed: false }).execute()).rejects.toThrow(/append-only/i);
+    await expect(db.updateTable('sales').set({ sale_price_cents: 1 }).execute()).rejects.toThrow(/append-only/i);
+    await expect(db.deleteFrom('sales').execute()).rejects.toThrow(/append-only/i);
+    await expect(sql`TRUNCATE sales`.execute(db)).rejects.toThrow(/append-only/i);
+    const l2 = await db.insertInto('ledger_entries').values({ occurred_on: '2026-10-12', domain_id: id, type: 'sale', amount_cents: 1 }).returning('id').executeTakeFirstOrThrow();
+    const { id: _i, created_at: _c, ...row } = s;
+    await expect(db.insertInto('sales').values({ ...row, sale_ledger_id: l2.id }).execute()).rejects.toThrow(/sales_venue_transaction_ref_key/);
+    await expect(db.insertInto('sales').values({ ...row, sale_ledger_id: l2.id, transaction_ref: 'Z1', confirmed: false, evidence_source: null, evidence_ref: null }).execute())
+      .rejects.toThrow(/sales_evidence_or_approval/);
+    await expect(db.insertInto('sales').values({ ...row, sale_ledger_id: l2.id, transaction_ref: 'a@b' }).execute()).rejects.toThrow(/transaction_ref/);
+  });
+
+  it('AU-10: the same WRITE token: /sold with evidence and no approval → 200 unconfirmed; /buy without approval_ref → 422, zero registrar calls', async () => {
+    const pb = new FakeAdapter('porkbun');
+    app = await makeApp({ adapters: [pb], now: () => NOW });
+    await afternicListed();
+    const { auth } = await issueToken('write');
+    const r = await sold({ ...noApproval(), evidence: ev() }, auth);
+    expect([r.statusCode, r.json().sale.confirmed]).toEqual([200, false]);
+    const { approval_ref: _a, ...buy } = buyBody();
+    const b = await postBuy(app, buy, auth);
+    expect(b.statusCode).toBe(422);
+    expect(pb.calls).toEqual([]);
+  });
+
+  it('offer note: unconfirmed → "system: <source> <ref>", approval text null; confirmed → "via /sold" with the approval text', async () => {
+    await setup();
+    const id = await afternicListed();
+    const E = 'othercityplumbing.com';
+    const eid = await listedDomain({ domain: E });
+    const mk = async (domain_id: number) => (await db.insertInto('offers').values({
+      domain_id, amount_cents: 150000, source: 'afternic', received_at: '2026-10-10T10:00:00Z', band: 'mid_range', routing: 'dvir', outcome: 'open', recorded_by: 'test',
+    }).returning('id').executeTakeFirstOrThrow()).id;
+    const o1 = await mk(id);
+    const o2 = await mk(eid);
+    const rr = await sold({ ...noApproval(), evidence: ev(), offer_id: o1 }, (await issueToken('write')).auth);
+    expect(rr.statusCode).toBe(200);
+    expect((await sold(good({ transaction_ref: 'AFN-2', approval_ref: approval(E), offer_id: o2 }), (await issueToken('write')).auth, E)).statusCode).toBe(200);
+    const get = (i: number) => db.selectFrom('offers').select(['outcome', 'outcome_note', 'outcome_approval_text']).where('id', '=', i).executeTakeFirstOrThrow();
+    expect(await get(o1)).toEqual({ outcome: 'sold', outcome_note: 'system: afternic_email <x at mail.afternic.com>', outcome_approval_text: null });
+    expect(await get(o2)).toEqual({ outcome: 'sold', outcome_note: 'via /sold', outcome_approval_text: approval(E).text });
+    expect((await db.selectFrom('sales').select('offer_id').orderBy('id').execute()).map((r) => r.offer_id)).toEqual([o1, o2]);
   });
 
   it('approval that does not name the domain → 422 APPROVAL_INVALID', async () => {
