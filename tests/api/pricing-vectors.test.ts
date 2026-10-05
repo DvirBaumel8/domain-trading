@@ -20,7 +20,7 @@ describe('PR-44: vectors are keyed by the settings version', () => {
     for (const v of V.plans) {
       const r = computePlan(v.input as PlanInput, s);
       if (!r.ok) throw new Error(`${JSON.stringify(v.input)} → ${r.code}`);
-      expect([r.plan.floorCents, r.plan.walkawayCents, r.plan.minOfferCents, r.plan.settingsVersion]).toEqual([v.floor, v.walkaway, v.min_offer, 2]);
+      expect([r.plan.floorCents, r.plan.walkawayCents, r.plan.minOfferCents, r.plan.settingsVersion]).toEqual([v.floor, v.walkaway, v.min_offer, V.settings_version]);
     }
     for (const v of V.schedules) {
       const r = computePlan(v.input as PlanInput, s);
