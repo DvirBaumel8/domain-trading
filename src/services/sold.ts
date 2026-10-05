@@ -7,6 +7,7 @@ import { formatUsd } from '../money.js';
 import { checkApproval } from './approval.js';
 import { manualDelist } from './export-state.js';
 import { withDomainLock } from './plan-store.js';
+import { pair } from './report/money.js';
 
 export const VENUES = ['afternic', 'sedo', 'afternic_checkout', 'escrow', 'other'] as const;
 export const EVIDENCE_SOURCES = ['afternic_email', 'sedo_email', 'afternic_dashboard', 'sedo_dashboard', 'escrow', 'other'] as const;
@@ -30,7 +31,6 @@ const OFFER_LINKABLE = ['open', 'countered', 'accepted'];
 const FUTURE_SKEW_MS = 5 * 60_000;
 const SEDO_RATES = [10, 15, 20];
 const AFNIC_MIN_COMMISSION_CENTS = 1500;
-export const pair = (name: string, c: number) => ({ [`${name}_cents`]: c, [name]: formatUsd(c) });
 const pct = (cents: number, rate: number) => Math.round((cents * rate) / 100);
 
 function commissionWarning(i: SoldInput, lander: string | null, landerSetAt: Date | null): string | null {

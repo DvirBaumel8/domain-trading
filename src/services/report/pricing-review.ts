@@ -22,9 +22,10 @@ export async function pricingReview(db: Kysely<Database>, o: { from: string; to:
   const out = [];
   const versions = new Set<number>();
   for (const s of sales) {
-    const h = await db.selectFrom('listing_history').select(['bin_cents', 'floor_cents', 'pricing_settings_version'])
+    const h = await db.selectFrom('listing_history').select(['bin_cents', 'floor_cents'])
       .where('domain_id', '=', s.domain_id).where('at', '<=', s.sold_at).orderBy('at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
     const ev = await db.selectFrom('price_schedule').select('event').where('domain_id', '=', s.domain_id).where('status', '=', 'applied')
+      .where('event', 'in', Object.keys(STAGE) as PriceScheduleEvent[])
       .where('applied_at', '<=', s.sold_at).orderBy('applied_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
     const bin = h?.bin_cents ?? null;
     const floor = h?.floor_cents ?? null;
@@ -38,9 +39,10 @@ export async function pricingReview(db: Kysely<Database>, o: { from: string; to:
     });
   }
 
-  // settings versions in use: the versions of every plan still driving a listed/owned name, plus those that priced the sales
-  const inUse = await sql<{ v: number }>`select distinct pricing_settings_version as v from domains
-    where pricing_settings_version is not null and status in ('owned', 'listed', 'delisted', 'sold')`.execute(db);
+  // settings versions in use: those that priced the sales in the window
+  const inUse = await sql<{ v: number }>`select distinct h.pricing_settings_version as v from sales s
+    join lateral (select pricing_settings_version from listing_history where domain_id = s.domain_id and at <= s.sold_at order by at desc, id desc limit 1) h on true
+    where s.sold_at >= ${start} and s.sold_at < ${end} and h.pricing_settings_version is not null`.execute(db);
   for (const r of inUse.rows) versions.add(r.v);
 
   const offerRows = await db.selectFrom('offers').select(['amount_cents', 'bin_cents_at', 'band']).where('received_at', '>=', start).where('received_at', '<', end).execute();
@@ -56,7 +58,7 @@ export async function pricingReview(db: Kysely<Database>, o: { from: string; to:
     from: o.from, to: o.to, sales: out,
     offers: { count: offerRows.length, by_band, median_pct_of_bin: pcts.length ? round4(median(pcts)) : null },
     skipped_events: await evCount(['skipped_at_minimum', 'skipped_no_change', 'skipped_disabled']),
-    held_events: held,
+    held_domains_now: held, // a snapshot of domains on a pricing hold now, not events in the window
     settings_versions_in_use: [...versions].sort((a, b) => a - b),
     insufficient_data: out.length < 3,
   };

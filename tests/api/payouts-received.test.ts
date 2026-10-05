@@ -35,6 +35,8 @@ describe('POST /payouts/{id}/received', () => {
     const key = randomUUID();
     const r = await post(pid, { received_on: '2026-10-15' }, write, key);
     expect(r.statusCode).toBe(200);
+    const pf = (await app.inject({ method: 'GET', url: `/portfolio/${D}`, headers: write })).json();
+    expect(pf.payout).toMatchObject({ status: 'received', received_on: '2026-10-15' });
     expect(r.json()).toMatchObject({ id: pid, domain: D, payout: { amount_cents: 168075, amount: '$1,680.75', fee_cents: 1500, fee: '$15.00', method: 'wire', received_on: '2026-10-15', status: 'received' } });
     expect((await db.selectFrom('payouts').select('received_on').executeTakeFirstOrThrow()).received_on).toBe('2026-10-15');
     const again = await post(pid, { received_on: '2026-10-15' }, write, key);

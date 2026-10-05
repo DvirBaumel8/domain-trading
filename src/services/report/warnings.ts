@@ -4,7 +4,7 @@ import type { Database } from '../../db/types.js';
 import { computePlan } from '../../pricing/plan.js';
 import { settingsByVersion } from '../../pricing/settings.js';
 import { toJerusalemIso } from '../../time.js';
-import { pendingDomains } from '../export-state.js';
+import { manualDelist, pendingDomains, VENUES } from '../export-state.js';
 import { payoutsPending } from './domains.js';
 import { pair, priceValues } from './money.js';
 
@@ -23,6 +23,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   const domains = await db.selectFrom('domains').selectAll().where('status', '!=', 'pending_purchase').orderBy('domain').execute();
   const nameOf = new Map(domains.map((d) => [d.id, d.domain]));
   const statusOf = new Map(domains.map((d) => [d.id, d.status]));
+  const registrarOf = new Map(domains.map((d) => [d.id, d.registrar]));
   const live = (s: string) => (LIVE as readonly string[]).includes(s);
 
   // sales
@@ -36,8 +37,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   for (const p of await db.selectFrom('registrar_presence').selectAll().where('status', '=', 'absent').orderBy('domain_id').execute()) {
     if (soldIds.has(p.domain_id)) continue;
     const d = nameOf.get(p.domain_id);
-    if (d === undefined) continue;
+    if (d === undefined || !live(statusOf.get(p.domain_id)!)) continue;
     add('DOMAIN_LEFT_ACCOUNT', 'error', `${d} is no longer in the registrar account and no sale is recorded.`, d, {
+      registrar: registrarOf.get(p.domain_id) ?? null,
       first_absent_at: p.first_absent_at ? toJerusalemIso(p.first_absent_at) : null, last_checked_at: toJerusalemIso(p.last_checked_at),
     });
   }
@@ -65,8 +67,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
       add('EXPIRED_NOT_RENEWED', 'error', `${d.domain} expired on ${d.expiry_date} and was not renewed.`, d.domain, { expiry_date: d.expiry_date });
     }
     if (d.status === 'listed' && pending.has(d.domain)) {
-      const days = d.export_pending_since ? Math.floor((now.getTime() - d.export_pending_since.getTime()) / DAY) : 0;
-      add('EXPORT_PENDING', days > 7 ? 'error' : 'warn', `${d.domain}: the marketplace price is stale for ${days} days (export and upload).`, d.domain, { days_pending: days, export_pending_since: d.export_pending_since ? toJerusalemIso(d.export_pending_since) : null });
+      const ms = d.export_pending_since ? now.getTime() - d.export_pending_since.getTime() : 0;
+      const days = Math.floor(ms / DAY);
+      add('EXPORT_PENDING', ms > 7 * DAY ? 'error' : 'warn', `${d.domain}: the marketplace price is stale for ${days} days (export and upload).`, d.domain, { days_pending: days, export_pending_since: d.export_pending_since ? toJerusalemIso(d.export_pending_since) : null });
     }
     if (d.pricing_hold) {
       const last = await db.selectFrom('listing_history').select('at').where('domain_id', '=', d.id).orderBy('id', 'desc').limit(1).executeTakeFirst();
@@ -93,6 +96,15 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     const since = new Date(now.getTime() - 7 * DAY);
     const up = await db.selectFrom('export_uploads').select('id').where('venue', '=', 'afternic').where('uploaded_at', '>=', since).limit(1).executeTakeFirst();
     if (!up) add('EXPORT_STALE', 'warn', 'No confirmed Afternic upload in the last 7 days while listings have changed.', undefined, { pending: [...pending] });
+  }
+
+  // manual removal task (PR-27): names that went live in a confirmed file and whose removal no confirmed file asked for
+  const venuesBy = new Map<string, string[]>();
+  for (const v of VENUES) for (const name of await manualDelist(db, v)) venuesBy.set(name, [...(venuesBy.get(name) ?? []), v]);
+  const statusByName = new Map(domains.map((d) => [d.domain, d.status]));
+  for (const [name, venues] of [...venuesBy].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const status = statusByName.get(name)!;
+    add('MANUAL_DELIST', 'warn', `Remove the listing at ${venues.join(', ')} (the name is ${status})`, name, { status, venues });
   }
 
   // purchases

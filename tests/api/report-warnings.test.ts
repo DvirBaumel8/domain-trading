@@ -5,6 +5,7 @@ import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
 import { issueToken } from '../helpers/tokens.js';
+import { RegistrarCheckJob } from '../../src/jobs/registrar-check.js';
 
 const apps: FastifyInstance[] = [];
 afterEach(async () => { await Promise.all(apps.splice(0).map((a) => a.close())); });
@@ -67,6 +68,41 @@ describe('GET /report warnings', () => {
     }
     const w = (await (await boot()).warnings()).filter((x) => x.code === 'DOMAIN_LEFT_ACCOUNT');
     expect(w.map((x) => [x.domain, x.level])).toEqual([['gone-one.com', 'error']]);
+    expect(w[0]!.details.registrar).toBe('porkbun');
+  });
+
+  it('DOMAIN_LEFT_ACCOUNT: a dropped domain with an absent row is not reported', async () => {
+    const a = await insertOwnedDomain(db, { domain: 'dropped-gone.com', status: 'dropped' });
+    await db.insertInto('registrar_presence').values({ domain_id: a, status: 'absent', first_absent_at: ago(DAY), last_checked_at: new Date(NOW) }).execute();
+    const w = (await (await boot()).warnings()).filter((x) => x.code === 'DOMAIN_LEFT_ACCOUNT');
+    expect(w).toEqual([]);
+  });
+
+  it('SL-6: RegistrarCheckJob finds the domain absent, then /report shows DOMAIN_LEFT_ACCOUNT', async () => {
+    await listedDomain({ domain: 'job-gone.com', registrar: 'porkbun', registrar_api: 'full', listing_changed_at: ago(DAY), export_pending_since: null });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: ['job-gone.com'], export_id: 'e_job' }).execute();
+    await db.insertInto('export_run_domains').values({ export_id: 'e_job', domain: 'job-gone.com', listing_changed_at: ago(DAY) }).execute();
+    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e_job', domains: ['job-gone.com'], uploaded_at: ago(DAY) }).execute();
+    const r = await new RegistrarCheckJob({ db, adapters: [new FakeAdapter('porkbun', { findDomain: () => null })], now: () => NOW }).runOnce();
+    expect(r.newlyAbsent).toEqual(['job-gone.com']);
+    const w = (await (await boot()).warnings()).filter((x) => x.code === 'DOMAIN_LEFT_ACCOUNT');
+    expect(w.map((x) => [x.domain, x.level, x.details.registrar])).toEqual([['job-gone.com', 'error', 'porkbun']]);
+  });
+
+  it('PR-27 MANUAL_DELIST: a delisted name that was in a confirmed Afternic upload shows the removal task until a confirmed file delists it', async () => {
+    await insertOwnedDomain(db, { domain: 'gone-live.com', status: 'delisted' });
+    await insertOwnedDomain(db, { domain: 'never-live.com', status: 'delisted' });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: ['gone-live.com'], export_id: 'e1', delist: [] }).execute();
+    await db.insertInto('export_run_domains').values({ export_id: 'e1', domain: 'gone-live.com' }).execute();
+    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e1', domains: ['gone-live.com'], uploaded_at: ago(2 * DAY) }).execute();
+    const t = await boot();
+    let w = (await t.warnings()).filter((x) => x.code === 'MANUAL_DELIST');
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatchObject({ level: 'warn', domain: 'gone-live.com', details: { status: 'delisted', venues: ['afternic'] }, message: 'Remove the listing at afternic (the name is delisted)' });
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [], export_id: 'e2', delist: ['gone-live.com'] }).execute();
+    await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'e2', domains: [], uploaded_at: ago(DAY) }).execute();
+    w = (await t.warnings()).filter((x) => x.code === 'MANUAL_DELIST');
+    expect(w).toEqual([]);
   });
 
   it('PO-5: PAYOUT_OVERDUE only for the payout pending more than 30 days (31 d, not 30 d)', async () => {
@@ -109,6 +145,10 @@ describe('GET /report warnings', () => {
     let w = await t.warnings();
     expect(w.filter((x) => x.code === 'EXPORT_PENDING').map((x) => [x.domain, x.level, x.details.days_pending])).toEqual([['p-three.com', 'warn', 3]]);
     expect(codes(w)).toContain('EXPORT_STALE');
+    await db.updateTable('domains').set({ export_pending_since: ago(6 * DAY + 23 * 3_600_000) }).where('domain', '=', 'p-three.com').execute();
+    expect((await t.warnings()).filter((x) => x.code === 'EXPORT_PENDING').map((x) => [x.level, x.details.days_pending])).toEqual([['warn', 6]]);
+    await db.updateTable('domains').set({ export_pending_since: ago(7 * DAY + 3_600_000) }).where('domain', '=', 'p-three.com').execute();
+    expect((await t.warnings()).filter((x) => x.code === 'EXPORT_PENDING').map((x) => [x.level, x.details.days_pending])).toEqual([['error', 7]]);
     await db.updateTable('domains').set({ listing_changed_at: ago(8 * DAY), export_pending_since: ago(8 * DAY) }).where('domain', '=', 'p-three.com').execute();
     w = await t.warnings();
     expect(w.filter((x) => x.code === 'EXPORT_PENDING').map((x) => [x.level, x.details.days_pending])).toEqual([['error', 8]]);

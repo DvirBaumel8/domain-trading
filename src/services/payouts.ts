@@ -3,7 +3,7 @@ import type { Database } from '../db/types.js';
 import { jerusalemDate } from '../dates.js';
 import { AppError } from '../http/errors.js';
 import { checkApproval } from './approval.js';
-import { pair } from './sold.js';
+import { pair } from './report/money.js';
 import { withDomainLock } from './plan-store.js';
 
 export class PayoutsService {

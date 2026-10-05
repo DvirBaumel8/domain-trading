@@ -43,15 +43,15 @@ export async function portfolioRows(db: Kysely<Database>, now: Date, status?: st
 
 /** The values in force at the newest confirmed file of the venue that contains the domain (never the walk-away). */
 async function exportBlock(db: Kysely<Database>, domain: string, domainId: number, venue: Venue, pending: Set<string>) {
-  const f = await sql<{ uploaded_at: Date; at: Date }>`
-    select u.uploaded_at, r.at from export_uploads u
+  const f = await sql<{ uploaded_at: Date; at: Date; listing_changed_at: Date | null }>`
+    select u.uploaded_at, r.at, rd.listing_changed_at from export_uploads u
     join export_runs r on r.export_id = u.export_id join export_run_domains rd on rd.export_id = u.export_id
     where u.venue = ${venue} and rd.domain = ${domain} order by r.at desc, u.id desc limit 1`.execute(db);
   const file = f.rows[0];
   let lastUploaded = null;
   if (file) {
     const h = await db.selectFrom('listing_history').select(['bin_cents', 'floor_cents', 'min_offer_cents'])
-      .where('domain_id', '=', domainId).where('at', '<=', file.at).orderBy('at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+      .where('domain_id', '=', domainId).where('at', '<=', file.listing_changed_at ?? file.at).orderBy('at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
     if (h) lastUploaded = { ...pair('bin', h.bin_cents), ...pair('floor', h.floor_cents), ...pair('min_offer', h.min_offer_cents) };
   }
   return { pending: pending.has(domain), last_confirmed_upload_at: iso(file?.uploaded_at ?? null), last_uploaded: lastUploaded };
@@ -98,14 +98,8 @@ export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: s
 }
 
 export async function dealView(db: Kysely<Database>, id: string) {
-  let deal: { id: string; domain: string | null; strategy: string | null; status_note: string | null; created_at: Date } | undefined =
-    await db.selectFrom('deals').selectAll().where('id', '=', id).executeTakeFirst();
-  if (!deal) {
-    // /buy records deal_id on the domain row only (no deals row); a deal known only that way is still a deal
-    const d = await db.selectFrom('domains').select(['domain', 'created_at']).where('deal_id', '=', id).orderBy('id').limit(1).executeTakeFirst();
-    if (!d) return null;
-    deal = { id, domain: d.domain, strategy: null, status_note: null, created_at: d.created_at };
-  }
+  const deal = await db.selectFrom('deals').selectAll().where('id', '=', id).executeTakeFirst();
+  if (!deal) return null;
   const rows = await db.selectFrom('audit_log').select(['id', 'at', 'method', 'path', 'approval_text', 'approval_at', 'status_code'])
     .where('approval_text', 'is not', null)
     .where((eb) => eb.or([

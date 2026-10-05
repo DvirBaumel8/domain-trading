@@ -69,7 +69,11 @@ describe('GET /report/pricing-review', () => {
     const b = (await t.review('?from=2026-10-01&to=2026-10-31')).json();
     expect(b.sales).toHaveLength(2);
     expect(b.insufficient_data).toBe(true);
-    expect((await t.review('?from=2026-11-01&to=2026-11-30')).json().sales).toEqual([]);
+    const empty = (await t.review('?from=2026-11-01&to=2026-11-30')).json();
+    expect(empty.sales).toEqual([]);
+    expect(empty.settings_versions_in_use).toEqual([]); // versions of sales in the window only
+    expect(empty.held_domains_now).toBe(0);
+    expect(empty).not.toHaveProperty('held_events');
   });
 
   it('counts offers in the window with a median % of BIN', async () => {

@@ -61,6 +61,9 @@ describe('GET /portfolio', () => {
     expect(l).toHaveLength(1);
     expect(l[0]).toMatchObject({ domain: 'beta-two.com', bin_cents: 199500, walkaway: '$960 (private)' });
     expect((await t.get('/portfolio?status=bogus')).statusCode).toBe(400);
+    const pp = await t.get('/portfolio?status=pending_purchase');
+    expect(pp.statusCode).toBe(400);
+    expect(pp.json().error.code).toBe('VALIDATION_ERROR');
     expect((await t.get('/portfolio?x=1')).statusCode).toBe(400);
   });
 
@@ -100,6 +103,7 @@ describe('GET /portfolio', () => {
       domain_id: id, at, source: 'list', category: 'trend', mode: 'hybrid', bin_cents: bin, floor_cents: floor, walkaway_cents: walkaway, min_offer_cents: 10000, pricing_settings_version: 2,
     }).execute();
     await hist(T(0), 199500, 129500, 96000);
+    await hist(T(3), 179500, 116500, 86000); // changed after the exported values, before the file was built (run at T(5))
     await db.insertInto('export_runs').values({ marketplace: 'afternic', at: T(5), domains: ['beta-two.com'], export_id: 'exp_a1', delist: [] }).execute();
     await db.insertInto('export_run_domains').values({ export_id: 'exp_a1', domain: 'beta-two.com', listing_changed_at: T(0) }).execute();
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'exp_a1', domains: ['beta-two.com'], uploaded_at: T(8), approval_text: 'uploaded', audit_id: null }).execute();
@@ -181,6 +185,10 @@ describe('GET /deals/{id}', () => {
     expect(b).toMatchObject({ id: 'D-002', domain: 'examplecityroofing.com' });
     expect(b.approvals).toHaveLength(1);
     expect(b.approvals[0]).toMatchObject({ method: 'POST', path: '/buy', approval_text: buyBody().approval_ref.text, status_code: 201 });
+    expect(await db.selectFrom('deals').select('id').where('id', '=', 'D-002').executeTakeFirst()).toBeDefined(); // the deals row (bookPurchase) backs the view
+    // a domain row carrying a deal_id without a deals row is not a deal
+    await insertOwnedDomain(db, { domain: 'orphan-deal.com', deal_id: 'D-077' });
+    expect((await app.inject({ method: 'GET', url: '/deals/D-077', headers: r.auth })).statusCode).toBe(404);
     const miss = await app.inject({ method: 'GET', url: '/deals/D-404', headers: r.auth });
     expect(miss.statusCode).toBe(404);
     expect(miss.json().error.code).toBe('DEAL_NOT_FOUND');

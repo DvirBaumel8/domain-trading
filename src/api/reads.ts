@@ -8,7 +8,7 @@ import { toCsv } from '../services/export.js';
 import { ISO_WITH_OFFSET } from '../services/offers.js';
 import { auditRows, dealView, ledgerCsvRows, ledgerJson, ledgerRows, portfolioDetail, portfolioRows } from '../services/report/portfolio.js';
 
-const STATUSES: readonly DomainStatus[] = ['pending_purchase', 'owned', 'listed', 'delisted', 'sold', 'dropped'];
+const STATUSES: readonly DomainStatus[] = ['owned', 'listed', 'delisted', 'sold', 'dropped'];
 const LEDGER_TYPES: readonly LedgerType[] = ['registration', 'renewal', 'fee', 'commission', 'sale', 'payout_fee', 'refund', 'tool', 'ai', 'adjustment'];
 const bad = (m: string) => new AppError(400, 'VALIDATION_ERROR', m);
 
