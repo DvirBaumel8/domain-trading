@@ -33,17 +33,21 @@ function formula(bin: Cents, s: PricingSettings): { floorCents: Cents; walkawayC
 }
 
 export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
+  for (const [field, v] of [['bin_cents', input.binCents], ['floor_cents', input.floorCents], ['walkaway_cents', input.walkawayCents]] as const) {
+    if (v != null && !(Number.isSafeInteger(v) && v > 0)) return fail('VALIDATION_ERROR', `${field} must be a positive integer number of cents`);
+  }
   const warnings: string[] = [];
   if (input.category === 'other') warnings.push('CATEGORY_OTHER');
 
   if (input.category === 'geo') {
     if (input.grade !== 'strong' && input.grade !== 'weaker') return fail('GEO_GRADE_REQUIRED', 'Geo names need price_grade strong or weaker');
     const bin = input.grade === 'strong' ? s.geoBinStrongCents : s.geoBinWeakerCents;
+    const sentBin = input.binCents ?? bin;
+    if ((input.floorCents != null && input.floorCents !== sentBin) || (input.walkawayCents != null && input.walkawayCents !== sentBin)) {
+      return fail('BIN_MODE_NO_NEGOTIATION', 'Geo names are strict Buy It Now: floor and walk-away equal the BIN');
+    }
     if (input.binCents != null && input.binCents !== bin) {
       return fail('GEO_BIN_NOT_GRADE_PRICE', 'A geo BIN must be the grade price', { grade: input.grade, bin_cents: bin });
-    }
-    if ((input.floorCents != null && input.floorCents !== bin) || (input.walkawayCents != null && input.walkawayCents !== bin)) {
-      return fail('BIN_MODE_NO_NEGOTIATION', 'Geo names are strict Buy It Now: floor and walk-away equal the BIN');
     }
     return { ok: true, plan: {
       mode: 'bin', category: 'geo', grade: input.grade, binCents: bin, floorCents: bin, walkawayCents: bin, minOfferCents: bin,
@@ -54,6 +58,9 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
   const bin = input.binCents;
   if (bin == null) return fail('HYBRID_FIELDS_REQUIRED', 'hybrid needs bin');
   const exception = input.exception === true;
+  if (exception && (input.floorCents == null || input.walkawayCents == null)) {
+    return fail('HYBRID_FIELDS_REQUIRED', 'An exception needs both floor and walkaway');
+  }
   if (!exception && bin % BAND !== ENDING_95) return fail('BIN_NOT_NICE', 'A non-geo BIN must be a whole-dollar price ending in 95');
   if (bin < hybridBinMin(s)) return fail('BIN_BELOW_FLOOR_MIN', 'BIN is below the minimum hybrid BIN', { min_bin_cents: hybridBinMin(s) });
 
@@ -63,16 +70,13 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
   let pricingSource: Plan['pricingSource'] = 'formula';
 
   if (exception) {
-    if (input.floorCents == null || input.walkawayCents == null) return fail('HYBRID_FIELDS_REQUIRED', 'An exception needs both floor and walkaway');
-    floorCents = input.floorCents;
-    walkawayCents = input.walkawayCents;
+    floorCents = input.floorCents ?? floorCents;
+    walkawayCents = input.walkawayCents ?? walkawayCents;
     if (!(walkawayCents <= floorCents && floorCents <= bin)) return fail('HYBRID_PRICES_INVALID', 'Need walkaway ≤ floor ≤ bin');
     if (floorCents < s.floorMinCents) return fail('FLOOR_BELOW_MIN', 'Floor is below the minimum', { floor_min_cents: s.floorMinCents });
     if (walkawayCents < s.walkawayMinCents) return fail('WALKAWAY_BELOW_MIN', 'Walk-away is below the minimum', { walkaway_min_cents: s.walkawayMinCents });
-    if (floorCents !== f.floorCents || walkawayCents !== f.walkawayCents) {
-      pricingSource = 'approved_exception';
-      warnings.push('PRICING_EXCEPTION');
-    }
+    pricingSource = 'approved_exception';
+    if (floorCents !== f.floorCents || walkawayCents !== f.walkawayCents || bin % BAND !== ENDING_95) warnings.push('PRICING_EXCEPTION');
   } else if (
     (input.floorCents != null && input.floorCents !== f.floorCents) ||
     (input.walkawayCents != null && input.walkawayCents !== f.walkawayCents)

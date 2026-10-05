@@ -78,7 +78,18 @@ describe('computePlan: sent floor/walk-away (LS-17–LS-20, LS-11)', () => {
   });
   it('LS-19: exception floor 700 → FLOOR_BELOW_MIN', () => expect(code(hy(199500, { floorCents: 70000, walkawayCents: 60000, exception: true }))).toBe('FLOOR_BELOW_MIN'));
   it('LS-20/PR-40: exception walk-away 450 → WALKAWAY_BELOW_MIN', () => expect(code(hy(199500, { floorCents: 129500, walkawayCents: 45000, exception: true }))).toBe('WALKAWAY_BELOW_MIN'));
-  it('an exception may waive "ends in 95"', () => expect(code(hy(200000, { floorCents: 130000, walkawayCents: 96000, exception: true }))).toBe('OK'));
+  it('an exception may waive "ends in 95"', () => {
+    const p = ok(hy(200000, { floorCents: 130000, walkawayCents: 96000, exception: true }));
+    expect(p.pricingSource).toBe('approved_exception');
+    expect(p.warnings).toContain('PRICING_EXCEPTION');
+  });
+  it('exception equal to the formula is stored approved_exception without PRICING_EXCEPTION', () => {
+    const p = ok(hy(199500, { floorCents: 129500, walkawayCents: 96000, exception: true }));
+    expect(p.pricingSource).toBe('approved_exception');
+    expect(p.warnings).not.toContain('PRICING_EXCEPTION');
+  });
+  it('exception missing a field wins over BIN_NOT_NICE', () => expect(code(hy(199000, { floorCents: 129500, exception: true }))).toBe('HYBRID_FIELDS_REQUIRED'));
+  it('non-integer cents → VALIDATION_ERROR', () => expect(code(hy(199500, { floorCents: 129500.5, walkawayCents: 96000, exception: true }))).toBe('VALIDATION_ERROR'));
   it('exception without both floor and walk-away → HYBRID_FIELDS_REQUIRED', () => expect(code(hy(199500, { floorCents: 129500, exception: true }))).toBe('HYBRID_FIELDS_REQUIRED'));
 });
 
@@ -91,6 +102,9 @@ describe('computePlan: geo (PR-6, LG-18/19)', () => {
     expect(code(computePlan({ category: 'geo' }, V2))).toBe('GEO_GRADE_REQUIRED');
     expect(code(computePlan({ category: 'geo', grade: 'strong', binCents: 39900 }, V2))).toBe('GEO_BIN_NOT_GRADE_PRICE');
     expect(code(computePlan({ category: 'geo', grade: 'strong', binCents: 49900 }, V2))).toBe('OK');
+  });
+  it('geo strong, bin 399, floor 350 → BIN_MODE_NO_NEGOTIATION first', () => {
+    expect(code(computePlan({ category: 'geo', grade: 'strong', binCents: 39900, floorCents: 35000 }, V2))).toBe('BIN_MODE_NO_NEGOTIATION');
   });
   it('geo with floor/walk-away sent different from BIN → BIN_MODE_NO_NEGOTIATION', () => {
     expect(code(computePlan({ category: 'geo', grade: 'weaker', floorCents: 35000 }, V2))).toBe('BIN_MODE_NO_NEGOTIATION');
