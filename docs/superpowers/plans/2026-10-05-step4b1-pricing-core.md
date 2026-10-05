@@ -175,9 +175,9 @@ CREATE FUNCTION seed_pricing_settings_v2() RETURNS void LANGUAGE sql AS $$
     'v2: $500 walk-away floor, one geo drop, Sedo make-offer, final push to floor', '2026-10-05T09:17:00+03:00',
     'pricing rules v2 (Gavriel spec commit 3488942, approved by Dvir)',
     49900, 39900, 29900, 49900,
-    true, '[{"afterMonths":12,"fromCents":49900,"toCents":39900}]'::jsonb,
+    true, '[{"after_months":12,"from_cents":49900,"to_cents":39900}]'::jsonb,
     6500, 75000, 4800, 50000,
-    10000, '[{"afterMonths":6,"pctBps":2000},{"afterMonths":18,"pctBps":2000}]'::jsonb, 90, 'bin_to_floor_ceil95',
+    10000, '[{"after_months":6,"pct_bps":2000},{"after_months":18,"pct_bps":2000}]'::jsonb, 90, 'bin_to_floor_ceil95',
     7, 7, 2, 3, false
   );
 $$;
@@ -642,8 +642,11 @@ export function ruleFields(s: PricingSettings): Record<string, unknown> {
 }
 
 const Int = z.number().int().nonnegative();
-const GeoDrops = z.array(z.object({ afterMonths: Int.positive(), fromCents: Int.positive(), toCents: Int.positive() }).strict());
-const Drops = z.array(z.object({ afterMonths: Int.positive(), pctBps: Int.min(1).max(9999) }).strict());
+// jsonb keys are snake_case in the DB (listing-strategy.md §10.1); the TS object is camelCase.
+const GeoDrops = z.array(z.object({ after_months: Int.positive(), from_cents: Int.positive(), to_cents: Int.positive() }).strict())
+  .transform((a) => a.map((d) => ({ afterMonths: d.after_months, fromCents: d.from_cents, toCents: d.to_cents })));
+const Drops = z.array(z.object({ after_months: Int.positive(), pct_bps: Int.min(1).max(9999) }).strict())
+  .transform((a) => a.map((d) => ({ afterMonths: d.after_months, pctBps: d.pct_bps })));
 
 export function rowToSettings(r: Selectable<PricingSettingsTable>): PricingSettings {
   return {
@@ -1122,7 +1125,7 @@ describe('pricing-settings admin (PR-31, PR-32)', () => {
   });
 
   it('jsonb and boolean values parse (drops, geo_drops_enabled)', async () => {
-    await newPricingSettings(db, { set: { drops: '[{"afterMonths":4,"pctBps":2000},{"afterMonths":18,"pctBps":2000}]', geo_drops_enabled: 'false' }, ...approval, now });
+    await newPricingSettings(db, { set: { drops: '[{"after_months":4,"pct_bps":2000},{"after_months":18,"pct_bps":2000}]', geo_drops_enabled: 'false' }, ...approval, now });
     const s = await currentSettings(db, new Date());
     expect(s.drops[0]).toEqual({ afterMonths: 4, pctBps: 2000 });
     expect(s.geoDropsEnabled).toBe(false);
