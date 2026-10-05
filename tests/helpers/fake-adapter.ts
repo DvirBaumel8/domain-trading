@@ -30,6 +30,9 @@ export interface FakeOptions {
   receipt?: Maybe<unknown>;
   setNs?: RegistrarError;
   getNs?: string[];
+  getNsError?: RegistrarError;
+  /** Runs inside setNameservers, before it returns. */
+  onSetNs?: () => Promise<void>;
   setAutoRenew?: RegistrarError;
   /** autoRenew value findDomain reports after setAutoRenew (default: what was set). */
   autoRenewAfter?: boolean | null;
@@ -144,11 +147,13 @@ export class FakeAdapter implements RegistrarAdapter {
   async setNameservers(domain: string, ns: string[]): Promise<void> {
     this.calls.push(`setNameservers ${domain} ${ns.join(',')}`);
     if (this.o.setNs) throw this.o.setNs;
+    await this.o.onSetNs?.();
     this.ns.set(domain, ns);
   }
 
   async getNameservers(domain: string): Promise<Set<string>> {
     this.calls.push(`getNameservers ${domain}`);
+    if (this.o.getNsError) throw this.o.getNsError;
     return new Set(this.o.getNs ?? this.ns.get(domain) ?? []);
   }
 

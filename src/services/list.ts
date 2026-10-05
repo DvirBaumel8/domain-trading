@@ -47,28 +47,25 @@ export class ListService {
       throw new AppError(422, 'DISPLAY_NAME_MISMATCH', 'display_name must be the domain with different capitalisation only');
     }
 
-    // Approval (V9/V10)
+    // Approval: evaluated now, enforced after V1–V8 (listing-strategy §5 order)
     let approvalValid = false;
     let approvedAt: Date | null = null;
+    let approvalFailure: { code: string; reason: string } | null = null;
     if (body.approval_ref) {
       const a = checkApproval(body.approval_ref, domain, now, settings.approval_max_age_hours);
-      if (!a.ok) throw new AppError(422, a.code, a.reason);
-      approvalValid = true;
-      approvedAt = a.approvedAt;
-    } else if (changing) {
-      throw new AppError(422, 'APPROVAL_REQUIRED', 'Changing the mode, a price or the category needs approval_ref (Dvir\'s words)');
+      if (a.ok) { approvalValid = true; approvedAt = a.approvedAt; } else approvalFailure = { code: a.code, reason: a.reason };
     }
 
-    // Category (V9 + relabel guard)
+    // Category (relabel guard: any non-geo -> geo is an override)
     let category: Category | null = row.category;
     let categoryOverride = false;
     if (categoryChange) {
       if (!isCategory(body.category)) throw new AppError(422, 'CATEGORY_REQUIRED', 'Unknown category');
-      const highValueToGeo = body.category === 'geo' && row.category !== null && settings.high_value_categories.includes(row.category);
-      if (highValueToGeo && !(body.override && body.override_reason?.trim() && approvalValid)) {
-        throw new AppError(422, 'OVERRIDE_NEEDS_APPROVAL', 'Moving a high-value name to geo is an override: needs override, a reason and approval_ref');
+      const relabelToGeo = body.category === 'geo' && row.category !== null && row.category !== 'geo';
+      if (relabelToGeo && !(body.override && body.override_reason?.trim() && approvalValid)) {
+        throw new AppError(422, 'OVERRIDE_NEEDS_APPROVAL', 'Relabelling a name as geo is an override: needs override, a reason and a valid approval_ref');
       }
-      categoryOverride = highValueToGeo;
+      categoryOverride = relabelToGeo;
       category = body.category;
     }
 
@@ -98,12 +95,18 @@ export class ListService {
 
     overrideUsed = overrideUsed || categoryOverride;
 
+    // V9/V10
+    if (approvalFailure) throw new AppError(422, approvalFailure.code, approvalFailure.reason);
+    if (changing && !body.approval_ref) {
+      throw new AppError(422, 'APPROVAL_REQUIRED', "Changing the mode, a price or the category needs approval_ref (Dvir's words)");
+    }
+
     // Lander target
     const lander = body.lander ?? settings.lander_target;
     let ns: string[];
     if (lander === 'dan') throw new AppError(422, 'LANDER_RETIRED', 'Dan.com retired 2025-06-27; use afternic');
     if (lander === 'custom') {
-      const list = (body.ns ?? []).map((n) => n.trim().toLowerCase().replace(/\.$/, ''));
+      const list = [...new Set((body.ns ?? []).map((n) => n.trim().toLowerCase().replace(/\.$/, '')))];
       if (list.length < 2 || list.length > 4 || !list.every((n) => HOST.test(n))) {
         throw new AppError(422, 'NS_INVALID', 'custom lander needs 2–4 valid nameserver hostnames');
       }
@@ -148,8 +151,16 @@ export class ListService {
     if (seen) ns_public = sameNsSet(seen, ns) ? 'match' : 'pending';
 
     // Save + history (one transaction)
-    const historyChange = priceChange || categoryChange;
+    const historyChange = priceChange || categoryChange || (row.lander !== null && row.lander !== lander);
     await db.transaction().execute(async (trx) => {
+      const cur = await trx.selectFrom('domains').selectAll().where('id', '=', row.id).forUpdate().executeTakeFirst();
+      if (!cur || (cur.status !== 'owned' && cur.status !== 'listed')) {
+        throw new AppError(404, 'NOT_IN_PORTFOLIO', `${domain} is not an owned or listed domain`);
+      }
+      if (cur.category !== row.category || cur.listing_mode !== row.listing_mode || cur.bin_cents !== row.bin_cents
+        || cur.floor_cents !== row.floor_cents || cur.min_offer_cents !== row.min_offer_cents || cur.lto_max_months !== row.lto_max_months) {
+        throw new AppError(409, 'LISTING_CHANGED_CONCURRENTLY', 'The listing changed while this request was running; retry');
+      }
       const nsChanged = !row.lander_ns || !sameNsSet(row.lander_ns, ns);
       await trx.updateTable('domains').set({
         ...(listing ? {
@@ -188,7 +199,7 @@ export class ListService {
     };
   }
 
-  private async setNameservers(row: DomainRow, ns: string[]): Promise<{ status: 'set' | 'mismatch' | 'manual'; steps?: string[] }> {
+  private async setNameservers(row: DomainRow, ns: string[]): Promise<{ status: 'set' | 'mismatch' | 'unverified' | 'manual'; steps?: string[] }> {
     const adapter = this.deps.adapters.find((a) => a.name === row.registrar);
     if (row.registrar_api === 'none' || !adapter || !adapter.capabilities.canManageNs) {
       return {
@@ -201,15 +212,18 @@ export class ListService {
     }
     try {
       await adapter.setNameservers(row.domain, ns);
-      const got = await adapter.getNameservers(row.domain);
-      return { status: sameNsSet(got, ns) ? 'set' : 'mismatch' };
     } catch (e) {
-      if (e instanceof RegistrarError && e.code === 'API_ACCESS_DISABLED') {
+      if (!(e instanceof RegistrarError)) throw e;
+      if (e.code === 'API_ACCESS_DISABLED') {
         throw new AppError(409, 'API_ACCESS_DISABLED', 'The registrar refused: API access is off for this domain. Turn on "Opt In All Domains" at porkbun.com/account/api, then call /list again.');
       }
-      throw new AppError(409, 'REGISTRAR_REJECTED', 'The registrar refused the nameserver change', {
-        registrar: adapter.name, registrar_code: e instanceof RegistrarError ? e.code : 'UNKNOWN',
-      });
+      throw new AppError(409, 'REGISTRAR_REJECTED', 'The registrar refused the nameserver change', { registrar: adapter.name, registrar_code: e.code });
+    }
+    try {
+      const got = await adapter.getNameservers(row.domain);
+      return { status: sameNsSet(got, ns) ? 'set' : 'mismatch' };
+    } catch {
+      return { status: 'unverified' };
     }
   }
 }

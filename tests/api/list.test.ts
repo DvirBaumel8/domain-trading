@@ -230,4 +230,97 @@ describe('POST /list/{domain}', () => {
       expect.stringMatching(/afternic\.csv.*Update/), expect.stringMatching(/sedo\.csv/), expect.stringMatching(/2026-12-03/),
     ]));
   });
+
+  it('relabel guard: any non-geo -> geo needs override + reason + approval', async () => {
+    const { auth } = await setup();
+    await insertOwnedDomain(db, { domain: D, category: 'trend' });
+    expect((await list({ category: 'other', approval_ref: approval() }, auth)).statusCode).toBe(200);
+    const res = await list({ category: 'geo', mode: 'bin', bin: 399, approval_ref: approval() }, auth);
+    expect(res.json().error.code).toBe('OVERRIDE_NEEDS_APPROVAL');
+  });
+
+  it('LG-5: geo bin 650 with override+reason but no / stale / wrong-domain approval -> OVERRIDE_NEEDS_APPROVAL', async () => {
+    const { auth } = await setup();
+    await insertOwnedDomain(db, { domain: D });
+    const base = { mode: 'bin', bin: 650, override: true, override_reason: 'premium city' };
+    const stale = { text: `yes list ${D}`, approved_at: new Date(Date.now() - 73 * 3_600_000).toISOString() };
+    for (const approval_ref of [undefined, stale, approval('other.com')]) {
+      expect((await list({ ...base, approval_ref }, auth)).json().error.code).toBe('OVERRIDE_NEEDS_APPROVAL');
+    }
+  });
+
+  it('V1 precedes V9: bad mode without approval -> MODE_INVALID', async () => {
+    const { auth } = await setup();
+    await insertOwnedDomain(db, { domain: D });
+    expect((await list({ mode: 'auction', bin: 399 }, auth)).json().error.code).toBe('MODE_INVALID');
+  });
+
+  it('an invalid approval_ref is rejected even for NS-only requests', async () => {
+    const { auth } = await setup();
+    await insertOwnedDomain(db, { domain: D });
+    expect((await list({ approval_ref: approval('other.com') }, auth)).json().error.code).toBe('APPROVAL_INVALID');
+  });
+
+  it('sold race: domain sold during the NS call -> 404, stays sold, no history', async () => {
+    const pb = new FakeAdapter('porkbun', { onSetNs: async () => { await db.updateTable('domains').set({ status: 'sold' }).execute(); } });
+    const { auth } = await setup(pb);
+    await insertOwnedDomain(db, { domain: D });
+    const res = await list({ mode: 'bin', bin: 399, approval_ref: approval() }, auth);
+    expect(res.statusCode).toBe(404);
+    expect((await dom()).status).toBe('sold');
+    expect(await history()).toHaveLength(0);
+  });
+
+  it('listing changed during the NS call -> 409 LISTING_CHANGED_CONCURRENTLY', async () => {
+    const pb = new FakeAdapter('porkbun', { onSetNs: async () => { await db.updateTable('domains').set({ bin_cents: 1 }).execute(); } });
+    const { auth } = await setup(pb);
+    await insertOwnedDomain(db, { domain: D });
+    const res = await list({ mode: 'bin', bin: 399, approval_ref: approval() }, auth);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe('LISTING_CHANGED_CONCURRENTLY');
+  });
+
+  it('getNameservers failing -> 200 ns_status unverified, lander saved', async () => {
+    const { auth } = await setup(new FakeAdapter('porkbun', { getNsError: new RegistrarError('porkbun', 'NETWORK', 'x') }));
+    await insertOwnedDomain(db, { domain: D });
+    const res = await list({}, auth);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ns_status).toBe('unverified');
+    expect((await dom()).lander).toBe('afternic');
+  });
+
+  it('mismatch: registrar reports other NS -> ns_status mismatch; DNS shows other NS -> ns_public pending', async () => {
+    const { auth } = await setup(new FakeAdapter('porkbun', { getNs: ['ns1.other.com', 'ns2.other.com'] }), async () => ['ns1.other.com']);
+    await insertOwnedDomain(db, { domain: D });
+    const j = (await list({}, auth)).json();
+    expect(j.ns_status).toBe('mismatch');
+    expect(j.ns_public).toBe('pending');
+  });
+
+  it('non-access registrar error on set -> 409 REGISTRAR_REJECTED with registrar_code', async () => {
+    const { auth } = await setup(new FakeAdapter('porkbun', { setNs: new RegistrarError('porkbun', 'DOMAIN_LOCKED', 'x') }));
+    await insertOwnedDomain(db, { domain: D });
+    const res = await list({}, auth);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatchObject({ code: 'REGISTRAR_REJECTED', details: { registrar_code: 'DOMAIN_LOCKED' } });
+  });
+
+  it('custom NS duplicates are deduped before the count check', async () => {
+    const { auth } = await setup();
+    await insertOwnedDomain(db, { domain: D });
+    expect((await list({ lander: 'custom', ns: ['ns1.x.com', 'NS1.x.com'] }, auth)).statusCode).toBe(422);
+  });
+
+  it('ns_verified_at cleared when the NS target changes, kept when unchanged; target change adds a history row', async () => {
+    const { auth } = await setup();
+    await insertOwnedDomain(db, { domain: D });
+    const verified = new Date('2026-10-01T00:00:00Z');
+    await db.updateTable('domains').set({ lander: 'sedo', lander_ns: ['ns1.sedoparking.com', 'ns2.sedoparking.com'], ns_verified_at: verified }).execute();
+    await list({ lander: 'sedo' }, auth);
+    expect((await dom()).ns_verified_at).not.toBeNull();
+    expect(await history()).toHaveLength(0);
+    await list({ lander: 'afternic' }, auth);
+    expect((await dom()).ns_verified_at).toBeNull();
+    expect(await history()).toHaveLength(1);
+  });
 });
