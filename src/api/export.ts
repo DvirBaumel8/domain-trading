@@ -27,6 +27,10 @@ export function registerExport(app: FastifyInstance, service: ExportService): vo
       throw new AppError(501, 'SEDO_TEMPLATE_MISSING',
         "Sedo's bulk-upload headers aren't public. Download Sedo's example file from your Sedo account and fill templates/sedo_template.json (see docs/specs/export-csv.md).");
     }
-    return reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="${r.filename}"`).send(r.csv);
+    return reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="${r.filename}"`)
+      .header('x-export-warnings', r.warnings.join(';'))
+      .send(r.csv);
   });
 }

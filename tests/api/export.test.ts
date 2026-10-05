@@ -28,7 +28,7 @@ describe('GET /export/afternic.csv', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toMatch(/^text\/csv; charset=utf-8/);
     expect(res.headers['content-disposition']).toMatch(/^attachment; filename="afternic-\d{4}-\d{2}-\d{2}\.csv"$/);
-    expect(res.headers['x-manual-delist']).toBe('gone.com');
+    expect(res.headers['x-manual-delist'] ?? '').toBe('');
     const rows = parseCsvStrict(res.body);
     expect(rows.every((r) => r.length === 11)).toBe(true);
     expect(rows.map((r) => r.join(','))).toEqual([
@@ -40,14 +40,43 @@ describe('GET /export/afternic.csv', () => {
     expect(res.body.endsWith('\r\n')).toBe(true);
   });
 
-  it('X-Manual-Delist only lists domains delisted since the previous Afternic export', async () => {
+  it('X-Manual-Delist: a sold domain that was never exported is not listed', async () => {
     app = await makeApp();
     const { auth } = await issueToken('read');
-    await fixture4();
+    await listedDomain({ domain: 'never.com', status: 'sold', sold_at: new Date() });
+    const res = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
+    expect(res.headers['x-manual-delist'] ?? '').toBe('');
+  });
+
+  it('X-Manual-Delist: sold after being exported is listed, and keeps being listed', async () => {
+    app = await makeApp();
+    const { auth } = await issueToken('read');
+    await listedDomain({ domain: 'x.com' });
     await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
-    const second = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
-    expect(second.headers['x-manual-delist'] ?? '').toBe('');
-    expect(await db.selectFrom('export_runs').selectAll().execute()).toHaveLength(2);
+    await db.updateTable('domains').set({ status: 'sold', sold_at: new Date() }).where('domain', '=', 'x.com').execute();
+    for (let i = 0; i < 2; i++) {
+      const res = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
+      expect(res.headers['x-manual-delist']).toBe('x.com');
+      expect(parseCsvStrict(res.body)).toHaveLength(1);
+    }
+  });
+
+  it('a non-ASCII domain is skipped with an index-only warning, no 500', async () => {
+    app = await makeApp();
+    const { auth } = await issueToken('read');
+    await listedDomain({ domain: 'bücher.com' });
+    const res = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(parseCsvStrict(res.body)).toHaveLength(1);
+    expect(res.headers['x-export-warnings']).toBe('0:DOMAIN_NOT_ASCII');
+  });
+
+  it('cents are rounded down with an AFTERNIC_ROUNDS_DOWN warning in the header', async () => {
+    app = await makeApp();
+    const { auth } = await issueToken('read');
+    await listedDomain({ domain: 'cents.com', bin_cents: 39950, floor_cents: 39950, min_offer_cents: 39950 });
+    const res = await app.inject({ method: 'GET', url: '/export/afternic.csv', headers: auth });
+    expect(res.headers['x-export-warnings']).toContain('cents.com:AFTERNIC_ROUNDS_DOWN');
   });
 
   it('E-3: a Min Offer < 20 row is skipped and reported in X-Export-Warnings', async () => {
@@ -114,5 +143,46 @@ describe('GET /export/sedo.csv', () => {
     const res = await app.inject({ method: 'GET', url: '/export/sedo.csv', headers: auth });
     expect(res.statusCode).toBe(501);
     expect(res.json().error.code).toBe('SEDO_TEMPLATE_INVALID');
+  });
+
+  async function badTemplate(content: string) {
+    const dir = mkdtempSync(join(tmpdir(), 'sedo-'));
+    const path = join(dir, 'sedo_template.json');
+    writeFileSync(path, content);
+    app = await makeApp({ env: { SEDO_TEMPLATE_PATH: path } });
+    const { auth } = await issueToken('read');
+    return app.inject({ method: 'GET', url: '/export/sedo.csv', headers: auth });
+  }
+  const good = {
+    headers: ['Domain Name', 'Option', 'Sale', 'Price', 'Min', 'Cur', 'Action'],
+    map: { domain: 'Domain Name', selling_option: 'Option', for_sale: 'Sale', price: 'Price', min_price: 'Min', currency: 'Cur', action: 'Action' },
+    values: { buy_now: 'FIXED', make_offer: 'OFFER', for_sale_yes: 'yes', usd: 'USD', action_add: 'ADD' },
+  };
+
+  it('invalid JSON → 501 SEDO_TEMPLATE_INVALID', async () => {
+    const res = await badTemplate('{not json');
+    expect(res.statusCode).toBe(501);
+    expect(res.json().error.code).toBe('SEDO_TEMPLATE_INVALID');
+  });
+
+  it('duplicate headers → 501 SEDO_TEMPLATE_INVALID', async () => {
+    const res = await badTemplate(JSON.stringify({ ...good, headers: [...good.headers, 'Price'] }));
+    expect(res.statusCode).toBe(501);
+    expect(res.json().error.code).toBe('SEDO_TEMPLATE_INVALID');
+  });
+
+  it('spec placeholder values → 501 SEDO_TEMPLATE_INVALID', async () => {
+    const res = await badTemplate(JSON.stringify({ ...good, values: { ...good.values, buy_now: '<exact value>' } }));
+    expect(res.statusCode).toBe(501);
+    expect(res.json().error.code).toBe('SEDO_TEMPLATE_INVALID');
+  });
+
+  it('Sedo rounding warning goes to X-Export-Warnings', async () => {
+    const res0 = await badTemplate(JSON.stringify(good));
+    expect(res0.statusCode).toBe(200);
+    const { auth } = await issueToken('read');
+    await listedDomain({ domain: 'cents.com', bin_cents: 39950, floor_cents: 39950, min_offer_cents: 39950 });
+    const res = await app.inject({ method: 'GET', url: '/export/sedo.csv', headers: auth });
+    expect(res.headers['x-export-warnings']).toBe('cents.com:SEDO_ROUNDS_DOWN');
   });
 });

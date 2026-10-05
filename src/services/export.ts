@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
 import type { Config } from '../config.js';
 import { jerusalemDate } from '../dates.js';
@@ -38,14 +38,22 @@ export function afternicRow(d: ExportDomain): { row: { cells: string[] } | { ski
   return { row: { cells }, warnings: round.dropped ? [`${d.domain}:AFTERNIC_ROUNDS_DOWN`] : [] };
 }
 
+const noPlaceholder = (v: string) => !(v.startsWith('<') && v.endsWith('>'));
+const unique = (a: string[]) => new Set(a).size === a.length;
 const SedoTemplateSchema = z.object({
-  headers: z.array(z.string().min(1)).min(1),
+  headers: z.array(z.string().min(1).refine(noPlaceholder, 'placeholder header')).min(1),
   map: z.object({
     domain: z.string(), selling_option: z.string(), for_sale: z.string(), price: z.string(),
     min_price: z.string(), currency: z.string(), action: z.string(),
   }),
-  values: z.object({ buy_now: z.string(), make_offer: z.string(), for_sale_yes: z.string(), usd: z.string(), action_add: z.string() }),
-}).refine((t) => Object.values(t.map).every((h) => t.headers.includes(h)), 'every mapped header must be in headers');
+  values: z.object({
+    buy_now: z.string(), make_offer: z.string(), for_sale_yes: z.string(), usd: z.string(), action_add: z.string(),
+  }),
+})
+  .refine((t) => unique(t.headers), 'headers must be unique')
+  .refine((t) => unique(Object.values(t.map)), 'map targets must be unique')
+  .refine((t) => Object.values(t.map).every((h) => t.headers.includes(h)), 'every mapped header must be in headers')
+  .refine((t) => Object.values(t.values).every((v) => v.length > 0 && noPlaceholder(v)), 'values must be set (no <placeholders>)');
 export type SedoTemplate = z.infer<typeof SedoTemplateSchema>;
 
 export class SedoTemplateInvalid extends Error {}
@@ -58,7 +66,13 @@ export async function loadSedoTemplate(path: string): Promise<SedoTemplate | nul
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw e;
   }
-  const parsed = SedoTemplateSchema.safeParse(JSON.parse(text));
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (e) {
+    throw new SedoTemplateInvalid(`not valid JSON: ${(e as Error).message}`);
+  }
+  const parsed = SedoTemplateSchema.safeParse(json);
   if (!parsed.success) throw new SedoTemplateInvalid(parsed.error.issues.map((i) => i.message).join('; '));
   return parsed.data;
 }
@@ -85,12 +99,27 @@ export function toCsv(rows: string[][]): string {
 }
 
 const EXPORT_COLS = ['domain', 'display_name', 'listing_mode', 'bin_cents', 'floor_cents', 'min_offer_cents', 'lto_max_months'] as const;
+const SAFE_DOMAIN = /^[a-z0-9.-]+$/;
+
+/** True when Sedo's integer-USD cells drop cents for this domain. */
+function sedoDropsCents(d: ExportDomain, hybridAs: 'buy_now' | 'make_offer'): boolean {
+  const fixed = d.listing_mode === 'bin' || (d.listing_mode === 'hybrid' && hybridAs === 'buy_now');
+  const priceCents = d.listing_mode === 'offer' ? null : d.bin_cents;
+  const minCents = fixed ? null : d.min_offer_cents;
+  return [priceCents, minCents].some((c) => c !== null && c % 100 !== 0);
+}
 
 export class ExportService {
   constructor(private readonly deps: { db: Kysely<Database>; config: Config; now: () => number }) {}
 
-  private async listed(): Promise<ExportDomain[]> {
-    return this.deps.db.selectFrom('domains').select(EXPORT_COLS).where('status', '=', 'listed').orderBy('domain').execute();
+  /** Listed domains safe for headers/rows; unsafe ones become index-only warnings (no raw value). */
+  private async listed(warnings: string[]): Promise<ExportDomain[]> {
+    const all = await this.deps.db.selectFrom('domains').select(EXPORT_COLS).where('status', '=', 'listed').orderBy('domain').execute();
+    return all.filter((d, i) => {
+      if (SAFE_DOMAIN.test(d.domain)) return true;
+      warnings.push(`${i}:DOMAIN_NOT_ASCII`);
+      return false;
+    });
   }
 
   async afternic(): Promise<{ csv: string; filename: string; delist: string[]; warnings: string[] }> {
@@ -98,7 +127,7 @@ export class ExportService {
     const rows: string[][] = [[...AFTERNIC_HEADER]];
     const warnings: string[] = [];
     const exported: string[] = [];
-    for (const d of await this.listed()) {
+    for (const d of await this.listed(warnings)) {
       const r = afternicRow(d);
       warnings.push(...r.warnings);
       if ('cells' in r.row) {
@@ -106,10 +135,17 @@ export class ExportService {
         exported.push(d.domain);
       }
     }
-    const last = await db.selectFrom('export_runs').select('at').where('marketplace', '=', 'afternic').orderBy('at', 'desc').executeTakeFirst();
-    let q = db.selectFrom('domains').select('domain').where('status', 'in', ['sold', 'dropped']).where('delisted_at', 'is not', null);
-    if (last) q = q.where('delisted_at', '>', last.at);
-    const delist = (await q.orderBy('domain').execute()).map((r) => r.domain);
+    const gone = await sql<{ domain: string }>`
+      select d.domain from domains d
+      where d.status in ('sold', 'dropped')
+        and exists (select 1 from export_runs r where r.marketplace = 'afternic' and d.domain = any(r.domains))
+      order by d.domain`.execute(db);
+    const delist = gone.rows.map((r) => r.domain).filter((dom, i) => {
+      if (SAFE_DOMAIN.test(dom)) return true;
+      warnings.push(`${i}:DOMAIN_NOT_ASCII`);
+      return false;
+    });
+    // Last DB step.
     await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: exported }).execute();
     return { csv: toCsv(rows), filename: `afternic-${jerusalemDate(new Date(this.deps.now()))}.csv`, delist, warnings };
   }
@@ -118,9 +154,15 @@ export class ExportService {
     const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath);
     if (!t) return null;
     const s = await this.deps.db.selectFrom('settings').select('sedo_hybrid_as').executeTakeFirstOrThrow();
+    const warnings: string[] = [];
     const rows: string[][] = [t.headers];
-    for (const d of await this.listed()) rows.push(sedoRow(d, t, s.sedo_hybrid_as));
-    await this.deps.db.insertInto('export_runs').values({ marketplace: 'sedo', domains: rows.slice(1).map((r) => r[t.headers.indexOf(t.map.domain)]!) }).execute();
-    return { csv: toCsv(rows), filename: `sedo-${jerusalemDate(new Date(this.deps.now()))}.csv`, warnings: [] };
+    const exported: string[] = [];
+    for (const d of await this.listed(warnings)) {
+      if (sedoDropsCents(d, s.sedo_hybrid_as)) warnings.push(`${d.domain}:SEDO_ROUNDS_DOWN`);
+      rows.push(sedoRow(d, t, s.sedo_hybrid_as));
+      exported.push(d.domain);
+    }
+    await this.deps.db.insertInto('export_runs').values({ marketplace: 'sedo', domains: exported }).execute();
+    return { csv: toCsv(rows), filename: `sedo-${jerusalemDate(new Date(this.deps.now()))}.csv`, warnings };
   }
 }
