@@ -80,8 +80,30 @@ function sameSecret(a: string, b: string): boolean {
   return timingSafeEqual(ha, hb);
 }
 
+const CACHE_TTL_MS = 10 * 60_000;
+const CACHE_MAX = 100;
+
+/** Recently verified bot credentials (sha256 -> auth). Consulted ONLY while the caller's IP is blocked, so a wrong IP derivation can't lock the bots out; normal requests always hit the DB (revocation is immediate). */
+class RecentCredentials {
+  private readonly m = new Map<string, { auth: AuthContext; at: number }>();
+  constructor(private readonly now: () => number) {}
+  get(hash: string): AuthContext | null {
+    const e = this.m.get(hash);
+    if (!e) return null;
+    if (e.at <= this.now() - CACHE_TTL_MS) { this.m.delete(hash); return null; }
+    return e.auth;
+  }
+  set(hash: string, auth: AuthContext): void {
+    this.m.delete(hash);
+    this.m.set(hash, { auth, at: this.now() });
+    if (this.m.size > CACHE_MAX) this.m.delete(this.m.keys().next().value as string);
+  }
+  drop(hash: string): void { this.m.delete(hash); }
+}
+
 export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTriggerToken?: string, now: () => number = Date.now): void {
   const failed = new FailedAuthLimiter(FAILED_AUTH_LIMIT, FAILED_AUTH_WINDOW_MS, now);
+  const recent = new RecentCredentials(now);
   app.decorateRequest('auth', null);
   app.decorateRequest('jobAuth', false);
   app.addHook('onRequest', async (req) => {
@@ -91,7 +113,19 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
     };
     if (PUBLIC_PATHS.has(pathOf(req.url)) && !isMutating(req.method)) return;
     const wait = failed.blockedFor(req.ip);
-    if (wait > 0) throw new AppError(429, 'RATE_LIMITED', 'Too many failed authentication attempts', { retry_after_seconds: wait });
+    if (wait > 0) {
+      // Blocked IP: only a correct job token (constant-time compare, no DB) or a recently verified bot token passes.
+      const bm = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '');
+      if (bm?.[1]) {
+        if (isJobRoute(req) && req.method === 'POST') {
+          if (jobTriggerToken && sameSecret(bm[1], jobTriggerToken)) { req.jobAuth = true; return; }
+        } else {
+          const cached = recent.get(hashToken(bm[1]));
+          if (cached) { req.auth = cached; return; }
+        }
+      }
+      throw new AppError(429, 'RATE_LIMITED', 'Too many failed authentication attempts', { retry_after_seconds: wait });
+    }
     if (isJobRoute(req) && req.method === 'POST') {
       // Dedicated bearer, never a READ/WRITE API token.
       if (!jobTriggerToken) throw new AppError(503, 'JOBS_DISABLED', 'The job endpoint is not configured');
@@ -102,15 +136,20 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
     }
     const m = BEARER.exec(req.headers.authorization ?? '');
     if (!m?.[1]) return refuse();
+    const hash = hashToken(m[1]);
     const row = await db
       .updateTable('api_tokens')
       .set({ last_used_at: new Date() })
-      .where('token_sha256', '=', hashToken(m[1]))
+      .where('token_sha256', '=', hash)
       .where('revoked_at', 'is', null)
       .returning(['id', 'scope', 'name'])
       .executeTakeFirst();
-    if (!row) return refuse();
+    if (!row) {
+      recent.drop(hash);
+      return refuse();
+    }
     req.auth = { tokenId: row.id, scope: row.scope, name: row.name };
+    recent.set(hash, req.auth);
   });
 }
 

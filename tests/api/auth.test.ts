@@ -118,6 +118,33 @@ describe('auth (AU)', () => {
     spy.mockRestore();
   });
 
+  it('AU-12: a blocked IP still passes a recently verified bot token (no lookup) and the correct job token; unseen tokens get 429', async () => {
+    const JOB = 'job_token_fake_0123456789abcdef0123456789';
+    app = await makeApp({ env: { JOB_TRIGGER_TOKEN: JOB } });
+    const ipx = '198.51.100.7';
+    const seen = await issueToken('read');
+    const unseen = await issueToken('read');
+    // seen on a normal path (from another IP) -> cached
+    expect((await app.inject({ method: 'GET', url: '/__test/ping', headers: seen.auth, remoteAddress: '198.51.100.8' })).statusCode).toBe(200);
+    for (let i = 0; i < 20; i++) await app.inject({ method: 'GET', url: '/__test/ping', headers: { authorization: 'Bearer dt_nope' }, remoteAddress: ipx });
+    const spy = vi.spyOn(testDb, 'updateTable');
+    expect((await app.inject({ method: 'GET', url: '/__test/ping', headers: seen.auth, remoteAddress: ipx })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/__test/ping', headers: unseen.auth, remoteAddress: ipx })).statusCode).toBe(429);
+    expect(spy).not.toHaveBeenCalled(); // before the job runs (its handler legitimately uses the DB)
+    const job = await app.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: `Bearer ${JOB}`, 'idempotency-key': 'k-job-blocked' }, payload: { job: 'tick' }, remoteAddress: ipx });
+    expect(job.statusCode).not.toBe(429);
+    expect(job.statusCode).not.toBe(401);
+    spy.mockRestore();
+  });
+
+  it('AU-12: a revoked token is 401 immediately on the normal path even if it was cached', async () => {
+    app = await makeApp();
+    const { id, auth } = await issueToken('read');
+    expect((await app.inject({ method: 'GET', url: '/__test/ping', headers: auth })).statusCode).toBe(200);
+    await revokeApiToken(testDb, id);
+    expect((await app.inject({ method: 'GET', url: '/__test/ping', headers: auth })).statusCode).toBe(401);
+  });
+
   it('AU-11: the limiter bounds its memory (oldest IP dropped beyond the cap)', () => {
     const l = new FailedAuthLimiter(1, 60_000, () => 0);
     for (let i = 0; i < 10_050; i++) l.fail(`ip-${i}`);
