@@ -142,6 +142,94 @@ Before writing it, check the real constraint text with `\d domains`.
 
 ---
 
+### Task 1b: Persist payouts (Dvir, 5 Oct 2026: "better to persist it")
+
+**Why:** `/sold` accepts `payout {amount, method, fee, received_on}`, but until now only the fee became a ledger row. The amount, method and date lived only in the audit log, and Gizbar can't reconcile cash from there.
+
+**Files:**
+- Create: `migrations/1760500000000_payouts.sql`, `tests/api/payouts.test.ts`
+- Modify: `src/services/sold.ts`, `src/db/types.ts`, `tests/helpers/db.ts` (TABLES), `tests/api/admin-cli.test.ts` (10 migrations), `tests/api/schema.test.ts`
+
+**Migration:**
+```sql
+-- Up Migration
+CREATE TABLE payouts (
+  id               bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  domain_id        bigint NOT NULL REFERENCES domains (id),
+  sale_ledger_id   bigint NOT NULL UNIQUE REFERENCES ledger_entries (id),   -- one payout per sale
+  fee_ledger_id    bigint REFERENCES ledger_entries (id),                   -- the payout_fee row, if any
+  venue            text NOT NULL,
+  amount_cents     integer NOT NULL CHECK (amount_cents > 0),               -- what the marketplace says it will pay out
+  fee_cents        integer NOT NULL DEFAULT 0 CHECK (fee_cents >= 0),
+  method           text NOT NULL CHECK (length(trim(method)) > 0 AND position('@' in method) = 0),
+  received_on      date,                                                    -- null until the money arrives
+  transaction_ref  text CHECK (transaction_ref IS NULL OR position('@' in transaction_ref) = 0),
+  audit_id         text,
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE FUNCTION payouts_facts_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'payouts: DELETE is not allowed'; END IF;
+  IF (NEW.domain_id, NEW.sale_ledger_id, NEW.fee_ledger_id, NEW.venue, NEW.amount_cents, NEW.fee_cents, NEW.method,
+      NEW.transaction_ref, NEW.audit_id, NEW.created_at)
+     IS DISTINCT FROM
+     (OLD.domain_id, OLD.sale_ledger_id, OLD.fee_ledger_id, OLD.venue, OLD.amount_cents, OLD.fee_cents, OLD.method,
+      OLD.transaction_ref, OLD.audit_id, OLD.created_at) THEN
+    RAISE EXCEPTION 'payouts: facts are immutable';
+  END IF;
+  IF OLD.received_on IS NOT NULL AND NEW.received_on IS DISTINCT FROM OLD.received_on THEN
+    RAISE EXCEPTION 'payouts: received_on is set once';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER payouts_immutable BEFORE UPDATE OR DELETE ON payouts FOR EACH ROW EXECUTE FUNCTION payouts_facts_immutable();
+CREATE TRIGGER payouts_no_truncate BEFORE TRUNCATE ON payouts FOR EACH STATEMENT EXECUTE FUNCTION reject_mutation();
+-- Down Migration
+DROP TABLE payouts;
+DROP FUNCTION payouts_facts_immutable();
+```
+
+**`/sold` changes**, inside its existing transaction:
+- When `payout` is given, insert a `payouts` row:
+  - `sale_ledger_id` = the `sale` row just inserted; `fee_ledger_id` = the `payout_fee` row, if any;
+  - `venue`, `amount_cents`, `fee_cents`, `method`, `received_on` (nullable), `transaction_ref`, `audit_id`.
+- **Consistency check (a warning, never a block):**
+  - `expected = sale − commission − other_fees`;
+  - if `|payout.amount + payout.fee − expected| > $1` → warning `PAYOUT_MISMATCH: expected $X before the payout fee, got $Y + fee $Z`.
+- **Response:** add `payout: {amount, fee, method, received_on, status: 'received'|'pending'}` (cents + display).
+- **Validation:**
+  - `payout.received_on` must not be in the future (IDT date) and not before the `sold_at` date → else 422 `VALIDATION_ERROR`;
+  - `payout.amount` must be > 0.
+
+**Not in this task** (decision P2 below): an endpoint that sets `received_on` later.
+
+**Decisions:**
+
+| # | Decision | Why |
+|---|---|---|
+| P1 | **A `payouts` table, not ledger rows.** A payout moves money that the `sale` row already counted, so a ledger row would double count. The payout is a cash-tracking fact that links to the sale's ledger row. Its facts are immutable; `received_on` can be set once, from null to a date | The ledger stays the single source for profit and ROI (R-2) |
+| P2 | **Marking a payout received later** (`POST /payouts/{id}/received {received_on, approval_ref}`) is listed in 00-architecture as "Proposed v1.1". **Default: build it in 4d-2**, with `/report` `payouts_pending` and a warning `PAYOUT_OVERDUE` after 30 days. If Dvir prefers, it stays v1.1 and he records the receipt date in the `/sold` call | The table is useful only if pending payouts can be closed |
+
+- [ ] **Step 1: Failing tests:**
+  - **`/sold` with payout `{amount 1680.75, method 'wire', fee 15.00, received_on null}`** for the S-1 sale:
+    - one `payouts` row with `sale_ledger_id` = the sale row and `fee_ledger_id` = the `payout_fee` row (−1500);
+    - response `payout.status 'pending'`;
+    - no `PAYOUT_MISMATCH`, since 1680.75 + 15 = 1695.75 = 1995 − 299.25.
+  - **`amount 1500`** → warning `PAYOUT_MISMATCH`, and the sale is still recorded.
+  - **No payout** → no `payouts` row.
+  - **`received_on`** in the future, or before `sold_at` → 422, with nothing written.
+  - **`@` in `method`** → 422 `NO_PII`.
+  - **Schema:**
+    - UPDATE `amount_cents` → error;
+    - `received_on` null → date → OK; date → another date → error;
+    - DELETE and TRUNCATE → error;
+    - a duplicate `sale_ledger_id` → error.
+  - **Replay** (same key) → still one `payouts` row.
+- [ ] **Step 2–4:** Implement. `npm run migrate up` on the dev DB, then down/up. Run `npx vitest run && npx tsc --noEmit`.
+- [ ] **Step 5: Commit** `feat: persist payouts from /sold (payouts table, immutable facts, received_on set once, PAYOUT_MISMATCH warning)`
+
+---
+
 ### Task 2: Drop job + `drop-at-first-expiry` (PR-25)
 
 **Files:** Create `src/jobs/drop.ts`, `src/admin/drop-date.ts`, `tests/api/drop-job.test.ts`, `tests/api/drop-date.test.ts`. Modify `src/app.ts` (`app.dropJob`), `src/main.ts` (run after the price job at startup and daily), `src/job.ts` (`npm run job -- drop [--dry-run] [--today]`), `src/admin.ts`.
