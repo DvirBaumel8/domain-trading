@@ -33,6 +33,8 @@ import { ListService } from './services/list.js';
 import { NsVerifier } from './jobs/ns-verify.js';
 import { DropJob } from './jobs/drop.js';
 import { PriceScheduleJob } from './jobs/price-schedule.js';
+import { registerJobs } from './api/jobs.js';
+import { JobRunner, type BackupExport } from './jobs/runner.js';
 import { Reconciler } from './services/reconciler.js';
 
 declare module 'fastify' {
@@ -43,6 +45,7 @@ declare module 'fastify' {
     priceJob: PriceScheduleJob;
     dropJob: DropJob;
     registrarCheckJob: RegistrarCheckJob;
+    jobRunner: JobRunner;
   }
 }
 
@@ -61,6 +64,8 @@ export interface AppDeps {
   sleep?: (ms: number) => Promise<void>;
   nsLookup?: NsLookup;
   exportLockTimeoutMs?: number;
+  /** Nightly data export (step 6a task 2); undefined → that step is skipped. */
+  backupExport?: BackupExport;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -81,7 +86,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   registerErrorHandling(app);
   registerAuditId(app); // onRequest (first)
-  registerAuth(app, deps.db); // onRequest
+  registerAuth(app, deps.db, deps.config.jobTriggerToken); // onRequest
   registerRateLimit(app, deps.now); // preHandler (first, so a 429 never claims an idempotency key)
   registerScope(app); // preHandler
   registerIdempotency(app, deps.db); // preHandler (after scope) + onSend (before audit write)
@@ -117,6 +122,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('dropJob', new DropJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
+  app.decorate('jobRunner', new JobRunner({
+    db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
+    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, backupExport: deps.backupExport,
+  }));
+  registerJobs(app, app.jobRunner);
   deps.registerExtraRoutes?.(app);
   return app;
 }

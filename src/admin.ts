@@ -42,7 +42,7 @@ async function main(argv: string[]): Promise<number> {
   });
   const [cmd, sub] = positionals;
   const config = loadConfig(process.env);
-  const db = createDb(config.databaseUrl);
+  const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });
   try {
     if (cmd === 'doctor') {
       for (const line of await runDoctor(config, db)) console.log(line);

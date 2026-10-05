@@ -34,7 +34,7 @@ async function main(argv: string[]): Promise<number> {
     }
   }
   const config = loadConfig(process.env);
-  const db = createDb(config.databaseUrl);
+  const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });
   try {
     if (positionals[0] === 'registrar-check') {
       if (today !== undefined) throw new UsageError('--today does not apply to registrar-check');

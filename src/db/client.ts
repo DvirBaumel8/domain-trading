@@ -6,9 +6,13 @@ import type { Database } from './types.js';
 pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v));
 pg.types.setTypeParser(pg.types.builtins.DATE, (v) => v);
 
-export function createDb(url: string): Kysely<Database> {
+export function poolConfig(url: string, opts: { ssl?: boolean } = {}): pg.PoolConfig {
+  return { connectionString: url, max: 10, ...(opts.ssl ? { ssl: { rejectUnauthorized: true } } : {}) };
+}
+
+export function createDb(url: string, opts: { ssl?: boolean } = {}): Kysely<Database> {
   return new Kysely<Database>({
-    dialect: new PostgresDialect({ pool: new pg.Pool({ connectionString: url, max: 10 }) }),
+    dialect: new PostgresDialect({ pool: new pg.Pool(poolConfig(url, opts)) }),
   });
 }
 

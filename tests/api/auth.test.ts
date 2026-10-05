@@ -12,8 +12,9 @@ const concrete = (url: string) => url.replace(/:(\w+)/g, '$1');
 
 describe('auth (AU)', () => {
   it('AU-1: no Authorization → 401 on every route except /health', async () => {
-    app = await makeApp({ testRoutes: false });
-    const routes = app.routeTable.filter((r) => r.method !== 'HEAD' && r.url !== '/health');
+    // JOB_TRIGGER_TOKEN is set so POST /jobs/run is exercised as 401 (unset it answers 503 JOBS_DISABLED, see jobs.test.ts).
+    app = await makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: 'job_token_fake_0123456789abcdef' } });
+    const routes = app.routeTable.filter((r) => r.method !== 'HEAD' && r.url !== '/health' && r.url !== '/health/ping');
     for (const r of routes) {
       const res = await app.inject({ method: r.method as 'GET', url: concrete(r.url) });
       expect(res.statusCode, `${r.method} ${r.url}`).toBe(401);
@@ -43,7 +44,7 @@ describe('auth (AU)', () => {
   });
 
   it('every mutating method without a token → 401 on every route and public path', async () => {
-    app = await makeApp({ testRoutes: false });
+    app = await makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: 'job_token_fake_0123456789abcdef' } });
     const urls = new Set([...app.routeTable.map((r) => concrete(r.url)), '/health', '/nope']);
     for (const url of urls) {
       for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'] as const) {

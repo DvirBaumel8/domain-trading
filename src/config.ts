@@ -13,6 +13,9 @@ const EnvSchema = z.object({
   ENABLED_REGISTRARS: z.string().default(''),
   SEDO_TEMPLATE_PATH: z.string().default('templates/sedo_template.json'),
   DNS_NS_SERVER: z.string().default('192.5.6.30'),
+  JOBS_MODE: z.enum(['internal', 'external']).default('internal'),
+  JOB_TRIGGER_TOKEN: z.string().optional(),
+  DATABASE_SSL: z.enum(['true', 'false']).default('false'),
 });
 
 export interface Config {
@@ -24,6 +27,11 @@ export interface Config {
   enabledRegistrars: string[];
   sedoTemplatePath: string;
   dnsNsServer: string;
+  /** internal: in-process timers + startup runs (dev). external: none; a trigger calls POST /jobs/run (production). */
+  jobsMode: 'internal' | 'external';
+  /** Bearer token for POST /jobs/run; undefined → the route answers 503 JOBS_DISABLED. */
+  jobTriggerToken: string | undefined;
+  databaseSsl: boolean;
   version: string;
   /** Raw env (strings only). Read secrets from here; never log it. */
   env: Readonly<Record<string, string>>;
@@ -31,7 +39,7 @@ export interface Config {
   secretValues: string[];
 }
 
-const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
+const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
 
 function readVersion(): string {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -65,6 +73,13 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     throw new Error(`Invalid environment: ENABLED_REGISTRARS: unknown registrar(s) ${unknown.join(', ')}`);
   }
 
+  if (e.APP_ENV === 'production' && new URL(e.DATABASE_URL).hostname.includes('-pooler.')) {
+    throw new Error(
+      'Invalid environment: DATABASE_URL points at a pooled (-pooler) connection. The per-domain lock is a session advisory lock, '
+      + 'which breaks behind a transaction-mode pooler. Use the direct (non-pooler) connection string.',
+    );
+  }
+
   const secretValues = SECRET_ENV.map((k) => strings[k] ?? '').filter((v) => v.length > 0);
   const dbPassword = decodeURIComponent(new URL(e.DATABASE_URL).password);
   if (dbPassword) secretValues.push(dbPassword);
@@ -78,6 +93,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     enabledRegistrars,
     sedoTemplatePath: e.SEDO_TEMPLATE_PATH,
     dnsNsServer: e.DNS_NS_SERVER,
+    jobsMode: e.JOBS_MODE,
+    jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
+    databaseSsl: e.DATABASE_SSL === 'true',
     version: readVersion(),
     env: Object.freeze(strings),
     secretValues,

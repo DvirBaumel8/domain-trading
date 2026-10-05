@@ -1,6 +1,7 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import type { NsLookup } from '../dns/ns-lookup.js';
+import { newAuditId } from '../http/audit.js';
 import { sameNsSet } from '../services/lander.js';
 
 /** list.md step 4: daily public-DNS check of every owned/listed domain that has a lander target. */
@@ -33,6 +34,10 @@ export class NsVerifier {
           out.cleared++;
         }
       }
+      await this.deps.db.insertInto('audit_log').values({
+        id: newAuditId(), at: new Date(this.deps.now()), scope: 'job', method: 'JOB', path: 'ns-verify',
+        status_code: 200, result_summary: `checked ${out.checked}; verified ${out.verified}; cleared ${out.cleared}; unknown ${out.unknown}`,
+      }).execute();
       return out;
     } finally {
       this.running = false;
