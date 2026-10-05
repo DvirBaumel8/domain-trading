@@ -16,6 +16,7 @@
     "test:api": "vitest run --project api",
     "migrate": "node-pg-migrate -m migrations -j sql",
     "admin": "tsx --env-file-if-exists=.env src/admin.ts",
+    "job": "tsx --env-file-if-exists=.env src/job.ts",
     "db:up": "docker compose up -d --wait db"
   },
   "dependencies": {
