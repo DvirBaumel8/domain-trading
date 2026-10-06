@@ -79,7 +79,7 @@ describe('rdapLookup', () => {
     }));
     const r = await rdapLookup('netextend.info', { baseUrl: 'https://rdap.identitydigital.services/rdap/' });
     expect(seen.path).toBe('/rdap/domain/netextend.info');
-    expect(seen.ua).toMatch(/^domain-trading-api\/1\.1\.0 \(\+https:\/\/github\.com\/DvirBaumel8\/domain-trading\)$/);
+    expect(seen.ua).toMatch(/^domain-trading-api\/1\.2\.0 \(\+https:\/\/github\.com\/DvirBaumel8\/domain-trading\)$/);
     expect(r).toMatchObject({ outcome: 'registered', facts: { created_at: '2005-04-19T08:30:37.922Z' } });
   });
 

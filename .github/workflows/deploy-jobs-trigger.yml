@@ -17,6 +17,10 @@ concurrency:
 jobs:
   verify-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
     permissions:
       contents: read
     defaults:
@@ -32,15 +36,20 @@ jobs:
           cache-dependency-path: jobs-trigger/package-lock.json
 
       - run: npm ci
+        timeout-minutes: 5
       - run: npm test
+        timeout-minutes: 5
       - run: npm run typecheck
+        timeout-minutes: 3
       - run: npx wrangler deploy --dry-run
+        timeout-minutes: 3
 
       - name: Skip deploy (API_BASE_URL repo variable not set)
         if: github.ref == 'refs/heads/main' && vars.API_BASE_URL == ''
         run: echo "::notice::Skipping deploy because the API_BASE_URL repository variable is empty."
 
       - name: Deploy jobs-trigger Worker
+        timeout-minutes: 5
         if: github.ref == 'refs/heads/main' && vars.API_BASE_URL != ''
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
