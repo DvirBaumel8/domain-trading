@@ -13,15 +13,22 @@ export interface Derived {
   not_implemented: CheckId[];
 }
 
-/** The newest row per check (highest id): a manual record supersedes the auto row it answers. */
+/**
+ * The result per check: a manual record always outranks an automatic or cached row (whatever the ids: a human record posted
+ * while the worker was still running must not be hidden by the auto row that lands later); within a kind the highest id wins.
+ */
 export function latestByCheck(results: ResultRow[]): Map<CheckId, ResultRow> {
   const m = new Map<CheckId, ResultRow>();
+  const beats = (a: ResultRow, b: ResultRow) => (a.source === 'manual') !== (b.source === 'manual') ? a.source === 'manual' : a.id > b.id;
   for (const r of results) {
     const have = m.get(r.check_id);
-    if (!have || r.id > have.id) m.set(r.check_id, r);
+    if (!have || beats(r, have)) m.set(r.check_id, r);
   }
   return m;
 }
+
+/** Checks that stay unbuilt in v1.1.0 (P1b screening pack, post-buy leads): never block a name. */
+export const EXEMPT_UNBUILT: CheckId[] = ['pack', 'leads'];
 
 /**
  * - `invalid`: the name could not be read (`form` FAIL `INPUT_INVALID`).
@@ -31,9 +38,10 @@ export function latestByCheck(results: ResultRow[]): Map<CheckId, ResultRow> {
  * - `pending_manual`: everything else passed but a MANUAL_REQUIRED record is outstanding.
  * - `would_buy` while `buyHold` (CR-002: never a BUY card while the hold is on), else `buy_candidate`.
  * Feature checks (`featureChecks`) never reject or stop a name; their UNKNOWN only leaves a feature unknown.
- * A NOT_RUN with reason `NOT_IMPLEMENTED` is ignored (the check does not exist yet), so `not_implemented` lists it.
+ * A gating check that answered NOT_RUN `NOT_IMPLEMENTED` (not built yet) makes a LIVE name `unknown` (never a survivor with a gate unchecked),
+ * except `pack` and `leads`; in a full (report) run it is only listed in `not_implemented`.
  */
-export function deriveItem(results: ResultRow[], plan: CheckId[], featureChecks: CheckId[], buyHold: boolean, runDone: boolean): Derived {
+export function deriveItem(results: ResultRow[], plan: CheckId[], featureChecks: CheckId[], buyHold: boolean, runDone: boolean, live = true): Derived {
   const latest = latestByCheck(results);
   const none: Derived = { final_status: 'running', first_fail: null, flags: [], pending_manual: [], not_implemented: [] };
   const form = latest.get('form');
@@ -51,7 +59,8 @@ export function deriveItem(results: ResultRow[], plan: CheckId[], featureChecks:
     return { ...base, final_status: 'rejected', first_fail: { check: failed, gate: r.gate, reason_code: r.reason_code ?? 'FAIL' } };
   }
   const pending_manual = gating.filter((c) => latest.get(c)?.status === 'MANUAL_REQUIRED');
-  if (gating.some((c) => latest.get(c)?.status === 'UNKNOWN')) return { ...base, pending_manual, final_status: 'unknown', first_fail: null };
+  const unbuilt = live && gating.some((c) => notImpl(latest.get(c)) && !EXEMPT_UNBUILT.includes(c));
+  if (unbuilt || gating.some((c) => latest.get(c)?.status === 'UNKNOWN')) return { ...base, pending_manual, final_status: 'unknown', first_fail: null };
   const missing = gating.some((c) => {
     const r = latest.get(c);
     return !r || (r.status === 'NOT_RUN' && !notImpl(r));
@@ -81,12 +90,14 @@ export function funnel(items: DerivedItem[], resultsByItem: Map<number, ResultRo
   for (const it of items) {
     const st = it.derived.final_status;
     out.by_final_status[st] = (out.by_final_status[st] ?? 0) + 1;
+    // An unreadable name is counted once, as `invalid`; it is not a form-gate failure.
     const lane = (out.by_lane[it.lane] ??= {
       names: 0, final: {},
       stages: (plan[it.lane] ?? []).map((check) => ({ check, gate: GATE_OF[check], reached: 0, passed: 0, flagged: 0, failed: 0, unknown: 0, manual_required: 0, not_run: 0 })),
     });
     lane.names++;
     lane.final[st] = (lane.final[st] ?? 0) + 1;
+    if (st === 'invalid') continue;
     if (it.derived.first_fail) {
       const f = (out.first_fail[it.derived.first_fail.check] ??= { gate: it.derived.first_fail.gate, count: 0 });
       f.count++;

@@ -124,8 +124,23 @@ describe('POST /screening/runs/{id}/manual: errors', () => {
     expect(err(await record('web_risk', { raw_status: 1, extra: 1 }))).toEqual([422, 'VALIDATION_ERROR']);
     expect(err(await record('tm_us', tm({ phrases_queried: [] })))).toEqual([422, 'VALIDATION_ERROR']);
     expect(err(await record('web_risk', { raw_status: 1 }, { evidence_url: 'http://insecure.example/x' }))).toEqual([422, 'VALIDATION_ERROR']);
-    expect(err(await record('web_risk', { raw_status: 1 }, { checked_at: '2027-01-01T00:00:00Z' }))).toEqual([422, 'VALIDATION_ERROR']);
+    expect(err(await record('web_risk', { raw_status: 1 }, { checked_at: '2027-01-01T00:00:00Z' }))).toEqual([422, 'CHECKED_AT_INVALID']);
+    expect(err(await record('web_risk', { raw_status: 1 }, { checked_at: '2026-09-01T00:00:00Z' }))).toEqual([422, 'CHECKED_AT_INVALID']); // older than web_risk's 168 h window
     expect(err(await record('web_risk', { raw_status: 1 }, { checked_at: 'yesterday' }))).toEqual([422, 'VALIDATION_ERROR']);
+  });
+});
+
+describe('manual records: list versions and the stored summary', () => {
+  it('a manual row stores the run list versions of its check lists; the summary of a finished run is refreshed', async () => {
+    const { record, id } = await setup({ settings: { 'web_risk.requires_clean_history': false } });
+    const before = (await db.selectFrom('screening_runs').select('summary').where('id', '=', id).executeTakeFirstOrThrow()).summary as { by_final_status: object };
+    expect(before.by_final_status).toEqual({ pending_manual: 1 });
+    await record('web_risk', { raw_status: 6 });
+    const tmRow = (await record('tm_us', tm())).json();
+    expect(tmRow.list_versions).toMatchObject({ trade: 1, generic_head: 1 }); // the tm_us check's lists at the run's versions
+    expect((await record('web_risk', { raw_status: 6 })).json().list_versions).toEqual({});
+    const after = (await db.selectFrom('screening_runs').select('summary').where('id', '=', id).executeTakeFirstOrThrow()).summary as { by_final_status: object };
+    expect(after.by_final_status).toEqual({ would_buy: 1 });
   });
 });
 
@@ -152,6 +167,17 @@ describe('POST /quotes/manual', () => {
     }
     expect((await post('/quotes/manual', body({ observed_at: ago(29.9) }))).statusCode).toBe(201);
     expect(await db.selectFrom('manual_quotes').select('id').execute()).toHaveLength(1);
+  });
+
+  it('the registrar must be a configured registrar name; Cloudflare is refused (founder rule 5)', async () => {
+    const { post } = await h();
+    const cf = await post('/quotes/manual', body({ registrar: 'Cloudflare' }));
+    expect([cf.statusCode, cf.json().error.code]).toEqual([422, 'REGISTRAR_NOT_ALLOWED']);
+    for (const registrar of ['nope', 'constructor']) {
+      const r = await post('/quotes/manual', body({ registrar }));
+      expect([r.statusCode, r.json().error.code]).toEqual([422, 'REGISTRAR_UNKNOWN']);
+    }
+    expect(await db.selectFrom('manual_quotes').select('id').execute()).toHaveLength(0);
   });
 
   it('bad input: a non-.com or invalid domain, a zero price, a missing source note: 422', async () => {

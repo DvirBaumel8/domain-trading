@@ -2,7 +2,7 @@
 // (the hourly tick and the next poll call resumeStalled/kick). Results are append-only; a check that is not built yet answers
 // NOT_RUN / NOT_IMPLEMENTED; a run that outlives its time budget finishes as `partial` with every open check UNKNOWN / TIMEOUT.
 import { randomUUID } from 'node:crypto';
-import type { Kysely, Selectable } from 'kysely';
+import { sql, type Kysely, type Selectable } from 'kysely';
 import type { Database, ScreeningResultsTable } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
@@ -127,9 +127,18 @@ export interface AssembledRun {
   progress: { checks_planned: number; checks_done: number };
 }
 
+/**
+ * A backtest never yields a buy card: the hold also applies when the run's settings version is not (or no longer) the active one.
+ * Returns the `buyHold` flag to give deriveItem.
+ */
+export async function effectiveHold(db: Kysely<Database>, run: { buy_hold: boolean; backtest: boolean; settings_label: string }): Promise<boolean> {
+  if (run.buy_hold || run.backtest) return true;
+  return (await activeSelectionSettings(db)).label !== run.settings_label;
+}
+
 /** Items with their latest results, final status and the funnel. `runDone`: no more results will come (done or partial). */
 export function assemble(
-  items: RunItem[], plan: Partial<Record<Lane, CheckId[]>>, rows: ResultRow[], values: SelectionValuesT, buyHold: boolean, runDone: boolean,
+  items: RunItem[], plan: Partial<Record<Lane, CheckId[]>>, rows: ResultRow[], values: SelectionValuesT, buyHold: boolean, runDone: boolean, live = true,
 ): AssembledRun {
   const byItem = new Map<number, ResultRow[]>();
   for (const r of rows) (byItem.get(r.item_idx) ?? byItem.set(r.item_idx, []).get(r.item_idx)!).push(r);
@@ -139,7 +148,7 @@ export function assemble(
   const out: AssembledItem[] = items.map((item) => {
     const p = plan[item.lane] ?? [];
     const rs = byItem.get(item.idx) ?? [];
-    const derived = deriveItem(rs, p, features, buyHold, runDone);
+    const derived = deriveItem(rs, p, features, buyHold, runDone, live);
     if (!item.input_error) {
       planned += p.length;
       const latest = latestByCheck(rs);
@@ -159,22 +168,44 @@ export interface ScreeningWorkerDeps {
   now: () => number;
   log: { warn(o: object, m: string): void; error(o: object, m: string): void };
   screening: ScreeningDeps;
+  /** Test-only: stop (as if the process died) after this many results written by the first execution. */
+  stopAfterResults?: number;
+}
+
+type RunRow = Selectable<Database['screening_runs']>;
+
+const loadRows = async (db: Kysely<Database>, runId: string): Promise<ResultRow[]> =>
+  (await db.selectFrom('screening_results').selectAll().where('run_id', '=', runId).orderBy('id').execute()).map(toResultRow);
+
+/** Recomputes the funnel summary of a run that has ended (also after a manual record changes a name). */
+export async function refreshSummary(db: Kysely<Database>, run: RunRow): Promise<void> {
+  if (run.status === 'running') return;
+  const sel = await selectionSettingsByLabel(db, run.settings_label);
+  if (!sel) return;
+  const items = (run.input as { names: RunItem[] }).names;
+  const a = assemble(items, run.gate_plan as Partial<Record<Lane, CheckId[]>>, await loadRows(db, run.id), sel.values, await effectiveHold(db, run), true, run.mode === 'live');
+  await db.updateTable('screening_runs').set({ summary: JSON.stringify({ ...a.funnel, progress: a.progress }) }).where('id', '=', run.id).execute();
 }
 
 export class ScreeningWorker {
   /** The registry in use: a copy of CHECKS, so tests can plug a fake check in without touching the shared one. */
   readonly checks: Partial<Record<CheckId, Check>> = { ...CHECKS };
-  /** Test hook: stop (as if the process died) after this many results written by one execution; cleared when it fires. */
-  stopAfterResults: number | undefined;
+  private stopAfterResults: number | undefined;
   private readonly active = new Map<string, Promise<void>>();
 
-  constructor(private readonly deps: ScreeningWorkerDeps) {}
+  constructor(private readonly deps: ScreeningWorkerDeps) {
+    this.stopAfterResults = deps.stopAfterResults;
+  }
 
   /** Starts the run in this process unless it is already running here. Returns at once. */
   kick(runId: string): void {
     if (this.active.has(runId)) return;
     const p: Promise<void> = this.execute(runId)
-      .catch((e) => this.deps.log.error({ err: (e as Error).message, runId }, 'screening run failed'))
+      .catch(async (e) => {
+        this.deps.log.error({ err: (e as Error).message, runId }, 'screening run failed');
+        // A run that keeps failing must still end: past its deadline it finishes partial with SOURCE_ERROR rows.
+        await this.closeOut(runId, 'SOURCE_ERROR', String((e as Error).message ?? e).slice(0, 200), true).catch(() => {});
+      })
       .finally(() => { if (this.active.get(runId) === p) this.active.delete(runId); });
     this.active.set(runId, p);
   }
@@ -192,7 +223,7 @@ export class ScreeningWorker {
 
   /**
    * Running runs this process is not working on: past the deadline they are finalised (`partial`), else resumed when the
-   * heartbeat is missing or older than HEARTBEAT_STALE_MS. Called by the hourly tick.
+   * heartbeat is missing or older than HEARTBEAT_STALE_MS. Called by the hourly tick. `finalized` lists only runs whose status changed.
    */
   async resumeStalled(): Promise<{ resumed: string[]; finalized: string[] }> {
     const now = this.deps.now();
@@ -203,13 +234,77 @@ export class ScreeningWorker {
       if (this.active.has(r.id)) continue;
       if (now >= r.deadline_at.getTime()) {
         await this.runToEnd(r.id);
-        finalized.push(r.id);
+        await this.closeOut(r.id, 'TIMEOUT', 'The run ran out of its time budget before this check', true); // a no-op when execute already ended it
+        const st = await this.deps.db.selectFrom('screening_runs').select('status').where('id', '=', r.id).executeTakeFirst();
+        if (st && st.status !== 'running') finalized.push(r.id);
       } else if (!r.heartbeat_at || now - r.heartbeat_at.getTime() > HEARTBEAT_STALE_MS) {
         this.kick(r.id);
         resumed.push(r.id);
       }
     }
     return { resumed, finalized };
+  }
+
+  /** Inserts one result row. null when the (item, check) already has an automatic row (a racing worker wrote it first). */
+  private async insertRow(
+    run: RunRow, it: RunItem, checkId: CheckId, o: CheckOutcome,
+    meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number },
+  ): Promise<ResultRow | null> {
+    const { db } = this.deps;
+    try {
+      const r = await db.insertInto('screening_results').values({
+        run_id: run.id, item_idx: it.idx, domain: it.domain, lane: it.lane, check_id: checkId, gate: GATE_OF[checkId],
+        rule_ids: this.checks[checkId]?.ruleIds ?? [], status: o.status, reason_code: o.reasonCode, reason: o.reason,
+        fields: JSON.stringify(o.fields), data_as_of: o.dataAsOf, checked_at: meta.checkedAt, settings_label: run.settings_label,
+        list_versions: JSON.stringify(meta.listVersions), duration_ms: Math.max(0, Math.round(meta.durationMs)), upstream_calls: o.upstreamCalls,
+        evidence_ids: o.evidenceIds.map(String), source: meta.source, cached_from: meta.cachedFrom === undefined ? null : String(meta.cachedFrom),
+      }).returningAll().executeTakeFirstOrThrow();
+      await db.updateTable('screening_runs').set({ heartbeat_at: new Date(this.deps.now()) }).where('id', '=', run.id).execute();
+      return toResultRow(r);
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') return null;
+      throw e;
+    }
+  }
+
+  /** Ends a run: sets the status (only while it is still `running`) and stores the funnel. Returns whether this call ended it. */
+  private async finalize(run: RunRow, status: 'done' | 'partial'): Promise<boolean> {
+    const { db } = this.deps;
+    const sel = await selectionSettingsByLabel(db, run.settings_label);
+    const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, await loadRows(db, run.id), sel!.values, await effectiveHold(db, run), true, run.mode === 'live');
+    const r = await db.updateTable('screening_runs').set({ status, finished_at: new Date(this.deps.now()), summary: JSON.stringify({ ...a.funnel, progress: a.progress }) })
+      .where('id', '=', run.id).where('status', '=', 'running').executeTakeFirst();
+    return Number(r.numUpdatedRows) > 0;
+  }
+
+  /**
+   * Past the deadline (or `force`d when execute failed and the deadline passed): every open check of a name that is not already
+   * stopped becomes UNKNOWN (`code`), then the run is `partial`. Reads only the database, so it works when execute cannot.
+   */
+  private async closeOut(runId: string, code: 'TIMEOUT' | 'SOURCE_ERROR', reason: string, onlyPastDeadline: boolean): Promise<void> {
+    const { db } = this.deps;
+    const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', runId).executeTakeFirst();
+    if (!run || run.status !== 'running') return;
+    if (onlyPastDeadline && this.deps.now() < run.deadline_at.getTime()) return;
+    const sel = await selectionSettingsByLabel(db, run.settings_label);
+    const features = sel!.values.run.feature_checks;
+    const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
+    const latest = new Map<number, Map<CheckId, ResultRow>>();
+    const by = new Map<number, ResultRow[]>();
+    for (const r of await loadRows(db, runId)) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
+    for (const [idx, rs] of by) latest.set(idx, latestByCheck(rs));
+    for (const it of (run.input as { names: RunItem[] }).names) {
+      if (it.input_error) continue;
+      const have = latest.get(it.idx) ?? new Map<CheckId, ResultRow>();
+      const p = plan[it.lane] ?? [];
+      const stopped = run.mode === 'live' && p.some((c) => !features.includes(c) && ['FAIL', 'UNKNOWN'].includes(have.get(c)?.status ?? ''));
+      if (stopped) continue;
+      for (const c of p) {
+        if (have.has(c)) continue;
+        await this.insertRow(run, it, c, outcome('UNKNOWN', code, reason), { source: 'auto', durationMs: 0, checkedAt: new Date(this.deps.now()), listVersions: {} });
+      }
+    }
+    await this.finalize(run, 'partial');
   }
 
   private async execute(runId: string): Promise<void> {
@@ -237,9 +332,8 @@ export class ScreeningWorker {
     const state = new Map<number, Map<CheckId, ResultRow>>();
     const load = async () => {
       state.clear();
-      const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', runId).orderBy('id').execute()).map(toResultRow);
       const by = new Map<number, ResultRow[]>();
-      for (const r of rows) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
+      for (const r of await loadRows(db, runId)) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
       for (const [idx, m] of by) state.set(idx, latestByCheck(m));
     };
     await load();
@@ -248,56 +342,25 @@ export class ScreeningWorker {
     const hasStatus = (it: RunItem, ...st: Status[]) => gating(it).some((c) => { const r = latestOf(it.idx).get(c); return !!r && st.includes(r.status); });
     const stopped = (it: RunItem) => run.mode === 'live' && hasStatus(it, 'FAIL', 'UNKNOWN');
     const shared = new Map<string, unknown>();
-    const rowsWritten = { n: 0 };
+    let written = 0;
 
     const write = async (it: RunItem, checkId: CheckId, o: CheckOutcome, meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number }): Promise<boolean> => {
-      try {
-        const r = await db.insertInto('screening_results').values({
-          run_id: runId, item_idx: it.idx, domain: it.domain, lane: it.lane, check_id: checkId, gate: GATE_OF[checkId],
-          rule_ids: this.checks[checkId]?.ruleIds ?? [], status: o.status, reason_code: o.reasonCode, reason: o.reason,
-          fields: JSON.stringify(o.fields), data_as_of: o.dataAsOf, checked_at: meta.checkedAt, settings_label: run.settings_label,
-          list_versions: JSON.stringify(meta.listVersions), duration_ms: Math.max(0, Math.round(meta.durationMs)), upstream_calls: o.upstreamCalls,
-          evidence_ids: o.evidenceIds.map(String), source: meta.source, cached_from: meta.cachedFrom === undefined ? null : String(meta.cachedFrom),
-        }).returningAll().executeTakeFirstOrThrow();
-        latestOf(it.idx).set(checkId, toResultRow(r));
-        await db.updateTable('screening_runs').set({ heartbeat_at: new Date(this.deps.now()) }).where('id', '=', runId).execute();
-        rowsWritten.n++;
-        return true;
-      } catch (e) {
-        if ((e as { code?: string }).code !== '23505') throw e;
-        await load(); // another worker wrote this (item, check): take its row, write nothing
-        return false;
-      }
+      const r = await this.insertRow(run, it, checkId, o, meta);
+      if (!r) { await load(); return false; } // another worker wrote this (item, check): take its row, write nothing
+      latestOf(it.idx).set(checkId, r);
+      written++;
+      return true;
     };
     const stopNow = () => {
-      if (this.stopAfterResults !== undefined && rowsWritten.n >= this.stopAfterResults) { this.stopAfterResults = undefined; return true; }
+      if (this.stopAfterResults !== undefined && written >= this.stopAfterResults) { this.stopAfterResults = undefined; return true; }
       return false;
     };
 
-    const finalize = async (status: 'done' | 'partial') => {
-      const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', runId).orderBy('id').execute()).map(toResultRow);
-      const a = assemble(items, plan, rows, values, run.buy_hold, true);
-      await db.updateTable('screening_runs').set({ status, finished_at: new Date(this.deps.now()), summary: JSON.stringify({ ...a.funnel, progress: a.progress }) }).where('id', '=', runId).execute();
-    };
-
-    const timeoutRest = async () => {
-      for (const it of order) {
-        if (it.input_error || stopped(it)) continue;
-        for (const c of plan[it.lane] ?? []) {
-          if (latestOf(it.idx).has(c)) continue;
-          await write(it, c, outcome('UNKNOWN', 'TIMEOUT', 'The run ran out of its time budget before this check', {}), {
-            source: 'auto', durationMs: 0, checkedAt: new Date(this.deps.now()), listVersions: {},
-          });
-        }
-      }
-      await finalize('partial');
-    };
-
-    const merged = [...new Set(Object.values(plan).flat() as CheckId[])];
+    const merged = [...new Set(Object.values(plan).flat() as CheckId[])]; // lane lists agree on order (checked when the settings are drafted)
     for (const checkId of merged) {
       for (const it of order) {
         if (it.input_error || !(plan[it.lane] ?? []).includes(checkId) || latestOf(it.idx).has(checkId) || stopped(it)) continue;
-        if (this.deps.now() > deadline) return timeoutRest();
+        if (this.deps.now() >= deadline) return this.closeOut(runId, 'TIMEOUT', 'The run ran out of its time budget before this check', false);
         const check = this.checks[checkId];
         const t0 = this.deps.now();
         let wrote: boolean;
@@ -327,17 +390,23 @@ export class ScreeningWorker {
         if (wrote && stopNow()) return;
       }
     }
-    await finalize('done');
+    await this.finalize(run, 'done');
   }
 
-  /** Newest reusable result for (domain, check): same settings label, same backtest flag, same list versions, inside the freshness window. */
-  private async cached(run: { settings_label: string; backtest: boolean }, values: SelectionValuesT, it: RunItem, checkId: CheckId, lv: Record<string, number>): Promise<ResultRow | null> {
+  /**
+   * Newest reusable result for (domain, check): same settings label, same backtest flag, same list versions, inside the freshness window.
+   * Never when this item is as of a past date (a full run with `as_of`), and never from a run that was as of a past date: a dated
+   * result is not "now". Only runs without explicit as_of (live runs, full runs that sent none) are sources.
+   */
+  private async cached(run: RunRow, values: SelectionValuesT, it: RunItem, checkId: CheckId, lv: Record<string, number>): Promise<ResultRow | null> {
     const hours = values.freshness_hours[checkId] ?? 0;
     if (hours <= 0) return null;
+    if (run.mode === 'full' && it.as_of !== undefined) return null;
     const r = await this.deps.db.selectFrom('screening_results as r').innerJoin('screening_runs as u', 'u.id', 'r.run_id').selectAll('r')
       .where('r.domain', '=', it.domain).where('r.check_id', '=', checkId).where('r.source', 'in', ['auto', 'manual'])
       .where('r.status', 'not in', ['UNKNOWN', 'NOT_RUN', 'MANUAL_REQUIRED']).where('r.settings_label', '=', run.settings_label)
       .where('u.backtest', '=', run.backtest).where('r.checked_at', '>=', new Date(this.deps.now() - hours * 3_600_000))
+      .where(sql<boolean>`(u.mode = 'live' or not jsonb_path_exists(u.input, '$.names[*].as_of'))`)
       .orderBy('r.checked_at', 'desc').orderBy('r.id', 'desc').limit(1).executeTakeFirst();
     if (!r) return null;
     const row = toResultRow(r);

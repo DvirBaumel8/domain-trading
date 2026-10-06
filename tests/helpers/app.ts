@@ -76,6 +76,7 @@ export async function makeApp(
     exportLockTimeoutMs?: number;
     backupExport?: { runOnce(): Promise<unknown> };
     holdoutCheck?: HoldoutCheck;
+    screeningStopAfterResults?: number;
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -91,6 +92,7 @@ export async function makeApp(
     exportLockTimeoutMs: opts.exportLockTimeoutMs,
     backupExport: opts.backupExport,
     holdoutCheck: opts.holdoutCheck,
+    screeningStopAfterResults: opts.screeningStopAfterResults,
     sleep: opts.sleep ?? (async () => {}),
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
     registerExtraRoutes: opts.testRoutes === false ? undefined : registerTestRoutes,

@@ -147,6 +147,17 @@ export const SelectionValues = Base.superRefine((v, ctx) => {
     if (lane !== 'default' && !(LANES as readonly string[]).includes(lane)) bad(['run', 'gates', lane], `unknown lane ${lane}`);
     for (const id of ids) if (!isCheckId(id)) bad(['run', 'gates', lane], `unknown check id "${id}"`);
   }
+  // One run merges the lane lists into one gate order, so two lists must agree on the relative order of the checks they share.
+  const lanes = Object.entries(v.run.gates);
+  for (let i = 0; i < lanes.length; i++) {
+    for (let j = i + 1; j < lanes.length; j++) {
+      const [la, a] = lanes[i]!;
+      const [lb, b] = lanes[j]!;
+      const shared = a.filter((id) => b.includes(id));
+      const inB = shared.map((id) => b.indexOf(id));
+      if (inB.some((x, k) => k > 0 && x < inB[k - 1]!)) bad(['run', 'gates', lb], `the order of the checks shared with "${la}" differs from "${la}" (lane lists must agree on gate order)`);
+    }
+  }
   for (const id of v.run.feature_checks) {
     if (!isCheckId(id)) bad(['run', 'feature_checks'], `unknown check id "${id}"`);
     else if (!(FEATURE_CHECK_IDS as readonly string[]).includes(id)) bad(['run', 'feature_checks'], `"${id}" is not a feature check (only ${FEATURE_CHECK_IDS.join(', ')} may be feature checks)`);

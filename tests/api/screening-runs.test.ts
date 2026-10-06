@@ -7,8 +7,8 @@ import { outcome } from '../../src/screening/types.js';
 
 let app: FastifyInstance | undefined;
 afterEach(async () => app?.close());
-async function h(): Promise<ScreeningHarness> {
-  const x = await screeningHarness();
+async function h(opts: { stopAfterResults?: number } = {}): Promise<ScreeningHarness> {
+  const x = await screeningHarness(opts);
   app = x.app;
   return x;
 }
@@ -197,13 +197,15 @@ describe('POST /screening/runs and the offline checks', () => {
     expect((await get('/screening/evidence/abc')).json().error.code).toBe('EVIDENCE_NOT_FOUND');
   });
 
-  it('a check with no implementation answers NOT_RUN NOT_IMPLEMENTED, listed in not_implemented and not blocking', async () => {
+  it('a check with no implementation answers NOT_RUN NOT_IMPLEMENTED, a live name is unknown, a full run only lists it', async () => {
     await putBrandLists();
     const { runDone } = await h();
     const { body } = await runDone({ checks: ['form', 'typo'], names: [nonGeo('tampapoolsco.com')] });
     const n = body.names[0];
     expect(res(n, 'typo')).toMatchObject({ status: 'NOT_RUN', reason_code: 'NOT_IMPLEMENTED', gate: 'G1' });
-    expect(n).toMatchObject({ not_implemented: ['typo'], final_status: 'would_buy' });
+    expect(n).toMatchObject({ not_implemented: ['typo'], final_status: 'unknown' }); // live: an unbuilt gate is never a survivor
+    const full = await runDone({ checks: ['form', 'typo'], mode: 'full', names: [nonGeo('tampapoolsco.com')] });
+    expect(full.body.names[0]).toMatchObject({ not_implemented: ['typo'], final_status: 'would_buy' }); // report mode lists it
   });
 
   it('results are append-only', async () => {
@@ -280,8 +282,7 @@ describe('time budget and resume (Review Focus 1)', () => {
 
   it('a worker killed mid-run and a clock past deadline_at: resumeStalled finalises it partial with TIMEOUT rows', async () => {
     await putBrandLists();
-    const { app: a, clock, run, get } = await h();
-    a.screeningWorker.stopAfterResults = 3;
+    const { app: a, clock, run, get } = await h({ stopAfterResults: 3 });
     const { id } = await run({ checks: plan, names: [nonGeo('tampapoolsco.com'), nonGeo('tulsaroofingco.com')] });
     await a.screeningWorker.runToEnd(id);
     expect((await get(`/screening/runs/${id}`)).json().status).toBe('running');
@@ -298,8 +299,7 @@ describe('time budget and resume (Review Focus 1)', () => {
 
   it('a killed worker: a GET after 3 minutes resumes the run and finishes it without duplicate (item, check) rows', async () => {
     await putBrandLists();
-    const { app: a, clock, run, get } = await h();
-    a.screeningWorker.stopAfterResults = 2;
+    const { app: a, clock, run, get } = await h({ stopAfterResults: 2 });
     const { id } = await run(live([nonGeo('tampapoolsco.com'), nonGeo('tulsaroofingco.com')]));
     await a.screeningWorker.runToEnd(id);
     expect((await get(`/screening/runs/${id}`)).json()).toMatchObject({ status: 'running', progress: { checks_planned: 10, checks_done: 2 } });
@@ -317,8 +317,7 @@ describe('time budget and resume (Review Focus 1)', () => {
 
   it('the hourly tick resumes a stalled run (step screeningResume {resumed, finalized})', async () => {
     await putBrandLists();
-    const { app: a, clock, run } = await h();
-    a.screeningWorker.stopAfterResults = 1;
+    const { app: a, clock, run } = await h({ stopAfterResults: 1 });
     const { id } = await run(live([nonGeo('tampapoolsco.com')]));
     await a.screeningWorker.runToEnd(id);
     clock.t += 3 * 60_000;
@@ -338,5 +337,147 @@ describe('time budget and resume (Review Focus 1)', () => {
     expect(r).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR' });
     expect(r.reason).toHaveLength(200);
     expect(body.names[0].final_status).toBe('unknown');
+  });
+});
+
+describe('fix round 1', () => {
+  const plan = ['form', 'brand_lists', 'availability', 'web_risk'];
+  const manualBody = (check: string, result: object) => ({ domain: 'tampapoolsco.com', check, checked_at: '2026-10-06T07:30:00Z', evidence_url: 'https://example.com/x', result });
+
+  it('a manual record posted while the worker is running, before G5, is not hidden by the auto row that lands later', async () => {
+    await putBrandLists();
+    const { app: a, post, run, get } = await h();
+    let id = '';
+    a.screeningWorker.checks.availability = {
+      id: 'availability', gate: 'G2', ruleIds: [], lists: [],
+      async run() {
+        // at G2 the run exists: the human record arrives before the worker reaches G5
+        const r = await post(`/screening/runs/${id}/manual`, manualBody('web_risk', { raw_status: 2 }));
+        expect(r.statusCode).toBe(201);
+        return outcome('PASS', null, null);
+      },
+    };
+    const created = await run({ checks: plan, names: [nonGeo('tampapoolsco.com')] });
+    id = created.id;
+    await a.screeningWorker.runToEnd(id);
+    const rows = await db.selectFrom('screening_results').select(['id', 'source', 'status']).where('check_id', '=', 'web_risk').orderBy('id').execute();
+    expect(rows.map((r) => r.source)).toEqual(['manual', 'cache']); // the worker reused the fresh manual result (a cache row copy); the manual row stays the answer
+    expect((await get(`/screening/runs/${id}`)).json().names[0]).toMatchObject({ final_status: 'rejected', first_fail: { check: 'web_risk', reason_code: 'UNSAFE' } });
+  });
+
+  it('a stale worker that already decided to run web_risk still loses to the manual record (auto row has the higher id)', async () => {
+    await putBrandLists();
+    const { app: a, post, run, get } = await h();
+    let id = '';
+    a.screeningWorker.checks.web_risk = {
+      id: 'web_risk', gate: 'G5', ruleIds: ['WEB-RISK-1'], lists: [],
+      async run() {
+        await post(`/screening/runs/${id}/manual`, manualBody('web_risk', { raw_status: 2 })); // lands during the check
+        return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', 'x');
+      },
+    };
+    id = (await run({ checks: plan, names: [nonGeo('tampapoolsco.com')] })).id;
+    await a.screeningWorker.runToEnd(id);
+    const rows = await db.selectFrom('screening_results').select(['id', 'source']).where('check_id', '=', 'web_risk').orderBy('id').execute();
+    expect(rows.map((r) => r.source)).toEqual(['manual', 'auto']);
+    expect((await get(`/screening/runs/${id}`)).json().names[0]).toMatchObject({ final_status: 'rejected', first_fail: { check: 'web_risk' } });
+  });
+
+  it('a backtest never yields a buy card: with buy_hold off in the draft it is still would_buy; so is a run whose settings are no longer active', async () => {
+    await putBrandLists();
+    const { runDone, post, get, app: a } = await h();
+    await post('/selection/settings', { label: 'v1h', set: { buy_hold: false, 'web_risk.requires_clean_history': false } });
+    const body = { checks: ['form', 'brand_lists'], names: [nonGeo('tampapoolsco.com')] };
+    const bt = await runDone({ ...body, mode: 'full', settings: 'v1h' });
+    expect(bt.body).toMatchObject({ backtest: true, buy_hold: false });
+    expect(bt.body.names[0].final_status).toBe('would_buy');
+    expect(JSON.stringify((await db.selectFrom('screening_runs').select('summary').where('id', '=', bt.id).executeTakeFirstOrThrow()).summary)).toContain('would_buy');
+    // an activated version with the hold off, a live run on it, then another version becomes active
+    const v1 = await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow();
+    const base = { values: JSON.stringify({ ...(v1.values as object), buy_hold: false }), created_by: 't', activated_by: 't', activation_approval_text: 'a', activation_approval_at: new Date(), activated_at: new Date() };
+    await db.insertInto('selection_settings').values({ ...base, label: 'vh', activation_seq: 2 }).execute();
+    const live = await runDone(body);
+    expect(live.body).toMatchObject({ settings_version: 'vh', backtest: false, buy_hold: false });
+    expect(live.body.names[0].final_status).toBe('buy_candidate');
+    await db.insertInto('selection_settings').values({ ...base, label: 'vz', activation_seq: 3 }).execute();
+    expect((await get(`/screening/runs/${live.id}`)).json().names[0].final_status).toBe('would_buy');
+    void a;
+  });
+
+  it('the freshness cache is skipped for an item as of a past date, and a dated run is never a source', async () => {
+    await putBrandLists();
+    const { runDone, post } = await h();
+    const n = (extra: object = {}) => [nonGeo('tampapoolsco.com', extra)];
+    const liveRun = await runDone({ checks: [...OFFLINE], names: n() });
+    expect((await post(`/screening/runs/${liveRun.id}/manual`, manualBody('web_risk', { raw_status: 2 }))).statusCode).toBe(201);
+    const dated = await runDone({ checks: [...OFFLINE], mode: 'full', names: n({ as_of: '2026-01-01T00:00:00Z' }) });
+    expect(res(dated.body.names[0], 'web_risk')).toMatchObject({ status: 'MANUAL_REQUIRED', cached: false });
+    const undated = await runDone({ checks: [...OFFLINE], mode: 'full', names: n() });
+    expect(res(undated.body.names[0], 'web_risk')).toMatchObject({ status: 'FAIL', cached: true }); // "now": the live result is reusable
+    // a manual record in the dated run is not reused by a later undated run
+    await post(`/screening/runs/${dated.id}/manual`, manualBody('tm_us', { phrases_queried: ['X'], control_ok: true, exact_or_core_live: [], generic_live: [] }));
+    const again = await runDone({ checks: [...OFFLINE], mode: 'full', names: n() });
+    expect(res(again.body.names[0], 'tm_us')).toMatchObject({ status: 'MANUAL_REQUIRED', cached: false });
+  });
+
+  it('a run whose execute throws still ends: past its deadline it is partial with SOURCE_ERROR rows; resumeStalled reports finalized only on a real change', async () => {
+    await putBrandLists();
+    const { app: a, clock, runDone, get } = await h();
+    let reads = 0;
+    a.screeningWorker.checks.availability = {
+      id: 'availability', gate: 'G2', ruleIds: [], async run() { return outcome('PASS', null, null); },
+      // createRun reads `lists` once; execute is the second read and fails, with the deadline already past
+      get lists(): string[] { if (++reads >= 2) { clock.t += 31 * 60_000; throw new Error('boom'); } return []; },
+    };
+    const { id, body } = await runDone({ checks: plan, names: [nonGeo('tampapoolsco.com')] });
+    expect(body.status).toBe('partial');
+    expect(res(body.names[0], 'availability')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR', reason: 'boom' });
+    expect(res(body.names[0], 'web_risk')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR' });
+    expect(body.names[0].final_status).toBe('unknown');
+    expect(await a.screeningWorker.resumeStalled()).toEqual({ resumed: [], finalized: [] }); // nothing is running any more
+    void get; void id;
+  });
+
+  it('before the deadline a failing execute leaves the run running (it is retried); finalized lists a run only if it really ended', async () => {
+    await putBrandLists();
+    const { app: a, clock, run, get } = await h();
+    let fail = true;
+    let reads = 0;
+    a.screeningWorker.checks.availability = {
+      id: 'availability', gate: 'G2', ruleIds: [], async run() { return outcome('PASS', null, null); },
+      get lists(): string[] { if (++reads >= 2 && fail) throw new Error('boom'); return []; },
+    };
+    const { id } = await run({ checks: plan, names: [nonGeo('tampapoolsco.com')] });
+    await a.screeningWorker.runToEnd(id);
+    expect((await get(`/screening/runs/${id}`)).json().status).toBe('running');
+    fail = false;
+    clock.t += 3 * 60_000;
+    expect((await a.screeningWorker.resumeStalled()).resumed).toEqual([id]);
+    await a.screeningWorker.idle();
+    expect((await get(`/screening/runs/${id}`)).json().status).toBe('done');
+  });
+
+  it('two workers on one run: the racing duplicate insert is harmless (23505), rows stay unique, the run finishes', async () => {
+    await putBrandLists();
+    const { app: a, run } = await h();
+    const slow = { id: 'availability' as const, gate: 'G2', ruleIds: [], lists: [], async run() { await new Promise((r) => setTimeout(r, 15)); return outcome('PASS', null, null); } };
+    a.screeningWorker.checks.availability = slow;
+    const { ScreeningWorker } = await import('../../src/screening/engine.js');
+    const other = new ScreeningWorker({ db, now: () => Date.parse('2026-10-06T08:00:20Z'), log: { warn() {}, error() {} }, screening: {} as never });
+    other.checks.availability = slow;
+    const { id } = await run({ checks: plan, names: [nonGeo('tampapoolsco.com'), nonGeo('tulsaroofingco.com')] });
+    await Promise.all([a.screeningWorker.runToEnd(id), other.runToEnd(id)]);
+    const rows = await db.selectFrom('screening_results').select(['item_idx', 'check_id']).where('run_id', '=', id).execute();
+    expect(rows).toHaveLength(8);
+    expect(new Set(rows.map((r) => `${r.item_idx}/${r.check_id}`)).size).toBe(8);
+    const st = await db.selectFrom('screening_runs').select('status').where('id', '=', id).executeTakeFirstOrThrow();
+    expect(st.status).toBe('done');
+  });
+
+  it('lane gate lists must agree on the order of the checks they share (SETTINGS_INVALID at draft time)', async () => {
+    const { post } = await h();
+    const r = await post('/selection/settings', { label: 'v1o', set: { 'run.gates.S2': ['brand_lists', 'form', 'availability'] } });
+    expect([r.statusCode, r.json().error.code]).toEqual([422, 'SETTINGS_INVALID']);
+    expect(JSON.stringify(r.json())).toContain('gate order');
   });
 });

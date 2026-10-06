@@ -9,7 +9,8 @@ import { dollarsToCents, formatUsd } from '../money.js';
 import { MANUAL_CHECKS, TmManual, WebRiskManual, tmFromManual, webRiskFromManual } from '../screening/checks/manual.js';
 import { GATE_OF } from '../screening/checks/index.js';
 import { latestByCheck } from '../screening/derive.js';
-import { HEARTBEAT_STALE_MS, assemble, createRun, toResultRow, type ScreeningWorker } from '../screening/engine.js';
+import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, refreshSummary, toResultRow, type ScreeningWorker } from '../screening/engine.js';
+import { REGISTRAR_ENV } from '../registrars/registry.js';
 import { readEvidence, storeEvidence } from '../screening/evidence.js';
 import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
 import type { ResultRow, RunItem } from '../screening/types.js';
@@ -74,7 +75,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const sel = await selectionSettingsByLabel(db, run.settings_label);
     const input = run.input as { names: RunItem[] };
     const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
-    const a = assemble(input.names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values, run.buy_hold, run.status !== 'running');
+    const a = assemble(input.names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values, await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
     const want = q.data.domain === undefined ? null : q.data.domain.trim().toLowerCase().replace(/\.$/, '');
     return {
       run_id: run.id, status: run.status, mode: run.mode, backtest: run.backtest, settings_version: run.settings_label, buy_hold: run.buy_hold,
@@ -105,8 +106,12 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const item = (run.input as { names: RunItem[] }).names.find((n) => n.domain === domain && !n.input_error);
     if (!item) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${body.domain}" is not a screened name of run ${run.id}`);
     const checkedAt = new Date(body.checked_at);
-    if (checkedAt.getTime() > deps.now() + 60_000) throw new AppError(422, 'VALIDATION_ERROR', 'checked_at is in the future');
     const sel = (await selectionSettingsByLabel(db, run.settings_label))!;
+    if (checkedAt.getTime() > deps.now() + 60_000) throw new AppError(422, 'CHECKED_AT_INVALID', 'checked_at is in the future');
+    const windowH = sel.values.freshness_hours[check] ?? 0;
+    if (windowH > 0 && checkedAt.getTime() < deps.now() - windowH * 3_600_000) {
+      throw new AppError(422, 'CHECKED_AT_INVALID', `checked_at is older than the ${check} freshness window (${windowH} h)`, { freshness_hours: windowH });
+    }
     const rec = check === 'web_risk' ? WebRiskManual.parse(body.result) : TmManual.parse(body.result);
     const history = await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
       .where('check_id', '=', 'history').orderBy('id', 'desc').limit(1).executeTakeFirst();
@@ -122,9 +127,11 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       run_id: run.id, item_idx: item.idx, domain: item.domain, lane: item.lane, check_id: check, gate: GATE_OF[check],
       rule_ids: worker.checks[check]?.ruleIds ?? [], status: o.status, reason_code: o.reasonCode, reason: o.reason,
       fields: JSON.stringify(o.fields), data_as_of: o.dataAsOf, checked_at: checkedAt, settings_label: run.settings_label,
-      list_versions: '{}', duration_ms: 0, upstream_calls: 0, evidence_ids: [String(evidenceId)], source: 'manual',
+      list_versions: JSON.stringify(Object.fromEntries((worker.checks[check]?.lists ?? []).filter((n) => (run.list_versions as Record<string, number>)[n] !== undefined).map((n) => [n, (run.list_versions as Record<string, number>)[n]]))),
+      duration_ms: 0, upstream_calls: 0, evidence_ids: [String(evidenceId)], source: 'manual',
       recorded_by: req.auth!.name, audit_id: req.auditId!,
     }).returningAll().executeTakeFirstOrThrow();
+    await refreshSummary(db, run);
     return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name });
   });
 
@@ -138,6 +145,9 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
   app.post('/quotes/manual', async (req, reply) => {
     const b = QuoteBody.parse(req.body ?? {});
     const domain = normalizeDomain(b.domain);
+    const registrar = b.registrar.toLowerCase();
+    if (registrar === 'cloudflare') throw new AppError(422, 'REGISTRAR_NOT_ALLOWED', 'Cloudflare Registrar is never used: no third-party nameservers, so no for-sale lander (founder rule 5)');
+    if (!Object.hasOwn(REGISTRAR_ENV, registrar)) throw new AppError(422, 'REGISTRAR_UNKNOWN', `"${b.registrar}" is not a configured registrar name`, { known: Object.keys(REGISTRAR_ENV) });
     const maxDays = (await activeSelectionSettings(db)).values.quote.manual_max_age_days;
     const observed = new Date(b.observed_at);
     const t = deps.now();
@@ -145,11 +155,11 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     if (observed.getTime() < t - maxDays * 86_400_000) throw new AppError(422, 'OBSERVED_AT_INVALID', `observed_at is older than ${maxDays} days (quote.manual_max_age_days)`, { max_age_days: maxDays });
     const renewal = dollarsToCents(b.renewal_usd);
     const r = await db.insertInto('manual_quotes').values({
-      domain, registrar: b.registrar.toLowerCase(), renewal_cents: renewal, first_year_cents: b.first_year_usd === undefined ? null : dollarsToCents(b.first_year_usd),
+      domain, registrar, renewal_cents: renewal, first_year_cents: b.first_year_usd === undefined ? null : dollarsToCents(b.first_year_usd),
       source_url: b.source_url ?? null, source_note: b.source_note, observed_at: observed, recorded_by: req.auth!.name, audit_id: req.auditId!,
     }).returning(['id']).executeTakeFirstOrThrow();
     return reply.code(201).send({
-      id: Number(r.id), domain, registrar: b.registrar.toLowerCase(), renewal_cents: renewal, renewal: formatUsd(renewal),
+      id: Number(r.id), domain, registrar, renewal_cents: renewal, renewal: formatUsd(renewal),
       valid_until: new Date(observed.getTime() + maxDays * 86_400_000).toISOString(),
     });
   });

@@ -26,9 +26,9 @@ export interface ScreeningHarness {
   runDone: (body: object) => Promise<{ id: string; body: any }>;
 }
 
-export async function screeningHarness(start = Date.parse('2026-10-06T08:00:00Z')): Promise<ScreeningHarness> {
-  const clock = { t: start };
-  const app = await makeApp({ now: () => clock.t });
+export async function screeningHarness(opts: { start?: number; stopAfterResults?: number } = {}): Promise<ScreeningHarness> {
+  const clock = { t: opts.start ?? Date.parse('2026-10-06T08:00:00Z') };
+  const app = await makeApp({ now: () => clock.t, screeningStopAfterResults: opts.stopAfterResults });
   const w = await issueToken('write', 'gavriel');
   const r = await issueToken('read');
   // The write limiter allows 10 per minute per token: each call is a fresh minute for it.

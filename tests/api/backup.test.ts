@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { BackupExporter, collectBackupFiles, gitBlobSha } from '../../src/jobs/backup-export.js';
 import { importBackup } from '../../src/jobs/backup-import.js';
 import { newAuditId } from '../../src/http/audit.js';
+import { readEvidence, storeEvidence } from '../../src/screening/evidence.js';
 import { loadConfig } from '../../src/config.js';
 import { buildReport } from '../../src/services/report/index.js';
 import { makeApp } from '../helpers/app.js';
@@ -119,6 +120,21 @@ async function seed() {
   clock = Date.parse('2026-12-02T09:00:00Z');
   const offer = await app.inject({ method: 'POST', url: '/offers', headers: { ...w, 'idempotency-key': randomUUID() }, payload: { domain: T, amount_usd: '450.00', source: 'afternic', received_at: '2026-12-01T09:12:00+02:00' } });
   expect(offer.statusCode).toBe(201);
+  // CR-001 tables: a draft settings version, a list, evidence, a run with a result, a manual quote
+  const v1 = await db.selectFrom('selection_settings').select(['id', 'values']).where('label', '=', 'v1').executeTakeFirstOrThrow();
+  await db.insertInto('selection_settings').values({ label: 'v1b', values: JSON.stringify(v1.values), based_on_id: v1.id, created_by: 'gavriel', note: 'draft' }).execute();
+  await db.insertInto('selection_lists').values({ name: 'brand', version: 1, terms: ['acme'], created_by: 'gavriel' }).execute();
+  const ev = await storeEvidence(db, { source: 'manual', url: 'https://example.com/e', retrievedAt: new Date('2026-10-06T07:00:00Z'), httpStatus: null, contentType: 'application/json', body: '{"a":1}', text: '{"a":1}', maxBytes: 1000 });
+  await db.insertInto('screening_runs').values({
+    id: 'run_bk', created_by: 'gavriel', mode: 'live', backtest: false, settings_id: v1.id, settings_label: 'v1', buy_hold: true,
+    input: JSON.stringify({ names: [{ idx: 0, domain: T, lane: 'S3', leads_ab: 0 }] }), gate_plan: JSON.stringify({ S3: ['form'] }), list_versions: '{}',
+    status: 'done', deadline_at: new Date('2026-10-06T08:30:00Z'), finished_at: new Date('2026-10-06T08:01:00Z'), summary: JSON.stringify({ names: 1 }),
+  }).execute();
+  await db.insertInto('screening_results').values({
+    run_id: 'run_bk', item_idx: 0, domain: T, lane: 'S3', check_id: 'web_risk', gate: 'G5', rule_ids: ['WEB-RISK-1'], status: 'PASS', fields: '{}',
+    checked_at: new Date('2026-10-06T07:30:00Z'), settings_label: 'v1', list_versions: '{}', duration_ms: 0, upstream_calls: 0, evidence_ids: [String(ev)], source: 'manual', recorded_by: 'gavriel',
+  }).execute();
+  await db.insertInto('manual_quotes').values({ domain: T, registrar: 'godaddy', renewal_cents: 2299, source_note: 'page', observed_at: new Date('2026-10-05T12:00:00Z'), recorded_by: 'gavriel' }).execute();
   const gid = await listedDomain({ domain: G, lander: 'afternic', lander_set_at: new Date('2026-10-10T00:00:00Z') });
   await db.insertInto('ledger_entries').values({ occurred_on: '2026-10-04', domain_id: gid, type: 'registration', amount_cents: -1108, note: 'has, "quotes"\nand a newline' }).execute();
   const sold = await app.inject({
@@ -342,7 +358,12 @@ describe('BK-3 import round trip', () => {
 
     await resetDb(db);
     const counts = await importBackup(db, dir);
-    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1 });
+    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1, selection_settings: 2, selection_lists: 11, screening_evidence: 1, screening_runs: 1, screening_results: 1, manual_quotes: 1 });
+    // the CR-001 rows are back with their ids; the evidence text survives the bytea round trip
+    expect((await db.selectFrom('selection_settings').select('label').orderBy('id').execute()).map((r) => r.label)).toEqual(['v1', 'v1b']);
+    expect((await db.selectFrom('selection_lists').select('terms').where('name', '=', 'brand').executeTakeFirstOrThrow()).terms).toEqual(['acme']);
+    expect((await readEvidence(db, 1))!.text).toBe('{"a":1}');
+    expect((await db.selectFrom('screening_results').select(['run_id', 'source']).executeTakeFirstOrThrow())).toEqual({ run_id: 'run_bk', source: 'manual' });
     expect(await buildReport(db, REPORT_AT)).toEqual(reportBefore);
 
     // Everything re-exports byte-identically; audit rows differ only in token_id (api_tokens are not restored).
@@ -351,7 +372,8 @@ describe('BK-3 import round trip', () => {
     // pricing_settings: the migration-seeded rows keep the new database's own created_at (append-only; not replaced).
     const noImportRow = (t: string) => t.split('\n').filter((l) => l && !l.includes('"path":"import-backup"')).map((l) => `${l}\n`).join('');
     for (const [p, c] of files) {
-      if (p === 'backup/tables/pricing_settings.json') continue;
+      // the migration-seeded rows (pricing v1/v2, selection v1 and its lists) keep the new database's own timestamps
+      if (['pricing_settings', 'selection_settings', 'selection_lists'].some((t) => p === `backup/tables/${t}.json`)) continue;
       expect(p === 'backup/audit.jsonl' ? noImportRow(after.get(p)!) : after.get(p), p).toBe(p === 'backup/audit.jsonl' ? noTok(c) : c);
     }
     const audit = JSON.parse((after.get('backup/audit.jsonl')!.trim().split('\n').at(-1))!);

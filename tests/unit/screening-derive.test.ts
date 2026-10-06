@@ -1,7 +1,7 @@
 // CAP-20 final status and funnel (pure). CR-002 CAP-20 acceptance: never a BUY card while buy_hold is on.
 import { describe, expect, it } from 'vitest';
 import { GATE_OF } from '../../src/screening/checks/index.js';
-import { deriveItem, funnel } from '../../src/screening/derive.js';
+import { deriveItem, funnel, latestByCheck } from '../../src/screening/derive.js';
 import type { CheckId, ResultRow, Status } from '../../src/screening/types.js';
 
 let id = 0;
@@ -60,6 +60,24 @@ describe('deriveItem', () => {
     expect(d(rows, true, true, ['form', 'pack'])).toMatchObject({ final_status: 'would_buy', not_implemented: ['pack'] });
   });
 
+  it('a gating check that is not built (NOT_IMPLEMENTED): a live name is unknown, a report/full name only lists it; pack and leads stay exempt', () => {
+    const rows = [row('form', 'PASS'), row('typo', 'NOT_RUN', 'NOT_IMPLEMENTED'), row('pack', 'NOT_RUN', 'NOT_IMPLEMENTED')];
+    expect(deriveItem(rows, ['form', 'typo', 'pack'], FEATURES, true, true, true)).toMatchObject({ final_status: 'unknown', not_implemented: ['typo', 'pack'] });
+    expect(deriveItem(rows, ['form', 'typo', 'pack'], FEATURES, false, true, true).final_status).toBe('unknown'); // never buy_candidate
+    expect(deriveItem(rows, ['form', 'typo', 'pack'], FEATURES, true, true, false)).toMatchObject({ final_status: 'would_buy', not_implemented: ['typo', 'pack'] });
+    expect(deriveItem([rows[0]!, rows[2]!], ['form', 'pack'], FEATURES, true, true, true).final_status).toBe('would_buy');
+  });
+
+  it('a manual row outranks an auto MANUAL_REQUIRED row whatever the ids; between manual rows the newest wins', () => {
+    const manual = { ...row('web_risk', 'FAIL', 'UNSAFE'), source: 'manual' as const };
+    const autoLater = row('web_risk', 'MANUAL_REQUIRED', 'MANUAL_SOURCE'); // higher id, written after the manual record
+    expect(autoLater.id).toBeGreaterThan(manual.id);
+    expect(latestByCheck([manual, autoLater]).get('web_risk')).toBe(manual);
+    expect(latestByCheck([autoLater, manual]).get('web_risk')).toBe(manual);
+    const manual2 = { ...row('web_risk', 'PASS'), source: 'manual' as const };
+    expect(latestByCheck([manual2, manual, autoLater]).get('web_risk')).toBe(manual2);
+  });
+
   it('FLAGs are listed and do not block; INPUT_INVALID is invalid', () => {
     const rows = [row('form', 'FLAG', 'AMBIGUOUS_SPLIT'), row('brand_lists', 'PASS')];
     expect(d(rows, false, true, ['form', 'brand_lists'])).toMatchObject({ final_status: 'buy_candidate', flags: ['form'] });
@@ -90,9 +108,9 @@ describe('funnel', () => {
     const f = funnel(items, by, plan);
     expect(f.names).toBe(4);
     expect(f.by_final_status).toEqual({ would_buy: 2, rejected: 1, invalid: 1 });
-    expect(f.first_fail).toEqual({ brand_lists: { gate: 'G1', count: 1 }, form: { gate: 'G0', count: 1 } });
+    expect(f.first_fail).toEqual({ brand_lists: { gate: 'G1', count: 1 } }); // an unreadable name is counted as `invalid` only
     expect(f.by_lane.S3!.names).toBe(3);
-    expect(f.by_lane.S3!.stages.map((s) => [s.check, s.reached, s.passed, s.failed])).toEqual([['form', 3, 2, 1], ['brand_lists', 2, 1, 1], ['typo', 1, 1, 0]]);
+    expect(f.by_lane.S3!.stages.map((s) => [s.check, s.reached, s.passed, s.failed])).toEqual([['form', 2, 2, 0], ['brand_lists', 2, 1, 1], ['typo', 1, 1, 0]]);
     expect(f.by_lane.S2!.final).toEqual({ would_buy: 1 });
   });
 });

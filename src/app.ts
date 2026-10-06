@@ -71,6 +71,8 @@ export interface AppDeps {
   backupExport?: BackupExport;
   /** Gate for clearing `buy_hold` in a selection settings activation (replaced by the holdout report in a later task). */
   holdoutCheck?: HoldoutCheck;
+  /** Test-only: the screening worker stops (as if killed) after this many results of its first execution. */
+  screeningStopAfterResults?: number;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -124,6 +126,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerSelection(app, { db: deps.db, now: deps.now ?? Date.now, holdoutCheck: deps.holdoutCheck });
   const screeningWorker = new ScreeningWorker({
     db: deps.db, now: deps.now ?? Date.now, log: app.log,
+    stopAfterResults: deps.screeningStopAfterResults,
     screening: { fetch: globalThis.fetch, sleep: deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), checkService },
   });
   app.decorate('screeningWorker', screeningWorker);
