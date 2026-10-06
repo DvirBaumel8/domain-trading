@@ -5,6 +5,7 @@ Semver for the API contract (`README.md` §Versioning). Newest first. Each entry
 ## 1.1.0 (unreleased)
 MINOR (additive only). Built task by task; each task adds its bullets here.
 - **Name form (CAP-01, incl. FORM-2 and G-FORM-1):** new `selection.md` with the form result and its reason codes `HAS_DIGIT`, `HAS_HYPHEN`, `UNKNOWN_TOKEN`, `GFORM1_WORDS`, `GFORM1_LENGTH`, `GEO_ATTR_MISSING`, `CITY_PLUS_LEGAL`, `AMBIGUOUS_SPLIT`. No route yet (the check runs inside the screening run, a later task).
+- **Pricing v3 (CR-001 G-1/G-2; `pricing_settings` columns, no new route):** when the current settings version has a price list (created only by the admin command, never seeded), new plans use the list, ladder drops, a whole-dollar floor, a geo M12 rung down to $299 and a final push to the lowest list price at or above the floor. New 422 codes on `/list`, `/buy` and `/pricing/preview`: `BIN_NOT_IN_PRICE_LIST`, `LANDER_EXCEPTION_REQUIRED` (always refused until the screening pack exists). `settings_version` is 3 in those responses. v2 plans, their schedules and every v2 number are unchanged (`BIN_NOT_NICE` and `BIN_BELOW_FLOOR_MIN` stay for v2).
 
 ## 1.0.1 (2026-10-06): documentation corrections
 PATCH. The code is unchanged except one message string; the contract now describes it exactly. Release note: `docs/releases/v1.0.1.md`. From the accuracy review (21 corrections).
@@ -39,7 +40,7 @@ The first written contract: the API as built after the 6 Oct 2026 cleanup (DOM h
 
 **Where the contract differs from the inherited specs** (the specs DOM inherited are now `docs/internal/`; the full list with decisions is `docs/internal/gaps.md`). The contract describes the code:
 - `POST /buy` still **requires 2–3 comps** (`pricing_evidence`, `COMPS_REQUIRED`) and does **not** accept `screening_pack` (an unknown field → 422). Selection v9.1 says comps are optional and a screening pack is required; that ships with CR-001 P1b.
-- Pricing is **`pricing_settings` v2** (x95 BINs, −20% drops, a $399 geo name never drops, floor and walk-away to the nearest $5). The v3 price list, step-down drops and the geo $399 → $299 rung ship with CR-001 P1a. `BIN_NOT_IN_PRICE_LIST` and `LANDER_EXCEPTION_REQUIRED` aren't emitted yet.
+- Pricing is **`pricing_settings` v2** (x95 BINs, −20% drops, a $399 geo name never drops, floor and walk-away to the nearest $5). The v3 price list, step-down drops and the geo $399 → $299 rung ship in 1.1.0 (see above); `BIN_NOT_IN_PRICE_LIST` and `LANDER_EXCEPTION_REQUIRED` were not emitted in 1.0.0.
 - Not built: the selection endpoints (`/check/batch`, `/check/history`, `/check/tm`, `/check/quote`, `/score`, `/screening_pack`, …), `POST /distribution/confirm` and the FT-1 warning `DISTRIBUTION_INCOMPLETE`, `GET /renewal/decision/{domain}`, `POST /renew/{domain}` and the `dt` CLI.
 - `POST_BUY_INCOMPLETE` means "bought without stored comps", not "without a screening pack".
 - `GET /check` ignores unknown query parameters; every other GET with a query schema is strict.

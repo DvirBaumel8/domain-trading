@@ -300,12 +300,18 @@ export interface PricingSettingsTable {
   hybrid_min_offer_cents: number;
   drops: Json;
   final_push_days_before_drop: number;
-  final_push_mode: 'bin_to_floor_ceil95';
+  final_push_mode: 'bin_to_floor_ceil95' | 'bin_to_lowest_listed_ge_floor';
   delist_days_before_drop: number;
   headsup_days_before: number;
   comps_min: number;
   comps_max: number;
   public_lto: boolean;
+  allowed_bins_cents: number[] | null;
+  nongeo_bin_min_cents: number | null;
+  nongeo_default_bin_cents: number | null;
+  lander_exception_bins_cents: number[];
+  floor_rounding: 'round5' | 'dollar';
+  drop_mode: 'pct' | 'ladder';
 }
 
 export type PriceScheduleEvent = 'drop1_m6' | 'drop2_m18' | 'geo_drop_m12' | 'final_push' | 'delist';

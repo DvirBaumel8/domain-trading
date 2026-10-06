@@ -3,7 +3,7 @@ import type { Category, ListingMode } from '../db/types.js';
 import { dollarsToCents, formatUsd } from '../money.js';
 import { computePlan, FAST_TRANSFER_MAX_CENTS } from '../pricing/plan.js';
 import { addMonthsClamped } from '../pricing/schedule.js';
-import type { PricingSettings } from '../pricing/settings.js';
+import { isV3, type PricingSettings } from '../pricing/settings.js';
 
 export const CATEGORIES: readonly Category[] = ['geo', 'trend', 'b2b', 'collision', 'regulation', 'buzzword', 'other'];
 export const isCategory = (v: unknown): v is Category => typeof v === 'string' && (CATEGORIES as readonly string[]).includes(v);
@@ -86,6 +86,8 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
         if (bin !== gradePrice) guards.push({ code: 'GEO_BIN_NOT_GRADE_PRICE', message: 'At buy, a geo BIN must be the grade price' });
       } else if (bin < s.geoBinMinCents || bin > s.geoBinMaxCents) {
         guards.push({ code: 'GEO_BIN_OUT_OF_RANGE', message: 'A geo BIN must be within the configured range' });
+      } else if (isV3(s) && !carried && !(s.allowedBinsCents ?? []).includes(bin)) {
+        return fail('BIN_NOT_IN_PRICE_LIST', 'A geo BIN must be on the price list', { allowed_bins_cents: (s.allowedBinsCents ?? []).filter((v) => v >= s.geoBinMinCents && v <= s.geoBinMaxCents) });
       } else {
         // A carried (stored) price was approved when it was set; replan re-decides and is not carried
         // In range: the grade price (or the scheduled strong -> weaker step) is bot-autonomous; any other price is a sell decision
@@ -115,7 +117,7 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
       : { code: 'MODE_NOT_ALLOWED_FOR_CATEGORY', message: 'offer mode needs an override' });
   } else {
     // V5
-    const r = computePlan({ category: ctx.category, mode: 'hybrid', grade: ctx.grade, binCents: bin, floorCents: floor, walkawayCents: walk, exception: exception || carried }, s);
+    const r = computePlan({ category: ctx.category, mode: 'hybrid', grade: ctx.grade, binCents: bin, floorCents: floor, walkawayCents: walk, exception: exception || carried, carried }, s);
     if (!r.ok) {
       const d = r.details ?? {};
       const display = Object.fromEntries(Object.entries(d).filter(([k]) => k.endsWith('_cents') && typeof d[k] === 'number')

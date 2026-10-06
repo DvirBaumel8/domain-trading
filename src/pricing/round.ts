@@ -15,6 +15,11 @@ export function round5(c: Cents): Cents {
   return div(c + 250, 500) * 500;
 }
 
+/** Nearest whole dollar, ties up (v3 floor rounding). */
+export function roundDollar(c: Cents): Cents {
+  return div(c + 50, DOLLAR) * DOLLAR;
+}
+
 function niceEnding(c: Cents, ending: Cents): Cents {
   const n = c + ending;
   const lo = div(n, HUNDRED_DOLLARS) * HUNDRED_DOLLARS;

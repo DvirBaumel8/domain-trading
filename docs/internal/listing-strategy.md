@@ -1,6 +1,6 @@
 # Listing and pricing strategy
 
-DOM-internal rules: categories, modes, guards, the calculator, the drop schedule, the offers log. API shapes: `docs/contract/`. **Built: pricing settings v2.** §10.13 (v3) is approved but not built (CR-001 P1a, `gaps.md`).
+DOM-internal rules: categories, modes, guards, the calculator, the drop schedule, the offers log. API shapes: `docs/contract/`. **Built: pricing settings v2; v3 (§10.13) built in code, not yet created** (the admin command creates it with Dvir's approval).
 
 **Process (Dvir, 5 Oct 2026, 00:46; v2 09:17; min offer and offers log 01:03):** geo = fixed-price `bin`, no negotiation; every other category = `hybrid` with a server-computed floor (65%, ≥ $750) and a **private** walk-away (max(48%, $500), ≤ floor) that is never exported, shown or told to a buyer; marketplace min offer $100; offers ≥ floor auto-accepted, walk-away..floor → Dvir (Gate D), below → declined automatically and **always logged** (§10.11); LTO off publicly. Scheduled drops (M6/M18 −20%, final push at `drop_date − 90`, delist at `drop_date − 7`; geo one drop $499 → $399 at M12) are pre-approved by the buy approval: Dvir gets heads-ups only. One approval on the buy card covers the whole sell plan. The quarterly review changes `pricing_settings` (a new version), never code.
 - **Never hard-code** 65/48/20/750/500/100/499/399 or the price list in logic. The server computes every derived price.
@@ -165,8 +165,8 @@ Columns and tables: `00-architecture.md` §4. The PR vectors were generated with
 - `WALKAWAY_NOT_ALLOWED`: walk-away or exception in offer mode (in bin mode a walk-away ≠ BIN is `BIN_MODE_NO_NEGOTIATION`). Also: `LISTING_PRICE_INVALID`, `GRADE_NOT_GEO`, `HOLD_REASON_REQUIRED`, `REPLAN_NOTHING_LISTED`, 503 `DOMAIN_BUSY`, 503 `REGISTRAR_UNAVAILABLE`, 500 `PRICING_SETTINGS_MISSING`.
 - A delisted domain counts toward the domain cap until sold or dropped.
 
-### 10.13 `pricing_settings` v3 (selection v9.1; Dvir approved 6 Oct 2026; **not built**: CR-001 P1a)
-New plans only; v2 plans keep their numbers. The admin command creates v3 with Dvir's v9.1 approval. **[v9.1]** = stated by v9.1; **[Dvir, 6 Oct 2026]** = needs Dvir's OK at the build gate.
+### 10.13 `pricing_settings` v3 (selection v9.1; Dvir approved 6 Oct 2026; **built** in CR-001 P1a Task 2; no v3 row exists until the admin command creates it)
+New plans only; v2 plans keep their numbers (the price job and manual changes read the settings version the plan was made under). The admin command creates v3 with Dvir's approval text citing the 6 Oct 2026 decisions. **[v9.1]** = stated by v9.1; **[Dvir, 6 Oct 2026]** = decided by Dvir (the formerly proposed items; code names `BIN_NOT_IN_PRICE_LIST`, `LANDER_EXCEPTION_REQUIRED` built). Implementation notes: the v3 columns are `allowed_bins_cents`, `nongeo_bin_min_cents`, `nongeo_default_bin_cents`, `lander_exception_bins_cents`, `floor_rounding`, `drop_mode` (v2 = null/default); `comps_min` stays 2 (G-4 is P1b); in P1a `LANDER_EXCEPTION_REQUIRED` is always refused (no screening pack yet); a stored (carried) plan skips the list.
 | Field | v3 | Meaning |
 |---|---|---|
 | `allowed_bins_cents` | `[29900,39900,49900,78800,108800,148800,198800,248800]` | **[v9.1]** Every listed or scheduled BIN is on the list (forbids $800–$999, $1,950–$1,999 and non-geo x95/x99) |

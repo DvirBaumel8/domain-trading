@@ -1,0 +1,27 @@
+{
+  "settings_version": 3,
+  "source": "docs/internal/listing-strategy.md §10.13 (Dvir, 6 Oct 2026)",
+  "plans": [
+    { "bin": 248800, "floor": 161700, "walkaway": 119500 },
+    { "bin": 198800, "floor": 129200, "walkaway": 95500 },
+    { "bin": 148800, "floor": 96700, "walkaway": 71500 },
+    { "bin": 108800, "floor": 75000, "walkaway": 52000 },
+    { "bin": 78800, "floor": 75000, "walkaway": 50000 }
+  ],
+  "schedules": [
+    { "input": { "category": "trend", "binCents": 248800 }, "anchor": "2026-10-12", "drop_date": "2028-10-04",
+      "events": [["drop1_m6","2027-04-12",198800,129200,95500,"planned"],["drop2_m18","2028-04-12",148800,96700,71500,"planned"],["final_push","2028-07-06",108800,96700,71500,"planned"],["delist","2028-09-27",null,null,null,"planned"]] },
+    { "input": { "category": "trend", "binCents": 198800 }, "anchor": "2026-10-12", "drop_date": "2028-10-04",
+      "events": [["drop1_m6","2027-04-12",148800,96700,71500,"planned"],["drop2_m18","2028-04-12",108800,75000,52000,"planned"],["final_push","2028-07-06",78800,75000,52000,"planned"],["delist","2028-09-27",null,null,null,"planned"]] },
+    { "input": { "category": "trend", "binCents": 148800 }, "anchor": "2026-10-12", "drop_date": "2028-10-04",
+      "events": [["drop1_m6","2027-04-12",108800,75000,52000,"planned"],["drop2_m18","2028-04-12",78800,75000,50000,"planned"],["final_push","2028-07-06",78800,75000,50000,"skipped_no_change"],["delist","2028-09-27",null,null,null,"planned"]] },
+    { "input": { "category": "trend", "binCents": 108800 }, "anchor": "2026-10-12", "drop_date": "2028-10-04",
+      "events": [["drop1_m6","2027-04-12",78800,75000,50000,"planned"],["drop2_m18","2028-04-12",78800,75000,50000,"skipped_at_minimum"],["final_push","2028-07-06",78800,75000,50000,"skipped_no_change"],["delist","2028-09-27",null,null,null,"planned"]] },
+    { "input": { "category": "trend", "binCents": 78800 }, "anchor": "2026-10-12", "drop_date": "2028-10-04",
+      "events": [["drop1_m6","2027-04-12",78800,75000,50000,"skipped_at_minimum"],["drop2_m18","2028-04-12",78800,75000,50000,"skipped_at_minimum"],["final_push","2028-07-06",78800,75000,50000,"skipped_no_change"],["delist","2028-09-27",null,null,null,"planned"]] },
+    { "input": { "category": "geo", "grade": "strong" }, "anchor": "2026-11-01", "drop_date": "2028-11-01",
+      "events": [["geo_drop_m12","2027-11-01",39900,39900,39900,"planned"],["delist","2028-10-25",null,null,null,"planned"]] },
+    { "input": { "category": "geo", "grade": "weaker" }, "anchor": "2026-11-01", "drop_date": "2028-11-01",
+      "events": [["geo_drop_m12","2027-11-01",29900,29900,29900,"planned"],["delist","2028-10-25",null,null,null,"planned"]] }
+  ]
+}

@@ -8,11 +8,12 @@ import { ruleFields, rowToSettings } from '../pricing/settings.js';
 const INT_KEYS = [
   'geo_bin_strong_cents', 'geo_bin_weaker_cents', 'geo_bin_min_cents', 'geo_bin_max_cents', 'floor_bps', 'floor_min_cents',
   'walkaway_bps', 'walkaway_min_cents', 'hybrid_min_offer_cents', 'final_push_days_before_drop', 'delist_days_before_drop',
-  'headsup_days_before', 'comps_min', 'comps_max',
+  'headsup_days_before', 'comps_min', 'comps_max', 'nongeo_bin_min_cents', 'nongeo_default_bin_cents',
 ] as const;
 const BOOL_KEYS = ['geo_drops_enabled', 'public_lto'] as const;
 const JSON_KEYS = ['geo_drops', 'drops'] as const;
-const TEXT_KEYS = ['final_push_mode'] as const;
+const INT_ARRAY_KEYS = ['allowed_bins_cents', 'lander_exception_bins_cents'] as const;
+const TEXT_KEYS = ['final_push_mode', 'floor_rounding', 'drop_mode'] as const;
 
 function parseValue(key: string, raw: string): unknown {
   if ((INT_KEYS as readonly string[]).includes(key)) {
@@ -24,6 +25,11 @@ function parseValue(key: string, raw: string): unknown {
     return raw === 'true';
   }
   if ((JSON_KEYS as readonly string[]).includes(key)) return JSON.stringify(JSON.parse(raw));
+  if ((INT_ARRAY_KEYS as readonly string[]).includes(key)) {
+    const v: unknown = JSON.parse(raw);
+    if (!Array.isArray(v) || !v.every((x) => Number.isSafeInteger(x) && x > 0)) throw new Error(`${key} must be a JSON array of positive integers`);
+    return v;
+  }
   if ((TEXT_KEYS as readonly string[]).includes(key)) return raw;
   throw new Error(`unknown pricing setting: ${key}`);
 }

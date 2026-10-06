@@ -4,7 +4,7 @@ import type { Selectable } from 'kysely';
 import { jerusalemDate } from '../dates.js';
 import { newAuditId } from '../http/audit.js';
 import { hybridBinMin } from '../pricing/plan.js';
-import { settingsByVersion, type PricingSettings } from '../pricing/settings.js';
+import { isV3, settingsByVersion, type PricingSettings } from '../pricing/settings.js';
 import { changedColumns } from '../services/export-state.js';
 import { withDomainLock } from '../services/plan-store.js';
 
@@ -29,10 +29,12 @@ export function rowValid(row: Pick<Row, 'bin_cents' | 'floor_cents' | 'walkaway_
     if (!(s.walkawayMinCents <= walk && walk <= floor && floor <= bin)) return 'walk-away/floor/BIN order or walk-away minimum violated';
     if (floor < s.floorMinCents) return 'floor below the floor minimum';
     if (bin < hybridBinMin(s)) return 'BIN below the minimum hybrid BIN';
+    if (isV3(s) && !(s.allowedBinsCents ?? []).includes(bin)) return 'BIN not on the price list';
     return null;
   }
   if (mode === 'bin') {
     if (bin < s.geoBinMinCents || bin > s.geoBinMaxCents) return 'geo BIN outside the allowed range';
+    if (isV3(s) && !(s.allowedBinsCents ?? []).includes(bin)) return 'geo BIN not on the price list';
     if (floor !== bin || walk !== bin) return 'geo floor and walk-away must equal the BIN';
     return null;
   }
