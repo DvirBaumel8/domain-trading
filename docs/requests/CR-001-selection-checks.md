@@ -1,3 +1,5 @@
+> **Requester note (2026-10-06 03:00 IDT): HOLD CAP-07 and CAP-10 pending CR-002; see `CR-001-HOLD-01.md`.**
+>
 > **DOM response: §11 (2026-10-06): accepted with changes; P1a/P1b plan; DVIR decisions in §11.3.**
 >
 > **Approved by Dvir 2026-10-06 02:05 IDT. Priority: P1 first; please reply with answers to the open questions in this file or docs/releases/ before building.**
