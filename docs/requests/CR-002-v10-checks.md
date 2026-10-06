@@ -300,3 +300,22 @@ Requester note (2026-10-06 05:15 IDT): features.csv and census/ added to CR-002-
 - `role` must be `test` for holdout rows. A holdout run containing any `fit` or `dev` name is refused.
 
 **History source (Dvir's decision, 6 Oct):** the Internet Archive's published terms grant access "for scholarship and research purposes only". DOM ships HIST-2 built but **switched off** (`sources.wayback` = false, so history is `UNKNOWN SOURCE_DISABLED`) until the Archive gives written permission, which Dvir is requesting. Until then, live screening can't produce survivors past the history gate, and S7 (expired-drop) names can't join a tranche. Replays over recorded features are unaffected.
+
+**DOM, 2026-10-06: CAP-21a diagnostic replay of `features.csv`, findings that need a decision by Gavriel or Dvir.** These are diagnostic runs, so none of them counts toward clearing `buy_hold`.
+
+| Target (CR-002 CAP-21) | DOM result | Note |
+|---|---|---|
+| Round 1: 42 / 43 (BT10-1) | **42 / 43 exactly**, 0 undecided | **Only under rule I alone** (`demand2_pass_tiers = [I]`). |
+| Round 1 under the **active v10 settings** (tiers I, B and G) | 45 / 55 sold accepted, **39 / 55 dropped rejected (71%)** | **BT10-1 fails the 75% bar** once tier B is on. |
+| Rounds 4–8: 150/211 and 144/195 | 148/207 and 143/200 (71.5%) | Within ±3. BT10-9 fails as expected. `n` differs because the table gives each name its latest slice only. |
+| Expired lane: 52/72 and 26/42 | dropped 27/42; sold not reproducible | The table has no registration age (`reg_to_sale_months`), so aged originals can't be told apart from re-registered drops. |
+| Backtest: 188/226 and 186/224 | 199/279 and 207/284, with 48 and 29 undecided | The table has 279 sold / 284 dropped fit rows, not 226/224. 77 rows lack share or history, so they are undecided, not guessed. |
+| Leakage lint | **1,175 of 1,593 checkable rows use data dated on or after `as_of`** (162 rows have no `as_of`) | The census is dated 2026-10-06, after almost every `as_of`. Under A2 these backtests contain leakage. |
+
+**Decisions needed:**
+1. **BT10-1 rule set.** Is the holdout judged with tier B (and G) on, as in the active v10 settings, or with rule I only? As configured, BT10-1 fails. If tier B should be off for now, propose a settings draft. Activating it needs Dvir's approval naming the label.
+2. **Data.** Please supply:
+   - the exact 226/224 backtest row set;
+   - `reg_to_sale_months` (or registration dates), to separate aged from expired names;
+   - per-row census dates. Holdout suites need sibling data dated before `as_of`.
+3. **Profit report.** DOM uses `profit.cost_per_name_year_cents` = **$11.08** (the ARA used in CR-001/v9.1) and defines the break-even base sale rate as documented in `docs/contract/selection.md`. Please confirm, or give the intended values.
