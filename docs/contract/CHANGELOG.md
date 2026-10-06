@@ -2,6 +2,27 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 1.0.1 (2026-10-06): documentation corrections
+PATCH. The code is unchanged except one message string; the contract now describes it exactly. Release note: `docs/releases/v1.0.1.md`. From the accuracy review (21 corrections).
+
+**Wrong (would mislead a client):**
+- `GET /audit` `request` is a JSON object (or null), not a string.
+- An unknown **POST** route answers 403 / 400 (`SCOPE_FORBIDDEN`, `IDEMPOTENCY_KEY_REQUIRED`) before 404; the same for `POST /export/dan/uploaded`. Only GET gets a plain 404.
+- `/list`: an off-grade geo BIN needs `approval_ref` (422 `APPROVAL_REQUIRED`); "no approval for any change within the rules" was too broad.
+
+**Incomplete and cosmetic:**
+- Money display: whole dollars only in the plan view and preview; `$1,995.00` elsewhere; the plan-view schedule has no `_cents` and no `(private)` suffix.
+- `/report` `next_price_event`, upcoming `values`, `applied_7d` are flat `*_cents` + display pairs.
+- Offer routing: `unpriced` (non-email) goes to `dvir`. `approval_ref` elsewhere is ignored unless a route says it is validated.
+- `POC_CAP_EXCEEDED` and `REGISTRAR_FUNDS` `details` keys listed exactly.
+- `pricing_evidence` problems are `COMPS_INVALID`, not `VALIDATION_ERROR`.
+- HEAD on the export routes writes an `export_runs` row.
+- `offers_by_strategy` scopes (listed names vs all-time); `domains_owned` differs between dry run and 201.
+- Failed-auth limiter: 20 or more failures. `POST /jobs/run` with no job token: 503 even unauthenticated.
+- `NOT_LISTED` never appears in export warnings. `OFFER_NOT_FOUND` comes after body validation. UTC time-field exceptions. Job step `skipped` only when the summary says so.
+- v1.0.0 release note: removed the stale "$500" clause.
+- **Message text (the only code change):** the `/buy` 202 `message` now says the bookkeeping resolves on the next hourly reconciler run (it said "within 10 minutes"). Messages are not part of the contract.
+
 ## 1.0.0 (2026-10-06): initial contract
 The first written contract: the API as built after the 6 Oct 2026 cleanup (DOM handover). Release note: `docs/releases/v1.0.0.md`.
 

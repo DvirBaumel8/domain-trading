@@ -2,7 +2,7 @@
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
-**Notation:** `field: type` · `?` = optional · `| null` = may be `null` · "USD number" = a JSON number with at most 2 decimals · "money pair" = `x_cents` + `x` (README §Conventions). Every POST needs `Idempotency-Key` (README §Idempotency). Every body schema is **strict**: an unknown field → 422 `VALIDATION_ERROR`. The cross-cutting errors (401, 403, 429, `IDEMPOTENCY_KEY_*`, `INVALID_BODY`, `INTERNAL`, `AUDIT_WRITE_FAILED`) apply everywhere and aren't repeated per route.
+**Notation:** `field: type` · `?` = optional · `| null` = may be `null` · "USD number" = a JSON number with at most 2 decimals · "money pair" = `x_cents` + `x` (README §Conventions). Every POST needs `Idempotency-Key` (README §Idempotency). Every body schema is **strict**: an unknown field → 422 `VALIDATION_ERROR` (exception: `pricing_evidence` on `/buy` is checked by the comps rules, so an extra key or a bad comp → 422 `COMPS_INVALID`). The cross-cutting errors (401, 403, 429, `IDEMPOTENCY_KEY_*`, `INVALID_BODY`, `INTERNAL`, `AUDIT_WRITE_FAILED`) apply everywhere and aren't repeated per route.
 
 | Method | Path | Token | Section |
 |---|---|---|---|
@@ -77,11 +77,11 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
   | `dry_run` | bool? | default `false` |
   | `auto_list` | bool? | default `true`: after the buy, point NS at the lander and store the listing |
 
-- **Checks, in order (any failure stops the call; no registrar call before check 6):** approval (`APPROVAL_INVALID` / `APPROVAL_EXPIRED`) → `proposed_listing.mode` (`MODE_INVALID`) → category (`CATEGORY_REQUIRED`) → grade (`GEO_GRADE_REQUIRED` / `GRADE_NOT_GEO`) → the listing rules for `proposed_listing` (the `/list` listing codes, plus `PRICING_FORMULA_MISMATCH`; a geo BIN must equal the grade price) → comps (`COMPS_REQUIRED` / `COMPS_INVALID`) → settings version (409 `SETTINGS_VERSION_CHANGED`) → not owned (409 `ALREADY_OWNED_OR_PENDING` / `ALREADY_IN_PORTFOLIO`) → domain cap (409 `DOMAIN_CAP_REACHED`) → live re-check, no cache (409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE`) → price caps, then the cheapest two-year (409 `PRICE_ABOVE_MAX`, `details.cheapest`) → POC cap $1,500 including open purchases (409 `POC_CAP_EXCEEDED`, `details` cap/spent/pending/remaining/cost) → registrar account (409 `REGISTRAR_STATE_UNKNOWN` / `REGISTRAR_AUTO_TOPUP_ON` / `REGISTRAR_FUNDS`) → the registrar's own dry run with the exact cost (409 `REGISTRAR_DRY_RUN_FAILED` with `details.registrar_code`; a price change re-quotes once and re-checks the caps; an ambiguous answer → 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`).
+- **Checks, in order (any failure stops the call; no registrar call before check 6):** approval (`APPROVAL_INVALID` / `APPROVAL_EXPIRED`) → `proposed_listing.mode` (`MODE_INVALID`) → category (`CATEGORY_REQUIRED`) → grade (`GEO_GRADE_REQUIRED` / `GRADE_NOT_GEO`) → the listing rules for `proposed_listing` (the `/list` listing codes, plus `PRICING_FORMULA_MISMATCH`; a geo BIN must equal the grade price) → comps (`COMPS_REQUIRED` / `COMPS_INVALID`) → settings version (409 `SETTINGS_VERSION_CHANGED`) → not owned (409 `ALREADY_OWNED_OR_PENDING` / `ALREADY_IN_PORTFOLIO`) → domain cap (409 `DOMAIN_CAP_REACHED`) → live re-check, no cache (409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE`) → price caps, then the cheapest two-year (409 `PRICE_ABOVE_MAX`, `details.cheapest`) → POC cap $1,500 including open purchases (409 `POC_CAP_EXCEEDED`, `details` `cap_cents`, `spent_cents`, `spent`, `pending_cents`, `remaining_cents`, `remaining`, `cost_cents`) → registrar account (409 `REGISTRAR_STATE_UNKNOWN` / `REGISTRAR_AUTO_TOPUP_ON` / `REGISTRAR_FUNDS`) → the registrar's own dry run with the exact cost (409 `REGISTRAR_DRY_RUN_FAILED` with `details.registrar_code`; a price change re-quotes once and re-checks the caps; an ambiguous answer → 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`).
 - **`dry_run: true`** stops after the checks. **200:**
   ```
   { dry_run: true, domain, check_id, registrar, first_year/renewal/two_year (money pairs),
-    poc_spent (pair), poc_remaining_after (pair), domains_owned: int,
+    poc_spent (pair), poc_remaining_after (pair), domains_owned: int (owned + listed + delisted + pending purchases),
     registrar_dry_run: { would_succeed: true, cost, cost_cents },
     proposed_listing: null | <plan view, with the schedule anchored today and drop date +24 months>,
     settings_version: int, warnings: [string] }
@@ -91,7 +91,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
   ```
   { domain, registrar, order_id, charged (pair), renewal (pair), two_year (pair),
     expiry_date: YYYY-MM-DD, drop_date: YYYY-MM-DD (expiry + 1 year), renewals_used: 0,
-    poc_spent_after (pair), poc_remaining (pair), domains_owned: int,
+    poc_spent_after (pair), poc_remaining (pair), domains_owned: int (owned + listed + delisted only),
     post_buy: { privacy: "on"|"off"|"unknown", auto_renew: "off"|"unconfirmed",
                 lander: "<target> ns set"|"pending"|"mismatch"|"failed"|"skipped", listing: null | <plan view> },
     warnings: [string], audit_id }
@@ -139,9 +139,9 @@ Points the domain at the for-sale lander and/or sets its listing mode and prices
   | `ns` | string[] \| null | only with `custom`: 2–4 hostnames |
   | `display_name` | string \| null | same name, other ASCII capitalisation |
   | `dry_run` | bool? | validate and preview only |
-  | `approval_ref` | `{text, approved_at}` \| null | required only for an exception or an override |
+  | `approval_ref` | `{text, approved_at}` \| null | required only for an exception, an override, or an off-grade geo BIN (422 `APPROVAL_REQUIRED`) |
 
-  No price field means "nameservers/lander only". No `approval_ref` is needed for any change within the rules.
+  No price field means "nameservers/lander only". No `approval_ref` is needed for a change within the rules. A geo BIN that is within range but is neither the grade price nor the scheduled strong → weaker step is a sell decision: without a valid `approval_ref` → 422 `APPROVAL_REQUIRED`.
 - **Behaviour:** validates (order: `MODE_INVALID`, field checks, the listing rules, then `approval_ref` if sent), sets the nameservers through the registrar (compared as a set), checks public DNS, saves the plan, appends `listing_history`, creates or regenerates the `price_schedule` rows (the first listing anchors the drop clock) and flags the export as pending. Runs under the per-domain lock shared with `/buy`.
 - **200:**
   ```
@@ -151,7 +151,7 @@ Points the domain at the for-sale lander and/or sets its listing mode and prices
   ```
   `manual` = the registrar has no NS API for this domain (do it by hand; `manual_steps`). `pending` = the registrar accepted but is still applying (warning `NS_PENDING`). The daily DNS check confirms either.
 - **200 dry run:** `{dry_run: true, valid: true, domain, category, listing: null | <plan view>, lander, ns, preview: {afternic: row | null, sedo: row | null}, warnings}`. Nothing is written except the audit row.
-- **Plan view** (also in `/buy`): `{mode, category, price_grade, bin (pair), floor (pair), walkaway_cents, walkaway: "$… (private)", min_offer (pair), lto_max_months, pricing_source, settings_version, override: bool, schedule: [{event, due_on, bin?, floor?, walkaway?, status}], sell_plan_line: string | null}`. Events: `drop1_m6`, `drop2_m18`, `geo_drop_m12`, `final_push`, `delist`. Statuses: `planned`, `applied`, `skipped_at_minimum`, `skipped_no_change`, `skipped_disabled`, `superseded`, `superseded_by_final_push`, `cancelled`, `failed`.
+- **Plan view** (also in `/buy`): `{mode, category, price_grade, bin (pair), floor (pair), walkaway_cents, walkaway: "$… (private)", min_offer (pair), lto_max_months, pricing_source, settings_version, override: bool, schedule: [{event, due_on, bin?, floor?, walkaway?, status}] (schedule prices are whole-dollar display strings only, with no `_cents`; the walk-away there has no `(private)` suffix), sell_plan_line: string | null}`. Events: `drop1_m6`, `drop2_m18`, `geo_drop_m12`, `final_push`, `delist`. Statuses: `planned`, `applied`, `skipped_at_minimum`, `skipped_no_change`, `skipped_disabled`, `superseded`, `superseded_by_final_push`, `cancelled`, `failed`.
 - **Listing rule codes (422):** `MODE_INVALID`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `LISTING_PRICE_INVALID` (not a positive whole-dollar amount), `BIN_REQUIRED`, `BIN_MODE_NO_NEGOTIATION`, `OFFER_MODE_HAS_BIN`, `MIN_OFFER_REQUIRED`, `MIN_OFFER_TOO_LOW`, `FLOOR_BELOW_MIN_OFFER`, `WALKAWAY_NOT_ALLOWED`, `HYBRID_FIELDS_REQUIRED`, `BIN_NOT_NICE`, `BIN_BELOW_FLOOR_MIN`, `PRICING_FORMULA_MISMATCH` (details show the computed values), `HYBRID_PRICES_INVALID`, `FLOOR_BELOW_MIN`, `WALKAWAY_BELOW_MIN`, `MIN_OFFER_FIXED`, `LTO_NOT_ALLOWED`, `LTO_INVALID`, `GEO_MODE_NOT_ALLOWED`, `GEO_BIN_NOT_GRADE_PRICE`, `GEO_BIN_OUT_OF_RANGE` (manual geo change outside $299–$499), `MODE_NOT_ALLOWED_FOR_CATEGORY`, `OVERRIDE_NEEDS_APPROVAL`, `EXCEPTION_REASON_REQUIRED`, `APPROVAL_REQUIRED`, `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `HOLD_REASON_REQUIRED`, `REPLAN_NOTHING_LISTED`, `DROP_DATE_UNKNOWN`, `DISPLAY_NAME_MISMATCH`, `LANDER_RETIRED`, `LANDER_INVALID`, `NS_INVALID`.
 - **Listing warnings:** `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`.
 - **Other errors:** 404 `NOT_IN_PORTFOLIO` (not `owned`/`listed`) · 409 `API_ACCESS_DISABLED` (turn on API access for the domain at the registrar) · 409 `REGISTRAR_REJECTED` (`details.registrar_code`) · 503 `REGISTRAR_UNAVAILABLE` (nothing saved; the key is released) · 503 `DOMAIN_BUSY` (lock wait > 30 s) · 409 `LISTING_CHANGED_CONCURRENTLY` (retry with a new key) · 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED`.
@@ -169,14 +169,14 @@ The **full** Afternic bulk-upload file (every `listed` domain), for an **Update*
   - `X-Pending-Changes`: count of listed names changed since the snapshot of this venue's last confirmed upload (all listed names if none);
   - `X-Manual-Delist`: comma list of names sold, delisted or dropped since that snapshot, which must be removed by hand at the marketplace;
   - `X-Export-Warnings`: `;`-separated, e.g. `name.com:MIN_OFFER_BELOW_20` (row skipped), `DISPLAY_NAME_IGNORED:name.com`, `name.com:AFTERNIC_ROUNDS_DOWN`, `row:<i>:DOMAIN_NOT_ASCII`, `delist:<i>:DOMAIN_NOT_ASCII`.
-- Writes one `export_runs` row (id, snapshot time, names). Excludes rows with min offer < 20 (`MIN_OFFER_BELOW_20`, `NOT_LISTED`).
+- Writes one `export_runs` row (id, snapshot time, names). Excludes rows with min offer < 20 (`MIN_OFFER_BELOW_20`; only listed names are read, so `NOT_LISTED` never appears in `X-Export-Warnings`).
 
 ### `GET /export/sedo.csv`
 The full Sedo file, built from `templates/sedo_template.json`. Same query rule and headers as Afternic (warnings may include `name.com:SEDO_ROUNDS_DOWN`).
 - **501** `SEDO_TEMPLATE_MISSING` until the template exists; **501** `SEDO_TEMPLATE_INVALID` if it is malformed. The service never guesses Sedo's headers.
 
 ### `POST /export/{venue}/uploaded`
-Records that a bot uploaded that file on the marketplace site. WRITE. `venue` = `afternic` | `sedo` (else 404 `NOT_FOUND`).
+Records that a bot uploaded that file on the marketplace site. WRITE. `venue` = `afternic` | `sedo` (else 404 `NOT_FOUND`, after the auth and `Idempotency-Key` checks).
 - **Body:** `export_id: string` (required), `uploaded_at?: string` (ISO with offset; default now), `note?: string | null` (≤ 500 chars, no `@`), `approval_ref?: {text, approved_at} | null` (optional; when valid its time becomes `uploaded_at`; it need not name a domain).
 - **200:** `{venue, export_id, domains: int, uploaded_at: ISO, pending_after: int, still_pending: [domain]}`. Moves the venue's pending boundary to that file's snapshot time; for Afternic, clears `export_pending_since` for the file's names unchanged since the snapshot.
 - **Errors:** 404 `EXPORT_NOT_FOUND` (unknown id, or another venue's) · 409 `EXPORT_ALREADY_CONFIRMED` · 422 `UPLOADED_AT_INVALID` (malformed, in the future, or before the file) · 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` (also an approval older than the file) · 422 `NO_PII` · 503 `DOMAIN_BUSY`.
@@ -189,14 +189,14 @@ Every offer received is logged as a demand signal. Recording never contacts anyo
 ### `POST /offers`
 WRITE.
 - **Body:** `domain: string`, `amount_usd: string` ("450.00": > 0, ≤ 2 decimals), `source: string` (`afternic`, `godaddy`, `sedo`, `domainagents`, `email_inbound`, `outbound_reply`, `other`), `received_at: string` (ISO with offset, ≤ 5 min in the future); optional: `buyer_type` (`end_user`, `investor`, `broker`, `unknown`; default `unknown`), `buyer_ref`, `external_ref` (dedupe key per source; may be a Message-ID), `note`, `pricing_hold: bool | null` + `pricing_hold_reason` (pause the drop schedule; reason required), `approval_ref`. No `@` in `buyer_ref` or `note`.
-- **Classification** against the prices in force at `received_at`. `band`: `below_min`, `below_walkaway`, `mid_range`, `at_or_above_floor`, `at_or_above_bin`, `geo_below_bin`, `unpriced`. `routing`: `auto_decline` (outcome `declined_auto`), `dvir` (mid-range, and every email offer ≥ walk-away), `auto_accept` (≥ floor on afternic/godaddy), `accept_preapproved` (≥ floor elsewhere).
+- **Classification** against the prices in force at `received_at`. `band`: `below_min`, `below_walkaway`, `mid_range`, `at_or_above_floor`, `at_or_above_bin`, `geo_below_bin`, `unpriced`. `routing`: `auto_decline` (outcome `declined_auto`), `dvir` (mid-range, `unpriced` for a non-email source, and every email offer ≥ walk-away), `auto_accept` (≥ floor on afternic/godaddy), `accept_preapproved` (≥ floor elsewhere).
 - **201:** the offer view + `next_step: string` + `warnings: [string]` (`OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`).
 - **200 duplicate** (same `source` + `external_ref`, or without `external_ref` the same domain + amount + source + time): the existing offer view + `duplicate: true`; nothing written.
 - **Offer view:** `{id, domain, amount (pair), source, received_at, buyer_type, buyer_ref, external_ref, note, band, routing, outcome, outcome_at, outcome_note, snapshot: {bin (pair), floor (pair), walkaway_cents, walkaway: "… (private)", min_offer (pair)}, listing_history_id, recorded_by}`.
 - **Errors:** 404 `DOMAIN_NOT_FOUND` · 404 `NOT_IN_PORTFOLIO` (hold on a name that isn't owned/listed) · 422 `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `VALIDATION_ERROR` (bad `received_at`), `NO_PII`, `HOLD_REASON_REQUIRED`, `APPROVAL_INVALID`, `APPROVAL_EXPIRED` · 409 `EXTERNAL_REF_CONFLICT` (that `external_ref` belongs to another domain's offer) · 503 `DOMAIN_BUSY`.
 
 ### `POST /offers/{id}/outcome`
-WRITE. `id` = the offer id (digits; anything else → 404 `OFFER_NOT_FOUND`).
+WRITE. `id` = the offer id (digits; anything else → 404 `OFFER_NOT_FOUND`, but an invalid body is checked first and gives 422).
 - **Body:** `outcome: string` (`declined`, `countered`, `accepted`, `expired`, `withdrawn`, `sold`), `note?: string | null` (no `@`), `approval_ref?`.
 - **Rules:** `countered` / `accepted` on an offer whose routing isn't `auto_accept` / `accept_preapproved` **needs `approval_ref`** naming the domain (a sell decision). From `open` or `declined_auto` any outcome is allowed; `countered` → `countered`/`accepted`/`declined`/`expired`/`withdrawn`; `accepted` → `sold`/`withdrawn`; `declined`, `expired`, `withdrawn` and `sold` are final. `sold` needs the domain recorded as sold first (`/sold`, which can also set it via `offer_id`).
 - **200:** the offer view + `outcome_approval_text`.
@@ -284,7 +284,7 @@ READ. `{id, domain, strategy, status_note, created_at, approvals: [{audit_id, at
 ### `GET /audit`
 READ. Newest first.
 - **Query (strict):** `since` (ISO with offset), `limit` (1–500, default 100).
-- **200:** `{rows: [{id, at, token_id, scope: "read"|"write"|"job"|"admin"|null, method, path, idempotency_key, approval_text, approval_at, request (redacted JSON string), status_code, result_summary, client_ip}]}`. Job runs appear with scope `job` (`path` `/jobs/run`, or `job tick|daily` for a CLI run).
+- **200:** `{rows: [{id, at, token_id, scope: "read"|"write"|"job"|"admin"|null, method, path, idempotency_key, approval_text, approval_at, request (the redacted request as a JSON object, or null; not a string), status_code, result_summary, client_ip}]}`. Job runs appear with scope `job` (`path` `/jobs/run`, or `job tick|daily` for a CLI run).
 - **Errors:** 400 `VALIDATION_ERROR`.
 
 ---
@@ -301,7 +301,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Cross-cutting errors:** `UNAUTHORIZED`, `SCOPE_FORBIDDEN`, `RATE_LIMITED`, `IDEMPOTENCY_KEY_REQUIRED`, `IDEMPOTENCY_KEY_MISMATCH`, `IDEMPOTENCY_KEY_IN_USE`, `VALIDATION_ERROR`, `INVALID_BODY`, `INVALID_REQUEST`, `NOT_FOUND`, `INTERNAL`, `AUDIT_WRITE_FAILED`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `JOBS_DISABLED`, `DOMAIN_BUSY`, `PRICING_SETTINGS_MISSING`.
 
-**Buying errors:** `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
+**Buying errors:** `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
 
 **Listing errors:** the listing rule codes under `POST /list/{domain}`, plus `NOT_IN_PORTFOLIO`, `API_ACCESS_DISABLED`, `REGISTRAR_UNAVAILABLE`, `LISTING_CHANGED_CONCURRENTLY`, `DOMAIN_NOT_FOUND`.
 

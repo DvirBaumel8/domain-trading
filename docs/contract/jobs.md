@@ -3,7 +3,7 @@
 The service runs **no timers of its own**. All scheduled work goes through one route, called by a Cloudflare Worker cron (`jobs-trigger/`). Bots don't call it; they see the results in `GET /audit` and `GET /report`.
 
 ## `POST /jobs/run`
-- **Auth:** `Authorization: Bearer <JOB_TRIGGER_TOKEN>` only. READ and WRITE bot tokens are refused (401), and the job token works on no other route (401). If the server has no job token configured → **503** `JOBS_DISABLED`.
+- **Auth:** `Authorization: Bearer <JOB_TRIGGER_TOKEN>` only. READ and WRITE bot tokens are refused (401), and the job token works on no other route (401). If the server has no job token configured → **503** `JOBS_DISABLED` (for any POST to this route, even without a token).
 - **Headers:** `Idempotency-Key` required (the Worker sends `<job>-<scheduled time in ms>`). Same key + same body → the stored response is replayed and the job doesn't run again.
 - **Body (strict):** `{"job": "tick"}` or `{"job": "daily"}`. Anything else → **422** `VALIDATION_ERROR`.
 - **200** (even when a step failed):
@@ -12,7 +12,7 @@ The service runs **no timers of its own**. All scheduled work goes through one r
     steps: { <step>: { ok: bool, skipped?: true, error?: string, summary: object|null } } }
   ```
   - `skipped: true` with `steps: {}`: the same job was already running in this instance.
-  - Each step is isolated: a failing step (`ok: false`, `error` = a message of at most 200 characters with secrets redacted) doesn't stop the next one. A step that had nothing to do, or was already running, has `skipped: true`.
+  - Each step is isolated: a failing step (`ok: false`, `error` = a message of at most 200 characters with secrets redacted) doesn't stop the next one. A step has `skipped: true` only when its own summary says so (already running, not due, or backup not configured). A step with nothing to do (an empty price or drop job) returns `ok: true` without `skipped`.
   - `summary` is the step's own result object (counts and names, see below). Its fields are informational, not part of the contract.
 - **Audit:** one `audit_log` row with scope `job` and a summary such as `tick: ok`, `daily: failed backupExport` or `daily: skipped`.
 - **Rate limit:** 10 calls per minute for the job token.
