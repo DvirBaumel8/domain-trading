@@ -70,7 +70,7 @@ export const concentrationCheck: Check = {
       if (b.length >= cap) return fail('CONCENTRATION_KEYWORD', 'keyword', kw, b);
     }
     if (isGeo && ctx.run.trancheId) {
-      const inTranche = await geoMembers(ctx.db, ctx.run.trancheId);
+      const inTranche = await geoMembers(ctx.db, ctx.run.trancheId, ctx.item.domain);
       const aheadGeo = ahead.filter((a) => a.item.lane === 'S2').map((a) => a.item.domain);
       if (inTranche + aheadGeo.length >= ctx.settings.tranche.geo_max) {
         return outcome('FAIL', 'GEO_CAP', `The tranche already has ${inTranche + aheadGeo.length} geo name(s) (geo_max ${ctx.settings.tranche.geo_max})`,

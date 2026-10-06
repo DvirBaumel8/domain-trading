@@ -460,7 +460,7 @@ export interface TrancheMembersTable {
   domain: string;
   lane: string;
   is_geo: boolean;
-  main_lane: boolean | null;
+  main_lane: boolean;
   est_cost_cents: number | null;
   run_id: string;
   added_at: TimestampDefault;

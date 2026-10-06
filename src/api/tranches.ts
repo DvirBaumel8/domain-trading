@@ -18,20 +18,28 @@ const CloseBody = z.object({ allow_below_target: z.boolean().optional(), reason:
 
 export function registerTranches(app: FastifyInstance, deps: TrancheApiDeps): void {
   const svc = new TrancheService(deps.db);
+  /** USD inputs are bounded by the POC cap (a larger figure is never meaningful and must not reach an integer column). */
+  const cents = async (v: number | undefined, field: string): Promise<number | null> => {
+    if (v === undefined) return null;
+    const c = dollarsToCents(v);
+    const cap = (await deps.db.selectFrom('settings').select('poc_cap_cents').executeTakeFirstOrThrow()).poc_cap_cents;
+    if (c > cap) throw new AppError(422, 'VALIDATION_ERROR', `${field} may not exceed the POC cap`, { field, cap_cents: cap });
+    return c;
+  };
   const actor = (req: { auth?: { name: string } | null; auditId?: string | null }) => ({ by: req.auth!.name, auditId: req.auditId ?? '', now: new Date(deps.now()) });
 
   app.get('/tranches', async () => svc.list());
 
   app.post('/tranches', async (req, reply) => {
     const b = OpenBody.parse(req.body ?? {});
-    return reply.code(201).send(await svc.open(b.name, b.spend_cap === undefined ? null : dollarsToCents(b.spend_cap), actor(req)));
+    return reply.code(201).send(await svc.open(b.name, await cents(b.spend_cap, 'spend_cap'), actor(req)));
   });
 
   app.post<{ Params: { id: string } }>('/tranches/:id/members', async (req) => {
     const b = MemberBody.parse(req.body ?? {});
     if (b.action === 'remove') return svc.removeMember(req.params.id, b.domain, actor(req));
     if (!b.run_id) throw new AppError(422, 'VALIDATION_ERROR', 'run_id is required to add a name');
-    const r = await svc.addMember(req.params.id, b.domain, b.run_id, b.est_cost === undefined ? null : dollarsToCents(b.est_cost), actor(req));
+    const r = await svc.addMember(req.params.id, b.domain, b.run_id, await cents(b.est_cost, 'est_cost'), actor(req));
     return { ...r.tranche, duplicate: r.duplicate };
   });
 

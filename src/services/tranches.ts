@@ -7,7 +7,7 @@ import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { formatUsd } from '../money.js';
 import { latestByCheck } from '../screening/derive.js';
-import { assemble, effectiveHold, toResultRow } from '../screening/engine.js';
+import { assemble, effectiveHold, planFor, toResultRow } from '../screening/engine.js';
 import { activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
 import type { CheckId, Lane, RunItem } from '../screening/types.js';
 import { geoMembers, openTrancheFor } from './tranche-members.js';
@@ -21,11 +21,10 @@ const OK_STATUS = ['would_buy', 'buy_candidate', 'pending_manual'];
 
 export { geoMembers, openTrancheFor };
 
-interface Counts { members: number; geo: number; main_lane: number; non_main: number; unknown_main_lane: number }
+interface Counts { members: number; geo: number; main_lane: number; non_main: number }
 function counts(ms: Mem[]): Counts {
   const main = ms.filter((m) => m.main_lane === true).length;
-  const unknown = ms.filter((m) => m.main_lane === null).length;
-  return { members: ms.length, geo: ms.filter((m) => m.is_geo).length, main_lane: main, non_main: ms.length - main - unknown, unknown_main_lane: unknown };
+  return { members: ms.length, geo: ms.filter((m) => m.is_geo).length, main_lane: main, non_main: ms.length - main };
 }
 
 /** Main-lane share needed for `n` members: `min_main_lane` of `size`, rounded up (a full 15 needs 10; 3 members need 2). */
@@ -42,21 +41,18 @@ export class TrancheService {
     return t;
   }
 
-  async view(db: Kysely<Database>, t: Trn, withRemoved = false): Promise<Record<string, unknown>> {
-    let q = db.selectFrom('tranche_members').selectAll().where('tranche_id', '=', t.id).orderBy('id');
-    if (!withRemoved) q = q.where('removed_at', 'is', null);
-    const ms = await q.execute();
-    const active = ms.filter((m) => m.removed_at === null);
-    const c = counts(active);
-    const committed = active.reduce((s, m) => s + (m.est_cost_cents ?? 0), 0);
+  async view(db: Kysely<Database>, t: Trn): Promise<Record<string, unknown>> {
+    const ms = await db.selectFrom('tranche_members').selectAll().where('tranche_id', '=', t.id).where('removed_at', 'is', null).orderBy('id').execute();
+    const c = counts(ms);
+    const committed = ms.reduce((s, m) => s + (m.est_cost_cents ?? 0), 0);
     return {
       id: t.id, name: t.name, status: t.status, opened_at: iso(t.opened_at), opened_by: t.opened_by, closed_at: iso(t.closed_at), closed_by: t.closed_by,
-      settings_version: t.settings_label,
+      opened_under: t.settings_label,
       spend_cap_cents: t.spend_cap_cents, spend_cap: t.spend_cap_cents === null ? null : formatUsd(t.spend_cap_cents),
       committed_cents: committed, committed: formatUsd(committed),
       members: ms.map((m) => ({
         domain: m.domain, lane: m.lane, is_geo: m.is_geo, main_lane: m.main_lane, run_id: m.run_id, added_at: iso(m.added_at),
-        est_cost_cents: m.est_cost_cents, ...(withRemoved && { removed_at: iso(m.removed_at) }),
+        est_cost_cents: m.est_cost_cents,
       })),
       counts: c, close_report: t.close_report,
     };
@@ -91,12 +87,18 @@ export class TrancheService {
   }
 
   /** The name's standing in `runId`: derived status, lane and whether it counts for the main-lane quota (null = cannot be told). */
-  private async standing(runId: string, domain: string): Promise<{ lane: Lane; mainLane: boolean | null }> {
+  private async standing(runId: string, domain: string): Promise<{ lane: Lane; mainLane: boolean }> {
     const { db } = this;
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', runId).executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${runId}"`);
     if (run.backtest) throw new AppError(409, 'NOT_SCREENED_OK', 'A backtest run never makes a name eligible', { run_id: runId, reason: 'BACKTEST' });
     const sel = await selectionSettingsByLabel(db, run.settings_label);
+    // A run with a cut plan (a `checks` subset, or any lane plan narrower than the settings' full plan) never admits a name.
+    const gp = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
+    const cut = Object.entries(gp).some(([lane, plan]) => JSON.stringify(plan) !== JSON.stringify(planFor(sel!.values, lane as Lane)));
+    if (cut || (run.input as { checks?: unknown }).checks !== undefined) {
+      throw new AppError(409, 'NOT_SCREENED_OK', 'The run used a cut plan (checks subset); only a full-plan run admits a name', { run_id: runId, reason: 'PARTIAL_PLAN' });
+    }
     const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
     const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values,
       await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
@@ -109,14 +111,11 @@ export class TrancheService {
     const latest = latestByCheck(it.rows);
     const lane = it.item.lane;
     const pass = (s?: string) => s === 'PASS' || s === 'PASS_WITH_NOTE';
-    let mainLane: boolean | null = false;
+    let mainLane = false;
     if (lane === 'S7') {
       const h = latest.get('history');
-      if (!h || !pass(h.status)) mainLane = false;
-      else {
-        const sl = h.fields.source_lane;
-        mainLane = sl === 'expired_drop' ? true : sl === 'fresh' ? false : null; // unknown while the archive source is off
-      }
+      // Only a passing history with an inferred expired_drop source lane counts; `fresh` and `unknown` (source off) do not.
+      mainLane = !!h && pass(h.status) && h.fields.source_lane === 'expired_drop';
     } else if (lane === 'S3') {
       mainLane = latest.get('tier')?.status === 'PASS';
     }
@@ -133,11 +132,11 @@ export class TrancheService {
     const st = await this.standing(runId, domain);
     const sel = await activeSelectionSettings(this.db);
     const { size, geo_max } = sel.values.tranche;
-    await this.db.transaction().execute(async (trx) => {
+    const duplicate = await this.db.transaction().execute(async (trx) => {
       const t = await this.load(trx, id, true);
       if (t.status === 'closed') throw new AppError(409, 'TRANCHE_CLOSED', 'A closed tranche is read-only');
       const ms = await trx.selectFrom('tranche_members').selectAll().where('tranche_id', '=', id).where('removed_at', 'is', null).execute();
-      if (ms.some((m) => m.domain === domain)) return;
+      if (ms.some((m) => m.domain === domain)) return true;
       if (ms.length >= size) throw new AppError(409, 'TRANCHE_FULL', `The tranche already has ${ms.length} names (size ${size})`, { size, members: ms.length });
       const isGeo = st.lane === 'S2';
       const geo = ms.filter((m) => m.is_geo).length;
@@ -153,8 +152,9 @@ export class TrancheService {
       await trx.insertInto('tranche_members').values({
         tranche_id: id, domain, lane: st.lane, is_geo: isGeo, main_lane: st.mainLane, est_cost_cents: estCostCents, run_id: runId, added_at: a.now, added_by: a.by,
       }).execute();
+      return false;
     });
-    return { duplicate: false, tranche: await this.get(id) };
+    return { duplicate, tranche: await this.get(id) };
   }
 
   async removeMember(id: string, domainIn: string, a: Actor): Promise<Record<string, unknown>> {
@@ -171,9 +171,10 @@ export class TrancheService {
   }
 
   /**
-   * Close (read-only from then on). A tranche may close below its target only with `allow_below_target` and a reason. The main-lane
-   * share rule applies to the members present: at least ceil(members x min_main_lane / size). When the share cannot be told (S7 names
-   * whose source lane is unknown) the close needs a reason too, and the report says so.
+   * Close (read-only from then on, in the service and in the database). A tranche may close below its target only with
+   * `allow_below_target` and a `reason`. The main-lane share rule applies to the members present: at least ceil(members x
+   * min_main_lane / size) main-lane members, with no waiver. A name whose main-lane standing cannot be told (S7, source lane unknown)
+   * is not main-lane.
    */
   async close(id: string, o: { allowBelowTarget: boolean; reason: string | null }, a: Actor): Promise<Record<string, unknown>> {
     const sel = await activeSelectionSettings(this.db);
@@ -189,22 +190,13 @@ export class TrancheService {
         throw new AppError(409, 'TRANCHE_BELOW_TARGET', `The tranche has ${c.members} of ${size} names; closing below target needs allow_below_target and a reason`, { size, members: c.members });
       }
       const required = requiredMainLane(c.members, size, min_main_lane);
-      let quota: 'MET' | 'UNKNOWN_ACCEPTED' = 'MET';
       if (c.main_lane < required) {
-        if (c.main_lane + c.unknown_main_lane < required) {
-          throw new AppError(409, 'MAIN_LANE_QUOTA', `${c.main_lane} of ${c.members} names are main-lane; at least ${required} are needed (${min_main_lane} of ${size})`,
-            { required_main_lane: required, ...c, status: 'FAIL' });
-        }
-        if (!o.reason) {
-          throw new AppError(409, 'MAIN_LANE_QUOTA', `The main-lane share cannot be told for ${c.unknown_main_lane} name(s) (source lane unknown); close with a reason to accept it`,
-            { required_main_lane: required, ...c, status: 'UNKNOWN' });
-        }
-        quota = 'UNKNOWN_ACCEPTED';
+        throw new AppError(409, 'MAIN_LANE_QUOTA', `${c.main_lane} of ${c.members} names are main-lane; at least ${required} are needed (${min_main_lane} of ${size})`,
+          { required_main_lane: required, ...c });
       }
       const report = {
         target_size: size, members: c.members, below_target: below, reason: o.reason, geo: c.geo, geo_max, main_lane: c.main_lane, non_main: c.non_main,
-        unknown_main_lane: c.unknown_main_lane, required_main_lane: required, min_main_lane, main_lane_quota: quota, settings_version: sel.label,
-        closed_with: o.allowBelowTarget ? 'allow_below_target' : 'plain',
+        required_main_lane: required, min_main_lane, settings_version_used: sel.label, closed_with: o.allowBelowTarget ? 'allow_below_target' : 'plain',
         domains: ms.map((m) => m.domain),
       };
       await trx.updateTable('tranches').set({ status: 'closed', closed_at: a.now, closed_by: a.by, close_report: JSON.stringify(report) }).where('id', '=', id).execute();

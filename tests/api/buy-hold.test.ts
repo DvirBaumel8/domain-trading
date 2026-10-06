@@ -41,7 +41,7 @@ describe('/buy BUY_HOLD (v1.1.0, additive)', () => {
     expect(res.json()).toMatchObject({ dry_run: true, would_be_blocked: 'BUY_HOLD' });
   });
 
-  it('a name never screened: /buy behaves as before (no BUY_HOLD, no would_be_blocked), with or without a tranche', async () => {
+  it('a name never screened: /buy behaves as before (no BUY_HOLD, no would_be_blocked, no tranche needed)', async () => {
     const { x, pb } = await setup();
     const dry = await buy(x, buyBody({ dry_run: true }));
     expect(dry.statusCode).toBe(200);
@@ -51,9 +51,66 @@ describe('/buy BUY_HOLD (v1.1.0, additive)', () => {
     expect(pb.realRegisterCalls).toBe(1);
   });
 
-  it('a screening of a different name does not hold this one', async () => {
+  it('a screening of a different name does not hold this name', async () => {
     const { x } = await setup();
     await x.runDone({ checks: ['form'], names: [{ domain: 'tampapoolsco.com', lane: 'S3' }] });
+    expect((await buy(x, buyBody())).statusCode).toBe(201);
+  });
+
+  it('a later backtest run of the name still holds it (a backtest counts as held)', async () => {
+    const { x } = await setup();
+    await x.runDone({ checks: ['form'], names: [{ domain: DOMAIN, lane: 'S3' }] });
+    await x.post('/selection/settings', { label: 'bt', set: { 'tranche.size': 12 } });
+    const bt = await x.runDone({ checks: ['form'], mode: 'full', settings: 'bt', names: [{ domain: DOMAIN, lane: 'S3' }] });
+    expect(bt.body.backtest).toBe(true);
+    const res = await buy(x, buyBody());
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatchObject({ code: 'BUY_HOLD', details: { run_id: bt.id } });
+  });
+
+  it('a run under a version that is no longer active still holds', async () => {
+    const { x, pb } = await setup();
+    const { id } = await x.runDone({ checks: ['form'], names: [{ domain: DOMAIN, lane: 'S3' }] });
+    await x.post('/selection/settings', { label: 'v1b', set: { 'tranche.size': 12 } });
+    const act = await x.post('/selection/settings/v1b/activate', { approval_ref: { text: 'Dvir: activate v1b', approved_at: new Date(T0 - 3_600_000).toISOString() } });
+    expect(act.statusCode).toBe(200);
+    const res = await buy(x, buyBody());
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatchObject({ code: 'BUY_HOLD', details: { run_id: id, settings_version: 'v1' } });
+    expect(pb.calls).toEqual([]);
+  });
+
+  it('a mixed-case domain against a screened name is held', async () => {
+    const { x } = await setup();
+    await x.runDone({ checks: ['form'], names: [{ domain: DOMAIN, lane: 'S3' }] });
+    const mixed = 'ExampleCityRoofing.COM';
+    const res = await buy(x, buyBody({ domain: mixed, approval_ref: { text: `yes buy ${mixed} up to $11.50`, approved_at: new Date(T0 - 3_600_000).toISOString() } }));
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe('BUY_HOLD');
+  });
+
+  it('a run that lists the name but has written no result yet holds it', async () => {
+    const { x } = await setup();
+    const t = Date.now();
+    const sel = await db.selectFrom('selection_settings').select(['id', 'label']).where('label', '=', 'v1').executeTakeFirstOrThrow();
+    await db.insertInto('screening_runs').values({
+      id: 'run_pending', created_by: 't', mode: 'live', backtest: false, settings_id: sel.id, settings_label: 'v1', buy_hold: true, tranche_id: null,
+      input: JSON.stringify({ names: [{ idx: 0, domain: DOMAIN, lane: 'S3', leads_ab: 0 }] }), gate_plan: JSON.stringify({ S3: ['form'] }), list_versions: '{}',
+      status: 'running', deadline_at: new Date(t + 3_600_000),
+    }).execute();
+    const res = await buy(x, buyBody());
+    expect(res.json().error).toMatchObject({ code: 'BUY_HOLD', details: { run_id: 'run_pending' } });
+  });
+
+  it('a run under a version with the hold off does not hold the name', async () => {
+    const { x } = await setup();
+    const v1 = await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow();
+    await db.insertInto('selection_settings').values({
+      values: JSON.stringify({ ...(v1.values as object), buy_hold: false }), created_by: 't', activated_by: 't', activation_approval_text: 'a',
+      activation_approval_at: new Date(), activated_at: new Date(), label: 'vh', activation_seq: 2,
+    }).execute();
+    const r = await x.runDone({ checks: ['form'], names: [{ domain: DOMAIN, lane: 'S3' }] });
+    expect(r.body).toMatchObject({ settings_version: 'vh', buy_hold: false });
     expect((await buy(x, buyBody())).statusCode).toBe(201);
   });
 });

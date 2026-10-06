@@ -8,8 +8,10 @@ export async function openTrancheFor(db: Kysely<Database>, domain: string): Prom
   return r ? { trancheId: r.id } : null;
 }
 
-export async function geoMembers(db: Kysely<Database>, trancheId: string): Promise<number> {
-  const r = await db.selectFrom('tranche_members').select((eb) => eb.fn.countAll<string>().as('n'))
-    .where('tranche_id', '=', trancheId).where('is_geo', '=', true).where('removed_at', 'is', null).executeTakeFirstOrThrow();
+export async function geoMembers(db: Kysely<Database>, trancheId: string, excludeDomain?: string): Promise<number> {
+  let q = db.selectFrom('tranche_members').select((eb) => eb.fn.countAll<string>().as('n'))
+    .where('tranche_id', '=', trancheId).where('is_geo', '=', true).where('removed_at', 'is', null);
+  if (excludeDomain !== undefined) q = q.where('domain', '!=', excludeDomain); // the item itself, if it is already a member
+  const r = await q.executeTakeFirstOrThrow();
   return Number(r.n);
 }
