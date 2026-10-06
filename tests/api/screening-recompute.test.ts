@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { DEPENDS_ON, GATE_OF } from '../../src/screening/checks/index.js';
-import { planFor, recomputePending, reopenRun, staleChecks } from '../../src/screening/engine.js';
+import { planFor, recomputePending, reopenRun, staleChecks, toResultRow } from '../../src/screening/engine.js';
 import { outcome, type Check, type CheckId, type ResultRow } from '../../src/screening/types.js';
 import { currentLists } from '../../src/screening/lists.js';
 import { testDb as db } from '../helpers/db.js';
@@ -127,10 +127,12 @@ describe('same-run recompute after a manual history record', () => {
 
   it('two history records back to back with a poll in between: one auto row per (check, generation), status ends done, nothing stale left', async () => {
     const { x, id } = await setup();
-    expect((await x.post(`/screening/runs/${id}/manual`, historyPass(x))).json().recompute).toBe(true);
+    const [r1, r2] = await Promise.all([
+      x.post(`/screening/runs/${id}/manual`, historyPass(x)),
+      x.post(`/screening/runs/${id}/manual`, historyPass(x, { first_capture_year: 2016, last_capture_year: 2020, evidence_urls: [URL1] })),
+    ]); // truly concurrent: the run row lock serialises them, the worker is kicked by both
+    expect([r1.statusCode, r2.statusCode]).toEqual([201, 201]);
     await x.get(`/screening/runs/${id}`); // a poll while the worker may be running
-    const r2 = await x.post(`/screening/runs/${id}/manual`, historyPass(x, { first_capture_year: 2016, last_capture_year: 2020, evidence_urls: [URL1] }));
-    expect(r2.statusCode).toBe(201);
     await x.app.screeningWorker.runToEnd(id);
     await x.app.screeningWorker.runToEnd(id);
     expect(await statusOf(id)).toBe('done');
@@ -142,8 +144,7 @@ describe('same-run recompute after a manual history record', () => {
     expect(t.length).toBeLessThanOrEqual(3);
     const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', id).orderBy('id').execute());
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
-    const asRows = rows.map((r) => ({ id: Number(r.id), item_idx: r.item_idx, check_id: r.check_id, source: r.source, status: r.status } as ResultRow));
-    expect(recomputePending((run.input as any).names, run.gate_plan as any, asRows, [], true)).toBe(false);
+    expect(recomputePending((run.input as any).names, run.gate_plan as any, rows.map(toResultRow), [], true)).toBe(false);
   });
 
   it('a record on a name whose dependents are not in its plan: recompute false, status unchanged', async () => {
@@ -162,6 +163,62 @@ describe('same-run recompute after a manual history record', () => {
     await x.app.screeningWorker.runToEnd(id);
     expect(await statusOf(id)).toBe('done');
     expect((await rowsOf(id, 'tier')).length).toBe(2);
+  });
+
+  it('lost update: a history record committed while a dependent is running (between load and its insert) is recomputed against, and the name ends on it', async () => {
+    const { x, id } = await setup('ext_dates', { history: 'MANUAL_REQUIRED' });
+    await db.updateTable('screening_runs').set({ status: 'running', finished_at: null }).where('id', '=', id).execute();
+    const real = x.app.screeningWorker.checks.tier!;
+    let posted = false;
+    x.app.screeningWorker.checks.tier = { ...real, async run(ctx) {
+      const o = await real.run(ctx); // computed from the history the worker read: none yet
+      if (!posted) { posted = true; expect((await x.post(`/screening/runs/${id}/manual`, historyPass(x))).statusCode).toBe(201); }
+      return o;
+    } };
+    await x.app.screeningWorker.runToEnd(id);
+    await x.app.screeningWorker.runToEnd(id);
+    expect(await statusOf(id)).toBe('done');
+    const t = await rowsOf(id, 'tier');
+    expect(t.map((r) => r.status)).toEqual(['UNKNOWN', 'PASS']);
+    expect(Number(t[1]!.generation)).toBeGreaterThan(Number(t[0]!.generation));
+    expect(await rowsOf(id, 'price')).toHaveLength(1);
+    expect((await x.get(`/screening/runs/${id}`)).json().names[0].final_status).toBe('would_buy');
+  });
+
+  it('a time-out during a recompute turns the stale dependents UNKNOWN TIMEOUT: the name is neither would_buy nor buy_candidate', async () => {
+    const { x, id } = await setup();
+    const real = x.app.screeningWorker.checks.ext_dates!;
+    x.app.screeningWorker.checks.ext_dates = { ...real, async run(ctx) { const o = await real.run(ctx); x.clock.t += 31 * 60_000; return o; } };
+    expect((await x.post(`/screening/runs/${id}/manual`, historyPass(x))).json().recompute).toBe(true);
+    await x.app.screeningWorker.runToEnd(id);
+    const body = (await x.get(`/screening/runs/${id}`)).json();
+    expect(body.status).toBe('partial');
+    const t = (await rowsOf(id, 'tier')).at(-1)!;
+    expect([t.status, t.reason_code]).toEqual(['UNKNOWN', 'TIMEOUT']);
+    expect(body.names[0].final_status).toBe('unknown');
+    expect(body.ranking).toEqual([]);
+  });
+
+  it('a stale row counts as missing for readers: running while the run runs, unknown once it ended', async () => {
+    const { x, id } = await setup('price', {});
+    // A manual history record lands (inserted directly: no worker is started) after tier and price were computed without it.
+    await db.insertInto('screening_results').values({
+      run_id: id, item_idx: 0, domain: DOMAIN, lane: 'S7', check_id: 'history', gate: 'G6', rule_ids: ['X'], status: 'PASS', reason_code: null, reason: null,
+      fields: JSON.stringify({ prior_history: 1, manual: true }), checked_at: new Date(), settings_label: 'v1', list_versions: '{}', duration_ms: 0, upstream_calls: 0, source: 'manual', recorded_by: 'gavriel',
+    }).execute();
+    const view = async () => (await x.get(`/screening/runs/${id}`)).json();
+    expect((await view()).names[0].final_status).toBe('unknown'); // finished: the stale checks are missing
+    expect((await view()).ranking).toEqual([]);
+    await db.updateTable('screening_runs').set({ status: 'running', finished_at: null, heartbeat_at: new Date(x.clock.t) }).where('id', '=', id).execute();
+    expect((await view()).names[0].final_status).toBe('running');
+  });
+
+  it('a tranche refuses a run that is still running (also one reopened for a recompute)', async () => {
+    const { x, id } = await setup('price', {});
+    await db.updateTable('screening_runs').set({ status: 'running', finished_at: null, heartbeat_at: new Date(x.clock.t) }).where('id', '=', id).execute();
+    const t = (await x.post('/tranches', { name: `T-${randomUUID().slice(0, 6)}` })).json().id as string;
+    const r = await x.post(`/tranches/${t}/members`, { action: 'add', domain: DOMAIN, run_id: id });
+    expect([r.statusCode, r.json().error.code, r.json().error.details.reason]).toEqual([409, 'NOT_SCREENED_OK', 'RUNNING']);
   });
 
   it('reopenRun only reopens a finished run, with a fresh deadline', async () => {

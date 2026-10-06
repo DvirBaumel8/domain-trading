@@ -65,6 +65,8 @@ export interface ResultRow {
   evidence_ids: number[];
   source: 'auto' | 'cache' | 'manual';
   cached_from: number | null;
+  /** Newest dependency row id this automatic row was computed from (0: none recorded; staleness then falls back to the row's own id). */
+  generation?: number;
   recorded_by: string | null;
 }
 

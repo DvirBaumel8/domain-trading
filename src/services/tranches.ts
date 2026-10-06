@@ -92,6 +92,8 @@ export class TrancheService {
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', runId).executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${runId}"`);
     if (run.backtest) throw new AppError(409, 'NOT_SCREENED_OK', 'A backtest run never makes a name eligible', { run_id: runId, reason: 'BACKTEST' });
+    // A run that is still working (also reopened for a recompute) has no settled answer for any name.
+    if (run.status === 'running') throw new AppError(409, 'NOT_SCREENED_OK', 'The run is still running; wait until it has finished', { run_id: runId, reason: 'RUNNING' });
     const sel = await selectionSettingsByLabel(db, run.settings_label);
     // A run with a cut plan (a `checks` subset, or any lane plan narrower than the settings' full plan) never admits a name.
     const gp = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
@@ -101,7 +103,7 @@ export class TrancheService {
     }
     const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
     const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values,
-      await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
+      await effectiveHold(db, run), true, run.mode === 'live'); // not running (refused above)
     const it = a.items.find((i) => i.item.domain === domain && !i.item.input_error);
     if (!it) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${domain}" is not a screened name of run ${runId}`);
     // CR-002 Amendment B5.2: a name whose history is still waiting for the human HIST-2 record never joins (it is not rejected, so say what is missing).

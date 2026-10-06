@@ -35,26 +35,31 @@ export function toResultRow(r: Row): ResultRow {
     rule_ids: r.rule_ids, status: r.status, reason_code: r.reason_code, reason: r.reason, fields: r.fields as Record<string, unknown>,
     data_as_of: r.data_as_of, checked_at: r.checked_at, settings_label: r.settings_label, list_versions: r.list_versions as Record<string, number>,
     duration_ms: r.duration_ms, upstream_calls: r.upstream_calls, evidence_ids: (r.evidence_ids ?? []).map(Number), source: r.source,
-    cached_from: r.cached_from === null ? null : Number(r.cached_from), recorded_by: r.recorded_by,
+    cached_from: r.cached_from === null ? null : Number(r.cached_from), generation: Number(r.generation), recorded_by: r.recorded_by,
   };
 }
 
 /**
- * Checks of `plan` whose in-force row is stale: an automatic or cached row (never a manual one) that some dependency (DEPENDS_ON) has
- * outdated, i.e. the dependency's in-force row is newer (higher id), or the dependency is itself stale. Walks the plan in order.
+ * Checks of `plan` whose in-force row is stale: an automatic or cached row (never a manual one) computed from an older dependency row
+ * than the one in force now (the dependency's id is above the row's recorded `generation`; a row with none recorded falls back to its own
+ * id), or whose dependency is itself stale. Walks the plan in order.
  */
+const inPlan = (c: CheckId, plan: CheckId[]): CheckId[] => (DEPENDS_ON[c] ?? []).filter((d) => plan.includes(d));
+
 export function staleChecks(latest: Map<CheckId, ResultRow>, plan: CheckId[]): Set<CheckId> {
   const stale = new Set<CheckId>();
   for (const c of plan) {
     const own = latest.get(c);
     if (!own || own.source === 'manual') continue;
-    if ((DEPENDS_ON[c] ?? []).some((d) => stale.has(d) || (latest.get(d)?.id ?? 0) > own.id)) stale.add(c);
+    const basis = own.generation || own.id;
+    // Only dependencies the plan runs count: a record of a check this lane does not read changes nothing here.
+    if (inPlan(c, plan).some((d) => stale.has(d) || (latest.get(d)?.id ?? 0) > basis)) stale.add(c);
   }
   return stale;
 }
 
 /** The newest in-force dependency row id a recompute of `c` reads: its `generation` (one automatic row per generation). */
-const generationOf = (latest: Map<CheckId, ResultRow>, c: CheckId): number => Math.max(0, ...(DEPENDS_ON[c] ?? []).map((d) => latest.get(d)?.id ?? 0));
+const generationOf = (latest: Map<CheckId, ResultRow>, c: CheckId, plan: CheckId[]): number => Math.max(0, ...inPlan(c, plan).map((d) => latest.get(d)?.id ?? 0));
 
 /**
  * Whether a recompute would run for this run: some name has a stale check in its plan and is not stopped by a gating FAIL/UNKNOWN
@@ -196,7 +201,11 @@ export function assemble(
   let done = 0;
   const out: AssembledItem[] = items.map((item) => {
     const p = plan[item.lane] ?? [];
-    const rs = byItem.get(item.idx) ?? [];
+    // A stale row counts as missing for every reader (status, funnel, progress, the GET view, tranche admission) until its recompute lands.
+    const all = byItem.get(item.idx) ?? [];
+    const stale = item.input_error ? new Set<CheckId>() : staleChecks(latestByCheck(all), p);
+    const rs = stale.size === 0 ? all : all.filter((r) => !stale.has(r.check_id));
+    if (stale.size > 0) byItem.set(item.idx, rs);
     const derived = deriveItem(rs, p, features, buyHold, runDone, live);
     if (!item.input_error) {
       planned += p.length;
@@ -344,13 +353,17 @@ export class ScreeningWorker {
     for (const [idx, rs] of by) latest.set(idx, latestByCheck(rs));
     for (const it of (run.input as { names: RunItem[] }).names) {
       if (it.input_error) continue;
-      const have = latest.get(it.idx) ?? new Map<CheckId, ResultRow>();
+      const all = latest.get(it.idx) ?? new Map<CheckId, ResultRow>();
       const p = plan[it.lane] ?? [];
+      // A stale row is as good as missing (as in load()): it gets the UNKNOWN row too, so no name ends on a pre-record PASS.
+      const have = new Map(all);
+      for (const c of staleChecks(all, p)) have.delete(c);
       const stopped = run.mode === 'live' && p.some((c) => !features.includes(c) && ['FAIL', 'UNKNOWN'].includes(have.get(c)?.status ?? ''));
       if (stopped) continue;
       for (const c of p) {
         if (have.has(c)) continue;
-        await this.insertRow(run, it, c, outcome('UNKNOWN', code, reason), { source: 'auto', durationMs: 0, checkedAt: new Date(this.deps.now()), listVersions: {} });
+        const row = await this.insertRow(run, it, c, outcome('UNKNOWN', code, reason), { source: 'auto', durationMs: 0, checkedAt: new Date(this.deps.now()), listVersions: {}, generation: generationOf(all, c, p) });
+        if (row) { all.set(c, row); have.set(c, row); } // later checks of the name record this row as their input
       }
     }
     await this.finalize(run, 'partial');
@@ -434,7 +447,7 @@ export class ScreeningWorker {
         const t0 = this.deps.now();
         let wrote: boolean;
         const isStale = staleByItem.get(it.idx)?.has(checkId) === true;
-        const generation = isStale ? generationOf(latestOf(it.idx), checkId) : 0;
+        const generation = generationOf(latestOf(it.idx), checkId, plan[it.lane] ?? []); // the dependency rows as read now, recorded on every automatic row
         if (!check) {
           wrote = await write(it, checkId, outcome('NOT_RUN', 'NOT_IMPLEMENTED', `The ${checkId} check is not built yet`), { source: 'auto', durationMs: 0, checkedAt: new Date(t0), listVersions: {}, generation });
         } else {
@@ -442,7 +455,7 @@ export class ScreeningWorker {
           const hit = isStale ? null : await this.cached(run, values, it, checkId, lv); // a stale row is recomputed, never served from the cache
           if (hit) {
             wrote = await write(it, checkId, { status: hit.status, reasonCode: hit.reason_code, reason: hit.reason, fields: hit.fields, dataAsOf: hit.data_as_of, evidenceIds: hit.evidence_ids, upstreamCalls: 0 },
-              { source: 'cache', durationMs: 0, checkedAt: hit.checked_at, listVersions: hit.list_versions, cachedFrom: hit.id });
+              { source: 'cache', durationMs: 0, checkedAt: hit.checked_at, listVersions: hit.list_versions, cachedFrom: hit.id, generation });
           } else {
             let o: CheckOutcome;
             try {
@@ -464,11 +477,15 @@ export class ScreeningWorker {
     if (!(await this.finalize(run, 'done'))) return;
     const fresh = await loadRows(db, runId);
     if (!recomputePending(items, plan, fresh, features, run.mode === 'live')) return;
-    if (!(await reopenRun(db, runId, new Date(this.deps.now()), values.run.time_budget_minutes))) return;
-    deadline = this.deps.now() + values.run.time_budget_minutes * 60_000;
+    if (!(await reopenRun(db, runId, new Date(this.deps.now()), values.run.time_budget_minutes))) {
+      const st = await db.selectFrom('screening_runs').select('status').where('id', '=', runId).executeTakeFirst();
+      if (st?.status !== 'running') return; // someone else reopened it (the route): carry on
+    }
+    deadline = (await db.selectFrom('screening_runs').select('deadline_at').where('id', '=', runId).executeTakeFirstOrThrow()).deadline_at.getTime();
     await load();
     }
-    await this.finalize(run, 'partial'); // passes exhausted (a pathological loop): end fail-closed rather than spin
+    // Passes exhausted (a pathological loop): every open or stale check becomes UNKNOWN and the run ends partial, fail-closed.
+    await this.closeOut(runId, 'SOURCE_ERROR', 'Dependent checks kept changing; the recompute did not settle', false);
   }
 
   /**

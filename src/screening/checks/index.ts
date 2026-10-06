@@ -45,13 +45,14 @@ export const GATE_OF: Record<CheckId, string> = {
 };
 
 /**
- * Which checks read which others' rows in the same run (taken from the `ctx.latest(...)` reads in checks/*.ts; keep in step with them).
- * When a dependency has a newer row than a check's own automatic row, that row is stale and is recomputed (appended with a new
- * `generation`; the old row stays). A manual row is never stale.
+ * Which checks read which others' rows in the same run (taken from the `ctx.latest(...)` reads in checks/*.ts; keep in step with them;
+ * `price` also reads every FLAG-capable check for its risk flag: tm_us, web_risk, tm_eu, same_name).
+ * Every automatic row records the newest dependency row id it was computed from (`generation`). When a dependency in force is newer
+ * than that, the row is stale and is recomputed (appended with a new `generation`; the old row stays). A manual row is never stale.
  */
 export const DEPENDS_ON: Partial<Record<CheckId, CheckId[]>> = {
   ext_dates: ['availability', 'history'],
   tier: ['form', 'census', 'history', 'ext_dates'],
-  price: ['form', 'history', 'tier', 'namebio', 'quote'],
+  price: ['form', 'history', 'tier', 'namebio', 'quote', 'tm_us', 'web_risk', 'tm_eu', 'same_name'],
   tm_us: ['form', 'history'],
 };

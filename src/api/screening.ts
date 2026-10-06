@@ -8,6 +8,7 @@ import { AppError } from '../http/errors.js';
 import { dollarsToCents, formatUsd } from '../money.js';
 import { HistoryManual, MANUAL_CHECKS, TmEuManual, TmManual, WebRiskManual, historyFromManual, tmEuFromManual, tmFromManual, webRiskFromManual } from '../screening/checks/manual.js';
 import { GATE_OF } from '../screening/checks/index.js';
+import { DEPENDS_ON } from '../screening/checks/index.js';
 import { beats, latestByCheck } from '../screening/derive.js';
 import { listVersion } from '../screening/lists.js';
 import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, loadRows, recomputePending, refreshSummary, reopenRun, toResultRow, type ScreeningWorker } from '../screening/engine.js';
@@ -184,17 +185,20 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       return row;
     });
     await refreshSummary(db, run);
-    // A history record outdates the rows computed without it (tier, ext_dates, price, tm_us read history). When the engine would recompute
+    // A manual record outdates the rows computed without it (history: tier, ext_dates, price, tm_us; web_risk, tm_us, tm_eu: price). When the engine would recompute
     // any of them, a finished run is reopened and the worker kicked; the new rows are appended and the old ones stay. A run that is still
     // running is kicked too (a no-op when this process already works on it; the worker re-checks before it ends).
     let recompute = false;
-    if (check === 'history') {
+    {
       const rows = await loadRows(db, run.id);
-      recompute = recomputePending((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel.values.run.feature_checks as CheckId[], run.mode === 'live');
-      if (recompute) {
-        await reopenRun(db, run.id, new Date(deps.now()), sel.values.run.time_budget_minutes);
-        worker.kick(run.id);
-      }
+      const names = (run.input as { names: RunItem[] }).names;
+      const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
+      const pending = recomputePending(names, plan, rows, sel.values.run.feature_checks as CheckId[], run.mode === 'live');
+      if (pending) await reopenRun(db, run.id, new Date(deps.now()), sel.values.run.time_budget_minutes); // false when it is running already
+      const live = (await db.selectFrom('screening_runs').select('status').where('id', '=', run.id).executeTakeFirstOrThrow()).status === 'running';
+      // A run that is still running is kicked and answers true when a dependent is in the name's plan (the worker re-checks before it ends).
+      recompute = pending || (live && (plan[item.lane] ?? []).some((c) => DEPENDS_ON[c] !== undefined));
+      if (recompute) worker.kick(run.id);
     }
     return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name, recompute });
   });

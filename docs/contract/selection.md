@@ -193,10 +193,10 @@ Some checks read other checks' rows of the same run (`ctx.latest(...)`). The dep
 |---|---|
 | `ext_dates` | `availability`, `history` |
 | `tier` | `form`, `census`, `history`, `ext_dates` |
-| `price` | `form`, `history`, `tier`, `namebio`, `quote` |
+| `price` | `form`, `history`, `tier`, `namebio`, `quote`, `tm_us`, `web_risk`, `tm_eu`, `same_name` |
 | `tm_us` | `form`, `history` |
 
-A check's row is **stale** when its in-force row is automatic (never manual) and a dependency's in-force row is newer (higher id), or a dependency is itself stale. A stale check is recomputed by the run's worker (the cache is skipped for it): a new row is appended with `generation` = the id of the newest dependency row it read (0 for a first computation; one automatic row per run, name, check and generation, so two workers cannot write it twice). The old row stays in the run's history. The usual trigger is a manual `history` record (`POST /screening/runs/{id}/manual`), which reopens a finished run for it; the worker also re-checks after it finishes a run, so a record posted at the same moment is not lost. A name stopped by a failing check is not recomputed. Final status is derived from the newest rows as before (a manual row still outranks an automatic one, except an automated history FAIL).
+Every automatic row records its `generation`: the id of the newest dependency row it was computed from. A check's row is **stale** when it is automatic (never manual) and a dependency's in-force row is newer than its `generation` (a row with none recorded falls back to its own id), or a dependency is itself stale; this also catches a record that commits while the check is running. Only dependencies in the name's plan count. A stale row counts as missing for every reader until recomputed. The run's worker recomputes it (the cache is skipped for it): a new row is appended (one automatic row per run, name, check and generation, so two workers cannot write it twice). The old row stays in the run's history. The usual trigger is a manual `history` record (`POST /screening/runs/{id}/manual`), which reopens a finished run for it; the worker also re-checks after it finishes a run, so a record posted at the same moment is not lost. A name stopped by a failing check is not recomputed. Final status is derived from the newest rows as before (a manual row still outranks an automatic one, except an automated history FAIL).
 
 ## FLAG verdicts (1.2.0)
 
