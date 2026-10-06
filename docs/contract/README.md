@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 2.0.0** (6 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 2.0.1** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -74,4 +74,4 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 
 **Known limits:**
 - Export pending and manual-delist flags (`X-Pending-Changes`, `X-Manual-Delist`, `EXPORT_PENDING`, `MANUAL_DELIST`) assume Gavriel calls the API **sequentially**. A `/list` change that races a concurrent export may be counted as already exported. They also compare timestamps taken from the app clock.
-- **Screening and the screening pack are in (v1.1.0, v1.2.0); the rest of CR-001 is not.** Since 2.0.0 a real `/buy` **requires** a complete, current pack of the name's latest run and an active membership of the open tranche (409 `SCREENING_PACK_REQUIRED`, `NO_TRANCHE`, `TRANCHE_SPEND_CAP`; `endpoints.md`); a dry run reports what would block in `would_be_blocked`. Lead verification (CAP-14/15/16) was cut on 6 Oct 2026 and is not built. `/buy` still requires 2-3 comps and refuses `screening_pack` (422). Web Risk and US trademark results are **manual records** (`POST /screening/runs/{id}/manual`). NameBio and the Internet Archive are switched off, so `history` is UNKNOWN and live screening cannot yet produce a survivor past the history gate (`selection.md`).
+- **Screening and the screening pack are in (v1.1.0, v1.2.0); the rest of CR-001 is not.** Since 2.0.0 a real `/buy` **requires** a complete, current pack of the name's latest run and an active membership of the open tranche (409 `SCREENING_PACK_REQUIRED`, `NO_TRANCHE`, `TRANCHE_SPEND_CAP`; `endpoints.md`); a dry run reports what would block in `would_be_blocked`. Lead verification (CAP-14/15/16) was cut on 6 Oct 2026 and is not built. `/buy` still requires 2-3 comps and refuses `screening_pack` (422). Web Risk and US trademark results are **manual records** (`POST /screening/runs/{id}/manual`). NameBio and the Internet Archive are switched off; `history` is `MANUAL_REQUIRED` until Gavriel records a manual history result per name (`selection.md`). `GET /check` and `/buy` need at least one enabled registrar adapter (Porkbun) to show `available`.

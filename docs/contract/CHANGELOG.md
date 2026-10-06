@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.0.1 (2026-10-07): documentation
+- `GET /check`: states the existing rule that `available` needs at least one enabled adapter to confirm. RDAP `not_registered` with no enabled adapter gives `unknown`. Behaviour is unchanged (question from Gavriel's v2.0.0 acceptance run).
+
 ## 2.0.0 (2026-10-06): /buy requires a complete screening pack and an open tranche
 **MAJOR (breaking, `/buy` only).** Release note: `docs/releases/v2.0.0.md`. Founder rules, caps, `approval_ref`, idempotency and audit are unchanged; manual imports are not affected.
 - **`SCREENING_PACK_REQUIRED` (409, real buys):** the domain's latest pack must be `complete`, from its latest screening run, issued under the still-active settings version, and at most `pack.max_age_at_buy_hours` old (new selection setting, default 72, ruling G-75). `details.reason` is `NO_PACK`, `INCOMPLETE`, `NOT_FROM_LATEST_RUN`, `SETTINGS_NOT_ACTIVE` or `PACK_TOO_OLD`; `details.pack_id`. After `BUY_HOLD`, before any registrar call.
