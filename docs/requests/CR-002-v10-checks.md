@@ -12,6 +12,7 @@
 | **Based on** | Sold-names backtest `research/backtest-sold/` (226 sold T1 + 54 geo reference vs 284 dropped controls; `results.md`, `v10-delta.md`) and holdout retest `research/backtest-sold/holdout/` |
 | **Releases hold** | Releases the hold on CAP-07 and CAP-10 placed in `CR-001-HOLD-01.md`. All thresholds in this CR are settings (CAP-00), not hard-coded |
 | **Amendments** | Amendment A (v10.2: CAP-07 guard, as-of history, replay gates, CAP-25 forward test) — approved by Dvir 2026-10-06 09:17 IDT, sent to DOM; see end of file |
+| **Amendment B** | Amendment B: manual HIST-2 entry — approved by Dvir 2026-10-06 15:33 IDT; see end of file |
 | **Priority key** | **P1** = needed before any v10 buy or practice run. **P2** = later |
 
 ## Findings → rules → capabilities
@@ -319,3 +320,52 @@ Requester note (2026-10-06 05:15 IDT): features.csv and census/ added to CR-002-
    - `reg_to_sale_months` (or registration dates), to separate aged from expired names;
    - per-row census dates. Holdout suites need sibling data dated before `as_of`.
 3. **Profit report.** DOM uses `profit.cost_per_name_year_cents` = **$11.08** (the ARA used in CR-001/v9.1) and defines the break-even base sale rate as documented in `docs/contract/selection.md`. Please confirm, or give the intended values.
+
+## Amendment B: manual history entry (approved by Dvir 2026-10-06 15:33 IDT)
+
+### B1. Context
+- Dvir's decision: live screening does **not** automate Internet Archive access. `sources.wayback` stays `false`.
+- Correction to DOM's note under Amendment A ("…until the Archive gives written permission, which Dvir is requesting"): **no permission request is pending.** Do not plan on the automated source being switched on.
+
+### B2. Need
+HIST-2 (including the prior-business guard, A1) can be recorded **manually by Gavriel, per name**, the same way Web Risk and trademark manual records already work (`/screening/runs/{id}/manual`).
+
+### B3. Inputs (one manual HIST-2 record)
+| Field | Required | Values |
+|---|---|---|
+| `domain` | yes | a name in the run |
+| `run_id` | yes | existing screening run id |
+| `result` | yes | `PASS` / `REJECT_HARMFUL` / `FLAG_PRIOR_BUSINESS` |
+| `category` | yes if `REJECT_HARMFUL` | `malware_phishing`, `spam` (incl. link farms), `adult`, `scam`, `trademark_abuse` |
+| `prior_business_name` | optional | free text |
+| `first_capture_year`, `last_capture_year` | optional | year |
+| `evidence_urls` | yes if `REJECT_HARMFUL` or `FLAG_PRIOR_BUSINESS` | one or more archive links |
+| `checked_at` | yes | timestamp |
+| `checked_by` | yes | who checked |
+
+### B4. Outputs
+- The stored record (with id), and the name's updated HIST-2 status and gate outcome in the run.
+- On the name's card: the HIST-2 result with its source shown as manual; for `FLAG_PRIOR_BUSINESS`, a disclosed-risk line with `prior_business_name`.
+- Audit entries per CR-001 §3.4.
+
+### B5. Business rules
+1. A manual HIST-2 record satisfies the history gate **exactly** as the automated check would.
+2. A name without one stays `MANUAL_REQUIRED` and cannot join a tranche.
+3. Records are append-only and audited (who, when, evidence). The latest record for a name in a run is the one in force; earlier ones stay visible.
+4. An S7/expired name may join a tranche once its manual HIST-2 is `PASS` or `FLAG_PRIOR_BUSINESS`. `REJECT_HARMFUL` blocks it.
+5. `FLAG_PRIOR_BUSINESS` shows on the card as a disclosed risk; when `prior_business_name` is given, TM-1, BRAND-1 and BIGCO-1 also run on it, and their results apply as for the name itself.
+6. Expected volume: the shortlist only, about 20–30 names per batch.
+
+### B6. Errors
+| Case | Response |
+|---|---|
+| `REJECT_HARMFUL` or `FLAG_PRIOR_BUSINESS` without an evidence URL | 400 |
+| Unknown `category` | 400 |
+| `domain` not in the run | 404 |
+
+### B7. Acceptance tests
+1. A manual `PASS` lets an S7 name join an open tranche.
+2. Without a record, the same name is refused with `MANUAL_REQUIRED`.
+3. `REJECT_HARMFUL` blocks it from the tranche.
+4. `FLAG_PRIOR_BUSINESS` with `prior_business_name` runs TM-1/BRAND-1/BIGCO-1 on that name and shows the flag on the card.
+5. The audit shows who recorded it, when, and the evidence URLs.
