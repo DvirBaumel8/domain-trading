@@ -49,7 +49,9 @@ function save(rel: string, f: Fixture): void {
 async function bootstrap(): Promise<{ fixture: Fixture; map: Map<string, string> }> {
   const f = await get(IANA_RDAP_URL, 'application/json');
   const full = parseBootstrap(f.body);
-  const keep = new Set(['com', 'net', 'org', 'info', 'ai']); // co, io and us have no entry: that absence is part of the fixture
+  // Trimmed to the extensions the tests use. co, io and us are NOT in the fixture because they are cut here; that the real bootstrap
+  // has no entry for them is recorded in docs/internal/sources.md (the recorder's own output, from the untrimmed file).
+  const keep = new Set(['com', 'net', 'org', 'info', 'ai']);
   const j = JSON.parse(f.body) as { services: [string[], string[]][]; publication?: string; version?: string; description?: string };
   const services = j.services.filter((s) => s[0].some((t) => keep.has(t))).map((s): [string[], string[]] => [s[0].filter((t) => keep.has(t)), s[1]]);
   const trimmed = JSON.stringify({ description: j.description, publication: j.publication, services, version: j.version });

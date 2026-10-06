@@ -192,7 +192,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   typo: { max_edit_distance: 1, top_n: 10000, max_list_age_days: 7 },
   concentration: { max_per_attr: 2, max_lane_share: 0.4, lane_share_enforced: false },
   tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true },
-  surbl: { zone: 'multi.surbl.org', control_name: 'test.surbl.org', blocked_answers: ['127.0.0.1'], list_bits: { '8': 'PH', '16': 'MW', '64': 'ABUSE', '128': 'CR' }, ns_override: [], timeout_ms: 3000 },
+  surbl: { zone: 'multi.surbl.org', control_name: 'test.surbl.org', blocked_answers: ['127.0.0.1'], list_bits: { '4': 'DM', '8': 'PH', '16': 'MW', '32': 'CT', '64': 'ABUSE', '128': 'CR' }, ns_override: [], timeout_ms: 3000 },
   history: {
     max_fetch_per_name: 6, min_ms_between_calls: 1000, timeout_ms: 20000, retries: 1, min_content_chars: 200,
     strong_action: 'FAIL', weak_action: 'FLAG', redirect_action: 'FLAG', forsale_action: 'PASS', parked_action: 'PASS',
@@ -242,7 +242,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   freshness_hours: { availability: 1, surbl: 24, typo: 24, history: 168, census: 720, ext_dates: 168, namebio: 24, quote: 24, web_risk: 168, tm_us: 168 },
   evidence: { max_text_bytes: 32768 },
   run: {
-    time_budget_minutes: 30, rdap_concurrency: 2, rdap_min_ms_between: 250,
+    time_budget_minutes: 30, rdap_concurrency: 1, rdap_min_ms_between: 1000,
     feature_checks: ['census', 'ext_dates', 'namebio'],
     gates: {
       default: ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'census', 'ext_dates', 'tier', 'namebio', 'quote', 'price'],

@@ -39,6 +39,17 @@ describe('rdapLookup', () => {
     expect(await rdapLookup('slow.com', { timeoutMs: 50 })).toMatchObject({ outcome: 'unknown', reasonCode: 'TIMEOUT' });
   });
 
+  it('a 404 is "not registered" only as an RDAP answer: an HTML 404 (a proxy, an error page) is unknown SOURCE_ERROR; rdapStatus keeps its bare-404 reading', async () => {
+    for (const ct of ['text/html', null]) {
+      mswServer.use(http.get(COM, () => new HttpResponse('<html>Not found</html>', { status: 404, headers: ct ? { 'content-type': ct } : {} })));
+      expect(await rdapLookup('nothere.com')).toMatchObject({ outcome: 'unknown', reasonCode: 'SOURCE_ERROR', httpStatus: 404 });
+    }
+    mswServer.use(http.get(COM, () => new HttpResponse('{"errorCode":404}', { status: 404, headers: { 'content-type': 'application/json' } })));
+    expect((await rdapLookup('nothere.com')).outcome).toBe('not_registered');
+    mswServer.use(http.get(COM, () => new HttpResponse(null, { status: 404 })));
+    expect(await rdapStatus('nothere.com')).toBe('not_registered');
+  });
+
   it('429 is unknown RATE_LIMITED and carries Retry-After in ms', async () => {
     mswServer.use(http.get(COM, () => new HttpResponse(null, { status: 429, headers: { 'retry-after': '3' } })));
     expect(await rdapLookup('busy.com')).toMatchObject({ outcome: 'unknown', reasonCode: 'RATE_LIMITED', httpStatus: 429, retryAfterMs: 3000 });
@@ -47,7 +58,7 @@ describe('rdapLookup', () => {
   });
 
   it('Review Focus 2: 200 with an HTML body, invalid JSON, JSON for another name or without ldhName is unknown SOURCE_ERROR, never registered', async () => {
-    for (const body of ['<html><body>Maintenance</body></html>', '{"ldhName":', '{"ldhName":"OTHER.COM"}', '{"errorCode":200}', '[]', 'null']) {
+    for (const body of ['<html><body>Maintenance</body></html>', '{"ldhName":', '{"ldhName":"OTHER.COM"}', '{"objectClassName":"nameserver","ldhName":"TARGET.COM"}', '{"errorCode":200}', '[]', 'null']) {
       mswServer.use(http.get(COM, () => new HttpResponse(body, { status: 200, headers: { 'content-type': 'text/html' } })));
       expect(await rdapLookup('target.com')).toMatchObject({ outcome: 'unknown', reasonCode: 'SOURCE_ERROR', httpStatus: 200, facts: null });
     }

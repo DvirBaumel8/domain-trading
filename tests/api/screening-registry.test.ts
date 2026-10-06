@@ -7,10 +7,11 @@ import type { FastifyInstance } from 'fastify';
 import type { DnsAnswer } from '../../src/dns/ns-lookup.js';
 import type { RdapLookup, RdapLookupFn } from '../../src/rdap.js';
 import { readEvidence } from '../../src/screening/evidence.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
 import { BootstrapError, Pacer, lookupCached, rdapBaseFor } from '../../src/screening/rdap-batch.js';
 import type { ScreeningDeps } from '../../src/screening/types.js';
 import { testDb as db } from '../helpers/db.js';
-import { putList, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
+import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { fixture, RANDOM_COM, respond } from '../helpers/screening-fixtures.js';
 import { mswServer } from '../setup/network.js';
 
@@ -24,6 +25,11 @@ async function h(screening?: Partial<ScreeningDeps>, opts: { start?: number } = 
 const byDomain = (body: any, domain: string) => body.names.find((n: any) => n.domain === domain);
 const res = (n: any, check: string) => n.results.find((r: any) => r.check === check);
 const item = (domain: string, extra: object = {}) => ({ domain, lane: 'S3', ...extra });
+
+/** A frozen census list (Dvir's approval recorded), as the freeze route stores it. */
+async function putCensus(name: string, terms: string[], version = 1, approval: string | null = 'Dvir: freeze this census list'): Promise<void> {
+  await db.insertInto('selection_lists').values({ name, version, terms, created_by: 'test', approval_text: approval }).onConflict((oc) => oc.doNothing()).execute();
+}
 
 // ---- fakes ----
 const facts = (created: string | null) => ({ registrar: 'Fake Registrar', created_at: created, expires_at: null, updated_at: null, statuses: [], nameservers: [] });
@@ -173,8 +179,69 @@ describe('lookupCached, Pacer, rdapBaseFor', () => {
     await expect(rdapBaseFor(db, deps, 'org', { enabled: true, now: () => t0 })).rejects.toBeInstanceOf(BootstrapError);
     status = 200;
     mswServer.use(http.get('https://data.iana.org/rdap/dns.json', () => new Response('{"services":[]}', { status: 200 })));
-    await expect(rdapBaseFor(db, deps, 'org', { enabled: true, now: () => t0 })).rejects.toBeInstanceOf(BootstrapError); // 200 with a non-conforming body
+    await expect(rdapBaseFor(db, baseDeps(fakeRdap({}).fn), 'org', { enabled: true, now: () => t0 })).rejects.toBeInstanceOf(BootstrapError); // 200 with a non-conforming body
     expect(await db.selectFrom('reference_files').select('id').execute()).toHaveLength(0);
+  });
+});
+
+describe('IANA bootstrap cooldown, per-host pacing, deadline', () => {
+  const deps = (): ScreeningDeps => ({ fetch: globalThis.fetch, sleep: async () => {}, checkService: undefined as never, rdapLookup: fakeRdap({}).fn, dnsQuery: async () => null, resolveNs: async () => [], resolve4: async () => [] });
+
+  it('after a failed refresh the bootstrap is not fetched again for the cooldown (60 min); then it is tried again', async () => {
+    let hits = 0;
+    mswServer.use(http.get('https://data.iana.org/rdap/dns.json', () => { hits++; return new Response('down', { status: 503 }); }));
+    const d = deps();
+    const t0 = Date.parse('2026-10-06T08:00:00Z');
+    for (let i = 0; i < 5; i++) await expect(rdapBaseFor(db, d, 'org', { enabled: true, now: () => t0 + i * 60_000 })).rejects.toBeInstanceOf(BootstrapError);
+    expect(hits).toBe(1);
+    await expect(rdapBaseFor(db, d, 'org', { enabled: true, now: () => t0 + 61 * 60_000 })).rejects.toBeInstanceOf(BootstrapError);
+    expect(hits).toBe(2);
+  });
+
+  it('with a stale copy and IANA down, a failed refresh serves the stale copy and is not retried inside the cooldown', async () => {
+    let hits = 0, up = true;
+    mswServer.use(http.get('https://data.iana.org/rdap/dns.json', () => { hits++; return up ? respond(fixture('iana-dns.json')) : new Response('x', { status: 500 }); }));
+    const d = deps();
+    const t0 = Date.parse('2026-10-06T08:00:00Z');
+    await rdapBaseFor(db, d, 'org', { enabled: true, now: () => t0 });
+    up = false;
+    for (let i = 0; i < 5; i++) expect(await rdapBaseFor(db, d, 'org', { enabled: true, now: () => t0 + 8 * 86_400_000 + i * 1000 })).toBe('https://rdap.publicinterestregistry.org/rdap/');
+    expect(hits).toBe(2);
+  });
+
+  it('50 names with IANA down: the other extensions are UNKNOWN SOURCE_ERROR and IANA is fetched at most once', async () => {
+    let hits = 0;
+    mswServer.use(http.get('https://data.iana.org/rdap/dns.json', () => { hits++; return new Response('down', { status: 503 }); }));
+    const name = (i: number) => `zq${String.fromCharCode(97 + Math.floor(i / 26))}${String.fromCharCode(97 + (i % 26))}extend.com`;
+    const { runDone } = await h({ rdapLookup: fakeRdap({}).fn });
+    const { body } = await runDone({ mode: 'full', checks: ['ext_dates'], names: Array.from({ length: 50 }, (_, i) => item(name(i))) });
+    expect(body.names).toHaveLength(50);
+    expect(res(body.names[0], 'ext_dates')).toMatchObject({ status: 'UNKNOWN', reason_code: 'ALL_EXT_UNKNOWN' });
+    expect(hits).toBe(1);
+  });
+
+  it('one pacer per RDAP host: the same host shares it (com and net are both rdap.verisign.com), another host has its own, and the settings set the pace', async () => {
+    const { pacerFor } = await import('../../src/screening/rdap-batch.js');
+    const shared = new Map<string, unknown>();
+    const ctx = { shared, settings: { run: { rdap_min_ms_between: 1000, rdap_concurrency: 1 } }, deps: { sleep: async () => {} } } as never;
+    const com = pacerFor(ctx, 'https://rdap.verisign.com/com/v1/');
+    expect(pacerFor(ctx, 'https://rdap.verisign.com/net/v1/')).toBe(com);
+    expect(pacerFor(ctx, 'https://rdap.identitydigital.services/rdap/')).not.toBe(com);
+    expect(pacerFor(ctx)).toBe(com);
+    expect(DEFAULT_SELECTION_VALUES.run).toMatchObject({ rdap_min_ms_between: 1000, rdap_concurrency: 1 });
+  });
+
+  it('the deadline is checked before the call and again inside the paced slot: a queued lookup that outlives the deadline sends nothing', async () => {
+    let t = Date.parse('2026-10-06T08:00:00Z');
+    const rdap = fakeRdap({});
+    const d: ScreeningDeps = { ...deps(), rdapLookup: async (dom, o) => { t += 5000; return rdap.fn(dom, o); } };
+    const o = { maxAgeHours: 0, evidenceMaxBytes: 1000, pace: new Pacer(0, 1, async () => {}), now: () => t, deadline: t + 3000 };
+    const [a, b] = await Promise.all([lookupCached(db, d, 'one.com', o), lookupCached(db, d, 'two.com', o)]);
+    expect(a.outcome).toBe('not_registered');
+    expect(b).toMatchObject({ outcome: 'unknown', reasonCode: 'TIMEOUT' });
+    expect(rdap.calls.map((c) => c.domain)).toEqual(['one.com']);
+    expect(await lookupCached(db, d, 'three.com', o)).toMatchObject({ outcome: 'unknown', reasonCode: 'TIMEOUT' });
+    expect(rdap.calls).toHaveLength(1);
   });
 });
 
@@ -184,13 +251,13 @@ describe('surbl (CAP-05, SURBL-1)', () => {
   const listed = (last: number): DnsAnswer => ({ rcode: 0, answers: [{ type: 1, data: `127.0.0.${last}` }] });
   const nx: DnsAnswer = { rcode: 3, answers: [] };
   /** A scripted SURBL: the control name and `table` entries answer, every other name is NXDOMAIN. */
-  function surbl(table: Record<string, DnsAnswer | null> = {}, o: { down?: string[]; control?: DnsAnswer | null } = {}) {
+  function surbl(table: Record<string, DnsAnswer | null> = {}, o: { down?: string[]; control?: DnsAnswer | null; controlBy?: Record<string, DnsAnswer | null> } = {}) {
     const calls: { name: string; server: string }[] = [];
     const dnsQuery: ScreeningDeps['dnsQuery'] = async (name, qtype, opts) => {
       calls.push({ name, server: opts.server });
       expect(qtype).toBe(1);
       if (o.down?.includes(opts.server)) return null;
-      if (name === `test.surbl.org.${ZONE}`) return o.control === undefined ? listed(254) : o.control;
+      if (name === `test.surbl.org.${ZONE}`) return o.controlBy && opts.server in o.controlBy ? o.controlBy[opts.server]! : o.control === undefined ? listed(254) : o.control;
       const key = name.slice(0, -(ZONE.length + 1));
       return key in table ? table[key]! : nx;
     };
@@ -202,7 +269,7 @@ describe('surbl (CAP-05, SURBL-1)', () => {
     return runDone({ checks: ['surbl'], names: names.map((d) => item(d)) });
   };
 
-  it('CAP-05 #2: control listed and names NXDOMAIN: PASS listed false, control_ok true, server and evidence recorded; the control and NS discovery run once for the batch', async () => {
+  it('CAP-05 #2: control listed and names NXDOMAIN: PASS listed false, control_ok true, server and evidence recorded; each server is proven by the control once and NS discovery runs once for the batch', async () => {
     const s = surbl();
     const { body } = await run(s, ['tampapoolsco.com', 'boisesolarco.com']);
     for (const d of ['tampapoolsco.com', 'boisesolarco.com']) {
@@ -210,18 +277,55 @@ describe('surbl (CAP-05, SURBL-1)', () => {
       expect(r).toMatchObject({ status: 'PASS', gate: 'G4', rule_ids: ['SURBL-1'], fields: { listed: false, lists: [], control_ok: true } });
       expect(['192.0.2.1', '192.0.2.2']).toContain(r.fields.server);
     }
-    expect(s.calls.filter((c) => c.name.startsWith('test.surbl.org'))).toHaveLength(1);
+    expect(s.calls.filter((c) => c.name.startsWith('test.surbl.org')).map((c) => c.server).sort()).toEqual(['192.0.2.1', '192.0.2.2']);
     expect(s.ns.calls).toBe(1);
     expect(s.calls.every((c) => ['192.0.2.1', '192.0.2.2'].includes(c.server))).toBe(true); // only the zone's own servers
     const ev = await db.selectFrom('screening_results').select('evidence_ids').where('domain', '=', 'tampapoolsco.com').executeTakeFirstOrThrow();
     const e = await readEvidence(db, Number(ev.evidence_ids[ev.evidence_ids.length - 1]));
     expect(e?.text).toContain('tampapoolsco.com.multi.surbl.org A');
     expect(e?.text).toContain('rcode 3');
+    expect(ev.evidence_ids).toHaveLength(3); // both control queries and the name's own answer
+    expect((await readEvidence(db, Number(ev.evidence_ids[0])))?.text).toContain('test.surbl.org.multi.surbl.org A');
   });
 
-  it('CAP-05 #1: a listed name FAILs SURBL_LISTED with the lists decoded from the bits (80 = MW + ABUSE; 254 control bits)', async () => {
-    const s = surbl({ 'spamsite.com': listed(80), 'phishy.com': listed(8) });
-    const { body } = await run(s, ['spamsite.com', 'phishy.com']);
+  it('only a server that answered the control as listed is ever asked about a name: an unproven server that says NXDOMAIN to everything never yields a PASS', async () => {
+    const s = surbl({ 'spamsite.com': listed(80) }, { controlBy: { '192.0.2.2': nx } });
+    const { body } = await run(s, ['spamsite.com', 'cleansite.com']);
+    expect(res(byDomain(body, 'spamsite.com'), 'surbl')).toMatchObject({ status: 'FAIL', reason_code: 'SURBL_LISTED', fields: { server: '192.0.2.1' } });
+    expect(res(byDomain(body, 'cleansite.com'), 'surbl')).toMatchObject({ status: 'PASS', fields: { server: '192.0.2.1' } });
+    expect(s.calls.filter((c) => !c.name.startsWith('test.surbl.org')).every((c) => c.server === '192.0.2.1')).toBe(true);
+  });
+
+  it('SERVFAIL or no answer from a proven server: the next proven server is tried; both failing is TIMEOUT (SOURCE_ERROR when it was SERVFAIL)', async () => {
+    const calls: string[] = [];
+    const dnsQuery: ScreeningDeps['dnsQuery'] = async (name, _t, { server }) => {
+      if (name.startsWith('test.surbl.org')) return listed(254);
+      calls.push(`${name.split('.')[0]}@${server}`);
+      if (name.startsWith('flaky.')) return server === '192.0.2.1' ? { rcode: 2, answers: [] } : nx;
+      if (name.startsWith('slow.')) return server === '192.0.2.1' ? null : nx;
+      return { rcode: 2, answers: [] }; // servfail.com: every proven server
+    };
+    const { runDone } = await h({ dnsQuery, resolveNs: async () => ['a.surbl.org', 'b.surbl.org'], resolve4: async (x) => (x === 'a.surbl.org' ? ['192.0.2.1'] : ['192.0.2.2']) });
+    const { body } = await runDone({ checks: ['surbl'], names: [item('flaky.com'), item('slow.com'), item('servfail.com')] });
+    expect(res(byDomain(body, 'flaky.com'), 'surbl')).toMatchObject({ status: 'PASS', fields: { server: '192.0.2.2' } });
+    expect(res(byDomain(body, 'slow.com'), 'surbl')).toMatchObject({ status: 'PASS', fields: { server: '192.0.2.2' } });
+    expect(res(byDomain(body, 'servfail.com'), 'surbl')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR' });
+  });
+
+  it('control queries are capped at 10 per run, even with many dead candidates', async () => {
+    let controls = 0;
+    const dnsQuery: ScreeningDeps['dnsQuery'] = async () => { controls++; return nx; };
+    const { runDone } = await h({ dnsQuery, resolveNs: async () => Array.from({ length: 20 }, (_, i) => `ns${i}.example.net`), resolve4: async (x) => [`198.51.100.${Number(x.slice(2).split('.')[0]) + 1}`] });
+    const { body } = await runDone({ checks: ['surbl'], names: [item('tampapoolsco.com'), item('boisesolarco.com')] });
+    expect(res(byDomain(body, 'tampapoolsco.com'), 'surbl')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CONTROL_FAILED' });
+    expect(controls).toBe(10);
+  });
+
+  it('CAP-05 #1: a listed name FAILs SURBL_LISTED with the lists decoded from the bits (80 = MW + ABUSE; 36 = DM + CT; 254 control bits); a 127.x answer with no known bit is UNKNOWN SOURCE_ERROR', async () => {
+    const s = surbl({ 'spamsite.com': listed(80), 'phishy.com': listed(8), 'dmct.com': listed(36), 'weird.com': listed(2) });
+    const { body } = await run(s, ['spamsite.com', 'phishy.com', 'dmct.com', 'weird.com']);
+    expect(res(byDomain(body, 'dmct.com'), 'surbl')).toMatchObject({ status: 'FAIL', fields: { lists: ['DM', 'CT'] } });
+    expect(res(byDomain(body, 'weird.com'), 'surbl')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR', fields: { listed: null, answer: '127.0.0.2' } });
     expect(res(byDomain(body, 'spamsite.com'), 'surbl')).toMatchObject({ status: 'FAIL', reason_code: 'SURBL_LISTED', fields: { listed: true, lists: ['MW', 'ABUSE'], control_ok: true } });
     expect(res(byDomain(body, 'phishy.com'), 'surbl').fields.lists).toEqual(['PH']);
   });
@@ -270,7 +374,7 @@ describe('surbl (CAP-05, SURBL-1)', () => {
     for (const d of ['odd.com', 'nodata.com', 'servfail.com']) expect(res(byDomain(body, d), 'surbl')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR' });
   });
 
-  it('a name tries the next server when the first does not answer; all down for the name is UNKNOWN TIMEOUT', async () => {
+  it('a server that never answers is never proven; a name that no proven server answers is UNKNOWN TIMEOUT', async () => {
     const calls: string[] = [];
     let controlDone = false;
     const dnsQuery: ScreeningDeps['dnsQuery'] = async (name, _t, { server }) => {
@@ -314,7 +418,7 @@ describe('census (CAP-10, CR-002)', () => {
     .split('\n').slice(1).map((s) => s.trim()).filter(Boolean).map((s) => `${s}.com`);
   const T = item('netextend.com', { census_list: 'bt1_netextend@v1' });
   const census = async (table: Record<string, RdapLookup>, extra: object = {}, itemExtra: object = {}, fallback: RdapLookup = notRegistered()) => {
-    await db.insertInto('selection_lists').values({ name: 'bt1_netextend', version: 1, terms: siblings, created_by: 'test' }).onConflict((oc) => oc.doNothing()).execute();
+    await putCensus('bt1_netextend', siblings);
     const rdap = fakeRdap(table, fallback);
     const hh = await h({ rdapLookup: rdap.fn });
     const { body } = await hh.runDone({ checks: ['census'], names: [{ ...T, ...itemExtra }], ...extra });
@@ -352,15 +456,23 @@ describe('census (CAP-10, CR-002)', () => {
     expect(res(n5, 'census')).toMatchObject({ status: 'PASS', fields: { registered_share: 0.5, n_unknown: 5, n_checked: 20 } });
   });
 
-  it('as_of (full mode): a sibling created on or after as_of is not counted (strict <), an undated one is counted and makes as_of_exact false, as_of is echoed', async () => {
+  it('as_of (full mode): a sibling created on or after as_of is not counted (strict <), an undated one is excluded from numerator and denominator (A2), as_of is echoed', async () => {
     const t: Record<string, RdapLookup> = {
       [siblings[0]!]: registered('2015-06-01T00:00:00Z'), [siblings[1]!]: registered('2024-03-01T00:00:00Z'),
       [siblings[2]!]: registered('2023-01-01T00:00:00Z'), [siblings[3]!]: registered(null),
     };
     const { n } = await census(t, { mode: 'full' }, { as_of: '2023-01-01T00:00:00Z' });
     const f = res(n, 'census').fields;
-    expect(f).toMatchObject({ n_registered: 2, registered_share: 0.1, registered_after_as_of_n: 2, undated_counted_n: 1, as_of: '2023-01-01T00:00:00.000Z', as_of_exact: false });
-    expect(f.siblings.filter((s: any) => s.counted).map((s: any) => s.domain)).toEqual([siblings[0], siblings[3]]);
+    expect(f).toMatchObject({ n_registered: 1, n_checked: 19, registered_share: 1 / 19, registered_after_as_of_n: 2, undated_excluded_n: 1, as_of: '2023-01-01T00:00:00.000Z', as_of_exact: false });
+    expect(f).not.toHaveProperty('undated_counted_n');
+    expect(f.siblings.filter((s: any) => s.counted).map((s: any) => s.domain)).toEqual([siblings[0]]);
+    expect(f.siblings[3]).toMatchObject({ status: 'registered', created_at: null, counted: false });
+  });
+
+  it('undated siblings count with the unknown ones toward TOO_MANY_UNKNOWN: 3 unknown + 3 undated of 20 is 30% > 25%', async () => {
+    const t: Record<string, RdapLookup> = { ...first(5), ...Object.fromEntries(siblings.slice(5, 8).map((d) => [d, unknown('TIMEOUT')])), ...Object.fromEntries(siblings.slice(8, 11).map((d) => [d, registered(null)])) };
+    const { n } = await census(t, { mode: 'full' }, { as_of: '2026-09-01T00:00:00Z' });
+    expect(res(n, 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'TOO_MANY_UNKNOWN', fields: { registered_share: null, n_unknown: 3, undated_excluded_n: 3 } });
   });
 
   it('as_of_exact is false when as_of is older than census.as_of_exact_max_days (365), true inside it', async () => {
@@ -377,21 +489,36 @@ describe('census (CAP-10, CR-002)', () => {
     expect(res(n, 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_MISSING', fields: { registered_share: null } });
   });
   it('a list that does not exist, or a version that does not exist, is CENSUS_LIST_MISSING; a list of the wrong size is CENSUS_LIST_SIZE', async () => {
-    await putList('bt1_short', siblings.slice(0, 19));
+    await putCensus('bt1_short', siblings.slice(0, 19));
     const rdap = fakeRdap({});
     const hh = await h({ rdapLookup: rdap.fn });
     const { body } = await hh.runDone({ checks: ['census'], names: [
-      item('aaaextend.com', { census_list: 'bt1_other@v1' }), item('bbbextend.com', { census_list: 'bt1_short@v9' }), item('cccextend.com', { census_list: 'bt1_short' }),
+      item('other.com', { census_list: 'bt1_other@v1' }), item('short.com', { census_list: 'bt1_short' }), item('shortb.com', { census_list: 'bt1_shortb@v9' }),
     ] });
-    expect(res(byDomain(body, 'aaaextend.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_MISSING' });
-    expect(res(byDomain(body, 'bbbextend.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_MISSING' });
-    expect(res(byDomain(body, 'cccextend.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_SIZE', fields: { list: 'bt1_short@v1' } });
+    expect(res(byDomain(body, 'other.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_MISSING' });
+    expect(res(byDomain(body, 'short.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_SIZE' });
+    expect(res(byDomain(body, 'shortb.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_MISSING' });
+    expect(rdap.calls).toEqual([]);
+  });
+
+  it('a census list that is not frozen (no approval) or is not a census list name is CENSUS_LIST_MISSING; another name\'s bt1_ list is CENSUS_LIST_MISMATCH', async () => {
+    await putCensus('bt1_loose', siblings.map((d) => d.replace('.com', 'x.com')), 1, null);
+    await putCensus('bt1_netextend', siblings);
+    await putCensus('brand', siblings);
+    const rdap = fakeRdap({});
+    const hh = await h({ rdapLookup: rdap.fn });
+    const { body } = await hh.runDone({ checks: ['census'], names: [
+      item('loose.com', { census_list: 'bt1_loose@v1' }), item('other.com', { census_list: 'brand' }), item('thief.com', { census_list: 'bt1_netextend@v1' }),
+    ] });
+    expect(res(byDomain(body, 'loose.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_MISSING' });
+    expect(res(byDomain(body, 'other.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_MISSING' });
+    expect(res(byDomain(body, 'thief.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'CENSUS_LIST_MISMATCH' });
     expect(rdap.calls).toEqual([]);
   });
 
   it('"name" without @vN uses the newest version', async () => {
-    await putList('bt1_netextend', siblings.slice(0, 19).concat('zzextra.com'), 1);
-    await putList('bt1_netextend', siblings, 2);
+    await putCensus('bt1_netextend', siblings.slice(0, 19).concat('zzextra.com'), 1);
+    await putCensus('bt1_netextend', siblings, 2);
     const rdap = fakeRdap(first(2));
     const hh = await h({ rdapLookup: rdap.fn });
     const { body } = await hh.runDone({ checks: ['census'], names: [item('netextend.com', { census_list: 'bt1_netextend' })] });
@@ -399,7 +526,7 @@ describe('census (CAP-10, CR-002)', () => {
   });
 
   it('a backtest (draft settings) without as_of is UNKNOWN AS_OF_REQUIRED; sources.rdap_com false is SOURCE_DISABLED', async () => {
-    await putList('bt1_netextend', siblings);
+    await putCensus('bt1_netextend', siblings);
     const rdap = fakeRdap({});
     const { post, runDone } = await h({ rdapLookup: rdap.fn });
     expect((await post('/selection/settings', { label: 'v1b', set: { 'tranche.size': 12 } })).statusCode).toBe(201);
@@ -412,7 +539,7 @@ describe('census (CAP-10, CR-002)', () => {
   });
 
   it('siblings are looked up through the cache: a second name sharing the list does not re-fetch', async () => {
-    await putList('bt1_netextend', siblings);
+    await putCensus('bt1_netextend', siblings);
     const rdap = fakeRdap(first(3));
     const hh = await h({ rdapLookup: rdap.fn });
     await hh.runDone({ checks: ['census'], names: [T] });
@@ -448,6 +575,12 @@ describe('ext_dates (CAP-12, CR-002)', () => {
     const a = await ext({ [COM]: registered('2023-05-01T00:00:00Z'), 'netextend.net': registered('2024-01-01T00:00:00Z') }, full);
     expect(a.f.alt_tld_before_n).toBe(0);
     expect(a.f.extensions.find((e: any) => e.tld === 'net').counted).toBe(false);
+  });
+  it('CAP-12 leakage: a .com created AFTER as_of and a .net created between as_of and the .com does not count (comparison = the earlier of the two)', async () => {
+    const { f } = await ext({ [COM]: registered('2024-05-01T00:00:00Z'), 'netextend.net': registered('2022-01-01T00:00:00Z'), 'netextend.info': registered('2019-01-01T00:00:00Z') }, { as_of: '2020-01-01T00:00:00Z' });
+    expect(f).toMatchObject({ comparison_basis: 'as_of', comparison_date: '2020-01-01T00:00:00.000Z', alt_tld_before_n: 1 });
+    expect(f.extensions.find((e: any) => e.tld === 'net').counted).toBe(false);
+    expect(f.extensions.find((e: any) => e.tld === 'info').counted).toBe(true);
   });
   it('CAP-12: an extension created at the very same instant as the .com does not count (strict <)', async () => {
     const b = await ext({ [COM]: registered('2023-05-01T00:00:00Z'), 'netextend.net': registered('2023-05-01T00:00:00Z') }, full);

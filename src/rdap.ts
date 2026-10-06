@@ -20,7 +20,7 @@ export interface RdapLookup {
   /** From a 429 `Retry-After` (seconds form only); null when absent or unreadable. */
   retryAfterMs?: number | null;
 }
-export type RdapLookupFn = (domain: string, opts?: { baseUrl?: string; timeoutMs?: number; signal?: AbortSignal }) => Promise<RdapLookup>;
+export type RdapLookupFn = (domain: string, opts?: { baseUrl?: string; timeoutMs?: number; signal?: AbortSignal; lenient404?: boolean }) => Promise<RdapLookup>;
 
 /** Honest identification for every outbound request of the screening sources (sources.md). */
 export const USER_AGENT = 'domain-trading-api/1.1.0 (+https://github.com/DvirBaumel8/domain-trading)';
@@ -55,6 +55,7 @@ export function parseRdapDomain(body: string, domain: string): RdapFacts | null 
   }
   if (typeof j !== 'object' || j === null || Array.isArray(j)) return null;
   const o = j as Record<string, unknown>;
+  if (o.objectClassName !== undefined && o.objectClassName !== 'domain') return null;
   if (typeof o.ldhName !== 'string' || o.ldhName.toLowerCase().replace(/\.$/, '') !== domain.toLowerCase()) return null;
   const events = Array.isArray(o.events) ? (o.events as Record<string, unknown>[]) : [];
   const at = (action: string): string | null => {
@@ -85,6 +86,9 @@ export const rdapLookup: RdapLookupFn = async (domain, opts = {}) => {
     const res = await fetch(url, { headers: { accept: 'application/rdap+json', 'user-agent': USER_AGENT }, signal });
     if (res.status === 404) {
       void res.body?.cancel().catch(() => {}); // not awaited: some servers never finish the body
+      // A 404 is "not registered" only when it is an RDAP answer: a proxy or error page also says 404.
+      const ct = (res.headers.get('content-type') ?? '').toLowerCase();
+      if (!opts.lenient404 && !ct.includes('application/rdap+json') && !ct.includes('application/json')) return unknown('SOURCE_ERROR', 404);
       return { outcome: 'not_registered', reasonCode: null, httpStatus: 404, url, retrievedAt, body: null, facts: null };
     }
     if (res.status === 429) {
@@ -108,6 +112,6 @@ export const rdapLookup: RdapLookupFn = async (domain, opts = {}) => {
 
 /** The older, coarse form used by the reconciler: a 200 that is not a domain object for the name is `rdap_unknown`, never `registered`. */
 export const rdapStatus: RdapFn = async (domain, opts = {}) => {
-  const r = await rdapLookup(domain, opts);
+  const r = await rdapLookup(domain, { ...opts, lenient404: true }); // the reconciler's long-standing reading of a bare 404
   return r.outcome === 'registered' ? 'registered' : r.outcome === 'not_registered' ? 'not_registered' : 'rdap_unknown';
 };

@@ -94,7 +94,12 @@ export async function makeApp(
     backupExport: opts.backupExport,
     holdoutCheck: opts.holdoutCheck,
     screeningStopAfterResults: opts.screeningStopAfterResults,
-    screening: opts.screening,
+    // No live DNS in tests: a test that needs name servers passes fakes.
+    screening: {
+      resolveNs: async () => { throw new Error('DNS blocked in tests'); },
+      resolve4: async () => { throw new Error('DNS blocked in tests'); },
+      ...opts.screening,
+    },
     sleep: opts.sleep ?? (async () => {}),
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
     registerExtraRoutes: opts.testRoutes === false ? undefined : registerTestRoutes,

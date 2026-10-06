@@ -1,15 +1,23 @@
-// G4 SURBL (CAP-05, SURBL-1): `<domain>.<zone>` A lookups sent straight to the zone's own authoritative servers (public resolvers
-// are refused, DR-001). A control name that must be listed is asked once per run: if it is not answered as listed, nothing this run
-// says about SURBL is trusted (every name UNKNOWN CONTROL_FAILED), so "not listed" can never come from a broken path.
+// G4 SURBL (CAP-05, SURBL-1): `<domain>.<zone>` A lookups sent straight to the zone's authoritative servers (public resolvers
+// are refused, DR-001). A name is only ever asked of a server that has itself answered the control name (a name that must be
+// listed) as listed in this run: an unproven server (one that answers NXDOMAIN to everything) can never produce a "not listed".
+// No server provable -> every name UNKNOWN CONTROL_FAILED.
 import { Pacer } from '../rdap-batch.js';
 import { storeEvidence } from '../evidence.js';
 import type { SelectionValuesT } from '../settings.js';
 import { outcome, type Check, type CheckContext, type CheckOutcome } from '../types.js';
 
 type SurblSettings = SelectionValuesT['surbl'];
-interface Control { ok: boolean; servers: string[]; server: string | null; detail: string; evidenceId: number | null; next: number }
+type Answer = { rcode: number; answers: { type: number; data: string }[] };
+
+/** Per run: the servers, which of them passed the control, and the evidence of every control query. */
+interface State { candidates: string[]; status: Map<string, 'proven' | 'failed'>; proven: string[]; controlQueries: number; evidenceIds: number[]; next: number; init: Promise<void> | null }
 
 const MIN_MS_BETWEEN = 200; // <= 5 queries/s in total (sources.md)
+const QUERY_TIMEOUT_MS = 2000; // a name waits at most 3 proven servers x 2 s, so 50 names take about a minute even with a bad server
+const TARGET_PROVEN = 3;
+const MAX_CONTROL_QUERIES = 10;
+const MAX_SERVERS_PER_NAME = 3;
 
 const isIPv4 = (s: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s);
 
@@ -28,55 +36,56 @@ const hostsToIps = async (ctx: CheckContext, hosts: string[]): Promise<string[]>
 };
 
 /**
- * Candidate groups of authoritative server IPs, in the order they are tried until one answers the control as listed:
- * the settings' `ns_override`; else the zone's own NS records; else SURBL's documented query hosts a..j.<parent of the zone>
- * (sources.md: `multi.surbl.org` has no NS records of its own, a..j.surbl.org serve it; the NS of `surbl.org` do not).
+ * Candidate server IPs, in the order they are proven: the settings' `ns_override` (alone when set); else the zone's own NS records;
+ * then SURBL's documented query hosts a..j of the zone's parent (sources.md: `multi.surbl.org` has no NS records of its own;
+ * the NS of `surbl.org` answer the control with no data).
  */
-async function serverGroups(ctx: CheckContext, s: SurblSettings): Promise<string[][]> {
-  const groups: string[][] = [];
-  const add = (ips: string[]) => { if (ips.length > 0 && !groups.some((g) => g.join() === ips.join())) groups.push(ips); };
-  if (s.ns_override.length > 0) { add(await hostsToIps(ctx, s.ns_override)); return groups; }
+async function candidatesOf(ctx: CheckContext, s: SurblSettings): Promise<string[]> {
+  if (s.ns_override.length > 0) return hostsToIps(ctx, s.ns_override);
+  const out: string[] = [];
+  const add = (ips: string[]) => { for (const ip of ips) if (!out.includes(ip)) out.push(ip); };
   add(await hostsToIps(ctx, await ctx.deps.resolveNs(s.zone).catch(() => [] as string[])));
   const parent = s.zone.split('.').slice(1).join('.');
   if (parent.includes('.')) add(await hostsToIps(ctx, 'abcdefghij'.split('').map((l) => `${l}.${parent}`)));
-  return groups;
+  return out;
 }
 
-async function ask(ctx: CheckContext, pace: Pacer, s: SurblSettings, servers: string[], start: number, qname: string) {
-  for (let i = 0; i < servers.length; i++) {
-    const server = servers[(start + i) % servers.length]!;
-    const ans = await pace.run(() => ctx.deps.dnsQuery(qname, 1, { server, timeoutMs: s.timeout_ms }));
-    if (ans) return { server, ans };
-  }
-  return null;
+const answerText = (qname: string, server: string, a: Answer | null) =>
+  a === null ? `;; ${qname} A @${server}\n;; no answer (timeout or unusable reply)` : `;; ${qname} A @${server}\n;; rcode ${a.rcode}\n${a.answers.map((x) => `${qname} A ${x.data}`).join('\n')}`.trim();
+
+async function evidence(ctx: CheckContext, qname: string, server: string, a: Answer | null): Promise<number> {
+  const text = answerText(qname, server, a);
+  return storeEvidence(ctx.db, { source: 'surbl', url: `dns://${server}/${qname}/A`, retrievedAt: new Date(ctx.now()), httpStatus: null, contentType: 'text/plain', body: text, text, maxBytes: ctx.settings.evidence.max_text_bytes });
 }
 
-const answerText = (qname: string, server: string, a: { rcode: number; answers: { type: number; data: string }[] }) =>
-  `;; ${qname} A @${server}\n;; rcode ${a.rcode}\n${a.answers.map((x) => `${qname} A ${x.data}`).join('\n')}`.trim();
-
-/** The control lookup, once per run: the first server group whose answer to the control name is "listed" is the one used. */
-async function control(ctx: CheckContext, s: SurblSettings, pace: Pacer): Promise<Control> {
-  const hit = ctx.shared.get('surbl_control') as Control | undefined;
-  if (hit) return hit;
-  const groups = await serverGroups(ctx, s);
-  const c: Control = { ok: false, servers: groups[0] ?? [], server: null, detail: groups.length === 0 ? 'no SURBL name server could be found' : '', evidenceId: null, next: 0 };
+/** Asks the control name of the next untried candidate. Returns false when none is left or the per-run cap is reached. */
+async function proveNext(ctx: CheckContext, st: State, s: SurblSettings, pace: Pacer): Promise<boolean> {
+  const server = st.candidates.find((c) => !st.status.has(c));
+  if (server === undefined || st.controlQueries >= MAX_CONTROL_QUERIES) return false;
+  st.controlQueries++;
   const qname = `${s.control_name}.${s.zone}`;
-  const why: string[] = [];
-  for (const servers of groups) {
-    const r = await ask(ctx, pace, s, servers, 0, qname);
-    if (!r) { why.push('no SURBL server answered the control lookup'); continue; }
-    const text = answerText(qname, r.server, r.ans);
-    c.evidenceId = await storeEvidence(ctx.db, { source: 'surbl', url: `dns://${r.server}/${qname}/A`, retrievedAt: new Date(ctx.now()), httpStatus: null, contentType: 'text/plain', body: text, text, maxBytes: ctx.settings.evidence.max_text_bytes });
-    const a = r.ans.answers.find((x) => x.type === 1 && /^127\./.test(x.data));
-    if (r.ans.rcode === 0 && a && !s.blocked_answers.includes(a.data) && decodeBits(Number(a.data.split('.')[3]), s.list_bits).length > 0) {
-      Object.assign(c, { ok: true, servers, server: r.server, detail: '' });
-      break;
-    }
-    why.push(`the control name ${qname} was not answered as listed by ${r.server} (rcode ${r.ans.rcode}, ${r.ans.answers.map((x) => x.data).join(',') || 'no answer'})`);
+  const a = await pace.run(() => ctx.deps.dnsQuery(qname, 1, { server, timeoutMs: Math.min(s.timeout_ms, QUERY_TIMEOUT_MS) }));
+  st.evidenceIds.push(await evidence(ctx, qname, server, a));
+  const hit = a?.answers.find((x) => x.type === 1 && /^127\./.test(x.data));
+  const ok = a !== null && a.rcode === 0 && hit !== undefined && !s.blocked_answers.includes(hit.data) && decodeBits(Number(hit.data.split('.')[3]), s.list_bits).length > 0;
+  st.status.set(server, ok ? 'proven' : 'failed');
+  if (ok) st.proven.push(server);
+  return true;
+}
+
+async function stateOf(ctx: CheckContext, s: SurblSettings, pace: Pacer): Promise<State> {
+  let st = ctx.shared.get('surbl_state') as State | undefined;
+  if (!st) {
+    st = { candidates: [], status: new Map(), proven: [], controlQueries: 0, evidenceIds: [], next: 0, init: null };
+    ctx.shared.set('surbl_state', st);
+    const me = st;
+    me.init = (async () => {
+      me.candidates = await candidatesOf(ctx, s);
+      while (me.proven.length < TARGET_PROVEN && (await proveNext(ctx, me, s, pace))) { /* keep proving */ }
+    })();
   }
-  if (!c.ok && why.length > 0) c.detail = why.join('; ');
-  ctx.shared.set('surbl_control', c);
-  return c;
+  await st.init;
+  return st;
 }
 
 export const surblCheck: Check = {
@@ -89,19 +98,38 @@ export const surblCheck: Check = {
     if (!ctx.settings.sources.surbl) return outcome('UNKNOWN', 'SOURCE_DISABLED', 'The SURBL source is switched off (sources.surbl)', { listed: null, control_ok: null });
     let pace = ctx.shared.get('surbl_pacer') as Pacer | undefined;
     if (!pace) { pace = new Pacer(MIN_MS_BETWEEN, 1, ctx.deps.sleep); ctx.shared.set('surbl_pacer', pace); }
-    const c = await control(ctx, s, pace);
-    const ev = (extra: number[] = []) => ({ evidenceIds: [...(c.evidenceId === null ? [] : [c.evidenceId]), ...extra], dataAsOf: new Date(ctx.now()) });
-    if (!c.ok) return outcome('UNKNOWN', 'CONTROL_FAILED', `SURBL cannot be trusted this run: ${c.detail}`, { listed: null, lists: [], control_ok: false, server: c.server }, ev());
+    const st = await stateOf(ctx, s, pace);
+    const ev = (extra: number[] = []) => ({ evidenceIds: [...st.evidenceIds, ...extra], dataAsOf: new Date(ctx.now()) });
+    if (st.proven.length === 0) {
+      return outcome('UNKNOWN', 'CONTROL_FAILED', `SURBL cannot be trusted this run: ${st.candidates.length === 0 ? 'no SURBL name server could be found' : `none of ${st.status.size} server(s) answered the control name ${s.control_name}.${s.zone} as listed`}`,
+        { listed: null, lists: [], control_ok: false, server: null }, ev());
+    }
 
     const qname = `${ctx.item.domain}.${s.zone}`;
-    const start = c.next++;
-    const r = await ask(ctx, pace, s, c.servers, start, qname);
-    if (!r) return outcome('UNKNOWN', 'TIMEOUT', 'No SURBL server answered', { listed: null, lists: [], control_ok: true, server: null }, ev());
-    const text = answerText(qname, r.server, r.ans);
-    const evId = await storeEvidence(ctx.db, { source: 'surbl', url: `dns://${r.server}/${qname}/A`, retrievedAt: new Date(ctx.now()), httpStatus: null, contentType: 'text/plain', body: text, text, maxBytes: ctx.settings.evidence.max_text_bytes });
-    const base = { control_ok: true, server: r.server };
-    const extra = { ...ev([evId]), upstreamCalls: 1 };
-    const { rcode, answers } = r.ans;
+    const tried = new Set<string>();
+    let got: { server: string; ans: Answer } | null = null;
+    let sawServfail = false;
+    const start = st.next++;
+    while (got === null && tried.size < MAX_SERVERS_PER_NAME) {
+      const open = st.proven.filter((p) => !tried.has(p));
+      const server = open.length > 0 ? open[start % open.length]! : undefined;
+      if (server === undefined) {
+        if (!(await proveNext(ctx, st, s, pace))) break; // every proven server failed for this name: prove one more, then ask it
+        continue;
+      }
+      tried.add(server);
+      const ans = await pace.run(() => ctx.deps.dnsQuery(qname, 1, { server, timeoutMs: Math.min(s.timeout_ms, QUERY_TIMEOUT_MS) }));
+      if (ans === null) continue;
+      if (ans.rcode === 2) { sawServfail = true; continue; }
+      got = { server, ans };
+    }
+    if (!got) {
+      return outcome('UNKNOWN', sawServfail ? 'SOURCE_ERROR' : 'TIMEOUT', sawServfail ? 'The proven SURBL servers answered SERVFAIL' : 'No proven SURBL server answered', { listed: null, lists: [], control_ok: true, server: null }, ev());
+    }
+    const evId = await evidence(ctx, qname, got.server, got.ans);
+    const base = { control_ok: true, server: got.server };
+    const extra = { ...ev([evId]), upstreamCalls: tried.size };
+    const { rcode, answers } = got.ans;
     if (rcode === 3) return outcome('PASS', null, null, { ...base, listed: false, lists: [] }, extra);
     const a = answers.filter((x) => x.type === 1);
     if (rcode === 5 || a.some((x) => s.blocked_answers.includes(x.data))) {
@@ -110,7 +138,10 @@ export const surblCheck: Check = {
     const hitA = a.find((x) => /^127\.\d+\.\d+\.\d+$/.test(x.data));
     if (rcode === 0 && hitA) {
       const lists = decodeBits(Number(hitA.data.split('.')[3]), s.list_bits);
-      return outcome('FAIL', 'SURBL_LISTED', `${ctx.item.domain} is listed on SURBL${lists.length ? ` (${lists.join(', ')})` : ''}`, { ...base, listed: true, lists, answer: hitA.data }, extra);
+      if (lists.length === 0) {
+        return outcome('UNKNOWN', 'SOURCE_ERROR', `SURBL answered ${hitA.data}, which sets no known list bit`, { ...base, listed: null, lists: [], answer: hitA.data }, extra);
+      }
+      return outcome('FAIL', 'SURBL_LISTED', `${ctx.item.domain} is listed on SURBL (${lists.join(', ')})`, { ...base, listed: true, lists, answer: hitA.data }, extra);
     }
     return outcome('UNKNOWN', 'SOURCE_ERROR', `Unexpected SURBL answer (rcode ${rcode}, ${a.map((x) => x.data).join(',') || 'no A record'})`, { ...base, listed: null, lists: [] }, extra);
   },

@@ -1,7 +1,7 @@
 // G8 other-extension creation dates (CAP-12, CR-002): how many other extensions of the same name were created strictly before the
 // .com's creation date (re-registration / drop-catch signal; leakage rule: a later extension never counts). An extension whose RDAP
 // is missing or fails is UNKNOWN for that extension, never "not registered".
-import { lookupCached, rdapBaseFor, sharedPacer, type CachedLookup } from '../rdap-batch.js';
+import { lookupCached, pacerFor, rdapBaseFor, type CachedLookup } from '../rdap-batch.js';
 import { outcome, type Check } from '../types.js';
 import { asOfOf } from './census.js';
 
@@ -19,11 +19,11 @@ export const extDatesCheck: Check = {
     const availability = ctx.latest('availability');
     const comCreated = availability?.fields.availability === 'registered' && typeof availability.fields.created_at === 'string' ? availability.fields.created_at : null;
     const { asOf } = asOfOf(ctx);
-    const comparison = comCreated ? new Date(comCreated) : asOf;
+    // The earlier of the two: an extension created after as_of never counts, whatever the .com's own date (leakage rule).
+    const comparison = comCreated && Date.parse(comCreated) < asOf.getTime() ? new Date(comCreated) : asOf;
     const sld = ctx.item.domain.replace(/\.com$/, '');
     const prior = ctx.latest('history')?.fields.prior_history;
     const comPrior = prior === 1 ? 'yes' : prior === 0 ? 'no' : 'unknown';
-    const pace = sharedPacer(ctx);
     const list = ctx.settings.ext.list;
     let calls = 0;
     const evidence: number[] = [];
@@ -39,7 +39,7 @@ export const extDatesCheck: Check = {
         continue;
       }
       if (base === null) { rows.push({ tld, status: 'unknown', created_at: null, reason_code: ctx.settings.sources.iana_bootstrap ? 'NO_REGISTRY_SERVICE' : 'SOURCE_DISABLED' }); continue; }
-      const r: CachedLookup = await lookupCached(ctx.db, ctx.deps, `${sld}.${tld}`, { maxAgeHours: ctx.settings.freshness_hours.ext_dates ?? 0, baseUrl: base, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace, now: ctx.now });
+      const r: CachedLookup = await lookupCached(ctx.db, ctx.deps, `${sld}.${tld}`, { maxAgeHours: ctx.settings.freshness_hours.ext_dates ?? 0, baseUrl: base, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace: pacerFor(ctx, base), now: ctx.now, deadline: ctx.deadline });
       if (!r.cached) calls++;
       if (r.evidenceId !== null) evidence.push(r.evidenceId);
       if (r.outcome === 'unknown') rows.push({ tld, status: 'unknown', created_at: null, reason_code: r.reasonCode ?? 'SOURCE_ERROR' });
@@ -56,7 +56,7 @@ export const extDatesCheck: Check = {
     }
     const nUnknown = rows.filter((r) => r.status === 'unknown').length;
     const fields = {
-      extensions: rows, as_of: asOf.toISOString(), comparison_date: comparison.toISOString(), comparison_basis: comCreated ? 'com_created_at' : 'as_of',
+      extensions: rows, as_of: asOf.toISOString(), comparison_date: comparison.toISOString(), comparison_basis: comparison === asOf ? 'as_of' : 'com_created_at',
       com_prior_registration: comPrior, n_unknown_ext: nUnknown, undated_excluded_n: undatedExcluded,
     };
     const extra = { upstreamCalls: calls, evidenceIds: evidence, dataAsOf: new Date(ctx.now()) };
