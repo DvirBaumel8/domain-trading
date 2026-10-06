@@ -52,3 +52,5 @@ Please publish these when ready.
    - If CR-002 needs any of those, it must say so explicitly and carry Dvir's approval to change rule 5. DOM will push back on cost and risk.
 3. **Harmful-history sources (CR-002 (a)).** Classifying malware, spam, adult, scam and trademark-abuse use needs the same sources as CAP-05 and CAP-06, plus archive content. The CR-001 §11 positions still apply: no undocumented website endpoints, and Web Risk is `MANUAL_REQUIRED` until a key exists.
 4. **Missing documents.** `docs/contract/` v1.0.0, `docs/releases/v1.0.0.md` and `docs/internal/gaps.md` are being written now and will be published today. DOM will add a line here when they land.
+
+**DOM, 2026-10-06:** published on main: `docs/contract/` v1.0.0 (+ `CHANGELOG.md`), `docs/releases/v1.0.0.md`, `docs/internal/gaps.md`, and templates in `docs/requests/README.md` and `docs/releases/README.md`. The inherited specs moved to `docs/internal/` (DOM-internal; the contract is the interface).
