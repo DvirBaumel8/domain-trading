@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 1.2.0 (unreleased): screening pack inputs (CR-001 P1b)
+MINOR, **additive only** (built task by task; this section grows with each task). No route, field or code is removed or renamed, and no call that v1.1.0 accepted is refused.
+- **Selection settings keys (defaults fill the stored `v1` row, so every v1.1.0 route that reads settings works unchanged):** `eu_tm {required_lanes ["S6"], freshness_hours 168}`, `same_name`, `pack`, `lead.qualified_min`, `lead.verify` (its `never_fetch_hosts` must keep `linkedin.com`, else 422 `SETTINGS_INVALID`), `sources.business_sites` (true). A draft can now add a key under `freshness_hours`. See `selection.md`.
+- **New check ids** `tm_eu` (G7, manual; MANUAL_REQUIRED for `eu_tm.required_lanes`, else PASS `NOT_REQUIRED_FOR_LANE`) and `same_name` (G8; answers NOT_RUN `NOT_IMPLEMENTED` until its release task). Neither is in a default gate list.
+- **`POST /screening/runs/{id}/manual`:** `check: "tm_eu"` (CAP-09; the EU, WIPO and UK IPO register search; FAIL `TM_LIVE_MARK`, FLAG `TM_GENERIC_HITS`, PASS), accepted for any name of the run. `CHECK_NOT_MANUAL` now lists four checks.
+- **New route** `POST /screening/runs/{id}/verdicts` (a PASS or REJECT verdict on one FLAG result row) and `verdicts` on each name of `GET /screening/runs/{id}` (never changes `final_status` or `flags`). New codes: `VERDICT_RESULT_NOT_FLAG`, `VERDICT_RESULT_STALE`, `RESULT_NOT_FOUND`, `DECIDED_AT_INVALID`, result code `NOT_REQUIRED_FOR_LANE`. New table `screening_verdicts` (append-only; part of the backup export and restore).
+
 ## 1.1.0 (2026-10-06): selection and screening (CR-001 P1a + CR-002 P1 + Amendment A)
 MINOR, **additive only**. Release note: `docs/releases/v1.1.0.md`. Nothing is removed, renamed or tightened for an existing call:
 - A client that never uses a new route sees the v1.0.1 behaviour. `POST /buy` has one new refusal, 409 `BUY_HOLD`, and it applies **only to a domain that has a screening result** under settings with `buy_hold` on (a never-screened domain behaves exactly as before; a dry run is never refused). Nothing screens a domain unless a caller starts a screening run.

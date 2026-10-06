@@ -440,6 +440,22 @@ export interface ScreeningResultsTable {
   created_at: TimestampDefault;
 }
 
+export interface ScreeningVerdictsTable {
+  id: Generated<string>;
+  run_id: string;
+  item_idx: number;
+  domain: string;
+  check_id: string;
+  result_id: string;
+  verdict: 'PASS' | 'REJECT';
+  reason: string;
+  decided_by: string;
+  decided_at: Timestamp;
+  recorded_by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface TranchesTable {
   id: string;
   name: string;
@@ -583,6 +599,7 @@ export interface Database {
   replay_runs: ReplayRunsTable;
   holdout_suites: HoldoutSuitesTable;
   screening_results: ScreeningResultsTable;
+  screening_verdicts: ScreeningVerdictsTable;
   manual_quotes: ManualQuotesTable;
   rdap_lookups: RdapLookupsTable;
   reference_files: ReferenceFilesTable;

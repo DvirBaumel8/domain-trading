@@ -6,7 +6,7 @@ import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { dollarsToCents, formatUsd } from '../money.js';
-import { HistoryManual, MANUAL_CHECKS, TmManual, WebRiskManual, historyFromManual, tmFromManual, webRiskFromManual } from '../screening/checks/manual.js';
+import { HistoryManual, MANUAL_CHECKS, TmEuManual, TmManual, WebRiskManual, historyFromManual, tmEuFromManual, tmFromManual, webRiskFromManual } from '../screening/checks/manual.js';
 import { GATE_OF } from '../screening/checks/index.js';
 import { beats, latestByCheck } from '../screening/derive.js';
 import { listVersion } from '../screening/lists.js';
@@ -14,6 +14,7 @@ import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, refreshSummary,
 import { REGISTRAR_ENV } from '../registrars/registry.js';
 import { readEvidence, storeEvidence } from '../screening/evidence.js';
 import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
+import { VerdictBody, verdictsFor } from '../screening/verdicts.js';
 import type { ResultRow, RunItem } from '../screening/types.js';
 import type { CheckId, Lane } from '../screening/types.js';
 
@@ -36,7 +37,7 @@ const RunBody = z.object({
 }).strict();
 const ManualBody = z.object({
   domain: z.string().trim().min(1).max(253), check: z.string(), checked_at: IsoTime,
-  // Required for web_risk and tm_us; a history record carries its archive links in result.evidence_urls (this one is then optional).
+  // Required for web_risk, tm_us and tm_eu; a history record carries its archive links in result.evidence_urls (this one is then optional).
   evidence_url: z.string().url().max(500).refine((u) => u.startsWith('https://'), 'an https URL').optional(),
   result: z.unknown(), note: z.string().max(500).optional(),
 }).strict();
@@ -80,6 +81,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const a = assemble(input.names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values, await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
     const want = q.data.domain === undefined ? null : q.data.domain.trim().toLowerCase().replace(/\.$/, '');
     const tierOrder: string[] = sel!.values.tier.order;
+    const verdicts = await verdictsFor(db, run.id);
     const names = a.items.map((i) => {
       const latest = latestByCheck(i.rows);
       return { i, latest, tierRank: tierOrder.indexOf((latest.get('tier')?.fields.tier as string | undefined) ?? ''), short: (latest.get('form')?.fields.short as number | undefined) ?? 0, score: (latest.get('price')?.fields.score_0_100 as number | undefined) ?? null };
@@ -97,6 +99,8 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
           domain: i.item.domain, lane: i.item.lane, final_status: i.derived.final_status, first_fail: i.derived.first_fail,
           tier: (latest.get('tier')?.fields.tier as string | undefined) ?? null, score: (latest.get('price')?.fields.score_0_100 as number | undefined) ?? null, short: (latest.get('form')?.fields.short as number | undefined) ?? null,
           flags: i.derived.flags, pending_manual: i.derived.pending_manual, not_implemented: i.derived.not_implemented,
+          // Only verdicts bound to a row that is in force now; final_status and flags are not changed by a verdict (v1.1.0 meaning).
+          verdicts: [...latest.values()].flatMap((r) => { const v = verdicts.get(r.id); return v ? [{ check: r.check_id, result_id: r.id, verdict: v.verdict, reason: v.reason, decided_by: v.decided_by, decided_at: v.decided_at.toISOString() }] : []; }),
           source_lane: (latest.get('history')?.fields.source_lane as string | undefined) ?? null,
           ...(q.data.view === 'full' && { results: [...latest.values()].sort((x, y) => x.id - y.id).map(resultJson) }),
         };
@@ -111,7 +115,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', req.params.id).executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${req.params.id}"`);
     if (!(MANUAL_CHECKS as readonly string[]).includes(body.check)) {
-      throw new AppError(422, 'CHECK_NOT_MANUAL', `Only ${MANUAL_CHECKS.join(' and ')} take a manual record`, { check: body.check, manual: MANUAL_CHECKS });
+      throw new AppError(422, 'CHECK_NOT_MANUAL', `Only ${MANUAL_CHECKS.slice(0, -1).join(', ')} and ${MANUAL_CHECKS[MANUAL_CHECKS.length - 1]} take a manual record`, { check: body.check, manual: MANUAL_CHECKS });
     }
     type ManualCheck = (typeof MANUAL_CHECKS)[number];
     const check = body.check as ManualCheck;
@@ -122,12 +126,12 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const checkedAt = new Date(body.checked_at);
     const sel = (await selectionSettingsByLabel(db, run.settings_label))!;
     if (checkedAt.getTime() > deps.now() + 60_000) throw new AppError(422, 'CHECKED_AT_INVALID', 'checked_at is in the future');
-    const windowH = sel.values.freshness_hours[check] ?? (check === 'history' ? 168 : 0);
+    const windowH = check === 'tm_eu' ? sel.values.eu_tm.freshness_hours : sel.values.freshness_hours[check] ?? (check === 'history' ? 168 : 0);
     if (windowH > 0 && checkedAt.getTime() < deps.now() - windowH * 3_600_000) {
       throw new AppError(422, 'CHECKED_AT_INVALID', `checked_at is older than the ${check} freshness window (${windowH} h)`, { freshness_hours: windowH });
     }
     if (check !== 'history' && body.evidence_url === undefined) throw new AppError(422, 'VALIDATION_ERROR', 'Request body is invalid', { issues: [{ path: 'evidence_url', message: `evidence_url is required for ${check}` }] });
-    const rec = check === 'web_risk' ? WebRiskManual.parse(body.result) : check === 'tm_us' ? TmManual.parse(body.result) : HistoryManual.parse(body.result);
+    const rec = check === 'web_risk' ? WebRiskManual.parse(body.result) : check === 'tm_us' ? TmManual.parse(body.result) : check === 'tm_eu' ? TmEuManual.parse(body.result) : HistoryManual.parse(body.result);
     // The history in force for this name: the same precedence as derive (a manual record outranks an auto or cached row).
     const histRows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
       .where('check_id', '=', 'history').execute()).map(toResultRow);
@@ -143,6 +147,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       let o;
       if (check === 'web_risk') o = webRiskFromManual(rec as z.infer<typeof WebRiskManual>, sel.values, history, evidenceUrl, checkedAt, body.note);
       else if (check === 'tm_us') o = tmFromManual(rec as z.infer<typeof TmManual>, evidenceUrl, checkedAt, body.note, history);
+      else if (check === 'tm_eu') o = tmEuFromManual(rec as z.infer<typeof TmEuManual>, evidenceUrl, checkedAt, body.note);
       else {
         const versions = run.list_versions as Record<string, number>;
         const load = async (n: string) => { const l = versions[n] === undefined ? null : await listVersion(trx, n, versions[n]); return l ? { version: l.version, terms: l.terms } : null; };
@@ -179,6 +184,33 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     });
     await refreshSummary(db, run);
     return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name });
+  });
+
+  app.post<{ Params: { id: string } }>('/screening/runs/:id/verdicts', async (req, reply) => {
+    const body = VerdictBody.parse(req.body ?? {});
+    const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', req.params.id).executeTakeFirst();
+    if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${req.params.id}"`);
+    let domain: string | null = null;
+    try { domain = normalizeDomain(body.domain); } catch { /* not a name of any run */ }
+    const item = (run.input as { names: RunItem[] }).names.find((n) => n.domain === domain && !n.input_error);
+    if (!item) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${body.domain}" is not a screened name of run ${run.id}`);
+    const decidedAt = new Date(body.decided_at);
+    if (decidedAt.getTime() > deps.now() + 60_000) throw new AppError(422, 'DECIDED_AT_INVALID', 'decided_at is in the future');
+    const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx).execute()).map(toResultRow);
+    const target = rows.find((r) => r.id === body.result_id && r.check_id === body.check);
+    if (!target) throw new AppError(404, 'RESULT_NOT_FOUND', `No ${body.check} result ${body.result_id} for ${item.domain} in run ${run.id}`);
+    const inForce = latestByCheck(rows).get(body.check)!;
+    if (inForce.id !== target.id) throw new AppError(409, 'VERDICT_RESULT_STALE', `Result ${target.id} is no longer the ${body.check} row in force`, { in_force_result_id: inForce.id });
+    if (target.status !== 'FLAG') throw new AppError(409, 'VERDICT_RESULT_NOT_FLAG', `Only a FLAG result takes a verdict (this one is ${target.status})`, { status: target.status });
+    const row = await db.insertInto('screening_verdicts').values({
+      run_id: run.id, item_idx: item.idx, domain: item.domain, check_id: body.check, result_id: String(target.id), verdict: body.verdict, reason: body.reason,
+      decided_by: body.decided_by, decided_at: decidedAt, recorded_by: req.auth!.name, audit_id: req.auditId!,
+    }).returningAll().executeTakeFirstOrThrow();
+    await refreshSummary(db, run);
+    return reply.code(201).send({
+      id: Number(row.id), run_id: run.id, domain: item.domain, check: body.check, result_id: target.id, verdict: row.verdict, reason: row.reason,
+      decided_by: row.decided_by, decided_at: row.decided_at.toISOString(), recorded_by: row.recorded_by,
+    });
   });
 
   app.get<{ Params: { id: string } }>('/screening/evidence/:id', async (req) => {

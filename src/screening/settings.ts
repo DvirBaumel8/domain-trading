@@ -8,7 +8,7 @@ import { AppError } from '../http/errors.js';
 import { requireNamedApproval } from './approval.js';
 
 export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short'] as const;
-export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'census', 'ext_dates', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads'] as const;
+export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads'] as const;
 /** Checks that only produce an input feature (a failed lookup makes the feature unknown, it does not stop the run). */
 export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio'] as const;
 /** Settings the API can never draft a change to (SEL9-2): only a migration changes them. */
@@ -18,7 +18,10 @@ export const LANES = ['S2', 'S3', 'S4', 'S6', 'S7'] as const;
 const TIERS = ['A', 'I', 'B', 'G'] as const;
 const OPS = ['>=', '<=', '>', '<', '==', '!='] as const;
 /** Dotted paths under which a new key may be added (a map, not a fixed object). */
-const OPEN_MAPS = ['thresholds', 'tier.clauses', 'run.gates'];
+const OPEN_MAPS = ['thresholds', 'tier.clauses', 'run.gates', 'freshness_hours'];
+
+type CheckIdT = (typeof CHECK_IDS)[number]; // local alias: settings.ts must not import types.ts (types.ts imports settings.ts)
+type Lane = (typeof LANES)[number];
 
 const num = z.number().finite();
 const nonneg = z.number().finite().nonnegative();
@@ -35,6 +38,39 @@ const Cond = z.union([
   z.object({ tier: z.enum(TIERS) }).strict(),
 ]);
 const Clause = z.union([z.object({ all: z.array(Cond).min(1) }).strict(), z.object({ any: z.array(Cond).min(1) }).strict()]);
+
+// v1.2.0 (CR-001 P1b) settings. The stored v1 row has none of these keys: every one carries a zod default holding the full literal value.
+export const EU_TM_DEFAULT = { required_lanes: ['S6'] as Lane[], freshness_hours: 168 };
+export const SAME_NAME_DEFAULT = {
+  min_visible_chars: 200, timeout_ms: 10_000, max_bytes: 512_000, max_redirects: 3, min_ms_between_fetches: 1000,
+  max_unknown_sites: 0, product_markers: ['\u2122', '\u00ae', '(tm)', '(r)'],
+};
+export const PACK_DEFAULT = {
+  exclude_checks: ['census', 'ext_dates', 'namebio', 'leads', 'pack'] as CheckIdT[],
+  require_checks: ['same_name'] as CheckIdT[],
+  availability_max_age_hours: 24,
+};
+export const LEAD_VERIFY_DEFAULT = {
+  time_budget_minutes: 15, fetch_timeout_ms: 10_000, min_ms_between_fetches: 1000, max_bytes: 512_000,
+  size_max: 10, long_sld_min: 16, d1_min_unrelated_users: 3, verified_max_age_days: 14,
+  weaker_share_min: 0.8, never_pitch_share_max: 0.3,
+  role_locals: ['info', 'contact', 'hello', 'office', 'sales', 'admin', 'support', 'team', 'service', 'inquiries', 'enquiries', 'mail', 'help', 'booking', 'bookings', 'marketing'],
+  placeholder_locals: ['test', 'example', 'yourname', 'name', 'email', 'user', 'someone', 'you'],
+  placeholder_domains: ['example.com', 'example.org', 'example.net', 'test.com', 'domain.com', 'email.com', 'yourdomain.com'],
+  free_mail_domains: ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'aol.com', 'icloud.com', 'protonmail.com', 'live.com'],
+  owner_roles: ['owner', 'founder', 'co-founder', 'president', 'ceo', 'principal', 'general manager', 'gm', 'managing partner', 'proprietor'],
+  mktops_roles: ['marketing', 'operations', 'office manager', 'operations manager', 'coo', 'cmo'],
+  enterprise_phrases: ['franchise', 'independently owned and operated', 'locations nationwide', 'series a', 'series b', 'venture-backed', 'nasdaq:', 'nyse:'],
+  social_hosts: ['facebook.com', 'instagram.com', 'yelp.com', 'linkedin.com', 'x.com', 'twitter.com', 'tiktok.com'],
+  never_fetch_hosts: ['linkedin.com'],
+  directory_hosts: ['bbb.org', 'm.bbb.org'],
+  free_subdomain_hosts: ['wixsite.com', 'weebly.com', 'godaddysites.com', 'square.site', 'business.site', 'wordpress.com', 'blogspot.com'],
+  eu_cctlds: ['at', 'be', 'bg', 'hr', 'cy', 'cz', 'dk', 'ee', 'fi', 'fr', 'de', 'gr', 'hu', 'ie', 'it', 'lv', 'lt', 'lu', 'mt', 'nl', 'pl', 'pt', 'ro', 'sk', 'si', 'es', 'se', 'eu'],
+};
+const QUALIFIED_MIN_DEFAULT = { S2: 20, S3: 10, S4: 10, S6: 10, S7: 10 };
+const checkId = z.enum(CHECK_IDS);
+const host = z.string().regex(/^[a-z0-9.-]{3,80}$/);
+const words = z.array(z.string().min(1).max(60));
 
 const Base = z.object({
   thresholds: z.record(z.string().regex(/^[A-Za-z0-9_]{1,40}$/), num),
@@ -75,7 +111,23 @@ const Base = z.object({
     demand2_pass_tiers: z.array(z.enum(TIERS)),
     p_passive: z.partialRecord(z.enum(TIERS), share),
   }).strict(),
-  lead: z.object({ gate_enabled: z.boolean(), ab_min: laneObj(int), p_lead: laneObj(share) }).strict(),
+  lead: z.object({
+    gate_enabled: z.boolean(), ab_min: laneObj(int), p_lead: laneObj(share),
+    qualified_min: laneObj(int).default(QUALIFIED_MIN_DEFAULT),
+    verify: z.object({
+      time_budget_minutes: int.positive(), fetch_timeout_ms: int.positive(), min_ms_between_fetches: int, max_bytes: int.positive(),
+      size_max: int, long_sld_min: int, d1_min_unrelated_users: int, verified_max_age_days: int, weaker_share_min: share, never_pitch_share_max: share,
+      role_locals: words, placeholder_locals: words, placeholder_domains: z.array(host), free_mail_domains: z.array(host), owner_roles: words,
+      mktops_roles: words, enterprise_phrases: words, social_hosts: z.array(host), never_fetch_hosts: z.array(host), directory_hosts: z.array(host),
+      free_subdomain_hosts: z.array(host), eu_cctlds: z.array(z.string().regex(/^[a-z]{2,3}$/)),
+    }).strict().default(LEAD_VERIFY_DEFAULT),
+  }).strict(),
+  eu_tm: z.object({ required_lanes: z.array(z.enum(LANES)), freshness_hours: int }).strict().default(EU_TM_DEFAULT),
+  same_name: z.object({
+    min_visible_chars: int, timeout_ms: int.positive(), max_bytes: int.positive(), max_redirects: int, min_ms_between_fetches: int,
+    max_unknown_sites: int, product_markers: words,
+  }).strict().default(SAME_NAME_DEFAULT),
+  pack: z.object({ exclude_checks: z.array(checkId), require_checks: z.array(checkId), availability_max_age_hours: int.positive() }).strict().default(PACK_DEFAULT),
   priors_v91: z.object({ p_passive: laneObj(share) }).strict(),
   money: z.object({ net_factor_afternic: share, net_factor_other: share, hold_years: int.positive() }).strict(),
   lander: z.object({ exception_ab_min: int, exception_retail_end_min: int }).strict(),
@@ -111,6 +163,8 @@ const Base = z.object({
   sources: z.object({
     surbl: z.boolean(), popularity: z.boolean(), namebio: z.boolean(), wayback: z.boolean(),
     rdap_com: z.boolean(), rdap_other: z.boolean(), iana_bootstrap: z.boolean(),
+    /** Operator and firm home pages (CAP-12, CAP-15); recorded in docs/internal/sources.md before any code reads it. */
+    business_sites: z.boolean().default(true),
   }).strict(),
 }).strict();
 
@@ -169,6 +223,7 @@ export const SelectionValues = Base.superRefine((v, ctx) => {
     else if (!(FEATURE_CHECK_IDS as readonly string[]).includes(id)) bad(['run', 'feature_checks'], `"${id}" is not a feature check (only ${FEATURE_CHECK_IDS.join(', ')} may be feature checks)`);
   }
   if (v.thresholds.registered_share_min === undefined) bad(['thresholds', 'registered_share_min'], 'required');
+  if (!v.lead.verify.never_fetch_hosts.includes('linkedin.com')) bad(['lead', 'verify', 'never_fetch_hosts'], 'must contain linkedin.com (LinkedIn is never fetched)');
   if (v.price.forbidden_bands_cents.some(([a, b]) => a > b)) bad(['price', 'forbidden_bands_cents'], 'a band must be [low, high]');
 });
 
@@ -221,7 +276,12 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
     gate_enabled: false,
     ab_min: { S2: 8, S3: 5, S4: 5, S6: 5, S7: 5 },
     p_lead: { S2: 0.005, S3: 0.002, S4: 0.002, S6: 0.003, S7: 0.002 },
+    qualified_min: QUALIFIED_MIN_DEFAULT,
+    verify: LEAD_VERIFY_DEFAULT,
   },
+  eu_tm: EU_TM_DEFAULT,
+  same_name: SAME_NAME_DEFAULT,
+  pack: PACK_DEFAULT,
   priors_v91: { p_passive: { S2: 0.005, S3: 0.004, S4: 0.004, S6: 0.005, S7: 0.004 } },
   money: { net_factor_afternic: 0.85, net_factor_other: 0.75, hold_years: 2 },
   lander: { exception_ab_min: 30, exception_retail_end_min: 20 },
@@ -260,7 +320,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   buy_hold: true,
   holdout: { sold_accept_min: 0.7, drop_reject_min: 0.75, min_n: 50, required_suites: ['BT10-1', 'BT10-9', 'BT10-11'], report_bands: [1000, 2500], lane_report: true, base_rates: [0.01, 0.02] },
   // Enabled only where docs/internal/sources.md recorded the terms as enabled (Task 1); NameBio is off (unreadable terms).
-  sources: { surbl: true, popularity: true, namebio: false, wayback: false, rdap_com: true, rdap_other: true, iana_bootstrap: true },
+  sources: { surbl: true, popularity: true, namebio: false, wayback: false, rdap_com: true, rdap_other: true, iana_bootstrap: true, business_sites: true },
 };
 
 // ---------- database ----------

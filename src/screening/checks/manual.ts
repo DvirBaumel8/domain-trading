@@ -9,7 +9,7 @@ import { nameTokens } from '../prior-business.js';
 import { matchTerms } from './brand-lists.js';
 import { formFieldsOf } from './form.js';
 
-export const MANUAL_CHECKS = ['web_risk', 'tm_us', 'history'] as const;
+export const MANUAL_CHECKS = ['web_risk', 'tm_us', 'history', 'tm_eu'] as const;
 export type ManualCheckId = (typeof MANUAL_CHECKS)[number];
 
 export const WebRiskManual = z.object({ raw_status: z.number().int(), threat_types: z.array(z.string().max(80)).max(20).optional() }).strict();
@@ -192,3 +192,43 @@ export function historyFromManual(
   if (flag) return outcome('FLAG', 'PRIOR_BUSINESS_FLAGGED', `Recorded by ${rec.checked_by}: a prior business used this name${name ? ` ("${name}")` : ''}; disclosed risk, the trademark search must cover it`, fields, extra);
   return outcome('PASS', null, null, fields, extra);
 }
+
+// ---- manual EU trademark record (CAP-09, rule TM-1-EU) ----
+
+const EU_REGISTERS = ['euipo', 'wipo', 'ukipo', 'tmview'] as const;
+const EuMark = z.object({ mark: z.string().max(200), number: z.string().max(40), owner: z.string().max(200), status: z.string().max(100), register: z.enum(EU_REGISTERS) }).strict();
+export const TmEuManual = z.object({
+  checked_by: z.string().trim().min(1).max(80),
+  registers: z.array(z.enum(EU_REGISTERS)).min(1).max(4),
+  register_urls: z.array(z.string().url().max(500).refine((u) => u.startsWith('https://'), 'an https URL')).min(1).max(10),
+  result: z.enum(['clear', 'hits']),
+  exact_or_core_live: z.array(EuMark).max(50),
+  generic_live: z.array(EuMark).max(50),
+}).strict().superRefine((r, ctx) => {
+  const n = r.exact_or_core_live.length + r.generic_live.length;
+  if (r.result === 'clear' && n > 0) ctx.addIssue({ code: 'custom', path: ['result'], message: 'result "clear" with marks listed' });
+  if (r.result === 'hits' && n === 0) ctx.addIssue({ code: 'custom', path: ['result'], message: 'result "hits" needs at least one mark' });
+});
+export type TmEuManualT = z.infer<typeof TmEuManual>;
+
+/** Turns a recorded EU/international trademark search into a result, split like CAP-08: a live exact or core mark FAILs, generic-only marks FLAG. */
+export function tmEuFromManual(rec: TmEuManualT, evidenceUrl: string, checkedAt: Date, note?: string): CheckOutcome {
+  const fields = { ...rec, evidence_url: evidenceUrl, checked_at: iso(checkedAt), note: note ?? null, source: 'manual' };
+  const extra = { dataAsOf: checkedAt };
+  if (rec.exact_or_core_live.length > 0) return outcome('FAIL', 'TM_LIVE_MARK', `Live EU/international mark on the exact or core phrase: ${rec.exact_or_core_live.map((m) => `${m.mark} (${m.register} ${m.number}, ${m.owner})`).join('; ')}`, fields, extra);
+  if (rec.generic_live.length > 0) return outcome('FLAG', 'TM_GENERIC_HITS', `Live EU/international marks only on a generic phrase: ${rec.generic_live.map((m) => `${m.mark} (${m.register} ${m.number})`).join('; ')}`, fields, extra);
+  return outcome('PASS', null, null, fields, extra);
+}
+
+export const tmEuCheck: Check = {
+  id: 'tm_eu',
+  gate: 'G7',
+  ruleIds: ['TM-1-EU'],
+  lists: [],
+  async run(ctx) {
+    if (!ctx.settings.eu_tm.required_lanes.includes(ctx.item.lane)) {
+      return outcome('PASS', 'NOT_REQUIRED_FOR_LANE', `EU trademark search is required only for ${ctx.settings.eu_tm.required_lanes.join(', ')} (eu_tm.required_lanes)`, { required: false });
+    }
+    return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', `EUIPO, WIPO and UK IPO are not automated: search and record it. ${HOW}`, { required: true, registers: ['euipo', 'wipo', 'ukipo'] });
+  },
+};

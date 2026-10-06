@@ -480,11 +480,11 @@ describe('BK-8 import refusals', () => {
   });
 
   it('a reordered migrations.json is refused too', async () => {
-    // The baseline is a single migration, so a reorder is only observable with a second (temporary) pgmigrations row.
+    // A temporary pgmigrations row keeps the reorder test independent of how many real migrations exist.
     await sql`insert into pgmigrations (name, run_on) values ('9999999999998_order_probe', now())`.execute(db);
     try {
       const files = await backupOfSeed();
-      expect(migrations(files).length).toBe(2);
+      expect(migrations(files).length).toBe(3); // baseline, v1-2-0, probe
       files.set('backup/migrations.json', JSON.stringify([...migrations(files)].reverse()));
       await expect(importBackup(db, await dirOf(files))).rejects.toThrow(/MIGRATION_LEVEL_MISMATCH/);
       await nothingWritten();

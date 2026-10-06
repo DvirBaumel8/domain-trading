@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
+import { DEFAULT_SELECTION_VALUES, SelectionValues } from '../../src/screening/settings.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';
@@ -37,7 +37,8 @@ describe('selection settings (CAP-00)', () => {
   it('the seed SQL equals DEFAULT_SELECTION_VALUES, including the v1 lists', async () => {
     await setup();
     const row = await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow();
-    expect(row.values).toEqual(DEFAULT_SELECTION_VALUES);
+    // v1.2.0: the immutable v1 row predates the new keys; it must parse to the defaults (selection-settings-v12.test.ts pins the missing keys).
+    expect(SelectionValues.parse(row.values)).toEqual(DEFAULT_SELECTION_VALUES);
     const lists = await db.selectFrom('selection_lists').select(['name', 'version']).orderBy('name').orderBy('version').execute();
     expect(lists.map((l) => `${l.name}@${l.version}`)).toEqual([
       'generic_head@1', 'legal@1', 'regime@1', 'sig_forsale@1', 'sig_forsale@2', 'sig_harmful_strong@1', 'sig_harmful_strong@2', 'sig_harmful_weak@1', 'sig_harmful_weak@2',
