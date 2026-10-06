@@ -133,4 +133,45 @@ describe('v2 plans survive v3 (Review Focus 5)', () => {
     await createV3(db);
     expect((await list({ mode: 'bin', bin: 349, approval_ref: approval() })).statusCode).toBe(200);
   });
+
+  it('an override never waives the price list: geo $549, non-geo bin $999 / $1,995 refused; a list value with override accepted', async () => {
+    await createV3(db);
+    const geoList = await setup({ mode: 'bin', bin: 399 }, { category: 'geo', price_grade: 'weaker' });
+    const o = { override: true, override_reason: 'test', approval_ref: approval() };
+    const g = await geoList({ mode: 'bin', bin: 549, ...o });
+    expect([g.statusCode, g.json().error.code]).toEqual([422, 'BIN_NOT_IN_PRICE_LIST']);
+  });
+
+  it('non-geo plain bin under v3: off-list BIN refused even with an override; list BIN with an override accepted', async () => {
+    await createV3(db);
+    const list = await setup({ mode: 'hybrid', bin: 1488, approval_ref: approval() }, { category: 'trend', price_grade: null });
+    const o = { override: true, override_reason: 'test', approval_ref: approval() };
+    for (const bin of [999, 1995]) {
+      const r = await list({ mode: 'bin', bin, ...o });
+      expect([r.statusCode, r.json().error.code]).toEqual([422, 'BIN_NOT_IN_PRICE_LIST']);
+    }
+    const ok = await list({ mode: 'bin', bin: 1488, ...o });
+    expect(ok.statusCode).toBe(200);
+  });
+
+  it('PR3-9: D-001 reprice via replan with the exception + approval under v3 → 1488 / 967 / 950, approved_exception', async () => {
+    const list = await setup({ mode: 'hybrid', bin: 1995, floor: 1295, walkaway: 950, pricing_exception: true, pricing_exception_reason: 'D-001 approved plan', approval_ref: approval() }, { category: 'trend', price_grade: null });
+    await createV3(db);
+    const r = await list({ replan: true, mode: 'hybrid', bin: 1488, floor: 967, walkaway: 950, pricing_exception: true, pricing_exception_reason: 'D-001 reprice (6 Oct)', approval_ref: approval() });
+    expect(r.statusCode).toBe(200);
+    const d = await db.selectFrom('domains').selectAll().where('domain', '=', D).executeTakeFirstOrThrow();
+    expect([d.bin_cents, d.floor_cents, d.walkaway_cents, d.min_offer_cents, d.pricing_source, d.pricing_settings_version]).toEqual([148800, 96700, 95000, 10000, 'approved_exception', 3]);
+  });
+});
+
+describe('v3 settings cross-field rules', () => {
+  const now = () => new Date(Date.now() - 60_000);
+  const at = () => new Date(Date.now() - 3_600_000).toISOString();
+  it('floor_rounding=dollar or lander exceptions outside ladder mode are refused', async () => {
+    await expect(newPricingSettings(db, { set: { floor_rounding: 'dollar' }, approvalText: 'x', approvalAt: at(), now: now() })).rejects.toThrow(/need drop_mode ladder/);
+    await expect(newPricingSettings(db, { set: { lander_exception_bins_cents: '[198800]' }, approvalText: 'x', approvalAt: at(), now: now() })).rejects.toThrow(/need drop_mode ladder|check constraint/);
+  });
+  it('price-list values must be whole dollars', async () => {
+    await expect(newPricingSettings(db, { set: { ...V3_SET, allowed_bins_cents: '[29900,39900,49900,78850,108800,148800,198800,248800]' }, approvalText: 'x', approvalAt: at(), now: now() })).rejects.toThrow(/whole dollars/);
+  });
 });

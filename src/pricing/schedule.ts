@@ -1,7 +1,7 @@
-import { ceil95, nice95, pct, round5, roundDollar } from './round.js';
+import { ceil95, nice95, pct, round5 } from './round.js';
 import type { Category, ListingMode, PriceScheduleEvent, PriceScheduleStatus } from '../db/types.js';
 import type { Cents } from './int.js';
-import { hybridBinMin } from './plan.js';
+import { hybridBinMin, priceFormula } from './plan.js';
 import { isV3, type PricingSettings } from './settings.js';
 
 export type ScheduleEventName = PriceScheduleEvent;
@@ -63,14 +63,6 @@ export function ladderStep(bin: Cents, steps: number, lane: 'geo' | 'nongeo', s:
 /** v3 final push: the lowest list price that is still >= floor and <= BIN. */
 function lowestListedAtOrAboveFloor(v: Values, s: PricingSettings): Cents {
   return laneList('nongeo', s).find((x) => x >= v.floor && x <= v.bin) ?? v.bin;
-}
-
-/** floor and walk-away from a BIN, by the formula (v3 recomputes after each ladder step; an exception does not carry through). */
-function formulaFor(bin: Cents, s: PricingSettings): Values {
-  const rawFloor = (s.floorRounding === 'dollar' ? roundDollar : round5)(pct(bin, s.floorBps));
-  const floor = Math.min(bin, Math.max(rawFloor, s.floorMinCents));
-  const walk = Math.min(floor, Math.max(round5(pct(bin, s.walkawayBps)), s.walkawayMinCents));
-  return { bin, floor, walk };
 }
 
 function applyDrop(v: Values, pctBps: number, s: PricingSettings): Values | null {
@@ -137,7 +129,11 @@ export function buildSchedule(input: {
     let next: Values | null;
     if (s.dropMode === 'ladder') {
       const bin = ladderStep(cur.bin, d.steps ?? 1, 'nongeo', s);
-      next = bin === null ? null : formulaFor(bin, s);
+      if (bin === null) next = null;
+      else {
+        const f = priceFormula(bin, s); // recomputed from the new BIN; an exception does not carry through
+        next = { bin, floor: f.floorCents, walk: f.walkawayCents };
+      }
     } else next = applyDrop(cur, d.pctBps ?? 0, s);
     if (!next) out.push(ev(name, due, cur, 'skipped_at_minimum'));
     else {

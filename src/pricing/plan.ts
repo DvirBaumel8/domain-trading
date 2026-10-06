@@ -28,7 +28,8 @@ export function hybridBinMin(s: PricingSettings): Cents {
   return isV3(s) ? (s.nongeoBinMinCents ?? ceil95(s.floorMinCents)) : ceil95(s.floorMinCents);
 }
 
-function formula(bin: Cents, s: PricingSettings): { floorCents: Cents; walkawayCents: Cents; raised: boolean } {
+/** The one floor / walk-away formula (plans and ladder drops both use it). */
+export function priceFormula(bin: Cents, s: PricingSettings): { floorCents: Cents; walkawayCents: Cents; raised: boolean } {
   const rawFloor = (s.floorRounding === 'dollar' ? roundDollar : round5)(pct(bin, s.floorBps));
   const floorCents = Math.min(bin, Math.max(rawFloor, s.floorMinCents));
   const walkawayCents = Math.min(floorCents, Math.max(round5(pct(bin, s.walkawayBps)), s.walkawayMinCents));
@@ -79,7 +80,7 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
     if (bin < hybridBinMin(s)) return fail('BIN_BELOW_FLOOR_MIN', 'BIN is below the minimum hybrid BIN', { min_bin_cents: hybridBinMin(s) });
   }
 
-  const f = formula(bin, s);
+  const f = priceFormula(bin, s);
   let floorCents = f.floorCents;
   let walkawayCents = f.walkawayCents;
   let pricingSource: Plan['pricingSource'] = 'formula';

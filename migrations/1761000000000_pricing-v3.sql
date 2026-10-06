@@ -18,7 +18,12 @@ ALTER TABLE pricing_settings ADD CONSTRAINT pricing_settings_v3_shape CHECK (
 
 -- Down Migration
 
--- Append-only table: refuse to drop v3 columns while a v3 row exists.
+-- Append-only table: refuse to drop the v3 columns while a v3 row exists (that would silently turn it into a v2 row).
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pricing_settings WHERE allowed_bins_cents IS NOT NULL) THEN
+    RAISE EXCEPTION 'cannot roll back pricing-v3: a v3 pricing_settings row exists (append-only)';
+  END IF;
+END $$;
 ALTER TABLE pricing_settings DROP CONSTRAINT pricing_settings_v3_shape;
 ALTER TABLE pricing_settings DROP CONSTRAINT pricing_settings_final_push_mode_check;
 ALTER TABLE pricing_settings ADD CONSTRAINT pricing_settings_final_push_mode_check CHECK (final_push_mode IN ('bin_to_floor_ceil95'));

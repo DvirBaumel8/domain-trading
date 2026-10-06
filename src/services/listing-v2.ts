@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Category, ListingMode } from '../db/types.js';
 import { dollarsToCents, formatUsd } from '../money.js';
-import { computePlan, FAST_TRANSFER_MAX_CENTS } from '../pricing/plan.js';
+import { computePlan, FAST_TRANSFER_MAX_CENTS, hybridBinMin } from '../pricing/plan.js';
 import { addMonthsClamped } from '../pricing/schedule.js';
 import { isV3, type PricingSettings } from '../pricing/settings.js';
 
@@ -77,6 +77,15 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
     }
     if (lto !== null) return fail('LTO_NOT_ALLOWED', 'Lease-to-own is only allowed in hybrid mode');
     if (bin < MIN_OFFER_FLOOR) return fail('MIN_OFFER_TOO_LOW', 'bin mode needs a BIN of at least $20');
+    // v3: the price list is never waived, not even by an override (an override relaxes mode guards only)
+    if (isV3(s) && !carried) {
+      const geo = ctx.category === 'geo';
+      const lane = (s.allowedBinsCents ?? []).filter((v) => (geo ? v >= s.geoBinMinCents && v <= s.geoBinMaxCents : v >= hybridBinMin(s)));
+      if (!lane.includes(bin)) return fail('BIN_NOT_IN_PRICE_LIST', 'A BIN must be on the price list', { allowed_bins_cents: lane });
+      if (!geo && s.landerExceptionBinsCents.includes(bin)) {
+        return fail('LANDER_EXCEPTION_REQUIRED', 'This BIN needs LANDER-1 evidence from the screening pack', { bin_cents: bin, needs: 'screening_pack (CR-001 P1b)' });
+      }
+    }
     out = { mode, category: ctx.category, grade: ctx.category === 'geo' ? ctx.grade : null, binCents: bin, floorCents: bin, walkawayCents: bin,
       minOfferCents: bin, ltoMaxMonths: null, pricingSource: 'formula', settingsVersion: s.version, formula: null };
     // V6 / V7
@@ -86,8 +95,6 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
         if (bin !== gradePrice) guards.push({ code: 'GEO_BIN_NOT_GRADE_PRICE', message: 'At buy, a geo BIN must be the grade price' });
       } else if (bin < s.geoBinMinCents || bin > s.geoBinMaxCents) {
         guards.push({ code: 'GEO_BIN_OUT_OF_RANGE', message: 'A geo BIN must be within the configured range' });
-      } else if (isV3(s) && !carried && !(s.allowedBinsCents ?? []).includes(bin)) {
-        return fail('BIN_NOT_IN_PRICE_LIST', 'A geo BIN must be on the price list', { allowed_bins_cents: (s.allowedBinsCents ?? []).filter((v) => v >= s.geoBinMinCents && v <= s.geoBinMaxCents) });
       } else {
         // A carried (stored) price was approved when it was set; replan re-decides and is not carried
         // In range: the grade price (or the scheduled strong -> weaker step) is bot-autonomous; any other price is a sell decision

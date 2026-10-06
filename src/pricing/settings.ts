@@ -51,8 +51,8 @@ function checkLadder(s: PricingSettings): void {
   if (list === null || s.nongeoBinMinCents === null || s.nongeoDefaultBinCents === null) {
     throw new Error('pricing_settings: ladder mode needs allowed_bins_cents, nongeo_bin_min_cents and nongeo_default_bin_cents');
   }
-  if (list.length === 0 || list.some((v, i) => !(v > 0) || (i > 0 && v <= list[i - 1]!))) {
-    throw new Error('pricing_settings.allowed_bins_cents: must be positive, strictly ascending and unique');
+  if (list.length === 0 || list.some((v, i) => !(v > 0) || v % 100 !== 0 || (i > 0 && v <= list[i - 1]!))) {
+    throw new Error('pricing_settings.allowed_bins_cents: must be positive whole dollars, strictly ascending and unique');
   }
   if (!list.includes(s.nongeoDefaultBinCents)) throw new Error('pricing_settings.nongeo_default_bin_cents: must be on allowed_bins_cents');
   if (s.nongeoDefaultBinCents < s.nongeoBinMinCents) throw new Error('pricing_settings.nongeo_default_bin_cents: must be >= nongeo_bin_min_cents');
@@ -73,6 +73,9 @@ function checkCrossFields(s: PricingSettings): PricingSettings {
   if (s.geoDrops.length > 1) throw new Error('pricing_settings.geo_drops: at most 1 entry');
   const g = s.geoDrops[0];
   if (s.dropMode === 'ladder') checkLadder(s);
+  else if (s.floorRounding !== 'round5' || s.landerExceptionBinsCents.length > 0) {
+    throw new Error("pricing_settings: floor_rounding other than round5 and lander_exception_bins_cents need drop_mode ladder");
+  }
   else if (s.finalPushMode === 'bin_to_lowest_listed_ge_floor') throw new Error('pricing_settings.final_push_mode bin_to_lowest_listed_ge_floor requires drop_mode ladder');
   if (g && s.dropMode === 'pct') {
     if (g.fromCents !== s.geoBinStrongCents) throw new Error('pricing_settings.geo_drops: from_cents must equal geo_bin_strong_cents');
