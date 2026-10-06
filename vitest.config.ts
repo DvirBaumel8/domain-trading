@@ -14,6 +14,8 @@ export default defineConfig({
           include: ['tests/api/**/*.test.ts'],
           globalSetup: ['tests/setup/global-db.ts'],
           setupFiles: ['tests/setup/network.ts', 'tests/setup/api.ts'],
+          // Several API tests spawn the admin/job CLI as a subprocess (tsx start-up); CI runners need more than 5 s.
+          testTimeout: 30_000,
         },
       },
       // Opt-in network projects: present only when VITEST_CONTRACT is set (the npm scripts set it), so plain
