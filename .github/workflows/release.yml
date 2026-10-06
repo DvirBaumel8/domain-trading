@@ -1,0 +1,56 @@
+name: release
+
+# Pushing a tag vX.Y.Z deploys that version to Render:
+#   1. the tag must be the tip of main, equal package.json's version and have a CHANGELOG entry;
+#   2. the full test suite must pass (ci.yml);
+#   3. the Render deploy hook is called (repo secret RENDER_DEPLOY_HOOK);
+#   4. GET {API_BASE_URL}/health/ping must answer within 10 minutes (repo variable API_BASE_URL).
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag is the tip of main (Render's deploy hook deploys main's latest commit)
+        run: |
+          git fetch -q origin main
+          [ "$(git rev-parse "$GITHUB_SHA")" = "$(git rev-parse origin/main)" ] || { echo "::error::tag $GITHUB_REF_NAME is not the tip of main; the deploy hook would ship a different commit"; exit 1; }
+      - name: Tag matches package.json and the CHANGELOG
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          [ "$tag" = "$pkg" ] || { echo "::error::tag v$tag but package.json is $pkg"; exit 1; }
+          grep -q "^## $tag" docs/contract/CHANGELOG.md || { echo "::error::no '## $tag' entry in docs/contract/CHANGELOG.md"; exit 1; }
+
+  test:
+    needs: check-version
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger the Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "::error::repo secret RENDER_DEPLOY_HOOK is not set (docs/DEPLOYMENT.md)"; exit 1; fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "deploy triggered for $GITHUB_REF_NAME"
+      - name: Wait for the service
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          if [ -z "$API_BASE_URL" ]; then echo "::warning::repo variable API_BASE_URL not set; skipping the health wait"; exit 0; fi
+          sleep 60
+          for i in $(seq 1 18); do
+            if curl -fsS --max-time 60 "$API_BASE_URL/health/ping" | grep -q '"ok"'; then echo "service up"; exit 0; fi
+            sleep 30
+          done
+          echo "::error::$API_BASE_URL/health/ping did not answer within 10 minutes"; exit 1

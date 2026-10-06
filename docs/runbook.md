@@ -79,5 +79,5 @@ budget and cap headroom. `GET /audit` shows every POST including `jobs/run` rows
 
 1. Full gate green: `npx vitest run && npx tsc --noEmit && npm run build`.
 2. Contract, `CHANGELOG.md`, `docs/internal/` and `gaps.md` updated in the same commit; release note `docs/releases/vX.Y.Z.md` written.
-3. Deploy: `curl -fsS -X POST "$RENDER_DEPLOY_HOOK"` (the hook URL is a secret: Render -> service -> Settings -> Deploy Hook; also stored as the GitHub secret `RENDER_DEPLOY_HOOK`). Render runs the migrations on start.
+3. Deploy: push the tag (`git tag vX.Y.Z && git push origin vX.Y.Z`). `.github/workflows/release.yml` checks that the tag is the tip of main, equals `package.json` and has a CHANGELOG entry, runs the full suite, calls the Render deploy hook and waits for `/health/ping`. Manual fallback: `curl -fsS -X POST "$RENDER_DEPLOY_HOOK"` (the hook URL is a secret: Render -> service -> Settings -> Deploy Hook; also stored as the GitHub secret `RENDER_DEPLOY_HOOK`). Render runs the migrations on start.
 4. Verify: `GET /health` (token) shows `db: ok` and the new `version`; fill in the release note's deploy status.

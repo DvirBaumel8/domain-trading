@@ -1,0 +1,4 @@
+# DOM (the vendor, working through Dvir's account) owns everything.
+# Gavriel may only add change requests and bug reports under docs/requests/ (checked by .github/workflows/requests-only.yml).
+*                  @DvirBaumel8
+/docs/requests/    @DvirBaumel8

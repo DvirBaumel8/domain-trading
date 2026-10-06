@@ -160,3 +160,14 @@ Check the `export` step in the reply, then that the `data-backup` branch has a n
 - **GoDaddy:** changing nameservers through the PAT may be refused for this account (403 `ACCOUNT_NOT_ELIGIBLE`). Then change NS by hand in GoDaddy and the NS verifier checks public DNS (`docs/internal/list.md`). GoDaddy is never a buying source here.
 - Check in GoDaddy that auto-renew is OFF for D-001 (renewals bill the card; the server cap cannot block them).
 - **Idempotency keys:** the hourly Worker calls add a small `idempotency_keys` row each (about 8,800 a year). The growth is fine for now (1 GB Neon); prune later if it ever matters.
+
+
+## Bot permissions (Gavriel writes only `docs/requests/`)
+`.github/workflows/requests-only.yml` fails any push in which a commit authored or committed as "Gavriel"/"Grok" changes a file outside `docs/requests/`. It **detects** violations; it can't prevent them, and author names are self-declared. To **enforce** it:
+1. Give Gavriel its own GitHub identity: a separate account added as a collaborator with **Write**, or a fine-grained token on that account. Don't use Dvir's account.
+2. Settings → Rules → Rulesets → New branch ruleset on `main`:
+   - **Restrict updates** with a bypass list that holds only Dvir's account;
+   - **Require status checks to pass** with `requests-only` and `ci`.
+3. Gavriel then pushes to a branch and opens a pull request touching only `docs/requests/`. `.github/CODEOWNERS` routes it to Dvir. DOM merges it after reading it.
+
+Until then the check gives a red ✗ on the offending push, and DOM reverts it.

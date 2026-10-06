@@ -1,0 +1,36 @@
+name: requests-only
+
+# Gavriel (the customer's bot) may only add or change files under docs/requests/.
+# Every commit in a push whose author or committer name contains "Gavriel" or "Grok" is checked.
+# This catches mistakes; it cannot undo a push. Real enforcement = branch protection plus a separate
+# GitHub identity for Gavriel (docs/DEPLOYMENT.md, "Bot permissions").
+on:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bot commits touch docs/requests/ only
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then range="$AFTER"; else range="$BEFORE..$AFTER"; fi
+          bad=0
+          for c in $(git rev-list "$range"); do
+            who="$(git log -1 --format='%an|%cn' "$c")"
+            if echo "$who" | grep -qiE 'gavriel|grok'; then
+              outside="$(git diff-tree --no-commit-id --name-only -r "$c" | grep -v '^docs/requests/' || true)"
+              if [ -n "$outside" ]; then
+                echo "::error::commit $c by '$who' changes files outside docs/requests/:"
+                echo "$outside"
+                bad=1
+              fi
+            fi
+          done
+          exit $bad

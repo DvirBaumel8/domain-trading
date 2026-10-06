@@ -1,0 +1,38 @@
+name: ci
+
+# Full test suite on every push to main (Postgres 16 service, same as docker compose).
+on:
+  push:
+    branches: [main]
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dt
+          POSTGRES_PASSWORD: dt
+          POSTGRES_DB: domain_trading
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U dt -d domain_trading"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      DATABASE_URL: postgres://dt:dt@localhost:5433/domain_trading
+      TEST_DATABASE_URL: postgres://dt:dt@localhost:5433/domain_trading_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create the test database (docker/initdb does this locally)
+        run: PGPASSWORD=dt psql -h localhost -p 5433 -U dt -d domain_trading -c 'CREATE DATABASE domain_trading_test OWNER dt'
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - run: npx vitest run
