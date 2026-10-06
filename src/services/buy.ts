@@ -561,8 +561,8 @@ export class BuyService {
     const { spent, pending } = await spentAndPending(db);
     const remaining = capCents - spent - pending;
     if (costCents > remaining) {
-      throw new AppError(409, 'POC_CAP_EXCEEDED', 'This purchase would exceed the $500 POC cap', {
-        spent_cents: spent, spent: formatUsd(spent), pending_cents: pending,
+      throw new AppError(409, 'POC_CAP_EXCEEDED', `This purchase would exceed the ${formatUsd(capCents)} POC cap`, {
+        cap_cents: capCents, spent_cents: spent, spent: formatUsd(spent), pending_cents: pending,
         remaining_cents: remaining, remaining: formatUsd(remaining), cost_cents: costCents,
       });
     }
