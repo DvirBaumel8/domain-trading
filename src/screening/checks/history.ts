@@ -99,7 +99,13 @@ export const historyCheck: Check = {
     const domain = ctx.item.domain;
     const { asOf, explicit } = asOfOf(ctx);
     const base = { ...NUL, as_of: asOf.toISOString() };
-    if (!ctx.settings.sources.wayback) return outcome('UNKNOWN', 'SOURCE_DISABLED', 'The Internet Archive source is switched off (sources.wayback)', base);
+    // Dvir, 6 Oct 2026 (CR-002 Amendment B1): the Internet Archive is never automated. With the source off the name waits for a human
+    // HIST-2 record (POST /screening/runs/{id}/manual, check "history"); it cannot join a tranche without one.
+    if (!ctx.settings.sources.wayback) {
+      return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', 'The Internet Archive is not automated: look the name up by hand and record HIST-2. Record the result with POST /screening/runs/{id}/manual (check "history")', {
+        ...base, lookup_name: domain, results: ['PASS', 'REJECT_HARMFUL', 'FLAG_PRIOR_BUSINESS'], archive_url: `https://web.archive.org/web/*/${domain}`,
+      });
+    }
     if (ctx.run.backtest && !ctx.item.as_of) return outcome('UNKNOWN', 'AS_OF_REQUIRED', 'A backtest or holdout run needs an as_of for every name', base);
     const missingSig = SIG_LISTS.filter((n) => !ctx.lists[n]);
     if (missingSig.length > 0) return outcome('UNKNOWN', 'LIST_MISSING', `No uploaded signature list: ${missingSig.join(', ')} (a missing list is never a clean result)`, { ...base, lists_missing: missingSig });

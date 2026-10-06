@@ -1,12 +1,15 @@
-// G5 Web Risk (CAP-06) and G7 US trademark (CAP-08): no official automated source is enabled (CR-001 §11 P-2: DOM does not use
-// undocumented website endpoints), so the run answers MANUAL_REQUIRED and a human result is recorded with
-// POST /screening/runs/{id}/manual. The record is turned into a status here, by the settings' rules.
+// G5 Web Risk (CAP-06), G7 US trademark (CAP-08) and G6 history (CAP-07, CR-002 Amendment B): no official automated source is enabled
+// (CR-001 §11 P-2: DOM does not use undocumented website endpoints; Dvir, 6 Oct 2026: the Internet Archive is never automated), so the
+// run answers MANUAL_REQUIRED and a human result is recorded with POST /screening/runs/{id}/manual. The record is turned into a status
+// here, by the settings' rules.
 import { z } from 'zod';
 import type { SelectionValuesT } from '../settings.js';
 import { outcome, type Check, type CheckOutcome, type ResultRow } from '../types.js';
+import { nameTokens } from '../prior-business.js';
+import { matchTerms } from './brand-lists.js';
 import { formFieldsOf } from './form.js';
 
-export const MANUAL_CHECKS = ['web_risk', 'tm_us'] as const;
+export const MANUAL_CHECKS = ['web_risk', 'tm_us', 'history'] as const;
 export type ManualCheckId = (typeof MANUAL_CHECKS)[number];
 
 export const WebRiskManual = z.object({ raw_status: z.number().int(), threat_types: z.array(z.string().max(80)).max(20).optional() }).strict();
@@ -110,5 +113,81 @@ export function tmFromManual(rec: z.infer<typeof TmManual>, evidenceUrl: string,
   if (rec.exact_or_core_live.length > 0) return outcome('FAIL', 'TM_LIVE_MARK', `Live mark on the exact or core phrase: ${rec.exact_or_core_live.map((m) => `${m.mark} (${m.serial}, ${m.owner})`).join('; ')}`, fields, extra);
   if ((rec.prior_name_live ?? []).length > 0) return outcome('FAIL', 'TM_LIVE_MARK', `Live mark on the prior business name "${priorName ?? ''}": ${rec.prior_name_live!.map((m) => `${m.mark} (${m.serial}, ${m.owner})`).join('; ')}`, fields, extra);
   if (rec.generic_live.length > 0) return outcome('FLAG', 'TM_GENERIC_HITS', `Live marks only on a generic phrase: ${rec.generic_live.map((m) => `${m.mark} (${m.serial})`).join('; ')}`, fields, extra);
+  return outcome('PASS', null, null, fields, extra);
+}
+
+// ---- manual HIST-2 (CR-002 Amendment B) ----
+
+export const HISTORY_RESULTS = ['PASS', 'REJECT_HARMFUL', 'FLAG_PRIOR_BUSINESS'] as const;
+export const HISTORY_CATEGORIES = ['malware_phishing', 'spam', 'adult', 'scam', 'trademark_abuse'] as const;
+/** A capture link of the Internet Archive: https://web.archive.org/web/<timestamp>[flags]/<original url>. */
+export const ARCHIVE_URL_RE = /^https:\/\/web\.archive\.org\/web\/\d{4,14}[a-z_]{0,4}\/\S+$/;
+const Year = z.number().int().min(1990).max(2100);
+
+export const HistoryManual = z.object({
+  result: z.enum(HISTORY_RESULTS),
+  category: z.enum(HISTORY_CATEGORIES).optional(),
+  prior_business_name: z.string().trim().min(1).max(200).optional(),
+  first_capture_year: Year.optional(),
+  last_capture_year: Year.optional(),
+  evidence_urls: z.array(z.string().max(500).regex(ARCHIVE_URL_RE, 'a web.archive.org/web/<timestamp>/... capture link')).max(10).optional(),
+  checked_by: z.string().trim().min(1).max(80),
+}).strict().superRefine((r, ctx) => {
+  if (r.result === 'REJECT_HARMFUL' && r.category === undefined) ctx.addIssue({ code: 'custom', path: ['category'], message: 'category is required for REJECT_HARMFUL' });
+  if (r.result !== 'REJECT_HARMFUL' && r.category !== undefined) ctx.addIssue({ code: 'custom', path: ['category'], message: 'category is only for REJECT_HARMFUL' });
+  if (r.result !== 'PASS' && (r.evidence_urls ?? []).length === 0) ctx.addIssue({ code: 'custom', path: ['evidence_urls'], message: `evidence_urls (at least one archive capture link) is required for ${r.result}` });
+  if (r.first_capture_year !== undefined && r.last_capture_year !== undefined && r.last_capture_year < r.first_capture_year) ctx.addIssue({ code: 'custom', path: ['last_capture_year'], message: 'last_capture_year is before first_capture_year' });
+});
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Turns a recorded HIST-2 into a history result with the SAME field shape as the automated check (derive, tier, ext_dates, source_lane
+ * and tranche admission read it unchanged). PASS -> PASS; REJECT_HARMFUL -> FAIL HARMFUL_HISTORY with hist2_fail_class = category;
+ * FLAG_PRIOR_BUSINESS -> FLAG PRIOR_BUSINESS_FLAGGED (a disclosed risk). The A1 guard runs on `prior_business_name` when given: a brand or
+ * big-company hit FAILs (a BRAND-1 / BIGCO-1 failure, not a HIST-2 one), a missing list is UNKNOWN; the manual TM record must then
+ * include that name's phrase (tmFromManual, PRIOR_NAME_NOT_QUERIED).
+ *
+ * prior_history: 1 when a capture year is given or the result is FLAG_PRIOR_BUSINESS (archive content existed before), otherwise null
+ * (unknown, never 0: a human "no problem found" does not say the archive was empty). source_lane / com_prior_registration follow it:
+ * prior_history 1 -> `expired_drop` / `yes`, otherwise `unknown`.
+ */
+export function historyFromManual(
+  rec: z.infer<typeof HistoryManual>, lists: { brand: { version: number; terms: string[] } | null; bigco: { version: number; terms: string[] } | null },
+  evidenceUrl: string, checkedAt: Date, note?: string,
+): CheckOutcome {
+  const flag = rec.result === 'FLAG_PRIOR_BUSINESS';
+  const reject = rec.result === 'REJECT_HARMFUL';
+  const priorHistory = rec.first_capture_year !== undefined || rec.last_capture_year !== undefined || flag ? 1 : null;
+  const name = rec.prior_business_name ?? null;
+  const years = rec.first_capture_year !== undefined && rec.last_capture_year !== undefined ? rec.last_capture_year - rec.first_capture_year : null;
+
+  let guard: Record<string, unknown> | null = null;
+  let guardIssue: { status: 'FAIL' | 'UNKNOWN'; code: string; reason: string } | null = null;
+  if (name !== null) {
+    const tokens = nameTokens(name);
+    const none = tokens.map(() => false);
+    const brand = lists.brand ? matchTerms(tokens, none, lists.brand.terms) : null;
+    const bigco = lists.bigco ? matchTerms(tokens, none, lists.bigco.terms) : null;
+    guard = { name, brand_hits: brand, bigco_hits: bigco, brand_list: lists.brand?.version ?? null, bigco_list: lists.bigco?.version ?? null, cap08_required: true, gate: 'G1', rules: ['BRAND-1', 'BIGCO-1'] };
+    if (brand && brand.length > 0) guardIssue = { status: 'FAIL', code: 'PRIOR_BUSINESS_BRAND_HIT', reason: `The prior business name "${name}" is on the brand list (${brand.map((x) => x.term).join(', ')}); a BRAND-1 failure, not a HIST-2 one` };
+    else if (bigco && bigco.length > 0) guardIssue = { status: 'FAIL', code: 'PRIOR_BUSINESS_BIGCO_HIT', reason: `The prior business name "${name}" is on the big-company list (${bigco.map((x) => x.term).join(', ')}); a BIGCO-1 failure, not a HIST-2 one` };
+    else if (!brand || !bigco) guardIssue = { status: 'UNKNOWN', code: 'LIST_MISSING', reason: `No uploaded ${!brand ? 'brand' : 'bigco'} list: the prior business name cannot be checked (never a clean result)` };
+  }
+
+  const fields = {
+    source: 'manual', manual: true, checked_by: rec.checked_by, checked_at: checkedAt.toISOString(), note: note ?? null, manual_result: rec.result,
+    prior_history: priorHistory, pre_caps: null, first_capture: null, last_capture: null, first_capture_year: rec.first_capture_year ?? null, last_capture_year: rec.last_capture_year ?? null,
+    pre_cls: reject ? 'harmful' : 'unknown', hist2: reject ? 'FAIL' : flag ? 'FLAG' : 'PASS', hist2_fail_class: reject ? rec.category ?? null : null,
+    forsale: null, parked_only: null, captures: [] as unknown[], archive_span_yrs: years === null ? null : round1(years),
+    prior_business_use: flag || name !== null ? 'yes' : 'unknown', prior_business_name: name, prior_business_years: name !== null && years !== null ? round1(years) : null,
+    ...(guard && { prior_business_guard: guard }),
+    source_lane: priorHistory === 1 ? 'expired_drop' : 'unknown', source_lane_inferred: true, com_prior_registration: priorHistory === 1 ? 'yes' : 'unknown',
+    evidence_urls: rec.evidence_urls ?? (evidenceUrl ? [evidenceUrl] : []),
+  };
+  const extra = { dataAsOf: checkedAt };
+  if (reject) return outcome('FAIL', 'HARMFUL_HISTORY', `Recorded by ${rec.checked_by}: harmful use of the name in the archive (${rec.category})`, fields, extra);
+  if (guardIssue) return outcome(guardIssue.status, guardIssue.code, guardIssue.reason, fields, extra);
+  if (flag) return outcome('FLAG', 'PRIOR_BUSINESS_FLAGGED', `Recorded by ${rec.checked_by}: a prior business used this name${name ? ` ("${name}")` : ''}; disclosed risk, the trademark search must cover it`, fields, extra);
   return outcome('PASS', null, null, fields, extra);
 }

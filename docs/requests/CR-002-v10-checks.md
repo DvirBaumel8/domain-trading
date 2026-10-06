@@ -1,6 +1,6 @@
 # CR-002 — Selection v10 check changes (delta to CR-001)
 
-> **DOM, 2026-10-06: shipped in v1.1.0 (CR-002 P1 + Amendment A; `docs/releases/v1.1.0.md`). Not shipped: the screening pack and `NO_TRANCHE` (2.0.0), CAP-14/15/16/19 (1.2.0), CR-002 Amendment B (gaps G-55), CAP-25 and CAP-21b (P2).**
+> **DOM, 2026-10-06: shipped in v1.1.0 (CR-002 P1 + Amendment A; `docs/releases/v1.1.0.md`). Amendment B (manual HIST-2) is also in v1.1.0. Not shipped: the screening pack and `NO_TRANCHE` (2.0.0), CAP-14/15/16/19 (1.2.0), CAP-25 and CAP-21b (P2).**
 
 
 | Field | Value |

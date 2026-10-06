@@ -283,13 +283,13 @@ describe('history: the archive failing is UNKNOWN, never "no history"', () => {
     expect(body.names[0].final_status).toBe('unknown');
   });
 
-  it('the seed ships with sources.wayback false (the Internet Archive has not given written permission): UNKNOWN SOURCE_DISABLED, nothing is fetched', async () => {
+  it('the seed ships with sources.wayback false (the Internet Archive is never automated, Amendment B1): MANUAL_REQUIRED MANUAL_SOURCE (CR-002 Amendment B1), nothing is fetched', async () => {
     const x = await h({ enabled: false });
     serve(x, { 'memphisplumbingpros.com': recordedSite('memphisplumbingpros.com') });
     const { body } = await x.runDone({ checks: ['history'], names: [item('memphisplumbingpros.com')] });
-    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED', fields: { prior_history: null, pre_cls: 'unknown' } });
+    expect(hist(body)).toMatchObject({ status: 'MANUAL_REQUIRED', reason_code: 'MANUAL_SOURCE', fields: { prior_history: null, pre_cls: 'unknown', lookup_name: 'memphisplumbingpros.com' } });
     expect(x.log.cdx).toHaveLength(0);
-    expect(body.names[0].final_status).toBe('unknown');
+    expect(body.names[0]).toMatchObject({ final_status: 'pending_manual', pending_manual: ['history'] });
   });
 });
 

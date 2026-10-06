@@ -104,6 +104,11 @@ export class TrancheService {
       await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
     const it = a.items.find((i) => i.item.domain === domain && !i.item.input_error);
     if (!it) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${domain}" is not a screened name of run ${runId}`);
+    // CR-002 Amendment B5.2: a name whose history is still waiting for the human HIST-2 record never joins (it is not rejected, so say what is missing).
+    if (!['rejected', 'invalid'].includes(it.derived.final_status) && latestByCheck(it.rows).get('history')?.status === 'MANUAL_REQUIRED') {
+      throw new AppError(409, 'MANUAL_REQUIRED', `${domain} has no HIST-2 record in run ${runId}: record it with POST /screening/runs/{id}/manual (check "history") and screen the name again`,
+        { run_id: runId, check: 'history', final_status: it.derived.final_status });
+    }
     if (!OK_STATUS.includes(it.derived.final_status)) {
       throw new AppError(409, 'NOT_SCREENED_OK', `${domain} is ${it.derived.final_status} in run ${runId}; only would_buy, buy_candidate or pending_manual names join a tranche`,
         { run_id: runId, final_status: it.derived.final_status, first_fail: it.derived.first_fail });
@@ -114,8 +119,10 @@ export class TrancheService {
     let mainLane = false;
     if (lane === 'S7') {
       const h = latest.get('history');
-      // Only a passing history with an inferred expired_drop source lane counts; `fresh` and `unknown` (source off) do not.
-      mainLane = !!h && pass(h.status) && h.fields.source_lane === 'expired_drop';
+      // Only a passing history with an inferred expired_drop source lane counts; `fresh` and `unknown` do not. A manual record (CR-002
+      // Amendment B5.4) also counts as FLAG_PRIOR_BUSINESS (a disclosed risk, not a rejection); its lane is expired_drop only when it says
+      // the archive held captures (a capture year, or the flag itself).
+      mainLane = !!h && (pass(h.status) || (h.status === 'FLAG' && h.fields.manual === true)) && h.fields.source_lane === 'expired_drop';
     } else if (lane === 'S3') {
       mainLane = latest.get('tier')?.status === 'PASS';
     }

@@ -6,9 +6,10 @@ import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { dollarsToCents, formatUsd } from '../money.js';
-import { MANUAL_CHECKS, TmManual, WebRiskManual, tmFromManual, webRiskFromManual } from '../screening/checks/manual.js';
+import { HistoryManual, MANUAL_CHECKS, TmManual, WebRiskManual, historyFromManual, tmFromManual, webRiskFromManual } from '../screening/checks/manual.js';
 import { GATE_OF } from '../screening/checks/index.js';
-import { latestByCheck } from '../screening/derive.js';
+import { beats, latestByCheck } from '../screening/derive.js';
+import { listVersion } from '../screening/lists.js';
 import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, refreshSummary, toResultRow, type ScreeningWorker } from '../screening/engine.js';
 import { REGISTRAR_ENV } from '../registrars/registry.js';
 import { readEvidence, storeEvidence } from '../screening/evidence.js';
@@ -35,7 +36,8 @@ const RunBody = z.object({
 }).strict();
 const ManualBody = z.object({
   domain: z.string().trim().min(1).max(253), check: z.string(), checked_at: IsoTime,
-  evidence_url: z.string().url().max(500).refine((u) => u.startsWith('https://'), 'an https URL'),
+  // Required for web_risk and tm_us; a history record carries its archive links in result.evidence_urls (this one is then optional).
+  evidence_url: z.string().url().max(500).refine((u) => u.startsWith('https://'), 'an https URL').optional(),
   result: z.unknown(), note: z.string().max(500).optional(),
 }).strict();
 const QuoteBody = z.object({
@@ -111,7 +113,8 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     if (!(MANUAL_CHECKS as readonly string[]).includes(body.check)) {
       throw new AppError(422, 'CHECK_NOT_MANUAL', `Only ${MANUAL_CHECKS.join(' and ')} take a manual record`, { check: body.check, manual: MANUAL_CHECKS });
     }
-    const check = body.check as (typeof MANUAL_CHECKS)[number];
+    type ManualCheck = (typeof MANUAL_CHECKS)[number];
+    const check = body.check as ManualCheck;
     let domain: string | null = null;
     try { domain = normalizeDomain(body.domain); } catch { /* not a name of any run */ }
     const item = (run.input as { names: RunItem[] }).names.find((n) => n.domain === domain && !n.input_error);
@@ -123,25 +126,53 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     if (windowH > 0 && checkedAt.getTime() < deps.now() - windowH * 3_600_000) {
       throw new AppError(422, 'CHECKED_AT_INVALID', `checked_at is older than the ${check} freshness window (${windowH} h)`, { freshness_hours: windowH });
     }
-    const rec = check === 'web_risk' ? WebRiskManual.parse(body.result) : TmManual.parse(body.result);
-    const history = await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
-      .where('check_id', '=', 'history').orderBy('id', 'desc').limit(1).executeTakeFirst();
+    if (check !== 'history' && body.evidence_url === undefined) throw new AppError(422, 'VALIDATION_ERROR', 'Request body is invalid', { issues: [{ path: 'evidence_url', message: `evidence_url is required for ${check}` }] });
+    const rec = check === 'web_risk' ? WebRiskManual.parse(body.result) : check === 'tm_us' ? TmManual.parse(body.result) : HistoryManual.parse(body.result);
+    // The history in force for this name: the same precedence as derive (a manual record outranks an auto or cached row).
+    const histRows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
+      .where('check_id', '=', 'history').execute()).map(toResultRow);
+    const history = histRows.reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined);
+    const evidenceUrl = body.evidence_url ?? (rec as { evidence_urls?: string[] }).evidence_urls?.[0] ?? `manual:history:${item.domain}`;
     const json = JSON.stringify(rec);
     const evidenceId = await storeEvidence(db, {
-      source: 'manual', url: body.evidence_url, retrievedAt: checkedAt, httpStatus: null, contentType: 'application/json',
+      source: 'manual', url: evidenceUrl, retrievedAt: checkedAt, httpStatus: null, contentType: 'application/json',
       body: json, text: json, maxBytes: sel.values.evidence.max_text_bytes,
     });
-    const o = check === 'web_risk'
-      ? webRiskFromManual(rec as z.infer<typeof WebRiskManual>, sel.values, history ? toResultRow(history) : undefined, body.evidence_url, checkedAt, body.note)
-      : tmFromManual(rec as z.infer<typeof TmManual>, body.evidence_url, checkedAt, body.note, history ? toResultRow(history) : undefined);
-    const row = await db.insertInto('screening_results').values({
-      run_id: run.id, item_idx: item.idx, domain: item.domain, lane: item.lane, check_id: check, gate: GATE_OF[check],
-      rule_ids: worker.checks[check]?.ruleIds ?? [], status: o.status, reason_code: o.reasonCode, reason: o.reason,
-      fields: JSON.stringify(o.fields), data_as_of: o.dataAsOf, checked_at: checkedAt, settings_label: run.settings_label,
-      list_versions: JSON.stringify(Object.fromEntries((worker.checks[check]?.lists ?? []).filter((n) => (run.list_versions as Record<string, number>)[n] !== undefined).map((n) => [n, (run.list_versions as Record<string, number>)[n]]))),
-      duration_ms: 0, upstream_calls: 0, evidence_ids: [String(evidenceId)], source: 'manual',
+    let o;
+    if (check === 'web_risk') o = webRiskFromManual(rec as z.infer<typeof WebRiskManual>, sel.values, history, evidenceUrl, checkedAt, body.note);
+    else if (check === 'tm_us') o = tmFromManual(rec as z.infer<typeof TmManual>, evidenceUrl, checkedAt, body.note, history);
+    else {
+      const versions = run.list_versions as Record<string, number>;
+      const load = async (n: string) => { const l = versions[n] === undefined ? null : await listVersion(db, n, versions[n]); return l ? { version: l.version, terms: l.terms } : null; };
+      o = historyFromManual(rec as z.infer<typeof HistoryManual>, { brand: await load('brand'), bigco: await load('bigco') }, evidenceUrl, checkedAt, body.note);
+    }
+    const put = (id: ManualCheck, out: typeof o, at: Date, evidenceIds: string[]) => db.insertInto('screening_results').values({
+      run_id: run.id, item_idx: item.idx, domain: item.domain, lane: item.lane, check_id: id, gate: GATE_OF[id],
+      rule_ids: worker.checks[id]?.ruleIds ?? [], status: out.status, reason_code: out.reasonCode, reason: out.reason,
+      fields: JSON.stringify(out.fields), data_as_of: out.dataAsOf, checked_at: at, settings_label: run.settings_label,
+      list_versions: JSON.stringify(Object.fromEntries((worker.checks[id]?.lists ?? []).filter((n) => (run.list_versions as Record<string, number>)[n] !== undefined).map((n) => [n, (run.list_versions as Record<string, number>)[n]]))),
+      duration_ms: 0, upstream_calls: 0, evidence_ids: evidenceIds, source: 'manual',
       recorded_by: req.auth!.name, audit_id: req.auditId!,
     }).returningAll().executeTakeFirstOrThrow();
+    const row = await put(check, o, checkedAt, [String(evidenceId)]);
+    // A history record decides what the earlier manual Web Risk / trademark records of this name needed (the prior-business phrase, a final
+    // history): those are re-read against it, and a changed verdict is appended (never edited).
+    if (check === 'history') {
+      const all = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
+        .where('check_id', 'in', ['web_risk', 'tm_us']).execute()).map(toResultRow);
+      const newHist = toResultRow(row);
+      for (const id of ['web_risk', 'tm_us'] as const) {
+        const cur = all.filter((r) => r.check_id === id).reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined);
+        if (!cur || cur.source !== 'manual') continue;
+        const f = cur.fields;
+        const url = typeof f.evidence_url === 'string' ? f.evidence_url : evidenceUrl;
+        const at = new Date(typeof f.checked_at === 'string' ? f.checked_at : cur.checked_at);
+        const re = id === 'web_risk'
+          ? webRiskFromManual(WebRiskManual.parse({ raw_status: f.raw_status, threat_types: f.threat_types }), sel.values, newHist, url, at, typeof f.note === 'string' ? f.note : undefined)
+          : tmFromManual(TmManual.parse({ phrases_queried: f.phrases_queried, control_ok: f.control_ok, exact_or_core_live: f.exact_or_core_live, generic_live: f.generic_live, dead_n: f.dead_n ?? undefined, prior_name_live: f.prior_name_live ?? undefined }), url, at, typeof f.note === 'string' ? f.note : undefined, newHist);
+        if (re.status !== cur.status || re.reasonCode !== cur.reason_code) await put(id, re, at, cur.evidence_ids.map(String));
+      }
+    }
     await refreshSummary(db, run);
     return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name });
   });

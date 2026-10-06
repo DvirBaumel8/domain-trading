@@ -51,7 +51,7 @@ export async function screeningHarness(opts: { start?: number; stopAfterResults?
   return { app, clock, post, get, run, runDone };
 }
 
-/** Switches `sources.wayback` on in the active (seeded) settings. It ships off until the Internet Archive gives written permission. */
+/** Switches `sources.wayback` on in the active (seeded) settings. It ships off for good (Amendment B1); only these tests switch it on. */
 export async function enableWayback(): Promise<void> {
   await testDb.connection().execute(async (conn) => {
     await sql`SET session_replication_role = replica`.execute(conn);
