@@ -11,10 +11,13 @@ export interface Logger {
 
 export const TIMEOUT_MS = 90_000;
 
-const CRON_JOBS: Record<string, Job> = {
-  '0 * * * *': 'tick',
-  '5 0 * * *': 'daily',
-};
+// One cron trigger only (the Cloudflare free plan allows 5 per account): every hour at :05 runs `tick`;
+// the 00:05 UTC firing also runs `daily` afterwards.
+export const CRON = '5 * * * *';
+
+export function jobsFor(scheduledTime: number): Job[] {
+  return new Date(scheduledTime).getUTCHours() === 0 ? ['tick', 'daily'] : ['tick'];
+}
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -65,11 +68,10 @@ export async function triggerJob(
 
 export default {
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    const job = CRON_JOBS[controller.cron];
-    if (!job) {
+    if (controller.cron !== CRON) {
       console.error(`jobs-trigger: unknown cron "${controller.cron}"`);
       return;
     }
-    await triggerJob(job, env, controller.scheduledTime, fetch, console);
+    for (const job of jobsFor(controller.scheduledTime)) await triggerJob(job, env, controller.scheduledTime, fetch, console);
   },
 };

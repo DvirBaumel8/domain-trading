@@ -103,7 +103,7 @@ Envelope, cross-cutting codes, money and time conventions: `docs/contract/README
 ## 8. Hosting ($0; Dvir, 5 Oct 2026)
 - **Render free web service** (`render.yaml`, Blueprint; sleeps when idle, ~50 s cold start). Health check `/health/ping` (no DB, so it never wakes Neon). Deploy in its own free workspace (750 instance-hours per workspace; no keep-warm ping).
 - **Neon free Postgres**, **direct** connection (production refuses a `-pooler` host: the per-domain lock is a session advisory lock), TLS `sslmode=verify-full` (`DATABASE_SSL=true`). No paid PITR: recovery = the nightly export + the restore drill (`backup.md`).
-- **Cloudflare Worker cron** (`jobs-trigger/`) calls `POST /jobs/run`: `tick` `0 * * * *`, `daily` `5 0 * * *`. The service runs no timers; locally `npm run job -- tick|daily` runs the same `JobRunner` (backup skipped with a warning when unconfigured; exit 1 if a step failed, 2 on bad args; audited with scope `job`, method `CLI`).
+- **Cloudflare Worker cron** (`jobs-trigger/`) calls `POST /jobs/run`: one cron `5 * * * *` (the Cloudflare free plan allows 5 per account): `tick` every hour at :05, and at 00:05 UTC `daily` right after it. The service runs no timers; locally `npm run job -- tick|daily` runs the same `JobRunner` (backup skipped with a warning when unconfigured; exit 1 if a step failed, 2 on bad args; audited with scope `job`, method `CLI`).
 - **Outbound IPs:** Render free uses shared regional ranges; Porkbun's IP allowlist is skipped. Namecheap needs fixed IPv4s (paid), so it stays out.
 - Setup steps: `docs/DEPLOYMENT.md`.
 

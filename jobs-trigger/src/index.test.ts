@@ -82,12 +82,12 @@ describe('triggerJob', () => {
 });
 
 describe('scheduled', () => {
-  const run = async (cron: string) => {
+  const run = async (cron: string, scheduledTime = 42) => {
     const fetchMock = vi.fn().mockResolvedValue(ok());
     vi.stubGlobal('fetch', fetchMock);
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      await worker.scheduled({ cron, scheduledTime: 42 } as ScheduledController, env, {} as ExecutionContext);
+      await worker.scheduled({ cron, scheduledTime } as ScheduledController, env, {} as ExecutionContext);
       return { fetchMock, errSpy: { calls: errSpy.mock.calls.length } };
     } finally {
       vi.unstubAllGlobals();
@@ -95,15 +95,19 @@ describe('scheduled', () => {
     }
   };
 
-  it('maps the hourly cron to tick', async () => {
-    const { fetchMock } = await run('0 * * * *');
+  it('runs tick at :05 on non-midnight hours', async () => {
+    const t = Date.UTC(2026, 9, 7, 13, 5);
+    const { fetchMock } = await run('5 * * * *', t);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]![1].body).toBe('{"job":"tick"}');
-    expect(fetchMock.mock.calls[0]![1].headers['Idempotency-Key']).toBe('tick-42');
+    expect(fetchMock.mock.calls[0]![1].headers['Idempotency-Key']).toBe(`tick-${t}`);
   });
 
-  it('maps the daily cron to daily', async () => {
-    const { fetchMock } = await run('5 0 * * *');
-    expect(fetchMock.mock.calls[0]![1].body).toBe('{"job":"daily"}');
+  it('runs tick then daily at 00:05 UTC', async () => {
+    const t = Date.UTC(2026, 9, 7, 0, 5);
+    const { fetchMock } = await run('5 * * * *', t);
+    expect(fetchMock.mock.calls.map((c) => c[1].body)).toEqual(['{"job":"tick"}', '{"job":"daily"}']);
+    expect(fetchMock.mock.calls[1]![1].headers['Idempotency-Key']).toBe(`daily-${t}`);
   });
 
   it('logs an unknown cron and sends nothing', async () => {
