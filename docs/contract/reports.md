@@ -17,6 +17,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `per_domain` | One row per domain (pending purchases excluded), see below |
 | `upcoming_90d` | Events within 90 days, see below |
 | `offers_by_strategy` | `[{category, strategy, names_listed, names_with_offers, offers_90d, offers_per_listed_name_per_month (2 decimals), median_offer_pct_of_bin, max_offer_pct_of_bin, band_shares: {<band>: share}}]` (`names_listed`, `names_with_offers` and `offers_90d` count currently listed names; `median_offer_pct_of_bin`, `max_offer_pct_of_bin` and `band_shares` cover all offers ever logged for the category; `strategy` is the service's strategy label for the category, `S2`..`S7`) |
+| `tranches` | `[<tranche view without members>]`, newest first: open and closed tranches with `counts`, spend cap, `committed` and (closed) `close_report`; shape in `endpoints.md` §Tranches |
 | `applied_7d` | Price events applied in the last 7 days: `[{domain, event, applied_at, old: {bin_cents, bin, floor_cents, floor, walkaway_cents, walkaway}, new: {…}, export_pending: bool}]` |
 | `warnings` | `[{code, level: "error"|"warn"|"info", domain?, message, details}]`, sorted error → warn → info, then by code and domain |
 

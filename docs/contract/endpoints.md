@@ -79,14 +79,15 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
   | `dry_run` | bool? | default `false` |
   | `auto_list` | bool? | default `true`: after the buy, point NS at the lander and store the listing |
 
-- **Checks, in order (any failure stops the call; no registrar call before check 6):** approval (`APPROVAL_INVALID` / `APPROVAL_EXPIRED`) → `proposed_listing.mode` (`MODE_INVALID`) → category (`CATEGORY_REQUIRED`) → grade (`GEO_GRADE_REQUIRED` / `GRADE_NOT_GEO`) → the listing rules for `proposed_listing` (the `/list` listing codes, plus `PRICING_FORMULA_MISMATCH`; a geo BIN must equal the grade price; under `pricing_settings` v3 also `BIN_NOT_IN_PRICE_LIST` and `LANDER_EXCEPTION_REQUIRED`) → comps (`COMPS_REQUIRED` / `COMPS_INVALID`) → settings version (409 `SETTINGS_VERSION_CHANGED`) → not owned (409 `ALREADY_OWNED_OR_PENDING` / `ALREADY_IN_PORTFOLIO`) → domain cap (409 `DOMAIN_CAP_REACHED`) → live re-check, no cache (409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE`) → price caps, then the cheapest two-year (409 `PRICE_ABOVE_MAX`, `details.cheapest`) → POC cap $1,500 including open purchases (409 `POC_CAP_EXCEEDED`, `details` `cap_cents`, `spent_cents`, `spent`, `pending_cents`, `remaining_cents`, `remaining`, `cost_cents`) → registrar account (409 `REGISTRAR_STATE_UNKNOWN` / `REGISTRAR_AUTO_TOPUP_ON` / `REGISTRAR_FUNDS`) → the registrar's own dry run with the exact cost (409 `REGISTRAR_DRY_RUN_FAILED` with `details.registrar_code`; a price change re-quotes once and re-checks the caps; an ambiguous answer → 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`).
+- **Checks, in order (any failure stops the call; no registrar call before check 6):** approval (`APPROVAL_INVALID` / `APPROVAL_EXPIRED`) → `proposed_listing.mode` (`MODE_INVALID`) → category (`CATEGORY_REQUIRED`) → grade (`GEO_GRADE_REQUIRED` / `GRADE_NOT_GEO`) → the listing rules for `proposed_listing` (the `/list` listing codes, plus `PRICING_FORMULA_MISMATCH`; a geo BIN must equal the grade price; under `pricing_settings` v3 also `BIN_NOT_IN_PRICE_LIST` and `LANDER_EXCEPTION_REQUIRED`) → comps (`COMPS_REQUIRED` / `COMPS_INVALID`) → settings version (409 `SETTINGS_VERSION_CHANGED`) → **buy hold** (409 `BUY_HOLD`, real buys only, see below) → not owned (409 `ALREADY_OWNED_OR_PENDING` / `ALREADY_IN_PORTFOLIO`) → domain cap (409 `DOMAIN_CAP_REACHED`) → live re-check, no cache (409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE`) → price caps, then the cheapest two-year (409 `PRICE_ABOVE_MAX`, `details.cheapest`) → POC cap $1,500 including open purchases (409 `POC_CAP_EXCEEDED`, `details` `cap_cents`, `spent_cents`, `spent`, `pending_cents`, `remaining_cents`, `remaining`, `cost_cents`) → registrar account (409 `REGISTRAR_STATE_UNKNOWN` / `REGISTRAR_AUTO_TOPUP_ON` / `REGISTRAR_FUNDS`) → the registrar's own dry run with the exact cost (409 `REGISTRAR_DRY_RUN_FAILED` with `details.registrar_code`; a price change re-quotes once and re-checks the caps; an ambiguous answer → 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`).
+- **Buy hold (v1.1.0, additive).** A domain that has a screening result is held when the settings version of the **latest** screening run that screened it has `buy_hold` on, is a backtest, or is no longer the active version (the same rule as `would_buy`). A real `/buy` of a held name → 409 `BUY_HOLD` (`details.settings_version`, `details.run_id`), before any registrar call. A domain that was **never screened** is not held: `/buy` behaves as in v1.0.x. A dry run is never refused; it adds `would_be_blocked: "BUY_HOLD"` to its 200. `/buy` does **not** require a tranche (`NO_TRANCHE` is planned for v2.0.0).
 - **`dry_run: true`** stops after the checks. **200:**
   ```
   { dry_run: true, domain, check_id, registrar, first_year/renewal/two_year (money pairs),
     poc_spent (pair), poc_remaining_after (pair), domains_owned: int (owned + listed + delisted + pending purchases),
     registrar_dry_run: { would_succeed: true, cost, cost_cents },
     proposed_listing: null | <plan view, with the schedule anchored today and drop date +24 months>,
-    settings_version: int, warnings: [string] }
+    settings_version: int, would_be_blocked?: "BUY_HOLD", warnings: [string] }
   ```
   Writes only the audit row and the quotes. The same key can't be reused for a real buy (different body → 409).
 - **201 (bought):**
@@ -349,13 +350,13 @@ WRITE (it writes only the audit row; nothing else is stored). Evaluates the tier
 
 ### `POST /screening/runs`
 WRITE. Starts a screening run (CAP-20) over 1 to 50 names and returns at once; the run is stored per (name, check) and continues in the background (and after a restart: see `jobs.md` `screeningResume`). Poll `GET /screening/runs/{id}`.
-- **Body (strict):** `mode?` (`live` default | `full`), `settings?` (a settings label; default the active version), `tranche_id?` (stored; concentration uses it for the geo cap once tranches exist), `checks?` (a subset of check ids: each lane's gate list is cut to it, in settings order; a lane left with nothing → 422 `VALIDATION_ERROR`), `names` (1–50) each `{domain, lane (S2 geo | S3 | S4 | S6 | S7), city?, state?, trade?, price_grade? (strong|weaker), bin_usd?, leads_ab? (default 0), census_list?, as_of? (ISO with offset, full mode only), rank? (int)}`.
+- **Body (strict):** `mode?` (`live` default | `full`), `settings?` (a settings label; default the active version), `tranche_id?` (an existing tranche, else 404 `TRANCHE_NOT_FOUND`; concentration counts its real geo members for the geo cap), `checks?` (a subset of check ids: each lane's gate list is cut to it, in settings order; a lane left with nothing → 422 `VALIDATION_ERROR`), `names` (1–50) each `{domain, lane (S2 geo | S3 | S4 | S6 | S7), city?, state?, trade?, price_grade? (strong|weaker), bin_usd?, leads_ab? (default 0), census_list?, as_of? (ISO with offset, full mode only), rank? (int)}`.
 - **Modes:** `live` stops a name at its first FAIL or UNKNOWN; `full` runs every planned check regardless. `live` needs the **active** settings version; a `full` run may name any version, and a non-active one makes it a `backtest` (results labelled, never a buy card).
 - **Order:** gate by gate in the settings' plan order, names in `rank` order (lower first; unranked after ranked, then submission order), so CONCENTRATION-1 sees the names ranked ahead.
 - **Per-name problems never fail the request:** an unreadable or duplicate name gets one `form` result FAIL `INPUT_INVALID` (`fields.cause` and the start of `reason`: `DUPLICATE` the same name again, `NOT_COM`, `DOMAIN_INVALID`) and the final status `invalid`.
 - **202:** `{run_id, status: "running", mode, backtest, settings_version, buy_hold, names_n, poll: "/screening/runs/<id>"}`.
 - **Buy hold:** a run labelled `backtest` (a non-active settings version), or whose settings version is no longer the active one, never reports `buy_candidate`: a name that passes is `would_buy`.
-- **Errors:** 422 `DRAFT_NOT_ALLOWED_LIVE` (`settings` is not the active version in a live run; `details.active`) · 404 `SETTINGS_NOT_FOUND` · 422 `AS_OF_LIVE_REFUSED` (`as_of` on a live run) · 422 `VALIDATION_ERROR` (size, lane, unknown check, unknown key). `TRANCHE_NOT_FOUND` arrives with tranches.
+- **Errors:** 422 `DRAFT_NOT_ALLOWED_LIVE` (`settings` is not the active version in a live run; `details.active`) · 404 `SETTINGS_NOT_FOUND` · 422 `AS_OF_LIVE_REFUSED` (`as_of` on a live run) · 422 `VALIDATION_ERROR` (size, lane, unknown check, unknown key). · 404 `TRANCHE_NOT_FOUND` (`tranche_id`).
 
 ### `GET /screening/runs/{id}`
 READ. `?domain=` (one name), `?view=summary|full` (default `full`; `summary` leaves out `results`). **A READ poll may start background work:** a running run whose last row is older than 120 s (the service slept) continues now (it writes result rows in the background); the answer does not wait for it and is not affected by it.
@@ -379,6 +380,32 @@ WRITE. A renewal price entered by Dvir's bot for a registrar the machine cannot 
 - **201:** `{id, domain, registrar (lowercased), renewal_cents, renewal, valid_until}` where `valid_until = observed_at + quote.manual_max_age_days` (30 in v1).
 - **Errors:** 422 `OBSERVED_AT_INVALID` (in the future, or older than `quote.manual_max_age_days`; `details.max_age_days`) · 422 `REGISTRAR_NOT_ALLOWED` (`cloudflare`: never, founder rule 5) · 422 `REGISTRAR_UNKNOWN` (`details.known`) · 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED` · 422 `VALIDATION_ERROR`.
 
+## Tranches
+
+A tranche is one batch of screened names bought together (CAP-04). One tranche is open at a time. Limits come from the **active** selection settings (`selection.md`: `tranche.size` 15, `tranche.min_main_lane` 10, `tranche.geo_max` 1). In v1.1.0 a tranche is a set of rules over its members; `/buy` does not look at it. A closed tranche is **read-only** and stays listed (also in `/report` `tranches`).
+
+**Tranche view** (returned by every tranche route): `{id: "trn_<12 hex>", name, status: "open"|"closed", opened_at, opened_by, closed_at, closed_by, settings_version, spend_cap_cents, spend_cap, committed_cents, committed, members: [{domain, lane, is_geo, main_lane: true|false|null, run_id, added_at, est_cost_cents}], counts: {members, geo, main_lane, non_main, unknown_main_lane}, close_report: null | {...}}`. `committed` is the sum of the members' `est_cost`. Members that were removed are not listed.
+
+### `GET /tranches`
+READ. `{tranches: [<tranche view>]}`, newest first (open and closed).
+
+### `POST /tranches`
+WRITE. Body (strict): `{name: string (unique), spend_cap?: USD number}`. **201** the tranche view. Errors: 409 `TRANCHE_ALREADY_OPEN` (`details.open_tranche`) · 409 `TRANCHE_NAME_TAKEN` · 422 `VALIDATION_ERROR`. `spend_cap` is a limit on the sum of the members' `est_cost` (it is not the POC cap; the POC cap on `/buy` is unchanged and does not count renewals).
+
+### `POST /tranches/{id}/members`
+WRITE. Body (strict): `{action: "add"|"remove", domain, run_id?, est_cost?: USD number}`. **200** the tranche view (`add` adds `duplicate: bool`).
+- **add** (`run_id` required): the name must be in that run (404 `NAME_NOT_IN_RUN`; 404 `RUN_NOT_FOUND`), the run must not be a backtest, and its final status there must be `would_buy`, `buy_candidate` or `pending_manual` (409 `NOT_SCREENED_OK`, `details.final_status`, `details.first_fail`). Adding a name already in the tranche is a 200 with `duplicate: true`. Checks in order: 409 `TRANCHE_CLOSED` → duplicate → 409 `NOT_SCREENED_OK` → 409 `TRANCHE_FULL` (members = `tranche.size`) → 409 `GEO_CAP` (geo members = `tranche.geo_max`; checked on **every** addition, so Gavriel adds geo names in Ratio order and the lowest-ranked is the one refused) → 409 `TRANCHE_SPEND_CAP` (when the tranche has a spend cap, `est_cost` is required, else 422 `VALIDATION_ERROR`, and the sum may not pass the cap). A name is a geo member when its lane is S2.
+- **`main_lane`** is read from the run's results: lane S7 with a `history` result PASS / PASS_WITH_NOTE and `source_lane` `expired_drop` (clean history), or lane S3 with a `tier` result PASS (DEMAND-2). Any other lane, a history that is not a pass, or a `fresh` source lane is `false`. A passing S7 history whose `source_lane` is `unknown` (it is inferred, and `unknown` while `sources.wayback` is off) is **`null`**: the share cannot be told.
+- **remove:** sets the member's removal time (open tranches only). 404 `MEMBER_NOT_FOUND`; 409 `TRANCHE_CLOSED`.
+- Also 404 `TRANCHE_NOT_FOUND`, 422 `DOMAIN_INVALID`.
+
+### `POST /tranches/{id}/close`
+WRITE. Body (strict, may be empty): `{allow_below_target?: bool, reason?: string}` (`allow_below_target` needs a `reason`, else 422 `VALIDATION_ERROR`). **200** the tranche view, now `closed`, with `close_report: {target_size, members, below_target, reason, geo, geo_max, main_lane, non_main, unknown_main_lane, required_main_lane, min_main_lane, main_lane_quota: "MET"|"UNKNOWN_ACCEPTED", settings_version, closed_with, domains}`. Checks, in order:
+1. 409 `TRANCHE_CLOSED` if already closed.
+2. 409 `GEO_CAP` if geo members exceed `tranche.geo_max` (the settings changed meanwhile).
+3. A tranche **may close below its target** (`members` < `tranche.size`) only with `allow_below_target: true` and a `reason`, else 409 `TRANCHE_BELOW_TARGET`.
+4. **Main-lane quota**, which still applies to the members present: at least `ceil(members x min_main_lane / size)` main-lane members (a full 15 needs 10, 3 members need 2). Fewer, even counting the unknown ones → 409 `MAIN_LANE_QUOTA` (`details.status: "FAIL"`, `required_main_lane`, counts); never waived. If only the **unknown** (`null`) members could make up the difference → 409 `MAIN_LANE_QUOTA` with `details.status: "UNKNOWN"` unless the request has a `reason`, which accepts it (`main_lane_quota: "UNKNOWN_ACCEPTED"` in the report).
+
 ---
 
 ## Jobs
@@ -393,11 +420,13 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Cross-cutting errors:** `UNAUTHORIZED`, `SCOPE_FORBIDDEN`, `RATE_LIMITED`, `IDEMPOTENCY_KEY_REQUIRED`, `IDEMPOTENCY_KEY_MISMATCH`, `IDEMPOTENCY_KEY_IN_USE`, `VALIDATION_ERROR`, `INVALID_BODY`, `INVALID_REQUEST`, `NOT_FOUND`, `INTERNAL`, `AUDIT_WRITE_FAILED`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `JOBS_DISABLED`, `DOMAIN_BUSY`, `PRICING_SETTINGS_MISSING`.
 
-**Buying errors:** `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
+**Buying errors:** `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `BUY_HOLD`, `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
 
 **Listing errors:** the listing rule codes under `POST /list/{domain}`, plus `NOT_IN_PORTFOLIO`, `API_ACCESS_DISABLED`, `REGISTRAR_UNAVAILABLE`, `LISTING_CHANGED_CONCURRENTLY`, `DOMAIN_NOT_FOUND`.
 
 **Screening errors:** `DRAFT_NOT_ALLOWED_LIVE`, `AS_OF_LIVE_REFUSED`, `RUN_NOT_FOUND`, `NAME_NOT_IN_RUN`, `CHECK_NOT_MANUAL`, `EVIDENCE_NOT_FOUND`, `OBSERVED_AT_INVALID`, `CHECKED_AT_INVALID`, `REGISTRAR_UNKNOWN` (and `REGISTRAR_NOT_ALLOWED`; and `SETTINGS_NOT_FOUND`, `VALIDATION_ERROR`). Result reason codes are in `selection.md` §Screening runs.
+
+**Tranche errors:** `TRANCHE_NOT_FOUND` (404; also on a screening run), `TRANCHE_ALREADY_OPEN`, `TRANCHE_NAME_TAKEN`, `TRANCHE_CLOSED`, `TRANCHE_FULL`, `GEO_CAP`, `TRANCHE_SPEND_CAP`, `TRANCHE_BELOW_TARGET`, `MAIN_LANE_QUOTA`, `NOT_SCREENED_OK`, `MEMBER_NOT_FOUND` (and `NAME_NOT_IN_RUN`, `RUN_NOT_FOUND`, `DOMAIN_INVALID`, `VALIDATION_ERROR`).
 
 **Export errors:** `SEDO_TEMPLATE_MISSING`, `SEDO_TEMPLATE_INVALID`, `EXPORT_NOT_FOUND`, `EXPORT_ALREADY_CONFIRMED`, `UPLOADED_AT_INVALID`, `NO_PII`.
 

@@ -9,6 +9,7 @@ import { registerReport } from './api/report.js';
 import { registerSold } from './api/sold.js';
 import { registerSelection } from './api/selection.js';
 import { registerScreening } from './api/screening.js';
+import { registerTranches } from './api/tranches.js';
 import { ScreeningWorker } from './screening/engine.js';
 import type { ScreeningDeps } from './screening/types.js';
 import type { HoldoutCheck } from './screening/settings.js';
@@ -145,6 +146,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('screeningWorker', screeningWorker);
   app.addHook('onClose', async () => screeningWorker.idle());
   registerScreening(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
+  registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });
   app.decorate('referenceRefreshJob', referenceRefresh);
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));

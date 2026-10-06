@@ -18,6 +18,7 @@ import { planView } from './plan-view.js';
 import { addMonthsClamped, buildSchedule } from '../pricing/schedule.js';
 import { domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
 import { currentSettings, type PricingSettings } from '../pricing/settings.js';
+import { screeningHold } from './buy-hold.js';
 import { evaluateQuote, pickWinner, type EvaluatedQuote } from './selection.js';
 
 export interface BuyInput {
@@ -40,7 +41,7 @@ type Caps = { maxFirstYearCents: number; maxTwoYearCents?: number };
 /** Everything the purchase phase needs once checks 1–10 passed. */
 export interface Approved {
   input: BuyInput; ctx: BuyCtx; category: Category; plan: ListingPlan | null; comps: Comp[]; rationale: string | null; pricing: PricingSettings; approvedAt: Date;
-  check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter;
+  check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: 'BUY_HOLD' | null;
   settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
 }
 
@@ -110,6 +111,13 @@ export class BuyService {
     const ver = checkSettingsVersion(input.expectedSettingsVersion, pricing);
     if (ver) throw new AppError(ver.status, ver.code, ver.message, ver.details);
 
+    // 3c. buy hold (v1.1.0, R1): only a name that was screened. A dry run reports it instead of refusing.
+    const hold = await screeningHold(db, input.domain);
+    if (hold && !input.dryRun) {
+      throw new AppError(409, 'BUY_HOLD', `${input.domain} was screened under selection settings "${hold.settingsVersion}" while buy_hold is on (or the version is a backtest or no longer active); no real buy`,
+        { settings_version: hold.settingsVersion, run_id: hold.runId });
+    }
+
     // 4, 5
     await this.assertNotOwned(db, input.domain);
     await this.assertDomainCap(db, settings.max_domains);
@@ -154,7 +162,7 @@ export class BuyService {
     winner = dry.winner;
 
     const approved: Approved = {
-      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter,
+      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: hold ? 'BUY_HOLD' : null,
       settings: { poc_cap_cents: settings.poc_cap_cents, max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
     if (input.dryRun) return { status: 200, body: await this.dryRunBody(approved) };
@@ -690,6 +698,7 @@ export class BuyService {
       domains_owned: await activeDomainCount(this.deps.db),
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
       proposed_listing: a.plan ? planView(a.plan, events) : null, settings_version: a.pricing.version,
+      ...(a.wouldBeBlocked && { would_be_blocked: a.wouldBeBlocked }),
       warnings: [...a.check.warnings, ...(a.plan?.warnings ?? [])],
     };
   }

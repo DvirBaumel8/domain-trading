@@ -68,6 +68,10 @@ export async function createRun(
   if (body.mode === 'live' && body.names.some((n) => n.as_of !== undefined)) {
     throw new AppError(422, 'AS_OF_LIVE_REFUSED', 'as_of is only for full (backtest) runs; a live run is as of the request time');
   }
+  if (body.tranche_id !== undefined) {
+    const t = await db.selectFrom('tranches').select('id').where('id', '=', body.tranche_id).executeTakeFirst();
+    if (!t) throw new AppError(404, 'TRANCHE_NOT_FOUND', `No tranche "${body.tranche_id}"`);
+  }
   const asOfNow = ctx.now.toISOString();
   const seen = new Set<string>();
   const items: RunItem[] = body.names.map((n, idx) => {

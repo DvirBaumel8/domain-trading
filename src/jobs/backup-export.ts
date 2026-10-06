@@ -11,11 +11,12 @@ export const TABLE_FILES = [
   'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'listing_history', 'quotes', 'price_schedule',
   'pricing_evidence', 'offers', 'export_runs', 'export_uploads', 'registrar_presence',
   'selection_settings', 'selection_lists', 'screening_evidence', 'screening_runs', 'screening_results', 'manual_quotes',
+  'tranches', 'tranche_members',
 ] as const;
 type Row = Record<string, unknown>;
 
 const PK: Record<string, string> = {
-  settings: 'id', deals: 'id', pricing_settings: 'version', registrar_presence: 'domain_id', audit_log: 'at, id',
+  settings: 'id', deals: 'id', pricing_settings: 'version', registrar_presence: 'domain_id', tranches: 'id', audit_log: 'at, id',
 };
 
 /** Every row of a table as the database's own JSON (exact timestamp precision), in primary-key order. */

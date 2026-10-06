@@ -69,7 +69,8 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 8. **The private walk-away is never written to an export file** (Afternic, Sedo, the preview's `afternic_row`). Read endpoints show it to the bots, marked `(private)`. `GET /report?format=md` leaves it out.
 9. **No secrets in responses or logs:** registrar keys live only in server environment variables. No route returns a key, a key prefix or an account balance.
 10. **No LLM calls** inside the service.
-11. **Hosting costs $0:** Render free web service, Neon free Postgres and a Cloudflare Worker cron.
+11. **Buy hold (v1.1.0):** while a screened name's latest screening run has `buy_hold` on (or is a backtest or no longer the active settings version), a real `/buy` of it is refused (409 `BUY_HOLD`). A name never screened is not held.
+12. **Hosting costs $0:** Render free web service, Neon free Postgres and a Cloudflare Worker cron.
 
 **Known limits:**
 - Export pending and manual-delist flags (`X-Pending-Changes`, `X-Manual-Delist`, `EXPORT_PENDING`, `MANUAL_DELIST`) assume Gavriel calls the API **sequentially**. A `/list` change that races a concurrent export may be counted as already exported. They also compare timestamps taken from the app clock.

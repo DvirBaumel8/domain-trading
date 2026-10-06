@@ -1,7 +1,8 @@
 // G3 portfolio concentration (CAP-04, CONCENTRATION-1): at most `concentration.max_per_attr` names per city, trade, regime
-// or keyword across owned/listed names + higher-ranked names of this run; the geo cap per tranche; the lane share.
+// or keyword across owned/listed names + higher-ranked names of this run; the geo cap per tranche (real members); the lane share.
 import { analyzeForm, type FormResult } from '../form.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
+import { geoMembers } from '../../services/tranche-members.js';
 import { formFieldsOf } from './form.js';
 
 interface Attrs { domain: string; city: string | null; trade: string | null; regime: string | null; keywords: string[] }
@@ -22,11 +23,6 @@ async function portfolioOf(ctx: CheckContext): Promise<Portfolio> {
   const p = { attrs, geo: rows.filter((r) => r.category === 'geo').length };
   ctx.shared.set('portfolio', p);
   return p;
-}
-
-/** Members of a tranche that are geo names. Task 8 (tranches) provides the real count; until then no tranche has members. */
-async function trancheGeoMembers(_ctx: CheckContext, _trancheId: string): Promise<number> {
-  return 0;
 }
 
 export const concentrationCheck: Check = {
@@ -74,7 +70,7 @@ export const concentrationCheck: Check = {
       if (b.length >= cap) return fail('CONCENTRATION_KEYWORD', 'keyword', kw, b);
     }
     if (isGeo && ctx.run.trancheId) {
-      const inTranche = await trancheGeoMembers(ctx, ctx.run.trancheId);
+      const inTranche = await geoMembers(ctx.db, ctx.run.trancheId);
       const aheadGeo = ahead.filter((a) => a.item.lane === 'S2').map((a) => a.item.domain);
       if (inTranche + aheadGeo.length >= ctx.settings.tranche.geo_max) {
         return outcome('FAIL', 'GEO_CAP', `The tranche already has ${inTranche + aheadGeo.length} geo name(s) (geo_max ${ctx.settings.tranche.geo_max})`,

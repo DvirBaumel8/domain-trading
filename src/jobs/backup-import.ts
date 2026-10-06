@@ -33,14 +33,16 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'screening_runs', file: 'tables/screening_runs.json' },
   { table: 'screening_results', file: 'tables/screening_results.json' },
   { table: 'manual_quotes', file: 'tables/manual_quotes.json' },
+  { table: 'tranches', file: 'tables/tranches.json' },
+  { table: 'tranche_members', file: 'tables/tranche_members.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 
 /** A restore targets a fresh database: restore first, THEN create tokens (the admin command writes audit rows). */
-const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log', 'screening_runs', 'screening_evidence', 'manual_quotes'];
+const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log', 'screening_runs', 'screening_evidence', 'manual_quotes', 'tranches'];
 
 /** Tables without a serial `id` column. */
-const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs']);
+const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches']);
 
 async function readRows(dir: string, f: { file: string; jsonl?: true }): Promise<Row[]> {
   let text: string;

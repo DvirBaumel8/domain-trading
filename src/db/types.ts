@@ -440,6 +440,35 @@ export interface ScreeningResultsTable {
   created_at: TimestampDefault;
 }
 
+export interface TranchesTable {
+  id: string;
+  name: string;
+  status: 'open' | 'closed';
+  opened_at: TimestampDefault;
+  opened_by: string;
+  closed_at: Date | null;
+  closed_by: string | null;
+  settings_label: string;
+  spend_cap_cents: number | null;
+  close_report: Json | null;
+  audit_id: string | null;
+}
+
+export interface TrancheMembersTable {
+  id: Generated<string>;
+  tranche_id: string;
+  domain: string;
+  lane: string;
+  is_geo: boolean;
+  main_lane: boolean | null;
+  est_cost_cents: number | null;
+  run_id: string;
+  added_at: TimestampDefault;
+  added_by: string;
+  removed_at: Date | null;
+  removed_by: string | null;
+}
+
 export interface RdapLookupsTable {
   id: Generated<string>;
   domain: string;
@@ -501,6 +530,8 @@ export interface Database {
   selection_lists: SelectionListsTable;
   screening_evidence: ScreeningEvidenceTable;
   screening_runs: ScreeningRunsTable;
+  tranches: TranchesTable;
+  tranche_members: TrancheMembersTable;
   screening_results: ScreeningResultsTable;
   manual_quotes: ManualQuotesTable;
   rdap_lookups: RdapLookupsTable;
