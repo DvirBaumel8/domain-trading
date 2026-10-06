@@ -19,6 +19,7 @@ Gavriel --HTTPS + Bearer--> [Render free web service: API] --> Neon Postgres (al
 Cloudflare Worker cron --POST /jobs/run--> API      daily job --git data API--> private data repo (backup)
 ```
 - Stack: Node 22, TypeScript (strict), Fastify 5, zod v4, Kysely + pg, node-pg-migrate (plain SQL), native fetch, Vitest + MSW.
+- Screening (`src/screening/*`): form, brand/typo, RDAP/census, SURBL, history (HIST-2), tier/DEMAND-2, quote/price, runs engine, tranches, replay. Outside sources are read only when their `sources.*` setting is true (terms log: `sources.md`). No LLM calls.
 - Adapters implement one interface (§5). Porkbun is fully implemented; GoDaddy is management-only; others are enabled only when implemented, keyed **and** their contract tests pass (`../research/registrars.md`).
 - Secrets (registrar keys, DB URL, backup PAT, job token) live **only** in server env vars (Render `sync: false`). Never returned, logged or committed.
 
@@ -42,6 +43,14 @@ Money = integer cents (USD). Timestamps = `timestamptz` (UTC). Calendar dates = 
 | `purchases` | `id`, `idempotency_key` (unique), `request_hash`, `domain`, `state` (`created`, `register_sent`, `succeeded`, `failed`, `unknown`), `dry_run`, `registrar`, `check_id`, `charged_cents`, `expected_cents` (counts toward the cap while open), `order_id`, `max_price_cents`, `approval_text`, `approval_at`, `request` (redacted), `response`, `audit_id` | One row per real `/buy`. A unique partial index allows one `created`/`register_sent`/`succeeded`/`unknown` row per domain |
 | `receipts` | `id`, `purchase_id`, `registrar`, `order_id`, `raw` (billing identity redacted), `fetched_at` | Registration `receipt_ref` = `<registrar>:<order_id>` |
 | `deals` | `id` (`D-NNN`), `domain`, `strategy`, `status_note`, `created_at` | Upserted when `/buy` passes `deal_id` |
+| `selection_settings` | `version`, `label` (unique), `values` (jsonb), `created_by`, activation columns (`activated_at`, `activated_by`, `approval_text`, `approval_at`) | Immutable apart from activation; the active row is the latest activated. Activations are columns here (R4: nothing is lost by merging) |
+| `selection_lists` | `name`, `version`, `items`, `frozen`, `approval_text` | Versioned lists (brand, bigco, events, signatures, census). Census lists frozen only with Dvir's approval |
+| `screening_runs`, `screening_results` | run input, mode, settings version, status; one row per (run, name, check) with status, reason code, fields, evidence ids | Resumable; manual rows outrank machine rows |
+| `screening_evidence` | `id`, `source`, `url`, `text`, `sha256`, `fetched_at` | Hash-addressed evidence (HIST-2 captures, manual URLs) |
+| `manual_quotes` | `domain`, `registrar`, `renewal_cents`, `observed_at` | Kept apart from `quotes`: those rows are tied to a `/check` and carry registrar raw data |
+| `rdap_lookups`, `reference_files` | cache of RDAP answers; downloaded reference files (popularity list, IANA bootstrap) | Caches, not in the backup export |
+| `tranches`, `tranche_members` | name, size, `spend_cap`, `opened_under`, status, per-member lane and `est_cost` | Closed rows read-only by DB trigger |
+| `labelled_names`, `holdout_suites`, `replay_runs` | append-only registry (`fit`/`dev`/`test`), pre-registered suite definitions (frozen with approval), replay reports | A failing holdout sticks per settings version |
 | `audit_log` | `id` (`aud_…`), `at`, `token_id`, `scope` (`read`/`write`/`job`/`admin`), `method`, `path`, `idempotency_key`, `approval_text`, `approval_at`, `request` (redacted), `status_code`, `result_summary`, `client_ip` | **Append-only.** One row per authenticated POST, job run and admin command |
 | `idempotency_keys` | `key` (PK), `request_hash`, `method`, `path`, `token_id`, `state`, `status_code`, `response_body`, `response_content_type`, `completed_at` | Never exported |
 | `api_tokens` | `id`, `name`, `scope` (`read`/`write`), `token_sha256`, `created_at`, `revoked_at`, `last_used_at` | Plain token shown once by the admin command. Never exported |

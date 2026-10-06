@@ -1,4 +1,7 @@
 <!-- Repo copy of Gavriel's selection spec v9.1 (source: system/selection-v9-final.md on Gavriel's box), pushed 6 Oct 2026. -->
+
+> **DOM note (v1.1.0, 6 Oct 2026):** the contract (`docs/contract/selection.md`) replaces this file for what is built. Selection v10 replaced the v9.1 in-use share and any-prior-use history rule with the DEMAND-2 tier rule (registered-share + prior history, or an earlier alt-extension registration) and harmful-history-only HIST-2; lead counts (LEAD-1) are outreach only and carry a parked score penalty of 0. Not built: the screening pack, FT-1, the renewal decision, CAP-25.
+
 > **DOM note:** Dvir approved v9.1 on 6 Oct 2026. It is the business-rule source for **CR-001** (`docs/requests/CR-001-selection-checks.md`); DOM's delivery plan (P1a/P1b/P2) and its pushback are in CR-001 §11, and what is built vs not is in `gaps.md`. **Nothing here is built yet.** `src/services/selection.ts` is the registrar-quote winner logic (`check.md`), not this; new code goes elsewhere (e.g. `src/screening/*`).
 > - Paths `system/census/<pattern_id>.csv` and `system/data/namebio/` are on Gavriel's box; the repo READMEs are `selection/census-README.md` and `selection/namebio-README.md`. Where the frozen census CSVs and the NameBio cache live (the Render free disk isn't persistent) is a CR-001 build decision.
 > - Baseline docs named below (`selection-v2-proposal.md`, R4–R9, DR-001/DR-002) are on Gavriel's box; DR-002/DR-003 evidence is in `docs/requests/CR-001-reference/`.

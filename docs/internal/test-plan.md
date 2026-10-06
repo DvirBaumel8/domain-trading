@@ -54,6 +54,29 @@ PR3-1 hybrid 1488 / 1988 / 2488 / 1088 / 788 → 967/715 · 1292/955 · 1617/119
 ## Selection (SEL)
 Defined in `selection.md` §7 (SEL-1–SEL-4, SEL3-*, SEL4-*, SEL5-*, SEL6-*, SEL7-*, SEL8-*, SEL9-1–SEL9-15, SEL10-1, SEL-T); built and run with CR-001 (the `/buy` side: B-29–B-32, LS-16b, LG-20). Any fail → no live Gate A until fixed or waived by Dvir. FT-1 counts 7 days from `ft_eligible_on` (B-32, SEL9-6; Dvir, 6 Oct 2026, 01:01).
 
+## CR acceptance map (v1.1.0)
+| CR item | Test |
+|---|---|
+| CR-001 CAP-00 (live vs draft, approval, SEL9-2) | `tests/api/selection-settings.test.ts`, `screening-runs.test.ts` |
+| CR-001 CAP-01 #1-#8, CR-002 CAP-01 (FORM-2, G-FORM-1, SEL10-6) | `tests/unit/screening-form.test.ts` |
+| CR-001 CAP-02 #1-#3 | `screening-runs.test.ts` (bigco), `tests/unit/screening-typo.test.ts` |
+| CR-001 CAP-03 #1-#4 (#5 is the P1b pack) | `tests/unit/rdap-lookup.test.ts`, `tests/api/screening-registry.test.ts` |
+| CR-001 CAP-04, CR-002 CAP-04 | `screening-runs.test.ts`, `tests/api/tranches.test.ts` |
+| CR-001 CAP-05 #1-#3 | `screening-registry.test.ts` |
+| CR-001 CAP-06/08 (manual) | `screening-manual.test.ts`, `screening-runs.test.ts` (phrases) |
+| CR-002 CAP-07 #1-#4 (+ CR-001 CAP-07 #2, #3, #8; Amendment A1/A2) | `screening-history.test.ts` (api and unit) |
+| CR-002 CAP-10 #1-#3 | `screening-registry.test.ts`, `screening-money-checks.test.ts` |
+| CR-001 CAP-11 #1-#3, #5, #6 | `tests/unit/screening-namebio.test.ts`, `reference-refresh.test.ts` |
+| CR-002 CAP-12 | `screening-registry.test.ts` |
+| CR-001 CAP-17 | `screening-money-checks.test.ts`, `screening-manual.test.ts` |
+| CR-001 CAP-18 #1-#8, CR-002 CAP-18, section 5.3 | `tests/unit/screening-money.test.ts`, `selection-evaluate.test.ts` |
+| CR-002 CAP-24 | `tests/unit/screening-tier.test.ts` |
+| CR-001 CAP-20 #2, #3; CR-002 CAP-20 (WOULD-BUY) | `screening-runs.test.ts`, `tests/unit/screening-derive.test.ts` (the DR-003 replay needs recorded DR data: measured after the first deploy, G-65) |
+| CR-002 CAP-21 #5, #6 (+ #1-#4 when reference data lands; Amendment A2/A3) | `selection-replay.test.ts`, `tests/unit/screening-replay.test.ts`, `selection-replay-cr002.test.ts` |
+| BUY_HOLD (NO_TRANCHE is v2.0.0) | `tests/api/buy-hold.test.ts` |
+| SEL9-9 / section 10.13 vectors | `pricing-v3.test.ts` (api and unit) |
+| CR-002 Amendment B (manual HIST-2) | none: not built (G-55) |
+
 ## Offers (OF; `listing-strategy.md` §10.11)
 Fixtures: D-001 imported as 1995 / 1295 / 950 / 100, listed 2026-10-12 (the 5 Oct plan); a geo name at $399; a second trend name at 2495 / 1620 / 1200.
 OF-1 D-001 $450 `afternic` → 201, `below_walkaway`, `auto_decline`, `declined_auto`, `next_step` says decline with no Gate D; snapshot 1995/1295/950/100. OF-2 $1,000 → `mid_range`, `dvir`, `open`. OF-3 $1,295 / $1,995 → `at_or_above_floor` + `auto_accept` + `OFFER_AT_OR_ABOVE_FLOOR` / `at_or_above_bin`. OF-4 boundaries $99, $100, $949, $950, $1,294 → `below_min`, `below_walkaway`, `below_walkaway`, `mid_range`, `mid_range`. OF-5 $1,200 / $600 `email_inbound` → `dvir` / `auto_decline`. OF-6 geo $350 / $399 → `geo_below_bin` + `auto_decline` / `at_or_above_bin`. OF-7 $1,100 received 2027-04-11 vs 04-13 (M6 applied 04-12, floor 1035) → `mid_range` vs `at_or_above_floor`. OF-8 same `source` + `external_ref` twice; same domain/amount/source/time without ref → 200 `duplicate: true`, one row. OF-9 READ token / unknown domain / amount 0 or "12.345" / source `ebay` / `received_at` +1 h / `buyer_ref` "a@b.com" → 403 / 404 / `AMOUNT_INVALID` / `SOURCE_INVALID` / `RECEIVED_AT_IN_FUTURE` / `NO_PII`. OF-10 an owned, unlisted name → 201 + `OFFER_ON_UNLISTED`, band vs the plan prices or `unpriced`. OF-11 SQL UPDATE of `amount_cents`, `band`, `received_at` → trigger error. OF-12 `countered` on a mid-range offer without / with approval; `declined` on an `auto_decline` offer without → 422 `APPROVAL_REQUIRED` / 200 / 200; one audit row each. OF-14 walk-away never leaks: Afternic + Sedo exports, preview, lander check for D-001 → row `PromptInjectionAudit.com,1995,1295,100,N,,Custom Lander,Y,N,Y,N`, Sedo minimum 100, 950 nowhere buyer-facing. OF-16 hybrid `/list` with `min_offer` 950 → `MIN_OFFER_FIXED`; settings with `hybrid_min_offer_cents=15000`: a new plan min 150, D-001 keeps 100 until a replan. OF-17 M6, M18 and final push on D-001 → min offer stays 100 (DB, history, export); geo M6 sets min offer = new BIN. OF-18 offers at −5 d $450, −40 d $1,000, −200 d $1,500 → `count_30d 1`, `highest_30d $450`, `count_90d 2`, `highest_90d $1,000`, `count_all 3`, `highest_all $1,500`, pct = 1500/1995; no offers → 0 / null, keys present. OF-19 two trend names (3 and 0 offers in 90 d) + one geo (1) → trend `names_listed 2`, `names_with_offers 1`, `offers_90d 3`, `offers_per_listed_name_per_month 0.50`, median/max pct, band shares sum to 1.00; geo separate; `GET /report/offers?group_by=source` matches. OF-20 `POST /offers` and `/outcome` with registrar and marketplace mocks armed → zero outbound calls, no price or hold change (unless asked, with a reason); a mid-range offer open 49 h → `OFFER_NEEDS_DVIR`. Removed 6 Oct 2026: OF-13 and OF-15 (CSV import), PO-1–PO-5 (payouts).

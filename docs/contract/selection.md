@@ -1,6 +1,6 @@
-# Selection checks (contract v1.1.0, unreleased)
+# Selection checks (contract v1.1.0)
 
-This file grows with each v1.1.0 task. It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
+It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
 ## Name form (CAP-01): result and codes
 

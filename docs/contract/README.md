@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 1.0.1** (6 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 1.1.0** (6 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -8,7 +8,7 @@
 | `endpoints.md` | Every route: method, path, token, request, response, error codes |
 | `jobs.md` | The scheduled jobs (`POST /jobs/run`: `tick`, `daily`) |
 | `reports.md` | `GET /report` fields and warnings (with levels) |
-| `selection.md` | Selection and screening checks: statuses, codes, shapes (v1.1.0, unreleased) |
+| `selection.md` | Selection and screening checks: statuses, codes, shapes (v1.1.0) |
 | `formats.md` | The Afternic CSV, the Sedo file, the ledger CSV, and other exported shapes |
 | `CHANGELOG.md` | Contract versions |
 
@@ -74,4 +74,4 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 
 **Known limits:**
 - Export pending and manual-delist flags (`X-Pending-Changes`, `X-Manual-Delist`, `EXPORT_PENDING`, `MANUAL_DELIST`) assume Gavriel calls the API **sequentially**. A `/list` change that races a concurrent export may be counted as already exported. They also compare timestamps taken from the app clock.
-- The selection endpoints of CR-001 (screening, `screening_pack`, `pricing_settings` v3) aren't in v1.0.0. `/buy` follows the v1.0.0 rules in `endpoints.md`.
+- **Screening is in (v1.1.0); the rest of CR-001 is not.** Not built: the screening pack and `NO_TRANCHE` on `/buy` (2.0.0), CAP-14/15/16/19 (1.2.0). `/buy` still requires 2-3 comps and refuses `screening_pack` (422). Web Risk and US trademark results are **manual records** (`POST /screening/runs/{id}/manual`). NameBio and the Internet Archive are switched off, so `history` is UNKNOWN and live screening cannot yet produce a survivor past the history gate (`selection.md`).

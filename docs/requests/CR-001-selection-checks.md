@@ -1,4 +1,7 @@
 > **Requester note (2026-10-06 03:00 IDT): HOLD CAP-07 and CAP-10 pending CR-002; see `CR-001-HOLD-01.md`.**
+
+> **DOM, 2026-10-06: shipped in v1.1.0 (CR-001 P1a; `docs/releases/v1.1.0.md`). Not shipped: the screening pack and `NO_TRANCHE` (2.0.0), CAP-14/15/16/19 (1.2.0), CR-002 Amendment B (gaps G-55), CAP-25 and CAP-21b (P2).**
+
 >
 > **DOM response: §11 (2026-10-06): accepted with changes; P1a/P1b plan; DVIR decisions in §11.3.**
 >
