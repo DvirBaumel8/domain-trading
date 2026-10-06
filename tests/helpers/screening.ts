@@ -51,11 +51,15 @@ export async function screeningHarness(opts: { start?: number; stopAfterResults?
   return { app, clock, post, get, run, runDone };
 }
 
-/** Switches `sources.wayback` on in the active (seeded) settings. It ships off for good (Amendment B1); only these tests switch it on. */
-export async function enableWayback(): Promise<void> {
+/** Sets one key (a path of existing object keys) in the active (seeded) settings row, bypassing the immutability guard (tests only). */
+export async function patchActiveSettings(path: string[], value: unknown): Promise<void> {
+  const literal = `{${path.join(',')}}`;
   await testDb.connection().execute(async (conn) => {
     await sql`SET session_replication_role = replica`.execute(conn);
-    await sql`UPDATE selection_settings SET "values" = jsonb_set("values", '{sources,wayback}', 'true')`.execute(conn);
+    await sql`UPDATE selection_settings SET "values" = jsonb_set("values", ${literal}::text[], ${JSON.stringify(value)}::jsonb)`.execute(conn);
     await sql`SET session_replication_role = origin`.execute(conn);
   });
 }
+
+/** Switches `sources.wayback` on in the active (seeded) settings. It ships off for good (Amendment B1); only these tests switch it on. */
+export const enableWayback = (): Promise<void> => patchActiveSettings(['sources', 'wayback'], true);

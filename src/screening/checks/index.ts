@@ -13,6 +13,7 @@ import { tmEuCheck, tmUsCheck, webRiskCheck } from './manual.js';
 import { namebioCheck } from './namebio.js';
 import { priceCheck } from './price.js';
 import { quoteCheck } from './quote.js';
+import { sameNameCheck } from './same-name.js';
 import { surblCheck } from './surbl.js';
 import { tierCheck } from './tier.js';
 import { typoCheck } from './typo.js';
@@ -29,6 +30,7 @@ export const CHECKS: Partial<Record<CheckId, Check>> = {
   history: historyCheck,
   census: censusCheck,
   ext_dates: extDatesCheck,
+  same_name: sameNameCheck,
   typo: typoCheck,
   tier: tierCheck,
   namebio: namebioCheck,

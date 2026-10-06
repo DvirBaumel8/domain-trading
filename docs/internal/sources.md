@@ -18,6 +18,7 @@ Summary
 | PIR RDAP (.org) | CAP-03 | enabled | <= 1 query/s |
 | Identity Digital RDAP (.info, .ai) | CAP-03 | enabled | <= 1 query/s |
 | .co, .io, .us RDAP | CAP-03, CAP-12 | **disabled: no base in the IANA bootstrap** | none |
+| Business websites (operator and firm home pages) | CAP-12, CAP-15 | **enabled** (`sources.business_sites`; robots.txt honoured) | <= 1 request per `same_name.min_ms_between_fetches` ms (default 1 s); CAP-15 per `lead.verify.min_ms_between_fetches` |
 
 ---
 
@@ -107,3 +108,17 @@ Summary
 ## .co, .io, .us RDAP
 - **Result:** the IANA bootstrap (2026-09-30) lists no RDAP base for `co`, `io` or `us`. DOM does not guess a base URL or scrape web WHOIS.
 - **Decision:** `disabled`. CAP-03 / CAP-12 for those extensions return `UNKNOWN` / `NO_REGISTRY_SERVICE` (never "available", never "not registered"). A base can be added later by a settings/list change once it appears in the bootstrap or a primary source is quoted here.
+
+## Business websites (CAP-12 operator sites, CAP-15 firm pages)
+- **What is fetched:** the public home page of a site that uses our name on another extension (CAP-12: `https://<sld>.<tld>/`), and, for lead verification (CAP-15), the firm pages the bot supplied. Nothing else: no crawling, no links followed, no search engines, no social networks.
+- **Purpose:** CAP-12 asks whether our exact name is already in use as a business name or a service description under another extension (`src/screening/site.ts`, `src/screening/checks/same-name.ts`); CAP-15 checks that a lead firm really offers the service the name describes.
+- **Policy (how DOM fetches third-party sites):**
+  - one `GET /robots.txt` per origin and run (or batch), read before any page; honoured for the group `User-agent: domain-trading-api` and, when there is no such group, for `User-agent: *`; the longest matching `Allow`/`Disallow` wins, `Allow` on a tie; a missing robots file (404, 410, other 4xx) allows everything, but a robots file that cannot be read (timeout, 5xx, 429, TLS or network error) means the page is **not** fetched and the result is UNKNOWN (never "no site");
+  - GET only, for the pages needed (CAP-12: the home page; CAP-15: the bot-supplied URLs), at most **one request per `same_name.min_ms_between_fetches` / `lead.verify.min_ms_between_fetches` milliseconds** (default 1,000) through one pacer for the whole run, redirects followed by hand (at most `same_name.max_redirects`, each one paced, robots checked for each new host; a redirect to another site is recorded and **not** followed), `same_name.timeout_ms` per request and `same_name.max_bytes` per body;
+  - the honest `USER_AGENT` of `src/rdap.ts` (`domain-trading-api/<version> (+https://github.com/DvirBaumel8/domain-trading)`); no browser spoofing;
+  - **no login, no form submission, no CAPTCHA solving, no script execution.** A page behind a login wall, a challenge page or a bot block (HTTP 401 / 403) is UNKNOWN, never read as "no site";
+  - **never `linkedin.com`** (and no host in `lead.verify.never_fetch_hosts`; the settings reject a draft that drops `linkedin.com`);
+  - a fetch that fails for any reason except a clear "no site there" (DNS name does not exist, connection refused, 404-style answer) is UNKNOWN; the check then FLAGs `SITE_UNKNOWN` for a human and never PASSes.
+- **Stored:** URL, retrieval time, sha256 of the response, and the visible text (capped at `evidence.max_text_bytes`, gzipped) **only for CAP-12 operator pages**. For firm pages (CAP-15) only the hash and URL are kept, because they hold personal data. The raw HTML is never stored.
+- **Terms:** there are no single terms of use (every owner differs). DOM relies on robots.txt and on the page being published for the public. A site owner who objects is honoured by adding the host to `lead.verify.never_fetch_hosts` through a settings version, or by their own robots.txt.
+- **Decision:** `enabled` (`sources.business_sites` true in the seed and in `DEFAULT_SELECTION_VALUES`). **Pacing:** <= 1 request per second (one pacer for the run), one robots.txt per origin.

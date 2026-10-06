@@ -169,6 +169,7 @@ const Base = z.object({
 }).strict();
 
 export type SelectionValuesT = z.infer<typeof Base>;
+export type SameNameSettings = SelectionValuesT['same_name'];
 export type ClauseT = z.infer<typeof Clause>;
 export type CondT = z.infer<typeof Cond>;
 

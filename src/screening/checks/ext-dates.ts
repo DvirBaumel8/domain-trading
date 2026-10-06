@@ -2,8 +2,31 @@
 // .com's creation date (re-registration / drop-catch signal; leakage rule: a later extension never counts). An extension whose RDAP
 // is missing or fails is UNKNOWN for that extension, never "not registered".
 import { lookupCached, pacerFor, rdapBaseFor, type CachedLookup } from '../rdap-batch.js';
-import { outcome, type Check } from '../types.js';
+import { outcome, type Check, type CheckContext } from '../types.js';
 import { asOfOf } from './census.js';
+
+export interface ExtRegistration { tld: string; status: 'registered' | 'not_registered' | 'unknown'; created_at: string | null; reason_code?: string; evidenceId: number | null; cached: boolean; /** true when a registry query was made or attempted (counts toward upstream_calls when not cached). */ upstream: boolean }
+
+/**
+ * Is `<sld>.<tld>` registered, from RDAP (the IANA bootstrap gives the base; `.com` is Verisign). A missing base, a timeout or any
+ * failure is `unknown` with a reason code, never "not registered". Shared by `ext_dates` and `same_name`.
+ */
+export async function extRegistration(ctx: CheckContext, sld: string, tld: string): Promise<ExtRegistration> {
+  const unk = (reason_code: string, upstream = false): ExtRegistration => ({ tld, status: 'unknown', created_at: null, reason_code, evidenceId: null, cached: false, upstream });
+  if (ctx.now() > ctx.deadline) return unk('TIMEOUT');
+  let base: string | null;
+  try {
+    base = await rdapBaseFor(ctx.db, ctx.deps, tld, { enabled: ctx.settings.sources.iana_bootstrap || tld === 'com', now: ctx.now });
+  } catch (e) {
+    return unk('SOURCE_ERROR');
+  }
+  if (base === null) return unk(ctx.settings.sources.iana_bootstrap ? 'NO_REGISTRY_SERVICE' : 'SOURCE_DISABLED');
+  const r: CachedLookup = await lookupCached(ctx.db, ctx.deps, `${sld}.${tld}`, { maxAgeHours: ctx.settings.freshness_hours.ext_dates ?? 0, baseUrl: base, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace: pacerFor(ctx, base), now: ctx.now, deadline: ctx.deadline });
+  const common = { tld, evidenceId: r.evidenceId, cached: r.cached, upstream: true };
+  if (r.outcome === 'unknown') return { ...common, status: 'unknown', created_at: null, reason_code: r.reasonCode ?? 'SOURCE_ERROR' };
+  if (r.outcome === 'not_registered') return { ...common, status: 'not_registered', created_at: null };
+  return { ...common, status: 'registered', created_at: r.facts?.created_at ?? null };
+}
 
 interface ExtRow { tld: string; status: 'registered' | 'not_registered' | 'unknown'; created_at: string | null; reason_code?: string; counted?: boolean }
 
@@ -33,21 +56,10 @@ export const extDatesCheck: Check = {
 
     const rows: ExtRow[] = [];
     for (const tld of list) {
-      if (ctx.now() > ctx.deadline) { rows.push({ tld, status: 'unknown', created_at: null, reason_code: 'TIMEOUT' }); continue; }
-      let base: string | null;
-      try {
-        base = await rdapBaseFor(ctx.db, ctx.deps, tld, { enabled: ctx.settings.sources.iana_bootstrap || tld === 'com', now: ctx.now });
-      } catch (e) {
-        rows.push({ tld, status: 'unknown', created_at: null, reason_code: 'SOURCE_ERROR' });
-        continue;
-      }
-      if (base === null) { rows.push({ tld, status: 'unknown', created_at: null, reason_code: ctx.settings.sources.iana_bootstrap ? 'NO_REGISTRY_SERVICE' : 'SOURCE_DISABLED' }); continue; }
-      const r: CachedLookup = await lookupCached(ctx.db, ctx.deps, `${sld}.${tld}`, { maxAgeHours: ctx.settings.freshness_hours.ext_dates ?? 0, baseUrl: base, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace: pacerFor(ctx, base), now: ctx.now, deadline: ctx.deadline });
-      if (!r.cached) calls++;
+      const r = await extRegistration(ctx, sld, tld);
+      if (!r.cached && r.upstream) calls++;
       if (r.evidenceId !== null) evidence.push(r.evidenceId);
-      if (r.outcome === 'unknown') rows.push({ tld, status: 'unknown', created_at: null, reason_code: r.reasonCode ?? 'SOURCE_ERROR' });
-      else if (r.outcome === 'not_registered') rows.push({ tld, status: 'not_registered', created_at: null });
-      else rows.push({ tld, status: 'registered', created_at: r.facts?.created_at ?? null });
+      rows.push(r.status === 'unknown' ? { tld, status: 'unknown', created_at: null, reason_code: r.reason_code ?? 'SOURCE_ERROR' } : { tld, status: r.status, created_at: r.created_at });
     }
 
     let before = 0, undatedExcluded = 0;

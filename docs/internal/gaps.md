@@ -94,6 +94,9 @@ Every place where the specs DOM inherited (`docs/internal/*`, which still descri
 | G-67 | Replay data (G-52, G-53, G-54): `reg_to_sale_months`, the 226/224 row set, gate columns with dates, sale prices, per-row census dates; suite definitions uploaded and approved by Dvir; the BT10-1 rule set (tier B on or off) | **Open** | **Gavriel / DVIR** |
 | G-68 | Signature lists (G-41) and prior-business capture rules need real captures | **Open** | Gavriel (lists API) |
 | G-69 | Web Risk and US trademark checks stay manual until an official API and key exist (G-9) | **Open** | **DVIR** (Google Cloud project, USPTO key) |
+| G-70 | CAP-12 `ext.variants` (`get<sld>.com` and similar) and `competing_forsale_n` are not built | **Open (P2)** | DOM |
+| G-71 | The business-use rule (`business_name` / `service_description` / `product_name` / `none`) is deterministic and conservative: it reads text, not meaning (a Title Case service heading reads as product-style; non-English pages are not understood). Any 401/403 page is UNKNOWN, not "no site" (a bot wall can hide an operator) | **Accepted** | DOM |
+| G-72 | An unreadable same-name site is a FLAG (`SITE_UNKNOWN`) for a bot verdict, not UNKNOWN, so a human can resolve it through the verdict route | **Accepted** | DOM |
 
 ## Removed by Dvir's 6 Oct decisions (no gap; listed for completeness)
 `POST /offers/import`, `offer_imports`, `offers.import_id`; the `payouts` table, `POST /payouts/{id}/received`, the `/sold` `payout` object, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE`, `payouts_pending` (tests PO-1–PO-5, S-13–S-15, OF-13, OF-15 deleted); `changed_only` and per-file export records; `JOBS_MODE` and in-process timers.
