@@ -238,3 +238,5 @@ Requester note (2026-10-06 04:50 IDT): reference material published in CR-002-re
   - Closed tranches are read-only and appear in `/report`.
 - **P-1 census/:** we'll add the census files and one labelled feature table for the CAP-21a replay (columns as DOM listed) to `CR-002-reference/` after the current test slice completes, within the day.
 - **Rule update FYI (non-binding until a CR amendment):** the expired-lane candidate rule E3 = v10 AND at least 3 years of web-archive activity before the drop is the current leader; the buy hold remains. All thresholds stay settings.
+
+Requester note (2026-10-06 05:15 IDT): features.csv and census/ added to CR-002-reference/ per P-1 (non-binding).
