@@ -10,7 +10,7 @@ function fakeApp(backupExport?: { runOnce(): Promise<unknown> }) {
   const ok = () => ({ runOnce: vi.fn(async () => ({})) });
   const jobs = { reconciler: ok(), nsVerifier: ok(), priceJob: ok(), dropJob: ok(), registrarCheckJob: ok() };
   // The real runner (the one POST /jobs/run uses); only its jobs are fakes. db is unused by `daily`.
-  const jobRunner = new JobRunner({ db: undefined as never, now: Date.now, ...jobs, backupExport });
+  const jobRunner = new JobRunner({ db: undefined as never, now: Date.now, ...jobs, screeningWorker: { resumeStalled: vi.fn(async () => ({})) }, backupExport });
   return { ...jobs, jobRunner };
 }
 

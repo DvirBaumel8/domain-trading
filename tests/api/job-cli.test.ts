@@ -36,7 +36,7 @@ describe('job CLI tick and daily (the shared JobRunner)', () => {
     const { stdout } = await cli(['tick']);
     const r = JSON.parse(stdout);
     expect(r).toMatchObject({ job: 'tick', skipped: false });
-    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier']);
+    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume']);
   });
 
   it('daily runs every step; the unconfigured backup step is skipped, not failed', async () => {

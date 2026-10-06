@@ -338,6 +338,37 @@ WRITE (it writes only the audit row; nothing else is stored). Evaluates the tier
 - **Warnings:** `PRICING_V3_MISSING` (the current pricing version has no price list: `bin_in_allowed_set` is null and a non-geo LANDER-1 cannot pass).
 - **Errors:** 422 `FORBIDDEN_FEATURE` (any key from `score.forbidden_feature_keys` anywhere in the body, found before validation; `details.path`) · 404 `SETTINGS_NOT_FOUND` · 422 `BIN_REQUIRED` (no BIN sent and the current pricing settings have no default non-geo BIN) · 422 `VALIDATION_ERROR`.
 
+### `POST /screening/runs`
+WRITE. Starts a screening run (CAP-20) over 1 to 50 names and returns at once; the run is stored per (name, check) and continues in the background (and after a restart: see `jobs.md` `screeningResume`). Poll `GET /screening/runs/{id}`.
+- **Body (strict):** `mode?` (`live` default | `full`), `settings?` (a settings label; default the active version), `tranche_id?` (stored; concentration uses it for the geo cap once tranches exist), `checks?` (a subset of check ids: each lane's gate list is cut to it, in settings order; a lane left with nothing → 422 `VALIDATION_ERROR`), `names` (1–50) each `{domain, lane (S2 geo | S3 | S4 | S6 | S7), city?, state?, trade?, price_grade? (strong|weaker), bin_usd?, leads_ab? (default 0), census_list?, as_of? (ISO with offset, full mode only), rank? (int)}`.
+- **Modes:** `live` stops a name at its first FAIL or UNKNOWN; `full` runs every planned check regardless. `live` needs the **active** settings version; a `full` run may name any version, and a non-active one makes it a `backtest` (results labelled, never a buy card).
+- **Order:** gate by gate in the settings' plan order, names in `rank` order (lower first; unranked after ranked, then submission order), so CONCENTRATION-1 sees the names ranked ahead.
+- **Per-name problems never fail the request:** an unreadable or duplicate name gets one `form` result FAIL `INPUT_INVALID` (`fields.cause` and the start of `reason`: `DUPLICATE` the same name again, `NOT_COM`, `DOMAIN_INVALID`) and the final status `invalid`.
+- **202:** `{run_id, status: "running", mode, backtest, settings_version, buy_hold, names_n, poll: "/screening/runs/<id>"}`.
+- **Errors:** 422 `DRAFT_NOT_ALLOWED_LIVE` (`settings` is not the active version in a live run; `details.active`) · 404 `SETTINGS_NOT_FOUND` · 422 `AS_OF_LIVE_REFUSED` (`as_of` on a live run) · 422 `VALIDATION_ERROR` (size, lane, unknown check, unknown key). `TRANCHE_NOT_FOUND` arrives with tranches.
+
+### `GET /screening/runs/{id}`
+READ. `?domain=` (one name), `?view=summary|full` (default `full`; `summary` leaves out `results`). A running run whose last row is older than 120 s (the service slept) continues now; the answer does not wait for it.
+- **200:** `{run_id, status: "running"|"done"|"partial", mode, backtest, settings_version, buy_hold, created_at, finished_at, progress: {checks_planned, checks_done}, names: [{domain, lane, final_status, first_fail: {check, gate, reason_code} | null, tier, short, flags: [check], pending_manual: [check], not_implemented: [check], results?: [{check, gate, rule_ids, status, reason_code, reason, fields, data_as_of, checked_at, cached, source, settings_version, list_versions, duration_ms, upstream_calls, evidence: [id]}]}], funnel}`. `results` holds the latest result per check, in the order written. `tier` is the tier check's tier (null until that check exists); `short` is the form check's `short`.
+- Statuses, final statuses, the funnel and the reason codes: `selection.md` §Screening runs.
+- **Errors:** 404 `RUN_NOT_FOUND` · 400 `VALIDATION_ERROR` (bad query).
+
+### `POST /screening/runs/{id}/manual`
+WRITE. Records a human result for a check no automated source answers: `web_risk` (Google Transparency Report, CAP-06) or `tm_us` (USPTO wordmark search, CAP-08). The server turns the record into a status by the settings' rules (below) and appends it; it supersedes the run's `MANUAL_REQUIRED` row for that name. The evidence URL is stored as an evidence row (`source: "manual"`, text = the JSON result).
+- **Body (strict):** `domain` (a name of the run), `check` (`web_risk` | `tm_us`), `checked_at` (ISO with offset, not in the future), `evidence_url` (an https URL), `result`, `note?` (≤ 500 chars). `result` for `web_risk`: `{raw_status: int, threat_types?: [string]}`; for `tm_us`: `{phrases_queried: [string] (≥ 1), control_ok: bool, exact_or_core_live: [{mark, serial, owner, status}], generic_live: [{mark, serial, owner, status}], dead_n?: int}`.
+- **Status rules:** `web_risk`: `raw_status` in `web_risk.unsafe_statuses` → FAIL `UNSAFE`; in `safe_statuses` → PASS when `web_risk.requires_clean_history` is false or the name's latest `history` result in this run is PASS or PASS_WITH_NOTE, else UNKNOWN `HISTORY_NOT_FINAL` (record again once history is decided); any other value → UNKNOWN `STATUS_UNRECOGNISED`. `tm_us`: `control_ok` false → UNKNOWN `CONTROL_FAILED`; any `exact_or_core_live` → FAIL `TM_LIVE_MARK`; only `generic_live` → FLAG `TM_GENERIC_HITS`; else PASS.
+- **201:** the new result: `{domain, check, gate, rule_ids, status, reason_code, reason, fields, data_as_of (= checked_at), checked_at, cached: false, source: "manual", settings_version, list_versions, duration_ms, upstream_calls, evidence: [id], recorded_by}`.
+- **Errors:** 404 `RUN_NOT_FOUND` · 404 `NAME_NOT_IN_RUN` (not a screened name of the run; an `INPUT_INVALID` name is not one) · 422 `CHECK_NOT_MANUAL` (`details.manual`) · 422 `VALIDATION_ERROR` (shape, an http URL, a future `checked_at`).
+
+### `GET /screening/evidence/{id}`
+READ. One stored evidence row: `{id, source, url, retrieved_at, http_status, sha256, truncated, text}`. `text` is the extracted visible text (never raw HTML); `sha256` covers the full response body. 404 `EVIDENCE_NOT_FOUND`.
+
+### `POST /quotes/manual`
+WRITE. A renewal price entered by Dvir's bot for a registrar the machine cannot quote (for example a GoDaddy account with fewer than 50 domains; CAP-17). Append-only; the quote check (a later task) accepts it until `valid_until`.
+- **Body (strict):** `domain` (a `.com`), `registrar`, `renewal_usd` (> 0, at most 2 decimals), `first_year_usd?`, `source_note` (1–500 chars: where the figure was read), `source_url?`, `observed_at` (ISO with offset).
+- **201:** `{id, domain, registrar (lowercased), renewal_cents, renewal, valid_until}` where `valid_until = observed_at + quote.manual_max_age_days` (30 in v1).
+- **Errors:** 422 `OBSERVED_AT_INVALID` (in the future, or older than `quote.manual_max_age_days`; `details.max_age_days`) · 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED` · 422 `VALIDATION_ERROR`.
+
 ---
 
 ## Jobs
@@ -355,6 +386,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Buying errors:** `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
 
 **Listing errors:** the listing rule codes under `POST /list/{domain}`, plus `NOT_IN_PORTFOLIO`, `API_ACCESS_DISABLED`, `REGISTRAR_UNAVAILABLE`, `LISTING_CHANGED_CONCURRENTLY`, `DOMAIN_NOT_FOUND`.
+
+**Screening errors:** `DRAFT_NOT_ALLOWED_LIVE`, `AS_OF_LIVE_REFUSED`, `RUN_NOT_FOUND`, `NAME_NOT_IN_RUN`, `CHECK_NOT_MANUAL`, `EVIDENCE_NOT_FOUND`, `OBSERVED_AT_INVALID` (and `SETTINGS_NOT_FOUND`, `VALIDATION_ERROR`). Result reason codes are in `selection.md` §Screening runs.
 
 **Export errors:** `SEDO_TEMPLATE_MISSING`, `SEDO_TEMPLATE_INVALID`, `EXPORT_NOT_FOUND`, `EXPORT_ALREADY_CONFIRMED`, `UPLOADED_AT_INVALID`, `NO_PII`.
 

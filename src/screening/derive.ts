@@ -1,0 +1,108 @@
+// Final status and funnel of a screening run (CAP-20). Pure: results in, verdict out.
+import { GATE_OF } from './checks/index.js';
+import type { CheckId, Lane, ResultRow } from './types.js';
+
+export type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'invalid' | 'running';
+
+export interface Derived {
+  final_status: FinalStatus;
+  first_fail: { check: CheckId; gate: string; reason_code: string } | null;
+  flags: CheckId[];
+  pending_manual: CheckId[];
+  /** Planned checks that answered NOT_RUN / NOT_IMPLEMENTED: shown, never counted as a pass or a fail. */
+  not_implemented: CheckId[];
+}
+
+/** The newest row per check (highest id): a manual record supersedes the auto row it answers. */
+export function latestByCheck(results: ResultRow[]): Map<CheckId, ResultRow> {
+  const m = new Map<CheckId, ResultRow>();
+  for (const r of results) {
+    const have = m.get(r.check_id);
+    if (!have || r.id > have.id) m.set(r.check_id, r);
+  }
+  return m;
+}
+
+/**
+ * - `invalid`: the name could not be read (`form` FAIL `INPUT_INVALID`).
+ * - `rejected`: a gating check FAILed (first in plan order is `first_fail`; in live mode later checks were never run).
+ * - `unknown`: a gating check is UNKNOWN, or the run is finished and a planned gating check has no result.
+ * - `running`: no FAIL/UNKNOWN yet and the run is not finished with a gating check still to come.
+ * - `pending_manual`: everything else passed but a MANUAL_REQUIRED record is outstanding.
+ * - `would_buy` while `buyHold` (CR-002: never a BUY card while the hold is on), else `buy_candidate`.
+ * Feature checks (`featureChecks`) never reject or stop a name; their UNKNOWN only leaves a feature unknown.
+ * A NOT_RUN with reason `NOT_IMPLEMENTED` is ignored (the check does not exist yet), so `not_implemented` lists it.
+ */
+export function deriveItem(results: ResultRow[], plan: CheckId[], featureChecks: CheckId[], buyHold: boolean, runDone: boolean): Derived {
+  const latest = latestByCheck(results);
+  const none: Derived = { final_status: 'running', first_fail: null, flags: [], pending_manual: [], not_implemented: [] };
+  const form = latest.get('form');
+  if (form && form.status === 'FAIL' && form.reason_code === 'INPUT_INVALID') {
+    return { ...none, final_status: 'invalid', first_fail: { check: 'form', gate: form.gate, reason_code: 'INPUT_INVALID' } };
+  }
+  const gating = plan.filter((c) => !featureChecks.includes(c));
+  const notImpl = (r: ResultRow | undefined) => r?.status === 'NOT_RUN' && r.reason_code === 'NOT_IMPLEMENTED';
+  const flags = plan.filter((c) => latest.get(c)?.status === 'FLAG');
+  const not_implemented = plan.filter((c) => notImpl(latest.get(c)));
+  const failed = gating.find((c) => latest.get(c)?.status === 'FAIL');
+  const base = { flags, pending_manual: [] as CheckId[], not_implemented };
+  if (failed) {
+    const r = latest.get(failed)!;
+    return { ...base, final_status: 'rejected', first_fail: { check: failed, gate: r.gate, reason_code: r.reason_code ?? 'FAIL' } };
+  }
+  const pending_manual = gating.filter((c) => latest.get(c)?.status === 'MANUAL_REQUIRED');
+  if (gating.some((c) => latest.get(c)?.status === 'UNKNOWN')) return { ...base, pending_manual, final_status: 'unknown', first_fail: null };
+  const missing = gating.some((c) => {
+    const r = latest.get(c);
+    return !r || (r.status === 'NOT_RUN' && !notImpl(r));
+  });
+  if (missing) return { ...base, pending_manual, final_status: runDone ? 'unknown' : 'running', first_fail: null };
+  if (pending_manual.length > 0) return { ...base, pending_manual, final_status: 'pending_manual', first_fail: null };
+  return { ...base, final_status: buyHold ? 'would_buy' : 'buy_candidate', first_fail: null };
+}
+
+export interface DerivedItem { idx: number; lane: Lane; derived: Derived }
+
+export interface Funnel {
+  names: number;
+  by_final_status: Record<string, number>;
+  /** First-fail counts per check: how many names each gate stopped. */
+  first_fail: Record<string, { gate: string; count: number }>;
+  by_lane: Record<string, {
+    names: number;
+    final: Record<string, number>;
+    /** Per planned check, in plan order: names with a result (`reached`) and how they came out. */
+    stages: { check: CheckId; gate: string; reached: number; passed: number; flagged: number; failed: number; unknown: number; manual_required: number; not_run: number }[];
+  }>;
+}
+
+export function funnel(items: DerivedItem[], resultsByItem: Map<number, ResultRow[]>, plan: Partial<Record<Lane, CheckId[]>>): Funnel {
+  const out: Funnel = { names: items.length, by_final_status: {}, first_fail: {}, by_lane: {} };
+  for (const it of items) {
+    const st = it.derived.final_status;
+    out.by_final_status[st] = (out.by_final_status[st] ?? 0) + 1;
+    const lane = (out.by_lane[it.lane] ??= {
+      names: 0, final: {},
+      stages: (plan[it.lane] ?? []).map((check) => ({ check, gate: GATE_OF[check], reached: 0, passed: 0, flagged: 0, failed: 0, unknown: 0, manual_required: 0, not_run: 0 })),
+    });
+    lane.names++;
+    lane.final[st] = (lane.final[st] ?? 0) + 1;
+    if (it.derived.first_fail) {
+      const f = (out.first_fail[it.derived.first_fail.check] ??= { gate: it.derived.first_fail.gate, count: 0 });
+      f.count++;
+    }
+    const latest = latestByCheck(resultsByItem.get(it.idx) ?? []);
+    for (const s of lane.stages) {
+      const r = latest.get(s.check);
+      if (!r) continue;
+      s.reached++;
+      if (r.status === 'PASS' || r.status === 'PASS_WITH_NOTE') s.passed++;
+      else if (r.status === 'FLAG') s.flagged++;
+      else if (r.status === 'FAIL') s.failed++;
+      else if (r.status === 'UNKNOWN') s.unknown++;
+      else if (r.status === 'MANUAL_REQUIRED') s.manual_required++;
+      else s.not_run++;
+    }
+  }
+  return out;
+}

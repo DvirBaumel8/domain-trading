@@ -113,7 +113,45 @@ ratio(price) = price * net_factor * stre_eff_y1 / renewal
 
 ## Evidence
 
-Each outside source read is stored once in `screening_evidence`: `source`, `url`, `retrieved_at`, `http_status`, `content_type`, `sha256` (of the **full response body**), the **extracted visible text** (gzip, cut to `evidence.max_text_bytes` bytes on a character boundary; `truncated` says so, `text_bytes` is the stored length). The raw HTML is never stored. Rows are append-only. Evidence is read through the screening results that cite it (a later task); this task adds the store only.
+Each outside source read is stored once in `screening_evidence`: `source`, `url`, `retrieved_at`, `http_status`, `content_type`, `sha256` (of the **full response body**), the **extracted visible text** (gzip, cut to `evidence.max_text_bytes` bytes on a character boundary; `truncated` says so, `text_bytes` is the stored length). The raw HTML is never stored. Rows are append-only. Evidence is read with `GET /screening/evidence/{id}`; a screening result cites it in `evidence`.
+
+## Screening runs (CAP-20)
+
+A run screens up to 50 names through the lane's gate list (`run.gates.<lane>`, else `run.gates.default`, in that order). Every (name, check) is a stored row; the newest row of a (name, check) is its result (a manual record, or a re-run, adds a row and never changes one). Gate by gate, names in `rank` order.
+
+**Result status** (`PASS`, `PASS_WITH_NOTE`, `FLAG`, `FAIL`, `UNKNOWN`, `MANUAL_REQUIRED`, `NOT_RUN`): only PASS has no reason code. `source` is `auto` (the check ran), `cache` (copied from an earlier result inside `freshness_hours.<check>`, same settings label, same backtest flag and same list versions; `cached: true`, the original `checked_at`; a result that is UNKNOWN, NOT_RUN or MANUAL_REQUIRED is never reused) or `manual`.
+
+**Checks built in this release** (`gate` is the label shown on each result):
+
+| Check | Gate | Rules | Lists | Result |
+|---|---|---|---|---|
+| `form` | G0 | SPELL-1, FORM-2, G-FORM-1, CAP-01 | trade, regime, tech, generic_head, state, legal, city_extra, dictionary_extra | the form result above as `fields`; `INPUT_INVALID` (written when the run is created) |
+| `brand_lists` | G1 | BRAND-1, BIGCO-1, EVENT-1 | brand, bigco, event | `fields`: `brand_hits[]`, `bigco_hits[]`, `event_hits[]` (each `{term, tokens}`), `lists_missing[]`, `list_versions`. A term matches when it equals a token or its space-stripped form equals consecutive tokens. Brand and bigco ignore `city` and `state` tokens; event does not. FAIL `BRAND_HIT` / `BIGCO_HIT` / `EVENT_HIT` (first in that order); else UNKNOWN `LIST_MISSING` when a list has no uploaded version (never a clean result); else PASS |
+| `concentration` | G3 | CONCENTRATION-1 | the form lists | `fields`: `city`, `trade`, `regime`, `keywords`, `cap`, `lane_share {lane, in_lane, total, share, max, enforced}`; on a FAIL also `details {attribute, value, count, cap, blocking[]}`. The attributes come from the name's `form` result; the portfolio is the names in `domains` with status `pending_purchase`, `owned`, `listed` or `delisted`, tokenised the same way, plus the names ranked ahead in this run that have no FAIL at a gating check. A count at or above `concentration.max_per_attr` → FAIL `CONCENTRATION_CITY`, `CONCENTRATION_TRADE`, `CONCENTRATION_REGIME` or `CONCENTRATION_KEYWORD` (in that order); a geo name when the run has a `tranche_id` and tranche geo members + geo names ahead reach `tranche.geo_max` → FAIL `GEO_CAP` (tranche members count as 0 until tranches exist); `LANE_SHARE` only when `concentration.lane_share_enforced` (off by default; the share is always reported); a geo name without a city or a trade → FLAG `GEO_ATTR_MISSING`; else PASS |
+| `web_risk` | G5 | WEB-RISK-1 | none | always MANUAL_REQUIRED `MANUAL_SOURCE` until a record is posted (`fields`: `lookup_name`, the safe and unsafe statuses, `requires_clean_history`). Record rules: `endpoints.md` `POST /screening/runs/{id}/manual` |
+| `tm_us` | G7 | TM-1 | the form lists | always MANUAL_REQUIRED `MANUAL_SOURCE` until a record is posted; `fields.phrases_to_query` lists what to search: the exact phrase (`TULSA ROOFING CO`), city + trade, the distinctive core (generic heads removed), and each generic-head pair (`ROOFING CO`); `control_required: true` |
+
+**Not built yet:** every other check id in a lane's gate list (`typo`, `availability`, `surbl`, `history`, `census`, `ext_dates`, `tier`, `namebio`, `quote`, `price`, ...) answers NOT_RUN with reason code `NOT_IMPLEMENTED`, with its gate label (`G1` typo, `G2` availability, `G4` surbl, `G6` history, `G8` census / ext_dates / tier / namebio, `G9` quote / price, `G10` pack, `G12` leads). It is shown, listed in the name's `not_implemented`, and never counts as a pass or a fail; each is replaced by a real result when its check ships. A name's `final_status` can therefore read `would_buy` while such a gate is missing: read `not_implemented` before relying on it.
+
+**Time budget and resume.** `deadline_at = created + run.time_budget_minutes`. A running run with no new row for 120 s is continued by the next `GET` or the hourly tick; a run past its deadline ends `partial`: every open check of a name that is not already stopped becomes UNKNOWN `TIMEOUT`. A check that throws is UNKNOWN `SOURCE_ERROR` (message cut to 200 characters). A (name, check) is never written twice by a run.
+
+**Final status** per name (`final_status`):
+
+| Value | Meaning |
+|---|---|
+| `invalid` | the name could not be read (`INPUT_INVALID`) |
+| `rejected` | a gating check FAILed; `first_fail` is the first in plan order. In `live` mode later checks were not run |
+| `unknown` | a gating check is UNKNOWN, or the run has ended and a planned gating check has no result |
+| `running` | no FAIL or UNKNOWN yet and a gating check is still to come |
+| `pending_manual` | everything else passed but a check is MANUAL_REQUIRED (`pending_manual` lists them) |
+| `would_buy` | everything passed and the settings' `buy_hold` is on: **never a buy card while the hold is on** (CR-002 CAP-20) |
+| `buy_candidate` | everything passed and `buy_hold` is off |
+
+Feature checks (`run.feature_checks`: census, ext_dates, namebio) never reject or stop a name; their UNKNOWN leaves a feature unknown. `flags` lists the checks that answered FLAG; a FLAG does not block (a bot judges it).
+
+**Funnel** (per run, also stored as `summary` when the run ends): `{names, by_final_status {<status>: n}, first_fail {<check>: {gate, count}}, by_lane {<lane>: {names, final {<status>: n}, stages [{check, gate, reached, passed, flagged, failed, unknown, manual_required, not_run}]}}}`.
+
+**As-of.** Each stored name carries `as_of`: a live run sets it to the request time; a full run keeps the `as_of` sent (none otherwise). The checks that use dated sources (a later task) read only data dated strictly before it.
 
 ## Status and reason codes (so far)
 
@@ -122,3 +160,4 @@ Each outside source read is stored once in `screening_evidence`: `source`, `url`
 | `HAS_DIGIT`, `HAS_HYPHEN`, `UNKNOWN_TOKEN`, `GFORM1_WORDS`, `GFORM1_LENGTH`, `GEO_ATTR_MISSING`, `CITY_PLUS_LEGAL`, `AMBIGUOUS_SPLIT` | name form (above) |
 | `BIN_NOT_IN_PRICE_LIST`, `PRICE_LIST_MISSING`, `LANDER_EXCEPTION_NOT_MET` | `money.lander1.reason` |
 | `PRICING_V3_MISSING` | `POST /selection/evaluate` `warnings` |
+| `INPUT_INVALID` (causes `DUPLICATE`, `NOT_COM`, `DOMAIN_INVALID`), `LIST_MISSING`, `BRAND_HIT`, `BIGCO_HIT`, `EVENT_HIT`, `CONCENTRATION_CITY`, `CONCENTRATION_TRADE`, `CONCENTRATION_REGIME`, `CONCENTRATION_KEYWORD`, `GEO_CAP`, `LANE_SHARE`, `MANUAL_SOURCE`, `UNSAFE`, `HISTORY_NOT_FINAL`, `STATUS_UNRECOGNISED`, `CONTROL_FAILED`, `TM_LIVE_MARK`, `TM_GENERIC_HITS`, `TIMEOUT`, `SOURCE_ERROR`, `NOT_IMPLEMENTED` | screening results (above) |

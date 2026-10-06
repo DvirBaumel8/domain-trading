@@ -392,6 +392,68 @@ export interface ScreeningEvidenceTable {
   created_at: TimestampDefault;
 }
 
+export interface ScreeningRunsTable {
+  id: string;
+  created_at: TimestampDefault;
+  created_by: string;
+  audit_id: string | null;
+  mode: 'live' | 'full';
+  backtest: boolean;
+  settings_id: number;
+  settings_label: string;
+  buy_hold: boolean;
+  tranche_id: string | null;
+  input: Json;
+  gate_plan: Json;
+  list_versions: Json;
+  status: 'running' | 'done' | 'partial';
+  deadline_at: Timestamp;
+  heartbeat_at: Date | null;
+  finished_at: Date | null;
+  summary: Json | null;
+}
+
+export interface ScreeningResultsTable {
+  id: Generated<string>;
+  run_id: string;
+  item_idx: number;
+  domain: string;
+  lane: string;
+  check_id: string;
+  gate: string;
+  rule_ids: string[];
+  status: 'PASS' | 'PASS_WITH_NOTE' | 'FLAG' | 'FAIL' | 'UNKNOWN' | 'MANUAL_REQUIRED' | 'NOT_RUN';
+  reason_code: string | null;
+  reason: string | null;
+  fields: Json;
+  data_as_of: Date | null;
+  checked_at: Timestamp;
+  settings_label: string;
+  list_versions: Json;
+  duration_ms: number;
+  upstream_calls: number;
+  evidence_ids: Generated<string[]>;
+  source: 'auto' | 'cache' | 'manual';
+  cached_from: string | null;
+  recorded_by: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+export interface ManualQuotesTable {
+  id: Generated<string>;
+  domain: string;
+  registrar: string;
+  renewal_cents: number;
+  first_year_cents: number | null;
+  source_url: string | null;
+  source_note: string;
+  observed_at: Timestamp;
+  recorded_by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface Database {
   api_tokens: ApiTokensTable;
   settings: SettingsTable;
@@ -415,6 +477,9 @@ export interface Database {
   selection_settings: SelectionSettingsTable;
   selection_lists: SelectionListsTable;
   screening_evidence: ScreeningEvidenceTable;
+  screening_runs: ScreeningRunsTable;
+  screening_results: ScreeningResultsTable;
+  manual_quotes: ManualQuotesTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

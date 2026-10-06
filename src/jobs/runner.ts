@@ -33,6 +33,8 @@ export interface JobRunnerDeps {
   priceJob: Runnable;
   dropJob: Runnable;
   registrarCheckJob: Runnable;
+  /** Resumes stalled screening runs (CAP-20); its summary is {resumed[], finalized[]}. */
+  screeningWorker: { resumeStalled(): Promise<unknown> };
   backupExport?: BackupExport;
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
@@ -86,6 +88,7 @@ export class JobRunner {
       if (!(await this.nsVerifyDue())) return { skipped: true, reason: 'ran within the last 24 h' };
       return this.deps.nsVerifier.runOnce();
     });
+    steps.screeningResume = await this.step(() => this.deps.screeningWorker.resumeStalled());
     return steps;
   }
 
