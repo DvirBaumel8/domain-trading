@@ -48,7 +48,7 @@ export function registerExport(app: FastifyInstance, service: ExportService): vo
     }
     if (!r) {
       throw new AppError(501, 'SEDO_TEMPLATE_MISSING',
-        "Sedo's bulk-upload headers aren't public. Download Sedo's example file from your Sedo account and fill templates/sedo_template.json (see docs/specs/export-csv.md).");
+        "Sedo's bulk-upload headers aren't public. Download Sedo's example file from your Sedo account and fill templates/sedo_template.json (see docs/contract/formats.md).");
     }
     return send(reply, r);
   });

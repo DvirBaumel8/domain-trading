@@ -79,8 +79,8 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `GITHUB_BACKUP_REPO` | `DvirBaumel8/domain-trading-data` |
    | `JOB_TRIGGER_TOKEN` | the value from step 3 |
 
-   The blueprint already sets `APP_ENV=production`, `DATABASE_SSL=true`, `LANDER_TARGET=afternic`,
-   `ENABLED_REGISTRARS=porkbun,godaddy`. Later pushes do not deploy by themselves: use Manual Deploy.
+   The blueprint already sets `APP_ENV=production`, `DATABASE_SSL=true` and
+   `ENABLED_REGISTRARS=porkbun,godaddy` (the lander target is a DB setting, default `afternic`). Later pushes do not deploy by themselves: use Manual Deploy.
 3. The first start runs the migrations (`npm run migrate up`) and then boots. Watch the logs for `Migrations complete!` and `Server listening`.
 4. Check, replacing the URL with yours (the first request may take ~50 s):
    ```bash
@@ -88,6 +88,7 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    curl -s -H "Authorization: Bearer $READ_TOKEN" https://domain-trading-api.onrender.com/health        # "db":"ok", adapters listed
    ```
 5. Note the service URL.
+6. **Deploy hook (for DOM's releases):** service -> Settings -> **Deploy Hook** -> copy the URL. Save it as the GitHub repo secret `RENDER_DEPLOY_HOOK` (Settings -> Secrets and variables -> Actions), and give it to DOM through the secret store, never chat. DOM deploys each release with `curl -fsS -X POST "$RENDER_DEPLOY_HOOK"` (`docs/runbook.md` §Releasing). Treat it like a password: anyone with it can trigger a deploy of `main`.
 
 ## 6. Cloudflare Worker cron (GitHub repo settings)
 
@@ -115,25 +116,24 @@ Hand each token to its bot through the bot's secret store, not through a chat lo
 
 ## 8. Import D-001
 
-Run it in the same `.env.neon` subshell. **Dry run first**, check the output, then drop `--dry-run`:
+Run it in the same `.env.neon` subshell. **Dry run first**, check the output, then drop `--dry-run`. The values are Dvir's 6 Oct 2026 00:32 reprice (`docs/internal/listing-strategy.md` §8); copy his exact 00:32 words into `--approval-text`:
 
 ```bash
-(set -a; . ./.env.neon; set +a; npm run admin -- import-domain --domain promptinjectionaudit.com --registrar godaddy --buy-date 2026-10-04 --cost 13.73 --cost-note "42 ILS @0.3269" --order none --deal D-001 --category trend --listing-mode hybrid --bin 1995 --floor 1295 --walkaway 950 --pricing-exception "Dvir approved 2026-10-05 00:39 IDT" --legacy-no-comps "bought before the comps rule; card found no comps" --approval-text "Approve the prices, but wait for the software to list it" --approval-at 2026-10-05T00:39:00+03:00 --manual --expiry 2027-10-04 --dry-run)
+(set -a; . ./.env.neon; set +a; npm run admin -- import-domain --domain promptinjectionaudit.com --registrar godaddy --buy-date 2026-10-04 --cost 13.73 --cost-note "42 ILS @0.3269" --order none --deal D-001 --category trend --listing-mode hybrid --bin 1488 --floor 967 --walkaway 950 --pricing-exception "Dvir approved 2026-10-06 00:32 IDT" --legacy-no-comps "bought before the comps rule; card found no comps" --approval-text "<Dvir's 00:32 words>" --approval-at 2026-10-06T00:32:00+03:00 --manual --expiry 2027-10-04 --dry-run)
+(set -a; . ./.env.neon; set +a; npm run admin -- drop-at-first-expiry --domain promptinjectionaudit.com --approval-text "<Dvir's 00:32 words>" --approval-at 2026-10-06T00:32:00+03:00)
 ```
 
-Optional: add `--renewal-price <GoDaddy renewal price, auto-renew off>` once known. Without it `/report` shows `RENEWAL_PRICE_UNKNOWN` and `committed_forward` is marked incomplete.
-
-(`docs/specs/report.md` §Import is the source. `--manual` because GoDaddy is not an API source for this account; use the API path only if `GODADDY_PAT` is set and the account is eligible.)
+Optional: add `--renewal-price <GoDaddy renewal price, auto-renew off>` once known. Without it `/report` shows `RENEWAL_PRICE_UNKNOWN` and `committed_forward` is marked incomplete. (`docs/internal/report.md` §Import is the source. `--manual` because GoDaddy is not an API source for this account; use the API path only if `GODADDY_PAT` is set and the account is eligible.)
 
 ## 9. G3: live read-only checks (no real purchase)
 
-Use the READ and WRITE tokens (Gavriel runs these; see `docs/specs/test-plan.md` G3). Note the Porkbun balance and invoice list first. The Porkbun credit must be **$0** (see step 4).
+Use the READ and WRITE tokens (Gavriel runs these; see `docs/internal/test-plan.md` G3). Note the Porkbun balance and invoice list first. The Porkbun credit must be **$0** (see step 4).
 
 1. `GET /health` (with a READ token) -> `db: ok`; `GET /health/ping` -> ok.
 2. **CK-12:** `GET /check?domain=<a random unregistered .com>` -> `available`, Porkbun first-year and renewal equal Porkbun's public `pricing/get` .com prices (within $0.01). `GET /check?domain=promptinjectionaudit.com` -> `taken`, no winner.
-3. **IM-4:** `GET /portfolio/promptinjectionaudit.com` -> registrar `godaddy`, cost $13.73, expiry 2027-10-04, `drop_date` 2028-10-04, category `trend`, hybrid 1995 / 1295 / walk-away 950 (private) / min offer 100, `pricing_source=approved_exception`, 4 schedule rows. `/ledger` holds only the D-001 row.
+3. **IM-4:** `GET /portfolio/promptinjectionaudit.com` -> registrar `godaddy`, cost $13.73, expiry 2027-10-04, `drop_date` 2027-10-04 (after `drop-at-first-expiry`), category `trend`, hybrid 1488 / 967 / walk-away 950 (private) / min offer 100, `pricing_source=approved_exception`, its schedule rows (final push 2027-07-06, delist 2027-09-27). `/ledger` holds only the D-001 row.
 4. `GET /report` -> sane totals, no unexpected warnings.
-5. `POST /buy` with **`"dry_run": true` set explicitly in the body** for a free test .com Dvir is willing to buy (a fresh `Idempotency-Key`; `approval_ref` text naming the domain; the other required fields per `docs/specs/buy.md`). With $0 credit the expected result is `INSUFFICIENT_FUNDS` (`REGISTRAR_FUNDS`) or the equivalent, and **that is a pass**. `wouldSucceed: true` or `VERIFICATION_REQUIRED` are also acceptable results. Never send the call without `dry_run: true` before G4.
+5. `POST /buy` with **`"dry_run": true` set explicitly in the body** for a free test .com Dvir is willing to buy (a fresh `Idempotency-Key`; `approval_ref` text naming the domain; the other required fields per `docs/contract/endpoints.md`). With $0 credit the expected result is `INSUFFICIENT_FUNDS` (`REGISTRAR_FUNDS`) or the equivalent, and **that is a pass**. `wouldSucceed: true` or `VERIFICATION_REQUIRED` are also acceptable results. Never send the call without `dry_run: true` before G4.
 6. **Pass criteria:** Porkbun balance, invoices and spend unchanged; audit rows present. **Any charge: stop everything, contact Porkbun support, revoke the WRITE token** (`npm run admin -- token revoke --id <id>`).
 
 ## 10. Restore drill (BK-5), before the first real buy
@@ -157,6 +157,6 @@ Check the `export` step in the reply, then that the `data-backup` branch has a n
 - **Cold start ~50 s.** Bots should use request timeouts of at least 60 s and retry once. The Worker uses 90 s.
 - **Reconciler runs hourly** in production (was every 10 min), so a stuck purchase resolves within about 90 min.
 - **Neon free:** 100 CU-hours per project per month, 1 GB, scale-to-zero after 5 min, only 6 hours of point-in-time history. The nightly `data-backup` export and your monthly manual dump are the real safety net. Hourly wakes use roughly 15 CU-h.
-- **GoDaddy:** changing nameservers through the PAT may be refused for this account (403 `ACCOUNT_NOT_ELIGIBLE`). Then change NS by hand in GoDaddy and the NS verifier checks public DNS (`docs/specs/list.md` step 4). GoDaddy is never a buying source here.
+- **GoDaddy:** changing nameservers through the PAT may be refused for this account (403 `ACCOUNT_NOT_ELIGIBLE`). Then change NS by hand in GoDaddy and the NS verifier checks public DNS (`docs/internal/list.md`). GoDaddy is never a buying source here.
 - Check in GoDaddy that auto-renew is OFF for D-001 (renewals bill the card; the server cap cannot block them).
 - **Idempotency keys:** the hourly Worker calls add a small `idempotency_keys` row each (about 8,800 a year). The growth is fine for now (1 GB Neon); prune later if it ever matters.

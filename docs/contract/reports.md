@@ -1,0 +1,72 @@
+# Reports (contract v1.0.0)
+
+Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
+
+## `GET /report`
+READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 400 `VALIDATION_ERROR`.
+- `md` returns `text/markdown`: a compact chat digest (budget, sales and ROI, domains, upcoming, warnings by level). It **never** contains the walk-away. Its layout isn't part of the contract.
+- `json` returns:
+
+| Field | Content |
+|---|---|
+| `generated_at` | ISO time |
+| `budget` | `poc_cap`, `spent`, `remaining` (pairs). `spent` = −Σ ledger `registration` + `renewal` + `fee` rows (the figure `/buy` checks against the cap). `committed_forward: {total (pair), complete: bool, missing: [domain]}` = one renewal for each live name with `renewals_used = 0` (`missing` = names without a known renewal price). `domains: {count, max}` (owned + listed + delisted + pending purchases, vs 50) |
+| `sales` | `count`, `gross`, `commission`, `fees` (sale-side fees: `/sold` fee and adjustment rows and `payout_fee`), `net` (pairs) |
+| `profit` | pair: `net − costs`. Costs = `registration`, `renewal`, `refund` (lowers costs), `tool`, `ai`, and `fee`/`adjustment` rows not written by `/sold` |
+| `roi`, `roi_pct` | `profit / costs`: a number with 2 decimals, and a whole percent; both `null` while costs are 0 |
+| `per_domain` | One row per domain (pending purchases excluded), see below |
+| `upcoming_90d` | Events within 90 days, see below |
+| `offers_by_strategy` | `[{category, strategy, names_listed, names_with_offers, offers_90d, offers_per_listed_name_per_month (2 decimals), median_offer_pct_of_bin, max_offer_pct_of_bin, band_shares: {<band>: share}}]` (counts are for currently listed names) |
+| `applied_7d` | Price events applied in the last 7 days: `[{domain, event, applied_at, old: {bin, floor, walkaway}, new: {…}, export_pending: bool}]` |
+| `warnings` | `[{code, level: "error"|"warn"|"info", domain?, message, details}]`, sorted error → warn → info, then by code and domain |
+
+### `per_domain` row
+`domain`, `status` (`owned`, `listed`, `delisted`, `sold`, `dropped`), `registrar`, `registrar_api` (`full`, `manage`, `none`), `category`, `price_grade`, `listing_mode` (`bin`/`hybrid`/`offer`/null), `bin`, `floor` (pairs), `walkaway_cents` + `walkaway` (`"$960 (private)"`), `min_offer` (pair), `pricing_source`, `pricing_settings_version`, `offers: {count_30d, highest_30d, count_90d, highest_90d, count_all, highest_all, highest_all_pct_of_bin, last_offer_at, open_for_dvir}` (highest = `{cents, display}` or null; periods in IDT days; keys always present), `next_price_event: null | {event, due_on, bin, floor, walkaway}`, `pricing_hold`, `export_pending_since`, `cost` (pair: registration + renewal rows), `renewal_price` (pair), `renewals_used` (0 or 1), `expiry_date`, `drop_date`, `lander`, `ns_verified: bool`, `days_held` (stops at the sale or drop date), `sold_at`, `delisted_at`.
+
+### `upcoming_90d` item
+`{domain, kind, date, stage?, headsup?, event?, values?, note}`, sorted by date. Kinds:
+- `first_renewal`: expiry within 60 days with `renewals_used = 0`; `stage` 60 / 30 / 7. Dvir decides once; the service doesn't renew in v1.
+- `final_expiry`: expiry within 60 days with the renewal used, or a name set to drop at its first expiry; `stage` 60 / 30; no renew option.
+- `fast_transfer`: buy date + 60 days (the Afternic Fast Transfer opt-in date).
+- `drop_date`: the registration lapses (unless it's the same date as a `final_expiry` item).
+- `price_event`: a planned `price_schedule` row with its exact `values` (`bin`, `floor`, `walkaway`); `headsup: true` within 7 days (the settings' `headsup_days_before`). Information only: pre-approved by the buy. Overdue events aren't listed (they show as warnings).
+
+### Warnings
+
+| Code | Level | When | `details` |
+|---|---|---|---|
+| `PURCHASE_UNKNOWN` | error | A purchase is in the `unknown` state | `purchase_id` |
+| `PRICE_EVENT_FAILED` | error | A scheduled price event failed (the domain is unchanged) | `events[] {event, due_on, note}` |
+| `EXPIRED_NOT_RENEWED` | error | A live name with `renewals_used = 0` is past its expiry (it is not auto-dropped: grace period) | `expiry_date` |
+| `DOMAIN_LEFT_ACCOUNT` | error | The daily registrar check found the name gone and no sale is recorded (status unchanged) | `registrar`, `first_absent_at`, `last_checked_at` |
+| `EXPORT_PENDING` | warn; **error after 7 days** | A listed name changed since the last confirmed Afternic upload | `days_pending`, `export_pending_since` |
+| `MANUAL_DELIST` | warn | A sold, delisted or dropped name must be removed by hand at a marketplace | `status`, `venues[]` |
+| `POST_BUY_INCOMPLETE` | warn | A bought name has no stored pricing evidence (comps) | `purchase_id` |
+| `NS_UNVERIFIED` | warn | Public DNS doesn't show the lander nameservers yet | `lander`, `lander_ns` |
+| `EXPORT_STALE` | warn | No confirmed Afternic upload in 7 days while listings changed | `pending[]` |
+| `HOLD_STALE` | warn | A pricing hold has been on for more than 30 days | `reason`, `since` |
+| `PAST_DROP_DATE` | warn | A live name is past its `drop_date` | `drop_date` |
+| `RECEIPT_MISSING` | warn | A completed purchase has no registrar receipt | `purchase_id` |
+| `RENEWAL_PRICE_UNKNOWN` | warn | No renewal price on record (`committed_forward` is incomplete) | — |
+| `BIN_MISSING` | warn | Listed in `bin`/`hybrid` without a BIN | — |
+| `CATEGORY_MISSING` | warn | Listed without a category (defensive; the DB prevents it) | — |
+| `OFFER_NEEDS_DVIR` | warn | A Dvir-routed offer is still `open`/`countered` 48 h after it was recorded | `offer_id`, `amount`, `source`, `outcome`, `logged_at` |
+| `SALE_UNCONFIRMED` | info | A sale recorded from evidence, without Dvir's approval | `venue`, `transaction_ref`, `evidence_source`, `evidence_ref`, `recorded_by`, `sold_at` |
+| `PRICING_EXCEPTION` | info | A name priced by an approved exception | `settings_version`, `stored`, `formula` |
+| `FLOOR_AUTO_ACCEPT` | info | Afternic auto-accepts any offer at or above the floor | `floor`, `bin` |
+
+## `GET /report/pricing-review`
+READ. For the quarterly pricing review.
+- **Query (strict):** `from`, `to` (`YYYY-MM-DD`; default: the last 90 IDT days ending today). Errors → 400 `VALIDATION_ERROR`.
+- **200:**
+  ```
+  { from, to,
+    sales: [{ domain, venue, gross (pair), bin_at_sale (pair), ratio: gross/BIN (2 decimals) | null,
+              stage: "M0"|"M6"|"M12"|"M18"|"final", days_listed, at_floor: bool, sold_at }],
+    offers: { count, by_band: {<band>: n}, median_pct_of_bin },
+    skipped_events: int, held_domains_now: int (a snapshot, not the window),
+    settings_versions_in_use: [int], insufficient_data: bool (fewer than 3 sales) }
+  ```
+
+## Other reads
+`GET /portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` and `/report/offers` are in `endpoints.md`.

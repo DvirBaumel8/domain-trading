@@ -1,13 +1,13 @@
 # Runbook
 
-Short ops page. Setup is in `docs/DEPLOYMENT.md`. All commands run from the repo root. For anything that talks to
+Short ops page for DOM. Setup is in `docs/DEPLOYMENT.md`; the API contract is `docs/contract/`. All commands run from the repo root. For anything that talks to
 production, put `DATABASE_URL` (Neon **direct** string) and `DATABASE_SSL=true` in `.env.neon` (gitignored, `chmod 600`; never in `.env`) and run in a subshell:
 `(set -a; . ./.env.neon; set +a; npm run admin -- ...)`. Never inline the URL on a command line.
 
 ## Tests
 
 ```bash
-npx vitest run && npx tsc --noEmit && npm run build     # offline suite (G0/G1)
+npx vitest run && npx tsc --noEmit && npm run build     # offline suite (G0/G1, incl. the contract-doc check)
 npm run test:contract:mock       # G2: VITEST_CONTRACT=1, adapter vs Porkbun's official mock server
 npm run test:contract:sandbox    # G2: VITEST_CONTRACT=1, Porkbun sandbox; needs PORKBUN_SANDBOX_API_KEY / _SECRET_API_KEY (pk1_sb_ keys); skipped without them
 ```
@@ -15,6 +15,7 @@ npm run test:contract:sandbox    # G2: VITEST_CONTRACT=1, Porkbun sandbox; needs
 ## Jobs by hand (CLI)
 
 ```bash
+npm run job -- tick | daily                                       # the same runner and steps as POST /jobs/run (audited, scope job)
 npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]   # compute/apply scheduled price changes (--today in the future only with --dry-run)
 npm run job -- drop          [--dry-run] [--today YYYY-MM-DD]    # apply due scheduled drops
 npm run job -- registrar-check [--dry-run]                       # compare registrar state with the DB
@@ -34,7 +35,7 @@ curl -sS -X POST "$API/jobs/run" \
   -d '{"job":"tick"}'          # or {"job":"daily"}
 ```
 
-The Worker's crons are `0 * * * *` (tick) and `5 0 * * *` (daily). A Worker log saying "timed out" does **not** mean the job failed (the cold start can exceed the Worker's wait while the job still runs): check `GET /audit` for the `jobs/run` row and its summary.
+The Worker's crons are `0 * * * *` (tick) and `5 0 * * *` (daily). A Worker log saying "timed out" does **not** mean the job failed (the cold start can exceed the Worker's wait while the job still runs): check `GET /audit` for the `/jobs/run` row and its summary.
 
 The reply has a per-step result. A second run while one is still running returns `skipped`. 401 = wrong token, 503 `JOBS_DISABLED` = `JOB_TRIGGER_TOKEN` not set in Render.
 Allow up to ~60 s for a cold start.
@@ -70,6 +71,13 @@ The scratch DB is local docker (service `db`, user `dt`, password `dt`, port 543
 
 ## Where warnings show
 
-`GET /report` (READ) lists warnings, for example `RENEWAL_PRICE_UNKNOWN`, `HIGH_VALUE_LOW_BIN`, upcoming renewal/drop dates, and the
-budget and cap headroom. `GET /audit` shows every POST including `jobs/run` rows (a failed step is in the summary, e.g. `daily: failed export`).
+`GET /report` (READ) lists warnings with levels (error/warn/info, `docs/contract/reports.md`), for example `RENEWAL_PRICE_UNKNOWN` or `EXPORT_PENDING`, plus upcoming renewal/drop dates and the
+budget and cap headroom. `GET /audit` shows every POST including `jobs/run` rows (a failed step is in the summary, e.g. `daily: failed backupExport`).
 `GET /health` (needs a READ or WRITE token) shows the DB and adapter state. Render logs (Dashboard -> Logs) hold startup and migration output.
+
+## Releasing (DOM)
+
+1. Full gate green: `npx vitest run && npx tsc --noEmit && npm run build`.
+2. Contract, `CHANGELOG.md`, `docs/internal/` and `gaps.md` updated in the same commit; release note `docs/releases/vX.Y.Z.md` written.
+3. Deploy: `curl -fsS -X POST "$RENDER_DEPLOY_HOOK"` (the hook URL is a secret: Render -> service -> Settings -> Deploy Hook; also stored as the GitHub secret `RENDER_DEPLOY_HOOK`). Render runs the migrations on start.
+4. Verify: `GET /health` (token) shows `db: ok` and the new `version`; fill in the release note's deploy status.

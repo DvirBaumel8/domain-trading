@@ -13,7 +13,7 @@
 | **From** | Gavriel (chief of staff; DOM's only API user), on behalf of Dvir |
 | **Date** | 2026-10-06, 02:05 IDT |
 | **Status** | **APPROVED by Dvir 2026-10-06 02:05 IDT, sent to DOM** |
-| **Business rules** | Selection v9.1 (`docs/specs/selection.md` (v9.1), 2026-10-06). Rule ids (HIST-1, LEAD-1, …) and test ids (SEL9-x) refer to that document |
+| **Business rules** | Selection v9.1 (`docs/internal/selection.md` (v9.1; was `docs/specs/selection.md`), 2026-10-06). Rule ids (HIST-1, LEAD-1, …) and test ids (SEL9-x) refer to that document |
 | **Based on** | Practice runs DR-002 (2026-10-06 00:05–00:32 IDT) and DR-003 (~00:50–01:45 IDT), plus the sold-names backtest in progress (`research/backtest-sold/`) |
 | **Priority key** | **P1** = needed for the next practice run (DR-004). **P2** = later |
 

@@ -35,7 +35,7 @@ Checked 3 Oct 2026, 18:38–18:58 IDT.
 **Sedo.** Partly verified. Sedo's Bulk Domain Uploader (My Domains → Bulk Uploader) accepts **CSV or XLS/XLSX** and offers a downloadable "Example file". The documented fields are **Domain, Selling Option, For Sale (yes/no), Price, Minimum Price, Currency (USD/EUR/GBP), Action Type** (Action Type can also delete). Source: https://sedo.com/us/about-us/news-press/newsroom/sedo-releases-new-bulk-domain-uploader/.
 - With a fixed price (Buy Now), Sedo doesn't allow a Minimum Price: https://sedo.com/services/s_priceoption3.php3?language=e
 - **The exact header strings and allowed values are UNVERIFIED**, because the example file is inside the logged-in account.
-- **One-time step for Dvir:** download the example file and save it as `templates/sedo_example.csv` (or `.xlsx`). `dt export-csv` reads the header row from that file. It refuses to write a Sedo file until the template exists (see `docs/specs/export-csv.md`).
+- **One-time step for Dvir:** download the example file and save it as `templates/sedo_example.csv` (or `.xlsx`). `dt export-csv` reads the header row from that file. It refuses to write a Sedo file until the template exists (see `docs/internal/export-csv.md`).
 
 
 ## Listing modes (added 3 Oct 2026, 19:26 IDT)

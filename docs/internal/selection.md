@@ -1,11 +1,9 @@
-<!-- Repo copy of Gavriel's selection spec v9.1 (source: system/selection-v9-final.md on Gavriel's box). Pushed 6 Oct 2026 by Gavriel (Grok Bot), docs only. -->
-> **Repo status (6 Oct 2026):** Dvir approved v9.1. This file is the selection contract for the backend. The text below is the source verbatim; this box adds the repo notes only.
-> - **Not built yet.** No selection endpoint exists in `src/` today. Note: `src/services/selection.ts` is the *registrar-quote* winner logic (`check.md`), not this. Name the new code differently (e.g. `src/screening/*`).
-> - **Paths:** `system/census/<pattern_id>.csv` and `system/data/namebio/` are paths on Gavriel's box. In this repo the READMEs are `docs/specs/selection/census-README.md` and `docs/specs/selection/namebio-README.md`. **Open build decision:** where the frozen census CSVs and the nightly NameBio cache live. Suggestion: census lists committed by Dvir under `data/census/` (versioned); the NameBio CSVs ("never deleted") in Postgres or the private data repo, because a Render free web service has no persistent disk.
-> - **Baseline docs** named below (`selection-v2-proposal.md`, `selection-v3-review.md`, R4–R9, DR-001/DR-002) are on Gavriel's box, not in this repo.
-> - **Rule changes this spec makes to existing specs** (comps → demand proof, the allowed BIN set and step-down drops as `pricing_settings` **v3**, live renewal price, FT-1, `/check/batch` split): applied in `listing-strategy.md` (header + §10.13), `buy.md`, `report.md`, `check.md`, `00-architecture.md`, `test-plan.md` and `CLAUDE.md` (decision log, 6 Oct 2026).
-> - **Amendments after push (marked inline):** FT-1 counts 7 days from the Fast Transfer eligibility date, not the buy (Dvir, 6 Oct 2026, 01:01).
-> - **Build order:** after step 6 (`CLAUDE.md` build step 9), in the order of §8 below. Tests: §7 (SEL-*, SEL3–SEL10, SEL-T); they are part of the gates.
+<!-- Repo copy of Gavriel's selection spec v9.1 (source: system/selection-v9-final.md on Gavriel's box), pushed 6 Oct 2026. -->
+> **DOM note:** Dvir approved v9.1 on 6 Oct 2026. It is the business-rule source for **CR-001** (`docs/requests/CR-001-selection-checks.md`); DOM's delivery plan (P1a/P1b/P2) and its pushback are in CR-001 §11, and what is built vs not is in `gaps.md`. **Nothing here is built yet.** `src/services/selection.ts` is the registrar-quote winner logic (`check.md`), not this; new code goes elsewhere (e.g. `src/screening/*`).
+> - Paths `system/census/<pattern_id>.csv` and `system/data/namebio/` are on Gavriel's box; the repo READMEs are `selection/census-README.md` and `selection/namebio-README.md`. Where the frozen census CSVs and the NameBio cache live (the Render free disk isn't persistent) is a CR-001 build decision.
+> - Baseline docs named below (`selection-v2-proposal.md`, R4–R9, DR-001/DR-002) are on Gavriel's box; DR-002/DR-003 evidence is in `docs/requests/CR-001-reference/`.
+> - Amendment (Dvir, 6 Oct 2026, 01:01): FT-1 counts 7 days from the Fast Transfer eligibility date, not the buy (marked inline).
+> - DOM positions that change v9.1 (CR-001 §11, pending Dvir): WEB-RISK-1 and TM-1 are `MANUAL_REQUIRED` until an official API and key exist (C16's Transparency Report automation is not used); lead discovery stays with the bots (DOM verifies and tiers supplied leads).
 
 # Selection v9.1 final: spec for Claude Code
 
@@ -17,39 +15,31 @@
 
 ---
 
-## Changelog vs v8
+## Change index (v8 → v9 → v9.1; the evidence is in R9 and DR-002 on Gavriel's box)
 
-| # | Change | Why (evidence) |
-|---|---|---|
-| C1 | **RATIO-1 now uses year-1 effective STR** `STRe_eff = 1−(1−p_passive)(1−p_lead)^leads_AB`, not the passive prior alone | In v8, Ratio at the low prior failed every lane (geo $499 → 0.77; non-geo $1,495 → 0.46), so nothing could ever reach Dvir [R9 §Q8] |
-| C2 | **Geo p_passive 0.02 → 0.005.** Outbound counted once, via leads | v8 counted outbound twice: the 2% was R4's total geo+outbound rate. Passive geo hand-reg is ~0.5% [R9 §Q1, §Q8] |
-| C3 | **Non-geo p_lead_low**: S3/S4 0.004 → **0.002**; S6 0.005 → **0.003** [est.] | Every comparing source says non-geo outbound converts worse than geo [R9 §Q3] |
-| C4 | **Default non-geo BIN $1,495 → $1,488**; exception steps $1,988 / $2,488; banned price bands $800–$999 and $1,950–$1,999 | x88 endings convert best; $1,495 is the "worst" [A]. A 31%-of-portfolio-at-$1,988 seller had 8 of 22 sales there [A] [R9 §Q6] |
-| C5 | **Geo Ratio-stress floor $399 → $299** | Outbound geo deals close at $100–$500 (69% ≤$399 in the 2018 analysis) [R9 §Q3] |
-| C6 | **New gate FT-1**: Afternic Fast Transfer opt-in confirmed within 7 days of buying *(repo amendment, Dvir 2026-10-06 01:01: within 7 days of the name becoming Fast Transfer eligible, not of the buy)* | Most hand-reg sales come via the registrar network, not the lander (>80%; 17 of 22) [A]; Porkbun requires manual opt-in [V] [R9 §Q6] |
-| C7 | **DEMAND-1 / `/comps/keyword`** reads a nightly NameBio retailstats **CSV cache** with attribution; API for spot checks only (≤4/min) | NameBio API docs [V] |
-| C8 | **S7: no ExpiredDomains automation.** Candidates from the zone/RDAP route only. ED stays an optional manual tool for Dvir | ED has no API and bans bots/AI agents [V] [R9 §Q5] |
-| C9 | **Geo score:** D-Liquidity comes from NameBio trade-term counts; A-Form by length bands; **city + lawyer/attorney = FLAG** | NameBio CSV (hvac 11 vs roofing 95 sales); WTB ≤12 chars, no lawyer/attorney [A] [R9 §Q1] |
-| C10 | Leads: new `lead_priority` and `prospect_type` fields; `exact_sld_other_tld` recorded but **not counted** unless Dvir approves D1 | Best outbound buyers are exact-name owners on .net/.co [A] [R9 §Q3] |
-| C11 | Timing: tranche 1 listed and E1 lists verified **by 2026-12-31** (soft target). No passive-sale KPI before month 6 | Jan–Apr strongest [A]; median hold of sold names 11 months [V-analysis] [R9 §Q1, §Q6] |
-| C12 | No price A/B tests during the POC beyond the fixed endings | Too few names; randomized ≥3-month tests needed [R9 §Q6] |
-| C13 | Tests SEL9-1…SEL9-8 added; implementation order updated | — |
+- **C1** **RATIO-1 now uses year-1 effective STR** `STRe_eff = 1−(1−p_passive)(1−p_lead)^leads_AB`, not the passive prior alone
+- **C2** **Geo p_passive 0.02 → 0.005.** Outbound counted once, via leads
+- **C3** **Non-geo p_lead_low**: S3/S4 0.004 → **0.002**; S6 0.005 → **0.003** [est.]
+- **C4** **Default non-geo BIN $1,495 → $1,488**; exception steps $1,988 / $2,488; banned price bands $800–$999 and $1,950–$1,999
+- **C5** **Geo Ratio-stress floor $399 → $299**
+- **C6** **New gate FT-1**: Afternic Fast Transfer opt-in confirmed within 7 days of buying *(repo amendment, Dvir 2026-10-06 01:01: within 7 days of the name becoming Fast Transfer eligible, not of the buy)*
+- **C7** **DEMAND-1 / `/comps/keyword`** reads a nightly NameBio retailstats **CSV cache** with attribution; API for spot checks only (≤4/min)
+- **C8** **S7: no ExpiredDomains automation.** Candidates from the zone/RDAP route only. ED stays an optional manual tool for Dvir
+- **C9** **Geo score:** D-Liquidity comes from NameBio trade-term counts; A-Form by length bands; **city + lawyer/attorney = FLAG**
+- **C10** Leads: new `lead_priority` and `prospect_type` fields; `exact_sld_other_tld` recorded but **not counted** unless Dvir approves D1
+- **C11** Timing: tranche 1 listed and E1 lists verified **by 2026-12-31** (soft target). No passive-sale KPI before month 6
+- **C12** No price A/B tests during the POC beyond the fixed endings
+- **C13** Tests SEL9-1…SEL9-8 added; implementation order updated
+- **C14** **D1 ON with strict limits:** `exact_sld_other_tld` / `prefix_suffix_variant` may count toward LEAD-1 only when the SLD is plainly descriptive, ≥3 unrelated businesses use the term as their **business or service description** (record URLs; **product-name use does not count**), TM-1 clean, and the price shown is the standard BIN
+- **C15** **Tier B / medium lead:** `info@` / `contact@` (role inbox) at a firm of **≤10 people** counts as tier **B** (medium). Re-check the rule after the first 60 outreach emails
+- **C16** **WEB-RISK-1 interim pass:** until the backend has a Web Risk / Safe Browsing API key, PASS iff Transparency Report status ∈ {no unsafe content, no data} **and** HIST-1 shows a clean history
+- **C17** **ARA = live registrar renewal** from `/check/quote` at the name's current registrar; Gate F also compares transfer-to-cheapest-FT-capable (incl. 1 yr) when eligible. No fixed $11.08
+- **C18** **Price drops step the allowed BIN set** (non-geo 2488→1988→1488→1088→788; geo 499→399→299). Floor = 65% of new BIN (≥$750 non-geo / geo floor rule). Not −20%
+- **C19** **Sibling census:** frozen name lists in `system/census/` (`pattern_id@version`); `/census/run` refuses bot-supplied lists. Written `in_use` definition (HTTP 200, final host = sibling, not parking list, ≥200 chars visible text)
+- **C20** **NameBio free CSV:** nightly cached under `system/data/namebio/retailstats-YYYYMMDD.csv` (+ tldstats); bots/agents forbidden to hit the download URL
+- **C21** Tests **SEL9-9…SEL9-15** (and SEL10-1) added for C14–C20
 
 ---
-
-## Changelog v9 → v9.1 (2026-10-06)
-
-| # | Change | Why (evidence / approval) |
-|---|---|---|
-| C14 | **D1 ON with strict limits:** `exact_sld_other_tld` / `prefix_suffix_variant` may count toward LEAD-1 only when the SLD is plainly descriptive, ≥3 unrelated businesses use the term as their **business or service description** (record URLs; **product-name use does not count**), TM-1 clean, and the price shown is the standard BIN | Dvir approval 2026-10-06; DR-002 V9-20 |
-| C15 | **Tier B / medium lead:** `info@` / `contact@` (role inbox) at a firm of **≤10 people** counts as tier **B** (medium). Re-check the rule after the first 60 outreach emails | Dvir approval 2026-10-06; DR-002 V9-01 |
-| C16 | **WEB-RISK-1 interim pass:** until the backend has a Web Risk / Safe Browsing API key, PASS iff Transparency Report status ∈ {no unsafe content, no data} **and** HIST-1 shows a clean history | Dvir approval 2026-10-06; DR-002 V9-06 |
-| C17 | **ARA = live registrar renewal** from `/check/quote` at the name's current registrar; Gate F also compares transfer-to-cheapest-FT-capable (incl. 1 yr) when eligible. No fixed $11.08 | DR-002 V9-05 |
-| C18 | **Price drops step the allowed BIN set** (non-geo 2488→1988→1488→1088→788; geo 499→399→299). Floor = 65% of new BIN (≥$750 non-geo / geo floor rule). Not −20% | DR-002 V9-10 |
-| C19 | **Sibling census:** frozen name lists in `system/census/` (`pattern_id@version`); `/census/run` refuses bot-supplied lists. Written `in_use` definition (HTTP 200, final host = sibling, not parking list, ≥200 chars visible text) | DR-002 V9-03, V9-04 |
-| C20 | **NameBio free CSV:** nightly cached under `system/data/namebio/retailstats-YYYYMMDD.csv` (+ tldstats); bots/agents forbidden to hit the download URL | DR-002 V9-07 (strengthens C7) |
-| C21 | Tests **SEL9-9…SEL9-15** (and SEL10-1) added for C14–C20 | — |
-
 
 ## 0. One-page summary (≤150 words)
 

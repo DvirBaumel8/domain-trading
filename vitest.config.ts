@@ -5,7 +5,8 @@ export default defineConfig({
     fileParallelism: false,
     env: { APP_ENV: 'test' },
     projects: [
-      { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts'], setupFiles: ['tests/setup/network.ts'] } },
+      // tests/contract/contract-doc.test.ts is offline (no DB, no network): it checks docs/contract/ against the code, so it runs here.
+      { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts', 'tests/contract/contract-doc.test.ts'], setupFiles: ['tests/setup/network.ts'] } },
       {
         extends: true,
         test: {

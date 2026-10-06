@@ -1,0 +1,46 @@
+# Gaps: inherited specs vs the code (6 Oct 2026, contract v1.0.0)
+
+Every place where the specs DOM inherited (`docs/internal/*`, which still describe some rules not yet built) differ from what the code does. **Decision** = build in CR-001 **P1a** (contract v1.1.0), **P1b** (v1.2.0), **P2** (later), **keep** (the code is right; the docs now say so), or **dropped**. Changes that need Dvir are marked **DVIR**.
+
+## Selection v9.1 and pricing v3 (approved by Dvir 6 Oct 2026, not built)
+| # | Spec says | Code does | Decision | Why |
+|---|---|---|---|---|
+| G-1 | `pricing_settings` **v3**: BIN price list {299…2488}, default $1,488, floor to the whole dollar, ladder drops (1488 → 1088 → 788), final push = lowest list price ≥ floor, `BIN_NOT_IN_PRICE_LIST`, `LANDER_EXCEPTION_REQUIRED` (`listing-strategy.md` §10.13) | v2 only: x95 BINs (`BIN_NOT_NICE`), −20% drops, round5 floor, final push `bin_to_floor_ceil95`; no v3 columns (`allowed_bins_cents`, `drop_mode`, `floor_rounding`, …) | **P1a** (CR-001 CAP-18) | CAP-18's price checks need it. Needs a migration (new columns) and calculator branches by version; v2 plans keep their numbers. The [proposed] items (final push mode, M6/M18 months, exceptions not carried through drops, code names) need Dvir's OK at the P1a gate (**DVIR**) |
+| G-2 | Geo ladder 499 → 399 → **299** at M12 (a $399 name may drop; Dvir 6 Oct 01:01) | v2: one geo drop 499 → 399; a $399 name never drops (settings loader refuses any other geo drop) | **P1a** (part of v3) | Same version change as G-1 |
+| G-3 | `/buy` requires a complete **`screening_pack`** (400 `SCREENING_PACK_REQUIRED`, 422 `SCREENING_PACK_INVALID`, SEL7-1, B-30) | No such field: the strict schema refuses it (422 `VALIDATION_ERROR`) | **P1b** (CAP-19 + `/buy` enforcement) | The pack needs the P1a checks first (CR-001 §11, P-6). Until then `/buy` keeps the v2 rules |
+| G-4 | Comps **optional** (`comps_min` 0, `COMPS_REQUIRED` retired, LG-20 / IM-15 accept no comps) | Comps required (v2 `comps_min` 2; DB CHECK `comps_min ≥ 1`; `pricing_evidence` CHECK comps or legacy reason) → `COMPS_REQUIRED` | **P1b**, together with G-3 | Removing the comps rule before the screening pack exists would leave `/buy` with no evidence rule at all. Option for Dvir: a small earlier change that makes comps optional (**DVIR**) |
+| G-5 | `POST_BUY_INCOMPLETE` = bought without a stored screening pack | = bought without stored comps (`pricing_evidence`) | **P1b** | Follows G-3/G-4 |
+| G-6 | **FT-1**: FT-capable registrar only (`NOT_FT_CAPABLE`), `ft_eligible_on`, `POST /distribution/confirm`, the daily `distribution_incomplete` flag, `/report` `DISTRIBUTION_INCOMPLETE`, `DISTRIBUTION_BIN_MISMATCH`, upcoming "FT-1 confirmation due" (B-29, B-32, SEL9-6) | None; `upcoming_90d` `fast_transfer` = buy date + 60 only | **P2** (CAP-22) | Not needed for DR-004 (CR-001 §11 Q16) |
+| G-7 | `GET /renewal/decision/{domain}` (RENEW/DROP, live ARA, transfer option; SEL7-4, SEL9-10) | None; `/report` `first_renewal` items only | **P2** (CAP-23) | The first renewal decision is due 2027 (D-001 drops at its first expiry, 2027-10-04) |
+| G-8 | Selection endpoints: `POST /check/batch`, `/check/history`, `/check/tm`, `GET /check/quote`, `/tokenize`, `/census/siblings`, `POST /census/run`, `GET /comps/keyword`, `/exttaken`, `POST /leads/build`, `/leads/verify`, `/score`, `/screening_pack`, `GET /patterns/{id}/health`, `POST /labels`, `GET /signals/keywords`, `/market/geo`, `/regimes`, `/s7/candidates` | None | **P1a/P1b/P2** per CR-001 §11 Q16 (shapes and names set by the CR, not by `selection.md` §4). **Dropped:** `POST /leads/build` (lead discovery stays with the bots, P-1) | CR-001 is the contract for these |
+| G-9 | WEB-RISK-1 interim = automated Transparency Report check (C16); TM-1 via the USPTO search backend (DR-002) | — | **Changed** to `MANUAL_REQUIRED` until an official API + key (**DVIR**: Google Cloud project, USPTO key) | DOM doesn't automate undocumented website endpoints (CR-001 P-2, Q3, Q5) |
+| G-10 | Selection settings writable through the API | No settings write route at all | **P1a** (CAP-00): Gavriel proposes a draft (WRITE), activation needs Dvir's `approval_ref`. `pricing_settings` stays admin-only | CR-001 P-8; founder rule 4 |
+| G-11 | `import-domain`: whether a hand-bought name needs a screening pack | No pack (imports are outside `/buy`) | Open (**DVIR**) | — |
+
+## Not built, outside CR-001
+| # | Spec says | Code does | Decision | Why |
+|---|---|---|---|---|
+| G-12 | `POST /renew/{domain}` (v1.1 proposal, `MAX_ONE_RENEWAL`) | None. The DB CHECK keeps `renewals_used` ≤ 1 | **P2**, after G-7 | No renewal is due before 2027; the renewal decision comes first |
+| G-13 | Thin `dt` CLI (v1.1, CLI-1–CLI-4) | None | **Dropped** unless Gavriel asks (a CR) | Gavriel calls the HTTP API directly; the contract replaces the CLI wording |
+| G-14 | LTO installment logging (v1.1) | None | **Dropped** until a lease happens | No lease exists |
+| G-15 | An undo for `drop-at-first-expiry` | None | Open (**DVIR**, D-001 §8 b) | — |
+| G-16 | D-001's drops before 2027-10-04 (v3 vs v2 vs none) | Whatever plan the import/replan stores | Open (**DVIR**, `listing-strategy.md` §8 a) | — |
+| G-17 | S7 auction `max_bid` / `MAX_BID_EXCEEDED` | None | **Dropped** (retired by v9.1 S7-ONLY; founder rule 5) | — |
+
+## Built differently (the docs and contract now follow the code)
+| # | Spec said | Code does | Decision |
+|---|---|---|---|
+| G-18 | JOB-3: a bad `/jobs/run` body → 400 | 422 `VALIDATION_ERROR` (zod body) | **keep**; JOB-3 now says 422 (Dvir, 6 Oct) |
+| G-19 | `00-architecture.md` `settings.sedo_hybrid_as` default `buy_now` | `make_offer` (migration `exports-v2`) | **keep**; docs fixed |
+| G-20 | `/check` query: the specs imply strict validation like the other GETs | Unknown query parameters are ignored | **keep** for v1.0.0 (contract says so); making it strict would be a MAJOR change for no gain |
+| G-21 | Codes the specs never listed: `SOLD_AT_IN_FUTURE`, `NOT_IN_PORTFOLIO` on `/sold` and offer holds, `EXPORT_NOT_FOUND`, `EXPORT_ALREADY_CONFIRMED`, `EXTERNAL_REF_CONFLICT`, `OUTCOME_FINAL`, `OUTCOME_TRANSITION_INVALID`, `OUTCOME_CHANGED_CONCURRENTLY`, `OFFER_SOLD_MISMATCH`, `SEDO_TEMPLATE_INVALID`, `DROP_DATE_UNKNOWN`, `LANDER_INVALID`, `NS_INVALID`, `COMMISSION_UNEXPECTED`, the `/buy` post-buy warnings (`AUTO_RENEW_*`, `PRIVACY_UNKNOWN`, `LANDER_*`, `CHARGE_ABOVE_MAX`, `FOUND_IN_ACCOUNT`, `POST_BUY_FAILED`, `TOTALS_UNAVAILABLE`, `RECONSTRUCTED`) and the export warnings (`AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`) | Emitted | **keep**; all in the contract code index (the contract-doc test enforces it) |
+| G-22 | `POST /offers/{id}/outcome` `sold` "must match a `/sold`" | 409 `OFFER_SOLD_MISMATCH` unless the domain is already sold | **keep** |
+| G-23 | Offers/outcome approval: the spec lists `countered`/`accepted` | Same; `sold` is also in the code's `APPROVAL_OUTCOMES` list but not enforced | **keep** (behaviour matches the spec); clean up the unused list entry in the next code change |
+| G-24 | `POC_CAP_EXCEEDED` message | Says "the $500 POC cap" (the cap is $1,500; `details` are right) | **Fix** in the next code change (message only; codes are the contract) |
+| G-25 | Stale code comments mention the removed offers CSV import (`FieldError`, `validateOfferAll`) | — | **Fix** with the T3 cleanup (dead-code pass) |
+| G-26 | `/health` `version` | The `package.json` version (0.1.0), not the contract version | **keep**; contract says so. Bump `package.json` with each release (next change) |
+| G-27 | Kill criteria "build > 2 evenings" and "Render cost not approved" | Built; hosting is $0 | **Dropped** (superseded); test-plan updated |
+| G-28 | `.env.example` doc-only variables (`POC_CAP_CENTS`, `MAX_DOMAINS`, `LANDER_TARGET`, …) suggested env-configurable caps | Caps live in the `settings` table only | **keep**; `.env.example` cleaned (caps are never env vars) |
+
+## Removed by Dvir's 6 Oct decisions (no gap; listed for completeness)
+`POST /offers/import`, `offer_imports`, `offers.import_id`; the `payouts` table, `POST /payouts/{id}/received`, the `/sold` `payout` object, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE`, `payouts_pending` (tests PO-1–PO-5, S-13–S-15, OF-13, OF-15 deleted); `changed_only` and per-file export records; `JOBS_MODE` and in-process timers.

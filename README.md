@@ -1,21 +1,20 @@
 # domain-trading
 
-A backend service (HTTP API + Postgres, no frontend) for a small domain-trading proof of concept: at most 50 .com names, a $1,500 cap (both confirmed by Dvir on 5 Oct 2026, 01:04 IDT), and each name held at most 2 years. Dvir's bot Gavriel calls it over HTTPS with READ/WRITE bearer tokens. Every purchase requires Dvir's explicit approval in chat.
+A backend service (HTTP API + Postgres, no frontend) for a small domain-trading proof of concept: at most 50 .com names, a $1,500 cap, each name held at most 2 years. Built, owned and run by **DOM** (the vendor); the only API user is Dvir's bot **Gavriel**, with READ/WRITE bearer tokens. Every purchase requires Dvir's explicit approval in chat.
 
-- **Start here:** `CLAUDE.md` (rules, conventions, build order), then `docs/specs/00-architecture.md`.
-- **Build:** paste `docs/claude-code-prompt.md` into Claude Code.
-- **Tests and gates:** `docs/specs/test-plan.md`.
-- **Hosting:** free: Render free + Neon + a Cloudflare Worker for the scheduled jobs ($0). Setup: `docs/DEPLOYMENT.md`; blueprint: `render.yaml`. Env vars: `.env.example`.
-- **Research behind the choices:** `docs/research/`.
+- **API contract (the interface):** `docs/contract/` (v1.0.0; changes in `docs/contract/CHANGELOG.md`).
+- **DOM's manual:** `CLAUDE.md` (founder rules, conventions, workflow). Internal rules and test IDs: `docs/internal/` (gaps vs the code: `docs/internal/gaps.md`).
+- **Requests and releases:** `docs/requests/` (CR/BUG templates), `docs/releases/` (release notes).
+- **Hosting ($0):** Render free + Neon + a Cloudflare Worker for the scheduled jobs. Setup: `docs/DEPLOYMENT.md`; operations: `docs/runbook.md`; env vars: `.env.example`.
 
-**Status (6 Oct 2026):** steps 1-5 built; step 6 code ready (free hosting, jobs trigger, backup). Waiting for Dvir's setup (`docs/DEPLOYMENT.md`) and then G3.
+**Status (6 Oct 2026):** contract v1.0.0 built and tested; not deployed yet (waiting for Dvir's one-time hosting setup, `docs/DEPLOYMENT.md`). Next: CR-001 P1a (selection checks, pricing settings v3).
 
 ## Run locally
 1. `npm install`
 2. `npm run db:up` (Postgres 16 in docker on port 5433; creates `domain_trading` and `domain_trading_test`)
 3. `cp .env.example .env` (fake/blank keys are fine for local work)
 4. `npm run migrate up`
-5. `npm run admin -- token create --scope write --name dvir-local` (the token is printed once)
-6. `npm run dev` only serves the API: nothing runs on timers. Run scheduled work by hand with `npm run job -- tick` or `npm run job -- daily` (the same runner and steps as `POST /jobs/run`; the backup step is skipped with a warning without a token). Check `curl localhost:3000/health/ping` and `curl -H "Authorization: Bearer $READ_TOKEN" localhost:3000/health` (a token is required; `/health/ping` is the only public route).
+5. `npm run admin -- token create --scope write --name dvir-local` (printed once)
+6. `npm run dev` serves the API only; nothing runs on timers. Run scheduled work with `npm run job -- tick` or `npm run job -- daily` (the same runner as `POST /jobs/run`). Check `curl localhost:3000/health/ping` and `curl -H "Authorization: Bearer $TOKEN" localhost:3000/health` (every route except `/health/ping` needs a token).
 
-Tests: `npm test` (unit + API; needs the docker Postgres from run step 2 above to be running). Network is blocked in tests.
+Tests: `npx vitest run && npx tsc --noEmit && npm run build` (unit + API + the contract-doc check; needs the docker Postgres from step 2). Network is blocked in tests.
