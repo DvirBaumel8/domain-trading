@@ -17,6 +17,10 @@ export interface FormSettings {
   geo_city_one_token: boolean;
   formB_max_words: number;
   legal_terms_list: 'legal';
+  /** FLAG AMBIGUOUS_SPLIT when a split has at least this many dictionary-only 2-letter tokens (animal·it·os); 0 turns it off. */
+  short_token_flag_min: number;
+  /** Read by buildLexicon: a place name that is also a dictionary word counts as a city only if listed here (or in city_extra). */
+  city_word_allowlist: string[];
 }
 
 export interface FormResult {
@@ -323,6 +327,14 @@ export function analyzeForm(
   }
   if (result.ambiguous) {
     return { ...result, status: 'FLAG', reason_code: 'AMBIGUOUS_SPLIT', reason: `Several readings: ${[seg.tokens, ...seg.alternatives].map((t) => t.join('·')).join(' / ')}` };
+  }
+  // A split made of tiny dictionary words (it, os, ad) is usually a split of a longer word the list does not know.
+  const tiny = seg.tokens.filter((t, idx) => t.length === 2 && token_types[idx] === 'dictionary' && (lex.types.get(t) ?? []).every((x) => x === 'dictionary'));
+  if (s.short_token_flag_min > 0 && tiny.length >= s.short_token_flag_min) {
+    return {
+      ...result, ambiguous: true, status: 'FLAG', reason_code: 'AMBIGUOUS_SPLIT',
+      reason: `The split ${seg.tokens.join('·')} has ${tiny.length} dictionary-only 2-letter tokens (${tiny.join(', ')}): the reading is unreliable`,
+    };
   }
   return result;
 }

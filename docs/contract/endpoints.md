@@ -19,6 +19,8 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/sold/{domain}` | WRITE | Sales |
 | GET | `/report`, `/report/pricing-review` | READ | Reports (`reports.md`) |
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | Reads |
+| GET | `/selection/settings`, `/selection/lists/{name}` | READ | Selection (`selection.md`) |
+| POST | `/selection/settings`, `/selection/settings/{label}/activate`, `/selection/lists/{name}`, `/selection/evaluate` | WRITE | Selection (`selection.md`) |
 | POST | `/jobs/run` | job token | Jobs (`jobs.md`) |
 
 ---
@@ -291,6 +293,53 @@ READ. Newest first.
 
 ---
 
+## Selection
+The selection settings, the word lists and the pure tier + money evaluation. Shapes, defaults and meanings of every setting are in `selection.md`. **Settings drafts and list edits are WRITE and take effect only as a draft or a new list version; activating a settings version and freezing a census list need Dvir's `approval_ref`** (text only: it need not name a domain). `pricing_settings` is **not** reachable here: it changes only through DOM's admin command.
+
+### `GET /selection/settings`
+READ. Query (strict): `label?`.
+- **Without `label`, 200:** `{active: {label, values, activated_at, approval_text}, versions: [{label, created_at, created_by, based_on: string | null, active: bool}]}` (oldest first).
+- **With `label`, 200:** `{label, values, created_at, created_by, based_on, note, active, activated_at: ISO | null, approval_text: string | null}`.
+- **Errors:** 404 `SETTINGS_NOT_FOUND` · 400 `VALIDATION_ERROR` (another query key).
+
+### `POST /selection/settings`
+WRITE. Creates a **draft** version; nothing changes for runs until it is activated. A version is immutable once created.
+- **Body (strict):** `label` (`^[a-z0-9][a-z0-9._-]{0,31}$`), `based_on?` (a label; default: the active one), `set` (an object of dotted paths to JSON values, at least one, e.g. `{"thresholds.registered_share_min": 0.4}`), `note?` (≤ 500 chars).
+- **Paths:** a path must exist in the settings document. New keys may be added only under `thresholds`, `tier.clauses` and `run.gates`. An array element is addressed by its index (`price.forbidden_bands_cents.0`). A path may name a whole object.
+- **201:** `{label, values, based_on}` (the full resulting document).
+- **Errors:** 422 `SETTINGS_KEY_UNKNOWN` (`details.path`) · 422 `SETTINGS_KEY_LOCKED` (the priors `tier.p_passive`, `lead.p_lead` and `priors_v91` can't be changed by a draft, whether by a leaf path or by replacing a parent; only a migration changes them; `details.path`) · 422 `SETTINGS_INVALID` (the resulting document breaks a rule: `details.issues[] {path, message}`; see `selection.md` §Validation) · 422 `SETTINGS_NO_CHANGE` (identical to the active version; a copy of a version that is not active is allowed, which is how an older version is brought back) · 409 `SETTINGS_LABEL_TAKEN` · 404 `SETTINGS_NOT_FOUND` (`based_on`) · 422 `VALIDATION_ERROR`.
+
+### `POST /selection/settings/{label}/activate`
+WRITE. Makes a draft the active version, for runs started afterwards (a run keeps the version it started with).
+- **Body (strict):** `{approval_ref}`, required (Dvir's words, valid as in README §Conventions, without the domain-name rule).
+- **200:** `{active: label, activated_at: ISO}`.
+- **Rules:** a version can be activated **once**; to bring an older version back, draft a new one based on it. Clearing the buy hold (the active version has `buy_hold: true`, the target `false`) also needs the holdout report to pass (every `holdout.required_suites` suite); until the holdout report exists the hold can never be cleared. The activation and the check run in one transaction, after the previous activation row is locked.
+- **Errors:** 422 `APPROVAL_REQUIRED` · 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` · 404 `SETTINGS_NOT_FOUND` · 409 `SETTINGS_ALREADY_ACTIVE` · 409 `SETTINGS_ALREADY_ACTIVATED` (activated before, then replaced) · 409 `HOLDOUT_NOT_PASSED` (`details.suites`).
+
+### `GET /selection/lists/{name}`
+READ. Query (strict): `version?` (integer ≥ 1; default the newest).
+- **200:** `{name, version, terms: [string], created_at, created_by}`.
+- **Errors:** 404 `LIST_NOT_FOUND` (unknown name, no such version, or a list nobody has uploaded yet such as `brand`) · 400 `VALIDATION_ERROR`.
+
+### `POST /selection/lists/{name}`
+WRITE. Writes version n+1 of a list; older versions stay readable. Names: the fixed lists `dictionary_extra`, `city_extra`, `trade`, `regime`, `tech`, `generic_head`, `state`, `legal`, `brand`, `bigco`, `event`, `sig_harmful_strong`, `sig_harmful_weak`, `sig_parked`, `sig_forsale`; or a **census list** `bt1_<sld>` / `s6_regime_audit`.
+- **Body (strict):** `replace?: [string]` **or** `add?: [string]` and `remove?: [string]`; `note?`; `approval_ref?` (required for a census list). At most 5000 terms (body limit 64 KB). Terms are lowercased and trimmed; duplicates collapse.
+- **Term shapes:** word lists `^[a-z]{2,40}$`; `brand`, `bigco`, `event` also multi-word phrases of lowercase words separated by single spaces (stored with the spaces; matched without them, so `new balance` and `newbalance` are one term); signature lists `class:phrase` with class in `adult, pharma, gambling, malware, phishing, hacked_spam, scam` (`sig_harmful_*`), `parked` (`sig_parked`), `forsale` (`sig_forsale`).
+- **Census lists:** replaced whole (`replace`), exactly `census.sibling_count` (default 20) distinct second-level `.com` names, normalised like every domain (case, trailing dot); stored sorted. The target name of `bt1_<sld>` is not its own sibling. Freezing needs `approval_ref` (Gavriel writes the list, Dvir approves it). Each frozen list is a version: `bt1_<sld>@v1`.
+- **201:** `{name, version, terms_n}`.
+- **Errors:** 422 `LIST_NAME_INVALID` · 422 `LIST_TERM_INVALID` (`details.terms`, `details.expected`) · 422 `LIST_NO_CHANGE` (also `replace` together with `add`/`remove`) · 422 `CENSUS_LIST_SIZE` (`details.expected`, `details.got`) · 422 `CENSUS_LIST_INVALID` (`details.invalid[] {term, reason}` or `details.duplicates`; also add/remove on a census list) · 422 `APPROVAL_REQUIRED` / `APPROVAL_INVALID` / `APPROVAL_EXPIRED` (census list) · 422 `VALIDATION_ERROR`.
+
+### `POST /selection/evaluate`
+WRITE (it writes only the audit row; nothing else is stored). Evaluates the tier (CAP-24) and the money rules (CAP-18) for one candidate from features the caller already has. Gavriel uses it for a quote check, a what-if or a backtest of a draft.
+- **Body (strict):** `lane` (`S2` geo, `S3`, `S4`, `S6`, `S7`), `features: {registered_share?: 0..1 | null, prior_history?: 0|1|null, alt_tld_before_n?: int | null, n_words?: int | null, sld_chars?: int | null, is_geo?: 0|1 (default: lane is S2), gform1_pass?: 0|1|null, short?: 0|1|null}` (an omitted or null feature is **unknown**), `leads_ab` (int ≥ 0), `bin_usd?`, `price_grade?` (`strong`|`weaker`, geo), `first_year_usd?`, `renewal_usd?`, `lander_ns?` (`afternic` default | `other`), `retail_start?`, `retail_end?` (NameBio counts), `form?: {geo_band_raw?, sld_len, word_count, short, syllables?}`, `domain?` (only for the syllable count), `risk_flag?`, `intent_raw?`, `timing_raw?` (0..10), `parked_only?`, `settings?` (a label: evaluate against that version instead of the active one). USD fields are positive numbers with at most 2 decimals.
+- **Missing BIN:** non-geo uses the current `pricing_settings` default non-geo BIN; geo uses the grade price (`price_grade`, else the `price.geo_default_grade` setting) of the current pricing settings.
+- **Missing form:** taken from `features` when `sld_chars` and `n_words` are given, otherwise A-Form is unknown (0 points).
+- **200:** `{settings_version: label, backtest: bool (true when `settings` is not the active version), pricing_version: int, bin_cents, tier: {tier: "A"|"I"|"B"|"G"|"none", tier_exact, clauses: {A: "true"|"false"|"unknown", ...}, demand2: "PASS"|"FAIL"|"UNKNOWN", fired: string | null, inputs}, money: {...}, warnings: [string]}`. `money` and `tier` are described in `selection.md` §Tier and §Money. A missing quote makes `ev_cents`, `ratio_at_bin`, `ratio_at_floor` and their `passes` null.
+- **Warnings:** `PRICING_V3_MISSING` (the current pricing version has no price list: `bin_in_allowed_set` is null and a non-geo LANDER-1 cannot pass).
+- **Errors:** 422 `FORBIDDEN_FEATURE` (any key from `score.forbidden_feature_keys` anywhere in the body, found before validation; `details.path`) · 404 `SETTINGS_NOT_FOUND` · 422 `BIN_REQUIRED` (no BIN sent and the current pricing settings have no default non-geo BIN) · 422 `VALIDATION_ERROR`.
+
+---
+
 ## Jobs
 
 ### `POST /jobs/run`
@@ -312,6 +361,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Offer and sale errors:** `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `HOLD_REASON_REQUIRED`, `EXTERNAL_REF_CONFLICT`, `OFFER_NOT_FOUND`, `APPROVAL_REQUIRED`, `OUTCOME_FINAL`, `OUTCOME_TRANSITION_INVALID`, `OFFER_SOLD_MISMATCH`, `OUTCOME_CHANGED_CONCURRENTLY`, `EVIDENCE_REQUIRED`, `SOLD_AT_IN_FUTURE`, `OFFER_MISMATCH`, `NOT_SELLABLE_STATE`, `SALE_ALREADY_RECORDED`, `DEAL_NOT_FOUND`.
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
+
+**Selection errors:** `SETTINGS_NOT_FOUND`, `SETTINGS_KEY_UNKNOWN`, `SETTINGS_KEY_LOCKED`, `SETTINGS_INVALID`, `SETTINGS_NO_CHANGE`, `SETTINGS_LABEL_TAKEN`, `SETTINGS_ALREADY_ACTIVE`, `SETTINGS_ALREADY_ACTIVATED`, `HOLDOUT_NOT_PASSED`, `SELECTION_SETTINGS_MISSING` (500), `SELECTION_SETTINGS_INVALID` (500), `LIST_NOT_FOUND`, `LIST_NAME_INVALID`, `LIST_TERM_INVALID`, `LIST_NO_CHANGE`, `CENSUS_LIST_SIZE`, `CENSUS_LIST_INVALID`, `FORBIDDEN_FEATURE`, `BIN_REQUIRED`. Selection warnings: `PRICING_V3_MISSING`. `APPROVAL_REQUIRED` / `APPROVAL_INVALID` / `APPROVAL_EXPIRED` also apply to an activation and to a census list.
 
 **`/report` warnings:** listed with levels in `reports.md`.
 

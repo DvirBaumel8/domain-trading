@@ -11,3 +11,7 @@ Committed reference data for `src/screening/lexicon.ts`. Rebuilt only by DOM, wi
 Total of the two data files: 1,297,538 bytes (plan cap 1.5 MB).
 
 Formats: `en-scowl-60.txt` is one lowercase a-z word per line (length >= 2, sorted, unique). `us-places.txt` is `name<TAB>STATE_USPS<TAB>WORDS`, one line per name/state/word-count triple, names lowercase letters only (`losangeles`, `stlouis`); `WORDS` is how many words the real name has (`Los Angeles` = 2), so a multi-word city can be a single token or not (`geo_city_one_token`).
+
+## Place names that are also dictionary words
+
+Common English words are also place names in the Census gazetteer (Dent, Lime, Mobile), and SCOWL in turn contains most big city names (Chicago, Tulsa). The lexicon (`buildLexicon`) therefore types such a name as a **city** only if it is in the selection settings `form.city_word_allowlist` (or in the versioned `city_extra` list); otherwise it stays a dictionary word. This is what stops `dentstorm`, `limemob` and `mobilelawyer` from becoming "city + trade" names. The v1 allowlist holds the 126 major cities of the CR-001 reference lexicon that the dictionary also contains (chicago, tulsa, phoenix, austin, dallas ...), minus names that are mostly common words (mobile, bend, mesa, boulder, buffalo, garland, chandler, providence, aurora, aspen, reno, carson). Dvir changes it with a settings draft and an approved activation (`docs/contract/selection.md`).

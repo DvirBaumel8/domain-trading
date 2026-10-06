@@ -6,7 +6,7 @@ import { TEST_DATABASE_URL } from './env.js';
 export const testDb: Kysely<Database> = createDb(TEST_DATABASE_URL);
 
 const TABLES = [
-  'registrar_presence',
+  'registrar_presence', 'screening_evidence', 'selection_lists', 'selection_settings',
   'sales', 'offers', 'price_schedule', 'pricing_evidence', 'pricing_settings', 'export_uploads', 'export_runs', 'idempotency_keys', 'audit_log', 'receipts', 'purchases', 'quotes', 'listing_history',
   'ledger_entries', 'domains', 'deals', 'api_tokens',
 ];
@@ -17,6 +17,7 @@ export async function resetDb(db: Kysely<Database>): Promise<void> {
     await sql`SET session_replication_role = replica`.execute(conn);
     await sql.raw(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`).execute(conn);
     await sql`SELECT seed_pricing_settings_v2()`.execute(conn);
+    await sql`SELECT seed_selection_v1()`.execute(conn);
     await sql`SET session_replication_role = origin`.execute(conn);
     await sql`DELETE FROM settings`.execute(conn);
     await sql`INSERT INTO settings DEFAULT VALUES`.execute(conn);

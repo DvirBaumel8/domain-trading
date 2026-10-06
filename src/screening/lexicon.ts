@@ -57,17 +57,21 @@ const LIST_TYPES: Record<string, TokenType> = {
   generic_head: 'generic_head',
   legal: 'legal',
   state: 'state',
+  city_extra: 'city',
+  dictionary_extra: 'dictionary',
 };
 
 /**
  * Merges the data files and the versioned lists into one term -> types map.
  * A multi-word city name (`losangeles`, written "Los Angeles") enters only when `cityOneToken`; otherwise only
  * single-word city names do, and the words of the long name tokenise on their own.
+ * A place name that is also a dictionary word enters as a city only through `cityWordAllowlist` (selection settings
+ * `form.city_word_allowlist`) or the versioned `city_extra` list.
  */
 export function buildLexicon(
   data: Pick<DataLexicon, 'dictionary' | 'cities' | 'versions'> & Partial<Pick<DataLexicon, 'multiWord'>>,
   lists: Record<string, { version: number; terms: string[] }>,
-  opts: { cityOneToken: boolean },
+  opts: { cityOneToken: boolean; cityWordAllowlist?: readonly string[] },
 ): Lexicon {
   const types = new Map<string, TokenType[]>();
   const add = (term: string, type: TokenType) => {
@@ -77,7 +81,12 @@ export function buildLexicon(
     else if (!have.includes(type)) have.push(type);
   };
   for (const w of data.dictionary) add(w, 'dictionary');
-  for (const c of data.cities) if (opts.cityOneToken || !data.multiWord?.has(c)) add(c, 'city');
+  // A gazetteer place name that is also a dictionary word (dent, lime, mobile, law) is a city only when allowed.
+  const allowed = new Set(opts.cityWordAllowlist ?? []);
+  for (const c of data.cities) {
+    if (data.dictionary.has(c) && !allowed.has(c)) continue;
+    if (opts.cityOneToken || !data.multiWord?.has(c)) add(c, 'city');
+  }
   const versions: Record<string, string | number> = { ...data.versions };
   for (const [name, list] of Object.entries(lists)) {
     versions[name] = list.version;

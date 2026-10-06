@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { AppError } from '../../src/http/errors.js';
 import { analyzeForm, gform1, type FormSettings, type Lane } from '../../src/screening/form.js';
 import { buildLexicon, loadDataLexicon } from '../../src/screening/lexicon.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
 
 /** Fixed test lists (not the production lists). */
 const LISTS = {
@@ -30,10 +31,12 @@ const S: FormSettings = {
   geo_city_one_token: true,
   formB_max_words: 2,
   legal_terms_list: 'legal',
+  short_token_flag_min: 2,
+  city_word_allowlist: DEFAULT_SELECTION_VALUES.form.city_word_allowlist,
 };
 const data = loadDataLexicon();
-const lex = buildLexicon(data, LISTS, { cityOneToken: true });
-const lexSplitCities = buildLexicon(data, LISTS, { cityOneToken: false });
+const lex = buildLexicon(data, LISTS, { cityOneToken: true, cityWordAllowlist: S.city_word_allowlist });
+const lexSplitCities = buildLexicon(data, LISTS, { cityOneToken: false, cityWordAllowlist: S.city_word_allowlist });
 const run = (d: string, lane: Lane = 'S3', l = lex, s = S) => analyzeForm(d, lane, l, s);
 const dots = (r: { tokens: string[] }) => r.tokens.join('·');
 
@@ -188,5 +191,40 @@ describe('segmentation mechanics', () => {
     const a = run('promptinjectionaudit.com');
     run('mcpentest.com');
     expect(run('promptinjectionaudit.com')).toEqual(a);
+  });
+});
+
+describe('CAP-01 carried items (Task 3): short-token flag and city-word allowlist', () => {
+  it('animalitos.com splits animal·it·os (two dictionary-only 2-letter tokens): FLAG AMBIGUOUS_SPLIT', () => {
+    const r = run('animalitos.com');
+    expect(dots(r)).toBe('animal·it·os');
+    expect([r.status, r.reason_code, r.ambiguous]).toEqual(['FLAG', 'AMBIGUOUS_SPLIT', true]);
+  });
+
+  it('short_token_flag_min 0 switches the flag off; 3 needs three tiny tokens', () => {
+    expect(run('animalitos.com', 'S3', lex, { ...S, short_token_flag_min: 0 }).status).toBe('PASS');
+    expect(run('animalitos.com', 'S3', lex, { ...S, short_token_flag_min: 3 }).status).toBe('PASS');
+  });
+
+  it('a typed 2-letter token (co, ai) is not a dictionary-only token', () => {
+    expect(run('tulsaroofingco.com', 'S3').reason_code).not.toBe('AMBIGUOUS_SPLIT');
+    expect(run('mcpai.com', 'S3').status).toBe('PASS');
+  });
+
+  it('dentstorm, limemob, mobilelawyer: a place name that is a dictionary word is not a city unless allowed', () => {
+    for (const d of ['dentstorm.com', 'limemob.com']) expect(run(d, 'S2').city).toBeNull();
+    const m = run('mobilelawyer.com', 'S3');
+    expect([m.city, m.city_plus_legal, m.status]).toEqual([null, false, 'PASS']);
+  });
+
+  it('listing the word in the allowlist makes it a city (setting, not code)', () => {
+    const allowed = buildLexicon(data, LISTS, { cityOneToken: true, cityWordAllowlist: [...S.city_word_allowlist, 'mobile'] });
+    const m = run('mobilelawyer.com', 'S3', allowed);
+    expect([m.city, m.city_plus_legal, m.reason_code]).toEqual(['mobile', true, 'CITY_PLUS_LEGAL']);
+  });
+
+  it('the city_extra list counts a word as a city without the allowlist', () => {
+    const l = buildLexicon(data, { ...LISTS, city_extra: { version: 1, terms: ['dent'] } }, { cityOneToken: true, cityWordAllowlist: [] });
+    expect(l.types.get('dent')).toContain('city');
   });
 });

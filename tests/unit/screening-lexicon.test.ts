@@ -51,8 +51,8 @@ describe('buildLexicon', () => {
     expect(lex.versions).toMatchObject({ trade: 3, legal: 2, brand: 9, 'en-scowl-60': data.versions['en-scowl-60'] });
   });
   it('a multi-word city is one token only when cityOneToken', () => {
-    const one = buildLexicon(data, lists, { cityOneToken: true });
-    const split = buildLexicon(data, lists, { cityOneToken: false });
+    const one = buildLexicon(data, lists, { cityOneToken: true, cityWordAllowlist: ['tulsa'] });
+    const split = buildLexicon(data, lists, { cityOneToken: false, cityWordAllowlist: ['tulsa'] });
     expect(one.types.get('losangeles')).toContain('city');
     expect(split.types.get('losangeles')).toBeUndefined();
     expect(split.types.get('tulsa')).toContain('city');

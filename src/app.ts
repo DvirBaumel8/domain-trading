@@ -7,6 +7,8 @@ import { registerOffers } from './api/offers.js';
 import { registerReads } from './api/reads.js';
 import { registerReport } from './api/report.js';
 import { registerSold } from './api/sold.js';
+import { registerSelection } from './api/selection.js';
+import type { HoldoutCheck } from './screening/settings.js';
 import { SoldService } from './services/sold.js';
 import { OffersService } from './services/offers.js';
 import { registerExport } from './api/export.js';
@@ -64,6 +66,8 @@ export interface AppDeps {
   exportLockTimeoutMs?: number;
   /** Nightly data export (step 6a task 2); undefined → that step is skipped. */
   backupExport?: BackupExport;
+  /** Gate for clearing `buy_hold` in a selection settings activation (replaced by the holdout report in a later task). */
+  holdoutCheck?: HoldoutCheck;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -114,6 +118,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerReport(app, { db: deps.db, now: deps.now ?? Date.now });
   registerReads(app, { db: deps.db, now: deps.now ?? Date.now });
   registerSold(app, new SoldService({ db: deps.db, now: deps.now ?? Date.now }));
+  registerSelection(app, { db: deps.db, now: deps.now ?? Date.now, holdoutCheck: deps.holdoutCheck });
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));

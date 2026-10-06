@@ -9,6 +9,7 @@ import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
 import type { Database } from '../../src/db/types.js';
 import type { AuditWriter } from '../../src/http/audit.js';
+import type { HoldoutCheck } from '../../src/screening/settings.js';
 import { testDb } from './db.js';
 import { testEnv } from './env.js';
 
@@ -74,6 +75,7 @@ export async function makeApp(
     nsLookup?: NsLookup;
     exportLockTimeoutMs?: number;
     backupExport?: { runOnce(): Promise<unknown> };
+    holdoutCheck?: HoldoutCheck;
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -88,6 +90,7 @@ export async function makeApp(
     quoteTimeoutMs: opts.quoteTimeoutMs,
     exportLockTimeoutMs: opts.exportLockTimeoutMs,
     backupExport: opts.backupExport,
+    holdoutCheck: opts.holdoutCheck,
     sleep: opts.sleep ?? (async () => {}),
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
     registerExtraRoutes: opts.testRoutes === false ? undefined : registerTestRoutes,

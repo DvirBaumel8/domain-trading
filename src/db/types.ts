@@ -347,6 +347,49 @@ export interface PricingEvidenceTable {
   created_at: TimestampDefault;
 }
 
+export interface SelectionSettingsTable {
+  id: Generated<number>;
+  label: string;
+  values: Json;
+  based_on_id: number | null;
+  note: string | null;
+  created_at: TimestampDefault;
+  created_by: string;
+  audit_id: string | null;
+  // Set once, when the version is activated (controller ruling R4: columns, not a table). Active = highest activation_seq.
+  activation_seq: number | null;
+  activated_at: Date | null;
+  activation_approval_text: string | null;
+  activation_approval_at: Date | null;
+  activated_by: string | null;
+  activation_audit_id: string | null;
+}
+
+export interface SelectionListsTable {
+  id: Generated<number>;
+  name: string;
+  version: number;
+  terms: string[];
+  note: string | null;
+  created_at: TimestampDefault;
+  created_by: string;
+  audit_id: string | null;
+}
+
+export interface ScreeningEvidenceTable {
+  id: Generated<string>;
+  source: string;
+  url: string;
+  retrieved_at: Timestamp;
+  http_status: number | null;
+  sha256: string;
+  content_type: string | null;
+  text_gz: Buffer | null;
+  text_bytes: number;
+  truncated: boolean;
+  created_at: TimestampDefault;
+}
+
 export interface Database {
   api_tokens: ApiTokensTable;
   settings: SettingsTable;
@@ -367,6 +410,9 @@ export interface Database {
   offers: OffersTable;
   registrar_presence: RegistrarPresenceTable;
   sales: SalesTable;
+  selection_settings: SelectionSettingsTable;
+  selection_lists: SelectionListsTable;
+  screening_evidence: ScreeningEvidenceTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

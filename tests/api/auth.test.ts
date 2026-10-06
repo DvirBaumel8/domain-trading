@@ -235,9 +235,14 @@ describe('auth (AU)', () => {
 
   it('AU-7: no route creates, lists or reveals tokens; no settings route', async () => {
     app = await makeApp({ testRoutes: false });
-    for (const r of app.routeTable) {
+    // The caps (`settings`) and `pricing_settings` have no route. The selection settings routes are the one deliberate
+    // exception (CR-001 CAP-00; drafts are WRITE, activation needs approval_ref; they hold no cap and no price).
+    for (const r of app.routeTable.filter((x) => !x.url.startsWith('/selection/settings'))) {
       expect(r.url).not.toMatch(/token|settings/i);
     }
+    expect(app.routeTable.filter((x) => x.url.startsWith('/selection/settings')).map((x) => `${x.method} ${x.url}`).sort()).toEqual([
+      'GET /selection/settings', 'HEAD /selection/settings', 'POST /selection/settings', 'POST /selection/settings/:label/activate',
+    ]);
   });
 
   it('updates last_used_at', async () => {
