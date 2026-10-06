@@ -674,3 +674,42 @@ describe('history: retries, Retry-After, the shared pacer, the fail class', () =
     expect(hist(body)).toMatchObject({ status: 'FAIL', reason_code: 'HARMFUL_HISTORY', fields: { hist2_fail_class: 'blocklist', details: { class: 'pharma' } } });
   });
 });
+
+describe('history: unreadable and cut captures (fix round 2)', () => {
+  const one = (name: string) => { const s = synth(name); const t = Object.keys(s.site.captures)[0]!; s.site.cdx = [s.site.cdx[0]!, s.site.cdx.find((r) => r[0] === t)!]; return { s, t }; };
+
+  it('a script block that never closes: UNKNOWN CAPTURE_UNAVAILABLE (truncated_markup), never an empty page', async () => {
+    const x = await h();
+    const { s, t } = one('synthetic-forsale');
+    s.site.captures[t]!.body = '<html><body><p>This domain name is for sale.</p><script>var a = 1;';
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'CAPTURE_UNAVAILABLE', fields: { fetch_reason: 'TRUNCATED_MARKUP', truncated_markup: true, error_code: 'ARCHIVE_UNAVAILABLE' } });
+  });
+
+  it('a capture cut at the 512 KB cap that would pass: FLAG CAPTURE_TRUNCATED; a harmful match in the prefix still FAILs', async () => {
+    await putBrandLists();
+    const x = await h();
+    const { s, t } = one('synthetic-business');
+    const filler = `<p>${'regular words about our local service and staff '.repeat(20)}</p>`.repeat(600);
+    const page = (extra: string) => s.site.captures[t]!.body.replace('</body>', `${extra}${filler}</body>`);
+    serve(x, { [s.domain]: s.site }, { capture: () => new HttpResponse(page(''), { status: 200, headers: { 'content-type': 'text/html' } }) });
+    const a = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(a.body)).toMatchObject({ status: 'FLAG', reason_code: 'CAPTURE_TRUNCATED', fields: { pre_cls: 'content' } });
+    expect(hist(a.body).fields.captures[0].truncated).toBe(true);
+    x.clock.t += 170 * 3_600_000;
+    serve(x, { [s.domain]: s.site }, { capture: () => new HttpResponse(page('<p>Buy cheap viagra here</p>'), { status: 200, headers: { 'content-type': 'text/html' } }) });
+    const b = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(b.body)).toMatchObject({ status: 'FAIL', reason_code: 'HARMFUL_HISTORY' });
+  });
+
+  it('a long page with strong harmful hits FAILs even when it contains a parking phrase (the override needs a thin page)', async () => {
+    const x = await h();
+    const s = synth('synthetic-pharma');
+    const t = Object.keys(s.site.captures)[0]!;
+    s.site.captures[t]!.body = s.site.captures[t]!.body.replace('</body>', `<p>This domain is not yet connected.</p><p>${'filler words about our region '.repeat(120)}</p></body>`);
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'FAIL', reason_code: 'HARMFUL_HISTORY' });
+  });
+});

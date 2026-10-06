@@ -8,7 +8,7 @@ import { hiddenSignals, metaRefreshTarget, visibleText } from '../html-text.js';
 import { businessNameCandidate, nameTokens, pickBusinessName, type BusinessCandidate } from '../prior-business.js';
 import {
   cdxCaptures, classifyCapture, fetchCapture, pickDecisive, scanPaths, timestampMs, toTimestamp, type Capture, type CaptureCls, type CaptureFetch, type CdxResult,
-  type PreCls, type SignatureLists,
+  MAX_CAPTURE_BYTES, type PreCls, type SignatureLists,
 } from '../wayback.js';
 import { outcome, type Check, type CheckContext, type CheckOutcome, type Status } from '../types.js';
 import { matchTerms } from './brand-lists.js';
@@ -30,9 +30,11 @@ const FAIL_CLASS_OF: Record<string, FailClass> = {
 const SEVERITY: FailClass[] = ['malware_phishing', 'scam', 'adult', 'spam', 'trademark_abuse', 'blocklist'];
 
 const classOfTerm = (term: string) => term.slice(0, term.indexOf(':'));
-const failClassOf = (matched: string[]): FailClass | null => {
-  const classes = matched.map((t) => FAIL_CLASS_OF[classOfTerm(t)]).filter((c): c is FailClass => c !== undefined);
-  return SEVERITY.find((s) => classes.includes(s)) ?? null;
+/** A class with no mapping (a custom term class) counts as `spam`: a FAIL never has a null class. */
+export const failClassOf = (matched: string[]): FailClass | null => {
+  if (matched.length === 0) return null;
+  const classes = matched.map((t) => FAIL_CLASS_OF[classOfTerm(t)] ?? 'spam');
+  return SEVERITY.find((s) => classes.includes(s)) ?? 'spam';
 };
 
 const NUL = {
@@ -156,7 +158,11 @@ export const historyCheck: Check = {
         return archiveDown('CAPTURE_UNAVAILABLE', `A decisive capture (${c.timestamp}) could not be read (${f.res.reasonCode}): an incomplete history never passes`, { pre_caps: preCaps, capture: c.timestamp, capture_url: f.res.url, fetch_reason: f.res.reasonCode });
       }
       const fr = f.res;
-      const vt = fr.html === null ? { title: null, text: '' } : visibleText(fr.html);
+      const vt = fr.html === null ? { title: null, text: '', truncatedMarkup: false } : visibleText(fr.html);
+      // A script or style block that never closes (in a capture that was not simply cut at the size cap) means the page text is unknown, not empty.
+      if (vt.truncatedMarkup && !fr.truncated) {
+        return archiveDown('CAPTURE_UNAVAILABLE', `A decisive capture (${c.timestamp}) has a script or style block that never closes: its text is unreadable, so an incomplete history never passes`, { pre_caps: preCaps, capture: c.timestamp, capture_url: fr.url, fetch_reason: 'TRUNCATED_MARKUP', truncated_markup: true });
+      }
       // A page that is only a quick meta refresh (<= 5 s) is a redirect: where it points decides, like a 3xx.
       const refresh = fr.html === null ? null : metaRefreshTarget(fr.html);
       const k = refresh !== null
@@ -177,7 +183,7 @@ export const historyCheck: Check = {
     const forsale = has('forsale');
     const captures = recs.map((r) => ({
       timestamp: isoOf(r.capture.timestamp), status: r.fetched.status, class: r.ignored ? 'same_site_redirect' : r.cls, title: r.title,
-      excerpt: excerptOf(r.text, r.matched), redirect_target: r.target, archive_url: r.fetched.url, matched: r.matched, ...(r.adMatches.length > 0 && { ad_matches: r.adMatches }), ...(r.metaRefresh && { meta_refresh: true }),
+      excerpt: excerptOf(r.text, r.matched), redirect_target: r.target, archive_url: r.fetched.url, matched: r.matched, ...(r.adMatches.length > 0 && { ad_matches: r.adMatches }), ...(r.metaRefresh && { meta_refresh: true }), ...(r.fetched.truncated && { truncated: true }),
     }));
 
     // ---- the verdict: the archive's classes by the settings' actions, blocklists, then the prior-business guard ----
@@ -200,6 +206,9 @@ export const historyCheck: Check = {
     const ads = counted.filter((r) => r.adMatches.length > 0);
     const parkedAds = ads.map((r) => ({ capture: isoOf(r.capture.timestamp), archive_url: r.fetched.url, ad_matches: r.adMatches, excerpt: excerptOf(r.text, r.adMatches) }));
     if (ads.length > 0) issues.push({ status: 'FLAG', code: 'HARMFUL_ON_PARKED_PAGE', reason: `A parked or for-sale capture of ${isoOf(ads[0]!.capture.timestamp).slice(0, 10)} shows harmful words (${ads[0]!.adMatches.join(', ')}), most likely sponsored links: needs a human look` });
+    // A capture cut at the size cap: what was read is clean, what was not read is unknown (a harmful match in the prefix still FAILs above).
+    const cutOff = counted.find((r) => r.fetched.truncated && r.cls !== 'harmful_strong');
+    if (cutOff) issues.push({ status: 'FLAG', code: 'CAPTURE_TRUNCATED', reason: `The archived capture of ${isoOf(cutOff.capture.timestamp).slice(0, 10)} is longer than the ${Math.round(MAX_CAPTURE_BYTES / 1000)} KB read: the rest of the page was not checked` });
     // The archived URLs themselves (subdomains, paths): scanned without fetching anything.
     const pathHits = scanPaths(before, domain, lists, h.url_terms).map((x) => ({ ...x, timestamp: isoOf(x.timestamp) }));
     if (pathHits.length > 0) issues.push({ status: 'FLAG', code: 'HARMFUL_PATH', reason: `An archived URL of this name contains harmful words (${pathHits[0]!.url}: ${pathHits[0]!.matched.join(', ')}): needs a human look` });

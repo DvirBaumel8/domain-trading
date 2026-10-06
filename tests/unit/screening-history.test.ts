@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { businessNameCandidate, nameTokens, pickBusinessName } from '../../src/screening/prior-business.js';
 import { hiddenSignals, metaRefreshTarget, visibleText } from '../../src/screening/html-text.js';
+import { failClassOf } from '../../src/screening/checks/history.js';
 import { classifyCapture, matchSignatures, parseCdx, pickDecisive, redirectTarget, scanPaths, timestampMs, toTimestamp, type Capture, type SignatureLists } from '../../src/screening/wayback.js';
 
 const lists: SignatureLists = {
@@ -105,10 +106,10 @@ describe('classifyCapture', () => {
   it('parked and for-sale come BEFORE harmful: ads on a placeholder are adMatches (a FLAG), never harmful_strong', () => {
     expect(cls(200, 'This domain is not yet connected. Sponsored: buy viagra, xxx')).toMatchObject({ cls: 'parked', adMatches: ['adult:xxx', 'pharma:viagra'] });
     expect(cls(200, 'This domain name is for sale. Related: viagra')).toMatchObject({ cls: 'forsale', adMatches: ['pharma:viagra'] });
-    // a sig_parked match overrides at any length
-    expect(cls(200, `${long.repeat(20)} not yet connected viagra`)).toMatchObject({ cls: 'parked', adMatches: ['pharma:viagra'] });
-    // a mere for-sale line on a FULL page does not override a harmful match
+    // the override needs a THIN page for both signatures: a long page with a parking phrase or a for-sale line is judged on its content
+    expect(cls(200, `${long.repeat(20)} not yet connected viagra`)).toMatchObject({ cls: 'harmful_strong' });
     expect(cls(200, `${long.repeat(20)} this domain name is for sale. Buy viagra`)).toMatchObject({ cls: 'harmful_strong' });
+    expect(cls(200, `${long.repeat(20)} not yet connected`)).toMatchObject({ cls: 'content' });
     // the threshold is a setting
     expect(classifyCapture({ status: 200, location: null, text: `${long} this domain name is for sale. viagra`, domain: 'example.com' }, lists, 200, 100_000)).toMatchObject({ cls: 'forsale', adMatches: ['pharma:viagra'] });
     expect(classifyCapture({ status: 200, location: null, text: `${long} this domain name is for sale. viagra`, domain: 'example.com' }, lists, 200, 50)).toMatchObject({ cls: 'harmful_strong' });
@@ -196,5 +197,14 @@ describe('hostile input stays fast (linear scans, no backtracking)', () => {
     ['40,000 img tags', () => hiddenSignals('<img alt="x" '.repeat(40000))],
   ])('%s finishes in under 200 ms', (_name, fn) => {
     expect(ms(fn)).toBeLessThan(200);
+  });
+});
+
+describe('failClassOf', () => {
+  it('maps the signature classes; an unmapped custom class is spam, never null on a match', () => {
+    expect(failClassOf(['malware:x', 'pharma:y'])).toBe('malware_phishing');
+    expect(failClassOf(['trademark:x'])).toBe('trademark_abuse');
+    expect(failClassOf(['custom:x'])).toBe('spam');
+    expect(failClassOf([])).toBeNull();
   });
 });

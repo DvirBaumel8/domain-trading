@@ -46,7 +46,7 @@ export async function readCappedBytes(res: Response, max: number): Promise<{ byt
     if (done) break;
     chunks.push(value);
     n += value.length;
-    if (n >= max) { cut = true; await reader.cancel().catch(() => {}); break; }
+    if (n >= max) { cut = true; void reader.cancel().catch(() => {}); break; }
   }
   return { bytes: Buffer.concat(chunks).subarray(0, max), cut };
 }
@@ -167,7 +167,7 @@ export async function cdxCaptures(deps: Deps, domain: string, o: { to?: string; 
 export const captureUrl = (c: Pick<Capture, 'timestamp' | 'original'>): string => `${ARCHIVE_WEB}/${c.timestamp}id_/${c.original}`;
 
 export type CaptureFetch =
-  | { ok: true; status: number; location: string | null; html: string | null; contentType: string | null; url: string; bytes: number }
+  | { ok: true; status: number; location: string | null; html: string | null; contentType: string | null; url: string; bytes: number; truncated: boolean }
   | { ok: false; reasonCode: string; url: string; retryAfterMs?: number | null };
 
 /**
@@ -191,12 +191,11 @@ export async function fetchCapture(deps: Deps, c: Capture, o: { timeoutMs: numbe
     void res.body?.cancel().catch(() => {});
     const location = res.headers.get('location');
     if (!location) return { ok: false, reasonCode: 'CAPTURE_UNAVAILABLE', url };
-    return { ok: true, status: res.status, location, html: null, contentType: res.headers.get('content-type'), url, bytes: 0 };
+    return { ok: true, status: res.status, location, html: null, contentType: res.headers.get('content-type'), url, bytes: 0, truncated: false };
   }
   try {
     const { text, cut } = await readCapped(res, MAX_CAPTURE_BYTES);
-    void cut;
-    return { ok: true, status: res.status, location: null, html: text, contentType: res.headers.get('content-type'), url, bytes: Buffer.byteLength(text) };
+    return { ok: true, status: res.status, location: null, html: text, contentType: res.headers.get('content-type'), url, bytes: Buffer.byteLength(text), truncated: cut };
   } catch (e) {
     return { ok: false, reasonCode: reasonOfError(e) === 'TIMEOUT' ? 'TIMEOUT' : 'CAPTURE_UNAVAILABLE', url };
   }
@@ -305,9 +304,10 @@ export function scanPaths(captures: Capture[], domain: string, lists: Pick<Signa
  * One decisive capture -> class. A 3xx to another site is `redirect_offsite` (or for-sale / parked when the target host is in those lists);
  * a 3xx to the same site is flagged `sameSiteRedirect` and the caller ignores it.
  *
- * Parked and for-sale come BEFORE harmful: a parking page is full of sponsored links, and its advertising is not the name's use. A
- * `sig_parked` match, or a for-sale match on a THIN page (at most `parkedMaxChars` of visible text), is parked / for-sale and any strong
- * harmful words on it are `adMatches` (the caller FLAGs, never FAILs). A for-sale line on a full page does not override a harmful match.
+ * Parked and for-sale come BEFORE harmful, but only for a THIN page (at most `parkedMaxChars` of visible text): a parking placeholder is
+ * full of sponsored links, and its advertising is not the name's use. A `sig_parked` or `sig_forsale` match on a thin page is parked /
+ * for-sale and any strong harmful words on it are `adMatches` (the caller FLAGs, never FAILs). A long page with a harmful match is
+ * judged on its content even if it contains a parking phrase.
  * `extra` (meta description and keywords, image alt text) feeds only the weak list.
  */
 export function classifyCapture(
@@ -330,7 +330,7 @@ export function classifyCapture(
   const forsale = matchSignatures(x.text, lists.forsale);
   const parked = matchSignatures(x.text, lists.parked);
   const thin = x.text.length <= parkedMaxChars;
-  if (parked.length > 0 || (forsale.length > 0 && thin)) {
+  if (thin && (parked.length > 0 || forsale.length > 0)) {
     const ad = strong.length > 0 ? { adMatches: strong } : {};
     return forsale.length > 0 ? { cls: 'forsale', matched: forsale, ...ad } : { cls: 'parked', matched: parked, ...ad };
   }
