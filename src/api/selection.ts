@@ -3,6 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
@@ -327,17 +328,46 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const approval = await requireNamedApproval(db, b.approval_ref, now(), 'Freezing a holdout suite', [b.suite]);
     const row = await db.transaction().execute(async (trx) => {
       await sql`SELECT pg_advisory_xact_lock(hashtext('holdout_suites'))`.execute(trx);
+      // No definition shopping: once any holdout replay of the suite exists its definition is final.
+      const scored = await trx.selectFrom('replay_runs').select('id').where('suite', '=', b.suite).where('mode', '=', 'holdout').limit(1).executeTakeFirst();
+      if (scored) throw new AppError(409, 'SUITE_ALREADY_SCORED', `${b.suite} already has a holdout replay (${scored.id}); its definition can no longer change`, { replay_id: scored.id });
+      const mine = await selectionOf(trx, b);
+      if (mine.domains.length === 0) throw new AppError(422, 'SUITE_EMPTY', 'The selection contains no test names');
+      const laneRows = b.cell === 'pooled' ? mine.rows : mine.rows.filter((r) => laneOf(r) === b.cell.slice('lane:'.length));
+      if (!laneRows.some((r) => r.label === 'sold') || !laneRows.some((r) => r.label === 'dropped')) {
+        throw new AppError(422, 'SUITE_EMPTY', `The judged cell ${b.cell} needs at least one sold and one dropped test name`, { sold: laneRows.filter((r) => r.label === 'sold').length, dropped: laneRows.filter((r) => r.label === 'dropped').length });
+      }
+      // Suites are disjoint: no name may be scored by two suites (against each other suite's latest frozen definition, on today's registry).
+      const mineSet = new Set(mine.domains);
+      for (const other of active.values.holdout.required_suites.filter((x) => x !== b.suite)) {
+        const od = await trx.selectFrom('holdout_suites').selectAll().where('suite', '=', other).orderBy('version', 'desc').limit(1).executeTakeFirst();
+        if (!od) continue;
+        const shared = (await selectionOf(trx, { slices: od.slices ?? undefined, sources: od.sources ?? undefined })).domains.filter((d) => mineSet.has(d));
+        if (shared.length > 0) throw new AppError(409, 'SUITE_OVERLAP', `${b.suite} shares ${shared.length} name(s) with ${other}; suites must be disjoint`, { other_suite: other, count: shared.length, examples: shared.slice(0, 5) });
+      }
       const last = await trx.selectFrom('holdout_suites').select('version').where('suite', '=', b.suite).orderBy('version', 'desc').limit(1).executeTakeFirst();
       return trx.insertInto('holdout_suites').values({
         suite: b.suite, version: (last?.version ?? 0) + 1, slices: b.slices ?? null, sources: b.sources ?? null, cell: b.cell,
+        member_hash: memberHash(mine.domains), member_count: mine.domains.length,
         created_by: req.auth!.name, approval_text: approval.text, approval_at: approval.approvedAt, audit_id: req.auditId!,
       }).returningAll().executeTakeFirstOrThrow();
     });
     return reply.code(201).send(suiteView(row));
   });
 
-  const suiteView = (r: { suite: string; version: number; slices: string[] | null; sources: string[] | null; cell: string; created_at: Date; created_by: string; approval_text: string }) => ({
-    suite: r.suite, version: r.version, slices: r.slices, sources: r.sources, cell: r.cell, created_at: r.created_at.toISOString(), created_by: r.created_by, approval_text: r.approval_text,
+  /** The registered names a suite selects by slice/source (any role); `domains` is the sorted test-row subset that is scored. */
+  const selectionOf = async (conn: Kysely<Database>, sel: { slices?: string[]; sources?: string[] }) => {
+    let q = conn.selectFrom('labelled_names').selectAll().orderBy('domain');
+    if (sel.slices) q = q.where('slice', 'in', sel.slices);
+    if (sel.sources) q = q.where('source', 'in', sel.sources);
+    const all = (await q.execute()).map(toLabelledRow);
+    const rows = all.filter((r) => r.role === 'test');
+    return { all, rows, domains: rows.map((r) => r.domain) };
+  };
+  const memberHash = (domains: string[]): string => createHash('sha256').update([...domains].sort().join('\n')).digest('hex');
+
+  const suiteView = (r: { suite: string; version: number; slices: string[] | null; sources: string[] | null; member_hash: string; member_count: number; cell: string; created_at: Date; created_by: string; approval_text: string }) => ({
+    suite: r.suite, version: r.version, slices: r.slices, sources: r.sources, member_hash: r.member_hash, member_count: r.member_count, cell: r.cell, created_at: r.created_at.toISOString(), created_by: r.created_by, approval_text: r.approval_text,
   });
 
   app.get('/selection/holdout-suites', async () => {
@@ -397,6 +427,13 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       const peeked = rows.filter((r) => r.role === 'test').map((r) => r.domain);
       if (peeked.length > 0) {
         throw new AppError(422, 'HOLDOUT_CONTAMINATED', 'Test rows are scored only by holdout replays', { domains: peeked.slice(0, 50), count: peeked.length });
+      }
+    }
+
+    if (b.mode === 'holdout' && def) {
+      const domains = rows.map((r) => r.domain);
+      if (domains.length !== def.member_count || memberHash(domains) !== def.member_hash) {
+        throw new AppError(409, 'SUITE_MEMBERSHIP_CHANGED', `The names ${b.suite} selects are not the names frozen with its definition; nothing was scored`, { frozen_count: def.member_count, current_count: domains.length });
       }
     }
 

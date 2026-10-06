@@ -11,6 +11,7 @@ let app: FastifyInstance;
 afterEach(async () => app?.close());
 const approval = (text: string) => ({ text, approved_at: new Date(Date.now() - 3_600_000).toISOString() });
 
+let readTok = '';
 async function setup() {
   wi = 0;
   let clock = Date.now();
@@ -19,6 +20,7 @@ async function setup() {
   const r = await issueToken('read', 'gizbar');
   const post = (url: string, payload: object) => (clock += 7_000, app.inject({ method: 'POST', url, headers: { ...w.auth, 'idempotency-key': randomUUID() }, payload }));
   const get = (url: string) => app.inject({ method: 'GET', url, headers: r.auth });
+  readTok = r.token;
   return { post, get };
 }
 
@@ -57,7 +59,12 @@ async function freeze(post: Awaited<ReturnType<typeof setup>>['post'], suite: st
   return r;
 }
 async function ho(post: Awaited<ReturnType<typeof setup>>['post'], suite: string, slices: string[], settings?: string) {
-  await freeze(post, suite, slices);
+  const have = (await app.inject({ method: 'GET', url: '/selection/holdout-suites', headers: { authorization: `Bearer ${readTok}` } })).json().suites as { suite: string; slices: string[] }[];
+  const last = have.filter((x) => x.suite === suite).pop();
+  if (!last || JSON.stringify(last.slices) !== JSON.stringify(slices)) {
+    const f = await post('/selection/holdout-suites', { suite, slices, approval_ref: approval(`Dvir: freeze ${suite}`) });
+    if (f.statusCode !== 201) return f;
+  }
   return post('/selection/replays', { suite, mode: 'holdout', ...(settings && { settings }) });
 }
 async function lists(post: Awaited<ReturnType<typeof setup>>['post']) {
@@ -164,13 +171,19 @@ describe('replay', () => {
     const { post } = await setup();
     const name = nextName();
     const sld = name.slice(0, -4);
-    await upload(post, [{ ...mk({ label: 'sold', ok: true, slice: 'b' }), domain: name }]);
+    await upload(post, [{ ...mk({ label: 'sold', ok: true, slice: 'b' }), domain: name }, mk({ label: 'dropped', ok: false, slice: 'b' })]);
     const noLists = (await ho(post, 'BT10-1', ['b'])).json();
     expect(noLists.report.pooled.sold).toMatchObject({ accepted: 0, undecided: 1 });
     expect(noLists.report.before_gates.pooled.sold.accepted).toBe(1);
     expect((await post('/selection/lists/brand', { replace: [sld] })).statusCode).toBe(201);
     expect((await post('/selection/lists/bigco', { replace: ['zzqx corp'] })).statusCode).toBe(201);
-    const hit = (await ho(post, 'BT10-9', ['b'])).json();
+    // a second name (own slice: suites are disjoint) carrying the brand
+    const name2 = nextName();
+    await upload(post, [{ ...mk({ label: 'sold', ok: true, slice: 'b2' }), domain: name2 }, mk({ label: 'dropped', ok: false, slice: 'b2' })]);
+    expect((await post('/selection/lists/brand', { replace: [name2.slice(0, -4)] })).statusCode).toBe(201);
+    const hitRes = await ho(post, 'BT10-9', ['b2']);
+    expect(hitRes.statusCode, hitRes.body).toBe(201);
+    const hit = hitRes.json();
     expect(hit.report.pooled.sold).toMatchObject({ accepted: 0, rejected: 1 });
   });
 
@@ -182,10 +195,11 @@ describe('replay', () => {
     expect(r.json().error.details.count).toBe(2);
     expect(r.json().error.details.rows.map((x: { missing: string[] }) => x.missing.length)).toEqual([4, 3]);
     expect(r.json().error.details.rows[0].missing).toEqual(['tm_us', 'tn', 'hist2', 'hist2_guard']);
-    await upload(post, [mk({ label: 'sold', ok: true, slice: 'na', as_of: null })]);
+    await upload(post, [mk({ label: 'sold', ok: true, slice: 'na', as_of: null }), mk({ label: 'dropped', ok: true, slice: 'na', as_of: null })]);
     expect((await ho(post, 'BT10-1', ['na'])).json().error.code).toBe('AS_OF_REQUIRED');
     // an input value without the date of its source is refused too (the leakage lint could not clear it)
-    await upload(post, [mk({ label: 'sold', ok: true, slice: 'nd', features: { ...accepted, input_dates: { census: '2026-01-01' } } })]);
+    const half = { ...accepted, input_dates: { census: '2026-01-01' } };
+    await upload(post, [mk({ label: 'sold', ok: true, slice: 'nd', features: half }), mk({ label: 'dropped', ok: true, slice: 'nd', features: half })]);
     const nd = await ho(post, 'BT10-1', ['nd']);
     expect(nd.json().error.code).toBe('REPLAY_INVALID_NO_GATES');
     expect(nd.json().error.details.rows[0].missing).toEqual(['input_dates.ext_dates', 'input_dates.history']);
@@ -221,8 +235,9 @@ describe('replay', () => {
     expect([unknown.statusCode, unknown.json().error.code]).toEqual([422, 'SUITE_UNKNOWN']);
     expect((await post('/selection/holdout-suites', { suite: 'BT10-1', approval_ref: approval('Dvir: freeze BT10-1') })).statusCode).toBe(422);
     expect((await freeze(post, 'BT10-1', ['s1'])).json()).toMatchObject({ suite: 'BT10-1', version: 1, slices: ['s1'], cell: 'pooled', approval_text: 'Dvir: freeze BT10-1' });
-    expect((await freeze(post, 'BT10-1', ['s1'])).json().version).toBe(2);
+    expect((await freeze(post, 'BT10-1', ['s1'])).json().version).toBe(2); // not scored yet: a new version is fine
     expect((await get('/selection/holdout-suites')).json().suites.map((x: { version: number }) => x.version)).toEqual([1, 2]);
+    expect((await get('/selection/holdout-suites')).json().suites[0]).toMatchObject({ member_count: 120, member_hash: expect.stringMatching(/^[0-9a-f]{64}$/) });
     await expect(db.updateTable('holdout_suites').set({ cell: 'pooled' }).execute()).rejects.toThrow();
   });
 
@@ -294,7 +309,7 @@ describe('hold-clearing gate', () => {
     expect([after.buy_hold, after.settings_version, after.clearable]).toEqual([false, 'v2', true]);
   });
 
-  it('a failure sticks: re-running a failed suite on an easier definition does not clear the hold', async () => {
+  it('a failure sticks and definitions cannot be shopped: after S1 fails, freezing another BT10-9 is refused (SUITE_ALREADY_SCORED)', async () => {
     const { post, get } = await setup();
     await lists(post);
     await upload(post, [...suiteRows('s1'), ...suiteRows('s2'), ...suiteRows('s3'), ...suiteRows('hard', 40, 47)]);
@@ -302,17 +317,49 @@ describe('hold-clearing gate', () => {
     expect((await ho(post, 'BT10-1', ['s1'], 'v2')).json().pass).toBe(true);
     const failed = await ho(post, 'BT10-9', ['hard'], 'v2'); // 40/60 = 66.7% sold accepted
     expect([failed.statusCode, failed.json().pass]).toEqual([201, false]);
-    const easy = await ho(post, 'BT10-9', ['s2'], 'v2'); // a changed (easier) definition: version 2, passes on its own
-    expect([easy.json().pass, easy.json().report.judged_cell]).toEqual([true, 'pooled']);
+    const easy = await post('/selection/holdout-suites', { suite: 'BT10-9', slices: ['s2'], approval_ref: approval('Dvir: freeze BT10-9') });
+    expect([easy.statusCode, easy.json().error.code]).toEqual([409, 'SUITE_ALREADY_SCORED']);
+    // the same on another draft: the definition is still the failed one, and a new draft is not a pre-registered variant
+    await post('/selection/settings', { label: 'v3', set: { buy_hold: false, 'tranche.size': 12 } });
+    expect((await post('/selection/replays', { suite: 'BT10-9', mode: 'holdout', settings: 'v3' })).json().error.code).toBe('VARIANT_NOT_PREREGISTERED');
     expect((await ho(post, 'BT10-11', ['s3'], 'v2')).json().pass).toBe(true);
     const bh = (await get('/selection/buy-hold?settings=v2')).json();
-    expect(bh.required_suites[1]).toMatchObject({ suite: 'BT10-9', pass: false, failed_before: true, definition_version: 2 });
+    expect(bh.required_suites[1]).toMatchObject({ suite: 'BT10-9', pass: false, failed_before: true, definition_version: 1 });
     expect(bh).toMatchObject({ buy_hold: true, clearable: false });
     const act = await post('/selection/settings/v2/activate', { approval_ref: approval('Dvir: activate v2') });
     expect([act.statusCode, act.json().error.code]).toEqual([409, 'HOLDOUT_NOT_PASSED']);
-    // a new variant after scoring has started is not pre-registered, so the failed suite cannot be retried on another draft
-    await post('/selection/settings', { label: 'v3', set: { buy_hold: false, 'tranche.size': 12 } });
-    expect((await ho(post, 'BT10-9', ['s2'], 'v3')).json().error.code).toBe('VARIANT_NOT_PREREGISTERED');
+  });
+
+  it('frozen membership: a test row added to a frozen slice changes the hash (SUITE_MEMBERSHIP_CHANGED, nothing stored); a fit row there is HOLDOUT_CONTAMINATED', async () => {
+    const { post } = await setup();
+    await lists(post);
+    await upload(post, suiteRows('s1'));
+    await freeze(post, 'BT10-1', ['s1']);
+    await upload(post, [mk({ label: 'sold', ok: true, slice: 's1' })]);
+    const r = await post('/selection/replays', { suite: 'BT10-1', mode: 'holdout' });
+    expect([r.statusCode, r.json().error.code, r.json().error.details]).toEqual([409, 'SUITE_MEMBERSHIP_CHANGED', { frozen_count: 120, current_count: 121 }]);
+    expect(await db.selectFrom('replay_runs').select('id').execute()).toEqual([]);
+    await upload(post, [mk({ label: 'sold', ok: true, slice: 's1', role: 'fit' })]);
+    expect((await post('/selection/replays', { suite: 'BT10-1', mode: 'holdout' })).json().error.code).toBe('HOLDOUT_CONTAMINATED');
+  });
+
+  it('disjoint suites: a selection sharing names with another suite\'s definition is refused (SUITE_OVERLAP)', async () => {
+    const { post } = await setup();
+    await upload(post, [...suiteRows('s1'), ...suiteRows('s2')]);
+    await freeze(post, 'BT10-1', ['s1']);
+    const r = await post('/selection/holdout-suites', { suite: 'BT10-9', slices: ['s1', 's2'], approval_ref: approval('Dvir: freeze BT10-9') });
+    expect([r.statusCode, r.json().error.code, r.json().error.details.other_suite, r.json().error.details.count]).toEqual([409, 'SUITE_OVERLAP', 'BT10-1', 120]);
+    expect(r.json().error.details.examples).toHaveLength(5);
+    expect((await freeze(post, 'BT10-9', ['s2'])).statusCode).toBe(201);
+  });
+
+  it('no empty suites: no test names, or a lane cell without sold or without dropped names (SUITE_EMPTY)', async () => {
+    const { post } = await setup();
+    await upload(post, [...suiteRows('s1'), mk({ label: 'sold', ok: true, slice: 'dev-only', role: 'dev' }), ...Array.from({ length: 3 }, () => mk({ label: 'sold', ok: true, slice: 'soldonly' }))]);
+    for (const [slices, cell] of [[['nothing'], 'pooled'], [['dev-only'], 'pooled'], [['soldonly'], 'pooled'], [['s1'], 'lane:geo']] as const) {
+      const r = await post('/selection/holdout-suites', { suite: 'BT10-11', slices, cell, approval_ref: approval('Dvir: freeze BT10-11') });
+      expect([r.statusCode, r.json().error.code]).toEqual([422, 'SUITE_EMPTY']);
+    }
   });
 
   it('the judged cell is the definition\'s: lane:expired judges only the expired lane', async () => {

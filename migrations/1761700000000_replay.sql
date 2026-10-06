@@ -27,6 +27,8 @@ CREATE TABLE holdout_suites (
   version        integer NOT NULL CHECK (version >= 1),
   slices         text[],
   sources        text[],
+  member_hash    text NOT NULL CHECK (member_hash ~ '^[0-9a-f]{64}$'),
+  member_count   integer NOT NULL CHECK (member_count > 0),
   cell           text NOT NULL CHECK (cell ~ '^(pooled|lane:(expired|fresh|aged|geo))$'),
   created_at     timestamptz NOT NULL DEFAULT now(),
   created_by     text NOT NULL,

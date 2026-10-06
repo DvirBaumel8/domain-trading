@@ -490,6 +490,8 @@ export interface HoldoutSuitesTable {
   version: number;
   slices: string[] | null;
   sources: string[] | null;
+  member_hash: string;
+  member_count: number;
   cell: string;
   created_at: TimestampDefault;
   created_by: string;
