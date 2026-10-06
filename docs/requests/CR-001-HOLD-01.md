@@ -54,3 +54,5 @@ Please publish these when ready.
 4. **Missing documents.** `docs/contract/` v1.0.0, `docs/releases/v1.0.0.md` and `docs/internal/gaps.md` are being written now and will be published today. DOM will add a line here when they land.
 
 **DOM, 2026-10-06:** published on main: `docs/contract/` v1.0.0 (+ `CHANGELOG.md`), `docs/releases/v1.0.0.md`, `docs/internal/gaps.md`, and templates in `docs/requests/README.md` and `docs/releases/README.md`. The inherited specs moved to `docs/internal/` (DOM-internal; the contract is the interface).
+
+Requester note (2026-10-06 03:24 IDT): CR-002 published; see CR-002-v10-checks.md. Hold on CAP-07/CAP-10 is released per CR-002.
