@@ -16,7 +16,7 @@ const RDAP = 'https://rdap.verisign.com/com/v1/domain/:d';
 describe('/check with the real Porkbun adapter (MSW)', () => {
   it('free .com → available, Porkbun winner, prices from the decimal strings', async () => {
     mswServer.use(
-      http.get(RDAP, () => new HttpResponse(null, { status: 404 })),
+      http.get(RDAP, () => new HttpResponse(null, { status: 404, headers: { 'content-type': 'application/rdap+json' } })),
       http.post(`${PORKBUN_BASE}/domain/checkDomain/:d`, () => HttpResponse.json(checkDomainBody())),
     );
     app = await makeApp(); // default wiring: createAdapters(config) + rdapStatus
@@ -27,7 +27,7 @@ describe('/check with the real Porkbun adapter (MSW)', () => {
 
   it('AU-8 (step 2): a Porkbun error leaks no key into the response, logs or stored quotes', async () => {
     mswServer.use(
-      http.get(RDAP, () => new HttpResponse(null, { status: 404 })),
+      http.get(RDAP, () => new HttpResponse(null, { status: 404, headers: { 'content-type': 'application/rdap+json' } })),
       http.post(`${PORKBUN_BASE}/domain/checkDomain/:d`, () => pbError('INVALID_API_KEYS_001', {}, { status: 403 })),
     );
     const logs = logCapture();

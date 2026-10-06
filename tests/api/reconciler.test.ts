@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { RdapFn } from '../../src/rdap.js';
+import { http, HttpResponse } from 'msw';
+import { rdapStatus, type RdapFn } from '../../src/rdap.js';
+import { mswServer } from '../setup/network.js';
 import { failPurchase } from '../../src/services/bookkeeping.js';
 import { Reconciler } from '../../src/services/reconciler.js';
 import { DOMAIN } from '../helpers/buy.js';
@@ -62,6 +64,16 @@ describe('Reconciler', () => {
     expect(await rec(new FakeAdapter('porkbun')).runOnce()).toMatchObject({ failed: 1 });
     expect((await db.selectFrom('purchases').selectAll().executeTakeFirstOrThrow()).state).toBe('failed');
     expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(0);
+  });
+
+  it('absent + older than 30 min but RDAP answers an HTML 404 (a proxy / error page) → NOT failed: rdapStatus says rdap_unknown', async () => {
+    mswServer.use(http.get('https://rdap.verisign.com/com/v1/domain/:d', () => new HttpResponse('<html>Not Found</html>', { status: 404, headers: { 'content-type': 'text/html' } })));
+    await seedPurchase('unknown', 31);
+    expect(await rec(new FakeAdapter('porkbun'), rdapStatus).runOnce()).toMatchObject({ failed: 0 });
+    expect((await db.selectFrom('purchases').selectAll().executeTakeFirstOrThrow()).state).toBe('unknown');
+    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(1);
+    mswServer.use(http.get('https://rdap.verisign.com/com/v1/domain/:d', () => new HttpResponse('{"errorCode":404}', { status: 404, headers: { 'content-type': 'application/rdap+json' } })));
+    expect(await rec(new FakeAdapter('porkbun'), rdapStatus).runOnce()).toMatchObject({ failed: 1 }); // a real RDAP 404 still fails it
   });
 
   it('absent but younger than 30 min, or RDAP says registered → untouched', async () => {

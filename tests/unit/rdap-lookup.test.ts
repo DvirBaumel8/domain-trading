@@ -39,7 +39,7 @@ describe('rdapLookup', () => {
     expect(await rdapLookup('slow.com', { timeoutMs: 50 })).toMatchObject({ outcome: 'unknown', reasonCode: 'TIMEOUT' });
   });
 
-  it('a 404 is "not registered" only as an RDAP answer: an HTML 404 (a proxy, an error page) is unknown SOURCE_ERROR; rdapStatus keeps its bare-404 reading', async () => {
+  it('a 404 is "not registered" only as an RDAP answer: an HTML 404 (a proxy, an error page) is unknown SOURCE_ERROR; rdapStatus reads it the same way', async () => {
     for (const ct of ['text/html', null]) {
       mswServer.use(http.get(COM, () => new HttpResponse('<html>Not found</html>', { status: 404, headers: ct ? { 'content-type': ct } : {} })));
       expect(await rdapLookup('nothere.com')).toMatchObject({ outcome: 'unknown', reasonCode: 'SOURCE_ERROR', httpStatus: 404 });
@@ -47,7 +47,7 @@ describe('rdapLookup', () => {
     mswServer.use(http.get(COM, () => new HttpResponse('{"errorCode":404}', { status: 404, headers: { 'content-type': 'application/json' } })));
     expect((await rdapLookup('nothere.com')).outcome).toBe('not_registered');
     mswServer.use(http.get(COM, () => new HttpResponse(null, { status: 404 })));
-    expect(await rdapStatus('nothere.com')).toBe('not_registered');
+    expect(await rdapStatus('nothere.com')).toBe('rdap_unknown');
   });
 
   it('429 is unknown RATE_LIMITED and carries Retry-After in ms', async () => {
