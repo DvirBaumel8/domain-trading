@@ -36,6 +36,8 @@ export interface JobRunnerDeps {
   /** Resumes stalled screening runs (CAP-20); its summary is {resumed[], finalized[]}. */
   screeningWorker: { resumeStalled(): Promise<unknown> };
   backupExport?: BackupExport;
+  /** Daily popularity list / IANA bootstrap / cache pruning (CAP-02); while undefined, that step reports skipped. */
+  referenceRefresh?: Runnable;
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
 }
@@ -68,6 +70,14 @@ export class JobRunner {
     }
   }
 
+  /** A sub-step that failed (previous snapshot kept) makes the step `ok: false` but keeps the summary. */
+  private async referenceStep(ref: Runnable): Promise<StepResult> {
+    const r = await this.step(() => ref.runOnce());
+    const errors = (r.summary as { errors?: unknown } | null)?.errors;
+    if (r.ok && Array.isArray(errors) && errors.length > 0) return { ok: false, error: this.clean(errors.join('; ')), summary: r.summary };
+    return r;
+  }
+
   private clean(message: string): string {
     let m = message;
     for (const v of this.deps.secretValues ?? []) if (v) m = m.split(v).join('[REDACTED]');
@@ -97,6 +107,8 @@ export class JobRunner {
     steps.priceJob = await this.step(() => this.deps.priceJob.runOnce());
     steps.dropJob = await this.step(() => this.deps.dropJob.runOnce());
     steps.registrarCheck = await this.step(() => this.deps.registrarCheckJob.runOnce());
+    const ref = this.deps.referenceRefresh;
+    steps.referenceRefresh = ref ? await this.referenceStep(ref) : { ok: true, skipped: true, summary: { skipped: true, reason: 'reference refresh not configured' } };
     const backup = this.deps.backupExport;
     steps.backupExport = backup
       ? await this.step(() => backup.runOnce())

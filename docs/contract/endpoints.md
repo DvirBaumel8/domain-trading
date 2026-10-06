@@ -19,7 +19,7 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/sold/{domain}` | WRITE | Sales |
 | GET | `/report`, `/report/pricing-review` | READ | Reports (`reports.md`) |
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | Reads |
-| GET | `/selection/settings`, `/selection/lists/{name}` | READ | Selection (`selection.md`) |
+| GET | `/selection/settings`, `/selection/lists/{name}`, `/selection/namebio` | READ | Selection (`selection.md`) |
 | POST | `/selection/settings`, `/selection/settings/{label}/activate`, `/selection/lists/{name}`, `/selection/evaluate` | WRITE | Selection (`selection.md`) |
 | POST | `/jobs/run` | job token | Jobs (`jobs.md`) |
 
@@ -320,6 +320,15 @@ WRITE. Makes a draft the active version, for runs started afterwards (a run keep
 READ. Query (strict): `version?` (integer ≥ 1; default the newest).
 - **200:** `{name, version, terms: [string], created_at, created_by}`.
 - **Errors:** 404 `LIST_NOT_FOUND` (unknown name, no such version, or a list nobody has uploaded yet such as `brand`) · 400 `VALIDATION_ERROR`.
+
+### `GET /selection/namebio`
+READ. `?keywords=a,b,c` (1 to 50 words of letters, digits and hyphens; lower-cased, duplicates dropped; anything else, an empty list or an unknown query key → 400 `VALIDATION_ERROR`). Counts come from the stored nightly cache only: **this route never calls NameBio** (the source is disabled in this release: `sources.namebio` false). 200:
+```
+{ cache_date: "YYYY-MM-DD"|null, data_as_of: "YYYY-MM-DD"|null, source: "nightly_csv", attribution: "Data from NameBio", stale?: bool,
+  status?: "UNKNOWN", reason_code?: "STALE_DATA"|"SOURCE_DISABLED",
+  keywords: { <word>: { start_count, end_count, exact_count } | null } }
+```
+A missing or too old cache (`namebio.max_cache_age_hours`) is 200 with `stale: true`, `status: "UNKNOWN"`, `reason_code: "STALE_DATA"` and every count null; the disabled source is `SOURCE_DISABLED`. A word not in the cache is `null`. Show `attribution` on any card that uses the numbers.
 
 ### `POST /selection/lists/{name}`
 WRITE. Writes version n+1 of a list; older versions stay readable. Names: the fixed lists `dictionary_extra`, `city_extra`, `trade`, `regime`, `tech`, `generic_head`, `state`, `legal`, `brand`, `bigco`, `event`, `sig_harmful_strong`, `sig_harmful_weak`, `sig_parked`, `sig_forsale`; or a **census list** `bt1_<sld>` / `s6_regime_audit`.

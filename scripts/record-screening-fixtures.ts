@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RDAP_COM_BASE, USER_AGENT } from '../src/rdap.js';
+import { POPULARITY_URL } from '../src/screening/tranco.js';
 import { IANA_RDAP_URL, parseBootstrap } from '../src/screening/rdap-batch.js';
 import { DEFAULT_SELECTION_VALUES } from '../src/screening/settings.js';
 
@@ -76,7 +77,16 @@ if (mode === 'rdap') {
     const f = await get(`${base}domain/${sld}.${tld}`, 'application/rdap+json');
     save(`rdap-ext/${sld}_${tld}.json`, { ...f, body: f.status === 200 ? trimRdap(f.body) : f.body.slice(0, 2000) });
   }
+} else if (mode === 'tranco' || mode === 'popularity') {
+  // The popularity list is the Majestic Million (CC BY 3.0; docs/internal/sources.md). Only the first 1,000 rows are kept.
+  const res = await fetch(POPULARITY_URL, { headers: { 'user-agent': USER_AGENT, range: 'bytes=0-199999' }, signal: AbortSignal.timeout(30_000) });
+  const lines = (await res.text()).split('\n').slice(0, 1001);
+  const p = join(OUT, 'majestic-million-top.csv');
+  writeFileSync(p, `${lines.join('\n')}\n`);
+  console.log(`majestic-million-top.csv\t${res.status}\t${lines.length - 1} rows\tlast-modified ${res.headers.get('last-modified')}`);
+} else if (mode === 'namebio') {
+  console.log('NameBio is disabled (docs/internal/sources.md, G-29): nothing recorded; tests use the synthetic namebio/retailstats-sample.csv.');
 } else {
-  console.error('usage: rdap <domain…> | iana | rdap-ext <sld> <tld…>');
+  console.error('usage: tranco | namebio | rdap <domain…> | iana | rdap-ext <sld> <tld…>');
   process.exit(2);
 }

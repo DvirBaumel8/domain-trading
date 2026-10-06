@@ -7,7 +7,7 @@ import type { Database, ScreeningResultsTable } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { CHECKS, GATE_OF } from './checks/index.js';
-import { deriveItem, funnel, latestByCheck, type Derived, type Funnel } from './derive.js';
+import { beats, deriveItem, funnel, latestByCheck, type Derived, type Funnel } from './derive.js';
 import { loadDataLexicon, buildLexicon } from './lexicon.js';
 import { listVersion, currentLists } from './lists.js';
 import {
@@ -347,7 +347,13 @@ export class ScreeningWorker {
     const write = async (it: RunItem, checkId: CheckId, o: CheckOutcome, meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number }): Promise<boolean> => {
       const r = await this.insertRow(run, it, checkId, o, meta);
       if (!r) { await load(); return false; } // another worker wrote this (item, check): take its row, write nothing
-      latestOf(it.idx).set(checkId, r);
+      // Same precedence as derive: a manual record outranks an auto or cached row. One posted while this check ran is read back now,
+      // so the stop decision below never rests on the auto row it is hiding.
+      const m = await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', it.idx)
+        .where('check_id', '=', checkId).where('source', '=', 'manual').orderBy('id', 'desc').limit(1).executeTakeFirst();
+      let best = latestOf(it.idx).get(checkId);
+      for (const c of [r, m ? toResultRow(m) : null]) if (c && (!best || beats(c, best))) best = c;
+      latestOf(it.idx).set(checkId, best!);
       written++;
       return true;
     };

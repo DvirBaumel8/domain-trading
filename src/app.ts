@@ -36,6 +36,7 @@ import { ExportService } from './services/export.js';
 import { ListService } from './services/list.js';
 import { NsVerifier } from './jobs/ns-verify.js';
 import { DropJob } from './jobs/drop.js';
+import { ReferenceRefreshJob } from './jobs/reference-refresh.js';
 import { PriceScheduleJob } from './jobs/price-schedule.js';
 import { registerJobs } from './api/jobs.js';
 import { JobRunner, type BackupExport } from './jobs/runner.js';
@@ -49,6 +50,7 @@ declare module 'fastify' {
     priceJob: PriceScheduleJob;
     dropJob: DropJob;
     registrarCheckJob: RegistrarCheckJob;
+    referenceRefreshJob: ReferenceRefreshJob;
     jobRunner: JobRunner;
     screeningWorker: ScreeningWorker;
   }
@@ -128,20 +130,23 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerReads(app, { db: deps.db, now: deps.now ?? Date.now });
   registerSold(app, new SoldService({ db: deps.db, now: deps.now ?? Date.now }));
   registerSelection(app, { db: deps.db, now: deps.now ?? Date.now, holdoutCheck: deps.holdoutCheck });
+  const screeningDeps: ScreeningDeps = {
+    fetch: globalThis.fetch, sleep: deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), checkService,
+    rdapLookup, dnsQuery: queryDns,
+    resolveNs: (zone) => dns.promises.resolveNs(zone),
+    resolve4: (host) => dns.promises.resolve4(host),
+    ...deps.screening,
+  };
   const screeningWorker = new ScreeningWorker({
     db: deps.db, now: deps.now ?? Date.now, log: app.log,
     stopAfterResults: deps.screeningStopAfterResults,
-    screening: {
-      fetch: globalThis.fetch, sleep: deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), checkService,
-      rdapLookup, dnsQuery: queryDns,
-      resolveNs: (zone) => dns.promises.resolveNs(zone),
-      resolve4: (host) => dns.promises.resolve4(host),
-      ...deps.screening,
-    },
+    screening: screeningDeps,
   });
   app.decorate('screeningWorker', screeningWorker);
   app.addHook('onClose', async () => screeningWorker.idle());
   registerScreening(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
+  const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });
+  app.decorate('referenceRefreshJob', referenceRefresh);
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
@@ -149,7 +154,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, screeningWorker, backupExport: deps.backupExport,
+    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
     secretValues: deps.config.secretValues,
   }));
   registerJobs(app, app.jobRunner);

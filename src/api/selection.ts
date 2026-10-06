@@ -10,6 +10,7 @@ import { dollarsToCents, formatUsd } from '../money.js';
 import { currentSettings } from '../pricing/settings.js';
 import { requireNamedApproval } from '../screening/approval.js';
 import { isCensusListName, isFixedList, listVersion, writeList, FIXED_LISTS } from '../screening/lists.js';
+import { keywordCounts } from '../screening/namebio.js';
 import { evaluateMoney, syllableCount } from '../screening/money.js';
 import {
   LABEL_RE, LANES, activate, activeSelectionSettings, createDraft, listSelectionVersions, noHoldoutYet, selectionSettingsByLabel,
@@ -124,6 +125,24 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const r = await listVersion(db, req.params.name, q.data.version);
     if (!r) throw new AppError(404, 'LIST_NOT_FOUND', `No list "${req.params.name}"${q.data.version ? ` version ${q.data.version}` : ''}`);
     return { name: r.name, version: r.version, terms: r.terms, created_at: iso(r.created_at), created_by: r.created_by };
+  });
+
+  // NameBio keyword counts from the nightly cache only: this route never calls NameBio (CAP-11 #4, SEL9-13).
+  app.get('/selection/namebio', async (req) => {
+    const q = z.object({ keywords: z.string() }).strict().safeParse(req.query);
+    const kws = q.success ? [...new Set(q.data.keywords.split(',').map((k) => k.trim().toLowerCase()).filter((k) => k !== ''))] : [];
+    if (!q.success || kws.length < 1 || kws.length > 50 || kws.some((k) => !/^[a-z0-9-]{1,60}$/.test(k))) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'keywords must be 1 to 50 comma-separated words (letters, digits, hyphen)');
+    }
+    const sel = (await activeSelectionSettings(db)).values;
+    const attribution = sel.namebio.attribution;
+    if (!sel.sources.namebio) {
+      return { cache_date: null, data_as_of: null, source: 'nightly_csv', attribution, stale: true, status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED', keywords: Object.fromEntries(kws.map((k) => [k, null])) };
+    }
+    const r = await keywordCounts(db, kws, sel, deps.now);
+    const keywords = Object.fromEntries(kws.map((k) => { const x = r.stats[k] ?? null; return [k, x && { start_count: x.start_count, end_count: x.end_count, exact_count: x.exact_count }]; }));
+    const base = { cache_date: r.cache_date, data_as_of: r.cache_date, source: r.source, attribution: r.attribution, keywords };
+    return r.cache_date === null || r.stale ? { ...base, stale: true, status: 'UNKNOWN', reason_code: 'STALE_DATA' } : { ...base, stale: false };
   });
 
   app.post<{ Params: { name: string } }>('/selection/lists/:name', async (req, reply) => {

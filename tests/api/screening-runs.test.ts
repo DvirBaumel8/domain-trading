@@ -200,12 +200,12 @@ describe('POST /screening/runs and the offline checks', () => {
   it('a check with no implementation answers NOT_RUN NOT_IMPLEMENTED, a live name is unknown, a full run only lists it', async () => {
     await putBrandLists();
     const { runDone } = await h();
-    const { body } = await runDone({ checks: ['form', 'typo'], names: [nonGeo('tampapoolsco.com')] });
+    const { body } = await runDone({ checks: ['form', 'history'], names: [nonGeo('tampapoolsco.com')] });
     const n = body.names[0];
-    expect(res(n, 'typo')).toMatchObject({ status: 'NOT_RUN', reason_code: 'NOT_IMPLEMENTED', gate: 'G1' });
-    expect(n).toMatchObject({ not_implemented: ['typo'], final_status: 'unknown' }); // live: an unbuilt gate is never a survivor
-    const full = await runDone({ checks: ['form', 'typo'], mode: 'full', names: [nonGeo('tampapoolsco.com')] });
-    expect(full.body.names[0]).toMatchObject({ not_implemented: ['typo'], final_status: 'would_buy' }); // report mode lists it
+    expect(res(n, 'history')).toMatchObject({ status: 'NOT_RUN', reason_code: 'NOT_IMPLEMENTED', gate: 'G6' });
+    expect(n).toMatchObject({ not_implemented: ['history'], final_status: 'unknown' }); // live: an unbuilt gate is never a survivor
+    const full = await runDone({ checks: ['form', 'history'], mode: 'full', names: [nonGeo('tampapoolsco.com')] });
+    expect(full.body.names[0]).toMatchObject({ not_implemented: ['history'], final_status: 'would_buy' }); // report mode lists it
   });
 
   it('results are append-only', async () => {
@@ -480,5 +480,31 @@ describe('fix round 1', () => {
     const r = await post('/selection/settings', { label: 'v1o', set: { 'run.gates.S2': ['brand_lists', 'form', 'availability'] } });
     expect([r.statusCode, r.json().error.code]).toEqual([422, 'SETTINGS_INVALID']);
     expect(JSON.stringify(r.json())).toContain('gate order');
+  });
+});
+
+describe('the worker keeps the same precedence as derive (a manual record outranks an auto row)', () => {
+  it('a manual PASS posted while the check ran is read back: the name is not stopped by the auto FAIL it hides, so the next check runs', async () => {
+    await putBrandLists();
+    const { app: a, runDone } = await h();
+    let tmRan = 0;
+    a.screeningWorker.checks.web_risk = {
+      id: 'web_risk', gate: 'G5', ruleIds: [], lists: [],
+      async run(ctx) {
+        // a human record for this very (name, check) lands while the automatic check is still running
+        await db.insertInto('screening_results').values({
+          run_id: ctx.run.id, item_idx: ctx.item.idx, domain: ctx.item.domain, lane: ctx.item.lane, check_id: 'web_risk', gate: 'G5', rule_ids: [], status: 'PASS',
+          reason_code: null, reason: null, fields: JSON.stringify({ raw_status: 6 }), data_as_of: null, checked_at: new Date(ctx.now()), settings_label: ctx.settingsLabel,
+          list_versions: JSON.stringify({}), duration_ms: 0, upstream_calls: 0, evidence_ids: [], source: 'manual', cached_from: null, recorded_by: 'gavriel',
+        }).execute();
+        return outcome('FAIL', 'SAFE_BROWSING_UNSAFE', 'auto row that the manual record hides');
+      },
+    };
+    a.screeningWorker.checks.tm_us = { id: 'tm_us', gate: 'G7', ruleIds: [], lists: [], async run() { tmRan++; return outcome('PASS', null, null); } };
+    const { body } = await runDone({ checks: ['web_risk', 'tm_us'], names: [nonGeo('tampapoolsco.com')] });
+    expect(tmRan).toBe(1);
+    const n = body.names[0];
+    expect(res(n, 'web_risk')).toMatchObject({ status: 'PASS', source: 'manual' });
+    expect(n.final_status).toBe('would_buy');
   });
 });

@@ -77,6 +77,15 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
     const a = assemble(input.names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values, await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
     const want = q.data.domain === undefined ? null : q.data.domain.trim().toLowerCase().replace(/\.$/, '');
+    const tierOrder: string[] = sel!.values.tier.order;
+    const names = a.items.map((i) => {
+      const latest = latestByCheck(i.rows);
+      return { i, latest, tierRank: tierOrder.indexOf((latest.get('tier')?.fields.tier as string | undefined) ?? ''), short: (latest.get('form')?.fields.short as number | undefined) ?? 0, score: (latest.get('price')?.fields.score_0_100 as number | undefined) ?? null };
+    });
+    // Survivors (never rejected, invalid or unknown) in the CR-002 CAP-01 FORM-2 order: tier order, short names first, then score, then submission order.
+    const ranking = names.filter((n) => ['buy_candidate', 'would_buy', 'pending_manual'].includes(n.i.derived.final_status))
+      .sort((x, y) => (x.tierRank < 0 ? 99 : x.tierRank) - (y.tierRank < 0 ? 99 : y.tierRank) || y.short - x.short || (y.score ?? -1) - (x.score ?? -1) || x.i.item.idx - y.i.item.idx)
+      .map((n) => n.i.item.domain);
     return {
       run_id: run.id, status: run.status, mode: run.mode, backtest: run.backtest, settings_version: run.settings_label, buy_hold: run.buy_hold,
       created_at: run.created_at.toISOString(), finished_at: iso(run.finished_at), progress: a.progress,
@@ -84,11 +93,12 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
         const latest = latestByCheck(i.rows);
         return {
           domain: i.item.domain, lane: i.item.lane, final_status: i.derived.final_status, first_fail: i.derived.first_fail,
-          tier: (latest.get('tier')?.fields.tier as string | undefined) ?? null, short: (latest.get('form')?.fields.short as number | undefined) ?? null,
+          tier: (latest.get('tier')?.fields.tier as string | undefined) ?? null, score: (latest.get('price')?.fields.score_0_100 as number | undefined) ?? null, short: (latest.get('form')?.fields.short as number | undefined) ?? null,
           flags: i.derived.flags, pending_manual: i.derived.pending_manual, not_implemented: i.derived.not_implemented,
           ...(q.data.view === 'full' && { results: [...latest.values()].sort((x, y) => x.id - y.id).map(resultJson) }),
         };
       }),
+      ranking,
       funnel: a.funnel,
     };
   });

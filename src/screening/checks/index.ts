@@ -9,7 +9,12 @@ import { concentrationCheck } from './concentration.js';
 import { extDatesCheck } from './ext-dates.js';
 import { formCheck } from './form.js';
 import { tmUsCheck, webRiskCheck } from './manual.js';
+import { namebioCheck } from './namebio.js';
+import { priceCheck } from './price.js';
+import { quoteCheck } from './quote.js';
 import { surblCheck } from './surbl.js';
+import { tierCheck } from './tier.js';
+import { typoCheck } from './typo.js';
 
 export const CHECKS: Partial<Record<CheckId, Check>> = {
   form: formCheck,
@@ -21,6 +26,11 @@ export const CHECKS: Partial<Record<CheckId, Check>> = {
   surbl: surblCheck,
   census: censusCheck,
   ext_dates: extDatesCheck,
+  typo: typoCheck,
+  tier: tierCheck,
+  namebio: namebioCheck,
+  quote: quoteCheck,
+  price: priceCheck,
 };
 
 /** Gate label per check (also the label of an unimplemented check's NOT_RUN row). */

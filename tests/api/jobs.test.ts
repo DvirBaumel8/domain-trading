@@ -211,16 +211,17 @@ describe('tick: reconciler cutoffs through the production path (buy.md §6, B-20
 });
 
 describe('daily', () => {
-  it('runs price, drop, registrar check, then the backup export, in order', async () => {
+  it('runs price, drop, registrar check, reference refresh, then the backup export, in order', async () => {
     const order: string[] = [];
     const backup = { runOnce: vi.fn(async () => { order.push('backup'); return { committed: false }; }) };
     app = await make({ backupExport: backup });
     vi.spyOn(app.priceJob, 'runOnce').mockImplementation(async () => { order.push('price'); return { skipped: false } as never; });
     vi.spyOn(app.dropJob, 'runOnce').mockImplementation(async () => { order.push('drop'); return { skipped: false } as never; });
     vi.spyOn(app.registrarCheckJob, 'runOnce').mockImplementation(async () => { order.push('registrar'); return { skipped: false } as never; });
+    vi.spyOn(app.referenceRefreshJob, 'runOnce').mockImplementation(async () => { order.push('reference'); return { skipped: true, reason: 'test' }; });
     const res = await post(app, 'daily');
-    expect(order).toEqual(['price', 'drop', 'registrar', 'backup']);
-    expect(Object.keys(res.json().steps)).toEqual(['priceJob', 'dropJob', 'registrarCheck', 'backupExport']);
+    expect(order).toEqual(['price', 'drop', 'registrar', 'reference', 'backup']);
+    expect(Object.keys(res.json().steps)).toEqual(['priceJob', 'dropJob', 'registrarCheck', 'referenceRefresh', 'backupExport']);
     expect(res.json().steps.backupExport).toMatchObject({ ok: true, summary: { committed: false } });
   });
 
@@ -230,6 +231,7 @@ describe('daily', () => {
     vi.spyOn(app.priceJob, 'runOnce').mockRejectedValue(new Error('price boom'));
     vi.spyOn(app.registrarCheckJob, 'runOnce').mockRejectedValue(new Error('reg boom'));
     const drop = vi.spyOn(app.dropJob, 'runOnce');
+    vi.spyOn(app.referenceRefreshJob, 'runOnce').mockResolvedValue({ skipped: true, reason: 'test' });
     const res = await post(app, 'daily');
     expect(res.statusCode).toBe(200);
     const steps = res.json().steps;

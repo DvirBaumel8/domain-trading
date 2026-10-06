@@ -17,9 +17,10 @@ export interface Derived {
  * The result per check: a manual record always outranks an automatic or cached row (whatever the ids: a human record posted
  * while the worker was still running must not be hidden by the auto row that lands later); within a kind the highest id wins.
  */
+export const beats = (a: ResultRow, b: ResultRow): boolean => (a.source === 'manual') !== (b.source === 'manual') ? a.source === 'manual' : a.id > b.id;
+
 export function latestByCheck(results: ResultRow[]): Map<CheckId, ResultRow> {
   const m = new Map<CheckId, ResultRow>();
-  const beats = (a: ResultRow, b: ResultRow) => (a.source === 'manual') !== (b.source === 'manual') ? a.source === 'manual' : a.id > b.id;
   for (const r of results) {
     const have = m.get(r.check_id);
     if (!have || beats(r, have)) m.set(r.check_id, r);

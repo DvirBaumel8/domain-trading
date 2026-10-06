@@ -8,7 +8,8 @@ Summary
 |---|---|---|---|
 | SCOWL / ESDB word list | CAP-01 dictionary | enabled (committed) | n/a (file) |
 | US Census Gazetteer places | CAP-01 city list | enabled (committed) | n/a (file) |
-| Tranco | CAP-02 TYPO-1 | enabled (internal use, list not redistributed; see note, DVIR) | 1 list per day |
+| Majestic Million | CAP-02 TYPO-1 | **enabled** (CC BY 3.0; replaces Tranco) | 1 download per day, first N rows only |
+| Tranco | CAP-02 TYPO-1 | **not used** (no licence of its own, CC BY-NC upstream) | none |
 | SURBL `multi` | CAP-05 | enabled | <= 5 queries/s, control lookup per batch |
 | NameBio | CAP-11 | **disabled, UNVERIFIED** | none |
 | Internet Archive CDX | CAP-07 | enabled (terms page UNVERIFIED, DVIR) | <= 1 request/s |
@@ -36,14 +37,18 @@ Summary
 - **Limit:** none found for the Gazetteer files. (The Census API Terms of Service, `https://www.census.gov/data/developers/about/terms-of-service.html`, apply to the Data API only and require the notice "This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau."; we do not use the API.) We do not imply Census endorsement.
 - **Decision:** `enabled`. **Pacing:** none (committed file).
 
-## Tranco
-- **URLs used:** `https://tranco-list.eu/api/lists/date/latest` (metadata: `list_id`, `download`, `created_on`), `https://tranco-list.eu/download/<list_id>/<N>` (CSV `rank,domain`; latest id seen: `56WKN`, 1,000,000 rows). Also `https://tranco-list.eu/top-1m.csv.zip`.
-- **Purpose:** CAP-02 TYPO-1 popularity list (Task 6).
-- **Terms URL:** `https://tranco-list.eu/` (home page, "Attribution" section) and `https://tranco-list.eu/api_documentation`. **No licence or terms of use for the Tranco list itself was found** (`/terms` is 404).
-- **Quote (attribution, upstream):** "We currently use the lists from five providers: Cisco Umbrella (available free of charge), and Majestic (available under a CC BY 3.0 license), Farsight (only for the default list), the Chrome User Experience Report (CrUX) ( available under a CC BY-SA 4.0 license), and Cloudflare Radar ( available under a CC BY-NC 4.0 license). Tranco is not affiliated with any of these providers." (home page text, spacing as published).
-- **Quote (limit):** "429 : Rate limit exceeded (1 query/second)" for `/ranks/domain/{domain}`; "429 : Rate limit exceeded (1 list generated concurrently)" for list generation. "A daily update to the list is made available by 0:00 UTC".
-- **Note (DVIR):** one upstream provider is CC BY-NC. We use the list only as an internal lookup for typo screening, never redistribute it and never commit it (it is cached in the DB as a reference file and pruned). Dvir should confirm this is acceptable for a commercial trading business; if not, set `sources.tranco` false and TYPO-1 becomes `UNKNOWN` / `SOURCE_DISABLED`.
-- **Decision:** `enabled` (internal use). **Pacing:** one metadata call + one download per day; never the per-domain rank API in bulk.
+## Majestic Million (the popularity list for TYPO-1; replaces Tranco)
+- **URL used:** `https://downloads.majestic.com/majestic_million.csv` (`HTTP/2 200`, `content-type: text/csv`, `last-modified: Tue, 06 Oct 2026 05:00:21 GMT`, 81,323,114 bytes, `accept-ranges: bytes`; columns `GlobalRank,TldRank,Domain,TLD,RefSubNets,RefIPs,IDN_Domain,IDN_TLD,PrevGlobalRank,PrevTldRank,PrevRefSubNets,PrevRefIPs`, sorted by rank). Retrieved 2026-10-06 with `curl`.
+- **Purpose:** CAP-02 TYPO-1 popularity list (`src/screening/tranco.ts`, `src/screening/checks/typo.ts`). The module keeps the plan's name `tranco`; the settings switch is still `sources.tranco`.
+- **Terms URL:** `https://majestic.com/reports/majestic-million` (the report page, "Export CSV (~80MB)" block).
+- **Quote (licence, verified at the primary source 2026-10-06):** "Licensed under a Creative Commons Attribution 3.0 Unported License". The same wording is repeated by Tranco's own attribution text for its Majestic input: "Majestic (available under a CC BY 3.0 license)".
+- **Why not Tranco:** Tranco has no licence of its own (`/terms` is 404) and one of its inputs is CC BY-NC 4.0 (Cloudflare Radar); a non-commercial upstream is not acceptable for a commercial trading business (gap G-30, resolved).
+- **Conditions:** CC BY 3.0 allows commercial use with attribution: "Majestic Million, Majestic (https://majestic.com), CC BY 3.0" (kept in `selection.md`). We store only the first `typo.top_n` rows as `rank,domain` text in `reference_files` (name `popularity_list`), use them as an internal lookup, and do not redistribute them. The test fixture `tests/fixtures/screening/majestic-million-top.csv` is the first 1,000 rows (about 71 KB) with the same attribution.
+- **Fetch:** one GET per day from the `referenceRefresh` job step (never in a request or a run), streamed and cancelled after `typo.top_n + 1` lines so the 81 MB file is not downloaded; honest User-Agent; a non-200, empty or non-CSV answer keeps the previous snapshot and fails the step.
+- **Decision:** `enabled`. **Pacing:** one download per day (a refresh inside 20 hours is skipped).
+
+### Tranco (not used)
+- **URLs seen (Task 1):** `https://tranco-list.eu/api/lists/date/latest`, `https://tranco-list.eu/download/<list_id>/<N>`; no licence or terms for the list itself; the home page lists upstream providers including "Cloudflare Radar ( available under a CC BY-NC 4.0 license)". Not fetched by the service.
 
 ## SURBL (`multi.surbl.org`)
 - **URLs used:** DNS A queries `<domain>.multi.surbl.org` against the public name servers of the zone (`a.surbl.org` ... `j.surbl.org`, from `dig NS multi.surbl.org`); `https://www.surbl.org/usage-policy`, `https://www.surbl.org/lists`, `https://www.surbl.org/guidelines`.
@@ -62,6 +67,7 @@ Summary
 - **URLs tried:** `https://namebio.com/`, `/terms`, `/terms-of-service`, `/tos`, `/help`, `/faq`, `/api`, `/data`, `/downloads` (all 2026-10-06, also with the honest User-Agent); `https://archive.org/wayback/available?url=namebio.com/terms` (no snapshot).
 - **Result:** every request answers **HTTP 403** with a Cloudflare "Sorry, you have been blocked" page (Ray ID a4627f965f3cc222); the terms of use, the free CSV download URL, the "1 download per hour" limit, attribution wording and storage rights could **not** be read from the primary source. DOM does not spoof a browser to get around the block.
 - **Status:** **UNVERIFIED.** No terms quote, no URL, no limit known; the "1 download per hour" figure in CR-001 is hearsay.
+- **Task 6:** only a disabled stub exists (`src/screening/namebio.ts`: the parser, a cache reader and a `refreshNameBio` that never makes a request). The test sample `tests/fixtures/screening/namebio/retailstats-sample.csv` is **synthetic** with a placeholder header (`keyword,start_count,end_count,exact_count[,avg_price_usd]`); the real header is unknown. Attribution text: `Data from NameBio`.
 - **Decision:** `disabled`. No NameBio data is fetched or committed; `sources.namebio` defaults to `false` (Task 3); CAP-11 returns `UNKNOWN` / `SOURCE_DISABLED`; the manual path (CR-001 CAP-11 fallback) stays. Logged as a gap for Dvir (`docs/internal/gaps.md`, G-29).
 - **Pacing:** none.
 

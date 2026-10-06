@@ -40,9 +40,17 @@ describe('job CLI tick and daily (the shared JobRunner)', () => {
   });
 
   it('daily runs every step; the unconfigured backup step is skipped, not failed', async () => {
+    // The CLI is a real process (no MSW): switch every outside source off so the reference refresh makes no request.
+    const { testDb: tdb } = await import('../helpers/db.js');
+    const cur = await tdb.selectFrom('selection_settings').selectAll().orderBy('activation_seq', 'desc').limit(1).executeTakeFirstOrThrow();
+    const values = cur.values as { sources: Record<string, boolean> };
+    const off = Object.fromEntries(Object.keys(values.sources).map((k) => [k, false]));
+    const { id: _id, ...rest } = cur;
+    await tdb.insertInto('selection_settings').values({ ...rest, label: 'v1off', values: JSON.stringify({ ...values, sources: off }), based_on_id: cur.id, activation_seq: (cur.activation_seq ?? 0) + 1 }).execute();
     const { stdout } = await cli(['daily']);
     const r = JSON.parse(stdout);
-    expect(Object.keys(r.steps)).toEqual(['priceJob', 'dropJob', 'registrarCheck', 'backupExport']);
+    expect(Object.keys(r.steps)).toEqual(['priceJob', 'dropJob', 'registrarCheck', 'referenceRefresh', 'backupExport']);
+    expect(r.steps.referenceRefresh).toMatchObject({ ok: true, summary: { tranco: { skipped: true, reason: 'SOURCE_DISABLED' }, iana: { skipped: true }, errors: [] } });
     expect(r.steps.backupExport).toMatchObject({ ok: true, skipped: true });
     const { testDb } = await import('../helpers/db.js');
     const a = await testDb.selectFrom('audit_log').selectAll().where('path', '=', 'job daily').orderBy('at', 'desc').executeTakeFirstOrThrow();
