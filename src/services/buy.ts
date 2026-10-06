@@ -178,7 +178,7 @@ export class BuyService {
 
     // 10. registrar dry run (re-quote once on COST_MISMATCH)
     const dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars,
-      { input, ctx, approvedAt: appr.approvedAt, check, category });
+      { input, ctx, approvedAt: appr.approvedAt, check, category, trancheId });
     winner = dry.winner;
 
     const approved: Approved = {
@@ -265,7 +265,15 @@ export class BuyService {
         await this.assertNotOwned(trx, a.input.domain);
         await this.assertDomainCap(trx, s.max_domains);
         await this.assertPocCap(trx, s.poc_cap_cents, a.cost);
-        // v2.0.0: the tranche, re-read under the global lock, so two buys against one spend cap cannot both pass
+        // v2.0.0: the hold and the pack, re-read under the global lock (a screening run started since the first checks changes both)
+        const hold = await screeningHold(trx, a.input.domain);
+        if (hold) {
+          throw new AppError(409, 'BUY_HOLD', `${a.input.domain} was screened under selection settings "${hold.settingsVersion}" while buy_hold is on (or the version is a backtest or no longer active); no real buy`,
+            { settings_version: hold.settingsVersion, run_id: hold.runId });
+        }
+        const pg = await packGate(trx, a.input.domain, this.deps.now());
+        if (pg) throw gateError(pg);
+        // the tranche, re-read under the global lock, so two buys against one spend cap cannot both pass
         const tg = await trancheGate(trx, a.input.domain);
         if ('gate' in tg) throw gateError(tg.gate);
         const cg = await spendCapGate(trx, tg.trancheId, a.cost);
@@ -625,7 +633,7 @@ export class BuyService {
 
   private async registrarDryRun(
     adapter: RegistrarAdapter, domain: string, winner: EvaluatedQuote, caps: Caps, pocCap: number, allowed: string[],
-    rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category },
+    rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category; trancheId: string | null },
   ): Promise<{ winner: EvaluatedQuote; cost: number }> {
     let w = winner;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -663,7 +671,7 @@ export class BuyService {
 
   /** An ambiguous dry run may have been a real registration: record an `unknown` purchase so the cap counts it and the reconciler resolves it. */
   private async recordDryRunAmbiguous(
-    adapter: RegistrarAdapter, e: RegistrarError, cost: number, rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category },
+    adapter: RegistrarAdapter, e: RegistrarError, cost: number, rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category; trancheId: string | null },
   ): Promise<never> {
     this.deps.log?.error({ domain: rec.input.domain, registrar: adapter.name, registrar_code: e.code }, 'dry run ambiguous — possible real charge');
     try {
@@ -674,7 +682,7 @@ export class BuyService {
           idempotency_key: `${rec.ctx.idempotencyKey}#dry-ambiguous-${randomUUID()}`, request_hash: rec.ctx.requestHash, domain: rec.input.domain,
           state: 'unknown', dry_run: false, registrar: adapter.name, check_id: rec.check.checkId, max_price_cents: rec.input.maxPriceCents,
           approval_text: String(rec.input.approval?.text), approval_at: rec.approvedAt, expected_cents: cost,
-          request: JSON.stringify(redact(rec.input.requestBody)), audit_id: rec.ctx.auditId,
+          request: JSON.stringify(redact(rec.input.requestBody)), audit_id: rec.ctx.auditId, tranche_id: rec.trancheId,
         }).execute();
         await trx.insertInto('domains').values({
           domain: rec.input.domain, status: 'pending_purchase', registrar: adapter.name, category: rec.category, price_grade: rec.input.priceGrade, deal_id: rec.input.dealId,
@@ -726,7 +734,7 @@ export class BuyService {
       domains_owned: await activeDomainCount(this.deps.db),
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
       proposed_listing: a.plan ? planView(a.plan, events) : null, settings_version: a.pricing.version,
-      ...(a.wouldBeBlocked && { would_be_blocked: a.wouldBeBlocked }),
+      would_be_blocked: a.wouldBeBlocked,
       screening_pack: { status: pack ? pack.status : 'none', pack_id: pack?.id ?? null, version: pack?.version ?? null, issued_at: pack?.issued_at.toISOString() ?? null },
       advisories: [...(pack?.status === 'complete' ? [] : ['SCREENING_PACK_REQUIRED']), ...(pack && latestRun && latestRun.id !== pack.run_id ? ['PACK_NOT_FROM_LATEST_RUN'] : [])],
       warnings: [...a.check.warnings, ...(a.plan?.warnings ?? [])],

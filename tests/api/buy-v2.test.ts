@@ -6,6 +6,7 @@ import { makeApp } from '../helpers/app.js';
 import { DOMAIN, T0, buyBody, postBuy, readyToBuy } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
+import { RegistrarError } from '../../src/registrars/types.js';
 import { issueToken } from '../helpers/tokens.js';
 
 let app: FastifyInstance;
@@ -134,10 +135,45 @@ describe('v2.0.0 /buy: dry run', () => {
     expect(capped.would_be_blocked).toBe('TRANCHE_SPEND_CAP');
     expect(capped.dry_run).toBe(true);
     await db.updateTable('tranches').set({ spend_cap_cents: 5000 }).execute();
-    expect((await dry(auth)).would_be_blocked).toBeUndefined();
+    expect((await dry(auth)).would_be_blocked).toBeNull();
     await laterRun(DOMAIN);
     expect((await dry(auth)).would_be_blocked).toBe('SCREENING_PACK_REQUIRED'); // not from the latest run
     await db.updateTable('screening_runs').set({ buy_hold: true }).where('id', '=', 'run_999999999999').execute();
     expect((await dry(auth)).would_be_blocked).toBe('BUY_HOLD');
+  });
+});
+
+describe('v2.0.0 /buy: money-path re-checks', () => {
+  it('an ambiguous registrar dry run counts against the tranche spend cap (the unknown purchase carries the tranche id)', async () => {
+    const pb = new FakeAdapter('porkbun', { dryRun: (n) => (n === 0 ? new RegistrarError('porkbun', 'REGISTRAR_TIMEOUT', 't', { ambiguous: true }) : undefined) });
+    app = await makeApp({ adapters: [pb], rdap: rdapFree, now: () => T0, sleep: async () => {} });
+    const auth = (await issueToken('write')).auth;
+    const { trancheId } = await readyToBuy(DOMAIN, { spendCapCents: 1500 });
+    await readyToBuy(OTHER);
+    const a = await real(auth, DOMAIN);
+    expect(a.json().error.code).toBe('REGISTRAR_DRY_RUN_AMBIGUOUS');
+    expect(await db.selectFrom('purchases').select(['state', 'tranche_id']).execute()).toEqual([{ state: 'unknown', tranche_id: trancheId }]);
+    const b = await real(auth, OTHER);
+    expect(b.statusCode).toBe(409);
+    expect(b.json().error).toMatchObject({ code: 'TRANCHE_SPEND_CAP', details: { spent_cents: 1108 } });
+  });
+
+  it('a screening run of the name started after the first checks is caught under the lock: NOT_FROM_LATEST_RUN, no register call', async () => {
+    let inject: (() => Promise<void>) | undefined;
+    const pb = new FakeAdapter('porkbun', { dryRun: () => { void 0; return undefined; } });
+    const orig = pb.register.bind(pb);
+    pb.register = async (d, i) => {
+      if (i.dryRun) await inject?.(); // the registrar dry run is the last step before reserve()
+      return orig(d, i);
+    };
+    app = await makeApp({ adapters: [pb], rdap: rdapFree, now: () => T0, sleep: async () => {} });
+    const auth = (await issueToken('write')).auth;
+    await readyToBuy(DOMAIN);
+    inject = () => laterRun(DOMAIN);
+    const res = await real(auth);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatchObject({ code: 'SCREENING_PACK_REQUIRED', details: { reason: 'NOT_FROM_LATEST_RUN' } });
+    expect(pb.realRegisterCalls).toBe(0);
+    expect(await db.selectFrom('purchases').selectAll().execute()).toHaveLength(0);
   });
 });
