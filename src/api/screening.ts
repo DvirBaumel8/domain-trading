@@ -10,7 +10,7 @@ import { HistoryManual, MANUAL_CHECKS, TmEuManual, TmManual, WebRiskManual, hist
 import { GATE_OF } from '../screening/checks/index.js';
 import { beats, latestByCheck } from '../screening/derive.js';
 import { listVersion } from '../screening/lists.js';
-import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, refreshSummary, toResultRow, type ScreeningWorker } from '../screening/engine.js';
+import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, loadRows, recomputePending, refreshSummary, reopenRun, toResultRow, type ScreeningWorker } from '../screening/engine.js';
 import { REGISTRAR_ENV } from '../registrars/registry.js';
 import { readEvidence, storeEvidence } from '../screening/evidence.js';
 import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
@@ -184,7 +184,19 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       return row;
     });
     await refreshSummary(db, run);
-    return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name });
+    // A history record outdates the rows computed without it (tier, ext_dates, price, tm_us read history). When the engine would recompute
+    // any of them, a finished run is reopened and the worker kicked; the new rows are appended and the old ones stay. A run that is still
+    // running is kicked too (a no-op when this process already works on it; the worker re-checks before it ends).
+    let recompute = false;
+    if (check === 'history') {
+      const rows = await loadRows(db, run.id);
+      recompute = recomputePending((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel.values.run.feature_checks as CheckId[], run.mode === 'live');
+      if (recompute) {
+        await reopenRun(db, run.id, new Date(deps.now()), sel.values.run.time_budget_minutes);
+        worker.kick(run.id);
+      }
+    }
+    return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name, recompute });
   });
 
   app.post<{ Params: { id: string } }>('/screening/runs/:id/verdicts', async (req, reply) => {

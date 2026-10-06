@@ -435,6 +435,8 @@ export interface ScreeningResultsTable {
   evidence_ids: Generated<string[]>;
   source: 'auto' | 'cache' | 'manual';
   cached_from: string | null;
+  /** 0 for a first computation; a recompute of a stale row carries the id of the newest dependency row it read (one auto row per generation). */
+  generation: Generated<string>;
   recorded_by: string | null;
   audit_id: string | null;
   created_at: TimestampDefault;

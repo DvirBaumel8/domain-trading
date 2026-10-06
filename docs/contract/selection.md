@@ -185,6 +185,19 @@ Feature checks (`run.feature_checks`: census, ext_dates, namebio) never reject o
 
 **Sources and pacing.** Every outside source is read only when its `sources.<name>` flag is true (else UNKNOWN `SOURCE_DISABLED`) and with the User-Agent `domain-trading-api/1.1.0 (+https://github.com/DvirBaumel8/domain-trading)`. RDAP queries are paced per RDAP host (one pacer per host and run: `run.rdap_concurrency` in flight, default 1, and `run.rdap_min_ms_between` between starts, default 1000; registries run in parallel; the run deadline is checked inside each paced slot). A 404 counts as "not registered" only when it carries an RDAP or JSON content type (else UNKNOWN `SOURCE_ERROR`). After a failed IANA bootstrap refresh the stored copy keeps serving (UNKNOWN `SOURCE_ERROR` when there is none) and no new fetch is made for 60 minutes; answers are cached in `rdap_lookups` (not in the backup export: re-fetchable) and the IANA bootstrap in `reference_files`. An error, a timeout, a non-conforming 200 body or a missing source is always UNKNOWN with a reason code, never stored as available, not listed, not registered, or zero.
 
+## Same-run recompute (1.2.0)
+
+Some checks read other checks' rows of the same run (`ctx.latest(...)`). The dependency list (`DEPENDS_ON` in `src/screening/checks/index.ts`):
+
+| Check | Reads |
+|---|---|
+| `ext_dates` | `availability`, `history` |
+| `tier` | `form`, `census`, `history`, `ext_dates` |
+| `price` | `form`, `history`, `tier`, `namebio`, `quote` |
+| `tm_us` | `form`, `history` |
+
+A check's row is **stale** when its in-force row is automatic (never manual) and a dependency's in-force row is newer (higher id), or a dependency is itself stale. A stale check is recomputed by the run's worker (the cache is skipped for it): a new row is appended with `generation` = the id of the newest dependency row it read (0 for a first computation; one automatic row per run, name, check and generation, so two workers cannot write it twice). The old row stays in the run's history. The usual trigger is a manual `history` record (`POST /screening/runs/{id}/manual`), which reopens a finished run for it; the worker also re-checks after it finishes a run, so a record posted at the same moment is not lost. A name stopped by a failing check is not recomputed. Final status is derived from the newest rows as before (a manual row still outranks an automatic one, except an automated history FAIL).
+
 ## FLAG verdicts (1.2.0)
 
 A FLAG does not block a name (a bot judges it). A human decision on it is recorded with `POST /screening/runs/{id}/verdicts`: `PASS` or `REJECT`, a reason, who decided and when. A verdict belongs to **one result row**: when the check is recorded again the new row is in force and has no verdict. Only a FLAG row takes one (409 `VERDICT_RESULT_NOT_FLAG`), and only the row in force (409 `VERDICT_RESULT_STALE`). The run view lists the verdicts of the rows in force (`names[].verdicts`); `final_status` and `flags` are unchanged. A REJECT verdict only matters to the screening pack.

@@ -6,7 +6,7 @@ import { sql, type Kysely, type Selectable } from 'kysely';
 import type { Database, ScreeningResultsTable } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { CHECKS, GATE_OF } from './checks/index.js';
+import { CHECKS, DEPENDS_ON, GATE_OF } from './checks/index.js';
 import { beats, deriveItem, funnel, latestByCheck, type Derived, type Funnel } from './derive.js';
 import { loadDataLexicon, buildLexicon } from './lexicon.js';
 import { listVersion, currentLists } from './lists.js';
@@ -19,6 +19,7 @@ import {
 
 /** A running run with no row for this long is resumed on the next poll or tick (Render sleeps after ~15 min idle). */
 export const HEARTBEAT_STALE_MS = 120_000;
+const MAX_RECOMPUTE_PASSES = 5;
 
 export interface InputName {
   domain: string; lane: Lane; city?: string; state?: string; trade?: string; price_grade?: 'strong' | 'weaker';
@@ -36,6 +37,50 @@ export function toResultRow(r: Row): ResultRow {
     duration_ms: r.duration_ms, upstream_calls: r.upstream_calls, evidence_ids: (r.evidence_ids ?? []).map(Number), source: r.source,
     cached_from: r.cached_from === null ? null : Number(r.cached_from), recorded_by: r.recorded_by,
   };
+}
+
+/**
+ * Checks of `plan` whose in-force row is stale: an automatic or cached row (never a manual one) that some dependency (DEPENDS_ON) has
+ * outdated, i.e. the dependency's in-force row is newer (higher id), or the dependency is itself stale. Walks the plan in order.
+ */
+export function staleChecks(latest: Map<CheckId, ResultRow>, plan: CheckId[]): Set<CheckId> {
+  const stale = new Set<CheckId>();
+  for (const c of plan) {
+    const own = latest.get(c);
+    if (!own || own.source === 'manual') continue;
+    if ((DEPENDS_ON[c] ?? []).some((d) => stale.has(d) || (latest.get(d)?.id ?? 0) > own.id)) stale.add(c);
+  }
+  return stale;
+}
+
+/** The newest in-force dependency row id a recompute of `c` reads: its `generation` (one automatic row per generation). */
+const generationOf = (latest: Map<CheckId, ResultRow>, c: CheckId): number => Math.max(0, ...(DEPENDS_ON[c] ?? []).map((d) => latest.get(d)?.id ?? 0));
+
+/**
+ * Whether a recompute would run for this run: some name has a stale check in its plan and is not stopped by a gating FAIL/UNKNOWN
+ * outside the stale checks (live mode only). The worker and the manual route use the same test, so a run is reopened only for work that happens.
+ */
+export function recomputePending(items: RunItem[], plan: Partial<Record<Lane, CheckId[]>>, rows: ResultRow[], features: readonly string[], live: boolean): boolean {
+  const by = new Map<number, ResultRow[]>();
+  for (const r of rows) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
+  for (const it of items) {
+    if (it.input_error) continue;
+    const p = plan[it.lane] ?? [];
+    const latest = latestByCheck(by.get(it.idx) ?? []);
+    const stale = staleChecks(latest, p);
+    if (stale.size === 0) continue;
+    const stopped = live && p.some((c) => !features.includes(c) && !stale.has(c) && ['FAIL', 'UNKNOWN'].includes(latest.get(c)?.status ?? ''));
+    if (!stopped) return true;
+  }
+  return false;
+}
+
+/** Puts a finished (done or partial) run back to `running` with a fresh deadline for a recompute. False when it was already running. */
+export async function reopenRun(db: Kysely<Database>, runId: string, now: Date, budgetMinutes: number): Promise<boolean> {
+  const r = await db.updateTable('screening_runs')
+    .set({ status: 'running', finished_at: null, heartbeat_at: null, deadline_at: new Date(now.getTime() + budgetMinutes * 60_000) })
+    .where('id', '=', runId).where('status', '<>', 'running').executeTakeFirst();
+  return Number(r.numUpdatedRows) > 0;
 }
 
 const isFeature = (c: CheckId, featureChecks: readonly string[]) => featureChecks.includes(c);
@@ -178,7 +223,7 @@ export interface ScreeningWorkerDeps {
 
 type RunRow = Selectable<Database['screening_runs']>;
 
-const loadRows = async (db: Kysely<Database>, runId: string): Promise<ResultRow[]> =>
+export const loadRows = async (db: Kysely<Database>, runId: string): Promise<ResultRow[]> =>
   (await db.selectFrom('screening_results').selectAll().where('run_id', '=', runId).orderBy('id').execute()).map(toResultRow);
 
 /** Recomputes the funnel summary of a run that has ended (also after a manual record changes a name). */
@@ -249,10 +294,10 @@ export class ScreeningWorker {
     return { resumed, finalized };
   }
 
-  /** Inserts one result row. null when the (item, check) already has an automatic row (a racing worker wrote it first). */
+  /** Inserts one result row. null when the (item, check, generation) already has an automatic row (a racing worker wrote it first). */
   private async insertRow(
     run: RunRow, it: RunItem, checkId: CheckId, o: CheckOutcome,
-    meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number },
+    meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number; generation?: number },
   ): Promise<ResultRow | null> {
     const { db } = this.deps;
     try {
@@ -261,7 +306,7 @@ export class ScreeningWorker {
         rule_ids: this.checks[checkId]?.ruleIds ?? [], status: o.status, reason_code: o.reasonCode, reason: o.reason,
         fields: JSON.stringify(o.fields), data_as_of: o.dataAsOf, checked_at: meta.checkedAt, settings_label: run.settings_label,
         list_versions: JSON.stringify(meta.listVersions), duration_ms: Math.max(0, Math.round(meta.durationMs)), upstream_calls: o.upstreamCalls,
-        evidence_ids: o.evidenceIds.map(String), source: meta.source, cached_from: meta.cachedFrom === undefined ? null : String(meta.cachedFrom),
+        evidence_ids: o.evidenceIds.map(String), source: meta.source, cached_from: meta.cachedFrom === undefined ? null : String(meta.cachedFrom), generation: String(meta.generation ?? 0),
       }).returningAll().executeTakeFirstOrThrow();
       await db.updateTable('screening_runs').set({ heartbeat_at: new Date(this.deps.now()) }).where('id', '=', run.id).execute();
       return toResultRow(r);
@@ -329,16 +374,26 @@ export class ScreeningWorker {
     }
     const lexicon = buildLexicon(loadDataLexicon(), lists, { cityOneToken: values.form.geo_city_one_token, cityWordAllowlist: values.form.city_word_allowlist });
     const runView: RunView = { id: run.id, mode: run.mode, backtest: run.backtest, buyHold: run.buy_hold, trancheId: run.tranche_id, createdAt: run.created_at };
-    const deadline = run.deadline_at.getTime();
+    let deadline = run.deadline_at.getTime();
     const features = values.run.feature_checks;
     const order = [...items].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.idx - b.idx);
 
     const state = new Map<number, Map<CheckId, ResultRow>>();
+    // Checks whose in-force row an earlier dependency outdated: dropped from `state` so the loop below recomputes them (appending a row), never cached.
+    const staleByItem = new Map<number, Set<CheckId>>();
     const load = async () => {
       state.clear();
+      staleByItem.clear();
       const by = new Map<number, ResultRow[]>();
       for (const r of await loadRows(db, runId)) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
-      for (const [idx, m] of by) state.set(idx, latestByCheck(m));
+      for (const [idx, m] of by) {
+        const latest = latestByCheck(m);
+        const it = items.find((i) => i.idx === idx);
+        const stale = it && !it.input_error ? staleChecks(latest, plan[it.lane] ?? []) : new Set<CheckId>();
+        for (const c of stale) latest.delete(c);
+        if (stale.size > 0) staleByItem.set(idx, stale);
+        state.set(idx, latest);
+      }
     };
     await load();
     const latestOf = (idx: number) => state.get(idx) ?? state.set(idx, new Map()).get(idx)!;
@@ -348,7 +403,7 @@ export class ScreeningWorker {
     const shared = new Map<string, unknown>();
     let written = 0;
 
-    const write = async (it: RunItem, checkId: CheckId, o: CheckOutcome, meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number }): Promise<boolean> => {
+    const write = async (it: RunItem, checkId: CheckId, o: CheckOutcome, meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number; generation?: number }): Promise<boolean> => {
       const r = await this.insertRow(run, it, checkId, o, meta);
       if (!r) { await load(); return false; } // another worker wrote this (item, check): take its row, write nothing
       // Same precedence as derive: a manual record outranks an auto or cached row. One posted while this check ran is read back now,
@@ -358,6 +413,7 @@ export class ScreeningWorker {
       let best = latestOf(it.idx).get(checkId);
       for (const c of [r, m ? toResultRow(m) : null]) if (c && (!best || beats(c, best))) best = c;
       latestOf(it.idx).set(checkId, best!);
+      staleByItem.get(it.idx)?.delete(checkId);
       written++;
       return true;
     };
@@ -367,6 +423,9 @@ export class ScreeningWorker {
     };
 
     const merged = [...new Set(Object.values(plan).flat() as CheckId[])]; // lane lists agree on order (checked when the settings are drafted)
+    // After the run ends, a manual record that landed meanwhile (a history record posted while this worker was finishing) may have staled
+    // a row: the run is then reopened here too, so no record is missed whichever side commits first. Bounded; each pass only appends.
+    for (let pass = 0; pass < MAX_RECOMPUTE_PASSES; pass++) {
     for (const checkId of merged) {
       for (const it of order) {
         if (it.input_error || !(plan[it.lane] ?? []).includes(checkId) || latestOf(it.idx).has(checkId) || stopped(it)) continue;
@@ -374,11 +433,13 @@ export class ScreeningWorker {
         const check = this.checks[checkId];
         const t0 = this.deps.now();
         let wrote: boolean;
+        const isStale = staleByItem.get(it.idx)?.has(checkId) === true;
+        const generation = isStale ? generationOf(latestOf(it.idx), checkId) : 0;
         if (!check) {
-          wrote = await write(it, checkId, outcome('NOT_RUN', 'NOT_IMPLEMENTED', `The ${checkId} check is not built yet`), { source: 'auto', durationMs: 0, checkedAt: new Date(t0), listVersions: {} });
+          wrote = await write(it, checkId, outcome('NOT_RUN', 'NOT_IMPLEMENTED', `The ${checkId} check is not built yet`), { source: 'auto', durationMs: 0, checkedAt: new Date(t0), listVersions: {}, generation });
         } else {
           const lv = Object.fromEntries(check.lists.filter((n) => versions[n] !== undefined).map((n) => [n, versions[n]!]));
-          const hit = await this.cached(run, values, it, checkId, lv);
+          const hit = isStale ? null : await this.cached(run, values, it, checkId, lv); // a stale row is recomputed, never served from the cache
           if (hit) {
             wrote = await write(it, checkId, { status: hit.status, reasonCode: hit.reason_code, reason: hit.reason, fields: hit.fields, dataAsOf: hit.data_as_of, evidenceIds: hit.evidence_ids, upstreamCalls: 0 },
               { source: 'cache', durationMs: 0, checkedAt: hit.checked_at, listVersions: hit.list_versions, cachedFrom: hit.id });
@@ -394,13 +455,20 @@ export class ScreeningWorker {
             } catch (e) {
               o = outcome('UNKNOWN', 'SOURCE_ERROR', String((e as Error).message ?? e).slice(0, 200));
             }
-            wrote = await write(it, checkId, o, { source: 'auto', durationMs: this.deps.now() - t0, checkedAt: new Date(t0), listVersions: lv });
+            wrote = await write(it, checkId, o, { source: 'auto', durationMs: this.deps.now() - t0, checkedAt: new Date(t0), listVersions: lv, generation });
           }
         }
         if (wrote && stopNow()) return;
       }
     }
-    await this.finalize(run, 'done');
+    if (!(await this.finalize(run, 'done'))) return;
+    const fresh = await loadRows(db, runId);
+    if (!recomputePending(items, plan, fresh, features, run.mode === 'live')) return;
+    if (!(await reopenRun(db, runId, new Date(this.deps.now()), values.run.time_budget_minutes))) return;
+    deadline = this.deps.now() + values.run.time_budget_minutes * 60_000;
+    await load();
+    }
+    await this.finalize(run, 'partial'); // passes exhausted (a pathological loop): end fail-closed rather than spin
   }
 
   /**

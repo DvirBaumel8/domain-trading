@@ -490,7 +490,7 @@ describe('BK-8 import refusals', () => {
     await sql`insert into pgmigrations (name, run_on) values ('9999999999998_order_probe', now())`.execute(db);
     try {
       const files = await backupOfSeed();
-      expect(migrations(files).length).toBe(3); // baseline, v1-2-0, probe
+      expect(migrations(files).length).toBeGreaterThanOrEqual(3); // baseline, the v1.2.0 files, probe
       files.set('backup/migrations.json', JSON.stringify([...migrations(files)].reverse()));
       await expect(importBackup(db, await dirOf(files))).rejects.toThrow(/MIGRATION_LEVEL_MISMATCH/);
       await nothingWritten();

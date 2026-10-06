@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { GATE_OF } from '../../src/screening/checks/index.js';
 import { planFor } from '../../src/screening/engine.js';
+import { outcome } from '../../src/screening/types.js';
 import { currentLists } from '../../src/screening/lists.js';
 import { testDb as db } from '../helpers/db.js';
 import { putBrandLists, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
@@ -15,6 +16,13 @@ async function h(): Promise<ScreeningHarness> {
   await putBrandLists(['zzbrand'], ['zzbigco'], ['zzevent']);
   const x = await screeningHarness();
   app = x.app;
+  // The seeded rows pre-date every manual record, so a history record recomputes them in the same run (Task 3); offline, with PASS stubs, and
+  // the worker is awaited after each post so the polls below read the settled run.
+  for (const id of Object.keys(GATE_OF) as (keyof typeof GATE_OF)[]) {
+    x.app.screeningWorker.checks[id] = { id, gate: GATE_OF[id], ruleIds: ['X'], lists: [], run: async () => outcome('PASS', null, null) };
+  }
+  const post = x.post;
+  x.post = async (url, payload) => { const r = await post(url, payload); await x.app.screeningWorker.idle(); return r; };
   return x;
 }
 
