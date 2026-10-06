@@ -198,6 +198,10 @@ export function historyFromManual(
 const EU_REGISTERS = ['euipo', 'wipo', 'ukipo', 'tmview'] as const;
 const EuMark = z.object({ mark: z.string().max(200), number: z.string().max(40), owner: z.string().max(200), status: z.string().max(100), register: z.enum(EU_REGISTERS) }).strict();
 export const TmEuManual = z.object({
+  /** The phrases searched (as in CAP-08 `phrases_queried`; compared uppercase without punctuation): a "clear" with no phrase says nothing. */
+  phrases_queried: z.array(z.string().min(1).max(200).refine((p) => priorPhraseOf(p) !== '', 'a phrase with letters or digits')).min(1).max(30),
+  /** Optional: false means the register search itself was broken, so no result is clear. */
+  control_ok: z.boolean().optional(),
   checked_by: z.string().trim().min(1).max(80),
   registers: z.array(z.enum(EU_REGISTERS)).min(1).max(4),
   register_urls: z.array(z.string().url().max(500).refine((u) => u.startsWith('https://'), 'an https URL')).min(1).max(10),
@@ -215,6 +219,7 @@ export type TmEuManualT = z.infer<typeof TmEuManual>;
 export function tmEuFromManual(rec: TmEuManualT, evidenceUrl: string, checkedAt: Date, note?: string): CheckOutcome {
   const fields = { ...rec, evidence_url: evidenceUrl, checked_at: iso(checkedAt), note: note ?? null, source: 'manual' };
   const extra = { dataAsOf: checkedAt };
+  if (rec.control_ok === false) return outcome('UNKNOWN', 'CONTROL_FAILED', 'The control query returned nothing: the search is broken, so no result is clear', fields, extra);
   if (rec.exact_or_core_live.length > 0) return outcome('FAIL', 'TM_LIVE_MARK', `Live EU/international mark on the exact or core phrase: ${rec.exact_or_core_live.map((m) => `${m.mark} (${m.register} ${m.number}, ${m.owner})`).join('; ')}`, fields, extra);
   if (rec.generic_live.length > 0) return outcome('FLAG', 'TM_GENERIC_HITS', `Live EU/international marks only on a generic phrase: ${rec.generic_live.map((m) => `${m.mark} (${m.register} ${m.number})`).join('; ')}`, fields, extra);
   return outcome('PASS', null, null, fields, extra);

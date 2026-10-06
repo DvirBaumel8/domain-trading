@@ -1,4 +1,5 @@
 -- Up Migration
+-- Task 1's migration only (screening_verdicts). Later v1.2.0 tasks add their own migration files; do not append to this one.
 -- v1.2.0 (CR-001 P1b): FLAG verdicts, screening packs, outreach lead verification with erasable personal data.
 CREATE TABLE public.screening_verdicts (
   id bigserial PRIMARY KEY,

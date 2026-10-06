@@ -42,7 +42,7 @@ async function seedRun(names: { domain: string; lane: string }[]): Promise<strin
 }
 
 const URL_ = 'https://euipo.europa.eu/eSearch/#basic/1+1+1+1/50+50+50+50/aiactconformity';
-const clear = { checked_by: 'dvir', registers: ['euipo', 'wipo', 'ukipo'], register_urls: ['https://euipo.europa.eu/eSearch/', 'https://branddb.wipo.int/'], result: 'clear', exact_or_core_live: [], generic_live: [] };
+const clear = { phrases_queried: ['AI ACT CONFORMITY', 'ACT CONFORMITY'], checked_by: 'dvir', registers: ['euipo', 'wipo', 'ukipo'], register_urls: ['https://euipo.europa.eu/eSearch/', 'https://branddb.wipo.int/'], result: 'clear', exact_or_core_live: [], generic_live: [] };
 const mk = (register: string, mark = 'AI ACT CONFORMITY') => ({ mark, number: '018912345', owner: 'X GmbH', status: 'registered', register });
 const base = (x: ScreeningHarness, over: object = {}) => ({ domain: 'aiactconformity.com', check: 'tm_eu', checked_at: new Date(x.clock.t - 3_600_000).toISOString(), evidence_url: URL_, ...over });
 
@@ -75,6 +75,19 @@ describe('POST /screening/runs/{id}/manual: tm_eu', () => {
     expect(await code(base(x, { result: { ...clear, result: 'hits' } }))).toEqual([422, 'VALIDATION_ERROR']);
     expect(await code(base(x, { evidence_url: undefined, result: clear }))).toEqual([422, 'VALIDATION_ERROR']);
     expect(await code(base(x, { checked_at: new Date(x.clock.t - 169 * 3_600_000).toISOString(), result: clear }))).toEqual([422, 'CHECKED_AT_INVALID']);
+  });
+
+  it('phrases_queried is required (min 1, with letters or digits); control_ok false is UNKNOWN CONTROL_FAILED', async () => {
+    const x = await h();
+    const id = await seedRun([{ domain: 'aiactconformity.com', lane: 'S6' }]);
+    const { phrases_queried: _p, ...noPhrases } = clear;
+    const code = async (result: object) => { const r = await x.post(`/screening/runs/${id}/manual`, base(x, { result })); return [r.statusCode, r.json().error?.code]; };
+    expect(await code(noPhrases)).toEqual([422, 'VALIDATION_ERROR']);
+    expect(await code({ ...clear, phrases_queried: [] })).toEqual([422, 'VALIDATION_ERROR']);
+    expect(await code({ ...clear, phrases_queried: ['--'] })).toEqual([422, 'VALIDATION_ERROR']);
+    const r = await x.post(`/screening/runs/${id}/manual`, base(x, { result: { ...clear, control_ok: false } }));
+    expect(r.json()).toMatchObject({ status: 'UNKNOWN', reason_code: 'CONTROL_FAILED' });
+    expect((await x.post(`/screening/runs/${id}/manual`, base(x, { result: { ...clear, control_ok: true } }))).json()).toMatchObject({ status: 'PASS', fields: { phrases_queried: clear.phrases_queried } });
   });
 
   it('CHECK_NOT_MANUAL lists the four manual checks', async () => {

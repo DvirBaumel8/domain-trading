@@ -223,6 +223,9 @@ export const SelectionValues = Base.superRefine((v, ctx) => {
     else if (!(FEATURE_CHECK_IDS as readonly string[]).includes(id)) bad(['run', 'feature_checks'], `"${id}" is not a feature check (only ${FEATURE_CHECK_IDS.join(', ')} may be feature checks)`);
   }
   if (v.thresholds.registered_share_min === undefined) bad(['thresholds', 'registered_share_min'], 'required');
+  if ('tm_eu' in v.freshness_hours) bad(['freshness_hours', 'tm_eu'], 'the manual EU trademark window is eu_tm.freshness_hours; freshness_hours.tm_eu is not read');
+  const both = v.pack.exclude_checks.filter((c) => v.pack.require_checks.includes(c));
+  if (both.length > 0) bad(['pack'], `pack.exclude_checks and pack.require_checks must not share a check (${both.join(', ')})`);
   if (!v.lead.verify.never_fetch_hosts.includes('linkedin.com')) bad(['lead', 'verify', 'never_fetch_hosts'], 'must contain linkedin.com (LinkedIn is never fetched)');
   if (v.price.forbidden_bands_cents.some(([a, b]) => a > b)) bad(['price', 'forbidden_bands_cents'], 'a band must be [low, high]');
 });

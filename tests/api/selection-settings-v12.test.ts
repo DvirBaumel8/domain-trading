@@ -30,6 +30,11 @@ describe('v1.2.0 settings keys', () => {
     expect(() => applySet(DEFAULT_SELECTION_VALUES, { 'lead.verify.never_fetch_hosts': ['example.org'] })).toThrow(/valid/);
     expect(DEFAULT_SELECTION_VALUES.lead.verify.never_fetch_hosts).toContain('linkedin.com');
   });
+  it('freshness_hours.tm_eu is refused; pack include/exclude lists must not overlap; an empty eu_tm.required_lanes is allowed', () => {
+    expect(() => applySet(DEFAULT_SELECTION_VALUES, { 'freshness_hours.tm_eu': 24 })).toThrow(/valid/);
+    expect(() => applySet(DEFAULT_SELECTION_VALUES, { 'pack.require_checks': ['same_name', 'census'] })).toThrow(/valid/);
+    expect(applySet(DEFAULT_SELECTION_VALUES, { 'eu_tm.required_lanes': [] }).eu_tm.required_lanes).toEqual([]);
+  });
   it('DEFAULT_SELECTION_VALUES equals what the stored v1 row parses to', async () => {
     const raw = (await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow()).values;
     expect(SelectionValues.parse(raw)).toEqual(DEFAULT_SELECTION_VALUES);

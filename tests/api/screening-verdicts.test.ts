@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { GATE_OF } from '../../src/screening/checks/index.js';
 import { planFor } from '../../src/screening/engine.js';
 import { testDb as db } from '../helpers/db.js';
+import { issueToken } from '../helpers/tokens.js';
 import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 
 let app: FastifyInstance | undefined;
@@ -69,6 +70,16 @@ describe('POST /screening/runs/{id}/verdicts', () => {
     expect((await x.post(`/screening/runs/${id}/verdicts`, { ...body, result_id: await resultIdOf(id, 'tm_us'), reason: '' })).statusCode).toBe(422);
     expect((await x.post(`/screening/runs/${id}/verdicts`, { ...body, domain: 'nothere.com' })).json().error.code).toBe('NAME_NOT_IN_RUN');
     expect((await x.post(`/screening/runs/run_nope/verdicts`, body)).json().error.code).toBe('RUN_NOT_FOUND');
+  });
+
+  it('a READ token is refused (403)', async () => {
+    const x = await h();
+    const id = await seedRun();
+    await postTmUsFlag(x, id);
+    const r = await issueToken('read');
+    const res = await x.app.inject({ method: 'POST', url: `/screening/runs/${id}/verdicts`, headers: { ...r.auth, 'idempotency-key': randomUUID() }, payload: { domain: DOMAIN, check: 'tm_us', result_id: await resultIdOf(id, 'tm_us'), verdict: 'PASS', reason: 'x', decided_by: 'S', decided_at: new Date(x.clock.t - 60_000).toISOString() } });
+    expect(res.statusCode).toBe(403);
+    expect(await db.selectFrom('screening_verdicts').select('id').execute()).toEqual([]);
   });
 
   it('GET lists verdicts per name (only those on a row in force); the latest verdict for a result wins; rows are append-only', async () => {

@@ -137,6 +137,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       .where('check_id', '=', 'history').execute()).map(toResultRow);
     const history = histRows.reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined);
     const row = await db.transaction().execute(async (trx) => {
+      await trx.selectFrom('screening_runs').select('id').where('id', '=', run.id).forUpdate().executeTakeFirstOrThrow(); // same lock as a verdict
       // A history record's evidence row names its first archive link (the top-level evidence_url is not used for it).
       const evidenceUrl = check === 'history' ? (rec as z.infer<typeof HistoryManual>).evidence_urls?.[0] ?? `manual:history:${item.domain}` : body.evidence_url!;
       const json = JSON.stringify(rec);
@@ -196,16 +197,22 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     if (!item) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${body.domain}" is not a screened name of run ${run.id}`);
     const decidedAt = new Date(body.decided_at);
     if (decidedAt.getTime() > deps.now() + 60_000) throw new AppError(422, 'DECIDED_AT_INVALID', 'decided_at is in the future');
-    const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx).execute()).map(toResultRow);
-    const target = rows.find((r) => r.id === body.result_id && r.check_id === body.check);
-    if (!target) throw new AppError(404, 'RESULT_NOT_FOUND', `No ${body.check} result ${body.result_id} for ${item.domain} in run ${run.id}`);
-    const inForce = latestByCheck(rows).get(body.check)!;
-    if (inForce.id !== target.id) throw new AppError(409, 'VERDICT_RESULT_STALE', `Result ${target.id} is no longer the ${body.check} row in force`, { in_force_result_id: inForce.id });
-    if (target.status !== 'FLAG') throw new AppError(409, 'VERDICT_RESULT_NOT_FLAG', `Only a FLAG result takes a verdict (this one is ${target.status})`, { status: target.status });
-    const row = await db.insertInto('screening_verdicts').values({
-      run_id: run.id, item_idx: item.idx, domain: item.domain, check_id: body.check, result_id: String(target.id), verdict: body.verdict, reason: body.reason,
-      decided_by: body.decided_by, decided_at: decidedAt, recorded_by: req.auth!.name, audit_id: req.auditId!,
-    }).returningAll().executeTakeFirstOrThrow();
+    // One transaction: the run row is locked (a manual record takes the same lock), the row in force is re-read inside it, then the verdict
+    // is inserted, so a record that lands between the check and the insert cannot leave a verdict on a superseded row.
+    const { row, target } = await db.transaction().execute(async (trx) => {
+      await trx.selectFrom('screening_runs').select('id').where('id', '=', run.id).forUpdate().executeTakeFirstOrThrow();
+      const rows = (await trx.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx).execute()).map(toResultRow);
+      const target = rows.find((r) => r.id === body.result_id && r.check_id === body.check);
+      if (!target) throw new AppError(404, 'RESULT_NOT_FOUND', `No ${body.check} result ${body.result_id} for ${item.domain} in run ${run.id}`);
+      const inForce = latestByCheck(rows).get(body.check)!;
+      if (inForce.id !== target.id) throw new AppError(409, 'VERDICT_RESULT_STALE', `Result ${target.id} is no longer the ${body.check} row in force`, { in_force_result_id: inForce.id });
+      if (target.status !== 'FLAG') throw new AppError(409, 'VERDICT_RESULT_NOT_FLAG', `Only a FLAG result takes a verdict (this one is ${target.status})`, { status: target.status });
+      const row = await trx.insertInto('screening_verdicts').values({
+        run_id: run.id, item_idx: item.idx, domain: item.domain, check_id: body.check, result_id: String(target.id), verdict: body.verdict, reason: body.reason,
+        decided_by: body.decided_by, decided_at: decidedAt, recorded_by: req.auth!.name, audit_id: req.auditId!,
+      }).returningAll().executeTakeFirstOrThrow();
+      return { row, target };
+    });
     await refreshSummary(db, run);
     return reply.code(201).send({
       id: Number(row.id), run_id: run.id, domain: item.domain, check: body.check, result_id: target.id, verdict: row.verdict, reason: row.reason,
