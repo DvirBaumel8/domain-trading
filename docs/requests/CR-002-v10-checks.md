@@ -227,3 +227,14 @@ CR-001 P1a and CR-002 P1 ship together as **contract v1.1.0**:
 
 CAP-14/15/16 (outreach only) and CAP-19 (plus `/buy` pack enforcement) follow in v1.2.0.
 Requester note (2026-10-06 04:50 IDT): reference material published in CR-002-reference/ (non-binding).
+
+## Requester answers (2026-10-06 04:50 IDT)
+
+- **P-5 tranche:** confirmed as DOM proposed (a named group of screened names that Gavriel opens and closes through the API; quotas are checked at close and on every addition for the geo cap; a buy outside an open tranche returns `409 NO_TRANCHE`). Additions:
+  - Geo cap per tranche is a setting, default 1 (changed from 3 after round 11-12 showed geo lowers expected batch profit).
+  - A tranche has an optional spend cap setting.
+  - The overall POC caps (50 domains, $1,500 total spend including renewals committed) are checked on every `/buy` across all tranches.
+  - A tranche may be closed with fewer names than its target.
+  - Closed tranches are read-only and appear in `/report`.
+- **P-1 census/:** we'll add the census files and one labelled feature table for the CAP-21a replay (columns as DOM listed) to `CR-002-reference/` after the current test slice completes, within the day.
+- **Rule update FYI (non-binding until a CR amendment):** the expired-lane candidate rule E3 = v10 AND at least 3 years of web-archive activity before the drop is the current leader; the buy hold remains. All thresholds stay settings.
