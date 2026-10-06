@@ -480,9 +480,16 @@ describe('BK-8 import refusals', () => {
   });
 
   it('a reordered migrations.json is refused too', async () => {
-    const files = await backupOfSeed();
-    files.set('backup/migrations.json', JSON.stringify([...migrations(files)].reverse()));
-    await expect(importBackup(db, await dirOf(files))).rejects.toThrow(/MIGRATION_LEVEL_MISMATCH/);
-    await nothingWritten();
+    // The baseline is a single migration, so a reorder is only observable with a second (temporary) pgmigrations row.
+    await sql`insert into pgmigrations (name, run_on) values ('9999999999998_order_probe', now())`.execute(db);
+    try {
+      const files = await backupOfSeed();
+      expect(migrations(files).length).toBe(2);
+      files.set('backup/migrations.json', JSON.stringify([...migrations(files)].reverse()));
+      await expect(importBackup(db, await dirOf(files))).rejects.toThrow(/MIGRATION_LEVEL_MISMATCH/);
+      await nothingWritten();
+    } finally {
+      await sql`delete from pgmigrations where name = '9999999999998_order_probe'`.execute(db);
+    }
   });
 });
