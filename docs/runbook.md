@@ -81,3 +81,7 @@ budget and cap headroom. `GET /audit` shows every POST including `jobs/run` rows
 2. Contract, `CHANGELOG.md`, `docs/internal/` and `gaps.md` updated in the same commit; release note `docs/releases/vX.Y.Z.md` written.
 3. Deploy: push the tag (`git tag vX.Y.Z && git push origin vX.Y.Z`). `.github/workflows/release.yml` checks that the tag is the tip of main, equals `package.json` and has a CHANGELOG entry, runs the full suite, calls the Render deploy hook and waits for `/health/ping`. Manual fallback: `curl -fsS -X POST "$RENDER_DEPLOY_HOOK"` (the hook URL is a secret: Render -> service -> Settings -> Deploy Hook; also stored as the GitHub secret `RENDER_DEPLOY_HOOK`). Render runs the migrations on start.
 4. Verify: `GET /health` (token) shows `db: ok` and the new `version`; fill in the release note's deploy status.
+
+
+## Deploys (since 7 Oct 2026)
+Render deploys **every push to `main` after the GitHub `ci` workflow passes** (`autoDeployTrigger: checksPass`). Pushes that change only `docs/**`, `*.md` or `jobs-trigger/**` don't deploy. A `vX.Y.Z` tag marks a release; the `release` workflow checks that it matches package.json and the CHANGELOG, and runs the tests. `RENDER_DEPLOY_HOOK` is no longer needed. To deploy manually: Render dashboard → Manual Deploy, or the Render API.

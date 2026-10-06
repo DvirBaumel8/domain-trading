@@ -28,7 +28,9 @@ services:
     # Migrations run from plain SQL files at start (no pre-deploy step on the free plan).
     startCommand: npm run migrate up && node dist/main.js
     healthCheckPath: /health/ping
-    autoDeployTrigger: 'off'     # Dvir deploys deliberately after tests pass
+    autoDeployTrigger: checksPass   # deploy each push to main after GitHub CI passes
+    buildFilter:
+      ignoredPaths: ['docs/**', '**/*.md', 'jobs-trigger/**']
     envVars:
       - key: NODE_VERSION
         value: 22.23.2           # a recent 22.x patch (same as trader)
