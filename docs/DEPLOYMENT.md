@@ -174,4 +174,4 @@ Until then the check gives a red ✗ on the offending push, and DOM reverts it.
 
 
 ## Deploys (since 7 Oct 2026)
-Render deploys **every push to `main` after the GitHub `ci` workflow passes** (`autoDeployTrigger: checksPass`). Pushes that change only `docs/**`, `*.md` or `jobs-trigger/**` don't deploy. A `vX.Y.Z` tag marks a release; the `release` workflow checks that it matches package.json and the CHANGELOG, and runs the tests. `RENDER_DEPLOY_HOOK` is no longer needed. To deploy manually: Render dashboard → Manual Deploy, or the Render API.
+Render deploys **every push to `main` after the GitHub `ci` workflow passes** (`autoDeployTrigger: checksPass`). A `vX.Y.Z` tag marks a release; the `release` workflow checks that it matches package.json and the CHANGELOG, and runs the tests. `RENDER_DEPLOY_HOOK` is no longer needed. To deploy manually: Render dashboard → Manual Deploy, or the Render API.
