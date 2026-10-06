@@ -32,7 +32,7 @@ export interface ScreeningHarness {
 
 export async function screeningHarness(opts: { start?: number; stopAfterResults?: number; screening?: AppDeps['screening']; adapters?: RegistrarAdapter[]; rdap?: RdapFn } = {}): Promise<ScreeningHarness> {
   const clock = { t: opts.start ?? Date.parse('2026-10-06T08:00:00Z') };
-  const app = await makeApp({ now: () => clock.t, screeningStopAfterResults: opts.stopAfterResults, screening: opts.screening, adapters: opts.adapters, rdap: opts.rdap });
+  const app = await makeApp({ now: () => clock.t, screeningStopAfterResults: opts.stopAfterResults, screening: { lookupHost: async () => [{ address: '93.184.216.34', family: 4 }], ...opts.screening }, adapters: opts.adapters, rdap: opts.rdap });
   const w = await issueToken('write', 'gavriel');
   const r = await issueToken('read');
   // The write limiter allows 10 per minute per token: each call is a fresh minute for it.

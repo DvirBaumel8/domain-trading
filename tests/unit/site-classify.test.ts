@@ -42,6 +42,34 @@ describe('classifySite (CAP-12)', () => {
   });
 });
 
+describe('classifySite order and name matching (fix round 1)', () => {
+  it('legal suffixes are ignored and every title segment is compared with our name', () => {
+    expect(cls(ok(read('synthetic-business-ltd.html')))).toMatchObject({ site_state: 'in_use', business_use: 'business_name', business_name: 'Prompt Injection Audit Ltd' });
+    expect(cls(ok(read('synthetic-business-segment.html')))).toMatchObject({ site_state: 'in_use', business_use: 'business_name', business_name: 'Prompt Injection Audit' });
+    for (const t of ['Prompt Injection Audit, LLC', 'Prompt Injection Audit GmbH', 'Prompt Injection Audit Pty Ltd', 'Welcome to Prompt Injection Audit Inc.']) {
+      const html = `<html><head><title>${t}</title></head><body>${'We test your systems every quarter and write it down. '.repeat(10)}</body></html>`;
+      expect(cls(ok(html)), t).toMatchObject({ business_use: 'business_name' });
+    }
+    const other = '<html><head><title>Prompt Injection Audit Services Group</title></head><body>' + 'We test your systems every quarter and write it down. '.repeat(10) + '</body></html>';
+    expect(cls(ok(other)).business_use).not.toBe('business_name');
+  });
+  it('a thin page whose own name is our name is still an operator', () => {
+    expect(cls(ok('<html><head><title>Prompt Injection Audit</title></head><body><p>Coming soon.</p></body></html>')).site_state).toBe('parked_or_for_sale'); // parked signature wins on a thin page
+    expect(cls(ok('<html><head><title>Prompt Injection Audit</title></head><body><p>Hello.</p></body></html>'))).toMatchObject({ site_state: 'in_use', business_use: 'business_name' });
+  });
+  it('a thin page drawn by scripts is unknown CLIENT_RENDERED, not "no site"', () => {
+    expect(cls(ok(read('synthetic-client-rendered.html')))).toMatchObject({ site_state: 'unknown', business_use: null, reason_code: 'CLIENT_RENDERED' });
+    expect(cls(ok(read('synthetic-thin.html')))).toMatchObject({ site_state: 'registered_no_site' }); // no script: truly empty
+  });
+  it('parked / for-sale signatures count only on a page of at most parked_max_text_chars', () => {
+    const page = ok(read('synthetic-long-marketplace.html'));
+    const textLen = 1000;
+    expect(textLen).toBeLessThan(S.parked_max_text_chars);
+    expect(cls(page).site_state).toBe('parked_or_for_sale'); // within the cap
+    expect(classifySite(page, 'promptinjectionaudit.net', 'promptinjectionaudit.com', P, lists, { ...S, parked_max_text_chars: 300 })).toMatchObject({ site_state: 'in_use', business_use: 'none' });
+  });
+});
+
 describe('phraseUse', () => {
   it('service_description: the phrase in running lowercase text', () => {
     expect(phraseUse('We run a prompt injection audit of your LLM app every quarter.', P, S.product_markers)).toBe('service_description');
@@ -93,6 +121,17 @@ describe('robotsAllows', () => {
     expect(robotsAllows('User-agent: *\nDisallow: /\nAllow: /public', UA, '/public/page')).toBe(true);
     expect(robotsAllows('User-agent: *\nDisallow: /private\nAllow: /private', UA, '/private')).toBe(true);
     expect(robotsAllows('User-agent: *\nDisallow: /private', UA, '/')).toBe(true);
+  });
+  it('the group is matched by the exact product token, never a substring (RFC 9309)', () => {
+    expect(robotsAllows('User-agent: ai\nDisallow: /', UA, '/')).toBe(true);
+    expect(robotsAllows('User-agent: domain\nDisallow: /', UA, '/')).toBe(true);
+    expect(robotsAllows('User-agent: domain-trading-api-extra\nDisallow: /', UA, '/')).toBe(true);
+    expect(robotsAllows('User-agent: DOMAIN-TRADING-API\nDisallow: /', UA, '/')).toBe(false);
+  });
+  it('rules and path length are capped', () => {
+    const many = `User-agent: *\n${'Disallow: /a\n'.repeat(3000)}Disallow: /zzz\n`;
+    expect(robotsAllows(many, UA, '/zzz')).toBe(true); // rule 3,001 is never read
+    expect(robotsAllows('User-agent: *\nDisallow: /*b$', UA, '/' + 'a'.repeat(600) + 'b')).toBe(true); // the path is cut to 512 characters before matching
   });
   it('several user-agent lines share a group; comments, wildcards and $ work', () => {
     expect(robotsAllows('User-agent: a\nUser-agent: domain-trading-api # us\nDisallow: /x', UA, '/x/y')).toBe(false);

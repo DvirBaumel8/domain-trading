@@ -43,7 +43,7 @@ const Clause = z.union([z.object({ all: z.array(Cond).min(1) }).strict(), z.obje
 export const EU_TM_DEFAULT = { required_lanes: ['S6'] as Lane[], freshness_hours: 168 };
 export const SAME_NAME_DEFAULT = {
   min_visible_chars: 200, timeout_ms: 10_000, max_bytes: 512_000, max_redirects: 3, min_ms_between_fetches: 1000,
-  max_unknown_sites: 0, product_markers: ['\u2122', '\u00ae', '(tm)', '(r)'],
+  max_unknown_sites: 0, parked_max_text_chars: 1500, product_markers: ['\u2122', '\u00ae', '(tm)', '(r)'],
 };
 export const PACK_DEFAULT = {
   exclude_checks: ['census', 'ext_dates', 'namebio', 'leads', 'pack'] as CheckIdT[],
@@ -125,7 +125,7 @@ const Base = z.object({
   eu_tm: z.object({ required_lanes: z.array(z.enum(LANES)), freshness_hours: int }).strict().default(EU_TM_DEFAULT),
   same_name: z.object({
     min_visible_chars: int, timeout_ms: int.positive(), max_bytes: int.positive(), max_redirects: int, min_ms_between_fetches: int,
-    max_unknown_sites: int, product_markers: words,
+    max_unknown_sites: int, parked_max_text_chars: int, product_markers: words,
   }).strict().default(SAME_NAME_DEFAULT),
   pack: z.object({ exclude_checks: z.array(checkId), require_checks: z.array(checkId), availability_max_age_hours: int.positive() }).strict().default(PACK_DEFAULT),
   priors_v91: z.object({ p_passive: laneObj(share) }).strict(),

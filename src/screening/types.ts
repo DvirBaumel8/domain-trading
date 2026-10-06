@@ -89,6 +89,8 @@ export interface ScreeningDeps {
   resolveNs: (zone: string) => Promise<string[]>;
   /** IPv4 addresses of a host name (system resolver). */
   resolve4: (host: string) => Promise<string[]>;
+  /** All addresses of a host (system resolver), for the outbound site guard (`src/net/safe-fetch.ts`). Default: dns.lookup all:true. */
+  lookupHost?: (host: string) => Promise<{ address: string; family: number }[]>;
 }
 
 export interface CheckContext {

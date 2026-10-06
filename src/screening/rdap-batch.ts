@@ -13,13 +13,13 @@ export class Pacer {
   private active = 0;
   private waiting: (() => void)[] = [];
   private nextStart = 0;
-  constructor(private readonly minMsBetween: number, private readonly concurrency: number, private readonly sleep: (ms: number) => Promise<void>) {}
+  constructor(private readonly minMsBetween: number, private readonly concurrency: number, private readonly sleep: (ms: number) => Promise<void>, private readonly clock: () => number = Date.now) {}
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
     if (this.active >= this.concurrency) await new Promise<void>((r) => this.waiting.push(r));
     else this.active++;
     try {
-      const t = Date.now();
+      const t = this.clock();
       const start = Math.max(t, this.nextStart);
       this.nextStart = start + this.minMsBetween;
       if (start > t) await this.sleep(start - t);

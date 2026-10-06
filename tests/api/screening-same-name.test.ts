@@ -30,7 +30,7 @@ const unknownRdap = (): RdapLookup => ({ outcome: 'unknown', reasonCode: 'TIMEOU
 const fakeRdap = (table: Record<string, RdapLookup>, fallback: RdapLookup = notRegistered()): RdapLookupFn => async (domain) => table[domain] ?? fallback;
 
 const nxdomain = () => Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' }) });
-type Rule = 'nxdomain' | 'timeout' | 'timeout_page' | 'tls' | 'error' | 'serve';
+type Rule = 'nxdomain' | 'timeout' | 'timeout_page' | 'tls_refused' | 'tls' | 'error' | 'serve';
 interface SiteFetch { fn: typeof fetch; calls: string[]; events: string[] }
 /** Site hosts of our name: `serve` (MSW answers), or an error thrown like undici throws it. Every other site host is DNS NXDOMAIN. */
 function siteFetch(rules: Record<string, Rule>, events: string[] = []): SiteFetch {
@@ -46,6 +46,7 @@ function siteFetch(rules: Record<string, Rule>, events: string[] = []): SiteFetc
     if (rule === 'nxdomain') throw nxdomain();
     if (rule === 'timeout_page' && u.pathname === '/robots.txt') return globalThis.fetch(input, init);
     if (rule === 'timeout' || rule === 'timeout_page') throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    if (rule === 'tls_refused') throw u.protocol === 'https:' ? Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('certificate has expired'), { code: 'CERT_HAS_EXPIRED' }) }) : Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }) });
     if (rule === 'tls') throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('certificate has expired'), { code: 'CERT_HAS_EXPIRED' }) });
     throw new TypeError('fetch failed');
   }) as typeof fetch;
@@ -60,14 +61,14 @@ beforeEach(async () => {
   mswServer.use(http.get('https://data.iana.org/rdap/dns.json', () => respond(fixture('iana-dns.json'))));
 });
 
-async function run(o: { rdap?: RdapLookupFn; sites: SiteFetch; sleep?: (ms: number) => Promise<void>; names?: object[]; extra?: object; setup?: (h: Awaited<ReturnType<typeof screeningHarness>>) => Promise<void> }) {
-  const screening: Partial<ScreeningDeps> = { rdapLookup: o.rdap ?? fakeRdap({}), fetch: o.sites.fn, ...(o.sleep ? { sleep: o.sleep } : {}) };
+async function run(o: { lookup?: ScreeningDeps['lookupHost']; rdap?: RdapLookupFn; sites: SiteFetch; sleep?: (ms: number) => Promise<void>; names?: object[]; extra?: object; setup?: (h: Awaited<ReturnType<typeof screeningHarness>>) => Promise<void> }) {
+  const screening: Partial<ScreeningDeps> = { rdapLookup: o.rdap ?? fakeRdap({}), fetch: o.sites.fn, ...(o.lookup ? { lookupHost: o.lookup } : {}), ...(o.sleep ? { sleep: o.sleep } : {}) };
   const h = await screeningHarness({ screening });
   app = h.app;
   await o.setup?.(h);
   const { body } = await h.runDone({ mode: 'full', checks: ['form', 'same_name'], names: o.names ?? [{ domain: COM, lane: 'S3' }], ...o.extra });
   const n = body.names[0];
-  return { body, h, n, r: n.results.find((x: any) => x.check === 'same_name') };
+  return { body, h, n, id: (body.run_id ?? body.id) as string, r: n.results.find((x: any) => x.check === 'same_name') };
 }
 const ext = (r: any, tld: string) => r.fields.extensions.find((e: any) => e.tld === tld);
 
@@ -228,5 +229,103 @@ describe('same_name guards', () => {
     await run({ rdap: fakeRdap({ [`${SLD}.net`]: registered() }), sites: siteFetch({ [`${SLD}.net`]: 'serve' }) });
     expect(seen).toHaveLength(2);
     for (const s of seen) expect(s).toEqual({ ua: expect.stringMatching(/^domain-trading-api\/\S+ \(\+https:\/\/github\.com\//), cookie: null, auth: null });
+  });
+});
+
+describe('same_name outbound guard (fix round 1)', () => {
+  const org = `${SLD}.org`;
+  const metadataHits: string[] = [];
+  beforeEach(() => {
+    metadataHits.length = 0;
+    mswServer.use(http.all('http://169.254.169.254/*', ({ request }) => { metadataHits.push(request.url); return new HttpResponse('secret'); }));
+  });
+
+  it('a host that resolves to a private address is never contacted: unknown ADDRESS_BLOCKED -> FLAG SITE_UNKNOWN', async () => {
+    const sites = siteFetch({ [org]: 'serve' });
+    const { r } = await run({ rdap: fakeRdap({ [org]: registered() }), sites, lookup: async (h) => [{ address: h === org ? '10.0.0.7' : '93.184.216.34', family: 4 }] });
+    expect(r).toMatchObject({ status: 'FLAG', reason_code: 'SITE_UNKNOWN' });
+    expect(ext(r, 'org')).toMatchObject({ site_state: 'unknown', reason_code: 'ADDRESS_BLOCKED' });
+    expect(sites.calls.filter((u) => u.includes(org))).toEqual([]);
+  });
+
+  it('robots.txt redirecting to the cloud metadata address is not followed (unknown, never fetched)', async () => {
+    mswServer.use(http.get(`https://${org}/robots.txt`, () => new HttpResponse(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data/' } })));
+    const { r } = await run({ rdap: fakeRdap({ [org]: registered() }), sites: siteFetch({ [org]: 'serve' }) });
+    expect(r).toMatchObject({ status: 'FLAG', reason_code: 'SITE_UNKNOWN' });
+    expect(ext(r, 'org')).toMatchObject({ site_state: 'unknown', reason_code: 'SOURCE_ERROR' });
+    expect(metadataHits).toEqual([]);
+  });
+
+  it('a page redirecting to the metadata address or to port 6379 is recorded, not fetched', async () => {
+    mswServer.use(
+      robots404(`${SLD}.net`), http.get(`https://${SLD}.net/`, () => new HttpResponse(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/' } })),
+      robots404(org), http.get(`https://${org}/`, () => new HttpResponse(null, { status: 302, headers: { location: `https://${org}:6379/` } })),
+    );
+    const sites = siteFetch({ [`${SLD}.net`]: 'serve', [org]: 'serve' });
+    const { r } = await run({ rdap: fakeRdap({ [`${SLD}.net`]: registered(), [org]: registered() }), sites });
+    expect(ext(r, 'net')).toMatchObject({ site_state: 'redirect_off_domain', final_url: 'http://169.254.169.254/latest/' });
+    expect(ext(r, 'org')).toMatchObject({ site_state: 'unknown', reason_code: 'URL_NOT_ALLOWED' });
+    expect(metadataHits).toEqual([]);
+    expect(sites.calls.some((u) => u.includes('6379'))).toBe(false);
+  });
+
+  it('never_fetch_hosts (and their subdomains) are refused: unknown HOST_EXCLUDED, no request', async () => {
+    const sites = siteFetch({ [org]: 'serve' });
+    const { r } = await run({
+      rdap: fakeRdap({ [org]: registered() }), sites, extra: { settings: 'v1b' },
+      setup: async (h) => { expect((await h.post('/selection/settings', { label: 'v1b', set: { 'lead.verify.never_fetch_hosts': ['linkedin.com', org] } })).statusCode).toBe(201); },
+    });
+    expect(ext(r, 'org')).toMatchObject({ site_state: 'unknown', reason_code: 'HOST_EXCLUDED' });
+    expect(r).toMatchObject({ status: 'FLAG', reason_code: 'SITE_UNKNOWN' });
+    expect(sites.calls.filter((u) => u.includes(org))).toEqual([]);
+  });
+
+  it('TLS error with a refused http port is unknown TLS_ERROR (not "no site")', async () => {
+    mswServer.use(robots404(org));
+    const { r } = await run({ rdap: fakeRdap({ [org]: registered() }), sites: siteFetch({ [org]: 'tls_refused' }) });
+    expect(r).toMatchObject({ status: 'FLAG', reason_code: 'SITE_UNKNOWN' });
+    expect(ext(r, 'org')).toMatchObject({ site_state: 'unknown', reason_code: 'TLS_ERROR' });
+  });
+
+  it('a 200 PDF on the home page is unknown UNEXPECTED_CONTENT_TYPE; a thin scripted page is CLIENT_RENDERED', async () => {
+    mswServer.use(
+      robots404(org), http.get(`https://${org}/`, () => new HttpResponse('%PDF-1.4', { headers: { 'content-type': 'application/pdf' } })),
+      robots404(`${SLD}.net`), http.get(`https://${SLD}.net/`, () => html(page('synthetic-client-rendered.html'))),
+    );
+    const { r } = await run({ rdap: fakeRdap({ [org]: registered(), [`${SLD}.net`]: registered() }), sites: siteFetch({ [org]: 'serve', [`${SLD}.net`]: 'serve' }) });
+    expect(ext(r, 'org')).toMatchObject({ site_state: 'unknown', reason_code: 'UNEXPECTED_CONTENT_TYPE' });
+    expect(ext(r, 'net')).toMatchObject({ site_state: 'unknown', reason_code: 'CLIENT_RENDERED' });
+    expect(r.reason_code).toBe('SITE_UNKNOWN');
+  });
+
+  it('legal-suffix and segment names are operators end to end; upstream_calls counts robots.txt and page requests', async () => {
+    mswServer.use(robots404(`${SLD}.net`), http.get(`https://${SLD}.net/`, () => html(page('synthetic-business-ltd.html'))));
+    const { r, id } = await run({ rdap: fakeRdap({ [`${SLD}.net`]: registered() }), sites: siteFetch({ [`${SLD}.net`]: 'serve' }) });
+    expect(r).toMatchObject({ status: 'FLAG', reason_code: 'SAME_NAME_OPERATOR', fields: { same_name_operators: [{ business_name: 'Prompt Injection Audit Ltd', business_use: 'business_name' }] } });
+    const row = await db.selectFrom('screening_results').select('upstream_calls').where('run_id', '=', id).where('check_id', '=', 'same_name').executeTakeFirstOrThrow();
+    // 7 extensions: 6 RDAP lookups (all but .co/.io/.us have a base: net org ai info = 4), plus robots.txt + page for .net and a page per other host
+    expect(row.upstream_calls).toBeGreaterThanOrEqual(2 + 4);
+  });
+});
+
+describe('ext_dates is unchanged by the extRegistration refactor', () => {
+  it('keeps its row shape, counting and statuses', async () => {
+    const NET = 'netextend';
+    const sites = siteFetch({});
+    const rdap = fakeRdap({
+      [`${NET}.com`]: { ...registered(), facts: { ...facts, created_at: '2023-05-01T00:00:00Z' } },
+      [`${NET}.net`]: { ...registered(), facts: { ...facts, created_at: '2015-02-02T00:00:00Z' } },
+      [`${NET}.ai`]: unknownRdap(),
+    });
+    const h = await screeningHarness({ screening: { rdapLookup: rdap, fetch: sites.fn } });
+    app = h.app;
+    const { body } = await h.runDone({ mode: 'full', checks: ['availability', 'ext_dates'], names: [{ domain: `${NET}.com`, lane: 'S3' }] });
+    const r = body.names[0].results.find((x: any) => x.check === 'ext_dates');
+    expect(r).toMatchObject({ status: 'PASS', gate: 'G8', fields: { alt_tld_before_n: 1, n_unknown_ext: 4, comparison_basis: 'com_created_at' } });
+    const byTld = (t: string) => r.fields.extensions.find((e: any) => e.tld === t);
+    expect(byTld('net')).toEqual({ tld: 'net', status: 'registered', created_at: '2015-02-02T00:00:00Z', counted: true });
+    expect(byTld('org')).toEqual({ tld: 'org', status: 'not_registered', created_at: null });
+    expect(byTld('ai')).toEqual({ tld: 'ai', status: 'unknown', created_at: null, reason_code: 'TIMEOUT' });
+    expect(byTld('co')).toEqual({ tld: 'co', status: 'unknown', created_at: null, reason_code: 'NO_REGISTRY_SERVICE' });
   });
 });

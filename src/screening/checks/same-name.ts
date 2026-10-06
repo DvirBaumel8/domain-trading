@@ -26,7 +26,7 @@ interface ExtensionRow {
 function sharedPacer(ctx: CheckContext): Pacer {
   const hit = ctx.shared.get('site_pacer') as Pacer | undefined;
   if (hit) return hit;
-  const p = new Pacer(ctx.settings.same_name.min_ms_between_fetches, 1, ctx.deps.sleep);
+  const p = new Pacer(ctx.settings.same_name.min_ms_between_fetches, 1, ctx.deps.sleep, ctx.now);
   ctx.shared.set('site_pacer', p);
   return p;
 }
@@ -82,8 +82,7 @@ export const sameNameCheck: Check = {
         continue;
       }
       const host = `${sld}.${tld}`;
-      const page = await fetchPage(ctx.deps, `https://${host}/`, { timeoutMs: s.timeout_ms, maxBytes: s.max_bytes, maxRedirects: s.max_redirects, pace, robots });
-      calls++;
+      const page = await fetchPage(ctx.deps, `https://${host}/`, { timeoutMs: s.timeout_ms, maxBytes: s.max_bytes, maxRedirects: s.max_redirects, pace, robots, neverFetchHosts: ctx.settings.lead.verify.never_fetch_hosts, deadline: ctx.deadline, now: ctx.now, onRequest: () => { calls++; } });
       const c = classifySite(page, host, ctx.item.domain, phraseTokens, lists, s);
       let evidenceId: number | null = null;
       if (page.ok && page.html !== '') {

@@ -97,6 +97,7 @@ Every place where the specs DOM inherited (`docs/internal/*`, which still descri
 | G-70 | CAP-12 `ext.variants` (`get<sld>.com` and similar) and `competing_forsale_n` are not built | **Open (P2)** | DOM |
 | G-71 | The business-use rule (`business_name` / `service_description` / `product_name` / `none`) is deterministic and conservative: it reads text, not meaning (a Title Case service heading reads as product-style; non-English pages are not understood). Any 401/403 page is UNKNOWN, not "no site" (a bot wall can hide an operator) | **Accepted** | DOM |
 | G-72 | An unreadable same-name site is a FLAG (`SITE_UNKNOWN`) for a bot verdict, not UNKNOWN, so a human can resolve it through the verdict route | **Accepted** | DOM |
+| G-73 | `undici` (8.x, Node >= 22.19) is now a direct dependency for the vetted-IP Agent of the outbound guard; `package.json` `engines` still says `>=22` | **Accepted**; raise `engines` with the next release | DOM |
 
 ## Removed by Dvir's 6 Oct decisions (no gap; listed for completeness)
 `POST /offers/import`, `offer_imports`, `offers.import_id`; the `payouts` table, `POST /payouts/{id}/received`, the `/sold` `payout` object, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE`, `payouts_pending` (tests PO-1–PO-5, S-13–S-15, OF-13, OF-15 deleted); `changed_only` and per-file export records; `JOBS_MODE` and in-process timers.
