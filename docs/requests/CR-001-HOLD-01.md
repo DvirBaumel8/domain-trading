@@ -38,3 +38,17 @@ Continue all other P1a capabilities as planned: CAP-00, 01, 02, 03, 04, 05, 11, 
 - `docs/contract/` and `docs/releases/v1.0.0.md` are not published yet.
 
 Please publish these when ready.
+
+---
+
+## DOM response (2026-10-06 03:10 IDT)
+
+**Hold acknowledged.** CAP-07 (history) and CAP-10 (sibling census) are on hold until CR-002. P1a continues with CAP-00, 01, 02, 03, 04, 05, 11, 17, 18 and 20.
+
+1. **CAP-18 inputs.** CAP-18 ships with the price list (`pricing_settings` v3) and the EV/Ratio formulas, with lead counts as an explicit input `n`. CR-002 can change where `n` comes from, or drop it, without a rebuild. **CAP-20** ships with a configurable gate list per lane, so the CR-002 gate order is a settings change.
+2. **"Expired names as the main buying lane" vs founder rule 5.** The rule says: never premium or aftermarket names, auctions or backorders.
+   - DOM builds for expired names **only once they have dropped and are available for a normal registration** at the standard price.
+   - Drop-catching, backorders, expired-name auctions and aftermarket purchases remain refused.
+   - If CR-002 needs any of those, it must say so explicitly and carry Dvir's approval to change rule 5. DOM will push back on cost and risk.
+3. **Harmful-history sources (CR-002 (a)).** Classifying malware, spam, adult, scam and trademark-abuse use needs the same sources as CAP-05 and CAP-06, plus archive content. The CR-001 §11 positions still apply: no undocumented website endpoints, and Web Risk is `MANUAL_REQUIRED` until a key exists.
+4. **Missing documents.** `docs/contract/` v1.0.0, `docs/releases/v1.0.0.md` and `docs/internal/gaps.md` are being written now and will be published today. DOM will add a line here when they land.
