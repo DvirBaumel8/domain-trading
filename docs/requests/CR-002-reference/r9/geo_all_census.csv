@@ -1,0 +1,238 @@
+domain,label,price,sale_date,city,gwords,chars,used_before,slice,G0_1w_le16,G20_1w_le20,G24_1w_le24,G2W_le16,G2W_le20,G2W_le24,G2W_any,created,gshare
+saltlakecitycleaningservices.com,sold,395.0,2026-04-11,saltlakecity,cleaning services,28,0,test,False,False,False,False,False,False,True,,0.5
+lasvegasbarber.com,sold,599.0,2025-04-12,lasvegas,barber,14,0,pick,True,True,True,True,True,True,True,,0.9
+maidslosangeles.com,sold,150.0,2026-04-16,losangeles,maids,15,0,test,True,True,True,True,True,True,True,,0.55
+autobuffalo.com,sold,280.0,2026-04-22,buffalo,auto,11,0,test,True,True,True,True,True,True,True,,0.65
+columbusbarber.com,sold,100.0,2024-04-26,columbus,barber,14,0,pick,True,True,True,True,True,True,True,,0.95
+chicagokitchenremodelers.com,sold,100.0,2024-04-28,chicago,kitchen remodelers,24,0,pick,False,False,False,False,False,True,True,,0.1
+minneapolisautodetailing.com,sold,100.0,2025-08-18,minneapolis,auto detailing,24,0,test,False,False,False,False,False,True,True,,0.35
+limoservicemilwaukee.com,sold,299.0,2024-08-02,milwaukee,limo service,20,0,pick,False,False,False,False,True,True,True,,0.4
+nyclawexperts.com,sold,249.0,2025-12-09,nyc,law experts,13,0,test,False,False,False,True,True,True,True,,0.05
+montgomerypressurewashing.com,sold,100.0,2025-12-13,montgomery,pressurewashing,25,0,test,False,False,False,False,False,False,True,,0.85
+austincriminallawattorney.com,sold,100.0,2024-12-12,austin,criminal law attorney,25,0,pick,False,False,False,False,False,False,False,,0.05
+chicagoupholstery.com,sold,1595.0,2025-12-21,chicago,upholstery,17,0,test,False,True,True,False,True,True,True,,0.9
+landscapingservicesjacksonville.com,sold,130.0,2025-12-28,jacksonville,landscaping services,31,0,test,False,False,False,False,False,False,True,,0.15
+propertymanagementmiamibeach.com,sold,150.0,2025-02-06,miamibeach,propertymanagement,28,0,pick,False,False,False,False,False,False,True,,0.55
+nashvilleinsurancegroup.com,sold,799.0,2025-02-14,nashville,insurance group,23,0,pick,False,False,False,False,False,True,True,,0.2
+riversidelawncare.com,sold,449.0,2026-01-30,riverside,lawncare,17,0,test,False,True,True,False,True,True,True,,0.9
+atlantataxservice.com,sold,100.0,2026-01-27,atlanta,tax service,17,0,test,False,False,False,False,True,True,True,,0.35
+dallaspestremoval.com,sold,176.0,2026-02-22,dallas,pest removal,17,0,test,False,False,False,False,True,True,True,,0.1
+naplesgaragedoorrepair.com,sold,150.0,2026-02-19,naples,garagedoor repair,22,0,test,False,False,False,False,False,True,True,,0.6
+nychomecleaners.com,sold,125.0,2026-01-25,nyc,home cleaners,15,0,test,False,False,False,True,True,True,True,,0.1
+lexingtonpaving.com,sold,111.0,2026-01-25,lexington,paving,15,0,test,True,True,True,True,True,True,True,,1.0
+housecleaningfortworth.com,sold,130.0,2026-01-02,fortworth,house cleaning,22,0,test,False,False,False,False,False,True,True,,0.2
+albanyhandyman.com,sold,295.0,2024-01-04,albany,handyman,14,0,pick,True,True,True,True,True,True,True,,0.95
+denvertowingservice.com,sold,200.0,2024-01-01,denver,towing service,19,0,pick,False,False,False,False,True,True,True,,0.35
+sacramentotowingservices.com,sold,365.0,2025-07-11,sacramento,towing services,24,0,test,False,False,False,False,False,True,True,,0.35
+realestateattorneyhouston.com,sold,295.0,2026-07-14,houston,realestate attorney,25,0,test,False,False,False,False,False,False,True,,0.05
+clevelandroofingcontractors.com,sold,350.0,2025-07-15,cleveland,roofing contractors,27,0,test,False,False,False,False,False,False,True,,0.35
+garagedoorrepairraleigh.com,sold,250.0,2025-07-14,raleigh,garagedoor repair,23,0,test,False,False,False,False,False,True,True,,0.5
+bronxcriminallawyers.com,sold,1988.0,2026-07-03,bronx,criminal lawyers,20,1,pick,False,False,False,False,True,True,True,,0.3
+minneapolisroofrepair.com,sold,100.0,2026-07-01,minneapolis,roofrepair,21,0,test,False,False,True,False,False,True,True,,1.0
+carpetcleaningnashville.com,sold,200.0,2025-06-30,nashville,carpet cleaning,23,0,pick,False,False,False,False,False,True,True,,0.5
+anaheimchiropractors.com,sold,200.0,2024-07-07,anaheim,chiropractors,20,0,pick,False,True,True,False,True,True,True,,0.8
+treeservicehonolulu.com,sold,300.0,2026-05-26,honolulu,treeservice,19,0,test,False,True,True,False,True,True,True,,0.65
+santaclaritahandyman.com,sold,110.0,2024-06-03,santaclarita,handyman,20,0,pick,False,True,True,False,True,True,True,,0.8
+naplescooling.com,sold,915.0,2025-06-19,naples,cooling,13,0,pick,True,True,True,True,True,True,True,,0.75
+roofersandiego.com,sold,899.0,2025-06-19,sandiego,roofer,14,0,pick,True,True,True,True,True,True,True,,0.8
+minneapolisinsurance.com,sold,4999.0,2026-06-23,minneapolis,insurance,20,0,test,False,True,True,False,True,True,True,,0.9
+atlantahvac.com,sold,1850.0,2025-06-28,atlanta,hvac,11,0,pick,True,True,True,True,True,True,True,,1.0
+manhattancriminaldefense.com,sold,199.0,2026-06-04,manhattan,criminal defense,24,0,test,False,False,False,False,False,True,True,,0.45
+limousineservicesaustin.com,sold,100.0,2026-06-03,austin,limousine services,23,0,test,False,False,False,False,False,True,True,,0.15
+tampahandymanservices.com,sold,100.0,2026-06-03,tampa,handyman services,21,0,test,False,False,False,False,False,True,True,,0.45
+houstonelectricalcontractors.com,sold,450.0,2026-03-10,houston,electrical contractors,28,0,test,False,False,False,False,False,False,True,,0.2
+therapyrochester.com,sold,388.0,2026-03-11,rochester,therapy,16,0,test,True,True,True,True,True,True,True,,0.45
+durhamphotographer.com,sold,199.0,2025-03-17,durham,photographer,18,0,pick,False,True,True,False,True,True,True,,0.8
+philadelphianotaryservices.com,sold,100.0,2025-05-09,philadelphia,notary services,26,0,pick,False,False,False,False,False,False,True,,0.1
+sewercleaningdenver.com,sold,375.0,2024-05-17,denver,sewer cleaning,19,0,pick,False,False,False,False,True,True,True,,0.05
+bostonorthodontist.com,sold,2200.0,2024-05-26,boston,orthodontist,18,0,pick,False,True,True,False,True,True,True,,0.85
+hoteldetroit.com,sold,1000.0,2026-05-02,detroit,hotel,12,0,test,True,True,True,True,True,True,True,,0.65
+chicagocleaningservices.com,sold,599.0,2026-04-29,chicago,cleaning services,23,0,test,False,False,False,False,False,True,True,,0.65
+autorepairglendale.com,sold,300.0,2026-05-01,glendale,autorepair,18,0,test,False,True,True,False,True,True,True,,0.55
+landscapinglincoln.com,sold,195.0,2026-05-01,lincoln,landscaping,18,0,test,False,True,True,False,True,True,True,,0.75
+flooringcompanychicago.com,sold,100.0,2025-11-08,chicago,flooring company,22,0,test,False,False,False,False,False,True,True,,0.05
+atlantahomecleaners.com,sold,200.0,2024-11-09,atlanta,home cleaners,19,0,pick,False,False,False,False,True,True,True,,0.05
+bostonwindowcleaners.com,sold,450.0,2025-10-31,boston,window cleaners,20,0,test,False,False,False,False,True,True,True,,0.25
+securityhollywood.com,sold,300.0,2024-11-02,hollywood,security,17,0,pick,False,True,True,False,True,True,True,,0.4
+denverhandymanservice.com,sold,100.0,2024-10-13,denver,handyman service,21,0,pick,False,False,False,False,False,True,True,,0.4
+nashvillehomerenovation.com,sold,500.0,2024-10-16,nashville,home renovation,23,0,pick,False,False,False,False,False,True,True,,0.1
+stpetersburgroofingcompany.com,sold,375.0,2025-10-04,stpetersburg,roofing company,26,0,test,False,False,False,False,False,False,True,,0.55
+roofingaustin.com,sold,1988.0,2024-10-03,austin,roofing,13,0,pick,True,True,True,True,True,True,True,,1.0
+kitchenremodelingseattle.com,sold,275.0,2025-08-26,seattle,kitchen remodeling,24,0,test,False,False,False,False,False,True,True,,0.2
+limoserviceminneapolis.com,sold,100.0,2024-09-12,minneapolis,limo service,22,0,pick,False,False,False,False,False,True,True,,0.1
+mobileautosolutions.com,sold,999.0,2025-09-17,mobile,auto solutions,19,0,test,False,False,False,False,True,True,True,,0.0
+nashvilleorthodontist.com,sold,2000.0,2024-09-28,nashville,orthodontist,21,0,pick,False,False,True,False,False,True,True,,0.95
+austinhandymanservices.com,sold,200.0,2024-09-03,austin,handyman services,22,0,pick,False,False,False,False,False,True,True,,0.4
+indianapolisroofingcontractors.com,sold,150.0,2024-09-04,indianapolis,roofing contractors,30,0,pick,False,False,False,False,False,False,True,,0.45
+spokanecountertops.com,sold,375.0,2026-08-07,spokane,countertops,18,1,pick,False,True,True,False,True,True,True,,0.75
+limoservicephiladelphia.com,sold,295.0,2026-08-06,philadelphia,limo service,23,1,pick,False,False,False,False,False,True,True,,0.2
+bathroomremodelingomaha.com,sold,499.0,2026-08-20,omaha,bathroom remodeling,23,1,pick,False,False,False,False,False,True,True,,0.25
+sacramentoconcretecontractor.com,sold,250.0,2026-08-17,sacramento,concrete contractor,28,1,pick,False,False,False,False,False,False,True,,0.3
+philadelphiamaids.com,sold,475.0,2026-09-12,philadelphia,maids,17,1,pick,False,True,True,False,True,True,True,,0.9
+chattanoogacleaningservices.com,sold,395.0,2026-09-15,chattanooga,cleaning services,27,1,pick,False,False,False,False,False,False,True,,0.45
+maidservicesseattle.com,sold,195.0,2026-09-15,seattle,maid services,19,1,pick,False,False,False,False,True,True,True,,0.05
+poolchicago.com,sold,100.0,2026-09-21,chicago,pool,11,1,pick,True,True,True,True,True,True,True,,0.5
+phoenixcleaningservices.com,sold,1295.0,2026-09-03,phoenix,cleaning services,23,1,pick,False,False,False,False,False,True,True,,0.65
+losangelesroofers.com,sold,400.0,2026-08-31,losangeles,roofers,17,1,pick,False,True,True,False,True,True,True,,1.0
+pittsburghwindowcleaner.com,dropped,,,pittsburgh,window cleaner,23,0,pick,False,False,False,False,False,True,True,2025-07-21,0.2
+tampaepoxyfloor.com,dropped,,,tampa,epoxy floor,15,0,test,False,False,False,True,True,True,True,2025-07-22,0.15
+bakersfieldhomehub.com,dropped,,,bakersfield,home hub,18,0,pick,False,False,False,False,True,True,True,2025-07-20,0.15
+treeremovalkansascity.com,dropped,,,kansascity,tree removal,21,0,test,False,False,False,False,False,True,True,2022-07-19,0.4
+signsorangecounty.com,dropped,,,orangecounty,signs,17,0,pick,False,True,True,False,True,True,True,2025-07-24,0.4
+phoenixguttercleaners.com,dropped,,,phoenix,gutter cleaners,21,0,test,False,False,False,False,False,True,True,2025-07-21,0.1
+garagedoorrepairwichita.com,dropped,,,wichita,garagedoor repair,23,0,pick,False,False,False,False,False,True,True,2025-07-20,0.45
+itwestchester.com,dropped,,,westchester,it,13,0,test,True,True,True,True,True,True,True,2025-07-21,0.45
+morenovalleyroofingcompany.com,dropped,,,morenovalley,roofing company,26,0,pick,False,False,False,False,False,False,True,2025-07-17,0.5
+memphistechrentals.com,dropped,,,memphis,tech rentals,18,0,test,False,False,False,False,True,True,True,2021-07-22,0.0
+spokanepainterpros.com,dropped,,,spokane,painter pros,18,0,pick,False,False,False,False,True,True,True,2023-07-21,0.05
+garlandpestcontrolexpertsco.com,dropped,,,garland,pestcontrol experts co,27,0,test,False,False,False,False,False,False,False,2025-07-20,0.0
+mesadaycare.com,dropped,,,mesa,daycare,11,0,pick,True,True,True,True,True,True,True,2025-07-21,0.9
+salemplumbingpros.com,dropped,,,salem,plumbing pros,17,0,test,False,False,False,False,True,True,True,2025-07-19,0.5
+tampaguttercontractors.com,dropped,,,tampa,gutter contractors,22,0,pick,False,False,False,False,False,True,True,2025-07-22,0.05
+charlottephysicaltherapy.com,dropped,,,charlotte,physicaltherapy,24,0,test,False,False,True,False,False,True,True,2025-07-17,0.9
+autoinjuryamarillo.com,dropped,,,amarillo,auto injury,18,0,pick,False,False,False,False,True,True,True,2025-07-22,0.0
+tampamovingservices.com,dropped,,,tampa,moving services,19,0,test,False,False,False,False,True,True,True,2025-07-23,0.25
+sandiegoguttercleaners.com,dropped,,,sandiego,gutter cleaners,22,0,pick,False,False,False,False,False,True,True,2025-07-21,0.05
+omahalawgroup.com,dropped,,,omaha,law group,13,0,test,False,False,False,True,True,True,True,2025-07-21,0.4
+concretecontractorskansascity.com,dropped,,,kansascity,concrete contractors,29,0,pick,False,False,False,False,False,False,True,2025-07-18,0.3
+proheatingairconditioningglendale.com,dropped,,,glendale,pro heating airconditioning,33,0,test,False,False,False,False,False,False,False,2025-07-20,0.0
+bayarearemodelers.com,dropped,,,bayarea,remodelers,17,0,pick,False,True,True,False,True,True,True,2025-07-20,0.6
+santaclaritacontractor.com,dropped,,,santaclarita,contractor,22,0,test,False,False,True,False,False,True,True,2023-07-20,0.9
+housepaintinglosangeles.com,dropped,,,losangeles,house painting,23,0,pick,False,False,False,False,False,True,True,2025-07-22,0.1
+kansascitypaintingsolutions.com,dropped,,,kansascity,painting solutions,27,0,test,False,False,False,False,False,False,True,2021-07-24,0.0
+sidingcontractorsatlanta.com,dropped,,,atlanta,siding contractors,24,0,pick,False,False,False,False,False,True,True,2025-07-19,0.15
+desmoinescoffee.com,dropped,,,desmoines,coffee,15,0,test,True,True,True,True,True,True,True,2025-07-21,0.7
+lubbockwindowrepair.com,dropped,,,lubbock,window repair,19,0,pick,False,False,False,False,True,True,True,2022-07-22,0.2
+detroitguttercleaners.com,dropped,,,detroit,gutter cleaners,21,0,test,False,False,False,False,False,True,True,2025-07-21,0.05
+atlantatechrentals.com,dropped,,,atlanta,tech rentals,18,0,pick,False,False,False,False,True,True,True,2021-07-22,0.0
+chandlerchimney.com,dropped,,,chandler,chimney,15,0,test,True,True,True,True,True,True,True,2025-07-23,0.8
+stpaulrealtor.com,dropped,,,stpaul,realtor,13,0,pick,True,True,True,True,True,True,True,2025-07-24,0.9
+criminaldefenseattorneysphoenix.com,dropped,,,phoenix,criminal defense attorneys,31,0,test,False,False,False,False,False,False,False,2025-07-22,0.05
+concretecompanysanantonio.com,dropped,,,sanantonio,concrete company,25,0,pick,False,False,False,False,False,False,True,2025-07-20,0.05
+sanfranciscodentalspa.com,dropped,,,sanfrancisco,dental spa,21,0,test,False,False,False,False,False,True,True,2025-07-24,0.15
+cincinnatirealtyservices.com,dropped,,,cincinnati,realty services,24,0,pick,False,False,False,False,False,True,True,2025-07-18,0.2
+floorsbakersfield.com,dropped,,,bakersfield,floors,17,0,test,False,True,True,False,True,True,True,2025-07-21,0.2
+fencinghonolulu.com,dropped,,,honolulu,fencing,15,0,pick,True,True,True,True,True,True,True,2025-07-21,0.6
+lasvegasdentalclinic.com,dropped,,,lasvegas,dental clinic,20,0,test,False,False,False,False,True,True,True,2025-07-20,0.3
+newyorkelectricalservices.com,dropped,,,newyork,electrical services,25,0,pick,False,False,False,False,False,False,True,2025-07-22,0.4
+cleaningserviceswichita.com,dropped,,,wichita,cleaning services,23,0,test,False,False,False,False,False,True,True,2025-07-19,0.4
+worcestertherapy.com,dropped,,,worcester,therapy,16,0,pick,True,True,True,True,True,True,True,2025-07-23,0.85
+homerenovationshouston.com,dropped,,,houston,home renovations,22,0,test,False,False,False,False,False,True,True,2025-07-17,0.05
+bookkeepingchicago.com,dropped,,,chicago,bookkeeping,18,0,pick,False,True,True,False,True,True,True,2021-07-21,0.7
+newyorkkitchenservices.com,dropped,,,newyork,kitchen services,22,0,test,False,False,False,False,False,True,True,2021-07-20,0.15
+masonrycontractoraustin.com,dropped,,,austin,masonry contractor,23,0,pick,False,False,False,False,False,True,True,2025-07-21,0.0
+tamparealtyonline.com,dropped,,,tampa,realty online,17,0,test,False,False,False,False,True,True,True,2023-07-31,0.1
+criminaldefenselawyerphiladelphia.com,dropped,,,philadelphia,criminal defense lawyer,33,0,pick,False,False,False,False,False,False,False,2025-07-20,0.3
+rockfordbankruptcylawyer.com,dropped,,,rockford,bankruptcy lawyer,24,0,test,False,False,False,False,False,True,True,2025-07-21,0.45
+newarkpestexterminators.com,dropped,,,newark,pest exterminators,23,0,pick,False,False,False,False,False,True,True,2025-07-21,0.0
+oaklandmedspa.com,dropped,,,oakland,medspa,13,0,test,True,True,True,True,True,True,True,2025-07-21,0.9
+chesapeakebuilder.com,dropped,,,chesapeake,builder,17,0,pick,False,True,True,False,True,True,True,2025-07-23,0.75
+raleighautoaccidentattorney.com,dropped,,,raleigh,auto accident attorney,27,0,test,False,False,False,False,False,False,False,2025-07-18,0.15
+charlotteguttercleaners.com,dropped,,,charlotte,gutter cleaners,23,0,pick,False,False,False,False,False,True,True,2025-07-21,0.2
+atlantaroofingservice.com,dropped,,,atlanta,roofing service,21,0,test,False,False,False,False,False,True,True,2025-07-20,0.35
+divorceshreveport.com,dropped,,,shreveport,divorce,17,0,pick,False,True,True,False,True,True,True,2025-07-20,0.45
+oxnardpizza.com,dropped,,,oxnard,pizza,11,0,test,True,True,True,True,True,True,True,2024-07-22,0.85
+garagedoorlansing.com,dropped,,,lansing,garagedoor,17,0,pick,False,True,True,False,True,True,True,2023-07-30,0.5
+bookkeepingserviceslasvegas.com,dropped,,,lasvegas,bookkeeping services,27,0,test,False,False,False,False,False,False,True,2025-07-22,0.2
+memphisguttercleaners.com,dropped,,,memphis,gutter cleaners,21,0,pick,False,False,False,False,False,True,True,2025-07-21,0.05
+phoenixroofchimney.com,dropped,,,phoenix,roof chimney,18,0,test,False,False,False,False,True,True,True,2025-07-23,0.0
+flooringpasadena.com,dropped,,,pasadena,flooring,16,0,pick,True,True,True,True,True,True,True,2025-07-20,0.4
+springfielddemolitioncompany.com,dropped,,,springfield,demolition company,28,0,test,False,False,False,False,False,False,True,2023-07-21,0.2
+treeremovalsantafe.com,dropped,,,santafe,tree removal,18,0,pick,False,False,False,False,True,True,True,2022-07-19,0.45
+notaryraleigh.com,dropped,,,raleigh,notary,13,0,test,True,True,True,True,True,True,True,2025-07-22,0.7
+washingtonkitchenservices.com,dropped,,,washington,kitchen services,25,0,pick,False,False,False,False,False,False,True,2021-07-20,0.1
+austinhvaccompany.com,dropped,,,austin,hvac company,17,0,test,False,False,False,False,True,True,True,2025-07-20,0.1
+irvingbuilder.com,dropped,,,irving,builder,13,0,pick,True,True,True,True,True,True,True,2025-07-23,0.85
+chulavistacoffee.com,dropped,,,chulavista,coffee,16,0,test,True,True,True,True,True,True,True,2025-07-21,0.8
+vetcolumbus.com,dropped,,,columbus,vet,11,0,pick,True,True,True,True,True,True,True,2025-07-20,0.45
+losangelesroofingscompany.com,dropped,,,losangeles,roofings company,25,0,test,False,False,False,False,False,False,True,2025-07-19,0.05
+glendalebuilder.com,dropped,,,glendale,builder,15,0,pick,True,True,True,True,True,True,True,2025-07-23,0.8
+homecleaningservicesminneapolis.com,dropped,,,minneapolis,home cleaning services,31,0,test,False,False,False,False,False,False,False,2025-07-23,0.0
+paintingcontractorlosangeles.com,dropped,,,losangeles,painting contractor,28,0,pick,False,False,False,False,False,False,True,2024-07-19,0.0
+santaclaritaconstruction.com,dropped,,,santaclarita,construction,24,0,test,False,False,True,False,False,True,True,2025-07-23,0.9
+renovationsphiladelphia.com,dropped,,,philadelphia,renovations,23,0,pick,False,False,True,False,False,True,True,2024-07-22,0.35
+sacramentocoffee.com,dropped,,,sacramento,coffee,16,0,test,True,True,True,True,True,True,True,2025-07-21,0.95
+newhavenrestaurant.com,dropped,,,newhaven,restaurant,18,0,pick,False,True,True,False,True,True,True,2025-07-24,0.75
+pittsburghroofingpros.com,dropped,,,pittsburgh,roofing pros,21,0,test,False,False,False,False,False,True,True,2025-07-22,0.3
+sacramentoguttercleaners.com,dropped,,,sacramento,gutter cleaners,24,0,pick,False,False,False,False,False,True,True,2025-07-21,0.1
+laredomarketing.com,dropped,,,laredo,marketing,15,0,test,True,True,True,True,True,True,True,2025-09-01,0.65
+miamiguttercleaners.com,dropped,,,miami,gutter cleaners,19,0,pick,False,False,False,False,True,True,True,2025-07-21,0.1
+bathroomremodelerraleigh.com,dropped,,,raleigh,bathroom remodeler,24,0,test,False,False,False,False,False,True,True,2025-07-28,0.1
+miamihousesolutions.com,dropped,,,miami,house solutions,19,0,pick,False,False,False,False,True,True,True,2024-07-19,0.15
+windowcleaningbaltimore.com,dropped,,,baltimore,window cleaning,23,0,test,False,False,False,False,False,True,True,2025-07-23,0.35
+tulsaguttercleaners.com,dropped,,,tulsa,gutter cleaners,19,0,pick,False,False,False,False,True,True,True,2025-07-21,0.1
+sandiegohvacservices.com,dropped,,,sandiego,hvac services,20,0,test,False,False,False,False,True,True,True,2025-07-19,0.35
+nashvillekitchenservices.com,dropped,,,nashville,kitchen services,24,0,pick,False,False,False,False,False,True,True,2021-07-20,0.2
+albanyrealtors.com,dropped,,,albany,realtors,14,0,test,True,True,True,True,True,True,True,2025-07-20,0.85
+yonkerstherapy.com,dropped,,,yonkers,therapy,14,0,pick,True,True,True,True,True,True,True,2025-07-23,0.85
+louisvillecriminallawyers.com,dropped,,,louisville,criminal lawyers,25,0,test,False,False,False,False,False,False,True,2025-07-22,0.35
+spokanepestcontrolexperts.com,dropped,,,spokane,pestcontrol experts,25,0,pick,False,False,False,False,False,False,True,2025-07-20,0.0
+acrepairhonolulu.com,dropped,,,honolulu,acrepair,16,0,test,True,True,True,True,True,True,True,2021-07-21,0.45
+atlantarealestatetours.com,dropped,,,atlanta,realestate tours,22,0,pick,False,False,False,False,False,True,True,2025-07-19,0.0
+autodetailingsanfrancisco.com,dropped,,,sanfrancisco,auto detailing,25,0,test,False,False,False,False,False,False,True,2024-07-19,0.2
+palmspringscleaningservice.com,dropped,,,palmsprings,cleaning service,26,0,pick,False,False,False,False,False,False,True,2021-07-22,0.35
+fortlauderdaleseocompany.com,dropped,,,fortlauderdale,seo company,24,0,test,False,False,False,False,False,True,True,2025-07-19,0.25
+denverhandymanhomeservices.com,dropped,,,denver,handyman home services,26,0,pick,False,False,False,False,False,False,False,2024-07-18,0.0
+restorationmobile.com,dropped,,,mobile,restoration,17,0,test,False,True,True,False,True,True,True,2022-07-23,0.8
+hotelsraleigh.com,dropped,,,raleigh,hotels,13,0,pick,True,True,True,True,True,True,True,2025-07-22,0.55
+miamitechrentals.com,dropped,,,miami,tech rentals,16,0,test,False,False,False,True,True,True,True,2021-07-22,0.05
+washingtonguttercleaners.com,dropped,,,washington,gutter cleaners,24,0,pick,False,False,False,False,False,True,True,2025-07-21,0.1
+durhamremodeling.com,dropped,,,durham,remodeling,16,0,test,True,True,True,True,True,True,True,2025-07-22,0.95
+autoglassrepairgreensboro.com,dropped,,,greensboro,auto glass repair,25,0,pick,False,False,False,False,False,False,False,2025-07-19,0.05
+kitchenremodelpittsburgh.com,dropped,,,pittsburgh,kitchen remodel,24,0,test,False,False,False,False,False,True,True,2024-07-22,0.2
+hollywoodpizzas.com,dropped,,,hollywood,pizzas,15,0,pick,True,True,True,True,True,True,True,2024-07-19,0.5
+roofrepaircharlotte.com,dropped,,,charlotte,roofrepair,19,0,test,False,True,True,False,True,True,True,2025-07-22,0.75
+lasvegascleaningsolutions.com,dropped,,,lasvegas,cleaning solutions,25,0,pick,False,False,False,False,False,False,True,2023-07-20,0.15
+auroraroofingexperts.com,dropped,,,aurora,roofing experts,20,0,test,False,False,False,False,True,True,True,2025-07-23,0.45
+nashvillemortgageexperts.com,dropped,,,nashville,mortgage experts,24,0,pick,False,False,False,False,False,True,True,2025-07-21,0.0
+tucsonguttercleaners.com,dropped,,,tucson,gutter cleaners,20,0,test,False,False,False,False,True,True,True,2025-07-21,0.25
+photographerssanfrancisco.com,dropped,,,sanfrancisco,photographers,25,0,pick,False,False,False,False,False,False,True,2025-07-22,0.3
+hotelgreensboro.com,dropped,,,greensboro,hotel,15,0,test,True,True,True,True,True,True,True,2025-07-20,0.55
+buffalorealestatehomes.com,dropped,,,buffalo,realestate homes,22,0,pick,False,False,False,False,False,True,True,2021-08-12,0.25
+seattletreeexperts.com,dropped,,,seattle,tree experts,18,0,test,False,False,False,False,True,True,True,2025-07-22,0.2
+columbusbookkeeping.com,dropped,,,columbus,bookkeeping,19,0,pick,False,True,True,False,True,True,True,2025-07-17,0.95
+accidentattorneyjerseycity.com,dropped,,,jerseycity,accident attorney,26,0,test,False,False,False,False,False,False,True,2025-07-22,0.2
+kitchenremodelingmilwaukee.com,dropped,,,milwaukee,kitchen remodeling,26,0,pick,False,False,False,False,False,False,True,2025-07-21,0.15
+lasvegaskitchenservices.com,dropped,,,lasvegas,kitchen services,23,0,test,False,False,False,False,False,True,True,2021-07-20,0.15
+tallahasseeseocompany.com,dropped,,,tallahassee,seo company,21,0,pick,False,False,False,False,False,True,True,2025-07-19,0.2
+santaanabuilder.com,dropped,,,santaana,builder,15,0,test,True,True,True,True,True,True,True,2025-07-23,0.6
+orlandophotographyco.com,dropped,,,orlando,photography co,20,0,pick,False,False,False,False,True,True,True,2022-07-24,0.05
+boisehomeservice.com,dropped,,,boise,home service,16,0,test,False,False,False,True,True,True,True,2025-07-20,0.2
+chicagotechrentals.com,dropped,,,chicago,tech rentals,18,0,pick,False,False,False,False,True,True,True,2021-07-22,0.0
+remodelingcontractortulsa.com,dropped,,,tulsa,remodeling contractor,25,0,test,False,False,False,False,False,False,True,2025-07-22,0.05
+exterminatorjacksonville.com,dropped,,,jacksonville,exterminator,24,0,pick,False,False,True,False,False,True,True,2024-07-23,0.6
+treeremovalworcester.com,dropped,,,worcester,tree removal,20,0,test,False,False,False,False,True,True,True,2022-07-22,0.35
+louisvillecooling.com,dropped,,,louisville,cooling,17,0,pick,False,True,True,False,True,True,True,2025-07-22,0.7
+proelectriciansmesa.com,dropped,,,mesa,pro electricians,19,0,test,False,False,False,False,True,True,True,2025-07-22,0.0
+hamptonsexpertpainting.com,dropped,,,hamptons,expert painting,22,0,pick,False,False,False,False,False,True,True,2024-07-29,0.05
+durhampressurewashing.com,dropped,,,durham,pressurewashing,21,0,test,False,False,True,False,False,True,True,2025-07-24,0.9
+chandlerpaving.com,dropped,,,chandler,paving,14,0,pick,True,True,True,True,True,True,True,2025-07-23,0.85
+floorsoakland.com,dropped,,,oakland,floors,13,0,test,True,True,True,True,True,True,True,2025-07-22,0.3
+spokanedeckcontractors.com,dropped,,,spokane,deck contractors,22,0,pick,False,False,False,False,False,True,True,2025-07-27,0.1
+tucsonexterminators.com,dropped,,,tucson,exterminators,19,0,test,False,True,True,False,True,True,True,2023-08-01,0.8
+jacksonvilleguttercleaners.com,dropped,,,jacksonville,gutter cleaners,26,0,pick,False,False,False,False,False,False,True,2025-07-21,0.15
+daytonpaving.com,dropped,,,dayton,paving,12,0,test,True,True,True,True,True,True,True,2025-07-23,0.8
+springfieldhandymanservices.com,dropped,,,springfield,handyman services,27,0,pick,False,False,False,False,False,False,True,2025-07-22,0.3
+austingaragedoorservice.com,dropped,,,austin,garagedoor service,23,0,test,False,False,False,False,False,True,True,2025-07-21,0.4
+plumberdesmoines.com,dropped,,,desmoines,plumber,16,0,pick,True,True,True,True,True,True,True,2025-07-21,0.7
+locksmithakron.com,dropped,,,akron,locksmith,14,0,test,True,True,True,True,True,True,True,2025-07-20,0.75
+restorationsolutionsirvine.com,dropped,,,irvine,restoration solutions,26,0,pick,False,False,False,False,False,False,True,2022-07-20,0.0
+houstonnailsspa.com,dropped,,,houston,nails spa,15,0,test,False,False,False,True,True,True,True,2025-07-19,0.1
+bathroomremodelerdurham.com,dropped,,,durham,bathroom remodeler,23,0,pick,False,False,False,False,False,True,True,2025-07-28,0.0
+palmspringspropertygroup.com,dropped,,,palmsprings,property group,24,0,test,False,False,False,False,False,True,True,2025-07-21,0.2
+anchoragebuilder.com,dropped,,,anchorage,builder,16,0,pick,True,True,True,True,True,True,True,2025-07-23,0.8
+baltimoreguttercleaners.com,dropped,,,baltimore,gutter cleaners,23,0,test,False,False,False,False,False,True,True,2025-07-21,0.1
+roofersamarillo.com,dropped,,,amarillo,roofers,15,0,pick,True,True,True,True,True,True,True,2025-07-22,0.45
+housepainterboston.com,dropped,,,boston,house painter,18,0,test,False,False,False,False,True,True,True,2025-07-21,0.05
+mortgagegreensboro.com,dropped,,,greensboro,mortgage,18,0,pick,False,True,True,False,True,True,True,2025-07-20,0.7
+mesatravels.com,dropped,,,mesa,travels,11,0,test,True,True,True,True,True,True,True,2025-07-19,0.65
+dallasguttercleaners.com,dropped,,,dallas,gutter cleaners,20,0,pick,False,False,False,False,True,True,True,2025-07-21,0.15
+sidingcontractorsboston.com,dropped,,,boston,siding contractors,23,0,test,False,False,False,False,False,True,True,2025-07-18,0.1
+raleighrealtyusa.com,dropped,,,raleigh,realty usa,16,0,pick,False,False,False,True,True,True,True,2024-07-22,0.0
+miamikitchenremodel.com,dropped,,,miami,kitchen remodel,19,0,test,False,False,False,False,True,True,True,2025-07-22,0.4
+longbeachrealestatephotographers.com,dropped,,,longbeach,realestate photographers,32,0,pick,False,False,False,False,False,False,True,2025-07-22,0.05
+carsonpaving.com,dropped,,,carson,paving,12,0,test,True,True,True,True,True,True,True,2025-07-23,0.85
+sanfranciscohomerental.com,dropped,,,sanfrancisco,home rental,22,0,pick,False,False,False,False,False,True,True,2025-07-22,0.1
+tulsasidingcompany.com,dropped,,,tulsa,siding company,18,0,test,False,False,False,False,True,True,True,2025-07-18,0.2
+siouxfallscoffee.com,dropped,,,siouxfalls,coffee,16,0,pick,True,True,True,True,True,True,True,2025-07-21,0.75
+philadelphiaroofingservices.com,dropped,,,philadelphia,roofing services,27,0,test,False,False,False,False,False,False,True,2025-07-21,0.3

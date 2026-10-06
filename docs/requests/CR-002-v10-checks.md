@@ -226,3 +226,4 @@ CR-001 P1a and CR-002 P1 ship together as **contract v1.1.0**:
 - CAP-06/08 as `MANUAL_REQUIRED` (CR-001 §11).
 
 CAP-14/15/16 (outreach only) and CAP-19 (plus `/buy` pack enforcement) follow in v1.2.0.
+Requester note (2026-10-06 04:50 IDT): reference material published in CR-002-reference/ (non-binding).

@@ -1,0 +1,308 @@
+domain,price,date,venue,source,week,ds,sale_date,rdap_created,age_m,tokens,type
+safireai.com,4999.0,12/23,Afternic,Twitter,december-29-2025,,2025-12-23,2025-09-15,3.3,saf ire ai,tech_compliance
+jordansjewelry.com,995.0,8/4,Afternic,Facebook,august-10,,2026-08-04,2024-06-27,25.2,jordans jewelry,descriptive_other
+azaleacounseling.com,149.0,4/2,Afternic,Facebook,april-6-2026,,2026-04-02,2025-10-10,5.7,azalea counseling,descriptive_other
+theintelligencecompany.com,4950.0,5/5,Afternic,Twitter,may-11-2026,,2026-05-05,2023-08-24,32.4,the intelligence company,descriptive_other
+blueflamelab.com,500.0,1/1,Afternic,Twitter,january-5-2026,,2026-01-01,2025-04-24,8.3,blue flame lab,tech_compliance
+stringlines.com,1818.0,3/8,Unknown,Twitter,march-8-2026,,2026-03-08,2025-11-17,3.6,string lines,descriptive_other
+agisilicon.com,18000.0,5/1,Afternic,Twitter,may-4-2026,,2026-05-01,2023-05-14,35.6,agi silicon,descriptive_other
+fairwaydeals.com,1000.0,4/10,Afternic,Twitter,april-13-2026,,2026-04-10,2025-01-13,14.8,fairway deals,descriptive_other
+aptusventures.com,3995.0,11/25,Afternic,Twitter,december-1-2025,,2025-11-25,2023-11-04,24.7,apt us ventures,descriptive_other
+holisticwellcare.com,495.0,03/23,Afternic,Twitter,march-24-2025,,2025-03-23,2024-04-17,11.2,holistic well care,descriptive_other
+lowerbound.com,999.0,2/7,Afternic,Twitter,february-9-2026,,2026-02-07,2023-04-15,33.8,lower bound,descriptive_other
+getello.com,888.0,11/8,Afternic,NamePros,november-10-2025,,2025-11-08,2023-09-08,26.0,get ello,descriptive_other
+facilitymanagementconsulting.com,200.0,5/19,Afternic,Facebook,may-25-2026,,2026-05-19,2026-02-25,2.7,facility management consulting,descriptive_other
+virtuallyfunny.com,888.0,6/10,Atom,Twitter,june-15-2026,,2026-06-10,2025-05-30,12.4,virtually funny,descriptive_other
+carinjuryaccidentlawyer.com,100.0,6/30,Afternic,Twitter,july-6-2026,,2026-06-30,2025-12-14,6.5,car injury accident lawyer,service_keyword
+omgmed.com,299.0,5/5,Afternic,Twitter,may-11-2026,,2026-05-05,2025-09-05,8.0,omg med,descriptive_other
+terranovaprojects.com,888.0,6/1,Spaceship,Facebook,june-8-2026,,2026-06-01,2026-05-18,0.5,terra nova projects,descriptive_other
+projectmanagercareer.com,300.0,2/27,Afternic,Facebook,march-2-2026,,2026-02-27,2025-10-09,4.6,project manager career,descriptive_other
+americanpowerline.com,5345.0,3/11,Afternic,Twitter,march-16-2026,,2026-03-11,2023-08-18,30.7,american power line,descriptive_other
+deepharness.com,1995.0,7/16,Afternic,NamePros,july-20-2026,,2026-07-16,2025-10-27,8.6,deep harness,descriptive_other
+colossalcommerce.com,299.0,6/6,Afternic,Twitter,june-8-2026,,2026-06-06,2026-01-11,4.8,colossal commerce,descriptive_other
+mybuildhub.com,499.0,5/28,Afternic,Twitter,june-1-2026,,2026-05-28,2025-12-30,4.9,my build hub,descriptive_other
+wiserbuild.com,2888.0,05/13,Atom,Twitter,may-19-2025,,2025-05-13,2024-09-22,7.7,wiser build,descriptive_other
+nursingtutoring.com,200.0,6/29,Afternic,Facebook,july-6-2026,,2026-06-29,2025-07-19,11.3,nursing tutoring,descriptive_other
+blackboxhosting.com,1495.0,3/25,Afternic,,march-30-2026,,2026-03-25,2025-03-08,12.5,black box hosting,tech_compliance
+shoredecker.com,499.0,3/26,Afternic,,march-30-2026,,2026-03-26,2026-03-18,0.3,shore decker,descriptive_other
+betfrost.com,888.0,05/30,Afternic,Twitter,june-2-2025,,2025-05-30,2025-03-07,2.8,bet frost,descriptive_other
+darkgrade.com,3888.0,1/9,Spaceship,Twitter,january-12-2026,,2026-01-09,2025-10-30,2.3,dark grade,descriptive_other
+aihomeideas.com,199.0,7/14,Spaceship,Twitter,july-20-2026,,2026-07-14,2025-10-06,9.2,ai home ideas,tech_compliance
+largestevents.com,395.0,4/26,Afternic,Twitter,april-27-2026,,2026-04-26,2025-08-06,8.6,largest events,descriptive_other
+testaweb.com,1999.0,9/18,Sedo,Twitter,september-21,,2026-09-18,2025-08-11,13.2,testa web,tech_compliance
+clsauto.com,750.0,2/2,Afternic,Twitter,february-9-2026,,2026-02-02,2025-10-08,3.8,cls auto,service_keyword
+cheapestpetinsurance.com,7988.0,7/10,Afternic,Twitter,july-13-2026,,2026-07-10,2024-12-01,19.3,cheapest pet insurance,service_keyword
+chilicars.com,280.0,7/11,Spaceship,Twitter,july-13-2026,,2026-07-11,2025-11-19,7.7,chili cars,descriptive_other
+jellytoken.com,699.0,5/28,Afternic,Twitter,june-1-2026,,2026-05-28,2025-01-30,15.9,jelly token,tech_compliance
+aidurable.com,199.0,5/7,Dynadot,Facebook,may-11-2026,,2026-05-07,2025-07-14,9.8,ai durable,tech_compliance
+parivo.com,4395.0,5/14,Atom,Twitter,may-18-2026,,2026-05-14,2025-05-07,12.2,par ivo,descriptive_other
+advancedaestheticsacademy.com,100.0,5/19,Sedo,Facebook,may-25-2026,,2026-05-19,2025-08-22,8.9,advanced aesthetics academy,descriptive_other
+haladrive.com,3565.0,03/22,Atom,Twitter,march-24-2025,,2025-03-22,2024-05-23,10.0,hala drive,descriptive_other
+opencoworker.com,3788.0,2/27,Afternic,Facebook,march-2-2026,,2026-02-27,2025-04-07,10.7,open coworker,descriptive_other
+alcovefitness.com,1982.0,7/30,Atom,Twitter,august-3,D,2026-07-30,2024-04-18,27.4,alcove fitness,descriptive_other
+armsauctions.com,600.0,4/26,Afternic,Facebook,april-27-2026,,2026-04-26,2024-03-05,25.7,arms auctions,descriptive_other
+incometrick.com,1250.0,05/28,Afternic,Twitter,june-2-2025,,2025-05-28,2024-10-01,7.9,income trick,descriptive_other
+purplegpt.com,1988.0,03/31,Afternic,Twitter,april-7-2025,,2025-03-31,2024-05-04,10.9,purple gpt,tech_compliance
+samplescents.com,1988.0,7/15,Afternic,NamePros,july-20-2026,,2026-07-15,2024-10-10,21.1,samples cents,descriptive_other
+boredweb.com,250.0,11/4,Afternic,Twitter,november-10-2025,,2025-11-04,2024-01-28,21.2,bored web,tech_compliance
+blackholing.com,125.0,2/21,Afternic,Facebook,february-23-2026,,2026-02-21,2025-03-05,11.6,black hol ing,descriptive_other
+macroagentic.com,488.0,7/13,Afternic,Twitter,july-20-2026,,2026-07-13,2025-01-16,17.8,mac roa gen tic,descriptive_other
+cybersecurityunion.com,499.0,6/8,Afternic,Twitter,june-15-2026,,2026-06-08,2026-01-22,4.5,cybersecurity union,descriptive_other
+onlinedigitalservices.com,620.0,05/23,Afternic,Twitter,may-26-2025,,2025-05-23,2024-11-13,6.3,online digital services,tech_compliance
+crystalbridgesmuseum.com,950.0,12/2,Afternic,Twitter,december-8-2025,,2025-12-02,2024-12-31,11.0,crystal bridges museum,descriptive_other
+agorafunds.com,5000.0,12/1,Unknown,Twitter,december-8-2025,,2025-12-01,2024-12-20,11.4,agora funds,descriptive_other
+agibeast.com,100.0,4/7,Spaceship,Twitter,april-13-2026,,2026-04-07,2025-02-22,13.4,agi beast,descriptive_other
+simplydirt.com,2850.0,12/23,Atom,Twitter,december-29-2025,,2025-12-23,2025-07-24,5.0,simply dirt,descriptive_other
+milanonailspa.com,999.0,2/11,Afternic,Twitter,february-16-2026,,2026-02-11,2025-05-12,9.0,milano nail spa,service_keyword
+pathwayhomemortgage.com,499.0,2/3,Afternic,Twitter,february-9-2026,,2026-02-03,2025-02-14,11.6,pathway home mortgage,service_keyword
+bnbpot.com,500.0,12/3,Atom,Twitter,december-8-2025,,2025-12-03,2024-01-20,22.4,bnb pot,descriptive_other
+futureoperator.com,1988.0,6/25,Spaceship,Twitter,june-29-2026,,2026-06-25,2024-07-23,23.1,future operator,descriptive_other
+ecmtek.com,999.0,04/04,Afternic,DomainX,april-7-2025,,2025-04-04,2024-12-31,3.1,ecm tek,descriptive_other
+tridentsecurityservices.com,275.0,12/8,Spaceship,Facebook,december-15-2025,,2025-12-08,2025-07-15,4.8,trident security services,tech_compliance
+poolservicefl.com,173.0,6/14,Sedo,Facebook,june-15-2026,,2026-06-14,2024-10-27,19.5,pool ser vic efl,service_keyword
+yarproject.com,1888.0,5/19,Afternic,Twitter,may-25-2026,,2026-05-19,2026-04-24,0.8,yar project,descriptive_other
+farobotics.com,2800.0,2/17,Afternic,Twitter,february-23-2026,,2026-02-17,2025-05-31,8.6,faro bot ics,tech_compliance
+johndoll.com,299.0,7/9,Afternic,Twitter,july-13-2026,,2026-07-09,2026-03-17,3.7,john doll,descriptive_other
+sharpity.com,150.0,8/6,Spaceship,Twitter,august-10,,2026-08-06,2025-09-26,10.3,shar pity,descriptive_other
+hereticai.com,299.0,5/26,Afternic,Twitter,june-1-2026,,2026-05-26,2025-06-11,11.5,heretic ai,tech_compliance
+russdentistry.com,100.0,11/6,Unknown,DomainX,november-10-2025,,2025-11-06,2025-08-19,2.6,russ dentistry,descriptive_other
+chatjudge.com,155.0,11/5,Afternic,Twitter,november-10-2025,,2025-11-05,2025-05-23,5.5,chat judge,descriptive_other
+athleticstv.com,777.0,1/8,Afternic,Twitter,january-12-2026,,2026-01-08,2024-09-27,15.4,athletics tv,descriptive_other
+gonowai.com,399.0,6/26,Afternic,Twitter,june-29-2026,,2026-06-26,2025-08-09,10.5,go now ai,tech_compliance
+agentichi.com,950.0,12/7,Afternic,Twitter,december-8-2025,,2025-12-07,2025-04-09,8.0,agent ichi,tech_compliance
+paintboothspecialists.com,450.0,12/5,Afternic,Twitter,december-8-2025,,2025-12-05,2025-05-20,6.5,paint booth specialists,descriptive_other
+applyaijobs.com,500.0,2/27,Afternic,Twitter,march-2-2026,,2026-02-27,2025-05-18,9.4,apply ai jobs,tech_compliance
+worstmedia.com,2495.0,11/29,Afternic,NamePros,december-1-2025,,2025-11-29,2025-11-29,0.0,worst media,tech_compliance
+measuredai.com,7488.0,1/1,Afternic,Twitter,january-5-2026,,2026-01-01,2025-07-04,5.9,measured ai,tech_compliance
+skillvia.com,2199.0,4/25,Atom,Twitter,april-27-2026,,2026-04-25,2024-12-03,16.7,skill via,descriptive_other
+hayeshomeservices.com,499.0,12/2,Afternic,Facebook,december-8-2025,,2025-12-02,2025-11-16,0.5,hayes home services,service_keyword
+aivaping.com,3500.0,07/14,Afternic,Twitter,july-21-2025,,2025-07-14,2022-11-16,31.9,ai vaping,tech_compliance
+edgebond.com,3880.0,6/4,Afternic,Twitter,june-8-2026,,2026-06-04,2026-03-29,2.2,edge bond,descriptive_other
+springborohomes.com,150.0,07/04,Afternic,Twitter,july-7-2025,,2025-07-04,2025-04-07,2.9,spring boro homes,service_keyword
+mgmsolution.com,1300.0,3/8,Afternic,Twitter,march-8-2026,,2026-03-08,2025-08-04,7.1,mgm solution,descriptive_other
+michaelbricker.com,499.0,2/27,Afternic,Facebook,march-2-2026,,2026-02-27,2026-02-24,0.1,michael bric ker,descriptive_other
+officesupplygroup.com,295.0,7/7,Afternic,Twitter,july-13-2026,,2026-07-07,2025-12-20,6.5,office supply group,descriptive_other
+useragentic.com,500.0,12/9,Afternic,Twitter,december-15-2025,,2025-12-09,2025-06-13,5.9,us era gen tic,descriptive_other
+motherstream.com,400.0,12/2,Afternic,Twitter,december-8-2025,,2025-12-02,2025-02-19,9.4,mother stream,descriptive_other
+mowersrepair.com,485.0,4/20,Spaceship,Twitter,april-27-2026,,2026-04-20,2025-12-09,4.3,mowers repair,service_keyword
+cfpcapital.com,2888.0,03/23,Afternic,Twitter,march-24-2025,,2025-03-23,2023-08-24,19.0,cfp capital,descriptive_other
+univoucher.com,850.0,04/28,AfternicC,Twitter,may-5-2025,,2025-04-28,2024-10-26,6.0,uni voucher,descriptive_other
+mcpinspector.com,15880.0,06/26,Afternic,Twitter,june-30-2025,,2025-06-26,2025-02-27,3.9,mcp inspector,descriptive_other
+swarmorchestrator.com,2500.0,6/16,Afternic,Twitter,june-22-2026,,2026-06-16,2025-11-28,6.6,swarm orchestra tor,descriptive_other
+amgstone.com,650.0,2/4,Afternic,Twitter,february-9-2026,,2026-02-04,2025-11-20,2.5,amg stone,service_keyword
+reselltech.com,1990.0,3/20,Afternic,Twitter,march-23-2026,,2026-03-20,2024-11-03,16.5,resell tech,tech_compliance
+deepdiveagent.com,100.0,5/29,Dynadot,Twitter,june-1-2026,,2026-05-29,2025-07-05,10.8,deep dive agent,tech_compliance
+arcawellness.com,1995.0,3/20,Afternic,Twitter,march-23-2026,,2026-03-20,2024-05-12,22.2,ar caw ell ness,tech_compliance
+askravi.com,275.0,2/6,Afternic,Twitter,february-9-2026,,2026-02-06,2025-10-25,3.4,ask ravi,descriptive_other
+rashpay.com,499.0,6/13,Afternic,Twitter,june-15-2026,,2026-06-13,2025-05-19,12.8,rash pay,descriptive_other
+goldsilverratio.com,1390.0,3/30,Afternic,Twitter,april-6-2026,,2026-03-30,2024-11-20,16.3,gold silver ratio,descriptive_other
+mycarvaluation.com,500.0,1/11,Afternic,Twitter,january-12-2026,,2026-01-11,2025-06-01,7.4,my car valuation,descriptive_other
+blankjerseys.com,488.0,06/27,Afternic,Twitter,june-30-2025,,2025-06-27,2025-03-07,3.7,blank jerseys,descriptive_other
+alwaysinescrow.com,1500.0,2/5,Afternic,Twitter,february-9-2026,,2026-02-05,2024-11-20,14.5,always ines crow,descriptive_other
+realitylayer.com,999.0,4/24,Sedo,NamePros,april-27-2026,,2026-04-24,2025-06-22,10.1,reality layer,descriptive_other
+fanaticsmarket.com,1499.0,12/21,Afternic,Twitter,december-22-2025,,2025-12-21,2025-10-22,2.0,fanatics market,descriptive_other
+mycreditdoctor.com,1600.0,2/23,Atom,Twitter,march-2-2026,,2026-02-23,2025-10-15,4.3,my credit doctor,descriptive_other
+pestpanda.com,2022.0,3/18,Atom,Twitter,march-23-2026,,2026-03-18,2025-07-18,8.0,pest panda,service_keyword
+bulldozerai.com,288.0,9/16,Afternic,Twitter,september-21,,2026-09-16,2025-12-26,8.7,bulldozer ai,tech_compliance
+findfoodnearme.com,285.0,8/26,Afternic,Facebook,august-31,,2026-08-26,2026-05-26,3.0,find food near me,descriptive_other
+clawyou.com,7310.0,4/29,Unknown,Twitter,may-4-2026,,2026-04-29,2025-08-07,8.7,claw you,descriptive_other
+kristibrown.com,100.0,8/12,Afternic,Twitter,august-18-2025,,2025-08-12,2025-02-28,5.4,kristi brown,descriptive_other
+fleetfuels.com,2000.0,1/12,Escrow,Twitter,january-19-2026,,2026-01-12,2025-06-03,7.3,fleet fuels,descriptive_other
+payonward.com,2000.0,4/27,Atom,Twitter,may-4-2026,,2026-04-27,2025-05-14,11.4,pay onward,descriptive_other
+soundmanage.com,499.0,2/25,Afternic,Twitter,march-2-2026,,2026-02-25,2025-12-13,2.4,sound manage,descriptive_other
+picela.com,150.0,8/6,Afternic,Facebook,august-10,D,2026-08-06,2025-11-15,8.7,pic ela,descriptive_other
+auragoldwater.com,4988.0,11/8,Afternic,Twitter,november-10-2025,,2025-11-08,2025-08-18,2.7,aura goldwater,descriptive_other
+alpsshop.com,125.0,8/16,Afternic,Twitter,august-18-2025,,2025-08-16,2024-09-27,10.6,alps shop,descriptive_other
+songfab.com,100.0,5/19,Afternic,NamePros,may-25-2026,,2026-05-19,2025-11-26,5.7,song fab,descriptive_other
+littleoneschildcare.com,375.0,4/14,Afternic,Twitter,april-20-2026,,2026-04-14,2025-02-14,13.9,little ones childcare,descriptive_other
+novaska.com,295.0,7/10,Afternic,Twitter,july-13-2026,,2026-07-10,2025-10-27,8.4,nova ska,descriptive_other
+heyeliza.com,1499.0,8/20,Afternic,Twitter,august-25-2025,,2025-08-20,2025-04-29,3.7,hey eliza,descriptive_other
+vibecreator.com,5000.0,11/4,Atom,Twitter,november-10-2025,,2025-11-04,2025-02-07,8.9,vibe creator,descriptive_other
+mygamingsetup.com,1577.0,06/21,Afternic,Twitter,june-23-2025,,2025-06-21,2023-11-12,19.3,my gaming setup,descriptive_other
+oddfitness.com,100.0,6/9,Afternic,Twitter,june-15-2026,,2026-06-09,2024-10-05,20.1,odd fitness,descriptive_other
+aigovernor.com,3809.0,1/31,Afternic,Twitter,february-2-2026,,2026-01-31,2024-05-16,20.5,ai governor,tech_compliance
+pawpixel.com,1000.0,06/20,Afternic,Twitter,june-23-2025,,2025-06-20,2023-10-05,20.5,paw pixel,descriptive_other
+freshhomeservices.com,125.0,5/9,Afternic,Facebook,may-11-2026,,2026-05-09,2025-08-15,8.8,fresh home services,service_keyword
+menucosting.com,495.0,3/24,Spaceship,D,march-30-2026,,2026-03-24,2025-09-25,5.9,menu costing,descriptive_other
+seetheinvisible.com,2000.0,5/23,Afternic,NamePros,may-25-2026,,2026-05-23,2025-03-25,13.9,see the invisible,descriptive_other
+unoluxe.com,550.0,07/28,Afternic,Twitter,august-4-2025,,2025-07-28,2025-05-27,2.0,uno luxe,descriptive_other
+poppep.com,395.0,4/28,Afternic,Twitter,may-4-2026,,2026-04-28,2025-06-20,10.2,pop pep,descriptive_other
+openweight.com,25000.0,6/21,Spaceship,Twitter,june-22-2026,,2026-06-21,2023-08-08,34.4,open weight,descriptive_other
+shipmentplanner.com,300.0,12/1,Afternic,Twitter,december-8-2025,,2025-12-01,2025-11-05,0.9,shipment planner,descriptive_other
+goinquire.com,1871.0,3/25,Atom,,march-30-2026,,2026-03-25,2025-12-08,3.5,go inquire,descriptive_other
+vibecodejobs.com,250.0,2/8,Spaceship,Twitter,february-9-2026,,2026-02-08,2025-03-15,10.8,vibe code jobs,tech_compliance
+agentjudge.com,1500.0,2/3,Afternic,Twitter,february-9-2026,,2026-02-03,2024-12-05,14.0,agent judge,tech_compliance
+hobsalon.com,2044.0,3/16,Afternic,Twitter,march-23-2026,,2026-03-16,2025-03-11,12.2,hob salon,service_keyword
+itomori.com,499.0,6/29,Afternic,Twitter,july-6-2026,,2026-06-29,2024-12-01,18.9,ito mori,descriptive_other
+speedingticketdefense.com,3000.0,04/02,Afternic,Twitter,april-7-2025,,2025-04-02,2025-01-27,2.1,speeding ticket defense,descriptive_other
+mysweetyskin.com,589.0,4/2,Afternic,Twitter,april-6-2026,,2026-04-02,2025-07-17,8.5,my sweety skin,descriptive_other
+seychellesboattour.com,388.0,8/9,Afternic,Twitter,august-10,,2026-08-09,2025-04-21,15.6,seychelles boat tour,descriptive_other
+billoff.com,1988.0,2/16,Sedo,Twitter,february-23-2026,,2026-02-16,2025-12-05,2.4,bill off,descriptive_other
+rpscan.com,499.0,04/08,Afternic,DomainX,april-14-2025,,2025-04-08,2025-03-04,1.1,rps can,descriptive_other
+aibrandstrategy.com,779.0,12/15,Spaceship,Facebook,december-22-2025,,2025-12-15,2025-06-04,6.4,ai brand strategy,tech_compliance
+bullioncentre.com,1000.0,4/3,Afternic,Twitter,april-6-2026,,2026-04-03,2026-01-24,2.3,bullion centre,descriptive_other
+quantasure.com,2488.0,12/14,Afternic,Twitter,december-15-2025,,2025-12-14,2025-09-21,2.8,qua nta sure,descriptive_other
+mahafilm.com,499.0,8/31,Afternic,Twitter,september-7,,2026-08-31,2025-08-08,12.7,maha film,descriptive_other
+biomedicalwellness.com,3995.0,12/17,Afternic,Twitter,december-22-2025,,2025-12-17,2025-08-17,4.0,biomedical wellness,descriptive_other
+regenerateai.com,2500.0,05/06,Afternic,Twitter,may-12-2025,,2025-05-06,2022-08-17,32.6,regenerate ai,tech_compliance
+selfwave.com,1869.0,5/23,Atom,Twitter,may-25-2026,,2026-05-23,2024-10-15,19.2,self wave,descriptive_other
+amsrenovations.com,2088.0,5/6,Afternic,Twitter,may-11-2026,,2026-05-06,2026-01-20,3.5,ams renovations,descriptive_other
+flowcontact.com,3337.0,4/1,Sedo,Facebook,april-6-2026,,2026-04-01,2023-12-04,27.9,flow contact,descriptive_other
+portarthurhomes.com,385.0,06/01,Afternic,Twitter,june-2-2025,,2025-06-01,2025-03-29,2.1,port arthur homes,service_keyword
+mintoy.com,2500.0,12/14,Atom,NamePros,december-15-2025,,2025-12-14,2025-09-20,2.8,min toy,descriptive_other
+crystalspires.com,499.0,9/25,Afternic,Twitter,september-28,D,2026-09-25,2025-12-07,9.6,crystal spires,descriptive_other
+braincarescore.com,2956.0,12/17,Afternic,Twitter,december-22-2025,,2025-12-17,2023-12-14,24.1,brain care score,descriptive_other
+cedeai.com,2000.0,9/3,Afternic,Twitter,september-7,,2026-09-03,2023-09-28,35.2,cede ai,tech_compliance
+underpinningspecialists.com,160.0,3/18,Afternic,Facebook,march-23-2026,,2026-03-18,2025-10-22,4.8,underpinning specialists,descriptive_other
+smoothintelligence.com,5800.0,03/23,Afternic,DomainX,march-24-2025,,2025-03-23,2024-09-02,6.6,smooth intelligence,descriptive_other
+aipresets.com,488.0,03/19,Afternic,Twitter,march-24-2025,,2025-03-19,2024-05-07,10.4,ai presets,tech_compliance
+agentissimo.com,12000.0,7/1,Atom,NamePros,july-6-2026,,2026-07-01,2025-01-18,17.4,agent iss imo,tech_compliance
+villaessence.com,150.0,7/3,Afternic,Facebook,july-6-2026,,2026-07-03,2025-11-29,7.1,villa essence,descriptive_other
+balticbrands.com,366.0,8/4,Atom,Twitter,august-11-2025,,2025-08-04,2025-03-10,4.8,baltic brands,descriptive_other
+heybailey.com,1899.0,11/26,Afternic,Twitter,december-1-2025,,2025-11-26,2025-05-09,6.6,hey bailey,descriptive_other
+dazeddispensary.com,250.0,4/19,Spaceship,DomainX,april-20-2026,,2026-04-19,2026-04-10,0.3,dazed dispensary,descriptive_other
+testosteronetestkit.com,5000.0,06/20,Afternic,Twitter,june-23-2025,,2025-06-20,2024-07-16,11.1,testosterone test kit,descriptive_other
+onsiteintelligence.com,9895.0,9/12,Afternic,Twitter,september-14,,2026-09-12,2025-03-27,17.5,onsite intelligence,descriptive_other
+cinemetry.com,599.0,3/9,Afternic,Twitter,march-16-2026,,2026-03-09,2024-08-15,18.8,cine me try,descriptive_other
+datastorageai.com,199.0,2/25,Afternic,Twitter,march-2-2026,,2026-02-25,2025-04-20,10.2,data storage ai,tech_compliance
+alexanderpetrov.com,287.0,8/21,Afternic,Facebook,august-24,,2026-08-21,2026-05-04,3.6,alexander petrov,descriptive_other
+traderstrong.com,169.0,12/30,Afternic,Facebook,january-5-2026,,2025-12-30,2024-03-23,21.3,trader strong,descriptive_other
+homeinspectai.com,499.0,3/5,Afternic,Twitter,march-8-2026,,2026-03-05,2025-11-23,3.4,home inspect ai,tech_compliance
+projeweller.com,130.0,6/27,Unknown,Twitter,june-29-2026,,2026-06-27,2026-02-06,4.6,pro jeweller,descriptive_other
+principleagent.com,3995.0,1/18,Afternic,Twitter,january-19-2026,,2026-01-18,2025-04-16,9.1,principle agent,tech_compliance
+oxysure.com,2999.0,5/26,Afternic,Twitter,june-1-2026,,2026-05-26,2025-05-02,12.8,oxy sure,descriptive_other
+gridlands.com,2495.0,3/16,Atom,Twitter,march-23-2026,,2026-03-16,2025-10-18,4.9,grid lands,tech_compliance
+printableguides.com,850.0,3/26,Afternic,,march-30-2026,,2026-03-26,2025-12-03,3.7,printable guides,descriptive_other
+memiri.com,2288.0,7/20,Unknown,NamePros,july-27,,2026-07-20,2025-09-01,10.6,me miri,descriptive_other
+kohlerwellness.com,7800.0,05/16,Afternic,Twitter,may-19-2025,,2025-05-16,2023-12-17,17.0,kohler wellness,descriptive_other
+reiscout.com,375.0,1/3,Afternic,Twitter,january-5-2026,,2026-01-03,2025-03-10,9.8,rei scout,descriptive_other
+concretelevelingcontractors.com,100.0,5/24,Afternic,Twitter,may-25-2026,,2026-05-24,2025-06-01,11.7,concrete leveling contractors,service_keyword
+phonenumberai.com,100.0,6/29,Afternic,Facebook,july-6-2026,,2026-06-29,2025-11-07,7.7,phone number ai,tech_compliance
+rootlongevity.com,1500.0,6/25,Afternic,Twitter,june-29-2026,,2026-06-25,2025-10-17,8.2,root longevity,descriptive_other
+caninegpt.com,2988.0,03/31,Afternic,Twitter,april-7-2025,,2025-03-31,2023-04-14,23.6,canine gpt,tech_compliance
+peptideblend.com,1436.0,2/6,Afternic,Twitter,february-9-2026,,2026-02-06,2024-01-31,24.2,peptide blend,descriptive_other
+familyofficecyprus.com,600.0,7/18,Afternic,Twitter,july-20-2026,,2026-07-18,2026-03-26,3.7,family office cyprus,descriptive_other
+deadnettle.com,495.0,3/6,Afternic,Twitter,march-8-2026,,2026-03-06,2025-04-08,10.9,dead nettle,descriptive_other
+bitcoinrunes.com,797.0,06/24,Afternic,Twitter,june-30-2025,,2025-06-24,2023-09-25,21.0,bitcoin runes,tech_compliance
+basecourier.com,299.0,3/16,Sedo,Twitter,march-23-2026,,2026-03-16,2025-03-10,12.2,base courier,descriptive_other
+solarcannabisco.com,650.0,05/07,Private,DomainX,may-12-2025,,2025-05-07,2025-04-28,0.3,solar cannabis co,service_keyword
+getcabana.com,7818.0,04/16,Atom,Twitter,april-21-2025,,2025-04-16,2023-08-20,19.9,get cabana,descriptive_other
+brivin.com,5130.0,9/25,Afternic,Twitter,september-28,,2026-09-25,2026-07-23,2.1,bri vin,descriptive_other
+openoutbound.com,100.0,06/11,Afternic,Twitter,june-16-2025,,2025-06-11,2023-04-03,26.3,open outbound,descriptive_other
+upagentic.com,999.0,8/21,Afternic,NamePros,august-25-2025,,2025-08-21,2024-11-27,8.8,upa gen tic,descriptive_other
+aresroofing.com,4888.0,1/16,Afternic,NamePros,january-19-2026,,2026-01-16,2025-08-23,4.8,ares roofing,service_keyword
+targetonlinemarketing.com,299.0,1/22,Afternic,Twitter,january-26-2026,,2026-01-22,2025-04-11,9.4,target online marketing,tech_compliance
+agenticconnect.com,3500.0,03/23,Afternic,Twitter,march-24-2025,,2025-03-23,2024-11-21,4.0,agent icc onn ect,tech_compliance
+seosilver.com,1101.0,1/6,Afternic,Twitter,january-12-2026,,2026-01-06,2025-05-06,8.0,seo silver,tech_compliance
+upsellstack.com,499.0,4/26,Afternic,Twitter,april-27-2026,,2026-04-26,2025-09-09,7.5,up sell stack,descriptive_other
+zingverse.com,2246.0,9/8,Atom,Twitter,september-14,R,2026-09-08,2025-05-27,15.4,zing verse,descriptive_other
+fishbattle.com,2488.0,3/11,Afternic,Twitter,march-16-2026,,2026-03-11,2023-10-19,28.7,fish battle,descriptive_other
+agerta.com,1649.0,12/8,Atom,Facebook,december-15-2025,,2025-12-08,2025-06-04,6.1,age rta,descriptive_other
+peterschafer.com,199.0,7/23,Afternic,Facebook,july-27,,2026-07-23,2025-11-14,8.2,peter schafer,descriptive_other
+indexnote.com,2488.0,4/8,Spaceship,NamePros,april-13-2026,,2026-04-08,2024-01-27,26.3,index note,descriptive_other
+joinsaveclub.com,299.0,6/20,Spaceship,Twitter,june-22-2026,,2026-06-20,2026-06-20,0.0,join save club,descriptive_other
+eaglemultimedia.com,500.0,11/4,Afternic,Twitter,november-10-2025,,2025-11-04,2025-09-30,1.1,eagle multimedia,descriptive_other
+limogeneva.com,500.0,2/10,Spaceship,Twitter,february-16-2026,,2026-02-10,2025-10-19,3.7,limo geneva,service_keyword
+cashmitra.com,695.0,12/1,Afternic,Twitter,december-8-2025,,2025-12-01,2025-01-17,10.4,cash mitra,descriptive_other
+agenticmartech.com,999.0,06/24,Afternic,NamePros,june-30-2025,,2025-06-24,2024-11-27,6.9,agent icm ar tech,tech_compliance
+augustacaraccidentlawyers.com,198.0,07/15,Afternic,Twitter,july-21-2025,,2025-07-15,2025-05-16,2.0,augusta car accident lawyers,service_keyword
+thevelvetexperience.com,120.0,4/16,Afternic,Facebook,april-20-2026,,2026-04-16,2026-02-13,2.0,the velvet experience,descriptive_other
+testosteronetestkits.com,5000.0,06/20,Afternic,Twitter,june-23-2025,,2025-06-20,2024-07-16,11.1,testosterone test kits,descriptive_other
+gtstechnology.com,1999.0,7/24,Afternic,Twitter,july-27,,2026-07-24,2026-02-14,5.3,gts technology,descriptive_other
+monetaryapp.com,399.0,2/5,Afternic,Twitter,february-9-2026,,2026-02-05,2025-04-06,10.0,monetary app,tech_compliance
+qualityasi.com,1499.0,07/03,Afternic,Twitter,july-7-2025,,2025-07-03,2025-06-15,0.6,quality asi,descriptive_other
+letpeoplework.com,495.0,2/12,Afternic,Facebook,february-16-2026,,2026-02-12,2025-10-22,3.7,let people work,descriptive_other
+tecatlas.com,250.0,4/16,Spaceship,Facebook,april-20-2026,,2026-04-16,2025-11-13,5.1,tec atlas,descriptive_other
+paybir.com,275.0,2/25,Sedo,Facebook,march-2-2026,,2026-02-25,2025-06-22,8.1,pay bir,descriptive_other
+bananaprompts.com,199.0,6/11,Spaceship,Twitter,june-15-2026,,2026-06-11,2025-08-31,9.3,banana prompts,descriptive_other
+newstockholm.com,100.0,3/15,Sedo,NamePros,march-16-2026,,2026-03-15,2026-01-29,1.5,new stockholm,descriptive_other
+quantumurban.com,100.0,3/15,UD,Facebook,march-16-2026,,2026-03-15,2025-11-21,3.7,quantum urban,tech_compliance
+aiagentshq.com,299.0,5/7,Afternic,Twitter,may-11-2026,,2026-05-07,2026-01-27,3.3,ai agents hq,tech_compliance
+bedplacement.com,350.0,6/16,Afternic,Twitter,june-22-2026,,2026-06-16,2025-10-31,7.5,bed placement,descriptive_other
+healthhubclinic.com,400.0,07/03,Afternic,Twitter,july-7-2025,,2025-07-03,2025-06-04,1.0,health hub clinic,service_keyword
+erikmaier.com,300.0,9/6,Spaceship,Twitter,september-7,D,2026-09-06,2026-03-01,6.2,erik maier,descriptive_other
+librisai.com,3488.0,04/02,Afternic,Twitter,april-7-2025,,2025-04-02,2023-07-06,20.9,lib ris ai,tech_compliance
+propcaptechnologies.com,1350.0,12/27,Afternic,Twitter,december-29-2025,,2025-12-27,2025-11-26,1.0,prop cap technologies,descriptive_other
+windbets.com,3749.0,12/1,Atom,Twitter,december-8-2025,,2025-12-01,2023-12-13,23.6,wind bets,descriptive_other
+sellmyvinyl.com,295.0,12/8,Afternic,Facebook,december-15-2025,,2025-12-08,2025-08-01,4.2,sell my vinyl,descriptive_other
+biotechasi.com,111.0,5/18,Atom,Twitter,may-25-2026,,2026-05-18,2025-07-07,10.3,biotech asi,descriptive_other
+authentai.com,2999.0,03/21,Afternic,Twitter,march-24-2025,,2025-03-21,2022-04-05,35.5,aut hentai,descriptive_other
+aidefend.com,4950.0,8/14,Afternic,Twitter,august-18-2025,,2025-08-14,2024-02-27,17.5,ai defend,tech_compliance
+trustenvironment.com,299.0,5/1,Afternic,Twitter,may-4-2026,,2026-05-01,2025-11-05,5.8,trust environment,descriptive_other
+theinspirationacademy.com,298.0,5/16,Afternic,Twitter,may-18-2026,,2026-05-16,2024-08-23,20.7,the inspiration academy,descriptive_other
+retiremore.com,1500.0,3/19,Afternic,Twitter,march-23-2026,,2026-03-19,2025-03-05,12.5,retire more,descriptive_other
+cleraskin.com,599.0,4/3,Afternic,Twitter,april-6-2026,,2026-04-03,2025-07-17,8.5,cle ras kin,descriptive_other
+teamfanapparel.com,400.0,3/13,Afternic,Facebook,march-16-2026,,2026-03-13,2025-11-07,4.1,team fan apparel,descriptive_other
+unionmarkets.com,295.0,7/15,Afternic,Twitter,july-20-2026,,2026-07-15,2025-11-17,7.9,union markets,descriptive_other
+biomasks.com,2880.0,05/26,Sedo,Twitter,june-2-2025,,2025-05-26,2023-04-13,25.4,bio masks,descriptive_other
+carolinapipecleaning.com,499.0,6/1,Afternic,Facebook,june-8-2026,,2026-06-01,2026-03-14,2.6,carolina pipe cleaning,service_keyword
+anypayments.com,1000.0,06/27,Afternic,NamePros,june-30-2025,,2025-06-27,2022-08-04,34.8,any payments,tech_compliance
+scrippstech.com,150.0,3/15,Afternic,Facebook,march-16-2026,,2026-03-15,2025-11-07,4.2,scripps tech,tech_compliance
+techugc.com,1114.0,2/3,Afternic,Twitter,february-9-2026,,2026-02-03,2025-08-30,5.2,tech ugc,tech_compliance
+animeeditor.com,1488.0,05/25,Afternic,Twitter,may-26-2025,,2025-05-25,2025-01-28,3.8,anime editor,descriptive_other
+pistakio.com,4000.0,7/23,Afternic,Twitter,july-27,R,2026-07-23,2024-04-07,27.5,pis tak io,descriptive_other
+challengetube.com,249.0,4/24,Spaceship,NamePros,april-27-2026,,2026-04-24,2026-01-26,2.9,challenge tube,descriptive_other
+jesusthetruth.com,400.0,3/6,Afternic,Twitter,march-8-2026,,2026-03-06,2025-11-28,3.2,jesus the truth,descriptive_other
+orichat.com,420.0,4/13,Afternic,Twitter,april-20-2026,,2026-04-13,2025-03-02,13.4,ori chat,descriptive_other
+buildplayground.com,169.0,05/17,Afternic,Twitter,may-19-2025,,2025-05-17,2024-03-21,13.9,build playground,descriptive_other
+fortdodgeford.com,375.0,2/27,Afternic,Facebook,march-2-2026,,2026-02-27,2025-02-25,12.1,fort dodge ford,descriptive_other
+picklefriends.com,2988.0,3/16,Afternic,Twitter,march-23-2026,,2026-03-16,2024-03-29,23.6,pickle friends,descriptive_other
+coronadopainting.com,250.0,11/8,Afternic,Facebook,november-10-2025,,2025-11-08,2025-09-18,1.7,coronado painting,service_keyword
+stargateinfrastructure.com,750.0,05/23,Afternic,Twitter,may-26-2025,,2025-05-23,2025-01-22,4.0,stargate infrastructure,descriptive_other
+yeasto.com,2999.0,04/03,Atom,NamePros,april-7-2025,,2025-04-03,2023-12-21,15.4,yea sto,descriptive_other
+fitmuslim.com,111.0,5/29,Afternic,Facebook,june-1-2026,,2026-05-29,2026-02-03,3.8,fit muslim,descriptive_other
+ampdance.com,300.0,3/26,Afternic,,march-30-2026,,2026-03-26,2026-03-09,0.6,amp dance,descriptive_other
+donstreeservice.com,300.0,3/15,Atom,Twitter,march-16-2026,,2026-03-15,2026-02-05,1.2,dons tree service,service_keyword
+agentclearing.com,299.0,4/18,Afternic,Twitter,april-20-2026,,2026-04-18,2025-10-10,6.2,agent clearing,tech_compliance
+govirl.com,150.0,2/26,Afternic,Twitter,march-2-2026,,2026-02-26,2025-02-10,12.5,gov irl,descriptive_other
+areatreeservice.com,150.0,2/2,Afternic,Twitter,february-9-2026,,2026-02-02,2025-01-22,12.4,area tree service,service_keyword
+minesmp.com,3000.0,6/26,Afternic,Twitter,june-29-2026,,2026-06-26,2025-12-27,5.9,mine smp,descriptive_other
+minisudoku.com,6995.0,1/13,Afternic,Twitter,january-19-2026,,2026-01-13,2025-11-17,1.9,mini sudoku,descriptive_other
+workimo.com,149.0,04/22,Atom,Twitter,april-28-2025,,2025-04-22,2024-05-31,10.7,work imo,descriptive_other
+pupplanner.com,199.0,6/1,Afternic,Facebook,june-8-2026,,2026-06-01,2025-09-04,8.9,pup planner,descriptive_other
+aimegaphone.com,100.0,5/3,Afternic,Twitter,may-4-2026,,2026-05-03,2025-08-31,8.0,ai megaphone,tech_compliance
+airytime.com,888.0,06/07,Afternic,Twitter,june-9-2025,,2025-06-07,2024-10-03,8.1,airy time,descriptive_other
+promptkeep.com,1000.0,07/07,UnstoppableDomains,Twitter,july-14-2025,,2025-07-07,2025-02-21,4.5,prompt keep,tech_compliance
+humanoidcommander.com,100.0,5/28,Spaceship,Twitter,june-1-2026,,2026-05-28,2025-09-09,8.6,humanoid commander,descriptive_other
+healthysmileclinic.com,500.0,05/15,Afternic,Twitter,may-19-2025,,2025-05-15,2024-11-20,5.8,healthy smile clinic,service_keyword
+caprasports.com,200.0,8/5,Spaceship,Facebook,august-10,,2026-08-05,2026-07-25,0.4,capra sports,descriptive_other
+roomkey.com,30000.0,11/5,NamesCon,NamesCon,november-10-2025,,2025-11-05,2025-02-26,8.3,room key,descriptive_other
+viralista.com,2995.0,7/4,BrandBucket,Twitter,july-6-2026,,2026-07-04,2024-12-28,18.2,vir ali sta,descriptive_other
+versatags.com,450.0,1/12,Afternic,Twitter,january-19-2026,,2026-01-12,2025-09-24,3.6,versa tags,descriptive_other
+setterassociates.com,499.0,4/30,Afternic,Twitter,may-4-2026,,2026-04-30,2025-10-10,6.6,setter associates,descriptive_other
+fitlifefitness.com,300.0,2/2,Afternic,Twitter,february-9-2026,,2026-02-02,2025-07-09,6.8,fit life fitness,descriptive_other
+apalife.com,2588.0,07/10,Afternic,Twitter,july-14-2025,,2025-07-10,2025-03-09,4.0,apa life,descriptive_other
+foamfox.com,4995.0,06/11,Atom,Twitter,june-16-2025,,2025-06-11,2024-09-24,8.5,foam fox,descriptive_other
+aidrivex.com,475.0,5/3,Afternic,Facebook,may-4-2026,,2026-05-03,2025-10-03,7.0,ai dri vex,tech_compliance
+realestatehvar.com,1000.0,7/14,Afternic,Twitter,july-20-2026,,2026-07-14,2026-01-31,5.4,real esta teh var,descriptive_other
+aibros.com,899.0,7/13,Spaceship,Twitter,july-20-2026,,2026-07-13,2024-05-24,25.6,ai bros,tech_compliance
+defiallodds.com,9888.0,06/07,Afternic,Twitter,june-9-2025,,2025-06-07,2024-04-21,13.5,defi all odds,tech_compliance
+luxuryrentalvacation.com,323.0,05/04,Afternic,Twitter,may-5-2025,,2025-05-04,2024-06-18,10.5,luxury rental vacation,service_keyword
+americantallow.com,599.0,1/12,Afternic,Twitter,january-19-2026,,2026-01-12,2025-08-15,4.9,american tal low,descriptive_other
+milkduck.com,1266.0,05/23,Atom,Twitter,may-26-2025,,2025-05-23,2024-10-13,7.3,milk duck,descriptive_other
+clinebot.com,300.0,8/8,Spaceship,NamePros,august-11-2025,,2025-08-08,2024-10-09,10.0,cline bot,tech_compliance
+offgridcontainerhomes.com,4999.0,8/5,Afternic,Twitter,august-10,D,2026-08-05,2025-11-04,9.0,off grid container homes,tech_compliance
+quantummakers.com,2706.0,4/10,Afternic,Twitter,april-13-2026,,2026-04-10,2024-12-30,15.3,quantum makers,tech_compliance
+wickedpickleball.com,1577.0,04/04,Afternic,Twitter,april-7-2025,,2025-04-04,2023-11-10,16.8,wicked pickle ball,descriptive_other
+gaioffice.com,1988.0,07/17,Sedo,NamePros,july-21-2025,,2025-07-17,2023-08-08,23.3,gai office,descriptive_other
+bodyconcierge.com,3988.0,7/3,Afternic,Twitter,july-6-2026,,2026-07-03,2023-07-31,35.1,body concierge,descriptive_other
+precisionhealthclinics.com,285.0,7/6,Afternic,Facebook,july-13-2026,,2026-07-06,2025-11-07,7.9,precision health clinics,service_keyword
+platingfood.com,499.0,12/2,Afternic,Facebook,december-8-2025,,2025-12-02,2025-08-29,3.1,plating food,descriptive_other
+tecateroofing.com,350.0,4/4,Afternic,Facebook,april-6-2026,,2026-04-04,2024-07-27,20.2,tec ate roofing,service_keyword
+bellinghamroofer.com,555.0,2/10,Afternic,Twitter,february-16-2026,,2026-02-10,2025-03-31,10.4,bellingham roofer,service_keyword
+wavecleaners.com,350.0,2/7,Afternic,Facebook,february-9-2026,,2026-02-07,2025-11-27,2.4,wave cleaners,service_keyword
+thomaswilliamson.com,199.0,4/4,Afternic,Facebook,april-6-2026,,2026-04-04,2025-11-15,4.6,thomas williamson,descriptive_other
+incomingo.com,2000.0,04/04,Afternic,NamePros,april-7-2025,,2025-04-04,2025-01-20,2.4,inc omi ngo,descriptive_other
+coronaliving.com,299.0,7/8,Afternic,NamePros,july-13-2026,,2026-07-08,2026-01-29,5.3,corona living,descriptive_other
+juicyescort.com,100.0,3/8,Sedo,NamePros,march-8-2026,,2026-03-08,2026-01-22,1.5,juicy escort,descriptive_other
+stevejohnsen.com,150.0,4/4,Afternic,Facebook,april-6-2026,,2026-04-04,2025-06-09,9.8,steve john sen,descriptive_other
+gaincs.com,479.0,12/30,Afternic,Twitter,january-5-2026,,2025-12-30,2025-05-22,7.3,gai ncs,descriptive_other
+freedomfreak.com,599.0,03/20,Afternic,DomainX,march-24-2025,,2025-03-20,2024-02-04,13.5,freedom freak,descriptive_other
+bangkokrooftop.com,450.0,12/18,Afternic,Twitter,december-22-2025,,2025-12-18,2025-12-10,0.3,bangkok rooftop,descriptive_other
+foresttreeservice.com,200.0,1/29,Afternic,Twitter,february-2-2026,,2026-01-29,2025-02-02,11.9,forest tree service,service_keyword
+designgpt.com,35000.0,8/5,Spaceship,Twitter,august-11-2025,,2025-08-05,2022-12-05,32.0,design gpt,tech_compliance
+twoany.com,100.0,5/19,Spaceship,Twitter,may-25-2026,,2026-05-19,2025-08-29,8.6,two any,descriptive_other
+bluelimetech.com,370.0,5/18,Escrow,Facebook,may-25-2026,,2026-05-18,2026-04-23,0.8,blue lime tech,tech_compliance
+clawmatic.com,2988.0,6/6,Afternic,Twitter,june-8-2026,,2026-06-06,2026-02-01,4.1,claw matic,descriptive_other
+photographertokyo.com,500.0,4/29,Afternic,Twitter,may-4-2026,,2026-04-29,2026-04-24,0.2,photographer tokyo,descriptive_other
+sheinstar.com,2338.0,07/09,Atom,NamePros,july-14-2025,,2025-07-09,2023-11-24,19.5,she ins tar,descriptive_other
