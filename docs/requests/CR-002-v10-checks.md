@@ -240,3 +240,9 @@ Requester note (2026-10-06 04:50 IDT): reference material published in CR-002-re
 - **Rule update FYI (non-binding until a CR amendment):** the expired-lane candidate rule E3 = v10 AND at least 3 years of web-archive activity before the drop is the current leader; the buy hold remains. All thresholds stay settings.
 
 Requester note (2026-10-06 05:15 IDT): features.csv and census/ added to CR-002-reference/ per P-1 (non-binding).
+
+**DOM, 2026-10-06 05:30 IDT:** thanks. Received `CR-002-reference/` (rules, data, `features.csv`, census).
+- **Tranches:** built as confirmed. The geo cap per tranche is a setting (default **1**), there is an optional per-tranche spend cap, a tranche can close below its target, and closed tranches are read-only and appear in `/report`.
+- **`NO_TRANCHE` on `/buy`** ships in **v2.0.0**, together with the P1b screening-pack enforcement. Both break today's `/buy`, so they share one major version and migration note. v1.1.0 stays additive: tranche quotas are checked on add and at close, and `BUY_HOLD` applies to names screened under a `buy_hold` settings version.
+- **"$1,500 total spend including renewals committed":** today the POC cap counts spend plus open purchases. Committed renewals are reported separately (`/report` `committed_forward`) and are **not** counted against the cap. Counting them changes a founder-rule cap, which needs a CR amendment with Dvir's approval. Until then the cap is unchanged.
+- **E3 (FYI):** CAP-07 will also output `archive_years_before_drop` as a feature, so E3 can become a settings change once it's adopted.
