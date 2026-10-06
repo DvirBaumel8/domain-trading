@@ -23,7 +23,7 @@ export interface RdapLookup {
 export type RdapLookupFn = (domain: string, opts?: { baseUrl?: string; timeoutMs?: number; signal?: AbortSignal }) => Promise<RdapLookup>;
 
 /** Honest identification for every outbound request of the screening sources (sources.md). */
-export const USER_AGENT = 'domain-trading-api/1.2.0 (+https://github.com/DvirBaumel8/domain-trading)';
+export const USER_AGENT = 'domain-trading-api/2.0.0 (+https://github.com/DvirBaumel8/domain-trading)';
 export const RDAP_COM_BASE = 'https://rdap.verisign.com/com/v1/';
 const MAX_BODY_CHARS = 1_000_000;
 

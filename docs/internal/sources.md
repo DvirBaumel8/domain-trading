@@ -1,6 +1,6 @@
 # External sources: terms log (CR-001 P-3, ground rule 6)
 
-Rule: a source is used only after its terms are quoted here (verbatim, with URL and retrieval date) **and** its `sources.<name>` flag is true in the active selection settings. If the terms could not be verified from the primary source the entry says **UNVERIFIED**, the decision is `disabled`, and no data from that source is committed or fetched. All entries retrieved by DOM on **2026-10-06** with `curl` (honest User-Agent `domain-trading-api/1.2.0 (+https://github.com/DvirBaumel8/domain-trading)`) unless noted. Everything here is read-only toward the outside world; nothing is posted, nothing contacts a person.
+Rule: a source is used only after its terms are quoted here (verbatim, with URL and retrieval date) **and** its `sources.<name>` flag is true in the active selection settings. If the terms could not be verified from the primary source the entry says **UNVERIFIED**, the decision is `disabled`, and no data from that source is committed or fetched. All entries retrieved by DOM on **2026-10-06** with `curl` (honest User-Agent `domain-trading-api/2.0.0 (+https://github.com/DvirBaumel8/domain-trading)`) unless noted. Everything here is read-only toward the outside world; nothing is posted, nothing contacts a person.
 
 Summary
 
