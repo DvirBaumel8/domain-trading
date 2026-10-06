@@ -2,6 +2,7 @@
 // Tasks 5-7 add their checks by importing the file and listing it below (availability, typo, surbl, history, census, ext_dates,
 // tier, namebio, quote, price). Nothing else in the engine changes. `pack` and `leads` stay unimplemented in v1.1.0 (P1b / post-buy).
 import type { Check, CheckId } from '../types.js';
+export { DEPENDS_ON } from '../depends.js';
 import { availabilityCheck } from './availability.js';
 import { brandListsCheck } from './brand-lists.js';
 import { censusCheck } from './census.js';
@@ -42,17 +43,4 @@ export const CHECKS: Partial<Record<CheckId, Check>> = {
 export const GATE_OF: Record<CheckId, string> = {
   form: 'G0', brand_lists: 'G1', typo: 'G1', availability: 'G2', concentration: 'G3', surbl: 'G4', web_risk: 'G5', history: 'G6',
   tm_us: 'G7', tm_eu: 'G7', census: 'G8', ext_dates: 'G8', same_name: 'G8', tier: 'G8', namebio: 'G8', quote: 'G9', price: 'G9', pack: 'G10', leads: 'G12',
-};
-
-/**
- * Which checks read which others' rows in the same run (taken from the `ctx.latest(...)` reads in checks/*.ts; keep in step with them;
- * `price` also reads every FLAG-capable check for its risk flag: tm_us, web_risk, tm_eu, same_name).
- * Every automatic row records the newest dependency row id it was computed from (`generation`). When a dependency in force is newer
- * than that, the row is stale and is recomputed (appended with a new `generation`; the old row stays). A manual row is never stale.
- */
-export const DEPENDS_ON: Partial<Record<CheckId, CheckId[]>> = {
-  ext_dates: ['availability', 'history'],
-  tier: ['form', 'census', 'history', 'ext_dates'],
-  price: ['form', 'history', 'tier', 'namebio', 'quote', 'tm_us', 'web_risk', 'tm_eu', 'same_name'],
-  tm_us: ['form', 'history'],
 };

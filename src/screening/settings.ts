@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { Database, SelectionSettingsTable } from '../db/types.js';
 import { AppError } from '../http/errors.js';
 import { requireNamedApproval } from './approval.js';
+import { DEPENDS_ON } from './depends.js';
 
 export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short'] as const;
 export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads'] as const;
@@ -218,6 +219,15 @@ export const SelectionValues = Base.superRefine((v, ctx) => {
       const inB = shared.map((id) => b.indexOf(id));
       if (inB.some((x, k) => k > 0 && x < inB[k - 1]!)) bad(['run', 'gates', lb], `the order of the checks shared with "${la}" differs from "${la}" (lane lists must agree on gate order)`);
     }
+  }
+  // A check that reads another check's row of the same run must come after it, or the recompute logic could not order them.
+  for (const [lane, ids] of Object.entries(v.run.gates)) {
+    ids.forEach((c, at) => {
+      for (const d of DEPENDS_ON[c as CheckIdT] ?? []) {
+        const di = ids.indexOf(d);
+        if (di > at) bad(['run', 'gates', lane], `"${d}" must come before "${c}" (${c} reads its result)`);
+      }
+    });
   }
   for (const id of v.run.feature_checks) {
     if (!isCheckId(id)) bad(['run', 'feature_checks'], `unknown check id "${id}"`);

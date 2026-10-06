@@ -1,6 +1,7 @@
 // v1.2.0 Task 3: a manual history record recomputes, in the same run, the checks that read history (ext_dates, tier, price, tm_us).
 // New rows are appended (generation = the newest dependency row id); the stale rows stay; a manual row is never stale.
 import { randomUUID } from 'node:crypto';
+import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { DEPENDS_ON, GATE_OF } from '../../src/screening/checks/index.js';
@@ -81,6 +82,7 @@ describe('same-run recompute after a manual history record', () => {
     expect(tierRows[0]!.status).toBe('UNKNOWN'); // the old row stays
     expect(tierRows[1]!.status).not.toBe('UNKNOWN');
     expect(Number(tierRows[1]!.generation)).toBeGreaterThan(0);
+    expect(tierRows[1]!.inputs).toMatchObject({ history: Number((await rowsOf(id, 'history')).at(-1)!.id) });
     expect(await rowsOf(id, 'price')).toHaveLength(1);
     expect(((await rowsOf(id, 'ext_dates')).at(-1)!.fields as any).com_prior_registration).toBe('yes');
     expect(body.names[0].final_status).toBe('would_buy');
@@ -102,7 +104,7 @@ describe('same-run recompute after a manual history record', () => {
     expect([...staleChecks(lm, ['history', 'tm_us'])]).toEqual([]);
   });
 
-  it('a stale row is never served from the cache (the recompute calls the check)', async () => {
+  it('a check with dependencies is never served from the cache (a stale recompute calls the check)', async () => {
     await patchActiveSettings(['freshness_hours', 'tier'], 168);
     const { x, id, calls } = await setup();
     // A fresh, cacheable tier PASS for the same name from another run: a first computation would take it.
@@ -180,7 +182,8 @@ describe('same-run recompute after a manual history record', () => {
     expect(await statusOf(id)).toBe('done');
     const t = await rowsOf(id, 'tier');
     expect(t.map((r) => r.status)).toEqual(['UNKNOWN', 'PASS']);
-    expect(Number(t[1]!.generation)).toBeGreaterThan(Number(t[0]!.generation));
+    expect(t[1]!.generation).not.toBe(t[0]!.generation);
+    expect(t[1]!.inputs).toMatchObject({ history: expect.any(Number) }); // the exact dependency rows it was computed from
     expect(await rowsOf(id, 'price')).toHaveLength(1);
     expect((await x.get(`/screening/runs/${id}`)).json().names[0].final_status).toBe('would_buy');
   });
@@ -221,6 +224,94 @@ describe('same-run recompute after a manual history record', () => {
     expect([r.statusCode, r.json().error.code, r.json().error.details.reason]).toEqual([409, 'NOT_SCREENED_OK', 'RUNNING']);
   });
 
+  it('race: a manual history with a LOWER id than the auto history a dependent read makes the dependent stale (inputs differ), and it is recomputed against the manual row', async () => {
+    const { x, id: _ } = await setup('form', {}); // only the harness and stubs are used; the run below is a real live run
+    const tierCalls: unknown[] = [];
+    const hist = x.app.screeningWorker.checks.history!;
+    x.app.screeningWorker.checks.history = { ...hist, async run() { return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', null); } };
+    const realTier = x.app.screeningWorker.checks.tier!;
+    x.app.screeningWorker.checks.tier = { ...realTier, async run(ctx) { tierCalls.push(ctx.latest('history')?.source); return realTier.run(ctx); } };
+    const seq = (await sql<{ seq: string }>`select pg_get_serial_sequence('screening_results', 'id') as seq`.execute(db)).rows[0]!.seq;
+    const now0 = Number((await sql<{ v: string }>`select last_value as v from screening_results_id_seq`.execute(db)).rows[0]!.v);
+    await sql`select setval(${seq}, ${now0 + 100})`.execute(db); // a gap: the run's rows get ids far above the ones the manual record gets below
+    const { id: rid, res: created } = await x.run({ mode: 'live', names: [{ domain: DOMAIN, lane: 'S7' }] });
+    expect(created.statusCode).toBe(202);
+    await x.app.screeningWorker.runToEnd(rid);
+    expect(await statusOf(rid)).toBe('done');
+    const autoHist = (await rowsOf(rid, 'history')).at(-1)!;
+    await sql`select setval(${seq}, ${now0 + 10})`.execute(db);
+    const r = await x.post(`/screening/runs/${rid}/manual`, historyPass(x));
+    expect(r.statusCode).toBe(201);
+    expect(Number(r.json().id ?? 0) || 0).toBeLessThan(Number(autoHist.id)); // the manual row's id is lower than the auto history's
+    expect(r.json().recompute).toBe(true);
+    await sql`select setval(${seq}, ${now0 + 500})`.execute(db); // later rows get higher ids again
+    await x.app.screeningWorker.runToEnd(rid);
+    expect(tierCalls.at(-1)).toBe('manual');
+    const t = await rowsOf(rid, 'tier');
+    expect(t.at(-1)!.status).not.toBe('UNKNOWN');
+    expect(await rowsOf(rid, 'price')).toHaveLength(1);
+  });
+
+  it('an off-plan dependency counts: a tm_eu FLAG posted after price ran makes price stale and it is recomputed with the risk flag', async () => {
+    const { x, id } = await setup('price', {});
+    x.app.screeningWorker.checks.price = { ...x.app.screeningWorker.checks.price!, async run(ctx) {
+      return outcome('PASS', null, null, { risk: ctx.latest('tm_eu')?.status === 'FLAG' });
+    } };
+    const eu = { domain: DOMAIN, check: 'tm_eu', checked_at: new Date(x.clock.t - 3_600_000).toISOString(), evidence_url: 'https://euipo.europa.eu/eSearch/', result: {
+      phrases_queried: ['OFFICEPREPEXAMPLE'], checked_by: 'dvir', registers: ['euipo', 'wipo', 'ukipo'], register_urls: ['https://euipo.europa.eu/eSearch/'], result: 'hits',
+      exact_or_core_live: [], generic_live: [{ mark: 'EXAMPLE', number: '018912345', owner: 'X GmbH', status: 'registered', register: 'wipo' }] } };
+    const r = await x.post(`/screening/runs/${id}/manual`, eu);
+    expect(r.json()).toMatchObject({ status: 'FLAG', recompute: true });
+    await x.app.screeningWorker.runToEnd(id);
+    const p = await rowsOf(id, 'price');
+    expect(p).toHaveLength(2);
+    expect((p[1]!.fields as any).risk).toBe(true);
+    expect(await statusOf(id)).toBe('done');
+  });
+
+  it('recompute follows the dependencies: history, then web_risk and tm_us records each reopen for price', async () => {
+    const { x, id } = await setup();
+    expect((await x.post(`/screening/runs/${id}/manual`, historyPass(x))).json().recompute).toBe(true);
+    await x.app.screeningWorker.runToEnd(id);
+    const wr = { domain: DOMAIN, check: 'web_risk', checked_at: new Date(x.clock.t - 3_600_000).toISOString(), evidence_url: 'https://transparencyreport.google.com/x', result: { raw_status: 1, threat_types: [] } };
+    expect((await x.post(`/screening/runs/${id}/manual`, wr)).json().recompute).toBe(true); // price and history read web_risk
+    await x.app.screeningWorker.runToEnd(id);
+    const tm = { domain: DOMAIN, check: 'tm_us', checked_at: new Date(x.clock.t - 3_600_000).toISOString(), evidence_url: 'https://tmsearch.uspto.gov/x', result: { phrases_queried: ['OFFICEPREPEXAMPLE'], control_ok: true, exact_or_core_live: [], generic_live: [] } };
+    expect((await x.post(`/screening/runs/${id}/manual`, tm)).json().recompute).toBe(true); // price reads tm_us
+  });
+
+  it('recompute is false for a record no planned check reads (tm_us with a plan of form and history)', async () => {
+    const { x, id } = await setup('history', { history: 'MANUAL_REQUIRED' }, ['form', 'history']);
+    const tm = { domain: DOMAIN, check: 'tm_us', checked_at: new Date(x.clock.t - 3_600_000).toISOString(), evidence_url: 'https://tmsearch.uspto.gov/x', result: { phrases_queried: ['OFFICEPREPEXAMPLE'], control_ok: true, exact_or_core_live: [], generic_live: [] } };
+    const r = await x.post(`/screening/runs/${id}/manual`, tm);
+    expect([r.statusCode, r.json().recompute]).toEqual([201, false]);
+    expect(await statusOf(id)).toBe('done');
+  });
+
+  it('a verdict on a stale FLAG row is refused VERDICT_RESULT_STALE', async () => {
+    const { x, id } = await setup('price', {});
+    await db.insertInto('screening_results').values({
+      run_id: id, item_idx: 0, domain: DOMAIN, lane: 'S7', check_id: 'tm_us', gate: 'G7', rule_ids: ['X'], status: 'FLAG', reason_code: 'TM_GENERIC_HITS', reason: null, generation: '1',
+      fields: JSON.stringify({}), checked_at: new Date(), settings_label: 'v1', list_versions: '{}', duration_ms: 0, upstream_calls: 0, source: 'auto',
+    }).execute();
+    const flag = (await rowsOf(id, 'tm_us')).at(-1)!;
+    // history changes after that FLAG was computed: it is stale (legacy row, newer dependency)
+    await db.insertInto('screening_results').values({
+      run_id: id, item_idx: 0, domain: DOMAIN, lane: 'S7', check_id: 'history', gate: 'G6', rule_ids: ['X'], status: 'PASS', reason_code: null, reason: null,
+      fields: JSON.stringify({ prior_history: 1, manual: true }), checked_at: new Date(), settings_label: 'v1', list_versions: '{}', duration_ms: 0, upstream_calls: 0, source: 'manual', recorded_by: 'gavriel',
+    }).execute();
+    const r = await x.post(`/screening/runs/${id}/verdicts`, { domain: DOMAIN, check: 'tm_us', result_id: Number(flag.id), verdict: 'PASS', reason: 'ok', decided_by: 'dvir', decided_at: new Date(x.clock.t - 1000).toISOString() });
+    expect([r.statusCode, r.json().error.code]).toEqual([409, 'VERDICT_RESULT_STALE']);
+  });
+
+  it('settings: a dependency listed after its dependent is refused SETTINGS_INVALID', async () => {
+    const x = await screeningHarness();
+    app = x.app;
+    const r = await x.post('/selection/settings', { label: 'v-order', based_on: 'v1', set: { 'run.gates.default': ['form', 'tier', 'history'] } });
+    expect(r.statusCode).toBe(422);
+    expect(JSON.stringify(r.json())).toMatch(/must come before/);
+  });
+
   it('reopenRun only reopens a finished run, with a fresh deadline', async () => {
     const { id } = await setup('history', { history: 'MANUAL_REQUIRED' }, ['form', 'history']);
     const now = new Date();
@@ -231,7 +322,7 @@ describe('same-run recompute after a manual history record', () => {
   });
 
   it('DEPENDS_ON and staleChecks: chain staleness, manual never stale, newer dependency only', () => {
-    expect(Object.keys(DEPENDS_ON).sort()).toEqual(['ext_dates', 'price', 'tier', 'tm_us']);
+    expect(Object.keys(DEPENDS_ON).sort()).toEqual(['ext_dates', 'history', 'price', 'tier', 'tm_us']);
     const row = (check_id: CheckId, id: number, source: 'auto' | 'manual' | 'cache' = 'auto') => [check_id, { id, check_id, source } as ResultRow] as const;
     const plan: CheckId[] = ['form', 'history', 'ext_dates', 'tier', 'price'];
     const latest = new Map([row('form', 1), row('history', 9, 'manual'), row('ext_dates', 3), row('tier', 4), row('price', 5)]);

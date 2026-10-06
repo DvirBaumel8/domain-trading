@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { GATE_OF } from '../../src/screening/checks/index.js';
 import { tmEuCheck } from '../../src/screening/checks/manual.js';
+import { outcome } from '../../src/screening/types.js';
 import { planFor } from '../../src/screening/engine.js';
 import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
 import type { CheckContext } from '../../src/screening/types.js';
@@ -62,8 +63,11 @@ describe('POST /screening/runs/{id}/manual: tm_eu', () => {
   it('is accepted for an S3 name whose plan has no tm_eu, and the run view shows it as a result row only when the plan reads it (final_status unchanged)', async () => {
     const x = await h();
     const id = await seedRun([{ domain: 'aiactconformity.com', lane: 'S3' }]);
+    // price reads tm_eu even when the plan does not run it, so the record recomputes price (Task 3): offline, with PASS stubs.
+    for (const c of Object.keys(GATE_OF) as (keyof typeof GATE_OF)[]) x.app.screeningWorker.checks[c] = { id: c, gate: GATE_OF[c], ruleIds: ['X'], lists: [], run: async () => outcome('PASS', null, null) };
     const before = (await x.get(`/screening/runs/${id}`)).json().names[0].final_status;
     expect((await x.post(`/screening/runs/${id}/manual`, base(x, { result: clear }))).statusCode).toBe(201);
+    await x.app.screeningWorker.idle();
     expect((await x.get(`/screening/runs/${id}`)).json().names[0].final_status).toBe(before);
   });
 

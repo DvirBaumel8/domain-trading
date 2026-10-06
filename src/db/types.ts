@@ -435,8 +435,10 @@ export interface ScreeningResultsTable {
   evidence_ids: Generated<string[]>;
   source: 'auto' | 'cache' | 'manual';
   cached_from: string | null;
-  /** 0 for a first computation; a recompute of a stale row carries the id of the newest dependency row it read (one auto row per generation). */
+  /** Hash of `inputs` (0 for a check without dependencies): one automatic row per (run, item, check, generation). */
   generation: Generated<string>;
+  /** The dependency row ids this row was computed from (see ResultRow.inputs). */
+  inputs: Json | null;
   recorded_by: string | null;
   audit_id: string | null;
   created_at: TimestampDefault;

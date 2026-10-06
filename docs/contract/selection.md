@@ -191,12 +191,13 @@ Some checks read other checks' rows of the same run (`ctx.latest(...)`). The dep
 
 | Check | Reads |
 |---|---|
+| `history` | `availability`, `surbl`, `web_risk` |
 | `ext_dates` | `availability`, `history` |
 | `tier` | `form`, `census`, `history`, `ext_dates` |
-| `price` | `form`, `history`, `tier`, `namebio`, `quote`, `tm_us`, `web_risk`, `tm_eu`, `same_name` |
+| `price` | `form`, `history`, `tier`, `namebio`, `quote`, `tm_us`, `web_risk`, `tm_eu`, `same_name`, `concentration` |
 | `tm_us` | `form`, `history` |
 
-Every automatic row records its `generation`: the id of the newest dependency row it was computed from. A check's row is **stale** when it is automatic (never manual) and a dependency's in-force row is newer than its `generation` (a row with none recorded falls back to its own id), or a dependency is itself stale; this also catches a record that commits while the check is running. Only dependencies in the name's plan count. A stale row counts as missing for every reader until recomputed. The run's worker recomputes it (the cache is skipped for it): a new row is appended (one automatic row per run, name, check and generation, so two workers cannot write it twice). The old row stays in the run's history. The usual trigger is a manual `history` record (`POST /screening/runs/{id}/manual`), which reopens a finished run for it; the worker also re-checks after it finishes a run, so a record posted at the same moment is not lost. A name stopped by a failing check is not recomputed. Final status is derived from the newest rows as before (a manual row still outranks an automatic one, except an automated history FAIL).
+Every automatic row records its `inputs`: the id of the row in force for each of its dependencies when it was computed (`null` = no row), for every dependency in the table, in the name's plan or not. A check's row is **stale** when it is automatic (never manual) and the row in force for any dependency now differs from the recorded one (so a manual record with a lower id that outranks an auto row counts, and so does a record of a check the lane does not run), or a dependency is itself stale; this also catches a record that commits while the check is running. A row without recorded inputs is stale when a dependency row is newer. A stale row counts as missing for every reader until recomputed. The run's worker recomputes it: a new row is appended (`generation`, a hash of the inputs, makes it one automatic row per run, name, check and inputs, so two workers cannot write it twice). A check listed in the table is never served from the freshness cache (only checks without dependencies are). Settings are refused (`SETTINGS_INVALID`) when a dependency is listed after its dependent in a gate list.
 
 ## FLAG verdicts (1.2.0)
 

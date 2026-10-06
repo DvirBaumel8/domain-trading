@@ -65,7 +65,9 @@ export interface ResultRow {
   evidence_ids: number[];
   source: 'auto' | 'cache' | 'manual';
   cached_from: number | null;
-  /** Newest dependency row id this automatic row was computed from (0: none recorded; staleness then falls back to the row's own id). */
+  /** The dependency row ids (DEPENDS_ON, null = no row) this automatic row was computed from; null when none were recorded (staleness then falls back to the row's own id). */
+  inputs?: Record<string, number | null> | null;
+  /** Uniqueness discriminator of an automatic row: a hash of `inputs` (0 for a check without dependencies). */
   generation?: number;
   recorded_by: string | null;
 }

@@ -1,7 +1,7 @@
 // CAP-20 screening run engine. A run is persisted per (item, check): Render free sleeps, so a run resumes where it stopped
 // (the hourly tick and the next poll call resumeStalled/kick). Results are append-only; a check that is not built yet answers
 // NOT_RUN / NOT_IMPLEMENTED; a run that outlives its time budget finishes as `partial` with every open check UNKNOWN / TIMEOUT.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import type { Database, ScreeningResultsTable } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
@@ -35,31 +35,38 @@ export function toResultRow(r: Row): ResultRow {
     rule_ids: r.rule_ids, status: r.status, reason_code: r.reason_code, reason: r.reason, fields: r.fields as Record<string, unknown>,
     data_as_of: r.data_as_of, checked_at: r.checked_at, settings_label: r.settings_label, list_versions: r.list_versions as Record<string, number>,
     duration_ms: r.duration_ms, upstream_calls: r.upstream_calls, evidence_ids: (r.evidence_ids ?? []).map(Number), source: r.source,
-    cached_from: r.cached_from === null ? null : Number(r.cached_from), generation: Number(r.generation), recorded_by: r.recorded_by,
+    cached_from: r.cached_from === null ? null : Number(r.cached_from), inputs: r.inputs as Record<string, number | null> | null, generation: Number(r.generation), recorded_by: r.recorded_by,
   };
 }
 
-/**
- * Checks of `plan` whose in-force row is stale: an automatic or cached row (never a manual one) computed from an older dependency row
- * than the one in force now (the dependency's id is above the row's recorded `generation`; a row with none recorded falls back to its own
- * id), or whose dependency is itself stale. Walks the plan in order.
- */
-const inPlan = (c: CheckId, plan: CheckId[]): CheckId[] => (DEPENDS_ON[c] ?? []).filter((d) => plan.includes(d));
+/** The dependency row ids (DEPENDS_ON; null = no row) a computation of `c` reads from `latest`. null for a check without dependencies. */
+export type Inputs = Record<string, number | null>;
+export function inputsOf(latest: Map<CheckId, ResultRow>, c: CheckId): Inputs | null {
+  const deps = DEPENDS_ON[c];
+  return deps ? Object.fromEntries(deps.map((d) => [d, latest.get(d)?.id ?? null])) : null;
+}
+/** Uniqueness discriminator of an automatic row: a hash of its inputs (identical inputs collide, so two workers write one row). 0 without inputs. */
+export const generationOf = (inputs: Inputs | null): number =>
+  inputs === null ? 0 : parseInt(createHash('sha256').update(JSON.stringify(Object.entries(inputs).sort(([a], [b]) => (a < b ? -1 : 1)))).digest('hex').slice(0, 12), 16);
 
+/**
+ * Checks of `plan` whose in-force row is stale: an automatic or cached row (never a manual one) computed from other dependency rows than
+ * the ones in force now (any dependency in DEPENDS_ON with a row, in the plan or not; null and non-null count as different), or whose
+ * dependency is itself stale. A row with no recorded inputs falls back to "a dependency row is newer than this row". Walks the plan in order.
+ */
 export function staleChecks(latest: Map<CheckId, ResultRow>, plan: CheckId[]): Set<CheckId> {
   const stale = new Set<CheckId>();
   for (const c of plan) {
     const own = latest.get(c);
     if (!own || own.source === 'manual') continue;
-    const basis = own.generation || own.id;
-    // Only dependencies the plan runs count: a record of a check this lane does not read changes nothing here.
-    if (inPlan(c, plan).some((d) => stale.has(d) || (latest.get(d)?.id ?? 0) > basis)) stale.add(c);
+    const deps = DEPENDS_ON[c] ?? [];
+    const changed = own.inputs
+      ? deps.some((d) => (latest.get(d)?.id ?? null) !== (own.inputs![d] ?? null))
+      : deps.some((d) => (latest.get(d)?.id ?? 0) > own.id);
+    if (changed || deps.some((d) => stale.has(d))) stale.add(c);
   }
   return stale;
 }
-
-/** The newest in-force dependency row id a recompute of `c` reads: its `generation` (one automatic row per generation). */
-const generationOf = (latest: Map<CheckId, ResultRow>, c: CheckId, plan: CheckId[]): number => Math.max(0, ...inPlan(c, plan).map((d) => latest.get(d)?.id ?? 0));
 
 /**
  * Whether a recompute would run for this run: some name has a stale check in its plan and is not stopped by a gating FAIL/UNKNOWN
@@ -306,7 +313,7 @@ export class ScreeningWorker {
   /** Inserts one result row. null when the (item, check, generation) already has an automatic row (a racing worker wrote it first). */
   private async insertRow(
     run: RunRow, it: RunItem, checkId: CheckId, o: CheckOutcome,
-    meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number; generation?: number },
+    meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number; inputs?: Inputs | null },
   ): Promise<ResultRow | null> {
     const { db } = this.deps;
     try {
@@ -315,7 +322,7 @@ export class ScreeningWorker {
         rule_ids: this.checks[checkId]?.ruleIds ?? [], status: o.status, reason_code: o.reasonCode, reason: o.reason,
         fields: JSON.stringify(o.fields), data_as_of: o.dataAsOf, checked_at: meta.checkedAt, settings_label: run.settings_label,
         list_versions: JSON.stringify(meta.listVersions), duration_ms: Math.max(0, Math.round(meta.durationMs)), upstream_calls: o.upstreamCalls,
-        evidence_ids: o.evidenceIds.map(String), source: meta.source, cached_from: meta.cachedFrom === undefined ? null : String(meta.cachedFrom), generation: String(meta.generation ?? 0),
+        evidence_ids: o.evidenceIds.map(String), source: meta.source, cached_from: meta.cachedFrom === undefined ? null : String(meta.cachedFrom), generation: String(generationOf(meta.inputs ?? null)), inputs: meta.inputs ? JSON.stringify(meta.inputs) : null,
       }).returningAll().executeTakeFirstOrThrow();
       await db.updateTable('screening_runs').set({ heartbeat_at: new Date(this.deps.now()) }).where('id', '=', run.id).execute();
       return toResultRow(r);
@@ -362,7 +369,7 @@ export class ScreeningWorker {
       if (stopped) continue;
       for (const c of p) {
         if (have.has(c)) continue;
-        const row = await this.insertRow(run, it, c, outcome('UNKNOWN', code, reason), { source: 'auto', durationMs: 0, checkedAt: new Date(this.deps.now()), listVersions: {}, generation: generationOf(all, c, p) });
+        const row = await this.insertRow(run, it, c, outcome('UNKNOWN', code, reason), { source: 'auto', durationMs: 0, checkedAt: new Date(this.deps.now()), listVersions: {}, inputs: inputsOf(all, c) });
         if (row) { all.set(c, row); have.set(c, row); } // later checks of the name record this row as their input
       }
     }
@@ -416,7 +423,7 @@ export class ScreeningWorker {
     const shared = new Map<string, unknown>();
     let written = 0;
 
-    const write = async (it: RunItem, checkId: CheckId, o: CheckOutcome, meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number; generation?: number }): Promise<boolean> => {
+    const write = async (it: RunItem, checkId: CheckId, o: CheckOutcome, meta: { source: 'auto' | 'cache'; durationMs: number; checkedAt: Date; listVersions: Record<string, number>; cachedFrom?: number; inputs?: Inputs | null }): Promise<boolean> => {
       const r = await this.insertRow(run, it, checkId, o, meta);
       if (!r) { await load(); return false; } // another worker wrote this (item, check): take its row, write nothing
       // Same precedence as derive: a manual record outranks an auto or cached row. One posted while this check ran is read back now,
@@ -446,29 +453,29 @@ export class ScreeningWorker {
         const check = this.checks[checkId];
         const t0 = this.deps.now();
         let wrote: boolean;
-        const isStale = staleByItem.get(it.idx)?.has(checkId) === true;
-        const generation = generationOf(latestOf(it.idx), checkId, plan[it.lane] ?? []); // the dependency rows as read now, recorded on every automatic row
+        const snap = new Map(latestOf(it.idx)); // what this computation reads; its dependency row ids are recorded with the row
+        const inputs = inputsOf(snap, checkId);
         if (!check) {
-          wrote = await write(it, checkId, outcome('NOT_RUN', 'NOT_IMPLEMENTED', `The ${checkId} check is not built yet`), { source: 'auto', durationMs: 0, checkedAt: new Date(t0), listVersions: {}, generation });
+          wrote = await write(it, checkId, outcome('NOT_RUN', 'NOT_IMPLEMENTED', `The ${checkId} check is not built yet`), { source: 'auto', durationMs: 0, checkedAt: new Date(t0), listVersions: {}, inputs });
         } else {
           const lv = Object.fromEntries(check.lists.filter((n) => versions[n] !== undefined).map((n) => [n, versions[n]!]));
-          const hit = isStale ? null : await this.cached(run, values, it, checkId, lv); // a stale row is recomputed, never served from the cache
+          const hit = await this.cached(run, values, it, checkId, lv); // never for a check with dependencies (so never for a stale row)
           if (hit) {
             wrote = await write(it, checkId, { status: hit.status, reasonCode: hit.reason_code, reason: hit.reason, fields: hit.fields, dataAsOf: hit.data_as_of, evidenceIds: hit.evidence_ids, upstreamCalls: 0 },
-              { source: 'cache', durationMs: 0, checkedAt: hit.checked_at, listVersions: hit.list_versions, cachedFrom: hit.id, generation });
+              { source: 'cache', durationMs: 0, checkedAt: hit.checked_at, listVersions: hit.list_versions, cachedFrom: hit.id, inputs });
           } else {
             let o: CheckOutcome;
             try {
               o = await check.run({
                 db, run: runView, item: it, settings: values, settingsLabel: run.settings_label,
-                latest: (c) => latestOf(it.idx).get(c),
+                latest: (c) => snap.get(c),
                 ahead: () => order.slice(0, order.indexOf(it)).filter((x) => !x.input_error && !hasStatus(x, 'FAIL')).map((x) => ({ item: x, latest: (c: CheckId) => latestOf(x.idx).get(c) })),
                 lists, lexicon, deps: this.deps.screening, now: this.deps.now, deadline, shared,
               });
             } catch (e) {
               o = outcome('UNKNOWN', 'SOURCE_ERROR', String((e as Error).message ?? e).slice(0, 200));
             }
-            wrote = await write(it, checkId, o, { source: 'auto', durationMs: this.deps.now() - t0, checkedAt: new Date(t0), listVersions: lv, generation });
+            wrote = await write(it, checkId, o, { source: 'auto', durationMs: this.deps.now() - t0, checkedAt: new Date(t0), listVersions: lv, inputs });
           }
         }
         if (wrote && stopNow()) return;
@@ -494,6 +501,7 @@ export class ScreeningWorker {
    * result is not "now". Only runs without explicit as_of (live runs, full runs that sent none) are sources.
    */
   private async cached(run: RunRow, values: SelectionValuesT, it: RunItem, checkId: CheckId, lv: Record<string, number>): Promise<ResultRow | null> {
+    if (DEPENDS_ON[checkId] !== undefined) return null; // a check that reads other rows of its run is never served from another run's cache
     const hours = values.freshness_hours[checkId] ?? 0;
     if (hours <= 0) return null;
     if (run.mode === 'full' && it.as_of !== undefined) return null;

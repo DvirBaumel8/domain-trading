@@ -11,7 +11,7 @@ import { GATE_OF } from '../screening/checks/index.js';
 import { DEPENDS_ON } from '../screening/checks/index.js';
 import { beats, latestByCheck } from '../screening/derive.js';
 import { listVersion } from '../screening/lists.js';
-import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, loadRows, recomputePending, refreshSummary, reopenRun, toResultRow, type ScreeningWorker } from '../screening/engine.js';
+import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, loadRows, recomputePending, refreshSummary, staleChecks, reopenRun, toResultRow, type ScreeningWorker } from '../screening/engine.js';
 import { REGISTRAR_ENV } from '../registrars/registry.js';
 import { readEvidence, storeEvidence } from '../screening/evidence.js';
 import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
@@ -193,11 +193,14 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       const rows = await loadRows(db, run.id);
       const names = (run.input as { names: RunItem[] }).names;
       const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
-      const pending = recomputePending(names, plan, rows, sel.values.run.feature_checks as CheckId[], run.mode === 'live');
+      const planned = plan[item.lane] ?? [];
+      // Only a record some planned dependent reads can change anything.
+      const reads = planned.some((c) => (DEPENDS_ON[c] ?? []).includes(check as CheckId));
+      const pending = reads && recomputePending(names, plan, rows, sel.values.run.feature_checks as CheckId[], run.mode === 'live');
       if (pending) await reopenRun(db, run.id, new Date(deps.now()), sel.values.run.time_budget_minutes); // false when it is running already
       const live = (await db.selectFrom('screening_runs').select('status').where('id', '=', run.id).executeTakeFirstOrThrow()).status === 'running';
       // A run that is still running is kicked and answers true when a dependent is in the name's plan (the worker re-checks before it ends).
-      recompute = pending || (live && (plan[item.lane] ?? []).some((c) => DEPENDS_ON[c] !== undefined));
+      recompute = pending || (reads && live);
       if (recompute) worker.kick(run.id);
     }
     return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name, recompute });
@@ -222,6 +225,10 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       if (!target) throw new AppError(404, 'RESULT_NOT_FOUND', `No ${body.check} result ${body.result_id} for ${item.domain} in run ${run.id}`);
       const inForce = latestByCheck(rows).get(body.check)!;
       if (inForce.id !== target.id) throw new AppError(409, 'VERDICT_RESULT_STALE', `Result ${target.id} is no longer the ${body.check} row in force`, { in_force_result_id: inForce.id });
+      // A row that a newer dependency outdated is about to be recomputed: a verdict on it would be bound to a row that is not an answer.
+      if (staleChecks(latestByCheck(rows), (run.gate_plan as Partial<Record<Lane, CheckId[]>>)[item.lane] ?? []).has(body.check as CheckId)) {
+        throw new AppError(409, 'VERDICT_RESULT_STALE', `Result ${target.id} is stale: a check it reads has a newer result, and it is being recomputed`, { in_force_result_id: inForce.id, stale: true });
+      }
       if (target.status !== 'FLAG') throw new AppError(409, 'VERDICT_RESULT_NOT_FLAG', `Only a FLAG result takes a verdict (this one is ${target.status})`, { status: target.status });
       const row = await trx.insertInto('screening_verdicts').values({
         run_id: run.id, item_idx: item.idx, domain: item.domain, check_id: body.check, result_id: String(target.id), verdict: body.verdict, reason: body.reason,
