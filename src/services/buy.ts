@@ -7,6 +7,7 @@ import { addOneYear, jerusalemDate } from '../dates.js';
 import { formatUsd } from '../money.js';
 import type { RdapFn } from '../rdap.js';
 import { nsPendingWarning, RegistrarError, type AccountState, type DomainInfo, type RegisterSuccess, type RegistrarAdapter } from '../registrars/types.js';
+import { latestPackFor } from '../screening/pack.js';
 import { checkApproval } from './approval.js';
 import { changedColumns } from './export-state.js';
 import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
@@ -687,6 +688,8 @@ export class BuyService {
     // Same default as GET /pricing/preview with no domain: anchor today (Jerusalem), drop date 24 months later
     const anchor = jerusalemDate(new Date(this.deps.now()));
     const events = a.plan ? buildSchedule({ plan: a.plan, anchor, dropDate: addMonthsClamped(anchor, 24), settings: a.pricing }) : [];
+    // CAP-19 (advisory in v1.2.0, enforced in v2.0.0): the latest screening pack of the name. `would_be_blocked` keeps its v1.1.0 meaning.
+    const pack = await latestPackFor(this.deps.db, a.input.domain);
     return {
       dry_run: true, domain: a.input.domain, check_id: a.check.checkId, registrar: w.registrar,
       first_year: formatUsd(w.firstYearCents!), first_year_cents: w.firstYearCents,
@@ -699,6 +702,8 @@ export class BuyService {
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
       proposed_listing: a.plan ? planView(a.plan, events) : null, settings_version: a.pricing.version,
       ...(a.wouldBeBlocked && { would_be_blocked: a.wouldBeBlocked }),
+      screening_pack: { status: pack ? pack.status : 'none', pack_id: pack?.id ?? null, version: pack?.version ?? null, issued_at: pack?.issued_at.toISOString() ?? null },
+      advisories: pack?.status === 'complete' ? [] : ['SCREENING_PACK_REQUIRED'],
       warnings: [...a.check.warnings, ...(a.plan?.warnings ?? [])],
     };
   }

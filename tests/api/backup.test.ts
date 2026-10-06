@@ -139,6 +139,10 @@ async function seed() {
     run_id: 'run_bk', item_idx: 0, domain: T, check_id: 'web_risk', result_id: resId, verdict: 'REJECT', reason: 'fixture verdict', decided_by: 'Shomer',
     decided_at: new Date('2026-10-06T07:45:00Z'), recorded_by: 'gavriel',
   }).execute();
+  await db.insertInto('screening_packs').values({
+    id: 'pk_0123456789ab', domain: T, version: 1, run_id: 'run_bk', item_idx: 0, status: 'incomplete', missing: JSON.stringify([{ item: 'web_risk', code: 'FLAG_REJECTED', detail: 'x' }]),
+    content: JSON.stringify({ domain: T }), content_sha256: 'a'.repeat(64), settings_label: 'v1', issued_at: new Date('2026-10-06T07:50:00Z'), issued_by: 'gavriel',
+  }).execute();
   await db.insertInto('manual_quotes').values({ domain: T, registrar: 'godaddy', renewal_cents: 2299, source_note: 'page', observed_at: new Date('2026-10-05T12:00:00Z'), recorded_by: 'gavriel' }).execute();
   const gid = await listedDomain({ domain: G, lander: 'afternic', lander_set_at: new Date('2026-10-10T00:00:00Z') });
   await db.insertInto('ledger_entries').values({ occurred_on: '2026-10-04', domain_id: gid, type: 'registration', amount_cents: -1108, note: 'has, "quotes"\nand a newline' }).execute();
@@ -363,12 +367,13 @@ describe('BK-3 import round trip', () => {
 
     await resetDb(db);
     const counts = await importBackup(db, dir);
-    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1, selection_settings: 2, selection_lists: 15, screening_evidence: 1, screening_runs: 1, screening_results: 1, screening_verdicts: 1, manual_quotes: 1 });
+    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1, selection_settings: 2, selection_lists: 15, screening_evidence: 1, screening_runs: 1, screening_results: 1, screening_verdicts: 1, screening_packs: 1, manual_quotes: 1 });
     // the CR-001 rows are back with their ids; the evidence text survives the bytea round trip
     expect((await db.selectFrom('selection_settings').select('label').orderBy('id').execute()).map((r) => r.label)).toEqual(['v1', 'v1b']);
     expect((await db.selectFrom('selection_lists').select('terms').where('name', '=', 'brand').executeTakeFirstOrThrow()).terms).toEqual(['acme']);
     expect((await readEvidence(db, 1))!.text).toBe('{"a":1}');
     expect((await db.selectFrom('screening_results').select(['run_id', 'source']).executeTakeFirstOrThrow())).toEqual({ run_id: 'run_bk', source: 'manual' });
+    expect(await db.selectFrom('screening_packs').select(['id', 'version', 'status', 'content_sha256']).executeTakeFirstOrThrow()).toEqual({ id: 'pk_0123456789ab', version: 1, status: 'incomplete', content_sha256: 'a'.repeat(64) });
     expect(await db.selectFrom('screening_verdicts').select(['run_id', 'check_id', 'verdict', 'reason', 'decided_by']).executeTakeFirstOrThrow()).toEqual({ run_id: 'run_bk', check_id: 'web_risk', verdict: 'REJECT', reason: 'fixture verdict', decided_by: 'Shomer' });
     expect(await buildReport(db, REPORT_AT)).toEqual(reportBefore);
 

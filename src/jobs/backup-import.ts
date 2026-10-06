@@ -33,6 +33,7 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'screening_runs', file: 'tables/screening_runs.json' },
   { table: 'screening_results', file: 'tables/screening_results.json' },
   { table: 'screening_verdicts', file: 'tables/screening_verdicts.json' },
+  { table: 'screening_packs', file: 'tables/screening_packs.json' },
   { table: 'manual_quotes', file: 'tables/manual_quotes.json' },
   { table: 'tranches', file: 'tables/tranches.json' },
   { table: 'tranche_members', file: 'tables/tranche_members.json' },

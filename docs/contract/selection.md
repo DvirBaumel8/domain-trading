@@ -205,6 +205,16 @@ A FLAG does not block a name (a bot judges it). A human decision on it is record
 
 **Trust boundary.** `decided_by` and `decided_at` are declared by the caller; the server checks only that `decided_at` is not in the future and records the calling token as `recorded_by`. It cannot prove that the named person decided. A verdict is written under the same row lock as a manual record, so it can never land on a row that was superseded in between.
 
+## Screening pack (CAP-19, 1.2.0)
+
+`POST /screening/packs` freezes the evidence for one name of a finished run. It reads only **current** rows (a stale row counts as missing), and a run that is still `running` is refused (409 `RUN_RUNNING`). Manual records are per run: nothing is reused from another run.
+
+**Required checks** (`pack` settings, `eu_tm`): the name's plan minus `pack.exclude_checks` (default `census`, `ext_dates`, `namebio`, `leads`, `pack`), plus `pack.require_checks` (default `same_name`), plus `tm_eu` for lanes in `eu_tm.required_lanes` (default `S6`; for other lanes `tm_eu` never decides). Excluded checks are listed in `gates` with `decides: false`.
+
+**`missing` codes** (one entry per cause; `item` is the check, or `van_test` / `tn1` / `bigco`): `NO_RESULT` (no current result; `detail` says when the check is not in the run's plan, which needs a settings version whose `run.gates` include it) · `FAIL` · `UNKNOWN` · `MANUAL_REQUIRED` · `NOT_RUN` (the check's status) · `FLAG_NO_VERDICT` · `FLAG_REJECTED` (a FLAG needs a PASS verdict on the row in force; a verdict on an older row does not count) · `STALE_AVAILABILITY` (the availability check is older than `pack.availability_max_age_hours`, 24, at pack time) · `STALE_QUOTE` (the quote is older than `quote.max_age_hours` / `quote.manual_max_age_days`, and a live quote also older than `pack.availability_max_age_hours`) · `JUDGMENT_REJECTED`. `PASS` and `PASS_WITH_NOTE` pass. `status` is `complete` only when `missing` is empty.
+
+**Freeze and versions.** A pack never changes (database triggers refuse an update or delete). The content hash covers everything except the issue time and issuer. The same content as the domain's latest pack returns that pack with `unchanged: true`; any change (a new verdict, a recorded result, a different judgment, a changed status) writes version + 1. Issuing is serialised per domain.
+
 ## Replay and the buy hold (CAP-21a, CR-002 §5 P-3, Amendment A2/A3)
 
 A replay re-decides recorded, labelled names with the **same tier / DEMAND-2 code** live screening uses and the chosen settings; it fetches nothing. Routes: `POST /selection/labelled-names` (the name registry), `POST /selection/holdout-suites` (frozen suite definitions), `POST /selection/replays`, `GET /selection/replays/{id}`, `GET /selection/buy-hold` (`endpoints.md`).

@@ -444,6 +444,22 @@ export interface ScreeningResultsTable {
   created_at: TimestampDefault;
 }
 
+export interface ScreeningPacksTable {
+  id: string;
+  domain: string;
+  version: number;
+  run_id: string;
+  item_idx: number;
+  status: 'complete' | 'incomplete';
+  missing: Json;
+  content: Json;
+  content_sha256: string;
+  settings_label: string;
+  issued_at: Timestamp;
+  issued_by: string;
+  audit_id: string | null;
+}
+
 export interface ScreeningVerdictsTable {
   id: Generated<string>;
   run_id: string;
@@ -604,6 +620,7 @@ export interface Database {
   holdout_suites: HoldoutSuitesTable;
   screening_results: ScreeningResultsTable;
   screening_verdicts: ScreeningVerdictsTable;
+  screening_packs: ScreeningPacksTable;
   manual_quotes: ManualQuotesTable;
   rdap_lookups: RdapLookupsTable;
   reference_files: ReferenceFilesTable;

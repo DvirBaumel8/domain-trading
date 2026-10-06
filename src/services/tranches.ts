@@ -7,7 +7,7 @@ import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { formatUsd } from '../money.js';
 import { latestByCheck } from '../screening/derive.js';
-import { assemble, effectiveHold, planFor, toResultRow } from '../screening/engine.js';
+import { assemble, effectiveHold, fullPlanRunOrThrow, toResultRow } from '../screening/engine.js';
 import { activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
 import type { CheckId, Lane, RunItem } from '../screening/types.js';
 import { geoMembers, openTrancheFor } from './tranche-members.js';
@@ -91,16 +91,10 @@ export class TrancheService {
     const { db } = this;
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', runId).executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${runId}"`);
-    if (run.backtest) throw new AppError(409, 'NOT_SCREENED_OK', 'A backtest run never makes a name eligible', { run_id: runId, reason: 'BACKTEST' });
     // A run that is still working (also reopened for a recompute) has no settled answer for any name.
-    if (run.status === 'running') throw new AppError(409, 'NOT_SCREENED_OK', 'The run is still running; wait until it has finished', { run_id: runId, reason: 'RUNNING' });
+    if (run.status === 'running' && !run.backtest) throw new AppError(409, 'NOT_SCREENED_OK', 'The run is still running; wait until it has finished', { run_id: runId, reason: 'RUNNING' });
     const sel = await selectionSettingsByLabel(db, run.settings_label);
-    // A run with a cut plan (a `checks` subset, or any lane plan narrower than the settings' full plan) never admits a name.
-    const gp = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
-    const cut = Object.entries(gp).some(([lane, plan]) => JSON.stringify(plan) !== JSON.stringify(planFor(sel!.values, lane as Lane)));
-    if (cut || (run.input as { checks?: unknown }).checks !== undefined) {
-      throw new AppError(409, 'NOT_SCREENED_OK', 'The run used a cut plan (checks subset); only a full-plan run admits a name', { run_id: runId, reason: 'PARTIAL_PLAN' });
-    }
+    fullPlanRunOrThrow(run, sel!); // a backtest (also a running one) and a cut plan never admit a name
     const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
     const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values,
       await effectiveHold(db, run), true, run.mode === 'live'); // not running (refused above)

@@ -41,6 +41,34 @@ describe('/buy BUY_HOLD (v1.1.0, additive)', () => {
     expect(res.json()).toMatchObject({ dry_run: true, would_be_blocked: 'BUY_HOLD' });
   });
 
+  it('dry run, no pack: screening_pack status none + advisory SCREENING_PACK_REQUIRED; would_be_blocked unchanged', async () => {
+    const { x } = await setup();
+    await x.runDone({ checks: ['form'], names: [{ domain: DOMAIN, lane: 'S3' }] });
+    const screened = (await buy(x, buyBody({ dry_run: true }))).json();
+    expect(screened).toMatchObject({ would_be_blocked: 'BUY_HOLD', screening_pack: { status: 'none', pack_id: null, version: null }, advisories: ['SCREENING_PACK_REQUIRED'] });
+    const never = (await buy(x, buyBody({ dry_run: true, domain: 'tampapoolsco.com' }))).json();
+    expect(never.would_be_blocked).toBeUndefined();
+    expect(never).toMatchObject({ screening_pack: { status: 'none' }, advisories: ['SCREENING_PACK_REQUIRED'] });
+  });
+
+  it('dry run with a complete latest pack: its id and version, no advisory; an incomplete one keeps the advisory; a real buy is not refused for a missing pack', async () => {
+    const { x, pb } = await setup();
+    const { id } = await x.runDone({ checks: ['form'], names: [{ domain: 'tampapoolsco.com', lane: 'S3' }] });
+    const put = (version: number, status: 'complete' | 'incomplete') => db.insertInto('screening_packs').values({
+      id: `pk_00000000000${version}`, domain: 'tampapoolsco.com', version, run_id: id, item_idx: 0, status, missing: '[]', content: '{}', content_sha256: String(version).repeat(64),
+      settings_label: 'v1', issued_at: new Date(T0), issued_by: 'test',
+    }).execute();
+    await put(1, 'complete');
+    const d1 = (await buy(x, buyBody({ dry_run: true, domain: 'tampapoolsco.com' }))).json();
+    expect(d1.screening_pack).toMatchObject({ status: 'complete', pack_id: 'pk_000000000001', version: 1 });
+    expect(d1.advisories).toEqual([]);
+    await put(2, 'incomplete');
+    const d2 = (await buy(x, buyBody({ dry_run: true, domain: 'tampapoolsco.com' }))).json();
+    expect(d2).toMatchObject({ screening_pack: { status: 'incomplete', version: 2 }, advisories: ['SCREENING_PACK_REQUIRED'] });
+    const real = await buy(x, buyBody()); // DOMAIN: never screened, no pack
+    expect([real.statusCode, pb.realRegisterCalls]).toEqual([201, 1]);
+  });
+
   it('a name never screened: /buy behaves as before (no BUY_HOLD, no would_be_blocked, no tranche needed)', async () => {
     const { x, pb } = await setup();
     const dry = await buy(x, buyBody({ dry_run: true }));

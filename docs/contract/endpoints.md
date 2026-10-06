@@ -87,9 +87,12 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
     poc_spent (pair), poc_remaining_after (pair), domains_owned: int (owned + listed + delisted + pending purchases),
     registrar_dry_run: { would_succeed: true, cost, cost_cents },
     proposed_listing: null | <plan view, with the schedule anchored today and drop date +24 months>,
-    settings_version: int, would_be_blocked?: "BUY_HOLD", warnings: [string] }
+    settings_version: int, would_be_blocked?: "BUY_HOLD",
+    screening_pack: { status: "none" | "complete" | "incomplete", pack_id: string | null, version: int | null, issued_at: string | null },
+    advisories: [string], warnings: [string] }
   ```
   Writes only the audit row and the quotes. The same key can't be reused for a real buy (different body → 409).
+  **Screening pack (1.2.0, additive).** `screening_pack` is the **latest** pack of the domain (`none` when it has none) and `advisories` is `["SCREENING_PACK_REQUIRED"]` unless that pack is `complete`. This is advisory in 1.2.0 and enforced in 2.0.0: a real `/buy` is not refused for a missing or incomplete pack, and `would_be_blocked` keeps its meaning (still only `"BUY_HOLD"`).
 - **201 (bought):**
   ```
   { domain, registrar, order_id, charged (pair), renewal (pair), two_year (pair),
@@ -426,6 +429,22 @@ WRITE. A renewal price entered by Dvir's bot for a registrar the machine cannot 
 - **Body (strict):** `domain` (a `.com`), `registrar` (a configured registrar name: `porkbun`, `dynadot`, `namecom`, `namecheap`, `godaddy`, `spaceship`, `namesilo`; case-insensitive), `renewal_usd` (> 0, at most 2 decimals), `first_year_usd?`, `source_note` (1–500 chars: where the figure was read), `source_url?`, `observed_at` (ISO with offset).
 - **201:** `{id, domain, registrar (lowercased), renewal_cents, renewal, valid_until}` where `valid_until = observed_at + quote.manual_max_age_days` (30 in v1).
 - **Errors:** 422 `OBSERVED_AT_INVALID` (in the future, or older than `quote.manual_max_age_days`; `details.max_age_days`) · 422 `REGISTRAR_NOT_ALLOWED` (`cloudflare`: never, founder rule 5) · 422 `REGISTRAR_UNKNOWN` (`details.known`) · 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED` · 422 `VALIDATION_ERROR`.
+
+## Screening packs (1.2.0, CAP-19)
+
+A screening pack is the frozen evidence for one name of one finished screening run: every check's result row (with its verdict), the three judgment calls, the money figures and the quote. Packs are append-only and versioned per domain. In 1.2.0 `/buy` does not require one (see the dry-run advisory under `POST /buy`; enforcement is 2.0.0). Built only from a **finished** run (not `running`) that is not a backtest and used the full plan, and only from rows that are not stale. Required checks, the missing codes and the freeze rules are in `selection.md` §Screening pack.
+
+**Pack summary:** `{pack_id: "pk_<12 hex>", domain, version, status: "complete"|"incomplete", missing: [{item, code, detail}], run_id, settings_version, content_sha256, issued_at, issued_by}`.
+
+### `POST /screening/packs`
+WRITE. Body (strict): `{run_id, domain, judgment: {van_test: {verdict: "PASS"|"REJECT", reason}, tn1: {...}, bigco: {...}, reason_not_to_buy (1–300), judged_by (1–80), judged_at (ISO with offset)}}`. A 3-lead spot check is not accepted (leads run after the buy decision): any extra key is 422 `VALIDATION_ERROR`. **201** with the summary when a new version was written; **200** with the summary and `unchanged: true` when the content (including status and missing) equals the domain's latest version (no new row). An incomplete pack is issued too. The judgment is declared by the caller; the server cannot prove who judged.
+Errors: 404 `RUN_NOT_FOUND` · 404 `NAME_NOT_IN_RUN` · 409 `RUN_RUNNING` (`details.reason: "RUNNING"`) · 409 `NOT_SCREENED_OK` (`details.reason`: `BACKTEST` | `PARTIAL_PLAN`) · 422 `DOMAIN_INVALID` · 422 `VALIDATION_ERROR`.
+
+### `GET /screening/packs/{id}`
+READ. The summary plus `content` (exactly as frozen: domain, lane, run, settings version, list versions, screened_at/by, status, missing, `gates` (every check of the plan and of the required set: `{check, gate, rule_ids, status, reason_code, result_id, source, recorded_by, checked_at, data_as_of, fields, evidence_ids, verdict, decides}`), `judgment`, `money`, `quote`). 404 `PACK_NOT_FOUND`.
+
+### `GET /screening/packs`
+READ. Query `domain` (required). `{packs: [<summary>]}` for the domain, newest version first. `domain` is required (400 `VALIDATION_ERROR` without it, or with any other parameter); 422 `DOMAIN_INVALID`.
 
 ## Tranches
 

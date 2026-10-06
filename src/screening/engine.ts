@@ -197,6 +197,19 @@ export async function effectiveHold(db: Kysely<Database>, run: { buy_hold: boole
   return (await activeSelectionSettings(db)).label !== run.settings_label;
 }
 
+/**
+ * Throws 409 NOT_SCREENED_OK when the run is a backtest (reason BACKTEST) or used a cut plan, a `checks` subset or any lane plan narrower than the
+ * settings' full plan (reason PARTIAL_PLAN). Only a full-plan, non-backtest run admits a name to a tranche or a pack.
+ */
+export function fullPlanRunOrThrow(run: { id: string; backtest: boolean; gate_plan: unknown; input: unknown }, sel: { values: SelectionValuesT }): void {
+  if (run.backtest) throw new AppError(409, 'NOT_SCREENED_OK', 'A backtest run never makes a name eligible', { run_id: run.id, reason: 'BACKTEST' });
+  const gp = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
+  const cut = Object.entries(gp).some(([lane, plan]) => JSON.stringify(plan) !== JSON.stringify(planFor(sel.values, lane as Lane)));
+  if (cut || (run.input as { checks?: unknown }).checks !== undefined) {
+    throw new AppError(409, 'NOT_SCREENED_OK', 'The run used a cut plan (checks subset); only a full-plan run admits a name', { run_id: run.id, reason: 'PARTIAL_PLAN' });
+  }
+}
+
 /** Items with their latest results, final status and the funnel. `runDone`: no more results will come (done or partial). */
 export function assemble(
   items: RunItem[], plan: Partial<Record<Lane, CheckId[]>>, rows: ResultRow[], values: SelectionValuesT, buyHold: boolean, runDone: boolean, live = true,
