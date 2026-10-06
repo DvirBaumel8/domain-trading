@@ -50,6 +50,7 @@ export const PACK_DEFAULT = {
   exclude_checks: ['census', 'ext_dates', 'namebio', 'leads', 'pack'] as CheckIdT[],
   require_checks: ['same_name'] as CheckIdT[],
   availability_max_age_hours: 24,
+  max_age_at_buy_hours: 72, // v2.0.0 (ruling G-75, DOM default): how old the pack may be at a real /buy
 };
 export const LEAD_VERIFY_DEFAULT = {
   time_budget_minutes: 15, fetch_timeout_ms: 10_000, min_ms_between_fetches: 1000, max_bytes: 512_000,
@@ -128,7 +129,7 @@ const Base = z.object({
     min_visible_chars: int, timeout_ms: int.positive(), max_bytes: int.positive(), max_redirects: int, min_ms_between_fetches: int,
     max_unknown_sites: int, parked_max_text_chars: int, product_markers: words,
   }).strict().default(SAME_NAME_DEFAULT),
-  pack: z.object({ exclude_checks: z.array(checkId), require_checks: z.array(checkId), availability_max_age_hours: int.positive() }).strict().default(PACK_DEFAULT),
+  pack: z.object({ exclude_checks: z.array(checkId), require_checks: z.array(checkId), availability_max_age_hours: int.positive(), max_age_at_buy_hours: int.positive().default(72) }).strict().default(PACK_DEFAULT),
   priors_v91: z.object({ p_passive: laneObj(share) }).strict(),
   money: z.object({ net_factor_afternic: share, net_factor_other: share, hold_years: int.positive() }).strict(),
   lander: z.object({ exception_ab_min: int, exception_retail_end_min: int }).strict(),

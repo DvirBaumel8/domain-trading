@@ -17,7 +17,8 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'domains', file: 'tables/domains.json' },
   { table: 'ledger_entries', file: 'tables/ledger_entries.json' },
   { table: 'listing_history', file: 'tables/listing_history.json' },
-  { table: 'purchases', file: 'purchases.json' },
+  { table: 'tranches', file: 'tables/tranches.json' },
+  { table: 'purchases', file: 'purchases.json' }, // after tranches: purchases.tranche_id references it (v2.0.0)
   { table: 'receipts', file: 'receipts.json' },
   { table: 'quotes', file: 'tables/quotes.json' },
   { table: 'price_schedule', file: 'tables/price_schedule.json' },
@@ -35,7 +36,6 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'screening_verdicts', file: 'tables/screening_verdicts.json' },
   { table: 'screening_packs', file: 'tables/screening_packs.json' },
   { table: 'manual_quotes', file: 'tables/manual_quotes.json' },
-  { table: 'tranches', file: 'tables/tranches.json' },
   { table: 'tranche_members', file: 'tables/tranche_members.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];

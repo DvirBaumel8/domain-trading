@@ -5,7 +5,7 @@ import { RegistrarError } from '../../src/registrars/types.js';
 import { failPurchase, markUnknown } from '../../src/services/bookkeeping.js';
 import { Reconciler } from '../../src/services/reconciler.js';
 import { makeApp } from '../helpers/app.js';
-import { DOMAIN, T0, approvalNow, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
+import { DOMAIN, T0, approvalNow, buyBody, postBuy, readyToBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { issueToken } from '../helpers/tokens.js';
@@ -437,6 +437,7 @@ describe('POST /buy final-review fixes', () => {
   it('the 202 reopen also applies on an encoded path (/%62uy routes to /buy)', async () => {
     const pb = stuck();
     const { auth } = await setup(pb);
+    await readyToBuy(DOMAIN); // v2.0.0: this call bypasses postBuy, so seed the pack and tranche here
     const send = () => app.inject({ method: 'POST', url: '/%62uy', headers: { ...auth, 'idempotency-key': 'k-enc202' }, payload: buyBody() as object });
     expect((await send()).statusCode).toBe(202);
     const owned = new FakeAdapter('porkbun', { alreadyOwned: true });

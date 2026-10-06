@@ -21,6 +21,7 @@ import { addMonthsClamped, buildSchedule } from '../pricing/schedule.js';
 import { domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
 import { currentSettings, type PricingSettings } from '../pricing/settings.js';
 import { screeningHold } from './buy-hold.js';
+import { gateError, packGate, spendCapGate, trancheGate, type BuyBlock } from './buy-gates.js';
 import { evaluateQuote, pickWinner, type EvaluatedQuote } from './selection.js';
 
 export interface BuyInput {
@@ -43,7 +44,7 @@ type Caps = { maxFirstYearCents: number; maxTwoYearCents?: number };
 /** Everything the purchase phase needs once checks 1–10 passed. */
 export interface Approved {
   input: BuyInput; ctx: BuyCtx; category: Category; plan: ListingPlan | null; comps: Comp[]; rationale: string | null; pricing: PricingSettings; approvedAt: Date;
-  check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: 'BUY_HOLD' | null;
+  check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: BuyBlock | null; trancheId: string | null;
   settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
 }
 
@@ -120,6 +121,16 @@ export class BuyService {
         { settings_version: hold.settingsVersion, run_id: hold.runId });
     }
 
+    // 3d. v2.0.0: a complete, current screening pack, then an open tranche (the spend cap is checked once the quote is known). A dry run reports the first.
+    let blocked: BuyBlock | null = hold ? 'BUY_HOLD' : null;
+    const pg = await packGate(db, input.domain, now.getTime());
+    if (pg && !input.dryRun) throw gateError(pg);
+    blocked ??= pg?.code ?? null;
+    const tg = await trancheGate(db, input.domain);
+    if ('gate' in tg && !input.dryRun) throw gateError(tg.gate);
+    blocked ??= 'gate' in tg ? tg.gate.code : null;
+    const trancheId = 'trancheId' in tg ? tg.trancheId : null;
+
     // 4, 5
     await this.assertNotOwned(db, input.domain);
     await this.assertDomainCap(db, settings.max_domains);
@@ -155,6 +166,13 @@ export class BuyService {
     // 8. POC cap (unlocked here; re-checked under the global lock for real buys)
     await this.assertPocCap(db, settings.poc_cap_cents, winner.firstYearCents!);
 
+    // 8b. tranche spend cap on this quote (re-checked under the global lock for real buys)
+    if (trancheId) {
+      const cg = await spendCapGate(db, trancheId, winner.firstYearCents!);
+      if (cg && !input.dryRun) throw gateError(cg);
+      blocked ??= cg?.code ?? null;
+    }
+
     // 9. registrar account state
     await this.assertAccountState(adapter, winner.firstYearCents!);
 
@@ -164,7 +182,7 @@ export class BuyService {
     winner = dry.winner;
 
     const approved: Approved = {
-      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: hold ? 'BUY_HOLD' : null,
+      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId,
       settings: { poc_cap_cents: settings.poc_cap_cents, max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
     if (input.dryRun) return { status: 200, body: await this.dryRunBody(approved) };
@@ -247,11 +265,16 @@ export class BuyService {
         await this.assertNotOwned(trx, a.input.domain);
         await this.assertDomainCap(trx, s.max_domains);
         await this.assertPocCap(trx, s.poc_cap_cents, a.cost);
+        // v2.0.0: the tranche, re-read under the global lock, so two buys against one spend cap cannot both pass
+        const tg = await trancheGate(trx, a.input.domain);
+        if ('gate' in tg) throw gateError(tg.gate);
+        const cg = await spendCapGate(trx, tg.trancheId, a.cost);
+        if (cg) throw gateError(cg);
         const { id } = await trx.insertInto('purchases').values({
           idempotency_key: a.ctx.idempotencyKey, request_hash: a.ctx.requestHash, domain: a.input.domain, state: 'created',
           dry_run: false, registrar: a.winner.registrar, check_id: a.check.checkId, max_price_cents: a.input.maxPriceCents,
           approval_text: String(a.input.approval?.text), approval_at: a.approvedAt, expected_cents: a.cost,
-          request: JSON.stringify(redact(a.input.requestBody)), audit_id: a.ctx.auditId,
+          request: JSON.stringify(redact(a.input.requestBody)), audit_id: a.ctx.auditId, tranche_id: tg.trancheId,
         }).returning('id').executeTakeFirstOrThrow();
         await trx.insertInto('domains').values({
           domain: a.input.domain, status: 'pending_purchase', registrar: a.winner.registrar, category: a.category, price_grade: a.input.priceGrade, deal_id: a.input.dealId,
@@ -689,7 +712,7 @@ export class BuyService {
     // Same default as GET /pricing/preview with no domain: anchor today (Jerusalem), drop date 24 months later
     const anchor = jerusalemDate(new Date(this.deps.now()));
     const events = a.plan ? buildSchedule({ plan: a.plan, anchor, dropDate: addMonthsClamped(anchor, 24), settings: a.pricing }) : [];
-    // CAP-19 (advisory in v1.2.0, enforced in v2.0.0): the latest screening pack of the name. `would_be_blocked` keeps its v1.1.0 meaning.
+    // CAP-19: the latest screening pack of the name (enforced since v2.0.0: `would_be_blocked` names the first blocking gate; `advisories` is kept as before).
     const pack = await latestPackFor(this.deps.db, a.input.domain);
     const latestRun = pack ? await latestScreeningRun(this.deps.db, a.input.domain) : null;
     return {

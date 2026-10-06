@@ -45,7 +45,7 @@ One JSON document per version (`values`). A version is immutable; a draft is mad
 | `form.city_word_allowlist` | 126 major cities | Gazetteer names that are also dictionary words and still count as cities |
 | `typo` | edit distance 1, top 10000, list at most 7 days old | TYPO-1 |
 | `concentration` | per attribute 2, lane share 0.40 (`lane_share_enforced` false) | The 40% rule is report-only (ruling R2) |
-| `tranche` | size 15, main lane 10, geo max 1 (ruling R6), `required_for_buy` true | Tranche rules (`GET /tranches`: geo cap on every addition, main-lane quota at close; `required_for_buy` is stored but **not enforced** in v1.1.0, `NO_TRANCHE` on `/buy` is planned for v2.0.0) |
+| `tranche` | size 15, main lane 10, geo max 1 (ruling R6), `required_for_buy` true | Tranche rules (`GET /tranches`: geo cap on every addition, main-lane quota at close; a real `/buy` needs an active member of the open tranche since 2.0.0: 409 `NO_TRANCHE`, and the optional spend cap as 409 `TRANCHE_SPEND_CAP`; `required_for_buy` itself is not read) |
 | `surbl` | zone `multi.surbl.org`, control `test.surbl.org`, blocked answers `["127.0.0.1"]`, bit names, `ns_override`, 3000 ms | SURBL lookup |
 | `history` | per-name fetch cap 6, 1000 ms between calls, 20 s timeout, 2 retries, 200 chars of text, parked/for-sale placeholder up to 1500 characters (`parked_max_text_chars`), `url_terms` (words that flag an archived URL); actions strong FAIL, weak FLAG, redirect FLAG, for-sale PASS, parked PASS | CAP-07; parked and for-sale prior pages are positive |
 | `census` | 20 siblings, at most 25% unknown, as-of exact for 365 days | CAP-10; `sibling_count` is also the size of a census list |
@@ -62,7 +62,7 @@ One JSON document per version (`values`). A version is immutable; a draft is mad
 | `buy_hold` | true | The buy hold (CR-002). Clearing it needs a passing holdout report and Dvir's approval. |
 | `eu_tm` (1.2.0) | `required_lanes` `["S6"]`, `freshness_hours` 168 | CAP-09: the lanes whose `tm_eu` check is MANUAL_REQUIRED (other lanes PASS `NOT_REQUIRED_FOR_LANE`); an **empty list means no lane** (the check PASSes `NOT_REQUIRED_FOR_LANE` everywhere). `freshness_hours` is the window of a manual `tm_eu` record; a `freshness_hours.tm_eu` key is refused (422 `SETTINGS_INVALID`) |
 | `same_name` (1.2.0) | `min_visible_chars` 200, `timeout_ms` 10000, `max_bytes` 512000, `max_redirects` 3, `min_ms_between_fetches` 1000, `max_unknown_sites` 0, `parked_max_text_chars` 1500, `product_markers` `["™","®","(tm)","(r)"]` | CAP-12 same name on other extensions (check `same_name`, G8; read by the check from 1.2.0 on) |
-| `pack` (1.2.0) | `exclude_checks` census, ext_dates, namebio, leads, pack; `require_checks` same_name (the two lists must not share a check, else `SETTINGS_INVALID`); `availability_max_age_hours` 24 | Screening pack rules (CAP-19) |
+| `pack` (1.2.0) | `exclude_checks` census, ext_dates, namebio, leads, pack; `require_checks` same_name (the two lists must not share a check, else `SETTINGS_INVALID`); `availability_max_age_hours` 24; `max_age_at_buy_hours` 72 (2.0.0, ruling G-75: the oldest pack a real `/buy` accepts; a zod default, so the stored row still parses) | Screening pack rules (CAP-19) |
 | `lead.qualified_min`, `lead.verify` (1.2.0) | `qualified_min` S2 20, S3/S4/S6/S7 10; `verify`: time budget, fetch limits, role and placeholder lists, `never_fetch_hosts` (must contain `linkedin.com`) and the other thresholds | **Reserved, unused in 1.2.0** (lead verification CAP-15/16 was cut on 6 Oct 2026; the keys stay so stored settings keep parsing; nothing reads them) |
 | `sources` | surbl, popularity, rdap_com, rdap_other, iana_bootstrap true, `business_sites` true (1.2.0); namebio and wayback false | A disabled source makes its check `UNKNOWN` `SOURCE_DISABLED`, except `wayback`: its check answers MANUAL_REQUIRED `MANUAL_SOURCE` and the result is recorded by hand. NameBio is off because its terms could not be read; `wayback` is **off permanently** (the Internet Archive's terms: access "granted for scholarship and research purposes only"; Dvir, 6 Oct 2026, CR-002 Amendment B1: no permission request is pending, DOM never automates it); HIST-2 is recorded manually per name (`POST /screening/runs/{id}/manual`, `check: "history"`). |
 
@@ -216,6 +216,8 @@ A FLAG does not block a name (a bot judges it). A human decision on it is record
 The content also freezes `settings_label`, `settings_active` (at issue) and `buy_hold_effective`; all are in the hash.
 
 **Freeze and versions.** A pack never changes (database triggers refuse an update or delete). The content hash covers everything except the issue time and issuer. The same content as the domain's latest pack returns that pack with `unchanged: true`; any change (a new verdict, a recorded result, a different judgment, a changed status) writes version + 1. Issuing is serialised per domain.
+
+**Enforced on `/buy` since 2.0.0** (`endpoints.md` §Screening pack gate): the latest pack must be `complete`, from the domain's latest run, under the still-active settings version, and at most `pack.max_age_at_buy_hours` old; else 409 `SCREENING_PACK_REQUIRED` with `details.reason` `NO_PACK`, `INCOMPLETE`, `NOT_FROM_LATEST_RUN`, `SETTINGS_NOT_ACTIVE` or `PACK_TOO_OLD`.
 
 ## Replay and the buy hold (CAP-21a, CR-002 §5 P-3, Amendment A2/A3)
 

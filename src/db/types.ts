@@ -217,6 +217,7 @@ export interface PurchasesTable {
   expected_cents: number | null;
   request: Json | null;
   audit_id: string | null;
+  tranche_id: string | null;
   created_at: TimestampDefault;
   updated_at: TimestampDefault;
 }

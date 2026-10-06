@@ -4,7 +4,7 @@ import { BuyService } from '../../src/services/buy.js';
 import { spentCents } from '../../src/services/budget.js';
 import { resetDb, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
-import { COMPS, T0, seedSpent } from '../helpers/buy.js';
+import { COMPS, T0, readyToBuy, seedSpent } from '../helpers/buy.js';
 
 describe('CAP-6: −Σ(registration+renewal+fee) ≤ poc_cap_cents after any sequence', () => {
   it('200 random sequences of parallel buys', { timeout: 180_000 }, async () => {
@@ -21,6 +21,7 @@ describe('CAP-6: −Σ(registration+renewal+fee) ≤ poc_cap_cents after any seq
       const checkService = new CheckService({ db, adapters: [pb], rdap: async () => 'not_registered', now: () => T0 });
       const svc = new BuyService({ db, adapters: [pb], checkService, rdap: async () => 'not_registered', now: () => T0, sleep: async () => {} });
       const n = 1 + rnd(4);
+      for (let i = 0; i < n; i++) await readyToBuy(`p${s}x${i}.com`); // v2.0.0: a pack and an open tranche for each name
       const results = await Promise.allSettled(Array.from({ length: n }, (_, i) => {
         const domain = `p${s}x${i}.com`;
         return svc.buy(
