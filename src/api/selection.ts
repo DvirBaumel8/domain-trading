@@ -1,7 +1,7 @@
 // Selection settings (CAP-00), versioned lists, and the pure tier + money evaluation (CAP-24, CAP-18).
 // Settings drafts and list edits are WRITE; activation and census-list freezing need Dvir's approval_ref.
 import type { FastifyInstance } from 'fastify';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
 import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
@@ -297,12 +297,55 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
           continue;
         }
         seen.set(v.domain, v);
-        await trx.insertInto('labelled_names').values({ ...v, features: JSON.stringify(v.features), created_by: req.auth!.name, audit_id: req.auditId! }).execute();
+        try {
+          await trx.insertInto('labelled_names').values({ ...v, features: JSON.stringify(v.features), created_by: req.auth!.name, audit_id: req.auditId! }).execute();
+        } catch (e) {
+          if ((e as { code?: string }).code === '23505') throw new AppError(409, 'LABELLED_NAME_CONFLICT', `${v.domain} was recorded by a concurrent upload; retry to see it as a duplicate or a conflict`, { domain: v.domain });
+          throw e;
+        }
         inserted++;
       }
       return { inserted, duplicates, conflicts };
     });
   });
+
+  const SuiteBody = z.object({
+    suite: z.string().regex(/^[A-Za-z0-9._-]{1,40}$/),
+    slices: z.array(z.string().min(1)).min(1).optional(),
+    sources: z.array(z.string().min(1)).min(1).optional(),
+    cell: z.string().regex(/^(pooled|lane:(expired|fresh|aged|geo))$/).default('pooled'),
+    approval_ref: Approval.nullable().optional(),
+  }).strict().refine((b) => b.slices !== undefined || b.sources !== undefined, 'a suite needs slices and/or sources');
+
+  // A suite is frozen BEFORE any holdout scoring: which names it scores and which cell is judged. Versioned, append-only.
+  app.post('/selection/holdout-suites', async (req, reply) => {
+    const b = SuiteBody.parse(req.body ?? {});
+    const active = await activeSelectionSettings(db);
+    if (!active.values.holdout.required_suites.includes(b.suite)) {
+      throw new AppError(422, 'SUITE_UNKNOWN', `${b.suite} is not one of holdout.required_suites`, { required_suites: active.values.holdout.required_suites });
+    }
+    const approval = await requireNamedApproval(db, b.approval_ref, now(), 'Freezing a holdout suite', [b.suite]);
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('holdout_suites'))`.execute(trx);
+      const last = await trx.selectFrom('holdout_suites').select('version').where('suite', '=', b.suite).orderBy('version', 'desc').limit(1).executeTakeFirst();
+      return trx.insertInto('holdout_suites').values({
+        suite: b.suite, version: (last?.version ?? 0) + 1, slices: b.slices ?? null, sources: b.sources ?? null, cell: b.cell,
+        created_by: req.auth!.name, approval_text: approval.text, approval_at: approval.approvedAt, audit_id: req.auditId!,
+      }).returningAll().executeTakeFirstOrThrow();
+    });
+    return reply.code(201).send(suiteView(row));
+  });
+
+  const suiteView = (r: { suite: string; version: number; slices: string[] | null; sources: string[] | null; cell: string; created_at: Date; created_by: string; approval_text: string }) => ({
+    suite: r.suite, version: r.version, slices: r.slices, sources: r.sources, cell: r.cell, created_at: r.created_at.toISOString(), created_by: r.created_by, approval_text: r.approval_text,
+  });
+
+  app.get('/selection/holdout-suites', async () => {
+    const rows = await db.selectFrom('holdout_suites').selectAll().orderBy('suite').orderBy('version').execute();
+    return { suites: rows.map(suiteView) };
+  });
+
+  const latestSuite = (suite: string) => db.selectFrom('holdout_suites').selectAll().where('suite', '=', suite).orderBy('version', 'desc').limit(1).executeTakeFirst();
 
   const ReplayBody = z.object({
     suite: z.string().regex(/^[A-Za-z0-9._-]{1,40}$/),
@@ -317,33 +360,55 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
 
   app.post('/selection/replays', async (req, reply) => {
     const b = ReplayBody.parse(req.body ?? {});
+    if (b.mode === 'holdout' && (b.slices || b.sources || b.roles || b.domains || b.profit !== undefined)) {
+      throw new AppError(422, 'VALIDATION_ERROR', 'A holdout replay takes only suite, mode and settings: the frozen suite definition selects the names');
+    }
     const active = await activeSelectionSettings(db);
     const ver = b.settings === undefined || b.settings === active.label ? await selectionSettingsByLabel(db, active.label) : await selectionSettingsByLabel(db, b.settings);
     if (!ver) throw new AppError(404, 'SETTINGS_NOT_FOUND', `No selection settings version "${b.settings}"`);
     const sel = ver.values;
-    const domains = b.domains?.map((d) => normalizeDomain(d));
+    let def: Awaited<ReturnType<typeof latestSuite>> = undefined;
     let q = db.selectFrom('labelled_names').selectAll().orderBy('domain');
-    if (b.slices) q = q.where('slice', 'in', b.slices);
-    if (b.sources) q = q.where('source', 'in', b.sources);
-    if (b.roles) q = q.where('role', 'in', b.roles);
-    if (domains) q = q.where('domain', 'in', domains);
+    let filter: Record<string, unknown>;
+    if (b.mode === 'holdout') {
+      def = await latestSuite(b.suite);
+      if (!def) throw new AppError(422, 'SUITE_NOT_DEFINED', `Suite ${b.suite} has no frozen definition; freeze it (POST /selection/holdout-suites) before any holdout scoring`);
+      if (!active.values.holdout.required_suites.includes(b.suite)) throw new AppError(422, 'SUITE_UNKNOWN', `${b.suite} is not one of holdout.required_suites`);
+      if (def.slices) q = q.where('slice', 'in', def.slices);
+      if (def.sources) q = q.where('source', 'in', def.sources);
+      filter = { suite_version: def.version, slices: def.slices, sources: def.sources, cell: def.cell };
+    } else {
+      const domains = b.domains?.map((d) => normalizeDomain(d));
+      if (b.slices) q = q.where('slice', 'in', b.slices);
+      if (b.sources) q = q.where('source', 'in', b.sources);
+      if (b.roles) q = q.where('role', 'in', b.roles);
+      if (domains) q = q.where('domain', 'in', domains);
+      filter = { slices: b.slices ?? null, sources: b.sources ?? null, roles: b.roles ?? null, domains: domains ?? null, profit: b.profit ?? false };
+    }
     const rows: LabelledRow[] = (await q.execute()).map(toLabelledRow);
     if (rows.length === 0) throw new AppError(422, 'REPLAY_EMPTY', 'No registered name matches the filters');
-    const filter = { slices: b.slices ?? null, sources: b.sources ?? null, roles: b.roles ?? null, domains: domains ?? null, profit: b.profit ?? false };
+    // Checked on the whole selection before anything else: fit and dev names never enter a holdout, and test names are never peeked at.
+    if (b.mode === 'holdout') {
+      const tainted = rows.filter((r) => r.role !== 'test').map((r) => r.domain);
+      if (tainted.length > 0) {
+        throw new AppError(422, 'HOLDOUT_CONTAMINATED', 'A holdout suite may select only names registered as test; these are fit or dev names (CR-002 CAP-21)', { domains: tainted.slice(0, 50), count: tainted.length });
+      }
+    } else {
+      const peeked = rows.filter((r) => r.role === 'test').map((r) => r.domain);
+      if (peeked.length > 0) {
+        throw new AppError(422, 'HOLDOUT_CONTAMINATED', 'Test rows are scored only by holdout replays', { domains: peeked.slice(0, 50), count: peeked.length });
+      }
+    }
 
     let entries: Entry[];
     let before: Entry[] | null = null;
     let gatesApplied = false;
     if (b.mode === 'holdout') {
-      const tainted = rows.filter((r) => r.role !== 'test').map((r) => r.domain);
-      if (tainted.length > 0) {
-        throw new AppError(422, 'HOLDOUT_CONTAMINATED', 'A holdout run may contain only names registered as test; these are fit or dev names (CR-002 CAP-21)', { domains: tainted.slice(0, 50), count: tainted.length });
-      }
       const noAsOf = rows.filter((r) => !r.as_of).map((r) => r.domain);
       if (noAsOf.length > 0) throw new AppError(422, 'AS_OF_REQUIRED', 'A holdout replay needs an as_of for every name', { domains: noAsOf.slice(0, 50), count: noAsOf.length });
       const miss = missingGates(rows);
       if (miss.length > 0) {
-        throw new AppError(422, 'REPLAY_INVALID_NO_GATES', 'A holdout replay needs TM-1, TN-1 and HIST-2 + guard results (with source and date) on every row', { required: [...GATE_KEYS], rows: miss.slice(0, 20), count: miss.length });
+        throw new AppError(422, 'REPLAY_INVALID_NO_GATES', 'A holdout replay needs TM-1, TN-1 and HIST-2 + guard results (with source and date) and an input date for every dated feature, on every row', { required: [...GATE_KEYS, 'input_dates.census', 'input_dates.ext_dates', 'input_dates.history'], rows: miss.slice(0, 20), count: miss.length });
       }
       const first = await db.selectFrom('replay_runs').select('created_at').where('suite', '=', b.suite).where('mode', '=', 'holdout').orderBy('created_at').limit(1).executeTakeFirst();
       if (first && ver.createdAt > first.created_at) {
@@ -358,19 +423,21 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       entries = rows.map((row) => ({ row, d: decideReplayRow(row.features, sel).decision, lane: laneOf(row) }));
     }
     const lint = leakageLint(rows);
+    const rep = reportOf(entries, sel);
+    const cellName = def ? def.cell : 'pooled';
+    const judged = cellName === 'pooled' ? rep.pooled : rep.by_lane[cellName.slice('lane:'.length)] ?? cell([], sel.holdout);
     const report: Record<string, unknown> = {
       mode: b.mode, gates_applied: gatesApplied, counts_toward_buy_hold: b.mode === 'holdout',
-      ...reportOf(entries, sel),
+      ...rep, judged_cell: cellName, judged,
       ...(before && { before_gates: { pooled: cell(before.map((e) => ({ label: e.row.label, d: e.d })), sel.holdout) } }),
       leakage_lint: lint,
     };
     if (b.profit) report.profit = profitReport(entries, sel);
-    const pooled = report.pooled as ReturnType<typeof cell>;
-    const pass = b.mode === 'holdout' && pooled.meets_thresholds && lint.rows_leaking === 0;
+    const pass = b.mode === 'holdout' && judged.meets_thresholds && lint.rows_leaking === 0 && lint.rows_without_dated_inputs === 0;
     const id = rpl();
     await db.insertInto('replay_runs').values({
       id, suite: b.suite, mode: b.mode, settings_id: (await db.selectFrom('selection_settings').select('id').where('label', '=', ver.label).executeTakeFirstOrThrow()).id,
-      settings_label: ver.label, filter: JSON.stringify(filter), report: JSON.stringify(report), leakage_rows: lint.rows_leaking, pass, created_by: req.auth!.name, audit_id: req.auditId!,
+      settings_label: ver.label, suite_def_id: def?.id ?? null, filter: JSON.stringify(filter), report: JSON.stringify(report), leakage_rows: lint.rows_leaking, pass, created_by: req.auth!.name, audit_id: req.auditId!,
     }).execute();
     return reply.code(201).send({ replay_id: id, suite: b.suite, mode: b.mode, settings_version: ver.label, gates_applied: gatesApplied, report, pass });
   });
@@ -394,6 +461,8 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const id = (await db.selectFrom('selection_settings').select('id').where('label', '=', label).executeTakeFirstOrThrow()).id;
     // The ACTIVE version's holdout settings judge every version (they are locked, so equal in all of them).
     const suites = await suiteStatuses(db, id, active.values.holdout);
-    return { buy_hold: active.values.buy_hold, settings_version: label, required_suites: suites, clearable: suites.length > 0 && suites.every((x) => x.pass) };
+    const targetValues = target ? target.values : active.values;
+    // Clearable only for a version that actually clears the hold (its own buy_hold is false).
+    return { buy_hold: active.values.buy_hold, settings_version: label, target_buy_hold: targetValues.buy_hold, required_suites: suites, clearable: !targetValues.buy_hold && suites.length > 0 && suites.every((x) => x.pass) };
   });
 }

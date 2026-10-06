@@ -6,7 +6,7 @@ import { TEST_DATABASE_URL } from './env.js';
 export const testDb: Kysely<Database> = createDb(TEST_DATABASE_URL);
 
 const TABLES = [
-  'replay_runs', 'labelled_names', 'registrar_presence', 'rdap_lookups', 'reference_files', 'manual_quotes', 'tranche_members', 'tranches', 'screening_results', 'screening_runs', 'screening_evidence', 'selection_lists', 'selection_settings',
+  'replay_runs', 'holdout_suites', 'labelled_names', 'registrar_presence', 'rdap_lookups', 'reference_files', 'manual_quotes', 'tranche_members', 'tranches', 'screening_results', 'screening_runs', 'screening_evidence', 'selection_lists', 'selection_settings',
   'sales', 'offers', 'price_schedule', 'pricing_evidence', 'pricing_settings', 'export_uploads', 'export_runs', 'idempotency_keys', 'audit_log', 'receipts', 'purchases', 'quotes', 'listing_history',
   'ledger_entries', 'domains', 'deals', 'api_tokens',
 ];

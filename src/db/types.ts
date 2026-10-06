@@ -484,12 +484,27 @@ export interface LabelledNamesTable {
   audit_id: string | null;
 }
 
+export interface HoldoutSuitesTable {
+  id: Generated<number>;
+  suite: string;
+  version: number;
+  slices: string[] | null;
+  sources: string[] | null;
+  cell: string;
+  created_at: TimestampDefault;
+  created_by: string;
+  approval_text: string;
+  approval_at: Date;
+  audit_id: string | null;
+}
+
 export interface ReplayRunsTable {
   id: string;
   suite: string;
   mode: 'diagnostic' | 'holdout';
   settings_id: number;
   settings_label: string;
+  suite_def_id: number | null;
   filter: Json;
   report: Json;
   leakage_rows: number;
@@ -564,6 +579,7 @@ export interface Database {
   tranche_members: TrancheMembersTable;
   labelled_names: LabelledNamesTable;
   replay_runs: ReplayRunsTable;
+  holdout_suites: HoldoutSuitesTable;
   screening_results: ScreeningResultsTable;
   manual_quotes: ManualQuotesTable;
   rdap_lookups: RdapLookupsTable;

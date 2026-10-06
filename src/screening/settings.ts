@@ -256,7 +256,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
       S2: ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tier', 'namebio', 'quote', 'price'],
     },
   },
-  profit: { bin_price_cents: 148800, cost_per_name_year_cents: 1373 },
+  profit: { bin_price_cents: 148800, cost_per_name_year_cents: 1108 },
   buy_hold: true,
   holdout: { sold_accept_min: 0.7, drop_reject_min: 0.75, min_n: 50, required_suites: ['BT10-1', 'BT10-9', 'BT10-11'], report_bands: [1000, 2500], lane_report: true, base_rates: [0.01, 0.02] },
   // Enabled only where docs/internal/sources.md recorded the terms as enabled (Task 1); NameBio is off (unreadable terms).

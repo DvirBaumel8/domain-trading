@@ -45,7 +45,12 @@ export function decideReplayRow(f: LabelledFeatures, sel: SelectionValuesT): { d
   const isGeo = f.is_geo === 1 ? 1 : 0;
   const nWords = f.n_words ?? null;
   const sldChars = f.sld_chars ?? null;
-  const gf = isGeo === 1 && known(nWords) && known(sldChars) ? gform1(nWords, sldChars, true, f.city_trade_ok ?? true, sel.form) : null;
+  // city_trade_ok unknown (null / absent) is unknown, not true: only a violated word or length limit decides without it.
+  let gf: boolean | null = null;
+  if (isGeo === 1 && known(nWords) && known(sldChars)) {
+    const limitsOk = gform1(nWords, sldChars, true, true, sel.form);
+    gf = f.city_trade_ok === false || !limitsOk ? false : known(f.city_trade_ok) ? true : null;
+  }
   const features: TierFeatures = {
     registered_share: f.registered_share ?? null, prior_history: f.prior_history ?? null, alt_tld_before_n: f.alt_tld_before_n ?? null,
     n_words: nWords, sld_chars: sldChars, is_geo: isGeo,
@@ -241,11 +246,21 @@ export function profitReport(entries: Entry[], sel: SelectionValuesT): ProfitRep
 
 // ---------- holdout gate columns ----------
 
+/** Every dated feature needs the date of the data it came from (else the leakage lint can't clear it). */
+const DATED: [feature: keyof LabelledFeatures, input: string][] = [
+  ['registered_share', 'census'], ['alt_tld_before_n', 'ext_dates'], ['prior_history', 'history'], ['pre_cls', 'history'], ['archive_span_years', 'history'],
+];
+
+/** Holdout rows need the four gate results (source and date) and an input date for every non-null dated feature. */
 export function missingGates(rows: LabelledRow[]): { domain: string; missing: string[] }[] {
   const out: { domain: string; missing: string[] }[] = [];
   for (const r of rows) {
-    const miss = GATE_KEYS.filter((k) => { const g = r.features.gates?.[k]; return !g || !g.source || !/^\d{4}-\d{2}-\d{2}$/.test(g.date); });
-    if (miss.length > 0) out.push({ domain: r.domain, missing: [...miss] });
+    const miss: string[] = GATE_KEYS.filter((k) => { const g = r.features.gates?.[k]; return !g || !g.source || !/^\d{4}-\d{2}-\d{2}$/.test(g.date); });
+    for (const [feat, input] of DATED) {
+      const col = `input_dates.${input}`;
+      if (known(r.features[feat]) && !/^\d{4}-\d{2}-\d{2}$/.test(r.features.input_dates?.[input] ?? '') && !miss.includes(col)) miss.push(col);
+    }
+    if (miss.length > 0) out.push({ domain: r.domain, missing: miss });
   }
   return out;
 }
@@ -265,22 +280,36 @@ export function toLabelledRow(r: { domain: string; role: LabelledRow['role']; la
 
 // ---------- hold-clearing ----------
 
-export interface SuiteStatus { suite: string; replay_id: string | null; pass: boolean; sold_accept_rate: number | null; drop_reject_rate: number | null; n_sold: number; n_dropped: number }
+export interface SuiteStatus {
+  suite: string; replay_id: string | null; pass: boolean; sold_accept_rate: number | null; drop_reject_rate: number | null; n_sold: number; n_dropped: number;
+  definition_version: number | null; failed_before: boolean; variants_scored: number;
+}
+
+/** A holdout replay's judged cell (`pooled` or `lane:<lane>`) from its stored report. */
+export const judgedOf = (report: unknown): Counts => (report as { judged: Counts }).judged;
 
 /**
- * Per required suite: the LATEST holdout-mode replay of that suite on this settings version, judged again against the ACTIVE version's
- * holdout settings (`holdout`, never the draft's), and it must have found 0 leaking rows. A diagnostic replay is never considered.
+ * Per required suite, for one settings version: a FAILING holdout replay sticks (no latest-wins; a re-run or a changed definition never
+ * erases it). Otherwise the suite passes only when its latest definition version has a passing replay (judged again by the ACTIVE
+ * version's `holdout` settings, with 0 leaking rows). Diagnostic replays are never considered. `variants_scored`: how many settings
+ * versions have a holdout replay of the suite (the pre-registered variants).
  */
 export async function suiteStatuses(db: Kysely<Database>, settingsId: number, holdout: SelectionValuesT['holdout']): Promise<SuiteStatus[]> {
   const out: SuiteStatus[] = [];
   for (const suite of holdout.required_suites) {
-    const r = await db.selectFrom('replay_runs').select(['id', 'report', 'leakage_rows']).where('suite', '=', suite).where('mode', '=', 'holdout').where('settings_id', '=', settingsId)
-      .orderBy('created_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
-    if (!r) { out.push({ suite, replay_id: null, pass: false, sold_accept_rate: null, drop_reject_rate: null, n_sold: 0, n_dropped: 0 }); continue; }
-    const pooled = (r.report as { pooled: Counts }).pooled;
+    const def = await db.selectFrom('holdout_suites').select(['id', 'version']).where('suite', '=', suite).orderBy('version', 'desc').limit(1).executeTakeFirst();
+    const runs = await db.selectFrom('replay_runs').select(['id', 'report', 'leakage_rows', 'suite_def_id']).where('suite', '=', suite).where('mode', '=', 'holdout').where('settings_id', '=', settingsId)
+      .orderBy('created_at').orderBy('id').execute();
+    const variants = Number((await db.selectFrom('replay_runs').select(db.fn.count<number>('settings_id').distinct().as('n')).where('suite', '=', suite).where('mode', '=', 'holdout').executeTakeFirstOrThrow()).n);
+    const judge = (r: (typeof runs)[number]) => r.leakage_rows === 0 && meets(judgedOf(r.report), holdout);
+    const failing = runs.find((r) => !judge(r));
+    const passing = def ? runs.filter((r) => r.suite_def_id === def.id).find(judge) : undefined;
+    const shown = failing ?? passing ?? runs[runs.length - 1];
+    const c = shown ? judgedOf(shown.report) : null;
     out.push({
-      suite, replay_id: r.id, pass: r.leakage_rows === 0 && meets(pooled, holdout),
-      sold_accept_rate: pooled.sold.accept_rate, drop_reject_rate: pooled.dropped.reject_rate, n_sold: pooled.sold.n, n_dropped: pooled.dropped.n,
+      suite, replay_id: shown?.id ?? null, pass: !failing && !!passing,
+      sold_accept_rate: c?.sold.accept_rate ?? null, drop_reject_rate: c?.dropped.reject_rate ?? null, n_sold: c?.sold.n ?? 0, n_dropped: c?.dropped.n ?? 0,
+      definition_version: def?.version ?? null, failed_before: !!failing, variants_scored: variants,
     });
   }
   return out;
@@ -295,6 +324,7 @@ export const holdoutCheck: HoldoutCheck = async (db, settingsId, _values, holdou
 
 /** Minimal RFC 4180 reader: quoted fields, doubled quotes, CRLF. */
 export function parseCsv(text: string): Record<string, string>[] {
+  text = text.replace(/^\uFEFF/, '');
   const rows: string[][] = [];
   let row: string[] = [];
   let cur = '';
@@ -330,11 +360,12 @@ export function csvToUploadRow(c: Record<string, string>): Record<string, unknow
   const geo = !!(s('geo_city') || s('geo_trade'));
   const features: Record<string, unknown> = {
     registered_share: n('registered_share'), prior_history: n('prior_history'), pre_cls: s('pre_cls'), alt_tld_before_n: n('alt_tld_before_n'),
-    n_words: n('n_words'), sld_chars: n('sld_chars'), is_geo: geo ? 1 : 0,
+    n_words: n('n_words'), sld_chars: n('sld_chars'), is_geo: n('is_geo') !== null ? n('is_geo') : geo ? 1 : 0,
   };
-  if (geo) Object.assign(features, { city_trade_ok: !!(s('geo_city') && s('geo_trade')), geo_city: s('geo_city'), geo_trade: s('geo_trade') });
+  if (geo || features.is_geo === 1) Object.assign(features, { city_trade_ok: !!(s('geo_city') && s('geo_trade')), geo_city: s('geo_city'), geo_trade: s('geo_trade') });
   if (s('archive_span_years') !== null) features.archive_span_years = n('archive_span_years');
-  if (s('census_date') !== null) features.input_dates = { census: s('census_date') };
+  const dates = Object.fromEntries((['census', 'ext_dates', 'history'] as const).flatMap((k) => (s(`${k}_date`) !== null ? [[k, s(`${k}_date`)]] : [])));
+  if (Object.keys(dates).length > 0) features.input_dates = dates;
   const gates: Record<string, unknown> = {};
   for (const g of GATE_KEYS) if (s(`${g}_result`) !== null) gates[g] = { result: s(`${g}_result`), source: s(`${g}_source`) ?? '', date: s(`${g}_date`) ?? '' };
   if (Object.keys(gates).length > 0) features.gates = gates;

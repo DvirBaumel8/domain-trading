@@ -30,6 +30,12 @@ describe('decideReplayRow (CR-002 CAP-21 missing-data rule)', () => {
     expect(dec({ registered_share: 0.1, prior_history: 0, alt_tld_before_n: 0, is_geo: 1, n_words: 2, sld_chars: 12, city_trade_ok: true })).toBe('accept');
     expect(dec({ registered_share: 0.1, prior_history: 0, alt_tld_before_n: 0, is_geo: 1, n_words: 2, sld_chars: 12, city_trade_ok: false })).toBe('reject');
   });
+  it('geo with city_trade_ok unknown is not assumed true: within limits it is undecided, over the limits still a reject', () => {
+    const g = { registered_share: 0.1, prior_history: 0 as const, alt_tld_before_n: 0, is_geo: 1 as const };
+    expect(dec({ ...g, n_words: 2, sld_chars: 12 })).toBe('undecided');
+    expect(dec({ ...g, n_words: 2, sld_chars: 12, city_trade_ok: null })).toBe('undecided');
+    expect(dec({ ...g, n_words: 3, sld_chars: 12 })).toBe('reject');
+  });
   it('a harmful prior page class rejects', () => {
     expect(dec({ registered_share: 0.9, prior_history: 1, alt_tld_before_n: 0, n_words: 2, sld_chars: 9, is_geo: 0, pre_cls: 'harmful' })).toBe('reject');
   });
@@ -114,12 +120,15 @@ describe('leakage lint and gate columns (Amendment A2, A3)', () => {
     expect(leakageLint([row({ f: { gates: { tm_us: g('2026-06-02') } } })]).rows_leaking).toBe(1);
     expect(leakageLint([row({ f: { gates: { tm_us: g('2026-05-02') } } })]).rows_leaking).toBe(0);
   });
-  it('missingGates names the missing gate columns, including a gate with no source or a bad date', () => {
+  it('missingGates names the missing gate columns and the input dates of dated features', () => {
     const g = { result: 'PASS' as const, source: 'x', date: '2026-01-01' };
     const all = { tm_us: g, tn: g, hist2: g, hist2_guard: g };
-    expect(missingGates([row({ f: { gates: all } })])).toEqual([]);
-    expect(missingGates([row({ domain: 'a.com', f: { gates: { ...all, tn: undefined, hist2: { ...g, source: '' } } } })])).toEqual([{ domain: 'a.com', missing: ['tn', 'hist2'] }]);
-    expect(missingGates([row({ domain: 'b.com' })])[0]!.missing).toHaveLength(4);
+    const dates = { census: '2026-01-01', ext_dates: '2026-01-01', history: '2026-01-01' };
+    expect(missingGates([row({ f: { gates: all, input_dates: dates } })])).toEqual([]);
+    expect(missingGates([row({ domain: 'a.com', f: { gates: { ...all, tn: undefined, hist2: { ...g, source: '' } }, input_dates: dates } })])).toEqual([{ domain: 'a.com', missing: ['tn', 'hist2'] }]);
+    expect(missingGates([row({ domain: 'b.com' })])[0]!.missing).toEqual(['tm_us', 'tn', 'hist2', 'hist2_guard', 'input_dates.census', 'input_dates.ext_dates', 'input_dates.history']);
+    // a null feature needs no date
+    expect(missingGates([row({ f: { gates: all, registered_share: null, alt_tld_before_n: null, prior_history: null, pre_cls: null } })])).toEqual([]);
   });
 });
 
@@ -156,6 +165,7 @@ describe('profit report (Amendment A3)', () => {
 
 describe('CSV upload mapping', () => {
   it('parses quoted fields and maps features.csv columns; an empty cell is unknown, never imputed', () => {
+    expect(parseCsv('\uFEFFdomain,x\na.com,1\n')[0]).toEqual({ domain: 'a.com', x: '1' });
     const rows = parseCsv('domain,label,slice,role,registered_share,prior_history,pre_cls,alt_tld_before_n,n_words,sld_chars,geo_city,geo_trade,as_of\r\n"a.com",sold,s1,test,0.5,,parked,,2,9,,,2026-01-02\nb.com,dropped,s1,dev,,1,,0,2,9,austin,roofing,\n');
     expect(rows).toHaveLength(2);
     const a = csvToUploadRow(rows[0]!) as { features: Record<string, unknown>; as_of: unknown; source: unknown };
