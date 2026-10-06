@@ -70,6 +70,11 @@ export function gform1(
   return cityTradeOk && nWords <= s.geo_max_words && sldChars <= s.geo_max_chars;
 }
 
+/** FORM-2: the same rule analyzeForm uses, exported so the replay (CAP-21a) derives `short` identically. */
+export function isShort(nWords: number, sldChars: number, s: Pick<FormSettings, 'short_max_words' | 'short_max_chars'>): 0 | 1 {
+  return nWords <= s.short_max_words && sldChars <= s.short_max_chars ? 1 : 0;
+}
+
 const maxTermLen = new WeakMap<Lexicon, number>();
 function longestTerm(lex: Lexicon): number {
   let m = maxTermLen.get(lex);
@@ -284,7 +289,7 @@ export function analyzeForm(
   const ti = firstOf('trade');
   const ri = firstOf('regime');
   const hasLegal = token_types.some((ty, idx) => ty === 'legal' && !seg.forced.has(idx));
-  const short: 0 | 1 = word_count <= s.short_max_words && sld.length <= s.short_max_chars ? 1 : 0;
+  const short = isShort(word_count, sld.length, s);
   const keywords = seg.tokens.filter((t, idx) => ['dictionary', 'tech', 'regime'].includes(token_types[idx]!) && t.length >= 4);
   const cityTradeOk = ci >= 0 && ti >= 0;
   const gf = gform1(word_count, sld.length, isGeo, cityTradeOk, s);

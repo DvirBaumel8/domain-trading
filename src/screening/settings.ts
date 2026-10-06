@@ -101,6 +101,8 @@ const Base = z.object({
     feature_checks: z.array(z.string()),
     gates: z.record(z.string(), z.array(z.string())),
   }).strict(),
+  /** Replay profit report (CR-002 Amendment A3): the BIN cap for sale prices and the all-in yearly cost of holding one accepted name. */
+  profit: z.object({ bin_price_cents: int.positive(), cost_per_name_year_cents: int.positive() }).strict(),
   buy_hold: z.boolean(),
   holdout: z.object({
     sold_accept_min: share, drop_reject_min: share, min_n: int, required_suites: z.array(z.string()),
@@ -254,6 +256,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
       S2: ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tier', 'namebio', 'quote', 'price'],
     },
   },
+  profit: { bin_price_cents: 148800, cost_per_name_year_cents: 1373 },
   buy_hold: true,
   holdout: { sold_accept_min: 0.7, drop_reject_min: 0.75, min_n: 50, required_suites: ['BT10-1', 'BT10-9', 'BT10-11'], report_bands: [1000, 2500], lane_report: true, base_rates: [0.01, 0.02] },
   // Enabled only where docs/internal/sources.md recorded the terms as enabled (Task 1); NameBio is off (unreadable terms).
@@ -269,8 +272,6 @@ export interface SettingsVersion { id: number; label: string; values: SelectionV
  * `holdout` is the ACTIVE version's holdout settings (locked, so equal in every version). The check MUST use these, never `values.holdout`.
  */
 export type HoldoutCheck = (db: Kysely<Database>, settingsId: number, values: SelectionValuesT, holdout: SelectionValuesT['holdout']) => Promise<{ pass: boolean; suites: unknown[] }>;
-/** Task 9 replaces this with the CAP-21a holdout report; until then the hold can never be cleared. */
-export const noHoldoutYet: HoldoutCheck = async () => ({ pass: false, suites: [] });
 
 type Row = Selectable<SelectionSettingsTable>;
 const parse = (raw: unknown, label: string): SelectionValuesT => {

@@ -197,7 +197,7 @@ describe('selection settings (CAP-00)', () => {
     const { post, get } = await setup();
     expect((await post('/selection/settings', { label: 'nohold', set: { buy_hold: false } })).statusCode).toBe(201);
     const r = await post('/selection/settings/nohold/activate', { approval_ref: approval('Dvir: activate nohold') });
-    expect([r.statusCode, r.json().error.code, r.json().error.details]).toEqual([409, 'HOLDOUT_NOT_PASSED', { suites: [] }]);
+    expect([r.statusCode, r.json().error.code, r.json().error.details]).toEqual([409, 'HOLDOUT_NOT_PASSED', { suites: ['BT10-1', 'BT10-9', 'BT10-11'].map((suite) => ({ suite, replay_id: null, pass: false, sold_accept_rate: null, drop_reject_rate: null, n_sold: 0, n_dropped: 0 })) }]);
     expect((await get('/selection/settings')).json().active.label).toBe('v1');
   });
 

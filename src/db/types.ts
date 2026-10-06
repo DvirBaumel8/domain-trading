@@ -469,6 +469,36 @@ export interface TrancheMembersTable {
   removed_by: string | null;
 }
 
+export interface LabelledNamesTable {
+  domain: string;
+  role: 'fit' | 'dev' | 'test';
+  label: 'sold' | 'dropped';
+  source: string;
+  slice: string;
+  report_lane: 'expired' | 'fresh' | 'aged' | 'geo' | null;
+  price_cents: number | null;
+  as_of: DateString | null;
+  features: Json;
+  created_at: TimestampDefault;
+  created_by: string;
+  audit_id: string | null;
+}
+
+export interface ReplayRunsTable {
+  id: string;
+  suite: string;
+  mode: 'diagnostic' | 'holdout';
+  settings_id: number;
+  settings_label: string;
+  filter: Json;
+  report: Json;
+  leakage_rows: number;
+  pass: boolean;
+  created_at: TimestampDefault;
+  created_by: string;
+  audit_id: string | null;
+}
+
 export interface RdapLookupsTable {
   id: Generated<string>;
   domain: string;
@@ -532,6 +562,8 @@ export interface Database {
   screening_runs: ScreeningRunsTable;
   tranches: TranchesTable;
   tranche_members: TrancheMembersTable;
+  labelled_names: LabelledNamesTable;
+  replay_runs: ReplayRunsTable;
   screening_results: ScreeningResultsTable;
   manual_quotes: ManualQuotesTable;
   rdap_lookups: RdapLookupsTable;

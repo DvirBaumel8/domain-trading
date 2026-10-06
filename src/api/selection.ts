@@ -13,10 +13,14 @@ import { isCensusListName, isFixedList, listVersion, writeList, FIXED_LISTS } fr
 import { keywordCounts } from '../screening/namebio.js';
 import { evaluateMoney, syllableCount } from '../screening/money.js';
 import {
-  LABEL_RE, LANES, activate, activeSelectionSettings, createDraft, listSelectionVersions, noHoldoutYet, selectionSettingsByLabel,
+  LABEL_RE, LANES, activate, deepEqual, activeSelectionSettings, createDraft, listSelectionVersions, selectionSettingsByLabel,
   type HoldoutCheck, type SelectionValuesT,
 } from '../screening/settings.js';
 import { evaluateTier, type TierFeatures } from '../screening/tier.js';
+import {
+  GATE_KEYS, cell, csvToUploadRow, decideHoldoutRow, decideReplayRow, gateContext, holdoutCheck as replayHoldoutCheck, laneOf, leakageLint, missingGates,
+  parseCsv, profitReport, reportOf, rpl, suiteStatuses, toLabelledRow, type Entry, type LabelledRow,
+} from '../screening/replay.js';
 
 export interface SelectionDeps { db: Kysely<Database>; now: () => number; holdoutCheck?: HoldoutCheck }
 
@@ -60,6 +64,27 @@ const EvalBody = z.object({
   settings: z.string().regex(LABEL_RE).optional(),
 }).strict();
 
+const gateRes = z.object({ result: z.enum(['PASS', 'FAIL', 'FLAG', 'UNKNOWN']), source: z.string().min(1).max(200), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict();
+const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const UploadRow = z.object({
+  domain: z.string().min(1).max(253),
+  role: z.enum(['fit', 'dev', 'test']),
+  label: z.enum(['sold', 'dropped']),
+  source: z.string().min(1).max(120),
+  slice: z.string().min(1).max(60),
+  report_lane: z.enum(['expired', 'fresh', 'aged', 'geo']).optional(),
+  price_usd: usd.optional(),
+  as_of: ymd.nullable().optional(),
+  features: z.object({
+    registered_share: z.number().min(0).max(1).nullable().optional(), prior_history: bit.nullable().optional(), pre_cls: z.string().max(40).nullable().optional(),
+    alt_tld_before_n: z.number().int().nonnegative().nullable().optional(), n_words: z.number().int().nonnegative().nullable().optional(),
+    sld_chars: z.number().int().nonnegative().nullable().optional(), is_geo: bit.optional(), city_trade_ok: z.boolean().nullable().optional(), short: bit.nullable().optional(),
+    geo_city: z.string().max(60).nullable().optional(), geo_trade: z.string().max(60).nullable().optional(), archive_span_years: z.number().nonnegative().nullable().optional(),
+    input_dates: z.record(z.string().min(1).max(40), ymd).optional(),
+    gates: z.object({ tm_us: gateRes.optional(), tn: gateRes.optional(), hist2: gateRes.optional(), hist2_guard: gateRes.optional() }).strict().optional(),
+  }).strict(),
+}).strict();
+
 /** Case-insensitive search for a forbidden gate-feature key anywhere in the raw body (SEL5-2). */
 function findForbidden(v: unknown, keys: Set<string>, path = ''): string | null {
   if (Array.isArray(v)) {
@@ -78,7 +103,7 @@ function findForbidden(v: unknown, keys: Set<string>, path = ''): string | null 
 export function registerSelection(app: FastifyInstance, deps: SelectionDeps): void {
   const { db } = deps;
   const now = () => new Date(deps.now());
-  const holdoutCheck = deps.holdoutCheck ?? noHoldoutYet;
+  const holdoutCheck = deps.holdoutCheck ?? replayHoldoutCheck;
 
   app.get('/selection/settings', async (req) => {
     const q = z.object({ label: z.string().optional() }).strict().safeParse(req.query);
@@ -229,5 +254,146 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       },
       warnings,
     };
+  });
+
+  // ---------- CAP-21a: name registry, replay, buy-hold report ----------
+
+  // 200 rows with gate results exceed the 64 KB default body limit.
+  app.post('/selection/labelled-names', { bodyLimit: 1024 * 1024 }, async (req) => {
+    const raw = (req.body ?? {}) as { rows?: unknown; csv?: unknown };
+    let rowsIn: unknown[];
+    if (typeof raw.csv === 'string' && raw.rows === undefined) {
+      try { rowsIn = parseCsv(raw.csv).map(csvToUploadRow); } catch { throw new AppError(422, 'VALIDATION_ERROR', 'csv could not be read'); }
+    } else if (Array.isArray(raw.rows) && raw.csv === undefined) rowsIn = raw.rows;
+    else throw new AppError(422, 'VALIDATION_ERROR', 'Send either rows (JSON) or csv (text), not both');
+    if (rowsIn.length < 1 || rowsIn.length > 200) throw new AppError(422, 'VALIDATION_ERROR', 'Send 1 to 200 rows per call');
+    const bad: { index: number; domain: string | null; message: string }[] = [];
+    const parsed: { row: z.infer<typeof UploadRow>; domain: string }[] = [];
+    rowsIn.forEach((r, index) => {
+      const p = UploadRow.safeParse(r);
+      const d = (r as { domain?: unknown })?.domain;
+      if (!p.success) { bad.push({ index, domain: typeof d === 'string' ? d : null, message: p.error.issues.map((i) => `${i.path.join('.') || 'row'}: ${i.message}`).join('; ') }); return; }
+      try { parsed.push({ row: p.data, domain: normalizeDomain(p.data.domain) }); } catch (e) { bad.push({ index, domain: p.data.domain, message: e instanceof AppError ? e.message : 'invalid domain' }); }
+    });
+    if (bad.length > 0) throw new AppError(422, 'ROWS_INVALID', 'Some rows are invalid; nothing was recorded', { rows: bad });
+
+    const toDb = ({ row, domain }: (typeof parsed)[number]) => ({
+      domain, role: row.role, label: row.label, source: row.source, slice: row.slice, report_lane: row.report_lane ?? null,
+      price_cents: row.price_usd === undefined ? null : dollarsToCents(row.price_usd), as_of: row.as_of ?? null, features: row.features,
+    });
+    return db.transaction().execute(async (trx) => {
+      let inserted = 0;
+      let duplicates = 0;
+      const conflicts: { domain: string; existing_role: string }[] = [];
+      const seen = new Map<string, ReturnType<typeof toDb>>();
+      const existing = new Map((await trx.selectFrom('labelled_names').selectAll().where('domain', 'in', parsed.map((p) => p.domain)).execute()).map((e) => [e.domain, e]));
+      for (const p of parsed) {
+        const v = toDb(p);
+        const have = seen.get(v.domain) ?? existing.get(v.domain);
+        if (have) {
+          const same = have.role === v.role && have.label === v.label && have.source === v.source && have.slice === v.slice && have.report_lane === v.report_lane &&
+            have.price_cents === v.price_cents && have.as_of === v.as_of && deepEqual(have.features, v.features);
+          if (same) duplicates++; else conflicts.push({ domain: v.domain, existing_role: have.role });
+          continue;
+        }
+        seen.set(v.domain, v);
+        await trx.insertInto('labelled_names').values({ ...v, features: JSON.stringify(v.features), created_by: req.auth!.name, audit_id: req.auditId! }).execute();
+        inserted++;
+      }
+      return { inserted, duplicates, conflicts };
+    });
+  });
+
+  const ReplayBody = z.object({
+    suite: z.string().regex(/^[A-Za-z0-9._-]{1,40}$/),
+    mode: z.enum(['diagnostic', 'holdout']),
+    settings: z.string().regex(LABEL_RE).optional(),
+    slices: z.array(z.string().min(1)).min(1).optional(),
+    sources: z.array(z.string().min(1)).min(1).optional(),
+    roles: z.array(z.enum(['fit', 'dev', 'test'])).min(1).optional(),
+    domains: z.array(z.string()).min(1).max(5000).optional(),
+    profit: z.boolean().optional(),
+  }).strict();
+
+  app.post('/selection/replays', async (req, reply) => {
+    const b = ReplayBody.parse(req.body ?? {});
+    const active = await activeSelectionSettings(db);
+    const ver = b.settings === undefined || b.settings === active.label ? await selectionSettingsByLabel(db, active.label) : await selectionSettingsByLabel(db, b.settings);
+    if (!ver) throw new AppError(404, 'SETTINGS_NOT_FOUND', `No selection settings version "${b.settings}"`);
+    const sel = ver.values;
+    const domains = b.domains?.map((d) => normalizeDomain(d));
+    let q = db.selectFrom('labelled_names').selectAll().orderBy('domain');
+    if (b.slices) q = q.where('slice', 'in', b.slices);
+    if (b.sources) q = q.where('source', 'in', b.sources);
+    if (b.roles) q = q.where('role', 'in', b.roles);
+    if (domains) q = q.where('domain', 'in', domains);
+    const rows: LabelledRow[] = (await q.execute()).map(toLabelledRow);
+    if (rows.length === 0) throw new AppError(422, 'REPLAY_EMPTY', 'No registered name matches the filters');
+    const filter = { slices: b.slices ?? null, sources: b.sources ?? null, roles: b.roles ?? null, domains: domains ?? null, profit: b.profit ?? false };
+
+    let entries: Entry[];
+    let before: Entry[] | null = null;
+    let gatesApplied = false;
+    if (b.mode === 'holdout') {
+      const tainted = rows.filter((r) => r.role !== 'test').map((r) => r.domain);
+      if (tainted.length > 0) {
+        throw new AppError(422, 'HOLDOUT_CONTAMINATED', 'A holdout run may contain only names registered as test; these are fit or dev names (CR-002 CAP-21)', { domains: tainted.slice(0, 50), count: tainted.length });
+      }
+      const noAsOf = rows.filter((r) => !r.as_of).map((r) => r.domain);
+      if (noAsOf.length > 0) throw new AppError(422, 'AS_OF_REQUIRED', 'A holdout replay needs an as_of for every name', { domains: noAsOf.slice(0, 50), count: noAsOf.length });
+      const miss = missingGates(rows);
+      if (miss.length > 0) {
+        throw new AppError(422, 'REPLAY_INVALID_NO_GATES', 'A holdout replay needs TM-1, TN-1 and HIST-2 + guard results (with source and date) on every row', { required: [...GATE_KEYS], rows: miss.slice(0, 20), count: miss.length });
+      }
+      const first = await db.selectFrom('replay_runs').select('created_at').where('suite', '=', b.suite).where('mode', '=', 'holdout').orderBy('created_at').limit(1).executeTakeFirst();
+      if (first && ver.createdAt > first.created_at) {
+        throw new AppError(409, 'VARIANT_NOT_PREREGISTERED', `Settings "${ver.label}" were created after the first holdout replay of ${b.suite}; variants must be recorded before test slices are scored`, { suite: b.suite, settings: ver.label });
+      }
+      const ctx = await gateContext(db, sel);
+      const outs = rows.map((r) => decideHoldoutRow(r, sel, ctx));
+      entries = outs.map((o) => ({ row: o.row, d: o.after, lane: o.lane }));
+      before = outs.map((o) => ({ row: o.row, d: o.before, lane: o.lane }));
+      gatesApplied = true;
+    } else {
+      entries = rows.map((row) => ({ row, d: decideReplayRow(row.features, sel).decision, lane: laneOf(row) }));
+    }
+    const lint = leakageLint(rows);
+    const report: Record<string, unknown> = {
+      mode: b.mode, gates_applied: gatesApplied, counts_toward_buy_hold: b.mode === 'holdout',
+      ...reportOf(entries, sel),
+      ...(before && { before_gates: { pooled: cell(before.map((e) => ({ label: e.row.label, d: e.d })), sel.holdout) } }),
+      leakage_lint: lint,
+    };
+    if (b.profit) report.profit = profitReport(entries, sel);
+    const pooled = report.pooled as ReturnType<typeof cell>;
+    const pass = b.mode === 'holdout' && pooled.meets_thresholds && lint.rows_leaking === 0;
+    const id = rpl();
+    await db.insertInto('replay_runs').values({
+      id, suite: b.suite, mode: b.mode, settings_id: (await db.selectFrom('selection_settings').select('id').where('label', '=', ver.label).executeTakeFirstOrThrow()).id,
+      settings_label: ver.label, filter: JSON.stringify(filter), report: JSON.stringify(report), leakage_rows: lint.rows_leaking, pass, created_by: req.auth!.name, audit_id: req.auditId!,
+    }).execute();
+    return reply.code(201).send({ replay_id: id, suite: b.suite, mode: b.mode, settings_version: ver.label, gates_applied: gatesApplied, report, pass });
+  });
+
+  app.get<{ Params: { id: string } }>('/selection/replays/:id', async (req) => {
+    const r = await db.selectFrom('replay_runs').selectAll().where('id', '=', req.params.id).executeTakeFirst();
+    if (!r) throw new AppError(404, 'REPLAY_NOT_FOUND', `No replay ${req.params.id}`);
+    return {
+      replay_id: r.id, suite: r.suite, mode: r.mode, settings_version: r.settings_label, filter: r.filter, report: r.report, leakage_rows: r.leakage_rows,
+      pass: r.pass, created_at: r.created_at.toISOString(), created_by: r.created_by,
+    };
+  });
+
+  app.get('/selection/buy-hold', async (req) => {
+    const q = z.object({ settings: z.string().regex(LABEL_RE).optional() }).strict().safeParse(req.query);
+    if (!q.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid query: only settings is accepted');
+    const active = await activeSelectionSettings(db);
+    const target = q.data.settings === undefined || q.data.settings === active.label ? null : await selectionSettingsByLabel(db, q.data.settings);
+    if (q.data.settings !== undefined && q.data.settings !== active.label && !target) throw new AppError(404, 'SETTINGS_NOT_FOUND', `No selection settings version "${q.data.settings}"`);
+    const label = target ? target.label : active.label;
+    const id = (await db.selectFrom('selection_settings').select('id').where('label', '=', label).executeTakeFirstOrThrow()).id;
+    // The ACTIVE version's holdout settings judge every version (they are locked, so equal in all of them).
+    const suites = await suiteStatuses(db, id, active.values.holdout);
+    return { buy_hold: active.values.buy_hold, settings_version: label, required_suites: suites, clearable: suites.length > 0 && suites.every((x) => x.pass) };
   });
 }
