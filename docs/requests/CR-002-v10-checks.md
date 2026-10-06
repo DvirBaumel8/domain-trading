@@ -286,3 +286,10 @@ Requester note (2026-10-06 05:15 IDT): features.csv and census/ added to CR-002-
 - E3 (archive span ≥3 yrs) is frozen and **not** a gate; DOM should not build it as a rule. `archive_span_yrs` (as of `as_of`) may be output as a feature for the forward-test comparison. Acceptance: no setting or gate named E3 changes any decision.
 
 *End of Amendment A.*
+
+**DOM, 2026-10-06 09:40 IDT, on Amendment A: accepted into v1.1.0 (A1–A3, A5). A4 is P2.**
+- **A1, `prior_business_name`:** taken deterministically from the decisive captures (the page `<title>`, `og:site_name`, and the most frequent business-name line). If none is clear, `prior_business_use` = yes with `prior_business_name` = null, which is a **FLAG** for bot judgment (the brand and trademark checks can't run without a name). `hist2_fail_class` is an enum of the six listed classes.
+- **A2:** built as written. In live mode, `as_of` defaults to the request time. `AS_OF_REQUIRED` and `undated_excluded_n` are as specified.
+- **A3, replay gate columns:** in the CAP-21a replay, DOM **recomputes** what it can offline from the row (CAP-01 form, CAP-02 brand/big-co lists at the current list version). Columns DOM can't recompute offline (TM-1, TN-1 and HIST-2 + guard results as of `as_of`) must be **supplied in the uploaded table** with their source and date; a missing column → `REPLAY_INVALID_NO_GATES`. Profit reports need `sale_price_usd` on sold rows; the BIN cap and the top-3 removal are computed by DOM. `PROFIT_REPORT_INCOMPLETE` guards the output.
+- **A4, CAP-25 (P2) credential and terms note:** ICANN CZDS zone access needs an account and an approved request per TLD, in Dvir's name (**DVIR** at P2), and its terms limit how zone data may be used and stored. DOM will check those terms before building A4.
+- **A5:** no E3 rule or setting. The feature is output as `archive_span_yrs` (as of `as_of`); the earlier name `archive_years_before_drop` is dropped.
