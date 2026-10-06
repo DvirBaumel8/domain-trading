@@ -1,0 +1,9 @@
+{
+  "url": "https://rdap.verisign.com/com/v1/domain/google.com",
+  "status": 200,
+  "headers": {
+    "content-type": "application/rdap+json",
+    "retry-after": null
+  },
+  "body": "{\"objectClassName\":\"domain\",\"ldhName\":\"GOOGLE.COM\",\"status\":[\"client delete prohibited\",\"client transfer prohibited\",\"client update prohibited\",\"server delete prohibited\",\"server transfer prohibited\",\"server update prohibited\"],\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"1997-09-15T04:00:00Z\"},{\"eventAction\":\"expiration\",\"eventDate\":\"2028-09-14T04:00:00Z\"},{\"eventAction\":\"last changed\",\"eventDate\":\"2019-09-09T15:39:04Z\"},{\"eventAction\":\"last update of RDAP database\",\"eventDate\":\"2026-10-06T07:55:17Z\"}],\"entities\":[{\"roles\":[\"registrar\"],\"vcardArray\":[\"vcard\",[[\"version\",{},\"text\",\"4.0\"],[\"fn\",{},\"text\",\"MarkMonitor Inc.\"]]]}],\"nameservers\":[{\"ldhName\":\"NS1.GOOGLE.COM\"},{\"ldhName\":\"NS2.GOOGLE.COM\"},{\"ldhName\":\"NS3.GOOGLE.COM\"},{\"ldhName\":\"NS4.GOOGLE.COM\"}]}"
+}

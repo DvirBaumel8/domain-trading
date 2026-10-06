@@ -1,5 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import type { AppDeps } from '../../src/app.js';
 import { testDb } from './db.js';
 import { makeApp } from './app.js';
 import { issueToken } from './tokens.js';
@@ -26,9 +27,9 @@ export interface ScreeningHarness {
   runDone: (body: object) => Promise<{ id: string; body: any }>;
 }
 
-export async function screeningHarness(opts: { start?: number; stopAfterResults?: number } = {}): Promise<ScreeningHarness> {
+export async function screeningHarness(opts: { start?: number; stopAfterResults?: number; screening?: AppDeps['screening'] } = {}): Promise<ScreeningHarness> {
   const clock = { t: opts.start ?? Date.parse('2026-10-06T08:00:00Z') };
-  const app = await makeApp({ now: () => clock.t, screeningStopAfterResults: opts.stopAfterResults });
+  const app = await makeApp({ now: () => clock.t, screeningStopAfterResults: opts.stopAfterResults, screening: opts.screening });
   const w = await issueToken('write', 'gavriel');
   const r = await issueToken('read');
   // The write limiter allows 10 per minute per token: each call is a fresh minute for it.

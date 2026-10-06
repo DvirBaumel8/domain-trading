@@ -1,0 +1,9 @@
+{
+  "url": "https://data.iana.org/rdap/dns.json",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": null
+  },
+  "body": "{\"description\":\"RDAP bootstrap file for Domain Name System registrations\",\"publication\":\"2026-09-30T23:00:03Z\",\"services\":[[[\"ai\",\"info\"],[\"https://rdap.identitydigital.services/rdap/\"]],[[\"org\"],[\"https://rdap.publicinterestregistry.org/rdap/\"]],[[\"com\"],[\"https://rdap.verisign.com/com/v1/\"]],[[\"net\"],[\"https://rdap.verisign.com/net/v1/\"]]],\"version\":\"1.0\"}"
+}

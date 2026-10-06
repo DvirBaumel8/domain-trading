@@ -20,6 +20,7 @@
     "admin": "tsx --env-file-if-exists=.env src/admin.ts",
     "job": "tsx --env-file-if-exists=.env src/job.ts",
     "db:up": "docker compose up -d --wait db",
+    "record:screening": "tsx --env-file-if-exists=.env scripts/record-screening-fixtures.ts",
     "contract:refresh-spec": "tsx scripts/refresh-porkbun-spec.ts"
   },
   "dependencies": {

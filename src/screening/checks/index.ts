@@ -2,10 +2,14 @@
 // Tasks 5-7 add their checks by importing the file and listing it below (availability, typo, surbl, history, census, ext_dates,
 // tier, namebio, quote, price). Nothing else in the engine changes. `pack` and `leads` stay unimplemented in v1.1.0 (P1b / post-buy).
 import type { Check, CheckId } from '../types.js';
+import { availabilityCheck } from './availability.js';
 import { brandListsCheck } from './brand-lists.js';
+import { censusCheck } from './census.js';
 import { concentrationCheck } from './concentration.js';
+import { extDatesCheck } from './ext-dates.js';
 import { formCheck } from './form.js';
 import { tmUsCheck, webRiskCheck } from './manual.js';
+import { surblCheck } from './surbl.js';
 
 export const CHECKS: Partial<Record<CheckId, Check>> = {
   form: formCheck,
@@ -13,6 +17,10 @@ export const CHECKS: Partial<Record<CheckId, Check>> = {
   concentration: concentrationCheck,
   web_risk: webRiskCheck,
   tm_us: tmUsCheck,
+  availability: availabilityCheck,
+  surbl: surblCheck,
+  census: censusCheck,
+  ext_dates: extDatesCheck,
 };
 
 /** Gate label per check (also the label of an unimplemented check's NOT_RUN row). */

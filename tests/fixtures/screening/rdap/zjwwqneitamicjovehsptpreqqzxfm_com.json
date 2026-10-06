@@ -1,0 +1,9 @@
+{
+  "url": "https://rdap.verisign.com/com/v1/domain/zjwwqneitamicjovehsptpreqqzxfm.com",
+  "status": 404,
+  "headers": {
+    "content-type": "application/rdap+json",
+    "retry-after": null
+  },
+  "body": ""
+}

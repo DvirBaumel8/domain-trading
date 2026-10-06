@@ -440,6 +440,29 @@ export interface ScreeningResultsTable {
   created_at: TimestampDefault;
 }
 
+export interface RdapLookupsTable {
+  id: Generated<string>;
+  domain: string;
+  outcome: 'registered' | 'not_registered' | 'unknown';
+  reason_code: string | null;
+  http_status: number | null;
+  facts: unknown | null;
+  evidence_id: string | null;
+  checked_at: Timestamp;
+}
+
+export interface ReferenceFilesTable {
+  id: Generated<string>;
+  name: string;
+  source_url: string;
+  fetched_at: Timestamp;
+  data_date: ColumnType<Date | string | null, string | null, string | null>;
+  sha256: string;
+  bytes: number;
+  body_gz: Buffer | null;
+  same_as_id: string | null;
+}
+
 export interface ManualQuotesTable {
   id: Generated<string>;
   domain: string;
@@ -480,6 +503,8 @@ export interface Database {
   screening_runs: ScreeningRunsTable;
   screening_results: ScreeningResultsTable;
   manual_quotes: ManualQuotesTable;
+  rdap_lookups: RdapLookupsTable;
+  reference_files: ReferenceFilesTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

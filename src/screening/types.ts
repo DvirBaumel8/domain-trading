@@ -2,6 +2,8 @@
 // under checks/ and register it in checks/index.ts; the engine, the cache, the deadline and resume logic stay as they are.
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
+import type { DnsQueryFn } from '../dns/ns-lookup.js';
+import type { RdapLookupFn } from '../rdap.js';
 import type { CheckService } from '../services/check.js';
 import type { Lane } from './form.js';
 import type { Lexicon } from './lexicon.js';
@@ -75,17 +77,18 @@ export interface RunView {
   createdAt: Date;
 }
 
-/**
- * Outside access for checks. Task 4 needs none of it. Tasks 5-7 fill the optional members (RDAP, DNS, fetch for the archive)
- * and tighten their types; they are `unknown`-shaped here only so the engine can pass them through.
- */
+/** Outside access for checks: every network and DNS call goes through one of these so tests inject fakes. */
 export interface ScreeningDeps {
   fetch: typeof fetch;
   sleep: (ms: number) => Promise<void>;
   checkService: CheckService;
-  rdapLookup?: (domain: string) => Promise<unknown>;
-  dnsQuery?: (zone: string, name: string) => Promise<unknown>;
-  resolveNs?: (zone: string) => Promise<string[]>;
+  rdapLookup: RdapLookupFn;
+  /** One UDP DNS query to a named server (SURBL goes straight to the zone's own servers, never to a public resolver). */
+  dnsQuery: DnsQueryFn;
+  /** NS host names of a zone, from the system resolver (only used to discover SURBL's servers). */
+  resolveNs: (zone: string) => Promise<string[]>;
+  /** IPv4 addresses of a host name (system resolver). */
+  resolve4: (host: string) => Promise<string[]>;
 }
 
 export interface CheckContext {

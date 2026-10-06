@@ -1,0 +1,9 @@
+{
+  "url": "https://rdap.verisign.com/com/v1/domain/tampaplumbingpros.com",
+  "status": 200,
+  "headers": {
+    "content-type": "application/rdap+json",
+    "retry-after": null
+  },
+  "body": "{\"objectClassName\":\"domain\",\"ldhName\":\"TAMPAPLUMBINGPROS.COM\",\"status\":[\"client delete prohibited\",\"client renew prohibited\",\"client transfer prohibited\",\"client update prohibited\"],\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"2025-11-11T01:24:04Z\"},{\"eventAction\":\"expiration\",\"eventDate\":\"2026-11-11T01:24:04Z\"},{\"eventAction\":\"last changed\",\"eventDate\":\"2025-11-11T01:24:05Z\"},{\"eventAction\":\"last update of RDAP database\",\"eventDate\":\"2026-10-06T07:55:17Z\"}],\"entities\":[{\"roles\":[\"registrar\"],\"vcardArray\":[\"vcard\",[[\"version\",{},\"text\",\"4.0\"],[\"fn\",{},\"text\",\"GoDaddy.com, LLC\"]]]}],\"nameservers\":[{\"ldhName\":\"NS33.DOMAINCONTROL.COM\"},{\"ldhName\":\"NS34.DOMAINCONTROL.COM\"}]}"
+}

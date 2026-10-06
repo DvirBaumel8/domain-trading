@@ -82,14 +82,78 @@ export function parseNsResponse(buf: Buffer, domain: string, id: number): string
   }
 }
 
-/** One UDP query to the registry server. Never throws; null on timeout or a bad answer. */
-export function queryNs(domain: string, opts: { server?: string; timeoutMs?: number } = {}): Promise<string[] | null> {
-  const id = randomInt(0, 0x10000);
-  const msg = encodeNsQuery(domain, id);
+export interface DnsAnswer { rcode: number; answers: { type: number; data: string }[] }
+/** One UDP query to a named server (RD=0). Never throws; null on timeout or an answer that fails the id, source or question checks. */
+export type DnsQueryFn = (name: string, qtype: 1 | 2, opts: { server: string; timeoutMs?: number }) => Promise<DnsAnswer | null>;
+
+const TYPE_A = 1;
+
+/** A standard query for `name` / `qtype` / IN with RD=0 (we ask an authoritative server directly). */
+export function encodeDnsQuery(name: string, qtype: number, id: number): Buffer {
+  const q = encodeNsQuery(name, id);
+  q.writeUInt16BE(qtype, q.length - 4);
+  return q;
+}
+
+/**
+ * Parses the answer to `encodeDnsQuery(name, qtype, id)`. Null when the id differs, it is not a response, it is truncated (TC),
+ * the question is not exactly what we asked, or a record runs past its data. rcode is returned as is (3 = NXDOMAIN is an answer).
+ * Only A (dotted IPv4) and NS records owned by `name` are returned; anything else is skipped.
+ */
+export function parseDnsResponse(buf: Buffer, name: string, qtype: number, id: number): DnsAnswer | null {
+  try {
+    if (buf.length < 12 || buf.readUInt16BE(0) !== id) return null;
+    const flags = buf.readUInt16BE(2);
+    if (!(flags & 0x8000) || flags & 0x0200) return null;
+    const rcode = flags & 0x000f;
+    if (buf.readUInt16BE(4) !== 1) return null;
+    const an = buf.readUInt16BE(6);
+    const want = name.toLowerCase().replace(/\.$/, '');
+    const q = readName(buf, 12);
+    if (q.name !== want || q.next + 4 > buf.length) return null;
+    if (buf.readUInt16BE(q.next) !== qtype || buf.readUInt16BE(q.next + 2) !== CLASS_IN) return null;
+    let pos = q.next + 4;
+    const answers: { type: number; data: string }[] = [];
+    if (rcode !== 0) return { rcode, answers };
+    for (let i = 0; i < an; i++) {
+      const owner = readName(buf, pos);
+      pos = owner.next;
+      if (pos + 10 > buf.length) return null;
+      const type = buf.readUInt16BE(pos);
+      const cls = buf.readUInt16BE(pos + 2);
+      const rdlen = buf.readUInt16BE(pos + 8);
+      const rdata = pos + 10;
+      if (rdata + rdlen > buf.length) return null;
+      if (cls === CLASS_IN && owner.name === want) {
+        if (type === TYPE_A) {
+          if (rdlen !== 4) return null;
+          answers.push({ type, data: `${buf[rdata]}.${buf[rdata + 1]}.${buf[rdata + 2]}.${buf[rdata + 3]}` });
+        } else if (type === TYPE_NS) {
+          const target = readName(buf, rdata);
+          if (target.next > rdata + rdlen) return null;
+          answers.push({ type, data: target.name });
+        }
+      }
+      pos = rdata + rdlen;
+    }
+    return { rcode, answers };
+  } catch {
+    return null;
+  }
+}
+
+/** The shared UDP transport: ignores datagrams from the wrong source or with another id; null on timeout, send error or a bad answer. */
+function udpQuery<T>(msg: Buffer, id: number, server: string, timeoutMs: number, parse: (buf: Buffer) => T | null): Promise<T | null> {
   return new Promise((resolve) => {
-    const sock = dgram.createSocket('udp4');
+    let sock: dgram.Socket;
+    try {
+      sock = dgram.createSocket('udp4');
+    } catch {
+      resolve(null);
+      return;
+    }
     let settled = false;
-    const done = (v: string[] | null) => {
+    const done = (v: T | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -100,18 +164,27 @@ export function queryNs(domain: string, opts: { server?: string; timeoutMs?: num
       }
       resolve(v);
     };
-    const timer = setTimeout(() => done(null), opts.timeoutMs ?? 3000);
+    const timer = setTimeout(() => done(null), timeoutMs);
     sock.on('error', () => done(null));
-    const server = opts.server ?? '192.5.6.30';
-    // Ignore datagrams from the wrong source or with a different id (spoof/stray); keep waiting until the timeout.
     sock.on('message', (buf, rinfo) => {
       if (rinfo.port !== 53) return;
       if (isIP(server) && rinfo.address !== server) return;
       if (buf.length < 2 || buf.readUInt16BE(0) !== id) return;
-      done(parseNsResponse(buf, domain, id));
+      done(parse(buf));
     });
     sock.send(msg, 53, server, (err) => {
       if (err) done(null);
     });
   });
+}
+
+export const queryDns: DnsQueryFn = (name, qtype, opts) => {
+  const id = randomInt(0, 0x10000);
+  return udpQuery(encodeDnsQuery(name, qtype, id), id, opts.server, opts.timeoutMs ?? 3000, (buf) => parseDnsResponse(buf, name, qtype, id));
+};
+
+/** One UDP query to the registry server. Never throws; null on timeout or a bad answer. */
+export function queryNs(domain: string, opts: { server?: string; timeoutMs?: number } = {}): Promise<string[] | null> {
+  const id = randomInt(0, 0x10000);
+  return udpQuery(encodeNsQuery(domain, id), id, opts.server ?? '192.5.6.30', opts.timeoutMs ?? 3000, (buf) => parseNsResponse(buf, domain, id));
 }

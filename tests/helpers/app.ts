@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { NsLookup } from '../../src/dns/ns-lookup.js';
 import type { RdapFn } from '../../src/rdap.js';
 import type { RegistrarAdapter } from '../../src/registrars/types.js';
-import { buildApp } from '../../src/app.js';
+import { buildApp, type AppDeps } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
 import type { Database } from '../../src/db/types.js';
 import type { AuditWriter } from '../../src/http/audit.js';
@@ -77,6 +77,7 @@ export async function makeApp(
     backupExport?: { runOnce(): Promise<unknown> };
     holdoutCheck?: HoldoutCheck;
     screeningStopAfterResults?: number;
+    screening?: AppDeps['screening'];
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -93,6 +94,7 @@ export async function makeApp(
     backupExport: opts.backupExport,
     holdoutCheck: opts.holdoutCheck,
     screeningStopAfterResults: opts.screeningStopAfterResults,
+    screening: opts.screening,
     sleep: opts.sleep ?? (async () => {}),
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
     registerExtraRoutes: opts.testRoutes === false ? undefined : registerTestRoutes,

@@ -1,0 +1,9 @@
+{
+  "url": "https://rdap.verisign.com/net/v1/domain/netextend.net",
+  "status": 404,
+  "headers": {
+    "content-type": "application/rdap+json",
+    "retry-after": null
+  },
+  "body": ""
+}

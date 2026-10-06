@@ -1,0 +1,9 @@
+{
+  "url": "https://rdap.identitydigital.services/rdap/domain/netextend.info",
+  "status": 200,
+  "headers": {
+    "content-type": "application/rdap+json",
+    "retry-after": null
+  },
+  "body": "{\"objectClassName\":\"domain\",\"ldhName\":\"netextend.info\",\"status\":[\"client transfer prohibited\"],\"events\":[{\"eventAction\":\"expiration\",\"eventDate\":\"2027-04-19T08:30:37.922Z\"},{\"eventAction\":\"registration\",\"eventDate\":\"2005-04-19T08:30:37.922Z\"},{\"eventAction\":\"last changed\",\"eventDate\":\"2026-08-13T20:00:56.718Z\"},{\"eventAction\":\"last update of RDAP database\",\"eventDate\":\"2026-10-06T07:55:35.082Z\"}],\"entities\":[{\"roles\":[\"registrar\"],\"vcardArray\":[\"vcard\",[[\"version\",{},\"text\",\"4.0\"],[\"fn\",{},\"text\",\"IONOS SE\"]]]}],\"nameservers\":[{\"ldhName\":\"ns1017.ui-dns.biz\"},{\"ldhName\":\"ns1074.ui-dns.de\"},{\"ldhName\":\"ns1083.ui-dns.org\"},{\"ldhName\":\"ns1034.ui-dns.com\"}]}"
+}

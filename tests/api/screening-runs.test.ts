@@ -369,6 +369,7 @@ describe('fix round 1', () => {
     await putBrandLists();
     const { app: a, post, run, get } = await h();
     let id = '';
+    a.screeningWorker.checks.availability = { id: 'availability', gate: 'G2', ruleIds: [], lists: [], async run() { return outcome('PASS', null, null); } }; // the real one is built in Task 5
     a.screeningWorker.checks.web_risk = {
       id: 'web_risk', gate: 'G5', ruleIds: ['WEB-RISK-1'], lists: [],
       async run() {

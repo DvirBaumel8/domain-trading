@@ -10,13 +10,15 @@ import { registerSold } from './api/sold.js';
 import { registerSelection } from './api/selection.js';
 import { registerScreening } from './api/screening.js';
 import { ScreeningWorker } from './screening/engine.js';
+import type { ScreeningDeps } from './screening/types.js';
 import type { HoldoutCheck } from './screening/settings.js';
 import { SoldService } from './services/sold.js';
 import { OffersService } from './services/offers.js';
 import { registerExport } from './api/export.js';
 import { registerCheck } from './api/check.js';
 import { registerHealth } from './api/health.js';
-import { queryNs, type NsLookup } from './dns/ns-lookup.js';
+import dns from 'node:dns';
+import { queryDns, queryNs, type NsLookup } from './dns/ns-lookup.js';
 import type { Config } from './config.js';
 import type { Database } from './db/types.js';
 import { dbAuditWriter, auditFrameworkError, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
@@ -24,7 +26,7 @@ import { registerAuth, registerScope } from './http/auth.js';
 import { registerIdempotency } from './http/idempotency.js';
 import { registerRateLimit } from './http/rate-limit.js';
 import { errorBody, registerErrorHandling } from './http/errors.js';
-import { rdapStatus, type RdapFn } from './rdap.js';
+import { rdapLookup, rdapStatus, type RdapFn } from './rdap.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
 import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
@@ -73,6 +75,8 @@ export interface AppDeps {
   holdoutCheck?: HoldoutCheck;
   /** Test-only: the screening worker stops (as if killed) after this many results of its first execution. */
   screeningStopAfterResults?: number;
+  /** Test-only: replaces the screening checks' outside access (RDAP, DNS, fetch). Production passes nothing. */
+  screening?: Partial<Omit<ScreeningDeps, 'checkService'>>;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -127,7 +131,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const screeningWorker = new ScreeningWorker({
     db: deps.db, now: deps.now ?? Date.now, log: app.log,
     stopAfterResults: deps.screeningStopAfterResults,
-    screening: { fetch: globalThis.fetch, sleep: deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), checkService },
+    screening: {
+      fetch: globalThis.fetch, sleep: deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), checkService,
+      rdapLookup, dnsQuery: queryDns,
+      resolveNs: (zone) => dns.promises.resolveNs(zone),
+      resolve4: (host) => dns.promises.resolve4(host),
+      ...deps.screening,
+    },
   });
   app.decorate('screeningWorker', screeningWorker);
   app.addHook('onClose', async () => screeningWorker.idle());
