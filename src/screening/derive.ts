@@ -14,10 +14,16 @@ export interface Derived {
 }
 
 /**
- * The result per check: a manual record always outranks an automatic or cached row (whatever the ids: a human record posted
+ * The result per check: a manual record always outranks an automatic or cached row, except an automated history FAIL (whatever the ids: a human record posted
  * while the worker was still running must not be hidden by the auto row that lands later); within a kind the highest id wins.
  */
-export const beats = (a: ResultRow, b: ResultRow): boolean => (a.source === 'manual') !== (b.source === 'manual') ? a.source === 'manual' : a.id > b.id;
+export const beats = (a: ResultRow, b: ResultRow): boolean => {
+  // Fail closed: an automated history FAIL (only possible with sources.wayback on; a cached manual row carries fields.manual) is never outranked by a manual row.
+  const autoFail = (r: ResultRow) => r.check_id === 'history' && r.source !== 'manual' && r.status === 'FAIL' && r.fields.manual !== true;
+  if (a.source === 'manual' && autoFail(b)) return false;
+  if (b.source === 'manual' && autoFail(a)) return true;
+  return (a.source === 'manual') !== (b.source === 'manual') ? a.source === 'manual' : a.id > b.id;
+};
 
 export function latestByCheck(results: ResultRow[]): Map<CheckId, ResultRow> {
   const m = new Map<CheckId, ResultRow>();

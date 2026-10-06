@@ -23,7 +23,7 @@ const URL1 = 'https://web.archive.org/web/20190412093000/http://officeprepexampl
 const URL2 = 'https://web.archive.org/web/20210301000000/http://officeprepexample.com/about';
 
 /** A finished live S7 run on the full plan: every check PASS (no network) except `history`, which is MANUAL_REQUIRED, as the live run leaves it. */
-async function seedRun(domains: string[] = [DOMAIN]): Promise<string> {
+async function seedRun(domains: string[] = [DOMAIN], history: 'MANUAL_REQUIRED' | 'FAIL' = 'MANUAL_REQUIRED'): Promise<string> {
   const sel = await db.selectFrom('selection_settings').select(['id', 'values']).where('label', '=', 'v1').executeTakeFirstOrThrow();
   const plan = planFor(sel.values as never, 'S7');
   const lists = await currentLists(db, ['brand', 'bigco']);
@@ -39,7 +39,7 @@ async function seedRun(domains: string[] = [DOMAIN]): Promise<string> {
       const manual = check === 'history';
       await db.insertInto('screening_results').values({
         run_id: id, item_idx: idx, domain: d, lane: 'S7', check_id: check, gate: GATE_OF[check as keyof typeof GATE_OF], rule_ids: ['X'],
-        status: manual ? 'MANUAL_REQUIRED' : 'PASS', reason_code: manual ? 'MANUAL_SOURCE' : null, reason: null, fields: JSON.stringify({}),
+        status: manual ? history : 'PASS', reason_code: manual ? (history === 'FAIL' ? 'HARMFUL_HISTORY' : 'MANUAL_SOURCE') : null, reason: null, fields: JSON.stringify({}),
         checked_at: new Date(), settings_label: 'v1', list_versions: '{}', duration_ms: 0, upstream_calls: 0, source: 'auto',
       }).execute();
     }
@@ -49,7 +49,7 @@ async function seedRun(domains: string[] = [DOMAIN]): Promise<string> {
 
 const rec = (x: ScreeningHarness, over: object = {}, top: object = {}) => ({
   domain: DOMAIN, check: 'history', checked_at: new Date(x.clock.t - 3_600_000).toISOString(),
-  result: { result: 'PASS', first_capture_year: 2019, last_capture_year: 2021, checked_by: 'gavriel', ...over }, ...top,
+  result: { result: 'PASS', first_capture_year: 2019, last_capture_year: 2021, evidence_urls: [URL1], checked_by: 'gavriel', ...over }, ...top,
 });
 const nameOf = async (x: ScreeningHarness, id: string, domain = DOMAIN) => (await x.get(`/screening/runs/${id}?domain=${domain}`)).json().names[0];
 const res = (n: any, check: string) => n.results.find((r: any) => r.check === check);
@@ -84,7 +84,7 @@ describe('manual HIST-2 record (CR-002 Amendment B)', () => {
   it('a PASS with no capture year leaves prior_history and the source lane unknown (not main lane)', async () => {
     const x = await h();
     const id = await seedRun();
-    const r = await x.post(`/screening/runs/${id}/manual`, rec(x, { first_capture_year: undefined, last_capture_year: undefined }));
+    const r = await x.post(`/screening/runs/${id}/manual`, rec(x, { first_capture_year: undefined, last_capture_year: undefined, evidence_urls: undefined }));
     expect(r.json().fields).toMatchObject({ prior_history: null, source_lane: 'unknown', com_prior_registration: 'unknown' });
     const j = await join(x, await openTranche(x), id);
     expect([j.statusCode, j.json().members[0].main_lane]).toEqual([200, false]);
@@ -147,13 +147,25 @@ describe('manual HIST-2 record (CR-002 Amendment B)', () => {
     expect(JSON.stringify(audit.request)).toContain('checked_by');
   });
 
+  it('fail closed: an automated history FAIL is never outranked by a manual PASS; the evidence row names the first archive link', async () => {
+    const x = await h();
+    const id = await seedRun([DOMAIN], 'FAIL');
+    const r = await x.post(`/screening/runs/${id}/manual`, rec(x, {}, { evidence_url: 'https://example.com/ignored' }));
+    expect(r.statusCode).toBe(201);
+    const n = await nameOf(x, id);
+    expect(res(n, 'history')).toMatchObject({ status: 'FAIL', source: 'auto' });
+    expect(n.final_status).toBe('rejected');
+    const ev = await x.get(`/screening/evidence/${r.json().evidence[0]}`);
+    expect(ev.json().url).toBe(URL1);
+  });
+
   describe('errors', () => {
     let x!: ScreeningHarness;
     let id = '';
     beforeEach(async () => { x = await h(); id = await seedRun(); });
     const bad = async (over: object, top: object = {}) => ({ r: await x.post(`/screening/runs/${id}/manual`, rec(x, over, top)) });
     it('REJECT_HARMFUL or FLAG_PRIOR_BUSINESS without an evidence URL: 422 VALIDATION_ERROR', async () => {
-      for (const over of [{ result: 'REJECT_HARMFUL', category: 'adult' }, { result: 'FLAG_PRIOR_BUSINESS' }, { result: 'FLAG_PRIOR_BUSINESS', evidence_urls: [] }]) {
+      for (const over of [{ result: 'REJECT_HARMFUL', category: 'adult', evidence_urls: undefined }, { result: 'FLAG_PRIOR_BUSINESS', evidence_urls: undefined }, { result: 'FLAG_PRIOR_BUSINESS', evidence_urls: [] }]) {
         const { r } = await bad(over);
         expect([r.statusCode, r.json().error.code]).toEqual([422, 'VALIDATION_ERROR']);
       }
@@ -166,6 +178,11 @@ describe('manual HIST-2 record (CR-002 Amendment B)', () => {
     it('evidence must be an archive capture link', async () => {
       expect((await bad({ result: 'FLAG_PRIOR_BUSINESS', evidence_urls: ['https://example.com/page'] })).r.statusCode).toBe(422);
       expect((await bad({ result: 'FLAG_PRIOR_BUSINESS', evidence_urls: ['https://web.archive.org/web/*/officeprepexample.com'] })).r.statusCode).toBe(422);
+    });
+    it('capture years without an archive evidence link: 422; the same PASS with no years is fine', async () => {
+      const r = await bad({ evidence_urls: undefined });
+      expect([r.r.statusCode, r.r.json().error.code]).toEqual([422, 'VALIDATION_ERROR']);
+      expect((await bad({ first_capture_year: undefined, last_capture_year: undefined, evidence_urls: undefined })).r.statusCode).toBe(201);
     });
     it('missing checked_by, an unknown result, or inverted years: 422', async () => {
       expect((await bad({ checked_by: undefined })).r.statusCode).toBe(422);

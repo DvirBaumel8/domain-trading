@@ -136,6 +136,7 @@ export const HistoryManual = z.object({
   if (r.result === 'REJECT_HARMFUL' && r.category === undefined) ctx.addIssue({ code: 'custom', path: ['category'], message: 'category is required for REJECT_HARMFUL' });
   if (r.result !== 'REJECT_HARMFUL' && r.category !== undefined) ctx.addIssue({ code: 'custom', path: ['category'], message: 'category is only for REJECT_HARMFUL' });
   if (r.result !== 'PASS' && (r.evidence_urls ?? []).length === 0) ctx.addIssue({ code: 'custom', path: ['evidence_urls'], message: `evidence_urls (at least one archive capture link) is required for ${r.result}` });
+  if ((r.first_capture_year !== undefined || r.last_capture_year !== undefined) && (r.evidence_urls ?? []).length === 0) ctx.addIssue({ code: 'custom', path: ['evidence_urls'], message: 'capture years need at least one archive evidence link' });
   if (r.first_capture_year !== undefined && r.last_capture_year !== undefined && r.last_capture_year < r.first_capture_year) ctx.addIssue({ code: 'custom', path: ['last_capture_year'], message: 'last_capture_year is before first_capture_year' });
 });
 

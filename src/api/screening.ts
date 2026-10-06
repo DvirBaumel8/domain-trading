@@ -122,7 +122,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const checkedAt = new Date(body.checked_at);
     const sel = (await selectionSettingsByLabel(db, run.settings_label))!;
     if (checkedAt.getTime() > deps.now() + 60_000) throw new AppError(422, 'CHECKED_AT_INVALID', 'checked_at is in the future');
-    const windowH = sel.values.freshness_hours[check] ?? 0;
+    const windowH = sel.values.freshness_hours[check] ?? (check === 'history' ? 168 : 0);
     if (windowH > 0 && checkedAt.getTime() < deps.now() - windowH * 3_600_000) {
       throw new AppError(422, 'CHECKED_AT_INVALID', `checked_at is older than the ${check} freshness window (${windowH} h)`, { freshness_hours: windowH });
     }
@@ -132,47 +132,51 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const histRows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
       .where('check_id', '=', 'history').execute()).map(toResultRow);
     const history = histRows.reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined);
-    const evidenceUrl = body.evidence_url ?? (rec as { evidence_urls?: string[] }).evidence_urls?.[0] ?? `manual:history:${item.domain}`;
-    const json = JSON.stringify(rec);
-    const evidenceId = await storeEvidence(db, {
-      source: 'manual', url: evidenceUrl, retrievedAt: checkedAt, httpStatus: null, contentType: 'application/json',
-      body: json, text: json, maxBytes: sel.values.evidence.max_text_bytes,
-    });
-    let o;
-    if (check === 'web_risk') o = webRiskFromManual(rec as z.infer<typeof WebRiskManual>, sel.values, history, evidenceUrl, checkedAt, body.note);
-    else if (check === 'tm_us') o = tmFromManual(rec as z.infer<typeof TmManual>, evidenceUrl, checkedAt, body.note, history);
-    else {
-      const versions = run.list_versions as Record<string, number>;
-      const load = async (n: string) => { const l = versions[n] === undefined ? null : await listVersion(db, n, versions[n]); return l ? { version: l.version, terms: l.terms } : null; };
-      o = historyFromManual(rec as z.infer<typeof HistoryManual>, { brand: await load('brand'), bigco: await load('bigco') }, evidenceUrl, checkedAt, body.note);
-    }
-    const put = (id: ManualCheck, out: typeof o, at: Date, evidenceIds: string[]) => db.insertInto('screening_results').values({
-      run_id: run.id, item_idx: item.idx, domain: item.domain, lane: item.lane, check_id: id, gate: GATE_OF[id],
-      rule_ids: worker.checks[id]?.ruleIds ?? [], status: out.status, reason_code: out.reasonCode, reason: out.reason,
-      fields: JSON.stringify(out.fields), data_as_of: out.dataAsOf, checked_at: at, settings_label: run.settings_label,
-      list_versions: JSON.stringify(Object.fromEntries((worker.checks[id]?.lists ?? []).filter((n) => (run.list_versions as Record<string, number>)[n] !== undefined).map((n) => [n, (run.list_versions as Record<string, number>)[n]]))),
-      duration_ms: 0, upstream_calls: 0, evidence_ids: evidenceIds, source: 'manual',
-      recorded_by: req.auth!.name, audit_id: req.auditId!,
-    }).returningAll().executeTakeFirstOrThrow();
-    const row = await put(check, o, checkedAt, [String(evidenceId)]);
-    // A history record decides what the earlier manual Web Risk / trademark records of this name needed (the prior-business phrase, a final
-    // history): those are re-read against it, and a changed verdict is appended (never edited).
-    if (check === 'history') {
-      const all = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
-        .where('check_id', 'in', ['web_risk', 'tm_us']).execute()).map(toResultRow);
-      const newHist = toResultRow(row);
-      for (const id of ['web_risk', 'tm_us'] as const) {
-        const cur = all.filter((r) => r.check_id === id).reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined);
-        if (!cur || cur.source !== 'manual') continue;
-        const f = cur.fields;
-        const url = typeof f.evidence_url === 'string' ? f.evidence_url : evidenceUrl;
-        const at = new Date(typeof f.checked_at === 'string' ? f.checked_at : cur.checked_at);
-        const re = id === 'web_risk'
-          ? webRiskFromManual(WebRiskManual.parse({ raw_status: f.raw_status, threat_types: f.threat_types }), sel.values, newHist, url, at, typeof f.note === 'string' ? f.note : undefined)
-          : tmFromManual(TmManual.parse({ phrases_queried: f.phrases_queried, control_ok: f.control_ok, exact_or_core_live: f.exact_or_core_live, generic_live: f.generic_live, dead_n: f.dead_n ?? undefined, prior_name_live: f.prior_name_live ?? undefined }), url, at, typeof f.note === 'string' ? f.note : undefined, newHist);
-        if (re.status !== cur.status || re.reasonCode !== cur.reason_code) await put(id, re, at, cur.evidence_ids.map(String));
+    const row = await db.transaction().execute(async (trx) => {
+      // A history record's evidence row names its first archive link (the top-level evidence_url is not used for it).
+      const evidenceUrl = check === 'history' ? (rec as z.infer<typeof HistoryManual>).evidence_urls?.[0] ?? `manual:history:${item.domain}` : body.evidence_url!;
+      const json = JSON.stringify(rec);
+      const evidenceId = await storeEvidence(trx, {
+        source: 'manual', url: evidenceUrl, retrievedAt: checkedAt, httpStatus: null, contentType: 'application/json',
+        body: json, text: json, maxBytes: sel.values.evidence.max_text_bytes,
+      });
+      let o;
+      if (check === 'web_risk') o = webRiskFromManual(rec as z.infer<typeof WebRiskManual>, sel.values, history, evidenceUrl, checkedAt, body.note);
+      else if (check === 'tm_us') o = tmFromManual(rec as z.infer<typeof TmManual>, evidenceUrl, checkedAt, body.note, history);
+      else {
+        const versions = run.list_versions as Record<string, number>;
+        const load = async (n: string) => { const l = versions[n] === undefined ? null : await listVersion(trx, n, versions[n]); return l ? { version: l.version, terms: l.terms } : null; };
+        o = historyFromManual(rec as z.infer<typeof HistoryManual>, { brand: await load('brand'), bigco: await load('bigco') }, evidenceUrl, checkedAt, body.note);
       }
-    }
+      const put = (id: ManualCheck, out: typeof o, at: Date, evidenceIds: string[]) => trx.insertInto('screening_results').values({
+        run_id: run.id, item_idx: item.idx, domain: item.domain, lane: item.lane, check_id: id, gate: GATE_OF[id],
+        rule_ids: worker.checks[id]?.ruleIds ?? [], status: out.status, reason_code: out.reasonCode, reason: out.reason,
+        fields: JSON.stringify(out.fields), data_as_of: out.dataAsOf, checked_at: at, settings_label: run.settings_label,
+        list_versions: JSON.stringify(Object.fromEntries((worker.checks[id]?.lists ?? []).filter((n) => (run.list_versions as Record<string, number>)[n] !== undefined).map((n) => [n, (run.list_versions as Record<string, number>)[n]]))),
+        duration_ms: 0, upstream_calls: 0, evidence_ids: evidenceIds, source: 'manual',
+        recorded_by: req.auth!.name, audit_id: req.auditId!,
+      }).returningAll().executeTakeFirstOrThrow();
+      const row = await put(check, o, checkedAt, [String(evidenceId)]);
+      // A history record decides what the earlier manual Web Risk / trademark records of this name needed (the prior-business phrase, a final
+      // history): those are re-read against it, and a changed verdict is appended (never edited).
+      if (check === 'history') {
+        const all = (await trx.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
+          .where('check_id', 'in', ['web_risk', 'tm_us']).execute()).map(toResultRow);
+        const newHist = [...histRows, toResultRow(row)].reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined)!; // the history in force, not just the new row
+        for (const id of ['web_risk', 'tm_us'] as const) {
+          const cur = all.filter((r) => r.check_id === id).reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined);
+          if (!cur || cur.source !== 'manual') continue;
+          const f = cur.fields;
+          const url = typeof f.evidence_url === 'string' ? f.evidence_url : evidenceUrl;
+          const at = new Date(typeof f.checked_at === 'string' ? f.checked_at : cur.checked_at);
+          const re = id === 'web_risk'
+            ? webRiskFromManual(WebRiskManual.parse({ raw_status: f.raw_status, threat_types: f.threat_types }), sel.values, newHist, url, at, typeof f.note === 'string' ? f.note : undefined)
+            : tmFromManual(TmManual.parse({ phrases_queried: f.phrases_queried, control_ok: f.control_ok, exact_or_core_live: f.exact_or_core_live, generic_live: f.generic_live, dead_n: f.dead_n ?? undefined, prior_name_live: f.prior_name_live ?? undefined }), url, at, typeof f.note === 'string' ? f.note : undefined, newHist);
+          if (re.status !== cur.status || re.reasonCode !== cur.reason_code) await put(id, re, at, cur.evidence_ids.map(String));
+        }
+      }
+      return row;
+    });
     await refreshSummary(db, run);
     return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name });
   });
