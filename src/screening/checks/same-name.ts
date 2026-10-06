@@ -82,7 +82,7 @@ export const sameNameCheck: Check = {
         continue;
       }
       const host = `${sld}.${tld}`;
-      const page = await fetchPage(ctx.deps, `https://${host}/`, { timeoutMs: s.timeout_ms, maxBytes: s.max_bytes, maxRedirects: s.max_redirects, pace, robots, neverFetchHosts: ctx.settings.lead.verify.never_fetch_hosts, deadline: ctx.deadline, now: ctx.now, onRequest: () => { calls++; } });
+      const page = await fetchPage({ fetch: ctx.deps.siteFetch, lookupHost: ctx.deps.lookupHost }, `https://${host}/`, { timeoutMs: s.timeout_ms, maxBytes: s.max_bytes, maxRedirects: s.max_redirects, pace, robots, neverFetchHosts: ctx.settings.lead.verify.never_fetch_hosts, deadline: ctx.deadline, now: ctx.now, onRequest: () => { calls++; } });
       const c = classifySite(page, host, ctx.item.domain, phraseTokens, lists, s);
       let evidenceId: number | null = null;
       if (page.ok && page.html !== '') {

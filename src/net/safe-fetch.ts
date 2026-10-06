@@ -9,7 +9,8 @@
 //     (rebinding) is never used. TLS still uses the hostname for SNI and certificate checks.
 import dns from 'node:dns';
 import net from 'node:net';
-import { Agent } from 'undici';
+import { domainToASCII } from 'node:url';
+import { Agent, fetch as undiciFetch } from 'undici';
 
 export type BlockCode = 'ADDRESS_BLOCKED' | 'HOST_EXCLUDED' | 'URL_NOT_ALLOWED';
 export class BlockedError extends Error {
@@ -80,11 +81,14 @@ export function isBlockedAddress(ip: string): boolean {
   if (n === 0n || n === 1n) return true; // :: and ::1
   if (inV6(n, 0n, 96)) return true; // ::/96, IPv4-compatible (deprecated) and the rest of the low block
   if (inV6(n, hex('ffff00000000'), 96)) return blockedV4Int(low32); // ::ffff:0:0/96 IPv4-mapped
+  if (inV6(n, hex('ffff') << 48n, 96)) return true; // ::ffff:0:0:0/96 IPv4-translated (SIIT)
   if (inV6(n, hex('0064ff9b') << 96n, 96)) return blockedV4Int(low32); // 64:ff9b::/96 NAT64
   if (inV6(n, hex('0064ff9b0001') << 80n, 48)) return true; // 64:ff9b:1::/48 local-use NAT64
   if (inV6(n, hex('2002') << 112n, 16)) return blockedV4Int(Number((n >> 80n) & 0xffffffffn)); // 2002::/16 6to4 embeds a v4
   if (inV6(n, hex('20010000') << 96n, 32)) return true; // 2001::/32 Teredo
   if (inV6(n, hex('20010db8') << 96n, 32)) return true; // documentation
+  if (inV6(n, hex('3fff') << 112n, 20)) return true; // 3fff::/20 documentation
+  if (inV6(n, hex('5f00') << 112n, 16)) return true; // 5f00::/16 SRv6 SIDs
   if (inV6(n, hex('200100020000') << 80n, 48)) return true; // benchmarking
   if (inV6(n, hex('0100') << 112n, 64)) return true; // 100::/64 discard
   if (inV6(n, hex('fe80') << 112n, 10)) return true; // link-local
@@ -104,43 +108,88 @@ export function vettedLookup(addresses: { address: string; family: number }[]) {
 
 // ---------- the guard ----------
 
+/** Lowercase, all trailing dots dropped, Unicode to punycode (both sides of the comparison go through this). */
+const normHost = (h: string): string => {
+  let x = h.trim().toLowerCase();
+  while (x.endsWith('.')) x = x.slice(0, -1);
+  while (x.startsWith('.')) x = x.slice(1);
+  return domainToASCII(x) || x;
+};
 export const hostExcluded = (host: string, neverFetchHosts: string[]): boolean => {
-  const h = host.toLowerCase().replace(/\.$/, '');
-  return neverFetchHosts.some((x) => { const e = x.toLowerCase().replace(/^\./, ''); return h === e || h.endsWith(`.${e}`); });
+  const h = normHost(host);
+  return neverFetchHosts.some((x) => { const e = normHost(x); return e !== '' && (h === e || h.endsWith(`.${e}`)); });
 };
 
-export interface SafeFetchDeps { fetch: typeof fetch; lookupHost?: LookupAll }
-export interface SafeFetchOpts { neverFetchHosts?: string[] }
+export interface SafeFetchDeps {
+  /** Production passes nothing and gets undici's own `fetch` (the one that matches the undici Agent). Tests inject a fake. */
+  fetch?: typeof fetch;
+  lookupHost?: LookupAll;
+}
+export interface SafeFetchOpts {
+  neverFetchHosts?: string[];
+  /** Abort the DNS lookup after this many ms (unknown TIMEOUT). */
+  lookupTimeoutMs?: number;
+  /** TEST ONLY: exceptions to the address and port rules, so an integration test can reach a server on 127.0.0.1. Production code never sets it. */
+  testAllow?: { addresses?: Set<string>; ports?: Set<string> };
+}
+
+const withTimeout = <T>(p: Promise<T>, ms: number | undefined): Promise<T> => {
+  if (ms === undefined) return p;
+  let timer: ReturnType<typeof setTimeout>;
+  const t = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new DOMException('The DNS lookup timed out', 'TimeoutError')), Math.max(1, ms)); });
+  return Promise.race([p, t]).finally(() => clearTimeout(timer));
+};
 
 /** Throws BlockedError for a URL the guard refuses before any connection is made; a lookup failure is rethrown with its code (ENOTFOUND etc.) as the cause. */
 export async function vetUrl(rawUrl: string, lookupHost: LookupAll, o: SafeFetchOpts): Promise<{ url: URL; addresses: { address: string; family: number }[] }> {
   let url: URL;
   try { url = new URL(rawUrl); } catch { throw new BlockedError('URL_NOT_ALLOWED', 'not a URL'); }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new BlockedError('URL_NOT_ALLOWED', `scheme ${url.protocol} is not allowed`);
-  if (url.port !== '') throw new BlockedError('URL_NOT_ALLOWED', 'only the default ports 80 and 443 are allowed');
+  if (url.port !== '' && !o.testAllow?.ports?.has(url.port)) throw new BlockedError('URL_NOT_ALLOWED', 'only the default ports 80 and 443 are allowed');
   if (url.username !== '' || url.password !== '') throw new BlockedError('URL_NOT_ALLOWED', 'credentials in a URL are not allowed');
   const host = url.hostname.toLowerCase();
   if (host.startsWith('[') || net.isIP(host) !== 0) throw new BlockedError('ADDRESS_BLOCKED', 'IP-literal hosts are not fetched');
   if (hostExcluded(host, o.neverFetchHosts ?? [])) throw new BlockedError('HOST_EXCLUDED', `${host} is on the never-fetch list`);
   let addresses: { address: string; family: number }[];
   try {
-    addresses = await lookupHost(host);
+    addresses = await withTimeout(lookupHost(host), o.lookupTimeoutMs);
   } catch (e) {
+    if (e instanceof DOMException && e.name === 'TimeoutError') throw e;
     throw Object.assign(new TypeError('fetch failed'), { cause: e });
   }
   if (addresses.length === 0) throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('no address'), { code: 'ENOTFOUND' }) });
-  if (addresses.some((a) => isBlockedAddress(a.address))) throw new BlockedError('ADDRESS_BLOCKED', `${host} resolves to a blocked address`);
+  if (addresses.some((a) => isBlockedAddress(a.address) && !o.testAllow?.addresses?.has(a.address))) throw new BlockedError('ADDRESS_BLOCKED', `${host} resolves to a blocked address`);
   return { url, addresses };
 }
 
-/** One guarded request: vet the URL and the resolved addresses, then connect to the vetted address only. `init.redirect` is the caller's (redirects are followed by hand, each hop through here). */
+/**
+ * One guarded request: vet the URL and the resolved addresses, then connect to the vetted address only. Redirects are never followed
+ * here (`redirect: 'manual'` overrides the caller), each hop is the caller's to send back through this function. The per-request Agent
+ * is closed once the body has been read or cancelled.
+ */
 export async function safeFetch(deps: SafeFetchDeps, rawUrl: string, init: RequestInit, o: SafeFetchOpts = {}): Promise<Response> {
   const { url, addresses } = await vetUrl(rawUrl, deps.lookupHost ?? systemLookup, o);
   const dispatcher = new Agent({ connections: 1, keepAliveTimeout: 100, keepAliveMaxTimeout: 100, connect: { lookup: vettedLookup(addresses) as never } });
+  let closed = false;
+  const close = () => { if (!closed) { closed = true; void dispatcher.close().catch(() => {}); } };
+  const f = (deps.fetch ?? (undiciFetch as unknown as typeof fetch));
+  let res: Response;
   try {
-    return await deps.fetch(url.toString(), { ...init, dispatcher } as RequestInit);
+    res = await f(url.toString(), { ...init, redirect: 'manual', dispatcher } as RequestInit);
   } catch (e) {
-    void dispatcher.close().catch(() => {});
+    close();
     throw e;
   }
+  if (!res.body) { close(); return res; }
+  const reader = res.body.getReader();
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(c) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) { c.close(); close(); } else c.enqueue(value);
+      } catch (e) { c.error(e); close(); }
+    },
+    cancel(reason) { void reader.cancel(reason).catch(() => {}); close(); },
+  });
+  return new Response(stream, { status: res.status, statusText: res.statusText, headers: res.headers });
 }

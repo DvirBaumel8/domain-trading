@@ -62,7 +62,7 @@ beforeEach(async () => {
 });
 
 async function run(o: { lookup?: ScreeningDeps['lookupHost']; rdap?: RdapLookupFn; sites: SiteFetch; sleep?: (ms: number) => Promise<void>; names?: object[]; extra?: object; setup?: (h: Awaited<ReturnType<typeof screeningHarness>>) => Promise<void> }) {
-  const screening: Partial<ScreeningDeps> = { rdapLookup: o.rdap ?? fakeRdap({}), fetch: o.sites.fn, ...(o.lookup ? { lookupHost: o.lookup } : {}), ...(o.sleep ? { sleep: o.sleep } : {}) };
+  const screening: Partial<ScreeningDeps> = { rdapLookup: o.rdap ?? fakeRdap({}), siteFetch: o.sites.fn, ...(o.lookup ? { lookupHost: o.lookup } : {}), ...(o.sleep ? { sleep: o.sleep } : {}) };
   const h = await screeningHarness({ screening });
   app = h.app;
   await o.setup?.(h);
@@ -91,7 +91,7 @@ describe('same_name (CAP-12)', () => {
   it('the check runs in the default plan right after ext_dates', async () => {
     mswServer.use(robots404(`${SLD}.net`), http.get(`https://${SLD}.net/`, () => html(page('synthetic-service.html'))));
     const sites = siteFetch({ [`${SLD}.net`]: 'serve' });
-    const h = await screeningHarness({ screening: { rdapLookup: fakeRdap({ [`${SLD}.net`]: registered() }), fetch: sites.fn } });
+    const h = await screeningHarness({ screening: { rdapLookup: fakeRdap({ [`${SLD}.net`]: registered() }), siteFetch: sites.fn } });
     app = h.app;
     const { body } = await h.runDone({ mode: 'full', names: [{ domain: COM, lane: 'S3' }] });
     const order = body.names[0].results.map((x: any) => x.check);
@@ -317,7 +317,7 @@ describe('ext_dates is unchanged by the extRegistration refactor', () => {
       [`${NET}.net`]: { ...registered(), facts: { ...facts, created_at: '2015-02-02T00:00:00Z' } },
       [`${NET}.ai`]: unknownRdap(),
     });
-    const h = await screeningHarness({ screening: { rdapLookup: rdap, fetch: sites.fn } });
+    const h = await screeningHarness({ screening: { rdapLookup: rdap, siteFetch: sites.fn } });
     app = h.app;
     const { body } = await h.runDone({ mode: 'full', checks: ['availability', 'ext_dates'], names: [{ domain: `${NET}.com`, lane: 'S3' }] });
     const r = body.names[0].results.find((x: any) => x.check === 'ext_dates');

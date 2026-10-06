@@ -28,7 +28,8 @@ export interface FetchPageOpts {
   /** Called once per request attempted (robots.txt, page, each hop), for `upstream_calls`. */
   onRequest?: () => void;
 }
-type FetchDeps = Pick<ScreeningDeps, 'fetch' | 'lookupHost'>;
+/** `fetch` is a test injection; production passes none and safeFetch uses undici's own fetch. */
+type FetchDeps = { fetch?: typeof fetch; lookupHost?: ScreeningDeps['lookupHost'] };
 
 /** The product token our robots.txt group is named by (the `User-Agent` header carries it as `domain-trading-api/<version>`). */
 export const ROBOTS_TOKEN = 'domain-trading-api';
@@ -131,7 +132,7 @@ async function once(deps: FetchDeps, url: string, o: FetchPageOpts, accept: stri
     const res = await o.pace.run(async () => {
       if (late(o)) throw timeoutError(); // checked again after the wait in the pacer queue
       o.onRequest?.();
-      return safeFetch(deps, url, { redirect: 'manual', headers: { 'user-agent': USER_AGENT, accept }, signal: AbortSignal.timeout(o.timeoutMs) }, { neverFetchHosts: o.neverFetchHosts });
+      return safeFetch(deps, url, { redirect: 'manual', headers: { 'user-agent': USER_AGENT, accept }, signal: AbortSignal.timeout(o.timeoutMs) }, { neverFetchHosts: o.neverFetchHosts, lookupTimeoutMs: o.deadline === undefined ? o.timeoutMs : Math.min(o.timeoutMs, (o.deadline - (o.now ?? Date.now)())) });
     });
     return { res };
   } catch (e) {

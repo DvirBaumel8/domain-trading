@@ -16,7 +16,7 @@ describe('isBlockedAddress', () => {
   it.each([
     '::', '::1', 'fe80::1', 'febf::1', 'fc00::1', 'fd12:3456::1', 'ff02::1', '2001:db8::1', '2001:0::1', '2001:2::1', '100::1',
     '::ffff:127.0.0.1', '::ffff:7f00:1', '::ffff:10.0.0.1', '::ffff:169.254.169.254', '::ffff:192.168.0.1', '::127.0.0.1', '::10.1.2.3', '::2',
-    '64:ff9b::7f00:1', '64:ff9b::a9fe:a9fe', '64:ff9b::10.0.0.1', '64:ff9b:1::1', '2002:7f00:1::1', '2002:a9fe:a9fe::', 'fe80::1%eth0', 'not-an-ip',
+    '64:ff9b::7f00:1', '64:ff9b::a9fe:a9fe', '64:ff9b::10.0.0.1', '64:ff9b:1::1', '::ffff:0:7f00:1', '::ffff:0:8.8.8.8', '3fff::1', '3fff:fff::1', '5f00::1', '2002:7f00:1::1', '2002:a9fe:a9fe::', 'fe80::1%eth0', 'not-an-ip',
   ])('v6 %s is blocked', (ip) => expect(isBlockedAddress(ip)).toBe(true));
   it.each(['2606:4700:4700::1111', '2001:4860:4860::8888', '::ffff:8.8.8.8', '64:ff9b::808:808', '2002:808:808::1'])('v6 %s is allowed', (ip) => expect(isBlockedAddress(ip)).toBe(false));
 });
@@ -52,6 +52,25 @@ describe('vetUrl', () => {
   });
 });
 
+describe('hostExcluded normalisation', () => {
+  it('lowercase, trailing dots and punycode on both sides', async () => {
+    const code = async (u: string, never: string[]) => vetUrl(u, PUBLIC, { neverFetchHosts: never }).then(() => 'allowed', (e) => (e as BlockedError).code);
+    expect(await code('https://LinkedIn.com./x', ['linkedin.com'])).toBe('HOST_EXCLUDED');
+    expect(await code('https://www.linkedin.com../x', ['LinkedIn.com.'])).toBe('HOST_EXCLUDED');
+    expect(await code('https://xn--bcher-kva.example/', ['b\u00fccher.example'])).toBe('HOST_EXCLUDED');
+    expect(await code('https://b\u00fccher.example/', ['xn--bcher-kva.example'])).toBe('HOST_EXCLUDED');
+    expect(await code('https://other.example/', ['linkedin.com', ''])).toBe('allowed');
+  });
+});
+
+describe('DNS lookup timeout', () => {
+  it('a lookup that never answers is a TimeoutError, not a hang', async () => {
+    const hang: LookupAll = () => new Promise(() => {});
+    await expect(vetUrl('https://slow.example/', hang, { lookupTimeoutMs: 20 })).rejects.toMatchObject({ name: 'TimeoutError' });
+    expect(await fetchPage({ fetch: (async () => new Response('x')) as unknown as typeof fetch, lookupHost: hang }, 'https://slow.example/', { timeoutMs: 20, maxBytes: 1000, maxRedirects: 1, pace: new Pacer(0, 1, async () => {}), robots: new Map(), neverFetchHosts: [] })).toMatchObject({ ok: false, kind: 'unknown', reasonCode: 'SOURCE_ERROR' }); // robots.txt could not be read in time
+  });
+});
+
 describe('connecting to the vetted address (DNS rebinding)', () => {
   it('vettedLookup answers with the vetted address whatever the name, in both callback shapes', () => {
     const l = vettedLookup([{ address: '93.184.216.34', family: 4 }]);
@@ -69,6 +88,13 @@ describe('connecting to the vetted address (DNS rebinding)', () => {
     await safeFetch({ fetch: fake, lookupHost }, 'https://rebind.example/', {}, {});
     expect(lookups).toBe(1);
     expect(inits[0]!.dispatcher).toBeTruthy();
+  });
+  it('safeFetch overrides a caller redirect option with manual', async () => {
+    const seen: (RequestInit | undefined)[] = [];
+    const fake = (async (_u: string, init?: RequestInit) => { seen.push(init); return new Response(null, { status: 302, headers: { location: 'http://x.example/' } }); }) as unknown as typeof fetch;
+    const res = await safeFetch({ fetch: fake, lookupHost: PUBLIC }, 'https://a.example/', { redirect: 'follow' }, {});
+    expect(seen[0]!.redirect).toBe('manual');
+    expect(res.status).toBe(302);
   });
   it('safeFetch makes no connection for a blocked address', async () => {
     let calls = 0;
