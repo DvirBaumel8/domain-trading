@@ -42,5 +42,13 @@ Every place where the specs DOM inherited (`docs/internal/*`, which still descri
 | G-27 | Kill criteria "build > 2 evenings" and "Render cost not approved" | Built; hosting is $0 | **Dropped** (superseded); test-plan updated |
 | G-28 | `.env.example` doc-only variables (`POC_CAP_CENTS`, `MAX_DOMAINS`, `LANDER_TARGET`, …) suggested env-configurable caps | Caps live in the `settings` table only | **keep**; `.env.example` cleaned (caps are never env vars) |
 
+## Source terms (Task 1 of P1a, 6 Oct 2026; see `docs/internal/sources.md`)
+| # | Spec says | Code does | Decision | Why |
+|---|---|---|---|---|
+| G-29 | CAP-11 NameBio free CSV, "1 download per hour" | Not built | **DVIR**: NameBio answers HTTP 403 (Cloudflare block) to every automated request, so its terms, download URL and limit are **UNVERIFIED**. `sources.namebio` defaults to `false`; CAP-11 returns `UNKNOWN` / `SOURCE_DISABLED`. Dvir (browser) or Gavriel can send the terms text and CSV URL, then DOM enables it | Source-terms rule: no quote, no use |
+| G-30 | CAP-02 Tranco list | Not built | **DVIR**: Tranco has no licence of its own and one upstream provider is CC BY-NC 4.0. Enabled for internal typo screening only (not redistributed or committed). Confirm it is acceptable for a commercial business | `sources.md` Tranco |
+| G-31 | CAP-07 Internet Archive CDX | Not built | **DVIR**: the Terms of Use page is JavaScript-only and could not be read by DOM; the documented CDX API is used at <= 1 request/s. Please confirm the terms | `sources.md` Wayback |
+| G-32 | CAP-03 / CAP-12 for `.co`, `.io`, `.us` (RDAP) | Not built | No RDAP base for these in the IANA bootstrap (2026-09-30): `UNKNOWN` / `NO_RDAP_SERVICE`, disabled until a primary source is quoted | `sources.md` |
+
 ## Removed by Dvir's 6 Oct decisions (no gap; listed for completeness)
 `POST /offers/import`, `offer_imports`, `offers.import_id`; the `payouts` table, `POST /payouts/{id}/received`, the `/sold` `payout` object, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE`, `payouts_pending` (tests PO-1–PO-5, S-13–S-15, OF-13, OF-15 deleted); `changed_only` and per-file export records; `JOBS_MODE` and in-process timers.

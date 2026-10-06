@@ -8,6 +8,7 @@
 | `endpoints.md` | Every route: method, path, token, request, response, error codes |
 | `jobs.md` | The scheduled jobs (`POST /jobs/run`: `tick`, `daily`) |
 | `reports.md` | `GET /report` fields and warnings (with levels) |
+| `selection.md` | Selection and screening checks: statuses, codes, shapes (v1.1.0, unreleased) |
 | `formats.md` | The Afternic CSV, the Sedo file, the ledger CSV, and other exported shapes |
 | `CHANGELOG.md` | Contract versions |
 

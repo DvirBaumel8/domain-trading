@@ -1,0 +1,9 @@
+data/wordlists/us-places.txt is derived from the U.S. Census Bureau 2026 Gazetteer, National Places file:
+https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2026_Gazetteer/2026_Gaz_place_national.zip (retrieved 2026-10-06).
+
+The Gazetteer is a work of the United States Government. 17 U.S.C. section 105 (https://www.law.cornell.edu/uscode/text/17/105):
+"Copyright protection under this title is not available for any work of the United States Government, but the United States
+Government is not precluded from receiving and holding copyrights transferred to it by assignment, bequest, or otherwise."
+
+Only place names and USPS state codes are kept. Suffixes (city, town, village, CDP, borough, municipality, ...) are stripped,
+names are lowercased and reduced to letters (Los Angeles -> losangeles). The Census Bureau does not endorse this derived file.
