@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Lane } from '../../src/screening/form.js';
 import { evaluateMoney, geoLadderBottomCents, syllableCount, type MoneyInput } from '../../src/screening/money.js';
 import { DEFAULT_SELECTION_VALUES as D, type SelectionValuesT } from '../../src/screening/settings.js';
+import { laneList } from '../../src/pricing/schedule.js';
 import { V2, V3 } from '../helpers/pricing.js';
 
 const ARA = 1108; // $11.08, lifetime $22.16
@@ -69,11 +70,11 @@ describe('SEL9-1 worked checks (v9.1 priors via lead.gate_enabled)', () => {
 
   it('D-001 at $1,995: not on the price list, LANDER-1 fails; forbidden band flagged', () => {
     const r = m({ binCents: 199500, leadsAB: 10 });
-    expect([r.bin_in_allowed_set, r.lander1, r.forbidden_band, r.passes.lander1]).toEqual([false, { pass: false, reason: 'BIN_NOT_IN_PRICE_LIST' }, true, false]);
+    expect([r.bin_in_allowed_set, r.lander1.reason, r.forbidden_band, r.passes.lander1]).toEqual([false, 'BIN_NOT_IN_PRICE_LIST', true, false]);
   });
 
   it('$1,988 needs the LANDER-1 exception (30 A/B and retail end >= 20); $2,488 as well', () => {
-    expect(m({ binCents: 198800, leadsAB: 29, retailEnd: 25 }).lander1).toEqual({ pass: false, reason: 'LANDER_EXCEPTION_NOT_MET' });
+    expect(m({ binCents: 198800, leadsAB: 29, retailEnd: 25 }).lander1).toMatchObject({ pass: false, reason: 'LANDER_EXCEPTION_NOT_MET' });
     expect(m({ binCents: 198800, leadsAB: 30, retailEnd: 19 }).lander1.pass).toBe(false);
     expect(m({ binCents: 198800, leadsAB: 30, retailEnd: 20 }).lander1.pass).toBe(true);
     expect(m({ binCents: 248800, leadsAB: 30, retailEnd: 20 }).lander1.pass).toBe(true);
@@ -112,6 +113,22 @@ describe('CR-002 CAP-18: p_passive from the tier (v10 defaults)', () => {
   });
 });
 
+describe('one price list (the same lane lists as computePlan and the price job)', () => {
+  it('a non-geo $499 is not in the set and LANDER-1 fails (computePlan says BIN_NOT_IN_PRICE_LIST for it)', () => {
+    const r = m({ binCents: 49900 });
+    expect([r.bin_in_allowed_set, r.lander1.pass, r.lander1.reason]).toEqual([false, false, 'BIN_NOT_IN_PRICE_LIST']);
+  });
+  it('a geo $1,488 is not in the set; a geo $499 is; a geo $788 is not', () => {
+    expect(m({ lane: 'S2', binCents: 148800 }).bin_in_allowed_set).toBe(false);
+    expect(m({ lane: 'S2', binCents: 148800 }).lander1.pass).toBe(false);
+    expect(m({ lane: 'S2', binCents: 49900 }).bin_in_allowed_set).toBe(true);
+    expect(m({ lane: 'S2', binCents: 78800 }).bin_in_allowed_set).toBe(false);
+  });
+  it('the geo ladder bottom comes from the geo lane list', () => {
+    expect(geoLadderBottomCents(V3)).toBe(laneList('geo', V3)[0]);
+  });
+});
+
 describe('money mechanics', () => {
   it('net factor: 0.85 with Afternic, 0.75 otherwise', () => {
     expect(m({}).net_price_cents).toBe(126480);
@@ -144,7 +161,8 @@ describe('money mechanics', () => {
 
   it('without a price list: bin_in_allowed_set is null and a non-geo LANDER-1 cannot pass', () => {
     const r = m({}, v91, V2);
-    expect([r.bin_in_allowed_set, r.lander1]).toEqual([null, { pass: false, reason: 'PRICE_LIST_MISSING' }]);
+    expect([r.bin_in_allowed_set, r.lander1.pass, r.lander1.reason]).toEqual([null, false, 'PRICE_LIST_MISSING']);
+    expect(r.lander1.message).toMatch(/pricing_settings v3 not created yet/);
     expect(m({ lane: 'S2', binCents: 49900 }, v91, V2).lander1.pass).toBe(true);
   });
 

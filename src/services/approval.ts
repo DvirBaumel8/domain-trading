@@ -5,11 +5,12 @@ export type ApprovalCheck =
 const ISO_WITH_TZ = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 const SKEW_MS = 60_000;
 
-/** The domain must appear on label boundaries: `x.com` is not named by `ba.com`, `x.com.au`, `www.x.com`, `x.company`. */
-function namesDomain(text: string, domain: string): boolean {
-  const esc = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?<![a-z0-9.-])${esc}(?![a-z0-9-]|\\.[a-z0-9])`, 'i').test(text);
+/** A name (domain, settings label, list name) must appear on label boundaries: `x.com` is not named by `ba.com`, `x.com.au`, `www.x.com`, `x.company`; `v1` is not named by `v1b`. */
+export function namesToken(text: string, token: string): boolean {
+  const esc = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![a-z0-9._-])${esc}(?![a-z0-9_-]|\\.[a-z0-9])`, 'i').test(text);
 }
+const namesDomain = namesToken;
 
 /** Text present, ISO time with an offset, not in the future (60 s skew), not older than `maxAgeHours`. Does not look for a domain name. */
 export function checkTimedApproval(

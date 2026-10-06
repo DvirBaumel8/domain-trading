@@ -1,18 +1,19 @@
 // CAP-00 selection settings: one versioned JSON document (selection_settings.values) holds every threshold, the tier
 // clauses and the gate list per lane. Code holds mechanics only. Drafts come in by dotted path; activation needs Dvir's
 // approval_ref; the priors are locked against API drafts (SEL9-2).
-import type { Kysely, Selectable } from 'kysely';
+import { sql, type Kysely, type Selectable } from 'kysely';
 import { z } from 'zod';
 import type { Database, SelectionSettingsTable } from '../db/types.js';
 import { AppError } from '../http/errors.js';
-import { checkTimedApproval } from '../services/approval.js';
+import { requireNamedApproval } from './approval.js';
 
 export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short'] as const;
 export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'census', 'ext_dates', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads'] as const;
 /** Checks that only produce an input feature (a failed lookup makes the feature unknown, it does not stop the run). */
 export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio'] as const;
 /** Settings the API can never draft a change to (SEL9-2): only a migration changes them. */
-export const LOCKED_PREFIXES = ['tier.p_passive', 'lead.p_lead', 'priors_v91'];
+/** `holdout` is locked too: the gate that clears `buy_hold` can't be redefined by the draft that clears it. */
+export const LOCKED_PREFIXES = ['tier.p_passive', 'lead.p_lead', 'priors_v91', 'holdout'];
 export const LANES = ['S2', 'S3', 'S4', 'S6', 'S7'] as const;
 const TIERS = ['A', 'I', 'B', 'G'] as const;
 const OPS = ['>=', '<=', '>', '<', '==', '!='] as const;
@@ -179,7 +180,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   },
   typo: { max_edit_distance: 1, top_n: 10000, max_list_age_days: 7 },
   concentration: { max_per_attr: 2, max_lane_share: 0.4, lane_share_enforced: false },
-  tranche: { size: 15, min_main_lane: 10, geo_max: 3, required_for_buy: true },
+  tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true },
   surbl: { zone: 'multi.surbl.org', control_name: 'test.surbl.org', blocked_answers: ['127.0.0.1'], list_bits: { '8': 'PH', '16': 'MW', '64': 'ABUSE', '128': 'CR' }, ns_override: [], timeout_ms: 3000 },
   history: {
     max_fetch_per_name: 6, min_ms_between_calls: 1000, timeout_ms: 20000, retries: 1, min_content_chars: 200,
@@ -248,7 +249,10 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
 export interface ActiveSettings { id: number; label: string; values: SelectionValuesT; activatedAt: Date }
 export interface SettingsVersion { id: number; label: string; values: SelectionValuesT; createdAt: Date; createdBy: string; basedOn: string | null; note: string | null; active: boolean; activatedAt: Date | null; approvalText: string | null }
 
-export type HoldoutCheck = (db: Kysely<Database>, settingsId: number, values: SelectionValuesT) => Promise<{ pass: boolean; suites: unknown[] }>;
+/**
+ * `holdout` is the ACTIVE version's holdout settings (locked, so equal in every version). The check MUST use these, never `values.holdout`.
+ */
+export type HoldoutCheck = (db: Kysely<Database>, settingsId: number, values: SelectionValuesT, holdout: SelectionValuesT['holdout']) => Promise<{ pass: boolean; suites: unknown[] }>;
 /** Task 9 replaces this with the CAP-21a holdout report; until then the hold can never be cleared. */
 export const noHoldoutYet: HoldoutCheck = async () => ({ pass: false, suites: [] });
 
@@ -341,7 +345,7 @@ function setPath(doc: Record<string, unknown>, path: string, value: unknown): vo
 
 export const LABEL_RE = /^[a-z0-9][a-z0-9._-]{0,31}$/;
 
-export function applySet(base: SelectionValuesT, set: Record<string, unknown>): SelectionValuesT {
+export function applySet(base: SelectionValuesT, set: Record<string, unknown>, active: SelectionValuesT = base): SelectionValuesT {
   const doc = clone(base) as unknown as Record<string, unknown>;
   for (const [path, value] of Object.entries(set)) setPath(doc, path, clone(value));
   const r = SelectionValues.safeParse(doc);
@@ -349,7 +353,8 @@ export function applySet(base: SelectionValuesT, set: Record<string, unknown>): 
     throw new AppError(422, 'SETTINGS_INVALID', 'The resulting settings are not valid', { issues: r.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
   }
   for (const prefix of LOCKED_PREFIXES) {
-    if (!deepEqual(getPath(r.data, prefix), getPath(base, prefix))) {
+    // against the base AND the active version: a draft based on an old version can't carry old priors or an old holdout gate back in
+    if (!deepEqual(getPath(r.data, prefix), getPath(base, prefix)) || !deepEqual(getPath(r.data, prefix), getPath(active, prefix))) {
       throw new AppError(422, 'SETTINGS_KEY_LOCKED', `${prefix} is locked: priors change only by migration (SEL9-2)`, { path: prefix });
     }
   }
@@ -365,7 +370,8 @@ export async function createDraft(
       ? await activeSelectionSettings(trx).then(async (a) => (await selectionSettingsByLabel(trx, a.label))!)
       : await selectionSettingsByLabel(trx, i.basedOn);
     if (!base) throw new AppError(404, 'SETTINGS_NOT_FOUND', `No selection settings version "${i.basedOn}"`);
-    const values = applySet(base.values, i.set);
+    const active = await activeSelectionSettings(trx);
+    const values = applySet(base.values, i.set, active.values);
     // Equal to a non-active base is allowed: it is how an older version is brought back (a new label, then activated).
     if (deepEqual(values, base.values) && base.active) throw new AppError(422, 'SETTINGS_NO_CHANGE', 'The draft is identical to the active version');
     try {
@@ -384,16 +390,14 @@ export async function activate(
   db: Kysely<Database>,
   i: { label: string; approvalRef: unknown; now: Date; createdBy: string; auditId: string; holdoutCheck: HoldoutCheck },
 ): Promise<{ label: string; activatedAt: Date }> {
-  const limits = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
-  const ref = isObj(i.approvalRef) ? i.approvalRef : null;
-  if (i.approvalRef === undefined || i.approvalRef === null) throw new AppError(422, 'APPROVAL_REQUIRED', "Activating selection settings needs approval_ref (Dvir's words)");
-  const a = checkTimedApproval(ref, i.now, limits.approval_max_age_hours);
-  if (!a.ok) throw new AppError(422, a.code, a.reason);
-  const approvalText = String((ref as { text: string }).text);
+  const approval = await requireNamedApproval(db, i.approvalRef, i.now, 'Activating selection settings', [i.label]);
+  const approvalText = approval.text;
+  const approvedAt = approval.approvedAt;
 
   return db.transaction().execute(async (trx) => {
-    // The latest activation row is the lock: two concurrent activations run one after the other.
-    const cur = await trx.selectFrom('selection_settings').selectAll().where('activation_seq', 'is not', null).orderBy('activation_seq', 'desc').limit(1).forUpdate().executeTakeFirst();
+    // One activation at a time; `cur` is read after the lock, so a concurrent loser sees the new active version and gets a clean 409.
+    await sql`SELECT pg_advisory_xact_lock(hashtext('selection_settings_activate'))`.execute(trx);
+    const cur = await trx.selectFrom('selection_settings').selectAll().where('activation_seq', 'is not', null).orderBy('activation_seq', 'desc').limit(1).executeTakeFirst();
     const target = await trx.selectFrom('selection_settings').selectAll().where('label', '=', i.label).forUpdate().executeTakeFirst();
     if (!target) throw new AppError(404, 'SETTINGS_NOT_FOUND', `No selection settings version "${i.label}"`);
     if (cur && cur.id === target.id) throw new AppError(409, 'SETTINGS_ALREADY_ACTIVE', `"${i.label}" is already the active version`);
@@ -402,12 +406,12 @@ export async function activate(
     }
     const values = parse(target.values, target.label);
     if (cur && parse(cur.values, cur.label).buy_hold && !values.buy_hold) {
-      const h = await i.holdoutCheck(trx, target.id, values);
+      const h = await i.holdoutCheck(trx, target.id, values, parse(cur.values, cur.label).holdout);
       if (!h.pass) throw new AppError(409, 'HOLDOUT_NOT_PASSED', 'buy_hold can be cleared only when every required holdout suite passes', { suites: h.suites });
     }
     const seq = (cur?.activation_seq ?? 0) + 1;
     await trx.updateTable('selection_settings').set({
-      activation_seq: seq, activated_at: i.now, activation_approval_text: approvalText, activation_approval_at: a.approvedAt,
+      activation_seq: seq, activated_at: i.now, activation_approval_text: approvalText, activation_approval_at: approvedAt,
       activated_by: i.createdBy, activation_audit_id: i.auditId,
     }).where('id', '=', target.id).execute();
     return { label: i.label, activatedAt: i.now };

@@ -1,6 +1,7 @@
 // CAP-18 (v9.1 formulas, v10 priors): P(sale), EV, renew ratio at the BIN and at the floor, LANDER-1, score 0-100. Pure.
 // Every rate, factor and band comes from the selection settings; the floor from the pricing settings (one formula, priceFormula).
 import { priceFormula } from '../pricing/plan.js';
+import { laneList } from '../pricing/schedule.js';
 import type { PricingSettings } from '../pricing/settings.js';
 import type { Lane } from './form.js';
 import type { SelectionValuesT } from './settings.js';
@@ -21,7 +22,7 @@ type Factor = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 export interface MoneyResult {
   p_passive: number; p_lead: number; n: number; P_sale: number; net_price_cents: number; lifetime_cost_cents: number | null;
   ev_cents: number | null; stre_eff_y1: number; ratio_at_bin: number | null; ratio_at_floor: number | null; floor_cents: number;
-  bin_in_allowed_set: boolean | null; forbidden_band: boolean; lander1: { pass: boolean; reason: string | null };
+  bin_in_allowed_set: boolean | null; forbidden_band: boolean; lander1: { pass: boolean; reason: string | null; message: string | null };
   score_0_100: number; factors: Record<Factor, { raw: number | null; weight: number; points: number }>; data_coverage: number;
   passes: { ev1: boolean | null; ratio1: boolean | null; lander1: boolean; coverage: boolean }; model_version: string;
 }
@@ -34,8 +35,7 @@ const byMax = (bands: { max: number | null; raw: number }[], x: number): number 
 
 /** The geo "floor" for the ratio is the bottom of the geo ladder: the lowest list price inside the geo band. The pricing floor of a geo name stays its BIN. */
 export function geoLadderBottomCents(p: PricingSettings): number {
-  const rungs = (p.allowedBinsCents ?? []).filter((v) => v >= p.geoBinMinCents && v <= p.geoBinMaxCents);
-  return rungs.length > 0 ? Math.min(...rungs) : p.geoBinMinCents;
+  return laneList('geo', p)[0] ?? p.geoBinMinCents;
 }
 
 /** Counts vowel groups: a rough syllable count that is enough for the A-Form band. */
@@ -43,15 +43,17 @@ export function syllableCount(sld: string): number {
   return Math.max(1, (sld.match(/[aeiouy]+/g) ?? []).length);
 }
 
-function landerCheck(i: MoneyInput, sel: SelectionValuesT, p: PricingSettings, inSet: boolean | null): { pass: boolean; reason: string | null } {
+function landerCheck(i: MoneyInput, sel: SelectionValuesT, p: PricingSettings, inSet: boolean | null): MoneyResult['lander1'] {
+  const ok = { pass: true, reason: null, message: null };
   const geo = i.lane === 'S2';
-  if (geo) return inSet === false ? { pass: false, reason: 'BIN_NOT_IN_PRICE_LIST' } : { pass: true, reason: null };
-  if (inSet === null) return { pass: false, reason: 'PRICE_LIST_MISSING' };
-  if (!inSet) return { pass: false, reason: 'BIN_NOT_IN_PRICE_LIST' };
-  const cap = Math.max(...(p.allowedBinsCents ?? []).filter((v) => !p.landerExceptionBinsCents.includes(v)));
-  if (i.binCents <= cap) return { pass: true, reason: null };
-  const ok = i.leadsAB >= sel.lander.exception_ab_min && (i.retailEnd ?? -1) >= sel.lander.exception_retail_end_min;
-  return ok ? { pass: true, reason: null } : { pass: false, reason: 'LANDER_EXCEPTION_NOT_MET' };
+  if (geo) return inSet === false ? { pass: false, reason: 'BIN_NOT_IN_PRICE_LIST', message: 'A geo BIN must be a geo price on the price list' } : ok;
+  // Fail closed: without a price list no non-geo BIN can be shown to be allowed.
+  if (inSet === null) return { pass: false, reason: 'PRICE_LIST_MISSING', message: 'pricing_settings v3 not created yet: there is no price list to check the BIN against' };
+  if (!inSet) return { pass: false, reason: 'BIN_NOT_IN_PRICE_LIST', message: 'The BIN is not on the non-geo price list' };
+  const cap = Math.max(...laneList('nongeo', p).filter((v) => !p.landerExceptionBinsCents.includes(v)));
+  if (i.binCents <= cap) return ok;
+  const exception = i.leadsAB >= sel.lander.exception_ab_min && (i.retailEnd ?? -1) >= sel.lander.exception_retail_end_min;
+  return exception ? ok : { pass: false, reason: 'LANDER_EXCEPTION_NOT_MET', message: 'A BIN above the standard cap needs the LANDER-1 exception evidence' };
 }
 
 export function evaluateMoney(i: MoneyInput, sel: SelectionValuesT, pricing: PricingSettings, settingsLabel: string): MoneyResult {
@@ -71,7 +73,7 @@ export function evaluateMoney(i: MoneyInput, sel: SelectionValuesT, pricing: Pri
   const ratio = (price: number): number | null => (i.renewalCents === null ? null : (price * factor * stre) / i.renewalCents);
   const rBin = ratio(i.binCents);
   const rFloor = ratio(floor);
-  const inSet = pricing.allowedBinsCents === null ? null : pricing.allowedBinsCents.includes(i.binCents);
+  const inSet = pricing.allowedBinsCents === null ? null : laneList(geo ? 'geo' : 'nongeo', pricing).includes(i.binCents);
   const lander1 = landerCheck(i, sel, pricing, inSet);
 
   // Score (tiebreaker only). A null raw is 0 points and does not count as data.

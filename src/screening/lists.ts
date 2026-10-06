@@ -106,7 +106,7 @@ export async function writeList(
   db: Kysely<Database>,
   name: string,
   body: ListBody,
-  ctx: { createdBy: string; auditId: string; settings: SelectionValuesT },
+  ctx: { createdBy: string; auditId: string; settings: SelectionValuesT; approvalText?: string },
 ): Promise<{ name: string; version: number; terms_n: number }> {
   if (!isFixedList(name) && !isCensusListName(name)) {
     throw invalid('LIST_NAME_INVALID', 'Unknown list name', { name, fixed: FIXED_LISTS, census: 'bt1_<sld> or s6_regime_audit' });
@@ -138,7 +138,7 @@ export async function writeList(
     if (same) throw invalid('LIST_NO_CHANGE', 'The list would not change', { list: name, version: cur?.version ?? null });
     const version = (cur?.version ?? 0) + 1;
     await trx.insertInto('selection_lists').values({
-      name, version, terms: next, note: body.note ?? null, created_by: ctx.createdBy, audit_id: ctx.auditId,
+      name, version, terms: next, note: body.note ?? null, created_by: ctx.createdBy, audit_id: ctx.auditId, approval_text: census ? ctx.approvalText ?? null : null,
     }).execute();
     return { name, version, terms_n: next.length };
   });

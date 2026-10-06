@@ -8,7 +8,7 @@ import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { dollarsToCents, formatUsd } from '../money.js';
 import { currentSettings } from '../pricing/settings.js';
-import { checkTimedApproval } from '../services/approval.js';
+import { requireNamedApproval } from '../screening/approval.js';
 import { isCensusListName, isFixedList, listVersion, writeList, FIXED_LISTS } from '../screening/lists.js';
 import { evaluateMoney, syllableCount } from '../screening/money.js';
 import {
@@ -79,13 +79,6 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
   const now = () => new Date(deps.now());
   const holdoutCheck = deps.holdoutCheck ?? noHoldoutYet;
 
-  async function requireApproval(ref: unknown, what: string): Promise<void> {
-    if (ref === undefined || ref === null) throw new AppError(422, 'APPROVAL_REQUIRED', `${what} needs approval_ref (Dvir's words)`);
-    const lim = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
-    const a = checkTimedApproval(ref as { text?: unknown; approved_at?: unknown }, now(), lim.approval_max_age_hours);
-    if (!a.ok) throw new AppError(422, a.code, a.reason);
-  }
-
   app.get('/selection/settings', async (req) => {
     const q = z.object({ label: z.string().optional() }).strict().safeParse(req.query);
     if (!q.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid query: only label is accepted');
@@ -140,10 +133,14 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       throw new AppError(422, 'LIST_NAME_INVALID', 'Unknown list name', { name, fixed: FIXED_LISTS, census: 'bt1_<sld> or s6_regime_audit' });
     }
     // A census list is frozen per name and version; Gavriel authors it, Dvir approves it (CR-001 §2, ruling R3).
-    if (isCensusListName(name)) await requireApproval(body.approval_ref, 'Freezing a census list');
+    let approvalText: string | undefined;
+    if (isCensusListName(name)) {
+      const target = name.startsWith('bt1_') ? [`${name.slice(4)}.com`, name.slice(4)] : [];
+      approvalText = (await requireNamedApproval(db, body.approval_ref, now(), 'Freezing a census list', [name, ...target])).text;
+    }
     const active = await activeSelectionSettings(db);
     const r = await writeList(db, name, { replace: body.replace, add: body.add, remove: body.remove, note: body.note }, {
-      createdBy: req.auth!.name, auditId: req.auditId!, settings: active.values,
+      createdBy: req.auth!.name, auditId: req.auditId!, settings: active.values, approvalText,
     });
     return reply.code(201).send(r);
   });

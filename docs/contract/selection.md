@@ -27,7 +27,9 @@ A place name from the gazetteer that is also a dictionary word (`dent`, `lime`, 
 
 One JSON document per version (`values`). A version is immutable; a draft is made by dotted paths (`POST /selection/settings`), activated with Dvir's `approval_ref` (`POST /selection/settings/{label}/activate`); the active version is the one with the highest activation number. The first version, `v1`, is seeded by the migration: CR-001 as approved (Dvir 2026-10-06 02:05 IDT) with the CR-002 v10.1 defaults (Dvir 2026-10-06 03:24 IDT). `GET /selection/settings` returns the active document, so it is the live reference; this table is the meaning of each key.
 
-**Locked** keys cannot be changed by a draft (SEL9-2): `tier.p_passive`, `lead.p_lead`, `priors_v91`. Only a migration changes them.
+**Locked** keys cannot be changed by a draft (SEL9-2): `tier.p_passive`, `lead.p_lead`, `priors_v91` and `holdout` (the gate that clears `buy_hold` cannot be redefined by the draft that clears it). Only a migration changes them. The lock compares the result with both the draft's base and the **active** version, so a draft based on an old version cannot bring old priors back.
+
+**Approvals are bound to the thing approved.** Activating a version needs an `approval_ref` whose text **names the settings label** (label-boundary match, as `/buy` does for a domain: `v1b` is not named by `v1bb`). Freezing a census list needs a text that names the **list name** or, for `bt1_<sld>`, the target name (`<sld>` or `<sld>.com`). A valid but unrelated approval → 422 `APPROVAL_INVALID`. The frozen list stores the approval text. The buy-hold check receives the **active** version's `holdout` settings and must use them (never the target's).
 
 | Key | Default (v1) | Meaning |
 |---|---|---|
@@ -43,7 +45,7 @@ One JSON document per version (`values`). A version is immutable; a draft is mad
 | `form.city_word_allowlist` | 126 major cities | Gazetteer names that are also dictionary words and still count as cities |
 | `typo` | edit distance 1, top 10000, list at most 7 days old | TYPO-1 |
 | `concentration` | per attribute 2, lane share 0.40 (`lane_share_enforced` false) | The 40% rule is report-only (ruling R2) |
-| `tranche` | size 15, main lane 10, geo max 3, `required_for_buy` true | Tranche rules |
+| `tranche` | size 15, main lane 10, geo max 1 (ruling R6), `required_for_buy` true | Tranche rules |
 | `surbl` | zone `multi.surbl.org`, control `test.surbl.org`, blocked answers `["127.0.0.1"]`, bit names, `ns_override`, 3000 ms | SURBL lookup |
 | `history` | per-name fetch cap 6, 1000 ms between calls, 20 s timeout, 1 retry, 200 chars of text; actions strong FAIL, weak FLAG, redirect FLAG, for-sale PASS, parked PASS | CAP-07; parked and for-sale prior pages are positive |
 | `census` | 20 siblings, at most 25% unknown, as-of exact for 365 days | CAP-10; `sibling_count` is also the size of a census list |
@@ -77,6 +79,8 @@ Versioned, append-only; a write adds version n+1 (`POST /selection/lists/{name}`
 | `sig_parked`, `sig_forsale` | `parked:phrase`, `forsale:phrase` | DOM starter sets |
 | `bt1_<sld>`, `s6_regime_audit` | `census.sibling_count` distinct `.com` names | frozen per version with Dvir's approval |
 
+**Bot-edited lists change gate outcomes at once.** The fixed lists (`brand`, `bigco`, `event`, the signature lists, `legal`, `trade` ...) are written with a WRITE token and take effect for the next run **without Dvir's approval**; that is deliberate (Gavriel curates them). Every change is a new version, audited (token, time, Idempotency-Key) and readable (`?version=`); a run records the list versions it used. Only census lists need an approval.
+
 ## Tier (CAP-24) and DEMAND-2
 
 `tier.order` lists the tiers in evaluation order (`A`, `I`, `B`, `G`). `tier.clauses.<tier>` is `{"all": [cond, ...]}` or `{"any": [cond, ...]}`; a condition is `{"f": <feature>, "op": ">="|"<="|">"|"<"|"=="|"!=", "v": <number or "$threshold">}` or `{"tier": <earlier tier>}` (that tier's result). Features: `registered_share`, `prior_history`, `alt_tld_before_n`, `n_words`, `sld_chars`, `is_geo`, `gform1_pass`, `short`.
@@ -99,11 +103,11 @@ EV        = round(P_sale * net_price) - lifetime_cost
 ratio(price) = price * net_factor * stre_eff_y1 / renewal
 ```
 
-`money` fields: `p_passive`, `p_lead`, `n`, `P_sale`, `net_price_cents`, `lifetime_cost_cents`, `ev_cents`, `stre_eff_y1`, `ratio_at_bin`, `ratio_at_floor` (4 decimals), `floor_cents`, `bin_in_allowed_set`, `forbidden_band`, `lander1 {pass, reason}`, `score_0_100`, `factors {A..G: {raw, weight, points}}`, `data_coverage`, `passes {ev1, ratio1, lander1, coverage}`, `model_version`, and `display` (strings for `bin`, `floor`, `net_price`, `lifetime_cost`, `ev`). Money is integer cents.
+`money` fields: `p_passive`, `p_lead`, `n`, `P_sale`, `net_price_cents`, `lifetime_cost_cents`, `ev_cents`, `stre_eff_y1`, `ratio_at_bin`, `ratio_at_floor` (4 decimals), `floor_cents`, `bin_in_allowed_set`, `forbidden_band`, `lander1 {pass, reason, message}`, `score_0_100`, `factors {A..G: {raw, weight, points}}`, `data_coverage`, `passes {ev1, ratio1, lander1, coverage}`, `model_version`, and `display` (strings for `bin`, `floor`, `net_price`, `lifetime_cost`, `ev`). Money is integer cents.
 
 - **Floor for the ratio.** Non-geo: the pricing floor of the BIN under the **current** `pricing_settings` (the same formula as `/list`: 65% of the BIN, never below its minimum, whole dollars in v3). **Geo: the bottom of the geo ladder** (the lowest price-list value inside the geo band, $299 in v3), not the pricing floor, which for a geo name is its BIN (founder rule 4). `floor_cents` shows the figure used.
 - **`passes`:** `ev1` = EV > 0; `ratio1` = ratio ≥ 1 at **both** the BIN and the floor; `coverage` = `data_coverage` ≥ `score.coverage_min` (reported, not gating while `coverage_gate` is false). `ev1` and `ratio1` are null when the quote is missing.
-- **LANDER-1 (`lander1`):** the BIN must be on the price list (`BIN_NOT_IN_PRICE_LIST`; `PRICE_LIST_MISSING` when the current pricing version has no list, which fails every non-geo name); a non-geo BIN above the highest non-exception list price needs the exception (`lander.exception_ab_min` A/B leads and a retail-end count ≥ `lander.exception_retail_end_min`, else `LANDER_EXCEPTION_NOT_MET`). A geo BIN only has to be on the list (or the list is missing: the grade price is fixed).
+- **LANDER-1 (`lander1`):** the BIN must be on the lane's price list (the same lane lists as `/list` and the price job: non-geo from the minimum non-geo BIN, geo inside the geo band) (`BIN_NOT_IN_PRICE_LIST`; `PRICE_LIST_MISSING` when the current pricing version has no list, which fails every non-geo name: fail closed; the message says "pricing_settings v3 not created yet"); a non-geo BIN above the highest non-exception list price needs the exception (`lander.exception_ab_min` A/B leads and a retail-end count ≥ `lander.exception_retail_end_min`, else `LANDER_EXCEPTION_NOT_MET`). A geo BIN only has to be on the list (or the list is missing: the grade price is fixed).
 - **Score (0–100, a tiebreaker only):** per lane weights (each sums to 100). Raw 0–10: A-Form = 10 when `short` is 1 (non-geo, FORM-2), else the mean of the length, word-count and syllable bands (non-geo; the syllable count is left out of the mean when unknown) or the geo length band (geo); B Buyers from `leads_ab` against `lead.ab_min` (0 → 0, below the gate → 0, at the gate 6, ×1.5 → 8, ×2 → 10); C Intent and E Timing as given; D Liquidity from the retail counts (`d_bands`, capped at `retail_only_max_points` points); F External business is not available yet (null); G Risk = `risk_raw.flag` or `risk_raw.clean`. A null raw is 0 points and not counted in `data_coverage` (the share of weights with data). Score = Σ raw × weight / 10, rounded half up, clipped to 0–100.
 - **No appraisal input:** `score.forbidden_feature_keys` (default `govalue_usd`, `estibot_value`, `humbleworth_usd`, `alexa_rank`, `appraisal_usd`) are refused anywhere in an evaluate body (`FORBIDDEN_FEATURE`; SEL5-2).
 

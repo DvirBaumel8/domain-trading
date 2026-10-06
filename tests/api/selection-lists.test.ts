@@ -8,7 +8,7 @@ import { issueToken } from '../helpers/tokens.js';
 
 let app: FastifyInstance;
 afterEach(async () => app?.close());
-const approval = () => ({ text: 'Dvir: freeze this census list', approved_at: new Date(Date.now() - 3_600_000).toISOString() });
+const approval = (text = 'Dvir: freeze bt1_netextend and s6_regime_audit') => ({ text, approved_at: new Date(Date.now() - 3_600_000).toISOString() });
 
 async function setup() {
   let clock = Date.now();
@@ -160,6 +160,20 @@ describe('census lists (CR-002 CAP-10)', () => {
     expect((await post('s6_regime_audit', { replace: other, approval_ref: approval() })).json().version).toBe(2);
   });
 
+  it('the approval must name the list (or the target sld): a valid but unrelated one is APPROVAL_INVALID; the text is stored with the list', async () => {
+    const { post } = await setup();
+    const names = siblings(20);
+    for (const text of ['Dvir: freeze the census', 'Dvir: freeze bt1_netextendx', 'Dvir: freeze xbt1_netextend']) {
+      expect(err(await post('bt1_netextend', { replace: names, approval_ref: approval(text) }))).toEqual([422, 'APPROVAL_INVALID']);
+    }
+    expect(err(await post('s6_regime_audit', { replace: names, approval_ref: approval('Dvir: freeze bt1_netextend') }))).toEqual([422, 'APPROVAL_INVALID']);
+    expect((await post('bt1_netextend', { replace: names, approval_ref: approval('Dvir: ok, freeze netextend.com census') })).statusCode).toBe(201);
+    const row = await db.selectFrom('selection_lists').select('approval_text').where('name', '=', 'bt1_netextend').executeTakeFirstOrThrow();
+    expect(row.approval_text).toBe('Dvir: ok, freeze netextend.com census');
+    await post('brand', { replace: ['acme'] });
+    expect((await db.selectFrom('selection_lists').select('approval_text').where('name', '=', 'brand').executeTakeFirstOrThrow()).approval_text).toBeNull();
+  });
+
   it('approval problems on a census list: invalid, expired', async () => {
     const { post } = await setup();
     const stale = { text: 'old', approved_at: new Date(Date.now() - 100 * 3_600_000).toISOString() };
@@ -172,7 +186,7 @@ describe('census lists (CR-002 CAP-10)', () => {
     const { post } = await setup();
     await app.inject({ method: 'POST', url: '/selection/settings', headers: { ...(await issueToken('write', 'g2')).auth, 'idempotency-key': randomUUID() }, payload: { label: 'v1b', set: { 'census.sibling_count': 10 } } });
     const w3 = await issueToken('write', 'g3');
-    await app.inject({ method: 'POST', url: '/selection/settings/v1b/activate', headers: { ...w3.auth, 'idempotency-key': randomUUID() }, payload: { approval_ref: approval() } });
+    await app.inject({ method: 'POST', url: '/selection/settings/v1b/activate', headers: { ...w3.auth, 'idempotency-key': randomUUID() }, payload: { approval_ref: approval('Dvir: activate v1b') } });
     expect((await post('bt1_netextend', { replace: siblings(10), approval_ref: approval() })).statusCode).toBe(201);
   });
 });

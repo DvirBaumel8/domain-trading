@@ -374,6 +374,8 @@ export interface SelectionListsTable {
   created_at: TimestampDefault;
   created_by: string;
   audit_id: string | null;
+  /** Dvir's words for a frozen census list; null for the other lists. */
+  approval_text: string | null;
 }
 
 export interface ScreeningEvidenceTable {

@@ -46,7 +46,7 @@ export interface SchedulePlan {
 interface Values { bin: Cents; floor: Cents; walk: Cents }
 
 /** The price list for a lane: non-geo from `nongeo_bin_min`, geo within `geo_bin_min..geo_bin_max` (ascending). */
-function laneList(lane: 'geo' | 'nongeo', s: PricingSettings): Cents[] {
+export function laneList(lane: 'geo' | 'nongeo', s: PricingSettings): Cents[] {
   const all = [...(s.allowedBinsCents ?? [])].sort((a, b) => a - b);
   return lane === 'geo'
     ? all.filter((v) => v >= s.geoBinMinCents && v <= s.geoBinMaxCents)
