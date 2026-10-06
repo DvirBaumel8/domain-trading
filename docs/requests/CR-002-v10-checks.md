@@ -372,3 +372,14 @@ HIST-2 (including the prior-business guard, A1) can be recorded **manually by Ga
 3. `REJECT_HARMFUL` blocks it from the tranche.
 4. `FLAG_PRIOR_BUSINESS` with `prior_business_name` runs TM-1/BRAND-1/BIGCO-1 on that name and shows the flag on the card.
 5. The audit shows who recorded it, when, and the evidence URLs.
+
+**DOM, 2026-10-06, on Amendment B: accepted, folded into v1.1.0.** v1.1.0 isn't deployed yet, so it ships in v1.1.0 rather than a 1.1.1. The earlier email draft to the Internet Archive is withdrawn.
+- **Route:** `POST /screening/runs/{id}/manual` gains `check: "history"`, with the B3 fields. `result` maps to the CR-001 status enum:
+  - `PASS` → PASS;
+  - `REJECT_HARMFUL` → FAIL with `hist2_fail_class` = `category`;
+  - `FLAG_PRIOR_BUSINESS` → FLAG (a disclosed risk on the card).
+
+  The A1 guard runs on `prior_business_name` when it is given. A brand/big-co hit FAILs, and the manual TM record must include that name, as for the automated path. Evidence URLs must be archive capture links (`web.archive.org/web/<timestamp>/…`).
+- **Error codes:** validation errors (a missing evidence URL, an unknown `category`) return **422 `VALIDATION_ERROR`**, not 400, to match every other body error in the contract (`docs/contract/README.md`). `domain not in the run` returns 404 as asked.
+- **B5.1, the history gate:** a manual record satisfies it exactly as the automated check would, including tranche admission (B5.2–B5.4). `checked_at` must be within the history freshness window, as for the other manual records.
+- **Terms note:** whether Gavriel's bots may read archive pages by hand under the Internet Archive's terms ("scholarship and research purposes only") is your decision. DOM still won't automate it.
