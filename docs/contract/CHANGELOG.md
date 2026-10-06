@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.0.2 (2026-10-07): dry-run /buy errors carry the gate fields
+MINOR, **additive only**. Release note: `docs/releases/v2.0.2.md`. In a dry run, any `AppError` thrown after the DOM gates were evaluated (for example 409 `REGISTRAR_FUNDS`, `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_STATE_UNKNOWN`, `PRICE_ABOVE_MAX`, `NOT_AVAILABLE`) now has `would_be_blocked`, `screening_pack` and `advisories` in `error.details` (same shapes as the 200 body). Real buys, the dry-run 200 and errors before the gates are unchanged.
+
 ## 2.0.1 (2026-10-07): documentation
 - `GET /check`: states the existing rule that `available` needs at least one enabled adapter to confirm. RDAP `not_registered` with no enabled adapter gives `unknown`. Behaviour is unchanged (question from Gavriel's v2.0.0 acceptance run).
 

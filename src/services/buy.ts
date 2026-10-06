@@ -131,54 +131,68 @@ export class BuyService {
     blocked ??= 'gate' in tg ? tg.gate.code : null;
     const trancheId = 'trancheId' in tg ? tg.trancheId : null;
 
-    // 4, 5
-    await this.assertNotOwned(db, input.domain);
-    await this.assertDomainCap(db, settings.max_domains);
+    // v2.0.2: in a dry run an error after the DOM gates carries the gate fields of the 200 body
+    let check!: Awaited<ReturnType<CheckService['check']>>;
+    let winner!: EvaluatedQuote;
+    let adapter!: RegistrarAdapter;
+    let dry!: Awaited<ReturnType<BuyService['registrarDryRun']>>;
+    try {
+      // 4, 5
+      await this.assertNotOwned(db, input.domain);
+      await this.assertDomainCap(db, settings.max_domains);
 
-    // 6. live re-check (no cache)
-    const check = await this.deps.checkService.check(input.domain, { useCache: false });
-    if (check.availability !== 'available') {
-      throw new AppError(409, 'NOT_AVAILABLE', `${input.domain} is not available`, { availability: check.availability, rdap: check.rdap });
-    }
-    let candidates = check.quotes;
-    if (input.registrar) {
-      const pinned = check.quotes.find((q) => q.registrar === input.registrar);
-      if (!pinned?.eligible) {
-        throw new AppError(409, 'PINNED_REGISTRAR_INELIGIBLE', `${input.registrar} can't register this domain; not falling back`, {
-          registrar: input.registrar, exclusion_reason: pinned?.exclusionReason ?? 'NO_ADAPTER',
+      // 6. live re-check (no cache)
+      check = await this.deps.checkService.check(input.domain, { useCache: false });
+      if (check.availability !== 'available') {
+        throw new AppError(409, 'NOT_AVAILABLE', `${input.domain} is not available`, { availability: check.availability, rdap: check.rdap });
+      }
+      let candidates = check.quotes;
+      if (input.registrar) {
+        const pinned = check.quotes.find((q) => q.registrar === input.registrar);
+        if (!pinned?.eligible) {
+          throw new AppError(409, 'PINNED_REGISTRAR_INELIGIBLE', `${input.registrar} can't register this domain; not falling back`, {
+            registrar: input.registrar, exclusion_reason: pinned?.exclusionReason ?? 'NO_ADAPTER',
+          });
+        }
+        candidates = [pinned];
+      } else if (!check.quotes.some((q) => q.eligible)) {
+        throw new AppError(409, 'NO_ELIGIBLE_REGISTRAR', 'No registrar can register this domain', {
+          quotes: check.quotes.map((q) => ({ registrar: q.registrar, exclusion_reason: q.exclusionReason })),
         });
       }
-      candidates = [pinned];
-    } else if (!check.quotes.some((q) => q.eligible)) {
-      throw new AppError(409, 'NO_ELIGIBLE_REGISTRAR', 'No registrar can register this domain', {
-        quotes: check.quotes.map((q) => ({ registrar: q.registrar, exclusion_reason: q.exclusionReason })),
-      });
+
+      // 7. price caps, then the cheapest two-year
+      const caps: Caps = { maxFirstYearCents: input.maxPriceCents, ...(input.maxTwoYearCents !== null ? { maxTwoYearCents: input.maxTwoYearCents } : {}) };
+      const picked = pickWinner(candidates, caps);
+      if (!picked) {
+        throw new AppError(409, 'PRICE_ABOVE_MAX', 'Every eligible price is above your cap', { cheapest: priceDetails(pickWinner(candidates)!) });
+      }
+      winner = picked;
+      adapter = this.adapter(winner.registrar);
+
+      // 8. POC cap (unlocked here; re-checked under the global lock for real buys)
+      await this.assertPocCap(db, settings.poc_cap_cents, winner.firstYearCents!);
+
+      // 8b. tranche spend cap on this quote (re-checked under the global lock for real buys)
+      if (trancheId) {
+        const cg = await spendCapGate(db, trancheId, winner.firstYearCents!);
+        if (cg && !input.dryRun) throw gateError(cg);
+        blocked ??= cg?.code ?? null;
+      }
+
+      // 9. registrar account state
+      await this.assertAccountState(adapter, winner.firstYearCents!);
+
+      // 10. registrar dry run (re-quote once on COST_MISMATCH)
+      dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars,
+        { input, ctx, approvedAt: appr.approvedAt, check, category, trancheId });
+
+    } catch (e) {
+      if (input.dryRun && e instanceof AppError) {
+        throw new AppError(e.status, e.code, e.message, { ...e.details, ...(await this.gateFields(input.domain, blocked)) });
+      }
+      throw e;
     }
-
-    // 7. price caps, then the cheapest two-year
-    const caps: Caps = { maxFirstYearCents: input.maxPriceCents, ...(input.maxTwoYearCents !== null ? { maxTwoYearCents: input.maxTwoYearCents } : {}) };
-    let winner = pickWinner(candidates, caps);
-    if (!winner) {
-      throw new AppError(409, 'PRICE_ABOVE_MAX', 'Every eligible price is above your cap', { cheapest: priceDetails(pickWinner(candidates)!) });
-    }
-    const adapter = this.adapter(winner.registrar);
-
-    // 8. POC cap (unlocked here; re-checked under the global lock for real buys)
-    await this.assertPocCap(db, settings.poc_cap_cents, winner.firstYearCents!);
-
-    // 8b. tranche spend cap on this quote (re-checked under the global lock for real buys)
-    if (trancheId) {
-      const cg = await spendCapGate(db, trancheId, winner.firstYearCents!);
-      if (cg && !input.dryRun) throw gateError(cg);
-      blocked ??= cg?.code ?? null;
-    }
-
-    // 9. registrar account state
-    await this.assertAccountState(adapter, winner.firstYearCents!);
-
-    // 10. registrar dry run (re-quote once on COST_MISMATCH)
-    const dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars,
-      { input, ctx, approvedAt: appr.approvedAt, check, category, trancheId });
     winner = dry.winner;
 
     const approved: Approved = {
@@ -714,6 +728,18 @@ export class BuyService {
     return ev;
   }
 
+  /** `would_be_blocked`, `screening_pack` and `advisories` of a dry run (the 200 body, and the details of a dry-run error after the DOM gates). */
+  private async gateFields(domain: string, wouldBeBlocked: BuyBlock | null): Promise<Record<string, unknown>> {
+    // CAP-19: the latest screening pack of the name (enforced since v2.0.0: `would_be_blocked` names the first blocking gate; `advisories` is kept as before).
+    const pack = await latestPackFor(this.deps.db, domain);
+    const latestRun = pack ? await latestScreeningRun(this.deps.db, domain) : null;
+    return {
+      would_be_blocked: wouldBeBlocked,
+      screening_pack: { status: pack ? pack.status : 'none', pack_id: pack?.id ?? null, version: pack?.version ?? null, issued_at: pack?.issued_at.toISOString() ?? null },
+      advisories: [...(pack?.status === 'complete' ? [] : ['SCREENING_PACK_REQUIRED']), ...(pack && latestRun && latestRun.id !== pack.run_id ? ['PACK_NOT_FROM_LATEST_RUN'] : [])],
+    };
+  }
+
   private async dryRunBody(a: Approved): Promise<Record<string, unknown>> {
     const { spent, pending } = await spentAndPending(this.deps.db);
     const w = a.winner;
@@ -721,8 +747,7 @@ export class BuyService {
     const anchor = jerusalemDate(new Date(this.deps.now()));
     const events = a.plan ? buildSchedule({ plan: a.plan, anchor, dropDate: addMonthsClamped(anchor, 24), settings: a.pricing }) : [];
     // CAP-19: the latest screening pack of the name (enforced since v2.0.0: `would_be_blocked` names the first blocking gate; `advisories` is kept as before).
-    const pack = await latestPackFor(this.deps.db, a.input.domain);
-    const latestRun = pack ? await latestScreeningRun(this.deps.db, a.input.domain) : null;
+    const gf = await this.gateFields(a.input.domain, a.wouldBeBlocked);
     return {
       dry_run: true, domain: a.input.domain, check_id: a.check.checkId, registrar: w.registrar,
       first_year: formatUsd(w.firstYearCents!), first_year_cents: w.firstYearCents,
@@ -734,9 +759,7 @@ export class BuyService {
       domains_owned: await activeDomainCount(this.deps.db),
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
       proposed_listing: a.plan ? planView(a.plan, events) : null, settings_version: a.pricing.version,
-      would_be_blocked: a.wouldBeBlocked,
-      screening_pack: { status: pack ? pack.status : 'none', pack_id: pack?.id ?? null, version: pack?.version ?? null, issued_at: pack?.issued_at.toISOString() ?? null },
-      advisories: [...(pack?.status === 'complete' ? [] : ['SCREENING_PACK_REQUIRED']), ...(pack && latestRun && latestRun.id !== pack.run_id ? ['PACK_NOT_FROM_LATEST_RUN'] : [])],
+      ...gf,
       warnings: [...a.check.warnings, ...(a.plan?.warnings ?? [])],
     };
   }
