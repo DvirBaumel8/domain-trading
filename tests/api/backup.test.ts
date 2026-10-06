@@ -358,7 +358,7 @@ describe('BK-3 import round trip', () => {
 
     await resetDb(db);
     const counts = await importBackup(db, dir);
-    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1, selection_settings: 2, selection_lists: 11, screening_evidence: 1, screening_runs: 1, screening_results: 1, manual_quotes: 1 });
+    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1, selection_settings: 2, selection_lists: 15, screening_evidence: 1, screening_runs: 1, screening_results: 1, manual_quotes: 1 });
     // the CR-001 rows are back with their ids; the evidence text survives the bytea round trip
     expect((await db.selectFrom('selection_settings').select('label').orderBy('id').execute()).map((r) => r.label)).toEqual(['v1', 'v1b']);
     expect((await db.selectFrom('selection_lists').select('terms').where('name', '=', 'brand').executeTakeFirstOrThrow()).terms).toEqual(['acme']);

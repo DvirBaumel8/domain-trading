@@ -53,8 +53,14 @@ export const tmUsCheck: Check = {
   lists: ['trade', 'regime', 'tech', 'generic_head', 'state', 'legal', 'city_extra', 'dictionary_extra'],
   async run(ctx) {
     const f = formFieldsOf(ctx);
+    const phrases = tmPhrases(f.tokens, f.token_types, f.city, f.trade);
+    // CR-002 Amendment A1: when the history check found a prior business, CAP-08 also runs on ITS name (a live mark there is a TM-1 failure).
+    const prior = ctx.latest('history')?.fields.prior_business_name;
+    const priorName = typeof prior === 'string' && prior !== '' ? prior : null;
+    const priorPhrase = priorName === null ? null : priorName.toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (priorPhrase && !phrases.includes(priorPhrase)) phrases.push(priorPhrase);
     return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', `The USPTO wordmark search is not automated: search these phrases (plus the control query) and record it. ${HOW}`, {
-      phrases_to_query: tmPhrases(f.tokens, f.token_types, f.city, f.trade), control_required: true,
+      phrases_to_query: phrases, control_required: true, ...(priorName !== null && { prior_business_name: priorName, prior_business_phrase: priorPhrase }),
     });
   },
 };

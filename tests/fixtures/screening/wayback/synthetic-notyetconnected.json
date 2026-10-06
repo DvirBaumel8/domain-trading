@@ -1,0 +1,29 @@
+{
+ "_note": "SYNTHETIC: a registrar placeholder (CR-002 CAP-07 'not yet connected'). The live archive for sacramentoepoxypros.com holds a blank meta-refresh page instead.",
+ "domain": "notconnectedexample.com",
+ "cdx": [
+  [
+   "timestamp",
+   "original",
+   "statuscode",
+   "mimetype",
+   "digest"
+  ],
+  [
+   "20250713063751",
+   "http://notconnectedexample.com/",
+   "200",
+   "text/html",
+   "D20250713063751"
+  ]
+ ],
+ "captures": {
+  "20250713063751": {
+   "status": 200,
+   "headers": {
+    "content-type": "text/html"
+   },
+   "body": "<!DOCTYPE html><html><head><title>Domain</title><script>var x='viagra';</script></head><body><p>This domain is not yet connected to a website.</p></body></html>"
+  }
+ }
+}

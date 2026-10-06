@@ -1,0 +1,57 @@
+{
+ "_note": "SYNTHETIC: a prior real business (title 'Office Prep Solutions Inc'). Stands in for CR-002 CAP-07 #1 (the live archive for officeprep.com holds only parking and for-sale captures).",
+ "domain": "officeprepexample.com",
+ "cdx": [
+  [
+   "timestamp",
+   "original",
+   "statuscode",
+   "mimetype",
+   "digest"
+  ],
+  [
+   "20120105090000",
+   "http://officeprepexample.com/",
+   "200",
+   "text/html",
+   "D20120105090000"
+  ],
+  [
+   "20160610090000",
+   "http://officeprepexample.com/",
+   "200",
+   "text/html",
+   "D20160610090000"
+  ],
+  [
+   "20190915090000",
+   "http://officeprepexample.com/",
+   "200",
+   "text/html",
+   "D20190915090000"
+  ]
+ ],
+ "captures": {
+  "20120105090000": {
+   "status": 200,
+   "headers": {
+    "content-type": "text/html"
+   },
+   "body": "<!DOCTYPE html><html><head><title>Home | Office Prep Solutions Inc</title><script>var x='viagra';</script></head><body><h1>Welcome</h1><p>our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing</p><p>(c) 2012 Office Prep Solutions Inc. All rights reserved.</p></body></html>"
+  },
+  "20160610090000": {
+   "status": 200,
+   "headers": {
+    "content-type": "text/html"
+   },
+   "body": "<!DOCTYPE html><html><head><title>Home | Office Prep Solutions Inc</title><script>var x='viagra';</script></head><body><h1>Welcome</h1><p>our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing</p><p>(c) 2016 Office Prep Solutions Inc. All rights reserved.</p></body></html>"
+  },
+  "20190915090000": {
+   "status": 200,
+   "headers": {
+    "content-type": "text/html"
+   },
+   "body": "<!DOCTYPE html><html><head><title>Home | Office Prep Solutions Inc</title><script>var x='viagra';</script></head><body><h1>Welcome</h1><p>our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing</p><p>(c) 2019 Office Prep Solutions Inc. All rights reserved.</p></body></html>"
+  }
+ }
+}

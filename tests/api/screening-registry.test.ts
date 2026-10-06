@@ -288,6 +288,23 @@ describe('surbl (CAP-05, SURBL-1)', () => {
     expect((await readEvidence(db, Number(ev.evidence_ids[0])))?.text).toContain('test.surbl.org.multi.surbl.org A');
   });
 
+  it('upstream_calls counts the control queries (charged once, to the name whose run made them) as well as the name queries', async () => {
+    const s = surbl();
+    const { body } = await run(s, ['tampapoolsco.com', 'boisesolarco.com']);
+    const calls = ['tampapoolsco.com', 'boisesolarco.com'].map((d) => res(byDomain(body, d), 'surbl').upstream_calls);
+    expect(calls).toEqual([3, 1]); // first name: 2 control queries + its own; second: its own
+    expect(calls.reduce((a, b) => a + b, 0)).toBe(s.calls.length);
+  });
+
+  it('a control query that throws leaves the server failed (not stuck pending); the other server is still proven', async () => {
+    const s = surbl();
+    const inner = s.deps.dnsQuery;
+    const deps = { ...s.deps, dnsQuery: (async (n: string, t: 1 | 2, o: { server: string; timeoutMs: number }) => { if (o.server === '192.0.2.1' && n.startsWith('test.surbl.org')) throw new Error('socket'); return inner(n, t, o); }) as ScreeningDeps['dnsQuery'] };
+    const { runDone } = await h(deps);
+    const { body } = await runDone({ checks: ['surbl'], names: [item('tampapoolsco.com')] });
+    expect(res(byDomain(body, 'tampapoolsco.com'), 'surbl')).toMatchObject({ status: 'PASS', fields: { control_ok: true, server: '192.0.2.2' }, upstream_calls: 3 });
+  });
+
   it('only a server that answered the control as listed is ever asked about a name: an unproven server that says NXDOMAIN to everything never yields a PASS', async () => {
     const s = surbl({ 'spamsite.com': listed(80) }, { controlBy: { '192.0.2.2': nx } });
     const { body } = await run(s, ['spamsite.com', 'cleansite.com']);
@@ -467,6 +484,15 @@ describe('census (CAP-10, CR-002)', () => {
     expect(f).not.toHaveProperty('undated_counted_n');
     expect(f.siblings.filter((s: any) => s.counted).map((s: any) => s.domain)).toEqual([siblings[0]]);
     expect(f.siblings[3]).toMatchObject({ status: 'registered', created_at: null, counted: false });
+  });
+
+  it('every sibling undated (share limit lifted to 1): UNKNOWN, never a 0 of 0 share', async () => {
+    await putCensus('bt1_netextend', siblings);
+    const rdap = fakeRdap(Object.fromEntries(siblings.map((d) => [d, registered(null)])));
+    const x = await h({ rdapLookup: rdap.fn });
+    await x.post('/selection/settings', { label: 'v1u', set: { 'census.max_unknown_share': 1 } });
+    const { body } = await x.runDone({ checks: ['census'], mode: 'full', settings: 'v1u', names: [{ ...T, as_of: '2023-01-01T00:00:00Z' }] });
+    expect(res(byDomain(body, 'netextend.com'), 'census')).toMatchObject({ status: 'UNKNOWN', reason_code: 'TOO_MANY_UNKNOWN', fields: { registered_share: null, n_checked: 0, undated_excluded_n: 20 } });
   });
 
   it('undated siblings count with the unknown ones toward TOO_MANY_UNKNOWN: 3 unknown + 3 undated of 20 is 30% > 25%', async () => {

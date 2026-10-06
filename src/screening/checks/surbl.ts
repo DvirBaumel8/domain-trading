@@ -11,7 +11,7 @@ type SurblSettings = SelectionValuesT['surbl'];
 type Answer = { rcode: number; answers: { type: number; data: string }[] };
 
 /** Per run: the servers, which of them passed the control, and the evidence of every control query. */
-interface State { candidates: string[]; status: Map<string, 'proven' | 'failed'>; proven: string[]; controlQueries: number; evidenceIds: number[]; next: number; init: Promise<void> | null }
+interface State { candidates: string[]; status: Map<string, 'proven' | 'failed' | 'pending'>; proven: string[]; controlQueries: number; charged: number; evidenceIds: number[]; next: number; init: Promise<void> | null }
 
 const MIN_MS_BETWEEN = 200; // <= 5 queries/s in total (sources.md)
 const QUERY_TIMEOUT_MS = 2000; // a name waits at most 3 proven servers x 2 s, so 50 names take about a minute even with a bad server
@@ -63,8 +63,14 @@ async function proveNext(ctx: CheckContext, st: State, s: SurblSettings, pace: P
   const server = st.candidates.find((c) => !st.status.has(c));
   if (server === undefined || st.controlQueries >= MAX_CONTROL_QUERIES) return false;
   st.controlQueries++;
+  st.status.set(server, 'pending'); // marked before the await: a concurrent caller must not prove the same server twice
   const qname = `${s.control_name}.${s.zone}`;
-  const a = await pace.run(() => ctx.deps.dnsQuery(qname, 1, { server, timeoutMs: Math.min(s.timeout_ms, QUERY_TIMEOUT_MS) }));
+  let a: Answer | null;
+  try {
+    a = await pace.run(() => ctx.deps.dnsQuery(qname, 1, { server, timeoutMs: Math.min(s.timeout_ms, QUERY_TIMEOUT_MS) }));
+  } catch {
+    a = null; // a thrown query is an unproven server, not a stuck 'pending' one
+  }
   st.evidenceIds.push(await evidence(ctx, qname, server, a));
   const hit = a?.answers.find((x) => x.type === 1 && /^127\./.test(x.data));
   const ok = a !== null && a.rcode === 0 && hit !== undefined && !s.blocked_answers.includes(hit.data) && decodeBits(Number(hit.data.split('.')[3]), s.list_bits).length > 0;
@@ -76,7 +82,7 @@ async function proveNext(ctx: CheckContext, st: State, s: SurblSettings, pace: P
 async function stateOf(ctx: CheckContext, s: SurblSettings, pace: Pacer): Promise<State> {
   let st = ctx.shared.get('surbl_state') as State | undefined;
   if (!st) {
-    st = { candidates: [], status: new Map(), proven: [], controlQueries: 0, evidenceIds: [], next: 0, init: null };
+    st = { candidates: [], status: new Map(), proven: [], controlQueries: 0, charged: 0, evidenceIds: [], next: 0, init: null };
     ctx.shared.set('surbl_state', st);
     const me = st;
     me.init = (async () => {
@@ -99,10 +105,12 @@ export const surblCheck: Check = {
     let pace = ctx.shared.get('surbl_pacer') as Pacer | undefined;
     if (!pace) { pace = new Pacer(MIN_MS_BETWEEN, 1, ctx.deps.sleep); ctx.shared.set('surbl_pacer', pace); }
     const st = await stateOf(ctx, s, pace);
+    // Every control query is an upstream call: it is charged once, to the name whose run made it (or needed it).
+    const chargeControl = () => { const n = st.controlQueries - st.charged; st.charged = st.controlQueries; return n; };
     const ev = (extra: number[] = []) => ({ evidenceIds: [...st.evidenceIds, ...extra], dataAsOf: new Date(ctx.now()) });
     if (st.proven.length === 0) {
       return outcome('UNKNOWN', 'CONTROL_FAILED', `SURBL cannot be trusted this run: ${st.candidates.length === 0 ? 'no SURBL name server could be found' : `none of ${st.status.size} server(s) answered the control name ${s.control_name}.${s.zone} as listed`}`,
-        { listed: null, lists: [], control_ok: false, server: null }, ev());
+        { listed: null, lists: [], control_ok: false, server: null }, { ...ev(), upstreamCalls: chargeControl() });
     }
 
     const qname = `${ctx.item.domain}.${s.zone}`;
@@ -124,11 +132,11 @@ export const surblCheck: Check = {
       got = { server, ans };
     }
     if (!got) {
-      return outcome('UNKNOWN', sawServfail ? 'SOURCE_ERROR' : 'TIMEOUT', sawServfail ? 'The proven SURBL servers answered SERVFAIL' : 'No proven SURBL server answered', { listed: null, lists: [], control_ok: true, server: null }, ev());
+      return outcome('UNKNOWN', sawServfail ? 'SOURCE_ERROR' : 'TIMEOUT', sawServfail ? 'The proven SURBL servers answered SERVFAIL' : 'No proven SURBL server answered', { listed: null, lists: [], control_ok: true, server: null }, { ...ev(), upstreamCalls: tried.size + chargeControl() });
     }
     const evId = await evidence(ctx, qname, got.server, got.ans);
     const base = { control_ok: true, server: got.server };
-    const extra = { ...ev([evId]), upstreamCalls: tried.size };
+    const extra = { ...ev([evId]), upstreamCalls: tried.size + chargeControl() };
     const { rcode, answers } = got.ans;
     if (rcode === 3) return outcome('PASS', null, null, { ...base, listed: false, lists: [] }, extra);
     const a = answers.filter((x) => x.type === 1);

@@ -18,6 +18,7 @@ export async function resetDb(db: Kysely<Database>): Promise<void> {
     await sql.raw(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`).execute(conn);
     await sql`SELECT seed_pricing_settings_v2()`.execute(conn);
     await sql`SELECT seed_selection_v1()`.execute(conn);
+    await sql`SELECT seed_signature_lists_v2()`.execute(conn);
     await sql`SET session_replication_role = origin`.execute(conn);
     await sql`DELETE FROM settings`.execute(conn);
     await sql`INSERT INTO settings DEFAULT VALUES`.execute(conn);

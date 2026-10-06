@@ -1,0 +1,10 @@
+{
+  "url": "https://web.archive.org/web/20030414154559id_/http://www.officeprep.com:80/",
+  "status": 302,
+  "headers": {
+    "content-type": "text/html; charset=iso-8859-1",
+    "retry-after": null,
+    "location": "https://web.archive.org/web/20030414154559id_/http://comingsoon.alldomains.com/"
+  },
+  "body": ""
+}

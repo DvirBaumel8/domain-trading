@@ -95,6 +95,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
           domain: i.item.domain, lane: i.item.lane, final_status: i.derived.final_status, first_fail: i.derived.first_fail,
           tier: (latest.get('tier')?.fields.tier as string | undefined) ?? null, score: (latest.get('price')?.fields.score_0_100 as number | undefined) ?? null, short: (latest.get('form')?.fields.short as number | undefined) ?? null,
           flags: i.derived.flags, pending_manual: i.derived.pending_manual, not_implemented: i.derived.not_implemented,
+          source_lane: (latest.get('history')?.fields.source_lane as string | undefined) ?? null,
           ...(q.data.view === 'full' && { results: [...latest.values()].sort((x, y) => x.id - y.id).map(resultJson) }),
         };
       }),

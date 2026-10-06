@@ -1,0 +1,9 @@
+{
+  "url": "https://web.archive.org/cdx/search/cdx?url=promptinjectionaudit.com&matchType=domain&output=json&fl=timestamp%2Coriginal%2Cstatuscode%2Cmimetype%2Cdigest&collapse=digest&limit=2000",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": null
+  },
+  "body": "[[\"timestamp\",\"original\",\"statuscode\",\"mimetype\",\"digest\"],[\"20261004182147\",\"https://promptinjectionaudit.com/\",\"200\",\"text/html\",\"QX2WK2BBCL2JQR3DJA7MWIZL7NLRWB2F\"],[\"20261004182149\",\"https://promptinjectionaudit.com/manifest.webmanifest\",\"200\",\"application/manifest+json\",\"2HLAU5GMOVTG3DB6NCGPCGD636MEJAW3\"],[\"20261005031857\",\"http://promptinjectionaudit.com/\",\"308\",\"unk\",\"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\"]]"
+}

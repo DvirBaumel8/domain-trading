@@ -38,9 +38,10 @@ describe('selection settings (CAP-00)', () => {
     await setup();
     const row = await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow();
     expect(row.values).toEqual(DEFAULT_SELECTION_VALUES);
-    const lists = await db.selectFrom('selection_lists').select(['name', 'version']).orderBy('name').execute();
+    const lists = await db.selectFrom('selection_lists').select(['name', 'version']).orderBy('name').orderBy('version').execute();
     expect(lists.map((l) => `${l.name}@${l.version}`)).toEqual([
-      'generic_head@1', 'legal@1', 'regime@1', 'sig_forsale@1', 'sig_harmful_strong@1', 'sig_harmful_weak@1', 'sig_parked@1', 'state@1', 'tech@1', 'trade@1',
+      'generic_head@1', 'legal@1', 'regime@1', 'sig_forsale@1', 'sig_forsale@2', 'sig_harmful_strong@1', 'sig_harmful_strong@2', 'sig_harmful_weak@1', 'sig_harmful_weak@2',
+      'sig_parked@1', 'sig_parked@2', 'state@1', 'tech@1', 'trade@1',
     ]);
   });
 

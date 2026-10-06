@@ -73,10 +73,10 @@ Summary
 
 ## Internet Archive Wayback CDX server
 - **URLs used:** `https://web.archive.org/cdx/search/cdx?...` (documented at `https://github.com/internetarchive/wayback/blob/master/wayback-cdx-server/README.md`, "Wayback CDX Server API - BETA").
-- **Purpose:** CAP-07 HIST-2 capture history (Task 7).
+- **Purpose:** CAP-07 HIST-2 capture history (Task 7). Built in Task 7: the CDX index (`matchType=domain&collapse=digest&limit=2000&fl=timestamp,original,statuscode,mimetype,digest[&to=]`) and the archive's raw-capture URLs `https://web.archive.org/web/<timestamp>id_/<original>` (documented in the Wayback URL scheme: `id_` returns the archived bytes without the toolbar), fetched without following redirects. Fixtures: `tests/fixtures/screening/wayback/` (recorded 2026-10-06 by `npm run record:screening -- wayback <domains>`, CDX trimmed to 200 rows and capture bodies to 64 KB; the `synthetic-*.json` files are hand-made).
 - **Terms URL:** `https://archive.org/about/terms.php`. The page is rendered by JavaScript: `curl` returns an empty shell (1,872 bytes) and `web.archive.org/web/2025/...` returns no text, so **the Terms of Use text is UNVERIFIED** (DVIR).
 - **Quote (documented API):** "The `wayback-cdx-server` is a standalone HTTP servlet that serves the index that the `wayback` machine uses to lookup captures." "The CDX server is deployed as part of web.archive.org Wayback Machine and the usage below reference this deployment." "The cdx server is designed to improve access to archived data to a broad audience, but it may be necessary to restrict certain parts of the cdx." No numeric rate limit and no "be polite" paragraph is documented in the README; the API can answer HTTP 429 or time out.
-- **Decision:** `enabled` (a documented public API; read-only), conditional on Dvir confirming the Terms of Use. **Pacing:** <= 1 request/s, `limit` and `fl` always set, `collapse` used, honest User-Agent, back off on 429/5xx, `UNKNOWN` on any non-conforming body (never "no history").
+- **Decision:** `enabled` (a documented public API; read-only), conditional on Dvir confirming the Terms of Use. **Pacing:** <= 1 request/s per host through one pacer (`history.min_ms_between_calls`, default 1000; the index and the captures share web.archive.org), `limit` and `fl` always set, `collapse` used, honest User-Agent, back off on 429/5xx, `UNKNOWN` on any non-conforming body (never "no history").
 
 ## IANA RDAP bootstrap
 - **URL used:** `https://data.iana.org/rdap/dns.json` (publication 2026-09-30T23:00:03Z, version 1.0, 71,334 bytes).

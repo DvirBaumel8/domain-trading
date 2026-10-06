@@ -8,6 +8,7 @@ import { censusCheck } from './census.js';
 import { concentrationCheck } from './concentration.js';
 import { extDatesCheck } from './ext-dates.js';
 import { formCheck } from './form.js';
+import { historyCheck } from './history.js';
 import { tmUsCheck, webRiskCheck } from './manual.js';
 import { namebioCheck } from './namebio.js';
 import { priceCheck } from './price.js';
@@ -24,6 +25,7 @@ export const CHECKS: Partial<Record<CheckId, Check>> = {
   tm_us: tmUsCheck,
   availability: availabilityCheck,
   surbl: surblCheck,
+  history: historyCheck,
   census: censusCheck,
   ext_dates: extDatesCheck,
   typo: typoCheck,

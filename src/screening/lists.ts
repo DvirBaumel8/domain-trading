@@ -11,7 +11,7 @@ export const FIXED_LISTS = [
 ] as const;
 export const MAX_LIST_TERMS = 5000;
 const PHRASE_LISTS = ['brand', 'bigco', 'event'];
-const HARMFUL_CLASSES = ['adult', 'pharma', 'gambling', 'malware', 'phishing', 'hacked_spam', 'scam'];
+const HARMFUL_CLASSES = ['adult', 'pharma', 'gambling', 'malware', 'phishing', 'hacked_spam', 'pbn', 'scam', 'trademark'];
 const SIGNATURE_CLASSES: Record<string, string[]> = {
   sig_harmful_strong: HARMFUL_CLASSES, sig_harmful_weak: HARMFUL_CLASSES, sig_parked: ['parked'], sig_forsale: ['forsale'],
 };

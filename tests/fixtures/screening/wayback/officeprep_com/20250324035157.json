@@ -1,0 +1,10 @@
+{
+  "url": "https://web.archive.org/web/20250324035157id_/http://officeprep.com/",
+  "status": 302,
+  "headers": {
+    "content-type": "text/html",
+    "retry-after": null,
+    "location": "https://web.archive.org/web/20250324035157id_/https://domains.atom.com/lpd/name/officeprep.com"
+  },
+  "body": ""
+}

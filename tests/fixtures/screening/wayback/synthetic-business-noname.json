@@ -1,0 +1,29 @@
+{
+ "_note": "SYNTHETIC: a business page with no title, no site name and no name line (the guard must FLAG).",
+ "domain": "plainbusinessexample.com",
+ "cdx": [
+  [
+   "timestamp",
+   "original",
+   "statuscode",
+   "mimetype",
+   "digest"
+  ],
+  [
+   "20150105090000",
+   "http://plainbusinessexample.com/",
+   "200",
+   "text/html",
+   "D20150105090000"
+  ]
+ ],
+ "captures": {
+  "20150105090000": {
+   "status": 200,
+   "headers": {
+    "content-type": "text/html"
+   },
+   "body": "<!DOCTYPE html><html><head><script>var x='viagra';</script></head><body><p>our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing call us today for a free estimate and a friendly chat about your project.</p></body></html>"
+  }
+ }
+}

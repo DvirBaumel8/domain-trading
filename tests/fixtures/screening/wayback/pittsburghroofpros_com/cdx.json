@@ -1,0 +1,9 @@
+{
+  "url": "https://web.archive.org/cdx/search/cdx?url=pittsburghroofpros.com&matchType=domain&output=json&fl=timestamp%2Coriginal%2Cstatuscode%2Cmimetype%2Cdigest&collapse=digest&limit=2000",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": null
+  },
+  "body": "[[\"timestamp\",\"original\",\"statuscode\",\"mimetype\",\"digest\"],[\"20180807083604\",\"http://pittsburghroofpros.com/\",\"302\",\"text/html\",\"737ZFUMPIXYUMZZWJ53D2FJERLMJTB4G\"],[\"20211221064724\",\"http://pittsburghroofpros.com/\",\"301\",\"text/html\",\"QH732FYSV7UM34JYWVYMB7EZGR2CYM6B\"],[\"20211221064725\",\"http://www.pittsburghroofpros.com/robots.txt\",\"404\",\"text/html\",\"KRSE5ITL2TR5TZKCHGBYZRKUVTFTNMJ5\"],[\"20220204080517\",\"http://www.pittsburghroofpros.com/favicon.ico\",\"404\",\"text/html\",\"KRSE5ITL2TR5TZKCHGBYZRKUVTFTNMJ5\"],[\"20220204080517\",\"http://www.pittsburghroofpros.com/robots.txt\",\"-\",\"warc/revisit\",\"KRSE5ITL2TR5TZKCHGBYZRKUVTFTNMJ5\"],[\"20220312011738\",\"http://www.pittsburghroofpros.com/\",\"200\",\"text/html\",\"LV7KBRAUKSL7GI66BIQITK37JO6XMO5T\"],[\"20250712172711\",\"http://pittsburghroofpros.com/\",\"301\",\"unk\",\"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\"]]"
+}

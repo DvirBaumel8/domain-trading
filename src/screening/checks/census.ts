@@ -67,6 +67,8 @@ export const censusCheck: Check = {
     const asOfExact = ctx.now() - asOf.getTime() <= ctx.settings.census.as_of_exact_max_days * DAY_MS;
     const total = row.terms.length;
     const nChecked = total - undated;
+    // Nothing countable (every sibling undated) is no evidence at all: UNKNOWN, never 0 of 0 read as a share.
+    if (nChecked === 0) return outcome('UNKNOWN', 'TOO_MANY_UNKNOWN', `All ${total} siblings are undated: no registered share can be computed`, { list: listName, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: 0, n_checked: 0, n_unknown: nUnknown, registered_after_as_of_n: after, undated_excluded_n: undated, siblings, in_use_share: null, registered_share: null }, { upstreamCalls: calls, evidenceIds: [...new Set(results.map((r) => r.evidenceId).filter((x): x is number => x !== null))], dataAsOf: new Date(Math.min(...results.map((r) => r.retrievedAt.getTime()))) });
     const fields = {
       list: listName, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: nRegistered, n_checked: nChecked, n_unknown: nUnknown,
       registered_after_as_of_n: after, undated_excluded_n: undated, siblings, in_use_share: null,

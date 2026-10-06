@@ -1,0 +1,29 @@
+{
+ "_note": "SYNTHETIC: a PBN / link-farm page. Not a real archive record.",
+ "domain": "linkfarmexample.com",
+ "cdx": [
+  [
+   "timestamp",
+   "original",
+   "statuscode",
+   "mimetype",
+   "digest"
+  ],
+  [
+   "20170810080000",
+   "http://linkfarmexample.com/",
+   "200",
+   "text/html",
+   "D20170810080000"
+  ]
+ ],
+ "captures": {
+  "20170810080000": {
+   "status": 200,
+   "headers": {
+    "content-type": "text/html"
+   },
+   "body": "<!DOCTYPE html><html><head><title>Daily news blog</title><script>var x='viagra';</script></head><body><p>Best casino bonus tips. Buy backlinks and paid guest posts from our private blog network. our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing our team provides dependable service for homes and offices across the region with friendly staff and honest pricing</p></body></html>"
+  }
+ }
+}

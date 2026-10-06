@@ -22,8 +22,11 @@ export const extDatesCheck: Check = {
     // The earlier of the two: an extension created after as_of never counts, whatever the .com's own date (leakage rule).
     const comparison = comCreated && Date.parse(comCreated) < asOf.getTime() ? new Date(comCreated) : asOf;
     const sld = ctx.item.domain.replace(/\.com$/, '');
-    const prior = ctx.latest('history')?.fields.prior_history;
-    const comPrior = prior === 1 ? 'yes' : prior === 0 ? 'no' : 'unknown';
+    // CAP-12: was the .com itself registered before? The history result decides (captures before the current registration); an older
+    // or stand-in history result that only carries `prior_history` is read the same way.
+    const hist = ctx.latest('history')?.fields;
+    const histPrior = hist?.com_prior_registration;
+    const comPrior = histPrior === 'yes' || histPrior === 'no' ? histPrior : hist?.prior_history === 1 ? 'yes' : hist?.prior_history === 0 ? 'no' : 'unknown';
     const list = ctx.settings.ext.list;
     let calls = 0;
     const evidence: number[] = [];

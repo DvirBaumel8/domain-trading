@@ -1,0 +1,36 @@
+{
+ "_note": "SYNTHETIC: one CDX row with an impossible timestamp (counted in undated_excluded_n).",
+ "domain": "undatedexample.com",
+ "cdx": [
+  [
+   "timestamp",
+   "original",
+   "statuscode",
+   "mimetype",
+   "digest"
+  ],
+  [
+   "20269999999999",
+   "http://undatedexample.com/",
+   "200",
+   "text/html",
+   "DBAD"
+  ],
+  [
+   "20180101000000",
+   "http://undatedexample.com/",
+   "200",
+   "text/html",
+   "D20180101000000"
+  ]
+ ],
+ "captures": {
+  "20180101000000": {
+   "status": 200,
+   "headers": {
+    "content-type": "text/html"
+   },
+   "body": "<!DOCTYPE html><html><head><title>Domain</title><script>var x='viagra';</script></head><body><p>This domain is not yet connected to a website.</p></body></html>"
+  }
+ }
+}

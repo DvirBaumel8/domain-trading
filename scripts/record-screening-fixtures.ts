@@ -2,6 +2,7 @@
 //   RECORD_FIXTURES=1 npm run record:screening -- rdap promptinjectionaudit.com google.com
 //   RECORD_FIXTURES=1 npm run record:screening -- iana
 //   RECORD_FIXTURES=1 npm run record:screening -- rdap-ext netextend net org co io ai info us
+//   RECORD_FIXTURES=1 npm run record:screening -- wayback officeprep.com pittsburghroofpros.com
 // Real requests, paced by the settings' run.rdap_min_ms_between, honest User-Agent. Each file: {url, status, headers, body}.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -9,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { RDAP_COM_BASE, USER_AGENT } from '../src/rdap.js';
 import { POPULARITY_URL } from '../src/screening/popularity.js';
 import { IANA_RDAP_URL, parseBootstrap } from '../src/screening/rdap-batch.js';
+import { cdxCaptures, fetchCapture, parseCdx, pickDecisive } from '../src/screening/wayback.js';
 import { DEFAULT_SELECTION_VALUES } from '../src/screening/settings.js';
 
 if (process.env.RECORD_FIXTURES !== '1') {
@@ -84,9 +86,33 @@ if (mode === 'rdap') {
   const p = join(OUT, 'majestic-million-top.csv');
   writeFileSync(p, `${lines.join('\n')}\n`);
   console.log(`majestic-million-top.csv\t${res.status}\t${lines.length - 1} rows\tlast-modified ${res.headers.get('last-modified')}`);
+} else if (mode === 'wayback') {
+  // CDX (<= 200 rows: the decisive captures plus non-decisive filler, so the picker gives the same answer on the trimmed file) and
+  // each decisive capture (body cut to 64 KB). Paced at 1 request/s (sources.md). Files: wayback/<name>/cdx.json, <timestamp>.json.
+  const max = DEFAULT_SELECTION_VALUES.history.max_fetch_per_name;
+  const deps = { fetch: async (url: string | URL | Request, init?: RequestInit) => { const r = await fetch(url, init); await sleep(1000); return r; } };
+  for (const d of args) {
+    const dir = `wayback/${d.replace(/\./g, '_')}`;
+    const cdx = await cdxCaptures(deps, d, { timeoutMs: 60_000 });
+    if (!cdx.ok) { console.log(`${d}\tCDX failed: ${cdx.reasonCode}`); continue; }
+    const picks = pickDecisive(cdx.captures, d, max);
+    const pickKeys = new Set(picks.map((c) => `${c.timestamp} ${c.original}`));
+    const filler = cdx.captures.filter((c) => !pickKeys.has(`${c.timestamp} ${c.original}`) && !pickDecisive([c], d, 1).length).slice(0, Math.max(0, 200 - picks.length));
+    const keep = [...picks, ...filler].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const rows = [['timestamp', 'original', 'statuscode', 'mimetype', 'digest'], ...keep.map((c) => [c.timestamp, c.original, c.statuscode, c.mimetype, c.digest])];
+    const body = rows.length > 1 ? JSON.stringify(rows) : cdx.body;
+    if (JSON.stringify(pickDecisive(parseCdx(body) ?? [], d, max)) !== JSON.stringify(picks)) throw new Error(`${d}: trimmed CDX changes the decisive captures`);
+    save(`${dir}/cdx.json`, { url: cdx.url, status: 200, headers: { 'content-type': 'application/json', 'retry-after': null }, body });
+    for (const c of picks) {
+      const f = await fetchCapture(deps, c, { timeoutMs: 60_000 });
+      if (!f.ok) { console.log(`${d}\t${c.timestamp}\tcapture failed: ${f.reasonCode}`); continue; }
+      const out = { url: f.url, status: f.status, headers: { 'content-type': f.contentType, 'retry-after': null, location: f.location }, body: (f.html ?? '').slice(0, 64_000) };
+      save(`${dir}/${c.timestamp}.json`, out as unknown as Fixture);
+    }
+  }
 } else if (mode === 'namebio') {
   console.log('NameBio is disabled (docs/internal/sources.md, G-29): nothing recorded; tests use the synthetic namebio/retailstats-sample.csv.');
 } else {
-  console.error('usage: popularity | namebio | rdap <domain…> | iana | rdap-ext <sld> <tld…>');
+  console.error('usage: popularity | namebio | rdap <domain…> | iana | rdap-ext <sld> <tld…> | wayback <domain…>');
   process.exit(2);
 }

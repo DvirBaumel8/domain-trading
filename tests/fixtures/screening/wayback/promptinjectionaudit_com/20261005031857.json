@@ -1,0 +1,10 @@
+{
+  "url": "https://web.archive.org/web/20261005031857id_/http://promptinjectionaudit.com/",
+  "status": 302,
+  "headers": {
+    "content-type": "text/plain; charset=utf-8",
+    "retry-after": null,
+    "location": "https://web.archive.org/web/20261004182147id_/https://promptinjectionaudit.com/"
+  },
+  "body": ""
+}
