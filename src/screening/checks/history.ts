@@ -4,10 +4,10 @@
 // An archive that cannot be read is UNKNOWN, never "no history". Source: Wayback CDX + raw captures, <= 1 request/s per host.
 import { Pacer } from '../rdap-batch.js';
 import { storeEvidence } from '../evidence.js';
-import { visibleText } from '../html-text.js';
+import { hiddenSignals, metaRefreshTarget, visibleText } from '../html-text.js';
 import { businessNameCandidate, nameTokens, pickBusinessName, type BusinessCandidate } from '../prior-business.js';
 import {
-  cdxCaptures, classifyCapture, fetchCapture, pickDecisive, timestampMs, toTimestamp, type Capture, type CaptureCls, type CaptureFetch, type CdxResult,
+  cdxCaptures, classifyCapture, fetchCapture, pickDecisive, scanPaths, timestampMs, toTimestamp, type Capture, type CaptureCls, type CaptureFetch, type CdxResult,
   type PreCls, type SignatureLists,
 } from '../wayback.js';
 import { outcome, type Check, type CheckContext, type CheckOutcome, type Status } from '../types.js';
@@ -55,16 +55,34 @@ interface Issue { status: Exclude<Status, 'PASS'>; code: string; reason: string;
 const SEV: Record<string, number> = { FAIL: 3, UNKNOWN: 2, FLAG: 1 };
 const worst = (xs: Issue[]): Issue | null => xs.reduce<Issue | null>((a, b) => (a === null || SEV[b.status]! > SEV[a.status]! ? b : a), null);
 
-/** Sends `run` through the host's pacer, retrying a failure `history.retries` times with a growing pause (never past the run deadline). */
-async function withRetries<T extends { ok: boolean }>(ctx: CheckContext, pace: Pacer, run: () => Promise<T>): Promise<{ res: T | null; calls: number }> {
+/** One pacer per host for the whole process (every run shares the archive's 1 request/s), kept per `ScreeningDeps` instance. */
+const PACERS = new WeakMap<object, Map<string, Pacer>>();
+function pacerOf(ctx: CheckContext, host: string): Pacer {
+  const byHost = PACERS.get(ctx.deps) ?? PACERS.set(ctx.deps, new Map()).get(ctx.deps)!;
+  let p = byHost.get(host);
+  if (!p) { p = new Pacer(ctx.settings.history.min_ms_between_calls, 1, ctx.deps.sleep); byHost.set(host, p); }
+  return p;
+}
+
+const MAX_RETRY_AFTER_MS = 30_000;
+
+/**
+ * Runs `run` (which paces itself), retrying a failure `history.retries` times with a growing pause, or the archive's own Retry-After
+ * when it asks for more (never past the run deadline; a Retry-After over 30 s is not waited for). An index that is truncated is not retried.
+ */
+async function withRetries<T extends { ok: boolean }>(ctx: CheckContext, run: () => Promise<T>): Promise<{ res: T | null; calls: number }> {
   let calls = 0;
   let res: T | null = null;
   for (let attempt = 0; attempt <= ctx.settings.history.retries; attempt++) {
     if (ctx.now() > ctx.deadline) return { res: null, calls };
-    res = await pace.run(run);
+    res = await run();
     calls++;
-    if (res.ok) break;
-    if (attempt < ctx.settings.history.retries) await ctx.deps.sleep(BACKOFF_MS * (attempt + 1));
+    if (res.ok || (res as { reasonCode?: string }).reasonCode === 'INDEX_TRUNCATED') break;
+    if (attempt < ctx.settings.history.retries) {
+      const ra = (res as { retryAfterMs?: number | null }).retryAfterMs ?? 0;
+      if (ra > MAX_RETRY_AFTER_MS) break;
+      await ctx.deps.sleep(Math.max(BACKOFF_MS * (attempt + 1), ra));
+    }
   }
   return { res, calls };
 }
@@ -96,8 +114,7 @@ export const historyCheck: Check = {
     const to = explicit || createdMs !== null ? (cutoffMs < nowMs ? toTimestamp(cutoffMs) : undefined) : undefined;
     const common = { ...base, cutoff: new Date(cutoffMs).toISOString(), cutoff_basis: cutoffBasis, list_versions: listVersions };
 
-    let pace = ctx.shared.get(`pacer:${WAYBACK_HOST}`) as Pacer | undefined;
-    if (!pace) { pace = new Pacer(h.min_ms_between_calls, 1, ctx.deps.sleep); ctx.shared.set(`pacer:${WAYBACK_HOST}`, pace); }
+    const pace = pacerOf(ctx, WAYBACK_HOST);
     let calls = 0;
     const evidenceIds: number[] = [];
     const ev = (extra: Partial<{ dataAsOf: Date }> = {}) => ({ upstreamCalls: calls, evidenceIds, dataAsOf: extra.dataAsOf ?? new Date(nowMs) });
@@ -105,11 +122,12 @@ export const historyCheck: Check = {
       outcome('UNKNOWN', reasonCode, reason, { ...common, ...more, error_code: 'ARCHIVE_UNAVAILABLE' }, ev());
 
     // ---- the index ----
-    const cdx = await withRetries<CdxResult>(ctx, pace, () => cdxCaptures(ctx.deps, domain, { to, timeoutMs: h.timeout_ms }));
+    const cdx = await withRetries<CdxResult>(ctx, () => cdxCaptures(ctx.deps, domain, { to, timeoutMs: h.timeout_ms, pace: (fn) => pace.run(fn) }));
     calls += cdx.calls;
     if (cdx.res === null) return archiveDown('TIMEOUT', 'The run ran out of time before the archive index was read');
-    if (!cdx.res.ok) return archiveDown(cdx.res.reasonCode, `The Internet Archive index did not answer usefully (${cdx.res.reasonCode}): history is unknown, not absent`, { cdx_url: cdx.res.url });
+    if (!cdx.res.ok) return archiveDown(cdx.res.reasonCode, cdx.res.reasonCode === 'INDEX_TRUNCATED' ? 'The archive index is larger than what was read (a full page with no resume key, or more than 5 pages): part of the history was never seen' : `The Internet Archive index did not answer usefully (${cdx.res.reasonCode}): history is unknown, not absent`, { cdx_url: cdx.res.url });
     const index = cdx.res;
+    calls += index.pages - 1;
     evidenceIds.push(await storeEvidence(ctx.db, { source: 'wayback', url: index.url, retrievedAt: new Date(ctx.now()), httpStatus: 200, contentType: 'application/json', body: index.body, text: index.body, maxBytes: ctx.settings.evidence.max_text_bytes }));
 
     // Strictly before the cut-off; a capture whose timestamp is not a real date cannot be placed and is excluded (A2).
@@ -128,10 +146,10 @@ export const historyCheck: Check = {
 
     // ---- the decisive captures ----
     const decisive = pickDecisive(before, domain, h.max_fetch_per_name);
-    interface Rec { capture: Capture; fetched: Extract<CaptureFetch, { ok: true }>; cls: CaptureCls; matched: string[]; title: string | null; text: string; html: string; target: string | null; ignored: boolean }
+    interface Rec { capture: Capture; fetched: Extract<CaptureFetch, { ok: true }>; cls: CaptureCls; matched: string[]; adMatches: string[]; metaRefresh: boolean; title: string | null; text: string; html: string; target: string | null; ignored: boolean }
     const recs: Rec[] = [];
     for (const c of decisive) {
-      const f = await withRetries<CaptureFetch>(ctx, pace, () => fetchCapture(ctx.deps, c, { timeoutMs: h.timeout_ms }));
+      const f = await withRetries<CaptureFetch>(ctx, () => pace.run(() => fetchCapture(ctx.deps, c, { timeoutMs: h.timeout_ms })));
       calls += f.calls;
       if (f.res === null) return archiveDown('TIMEOUT', 'The run ran out of time while reading archived captures', { pre_caps: preCaps });
       if (!f.res.ok) {
@@ -139,13 +157,17 @@ export const historyCheck: Check = {
       }
       const fr = f.res;
       const vt = fr.html === null ? { title: null, text: '' } : visibleText(fr.html);
-      const k = classifyCapture({ status: fr.status, location: fr.location, text: vt.text, domain }, lists, h.min_content_chars);
-      const target = fr.location;
+      // A page that is only a quick meta refresh (<= 5 s) is a redirect: where it points decides, like a 3xx.
+      const refresh = fr.html === null ? null : metaRefreshTarget(fr.html);
+      const k = refresh !== null
+        ? classifyCapture({ status: 302, location: refresh, text: '', domain }, lists, h.min_content_chars, h.parked_max_text_chars)
+        : classifyCapture({ status: fr.status, location: fr.location, text: vt.text, domain, extra: fr.html === null ? '' : hiddenSignals(fr.html) }, lists, h.min_content_chars, h.parked_max_text_chars);
+      const target = refresh ?? fr.location;
       evidenceIds.push(await storeEvidence(ctx.db, {
         source: 'wayback', url: fr.url, retrievedAt: new Date(ctx.now()), httpStatus: fr.status, contentType: fr.contentType,
         body: fr.html ?? `HTTP ${fr.status} ${fr.location ?? ''}`, text: fr.html === null ? `HTTP ${fr.status} redirect to ${fr.location ?? '(no Location)'}` : vt.text, maxBytes: ctx.settings.evidence.max_text_bytes,
       }));
-      recs.push({ capture: c, fetched: fr, cls: k.cls, matched: k.matched, title: vt.title, text: vt.text, html: fr.html ?? '', target, ignored: k.sameSiteRedirect === true });
+      recs.push({ capture: c, fetched: fr, cls: k.cls, matched: k.matched, adMatches: k.adMatches ?? [], metaRefresh: refresh !== null, title: vt.title, text: vt.text, html: fr.html ?? '', target, ignored: k.sameSiteRedirect === true });
     }
     const counted = recs.filter((r) => !r.ignored);
     const has = (...cls: CaptureCls[]) => counted.some((r) => cls.includes(r.cls));
@@ -155,7 +177,7 @@ export const historyCheck: Check = {
     const forsale = has('forsale');
     const captures = recs.map((r) => ({
       timestamp: isoOf(r.capture.timestamp), status: r.fetched.status, class: r.ignored ? 'same_site_redirect' : r.cls, title: r.title,
-      excerpt: excerptOf(r.text, r.matched), redirect_target: r.target, archive_url: r.fetched.url, matched: r.matched,
+      excerpt: excerptOf(r.text, r.matched), redirect_target: r.target, archive_url: r.fetched.url, matched: r.matched, ...(r.adMatches.length > 0 && { ad_matches: r.adMatches }), ...(r.metaRefresh && { meta_refresh: true }),
     }));
 
     // ---- the verdict: the archive's classes by the settings' actions, blocklists, then the prior-business guard ----
@@ -174,6 +196,13 @@ export const historyCheck: Check = {
       if (!details) details = { class: classOfTerm(weak.matched[0]!), fail_class: failClassOf(weak.matched), matched: weak.matched, capture: isoOf(weak.capture.timestamp), archive_url: weak.fetched.url };
       act(h.weak_action, 'HARMFUL_WEAK', `Archived capture of ${isoOf(weak.capture.timestamp).slice(0, 10)} partly matches harmful signatures (${weak.matched.join(', ')}): needs a human look`);
     }
+    // Harmful words on a parking or for-sale placeholder are its advertising: a FLAG for a human, never a FAIL (parked first).
+    const ads = counted.filter((r) => r.adMatches.length > 0);
+    const parkedAds = ads.map((r) => ({ capture: isoOf(r.capture.timestamp), archive_url: r.fetched.url, ad_matches: r.adMatches, excerpt: excerptOf(r.text, r.adMatches) }));
+    if (ads.length > 0) issues.push({ status: 'FLAG', code: 'HARMFUL_ON_PARKED_PAGE', reason: `A parked or for-sale capture of ${isoOf(ads[0]!.capture.timestamp).slice(0, 10)} shows harmful words (${ads[0]!.adMatches.join(', ')}), most likely sponsored links: needs a human look` });
+    // The archived URLs themselves (subdomains, paths): scanned without fetching anything.
+    const pathHits = scanPaths(before, domain, lists, h.url_terms).map((x) => ({ ...x, timestamp: isoOf(x.timestamp) }));
+    if (pathHits.length > 0) issues.push({ status: 'FLAG', code: 'HARMFUL_PATH', reason: `An archived URL of this name contains harmful words (${pathHits[0]!.url}: ${pathHits[0]!.matched.join(', ')}): needs a human look` });
     const redirect = counted.find((r) => r.cls === 'redirect_offsite');
     if (redirect) act(h.redirect_action, 'REDIRECT_OFFSITE', `Archived capture of ${isoOf(redirect.capture.timestamp).slice(0, 10)} redirects to another site (${redirect.target})`);
     if (forsale) act(h.forsale_action, 'FORSALE_HISTORY', 'The name was archived as a for-sale page');
@@ -184,7 +213,7 @@ export const historyCheck: Check = {
     const wr = ctx.latest('web_risk');
     const blocklist = { surbl: surbl ? surbl.status : 'not_run', web_risk: wr ? wr.status : 'not_run' };
     if (surbl?.status === 'FAIL' || wr?.status === 'FAIL') {
-      failClass = failClass ?? 'blocklist';
+      failClass = 'blocklist'; // a listing is the cause of the FAIL, whatever else the pages say (details keep the page matches)
       details = details ?? { class: 'blocklist', fail_class: 'blocklist', matched: [], source: surbl?.status === 'FAIL' ? 'surbl' : 'web_risk' };
       issues.push({ status: 'FAIL', code: 'HARMFUL_HISTORY', reason: `${domain} is on a blocklist (${surbl?.status === 'FAIL' ? 'SURBL' : 'Web Risk'})` });
     } else if (surbl?.status === 'UNKNOWN') {
@@ -198,13 +227,16 @@ export const historyCheck: Check = {
     let bizName: string | null = null;
     let bizYears: number | null = null;
     let guard: Record<string, unknown> | null = null;
+    let bizNameInfo: Record<string, unknown> = {};
     if (business) {
       const cands = content.map((r) => businessNameCandidate({ html: r.html, title: r.title, text: r.text, timestamp: r.capture.timestamp }, domain)).filter((x): x is BusinessCandidate => x !== null);
-      bizName = pickBusinessName(cands);
+      const picked = pickBusinessName(cands);
+      bizName = picked.name;
+      bizNameInfo = { prior_business_name_is_domain: picked.nameIsDomain, prior_business_name_basis: picked.reason, prior_business_name_sources: [...new Set(cands.map((x) => x.source))] };
       const ts = content.map((r) => timestampMs(r.capture.timestamp)!).sort((a, b) => a - b);
       bizYears = round1((ts[ts.length - 1]! - ts[0]!) / YEAR_MS);
       if (bizName === null) {
-        issues.push({ status: 'FLAG', code: 'PRIOR_BUSINESS_NAME_UNKNOWN', guard: true, reason: 'A prior business used this name but no business name is clear from its pages: the brand and trademark checks cannot run on it' });
+        issues.push({ status: 'FLAG', code: 'PRIOR_BUSINESS_NAME_UNKNOWN', guard: true, reason: `A prior business used this name but no business name is clear from its pages (${bizNameInfo.prior_business_name_basis === 'conflict' ? 'the captures name different businesses' : bizNameInfo.prior_business_name_basis === 'text_line_only' ? 'only a text line suggests one' : 'none found'}): the brand and trademark checks cannot run on it` });
       } else {
         const tokens = nameTokens(bizName);
         const none = tokens.map(() => false);
@@ -229,7 +261,7 @@ export const historyCheck: Check = {
       hist2_fail_class: issues.some((i) => i.status === 'FAIL' && i.code === 'HARMFUL_HISTORY') ? failClass : null, ...(details && { details }),
       forsale, parked_only: preCls === 'parked', captures,
       archive_span_yrs: preCaps === 0 ? 0 : round1((last!.ms - first!.ms) / YEAR_MS),
-      prior_business_use: business ? 'yes' : 'no', prior_business_name: bizName, prior_business_years: business ? bizYears : null, ...(guard && { prior_business_guard: guard }),
+      prior_business_use: business ? 'yes' : 'no', prior_business_name: bizName, prior_business_years: business ? bizYears : null, ...(guard && { prior_business_guard: guard }), ...bizNameInfo, path_hits: pathHits, parked_page_ads: parkedAds,
       source_lane: lane, source_lane_inferred: true, com_prior_registration: comPrior, blocklist,
       evidence_urls: [index.url, ...recs.map((r) => r.fetched.url)], decisive_n: recs.length, undated_excluded_n: undated, after_cutoff_n: after,
     };

@@ -8,7 +8,10 @@ export const CDX_URL = 'https://web.archive.org/cdx/search/cdx';
 export const ARCHIVE_WEB = 'https://web.archive.org/web';
 const CDX_FIELDS = ['timestamp', 'original', 'statuscode', 'mimetype', 'digest'] as const;
 const MAX_CDX_BYTES = 8_000_000;
-export const MAX_CAPTURE_BYTES = 2_000_000;
+export const MAX_CAPTURE_BYTES = 512_000;
+const PAGE_LIMIT = 2000;
+const MAX_PAGES = 5;
+const MAX_RETRY_AFTER_MS = 30_000;
 
 export interface Capture { timestamp: string; original: string; statuscode: string; mimetype: string; digest: string }
 type Deps = Pick<ScreeningDeps, 'fetch'>;
@@ -31,9 +34,9 @@ const reasonOfError = (e: unknown): FetchReason => {
   return n === 'TimeoutError' || n === 'AbortError' ? 'TIMEOUT' : 'SOURCE_ERROR';
 };
 
-/** Reads at most `max` bytes of a body (a capture can be megabytes); returns the text and whether it was cut. */
-export async function readCapped(res: Response, max: number): Promise<{ text: string; cut: boolean }> {
-  if (!res.body) return { text: await res.text(), cut: false };
+/** Reads at most `max` bytes of a body (a capture can be megabytes); returns the bytes and whether they were cut. */
+export async function readCappedBytes(res: Response, max: number): Promise<{ bytes: Buffer; cut: boolean }> {
+  if (!res.body) return { bytes: Buffer.from(await res.arrayBuffer()).subarray(0, max), cut: false };
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let n = 0;
@@ -45,66 +48,133 @@ export async function readCapped(res: Response, max: number): Promise<{ text: st
     n += value.length;
     if (n >= max) { cut = true; await reader.cancel().catch(() => {}); break; }
   }
-  return { text: Buffer.concat(chunks).subarray(0, max).toString('utf8'), cut };
+  return { bytes: Buffer.concat(chunks).subarray(0, max), cut };
+}
+
+/** The charset a page declares (Content-Type header, else a `<meta charset>` / `content="...charset=">` in its first 1,024 bytes). */
+export function charsetOf(contentType: string | null, head: Buffer): string | null {
+  const h = /charset\s*=\s*["']?([A-Za-z0-9_.:-]+)/i.exec(contentType ?? '');
+  if (h) return h[1]!;
+  const m = /charset\s*=\s*["']?([A-Za-z0-9_.:-]+)/i.exec(head.subarray(0, 1024).toString('latin1'));
+  return m ? m[1]! : null;
+}
+
+/** Bytes to text by the declared charset; an unknown or missing charset is UTF-8. */
+export function decodeBody(bytes: Buffer, contentType: string | null): string {
+  const label = charsetOf(contentType, bytes);
+  if (label) { try { return new TextDecoder(label).decode(bytes); } catch { /* unknown label: UTF-8 */ } }
+  return bytes.toString('utf8');
+}
+
+export async function readCapped(res: Response, max: number, contentType: string | null = null): Promise<{ text: string; cut: boolean }> {
+  const { bytes, cut } = await readCappedBytes(res, max);
+  return { text: decodeBody(bytes, contentType ?? res.headers.get('content-type')), cut };
 }
 
 export type CdxResult =
-  | { ok: true; captures: Capture[]; url: string; body: string }
-  | { ok: false; reasonCode: FetchReason; url: string };
+  | { ok: true; captures: Capture[]; url: string; body: string; pages: number }
+  | { ok: false; reasonCode: FetchReason | 'INDEX_TRUNCATED'; url: string; retryAfterMs?: number | null };
 
-/** A CDX body: JSON array of rows (first row is the header); an empty 200 body is the server's way of saying "no captures". */
-export function parseCdx(body: string): Capture[] | null {
+/**
+ * A CDX body: JSON array of rows (first row is the header). `[]` is the server's "no captures". With `showResumeKey` the rows end with
+ * an empty row and a one-cell row holding the key of the next page. Anything else (an empty body, HTML, wrong columns) is null.
+ */
+export function parseCdxPage(body: string): { captures: Capture[]; resumeKey: string | null } | null {
   const t = body.trim();
-  if (t === '') return [];
+  if (t === '') return null;
   let j: unknown;
   try { j = JSON.parse(t); } catch { return null; }
   if (!Array.isArray(j)) return null;
-  if (j.length === 0) return [];
+  if (j.length === 0) return { captures: [], resumeKey: null };
   const header = j[0];
   if (!Array.isArray(header) || !CDX_FIELDS.every((f) => header.includes(f))) return null;
   const idx = Object.fromEntries(CDX_FIELDS.map((f) => [f, header.indexOf(f)])) as Record<(typeof CDX_FIELDS)[number], number>;
   const out: Capture[] = [];
-  for (const row of j.slice(1)) {
-    if (!Array.isArray(row) || row.some((c) => typeof c !== 'string')) return null;
+  let resumeKey: string | null = null;
+  for (let r = 1; r < j.length; r++) {
+    const row = j[r];
+    if (!Array.isArray(row)) return null;
+    if (row.length === 0) { // the end of the rows: an optional resume key follows
+      const k = j[r + 1];
+      if (Array.isArray(k) && k.length === 1 && typeof k[0] === 'string') resumeKey = k[0];
+      break;
+    }
+    if (row.some((c) => typeof c !== 'string')) return null;
     out.push({ timestamp: row[idx.timestamp], original: row[idx.original], statuscode: row[idx.statuscode], mimetype: row[idx.mimetype], digest: row[idx.digest] });
   }
-  return out;
+  return { captures: out, resumeKey };
 }
+export const parseCdx = (body: string): Capture[] | null => parseCdxPage(body)?.captures ?? null;
 
-export function cdxUrl(domain: string, to?: string): string {
-  const q = new URLSearchParams({ url: domain, matchType: 'domain', output: 'json', fl: CDX_FIELDS.join(','), collapse: 'digest', limit: '2000' });
-  if (to) q.set('to', to);
+/**
+ * The index query for a name. Asset floods (images, fonts, audio, video, style sheets, scripts) are filtered out so the 2,000-row page
+ * is spent on pages, redirects and errors; `collapse=digest` drops adjacent duplicates; `showResumeKey` lets the caller page.
+ */
+export function cdxUrl(domain: string, o: { to?: string; resumeKey?: string } = {}): string {
+  const q = new URLSearchParams({ url: domain, matchType: 'domain', output: 'json', fl: CDX_FIELDS.join(','), collapse: 'digest', limit: String(PAGE_LIMIT), showResumeKey: 'true' });
+  q.append('filter', '!mimetype:(image|font|audio|video).*');
+  q.append('filter', '!mimetype:text/css');
+  q.append('filter', '!mimetype:.*javascript.*');
+  if (o.to) q.set('to', o.to);
+  if (o.resumeKey) q.set('resumeKey', o.resumeKey);
   return `${CDX_URL}?${q.toString()}`;
 }
 
-/** One CDX request. Never throws: a timeout, a 429, any other HTTP status or a body that is not CDX JSON is a reason code. */
-export async function cdxCaptures(deps: Deps, domain: string, o: { to?: string; timeoutMs: number }): Promise<CdxResult> {
-  const url = cdxUrl(domain, o.to);
-  let res: Response;
-  try {
-    res = await deps.fetch(url, { headers: { accept: 'application/json', 'user-agent': USER_AGENT }, signal: AbortSignal.timeout(o.timeoutMs) });
-  } catch (e) {
-    return { ok: false, reasonCode: reasonOfError(e), url };
+const retryAfterOf = (res: Response): number | null => {
+  const v = res.headers.get('retry-after');
+  const n = v !== null && /^\d{1,4}$/.test(v.trim()) ? Number(v) * 1000 : null;
+  return n;
+};
+
+/**
+ * The whole index of a name, paged by resume key (at most 5 pages of 2,000). Never throws: a timeout, a 429, any other HTTP status or a
+ * body that is not CDX JSON (an empty body included) is a reason code. A page that is full with no resume key, or a resume key after the
+ * last allowed page, is `INDEX_TRUNCATED`: part of the history was never seen, so it is never "no history" or "clean".
+ */
+export async function cdxCaptures(deps: Deps, domain: string, o: { to?: string; timeoutMs: number; pace?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<CdxResult> {
+  const all: Capture[] = [];
+  const bodies: string[] = [];
+  let resumeKey: string | undefined;
+  let url = cdxUrl(domain, { to: o.to });
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    url = cdxUrl(domain, { to: o.to, resumeKey });
+    const one = async (): Promise<{ ok: true; body: string } | { ok: false; reasonCode: FetchReason; retryAfterMs?: number | null }> => {
+      let res: Response;
+      try {
+        res = await deps.fetch(url, { headers: { accept: 'application/json', 'user-agent': USER_AGENT }, signal: AbortSignal.timeout(o.timeoutMs) });
+      } catch (e) {
+        return { ok: false, reasonCode: reasonOfError(e) };
+      }
+      if (res.status === 429) { const ra = retryAfterOf(res); void res.body?.cancel().catch(() => {}); return { ok: false, reasonCode: 'RATE_LIMITED', retryAfterMs: ra }; }
+      if (res.status !== 200) { void res.body?.cancel().catch(() => {}); return { ok: false, reasonCode: 'SOURCE_ERROR' }; }
+      try { return { ok: true, body: (await readCapped(res, MAX_CDX_BYTES)).text }; } catch (e) { return { ok: false, reasonCode: reasonOfError(e) }; }
+    };
+    const r = await (o.pace ? o.pace(one) : one());
+    if (!r.ok) return { ok: false, reasonCode: r.reasonCode, url, retryAfterMs: r.retryAfterMs };
+    const parsed = parseCdxPage(r.body);
+    if (parsed === null) return { ok: false, reasonCode: 'SOURCE_ERROR', url };
+    all.push(...parsed.captures);
+    bodies.push(r.body);
+    if (parsed.resumeKey === null) {
+      if (parsed.captures.length >= PAGE_LIMIT) return { ok: false, reasonCode: 'INDEX_TRUNCATED', url };
+      return { ok: true, captures: all, url: cdxUrl(domain, { to: o.to }), body: bodies.length === 1 ? bodies[0]! : `[${bodies.join(',')}]`, pages: page };
+    }
+    resumeKey = parsed.resumeKey;
   }
-  if (res.status === 429) { void res.body?.cancel().catch(() => {}); return { ok: false, reasonCode: 'RATE_LIMITED', url }; }
-  if (res.status !== 200) { void res.body?.cancel().catch(() => {}); return { ok: false, reasonCode: 'SOURCE_ERROR', url }; }
-  let body: string;
-  try { body = (await readCapped(res, MAX_CDX_BYTES)).text; } catch (e) { return { ok: false, reasonCode: reasonOfError(e), url }; }
-  const captures = parseCdx(body);
-  if (captures === null) return { ok: false, reasonCode: 'SOURCE_ERROR', url };
-  return { ok: true, captures, url, body };
+  return { ok: false, reasonCode: 'INDEX_TRUNCATED', url };
 }
 
 export const captureUrl = (c: Pick<Capture, 'timestamp' | 'original'>): string => `${ARCHIVE_WEB}/${c.timestamp}id_/${c.original}`;
 
 export type CaptureFetch =
   | { ok: true; status: number; location: string | null; html: string | null; contentType: string | null; url: string; bytes: number }
-  | { ok: false; reasonCode: string; url: string };
+  | { ok: false; reasonCode: string; url: string; retryAfterMs?: number | null };
 
 /**
  * One raw capture (`id_` = the archived bytes, no archive toolbar). Redirects are not followed: a 3xx capture is read from its status
  * and Location. The archive mirrors the archived status, so a status of another class than the index said (a 5xx for a capture the
- * index lists as 200, a 429, a 404) is the archive failing, not the site: `CAPTURE_UNAVAILABLE` (or `TIMEOUT`).
+ * index lists as 200, a 429, a 404) is the archive failing, not the site: `CAPTURE_UNAVAILABLE` (or `TIMEOUT`); so is a 3xx with no
+ * Location (where it went is unknown). The body is decoded by its declared charset.
  */
 export async function fetchCapture(deps: Deps, c: Capture, o: { timeoutMs: number }): Promise<CaptureFetch> {
   const url = captureUrl(c);
@@ -116,10 +186,16 @@ export async function fetchCapture(deps: Deps, c: Capture, o: { timeoutMs: numbe
   }
   const want = Number(c.statuscode[0]);
   const got = Math.floor(res.status / 100);
-  if (res.status === 429 || got !== want) { void res.body?.cancel().catch(() => {}); return { ok: false, reasonCode: 'CAPTURE_UNAVAILABLE', url }; }
-  if (got === 3) { void res.body?.cancel().catch(() => {}); return { ok: true, status: res.status, location: res.headers.get('location'), html: null, contentType: res.headers.get('content-type'), url, bytes: 0 }; }
+  if (res.status === 429 || got !== want) { const ra = retryAfterOf(res); void res.body?.cancel().catch(() => {}); return { ok: false, reasonCode: 'CAPTURE_UNAVAILABLE', url, retryAfterMs: ra }; }
+  if (got === 3) {
+    void res.body?.cancel().catch(() => {});
+    const location = res.headers.get('location');
+    if (!location) return { ok: false, reasonCode: 'CAPTURE_UNAVAILABLE', url };
+    return { ok: true, status: res.status, location, html: null, contentType: res.headers.get('content-type'), url, bytes: 0 };
+  }
   try {
-    const { text } = await readCapped(res, MAX_CAPTURE_BYTES);
+    const { text, cut } = await readCapped(res, MAX_CAPTURE_BYTES);
+    void cut;
     return { ok: true, status: res.status, location: null, html: text, contentType: res.headers.get('content-type'), url, bytes: Buffer.byteLength(text) };
   } catch (e) {
     return { ok: false, reasonCode: reasonOfError(e) === 'TIMEOUT' ? 'TIMEOUT' : 'CAPTURE_UNAVAILABLE', url };
@@ -152,15 +228,21 @@ export function pickDecisive(captures: Capture[], domain: string, max: number): 
   const first = sorted[0]!;
   const last = sorted[sorted.length - 1]!;
   if (max === 1) return [last];
-  const byYear = new Map<string, Capture>();
-  for (const c of sorted.slice(1, -1)) if (!byYear.has(c.timestamp.slice(0, 4))) byYear.set(c.timestamp.slice(0, 4), c);
-  let mid = [...byYear.values()];
+  // Every capture left after the digest dedupe is a content change. Over the cap: one change per calendar year in between first
+  // (the years the content moved in), thinned evenly when the years exceed the slots; slots still free are then filled with the other
+  // changes, evenly spread, rather than left unused.
+  const inner = sorted.slice(1, -1);
   const slots = max - 2;
-  if (mid.length > slots) {
-    const n = mid.length;
-    mid = slots <= 0 ? [] : Array.from({ length: slots }, (_, i) => mid[Math.min(n - 1, Math.max(0, Math.round(((i + 1) * (n + 1)) / (slots + 1)) - 1))]!);
+  const byYear = new Map<string, Capture>();
+  for (const c of inner) if (!byYear.has(c.timestamp.slice(0, 4))) byYear.set(c.timestamp.slice(0, 4), c);
+  const spread = <T,>(xs: T[], k: number): T[] => (k <= 0 ? [] : xs.length <= k ? xs : Array.from({ length: k }, (_, i) => xs[Math.min(xs.length - 1, Math.max(0, Math.round(((i + 1) * (xs.length + 1)) / (k + 1)) - 1))]!));
+  let mid = spread([...byYear.values()], slots);
+  if (mid.length < slots) {
+    const chosen = new Set(mid);
+    mid = [...mid, ...spread(inner.filter((c) => !chosen.has(c)), slots - mid.length)];
   }
-  return [first, ...new Set(mid), last];
+  const midSet = new Set(mid);
+  return [first, ...inner.filter((c) => midSet.has(c)), last];
 }
 
 // ---- classification ----
@@ -183,14 +265,38 @@ export function redirectTarget(location: string, base: string): string | null {
 const isOwnHost = (host: string, domain: string) => host === domain || host.endsWith(`.${domain}`);
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** A matcher for `class:phrase` terms: each phrase as a whole word/phrase, case-insensitive, runs of spaces equal. Compiled once. */
+export function makeMatcher(terms: string[]): (text: string) => string[] {
+  const compiled = terms.map((t) => ({ t, phrase: t.slice(t.indexOf(':') + 1).trim().toLowerCase() })).filter((x) => x.phrase !== '')
+    .map((x) => ({ t: x.t, re: new RegExp(`(?<![a-z0-9])${esc(x.phrase).replace(/\s+/g, '\\s+')}(?![a-z0-9])`) }));
+  return (text) => { const hay = text.toLowerCase(); return compiled.filter((c) => c.re.test(hay)).map((c) => c.t); };
+}
+
 /** Terms (`class:phrase`) found in the text as whole words/phrases, case-insensitive; returned as written in the list. */
 export function matchSignatures(text: string, terms: string[]): string[] {
-  const hay = text.toLowerCase();
-  const hits: string[] = [];
-  for (const t of terms) {
-    const phrase = t.slice(t.indexOf(':') + 1).trim().toLowerCase();
-    if (phrase === '') continue;
-    if (new RegExp(`(?<![a-z0-9])${esc(phrase).replace(/\s+/g, '\\s+')}(?![a-z0-9])`).test(hay)) hits.push(t);
+  return makeMatcher(terms)(text);
+}
+
+export interface PathHit { timestamp: string; url: string; matched: string[] }
+
+/**
+ * A no-fetch scan of the archived URLs (subdomain labels and path words) against the strong and weak signature phrases and the
+ * settings' URL terms. Only reads what the index already holds; a hit says "look at this name", never rejects (the caller FLAGs).
+ */
+export function scanPaths(captures: Capture[], domain: string, lists: Pick<SignatureLists, 'strong' | 'weak'>, urlTerms: string[]): PathHit[] {
+  const match = makeMatcher([...lists.strong, ...lists.weak, ...urlTerms.map((t) => `url:${t}`)]);
+  const hits: PathHit[] = [];
+  for (const c of captures) {
+    let u: URL;
+    try { u = new URL(c.original); } catch { continue; }
+    const host = u.hostname.toLowerCase();
+    const sub = host === domain || host === `www.${domain}` ? '' : host.endsWith(`.${domain}`) ? host.slice(0, -(domain.length + 1)).replace(/^www\./, '') : '';
+    let path = u.pathname;
+    try { path = decodeURIComponent(path); } catch { /* keep as is */ }
+    const words = `${sub} ${path}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (words === '') continue;
+    const m = match(words);
+    if (m.length > 0) { hits.push({ timestamp: c.timestamp, url: c.original, matched: m }); if (hits.length >= 20) break; }
   }
   return hits;
 }
@@ -198,10 +304,15 @@ export function matchSignatures(text: string, terms: string[]): string[] {
 /**
  * One decisive capture -> class. A 3xx to another site is `redirect_offsite` (or for-sale / parked when the target host is in those lists);
  * a 3xx to the same site is flagged `sameSiteRedirect` and the caller ignores it.
+ *
+ * Parked and for-sale come BEFORE harmful: a parking page is full of sponsored links, and its advertising is not the name's use. A
+ * `sig_parked` match, or a for-sale match on a THIN page (at most `parkedMaxChars` of visible text), is parked / for-sale and any strong
+ * harmful words on it are `adMatches` (the caller FLAGs, never FAILs). A for-sale line on a full page does not override a harmful match.
+ * `extra` (meta description and keywords, image alt text) feeds only the weak list.
  */
 export function classifyCapture(
-  x: { status: number; location: string | null; text: string; domain: string }, lists: SignatureLists, minContentChars: number,
-): { cls: CaptureCls; matched: string[]; sameSiteRedirect?: boolean } {
+  x: { status: number; location: string | null; text: string; domain: string; extra?: string }, lists: SignatureLists, minContentChars: number, parkedMaxChars = 1500,
+): { cls: CaptureCls; matched: string[]; sameSiteRedirect?: boolean; adMatches?: string[] } {
   if (x.status >= 300 && x.status < 400) {
     const target = x.location === null ? null : redirectTarget(x.location, `http://${x.domain}/`);
     const host = target === null ? null : new URL(target).hostname.toLowerCase();
@@ -216,13 +327,17 @@ export function classifyCapture(
   }
   if (x.status >= 400) return { cls: 'error', matched: [] };
   const strong = matchSignatures(x.text, lists.strong);
-  if (strong.length > 0) return { cls: 'harmful_strong', matched: strong };
-  const weak = matchSignatures(x.text, lists.weak);
-  if (weak.length > 0) return { cls: 'harmful_weak', matched: weak };
   const forsale = matchSignatures(x.text, lists.forsale);
-  if (forsale.length > 0) return { cls: 'forsale', matched: forsale };
   const parked = matchSignatures(x.text, lists.parked);
-  if (parked.length > 0) return { cls: 'parked', matched: parked };
+  const thin = x.text.length <= parkedMaxChars;
+  if (parked.length > 0 || (forsale.length > 0 && thin)) {
+    const ad = strong.length > 0 ? { adMatches: strong } : {};
+    return forsale.length > 0 ? { cls: 'forsale', matched: forsale, ...ad } : { cls: 'parked', matched: parked, ...ad };
+  }
+  if (strong.length > 0) return { cls: 'harmful_strong', matched: strong };
+  const weak = matchSignatures(`${x.text} ${x.extra ?? ''}`, lists.weak);
+  if (weak.length > 0) return { cls: 'harmful_weak', matched: weak };
+  if (forsale.length > 0) return { cls: 'forsale', matched: forsale };
   if (x.text.length < minContentChars) return { cls: 'error', matched: [] }; // a near-empty page is not a business
   return { cls: 'content', matched: [] };
 }

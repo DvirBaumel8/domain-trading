@@ -8,7 +8,7 @@ import type { RdapLookup } from '../../src/rdap.js';
 import { readEvidence } from '../../src/screening/evidence.js';
 import { outcome, type Check, type CheckId } from '../../src/screening/types.js';
 import { testDb as db } from '../helpers/db.js';
-import { putBrandLists, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
+import { enableWayback, putBrandLists, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { recordedSite, syntheticSite, waybackHandlers, type WaybackLog, type WaybackOpts, type WaybackSite } from '../helpers/screening-fixtures.js';
 import { mswServer } from '../setup/network.js';
 
@@ -19,7 +19,8 @@ const REGISTERED_AT = '2026-10-04T13:16:00.000Z';
 const registered = (created: string | null): RdapLookup => ({ outcome: 'registered', reasonCode: null, httpStatus: 200, url: 'https://rdap.example/x', retrievedAt: new Date(), body: '{"ldhName":"x"}', facts: { registrar: 'R', created_at: created, expires_at: null, updated_at: null, statuses: [], nameservers: [] } });
 const available = (): RdapLookup => ({ outcome: 'not_registered', reasonCode: null, httpStatus: 404, url: 'https://rdap.example/x', retrievedAt: new Date(), body: null, facts: null });
 
-async function h(opts: { rdap?: Record<string, RdapLookup>; fetch?: typeof fetch } = {}): Promise<ScreeningHarness & { log: WaybackLog }> {
+async function h(opts: { rdap?: Record<string, RdapLookup>; fetch?: typeof fetch; enabled?: boolean } = {}): Promise<ScreeningHarness & { log: WaybackLog }> {
+  if (opts.enabled !== false) await enableWayback();
   const x = await screeningHarness({ screening: { sleep: async () => {}, rdapLookup: async (d) => opts.rdap?.[d] ?? available(), ...(opts.fetch && { fetch: opts.fetch }) } });
   app = x.app;
   return Object.assign(x, { log: { cdx: [], captures: [] } as WaybackLog });
@@ -65,12 +66,12 @@ describe('history: recorded archive captures', () => {
     expect(body.names[0].first_fail).toMatchObject({ check: 'history', gate: 'G6' });
   });
 
-  it('sacramentoepoxypros.com: the only home-page capture is a blank meta-refresh page, never a normal page -> PASS redirect_error_only', async () => {
+  it('sacramentoepoxypros.com: the only home-page capture is a blank meta-refresh page (to a page of its own site), never a normal page -> PASS redirect_error_only', async () => {
     const x = await h();
     serve(x, { 'sacramentoepoxypros.com': recordedSite('sacramentoepoxypros.com') });
     const { body } = await x.runDone({ checks: ['history'], names: [item('sacramentoepoxypros.com')] });
     expect(hist(body)).toMatchObject({ status: 'PASS', fields: { prior_history: 1, pre_cls: 'redirect_error_only', prior_business_use: 'no' } });
-    expect(hist(body).fields.captures[0]).toMatchObject({ status: 200, class: 'error' });
+    expect(hist(body).fields.captures[0]).toMatchObject({ status: 200, class: 'same_site_redirect', meta_refresh: true, redirect_target: 'defaultsite' });
   });
 
   it('memphisplumbingpros.com: no captures at all -> PASS, pre_cls none, prior_history 0 (the server\'s empty body is "none", with evidence of what it said)', async () => {
@@ -240,12 +241,12 @@ describe('history: harmful use, for-sale, parked and the prior-business guard (s
 });
 
 describe('history: the archive failing is UNKNOWN, never "no history"', () => {
-  it('the index times out twice (1 retry): UNKNOWN TIMEOUT with error_code ARCHIVE_UNAVAILABLE (CR-002 #4)', async () => {
+  it('the index times out on every attempt (2 retries): UNKNOWN TIMEOUT with error_code ARCHIVE_UNAVAILABLE (CR-002 #4)', async () => {
     let n = 0;
     const x = await h({ fetch: (async () => { n++; throw Object.assign(new Error('timed out'), { name: 'TimeoutError' }); }) as unknown as typeof fetch });
     const { body } = await x.runDone({ checks: ['history'], names: [item('pittsburghroofpros.com')] });
-    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'TIMEOUT', upstream_calls: 2, fields: { error_code: 'ARCHIVE_UNAVAILABLE', prior_history: null, pre_cls: 'unknown', hist2: 'UNKNOWN', source_lane: 'unknown' } });
-    expect(n).toBe(2);
+    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'TIMEOUT', upstream_calls: 3, fields: { error_code: 'ARCHIVE_UNAVAILABLE', prior_history: null, pre_cls: 'unknown', hist2: 'UNKNOWN', source_lane: 'unknown' } });
+    expect(n).toBe(3);
     expect(body.names[0].final_status).toBe('unknown');
   });
 
@@ -253,7 +254,7 @@ describe('history: the archive failing is UNKNOWN, never "no history"', () => {
     const x = await h();
     serve(x, { 'memphisplumbingpros.com': recordedSite('memphisplumbingpros.com') });
     let first = true;
-    mswServer.use(...waybackHandlers({}, x.log, { cdx: () => { if (first) { first = false; return new HttpResponse('busy', { status: 429 }); } return new HttpResponse('', { status: 200 }); } }));
+    mswServer.use(...waybackHandlers({}, x.log, { cdx: () => { if (first) { first = false; return new HttpResponse('busy', { status: 429 }); } return new HttpResponse('[]', { status: 200 }); } }));
     const { body } = await x.runDone({ checks: ['history'], names: [item('memphisplumbingpros.com')] });
     expect(hist(body)).toMatchObject({ status: 'PASS', upstream_calls: 2, fields: { pre_cls: 'none' } });
   });
@@ -282,12 +283,13 @@ describe('history: the archive failing is UNKNOWN, never "no history"', () => {
     expect(body.names[0].final_status).toBe('unknown');
   });
 
-  it('sources.wayback false: UNKNOWN SOURCE_DISABLED', async () => {
-    const x = await h();
-    await x.post('/selection/settings', { label: 'v1w', set: { 'sources.wayback': false } });
-    const { body } = await x.runDone({ checks: ['history'], mode: 'full', settings: 'v1w', names: [item('memphisplumbingpros.com', { as_of: '2026-10-06T08:00:00Z' })] });
-    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED' });
+  it('the seed ships with sources.wayback false (the Internet Archive has not given written permission): UNKNOWN SOURCE_DISABLED, nothing is fetched', async () => {
+    const x = await h({ enabled: false });
+    serve(x, { 'memphisplumbingpros.com': recordedSite('memphisplumbingpros.com') });
+    const { body } = await x.runDone({ checks: ['history'], names: [item('memphisplumbingpros.com')] });
+    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED', fields: { prior_history: null, pre_cls: 'unknown' } });
     expect(x.log.cdx).toHaveLength(0);
+    expect(body.names[0].final_status).toBe('unknown');
   });
 });
 
@@ -367,6 +369,7 @@ describe('history: as_of, the registration cut-off and the source lane', () => {
 
   it('pacing: every request to web.archive.org goes through one pacer of history.min_ms_between_calls (1 s)', async () => {
     const sleeps: number[] = [];
+    await enableWayback();
     const x = await screeningHarness({ screening: { sleep: async (ms) => { sleeps.push(ms); }, rdapLookup: async () => available() } });
     app = x.app;
     serve({ log: { cdx: [], captures: [] } }, { 'pittsburghroofpros.com': recordedSite('pittsburghroofpros.com') });
@@ -375,5 +378,299 @@ describe('history: as_of, the registration cut-off and the source lane', () => {
     expect(sleeps).toHaveLength(4);
     sleeps.forEach((s, i) => { if (i > 0) expect(s - sleeps[i - 1]!).toBeGreaterThan(900); if (i > 0) expect(s - sleeps[i - 1]!).toBeLessThanOrEqual(1100); });
     expect(sleeps[0]).toBeLessThanOrEqual(1000);
+  });
+});
+
+const HEAD = ['timestamp', 'original', 'statuscode', 'mimetype', 'digest'];
+const wr = (domain: string) => ({ domain, check: 'web_risk', checked_at: '2026-10-06T07:30:00Z', evidence_url: 'https://transparencyreport.google.com/safe-browsing/search?url=x', result: { raw_status: 6 } });
+const tm = (domain: string, result: object) => ({ domain, check: 'tm_us', checked_at: '2026-10-06T07:30:00Z', evidence_url: 'https://tmsearch.uspto.gov/x', result: { control_ok: true, exact_or_core_live: [], generic_live: [], ...result } });
+const mark = { mark: 'OFFICE PREP SOLUTIONS', serial: '88123456', owner: 'Someone Else LLC', status: 'LIVE' };
+
+describe('history: parked first (ads on a placeholder are a FLAG, never a FAIL)', () => {
+  it('a parked capture with a pharma ad: FLAG HARMFUL_ON_PARKED_PAGE with ad_matches and excerpt; pre_cls parked; not harmful', async () => {
+    const x = await h();
+    const s = synth('synthetic-notyetconnected');
+    s.site.captures['20250713063751']!.body = s.site.captures['20250713063751']!.body.replace('</p>', '</p><p>Sponsored links: buy viagra online, cialis, xxx</p>');
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    const r = hist(body);
+    expect(r).toMatchObject({ status: 'FLAG', reason_code: 'HARMFUL_ON_PARKED_PAGE', fields: { pre_cls: 'parked', hist2: 'FLAG', hist2_fail_class: null } });
+    expect(r.fields.captures[0]).toMatchObject({ class: 'parked', ad_matches: expect.arrayContaining(['pharma:viagra', 'adult:xxx']) });
+    expect(r.fields.parked_page_ads[0]).toMatchObject({ ad_matches: expect.arrayContaining(['pharma:viagra']), excerpt: expect.stringContaining('viagra') });
+  });
+
+  it('a for-sale line on a FULL page does not override: the pharma page still FAILs', async () => {
+    const x = await h();
+    const s = synth('synthetic-pharma');
+    const cap = s.site.captures['20160412101010']!;
+    cap.body = cap.body.replace('</body>', `<p>This domain name is for sale.</p><p>${'filler words about our region and service '.repeat(60)}</p></body>`);
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'FAIL', reason_code: 'HARMFUL_HISTORY', fields: { hist2_fail_class: 'spam' } });
+  });
+});
+
+describe('history: the index (paging, truncation, paths)', () => {
+  const rows = (n: number, prefix = 'p'): string[][] => Array.from({ length: n }, (_, i) => [`${2010 + (i % 15)}${String((i % 12) + 1).padStart(2, '0')}${String((i % 27) + 1).padStart(2, '0')}000000`, `http://bigexample.com/${prefix}${i}`, '404', 'text/html', `D${prefix}${i}`]);
+
+  it('asks for a narrowed, pageable index: the domain, collapse by digest, a resume key, asset types filtered out', async () => {
+    const x = await h();
+    serve(x, {});
+    await x.runDone({ checks: ['history'], names: [item('memphisplumbingpros.com')] });
+    const q = x.log.cdx[0]!.searchParams;
+    expect([q.get('url'), q.get('matchType'), q.get('collapse'), q.get('limit'), q.get('showResumeKey')]).toEqual(['memphisplumbingpros.com', 'domain', 'digest', '2000', 'true']);
+    expect(q.getAll('filter')).toEqual(['!mimetype:(image|font|audio|video).*', '!mimetype:text/css', '!mimetype:.*javascript.*']);
+  });
+
+  it('a full page with no resume key: UNKNOWN INDEX_TRUNCATED (never "no history", never clean)', async () => {
+    const x = await h();
+    serve(x, {}, { cdx: () => new HttpResponse(JSON.stringify([HEAD, ...rows(2000)]), { status: 200 }) });
+    const { body } = await x.runDone({ checks: ['history'], names: [item('bigexample.com')] });
+    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'INDEX_TRUNCATED', upstream_calls: 1, fields: { error_code: 'ARCHIVE_UNAVAILABLE', prior_history: null } });
+  });
+
+  it('a resume key is followed: the pages are merged, every request is counted, the evidence holds both pages', async () => {
+    const x = await h();
+    const keys: (string | null)[] = [];
+    serve(x, {}, { cdx: (_d, url) => {
+      keys.push(url.searchParams.get('resumeKey'));
+      return new HttpResponse(JSON.stringify(url.searchParams.get('resumeKey') ? [HEAD, ['20100101000000', 'http://other.example.org/', '200', 'text/html', 'DX']] : [HEAD, ['20090101000000', 'http://pgexample.com/', '404', 'text/html', 'DY'], [], ['KEY1']]), { status: 200 });
+    } });
+    const { body } = await x.runDone({ checks: ['history'], names: [item('pgexample.com')] });
+    expect(keys).toEqual([null, 'KEY1']);
+    expect(hist(body)).toMatchObject({ status: 'PASS', upstream_calls: 2, fields: { pre_caps: 2, first_capture: '2009-01-01T00:00:00.000Z' } });
+  });
+
+  it('a resume key after the fifth page: UNKNOWN INDEX_TRUNCATED', async () => {
+    const x = await h();
+    serve(x, {}, { cdx: () => new HttpResponse(JSON.stringify([HEAD, ['20100101000000', 'http://pgexample.com/', '404', 'text/html', 'DY'], [], ['MORE']]), { status: 200 }) });
+    const { body } = await x.runDone({ checks: ['history'], names: [item('pgexample.com')] });
+    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'INDEX_TRUNCATED' });
+    expect(x.log.cdx).toHaveLength(5);
+  });
+
+  it('an EMPTY 200 index body is UNKNOWN SOURCE_ERROR; `[]` is "no captures"', async () => {
+    const x = await h();
+    serve(x, {}, { cdx: () => new HttpResponse('', { status: 200 }) });
+    const a = await x.runDone({ checks: ['history'], names: [item('memphisplumbingpros.com')] });
+    expect(hist(a.body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR' });
+    serve(x, {}, { cdx: () => new HttpResponse('[]', { status: 200 }) });
+    const b = await x.runDone({ checks: ['history'], names: [item('tulsaroofingco.com')] });
+    expect(hist(b.body)).toMatchObject({ status: 'PASS', fields: { pre_cls: 'none' } });
+  });
+
+  it('a no-fetch scan of archived URLs: harmful words in a path or subdomain FLAG HARMFUL_PATH, with the url', async () => {
+    const x = await h();
+    const s = synth('synthetic-forsale');
+    s.site.cdx.push(['20190302000000', `http://${s.domain}/cheap-viagra-online`, '200', 'text/html', 'DPATH'], ['20190303000000', `http://casino.${s.domain}/`, '200', 'text/html', 'DSUB']);
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    const r = hist(body);
+    expect(r).toMatchObject({ status: 'FLAG', reason_code: 'HARMFUL_PATH', fields: { pre_cls: 'parked' } });
+    expect(r.fields.path_hits.map((p: any) => [p.url, p.matched])).toEqual([[`http://${s.domain}/cheap-viagra-online`, ['pharma:viagra', 'url:viagra']], [`http://casino.${s.domain}/`, ['gambling:casino', 'url:casino']]]);
+    expect(x.log.captures).toEqual(['20190301120000']); // only the home page was fetched
+  });
+
+  it('url_terms is a setting: a URL term flags, an emptied list finds nothing', async () => {
+    const x = await h();
+    const s = synth('synthetic-forsale');
+    s.site.cdx.push(['20190302000000', `http://${s.domain}/cheap-payday-loan-offers`, '200', 'text/html', 'DPATH']);
+    serve(x, { [s.domain]: s.site });
+    const a = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(a.body)).toMatchObject({ status: 'FLAG', reason_code: 'HARMFUL_PATH', fields: { path_hits: [{ matched: ['url:payday loan'] }] } });
+    await x.post('/selection/settings', { label: 'v1u', set: { 'history.url_terms': [] } });
+    const { body } = await x.runDone({ checks: ['history'], mode: 'full', settings: 'v1u', names: [item(s.domain, { as_of: '2026-10-06T08:00:00Z' })] });
+    expect(hist(body)).toMatchObject({ status: 'PASS', fields: { path_hits: [] } });
+  });
+});
+
+describe('history: manual records that depend on it', () => {
+  it('Web Risk "safe" after a FLAG history is PASS (a FLAG is final and clean here); after a FAIL history it is UNKNOWN HISTORY_NOT_CLEAN', async () => {
+    const x = await h();
+    const p = synth('synthetic-pharma');
+    serve(x, { 'pittsburghroofpros.com': recordedSite('pittsburghroofpros.com'), [p.domain]: p.site });
+    const a = await x.runDone({ checks: ['web_risk', 'history'], mode: 'full', names: [item('pittsburghroofpros.com'), item(p.domain)] });
+    expect(hist(a.body, 'pittsburghroofpros.com').status).toBe('FLAG');
+    const ok = await x.post(`/screening/runs/${a.id}/manual`, wr('pittsburghroofpros.com'));
+    expect([ok.statusCode, ok.json().status, ok.json().fields.history_status]).toEqual([201, 'PASS', 'FLAG']);
+    const bad = await x.post(`/screening/runs/${a.id}/manual`, wr(p.domain));
+    expect([bad.statusCode, bad.json().status, bad.json().reason_code]).toEqual([201, 'UNKNOWN', 'HISTORY_NOT_CLEAN']);
+  });
+
+  it('TM-1 on the prior name is enforced: a record that does not list its phrase is UNKNOWN PRIOR_NAME_NOT_QUERIED; with it, a live mark on it is FAIL TM_LIVE_MARK; none is PASS', async () => {
+    await putBrandLists();
+    const x = await h();
+    const s = synth('synthetic-business');
+    serve(x, { [s.domain]: s.site });
+    const a = await x.runDone({ checks: ['history', 'tm_us'], names: [item(s.domain)] });
+    expect(a.body.names[0].results.find((r: any) => r.check === 'tm_us').fields.phrases_to_query).toContain('OFFICE PREP SOLUTIONS INC');
+    const missing = await x.post(`/screening/runs/${a.id}/manual`, tm(s.domain, { phrases_queried: ['OFFICEPREPEXAMPLE'] }));
+    expect([missing.statusCode, missing.json().status, missing.json().reason_code]).toEqual([201, 'UNKNOWN', 'PRIOR_NAME_NOT_QUERIED']);
+    const live = await x.post(`/screening/runs/${a.id}/manual`, tm(s.domain, { phrases_queried: ['OFFICEPREPEXAMPLE', 'Office Prep Solutions Inc'], prior_name_live: [mark] }));
+    expect([live.json().status, live.json().reason_code, live.json().fields.prior_business_phrase]).toEqual(['FAIL', 'TM_LIVE_MARK', 'OFFICE PREP SOLUTIONS INC']);
+    const clean = await x.post(`/screening/runs/${a.id}/manual`, tm(s.domain, { phrases_queried: ['OFFICEPREPEXAMPLE', 'OFFICE PREP SOLUTIONS INC'] }));
+    expect(clean.json().status).toBe('PASS');
+  });
+
+  it('a name with no prior business needs no extra phrase', async () => {
+    const x = await h();
+    const s = synth('synthetic-forsale');
+    serve(x, { [s.domain]: s.site });
+    const a = await x.runDone({ checks: ['history', 'tm_us'], names: [item(s.domain)] });
+    const r = await x.post(`/screening/runs/${a.id}/manual`, tm(s.domain, { phrases_queried: ['FORSALEEXAMPLE'] }));
+    expect(r.json().status).toBe('PASS');
+  });
+});
+
+describe('history: prior-business name quality', () => {
+  const twoCaptures = (a: string, b: string) => {
+    const s = synth('synthetic-business');
+    const [t1, t2] = Object.keys(s.site.captures);
+    s.site.captures[t1!]!.body = s.site.captures[t1!]!.body.replace('Home | Office Prep Solutions Inc', a);
+    s.site.captures[t2!]!.body = s.site.captures[t2!]!.body.replace('Home | Office Prep Solutions Inc', b);
+    delete s.site.captures[Object.keys(s.site.captures)[2]!];
+    s.site.cdx = [s.site.cdx[0]!, s.site.cdx[1]!, s.site.cdx[2]!];
+    return s;
+  };
+
+  it('captures that name different businesses: no name, FLAG PRIOR_BUSINESS_NAME_UNKNOWN (conflict)', async () => {
+    await putBrandLists();
+    const x = await h();
+    const s = twoCaptures('Alpha Studio Inc', 'Beta Studio Inc');
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'FLAG', reason_code: 'PRIOR_BUSINESS_NAME_UNKNOWN', fields: { prior_business_name: null, prior_business_name_basis: 'conflict' } });
+  });
+
+  it('only a copyright line gives a name: low confidence, FLAG (text_line_only)', async () => {
+    await putBrandLists();
+    const x = await h();
+    const s = synth('synthetic-business-noname');
+    const t = Object.keys(s.site.captures)[0]!;
+    s.site.captures[t]!.body = s.site.captures[t]!.body.replace('</body>', '<p>\u00a9 2015 Quiet Hill Group. All rights reserved.</p></body>');
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'FLAG', reason_code: 'PRIOR_BUSINESS_NAME_UNKNOWN', fields: { prior_business_name: null, prior_business_name_basis: 'text_line_only' } });
+  });
+
+  it('an error or navigation title is not a name (403 Forbidden, Index of, Account Suspended): FLAG', async () => {
+    await putBrandLists();
+    const x = await h();
+    const s = synth('synthetic-business');
+    for (const t of Object.keys(s.site.captures)) s.site.captures[t]!.body = s.site.captures[t]!.body.replace('Home | Office Prep Solutions Inc', '403 Forbidden').replace('Office Prep Solutions Inc.', '');
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'FLAG', reason_code: 'PRIOR_BUSINESS_NAME_UNKNOWN', fields: { prior_business_use: 'yes', prior_business_name: null } });
+  });
+
+  it('a title that is the domain\'s own name is used, with prior_business_name_is_domain true', async () => {
+    await putBrandLists();
+    const x = await h();
+    const s = synth('synthetic-business');
+    for (const t of Object.keys(s.site.captures)) s.site.captures[t]!.body = s.site.captures[t]!.body.replace('Home | Office Prep Solutions Inc', 'OfficePrepExample.com | Home');
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'PASS', fields: { prior_business_name: 'OfficePrepExample.com', prior_business_name_is_domain: true } });
+  });
+});
+
+describe('history: capture reading', () => {
+  const one = (name: string) => { const s = synth(name); const t = Object.keys(s.site.captures)[0]!; s.site.cdx = [s.site.cdx[0]!, s.site.cdx.find((r) => r[0] === t)!]; return { s, t }; };
+
+  it('the declared charset is honoured (ISO-8859-1 header): the accent survives in the title and the name', async () => {
+    await putBrandLists();
+    const x = await h();
+    const { s, t } = one('synthetic-business');
+    const html = s.site.captures[t]!.body.replace('Home | Office Prep Solutions Inc', 'Caf\u00e9 Prep Inc');
+    serve(x, { [s.domain]: s.site }, { capture: () => new HttpResponse(Buffer.from(html, 'latin1'), { status: 200, headers: { 'content-type': 'text/html; charset=iso-8859-1' } }) });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'PASS', fields: { prior_business_name: 'Caf\u00e9 Prep Inc' } });
+    expect(hist(body).fields.captures[0].title).toBe('Caf\u00e9 Prep Inc');
+  });
+
+  it('a charset in <meta> is honoured when the header says nothing', async () => {
+    await putBrandLists();
+    const x = await h();
+    const { s, t } = one('synthetic-business');
+    const html = s.site.captures[t]!.body.replace('Home | Office Prep Solutions Inc', 'Caf\u00e9 Prep Inc').replace('<head>', '<head><meta charset="windows-1252">');
+    serve(x, { [s.domain]: s.site }, { capture: () => new HttpResponse(Buffer.from(html, 'latin1'), { status: 200, headers: { 'content-type': 'text/html' } }) });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body).fields.captures[0].title).toBe('Caf\u00e9 Prep Inc');
+  });
+
+  it('a quick meta refresh to another site is an off-site redirect: FLAG REDIRECT_OFFSITE', async () => {
+    const x = await h();
+    const { s, t } = one('synthetic-forsale');
+    s.site.captures[t]!.body = '<html><head><meta http-equiv="refresh" content="0; url=http://elsewhere.example.net/landing"></head><body></body></html>';
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'FLAG', reason_code: 'REDIRECT_OFFSITE', fields: { pre_cls: 'redirect_offsite' } });
+    expect(hist(body).fields.captures[0]).toMatchObject({ class: 'redirect_offsite', meta_refresh: true, redirect_target: 'http://elsewhere.example.net/landing' });
+  });
+
+  it('a 3xx capture with no Location: UNKNOWN CAPTURE_UNAVAILABLE', async () => {
+    const x = await h();
+    serve(x, { 'pittsburghroofpros.com': recordedSite('pittsburghroofpros.com') }, { capture: (ts) => (ts === '20180807083604' ? new HttpResponse(null, { status: 302 }) : undefined) });
+    const { body } = await x.runDone({ checks: ['history'], names: [item('pittsburghroofpros.com')] });
+    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'CAPTURE_UNAVAILABLE', fields: { capture: '20180807083604' } });
+  });
+
+  it('meta description and alt text feed only the weak list: a weak phrase FLAGs, a strong one does not FAIL', async () => {
+    await putBrandLists();
+    const x = await h();
+    const { s, t } = one('synthetic-business');
+    const base = s.site.captures[t]!.body;
+    s.site.captures[t]!.body = base.replace('<head>', '<head><meta name="description" content="best online casino bonus">');
+    serve(x, { [s.domain]: s.site });
+    const weak = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(weak.body)).toMatchObject({ status: 'FLAG', reason_code: 'HARMFUL_WEAK', fields: { pre_cls: 'harmful' } });
+    s.site.captures[t]!.body = base.replace('<head>', '<head><meta name="keywords" content="buy viagra, xxx"><meta name="description" content="x">').replace('<h1>', '<img src="a.png" alt="cialis"><h1>');
+    x.clock.t += 170 * 3_600_000; // past the 168 h freshness window: the first answer is not reused
+    const strong = await x.runDone({ checks: ['history'], names: [item(s.domain)] });
+    expect(hist(strong.body)).toMatchObject({ status: 'PASS', fields: { pre_cls: 'content' } });
+  });
+});
+
+describe('history: retries, Retry-After, the shared pacer, the fail class', () => {
+  it('Retry-After is honoured when it asks for more than the backoff; retries default to 2', async () => {
+    const sleeps: number[] = [];
+    await enableWayback();
+    const x = await screeningHarness({ screening: { sleep: async (ms) => { sleeps.push(ms); }, rdapLookup: async () => available() } });
+    app = x.app;
+    let n = 0;
+    mswServer.use(...waybackHandlers({}, { cdx: [], captures: [] }, { cdx: () => (++n < 3 ? new HttpResponse('slow down', { status: 429, headers: { 'retry-after': n === 1 ? '3' : '1' } }) : new HttpResponse('[]', { status: 200 })) }));
+    const { body } = await x.runDone({ checks: ['history'], names: [item('memphisplumbingpros.com')] });
+    expect(hist(body)).toMatchObject({ status: 'PASS', upstream_calls: 3 });
+    expect(sleeps.filter((ms) => ms >= 2000 && ms <= 4000)).toEqual(expect.arrayContaining([3000, 4000]));
+  });
+
+  it('a Retry-After over 30 s is not waited for: UNKNOWN RATE_LIMITED after one request', async () => {
+    const x = await h();
+    serve(x, {}, { cdx: () => new HttpResponse('slow', { status: 429, headers: { 'retry-after': '600' } }) });
+    const { body } = await x.runDone({ checks: ['history'], names: [item('memphisplumbingpros.com')] });
+    expect(hist(body)).toMatchObject({ status: 'UNKNOWN', reason_code: 'RATE_LIMITED', upstream_calls: 1 });
+  });
+
+  it('one pacer per host serves every run of the process: the second run starts behind the first one\'s last slot', async () => {
+    const sleeps: number[][] = [[], []];
+    let run = 0;
+    await enableWayback();
+    const x = await screeningHarness({ screening: { sleep: async (ms) => { sleeps[run]!.push(ms); }, rdapLookup: async () => available() } });
+    app = x.app;
+    serve({ log: { cdx: [], captures: [] } }, { 'memphisplumbingpros.com': recordedSite('memphisplumbingpros.com'), 'tulsaroofingco.com': recordedSite('memphisplumbingpros.com') });
+    await x.runDone({ checks: ['history'], names: [item('memphisplumbingpros.com')] });
+    run = 1;
+    await x.runDone({ checks: ['history'], names: [item('tulsaroofingco.com')] });
+    expect(sleeps[0]).toHaveLength(0); // one request, no wait
+    expect(sleeps[1]).toHaveLength(1); // a new run still waits for the previous slot
+  });
+
+  it('hist2_fail_class is blocklist when SURBL caused the FAIL, whatever else the pages say', async () => {
+    const x = await h();
+    x.app.screeningWorker.checks.surbl = fake('surbl', 'G4', 'FAIL', 'SURBL_LISTED');
+    const s = synth('synthetic-pharma');
+    serve(x, { [s.domain]: s.site });
+    const { body } = await x.runDone({ checks: ['surbl', 'history'], mode: 'full', names: [item(s.domain)] });
+    expect(hist(body)).toMatchObject({ status: 'FAIL', reason_code: 'HARMFUL_HISTORY', fields: { hist2_fail_class: 'blocklist', details: { class: 'pharma' } } });
   });
 });

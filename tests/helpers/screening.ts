@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { AppDeps } from '../../src/app.js';
 import type { RdapFn } from '../../src/rdap.js';
 import type { RegistrarAdapter } from '../../src/registrars/types.js';
+import { sql } from 'kysely';
 import { testDb } from './db.js';
 import { makeApp } from './app.js';
 import { issueToken } from './tokens.js';
@@ -48,4 +49,13 @@ export async function screeningHarness(opts: { start?: number; stopAfterResults?
     return { id, body: (await get(`/screening/runs/${id}`)).json() };
   };
   return { app, clock, post, get, run, runDone };
+}
+
+/** Switches `sources.wayback` on in the active (seeded) settings. It ships off until the Internet Archive gives written permission. */
+export async function enableWayback(): Promise<void> {
+  await testDb.connection().execute(async (conn) => {
+    await sql`SET session_replication_role = replica`.execute(conn);
+    await sql`UPDATE selection_settings SET "values" = jsonb_set("values", '{sources,wayback}', 'true')`.execute(conn);
+    await sql`SET session_replication_role = origin`.execute(conn);
+  });
 }

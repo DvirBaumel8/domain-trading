@@ -61,6 +61,10 @@ const Base = z.object({
   }).strict(),
   history: z.object({
     max_fetch_per_name: int, min_ms_between_calls: int, timeout_ms: int, retries: int, min_content_chars: int,
+    /** A parked or for-sale page with at most this many visible characters is a placeholder: harmful words on it are advertising (FLAG), not use. */
+    parked_max_text_chars: int,
+    /** Words that, as whole words in an archived URL (subdomain or path), FLAG the name without fetching the page (HARMFUL_PATH). */
+    url_terms: z.array(z.string().min(2).max(40)),
     strong_action: action, weak_action: action, redirect_action: action, forsale_action: action, parked_action: action,
   }).strict(),
   census: z.object({ sibling_count: int.positive(), max_unknown_share: share, as_of_exact_max_days: int }).strict(),
@@ -194,7 +198,8 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true },
   surbl: { zone: 'multi.surbl.org', control_name: 'test.surbl.org', blocked_answers: ['127.0.0.1'], list_bits: { '4': 'DM', '8': 'PH', '16': 'MW', '32': 'CT', '64': 'ABUSE', '128': 'CR' }, ns_override: [], timeout_ms: 3000 },
   history: {
-    max_fetch_per_name: 6, min_ms_between_calls: 1000, timeout_ms: 20000, retries: 1, min_content_chars: 200,
+    max_fetch_per_name: 6, min_ms_between_calls: 1000, timeout_ms: 20000, retries: 2, min_content_chars: 200, parked_max_text_chars: 1500,
+    url_terms: ['viagra','cialis','xanax','casino','poker','porn','xxx','escort','payday loan','replica watches','buy backlinks'],
     strong_action: 'FAIL', weak_action: 'FLAG', redirect_action: 'FLAG', forsale_action: 'PASS', parked_action: 'PASS',
   },
   census: { sibling_count: 20, max_unknown_share: 0.25, as_of_exact_max_days: 365 },
@@ -252,7 +257,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   buy_hold: true,
   holdout: { sold_accept_min: 0.7, drop_reject_min: 0.75, min_n: 50, required_suites: ['BT10-1', 'BT10-9', 'BT10-11'], report_bands: [1000, 2500], lane_report: true, base_rates: [0.01, 0.02] },
   // Enabled only where docs/internal/sources.md recorded the terms as enabled (Task 1); NameBio is off (unreadable terms).
-  sources: { surbl: true, popularity: true, namebio: false, wayback: true, rdap_com: true, rdap_other: true, iana_bootstrap: true },
+  sources: { surbl: true, popularity: true, namebio: false, wayback: false, rdap_com: true, rdap_other: true, iana_bootstrap: true },
 };
 
 // ---------- database ----------

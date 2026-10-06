@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { testDb as db, insertOwnedDomain } from '../helpers/db.js';
-import { OFFLINE, putBrandLists, putList, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
+import { OFFLINE, enableWayback, putBrandLists, putList, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { outcome } from '../../src/screening/types.js';
 import { HttpResponse } from 'msw';
 import { recordedSite, syntheticSite, waybackHandlers } from '../helpers/screening-fixtures.js';
@@ -519,6 +519,7 @@ describe('history in a full plan (CAP-07)', () => {
 
   it('the v10 order is respected (web_risk before history before tm_us); a manual web_risk record turns UNKNOWN HISTORY_NOT_FINAL into PASS once history has passed', async () => {
     await putBrandLists();
+    await enableWayback();
     const x = await screeningHarness({ screening: { sleep: async () => {}, rdapLookup: async () => ({ outcome: 'not_registered', reasonCode: null, httpStatus: 404, url: 'https://rdap.example/x', retrievedAt: new Date(), body: null, facts: null }) } });
     app = x.app;
     const plan = ['form', 'availability', 'web_risk', 'history', 'tm_us'];
@@ -543,6 +544,7 @@ describe('history in a full plan (CAP-07)', () => {
 
   it('a harmful history stops a live name at G6: the later gates never run', async () => {
     await putBrandLists();
+    await enableWayback();
     const x = await screeningHarness({ screening: { sleep: async () => {}, rdapLookup: async () => ({ outcome: 'not_registered', reasonCode: null, httpStatus: 404, url: 'https://rdap.example/x', retrievedAt: new Date(), body: null, facts: null }) } });
     app = x.app;
     const s = syntheticSite('synthetic-pharma');

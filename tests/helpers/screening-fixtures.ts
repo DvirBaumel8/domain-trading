@@ -56,7 +56,7 @@ export function waybackHandlers(sites: Record<string, WaybackSite>, log: Wayback
       const domain = url.searchParams.get('url') ?? '';
       if (o.cdx) return o.cdx(domain, url);
       const rows = sites[domain]?.cdx ?? [];
-      return new HttpResponse(rows.length <= 1 ? '' : JSON.stringify(rows), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new HttpResponse(rows.length <= 1 ? '[]' : JSON.stringify(rows), { status: 200, headers: { 'content-type': 'application/json' } });
     }),
     http.get('https://web.archive.org/web/*', ({ request }) => {
       const m = /^\/web\/(\d{14})id_\/(.+)$/.exec(new URL(request.url).pathname);

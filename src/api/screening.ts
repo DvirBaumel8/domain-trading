@@ -133,7 +133,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     });
     const o = check === 'web_risk'
       ? webRiskFromManual(rec as z.infer<typeof WebRiskManual>, sel.values, history ? toResultRow(history) : undefined, body.evidence_url, checkedAt, body.note)
-      : tmFromManual(rec as z.infer<typeof TmManual>, body.evidence_url, checkedAt, body.note);
+      : tmFromManual(rec as z.infer<typeof TmManual>, body.evidence_url, checkedAt, body.note, history ? toResultRow(history) : undefined);
     const row = await db.insertInto('screening_results').values({
       run_id: run.id, item_idx: item.idx, domain: item.domain, lane: item.lane, check_id: check, gate: GATE_OF[check],
       rule_ids: worker.checks[check]?.ruleIds ?? [], status: o.status, reason_code: o.reasonCode, reason: o.reason,
