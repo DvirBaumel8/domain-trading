@@ -39,7 +39,7 @@ Summary
 
 ## Majestic Million (the popularity list for TYPO-1; replaces Tranco)
 - **URL used:** `https://downloads.majestic.com/majestic_million.csv` (`HTTP/2 200`, `content-type: text/csv`, `last-modified: Tue, 06 Oct 2026 05:00:21 GMT`, 81,323,114 bytes, `accept-ranges: bytes`; columns `GlobalRank,TldRank,Domain,TLD,RefSubNets,RefIPs,IDN_Domain,IDN_TLD,PrevGlobalRank,PrevTldRank,PrevRefSubNets,PrevRefIPs`, sorted by rank). Retrieved 2026-10-06 with `curl`.
-- **Purpose:** CAP-02 TYPO-1 popularity list (`src/screening/tranco.ts`, `src/screening/checks/typo.ts`). The module keeps the plan's name `tranco`; the settings switch is still `sources.tranco`.
+- **Purpose:** CAP-02 TYPO-1 popularity list (`src/screening/popularity.ts`, `src/screening/checks/typo.ts`); the settings switch is `sources.popularity`.
 - **Terms URL:** `https://majestic.com/reports/majestic-million` (the report page, "Export CSV (~80MB)" block).
 - **Quote (licence, verified at the primary source 2026-10-06):** "Licensed under a Creative Commons Attribution 3.0 Unported License". The same wording is repeated by Tranco's own attribution text for its Majestic input: "Majestic (available under a CC BY 3.0 license)".
 - **Why not Tranco:** Tranco has no licence of its own (`/terms` is 404) and one of its inputs is CC BY-NC 4.0 (Cloudflare Radar); a non-commercial upstream is not acceptable for a commercial trading business (gap G-30, resolved).

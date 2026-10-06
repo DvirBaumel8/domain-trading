@@ -6,6 +6,7 @@ import { evaluateMoney, syllableCount } from '../money.js';
 import { CHECK_IDS } from '../settings.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 import { formFieldsOf } from './form.js';
+import { quoteIsStale } from './quote.js';
 
 const OK = ['PASS', 'PASS_WITH_NOTE'];
 
@@ -28,6 +29,9 @@ export const priceCheck: Check = {
     const q = ctx.latest('quote');
     if (!q || !OK.includes(q.status) || q.fields.renewal_cents == null || q.fields.first_year_cents == null) {
       return outcome('UNKNOWN', 'NO_QUOTE', 'The price needs a first-year and a renewal quote', { bin_cents: bin });
+    }
+    if (quoteIsStale(q.fields, sel.quote, ctx.now())) {
+      return outcome('UNKNOWN', 'STALE_DATA', 'The quote is older than quote.max_age_hours (manual: quote.manual_max_age_days)', { bin_cents: bin, quoted_at: q.fields.quoted_at ?? null });
     }
     const tierRow = ctx.latest('tier');
     const tier = (tierRow && tierRow.fields.tier ? (tierRow.fields.tier as string) : 'none') as 'A' | 'I' | 'B' | 'G' | 'none';

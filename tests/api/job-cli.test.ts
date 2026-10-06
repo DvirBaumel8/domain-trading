@@ -50,7 +50,7 @@ describe('job CLI tick and daily (the shared JobRunner)', () => {
     const { stdout } = await cli(['daily']);
     const r = JSON.parse(stdout);
     expect(Object.keys(r.steps)).toEqual(['priceJob', 'dropJob', 'registrarCheck', 'referenceRefresh', 'backupExport']);
-    expect(r.steps.referenceRefresh).toMatchObject({ ok: true, summary: { tranco: { skipped: true, reason: 'SOURCE_DISABLED' }, iana: { skipped: true }, errors: [] } });
+    expect(r.steps.referenceRefresh).toMatchObject({ ok: true, summary: { popularity: { skipped: true, reason: 'SOURCE_DISABLED' }, iana: { skipped: true }, errors: [] } });
     expect(r.steps.backupExport).toMatchObject({ ok: true, skipped: true });
     const { testDb } = await import('../helpers/db.js');
     const a = await testDb.selectFrom('audit_log').selectAll().where('path', '=', 'job daily').orderBy('at', 'desc').executeTakeFirstOrThrow();

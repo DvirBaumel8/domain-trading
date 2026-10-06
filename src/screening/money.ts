@@ -33,6 +33,12 @@ const roundHalfUp = (x: number): number => Math.floor(x + 0.5);
 /** First band whose `max` is at least `x` (a null max is open-ended). */
 const byMax = (bands: { max: number | null; raw: number }[], x: number): number => (bands.find((b) => b.max === null || x <= b.max) ?? bands[bands.length - 1]!).raw;
 
+/** The raw value of the band with the highest `min` that `x` reaches (bands in any order); the lowest band when none is reached. */
+export function bandByMin(bands: { min: number; raw: number }[], x: number): number {
+  const sorted = [...bands].sort((a, b) => b.min - a.min);
+  return (sorted.find((b) => x >= b.min) ?? sorted[sorted.length - 1]!).raw;
+}
+
 /** The geo "floor" for the ratio is the bottom of the geo ladder: the lowest list price inside the geo band. The pricing floor of a geo name stays its BIN. */
 export function geoLadderBottomCents(p: PricingSettings): number {
   return laneList('geo', p)[0] ?? p.geoBinMinCents;
@@ -93,7 +99,7 @@ export function evaluateMoney(i: MoneyInput, sel: SelectionValuesT, pricing: Pri
   const gate = sel.lead.ab_min[i.lane];
   const bRaw = n === 0 || n < gate ? 0 : n >= 2 * gate ? 10 : n >= 1.5 * gate ? 8 : 6;
   const retail = i.retailStart === null && i.retailEnd === null ? null : (i.retailStart ?? 0) + (i.retailEnd ?? 0);
-  const dRaw = retail === null ? null : (sc.d_bands.find((b) => retail >= b.min) ?? sc.d_bands[sc.d_bands.length - 1]!).raw;
+  const dRaw = retail === null ? null : bandByMin(sc.d_bands, retail);
   const gRaw = i.riskFlag ? sc.risk_raw.flag : sc.risk_raw.clean;
   const raws: Record<Factor, number | null> = { A: aRaw, B: bRaw, C: i.intentRaw, D: dRaw, E: i.timingRaw, F: i.extBusinessRaw, G: gRaw };
   const factors = {} as MoneyResult['factors'];

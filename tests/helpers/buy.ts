@@ -5,7 +5,8 @@ import { insertOwnedDomain, testDb } from './db.js';
 export const DOMAIN = 'examplecityroofing.com';
 
 // A fixed instant: buy suites run on this app clock (makeApp({ now: () => T0 })), so approvals never age with the wall clock.
-export const T0 = Date.parse('2026-10-06T09:00:00Z');
+// (Never earlier than the wall clock: a few reconciler tests compare it with the database's now(), which would otherwise run ahead of T0 once the day passes 09:10Z.)
+export const T0 = Math.max(Date.parse('2026-10-06T09:00:00Z'), Date.now());
 
 export function approvalNow(domain = DOMAIN, hoursAgo = 1) {
   return { text: `yes buy ${domain} up to $11.50, list BIN $399`, approved_at: new Date(T0 - hoursAgo * 3_600_000).toISOString() };

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { RegistrarError } from '../../src/registrars/types.js';
 import { NAMEBIO_NAME } from '../../src/screening/namebio.js';
-import { POPULARITY_NAME, parsePopularityCsv } from '../../src/screening/tranco.js';
+import { POPULARITY_NAME, parsePopularityCsv } from '../../src/screening/popularity.js';
 import { outcome, type Check, type CheckId } from '../../src/screening/types.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { testDb as db } from '../helpers/db.js';
@@ -27,12 +27,12 @@ const nonGeo = (domain: string, extra: object = {}) => ({ domain, lane: 'S3', ..
 
 async function seedPopularity(date: string): Promise<void> {
   const { rows } = parsePopularityCsv(csv, 10_000);
-  const body = rows.map((r) => `${r.rank},${r.domain}`).join('\n');
+  const body = rows.map((r) => `${r.rank},${r.domain},${r.tld ?? ''}`).join('\n');
   await db.insertInto('reference_files').values({
     name: POPULARITY_NAME, source_url: 'x', fetched_at: new Date(`${date}T05:00:00Z`), data_date: date, sha256: date.padEnd(64, '0'), bytes: body.length, body_gz: gzipSync(Buffer.from(body)), same_as_id: null,
   }).execute();
 }
-const fake = (id: CheckId, gate: string, fields: Record<string, unknown>, status: 'PASS' | 'FLAG' = 'PASS'): Check => ({ id, gate, ruleIds: [], lists: [], run: async () => outcome(status, null, null, fields) });
+const fake = (id: CheckId, gate: string, fields: Record<string, unknown>, status: 'PASS' | 'FLAG' = 'PASS'): Check => ({ id, gate, ruleIds: [], lists: [], run: async () => outcome(status, status === 'PASS' ? null : 'FAKE_FLAG', null, fields) });
 
 describe('typo (CAP-02, TYPO-1)', () => {
   it('10 one-letter typos of top-1,000 names: FAIL TYPO_MATCH with the match, rank and distance', async () => {
@@ -48,12 +48,12 @@ describe('typo (CAP-02, TYPO-1)', () => {
     expect(res(body.names[0], 'typo').fields.typo_matches[0]).toMatchObject({ domain: 'google', rank: 1 });
   });
 
-  it('10 clean names pass (SEL7-2); data_as_of is the list date', async () => {
+  it('10 clean names pass (SEL7-2); data_as_of is the list date; a top_n above the 1,000 stored rows is noted; attribution is on the card', async () => {
     await seedPopularity('2026-10-06');
     const { runDone } = await h();
     const clean = ['boisesolarco', 'paytransparencyaudit', 'ragsecurityaudit', 'tampapoolsco', 'memphisplumbingpros', 'pittsburghroofpros', 'doraictcompliance', 'promptinjectionaudit', 'hvacchicago', 'netextend'];
     const { body } = await runDone({ checks: ['typo'], names: clean.map((t) => nonGeo(`${t}.com`)) });
-    for (const n of body.names) expect(res(n, 'typo')).toMatchObject({ status: 'PASS', data_as_of: '2026-10-06T00:00:00.000Z' });
+    for (const n of body.names) expect(res(n, 'typo')).toMatchObject({ status: 'PASS', data_as_of: '2026-10-06T00:00:00.000Z', fields: { attribution: 'Majestic Million, Majestic (https://majestic.com), CC BY 3.0', typo_note: 'TOP_N_EXCEEDS_LIST', list_rows: 1000 } });
   });
 
   it('a 9-day-old list is UNKNOWN STALE_DATA (7 days is still fine); no list at all is the same', async () => {
@@ -68,10 +68,10 @@ describe('typo (CAP-02, TYPO-1)', () => {
     expect(await one('twiter')).toMatchObject({ status: 'UNKNOWN', reason_code: 'STALE_DATA' });
   });
 
-  it('sources.tranco false: UNKNOWN SOURCE_DISABLED', async () => {
+  it('sources.popularity false: UNKNOWN SOURCE_DISABLED', async () => {
     await seedPopularity('2026-10-06');
     const { runDone, post } = await h();
-    await post('/selection/settings', { label: 'v1t', set: { 'sources.tranco': false } });
+    await post('/selection/settings', { label: 'v1t', set: { 'sources.popularity': false } });
     const { body } = await runDone({ checks: ['typo'], mode: 'full', settings: 'v1t', names: [nonGeo('gooogle.com')] });
     expect(res(body.names[0], 'typo')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED' });
   });
@@ -157,7 +157,7 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
     withFakes(x);
     const { body } = await x.runDone({ checks, names: [nonGeo(name, { bin_usd: 1488 })] });
     const n = body.names[0];
-    expect(res(n, 'quote')).toMatchObject({ status: 'PASS', gate: 'G9', fields: { registrar: 'porkbun', first_year_cents: 1108, renewal_cents: 1108, two_year_cents: 2216, two_year: '$22.16', registrar_ft_capable: true, source: 'live' } });
+    expect(res(n, 'quote')).toMatchObject({ status: 'PASS', gate: 'G9', fields: { registrar: 'porkbun', first_year_cents: 1108, renewal_cents: 1108, two_year_cents: 2216, two_year: '$22.16', registrar_ft_capable: true, quote_source: 'live', fallback_reason: null } });
     expect(res(n, 'tier')).toMatchObject({ status: 'PASS', fields: { tier: 'A', demand2: 'PASS' } });
     const p = res(n, 'price');
     expect(p).toMatchObject({ status: 'PASS', reason_code: null, fields: { bin_cents: 148800, lifetime_cost_cents: 2216 } });
@@ -170,12 +170,46 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
     expect(ev.json().money.ev_cents).toBe(p.fields.ev_cents);
   });
 
-  it('with buy_hold cleared in a draft the survivor stays would_buy (backtest never buys), and ranking orders by tier then short then score', async () => {
+  it('ranking is exact: tier order (A, I, B), then short names first, then score', async () => {
+    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun', { quote: { firstYearCents: 500, renewalCents: 500 } })], rdap });
+    await createV3(db);
+    // domain -> [registered_share, prior_history, alt_tld_before_n, word_count, sld_len, short]; the checks are fakes so each name's tier and form are set.
+    const T: Record<string, [number, number, number, number, number, 0 | 1]> = {
+      'atierb.com': [0.6, 0, 0, 2, 9, 0],   // tier B
+      'dtieri.com': [0.3, 0, 1, 2, 9, 0],   // tier I (alt TLD before)
+      'elong.com': [0.65, 1, 0, 4, 25, 0],  // tier A, long, many words: the lower score
+      'bmid.com': [0.65, 1, 0, 2, 9, 0],    // tier A, normal
+      'cshort.com': [0.65, 1, 0, 1, 5, 1],  // tier A, short (FORM-2)
+    };
+    const c = x.app.screeningWorker.checks;
+    const row = (ctx: { item: { domain: string } }) => T[ctx.item.domain]!;
+    c.form = { id: 'form', gate: 'G0', ruleIds: [], lists: [], run: async (ctx) => { const r = row(ctx); return outcome('PASS', null, null, { domain: ctx.item.domain, sld: ctx.item.domain.slice(0, -4), sld_len: r[4], word_count: r[3], short: r[5], gform1_pass: true, geo_length_band: 0, keywords: [], tokens: ['x'], status: 'PASS' }); } };
+    c.census = { id: 'census', gate: 'G8', ruleIds: [], lists: [], run: async (ctx) => outcome('PASS', null, null, { registered_share: row(ctx)[0] }) };
+    c.history = { id: 'history', gate: 'G6', ruleIds: [], lists: [], run: async (ctx) => outcome('PASS', null, null, { prior_history: row(ctx)[1] }) };
+    c.ext_dates = { id: 'ext_dates', gate: 'G8', ruleIds: [], lists: [], run: async (ctx) => outcome('PASS', null, null, { alt_tld_before_n: row(ctx)[2] }) };
+    const names = Object.keys(T).map((d) => nonGeo(d, { bin_usd: 1488 }));
+    const { body } = await x.runDone({ checks, names });
+    const by = (d: string) => body.names.find((n: any) => n.domain === d);
+    expect(body.names.map((n: any) => [n.domain, n.tier, n.final_status])).toEqual([
+      ['atierb.com', 'B', 'would_buy'], ['dtieri.com', 'I', 'would_buy'], ['elong.com', 'A', 'would_buy'], ['bmid.com', 'A', 'would_buy'], ['cshort.com', 'A', 'would_buy'],
+    ]);
+    expect(by('bmid.com').score).toBeGreaterThan(by('elong.com').score); // the premise for the order inside tier A
+    expect(body.ranking).toEqual(['cshort.com', 'bmid.com', 'elong.com', 'dtieri.com', 'atierb.com']);
+  });
+
+  it('history FLAG with share 0.65: tier A is PASS_WITH_NOTE TIER_FROM_FLAGGED_INPUT, tier_exact false, flagged_inputs lists history', async () => {
     const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun')], rdap });
     await createV3(db);
     withFakes(x);
-    const { body } = await x.runDone({ checks, names: [nonGeo('rocksolid.com', { bin_usd: 1488 }), nonGeo('stonefirm.com', { bin_usd: 1488 })] });
-    expect(body.ranking.sort()).toEqual(['rocksolid.com', 'stonefirm.com']);
+    x.app.screeningWorker.checks.history = fake('history', 'G6', { prior_history: 1 }, 'FLAG');
+    const { body } = await x.runDone({ checks, names: [nonGeo(name, { bin_usd: 1488 })] });
+    expect(res(body.names[0], 'tier')).toMatchObject({ status: 'PASS_WITH_NOTE', reason_code: 'TIER_FROM_FLAGGED_INPUT', fields: { tier: 'A', tier_exact: false, flagged_inputs: ['history'], demand2: 'PASS' } });
+    expect(body.names[0]).toMatchObject({ tier: 'A', flags: ['history'] });
+    // a flagged input the deciding clause does not read adds no note: ext_dates FLAG, tier A decided by census + history
+    x.app.screeningWorker.checks.history = fake('history', 'G6', { prior_history: 1 });
+    x.app.screeningWorker.checks.ext_dates = fake('ext_dates', 'G8', { alt_tld_before_n: 0 }, 'FLAG');
+    const b2 = await x.runDone({ checks, names: [nonGeo('other.com', { bin_usd: 1488 })] });
+    expect(res(b2.body.names[0], 'tier')).toMatchObject({ status: 'PASS', fields: { tier: 'A', flagged_inputs: ['ext_dates'] } });
   });
 
   it('the s6_regime_audit pattern (census 0.20, prior 1, alt 0): tier FAIL DEMAND2_FAIL (CR-002 CAP-10 #2); price still computed from the facts it has', async () => {
@@ -196,14 +230,60 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
     expect(res(body.names[0], 'tier')).toMatchObject({ status: 'UNKNOWN', reason_code: 'DEMAND2_UNDECIDED' });
   });
 
-  it('every adapter fails: quote UNKNOWN NO_QUOTE and the renewal is never 0; price is not reached in a live run', async () => {
+  it('an adapter error: quote UNKNOWN SOURCE_ERROR, never a manual fallback, renewal never 0; price needs a quote', async () => {
     const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun', { error: new RegistrarError('porkbun', 'REGISTRAR_UNAVAILABLE', 'down') })], rdap });
     await createV3(db);
     withFakes(x);
     const { body } = await x.runDone({ checks, names: [nonGeo(name, { bin_usd: 1488 })] });
-    expect(res(body.names[0], 'quote')).toMatchObject({ status: 'UNKNOWN', reason_code: 'NO_QUOTE', fields: { renewal_cents: null } });
+    expect(res(body.names[0], 'quote')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR', fields: { renewal_cents: null } });
+    // a fresh manual quote for another registrar is no substitute for a live error
+    await x.post('/quotes/manual', { domain: name, registrar: 'godaddy', renewal_usd: 12.99, first_year_usd: 9.99, source_note: 'renewal page', observed_at: new Date(x.clock.t - DAY).toISOString() });
+    const again = await x.runDone({ checks: ['quote'], mode: 'full', names: [nonGeo(name, { bin_usd: 1488 })] });
+    expect(res(again.body.names[0], 'quote')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR' });
     const full = await x.runDone({ checks, mode: 'full', names: [nonGeo(name, { bin_usd: 1488 })] });
     expect(res(full.body.names[0], 'price')).toMatchObject({ status: 'UNKNOWN', reason_code: 'NO_QUOTE' });
+  });
+
+  it('a management-only registrar (no quote access) may be quoted by hand: fallback_reason REGISTRAR_NOT_MACHINE_QUOTABLE; a machine-quotable registrar may not', async () => {
+    const gd = new FakeAdapter('godaddy', { capabilities: { canQuote: false, canRegister: false, afternicFastTransfer: true } });
+    const x = await h({ start: Date.now(), adapters: [gd], rdap });
+    await createV3(db);
+    withFakes(x);
+    await x.post('/quotes/manual', { domain: name, registrar: 'godaddy', renewal_usd: 12.99, first_year_usd: 9.99, source_note: 'renewal page', observed_at: new Date(x.clock.t - DAY).toISOString() });
+    const { body } = await x.runDone({ checks: ['quote'], names: [nonGeo(name, { bin_usd: 1488 })] });
+    expect(res(body.names[0], 'quote')).toMatchObject({ status: 'PASS', fields: { quote_source: 'manual', fallback_reason: 'REGISTRAR_NOT_MACHINE_QUOTABLE', registrar: 'godaddy' } });
+  });
+
+  it('a manual quote for a registrar that can be machine-quoted is ignored (porkbun taken name: no winner, no fallback)', async () => {
+    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun', { quote: { available: false } })], rdap: async () => 'registered' });
+    await createV3(db);
+    await x.post('/quotes/manual', { domain: name, registrar: 'porkbun', renewal_usd: 12.99, first_year_usd: 9.99, source_note: 'by hand', observed_at: new Date(x.clock.t - DAY).toISOString() });
+    const { body } = await x.runDone({ checks: ['quote'], names: [nonGeo(name, { bin_usd: 1488 })] });
+    expect(res(body.names[0], 'quote')).toMatchObject({ status: 'UNKNOWN', reason_code: 'NO_QUOTE' });
+  });
+
+  it('a cheaper Cloudflare adapter never wins (the database refuses it in allowed_registrars; the check also filters it): the next live quote is used (founder rule 5)', async () => {
+    const cf = new FakeAdapter('cloudflare', { quote: { firstYearCents: 800, renewalCents: 800 } });
+    const x = await h({ start: Date.now(), adapters: [cf, new FakeAdapter('porkbun')], rdap });
+    const { body } = await x.runDone({ checks: ['quote'], names: [nonGeo(name, { bin_usd: 1488 })] });
+    expect(res(body.names[0], 'quote')).toMatchObject({ status: 'PASS', fields: { registrar: 'porkbun', quote_source: 'live' } });
+  });
+
+  it('price judges the quote by its original quoted_at: a live quote over quote.max_age_hours (24) or a manual one over 30 days is UNKNOWN STALE_DATA', async () => {
+    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun')], rdap });
+    await createV3(db);
+    withFakes(x);
+    const at = (ms: number) => new Date(x.clock.t - ms).toISOString();
+    const base = { registrar: 'porkbun', first_year_cents: 1108, renewal_cents: 1108 };
+    const price = async (fields: object, d: string) => {
+      x.app.screeningWorker.checks.quote = fake('quote', 'G9', { ...base, ...fields });
+      return res((await x.runDone({ checks, mode: 'full', names: [nonGeo(d, { bin_usd: 1488 })] })).body.names[0], 'price');
+    };
+    expect(await price({ quote_source: 'live', quoted_at: at(25 * 3_600_000) }, 'aone.com')).toMatchObject({ status: 'UNKNOWN', reason_code: 'STALE_DATA' });
+    expect((await price({ quote_source: 'live', quoted_at: at(23 * 3_600_000) }, 'btwo.com')).status).toBe('PASS');
+    expect(await price({ quote_source: 'manual', quoted_at: at(31 * DAY) }, 'cthree.com')).toMatchObject({ status: 'UNKNOWN', reason_code: 'STALE_DATA' });
+    expect((await price({ quote_source: 'manual', quoted_at: at(29 * DAY) }, 'dfour.com')).status).toBe('PASS');
+    expect(await price({ quote_source: 'live' }, 'efive.com')).toMatchObject({ status: 'UNKNOWN', reason_code: 'STALE_DATA' }); // no quoted_at: never assumed fresh
   });
 
   it('a fresh manual quote is used when no adapter quotes (GoDaddy-style); an old one is not; Cloudflare is never used', async () => {
@@ -213,7 +293,7 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
     const q = (extra: object) => x.post('/quotes/manual', { domain: name, registrar: 'godaddy', renewal_usd: 12.99, first_year_usd: 9.99, source_note: 'renewal page', observed_at: new Date(x.clock.t - 2 * DAY).toISOString(), ...extra });
     expect((await q({ observed_at: new Date(x.clock.t - 2 * DAY).toISOString() })).statusCode).toBe(201);
     const { body } = await x.runDone({ checks, names: [nonGeo(name, { bin_usd: 1488 })] });
-    expect(res(body.names[0], 'quote')).toMatchObject({ status: 'PASS', fields: { source: 'manual', registrar: 'godaddy', renewal_cents: 1299, first_year_cents: 999, two_year_cents: 2298, registrar_ft_capable: null } });
+    expect(res(body.names[0], 'quote')).toMatchObject({ status: 'PASS', fields: { quote_source: 'manual', fallback_reason: 'NO_ADAPTER', registrar: 'godaddy', renewal_cents: 1299, first_year_cents: 999, two_year_cents: 2298, registrar_ft_capable: null } });
     expect(res(body.names[0], 'price')).toMatchObject({ status: 'PASS', fields: { lifetime_cost_cents: 2298 } });
     // 31 days later the manual quote is too old (quote.manual_max_age_days 30)
     x.clock.t += 40 * DAY;

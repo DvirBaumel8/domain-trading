@@ -75,7 +75,7 @@ Geo names now need about 10–12 owner-level leads to pay. Non-geo names need �
 | EV-1 | `EV = P_sale × net_price − lifetime_cost > 0` at **low** priors, with BIN (not floor) | — |
 | SCREEN-1 | `screening_pack` complete | — |
 | EVENT-1 | Sensitive-event blocklist | — |
-| TYPO-1 | Tranco edit-distance screen | — |
+| TYPO-1 | Popularity-list (Majestic Million, CC BY 3.0) edit-distance screen | — |
 | S7-ONLY | Fully dropped + RDAP 404 ×2; no auctions; **no automated ExpiredDomains access** | + C8 |
 
 ### 1.2 Qualified lead definition
@@ -343,7 +343,7 @@ Paste ≤10 names into `/s7/candidates`. Those names then go through the full pi
 | SEL6-2 | Tranche 1 ≥10 geo | Simulator pass |
 | SEL6-3 | Lander fit | High BIN without exception fails |
 | SEL7-1 | screening_pack required on /buy | 400 if missing |
-| SEL7-2 | Tranco typos | 10 reject / 10 pass |
+| SEL7-2 | Popularity-list typos | 10 reject / 10 pass |
 | SEL7-3 | never_pitch blocked at Gate C | 100% |
 | SEL7-4 | Renewal DROP if Ratio <1 | 100% |
 | SEL8-1 | Bot census list ignored | Backend list wins |
@@ -381,7 +381,7 @@ Any fail → no live Gate A until fixed (or a documented Dvir waiver).
 5. `/leads/build` + verify + never_pitch + prospect_type/lead_priority + role-inbox≤10→B (SEL9-7, SEL9-15, SEL10-1)
 6. `screening_pack` + `/buy` enforcement + allowed BIN set + step-down drops (SEL9-3, SEL9-9) + `/distribution/confirm` (SEL9-6)
 7. `/renewal/decision` with live ARA + transfer compare (SEL9-10) + pattern health
-8. `/tokenize` + Tranco typo job
+8. `/tokenize` + popularity-list typo job (daily `referenceRefresh` step)
 9. Slim briefs + evidence allowlist lint + ED egress block (SEL9-5)
 10. Labels + shadow book jobs + BT-001 notebook + measurement wiring (inquiry source, Afternic paste fields)
 

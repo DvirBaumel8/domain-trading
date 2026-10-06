@@ -7,13 +7,14 @@ import type { Database } from '../db/types.js';
 import { refreshNameBio, NAMEBIO_NAME } from '../screening/namebio.js';
 import { rdapBaseFor } from '../screening/rdap-batch.js';
 import { activeSelectionSettings } from '../screening/settings.js';
-import { refreshTranco } from '../screening/tranco.js';
+import { refreshPopularity } from '../screening/popularity.js';
 import type { ScreeningDeps } from '../screening/types.js';
 
 const RDAP_LOOKUP_KEEP_DAYS = 30;
 const SNAPSHOTS_KEPT = 10;
+const IANA_MAX_AGE_MS = 7 * 86_400_000;
 
-export interface ReferenceRefreshSummary { tranco: unknown; namebio: unknown; iana: unknown; pruned: number; errors: string[] }
+export interface ReferenceRefreshSummary { popularity: unknown; namebio: unknown; iana: unknown; pruned: number; errors: string[] }
 
 export class ReferenceRefreshJob {
   private running = false;
@@ -37,17 +38,21 @@ export class ReferenceRefreshJob {
           return { ok: false, error: m };
         }
       };
-      const tranco = await sub('tranco', () => refreshTranco(db, screening, s, now));
+      const popularity = await sub('popularity', () => refreshPopularity(db, screening, s, now));
       const namebio = await sub('namebio', () => refreshNameBio(db, screening, s));
       const iana = await sub('iana', async () => {
         if (!s.sources.iana_bootstrap) return { skipped: true, reason: 'SOURCE_DISABLED' };
-        const before = await db.selectFrom('reference_files').select('id').where('name', '=', 'iana_rdap_dns').orderBy('id', 'desc').limit(1).executeTakeFirst();
-        await rdapBaseFor(db, screening, 'net', { enabled: true, now }); // refreshes when the newest copy is over 7 days old
-        const after = await db.selectFrom('reference_files').select('id').where('name', '=', 'iana_rdap_dns').orderBy('id', 'desc').limit(1).executeTakeFirst();
+        const newest = () => db.selectFrom('reference_files').select(['id', 'fetched_at']).where('name', '=', 'iana_rdap_dns').orderBy('id', 'desc').limit(1).executeTakeFirst();
+        const before = await newest();
+        await rdapBaseFor(db, screening, 'net', { enabled: true, now }); // refreshes when the newest copy is over 7 days old; throws when there is no copy at all
+        const after = await newest();
+        const due = !before || now() - before.fetched_at.getTime() > IANA_MAX_AGE_MS;
+        // rdapBaseFor keeps serving the stored copy when a refresh fails; the job still reports it.
+        if (due && after?.id === before?.id) throw new Error('refresh failed; the stored bootstrap copy is kept');
         return { refreshed: after?.id !== before?.id };
       });
       const pruned = await this.prune().catch((e: Error) => { errors.push(`prune: ${e.message.slice(0, 120)}`); return 0; });
-      return { tranco, namebio, iana, pruned, errors };
+      return { popularity, namebio, iana, pruned, errors };
     } finally {
       this.running = false;
     }

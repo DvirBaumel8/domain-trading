@@ -103,7 +103,7 @@ const Base = z.object({
     report_bands: z.array(int), lane_report: z.boolean(), base_rates: z.array(share),
   }).strict(),
   sources: z.object({
-    surbl: z.boolean(), tranco: z.boolean(), namebio: z.boolean(), wayback: z.boolean(),
+    surbl: z.boolean(), popularity: z.boolean(), namebio: z.boolean(), wayback: z.boolean(),
     rdap_com: z.boolean(), rdap_other: z.boolean(), iana_bootstrap: z.boolean(),
   }).strict(),
 }).strict();
@@ -252,7 +252,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   buy_hold: true,
   holdout: { sold_accept_min: 0.7, drop_reject_min: 0.75, min_n: 50, required_suites: ['BT10-1', 'BT10-9', 'BT10-11'], report_bands: [1000, 2500], lane_report: true, base_rates: [0.01, 0.02] },
   // Enabled only where docs/internal/sources.md recorded the terms as enabled (Task 1); NameBio is off (unreadable terms).
-  sources: { surbl: true, tranco: true, namebio: false, wayback: true, rdap_com: true, rdap_other: true, iana_bootstrap: true },
+  sources: { surbl: true, popularity: true, namebio: false, wayback: true, rdap_com: true, rdap_other: true, iana_bootstrap: true },
 };
 
 // ---------- database ----------

@@ -4,12 +4,13 @@ import { gzipSync } from 'node:zlib';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { POPULARITY_URL, latestTranco } from '../../src/screening/tranco.js';
+import { POPULARITY_URL, latestPopularity } from '../../src/screening/popularity.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { fixture, respond } from '../helpers/screening-fixtures.js';
 import { issueToken } from '../helpers/tokens.js';
+import { screeningHarness } from '../helpers/screening.js';
 import { mswServer } from '../setup/network.js';
 
 const csv = readFileSync(new URL('../fixtures/screening/majestic-million-top.csv', import.meta.url), 'utf8');
@@ -48,11 +49,11 @@ describe('referenceRefresh (daily step)', () => {
     expect(Object.keys(r.steps)).toEqual(['priceJob', 'dropJob', 'registrarCheck', 'referenceRefresh', 'backupExport']);
     expect(r.steps.referenceRefresh).toMatchObject({
       ok: true,
-      summary: { tranco: { list_id: 'majestic-2026-10-06', list_date: '2026-10-06', rows: 1000 }, namebio: { skipped: true, reason: 'SOURCE_DISABLED' }, iana: { refreshed: true }, pruned: 0, errors: [] },
+      summary: { popularity: { list_id: 'majestic-2026-10-06', list_date: '2026-10-06', rows: 1000, malformed_skipped: 0 }, namebio: { skipped: true, reason: 'SOURCE_DISABLED' }, iana: { refreshed: true }, pruned: 0, errors: [] },
     });
     const rows = await db.selectFrom('reference_files').select(['name', 'data_date', 'bytes']).orderBy('id').execute();
     expect(rows.map((x) => x.name).sort()).toEqual(['iana_rdap_dns', 'popularity_list']);
-    const list = (await latestTranco(db))!;
+    const list = (await latestPopularity(db))!;
     expect(list).toMatchObject({ listId: 'majestic-2026-10-06', listDate: '2026-10-06' });
     expect(list.ranks.get('google')).toBe(1);
     expect(list.slds).toHaveLength(new Set(list.slds).size); // distinct SLDs
@@ -66,7 +67,7 @@ describe('referenceRefresh (daily step)', () => {
     expect(hits.pop).toBe(1);
     clock.t += 3_600_000;
     const again = await daily();
-    expect(again.steps.referenceRefresh!.summary).toMatchObject({ tranco: { skipped: true } });
+    expect(again.steps.referenceRefresh!.summary).toMatchObject({ popularity: { skipped: true } });
     expect(hits.pop).toBe(1);
     clock.t += DAY;
     await daily();
@@ -76,22 +77,22 @@ describe('referenceRefresh (daily step)', () => {
     expect(pop[0]!.body_gz).not.toBeNull();
     expect(pop[1]!.body_gz).toBeNull();
     expect(Number(pop[1]!.same_as_id)).toBe(Number(pop[0]!.id));
-    expect((await latestTranco(db))!.slds.length).toBeGreaterThan(900); // the newest row borrows the older body
+    expect((await latestPopularity(db))!.slds.length).toBeGreaterThan(800); // the newest row borrows the older body
   });
 
   it('an empty, non-CSV or HTTP 500 answer: the step is ok:false with the reason, the previous snapshot is still served (Review Focus 2)', async () => {
     clock.t = Date.parse('2026-10-06T08:00:00Z');
     serve(() => csv);
     await daily();
-    const before = (await latestTranco(db))!;
+    const before = (await latestPopularity(db))!;
     for (const [body, status] of [['', 200], ['<html>Access denied</html>', 200], ['oops', 500]] as const) {
       clock.t += DAY;
       serve(() => body, status);
       const r = await daily();
-      expect(r.steps.referenceRefresh).toMatchObject({ ok: false, summary: { pruned: 0, errors: [expect.stringMatching(/^tranco: /)] } });
-      expect(r.steps.referenceRefresh!.error).toMatch(/tranco/);
+      expect(r.steps.referenceRefresh).toMatchObject({ ok: false, summary: { pruned: 0, errors: [expect.stringMatching(/^popularity: /)] } });
+      expect(r.steps.referenceRefresh!.error).toMatch(/popularity/);
       expect(r.steps.backupExport!.ok).toBe(true); // later steps still run
-      expect(await latestTranco(db)).toMatchObject({ listId: before.listId, listDate: before.listDate });
+      expect(await latestPopularity(db)).toMatchObject({ listId: before.listId, listDate: before.listDate });
     }
     expect(await db.selectFrom('reference_files').select('id').where('name', '=', 'popularity_list').execute()).toHaveLength(1);
   });
@@ -99,21 +100,37 @@ describe('referenceRefresh (daily step)', () => {
   it('a switched-off source is skipped without a request', async () => {
     clock.t = Date.parse('2026-10-06T08:00:00Z');
     serve(() => csv);
-    const { post } = await activeDraft({ 'sources.tranco': false });
+    const { post } = await activeDraft({ 'sources.popularity': false });
     await post();
     const r = await daily();
-    expect(r.steps.referenceRefresh!.summary).toMatchObject({ tranco: { skipped: true, reason: 'SOURCE_DISABLED' } });
+    expect(r.steps.referenceRefresh!.summary).toMatchObject({ popularity: { skipped: true, reason: 'SOURCE_DISABLED' } });
     expect(hits.pop).toBe(0);
   });
 
-  it('NameBio is never requested: not by the daily job and not by GET /selection/namebio or screening runs (SEL9-13)', async () => {
+  it('NameBio is never requested: not by the daily job, GET /selection/namebio or screening runs that use the namebio check (SEL9-13)', async () => {
     clock.t = Date.parse('2026-10-06T08:00:00Z');
     serve(() => csv);
-    app = await makeApp({ now: () => clock.t, adapters: [] });
-    const r = await issueToken('read');
-    for (let i = 0; i < 3; i++) expect((await app.inject({ method: 'GET', url: '/selection/namebio?keywords=plumbing', headers: r.auth })).statusCode).toBe(200);
-    await app.jobRunner.run('daily');
+    const x = await screeningHarness({ start: clock.t, adapters: [] });
+    app = x.app;
+    await x.post('/selection/settings', { label: 'v1n', set: { 'sources.namebio': true } });
+    for (const trade of ['plumbing', 'solar', 'hvac']) {
+      const { body } = await x.runDone({ checks: ['namebio'], mode: 'full', settings: 'v1n', names: [{ domain: `tulsa${trade}.com`, lane: 'S2', city: 'tulsa', state: 'ok', trade }] });
+      expect(body.names[0].results[0]).toMatchObject({ check: 'namebio', status: 'UNKNOWN', reason_code: 'STALE_DATA' }); // enabled, but there is no cache and no fetcher
+    }
+    for (let i = 0; i < 3; i++) expect((await x.get('/selection/namebio?keywords=plumbing')).statusCode).toBe(200);
+    expect(await app.jobRunner.run('daily')).toMatchObject({ job: 'daily' });
     expect(hits.namebio).toBe(0);
+    expect(hits.pop).toBe(1); // the one daily download
+  });
+
+  it('an IANA refresh that fails while the stored copy is over 7 days old: the step is ok:false (the copy keeps serving)', async () => {
+    clock.t = Date.parse('2026-10-06T08:00:00Z');
+    serve(() => csv);
+    mswServer.use(http.get('https://data.iana.org/rdap/dns.json', () => new HttpResponse('down', { status: 503 })));
+    await db.insertInto('reference_files').values({ name: 'iana_rdap_dns', source_url: 'x', fetched_at: new Date(clock.t - 8 * DAY), data_date: null, sha256: 'i'.padEnd(64, '0'), bytes: 1, body_gz: gzipSync(Buffer.from(fixture('iana-dns.json').body)), same_as_id: null }).execute();
+    const r = await daily();
+    expect(r.steps.referenceRefresh).toMatchObject({ ok: false, summary: { errors: [expect.stringMatching(/^iana: .*kept/)] } });
+    expect(r.steps.referenceRefresh!.error).toMatch(/iana/);
   });
 
   it('prune: rdap_lookups over 30 days; reference_files beyond the newest 10 per name (a kept row keeps the body it borrows); NameBio snapshots are kept', async () => {

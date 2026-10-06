@@ -17,7 +17,7 @@ CREATE TABLE rdap_lookups (
 );
 CREATE INDEX rdap_lookups_domain ON rdap_lookups (domain, checked_at DESC);
 
--- A downloaded reference file (the IANA RDAP bootstrap here; Tranco and NameBio in a later task). `same_as_id` points at the
+-- A downloaded reference file (the IANA RDAP bootstrap here; the popularity list and NameBio). `same_as_id` points at the
 -- row holding the identical body, so an unchanged daily download stores no second copy.
 CREATE TABLE reference_files (
   id          bigserial PRIMARY KEY,

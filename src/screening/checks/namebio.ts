@@ -1,5 +1,6 @@
 // G8 NameBio keyword counts (CAP-11): a score feature (D, retail demand), never a gate. DISABLED while `sources.namebio` is false
 // (the default: see ../namebio.ts). A disabled, stale or missing source is UNKNOWN, and an UNKNOWN feature scores 0 points.
+import { bandByMin } from '../money.js';
 import { keywordCounts } from '../namebio.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 import { formFieldsOf } from './form.js';
@@ -31,7 +32,7 @@ export const namebioCheck: Check = {
     const retailStart = first?.start_count ?? null;
     const retailEnd = last?.end_count ?? null;
     const geoRaw = ctx.item.lane === 'S2' && retailStart !== null && retailEnd !== null
-      ? (ctx.settings.score.d_bands.find((b) => retailStart + retailEnd >= b.min) ?? ctx.settings.score.d_bands[ctx.settings.score.d_bands.length - 1]!).raw
+      ? bandByMin(ctx.settings.score.d_bands, retailStart + retailEnd)
       : null;
     const out = { ...fields, retail_start: retailStart, retail_end: retailEnd, geo_d_raw: geoRaw };
     const missing = kws.filter((k) => r.stats[k] === null);
