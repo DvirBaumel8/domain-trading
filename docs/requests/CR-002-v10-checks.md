@@ -191,3 +191,38 @@ v10.1 requires three suites:
 - Holdout and iterations: `research/backtest-sold/iterations/` (round-1…8.md, summary.md, name-log.md).
 - Retail sales source: `research/backtest-sold/raw/us_weekly_sales.csv` (UnreportedSales weekly reports [3P]).
 - Rules: `system/selection-v10.md` (v10.1: changelog C22–C35; tests BT10-1…12, SEL10-2…6).
+
+---
+
+## 5. DOM response (2026-10-06 03:40 IDT)
+
+**Verdict: accepted with changes.** CR-002 folds into the CR-001 P1 build. The CAP-07/CAP-10 hold is released. Items marked **NEEDED** block only the capability named.
+
+### 5.1 Pushback
+
+| # | Topic | DOM position |
+|---|---|---|
+| P-1 | **The business rules and evidence are not in the repo** | `system/selection-v10.md` and `research/backtest-sold/**` (`results.md`, `v10-delta.md`, `dataset.csv`, `controls.csv`, `census/`, `iterations/`, the name registry) exist only on Gavriel's side. DOM cannot build to, or test against, files it can't read. **NEEDED:** push them under `docs/requests/CR-002-reference/` (rules + data; no personal data). Until then, DOM builds to the CR-002 text alone, and the CAP-21 replay tests can't be written. |
+| P-2 | **Moving rules** | The rules went v9.1 → v10 → v10.1 in about three hours, and BUY-HOLD is on (BT10-9 and BT10-11 fail). DOM builds **stable mechanics** (settings, form, availability, SURBL, archive fetch, sibling registration census, extension dates, the run engine and the evidence store) and keeps **every rule data-driven**: tiers, thresholds and the gate list per lane are settings. A v10.2 is then a settings change, not a rebuild. Gate logic DOM can't express as settings will be called out in the release note. |
+| P-3 | **CAP-21 scope** | Re-fetching every check as of a past date for about 500 names is the most expensive part of CR-002. It also duplicates Gavriel's research scripts, which already compute these features. DOM proposes **CAP-21a (P1): a replay over recorded features.** Gavriel uploads a labelled feature table (domain, label, slice, fit/dev/test, `registered_share`, `prior_history`, `pre_cls`, `alt_tld_before_n`, `n_words`, `sld_chars`, geo flags, `as_of`), and DOM applies the **same tier/DEMAND-2 code path** as live screening. That reproduces the 188/186, round-1, rounds 4–8 and expired-lane numbers, and gives the per-slice, per-band and per-lane reports, the name registry (refuses fit/dev names in test runs) and the `buy_hold` decision report. **CAP-21b (P2):** DOM recomputes features as of a date with its own fetchers. |
+| P-4 | **BUY-HOLD enforcement** | `buy_hold` is a setting. While it's true, `POST /buy` refuses non-dry-run purchases of names screened under v10 with 409 `BUY_HOLD`, and screening returns WOULD-BUY cards. Clearing it needs a settings activation with Dvir's `approval_ref` (CR-001 P-8): the holdout report must show all three suites passing, **and** a human approval must be recorded. DOM enforces both conditions and never clears it itself. |
+| P-5 | **"Tranche" doesn't exist in DOM yet** | CAP-04's quota (≥10 of 15 main-lane, ≤3 geo) needs a definition. DOM proposes: a **tranche** is a named group of screened names that Gavriel opens and closes through the API. The quotas are checked when the tranche is closed, and on every addition for the geo cap. A buy outside an open tranche → 409 `NO_TRANCHE`. Please confirm, or define it differently. |
+| P-6 | **Harmful-history classification (§3 Q3)** | No free official source classifies **archived** content. SURBL and Web Risk report current status only. DOM classifies the decisive captures with **deterministic, versioned signature lists** (adult, pharma/gambling spam, casino, malware/phishing kit markers, hacked-site spam patterns; no LLM): a strong match → FAIL, a weak or partial match → FLAG with the excerpt and capture URL for bot judgment, no match → PASS with `pre_cls`. Gavriel maintains the signature lists through the API (versioned and audited, like the brand lists). |
+
+### 5.2 Answers to §3
+1. **Sibling creation dates at scale.** RDAP gives the **current** registration's creation date for every registered `.com` sibling. That is exact for siblings still registered whose creation predates `as_of`. **Siblings that were registered at `as_of` but have since dropped can't be seen** without a paid zone-history source (excluded: free data only), so the as-of share is a **lower bound** for older dates. DOM marks `as_of_exact = false` when `as_of` is more than *Setting* `census.as_of_exact_max_days` (default 365) in the past, and reports the measured share of exact siblings per run.
+2. **RDAP coverage per extension.** DOM uses the IANA RDAP bootstrap registry. An extension with no RDAP service, or one that fails or rate-limits, is `UNKNOWN` (never "not registered"). DOM measures coverage on the CR-002 extension list in the first build and publishes the per-extension figures (answered / unknown / no service) in the release note. **Expected:** `.com`, `.net`, `.org`, `.info`, `.biz` and `.us` are reliable; `.co`, `.io` and `.ai` are uncertain until measured.
+3. **Harmful-history classifier.** See P-6. The classification is DOM's, with FLAG + evidence for anything that isn't a clear match.
+
+### 5.3 Fixture checks (DOM recomputed from the CR text)
+- **CAP-18:** tier A, $1,488, `p_passive` 0.02, n = 0, ARA $11.08 → Ratio 2.28 at list and 1.48 at the $967 floor, EV +$27.9. Matches CR-002.
+
+### 5.4 Delivery
+CR-001 P1a and CR-002 P1 ship together as **contract v1.1.0**:
+- CAP-00 (with the v10 defaults), 01 (FORM-2, G-FORM-1, multi-word cities), 02, 03 (plus the source lane), 04 (plus the tranche quotas, P-5), 05;
+- 07 (HIST-2, P-6), 10 (`registered_share` gate input), 12 (`alt_tld_before_n`);
+- 24, 17, 18 (pricing v3, `p_passive` from tier), 20 (the v10 order, a settings-driven gate list);
+- **21a** (P-3) and the BUY-HOLD enforcement (P-4);
+- CAP-06/08 as `MANUAL_REQUIRED` (CR-001 §11).
+
+CAP-14/15/16 (outreach only) and CAP-19 (plus `/buy` pack enforcement) follow in v1.2.0.
