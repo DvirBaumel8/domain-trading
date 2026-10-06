@@ -166,7 +166,7 @@ Columns and tables: `00-architecture.md` §4. The PR vectors were generated with
 - A delisted domain counts toward the domain cap until sold or dropped.
 
 ### 10.13 `pricing_settings` v3 (selection v9.1; Dvir approved 6 Oct 2026; **not built**: CR-001 P1a)
-New plans only; v2 plans keep their numbers. The admin command creates v3 with Dvir's v9.1 approval. **[v9.1]** = stated by v9.1; **[proposed]** = needs Dvir's OK at the build gate.
+New plans only; v2 plans keep their numbers. The admin command creates v3 with Dvir's v9.1 approval. **[v9.1]** = stated by v9.1; **[Dvir, 6 Oct 2026]** = needs Dvir's OK at the build gate.
 | Field | v3 | Meaning |
 |---|---|---|
 | `allowed_bins_cents` | `[29900,39900,49900,78800,108800,148800,198800,248800]` | **[v9.1]** Every listed or scheduled BIN is on the list (forbids $800–$999, $1,950–$1,999 and non-geo x95/x99) |
@@ -174,12 +174,12 @@ New plans only; v2 plans keep their numbers. The admin command creates v3 with D
 | `lander_exception_bins_cents` | `[198800,248800]` | **[v9.1]** Need LANDER-1 evidence (≥ 30 A/B leads and retailstats end count ≥ 20) in the screening pack |
 | `floor_bps` / `floor_min_cents` / `floor_rounding` | 6500 / 75000 / `dollar` | **[v9.1]** Floor to the whole dollar ($1,488 → $967) |
 | `walkaway_bps` / `walkaway_min_cents`, `hybrid_min_offer_cents` | 4800 / 50000, 10000 | Unchanged (`round5`) |
-| `drop_mode` / `drops` | `ladder` / `[{"after_months":6,"steps":1},{"after_months":18,"steps":1}]` | **[v9.1]** ladder; months **[proposed]** |
+| `drop_mode` / `drops` | `ladder` / `[{"after_months":6,"steps":1},{"after_months":18,"steps":1}]` | **[v9.1]** ladder; months **[Dvir, 6 Oct 2026]** |
 | `geo_drops` | `[{"after_months":12,"steps":1}]` | **[v9.1; confirmed 6 Oct 01:01]** 499 → 399 → 299, one rung at M12 (a $399 name drops to $299) |
-| `final_push_mode` | `bin_to_lowest_listed_ge_floor` | **[proposed]** lowest list value ≥ floor and ≤ BIN; geo none |
+| `final_push_mode` | `bin_to_lowest_listed_ge_floor` | **[Dvir, 6 Oct 2026]** lowest list value ≥ floor and ≤ BIN; geo none |
 | `comps_min` / `comps_max` | 0 / 3 | **[v9.1]** comps optional |
 | `geo_bin_min_cents` / `geo_bin_max_cents` | 29900 / 49900 | Manual geo change must be on the list |
 - `round_dollar(c) = ((c + 50) div 100) × 100`; floor = `min(BIN, max(round_dollar(pct(BIN, 6500)), 75000))`; walk-away as v2.
-- Ladder step = next lower list value in the lane (non-geo ≥ $788; geo ≤ $499); at the bottom → `skipped_at_minimum`. After each step floor and walk-away are **recomputed** from the new BIN **[v9.1]**; an exception does not carry through **[proposed]**.
+- Ladder step = next lower list value in the lane (non-geo ≥ $788; geo ≤ $499); at the bottom → `skipped_at_minimum`. After each step floor and walk-away are **recomputed** from the new BIN **[v9.1]**; an exception does not carry through **[Dvir, 6 Oct 2026]**.
 - Hybrid V5 under v3: BIN on the list and ≥ $788 else `BIN_NOT_IN_PRICE_LIST` (replaces `BIN_NOT_NICE`/`BIN_BELOW_FLOOR_MIN`, which stay for v2 plans); $1,988/$2,488 without LANDER-1 → `LANDER_EXCEPTION_REQUIRED`. An exception never waives the list. Code names proposed.
 - Vectors (PR3-*): 2488 → 1617/1195, M6 1988/1292/955, M18 1488/967/715, final 1088/967/715 · 1988 → 1292/955, M6 1488/967/715, M18 1088/750/520, final 788/750/520 · **1488 → 967/715, M6 1088/750/520, M18 788/750/500, final `skipped_no_change`** · 1088 → 750/520, M6 788/750/500, M18 `skipped_at_minimum` · 788 → 750/500, M6 and M18 `skipped_at_minimum` · geo 499/399: M12 → 399/299; no other rows but delist.
