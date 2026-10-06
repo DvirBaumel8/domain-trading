@@ -11,6 +11,7 @@
 | **Builds on** | CR-001 (selection checks as a service). Everything in CR-001 stays unless changed here: status enum (§3.1), per-result fields (§3.2), batches/caching (§3.3), audit (§3.4) |
 | **Based on** | Sold-names backtest `research/backtest-sold/` (226 sold T1 + 54 geo reference vs 284 dropped controls; `results.md`, `v10-delta.md`) and holdout retest `research/backtest-sold/holdout/` |
 | **Releases hold** | Releases the hold on CAP-07 and CAP-10 placed in `CR-001-HOLD-01.md`. All thresholds in this CR are settings (CAP-00), not hard-coded |
+| **Amendments** | Amendment A (v10.2: CAP-07 guard, as-of history, replay gates, CAP-25 forward test) — approved by Dvir 2026-10-06 09:17 IDT, sent to DOM; see end of file |
 | **Priority key** | **P1** = needed before any v10 buy or practice run. **P2** = later |
 
 ## Findings → rules → capabilities
@@ -246,3 +247,42 @@ Requester note (2026-10-06 05:15 IDT): features.csv and census/ added to CR-002-
 - **`NO_TRANCHE` on `/buy`** ships in **v2.0.0**, together with the P1b screening-pack enforcement. Both break today's `/buy`, so they share one major version and migration note. v1.1.0 stays additive: tranche quotas are checked on add and at close, and `BUY_HOLD` applies to names screened under a `buy_hold` settings version.
 - **"$1,500 total spend including renewals committed":** today the POC cap counts spend plus open purchases. Committed renewals are reported separately (`/report` `committed_forward`) and are **not** counted against the cap. Counting them changes a founder-rule cap, which needs a CR amendment with Dvir's approval. Until then the cap is unchanged.
 - **E3 (FYI):** CAP-07 will also output `archive_years_before_drop` as a feature, so E3 can become a settings change once it's adopted.
+
+---
+
+## Amendment A — Approved by Dvir 2026-10-06 09:17 IDT, sent to DOM
+
+**Status:** Approved by Dvir 2026-10-06 09:17 IDT, sent to DOM. Source: `system/selection-v10.md` v10.2 (C36–C42, §6a), after Shomer's red-team `research/backtest-sold/iterations/shomer-attack-r12.md`. Only spec changes that affect DOM are listed. The decision rule (v10), BUY-HOLD and rule 5 are unchanged. All thresholds are settings (CAP-00). No delivery dates or time estimates are requested here.
+
+### A1. CAP-07 (changed) HIST-2 + prior-business guard — P1
+- **Inputs:** domain, `as_of` (see A2), archive captures, blocklist results (SURBL, Web Risk).
+- **Outputs:** `hist2` (PASS/FAIL/UNKNOWN), `hist2_fail_class`, `prior_business_use` (yes/no/UNKNOWN), `prior_business_name`, `prior_business_years`, `evidence_urls[]`.
+- **Business rules:** FAIL classes are exactly: SURBL/Web Risk listing, malware/phishing, spam (incl. pharma/gambling spam, hacked-site spam, PBN/link-farm content), adult, scam, trademark abuse. HIST-1 is retired; a same-name business still operating elsewhere is not a CAP-07 FAIL (CAP-08/09 handle it). When `prior_business_use` = yes, CAP-02 (BRAND-1, BIGCO-1) and CAP-08 (TM-1) also run on `prior_business_name`; a hit = FAIL under that gate; otherwise the card shows `prior_business_use` as a disclosed risk, not a reject. Parked/for-sale history = PASS.
+- **Errors:** archive or blocklist lookup failure → `hist2` UNKNOWN with `error_code` (`ARCHIVE_UNAVAILABLE`, `BLOCKLIST_UNAVAILABLE`); never PASS by default.
+- **Acceptance tests:** (1) prior real business, no hits on prior name → `hist2` PASS, `prior_business_use` yes on the card; (2) same with a live TM on the prior name → FAIL under TM-1, not HIST-2; (3) PBN/link-farm captures → FAIL (spam); (4) parked/for-sale → PASS.
+
+### A2. CAP-07 / CAP-10 / CAP-12 / CAP-21 (changed) history as of the as-of date — P1
+- **Inputs:** domain, `as_of` (date), mode (live/backtest/holdout).
+- **Outputs:** existing fields (captures, `pre_caps`, span, `pre_cls`, `alt_tld_before_n`, sibling counts) computed as of `as_of`; `as_of` echoed on every result.
+- **Business rules:** only data dated strictly before `as_of` is used. Backtest/holdout: `as_of` = drop date for dropped rows, catch/creation date for sold rows. Live: `as_of` = decision date.
+- **Errors:** missing `as_of` in backtest/holdout → request rejected (`AS_OF_REQUIRED`); data with undeterminable date → excluded and counted in `undated_excluded_n`.
+- **Acceptance tests:** (1) a capture dated after `as_of` is not counted; (2) a leakage lint over a replay reports 0 rows using data dated ≥ `as_of`.
+
+### A3. CAP-21 (changed) hard rejects in every replay + profit reports — P1
+- **Inputs:** replay set (backtest, holdout or forward), settings (`bin_price` default $1,488).
+- **Outputs:** per row: gate columns for CAP-02 (BRAND-1, BIGCO-1), CAP-08/09 (TM-1, TN-1), CAP-07 (HIST-2 + guard); accept/reject before and after these gates. Profit report: as computed, without the top 3 sales, prices capped at the BIN, and the break-even base sale rate (E3 reference range 0.74–1.75%/yr).
+- **Business rules:** gates apply per row in every replay mode.
+- **Errors:** a replay without the gate columns → refused (`REPLAY_INVALID_NO_GATES`); a profit report missing the top-3-removed or BIN-capped column → refused (`PROFIT_REPORT_INCOMPLETE`).
+- **Acceptance tests:** (1) replay without gate columns is refused; (2) profit report missing either column is refused; (3) complete report shows all four profit figures.
+
+### A4. CAP-25 (new, future) forward test — P2
+- **Inputs:** weekly sample of .com names in `pendingDelete` from official/public sources only (CZDS zone-file differences, RDAP status checks).
+- **Outputs:** rows matching `research/forward-test/log.csv` (selection-v10.md §6a): v10 and frozen E3 arm scored as of the drop date with A1–A3 applied, drop outcome, 30/60/90-day recheck (re-registered via RDAP; listed via public marketplace pages). Report: re-registered-or-listed rate, accepted vs rejected, Wilson CIs, n per class.
+- **Business rules:** capability only; it does not measure sales. Until CAP-25 exists, Gavriel's research runs do this. No requests to ExpiredDomains or the NameBio download URL.
+- **Errors:** RDAP failure → row UNKNOWN/undecided, never accepted or rejected.
+- **Acceptance tests:** (1) replaying a recorded week reproduces the logged decisions; (2) RDAP failure → UNKNOWN; (3) 0 requests to ExpiredDomains or the NameBio download URL.
+
+### A5. Clarification — E3
+- E3 (archive span ≥3 yrs) is frozen and **not** a gate; DOM should not build it as a rule. `archive_span_yrs` (as of `as_of`) may be output as a feature for the forward-test comparison. Acceptance: no setting or gate named E3 changes any decision.
+
+*End of Amendment A.*
