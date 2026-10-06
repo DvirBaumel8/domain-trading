@@ -69,6 +69,18 @@ describe('/buy BUY_HOLD (v1.1.0, additive)', () => {
     expect([real.statusCode, pb.realRegisterCalls]).toEqual([201, 1]);
   });
 
+  it('dry run: a pack from an older run than the domain\'s latest screening run adds PACK_NOT_FROM_LATEST_RUN', async () => {
+    const { x } = await setup();
+    const { id } = await x.runDone({ checks: ['form'], names: [{ domain: 'tampapoolsco.com', lane: 'S3' }] });
+    await db.insertInto('screening_packs').values({
+      id: 'pk_000000000001', domain: 'tampapoolsco.com', version: 1, run_id: id, item_idx: 0, status: 'complete', missing: '[]', content: '{}', content_sha256: '1'.repeat(64),
+      settings_label: 'v1', issued_at: new Date(T0), issued_by: 'test',
+    }).execute();
+    expect((await buy(x, buyBody({ dry_run: true, domain: 'tampapoolsco.com' }))).json().advisories).toEqual([]);
+    await x.runDone({ checks: ['form'], names: [{ domain: 'tampapoolsco.com', lane: 'S3' }] });
+    expect((await buy(x, buyBody({ dry_run: true, domain: 'tampapoolsco.com' }))).json().advisories).toEqual(['PACK_NOT_FROM_LATEST_RUN']);
+  });
+
   it('a name never screened: /buy behaves as before (no BUY_HOLD, no would_be_blocked, no tranche needed)', async () => {
     const { x, pb } = await setup();
     const dry = await buy(x, buyBody({ dry_run: true }));

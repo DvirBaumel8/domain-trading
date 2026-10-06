@@ -92,7 +92,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
     advisories: [string], warnings: [string] }
   ```
   Writes only the audit row and the quotes. The same key can't be reused for a real buy (different body → 409).
-  **Screening pack (1.2.0, additive).** `screening_pack` is the **latest** pack of the domain (`none` when it has none) and `advisories` is `["SCREENING_PACK_REQUIRED"]` unless that pack is `complete`. This is advisory in 1.2.0 and enforced in 2.0.0: a real `/buy` is not refused for a missing or incomplete pack, and `would_be_blocked` keeps its meaning (still only `"BUY_HOLD"`).
+  **Screening pack (1.2.0, additive).** `screening_pack` is the **latest** pack of the domain (`none` when it has none) and `advisories` holds `"SCREENING_PACK_REQUIRED"` unless that pack is `complete`, and `"PACK_NOT_FROM_LATEST_RUN"` when the pack's run is not the domain's latest screening run. This is advisory in 1.2.0 and enforced in 2.0.0: a real `/buy` is not refused for a missing or incomplete pack, and `would_be_blocked` keeps its meaning (still only `"BUY_HOLD"`).
 - **201 (bought):**
   ```
   { domain, registrar, order_id, charged (pair), renewal (pair), two_year (pair),
@@ -438,7 +438,7 @@ A screening pack is the frozen evidence for one name of one finished screening r
 
 ### `POST /screening/packs`
 WRITE. Body (strict): `{run_id, domain, judgment: {van_test: {verdict: "PASS"|"REJECT", reason}, tn1: {...}, bigco: {...}, reason_not_to_buy (1–300), judged_by (1–80), judged_at (ISO with offset)}}`. A 3-lead spot check is not accepted (leads run after the buy decision): any extra key is 422 `VALIDATION_ERROR`. **201** with the summary when a new version was written; **200** with the summary and `unchanged: true` when the content (including status and missing) equals the domain's latest version (no new row). An incomplete pack is issued too. The judgment is declared by the caller; the server cannot prove who judged.
-Errors: 404 `RUN_NOT_FOUND` · 404 `NAME_NOT_IN_RUN` · 409 `RUN_RUNNING` (`details.reason: "RUNNING"`) · 409 `NOT_SCREENED_OK` (`details.reason`: `BACKTEST` | `PARTIAL_PLAN`) · 422 `DOMAIN_INVALID` · 422 `VALIDATION_ERROR`.
+Errors: 404 `RUN_NOT_FOUND` · 404 `NAME_NOT_IN_RUN` · 409 `RUN_RUNNING` (`details.reason: "RUNNING"`) · 409 `NOT_SCREENED_OK` (`details.reason`: `BACKTEST` | `PARTIAL_PLAN`) · 422 `DOMAIN_INVALID` · 422 `JUDGED_AT_INVALID` (`judged_at` later than now plus 60 s, or earlier than the run's creation) · 422 `VALIDATION_ERROR`. The run, its rows and verdicts are read inside one transaction under the domain lock and the run-row lock, so a verdict or record committed before the call is always in the pack.
 
 ### `GET /screening/packs/{id}`
 READ. The summary plus `content` (exactly as frozen: domain, lane, run, settings version, list versions, screened_at/by, status, missing, `gates` (every check of the plan and of the required set: `{check, gate, rule_ids, status, reason_code, result_id, source, recorded_by, checked_at, data_as_of, fields, evidence_ids, verdict, decides}`), `judgment`, `money`, `quote`). 404 `PACK_NOT_FOUND`.

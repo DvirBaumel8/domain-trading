@@ -20,7 +20,7 @@ async function h(): Promise<ScreeningHarness> {
 }
 const DOMAIN = 'aiactconformity.com';
 const judgment = { van_test: { verdict: 'PASS', reason: 'Clear to a van driver' }, tn1: { verdict: 'PASS', reason: 'No operator trades under it' },
-  bigco: { verdict: 'PASS', reason: 'No big-company overlap' }, reason_not_to_buy: 'Thin end-user demand', judged_by: 'Gavriel', judged_at: '2026-10-06T08:00:00+03:00' };
+  bigco: { verdict: 'PASS', reason: 'No big-company overlap' }, reason_not_to_buy: 'Thin end-user demand', judged_by: 'Gavriel', judged_at: new Date(Date.parse('2026-10-06T08:00:00Z') - 1000).toISOString() };
 
 /** A finished S3 run, every check PASS (a tm_us FLAG when `flag`), fresh availability and quote at `at`. */
 async function seedRun(at: number, o: { flag?: boolean; backtest?: boolean; status?: 'done' | 'running'; checks?: string[]; plan?: string[] } = {}): Promise<string> {
@@ -28,7 +28,7 @@ async function seedRun(at: number, o: { flag?: boolean; backtest?: boolean; stat
   const plan = o.plan ?? planFor(sel.values as never, 'S3');
   const id = `run_${randomUUID()}`;
   await db.insertInto('screening_runs').values({
-    id, created_by: 'test', mode: 'live', backtest: o.backtest ?? false, settings_id: sel.id, settings_label: 'v1', buy_hold: true, tranche_id: null,
+    id, created_at: new Date(at - 3_600_000), created_by: 'test', mode: 'live', backtest: o.backtest ?? false, settings_id: sel.id, settings_label: 'v1', buy_hold: true, tranche_id: null,
     input: JSON.stringify({ ...(o.checks ? { checks: o.checks } : {}), names: [{ idx: 0, domain: DOMAIN, lane: 'S3', leads_ab: 0 }] }), gate_plan: JSON.stringify({ S3: plan }),
     list_versions: '{}', status: o.status ?? 'done', deadline_at: new Date(at + 3_600_000), finished_at: o.status === 'running' ? null : new Date(at),
   }).execute();
@@ -118,6 +118,46 @@ describe('POST /screening/packs', () => {
     }).execute();
     const r = await x.post('/screening/packs', { run_id: id, domain: DOMAIN, judgment });
     expect(r.json()).toMatchObject({ status: 'incomplete', missing: [{ item: 'price', code: 'NO_RESULT' }] });
+  });
+});
+
+describe('pack context and concurrency', () => {
+  it('judged_at in the future or before the run is 422 JUDGED_AT_INVALID', async () => {
+    const x = await h();
+    const id = await seedRun(x.clock.t);
+    const bad = (judged_at: string) => x.post('/screening/packs', { run_id: id, domain: DOMAIN, judgment: { ...judgment, judged_at } });
+    const a = await bad(new Date(x.clock.t + 3_600_000).toISOString());
+    expect([a.statusCode, a.json().error.code]).toEqual([422, 'JUDGED_AT_INVALID']);
+    const b = await bad(new Date(x.clock.t - 7_200_000).toISOString());
+    expect([b.statusCode, b.json().error.code]).toEqual([422, 'JUDGED_AT_INVALID']);
+    expect(await db.selectFrom('screening_packs').select('id').execute()).toEqual([]);
+  });
+
+  it('a run of a settings version that is not the active one: SETTINGS_NOT_ACTIVE, never complete; the context is frozen', async () => {
+    const x = await h();
+    const id = await seedRun(x.clock.t);
+    const ok = (await x.post('/screening/packs', { run_id: id, domain: DOMAIN, judgment })).json();
+    expect(ok.status).toBe('complete');
+    expect((await x.get(`/screening/packs/${ok.pack_id}`)).json().content).toMatchObject({ settings_label: 'v1', settings_active: true, buy_hold_effective: true });
+    await x.post('/selection/settings', { label: 'v1x', set: { 'tranche.size': 12 } });
+    const act = await x.post('/selection/settings/v1x/activate', { approval_ref: { text: 'activate v1x', approved_at: new Date(x.clock.t - 60_000).toISOString() } });
+    expect(act.statusCode).toBe(200);
+    const r = (await x.post('/screening/packs', { run_id: id, domain: DOMAIN, judgment })).json();
+    expect(r).toMatchObject({ version: 2, status: 'incomplete', missing: [{ item: 'settings', code: 'SETTINGS_NOT_ACTIVE' }] });
+    expect((await x.get(`/screening/packs/${r.pack_id}`)).json().content).toMatchObject({ settings_active: false });
+  });
+
+  it('issues interleaved with a REJECT verdict: the latest pack reflects the verdict and versions stay unique', async () => {
+    const x = await h();
+    const id = await seedRun(x.clock.t, { flag: true });
+    const flagId = await rid(id, 'tm_us');
+    const body = { run_id: id, domain: DOMAIN, judgment };
+    await x.post('/screening/packs', body);
+    const [, , ] = await Promise.all([x.post('/screening/packs', body), verdict(x, id, flagId, 'REJECT'), x.post('/screening/packs', body)]);
+    await x.post('/screening/packs', body);
+    const l = (await x.get(`/screening/packs?domain=${DOMAIN}`)).json().packs;
+    expect(new Set(l.map((p: { version: number }) => p.version)).size).toBe(l.length);
+    expect(l[0]).toMatchObject({ status: 'incomplete', missing: [{ item: 'tm_us', code: 'FLAG_REJECTED' }] });
   });
 });
 

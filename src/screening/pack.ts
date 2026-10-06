@@ -10,7 +10,7 @@ import { canonicalJson } from '../http/canonical-json.js';
 import { quoteIsStale } from './checks/quote.js';
 import { latestByCheck } from './derive.js';
 import { assemble, effectiveHold, fullPlanRunOrThrow, toResultRow } from './engine.js';
-import { selectionSettingsByLabel, type SelectionValuesT } from './settings.js';
+import { activeSelectionSettings, selectionSettingsByLabel, type SelectionValuesT } from './settings.js';
 import type { CheckId, Lane, ResultRow, RunItem } from './types.js';
 import { verdictsFor, type VerdictRow } from './verdicts.js';
 
@@ -44,7 +44,7 @@ export function requiredChecks(lane: Lane, plan: CheckId[], s: SelectionValuesT)
 }
 
 export function assessPack(i: {
-  lane: Lane; plan: CheckId[]; latest: Map<CheckId, ResultRow>; verdicts: Map<number, VerdictRow>; judgment: JudgmentT; sel: SelectionValuesT; now: number;
+  lane: Lane; plan: CheckId[]; latest: Map<CheckId, ResultRow>; verdicts: Map<number, VerdictRow>; judgment: JudgmentT; sel: SelectionValuesT; now: number; settingsActive?: boolean;
 }): { status: 'complete' | 'incomplete'; missing: Missing[]; gates: PackGate[] } {
   const required = requiredChecks(i.lane, i.plan, i.sel);
   const missing: Missing[] = [];
@@ -63,6 +63,7 @@ export function assessPack(i: {
       missing.push({ item: c, code: r.status, detail: `${c} is ${r.status}${r.reason_code ? ` (${r.reason_code})` : ''}` });
     }
   }
+  if (i.settingsActive === false) missing.push({ item: 'settings', code: 'SETTINGS_NOT_ACTIVE', detail: 'the run was screened under a settings version that is no longer the active one' });
   const av = i.latest.get('availability');
   if (av) {
     const at = Date.parse(typeof av.fields.checked_at === 'string' ? av.fields.checked_at : av.checked_at.toISOString());
@@ -98,27 +99,35 @@ const pick = (f: Record<string, unknown> | undefined, keys: string[]): Record<st
   f ? Object.fromEntries(keys.map((k) => [k, f[k] ?? null])) : null;
 
 export async function issuePack(db: Kysely<Database>, i: { runId: string; domain: string; judgment: JudgmentT; by: string; auditId: string | null; now: Date }): Promise<{ row: PackRow; created: boolean }> {
-  const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', i.runId).executeTakeFirst();
-  if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${i.runId}"`);
-  if (run.status === 'running') throw new AppError(409, 'RUN_RUNNING', 'The run is still running; a pack is built from a finished run only', { run_id: run.id, reason: 'RUNNING' });
-  const sel = (await selectionSettingsByLabel(db, run.settings_label))!;
-  fullPlanRunOrThrow(run, sel);
-  const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
-  const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel.values, await effectiveHold(db, run), true, run.mode === 'live');
-  const it = a.items.find((x) => x.item.domain === i.domain && !x.item.input_error);
-  if (!it) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${i.domain}" is not a screened name of run ${run.id}`);
-  const latest = latestByCheck(it.rows);
-  const verdicts = await verdictsFor(db, run.id);
-  const res = assessPack({ lane: it.item.lane, plan: it.plan, latest, verdicts, judgment: i.judgment, sel: sel.values, now: i.now.getTime() });
-  const content = {
-    domain: i.domain, lane: it.item.lane, run_id: run.id, settings_version: run.settings_label, list_versions: run.list_versions,
-    screened_at: run.created_at.toISOString(), screened_by: run.created_by, status: res.status, missing: res.missing, gates: res.gates, judgment: i.judgment,
-    money: pick(latest.get('price')?.fields, ['ev_cents', 'ratio_at_bin', 'ratio_at_floor', 'bin_in_allowed_set', 'floor_cents', 'bin_cents']),
-    quote: pick(latest.get('quote')?.fields, ['registrar', 'first_year_cents', 'renewal_cents', 'registrar_ft_capable', 'quoted_at', 'quote_source']),
-  };
-  const sha = createHash('sha256').update(canonicalJson(content)).digest('hex');
+  // Everything is read inside one transaction, after the per-domain lock and the run-row lock (a manual record and a verdict take the run-row
+  // lock too), so the pack always reflects the rows and verdicts committed before it and a later one cannot slip in half-way.
   return db.transaction().execute(async (trx) => {
     await sql`SELECT pg_advisory_xact_lock(hashtext(${'pack:' + i.domain}))`.execute(trx);
+    const run = await trx.selectFrom('screening_runs').selectAll().where('id', '=', i.runId).forUpdate().executeTakeFirst();
+    if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${i.runId}"`);
+    if (run.status === 'running') throw new AppError(409, 'RUN_RUNNING', 'The run is still running; a pack is built from a finished run only', { run_id: run.id, reason: 'RUNNING' });
+    const sel = (await selectionSettingsByLabel(trx, run.settings_label))!;
+    fullPlanRunOrThrow(run, sel);
+    const judgedAt = Date.parse(i.judgment.judged_at);
+    if (judgedAt > i.now.getTime() + 60_000) throw new AppError(422, 'JUDGED_AT_INVALID', 'judged_at is in the future');
+    if (judgedAt < run.created_at.getTime()) throw new AppError(422, 'JUDGED_AT_INVALID', 'judged_at is earlier than the run it judges', { run_created_at: run.created_at.toISOString() });
+    const rows = (await trx.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
+    const hold = await effectiveHold(trx, run);
+    const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel.values, hold, true, run.mode === 'live');
+    const it = a.items.find((x) => x.item.domain === i.domain && !x.item.input_error);
+    if (!it) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${i.domain}" is not a screened name of run ${run.id}`);
+    const latest = latestByCheck(it.rows);
+    const verdicts = await verdictsFor(trx, run.id);
+    const settingsActive = (await activeSelectionSettings(trx)).label === run.settings_label;
+    const res = assessPack({ lane: it.item.lane, plan: it.plan, latest, verdicts, judgment: i.judgment, sel: sel.values, now: i.now.getTime(), settingsActive });
+    const content = {
+      domain: i.domain, lane: it.item.lane, run_id: run.id, settings_version: run.settings_label, settings_label: run.settings_label, settings_active: settingsActive,
+      buy_hold_effective: hold, list_versions: run.list_versions,
+      screened_at: run.created_at.toISOString(), screened_by: run.created_by, status: res.status, missing: res.missing, gates: res.gates, judgment: i.judgment,
+      money: pick(latest.get('price')?.fields, ['ev_cents', 'ratio_at_bin', 'ratio_at_floor', 'bin_in_allowed_set', 'floor_cents', 'bin_cents']),
+      quote: pick(latest.get('quote')?.fields, ['registrar', 'first_year_cents', 'renewal_cents', 'registrar_ft_capable', 'quoted_at', 'quote_source']),
+    };
+    const sha = createHash('sha256').update(canonicalJson(content)).digest('hex');
     const last = await trx.selectFrom('screening_packs').selectAll().where('domain', '=', i.domain).orderBy('version', 'desc').limit(1).executeTakeFirst();
     if (last && last.content_sha256 === sha) return { row: last, created: false };
     const row = await trx.insertInto('screening_packs').values({
