@@ -136,6 +136,6 @@ describe('daily-only schedule: the daily job runs the former tick steps first', 
     expect(Object.keys(daily.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'backupExport']);
     expect(daily.json().steps.reconciler.ok).toBe(true);
     const tick = await run('tick');
-    expect(Object.keys(tick.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume']);
+    expect(Object.keys(tick.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'reviewRetry']);
   });
 });

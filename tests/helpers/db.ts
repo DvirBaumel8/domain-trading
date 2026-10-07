@@ -6,7 +6,7 @@ import { TEST_DATABASE_URL } from './env.js';
 export const testDb: Kysely<Database> = createDb(TEST_DATABASE_URL);
 
 const TABLES = [
-  'review_item_statuses', 'review_items', 'review_feedback', 'review_packets', 'forbidden_terms', 'company_documents',
+  'review_retries', 'review_settings_changes', 'review_item_statuses', 'review_items', 'review_feedback', 'review_packets', 'forbidden_terms', 'company_documents',
   'cohort_outcomes', 'cohort_decisions', 'cohort_names', 'cohorts', 'drop_list_checks', 'drop_list_rows', 'drop_lists', 'job_runs', 'portfolio_checks', 'api_usage', 'replay_runs', 'test_set_rows', 'test_sets', 'holdout_suites', 'labelled_names', 'registrar_presence', 'rdap_lookups', 'reference_files', 'manual_quotes', 'tranche_members', 'tranches', 'screening_packs', 'screening_verdicts', 'screening_results', 'screening_runs', 'screening_evidence', 'sibling_method_approvals', 'selection_lists', 'selection_settings',
   'sales', 'offers', 'price_schedule', 'pricing_evidence', 'pricing_settings', 'export_uploads', 'export_runs', 'idempotency_keys', 'audit_log', 'receipts', 'purchases', 'quotes', 'listing_history',
   'ledger_entries', 'domains', 'deals', 'api_tokens',

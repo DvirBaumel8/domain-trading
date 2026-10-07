@@ -39,7 +39,7 @@ import { registerDropLists } from './api/drop-lists.js';
 import { registerCohorts } from './api/cohorts.js';
 import { registerCompany } from './api/company.js';
 import { registerReviews } from './api/reviews.js';
-import { runReview } from './services/review/run.js';
+import { retryReview, runReview } from './services/review/run.js';
 import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
 import { BuyService } from './services/buy.js';
@@ -178,7 +178,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
-  const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey, model: deps.config.geminiModel };
+  const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey };
   registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });
   registerPacks(app, { db: deps.db, now: deps.now ?? Date.now });
   registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
@@ -198,6 +198,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     outsideReview: async () => {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: (deps.now ?? Date.now)() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;
+    },
+    reviewRetry: async () => {
+      const r = await retryReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { now: (deps.now ?? Date.now)() });
+      return 'skipped' in r ? { skipped: true, reason: r.skipped } : r;
     },
     secretValues: deps.config.secretValues,
   }));

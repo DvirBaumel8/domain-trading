@@ -1,4 +1,4 @@
-# Endpoints (contract v2.11.1)
+# Endpoints (contract v2.11.2)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -32,8 +32,8 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/jobs/preview` | WRITE | Jobs (`jobs.md`) |
 | POST | `/company/document`, `/company/forbidden-terms` | WRITE | Company and reviews |
 | GET | `/company/document/versions`, `/company/document/versions/{n}`, `/company/forbidden-terms` | READ | Company and reviews |
-| POST | `/reviews/packet`, `/reviews/run`, `/reviews/{packet_id}/feedback`, `/reviews/items/{id}/status` | WRITE | Company and reviews |
-| GET | `/reviews/packets/{id}`, `/reviews/items`, `/reviews/cost` | READ | Company and reviews |
+| POST | `/reviews/packet`, `/reviews/run`, `/reviews/settings`, `/reviews/{packet_id}/feedback`, `/reviews/items/{id}/status` | WRITE | Company and reviews |
+| GET | `/reviews/packets/{id}`, `/reviews/items`, `/reviews/cost`, `/reviews/settings` | READ | Company and reviews |
 
 ---
 
@@ -46,7 +46,7 @@ The only public route. No auth, no DB access (Render's health check uses it).
 ### `GET /health`
 Any valid bot token (READ or WRITE).
 - **200** `{status: "ok", db: "ok", jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
-- `review` (2.11.0, additive): `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
+- `review` (2.11.0, additive; `disabled` and `review_model` 2.11.2): `disabled` (the switch is off), `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
 - `jobs` (2.1.0, additive) is `overdue` when no `daily` run has finished in the last 26 hours (the same rule as the `/report` warning `JOB_OVERDUE`), else `ok`. A run started by hand counts. `GET /health/ping` is unchanged (no DB).
 - `version` is the service build version (`package.json`), not the contract version. The only scheduled job is the daily run at 00:05 UTC (`jobs.md`); its rows are in `GET /audit` (scope `job`). No secret, key prefix or balance is ever shown.
 
@@ -586,7 +586,7 @@ The arrays are the `applied`, `superseded`, `held`, `delisted`, `cancelled`, `fa
 ---
 
 ## Company and reviews
-2.10.0, CR-011 part B. The daily outside review. **Since 2.11.0 DOM calls the reviewer itself** (founder rule 9 as changed by Dvir, 7 Oct 2026): Google Gemini (`gemini-2.5-flash`, or the env `GEMINI_MODEL`), key `GEMINI_API_KEY` in the server environment only. The daily step `outsideReview` (`jobs.md`) builds the packet, calls the reviewer under a fixed instruction asking for at most 10 JSON items (category strategy / pricing / risk / operations / data / cost / other, severity, text), and stores the answer as feedback (provider `gemini`, the model, and the cost computed from Google's token counts at $0.30 per million input and $2.50 per million output tokens). A bad key, a refusal, a timeout or an answer that is not the JSON asked for is stored as `unknown` feedback with Google's status and reason (never the key). Item texts that fail the block list are dropped and counted. `POST /reviews/{packet_id}/feedback` stays for a second opinion by hand. Request texts on these routes (`text`, `term`, `note`, `reason`) are stored in the audit row only as `[TEXT n chars]`.
+2.10.0, CR-011 part B. The daily outside review. **Since 2.11.0 DOM calls the reviewer itself** (founder rule 9 as changed by Dvir, 7 Oct 2026): Google Gemini, the model of `review.model` (2.11.2; default `gemini-3.8-flash` on the free tier; the env `GEMINI_MODEL` is gone), key `GEMINI_API_KEY` in the server environment only (from a Google project **without** billing while `review.tier` is `free`). The daily step `outsideReview` (`jobs.md`) builds the packet, calls the reviewer under a fixed instruction asking for at most 10 JSON items (category strategy / pricing / risk / operations / data / cost / other, severity, text), and stores the answer as feedback (provider `gemini`, the model, and the cost: 0 on the `free` tier, else Google's token counts at the model's list price in `allowed_models`). A bad key, a refusal, a timeout or an answer that is not the JSON asked for is stored as `unknown` feedback with Google's status and reason (never the key). Item texts that fail the block list are dropped and counted. `POST /reviews/{packet_id}/feedback` stays for a second opinion by hand. Request texts on these routes (`text`, `term`, `note`, `reason`) are stored in the audit row only as `[TEXT n chars]`.
 
 **Block list.** Every text these routes take, and every packet, is checked first. A match is 422 `TEXT_BLOCKED` with `details.category` only (`secret`: a value DOM keeps as a secret, a DOM token shape or a common key shape; `email`; `phone`: 9 or more digits, dates and money excepted; `listed_term`: a forbidden term), **never the matched text**.
 
@@ -609,7 +609,13 @@ READ. `{terms: [{id, category, created_at}]}` (no term text).
 WRITE. `preview?` (query or body, boolean). Builds what the reviewer gets: `{kind: "daily" | "weekly", generated_at, document: {version, sha256, text (in full on a weekly packet or the first one, else null), diff_since: {from_version, diff} | null}, dom_changes: {since, service_version, settings_versions[], listing_changes[], offers[], sales[], failed_job_steps[]} (each list at most the newest 200), numbers (the /report object without any walk-away field)}`. `kind` is `weekly` when no weekly packet exists from the last 7 days. The packet must pass the block list. `preview` → **200** `{preview: true, kind, content, sha256}`, nothing stored; otherwise **201** `{packet_id, kind, document_version, sha256, content}` and the packet is stored exactly as sent. **Errors:** 409 `DOCUMENT_MISSING` · 409 `REVIEW_COST_CAP` (`details.spent_usd`, `cap_usd`; a preview too) · 422 `TEXT_BLOCKED`.
 
 ### `POST /reviews/run`
-WRITE (2.11.0). Runs a review now (for testing): the same work as the daily step, but it never skips for "already done today". At most 3 calls per hour per WRITE token (429 `RATE_LIMITED`); each counts toward the monthly cap. **200:** `{packet_id, kind, status: "ok" | "unknown", items_n, new_n, repeat_n, cost_usd, dropped_n, reason?}`. **Errors:** 503 `REVIEWER_NOT_CONFIGURED` (no key) · 409 `REVIEW_COST_CAP` · 409 `DOCUMENT_MISSING` · 422 `TEXT_BLOCKED` (`details.category`).
+WRITE (2.11.0). Runs a review now (for testing): the same work as the daily step, but it never skips for "already done today". At most 3 calls per hour per WRITE token (429 `RATE_LIMITED`); each counts toward the monthly cap. **200:** `{packet_id, kind, status: "ok" | "unknown", items_n, new_n, repeat_n, cost_usd, dropped_n, reason?}`. **Errors:** 503 `REVIEWER_NOT_CONFIGURED` (no key) · 409 `REVIEW_DISABLED` (2.11.2, the switch is off) · 409 `REVIEW_COST_CAP` · 409 `DOCUMENT_MISSING` · 422 `TEXT_BLOCKED` (`details.category`).
+
+### `GET /reviews/settings`
+READ (2.11.2, CR-011 addendum C). `{enabled, model, tier: "free" | "paid", allowed_models: [{model, tier, input_usd_per_m, output_usd_per_m}], updated_at, updated_by}`. Defaults: `enabled: true`, `model: "gemini-3.8-flash"`, `tier: "free"`. Allowed: `gemini-3.8-flash` (free or paid; its paid prices are DOM's placeholders, $0.50 / $3.00 per million tokens), `gemini-3.1-pro-preview` (paid only, $2.00 / $12.00).
+
+### `POST /reviews/settings`
+WRITE (2.11.2). Body (strict, at least one of the first three): `{enabled?, model?, tier?, note? (1–300)}`. Every change is an append-only row with the old values (audited). `tier: "paid"` needs a `note` naming Dvir's approval (422 `VALIDATION_ERROR`). **200:** the new state plus `changed` (false, and no row, when nothing changed). **Errors:** 422 `REVIEW_MODEL_NOT_ALLOWED` (`details.allowed_models`) · 422 `REVIEW_MODEL_NEEDS_PAID` (a paid-only model on the free tier) · 422 `TEXT_BLOCKED` (note) · 400/422 `VALIDATION_ERROR`. A change takes effect from the next review; the feedback names the model used.
 
 ### `GET /reviews/packets/{id}`
 READ. The stored packet. 404 `PACKET_NOT_FOUND`.
@@ -624,7 +630,7 @@ READ. Query `view?` (`new` default: leaves out repeats of an item whose status i
 WRITE. Body (strict) `{status: acted|rejected|watching, note (1–500)}` (audited; the latest status counts). **201** `{item_id, status, note, at}`. 404 `REVIEW_ITEM_NOT_FOUND`.
 
 ### `GET /reviews/cost`
-READ. `{month (UTC, YYYY-MM), spent_usd (the reported cost_usd summed), cap_usd (5, a constant), feedback_n, unknown_n}`.
+READ. `{month (UTC, YYYY-MM), spent_usd (the reported cost_usd summed), cap_usd (5, a constant), feedback_n, unknown_n, enabled, model, tier}` (the last three 2.11.2).
 
 ## Code index
 Every code the service emits, by kind. Errors are `error.code`; warnings are strings in `warnings[]` (or `{code, level}` objects in `/report`, see `reports.md`).
@@ -645,7 +651,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
 
-**Company and review errors (2.10.0):** `REVIEWER_NOT_CONFIGURED` (2.11.0), `ALREADY_DONE_TODAY` (2.11.0; a skip reason of the daily step, mapped to 409 internally; `POST /reviews/run` never returns it), `TEXT_BLOCKED`, `DOCUMENT_VERSION_NOT_FOUND`, `DOCUMENT_MISSING`, `REVIEW_COST_CAP`, `PACKET_NOT_FOUND`, `FEEDBACK_EXISTS`, `REVIEW_ITEM_NOT_FOUND`.
+**Company and review errors (2.10.0):** `REVIEWER_NOT_CONFIGURED` (2.11.0), `ALREADY_DONE_TODAY` (2.11.0; a skip reason of the daily step, mapped to 409 internally; `POST /reviews/run` never returns it), `REVIEW_DISABLED`, `REVIEW_MODEL_NOT_ALLOWED`, `REVIEW_MODEL_NEEDS_PAID` (2.11.2), skip reasons `DISABLED` and `NOTHING_PENDING` (2.11.2, steps only), `TEXT_BLOCKED`, `DOCUMENT_VERSION_NOT_FOUND`, `DOCUMENT_MISSING`, `REVIEW_COST_CAP`, `PACKET_NOT_FOUND`, `FEEDBACK_EXISTS`, `REVIEW_ITEM_NOT_FOUND`.
 
 **Selection errors:** `SETTINGS_NOT_FOUND`, `SETTINGS_KEY_UNKNOWN`, `SETTINGS_KEY_LOCKED`, `SETTINGS_INVALID`, `SETTINGS_NO_CHANGE`, `SETTINGS_LABEL_TAKEN`, `SETTINGS_ALREADY_ACTIVE`, `SETTINGS_ALREADY_ACTIVATED`, `HOLDOUT_NOT_PASSED`, `ROWS_INVALID`, `REPLAY_EMPTY`, `HOLDOUT_CONTAMINATED`, `AS_OF_REQUIRED`, `REPLAY_INVALID_NO_GATES`, `SUITE_NOT_DEFINED`, `SUITE_UNKNOWN`, `SUITE_ALREADY_SCORED`, `SUITE_OVERLAP`, `SUITE_EMPTY`, `SUITE_MEMBERSHIP_CHANGED`, `LABELLED_NAME_CONFLICT`, `VARIANT_NOT_PREREGISTERED`, `PROFIT_REPORT_INCOMPLETE`, `REPLAY_NOT_FOUND`, `SELECTION_SETTINGS_MISSING` (500), `SELECTION_SETTINGS_INVALID` (500), `LIST_NOT_FOUND`, `LIST_NAME_INVALID`, `LIST_TERM_INVALID`, `LIST_NO_CHANGE`, `CENSUS_LIST_SIZE`, `CENSUS_LIST_INVALID`, `FORBIDDEN_FEATURE`, `BIN_REQUIRED`, `SIBLING_METHOD_NOT_FOUND`, `SIBLING_METHOD_ALREADY_APPROVED` (2.4.0), `SIBLING_METHOD_NOT_APPROVED`, `TEST_SET_NAME_TAKEN`, `TEST_SET_EMPTY`, `TEST_SET_NOT_FOUND`, `TEST_SET_NOT_READY`, `TEST_SET_ALREADY_SEALED`, `TEST_SET_NOT_SEALABLE` (2.5.0), `DROP_LIST_NAME_TAKEN`, `DROP_LIST_NOT_FOUND`, `COHORT_NAME_TAKEN`, `COHORT_EMPTY`, `COHORT_NOT_FOUND` (2.8.0). Selection warnings: `PRICING_V3_MISSING`. `APPROVAL_REQUIRED` / `APPROVAL_INVALID` / `APPROVAL_EXPIRED` also apply to an activation, a census list and a sibling method approval.
 

@@ -52,6 +52,8 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'review_feedback', file: 'tables/review_feedback.json' },
   { table: 'review_items', file: 'tables/review_items.json' },
   { table: 'review_item_statuses', file: 'tables/review_item_statuses.json' },
+  { table: 'review_settings_changes', file: 'tables/review_settings_changes.json' },
+  { table: 'review_retries', file: 'tables/review_retries.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 

@@ -101,6 +101,13 @@ describe('scheduled', () => {
     }
   };
 
+  it('runs tick only, at 07:30 UTC (10:30 IDT), with the tick idempotency key', async () => {
+    const t = Date.UTC(2026, 9, 7, 7, 30);
+    const { fetchMock } = await run('30 7 * * *', t);
+    expect(fetchMock.mock.calls.map((c) => c[1].body)).toEqual(['{"job":"tick"}']);
+    expect(fetchMock.mock.calls[0]![1].headers['Idempotency-Key']).toBe(`tick-${t}`);
+  });
+
   it('runs daily only, at 00:05 UTC', async () => {
     const t = Date.UTC(2026, 9, 7, 0, 5);
     const { fetchMock } = await run('5 0 * * *', t);

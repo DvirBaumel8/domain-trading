@@ -11,12 +11,17 @@ export interface Logger {
 
 export const TIMEOUT_MS = 90_000;
 
-// One cron trigger, once a day (CR-005 Amendment A): 00:05 UTC runs `daily` only. `daily` includes the former hourly steps
-// (reconciler, nsVerifier, screeningResume).
-export const CRON = '5 0 * * *';
+// Two cron triggers (CR-005 Amendment A, then CR-011 addendum C): 00:05 UTC runs `daily` (it includes the former hourly steps: reconciler,
+// nsVerifier, screeningResume); 07:30 UTC (10:30 IDT, after Google's daily quota reset in both seasons) runs `tick`, whose reviewRetry
+// step retries a review that got a 429 in the daily run.
+export const DAILY_CRON = '5 0 * * *';
+export const TICK_CRON = '30 7 * * *';
+export const CRON = DAILY_CRON;
+export const CRONS: Record<string, Job> = { [DAILY_CRON]: 'daily', [TICK_CRON]: 'tick' };
 
-export function jobsFor(_scheduledTime: number): Job[] {
-  return ['daily'];
+export function jobsFor(cron: string): Job[] {
+  const job = CRONS[cron];
+  return job ? [job] : [];
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
@@ -68,10 +73,11 @@ export async function triggerJob(
 
 export default {
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    if (controller.cron !== CRON) {
+    const jobs = jobsFor(controller.cron);
+    if (jobs.length === 0) {
       console.error(`jobs-trigger: unknown cron "${controller.cron}"`);
       return;
     }
-    for (const job of jobsFor(controller.scheduledTime)) await triggerJob(job, env, controller.scheduledTime, fetch, console);
+    for (const job of jobs) await triggerJob(job, env, controller.scheduledTime, fetch, console);
   },
 };

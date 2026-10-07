@@ -7,6 +7,9 @@ import type { Database } from '../db/types.js';
 import { AppError } from '../http/errors.js';
 import { checkText } from '../services/blocklist.js';
 import { runReview, skipToError, type ReviewRunDeps } from '../services/review/run.js';
+import { ALLOWED_REVIEW_MODELS } from '../services/review/gemini.js';
+import { allowedModelsView, currentReviewSettings } from '../services/review/settings.js';
+import { toJerusalemIso } from '../time.js';
 import { storeFeedback, type FeedbackInput } from '../services/review/feedback.js';
 import { buildPacket, insertPacket, latestDocument, monthSpend, newPacketId, REVIEW_MONTHLY_CAP_USD, sha256 } from '../services/review/packet.js';
 
@@ -23,6 +26,12 @@ const Feedback: z.ZodType<FeedbackInput> = z.discriminatedUnion('status', [
   z.object({ status: z.literal('ok'), provider: z.string().min(1).max(60), model: z.string().min(1).max(100), cost_usd: z.number().min(0).max(100), items: z.array(Item).max(50) }).strict(),
   z.object({ status: z.literal('unknown'), provider: z.string().min(1).max(60), model: z.string().min(1).max(100).optional(), cost_usd: z.number().min(0).max(100).optional(), reason: z.string().min(1).max(500) }).strict(),
 ]);
+const SettingsBody = z.object({
+  enabled: z.boolean().optional(),
+  model: z.string().min(1).max(100).optional(),
+  tier: z.enum(['free', 'paid']).optional(),
+  note: z.string().min(1).max(300).optional(),
+}).strict();
 const StatusBody = z.object({ status: z.enum(['acted', 'rejected', 'watching']), note: z.string().min(1).max(500) }).strict();
 const ItemsQuery = z.object({
   view: z.enum(['new', 'all']).default('new'),
@@ -62,6 +71,46 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
     const r = await runReview({ ...deps.review, db, secretValues: deps.secretValues, version: deps.version }, { trigger: 'manual', now: deps.now(), createdBy: req.auth!.name });
     if ('skipped' in r) throw skipToError(r);
     return r;
+  });
+
+  const settingsView = async () => {
+    const s = await currentReviewSettings(db);
+    return {
+      enabled: s.enabled, model: s.model, tier: s.tier, allowed_models: allowedModelsView(),
+      updated_at: s.updatedAt ? toJerusalemIso(s.updatedAt) : null, updated_by: s.updatedBy,
+    };
+  };
+
+  // v2.11.2 (CR-011 addendum C): the review's switch, model and tier. History = review_settings_changes (append-only).
+  app.get('/reviews/settings', async () => settingsView());
+
+  app.post('/reviews/settings', async (req) => {
+    const p = SettingsBody.safeParse(req.body ?? {});
+    if (!p.success) throw new AppError(400, 'VALIDATION_ERROR', `Invalid request: enabled (boolean), model, tier (free or paid) and note (1..300 characters) are accepted (${p.error.issues.map((i) => i.path.join('.') || i.message).join(', ')})`);
+    const b = p.data;
+    if (b.enabled === undefined && b.model === undefined && b.tier === undefined) throw new AppError(400, 'VALIDATION_ERROR', 'At least one of enabled, model or tier is required');
+    const allowed = allowedModelsView();
+    if (b.model !== undefined && !ALLOWED_REVIEW_MODELS.some((m) => m.model === b.model)) {
+      throw new AppError(422, 'REVIEW_MODEL_NOT_ALLOWED', 'That model is not on the allowed list', { allowed_models: allowed });
+    }
+    if (b.tier === 'paid' && b.note === undefined) throw new AppError(422, 'VALIDATION_ERROR', 'Setting tier to paid needs a note that names Dvir\'s approval');
+    const cur = await currentReviewSettings(db);
+    const next = { enabled: b.enabled ?? cur.enabled, model: b.model ?? cur.model, tier: b.tier ?? cur.tier };
+    const entry = ALLOWED_REVIEW_MODELS.find((m) => m.model === next.model);
+    if (next.tier === 'free' && entry && !entry.free) {
+      throw new AppError(422, 'REVIEW_MODEL_NEEDS_PAID', 'That model has no free tier; set tier to paid first, with a note that names Dvir\'s approval', { model: next.model });
+    }
+    if (next.enabled === cur.enabled && next.model === cur.model && next.tier === cur.tier) {
+      req.auditSummary = 'review settings: unchanged';
+      return { changed: false, ...(await settingsView()) };
+    }
+    if (b.note !== undefined) await block(b.note);
+    await db.insertInto('review_settings_changes').values({
+      at: new Date(deps.now()), by: req.auth!.name, audit_id: req.auditId, ...next, note: b.note ?? null,
+      old: JSON.stringify({ enabled: cur.enabled, model: cur.model, tier: cur.tier }),
+    }).execute();
+    req.auditSummary = `review settings: enabled ${next.enabled}, model ${next.model}, tier ${next.tier}`;
+    return { changed: true, ...(await settingsView()) };
   });
 
   app.get('/reviews/packets/:id', async (req) => {
@@ -124,6 +173,7 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
 
   app.get('/reviews/cost', async () => {
     const s = await monthSpend(db, deps.now());
-    return { month: s.month, spent_usd: s.spentUsd, cap_usd: REVIEW_MONTHLY_CAP_USD, feedback_n: s.okN, unknown_n: s.unknownN };
+    const c = await currentReviewSettings(db);
+    return { month: s.month, spent_usd: s.spentUsd, cap_usd: REVIEW_MONTHLY_CAP_USD, feedback_n: s.okN, unknown_n: s.unknownN, enabled: c.enabled, model: c.model, tier: c.tier };
   });
 }

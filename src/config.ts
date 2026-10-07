@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { poolConfig } from './db/client.js';
-import { DEFAULT_GEMINI_MODEL } from './services/review/gemini.js';
 import { REGISTRAR_ENV } from './registrars/registry.js';
 
 /** The code repo. The backup token must never be able to touch it. */
@@ -21,7 +20,6 @@ const EnvSchema = z.object({
   JOB_TRIGGER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\S{32,}$/, 'JOB_TRIGGER_TOKEN must be at least 32 non-space characters (openssl rand -hex 32)').optional()),
   GOOGLE_WEB_RISK_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   GEMINI_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  GEMINI_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^[A-Za-z0-9._-]{1,80}$/, 'GEMINI_MODEL must be a model id such as gemini-2.5-flash').optional()),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
   GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string()
     .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/, 'GITHUB_BACKUP_REPO must be owner/name')
@@ -44,7 +42,6 @@ export interface Config {
   databaseSsl: boolean;
   /** Gemini API key for the one outside review (header `x-goog-api-key`). undefined → the review step is skipped (NO_KEY). */
   geminiApiKey: string | undefined;
-  geminiModel: string;
   /** Google Web Risk Lookup API key (header `x-goog-api-key`, never in a URL). undefined → the web_risk check stays MANUAL_REQUIRED. */
   webRiskApiKey: string | undefined;
   /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
@@ -126,7 +123,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
     databaseSsl: e.DATABASE_SSL === 'true',
     geminiApiKey: e.GEMINI_API_KEY ? e.GEMINI_API_KEY : undefined,
-    geminiModel: e.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL,
     webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,
     backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },
     version: readVersion(),

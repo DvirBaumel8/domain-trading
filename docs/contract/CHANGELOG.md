@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.11.2 (2026-10-07): CR-011 addendum C, review switch, model setting, free tier
+PATCH-sized but **additive** routes (kept in the 2.11 line). Release note: `docs/releases/v2.11.2.md`.
+- **`GET/POST /reviews/settings`:** `enabled` (default true), `model` (default `gemini-3.8-flash`, from an allowed list), `tier` (default `free`, cost 0; `paid` needs a note naming Dvir's approval). Codes `REVIEW_MODEL_NOT_ALLOWED`, `REVIEW_MODEL_NEEDS_PAID`, `REVIEW_DISABLED`. The env `GEMINI_MODEL` is removed.
+- **429 retry:** the daily review stores nothing on a 429; a second Worker cron runs `tick` at 07:30 UTC (10:30 IDT) whose `reviewRetry` step tries once more, then stores `unknown`.
+- **`/health`** `review: "disabled"` and `review_model`; `GET /reviews/cost` adds `enabled`, `model`, `tier`.
+
 ## 2.11.1 (2026-10-07): registry circuit breaker
 PATCH. Release note: `docs/releases/v2.11.1.md`. After 5 refusals in a row from one RDAP registry within a run, the run stops asking it and answers the rest of its lookups UNKNOWN `RATE_LIMITED` at once (counted in `rate_limited`). It makes a rerun of a test set no longer wait on a registry that refuses everything (`.biz`, CR-010 T10-1).
 

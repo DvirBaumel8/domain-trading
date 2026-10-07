@@ -3,11 +3,15 @@
 import { z } from 'zod';
 
 export const GEMINI_HOST = 'https://generativelanguage.googleapis.com';
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 export const GEMINI_TIMEOUT_MS = 60_000;
-/** List price in USD per million tokens, written in code (CR-011 v2.11.0). */
-export const GEMINI_INPUT_USD_PER_M = 0.30;
-export const GEMINI_OUTPUT_USD_PER_M = 2.50;
+/**
+ * The models the review may use (CR-011 addendum C), with Google's list prices in USD per million tokens. `free: true` = the model
+ * has a free tier; a model with `free: false` needs tier `paid`. The paid prices of gemini-3.8-flash are DOM's placeholder list prices.
+ */
+export const ALLOWED_REVIEW_MODELS = [
+  { model: 'gemini-3.8-flash', free: true, input_usd_per_m: 0.50, output_usd_per_m: 3.00 },
+  { model: 'gemini-3.1-pro-preview', free: false, input_usd_per_m: 2.00, output_usd_per_m: 12.00 },
+] as const;
 export const REVIEW_CATEGORIES = ['strategy', 'pricing', 'risk', 'operations', 'data', 'cost', 'other'] as const;
 
 export const REVIEWER_INSTRUCTION = [
@@ -24,9 +28,11 @@ export type GeminiResult =
   | { kind: 'ok'; items: GeminiItem[]; inputTokens: number; outputTokens: number; model: string }
   | { kind: 'unknown'; httpStatus: number | null; errorStatus: string | null; reason: string };
 
-/** Cost in USD from Google's token counts, rounded to 4 decimals. */
-export function geminiCostUsd(inputTokens: number, outputTokens: number): number {
-  return Math.round((inputTokens / 1e6 * GEMINI_INPUT_USD_PER_M + outputTokens / 1e6 * GEMINI_OUTPUT_USD_PER_M) * 10_000) / 10_000;
+/** Cost in USD from Google's token counts, rounded to 4 decimals: 0 on the free tier, else the model's list price (0 for a model not on the list). */
+export function geminiCostUsd(model: string, tier: 'free' | 'paid', inputTokens: number, outputTokens: number): number {
+  const m = ALLOWED_REVIEW_MODELS.find((x) => x.model === model);
+  if (tier === 'free' || !m) return 0;
+  return Math.round((inputTokens / 1e6 * m.input_usd_per_m + outputTokens / 1e6 * m.output_usd_per_m) * 10_000) / 10_000;
 }
 
 const Answer = z.object({
@@ -49,10 +55,10 @@ function errorOf(text: string): { status: string | null; message: string | null 
 }
 
 export async function callGemini(
-  deps: { fetch: typeof fetch; apiKey: string; model?: string; timeoutMs?: number },
+  deps: { fetch: typeof fetch; apiKey: string; model: string; timeoutMs?: number },
   packetContent: string,
 ): Promise<GeminiResult> {
-  const model = deps.model || DEFAULT_GEMINI_MODEL;
+  const model = deps.model;
   const body = {
     systemInstruction: { parts: [{ text: REVIEWER_INSTRUCTION }] },
     contents: [{ role: 'user', parts: [{ text: packetContent }] }],

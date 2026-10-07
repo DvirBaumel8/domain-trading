@@ -61,7 +61,7 @@ interface Guarantee { what: string; file: string; test: string; note?: string }
 /** Tables whose rows may never be changed or deleted (database triggers). */
 export const APPEND_ONLY_TABLES = [
   'audit_log', 'cohort_decisions', 'cohort_names', 'cohort_outcomes', 'company_documents', 'drop_list_checks', 'drop_list_rows', 'drop_lists', 'export_uploads', 'forbidden_terms', 'holdout_suites', 'job_runs', 'labelled_names', 'ledger_entries', 'listing_history', 'manual_quotes', 'pricing_evidence',
-  'pricing_settings', 'portfolio_checks', 'replay_runs', 'review_feedback', 'review_item_statuses', 'review_items', 'review_packets', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings', 'sibling_method_approvals', 'test_set_rows',
+  'pricing_settings', 'portfolio_checks', 'replay_runs', 'review_feedback', 'review_item_statuses', 'review_items', 'review_packets', 'review_retries', 'review_settings_changes', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings', 'sibling_method_approvals', 'test_set_rows',
 ] as const;
 
 const GUARANTEES: Guarantee[] = [

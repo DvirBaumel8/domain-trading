@@ -109,7 +109,7 @@ describe('pricing-settings admin (PR-31, PR-32)', () => {
     const app = await makeApp({ testRoutes: false });
     for (const r of app.routeTable) {
       // /selection/settings is the selection-settings document (CR-001 CAP-00), not pricing_settings or the caps.
-      if (r.method !== 'GET' && r.method !== 'HEAD' && !r.url.startsWith('/selection/settings')) expect(r.url).not.toMatch(/pricing|settings/i);
+      if (r.method !== 'GET' && r.method !== 'HEAD' && !r.url.startsWith('/selection/settings') && r.url !== '/reviews/settings') expect(r.url).not.toMatch(/pricing|settings/i);
     }
     await app.close();
   });

@@ -31,27 +31,32 @@ function serve(resp: () => Response | Promise<Response>) {
   }));
 }
 
-async function boot(opts: { key?: string | null; model?: string } = {}) {
+async function boot(opts: { key?: string | null; settings?: { enabled?: boolean; model?: string; tier?: 'free' | 'paid' } } = {}) {
   const clock = { t: T0 };
   const logs = logCapture();
   const env: Record<string, string> = {};
   if (opts.key !== null) env.GEMINI_API_KEY = opts.key ?? KEY;
-  if (opts.model) env.GEMINI_MODEL = opts.model;
   const app = await makeApp({ now: () => clock.t, env, logStream: logs.stream });
   apps.push(app);
   const w = (await issueToken('write')).auth;
   const r = (await issueToken('read')).auth;
   const post = (url: string, payload?: object) => app.inject({ method: 'POST', url, headers: { ...w, 'idempotency-key': randomUUID() }, ...(payload === undefined ? {} : { payload }) });
   const get = (url: string) => app.inject({ method: 'GET', url, headers: r });
+  if (opts.settings) {
+    const s = { enabled: true, model: 'gemini-3.8-flash', tier: 'free' as const, ...opts.settings };
+    await db.insertInto('review_settings_changes').values({ by: 'test', ...s, old: '{}' }).execute();
+  }
   const doc = async (text = 'We buy short .com names and sell them at a fixed price.') => { const x = await post('/company/document', { text }); expect(x.statusCode, x.body).toBeLessThan(300); };
   return { app, clock, logs, post, get, doc };
 }
 
 describe('Gemini client', () => {
-  it('computes cost from the usage by hand: 10,000 in + 2,000 out = $0.0080', () => {
-    expect(geminiCostUsd(10_000, 2_000)).toBe(0.008); // 10000/1e6*0.30 = 0.003; 2000/1e6*2.50 = 0.005
-    expect(geminiCostUsd(0, 0)).toBe(0);
-    expect(geminiCostUsd(123_456, 7_890)).toBe(0.0568); // 0.0370368 + 0.019725 = 0.0567618
+  it('computes cost from the usage by hand: paid 10,000 in + 2,000 out on Pro = $0.0440; free is $0', () => {
+    expect(geminiCostUsd('gemini-3.1-pro-preview', 'paid', 10_000, 2_000)).toBe(0.044); // 10000/1e6*2.00 = 0.02; 2000/1e6*12.00 = 0.024
+    expect(geminiCostUsd('gemini-3.8-flash', 'paid', 10_000, 2_000)).toBe(0.011); // 0.005 + 0.006
+    expect(geminiCostUsd('gemini-3.8-flash', 'free', 10_000, 2_000)).toBe(0);
+    expect(geminiCostUsd('gemini-3.1-pro-preview', 'paid', 0, 0)).toBe(0);
+    expect(geminiCostUsd('gemini-3.1-pro-preview', 'paid', 123_456, 7_890)).toBe(0.3416); // 0.246912 + 0.09468 = 0.341592
   });
 
   it('sends the key in a header only, the fixed schema, and returns validated items (unknown category becomes other, text cut to 2000)', async () => {
@@ -70,28 +75,28 @@ describe('Gemini client', () => {
 
   it('a timeout is unknown with reason timeout', async () => {
     serve(async () => { await delay(500); return answer([]); });
-    const r = await callGemini({ fetch, apiKey: KEY, timeoutMs: 50 }, '{}');
+    const r = await callGemini({ fetch, apiKey: KEY, model: 'gemini-3.8-flash', timeoutMs: 50 }, '{}');
     expect(r).toMatchObject({ kind: 'unknown', reason: 'timeout' });
   });
 });
 
 describe('runReview through POST /reviews/run', () => {
   it('an ok answer is stored as feedback with provider gemini, the model and the cost from usage; the key never appears anywhere', async () => {
-    const t = await boot({ model: 'gemini-test-model' });
+    const t = await boot({ settings: { model: 'gemini-3.1-pro-preview', tier: 'paid' } });
     await t.doc();
     serve(() => answer([gi('Raise the floor on the default plan.'), gi('Watch renewal cash.', 'cost', 'low')]));
     const r = await t.post('/reviews/run');
     expect(r.statusCode, r.body).toBe(200);
-    expect(r.json()).toMatchObject({ kind: 'weekly', status: 'ok', items_n: 2, new_n: 2, repeat_n: 0, cost_usd: 0.008, dropped_n: 0, packet_id: expect.stringMatching(/^rvp_/) });
-    expect(seen[0]!.url).toContain('gemini-test-model');
+    expect(r.json()).toMatchObject({ kind: 'weekly', status: 'ok', items_n: 2, new_n: 2, repeat_n: 0, cost_usd: 0.044, dropped_n: 0, packet_id: expect.stringMatching(/^rvp_/) });
+    expect(seen[0]!.url).toContain('gemini-3.1-pro-preview');
     const fb = await db.selectFrom('review_feedback').selectAll().execute();
     expect(fb).toHaveLength(1);
-    expect(fb[0]).toMatchObject({ provider: 'gemini', model: 'gemini-test-model', status: 'ok' });
-    expect(Number(fb[0]!.cost_usd)).toBe(0.008);
+    expect(fb[0]).toMatchObject({ provider: 'gemini', model: 'gemini-3.1-pro-preview', status: 'ok' });
+    expect(Number(fb[0]!.cost_usd)).toBe(0.044);
     expect(await db.selectFrom('review_items').selectAll().execute()).toHaveLength(2);
     const audit = JSON.stringify(await db.selectFrom('audit_log').selectAll().execute());
     for (const text of [r.body, audit, t.logs.text(), JSON.stringify(fb)]) expect(text).not.toContain(KEY);
-    expect((await t.get('/reviews/cost')).json()).toMatchObject({ spent_usd: 0.008, feedback_n: 1 });
+    expect((await t.get('/reviews/cost')).json()).toMatchObject({ spent_usd: 0.044, feedback_n: 1, enabled: true, model: 'gemini-3.1-pro-preview', tier: 'paid' });
   });
 
   it('items go through novelty: the same advice a second time is a repeat', async () => {

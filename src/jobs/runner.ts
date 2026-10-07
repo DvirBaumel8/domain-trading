@@ -53,6 +53,8 @@ export interface JobRunnerDeps {
   screeningWorker: { resumeStalled(): Promise<unknown> };
   /** The one outside review (founder rule 9, v2.11.0); runs after referenceRefresh and before backupExport so the backup includes it. While undefined, that step reports skipped. */
   outsideReview?: () => Promise<unknown>;
+  /** The 10:30 IDT tick retries a review that got a 429 in the daily run (CR-011 addendum C); while undefined, that step reports skipped. */
+  reviewRetry?: () => Promise<unknown>;
   backupExport?: BackupExport;
   /** Daily popularity list / IANA bootstrap / cache pruning (CAP-02); while undefined, that step reports skipped. */
   referenceRefresh?: Runnable;
@@ -77,7 +79,7 @@ export class JobRunner {
     }
     this.active.add(job);
     try {
-      const result: JobRunResult = { job, skipped: false, steps: job === 'tick' ? await this.tick() : await this.daily() };
+      const result: JobRunResult = { job, skipped: false, steps: job === 'tick' ? await this.tickRun() : await this.daily() };
       await this.record(result, opts, started);
       return result;
     } finally {
@@ -126,6 +128,14 @@ export class JobRunner {
     const last = await this.deps.db.selectFrom('audit_log').select('at').where('path', '=', 'ns-verify')
       .orderBy('at', 'desc').limit(1).executeTakeFirst();
     return !last || this.deps.now() - last.at.getTime() >= NS_VERIFY_EVERY_MS;
+  }
+
+  /** The standalone tick: the base steps, then the review retry (the daily run does not retry; it just ran the review). */
+  private async tickRun(): Promise<Record<string, StepResult>> {
+    const steps = await this.tick();
+    const retry = this.deps.reviewRetry;
+    steps.reviewRetry = retry ? await this.step(retry) : { ok: true, skipped: true, summary: { skipped: true, reason: 'review retry not configured' } };
+    return steps;
   }
 
   private async tick(): Promise<Record<string, StepResult>> {

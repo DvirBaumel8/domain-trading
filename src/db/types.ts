@@ -745,6 +745,25 @@ export interface ReviewItemStatusesTable {
   audit_id: string | null;
 }
 
+export interface ReviewSettingsChangesTable {
+  id: Generated<number>;
+  at: TimestampDefault;
+  by: string;
+  audit_id: string | null;
+  enabled: boolean;
+  model: string;
+  tier: 'free' | 'paid';
+  note: string | null;
+  old: unknown;
+}
+
+export interface ReviewRetriesTable {
+  id: Generated<number>;
+  packet_id: string;
+  day: string;
+  created_at: TimestampDefault;
+}
+
 export interface ReplayRunsTable {
   id: string;
   suite: string;
@@ -854,6 +873,8 @@ export interface Database {
   review_feedback: ReviewFeedbackTable;
   review_items: ReviewItemsTable;
   review_item_statuses: ReviewItemStatusesTable;
+  review_settings_changes: ReviewSettingsChangesTable;
+  review_retries: ReviewRetriesTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;
