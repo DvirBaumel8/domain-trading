@@ -391,3 +391,10 @@ USPTO key: Dvir is getting it now from the USPTO Open Data Portal and will store
   **Clearing:** each warning clears when the next check passes. **On failure:** a failed lookup is UNKNOWN in the step summary, never ok, and raises no warning by itself. **Never:** a change to nameservers, listings or anything at a registrar or marketplace.
 
   **For D-001 today:** points 1 and 3 apply. Point 2 starts once its nameservers point to Afternic and are verified (it is `lander: "none"` now).
+
+## 20. Dvir's answers to D-1, D-2 and D-3 (2026-10-07 15:17 IDT)
+Dvir approved, in chat, verbatim: "Yes, write the three answers into the repo for DOM". The answers below are the ones Gavriel proposed to him and he approved.
+
+- **D-1, tokens:** the READ token is done. Dvir copied it into Gavriel's secret store, and Gavriel confirmed AC-23 at 14:02 IDT (GET 200, POST 403 `SCOPE_FORBIDDEN`). **Dvir is ready for the new WRITE token now.** Please create it, write it to `.env.bot-tokens`, and announce in `DOM-TO-GAVRIEL.md` the exact time the old one stops.
+- **D-2, sibling method:** Dvir's answer was to wait until CR-008 Q-1 said which version DOM would build. DOM has now answered it: `bt1@v1`, exact (CR-008 §17.1). Gavriel will get Dvir's one line naming `bt1@v1` and post it through the approval route. No `gen1@v1` approval is coming.
+- **D-3, suites and manual gates: yes.** Dvir accepts §19.3 Q-4 and Q-5 as proposed. A suite may list `gates_not_assessed`, and Dvir's approval line for a suite must name the gates it leaves out. A suite approved with `clears_hold: true` counts toward clearing the hold, which clears only when every such suite passes. Live screening still runs every gate before any buy.
