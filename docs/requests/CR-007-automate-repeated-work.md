@@ -398,3 +398,28 @@ Dvir approved, in chat, verbatim: "Yes, write the three answers into the repo fo
 - **D-1, tokens:** the READ token is done. Dvir copied it into Gavriel's secret store, and Gavriel confirmed AC-23 at 14:02 IDT (GET 200, POST 403 `SCOPE_FORBIDDEN`). **Dvir is ready for the new WRITE token now.** Please create it, write it to `.env.bot-tokens`, and announce in `DOM-TO-GAVRIEL.md` the exact time the old one stops.
 - **D-2, sibling method:** Dvir's answer was to wait until CR-008 Q-1 said which version DOM would build. DOM has now answered it: `bt1@v1`, exact (CR-008 §17.1). Gavriel will get Dvir's one line naming `bt1@v1` and post it through the approval route. No `gen1@v1` approval is coming.
 - **D-3, suites and manual gates: yes.** Dvir accepts §19.3 Q-4 and Q-5 as proposed. A suite may list `gates_not_assessed`, and Dvir's approval line for a suite must name the gates it leaves out. A suite approved with `clears_hold: true` counts toward clearing the hold, which clears only when every such suite passes. Live screening still runs every gate before any buy.
+
+## 21. DOM: v2.5.0 design (G-4a to G-4d, and CR-008 AC-10), 2026-10-07
+D-3 is accepted (§20). What v2.5.0 builds (the contract holds the exact wording):
+- **G-4a, `POST /selection/test-sets` (WRITE), purpose `new`.**
+  - **Input:** Gavriel's source rows: domain, `sold` / `dropped`, `as_of`, source, price.
+  - **Filters (all optional):** words, length, geo excluded, minimum price, date window.
+  - **Removal:** DOM removes every name already in the name registry (any role), duplicates and filtered rows, each with a reason.
+  - **Split:** into `test` and `dev` by a logged `seed`, deterministic. Rows are ordered by the sha256 of seed and name, and the first `test_share` are test.
+- **G-4b, features computed by DOM.**
+  - **The run:** the set starts a back-test screening run (`form`, `census` with `bt1@v1`, `ext_dates`) at each row's `as_of`. It counts only siblings and other extensions created **strictly before** `as_of`.
+  - **Pacing:** at about 24 registry lookups per name and polite pacing, a 900-name set takes about 6 hours. Poll `GET` to keep the free server awake.
+  - **Reconstructed features:** they carry the input date "the day before `as_of`". A known limit: a name registered before `as_of` and deleted since is invisible.
+  - **No history and no "in use today":** they stay unknown.
+- **Seal, `POST /selection/test-sets/{name}/seal` (WRITE).** It registers every kept row (`test` or `dev`, slice = the set name) with DOM's features, and freezes the test membership (count and hash). No approval is needed (R-19).
+- **CR-008 AC-10, purpose `rescore`.**
+  - **Input:** names **already registered** (by slice, e.g. `R15-TEST15-USED`; `test` names refused).
+  - **What happens:** their as-of features are computed the same way, and a report gives accepted / rejected / undecided with Wilson 95% ranges per label for a settings label (e.g. `v11`).
+  - **Registry:** nothing is registered or changed.
+- **G-4c/d, suites.**
+  - **Any id:** `POST /selection/holdout-suites` accepts any suite id.
+  - **New optional fields:** `gates_not_assessed` (any of `tm_us`, `tn`, `hist2`, `hist2_guard`) and `clears_hold`.
+  - **Dvir's approval text must name:** the suite, each gate it leaves out, and, for `clears_hold`, the words "clears hold".
+  - **Holdout replay:** it needs only the assessed gates. Its report names the gates not assessed and how many accepts they could still turn into rejects.
+  - **The hold clears** only when every suite whose latest definition has `clears_hold` passes on the draft (the 2.1.0 rules: judged with the active `holdout` settings, a failure sticks). With no such suite, `holdout.required_suites` applies as today.
+  - **Live screening is unchanged.**
