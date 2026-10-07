@@ -423,3 +423,35 @@ D-3 is accepted (§20). What v2.5.0 builds (the contract holds the exact wording
   - **Holdout replay:** it needs only the assessed gates. Its report names the gates not assessed and how many accepts they could still turn into rejects.
   - **The hold clears** only when every suite whose latest definition has `clears_hold` passes on the draft (the 2.1.0 rules: judged with the active `holdout` settings, a failure sticks). With no such suite, `holdout.required_suites` applies as today.
   - **Live screening is unchanged.**
+
+## 22. DOM: v2.8.0 design (G-2 source A and G-1), 2026-10-07
+- **G-2, the drop list (source A).**
+  - **Upload:** `POST /selection/drop-lists` (WRITE): `{list_name, list_date, domains[]}`, up to 20,000 names, from SnapNames or any deleting list.
+  - **Filter:** DOM keeps letters-only `.com` names of at most 3 words (by the `bt1@v2` split) and records why each other name was dropped.
+  - **Registry check:** the daily run's new step, `dropWatch`, asks the registry about each kept name once (4 at a time, as test sets do). It records the status: `pending delete`, `redemption`, other registered, not registered or unknown.
+  - **Expected drop date:**
+    - **pending delete:** the RDAP "last changed" date + 5 days (source `rdap_last_changed`);
+    - **redemption:** + 35 days (source `estimate`);
+    - **otherwise:** none.
+  - **Reading it:** `GET /selection/drop-lists/{list_name}` and `GET /selection/drop-lists?drop_from=&drop_to=`.
+  - **Retention:** rows are kept 60 days after their list date.
+  - **Stale warning:** `/report` warns `DROP_FEED_STALE` when the newest list is more than 2 days old (only once any list exists).
+- **G-1, cohorts (the forward test).**
+  - **Create:** `POST /selection/cohorts` (WRITE): `{name, settings: [1 to 3 labels]}` and either `names` (1 to 200, each with an expected drop date and source) or `{from_drop_lists: {drop_from, drop_to}, sample_n, seed}` (a seeded sample from the drop list).
+  - **Late names (R-1):** a name whose expected drop date is today or earlier is left out as `LATE`.
+  - **Features:** DOM runs the features, as a test-set rescore does (`bt1@v2` census, `ext_dates`, form, registration now).
+  - **Decisions:** when the run is done, DOM freezes one decision per name and settings label: `accept` / `reject` / `undecided`, with the tier, from the same tier code. A decision frozen on or after a name's expected drop date is kept but marked `late` and left out of the rates.
+  - **Append-only:** a cohort can't change after that (R-5).
+- **Outcomes,** in the daily step `cohortOutcomes`:
+  - **After the drop:** from the day after the expected drop date, one RDAP lookup per name gives the drop outcome:
+    - `available_after_drop` (not registered);
+    - `caught_at_drop` (registered, created on or after the expected drop date − 1);
+    - `restored` (registered, created earlier);
+    - `still_pending` (still pending delete; asked again the next day);
+    - `unknown` (asked again on the next 5 daily runs, then it stays unknown).
+  - **Re-registration:** at 30, 60 and 90 days after the drop, each `available_after_drop` name gets `re_registered` yes / no / unknown, with the creation date and registrar.
+- **The report:** `GET /selection/cohorts/{name}` and `GET /selection/cohorts/report?settings=<label>` (across cohorts).
+  - **Rates:** for each label, on `available_after_drop` names, the re-registered rate of accepted vs rejected names at 30, 60 and 90 days, with Wilson 95% ranges.
+  - **Counted separately:** `caught_at_drop`, undecided, late and unknown.
+  - **Pass line FWD-1:** the accepted rate is at least 2× the rejected rate, with at least 50 names per class. Both numbers are constants, and a change needs a release.
+- **Registry load:** a 200-name cohort is about 4,800 feature lookups (about 20 minutes) plus 4 checks per name over 90 days. All of it is paced and fails closed.
