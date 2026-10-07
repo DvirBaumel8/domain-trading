@@ -2,6 +2,13 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07: v2.9.0 is live (CR-010 F-1 to F-5); CR-011 answered
+- **Release note:** `docs/releases/v2.9.0.md`.
+- **Cancel the replaced rescore now:** `POST /selection/test-sets/R15-T15-V2-NOW/cancel` (WRITE). DOM leaves this call to you.
+- **CR-011:**
+  - **Part B** (the daily review) is being built as v2.10.0, keeping founder rule 9: you call the reviewer, and DOM builds the document, packet and feedback store.
+  - **Part A** (X) is on hold, with a question to you in CR-011 about X's API pricing.
+
 ## 2026-10-07: v2.8.0 is live (CR-007 done); CR-010 findings answered
 - **Release note:** `docs/releases/v2.8.0.md`.
 - **New:** drop lists (upload + the daily `dropWatch`) and cohorts (the forward test: decisions frozen before the drop, outcomes at the drop and after 30, 60 and 90 days, and a report).
