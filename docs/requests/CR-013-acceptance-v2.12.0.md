@@ -1,4 +1,4 @@
-> Status: Approved by Dvir 2026-10-07 23:37 IDT
+> Status: Approved by Dvir 2026-10-07 23:37 IDT. DOM: accepted, in progress (release v2.15.0)
 
 # CR-013: acceptance findings on v2.8.0 to v2.12.0 (review packet, block list, retries, posting docs)
 | Field | Value |
@@ -140,3 +140,31 @@
 4. Which tests in §2 does DOM expect to meet, and does it push back on any, with the reason?
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-07 23:50 IDT)
+**Accepted, all 11.** One release, v2.15.0, aimed before tonight's 03:05 IDT review.
+
+**Answers:**
+- **F-1:** the single weekly rule is: `weekly` when no packet **whose feedback is `ok`** has sent the full document in the last 7 days; and on Sunday. A packet whose feedback is `unknown`, or that has none, never counts, so the full document goes again until a review with `ok` has received it. endpoints.md and jobs.md will state this one rule.
+- **F-2:** **R-3 and R-4.**
+  - **R-3:** DOM strips actor and token ids (`opened_by`, `created_by`, `closed_by`, `updated_by`, `set_by`, `triggered_by`, `token_name`, `cancelled_by`, and any token label) from everything it builds into a packet. They become `"operator"`.
+  - **R-4:** `POST /company/forbidden-terms/{id}/retire` (WRITE, audited, history kept).
+  - **R-5 is not built:** with R-3, DOM's own packet text holds no names, and redacting quietly would hide a leak instead of showing it.
+- **F-3:** a 503 / UNAVAILABLE or a timeout in the daily review is treated like a 429: nothing is stored, the day is marked for the 10:30 IDT retry, and a second failure is stored as `unknown`. A manual run that fails stores `unknown`, and by F-1 that no longer uses up the weekly packet.
+- **F-4:** these key shapes are refused as `secret`, and the contract lists them:
+  - DOM tokens; `pk1_` / `sk1_` (Porkbun); `AIza…` (Google); `ghp_` / `github_pat_` (GitHub);
+  - `sk-` and `sk-proj-` / `sk-ant-` (OpenAI / Anthropic style); `xoxb-` / `xoxp-` / `xapp-` (Slack); `AKIA` + 16 (AWS); `rnd_` (Render); JWT-shaped `eyJ….….…`;
+  - any configured secret value.
+- **F-5 to F-11:** fixed in the service or the docs as you ask:
+  - **F-5:** the contract follows the live cohort report shape.
+  - **F-6:** any unknown media token is 404.
+  - **F-7:** documented: a dry run answers 200 with `ok: false`.
+  - **F-8:** documented, and a trailing "s", "es" or "'s" also matches a listed term.
+  - **F-9:** only calls that reach Google count toward the 3 per hour.
+  - **F-10:** `GET /reviews/settings/history` lists each change with old and new values.
+  - **F-11:** the 404 is documented; removed drop-list rows show their tokens; an empty cohort window answers `COHORT_EMPTY` with `details.reason: NO_PENDING_NAMES_IN_WINDOW` and the window.
+- **Q1:** DOM checks it in this release. If each label is not scored with its own settings, it is a bug, fixed here and reported in this file.
+- **Q2:** noted.
+- **§4:**
+  - **`GEMINI_MODEL`:** nothing reads it since 2.11.2, so the Render variable can be removed.
+  - **`gemini-2.5-flash`:** it won't be added back.
