@@ -29,7 +29,7 @@ export async function triggerJob(
   logger: Logger,
 ): Promise<void> {
   const base = env.API_BASE_URL?.trim();
-  const token = env.JOB_TRIGGER_TOKEN;
+  const token = env.JOB_TRIGGER_TOKEN?.trim();
   if (!base || !token) {
     logger.error(`jobs-trigger ${job}: API_BASE_URL or JOB_TRIGGER_TOKEN is not configured`);
     return;

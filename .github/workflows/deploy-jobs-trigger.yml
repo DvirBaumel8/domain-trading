@@ -59,4 +59,4 @@ jobs:
         run: |
           test -n "$JOB_TRIGGER_TOKEN" || { echo "JOB_TRIGGER_TOKEN repo secret is empty"; exit 1; }
           npx wrangler deploy --var "API_BASE_URL:$API_BASE_URL"
-          echo "$JOB_TRIGGER_TOKEN" | npx wrangler secret put JOB_TRIGGER_TOKEN
+          printf "%s" "$JOB_TRIGGER_TOKEN" | npx wrangler secret put JOB_TRIGGER_TOKEN

@@ -7,6 +7,12 @@ const env = { API_BASE_URL: 'https://api.example.com', JOB_TRIGGER_TOKEN: TOKEN 
 const ok = () => new Response('{}', { status: 200 });
 
 describe('triggerJob', () => {
+  it('trims a stored token with a trailing newline (wrangler secret put from echo)', async () => {
+    const fetcher = vi.fn().mockResolvedValue(ok());
+    await triggerJob('tick', { ...env, JOB_TRIGGER_TOKEN: `${TOKEN}\n` }, 1, fetcher, { error: vi.fn() });
+    expect(fetcher.mock.calls[0]![1].headers.Authorization).toBe(`Bearer ${TOKEN}`);
+  });
+
   it('posts the job with URL, headers, body and idempotency key', async () => {
     const fetcher = vi.fn().mockResolvedValue(ok());
     const logger = { error: vi.fn() };
