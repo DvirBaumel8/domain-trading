@@ -49,7 +49,7 @@ describe('job CLI tick and daily (the shared JobRunner)', () => {
     await tdb.insertInto('selection_settings').values({ ...rest, label: 'v1off', values: JSON.stringify({ ...values, sources: off }), based_on_id: cur.id, activation_seq: (cur.activation_seq ?? 0) + 1 }).execute();
     const { stdout } = await cli(['daily']);
     const r = JSON.parse(stdout);
-    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'backupExport']);
+    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'backupExport']);
     expect(r.steps.referenceRefresh).toMatchObject({ ok: true, summary: { popularity: { skipped: true, reason: 'SOURCE_DISABLED' }, iana: { skipped: true }, errors: [] } });
     expect(r.steps.backupExport).toMatchObject({ ok: true, skipped: true });
     const { testDb } = await import('../helpers/db.js');

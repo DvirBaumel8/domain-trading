@@ -39,6 +39,7 @@ import { registerDropLists } from './api/drop-lists.js';
 import { registerCohorts } from './api/cohorts.js';
 import { registerCompany } from './api/company.js';
 import { registerReviews } from './api/reviews.js';
+import { runReview } from './services/review/run.js';
 import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
 import { BuyService } from './services/buy.js';
@@ -177,7 +178,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
-  registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version });
+  const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey, model: deps.config.geminiModel };
+  registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });
   registerPacks(app, { db: deps.db, now: deps.now ?? Date.now });
   registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });
@@ -193,6 +195,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
     dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
+    outsideReview: async () => {
+      const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: (deps.now ?? Date.now)() });
+      return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;
+    },
     secretValues: deps.config.secretValues,
   }));
   registerJobs(app, app.jobRunner, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });

@@ -47,11 +47,23 @@ export async function latestDocument(db: Kysely<Database>) {
   return db.selectFrom('company_documents').selectAll().orderBy('version', 'desc').limit(1).executeTakeFirst();
 }
 
-export async function buildPacket(db: Kysely<Database>, now: Date, serviceVersion: string): Promise<PacketBuild | null> {
+/** Calendar facts in IDT (Asia/Jerusalem): the day key (YYYY-MM-DD), the weekday (0 = Sunday), and the instant the day began. */
+const IDT_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' });
+const IDT_WEEKDAY = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', weekday: 'short' });
+export const idtDay = (ms: number): string => IDT_DAY.format(new Date(ms));
+export const idtIsSunday = (ms: number): boolean => IDT_WEEKDAY.format(new Date(ms)) === 'Sun';
+
+export async function insertPacket(db: Kysely<Database>, a: { id: string; createdBy: string; now: Date; built: PacketBuild; text: string; hash: string }): Promise<void> {
+  await db.insertInto('review_packets').values({
+    id: a.id, created_by: a.createdBy, created_at: a.now, kind: a.built.kind, document_version: a.built.documentVersion, content: a.text, sha256: a.hash,
+  }).execute();
+}
+
+export async function buildPacket(db: Kysely<Database>, now: Date, serviceVersion: string, opts: { forceWeekly?: boolean } = {}): Promise<PacketBuild | null> {
   const doc = await latestDocument(db);
   if (!doc) return null;
   const lastWeekly = await db.selectFrom('review_packets').select('created_at').where('kind', '=', 'weekly').orderBy('created_at', 'desc').limit(1).executeTakeFirst();
-  const kind: 'daily' | 'weekly' = !lastWeekly || lastWeekly.created_at.getTime() < now.getTime() - WEEKLY_EVERY_MS ? 'weekly' : 'daily';
+  const kind: 'daily' | 'weekly' = opts.forceWeekly || !lastWeekly || lastWeekly.created_at.getTime() < now.getTime() - WEEKLY_EVERY_MS ? 'weekly' : 'daily';
   const prev = await db.selectFrom('review_packets').select(['created_at', 'document_version']).orderBy('created_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
   const full = kind === 'weekly' || !prev;
   let diffSince: { from_version: number; diff: string } | null = null;

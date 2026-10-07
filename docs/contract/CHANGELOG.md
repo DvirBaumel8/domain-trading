@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.11.0 (2026-10-07): CR-011 addendum B, DOM calls the outside reviewer
+MINOR, **additive**. Release note: `docs/releases/v2.11.0.md`. Founder rule 9 changed by Dvir (7 Oct 2026, 19:07): one AI call is allowed, this review.
+- **Daily step `outsideReview`** (once per IDT day, weekly on Sunday) and **`POST /reviews/run`** (WRITE, 3 per hour): build the packet, call Google Gemini, store the feedback with model and computed cost.
+- **`/health`** adds `review`. New code `REVIEWER_NOT_CONFIGURED`. New optional env `GEMINI_API_KEY` (secret) and `GEMINI_MODEL`.
+- **Guarantee changed:** "one AI call only (`src/services/review/gemini.ts`); no AI SDK, no other provider host" (checked by `tests/unit/no-llm.test.ts`).
+
 ## 2.10.0 (2026-10-07): CR-011 part B, the daily outside review (founder rule 9 kept)
 MINOR, **additive**. Release note: `docs/releases/v2.10.0.md`.
 - **Company document:** versioned upload and reads with diffs (`/company/document`).

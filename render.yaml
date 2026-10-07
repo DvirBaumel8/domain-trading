@@ -55,3 +55,5 @@ services:
         sync: false
       - key: GOOGLE_WEB_RISK_API_KEY # optional: Web Risk Lookup API key (free tier, 10,000 lookups a month cap in code); unset keeps web_risk manual
         sync: false
+      - key: GEMINI_API_KEY      # optional: the one outside review (Gemini); unset skips the daily outsideReview step
+        sync: false

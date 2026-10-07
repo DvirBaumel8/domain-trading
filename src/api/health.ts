@@ -18,8 +18,20 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       status: dbOk ? 'ok' : 'degraded',
       db: dbOk ? 'ok' : 'down',
       jobs,
+      review: await reviewHealth(db, config),
       version: config.version,
       adapters: adapterStatus(config).map(({ name, enabled }) => ({ name, enabled })),
     });
   });
+}
+
+/** The outside reviewer's state: the latest feedback decides (ok / failed), `not_configured` without a key, `unknown` before the first review. */
+async function reviewHealth(db: Kysely<Database>, config: Config): Promise<'ok' | 'not_configured' | 'failed' | 'unknown'> {
+  if (!config.geminiApiKey) return 'not_configured';
+  try {
+    const last = await db.selectFrom('review_feedback').select('status').where('provider', '=', 'gemini').orderBy('id', 'desc').limit(1).executeTakeFirst();
+    return !last ? 'unknown' : last.status === 'ok' ? 'ok' : 'failed';
+  } catch {
+    return 'unknown';
+  }
 }

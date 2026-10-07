@@ -51,6 +51,8 @@ export interface JobRunnerDeps {
   cohortOutcomesJob?: Runnable;
   /** Resumes stalled screening runs (CAP-20); its summary is {resumed[], finalized[]}. */
   screeningWorker: { resumeStalled(): Promise<unknown> };
+  /** The one outside review (founder rule 9, v2.11.0); runs after referenceRefresh and before backupExport so the backup includes it. While undefined, that step reports skipped. */
+  outsideReview?: () => Promise<unknown>;
   backupExport?: BackupExport;
   /** Daily popularity list / IANA bootstrap / cache pruning (CAP-02); while undefined, that step reports skipped. */
   referenceRefresh?: Runnable;
@@ -151,6 +153,8 @@ export class JobRunner {
     steps.cohortOutcomes = co ? await this.step(() => co.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'cohort outcomes not configured' } };
     const ref = this.deps.referenceRefresh;
     steps.referenceRefresh = ref ? await this.referenceStep(ref) : { ok: true, skipped: true, summary: { skipped: true, reason: 'reference refresh not configured' } };
+    const review = this.deps.outsideReview;
+    steps.outsideReview = review ? await this.step(review) : { ok: true, skipped: true, summary: { skipped: true, reason: 'outside review not configured' } };
     const backup = this.deps.backupExport;
     steps.backupExport = backup
       ? await this.step(() => backup.runOnce())

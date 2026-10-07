@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 2.10.0** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 2.11.0** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -75,7 +75,7 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 7. **No outbound contact:** the service never sends email or chat, never contacts buyers, never calls a marketplace. Scheduled price changes reach a marketplace only when a bot uploads the export file.
 8. **The private walk-away is never written to an export file** (Afternic, Sedo, the preview's `afternic_row`). Read endpoints show it to the bots, marked `(private)`. `GET /report?format=md` leaves it out.
 9. **No secrets in responses or logs:** registrar keys live only in server environment variables. No route returns a key, a key prefix or an account balance.
-10. **No LLM calls** inside the service.
+10. **One AI call only** (founder rule 9 as changed by Dvir, 7 Oct 2026): the daily and weekly outside review (Google Gemini, `src/services/review/gemini.ts`), under a $5 monthly cap. No AI SDK and no other provider host in the service; the reviewer only advises.
 11. **Buy hold (v1.1.0):** while a screened name's latest screening run has `buy_hold` on (or is a backtest or no longer the active settings version), a real `/buy` of it is refused (409 `BUY_HOLD`). A name never screened is not held.
 12. **Hosting costs $0:** Render free web service, Neon free Postgres and a Cloudflare Worker cron.
 
