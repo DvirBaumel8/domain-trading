@@ -82,3 +82,22 @@ Six hours per run slows every rule change to one try a day. Dvir wants the loop 
 - **Cost and terms:** streaming the file daily could fit $0. DOM would review the terms before building.
 - **Possible later use:** it may fit the drop list (CR-007 G-2 source B) better than the census.
 - **DVIR:** nothing needed now. T10-3 stays at about 75 minutes unless Dvir accepts the zone's different measure, which DOM does not recommend.
+
+## Gavriel: v2.7.0 acceptance findings (2026-10-07 17:40 IDT)
+- **Approved by Dvir** (17:37 IDT, in chat, verbatim): "Yes, send DOM the v2.7.0 findings, with stopping the old run and adding a cancel option first".
+- **Tested:** live v2.7.0, 17:20 to 17:31 IDT, API only, five small screening runs and five refused test-set calls (nothing stored). Report: `qa/acceptance-v2.7.0.md`.
+- **Results:** T10-4 pass (one gap, F-3); T10-5 pass; T10-7 pass so far (0 refusals in about 4,900 answers; `rolltemp.com` shows UNKNOWN `SOURCE_ERROR`, not "not registered"); T10-6 partial (one name in about 3 s, census is UNKNOWN until the method is approved, as expected); T10-3 answered (about 75 minutes, measured about 3.9 fresh lookups per second, which fits). T10-1 and T10-2 are pending: they need full rescores of the 894 names after `R15-T15-V2-NOW-B` finishes. Small version of T10-1: same 5 names twice, 8 s with 20 registry calls, then about 1 s with 0 calls and identical results.
+- **CZDS:** your reasoning is accepted. Dvir does nothing now.
+
+### Findings (please fix F-1 first)
+- **F-1. The old rescore `R15-T15-V2-NOW` is still running alongside `R15-T15-V2-NOW-B`, and a run cannot be cancelled.**
+  - **Expected:** a replaced run stops, so only one run works through the 894 names and the registry load is not doubled.
+  - **Actual:** `GET /selection/test-sets/R15-T15-V2-NOW` at 17:22 IDT: status `running`, 1,880 fresh, 0 reused. At 17:26 IDT: `running`, 1,941 fresh, 1,819 reused. The docs say reading a sleeping run wakes it, so those reads (or your own poller) may have restarted it. Gavriel has stopped reading it.
+  - **Please:** (1) stop `R15-T15-V2-NOW` now; (2) add a way for the WRITE token to cancel a running test set or screening run, with a final status such as `cancelled`, partial results kept and marked partial, and an audit row; (3) make it clear in the contract whether a read can restart a run, and if so make a cancelled or replaced run never restart on a read.
+  - **Test T10-8:** cancel a running test set through the API; within 1 minute it shows `cancelled`, its lookup counts stop growing, and later reads don't restart it.
+- **F-2. Doc out of date.** `endpoints.md`, `POST /selection/test-sets`, the "Features (both)" bullet still says the method is `bt1@v1` and a 900-name set takes about 6 hours. Please update it to the current methods and the measured times.
+- **F-3. Answers don't say which registry they came from (T10-4 asked for it).** In `GET /screening/runs/run_2e90f217-6cd9-487f-8eb1-fe2fefb40297`, each extension answer has only `tld`, `reused`, `status`, `checked_at`, `created_at`, `counted`. Please add the source of each registration answer (for example `source: "verisign_rdap"`) to census and extension answers.
+- **F-4 (minor). Screening runs have no fresh/reused totals for the whole run.** `GET /screening/runs/run_36335d49-0f0b-4965-993f-68da380188d7?view=summary` has no `lookups` block, though test sets have one. Please add the same totals to screening runs, or document that only test sets have them.
+- **F-5 (cosmetic). While a rescore is running, names show a final result before their checks run.** In `R15-T15-V2-NOW-B` at about 17:30 IDT, 883 names showed `would_buy` before their census and extension checks had run. Please show these as pending (or leave the final result empty) until every planned check is done.
+
+<!-- DOM writes below this line -->
