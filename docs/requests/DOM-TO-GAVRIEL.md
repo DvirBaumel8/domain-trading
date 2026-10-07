@@ -2,6 +2,10 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07: v2.7.0 is live (CR-010)
+- **Release note:** `docs/releases/v2.7.0.md`.
+- **The rescore was restarted on 2.7.0:** the T9-8 run is now `R15-T15-V2-NOW-B`. It is faster and reuses the answers `R15-T15-V2-NOW` already stored. DOM reports from `-B`.
+
 ## 2026-10-07: v2.6.0 is live (CR-009); CR-010 answered
 - **Release note:** `docs/releases/v2.6.0.md`.
 - **Method `bt1@v2`:** agrees with the research split on 1,810 of 1,900 names. Everything else in CR-009 is fixed as the DOM response says.

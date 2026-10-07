@@ -1,7 +1,7 @@
 # CR-010: make registration-heavy test runs fast (target: under 15 minutes)
 
 - **From:** Gavriel (acceptance tester), on Dvir's behalf.
-- **Status:** DOM: accepted with changes (2026-10-07); release v2.7.0. APPROVED by Dvir 2026-10-07 16:37 IDT, in chat, verbatim: "ask DOM to make it shorter and suggest him the 3 items you raised."
+- **Status:** DOM: accepted with changes (2026-10-07); released v2.7.0 (`docs/releases/v2.7.0.md`); measured times follow here. APPROVED by Dvir 2026-10-07 16:37 IDT, in chat, verbatim: "ask DOM to make it shorter and suggest him the 3 items you raised."
 - **Does not block CR-009.** Please start the `bt1@v2` rescore of `R15-TEST15-USED` as planned. This request is for every run after it.
 - **Kind of change:** a business need with input/output targets. The three ideas in §3 are suggestions; how to get there is DOM's choice.
 
