@@ -1,7 +1,7 @@
 # CR-009: v2.2.0, v2.3.0 and v2.4.0 acceptance findings, and the word-split fix for v11
 
 - **From:** Gavriel (acceptance tester), on Dvir's behalf.
-- **Status:** APPROVED by Dvir 2026-10-07 15:50 IDT, in chat, verbatim: "Don't switch the rule on yet. Send the bug list (CR-009) to DOM with the word-split fix, and switch on after it's fixed."
+- **Status:** DOM: accepted (2026-10-07); in progress: release v2.6.0. APPROVED by Dvir 2026-10-07 15:50 IDT, in chat, verbatim: "Don't switch the rule on yet. Send the bug list (CR-009) to DOM with the word-split fix, and switch on after it's fixed."
 - **Dvir's decision on the word split (replaces the "Accept" recorded in CR-008 §17.5):** DOM's 93% split is **not** accepted for v11, because with it the sold side falls to about 69.75%, under the 70% bar (N-8). `v11` stays a draft and is **not** activated until the split fix in N-8 passes T9-8. Gavriel will not use the two approval lines in CR-008 §17.5 now; Gavriel gets fresh lines from Dvir directly when the fix is live. BUY-HOLD stays on.
 - **Tested:** live API v2.2.0, 2026-10-07 14:04 to 14:07 IDT, docs at 04f54c2. 17 checks: 13 pass, 3 pass with a note, 0 fail, 1 pending (first scheduled daily run tonight 03:05 IDT). All five CR-006 findings are closed and all six answers are in the contract. Full report: `qa/acceptance-v2.2.0.md`.
 - **Also tested (added 2026-10-07 15:45 IDT):** live v2.3.0 (15:18 to 15:22 IDT: 9 checks, 7 pass, 1 fail N-3, 1 not testable) and live v2.4.0 (15:25 to 15:45 IDT: AC-1 to AC-8 of CR-008; all pass except AC-6 below its bar and AC-8's after-approval half pending). Reports: `qa/acceptance-v2.3.0.md`, `qa/acceptance-v2.4.0.md`. Docs at `e886da0`.
@@ -94,3 +94,40 @@
 - **T9-8:** the split agreement on the 1,900 vectors is reported and is at least 95% (or the remaining differences change no TEST15 decision); the replay of the 894 TEST15 fixtures with DOM-built siblings gives sold accepted ≥ 70% and dropped rejected ≥ 75% under `v11`; `theeventhouse.com` splits as `the|event|house` and `ballstart.com` does not split as `balls|tart`. Gavriel reruns the replay through the API.
 
 <!-- DOM writes below this line -->
+## DOM response (2026-10-07)
+**Verdict: accepted, all eight.**
+- **Release:** v2.6.0, before CR-007's drop list and forward test (those move to v2.7.0).
+- **N-8:** met by a new sibling method version, **`bt1@v2`**. It is Appendix B's recipe on a frozen, frequency-aware word split. Dvir approves it by name (D-9-1), and `v11` needs no change.
+
+### N-8: the word split
+- **Method:** the split picks the reading with the lowest total cost.
+  - **Word cost:** each word costs by how common it is: its SCOWL size level, the same source and licence as DOM's dictionary (35 most common, then 40, 50, 60).
+  - **Piece cost:** each extra piece costs a little.
+  - **Special terms:** DOM's term lists (tech, trade, legal, generic heads, regimes, states) count as common.
+  - **Place names:** a city-only piece is expensive.
+- **What's frozen:** the levels, the term lists and the four costs are part of `bt1@v2` (a data file with its sha256), so later list edits never change a sibling list. `bt1@v1` stays exactly as it is.
+- **Measured on the 1,900 vectors:**
+  - **1,810 agree (95.3%).** DOM's v2.4.0 split gave 1,767 (93.0%).
+  - **The costs were chosen on half the names,** and the other half then scores 95.0% and 95.2%, so the result is not tuned to these names.
+  - **The two required names:** `theeventhouse.com` → `the event house`, `ballstart.com` → `ball start`.
+  - **The 90 that still differ** will be listed in the release note. Most are compounds and names that are hard to split either way (`catskills`, `wellspring`, `copilot`), or tokens no list holds (`llc`, `uae`, `cbd`).
+- **The replay with DOM-built siblings (second half of T9-8):** v2.6.0 lets a `rescore` test set take `sibling_method` and `features_as_of: "now"`, which reads registration today, as the research did.
+  - **No approval needed:** a rescore is diagnostic only (it registers nothing), so it may use a method Dvir has not approved yet. Live screening and `new` sets still need the approval.
+  - **After deploy:** DOM starts `rescore` of `R15-TEST15-USED` on `v11` with `bt1@v2` and `features_as_of: "now"`, and reports the rates in this file (about 6 hours of paced lookups).
+  - **If the sold side lands under 70%,** DOM says so plainly with the rates, as you asked.
+
+### The other findings
+| # | Fix |
+|---|---|
+| N-1 | Contract. Over HTTP/1.1 the edge answers `Connection: keep-alive` on every response; over HTTP/2 there is no Connection header. The service's own `close` never reaches a client |
+| N-2 | Service. `POST /jobs/preview` adds `would_cancel` and `would_fail`, as objects `{row_id, domain, event}` (`would_fail` adds `reason`). The contract gives each array's item shape. `would_supersede` stays a list of row ids (unchanged, documented) |
+| N-3 | Service. An UNKNOWN Web Risk result adds `fields.http_status` and Google's error `status` / `reason` (never the key). The weekly blocklist check is `unknown`, not `ok`, when any source failed and none listed the name: your point 3 was right, the 14:33 run would have hidden it. Cause: a 190 ms refusal is Google rejecting the request, most likely the API not enabled on the key's project or a key restriction. With the new fields, DOM reads the exact reason after deploy and writes here what Dvir must change |
+| N-4 | Service. A refused (401) call to `/jobs/run` carries no RateLimit headers and uses no manual-run slot. Only calls with a WRITE token count |
+| N-5 | Contract. Every WRITE call to `/jobs/run` counts toward the 4 per hour, a 422 included |
+| N-6 | Contract. A run started with the WRITE token is audited under scope `write`; scheduled and job-token runs under `job` |
+| N-7 | Service. A name whose plan had no gating check is `not_screened` (new final status) and is left out of `ranking` |
+
+### For Dvir (DVIR)
+- **D-9-1 (once the rescore shows ≥ 70% / ≥ 75%):** one line: **"sibling method bt1@v2 approved"**.
+- **D-9-2:** a fresh activation line for `v11`, as CR-009 says.
+- **No `bt1@v1` approval is needed** any more.
