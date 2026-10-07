@@ -296,3 +296,19 @@ This is exactly what Python 3's `random.Random(s).shuffle` does, written out so 
 5. **The buy hold stays on.**
 
 **Activating `v11` before step 3 is possible but pointless.** A name with no frozen list gets an UNKNOWN share, so only the other-extension path could accept.
+
+### 17.5 Dvir's answers to DOM (2026-10-07 15:26 IDT, in chat with DOM, verbatim)
+DOM asked Dvir three numbered questions:
+1. activate v11 with the line "selection settings v11 approved for activation; buy hold stays on";
+2. "sibling method bt1@v1 approved";
+3. accept DOM's word split (AC-6, 93.0%) as a known limit.
+
+Dvir answered: **"1. Switch the new rule now 2. Approved 3. Accept"**.
+
+**The `approval_ref` texts.** Gavriel uses these exactly. Each quotes the question Dvir answered, so it names the label or method. Each is valid until 2026-10-10 15:26 IDT (72 hours).
+- **For `POST /selection/sibling-methods/bt1@v1/approve` (do this first):**
+  - `{"text": "Dvir, 2026-10-07 15:26 IDT, in chat with DOM, answering \"sibling method bt1@v1 approved\": Approved", "approved_at": "2026-10-07T15:26:00+03:00"}`
+- **For `POST /selection/settings/v11/activate`, after the `v11` draft exists and AC-1 to AC-3 pass:**
+  - `{"text": "Dvir, 2026-10-07 15:26 IDT, in chat with DOM, answering \"selection settings v11 approved for activation; buy hold stays on\": Switch the new rule now", "approved_at": "2026-10-07T15:26:00+03:00"}`
+- **AC-6:** accepted. DOM's word split is the split for `bt1@v1` in live screening, a known limit (`docs/internal/gaps.md` G-84). The 133 differences stay listed in `docs/releases/v2.4.0-ac6-split-differences.tsv`.
+- **Buy hold:** stays on.

@@ -107,6 +107,7 @@ Every place where the specs DOM inherited (`docs/internal/*`, which still descri
 | G-81 | CR-007 T-1/T-3 asked DOM to hand tokens to Gavriel through Render secrets | **Declined**: a Render API key reads every variable of every service in the workspace (registrar keys, DB URL); Dvir copies tokens into Gavriel's store by hand (CR-007 §19.2, D-1) | DOM |
 | G-82 | CR-007 G-5 point 4 (the price shown on the marketplace page) | **Not built**: `forsale.godaddy.com` refuses non-browsers; becomes a human "venue state" record with G-8 (P2) | DOM |
 | G-83 | CR-007 G-2 source B (CZDS zone diff) | **Declined at $0** (memory and disk); source A (uploads + RDAP) is planned for v2.5.0 | DOM |
+| G-84 | `bt1@v1` siblings use DOM's `form` split; it equals the research split on 1,767 of 1,900 names (93.0%, CR-008 AC-6) | **Accepted by Dvir** (2026-10-07 15:26 IDT, CR-008 §17.5) as a known limit; a better split needs a word list with frequencies and a new method version | DOM |
 
 ## Removed by Dvir's 6 Oct decisions (no gap; listed for completeness)
 `POST /offers/import`, `offer_imports`, `offers.import_id`; the `payouts` table, `POST /payouts/{id}/received`, the `/sold` `payout` object, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE`, `payouts_pending` (tests PO-1–PO-5, S-13–S-15, OF-13, OF-15 deleted); `changed_only` and per-file export records; `JOBS_MODE` and in-process timers.

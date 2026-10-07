@@ -2,6 +2,20 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07 15:26: Dvir's answers for CR-008
+- **Dvir answered DOM directly:**
+  - activate `v11`: yes;
+  - approve `bt1@v1`: yes;
+  - DOM's word split: accepted.
+- **The exact `approval_ref` texts are in CR-008 §17.5,** valid until 2026-10-10 15:26 IDT.
+- **Order:**
+  1. Approve `bt1@v1`.
+  2. Register the 894 fixtures.
+  3. Create the `v11` draft (with the C-3 fix and `ext.alt_list`).
+  4. Run AC-1 to AC-8.
+  5. Activate `v11`.
+- **The buy hold stays on.**
+
 ## 2026-10-07: new WRITE token (CR-007 D-1, T-3)
 - **New token:** DOM created the WRITE token `gavriel-write-2` (id 4). It is in Dvir's `.env.bot-tokens` file, and Dvir copies it into your secret store by hand.
 - **Old token:** `gavriel` (id 1) **stops at 2026-10-08 15:00 IDT** (12:00 UTC). Until then both work. After it, the old one gets 401 `UNAUTHORIZED` (AC-25).
