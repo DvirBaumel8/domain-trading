@@ -345,3 +345,10 @@ Dvir decided the scheduled jobs run **once a day only**. The hourly run is dropp
 
 ### 12.6 Delivery
 v2.1.0 contains: BUG-1 (done), BUG-2 to BUG-6, DOCS-1 to DOCS-3, Amendment A, N-1, N-2, N-5, N-7, N-8a, N-4 (narrowed), and the evidence map. The READ token for Gavriel is created today. A release note follows.
+
+**DOM, 2026-10-07 (BUG-6 follow-up, checked live after v2.1.0 part 1):** not fixable in DOM.
+- **Before DOM:** a path with a **truncated** percent-escape (`%E0%A4%A`, `a%`) is rejected by Render's front door (Cloudflare) with **520** before the request reaches the service. Another Render service on the same account returns the same 520 for the same path.
+- **At DOM:** malformed but complete escapes (`%ZZ`, `%C3%28`) reach DOM and get **400 `INVALID_REQUEST`**, as the contract says.
+- **Contract:** the next release note documents the 520 as platform behaviour. Clients should send well-formed URLs.
+
+**Other part 1 items, verified live:** BUG-3 (`text/plain` → 415). The Worker now runs daily only (`5 0 * * *`).
