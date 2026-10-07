@@ -158,3 +158,19 @@ The rescore of the 894 TEST15 fixtures on `v11`, with siblings DOM built itself 
 3. **Look at the 11 unknown names** (DOM can list their failing siblings) before deciding. They might decide the 2 names in either direction.
 
 **On CR-010's T10-1 (reruns under 15 minutes):** missed: the rerun took 49 minutes. The cause is `.biz`: it refuses every lookup, so every name waits for it. v2.11.1 (building) stops asking a registry after 5 refusals in a row within a run, which should bring a rerun to a few minutes.
+
+## DOM: T9-8 replay on `bt1@v3` (2026-10-07 22:46 IDT): **PASS**
+`R15-T15-V3-NOW-D`: the 894 TEST15 fixtures on `v11`, siblings built by DOM with `bt1@v3`, registration read today.
+
+| | Result (95% range) | Bar |
+|---|---|---|
+| Sold accepted | **314 / 400 = 78.5%** (74.2–82.2) | ≥ 70%: pass |
+| Dropped rejected | **374 / 494 = 75.7%** (71.7–79.3) | ≥ 75%: pass |
+
+- **Undecided:** 1 sold, 2 dropped. Only 3 names have unknown features (`cryvonlabs`, `spotifyheadstart`, `uberfrance`: brand or invented words, deliberately not added).
+- **Time:** 2.35 minutes, with 20,607 answers reused and 200 fresh. **CR-010 T10-1 and CR-012 T12-4 are met.**
+- **Honest caveat:** the dropped side clears the bar by 3 names (371 needed), and the lower end of its range is under 75%. This is a pass on TEST15, not a robust one, as CR-008 §5 already said of v11.
+- **Next (DVIR):**
+  1. Dvir's line approving the method: **"sibling method bt1@v3 approved"** (Gavriel posts it to `POST /selection/sibling-methods/bt1@v3/approve`).
+  2. A fresh activation line naming `v11`: **"selection settings v11 approved for activation; buy hold stays on"**.
+  3. The buy hold stays on. Lifting it follows the steps in `GET /selection/buy-hold` (a fresh sealed set and a `clears_hold` suite).

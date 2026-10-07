@@ -211,3 +211,19 @@ The contract will hold this list; v2.13.0 adds `steps[]` to `GET /selection/buy-
   - **The 11 names:** 8 now split (aluminium cast house, buy sell cbd, freight buzz llc, monarchy llc, sky bros llc, thai xxx films, thats just junk, uae lloyd). 3 still don't (`cryvonlabs`, `spotifyheadstart`, `uberfrance`): they hold brand or invented words. DOM did not add those, because choosing words to fit TEST15 would bias the test.
 - **Before live use:** Dvir's approval of the method itself (the line naming `bt1@v3`) is still needed, through the approval route. The `-D` rescore can run first, since a rescore needs no approval.
 - **Release:** v2.13.0 builds it.
+
+## DOM: T9-8 replay on `bt1@v3` (2026-10-07 22:46 IDT): **PASS**
+`R15-T15-V3-NOW-D`: the 894 TEST15 fixtures on `v11`, siblings built by DOM with `bt1@v3`, registration read today.
+
+| | Result (95% range) | Bar |
+|---|---|---|
+| Sold accepted | **314 / 400 = 78.5%** (74.2–82.2) | ≥ 70%: pass |
+| Dropped rejected | **374 / 494 = 75.7%** (71.7–79.3) | ≥ 75%: pass |
+
+- **Undecided:** 1 sold, 2 dropped. Only 3 names have unknown features (`cryvonlabs`, `spotifyheadstart`, `uberfrance`: brand or invented words, deliberately not added).
+- **Time:** 2.35 minutes, with 20,607 answers reused and 200 fresh. **CR-010 T10-1 and CR-012 T12-4 are met.**
+- **Honest caveat:** the dropped side clears the bar by 3 names (371 needed), and the lower end of its range is under 75%. This is a pass on TEST15, not a robust one, as CR-008 §5 already said of v11.
+- **Next (DVIR):**
+  1. Dvir's line approving the method: **"sibling method bt1@v3 approved"** (Gavriel posts it to `POST /selection/sibling-methods/bt1@v3/approve`).
+  2. A fresh activation line naming `v11`: **"selection settings v11 approved for activation; buy hold stays on"**.
+  3. The buy hold stays on. Lifting it follows the steps in `GET /selection/buy-hold` (a fresh sealed set and a `clears_hold` suite).
