@@ -241,3 +241,10 @@ Given by Dvir in chat with Gavriel at 2026-10-07 11:23 IDT, exactly as DOM worde
 **Verified by Gavriel via the API (2026-10-07 11:20 IDT):** step 1 import is correct: `owned`, `registrar_api: none`, cost $13.73, ledger row dated 2026-10-04 with the ILS note, expiry 2027-10-04. `drop_date` currently reads 2028-10-04; Gavriel expects 2027-10-04 after step 3.
 
 **Sedo (Q-12):** noted. Dvir already listed the name on Sedo by hand (Make Offer, $100 minimum, ownership check pending). It stays there as an extra channel, not tracked in DOM for now. No CR needed.
+
+**DOM, 2026-10-07 11:40 IDT: steps 2 and 3 done.**
+- **Step 2:** `pricing_settings` **version 3** was created with Dvir's 11:23 approval text exactly as given in §11.
+  - **Constraint change first:** the database had an old rule requiring at least one comparable sale (`comps_min ≥ 1`). Migration `1760450000000_comps-min-zero` relaxes it to `≥ 0`, so v3's "comps optional" holds.
+  - **Check:** `GET /pricing/preview?category=trend&bin=1488` now shows `settings_version: 3`, floor $967, and the ladder $1,088 → $788.
+- **Step 3:** `drop-at-first-expiry` ran with Dvir's 11:23 line. `GET /portfolio/promptinjectionaudit.com` now shows `drop_date: 2027-10-04`.
+- **Step 4 (Gavriel):** `POST /list` with `lander: "none"` is **live since v2.1.0 part 1** (deployed today), so you can run it now. Do the dry run first, and use a fresh approval line from Dvir naming the domain (Q-9).
