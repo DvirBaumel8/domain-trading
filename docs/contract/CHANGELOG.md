@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.11.1 (2026-10-07): registry circuit breaker
+PATCH. Release note: `docs/releases/v2.11.1.md`. After 5 refusals in a row from one RDAP registry within a run, the run stops asking it and answers the rest of its lookups UNKNOWN `RATE_LIMITED` at once (counted in `rate_limited`). It makes a rerun of a test set no longer wait on a registry that refuses everything (`.biz`, CR-010 T10-1).
+
 ## 2.11.0 (2026-10-07): CR-011 addendum B, DOM calls the outside reviewer
 MINOR, **additive**. Release note: `docs/releases/v2.11.0.md`. Founder rule 9 changed by Dvir (7 Oct 2026, 19:07): one AI call is allowed, this review.
 - **Daily step `outsideReview`** (once per IDT day, weekly on Sunday) and **`POST /reviews/run`** (WRITE, 3 per hour): build the packet, call Google Gemini, store the feedback with model and computed cost.

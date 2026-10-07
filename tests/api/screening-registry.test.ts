@@ -468,7 +468,7 @@ describe('census (CAP-10, CR-002)', () => {
   });
 
   it('5 of 20 unknown (25%, not more) is still a number, with the unknown in the denominator', async () => {
-    const t5: Record<string, RdapLookup> = { ...first(10), ...Object.fromEntries(siblings.slice(10, 15).map((d) => [d, unknown('RATE_LIMITED')])) };
+    const t5: Record<string, RdapLookup> = { ...first(10), ...Object.fromEntries([10, 12, 14, 16, 18].map((i) => [siblings[i]!, unknown('RATE_LIMITED')]) /* not consecutive: five refusals in a row would open the v2.11.1 host breaker */) };
     const { n: n5 } = await census(t5, {}, {}, notRegistered());
     expect(res(n5, 'census')).toMatchObject({ status: 'PASS', fields: { registered_share: 0.5, n_unknown: 5, n_checked: 20 } });
   });

@@ -12,6 +12,8 @@ export const TEST_SET_RDAP_CONCURRENCY = 4;
 export const TEST_SET_RDAP_MIN_MS = 250;
 /** Adaptive slow-down (v2.7.0): each 429 or refusal doubles the gap up to this cap; after two of them concurrency drops to 1. */
 export const RDAP_MAX_MIN_MS = 4000;
+/** v2.11.1 circuit breaker: after this many refusals in a row from one host (within one pacer's life) that host is not asked again; lookups return UNKNOWN RATE_LIMITED at once. */
+export const HOST_BREAKER_REFUSALS = 5;
 
 /** At most `concurrency` calls in flight and at least `minMsBetween` between two starts. `sleep` is injected (tests pass a no-op). `slowDown()` halves the rate. */
 export class Pacer {
@@ -21,6 +23,9 @@ export class Pacer {
   private halvings = 0;
   /** How many times the rate was halved (a 429 or a refusal was seen). */
   slowdowns = 0;
+  private streak = 0;
+  /** True once HOST_BREAKER_REFUSALS refusals came in a row: the host is not asked again for the rest of this pacer's life. */
+  breakerOpen = false;
   constructor(private minMsBetween: number, private concurrency: number, private readonly sleep: (ms: number) => Promise<void>, private readonly clock: () => number = Date.now) {}
 
   get minGapMs(): number { return this.minMsBetween; }
@@ -29,10 +34,14 @@ export class Pacer {
   /** Halve the rate: double the minimum gap (cap RDAP_MAX_MIN_MS); after the second halving, one call at a time. */
   slowDown(): void {
     this.slowdowns++;
+    if (++this.streak >= HOST_BREAKER_REFUSALS) this.breakerOpen = true;
     this.halvings++;
     this.minMsBetween = Math.min(Math.max(this.minMsBetween, 1) * 2, RDAP_MAX_MIN_MS);
     if (this.halvings >= 2) this.concurrency = 1;
   }
+
+  /** A lookup that was not refused ends the refusal streak (no effect once the breaker is open). */
+  noteNotRefused(): void { if (!this.breakerOpen) this.streak = 0; }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
     if (this.active >= this.concurrency) await new Promise<void>((r) => this.waiting.push(r));
@@ -116,20 +125,26 @@ export async function lookupCached(db: Kysely<Database>, deps: ScreeningDeps, do
   }
   const late = (): CachedLookup => ({ outcome: 'unknown', reasonCode: 'TIMEOUT', httpStatus: null, url: '', retrievedAt: new Date(now()), body: null, facts: null, cached: false, evidenceId: null, checkedAt: new Date(now()), rateLimited: 0, source: null });
   if ((o.deadline !== undefined && now() > o.deadline) || o.isCancelled?.()) return late();
+  const open = (): CachedLookup => ({ outcome: 'unknown', reasonCode: 'RATE_LIMITED', httpStatus: null, url: '', retrievedAt: new Date(now()), body: null, facts: null, cached: false, evidenceId: null, checkedAt: new Date(now()), rateLimited: 1, source: null });
+  if (o.pace.breakerOpen) return open(); // v2.11.1: the host refused HOST_BREAKER_REFUSALS times in a row; no call, no wait, no row
   const call = () => deps.rdapLookup(domain, { baseUrl: o.baseUrl, timeoutMs: o.timeoutMs });
   let skipped = false;
+  let broken = false;
   let limited = 0;
   const r = await o.pace.run(async () => {
     if ((o.deadline !== undefined && now() > o.deadline) || o.isCancelled?.()) { skipped = true; return late(); } // checked again after the wait in the pacer queue
+    if (o.pace.breakerOpen) { broken = true; return late(); } // opened while this lookup waited in the queue
     let x = await call();
-    if (refused(x)) { limited++; o.pace.slowDown(); }
+    if (refused(x)) { limited++; o.pace.slowDown(); } else o.pace.noteNotRefused();
     if (x.reasonCode === 'RATE_LIMITED' && x.retryAfterMs != null && x.retryAfterMs <= MAX_RETRY_AFTER_MS) {
       await deps.sleep(x.retryAfterMs);
+      if (o.pace.breakerOpen) return x;
       x = await call();
-      if (refused(x)) { limited++; o.pace.slowDown(); }
+      if (refused(x)) { limited++; o.pace.slowDown(); } else o.pace.noteNotRefused();
     }
     return x;
   });
+  if (broken) return open();
   if (skipped) return late();
   let evidenceId: number | null = null;
   const text = r.body ?? (r.outcome === 'not_registered' ? `HTTP ${r.httpStatus}: no registration found for ${domain}` : null);

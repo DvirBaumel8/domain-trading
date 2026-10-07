@@ -3,7 +3,7 @@ import { http } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { RdapLookup, RdapLookupFn } from '../../src/rdap.js';
-import { Pacer, TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS, lookupCached, pacerFor, prefetchStored } from '../../src/screening/rdap-batch.js';
+import { HOST_BREAKER_REFUSALS, Pacer, TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS, lookupCached, pacerFor, prefetchStored } from '../../src/screening/rdap-batch.js';
 import { siblingsBt1 } from '../../src/screening/siblings.js';
 import type { ScreeningDeps } from '../../src/screening/types.js';
 import { testDb as db } from '../helpers/db.js';
@@ -138,9 +138,10 @@ describe('provenance and date safety (CR-010 T10-4, T10-5)', () => {
   });
 });
 
+const deps = (rdap: RdapLookupFn, sleeps: number[] = []): ScreeningDeps => ({ rdapLookup: rdap, sleep: async (ms: number) => { sleeps.push(ms); } } as unknown as ScreeningDeps);
+const opts = (pace: Pacer) => ({ maxAgeHours: 0, evidenceMaxBytes: 1000, pace });
+
 describe('RDAP pacing for test-set runs (CR-010 T10-7)', () => {
-  const deps = (rdap: RdapLookupFn, sleeps: number[] = []): ScreeningDeps => ({ rdapLookup: rdap, sleep: async (ms: number) => { sleeps.push(ms); } } as unknown as ScreeningDeps);
-  const opts = (pace: Pacer) => ({ maxAgeHours: 0, evidenceMaxBytes: 1000, pace });
 
   it('V27-6 test-set runs get a 4-at-a-time, 250 ms pacer; other runs keep the settings', () => {
     expect([TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS]).toEqual([4, 250]);
@@ -176,7 +177,7 @@ describe('RDAP pacing for test-set runs (CR-010 T10-7)', () => {
     expect([pace.minGapMs, pace.maxConcurrency]).toEqual([1000, 1]);
     for (let i = 0; i < 5; i++) await lookupCached(db, deps(rdap), `slow${i}x.com`, opts(pace));
     expect(pace.minGapMs).toBe(4000);
-    expect(pace.slowdowns).toBe(7);
+    expect(pace.slowdowns).toBe(5); // v2.11.1: the breaker opens at the 5th refusal in a row
     // Retry-After within 10 s is honoured: sleeps, retries, counts both
     const sleeps: number[] = [];
     let n = 0;
@@ -218,3 +219,42 @@ describe('speed of reuse (CR-010)', () => {
     expect((await prefetchStored(db, ['one.com'], { maxAgeHours: 0, now })).size).toBe(0);
   });
 });
+
+describe('per-host circuit breaker (v2.11.1, CR-010)', () => {
+  it('V2111-1 a host that refuses 5 times in a row is not asked again: UNKNOWN RATE_LIMITED at once, counted, no row; another host is unaffected', async () => {
+    expect(HOST_BREAKER_REFUSALS).toBe(5);
+    let biz = 0, com = 0;
+    const bizPace = new Pacer(250, 4, async () => {});
+    const comPace = new Pacer(250, 4, async () => {});
+    const bizRdap: RdapLookupFn = async () => { biz++; return limited(null); };
+    const comRdap: RdapLookupFn = async () => { com++; return notRegistered(); };
+    const out = [];
+    for (let i = 0; i < 8; i++) out.push(await lookupCached(db, deps(bizRdap), `brk${i}x.biz`, opts(bizPace)));
+    expect(biz).toBe(5);
+    for (const r of out) expect(r).toMatchObject({ outcome: 'unknown', reasonCode: 'RATE_LIMITED', rateLimited: 1 });
+    expect(out.slice(5).every((r) => r.httpStatus === null && r.evidenceId === null)).toBe(true);
+    expect(await db.selectFrom('rdap_lookups').select('domain').where('domain', 'like', 'brk%x.biz').execute()).toHaveLength(5);
+    const c = await lookupCached(db, deps(comRdap), 'brkcom.com', opts(comPace));
+    expect(c.outcome).toBe('not_registered');
+    expect(com).toBe(1);
+  });
+
+  it('V2111-2 refusals queued before the breaker opens do not call the host either', async () => {
+    let calls = 0;
+    const pace = new Pacer(250, 1, async () => {});
+    const rdap: RdapLookupFn = async () => { calls++; await new Promise((r) => setTimeout(r, 2)); return limited(null); };
+    const res = await Promise.all(Array.from({ length: 9 }, (_, i) => lookupCached(db, deps(rdap), `q${i}brk.biz`, opts(pace))));
+    expect(calls).toBe(5);
+    for (const r of res) expect(r).toMatchObject({ outcome: 'unknown', reasonCode: 'RATE_LIMITED' });
+  });
+
+  it('V2111-3 an answer between refusals resets the streak: only 5 consecutive refusals open the breaker', async () => {
+    const pace = new Pacer(250, 4, async () => {});
+    let n = 0;
+    const rdap: RdapLookupFn = async () => (++n % 3 === 0 ? notRegistered() : limited(null));
+    for (let i = 0; i < 12; i++) await lookupCached(db, deps(rdap), `rs${i}x.biz`, opts(pace));
+    expect(n).toBe(12);
+    expect(pace.breakerOpen).toBe(false);
+  });
+});
+
