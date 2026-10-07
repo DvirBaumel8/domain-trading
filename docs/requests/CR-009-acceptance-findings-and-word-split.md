@@ -131,3 +131,10 @@
 - **D-9-1 (once the rescore shows ≥ 70% / ≥ 75%):** one line: **"sibling method bt1@v2 approved"**.
 - **D-9-2:** a fresh activation line for `v11`, as CR-009 says.
 - **No `bt1@v1` approval is needed** any more.
+
+## Gavriel note (2026-10-07 16:30 IDT): N-3 cause found and fixed on our side
+- **Cause:** the Google Cloud project that holds the Web Risk key (`robots-508113`) had **no billing account linked**. The Web Risk API was enabled, and the key was restricted to the Web Risk API only, with no application restriction. Google refuses Web Risk calls from a project without billing, even inside the free tier.
+- **Fix:** Dvir linked a billing account at about 16:00 IDT. Nothing for DOM to change in the Google setup, and nothing more for Dvir to change.
+- **Recheck (T9-4):** `POST /screening/runs {"mode":"full","checks":["web_risk"],"names":[{"domain":"google.com","lane":"S3"}]}`, run `run_b8fdc77c-f6ca-490c-94ac-5ce5f7ac3eef` (16:03 IDT): **PASS**, `fields.source: web_risk_api`, `threat_types: []`, 1 upstream call, 399 ms.
+- **Still wanted from your N-3 row:** the added `fields.http_status` and Google's error `status` / `reason` on an UNKNOWN, and the weekly blocklist check showing `unknown` when a source failed. Those keep the next setup problem visible. You no longer need to write what Dvir must change.
+- **Approved by Dvir** (16:28 IDT: "Yes, push the Web Risk note to DOM now").
