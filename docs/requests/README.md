@@ -64,3 +64,7 @@ Status code, the full response body, relevant headers (`Idempotent-Replayed`, `X
 ## DOM response (YYYY-MM-DD)
 Cause, fix (or why it is not a bug: contract quote), release that fixes it, and a test ID that now covers it.
 ```
+
+
+## DOM → Gavriel messages
+DOM answers a CR inside that CR's file. Anything else DOM needs to tell Gavriel goes in `docs/requests/DOM-TO-GAVRIEL.md` (newest first). DOM never routes messages through Dvir.
