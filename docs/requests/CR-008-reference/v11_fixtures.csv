@@ -1,0 +1,895 @@
+domain,tokens,label,as_of,n_words,sld_chars,is_geo,known_siblings,registered_share,alt_tld_before_n,expected
+achievehire.com,achieve hire,sold,2024-06-05,2,11,0,20,0.8,0,accept
+acreai.com,acre ai,sold,2025-02-08,2,6,0,20,0.85,0,accept
+activestack.com,active stack,sold,2025-04-24,2,11,0,20,1.0,0,accept
+adaptivemarineanalytics.com,adaptive marine analytics,dropped,2026-10-06,3,23,0,20,0.0,0,reject
+addsold.com,adds old,dropped,2026-10-06,2,7,0,20,0.5,0,reject
+adoptiq.com,adopt iq,sold,2022-11-05,2,7,0,20,0.8,0,accept
+adorablenest.com,adorable nest,dropped,2026-10-06,2,12,0,20,0.55,0,accept
+adviserguide.com,adviser guide,sold,2025-09-19,2,12,0,20,0.7,0,accept
+advisorallyplanning.com,advisor ally planning,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+affordablehousingsolution.com,affordable housing solution,sold,2025-01-25,3,25,0,20,0.15,1,accept
+agenticcred.com,agent icc red,sold,2025-04-12,3,11,0,20,0.0,0,reject
+agentjar.com,agent jar,sold,2025-09-17,2,8,0,20,0.85,0,accept
+agentresolution.com,agent resolution,sold,2026-02-17,2,15,0,20,0.8,0,accept
+agentsforwork.com,agents for work,sold,2025-09-03,3,13,0,20,0.25,0,reject
+aiagentsworld.com,ai agents world,sold,2023-12-24,3,13,0,20,0.1,0,reject
+aiarchitecturaldesign.com,ai architectural design,sold,2024-09-11,3,21,0,20,0.0,0,reject
+aibankruptcy.com,ai bankruptcy,sold,2022-08-21,2,12,0,20,0.6,0,accept
+aibore.com,ai bore,sold,2024-10-08,2,6,0,20,0.55,0,accept
+aicryptotool.com,ai crypto tool,sold,2025-01-08,3,12,0,20,0.2,0,reject
+aidiscipline.com,ai discipline,sold,2023-05-24,2,12,0,20,0.6,0,accept
+aifluids.com,ai fluids,sold,2023-09-26,2,8,0,20,0.6,0,accept
+aiforumworld.com,ai forum world,sold,2025-02-14,3,12,0,20,0.0,0,reject
+aijobrisk.com,ai job risk,sold,2025-09-04,3,9,0,20,0.1,0,reject
+ailearnedge.com,ai learn edge,dropped,2026-10-06,3,11,0,20,0.05,0,reject
+ailikeled.com,ai like led,dropped,2026-10-06,3,9,0,20,0.0,0,reject
+aimarketplacepro.com,ai marketplace pro,sold,2025-02-17,3,16,0,20,0.0,0,reject
+ainetsec.com,ai net sec,sold,2023-08-21,3,8,0,20,0.05,0,reject
+aiquantumlearning.com,ai quantum learning,dropped,2026-10-06,3,17,0,20,0.05,0,reject
+airebuild.com,ai rebuild,sold,2024-03-28,2,9,0,20,0.55,0,accept
+airetirementplan.com,ai retirement plan,sold,2024-09-15,3,16,0,20,0.2,0,reject
+airportdigitaltwin.com,airport digital twin,sold,2023-12-04,3,18,0,20,0.2,1,accept
+aiseocompany.com,ai seo company,sold,2025-05-20,3,12,0,20,0.25,0,reject
+aismartvideo.com,ai smart video,sold,2025-02-17,3,12,0,20,0.35,0,reject
+aisuperapp.com,ai super app,sold,2022-12-11,3,10,0,20,0.25,0,reject
+aiwebkit.com,ai web kit,sold,2024-03-16,3,8,0,20,0.4,0,reject
+albertapropertymanagement.com,alberta property management,sold,2025-02-18,3,25,0,20,0.15,0,reject
+alertgonow.com,alert go now,dropped,2026-10-06,3,10,0,20,0.15,0,reject
+allgoodstuff.com,all good stuff,sold,2022-04-19,3,12,0,20,0.3,1,accept
+alljustpicks.com,all just picks,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+allowlisting.com,allow listing,sold,2024-10-23,2,12,0,20,0.45,0,reject
+alphabarberacademy.com,alpha barber academy,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+alphacry.com,alpha cry,sold,2025-01-25,2,8,0,20,0.8,0,accept
+aluminiumcasthouse.com,aluminium cast house,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+alwaysbecomingministries.com,always becoming ministries,dropped,2026-10-06,3,24,0,20,0.0,0,reject
+alwaysindustry.com,always industry,dropped,2026-10-06,2,14,0,20,0.75,0,accept
+amazonhomestuff.com,amazon home stuff,dropped,2026-10-06,3,15,0,20,0.15,0,reject
+amberrosephotography.com,amber rose photography,sold,2025-01-17,3,20,0,20,0.0,0,reject
+americandreamai.com,american dream ai,sold,2025-08-12,3,15,0,20,0.2,0,reject
+americanfluidpower.com,american fluid power,sold,2026-04-01,3,18,0,20,0.0,0,reject
+analapi.com,anal api,dropped,2026-10-06,2,7,0,20,0.6,0,accept
+analogagents.com,analog agents,sold,2025-04-06,2,12,0,20,0.7,0,accept
+analyticsoperator.com,analytics operator,sold,2025-01-26,2,17,0,20,0.7,0,accept
+andersonhomeservices.com,anderson home services,sold,2026-01-04,3,20,0,20,0.35,0,reject
+animaleyedoctor.com,animal eye doctor,sold,2023-12-09,3,15,0,20,0.0,0,reject
+antiagetea.com,anti age tea,dropped,2026-10-06,3,10,0,20,0.05,0,reject
+antiphilosophy.com,anti philosophy,sold,2024-12-21,2,14,0,20,0.8,0,accept
+apexweightloss.com,apex weight loss,sold,2023-02-24,3,14,0,20,0.25,0,reject
+apolloacquisition.com,apollo acquisition,sold,2025-10-10,2,17,0,20,0.75,0,accept
+appdownloadfile.com,app download file,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+applyfacility.com,apply facility,dropped,2026-10-06,2,13,0,20,0.75,0,accept
+approveanycredit.com,approve any credit,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+appshipping.com,app shipping,sold,2025-11-24,2,11,0,20,0.85,1,accept
+archivetravel.com,archive travel,sold,2024-04-30,2,13,0,20,0.7,0,accept
+armordialapp.com,armor dial app,dropped,2026-10-06,3,12,0,20,0.05,0,reject
+artpdf.com,art pdf,sold,2023-11-21,2,6,0,20,0.95,0,accept
+artterritories.com,art territories,dropped,2026-10-06,2,14,0,20,0.5,1,accept
+askcompanion.com,ask companion,sold,2025-07-17,2,12,0,20,0.9,0,accept
+assetfraction.com,asset fraction,sold,2023-11-04,2,13,0,20,0.6,0,accept
+assetsray.com,assets ray,dropped,2026-10-06,2,9,0,20,0.85,0,accept
+assumeyourhome.com,assume your home,dropped,2026-10-06,3,14,0,20,0.15,0,reject
+astonishingstoriesbooks.com,astonishing stories books,dropped,2026-10-06,3,23,0,20,0.0,0,reject
+athleteresourcecenter.com,athlete resource center,dropped,2026-10-06,3,21,0,20,0.15,0,reject
+attackitservices.com,attack it services,dropped,2026-10-06,3,16,0,20,0.2,0,reject
+authenticrelating.com,authentic relating,sold,2024-06-14,2,17,0,20,0.55,1,accept
+autoimagine.com,auto imagine,sold,2024-11-23,2,11,0,20,0.5,0,reject
+automationlearninglab.com,automation learning lab,dropped,2026-10-06,3,21,0,20,0.2,0,reject
+autotradingclub.com,auto trading club,dropped,2026-10-06,3,15,0,20,0.05,0,reject
+autotroll.com,auto troll,sold,2024-08-20,2,9,0,20,0.5,0,reject
+badbanagency.com,bad ban agency,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+bagsleatherbag.com,bags leather bag,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+ballstart.com,ball start,dropped,2026-10-06,2,9,0,20,0.95,0,accept
+ballwithlife.com,ball with life,dropped,2026-10-06,3,12,0,20,0.05,0,reject
+baseballprotein.com,baseball protein,dropped,2026-10-06,2,15,0,20,0.65,0,accept
+basedgame.com,based game,sold,2025-06-18,2,9,0,20,0.9,0,accept
+beatadvisor.com,beat advisor,sold,2024-12-06,2,11,0,20,0.95,0,accept
+beatyourbeat.com,beat your beat,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+beautifulyouink.com,beautiful you ink,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+besideai.com,beside ai,sold,2024-04-02,2,8,0,20,0.65,0,accept
+bestelectricfan.com,best electric fan,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+bestlogomaker.com,best logo maker,sold,2023-12-18,3,13,0,20,0.1,0,reject
+bestplacesapp.com,best places app,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+bestsignco.com,best sign co,dropped,2026-10-06,3,10,0,20,0.05,0,reject
+betwildcards.com,bet wild cards,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+biaswipe.com,bias wipe,dropped,2026-10-06,2,8,0,20,0.4,0,reject
+bigblacksmail.com,big blacks mail,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+bigjewelrycreation.com,big jewelry creation,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+biodisco.com,bio disco,sold,2025-08-19,2,8,0,20,0.7,0,accept
+bitcoinonezero.com,bitcoin one zero,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+blackpanthergym.com,black panther gym,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+blonderover.com,blonde rover,dropped,2026-10-06,2,11,0,20,0.55,0,accept
+bloodpressurepolice.com,blood pressure police,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+bluecyrus.com,blue cyrus,dropped,2026-10-06,2,9,0,20,0.5,0,reject
+bluedreamcourier.com,blue dream courier,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+blueforgeinnovations.com,blue forge innovations,dropped,2026-10-06,3,20,0,20,0.05,0,reject
+bluejunk.com,blue junk,sold,2024-12-11,2,8,0,20,0.6,0,accept
+blueridgeassociates.com,blue ridge associates,sold,2023-03-16,3,19,0,20,0.25,0,reject
+bluestardev.com,blue star dev,sold,2024-12-27,3,11,0,20,0.1,0,reject
+blupaint.com,blu paint,sold,2023-06-18,2,8,0,20,0.95,0,accept
+boardingapp.com,boarding app,sold,2024-07-12,2,11,0,20,0.5,0,reject
+bombayeventsvenue.com,bombay events venue,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+bookhouseboats.com,book house boats,sold,2024-06-24,3,14,0,20,0.0,0,reject
+breezeupstore.com,breeze up store,dropped,2026-10-06,3,13,0,20,0.1,0,reject
+bridgeviewcleaning.com,bridge view cleaning,dropped,2026-10-06,3,18,0,20,0.15,0,reject
+brotherfire.com,brother fire,sold,2025-06-30,2,11,0,20,0.75,0,accept
+browserforge.com,browser forge,sold,2025-04-15,2,12,0,20,0.85,0,accept
+buddypunchtasks.com,buddy punch tasks,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+budgetbreezeshop.com,budget breeze shop,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+businessdeployment.com,business deployment,dropped,2026-10-06,2,18,0,20,0.6,0,accept
+buttonlyfans.com,butt only fans,dropped,2026-10-06,3,12,0,20,0.05,0,reject
+buyauthenticwatch.com,buy authentic watch,dropped,2026-10-06,3,17,0,20,0.05,0,reject
+buyeasyproducts.com,buy easy products,dropped,2026-10-06,3,15,0,20,0.05,0,reject
+buyqatar.com,buy qatar,sold,2024-05-25,2,8,0,20,0.85,0,accept
+buysellcbd.com,buy sell cbd,dropped,2026-10-06,3,10,0,20,0.2,0,reject
+buyunlimited.com,buy unlimited,sold,2025-02-26,2,12,0,20,0.95,0,accept
+callbeast.com,call beast,sold,2023-07-21,2,9,0,20,0.95,0,accept
+calwindpower.com,cal wind power,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+camcontractors.com,cam contractors,sold,2025-04-15,2,14,0,20,0.65,1,accept
+camsetion.com,cam set ion,dropped,2026-10-06,3,9,0,20,0.0,0,reject
+canadafirstaid.com,canada first aid,sold,2025-07-04,3,14,0,20,0.2,1,accept
+canadapetpharmacy.com,canada pet pharmacy,sold,2025-10-03,3,17,0,20,0.05,0,reject
+canconvert.com,can convert,sold,2025-07-28,2,10,0,20,0.8,0,accept
+canewalls.com,cane walls,dropped,2026-10-06,2,9,0,20,0.6,0,accept
+capebreezetech.com,cape breeze tech,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+capitalcityshipping.com,capital city shipping,dropped,2026-10-06,3,19,0,20,0.25,0,reject
+careworldindia.com,care world india,dropped,2026-10-06,3,14,0,20,0.1,0,reject
+carolineelliott.com,caroline elliott,sold,2024-12-20,2,15,0,20,0.3,1,accept
+carstake.com,cars take,sold,2024-05-05,2,8,0,20,0.75,0,accept
+casestudied.com,case studied,sold,2023-09-06,2,11,0,20,0.45,1,accept
+catalogelectronics.com,catalog electronics,dropped,2026-10-06,2,18,0,20,0.65,0,accept
+catcatcool.com,cat cat cool,dropped,2026-10-06,3,10,0,20,0.1,0,reject
+catchthefeels.com,catch the feels,dropped,2026-10-06,3,13,0,20,0.1,0,reject
+catholicstatueworld.com,catholic statue world,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+ceobarbarajones.com,ceo barbara jones,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+ceramictechinc.com,ceramic tech inc,sold,2025-11-29,3,14,0,20,0.25,0,reject
+changewithspotify.com,change with spotify,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+charliemaccomedy.com,charlie mac comedy,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+chasingartproject.com,chasing art project,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+chasingfitnessdreams.com,chasing fitness dreams,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+chatbetty.com,chat betty,sold,2025-11-24,2,9,0,20,0.75,0,accept
+chatenabled.com,chat enabled,sold,2023-10-10,2,11,0,20,0.55,0,accept
+cheeseshirt.com,cheese shirt,sold,2023-11-17,2,11,0,20,0.65,0,accept
+cheftemp.com,chef temp,sold,2025-04-28,2,8,0,20,0.65,0,accept
+chiefquantumofficer.com,chief quantum officer,sold,2024-07-29,3,19,0,20,0.0,0,reject
+chinesestrategic.com,chinese strategic,dropped,2026-10-06,2,16,0,20,0.65,0,accept
+chitonconsulting.com,chi ton consulting,dropped,2026-10-06,3,16,0,20,0.0,1,accept
+choicesclaims.com,choices claims,dropped,2026-10-06,2,13,0,20,0.6,0,accept
+chrisegypt.com,chris egypt,dropped,2026-10-06,2,10,0,20,0.6,0,accept
+citysidebooks.com,city side books,dropped,2026-10-06,3,13,0,20,0.1,0,reject
+clanplus.com,clan plus,sold,2024-02-26,2,8,0,20,0.8,0,accept
+cleanerai.com,cleaner ai,sold,2023-03-02,2,9,0,20,0.7,0,accept
+clearalert.com,clear alert,sold,2023-07-29,2,10,0,20,0.9,1,accept
+clearsuccesspath.com,clear success path,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+cliprun.com,clip run,sold,2024-05-26,2,7,0,20,0.9,0,accept
+coachesgetlisted.com,coaches get listed,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+coachplanning.com,coach planning,dropped,2026-10-06,2,13,0,20,0.9,0,accept
+coastalflower.com,coastal flower,sold,2026-01-05,2,13,0,20,0.9,0,accept
+cognitiveproperty.com,cognitive property,sold,2025-11-21,2,17,0,20,0.85,0,accept
+colormaybleed.com,color may bleed,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+combatwatch.com,combat watch,sold,2024-05-27,2,11,0,20,0.75,0,accept
+commercialservicesgroup.com,commercial services group,sold,2025-03-12,3,23,0,20,0.4,1,accept
+companycomputer.com,company computer,sold,2024-12-12,2,15,0,20,0.95,0,accept
+conceptbrains.com,concept brains,dropped,2026-10-06,2,13,0,20,0.85,0,accept
+conchaos.com,con chaos,dropped,2026-10-06,2,8,0,20,0.85,1,accept
+concretedrivewayrepair.com,concrete driveway repair,sold,2024-06-30,3,22,0,20,0.1,1,accept
+connectioncapacity.com,connection capacity,sold,2025-10-14,2,18,0,20,0.45,1,accept
+controlring.com,control ring,sold,2026-02-10,2,11,0,20,1.0,0,accept
+convertagents.com,convert agents,sold,2025-05-03,2,13,0,20,0.75,0,accept
+coolanimalsthings.com,cool animals things,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+coolseolist.com,cool seo list,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+copiloteverywhere.com,co pilot everywhere,dropped,2026-10-06,3,17,0,20,0.4,0,reject
+coppercaptive.com,copper captive,dropped,2026-10-06,2,13,0,20,0.5,0,reject
+corightvip.com,co right vip,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+coslam.com,co slam,dropped,2026-10-06,2,6,0,20,0.9,0,accept
+courageborn.com,courage born,dropped,2026-10-06,2,11,0,20,0.6,0,accept
+courtsapp.com,courts app,sold,2025-01-15,2,9,0,20,0.6,0,accept
+crashconsult.com,crash consult,sold,2025-09-23,2,12,0,20,0.85,0,accept
+crashguys.com,crash guys,sold,2023-09-27,2,9,0,20,0.9,0,accept
+creatorscaling.com,creator scaling,sold,2025-09-04,2,14,0,20,0.65,0,accept
+creditsafeindia.com,credit safe india,dropped,2026-10-06,3,15,0,20,0.15,0,reject
+creditsaison.com,credits ai son,sold,2023-10-13,3,12,0,20,0.0,0,reject
+crimsonmistband.com,crimson mist band,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+cruisepackagedeal.com,cruise package deal,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+crystalbluerecycling.com,crystal blue recycling,dropped,2026-10-06,3,20,0,20,0.2,0,reject
+cryvonlabs.com,cry von labs,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+curelinkplus.com,cure link plus,dropped,2026-10-06,3,12,0,20,0.05,0,reject
+curlyhood.com,curly hood,dropped,2026-10-06,2,9,0,20,0.5,0,reject
+customcontainerpod.com,custom container pod,dropped,2026-10-06,3,18,0,20,0.05,0,reject
+customersupportai.com,customer support ai,sold,2022-05-03,3,17,0,20,0.1,0,reject
+dailydecortips.com,daily decor tips,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+dailyprizes.com,daily prizes,sold,2023-07-20,2,11,0,20,0.65,1,accept
+dandrivesdog.com,dan drives dog,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+davidflowerglass.com,david flower glass,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+dealsit.com,deals it,sold,2025-08-15,2,7,0,20,1.0,0,accept
+defencehouse.com,defence house,sold,2025-04-11,2,12,0,20,0.55,0,accept
+deldeal.com,del deal,dropped,2026-10-06,2,7,0,20,0.85,0,accept
+deliverydevil.com,delivery devil,sold,2025-03-10,2,13,0,20,0.8,0,accept
+dentalemergencyservice.com,dental emergency service,dropped,2026-10-06,3,22,0,20,0.1,1,accept
+detailingknight.com,detailing knight,dropped,2026-10-06,2,15,0,20,0.55,0,accept
+diamondbaseballholding.com,diamond baseball holding,dropped,2026-10-06,3,22,0,20,0.05,0,reject
+dianewestrum.com,diane west rum,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+dietmancom.com,diet man com,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+digitalhealthexplorer.com,digital health explorer,dropped,2026-10-06,3,21,0,20,0.2,0,reject
+digitupagency.com,digit up agency,sold,2025-06-27,3,13,0,20,0.25,0,reject
+directlybuzzoutreach.com,directly buzz outreach,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+discountchase.com,discount chase,dropped,2026-10-06,2,13,0,20,0.8,0,accept
+discountpottery.com,discount pottery,dropped,2026-10-06,2,15,0,20,0.7,0,accept
+dispatchtool.com,dispatch tool,sold,2025-04-30,2,12,0,20,0.85,0,accept
+dividetalent.com,divide talent,dropped,2026-10-06,2,12,0,20,0.65,0,accept
+dixonai.com,dixon ai,sold,2024-03-26,2,7,0,20,0.75,0,accept
+dolphinrealestates.com,dolphin real estates,dropped,2026-10-06,3,18,0,20,0.15,0,reject
+dominicanschoolmanila.com,dominican school manila,dropped,2026-10-06,3,21,0,20,0.0,0,reject
+drinkhealthycanada.com,drink healthy canada,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+drugaddictiontherapy.com,drug addiction therapy,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+dualidentitymusic.com,dual identity music,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+dundeegovjam.com,dundee gov jam,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+eaglenestco.com,eagle nest co,dropped,2026-10-06,3,11,0,20,0.3,0,reject
+earnbeta.com,earn beta,dropped,2026-10-06,2,8,0,20,0.9,0,accept
+earningtool.com,earning tool,sold,2025-07-12,2,11,0,20,0.75,0,accept
+easttile.com,east tile,sold,2024-03-22,2,8,0,20,0.9,0,accept
+easylifefoods.com,easy life foods,dropped,2026-10-06,3,13,0,20,0.2,0,reject
+echobuilder.com,echo builder,sold,2025-04-21,2,11,0,20,0.9,0,accept
+echolabsolutions.com,echo lab solutions,dropped,2026-10-06,3,16,0,20,0.1,0,reject
+ecologyandmindset.com,ecology and mindset,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+ecoretreatisland.com,eco retreat island,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+ecosafetech.com,eco safe tech,sold,2024-04-04,3,11,0,20,0.1,1,accept
+elevatedtattoos.com,elevated tattoos,dropped,2026-10-06,2,15,0,20,0.5,0,reject
+elevatedusa.com,elevated usa,sold,2024-07-16,2,11,0,20,0.85,0,accept
+elevationlandscapes.com,elevation landscapes,sold,2025-07-16,2,19,0,20,0.35,0,reject
+eliteexpertise.com,elite expertise,sold,2024-05-01,2,14,0,20,0.85,1,accept
+elitereviewspoint.com,elite reviews point,dropped,2026-10-06,3,17,0,20,0.05,0,reject
+elitesconsultants.com,elites consultants,dropped,2026-10-06,2,17,0,20,0.75,0,accept
+elitetaskforces.com,elite task forces,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+elitetranslationgroup.com,elite translation group,dropped,2026-10-06,3,21,0,20,0.0,0,reject
+elitevisapro.com,elite visa pro,dropped,2026-10-06,3,12,0,20,0.05,0,reject
+ellapay.com,ella pay,sold,2024-08-05,2,7,0,20,0.75,0,accept
+emeraldwildlife.com,emerald wildlife,dropped,2026-10-06,2,15,0,20,0.6,0,accept
+enterprisecloudai.com,enterprise cloud ai,sold,2025-09-09,3,17,0,20,0.25,0,reject
+epicborrowing.com,epic borrowing,dropped,2026-10-06,2,13,0,20,0.65,0,accept
+equipmentsalesireland.com,equipment sales ireland,dropped,2026-10-06,3,21,0,20,0.05,0,reject
+essentialoilblessings.com,essential oil blessings,dropped,2026-10-06,3,21,0,20,0.1,0,reject
+estherandaaron.com,esther and aaron,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+euroshopaudi.com,euro shop audi,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+eventbookpro.com,event book pro,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+eventdesignermexico.com,event designer mexico,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+expeditionmission.com,expedition mission,dropped,2026-10-06,2,17,0,20,0.75,0,accept
+extraunit.com,extra unit,sold,2024-05-07,2,9,0,20,0.9,0,accept
+faceyourdeath.com,face your death,dropped,2026-10-06,3,13,0,20,0.1,1,accept
+factualai.com,factual ai,sold,2022-12-14,2,9,0,20,0.6,0,accept
+familylawyerservices.com,family lawyer services,sold,2025-05-14,3,20,0,20,0.05,0,reject
+farmstayiceland.com,farm stay iceland,dropped,2026-10-06,3,15,0,20,0.05,0,reject
+fastwaymessenger.com,fast way messenger,dropped,2026-10-06,3,16,0,20,0.05,0,reject
+fatnowgone.com,fat now gone,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+favoritescene.com,favorite scene,sold,2025-10-12,2,13,0,20,0.6,0,accept
+featuremarket.com,feature market,sold,2022-12-10,2,13,0,20,0.75,0,accept
+femininepowernow.com,feminine power now,dropped,2026-10-06,3,16,0,20,0.1,0,reject
+fillmydeck.com,fill my deck,dropped,2026-10-06,3,10,0,20,0.1,0,reject
+findgomate.com,find go mate,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+findhoneysnow.com,find honey snow,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+findingflight.com,finding flight,sold,2023-09-02,2,13,0,20,0.65,0,accept
+findshadow.com,find shadow,sold,2023-06-12,2,10,0,20,0.9,0,accept
+findspeakerseasy.com,find speakers easy,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+findtheoffice.com,find the office,dropped,2026-10-06,3,13,0,20,0.25,0,reject
+finitetradezone.com,finite trade zone,dropped,2026-10-06,3,15,0,20,0.15,0,reject
+firesystemservices.com,fire system services,sold,2025-08-17,3,18,0,20,0.05,0,reject
+flatearthmemes.com,flat earth memes,dropped,2026-10-06,3,14,0,20,0.1,0,reject
+flightdates.com,flight dates,sold,2025-01-22,2,11,0,20,0.8,0,accept
+flyingpapercrafts.com,flying paper crafts,dropped,2026-10-06,3,17,0,20,0.05,0,reject
+followyourspark.com,follow your spark,sold,2024-07-23,3,15,0,20,0.05,0,reject
+footfast.com,foot fast,sold,2023-09-29,2,8,0,20,0.9,0,accept
+forexexperttrader.com,forex expert trader,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+fortuneskins.com,fortune skins,dropped,2026-10-06,2,12,0,20,0.75,0,accept
+founderlogs.com,founder logs,sold,2024-12-27,2,11,0,20,0.95,0,accept
+fourthhorizon.com,fourth horizon,sold,2026-02-28,2,13,0,20,0.7,0,accept
+foxmassage.com,fox massage,sold,2023-02-22,2,10,0,20,0.85,0,accept
+framesignal.com,frame signal,sold,2025-07-27,2,11,0,20,0.95,0,accept
+freedomforbangladesh.com,freedom for bangladesh,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+freeworldasia.com,free world asia,dropped,2026-10-06,3,13,0,20,0.25,0,reject
+freightbuzzllc.com,freight buzz llc,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+funkynext.com,funky next,dropped,2026-10-06,2,9,0,20,0.8,0,accept
+furniturehometips.com,furniture home tips,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+galaxysoundsstudios.com,galaxy sounds studios,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+gameflight.com,game flight,sold,2024-09-05,2,10,0,20,1.0,0,accept
+gamingaiagent.com,gaming ai agent,sold,2024-12-16,3,13,0,20,0.45,0,reject
+gangstag.com,gangs tag,dropped,2026-10-06,2,8,0,20,0.45,0,reject
+garagecleaningservices.com,garage cleaning services,sold,2025-01-24,3,22,0,20,0.3,0,reject
+gardenslice.com,garden slice,sold,2025-04-29,2,11,0,20,0.9,0,accept
+gasinfrastructurecompany.com,gas infrastructure company,dropped,2026-10-06,3,24,0,20,0.0,0,reject
+gemsolutionsinc.com,gem solutions inc,dropped,2026-10-06,3,15,0,20,0.2,0,reject
+gemstarvisions.com,gem star visions,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+genelse.com,gen else,dropped,2026-10-06,2,7,0,20,0.6,0,accept
+genevamagazine.com,geneva magazine,dropped,2026-10-06,2,14,0,20,0.7,0,accept
+geniusshot.com,genius shot,sold,2024-01-29,2,10,0,20,0.95,0,accept
+genociderecords.com,genocide records,dropped,2026-10-06,2,15,0,20,0.55,0,accept
+getmotiveretail.com,get motive retail,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+giftboxhouse.com,gift box house,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+girldadvibe.com,girl dad vibe,dropped,2026-10-06,3,11,0,20,0.1,0,reject
+glenoil.com,glen oil,sold,2025-11-03,2,7,0,20,0.8,0,accept
+globalbusinesstechnology.com,global business technology,dropped,2026-10-06,3,24,0,20,0.15,0,reject
+globaldispute.com,global dispute,sold,2025-11-27,2,13,0,20,0.55,0,accept
+globalgoldenvisa.com,global golden visa,sold,2025-07-24,3,16,0,20,0.05,0,reject
+globalspiderweb.com,global spider web,sold,2025-10-04,3,15,0,20,0.0,0,reject
+glowingumbrella.com,glowing umbrella,dropped,2026-10-06,2,15,0,20,0.75,0,accept
+goalsetai.com,goal set ai,dropped,2026-10-06,3,9,0,20,0.1,0,reject
+goarmordial.com,go armor dial,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+goatleads.com,goat leads,sold,2023-03-30,2,9,0,20,0.95,0,accept
+godmadeisaac.com,god made isaac,dropped,2026-10-06,3,12,0,20,0.1,0,reject
+goingwithjoe.com,going with joe,dropped,2026-10-06,3,12,0,20,0.15,0,reject
+goldhotelsolutions.com,gold hotel solutions,dropped,2026-10-06,3,18,0,20,0.05,0,reject
+gowarriormails.com,go warrior mails,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+gradeagent.com,grade agent,sold,2024-10-10,2,10,0,20,0.7,0,accept
+greatcustomstuff.com,great custom stuff,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+greenalternativefuels.com,green alternative fuels,dropped,2026-10-06,3,21,0,20,0.0,0,reject
+greenlinetest.com,green line test,sold,2025-09-12,3,13,0,20,0.3,1,accept
+groundedarticles.com,grounded articles,dropped,2026-10-06,2,16,0,20,0.7,0,accept
+guaranteedleadacquisition.com,guaranteed lead acquisition,dropped,2026-10-06,3,25,0,20,0.0,0,reject
+guardianangeltactics.com,guardian angel tactics,dropped,2026-10-06,3,20,0,20,0.1,0,reject
+gymcomment.com,gym comment,dropped,2026-10-06,2,10,0,20,0.7,0,accept
+habitson.com,habit son,dropped,2026-10-06,2,8,0,20,0.6,0,accept
+handrand.com,hand rand,dropped,2026-10-06,2,8,0,20,0.7,0,accept
+hardsleep.com,hard sleep,sold,2024-07-07,2,9,0,20,0.8,0,accept
+havencresthomes.com,haven crest homes,sold,2025-04-09,3,15,0,20,0.1,0,reject
+hawkdownofficial.com,hawk down official,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+healthcareconsultingjobs.com,healthcare consulting jobs,sold,2024-01-18,3,24,0,20,0.0,0,reject
+hearingaidmask.com,hearing aid mask,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+hedgestonehub.com,hedge stone hub,dropped,2026-10-06,3,13,0,20,0.05,0,reject
+heirwise.com,heir wise,sold,2025-05-06,2,8,0,20,0.75,0,accept
+helloeng.com,hello eng,sold,2022-12-29,2,8,0,20,0.95,1,accept
+helpunitedabc.com,help united abc,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+herbertandlinda.com,herbert and linda,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+herhop.com,her hop,sold,2024-10-27,2,6,0,20,1.0,0,accept
+heyclientget.com,hey client get,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+highflowagency.com,high flow agency,dropped,2026-10-06,3,14,0,20,0.15,0,reject
+hindiday.com,hindi day,sold,2026-01-25,2,8,0,20,0.7,0,accept
+hitforfun.com,hit for fun,sold,2025-07-21,3,9,0,20,0.2,0,reject
+homeinkivy.com,home ink ivy,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+hopejournals.com,hope journals,sold,2025-08-16,2,12,0,20,0.8,0,accept
+hormonebalanceclinic.com,hormone balance clinic,sold,2025-01-15,3,20,0,20,0.0,0,reject
+horrorpropsshop.com,horror props shop,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+hoseai.com,hose ai,sold,2023-05-03,2,6,0,20,0.55,0,accept
+hostingcostarica.com,hosting costa rica,sold,2025-10-19,3,16,0,20,0.15,1,accept
+hotthinking.com,hot thinking,dropped,2026-10-06,2,11,0,20,0.9,0,accept
+housekent.com,house kent,dropped,2026-10-06,2,9,0,20,0.7,0,accept
+housingsuperapp.com,housing super app,sold,2024-02-15,3,15,0,20,0.15,0,reject
+hrmindai.com,hr mind ai,dropped,2026-10-06,3,8,0,20,0.3,0,reject
+hugegoldmusic.com,huge gold music,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+hughescontact.com,hughes contact,dropped,2026-10-06,2,13,0,20,0.55,0,accept
+humanplane.com,human plane,sold,2025-08-03,2,10,0,20,0.7,0,accept
+huntingsuccess.com,hunting success,dropped,2026-10-06,2,14,0,20,0.65,0,accept
+hustleandshop.com,hustle and shop,dropped,2026-10-06,3,13,0,20,0.2,0,reject
+icedigitalcampus.com,ice digital campus,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+icondot.com,icon dot,sold,2024-01-29,2,7,0,20,1.0,0,accept
+idealtracker.com,ideal tracker,sold,2024-10-29,2,12,0,20,1.0,0,accept
+illusionbook.com,illusion book,sold,2025-07-03,2,12,0,20,0.65,0,accept
+imageplustype.com,image plus type,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+imaginedestate.com,imagined estate,dropped,2026-10-06,2,14,0,20,0.5,0,reject
+immortalitservice.com,immortal it service,dropped,2026-10-06,3,17,0,20,0.15,0,reject
+impactwindowsdirect.com,impact windows direct,sold,2024-07-21,3,19,0,20,0.0,1,accept
+imperialmetalbuyer.com,imperial metal buyer,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+indoorduck.com,indoor duck,dropped,2026-10-06,2,10,0,20,0.65,0,accept
+infectionpreventionnow.com,infection prevention now,dropped,2026-10-06,3,22,0,20,0.05,0,reject
+infojetglobal.com,info jet global,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+innercombat.com,inner combat,dropped,2026-10-06,2,11,0,20,0.85,0,accept
+innerloopai.com,inner loop ai,sold,2025-07-17,3,11,0,20,0.2,0,reject
+insightnewszone.com,insight news zone,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+insighttherapyservices.com,insight therapy services,sold,2025-10-26,3,22,0,20,0.15,1,accept
+insighttrainingsolutions.com,insight training solutions,sold,2025-08-14,3,24,0,20,0.1,0,reject
+intelligenceequity.com,intelligence equity,sold,2025-04-07,2,18,0,20,0.85,0,accept
+interiorhousepainter.com,interior house painter,sold,2024-09-27,3,20,0,20,0.0,0,reject
+internetoil.com,internet oil,dropped,2026-10-06,2,11,0,20,0.9,0,accept
+internetservicehub.com,internet service hub,dropped,2026-10-06,3,18,0,20,0.1,0,reject
+investclearly.com,invest clearly,sold,2023-09-28,2,13,0,20,0.45,0,reject
+iqhat.com,iq hat,sold,2024-02-04,2,5,0,20,0.7,0,accept
+irelandanimalclinic.com,ireland animal clinic,sold,2025-11-05,3,19,0,20,0.05,1,accept
+ironbridgefinancial.com,iron bridge financial,sold,2023-10-09,3,19,0,20,0.2,0,reject
+irontigersmart.com,iron tiger smart,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+italyfashiontime.com,italy fashion time,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+itstravels.com,its travels,sold,2025-10-09,2,10,0,20,0.85,0,accept
+ivyweightloss.com,ivy weight loss,sold,2024-06-02,3,13,0,20,0.1,0,reject
+jackwidow.com,jack widow,sold,2023-07-16,2,9,0,20,0.45,0,reject
+jarchain.com,jar chain,sold,2025-12-14,2,8,0,20,0.85,0,accept
+jasonelite.com,jason elite,dropped,2026-10-06,2,10,0,20,0.8,0,accept
+jeffjoycephotography.com,jeff joyce photography,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+jellylabs.com,jelly labs,sold,2022-12-13,2,9,0,20,0.6,0,accept
+jellytide.com,jelly tide,sold,2026-05-03,2,9,0,20,0.9,1,accept
+jenkinsfinancialadvisor.com,jenkins financial advisor,dropped,2026-10-06,3,23,0,20,0.15,0,reject
+jeremykelly.com,jeremy kelly,sold,2025-05-01,2,11,0,20,0.2,1,accept
+jeremymorrislaw.com,jeremy morris law,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+jobsearchacademy.com,job search academy,sold,2024-05-07,3,16,0,20,0.15,0,reject
+jobsilver.com,job silver,sold,2025-10-03,2,9,0,20,0.9,0,accept
+joeybrennan.com,joey brennan,sold,2025-10-03,2,11,0,20,0.3,0,reject
+johnmattman.com,john matt man,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+jupiterhomewatch.com,jupiter home watch,sold,2022-01-28,3,16,0,20,0.0,0,reject
+karenfatigue.com,karen fatigue,dropped,2026-10-06,2,12,0,20,0.3,0,reject
+kaydevwedding.com,kay dev wedding,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+kindateen.com,kinda teen,dropped,2026-10-06,2,9,0,20,0.4,0,reject
+kingdommindedmom.com,kingdom minded mom,dropped,2026-10-06,3,16,0,20,0.05,0,reject
+kingmaxlighting.com,king max lighting,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+knightenergyconsultants.com,knight energy consultants,dropped,2026-10-06,3,23,0,20,0.1,0,reject
+knitwithhandmade.com,knit with handmade,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+kuwaitlawyer.com,kuwait lawyer,sold,2025-05-05,2,12,0,20,0.65,1,accept
+kylepatterson.com,kyle patterson,sold,2026-02-27,2,13,0,20,0.1,1,accept
+lagband.com,lag band,dropped,2026-10-06,2,7,0,20,0.65,0,accept
+lancasterjewelry.com,lancaster jewelry,sold,2024-08-31,2,16,0,20,0.65,0,accept
+landintegritysolutions.com,land integrity solutions,dropped,2026-10-06,3,22,0,20,0.05,0,reject
+landmatchplay.com,land match play,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+lawpic.com,law pic,sold,2024-12-16,2,6,0,20,0.45,0,reject
+laypreachingacademy.com,lay preaching academy,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+leaderorange.com,leader orange,dropped,2026-10-06,2,12,0,20,0.85,0,accept
+leadscampaign.com,leads campaign,sold,2025-06-18,2,13,0,20,0.75,0,accept
+leantreat.com,lean treat,sold,2024-07-23,2,9,0,20,0.85,0,accept
+learnmedmath.com,learn med math,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+leatherfreeclothes.com,leather free clothes,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+legacymachinerysales.com,legacy machinery sales,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+lensoffer.com,lens offer,sold,2024-09-20,2,9,0,20,0.95,0,accept
+lensreel.com,lens reel,sold,2025-05-31,2,8,0,20,1.0,0,accept
+lestonai.com,les ton ai,dropped,2026-10-06,3,8,0,20,0.0,0,reject
+letsprompt.com,lets prompt,sold,2022-12-20,2,10,0,20,0.85,0,accept
+levelsai.com,levels ai,sold,2024-01-07,2,8,0,20,0.7,0,accept
+lifefinancialplanning.com,life financial planning,sold,2025-01-14,3,21,0,20,0.25,0,reject
+lifetreecosmetics.com,life tree cosmetics,dropped,2026-10-06,3,17,0,20,0.2,0,reject
+limepersonnel.com,lime personnel,dropped,2026-10-06,2,13,0,20,0.55,0,accept
+linkedinlogsbuilders.com,linkedin logs builders,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+littlehumanapp.com,little human app,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+littlemoosebrands.com,little moose brands,dropped,2026-10-06,3,17,0,20,0.05,0,reject
+lobsterbot.com,lobster bot,sold,2025-06-06,2,10,0,20,0.65,0,accept
+lobsteriq.com,lobster iq,sold,2026-03-12,2,9,0,20,0.8,0,accept
+localstages.com,local stages,sold,2026-04-08,2,11,0,20,0.7,1,accept
+locatefixture.com,locate fixture,dropped,2026-10-06,2,13,0,20,0.3,0,reject
+loopyields.com,loop yields,dropped,2026-10-06,2,10,0,20,0.6,0,accept
+lordsholidays.com,lords holidays,dropped,2026-10-06,2,13,0,20,0.6,0,accept
+lotgal.com,lot gal,sold,2025-08-08,2,6,0,20,0.7,0,accept
+loubabylinks.com,lou baby links,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+lowestpriceplanes.com,lowest price planes,dropped,2026-10-06,3,17,0,20,0.05,0,reject
+lowhopes.com,low hopes,dropped,2026-10-06,2,8,0,20,0.6,0,accept
+lowlend.com,low lend,sold,2025-11-30,2,7,0,20,0.85,0,accept
+lowpricereviews.com,low price reviews,dropped,2026-10-06,3,15,0,20,0.05,0,reject
+lunacandy.com,luna candy,sold,2025-02-26,2,9,0,20,0.9,0,accept
+machineshopcafe.com,machine shop cafe,dropped,2026-10-06,3,15,0,20,0.1,0,reject
+macrodeep.com,macro deep,sold,2025-10-29,2,9,0,20,0.8,0,accept
+magicmoneyai.com,magic money ai,sold,2025-03-28,3,12,0,20,0.05,0,reject
+mailboostapp.com,mail boost app,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+mailsprimedate.com,mails prime date,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+mainandrose.com,main and rose,dropped,2026-10-06,3,11,0,20,0.15,0,reject
+mainfans.com,main fans,sold,2025-12-04,2,8,0,20,0.95,0,accept
+makeshots.com,make shots,sold,2025-03-25,2,9,0,20,0.85,0,accept
+mamaplate.com,mama plate,dropped,2026-10-06,2,9,0,20,0.9,0,accept
+managedagent.com,managed agent,sold,2024-11-18,2,12,0,20,0.85,0,accept
+mangainfo.com,manga info,sold,2024-11-27,2,9,0,20,1.0,1,accept
+marketingmug.com,marketing mug,sold,2026-06-15,2,12,0,20,0.75,0,accept
+marriagecity.com,marriage city,sold,2025-12-14,2,12,0,20,1.0,0,accept
+massrestaurant.com,mass restaurant,sold,2026-02-13,2,14,0,20,0.75,1,accept
+masternodeempire.com,master node empire,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+materialgrowth.com,material growth,sold,2025-02-05,2,14,0,20,1.0,0,accept
+mattgrace.com,matt grace,sold,2025-01-11,2,9,0,20,0.9,1,accept
+matthewschevrolet.com,matthews chevrolet,sold,2025-02-28,2,17,0,20,0.35,0,reject
+maxdigitalshop.com,max digital shop,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+maxwellstonegroup.com,maxwell stone group,dropped,2026-10-06,3,17,0,20,0.15,0,reject
+medicalseoservices.com,medical seo services,sold,2025-12-22,3,18,0,20,0.1,0,reject
+medicalvehicles.com,medical vehicles,sold,2025-11-17,2,15,0,20,0.75,0,accept
+merrymove.com,merry move,sold,2024-02-28,2,9,0,20,0.75,0,accept
+metaaielections.com,meta ai elections,dropped,2026-10-06,3,15,0,20,0.2,0,reject
+metaeverybody.com,meta everybody,dropped,2026-10-06,2,13,0,20,0.5,0,reject
+metasam.com,meta sam,sold,2023-04-27,2,7,0,20,0.8,0,accept
+metrometalrecycling.com,metro metal recycling,sold,2024-12-28,3,19,0,20,0.05,1,accept
+michellegauthor.com,michel leg author,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+midnightdrivingclub.com,midnight driving club,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+midwayairportparking.com,midway airport parking,sold,2024-12-25,3,20,0,20,0.0,0,reject
+migrationlaws.com,migration laws,sold,2025-12-28,2,13,0,20,0.6,0,accept
+mindmesh.com,mind mesh,sold,2025-10-28,2,8,0,20,0.95,1,accept
+minimalmark.com,minimal mark,dropped,2026-10-06,2,11,0,20,0.85,0,accept
+mintaway.com,mint away,sold,2022-01-18,2,8,0,20,1.0,0,accept
+missengineer.com,miss engineer,sold,2025-05-19,2,12,0,20,0.85,1,accept
+mobilityauction.com,mobility auction,sold,2025-04-25,2,15,0,20,0.8,0,accept
+modernkitchenrenovation.com,modern kitchen renovation,sold,2023-10-08,3,23,0,20,0.05,0,reject
+modeupclean.com,mode up clean,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+momentsforexcellence.com,moments for excellence,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+monacocarrental.com,monaco car rental,sold,2024-07-09,3,15,0,20,0.2,0,reject
+monarchyllc.com,monarchy llc,dropped,2026-10-06,2,11,0,20,0.5,0,reject
+mondaymentalhealth.com,monday mental health,sold,2026-01-25,3,18,0,20,0.25,0,reject
+moneypolymath.com,money poly math,dropped,2026-10-06,3,13,0,20,0.05,0,reject
+moneyswing.com,money swing,sold,2025-01-04,2,10,0,20,0.7,0,accept
+monhosting.com,mon hosting,dropped,2026-10-06,2,10,0,20,0.8,0,accept
+monroeresidence.com,monroe residence,dropped,2026-10-06,2,15,0,20,0.55,0,accept
+monsterfocus.com,monster focus,sold,2025-10-16,2,12,0,20,0.95,1,accept
+moosecreekcenter.com,moose creek center,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+mortgageseal.com,mortgage seal,sold,2025-11-16,2,12,0,20,0.6,0,accept
+motionforjustice.com,motion for justice,sold,2025-09-18,3,16,0,20,0.15,1,accept
+multiliquid.com,multi liquid,sold,2024-12-17,2,11,0,20,0.8,0,accept
+myaifinance.com,my ai finance,sold,2025-03-24,3,11,0,20,0.4,0,reject
+mymapsmedia.com,my maps media,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+mymonstertracker.com,my monster tracker,dropped,2026-10-06,3,16,0,20,0.1,0,reject
+mypalai.com,my pal ai,sold,2023-07-01,3,7,0,20,0.05,0,reject
+myperfectshield.com,my perfect shield,dropped,2026-10-06,3,15,0,20,0.2,0,reject
+myshortebook.com,my short ebook,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+myskillspassport.com,my skills passport,sold,2024-05-20,3,16,0,20,0.0,1,accept
+mytownorders.com,my town orders,dropped,2026-10-06,3,12,0,20,0.25,0,reject
+mytradefair.com,my trade fair,sold,2024-11-18,3,11,0,20,0.2,1,accept
+mywiseinsurance.com,my wise insurance,sold,2026-01-29,3,15,0,20,0.05,0,reject
+nateperryathlete.com,nate perry athlete,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+nathansonholiday.com,nathan son holiday,dropped,2026-10-06,3,16,0,20,0.05,0,reject
+naturaloptionshealth.com,natural options health,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+naturalrings.com,natural rings,sold,2023-08-23,2,12,0,20,0.85,0,accept
+natureseoul.com,nature seoul,dropped,2026-10-06,2,11,0,20,0.65,0,accept
+necklacewear.com,necklace wear,dropped,2026-10-06,2,12,0,20,0.55,0,accept
+netsecuritytech.com,net security tech,dropped,2026-10-06,3,15,0,20,0.1,0,reject
+neuralcaptain.com,neural captain,sold,2024-04-06,2,13,0,20,0.85,0,accept
+neuralomega.com,neural omega,sold,2023-01-30,2,11,0,20,0.65,0,accept
+newcastletherapy.com,newcastle therapy,sold,2024-12-17,2,16,0,20,0.8,0,accept
+newlifehousing.com,new life housing,sold,2025-08-15,3,14,0,20,0.35,1,accept
+nextdaynetworks.com,next day networks,dropped,2026-10-06,3,15,0,20,0.3,0,reject
+nexusphotographics.com,nexus photo graphics,dropped,2026-10-06,3,18,0,20,0.05,0,reject
+nicholasclaythompson.com,nicholas clay thompson,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+nickelsystem.com,nickel system,sold,2024-06-23,2,12,0,20,0.75,0,accept
+nightshiftartist.com,night shift artist,dropped,2026-10-06,3,16,0,20,0.1,0,reject
+nonsenseblog.com,nonsense blog,dropped,2026-10-06,2,12,0,20,0.5,0,reject
+northpointcoaching.com,north point coaching,sold,2025-12-10,3,18,0,20,0.25,1,accept
+nothingordinarybeauty.com,nothing ordinary beauty,dropped,2026-10-06,3,21,0,20,0.0,0,reject
+notionday.com,notion day,dropped,2026-10-06,2,9,0,20,0.65,0,accept
+notjustmovies.com,not just movies,sold,2023-12-01,3,13,0,20,0.15,1,accept
+novatransit.com,nova transit,sold,2025-08-24,2,11,0,20,0.85,1,accept
+nowzipmarketing.com,now zip marketing,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+oddsscout.com,odds scout,sold,2025-05-07,2,9,0,20,0.9,0,accept
+offrunning.com,off running,sold,2024-09-09,2,10,0,20,0.9,0,accept
+oldwatershow.com,old water show,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+olympicdoors.com,olympic doors,sold,2024-06-25,2,12,0,20,0.7,0,accept
+onequarterbrand.com,one quarter brand,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+oneranks.com,one ranks,sold,2026-01-26,2,8,0,20,0.8,0,accept
+onewordwonders.com,one word wonders,dropped,2026-10-06,3,14,0,20,0.15,0,reject
+onlineitemdepot.com,online item depot,dropped,2026-10-06,3,15,0,20,0.05,0,reject
+onlychase.com,only chase,sold,2025-01-24,2,9,0,20,0.85,0,accept
+onlyexams.com,only exams,sold,2025-09-19,2,9,0,20,0.9,0,accept
+onlyglowbeauty.com,only glow beauty,dropped,2026-10-06,3,14,0,20,0.15,0,reject
+oopssuits.com,oops suits,dropped,2026-10-06,2,9,0,20,0.45,0,reject
+opsguide.com,ops guide,sold,2025-01-12,2,8,0,20,0.9,1,accept
+orangearabia.com,orange arabia,sold,2024-08-23,2,12,0,20,0.7,0,accept
+orbitstairs.com,orbit stairs,dropped,2026-10-06,2,11,0,20,0.65,0,accept
+orderessay.com,order essay,sold,2024-02-27,2,10,0,20,0.65,1,accept
+outerknownclothing.com,outer known clothing,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+outfitlanes.com,outfit lanes,dropped,2026-10-06,2,11,0,20,0.5,0,reject
+overviewpros.com,overview pros,sold,2024-05-14,2,12,0,20,0.65,0,accept
+oxfordpizza.com,oxford pizza,sold,2021-09-30,2,11,0,20,0.9,0,accept
+pablopencil.com,pablo pencil,dropped,2026-10-06,2,11,0,20,0.35,0,reject
+paidmessage.com,paid message,sold,2023-11-01,2,11,0,20,0.8,0,accept
+palmbuild.com,palm build,sold,2025-11-26,2,9,0,20,0.9,0,accept
+palmeranetwork.com,palm era network,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+palmmygreen.com,palm my green,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+palmship.com,palm ship,sold,2021-12-09,2,8,0,20,1.0,0,accept
+partsimports.com,parts imports,sold,2025-01-09,2,12,0,20,0.8,0,accept
+partystrategy.com,party strategy,dropped,2026-10-06,2,13,0,20,0.9,0,accept
+passionwaveshop.com,passion wave shop,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+patchrated.com,patch rated,sold,2026-08-31,2,10,0,20,0.65,0,accept
+patentlawfirms.com,patent law firms,sold,2025-02-02,3,14,0,20,0.05,0,reject
+patriotgaragedoors.com,patriot garage doors,sold,2024-08-02,3,18,0,20,0.1,0,reject
+paytabgo.com,pay tab go,dropped,2026-10-06,3,8,0,20,0.0,0,reject
+pdfeden.com,pdf eden,dropped,2026-10-06,2,7,0,20,0.6,0,accept
+peakbag.com,peak bag,sold,2025-12-01,2,7,0,20,0.95,1,accept
+performanceaidata.com,performance ai data,dropped,2026-10-06,3,17,0,20,0.05,0,reject
+petwines.com,pet wines,sold,2025-01-24,2,8,0,20,0.95,0,accept
+photographydreams.com,photography dreams,dropped,2026-10-06,2,17,0,20,0.6,0,accept
+physicalsuperintelligence.com,physical super intelligence,sold,2025-07-08,3,25,0,20,0.25,0,reject
+pingarden.com,pin garden,sold,2025-03-07,2,9,0,20,0.85,0,accept
+pinmypain.com,pin my pain,sold,2025-09-12,3,9,0,20,0.05,1,accept
+pipelogincome.com,pipe log income,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+pitbullsbrewery.com,pit bulls brewery,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+pixelbanggame.com,pixel bang game,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+platinumgenesis.com,platinum genesis,dropped,2026-10-06,2,15,0,20,0.8,0,accept
+playaustraliangames.com,play australian games,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+playfortunebrazil.com,play fortune brazil,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+plusringquiet.com,plus ring quiet,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+pointgloballogs.com,point global logs,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+pokehost.com,poke host,dropped,2026-10-06,2,8,0,20,0.8,1,accept
+pokeprovisions.com,poke provisions,dropped,2026-10-06,2,14,0,20,0.85,0,accept
+politicsentrepreneur.com,politics entrepreneur,dropped,2026-10-06,2,20,0,20,0.6,0,accept
+portalmembersonline.com,portal members online,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+portercollection.com,porter collection,dropped,2026-10-06,2,16,0,20,0.8,0,accept
+powelldailypay.com,powell daily pay,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+practicallymagicgarden.com,practically magic garden,dropped,2026-10-06,3,22,0,20,0.0,0,reject
+prandpolitics.com,pr and politics,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+preciseincome.com,precise income,sold,2022-05-08,2,13,0,20,0.9,0,accept
+precisionmedicalclinic.com,precision medical clinic,sold,2025-08-16,3,22,0,20,0.2,0,reject
+preparedforriders.com,prepared for riders,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+pricebrostransportation.com,price bros transportation,dropped,2026-10-06,3,23,0,20,0.0,0,reject
+priestscottage.com,priests cottage,dropped,2026-10-06,2,14,0,20,0.4,0,reject
+printyourjoy.com,print your joy,dropped,2026-10-06,3,12,0,20,0.1,1,accept
+prnewspulse.com,pr news pulse,dropped,2026-10-06,3,11,0,20,0.2,0,reject
+probowlcontest.com,pro bowl contest,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+productemail.com,product email,sold,2025-11-26,2,12,0,20,0.8,0,accept
+profitsdepot.com,profits depot,sold,2023-05-01,2,12,0,20,0.6,0,accept
+progolfconnect.com,pro golf connect,dropped,2026-10-06,3,14,0,20,0.1,0,reject
+progressframe.com,progress frame,sold,2025-09-27,2,13,0,20,0.95,0,accept
+promptgate.com,prompt gate,sold,2025-06-13,2,10,0,20,0.95,0,accept
+promptwarrior.com,prompt warrior,sold,2024-02-03,2,13,0,20,0.8,0,accept
+propartnerships.com,pro partnerships,sold,2025-09-06,2,15,0,20,0.6,0,accept
+properaviationmaintenance.com,proper aviation maintenance,dropped,2026-10-06,3,25,0,20,0.0,0,reject
+proveflex.com,prove flex,dropped,2026-10-06,2,9,0,20,0.65,0,accept
+psychiatristcare.com,psychiatrist care,sold,2023-04-26,2,16,0,20,0.55,0,accept
+publicstorytelling.com,public storytelling,sold,2026-03-20,2,18,0,20,0.55,1,accept
+pursuitmortgagegroup.com,pursuit mortgage group,dropped,2026-10-06,3,20,0,20,0.05,0,reject
+quantumrev.com,quantum rev,sold,2022-05-15,2,10,0,20,0.75,0,accept
+queenmotherpromo.com,queen mother promo,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+quickpaynetwork.com,quick pay network,dropped,2026-10-06,3,15,0,20,0.15,0,reject
+quietbody.com,quiet body,sold,2025-01-08,2,9,0,20,0.9,1,accept
+quotedsecurities.com,quoted securities,dropped,2026-10-06,2,16,0,20,0.3,0,reject
+radiorestaurant.com,radio restaurant,sold,2025-08-27,2,15,0,20,0.75,1,accept
+raisingandwriting.com,raising and writing,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+ralphrose.com,ralph rose,sold,2026-04-02,2,9,0,20,0.5,0,reject
+rankprompt.com,rank prompt,sold,2023-02-22,2,10,0,20,0.6,0,accept
+rapidfirerob.com,rapid fire rob,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+rapidroad.com,rapid road,sold,2023-10-05,2,9,0,20,0.95,1,accept
+rawmodern.com,raw modern,sold,2026-01-24,2,9,0,20,0.95,0,accept
+raymorehomes.com,ray more homes,sold,2025-03-28,3,12,0,20,0.0,0,reject
+reallayer.com,real layer,sold,2025-01-16,2,9,0,20,0.95,0,accept
+realrosecosmetics.com,real rose cosmetics,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+realworldbench.com,real world bench,sold,2026-04-17,3,14,0,20,0.2,0,reject
+recordmeeting.com,record meeting,sold,2025-05-29,2,13,0,20,0.85,1,accept
+recoverystartupcredits.com,recovery startup credits,dropped,2026-10-06,3,22,0,20,0.05,0,reject
+redaisin.com,red ai sin,dropped,2026-10-06,3,8,0,20,0.0,0,reject
+redeyeprojects.com,red eye projects,dropped,2026-10-06,3,14,0,20,0.15,0,reject
+redratsnest.com,red rats nest,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+referraljump.com,referral jump,dropped,2026-10-06,2,12,0,20,0.6,0,accept
+reignwoodfinance.com,reign wood finance,dropped,2026-10-06,3,16,0,20,0.05,0,reject
+relyrealestate.com,rely real estate,sold,2025-02-07,3,14,0,20,0.45,0,reject
+remotehealthcarejobs.com,remote healthcare jobs,sold,2024-01-08,3,20,0,20,0.1,0,reject
+rentalcardelivery.com,rental car delivery,sold,2023-02-19,3,17,0,20,0.0,0,reject
+rentaltemples.com,rental temples,dropped,2026-10-06,2,13,0,20,0.4,0,reject
+revelationbreakthrough.com,revelation breakthrough,dropped,2026-10-06,2,22,0,20,0.4,0,reject
+revoltpowersports.com,revolt power sports,sold,2023-09-28,3,17,0,20,0.25,0,reject
+rewardsrabbit.com,rewards rabbit,sold,2024-12-04,2,13,0,20,0.65,0,accept
+rhythmfun.com,rhythm fun,sold,2024-09-11,2,9,0,20,0.9,1,accept
+ridgelineit.com,ridge line it,sold,2025-01-18,3,11,0,20,0.3,1,accept
+rioglow.com,rio glow,sold,2026-02-17,2,7,0,20,0.9,0,accept
+risingfilipinoawards.com,rising filipino awards,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+robitsan.com,rob it san,dropped,2026-10-06,3,8,0,20,0.05,0,reject
+rockcompanion.com,rock companion,dropped,2026-10-06,2,13,0,20,1.0,0,accept
+rockymybuddy.com,rocky my buddy,dropped,2026-10-06,3,12,0,20,0.05,0,reject
+romanrecords.com,roman records,sold,2025-04-02,2,12,0,20,0.75,1,accept
+romcruise.com,rom cruise,dropped,2026-10-06,2,9,0,20,0.65,0,accept
+roomar.com,room ar,sold,2023-07-14,2,6,0,20,0.75,0,accept
+rosaellen.com,rosa ellen,dropped,2026-10-06,2,9,0,20,0.25,0,reject
+rowdesigns.com,row designs,sold,2025-08-18,2,10,0,20,0.9,0,accept
+rushslot.com,rush slot,sold,2025-02-16,2,8,0,20,0.75,0,accept
+russiandrones.com,russian drones,sold,2025-01-20,2,13,0,20,0.65,0,accept
+sacfood.com,sac food,sold,2026-05-23,2,7,0,20,0.75,0,accept
+sadsexy.com,sad sexy,dropped,2026-10-06,2,7,0,20,0.65,0,accept
+safariintelligence.com,safari intelligence,sold,2025-12-02,2,18,0,20,0.9,0,accept
+sagecase.com,sage case,sold,2025-06-17,2,8,0,20,1.0,0,accept
+salesmarketingspark.com,sales marketing spark,dropped,2026-10-06,3,19,0,20,0.05,0,reject
+sallyandmorgan.com,sally and morgan,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+saltlifesailing.com,salt life sailing,sold,2025-05-27,3,15,0,20,0.2,0,reject
+saltusmarket.com,salt us market,dropped,2026-10-06,3,12,0,20,0.1,0,reject
+samepodcast.com,same podcast,dropped,2026-10-06,2,11,0,20,0.85,0,accept
+samplewaves.com,sample waves,dropped,2026-10-06,2,11,0,20,0.7,0,accept
+samuraiorchestra.com,samurai orchestra,dropped,2026-10-06,2,16,0,20,0.25,0,reject
+sandscoffee.com,sands coffee,sold,2025-02-13,2,11,0,20,0.8,0,accept
+satellitemotel.com,satellite motel,sold,2025-05-27,2,14,0,20,0.6,0,accept
+scatteredimage.com,scattered image,dropped,2026-10-06,2,14,0,20,0.45,0,reject
+scriptday.com,script day,sold,2025-10-17,2,9,0,20,0.85,0,accept
+sealtalks.com,seal talks,dropped,2026-10-06,2,9,0,20,0.8,0,accept
+seatcoverscustom.com,seat covers custom,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+seatreserved.com,seat reserved,sold,2025-03-09,2,12,0,20,0.45,0,reject
+seekstrategy.com,seek strategy,sold,2024-02-19,2,12,0,20,0.95,0,accept
+seizureclinic.com,seizure clinic,sold,2026-02-14,2,13,0,20,0.55,1,accept
+selfformed.com,self formed,sold,2025-11-04,2,10,0,20,0.6,0,accept
+sendarmor.com,send armor,sold,2022-08-31,2,9,0,20,0.85,0,accept
+seocreation.com,seo creation,sold,2025-05-07,2,11,0,20,0.75,0,accept
+sepandmotor.com,sep and motor,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+serviceleadersinstitute.com,service leaders institute,dropped,2026-10-06,3,23,0,20,0.0,0,reject
+servicetrail.com,service trail,sold,2024-03-31,2,12,0,20,0.85,0,accept
+sexyrainwear.com,sexy rain wear,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+shakeandboost.com,shake and boost,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+sharestreammusic.com,share stream music,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+sharonai.com,sharon ai,sold,2023-05-31,2,8,0,20,0.55,0,accept
+shellnutphotography.com,shell nut photography,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+sheremembersyou.com,she remembers you,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+shipmile.com,ship mile,sold,2024-04-07,2,8,0,20,0.9,0,accept
+shirtcue.com,shirt cue,dropped,2026-10-06,2,8,0,20,0.7,0,accept
+shopfreshfood.com,shop fresh food,sold,2023-07-26,3,13,0,20,0.05,0,reject
+signsmidwest.com,signs midwest,dropped,2026-10-06,2,12,0,20,0.4,0,reject
+silencescore.com,silence score,dropped,2026-10-06,2,12,0,20,0.7,0,accept
+silvawoodfactory.com,silva wood factory,dropped,2026-10-06,3,16,0,20,0.1,0,reject
+silvercardinalgems.com,silver cardinal gems,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+simhotdate.com,sim hot date,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+simpleamazingstore.com,simple amazing store,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+simplyherexpression.com,simply her expression,dropped,2026-10-06,3,19,0,20,0.05,0,reject
+siskills.com,sis kills,sold,2025-06-21,2,8,0,20,0.45,0,reject
+sixlayers.com,six layers,sold,2025-02-16,2,9,0,20,0.6,0,accept
+skinlanguage.com,skin language,sold,2024-10-25,2,12,0,20,0.85,0,accept
+skybrosllc.com,sky bros llc,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+skycost.com,sky cost,sold,2025-09-15,2,7,0,20,0.85,0,accept
+skyprintguide.com,sky print guide,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+smallshort.com,small short,dropped,2026-10-06,2,10,0,20,0.8,0,accept
+smartaibuilder.com,smart ai builder,sold,2025-08-29,3,14,0,20,0.15,0,reject
+smartbioink.com,smart bio ink,dropped,2026-10-06,3,11,0,20,0.1,0,reject
+smartboardideas.com,smart board ideas,dropped,2026-10-06,3,15,0,20,0.05,0,reject
+smartbrandsinc.com,smart brands inc,dropped,2026-10-06,3,14,0,20,0.1,0,reject
+smarterkidstoys.com,smarter kids toys,dropped,2026-10-06,3,15,0,20,0.1,0,reject
+smarternew.com,smarter new,dropped,2026-10-06,2,10,0,20,0.85,0,accept
+smartsuperagents.com,smart super agents,sold,2025-01-20,3,16,0,20,0.0,0,reject
+smssnap.com,sms snap,sold,2024-07-08,2,7,0,20,0.6,0,accept
+softawake.com,soft awake,dropped,2026-10-06,2,9,0,20,0.65,0,accept
+softsummer.com,soft summer,sold,2025-05-19,2,10,0,20,0.9,0,accept
+solarhomebuilders.com,solar home builders,sold,2023-08-10,3,17,0,20,0.05,0,reject
+solidbuildersltd.com,solid builders ltd,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+solohaircosmetics.com,solo hair cosmetics,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+solzero.com,sol zero,sold,2025-08-25,2,7,0,20,0.95,0,accept
+somedaysoonclothing.com,someday soon clothing,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+somefacts.com,some facts,sold,2025-02-06,2,9,0,20,0.9,1,accept
+sometherapy.com,some therapy,sold,2025-03-18,2,11,0,20,0.85,0,accept
+sophiedavisbeauty.com,sophie davis beauty,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+spacessolutions.com,spaces solutions,sold,2024-10-22,2,15,0,20,0.75,0,accept
+spainpass.com,spain pass,sold,2025-08-06,2,9,0,20,0.9,0,accept
+spanplus.com,span plus,sold,2025-12-15,2,8,0,20,0.8,0,accept
+sparknaturesolution.com,spark nature solution,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+specialtyrestore.com,specialty restore,dropped,2026-10-06,2,16,0,20,0.55,0,accept
+spinsplash.com,spin splash,sold,2022-08-27,2,10,0,20,0.95,0,accept
+spiritfully.com,spirit fully,sold,2024-03-25,2,11,0,20,0.8,0,accept
+sponsorbot.com,sponsor bot,sold,2024-11-07,2,10,0,20,0.85,1,accept
+spotfloor.com,spot floor,dropped,2026-10-06,2,9,0,20,0.75,0,accept
+spotifyheadstart.com,spotify head start,dropped,2026-10-06,3,16,0,20,0.1,0,reject
+stainedcamel.com,stained camel,dropped,2026-10-06,2,12,0,20,0.1,0,reject
+stanleylegacyllc.com,stanley legacy llc,dropped,2026-10-06,3,16,0,20,0.15,0,reject
+starsblossom.com,stars blossom,dropped,2026-10-06,2,12,0,20,0.9,0,accept
+startfinancialplanning.com,start financial planning,dropped,2026-10-06,3,22,0,20,0.1,0,reject
+startyourquest.com,start your quest,sold,2024-09-05,3,14,0,20,0.25,0,reject
+stemboat.com,stem boat,sold,2023-12-07,2,8,0,20,0.9,0,accept
+stephanieleigharnold.com,stephanie leigh arnold,dropped,2026-10-06,3,20,0,20,0.0,0,reject
+stepsguide.com,steps guide,sold,2024-07-13,2,10,0,20,0.75,0,accept
+stonebridgeai.com,stone bridge ai,sold,2025-09-06,3,13,0,20,0.15,0,reject
+stoneinvestinggroup.com,stone investing group,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+storebbq.com,store bbq,dropped,2026-10-06,2,8,0,20,0.95,0,accept
+studiodigitaltech.com,studio digital tech,dropped,2026-10-06,3,17,0,20,0.2,0,reject
+styleswant.com,styles want,dropped,2026-10-06,2,10,0,20,0.4,0,reject
+stylishwow.com,stylish wow,dropped,2026-10-06,2,10,0,20,0.7,0,accept
+subscore.com,sub score,sold,2024-03-24,2,8,0,20,0.95,1,accept
+sullivanfamilydental.com,sullivan family dental,sold,2025-07-08,3,20,0,20,0.1,1,accept
+summitsourceexploration.com,summit source exploration,dropped,2026-10-06,3,23,0,20,0.0,0,reject
+sunsetwire.com,sunset wire,sold,2023-04-23,2,10,0,20,0.8,0,accept
+sunstoneai.com,sun stone ai,sold,2025-05-17,3,10,0,20,0.15,0,reject
+supercoolpage.com,super cool page,dropped,2026-10-06,3,13,0,20,0.2,0,reject
+supplierchallenge.com,supplier challenge,dropped,2026-10-06,2,17,0,20,0.85,0,accept
+supplychef.com,supply chef,sold,2024-03-10,2,10,0,20,1.0,0,accept
+supportmetamasks.com,support meta masks,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+surgeagents.com,surge agents,sold,2025-07-01,2,11,0,20,0.8,0,accept
+swedishass.com,swedish ass,dropped,2026-10-06,2,10,0,20,0.5,0,reject
+swissracecustoms.com,swiss race customs,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+swordboss.com,sword boss,sold,2025-03-02,2,9,0,20,0.65,0,accept
+talentaccessgroup.com,talent access group,dropped,2026-10-06,3,17,0,20,0.15,0,reject
+tallandchain.com,tall and chain,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+taxdisputeslawyer.com,tax disputes lawyer,sold,2024-01-20,3,17,0,20,0.05,0,reject
+techfunpackaging.com,tech fun packaging,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+techguidetips.com,tech guide tips,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+technicaleyes.com,technical eyes,sold,2025-09-19,2,13,0,20,0.8,0,accept
+techniqueclothing.com,technique clothing,dropped,2026-10-06,2,17,0,20,0.55,0,accept
+tenderhawk.com,tender hawk,sold,2024-04-24,2,10,0,20,0.85,0,accept
+terminalconsole.com,terminal console,dropped,2026-10-06,2,15,0,20,0.65,0,accept
+teslagurugram.com,tesla guru gram,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+thaicrush.com,thai crush,sold,2025-09-20,2,9,0,20,0.8,0,accept
+thaixxxfilms.com,thai xxx films,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+thatcoastalglow.com,that coastal glow,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+thatsjustjunk.com,thats just junk,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+theacres.com,the acres,sold,2025-07-02,2,8,0,20,0.9,1,accept
+theagentverse.com,the agent verse,sold,2025-01-19,3,13,0,20,0.35,0,reject
+theaiblog.com,the ai blog,sold,2024-11-09,3,9,0,20,0.5,1,accept
+theairfilter.com,the air filter,sold,2024-11-26,3,12,0,20,0.3,0,reject
+theakinanalytics.com,the akin analytics,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+thearmscorp.com,the arms corp,sold,2023-10-21,3,11,0,20,0.05,0,reject
+theatreticketsco.com,theatre tickets co,dropped,2026-10-06,3,16,0,20,0.0,0,reject
+thebetlab.com,the bet lab,sold,2024-05-24,3,9,0,20,0.1,0,reject
+theblanketstore.com,the blanket store,sold,2023-08-23,3,15,0,20,0.0,0,reject
+thegenuinely.com,the genuinely,dropped,2026-10-06,2,12,0,20,0.5,0,reject
+thehighbuds.com,the high buds,dropped,2026-10-06,3,11,0,20,0.2,0,reject
+thelittleexplorer.com,the little explorer,sold,2023-08-12,3,17,0,20,0.35,0,reject
+theluxurymarketplace.com,the luxury marketplace,sold,2026-02-22,3,20,0,20,0.15,0,reject
+themoneystarter.com,the money starter,dropped,2026-10-06,3,15,0,20,0.1,0,reject
+thepackmethod.com,the pack method,dropped,2026-10-06,3,13,0,20,0.05,1,accept
+thepowerhome.com,the power home,sold,2025-10-24,3,12,0,20,0.1,0,reject
+theskillforce.com,the skill force,dropped,2026-10-06,3,13,0,20,0.05,0,reject
+thesmartharvest.com,the smart harvest,dropped,2026-10-06,3,15,0,20,0.2,0,reject
+thesquadroom.com,the squad room,sold,2024-04-10,3,12,0,20,0.05,1,accept
+thetechadventures.com,the tech adventures,dropped,2026-10-06,3,17,0,20,0.4,0,reject
+thetechtag.com,the tech tag,dropped,2026-10-06,3,10,0,20,0.35,0,reject
+thetommyhawks.com,the tommy hawks,dropped,2026-10-06,3,13,0,20,0.05,0,reject
+thetouchretreat.com,the touch retreat,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+thetrumpstores.com,the trump stores,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+theupstairsstudio.com,the upstairs studio,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+thevacationvoyage.com,the vacation voyage,dropped,2026-10-06,3,17,0,20,0.15,0,reject
+theyarrowtree.com,they arrow tree,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+thoughtfever.com,thought fever,dropped,2026-10-06,2,12,0,20,0.6,0,accept
+threatguardai.com,threat guard ai,sold,2025-09-09,3,13,0,20,0.2,0,reject
+ticketmotion.com,ticket motion,sold,2024-03-09,2,12,0,20,0.85,0,accept
+timberframebuilder.com,timber frame builder,sold,2025-07-11,3,18,0,20,0.1,0,reject
+titandirect.com,titan direct,sold,2021-11-11,2,11,0,20,0.95,0,accept
+titleartgallery.com,title art gallery,dropped,2026-10-06,3,15,0,20,0.2,0,reject
+tomcarterproducer.com,tom carter producer,dropped,2026-10-06,3,17,0,20,0.1,0,reject
+topingparts.com,top ing parts,dropped,2026-10-06,3,11,0,20,0.05,0,reject
+topshelftrail.com,top shelf trail,dropped,2026-10-06,3,13,0,20,0.35,0,reject
+toptalentglobe.com,top talent globe,dropped,2026-10-06,3,14,0,20,0.0,0,reject
+toyjoyspot.com,toy joy spot,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+tracebasketball.com,trace basketball,dropped,2026-10-06,2,15,0,20,0.7,0,accept
+trackgpsonline.com,track gps online,dropped,2026-10-06,3,14,0,20,0.0,1,accept
+transactioncheckenable.com,transaction check enable,dropped,2026-10-06,3,22,0,20,0.05,0,reject
+transactorpay.com,trans actor pay,dropped,2026-10-06,3,13,0,20,0.0,1,accept
+tripconnectbusiness.com,trip connect business,dropped,2026-10-06,3,19,0,20,0.0,0,reject
+truckthisplace.com,truck this place,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+truecredits.com,true credits,sold,2023-04-04,2,11,0,20,0.85,0,accept
+trueheavenreality.com,true heaven reality,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+trustedenterprises.com,trusted enterprises,sold,2025-03-29,2,18,0,20,1.0,1,accept
+tuningdevices.com,tuning devices,dropped,2026-10-06,2,13,0,20,0.55,0,accept
+tvfreeplay.com,tv free play,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+twilightsparkvibe.com,twilight spark vibe,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+uaelloyd.com,uae lloyd,dropped,2026-10-06,2,8,0,20,0.55,0,accept
+uberfrance.com,uber france,dropped,2026-10-06,2,10,0,20,0.75,0,accept
+ugandagoldminers.com,uganda gold miners,dropped,2026-10-06,3,16,0,20,0.05,0,reject
+uniquedispatch.com,unique dispatch,dropped,2026-10-06,2,14,0,20,0.85,0,accept
+unitedfrontnetwork.com,united front network,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+unlimitedtherapy.com,unlimited therapy,sold,2025-06-04,2,16,0,20,0.85,0,accept
+unlockedfuture.com,unlocked future,sold,2024-12-18,2,14,0,20,0.6,0,accept
+unlockedrealestate.com,unlocked real estate,sold,2025-10-10,3,18,0,20,0.45,0,reject
+updateseller.com,update seller,dropped,2026-10-06,2,12,0,20,0.7,0,accept
+uploadcontent.com,upload content,sold,2025-03-09,2,13,0,20,0.7,0,accept
+urbanpublication.com,urban publication,dropped,2026-10-06,2,16,0,20,0.7,0,accept
+usdborder.com,usd border,dropped,2026-10-06,2,9,0,20,0.4,0,reject
+usdpower.com,usd power,sold,2025-10-11,2,8,0,20,0.8,1,accept
+usearmordial.com,use armor dial,dropped,2026-10-06,3,12,0,20,0.0,0,reject
+usecaselibrary.com,use case library,sold,2025-11-28,3,14,0,20,0.05,1,accept
+usefulmodels.com,useful models,sold,2024-01-17,2,12,0,20,0.65,1,accept
+useoutscale.com,use out scale,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+usesurge.com,use surge,sold,2023-11-20,2,8,0,20,0.85,0,accept
+ushousinggroup.com,us housing group,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+valleyhomecooling.com,valley home cooling,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+valueaddedcredit.com,value added credit,dropped,2026-10-06,3,16,0,20,0.05,0,reject
+vampiregolf.com,vampire golf,sold,2022-10-23,2,11,0,20,0.65,0,accept
+vectordigitalmarketing.com,vector digital marketing,sold,2025-07-27,3,22,0,20,0.3,0,reject
+veganisrael.com,vegan israel,dropped,2026-10-06,2,11,0,20,0.85,0,accept
+velvetthunder.com,velvet thunder,sold,2025-05-29,2,13,0,20,0.75,0,accept
+vendorrelationship.com,vendor relationship,sold,2026-01-10,2,18,0,20,0.25,0,reject
+venicehost.com,venice host,sold,2025-03-01,2,10,0,20,0.6,1,accept
+versaloyalty.com,versa loyalty,dropped,2026-10-06,2,12,0,20,0.65,0,accept
+vibecodeeditor.com,vibe code editor,sold,2025-03-28,3,14,0,20,0.25,0,reject
+vibecodetech.com,vibe code tech,sold,2025-03-28,3,12,0,20,0.35,0,reject
+vibecodingcommunity.com,vibe coding community,sold,2025-03-28,3,19,0,20,0.05,0,reject
+vibeposting.com,vibe posting,sold,2025-03-23,2,11,0,20,0.65,0,accept
+victoriacarhire.com,victoria car hire,sold,2024-09-29,3,15,0,20,0.25,1,accept
+videoaiagents.com,video ai agents,sold,2024-11-01,3,13,0,20,0.35,0,reject
+vinylshield.com,vinyl shield,sold,2024-04-07,2,11,0,20,0.8,0,accept
+vipchloe.com,vip chloe,dropped,2026-10-06,2,8,0,20,0.5,0,reject
+virtualeventmanagement.com,virtual event management,sold,2025-08-05,3,22,0,20,0.15,0,reject
+visithero.com,visit hero,sold,2023-04-22,2,9,0,20,0.95,0,accept
+walkerpharmacy.com,walker pharmacy,sold,2023-06-21,2,14,0,20,0.85,0,accept
+walkerweddings.com,walker weddings,sold,2025-02-20,2,14,0,20,0.8,0,accept
+wantedhair.com,wanted hair,sold,2024-04-21,2,10,0,20,0.8,0,accept
+watchwhy.com,watch why,sold,2025-08-18,2,8,0,20,0.85,0,accept
+wealthplacement.com,wealth placement,sold,2024-06-04,2,15,0,20,0.75,0,accept
+wealthsignale.com,wealth sign ale,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+webdevgenerators.com,web dev generators,dropped,2026-10-06,3,16,0,20,0.35,0,reject
+weightlossindustry.com,weight loss industry,dropped,2026-10-06,3,18,0,20,0.25,0,reject
+wellhunggenius.com,well hung genius,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+wespotcars.com,wes pot cars,dropped,2026-10-06,3,10,0,20,0.0,0,reject
+wherethechuck.com,where the chuck,dropped,2026-10-06,3,13,0,20,0.05,0,reject
+whiskeyjackranch.com,whiskey jack ranch,dropped,2026-10-06,3,16,0,20,0.15,1,accept
+whisperpathstories.com,whisper path stories,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+whitehatarmy.com,white hat army,sold,2022-03-10,3,12,0,20,0.1,0,reject
+wickedtvmedia.com,wicked tv media,dropped,2026-10-06,3,13,0,20,0.0,0,reject
+wilddad.com,wild dad,sold,2023-10-16,2,7,0,20,0.9,0,accept
+wildfoxdeliveries.com,wild fox deliveries,dropped,2026-10-06,3,17,0,20,0.05,0,reject
+wildfoxgroup.com,wild fox group,dropped,2026-10-06,3,12,0,20,0.05,0,reject
+wingtransport.com,wing transport,dropped,2026-10-06,2,13,0,20,1.0,0,accept
+winthefamily.com,win the family,dropped,2026-10-06,3,12,0,20,0.3,1,accept
+worldalphaoptions.com,world alpha options,dropped,2026-10-06,3,17,0,20,0.0,0,reject
+worldbrandsale.com,world brand sale,dropped,2026-10-06,3,14,0,20,0.05,0,reject
+worldleadinghotels.com,world leading hotels,dropped,2026-10-06,3,18,0,20,0.0,0,reject
+worldmodelos.com,world mode los,sold,2025-11-14,3,12,0,20,0.1,0,reject
+worldpeaceai.com,world peace ai,sold,2025-03-07,3,12,0,20,0.05,1,accept
+worldpeacebali.com,world peace bali,dropped,2026-10-06,3,14,0,20,0.1,0,reject
+worstgameawards.com,worst game awards,dropped,2026-10-06,3,15,0,20,0.0,0,reject
+writethebible.com,write the bible,sold,2026-05-05,3,13,0,20,0.2,0,reject
+writevisionpublishing.com,write vision publishing,dropped,2026-10-06,3,21,0,20,0.1,1,accept
+yardgrid.com,yard grid,sold,2023-07-10,2,8,0,20,0.85,0,accept
+yeahnailart.com,yeah nail art,dropped,2026-10-06,3,11,0,20,0.0,0,reject
+yellbot.com,yell bot,sold,2025-08-15,2,7,0,20,0.6,0,accept
+yourecave.com,youre cave,dropped,2026-10-06,2,9,0,20,0.55,0,accept
+yourfaithdot.com,your faith dot,dropped,2026-10-06,3,12,0,20,0.05,0,reject
+yourmaths.com,your maths,sold,2024-12-13,2,9,0,20,0.8,1,accept
+youseefilms.com,you see films,dropped,2026-10-06,3,11,0,20,0.05,0,reject
