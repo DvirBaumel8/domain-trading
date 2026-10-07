@@ -287,3 +287,6 @@ DOM's reviewer model is `gemini-2.5-flash` (optional env `GEMINI_MODEL` override
   - **If it fails again:** the review is stored as UNKNOWN with Google's status and reason. No other key or model is ever tried.
   - **Cost of the change:** the extra cron costs nothing; it reverses CR-005 Amendment A only for this one short `tick` a day.
 - **`GET /reviews/cost`** adds `enabled`, `model`, `tier`.
+
+## Dvir's go-ahead for part A (2026-10-07, in chat with DOM, verbatim): "Yes accepting all go ahead"
+This answers DOM's question in its session ("approve X posting"). DOM builds X posting through Buffer as v2.12.0, as described in "Part A through Buffer's free plan (v2.12.0)". Nothing posts until Dvir adds `BUFFER_API_KEY` in Render.

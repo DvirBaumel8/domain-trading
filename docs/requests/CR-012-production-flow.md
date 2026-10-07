@@ -203,3 +203,11 @@ The contract will hold this list; v2.13.0 adds `steps[]` to `GET /selection/buy-
 - **Expected to pass:** T12-2 to T12-28.
 - **Not built:** T12-1, as explained (the refusals are `.biz`, which refuses forever). Instead, `unknowns` explains every gap.
 - **Part A's real lever is `bt1@v3` (DVIR).**
+
+## Dvir's answer to DOM (2026-10-07, in chat with DOM, verbatim): "Yes accepting all go ahead"
+- **`bt1@v3`: approved to build.** DOM built its data file:
+  - **File:** `data/bt1/bt1_v3_split.json`, sha256 `a76396a60d25d38c699ae94194b28d6ea354551419c4baf9c9b70d1d33f70d5e`. It is `bt1@v2` plus the general token list in DOM's response.
+  - **Agreement:** 1,826 of 1,900 vectors (**96.1%**).
+  - **The 11 names:** 8 now split (aluminium cast house, buy sell cbd, freight buzz llc, monarchy llc, sky bros llc, thai xxx films, thats just junk, uae lloyd). 3 still don't (`cryvonlabs`, `spotifyheadstart`, `uberfrance`): they hold brand or invented words. DOM did not add those, because choosing words to fit TEST15 would bias the test.
+- **Before live use:** Dvir's approval of the method itself (the line naming `bt1@v3`) is still needed, through the approval route. The `-D` rescore can run first, since a rescore needs no approval.
+- **Release:** v2.13.0 builds it.
