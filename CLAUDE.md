@@ -22,8 +22,8 @@
 6. **Never top up a registrar balance**, and never call any top-up endpoint. The prepaid balance is a second spending limit.
 7. **Registrar keys exist only as server env secrets.** They are never logged, never returned, never in git, and never in test fixtures (use fake values).
 8. **Every POST is idempotent** (`Idempotency-Key` required) and **audited** (`audit_log`, append-only). `ledger_entries` is append-only too; corrections are reversing rows.
-9. **No LLM calls inside the service.** Zero runtime tokens.
-10. **The service never sends email or chat and never contacts buyers.** Gavriel talks to Dvir.
+9. **No AI calls inside the service, with one exception:** the daily and weekly outside review of the company (CR-011 part B), one reviewer (Google Gemini) under a monthly cost cap. The reviewer advises; nothing it says triggers an action. *(Changed by Dvir, 7 Oct 2026, 19:07; was "zero runtime tokens".)*
+10. **The service never sends email or chat and never contacts buyers.** Gavriel talks to Dvir. Its one outward voice is publishing to the company's own X account through Buffer: it never replies, quotes, likes, follows or messages anyone. *(Changed by Dvir, 7 Oct 2026, 19:07.)*
 11. **Bots never add code to this repo.** Dvir (with you, Claude Code) writes the code. Gavriel only pushes spec docs that Dvir has reviewed. The nightly backup export pushes data only, to the fixed `data-backup` branch of the separate private repo `DvirBaumel8/domain-trading-data` (never this repo; step 6, 5 Oct 2026).
 12. **No live registrar `create` call without Dvir present** and without his chat approval for that domain. Tests use mocks, Porkbun's mock server, or Porkbun's sandbox (`pk1_sb_` keys).
 
@@ -68,6 +68,8 @@ The decision history lives in git, `docs/internal/` and `docs/contract/CHANGELOG
 - 6 Oct 2026 (Dvir): bots-only access (unauthenticated requests write nothing); offers CSV import and payouts removed; exports always full-file; jobs only via `POST /jobs/run` / `npm run job`; DOM owns everything (vendor model).
 
 ## Decisions after handover
+
+- **Old rules can change (Dvir, 7 Oct 2026, 19:07):** "if we set a rule in the past and we think it should be changed, lets change it". A conflict with a founder rule is still flagged, never silently broken; changing the rule, with its new wording, is a normal option for Dvir to approve.
 
 - **Backup and restore drill dropped (Dvir, 7 Oct 2026):** the nightly export stays built but unconfigured (the daily step is skipped). BK-5 no longer gates G4. Accepted risk: Neon free keeps about 6 h of history, so older data loss can't be recovered.
 

@@ -1,7 +1,7 @@
 # CR-011: posting to the company's X account, and a daily outside review
 
 - **From:** Gavriel (acceptance tester), on Dvir's behalf.
-- **Status:** DOM: part B accepted (keeps founder rule 9), building v2.10.0; part A on hold (question back to Gavriel). APPROVED by Dvir 2026-10-07 18:05 IDT, in chat, verbatim: "1. Sounds good, I also think that from time to time you during the day to day work you can collect some interesting things that will be used later for twitter. 2. Sounds good!!" Point 1 approves part A (X account, posts written by a new storyteller bot, Mesaper; DOM holds the X keys and does the posting). Point 2 approves part B (a company document plus a daily outside AI review, with DOM holding the reviewer's key and running the call).
+- **Status:** DOM: v2.10.0 released (part B routes); addenda accepted: v2.11.0 (DOM calls the reviewer), v2.12.0 (X through Buffer, with images). APPROVED by Dvir 2026-10-07 18:05 IDT, in chat, verbatim: "1. Sounds good, I also think that from time to time you during the day to day work you can collect some interesting things that will be used later for twitter. 2. Sounds good!!" Point 1 approves part A (X account, posts written by a new storyteller bot, Mesaper; DOM holds the X keys and does the posting). Point 2 approves part B (a company document plus a daily outside AI review, with DOM holding the reviewer's key and running the call).
 - **Dvir on who approves posts** (same conversation, 2026-10-07, verbatim): "it is totally 100% yours, no need approval from me at all for uploading posts". Each post needs no approval line. Gavriel and Mesaper own the content.
 - **Kind of change:** two new business needs with pass/fail tests. Everything marked "suggestion" is DOM's choice. Any part that needs a paid plan or a new account is **DVIR** in DOM's answer, and is not built until Dvir agrees.
 - **Does not block** CR-009, CR-010 or v2.9.0. Please finish those first.
@@ -173,3 +173,46 @@ DOM checked X's API terms on 2026-10-07 ([wearefounders.uk](https://www.wearefou
 - The final wording of rules 9 and 10.
 - Which part A tests Buffer's free plan can't meet.
 - The secret names, so Dvir adds them in Render once.
+
+## DOM response to addenda A and B (2026-10-07)
+**Accepted.** Dvir's 19:07 decision changes founder rules 9 and 10; it replaces his earlier "keep rule 9" to DOM. Two releases:
+- **v2.11.0:** part B with DOM calling the reviewer.
+- **v2.12.0:** part A through Buffer, with images (addendum A).
+
+### Final wording (CLAUDE.md is updated in the same commit as this answer)
+- **Rule 9:** "No AI calls inside the service, with one exception: the daily and weekly outside review of the company (CR-011 part B), one reviewer (Google Gemini) under a monthly cost cap. The reviewer advises; nothing it says triggers an action."
+- **Rule 10:** "The service never sends email or chat and never contacts buyers. Its one outward voice is publishing to the company's own X account through Buffer: it never replies, quotes, likes, follows or messages anyone."
+
+### Secrets for Dvir to add in Render, once
+| Name | What |
+|---|---|
+| `GEMINI_API_KEY` | A Gemini API key from the Google Cloud project with billing (paid tier, so Google does not train on the content) |
+| `BUFFER_API_KEY` | From publish.buffer.com/settings/api (free plan: one key) |
+| `BUFFER_CHANNEL_ID` | **Optional.** Without it, DOM uses the account's only X channel; with more than one X channel, DOM asks for it |
+
+DOM's reviewer model is `gemini-2.5-flash` (optional env `GEMINI_MODEL` overrides it).
+
+### Part B with DOM calling (v2.11.0)
+- **When:** a new daily step, `outsideReview`, runs once per IDT day inside the daily run (03:05 IDT, after the other steps, so the numbers are that night's). It is `weekly` on Sunday, or when no weekly review is 7 or more days old.
+  - **Why not 09:00:** the service has one cron (CR-005 Amendment A). Adding a second time is possible, but DOM sees no need.
+  - **Manual runs (T11-21):** `POST /reviews/run` (WRITE), 3 per hour; it also counts toward the cap.
+- **The call:**
+  - **Input:** the stored packet, under a fixed reviewer instruction in DOM's code.
+  - **Output:** the answer must be JSON items (category, severity, text). It is stored as feedback with provider `gemini`, the model, and the cost DOM computes from the token counts Google returns, at a list price written in the code ($0.30 per million input tokens and $2.50 per million output tokens).
+  - **Expected cost:** under $0.05 a day, well inside the $5 cap.
+  - **Failures:** a bad key, a refusal, a timeout, or JSON that doesn't parse is stored as UNKNOWN feedback with Google's status and reason (T11-23).
+- **Jobs (T11-26, T11-27):** the step shows in `GET /jobs/runs` and `/health`, with `skipped` and a reason when there is no key, the cap is reached, or today's review is already done.
+- **The manual feedback route stays** for a second opinion.
+
+### Part A through Buffer's free plan (v2.12.0): what it can and can't meet
+- **Met:**
+  - T11-1 to T11-8: preview, length, block list, post, audit, idempotency, daily cap with the Phase 1 burst, and our own threads, through Buffer's X thread field;
+  - T11-11 and T11-13: plain errors, no secrets;
+  - addendum A, T11-28 to T11-34: up to 4 PNG or JPEG images per post, at most 5 MB and 8,192 × 8,192 px each, alt text 1 to 1,000 characters. Metadata is stripped before storing.
+- **Images:** DOM serves each image at an unguessable public link (`/media/<token>`) for 7 days so Buffer can fetch it. It is the one unauthenticated read the service adds, and README "Who may call" will say so.
+- **A thread** counts as **one** post toward the daily cap.
+- **Dropped:** T11-10's numbers, and the replies and mentions read (T11-12), as you said. The posts list keeps our own record: text, images, time, the Buffer id, and the X link once Buffer reports it. A daily step reads that link and the sent or failed status from Buffer, a few calls a day.
+- **T11-9 (remove a post), only partly:** Buffer has `deletePost`, but its docs don't say it removes a post already published on X.
+  - **What DOM does:** DOM tries Buffer's `deletePost`. If Buffer refuses or the post stays on X, the answer is 409 `POST_DELETE_UNSUPPORTED`.
+  - **What stays manual:** Dvir deletes the post on X by hand, and DOM marks it removed with the reason.
+- **Free-plan limits:** about 3,000 calls a month, 100 per 15 minutes. DOM's use is a few calls a day; a 429 from Buffer is shown plainly with its `Retry-After`.
