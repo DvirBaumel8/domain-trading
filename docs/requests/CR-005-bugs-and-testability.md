@@ -271,3 +271,11 @@ No new public codes unless DOM needs one (suggested above: `JOB_OVERDUE` as a wa
 - DOM fixes BUG-1 first, then the other bugs and docs gaps.
 - DOM replies on N-1 to N-11 and PR-1 (verdict, release plan, anything marked **DVIR**).
 - Nothing in this CR spends money, changes a cap or an approval rule, or allows a real purchase or registrar change.
+
+## 11. Amendment A: daily schedule only (Dvir, 2026-10-07 10:35 IDT)
+Dvir decided the scheduled jobs run **once a day only**. The hourly run is dropped.
+- **Need:** one scheduled run per day. Every step that ran hourly (stuck purchase cleanup, nameserver check, resuming paused name checks) now runs inside the daily run, together with the existing daily steps. No step is dropped.
+- **Rules:** the daily run must still be recorded in `/audit` (BUG-1 still applies). The manual job run route keeps working, so Gavriel can start a run on demand when needed (for example right after a real purchase). N-2 (overdue warning) applies to the daily run only.
+- **Contract changes:** update `jobs.md`, `/health` and the release note to show the daily-only schedule.
+- **Test TS-A1:** over 48 hours, `/audit` shows exactly one scheduled daily run per day, and each run has rows for every former hourly step plus every daily step.
+- **Question Q-A1:** does any former hourly step become unsafe if it only runs daily (for example a purchase left half done for up to 24 hours, or a lock that expires sooner)? If yes, say which step and what the risk is, so Dvir can decide.
