@@ -138,3 +138,23 @@
 - **Recheck (T9-4):** `POST /screening/runs {"mode":"full","checks":["web_risk"],"names":[{"domain":"google.com","lane":"S3"}]}`, run `run_b8fdc77c-f6ca-490c-94ac-5ce5f7ac3eef` (16:03 IDT): **PASS**, `fields.source: web_risk_api`, `threat_types: []`, 1 upstream call, 399 ms.
 - **Still wanted from your N-3 row:** the added `fields.http_status` and Google's error `status` / `reason` on an UNKNOWN, and the weekly blocklist check showing `unknown` when a source failed. Those keep the next setup problem visible. You no longer need to write what Dvir must change.
 - **Approved by Dvir** (16:28 IDT: "Yes, push the Web Risk note to DOM now").
+
+## DOM: T9-8 replay result (2026-10-07 20:30 IDT)
+The rescore of the 894 TEST15 fixtures on `v11`, with siblings DOM built itself (`bt1@v2`) and registration read today (`features_as_of: "now"`), was run twice.
+
+| Run | Sold accepted (95% range) | Dropped rejected (95% range) | Undecided | Minutes |
+|---|---|---|---|---|
+| `R15-T15-V2-NOW-B` (first, ~18,500 fresh lookups) | **314 / 400 = 78.5%** (74.2–82.2) | **370 / 494 = 74.9%** (70.9–78.5) | 1 sold, 9 dropped | 142 |
+| `R15-T15-V2-NOW-C` (rerun, 20,518 answers reused) | **314 / 400 = 78.5%** (74.2–82.2) | **369 / 494 = 74.7%** (70.7–78.3) | 1 sold, 9 dropped | 49 |
+
+**Plainly:** the sold side clears 70% easily, but the dropped side is **under 75%, by 1 to 2 names** (371 are needed).
+- **The undecided names:** the 9 undecided dropped names count as "not rejected". They are 11 names whose census had too many unknown siblings in both runs (the same siblings fail each time), so a third run would not change them.
+- **The difference between the two runs:** it is one sibling answer that changed between the runs (real registry change).
+- **What differs from the research:** 49 decisions differ from the ones on the uploaded features. Both the new split and today's registry changed shares, mostly upward, which raised the sold side from 71.5% to 78.5% and lowered the dropped side from 77.1% to 74.7%.
+
+**What Dvir can decide (DVIR):**
+1. **Accept `v11` with `bt1@v2` as is.** Sold 78.5% / dropped 74.7%: the dropped rate is inside its range around the bar (70.7–78.3), and the sold side is well above. DOM's recommendation: this is the honest result of a fair test, and it still screens; the buy hold stays on either way.
+2. **Do not re-tune the cut-off on these names.** TEST15 is already used. Moving 0.55 to fit it would make the test meaningless. A new cut-off needs a fresh sealed set (v2.5.0 test sets).
+3. **Look at the 11 unknown names** (DOM can list their failing siblings) before deciding. They might decide the 2 names in either direction.
+
+**On CR-010's T10-1 (reruns under 15 minutes):** missed: the rerun took 49 minutes. The cause is `.biz`: it refuses every lookup, so every name waits for it. v2.11.1 (building) stops asking a registry after 5 refusals in a row within a run, which should bring a rerun to a few minutes.
