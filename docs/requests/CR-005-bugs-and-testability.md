@@ -279,3 +279,69 @@ Dvir decided the scheduled jobs run **once a day only**. The hourly run is dropp
 - **Contract changes:** update `jobs.md`, `/health` and the release note to show the daily-only schedule.
 - **Test TS-A1:** over 48 hours, `/audit` shows exactly one scheduled daily run per day, and each run has rows for every former hourly step plus every daily step.
 - **Question Q-A1:** does any former hourly step become unsafe if it only runs daily (for example a purchase left half done for up to 24 hours, or a lock that expires sooner)? If yes, say which step and what the risk is, so Dvir can decide.
+
+---
+
+## 12. DOM response (2026-10-07)
+
+**Verdict:** BUG-1 is fixed. The other bugs and docs gaps are accepted. Amendment A is accepted. Of the testability needs, the small ones are accepted and the large ones are declined, with test evidence offered instead (Dvir: "keep it simple"). PR-1 is deferred. Everything accepted ships as **v2.1.0**, which is additive.
+
+### 12.1 BUG-1: cause and fix (Q-1, Q-2)
+- **Q-1, cause:** a DOM bug in the Worker deploy step. It stored the Worker's job token with `echo`, which added a trailing newline. The Worker then built `Authorization: Bearer <token>\n`. The runtime refuses a header value containing a newline, so the request never left the Worker. That is why the service has no rows at all. Nothing was rejected on the service side; it was never called.
+- **Fix:** commit `2a8504f` (deployed 2026-10-07 07:38 UTC). The token is now stored with `printf`, without a newline, and the Worker trims it as well. A unit test covers this.
+- **Q-2:** nothing was lost. The only run that was due did happen (DOM's manual `daily` at 01:01 IDT, which loaded the reference data). There are no purchases, holdings or listings, so the reconciler, nameserver and ownership checks had nothing to do. Every job catches up by itself: due price rows are "due on or before today", and the reconciler takes every pending purchase whatever its age.
+- **Our own record:** the Worker logs its errors only to Cloudflare's console. That is the blind spot N-1 and N-2 close.
+
+### 12.2 Amendment A: daily only (Q-A1)
+- **Schedule:** one cron, 00:05 UTC. `daily` now also runs the former hourly steps (`reconciler`, `nsVerifier`, `screeningResume`) first, then `priceJob`, `dropJob`, `registrarCheck`, `referenceRefresh`, `backupExport`. `tick` stays callable by hand.
+- **Q-A1, risk of running daily:** nothing becomes unsafe; some things become slower.
+  - **Stuck purchase:** a purchase left in `register_sent` or `unknown` (202) settles up to 24 h later, not about 90 min. Meanwhile it still counts against the $1,500 cap and the domain cap and holds the name. That is conservative, not unsafe.
+  - **Abandoned `created` purchase:** same, up to 24 h.
+  - **Interrupted screening run:** a run interrupted by the server sleeping resumes when it is polled (`GET /screening/runs/{id}` resumes it), so polling covers it.
+  - **Locks:** they are per transaction or per session and don't outlive a request, so no lock expires early.
+  - **On demand:** a manual run uses `POST /jobs/run`, which takes **only the job token**, not WRITE. To let Gavriel run it after a real buy, Dvir gives Gavriel the job token from `~/claude/domain-trading/.env.jobs` through Gavriel's secret store. That needs no code change. It can only start the fixed jobs, never a purchase.
+
+### 12.3 Bugs and docs (accepted; v2.1.0)
+- **BUG-2:** every timestamp in a response uses the Asia/Jerusalem offset, except the documented UTC fields.
+- **BUG-3:** `text/plain` returns 415 `INVALID_BODY`.
+- **BUG-4:** on `/offers/{id}/outcome` the body is checked before the id.
+- **BUG-5:** replacing a locked parent returns `SETTINGS_KEY_LOCKED` with `details.path`.
+- **BUG-6:**
+  - **Fix:** a malformed percent-encoding returns 400 `INVALID_REQUEST` in the error shape. It currently crashes the response, and Cloudflare (Render's front door) shows 520.
+  - **Test:** DOM adds a test for it.
+- **DOCS-1, DOCS-2, DOCS-3:** fixed.
+  - **Contract test:** it now checks the route table **and** every section, and fails on missing codes in both directions. This is how DOCS-1 and DOCS-2 slipped past it.
+  - **DOCS-3:** `SUITE_UNKNOWN` = the suite isn't in `holdout.required_suites`. `SUITE_NOT_DEFINED` = it is required but has no frozen definition. Replays will return `SUITE_UNKNOWN` for the first case.
+- **Q-3:** one CR is fine.
+
+### 12.4 Testability (Q-4 to Q-11)
+| Need | DOM | What ships |
+|---|---|---|
+| **N-1** job runs read | **Accept** | `GET /jobs/runs` (READ): per run `job`, `trigger` (`scheduled` / `manual`), `scheduled_for`, `started_at`, `finished_at`, `steps{}` (the summaries from `jobs.md`); per job `last_run_at`, `last_ok_at`, `next_due_at` |
+| **N-2** overdue warning | **Accept** | `/report` warning `JOB_OVERDUE` (error) when no `daily` has finished in 26 h (setting). Also in `/health` as `jobs: ok \| overdue` |
+| **N-5** reference and backup status | **Accept** (folded into N-1) | `GET /jobs/runs` also returns `reference` (popularity list date and rows, IANA refresh time, NameBio enabled) and `backup` (`configured: false`, `last_status: skipped`) |
+| **N-7** strict dry run | **Accept** | `dry_run: "strict"`: the first real-buy gate refusal is returned as the error (`BUY_HOLD`, `SCREENING_PACK_REQUIRED` with reason and pack id, `NO_TRANCHE`, `TRANCHE_SPEND_CAP`). Same side effects as a dry run: none |
+| **N-8** | (a) **Accept**: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` on every authenticated response. (c) **Q-6: yes, now:** DOM creates a READ token `gavriel-read` today and hands it to Dvir. (b) low-limit test token: **declined**, as it needs N-3 | |
+| **N-4** job dry run, simulated date | **Accept, narrowed** | `POST /jobs/preview {today?}` (WRITE): runs `priceJob` and `dropJob` with `dryRun: true` on real data, for any `today` up to 3 years ahead. Returns `would_apply`, `would_supersede`, `held`, `would_delist` and `would_drop`. Writes only the audit row and never counts as a run. The other steps call outside services or are covered by N-1 (**Q-7**) |
+| **N-3** test environment | **Declined** (**Q-4**) | A second Render service shares the same free 750 h pool. A test mode inside production is exactly where S-2 and S-3 fail (one switch away from mixing test and real money data). Neither is worth the risk or cost now |
+| **N-6** validate-only on 8 routes | **Declined** | Eight more code paths that must exactly mirror the real ones. That is the kind of duplication that drifts. Evidence below instead |
+| **N-9** fault switch | **Declined** (**Q-9**) | Evidence below instead |
+| **N-10** `/report?as_of=` | **Declined** (**Q-11**) | Report warnings mix stored facts with "now". A faithful future report needs a full simulation of every job, which is N-4 for everything. N-4 covers the costly cases (drops, delists) |
+| **N-11** | (b) **Accept** via the evidence map. (a) outbound-host log: **declined** | Outbound hosts are fixed in code and listed in `docs/internal/sources.md`. The evidence map shows the tests that block anything else (network-blocked test suite, the SSRF guard) |
+
+**Evidence instead of switches (Q-5, Q-9):** v2.1.0 adds `docs/contract/test-evidence.md`. It is generated from the test suite and checked by CI.
+- **Every code:** each error code in the index → the automated test(s) that produce it, with file and test name. That covers every fault path in N-9: `AUDIT_WRITE_FAILED`, `IDEMPOTENCY_KEY_IN_USE`, `DOMAIN_BUSY`, `/health` 503, the settings-missing codes, `RUN_RUNNING`, `VERDICT_RESULT_STALE`, a stalled run and the rest.
+- **Every guarantee:** append-only per table, no secrets in responses, no LLM, no top-up, network-blocked tests → their tests.
+- **The tests behind it:** 1,894 tests today, run on every push (`ci`, Node 22, real Postgres). A code with no test fails CI.
+
+**Q-8:** Render (free) and Cloudflare (Render's front door) publish no request limits for us. The only limits are the service's own (`README.md` §Limits). Expect 429 only from those, plus the about 50 s cold start.
+
+### 12.5 PR-1 dated price change: deferred (Q-12, Q-13)
+- **Why defer:** every real buy is refused while the buy hold is on, and that can't clear without passing holdouts plus Dvir's approval. So no name is likely to be bought before 2026-11-01. From that day Porkbun's **live quotes** carry the new price, and `/check`, `two_year`, the max-price checks and the selection money all use the live quote.
+- **What remains:**
+  - `committed_forward` for names held before 1 Nov: only D-001, which renews at GoDaddy and is entered by hand.
+  - `profit.cost_per_name_year_cents` (1108), a selection setting. Raising it is a new settings version that Gavriel drafts and Dvir approves; no code needed.
+- **When to revisit:** if a real buy happens before 2026-11-01, or a later dated rise matters, DOM will build PR-1 as a small CR. Entries would be made by DOM's admin step on Dvir's word (Q-12), which avoids a new write route.
+
+### 12.6 Delivery
+v2.1.0 contains: BUG-1 (done), BUG-2 to BUG-6, DOCS-1 to DOCS-3, Amendment A, N-1, N-2, N-5, N-7, N-8a, N-4 (narrowed), and the evidence map. The READ token for Gavriel is created today. A release note follows.
