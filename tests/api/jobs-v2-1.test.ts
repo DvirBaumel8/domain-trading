@@ -34,7 +34,7 @@ describe('GET /jobs/runs', () => {
     expect(b.runs[1]).toMatchObject({ job: 'daily', trigger: 'scheduled', ok: expect.any(Boolean) }); // the outside reference sources are blocked in tests, so a step may fail
     expect(new Date(b.runs[1].scheduled_for).getTime()).toBe(Date.parse('2027-04-12T00:05:00Z'));
     expect(b.runs[1].scheduled_for).toMatch(/\+03:00$/);
-    expect(Object.keys(b.runs[1].steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'backupExport']);
+    expect(Object.keys(b.runs[1].steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
     expect(b.runs[1].steps.priceJob).toMatchObject({ ok: true, summary: { dryRun: false } });
     expect(b.jobs.daily).toMatchObject({ next_due_at: expect.stringMatching(/^2027-04-13T03:05:00\+03:00$/) });
     expect(new Date(b.jobs.daily.last_run_at).getTime()).toBe(Date.parse('2027-04-12T00:05:00Z'));

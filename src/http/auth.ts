@@ -20,8 +20,11 @@ declare module 'fastify' {
   }
 }
 
-/** Only liveness is public (no DB). Everything else, /health included, needs a bot token (Dvir, 6 Oct 2026: bots are the only customers). */
+/** Only liveness is public (no DB), plus GET /media/<token> (MEDIA_PATH). Everything else, /health included, needs a bot token (Dvir, 6 Oct 2026: bots are the only customers). */
 export const PUBLIC_PATHS: ReadonlySet<string> = new Set(['/health/ping']);
+
+/** v2.12.0: the one other public read. Buffer fetches post images from GET /media/<32 hex token> (unguessable, expires after 7 days). It writes nothing. */
+export const MEDIA_PATH = /^\/media\/[0-9a-f]{32}$/;
 
 export const FAILED_AUTH_LIMIT = 20;
 export const FAILED_AUTH_WINDOW_MS = 10 * 60_000;
@@ -111,7 +114,7 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
       failed.fail(req.ip);
       throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
     };
-    if (PUBLIC_PATHS.has(pathOf(req.url)) && !isMutating(req.method)) return;
+    if ((PUBLIC_PATHS.has(pathOf(req.url)) || MEDIA_PATH.test(pathOf(req.url))) && !isMutating(req.method)) return;
     const wait = failed.blockedFor(req.ip);
     const tooMany = (): never => {
       reply.header('retry-after', String(wait));

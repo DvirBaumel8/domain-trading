@@ -14,17 +14,20 @@ export const TABLE_FILES = [
   'tranches', 'tranche_members', 'test_sets', 'test_set_rows',
   'drop_lists', 'drop_list_rows', 'drop_list_checks', 'cohorts', 'cohort_names', 'cohort_decisions', 'cohort_outcomes',
   'company_documents', 'forbidden_terms', 'review_packets', 'review_feedback', 'review_items', 'review_item_statuses', 'review_settings_changes', 'review_retries',
+  'posts', 'post_images', 'posting_switches', 'posting_bursts',
 ] as const;
 type Row = Record<string, unknown>;
 
 const PK: Record<string, string> = {
-  settings: 'id', deals: 'id', pricing_settings: 'version', registrar_presence: 'domain_id', tranches: 'id', audit_log: 'at, id', company_documents: 'version', test_sets: 'name', drop_lists: 'name', cohorts: 'name',
+  posts: 'created_at, id', settings: 'id', deals: 'id', pricing_settings: 'version', registrar_presence: 'domain_id', tranches: 'id', audit_log: 'at, id', company_documents: 'version', test_sets: 'name', drop_lists: 'name', cohorts: 'name',
 };
 
 /** Every row of a table as the database's own JSON (exact timestamp precision), in primary-key order. */
 async function dump(trx: Kysely<Database>, table: string): Promise<Row[]> {
   const order = PK[table] ?? 'id';
-  const r = await sql<{ j: Row }>`select to_jsonb(t) as j from ${sql.table(table)} t order by ${sql.raw(order)}`.execute(trx);
+  // v2.12.0: the image bytes of post_images stay out of the export (the rows, hashes and alt texts are in it); a restore has data = null.
+  const cols = table === 'post_images' ? sql.raw(`to_jsonb(t) - 'data'`) : sql.raw('to_jsonb(t)');
+  const r = await sql<{ j: Row }>`select ${cols} as j from ${sql.table(table)} t order by ${sql.raw(order)}`.execute(trx);
   return r.rows.map((x) => x.j);
 }
 

@@ -20,7 +20,8 @@ describe('auth (AU)', () => {
     // JOB_TRIGGER_TOKEN is set so POST /jobs/run is exercised as 401 (unset it answers 503 JOBS_DISABLED, see jobs.test.ts).
     app = await makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: 'job_token_fake_0123456789abcdef0123456789' } });
     const before = await writeCounts();
-    const routes = app.routeTable.filter((r) => r.method !== 'HEAD' && r.url !== '/health/ping');
+    // GET /media/:token is the one other public route (v2.12.0); it has its own tests in v2-12-0.test.ts.
+    const routes = app.routeTable.filter((r) => r.method !== 'HEAD' && r.url !== '/health/ping' && !(r.method === 'GET' && r.url === '/media/:token'));
     let n = 0;
     for (const r of routes) {
       // A distinct source IP per call keeps the sweep clear of the failed-auth limiter.
@@ -237,7 +238,7 @@ describe('auth (AU)', () => {
     app = await makeApp({ testRoutes: false });
     // The caps (`settings`) and `pricing_settings` have no route. The selection settings routes are the one deliberate
     // exception (CR-001 CAP-00; drafts are WRITE, activation needs approval_ref; they hold no cap and no price).
-    for (const r of app.routeTable.filter((x) => !x.url.startsWith('/selection/settings') && x.url !== '/reviews/settings')) {
+    for (const r of app.routeTable.filter((x) => !x.url.startsWith('/selection/settings') && x.url !== '/reviews/settings' && x.url !== '/media/:token')) {
       expect(r.url).not.toMatch(/token|settings/i);
     }
     // /reviews/settings (v2.11.2) is the outside review's switch, model and tier: no cap, no price.

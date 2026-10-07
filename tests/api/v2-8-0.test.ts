@@ -497,7 +497,7 @@ describe('daily run (G-1, G-2)', () => {
     const res = await a.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: 'Bearer job_token_fake_0123456789abcdef0123456789', 'idempotency-key': 'dw-1' }, payload: { job: 'daily' } });
     expect(res.statusCode, res.body).toBe(200);
     const steps = Object.keys(res.json().steps);
-    expect(steps.slice(steps.indexOf('portfolioCheck'))).toEqual(['portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'backupExport']);
+    expect(steps.slice(steps.indexOf('portfolioCheck'))).toEqual(['portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
     expect(res.json().steps.dropWatch).toMatchObject({ ok: true, summary: { checked: 2, pending_delete: 2, left_for_next_run: 0 } });
     expect(res.json().steps.cohortOutcomes).toMatchObject({ ok: true, summary: { frozen: 0, checked: 0 } });
     expect(adapter.calls.slice(before).every((c) => c.startsWith('findDomain'))).toBe(true);

@@ -38,6 +38,9 @@ import { CohortOutcomesJob } from './jobs/cohort-outcomes.js';
 import { registerDropLists } from './api/drop-lists.js';
 import { registerCohorts } from './api/cohorts.js';
 import { registerCompany } from './api/company.js';
+import { registerPosts } from './api/posts.js';
+import { BufferClient } from './services/posting/buffer.js';
+import { postsRefresh, type PostingDeps } from './services/posting/posts.js';
 import { registerReviews } from './api/reviews.js';
 import { retryReview, runReview } from './services/review/run.js';
 import { createAdapters } from './registrars/registry.js';
@@ -133,7 +136,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerIdempotency(app, deps.db); // preHandler (after scope) + onSend (before audit write)
   registerAuditWrite(app, auditWriter); // onSend (last)
 
-  registerHealth(app, deps.config, deps.db, deps.now ?? Date.now);
+  const postingDeps: PostingDeps = {
+    db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, publicBaseUrl: deps.config.publicBaseUrl,
+    buffer: deps.config.bufferApiKey ? new BufferClient({ fetch: globalThis.fetch, apiKey: deps.config.bufferApiKey, channelId: deps.config.bufferChannelId }) : null,
+  };
+  registerHealth(app, deps.config, deps.db, deps.now ?? Date.now, postingDeps);
   const adapters = deps.adapters ?? createAdapters(deps.config);
   const checkService = new CheckService({
     db: deps.db,
@@ -180,6 +187,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
   const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey };
   registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });
+  registerPosts(app, postingDeps);
   registerPacks(app, { db: deps.db, now: deps.now ?? Date.now });
   registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });
@@ -199,6 +207,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: (deps.now ?? Date.now)() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;
     },
+    postsRefresh: async () => postsRefresh(postingDeps),
     reviewRetry: async () => {
       const r = await retryReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { now: (deps.now ?? Date.now)() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped } : r;

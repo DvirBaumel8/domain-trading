@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.12.0 (2026-10-07): CR-011 part A, posting to the company's X account through Buffer
+MINOR, **additive**. Release note: `docs/releases/v2.12.0.md`. Founder rule 10 changed by Dvir (7 Oct 2026).
+- **Routes:** `POST /posts` (dry run, images with alt text, threads, daily cap with a burst), `GET /posts`, `GET /posts/{id}/images/{part}/{position}`, `POST /posts/{id}/remove`, `POST /posts/pause`, `POST /posts/burst`, and the public `GET /media/{token}` (images for Buffer, 7 days).
+- **Codes:** `POST_INVALID`, `POST_TOO_LONG`, `POSTING_PAUSED`, `POSTING_NOT_CONFIGURED`, `POST_DAILY_CAP`, `POST_FAILED`, `POST_NOT_REMOVABLE`, `POST_DELETE_UNSUPPORTED`.
+- **`/health`** adds `posting`, `posting_reason`; daily step `postsRefresh`. Env `BUFFER_API_KEY` (secret), `BUFFER_CHANNEL_ID`, `PUBLIC_BASE_URL`.
+
 ## 2.11.2 (2026-10-07): CR-011 addendum C, review switch, model setting, free tier
 PATCH-sized but **additive** routes (kept in the 2.11 line). Release note: `docs/releases/v2.11.2.md`.
 - **`GET/POST /reviews/settings`:** `enabled` (default true), `model` (default `gemini-3.8-flash`, from an allowed list), `tier` (default `free`, cost 0; `paid` needs a note naming Dvir's approval). Codes `REVIEW_MODEL_NOT_ALLOWED`, `REVIEW_MODEL_NEEDS_PAID`, `REVIEW_DISABLED`. The env `GEMINI_MODEL` is removed.

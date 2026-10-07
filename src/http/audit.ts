@@ -89,7 +89,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
         idempotency_key: idempotencyKeyOf(req),
         approval_text: approval.text,
         approval_at: approval.at,
-        request: body ? JSON.stringify(redact(/^\/(company|reviews)\//.test(req.url) ? redactFreeText(body) : body)) : null,
+        request: body ? JSON.stringify(redact(/^\/(company|reviews)\//.test(req.url) || /^\/posts(\/|\?|$)/.test(req.url) ? redactFreeText(body) : body)) : null,
         status_code: reply.statusCode,
         result_summary: replayed ? `replayed:${summary}` : summary,
         client_ip: req.ip,

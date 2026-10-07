@@ -54,6 +54,10 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'review_item_statuses', file: 'tables/review_item_statuses.json' },
   { table: 'review_settings_changes', file: 'tables/review_settings_changes.json' },
   { table: 'review_retries', file: 'tables/review_retries.json' },
+  { table: 'posts', file: 'tables/posts.json' },
+  { table: 'post_images', file: 'tables/post_images.json' }, // without the image bytes: data = null after a restore
+  { table: 'posting_switches', file: 'tables/posting_switches.json' },
+  { table: 'posting_bursts', file: 'tables/posting_bursts.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 
@@ -61,7 +65,7 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
 const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log', 'screening_runs', 'screening_evidence', 'manual_quotes', 'tranches'];
 
 /** Tables without a serial `id` column. */
-const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts']);
+const NO_SERIAL = new Set(['posts', 'settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts']);
 
 /** Tables whose identity column is not called `id`. */
 const SERIAL_COL: Record<string, string> = { company_documents: 'version' };

@@ -133,7 +133,7 @@ describe('daily-only schedule: the daily job runs the former tick steps first', 
     app = await makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: JOB } });
     const run = (job: string) => app.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: `Bearer ${JOB}`, 'idempotency-key': randomUUID() }, payload: { job } });
     const daily = await run('daily');
-    expect(Object.keys(daily.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'backupExport']);
+    expect(Object.keys(daily.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
     expect(daily.json().steps.reconciler.ok).toBe(true);
     const tick = await run('tick');
     expect(Object.keys(tick.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'reviewRetry']);

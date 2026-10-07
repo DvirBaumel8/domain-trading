@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 2.11.2** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 2.12.0** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -19,7 +19,7 @@
 `https://<service>.onrender.com` (expected: `https://domain-trading-api.onrender.com`; the release note gives the real one once it's deployed). HTTPS only. The service sleeps when idle and needs **up to ~60 s** for a cold start, so use request timeouts of at least 60 s and retry an idempotent call once (same `Idempotency-Key`).
 
 ## Who may call
-**Bots only.** Every request needs a credential, except `GET /health/ping`.
+**Bots only.** Every request needs a credential, except `GET /health/ping` and (2.12.0) `GET /media/{token}`, which serves a post image to Buffer at an unguessable link for 7 days and writes nothing.
 
 | Credential | Header | May call |
 |---|---|---|

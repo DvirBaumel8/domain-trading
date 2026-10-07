@@ -6,6 +6,9 @@ import { REGISTRAR_ENV } from './registrars/registry.js';
 /** The code repo. The backup token must never be able to touch it. */
 const CODE_REPO = 'DvirBaumel8/domain-trading';
 
+/** Where Buffer fetches post images from (GET /media/<token>). */
+export const DEFAULT_PUBLIC_BASE_URL = 'https://domain-trading-api.onrender.com';
+
 const EnvSchema = z.object({
   DATABASE_URL: z
     .string({ error: 'DATABASE_URL is required' })
@@ -20,6 +23,9 @@ const EnvSchema = z.object({
   JOB_TRIGGER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\S{32,}$/, 'JOB_TRIGGER_TOKEN must be at least 32 non-space characters (openssl rand -hex 32)').optional()),
   GOOGLE_WEB_RISK_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   GEMINI_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  BUFFER_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  BUFFER_CHANNEL_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).max(100).optional()),
+  PUBLIC_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine((v) => /^https?:\/\//.test(v), 'PUBLIC_BASE_URL must be http(s)').default(DEFAULT_PUBLIC_BASE_URL)),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
   GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string()
     .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/, 'GITHUB_BACKUP_REPO must be owner/name')
@@ -44,6 +50,12 @@ export interface Config {
   geminiApiKey: string | undefined;
   /** Google Web Risk Lookup API key (header `x-goog-api-key`, never in a URL). undefined → the web_risk check stays MANUAL_REQUIRED. */
   webRiskApiKey: string | undefined;
+  /** Buffer API key for X posting (founder rule 10: the company's own account only). undefined -> POST /posts answers 503 POSTING_NOT_CONFIGURED. */
+  bufferApiKey: string | undefined;
+  /** Optional Buffer channel id; else the single X channel of the account is used. */
+  bufferChannelId: string | undefined;
+  /** Public base URL of this service, without a trailing slash (image links for Buffer). */
+  publicBaseUrl: string;
   /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
   backup: { token: string | undefined; repo: string | undefined };
   version: string;
@@ -53,7 +65,7 @@ export interface Config {
   secretValues: string[];
 }
 
-const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'GEMINI_API_KEY', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
+const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'GEMINI_API_KEY', 'BUFFER_API_KEY', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
 
 function readVersion(): string {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -123,6 +135,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
     databaseSsl: e.DATABASE_SSL === 'true',
     geminiApiKey: e.GEMINI_API_KEY ? e.GEMINI_API_KEY : undefined,
+    bufferApiKey: e.BUFFER_API_KEY ? e.BUFFER_API_KEY : undefined,
+    bufferChannelId: e.BUFFER_CHANNEL_ID ? e.BUFFER_CHANNEL_ID : undefined,
+    publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
     webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,
     backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },
     version: readVersion(),

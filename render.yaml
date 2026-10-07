@@ -57,3 +57,9 @@ services:
         sync: false
       - key: GEMINI_API_KEY      # optional: the one outside review (Gemini): key from a new AI Studio project with no billing (free tier); unset skips the daily outsideReview step
         sync: false
+      - key: BUFFER_API_KEY      # optional: X posting through Buffer (the company's own account only); unset answers 503 POSTING_NOT_CONFIGURED
+        sync: false
+      - key: BUFFER_CHANNEL_ID   # optional: the Buffer channel id; unset uses the account's single X channel
+        sync: false
+      - key: PUBLIC_BASE_URL     # where Buffer fetches post images (GET /media/<token>)
+        value: https://domain-trading-api.onrender.com

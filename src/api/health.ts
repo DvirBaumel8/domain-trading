@@ -5,9 +5,10 @@ import { pingDb } from '../db/client.js';
 import type { Database } from '../db/types.js';
 import { adapterStatus } from '../registrars/registry.js';
 import { currentReviewSettings } from '../services/review/settings.js';
+import { postingHealth, type PostingDeps } from '../services/posting/posts.js';
 import { jobsOverdue } from '../services/job-runs.js';
 
-export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now): void {
+export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, posting?: PostingDeps): void {
   // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
   app.get('/health/ping', async () => ({ status: 'ok' }));
 
@@ -21,6 +22,7 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       jobs,
       review: await reviewHealth(db, config),
       review_model: await reviewModel(db),
+      ...(await postingHealth({ db, buffer: posting?.buffer ?? null })),
       version: config.version,
       adapters: adapterStatus(config).map(({ name, enabled }) => ({ name, enabled })),
     });

@@ -1,4 +1,4 @@
-# Endpoints (contract v2.11.2)
+# Endpoints (contract v2.12.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -34,6 +34,9 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | GET | `/company/document/versions`, `/company/document/versions/{n}`, `/company/forbidden-terms` | READ | Company and reviews |
 | POST | `/reviews/packet`, `/reviews/run`, `/reviews/settings`, `/reviews/{packet_id}/feedback`, `/reviews/items/{id}/status` | WRITE | Company and reviews |
 | GET | `/reviews/packets/{id}`, `/reviews/items`, `/reviews/cost`, `/reviews/settings` | READ | Company and reviews |
+| POST | `/posts`, `/posts/{id}/remove`, `/posts/pause`, `/posts/burst` | WRITE | Posting to X |
+| GET | `/posts`, `/posts/{id}/images/{part}/{position}` | READ | Posting to X |
+| GET | `/media/{token}` | none (public) | Posting to X |
 
 ---
 
@@ -46,6 +49,7 @@ The only public route. No auth, no DB access (Render's health check uses it).
 ### `GET /health`
 Any valid bot token (READ or WRITE).
 - **200** `{status: "ok", db: "ok", jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
+- `posting` (2.12.0, additive): `paused`, `not_configured`, `failed` (the latest post failed), else `ok`; `posting_reason` with the pause reason or the failure.
 - `review` (2.11.0, additive; `disabled` and `review_model` 2.11.2): `disabled` (the switch is off), `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
 - `jobs` (2.1.0, additive) is `overdue` when no `daily` run has finished in the last 26 hours (the same rule as the `/report` warning `JOB_OVERDUE`), else `ok`. A run started by hand counts. `GET /health/ping` is unchanged (no DB).
 - `version` is the service build version (`package.json`), not the contract version. The only scheduled job is the daily run at 00:05 UTC (`jobs.md`); its rows are in `GET /audit` (scope `job`). No secret, key prefix or balance is ever shown.
@@ -632,6 +636,34 @@ WRITE. Body (strict) `{status: acted|rejected|watching, note (1–500)}` (audite
 ### `GET /reviews/cost`
 READ. `{month (UTC, YYYY-MM), spent_usd (the reported cost_usd summed), cap_usd (5, a constant), feedback_n, unknown_n, enabled, model, tier}` (the last three 2.11.2).
 
+## Posting to X
+2.12.0, CR-011 part A and addendum A. Founder rule 10 (changed by Dvir, 7 Oct 2026): the service publishes to the company's own X account **through Buffer only** and never replies, quotes, likes, follows or messages anyone; no route for any of that exists. Key `BUFFER_API_KEY` (server env only); channel `BUFFER_CHANNEL_ID`, or the account's only X channel. Request texts are audited as `[TEXT n chars]`, images as `[IMAGE n chars]`.
+
+**Checks (every post, dry run included):** each part's text has an X weighted length of at most 280 (a link counts 23, CJK and emoji 2, other characters 1: a simplified form of X's rule) → 422 `POST_TOO_LONG` (`details.length`, `limit`, `part`); text and alt text pass the block list → 422 `TEXT_BLOCKED` (`category`, never the match). **Images:** up to 4 per part, PNG or JPEG (by content), at most 5 MB, 4 to 8,192 px each side, alt text 1 to 1,000 characters; metadata is stripped before storing (JPEG APP1–APP15 and comments, which also drops ICC colour profiles; PNG text, time and EXIF chunks and every other non-essential chunk). Any image problem → 422 `POST_INVALID` with `details.images: [{part, position, reason (IMAGE_TYPE, IMAGE_CORRUPT, IMAGE_TOO_LARGE, IMAGE_DIMENSIONS, ALT_MISSING, ALT_TOO_LONG, ALT_BLOCKED, TOO_MANY_IMAGES), category?}]`.
+
+**Daily cap:** 1 post per IDT day (a thread counts as one), or the burst cap set for that day (2–5). A failed post uses no allowance.
+
+### `POST /posts`
+WRITE. Body (strict) `{text, images?: [{data_base64, alt}], thread?: [{text, images?}] (up to 2 more parts), dry_run?}`; body limit 40 MB on this route. **Dry run** → **200** `{dry_run: true, ok, parts: [{part, length, limit, ok, reason? (TOO_LONG or TEXT_BLOCKED), category?}], images: [{part, position, ok, reason?, width, height, bytes}], allowance: {today_cap, used_today, remaining}}`: nothing is stored, sent or counted. **Real:** the images are stored and served at `/media/{token}`, then Buffer is asked to publish now (`shareNow`, images with alt text in order, the thread parts). **201** `{post_id, buffer_post_id, status: "posted", external_link (may be null until Buffer reports it), images: [{part, position, sha256}], allowance}`. **Errors:** 409 `POSTING_PAUSED` · 503 `POSTING_NOT_CONFIGURED` · 409 `POST_DAILY_CAP` (`details.next_allowed_at`) · 422 `POST_TOO_LONG` / `POST_INVALID` / `TEXT_BLOCKED` · 502 `POST_FAILED` (`details`: `step` channel or create, `kind` rate_limited / refused / unavailable, Buffer's `status`, `message`, `retry_after`; the post is recorded as `failed`). **Known limit:** the post record is written after Buffer answers; a server crash in that moment would leave a published post without a record (and a retry with the same key could post again).
+
+### `GET /posts`
+READ. Query `limit?` (1–200, default 50). `{posting, allowance, posts: [{post_id, created_at, text, thread, status: posted|failed|removed, buffer_post_id, external_link, sent_at, error, removed_at, removed_reason, images: [{part, position, mime, bytes, width, height, sha256, alt}]}]}`, newest first. Reach and replies are not read (Buffer's free plan; Dvir accepted).
+
+### `GET /posts/{id}/images/{part}/{position}`
+READ. The stored image bytes. 404 `NOT_FOUND` (also when the bytes were not kept, after a restore: the backup leaves image bytes out).
+
+### `POST /posts/{id}/remove`
+WRITE. Body `{reason (1–300), marked_removed_by_hand?}`. Only a `posted` post (else 409 `POST_NOT_REMOVABLE`). DOM asks Buffer to delete it: success → **200** `{..., status: "removed", deleted_on_buffer: true}`; Buffer refuses → 409 `POST_DELETE_UNSUPPORTED` (Buffer's message), unless `marked_removed_by_hand: true` (Dvir deleted it on X), which marks it removed. 503 `POSTING_NOT_CONFIGURED` without a key (unless marked by hand).
+
+### `POST /posts/pause`
+WRITE. `{paused, reason?}` → **200** the state. While paused a real post is 409 `POSTING_PAUSED`; a dry run still works.
+
+### `POST /posts/burst`
+WRITE. `{day (today or later, IDT), cap (2–5)}` → **201**. Phase 1's five posts on one day.
+
+### `GET /media/{token}`
+**Public** (no token). The image bytes with their type and `Cache-Control: public, max-age=3600`, for 7 days after the post; then 404 `NOT_FOUND`. Writes nothing.
+
 ## Code index
 Every code the service emits, by kind. Errors are `error.code`; warnings are strings in `warnings[]` (or `{code, level}` objects in `/report`, see `reports.md`).
 
@@ -650,6 +682,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Offer and sale errors:** `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `HOLD_REASON_REQUIRED`, `EXTERNAL_REF_CONFLICT`, `OFFER_NOT_FOUND`, `APPROVAL_REQUIRED`, `OUTCOME_FINAL`, `OUTCOME_TRANSITION_INVALID`, `OFFER_SOLD_MISMATCH`, `OUTCOME_CHANGED_CONCURRENTLY`, `EVIDENCE_REQUIRED`, `SOLD_AT_IN_FUTURE`, `OFFER_MISMATCH`, `NOT_SELLABLE_STATE`, `SALE_ALREADY_RECORDED`, `DEAL_NOT_FOUND`.
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
+
+**Posting errors (2.12.0):** `POST_INVALID`, `POST_TOO_LONG`, `POSTING_PAUSED`, `POSTING_NOT_CONFIGURED`, `POST_DAILY_CAP`, `POST_FAILED`, `POST_NOT_REMOVABLE`, `POST_DELETE_UNSUPPORTED`.
 
 **Company and review errors (2.10.0):** `REVIEWER_NOT_CONFIGURED` (2.11.0), `ALREADY_DONE_TODAY` (2.11.0; a skip reason of the daily step, mapped to 409 internally; `POST /reviews/run` never returns it), `REVIEW_DISABLED`, `REVIEW_MODEL_NOT_ALLOWED`, `REVIEW_MODEL_NEEDS_PAID` (2.11.2), skip reasons `DISABLED` and `NOTHING_PENDING` (2.11.2, steps only), `TEXT_BLOCKED`, `DOCUMENT_VERSION_NOT_FOUND`, `DOCUMENT_MISSING`, `REVIEW_COST_CAP`, `PACKET_NOT_FOUND`, `FEEDBACK_EXISTS`, `REVIEW_ITEM_NOT_FOUND`.
 

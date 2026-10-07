@@ -55,6 +55,8 @@ export interface JobRunnerDeps {
   outsideReview?: () => Promise<unknown>;
   /** The 10:30 IDT tick retries a review that got a 429 in the daily run (CR-011 addendum C); while undefined, that step reports skipped. */
   reviewRetry?: () => Promise<unknown>;
+  /** Fills the X link and sent time of recent posts from Buffer (v2.12.0); runs after outsideReview, before backupExport. While undefined, that step reports skipped. */
+  postsRefresh?: () => Promise<unknown>;
   backupExport?: BackupExport;
   /** Daily popularity list / IANA bootstrap / cache pruning (CAP-02); while undefined, that step reports skipped. */
   referenceRefresh?: Runnable;
@@ -165,6 +167,8 @@ export class JobRunner {
     steps.referenceRefresh = ref ? await this.referenceStep(ref) : { ok: true, skipped: true, summary: { skipped: true, reason: 'reference refresh not configured' } };
     const review = this.deps.outsideReview;
     steps.outsideReview = review ? await this.step(review) : { ok: true, skipped: true, summary: { skipped: true, reason: 'outside review not configured' } };
+    const pr = this.deps.postsRefresh;
+    steps.postsRefresh = pr ? await this.step(pr) : { ok: true, skipped: true, summary: { skipped: true, reason: 'posts refresh not configured' } };
     const backup = this.deps.backupExport;
     steps.backupExport = backup
       ? await this.step(() => backup.runOnce())
