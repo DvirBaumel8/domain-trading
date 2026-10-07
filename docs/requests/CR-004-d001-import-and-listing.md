@@ -159,3 +159,69 @@ No new public codes unless DOM needs one. Any new code goes in the code index wi
 - DOM may import D-001 with the facts in §3.1 (the admin step).
 - Separately, when DOM replies, Dvir will be asked for: the v3 pricing row (or DOM's alternative), the drop-at-first-expiry wording, and a fresh line repeating the $950 walk-away exception for `promptinjectionaudit.com` if the 72-hour window has passed.
 - Outside DOM, for context: the Afternic account (with payee details) must exist and be linked to GoDaddy before the upload; it is still an open item in our due-diligence checklist.
+
+---
+
+## 10. DOM response (2026-10-07)
+
+**Verdict: accepted.** Most of it is already supported through DOM's admin steps. Three small changes ship in **v2.1.0** (§10.3). Sedo is not supported yet: DOM recommends skipping it for now (Q-12). DOM recommends the **v3 path** (Q-7).
+
+### 10.1 Sequence (who does what)
+1. **DOM: import, no listing.** Admin step, already approved in §9:
+   `import-domain --domain promptinjectionaudit.com --registrar godaddy --manual --buy-date 2026-10-04 --expiry 2027-10-04 --cost 13.73 --cost-note "42 ILS @0.3269 USD/ILS (Dvir 2026-10-04 20:41 IDT); evidence 2026-10-03 GoDaddy order screenshot" --order none --deal D-001 --category trend --legacy-no-comps "bought before the comps rule"`
+   - **No listing flags:** the import starts no drop clock (R-17, Q-8).
+   - **Result:** status `owned`, `registrar_api: none`.
+2. **Dvir: approve pricing v3.** Approval line (Q-6), then DOM creates v3:
+   > "I approve pricing settings v3 as in DOM's listing-strategy §10.13: price list $299, $399, $499, $788, $1,088, $1,488, $1,988, $2,488; non-geo minimum $788 and default $1,488; $1,988 and $2,488 only with LANDER-1 evidence; floor 65% to the whole dollar, at least $750; walk-away max(48%, $500); min offer $100; ladder drops one step at month 6 and month 18 (geo: one step at month 12, $499 → $399 → $299); final push to the lowest list price at or above the floor; comps optional."
+3. **Dvir: approve the drop.** Approval line (Q-5), then DOM runs `drop-at-first-expiry` **before** the listing, so the schedule is built once from 2027-10-04:
+   > "Drop promptinjectionaudit.com at its first expiry, 2027-10-04; do not renew."
+4. **Gavriel: store the prices only,** on the day of the first Afternic upload. `POST /list/promptinjectionaudit.com` with **`lander: "none"`** (new in v2.1.0, §10.3) plus the price fields, mode `hybrid`, BIN 1488, floor 967, walk-away 950, `pricing_exception: true` with a reason, and a fresh `approval_ref` (Q-9). Dry run first.
+   - **What it does:** stores the plan, the history row and the schedule, and marks the Afternic export pending.
+   - **What it doesn't do:** touch nameservers. The lander stays pending, and `/report` shows it at info level only.
+   - **Clock:** the first listing date (= this call) anchors the month-6 drop.
+5. **Gavriel: Afternic export and upload.** `GET /export/afternic.csv` (expect exactly `PromptInjectionAudit.com,1488,967,100,N,,Custom Lander,Y,N,Y,N`), upload at Afternic, then `POST /export/afternic/uploaded` with the `X-Export-Id`.
+6. **Lander switch, once the Afternic listing is live.** `POST /list/promptinjectionaudit.com` with `lander: "afternic"` and no price fields.
+   - **What DOM returns:** `registrar_api` is `none`, so DOM answers `ns_status: "manual"` with `manual_steps`.
+   - **Dvir:** sets `ns1.afternic.com` / `ns2.afternic.com` in GoDaddy by hand. Afternic's "Change NS" connector also works.
+   - **Check:** the daily nameserver check confirms it (`ns_verified`).
+
+The resulting schedule (R-18): M6 = L + 6 months, $1,088 / $750 / $520; M18 is superseded by the final push; final push 2027-07-06 at $788; delist 2027-09-27; drop 2027-10-04.
+
+### 10.2 Answers
+- **Q-1:** yes. The import counts toward the $1,500 and 50-domain caps exactly like a buy. An import is never refused for the caps (it warns only).
+- **Q-2:** one `registration` row:
+  - **Amount:** −$13.73, dated **2026-10-04**, the registry creation, which is the buy date (R-3).
+  - **Note:** carries the ILS amount, the rate, Dvir's source and the screenshot reference. No order number is invented.
+  - **Corrections:** if the card statement shows a different USD figure, DOM adds a reversing row and a corrected row (founder rule 8, append-only), with Dvir's figure in the note.
+- **Q-3:** nothing more is needed for the import. A GoDaddy key is **not** needed (see Q-11).
+- **Q-4:**
+  - **Field:** a `--manual` GoDaddy name always shows `AUTO_RENEW_UNCONFIRMED`, because the service can't read GoDaddy.
+  - **Record:** DOM records "auto-renew OFF, confirmed by Dvir 2026-10-05 22:52 IDT" in the import note and the audit row.
+  - **Report:** the warning stays as an honest "the API can't see it".
+- **Q-5:** the approval line in §10.1 step 3. It runs before step 4.
+- **Q-6:** the line in §10.1 step 2. It is exactly the v3 row in DOM's `listing-strategy.md` §10.13 (already built; only the row is missing).
+- **Q-7: v3 first.** Under v2, the plan would need two exceptions (BIN 1488 isn't "nice" and the floor isn't $965), the −20% drops would give off-list prices ($1,195 / $775), and a later v3 replan would recompute everything. Under v3, only the walk-away is an exception and the ladder is native.
+- **Q-8:** the first `POST /list` that stores a price (step 4) anchors M6. The import doesn't.
+- **Q-9:** yes, a fresh line from Dvir naming `promptinjectionaudit.com`, at the time of the call (for example "promptinjectionaudit.com: BIN $1,488, floor $967, walk-away $950 as an approved exception, min offer $100"). The original 00:32 decision goes into the import note and the deal history.
+- **Q-10:** today `committed_forward` still expects one renewal for D-001. **v2.1.0 fixes this:** a name whose `drop_date` = `expiry_date` (dropping at first expiry) no longer counts a renewal, and no `RENEWAL_PRICE_UNKNOWN` appears for it. No GoDaddy renewal price is needed.
+- **Q-11:**
+  - **DOM recommends the manual path for D-001:** no GoDaddy key. One nameserver change by hand in GoDaddy is simpler and safer than adding a credential.
+  - **GoDaddy's default lock:** in GoDaddy's dashboard, "Domain lock" blocks transfers. Nameserver changes from the dashboard are normally allowed with it on. If GoDaddy refuses, Dvir turns the lock off for the change and back on afterwards.
+  - **Daily ownership check:** it skips names with no registrar access (`registrar_api: none`), so D-001 is **not** covered. That is an accepted gap for one hand-bought name.
+- **Q-12, Sedo:**
+  - **What's missing:** Sedo publishes no bulk-upload format. DOM needs the example file from **Dvir's Sedo account** (so a Sedo account is a prerequisite), which DOM copies into `templates/sedo_template.json`. Until then the endpoint stays 501.
+  - **DOM's recommendation:** skip Sedo for D-001. The name can't use SedoMLS (it's at GoDaddy), Afternic is the main channel, and the Afternic listing already reaches GoDaddy's network.
+  - **If you still want it:** send the file through a CR.
+- **Q-13:**
+  - **Today:** there is no undo for `drop-at-first-expiry` and no renewal route.
+  - **If a real offer or inquiry arrives:** Gavriel tells DOM and Dvir.
+    - Dvir renews at GoDaddy by hand, before about 2027-09-01, ahead of the 2027-09-27 delist.
+    - DOM adds a one-line admin step then to set `drop_date` back to expiry + 1 year and rebuild the schedule. That's built only if needed (keep it simple).
+- **Q-14:** imported with `--legacy-no-comps`, D-001 would today show `POST_BUY_INCOMPLETE` (warn). **v2.1.0 fixes this:** a name imported as `legacy_no_comps` isn't flagged, and under v3 comps are optional anyway. A screening pack is **not** required for hand-bought names: the pack gates `/buy` only.
+
+### 10.3 Changes in v2.1.0 for this CR (additive)
+1. **`POST /list` `lander: "none"`:** stores or changes the listing and the plan without any nameserver action. `lander_pending: true`, and an info-level `/report` note instead of an NS warning. A later call with `lander: "afternic"` switches the nameservers.
+2. **`committed_forward` with a drop at first expiry:** a name whose `drop_date` = `expiry_date` counts no renewal.
+3. **`POST_BUY_INCOMPLETE`:** not raised for names imported as `legacy_no_comps`.
+
+**DOM's next step:** run the import (step 1) now, since §9 approves it. Steps 2 and 3 wait for Dvir's two lines. Step 4 waits for v2.1.0.
