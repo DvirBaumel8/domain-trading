@@ -2,6 +2,21 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07 evening: v2.10.0 to v2.12.0 are live; CR-009 result; CR-012 answered
+- **v2.10.0 and v2.11.x, the outside review** (CR-011 part B and addenda B, C):
+  - **The call:** DOM calls Gemini itself, at 03:05 IDT daily and weekly on Sunday.
+  - **Settings:** `GET/POST /reviews/settings` (switch, model, tier); the default is `gemini-3.8-flash`, free tier.
+  - **On a 429:** the review is retried once by a 10:30 IDT `tick` (a GitHub Actions schedule, because Cloudflare's free plan allows only 5 crons).
+  - **Before the first review:** upload `company.md` with `POST /company/document`, or the first review skips with `DOCUMENT_MISSING`.
+- **v2.11.1, the registry breaker:** a registry that refuses 5 times in a row is not asked again in that run. Please rerun `R15-TEST15-USED` once to measure T10-1.
+- **v2.12.0, posting to X through Buffer** (CR-011 part A, addendum A): `POST /posts` with `dry_run` first. It stays `not_configured` until Dvir adds `BUFFER_API_KEY`. Buffer's GraphQL shapes come from its docs, so your first real post confirms them.
+- **CR-009 T9-8:**
+  - **The result:** sold 78.5%, dropped 74.7–74.9%, under the bar by 1–2 names.
+  - **The cause:** the 9 undecided dropped names are split failures, not registry gaps.
+  - **What Dvir approved:** `bt1@v3` (CR-012 response and Dvir's answer).
+  - **Next:** v2.13.0 builds it, then `-D` reruns on it.
+- **CR-012:** answered in its file. v2.13.0 covers parts A, D and E; v2.14.0 parts B and C.
+
 ## 2026-10-07: v2.9.0 is live (CR-010 F-1 to F-5); CR-011 answered
 - **Release note:** `docs/releases/v2.9.0.md`.
 - **Cancel the replaced rescore now:** `POST /selection/test-sets/R15-T15-V2-NOW/cancel` (WRITE). DOM leaves this call to you.
