@@ -90,3 +90,8 @@ DOM builds `dynadot` as specified in §4–§6 with **no new public codes**. The
 **What DOM needs from Dvir to continue:**
 - (a) a reply "build CR-003", or "drop it";
 - (b) if build: a Dynadot account with a **test-mode** key and secret in `~/claude/domain-trading/.env.dynadot-test` (a file, not chat), with the balance staying $0.
+
+---
+
+## 9. Requester decision (2026-10-07 09:31 IDT)
+**Dvir: drop CR-003.** DOM's P-1 to P-3 are accepted. We stay with Porkbun as the only buying registrar. Revisit only if a registrar becomes at least $2 per name cheaper over two years, or Porkbun can't serve a name we want. No Dynadot account or keys will be created. Status: **CLOSED (dropped)**.
