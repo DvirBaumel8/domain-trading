@@ -106,3 +106,5 @@ Every place where the specs DOM inherited (`docs/internal/*`, which still descri
 
 ## Removed by Dvir's 6 Oct decisions (no gap; listed for completeness)
 `POST /offers/import`, `offer_imports`, `offers.import_id`; the `payouts` table, `POST /payouts/{id}/received`, the `/sold` `payout` object, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE`, `payouts_pending` (tests PO-1–PO-5, S-13–S-15, OF-13, OF-15 deleted); `changed_only` and per-file export records; `JOBS_MODE` and in-process timers.
+
+| G-79 | Backup / restore drill (BK-5) | **Dropped by Dvir, 7 Oct 2026.** The export code stays; `GITHUB_BACKUP_*` is not configured, so the daily step reports `skipped`. Accepted risk: Neon free history ≈ 6 h. |

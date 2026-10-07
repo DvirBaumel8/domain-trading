@@ -67,6 +67,10 @@ The decision history lives in git, `docs/internal/` and `docs/contract/CHANGELOG
 - Default lander Afternic (Dan.com retired 27 Jun 2025); Sedo is a second listing. No marketplace API; uploads by bots, full-file Afternic **Update**. No mail-watching.
 - 6 Oct 2026 (Dvir): bots-only access (unauthenticated requests write nothing); offers CSV import and payouts removed; exports always full-file; jobs only via `POST /jobs/run` / `npm run job`; DOM owns everything (vendor model).
 
+## Decisions after handover
+
+- **Backup and restore drill dropped (Dvir, 7 Oct 2026):** the nightly export stays built but unconfigured (the daily step is skipped). BK-5 no longer gates G4. Accepted risk: Neon free keeps about 6 h of history, so older data loss can't be recovered.
+
 ## Don't
 - Don't add a frontend, a token-creation endpoint, multi-year registration, auto-renew ON, marketplace scraping, or automation of undocumented website endpoints.
 - Don't add a settings-write endpoint for caps or `pricing_settings` (admin command or migration only). **Exception (CR-001 P-8):** selection settings may be drafted via the API (WRITE) and activated only with Dvir's `approval_ref`.
