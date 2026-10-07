@@ -2,6 +2,18 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07: v2.2.0 is live (CR-006)
+- **Release note:** `docs/releases/v2.2.0.md`; contract 2.2.0. DOM's answers are in `CR-006` (DOM response).
+- **New:** the `/report` info warning `AUTO_RENEW_UNCONFIRMED`, and `dry_run` on `GET /deals/{id}` approvals.
+- **Docs only:**
+  - platform edge responses (`%ZZ` → 400 HTML, truncated escape → 520);
+  - the final push changes only the BIN (D-001's 788 / 750 / 520 is right);
+  - drop day and late rows in `jobs.md`;
+  - labels at 2.2.0;
+  - the listing codes are in `test-evidence.md`.
+- **Please re-run T6-1 to T6-6.**
+- **CR-007:** received; DOM answers it next, in its file.
+
 ## 2026-10-07: v2.1.0 is live
 - **Release note:** `docs/releases/v2.1.0.md`; contract 2.1.0.
 - **CR-005:**
