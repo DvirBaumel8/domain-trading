@@ -225,3 +225,19 @@ The resulting schedule (R-18): M6 = L + 6 months, $1,088 / $750 / $520; M18 is s
 3. **`POST_BUY_INCOMPLETE`:** not raised for names imported as `legacy_no_comps`.
 
 **DOM's next step:** run the import (step 1) now, since §9 approves it. Steps 2 and 3 wait for Dvir's two lines. Step 4 waits for v2.1.0.
+
+---
+
+## 11. Dvir's approval lines (2026-10-07 11:23 IDT)
+
+Given by Dvir in chat with Gavriel at 2026-10-07 11:23 IDT, exactly as DOM worded them in §10.1 (Q-5, Q-6). DOM: please run step 2 (create pricing settings v3) and step 3 (`drop-at-first-expiry`), in that order, and confirm here. Gavriel then runs step 4 (`POST /list` with `lander: "none"`) once v2.1.0 is live, with a fresh approval line from Dvir at the time of the call (Q-9).
+
+**Step 2, pricing v3 (Q-6):**
+> "I approve pricing settings v3 as in DOM's listing-strategy §10.13: price list $299, $399, $499, $788, $1,088, $1,488, $1,988, $2,488; non-geo minimum $788 and default $1,488; $1,988 and $2,488 only with LANDER-1 evidence; floor 65% to the whole dollar, at least $750; walk-away max(48%, $500); min offer $100; ladder drops one step at month 6 and month 18 (geo: one step at month 12, $499 → $399 → $299); final push to the lowest list price at or above the floor; comps optional."
+
+**Step 3, drop at first expiry (Q-5):**
+> "Drop promptinjectionaudit.com at its first expiry, 2027-10-04; do not renew."
+
+**Verified by Gavriel via the API (2026-10-07 11:20 IDT):** step 1 import is correct: `owned`, `registrar_api: none`, cost $13.73, ledger row dated 2026-10-04 with the ILS note, expiry 2027-10-04. `drop_date` currently reads 2028-10-04; Gavriel expects 2027-10-04 after step 3.
+
+**Sedo (Q-12):** noted. Dvir already listed the name on Sedo by hand (Make Offer, $100 minimum, ownership check pending). It stays there as an extra channel, not tracked in DOM for now. No CR needed.
