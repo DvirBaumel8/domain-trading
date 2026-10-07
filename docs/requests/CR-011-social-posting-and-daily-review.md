@@ -216,3 +216,54 @@ DOM's reviewer model is `gemini-2.5-flash` (optional env `GEMINI_MODEL` override
   - **What DOM does:** DOM tries Buffer's `deletePost`. If Buffer refuses or the post stays on X, the answer is 409 `POST_DELETE_UNSUPPORTED`.
   - **What stays manual:** Dvir deletes the post on X by hand, and DOM marks it removed with the reason.
 - **Free-plan limits:** about 3,000 calls a month, 100 per 15 minutes. DOM's use is a few calls a day; a 429 from Buffer is shown plainly with its `Retry-After`.
+
+## Addendum C: review on/off switch and model setting; start on free Gemini 3.8 Flash (Dvir, 2026-10-07 20:24 IDT)
+- **From:** Gavriel, on Dvir's behalf. Dvir in chat, 2026-10-07 20:24 IDT, verbatim: "Yes: build it with an on/off switch and a model setting, start ON with free Gemini 3.8 Flash from a new no-billing Google project; review usefulness after two weeks"
+- **Scope:** changes part B as DOM builds it in v2.11.0 (DOM calls the reviewer). Everything else in part B stays as written. Part A is not touched.
+- **Business need:** Dvir prefers $0 for the review. We start on Google's free tier and keep a way to turn the review off, or move to a stronger paid model, without a new release. After two weeks Gavriel tells Dvir whether the review was useful; he then keeps it, moves it to a paid model, or turns it off.
+
+### Two settings
+- **`review.enabled`:** true or false, default **true**. When false, no call goes to Google, neither the daily step nor a manual run.
+- **`review.model`:** the Gemini model the review uses, default **`gemini-3.8-flash`**. DOM keeps a documented list of allowed values, at least `gemini-3.8-flash` and `gemini-3.1-pro-preview` (for later, paid only). Any other value is refused with 422 and the allowed list.
+- **Who changes them:** Gavriel's WRITE token, through the existing settings versions or a small endpoint. DOM's choice; the README and this CR say which.
+- **Audit:** every change is logged: who, when, old value, new value, idempotency key.
+- **Where they show:** `GET /health` jobs (the `outsideReview` step shows `disabled` when off, and the current model) and `GET /reviews/cost` (enabled, model, tier).
+- **The weekly Sunday review** uses the same `review.model`. There is no separate weekly model, so no Pro on the free tier.
+- **`GEMINI_MODEL`:** the setting replaces the env override DOM named above. Please say whether the env stays (and which wins) or goes.
+
+### The key: a new Google project with no billing
+- **What Dvir does:** creates a **new** Google AI Studio project with **no billing account** linked, makes a Gemini API key there, and puts it in the Render service `domain-trading-api`.
+- **Name:** DOM's secrets table above already names `GEMINI_API_KEY`. Keep that name unless DOM prefers another, and update the table's description: the key comes from a project with no billing (free tier), not from the project with billing.
+- **Not this key:** the existing project `robots-508113` has billing linked (for Web Risk). A key from it would bill us, so it must not be used for the review.
+
+### Free tier facts (Google's pricing page, https://ai.google.dev/gemini-api/docs/pricing, last updated 2026-10-07, read the same day)
+- **`gemini-3.8-flash`:** input and output are free of charge on the free tier.
+- **`gemini-3.1-pro-preview`:** not available on the free tier (paid list price $2.00 per million input tokens and $12.00 per million output tokens, for prompts up to 200k tokens).
+- **Data use:** on the free tier Google may use what we send to improve its products. Dvir accepts this.
+- **Limits:** rate limits are per project, and the requests-per-day count resets at midnight Pacific time (09:00 or 10:00 in Israel, depending on the season). One daily review plus a few manual runs is far below them.
+
+### When Google says "too many requests" (429)
+- The run waits and tries again later the same Israel day, at least once after Google's daily reset.
+- If it still fails, the review is stored as UNKNOWN with Google's status and reason (T11-23), and `REVIEW_OVERDUE` follows as already specified.
+- It never falls back to another key, a paid key, or another model.
+- A model that the free tier refuses (for example Pro on a free key) is the same: UNKNOWN with Google's reason, no fallback.
+
+### Cost
+- **On the free tier, `cost_usd` is 0** for every review, and `GET /reviews/cost` shows a spend of $0 with the count of calls.
+- **The $5 monthly cap stays in force** (409 `REVIEW_COST_CAP`) for when a paid model is chosen. Cost is then computed at the chosen model's paid list price, not at one fixed price for every model.
+- **Free or paid:** Google's answer does not say which tier a key is on, so DOM states how it knows. Suggestion: a third setting `review.tier`, `free` or `paid`, default `free`, changed only after Dvir approves a paid model.
+
+### Acceptance tests
+- **T11-35 (switch off):** with `review.enabled` set to false, the daily step makes no call to Google and its run summary says `skipped` with the reason `disabled`. A manual `POST /reviews/run` is refused with a code that says the review is off. `/health` shows the step as disabled.
+- **T11-36 (switch back on):** setting `review.enabled` back to true makes the next daily step or manual run call Google again. It runs one review, not one per day missed.
+- **T11-37 (model change):** a change of `review.model` takes effect from the next run, daily or weekly. The stored feedback names the model used. The change is in the audit log with the old and new value.
+- **T11-38 (unknown model):** a value not on the allowed list gives 422 with the allowed list. Nothing changes and no audit row says it changed.
+- **T11-39 (free tier 429):** when Google answers 429, the run retries later the same Israel day as described above. If it still fails, the review is UNKNOWN with Google's status and reason (never the key), and no other key or model is tried.
+- **T11-40 (cost on free):** a review on the free tier stores `cost_usd` 0, and `GET /reviews/cost` shows spend $0, the cap, the count, `enabled`, the model and the tier.
+- **T11-41 (cap kept for paid):** with a paid model and tier, the cost is computed at that model's list price, and past $5 in a month `POST /reviews/run` and the daily step answer 409 `REVIEW_COST_CAP` with no call made.
+
+### Please answer
+- The env var name for the free key (suggested: keep `GEMINI_API_KEY`), so Dvir adds it in Render once.
+- Whether the two settings live in the settings versions or in a separate endpoint, and the exact route and field names.
+- What happens to the `GEMINI_MODEL` env override.
+- How DOM knows the tier, if not the suggested `review.tier`.
