@@ -135,3 +135,41 @@ DOM checked X's API terms on 2026-10-07 ([wearefounders.uk](https://www.wearefou
 ### Suggestions (DOM chooses)
 - How images reach DOM: multipart upload or base64 in the JSON body of the WRITE call.
 - First use: Phase 1's five posts, one image each (two on the thread), 1600x900 PNG with alt text, already prepared by Gavriel.
+
+## Addendum B: Dvir's answers; founder rules 9 and 10 change (Dvir, 2026-10-07 19:07 IDT)
+- **From:** Gavriel, on Dvir's behalf. Dvir in chat, verbatim:
+  - "1. If we think that the correct way is to do it via the software lets change the rule - and what i just said ahould be a general thing for the future, if we set a rule in the past and we think it ahould be changed, lets change it"
+  - "2. How can we achieve our goal with X but in a free plan? Im okay with buffer, i dont think i care to add one more wrapper in the middle and to lose this data"
+- **Gavriel's view (why the software is the right place):** both jobs are mechanical, daily and keyed. Done by a bot, each run costs bot tokens and puts keys in a bot's hands; done by DOM, they cost no bot tokens, keys stay in Render, and every call is logged and testable. Dvir agreed.
+
+### Founder rule changes (Dvir approved, as above)
+- **Rule 9, new wording:** "The service makes no AI calls, with one exception: the daily and weekly outside review of the company (CR-011 part B), using one reviewer AI, with a monthly cost cap. No other AI calls inside the service."
+- **Rule 10, new wording:** "The service may publish to the company's own X account only, through Buffer. It never replies, quotes, likes, follows or messages anyone."
+- DOM may tighten the wording; please write the final text in your reply.
+
+### Answers to DOM's part A questions (sources read 2026-10-07; details in Gavriel's notes)
+1. **Pricing:** you were right. X's API is pay-per-use only for new developers (free tier ended 6 Feb 2026; per-post prices since 20 Apr 2026: $0.015 a post, $0.20 with a link, reads $0.005, or $0.001 for an app's own posts and mentions). Basic ended after 1 June 2026 and Pro after 1 Sept 2026. A one-time $20 credit for new cards was announced 2 Oct 2026, still rolling out. Sources: https://docs.x.com/x-api/getting-started/pricing, https://docs.x.com/changelog, https://docs.x.com/x-api/getting-started/free-credits.
+2. **Cheapest setup:** X direct would be about $1 to $2 a month. Dvir chose $0 instead.
+3. **Another way:** Buffer, an official X partner, posts for us on its free plan (https://buffer.com/pricing.md, API at https://developers.buffer.com). Dvir accepts Buffer in the middle and losing X numbers and replies.
+
+### Part A, revised: post through Buffer's free plan
+- **Keep:** T11-1 to T11-3 (preview, length, block list), T11-4 to T11-6 (real post, audit, idempotency, daily cap), T11-7 (our own threads, if Buffer supports them; if not, say so and threads drop), T11-8 (pause switch), T11-11 (errors shown plainly, keys never shown), Addendum A (images with alt text, T11-28 to T11-34).
+- **Drop:** T11-10's metrics and the replies/mentions read (T11-12, T11-13): not available on Buffer's free plan for us. The posts list keeps our own records (text, images, time, Buffer id, the X link if Buffer returns it).
+- **May drop:** T11-9 (delete our own post), if Buffer's API can't delete a published post. Say so.
+- **Images:** Buffer takes images by public web address. DOM serves each stored image at an unguessable public URL for as long as Buffer needs it, then may stop serving it.
+- **Free-plan limits:** respect Buffer's free limits (at most 10 queued posts, about 3,000 API calls a month); the daily cap (default 1, burst up to 5 on one named day) keeps us far below them. Over a limit is a clear refusal, never a silent drop.
+- **Secrets:** DOM names them. Suggested: `BUFFER_API_KEY` (and the Buffer channel id for the X account if needed).
+- **Automated label:** Dvir turns on X's "Automated" label on the company account himself (Settings, Your account, Automation, linked to his personal account), and the bio says it's a bot. Nothing for DOM.
+
+### Part B, revised: DOM calls the reviewer
+- **Reviewer:** Google Gemini, via Dvir's Google Cloud project that has billing (so Google doesn't use the content for training). Suggested secret: `GEMINI_API_KEY`. DOM picks the model and states it.
+- **Keep everything DOM already designed** (document versions, packet, block list, feedback store with new/repeat, Gavriel's status, $5 monthly cap, `REVIEW_OVERDUE`), and add:
+  - **T11-21 back in:** a scheduled daily review (DOM suggested 09:00 IDT; weekly full review on Sunday), plus a manual trigger with the WRITE token for testing, counted within limits.
+  - **T11-26 and T11-27 back in:** the review job and the posting step show in `/health` jobs and the job run list, can be started through the API, and give a reason when they fail or are skipped.
+  - **The feedback is stored with provider, model and cost,** as in your `POST /reviews/{packet_id}/feedback` body, but filled by DOM.
+  - **Keep `POST /reviews/{packet_id}/feedback` too,** so Gavriel can add a second opinion by hand if ever needed.
+
+### Please answer
+- The final wording of rules 9 and 10.
+- Which part A tests Buffer's free plan can't meet.
+- The secret names, so Dvir adds them in Render once.
