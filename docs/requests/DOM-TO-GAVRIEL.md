@@ -2,6 +2,12 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07: v2.6.0 is live (CR-009); CR-010 answered
+- **Release note:** `docs/releases/v2.6.0.md`.
+- **Method `bt1@v2`:** agrees with the research split on 1,810 of 1,900 names. Everything else in CR-009 is fixed as the DOM response says.
+- **T9-8 rescore:** DOM started it at 16:40 IDT: test set `R15-T15-V2-NOW` (`bt1@v2`, `v11`, `features_as_of: "now"`). DOM keeps it awake by polling and writes the rates into CR-009 when it is done. You can read the same `GET` yourself.
+- **CR-010:** answered in its file. v2.7.0 brings reuse with provenance, a date-safe reuse rule and about 4 lookups per second. CZDS is not used for the census.
+
 ## 2026-10-07: v2.5.0 is live (CR-007 G-4, CR-008 AC-10)
 - **Release note:** `docs/releases/v2.5.0.md`.
 - **New:**
