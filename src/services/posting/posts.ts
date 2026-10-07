@@ -1,5 +1,6 @@
 // v2.12.0 (CR-011 part A through Buffer): validation, the daily allowance, the pause switch, creating and removing a post, and the daily refresh.
 // Founder rule 10: only the company's own X account, publish only. This module never replies, quotes, likes, follows or messages anyone.
+import { advisoryXactLock } from '../../core/locks.js';
 import { randomBytes } from 'node:crypto';
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
@@ -128,8 +129,7 @@ export interface CreateResult {
   images: { part: number; position: number; sha256: string }[]; allowance: Allowance;
 }
 
-/** The pending row is inserted under this advisory lock together with the cap and pause checks (one Render instance or many). */
-export const POSTS_CAP_LOCK = "pg_advisory_xact_lock(hashtext('posts_cap'))";
+/** The pending row is inserted under the 'posts_cap' advisory lock together with the cap and pause checks (one Render instance or many). */
 /** A pending row older than this lost its process before Buffer answered: postsRefresh turns it into 'unknown'. */
 export const PENDING_STALE_MS = 15 * 60_000;
 
@@ -162,7 +162,7 @@ export async function createPost(
   // Cap check, pause check and the 'pending' row are one step under an advisory lock: two requests can never both pass the cap, and the row
   // exists before Buffer is called, so no later failure (or restart) can lead to a second post.
   const al = await db.transaction().execute(async (trx) => {
-    await sql.raw(`select ${POSTS_CAP_LOCK}`).execute(trx);
+    await advisoryXactLock(trx, 'posts_cap');
     const st = await postingState(trx);
     if (st.paused) throw new AppError(409, 'POSTING_PAUSED', 'Posting is paused', { reason: st.reason, since: st.since ? toJerusalemIso(st.since) : null });
     const cur = await allowanceNow(trx, nowMs);

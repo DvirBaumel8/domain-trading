@@ -24,9 +24,21 @@ export class Pacer {
   /** How many times the rate was halved (a 429 or a refusal was seen). */
   slowdowns = 0;
   private streak = 0;
-  /** True once HOST_BREAKER_REFUSALS refusals came in a row: the host is not asked again for the rest of this pacer's life. */
-  breakerOpen = false;
-  constructor(private minMsBetween: number, private concurrency: number, private readonly sleep: (ms: number) => Promise<void>, private readonly clock: () => number = Date.now) {}
+  private breaker = false;
+  private readonly baseGap: number;
+  private readonly baseConcurrency: number;
+  constructor(private minMsBetween: number, private concurrency: number, private readonly sleep: (ms: number) => Promise<void>, private readonly clock: () => number = Date.now) {
+    this.baseGap = minMsBetween;
+    this.baseConcurrency = concurrency;
+  }
+
+  /** True once HOST_BREAKER_REFUSALS refusals came in a row: the host is not asked again until `reset()` (a run's own pacer: for the rest of that run). */
+  get breakerOpen(): boolean { return this.breaker; }
+
+  /** Back to the base rate with the breaker closed (a shared host pacer, when no screening run is going any more). */
+  reset(): void {
+    this.breaker = false; this.streak = 0; this.halvings = 0; this.slowdowns = 0; this.minMsBetween = this.baseGap; this.concurrency = this.baseConcurrency;
+  }
 
   get minGapMs(): number { return this.minMsBetween; }
   get maxConcurrency(): number { return this.concurrency; }
@@ -34,7 +46,7 @@ export class Pacer {
   /** Halve the rate: double the minimum gap (cap RDAP_MAX_MIN_MS); after the second halving, one call at a time. */
   slowDown(): void {
     this.slowdowns++;
-    if (++this.streak >= HOST_BREAKER_REFUSALS) this.breakerOpen = true;
+    if (++this.streak >= HOST_BREAKER_REFUSALS) this.breaker = true;
     this.halvings++;
     this.minMsBetween = Math.min(Math.max(this.minMsBetween, 1) * 2, RDAP_MAX_MIN_MS);
     if (this.halvings >= 2) this.concurrency = 1;
@@ -63,7 +75,7 @@ export class Pacer {
 }
 
 export interface LookupOpts {
-  maxAgeHours: number; baseUrl?: string; evidenceMaxBytes: number; pace: Pacer; now?: () => number; timeoutMs?: number; /** ms epoch: past it no query is sent (UNKNOWN TIMEOUT). */ deadline?: number; /** v2.9.0: when it returns true no query is sent (the run was cancelled). */ isCancelled?: () => boolean;
+  maxAgeHours: number; baseUrl?: string; evidenceMaxBytes: number; pace: Pace; now?: () => number; timeoutMs?: number; /** ms epoch: past it no query is sent (UNKNOWN TIMEOUT). */ deadline?: number; /** v2.9.0: when it returns true no query is sent (the run was cancelled). */ isCancelled?: () => boolean;
   /** v2.7.0 date safety: a stored answer is reusable only if checked_at >= max(now - maxAge, notBefore). */
   notBefore?: Date;
   /** v2.7.0: stored answers read in one query by `prefetchStored`; a domain absent from the map has no reusable answer (no per-lookup query). */
@@ -268,15 +280,67 @@ export async function rdapBaseFor(db: Kysely<Database>, deps: ScreeningDeps, tld
   return map.get(t) ?? null;
 }
 
-/** One pacer per RDAP host and run (`run.rdap_min_ms_between`, `run.rdap_concurrency`, both per host): different registries run in parallel. */
-export function pacerFor(ctx: CheckContext, baseUrl: string = RDAP_COM_BASE): Pacer {
+/** What lookupCached needs from a pacer. */
+export interface Pace {
+  run<T>(fn: () => Promise<T>): Promise<T>;
+  slowDown(): void;
+  noteNotRefused(): void;
+  readonly breakerOpen: boolean;
+  readonly minGapMs: number;
+  readonly maxConcurrency: number;
+}
+
+/**
+ * The effective pacer of one run for one host: the process-wide host pacer (shared by every run) and, for a run whose own limit is stricter,
+ * a per-run gate on top. The effective rate is the stricter of the two; refusals slow both; the breaker is open when either is.
+ */
+export class LayeredPacer implements Pace {
+  constructor(private readonly host: Pacer, private readonly gate: Pacer | null) {}
+  run<T>(fn: () => Promise<T>): Promise<T> { return this.gate ? this.gate.run(() => this.host.run(fn)) : this.host.run(fn); }
+  slowDown(): void { this.host.slowDown(); this.gate?.slowDown(); }
+  noteNotRefused(): void { this.host.noteNotRefused(); this.gate?.noteNotRefused(); }
+  get breakerOpen(): boolean { return this.host.breakerOpen || (this.gate?.breakerOpen ?? false); }
+  get minGapMs(): number { return Math.max(this.host.minGapMs, this.gate?.minGapMs ?? 0); }
+  get maxConcurrency(): number { return Math.min(this.host.maxConcurrency, this.gate?.maxConcurrency ?? Infinity); }
+  get slowdowns(): number { return this.host.slowdowns; }
+}
+
+// Process-wide: one pacer per RDAP host, at the polite test-set ceiling. A different `sleep` means a different app instance (tests); it gets its own pacer.
+const hostPacers = new Map<string, { sleep: (ms: number) => Promise<void>; pacer: Pacer }>();
+
+/** The shared pacer of an RDAP host. */
+export function hostPacer(host: string, sleep: (ms: number) => Promise<void>): Pacer {
+  const hit = hostPacers.get(host);
+  if (hit && hit.sleep === sleep) return hit.pacer;
+  const pacer = new Pacer(TEST_SET_RDAP_MIN_MS, TEST_SET_RDAP_CONCURRENCY, sleep);
+  hostPacers.set(host, { sleep, pacer });
+  return pacer;
+}
+
+/**
+ * Called when no screening run is going any more in an app (its sleep identifies it): the shared host pacers go back to the base rate with the
+ * breaker closed, so a run that starts later is not held back by an earlier run's refusals (the state is shared only while runs overlap).
+ */
+export function settleHostPacers(sleep: (ms: number) => Promise<void>): void {
+  for (const e of hostPacers.values()) if (e.sleep === sleep) e.pacer.reset();
+}
+
+/** Forgets every shared host pacer (tests). */
+export function resetHostPacers(): void { hostPacers.clear(); }
+
+/**
+ * The pacer of this run for an RDAP host: the shared host pacer (4 in flight, 250 ms between starts), plus a per-run gate with the settings'
+ * `run.rdap_min_ms_between` / `run.rdap_concurrency` when the run is not a test-set run and its limit is stricter.
+ */
+export function pacerFor(ctx: CheckContext, baseUrl: string = RDAP_COM_BASE): LayeredPacer {
   const host = new URL(baseUrl).host;
   const key = `rdap_pacer:${host}`;
-  const hit = ctx.shared.get(key) as Pacer | undefined;
+  const hit = ctx.shared.get(key) as LayeredPacer | undefined;
   if (hit) return hit;
-  const p = ctx.run.testSet
-    ? new Pacer(TEST_SET_RDAP_MIN_MS, TEST_SET_RDAP_CONCURRENCY, ctx.deps.sleep)
-    : new Pacer(ctx.settings.run.rdap_min_ms_between, ctx.settings.run.rdap_concurrency, ctx.deps.sleep);
+  const shared = hostPacer(host, ctx.deps.sleep);
+  const r = ctx.settings.run;
+  const stricter = r.rdap_min_ms_between > TEST_SET_RDAP_MIN_MS || r.rdap_concurrency < TEST_SET_RDAP_CONCURRENCY;
+  const p = new LayeredPacer(shared, ctx.run.testSet || !stricter ? null : new Pacer(r.rdap_min_ms_between, r.rdap_concurrency, ctx.deps.sleep));
   ctx.shared.set(key, p);
   return p;
 }

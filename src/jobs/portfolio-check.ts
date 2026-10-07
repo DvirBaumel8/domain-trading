@@ -2,6 +2,7 @@
 // Read-only toward the outside: RDAP, one guarded GET of the name's own site, SURBL and Web Risk lookups. It never calls a registrar API,
 // never changes nameservers, listings or domain rows, and sends nothing. It writes only its own append-only rows (portfolio_checks), the
 // Web Risk usage counter and one audit row. `/report` raises REGISTRY_MISMATCH, LANDER_DOWN and OWNED_NAME_BLOCKLISTED from those rows.
+import { trySessionLock } from '../core/locks.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { idtDay } from '../core/dates.js';
@@ -40,8 +41,6 @@ export interface PortfolioCheckSummary {
 }
 
 export class PortfolioCheckJob {
-  private running = false;
-
   constructor(private readonly deps: {
     db: Kysely<Database>; rdapLookup: RdapLookupFn; screening: ScreeningDeps; now: () => number;
     log?: { warn(o: object, m: string): void };
@@ -50,8 +49,8 @@ export class PortfolioCheckJob {
   async runOnce(opts: { dryRun?: boolean } = {}): Promise<PortfolioCheckSummary> {
     const dryRun = opts.dryRun ?? false;
     const out: PortfolioCheckSummary = { dryRun, skipped: false, checked: 0, registry: tally(), web: { ...tally(), skipped: 0 }, blocklist: { ...tally(), skipped: 0 }, names: [] };
-    if (this.running) return { ...out, skipped: true };
-    this.running = true;
+    const lock = await trySessionLock(this.deps.db, 'job:portfolio-check');
+    if (!lock) return { ...out, skipped: true };
     try {
       const { db } = this.deps;
       const doms = await db.selectFrom('domains')
@@ -89,7 +88,7 @@ export class PortfolioCheckJob {
       }
       return out;
     } finally {
-      this.running = false;
+      await lock.release();
     }
   }
 

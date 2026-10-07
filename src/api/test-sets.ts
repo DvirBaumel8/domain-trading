@@ -1,4 +1,5 @@
 // v2.5.0 (CR-007 §21): test sets. POST /selection/test-sets (purpose new | rescore), GET /selection/test-sets/{name}, POST .../seal.
+import { advisoryXactLock } from '../core/locks.js';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
@@ -13,7 +14,7 @@ import { decideReplayRow, gateContext, toLabelledRow } from '../screening/replay
 import { LABEL_RE, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
 import { methodApproval } from '../screening/sibling-methods.js';
 import {
-  LEGACY_TEST_SET_METHOD, TEST_SET_CHECKS, TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, dayBefore, featuresOfRun, memberHashOf, midnightJerusalem, rescoreReport, splitRoles,
+  LEGACY_TEST_SET_METHOD, TEST_SET_CHECKS, TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, dayBefore, cachedFeaturesOfRun, featuresOfRun, memberHashOf, progressOfRun, midnightJerusalem, rescoreReport, splitRoles,
 } from '../screening/test-sets.js';
 import type { LabelledFeatures } from '../screening/replay.js';
 import type { InputName } from '../screening/engine.js';
@@ -205,8 +206,9 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     const { status, run } = await refresh(db, set);
     const rows = await db.selectFrom('test_set_rows').select(['domain', 'label', 'role', 'kept', 'reason']).where('set_name', '=', set.name).orderBy('id').execute();
     const kept = rows.filter((r) => r.kept);
-    const feats = await featuresOfRun(db, run);
     const finished = run.status !== 'running';
+    // R1b: while the run is going, progress comes from one aggregate query (no result rows); the full features are read (and remembered per run) once it has finished.
+    const feats = finished ? await cachedFeaturesOfRun(db, run) : await progressOfRun(db, run);
     let report: unknown = null;
     const undecided: UndecidedMap = new Map();
     if (set.purpose === 'rescore' && finished) {
@@ -224,14 +226,15 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
       if (typeof fs.from_set === 'string') (report as Record<string, unknown>).gaps = { before: fs.before_n ?? null, after: unknownNames(feats.latest).length };
     }
     // v2.13.0 (T12-2): why a feature is unknown. A rescore set lists its names; a `new` set gives counts only (its names are never shown, R-18).
-    const unknowns = set.purpose === 'rescore' ? await unknownsOf(db, feats.latest, undecided) : unknownCounts(feats.latest);
+    // R1b: while the run is going these are not computed (null = not known yet), never zeros that would read as "nothing happened".
+    const unknowns = !finished ? null : set.purpose === 'rescore' ? await unknownsOf(db, feats.latest, undecided) : unknownCounts(feats.latest);
     return {
       name: set.name, purpose: set.purpose, sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD, ...(set.purpose === 'rescore' && { features_as_of: set.features_as_of ?? 'row' }), status, max_answer_age_days: set.max_answer_age_days ?? TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, settings_version: set.settings_label, seed: set.seed, test_share: set.test_share === null ? null : Number(set.test_share),
       filters: set.filters, created_at: set.created_at.toISOString(),
       kept_n: kept.length, removed_n: rows.length - kept.length, test_n: kept.filter((r) => r.role === 'test').length, dev_n: kept.filter((r) => r.role === 'dev').length,
       removed: rows.filter((r) => !r.kept).map((r) => ({ domain: r.domain, reason: r.reason })),
       run: { id: run.id, status: run.status, names_n: feats.names_n, done_n: feats.done_n },
-      lookups: feats.lookups, unknowns,
+      lookups: finished ? feats.lookups : null, unknowns,
       timing: { started_at: toJerusalemIso(set.created_at), finished_at: run.finished_at ? toJerusalemIso(run.finished_at) : null, minutes: run.finished_at ? Math.round((run.finished_at.getTime() - set.created_at.getTime()) / 600) / 100 : null },
       features: finished ? { census_known_n: [...feats.byDomain.values()].filter((f) => f.registered_share !== null).length, alt_known_n: [...feats.byDomain.values()].filter((f) => f.alt_tld_before_n !== null).length } : null,
       sealed_at: set.sealed_at ? set.sealed_at.toISOString() : null, member_count: set.member_count, member_hash: set.member_hash, report,
@@ -254,7 +257,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
   app.post<{ Params: { name: string } }>('/selection/test-sets/:name/seal', async (req, reply) => {
     z.object({}).strict().parse(req.body ?? {});
     const out = await db.transaction().execute(async (trx) => {
-      await sql`SELECT pg_advisory_xact_lock(hashtext('test_sets_seal'))`.execute(trx);
+      await advisoryXactLock(trx, 'test_sets_seal');
       const set = await trx.selectFrom('test_sets').selectAll().where('name', '=', req.params.name).forUpdate().executeTakeFirst();
       if (!set) throw new AppError(404, 'TEST_SET_NOT_FOUND', `No test set "${req.params.name}"`);
       if (set.purpose !== 'new') throw new AppError(409, 'TEST_SET_NOT_SEALABLE', 'Only a test set with purpose new can be sealed; a rescore set registers nothing');

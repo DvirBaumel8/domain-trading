@@ -1,5 +1,6 @@
 // v2.14.0 (CR-012 part C): scouts send names (POST /candidates/intake); the daily step `intakeScreening` screens them (with the drop-list names that are about
 // to drop) in ONE full-plan run and records what it took. Nothing here calls a registrar or marketplace; the screening run does its own lookups.
+import { advisoryXactLock } from '../core/locks.js';
 import { hasAtSign, piiError } from '../core/validation.js';
 import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
@@ -146,7 +147,7 @@ export class IntakeScreeningJob {
       const started: { runId: string | null } = { runId: null };
       try {
       const summary = await this.deps.db.transaction().execute(async (db) => {
-      await sql`SELECT pg_advisory_xact_lock(hashtext('intake_screening'))`.execute(db);
+      await advisoryXactLock(db, 'intake_screening');
       const doneToday = Number((await db.selectFrom('candidate_screenings').select(sql<string>`count(distinct domain)`.as('n')).where('day', '=', today).executeTakeFirstOrThrow()).n);
 
       // Queued intake rows not yet screened, oldest first; one name per domain, an owned name is never screened.

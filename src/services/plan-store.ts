@@ -8,51 +8,6 @@ import type { ListingPlan } from './listing-v2.js';
 
 export const newPlanId = (): string => `pl_${randomUUID()}`;
 
-const LOCK_POLL_MS = 50;
-const LOCK_TIMEOUT_MS = 30_000;
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-async function release(conn: Kysely<Database>, domain: string): Promise<void> {
-  // fn may have left a transaction open (possibly aborted); roll it back so the connection returns to the pool clean
-  try { await sql`rollback`.execute(conn); } catch { /* nothing to roll back */ }
-  try {
-    await sql`select pg_advisory_unlock(hashtext(${domain}))`.execute(conn);
-  } catch {
-    await sql`select pg_advisory_unlock_all()`.execute(conn);
-  }
-}
-
-/** Session-level advisory lock on the same key /buy uses (pg_advisory_xact_lock(hashtext(domain))). Bounded wait. */
-export async function withDomainLock<T>(
-  db: Kysely<Database>, domain: string, fn: (conn: Kysely<Database>) => Promise<T>, opts?: { timeoutMs?: number },
-): Promise<T> {
-  const deadline = Date.now() + (opts?.timeoutMs ?? LOCK_TIMEOUT_MS);
-  return db.connection().execute(async (conn) => {
-    for (;;) {
-      const r = await sql<{ ok: boolean }>`select pg_try_advisory_lock(hashtext(${domain})) as ok`.execute(conn);
-      if (r.rows[0]?.ok) break;
-      if (Date.now() >= deadline) throw new AppError(503, 'DOMAIN_BUSY', 'Another change to this domain is in progress; retry shortly');
-      await sleep(LOCK_POLL_MS);
-    }
-    let result: T | undefined;
-    let failed = false;
-    let error: unknown;
-    try {
-      result = await fn(conn);
-    } catch (e) {
-      failed = true;
-      error = e;
-    }
-    try {
-      await release(conn, domain);
-    } catch (e) {
-      if (!failed) throw e; // never mask fn's error
-    }
-    if (failed) throw error;
-    return result as T;
-  });
-}
-
 export async function writePlan(trx: Transaction<Database>, o: {
   domainId: number; plan: ListingPlan; anchor: string; dropDate: string; settings: PricingSettings;
   planAuditId: string; startAfter?: string; now: Date;

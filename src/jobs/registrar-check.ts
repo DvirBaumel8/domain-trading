@@ -1,4 +1,5 @@
 import type { Kysely } from 'kysely';
+import { trySessionLock } from '../core/locks.js';
 import type { Database } from '../db/types.js';
 import { newAuditId } from '../http/audit.js';
 import type { RegistrarAdapter } from '../registrars/types.js';
@@ -10,8 +11,6 @@ export interface RegistrarCheckResult {
 
 /** Read-only: asks each registrar whether a name is still in our account and records it in registrar_presence. Never writes to a registrar or a domain. */
 export class RegistrarCheckJob {
-  private running = false;
-
   constructor(private readonly deps: {
     db: Kysely<Database>; adapters: RegistrarAdapter[]; now: () => number;
     log?: { warn(o: object, m: string): void; error(o: object, m: string): void };
@@ -20,8 +19,8 @@ export class RegistrarCheckJob {
   async runOnce(opts: { dryRun?: boolean } = {}): Promise<RegistrarCheckResult> {
     const dryRun = opts.dryRun ?? false;
     const out: RegistrarCheckResult = { dryRun, skipped: false, checked: 0, present: 0, absent: 0, errors: 0, newlyAbsent: [] };
-    if (this.running) return { ...out, skipped: true };
-    this.running = true;
+    const lock = await trySessionLock(this.deps.db, 'job:registrar-check');
+    if (!lock) return { ...out, skipped: true };
     try {
       const byName = new Map(this.deps.adapters.map((a) => [a.name, a]));
       const doms = await this.deps.db.selectFrom('domains').select(['id', 'domain', 'registrar'])
@@ -68,7 +67,7 @@ export class RegistrarCheckJob {
       }
       return out;
     } finally {
-      this.running = false;
+      await lock.release();
     }
   }
 }

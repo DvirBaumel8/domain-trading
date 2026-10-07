@@ -1,6 +1,7 @@
 // Daily step `dropWatch` (CR-007 §22, G-2): asks the registry (RDAP, fresh, 4 at a time) about each kept name of the uploaded drop lists that has
 // no check yet (or whose last check was unknown, up to 5 checks), and records pending delete / redemption / registered / not registered / unknown
 // with the expected drop date. It never calls a registrar or marketplace and sends nothing. Writes only drop_list_checks (append-only) and one audit row.
+import { trySessionLock } from '../core/locks.js';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { DROP_WATCH_MAX_PER_RUN, MAX_UNKNOWN_CHECKS, freshLookups, retentionCutoff, watchStatusOf } from '../drops/drop-lists.js';
@@ -12,15 +13,13 @@ export interface DropWatchSummary {
 }
 
 export class DropWatchJob {
-  private running = false;
-
   constructor(private readonly deps: { db: Kysely<Database>; screening: ScreeningDeps; now: () => number; /** Tests only: a smaller per-run cap. */ maxPerRun?: number; log?: { warn(o: object, m: string): void } }) {}
 
   async runOnce(opts: { dryRun?: boolean } = {}): Promise<DropWatchSummary> {
     const dryRun = opts.dryRun ?? false;
     const out: DropWatchSummary = { dryRun, skipped: false, checked: 0, pending_delete: 0, redemption: 0, registered: 0, not_registered: 0, unknown: 0, left_for_next_run: 0 };
-    if (this.running) return { ...out, skipped: true };
-    this.running = true;
+    const lock = await trySessionLock(this.deps.db, 'job:drop-watch');
+    if (!lock) return { ...out, skipped: true };
     try {
       const { db, now } = this.deps;
       const today = idtDay(now());
@@ -60,7 +59,7 @@ export class DropWatchJob {
       }
       return out;
     } finally {
-      this.running = false;
+      await lock.release();
     }
   }
 }

@@ -1,4 +1,5 @@
 import type { Kysely, Transaction } from 'kysely';
+import { trySessionLock } from '../core/locks.js';
 import type { Database, DomainRow, ListingMode, PriceScheduleTable } from '../db/types.js';
 import type { Selectable } from 'kysely';
 import { idtDay, isYmd } from '../core/dates.js';
@@ -6,7 +7,7 @@ import { newAuditId } from '../http/audit.js';
 import { hybridBinMin } from '../pricing/plan.js';
 import { isV3, settingsByVersion, type PricingSettings } from '../pricing/settings.js';
 import { changedColumns } from '../services/export-state.js';
-import { withDomainLock } from '../services/plan-store.js';
+import { withDomainLock } from '../core/locks.js';
 
 type Row = Selectable<PriceScheduleTable>;
 type Q = Kysely<Database> | Transaction<Database>;
@@ -44,8 +45,6 @@ type Partial_ = Omit<PriceJobResult, 'today' | 'dryRun' | 'skipped'>;
 const emptyPartial = (): Partial_ => ({ applied: [], superseded: [], failed: [], held: [], delisted: [], cancelled: [] });
 
 export class PriceScheduleJob {
-  private running = false;
-
   constructor(private readonly deps: {
     db: Kysely<Database>; now: () => number; lockTimeoutMs?: number;
     log?: { warn(o: object, m: string): void; error(o: object, m: string): void };
@@ -56,8 +55,8 @@ export class PriceScheduleJob {
     if (!isYmd(today)) throw new Error(`today must be YYYY-MM-DD, got ${today}`);
     const dryRun = opts.dryRun ?? false;
     const out: PriceJobResult = { today, dryRun, skipped: false, ...emptyPartial() };
-    if (this.running) return { ...out, skipped: true };
-    this.running = true;
+    const lock = await trySessionLock(this.deps.db, 'job:price');
+    if (!lock) return { ...out, skipped: true };
     try {
       const doms = await this.deps.db.selectFrom('price_schedule').innerJoin('domains', 'domains.id', 'price_schedule.domain_id')
         .select(['domains.id as id', 'domains.domain as domain']).distinct()
@@ -89,7 +88,7 @@ export class PriceScheduleJob {
       }
       return out;
     } finally {
-      this.running = false;
+      await lock.release();
     }
   }
 

@@ -1,6 +1,7 @@
 // CAP-00 selection settings: one versioned JSON document (selection_settings.values) holds every threshold, the tier
 // clauses and the gate list per lane. Code holds mechanics only. Drafts come in by dotted path; activation needs Dvir's
 // approval_ref; the priors are locked against API drafts (SEL9-2).
+import { advisoryXactLock } from '../core/locks.js';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import { z } from 'zod';
 import type { Database, SelectionSettingsTable } from '../db/types.js';
@@ -505,7 +506,7 @@ export async function activate(
 
   return db.transaction().execute(async (trx) => {
     // One activation at a time; `cur` is read after the lock, so a concurrent loser sees the new active version and gets a clean 409.
-    await sql`SELECT pg_advisory_xact_lock(hashtext('selection_settings_activate'))`.execute(trx);
+    await advisoryXactLock(trx, 'selection_settings_activate');
     const cur = await trx.selectFrom('selection_settings').selectAll().where('activation_seq', 'is not', null).orderBy('activation_seq', 'desc').limit(1).executeTakeFirst();
     const target = await trx.selectFrom('selection_settings').selectAll().where('label', '=', i.label).forUpdate().executeTakeFirst();
     if (!target) throw new AppError(404, 'SETTINGS_NOT_FOUND', `No selection settings version "${i.label}"`);

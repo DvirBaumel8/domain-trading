@@ -5,7 +5,7 @@ import type { Kysely } from 'kysely';
 import { AppError } from '../http/errors.js';
 import { checkTimedApproval } from './approval.js';
 import { manualDelist, pendingDomains, type Venue } from './export-state.js';
-import { withDomainLock } from './plan-store.js';
+import { withDomainLock } from '../core/locks.js';
 import { z } from 'zod';
 import type { Config } from '../config.js';
 import { ISO_WITH_OFFSET, idtDay } from '../core/dates.js';

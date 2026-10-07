@@ -1,5 +1,6 @@
 // Selection settings (CAP-00), versioned lists, and the pure tier + money evaluation (CAP-24, CAP-18).
 // Settings drafts and list edits are WRITE; activation and census-list freezing need Dvir's approval_ref.
+import { advisoryXactLock } from '../core/locks.js';
 import { approvalRefObject } from '../core/validation.js';
 import { ymd } from '../core/dates.js';
 import type { FastifyInstance } from 'fastify';
@@ -369,7 +370,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       });
     }
     const row = await db.transaction().execute(async (trx) => {
-      await sql`SELECT pg_advisory_xact_lock(hashtext('holdout_suites'))`.execute(trx);
+      await advisoryXactLock(trx, 'holdout_suites');
       // No definition shopping: once any holdout replay of the suite exists its definition is final.
       const scored = await trx.selectFrom('replay_runs').select('id').where('suite', '=', b.suite).where('mode', '=', 'holdout').limit(1).executeTakeFirst();
       if (scored) throw new AppError(409, 'SUITE_ALREADY_SCORED', `${b.suite} already has a holdout replay (${scored.id}); its definition can no longer change`, { replay_id: scored.id });

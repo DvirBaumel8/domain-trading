@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.16.2 (2026-10-08): refactor R1b, database locks and efficiency
+PATCH. Release note: `docs/releases/v2.16.2.md`.
+- **Visible:**
+  - each job step has `ms`;
+  - `GET /selection/test-sets/{name}` returns `lookups: null` and `unknowns: null` while its run is going (it used to compute them from every row on each poll).
+- **Inside:**
+  - every in-memory lock or "running" flag is now a database lock, so it holds across restarts and overlapping deploys (a second run is still `skipped`);
+  - one shared polite pace per registry host for the whole service;
+  - the screening engine makes about a third of the database calls it did (225 → 83 on a 20-name run).
+
 ## 2.16.1 (2026-10-08): refactor R1a, shared core
 PATCH, **no contract change**. Release note: `docs/releases/v2.16.1.md`. One home (`src/core/`) for dates, money, validation and redaction; the duplicate copies are removed, and a test stops new copies. Responses, codes and messages are unchanged.
 

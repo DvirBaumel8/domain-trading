@@ -2,6 +2,7 @@
 // asks Gemini through src/services/review/gemini.ts, and stores the answer as feedback (provider `gemini`).
 import { scrubSecrets } from '../../core/redact.js';
 import { idtDay } from '../../core/dates.js';
+import { trySessionLock } from '../../core/locks.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
@@ -31,15 +32,14 @@ export function isTransientFailure(g: { transient: boolean }): boolean {
   return g.transient;
 }
 
-/** One review call at a time in the whole process (a manual run, the scheduled run and the retry share it): two concurrent calls could otherwise both reach Google and both be stored. */
-let inFlight = false;
-async function exclusive(wait: 'manual' | 'scheduled', fn: () => Promise<ReviewRunResult>): Promise<ReviewRunResult> {
-  if (inFlight) {
+/** One review call at a time across all instances (a manual run, the scheduled run and the retry share the 'review_run' database lock): two concurrent calls could otherwise both reach Google and both be stored. */
+async function exclusive(db: Kysely<Database>, wait: 'manual' | 'scheduled', fn: () => Promise<ReviewRunResult>): Promise<ReviewRunResult> {
+  const lock = await trySessionLock(db, 'review_run');
+  if (!lock) {
     if (wait === 'manual') throw new AppError(409, 'REVIEW_IN_PROGRESS', 'Another review call is running; try again in a minute');
     return { skipped: 'IN_PROGRESS' };
   }
-  inFlight = true;
-  try { return await fn(); } finally { inFlight = false; }
+  try { return await fn(); } finally { await lock.release(); }
 }
 
 /**
@@ -80,7 +80,7 @@ async function callAndStore(
 }
 
 export function runReview(deps: ReviewRunDeps, opts: { trigger: 'scheduled' | 'manual'; now: number; createdBy?: string }): Promise<ReviewRunResult> {
-  return exclusive(opts.trigger, () => runReviewInner(deps, opts));
+  return exclusive(deps.db, opts.trigger, () => runReviewInner(deps, opts));
 }
 
 async function runReviewInner(deps: ReviewRunDeps, opts: { trigger: 'scheduled' | 'manual'; now: number; createdBy?: string }): Promise<ReviewRunResult> {
@@ -115,7 +115,7 @@ async function runReviewInner(deps: ReviewRunDeps, opts: { trigger: 'scheduled' 
  * ok -> feedback; any failure, a second 429 included -> UNKNOWN feedback with Google's status and reason.
  */
 export function retryReview(deps: ReviewRunDeps, opts: { now: number }): Promise<ReviewRunResult> {
-  return exclusive('scheduled', () => retryReviewInner(deps, opts));
+  return exclusive(deps.db, 'scheduled', () => retryReviewInner(deps, opts));
 }
 
 async function retryReviewInner(deps: ReviewRunDeps, opts: { now: number }): Promise<ReviewRunResult> {

@@ -1,8 +1,9 @@
 import type { Kysely, Transaction } from 'kysely';
+import { trySessionLock } from '../core/locks.js';
 import type { Database } from '../db/types.js';
 import { idtDay, isYmd } from '../core/dates.js';
 import { newAuditId } from '../http/audit.js';
-import { withDomainLock } from '../services/plan-store.js';
+import { withDomainLock } from '../core/locks.js';
 
 type Q = Kysely<Database> | Transaction<Database>;
 
@@ -14,8 +15,6 @@ export interface DropJobResult {
 
 /** Marks domains whose drop_date has passed as `dropped` and cancels their planned schedule rows. Touches only DB rows. */
 export class DropJob {
-  private running = false;
-
   constructor(private readonly deps: {
     db: Kysely<Database>; now: () => number; lockTimeoutMs?: number;
     log?: { warn(o: object, m: string): void; error(o: object, m: string): void };
@@ -26,8 +25,8 @@ export class DropJob {
     if (!isYmd(today)) throw new Error(`today must be YYYY-MM-DD, got ${today}`);
     const dryRun = opts.dryRun ?? false;
     const out: DropJobResult = { today, dryRun, skipped: false, dropped: [], failed: [] };
-    if (this.running) return { ...out, skipped: true };
-    this.running = true;
+    const lock = await trySessionLock(this.deps.db, 'job:drop');
+    if (!lock) return { ...out, skipped: true };
     try {
       const doms = await this.deps.db.selectFrom('domains').select(['id', 'domain'])
         .where('status', 'in', ['owned', 'listed', 'delisted']).where('drop_date', '<', today).orderBy('domain').execute();
@@ -56,7 +55,7 @@ export class DropJob {
       }
       return out;
     } finally {
-      this.running = false;
+      await lock.release();
     }
   }
 

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { RegistrarError } from '../../src/registrars/types.js';
-import { withDomainLock } from '../../src/services/plan-store.js';
+import { withDomainLock } from '../../src/core/locks.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';

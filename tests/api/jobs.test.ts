@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createDb } from '../../src/db/client.js';
+import { trySessionLock } from '../../src/core/locks.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';
@@ -275,13 +276,12 @@ describe('daily', () => {
     expect((await first).json().skipped).toBe(false);
   });
 
-  it('a job already running elsewhere (its own running flag) reports skipped', async () => {
+  it('a job already running elsewhere (its database lock is held by another session) reports skipped', async () => {
     app = await make();
     vi.spyOn(app.priceJob, 'runOnce').mockResolvedValue({ skipped: false } as never);
-    const flag = app.dropJob as unknown as { running: boolean };
-    flag.running = true;
+    const lock = await trySessionLock(testDb, 'job:drop');
     const res = await post(app, 'daily');
-    flag.running = false;
+    await lock!.release();
     expect(res.json().steps.dropJob).toMatchObject({ ok: true, skipped: true });
   });
 });

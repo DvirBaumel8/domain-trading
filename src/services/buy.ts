@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { advisoryXactLock } from '../core/locks.js';
 import { sql, type Kysely } from 'kysely';
 import type { Category, Database } from '../db/types.js';
 import { AppError, errorBody } from '../http/errors.js';
@@ -18,7 +19,8 @@ import type { CheckResult, CheckService } from './check.js';
 import { checkSettingsVersion, isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from './listing-v2.js';
 import { planView } from './plan-view.js';
 import { buildSchedule } from '../pricing/schedule.js';
-import { domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
+import { domainPlanColumns, historyRow, writePlan } from './plan-store.js';
+import { withDomainLock } from '../core/locks.js';
 import { currentSettings, type PricingSettings } from '../pricing/settings.js';
 import { screeningHold } from './buy-hold.js';
 import { gateError, packGate, spendCapGate, trancheGate, type BuyBlock } from './buy-gates.js';
@@ -279,7 +281,7 @@ export class BuyService {
     const { db } = this.deps;
     try {
       return await db.transaction().execute(async (trx) => {
-        await sql`select pg_advisory_xact_lock(hashtext(${a.input.domain}))`.execute(trx);
+        await advisoryXactLock(trx, `domain:${a.input.domain}`);
         const s = await trx.selectFrom('settings').select(['poc_cap_cents', 'max_domains']).forUpdate().executeTakeFirstOrThrow();
         await this.assertNotOwned(trx, a.input.domain);
         await this.assertDomainCap(trx, s.max_domains);
@@ -704,7 +706,7 @@ export class BuyService {
     try {
       // The pending domains row makes the domain cap count this possible purchase; both rows or neither.
       await this.deps.db.transaction().execute(async (trx) => {
-        await sql`select pg_advisory_xact_lock(hashtext(${rec.input.domain}))`.execute(trx);
+        await advisoryXactLock(trx, `domain:${rec.input.domain}`);
         await trx.insertInto('purchases').values({
           idempotency_key: `${rec.ctx.idempotencyKey}#dry-ambiguous-${randomUUID()}`, request_hash: rec.ctx.requestHash, domain: rec.input.domain,
           state: 'unknown', dry_run: false, registrar: adapter.name, check_id: rec.check.checkId, max_price_cents: rec.input.maxPriceCents,

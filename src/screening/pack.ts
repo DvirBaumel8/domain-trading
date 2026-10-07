@@ -1,6 +1,7 @@
 // CAP-19 screening pack: the evidence a buy decision rests on, frozen and versioned. Built only from a finished, full-plan run's non-stale
 // rows (assemble drops stale ones). A pack is complete only when every required check passed (a FLAG needs a PASS verdict on the row in force),
 // availability and the quote are fresh at pack time, and the three judgment calls are PASS. An incomplete pack is issued too, with what is missing.
+import { advisoryXactLock } from '../core/locks.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import { z } from 'zod';
@@ -103,7 +104,7 @@ export async function issuePack(db: Kysely<Database>, i: { runId: string; domain
   // Everything is read inside one transaction, after the per-domain lock and the run-row lock (a manual record and a verdict take the run-row
   // lock too), so the pack always reflects the rows and verdicts committed before it and a later one cannot slip in half-way.
   return db.transaction().execute(async (trx) => {
-    await sql`SELECT pg_advisory_xact_lock(hashtext(${'pack:' + i.domain}))`.execute(trx);
+    await advisoryXactLock(trx, `pack:${i.domain}`);
     const run = await trx.selectFrom('screening_runs').selectAll().where('id', '=', i.runId).forUpdate().executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${i.runId}"`);
     if (run.status === 'running') throw new AppError(409, 'RUN_RUNNING', 'The run is still running; a pack is built from a finished run only', { run_id: run.id, reason: 'RUNNING' });

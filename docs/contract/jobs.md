@@ -1,4 +1,4 @@
-# Jobs (contract v2.16.1)
+# Jobs (contract v2.16.2)
 
 The service runs **no timers of its own**. All scheduled work goes through one route, called by a Cloudflare Worker cron (`jobs-trigger/`). Since 2.1.0 the cron fires **once a day** (00:05 UTC) and runs `daily` only; `tick` stays callable by hand. Since 2.3.0 a bot with the WRITE token may also start `daily` or `tick` by hand (after a real buy, or when testing); the results are in `GET /jobs/runs`, `GET /audit` and `GET /report`.
 
@@ -13,6 +13,7 @@ The service runs **no timers of its own**. All scheduled work goes through one r
   ```
   - `skipped: true` with `steps: {}`: the same job was already running in this instance.
   - Each step is isolated; since 2.16.0 a step whose summary lists failed items (`failed: [...]`) is `ok: false` with `error: "N item(s) failed"`, and its run is not ok. A failing step (`ok: false`, `error` = a message of at most 200 characters with secrets redacted) doesn't stop the next one. A step has `skipped: true` only when its own summary says so (already running, not due, or backup not configured). A step with nothing to do (an empty price or drop job) returns `ok: true` without `skipped`.
+  - **`ms`** (2.16.2): how long the step took, in milliseconds.
   - `summary` is the step's own result object (counts and names, see below). Its fields are informational, not part of the contract.
 - **Audit:** one `audit_log` row, with scope `job` for a scheduled or job-token run and the bot token's scope (`write`) for a run a WRITE token started (2.6.0, CR-009 N-6), and a summary such as `tick: ok`, `daily: failed backupExport` or `daily: skipped`.
 - **Rate limit:** 10 calls per minute for the job token.

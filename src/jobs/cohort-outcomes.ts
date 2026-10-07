@@ -2,6 +2,7 @@
 // what happened to each included name of the frozen cohorts: the drop outcome from the day after the expected drop date, and the
 // re-registration check at 30, 60 and 90 days after an available_after_drop outcome. It never calls a registrar or marketplace and sends nothing.
 // Writes only cohort_decisions / cohort_outcomes (append-only), the cohorts status, rdap rows and one audit row.
+import { trySessionLock } from '../core/locks.js';
 import { sql, type Kysely } from 'kysely';
 import { addDays, idtDay } from '../core/dates.js';
 import type { Database } from '../db/types.js';
@@ -50,8 +51,6 @@ export function rereg(r: Pick<CachedLookup, 'outcome' | 'facts' | 'reasonCode'>,
 }
 
 export class CohortOutcomesJob {
-  private running = false;
-
   constructor(private readonly deps: { db: Kysely<Database>; screening: ScreeningDeps; now: () => number; /** Tests only: a smaller per-run cap. */ maxPerRun?: number; log?: { warn(o: object, m: string): void } }) {}
 
   async runOnce(opts: { dryRun?: boolean } = {}): Promise<CohortOutcomesSummary> {
@@ -60,8 +59,8 @@ export class CohortOutcomesJob {
       dryRun, skipped: false, frozen: 0, checked: 0,
       drop: { available_after_drop: 0, caught_at_drop: 0, restored: 0, still_pending: 0, unknown: 0 }, rereg: { yes: 0, no: 0, unknown: 0 }, left_for_next_run: 0,
     };
-    if (this.running) return { ...out, skipped: true };
-    this.running = true;
+    const lock = await trySessionLock(this.deps.db, 'job:cohort-outcomes');
+    if (!lock) return { ...out, skipped: true };
     try {
       const { db, now } = this.deps;
       if (!dryRun) out.frozen = (await freezeReadyCohorts(db, now())).length;
@@ -119,7 +118,7 @@ export class CohortOutcomesJob {
       }
       return out;
     } finally {
-      this.running = false;
+      await lock.release();
     }
   }
 }

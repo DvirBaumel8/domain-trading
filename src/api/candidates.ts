@@ -1,5 +1,6 @@
 import { idtDay } from '../core/dates.js';
 // v2.13.0 (CR-012 part E): records per domain. POST /candidates/{domain}/records (WRITE), GET /candidates/{domain}/records (READ).
+import { advisoryXactLock } from '../core/locks.js';
 import type { FastifyInstance } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
@@ -53,7 +54,7 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
     const today = idtDay(deps.now());
     // The count and the build run under one advisory lock (the build commits its row before the lock is released), so two calls cannot both take the last slot.
     const out = await db.transaction().execute(async (trx) => {
-      await sql`SELECT pg_advisory_xact_lock(hashtext('daily_rebuild'))`.execute(trx);
+      await advisoryXactLock(trx, 'daily_rebuild');
       const used = Number((await trx.selectFrom('daily_candidate_lists').select(sql<string>`count(*)`.as('n')).where('day', '=', today).where('built_by', '=', 'rebuild').executeTakeFirstOrThrow()).n);
       if (used >= DAILY_REBUILD_MAX_PER_DAY) {
         throw new AppError(429, 'RATE_LIMITED', `At most ${DAILY_REBUILD_MAX_PER_DAY} rebuilds of the daily list per day`, { max_per_day: DAILY_REBUILD_MAX_PER_DAY, day: today });

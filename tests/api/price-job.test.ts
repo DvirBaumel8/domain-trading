@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { withDomainLock } from '../../src/services/plan-store.js';
+import { withDomainLock } from '../../src/core/locks.js';
 import { PriceScheduleJob } from '../../src/jobs/price-schedule.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';

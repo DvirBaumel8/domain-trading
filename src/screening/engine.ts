@@ -7,6 +7,8 @@ import type { Database, ScreeningResultsTable } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { CHECKS, DEPENDS_ON, GATE_OF } from './checks/index.js';
+import { MANUAL_CHECKS } from './checks/manual.js';
+import { settleHostPacers } from './rdap-batch.js';
 import { beats, deriveItem, funnel, latestByCheck, type Derived, type Funnel } from './derive.js';
 import { loadDataLexicon, buildLexicon } from './lexicon.js';
 import { listVersion, currentLists } from './lists.js';
@@ -20,6 +22,9 @@ import {
 /** A running run with no row for this long is resumed on the next poll or tick (Render sleeps after ~15 min idle). */
 export const HEARTBEAT_STALE_MS = 120_000;
 const MAX_RECOMPUTE_PASSES = 5;
+/** R1b: how often a run writes its heartbeat (HEARTBEAT_STALE_MS is 120 s) and re-reads its status for a cancel from another process. Wall-clock, so a fake `now` does not stop them. */
+export const HEARTBEAT_EVERY_MS = 10_000;
+export const CANCEL_CHECK_EVERY_MS = 5_000;
 
 export interface InputName {
   domain: string; lane: Lane; city?: string; state?: string; trade?: string; price_grade?: 'strong' | 'weaker';
@@ -272,6 +277,9 @@ export class ScreeningWorker {
   private readonly active = new Map<string, Promise<void>>();
   /** Runs cancelled through this process: paced lookups and the check loop see it at once, without a database read. */
   private readonly cancelledHere = new Set<string>();
+  /** Wall-clock time of the last heartbeat write / DB cancel check, per run. */
+  private readonly lastHeartbeat = new Map<string, number>();
+  private readonly lastCancelCheck = new Map<string, number>();
 
   constructor(private readonly deps: ScreeningWorkerDeps) {
     this.stopAfterResults = deps.stopAfterResults;
@@ -286,7 +294,7 @@ export class ScreeningWorker {
         // A run that keeps failing must still end: past its deadline it finishes partial with SOURCE_ERROR rows.
         await this.closeOut(runId, 'SOURCE_ERROR', String((e as Error).message ?? e).slice(0, 200), true).catch(() => {});
       })
-      .finally(() => { if (this.active.get(runId) === p) this.active.delete(runId); });
+      .finally(() => { if (this.active.get(runId) === p) this.active.delete(runId); this.lastHeartbeat.delete(runId); this.lastCancelCheck.delete(runId); if (this.active.size === 0) settleHostPacers(this.deps.screening.sleep); });
     this.active.set(runId, p);
   }
 
@@ -312,6 +320,10 @@ export class ScreeningWorker {
   /** Cross-process check used between checks: this process's flag, else the stored status. */
   private async cancelledNow(runId: string): Promise<boolean> {
     if (this.cancelledHere.has(runId)) return true;
+    const t = Date.now();
+    const last = this.lastCancelCheck.get(runId);
+    if (last !== undefined && t - last < CANCEL_CHECK_EVERY_MS) return false;
+    this.lastCancelCheck.set(runId, t);
     const st = await this.deps.db.selectFrom('screening_runs').select('status').where('id', '=', runId).executeTakeFirst();
     return st?.status === 'cancelled';
   }
@@ -365,7 +377,12 @@ export class ScreeningWorker {
         list_versions: JSON.stringify(meta.listVersions), duration_ms: Math.max(0, Math.round(meta.durationMs)), upstream_calls: o.upstreamCalls,
         evidence_ids: o.evidenceIds.map(String), source: meta.source, cached_from: meta.cachedFrom === undefined ? null : String(meta.cachedFrom), generation: String(generationOf(meta.inputs ?? null)), inputs: meta.inputs ? JSON.stringify(meta.inputs) : null,
       }).returningAll().executeTakeFirstOrThrow();
-      await db.updateTable('screening_runs').set({ heartbeat_at: new Date(this.deps.now()) }).where('id', '=', run.id).execute();
+      const t = Date.now();
+      const last = this.lastHeartbeat.get(run.id);
+      if (last === undefined || t - last >= HEARTBEAT_EVERY_MS) {
+        this.lastHeartbeat.set(run.id, t);
+        await db.updateTable('screening_runs').set({ heartbeat_at: new Date(this.deps.now()) }).where('id', '=', run.id).execute();
+      }
       return toResultRow(r);
     } catch (e) {
       if ((e as { code?: string }).code === '23505') return null;
@@ -486,8 +503,10 @@ export class ScreeningWorker {
       if (!r) { await load(); return false; } // another worker wrote this (item, check): take its row, write nothing
       // Same precedence as derive: a manual record outranks an auto or cached row. One posted while this check ran is read back now,
       // so the stop decision below never rests on the auto row it is hiding.
-      const m = await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', it.idx)
-        .where('check_id', '=', checkId).where('source', '=', 'manual').orderBy('id', 'desc').limit(1).executeTakeFirst();
+      const m = (MANUAL_CHECKS as readonly string[]).includes(checkId)
+        ? await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', it.idx)
+          .where('check_id', '=', checkId).where('source', '=', 'manual').orderBy('id', 'desc').limit(1).executeTakeFirst()
+        : undefined;
       let best = latestOf(it.idx).get(checkId);
       for (const c of [r, m ? toResultRow(m) : null]) if (c && (!best || beats(c, best))) best = c;
       latestOf(it.idx).set(checkId, best!);

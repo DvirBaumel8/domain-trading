@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { AppDeps } from '../../src/app.js';
 import type { RdapFn } from '../../src/rdap.js';
 import type { RegistrarAdapter } from '../../src/registrars/types.js';
-import { sql } from 'kysely';
+import { sql, type Kysely } from 'kysely';
+import type { Database } from '../../src/db/types.js';
 import { testDb } from './db.js';
 import { makeApp } from './app.js';
 import { issueToken } from './tokens.js';
@@ -30,9 +31,9 @@ export interface ScreeningHarness {
   runDone: (body: object) => Promise<{ id: string; body: any }>;
 }
 
-export async function screeningHarness(opts: { start?: number; stopAfterResults?: number; screening?: AppDeps['screening']; adapters?: RegistrarAdapter[]; rdap?: RdapFn } = {}): Promise<ScreeningHarness> {
+export async function screeningHarness(opts: { start?: number; stopAfterResults?: number; screening?: AppDeps['screening']; adapters?: RegistrarAdapter[]; rdap?: RdapFn; db?: Kysely<Database> } = {}): Promise<ScreeningHarness> {
   const clock = { t: opts.start ?? Date.parse('2026-10-06T08:00:00Z') };
-  const app = await makeApp({ now: () => clock.t, screeningStopAfterResults: opts.stopAfterResults, screening: { lookupHost: async () => [{ address: '93.184.216.34', family: 4 }], ...opts.screening }, adapters: opts.adapters, rdap: opts.rdap });
+  const app = await makeApp({ now: () => clock.t, screeningStopAfterResults: opts.stopAfterResults, screening: { lookupHost: async () => [{ address: '93.184.216.34', family: 4 }], ...opts.screening }, adapters: opts.adapters, rdap: opts.rdap, db: opts.db });
   const w = await issueToken('write', 'gavriel');
   const r = await issueToken('read');
   // The write limiter allows 10 per minute per token: each call is a fresh minute for it.

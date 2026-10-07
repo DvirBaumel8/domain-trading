@@ -9,7 +9,7 @@ import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
 import { issueToken } from '../helpers/tokens.js';
-import { withDomainLock } from '../../src/services/plan-store.js';
+import { withDomainLock } from '../../src/core/locks.js';
 import { PriceScheduleJob } from '../../src/jobs/price-schedule.js';
 
 let app: FastifyInstance;

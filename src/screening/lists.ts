@@ -1,4 +1,5 @@
 // Versioned word lists and frozen census lists (append-only selection_lists). A write never changes a row: it adds version n+1.
+import { advisoryXactLock } from '../core/locks.js';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
@@ -122,7 +123,7 @@ export async function writeList(
   }
 
   return db.transaction().execute(async (trx) => {
-    await sql`SELECT pg_advisory_xact_lock(hashtext(${'selection_list:' + name}))`.execute(trx);
+    await advisoryXactLock(trx, `selection_list:${name}`);
     const cur = await listVersion(trx, name);
     let next: string[];
     if (body.replace !== undefined) next = normaliseTerms(name, body.replace, ctx.settings);

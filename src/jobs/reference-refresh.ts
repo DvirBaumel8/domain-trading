@@ -2,6 +2,7 @@
 // Read-only toward the outside world: one GET per source per day, honest User-Agent, no registrar or marketplace call, never a
 // create or top-up. Each sub-step is isolated; a failure keeps the previous snapshot and is reported in `errors` (the runner
 // shows the step as failed). Nothing here is on a request path: checks only read the stored copies.
+import { trySessionLock } from '../core/locks.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { refreshNameBio, NAMEBIO_NAME } from '../screening/namebio.js';
@@ -17,13 +18,11 @@ const IANA_MAX_AGE_MS = 7 * 86_400_000;
 export interface ReferenceRefreshSummary { popularity: unknown; namebio: unknown; iana: unknown; pruned: number; errors: string[] }
 
 export class ReferenceRefreshJob {
-  private running = false;
-
   constructor(private readonly deps: { db: Kysely<Database>; screening: ScreeningDeps; now: () => number; log?: { warn(obj: object, msg: string): void } }) {}
 
   async runOnce(): Promise<ReferenceRefreshSummary | { skipped: true; reason: string }> {
-    if (this.running) return { skipped: true, reason: 'already running' };
-    this.running = true;
+    const lock = await trySessionLock(this.deps.db, 'job:reference-refresh');
+    if (!lock) return { skipped: true, reason: 'already running' };
     try {
       const { db, screening, now } = this.deps;
       const s = (await activeSelectionSettings(db)).values;
@@ -54,7 +53,7 @@ export class ReferenceRefreshJob {
       const pruned = await this.prune().catch((e: Error) => { errors.push(`prune: ${e.message.slice(0, 120)}`); return 0; });
       return { popularity, namebio, iana, pruned, errors };
     } finally {
-      this.running = false;
+      await lock.release();
     }
   }
 

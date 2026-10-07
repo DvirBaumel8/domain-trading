@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { buildSchedule } from '../../src/pricing/schedule.js';
 import { currentSettings } from '../../src/pricing/settings.js';
 import { validateListing, type ListingPlan, type ListingRequest } from '../../src/services/listing-v2.js';
-import { domainPlanColumns, historyRow, newPlanId, withDomainLock, writePlan } from '../../src/services/plan-store.js';
+import { domainPlanColumns, historyRow, newPlanId, writePlan } from '../../src/services/plan-store.js';
+import { withDomainLock } from '../../src/core/locks.js';
 import { planView } from '../../src/services/plan-view.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 

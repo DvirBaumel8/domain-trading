@@ -5,7 +5,8 @@ import { idtDay } from '../core/dates.js';
 import { AppError } from '../http/errors.js';
 import { newAuditId } from '../http/audit.js';
 import { settingsByVersion } from '../pricing/settings.js';
-import { currentPlan, withDomainLock, writePlan } from '../services/plan-store.js';
+import { currentPlan, writePlan } from '../services/plan-store.js';
+import { withDomainLock } from '../core/locks.js';
 
 export class DropDateInputError extends Error {}
 

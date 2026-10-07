@@ -2,7 +2,7 @@
 // features itself by a back-test screening run (form, census with a sibling method (bt1@v1, bt1@v2 or bt1@v3), ext_dates) as of each name's date. Pure helpers live here; the routes
 // are in src/api/test-sets.ts.
 import { createHash } from 'node:crypto';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { addDays, idtMidnightIso, toJerusalemIso } from '../core/dates.js';
 import { latestByCheck } from './derive.js';
@@ -149,4 +149,43 @@ export function rescoreReport(
     features_unknown_n: unknown, rows_changed_vs_registered: changed, as_of_reconstructed: true,
     features_as_of: meta.features_as_of, sibling_method: meta.sibling_method,
   };
+}
+
+type Features = Awaited<ReturnType<typeof featuresOfRun>>;
+const FEATURES_CACHE_MAX = 16;
+const featuresCache = new Map<string, { key: string; feats: Features }>();
+
+/** Forgets every cached feature set (tests). */
+export function clearFeaturesCache(): void { featuresCache.clear(); }
+
+/** The run's result rows as a cheap fingerprint: any new row (or a deleted one) changes it. */
+async function rowsFingerprint(db: Kysely<Database>, runId: string): Promise<string> {
+  const r = await sql<{ n: string; m: string | null }>`select count(*) as n, max(id) as m from screening_results where run_id = ${runId}`.execute(db);
+  return `${r.rows[0]!.n}:${r.rows[0]!.m ?? 0}`;
+}
+
+/** featuresOfRun for a FINISHED run, remembered per run id in memory until the run's rows change (a recompute or a manual record appends a row). */
+export async function cachedFeaturesOfRun(db: Kysely<Database>, run: RunRowT): Promise<Features> {
+  const key = await rowsFingerprint(db, run.id);
+  const hit = featuresCache.get(run.id);
+  if (hit && hit.key === key) return hit.feats;
+  const feats = await featuresOfRun(db, run);
+  featuresCache.delete(run.id);
+  featuresCache.set(run.id, { key, feats });
+  while (featuresCache.size > FEATURES_CACHE_MAX) featuresCache.delete(featuresCache.keys().next().value!);
+  return feats;
+}
+
+/**
+ * Progress of a run that is still going, from one aggregate query (no result rows are loaded): `done_n` as featuresOfRun counts it. Features, lookups
+ * and unknowns are only computed once the run has finished, so here they are empty.
+ */
+export async function progressOfRun(db: Kysely<Database>, run: RunRowT): Promise<Features> {
+  const items = (run.input as { names: RunItem[] }).names;
+  const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
+  const rows = await sql<{ item_idx: number; checks: string[] }>`select item_idx, array_agg(distinct check_id) as checks from screening_results where run_id = ${run.id} group by item_idx`.execute(db);
+  const have = new Map(rows.rows.map((r) => [r.item_idx, new Set(r.checks)]));
+  let done = 0;
+  for (const it of items) if ((plan[it.lane] ?? []).every((c) => have.get(it.idx)?.has(c))) done++;
+  return { byDomain: new Map(), done_n: done, names_n: items.length, lookups: { fresh: 0, reused: 0, unknown: 0, rate_limited: 0 }, latest: [] };
 }

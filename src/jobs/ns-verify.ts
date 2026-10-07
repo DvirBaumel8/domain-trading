@@ -1,4 +1,5 @@
 import { sql, type Kysely } from 'kysely';
+import { trySessionLock } from '../core/locks.js';
 import type { Database } from '../db/types.js';
 import type { NsLookup } from '../dns/ns-lookup.js';
 import { newAuditId } from '../http/audit.js';
@@ -9,14 +10,12 @@ const sameLanderNs = (ns: string[]) => (ns.length > 0 ? sql<boolean>`lander_ns =
 
 /** list.md step 4: daily public-DNS check of every owned/listed domain that has a lander target. */
 export class NsVerifier {
-  private running = false;
-
   constructor(private readonly deps: { db: Kysely<Database>; nsLookup: NsLookup; now: () => number; log?: { warn(o: object, m: string): void } }) {}
 
   async runOnce(): Promise<{ checked: number; verified: number; cleared: number; unknown: number; skipped: boolean }> {
     const out = { checked: 0, verified: 0, cleared: 0, unknown: 0, skipped: false };
-    if (this.running) return { ...out, skipped: true };
-    this.running = true;
+    const lock = await trySessionLock(this.deps.db, 'job:ns-verify');
+    if (!lock) return { ...out, skipped: true };
     try {
       const rows = await this.deps.db.selectFrom('domains').select(['id', 'domain', 'lander_ns', 'ns_verified_at'])
         .where('status', 'in', ['owned', 'listed']).where('lander_ns', 'is not', null).execute();
@@ -44,7 +43,7 @@ export class NsVerifier {
       }).execute();
       return out;
     } finally {
-      this.running = false;
+      await lock.release();
     }
   }
 }

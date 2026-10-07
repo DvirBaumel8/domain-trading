@@ -1,4 +1,5 @@
 // v2.10.0 (CR-011 part B): the company document and the forbidden-terms list (the block list's own data).
+import { advisoryXactLock } from '../core/locks.js';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
@@ -26,7 +27,7 @@ export function registerCompany(app: FastifyInstance, deps: CompanyDeps): void {
     if (!blocked.ok) throw new AppError(422, 'TEXT_BLOCKED', 'The text is refused by the block list', { category: blocked.category });
     const hash = sha256(b.text);
     const out = await db.transaction().execute(async (trx) => {
-      await sql`select pg_advisory_xact_lock(hashtext('company_document'))`.execute(trx);
+      await advisoryXactLock(trx, 'company_document');
       const last = await trx.selectFrom('company_documents').select(['version', 'sha256', 'created_at']).orderBy('version', 'desc').limit(1).executeTakeFirst();
       if (last && last.sha256 === hash) return { changed: false, row: last };
       const row = await trx.insertInto('company_documents').values({ sha256: hash, text: b.text, created_by: req.auth!.name, audit_id: req.auditId, created_at: new Date(deps.now()) })

@@ -13,7 +13,8 @@ import { addDays, idtDay } from '../core/dates.js';
 import { buildSchedule, type ScheduleEvent } from '../pricing/schedule.js';
 import { currentSettings, settingsByVersion } from '../pricing/settings.js';
 import { isCategory, validateListing, type ListingPlan, type ListingRequest } from './listing-v2.js';
-import { applyHold, currentPlan, domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
+import { applyHold, currentPlan, domainPlanColumns, historyRow, writePlan } from './plan-store.js';
+import { withDomainLock } from '../core/locks.js';
 import { isValidDisplayName } from '../domain-name.js';
 import { planView } from './plan-view.js';
 

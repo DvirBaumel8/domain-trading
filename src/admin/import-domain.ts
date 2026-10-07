@@ -14,7 +14,8 @@ import { registrarApiOf } from '../services/bookkeeping.js';
 import { changedColumns } from '../services/export-state.js';
 import { isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from '../services/listing-v2.js';
 import { planView } from '../services/plan-view.js';
-import { domainPlanColumns, historyRow, withDomainLock, writePlan } from '../services/plan-store.js';
+import { domainPlanColumns, historyRow, writePlan } from '../services/plan-store.js';
+import { withDomainLock } from '../core/locks.js';
 
 /** Bad or missing arguments (the CLI exits 2). Business refusals are AppErrors (exit 1, code in the message). */
 export class ImportInputError extends Error {}

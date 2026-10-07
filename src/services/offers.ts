@@ -7,7 +7,8 @@ import { formatUsd, usdStringToCents, wholeUsd } from '../core/money.js';
 import { isIsoWithOffset, toJerusalemIso } from '../core/dates.js';
 import { checkApproval } from './approval.js';
 import { classify, BUYER_TYPES, OFFER_SOURCES, type BuyerType, type OfferSnapshot, type OfferSource } from './offer-rules.js';
-import { applyHold, withDomainLock } from './plan-store.js';
+import { applyHold } from './plan-store.js';
+import { withDomainLock } from '../core/locks.js';
 
 type OfferRow = Selectable<OffersTable>;
 
