@@ -118,30 +118,38 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
       throw new AppError(429, 'RATE_LIMITED', 'Too many failed authentication attempts', { retry_after_seconds: wait });
     };
     const jobRoute = isJobRoute(req) && req.method === 'POST';
+    // POST /jobs/run: the dedicated job bearer (never an API token's scope), or else a WRITE API token (checked in registerScope).
+    // A constant-time compare needs no DB, so the correct job bearer passes even a blocked IP.
+    let jobsDisabled = false;
     if (jobRoute) {
-      // Dedicated bearer, never a READ/WRITE API token. A constant-time compare needs no DB, so the correct one passes even a blocked IP.
-      if (wait > 0 && !jobTriggerToken) return tooMany();
-      if (!jobTriggerToken) throw new AppError(503, 'JOBS_DISABLED', 'The job endpoint is not configured');
       const jm = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '');
-      if (!jm?.[1] || !sameSecret(jm[1], jobTriggerToken)) return wait > 0 ? tooMany() : refuse();
-      req.jobAuth = true;
-      return;
+      if (jobTriggerToken && jm?.[1] && sameSecret(jm[1], jobTriggerToken)) {
+        req.jobAuth = true;
+        return;
+      }
+      jobsDisabled = !jobTriggerToken;
     }
+    const unauthenticated = (): never => {
+      if (jobsDisabled) throw new AppError(503, 'JOBS_DISABLED', 'The job endpoint is not configured');
+      return refuse();
+    };
     const m = BEARER.exec(req.headers.authorization ?? '');
     const hash = m?.[1] ? hashToken(m[1]) : null;
     // Blocked IP: only a recently verified token may proceed, and only to the normal DB lookup (revocation still bites).
     if (wait > 0 && (!hash || !recent.get(hash))) return tooMany();
-    if (!hash) return refuse();
+    if (!hash) return unauthenticated();
     const row = await db
       .updateTable('api_tokens')
       .set({ last_used_at: new Date() })
       .where('token_sha256', '=', hash)
       .where('revoked_at', 'is', null)
+      // An expired token is an unknown token: same 401, no hint (CR-007 T-3).
+      .where((eb) => eb.or([eb('expires_at', 'is', null), eb('expires_at', '>', new Date(now()))]))
       .returning(['id', 'scope', 'name'])
       .executeTakeFirst();
     if (!row) {
       recent.drop(hash);
-      return wait > 0 ? tooMany() : refuse();
+      return wait > 0 ? tooMany() : unauthenticated();
     }
     req.auth = { tokenId: row.id, scope: row.scope, name: row.name };
     recent.set(hash, req.auth);
@@ -150,8 +158,9 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
 
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
-    if (isJobRoute(req) && !req.jobAuth) throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
-    if (req.jobAuth) return; // POST /jobs/run: authenticated by the job-trigger bearer, no API-token scope
+    // POST /jobs/run: the job-trigger bearer, or a WRITE token (CR-007 T-2). A READ token is refused like any other credential.
+    if (isJobRoute(req) && !req.jobAuth && req.auth?.scope !== 'write') throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
+    if (req.jobAuth) return; // authenticated by the job-trigger bearer, no API-token scope
     if (!req.auth) {
       // Only public GET/HEAD/OPTIONS routes reach here without auth; fail closed for mutations.
       if (isMutating(req.method)) throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');

@@ -94,6 +94,8 @@ export interface ScreeningDeps {
   /** IPv4 addresses of a host name (system resolver). */
   resolve4: (host: string) => Promise<string[]>;
   /** Test injection for the outbound site guard: production leaves it out and the guard uses undici's own fetch (never `fetch` above). */
+  /** Google Web Risk Lookup API key; undefined → the web_risk check answers MANUAL_REQUIRED (CR-007 G-6). */
+  webRiskApiKey?: string;
   siteFetch?: typeof fetch;
   /** All addresses of a host (system resolver), for the outbound site guard (`src/net/safe-fetch.ts`). Default: dns.lookup all:true. */
   lookupHost?: (host: string) => Promise<{ address: string; family: number }[]>;

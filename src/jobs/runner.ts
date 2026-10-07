@@ -16,6 +16,8 @@ export interface RunOptions {
   /** `scheduled` = the Worker's `<job>-<ms>` key, `manual` = any other job-token call, `cli` = `npm run job`. Default `manual`. */
   trigger?: JobTrigger;
   scheduledFor?: Date | null;
+  /** The WRITE token's name for a manual run started through the API (CR-007 T-2); omitted for the job token, the Worker and the CLI. */
+  triggeredBy?: string | null;
 }
 
 export interface JobRunResult {
@@ -41,6 +43,8 @@ export interface JobRunnerDeps {
   priceJob: Runnable;
   dropJob: Runnable;
   registrarCheckJob: Runnable;
+  /** Daily registry, lander and blocklist checks of the live names (CR-007 G-5); while undefined, that step reports skipped. */
+  portfolioCheckJob?: Runnable;
   /** Resumes stalled screening runs (CAP-20); its summary is {resumed[], finalized[]}. */
   screeningWorker: { resumeStalled(): Promise<unknown> };
   backupExport?: BackupExport;
@@ -80,7 +84,7 @@ export class JobRunner {
     try {
       await this.deps.db.insertInto('job_runs').values({
         job: r.job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, started_at: started,
-        finished_at: new Date(this.deps.now()), skipped: r.skipped, ok: Object.values(r.steps).every((s) => s.ok), steps: JSON.stringify(r.steps),
+        finished_at: new Date(this.deps.now()), skipped: r.skipped, ok: Object.values(r.steps).every((s) => s.ok), steps: JSON.stringify(r.steps), triggered_by: opts.triggeredBy ?? null,
       }).execute();
     } catch {
       // not recorded; the audit row still records the run
@@ -135,6 +139,8 @@ export class JobRunner {
     steps.priceJob = await this.step(() => this.deps.priceJob.runOnce());
     steps.dropJob = await this.step(() => this.deps.dropJob.runOnce());
     steps.registrarCheck = await this.step(() => this.deps.registrarCheckJob.runOnce());
+    const pc = this.deps.portfolioCheckJob;
+    steps.portfolioCheck = pc ? await this.step(() => pc.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'portfolio check not configured' } };
     const ref = this.deps.referenceRefresh;
     steps.referenceRefresh = ref ? await this.referenceStep(ref) : { ok: true, skipped: true, summary: { skipped: true, reason: 'reference refresh not configured' } };
     const backup = this.deps.backupExport;

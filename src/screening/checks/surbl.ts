@@ -54,6 +54,7 @@ const answerText = (qname: string, server: string, a: Answer | null) =>
   a === null ? `;; ${qname} A @${server}\n;; no answer (timeout or unusable reply)` : `;; ${qname} A @${server}\n;; rcode ${a.rcode}\n${a.answers.map((x) => `${qname} A ${x.data}`).join('\n')}`.trim();
 
 async function evidence(ctx: CheckContext, qname: string, server: string, a: Answer | null): Promise<number> {
+  if (ctx.shared.get('surbl_no_evidence') === true) return 0; // the portfolio check keeps no screening evidence rows (CR-007 G-5)
   const text = answerText(qname, server, a);
   return storeEvidence(ctx.db, { source: 'surbl', url: `dns://${server}/${qname}/A`, retrievedAt: new Date(ctx.now()), httpStatus: null, contentType: 'text/plain', body: text, text, maxBytes: ctx.settings.evidence.max_text_bytes });
 }

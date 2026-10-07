@@ -3,6 +3,9 @@ import { isJobRoute } from './auth.js';
 import { AppError } from './errors.js';
 import { isMutating } from './methods.js';
 
+/** POST /jobs/run by a WRITE token: calls per hour per token (the job token keeps the general 10 per minute). */
+export const WRITE_JOB_RUNS_PER_HOUR = 4;
+
 /** In-memory sliding window. Fine for one Render instance; revisit if we ever scale out. */
 export class SlidingWindowLimiter {
   private readonly hits = new Map<string, number[]>();
@@ -36,10 +39,12 @@ export class SlidingWindowLimiter {
 export function registerRateLimit(app: FastifyInstance, now: () => number = Date.now): void {
   const reads = new SlidingWindowLimiter(60, 60_000, now);
   const writes = new SlidingWindowLimiter(10, 60_000, now);
+  const jobStarts = new SlidingWindowLimiter(WRITE_JOB_RUNS_PER_HOUR, 3_600_000, now);
   app.addHook('preHandler', async (req, reply) => {
     const key = req.auth ? String(req.auth.tokenId) : req.jobAuth && isJobRoute(req) ? 'job' : null;
     if (key === null) return; // public routes (/health) are not limited
-    const limiter = isMutating(req.method) ? writes : reads;
+    // CR-007 T-2: a WRITE token starting a job has its own, tighter limit (instead of the general write limit).
+    const limiter = req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method) ? writes : reads;
     const wait = limiter.take(key);
     // CR-005 N-8a: the caller's own limit for this method class (GET vs POST), on every authenticated response, a 429 included.
     const st = limiter.state(key);

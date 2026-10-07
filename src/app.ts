@@ -31,6 +31,7 @@ import { errorBody, registerErrorHandling } from './http/errors.js';
 import { jerusalemDeep } from './time.js';
 import { rdapLookup, rdapStatus, type RdapFn } from './rdap.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
+import { PortfolioCheckJob } from './jobs/portfolio-check.js';
 import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
 import { BuyService } from './services/buy.js';
@@ -53,6 +54,7 @@ declare module 'fastify' {
     priceJob: PriceScheduleJob;
     dropJob: DropJob;
     registrarCheckJob: RegistrarCheckJob;
+    portfolioCheckJob: PortfolioCheckJob;
     referenceRefreshJob: ReferenceRefreshJob;
     jobRunner: JobRunner;
     screeningWorker: ScreeningWorker;
@@ -151,6 +153,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     rdapLookup, dnsQuery: queryDns,
     resolveNs: (zone) => dns.promises.resolveNs(zone),
     resolve4: (host) => dns.promises.resolve4(host),
+    webRiskApiKey: deps.config.webRiskApiKey,
     ...deps.screening,
   };
   const screeningWorker = new ScreeningWorker({
@@ -166,13 +169,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });
   app.decorate('referenceRefreshJob', referenceRefresh);
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
+  app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: screeningDeps.rdapLookup, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('dropJob', new DropJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
+    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
     secretValues: deps.config.secretValues,
   }));
   registerJobs(app, app.jobRunner, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });

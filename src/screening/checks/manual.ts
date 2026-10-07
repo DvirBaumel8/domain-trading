@@ -3,6 +3,7 @@
 // run answers MANUAL_REQUIRED and a human result is recorded with POST /screening/runs/{id}/manual. The record is turned into a status
 // here, by the settings' rules.
 import { z } from 'zod';
+import { webRiskLookup } from '../web-risk.js';
 import type { SelectionValuesT } from '../settings.js';
 import { outcome, type Check, type CheckOutcome, type ResultRow } from '../types.js';
 import { nameTokens } from '../prior-business.js';
@@ -48,10 +49,28 @@ export const webRiskCheck: Check = {
   ruleIds: ['WEB-RISK-1'],
   lists: [],
   async run(ctx) {
-    return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', `Google Web Risk is not automated: look the name up and record it. ${HOW}`, {
-      source: 'transparency_report_interim', lookup_name: ctx.item.domain, safe_statuses: ctx.settings.web_risk.safe_statuses,
-      unsafe_statuses: ctx.settings.web_risk.unsafe_statuses, requires_clean_history: ctx.settings.web_risk.requires_clean_history,
-    });
+    const key = ctx.deps.webRiskApiKey;
+    if (!key) {
+      return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', `Google Web Risk is not automated: look the name up and record it. ${HOW}`, {
+        source: 'transparency_report_interim', lookup_name: ctx.item.domain, safe_statuses: ctx.settings.web_risk.safe_statuses,
+        unsafe_statuses: ctx.settings.web_risk.unsafe_statuses, requires_clean_history: ctx.settings.web_risk.requires_clean_history,
+      });
+    }
+    // CR-007 G-6: the free Lookup API (one upstream call, counted against the monthly cap).
+    const checkedAt = new Date(ctx.now());
+    const r = await webRiskLookup({ db: ctx.db, fetch: ctx.deps.fetch, apiKey: key, now: ctx.now }, ctx.item.domain);
+    const base = { source: 'web_risk_api', lookup_name: ctx.item.domain, checked_at: iso(checkedAt) };
+    const extra = { dataAsOf: checkedAt, upstreamCalls: r.kind === 'unknown' && r.reason === 'QUOTA_CAP' ? 0 : 1 };
+    if (r.kind === 'unknown') {
+      const why = r.reason === 'QUOTA' ? 'Web Risk answered with a quota limit' : r.reason === 'QUOTA_CAP' ? 'the monthly Web Risk lookup cap is reached (no call was made)' : 'Web Risk could not be read';
+      return outcome('UNKNOWN', r.reason, `${why}: record the lookup by hand if needed. ${HOW}`, { ...base, threat_types: [] }, extra);
+    }
+    if (r.kind === 'match') {
+      return outcome('FAIL', 'UNSAFE', `Web Risk lists ${ctx.item.domain}: ${r.threatTypes.join(', ')}`, { ...base, threat_types: r.threatTypes, expire_time: r.expireTime }, extra);
+    }
+    // CR-001 CAP-06 "with an API key: Lookup no-match → PASS". The clean-history condition belongs to the interim (manual) source only;
+    // history reads this check's row (blocklist class), so it could never be final here anyway.
+    return outcome('PASS', null, null, { ...base, threat_types: [] }, extra);
   },
 };
 
@@ -76,23 +95,34 @@ export const tmUsCheck: Check = {
 
 const iso = (d: Date) => d.toISOString();
 
+/** The history facts a Web Risk result records: final = anything but UNKNOWN, NOT_RUN or MANUAL_REQUIRED; clean = not a FAIL. */
+function historyFields(history: ResultRow | undefined): { hist1_clean: boolean | null; history_status: string | null } {
+  const final = history ? !['UNKNOWN', 'NOT_RUN', 'MANUAL_REQUIRED'].includes(history.status) : false;
+  const clean = history ? history.status !== 'FAIL' : null;
+  return { hist1_clean: history ? final && clean : null, history_status: history?.status ?? null };
+}
+
+/** A safe manual Web Risk status, by the settings' history rule (the interim source; an API no-match is a plain PASS). */
+function webRiskSafe(sel: SelectionValuesT, history: ResultRow | undefined, fields: Record<string, unknown>, extra: Parameters<typeof outcome>[4]): CheckOutcome {
+  const f = { ...fields, ...historyFields(history) };
+  const final = history ? !['UNKNOWN', 'NOT_RUN', 'MANUAL_REQUIRED'].includes(history.status) : false;
+  const clean = history ? history.status !== 'FAIL' : null;
+  if (!sel.web_risk.requires_clean_history) return outcome('PASS', null, null, f, extra);
+  if (!final) return outcome('UNKNOWN', 'HISTORY_NOT_FINAL', 'Status is safe but the history check is not final yet (unknown or not run): record again once HIST is decided', f, extra);
+  if (!clean) return outcome('UNKNOWN', 'HISTORY_NOT_CLEAN', 'Status is safe but the history check FAILED: a clean Web Risk status does not clear a harmful history', f, extra);
+  return outcome('PASS', null, null, f, extra);
+}
+
 /**
  * Turns a recorded Web Risk lookup into a result (CAP-06 interim rule; the history requirement is a setting). History is "final" when it
  * is anything but UNKNOWN, NOT_RUN or MANUAL_REQUIRED, and "clean" when it is not a FAIL: a FLAG history is final and clean here (the
  * FLAG still needs its own verdict; this record does not give it one). No history result at all is not final.
  */
 export function webRiskFromManual(rec: z.infer<typeof WebRiskManual>, sel: SelectionValuesT, history: ResultRow | undefined, evidenceUrl: string, checkedAt: Date, note?: string): CheckOutcome {
-  const final = history ? !['UNKNOWN', 'NOT_RUN', 'MANUAL_REQUIRED'].includes(history.status) : false;
-  const clean = history ? history.status !== 'FAIL' : null;
-  const fields = { source: 'transparency_report_interim', raw_status: rec.raw_status, threat_types: rec.threat_types ?? [], hist1_clean: history ? final && clean : null, history_status: history?.status ?? null, evidence_url: evidenceUrl, checked_at: iso(checkedAt), note: note ?? null };
+  const fields = { source: 'transparency_report_interim', raw_status: rec.raw_status, threat_types: rec.threat_types ?? [], ...historyFields(history), evidence_url: evidenceUrl, checked_at: iso(checkedAt), note: note ?? null };
   const extra = { dataAsOf: checkedAt };
   if (sel.web_risk.unsafe_statuses.includes(rec.raw_status)) return outcome('FAIL', 'UNSAFE', `Web Risk status ${rec.raw_status} is an unsafe status`, fields, extra);
-  if (sel.web_risk.safe_statuses.includes(rec.raw_status)) {
-    if (!sel.web_risk.requires_clean_history) return outcome('PASS', null, null, fields, extra);
-    if (!final) return outcome('UNKNOWN', 'HISTORY_NOT_FINAL', 'Status is safe but the history check is not final yet (unknown or not run): record again once HIST is decided', fields, extra);
-    if (!clean) return outcome('UNKNOWN', 'HISTORY_NOT_CLEAN', 'Status is safe but the history check FAILED: a clean Web Risk status does not clear a harmful history', fields, extra);
-    return outcome('PASS', null, null, fields, extra);
-  }
+  if (sel.web_risk.safe_statuses.includes(rec.raw_status)) return webRiskSafe(sel, history, fields, extra);
   return outcome('UNKNOWN', 'STATUS_UNRECOGNISED', `Web Risk status ${rec.raw_status} is neither a safe nor an unsafe status in the settings`, fields, extra);
 }
 

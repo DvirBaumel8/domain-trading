@@ -39,7 +39,7 @@ function previewDay(v: string, today: string): string {
 }
 
 /**
- * POST /jobs/run: called by the external scheduler (Cloudflare Worker). Auth is the job-trigger bearer (see http/auth.ts).
+ * POST /jobs/run: called by the external scheduler (Cloudflare Worker) with the job-trigger bearer, or by Gavriel's WRITE token (own limit, see http/auth.ts and http/rate-limit.ts).
  * GET /jobs/runs (READ): the recorded runs. POST /jobs/preview (WRITE): the price and drop jobs as a dry run for a chosen day.
  */
 export function registerJobs(app: FastifyInstance, runner: JobRunner, deps: JobsDeps): void {
@@ -47,7 +47,11 @@ export function registerJobs(app: FastifyInstance, runner: JobRunner, deps: Jobs
     const { job } = Body.parse(req.body);
     const started = new Date().toISOString();
     const key = req.headers['idempotency-key'];
-    const result = await runner.run(job, triggerFromKey(job, typeof key === 'string' ? key : undefined));
+    // A WRITE token's run is always `manual` (whatever its key looks like) and records the token's name; the job token keeps the key rule.
+    const trigger = req.auth
+      ? { trigger: 'manual' as const, scheduledFor: null, triggeredBy: req.auth.name }
+      : triggerFromKey(job, typeof key === 'string' ? key : undefined);
+    const result = await runner.run(job, trigger);
     const failed = Object.entries(result.steps).filter(([, s]) => !s.ok).map(([k]) => k);
     req.auditSummary = result.skipped ? `${job}: skipped` : failed.length ? `${job}: failed ${failed.join(',')}` : `${job}: ok`;
     return reply.code(200).send({ ...result, started_at: started, finished_at: new Date().toISOString() });

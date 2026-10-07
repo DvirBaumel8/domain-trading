@@ -352,7 +352,7 @@ USPTO key: Dvir is getting it now from the USPTO Open Data Portal and will store
   - **DOM uses only the Lookup API** (`uris:search`) and never the Update API. A static test proves no `computeDiff` / `threatLists` call exists.
   - **Quota cap:** DOM caps itself at **10,000 lookups per calendar month** (a setting; Google's free tier is 100,000). Past the cap, the check is UNKNOWN `QUOTA_CAP`, never PASS.
   - **Second guard (optional):** Dvir can set a daily request quota in the Cloud console.
-  - **Clean-history rule:** `requires_clean_history` stays as it is. Changing it is a selection settings draft (Gavriel) plus Dvir's activation.
+  - **Clean-history rule:** CR-001 CAP-06 already says "with an API key: no match → PASS", so `requires_clean_history` applies only to the manual (interim) record. No settings change is needed.
 - **Q-10:** see §19.2.
 - **Q-11:** **(b).**
   - **Why (b):** it needs no new secret delivery, and the token can still do nothing but start the two fixed jobs.
@@ -378,7 +378,7 @@ USPTO key: Dvir is getting it now from the USPTO Open Data Portal and will store
 - **T-2:** `POST /jobs/run` also accepts a WRITE token, for `daily` and `tick` only, at 4 per hour. `GET /jobs/runs` shows `trigger: "manual"` and the token name.
 - **T-3:** an admin command sets an expiry time on a token. After that time, the token gets 401 `UNAUTHORIZED`.
 - **G-6:** `web_risk` runs automatically when `GOOGLE_WEB_RISK_API_KEY` is set (the name Dvir used is kept).
-  - **No match:** PASS (subject to `requires_clean_history`, as today).
+  - **No match:** PASS (CR-001 CAP-06, "with an API key"; `requires_clean_history` stays for manual records only).
   - **A match:** FAIL `UNSAFE` with the threat types.
   - **An error, a quota refusal or the monthly cap:** UNKNOWN.
   - **Without the key:** MANUAL_REQUIRED, as today. The manual record stays as the fallback.

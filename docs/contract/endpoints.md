@@ -1,4 +1,4 @@
-# Endpoints (contract v2.2.0)
+# Endpoints (contract v2.3.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -493,14 +493,14 @@ A closed tranche is read-only in the database as well (an update of the tranche 
 ## Jobs
 
 ### `POST /jobs/run`
-The job token only (see `jobs.md`). Body `{"job": "tick" | "daily"}` (strict; anything else → 422 `VALIDATION_ERROR`). Needs `Idempotency-Key`. **200** `{job, skipped: bool, steps: {<step>: {ok, skipped?, error?, summary}}, started_at, finished_at}`. **503** `JOBS_DISABLED` when the job token isn't configured.
+The job token, or (2.3.0) a WRITE bot token, at most 4 calls per hour per WRITE token (see `jobs.md`). Body `{"job": "tick" | "daily"}` (strict; anything else → 422 `VALIDATION_ERROR`). Needs `Idempotency-Key`. **200** `{job, skipped: bool, steps: {<step>: {ok, skipped?, error?, summary}}, started_at, finished_at}`. **503** `JOBS_DISABLED` when the job token isn't configured.
 
 ---
 
 ### `GET /jobs/runs`
 READ (any `GET` token; not the job token). Query (all optional; an unknown parameter or a bad value → **400** `VALIDATION_ERROR`): `job` (`tick` | `daily`), `since` (ISO 8601 with an offset; runs that finished at or after it), `limit` (1 to 500, default 50). **200:**
 ```
-{ runs: [ { job, trigger: "scheduled" | "manual" | "cli", scheduled_for: ISO | null,
+{ runs: [ { job, trigger: "scheduled" | "manual" | "cli", triggered_by: string | null, scheduled_for: ISO | null,
             started_at, finished_at, skipped: bool, ok: bool,
             steps: { <step>: { ok, skipped?, error?, summary } } } ],          // newest first
   jobs: { tick: { last_run_at, last_ok_at, next_due_at: null },
@@ -509,7 +509,7 @@ READ (any `GET` token; not the job token). Query (all optional; an unknown param
                iana: { refreshed_at: ISO | null }, namebio: { enabled: false } },
   backup: { configured: bool, last_status: "ok" | "failed" | "skipped" | null } }
 ```
-- `trigger`: `scheduled` when the `Idempotency-Key` of the `POST /jobs/run` call is the Worker's `<job>-<ms>` (`scheduled_for` is that time), `manual` for any other call, `cli` for `npm run job`. `steps` are the step results exactly as `POST /jobs/run` returned them (`jobs.md`). A skipped overlap is listed (`skipped: true`, `steps: {}`); a failed run has `ok: false`.
+- `trigger`: `scheduled` when the `Idempotency-Key` of the `POST /jobs/run` call is the Worker's `<job>-<ms>` (`scheduled_for` is that time), `manual` for any other call, `cli` for `npm run job`. `triggered_by` (2.3.0) is the bot token's name for a run a WRITE token started, else `null`. `steps` are the step results exactly as `POST /jobs/run` returned them (`jobs.md`). A skipped overlap is listed (`skipped: true`, `steps: {}`); a failed run has `ok: false`.
 - `last_run_at` / `last_ok_at` ignore skipped overlaps. `next_due_at` is the next 00:05 UTC for `daily`; `tick` has no schedule (`null`).
 - `reference` is the snapshot in use now. `backup.last_status` is the last daily run's `backupExport` step (`null` before any run). Times use the Asia/Jerusalem offset. No secret, token or repository address is ever shown. Only runs since 2.1.0 are listed.
 

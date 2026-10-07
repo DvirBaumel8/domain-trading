@@ -62,7 +62,7 @@ export async function jobRunsView(db: Kysely<Database>, config: Pick<Config, 'ba
   return {
     runs: rows.map((r) => ({
       job: r.job, trigger: r.trigger, scheduled_for: r.scheduled_for, started_at: r.started_at, finished_at: r.finished_at,
-      skipped: r.skipped, ok: r.ok, steps: r.steps,
+      skipped: r.skipped, ok: r.ok, steps: r.steps, triggered_by: r.triggered_by,
     })),
     jobs,
     reference: {

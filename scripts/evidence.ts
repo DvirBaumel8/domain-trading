@@ -61,7 +61,7 @@ interface Guarantee { what: string; file: string; test: string; note?: string }
 /** Tables whose rows may never be changed or deleted (database triggers). */
 export const APPEND_ONLY_TABLES = [
   'audit_log', 'export_uploads', 'holdout_suites', 'job_runs', 'labelled_names', 'ledger_entries', 'listing_history', 'manual_quotes', 'pricing_evidence',
-  'pricing_settings', 'replay_runs', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings',
+  'pricing_settings', 'portfolio_checks', 'replay_runs', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings',
 ] as const;
 
 const GUARANTEES: Guarantee[] = [
@@ -69,6 +69,7 @@ const GUARANTEES: Guarantee[] = [
   { what: 'Tests never reach the network (an unmocked outbound request fails)', file: 'tests/unit/network-block.test.ts', test: 'fails any unmocked outbound HTTP request' },
   { what: 'No LLM call inside the service (no SDK dependency, no provider host in `src/`)', file: 'tests/unit/no-llm.test.ts', test: 'no LLM SDK dependency' },
   { what: 'No registrar top-up call, ever (no top-up endpoint is referenced in `src/`)', file: 'tests/unit/no-topup.test.ts', test: 'no source file references a top-up endpoint' },
+  { what: 'Web Risk uses only the free Lookup API (no Update API call in `src/`)', file: 'tests/unit/no-web-risk-update.test.ts', test: 'no source file calls the Web Risk Update API' },
 ];
 
 export function generateEvidence(root = ROOT): string {

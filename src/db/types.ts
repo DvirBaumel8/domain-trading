@@ -24,6 +24,7 @@ export interface ApiTokensTable {
   created_at: TimestampDefault;
   revoked_at: Timestamp | null;
   last_used_at: Timestamp | null;
+  expires_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
 }
 
 export interface SettingsTable {
@@ -293,6 +294,23 @@ export interface JobRunsTable {
   skipped: boolean;
   ok: boolean;
   steps: Json;
+  /** The WRITE token's name for a manual run started through the API; null for the job token, the Worker and the CLI. */
+  triggered_by: ColumnType<string | null, string | null | undefined, never>;
+}
+
+export interface ApiUsageTable {
+  source: string;
+  month: string;
+  calls: Generated<number>;
+}
+
+export interface PortfolioChecksTable {
+  id: Generated<number>;
+  domain_id: number;
+  at: TimestampDefault;
+  kind: 'registry' | 'web' | 'blocklist';
+  status: 'ok' | 'fail' | 'unknown';
+  details: ColumnType<Record<string, unknown>, string | undefined, never>;
 }
 
 export interface PricingSettingsTable {
@@ -640,6 +658,8 @@ export interface Database {
   rdap_lookups: RdapLookupsTable;
   reference_files: ReferenceFilesTable;
   job_runs: JobRunsTable;
+  api_usage: ApiUsageTable;
+  portfolio_checks: PortfolioChecksTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

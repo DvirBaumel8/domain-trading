@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { sql } from 'kysely';
 import { APPEND_ONLY_TABLES } from '../../scripts/evidence.js';
-import { testDb as db } from '../helpers/db.js';
+import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 
 describe('append-only tables', () => {
   it('every listed table has row triggers that refuse UPDATE, DELETE and a TRUNCATE trigger (catalog)', async () => {
@@ -28,5 +28,11 @@ describe('append-only tables', () => {
     await expect(db.updateTable('job_runs').set({ ok: false }).execute()).rejects.toThrow(/append-only/);
     await expect(db.deleteFrom('job_runs').execute()).rejects.toThrow(/append-only/);
     expect(await db.selectFrom('job_runs').selectAll().execute()).toHaveLength(1);
+    // portfolio_checks (v2.3.0)
+    const d = await insertOwnedDomain(db, { domain: 'append-only-check.com' });
+    await db.insertInto('portfolio_checks').values({ domain_id: d, kind: 'registry', status: 'ok', details: '{}' }).execute();
+    await expect(db.updateTable('portfolio_checks').set({ status: 'fail' }).execute()).rejects.toThrow(/append-only/);
+    await expect(db.deleteFrom('portfolio_checks').execute()).rejects.toThrow(/append-only/);
+    expect(await db.selectFrom('portfolio_checks').selectAll().execute()).toHaveLength(1);
   });
 });

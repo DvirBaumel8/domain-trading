@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.3.0 (2026-10-07): CR-007 operations: manual runs, token expiry, automatic Web Risk, daily portfolio check
+MINOR, **additive**. Release note: `docs/releases/v2.3.0.md`.
+- **`POST /jobs/run` with a WRITE token (T-2):** `daily` or `tick` only, at most 4 calls per hour per token, same overlap lock; `GET /jobs/runs` adds `triggered_by` (the token's name). The READ token is still refused.
+- **Token expiry (T-3):** a token may carry an expiry time set by DOM's admin command; after it the token gets 401 `UNAUTHORIZED` like an unknown one.
+- **Automatic Web Risk (G-6):** with the server's Google Web Risk key, `web_risk` calls the Lookup API: a match is FAIL `UNSAFE`, no match is PASS (CAP-06; `requires_clean_history` applies only to manual records), errors are UNKNOWN `QUOTA` / `SOURCE_ERROR`, DOM's monthly cap (10,000) UNKNOWN `QUOTA_CAP`. Without the key, MANUAL_REQUIRED as before. The Update API is never called (a static test).
+- **Daily `portfolioCheck` step (G-5):** registry (RDAP) and web answer daily, blocklists weekly, for every owned, listed or delisted name, hand-bought names included. New `/report` warnings `REGISTRY_MISMATCH` (error), `LANDER_DOWN` (warn, error from the 2nd day), `OWNED_NAME_BLOCKLISTED` (error). New append-only table `portfolio_checks` (operational, not in the data backup).
+- **US trademark:** stays manual; the contract says the USPTO key gives no wordmark search (CR-007 Q-8).
+
 ## 2.2.0 (2026-10-07): CR-006 acceptance findings
 MINOR, **additive**. Release note: `docs/releases/v2.2.0.md`. Two additions; the rest makes the docs match what the service and the platform do.
 - **`/report` warning `AUTO_RENEW_UNCONFIRMED` (info, F-2):** on every report for each live name whose auto-renew the service can't read (GoDaddy, or `registrar_api: none`). Before, it appeared only in the import output.

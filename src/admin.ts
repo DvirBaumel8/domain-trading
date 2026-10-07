@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import { createApiToken, listApiTokens, revokeApiToken } from './admin/tokens.js';
+import { createApiToken, expireApiToken, listApiTokens, revokeApiToken } from './admin/tokens.js';
 import { newPricingSettings, showPricingSettings } from './admin/pricing-settings.js';
 import { DropDateInputError, dropAtFirstExpiry } from './admin/drop-date.js';
 import { runDoctor } from './admin/doctor.js';
@@ -7,12 +7,14 @@ import { ImportInputError, importDomain, type ImportInput } from './admin/import
 import { createAdapters } from './registrars/registry.js';
 import { readFileSync } from 'node:fs';
 import { AppError } from './http/errors.js';
+import { ISO_WITH_OFFSET } from './services/offers.js';
 import { loadConfig } from './config.js';
 import { createDb } from './db/client.js';
 
 const USAGE = `usage:
   npm run admin -- token create --scope read|write --name <name>
   npm run admin -- token revoke --id <id>
+  npm run admin -- token expire --id <id> --at <ISO 8601 time with an offset>
   npm run admin -- token list
   npm run admin -- pricing-settings new [--from-current] --set key=value [--set ...] --approval-text "<words>" --approval-at <ISO> [--note <text>]
   npm run admin -- pricing-settings show [--version N]
@@ -29,7 +31,7 @@ async function main(argv: string[]): Promise<number> {
     args: argv,
     allowPositionals: true,
     options: {
-      scope: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' },
+      scope: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, at: { type: 'string' },
       set: { type: 'string', multiple: true }, 'from-current': { type: 'boolean' },
       'approval-text': { type: 'string' }, domain: { type: 'string' }, 'approval-at': { type: 'string' },
       note: { type: 'string' }, version: { type: 'string' },
@@ -64,12 +66,22 @@ async function main(argv: string[]): Promise<number> {
       console.log(ok ? `Revoked token ${id}` : `No active token with id ${id}`);
       return ok ? 0 : 1;
     }
+    if (cmd === 'token' && sub === 'expire') {
+      const id = Number(values.id);
+      if (!Number.isInteger(id) || id <= 0) throw new UsageError('--id must be a positive integer');
+      const at = values.at;
+      if (!at || !ISO_WITH_OFFSET.test(at) || Number.isNaN(Date.parse(at))) throw new UsageError('--at must be an ISO 8601 time with an offset, e.g. 2026-12-31T23:59:00+02:00');
+      const ok = await expireApiToken(db, id, new Date(at));
+      console.log(ok ? `Token ${id} expires ${new Date(at).toISOString()}` : `No active token with id ${id}`);
+      return ok ? 0 : 1;
+    }
     if (cmd === 'token' && sub === 'list') {
       for (const t of await listApiTokens(db)) {
         console.log(
           [t.id, t.name, t.scope, `created ${t.created_at.toISOString()}`,
            t.revoked_at ? `REVOKED ${t.revoked_at.toISOString()}` : 'active',
-           `last used ${t.last_used_at?.toISOString() ?? 'never'}`].join('  '),
+           `last used ${t.last_used_at?.toISOString() ?? 'never'}`,
+           t.expires_at ? `expires ${t.expires_at.toISOString()}` : 'no expiry'].join('  '),
         );
       }
       return 0;

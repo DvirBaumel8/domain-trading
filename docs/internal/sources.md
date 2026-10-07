@@ -18,6 +18,10 @@ Summary
 | PIR RDAP (.org) | CAP-03 | enabled | <= 1 query/s |
 | Identity Digital RDAP (.info, .ai) | CAP-03 | enabled | <= 1 query/s |
 | .co, .io, .us RDAP | CAP-03, CAP-12 | **disabled: no base in the IANA bootstrap** | none |
+| Google Web Risk Lookup API (`uris:search`) | CAP-06, `portfolioCheck` blocklist | **enabled when `GOOGLE_WEB_RISK_API_KEY` is set** (2.3.0; key in the `x-goog-api-key` header, never the URL). Update API never called (pricing switch; static test) | DOM cap 10,000 per UTC month (`WEB_RISK_MONTHLY_CAP`, table `api_usage`); Google free tier 100,000 |
+| Our own domains, `http://<domain>/` | `portfolioCheck` web answer | enabled (our names, served by the lander) | 1 request per listed name per day, via `safeFetch`, redirects not followed |
+| USPTO TSDR (`USPTO_API_KEY`) | CAP-08 | **not used**: status by serial number only, no wordmark search (CR-007 Q-8); TM-1 stays manual | none |
+| CZDS `.com` zone | CR-007 G-2 B | **not used**: not possible at $0 (CR-007 §19.2) | none |
 | Business websites (operator and firm home pages) | CAP-12, CAP-15 | **enabled** (`sources.business_sites`; robots.txt honoured) | <= 1 request per `same_name.min_ms_between_fetches` ms (default 1 s); CAP-15 per `lead.verify.min_ms_between_fetches` |
 
 ---

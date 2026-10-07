@@ -33,12 +33,12 @@ describe('POST /jobs/run auth', () => {
     expect(await testDb.selectFrom('idempotency_keys').selectAll().execute()).toHaveLength(0);
   });
 
-  it('does not accept READ or WRITE API tokens', async () => {
+  it('does not accept a READ API token (a WRITE token may start daily or tick since v2.3.0: jobs-write-token.test.ts)', async () => {
     app = await make();
     const read = await issueToken('read');
-    const write = await issueToken('write');
-    expect((await post(app, 'tick', read.auth)).statusCode).toBe(401);
-    expect((await post(app, 'tick', write.auth)).statusCode).toBe(401);
+    const r = await post(app, 'tick', read.auth);
+    expect(r.statusCode).toBe(401);
+    expect(r.json().error.code).toBe('UNAUTHORIZED');
   });
 
   it('the job token does not work on other routes', async () => {
@@ -87,17 +87,17 @@ describe('encoded paths cannot bypass the job route', () => {
   const enc = (app: FastifyInstance, url: string, headers: Record<string, string>) =>
     app.inject({ method: 'POST', url, headers: { ...headers, 'idempotency-key': `enc-${++n}` }, payload: { job: 'tick' } });
 
-  it.each(['/jobs/%72un', '/%6Aobs/run'])('WRITE token on %s → 401; the job token → 200', async (url) => {
+  it.each(['/jobs/%72un', '/%6Aobs/run'])('READ token on %s → 401; the job token → 200', async (url) => {
     app = await make();
-    const write = await issueToken('write');
-    expect((await enc(app, url, write.auth)).statusCode).toBe(401);
+    const read = await issueToken('read');
+    expect((await enc(app, url, read.auth)).statusCode).toBe(401);
     expect((await enc(app, url, bearer)).statusCode).toBe(200);
   });
 
-  it('with no JOB_TRIGGER_TOKEN a WRITE token on the encoded path is never 200', async () => {
+  it('with no JOB_TRIGGER_TOKEN a READ token on the encoded path is never 200', async () => {
     app = await makeApp({ testRoutes: false });
-    const write = await issueToken('write');
-    const res = await enc(app, '/jobs/%72un', write.auth);
+    const read = await issueToken('read');
+    const res = await enc(app, '/jobs/%72un', read.auth);
     expect([401, 503]).toContain(res.statusCode);
   });
 
@@ -221,7 +221,7 @@ describe('daily', () => {
     vi.spyOn(app.referenceRefreshJob, 'runOnce').mockImplementation(async () => { order.push('reference'); return { skipped: true, reason: 'test' }; });
     const res = await post(app, 'daily');
     expect(order).toEqual(['price', 'drop', 'registrar', 'reference', 'backup']);
-    expect(Object.keys(res.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'referenceRefresh', 'backupExport']);
+    expect(Object.keys(res.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'referenceRefresh', 'backupExport']);
     expect(res.json().steps.backupExport).toMatchObject({ ok: true, summary: { committed: false } });
   });
 

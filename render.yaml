@@ -53,3 +53,5 @@ services:
         sync: false
       - key: JOB_TRIGGER_TOKEN   # same value as the GitHub repo secret used by the Worker
         sync: false
+      - key: GOOGLE_WEB_RISK_API_KEY # optional: Web Risk Lookup API key (free tier, 10,000 lookups a month cap in code); unset keeps web_risk manual
+        sync: false

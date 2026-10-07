@@ -59,7 +59,34 @@ export async function revokeApiToken(db: Kysely<Database>, id: number): Promise<
 export async function listApiTokens(db: Kysely<Database>) {
   return db
     .selectFrom('api_tokens')
-    .select(['id', 'name', 'scope', 'created_at', 'revoked_at', 'last_used_at'])
+    .select(['id', 'name', 'scope', 'created_at', 'revoked_at', 'last_used_at', 'expires_at'])
     .orderBy('id')
     .execute();
+}
+
+/** Sets when a token stops working (CR-007 T-3). A time in the past expires it at once. Returns false when the token does not exist or is revoked. */
+export async function expireApiToken(db: Kysely<Database>, id: number, at: Date): Promise<boolean> {
+  return db.transaction().execute(async (trx) => {
+    const r = await trx
+      .updateTable('api_tokens')
+      .set({ expires_at: at })
+      .where('id', '=', id)
+      .where('revoked_at', 'is', null)
+      .returning('id')
+      .executeTakeFirst();
+    if (!r) return false;
+    await trx
+      .insertInto('audit_log')
+      .values({
+        id: newAuditId(),
+        scope: 'admin',
+        method: 'ADMIN',
+        path: 'token expire',
+        request: JSON.stringify({ id, at: at.toISOString() }),
+        status_code: 200,
+        result_summary: `token ${id} expires ${at.toISOString()}`,
+      })
+      .execute();
+    return true;
+  });
 }

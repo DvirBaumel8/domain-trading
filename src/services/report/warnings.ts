@@ -1,4 +1,4 @@
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { jerusalemDate } from '../../dates.js';
 import type { Database } from '../../db/types.js';
 import { computePlan } from '../../pricing/plan.js';
@@ -13,6 +13,8 @@ export interface ReportWarning { code: string; level: WarningLevel; domain?: str
 
 const LIVE = ['owned', 'listed', 'delisted'] as const;
 const DAY = 86_400_000;
+/** LANDER_DOWN turns from warn to error when the lander failed on this many different IDT days in a row (CR-007 G-5). */
+export const LANDER_DOWN_ERROR_DAYS = 2;
 const RANK: Record<WarningLevel, number> = { error: 0, warn: 1, info: 2 };
 
 export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<ReportWarning[]> {
@@ -33,6 +35,33 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   const statusOf = new Map(domains.map((d) => [d.id, d.status]));
   const registrarOf = new Map(domains.map((d) => [d.id, d.registrar]));
   const live = (s: string) => (LIVE as readonly string[]).includes(s);
+
+  // daily portfolio checks (CR-007 G-5): the latest row of each kind that is NOT unknown decides (an unknown never clears nor raises)
+  const latestChecks = await sql<{ domain_id: number; kind: string; status: string; at: Date; details: Record<string, any> }>`
+    select distinct on (domain_id, kind) domain_id, kind, status, at, details from portfolio_checks
+    where status <> 'unknown' order by domain_id, kind, id desc`.execute(db);
+  for (const c of latestChecks.rows) {
+    const d = nameOf.get(Number(c.domain_id));
+    const st = statusOf.get(Number(c.domain_id));
+    if (d === undefined || st === undefined || !live(st) || c.status !== 'fail') continue;
+    const checkedAt = toJerusalemIso(c.at);
+    if (c.kind === 'registry') {
+      add('REGISTRY_MISMATCH', 'error', `${d}: the registry does not agree with our record.`, d, { checked_at: checkedAt, differences: c.details.differences ?? [] });
+    } else if (c.kind === 'blocklist') {
+      add('OWNED_NAME_BLOCKLISTED', 'error', `${d} is listed on a blocklist.`, d, { checked_at: checkedAt, sources: c.details.sources ?? [] });
+    } else if (c.kind === 'web' && st === 'listed') {
+      const recent = (await sql<{ status: string; at: Date }>`
+        select status, at from portfolio_checks where domain_id = ${c.domain_id} and kind = 'web' and status <> 'unknown' order by id desc limit 400`.execute(db)).rows;
+      let streak = 0;
+      while (streak < recent.length && recent[streak]!.status === 'fail') streak++;
+      const since = recent[streak - 1]!.at;
+      const days = new Set(recent.slice(0, streak).map((r) => jerusalemDate(r.at)));
+      const twoFails = streak >= 2 && jerusalemDate(recent[0]!.at) !== jerusalemDate(recent[1]!.at);
+      add('LANDER_DOWN', twoFails && days.size >= LANDER_DOWN_ERROR_DAYS ? 'error' : 'warn', `${d}: the for-sale lander is not answering as expected.`, d, {
+        checked_at: checkedAt, since: toJerusalemIso(since), status_code: c.details.status_code ?? null, reason: c.details.reason ?? null,
+      });
+    }
+  }
 
   // sales
   const sales = await db.selectFrom('sales').selectAll().where('confirmed', '=', false).orderBy('sold_at').orderBy('id').execute();
