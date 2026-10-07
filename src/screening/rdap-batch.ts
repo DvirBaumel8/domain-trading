@@ -54,15 +54,25 @@ export class Pacer {
 }
 
 export interface LookupOpts {
-  maxAgeHours: number; baseUrl?: string; evidenceMaxBytes: number; pace: Pacer; now?: () => number; timeoutMs?: number; /** ms epoch: past it no query is sent (UNKNOWN TIMEOUT). */ deadline?: number;
+  maxAgeHours: number; baseUrl?: string; evidenceMaxBytes: number; pace: Pacer; now?: () => number; timeoutMs?: number; /** ms epoch: past it no query is sent (UNKNOWN TIMEOUT). */ deadline?: number; /** v2.9.0: when it returns true no query is sent (the run was cancelled). */ isCancelled?: () => boolean;
   /** v2.7.0 date safety: a stored answer is reusable only if checked_at >= max(now - maxAge, notBefore). */
   notBefore?: Date;
   /** v2.7.0: stored answers read in one query by `prefetchStored`; a domain absent from the map has no reusable answer (no per-lookup query). */
   prefetched?: Map<string, StoredLookup>;
 }
-export type CachedLookup = RdapLookup & { cached: boolean; evidenceId: number | null; /** When the answer was read (the stored row's checked_at); provenance in v2.7.0. */ checkedAt: Date; /** 429s / refusals this lookup met (v2.7.0). */ rateLimited: number };
+export type CachedLookup = RdapLookup & { cached: boolean; evidenceId: number | null; /** When the answer was read (the stored row's checked_at); provenance in v2.7.0. */ checkedAt: Date; /** 429s / refusals this lookup met (v2.7.0). */ rateLimited: number; /** v2.9.0: the RDAP host that answered (the stored answer's host when reused); null when unknown (answers stored before v2.9.0, or no query made). */ source: string | null };
 
-export type StoredLookup = { outcome: string; http_status: number | null; checked_at: Date; facts: unknown; evidence_id: string | null };
+export type StoredLookup = { outcome: string; http_status: number | null; checked_at: Date; facts: unknown; evidence_id: string | null; source?: string | null };
+
+/** Stable id of the RDAP host behind a query URL: `verisign_rdap` for Verisign (.com/.net), else the hostname. null for an empty or unreadable URL. */
+export function rdapSourceOf(url: string): string | null {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === 'rdap.verisign.com' ? 'verisign_rdap' : host || null;
+  } catch {
+    return null;
+  }
+}
 
 const MAX_RETRY_AFTER_MS = 10_000;
 
@@ -76,7 +86,7 @@ export async function prefetchStored(db: Kysely<Database>, domains: string[], o:
   const out = new Map<string, StoredLookup>();
   const cutoff = cutoffOf((o.now ?? Date.now)(), o.maxAgeHours, o.notBefore);
   if (cutoff === null || domains.length === 0) return out;
-  const rows = await db.selectFrom('rdap_lookups').select(['domain', 'outcome', 'http_status', 'checked_at', 'facts', 'evidence_id']).where('domain', 'in', domains)
+  const rows = await db.selectFrom('rdap_lookups').select(['domain', 'outcome', 'http_status', 'checked_at', 'facts', 'evidence_id', 'source']).where('domain', 'in', domains)
     .where('outcome', '!=', 'unknown').where('checked_at', '>=', cutoff).orderBy('checked_at', 'desc').orderBy('id', 'desc').execute();
   for (const r of rows) if (!out.has(r.domain)) out.set(r.domain, r);
   return out;
@@ -100,17 +110,17 @@ export async function lookupCached(db: Kysely<Database>, deps: ScreeningDeps, do
     if (row) {
       return {
         outcome: row.outcome as 'registered' | 'not_registered', reasonCode: null, httpStatus: row.http_status, url: '', retrievedAt: row.checked_at,
-        body: null, facts: (row.facts as RdapFacts | null) ?? null, cached: true, evidenceId: row.evidence_id === null ? null : Number(row.evidence_id), checkedAt: row.checked_at, rateLimited: 0,
+        body: null, facts: (row.facts as RdapFacts | null) ?? null, cached: true, evidenceId: row.evidence_id === null ? null : Number(row.evidence_id), checkedAt: row.checked_at, rateLimited: 0, source: row.source ?? null,
       };
     }
   }
-  const late = (): CachedLookup => ({ outcome: 'unknown', reasonCode: 'TIMEOUT', httpStatus: null, url: '', retrievedAt: new Date(now()), body: null, facts: null, cached: false, evidenceId: null, checkedAt: new Date(now()), rateLimited: 0 });
-  if (o.deadline !== undefined && now() > o.deadline) return late();
+  const late = (): CachedLookup => ({ outcome: 'unknown', reasonCode: 'TIMEOUT', httpStatus: null, url: '', retrievedAt: new Date(now()), body: null, facts: null, cached: false, evidenceId: null, checkedAt: new Date(now()), rateLimited: 0, source: null });
+  if ((o.deadline !== undefined && now() > o.deadline) || o.isCancelled?.()) return late();
   const call = () => deps.rdapLookup(domain, { baseUrl: o.baseUrl, timeoutMs: o.timeoutMs });
   let skipped = false;
   let limited = 0;
   const r = await o.pace.run(async () => {
-    if (o.deadline !== undefined && now() > o.deadline) { skipped = true; return late(); } // checked again after the wait in the pacer queue
+    if ((o.deadline !== undefined && now() > o.deadline) || o.isCancelled?.()) { skipped = true; return late(); } // checked again after the wait in the pacer queue
     let x = await call();
     if (refused(x)) { limited++; o.pace.slowDown(); }
     if (x.reasonCode === 'RATE_LIMITED' && x.retryAfterMs != null && x.retryAfterMs <= MAX_RETRY_AFTER_MS) {
@@ -129,9 +139,9 @@ export async function lookupCached(db: Kysely<Database>, deps: ScreeningDeps, do
   const checkedAt = new Date(now());
   await db.insertInto('rdap_lookups').values({
     domain, outcome: r.outcome, reason_code: r.reasonCode, http_status: r.httpStatus, facts: r.facts ? JSON.stringify(r.facts) : null,
-    evidence_id: evidenceId === null ? null : String(evidenceId), checked_at: checkedAt,
+    evidence_id: evidenceId === null ? null : String(evidenceId), checked_at: checkedAt, source: rdapSourceOf(r.url),
   }).execute();
-  return { ...r, cached: false, evidenceId, checkedAt, rateLimited: limited };
+  return { ...r, cached: false, evidenceId, checkedAt, rateLimited: limited, source: rdapSourceOf(r.url) };
 }
 
 /**

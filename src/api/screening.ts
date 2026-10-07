@@ -15,6 +15,7 @@ import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, loadRows, recom
 import { REGISTRAR_ENV } from '../registrars/registry.js';
 import { readEvidence, storeEvidence } from '../screening/evidence.js';
 import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
+import { lookupsOf } from '../screening/test-sets.js';
 import { VerdictBody, verdictsFor } from '../screening/verdicts.js';
 import type { ResultRow, RunItem } from '../screening/types.js';
 import type { CheckId, Lane } from '../screening/types.js';
@@ -94,6 +95,8 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     return {
       run_id: run.id, status: run.status, mode: run.mode, backtest: run.backtest, settings_version: run.settings_label, buy_hold: run.buy_hold,
       created_at: run.created_at.toISOString(), finished_at: iso(run.finished_at), progress: a.progress,
+      lookups: lookupsOf(a.items.map((i) => latestByCheck(i.rows))),
+      ...(run.status === 'cancelled' && { cancelled_at: iso(run.cancelled_at), cancelled_by: run.cancelled_by }),
       names: a.items.filter((i) => want === null || i.item.domain === want).map((i) => {
         const latest = latestByCheck(i.rows);
         return {
@@ -109,6 +112,18 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       ranking,
       funnel: a.funnel,
     };
+  });
+
+  app.post<{ Params: { id: string } }>('/screening/runs/:id/cancel', async (req) => {
+    const body = z.object({ reason: z.string().trim().min(1).max(200).optional() }).strict().parse(req.body ?? {});
+    const run = await db.selectFrom('screening_runs').select(['id', 'status']).where('id', '=', req.params.id).executeTakeFirst();
+    if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${req.params.id}"`);
+    const done = await worker.cancel(run.id, req.auth!.name, body.reason);
+    if (!done) {
+      const st = (await db.selectFrom('screening_runs').select('status').where('id', '=', run.id).executeTakeFirstOrThrow()).status;
+      throw new AppError(409, 'RUN_NOT_RUNNING', `Run ${run.id} is ${st}, not running; only a running run can be cancelled`, { status: st });
+    }
+    return { id: run.id, status: 'cancelled' as const, cancelled_at: done.cancelled_at.toISOString(), cancelled_by: req.auth!.name };
   });
 
   app.post<{ Params: { id: string } }>('/screening/runs/:id/manual', async (req, reply) => {

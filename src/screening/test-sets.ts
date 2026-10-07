@@ -85,6 +85,13 @@ function countLookups(rows: { fields: Record<string, unknown> }[], into: LookupC
   }
 }
 
+/** v2.9.0 (F-4): the lookup totals of a run from the census and ext_dates row in force for each name (shared by the test-set and the screening-run GET). */
+export function lookupsOf(latestPerName: Iterable<Map<CheckId, { fields: Record<string, unknown> }>>): LookupCounts {
+  const lookups: LookupCounts = { fresh: 0, reused: 0, unknown: 0, rate_limited: 0 };
+  for (const latest of latestPerName) countLookups([latest.get('census'), latest.get('ext_dates')].filter((x): x is NonNullable<typeof x> => x !== undefined), lookups);
+  return lookups;
+}
+
 export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise<{ byDomain: Map<string, DomFeatures>; done_n: number; names_n: number; lookups: LookupCounts }> {
   const items = (run.input as { names: RunItem[] }).names;
   const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
@@ -92,14 +99,14 @@ export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise
   for (const r of await loadRows(db, run.id)) (byItem.get(r.item_idx) ?? byItem.set(r.item_idx, []).get(r.item_idx)!).push(r);
   const byDomain = new Map<string, DomFeatures>();
   let done = 0;
-  const lookups: LookupCounts = { fresh: 0, reused: 0, unknown: 0, rate_limited: 0 };
+  const perName: Map<CheckId, Awaited<ReturnType<typeof loadRows>>[number]>[] = [];
   for (const it of items) {
     const latest = latestByCheck(byItem.get(it.idx) ?? []);
     if ((plan[it.lane] ?? []).every((c) => latest.has(c))) done++;
     const form = latest.get('form')?.fields as { word_count?: number; sld_len?: number; city?: string | null; trade?: string | null } | undefined;
     const census = latest.get('census');
     const ext = latest.get('ext_dates');
-    countLookups([census, ext].filter((x): x is NonNullable<typeof x> => x !== undefined), lookups);
+    perName.push(latest);
     const share = census?.status === 'PASS' && typeof census.fields.registered_share === 'number' ? census.fields.registered_share : null;
     const alt = ext?.status === 'PASS' && typeof ext.fields.alt_tld_before_n === 'number' ? ext.fields.alt_tld_before_n : null;
     byDomain.set(it.domain, {
@@ -108,7 +115,7 @@ export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise
       is_geo: form?.city && form?.trade ? 1 : 0,
     });
   }
-  return { byDomain, done_n: done, names_n: items.length, lookups };
+  return { byDomain, done_n: done, names_n: items.length, lookups: lookupsOf(perName) };
 }
 
 export interface RescoreReport {

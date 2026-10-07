@@ -87,11 +87,11 @@ export function recomputePending(items: RunItem[], plan: Partial<Record<Lane, Ch
   return false;
 }
 
-/** Puts a finished (done or partial) run back to `running` with a fresh deadline for a recompute. False when it was already running. */
+/** Puts a finished (done or partial) run back to `running` with a fresh deadline for a recompute. False when it was already running or was cancelled (a cancelled run is never reopened). */
 export async function reopenRun(db: Kysely<Database>, runId: string, now: Date, budgetMinutes: number): Promise<boolean> {
   const r = await db.updateTable('screening_runs')
     .set({ status: 'running', finished_at: null, heartbeat_at: null, deadline_at: new Date(now.getTime() + budgetMinutes * 60_000) })
-    .where('id', '=', runId).where('status', '<>', 'running').executeTakeFirst();
+    .where('id', '=', runId).where('status', 'in', ['done', 'partial']).executeTakeFirst();
   return Number(r.numUpdatedRows) > 0;
 }
 
@@ -270,6 +270,8 @@ export class ScreeningWorker {
   readonly checks: Partial<Record<CheckId, Check>> = { ...CHECKS };
   private stopAfterResults: number | undefined;
   private readonly active = new Map<string, Promise<void>>();
+  /** Runs cancelled through this process: paced lookups and the check loop see it at once, without a database read. */
+  private readonly cancelledHere = new Set<string>();
 
   constructor(private readonly deps: ScreeningWorkerDeps) {
     this.stopAfterResults = deps.stopAfterResults;
@@ -286,6 +288,32 @@ export class ScreeningWorker {
       })
       .finally(() => { if (this.active.get(runId) === p) this.active.delete(runId); });
     this.active.set(runId, p);
+  }
+
+  /**
+   * v2.9.0 (CR-010 F-1): cancels a `running` run. The status moves to `cancelled` first (a finishing worker's `done` then loses), the in-memory flag
+   * stops this process's paced lookups and check loop, and every open check of a name that is not already stopped gets UNKNOWN `CANCELLED`
+   * (results already written are kept). Returns null when the run is not `running` (the caller reads its status).
+   */
+  async cancel(runId: string, by: string, _reason?: string): Promise<{ cancelled_at: Date } | null> {
+    const { db } = this.deps;
+    this.cancelledHere.add(runId);
+    const at = new Date(this.deps.now());
+    const r = await db.updateTable('screening_runs').set({ status: 'cancelled', finished_at: at, cancelled_at: at, cancelled_by: by })
+      .where('id', '=', runId).where('status', '=', 'running').executeTakeFirst();
+    if (Number(r.numUpdatedRows) === 0) { this.cancelledHere.delete(runId); return null; }
+    await this.closeCancelled(runId);
+    return { cancelled_at: at };
+  }
+
+  /** Whether the run was cancelled through this process (synchronous; handed to checks as `isCancelled`). */
+  isCancelled(runId: string): boolean { return this.cancelledHere.has(runId); }
+
+  /** Cross-process check used between checks: this process's flag, else the stored status. */
+  private async cancelledNow(runId: string): Promise<boolean> {
+    if (this.cancelledHere.has(runId)) return true;
+    const st = await this.deps.db.selectFrom('screening_runs').select('status').where('id', '=', runId).executeTakeFirst();
+    return st?.status === 'cancelled';
   }
 
   /** Starts it if needed and resolves when this process has finished (or stopped) working on it. */
@@ -364,6 +392,22 @@ export class ScreeningWorker {
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', runId).executeTakeFirst();
     if (!run || run.status !== 'running') return;
     if (onlyPastDeadline && this.deps.now() < run.deadline_at.getTime()) return;
+    await this.fillOpen(run, code, reason);
+    await this.finalize(run, 'partial');
+  }
+
+  /** The run was just set to `cancelled`: open checks become UNKNOWN CANCELLED and the funnel summary is stored. */
+  private async closeCancelled(runId: string): Promise<void> {
+    const { db } = this.deps;
+    const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
+    await this.fillOpen(run, 'CANCELLED', 'The run was cancelled before this check');
+    await refreshSummary(db, run);
+  }
+
+  /** Every open (or stale) check of a name that is not already stopped becomes UNKNOWN (`code`). */
+  private async fillOpen(run: RunRow, code: 'TIMEOUT' | 'SOURCE_ERROR' | 'CANCELLED', reason: string): Promise<void> {
+    const { db } = this.deps;
+    const runId = run.id;
     const sel = await selectionSettingsByLabel(db, run.settings_label);
     const features = sel!.values.run.feature_checks;
     const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
@@ -386,7 +430,6 @@ export class ScreeningWorker {
         if (row) { all.set(c, row); have.set(c, row); } // later checks of the name record this row as their input
       }
     }
-    await this.finalize(run, 'partial');
   }
 
   private async execute(runId: string): Promise<void> {
@@ -464,6 +507,7 @@ export class ScreeningWorker {
     for (const checkId of merged) {
       for (const it of order) {
         if (it.input_error || !(plan[it.lane] ?? []).includes(checkId) || latestOf(it.idx).has(checkId) || stopped(it)) continue;
+        if (await this.cancelledNow(runId)) return; // cancelled (POST .../cancel): no further lookups, no rows
         if (this.deps.now() >= deadline) return this.closeOut(runId, 'TIMEOUT', 'The run ran out of its time budget before this check', false);
         const check = this.checks[checkId];
         const t0 = this.deps.now();
@@ -485,11 +529,12 @@ export class ScreeningWorker {
                 db, run: runView, item: it, settings: values, settingsLabel: run.settings_label,
                 latest: (c) => snap.get(c),
                 ahead: () => order.slice(0, order.indexOf(it)).filter((x) => !x.input_error && !hasStatus(x, 'FAIL')).map((x) => ({ item: x, latest: (c: CheckId) => latestOf(x.idx).get(c) })),
-                lists, lexicon, deps: this.deps.screening, now: this.deps.now, deadline, shared,
+                lists, lexicon, deps: this.deps.screening, now: this.deps.now, deadline, shared, isCancelled: () => this.cancelledHere.has(runId),
               });
             } catch (e) {
               o = outcome('UNKNOWN', 'SOURCE_ERROR', String((e as Error).message ?? e).slice(0, 200));
             }
+            if (this.cancelledHere.has(runId)) return; // the result of a check that was running while the run was cancelled is dropped
             wrote = await write(it, checkId, o, { source: 'auto', durationMs: this.deps.now() - t0, checkedAt: new Date(t0), listVersions: lv, inputs });
           }
         }

@@ -14,7 +14,7 @@ export const availabilityCheck: Check = {
     if (!ctx.settings.sources.rdap_com) return outcome('UNKNOWN', 'SOURCE_DISABLED', 'The .com RDAP source is switched off (sources.rdap_com)', base);
     const r = await lookupCached(ctx.db, ctx.deps, ctx.item.domain, {
       maxAgeHours: ctx.settings.freshness_hours.availability ?? 0, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes,
-      pace: pacerFor(ctx), now: ctx.now, deadline: ctx.deadline,
+      pace: pacerFor(ctx), now: ctx.now, deadline: ctx.deadline, isCancelled: ctx.isCancelled,
     });
     const extra = { dataAsOf: r.retrievedAt, evidenceIds: r.evidenceId === null ? [] : [r.evidenceId], upstreamCalls: r.cached ? 0 : 1 };
     if (r.outcome === 'not_registered') return outcome('PASS', null, null, { availability: 'available', checked_at: checkedAt, http_status: r.httpStatus }, extra);

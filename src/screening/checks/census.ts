@@ -65,7 +65,7 @@ export const censusCheck: Check = {
     // One query reads every stored answer of the 20 siblings; a stored answer never waits in the pacer.
     const prefetched = await prefetchStored(ctx.db, terms, { ...policy, now: ctx.now });
     await Promise.all(terms.map(async (d, i) => {
-      const r = await lookupCached(ctx.db, ctx.deps, d, { ...policy, prefetched, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace, now: ctx.now, deadline: ctx.deadline });
+      const r = await lookupCached(ctx.db, ctx.deps, d, { ...policy, prefetched, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace, now: ctx.now, deadline: ctx.deadline, isCancelled: ctx.isCancelled });
       if (!r.cached && r.reasonCode !== 'TIMEOUT') calls++;
       results[i] = r;
     }));
@@ -74,7 +74,7 @@ export const censusCheck: Check = {
     let nRegistered = 0, nUnknown = 0, undated = 0, after = 0;
     const siblings = terms.map((d, i) => {
       const r = results[i]!;
-      const prov = { checked_at: r.checkedAt.toISOString(), reused: r.cached };
+      const prov = { checked_at: r.checkedAt.toISOString(), reused: r.cached, source: r.source };
       if (r.outcome === 'unknown') { nUnknown++; return { domain: d, status: 'unknown', created_at: null, counted: false, reason_code: r.reasonCode, ...prov }; }
       if (r.outcome === 'not_registered') return { domain: d, status: 'not_registered', created_at: null, counted: false, ...prov };
       const created = r.facts?.created_at ?? null;

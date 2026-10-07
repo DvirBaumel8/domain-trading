@@ -121,6 +121,8 @@ export interface CheckContext {
   now: () => number;
   /** ms epoch of the run deadline; a long check should stop and return UNKNOWN TIMEOUT when `now() > deadline`. */
   deadline: number;
+  /** v2.9.0: true once the run was cancelled through this process; a paced lookup then sends no query (UNKNOWN TIMEOUT, dropped by the worker). */
+  isCancelled?: () => boolean;
   /** Per-run memo shared by all items (e.g. the SURBL control result, the portfolio's attributes). */
   shared: Map<string, unknown>;
 }

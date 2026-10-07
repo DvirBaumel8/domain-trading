@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.9.0 (2026-10-07): CR-010 v2.7.0 findings: cancel, answer source, run totals, pending
+MINOR, **additive**. Release note: `docs/releases/v2.9.0.md`.
+- **Cancel (F-1):** `POST /screening/runs/{id}/cancel` and `POST /selection/test-sets/{name}/cancel` (WRITE, audited); status `cancelled`; unfinished checks UNKNOWN `CANCELLED`; new code `RUN_NOT_RUNNING`. A cancelled run is never woken or reopened by a read. The contract now says when a read restarts work.
+- **Answer source (F-3):** census siblings and `ext_dates` extensions add `source`.
+- **Run totals (F-4):** `GET /screening/runs/{id}` adds `lookups`.
+- **Pending (F-5):** a name whose checks are not all done in a running run is `pending` and not ranked.
+- **Docs (F-2):** test-set features name the current methods and the measured times.
+
 ## 2.8.0 (2026-10-07): CR-007 G-2 (drop lists, source A) and G-1 (cohorts, the forward test)
 MINOR, **additive**. Release note: `docs/releases/v2.8.0.md`.
 - **Drop lists:** `POST /selection/drop-lists`, `GET /selection/drop-lists/{name}`, `GET /selection/drop-lists?drop_from=&drop_to=`; daily step `dropWatch` (registry status, expected drop date); `/report` warning `DROP_FEED_STALE`.

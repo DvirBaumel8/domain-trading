@@ -69,7 +69,7 @@ export const sameNameCheck: Check = {
       // Registration is RDAP's; with rdap_other off it is unknown (the site is still read: a site in use is a fact).
       const reg: ExtRegistration = ctx.settings.sources.rdap_other
         ? await extRegistration(ctx, sld, tld)
-        : { tld, status: 'unknown', created_at: null, reason_code: 'SOURCE_DISABLED', evidenceId: null, cached: false, upstream: false, checked_at: new Date(ctx.now()).toISOString(), reused: false, rate_limited: 0 };
+        : { tld, status: 'unknown', created_at: null, reason_code: 'SOURCE_DISABLED', evidenceId: null, cached: false, upstream: false, checked_at: new Date(ctx.now()).toISOString(), reused: false, rate_limited: 0, source: null };
       if (!reg.cached && reg.upstream) calls++;
       if (reg.evidenceId !== null) evidence.push(reg.evidenceId);
       const base = { tld, registered: reg.status === 'registered' ? 'yes' as const : reg.status === 'not_registered' ? 'no' as const : 'unknown' as const, created_at: reg.created_at, registration_reason_code: reg.reason_code ?? null };

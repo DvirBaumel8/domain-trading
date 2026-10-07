@@ -2,7 +2,7 @@
 import { GATE_OF } from './checks/index.js';
 import type { CheckId, Lane, ResultRow } from './types.js';
 
-export type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'invalid' | 'running' | 'not_screened';
+export type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'invalid' | 'running' | 'pending' | 'not_screened';
 
 export interface Derived {
   final_status: FinalStatus;
@@ -43,6 +43,7 @@ export const EXEMPT_UNBUILT: CheckId[] = ['pack', 'leads'];
  * - `unknown`: a gating check is UNKNOWN, or the run is finished and a planned gating check has no result.
  * - `not_screened`: the effective plan holds no gating check (only feature checks, e.g. `checks: ["census"]`).
  * - `running`: no FAIL/UNKNOWN yet and the run is not finished with a gating check still to come.
+ * - `pending` (v2.9.0): a survivor so far, but the run is still running and a planned check (a feature check, say) has no result yet: never shown as a result before its checks ran.
  * - `pending_manual`: everything else passed but a MANUAL_REQUIRED record is outstanding.
  * - `would_buy` while `buyHold` (CR-002: never a BUY card while the hold is on), else `buy_candidate`.
  * Feature checks (`featureChecks`) never reject or stop a name; their UNKNOWN only leaves a feature unknown.
@@ -76,6 +77,7 @@ export function deriveItem(results: ResultRow[], plan: CheckId[], featureChecks:
     return !r || (r.status === 'NOT_RUN' && !notImpl(r));
   });
   if (missing) return { ...base, pending_manual, final_status: runDone ? 'unknown' : 'running', first_fail: null };
+  if (!runDone && plan.some((c) => !latest.has(c))) return { ...base, pending_manual, final_status: 'pending', first_fail: null };
   if (pending_manual.length > 0) return { ...base, pending_manual, final_status: 'pending_manual', first_fail: null };
   return { ...base, final_status: buyHold ? 'would_buy' : 'buy_candidate', first_fail: null };
 }

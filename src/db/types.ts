@@ -450,7 +450,9 @@ export interface ScreeningRunsTable {
   input: Json;
   gate_plan: Json;
   list_versions: Json;
-  status: 'running' | 'done' | 'partial';
+  status: 'running' | 'done' | 'partial' | 'cancelled';
+  cancelled_at: Date | null;
+  cancelled_by: string | null;
   deadline_at: Timestamp;
   heartbeat_at: Date | null;
   finished_at: Date | null;
@@ -593,7 +595,7 @@ export interface TestSetsTable {
   run_id: string;
   created_at: TimestampDefault;
   created_by: string;
-  status: 'computing' | 'ready' | 'sealed';
+  status: 'computing' | 'ready' | 'sealed' | 'cancelled';
   sealed_at: Date | null;
   member_count: number | null;
   member_hash: string | null;
@@ -712,6 +714,8 @@ export interface RdapLookupsTable {
   facts: unknown | null;
   evidence_id: string | null;
   checked_at: Timestamp;
+  /** v2.9.0: the RDAP host that answered (verisign_rdap or a hostname); NULL before v2.9.0. */
+  source: string | null;
 }
 
 export interface ReferenceFilesTable {

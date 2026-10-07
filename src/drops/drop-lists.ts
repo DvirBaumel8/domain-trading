@@ -90,7 +90,7 @@ export async function freshLookups(db: Kysely<Database>, deps: ScreeningDeps, no
         r = await lookupCached(db, deps, d, { maxAgeHours: 0, evidenceMaxBytes, pace, now });
       } catch (e) {
         void e;
-        r = { outcome: 'unknown', reasonCode: 'SOURCE_ERROR', httpStatus: null, url: '', retrievedAt: new Date(now()), body: null, facts: null, cached: false, evidenceId: null, checkedAt: new Date(now()), rateLimited: 0 };
+        r = { outcome: 'unknown', reasonCode: 'SOURCE_ERROR', httpStatus: null, url: '', retrievedAt: new Date(now()), body: null, facts: null, cached: false, evidenceId: null, checkedAt: new Date(now()), rateLimited: 0, source: null };
       }
       await onResult(d, r);
     }

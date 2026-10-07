@@ -323,9 +323,9 @@ describe('ext_dates is unchanged by the extRegistration refactor', () => {
     const r = body.names[0].results.find((x: any) => x.check === 'ext_dates');
     expect(r).toMatchObject({ status: 'PASS', gate: 'G8', fields: { alt_tld_before_n: 1, n_unknown_ext: 4, comparison_basis: 'com_created_at' } });
     const byTld = (t: string) => r.fields.extensions.find((e: any) => e.tld === t);
-    expect(byTld('net')).toEqual({ tld: 'net', status: 'registered', created_at: '2015-02-02T00:00:00Z', counted: true, checked_at: expect.any(String), reused: false });
-    expect(byTld('org')).toEqual({ tld: 'org', status: 'not_registered', created_at: null, checked_at: expect.any(String), reused: false });
-    expect(byTld('ai')).toEqual({ tld: 'ai', status: 'unknown', created_at: null, reason_code: 'TIMEOUT', checked_at: expect.any(String), reused: false });
-    expect(byTld('co')).toEqual({ tld: 'co', status: 'unknown', created_at: null, reason_code: 'NO_REGISTRY_SERVICE', checked_at: expect.any(String), reused: false });
+    expect(byTld('net')).toEqual({ tld: 'net', status: 'registered', created_at: '2015-02-02T00:00:00Z', counted: true, checked_at: expect.any(String), reused: false, source: 'rdap.example' });
+    expect(byTld('org')).toEqual({ tld: 'org', status: 'not_registered', created_at: null, checked_at: expect.any(String), reused: false, source: 'rdap.example' });
+    expect(byTld('ai')).toEqual({ tld: 'ai', status: 'unknown', created_at: null, reason_code: 'TIMEOUT', checked_at: expect.any(String), reused: false, source: 'rdap.example' });
+    expect(byTld('co')).toEqual({ tld: 'co', status: 'unknown', created_at: null, reason_code: 'NO_REGISTRY_SERVICE', checked_at: expect.any(String), reused: false, source: null });
   });
 });

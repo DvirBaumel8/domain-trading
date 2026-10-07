@@ -60,7 +60,10 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     const run = (await loadRun(conn, set.run_id))!;
     if (run.status === 'running' && (!run.heartbeat_at || deps.now() - run.heartbeat_at.getTime() > HEARTBEAT_STALE_MS)) worker.kick(run.id);
     let status = set.status;
-    if (status === 'computing' && run.status !== 'running') {
+    if (status === 'computing' && run.status === 'cancelled') {
+      await conn.updateTable('test_sets').set({ status: 'cancelled' }).where('name', '=', set.name).where('status', '=', 'computing').execute();
+      status = 'cancelled';
+    } else if (status === 'computing' && run.status !== 'running') {
       await conn.updateTable('test_sets').set({ status: 'ready' }).where('name', '=', set.name).where('status', '=', 'computing').execute();
       status = 'ready';
     }
@@ -202,6 +205,19 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     };
   });
 
+  app.post<{ Params: { name: string } }>('/selection/test-sets/:name/cancel', async (req) => {
+    const body = z.object({ reason: z.string().trim().min(1).max(200).optional() }).strict().parse(req.body ?? {});
+    const set = await db.selectFrom('test_sets').selectAll().where('name', '=', req.params.name).executeTakeFirst();
+    if (!set) throw new AppError(404, 'TEST_SET_NOT_FOUND', `No test set "${req.params.name}"`);
+    const done = await worker.cancel(set.run_id, req.auth!.name, body.reason);
+    if (!done) {
+      const st = (await loadRun(db, set.run_id))!.status;
+      throw new AppError(409, 'RUN_NOT_RUNNING', `The run of ${set.name} is ${st}, not running; only a running set can be cancelled`, { status: st, run_id: set.run_id });
+    }
+    await db.updateTable('test_sets').set({ status: 'cancelled' }).where('name', '=', set.name).where('status', '=', 'computing').execute();
+    return { name: set.name, status: 'cancelled' as const, run_id: set.run_id, cancelled_at: done.cancelled_at.toISOString(), cancelled_by: req.auth!.name };
+  });
+
   app.post<{ Params: { name: string } }>('/selection/test-sets/:name/seal', async (req, reply) => {
     z.object({}).strict().parse(req.body ?? {});
     const out = await db.transaction().execute(async (trx) => {
@@ -211,7 +227,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
       if (set.purpose !== 'new') throw new AppError(409, 'TEST_SET_NOT_SEALABLE', 'Only a test set with purpose new can be sealed; a rescore set registers nothing');
       if (set.status === 'sealed') throw new AppError(409, 'TEST_SET_ALREADY_SEALED', `${set.name} is already sealed`, { sealed_at: set.sealed_at!.toISOString() });
       const { status, run } = await refresh(trx, set);
-      if (status !== 'ready') throw new AppError(409, 'TEST_SET_NOT_READY', 'The back-test run has not finished; poll GET /selection/test-sets/' + set.name, { run_id: run.id, run_status: run.status });
+      if (status !== 'ready') throw new AppError(409, 'TEST_SET_NOT_READY', 'The back-test run has not finished; poll GET /selection/test-sets/' + set.name, { run_id: run.id, run_status: run.status, status });
       const rows = (await trx.selectFrom('test_set_rows').selectAll().where('set_name', '=', set.name).where('kept', '=', true).orderBy('id').execute());
       const taken = await trx.selectFrom('labelled_names').select(['domain', 'role']).where('domain', 'in', rows.map((r) => r.domain)).execute();
       if (taken.length > 0) {
