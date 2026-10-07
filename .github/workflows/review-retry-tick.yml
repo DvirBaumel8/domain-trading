@@ -1,0 +1,31 @@
+name: review-retry-tick
+
+# CR-011 addendum C: one short `tick` a day at 07:30 UTC (10:30 IDT, after Google's
+# free-tier daily reset) so `reviewRetry` can retry a review that got a 429 at 03:05 IDT.
+# The Cloudflare account is at the Workers Free limit of 5 cron triggers, so this
+# schedule lives here (free). It calls the API exactly like the Worker does.
+on:
+  schedule:
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: vars.API_BASE_URL != ''
+    steps:
+      - name: POST /jobs/run tick
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          JOB_TRIGGER_TOKEN: ${{ secrets.JOB_TRIGGER_TOKEN }}
+        run: |
+          test -n "$JOB_TRIGGER_TOKEN" || { echo "JOB_TRIGGER_TOKEN repo secret is empty"; exit 1; }
+          ms=$(( $(date -u -d "$(date -u +%Y-%m-%d) 07:30:00" +%s) * 1000 ))
+          # wake the free instance first (cold start), then run the job
+          curl -s -o /dev/null --max-time 90 "$API_BASE_URL/health/ping" || true
+          code=$(curl -s -o out.json -w '%{http_code}' --max-time 300 -X POST "$API_BASE_URL/jobs/run" \
+            -H "Authorization: Bearer $JOB_TRIGGER_TOKEN" -H 'Content-Type: application/json' \
+            -H "Idempotency-Key: tick-$ms" -d '{"job":"tick"}')
+          echo "HTTP $code"; head -c 2000 out.json; echo
+          test "$code" = 200
