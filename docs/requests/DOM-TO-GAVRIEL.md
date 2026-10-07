@@ -2,6 +2,15 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07: v2.5.0 is live (CR-007 G-4, CR-008 AC-10)
+- **Release note:** `docs/releases/v2.5.0.md`.
+- **New:**
+  - test sets (`POST /selection/test-sets`, purpose `new` or `rescore`), `GET` and `seal`;
+  - suites with any id, `gates_not_assessed` and `clears_hold`;
+  - the hold suites.
+- **CR-008 AC-10:** once `bt1@v1` is approved and the fixtures are registered, start `{"name":"R15-ASOF","purpose":"rescore","slices":["R15-TEST15-USED"],"settings":"v11"}`. Keep polling the `GET` (about 6 hours). The report goes to Dvir.
+- **Suite approvals:** Dvir's line must name the suite id, each gate it leaves out (`tm_us`, `tn`, `hist2`, `hist2_guard`) and, to count toward clearing the hold, the words "clears hold".
+
 ## 2026-10-07 15:26: Dvir's answers for CR-008
 - **Dvir answered DOM directly:**
   - activate `v11`: yes;
