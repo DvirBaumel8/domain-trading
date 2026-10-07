@@ -174,7 +174,7 @@ function isUsd(n: number): boolean {
   }
 }
 
-const CompSchema = z.object({
+export const CompSchema = z.object({
   domain: z.string().trim().min(3).max(253),
   price_usd: z.number().refine(isUsd, 'a positive USD amount with at most 2 decimals'),
   sold_on: z.string().regex(DATE),

@@ -47,6 +47,10 @@ export interface JobRunnerDeps {
   portfolioCheckJob?: Runnable;
   /** Daily registry check of the kept names of the uploaded drop lists (CR-007 §22 G-2); while undefined, that step reports skipped. */
   dropWatchJob?: Runnable;
+  /** Screens the queued scout names and the drop-list names about to drop in one full-plan run (CR-012 part C); while undefined, that step reports skipped. */
+  intakeScreeningJob?: Runnable;
+  /** Builds the day's candidate list after the intake run has finished (CR-012 part B); while undefined, that step reports skipped. */
+  buildDailyListJob?: Runnable;
   /** Freezes cohorts and checks their drop and re-registration outcomes (CR-007 §22 G-1); while undefined, that step reports skipped. */
   cohortOutcomesJob?: Runnable;
   /** Resumes stalled screening runs (CAP-20); its summary is {resumed[], finalized[]}. */
@@ -161,6 +165,10 @@ export class JobRunner {
     steps.portfolioCheck = pc ? await this.step(() => pc.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'portfolio check not configured' } };
     const dw = this.deps.dropWatchJob;
     steps.dropWatch = dw ? await this.step(() => dw.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'drop watch not configured' } };
+    const is = this.deps.intakeScreeningJob;
+    steps.intakeScreening = is ? await this.step(() => is.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'intake screening not configured' } };
+    const bl = this.deps.buildDailyListJob;
+    steps.buildDailyList = bl ? await this.step(() => bl.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'daily list not configured' } };
     const co = this.deps.cohortOutcomesJob;
     steps.cohortOutcomes = co ? await this.step(() => co.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'cohort outcomes not configured' } };
     const ref = this.deps.referenceRefresh;

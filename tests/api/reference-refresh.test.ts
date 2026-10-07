@@ -46,7 +46,7 @@ describe('referenceRefresh (daily step)', () => {
     serve(() => csv);
     const adapter = new FakeAdapter('porkbun');
     const r = await daily(adapter);
-    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
+    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
     expect(r.steps.referenceRefresh).toMatchObject({
       ok: true,
       summary: { popularity: { list_id: 'majestic-2026-10-06', list_date: '2026-10-06', rows: 1000, malformed_skipped: 0 }, namebio: { skipped: true, reason: 'SOURCE_DISABLED' }, iana: { refreshed: true }, pruned: 0, errors: [] },

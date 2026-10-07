@@ -18,6 +18,12 @@ describe('admin CLI', () => {
     expect(JSON.stringify(rows)).not.toContain(token);
   });
 
+  it('V214 token create accepts --scope intake (v2.14.0)', async () => {
+    const { stdout } = await cli(['token', 'create', '--scope', 'intake', '--name', 'scout-cli']);
+    expect(stdout).toContain('(intake, "scout-cli")');
+    expect((await db.selectFrom('api_tokens').select('scope').executeTakeFirstOrThrow()).scope).toBe('intake');
+  });
+
   it('token list shows tokens without hashes; token revoke revokes', async () => {
     await cli(['token', 'create', '--scope', 'write', '--name', 'gavriel-write']);
     const list = (await cli(['token', 'list'])).stdout;
@@ -36,7 +42,7 @@ describe('admin CLI', () => {
   it('doctor reports DB, migrations and adapters and never prints a secret', async () => {
     const { stdout } = await cli(['doctor']);
     expect(stdout).toMatch(/db: ok/);
-    expect(stdout).toMatch(/migrations: 19 applied/);
+    expect(stdout).toMatch(/migrations: 20 applied/);
     expect(stdout).toMatch(/porkbun: enabled/);
     for (const secret of ['pk1_', 'sk1_', 'fake_godaddy_pat', 'github_pat_fake', ':dt@']) {
       expect(stdout).not.toContain(secret);

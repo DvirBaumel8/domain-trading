@@ -6,6 +6,10 @@ import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { HistoryManual, TmManual } from '../screening/checks/manual.js';
+import { ymd } from './drop-lists.js';
+import { todayIdt } from '../drops/drop-lists.js';
+import { DAILY_LIST_DEFAULT_LIMIT, DAILY_LIST_MAX_LIMIT, readDailyList } from '../screening/daily-list.js';
+import { IntakeBody, takeIntake } from '../screening/intake.js';
 import { RECORD_FRESH_DAYS, RECORD_KINDS, freshUntil, isFresh, type RecordKind } from '../screening/domain-records.js';
 
 /** The record shapes are exactly the manual shapes (the same zod schemas as POST /screening/runs/{id}/manual). */
@@ -17,10 +21,24 @@ const Body = z.object({
   kind: z.enum(RECORD_KINDS), record: z.unknown(), checked_by: z.string().trim().min(1).max(80),
   evidence_url: z.string().url().max(500).refine((u) => u.startsWith('https://'), 'an https URL').optional(), note: z.string().max(500).optional(),
 }).strict();
+const DailyQuery = z.object({ date: ymd.optional(), limit: z.coerce.number().int().min(1).max(DAILY_LIST_MAX_LIMIT).default(DAILY_LIST_DEFAULT_LIMIT) }).strict();
 const Query = z.object({ kind: z.enum(RECORD_KINDS).optional() }).strict();
 
 export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): void {
   const { db } = deps;
+
+  // v2.14.0 (CR-012 part C): a scout sends names. WRITE or intake token (the scope hook allows an intake token on this route and on POST /selection/drop-lists only).
+  app.post('/candidates/intake', { bodyLimit: 512 * 1024 }, async (req) => {
+    const body = IntakeBody.parse(req.body ?? {});
+    return takeIntake(db, body, { tokenName: req.auth!.name, auditId: req.auditId ?? null, now: new Date(deps.now()) });
+  });
+
+  // v2.14.0 (CR-012 part B): the day's candidate list, as built once by the daily step (newest build of the day).
+  app.get('/candidates/daily', async (req) => {
+    const q = DailyQuery.safeParse(req.query ?? {});
+    if (!q.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid query: date (YYYY-MM-DD) and limit (1..25) are the only parameters', { issues: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
+    return readDailyList(db, q.data.date ?? todayIdt(deps.now()), q.data.limit);
+  });
 
   app.post<{ Params: { domain: string } }>('/candidates/:domain/records', async (req, reply) => {
     const domain = normalizeDomain(req.params.domain);

@@ -159,8 +159,17 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
   });
 }
 
+/** v2.14.0 (CR-012 T12-18): the only routes an `intake` token may call (all POST). Everything else, GETs included, is 403 SCOPE_FORBIDDEN. */
+export const INTAKE_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake', '/selection/drop-lists']);
+
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
+    if (req.auth?.scope === 'intake' && !req.jobAuth) {
+      if (req.method !== 'POST' || !INTAKE_ROUTES.has(req.routeOptions?.url ?? '')) {
+        throw new AppError(403, 'SCOPE_FORBIDDEN', 'An intake token may only call POST /candidates/intake and POST /selection/drop-lists');
+      }
+      return;
+    }
     // POST /jobs/run: the job-trigger bearer, or a WRITE token (CR-007 T-2). A READ token is refused like any other credential.
     if (isJobRoute(req) && !req.jobAuth && req.auth?.scope !== 'write') throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
     if (req.jobAuth) return; // authenticated by the job-trigger bearer, no API-token scope

@@ -55,6 +55,8 @@ import { DropJob } from './jobs/drop.js';
 import { ReferenceRefreshJob } from './jobs/reference-refresh.js';
 import { PriceScheduleJob } from './jobs/price-schedule.js';
 import { registerJobs } from './api/jobs.js';
+import { IntakeScreeningJob } from './screening/intake.js';
+import { BuildDailyListJob } from './screening/daily-list.js';
 import { JobRunner, type BackupExport } from './jobs/runner.js';
 import { Reconciler } from './services/reconciler.js';
 
@@ -68,6 +70,8 @@ declare module 'fastify' {
     registrarCheckJob: RegistrarCheckJob;
     portfolioCheckJob: PortfolioCheckJob;
     dropWatchJob: DropWatchJob;
+    intakeScreeningJob: IntakeScreeningJob;
+    buildDailyListJob: BuildDailyListJob;
     cohortOutcomesJob: CohortOutcomesJob;
     referenceRefreshJob: ReferenceRefreshJob;
     jobRunner: JobRunner;
@@ -96,6 +100,8 @@ export interface AppDeps {
   holdoutCheck?: HoldoutCheck;
   /** Test-only: the screening worker stops (as if killed) after this many results of its first execution. */
   screeningStopAfterResults?: number;
+  /** Test-only: how long buildDailyList waits for the day's intake run (default 20 minutes). */
+  dailyListWaitMs?: number;
   /** Test-only: replaces the screening checks' outside access (RDAP, DNS, fetch). Production passes nothing. */
   screening?: Partial<Omit<ScreeningDeps, 'checkService'>>;
 }
@@ -197,6 +203,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: screeningDeps.rdapLookup, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('dropWatchJob', new DropWatchJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
+  app.decorate('intakeScreeningJob', new IntakeScreeningJob({ db: deps.db, worker: screeningWorker, now: deps.now ?? Date.now }));
+  app.decorate('buildDailyListJob', new BuildDailyListJob({ db: deps.db, worker: screeningWorker, now: deps.now ?? Date.now, waitMs: deps.dailyListWaitMs }));
   app.decorate('cohortOutcomesJob', new CohortOutcomesJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
@@ -204,7 +212,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
+    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
     outsideReview: async () => {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: (deps.now ?? Date.now)() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;

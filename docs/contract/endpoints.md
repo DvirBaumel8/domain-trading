@@ -1,4 +1,4 @@
-# Endpoints (contract v2.13.0)
+# Endpoints (contract v2.14.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -38,6 +38,8 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | GET | `/posts`, `/posts/{id}/images/{part}/{position}` | READ | Posting to X |
 | GET | `/media/{token}` | none (public) | Posting to X |
 | POST | `/candidates/{domain}/records` | WRITE | Candidates |
+| POST | `/candidates/intake` | WRITE or intake | Candidates |
+| GET | `/candidates/daily` | READ | Candidates |
 | GET | `/candidates/{domain}/records` | READ | Candidates |
 
 ---
@@ -672,6 +674,12 @@ WRITE. `{day (today or later, IDT), cap (2–5)}` → **201**. Phase 1's five po
 
 ### `POST /candidates/{domain}/records`
 WRITE. Body (strict) `{kind: tm_us|history, record (exactly the manual record shape of `POST /screening/runs/{id}/manual` for that check), checked_by, evidence_url?, note?}` → **201** `{id, domain, kind, created_at, fresh_until}`. Append-only. `POST /screening/runs/{id}/manual` for `tm_us` and `history` also writes a domain record (with `source_run_id`). **Freshness:** `tm_us` 30 days, `history` 180 days, from `checked_at` (constants). **Reuse:** a live screening run of the domain uses its newest fresh record exactly as a manual row would (same conversion, the A1 prior-name rules and the brand / big-company guard included; the result is an automatic row with `fields.domain_record_id`). A manual row in the run still outranks it; while `sources.wayback` is on, the automated history check runs and never reads a record (an automated FAIL is never outranked); backtest runs never use records; a stale record counts as missing (MANUAL_REQUIRED). **Errors:** 422 `VALIDATION_ERROR` · 422 `DOMAIN_INVALID`.
+
+### `POST /candidates/intake`
+WRITE or **intake** (2.14.0, CR-012 part C). Scouts send names; the daily run screens them. Body (strict, limit 512 KB) `{names (1–100): [{domain, lane: S2|S3|S4|S6|S7, source (1–120), note? (≤ 500), comps? (2–3, the `/buy` comps shape; a bad one is 422 `COMPS_INVALID`)}]}`. **200** `{accepted: [{domain, intake_id}], duplicates: [{domain, first_intake_id}], removed: [{domain, reason}]}`. Removed: `DOMAIN_INVALID`, `NOT_COM`, `HAS_DIGIT`, `HAS_HYPHEN`, `TOO_MANY_WORDS` (more than 3 words by the `bt1@v2` split), `OWNED` (owned or being bought), `DUPLICATE_IN_UPLOAD`. A name taken in during the last **30 days** is a `duplicate` (its new source is still recorded). The audit row names the token.
+
+### `GET /candidates/daily`
+READ (2.14.0, CR-012 part B). Query `date?` (IDT day, default today), `limit?` (default 10, at most 25). The day's list is **built once by the daily run** (step `buildDailyList`, ready by about 03:30 IDT) and stored, so reads agree; a later rebuild that day keeps the first order, adds new names, and marks changes (`changed_since_first: {reason: STATE_CHANGED, changes}`; names that dropped out are in `sections.removed_since_first`). Before any build: 200 with empty `entries` and `summary.not_built: true`. **Entries** (never padded): names with final status `buy_candidate` or `would_buy` from a full-plan live run on the active settings in the last **72 hours**, no FAIL and no gating UNKNOWN, fresh `tm_us` and `history` records, not owned. **Order:** exact tier first, then the money ratio at the floor (high first), then the score, then arrival. **Entry:** `{domain, rank, run_id, settings_version, lane, sources: [{source, received_at, token_name}], price: {registrar, first_year, renewal, quoted_at}, plan: {bin, floor, min_offer} (current pricing settings; never the walk-away), checks: [{check, status, reason_code}], flags, records: {tm_us, history: {result, checked_at, checked_by, source}}, comps, dates: {expiry_or_drop, buyable_from}, why: {tier, clause, ratio_at_bin, ratio_at_floor}, would_be_blocked: [code] (every code a real /buy would refuse with today; a /buy dry run reports the first), held}`. **Sections:** `almost_ready` (only a trademark or history record missing or stale: `RECORD_MISSING` / `NO_RECORD`, with what is missing), `upcoming` (drop names expected in 0–7 days that passed everything a registered name can pass), `removed_since_first`. **Summary:** `{screened_today, failed_by_check, waiting_for_records, unknown_by_reason, partial}` (`partial` when the day's screening run was still running after 20 minutes; a run older than 72 hours is `SCREENING_TOO_OLD`). Nothing in it is an approval.
 
 ### `GET /candidates/{domain}/records`
 READ. Query `kind?`. `{domain, freshness_days: {tm_us: 30, history: 180}, records: [{id, kind, record, checked_by, checked_at, evidence_url, note, created_at, source_run_id, fresh_until, fresh}]}`, newest first.

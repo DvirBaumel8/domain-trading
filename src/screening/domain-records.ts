@@ -12,12 +12,12 @@ const DAY_MS = 86_400_000;
 export const freshUntil = (kind: RecordKind, checkedAt: Date): Date => new Date(checkedAt.getTime() + RECORD_FRESH_DAYS[kind] * DAY_MS);
 export const isFresh = (kind: RecordKind, checkedAt: Date, nowMs: number): boolean => checkedAt.getTime() <= nowMs + 60_000 && freshUntil(kind, checkedAt).getTime() > nowMs;
 
-export interface FreshRecord { id: number; record: unknown; checkedAt: Date; evidenceUrl: string | null; note: string | null }
+export interface FreshRecord { id: number; record: unknown; checkedAt: Date; evidenceUrl: string | null; note: string | null; checkedBy: string }
 
 /** The newest fresh record of `kind` for a domain, or null (a stale record counts as missing). */
 export async function freshDomainRecord(db: Kysely<Database>, domain: string, kind: RecordKind, nowMs: number): Promise<FreshRecord | null> {
   const r = await db.selectFrom('domain_records').selectAll().where('domain', '=', domain).where('kind', '=', kind)
     .where('checked_at', '>', new Date(nowMs - RECORD_FRESH_DAYS[kind] * DAY_MS)).where('checked_at', '<=', new Date(nowMs + 60_000))
     .orderBy('checked_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
-  return r ? { id: Number(r.id), record: r.record, checkedAt: r.checked_at, evidenceUrl: r.evidence_url, note: r.note } : null;
+  return r ? { id: Number(r.id), record: r.record, checkedAt: r.checked_at, evidenceUrl: r.evidence_url, note: r.note, checkedBy: r.checked_by } : null;
 }

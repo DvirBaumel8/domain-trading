@@ -497,10 +497,11 @@ describe('daily run (G-1, G-2)', () => {
     const res = await a.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: 'Bearer job_token_fake_0123456789abcdef0123456789', 'idempotency-key': 'dw-1' }, payload: { job: 'daily' } });
     expect(res.statusCode, res.body).toBe(200);
     const steps = Object.keys(res.json().steps);
-    expect(steps.slice(steps.indexOf('portfolioCheck'))).toEqual(['portfolioCheck', 'dropWatch', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
+    expect(steps.slice(steps.indexOf('portfolioCheck'))).toEqual(['portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
     expect(res.json().steps.dropWatch).toMatchObject({ ok: true, summary: { checked: 2, pending_delete: 2, left_for_next_run: 0 } });
     expect(res.json().steps.cohortOutcomes).toMatchObject({ ok: true, summary: { frozen: 0, checked: 0 } });
-    expect(adapter.calls.slice(before).every((c) => c.startsWith('findDomain'))).toBe(true);
+    // v2.14.0: the intakeScreening run also screens the two pending-delete names, and its quote check asks the registrar for a read-only `quote`; dropWatch and cohortOutcomes still only use RDAP, and nothing is ever registered.
+    expect(adapter.calls.slice(before).every((c) => c.startsWith('findDomain') || c.startsWith('quote '))).toBe(true);
     expect(await db.selectFrom('drop_list_checks').select('expected_drop_date').execute()).toEqual([{ expected_drop_date: '2026-10-23' }, { expected_drop_date: '2026-10-23' }]);
   });
 });

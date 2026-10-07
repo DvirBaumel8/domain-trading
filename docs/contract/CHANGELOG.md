@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.14.0 (2026-10-07): CR-012 parts B and C, scout intake and the daily candidate list
+MINOR, **additive**. Release note: `docs/releases/v2.14.0.md`.
+- **Token scope `intake`:** may only `POST /candidates/intake` and `POST /selection/drop-lists`.
+- **`POST /candidates/intake`:** scouts send names (30-day dedupe; owned refused).
+- **Daily steps** `intakeScreening` (at most 30 names a day, intake first, then drop names due in 7 days) and `buildDailyList`.
+- **`GET /candidates/daily`:** the day's ranked buy-ready list with sections and a summary; never the walk-away.
+- **New tables:** `candidate_intake`, `candidate_screenings`, `daily_candidate_lists` (append-only, in the backup).
+
 ## 2.13.0 (2026-10-07): CR-012 parts A, D, E, and the sibling method bt1@v3
 MINOR, **additive**. Release note: `docs/releases/v2.13.0.md`.
 - **`bt1@v3`** (Dvir approved building it): `bt1@v2` plus a general token list; 1,826 of 1,900 vectors.

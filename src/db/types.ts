@@ -6,7 +6,7 @@ type Timestamp = ColumnType<Date, Date | string, Date | string>;
 type TimestampDefault = ColumnType<Date, Date | string | undefined, Date | string>;
 type Json = ColumnType<unknown, string, string>; // insert/update with JSON.stringify(...)
 
-export type Scope = 'read' | 'write';
+export type Scope = 'read' | 'write' | 'intake';
 export type Category = 'geo' | 'trend' | 'b2b' | 'collision' | 'regulation' | 'buzzword' | 'other';
 export type ListingMode = 'bin' | 'offer' | 'hybrid';
 export type DomainStatus = 'pending_purchase' | 'owned' | 'listed' | 'delisted' | 'sold' | 'dropped';
@@ -411,6 +411,36 @@ export interface SelectionListsTable {
   approval_text: string | null;
 }
 
+export interface CandidateIntakeTable {
+  id: Generated<string>;
+  domain: string;
+  lane: 'S2' | 'S3' | 'S4' | 'S6' | 'S7';
+  source: string;
+  note: string | null;
+  comps: Json | null;
+  received_at: TimestampDefault;
+  token_name: string;
+  audit_id: string | null;
+  status: 'queued' | 'duplicate' | 'removed';
+  reason: string | null;
+}
+export interface CandidateScreeningsTable {
+  id: Generated<string>;
+  intake_id: string | null;
+  domain: string;
+  origin: 'intake' | 'drop_list';
+  run_id: string;
+  day: DateString;
+  at: TimestampDefault;
+}
+export interface DailyCandidateListsTable {
+  id: Generated<string>;
+  day: DateString;
+  built_at: TimestampDefault;
+  entries: Json;
+  sections: Json;
+  summary: Json;
+}
 export interface DomainRecordsTable {
   id: Generated<string>;
   domain: string;
@@ -911,6 +941,9 @@ export interface Database {
   selection_lists: SelectionListsTable;
   sibling_method_approvals: SiblingMethodApprovalsTable;
   domain_records: DomainRecordsTable;
+  candidate_intake: CandidateIntakeTable;
+  candidate_screenings: CandidateScreeningsTable;
+  daily_candidate_lists: DailyCandidateListsTable;
   screening_evidence: ScreeningEvidenceTable;
   screening_runs: ScreeningRunsTable;
   tranches: TranchesTable;
