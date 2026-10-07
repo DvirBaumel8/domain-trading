@@ -15,3 +15,7 @@ Formats: `en-scowl-60.txt` is one lowercase a-z word per line (length >= 2, sort
 ## Place names that are also dictionary words
 
 Common English words are also place names in the Census gazetteer (Dent, Lime, Mobile), and SCOWL in turn contains most big city names (Chicago, Tulsa). The lexicon (`buildLexicon`) therefore types such a name as a **city** only if it is in the selection settings `form.city_word_allowlist` (or in the versioned `city_extra` list); otherwise it stays a dictionary word. This is what stops `dentstorm`, `limemob` and `mobilelawyer` from becoming "city + trade" names. The v1 allowlist holds the 126 major cities of the CR-001 reference lexicon that the dictionary also contains (chicago, tulsa, phoenix, austin, dallas ...), minus names that are mostly common words (mobile, bend, mesa, boulder, buffalo, garland, chandler, providence, aurora, aspen, reno, carson). Dvir changes it with a settings draft and an approved activation (`docs/contract/selection.md`).
+
+## bt1/
+
+`bt1/bt1_pools_v1.json` is the frozen word pools of the sibling method `bt1@v1` (CR-008 Appendix B), copied unchanged from `docs/requests/CR-008-reference/bt1_pools_v1.json`. sha256 `a984b85e06ed79cf972590518214ccd35c6ea12887a8e08d8a5e807e1a7df48b`, checked every time `src/screening/siblings.ts` loads it (it throws on a difference). The order of each pool and the duplicate `cyber` in `tech` are part of the method. Changing a word needs a new method version (a new file and a new approval), never an edit of this file.

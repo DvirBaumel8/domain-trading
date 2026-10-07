@@ -17,6 +17,8 @@ import {
   LABEL_RE, LANES, activate, deepEqual, activeSelectionSettings, createDraft, listSelectionVersions, selectionSettingsByLabel,
   type HoldoutCheck, type SelectionValuesT,
 } from '../screening/settings.js';
+import { approveMethod, methodApproval, methodSha, splitOfDomain } from '../screening/sibling-methods.js';
+import { KNOWN_METHODS, isKnownMethod, loadPools, siblingsBt1 } from '../screening/siblings.js';
 import { evaluateTier, type TierFeatures } from '../screening/tier.js';
 import {
   GATE_KEYS, cell, csvToUploadRow, decideHoldoutRow, decideReplayRow, gateContext, holdoutCheck as replayHoldoutCheck, laneOf, leakageLint, missingGates,
@@ -188,6 +190,36 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       createdBy: req.auth!.name, auditId: req.auditId!, settings: active.values, approvalText,
     });
     return reply.code(201).send(r);
+  });
+
+  // CR-008 C-2: the frozen sibling method (read: pools, approval, siblings for a name or a split; approve: Dvir's line naming the version).
+  const MethodQuery = z.object({ domain: z.string().min(1).max(253).optional(), tokens: z.string().min(1).max(300).optional() }).strict();
+  app.get<{ Params: { method: string } }>('/selection/sibling-methods/:method', async (req) => {
+    const method = req.params.method;
+    if (!isKnownMethod(method)) throw new AppError(404, 'SIBLING_METHOD_NOT_FOUND', `No sibling method "${method}"`, { known: Object.keys(KNOWN_METHODS) });
+    const q = MethodQuery.safeParse(req.query);
+    if (!q.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid query: only domain or tokens is accepted');
+    if (q.data.domain !== undefined && q.data.tokens !== undefined) throw new AppError(400, 'VALIDATION_ERROR', 'Send domain or tokens, not both');
+    let tokens: string[] | null = null;
+    if (q.data.tokens !== undefined) {
+      tokens = q.data.tokens.split(',');
+      if (tokens.length < 2 || tokens.some((t) => !/^[a-z]{1,40}$/.test(t))) throw new AppError(400, 'VALIDATION_ERROR', 'tokens must be at least 2 comma-separated lower-case words (letters only)');
+    } else if (q.data.domain !== undefined) {
+      tokens = (await splitOfDomain(db, q.data.domain, (await activeSelectionSettings(db)).values)).tokens;
+    }
+    const pools = loadPools(method);
+    const ap = await methodApproval(db, method);
+    const list = tokens === null ? null : siblingsBt1(tokens, pools);
+    return {
+      method, pools_sha256: methodSha(method), pools, approved: ap !== null, approval_text: ap?.text ?? null, approved_at: ap ? ap.approvedAt.toISOString() : null,
+      ...(tokens !== null && { siblings: { tokens, list: list!, size: list!.length } }),
+    };
+  });
+
+  app.post<{ Params: { method: string } }>('/selection/sibling-methods/:method/approve', async (req, reply) => {
+    const body = z.object({ approval_ref: Approval.nullable().optional() }).strict().parse(req.body ?? {});
+    const a = await approveMethod(db, req.params.method, body.approval_ref, now(), { createdBy: req.auth!.name, auditId: req.auditId! });
+    return reply.code(201).send({ method: req.params.method, approved: true, approval_text: a.text, approved_at: a.approvedAt.toISOString() });
   });
 
   app.post('/selection/evaluate', async (req) => {

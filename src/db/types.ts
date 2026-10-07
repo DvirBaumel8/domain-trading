@@ -411,6 +411,17 @@ export interface SelectionListsTable {
   approval_text: string | null;
 }
 
+export interface SiblingMethodApprovalsTable {
+  id: Generated<string>;
+  method: string;
+  pools_sha256: string;
+  approval_text: string;
+  approval_at: Timestamp;
+  audit_id: string | null;
+  created_by: string | null;
+  at: TimestampDefault;
+}
+
 export interface ScreeningEvidenceTable {
   id: Generated<string>;
   source: string;
@@ -644,6 +655,7 @@ export interface Database {
   sales: SalesTable;
   selection_settings: SelectionSettingsTable;
   selection_lists: SelectionListsTable;
+  sibling_method_approvals: SiblingMethodApprovalsTable;
   screening_evidence: ScreeningEvidenceTable;
   screening_runs: ScreeningRunsTable;
   tranches: TranchesTable;

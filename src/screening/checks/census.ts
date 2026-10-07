@@ -2,6 +2,9 @@
 // A sibling counts only if its RDAP creation date is strictly before `as_of` (unknown date: counted and `as_of_exact` false).
 // More than `census.max_unknown_share` unknown siblings makes the share UNKNOWN: an error is never read as "not registered".
 import { isCensusListName } from '../lists.js';
+import { methodApproval } from '../sibling-methods.js';
+import { isKnownMethod, siblingsBt1 } from '../siblings.js';
+import { formFieldsOf } from './form.js';
 import { lookupCached, pacerFor, type CachedLookup } from '../rdap-batch.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 
@@ -22,34 +25,49 @@ export const censusCheck: Check = {
     const nul = { registered_share: null, in_use_share: null };
     if (!ctx.settings.sources.rdap_com) return outcome('UNKNOWN', 'SOURCE_DISABLED', 'The .com RDAP source is switched off (sources.rdap_com)', nul);
     if (ctx.run.backtest && !ctx.item.as_of) return outcome('UNKNOWN', 'AS_OF_REQUIRED', 'A backtest or holdout run needs an as_of for every name', nul);
-    const ref = ctx.item.census_list ? REF.exec(ctx.item.census_list) : null;
-    if (!ref) return outcome('UNKNOWN', 'CENSUS_LIST_MISSING', ctx.item.census_list ? `"${ctx.item.census_list}" is not a census list reference (name or name@vN)` : 'The name has no census_list', nul);
-    const name = ref[1]!;
-    if (!isCensusListName(name)) return outcome('UNKNOWN', 'CENSUS_LIST_MISSING', `"${name}" is not a census list name`, nul);
-    let q = ctx.db.selectFrom('selection_lists').select(['name', 'version', 'terms', 'approval_text']).where('name', '=', name);
-    q = ref[2] === undefined ? q.orderBy('version', 'desc').limit(1) : q.where('version', '=', Number(ref[2]));
-    const row = await q.executeTakeFirst();
-    if (!row) return outcome('UNKNOWN', 'CENSUS_LIST_MISSING', `Census list ${ctx.item.census_list} does not exist`, nul);
-    if (!row.approval_text) return outcome('UNKNOWN', 'CENSUS_LIST_MISSING', `Census list ${name}@v${row.version} is not frozen (no approval recorded)`, nul);
-    // bt1_<sld> belongs to that name; the shared pattern lists (s6_regime_audit) are frozen for several names and carry no single owner.
-    const sld = ctx.item.domain.replace(/\.com$/, '');
-    if (name.startsWith('bt1_') && name !== `bt1_${sld}`) return outcome('UNKNOWN', 'CENSUS_LIST_MISMATCH', `Census list ${name} belongs to ${name.slice(4)}.com, not ${ctx.item.domain}`, nul);
-    const listName = `${row.name}@v${row.version}`;
+    let listName: string;
+    let listTerms: string[];
+    const extraFields: Record<string, unknown> = {};
+    if (ctx.item.census_list && isKnownMethod(ctx.item.census_list)) {
+      // CR-008 C-2: a frozen sibling method builds the 20 siblings from the name's own word split, once Dvir approved the method version.
+      const method = ctx.item.census_list;
+      if (!(await methodApproval(ctx.db, method))) return outcome('UNKNOWN', 'CENSUS_METHOD_NOT_APPROVED', `Sibling method ${method} has no approval recorded (POST /selection/sibling-methods/${method}/approve)`, { ...nul, list: method });
+      const tokens = formFieldsOf(ctx).tokens;
+      listTerms = siblingsBt1(tokens).map((l) => `${l}.com`);
+      listName = method;
+      extraFields.sibling_tokens = tokens;
+    } else {
+      const ref = ctx.item.census_list ? REF.exec(ctx.item.census_list) : null;
+      if (!ref) return outcome('UNKNOWN', 'CENSUS_LIST_MISSING', ctx.item.census_list ? `"${ctx.item.census_list}" is not a census list reference (name or name@vN)` : 'The name has no census_list', nul);
+      const name = ref[1]!;
+      if (!isCensusListName(name)) return outcome('UNKNOWN', 'CENSUS_LIST_MISSING', `"${name}" is not a census list name`, nul);
+      let q = ctx.db.selectFrom('selection_lists').select(['name', 'version', 'terms', 'approval_text']).where('name', '=', name);
+      q = ref[2] === undefined ? q.orderBy('version', 'desc').limit(1) : q.where('version', '=', Number(ref[2]));
+      const row = await q.executeTakeFirst();
+      if (!row) return outcome('UNKNOWN', 'CENSUS_LIST_MISSING', `Census list ${ctx.item.census_list} does not exist`, nul);
+      if (!row.approval_text) return outcome('UNKNOWN', 'CENSUS_LIST_MISSING', `Census list ${name}@v${row.version} is not frozen (no approval recorded)`, nul);
+      // bt1_<sld> belongs to that name; the shared pattern lists (s6_regime_audit) are frozen for several names and carry no single owner.
+      const sld = ctx.item.domain.replace(/\.com$/, '');
+      if (name.startsWith('bt1_') && name !== `bt1_${sld}`) return outcome('UNKNOWN', 'CENSUS_LIST_MISMATCH', `Census list ${name} belongs to ${name.slice(4)}.com, not ${ctx.item.domain}`, nul);
+      listName = `${row.name}@v${row.version}`;
+      listTerms = row.terms;
+    }
+    const terms = listTerms;
     const size = ctx.settings.census.sibling_count;
-    if (row.terms.length !== size) return outcome('UNKNOWN', 'CENSUS_LIST_SIZE', `Census list ${listName} has ${row.terms.length} names, not ${size}`, { ...nul, list: listName });
+    if (terms.length !== size) return outcome('UNKNOWN', 'CENSUS_LIST_SIZE', `Census list ${listName} has ${terms.length} names, not ${size}`, { ...nul, list: listName, ...extraFields });
 
     const { asOf, explicit } = asOfOf(ctx);
     const pace = pacerFor(ctx);
     const results: CachedLookup[] = [];
     let calls = 0;
-    await Promise.all(row.terms.map(async (d, i) => {
+    await Promise.all(terms.map(async (d, i) => {
       const r = await lookupCached(ctx.db, ctx.deps, d, { maxAgeHours: ctx.settings.freshness_hours.census ?? 0, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace, now: ctx.now, deadline: ctx.deadline });
       if (!r.cached && r.reasonCode !== 'TIMEOUT') calls++;
       results[i] = r;
     }));
 
     let nRegistered = 0, nUnknown = 0, undated = 0, after = 0;
-    const siblings = row.terms.map((d, i) => {
+    const siblings = terms.map((d, i) => {
       const r = results[i]!;
       if (r.outcome === 'unknown') { nUnknown++; return { domain: d, status: 'unknown', created_at: null, counted: false, reason_code: r.reasonCode }; }
       if (r.outcome === 'not_registered') return { domain: d, status: 'not_registered', created_at: null, counted: false };
@@ -65,12 +83,12 @@ export const censusCheck: Check = {
       return { domain: d, status: 'registered', created_at: created, counted: false };
     });
     const asOfExact = ctx.now() - asOf.getTime() <= ctx.settings.census.as_of_exact_max_days * DAY_MS;
-    const total = row.terms.length;
+    const total = terms.length;
     const nChecked = total - undated;
     // Nothing countable (every sibling undated) is no evidence at all: UNKNOWN, never 0 of 0 read as a share.
-    if (nChecked === 0) return outcome('UNKNOWN', 'TOO_MANY_UNKNOWN', `All ${total} siblings are undated: no registered share can be computed`, { list: listName, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: 0, n_checked: 0, n_unknown: nUnknown, registered_after_as_of_n: after, undated_excluded_n: undated, siblings, in_use_share: null, registered_share: null }, { upstreamCalls: calls, evidenceIds: [...new Set(results.map((r) => r.evidenceId).filter((x): x is number => x !== null))], dataAsOf: new Date(Math.min(...results.map((r) => r.retrievedAt.getTime()))) });
+    if (nChecked === 0) return outcome('UNKNOWN', 'TOO_MANY_UNKNOWN', `All ${total} siblings are undated: no registered share can be computed`, { list: listName, ...extraFields, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: 0, n_checked: 0, n_unknown: nUnknown, registered_after_as_of_n: after, undated_excluded_n: undated, siblings, in_use_share: null, registered_share: null }, { upstreamCalls: calls, evidenceIds: [...new Set(results.map((r) => r.evidenceId).filter((x): x is number => x !== null))], dataAsOf: new Date(Math.min(...results.map((r) => r.retrievedAt.getTime()))) });
     const fields = {
-      list: listName, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: nRegistered, n_checked: nChecked, n_unknown: nUnknown,
+      list: listName, ...extraFields, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: nRegistered, n_checked: nChecked, n_unknown: nUnknown,
       registered_after_as_of_n: after, undated_excluded_n: undated, siblings, in_use_share: null,
     };
     const extra = { upstreamCalls: calls, evidenceIds: [...new Set(results.map((r) => r.evidenceId).filter((x): x is number => x !== null))], dataAsOf: new Date(Math.min(...results.map((r) => r.retrievedAt.getTime()))) };

@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.4.0 (2026-10-07): CR-008 sibling method bt1@v1 and ext.alt_list (CR-007 G-3)
+MINOR, **additive**. Release note: `docs/releases/v2.4.0.md`.
+- **Sibling method `bt1@v1`:** `GET /selection/sibling-methods/{method}` (READ: frozen pools, approval state, the 20 siblings for a domain or a word split) and `POST /selection/sibling-methods/{method}/approve` (WRITE, Dvir's `approval_ref` naming the method, once). New codes `SIBLING_METHOD_NOT_FOUND`, `SIBLING_METHOD_ALREADY_APPROVED`. New append-only table `sibling_method_approvals` (in the data backup).
+- **Census:** an item's `census_list` may be `bt1@v1`: siblings built at run time; UNKNOWN `CENSUS_METHOD_NOT_APPROVED` before the approval. Per-name lists are unchanged.
+- **`ext.alt_list` (C-1):** an optional settings key; `ext_dates` (`alt_tld_before_n`) reads it when present, else `ext.list`. `same_name` is unchanged. Existing versions behave as before.
+
 ## 2.3.0 (2026-10-07): CR-007 operations: manual runs, token expiry, automatic Web Risk, daily portfolio check
 MINOR, **additive**. Release note: `docs/releases/v2.3.0.md`.
 - **`POST /jobs/run` with a WRITE token (T-2):** `daily` or `tick` only, at most 4 calls per hour per token, same overlap lock; `GET /jobs/runs` adds `triggered_by` (the token's name). The READ token is still refused.

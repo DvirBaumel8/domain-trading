@@ -1,4 +1,4 @@
-# Endpoints (contract v2.3.0)
+# Endpoints (contract v2.4.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -19,8 +19,8 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/sold/{domain}` | WRITE | Sales |
 | GET | `/report`, `/report/pricing-review` | READ | Reports (`reports.md`) |
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | Reads |
-| GET | `/selection/settings`, `/selection/lists/{name}`, `/selection/namebio`, `/selection/replays/{id}`, `/selection/buy-hold`, `/selection/holdout-suites` | READ | Selection (`selection.md`) |
-| POST | `/selection/settings`, `/selection/settings/{label}/activate`, `/selection/lists/{name}`, `/selection/evaluate`, `/selection/labelled-names`, `/selection/replays`, `/selection/holdout-suites` | WRITE | Selection (`selection.md`) |
+| GET | `/selection/settings`, `/selection/lists/{name}`, `/selection/sibling-methods/{method}`, `/selection/namebio`, `/selection/replays/{id}`, `/selection/buy-hold`, `/selection/holdout-suites` | READ | Selection (`selection.md`) |
+| POST | `/selection/settings`, `/selection/settings/{label}/activate`, `/selection/lists/{name}`, `/selection/sibling-methods/{method}/approve`, `/selection/evaluate`, `/selection/labelled-names`, `/selection/replays`, `/selection/holdout-suites` | WRITE | Selection (`selection.md`) |
 | POST | `/screening/runs`, `/screening/runs/{id}/manual`, `/screening/runs/{id}/verdicts`, `/quotes/manual` | WRITE | Screening |
 | GET | `/screening/runs/{id}`, `/screening/evidence/{id}` | READ | Screening |
 | POST | `/screening/packs` | WRITE | Screening packs |
@@ -334,6 +334,18 @@ WRITE. Makes a draft the active version, for runs started afterwards (a run keep
 - **Rules:** a version can be activated **once**; to bring an older version back, draft a new one based on it. Clearing the buy hold (the active version has `buy_hold: true`, the target `false`) also needs every `holdout.required_suites` suite to have passed as a **holdout-mode** replay on that target version (`POST /selection/replays`; `GET /selection/buy-hold?settings=<label>` shows the state), judged by the active version's `holdout` settings; DOM never clears the hold without the `approval_ref` as well. The activation and the check run in one transaction, after the previous activation row is locked.
 - **Errors:** 422 `APPROVAL_REQUIRED` · 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` · 404 `SETTINGS_NOT_FOUND` · 409 `SETTINGS_ALREADY_ACTIVE` · 409 `SETTINGS_ALREADY_ACTIVATED` (activated before, then replaced) · 409 `HOLDOUT_NOT_PASSED` (`details.suites`).
 
+### `GET /selection/sibling-methods/{method}`
+READ (2.4.0, CR-008). A **sibling method** builds a name's 20 census siblings from its words, the same way every time, without looking at whether a sibling is registered. The one method is **`bt1@v1`** (CR-008 Appendix B, exactly; its pools are frozen from `bt1_pools_v1.json`, sha256 `a984b85e06ed79cf972590518214ccd35c6ea12887a8e08d8a5e807e1a7df48b`). `{method}` may be sent as `bt1@v1` or `bt1%40v1`.
+- **Query (strict, optional, at most one):** `domain` (a `.com`; DOM's own word split, the `form` tokens) or `tokens` (comma-separated lower-case words, at least 2: your split). Both → 400 `VALIDATION_ERROR`.
+- **200:** `{method, pools_sha256, pools: {first_pool, last_pool, tech, trades} (in their frozen order, duplicates kept), approved: bool, approval_text: string | null, approved_at: ISO | null, siblings?: {tokens: [string], list: [label] (in order, without ".com"), size: int}}`. `siblings` is there when `domain` or `tokens` is given; `size` below 20 is shown as it is (the census then answers `CENSUS_LIST_SIZE`).
+- **Errors:** 404 `SIBLING_METHOD_NOT_FOUND` · 400 `VALIDATION_ERROR` · 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED`.
+
+### `POST /selection/sibling-methods/{method}/approve`
+WRITE (2.4.0). Dvir approves a method version **once**; after that the census accepts it for any name with no per-name approval (CR-007 G-3, CR-008 C-2). Append-only: an approval is never changed or withdrawn (a new method needs a new version).
+- **Body (strict):** `{approval_ref}`, whose text must **name the method** (`bt1@v1`; label-boundary match, as for a settings activation).
+- **201:** `{method, approved: true, approval_text, approved_at}`.
+- **Errors:** 404 `SIBLING_METHOD_NOT_FOUND` · 409 `SIBLING_METHOD_ALREADY_APPROVED` · 422 `APPROVAL_REQUIRED` / `APPROVAL_INVALID` / `APPROVAL_EXPIRED` · 422 `VALIDATION_ERROR`.
+
 ### `GET /selection/lists/{name}`
 READ. Query (strict): `version?` (integer ≥ 1; default the newest).
 - **200:** `{name, version, terms: [string], created_at, created_by}`.
@@ -542,7 +554,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
 
-**Selection errors:** `SETTINGS_NOT_FOUND`, `SETTINGS_KEY_UNKNOWN`, `SETTINGS_KEY_LOCKED`, `SETTINGS_INVALID`, `SETTINGS_NO_CHANGE`, `SETTINGS_LABEL_TAKEN`, `SETTINGS_ALREADY_ACTIVE`, `SETTINGS_ALREADY_ACTIVATED`, `HOLDOUT_NOT_PASSED`, `ROWS_INVALID`, `REPLAY_EMPTY`, `HOLDOUT_CONTAMINATED`, `AS_OF_REQUIRED`, `REPLAY_INVALID_NO_GATES`, `SUITE_NOT_DEFINED`, `SUITE_UNKNOWN`, `SUITE_ALREADY_SCORED`, `SUITE_OVERLAP`, `SUITE_EMPTY`, `SUITE_MEMBERSHIP_CHANGED`, `LABELLED_NAME_CONFLICT`, `VARIANT_NOT_PREREGISTERED`, `PROFIT_REPORT_INCOMPLETE`, `REPLAY_NOT_FOUND`, `SELECTION_SETTINGS_MISSING` (500), `SELECTION_SETTINGS_INVALID` (500), `LIST_NOT_FOUND`, `LIST_NAME_INVALID`, `LIST_TERM_INVALID`, `LIST_NO_CHANGE`, `CENSUS_LIST_SIZE`, `CENSUS_LIST_INVALID`, `FORBIDDEN_FEATURE`, `BIN_REQUIRED`. Selection warnings: `PRICING_V3_MISSING`. `APPROVAL_REQUIRED` / `APPROVAL_INVALID` / `APPROVAL_EXPIRED` also apply to an activation and to a census list.
+**Selection errors:** `SETTINGS_NOT_FOUND`, `SETTINGS_KEY_UNKNOWN`, `SETTINGS_KEY_LOCKED`, `SETTINGS_INVALID`, `SETTINGS_NO_CHANGE`, `SETTINGS_LABEL_TAKEN`, `SETTINGS_ALREADY_ACTIVE`, `SETTINGS_ALREADY_ACTIVATED`, `HOLDOUT_NOT_PASSED`, `ROWS_INVALID`, `REPLAY_EMPTY`, `HOLDOUT_CONTAMINATED`, `AS_OF_REQUIRED`, `REPLAY_INVALID_NO_GATES`, `SUITE_NOT_DEFINED`, `SUITE_UNKNOWN`, `SUITE_ALREADY_SCORED`, `SUITE_OVERLAP`, `SUITE_EMPTY`, `SUITE_MEMBERSHIP_CHANGED`, `LABELLED_NAME_CONFLICT`, `VARIANT_NOT_PREREGISTERED`, `PROFIT_REPORT_INCOMPLETE`, `REPLAY_NOT_FOUND`, `SELECTION_SETTINGS_MISSING` (500), `SELECTION_SETTINGS_INVALID` (500), `LIST_NOT_FOUND`, `LIST_NAME_INVALID`, `LIST_TERM_INVALID`, `LIST_NO_CHANGE`, `CENSUS_LIST_SIZE`, `CENSUS_LIST_INVALID`, `FORBIDDEN_FEATURE`, `BIN_REQUIRED`, `SIBLING_METHOD_NOT_FOUND`, `SIBLING_METHOD_ALREADY_APPROVED` (2.4.0). Selection warnings: `PRICING_V3_MISSING`. `APPROVAL_REQUIRED` / `APPROVAL_INVALID` / `APPROVAL_EXPIRED` also apply to an activation, a census list and a sibling method approval.
 
 **`/report` warnings:** listed with levels in `reports.md`.
 

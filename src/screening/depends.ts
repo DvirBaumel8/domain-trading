@@ -10,6 +10,7 @@ import type { CheckId } from './types.js';
  */
 export const DEPENDS_ON: Partial<Record<CheckId, CheckId[]>> = {
   history: ['availability', 'surbl', 'web_risk'],
+  census: ['form'], // a sibling-method list (bt1@v1) is built from the form check's word split
   ext_dates: ['availability', 'history'],
   tier: ['form', 'census', 'history', 'ext_dates'],
   price: ['form', 'history', 'tier', 'namebio', 'quote', 'tm_us', 'web_risk', 'tm_eu', 'same_name', 'concentration'],

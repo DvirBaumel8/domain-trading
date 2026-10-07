@@ -20,6 +20,8 @@ const TIERS = ['A', 'I', 'B', 'G'] as const;
 const OPS = ['>=', '<=', '>', '<', '==', '!='] as const;
 /** Dotted paths under which a new key may be added (a map, not a fixed object). */
 const OPEN_MAPS = ['thresholds', 'tier.clauses', 'run.gates', 'freshness_hours'];
+/** Optional keys a draft may add although the base document lacks them (v2.4.0: `ext.alt_list`). */
+const OPEN_PATHS = ['ext.alt_list'];
 
 type CheckIdT = (typeof CHECK_IDS)[number]; // local alias: settings.ts must not import types.ts (types.ts imports settings.ts)
 type Lane = (typeof LANES)[number];
@@ -106,7 +108,11 @@ const Base = z.object({
     strong_action: action, weak_action: action, redirect_action: action, forsale_action: action, parked_action: action,
   }).strict(),
   census: z.object({ sibling_count: int.positive(), max_unknown_share: share, as_of_exact_max_days: int }).strict(),
-  ext: z.object({ list: z.array(z.string().regex(/^[a-z]{2,10}$/)) }).strict(),
+  /** `alt_list` (v2.4.0, CR-008 C-1): optional; when present `ext_dates` (alt_tld_before_n) reads it instead of `list`. `same_name` always reads `list`. */
+  ext: z.object({
+    list: z.array(z.string().regex(/^[a-z]{2,10}$/)),
+    alt_list: z.array(z.string().regex(/^[a-z]{2,10}$/)).min(1).optional(),
+  }).strict(),
   tier: z.object({
     order: z.array(z.enum(TIERS)).min(1),
     clauses: z.partialRecord(z.enum(TIERS), Clause),
@@ -230,6 +236,7 @@ export const SelectionValues = Base.superRefine((v, ctx) => {
       }
     });
   }
+  if (v.ext.alt_list && new Set(v.ext.alt_list).size !== v.ext.alt_list.length) bad(['ext', 'alt_list'], 'ext.alt_list must not repeat an extension');
   for (const id of v.run.feature_checks) {
     if (!isCheckId(id)) bad(['run', 'feature_checks'], `unknown check id "${id}"`);
     else if (!(FEATURE_CHECK_IDS as readonly string[]).includes(id)) bad(['run', 'feature_checks'], `"${id}" is not a feature check (only ${FEATURE_CHECK_IDS.join(', ')} may be feature checks)`);
@@ -428,7 +435,7 @@ function setPath(doc: Record<string, unknown>, path: string, value: unknown): vo
       if (last) cur[idx] = value;
       else cur = cur[idx];
     } else if (isObj(cur)) {
-      if (!(seg in cur) && !OPEN_MAPS.includes(here)) throw new AppError(422, 'SETTINGS_KEY_UNKNOWN', `Unknown settings path: ${path}`, { path });
+      if (!(seg in cur) && !OPEN_MAPS.includes(here) && !OPEN_PATHS.includes(here ? `${here}.${seg}` : seg)) throw new AppError(422, 'SETTINGS_KEY_UNKNOWN', `Unknown settings path: ${path}`, { path });
       if (last) cur[seg] = value;
       else cur = cur[seg];
     } else throw new AppError(422, 'SETTINGS_KEY_UNKNOWN', `Unknown settings path: ${path}`, { path });

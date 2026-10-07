@@ -10,7 +10,7 @@ import { toCsv } from '../services/export.js';
 export const TABLE_FILES = [
   'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'listing_history', 'quotes', 'price_schedule',
   'pricing_evidence', 'offers', 'export_runs', 'export_uploads', 'registrar_presence',
-  'selection_settings', 'selection_lists', 'screening_evidence', 'screening_runs', 'screening_results', 'screening_verdicts', 'screening_packs', 'manual_quotes',
+  'selection_settings', 'selection_lists', 'sibling_method_approvals', 'screening_evidence', 'screening_runs', 'screening_results', 'screening_verdicts', 'screening_packs', 'manual_quotes',
   'tranches', 'tranche_members',
 ] as const;
 type Row = Record<string, unknown>;

@@ -322,7 +322,7 @@ describe('same-run recompute after a manual history record', () => {
   });
 
   it('DEPENDS_ON and staleChecks: chain staleness, manual never stale, newer dependency only', () => {
-    expect(Object.keys(DEPENDS_ON).sort()).toEqual(['ext_dates', 'history', 'price', 'tier', 'tm_us']);
+    expect(Object.keys(DEPENDS_ON).sort()).toEqual(['census', 'ext_dates', 'history', 'price', 'tier', 'tm_us']);
     const row = (check_id: CheckId, id: number, source: 'auto' | 'manual' | 'cache' = 'auto') => [check_id, { id, check_id, source } as ResultRow] as const;
     const plan: CheckId[] = ['form', 'history', 'ext_dates', 'tier', 'price'];
     const latest = new Map([row('form', 1), row('history', 9, 'manual'), row('ext_dates', 3), row('tier', 4), row('price', 5)]);

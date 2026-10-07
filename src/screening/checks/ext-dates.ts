@@ -50,7 +50,8 @@ export const extDatesCheck: Check = {
     const hist = ctx.latest('history')?.fields;
     const histPrior = hist?.com_prior_registration;
     const comPrior = histPrior === 'yes' || histPrior === 'no' ? histPrior : hist?.prior_history === 1 ? 'yes' : hist?.prior_history === 0 ? 'no' : 'unknown';
-    const list = ctx.settings.ext.list;
+    // CR-008 C-1: `ext.alt_list` (when the version has one) is the only list this feature counts; an absent key reads `ext.list`.
+    const list = ctx.settings.ext.alt_list ?? ctx.settings.ext.list;
     let calls = 0;
     const evidence: number[] = [];
 
