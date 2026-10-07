@@ -281,4 +281,5 @@ Gavriel's scripts for each item, for reference only. They contain shortcuts and 
 This includes G-3: a sibling (look-alike) method version that Dvir approves once replaces his approval of each list. That changes CR-001 §2. The other DVIR points (G-4c suites that clear the hold, G-4d the rule for manual gates) still come back to Dvir after DOM's reply.
 
 Web Risk key: already stored by Dvir as `GOOGLE_WEB_RISK_API_KEY` on the Render service `domain-trading-api` (§11).
+USPTO key: Dvir is getting it now from the USPTO Open Data Portal and will store it as `USPTO_API_KEY` on the same Render service. Gavriel will note in this file when it is there.
 
