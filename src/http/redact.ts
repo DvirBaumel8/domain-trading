@@ -10,3 +10,20 @@ export function redact(value: unknown, depth = 0): unknown {
   }
   return value;
 }
+
+const FREE_TEXT_KEYS = new Set(['text', 'term', 'note', 'reason']);
+
+/**
+ * v2.10.0: bodies of /company/* and /reviews/* carry free text (a document, a forbidden term, review items) that the block list may
+ * refuse because it holds a secret, an address or a listed term. The audit row keeps the shape and the length, never the text.
+ */
+export function redactFreeText(value: unknown, depth = 0): unknown {
+  if (depth > 10) return '[TRUNCATED]';
+  if (Array.isArray(value)) return value.map((v) => redactFreeText(v, depth + 1));
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = FREE_TEXT_KEYS.has(k) && typeof v === 'string' ? `[TEXT ${v.length} chars]` : redactFreeText(v, depth + 1);
+    return out;
+  }
+  return value;
+}

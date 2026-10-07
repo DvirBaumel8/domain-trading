@@ -16,6 +16,8 @@ const LIVE = ['owned', 'listed', 'delisted'] as const;
 const DAY = 86_400_000;
 /** LANDER_DOWN turns from warn to error when the lander failed on this many different IDT days in a row (CR-007 G-5). */
 export const LANDER_DOWN_ERROR_DAYS = 2;
+/** REVIEW_OVERDUE is raised when the newest review feedback is older than this (CR-011 part B). */
+export const REVIEW_OVERDUE_HOURS = 36;
 const RANK: Record<WarningLevel, number> = { error: 0, warn: 1, info: 2 };
 
 export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<ReportWarning[]> {
@@ -30,6 +32,11 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     add('JOB_OVERDUE', 'error', `No daily job run has finished in the last ${JOBS_OVERDUE_HOURS} hours.`, undefined, {
       job: 'daily', last_run_at: overdue.lastRunAt ? toJerusalemIso(overdue.lastRunAt) : null, expected_every: '24h',
     });
+  }
+  // CR-011 part B: once any review feedback exists, the newest must not be older than REVIEW_OVERDUE_HOURS.
+  const lastFeedback = await db.selectFrom('review_feedback').select('created_at').orderBy('created_at', 'desc').limit(1).executeTakeFirst();
+  if (lastFeedback && now.getTime() - lastFeedback.created_at.getTime() > REVIEW_OVERDUE_HOURS * 3_600_000) {
+    add('REVIEW_OVERDUE', 'warn', `No review feedback has been recorded for over ${REVIEW_OVERDUE_HOURS} hours.`, undefined, { last_feedback_at: toJerusalemIso(lastFeedback.created_at) });
   }
   const domains = await db.selectFrom('domains').selectAll().where('status', '!=', 'pending_purchase').orderBy('domain').execute();
   const nameOf = new Map(domains.map((d) => [d.id, d.domain]));

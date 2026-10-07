@@ -1,4 +1,4 @@
-# Endpoints (contract v2.9.0)
+# Endpoints (contract v2.10.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -30,6 +30,10 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/jobs/run` | job token | Jobs (`jobs.md`) |
 | GET | `/jobs/runs` | READ | Jobs (`jobs.md`) |
 | POST | `/jobs/preview` | WRITE | Jobs (`jobs.md`) |
+| POST | `/company/document`, `/company/forbidden-terms` | WRITE | Company and reviews |
+| GET | `/company/document/versions`, `/company/document/versions/{n}`, `/company/forbidden-terms` | READ | Company and reviews |
+| POST | `/reviews/packet`, `/reviews/{packet_id}/feedback`, `/reviews/items/{id}/status` | WRITE | Company and reviews |
+| GET | `/reviews/packets/{id}`, `/reviews/items`, `/reviews/cost` | READ | Company and reviews |
 
 ---
 
@@ -580,6 +584,44 @@ The arrays are the `applied`, `superseded`, `held`, `delisted`, `cancelled`, `fa
 
 ---
 
+## Company and reviews
+2.10.0, CR-011 part B. The daily outside review. **DOM never calls an AI** (founder rule 9): Gavriel sends the packet to the reviewer and posts the answer back. Request texts on these routes (`text`, `term`, `note`, `reason`) are stored in the audit row only as `[TEXT n chars]`.
+
+**Block list.** Every text these routes take, and every packet, is checked first. A match is 422 `TEXT_BLOCKED` with `details.category` only (`secret`: a value DOM keeps as a secret, a DOM token shape or a common key shape; `email`; `phone`: 9 or more digits, dates and money excepted; `listed_term`: a forbidden term), **never the matched text**.
+
+### `POST /company/document`
+WRITE. Body (strict) `{text}` (Markdown, 1 to 65,536 characters). A text equal to the latest version → **200** `{version, sha256, created_at, changed: false}`; otherwise a new version → **201** `{version, sha256, created_at, changed: true}`. Returning to an older text makes a new version. **Errors:** 422 `TEXT_BLOCKED` · 422 `VALIDATION_ERROR`.
+
+### `GET /company/document/versions`
+READ. `{versions: [{version, sha256, created_at, created_by, bytes}]}`, newest first.
+
+### `GET /company/document/versions/{n}`
+READ. `{version, sha256, created_at, text, diff}`; `diff` is a unified diff against version n−1 (null for version 1). 404 `DOCUMENT_VERSION_NOT_FOUND`.
+
+### `POST /company/forbidden-terms`
+WRITE. Body (strict) `{term (2–200 characters), category? ("listed_term")}`. **201** `{id, category, created_at}`. A term is never returned by any route.
+
+### `GET /company/forbidden-terms`
+READ. `{terms: [{id, category, created_at}]}` (no term text).
+
+### `POST /reviews/packet`
+WRITE. `preview?` (query or body, boolean). Builds what the reviewer gets: `{kind: "daily" | "weekly", generated_at, document: {version, sha256, text (in full on a weekly packet or the first one, else null), diff_since: {from_version, diff} | null}, dom_changes: {since, service_version, settings_versions[], listing_changes[], offers[], sales[], failed_job_steps[]} (each list at most the newest 200), numbers (the /report object without any walk-away field)}`. `kind` is `weekly` when no weekly packet exists from the last 7 days. The packet must pass the block list. `preview` → **200** `{preview: true, kind, content, sha256}`, nothing stored; otherwise **201** `{packet_id, kind, document_version, sha256, content}` and the packet is stored exactly as sent. **Errors:** 409 `DOCUMENT_MISSING` · 409 `REVIEW_COST_CAP` (`details.spent_usd`, `cap_usd`; a preview too) · 422 `TEXT_BLOCKED`.
+
+### `GET /reviews/packets/{id}`
+READ. The stored packet. 404 `PACKET_NOT_FOUND`.
+
+### `POST /reviews/{packet_id}/feedback`
+WRITE. Once per packet. Body (strict), either `{status: "ok", provider, model, cost_usd (0–100), items (0–50): [{category, severity: low|medium|high, text (1–2,000)}]}` or `{status: "unknown", provider, model?, cost_usd?, reason}` (the provider's status and reason, never a key). Texts pass the block list. Each item is `new` or `repeat`: compared with earlier items of the same category on their significant words (lower-case, common words dropped, numbers kept whole), a Jaccard overlap of at least 0.6 makes it a repeat of the closest (earliest on a tie) item's original. **201** `{feedback_id, items: [{id, category, severity, novelty, repeats_item_id}]}`. **Errors:** 404 `PACKET_NOT_FOUND` · 409 `FEEDBACK_EXISTS` · 422 `TEXT_BLOCKED` · 422 `VALIDATION_ERROR`.
+
+### `GET /reviews/items`
+READ. Query `view?` (`new` default: leaves out repeats of an item whose status is `rejected`; or `all`), `status?`, `limit?` (1–500, default 100). `{items: [{id, packet_id, created_at, kind, category, severity, text, novelty, repeats_item_id, status: {status, note, at} | null}]}`, newest first.
+
+### `POST /reviews/items/{id}/status`
+WRITE. Body (strict) `{status: acted|rejected|watching, note (1–500)}` (audited; the latest status counts). **201** `{item_id, status, note, at}`. 404 `REVIEW_ITEM_NOT_FOUND`.
+
+### `GET /reviews/cost`
+READ. `{month (UTC, YYYY-MM), spent_usd (the reported cost_usd summed), cap_usd (5, a constant), feedback_n, unknown_n}`.
+
 ## Code index
 Every code the service emits, by kind. Errors are `error.code`; warnings are strings in `warnings[]` (or `{code, level}` objects in `/report`, see `reports.md`).
 
@@ -598,6 +640,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Offer and sale errors:** `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `HOLD_REASON_REQUIRED`, `EXTERNAL_REF_CONFLICT`, `OFFER_NOT_FOUND`, `APPROVAL_REQUIRED`, `OUTCOME_FINAL`, `OUTCOME_TRANSITION_INVALID`, `OFFER_SOLD_MISMATCH`, `OUTCOME_CHANGED_CONCURRENTLY`, `EVIDENCE_REQUIRED`, `SOLD_AT_IN_FUTURE`, `OFFER_MISMATCH`, `NOT_SELLABLE_STATE`, `SALE_ALREADY_RECORDED`, `DEAL_NOT_FOUND`.
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
+
+**Company and review errors (2.10.0):** `TEXT_BLOCKED`, `DOCUMENT_VERSION_NOT_FOUND`, `DOCUMENT_MISSING`, `REVIEW_COST_CAP`, `PACKET_NOT_FOUND`, `FEEDBACK_EXISTS`, `REVIEW_ITEM_NOT_FOUND`.
 
 **Selection errors:** `SETTINGS_NOT_FOUND`, `SETTINGS_KEY_UNKNOWN`, `SETTINGS_KEY_LOCKED`, `SETTINGS_INVALID`, `SETTINGS_NO_CHANGE`, `SETTINGS_LABEL_TAKEN`, `SETTINGS_ALREADY_ACTIVE`, `SETTINGS_ALREADY_ACTIVATED`, `HOLDOUT_NOT_PASSED`, `ROWS_INVALID`, `REPLAY_EMPTY`, `HOLDOUT_CONTAMINATED`, `AS_OF_REQUIRED`, `REPLAY_INVALID_NO_GATES`, `SUITE_NOT_DEFINED`, `SUITE_UNKNOWN`, `SUITE_ALREADY_SCORED`, `SUITE_OVERLAP`, `SUITE_EMPTY`, `SUITE_MEMBERSHIP_CHANGED`, `LABELLED_NAME_CONFLICT`, `VARIANT_NOT_PREREGISTERED`, `PROFIT_REPORT_INCOMPLETE`, `REPLAY_NOT_FOUND`, `SELECTION_SETTINGS_MISSING` (500), `SELECTION_SETTINGS_INVALID` (500), `LIST_NOT_FOUND`, `LIST_NAME_INVALID`, `LIST_TERM_INVALID`, `LIST_NO_CHANGE`, `CENSUS_LIST_SIZE`, `CENSUS_LIST_INVALID`, `FORBIDDEN_FEATURE`, `BIN_REQUIRED`, `SIBLING_METHOD_NOT_FOUND`, `SIBLING_METHOD_ALREADY_APPROVED` (2.4.0), `SIBLING_METHOD_NOT_APPROVED`, `TEST_SET_NAME_TAKEN`, `TEST_SET_EMPTY`, `TEST_SET_NOT_FOUND`, `TEST_SET_NOT_READY`, `TEST_SET_ALREADY_SEALED`, `TEST_SET_NOT_SEALABLE` (2.5.0), `DROP_LIST_NAME_TAKEN`, `DROP_LIST_NOT_FOUND`, `COHORT_NAME_TAKEN`, `COHORT_EMPTY`, `COHORT_NOT_FOUND` (2.8.0). Selection warnings: `PRICING_V3_MISSING`. `APPROVAL_REQUIRED` / `APPROVAL_INVALID` / `APPROVAL_EXPIRED` also apply to an activation, a census list and a sibling method approval.
 

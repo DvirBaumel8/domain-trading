@@ -13,11 +13,12 @@ export const TABLE_FILES = [
   'selection_settings', 'selection_lists', 'sibling_method_approvals', 'screening_evidence', 'screening_runs', 'screening_results', 'screening_verdicts', 'screening_packs', 'manual_quotes',
   'tranches', 'tranche_members', 'test_sets', 'test_set_rows',
   'drop_lists', 'drop_list_rows', 'drop_list_checks', 'cohorts', 'cohort_names', 'cohort_decisions', 'cohort_outcomes',
+  'company_documents', 'forbidden_terms', 'review_packets', 'review_feedback', 'review_items', 'review_item_statuses',
 ] as const;
 type Row = Record<string, unknown>;
 
 const PK: Record<string, string> = {
-  settings: 'id', deals: 'id', pricing_settings: 'version', registrar_presence: 'domain_id', tranches: 'id', audit_log: 'at, id', test_sets: 'name', drop_lists: 'name', cohorts: 'name',
+  settings: 'id', deals: 'id', pricing_settings: 'version', registrar_presence: 'domain_id', tranches: 'id', audit_log: 'at, id', company_documents: 'version', test_sets: 'name', drop_lists: 'name', cohorts: 'name',
 };
 
 /** Every row of a table as the database's own JSON (exact timestamp precision), in primary-key order. */

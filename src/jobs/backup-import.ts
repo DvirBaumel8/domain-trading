@@ -46,6 +46,12 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'cohort_names', file: 'tables/cohort_names.json' },
   { table: 'cohort_decisions', file: 'tables/cohort_decisions.json' },
   { table: 'cohort_outcomes', file: 'tables/cohort_outcomes.json' },
+  { table: 'company_documents', file: 'tables/company_documents.json' },
+  { table: 'forbidden_terms', file: 'tables/forbidden_terms.json' },
+  { table: 'review_packets', file: 'tables/review_packets.json' },
+  { table: 'review_feedback', file: 'tables/review_feedback.json' },
+  { table: 'review_items', file: 'tables/review_items.json' },
+  { table: 'review_item_statuses', file: 'tables/review_item_statuses.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 
@@ -54,6 +60,9 @@ const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales
 
 /** Tables without a serial `id` column. */
 const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts']);
+
+/** Tables whose identity column is not called `id`. */
+const SERIAL_COL: Record<string, string> = { company_documents: 'version' };
 
 async function readRows(dir: string, f: { file: string; jsonl?: true }): Promise<Row[]> {
   let text: string;
@@ -146,8 +155,9 @@ export async function importBackup(db: Kysely<Database>, dir: string): Promise<R
       const conflict = table === 'pricing_settings' ? sql`on conflict (version) do nothing` : table === 'selection_settings' || table === 'selection_lists' ? sql`on conflict do nothing` : sql``;
       await sql`insert into ${sql.table(table)} overriding system value select * from jsonb_populate_recordset(null::${sql.table(table)}, ${JSON.stringify(rows)}::jsonb) ${conflict}`.execute(trx);
       if (NO_SERIAL.has(table)) continue;
-      const seq = await sql<{ s: string | null }>`select pg_get_serial_sequence(${table}, 'id') as s`.execute(trx);
-      if (seq.rows[0]?.s) await sql`select setval(${seq.rows[0].s}, (select coalesce(max(id), 1) from ${sql.table(table)}), (select count(*) > 0 from ${sql.table(table)}))`.execute(trx);
+      const col = SERIAL_COL[table] ?? 'id';
+      const seq = await sql<{ s: string | null }>`select pg_get_serial_sequence(${table}, ${col}) as s`.execute(trx);
+      if (seq.rows[0]?.s) await sql`select setval(${seq.rows[0].s}, (select coalesce(max(${sql.ref(col)}), 1) from ${sql.table(table)}), (select count(*) > 0 from ${sql.table(table)}))`.execute(trx);
     }
     await trx.insertInto('audit_log').values({
       id: newAuditId(), scope: 'admin', method: 'ADMIN', path: 'import-backup',

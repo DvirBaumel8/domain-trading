@@ -37,6 +37,8 @@ import { DropWatchJob } from './jobs/drop-watch.js';
 import { CohortOutcomesJob } from './jobs/cohort-outcomes.js';
 import { registerDropLists } from './api/drop-lists.js';
 import { registerCohorts } from './api/cohorts.js';
+import { registerCompany } from './api/company.js';
+import { registerReviews } from './api/reviews.js';
 import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
 import { BuyService } from './services/buy.js';
@@ -174,6 +176,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerTestSets(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
+  registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
+  registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version });
   registerPacks(app, { db: deps.db, now: deps.now ?? Date.now });
   registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });

@@ -5,7 +5,7 @@ import type { AuditRowInsert, Database } from '../db/types.js';
 import { isJobRoute } from './auth.js';
 import { errorBody } from './errors.js';
 import { isMutating } from './methods.js';
-import { redact } from './redact.js';
+import { redact, redactFreeText } from './redact.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -89,7 +89,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
         idempotency_key: idempotencyKeyOf(req),
         approval_text: approval.text,
         approval_at: approval.at,
-        request: body ? JSON.stringify(redact(body)) : null,
+        request: body ? JSON.stringify(redact(/^\/(company|reviews)\//.test(req.url) ? redactFreeText(body) : body)) : null,
         status_code: reply.statusCode,
         result_summary: replayed ? `replayed:${summary}` : summary,
         client_ip: req.ip,

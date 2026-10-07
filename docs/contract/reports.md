@@ -1,4 +1,4 @@
-# Reports (contract v2.9.0)
+# Reports (contract v2.10.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -50,6 +50,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `LANDER_PENDING` | info | The name was listed with `lander: "none"` and no lander has been chosen yet (2.1.0); no nameserver action is pending in the service | `lander` (null) |
 | `NS_UNVERIFIED` | warn | Public DNS doesn't show the lander nameservers yet | `lander`, `lander_ns` |
 | `DROP_FEED_STALE` | warn | (2.8.0) Drop lists exist, but the newest `list_date` is more than 2 days before today | `newest_list`, `newest_list_date` |
+| `REVIEW_OVERDUE` | warn | (2.10.0) Review feedback exists, but none was recorded in the last 36 hours | `last_feedback_at` |
 | `EXPORT_STALE` | warn | No confirmed Afternic upload in 7 days while listings changed | `pending[]` |
 | `HOLD_STALE` | warn | A pricing hold has been on for more than 30 days | `reason`, `since` |
 | `PAST_DROP_DATE` | warn | A live name is past its `drop_date` | `drop_date` |

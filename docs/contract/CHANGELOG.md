@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.10.0 (2026-10-07): CR-011 part B, the daily outside review (founder rule 9 kept)
+MINOR, **additive**. Release note: `docs/releases/v2.10.0.md`.
+- **Company document:** versioned upload and reads with diffs (`/company/document`).
+- **Block list:** secrets, emails, phones and forbidden terms (`/company/forbidden-terms`) are refused as `TEXT_BLOCKED` with the category only.
+- **Reviews:** `POST /reviews/packet` (what the reviewer gets, stored exactly), `POST /reviews/{packet_id}/feedback` (items marked new or repeat), `GET /reviews/items`, `POST /reviews/items/{id}/status`, `GET /reviews/cost` ($5 monthly cap); `/report` warning `REVIEW_OVERDUE`. DOM never calls an AI: Gavriel does.
+- **New codes:** `TEXT_BLOCKED`, `DOCUMENT_VERSION_NOT_FOUND`, `DOCUMENT_MISSING`, `REVIEW_COST_CAP`, `PACKET_NOT_FOUND`, `FEEDBACK_EXISTS`, `REVIEW_ITEM_NOT_FOUND`. Six new append-only tables (in the data backup).
+
 ## 2.9.0 (2026-10-07): CR-010 v2.7.0 findings: cancel, answer source, run totals, pending
 MINOR, **additive**. Release note: `docs/releases/v2.9.0.md`.
 - **Cancel (F-1):** `POST /screening/runs/{id}/cancel` and `POST /selection/test-sets/{name}/cancel` (WRITE, audited); status `cancelled`; unfinished checks UNKNOWN `CANCELLED`; new code `RUN_NOT_RUNNING`. A cancelled run is never woken or reopened by a read. The contract now says when a read restarts work.

@@ -146,6 +146,13 @@ async function seed() {
     content: JSON.stringify({ domain: T }), content_sha256: 'a'.repeat(64), settings_label: 'v1', issued_at: new Date('2026-10-06T07:50:00Z'), issued_by: 'gavriel',
   }).execute();
   await db.insertInto('manual_quotes').values({ domain: T, registrar: 'godaddy', renewal_cents: 2299, source_note: 'page', observed_at: new Date('2026-10-05T12:00:00Z'), recorded_by: 'gavriel' }).execute();
+  // v2.10.0 (CR-011 part B) tables
+  await db.insertInto('company_documents').values({ sha256: 'b'.repeat(64), text: 'Company doc\n', created_by: 'gavriel', created_at: new Date('2026-10-06T08:00:00Z') }).execute();
+  await db.insertInto('forbidden_terms').values({ term: 'codename', created_by: 'gavriel', created_at: new Date('2026-10-06T08:01:00Z') }).execute();
+  await db.insertInto('review_packets').values({ id: 'rvp_0123456789ab', created_by: 'gavriel', created_at: new Date('2026-10-06T08:02:00Z'), kind: 'weekly', document_version: 1, content: '{"kind":"weekly"}', sha256: 'c'.repeat(64) }).execute();
+  await db.insertInto('review_feedback').values({ packet_id: 'rvp_0123456789ab', created_by: 'gavriel', created_at: new Date('2026-10-06T08:03:00Z'), status: 'ok', provider: 'acme-ai', model: 'm-1', cost_usd: 0.25 }).execute();
+  await db.insertInto('review_items').values({ packet_id: 'rvp_0123456789ab', created_at: new Date('2026-10-06T08:03:00Z'), category: 'pricing', severity: 'low', text: 'An item', novelty: 'new' }).execute();
+  await db.insertInto('review_item_statuses').values({ item_id: 1, status: 'watching', note: 'ok', created_by: 'gavriel', created_at: new Date('2026-10-06T08:04:00Z') }).execute();
   const gid = await listedDomain({ domain: G, lander: 'afternic', lander_set_at: new Date('2026-10-10T00:00:00Z') });
   await db.insertInto('ledger_entries').values({ occurred_on: '2026-10-04', domain_id: gid, type: 'registration', amount_cents: -1108, note: 'has, "quotes"\nand a newline' }).execute();
   const sold = await app.inject({
@@ -369,7 +376,11 @@ describe('BK-3 import round trip', () => {
 
     await resetDb(db);
     const counts = await importBackup(db, dir);
-    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1, selection_settings: 2, selection_lists: 15, screening_evidence: 1, screening_runs: 2, screening_results: 1, screening_verdicts: 1, screening_packs: 2, manual_quotes: 1 });
+    expect(counts).toMatchObject({ domains: 2, sales: 1, offers: 1, selection_settings: 2, selection_lists: 15, screening_evidence: 1, screening_runs: 2, screening_results: 1, screening_verdicts: 1, screening_packs: 2, manual_quotes: 1, company_documents: 1, forbidden_terms: 1, review_packets: 1, review_feedback: 1, review_items: 1, review_item_statuses: 1 });
+    // v2.10.0: the identity of company_documents is `version`; the next upload continues after the restored one
+    expect((await db.insertInto('company_documents').values({ sha256: 'd'.repeat(64), text: 'Next\n', created_by: 'gavriel' }).returning('version').executeTakeFirstOrThrow()).version).toBe(2);
+    // remove the probe row again (append-only: the trigger is bypassed on one connection, as resetDb does) so the re-export below stays identical
+    await db.connection().execute(async (c) => { await sql`SET session_replication_role = replica`.execute(c); await sql`delete from company_documents where version = 2`.execute(c); await sql`SET session_replication_role = origin`.execute(c); });
     // the CR-001 rows are back with their ids; the evidence text survives the bytea round trip
     expect((await db.selectFrom('selection_settings').select('label').orderBy('id').execute()).map((r) => r.label)).toEqual(['v1', 'v1b']);
     expect((await db.selectFrom('selection_lists').select('terms').where('name', '=', 'brand').executeTakeFirstOrThrow()).terms).toEqual(['acme']);
