@@ -4,8 +4,7 @@ import type { Config } from '../config.js';
 import { pingDb } from '../db/client.js';
 import type { Database } from '../db/types.js';
 import { adapterStatus } from '../registrars/registry.js';
-import { currentReviewSettings } from '../services/review/settings.js';
-import { postingHealth, type PostingDeps } from '../services/posting/posts.js';
+import { currentReviewSettings, postingHealth, type PostingDeps } from '../modules/outreach/index.js';
 import { jobsOverdue } from '../services/job-runs.js';
 
 export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, posting?: PostingDeps): void {

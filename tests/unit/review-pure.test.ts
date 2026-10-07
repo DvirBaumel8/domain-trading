@@ -1,8 +1,8 @@
 // v2.10.0 (CR-011 part B): the pure parts of the review feature (line diff, novelty words).
 import { describe, expect, it } from 'vitest';
-import { unifiedDiff } from '../../src/services/review/diff.js';
-import { jaccard, noveltyTokens, REPEAT_JACCARD } from '../../src/services/review/novelty.js';
-import { stripWalkaway } from '../../src/services/review/packet.js';
+import { unifiedDiff } from '../../src/modules/outreach/review/diff.js';
+import { jaccard, noveltyTokens, REPEAT_JACCARD } from '../../src/modules/outreach/review/novelty.js';
+import { stripWalkaway } from '../../src/modules/outreach/review/packet.js';
 
 describe('unified diff', () => {
   it('equal texts give an empty diff', () => {

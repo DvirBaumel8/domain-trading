@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classify, type OfferSnapshot } from '../../src/services/offer-rules.js';
+import { classify, type OfferSnapshot } from '../../src/modules/selling/offer-rules.js';
 
 const d001: OfferSnapshot = { mode: 'hybrid', binCents: 199500, floorCents: 129500, walkawayCents: 95000, minOfferCents: 10000, listingHistoryId: 1, listedAtReceipt: true };
 const geo: OfferSnapshot = { mode: 'bin', binCents: 39900, floorCents: null, walkawayCents: null, minOfferCents: 39900, listingHistoryId: 2, listedAtReceipt: true };

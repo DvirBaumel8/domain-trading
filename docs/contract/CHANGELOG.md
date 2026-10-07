@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.16.3 (2026-10-08): refactor R2 part 1, first modules
+PATCH, **no contract change**. Release note: `docs/releases/v2.16.3.md`. Outreach (posting, review, company document, block list), reporting and selling (offers, sales) moved to `src/modules/<name>/` with one public `index.ts` each. A test enforces the boundaries.
+
 ## 2.16.2 (2026-10-08): refactor R1b, database locks and efficiency
 PATCH. Release note: `docs/releases/v2.16.2.md`.
 - **Visible:**

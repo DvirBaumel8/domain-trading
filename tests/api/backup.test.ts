@@ -13,7 +13,7 @@ import { importBackup } from '../../src/jobs/backup-import.js';
 import { newAuditId } from '../../src/http/audit.js';
 import { readEvidence, storeEvidence } from '../../src/screening/evidence.js';
 import { loadConfig } from '../../src/config.js';
-import { buildReport } from '../../src/services/report/index.js';
+import { buildReport } from '../../src/modules/reporting/report/index.js';
 import { makeApp } from '../helpers/app.js';
 import { COMPS, buyBody, postBuy } from '../helpers/buy.js';
 import { patchActiveSettings } from '../helpers/screening.js';

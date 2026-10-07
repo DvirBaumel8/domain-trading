@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { PriceScheduleJob } from '../../src/jobs/price-schedule.js';
-import { offersByStrategy, perDomainOffers, reportOffers } from '../../src/services/offer-stats.js';
+import { offersByStrategy, perDomainOffers, reportOffers } from '../../src/modules/selling/offer-stats.js';
 import { makeApp } from '../helpers/app.js';
 import { parseCsvStrict } from '../helpers/csv.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { callGemini, geminiCostUsd, GEMINI_HOST } from '../../src/services/review/gemini.js';
+import { callGemini, geminiCostUsd, GEMINI_HOST } from '../../src/modules/outreach/review/gemini.js';
 import { makeApp, logCapture } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';

@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { checkText, termMatches } from '../../src/services/blocklist.js';
+import { checkText, termMatches } from '../../src/modules/outreach/blocklist.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { screeningHarness } from '../helpers/screening.js';
@@ -119,7 +119,7 @@ describe('F-2 bot names out of the packet; retiring a term (T13-4, T13-5, T13-6)
   });
 
   it('V215-5 anonymizeActors replaces actor keys and token names at any depth', async () => {
-    const { anonymizeActors } = await import('../../src/services/review/packet.js');
+    const { anonymizeActors } = await import('../../src/modules/outreach/review/packet.js');
     const out = anonymizeActors({ a: [{ opened_by: 'x', n: 1, by: 'y', note: 'Gavriel-WRITE-2', keep: 'fine', deep: { token_name: 'zed', closed_by: null } }] }, new Set(['gavriel-write-2']));
     expect(out).toEqual({ a: [{ opened_by: 'operator', n: 1, by: 'operator', note: 'operator', keep: 'fine', deep: { token_name: 'operator', closed_by: null } }] });
   });

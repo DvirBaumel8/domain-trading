@@ -9,7 +9,7 @@ import { testDb as db } from '../helpers/db.js';
 import { b64, commentSegment, exifSegment, makeJpeg, makePng, textChunk } from '../helpers/images.js';
 import { issueToken } from '../helpers/tokens.js';
 import { mswServer } from '../setup/network.js';
-import { inspectImage } from '../../src/services/posting/images.js';
+import { inspectImage } from '../../src/modules/outreach/posting/images.js';
 
 const KEY = 'buf_fake_key_0123456789abcdefABCDEF';
 const BASE = 'https://domain-trading-api.onrender.com';
@@ -531,7 +531,7 @@ describe('storage guards', () => {
 
 describe('founder rule 10: publish only', () => {
   it('no route replies, quotes, likes, follows, mentions or messages; the Buffer client has no such call', () => {
-    const src = readFileSync('src/services/posting/buffer.ts', 'utf8');
+    const src = readFileSync('src/modules/outreach/posting/buffer.ts', 'utf8');
     for (const word of ['createReply', 'reply', 'retweet', 'quote', 'like', 'follow', 'mention', 'message(', 'direct']) {
       const lines = src.split('\n').filter((l) => !l.trim().startsWith('//') && !l.includes('MutationError') && !/message/.test(l) && l.toLowerCase().includes(word.toLowerCase()));
       expect(lines, word).toEqual([]);

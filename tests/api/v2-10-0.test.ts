@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { generateToken } from '../../src/auth/tokens.js';
-import { checkText } from '../../src/services/blocklist.js';
+import { checkText } from '../../src/modules/outreach/blocklist.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';

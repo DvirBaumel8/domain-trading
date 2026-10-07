@@ -4,7 +4,7 @@ import { sql } from 'kysely';
 import type { LedgerType } from '../../src/db/types.js';
 import type { FastifyInstance } from 'fastify';
 import { addOneYear } from '../../src/core/dates.js';
-import { offersByStrategy, perDomainOffers } from '../../src/services/offer-stats.js';
+import { offersByStrategy, perDomainOffers } from '../../src/modules/selling/offer-stats.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, seedDailyRun, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';

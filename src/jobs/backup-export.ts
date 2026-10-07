@@ -3,7 +3,7 @@ import { sql, type Kysely } from 'kysely';
 import type { Config } from '../config.js';
 import type { Database } from '../db/types.js';
 import { redactInvoice } from '../registrars/porkbun.js';
-import { ledgerCsvRows, ledgerRows, usdSigned } from '../services/report/portfolio.js';
+import { ledgerCsvRows, ledgerRows, usdSigned } from '../modules/reporting/index.js';
 import { toCsv } from '../services/export.js';
 
 /** Tables written in full (all columns, every row) under backup/tables/ so a restore is lossless. */

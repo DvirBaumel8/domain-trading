@@ -67,7 +67,7 @@ export const APPEND_ONLY_TABLES = [
 const GUARANTEES: Guarantee[] = [
   { what: 'No secret, key or token appears in a response, a log line or an audit row', file: 'tests/api/secrets.test.ts', test: 'responses, logs and audit rows contain no env secret' },
   { what: 'Tests never reach the network (an unmocked outbound request fails)', file: 'tests/unit/network-block.test.ts', test: 'fails any unmocked outbound HTTP request' },
-  { what: 'One AI call only: the outside review (src/services/review/gemini.ts); no AI SDK, no other provider host in src/', file: 'tests/unit/no-llm.test.ts', test: 'no LLM SDK dependency' },
+  { what: 'One AI call only: the outside review (src/modules/outreach/review/gemini.ts); no AI SDK, no other provider host in src/', file: 'tests/unit/no-llm.test.ts', test: 'no LLM SDK dependency' },
   { what: 'No registrar top-up call, ever (no top-up endpoint is referenced in `src/`)', file: 'tests/unit/no-topup.test.ts', test: 'no source file references a top-up endpoint' },
   { what: 'Web Risk uses only the free Lookup API (no Update API call in `src/`)', file: 'tests/unit/no-web-risk-update.test.ts', test: 'no source file calls the Web Risk Update API' },
 ];

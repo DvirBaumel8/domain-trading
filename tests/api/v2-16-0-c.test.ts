@@ -9,10 +9,10 @@ import { testDb as db } from '../helpers/db.js';
 import { makePng, b64 } from '../helpers/images.js';
 import { issueToken } from '../helpers/tokens.js';
 import { mswServer } from '../setup/network.js';
-import { checkText } from '../../src/services/blocklist.js';
+import { checkText } from '../../src/modules/outreach/blocklist.js';
 import { requestHash, pruneIdempotencyKeys, STALE_IN_PROGRESS_MS } from '../../src/http/idempotency.js';
-import { postsRefresh } from '../../src/services/posting/posts.js';
-import { BufferClient } from '../../src/services/posting/buffer.js';
+import { postsRefresh } from '../../src/modules/outreach/posting/posts.js';
+import { BufferClient } from '../../src/modules/outreach/posting/buffer.js';
 
 const BUF_KEY = 'buf_fake_key_0123456789abcdefABCDEF';
 const T0 = Date.parse('2026-10-20T10:00:00Z');
@@ -262,7 +262,7 @@ describe('review concurrency and cost (v2.16.0)', () => {
     expect(over.statusCode).toBe(422);
     const fb = await t.post(`/reviews/${packet}/feedback`, { status: 'ok', provider: 'bot', model: 'm', cost_usd: 5, items: [] });
     expect(fb.statusCode, fb.body).toBe(201);
-    const { monthSpend } = await import('../../src/services/review/packet.js');
+    const { monthSpend } = await import('../../src/modules/outreach/review/packet.js');
     expect((await monthSpend(db, t.clock.t)).spentUsd).toBe(0);
     mswServer.use(http.post(GEMINI, () => ok()));
     expect((await t.post('/reviews/run')).statusCode).toBe(200);

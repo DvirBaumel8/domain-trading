@@ -10,7 +10,7 @@ function files(dir: string): string[] {
 }
 
 /** The one file allowed to name an AI provider host, and the only host it may name (founder rule 9, changed 7 Oct 2026). */
-const GEMINI_FILE = join('src', 'services', 'review', 'gemini.ts');
+const GEMINI_FILE = join('src', 'modules', 'outreach', 'review', 'gemini.ts');
 const BANNED_HOSTS = /api\.anthropic\.com|api\.openai\.com|generativelanguage\.googleapis\.com|api\.mistral\.ai|api\.cohere\.(ai|com)|openrouter\.ai/gi;
 const BANNED_SDK = /from ['"](@anthropic-ai|openai|@google\/genai|@google\/generative-ai|@ai-sdk)/i;
 
@@ -31,7 +31,7 @@ describe('founder rule 9: one AI call only, the outside review (static)', () => 
     expect(Object.keys(pkg.dependencies ?? {}).filter((d) => banned.test(d))).toEqual([]);
   });
 
-  it('provider hosts appear only in src/services/review/gemini.ts, and only the Gemini host there; no SDK import anywhere', () => {
+  it('provider hosts appear only in src/modules/outreach/review/gemini.ts, and only the Gemini host there; no SDK import anywhere', () => {
     const problems = files('src').map((f) => violation(f, readFileSync(f, 'utf8'))).filter((x) => x !== null);
     expect(problems).toEqual([]);
     expect(readFileSync(GEMINI_FILE, 'utf8')).toContain('generativelanguage.googleapis.com');
