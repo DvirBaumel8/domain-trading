@@ -267,3 +267,23 @@ DOM's reviewer model is `gemini-2.5-flash` (optional env `GEMINI_MODEL` override
 - Whether the two settings live in the settings versions or in a separate endpoint, and the exact route and field names.
 - What happens to the `GEMINI_MODEL` env override.
 - How DOM knows the tier, if not the suggested `review.tier`.
+
+## DOM response to addendum C (2026-10-07)
+**Accepted; release v2.11.2,** after v2.11.1 (the `.biz` breaker, building now).
+- **Key:** keep **`GEMINI_API_KEY`**. Its description changes to: a key from a **new Google AI Studio project with no billing** (free tier). Never a key from `robots-508113`, which has billing for Web Risk.
+- **Settings, in a small endpoint (not the selection settings versions):**
+  - **Read:** `GET /reviews/settings` (READ) returns `{enabled, model, tier, allowed_models: [{model, tier: free|paid, input_usd_per_m, output_usd_per_m}], updated_at, updated_by}`.
+  - **Change:** `POST /reviews/settings` (WRITE, audited) takes any of `{enabled, model, tier}`. A model not on the list → 422 `REVIEW_MODEL_NOT_ALLOWED` with the allowed list, and nothing changes.
+  - **History:** every change is a row in an append-only table, with the old and the new value.
+  - **Defaults:** `enabled: true`, `model: "gemini-3.8-flash"`, `tier: "free"`.
+  - **The list:** `gemini-3.8-flash` (free: $0; paid prices kept for when the tier is `paid`) and `gemini-3.1-pro-preview` (paid only: $2.00 / $12.00 per million tokens).
+  - **Paid tier:** setting `tier: "paid"` needs a `note` naming Dvir's approval. A paid-only model on the `free` tier → 422 `REVIEW_MODEL_NEEDS_PAID`.
+- **`GEMINI_MODEL` env:** removed. The setting is the only source.
+- **Tier:** `review.tier`, as you suggested. On `free`, `cost_usd` is 0. On `paid`, the model's list prices apply and the $5 cap is enforced before any call.
+- **Off:** the daily step is `skipped` with reason `DISABLED`. `POST /reviews/run` → 409 `REVIEW_DISABLED`. `/health` `review: "disabled"`, plus the model. Turning it back on runs one review the next time, not one per missed day.
+- **429 on the free tier (T11-39):**
+  - **First 429:** the daily run (03:05 IDT, before Google's reset) stores **no** feedback. It marks the day's review `retry_pending`.
+  - **The retry:** a **second Worker cron at 07:30 UTC** (10:30 IDT, after Google's reset in both seasons) runs `tick`, and `tick` gains a `reviewRetry` step that tries once more.
+  - **If it fails again:** the review is stored as UNKNOWN with Google's status and reason. No other key or model is ever tried.
+  - **Cost of the change:** the extra cron costs nothing; it reverses CR-005 Amendment A only for this one short `tick` a day.
+- **`GET /reviews/cost`** adds `enabled`, `model`, `tier`.
