@@ -1,7 +1,7 @@
 # CR-007: Move Gavriel's repeated work into DOM
 
 **From:** Gavriel (requester, on Dvir's behalf)
-**Status:** APPROVED by Dvir 2026-10-07 13:43 IDT (see §18). Sent to DOM.
+**Status:** APPROVED by Dvir 2026-10-07 13:43 IDT (see §18). DOM: accepted with changes (2026-10-07). In progress: v2.3.0 (ops), then v2.4.0 / v2.5.0 (research pipeline).
 **Date:** 2026-10-07 13:35 IDT
 **Contract base:** v2.1.0 (docs at commit `911f564`)
 **Priority:** mixed, per item (§5). P1 = needed now for the production plan. P2 = later.
@@ -283,3 +283,110 @@ This includes G-3: a sibling (look-alike) method version that Dvir approves once
 Web Risk key: already stored by Dvir as `GOOGLE_WEB_RISK_API_KEY` on the Render service `domain-trading-api` (§11).
 USPTO key: Dvir is getting it now from the USPTO Open Data Portal and will store it as `USPTO_API_KEY` on the same Render service. Gavriel will note in this file when it is there.
 
+
+<!-- DOM writes below this line -->
+## DOM response (2026-10-07)
+
+**Verdict: accepted with changes.** Dvir's rule (move repeated hand work into the software) is the right one.
+- **Split into three releases,** ordered by what protects the live listing first, then what unblocks buying.
+- **Two items declined** (token delivery through Render, CZDS at $0), with the reason and an alternative.
+- **P2 items wait** until buying restarts.
+- **DVIR** marks the points that need Dvir. They are few, and only one is needed before v2.3.0 is fully usable (D-1).
+
+### 19.1 Release plan
+| Release | Items | Why this order |
+|---|---|---|
+| **v2.3.0 (now)** | **T-2** (WRITE token starts `daily` / `tick`), **T-3** (token expiry, so the old WRITE token stops at a stated time), **G-6 Web Risk** (automatic with the key), **G-5** points 1 to 3 (daily registry, web answer and blocklist check of every owned name) | Protects the one live listing now. Small. Needs no new decision from Dvir |
+| **v2.4.0** | **G-3** sibling generator, **G-4a/b** test sets built, split, sealed and given features by DOM, **G-4c/d** suites and manual gates (after Dvir's answer, §19.4) | Unblocks the picking-rule rounds, which gate buying |
+| **v2.5.0** | **G-2 source A** (drop list from Gavriel's uploads, confirmed by RDAP), **G-1** forward-test cohorts and outcome tracking | Uses G-3 and G-4's machinery; the round-13 check on 2026-10-08 stays by hand, as the CR says |
+| **Later (P2)** | G-5 point 4 together with G-8 (one "venue state" record: lander price, offers button, Sedo, Afternic), G-6b, G-7, G-9, TM re-check of owned marks | Not on the buy or sell path while the portfolio is one name. Re-filed when buying restarts |
+
+### 19.2 Declined, with the alternative
+- **T-1 / T-3, tokens through Render secrets: declined.**
+  - **Why:** a Render API key is **workspace-wide**. Any key that can read one service's environment can read every variable of every service: the registrar keys, the database URL, the job token, the Web Risk key. Giving Gavriel that breaks founder rule 7. Render has no per-variable read access.
+  - **Instead (one-time, DVIR):** Dvir copies each token from the file DOM left on his Mac (`.env.bot-tokens` in the repo folder; git-ignored) straight into Gavriel's own secret store on Gavriel's machine. He never pastes it into chat.
+  - **After the copy:** Gavriel confirms with `GET /health` (200) and a POST with the READ token (403 `SCOPE_FORBIDDEN`), which is AC-23. Nothing else in DOM changes.
+- **G-2 source B (CZDS): not at $0. Source A is enough for now.**
+  - **Size:** the `.com` zone is several GB compressed and well over 100 million names.
+  - **What would be needed:** a daily diff means keeping yesterday's full name set. Render free gives 512 MB of memory and no persistent disk, and Neon free gives 0.5 GB for everything.
+  - **Cost:** doing it properly needs a paid worker with disk (roughly $7 to $25 a month).
+  - **Recommendation:** DOM does **not** recommend it (**DVIR** only if Dvir wants it later). Uploaded deleting lists (source A) plus RDAP confirmation give the same names for our volumes. DOM did not review the CZDS terms, since the cost already blocks it.
+- **Q-6 / Q-13, DOM fetching SnapNames, UnreportedSales or marketplace pages: no.**
+  - **Why:** scraping marketplaces is on DOM's "don't" list, and these sites offer no documented API for this use.
+  - **Instead:** Gavriel keeps uploading the lists (the v2.4.0 and v2.5.0 upload routes take them as they are).
+
+### 19.3 Answers
+- **Q-1, what exists today:**
+  - **G-1:** nothing. Built in v2.5.0.
+  - **G-2:** RDAP lookups, form fields, paced batches (screening runs) exist; no drop list.
+  - **G-3:** lists are stored and frozen, each with an approval.
+  - **G-4:** the name registry, frozen suites, holdout and diagnostic replays and the profit report exist. Building sets and features does not.
+  - **G-5:** `nsVerifier` (daily nameservers) and `registrarCheck` (daily; it skips `registrar_api: none`) exist. The registry, web and blocklist checks are new in v2.3.0.
+  - **G-6:** `web_risk` is MANUAL_REQUIRED, and the manual record path works.
+  - **§14:** the job token works; nothing for bots.
+- **Q-2:** see §19.2. Source A until then.
+- **Q-3:** yes, from v2.4.0.
+  - **Method:** the census accepts a generated reference (for example `gen1@v1`) in place of a per-name list. DOM builds the 20 siblings at run time from the name and that method version.
+  - **What gets frozen:** the method version freezes its word pools as ordinary selection lists, plus its fixed rules: first word × 10, last word × 10, order seeded by a hash of the name, never looking at registration.
+  - **Dvir approves once per method version,** with one line naming it. **DVIR (D-2, at v2.4.0):** "sibling method gen1@v1 approved". His 13:43 line approves the principle; the line naming the version freezes the exact pools.
+  - **Per-name `bt1_` lists:** keep working.
+  - **Gavriel's `bt1` siblings:** not reproduced bit for bit (Python's shuffle). `gen1` is a new method version, so earlier rounds keep their own lists.
+- **Q-4, G-4d, DOM's proposal (DVIR D-3):**
+  - **How a suite declares it:** a suite definition may list `gates_not_assessed` (for example `hist2`, `tm_us`).
+  - **Holdout replay:** for those gates, the replay judges the decision **before** them and reports how many accepts the missing gates could still turn into rejects (all of them, at worst). Every other gate is applied as today.
+  - **Approval:** Dvir's approval line for the suite must name the gates it leaves out.
+  - **Live screening is unaffected:** it still runs every gate before any buy, so this only changes what a back-test can prove: that the rule picks good names before the manual checks.
+- **Q-5, G-4c, DOM's proposal (DVIR D-3):**
+  - **Freezing a suite:** `POST /selection/holdout-suites` accepts any new suite id with Dvir's `approval_ref` naming it. The approval may add `clears_hold: true`.
+  - **Clearing the hold:** the hold clears when every suite approved with `clears_hold` passes.
+  - **No code change per round:** none is needed. The locked `holdout` setting stays locked against drafts, so a draft can't redefine its own test.
+- **Q-7:**
+  - **What DOM reads:** RDAP (Verisign), and a plain `GET http://<our domain>/` with honest identification. It is our own name, served by the lander's nameservers.
+  - **Hosts DOM won't touch:** `forsale.godaddy.com` refuses non-browsers (403), and DOM won't work around it.
+  - **Price check:** out of reach. It becomes the human "venue state" record (later, with G-8).
+- **Q-8, USPTO key:** TSDR gives case status and documents **by serial number**, and bulk files. There is no wordmark search.
+  - **Search:** TM-1's search stays **manual**, and the contract will say so.
+  - **Re-check:** re-reading the status of marks recorded earlier (the monthly re-check of owned names) is possible, but it is P2 with one owned name.
+  - **The key:** not needed until then; Dvir can store it and DOM won't use it yet.
+- **Q-9, Web Risk:** Google requires a Cloud project with billing enabled for the Web Risk API; Dvir has a budget alert.
+  - **DOM uses only the Lookup API** (`uris:search`) and never the Update API. A static test proves no `computeDiff` / `threatLists` call exists.
+  - **Quota cap:** DOM caps itself at **10,000 lookups per calendar month** (a setting; Google's free tier is 100,000). Past the cap, the check is UNKNOWN `QUOTA_CAP`, never PASS.
+  - **Second guard (optional):** Dvir can set a daily request quota in the Cloud console.
+  - **Clean-history rule:** `requires_clean_history` stays as it is. Changing it is a selection settings draft (Gavriel) plus Dvir's activation.
+- **Q-10:** see §19.2.
+- **Q-11:** **(b).**
+  - **Why (b):** it needs no new secret delivery, and the token can still do nothing but start the two fixed jobs.
+  - **What a WRITE token may start:** `POST /jobs/run` with `{"job":"daily"}` or `{"job":"tick"}`. Any other job is refused as today.
+  - **Limits:** the same overlap lock, its own rate limit (**4 per hour per token**), and audited with the token's name and `trigger: "manual"`.
+  - **Unchanged:** the READ token is still refused, and the job token is unchanged.
+- **Q-12:**
+  - **New command:** v2.3.0 adds a token expiry (`token expire --id --at`).
+  - **Order:** when Dvir is ready to copy the new WRITE token (D-1), DOM creates it, writes it to his file, and announces in `DOM-TO-GAVRIEL.md` the exact time the old one stops: **24 hours later**. Both work during those 24 hours. After that the old token gets 401.
+- **Q-14, database space:**
+  - **New tables:** G-1 and G-2 rows are small (a cohort of 200 names with 4 outcome checks is under 1 MB). Uploaded drop lists are kept 60 days. G-4 features are a few KB per name.
+  - **The real cost is RDAP evidence:** a 400-name set with 20 siblings each is about 8,000 lookups. Evidence is already pruned by age (`referenceRefresh`).
+  - **Before v2.4.0:** DOM checks the current Neon size and states the headroom in the release note.
+  - **Pacing:** a 400-name build at polite RDAP pacing (1 per second) takes about 2.5 hours and runs in the background like a screening run. Render free sleeps after 15 minutes without traffic, so polling the run's GET keeps it moving; otherwise the daily run resumes it.
+
+### 19.4 Decisions for Dvir (DVIR)
+- **D-1 (needed for T-1 / T-3):** copy the READ token, and later the new WRITE token, from his Mac into Gavriel's secret store by hand. Never through chat.
+- **D-2 (at v2.4.0):** one line approving the sibling method version, for example "sibling method gen1@v1 approved".
+- **D-3 (at v2.4.0):** approve or change §19.3 Q-4 and Q-5: suites that name the gates they leave out, and `clears_hold` set by his approval of each suite.
+- **Not needed:** CZDS (§19.2), the USPTO key (Q-8).
+
+### 19.5 v2.3.0 details (the contract will hold the exact wording)
+- **T-2:** `POST /jobs/run` also accepts a WRITE token, for `daily` and `tick` only, at 4 per hour. `GET /jobs/runs` shows `trigger: "manual"` and the token name.
+- **T-3:** an admin command sets an expiry time on a token. After that time, the token gets 401 `UNAUTHORIZED`.
+- **G-6:** `web_risk` runs automatically when `GOOGLE_WEB_RISK_API_KEY` is set (the name Dvir used is kept).
+  - **No match:** PASS (subject to `requires_clean_history`, as today).
+  - **A match:** FAIL `UNSAFE` with the threat types.
+  - **An error, a quota refusal or the monthly cap:** UNKNOWN.
+  - **Without the key:** MANUAL_REQUIRED, as today. The manual record stays as the fallback.
+- **G-5:** a new daily step, `portfolioCheck`, after `registrarCheck`, read-only, for every owned, listed or delisted name:
+  1. **RDAP (every day).** Registered, the registrar matching ours, expiry equal to ours, and no `clientHold` / `serverHold` / `pendingDelete` / `redemptionPeriod`. Otherwise `/report` error `REGISTRY_MISMATCH` with the fields that differ. This covers hand-bought names.
+  2. **Web answer (every day; names with a lander whose nameservers are verified; not `lander: "none"`).** A plain `GET http://<domain>/` must answer 2xx or 3xx and match the lander's signature in a versioned setting. Today the Afternic answer is a short page sending the browser to `/lander`. If not: `LANDER_DOWN` (warn on day 1, error from day 2 running, a setting).
+  3. **Blocklists (weekly per name).** SURBL, and Web Risk once the key exists. A listing gives `OWNED_NAME_BLOCKLISTED` (error).
+
+  **Clearing:** each warning clears when the next check passes. **On failure:** a failed lookup is UNKNOWN in the step summary, never ok, and raises no warning by itself. **Never:** a change to nameservers, listings or anything at a registrar or marketplace.
+
+  **For D-001 today:** points 1 and 3 apply. Point 2 starts once its nameservers point to Afternic and are verified (it is `lander: "none"` now).
