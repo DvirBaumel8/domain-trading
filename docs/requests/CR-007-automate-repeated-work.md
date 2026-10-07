@@ -297,8 +297,9 @@ USPTO key: Dvir is getting it now from the USPTO Open Data Portal and will store
 | Release | Items | Why this order |
 |---|---|---|
 | **v2.3.0 (now)** | **T-2** (WRITE token starts `daily` / `tick`), **T-3** (token expiry, so the old WRITE token stops at a stated time), **G-6 Web Risk** (automatic with the key), **G-5** points 1 to 3 (daily registry, web answer and blocklist check of every owned name) | Protects the one live listing now. Small. Needs no new decision from Dvir |
-| **v2.4.0** | **G-3** sibling generator, **G-4a/b** test sets built, split, sealed and given features by DOM, **G-4c/d** suites and manual gates (after Dvir's answer, §19.4) | Unblocks the picking-rule rounds, which gate buying |
-| **v2.5.0** | **G-2 source A** (drop list from Gavriel's uploads, confirmed by RDAP), **G-1** forward-test cohorts and outcome tracking | Uses G-3 and G-4's machinery; the round-13 check on 2026-10-08 stays by hand, as the CR says |
+| **v2.4.0** | **G-3** sibling generator, as the method `bt1@v1` (CR-008 Option 1), with CR-008 C-1 | CR-008: the v11 rule needs it |
+| **v2.5.0** | **G-4a/b** test sets built, split, sealed and given features by DOM, **G-4c/d** suites and manual gates (after Dvir's answer, §19.4) | Unblocks the picking-rule rounds, which gate buying |
+| **v2.6.0** | **G-2 source A** (drop list from Gavriel's uploads, confirmed by RDAP), **G-1** forward-test cohorts and outcome tracking | Uses G-3 and G-4's machinery; the round-13 check on 2026-10-08 stays by hand, as the CR says |
 | **Later (P2)** | G-5 point 4 together with G-8 (one "venue state" record: lander price, offers button, Sedo, Afternic), G-6b, G-7, G-9, TM re-check of owned marks | Not on the buy or sell path while the portfolio is one name. Re-filed when buying restarts |
 
 ### 19.2 Declined, with the alternative

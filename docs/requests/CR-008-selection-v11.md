@@ -1,7 +1,7 @@
 # CR-008: Picking rule v11 as a selection settings change
 
 **From:** Gavriel (requester, on Dvir's behalf)
-**Status:** APPROVED by Dvir 2026-10-07 13:59 IDT (see §15). Waiting for DOM.
+**Status:** APPROVED by Dvir 2026-10-07 13:59 IDT (see §15). DOM: accepted with changes (2026-10-07). In progress: release v2.4.0.
 **Date:** 2026-10-07 14:10 IDT
 **Contract base:** v2.2.0 (docs at commit `04f54c2`, which holds DOM's reply to CR-007)
 **Priority:** P1 for the parts DOM builds in v2.4.0 anyway (the sibling method, §7). The settings draft itself needs no new code except one key (§6, C-1).
@@ -219,3 +219,80 @@ This is exactly what Python 3's `random.Random(s).shuffle` does, written out so 
 - **D-8-2:** Gavriel records this line as Dvir's activation approval for the selection settings label `v11` ("the new rule" here can only mean v11; buy hold stays on). **Please confirm** in your reply that it is enough as the `approval_ref` for `POST /selection/settings/v11/activate`. If you need the exact form from §13, say so and Gavriel will get that line from Dvir.
 - **Changed order of work (replaces §11 steps 4 and 5):** Gavriel creates the `v11` draft as soon as C-1 (`ext.alt_list`) exists, runs AC-1 to AC-3, and then activates it with the line above. Gavriel will not activate a version without `ext.alt_list`, because that would count more extensions than the tested rule. If you think a live `v11` must wait for the v2.4.0 sibling generator (for example because the census clause has no list to read for new names), say so; until then, per-name lists frozen with Dvir's approval keep working (§11, "Until v2.4.0").
 - **Unchanged:** BUY-HOLD stays on. No buy. No change to tier priors or money settings.
+
+<!-- DOM writes below this line -->
+## DOM response (2026-10-07)
+
+**Verdict: accepted, Option 1.**
+- **Release:** v2.4.0 ships C-1 (`ext.alt_list`) and the sibling method `bt1@v1`, reproduced exactly (this is CR-007 G-3).
+- **Plan changes:** CR-007's later items move one release each (G-4 → v2.5.0, G-1 / G-2 → v2.6.0; CR-007 §19.1 is updated).
+- **Draft:** one change to the draft (C-3).
+- **Activation:** Dvir's 14:13 line is **not** enough to activate (D-8-2 below).
+- **Buy hold:** stays on; nothing here buys or changes money settings.
+
+### 17.1 Answers
+- **Q-1: yes, Option 1.**
+  - **Method:** v2.4.0 implements Appendix B exactly: MD5 seed, MT19937 with init by array, `below(n)` by rejection, Fisher-Yates, frozen pools in their order with the duplicate.
+  - **Test:** DOM's default suite checks all **1,900 of 1,900** `bt1_vectors.csv` lists, in order (AC-4).
+  - **Pools:** frozen with the method version from `bt1_pools_v1.json`. Its sha256 (`a984b85e…df48b`) is checked at load, so AC-5 is a read-back.
+  - **Name:** the method is called **`bt1@v1`**.
+- **Q-2: `ext.alt_list` accepted.**
+  - **Readers:** only `alt_tld_before_n` (the `ext_dates` check) reads it.
+  - **Absent key:** `ext_dates` reads `ext.list` as today, so every existing version is unchanged.
+  - **TN-1:** `same_name` keeps reading `ext.list`.
+  - **Validation:** a draft may set it. It must be a non-empty list of lower-case extensions.
+  - **Unavailable registries:** an extension whose registry has no RDAP service or refuses is UNKNOWN at run time and never counted, as today (`.biz` included). DOM does not check the IANA bootstrap at draft time: the bootstrap is reference data that changes.
+- **Q-3: confirmed.**
+  - **The formula:** `ratio_at_floor` = floor × 0.85 (Afternic) × P(sale in year 1) ÷ renewal. With no leads, P(sale in year 1) = `p_passive`.
+  - **The numbers:** at `p_passive` 0.01: 967 × 0.85 × 0.01 ÷ 11.79 ≈ **0.70** → FAIL `RATIO_BELOW_1`. At 0.02 (`A`, `I`) ≈ **1.39** → pass.
+  - **So:** using `A` and `I` is right. A v11 name is never blocked by the price gate only because of its tier label, since both v11 paths carry 0.02.
+- **Q-4, C-3: one change.** Your §6.1 sets `tier.clauses.A` and `.I` one by one. Then clause `B` stays in the document while `B` leaves `tier.order`, and validation refuses it ("clause B is not in tier order").
+  - **Fix:** set **`tier.clauses` as a whole object** holding `A`, `I` and the unchanged `G` (copy `G` from `GET /selection/settings`).
+  - **Validity:** `tier.order` and `tier.demand2_pass_tiers` may be changed by a draft, and removing `B` is valid once its clause is gone.
+  - **Everything else:** the `thresholds.*` keys, `freshness_hours.census` and `ext.alt_list` (after v2.4.0) validate as written.
+- **Q-5: role `fit`, slice `R15-TEST15-USED`.**
+  - **Use:** `fit` rows are scored by diagnostic replays.
+  - **No reuse:** the registry records a name once, any role. CR-007 G-4a's set builder (v2.5.0) removes every registered name, so these can never enter a later test set.
+  - **No new role** is needed.
+- **Q-6: no.**
+  - **Why:** DOM's dictionary (SCOWL) has no word frequencies, so `form.min_word_zipf` isn't possible without a new word list.
+  - **Instead:** v2.4.0's release note reports AC-6 (DOM's split vs your `tokens` on the 1,900 names, with the differences listed).
+  - **Fallback:** if they agree on fewer than 95%, it comes back to Dvir, as §7 says.
+  - **Using your split:** `GET` of the method also accepts a given word split, so you can always get the siblings for your split.
+
+### 17.2 What v2.4.0 adds (the contract will hold the exact wording)
+- **Settings:** the optional key `ext.alt_list` (C-1).
+- **The method:** `bt1@v1`, frozen from your pools file.
+  - **Read:** `GET` returns its pools, sha256, approval state, and the 20 siblings for a name (DOM's split) or for a given split.
+  - **Approve:** `POST` approves it with Dvir's `approval_ref`, which must name `bt1@v1`. Approval is once, append-only.
+- **Census (C-2):** an item's `census_list` may be `bt1@v1`; DOM builds the 20 siblings at run time.
+  - **Before the approval:** UNKNOWN `CENSUS_METHOD_NOT_APPROVED`.
+  - **Fewer than 20 siblings:** UNKNOWN `CENSUS_LIST_SIZE`.
+  - **Unchanged:** per-name `bt1_<sld>` lists keep working.
+- **Tests:**
+  - every `bt1_vectors.csv` list;
+  - the pools' sha256;
+  - the 894 `v11_fixtures.csv` rows through the real tier code with the v11 draft values: the `expected` decision row by row, 286 / 400 and 381 / 494, all 24 rows at 0.55 accepted;
+  - the AC-3 boundaries;
+  - AC-7.
+- **AC-10:** stays with CR-007 G-4b (v2.5.0).
+
+### 17.3 Dvir's lines (DVIR)
+- **D-8-2: the 14:13 line can't be the `approval_ref`.** Activation checks that the approval text **names the label** (`v11`), and "the new rule" doesn't. This rule exists so one line can never activate a version it doesn't name.
+  - **What DOM needs:** one line from Dvir, for example: **"selection settings v11 approved for activation; buy hold stays on"**.
+  - **Timing:** the line is valid for 72 hours, so Gavriel should get it when v2.4.0 is live and the draft exists.
+  - **His decision to activate before the as-of check (D-8-3)** stands.
+- **D-2:** after v2.4.0 is live, one line: **"sibling method bt1@v1 approved"**.
+- **D-3:** unchanged (CR-007 §19.3 Q-4, Q-5). It is needed for v2.5.0, not for v11.
+
+### 17.4 Order of work
+1. **DOM ships v2.4.0** (this CR's C-1, C-2 and its tests).
+2. **Gavriel:**
+   - registers the 894 fixtures (`fit`, `R15-TEST15-USED`);
+   - creates the `v11` draft (§6.1 with the C-3 fix, `ext.alt_list` included);
+   - runs AC-1 to AC-8.
+3. **Dvir gives D-2,** and Gavriel approves `bt1@v1` with it.
+4. **Dvir gives the D-8-2 line naming `v11`,** and Gavriel activates.
+5. **The buy hold stays on.**
+
+**Activating `v11` before step 3 is possible but pointless.** A name with no frozen list gets an UNKNOWN share, so only the other-extension path could accept.
