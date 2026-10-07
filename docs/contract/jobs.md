@@ -1,4 +1,4 @@
-# Jobs (contract v2.1.0)
+# Jobs (contract v2.2.0)
 
 The service runs **no timers of its own**. All scheduled work goes through one route, called by a Cloudflare Worker cron (`jobs-trigger/`). Since 2.1.0 the cron fires **once a day** (00:05 UTC) and runs `daily` only; `tick` stays callable by hand. Bots don't call it; they see the results in `GET /audit` and `GET /report`.
 
@@ -31,5 +31,10 @@ The service runs **no timers of its own**. All scheduled work goes through one r
 Summary objects: `reconciler` `{booked, failed, abandoned, receipts, skipped}`, `nsVerifier` `{checked, verified, cleared, unknown, skipped}`, `screeningResume` `{resumed: [run_id], finalized: [run_id]}`, `priceJob` `{today, dryRun, skipped, applied[], superseded[], failed[], held[], delisted[], cancelled[]}`, `dropJob` `{today, dryRun, skipped, dropped[], failed[]}`, `registrarCheck` `{dryRun, skipped, checked, present, absent, errors, newlyAbsent[]}`, `referenceRefresh` `{popularity: {list_id, list_date, rows} | {skipped, reason}, namebio: {skipped, reason}, iana: {refreshed} | {skipped, reason}, pruned, errors[]}` (`popularity` is the Majestic Million list for TYPO-1; a failed sub-step is `{ok: false, error}` there and in `errors`), `backupExport` `{skipped?, reason?, committed?, commit?, files?, changed?}`.
 
 **Cold start:** the Worker waits 90 s. A Worker-side timeout doesn't mean the job failed; the `/audit` row is the record.
+
+**Which day a job acts (2.2.0, CR-006 Q-2, Q-3).** A run's `today` is the IDT calendar date at the moment it runs (00:05 UTC = 03:05 IDT, 02:05 in winter).
+- `priceJob` applies a row on the first run whose `today` is on or after its `due_on`. The final push changes only the BIN; the floor and walk-away stay (`endpoints.md` §Pricing version).
+- `dropJob` marks a name `dropped` on the first run whose `today` is **after** `drop_date` (the name still exists on `drop_date` itself). Example: `drop_date` 2027-10-04 → dropped by the run at 03:05 IDT on 2027-10-05. `POST /jobs/preview` shows it from that day.
+- **Late rows (a missed run, an outage):** the next run takes every `planned` row of the current plan that is due. If a `delist` is among them, the name is delisted and every other open row is cancelled. Otherwise the rows are checked newest first: a row that fails the price rules becomes `failed`, the newest valid row is applied, and the older due rows become `superseded` (so the name jumps to the newest due price and never replays older drops). A pricing hold pauses all of this except the delist. `POST /jobs/preview` for a later day assumes the same: it shows what the next run on that day would do with every row due by then.
 
 **What bots can rely on:** a stuck purchase (`register_sent` / `unknown`) resolves by the next daily run, up to about 24 hours (it keeps counting against the caps and holds the name meanwhile); to settle it sooner, start a run by hand (`POST /jobs/run`, job token); a scheduled price change is in the DB by about 00:10 UTC on its due day (IDT date) and reaches a marketplace only when a bot uploads the next export; `/report` warnings reflect the last daily run. Every scheduled run is recorded in `GET /audit` (scope `job`, one row per run, idempotency key `daily-<scheduled time in ms>`).

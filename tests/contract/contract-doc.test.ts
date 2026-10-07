@@ -137,9 +137,10 @@ describe('contract: codes', () => {
 describe('contract: version labels', () => {
   it('"(contract vX)" in every contract file matches package.json', () => {
     const version = (JSON.parse(read(join(ROOT, 'package.json'))) as { version: string }).version;
-    for (const f of ['endpoints.md', 'formats.md', 'jobs.md', 'reports.md']) {
+    for (const f of ['endpoints.md', 'formats.md', 'jobs.md', 'reports.md', 'selection.md']) {
       expect(read(join(CONTRACT, f)).split('\n')[0], f).toContain(`(contract v${version})`);
     }
+    expect(read(join(CONTRACT, 'test-evidence.md')).split('\n')[0]).toContain(`(contract v${version}`);
     expect(read(join(CONTRACT, 'README.md'))).toContain(`**Version ${version}**`);
   });
 });

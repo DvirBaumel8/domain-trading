@@ -175,6 +175,8 @@ describe('GET /deals/{id}', () => {
     app = await makeApp({ adapters: [new FakeAdapter('porkbun')], now: () => T0, rdap: async () => 'not_registered' });
     const w = await issueToken('write');
     const r = await issueToken('read');
+    const dry = await postBuy(app, buyBody({ deal_id: 'D-002', dry_run: true }), w.auth);
+    expect(dry.statusCode, dry.body).toBe(200);
     const buy = await postBuy(app, buyBody({ deal_id: 'D-002' }), w.auth);
     expect(buy.statusCode, buy.body).toBe(201);
     await postBuy(app, buyBody({ domain: 'otherdomain.com', deal_id: 'D-003' }), w.auth);
@@ -182,8 +184,9 @@ describe('GET /deals/{id}', () => {
     expect(res.statusCode).toBe(200);
     const b = res.json();
     expect(b).toMatchObject({ id: 'D-002', domain: 'examplecityroofing.com' });
-    expect(b.approvals).toHaveLength(1);
-    expect(b.approvals[0]).toMatchObject({ method: 'POST', path: '/buy', approval_text: buyBody().approval_ref.text, status_code: 201 });
+    expect(b.approvals).toHaveLength(2);
+    expect(b.approvals.map((x: { dry_run: boolean }) => x.dry_run)).toEqual([true, false]);
+    expect(b.approvals[1]).toMatchObject({ method: 'POST', path: '/buy', approval_text: buyBody().approval_ref.text, status_code: 201, dry_run: false });
     expect(await db.selectFrom('deals').select('id').where('id', '=', 'D-002').executeTakeFirst()).toBeDefined(); // the deals row (bookPurchase) backs the view
     // a domain row carrying a deal_id without a deals row is not a deal
     await insertOwnedDomain(db, { domain: 'orphan-deal.com', deal_id: 'D-077' });

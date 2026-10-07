@@ -92,7 +92,7 @@ describe('audit (AL)', () => {
     expect(row).toMatchObject({ approval_text: 'yes', approval_at: null });
   });
 
-  it('a Fastify framework error (bad percent-encoding) gets the error envelope and writes nothing', async () => {
+  it('a Fastify framework error (bad percent-encoding, e.g. %ZZ at the service; live the platform edge answers %ZZ first) gets the error envelope and writes nothing', async () => {
     app = await makeApp();
     const w = await issueToken('write');
     const res = await app.inject({
@@ -104,7 +104,7 @@ describe('audit (AL)', () => {
     expect(await db.selectFrom('idempotency_keys').selectAll().execute()).toHaveLength(0);
   });
 
-  it('BUG-6: a truncated percent-encoding (GET /portfolio/%E0%A4%A) gets 400 INVALID_REQUEST in the error shape, with the READ token', async () => {
+  it('BUG-6: a truncated or invalid percent-encoding that reaches the service gets 400 INVALID_REQUEST in the error shape, with the READ token (live, the platform edge answers a truncated escape with 520 first: test-evidence.md, Platform responses)', async () => {
     app = await makeApp();
     const r = await issueToken('read');
     for (const url of ['/portfolio/%E0%A4%A', '/portfolio/%E0%A4%A%', '/portfolio/%', '/portfolio/%FF']) {

@@ -98,7 +98,7 @@ export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: s
 export async function dealView(db: Kysely<Database>, id: string) {
   const deal = await db.selectFrom('deals').selectAll().where('id', '=', id).executeTakeFirst();
   if (!deal) return null;
-  const rows = await db.selectFrom('audit_log').select(['id', 'at', 'method', 'path', 'approval_text', 'approval_at', 'status_code'])
+  const rows = await db.selectFrom('audit_log').select(['id', 'at', 'method', 'path', 'approval_text', 'approval_at', 'status_code', sql<unknown>`request->'dry_run'`.as('dry_run')])
     .where('approval_text', 'is not', null)
     .where((eb) => eb.or([
       eb(sql`request->>'deal_id'`, '=', id),
@@ -106,7 +106,7 @@ export async function dealView(db: Kysely<Database>, id: string) {
     ])).orderBy('at').orderBy('id').execute();
   return {
     id: deal.id, domain: deal.domain, strategy: deal.strategy, status_note: deal.status_note, created_at: iso(deal.created_at),
-    approvals: rows.map((r) => ({ audit_id: r.id, at: iso(r.at), method: r.method, path: r.path, approval_text: r.approval_text, approval_at: iso(r.approval_at), status_code: r.status_code })),
+    approvals: rows.map((r) => ({ audit_id: r.id, at: iso(r.at), method: r.method, path: r.path, approval_text: r.approval_text, approval_at: iso(r.approval_at), status_code: r.status_code, dry_run: r.dry_run === true || r.dry_run === 'strict' })),
   };
 }
 

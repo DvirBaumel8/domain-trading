@@ -62,6 +62,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     if (d.lander_pending && (d.status === 'owned' || d.status === 'listed')) {
       add('LANDER_PENDING', 'info', `${d.domain} is listed with no lander yet (listed with lander "none"); call POST /list with a lander when the nameservers should change.`, d.domain, { lander: null });
     }
+    if (live(d.status) && (d.registrar_api === 'none' || d.registrar === 'godaddy')) {
+      add('AUTO_RENEW_UNCONFIRMED', 'info', `${d.domain}: the service can't read auto-renew at ${d.registrar}; check it is OFF in the ${d.registrar} dashboard (a renewal there is billed outside the cap).`, d.domain, { registrar: d.registrar, registrar_api: d.registrar_api });
+    }
     if (d.status === 'listed' && d.category === null) add('CATEGORY_MISSING', 'warn', `${d.domain} is listed without a category.`, d.domain);
     const dropsAtFirstExpiry = d.drop_date !== null && d.drop_date === d.expiry_date; // no renewal is planned, so no renewal price is needed
     if (d.renewals_used === 0 && d.renewal_price_cents === null && d.status !== 'sold' && d.status !== 'dropped' && !dropsAtFirstExpiry) {

@@ -176,7 +176,7 @@ New plans only; v2 plans keep their numbers (the price job and manual changes re
 | `walkaway_bps` / `walkaway_min_cents`, `hybrid_min_offer_cents` | 4800 / 50000, 10000 | Unchanged (`round5`) |
 | `drop_mode` / `drops` | `ladder` / `[{"after_months":6,"steps":1},{"after_months":18,"steps":1}]` | **[v9.1]** ladder; months **[Dvir, 6 Oct 2026]** |
 | `geo_drops` | `[{"after_months":12,"steps":1}]` | **[v9.1; confirmed 6 Oct 01:01]** 499 → 399 → 299, one rung at M12 (a $399 name drops to $299) |
-| `final_push_mode` | `bin_to_lowest_listed_ge_floor` | **[Dvir, 6 Oct 2026]** lowest list value ≥ floor and ≤ BIN; geo none |
+| `final_push_mode` | `bin_to_lowest_listed_ge_floor` | **[Dvir, 6 Oct 2026]** lowest list value ≥ floor and ≤ BIN; floor and walk-away unchanged (as in v2; CR-006 Q-1); geo none |
 | `comps_min` / `comps_max` | 0 / 3 | **[v9.1]** comps optional |
 | `geo_bin_min_cents` / `geo_bin_max_cents` | 29900 / 49900 | Manual geo change must be on the list |
 - `round_dollar(c) = ((c + 50) div 100) × 100`; floor = `min(BIN, max(round_dollar(pct(BIN, 6500)), 75000))`; walk-away as v2.

@@ -1,4 +1,4 @@
-# Endpoints (contract v2.1.0)
+# Endpoints (contract v2.2.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -124,7 +124,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
 
 ## Listing
 
-**Pricing version (v2 or v3).** When the current `pricing_settings` version has a price list (**v3**, created only by the admin command), a **new** non-geo plan needs a BIN on the list and at or above the non-geo minimum (the x95 and minimum-BIN rules of v2 do not apply). Floor = 65% of the BIN to the whole dollar (never below $750); walk-away as in v2 (nearest $5, never below $500). Drops are one rung down the list (non-geo at M6 and M18, geo at M12 down to $299), with floor and walk-away recomputed from the new BIN (an exception does not carry through a drop); the final push is the lowest list price at or above the floor (none for geo). **An override never waives the price list** (an override relaxes mode guards only): under v3 every non-carried BIN in any mode, geo included, must be on the list. A plan keeps the settings version it was made under: its stored schedule and its manual changes follow that version, so v2 plans are unchanged unless replanned (a replan uses the current version). `settings_version` in every response says which applies.
+**Pricing version (v2 or v3).** When the current `pricing_settings` version has a price list (**v3**, created only by the admin command), a **new** non-geo plan needs a BIN on the list and at or above the non-geo minimum (the x95 and minimum-BIN rules of v2 do not apply). Floor = 65% of the BIN to the whole dollar (never below $750); walk-away as in v2 (nearest $5, never below $500). Drops are one rung down the list (non-geo at M6 and M18, geo at M12 down to $299), with floor and walk-away recomputed from the new BIN (an exception does not carry through a drop); the final push is the lowest list price at or above the floor (none for geo) and changes **only the BIN**: the floor and walk-away stay as the last drop (or the plan) set them, so a walk-away above the formula's value for the pushed BIN is expected (CR-006 Q-1; e.g. M6 1088 / 750 / 520, then final push 788 / 750 / 520). **An override never waives the price list** (an override relaxes mode guards only): under v3 every non-carried BIN in any mode, geo included, must be on the list. A plan keeps the settings version it was made under: its stored schedule and its manual changes follow that version, so v2 plans are unchanged unless replanned (a replan uses the current version). `settings_version` in every response says which applies.
 
 ### `GET /pricing/preview`
 The sell plan the server would store: floor, private walk-away, min offer, drop schedule. No side effects (no audit row).
@@ -300,7 +300,7 @@ READ. Ledger rows in date order.
 - **Errors:** 400 `VALIDATION_ERROR`.
 
 ### `GET /deals/{id}`
-READ. `{id, domain, strategy, status_note, created_at, approvals: [{audit_id, at, method, path, approval_text, approval_at, status_code}]}` (audit rows with an approval that cite the deal or its domain).
+READ. `{id, domain, strategy, status_note, created_at, approvals: [{audit_id, at, method, path, approval_text, approval_at, status_code, dry_run}]}` (audit rows with an approval that cite the deal or its domain). `dry_run` (2.2.0, additive) is `true` when that call was a dry run (`dry_run: true` or `"strict"`), so one approval used for a dry run and then the real call shows as one dry run plus one real row.
 - **Errors:** 404 `DEAL_NOT_FOUND`.
 
 ### `GET /audit`

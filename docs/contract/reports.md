@@ -1,4 +1,4 @@
-# Reports (contract v2.1.0)
+# Reports (contract v2.2.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -57,6 +57,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `SALE_UNCONFIRMED` | info | A sale recorded from evidence, without Dvir's approval | `venue`, `transaction_ref`, `evidence_source`, `evidence_ref`, `recorded_by`, `sold_at` |
 | `PRICING_EXCEPTION` | info | A name priced by an approved exception | `settings_version`, `stored`, `formula` |
 | `FLOOR_AUTO_ACCEPT` | info | Afternic auto-accepts any offer at or above the floor | `floor`, `bin` |
+| `AUTO_RENEW_UNCONFIRMED` | info | A live (owned, listed or delisted) name at a registrar whose auto-renew setting the service can't read: GoDaddy, or any name with `registrar_api: none` (imported `--manual`). Raised on every report (2.2.0, CR-006); check auto-renew is OFF in the registrar's dashboard, since a renewal there is billed outside the cap. A confirmation by Dvir is recorded in the import note and audit row, not here | `registrar`, `registrar_api` |
 
 ## `GET /report/pricing-review`
 READ. For the quarterly pricing review.

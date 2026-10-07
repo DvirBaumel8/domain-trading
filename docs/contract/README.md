@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 2.1.0** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 2.2.0** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -8,7 +8,7 @@
 | `endpoints.md` | Every route: method, path, token, request, response, error codes |
 | `jobs.md` | The scheduled jobs (`POST /jobs/run`: `tick`, `daily`) |
 | `reports.md` | `GET /report` fields and warnings (with levels) |
-| `selection.md` | Selection and screening checks: statuses, codes, shapes (v1.1.0) |
+| `selection.md` | Selection and screening checks: statuses, codes, shapes |
 | `formats.md` | The Afternic CSV, the Sedo file, the ledger CSV, and other exported shapes |
 | `test-evidence.md` | Generated map: every code in the code index, and every guarantee, to the automated tests that prove it (2.1.0) |
 | `CHANGELOG.md` | Contract versions |
@@ -51,8 +51,13 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 { "error": { "code": "POC_CAP_EXCEEDED", "message": "…", "details": { } } }
 ```
 - **Branch on `code`, never on `message`.** Codes are stable within a MAJOR version; messages may change at any time. `details` is always an object (may be empty).
-- Cross-cutting codes: `UNAUTHORIZED` 401 · `SCOPE_FORBIDDEN` 403 · `RATE_LIMITED` 429 · `IDEMPOTENCY_KEY_REQUIRED` 400 · `IDEMPOTENCY_KEY_MISMATCH` / `IDEMPOTENCY_KEY_IN_USE` 409 · `VALIDATION_ERROR` **422** for a request body (strict schemas: an unknown field is a 422, except inside `pricing_evidence`, whose problems are `COMPS_INVALID`; with `details.issues[] {path, message}`), **400** for most query-string errors (exceptions are listed per route) · `INVALID_BODY` 400/413/415 (unparseable JSON, body over 64 KB, wrong content type, `text/plain` included) · `INVALID_REQUEST` 4xx (malformed URL and other framework rejections) · `DOMAIN_INVALID` 422 (not a second-level name like `name.com`) · `TLD_NOT_SUPPORTED` 422 (only `.com` in v1) · `NOT_FOUND` 404 (unknown route) · `INTERNAL` 500 · `AUDIT_WRITE_FAILED` 500.
+- Cross-cutting codes: `UNAUTHORIZED` 401 · `SCOPE_FORBIDDEN` 403 · `RATE_LIMITED` 429 · `IDEMPOTENCY_KEY_REQUIRED` 400 · `IDEMPOTENCY_KEY_MISMATCH` / `IDEMPOTENCY_KEY_IN_USE` 409 · `VALIDATION_ERROR` **422** for a request body (strict schemas: an unknown field is a 422, except inside `pricing_evidence`, whose problems are `COMPS_INVALID`; with `details.issues[] {path, message}`), **400** for most query-string errors (exceptions are listed per route) · `INVALID_BODY` 400/413/415 (unparseable JSON, body over 64 KB, wrong content type, `text/plain` included) · `INVALID_REQUEST` 4xx (malformed URL and other framework rejections that reach the service; some malformed paths never do: see **Platform responses** below) · `DOMAIN_INVALID` 422 (not a second-level name like `name.com`) · `TLD_NOT_SUPPORTED` 422 (only `.com` in v1) · `NOT_FOUND` 404 (unknown route) · `INTERNAL` 500 · `AUDIT_WRITE_FAILED` 500.
 - Route-specific codes are listed per route in `endpoints.md`. The code index at the end of `endpoints.md` lists every code the service emits.
+- **Platform responses (2.2.0, CR-006).** Render's front door (Cloudflare) answers some malformed paths itself, before the request reaches the service, so they are **not** in the error shape and write no audit row:
+  - an escape that is not hex (`/portfolio/%ZZ`, `%zz`): **400** with a `text/html` Cloudflare page;
+  - a truncated escape (`/portfolio/%E0%A4%A`, `a%`): **520** with `text/plain` `error code: 520`.
+
+  A complete escape that decodes to invalid UTF-8 (`/portfolio/%C3%28`) does reach the service and gets 400 `INVALID_REQUEST` in the error shape. Branch on the status and the `Content-Type`: only `application/json` bodies are the service's. Clients should send well-formed URLs. The service's own 400 asks to close the connection, but HTTP/2 drops connection headers at the edge, so a client sees no `Connection` header.
 
 ## Conventions
 - **Money:** integer **cents, USD**. Every money field is a pair: `<key>_cents` (integer) plus `<key>` (display string such as `"$11.08"`). Display strings for listing prices differ by place. The plan view (`/list`, `/buy`, `/pricing/preview`, including its `schedule` entries) uses whole dollars (`"$1,995"`). `/report`, `/portfolio`, `next_price_event`, upcoming `values`, `applied_7d`, an offer `snapshot` and listing history use the standard money format (`"$1,995.00"`). The walk-away display is whole dollars with `(private)` everywhere except the plan-view `schedule` entries (no suffix there). **Request** amounts are USD numbers or strings as stated per route (for example `max_price: 11.5`, `amount_usd: "450.00"`), with at most 2 decimals.

@@ -266,4 +266,16 @@ describe('GET /report?format=md', () => {
     expect(bad.statusCode).toBe(400);
     expect(bad.json().error.code).toBe('VALIDATION_ERROR');
   });
+
+  it('AUTO_RENEW_UNCONFIRMED: info for a live godaddy / registrar_api none name only', async () => {
+    await insertOwnedDomain(db, { domain: 'gd-owned.com', registrar: 'godaddy', registrar_api: 'none' });
+    await insertOwnedDomain(db, { domain: 'pb-full.com' });
+    await insertOwnedDomain(db, { domain: 'gd-sold.com', registrar: 'godaddy', registrar_api: 'none', status: 'sold' });
+    await insertOwnedDomain(db, { domain: 'gd-dropped.com', registrar: 'godaddy', registrar_api: 'none', status: 'dropped' });
+    const t = await boot();
+    const hits = (await t.warnings()).filter((w) => w.code === 'AUTO_RENEW_UNCONFIRMED');
+    expect(hits.map((w) => w.domain)).toEqual(['gd-owned.com']);
+    expect(hits[0]).toMatchObject({ level: 'info', details: { registrar: 'godaddy', registrar_api: 'none' } });
+    expect(hits[0]!.message).toContain('check it is OFF in the godaddy dashboard');
+  });
 });
