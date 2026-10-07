@@ -26,9 +26,10 @@ export interface ListRow { name: string; version: number; terms: string[]; creat
 /** The newest version of each named list; a list with no rows is absent from the result. */
 export async function currentLists(db: Kysely<Database>, names: string[]): Promise<Record<string, { version: number; terms: string[] }>> {
   if (names.length === 0) return {};
-  const rows = await db.selectFrom('selection_lists').select(['name', 'version', 'terms']).where('name', 'in', names).orderBy('name').orderBy('version', 'desc').execute();
+  // one row per name: the highest version (DISTINCT ON), not every version of every list
+  const rows = await db.selectFrom('selection_lists').select(['name', 'version', 'terms']).distinctOn('name').where('name', 'in', names).orderBy('name').orderBy('version', 'desc').execute();
   const out: Record<string, { version: number; terms: string[] }> = {};
-  for (const r of rows) if (!out[r.name]) out[r.name] = { version: r.version, terms: r.terms };
+  for (const r of rows) out[r.name] = { version: r.version, terms: r.terms };
   return out;
 }
 

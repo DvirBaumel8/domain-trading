@@ -46,6 +46,8 @@ export interface Approved {
   input: BuyInput; ctx: BuyCtx; category: Category; plan: ListingPlan | null; comps: Comp[]; rationale: string | null; pricing: PricingSettings; approvedAt: Date;
   check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: BuyBlock | null; trancheId: string | null;
   settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
+  /** Dry run only: registrar account-state findings that a real buy would refuse on (founder rule 6). */
+  accountWarnings?: string[];
 }
 
 const priceDetails = (q: EvaluatedQuote) => ({
@@ -138,6 +140,7 @@ export class BuyService {
     let winner!: EvaluatedQuote;
     let adapter!: RegistrarAdapter;
     let dry!: Awaited<ReturnType<BuyService['registrarDryRun']>>;
+    let accountWarnings: string[] = [];
     try {
       // 4, 5
       await this.assertNotOwned(db, input.domain);
@@ -183,7 +186,7 @@ export class BuyService {
       }
 
       // 9. registrar account state
-      await this.assertAccountState(adapter, winner.firstYearCents!);
+      accountWarnings = await this.assertAccountState(adapter, winner.firstYearCents!, input.dryRun);
 
       // 10. registrar dry run (re-quote once on COST_MISMATCH)
       dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars,
@@ -198,7 +201,7 @@ export class BuyService {
     winner = dry.winner;
 
     const approved: Approved = {
-      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId,
+      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, accountWarnings,
       settings: { poc_cap_cents: settings.poc_cap_cents, max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
     if (input.dryRun) return { status: 200, body: await this.dryRunBody(approved) };
@@ -446,7 +449,7 @@ export class BuyService {
     await bookPurchase(db, {
       purchaseId, domain: a.input.domain, registrar: a.adapter.name, registrarApi: registrarApiOf(a.adapter.capabilities),
       orderId: x.orderId, chargedCents: x.chargedCents, renewalCents: a.winner.renewalCents, expiryDate: expiry, buyDate: x.buyDate,
-      category: a.category, dealId: a.input.dealId, checkId: a.check.checkId, auditId: a.ctx.auditId, receiptRaw: x.receiptRaw ?? null,
+      category: a.category, dealId: a.input.dealId, checkId: a.check.checkId, auditId: a.ctx.auditId, receiptRaw: x.receiptRaw ?? null, now: new Date(this.deps.now()),
     });
     this.deps.checkService.invalidate(a.input.domain);
 
@@ -625,7 +628,8 @@ export class BuyService {
     }
   }
 
-  private async assertAccountState(adapter: RegistrarAdapter, cost: number): Promise<void> {
+  private async assertAccountState(adapter: RegistrarAdapter, cost: number, dryRun: boolean): Promise<string[]> {
+    const warnings: string[] = [];
     let st: AccountState;
     try {
       st = await adapter.accountState();
@@ -639,12 +643,19 @@ export class BuyService {
         'Auto top-up is on at the registrar, so the prepaid balance is not a spending limit. Turn it off (porkbun.com/account/api) and retry.',
         { registrar: adapter.name });
     }
+    if (st.autoTopupEnabled === null) {
+      // Founder rule 6: an unknown auto top-up setting could mean the prepaid balance is not a limit. A real buy refuses; a dry run reports it.
+      const msg = 'The registrar did not report whether auto top-up is on; a real buy would be refused until it is known to be off';
+      if (!dryRun) throw new AppError(409, 'REGISTRAR_STATE_UNKNOWN', msg, { registrar: adapter.name, registrar_code: 'AUTO_TOPUP_UNKNOWN' });
+      warnings.push(`AUTO_TOPUP_UNKNOWN: ${msg}`);
+    }
     if (st.balanceCents !== null && st.balanceCents < cost) throw funds(cost - st.balanceCents);
     if (st.spendLimitRemainingCents !== null && st.spendLimitRemainingCents < cost) {
       throw new AppError(409, 'REGISTRAR_FUNDS', "The registrar's monthly API spend limit would be exceeded", {
         reason: 'MONTHLY_SPEND_LIMIT', remaining_cents: st.spendLimitRemainingCents,
       });
     }
+    return warnings;
   }
 
   private async registrarDryRun(
@@ -672,7 +683,7 @@ export class BuyService {
         if (!(e instanceof RegistrarError)) throw e;
         if (e.ambiguous) await this.recordDryRunAmbiguous(adapter, e, cost, rec);
         if (e.code === 'COST_MISMATCH' && attempt === 0) {
-          w = await this.requote(adapter, domain, caps, pocCap, allowed);
+          w = await this.requote(adapter, domain, caps, pocCap, allowed, rec.input.dryRun);
           continue;
         }
         if (e.code === 'INSUFFICIENT_FUNDS') throw funds(e.details.shortfall as number | undefined);
@@ -714,7 +725,7 @@ export class BuyService {
       { registrar: adapter.name, registrar_code: e.code });
   }
 
-  private async requote(adapter: RegistrarAdapter, domain: string, caps: Caps, pocCap: number, allowed: string[]): Promise<EvaluatedQuote> {
+  private async requote(adapter: RegistrarAdapter, domain: string, caps: Caps, pocCap: number, allowed: string[], dryRun: boolean): Promise<EvaluatedQuote> {
     let ev: EvaluatedQuote;
     try {
       ev = evaluateQuote({ registrar: adapter.name, capabilities: adapter.capabilities, quote: await adapter.quote(domain), error: null }, allowed);
@@ -726,7 +737,7 @@ export class BuyService {
     if (!ev.eligible) throw new AppError(409, 'NO_ELIGIBLE_REGISTRAR', 'After a price change the registrar is no longer eligible', { exclusion_reason: ev.exclusionReason });
     if (!pickWinner([ev], caps)) throw new AppError(409, 'PRICE_ABOVE_MAX', 'The price changed and is now above your cap', { cheapest: priceDetails(ev) });
     await this.assertPocCap(this.deps.db, pocCap, ev.firstYearCents!);
-    await this.assertAccountState(adapter, ev.firstYearCents!);
+    await this.assertAccountState(adapter, ev.firstYearCents!, dryRun);
     return ev;
   }
 
@@ -762,7 +773,7 @@ export class BuyService {
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
       proposed_listing: a.plan ? planView(a.plan, events) : null, settings_version: a.pricing.version,
       ...gf,
-      warnings: [...a.check.warnings, ...(a.plan?.warnings ?? [])],
+      warnings: [...a.check.warnings, ...(a.plan?.warnings ?? []), ...(a.accountWarnings ?? [])],
     };
   }
 }

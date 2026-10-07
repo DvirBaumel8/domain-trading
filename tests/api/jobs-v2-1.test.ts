@@ -216,3 +216,23 @@ describe('rate-limit headers', () => {
     expect((await app.inject({ method: 'GET', url: '/health/ping' })).headers['ratelimit-limit']).toBeUndefined();
   });
 });
+
+describe('the walk-away stays out of job output (v2.16.0)', () => {
+  it('/jobs/run, /jobs/preview and GET /jobs/runs never carry walkaway', async () => {
+    await make();
+    const id = await insertOwnedDomain(db, { domain: 'examplecityroofing.com', status: 'listed', category: 'trend', price_grade: null, listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 129500, walkaway_cents: 96000, min_offer_cents: 10000, drop_date: '2028-10-04' });
+    await db.updateTable('domains').set({ plan_id: 'pl_x', first_listed_at: new Date('2026-10-12T09:00:00Z') }).where('id', '=', id).execute();
+    await db.insertInto('price_schedule').values({ domain_id: id, plan_id: 'pl_x', event: 'drop1_m6', due_on: '2027-04-12', bin_cents: 159500, floor_cents: 103500, walkaway_cents: 77000, settings_version: 2, status: 'planned' }).execute();
+    const pv = await app.inject({ method: 'POST', url: '/jobs/preview', headers: { ...(await issueToken('write')).auth, 'idempotency-key': 'pv-walk' }, payload: { today: '2027-04-12' } });
+    expect(pv.json().priceJob.would_apply).toHaveLength(1);
+    expect(pv.body.toLowerCase()).not.toContain('walkaway');
+    const run = await runJob('daily', 'daily-walk');
+    expect(run.json().steps.priceJob.summary.applied).toHaveLength(1);
+    expect(run.body.toLowerCase()).not.toContain('walkaway');
+    const runs = await get('/jobs/runs');
+    expect(runs.json().runs.length).toBeGreaterThan(0);
+    expect(runs.body.toLowerCase()).not.toContain('walkaway');
+    expect(JSON.stringify(await db.selectFrom('job_runs').select('steps').execute()).toLowerCase()).not.toContain('walkaway');
+    expect((await db.selectFrom('domains').select('walkaway_cents').where('id', '=', id).executeTakeFirstOrThrow()).walkaway_cents).toBe(77000);
+  });
+});

@@ -28,7 +28,7 @@ import { dbAuditWriter, auditFrameworkError, registerAuditId, registerAuditWrite
 import { registerAuth, registerScope } from './http/auth.js';
 import { registerIdempotency } from './http/idempotency.js';
 import { registerRateLimit } from './http/rate-limit.js';
-import { errorBody, registerErrorHandling } from './http/errors.js';
+import { registerErrorHandling } from './http/errors.js';
 import { jerusalemDeep } from './time.js';
 import { rdapLookup, rdapStatus, type RdapFn } from './rdap.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
@@ -191,7 +191,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerTestSets(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
-  registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now });
+  registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
   const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey };
   registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });

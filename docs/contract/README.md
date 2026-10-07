@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 2.15.0** (8 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 2.16.0** (8 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -39,7 +39,7 @@
 ## Idempotency (every POST)
 - `Idempotency-Key: <1–255 visible ASCII characters>` is **required** on every POST. Missing or malformed → **400** `IDEMPOTENCY_KEY_REQUIRED`.
 - **Same key, same method, path and body** (canonical JSON): the stored response is replayed with the header `Idempotent-Replayed: true`. The side effects happen once.
-- **Same key, different request** → **409** `IDEMPOTENCY_KEY_MISMATCH`. **Same key while the first call is still running** → **409** `IDEMPOTENCY_KEY_IN_USE`.
+- **Same key, different request** → **409** `IDEMPOTENCY_KEY_MISMATCH`. **Same key while the first call is still running** → **409** `IDEMPOTENCY_KEY_IN_USE` (2.16.0: with `details: {stale: true, started_at}` when the first call started more than 15 minutes ago and may have died; the key is not released, so retry with a new key only after checking whether the first call acted). Completed keys are kept 30 days.
 - A 5xx response releases the key, so a retry with the same key runs again. Exception: `AUDIT_WRITE_FAILED` (500) means the request **was processed** but not audited. Retry with the same key to get the stored result.
 - `POST /buy` only: a stored **202** (purchase state unknown) is re-evaluated on retry with the same key, never replayed blindly. Never retry a purchase with a **new** key.
 - Keys are global, not per token. Use a fresh UUID per intended action.

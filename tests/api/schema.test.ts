@@ -80,6 +80,7 @@ describe('schema: export_uploads and job scope (migration 6)', () => {
   });
   it('audit scope job is accepted', async () => {
     await db.insertInto('audit_log').values({ id: 'aud_' + '1'.repeat(32), method: 'JOB', path: '/job/price', status_code: 200, scope: 'job' }).execute();
+    expect(await db.selectFrom('audit_log').select(['scope', 'method']).where('id', '=', 'aud_' + '1'.repeat(32)).executeTakeFirstOrThrow()).toEqual({ scope: 'job', method: 'JOB' });
   });
 });
 
@@ -300,6 +301,7 @@ describe('schema: offers (OF-11)', () => {
   it('external_ref may be an email Message-ID', async () => {
     const id = await insertOwnedDomain(db);
     await db.insertInto('offers').values(offerRow(id, { external_ref: '<abc@mail.gmail.com>' })).execute();
+    expect((await db.selectFrom('offers').select('external_ref').executeTakeFirstOrThrow()).external_ref).toBe('<abc@mail.gmail.com>');
   });
   it('note CHECK rejects an email address', async () => {
     const id = await insertOwnedDomain(db);

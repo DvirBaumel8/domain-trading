@@ -53,7 +53,7 @@ export function filterDropName(raw: string, seen: Set<string>): FilteredName {
 const squash = (s: string) => s.toLowerCase().replace(/\s+/g, '');
 export const isPendingDelete = (f: RdapFacts | null): boolean => !!f && f.statuses.some((s) => squash(s) === 'pendingdelete');
 export const isRedemption = (f: RdapFacts | null): boolean => !!f && f.statuses.some((s) => squash(s) === 'redemptionperiod');
-const dateOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? new Date(Date.parse(iso)).toISOString().slice(0, 10) : null);
+const dateOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? jerusalemDate(new Date(Date.parse(iso))) : null);
 
 export interface WatchStatus {
   status: 'pending_delete' | 'redemption' | 'registered' | 'not_registered' | 'unknown';

@@ -2,6 +2,30 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.16.0 (2026-10-08): tech-debt pass, CR-014, CR-015
+MINOR. Release note: `docs/releases/v2.16.0.md`. Mostly fixes. Additive fields and one new route. A few checks are now stricter, each listed here.
+- **New:** `POST /candidates/daily/rebuild` (6 a day); `token_name` on `GET /audit` rows; `checked_at` on `POST /candidates/{domain}/records`; `unknowns` lists undecided names, with `unread` and `unknown_inputs`; cohort status `abandoned`; post statuses `pending` and `unknown`; `REVIEW_IN_PROGRESS`; admin `resolve-purchase`.
+- **Stricter:**
+  - a `tm_us` domain record needs an https evidence URL and the domain's own phrase (CR-014 N-1);
+  - intake notes refuse personal data (`NO_PII`, CR-015 I-1) and remove `NO_SPLIT` / `ONE_WORD` names;
+  - a test set seals only from a `done` run;
+  - a cohort freezes only from a `done` run;
+  - a real `/buy` refuses an unknown auto top-up state (`REGISTRAR_STATE_UNKNOWN`, founder rule 6);
+  - geo LANDER-1 fails closed without a price list;
+  - bot-posted review cost at most $5, and only Gemini cost counts toward the cap;
+  - `/media` is limited to 120 a minute per IP.
+- **Behaviour:**
+  - **Posting:** a post is recorded `pending` before Buffer is called, so a retry can't post twice (`unknown` counts toward the cap).
+  - **Reviews:** one review runs at a time.
+  - **Jobs:**
+    - a step with failed items is `ok: false`;
+    - the walk-away is no longer in `/jobs/run`, `/jobs/preview` or `GET /jobs/runs`;
+    - NS verification and the weekly blocklist follow IDT days;
+    - the review-retry `tick` runs at 08:30 UTC.
+  - **The daily list** judges domain records at build time.
+  - **Idempotency:** a stale `in_progress` key says `stale: true`.
+  - **Restore:** the backup now restores every exported table.
+
 ## 2.15.0 (2026-10-08): CR-013 acceptance fixes
 MINOR, **additive**. Release note: `docs/releases/v2.15.0.md`.
 - **Review:** one weekly rule (a failed review never uses up the full-document packet, F-1); actor and token ids in packets become `operator` (F-2); a 503, timeout or network error is retried at 10:30 IDT like a 429 (F-3); `GET /reviews/settings/history` (F-10); only calls that reach Google count toward 3 per hour (F-9).

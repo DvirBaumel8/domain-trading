@@ -162,12 +162,19 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
 /** v2.14.0 (CR-012 T12-18): the only routes an `intake` token may call (all POST). Everything else, GETs included, is 403 SCOPE_FORBIDDEN. */
 export const INTAKE_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake', '/selection/drop-lists']);
 
+const intakeForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'An intake token may only call POST /candidates/intake and POST /selection/drop-lists');
+
+/** onRequest hook for a route that takes a big body (POST /posts): a token that cannot write is refused before the body is read or parsed (F12). */
+export async function requireWriteBeforeBody(req: { auth: AuthContext | null; jobAuth: boolean }): Promise<void> {
+  if (!req.auth || req.jobAuth) return; // unauthenticated requests were already refused 401 in the auth hook
+  if (req.auth.scope === 'intake') throw intakeForbidden();
+  if (req.auth.scope !== 'write') throw new AppError(403, 'SCOPE_FORBIDDEN', 'This token may only call GET endpoints');
+}
+
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
     if (req.auth?.scope === 'intake' && !req.jobAuth) {
-      if (req.method !== 'POST' || !INTAKE_ROUTES.has(req.routeOptions?.url ?? '')) {
-        throw new AppError(403, 'SCOPE_FORBIDDEN', 'An intake token may only call POST /candidates/intake and POST /selection/drop-lists');
-      }
+      if (req.method !== 'POST' || !INTAKE_ROUTES.has(req.routeOptions?.url ?? '')) throw intakeForbidden();
       return;
     }
     // POST /jobs/run: the job-trigger bearer, or a WRITE token (CR-007 T-2). A READ token is refused like any other credential.

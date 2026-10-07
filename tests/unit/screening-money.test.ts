@@ -159,11 +159,14 @@ describe('money mechanics', () => {
     expect(m({ binCents: 108800 }).floor_cents).toBe(75000);
   });
 
-  it('without a price list: bin_in_allowed_set is null and a non-geo LANDER-1 cannot pass', () => {
+  it('without a price list: bin_in_allowed_set is null and no LANDER-1 (geo or not) can pass', () => {
     const r = m({}, v91, V2);
     expect([r.bin_in_allowed_set, r.lander1.pass, r.lander1.reason]).toEqual([null, false, 'PRICE_LIST_MISSING']);
     expect(r.lander1.message).toMatch(/pricing_settings v3 not created yet/);
-    expect(m({ lane: 'S2', binCents: 49900 }, v91, V2).lander1.pass).toBe(true);
+    // v2.16.0: a geo BIN fails closed too (it cannot be shown to be on a price list that does not exist)
+    const geo = m({ lane: 'S2', binCents: 49900 }, v91, V2);
+    expect([geo.bin_in_allowed_set, geo.lander1.pass, geo.lander1.reason]).toEqual([null, false, 'PRICE_LIST_MISSING']);
+    expect(m({ lane: 'S2', binCents: 49900 }, v91, V3).lander1.pass).toBe(true);
   });
 
   it('syllables: vowel groups, at least one', () => {

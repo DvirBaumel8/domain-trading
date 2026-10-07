@@ -23,7 +23,8 @@ const KEY_SHAPES = new RegExp([
   '(?<![A-Za-z0-9])rnd_[A-Za-z0-9]{16,}',
   '(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}',
 ].join('|'));
-const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}/;
+// The local part is bounded ({1,64}, the SMTP maximum) so a long run of letters cannot make the match quadratic (checked only when the text has an @).
+const EMAIL = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,}/;
 // Dates such as 2026-10-07 are blanked before the phone check.
 const ISO_DATE = /\d{4}-\d{2}-\d{2}/g;
 // A candidate run of digits with spaces, dashes and parentheses, not glued to letters or digits (so a hex hash never matches).
@@ -55,7 +56,7 @@ export function termMatches(text: string, term: string): boolean {
 export async function checkText(db: Kysely<Database>, text: string, opts: BlockOpts = {}): Promise<BlockResult> {
   for (const v of opts.secretValues ?? []) if (v.length >= MIN_SECRET_LENGTH && text.includes(v)) return { ok: false, category: 'secret' };
   if (DOM_TOKEN.test(text) || KEY_SHAPES.test(text)) return { ok: false, category: 'secret' };
-  if (EMAIL.test(text)) return { ok: false, category: 'email' };
+  if (text.includes('@') && EMAIL.test(text)) return { ok: false, category: 'email' };
   if (hasPhone(text)) return { ok: false, category: 'phone' };
   const terms = await db.selectFrom('forbidden_terms as t').leftJoin('forbidden_term_retirements as r', 'r.term_id', 't.id').select('t.term').where('r.id', 'is', null).execute();
   for (const { term } of terms) if (termMatches(text, term)) return { ok: false, category: 'listed_term' };

@@ -9,9 +9,17 @@ export const WRITE_JOB_RUNS_PER_HOUR = 4;
 /** POST /reviews/run: calls per hour per WRITE token (the outside review costs money and counts toward the monthly cap). */
 export const REVIEW_RUNS_PER_HOUR = 3;
 
-/** CR-013 F-9: requests whose POST /reviews/run reached Google. Only these count toward the hourly limit (the count is taken when the response is sent). */
+/**
+ * POST /reviews/run counts toward its hourly limit only when the call reaches Google, and the slot is taken right BEFORE the Google call
+ * (never given back), so two concurrent calls cannot both slip under the limit. The preHandler below registers the taker for the request.
+ */
+const reviewSlotTakers = new WeakMap<object, () => void>();
 const reachedGoogle = new WeakSet<object>();
-export const markReviewReachedGoogle = (req: object): void => { reachedGoogle.add(req); };
+export const markReviewReachedGoogle = (req: object): void => {
+  if (reachedGoogle.has(req)) return;
+  reachedGoogle.add(req);
+  reviewSlotTakers.get(req)?.();
+};
 
 /** In-memory sliding window. Fine for one Render instance; revisit if we ever scale out. */
 export class SlidingWindowLimiter {
@@ -39,6 +47,9 @@ export class SlidingWindowLimiter {
 
   take(key: string): number {
     const t = this.now();
+    if (this.hits.size > 5000) {
+      for (const [k, v] of this.hits) if (v.every((x) => x <= t - this.windowMs)) this.hits.delete(k);
+    }
     const recent = (this.hits.get(key) ?? []).filter((x) => x > t - this.windowMs);
     if (recent.length >= this.limit) {
       this.hits.set(key, recent);
@@ -57,9 +68,7 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
   const reviewRuns = new SlidingWindowLimiter(REVIEW_RUNS_PER_HOUR, 3_600_000, now);
   app.addHook('onSend', async (req, reply, payload) => {
     if (!req.auth || !reachedGoogle.has(req)) return payload;
-    const key = String(req.auth.tokenId);
-    reviewRuns.take(key);
-    const st = reviewRuns.state(key);
+    const st = reviewRuns.state(String(req.auth.tokenId));
     reply.header('ratelimit-remaining', String(st.remaining));
     reply.header('ratelimit-reset', String(st.resetSeconds));
     return payload;
@@ -72,7 +81,8 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
     // CR-007 T-2: a WRITE token starting a job has its own, tighter limit (instead of the general write limit).
     const reviewRun = req.auth && req.routeOptions?.url === '/reviews/run' && req.method === 'POST' && req.auth.scope === 'write';
     const limiter = reviewRun ? reviewRuns : req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method) ? writes : reads;
-    // POST /reviews/run is counted only when the call reaches Google (onSend below); here it is only refused when the hour is already used up.
+    // POST /reviews/run is counted only when the call reaches Google (the slot is taken just before the Google call); here it is only refused when the hour is already used up.
+    if (reviewRun) reviewSlotTakers.set(req, () => { reviewRuns.take(key); });
     const wait = reviewRun ? limiter.peek(key) : limiter.take(key);
     // CR-005 N-8a: the caller's own limit for this method class (GET vs POST), on every authenticated response, a 429 included.
     const st = limiter.state(key);

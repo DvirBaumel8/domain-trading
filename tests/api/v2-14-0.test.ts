@@ -30,8 +30,10 @@ async function h(): Promise<ScreeningHarness> {
 const fakeWorker = (x: ScreeningHarness, kicked: string[] = []): ScreeningWorker => ({ checks: x.app.screeningWorker.checks, kick: (id: string) => { kicked.push(id); }, runToEnd: async () => {} }) as unknown as ScreeningWorker;
 const intakeJob = (x: ScreeningHarness, kicked: string[] = []) => new IntakeScreeningJob({ db, worker: fakeWorker(x, kicked), now: () => x.clock.t });
 const ap = (x: ScreeningHarness, text: string) => ({ text, approved_at: new Date(x.clock.t - 3_600_000).toISOString() });
-const letters = (i: number) => String.fromCharCode(97 + Math.floor(i / 26), 97 + (i % 26));
-const nm = (i: number) => `qxz${letters(i)}.com`;
+// two-word names (the intake word rules need a reading of 2 or 3 words by the bt1@v2 split)
+const NAMES = ['superpro', 'superbox', 'supertech', 'superhealth', 'supermedia', 'superlab', 'superhub', 'supershop', 'superworks', 'supergroup', 'superhouse', 'superstore', 'megapro', 'megatech', 'megahealth', 'megamedia', 'megalab', 'megahub',
+  'megaworks', 'megagroup', 'megahouse', 'smartpro', 'smartbox', 'smarttech', 'smarthealth', 'smartmedia', 'smartlab', 'smarthub', 'smartshop', 'smartworks', 'smartgroup', 'smarthouse', 'smartstore', 'quickpro', 'quickbox'];
+const nm = (i: number) => `${NAMES[i]}.com`;
 const COMPS = [
   { domain: 'alpha.com', price_usd: 1200, sold_on: '2026-01-05', venue: 'Afternic', source_url: 'https://example.com/a' },
   { domain: 'beta.com', price_usd: 900, sold_on: '2026-02-05', venue: 'Sedo', source_url: 'https://example.com/b' },
@@ -48,7 +50,7 @@ describe('intake scope and route (CR-012 T12-14, T12-15, T12-18)', () => {
   it('V214-1 an intake token may call only POST /candidates/intake and POST /selection/drop-lists; every other route is 403 SCOPE_FORBIDDEN (GETs too); a READ token cannot intake', async () => {
     const x = await h();
     const s = await scout(x);
-    const ok = await s.intake([{ domain: 'qxzaa.com', lane: 'S3', source: 'scout-1/run-7' }]);
+    const ok = await s.intake([{ domain: 'quickmedia.com', lane: 'S3', source: 'scout-1/run-7' }]);
     expect(ok.statusCode, ok.body).toBe(200);
     const drops = await s.call('POST', '/selection/drop-lists', { name: 'dl-intake', list_date: '2026-10-06', domains: ['alphabeta.com'] });
     expect(drops.statusCode, drops.body).toBe(201);
@@ -60,7 +62,7 @@ describe('intake scope and route (CR-012 T12-14, T12-15, T12-18)', () => {
       expect([m, u, r.statusCode, r.json().error.code]).toEqual([m, u, 403, 'SCOPE_FORBIDDEN']);
     }
     const read = await issueToken('read');
-    const r = await x.app.inject({ method: 'POST', url: '/candidates/intake', headers: { ...read.auth, 'idempotency-key': randomUUID() }, payload: { names: [{ domain: 'qxzab.com', lane: 'S3', source: 's' }] } });
+    const r = await x.app.inject({ method: 'POST', url: '/candidates/intake', headers: { ...read.auth, 'idempotency-key': randomUUID() }, payload: { names: [{ domain: 'quicklab.com', lane: 'S3', source: 's' }] } });
     expect([r.statusCode, r.json().error.code]).toEqual([403, 'SCOPE_FORBIDDEN']);
     // the audit row names the token (token_id -> api_tokens.name) and carries the intake scope; the intake row names the scout and the audit row
     const audit = await db.selectFrom('audit_log').innerJoin('api_tokens', 'api_tokens.id', 'audit_log.token_id').select(['audit_log.id as aid', 'audit_log.scope', 'api_tokens.name'])
@@ -68,7 +70,7 @@ describe('intake scope and route (CR-012 T12-14, T12-15, T12-18)', () => {
     expect(audit).toMatchObject({ scope: 'intake', name: 'scout-1' });
     expect((await queuedRows())[0]).toMatchObject({ token_name: 'scout-1', audit_id: audit.aid, source: 'scout-1/run-7', status: 'queued' });
     // a WRITE token works too
-    const w = await x.post('/candidates/intake', { names: [{ domain: 'qxzac.com', lane: 'S4', source: 'gavriel' }] });
+    const w = await x.post('/candidates/intake', { names: [{ domain: 'quickhub.com', lane: 'S4', source: 'gavriel' }] });
     expect(w.statusCode).toBe(200);
   });
 
@@ -79,23 +81,23 @@ describe('intake scope and route (CR-012 T12-14, T12-15, T12-18)', () => {
     const r = await s.intake([
       { domain: 'bad domain', lane: 'S3', source: 's' }, { domain: 'qxzaa.net', lane: 'S3', source: 's' }, { domain: 'qxz9.com', lane: 'S3', source: 's' },
       { domain: 'qxz-aa.com', lane: 'S3', source: 's' }, { domain: 'littlebigredhousepaint.com', lane: 'S3', source: 's' }, { domain: 'OwnedName.com', lane: 'S3', source: 's' },
-      { domain: 'qxzbb.com', lane: 'S3', source: 's' }, { domain: 'QXZBB.com', lane: 'S3', source: 's' }, { domain: 'www.qxzcc.com', lane: 'S3', source: 's' },
+      { domain: 'quickshop.com', lane: 'S3', source: 's' }, { domain: 'QUICKSHOP.com', lane: 'S3', source: 's' }, { domain: 'www.quickworks.com', lane: 'S3', source: 's' },
     ]);
     expect(r.statusCode, r.body).toBe(200);
     const b = r.json();
     expect(b.removed).toEqual([
       { domain: 'bad domain', reason: 'DOMAIN_INVALID' }, { domain: 'qxzaa.net', reason: 'NOT_COM' }, { domain: 'qxz9.com', reason: 'HAS_DIGIT' }, { domain: 'qxz-aa.com', reason: 'HAS_HYPHEN' },
-      { domain: 'littlebigredhousepaint.com', reason: 'TOO_MANY_WORDS' }, { domain: 'ownedname.com', reason: 'OWNED' }, { domain: 'qxzbb.com', reason: 'DUPLICATE_IN_UPLOAD' }, { domain: 'www.qxzcc.com', reason: 'DOMAIN_INVALID' },
+      { domain: 'littlebigredhousepaint.com', reason: 'TOO_MANY_WORDS' }, { domain: 'ownedname.com', reason: 'OWNED' }, { domain: 'quickshop.com', reason: 'DUPLICATE_IN_UPLOAD' }, { domain: 'www.quickworks.com', reason: 'DOMAIN_INVALID' },
     ]);
-    expect(b.accepted).toEqual([{ domain: 'qxzbb.com', intake_id: expect.any(Number) }]);
+    expect(b.accepted).toEqual([{ domain: 'quickshop.com', intake_id: expect.any(Number) }]);
     expect(b.duplicates).toEqual([]);
     expect((await queuedRows()).map((q) => q.status)).toEqual(['removed', 'removed', 'removed', 'removed', 'removed', 'removed', 'queued', 'removed', 'removed']);
     // strict body: an unknown field, a lane outside S2..S7, comps of one, an empty list
     for (const bad of [
-      { names: [{ domain: 'qxzdd.com', lane: 'S3', source: 's', price: 5 }] }, { names: [{ domain: 'qxzdd.com', lane: 'S1', source: 's' }] },
-      { names: [{ domain: 'qxzdd.com', lane: 'S3', source: 's', comps: [COMPS[0]] }] }, { names: [] }, { names: [{ domain: 'qxzdd.com', lane: 'S3', source: '' }] },
+      { names: [{ domain: 'quickgroup.com', lane: 'S3', source: 's', price: 5 }] }, { names: [{ domain: 'quickgroup.com', lane: 'S1', source: 's' }] },
+      { names: [{ domain: 'quickgroup.com', lane: 'S3', source: 's', comps: [COMPS[0]] }] }, { names: [] }, { names: [{ domain: 'quickgroup.com', lane: 'S3', source: '' }] },
     ]) expect((await s.call('POST', '/candidates/intake', bad)).statusCode).toBe(422);
-    const future = await s.intake([{ domain: 'qxzee.com', lane: 'S3', source: 's', comps: [COMPS[0], { ...COMPS[1], sold_on: '2030-01-01' }] }]);
+    const future = await s.intake([{ domain: 'quickhouse.com', lane: 'S3', source: 's', comps: [COMPS[0], { ...COMPS[1], sold_on: '2030-01-01' }] }]);
     expect([future.statusCode, future.json().error.code]).toEqual([422, 'COMPS_INVALID']);
   });
 
@@ -103,13 +105,13 @@ describe('intake scope and route (CR-012 T12-14, T12-15, T12-18)', () => {
     const x = await h();
     const a = await scout(x, 'scout-a');
     const b = await scout(x, 'scout-b');
-    const first = (await a.intake([{ domain: 'qxzaa.com', lane: 'S3', source: 'a/1', comps: COMPS }])).json();
+    const first = (await a.intake([{ domain: 'quickmedia.com', lane: 'S3', source: 'a/1', comps: COMPS }])).json();
     expect(first.accepted).toHaveLength(1);
     x.clock.t += (INTAKE_DEDUPE_DAYS - 1) * DAY;
-    const dup = (await b.intake([{ domain: 'qxzaa.com', lane: 'S4', source: 'b/9', note: 'seen on a list' }])).json();
-    expect(dup).toMatchObject({ accepted: [], duplicates: [{ domain: 'qxzaa.com', first_intake_id: first.accepted[0].intake_id }] });
+    const dup = (await b.intake([{ domain: 'quickmedia.com', lane: 'S4', source: 'b/9', note: 'seen on a list' }])).json();
+    expect(dup).toMatchObject({ accepted: [], duplicates: [{ domain: 'quickmedia.com', first_intake_id: first.accepted[0].intake_id }] });
     x.clock.t += 2 * DAY;
-    const again = (await b.intake([{ domain: 'qxzaa.com', lane: 'S4', source: 'b/10' }])).json();
+    const again = (await b.intake([{ domain: 'quickmedia.com', lane: 'S4', source: 'b/10' }])).json();
     expect(again.accepted).toHaveLength(1);
     const rows = await queuedRows();
     expect(rows.map((r) => [r.source, r.status, r.token_name])).toEqual([['a/1', 'queued', 'scout-a'], ['b/9', 'duplicate', 'scout-b'], ['b/10', 'queued', 'scout-b']]);
@@ -148,7 +150,7 @@ describe('intakeScreening (CR-012 T12-16, T12-17, T12-19)', () => {
   it('V214-5 drop-list names about to drop join the run after the intake names, are not screened again within 7 days, and an owned name never is', async () => {
     const x = await h();
     const s = await scout(x);
-    await s.intake([{ domain: 'qxzaa.com', lane: 'S3', source: 'scout' }]);
+    await s.intake([{ domain: 'quickmedia.com', lane: 'S3', source: 'scout' }]);
     await db.insertInto('drop_lists').values({ name: 'dl-1', list_date: '2026-10-06', created_by: 'scout-1', received_n: 5, kept_n: 5 }).execute();
     const names = ['dropone.com', 'droptwo.com', 'dropthree.com', 'dropfour.com', 'dropfive.com'];
     await db.insertInto('drop_list_rows').values(names.map((domain) => ({ list_name: 'dl-1', domain, kept: true, reason: null, tokens: ['drop', 'x'] }))).execute();
@@ -159,8 +161,8 @@ describe('intakeScreening (CR-012 T12-16, T12-17, T12-19)', () => {
     const r = await job.runOnce();
     expect(r).toMatchObject({ queued_before: 1, screened: 3, from_intake: 1, from_drop_lists: 2, left_for_next_run: 0 });
     const run = await db.selectFrom('screening_runs').selectAll().executeTakeFirstOrThrow();
-    expect((run.input as { names: { domain: string }[] }).names.map((n) => n.domain)).toEqual(['qxzaa.com', 'dropone.com', 'droptwo.com']);
-    expect((await db.selectFrom('candidate_screenings').select(['domain', 'origin', 'intake_id']).orderBy('id').execute()).map((q) => [q.domain, q.origin, q.intake_id === null])).toEqual([['qxzaa.com', 'intake', false], ['dropone.com', 'drop_list', true], ['droptwo.com', 'drop_list', true]]);
+    expect((run.input as { names: { domain: string }[] }).names.map((n) => n.domain)).toEqual(['quickmedia.com', 'dropone.com', 'droptwo.com']);
+    expect((await db.selectFrom('candidate_screenings').select(['domain', 'origin', 'intake_id']).orderBy('id').execute()).map((q) => [q.domain, q.origin, q.intake_id === null])).toEqual([['quickmedia.com', 'intake', false], ['dropone.com', 'drop_list', true], ['droptwo.com', 'drop_list', true]]);
     x.clock.t += 2 * DAY; // inside the 7 days: not again
     expect(await job.runOnce()).toMatchObject({ skipped: true, reason: 'NO_NAMES' });
     expect(await db.selectFrom('screening_runs').select('id').execute()).toHaveLength(1);
@@ -172,13 +174,13 @@ describe('intakeScreening (CR-012 T12-16, T12-17, T12-19)', () => {
     expect(await intakeCensusList(db)).toBeNull();
     expect((await x.post('/selection/sibling-methods/bt1@v2/approve', { approval_ref: ap(x, 'sibling method bt1@v2 approved') })).statusCode).toBe(201);
     expect(await intakeCensusList(db)).toBe('bt1@v2');
-    await s.intake([{ domain: 'qxzaa.com', lane: 'S3', source: 'scout' }]);
+    await s.intake([{ domain: 'quickmedia.com', lane: 'S3', source: 'scout' }]);
     const r1 = await intakeJob(x).runOnce();
     expect(r1.census_list).toBe('bt1@v2');
     expect(((await db.selectFrom('screening_runs').select('input').where('id', '=', r1.run_id!).executeTakeFirstOrThrow()).input as { names: { census_list?: string }[] }).names[0]!.census_list).toBe('bt1@v2');
     expect((await x.post('/selection/sibling-methods/bt1@v3/approve', { approval_ref: ap(x, 'sibling method bt1@v3 approved') })).statusCode).toBe(201);
     expect(await intakeCensusList(db)).toBe('bt1@v3');
-    await s.intake([{ domain: 'qxzbb.com', lane: 'S3', source: 'scout' }]);
+    await s.intake([{ domain: 'quickshop.com', lane: 'S3', source: 'scout' }]);
     x.clock.t += DAY;
     const r2 = await intakeJob(x).runOnce();
     expect(r2.census_list).toBe('bt1@v3');
@@ -188,7 +190,7 @@ describe('intakeScreening (CR-012 T12-16, T12-17, T12-19)', () => {
   it('V214-7 both steps run in the daily job after dropWatch and before cohortOutcomes, show in GET /jobs/runs, and the real worker screens the intake run', async () => {
     const x = await h();
     const s = await scout(x);
-    await s.intake([{ domain: 'qxzaa.com', lane: 'S3', source: 'scout' }]);
+    await s.intake([{ domain: 'quickmedia.com', lane: 'S3', source: 'scout' }]);
     const res = await x.post('/jobs/run', { job: 'daily' });
     expect(res.statusCode, res.body).toBe(200);
     const steps = Object.keys(res.json().steps);

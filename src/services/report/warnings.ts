@@ -99,6 +99,16 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
 
   // domains
   const pending = new Set(await pendingDomains(db, 'afternic'));
+  // batched lookups for the per-row rules below (no query inside the loop)
+  const heldIds = domains.filter((d) => d.pricing_hold).map((d) => d.id);
+  const lastHistoryAt = new Map<number, Date>(); // newest listing_history row (by id) of each held name
+  if (heldIds.length > 0) {
+    const r = await sql<{ domain_id: number; at: Date }>`select distinct on (domain_id) domain_id, at from listing_history where domain_id in (${sql.join(heldIds)}) order by domain_id, id desc`.execute(db);
+    for (const x of r.rows) lastHistoryAt.set(x.domain_id, x.at);
+  }
+  const exceptionVersions = [...new Set(domains.filter((d) => d.pricing_source === 'approved_exception' && d.pricing_settings_version !== null).map((d) => d.pricing_settings_version!))];
+  const settingsOf = new Map<number, Awaited<ReturnType<typeof settingsByVersion>>>();
+  for (const v of exceptionVersions) settingsOf.set(v, await settingsByVersion(db, v));
   for (const d of domains) {
     if (d.lander_ns && d.ns_verified_at === null && (d.status === 'owned' || d.status === 'listed')) {
       add('NS_UNVERIFIED', 'warn', `${d.domain}: the nameservers are not verified as the lander's.`, d.domain, { lander: d.lander, lander_ns: d.lander_ns });
@@ -129,15 +139,14 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
       add('EXPORT_PENDING', ms > 7 * DAY ? 'error' : 'warn', `${d.domain}: the marketplace price is stale for ${days} days (export and upload).`, d.domain, { days_pending: days, export_pending_since: d.export_pending_since ? toJerusalemIso(d.export_pending_since) : null });
     }
     if (d.pricing_hold) {
-      const last = await db.selectFrom('listing_history').select('at').where('domain_id', '=', d.id).orderBy('id', 'desc').limit(1).executeTakeFirst();
-      const since = last?.at ?? d.updated_at;
+      const since = lastHistoryAt.get(d.id) ?? d.updated_at;
       if (now.getTime() - since.getTime() > 30 * DAY) {
         add('HOLD_STALE', 'warn', `${d.domain}: the pricing hold has been on since ${toJerusalemIso(since)} (over 30 days).`, d.domain, { reason: d.pricing_hold_reason, since: toJerusalemIso(since) });
       }
     }
     if (d.pricing_source === 'approved_exception') {
       let formula: Record<string, unknown> | null = null;
-      const st = d.pricing_settings_version === null ? null : await settingsByVersion(db, d.pricing_settings_version);
+      const st = d.pricing_settings_version === null ? null : settingsOf.get(d.pricing_settings_version) ?? null;
       if (st && d.category && d.bin_cents !== null) {
         const r = computePlan({ category: d.category, grade: d.price_grade, binCents: d.bin_cents, floorCents: d.floor_cents, walkawayCents: d.walkaway_cents, exception: true, mode: 'hybrid' }, st);
         if (r.ok && r.plan.formula) formula = priceValues({ bin_cents: d.bin_cents, floor_cents: r.plan.formula.floorCents, walkaway_cents: r.plan.formula.walkawayCents });
@@ -166,17 +175,23 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
 
   // purchases
   const purchases = await db.selectFrom('purchases').select(['id', 'domain', 'state', 'dry_run']).where('state', 'in', ['unknown', 'succeeded']).orderBy('id').execute();
+  const buyIds = purchases.filter((p) => p.state === 'succeeded' && !p.dry_run).map((p) => p.id);
+  const withReceipt = new Set<number>();
+  if (buyIds.length > 0) for (const r of await db.selectFrom('receipts').select('purchase_id').distinct().where('purchase_id', 'in', buyIds).execute()) withReceipt.add(r.purchase_id as number);
+  const domainByName = new Map(domains.map((d) => [d.domain, d]));
+  const withEvidence = new Set<number>();
+  const evDomainIds = purchases.filter((p) => p.state === 'succeeded' && !p.dry_run).map((p) => domainByName.get(p.domain)?.id).filter((x): x is number => x !== undefined);
+  if (evDomainIds.length > 0) for (const r of await db.selectFrom('pricing_evidence').select('domain_id').distinct().where('domain_id', 'in', evDomainIds).execute()) withEvidence.add(r.domain_id as number);
   for (const p of purchases) {
     if (p.state === 'unknown') {
       add('PURCHASE_UNKNOWN', 'error', `The purchase of ${p.domain} is in an unknown state; the reconciler or Dvir must resolve it.`, p.domain, { purchase_id: p.id });
       continue;
     }
     if (p.dry_run) continue;
-    const rec = await db.selectFrom('receipts').select('id').where('purchase_id', '=', p.id).limit(1).executeTakeFirst();
-    if (!rec) add('RECEIPT_MISSING', 'warn', `The purchase of ${p.domain} has no receipt on file.`, p.domain, { purchase_id: p.id });
-    const dom = domains.find((d) => d.domain === p.domain);
+    if (!withReceipt.has(p.id)) add('RECEIPT_MISSING', 'warn', `The purchase of ${p.domain} has no receipt on file.`, p.domain, { purchase_id: p.id });
+    const dom = domainByName.get(p.domain);
     if (dom) {
-      const ev = await db.selectFrom('pricing_evidence').select('id').where('domain_id', '=', dom.id).limit(1).executeTakeFirst();
+      const ev = withEvidence.has(dom.id);
       // an imported legacy_no_comps name has an evidence row (comps null + legacy reason): that is complete, not "incomplete"
       if (!ev) add('POST_BUY_INCOMPLETE', 'warn', `${p.domain} was bought without pricing evidence (comps); add the sell plan.`, p.domain, { purchase_id: p.id });
     }

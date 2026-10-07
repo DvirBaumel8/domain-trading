@@ -38,4 +38,14 @@ describe('NsVerifier', () => {
     const [a, b] = await Promise.all([job.runOnce(), job.runOnce()]);
     expect([a.skipped, b.skipped].sort()).toEqual([false, true]);
   });
+
+  it('race: a lander_ns changed by /list after the read is not marked verified', async () => {
+    await insertOwnedDomain(db, { domain: 'a.com', lander: 'afternic', lander_ns: ['ns1.afternic.com', 'ns2.afternic.com'] });
+    const lookup = async () => {
+      await db.updateTable('domains').set({ lander_ns: ['ns1.sedo.com', 'ns2.sedo.com'] }).where('domain', '=', 'a.com').execute(); // concurrent change during the DNS lookup
+      return ['ns1.afternic.com', 'ns2.afternic.com'];
+    };
+    await v(lookup).runOnce();
+    expect((await row('a.com')).ns_verified_at).toBeNull();
+  });
 });

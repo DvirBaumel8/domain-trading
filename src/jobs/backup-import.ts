@@ -10,7 +10,7 @@ export class ImportError extends Error {}
 type Row = Record<string, unknown>;
 
 /** Parent tables before children (foreign keys). `file` is relative to the backup directory. */
-const ORDER: { table: string; file: string; jsonl?: true }[] = [
+export const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'settings', file: 'tables/settings.json' },
   { table: 'deals', file: 'tables/deals.json' },
   { table: 'pricing_settings', file: 'tables/pricing_settings.json' },
@@ -30,6 +30,7 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'registrar_presence', file: 'tables/registrar_presence.json' },
   { table: 'selection_settings', file: 'tables/selection_settings.json' },
   { table: 'selection_lists', file: 'tables/selection_lists.json' },
+  { table: 'sibling_method_approvals', file: 'tables/sibling_method_approvals.json' },
   { table: 'screening_evidence', file: 'tables/screening_evidence.json' },
   { table: 'screening_runs', file: 'tables/screening_runs.json' },
   { table: 'domain_records', file: 'tables/domain_records.json' },
@@ -50,8 +51,12 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'cohort_names', file: 'tables/cohort_names.json' },
   { table: 'cohort_decisions', file: 'tables/cohort_decisions.json' },
   { table: 'cohort_outcomes', file: 'tables/cohort_outcomes.json' },
+  { table: 'labelled_names', file: 'tables/labelled_names.json' },
+  { table: 'holdout_suites', file: 'tables/holdout_suites.json' },
+  { table: 'replay_runs', file: 'tables/replay_runs.json' }, // after selection_settings and holdout_suites (FKs)
   { table: 'company_documents', file: 'tables/company_documents.json' },
   { table: 'forbidden_terms', file: 'tables/forbidden_terms.json' },
+  { table: 'forbidden_term_retirements', file: 'tables/forbidden_term_retirements.json' },
   { table: 'review_packets', file: 'tables/review_packets.json' },
   { table: 'review_feedback', file: 'tables/review_feedback.json' },
   { table: 'review_items', file: 'tables/review_items.json' },
@@ -69,7 +74,7 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
 const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log', 'screening_runs', 'screening_evidence', 'manual_quotes', 'tranches'];
 
 /** Tables without a serial `id` column. */
-const NO_SERIAL = new Set(['posts', 'settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts']);
+const NO_SERIAL = new Set(['posts', 'settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts', 'labelled_names', 'replay_runs']);
 
 /** Tables whose identity column is not called `id`. */
 const SERIAL_COL: Record<string, string> = { company_documents: 'version' };

@@ -259,17 +259,17 @@ describe('review packet (T11-15..17, T11-24, T11-25)', () => {
     expect((await t.post('/reviews/packet')).json().kind).toBe('weekly');
   });
 
-  it('REVIEW_COST_CAP (409) once the month spend reaches the cap; GET /reviews/cost shows it', async () => {
+  it('REVIEW_COST_CAP (409) once the month spend (the gemini provider only, F9) reaches the cap; GET /reviews/cost shows it', async () => {
     const t = await boot();
     await t.doc('Doc\n');
     const p = (await t.post('/reviews/packet')).json();
     expect((await t.get('/reviews/cost')).json()).toEqual({ month: '2026-10', spent_usd: 0, cap_usd: 5, feedback_n: 0, unknown_n: 0, enabled: true, model: 'gemini-3.8-flash', tier: 'free' });
     t.clock.t = T0 + HOUR;
-    const f = await t.post(`/reviews/${p.packet_id}/feedback`, feedbackOk([], { cost_usd: 4.9999 }));
+    const f = await t.post(`/reviews/${p.packet_id}/feedback`, feedbackOk([], { provider: 'gemini', cost_usd: 4.9999 }));
     expect(f.statusCode, f.body).toBe(201);
     expect((await t.post('/reviews/packet')).statusCode).toBe(201); // 4.9999 < 5
     const p2 = (await db.selectFrom('review_packets').select('id').orderBy('created_at', 'desc').orderBy('id').execute())[0]!.id;
-    expect((await t.post(`/reviews/${p2}/feedback`, { status: 'unknown', provider: 'acme-ai', cost_usd: 0.0001, reason: 'timeout' })).statusCode).toBe(201);
+    expect((await t.post(`/reviews/${p2}/feedback`, { status: 'unknown', provider: 'gemini', cost_usd: 0.0001, reason: 'timeout' })).statusCode).toBe(201);
     const r = await t.post('/reviews/packet');
     expect(r.statusCode).toBe(409);
     expect(r.json().error.code).toBe('REVIEW_COST_CAP');

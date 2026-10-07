@@ -440,6 +440,7 @@ export interface DailyCandidateListsTable {
   entries: Json;
   sections: Json;
   summary: Json;
+  built_by: Generated<'daily' | 'rebuild'>;
 }
 export interface DomainRecordsTable {
   id: Generated<string>;
@@ -701,7 +702,7 @@ export interface CohortsTable {
   settings_labels: string[];
   source: Json;
   run_id: string;
-  status: 'computing' | 'frozen';
+  status: 'computing' | 'frozen' | 'abandoned';
 }
 export interface CohortNamesTable {
   id: Generated<number>;
@@ -825,7 +826,7 @@ export interface PostsTable {
   idempotency_key: string | null;
   text: string;
   thread: Json;
-  status: ColumnType<'posted' | 'failed' | 'removed', 'posted' | 'failed' | 'removed', 'removed'>;
+  status: ColumnType<'pending' | 'posted' | 'failed' | 'removed' | 'unknown', 'pending' | 'posted' | 'failed' | 'removed' | 'unknown', 'posted' | 'failed' | 'removed' | 'unknown'>;
   buffer_post_id: string | null;
   external_link: ColumnType<string | null, string | null | undefined, string | null>;
   sent_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;

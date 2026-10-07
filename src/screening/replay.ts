@@ -22,7 +22,7 @@ export interface GateResult { result: 'PASS' | 'FAIL' | 'FLAG' | 'UNKNOWN'; sour
 
 export interface LabelledFeatures {
   registered_share?: number | null; prior_history?: 0 | 1 | null; pre_cls?: string | null; alt_tld_before_n?: number | null;
-  n_words?: number | null; sld_chars?: number | null; is_geo?: 0 | 1; city_trade_ok?: boolean | null; short?: 0 | 1 | null;
+  n_words?: number | null; sld_chars?: number | null; is_geo?: 0 | 1 | null; city_trade_ok?: boolean | null; short?: 0 | 1 | null;
   geo_city?: string | null; geo_trade?: string | null; archive_span_years?: number | null;
   /** Dates (YYYY-MM-DD) of the data each input came from, by input name; used only by the leakage lint. */
   input_dates?: Record<string, string>;

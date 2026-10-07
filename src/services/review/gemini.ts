@@ -26,7 +26,7 @@ export const REVIEWER_INSTRUCTION = [
 export interface GeminiItem { category: string; severity: 'low' | 'medium' | 'high'; text: string }
 export type GeminiResult =
   | { kind: 'ok'; items: GeminiItem[]; inputTokens: number; outputTokens: number; model: string }
-  | { kind: 'unknown'; httpStatus: number | null; errorStatus: string | null; reason: string };
+  | { kind: 'unknown'; httpStatus: number | null; errorStatus: string | null; reason: string; /** Google's "try again later": 429, 503/UNAVAILABLE, a timeout or a network error. */ transient: boolean };
 
 /** Cost in USD from Google's token counts, rounded to 4 decimals: 0 on the free tier, else the model's list price (0 for a model not on the list). */
 export function geminiCostUsd(model: string, tier: 'free' | 'paid', inputTokens: number, outputTokens: number): number {
@@ -43,7 +43,10 @@ const Answer = z.object({
   })).max(50),
 });
 
-const unknownOf = (reason: string, httpStatus: number | null = null, errorStatus: string | null = null): GeminiResult => ({ kind: 'unknown', httpStatus, errorStatus, reason: reason.slice(0, 300) });
+const unknownOf = (reason: string, httpStatus: number | null = null, errorStatus: string | null = null, transient?: boolean): GeminiResult => ({
+  kind: 'unknown', httpStatus, errorStatus, reason: reason.slice(0, 300),
+  transient: transient ?? (httpStatus === 429 || httpStatus === 503 || errorStatus === 'UNAVAILABLE'),
+});
 
 function errorOf(text: string): { status: string | null; message: string | null } {
   try {
@@ -103,6 +106,6 @@ export async function callGemini(
     return { kind: 'ok', items, inputTokens: num(j.usageMetadata?.promptTokenCount), outputTokens: num(j.usageMetadata?.candidatesTokenCount), model };
   } catch (e) {
     const name = (e as Error).name;
-    return unknownOf(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network error', httpStatus);
+    return unknownOf(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network error', httpStatus, null, true);
   }
 }

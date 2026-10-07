@@ -5,11 +5,27 @@ import type { Database } from '../db/types.js';
 import { canonicalJson } from './canonical-json.js';
 import { AppError } from './errors.js';
 import { isMutating } from './methods.js';
+import { toJerusalemIso } from '../time.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
     idem: { key: string; claimed: boolean } | null;
   }
+}
+
+/** An in_progress key this old probably belongs to a request that died (the caller is told so, the key is still not re-run). */
+export const STALE_IN_PROGRESS_MS = 15 * 60_000;
+/** Completed keys older than this are deleted (lazily, at most once a day). */
+export const KEY_RETENTION_MS = 30 * 86_400_000;
+const PRUNE_EVERY_MS = 86_400_000;
+
+/** Responses that must stay the final answer for their key even when they are 5xx (the work may have happened: POST /posts after the row is written). */
+const keepKey = new WeakSet<object>();
+export const keepIdempotencyKey = (req: object): void => { keepKey.add(req); };
+
+export async function pruneIdempotencyKeys(db: Kysely<Database>, nowMs: number = Date.now()): Promise<number> {
+  const r = await db.deleteFrom('idempotency_keys').where('state', '=', 'completed').where('completed_at', '<', new Date(nowMs - KEY_RETENTION_MS)).executeTakeFirst();
+  return Number(r.numDeletedRows);
 }
 
 const KEY = /^[\x21-\x7e]{1,255}$/; // visible ASCII, 1–255 chars
@@ -24,6 +40,7 @@ export function requestHash(method: string, url: string, body: unknown): string 
  */
 export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>): void {
   app.decorateRequest('idem', null);
+  let lastPrune = 0;
 
   app.addHook('preHandler', async (req, reply) => {
     if (!isMutating(req.method)) return;
@@ -34,6 +51,10 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
         'IDEMPOTENCY_KEY_REQUIRED',
         'An Idempotency-Key header (1–255 visible ASCII characters) is required on every POST',
       );
+    }
+    if (Date.now() - lastPrune >= PRUNE_EVERY_MS) {
+      lastPrune = Date.now();
+      void pruneIdempotencyKeys(db).catch((err) => req.log.error({ errMessage: (err as Error).message }, 'idempotency prune failed'));
     }
     const hash = requestHash(req.method, req.url, req.body);
     const inserted = await db
@@ -58,7 +79,8 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
       throw new AppError(409, 'IDEMPOTENCY_KEY_MISMATCH', 'This Idempotency-Key was used with a different request');
     }
     if (!existing || existing.state !== 'completed' || existing.status_code === null) {
-      throw new AppError(409, 'IDEMPOTENCY_KEY_IN_USE', 'A request with this Idempotency-Key is still in progress');
+      const stale = existing?.state === 'in_progress' && Date.now() - existing.created_at.getTime() > STALE_IN_PROGRESS_MS;
+      throw new AppError(409, 'IDEMPOTENCY_KEY_IN_USE', 'A request with this Idempotency-Key is still in progress', stale ? { stale: true, started_at: toJerusalemIso(existing.created_at) } : undefined);
     }
     // A stored 202 on POST /buy is "purchase state unknown": the reconciler may have booked it since, so the
     // handler must run again (BuyService.priorOutcome never re-registers) and its answer replaces the stored one.
@@ -87,7 +109,7 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
     if (!idem?.claimed) return payload;
     idem.claimed = false;
     try {
-      if (reply.statusCode >= 500) {
+      if (reply.statusCode >= 500 && !keepKey.has(req)) {
         await db.deleteFrom('idempotency_keys').where('key', '=', idem.key).where('state', '=', 'in_progress').execute();
       } else {
         const ct = reply.getHeader('content-type');

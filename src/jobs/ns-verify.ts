@@ -1,8 +1,11 @@
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import type { NsLookup } from '../dns/ns-lookup.js';
 import { newAuditId } from '../http/audit.js';
 import { sameNsSet } from '../services/lander.js';
+
+/** The row still holds the lander_ns value that was read (compared as a text[]). */
+const sameLanderNs = (ns: string[]) => (ns.length > 0 ? sql<boolean>`lander_ns = ARRAY[${sql.join(ns)}]::text[]` : sql<boolean>`lander_ns = '{}'::text[]`);
 
 /** list.md step 4: daily public-DNS check of every owned/listed domain that has a lander target. */
 export class NsVerifier {
@@ -26,11 +29,12 @@ export class NsVerifier {
         }
         if (sameNsSet(seen, r.lander_ns!)) {
           if (!r.ns_verified_at) {
-            await this.deps.db.updateTable('domains').set({ ns_verified_at: new Date(this.deps.now()) }).where('id', '=', r.id).execute();
+            await this.deps.db.updateTable('domains').set({ ns_verified_at: new Date(this.deps.now()) }).where('id', '=', r.id)
+              .where(sameLanderNs(r.lander_ns!)).execute(); // a /list change since the read is not marked verified
           }
           out.verified++;
         } else {
-          if (r.ns_verified_at) await this.deps.db.updateTable('domains').set({ ns_verified_at: null }).where('id', '=', r.id).execute();
+          if (r.ns_verified_at) await this.deps.db.updateTable('domains').set({ ns_verified_at: null }).where('id', '=', r.id).where(sameLanderNs(r.lander_ns!)).execute();
           out.cleared++;
         }
       }

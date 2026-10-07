@@ -2,6 +2,7 @@ import { parseArgs } from 'node:util';
 import { createApiToken, expireApiToken, listApiTokens, revokeApiToken } from './admin/tokens.js';
 import { newPricingSettings, showPricingSettings } from './admin/pricing-settings.js';
 import { DropDateInputError, dropAtFirstExpiry } from './admin/drop-date.js';
+import { ResolvePurchaseInputError, resolvePurchaseFailed } from './admin/resolve-purchase.js';
 import { runDoctor } from './admin/doctor.js';
 import { ImportInputError, importDomain, type ImportInput } from './admin/import-domain.js';
 import { createAdapters } from './registrars/registry.js';
@@ -22,6 +23,7 @@ const USAGE = `usage:
   npm run admin -- import-domain --domain <d> --registrar porkbun|godaddy|other --buy-date YYYY-MM-DD --cost 13.73 --category <c> [--grade strong|weaker]
       [--cost-note "<text>"] [--order <id>|none] [--deal D-NNN] [--listing-mode bin|hybrid|offer --bin N [--floor N --walkaway N --pricing-exception "<reason>"] [--min-offer N] [--override --override-reason "<why>"]]
       [--comps-file comps.json | --legacy-no-comps "<reason>"] [--approval-text "<words>" --approval-at <ISO>] [--manual --expiry YYYY-MM-DD] [--renewal-price N] [--dry-run]
+  npm run admin -- resolve-purchase --id <purchase_id> --fail --reason "<text>"   (a purchase stuck in unknown/register_sent; check the registrar account first)
   npm run admin -- doctor`;
 
 class UsageError extends Error {}
@@ -39,7 +41,7 @@ async function main(argv: string[]): Promise<number> {
       deal: { type: 'string' }, category: { type: 'string' }, grade: { type: 'string' }, 'listing-mode': { type: 'string' }, bin: { type: 'string' },
       floor: { type: 'string' }, walkaway: { type: 'string' }, 'min-offer': { type: 'string' }, 'pricing-exception': { type: 'string' },
       override: { type: 'boolean' }, 'override-reason': { type: 'string' }, 'comps-file': { type: 'string' }, 'legacy-no-comps': { type: 'string' },
-      manual: { type: 'boolean' }, expiry: { type: 'string' }, 'renewal-price': { type: 'string' }, 'dry-run': { type: 'boolean' },
+      manual: { type: 'boolean' }, expiry: { type: 'string' }, 'renewal-price': { type: 'string' }, 'dry-run': { type: 'boolean' }, fail: { type: 'boolean' }, reason: { type: 'string' },
     },
   });
   const [cmd, sub] = positionals;
@@ -111,6 +113,19 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       } catch (e) {
         if (e instanceof ImportInputError) throw new UsageError(e.message);
+        if (!(e instanceof AppError)) throw e;
+        console.error(`${e.code}: ${e.message}`);
+        return 1;
+      }
+    }
+    if (cmd === 'resolve-purchase') {
+      if (!values.fail) throw new UsageError('--fail is required (the only resolution is marking the purchase failed)');
+      try {
+        const r = await resolvePurchaseFailed(db, { purchaseId: Number(values.id), reason: values.reason ?? '' });
+        console.log(`purchase ${r.purchaseId} (${r.domain}): ${r.from} -> failed; the pending domain row was released`);
+        return 0;
+      } catch (e) {
+        if (e instanceof ResolvePurchaseInputError) throw new UsageError(e.message);
         if (!(e instanceof AppError)) throw e;
         console.error(`${e.code}: ${e.message}`);
         return 1;

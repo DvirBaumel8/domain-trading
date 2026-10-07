@@ -150,12 +150,13 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     }
     if (check !== 'history' && body.evidence_url === undefined) throw new AppError(422, 'VALIDATION_ERROR', 'Request body is invalid', { issues: [{ path: 'evidence_url', message: `evidence_url is required for ${check}` }] });
     const rec = check === 'web_risk' ? WebRiskManual.parse(body.result) : check === 'tm_us' ? TmManual.parse(body.result) : check === 'tm_eu' ? TmEuManual.parse(body.result) : HistoryManual.parse(body.result);
-    // The history in force for this name: the same precedence as derive (a manual record outranks an auto or cached row).
-    const histRows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
-      .where('check_id', '=', 'history').execute()).map(toResultRow);
-    const history = histRows.reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined);
     const row = await db.transaction().execute(async (trx) => {
       await trx.selectFrom('screening_runs').select('id').where('id', '=', run.id).forUpdate().executeTakeFirstOrThrow(); // same lock as a verdict
+      // The history in force for this name: the same precedence as derive (a manual record outranks an auto or cached row). Read inside the transaction,
+      // after the run lock, so a history record that landed while this one waited is seen (v2.16.0).
+      const histRows = (await trx.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).where('item_idx', '=', item.idx)
+        .where('check_id', '=', 'history').execute()).map(toResultRow);
+      const history = histRows.reduce<ResultRow | undefined>((a, b) => (a === undefined || beats(b, a) ? b : a), undefined);
       // A history record's evidence row names its first archive link (the top-level evidence_url is not used for it).
       const evidenceUrl = check === 'history' ? (rec as z.infer<typeof HistoryManual>).evidence_urls?.[0] ?? `manual:history:${item.domain}` : body.evidence_url!;
       const json = JSON.stringify(rec);

@@ -61,7 +61,7 @@ export function wilson95(k: number, n: number): [number, number] | null {
 }
 
 export interface DomFeatures {
-  registered_share: number | null; alt_tld_before_n: number | null; n_words: number | null; sld_chars: number | null; is_geo: 0 | 1;
+  registered_share: number | null; alt_tld_before_n: number | null; n_words: number | null; sld_chars: number | null; is_geo: 0 | 1 | null;
 }
 
 type RunRowT = { id: string; input: unknown; gate_plan: unknown };
@@ -104,7 +104,8 @@ export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise
   for (const it of items) {
     const latest = latestByCheck(byItem.get(it.idx) ?? []);
     if ((plan[it.lane] ?? []).every((c) => latest.has(c))) done++;
-    const form = latest.get('form')?.fields as { word_count?: number; sld_len?: number; city?: string | null; trade?: string | null } | undefined;
+    const formRow = latest.get('form');
+    const form = formRow?.fields as { word_count?: number; sld_len?: number; city?: string | null; trade?: string | null } | undefined;
     const census = latest.get('census');
     const ext = latest.get('ext_dates');
     perName.push(latest);
@@ -114,7 +115,8 @@ export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise
     byDomain.set(it.domain, {
       registered_share: share, alt_tld_before_n: alt,
       n_words: typeof form?.word_count === 'number' ? form.word_count : null, sld_chars: typeof form?.sld_len === 'number' ? form.sld_len : null,
-      is_geo: form?.city && form?.trade ? 1 : 0,
+      // v2.16.0: unknown (null), not 0, when the form check did not PASS (or did not run).
+      is_geo: formRow?.status === 'PASS' || formRow?.status === 'PASS_WITH_NOTE' ? (form?.city && form?.trade ? 1 : 0) : null,
     });
   }
   return { byDomain, done_n: done, names_n: items.length, lookups: lookupsOf(perName), latest: perDomain };

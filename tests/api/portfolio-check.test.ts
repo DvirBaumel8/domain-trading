@@ -187,6 +187,16 @@ describe('portfolioCheck: blocklist (weekly)', () => {
     expect(await rows('registry')).toHaveLength(3); // registry is daily
   });
 
+  it('weekly by IDT day: a check late on day X is due at 00:05 IDT on day X+7, though under 7 days passed', async () => {
+    await d001();
+    clock.t = Date.parse('2026-10-20T20:00:00Z'); // 23:00 IDT on the 20th
+    expect((await job().runOnce()).blocklist).toMatchObject({ ok: 1 });
+    clock.t = Date.parse('2026-10-26T22:30:00Z'); // 00:30 on the 27th (Israel winter time): 6 days and a bit, but 7 IDT days later
+    expect((await job().runOnce()).blocklist).toMatchObject({ ok: 1, skipped: 0 });
+    clock.t = Date.parse('2026-11-02T12:00:00Z'); // 6 days after the 27th: not due
+    expect((await job().runOnce()).blocklist).toMatchObject({ skipped: 1 });
+  });
+
   it('SURBL lists the name: fail, OWNED_NAME_BLOCKLISTED (error) with the source; it clears when a later weekly run is clean', async () => {
     await d001();
     state.surbl = 80;

@@ -265,6 +265,7 @@ export class PorkbunAdapter implements RegistrarAdapter {
 
   async findRegistration(domain: string, opts: { since: string }): Promise<RegistrationRecord | null> {
     const fromYear = Number(opts.since.slice(0, 4));
+    // Wall clock on purpose: the adapter has no injected clock, and only the upper bound of the invoice-year scan depends on it (a year too many costs one extra call).
     const toYear = new Date().getUTCFullYear();
     for (let year = toYear; year >= fromYear; year--) {
       const list = await this.call('invoices', { query: { year, limit: 100 } });

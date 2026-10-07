@@ -38,7 +38,10 @@ export function registerCohorts(app: FastifyInstance, deps: CohortsDeps): void {
     const run = (await db.selectFrom('screening_runs').selectAll().where('id', '=', c.run_id).executeTakeFirst())!;
     if (run.status === 'running' && (!run.heartbeat_at || deps.now() - run.heartbeat_at.getTime() > HEARTBEAT_STALE_MS)) worker.kick(run.id);
     const frozen = c.status === 'frozen' || (await freezeCohortIfReady(db, name, deps.now()));
-    return { c, run, status: frozen ? 'frozen' : 'computing' };
+    // abandoned: the run was cancelled or ended partial, so no decision was written and the cohort never reports (v2.16.0)
+    const now = frozen ? 'frozen' : (await db.selectFrom('cohorts').select('status').where('name', '=', name).executeTakeFirstOrThrow()).status;
+    const status: 'frozen' | 'abandoned' | 'computing' = now === 'frozen' ? 'frozen' : now === 'abandoned' ? 'abandoned' : 'computing';
+    return { c, run, status };
   };
 
   app.post('/selection/cohorts', async (req, reply) => {
@@ -69,7 +72,7 @@ export function registerCohorts(app: FastifyInstance, deps: CohortsDeps): void {
     const cand = [...new Set(valid.filter((d): d is string => d !== null))];
     if (cand.length > 0) {
       const since = new Date(nowMs - COHORT_OPEN_DAYS * 86_400_000);
-      for (const x of await db.selectFrom('cohort_names as n').innerJoin('cohorts as c', 'c.name', 'n.cohort').select('n.domain').where('n.included', '=', true).where('n.domain', 'in', cand).where('c.created_at', '>=', since).execute()) open.add(x.domain);
+      for (const x of await db.selectFrom('cohort_names as n').innerJoin('cohorts as c', 'c.name', 'n.cohort').select('n.domain').where('n.included', '=', true).where('n.domain', 'in', cand).where('c.created_at', '>=', since).where('c.status', '!=', 'abandoned').execute()) open.add(x.domain);
     }
     const seen = new Set<string>();
     const stored: Candidate[] = cands.map((c, i): Candidate => {
@@ -106,9 +109,11 @@ export function registerCohorts(app: FastifyInstance, deps: CohortsDeps): void {
       });
     } catch (e) {
       if ((e as { code?: string; constraint?: string }).code === '23505' && (e as { constraint?: string }).constraint === 'cohorts_pkey') {
-        await db.updateTable('screening_runs').set({ status: 'partial', finished_at: new Date(deps.now()) }).where('id', '=', run.id).execute();
+        await worker.cancel(run.id, 'system', 'cohort name taken').catch(() => null);
         throw new AppError(409, 'COHORT_NAME_TAKEN', `A cohort named ${b.name} exists`, { name: b.name });
       }
+      // v2.16.0: the run exists but its bookkeeping failed; it must not go on running with nothing pointing at it.
+      await worker.cancel(run.id, 'system', 'bookkeeping failed').catch(() => null);
       throw e;
     }
     worker.kick(run.id);

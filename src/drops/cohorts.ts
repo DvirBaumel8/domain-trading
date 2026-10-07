@@ -21,15 +21,21 @@ type RunRow = { id: string; input: unknown; gate_plan: unknown; status: string }
 
 /**
  * Freezes a cohort whose feature run has finished: one decision per included name and settings label, computed once, never again.
- * decided_at is now; `late` when that IDT day is on or after the name's expected drop date. Returns true when the cohort is frozen afterwards.
+ * Only a run that is `done` freezes; a `cancelled` or `partial` run marks the cohort `abandoned` and writes no decision (returns false). decided_at is now; `late` when that IDT day is on or after the name's expected drop date. Returns true when the cohort is frozen afterwards.
  */
 export async function freezeCohortIfReady(db: Kysely<Database>, name: string, nowMs: number): Promise<boolean> {
   return db.transaction().execute(async (trx) => {
     const cohort = await trx.selectFrom('cohorts').selectAll().where('name', '=', name).forUpdate().executeTakeFirst();
     if (!cohort) return false;
     if (cohort.status === 'frozen') return true;
+    if (cohort.status === 'abandoned') return false;
     const run = (await trx.selectFrom('screening_runs').selectAll().where('id', '=', cohort.run_id).executeTakeFirst()) as RunRow | undefined;
     if (!run || run.status === 'running') return false;
+    // v2.16.0: only a finished (`done`) run freezes decisions. A cancelled or partial run leaves the cohort abandoned, with no decisions.
+    if (run.status !== 'done') {
+      await trx.updateTable('cohorts').set({ status: 'abandoned' }).where('name', '=', name).where('status', '=', 'computing').execute();
+      return false;
+    }
     const names = await trx.selectFrom('cohort_names').select(['domain', 'expected_drop_date']).where('cohort', '=', name).where('included', '=', true).orderBy('id').execute();
     const { byDomain } = await featuresOfRun(trx, run);
     const today = todayIdt(nowMs);

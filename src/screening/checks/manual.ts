@@ -28,7 +28,7 @@ export const TmManual = z.object({
 
 /** The phrase searched for a prior business name: uppercase letters, digits and single spaces. */
 export const priorPhraseOf = (name: string): string => name.toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
-const phraseKey = (p: string): string => priorPhraseOf(p);
+export const phraseKey = (p: string): string => priorPhraseOf(p);
 
 /** Phrases to search at USPTO for a name (CAP-08): the exact phrase, city + trade, the distinctive core, generic-head pairs. */
 export function tmPhrases(tokens: string[], types: string[], city: string | null, trade: string | null): string[] {

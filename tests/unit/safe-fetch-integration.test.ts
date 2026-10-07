@@ -60,5 +60,8 @@ describe('safeFetch with undici fetch on real sockets', () => {
   it('a cancelled body closes cleanly', async () => {
     const res = await safeFetch({ lookupHost }, `http://itest.invalid:${port}/cancel`, {}, { testAllow: testAllow() });
     await res.body!.cancel();
+    // the cancel released the socket cleanly: the next request is served as usual
+    const next = await safeFetch({ lookupHost }, `http://itest.invalid:${port}/loop`, {}, { testAllow: testAllow() });
+    expect(await next.text()).toContain('integration ok');
   });
 });

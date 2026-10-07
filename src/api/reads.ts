@@ -65,6 +65,11 @@ export function registerReads(app: FastifyInstance, deps: { db: Kysely<Database>
     const limit = q.limit === undefined ? 100 : Number(q.limit);
     if (limit < 1 || limit > 500) throw bad('limit must be 1 to 500');
     if (q.since !== undefined && (!ISO_WITH_OFFSET.test(q.since) || Number.isNaN(Date.parse(q.since)))) throw bad('since must be an ISO 8601 time with an offset');
-    return { rows: await auditRows(deps.db, { since: q.since ? new Date(q.since) : undefined, limit }) };
+    const rows = await auditRows(deps.db, { since: q.since ? new Date(q.since) : undefined, limit });
+    // v2.16.0 (CR-015 I-2): who made the call, by token name (never the token or its hash); null for a job, an admin command or a deleted token id.
+    const ids = [...new Set(rows.map((r) => r.token_id).filter((x): x is number => x !== null))];
+    const names = new Map<number, string>();
+    if (ids.length > 0) for (const t of await deps.db.selectFrom('api_tokens').select(['id', 'name']).where('id', 'in', ids).execute()) names.set(t.id, t.name);
+    return { rows: rows.map((r) => ({ ...r, token_name: r.token_id === null ? null : names.get(r.token_id) ?? null })) };
   });
 }

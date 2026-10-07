@@ -208,6 +208,16 @@ describe('POST /buy checks (no money moves)', () => {
     expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('REGISTRAR_AUTO_TOPUP_ON');
   });
 
+  it('founder rule 6: auto top-up unknown (null) → a real buy is refused 409 REGISTRAR_STATE_UNKNOWN; a dry run only warns', async () => {
+    const auth = await setup([new FakeAdapter('porkbun', { account: { autoTopupEnabled: null } })]);
+    const real = await postBuy(app, buyBody(), auth);
+    expect(real.statusCode).toBe(409);
+    expect(real.json().error).toMatchObject({ code: 'REGISTRAR_STATE_UNKNOWN', details: { registrar_code: 'AUTO_TOPUP_UNKNOWN' } });
+    const dry = await postBuy(app, buyBody({ dry_run: true }), auth);
+    expect(dry.statusCode).toBe(200);
+    expect((dry.json().warnings as string[]).some((w) => w.startsWith('AUTO_TOPUP_UNKNOWN'))).toBe(true);
+  });
+
   it('B2: account state unreadable → 409 REGISTRAR_STATE_UNKNOWN', async () => {
     const auth = await setup([new FakeAdapter('porkbun', { account: new RegistrarError('porkbun', 'REGISTRAR_TIMEOUT', 't', { ambiguous: true }) })]);
     expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('REGISTRAR_STATE_UNKNOWN');

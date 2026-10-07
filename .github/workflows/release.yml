@@ -2,7 +2,7 @@ name: release
 
 # Pushing a tag vX.Y.Z marks a release. Render deploys every push to main itself, once CI passes
 # (autoDeployTrigger: checksPass), so this workflow only verifies the tag:
-#   1. the tag must be the tip of main, equal package.json's version and have a CHANGELOG entry;
+#   1. the tag commit must be on main (an ancestor of origin/main), equal package.json's version, have a CHANGELOG heading and a release note;
 #   2. the full test suite must pass (ci.yml);
 on:
   push:
@@ -15,16 +15,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Tag is the tip of main (Render's deploy hook deploys main's latest commit)
+      - name: Tag commit is on main (an ancestor of origin/main)
         run: |
           git fetch -q origin main
-          [ "$(git rev-parse "$GITHUB_SHA")" = "$(git rev-parse origin/main)" ] || { echo "::error::tag $GITHUB_REF_NAME is not the tip of main; the deploy hook would ship a different commit"; exit 1; }
-      - name: Tag matches package.json and the CHANGELOG
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::tag $GITHUB_REF_NAME is not on main (its commit is not an ancestor of origin/main)"; exit 1; }
+      - name: Tag matches package.json, the CHANGELOG and the release note
         run: |
           tag="${GITHUB_REF_NAME#v}"
           pkg="$(node -p "require('./package.json').version")"
           [ "$tag" = "$pkg" ] || { echo "::error::tag v$tag but package.json is $pkg"; exit 1; }
-          grep -q "^## $tag" docs/contract/CHANGELOG.md || { echo "::error::no '## $tag' entry in docs/contract/CHANGELOG.md"; exit 1; }
+          # exact heading: "## X.Y.Z (" (so 2.1.1 never matches 2.1.10)
+          grep -Fq "## ${tag} (" docs/contract/CHANGELOG.md || { echo "::error::no '## ${tag} (' heading in docs/contract/CHANGELOG.md"; exit 1; }
+          [ -f "docs/releases/v${tag}.md" ] || { echo "::error::docs/releases/v${tag}.md does not exist"; exit 1; }
 
   test:
     needs: check-version

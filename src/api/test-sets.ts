@@ -9,7 +9,7 @@ import { AppError } from '../http/errors.js';
 import { dollarsToCents } from '../money.js';
 import { HEARTBEAT_STALE_MS, createRun, type ScreeningWorker } from '../screening/engine.js';
 import { analyzeForm } from '../screening/form.js';
-import { gateContext, toLabelledRow } from '../screening/replay.js';
+import { decideReplayRow, gateContext, toLabelledRow } from '../screening/replay.js';
 import { LABEL_RE, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
 import { methodApproval } from '../screening/sibling-methods.js';
 import {
@@ -17,7 +17,8 @@ import {
 } from '../screening/test-sets.js';
 import type { LabelledFeatures } from '../screening/replay.js';
 import type { InputName } from '../screening/engine.js';
-import { unknownCounts, unknownNames, unknownsOf } from '../screening/unknowns.js';
+import { unknownInputsOf } from '../screening/tier.js';
+import { unknownCounts, unknownNames, unknownsOf, type UndecidedMap } from '../screening/unknowns.js';
 import { toJerusalemIso } from '../time.js';
 
 export interface TestSetsDeps { db: Kysely<Database>; now: () => number; worker: ScreeningWorker }
@@ -185,9 +186,11 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
       });
     } catch (e) {
       if ((e as { code?: string; constraint?: string }).code === '23505' && (e as { constraint?: string }).constraint === 'test_sets_pkey') {
-        await db.updateTable('screening_runs').set({ status: 'partial', finished_at: now() }).where('id', '=', run.id).execute();
+        await worker.cancel(run.id, 'system', 'test set name taken').catch(() => null);
         throw new AppError(409, 'TEST_SET_NAME_TAKEN', `A test set named ${b.name} exists`, { name: b.name });
       }
+      // v2.16.0: the run exists but its bookkeeping failed; it must not go on running with nothing pointing at it.
+      await worker.cancel(run.id, 'system', 'bookkeeping failed').catch(() => null);
       throw e;
     }
     worker.kick(run.id);
@@ -206,15 +209,23 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     const feats = await featuresOfRun(db, run);
     const finished = run.status !== 'running';
     let report: unknown = null;
+    const undecided: UndecidedMap = new Map();
     if (set.purpose === 'rescore' && finished) {
       const sel = (await selectionSettingsByLabel(db, set.settings_label!))!;
       const labelled = (await db.selectFrom('labelled_names').selectAll().where('domain', 'in', kept.map((k) => k.domain)).execute()).map(toLabelledRow);
       report = rescoreReport(labelled, feats.byDomain, sel.label, sel.values, { features_as_of: set.features_as_of ?? 'row', sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD });
+      // v2.16.0 (CR-014 N-3): every undecided name is listed in `unknowns` with the inputs the rules could not read, even when no feature check is unknown.
+      for (const r of labelled) {
+        const f = feats.byDomain.get(r.domain);
+        const own: LabelledFeatures = { ...r.features, registered_share: f?.registered_share ?? null, alt_tld_before_n: f?.alt_tld_before_n ?? null, n_words: f?.n_words ?? null, sld_chars: f?.sld_chars ?? null, is_geo: f?.is_geo ?? 0 };
+        const d = decideReplayRow(own, sel.values);
+        if (d.decision === 'undecided') undecided.set(r.domain, { unknown_inputs: unknownInputsOf(d.tier, sel.values.tier) });
+      }
       const fs = set.filters as { from_set?: string; before_n?: number };
       if (typeof fs.from_set === 'string') (report as Record<string, unknown>).gaps = { before: fs.before_n ?? null, after: unknownNames(feats.latest).length };
     }
     // v2.13.0 (T12-2): why a feature is unknown. A rescore set lists its names; a `new` set gives counts only (its names are never shown, R-18).
-    const unknowns = set.purpose === 'rescore' ? await unknownsOf(db, feats.latest) : unknownCounts(feats.latest);
+    const unknowns = set.purpose === 'rescore' ? await unknownsOf(db, feats.latest, undecided) : unknownCounts(feats.latest);
     return {
       name: set.name, purpose: set.purpose, sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD, ...(set.purpose === 'rescore' && { features_as_of: set.features_as_of ?? 'row' }), status, max_answer_age_days: set.max_answer_age_days ?? TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, settings_version: set.settings_label, seed: set.seed, test_share: set.test_share === null ? null : Number(set.test_share),
       filters: set.filters, created_at: set.created_at.toISOString(),
@@ -251,6 +262,8 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
       if (set.status === 'sealed') throw new AppError(409, 'TEST_SET_ALREADY_SEALED', `${set.name} is already sealed`, { sealed_at: set.sealed_at!.toISOString() });
       const { status, run } = await refresh(trx, set);
       if (status !== 'ready') throw new AppError(409, 'TEST_SET_NOT_READY', 'The back-test run has not finished; poll GET /selection/test-sets/' + set.name, { run_id: run.id, run_status: run.status, status });
+      // v2.16.0: only a run that finished (`done`) seals; a partial run has names without features, and a seal registers them for good.
+      if (run.status !== 'done') throw new AppError(409, 'TEST_SET_NOT_READY', `The back-test run is ${run.status}, not done; a set seals only after a complete run`, { run_id: run.id, run_status: run.status, status: run.status });
       const rows = (await trx.selectFrom('test_set_rows').selectAll().where('set_name', '=', set.name).where('kept', '=', true).orderBy('id').execute());
       const taken = await trx.selectFrom('labelled_names').select(['domain', 'role']).where('domain', 'in', rows.map((r) => r.domain)).execute();
       if (taken.length > 0) {

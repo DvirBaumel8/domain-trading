@@ -102,11 +102,12 @@ async function collectPool(db: Kysely<Database>, nowMs: number): Promise<{ pool:
   return { pool, hold: sel.values.buy_hold, values: sel.values, label: sel.label };
 }
 
-export async function buildDailyList(deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number; waitMs?: number }): Promise<{ id: string; day: string; entries_n: number; almost_ready_n: number; upcoming_n: number; partial: boolean; version: number }> {
+export async function buildDailyList(deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number; waitMs?: number; noWait?: boolean; builtBy?: 'daily' | 'rebuild' }): Promise<{ id: string; day: string; entries_n: number; almost_ready_n: number; upcoming_n: number; partial: boolean; version: number }> {
   const { db } = deps;
   const nowMs = deps.now();
   const today = todayIdt(nowMs);
-  const timedOut = await waitForRuns(db, deps.worker, today, deps.waitMs ?? DAILY_LIST_WAIT_MS);
+  // noWait (a manual rebuild): build from what is done now; a run still going marks the list partial below.
+  const timedOut = deps.noWait ? false : await waitForRuns(db, deps.worker, today, deps.waitMs ?? DAILY_LIST_WAIT_MS);
   const nowAfter = deps.now();
   const { pool, hold, values, label } = await collectPool(db, nowAfter);
   const pricing = await currentSettings(db, new Date(nowAfter));
@@ -187,7 +188,10 @@ export async function buildDailyList(deps: { db: Kysely<Database>; worker: Scree
         continue;
       }
       const rec = await needRecords();
-      almost.push({ ...base, final_status: fs, missing: RECORD_KINDS.filter((k) => pm.includes(k)).map((k) => ({ kind: k, reason: rec.missing.find((m) => m.kind === k)?.reason ?? 'NO_RECORD' })), records: rec.records, note: 'Record the missing item with POST /candidates/{domain}/records, then screen the name again', checks: p.plan.map((c) => latest.get(c)).filter((r): r is ResultRow => !!r).map(checkLine) });
+      // v2.16.0 (CR-015 I-4): judged by the records in force NOW, not by what the run saw. A kind with a fresh record at build time is not missing; when none is missing
+      // the records arrived after the screening, and the name needs a new screening to use them.
+      const stillMissing = RECORD_KINDS.filter((k) => pm.includes(k)).flatMap((k) => { const m = rec.missing.find((x) => x.kind === k); return m ? [{ kind: k, reason: m.reason }] : []; });
+      almost.push({ ...base, final_status: fs, missing: stillMissing, records: rec.records, note: stillMissing.length === 0 ? 'The records are in, but this screening ran before them: screen the name again' : 'Record the missing item with POST /candidates/{domain}/records, then screen the name again', checks: p.plan.map((c) => latest.get(c)).filter((r): r is ResultRow => !!r).map(checkLine) });
       continue;
     }
     if (fs !== 'buy_candidate' && fs !== 'would_buy') continue;
@@ -260,7 +264,7 @@ export async function buildDailyList(deps: { db: Kysely<Database>; worker: Scree
   };
   const sections = { almost_ready: almost, upcoming, ...(first ? { removed_since_first: removed } : {}) };
   const row = await db.insertInto('daily_candidate_lists').values({
-    day: today, built_at: new Date(nowAfter), entries: JSON.stringify(entries), sections: JSON.stringify(sections), summary: JSON.stringify(summary),
+    day: today, built_at: new Date(nowAfter), entries: JSON.stringify(entries), sections: JSON.stringify(sections), summary: JSON.stringify(summary), built_by: deps.builtBy ?? 'daily',
   }).returning('id').executeTakeFirstOrThrow();
   const version = Number((await db.selectFrom('daily_candidate_lists').select(sql<string>`count(*)`.as('n')).where('day', '=', today).executeTakeFirstOrThrow()).n);
   return { id: row.id, day: today, entries_n: entries.length, almost_ready_n: almost.length, upcoming_n: upcoming.length, partial, version };

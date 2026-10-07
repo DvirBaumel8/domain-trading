@@ -26,8 +26,9 @@ export async function monthSpend(db: Kysely<Database>, nowMs: number): Promise<{
   const month = monthOf(nowMs);
   const from = new Date(`${month}-01T00:00:00Z`);
   const to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
-  const rows = await db.selectFrom('review_feedback').select(['status', 'cost_usd']).where('created_at', '>=', from).where('created_at', '<', to).execute();
-  const spent = rows.reduce((s, r) => s + Math.round(Number(r.cost_usd) * 10_000), 0) / 10_000;
+  // Only the service's own Gemini calls count toward the cap: feedback a bot posts (any other provider) can never lock the review.
+  const rows = await db.selectFrom('review_feedback').select(['status', 'cost_usd', 'provider']).where('created_at', '>=', from).where('created_at', '<', to).execute();
+  const spent = rows.filter((r) => r.provider === 'gemini').reduce((s, r) => s + Math.round(Number(r.cost_usd) * 10_000), 0) / 10_000;
   return { month, spentUsd: spent, okN: rows.filter((r) => r.status === 'ok').length, unknownN: rows.filter((r) => r.status === 'unknown').length };
 }
 
@@ -91,7 +92,10 @@ export async function buildPacket(db: Kysely<Database>, now: Date, serviceVersio
   const doc = await latestDocument(db);
   if (!doc) return null;
   const kind: 'daily' | 'weekly' = (await weeklyDue(db, now)) ? 'weekly' : 'daily';
-  const prev = await db.selectFrom('review_packets').select(['created_at', 'document_version']).orderBy('created_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+  // The "changes since" window starts at the latest packet that got ok feedback: a packet nobody reviewed (a manual one, a failed call) must not shrink it.
+  const prev = await db.selectFrom('review_packets as p').select(['p.created_at', 'p.document_version'])
+    .where((e) => e.exists(e.selectFrom('review_feedback as f').select('f.id').whereRef('f.packet_id', '=', 'p.id').where('f.status', '=', 'ok')))
+    .orderBy('p.created_at', 'desc').orderBy('p.id', 'desc').limit(1).executeTakeFirst();
   const full = kind === 'weekly';
   let diffSince: { from_version: number; diff: string } | null = null;
   if (!full && prev) {

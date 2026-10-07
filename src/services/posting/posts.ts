@@ -107,7 +107,7 @@ export async function allowanceNow(db: Kysely<Database>, nowMs: number): Promise
   const day = idtDay(nowMs);
   const burst = await db.selectFrom('posting_bursts').select('cap').where('day', '=', day).orderBy('id', 'desc').limit(1).executeTakeFirst();
   const cap = burst?.cap ?? POSTS_PER_DAY;
-  const used = await db.selectFrom('posts').select((e) => e.fn.countAll().as('n')).where('idt_day', '=', day).where('status', 'in', ['posted', 'removed']).executeTakeFirstOrThrow();
+  const used = await db.selectFrom('posts').select((e) => e.fn.countAll().as('n')).where('idt_day', '=', day).where('status', 'in', ['pending', 'posted', 'removed', 'unknown']).executeTakeFirstOrThrow();
   const n = Number(used.n);
   return { today_cap: cap, used_today: n, remaining: Math.max(0, cap - n) };
 }
@@ -126,14 +126,6 @@ export async function nextMidnightIdt(db: Kysely<Database>, nowMs: number): Prom
 
 export const newPostId = () => `pst_${randomBytes(6).toString('hex')}`;
 
-/** One post at a time per process (one Render instance): the cap check and the Buffer call must not interleave. */
-let chain: Promise<unknown> = Promise.resolve();
-function exclusive<T>(fn: () => Promise<T>): Promise<T> {
-  const run = chain.then(fn, fn);
-  chain = run.catch(() => undefined);
-  return run;
-}
-
 const failText = (e: BufferError) => `${e.kind}${e.status ? ` (HTTP ${e.status})` : ''}: ${e.message}`.slice(0, 500);
 
 export interface CreateResult {
@@ -141,9 +133,20 @@ export interface CreateResult {
   images: { part: number; position: number; sha256: string }[]; allowance: Allowance;
 }
 
+/** The pending row is inserted under this advisory lock together with the cap and pause checks (one Render instance or many). */
+export const POSTS_CAP_LOCK = "pg_advisory_xact_lock(hashtext('posts_cap'))";
+/** A pending row older than this lost its process before Buffer answered: postsRefresh turns it into 'unknown'. */
+export const PENDING_STALE_MS = 15 * 60_000;
+
+/** Did Buffer perhaps publish despite the error? Only a lost or garbled answer (no status, or 5xx) leaves that open; a 4xx, a refusal or a 429 is a definite no. */
+export function outcomeIsUnknown(e: BufferError): boolean {
+  if (e.kind === 'refused' || e.kind === 'rate_limited' || e.kind === 'channel_unknown') return false;
+  return e.status === undefined || e.status >= 500;
+}
+
 export async function createPost(
   deps: PostingDeps,
-  a: { body: PostBodyT; validation: Validation; by: string; auditId: string | null; idempotencyKey: string | null },
+  a: { body: PostBodyT; validation: Validation; by: string; auditId: string | null; idempotencyKey: string | null; onPending?: () => void },
 ): Promise<CreateResult> {
   const { db } = deps;
   if ((await postingState(db)).paused) {
@@ -152,52 +155,66 @@ export async function createPost(
   }
   if (!deps.buffer) throw new AppError(503, 'POSTING_NOT_CONFIGURED', 'Posting is not configured on this server (no Buffer key)');
   const buffer = deps.buffer;
-  return exclusive(async () => {
-    const nowMs = deps.now();
-    const al = await allowanceNow(db, nowMs);
-    if (al.remaining <= 0) {
-      throw new AppError(409, 'POST_DAILY_CAP', 'The daily post allowance is used up', { ...al, next_allowed_at: toJerusalemIso(await nextMidnightIdt(db, nowMs)) });
+  const nowMs = deps.now();
+  const id = newPostId();
+  const now = new Date(nowMs);
+  const expires = new Date(nowMs + MEDIA_TTL_MS);
+  const stored = a.validation.prepared.map((p) => ({ ...p, token: randomBytes(16).toString('hex') }));
+  const base = {
+    id, created_at: now, created_by: a.by, audit_id: a.auditId, idempotency_key: a.idempotencyKey, text: a.body.text,
+    thread: JSON.stringify((a.body.thread ?? []).map((t) => ({ text: t.text }))), idt_day: idtDay(nowMs),
+  };
+  // Cap check, pause check and the 'pending' row are one step under an advisory lock: two requests can never both pass the cap, and the row
+  // exists before Buffer is called, so no later failure (or restart) can lead to a second post.
+  const al = await db.transaction().execute(async (trx) => {
+    await sql.raw(`select ${POSTS_CAP_LOCK}`).execute(trx);
+    const st = await postingState(trx);
+    if (st.paused) throw new AppError(409, 'POSTING_PAUSED', 'Posting is paused', { reason: st.reason, since: st.since ? toJerusalemIso(st.since) : null });
+    const cur = await allowanceNow(trx, nowMs);
+    if (cur.remaining <= 0) {
+      throw new AppError(409, 'POST_DAILY_CAP', 'The daily post allowance is used up', { ...cur, next_allowed_at: toJerusalemIso(await nextMidnightIdt(trx, nowMs)) });
     }
-    const id = newPostId();
-    const now = new Date(nowMs);
-    const expires = new Date(nowMs + MEDIA_TTL_MS);
-    const stored = a.validation.prepared.map((p) => ({ ...p, token: randomBytes(16).toString('hex') }));
+    await trx.insertInto('posts').values({ ...base, status: 'pending', buffer_post_id: null }).execute();
     if (stored.length > 0) {
-      await db.insertInto('post_images').values(stored.map((p) => ({
+      await trx.insertInto('post_images').values(stored.map((p) => ({
         post_id: id, part: p.part, position: p.position, mime: p.image.mime, bytes: p.image.data.length, width: p.image.width, height: p.image.height,
         sha256: p.image.sha256, alt: p.alt, data: p.image.data, media_token: p.token, media_expires_at: expires, created_at: now,
       }))).execute();
     }
-    const partsOf = (part: number, text: string): BufferPart => ({
-      text,
-      images: stored.filter((s) => s.part === part).sort((x, y) => x.position - y.position).map((s) => ({ url: `${deps.publicBaseUrl}/media/${s.token}`, altText: s.alt })),
-    });
-    const parts = a.validation.texts.map((t, i) => partsOf(i + 1, t));
-    const base = {
-      id, created_at: now, created_by: a.by, audit_id: a.auditId, idempotency_key: a.idempotencyKey, text: a.body.text,
-      thread: JSON.stringify((a.body.thread ?? []).map((t) => ({ text: t.text }))), idt_day: idtDay(nowMs),
-    };
-    let step: 'channel' | 'create' = 'channel';
-    try {
-      const channel = await buffer.resolveChannel();
-      step = 'create';
-      const post = await buffer.createPost(channel, parts[0]!, parts.slice(1));
-      await db.insertInto('posts').values({
-        ...base, status: 'posted', buffer_post_id: post.id, external_link: post.externalLink, sent_at: post.sentAt,
-      }).execute();
-      return {
-        post_id: id, buffer_post_id: post.id, status: 'posted' as const, external_link: post.externalLink, sent_at: post.sentAt,
-        images: stored.map((s) => ({ part: s.part, position: s.position, sha256: s.image.sha256 })),
-        allowance: { today_cap: al.today_cap, used_today: al.used_today + 1, remaining: Math.max(0, al.remaining - 1) },
-      };
-    } catch (e) {
-      if (!(e instanceof BufferError)) throw e;
-      await db.insertInto('posts').values({ ...base, status: 'failed', buffer_post_id: null, error: `${step}: ${failText(e)}` }).execute();
-      throw new AppError(502, 'POST_FAILED', 'Buffer did not publish the post', {
-        step, kind: e.kind, ...(e.status !== undefined ? { status: e.status } : {}), message: e.message, ...(e.retryAfter !== undefined ? { retry_after: e.retryAfter } : {}),
-      });
-    }
+    return cur;
   });
+  a.onPending?.();
+  const partsOf = (part: number, text: string): BufferPart => ({
+    text,
+    images: stored.filter((s) => s.part === part).sort((x, y) => x.position - y.position).map((s) => ({ url: `${deps.publicBaseUrl}/media/${s.token}`, altText: s.alt })),
+  });
+  const parts = a.validation.texts.map((t, i) => partsOf(i + 1, t));
+  let step: 'channel' | 'create' = 'channel';
+  let post: Awaited<ReturnType<BufferClient['createPost']>>;
+  try {
+    const channel = await buffer.resolveChannel();
+    step = 'create';
+    post = await buffer.createPost(channel, parts[0]!, parts.slice(1));
+  } catch (e) {
+    if (!(e instanceof BufferError)) {
+      // Not a Buffer answer (a bug): the send may or may not have happened, so the row stays counted.
+      await db.updateTable('posts').set({ status: 'unknown', error: `${step}: unexpected error`.slice(0, 500) }).where('id', '=', id).where('status', '=', 'pending').execute().catch(() => undefined);
+      throw e;
+    }
+    const unknown = step === 'create' && outcomeIsUnknown(e);
+    const error = `${step}: ${failText(e)}`;
+    await db.updateTable('posts').set({ status: unknown ? 'unknown' : 'failed', error }).where('id', '=', id).where('status', '=', 'pending').execute().catch(() => undefined);
+    throw new AppError(502, 'POST_FAILED', unknown ? 'Buffer did not answer clearly; the post may be live' : 'Buffer did not publish the post', {
+      step, kind: e.kind, outcome: unknown ? 'unknown' : 'failed', ...(unknown ? { post_id: id } : {}),
+      ...(e.status !== undefined ? { status: e.status } : {}), message: e.message, ...(e.retryAfter !== undefined ? { retry_after: e.retryAfter } : {}),
+    });
+  }
+  await db.updateTable('posts').set({ status: 'posted', buffer_post_id: post.id, external_link: post.externalLink, sent_at: post.sentAt }).where('id', '=', id).where('status', '=', 'pending').execute();
+  return {
+    post_id: id, buffer_post_id: post.id, status: 'posted' as const, external_link: post.externalLink, sent_at: post.sentAt,
+    images: stored.map((s) => ({ part: s.part, position: s.position, sha256: s.image.sha256 })),
+    allowance: { today_cap: al.today_cap, used_today: al.used_today + 1, remaining: Math.max(0, al.remaining - 1) },
+  };
 }
 
 export async function removePost(
@@ -237,10 +254,27 @@ export async function postsRefresh(deps: PostingDeps): Promise<RefreshSummary> {
   if (!deps.buffer) return { skipped: true, reason: 'NO_KEY' };
   const { db } = deps;
   const since = new Date(deps.now() - REFRESH_WINDOW_MS);
-  const rows = await db.selectFrom('posts').select(['id', 'buffer_post_id', 'external_link', 'sent_at', 'error']).where('status', '=', 'posted')
+  // A pending row whose process died before Buffer answered: the post may be live, so it becomes 'unknown' (still counted).
+  await db.updateTable('posts').set({ status: 'unknown', error: 'pending: the server ended before Buffer answered; the post may be live' })
+    .where('status', '=', 'pending').where('created_at', '<', new Date(deps.now() - PENDING_STALE_MS)).execute();
+  // An unknown row that has a Buffer id is looked up: found = posted.
+  const unknownRows = await db.selectFrom('posts').select(['id', 'buffer_post_id']).where('status', '=', 'unknown').where('buffer_post_id', 'is not', null).orderBy('created_at').execute();
+  const rows = await db.selectFrom('posts').select(['id', 'buffer_post_id', 'external_link', 'sent_at', 'error', 'status']).where('status', '=', 'posted')
     .where('created_at', '>=', since).where((e) => e.or([e('external_link', 'is', null), e('sent_at', 'is', null)])).orderBy('created_at').execute();
   let updated = 0;
   const errors: string[] = [];
+  for (const r of unknownRows) {
+    try {
+      const p = await deps.buffer.getPost(r.buffer_post_id!);
+      if (!p) continue;
+      await db.updateTable('posts').set({ status: 'posted', external_link: p.externalLink, sent_at: p.sentAt }).where('id', '=', r.id).where('status', '=', 'unknown').execute();
+      updated += 1;
+    } catch (e) {
+      if (!(e instanceof BufferError)) throw e;
+      errors.push(`${r.id}: ${failText(e)}`);
+      if (e.kind === 'rate_limited') return { checked: unknownRows.length, updated, errors };
+    }
+  }
   for (const r of rows) {
     if (!r.buffer_post_id) continue;
     try {
@@ -259,7 +293,7 @@ export async function postsRefresh(deps: PostingDeps): Promise<RefreshSummary> {
       if (e.kind === 'rate_limited') break;
     }
   }
-  return { checked: rows.length, updated, ...(errors.length > 0 ? { errors } : {}) };
+  return { checked: rows.length + unknownRows.length, updated, ...(errors.length > 0 ? { errors } : {}) };
 }
 
 /** /health: ok | paused | not_configured | failed, with the reason. */
@@ -269,7 +303,7 @@ export async function postingHealth(deps: Pick<PostingDeps, 'db' | 'buffer'>): P
     if (s.paused) return { posting: 'paused', posting_reason: s.reason };
     if (!deps.buffer) return { posting: 'not_configured', posting_reason: null };
     const last = await deps.db.selectFrom('posts').select(['status', 'error']).orderBy('created_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
-    if (last?.status === 'failed') return { posting: 'failed', posting_reason: last.error };
+    if (last?.status === 'failed' || last?.status === 'unknown') return { posting: 'failed', posting_reason: last.error };
     return { posting: 'ok', posting_reason: null };
   } catch {
     return { posting: 'failed', posting_reason: 'the posting state could not be read' };

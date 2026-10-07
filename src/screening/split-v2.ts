@@ -65,3 +65,23 @@ export function splitV2(sld: string, table: SplitV2Table = loadSplitV2('bt1@v2')
 
 /** The split of a `.com` domain name (lower-case); anything that is not `<letters>.com` has none. */
 export const splitV2OfDomain = (domain: string, method = 'bt1@v2'): string[] => (domain.endsWith('.com') ? splitV2(domain.slice(0, -4), loadSplitV2(method)) : []);
+
+/**
+ * v2.16.0 (CR-014 N-3): the part of an SLD the split could not read: what follows the longest prefix that reads as known tokens
+ * (the whole SLD when no prefix reads, null when the whole SLD reads or is empty).
+ */
+export function splitUnread(sld: string, table: SplitV2Table = loadSplitV2('bt1@v2')): string | null {
+  if (sld.length === 0) return null;
+  if (!/^[a-z]+$/.test(sld)) return sld;
+  const n = sld.length;
+  const reach = new Array<boolean>(n + 1).fill(false);
+  reach[0] = true;
+  let longest = 0;
+  for (let i = 0; i < n; i++) {
+    if (!reach[i]) continue;
+    for (let j = i + 2; j <= Math.min(n, i + 24); j++) {
+      if (table.cost.has(sld.slice(i, j))) { reach[j] = true; if (j > longest) longest = j; }
+    }
+  }
+  return longest >= n ? null : sld.slice(longest);
+}

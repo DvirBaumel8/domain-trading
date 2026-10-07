@@ -86,7 +86,7 @@ export class Reconciler {
           purchaseId: p.id, domain: p.domain, registrar: adapter.name, registrarApi: registrarApiOf(adapter.capabilities),
           orderId: rec.orderId, chargedCents: rec.chargedCents, renewalCents: q?.renewal_cents ?? null, expiryDate: expiry,
           buyDate: rec.invoiceDate, category: req.category ?? 'other', dealId: req.deal_id ?? null, checkId: p.check_id,
-          auditId: p.audit_id ?? 'reconciler', receiptRaw: rec.raw,
+          auditId: p.audit_id ?? 'reconciler', receiptRaw: rec.raw, now: new Date(now),
         });
         if (r.booked) {
           out.booked++;

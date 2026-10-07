@@ -430,7 +430,7 @@ describe('Buffer failures (T11-12)', () => {
     expect(c.json().error.details).toMatchObject({ kind: 'unavailable', status: 503 });
     expect(c.statusCode).toBe(502);
     const rows = await postRows();
-    expect(rows.map((r) => r.status)).toEqual(['failed', 'failed', 'failed']);
+    expect(rows.map((r) => r.status)).toEqual(['failed', 'failed', 'unknown']); // v2.16.0: a 5xx may have published, so it is unknown (and counts toward the cap)
     const everything = [a.body, b.body, c.body, logs.text(), JSON.stringify(rows), JSON.stringify(await db.selectFrom('audit_log').selectAll().execute()), JSON.stringify((await t.get('/health')).json()), JSON.stringify((await t.get('/posts')).json())].join('\n');
     expect(everything).not.toContain(KEY);
   });

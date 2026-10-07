@@ -1,5 +1,6 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
+import { jerusalemDate } from '../dates.js';
 
 export interface StepResult {
   ok: boolean;
@@ -68,7 +69,6 @@ export interface JobRunnerDeps {
   secretValues?: string[];
 }
 
-const NS_VERIFY_EVERY_MS = 24 * 3_600_000;
 
 /** Orchestrates the scheduled work for POST /jobs/run. Each step is isolated; jobs' own `running` flags make overlaps skip. */
 export class JobRunner {
@@ -109,7 +109,11 @@ export class JobRunner {
     try {
       const summary = await fn();
       const skipped = typeof summary === 'object' && summary !== null && (summary as { skipped?: unknown }).skipped === true;
-      return skipped ? { ok: true, skipped: true, summary } : { ok: true, summary };
+      if (skipped) return { ok: true, skipped: true, summary };
+      // A step that finished but reports failed items (price job, drop job, ...) is not ok, so the run shows it; the summary is kept.
+      const failed = typeof summary === 'object' && summary !== null ? (summary as { failed?: unknown }).failed : undefined;
+      if (Array.isArray(failed) && failed.length > 0) return { ok: false, error: `${failed.length} item(s) failed`, summary };
+      return { ok: true, summary };
     } catch (e) {
       return { ok: false, error: this.clean((e as Error).message), summary: null };
     }
@@ -133,7 +137,8 @@ export class JobRunner {
   private async nsVerifyDue(): Promise<boolean> {
     const last = await this.deps.db.selectFrom('audit_log').select('at').where('path', '=', 'ns-verify')
       .orderBy('at', 'desc').limit(1).executeTakeFirst();
-    return !last || this.deps.now() - last.at.getTime() >= NS_VERIFY_EVERY_MS;
+    // Once per IDT day: a 00:05 UTC run is never skipped because the last one was a few minutes under 24 h ago.
+    return !last || jerusalemDate(last.at) < jerusalemDate(new Date(this.deps.now()));
   }
 
   /** The standalone tick: the base steps, then the review retry (the daily run does not retry; it just ran the review). */
@@ -148,7 +153,7 @@ export class JobRunner {
     const steps: Record<string, StepResult> = {};
     steps.reconciler = await this.step(() => this.deps.reconciler.runOnce());
     steps.nsVerifier = await this.step(async () => {
-      if (!(await this.nsVerifyDue())) return { skipped: true, reason: 'ran within the last 24 h' };
+      if (!(await this.nsVerifyDue())) return { skipped: true, reason: 'already ran today (IDT)' };
       return this.deps.nsVerifier.runOnce();
     });
     steps.screeningResume = await this.step(() => this.deps.screeningWorker.resumeStalled());

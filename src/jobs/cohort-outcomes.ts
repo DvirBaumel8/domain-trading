@@ -23,7 +23,7 @@ type Result = Database['cohort_outcomes']['result'];
 interface Task { cohort: string; domain: string; kind: Kind; expected: string; dropDay: string | null; dropAt: Date | null }
 interface Outcome { result: Result; created_at_registry: Date | null; registrar: string | null; reason_code: string | null }
 
-const dayOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? new Date(Date.parse(iso)).toISOString().slice(0, 10) : null);
+const dayOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? jerusalemDate(new Date(Date.parse(iso))) : null);
 
 /** The drop outcome of a fresh lookup. created_at on or after (expected drop date - 1 day) means someone caught the name at the drop. */
 export function dropOutcomeOf(r: Pick<CachedLookup, 'outcome' | 'facts' | 'reasonCode'>, expected: string): Outcome {

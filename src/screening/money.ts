@@ -52,9 +52,9 @@ export function syllableCount(sld: string): number {
 function landerCheck(i: MoneyInput, sel: SelectionValuesT, p: PricingSettings, inSet: boolean | null): MoneyResult['lander1'] {
   const ok = { pass: true, reason: null, message: null };
   const geo = i.lane === 'S2';
-  if (geo) return inSet === false ? { pass: false, reason: 'BIN_NOT_IN_PRICE_LIST', message: 'A geo BIN must be a geo price on the price list' } : ok;
-  // Fail closed: without a price list no non-geo BIN can be shown to be allowed.
+  // Fail closed: without a price list no BIN (geo or not) can be shown to be allowed.
   if (inSet === null) return { pass: false, reason: 'PRICE_LIST_MISSING', message: 'pricing_settings v3 not created yet: there is no price list to check the BIN against' };
+  if (geo) return inSet === false ? { pass: false, reason: 'BIN_NOT_IN_PRICE_LIST', message: 'A geo BIN must be a geo price on the price list' } : ok;
   if (!inSet) return { pass: false, reason: 'BIN_NOT_IN_PRICE_LIST', message: 'The BIN is not on the non-geo price list' };
   const cap = Math.max(...laneList('nongeo', p).filter((v) => !p.landerExceptionBinsCents.includes(v)));
   if (i.binCents <= cap) return ok;

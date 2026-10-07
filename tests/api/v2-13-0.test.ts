@@ -61,7 +61,7 @@ describe('unknowns (CR-012 T12-2, T12-3)', () => {
     expect(got.unknowns).toMatchObject({ total_n: 2, truncated: false });
     const byName = Object.fromEntries(got.unknowns.entries.map((e: any) => [e.domain, e.features]));
     expect(Object.keys(byName).sort()).toEqual(['superpro.com', 'zzqxjkvv.com']);
-    expect(byName['zzqxjkvv.com']).toEqual([{ check: 'census', reason_code: 'CENSUS_LIST_SIZE', detail: { tokens: [], size: 0 } }]);
+    expect(byName['zzqxjkvv.com']).toEqual([{ check: 'census', reason_code: 'CENSUS_LIST_SIZE', detail: { tokens: [], size: 0, unread: 'zzqxjkvv' } }]);
     const sp = byName['superpro.com'].find((f: any) => f.check === 'census');
     expect(sp).toMatchObject({ reason_code: 'TOO_MANY_UNKNOWN' });
     expect(sp.detail.lookups).toHaveLength(20);
@@ -110,7 +110,7 @@ describe('unknowns (CR-012 T12-2, T12-3)', () => {
 
 describe('records per domain (CR-012 part E)', () => {
   const D = 'tampapoolsco.com';
-  const TM = { phrases_queried: ['TAMPA POOLS CO'], control_ok: true, exact_or_core_live: [], generic_live: [] };
+  const TM = { phrases_queried: ['TAMPA POOLS CO', 'TAMPAPOOLSCO'], control_ok: true, exact_or_core_live: [], generic_live: [] };
   const URL1 = 'https://web.archive.org/web/20190412093000/http://tampapoolsco.com/';
   const HIST = { result: 'PASS', first_capture_year: 2019, last_capture_year: 2021, evidence_urls: [URL1], checked_by: 'gavriel' };
   const at = (res: any, check: string) => res.results.find((q: any) => q.check === check);
@@ -144,7 +144,7 @@ describe('records per domain (CR-012 part E)', () => {
   it('V213-5 a stale record counts as missing: tm_us after 30 days, history after 180; GET says fresh false', async () => {
     await putBrandLists();
     const x = await h();
-    await x.post(`/candidates/${D}/records`, { kind: 'tm_us', record: TM, checked_by: 'gavriel' });
+    await x.post(`/candidates/${D}/records`, { kind: 'tm_us', record: TM, checked_by: 'gavriel', evidence_url: 'https://tmsearch.uspto.gov/x' });
     await x.post(`/candidates/${D}/records`, { kind: 'history', record: HIST, checked_by: 'gavriel' });
     x.clock.t += 29 * DAY;
     const ok = await run(x);
@@ -161,7 +161,7 @@ describe('records per domain (CR-012 part E)', () => {
   it('V213-6 precedence: a run-level manual row outranks the domain record; the A1 prior-name rule still applies; an automated history result is not replaced', async () => {
     await putBrandLists();
     const x = await h();
-    await x.post(`/candidates/${D}/records`, { kind: 'tm_us', record: TM, checked_by: 'gavriel' });
+    await x.post(`/candidates/${D}/records`, { kind: 'tm_us', record: TM, checked_by: 'gavriel', evidence_url: 'https://tmsearch.uspto.gov/x' });
     await x.post(`/candidates/${D}/records`, { kind: 'history', record: { ...HIST, result: 'FLAG_PRIOR_BUSINESS', prior_business_name: 'Sunny Pools LLC' }, checked_by: 'gavriel' });
     // the history record names a prior business, so the tm_us record (which did not query its phrase) is UNKNOWN, as a manual row would be
     const r1 = await run(x);
@@ -208,7 +208,7 @@ describe('records per domain (CR-012 part E)', () => {
     expect((await bad({ kind: 'tm_us', record: TM })).json().error.code).toBe('VALIDATION_ERROR');
     expect((await bad({ kind: 'tm_us', record: TM, checked_by: 'g' }, 'tampapools.net')).statusCode).toBe(422);
     expect(await db.selectFrom('domain_records').selectAll().execute()).toHaveLength(0);
-    await bad({ kind: 'tm_us', record: TM, checked_by: 'g' });
+    await bad({ kind: 'tm_us', record: TM, checked_by: 'g', evidence_url: 'https://tmsearch.uspto.gov/x' });
     await expect(db.updateTable('domain_records').set({ checked_by: 'x' }).execute()).rejects.toThrow(/append-only/);
     await expect(db.deleteFrom('domain_records').execute()).rejects.toThrow(/append-only/);
     const read = await app!.inject({ method: 'POST', url: `/candidates/${D}/records`, payload: {} });

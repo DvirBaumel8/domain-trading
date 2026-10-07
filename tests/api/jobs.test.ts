@@ -131,19 +131,29 @@ describe('tick', () => {
     expect(await testDb.selectFrom('audit_log').select('id').where('path', '=', 'ns-verify').execute()).toHaveLength(1);
   });
 
-  it('runs the NS verifier only when its last run is 24 h old', async () => {
-    let now = Date.parse('2026-10-06T00:00:00Z');
+  it('runs the NS verifier once per IDT day (a 00:05 run is never skipped by minutes)', async () => {
+    let now = Date.parse('2026-10-06T00:05:00Z'); // 03:05 IDT on the 6th
     app = await make({ now: () => now });
     const ns = vi.spyOn(app.nsVerifier, 'runOnce');
     await post(app, 'tick');
     expect(ns).toHaveBeenCalledTimes(1);
-    now += 23 * 3_600_000;
+    now += 3_600_000; // same IDT day
     const early = await post(app, 'tick');
     expect(ns).toHaveBeenCalledTimes(1);
     expect(early.json().steps.nsVerifier).toMatchObject({ ok: true, skipped: true });
-    now += 3_600_000;
+    now = Date.parse('2026-10-07T00:05:00Z'); // 23 h 59 min... after the first run, but the next IDT day
     await post(app, 'tick');
     expect(ns).toHaveBeenCalledTimes(2);
+  });
+
+  it('a step whose summary has failed items is ok:false with "N item(s) failed" (summary kept; /jobs/run still 200)', async () => {
+    app = await make();
+    vi.spyOn(app.priceJob, 'runOnce').mockResolvedValue({ today: '2026-10-06', dryRun: false, skipped: false, applied: [], superseded: [], held: [], delisted: [], cancelled: [], failed: [{ domain: 'x.com', rowId: 1, reason: 'bad' }, { domain: 'y.com', rowId: 2, reason: 'bad' }] });
+    const res = await post(app, 'daily');
+    expect(res.statusCode).toBe(200);
+    expect(res.json().steps.priceJob).toMatchObject({ ok: false, error: '2 item(s) failed', summary: { failed: [{ domain: 'x.com' }, { domain: 'y.com' }] } });
+    const run = await testDb.selectFrom('job_runs').select('ok').orderBy('id', 'desc').executeTakeFirstOrThrow();
+    expect(run.ok).toBe(false);
   });
 
   it('a failing reconciler does not stop the NS verifier', async () => {

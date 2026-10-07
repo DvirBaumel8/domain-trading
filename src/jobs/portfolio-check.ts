@@ -4,6 +4,7 @@
 // Web Risk usage counter and one audit row. `/report` raises REGISTRY_MISMATCH, LANDER_DOWN and OWNED_NAME_BLOCKLISTED from those rows.
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
+import { jerusalemDate } from '../dates.js';
 import { newAuditId } from '../http/audit.js';
 import { BlockedError, safeFetch } from '../net/safe-fetch.js';
 import { USER_AGENT, type RdapLookupFn } from '../rdap.js';
@@ -25,7 +26,7 @@ export const LANDER_SIGNATURES: Readonly<Record<string, RegExp[]>> = { afternic:
 export const WEB_CHECK_TIMEOUT_MS = 10_000;
 export const WEB_BODY_BYTES = 4096;
 /** A name's blocklist lookup is repeated when its latest one is at least this old. */
-export const BLOCKLIST_EVERY_MS = 7 * 86_400_000;
+export const BLOCKLIST_EVERY_DAYS = 7;
 
 const squash = (s: string) => s.toLowerCase().replace(/\s+/g, '');
 const tally = () => ({ ok: 0, fail: 0, unknown: 0 });
@@ -148,7 +149,11 @@ export class PortfolioCheckJob {
   private async blocklistDue(domainId: number): Promise<boolean> {
     const last = await this.deps.db.selectFrom('portfolio_checks').select('at').where('domain_id', '=', domainId).where('kind', '=', 'blocklist')
       .orderBy('id', 'desc').limit(1).executeTakeFirst();
-    return !last || this.deps.now() - last.at.getTime() >= BLOCKLIST_EVERY_MS;
+    if (!last) return true;
+    // weekly by IDT calendar day: due when the last check's day is at least 7 days before today's
+    const today = jerusalemDate(new Date(this.deps.now()));
+    const dueDay = jerusalemDate(new Date(Date.parse(`${today}T12:00:00Z`) - BLOCKLIST_EVERY_DAYS * 86_400_000));
+    return jerusalemDate(last.at) <= dueDay;
   }
 
   private async blocklist(domain: string, shared: Map<string, unknown>, dryRun: boolean): Promise<{ status: Status; details: Record<string, unknown> }> {

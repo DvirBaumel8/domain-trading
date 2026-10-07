@@ -2,7 +2,10 @@
 // quotes, likes, follows or messages anyone. GET /media/:token is the one public (unauthenticated) read besides /health/ping.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { requireWriteBeforeBody } from '../http/auth.js';
 import { AppError } from '../http/errors.js';
+import { keepIdempotencyKey } from '../http/idempotency.js';
+import { SlidingWindowLimiter } from '../http/rate-limit.js';
 import { idtDay } from '../services/review/packet.js';
 import { allowanceNow, createPost, nextMidnightIdt, PostBody, POST_BODY_LIMIT, postingState, removePost, throwIfInvalid, validatePost, type PostingDeps } from '../services/posting/posts.js';
 import { toJerusalemIso } from '../time.js';
@@ -13,12 +16,16 @@ const BurstBody = z.object({ day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), cap: 
 const ListQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }).strict();
 const IdParam = z.string().regex(/^pst_[0-9a-f]{12}$/);
 
+/** GET /media/:token per IP and minute (the route is public). */
+export const MEDIA_PER_MINUTE = 120;
+
 const iso = (d: Date | null) => (d ? toJerusalemIso(d) : null);
 
 export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
   const { db } = deps;
 
-  app.post('/posts', { bodyLimit: POST_BODY_LIMIT }, async (req, reply) => {
+  // onRequest (after the auth hook, before the body is read): a token that cannot write is refused without parsing up to 40 MB. A body over 40 MB is refused 413 INVALID_BODY by the body limit.
+  app.post('/posts', { bodyLimit: POST_BODY_LIMIT, onRequest: requireWriteBeforeBody }, async (req, reply) => {
     const b = PostBody.parse(req.body ?? {});
     const v = await validatePost(deps, b);
     if (b.dry_run) {
@@ -34,6 +41,8 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
     const r = await createPost(deps, {
       body: b, validation: v, by: req.auth!.name, auditId: req.auditId,
       idempotencyKey: typeof req.headers['idempotency-key'] === 'string' ? req.headers['idempotency-key'].slice(0, 255) : null,
+      // From the moment the row exists a failure is never released for a retry under the same key: the post may be live.
+      onPending: () => keepIdempotencyKey(req),
     });
     req.auditSummary = `posted ${r.post_id}`;
     return reply.code(201).send({
@@ -100,12 +109,19 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
   });
 
   // The one public read (founder rules unchanged: nothing is written, no audit, no idempotency). Buffer fetches the images from here.
+  const mediaLimiter = new SlidingWindowLimiter(MEDIA_PER_MINUTE, 60_000, deps.now);
   app.get('/media/:token', async (req, reply) => {
+    const wait = mediaLimiter.take(req.ip);
+    if (wait > 0) {
+      const seconds = Math.ceil(wait / 1000);
+      reply.header('retry-after', String(seconds));
+      throw new AppError(429, 'RATE_LIMITED', 'Too many requests', { retry_after_seconds: seconds });
+    }
     const token = (req.params as { token: string }).token;
     const row = /^[0-9a-f]{32}$/.test(token)
       ? await db.selectFrom('post_images').select(['mime', 'data', 'media_expires_at']).where('media_token', '=', token).executeTakeFirst()
       : undefined;
     if (!row || !row.data || row.media_expires_at.getTime() <= deps.now()) throw new AppError(404, 'NOT_FOUND', 'Not found');
-    return reply.header('content-type', row.mime).header('cache-control', 'public, max-age=3600').header('x-content-type-options', 'nosniff').send(row.data);
+    return reply.header('content-type', row.mime).header('cache-control', `public, max-age=${Math.max(0, Math.min(3600, Math.floor((row.media_expires_at.getTime() - deps.now()) / 1000)))}`).header('x-content-type-options', 'nosniff').send(row.data);
   });
 }

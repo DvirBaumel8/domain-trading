@@ -4,13 +4,12 @@ import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
 import { jerusalemDate } from '../dates.js';
 import type { Database } from '../db/types.js';
-import { MAX_WORDS, namesDroppingBetween, addDays, todayIdt } from '../drops/drop-lists.js';
+import { filterDropName, namesDroppingBetween, addDays, todayIdt, type RemovedReason } from '../drops/drop-lists.js';
 import { newAuditId } from '../http/audit.js';
 import { AppError } from '../http/errors.js';
 import { CompSchema } from '../services/listing-v2.js';
 import { createRun, type InputName, type ScreeningWorker } from './engine.js';
 import { methodApproval } from './sibling-methods.js';
-import { splitV2 } from './split-v2.js';
 
 /** A name sent again within this many days is a duplicate (its extra source is recorded, it is not screened twice). */
 export const INTAKE_DEDUPE_DAYS = 30;
@@ -33,7 +32,7 @@ export const IntakeBody = z.object({
 }).strict();
 export type IntakeBodyT = z.infer<typeof IntakeBody>;
 
-export type IntakeRemoval = 'DOMAIN_INVALID' | 'NOT_COM' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'TOO_MANY_WORDS' | 'OWNED' | 'DUPLICATE_IN_UPLOAD';
+export type IntakeRemoval = 'DOMAIN_INVALID' | 'NOT_COM' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'NO_SPLIT' | 'TOO_MANY_WORDS' | 'ONE_WORD' | 'OWNED' | 'DUPLICATE_IN_UPLOAD';
 
 /** The form rules of an intake name (before ownership and duplicates): a letters-only second-level .com of at most 3 words by the bt1@v2 split. */
 export function intakeFormReason(raw: string): { domain: string; reason: IntakeRemoval | null } {
@@ -45,12 +44,20 @@ export function intakeFormReason(raw: string): { domain: string; reason: IntakeR
   return { domain, reason: null };
 }
 
-/** The word rules, after the upload-duplicate test (the order of the drop-list filter). */
+/** The word rules, after the upload-duplicate test: the drop-list filter's own (digit, hyphen, no split, more than 3 words, one word). v2.16.0: one rule set for both feeds. */
 function wordReason(domain: string): IntakeRemoval | null {
-  const sld = domain.split('.')[0]!;
-  if (/\d/.test(sld)) return 'HAS_DIGIT';
-  if (sld.includes('-')) return 'HAS_HYPHEN';
-  return splitV2(sld).length > MAX_WORDS ? 'TOO_MANY_WORDS' : null;
+  const f = filterDropName(domain, new Set());
+  return f.kept ? null : (f.reason as RemovedReason as IntakeRemoval);
+}
+
+/** v2.16.0 (CR-015 I-1): `note` and `source` carry no personal data: the rule of /offers (no '@'), 422 NO_PII with the name's index and the field. */
+export function checkIntakePii(body: IntakeBodyT): void {
+  body.names.forEach((n, index) => {
+    for (const field of ['note', 'source'] as const) {
+      const v = n[field];
+      if (v != null && v.includes('@')) throw new AppError(422, 'NO_PII', `names[${index}].${field} must not contain an email address or '@'`, { index, field });
+    }
+  });
 }
 
 /** Comparable sales must be real, past dates (the same rule as /buy). */
@@ -76,6 +83,7 @@ export interface IntakeResult {
 
 export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: { tokenName: string; auditId: string | null; now: Date }): Promise<IntakeResult> {
   checkIntakeComps(body, jerusalemDate(ctx.now));
+  checkIntakePii(body);
   const out: IntakeResult = { accepted: [], duplicates: [], removed: [] };
   const checked = body.names.map((n) => ({ n, ...intakeFormReason(n.domain) }));
   const owned = await ownedDomains(db, checked.map((c) => c.domain));
@@ -128,10 +136,17 @@ export class IntakeScreeningJob {
     if (this.running) return none('ALREADY_RUNNING');
     this.running = true;
     try {
-      const { db, worker } = this.deps;
+      const { worker } = this.deps;
       const nowMs = this.deps.now();
       const now = new Date(nowMs);
       const today = todayIdt(nowMs);
+      // v2.16.0: one transaction, serialised by an advisory lock, from the queue read to the bookkeeping rows, so two instances (or a retried trigger)
+      // cannot screen the same names. The run itself is created on its own connection (createRun opens its own transaction); if anything after it
+      // fails, the run is cancelled (it must not run with no bookkeeping) and the error is rethrown.
+      const started: { runId: string | null } = { runId: null };
+      try {
+      const summary = await this.deps.db.transaction().execute(async (db) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('intake_screening'))`.execute(db);
       const doneToday = Number((await db.selectFrom('candidate_screenings').select(sql<string>`count(distinct domain)`.as('n')).where('day', '=', today).executeTakeFirstOrThrow()).n);
 
       // Queued intake rows not yet screened, oldest first; one name per domain, an owned name is never screened.
@@ -163,22 +178,28 @@ export class IntakeScreeningJob {
         ...takenDrops.map((d) => ({ domain: d.domain, lane: 'S7' as const, ...(census && { census_list: census }) })),
       ];
       const auditId = newAuditId();
-      await db.insertInto('audit_log').values({
+      // on the pool, not the locked transaction: the run row (made on its own connection) refers to this audit row
+      await this.deps.db.insertInto('audit_log').values({
         id: auditId, at: now, scope: 'job', method: 'JOB', path: 'intake-screening', request: JSON.stringify({ names: names.length }), status_code: 200,
         result_summary: `intake ${takenIntake.length}; drop lists ${takenDrops.length}; left ${queuedBefore + drops.length - names.length}`,
       }).execute();
-      const run = await createRun(db, { mode: 'full', names }, { createdBy: 'intakeScreening', auditId, now }, worker.checks);
-      await db.transaction().execute(async (trx) => {
-        for (const [domain, v] of takenIntake) {
-          for (const id of v.ids) await trx.insertInto('candidate_screenings').values({ intake_id: id, domain, origin: 'intake', run_id: run.id, day: today, at: now }).execute();
-        }
-        for (const d of takenDrops) await trx.insertInto('candidate_screenings').values({ intake_id: null, domain: d.domain, origin: 'drop_list', run_id: run.id, day: today, at: now }).execute();
-      });
-      worker.kick(run.id);
+      const run = await createRun(this.deps.db, { mode: 'full', names }, { createdBy: 'intakeScreening', auditId, now }, worker.checks);
+      started.runId = run.id;
+      for (const [domain, v] of takenIntake) {
+        for (const id of v.ids) await db.insertInto('candidate_screenings').values({ intake_id: id, domain, origin: 'intake', run_id: run.id, day: today, at: now }).execute();
+      }
+      for (const d of takenDrops) await db.insertInto('candidate_screenings').values({ intake_id: null, domain: d.domain, origin: 'drop_list', run_id: run.id, day: today, at: now }).execute();
       return {
         queued_before: queuedBefore, screened: names.length, from_intake: takenIntake.length, from_drop_lists: takenDrops.length,
         left_for_next_run: queuedBefore + drops.length - names.length, run_id: run.id, census_list: census,
       };
+      });
+      if (summary.run_id) worker.kick(summary.run_id);
+      return summary;
+      } catch (e) {
+        if (started.runId !== null) await worker.cancel(started.runId, 'system', 'intake bookkeeping failed').catch(() => null);
+        throw e;
+      }
     } finally {
       this.running = false;
     }

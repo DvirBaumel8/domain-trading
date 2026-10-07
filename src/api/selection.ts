@@ -3,7 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
-import { createHash } from 'node:crypto';
+import { memberHashOf } from '../screening/test-sets.js';
 import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
@@ -390,7 +390,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       const last = await trx.selectFrom('holdout_suites').select('version').where('suite', '=', b.suite).orderBy('version', 'desc').limit(1).executeTakeFirst();
       return trx.insertInto('holdout_suites').values({
         suite: b.suite, version: (last?.version ?? 0) + 1, slices: b.slices ?? null, sources: b.sources ?? null, cell: b.cell,
-        member_hash: memberHash(mine.domains), member_count: mine.domains.length, gates_not_assessed: b.gates_not_assessed, clears_hold: b.clears_hold,
+        member_hash: memberHashOf(mine.domains), member_count: mine.domains.length, gates_not_assessed: b.gates_not_assessed, clears_hold: b.clears_hold,
         created_by: req.auth!.name, approval_text: approval.text, approval_at: approval.approvedAt, audit_id: req.auditId!,
       }).returningAll().executeTakeFirstOrThrow();
     });
@@ -406,7 +406,6 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const rows = all.filter((r) => r.role === 'test');
     return { all, rows, domains: rows.map((r) => r.domain) };
   };
-  const memberHash = (domains: string[]): string => createHash('sha256').update([...domains].sort().join('\n')).digest('hex');
 
   const suiteView = (r: { suite: string; version: number; slices: string[] | null; sources: string[] | null; member_hash: string; member_count: number; cell: string; created_at: Date; created_by: string; approval_text: string; gates_not_assessed?: string[] | null; clears_hold?: boolean | null }) => ({
     suite: r.suite, version: r.version, slices: r.slices, sources: r.sources, member_hash: r.member_hash, member_count: r.member_count, cell: r.cell,
@@ -480,7 +479,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
 
     if (b.mode === 'holdout' && def) {
       const domains = rows.map((r) => r.domain);
-      if (domains.length !== def.member_count || memberHash(domains) !== def.member_hash) {
+      if (domains.length !== def.member_count || memberHashOf(domains) !== def.member_hash) {
         throw new AppError(409, 'SUITE_MEMBERSHIP_CHANGED', `The names ${b.suite} selects are not the names frozen with its definition; nothing was scored`, { frozen_count: def.member_count, current_count: domains.length });
       }
     }

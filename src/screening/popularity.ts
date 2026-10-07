@@ -5,7 +5,7 @@
 // Attribution: "Majestic Million, Majestic (https://majestic.com), CC BY 3.0". The file is never redistributed or committed in full.
 import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { USER_AGENT } from '../rdap.js';
 import type { ScreeningDeps } from './types.js';
@@ -113,7 +113,7 @@ export async function refreshPopularity(db: Kysely<Database>, deps: ScreeningDep
   const body = rows.map((r) => `${r.rank},${r.domain},${r.tld ?? ''}`).join('\n');
   const sha = createHash('sha256').update(body, 'utf8').digest('hex');
   const same = last && last.sha256 === sha ? last : null;
-  const sameId = same ? (same.body_gz ? same.id : same.same_as_id) : null;
+  const sameId = same ? (same.has_body ? same.id : same.same_as_id) : null;
   await db.insertInto('reference_files').values({
     name: POPULARITY_NAME, source_url: POPULARITY_URL, fetched_at: new Date(now()), data_date: listDate, sha256: sha,
     bytes: Buffer.byteLength(body, 'utf8'), body_gz: sameId ? null : gzipSync(Buffer.from(body, 'utf8')), same_as_id: sameId,
@@ -122,7 +122,9 @@ export async function refreshPopularity(db: Kysely<Database>, deps: ScreeningDep
 }
 
 async function newestRow(db: Kysely<Database>) {
-  return db.selectFrom('reference_files').selectAll().where('name', '=', POPULARITY_NAME).orderBy('fetched_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+  // metadata only: the gzipped body is fetched when the in-process cache misses (v2.16.0)
+  return db.selectFrom('reference_files').select(['id', 'name', 'source_url', 'fetched_at', 'data_date', 'sha256', 'bytes', 'same_as_id', sql<boolean>`body_gz is not null`.as('has_body')])
+    .where('name', '=', POPULARITY_NAME).orderBy('fetched_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
 }
 
 export interface PopularityList { listId: string; listDate: string; fetchedAt: Date; rows: number; slds: string[]; ranks: Map<string, number> }
@@ -134,8 +136,8 @@ export async function latestPopularity(db: Kysely<Database>): Promise<Popularity
   if (!row) return null;
   const key = `${row.id}:${row.sha256}:${row.fetched_at.getTime()}`;
   if (cached?.key === key) return cached.list;
-  let bodyRow: { body_gz: Buffer | null } | undefined = row;
-  if (!row.body_gz && row.same_as_id !== null) bodyRow = await db.selectFrom('reference_files').select('body_gz').where('id', '=', row.same_as_id).executeTakeFirst();
+  const bodyId = row.has_body ? row.id : row.same_as_id;
+  const bodyRow = bodyId === null ? undefined : await db.selectFrom('reference_files').select('body_gz').where('id', '=', bodyId).executeTakeFirst();
   if (!bodyRow?.body_gz) return null;
   const ranks = new Map<string, number>();
   let n = 0;

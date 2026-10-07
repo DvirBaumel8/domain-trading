@@ -1,6 +1,6 @@
 // v2.9.0 (CR-010 acceptance findings): cancel (F-1, T10-8), source of each answer (F-3), lookup totals on screening runs (F-4), pending before the checks ran (F-5).
 import { http } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { RdapLookup, RdapLookupFn } from '../../src/rdap.js';
@@ -37,7 +37,8 @@ async function h(rdapLookup: RdapLookupFn): Promise<ScreeningHarness> {
   app = x.app;
   return x;
 }
-const settle = () => new Promise((r) => setTimeout(r, 50));
+/** Waits until the gated lookup has been asked at least once (the worker has started), instead of a fixed sleep. */
+const started = (rdap: { calls: string[] }) => vi.waitFor(() => expect(rdap.calls.length).toBeGreaterThan(0), { timeout: 5_000, interval: 5 });
 async function startSet(x: ScreeningHarness, name: string): Promise<string> {
   const r = await x.post('/selection/test-sets', { name, purpose: 'rescore', sibling_method: 'bt1@v1', slices: ['R'] });
   expect(r.statusCode, r.body).toBe(202);
@@ -50,7 +51,7 @@ describe('cancel (CR-010 F-1, T10-8)', () => {
     const x = await h(rdap.fn);
     await x.post('/selection/labelled-names', { rows: [reg('superpro.com')] });
     const runId = await startSet(x, 'CAN-1');
-    await settle();
+    await started(rdap);
     expect(rdap.calls.length).toBeGreaterThan(0);
     expect((await x.get('/selection/test-sets/CAN-1')).json()).toMatchObject({ status: 'computing', run: { status: 'running' } });
     const c = await x.post('/selection/test-sets/CAN-1/cancel', { reason: 'replaced by CAN-2' });
@@ -62,7 +63,6 @@ describe('cancel (CR-010 F-1, T10-8)', () => {
     const before = rdap.calls.length;
     rdap.release();
     await app!.screeningWorker.idle();
-    await settle();
     expect(rdap.calls.length).toBe(before); // nothing after the cancel (the in-flight ones were already counted)
     // a read neither restarts nor reopens it, even with a stale heartbeat
     x.clock.t += 10 * 60_000;
@@ -71,7 +71,7 @@ describe('cancel (CR-010 F-1, T10-8)', () => {
     expect(await reopenRun(db, runId, new Date(x.clock.t), 30)).toBe(false);
     expect(await app!.screeningWorker.resumeStalled()).toEqual({ resumed: [], finalized: [] });
     await app!.screeningWorker.runToEnd(runId);
-    await settle();
+    await app!.screeningWorker.idle();
     expect(rdap.calls.length).toBe(before);
     expect((await db.selectFrom('screening_runs').select('status').where('id', '=', runId).executeTakeFirstOrThrow()).status).toBe('cancelled');
     // unfinished checks are UNKNOWN CANCELLED; the audit row exists
@@ -91,7 +91,7 @@ describe('cancel (CR-010 F-1, T10-8)', () => {
     const x = await h(rdap.fn);
     await x.post('/selection/labelled-names', { rows: [reg('superpro.com')] });
     await startSet(x, 'CAN-2');
-    await settle();
+    await started(rdap);
     // make it a purpose-new set for the seal check (the seal route reads purpose first)
     await db.updateTable('test_sets').set({ purpose: 'new' }).where('name', '=', 'CAN-2').execute();
     expect((await x.post('/selection/test-sets/CAN-2/cancel', {})).statusCode).toBe(200);

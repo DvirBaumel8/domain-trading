@@ -1,4 +1,4 @@
-# Data formats (contract v2.15.0)
+# Data formats (contract v2.16.0)
 
 All CSV files: UTF-8, **CRLF** line endings, RFC 4180 quoting (a cell with `,`, `"` or a line break is quoted, `"` doubled), a header row first.
 

@@ -15,7 +15,12 @@
    - a lock registry with named keys, so two jobs never share a key by accident.
 4. **`core/validation.ts`:** the shared zod pieces (`usd`, `domainParam`, `approvalRef`, `comps`), and the personal-data check (`NO_PII`) used by offers, sold, uploads and intake.
 5. **`core/redact.ts`:** one scrub helper (secret values and token names) used by audit, runner, Buffer, Gemini and the Worker logs. "Free-text route" becomes a route option instead of a path regex in `audit.ts`.
-6. **Gate for R1:** an `import-boundaries` unit test that fails if a new copy appears, by searching for the old helper names outside `core/`.
+6. **Efficiency (Dvir asked, 8 Oct):**
+   - **One shared pacer per registry host for the whole process,** so parallel work can never exceed our polite rate.
+   - **Batched engine writes:** the heartbeat at most every 10 s, the cancel check at most every 5 s, manual-row lookups only for checks that can be manual. That cuts the database calls per check from about 4 to about 1.
+   - **Light progress reads:** stored per-run summaries instead of loading every result row on each poll.
+   - **Step timings** recorded in each job run, so gains are measured.
+7. **Gate for R1:** an `import-boundaries` unit test that fails if a new copy appears, by searching for the old helper names outside `core/`.
 
 ## R2: modules with public entry points (PATCH)
 - **Target layout:** `src/modules/<name>/` with an `index.ts` that is the only file other modules may import. Routes stay in each module's `api.ts`.
@@ -38,6 +43,7 @@
   - **the in-process worker** works through the steps in order while the instance is awake;
   - **`GET /jobs/runs`** shows each step's status, attempts and errors;
   - **`JOB_OVERDUE`** also fires for a step that failed after its last attempt.
+- **Independent steps run in parallel** under the shared per-registry pacer: the portfolio web checks 4 at a time, and steps that don't depend on each other side by side.
 - **Long screening runs** (test sets, cohorts, intake) keep their own engine for now. They already resume after a restart and are moved onto the queue only if that proves simpler.
 - **Contract:** `POST /jobs/run` changes from a 200 with all step results to a 202 with the run id. That breaks the Worker and workflows, which DOM updates in the same release. Bots read results through `GET /jobs/runs`. This is a **MAJOR** change for `/jobs/run` callers, and DOM is the only one (Worker, workflow). Gavriel's manual runs are announced in `DOM-TO-GAVRIEL.md`, so it ships as 3.0.0 with a release note.
 

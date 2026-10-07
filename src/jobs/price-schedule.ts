@@ -13,7 +13,7 @@ type Q = Kysely<Database> | Transaction<Database>;
 
 export interface PriceJobResult {
   today: string; dryRun: boolean; skipped: boolean;
-  applied: { domain: string; event: string; rowId: number; bin_cents: number | null; floor_cents: number | null; walkaway_cents: number | null }[];
+  applied: { domain: string; event: string; rowId: number; bin_cents: number | null; floor_cents: number | null }[];
   superseded: number[]; failed: { domain: string; rowId: number; reason: string }[];
   held: string[]; delisted: string[]; cancelled: number[];
 }
@@ -191,7 +191,7 @@ export class PriceScheduleJob {
       await q.updateTable('price_schedule').set({ status: 'applied', applied_at: now, listing_history_id: h.id, updated_at: now }).where('id', '=', last.id).execute();
     }
     await audit(last.event, last.id, `${last.event} applied`);
-    res.applied.push({ domain, event: last.event, rowId: last.id, bin_cents: last.bin_cents, floor_cents: last.floor_cents, walkaway_cents: last.walkaway_cents });
+    res.applied.push({ domain, event: last.event, rowId: last.id, bin_cents: last.bin_cents, floor_cents: last.floor_cents });
     return res;
   }
 }

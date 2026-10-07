@@ -1,6 +1,6 @@
 // G8 tier (CAP-24) and DEMAND-2: the rule tier from the item's other results. A result that is absent (not in the plan) or not usable
 // leaves its feature null, and a null feature makes its conditions `unknown` (never read as a pass or a fail).
-import { evaluateTier, type TierFeatures } from '../tier.js';
+import { cmp, condValue, evaluateTier, type TierFeatures } from '../tier.js';
 import type { SelectionValuesT } from '../settings.js';
 import { outcome, type Check, type CheckContext, type CheckId } from '../types.js';
 
@@ -33,7 +33,6 @@ export function tierFeatures(ctx: CheckContext): TierFeatures {
 }
 
 type Cond = { f: string; op: string; v: string | number } | { tier: string };
-const holds = (op: string, a: number, b: number): boolean => (op === '>=' ? a >= b : op === '<=' ? a <= b : op === '>' ? a > b : op === '<' ? a < b : op === '==' ? a === b : a !== b);
 
 /**
  * The feature names that decided a tier's clause: every condition of an `all` clause, but only the conditions that are true in an `any`
@@ -52,8 +51,8 @@ function decidingFeatures(tier: string, t: SelectionValuesT['tier'], features: T
       for (const f of decidingFeatures(cond.tier, t, features, thresholds, seen)) out.add(f);
     } else {
       const x = (features as unknown as Record<string, number | null>)[cond.f];
-      const v = typeof cond.v === 'string' ? thresholds[cond.v.slice(1)] : cond.v;
-      if (isAny && (x === null || x === undefined || v === undefined || !holds(cond.op, x, v))) continue;
+      const v = condValue(cond.v, thresholds);
+      if (isAny && (x === null || x === undefined || v === undefined || !cmp(cond.op, x, v))) continue;
       out.add(cond.f);
     }
   }

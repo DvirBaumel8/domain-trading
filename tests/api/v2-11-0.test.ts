@@ -164,7 +164,7 @@ describe('runReview through POST /reviews/run', () => {
     await t.doc();
     await t.post('/reviews/packet'); // creates a packet to hang spend on
     const p = (await db.selectFrom('review_packets').select('id').executeTakeFirstOrThrow()).id;
-    await db.insertInto('review_feedback').values({ packet_id: p, created_by: 'x', created_at: new Date(T0), status: 'ok', provider: 'acme', model: 'm', cost_usd: 5, reason: null }).execute();
+    await db.insertInto('review_feedback').values({ packet_id: p, created_by: 'x', created_at: new Date(T0), status: 'ok', provider: 'gemini', model: 'm', cost_usd: 5, reason: null }).execute();
     serve(() => answer([]));
     const r = await t.post('/reviews/run');
     expect([r.statusCode, r.json().error.code]).toEqual([409, 'REVIEW_COST_CAP']);
@@ -250,7 +250,7 @@ describe('outsideReview daily step', () => {
     expect(a.steps.outsideReview).toMatchObject({ ok: true, summary: { status: 'unknown' } });
     const p = (await db.selectFrom('review_packets').select('id').executeTakeFirstOrThrow()).id;
     await db.insertInto('review_packets').values({ id: 'rvp_000000000000', created_by: 'x', created_at: new Date(T0), kind: 'daily', document_version: 1, content: '{}', sha256: 'a'.repeat(64) }).execute();
-    await db.insertInto('review_feedback').values({ packet_id: 'rvp_000000000000', created_by: 'x', created_at: new Date(T0), status: 'ok', provider: 'acme', model: 'm', cost_usd: 5, reason: null }).execute();
+    await db.insertInto('review_feedback').values({ packet_id: 'rvp_000000000000', created_by: 'x', created_at: new Date(T0), status: 'ok', provider: 'gemini', model: 'm', cost_usd: 5, reason: null }).execute();
     expect(p).toBeDefined();
     t.clock.t += DAY;
     expect((await t.app.jobRunner.run('daily')).steps.outsideReview!.summary).toMatchObject({ skipped: true, reason: 'COST_CAP' });

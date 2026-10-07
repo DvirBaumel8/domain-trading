@@ -2,7 +2,7 @@
 // keeps us under the per-source limits recorded in docs/internal/sources.md.
 import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { RDAP_COM_BASE, USER_AGENT, type RdapFacts, type RdapLookup } from '../rdap.js';
 import { storeEvidence } from './evidence.js';
@@ -208,13 +208,15 @@ const parsedBySha = new Map<string, Map<string, string>>(); // body sha256 -> pa
 
 type FileRow = Awaited<ReturnType<typeof latestBootstrap>>;
 /** The newest bootstrap row (it may point at an identical older row via same_as_id). */
-async function latestBootstrap(db: Kysely<Database>) {
-  return db.selectFrom('reference_files').selectAll().where('name', '=', BOOTSTRAP_NAME).orderBy('fetched_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+async function latestBootstrap(db: Kysely<Database>, id?: string) {
+  // metadata only: the gzipped body is fetched when the parsed map is not cached in-process (v2.16.0)
+  return db.selectFrom('reference_files').select(['id', 'name', 'source_url', 'fetched_at', 'data_date', 'sha256', 'bytes', 'same_as_id', sql<boolean>`body_gz is not null`.as('has_body')])
+    .where('name', '=', BOOTSTRAP_NAME).$if(id !== undefined, (q) => q.where('id', '=', id!)).orderBy('fetched_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
 }
 async function bodyOf(db: Kysely<Database>, row: NonNullable<FileRow>): Promise<Buffer | null> {
-  if (row.body_gz) return row.body_gz;
-  if (row.same_as_id === null) return null;
-  const src = await db.selectFrom('reference_files').select('body_gz').where('id', '=', row.same_as_id).executeTakeFirst();
+  const id = row.has_body ? row.id : row.same_as_id;
+  if (id === null) return null;
+  const src = await db.selectFrom('reference_files').select('body_gz').where('id', '=', id).executeTakeFirst();
   return src?.body_gz ?? null;
 }
 
@@ -242,12 +244,12 @@ export async function rdapBaseFor(db: Kysely<Database>, deps: ScreeningDeps, tld
       const { publication } = parseBootstrap(text);
       const sha = createHash('sha256').update(text, 'utf8').digest('hex');
       const same = row && row.sha256 === sha ? row : null;
-      const sameId = same ? (same.body_gz ? same.id : same.same_as_id) : null;
+      const sameId = same ? (same.has_body ? same.id : same.same_as_id) : null;
       const ins = await db.insertInto('reference_files').values({
         name: BOOTSTRAP_NAME, source_url: IANA_RDAP_URL, fetched_at: new Date(now()), data_date: publication ? publication.slice(0, 10) : null,
         sha256: sha, bytes: Buffer.byteLength(text, 'utf8'), body_gz: sameId ? null : gzipSync(Buffer.from(text, 'utf8')), same_as_id: sameId,
       }).returning('id').executeTakeFirstOrThrow();
-      row = await db.selectFrom('reference_files').selectAll().where('id', '=', ins.id).executeTakeFirstOrThrow();
+      row = await latestBootstrap(db, ins.id);
       failedAt.delete(deps);
     } catch (e) {
       failedAt.set(deps, now());

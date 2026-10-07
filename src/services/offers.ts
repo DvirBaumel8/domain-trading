@@ -207,12 +207,12 @@ export class OffersService {
   }
 }
 
-/** An AppError that knows which input field it is about (the CSV import reports it per row). */
+/** An AppError that knows which input field it is about. */
 export class FieldError extends AppError {
   constructor(public readonly field: string, status: number, code: string, message: string) { super(status, code, message); }
 }
 
-/** The one set of field rules for an offer, shared by POST /offers and the CSV import: every problem, in field order. */
+/** The field rules for an offer (POST /offers): every problem, in field order. */
 export function validateOfferAll(
   body: { amount_usd: string; source: string; received_at: string; buyer_type?: string | null; buyer_ref?: string | null; note?: string | null },
   now: Date,
@@ -247,7 +247,7 @@ export function validateOffer(body: Parameters<typeof validateOfferAll>[0], now:
   return r.value!;
 }
 
-/** The offer row values common to POST /offers and the CSV import (the facts, the snapshot at receipt, the classification). */
+/** The offer row values (the facts, the snapshot at receipt, the classification). */
 function offerValues(
   domainId: number,
   p: { amountCents: number; source: OfferSource; receivedAt: Date; buyerType: BuyerType; buyerRef: string | null; externalRef: string | null; note: string | null },

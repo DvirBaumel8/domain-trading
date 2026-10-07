@@ -19,19 +19,30 @@ export interface ReviewRunDeps {
   /** Called just before the request goes to Google (POST /reviews/run counts only such calls toward its hourly limit). */
   onGoogleCall?: () => void;
 }
-export type ReviewSkip = 'NO_KEY' | 'DISABLED' | 'DOCUMENT_MISSING' | 'COST_CAP' | 'ALREADY_DONE_TODAY' | 'TEXT_BLOCKED' | 'NOTHING_PENDING';
+export type ReviewSkip = 'IN_PROGRESS' | 'NO_KEY' | 'DISABLED' | 'DOCUMENT_MISSING' | 'COST_CAP' | 'ALREADY_DONE_TODAY' | 'TEXT_BLOCKED' | 'NOTHING_PENDING';
 export type ReviewRunResult =
   | { skipped: ReviewSkip; category?: BlockCategory }
   | { packet_id: string; kind: 'daily' | 'weekly'; status: 'ok' | 'unknown' | 'retry_pending'; items_n: number; new_n: number; repeat_n: number; cost_usd: number; dropped_n: number; reason?: string; detail?: string };
 
 /** CR-013 F-3: Google's "try again later" answers: 429, 503, UNAVAILABLE, a timeout or a network error. */
-export function isTransientFailure(g: { httpStatus: number | null; errorStatus: string | null; reason: string }): boolean {
-  return g.httpStatus === 429 || g.httpStatus === 503 || g.errorStatus === 'UNAVAILABLE' || g.reason === 'timeout' || g.reason === 'network error';
+export function isTransientFailure(g: { transient: boolean }): boolean {
+  return g.transient;
+}
+
+/** One review call at a time in the whole process (a manual run, the scheduled run and the retry share it): two concurrent calls could otherwise both reach Google and both be stored. */
+let inFlight = false;
+async function exclusive(wait: 'manual' | 'scheduled', fn: () => Promise<ReviewRunResult>): Promise<ReviewRunResult> {
+  if (inFlight) {
+    if (wait === 'manual') throw new AppError(409, 'REVIEW_IN_PROGRESS', 'Another review call is running; try again in a minute');
+    return { skipped: 'IN_PROGRESS' };
+  }
+  inFlight = true;
+  try { return await fn(); } finally { inFlight = false; }
 }
 
 /**
  * Calls Gemini for a stored packet and stores the answer. `onRateLimit`: 'store' = a transient failure (429, 503/UNAVAILABLE, timeout, network error) is stored as UNKNOWN at once (manual run, retry);
- * 'defer' = a transient failure stores no feedback and marks the packet in review_retries for the 10:30 IDT tick (the scheduled daily run).
+ * 'defer' = a transient failure stores no feedback and marks the packet in review_retries for the 08:30 UTC tick (the scheduled daily run).
  * Never another key or model.
  */
 async function callAndStore(
@@ -41,12 +52,12 @@ async function callAndStore(
   const { db } = deps;
   const apiKey = deps.apiKey!;
   const now = new Date(a.now);
-  deps.onGoogleCall?.();
+  deps.onGoogleCall?.(); // the hourly-limit slot is taken here, before the request, and never given back
   const g = await callGemini({ fetch: deps.fetch, apiKey, model: settings.model, timeoutMs: deps.timeoutMs }, a.text);
   if (g.kind === 'unknown') {
     if (isTransientFailure(g) && a.onRateLimit === 'defer') {
       await db.insertInto('review_retries').values({ packet_id: a.packetId, day: idtDay(a.now), created_at: now }).execute();
-      return { packet_id: a.packetId, kind: a.kind, status: 'retry_pending', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason: 'retry_pending', detail: `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: retry at the 10:30 tick` };
+      return { packet_id: a.packetId, kind: a.kind, status: 'retry_pending', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason: 'retry_pending', detail: `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: retry at the 08:30 UTC tick` };
     }
     const raw = `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: ${g.reason}`.replaceAll(apiKey, '[REDACTED]').slice(0, 500);
     const blockedReason = await checkText(db, raw, { secretValues: deps.secretValues });
@@ -66,7 +77,11 @@ async function callAndStore(
   return { packet_id: a.packetId, kind: a.kind, status: 'ok', items_n: stored.items.length, new_n: stored.items.length - repeat, repeat_n: repeat, cost_usd: cost, dropped_n: dropped };
 }
 
-export async function runReview(deps: ReviewRunDeps, opts: { trigger: 'scheduled' | 'manual'; now: number; createdBy?: string }): Promise<ReviewRunResult> {
+export function runReview(deps: ReviewRunDeps, opts: { trigger: 'scheduled' | 'manual'; now: number; createdBy?: string }): Promise<ReviewRunResult> {
+  return exclusive(opts.trigger, () => runReviewInner(deps, opts));
+}
+
+async function runReviewInner(deps: ReviewRunDeps, opts: { trigger: 'scheduled' | 'manual'; now: number; createdBy?: string }): Promise<ReviewRunResult> {
   const { db } = deps;
   const settings = await currentReviewSettings(db);
   if (!settings.enabled) return { skipped: 'DISABLED' };
@@ -97,7 +112,11 @@ export async function runReview(deps: ReviewRunDeps, opts: { trigger: 'scheduled
  * The tick's reviewRetry step: today's packet (IDT) that got a transient failure and has no feedback is sent to Gemini once more, as stored.
  * ok -> feedback; any failure, a second 429 included -> UNKNOWN feedback with Google's status and reason.
  */
-export async function retryReview(deps: ReviewRunDeps, opts: { now: number }): Promise<ReviewRunResult> {
+export function retryReview(deps: ReviewRunDeps, opts: { now: number }): Promise<ReviewRunResult> {
+  return exclusive('scheduled', () => retryReviewInner(deps, opts));
+}
+
+async function retryReviewInner(deps: ReviewRunDeps, opts: { now: number }): Promise<ReviewRunResult> {
   const { db } = deps;
   const settings = await currentReviewSettings(db);
   if (!settings.enabled) return { skipped: 'DISABLED' };
@@ -113,6 +132,7 @@ export async function retryReview(deps: ReviewRunDeps, opts: { now: number }): P
 /** Maps a skip from a manual run to the API error. */
 export function skipToError(r: { skipped: ReviewSkip; category?: BlockCategory }): AppError {
   switch (r.skipped) {
+    case 'IN_PROGRESS': return new AppError(409, 'REVIEW_IN_PROGRESS', 'Another review call is running; try again in a minute');
     case 'DISABLED': return new AppError(409, 'REVIEW_DISABLED', 'The outside review is switched off (POST /reviews/settings to turn it on)');
     case 'NO_KEY': return new AppError(503, 'REVIEWER_NOT_CONFIGURED', 'No outside reviewer key is configured on the server');
     case 'COST_CAP': return new AppError(409, 'REVIEW_COST_CAP', 'The monthly review cost cap is reached', { cap_usd: REVIEW_MONTHLY_CAP_USD });

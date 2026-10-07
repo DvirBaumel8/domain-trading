@@ -13,6 +13,8 @@ export interface BookInput {
   purchaseId: number; domain: string; registrar: string; registrarApi: RegistrarApi;
   orderId: string; chargedCents: number; renewalCents: number | null; expiryDate: string; buyDate: string;
   category: Category; dealId: string | null; checkId: string | null; auditId: string; receiptRaw: unknown | null;
+  /** The injected clock's current time (used for updated_at). */
+  now: Date;
 }
 
 /** buy.md step 6: ONE transaction. Idempotent: a succeeded purchase is never booked twice. */
@@ -20,7 +22,7 @@ export async function bookPurchase(db: Kysely<Database>, b: BookInput): Promise<
   return db.transaction().execute(async (trx) => {
     const p = await trx.selectFrom('purchases').select('state').where('id', '=', b.purchaseId).forUpdate().executeTakeFirstOrThrow();
     if (p.state === 'succeeded') return { booked: false };
-    const now = new Date();
+    const now = b.now;
     const fields = {
       status: 'owned' as const, registrar: b.registrar, registrar_api: b.registrarApi, buy_date: b.buyDate,
       cost_cents: b.chargedCents, expiry_date: b.expiryDate, renewal_price_cents: b.renewalCents, renewals_used: 0,

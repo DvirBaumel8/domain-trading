@@ -156,13 +156,18 @@ describe('RDAP pacing for test-set runs (CR-010 T10-7)', () => {
     let t = 0;
     const waits: Promise<void>[] = [];
     const rdap: RdapLookupFn = async () => { inFlight++; max = Math.max(max, inFlight); starts.push(t); await new Promise((r) => setTimeout(r, 5)); inFlight--; return notRegistered(); };
-    const pace = new Pacer(250, 4, async (ms: number) => { t += ms; }, () => t);
+    const sleeps: number[] = [];
+    const pace = new Pacer(250, 4, async (ms: number) => { sleeps.push(ms); t += ms; }, () => t);
     await Promise.all(Array.from({ length: 12 }, (_, i) => lookupCached(db, deps(rdap), `p${i}pace.com`, opts(pace))));
     void waits;
     expect(max).toBeLessThanOrEqual(4);
     expect(max).toBeGreaterThan(1);
     const sorted = [...starts].sort((a, b) => a - b);
-    for (let i = 1; i < sorted.length; i++) expect(sorted[i]! - sorted[i - 1]!).toBeGreaterThanOrEqual(0);
+    // every start is at least the minimum gap after the one before it (the pacer's own clock)
+    // the real pacing signal: all but the first lookup waited exactly one gap for its slot, so the shared clock moved 11 gaps in all
+    // (the recorded start times share one fake clock that every waiter advances, so they are not compared one by one)
+    expect(sleeps).toEqual(Array.from({ length: 11 }, () => 250));
+    expect(t).toBe(11 * 250);
     expect(sorted[11]! - sorted[0]!).toBeGreaterThanOrEqual(11 * 250 - 1);
   });
 

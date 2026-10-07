@@ -24,8 +24,8 @@ const Item = z.object({
   text: z.string().min(1).max(2000),
 }).strict();
 const Feedback: z.ZodType<FeedbackInput> = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('ok'), provider: z.string().min(1).max(60), model: z.string().min(1).max(100), cost_usd: z.number().min(0).max(100), items: z.array(Item).max(50) }).strict(),
-  z.object({ status: z.literal('unknown'), provider: z.string().min(1).max(60), model: z.string().min(1).max(100).optional(), cost_usd: z.number().min(0).max(100).optional(), reason: z.string().min(1).max(500) }).strict(),
+  z.object({ status: z.literal('ok'), provider: z.string().min(1).max(60), model: z.string().min(1).max(100), cost_usd: z.number().min(0).max(5), items: z.array(Item).max(50) }).strict(),
+  z.object({ status: z.literal('unknown'), provider: z.string().min(1).max(60), model: z.string().min(1).max(100).optional(), cost_usd: z.number().min(0).max(5).optional(), reason: z.string().min(1).max(500) }).strict(),
 ]);
 const SettingsBody = z.object({
   enabled: z.boolean().optional(),

@@ -163,13 +163,20 @@ describe('tranches', () => {
     const x = await h();
     const id = await open(x, 'T1', { spend_cap: 30 });
     const run = await seedRun([s3('tampapoolsco.com'), s3('austinbarbers.com')]);
-    const [a, b] = await Promise.all(['tampapoolsco.com', 'austinbarbers.com'].map((domain) => x.post(members(id), { action: 'add', domain, run_id: run, est_cost: 20 })));
-    expect([a!.statusCode, b!.statusCode].sort()).toEqual([200, 409]);
-    expect([a!, b!].find((r) => r.statusCode === 409)!.json().error.code).toBe('TRANCHE_SPEND_CAP');
-    const [d1, d2] = await Promise.all([1, 2].map(() => x.post(members(id), { action: 'add', domain: 'tampapoolsco.com', run_id: run, est_cost: 5 })));
+    const doms = ['tampapoolsco.com', 'austinbarbers.com'] as const;
+    const rs = await Promise.all(doms.map((domain) => x.post(members(id), { action: 'add', domain, run_id: run, est_cost: 20 })));
+    // which add wins the race is not fixed: read the winner from the responses, then assert per winner and per loser
+    expect(rs.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    const w = rs.findIndex((r) => r.statusCode === 200);
+    const winner = doms[w]!;
+    const loser = doms[1 - w]!;
+    expect(rs[1 - w]!.json().error.code).toBe('TRANCHE_SPEND_CAP');
+    expect(rs[w]!.json()).toMatchObject({ duplicate: false });
+    expect((await db.selectFrom('tranche_members').select('domain').where('tranche_id', '=', id).where('removed_at', 'is', null).execute()).map((m) => m.domain)).toEqual([winner]);
+    const [d1, d2] = await Promise.all([1, 2].map(() => x.post(members(id), { action: 'add', domain: winner, run_id: run, est_cost: 5 })));
     expect([d1!.statusCode, d2!.statusCode]).toEqual([200, 200]);
     expect([d1!, d2!].map((r) => r.json().duplicate)).toEqual([true, true]);
-    const e1 = await Promise.all([1, 2].map(() => x.post(members(id), { action: 'add', domain: 'austinbarbers.com', run_id: run, est_cost: 5 })));
+    const e1 = await Promise.all([1, 2].map(() => x.post(members(id), { action: 'add', domain: loser, run_id: run, est_cost: 5 })));
     expect(e1.map((r) => r.statusCode).sort()).toEqual([200, 200]);
     expect(e1.map((r) => r.json().duplicate).sort()).toEqual([false, true]);
   });
