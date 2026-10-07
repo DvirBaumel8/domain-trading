@@ -6,6 +6,7 @@ import { settingsByVersion } from '../../pricing/settings.js';
 import { toJerusalemIso } from '../../time.js';
 import { manualDelist, pendingDomains, VENUES } from '../export-state.js';
 import { JOBS_OVERDUE_HOURS, jobsOverdue } from '../job-runs.js';
+import { DROP_FEED_STALE_DAYS, daysBetween } from '../../drops/drop-lists.js';
 import { pair, priceValues } from './money.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
@@ -61,6 +62,14 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
         checked_at: checkedAt, since: toJerusalemIso(since), status_code: c.details.status_code ?? null, reason: c.details.reason ?? null,
       });
     }
+  }
+
+  // drop lists (CR-007 §22 G-2): once any list exists, the newest one must not be more than DROP_FEED_STALE_DAYS old
+  const newest = await sql<{ d: string | null }>`select max(list_date)::text as d from drop_lists`.execute(db);
+  const newestDate = newest.rows[0]?.d ?? null;
+  if (newestDate !== null && daysBetween(newestDate, today) > DROP_FEED_STALE_DAYS) {
+    const list = await db.selectFrom('drop_lists').select('name').where('list_date', '=', newestDate).orderBy('created_at', 'desc').limit(1).executeTakeFirst();
+    add('DROP_FEED_STALE', 'warn', `The newest drop list is from ${newestDate}; upload today's list.`, undefined, { newest_list: list?.name ?? null, newest_list_date: newestDate });
   }
 
   // sales

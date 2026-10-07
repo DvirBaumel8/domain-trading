@@ -33,6 +33,10 @@ import { jerusalemDeep } from './time.js';
 import { rdapLookup, rdapStatus, type RdapFn } from './rdap.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
 import { PortfolioCheckJob } from './jobs/portfolio-check.js';
+import { DropWatchJob } from './jobs/drop-watch.js';
+import { CohortOutcomesJob } from './jobs/cohort-outcomes.js';
+import { registerDropLists } from './api/drop-lists.js';
+import { registerCohorts } from './api/cohorts.js';
 import { createAdapters } from './registrars/registry.js';
 import type { RegistrarAdapter } from './registrars/types.js';
 import { BuyService } from './services/buy.js';
@@ -56,6 +60,8 @@ declare module 'fastify' {
     dropJob: DropJob;
     registrarCheckJob: RegistrarCheckJob;
     portfolioCheckJob: PortfolioCheckJob;
+    dropWatchJob: DropWatchJob;
+    cohortOutcomesJob: CohortOutcomesJob;
     referenceRefreshJob: ReferenceRefreshJob;
     jobRunner: JobRunner;
     screeningWorker: ScreeningWorker;
@@ -166,19 +172,23 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.addHook('onClose', async () => screeningWorker.idle());
   registerScreening(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerTestSets(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
+  registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
+  registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerPacks(app, { db: deps.db, now: deps.now ?? Date.now });
   registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });
   app.decorate('referenceRefreshJob', referenceRefresh);
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: screeningDeps.rdapLookup, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
+  app.decorate('dropWatchJob', new DropWatchJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
+  app.decorate('cohortOutcomesJob', new CohortOutcomesJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('dropJob', new DropJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
+    dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
     secretValues: deps.config.secretValues,
   }));
   registerJobs(app, app.jobRunner, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });

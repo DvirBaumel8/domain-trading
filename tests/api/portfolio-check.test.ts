@@ -252,7 +252,9 @@ describe('portfolioCheck: in the daily run', () => {
     expect(res.statusCode, res.body).toBe(200);
     const steps = Object.keys(res.json().steps);
     expect(steps.indexOf('portfolioCheck')).toBe(steps.indexOf('registrarCheck') + 1);
-    expect(steps.indexOf('referenceRefresh')).toBe(steps.indexOf('portfolioCheck') + 1);
+    expect(steps.indexOf('dropWatch')).toBe(steps.indexOf('portfolioCheck') + 1);
+    expect(steps.indexOf('cohortOutcomes')).toBe(steps.indexOf('dropWatch') + 1);
+    expect(steps.indexOf('referenceRefresh')).toBe(steps.indexOf('cohortOutcomes') + 1);
     expect(res.json().steps.portfolioCheck).toMatchObject({ ok: true, summary: { checked: 1, registry: { ok: 1 } } });
     const runs = (await app.inject({ method: 'GET', url: '/jobs/runs?job=daily', headers: read })).json().runs;
     expect(Object.keys(runs[0].steps)).toContain('portfolioCheck');

@@ -39,6 +39,13 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'tranche_members', file: 'tables/tranche_members.json' },
   { table: 'test_sets', file: 'tables/test_sets.json' },
   { table: 'test_set_rows', file: 'tables/test_set_rows.json' },
+  { table: 'drop_lists', file: 'tables/drop_lists.json' },
+  { table: 'drop_list_rows', file: 'tables/drop_list_rows.json' },
+  { table: 'drop_list_checks', file: 'tables/drop_list_checks.json' },
+  { table: 'cohorts', file: 'tables/cohorts.json' },
+  { table: 'cohort_names', file: 'tables/cohort_names.json' },
+  { table: 'cohort_decisions', file: 'tables/cohort_decisions.json' },
+  { table: 'cohort_outcomes', file: 'tables/cohort_outcomes.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 
@@ -46,7 +53,7 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
 const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log', 'screening_runs', 'screening_evidence', 'manual_quotes', 'tranches'];
 
 /** Tables without a serial `id` column. */
-const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets']);
+const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts']);
 
 async function readRows(dir: string, f: { file: string; jsonl?: true }): Promise<Row[]> {
   let text: string;

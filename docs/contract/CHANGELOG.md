@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.8.0 (2026-10-07): CR-007 G-2 (drop lists, source A) and G-1 (cohorts, the forward test)
+MINOR, **additive**. Release note: `docs/releases/v2.8.0.md`.
+- **Drop lists:** `POST /selection/drop-lists`, `GET /selection/drop-lists/{name}`, `GET /selection/drop-lists?drop_from=&drop_to=`; daily step `dropWatch` (registry status, expected drop date); `/report` warning `DROP_FEED_STALE`.
+- **Cohorts:** `POST /selection/cohorts`, `GET /selection/cohorts/{name}`, `GET /selection/cohorts/report`; decisions frozen before the drop; daily step `cohortOutcomes` (drop outcome, re-registration at 30/60/90 days); FWD-1 pass line.
+- **New codes:** `DROP_LIST_NAME_TAKEN`, `DROP_LIST_NOT_FOUND`, `COHORT_NAME_TAKEN`, `COHORT_EMPTY`, `COHORT_NOT_FOUND`.
+- **New tables:** `drop_lists`, `drop_list_rows`, `drop_list_checks`, `cohorts`, `cohort_names`, `cohort_decisions`, `cohort_outcomes` (in the data backup).
+
 ## 2.7.0 (2026-10-07): CR-010 fast test runs
 MINOR, **additive**. Release note: `docs/releases/v2.7.0.md`.
 - **Provenance:** each census sibling and `ext_dates` extension shows `checked_at` and `reused`; census and `ext_dates` fields add `rate_limited_n`.

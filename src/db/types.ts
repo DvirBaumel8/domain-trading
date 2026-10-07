@@ -617,6 +617,76 @@ export interface TestSetRowsTable {
   reason: string | null;
 }
 
+/** v2.8.0 (CR-007 §22 G-2): an uploaded drop list, its rows (kept or removed with a reason) and the daily registry checks of the kept ones. All append-only. */
+export interface DropListsTable {
+  name: string;
+  list_date: DateString;
+  created_at: TimestampDefault;
+  created_by: string;
+  received_n: number;
+  kept_n: number;
+}
+export interface DropListRowsTable {
+  id: Generated<number>;
+  list_name: string;
+  domain: string;
+  kept: boolean;
+  reason: string | null;
+  tokens: string[] | null;
+}
+export interface DropListChecksTable {
+  id: Generated<number>;
+  list_name: string;
+  domain: string;
+  checked_at: Timestamp;
+  status: 'pending_delete' | 'redemption' | 'registered' | 'not_registered' | 'unknown';
+  last_changed: DateString | null;
+  expected_drop_date: DateString | null;
+  drop_date_source: 'rdap_last_changed' | 'estimate' | null;
+  reason_code: string | null;
+}
+
+/** v2.8.0 (G-1): a cohort of names for the forward test. Only `status` computing -> frozen may change (trigger). */
+export interface CohortsTable {
+  name: string;
+  created_at: TimestampDefault;
+  created_by: string;
+  settings_labels: string[];
+  source: Json;
+  run_id: string;
+  status: 'computing' | 'frozen';
+}
+export interface CohortNamesTable {
+  id: Generated<number>;
+  cohort: string;
+  domain: string;
+  expected_drop_date: DateString | null;
+  source: string | null;
+  included: boolean;
+  reason: string | null;
+}
+export interface CohortDecisionsTable {
+  id: Generated<number>;
+  cohort: string;
+  domain: string;
+  settings_label: string;
+  decision: 'accept' | 'reject' | 'undecided';
+  tier: string | null;
+  decided_at: Timestamp;
+  late: boolean;
+}
+export interface CohortOutcomesTable {
+  id: Generated<number>;
+  cohort: string;
+  domain: string;
+  kind: 'drop' | 'rereg30' | 'rereg60' | 'rereg90';
+  checked_at: Timestamp;
+  result: 'available_after_drop' | 'caught_at_drop' | 'restored' | 'still_pending' | 'unknown' | 'yes' | 'no';
+  created_at_registry: Date | null;
+  registrar: string | null;
+  reason_code: string | null;
+}
+
 export interface ReplayRunsTable {
   id: string;
   suite: string;
@@ -711,6 +781,13 @@ export interface Database {
   job_runs: JobRunsTable;
   api_usage: ApiUsageTable;
   portfolio_checks: PortfolioChecksTable;
+  drop_lists: DropListsTable;
+  drop_list_rows: DropListRowsTable;
+  drop_list_checks: DropListChecksTable;
+  cohorts: CohortsTable;
+  cohort_names: CohortNamesTable;
+  cohort_decisions: CohortDecisionsTable;
+  cohort_outcomes: CohortOutcomesTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

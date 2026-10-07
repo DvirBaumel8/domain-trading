@@ -45,6 +45,10 @@ export interface JobRunnerDeps {
   registrarCheckJob: Runnable;
   /** Daily registry, lander and blocklist checks of the live names (CR-007 G-5); while undefined, that step reports skipped. */
   portfolioCheckJob?: Runnable;
+  /** Daily registry check of the kept names of the uploaded drop lists (CR-007 §22 G-2); while undefined, that step reports skipped. */
+  dropWatchJob?: Runnable;
+  /** Freezes cohorts and checks their drop and re-registration outcomes (CR-007 §22 G-1); while undefined, that step reports skipped. */
+  cohortOutcomesJob?: Runnable;
   /** Resumes stalled screening runs (CAP-20); its summary is {resumed[], finalized[]}. */
   screeningWorker: { resumeStalled(): Promise<unknown> };
   backupExport?: BackupExport;
@@ -141,6 +145,10 @@ export class JobRunner {
     steps.registrarCheck = await this.step(() => this.deps.registrarCheckJob.runOnce());
     const pc = this.deps.portfolioCheckJob;
     steps.portfolioCheck = pc ? await this.step(() => pc.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'portfolio check not configured' } };
+    const dw = this.deps.dropWatchJob;
+    steps.dropWatch = dw ? await this.step(() => dw.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'drop watch not configured' } };
+    const co = this.deps.cohortOutcomesJob;
+    steps.cohortOutcomes = co ? await this.step(() => co.runOnce()) : { ok: true, skipped: true, summary: { skipped: true, reason: 'cohort outcomes not configured' } };
     const ref = this.deps.referenceRefresh;
     steps.referenceRefresh = ref ? await this.referenceStep(ref) : { ok: true, skipped: true, summary: { skipped: true, reason: 'reference refresh not configured' } };
     const backup = this.deps.backupExport;
