@@ -117,3 +117,21 @@ DOM checked X's API terms on 2026-10-07 ([wearefounders.uk](https://www.wearefou
 - **Pushback:**
   - **T11-21, T11-26 and T11-27** have no DOM job for part B: Gavriel schedules the reviewer call, and DOM's part is the routes. The X jobs follow part A's answer.
   - **Times:** the daily review is whenever Gavriel calls; DOM suggests 09:00 IDT, weekly on Sunday.
+
+## Addendum A: images on posts (Dvir, 2026-10-07 18:42 IDT)
+- **From:** Gavriel, on Dvir's behalf. Dvir in chat, verbatim: "Can we also add some screenshots, graphs, ai generated photos? Something interested, we said we do things world class"
+- **Scope:** adds to part A. Part A is on hold until Gavriel answers DOM's pricing question above, so this addendum is built together with part A, not before. Nothing to do now beyond reading it. If images change the cost of a post on X's pay-per-use pricing, please say so in the same answer that sets part A's cost.
+- **Business need:** posts can carry images (charts, screenshots, illustrations), each with alt text, so the account looks professional and is readable for people using screen readers. Gavriel and the storyteller bot make the images; DOM checks, stores and posts them.
+
+### Acceptance tests
+- **T11-28 (image post):** a post (including one that continues a thread, T11-7) may carry 1 to 4 images, PNG or JPEG, within X's size and dimension limits for images. DOM documents the limits it enforces. Each image has alt text, required, 1 to 1,000 characters (X's limit). The post shows on X with the images in the order sent, each with its alt text. The answer lists each image's X media id. Metadata (EXIF, location, camera and software tags) is removed before upload.
+- **T11-29 (bad file refused):** a wrong type, a corrupt file, a file over the size or dimension limit, more than 4 images, a missing alt text, or an alt text over 1,000 characters is refused with a code and a reason per image (by its position). Nothing is uploaded or posted, and no daily allowance is used.
+- **T11-30 (preview):** preview mode (T11-1) with images checks every image and its alt text exactly as a real post would and returns the result per image. Nothing is sent to X, nothing is uploaded, and no daily allowance is used.
+- **T11-31 (block list covers alt text):** alt text goes through the T11-3 block list. A refusal names the image position and the category, never the matched text. (The block list reads text only; Gavriel checks what is inside each image by eye. DOM is not asked to read text in pixels.)
+- **T11-32 (kept and listed):** each image is kept with the post record: position, type, size, width and height, sha256, alt text, X media id. The READ posts list (T11-10) shows them, and a READ route returns the stored image. A removed post (T11-9) keeps its images in the record.
+- **T11-33 (idempotency):** the same `Idempotency-Key` sent twice with images gives the same answer, one post on X and one set of uploads.
+- **T11-34 (honest failure):** if X accepts some uploads and then refuses the post (or refuses an upload), the post is not recorded as posted, the answer says which step failed with X's status and reason, and no allowance is used.
+
+### Suggestions (DOM chooses)
+- How images reach DOM: multipart upload or base64 in the JSON body of the WRITE call.
+- First use: Phase 1's five posts, one image each (two on the thread), 1600x900 PNG with alt text, already prepared by Gavriel.
