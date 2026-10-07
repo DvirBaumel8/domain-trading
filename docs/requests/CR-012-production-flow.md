@@ -1,7 +1,7 @@
 # CR-012: production flow (fill missing registry answers and rerun v11, daily buy-ready list, scout intake, path to lift the buy hold, trademark and history records)
 
 - **From:** Gavriel (acceptance tester), on Dvir's behalf.
-- **Status:** APPROVED by Dvir 2026-10-07 20:31 IDT, in chat (his answer to a yes/no question), verbatim: "Yes, push the production-flow change request to DOM (lookup fix + v11 rerun, daily buy-ready list, scouts feeding automatically, path to lift the hold, recorded trademark/history checks)"
+- **Status:** DOM: accepted with changes (2026-10-07); v2.13.0 (parts A, D, E), v2.14.0 (parts B, C). APPROVED by Dvir 2026-10-07 20:31 IDT, in chat (his answer to a yes/no question), verbatim: "Yes, push the production-flow change request to DOM (lookup fix + v11 rerun, daily buy-ready list, scouts feeding automatically, path to lift the hold, recorded trademark/history checks)"
 - **Kind of change:** business needs with pass/fail tests. Every route name, field name and method below is a suggestion; how to build it is DOM's choice. Any part that needs a paid plan, a new account or a change to an earlier Dvir decision is **DVIR** in DOM's answer and is not built until Dvir agrees.
 - **Based on:** Gavriel's production-readiness check of live v2.11.0 (2026-10-07, 20:25 IDT, API reads only) and the v11 rerun `R15-T15-V2-NOW-C`.
 - **Order:** part A first (it decides whether v11 can ever pass), then B, C, D, E. CR-011 Addendum C and v2.12.0 may go before or alongside, DOM's choice.
@@ -115,3 +115,91 @@ Today both are recorded per run with `POST /screening/runs/{id}/manual`, and a r
 8. **Which tests in §3 DOM expects to meet,** and any it pushes back on, with the reason.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-07)
+**Verdict: accepted with changes.**
+- **The finding on part A changes its plan:** the missing registry answers are **not** what keeps v11 under the bar.
+- **Release plan:**
+  - **v2.13.0:** part A diagnostics and rerun of gaps, part E records per domain, and part D's steps as a READ.
+  - **v2.14.0:** part C intake and daily screening, and part B daily list.
+  - **v2.12.0** stays reserved for X posting (CR-011 part A), which waits for Dvir's explicit go-ahead in DOM's session.
+
+### Q-1. Part A: what the ~690 refusals and the 11 unknown names really are
+DOM read `R15-T15-V2-NOW-C` (`run_cef7319e…`) name by name:
+- **All 689 refused lookups are `.biz`** (`rdap.nic.biz`, `SOURCE_ERROR`): that registry refuses DOM's RDAP queries every time.
+  - **No decision changes because of them:** `alt_tld_before_n` counts .net, .org and .ca, and a `.biz` unknown is never counted (CR-008 §6.2, as agreed; `.biz` refused in the research too).
+  - **A background fill would only be refused again,** so DOM does not build T12-1 as a re-asking job (pushback). v2.11.1's breaker already stops a run waiting on `.biz`.
+  - **If you want the rule to match what is measurable:** a `v11b` draft with `ext.alt_list` [net, org, ca] is a settings draft you can make, and Dvir activates it. DOM does not recommend it: `.biz` already counts for nothing, so it changes no result.
+- **The 11 names with unknown features are `CENSUS_LIST_SIZE`, not registry gaps:**
+  - **The names:** `aluminiumcasthouse`, `buysellcbd`, `cryvonlabs`, `freightbuzzllc`, `monarchyllc`, `skybrosllc`, `spotifyheadstart`, `thaixxxfilms`, `thatsjustjunk`, `uaelloyd`, `uberfrance`.
+  - **Why:** the `bt1@v2` split finds no full reading for them (`llc`, `cbd`, `uae`, `xxx`, `spotify`, `aluminium`, `thats`, `cryvon` are not in its frozen word classes), so they get fewer than 20 siblings. These are the 9 undecided dropped names, plus 1 sold and 1 more.
+- **What decides v11:**
+  - **If all 9 undecided dropped names turned into rejections:** 378 / 494 = 76.5% (pass).
+  - **If they turned into accepts:** 369 / 494 = 74.7% (fail).
+  - **Only a split that reads them can tell.**
+- **DOM's proposal (DVIR):** a method version **`bt1@v3`**. It is `bt1@v2` plus a short, general token list chosen **without looking at TEST15 decisions**:
+  - **Company suffixes:** llc, inc, ltd, co, corp, gmbh;
+  - **Common acronyms and country codes:** uae, usa, uk, eu, cbd, seo, xxx, ai, vr, ev;
+  - **British spellings:** aluminium, colour, centre, theatre, defence;
+  - **Contractions written without the apostrophe:** thats, youre, dont, cant, wont, isnt.
+
+  **What it changes:** it changes the split only where `bt1@v2` had no reading, or a worse one. Agreement on the 1,900 vectors is re-measured and must stay at least 95%. Then `-D` reruns on `bt1@v3`, and Dvir approves the method by name. If Dvir prefers not to, v11's result stands as reported in CR-009.
+- **T12-2:** v2.13.0 adds `unknowns` to the test-set and screening-run reads: for each name with an unknown feature, the feature, its reason (`CENSUS_LIST_SIZE` with the tokens, or per lookup the name, source, reason, tries and last try).
+- **T12-3:** a rescore option `only_names_with_unknowns: true`.
+- **T12-5 (`-D`):** whoever is ready starts it once `bt1@v3` is built (or the decision is "no `bt1@v3`").
+- **T12-6:** unchanged.
+
+### Q-2. Rerun time with every answer stored (T12-4)
+- **Expected:** a few minutes. v2.11.1 (live tonight) stops asking `.biz` after 5 refusals, and every other answer comes from the store.
+- **The measure:** a rerun of `R15-TEST15-USED` on v2.11.1 gives T10-1 and T12-4 directly.
+
+### Q-3. Part B, the daily list (v2.14.0)
+- **Route:** `GET /candidates/daily?date=&limit=` (default 10, at most 25).
+- **When it is built:** once, in the daily run after the intake screening, and stored. It is ready by about **03:30 IDT**, so two reads of a day agree, and a later change is shown with its reason (T12-12).
+- **Ranking:**
+  1. tier from an exact clause before a flagged one;
+  2. then the money ratio at the floor;
+  3. then the score;
+  4. then arrival.
+- **Freshness:** screened in the last **72 hours** (the pack rule).
+- **Entry fields:** as T12-7 lists, never the walk-away. Plus `held` while the hold is on, and `would_be_blocked` from the same code as a `/buy` dry run.
+- **Sections:** `almost_ready` (waiting for a part E record) and `upcoming` (drops in 7 days).
+- **Empty day:** an empty list with the day's funnel.
+
+### Q-4. Part C, scouts (v2.14.0)
+- **Token:** a new token **scope `intake`**. It may only `POST /candidates/intake` and `POST /selection/drop-lists`, and its audit rows name the scout. It can't buy, list, approve or change settings. DOM creates one per scout bot on request; Gavriel's WRITE token works too.
+- **Daily screening maximum: 30 names.** A full lane plan is about 30 registry lookups a name, so 900 lookups, about 5 minutes at 4 a second. That fits Render free and Neon free with room. The rest wait in arrival order.
+- **Dedupe window:** 30 days (a later sender is added to the name's sources).
+- **Drop lists:** DOM can't fetch one itself. No free, documented source allows it (SnapNames and similar sites are web pages without an API, and scraping is on DOM's "don't" list). A scout uploads daily, and `DROP_FEED_STALE` warns otherwise.
+- **Jobs:** the steps `intakeScreening` and the existing `dropWatch` show in `GET /jobs/runs` and `/health`.
+
+### Q-5. Part D, the path to lift the buy hold
+The contract will hold this list; v2.13.0 adds `steps[]` to `GET /selection/buy-hold`, each with a status, evidence and who acts next (T12-21).
+1. **Gavriel:** builds a fresh test set with `POST /selection/test-sets` (`new`, `bt1@v3` or `v2`), waits for it, and seals it.
+2. **Dvir approves the method** by name ("sibling method bt1@v3 approved"). Gavriel posts it.
+3. **Gavriel freezes the hold suite(s)** from the sealed set's test slice, with `gates_not_assessed` [tm_us, tn, hist2, hist2_guard] and `clears_hold: true`.
+   - **Dvir's line must name:** the suite id, the four gates and the words "clears hold".
+4. **Gavriel drafts the settings** (`v11` with the chosen method in force, `buy_hold: false`).
+5. **Gavriel runs the holdout replay** of each hold suite on that draft. It must pass (sold accepted ≥ 70%, dropped rejected ≥ 75%, at least 50 per class, 0 leaking rows). A failure sticks.
+6. **Dvir activates the draft** with a line naming its label. That lifts the hold. Nothing else ever does (T12-22, T12-23 as today).
+7. **Production tranche (T12-24):**
+   - **Gavriel** closes `accept-v2-probe-20261007`.
+   - **Dvir** chooses the cap (DVIR), and Gavriel opens the production tranche with it.
+   - **Gavriel** adds the names Dvir picks, then dry-runs `/buy` `dry_run: "strict"` and `/list`.
+
+### Q-6. Part E, records per domain (v2.13.0)
+- **Route:** `POST /candidates/{domain}/records` (WRITE) `{kind: tm_us|history, record (the same shape as today's manual record), checked_by}`.
+- **Reuse:** a run of that domain uses the newest fresh record, with the same rules as today, and a manual row still never outranks an automated FAIL. Today's per-run route keeps working and also writes the domain record.
+- **Freshness (constants):** `tm_us` **30 days**, `history` **180 days** (a past use doesn't change).
+- **Automation (T12-29):** nothing new.
+  - **US trademark:** USPTO has no free wordmark search API (CR-007 Q-8), and its search site isn't for automation.
+  - **History:** stays manual by Dvir's decision.
+
+### Q-7. Free plans
+- **Daily load:** 30 intake names plus `dropWatch` (at most 3,000 lookups) plus the cohorts (at most 2,000) all run in the 03:05 IDT run. The worst case is about 20 to 30 minutes of paced lookups, within Render free. The service stays awake while the run works.
+- **Database:** the rows are small. The evidence store is pruned by age.
+
+### Q-8. Tests
+- **Expected to pass:** T12-2 to T12-28.
+- **Not built:** T12-1, as explained (the refusals are `.biz`, which refuses forever). Instead, `unknowns` explains every gap.
+- **Part A's real lever is `bt1@v3` (DVIR).**
