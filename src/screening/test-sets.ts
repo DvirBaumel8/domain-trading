@@ -1,5 +1,5 @@
 // v2.5.0 (CR-007 §21, G-4a/G-4b, CR-008 AC-10): test sets. A set stores a selection of names with their labels and `as_of` dates; DOM computes the
-// features itself by a back-test screening run (form, census with a sibling method (bt1@v1 or bt1@v2), ext_dates) as of each name's date. Pure helpers live here; the routes
+// features itself by a back-test screening run (form, census with a sibling method (bt1@v1, bt1@v2 or bt1@v3), ext_dates) as of each name's date. Pure helpers live here; the routes
 // are in src/api/test-sets.ts.
 import { createHash } from 'node:crypto';
 import type { Kysely } from 'kysely';
@@ -13,7 +13,7 @@ import type { CheckId, Lane, RunItem } from './types.js';
 
 /** A test-set run's deadline (hours), instead of `run.time_budget_minutes`: about 24 registry lookups per name at polite pacing. */
 export const TEST_SET_RUN_HOURS = 48;
-export const TEST_SET_METHODS = ['bt1@v1', 'bt1@v2'] as const;
+export const TEST_SET_METHODS = ['bt1@v1', 'bt1@v2', 'bt1@v3'] as const;
 export type TestSetMethod = (typeof TEST_SET_METHODS)[number];
 /** Default for a new set (v2.6.0); sets stored before v2.6.0 have no method and read as bt1@v1. */
 export const TEST_SET_DEFAULT_METHOD: TestSetMethod = 'bt1@v2';
@@ -92,7 +92,7 @@ export function lookupsOf(latestPerName: Iterable<Map<CheckId, { fields: Record<
   return lookups;
 }
 
-export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise<{ byDomain: Map<string, DomFeatures>; done_n: number; names_n: number; lookups: LookupCounts }> {
+export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise<{ byDomain: Map<string, DomFeatures>; done_n: number; names_n: number; lookups: LookupCounts; latest: { domain: string; latest: Map<CheckId, Awaited<ReturnType<typeof loadRows>>[number]> }[] }> {
   const items = (run.input as { names: RunItem[] }).names;
   const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
   const byItem = new Map<number, Awaited<ReturnType<typeof loadRows>>>();
@@ -100,6 +100,7 @@ export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise
   const byDomain = new Map<string, DomFeatures>();
   let done = 0;
   const perName: Map<CheckId, Awaited<ReturnType<typeof loadRows>>[number]>[] = [];
+  const perDomain: { domain: string; latest: Map<CheckId, Awaited<ReturnType<typeof loadRows>>[number]> }[] = [];
   for (const it of items) {
     const latest = latestByCheck(byItem.get(it.idx) ?? []);
     if ((plan[it.lane] ?? []).every((c) => latest.has(c))) done++;
@@ -107,6 +108,7 @@ export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise
     const census = latest.get('census');
     const ext = latest.get('ext_dates');
     perName.push(latest);
+    perDomain.push({ domain: it.domain, latest });
     const share = census?.status === 'PASS' && typeof census.fields.registered_share === 'number' ? census.fields.registered_share : null;
     const alt = ext?.status === 'PASS' && typeof ext.fields.alt_tld_before_n === 'number' ? ext.fields.alt_tld_before_n : null;
     byDomain.set(it.domain, {
@@ -115,7 +117,7 @@ export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise
       is_geo: form?.city && form?.trade ? 1 : 0,
     });
   }
-  return { byDomain, done_n: done, names_n: items.length, lookups: lookupsOf(perName) };
+  return { byDomain, done_n: done, names_n: items.length, lookups: lookupsOf(perName), latest: perDomain };
 }
 
 export interface RescoreReport {

@@ -16,6 +16,7 @@ import { REGISTRAR_ENV } from '../registrars/registry.js';
 import { readEvidence, storeEvidence } from '../screening/evidence.js';
 import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
 import { lookupsOf } from '../screening/test-sets.js';
+import { unknownsOf } from '../screening/unknowns.js';
 import { VerdictBody, verdictsFor } from '../screening/verdicts.js';
 import type { ResultRow, RunItem } from '../screening/types.js';
 import type { CheckId, Lane } from '../screening/types.js';
@@ -96,6 +97,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       run_id: run.id, status: run.status, mode: run.mode, backtest: run.backtest, settings_version: run.settings_label, buy_hold: run.buy_hold,
       created_at: run.created_at.toISOString(), finished_at: iso(run.finished_at), progress: a.progress,
       lookups: lookupsOf(a.items.map((i) => latestByCheck(i.rows))),
+      unknowns: await unknownsOf(db, a.items.filter((i) => want === null || i.item.domain === want).map((i) => ({ domain: i.item.domain, latest: latestByCheck(i.rows) }))),
       ...(run.status === 'cancelled' && { cancelled_at: iso(run.cancelled_at), cancelled_by: run.cancelled_by }),
       names: a.items.filter((i) => want === null || i.item.domain === want).map((i) => {
         const latest = latestByCheck(i.rows);
@@ -179,6 +181,13 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
         recorded_by: req.auth!.name, audit_id: req.auditId!,
       }).returningAll().executeTakeFirstOrThrow();
       const row = await put(check, o, checkedAt, [String(evidenceId)]);
+      // CR-012 part E: a US trademark or history record is also kept against the name, so later runs of it reuse it while it is fresh.
+      if (check === 'tm_us' || check === 'history') {
+        await trx.insertInto('domain_records').values({
+          domain: item.domain, kind: check, record: json, checked_by: check === 'history' ? (rec as z.infer<typeof HistoryManual>).checked_by : req.auth!.name, checked_at: checkedAt,
+          evidence_url: check === 'history' ? null : evidenceUrl, note: body.note ?? null, created_by: req.auth!.name, audit_id: req.auditId ?? null, source_run_id: run.id,
+        }).execute();
+      }
       // A history record decides what the earlier manual Web Risk / trademark records of this name needed (the prior-business phrase, a final
       // history): those are re-read against it, and a changed verdict is appended (never edited).
       if (check === 'history') {

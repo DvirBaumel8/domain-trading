@@ -33,7 +33,7 @@ export const censusCheck: Check = {
       // CR-008 C-2: a frozen sibling method builds the 20 siblings from the name's own word split, once Dvir approved the method version.
       const method = ctx.item.census_list;
       if (!ctx.run.allowUnapprovedMethod && !(await methodApproval(ctx.db, method))) return outcome('UNKNOWN', 'CENSUS_METHOD_NOT_APPROVED', `Sibling method ${method} has no approval recorded (POST /selection/sibling-methods/${method}/approve)`, { ...nul, list: method });
-      const tokens = usesSplitV2(method) ? splitV2OfDomain(ctx.item.domain) : formFieldsOf(ctx).tokens;
+      const tokens = usesSplitV2(method) ? splitV2OfDomain(ctx.item.domain, method) : formFieldsOf(ctx).tokens;
       listTerms = siblingsBt1(tokens).map((l) => `${l}.com`);
       listName = method;
       extraFields.sibling_tokens = tokens;
@@ -55,7 +55,7 @@ export const censusCheck: Check = {
     }
     const terms = listTerms;
     const size = ctx.settings.census.sibling_count;
-    if (terms.length !== size) return outcome('UNKNOWN', 'CENSUS_LIST_SIZE', `Census list ${listName} has ${terms.length} names, not ${size}`, { ...nul, list: listName, ...extraFields });
+    if (terms.length !== size) return outcome('UNKNOWN', 'CENSUS_LIST_SIZE', `Census list ${listName} has ${terms.length} names, not ${size}`, { ...nul, list: listName, size: terms.length, ...extraFields });
 
     const { asOf, explicit } = asOfOf(ctx);
     const pace = pacerFor(ctx);

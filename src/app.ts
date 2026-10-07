@@ -38,6 +38,7 @@ import { CohortOutcomesJob } from './jobs/cohort-outcomes.js';
 import { registerDropLists } from './api/drop-lists.js';
 import { registerCohorts } from './api/cohorts.js';
 import { registerCompany } from './api/company.js';
+import { registerCandidates } from './api/candidates.js';
 import { registerPosts } from './api/posts.js';
 import { BufferClient } from './services/posting/buffer.js';
 import { postsRefresh, type PostingDeps } from './services/posting/posts.js';
@@ -184,6 +185,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerTestSets(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
+  registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
   const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey };
   registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });

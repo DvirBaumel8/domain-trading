@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { SPLIT_V2_SHA256 } from './split-v2.js';
+import { SPLIT_V2_SHA256, SPLIT_V3_SHA256 } from './split-v2.js';
 
 export interface SiblingPools { first_pool: string[]; last_pool: string[]; tech: string[]; trades: string[] }
 
@@ -13,6 +13,8 @@ const BT1_POOLS = { file: 'bt1/bt1_pools_v1.json', sha256: 'a984b85e06ed79cf9725
 export const KNOWN_METHODS: Record<string, { file: string; sha256: string; split: string | null }> = {
   'bt1@v1': { ...BT1_POOLS, split: null },
   'bt1@v2': { ...BT1_POOLS, split: SPLIT_V2_SHA256 },
+  /** `bt1@v3` (CR-012): the same recipe on data/bt1/bt1_v3_split.json. */
+  'bt1@v3': { ...BT1_POOLS, split: SPLIT_V3_SHA256 },
 };
 /** The word split a method is applied to for a name: DOM's own `form` tokens (v1) or the frozen split-v2 tokens. */
 export const usesSplitV2 = (method: string): boolean => KNOWN_METHODS[method]?.split != null;

@@ -119,7 +119,7 @@ describe('test sets: sibling_method and features_as_of (CR-009 N-8)', () => {
     const no = await x.post('/selection/test-sets', body());
     expect([no.statusCode, no.json().error.code]).toEqual([409, 'SIBLING_METHOD_NOT_APPROVED']);
     expect(no.json().error.details).toEqual({ method: 'bt1@v2' });
-    const bad = await x.post('/selection/test-sets', body({ sibling_method: 'bt1@v3' }));
+    const bad = await x.post('/selection/test-sets', body({ sibling_method: 'bt1@v4' }));
     expect([bad.statusCode, bad.json().error.code]).toEqual([422, 'VALIDATION_ERROR']);
     expect(await db.selectFrom('test_sets').selectAll().execute()).toHaveLength(0);
     await approve(x, 'bt1@v2');

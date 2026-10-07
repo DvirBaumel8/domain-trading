@@ -420,10 +420,10 @@ describe('fix round 1', () => {
     expect(res(dated.body.names[0], 'web_risk')).toMatchObject({ status: 'MANUAL_REQUIRED', cached: false });
     const undated = await runDone({ checks: [...OFFLINE], mode: 'full', names: n() });
     expect(res(undated.body.names[0], 'web_risk')).toMatchObject({ status: 'FAIL', cached: true }); // "now": the live result is reusable
-    // a manual record in the dated run is not reused by a later undated run
+    // v2.13.0 (CR-012 part E): a tm_us record in the dated run is also kept against the name, so a later undated run reuses it while it is fresh
     await post(`/screening/runs/${dated.id}/manual`, manualBody('tm_us', { phrases_queried: ['X'], control_ok: true, exact_or_core_live: [], generic_live: [] }));
     const again = await runDone({ checks: [...OFFLINE], mode: 'full', names: n() });
-    expect(res(again.body.names[0], 'tm_us')).toMatchObject({ status: 'MANUAL_REQUIRED', cached: false });
+    expect(res(again.body.names[0], 'tm_us')).toMatchObject({ status: 'PASS', cached: false, fields: { domain_record_id: expect.any(Number) } });
   });
 
   it('a run whose execute throws still ends: past its deadline it is partial with SOURCE_ERROR rows; resumeStalled reports finalized only on a real change', async () => {

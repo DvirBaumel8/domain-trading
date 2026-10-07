@@ -1,4 +1,4 @@
-# Jobs (contract v2.12.0)
+# Jobs (contract v2.13.0)
 
 The service runs **no timers of its own**. All scheduled work goes through one route, called by a Cloudflare Worker cron (`jobs-trigger/`). Since 2.1.0 the cron fires **once a day** (00:05 UTC) and runs `daily` only; `tick` stays callable by hand. Since 2.3.0 a bot with the WRITE token may also start `daily` or `tick` by hand (after a real buy, or when testing); the results are in `GET /jobs/runs`, `GET /audit` and `GET /report`.
 

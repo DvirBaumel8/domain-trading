@@ -21,6 +21,7 @@ import {
 import { approveMethod, methodApproval, methodSha, methodSplitSha, splitOfDomain } from '../screening/sibling-methods.js';
 import { KNOWN_METHODS, isKnownMethod, loadPools, siblingsBt1, usesSplitV2 } from '../screening/siblings.js';
 import { splitV2OfDomain } from '../screening/split-v2.js';
+import { buyHoldSteps } from '../screening/hold-steps.js';
 import { evaluateTier, type TierFeatures } from '../screening/tier.js';
 import {
   GATE_KEYS, cell, csvToUploadRow, decideHoldoutRow, decideReplayRow, gateContext, holdoutCheck as replayHoldoutCheck, laneOf, leakageLint, missingGates,
@@ -207,7 +208,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       tokens = q.data.tokens.split(',');
       if (tokens.length < 2 || tokens.some((t) => !/^[a-z]{1,40}$/.test(t))) throw new AppError(400, 'VALIDATION_ERROR', 'tokens must be at least 2 comma-separated lower-case words (letters only)');
     } else if (q.data.domain !== undefined) {
-      tokens = usesSplitV2(method) ? splitV2OfDomain(normalizeDomain(q.data.domain)) : (await splitOfDomain(db, q.data.domain, (await activeSelectionSettings(db)).values)).tokens;
+      tokens = usesSplitV2(method) ? splitV2OfDomain(normalizeDomain(q.data.domain), method) : (await splitOfDomain(db, q.data.domain, (await activeSelectionSettings(db)).values)).tokens;
     }
     const pools = loadPools(method);
     const ap = await methodApproval(db, method);
@@ -555,6 +556,6 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const hold = await holdSuites(db, active.values.holdout);
     const targetValues = target ? target.values : active.values;
     // Clearable only for a version that actually clears the hold (its own buy_hold is false).
-    return { buy_hold: active.values.buy_hold, settings_version: label, target_buy_hold: targetValues.buy_hold, required_suites: suites, hold_suites: hold.suites, hold_suites_source: hold.source, clearable: !targetValues.buy_hold && suites.length > 0 && suites.every((x) => x.pass) };
+    return { buy_hold: active.values.buy_hold, settings_version: label, target_buy_hold: targetValues.buy_hold, required_suites: suites, hold_suites: hold.suites, hold_suites_source: hold.source, clearable: !targetValues.buy_hold && suites.length > 0 && suites.every((x) => x.pass), ...(await buyHoldSteps(db, active)) };
   });
 }

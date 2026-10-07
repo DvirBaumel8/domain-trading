@@ -10,7 +10,7 @@ import { toCsv } from '../services/export.js';
 export const TABLE_FILES = [
   'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'listing_history', 'quotes', 'price_schedule',
   'pricing_evidence', 'offers', 'export_runs', 'export_uploads', 'registrar_presence',
-  'selection_settings', 'selection_lists', 'sibling_method_approvals', 'screening_evidence', 'screening_runs', 'screening_results', 'screening_verdicts', 'screening_packs', 'manual_quotes',
+  'selection_settings', 'selection_lists', 'sibling_method_approvals', 'screening_evidence', 'screening_runs', 'screening_results', 'screening_verdicts', 'screening_packs', 'manual_quotes', 'domain_records',
   'tranches', 'tranche_members', 'test_sets', 'test_set_rows',
   'drop_lists', 'drop_list_rows', 'drop_list_checks', 'cohorts', 'cohort_names', 'cohort_decisions', 'cohort_outcomes',
   'company_documents', 'forbidden_terms', 'review_packets', 'review_feedback', 'review_items', 'review_item_statuses', 'review_settings_changes', 'review_retries',

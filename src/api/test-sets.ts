@@ -17,6 +17,7 @@ import {
 } from '../screening/test-sets.js';
 import type { LabelledFeatures } from '../screening/replay.js';
 import type { InputName } from '../screening/engine.js';
+import { unknownCounts, unknownNames, unknownsOf } from '../screening/unknowns.js';
 import { toJerusalemIso } from '../time.js';
 
 export interface TestSetsDeps { db: Kysely<Database>; now: () => number; worker: ScreeningWorker }
@@ -46,7 +47,12 @@ const NewBody = z.object({
 const RescoreBody = z.object({
   name: z.string().regex(NAME), purpose: z.literal('rescore'), slices: z.array(z.string().min(1).max(60)).min(1).max(20), settings: z.string().regex(LABEL_RE).optional(),
   sibling_method: z.enum(TEST_SET_METHODS).default(TEST_SET_DEFAULT_METHOD), features_as_of: z.enum(['row', 'now']).default('row'), max_answer_age_days: AnswerAge,
-}).strict();
+  // v2.13.0 (CR-012 T12-3): only the names of an earlier rescore set that had an unknown feature.
+  only_names_with_unknowns: z.boolean().optional(), from_set: z.string().regex(NAME).optional(),
+}).strict().superRefine((b, ctx) => {
+  if (b.only_names_with_unknowns === true && b.from_set === undefined) ctx.addIssue({ code: 'custom', path: ['from_set'], message: 'only_names_with_unknowns needs from_set (an earlier rescore test set)' });
+  if (b.from_set !== undefined && b.only_names_with_unknowns !== true) ctx.addIssue({ code: 'custom', path: ['only_names_with_unknowns'], message: 'from_set is only used with only_names_with_unknowns: true' });
+});
 const Body = z.discriminatedUnion('purpose', [NewBody, RescoreBody]);
 
 interface Stored { domain: string; label: 'sold' | 'dropped'; as_of: string; source: string; price_usd: number | null; report_lane: 'expired' | 'fresh' | 'aged' | 'geo' | null; role: 'test' | 'dev' | null; kept: boolean; reason: string | null }
@@ -90,6 +96,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     let seed: string | null = null;
     let share: number | null = null;
     let filters: object = {};
+    let fromSet: { name: string; before_n: number } | null = null;
 
     if (b.purpose === 'new') {
       const today = toJerusalemIso(now()).slice(0, 10);
@@ -132,12 +139,24 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
         if (!v) throw new AppError(404, 'SETTINGS_NOT_FOUND', `No selection settings version "${b.settings}"`);
         settingsLabel = v.label;
       }
-      const rows = (await db.selectFrom('labelled_names').selectAll().where('slice', 'in', b.slices).orderBy('domain').execute()).map(toLabelledRow);
+      let rows = (await db.selectFrom('labelled_names').selectAll().where('slice', 'in', b.slices).orderBy('domain').execute()).map(toLabelledRow);
       if (rows.length === 0) throw new AppError(422, 'TEST_SET_EMPTY', 'No registered name is in these slices; nothing was stored', { slices: b.slices });
       const test = rows.filter((r) => r.role === 'test').map((r) => r.domain);
       if (test.length > 0) throw new AppError(422, 'HOLDOUT_CONTAMINATED', 'Test names are never rescored', { domains: test.slice(0, 20), count: test.length });
       const noAsOf = rows.filter((r) => !r.as_of).map((r) => r.domain);
       if (noAsOf.length > 0) throw new AppError(422, 'AS_OF_REQUIRED', 'A rescore needs an as_of for every name', { domains: noAsOf.slice(0, 20), count: noAsOf.length });
+      if (b.from_set !== undefined) {
+        // The earlier set's names that had an unknown feature (a rescore set only: the names of a `new` set are never shown, R-18).
+        const prev = await db.selectFrom('test_sets').selectAll().where('name', '=', b.from_set).executeTakeFirst();
+        if (!prev) throw new AppError(404, 'TEST_SET_NOT_FOUND', `No test set "${b.from_set}"`);
+        if (prev.purpose !== 'rescore') throw new AppError(422, 'VALIDATION_ERROR', 'from_set must be a rescore test set', { from_set: b.from_set, purpose: prev.purpose });
+        const { status: prevStatus, run: prevRun } = await refresh(db, prev);
+        if (prevStatus !== 'ready') throw new AppError(409, 'TEST_SET_NOT_READY', `The earlier set ${b.from_set} has not finished`, { run_id: prevRun.id, run_status: prevRun.status, status: prevStatus });
+        const had = new Set(unknownNames((await featuresOfRun(db, prevRun)).latest));
+        fromSet = { name: b.from_set, before_n: had.size };
+        rows = rows.filter((r) => had.has(r.domain));
+        if (rows.length === 0) throw new AppError(422, 'TEST_SET_EMPTY', `No name of ${b.from_set} had an unknown feature among these slices; nothing was stored`, { from_set: b.from_set, before_n: had.size });
+      }
       stored = rows.map((r) => ({
         domain: r.domain, label: r.label, as_of: r.as_of!, source: r.source, price_usd: r.price_cents === null ? null : r.price_cents / 100, report_lane: r.report_lane, role: null, kept: true, reason: null,
       }));
@@ -153,7 +172,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     try {
       await db.transaction().execute(async (trx) => {
         await trx.insertInto('test_sets').values({
-          name: b.name, purpose: b.purpose, settings_label: settingsLabel, seed, test_share: share === null ? null : String(share), filters: JSON.stringify(filters),
+          name: b.name, purpose: b.purpose, settings_label: settingsLabel, seed, test_share: share === null ? null : String(share), filters: JSON.stringify(fromSet ? { only_names_with_unknowns: true, from_set: fromSet.name, before_n: fromSet.before_n } : filters),
           run_id: run.id, created_at: createdAt, created_by: req.auth!.name, status: 'computing',
           sibling_method: b.sibling_method, features_as_of: b.purpose === 'rescore' ? b.features_as_of : null, max_answer_age_days: b.max_answer_age_days,
         }).execute();
@@ -191,14 +210,18 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
       const sel = (await selectionSettingsByLabel(db, set.settings_label!))!;
       const labelled = (await db.selectFrom('labelled_names').selectAll().where('domain', 'in', kept.map((k) => k.domain)).execute()).map(toLabelledRow);
       report = rescoreReport(labelled, feats.byDomain, sel.label, sel.values, { features_as_of: set.features_as_of ?? 'row', sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD });
+      const fs = set.filters as { from_set?: string; before_n?: number };
+      if (typeof fs.from_set === 'string') (report as Record<string, unknown>).gaps = { before: fs.before_n ?? null, after: unknownNames(feats.latest).length };
     }
+    // v2.13.0 (T12-2): why a feature is unknown. A rescore set lists its names; a `new` set gives counts only (its names are never shown, R-18).
+    const unknowns = set.purpose === 'rescore' ? await unknownsOf(db, feats.latest) : unknownCounts(feats.latest);
     return {
       name: set.name, purpose: set.purpose, sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD, ...(set.purpose === 'rescore' && { features_as_of: set.features_as_of ?? 'row' }), status, max_answer_age_days: set.max_answer_age_days ?? TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, settings_version: set.settings_label, seed: set.seed, test_share: set.test_share === null ? null : Number(set.test_share),
       filters: set.filters, created_at: set.created_at.toISOString(),
       kept_n: kept.length, removed_n: rows.length - kept.length, test_n: kept.filter((r) => r.role === 'test').length, dev_n: kept.filter((r) => r.role === 'dev').length,
       removed: rows.filter((r) => !r.kept).map((r) => ({ domain: r.domain, reason: r.reason })),
       run: { id: run.id, status: run.status, names_n: feats.names_n, done_n: feats.done_n },
-      lookups: feats.lookups,
+      lookups: feats.lookups, unknowns,
       timing: { started_at: toJerusalemIso(set.created_at), finished_at: run.finished_at ? toJerusalemIso(run.finished_at) : null, minutes: run.finished_at ? Math.round((run.finished_at.getTime() - set.created_at.getTime()) / 600) / 100 : null },
       features: finished ? { census_known_n: [...feats.byDomain.values()].filter((f) => f.registered_share !== null).length, alt_known_n: [...feats.byDomain.values()].filter((f) => f.alt_tld_before_n !== null).length } : null,
       sealed_at: set.sealed_at ? set.sealed_at.toISOString() : null, member_count: set.member_count, member_hash: set.member_hash, report,

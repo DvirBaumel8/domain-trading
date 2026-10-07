@@ -4,6 +4,7 @@
 // here, by the settings' rules.
 import { z } from 'zod';
 import { webRiskLookup } from '../web-risk.js';
+import { freshDomainRecord } from '../domain-records.js';
 import type { SelectionValuesT } from '../settings.js';
 import { outcome, type Check, type CheckOutcome, type ResultRow } from '../types.js';
 import { nameTokens } from '../prior-business.js';
@@ -87,6 +88,16 @@ export const tmUsCheck: Check = {
     const priorName = typeof prior === 'string' && prior !== '' ? prior : null;
     const priorPhrase = priorName === null ? null : priorPhraseOf(priorName);
     if (priorPhrase && !phrases.includes(priorPhrase)) phrases.push(priorPhrase);
+    // CR-012 part E: a fresh record kept for this name (POST /candidates/{domain}/records, or an earlier run's manual record) is used exactly as a manual record
+    // would be (same conversion, so the A1 prior-name rule still applies); a stale one counts as missing. Not in a backtest (a record is a fact of today).
+    if (!ctx.run.backtest) {
+      const rec = await freshDomainRecord(ctx.db, ctx.item.domain, 'tm_us', ctx.now());
+      const parsed = rec ? TmManual.safeParse(rec.record) : null;
+      if (rec && parsed?.success) {
+        const o = tmFromManual(parsed.data, rec.evidenceUrl ?? `manual:tm_us:${ctx.item.domain}`, rec.checkedAt, rec.note ?? undefined, ctx.latest('history'));
+        return { ...o, fields: { ...o.fields, domain_record_id: rec.id } };
+      }
+    }
     return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', `The USPTO wordmark search is not automated: search these phrases (plus the control query) and record it. ${HOW}`, {
       phrases_to_query: phrases, control_required: true, ...(priorName !== null && { prior_business_name: priorName, prior_business_phrase: priorPhrase }),
     });

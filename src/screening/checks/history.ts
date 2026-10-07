@@ -12,6 +12,8 @@ import {
 } from '../wayback.js';
 import { outcome, type Check, type CheckContext, type CheckOutcome, type Status } from '../types.js';
 import { matchTerms } from './brand-lists.js';
+import { freshDomainRecord } from '../domain-records.js';
+import { HistoryManual, historyFromManual } from './manual.js';
 import { asOfOf } from './census.js';
 
 const YEAR_MS = 365.25 * 86_400_000;
@@ -102,6 +104,16 @@ export const historyCheck: Check = {
     // Dvir, 6 Oct 2026 (CR-002 Amendment B1): the Internet Archive is never automated. With the source off the name waits for a human
     // HIST-2 record (POST /screening/runs/{id}/manual, check "history"); it cannot join a tranche without one.
     if (!ctx.settings.sources.wayback) {
+      // CR-012 part E: a fresh record kept for this name is used exactly as a manual HIST-2 record would be (same conversion and prior-business guard); stale = missing.
+      // The automated check never runs here, so no automated FAIL exists for a manual row to outrank. Not in a backtest.
+      if (!ctx.run.backtest) {
+        const rec = await freshDomainRecord(ctx.db, domain, 'history', ctx.now());
+        const parsed = rec ? HistoryManual.safeParse(rec.record) : null;
+        if (rec && parsed?.success) {
+          const o = historyFromManual(parsed.data, { brand: ctx.lists.brand ?? null, bigco: ctx.lists.bigco ?? null }, parsed.data.evidence_urls?.[0] ?? rec.evidenceUrl ?? `manual:history:${domain}`, rec.checkedAt, rec.note ?? undefined);
+          return { ...o, fields: { ...o.fields, domain_record_id: rec.id } };
+        }
+      }
       return outcome('MANUAL_REQUIRED', 'MANUAL_SOURCE', 'The Internet Archive is not automated: look the name up by hand and record HIST-2. Record the result with POST /screening/runs/{id}/manual (check "history")', {
         ...base, lookup_name: domain, results: ['PASS', 'REJECT_HARMFUL', 'FLAG_PRIOR_BUSINESS'], archive_url: `https://web.archive.org/web/*/${domain}`,
       });

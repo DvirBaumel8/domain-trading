@@ -411,6 +411,21 @@ export interface SelectionListsTable {
   approval_text: string | null;
 }
 
+export interface DomainRecordsTable {
+  id: Generated<string>;
+  domain: string;
+  kind: 'tm_us' | 'history';
+  record: unknown;
+  checked_by: string;
+  checked_at: Timestamp;
+  evidence_url: string | null;
+  note: string | null;
+  created_at: TimestampDefault;
+  created_by: string;
+  audit_id: string | null;
+  source_run_id: string | null;
+}
+
 export interface SiblingMethodApprovalsTable {
   id: Generated<string>;
   method: string;
@@ -599,7 +614,7 @@ export interface TestSetsTable {
   sealed_at: Date | null;
   member_count: number | null;
   member_hash: string | null;
-  sibling_method: 'bt1@v1' | 'bt1@v2' | null;
+  sibling_method: 'bt1@v1' | 'bt1@v2' | 'bt1@v3' | null;
   features_as_of: 'row' | 'now' | null;
   /** v2.7.0: NULL (sets before it) reads as 7. */
   max_answer_age_days: number | null;
@@ -895,6 +910,7 @@ export interface Database {
   selection_settings: SelectionSettingsTable;
   selection_lists: SelectionListsTable;
   sibling_method_approvals: SiblingMethodApprovalsTable;
+  domain_records: DomainRecordsTable;
   screening_evidence: ScreeningEvidenceTable;
   screening_runs: ScreeningRunsTable;
   tranches: TranchesTable;

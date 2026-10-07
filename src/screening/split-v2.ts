@@ -7,30 +7,42 @@ import { fileURLToPath } from 'node:url';
 
 export const SPLIT_V2_FILE = 'bt1/bt1_v2_split.json';
 export const SPLIT_V2_SHA256 = '69e659c242ef3a6ea7f55c76dba5680db2199c81ef281d0e80adaf1547f80d73';
+// v2.13.0 (CR-012): bt1@v3 is the same recipe on the split of data/bt1/bt1_v3_split.json (same shape; v2 plus a short general token list).
+export const SPLIT_V3_FILE = 'bt1/bt1_v3_split.json';
+export const SPLIT_V3_SHA256 = 'a76396a60d25d38c699ae94194b28d6ea354551419c4baf9c9b70d1d33f70d5e';
+/** The frozen split files by sibling method (methods that use a split file). */
+export const SPLIT_FILES: Record<string, { file: string; sha256: string }> = {
+  'bt1@v2': { file: SPLIT_V2_FILE, sha256: SPLIT_V2_SHA256 },
+  'bt1@v3': { file: SPLIT_V3_FILE, sha256: SPLIT_V3_SHA256 },
+};
 
 export interface SplitV2Table { pieceCost: number; cost: Map<string, number> }
 
-let cached: SplitV2Table | undefined;
+const cached = new Map<string, SplitV2Table>();
 
-/** Reads and verifies the frozen split file (throws when its sha256 differs). */
-export function loadSplitV2(): SplitV2Table {
-  if (cached) return cached;
-  const bytes = readFileSync(fileURLToPath(new URL(`../../data/${SPLIT_V2_FILE}`, import.meta.url)));
+/** Reads and verifies the frozen split file of a method (default bt1@v2; throws when its sha256 differs). */
+export function loadSplitV2(method = 'bt1@v2'): SplitV2Table {
+  const hit = cached.get(method);
+  if (hit) return hit;
+  const f = SPLIT_FILES[method];
+  if (!f) throw new Error(`Sibling method ${method} has no split file`);
+  const bytes = readFileSync(fileURLToPath(new URL(`../../data/${f.file}`, import.meta.url)));
   const sha = createHash('sha256').update(bytes).digest('hex');
-  if (sha !== SPLIT_V2_SHA256) throw new Error(`Split data for bt1@v2 does not match its frozen sha256 (got ${sha})`);
+  if (sha !== f.sha256) throw new Error(`Split data for ${method} does not match its frozen sha256 (got ${sha})`);
   const j = JSON.parse(bytes.toString('utf8')) as { split: { piece_cost: number; class_costs: Record<string, number> }; classes: Record<string, string[]> };
   const cost = new Map<string, number>();
   for (const [cls, tokens] of Object.entries(j.classes)) {
     const c = j.split.class_costs[cls];
-    if (c === undefined) throw new Error(`bt1@v2 split: class ${cls} has no cost`);
+    if (c === undefined) throw new Error(`${method} split: class ${cls} has no cost`);
     for (const t of tokens) cost.set(t, c);
   }
-  cached = { pieceCost: j.split.piece_cost, cost };
-  return cached;
+  const table = { pieceCost: j.split.piece_cost, cost };
+  cached.set(method, table);
+  return table;
 }
 
 /** The cheapest split of an SLD (domain without `.com`) into known tokens; `[]` when there is none. */
-export function splitV2(sld: string, table: SplitV2Table = loadSplitV2()): string[] {
+export function splitV2(sld: string, table: SplitV2Table = loadSplitV2('bt1@v2')): string[] {
   if (!/^[a-z]+$/.test(sld)) return [];
   const n = sld.length;
   const INF = 1_000_000_000;
@@ -52,4 +64,4 @@ export function splitV2(sld: string, table: SplitV2Table = loadSplitV2()): strin
 }
 
 /** The split of a `.com` domain name (lower-case); anything that is not `<letters>.com` has none. */
-export const splitV2OfDomain = (domain: string): string[] => (domain.endsWith('.com') ? splitV2(domain.slice(0, -4)) : []);
+export const splitV2OfDomain = (domain: string, method = 'bt1@v2'): string[] => (domain.endsWith('.com') ? splitV2(domain.slice(0, -4), loadSplitV2(method)) : []);

@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.13.0 (2026-10-07): CR-012 parts A, D, E, and the sibling method bt1@v3
+MINOR, **additive**. Release note: `docs/releases/v2.13.0.md`.
+- **`bt1@v3`** (Dvir approved building it): `bt1@v2` plus a general token list; 1,826 of 1,900 vectors.
+- **Unknowns explained (A):** `unknowns` on test sets and screening runs; rescore option `only_names_with_unknowns` with `from_set`, report `gaps`.
+- **Records per domain (E):** `POST/GET /candidates/{domain}/records`; fresh records (tm_us 30 days, history 180) are reused by live runs; the per-run manual route also writes one. New append-only table `domain_records` (in the backup).
+- **Path to a real buy (D):** `GET /selection/buy-hold` adds `steps` and `ready`.
+
 ## 2.12.0 (2026-10-07): CR-011 part A, posting to the company's X account through Buffer
 MINOR, **additive**. Release note: `docs/releases/v2.12.0.md`. Founder rule 10 changed by Dvir (7 Oct 2026).
 - **Routes:** `POST /posts` (dry run, images with alt text, threads, daily cap with a burst), `GET /posts`, `GET /posts/{id}/images/{part}/{position}`, `POST /posts/{id}/remove`, `POST /posts/pause`, `POST /posts/burst`, and the public `GET /media/{token}` (images for Buffer, 7 days).
