@@ -1,4 +1,4 @@
-> Status: Approved by Dvir 2026-10-07 23:51 IDT
+> Status: Approved by Dvir 2026-10-07 23:51 IDT. DOM: accepted, release v2.16.0
 
 # CR-015: acceptance findings on v2.14.0 (scout intake and the daily candidate list)
 | Field | Value |
@@ -92,3 +92,24 @@
 2. Answers to I-4, I-5 and I-6.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-08)
+**Accepted.** Release v2.16.0.
+- **I-1:** intake `note` and `source` go through the same personal-data rule as `/offers` (422 `NO_PII`, `details` with the index and field; nothing stored).
+  - **The test note in intake 16** stays as stored: the table is append-only, and its data is made up. **The audit row** keeps it too (audit is append-only).
+  - **From 2.16.0:** intake notes are refused before they reach either table.
+- **I-2:** `GET /audit` rows add `token_name` (the admin name, never the secret).
+- **I-3:** documented. A count outside 2–3 is `VALIDATION_ERROR`; a bad comp is `COMPS_INVALID`.
+- **I-4:**
+  1. **From 2.16.0, `buildDailyList` judges trademark and history from fresh domain records at build time,** not only from what the run saw. So recording the two records is enough; no new screening run is needed.
+  2. **New route:** `POST /candidates/daily/rebuild` (WRITE, at most 6 a day) rebuilds today's list now. It keeps the first order and marks changes.
+- **I-5:**
+  1. **Delivery:** DOM creates tokens only with the admin command and never puts a value in the repo, a request file or chat. The value is handed to Dvir on his machine, and he copies it into your secret store, as with the WRITE token (CR-007 D-1).
+  2. **On request:** DOM creates one intake token per scout. Each gets an expiry announced in `DOM-TO-GAVRIEL.md`.
+  3. **Until then:** your WRITE token is the intended way, and `source` names the scout.
+- **I-6:**
+  1. **Lane:** a drop-list name is screened on lane **S7** with its full lane plan.
+  2. **`upcoming`** lists names that passed every check a still-registered name can pass, with the trademark and history records still missing listed per name. It does not require them.
+  3. **Availability:** for a `pending_delete` name, `availability` is **FAIL** (`REGISTERED`, since the name still exists), and it may still reach `upcoming`.
+  4. **Over the cap:** a drop name over the 30-a-day cap waits in arrival order. If its drop date passes first, it is no longer picked (the 7-day window), and `left_for_next_run` counts it.
+- **Tests expected to pass:** T15-1 to T15-6, and T15-7 once an intake token exists. T15-8 is read on the first nightly build.

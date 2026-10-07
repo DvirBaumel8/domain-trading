@@ -75,12 +75,17 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `DATABASE_URL` | the Neon **direct** string from step 1 |
    | `PORKBUN_API_KEY` / `PORKBUN_SECRET_API_KEY` | the pair from step 4 |
    | `GODADDY_PAT` | a GoDaddy PAT with `domains.domain:read` + `domains.nameserver:update`; leave blank if you don't have one (NS is then manual) |
-   | `GITHUB_BACKUP_TOKEN` | the PAT from step 2 |
-   | `GITHUB_BACKUP_REPO` | `DvirBaumel8/domain-trading-data` |
+   | `GITHUB_BACKUP_TOKEN` | the PAT from step 2 (optional: the export is not configured by decision, 7 Oct 2026) |
+   | `GITHUB_BACKUP_REPO` | `DvirBaumel8/domain-trading-data` (optional, as above) |
    | `JOB_TRIGGER_TOKEN` | the value from step 3 |
+   | `GOOGLE_WEB_RISK_API_KEY` | optional: a key restricted to the Web Risk API, from a Google project **with** billing (Lookup API only; DOM caps itself at 10,000 a month) |
+   | `GEMINI_API_KEY` | optional: the outside review; a Gemini key from a **new Google AI Studio project with no billing** (free tier) |
+   | `BUFFER_API_KEY` | optional: posting to X; from publish.buffer.com/settings/api |
+   | `BUFFER_CHANNEL_ID` | optional: only if the Buffer account has more than one X channel |
+   | `PUBLIC_BASE_URL` | optional: the public base URL for post images (default `https://domain-trading-api.onrender.com`) |
 
    The blueprint already sets `APP_ENV=production`, `DATABASE_SSL=true` and
-   `ENABLED_REGISTRARS=porkbun,godaddy` (the lander target is a DB setting, default `afternic`). Later pushes do not deploy by themselves: use Manual Deploy.
+   `ENABLED_REGISTRARS=porkbun,godaddy` (the lander target is a DB setting, default `afternic`). Later pushes to `main` deploy by themselves once the `ci` workflow passes (`autoDeployTrigger: checksPass`, §Deploys below).
 3. The first start runs the migrations (`npm run migrate up`) and then boots. Watch the logs for `Migrations complete!` and `Server listening`.
 4. Check, replacing the URL with yours (the first request may take ~50 s):
    ```bash
@@ -100,7 +105,7 @@ The Worker calls `POST /jobs/run` once a day at 00:05 UTC with `daily` (since 2.
    - `JOB_TRIGGER_TOKEN`: the same value as in Render.
 2. **Variables** -> `API_BASE_URL` = the Render URL from step 5 (`https://domain-trading-api.onrender.com`, no trailing slash).
 3. Actions -> `deploy-jobs-trigger` -> **Run workflow** (it only deploys on main and when `API_BASE_URL` is set).
-4. Verify: Cloudflare dashboard -> Workers -> `domain-trading-jobs` -> Triggers shows the two crons. After the next full hour,
+4. Verify: Cloudflare dashboard -> Workers -> `domain-trading-jobs` -> Triggers shows the one cron (`5 0 * * *`). The 08:30 UTC review-retry `tick` runs from GitHub Actions (`.github/workflows/review-retry-tick.yml`), which needs the repo variable `API_BASE_URL` and the repo secret `JOB_TRIGGER_TOKEN`; the account is at Cloudflare's free limit of 5 crons. After the next full hour,
    `GET /audit` (READ token) has a row for `jobs/run` with scope `job`. A 401 there means the tokens differ.
 
 ## 7. API tokens for the bots
@@ -136,9 +141,9 @@ Use the READ and WRITE tokens (Gavriel runs these; see `docs/internal/test-plan.
 5. `POST /buy` with **`"dry_run": true` set explicitly in the body** for a free test .com Dvir is willing to buy (a fresh `Idempotency-Key`; `approval_ref` text naming the domain; the other required fields per `docs/contract/endpoints.md`). With $0 credit the expected result is `INSUFFICIENT_FUNDS` (`REGISTRAR_FUNDS`) or the equivalent, and **that is a pass**. `wouldSucceed: true` or `VERIFICATION_REQUIRED` are also acceptable results. Never send the call without `dry_run: true` before G4.
 6. **Pass criteria:** Porkbun balance, invoices and spend unchanged; audit rows present. **Any charge: stop everything, contact Porkbun support, revoke the WRITE token** (`npm run admin -- token revoke --id <id>`).
 
-## 10. Restore drill (BK-5), before the first real buy
+## 10. Restore drill (BK-5): dropped by Dvir on 7 Oct 2026
 
-Required before G4. Steps are in `docs/runbook.md` (Restore drill). The first nightly export runs in the `daily` job at 00:05 UTC. To force one now, call the daily job over HTTP (the backup PAT stays in Render only, so do not use the laptop job CLI):
+**Not required** (Dvir, 7 Oct 2026: the nightly export stays built but unconfigured; accepted risk: Neon free keeps about 6 hours of history). If the export is ever configured, the steps are in `docs/runbook.md` (Restore drill). The first nightly export runs in the `daily` job at 00:05 UTC. To force one now, call the daily job over HTTP (the backup PAT stays in Render only, so do not use the laptop job CLI):
 
 ```bash
 API=https://domain-trading-api.onrender.com

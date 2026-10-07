@@ -1,6 +1,6 @@
 # Reads: /report, /portfolio, /ledger, /deals, /audit, /health (READ); import-domain; lifecycle
 
-Gavriel and Gizbar (the CFO bot) answer any question from the DB alone. **Every figure traces back to ledger rows; nothing is estimated.** Fields, warnings and levels: `docs/contract/reports.md`; other reads: `docs/contract/endpoints.md`.
+Gavriel and Gizbar (the CFO bot) answer any question from the DB alone. **The `/report` fields and the full warnings list are in the contract (`docs/contract/reports.md`), which wins over this file;** this file keeps DOM's internal rules and test IDs. **Every figure traces back to ledger rows; nothing is estimated.** Fields, warnings and levels: `docs/contract/reports.md`; other reads: `docs/contract/endpoints.md`.
 
 ## Rules
 - Money = flat pairs (`x_cents` + `x`); times returned with the Asia/Jerusalem offset (spec sync 4d-2, Dvir, 5 Oct 2026, 22:02).

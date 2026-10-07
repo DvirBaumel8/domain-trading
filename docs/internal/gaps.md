@@ -1,4 +1,29 @@
-# Gaps: inherited specs vs the code (6 Oct 2026, contract v1.2.0)
+# Gaps: specs vs the code (last full pass 8 Oct 2026, contract 2.16.0)
+
+## State as of 2.16.0 (8 Oct 2026, tech-debt pass)
+- **Rows below dated 6 Oct describe the state then.** Since then, the following are built:
+  - pricing **v3** is current: the price list, ladder drops, `comps_min` 0, so comps are optional (G-1, G-2, G-4 closed by the v3 row of 7 Oct);
+  - `/buy` requires a screening pack and a tranche (G-3, 2.0.0);
+  - the selection rule **v11** is active, with `bt1@v3` (7 Oct);
+  - the buy hold stays on.
+- **G-5 is still open:** `POST_BUY_INCOMPLETE` still means "no stored comps".
+- **CR-012, the daily list:** the daily list judges domain records at build time.
+- **Parked in this pass (with the reason):**
+  - **G-85** No renewal path (`renewals_used` is never set to 1, and no `renewal` ledger row is written). Founder rule 3 and the cap can't see a renewal. **Needed before the first expiry (Oct 2027)**; a CR then.
+  - **G-86** Sale-side fees (`/sold` books them as `fee`) count against the $1,500 cap in `budget.spentCents`. **DVIR:** should fees paid out of a sale count toward the spending cap? Left as is.
+  - **G-87** `ext_dates` is PASS when some extensions are unknown, counting only the known ones (deliberate: CR-008 §6.2 accepted it, and `.biz` is always unknown; changing it would undo v11's measured result).
+  - **G-88** `POST /posts/burst` raises the daily post cap (2–5) without an approval: deliberate. Dvir: posts need no approval (CR-011).
+  - **G-89** `APP_ENV` defaults to `development`, which turns off the production-only checks if the Render variable is lost. Render's blueprint sets it; left as is.
+  - **G-90** Idempotency keys are global, not per token. Bots only, so left as is.
+  - **G-91** Rate-limiter state is in memory and resets on each cold start or deploy (documented; the hourly review limit is weaker than it reads).
+  - **G-92** `is_geo` has three definitions: lane S2 live, city + trade in test sets and cohorts, uploaded in replays. Test sets and cohorts score on S7 with the form-derived geo; left until a geo rule is tested.
+  - **G-93** Evidence freshness has several rules: `freshness_hours`, the manual-record window, and the domain-record days (30 / 180). Documented in the contract; one source is a later cleanup.
+  - **G-94** No CI check enforces "every test ID in the internal docs is a real test". Dead IDs were struck in this pass; the remaining spec-only IDs are listed in the internal docs as such.
+  - **G-95** Tables that grow without pruning: `quotes` (raw JSON per check), `export_runs`, `portfolio_checks`, `job_runs`, idempotency rows (completed rows are pruned from 2.16.0). Fine at today's volumes; revisit before 100+ names.
+  - **G-96** Step timeouts: a hung step keeps its job "running" until a restart. Left as is; `JOB_OVERDUE` shows it.
+  - **G-97** Old `in_progress` idempotency keys are reported as `stale` but not released (releasing could double-act).
+
+
 
 Every place where the specs DOM inherited (`docs/internal/*`, which still describe some rules not yet built) differ from what the code does. **Decision** = build in CR-001 **P1a** (contract v1.1.0), **P1b** (v1.2.0), **P2** (later), **keep** (the code is right; the docs now say so), or **dropped**. Changes that need Dvir are marked **DVIR**.
 
@@ -108,8 +133,8 @@ Every place where the specs DOM inherited (`docs/internal/*`, which still descri
 | G-82 | CR-007 G-5 point 4 (the price shown on the marketplace page) | **Not built**: `forsale.godaddy.com` refuses non-browsers; becomes a human "venue state" record with G-8 (P2) | DOM |
 | G-83 | CR-007 G-2 source B (CZDS zone diff) | **Declined at $0** (memory and disk); source A (uploads + RDAP) is planned for v2.5.0 | DOM |
 | G-84 | `bt1@v1` siblings use DOM's `form` split; it equals the research split on 1,767 of 1,900 names (93.0%, CR-008 AC-6) | **Accepted by Dvir** (2026-10-07 15:26 IDT, CR-008 §17.5) as a known limit; a better split needs a word list with frequencies and a new method version | DOM |
+| G-79 | Backup / restore drill (BK-5) | **Dropped by Dvir, 7 Oct 2026.** The export code stays; `GITHUB_BACKUP_*` is not configured, so the daily step reports `skipped`. Accepted risk: Neon free history ≈ 6 h. |
 
 ## Removed by Dvir's 6 Oct decisions (no gap; listed for completeness)
 `POST /offers/import`, `offer_imports`, `offers.import_id`; the `payouts` table, `POST /payouts/{id}/received`, the `/sold` `payout` object, `PAYOUT_MISMATCH`, `PAYOUT_OVERDUE`, `payouts_pending` (tests PO-1–PO-5, S-13–S-15, OF-13, OF-15 deleted); `changed_only` and per-file export records; `JOBS_MODE` and in-process timers.
 
-| G-79 | Backup / restore drill (BK-5) | **Dropped by Dvir, 7 Oct 2026.** The export code stays; `GITHUB_BACKUP_*` is not configured, so the daily step reports `skipped`. Accepted risk: Neon free history ≈ 6 h. |

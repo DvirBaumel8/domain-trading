@@ -35,7 +35,7 @@ curl -sS -X POST "$API/jobs/run" \
   -d '{"job":"tick"}'          # or {"job":"daily"}
 ```
 
-The Worker has one cron, `5 0 * * *`: `daily` at 00:05 UTC (since 2.1.0 `daily` also runs the former hourly `tick` steps first; `tick` is by hand only). A Worker log saying "timed out" does **not** mean the job failed (the cold start can exceed the Worker's wait while the job still runs): check `GET /audit` for the `/jobs/run` row and its summary.
+The Worker has one cron, `5 0 * * *`: `daily` at 00:05 UTC. A second schedule lives in GitHub Actions (`.github/workflows/review-retry-tick.yml`, 08:30 UTC, after Google's free-tier reset in both seasons; Cloudflare's free plan allows 5 crons per account): it runs `tick`, whose last step `reviewRetry` retries a review that Google refused at 03:05 IDT. `tick` can also be run by hand. A Worker log saying "timed out" does **not** mean the job failed (the cold start can exceed the Worker's wait while the job still runs): check `GET /audit` for the `/jobs/run` row and its summary.
 
 The reply has a per-step result. A second run while one is still running returns `skipped`. 401 = wrong token, 503 `JOBS_DISABLED` = `JOB_TRIGGER_TOKEN` not set in Render.
 Allow up to ~60 s for a cold start.
@@ -52,7 +52,7 @@ Allow up to ~60 s for a cold start.
 
 Never put a secret in the repo, a log or chat.
 
-## Restore drill (BK-5; before the first real buy, then quarterly)
+## Restore drill (optional: BK-5 was dropped by Dvir on 7 Oct 2026; the nightly export is built but not configured)
 
 The scratch DB is local docker (service `db`, user `dt`, password `dt`, port 5433). Use a clean subshell with no registrar keys and no production values.
 

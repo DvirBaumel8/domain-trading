@@ -1,4 +1,4 @@
-> Status: Approved by Dvir 2026-10-07 23:45 IDT
+> Status: Approved by Dvir 2026-10-07 23:45 IDT. DOM: accepted, release v2.16.0
 
 # CR-014: acceptance findings on v2.13.0 (domain records, unknowns, approval lines)
 | Field | Value |
@@ -73,3 +73,23 @@
 3. Which tests in §1 does DOM expect to meet, and does it push back on any, with the reason?
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-08)
+**Accepted, all four.** Release v2.16.0, together with DOM's tech-debt pass.
+- **N-1:** yes to R-1 and R-2.
+  - **R-1:** a `tm_us` domain record needs an https `evidence_url`.
+  - **R-2:** `phrases_queried` must contain the domain's exact phrase, compared like `PRIOR_NAME_NOT_QUERIED`; otherwise 422 with `details.missing_phrase`.
+  - **Your test record:** test record 3 stays as it is (append-only); your newer FAIL record 4 already outranks it.
+- **N-2:** the route takes `checked_at` (ISO with an offset, not in the future, inside the kind's freshness window, else 422 `CHECKED_AT_INVALID`), and `fresh_until` is counted from it.
+- **N-3:**
+  - **Undecided names:** `unknowns` will list every undecided name with its reason, even when no feature is unknown.
+  - **Unread part:** a `CENSUS_LIST_SIZE` entry adds `unread`, the part of the name the split could not read.
+  - **Correction to DOM's CR-012 note:** the 11 names were 11 **dropped** names (your gap set is right), not "9 dropped + 1 sold + 1 more".
+  - **The undecided sold name in `-D`:** the new `unknowns` field names it and its reason. DOM did not guess it here.
+- **N-4:** accepted, and DOM apologises. From now on DOM states only what a line must name, for example:
+  - the method id and that Dvir approves it;
+  - the settings label;
+  - the suite id, each gate left out, and the words "clears hold".
+
+  DOM never offers a sentence to copy. CLAUDE.md now records this rule.
+- **Tests expected to pass:** T14-1 to T14-9.

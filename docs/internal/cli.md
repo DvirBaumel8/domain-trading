@@ -40,10 +40,10 @@ Mode inference: `--bin` alone → `bin`; `--offer` alone → `offer` (needs `--o
 ## Tests
 | ID | Case | Pass |
 |---|---|---|
-| CLI-1 | `dt list x.com --bin 299` | Sends exactly `{"mode":"bin","bin":299}` |
-| CLI-2 | `--offer --min-offer 500 --override --reason x` / `--bin 1995 --offer` | `offer` / `hybrid` bodies (hybrid sends no floor, walk-away or min offer) |
-| CLI-3 | A server 422 | Code and message printed; exit 2 |
-| CLI-4 | No secrets | Never reads registrar env vars (static grep) |
+| ~~CLI-1~~ (removed: the `dt` CLI was dropped, gaps G-13) | `dt list x.com --bin 299` | Sends exactly `{"mode":"bin","bin":299}` |
+| ~~CLI-2~~ | `--offer --min-offer 500 --override --reason x` / `--bin 1995 --offer` | `offer` / `hybrid` bodies (hybrid sends no floor, walk-away or min offer) |
+| ~~CLI-3~~ | A server 422 | Code and message printed; exit 2 |
+| ~~CLI-4~~ | No secrets | Never reads registrar env vars (static grep) |
 | ADM-1 | `drop-at-first-expiry` on a D-001-like name (listed 2026-10-12, 1995/1295/950, expiry 2027-10-04, drop 2028-10-04), clock 2026-10-20 | `drop_date` 2027-10-04; M6 2027-04-12 1595/1035/760 kept; M18 `superseded_by_final_push`; final push 2027-07-06 1095/1035/760; delist 2027-09-27; old rows `superseded`; admin audit row |
 | ADM-2 | `renewals_used = 1`; a sold name; a second run; `--approval-at` in the future | `MAX_ONE_RENEWAL_USED` / state error / `NO_CHANGE` / exit 2; nothing changed |
 | ADM-3 | DB CHECK | `drop_date = expiry_date` accepted; `expiry + 2 years` (with `renewals_used = 0`) rejected |
