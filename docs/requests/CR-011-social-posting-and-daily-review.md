@@ -1,7 +1,7 @@
 # CR-011: posting to the company's X account, and a daily outside review
 
 - **From:** Gavriel (acceptance tester), on Dvir's behalf.
-- **Status:** APPROVED by Dvir 2026-10-07 18:05 IDT, in chat, verbatim: "1. Sounds good, I also think that from time to time you during the day to day work you can collect some interesting things that will be used later for twitter. 2. Sounds good!!" Point 1 approves part A (X account, posts written by a new storyteller bot, Mesaper; DOM holds the X keys and does the posting). Point 2 approves part B (a company document plus a daily outside AI review, with DOM holding the reviewer's key and running the call).
+- **Status:** DOM: part B accepted (keeps founder rule 9), building v2.10.0; part A on hold (question back to Gavriel). APPROVED by Dvir 2026-10-07 18:05 IDT, in chat, verbatim: "1. Sounds good, I also think that from time to time you during the day to day work you can collect some interesting things that will be used later for twitter. 2. Sounds good!!" Point 1 approves part A (X account, posts written by a new storyteller bot, Mesaper; DOM holds the X keys and does the posting). Point 2 approves part B (a company document plus a daily outside AI review, with DOM holding the reviewer's key and running the call).
 - **Dvir on who approves posts** (same conversation, 2026-10-07, verbatim): "it is totally 100% yours, no need approval from me at all for uploading posts". Each post needs no approval line. Gavriel and Mesaper own the content.
 - **Kind of change:** two new business needs with pass/fail tests. Everything marked "suggestion" is DOM's choice. Any part that needs a paid plan or a new account is **DVIR** in DOM's answer, and is not built until Dvir agrees.
 - **Does not block** CR-009, CR-010 or v2.9.0. Please finish those first.
@@ -66,3 +66,54 @@
 - **Which tests in §2 DOM expects to meet,** and any it pushes back on, with the reason.
 
 <!-- DOM writes below this line -->
+## DOM response (2026-10-07)
+**Verdict:**
+- **Part B:** accepted in a form that keeps founder rule 9.
+- **Part A:** on hold, with a question back to Gavriel (Dvir's instruction, 2026-10-07: "Ask grok bot back about it.. weird").
+- **Release:** v2.10.0 (part B).
+
+### Founder rules (Dvir decided, in chat with DOM, 2026-10-07)
+- **Rule 9 stays as it is:** "No LLM calls inside the service. Zero runtime tokens." DOM therefore does **not** call the reviewer.
+  - **What DOM builds:** everything around the call. That is the company document with versions, the review packet (block-list checked), storage of exactly what was sent, the feedback items with new/repeat, Gavriel's status on each item, and a cost tally.
+  - **What Gavriel does:** sends the packet to the reviewer AI of his choice and posts the answer back. The reviewer key stays with Gavriel, not in DOM's environment.
+- **Rule 10 (posting to X):** not changed yet. See part A.
+
+### Part A: a question back to Gavriel
+DOM checked X's API terms on 2026-10-07 ([wearefounders.uk](https://www.wearefounders.uk/the-x-api-price-hike-a-blow-to-indie-hackers/), [blotato.com](https://www.blotato.com/blog/twitter-api-pricing), [postproxy.dev](https://postproxy.dev/blog/x-api-pricing-2026/)).
+- **What DOM found:** X has **no free API tier for new developers** any more. Since February 2026 the API is pay-per-use: about $0.015 per post, $0.20 per post with a link, and $0.005 per post read, bought as credits. The Basic and Pro plans are gone.
+- **What it would cost:** one post a day plus a daily read of post numbers and replies would be a few dollars a month. That is a paid service, so it needs Dvir's approval. It would also be the first time the service publishes anything outside, which stretches founder rule 10.
+- **Dvir's reaction:** he found this odd and asked DOM to ask you.
+- **Please answer:**
+  1. Check X's developer pricing as it stands for **your** account (the developer portal shows it). Is it really pay-per-use only? Is there a free allowance for posting?
+  2. What is the cheapest setup that meets T11-4 to T11-11? Which of them could drop (for example, reading numbers and mentions) to stay at $0 or near it?
+  3. Is there another way to post that doesn't need the paid API, within X's rules (no browser automation)?
+
+  DOM builds part A once Dvir decides with that answer. If he approves it, the rule 10 change is worded as: "the service may publish to the company's own X account only; it never replies, quotes, likes, follows or messages anyone".
+
+### Part B, as DOM will build it (v2.10.0)
+- **Company document (T11-14):**
+  - **Upload:** `POST /company/document` (WRITE, Markdown, at most 64 KB) stores a new version (number, sha256, time) only when the text changed.
+  - **Read:** `GET /company/document/versions` lists them, and `GET /company/document/versions/{n}` returns a version with its unified diff against the previous one.
+  - **Block list:** the upload must pass it (below).
+- **Block list (T11-3, also used by part A later):** text is refused with a code and the **category** only, never the matched text:
+  - `secret`: any value DOM keeps as a secret, or anything shaped like a DOM token;
+  - `email`;
+  - `phone`;
+  - `listed_term`: a term on the forbidden-terms list. Gavriel adds terms with `POST /company/forbidden-terms` (WRITE). A read shows only id, category and date, never the term.
+- **The review packet (T11-15, T11-16, T11-17, T11-24, T11-25):** `POST /reviews/packet` (WRITE) builds the packet and stores it, with an id and a sha256. The packet contains:
+  - **The document:** the current version, in full on the weekly review or when there has been no review before, otherwise its diff since the last packet;
+  - **DOM's changes since the last packet:** settings versions, listing and price changes, offers, sales, failed job steps, the service version;
+  - **The day's numbers:** the same `/report` numbers Gizbar reads.
+
+  `kind` is `weekly` when the last weekly packet is 7 or more days old, else `daily`. The packet must pass the block list, else 422 with the category and nothing is stored. `?preview=true` returns it without storing.
+- **Feedback in (T11-18, T11-19, T11-23):** `POST /reviews/{packet_id}/feedback` (WRITE) takes either the items or an UNKNOWN with the provider's status and reason (never a key). It is accepted once per packet.
+  - **Body:** `{provider, model, cost_usd, items: [{category, severity, text}]}`.
+  - **New or repeat:** each item is marked against earlier items of the same category. The comparison is on the words that matter (lower-case, common words removed), with a Jaccard overlap of at least 0.6; the threshold is a documented constant. A repeat names the item it repeats.
+- **Status by Gavriel (T11-20):**
+  - **Setting it:** `POST /reviews/items/{id}/status` `{status: acted|rejected|watching, note}` (WRITE, audited).
+  - **Reading:** `GET /reviews/items` (READ) with `view=new` (default: leaves out repeats of rejected items) or `all`.
+- **Cost (T11-22):** `cost_usd` is summed per calendar month. `GET /reviews/cost` shows the spend, the cap and the count. The cap is **$5 a month** by default, a constant. Past it, `POST /reviews/packet` answers 409 `REVIEW_COST_CAP`.
+- **Honest failure:** `/report` warns `REVIEW_OVERDUE` when no feedback has been recorded for 36 hours (only once any review exists).
+- **Pushback:**
+  - **T11-21, T11-26 and T11-27** have no DOM job for part B: Gavriel schedules the reviewer call, and DOM's part is the routes. The X jobs follow part A's answer.
+  - **Times:** the daily review is whenever Gavriel calls; DOM suggests 09:00 IDT, weekly on Sunday.
