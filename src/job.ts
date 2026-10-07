@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import { loadConfig } from './config.js';
 import { createDb } from './db/client.js';
-import { jerusalemDate } from './dates.js';
+import { idtDay, isRealDate } from './core/dates.js';
 import { DropJob } from './jobs/drop.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
 import { createAdapters } from './registrars/registry.js';
@@ -79,11 +79,10 @@ async function main(argv: string[]): Promise<number> {
   }
   const today = values.today;
   if (today !== undefined) {
-    const d = new Date(`${today}T00:00:00Z`);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== today) {
+    if (!isRealDate(today)) {
       throw new UsageError('--today must be a valid YYYY-MM-DD date');
     }
-    if (!values['dry-run'] && today > jerusalemDate(new Date())) {
+    if (!values['dry-run'] && today > idtDay(new Date())) {
       throw new UsageError('--today in the future is only allowed with --dry-run');
     }
   }

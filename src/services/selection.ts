@@ -1,4 +1,4 @@
-import { formatUsd } from '../money.js';
+import { formatUsd } from '../core/money.js';
 import type { RdapStatus } from '../rdap.js';
 import type { Capabilities, Quote, RegistrarError } from '../registrars/types.js';
 

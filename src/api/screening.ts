@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { dollarsToCents, formatUsd } from '../money.js';
+import { dollarsToCents, formatUsd } from '../core/money.js';
 import { HistoryManual, MANUAL_CHECKS, TmEuManual, TmManual, WebRiskManual, historyFromManual, tmEuFromManual, tmFromManual, webRiskFromManual } from '../screening/checks/manual.js';
 import { GATE_OF } from '../screening/checks/index.js';
 import { DEPENDS_ON } from '../screening/checks/index.js';

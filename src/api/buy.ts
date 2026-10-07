@@ -1,9 +1,10 @@
+import { approvalRef } from '../core/validation.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { requestHash } from '../http/idempotency.js';
-import { dollarsToCents } from '../money.js';
+import { dollarsToCents } from '../core/money.js';
 import type { BuyService } from '../services/buy.js';
 
 const Listing = z.object({
@@ -21,7 +22,7 @@ const BuyBody = z.object({
   domain: z.string().min(1),
   max_price: z.number(),
   max_two_year_price: z.number().nullable().optional(),
-  approval_ref: z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict().nullable().optional(),
+  approval_ref: approvalRef,
   deal_id: z.string().regex(/^D-\d{3,}$/).nullable().optional(),
   category: z.string().nullable().optional(),
   price_grade: z.enum(['strong', 'weaker']).nullable().optional(),

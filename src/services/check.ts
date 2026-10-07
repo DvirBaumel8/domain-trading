@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
-import { redact } from '../http/redact.js';
+import { redact } from '../core/redact.js';
 import type { RdapFn, RdapStatus } from '../rdap.js';
 import { RegistrarError, type RegistrarAdapter } from '../registrars/types.js';
 import {

@@ -1,3 +1,4 @@
+import { isIsoWithOffset, isRealDate } from '../core/dates.js';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
@@ -5,7 +6,6 @@ import type { Database, DomainStatus, LedgerType } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { toCsv } from '../services/export.js';
-import { ISO_WITH_OFFSET } from '../services/offers.js';
 import { auditRows, dealView, ledgerCsvRows, ledgerJson, ledgerRows, portfolioDetail, portfolioRows } from '../services/report/portfolio.js';
 
 const STATUSES: readonly DomainStatus[] = ['owned', 'listed', 'delisted', 'sold', 'dropped'];
@@ -13,8 +13,7 @@ const LEDGER_TYPES: readonly LedgerType[] = ['registration', 'renewal', 'fee', '
 const bad = (m: string) => new AppError(400, 'VALIDATION_ERROR', m);
 
 export function realDay(v: string, f: string): string {
-  const t = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00Z`) : null;
-  if (!t || Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== v) throw bad(`${f} must be a real date (YYYY-MM-DD)`);
+  if (!isRealDate(v)) throw bad(`${f} must be a real date (YYYY-MM-DD)`);
   return v;
 }
 const parse = <T extends z.ZodType>(schema: T, q: unknown): z.infer<T> => {
@@ -64,7 +63,7 @@ export function registerReads(app: FastifyInstance, deps: { db: Kysely<Database>
     const q = parse(z.object({ since: z.string().optional(), limit: z.string().regex(/^\d{1,4}$/).optional() }).strict(), req.query);
     const limit = q.limit === undefined ? 100 : Number(q.limit);
     if (limit < 1 || limit > 500) throw bad('limit must be 1 to 500');
-    if (q.since !== undefined && (!ISO_WITH_OFFSET.test(q.since) || Number.isNaN(Date.parse(q.since)))) throw bad('since must be an ISO 8601 time with an offset');
+    if (q.since !== undefined && (!isIsoWithOffset(q.since))) throw bad('since must be an ISO 8601 time with an offset');
     const rows = await auditRows(deps.db, { since: q.since ? new Date(q.since) : undefined, limit });
     // v2.16.0 (CR-015 I-2): who made the call, by token name (never the token or its hash); null for a job, an admin command or a deleted token id.
     const ids = [...new Set(rows.map((r) => r.token_id).filter((x): x is number => x !== null))];

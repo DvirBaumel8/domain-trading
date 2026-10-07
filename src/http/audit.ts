@@ -5,7 +5,7 @@ import type { AuditRowInsert, Database } from '../db/types.js';
 import { isJobRoute } from './auth.js';
 import { errorBody } from './errors.js';
 import { isMutating } from './methods.js';
-import { redact, redactFreeText } from './redact.js';
+import { redact, redactFreeText } from '../core/redact.js';
 
 declare module 'fastify' {
   interface FastifyRequest {

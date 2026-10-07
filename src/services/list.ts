@@ -1,3 +1,4 @@
+import { centsToDollarsOrNull } from '../core/money.js';
 import type { Kysely } from 'kysely';
 import type { Config } from '../config.js';
 import type { Category, Database, DomainRow } from '../db/types.js';
@@ -8,7 +9,7 @@ import { checkApproval } from './approval.js';
 import { changedColumns } from './export-state.js';
 import { afternicRow, loadSedoTemplate, sedoRow, type ExportDomain } from './export.js';
 import { landerNameservers, sameNsSet } from './lander.js';
-import { jerusalemDate } from '../dates.js';
+import { addDays, idtDay } from '../core/dates.js';
 import { buildSchedule, type ScheduleEvent } from '../pricing/schedule.js';
 import { currentSettings, settingsByVersion } from '../pricing/settings.js';
 import { isCategory, validateListing, type ListingPlan, type ListingRequest } from './listing-v2.js';
@@ -30,13 +31,6 @@ const HOST = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}
 const PRICE_FIELDS = ['mode', 'bin', 'floor', 'walkaway', 'min_offer', 'lto_max_months', 'pricing_exception'] as const;
 
 const sameNullableNs = (a: string[] | null, b: string[] | null): boolean => (a === null || b === null ? a === b : sameNsSet(a, b));
-const dollars = (c: number | null): number | null => (c === null ? null : c / 100);
-
-function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 export class ListService {
   constructor(private readonly deps: { db: Kysely<Database>; adapters: RegistrarAdapter[]; config: Config; nsLookup: NsLookup; now: () => number }) {}
@@ -115,11 +109,11 @@ export class ListService {
       if (row.listing_mode === 'hybrid') {
         // replan recomputes from the formula (Q10); anything else carries the stored values (§10.4)
         req = replan
-          ? { mode: 'hybrid', bin: dollars(row.bin_cents), lto_max_months: row.lto_max_months }
-          : { mode: 'hybrid', bin: dollars(row.bin_cents), floor: dollars(row.floor_cents), walkaway: dollars(row.walkaway_cents),
-              min_offer: dollars(row.min_offer_cents), lto_max_months: row.lto_max_months };
-      } else if (row.listing_mode === 'bin') req = { mode: 'bin', bin: dollars(row.bin_cents) };
-      else req = { mode: 'offer', min_offer: dollars(row.min_offer_cents), floor: dollars(row.floor_cents) };
+          ? { mode: 'hybrid', bin: centsToDollarsOrNull(row.bin_cents), lto_max_months: row.lto_max_months }
+          : { mode: 'hybrid', bin: centsToDollarsOrNull(row.bin_cents), floor: centsToDollarsOrNull(row.floor_cents), walkaway: centsToDollarsOrNull(row.walkaway_cents),
+              min_offer: centsToDollarsOrNull(row.min_offer_cents), lto_max_months: row.lto_max_months };
+      } else if (row.listing_mode === 'bin') req = { mode: 'bin', bin: centsToDollarsOrNull(row.bin_cents) };
+      else req = { mode: 'offer', min_offer: centsToDollarsOrNull(row.min_offer_cents), floor: centsToDollarsOrNull(row.floor_cents) };
     }
     let plan: ListingPlan | null = null;
     const warnings: string[] = [];
@@ -127,7 +121,7 @@ export class ListService {
       const r = validateListing(req, {
         category, grade, phase: 'change', settings: s, highValueMinBinCents: settings.high_value_min_bin_cents,
         override: body.override ?? false, overrideReason: body.override_reason ?? null, approvalValid,
-        today: jerusalemDate(now), dropDate: row.drop_date,
+        today: idtDay(now), dropDate: row.drop_date,
         ...(!priceChange && !replan && (row.listing_mode === 'hybrid' || row.listing_mode === 'bin') ? { carried: { pricingSource: row.pricing_source ?? 'formula' } } : {}),
       });
       if (!r.ok) throw new AppError(r.status, r.code, r.message, r.details ?? {});
@@ -142,8 +136,8 @@ export class ListService {
 
     // Schedule anchor: the first listing starts the clock; later plans keep it and only schedule events after today
     const firstListing = row.first_listed_at === null;
-    const today = jerusalemDate(now);
-    const anchor = firstListing ? today : jerusalemDate(row.first_listed_at!);
+    const today = idtDay(now);
+    const anchor = firstListing ? today : idtDay(row.first_listed_at!);
     const startAfter = firstListing ? undefined : today;
     if (plan && row.drop_date === null) throw new AppError(422, 'DROP_DATE_UNKNOWN', 'The domain has no drop_date; a schedule cannot be built');
 

@@ -1,3 +1,4 @@
+import { assertNoteNoPii } from '../core/validation.js';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { Kysely } from 'kysely';
@@ -7,7 +8,7 @@ import { manualDelist, pendingDomains, type Venue } from './export-state.js';
 import { withDomainLock } from './plan-store.js';
 import { z } from 'zod';
 import type { Config } from '../config.js';
-import { jerusalemDate } from '../dates.js';
+import { ISO_WITH_OFFSET, idtDay } from '../core/dates.js';
 import type { Database, DomainRow } from '../db/types.js';
 import { isValidDisplayName } from '../domain-name.js';
 
@@ -159,7 +160,7 @@ export class ExportService {
       }).execute();
       return { csv: built.csv, pendingChanges: pending.length, manualDelist: delist };
     });
-    const day = jerusalemDate(fileAt);
+    const day = idtDay(fileAt);
     return { csv: out.csv, filename: `${venue}-${day}.csv`, exportId, pendingChanges: out.pendingChanges, manualDelist: out.manualDelist, warnings };
   }
 
@@ -209,14 +210,14 @@ export class ExportService {
       approvalText = String(body.approval_ref.text).trim();
       uploadedAt = a.approvedAt; // when both are sent, the approval time wins and uploaded_at is ignored
     } else if (body.uploaded_at != null) {
-      if (typeof body.uploaded_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/.test(body.uploaded_at)
+      if (typeof body.uploaded_at !== 'string' || !ISO_WITH_OFFSET.test(body.uploaded_at)
         || Number.isNaN(new Date(body.uploaded_at).getTime())) {
         throw new AppError(422, 'UPLOADED_AT_INVALID', 'uploaded_at must be ISO 8601 with a timezone offset');
       }
       uploadedAt = new Date(body.uploaded_at);
       if (uploadedAt.getTime() > now.getTime() + 60_000) throw new AppError(422, 'UPLOADED_AT_INVALID', 'uploaded_at is in the future');
     }
-    if (body.note != null && body.note.includes('@')) throw new AppError(422, 'NO_PII', "note must not contain an email address or '@'");
+    assertNoteNoPii(body.note);
     const run = await db.selectFrom('export_runs').selectAll().where('export_id', '=', body.export_id).executeTakeFirst();
     if (!run || run.marketplace !== venue) throw new AppError(404, 'EXPORT_NOT_FOUND', 'No such export for this venue');
     if (uploadedAt.getTime() < run.at.getTime() - 60_000) {

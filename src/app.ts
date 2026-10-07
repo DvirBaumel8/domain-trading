@@ -29,7 +29,7 @@ import { registerAuth, registerScope } from './http/auth.js';
 import { registerIdempotency } from './http/idempotency.js';
 import { registerRateLimit } from './http/rate-limit.js';
 import { registerErrorHandling } from './http/errors.js';
-import { jerusalemDeep } from './time.js';
+import { jerusalemDeep } from './core/dates.js';
 import { rdapLookup, rdapStatus, type RdapFn } from './rdap.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
 import { PortfolioCheckJob } from './jobs/portfolio-check.js';

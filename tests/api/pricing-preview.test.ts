@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { addDays } from '../../src/pricing/schedule.js';
+import { addDays } from '../../src/core/dates.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';

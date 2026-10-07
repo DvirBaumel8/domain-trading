@@ -4,8 +4,7 @@ import { z } from 'zod';
 import type { Database } from '../db/types.js';
 import { AppError } from '../http/errors.js';
 import { buildReport } from '../services/report/index.js';
-import { jerusalemDate } from '../dates.js';
-import { idtDayStart } from '../services/offer-stats.js';
+import { idtDay, idtDayStart } from '../core/dates.js';
 import { pricingReview } from '../services/report/pricing-review.js';
 import { realDay } from './reads.js';
 import { reportMarkdown } from '../services/report/markdown.js';
@@ -24,9 +23,9 @@ export function registerReport(app: FastifyInstance, deps: { db: Kysely<Database
   app.get('/report/pricing-review', async (req) => {
     const q = z.object({ from: z.string().optional(), to: z.string().optional() }).strict().safeParse(req.query);
     if (!q.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid query: only from and to (YYYY-MM-DD) are accepted');
-    const today = jerusalemDate(new Date(deps.now()));
+    const today = idtDay(new Date(deps.now()));
     const to = q.data.to === undefined ? today : realDay(q.data.to, 'to');
-    const from = q.data.from === undefined ? jerusalemDate(await idtDayStart(deps.db, to, -89)) : realDay(q.data.from, 'from');
+    const from = q.data.from === undefined ? idtDay(idtDayStart(to, -89)) : realDay(q.data.from, 'from');
     if (from > to) throw new AppError(400, 'VALIDATION_ERROR', 'from must not be after to');
     return pricingReview(deps.db, { from, to });
   });

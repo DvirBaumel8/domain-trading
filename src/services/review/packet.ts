@@ -4,7 +4,7 @@ import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { currentSettings } from '../../pricing/settings.js';
 import { activeSelectionSettings } from '../../screening/settings.js';
-import { toJerusalemIso } from '../../time.js';
+import { idtIsSunday, toJerusalemIso, utcMonth } from '../../core/dates.js';
 import { buildReport } from '../report/index.js';
 import { unifiedDiff } from './diff.js';
 
@@ -18,12 +18,8 @@ export const PACKET_LIST_LIMIT = 200;
 export const newPacketId = (): string => `rvp_${randomBytes(6).toString('hex')}`;
 export const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 
-export function monthOf(nowMs: number): string {
-  return new Date(nowMs).toISOString().slice(0, 7);
-}
-
 export async function monthSpend(db: Kysely<Database>, nowMs: number): Promise<{ month: string; spentUsd: number; okN: number; unknownN: number }> {
-  const month = monthOf(nowMs);
+  const month = utcMonth(nowMs);
   const from = new Date(`${month}-01T00:00:00Z`);
   const to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
   // Only the service's own Gemini calls count toward the cap: feedback a bot posts (any other provider) can never lock the review.
@@ -75,12 +71,6 @@ export interface PacketBuild { kind: 'daily' | 'weekly'; documentVersion: number
 export async function latestDocument(db: Kysely<Database>) {
   return db.selectFrom('company_documents').selectAll().orderBy('version', 'desc').limit(1).executeTakeFirst();
 }
-
-/** Calendar facts in IDT (Asia/Jerusalem): the day key (YYYY-MM-DD), the weekday (0 = Sunday), and the instant the day began. */
-const IDT_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' });
-const IDT_WEEKDAY = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', weekday: 'short' });
-export const idtDay = (ms: number): string => IDT_DAY.format(new Date(ms));
-export const idtIsSunday = (ms: number): boolean => IDT_WEEKDAY.format(new Date(ms)) === 'Sun';
 
 export async function insertPacket(db: Kysely<Database>, a: { id: string; createdBy: string; now: Date; built: PacketBuild; text: string; hash: string }): Promise<void> {
   await db.insertInto('review_packets').values({

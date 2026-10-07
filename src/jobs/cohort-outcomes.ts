@@ -3,10 +3,10 @@
 // re-registration check at 30, 60 and 90 days after an available_after_drop outcome. It never calls a registrar or marketplace and sends nothing.
 // Writes only cohort_decisions / cohort_outcomes (append-only), the cohorts status, rdap rows and one audit row.
 import { sql, type Kysely } from 'kysely';
-import { jerusalemDate } from '../dates.js';
+import { addDays, idtDay } from '../core/dates.js';
 import type { Database } from '../db/types.js';
 import { COHORT_OUTCOMES_MAX_PER_RUN, FINAL_DROP, REREG_DAYS, freezeReadyCohorts } from '../drops/cohorts.js';
-import { MAX_UNKNOWN_CHECKS, addDays, freshLookups, isPendingDelete, todayIdt } from '../drops/drop-lists.js';
+import { MAX_UNKNOWN_CHECKS, freshLookups, isPendingDelete } from '../drops/drop-lists.js';
 import { newAuditId } from '../http/audit.js';
 import type { CachedLookup } from '../screening/rdap-batch.js';
 import type { ScreeningDeps } from '../screening/types.js';
@@ -23,7 +23,7 @@ type Result = Database['cohort_outcomes']['result'];
 interface Task { cohort: string; domain: string; kind: Kind; expected: string; dropDay: string | null; dropAt: Date | null }
 interface Outcome { result: Result; created_at_registry: Date | null; registrar: string | null; reason_code: string | null }
 
-const dayOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? jerusalemDate(new Date(Date.parse(iso))) : null);
+const dayOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? idtDay(new Date(Date.parse(iso))) : null);
 
 /** The drop outcome of a fresh lookup. created_at on or after (expected drop date - 1 day) means someone caught the name at the drop. */
 export function dropOutcomeOf(r: Pick<CachedLookup, 'outcome' | 'facts' | 'reasonCode'>, expected: string): Outcome {
@@ -65,7 +65,7 @@ export class CohortOutcomesJob {
     try {
       const { db, now } = this.deps;
       if (!dryRun) out.frozen = (await freezeReadyCohorts(db, now())).length;
-      const today = todayIdt(now());
+      const today = idtDay(now());
       const names = (await sql<{ cohort: string; domain: string; expected: string }>`
         select n.cohort, n.domain, n.expected_drop_date::text as expected from cohort_names n join cohorts c on c.name = n.cohort
         where n.included and c.status = 'frozen' order by n.expected_drop_date, n.cohort, n.id`.execute(db)).rows;
@@ -80,7 +80,7 @@ export class CohortOutcomesJob {
       for (const n of names) {
         const h = (k: Kind) => hist.get(`${n.cohort}\t${n.domain}\t${k}`) ?? [];
         const retryable = (xs: { result: Result; checked_at: Date }[]) =>
-          xs.length === 0 || (jerusalemDate(xs[xs.length - 1]!.checked_at) < today && xs.filter((x) => x.result === 'unknown').length < MAX_UNKNOWN_CHECKS);
+          xs.length === 0 || (idtDay(xs[xs.length - 1]!.checked_at) < today && xs.filter((x) => x.result === 'unknown').length < MAX_UNKNOWN_CHECKS);
         const drops = h('drop');
         const final = drops.find((d) => (FINAL_DROP as readonly string[]).includes(d.result));
         if (!final) {
@@ -88,7 +88,7 @@ export class CohortOutcomesJob {
           continue;
         }
         if (final.result !== 'available_after_drop') continue;
-        const dropDay = jerusalemDate(final.checked_at);
+        const dropDay = idtDay(final.checked_at);
         for (const k of ['rereg30', 'rereg60', 'rereg90'] as const) {
           const xs = h(k);
           if (xs.some((x) => x.result === 'yes' || x.result === 'no')) continue;

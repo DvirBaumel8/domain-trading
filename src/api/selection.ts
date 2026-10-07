@@ -1,5 +1,7 @@
 // Selection settings (CAP-00), versioned lists, and the pure tier + money evaluation (CAP-24, CAP-18).
 // Settings drafts and list edits are WRITE; activation and census-list freezing need Dvir's approval_ref.
+import { approvalRefObject } from '../core/validation.js';
+import { ymd } from '../core/dates.js';
 import type { FastifyInstance } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
@@ -7,7 +9,7 @@ import { memberHashOf } from '../screening/test-sets.js';
 import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { dollarsToCents, formatUsd } from '../money.js';
+import { dollarsToCents, formatUsd } from '../core/money.js';
 import { currentSettings } from '../pricing/settings.js';
 import { requireNamedApproval } from '../screening/approval.js';
 import { namesToken } from '../services/approval.js';
@@ -31,7 +33,7 @@ import {
 export interface SelectionDeps { db: Kysely<Database>; now: () => number; holdoutCheck?: HoldoutCheck }
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
-const Approval = z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict();
+const Approval = approvalRefObject;
 
 const DraftBody = z.object({
   label: z.string().regex(LABEL_RE, 'label must match ^[a-z0-9][a-z0-9._-]{0,31}$'),
@@ -70,8 +72,7 @@ const EvalBody = z.object({
   settings: z.string().regex(LABEL_RE).optional(),
 }).strict();
 
-const gateRes = z.object({ result: z.enum(['PASS', 'FAIL', 'FLAG', 'UNKNOWN']), source: z.string().min(1).max(200), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict();
-const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const gateRes = z.object({ result: z.enum(['PASS', 'FAIL', 'FLAG', 'UNKNOWN']), source: z.string().min(1).max(200), date: ymd }).strict();
 const UploadRow = z.object({
   domain: z.string().min(1).max(253),
   role: z.enum(['fit', 'dev', 'test']),

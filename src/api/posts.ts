@@ -6,13 +6,12 @@ import { requireWriteBeforeBody } from '../http/auth.js';
 import { AppError } from '../http/errors.js';
 import { keepIdempotencyKey } from '../http/idempotency.js';
 import { SlidingWindowLimiter } from '../http/rate-limit.js';
-import { idtDay } from '../services/review/packet.js';
-import { allowanceNow, createPost, nextMidnightIdt, PostBody, POST_BODY_LIMIT, postingState, removePost, throwIfInvalid, validatePost, type PostingDeps } from '../services/posting/posts.js';
-import { toJerusalemIso } from '../time.js';
-
+import { idtDay, isRealDate, nextIdtMidnight, ymd } from '../core/dates.js';
+import { allowanceNow, createPost, PostBody, POST_BODY_LIMIT, postingState, removePost, throwIfInvalid, validatePost, type PostingDeps } from '../services/posting/posts.js';
+import { toJerusalemIso } from '../core/dates.js';
 const RemoveBody = z.object({ reason: z.string().trim().min(1).max(300), marked_removed_by_hand: z.boolean().optional() }).strict();
 const PauseBody = z.object({ paused: z.boolean(), reason: z.string().trim().min(1).max(300).optional() }).strict();
-const BurstBody = z.object({ day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), cap: z.number().int().min(2).max(5) }).strict();
+const BurstBody = z.object({ day: ymd, cap: z.number().int().min(2).max(5) }).strict();
 const ListQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }).strict();
 const IdParam = z.string().regex(/^pst_[0-9a-f]{12}$/);
 
@@ -99,13 +98,13 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
 
   app.post('/posts/burst', async (req, reply) => {
     const b = BurstBody.parse(req.body ?? {});
-    if (Number.isNaN(Date.parse(`${b.day}T00:00:00Z`)) || new Date(`${b.day}T00:00:00Z`).toISOString().slice(0, 10) !== b.day) throw new AppError(422, 'VALIDATION_ERROR', 'day must be a real calendar date (YYYY-MM-DD)');
+    if (!isRealDate(b.day)) throw new AppError(422, 'VALIDATION_ERROR', 'day must be a real calendar date (YYYY-MM-DD)');
     const today = idtDay(deps.now());
     if (b.day < today) throw new AppError(422, 'VALIDATION_ERROR', 'day must be today or later (IDT)', { today });
     const at = new Date(deps.now());
     await db.insertInto('posting_bursts').values({ day: b.day, cap: b.cap, at, by: req.auth!.name, audit_id: req.auditId }).execute();
     req.auditSummary = `burst ${b.day} cap ${b.cap}`;
-    return reply.code(201).send({ day: b.day, cap: b.cap, set_at: iso(at), set_by: req.auth!.name, ends_at: iso(await nextMidnightIdt(db, new Date(`${b.day}T12:00:00Z`).getTime())) });
+    return reply.code(201).send({ day: b.day, cap: b.cap, set_at: iso(at), set_by: req.auth!.name, ends_at: iso(nextIdtMidnight(new Date(`${b.day}T12:00:00Z`))) });
   });
 
   // The one public read (founder rules unchanged: nothing is written, no audit, no idempotency). Buffer fetches the images from here.

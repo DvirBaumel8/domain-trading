@@ -5,7 +5,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import { z } from 'zod';
 import type { Database, ScreeningPacksTable } from '../db/types.js';
-import { jerusalemDeep } from '../time.js';
+import { jerusalemDeep } from '../core/dates.js';
 import { AppError } from '../http/errors.js';
 import { canonicalJson } from '../http/canonical-json.js';
 import { quoteIsStale } from './checks/quote.js';

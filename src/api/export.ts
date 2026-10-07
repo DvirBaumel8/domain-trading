@@ -1,3 +1,4 @@
+import { approvalRef } from '../core/validation.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { AppError } from '../http/errors.js';
@@ -13,7 +14,7 @@ function noQuery(req: FastifyRequest): void {
 
 const BodySchema = z.object({
   export_id: z.string().min(1),
-  approval_ref: z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict().nullable().optional(),
+  approval_ref: approvalRef,
   uploaded_at: z.unknown().optional(),
   note: z.string().max(500).nullable().optional(),
 }).strict();

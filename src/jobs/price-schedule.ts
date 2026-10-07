@@ -1,7 +1,7 @@
 import type { Kysely, Transaction } from 'kysely';
 import type { Database, DomainRow, ListingMode, PriceScheduleTable } from '../db/types.js';
 import type { Selectable } from 'kysely';
-import { jerusalemDate } from '../dates.js';
+import { idtDay, isYmd } from '../core/dates.js';
 import { newAuditId } from '../http/audit.js';
 import { hybridBinMin } from '../pricing/plan.js';
 import { isV3, settingsByVersion, type PricingSettings } from '../pricing/settings.js';
@@ -18,7 +18,6 @@ export interface PriceJobResult {
   held: string[]; delisted: string[]; cancelled: number[];
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** V5/V6 re-check of a planned row against the settings version it was planned under (R8). Returns a reason or null. */
 export function rowValid(row: Pick<Row, 'bin_cents' | 'floor_cents' | 'walkaway_cents'>, s: PricingSettings, mode: ListingMode | null): string | null {
@@ -53,8 +52,8 @@ export class PriceScheduleJob {
   }) {}
 
   async runOnce(opts: { today?: string; dryRun?: boolean } = {}): Promise<PriceJobResult> {
-    const today = opts.today ?? jerusalemDate(new Date(this.deps.now()));
-    if (!DATE.test(today)) throw new Error(`today must be YYYY-MM-DD, got ${today}`);
+    const today = opts.today ?? idtDay(new Date(this.deps.now()));
+    if (!isYmd(today)) throw new Error(`today must be YYYY-MM-DD, got ${today}`);
     const dryRun = opts.dryRun ?? false;
     const out: PriceJobResult = { today, dryRun, skipped: false, ...emptyPartial() };
     if (this.running) return { ...out, skipped: true };

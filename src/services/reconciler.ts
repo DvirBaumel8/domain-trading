@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely';
-import { addOneYear, jerusalemDate } from '../dates.js';
+import { addOneYear, idtDay } from '../core/dates.js';
 import type { Category, Database } from '../db/types.js';
 import { errorBody } from '../http/errors.js';
 import type { RdapFn } from '../rdap.js';
@@ -76,7 +76,7 @@ export class Reconciler {
         return; // unknown stays unknown
       }
       if (info) {
-        const rec = await adapter.findRegistration(p.domain, { since: jerusalemDate(new Date(p.created_at.getTime() - 86_400_000)) }).catch(() => null);
+        const rec = await adapter.findRegistration(p.domain, { since: idtDay(new Date(p.created_at.getTime() - 86_400_000)) }).catch(() => null);
         if (!rec) return;
         const req = (p.request ?? {}) as { category?: Category; deal_id?: string | null; proposed_listing?: unknown };
         const q = await db.selectFrom('quotes').select('renewal_cents')

@@ -3,11 +3,10 @@
 // with the expected drop date. It never calls a registrar or marketplace and sends nothing. Writes only drop_list_checks (append-only) and one audit row.
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
-import { DROP_WATCH_MAX_PER_RUN, MAX_UNKNOWN_CHECKS, freshLookups, retentionCutoff, todayIdt, watchStatusOf } from '../drops/drop-lists.js';
+import { DROP_WATCH_MAX_PER_RUN, MAX_UNKNOWN_CHECKS, freshLookups, retentionCutoff, watchStatusOf } from '../drops/drop-lists.js';
 import { newAuditId } from '../http/audit.js';
 import type { ScreeningDeps } from '../screening/types.js';
-import { jerusalemDate } from '../dates.js';
-
+import { idtDay } from '../core/dates.js';
 export interface DropWatchSummary {
   dryRun: boolean; skipped: boolean; checked: number; pending_delete: number; redemption: number; registered: number; not_registered: number; unknown: number; left_for_next_run: number;
 }
@@ -24,7 +23,7 @@ export class DropWatchJob {
     this.running = true;
     try {
       const { db, now } = this.deps;
-      const today = todayIdt(now());
+      const today = idtDay(now());
       // Kept rows of lists within retention, with their check count and last check (status, IDT day).
       const rows = (await sql<{ list_name: string; domain: string; n: string; last_status: string | null; last_at: Date | null }>`
         select r.list_name, r.domain, count(c.id)::text as n,
@@ -36,7 +35,7 @@ export class DropWatchJob {
       const due = rows.filter((r) => {
         const n = Number(r.n);
         if (n === 0) return true;
-        return r.last_status === 'unknown' && n < MAX_UNKNOWN_CHECKS && r.last_at !== null && jerusalemDate(r.last_at) < today; // one try per IDT day
+        return r.last_status === 'unknown' && n < MAX_UNKNOWN_CHECKS && r.last_at !== null && idtDay(r.last_at) < today; // one try per IDT day
       });
       const domains = [...new Set(due.map((r) => r.domain))];
       const batch = domains.slice(0, this.deps.maxPerRun ?? DROP_WATCH_MAX_PER_RUN);

@@ -1,3 +1,4 @@
+import { idtDay } from '../core/dates.js';
 // v2.13.0 (CR-012 part E): records per domain. POST /candidates/{domain}/records (WRITE), GET /candidates/{domain}/records (READ).
 import type { FastifyInstance } from 'fastify';
 import { sql, type Kysely } from 'kysely';
@@ -7,7 +8,7 @@ import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
 import { HistoryManual, TmManual, phraseKey, priorPhraseOf } from '../screening/checks/manual.js';
 import { ymd } from './drop-lists.js';
-import { todayIdt } from '../drops/drop-lists.js';
+
 import { DAILY_LIST_DEFAULT_LIMIT, DAILY_LIST_MAX_LIMIT, buildDailyList, readDailyList } from '../screening/daily-list.js';
 import type { ScreeningWorker } from '../screening/engine.js';
 import { IntakeBody, takeIntake } from '../screening/intake.js';
@@ -42,14 +43,14 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
   app.get('/candidates/daily', async (req) => {
     const q = DailyQuery.safeParse(req.query ?? {});
     if (!q.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid query: date (YYYY-MM-DD) and limit (1..25) are the only parameters', { issues: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
-    return readDailyList(db, q.data.date ?? todayIdt(deps.now()), q.data.limit);
+    return readDailyList(db, q.data.date ?? idtDay(deps.now()), q.data.limit);
   });
 
   // v2.16.0 (CR-015 I-4): rebuild today's list now (a record posted after the daily step is judged at once). Same rules as the daily step: the day's first order is kept,
   // changes are marked. It waits for nothing (the daily step already did) and reads only the database. At most 6 per IDT day.
   app.post('/candidates/daily/rebuild', async (req, reply) => {
     z.object({}).strict().parse(req.body ?? {});
-    const today = todayIdt(deps.now());
+    const today = idtDay(deps.now());
     // The count and the build run under one advisory lock (the build commits its row before the lock is released), so two calls cannot both take the last slot.
     const out = await db.transaction().execute(async (trx) => {
       await sql`SELECT pg_advisory_xact_lock(hashtext('daily_rebuild'))`.execute(trx);

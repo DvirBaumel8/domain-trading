@@ -1,15 +1,16 @@
+import { approvalRef } from '../core/validation.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { ISO_WITH_OFFSET, OFFER_BANDS, OffersService } from '../services/offers.js';
+import { OFFER_BANDS, OffersService } from '../services/offers.js';
 import { OFFER_SOURCES } from '../services/offer-rules.js';
-import { idtDayStart, reportOffers } from '../services/offer-stats.js';
-import { jerusalemDate } from '../dates.js';
+import { reportOffers } from '../services/offer-stats.js';
+import { addDays, idtDay, idtDayStart, isIsoWithOffset, isRealDate, isYmd } from '../core/dates.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 
-const Approval = z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict().nullable().optional();
+const Approval = approvalRef;
 
 const RecordSchema = z.object({
   domain: z.string(), amount_usd: z.string(), source: z.string(), received_at: z.string(),
@@ -30,15 +31,14 @@ const bad = (m: string) => new AppError(400, 'VALIDATION_ERROR', m);
 
 /** One validator for a YYYY-MM-DD calendar day: rejects bad shapes, invalid and rolled-over dates (2026-02-30, 2026-13-01). */
 function realDay(v: string, f: string): string {
-  const t = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00Z`) : null;
-  if (!t || Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== v) throw bad(`${f} must be a real date (YYYY-MM-DD, IDT day)`);
+  if (!isRealDate(v)) throw bad(`${f} must be a real date (YYYY-MM-DD, IDT day)`);
   return v;
 }
 
 function bound(v: string | undefined, f: string): { date?: string; at?: Date } | undefined {
   if (v === undefined) return undefined;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return { date: realDay(v, f) };
-  if (ISO_WITH_OFFSET.test(v) && !Number.isNaN(Date.parse(v))) { realDay(v.slice(0, 10), f); return { at: new Date(v) }; }
+  if (isYmd(v)) return { date: realDay(v, f) };
+  if (isIsoWithOffset(v)) { realDay(v.slice(0, 10), f); return { at: new Date(v) }; }
   throw bad(`${f} must be a date (YYYY-MM-DD, IDT day) or an ISO time with an offset`);
 }
 
@@ -72,16 +72,12 @@ export function registerOffers(app: FastifyInstance, service: OffersService, sta
   app.get('/report/offers', async (req) => {
     const p = z.object({ from: z.string().optional(), to: z.string().optional(), group_by: z.enum(['domain', 'category', 'source', 'month']).optional() }).strict().safeParse(req.query);
     if (!p.success) throw bad(`Invalid query: ${p.error.issues.map((i) => i.path.join('.') || i.message).join(', ')}`);
-    const today = jerusalemDate(new Date(stats.now()));
+    const today = idtDay(new Date(stats.now()));
     const to = p.data.to === undefined ? today : realDay(p.data.to, 'to');
-    const from = p.data.from === undefined ? (await idtDayStartDate(stats.db, today, -89)) : realDay(p.data.from, 'from');
+    const from = p.data.from === undefined ? addDays(today, -89) : realDay(p.data.from, 'from');
     if (from > to) throw bad('from must not be after to');
     const group_by = p.data.group_by ?? 'domain';
-    const rows = await reportOffers(stats.db, { from: await idtDayStart(stats.db, from), to: await idtDayStart(stats.db, to, 1), groupBy: group_by });
+    const rows = await reportOffers(stats.db, { from: idtDayStart(from), to: idtDayStart(to, 1), groupBy: group_by });
     return { from, to, group_by, rows };
   });
-}
-
-async function idtDayStartDate(db: Kysely<Database>, date: string, plus: number): Promise<string> {
-  return jerusalemDate(await idtDayStart(db, date, plus));
 }

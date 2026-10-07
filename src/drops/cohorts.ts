@@ -1,3 +1,4 @@
+import { idtDay } from '../core/dates.js';
 // v2.8.0 (CR-007 §22, G-1): cohorts, the forward test. Pure rate math, the one-time freezing of decisions, and the read models for
 // GET /selection/cohorts/{name} and /selection/cohorts/report. Decisions come from the same tier code as a test-set rescore (decideReplayRow).
 import type { Kysely } from 'kysely';
@@ -6,7 +7,7 @@ import type { Database } from '../db/types.js';
 import { decideReplayRow, type Decision, type LabelledFeatures } from '../screening/replay.js';
 import { selectionSettingsByLabel } from '../screening/settings.js';
 import { featuresOfRun, wilson95 } from '../screening/test-sets.js';
-import { todayIdt } from './drop-lists.js';
+
 
 /** Pass line FWD-1: accepted re-registration rate at least this many times the rejected rate, with at least FWD_MIN_N names per class. A change needs a release. */
 export const FWD_MIN_RATIO = 2;
@@ -38,7 +39,7 @@ export async function freezeCohortIfReady(db: Kysely<Database>, name: string, no
     }
     const names = await trx.selectFrom('cohort_names').select(['domain', 'expected_drop_date']).where('cohort', '=', name).where('included', '=', true).orderBy('id').execute();
     const { byDomain } = await featuresOfRun(trx, run);
-    const today = todayIdt(nowMs);
+    const today = idtDay(nowMs);
     const at = new Date(nowMs);
     const rows: { cohort: string; domain: string; settings_label: string; decision: Decision; tier: string | null; decided_at: Date; late: boolean }[] = [];
     for (const label of cohort.settings_labels) {

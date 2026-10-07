@@ -8,6 +8,8 @@
 //                      metadata: {twitter: {thread: [{text, assets}]}}})  ->  union: PostActionSuccess {post {id status externalLink sentAt}} | MutationError {message}
 //   post(input: {id}) {id status externalLink sentAt}        deletePost(input: {id})  ->  MutationError {message} | anything else = success
 //   account {organizations {id}}                             channels(input: {organizationId}) {id name service}
+import { scrubSecrets } from '../../core/redact.js';
+
 export const BUFFER_URL = 'https://api.buffer.com';
 export const BUFFER_TIMEOUT_MS = 30_000;
 
@@ -60,7 +62,7 @@ export class BufferClient {
   constructor(private readonly deps: BufferDeps) {}
 
   private scrub(s: string): string {
-    return clip(s.split(this.deps.apiKey).join('[REDACTED]'));
+    return clip(scrubSecrets(s, [this.deps.apiKey]));
   }
 
   private async call(query: string, variables: Record<string, unknown>): Promise<Record<string, any>> {

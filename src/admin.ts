@@ -1,3 +1,4 @@
+import { isIsoWithOffset } from './core/dates.js';
 import { parseArgs } from 'node:util';
 import { createApiToken, expireApiToken, listApiTokens, revokeApiToken } from './admin/tokens.js';
 import { newPricingSettings, showPricingSettings } from './admin/pricing-settings.js';
@@ -8,7 +9,6 @@ import { ImportInputError, importDomain, type ImportInput } from './admin/import
 import { createAdapters } from './registrars/registry.js';
 import { readFileSync } from 'node:fs';
 import { AppError } from './http/errors.js';
-import { ISO_WITH_OFFSET } from './services/offers.js';
 import { loadConfig } from './config.js';
 import { createDb } from './db/client.js';
 
@@ -72,7 +72,7 @@ async function main(argv: string[]): Promise<number> {
       const id = Number(values.id);
       if (!Number.isInteger(id) || id <= 0) throw new UsageError('--id must be a positive integer');
       const at = values.at;
-      if (!at || !ISO_WITH_OFFSET.test(at) || Number.isNaN(Date.parse(at))) throw new UsageError('--at must be an ISO 8601 time with an offset, e.g. 2026-12-31T23:59:00+02:00');
+      if (!at || !isIsoWithOffset(at)) throw new UsageError('--at must be an ISO 8601 time with an offset, e.g. 2026-12-31T23:59:00+02:00');
       const ok = await expireApiToken(db, id, new Date(at));
       console.log(ok ? `Token ${id} expires ${new Date(at).toISOString()}` : `No active token with id ${id}`);
       return ok ? 0 : 1;

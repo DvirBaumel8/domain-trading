@@ -1,3 +1,4 @@
+import { approvalRef } from '../core/validation.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { normalizeDomain } from '../domain-name.js';
@@ -23,7 +24,7 @@ const ListBodySchema = z.object({
   ns: z.array(z.string()).nullable().optional(),
   display_name: z.string().nullable().optional(),
   dry_run: z.boolean().optional(),
-  approval_ref: z.object({ text: z.unknown().optional(), approved_at: z.unknown().optional() }).strict().nullable().optional(),
+  approval_ref: approvalRef,
 }).strict();
 
 export function registerList(app: FastifyInstance, service: ListService): void {

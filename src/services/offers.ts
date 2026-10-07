@@ -1,10 +1,10 @@
+import { assertNoteNoPii, hasAtSign } from '../core/validation.js';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import type { Database, DomainRow, OffersTable } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { formatUsd, usdStringToCents } from '../money.js';
-import { wholeUsd } from '../pricing/present.js';
-import { toJerusalemIso } from '../time.js';
+import { formatUsd, usdStringToCents, wholeUsd } from '../core/money.js';
+import { isIsoWithOffset, toJerusalemIso } from '../core/dates.js';
 import { checkApproval } from './approval.js';
 import { classify, BUYER_TYPES, OFFER_SOURCES, type BuyerType, type OfferSnapshot, type OfferSource } from './offer-rules.js';
 import { applyHold, withDomainLock } from './plan-store.js';
@@ -22,7 +22,6 @@ export interface OutcomeBody {
   outcome: string; note?: string | null; approval_ref?: { text?: unknown; approved_at?: unknown } | null;
 }
 
-export const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 export const OFFER_BANDS = ['below_min', 'below_walkaway', 'mid_range', 'at_or_above_floor', 'at_or_above_bin', 'geo_below_bin', 'unpriced'] as const;
 const OFFERS_LIMIT = 500;
 const FUTURE_SKEW_MS = 5 * 60_000;
@@ -155,7 +154,7 @@ export class OffersService {
     if (!(OUTCOMES as readonly string[]).includes(body.outcome)) {
       throw new AppError(422, 'VALIDATION_ERROR', `outcome must be one of ${OUTCOMES.join(', ')}`);
     }
-    if (body.note != null && body.note.includes('@')) throw new AppError(422, 'NO_PII', "note must not contain an email address or '@'");
+    assertNoteNoPii(body.note);
   }
 
   async outcome(id: number, body: OutcomeBody) {
@@ -168,7 +167,7 @@ export class OffersService {
     if (!(OUTCOMES as readonly string[]).includes(body.outcome)) {
       throw new AppError(422, 'VALIDATION_ERROR', `outcome must be one of ${OUTCOMES.join(', ')}`);
     }
-    if (body.note != null && body.note.includes('@')) throw new AppError(422, 'NO_PII', "note must not contain an email address or '@'");
+    assertNoteNoPii(body.note);
     if (FINAL.has(o.outcome)) throw new AppError(409, 'OUTCOME_FINAL', `Offer is already ${o.outcome}`);
     if (o.outcome !== 'open' && o.outcome !== 'declined_auto' && !AFTER[o.outcome]?.includes(body.outcome)) {
       throw new AppError(409, 'OUTCOME_TRANSITION_INVALID', `Cannot go from ${o.outcome} to ${body.outcome}`);
@@ -225,7 +224,7 @@ export function validateOfferAll(
   const buyerType = body.buyer_type ?? 'unknown';
   if (!(BUYER_TYPES as readonly string[]).includes(buyerType)) fail('buyer_type', 'BUYER_TYPE_INVALID', `buyer_type must be one of ${BUYER_TYPES.join(', ')}`);
   let receivedAt = new Date(0);
-  if (!ISO_WITH_OFFSET.test(body.received_at) || Number.isNaN(Date.parse(body.received_at))) {
+  if (!isIsoWithOffset(body.received_at)) {
     fail('received_at', 'VALIDATION_ERROR', 'received_at must be ISO 8601 with a timezone offset');
   } else if (!realDate(body.received_at)) {
     fail('received_at', 'VALIDATION_ERROR', 'received_at is not a real calendar date');
@@ -235,7 +234,7 @@ export function validateOfferAll(
   }
   // external_ref may legitimately be an email Message-ID, so it is exempt from the '@' rule
   for (const [f, v] of [['buyer_ref', body.buyer_ref], ['note', body.note]] as const) {
-    if (v != null && v.includes('@')) fail(f, 'NO_PII', `${f} must not contain an email address or '@'`);
+    if (hasAtSign(v)) fail(f, 'NO_PII', `${f} must not contain an email address or '@'`);
   }
   return { errors, value: errors.length ? null : { amountCents, source: body.source as OfferSource, buyerType: buyerType as BuyerType, receivedAt } };
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
-import { jerusalemDate } from '../dates.js';
+import { idtDay } from '../core/dates.js';
 import { AppError } from '../http/errors.js';
 import { newAuditId } from '../http/audit.js';
 import { settingsByVersion } from '../pricing/settings.js';
@@ -51,14 +51,14 @@ export async function dropAtFirstExpiry(
       const done = await trx.selectFrom('price_schedule').select(({ fn }) => fn.max('due_on').as('d')).where('domain_id', '=', cur.id).where('plan_id', '=', cur.plan_id)
         .where('status', 'in', ['applied', 'skipped_at_minimum', 'skipped_no_change', 'skipped_disabled']).executeTakeFirst();
       planId = (await writePlan(trx, {
-        domainId: cur.id, plan, anchor: jerusalemDate(cur.first_listed_at), dropDate: cur.expiry_date,
+        domainId: cur.id, plan, anchor: idtDay(cur.first_listed_at), dropDate: cur.expiry_date,
         settings, planAuditId: auditId, startAfter: done?.d ?? undefined, now,
       })).planId;
     }
     const rows = cur.status === 'listed' && planId
       ? await trx.selectFrom('price_schedule').selectAll().where('domain_id', '=', cur.id).where('plan_id', '=', planId).orderBy('due_on').orderBy('id').execute()
       : null;
-    const warnings = cur.expiry_date < jerusalemDate(now) ? ['DROP_DATE_IN_PAST: the next daily run will mark it dropped'] : [];
+    const warnings = cur.expiry_date < idtDay(now) ? ['DROP_DATE_IN_PAST: the next daily run will mark it dropped'] : [];
     return {
       warnings, domain, from: cur.drop_date, dropDate: cur.expiry_date,
       schedule: rows && rows.map((r) => ({ event: r.event, due_on: r.due_on, bin_cents: r.bin_cents, floor_cents: r.floor_cents, walkaway_cents: r.walkaway_cents, status: r.status })),

@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import type { Category, Database } from '../db/types.js';
 import { AppError, errorBody } from '../http/errors.js';
-import { redact } from '../http/redact.js';
-import { addOneYear, jerusalemDate } from '../dates.js';
-import { formatUsd } from '../money.js';
+import { redact } from '../core/redact.js';
+import { addMonthsClamped, addOneYear, idtDay } from '../core/dates.js';
+import { formatUsd } from '../core/money.js';
 import type { RdapFn } from '../rdap.js';
 import { nsPendingWarning, RegistrarError, type AccountState, type DomainInfo, type RegisterSuccess, type RegistrarAdapter } from '../registrars/types.js';
 import { latestScreeningRun } from './buy-hold.js';
@@ -17,7 +17,7 @@ import { activeDomainCount, spentAndPending, spentCents } from './budget.js';
 import type { CheckResult, CheckService } from './check.js';
 import { checkSettingsVersion, isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from './listing-v2.js';
 import { planView } from './plan-view.js';
-import { addMonthsClamped, buildSchedule } from '../pricing/schedule.js';
+import { buildSchedule } from '../pricing/schedule.js';
 import { domainPlanColumns, historyRow, withDomainLock, writePlan } from './plan-store.js';
 import { currentSettings, type PricingSettings } from '../pricing/settings.js';
 import { screeningHold } from './buy-hold.js';
@@ -100,7 +100,7 @@ export class BuyService {
     if (category === 'geo' && !input.priceGrade) throw new AppError(422, 'GEO_GRADE_REQUIRED', 'Geo names need price_grade strong or weaker');
     if (category !== 'geo' && input.priceGrade) throw new AppError(422, 'GRADE_NOT_GEO', 'price_grade is only for geo names');
     const pricing = await currentSettings(db, now);
-    const today = jerusalemDate(now);
+    const today = idtDay(now);
     let plan: ListingPlan | null = null;
     if (input.proposedListing) {
       const r = validateListing(input.proposedListing, {
@@ -412,7 +412,7 @@ export class BuyService {
 
   /** Domain is in our account but we have no register result: book only from the registrar's invoice. */
   private async finishFound(a: Approved, purchaseId: number, info: DomainInfo, warnings: string[]): Promise<BuyResult> {
-    const since = jerusalemDate(new Date(this.deps.now() - 2 * 86_400_000));
+    const since = idtDay(new Date(this.deps.now() - 2 * 86_400_000));
     const rec = await a.adapter.findRegistration(a.input.domain, { since }).catch(() => null);
     if (!rec) return this.unknown(a, purchaseId);
     return this.complete(a, purchaseId, {
@@ -425,13 +425,13 @@ export class BuyService {
     const info = await a.adapter.findDomain(a.input.domain).catch(() => null);
     let fallbackExpiry: string | null = null;
     if (!info?.expiryDate) {
-      const rec = await a.adapter.findRegistration(a.input.domain, { since: jerusalemDate(new Date(this.deps.now() - 86_400_000)) }).catch(() => null);
+      const rec = await a.adapter.findRegistration(a.input.domain, { since: idtDay(new Date(this.deps.now() - 86_400_000)) }).catch(() => null);
       fallbackExpiry = rec?.expiryDate ?? null;
     }
     const receiptRaw = await a.adapter.getReceipt(r.orderId).catch(() => null); // the reconciler fetches it later if missing
     const warnings = r.chargedCents > a.input.maxPriceCents ? [`CHARGE_ABOVE_MAX: charged ${formatUsd(r.chargedCents)} above max_price`] : [];
     return this.complete(a, purchaseId, {
-      orderId: r.orderId, chargedCents: r.chargedCents, info, fallbackExpiry, receiptRaw, buyDate: jerusalemDate(new Date(this.deps.now())),
+      orderId: r.orderId, chargedCents: r.chargedCents, info, fallbackExpiry, receiptRaw, buyDate: idtDay(new Date(this.deps.now())),
     }, warnings);
   }
 
@@ -590,7 +590,7 @@ export class BuyService {
           approvalText: String(a.input.approval?.text), approvalAt: a.approvedAt, auditId: a.ctx.auditId, planAuditId: a.ctx.auditId, at: now,
         })).execute();
         return (await writePlan(trx, {
-          domainId: row.id, plan, anchor: jerusalemDate(now), dropDate: row.drop_date, settings: a.pricing, planAuditId: a.ctx.auditId, now,
+          domainId: row.id, plan, anchor: idtDay(now), dropDate: row.drop_date, settings: a.pricing, planAuditId: a.ctx.auditId, now,
         })).events;
       }));
       post.listing = planView(plan, events);
@@ -757,7 +757,7 @@ export class BuyService {
     const { spent, pending } = await spentAndPending(this.deps.db);
     const w = a.winner;
     // Same default as GET /pricing/preview with no domain: anchor today (Jerusalem), drop date 24 months later
-    const anchor = jerusalemDate(new Date(this.deps.now()));
+    const anchor = idtDay(new Date(this.deps.now()));
     const events = a.plan ? buildSchedule({ plan: a.plan, anchor, dropDate: addMonthsClamped(anchor, 24), settings: a.pricing }) : [];
     // CAP-19: the latest screening pack of the name (enforced since v2.0.0: `would_be_blocked` names the first blocking gate; `advisories` is kept as before).
     const gf = await this.gateFields(a.input.domain, a.wouldBeBlocked);

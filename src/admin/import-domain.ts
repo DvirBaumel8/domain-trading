@@ -3,8 +3,8 @@ import type { Kysely } from 'kysely';
 import type { Category, Database } from '../db/types.js';
 import { AppError } from '../http/errors.js';
 import { newAuditId } from '../http/audit.js';
-import { addOneYear, jerusalemDate } from '../dates.js';
-import { formatUsd, usdStringToCents } from '../money.js';
+import { addOneYear, idtDay, isRealDate } from '../core/dates.js';
+import { centsToDollarsOrNull, formatUsd, usdStringToCents } from '../core/money.js';
 import { normalizeDomain } from '../domain-name.js';
 import { buildSchedule } from '../pricing/schedule.js';
 import { currentSettings } from '../pricing/settings.js';
@@ -41,7 +41,7 @@ const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 const DEAL = /^D-\d{3,}$/;
 
 function realDate(label: string, v: string | undefined): string {
-  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(`${v}T00:00:00Z`)) || new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) !== v) {
+  if (!v || !isRealDate(v)) {
     throw new ImportInputError(`${label} must be a real date YYYY-MM-DD`);
   }
   return v;
@@ -65,7 +65,7 @@ function parseInput(i: ImportInput, now: Date) {
   if (!['porkbun', 'godaddy', 'other'].includes(registrar)) throw new ImportInputError('--registrar must be porkbun, godaddy or other');
   const manual = i.manual === true;
   if (!manual && registrar === 'other') throw new ImportInputError('--registrar other needs --manual');
-  const today = jerusalemDate(now);
+  const today = idtDay(now);
   const buyDate = realDate('--buy-date', i.buyDate);
   if (buyDate > today) throw new ImportInputError('--buy-date must not be in the future');
   const costCents = usd('--cost', i.cost);
@@ -96,7 +96,7 @@ function parseInput(i: ImportInput, now: Date) {
   if (i.pricingException !== undefined && !i.pricingException.trim()) throw new AppError(422, 'EXCEPTION_REASON_REQUIRED', 'A pricing exception needs a reason');
   let listing: ListingRequest | null = null;
   if (hasListing) {
-    const dollars = (label: string, v: string | undefined) => { const c = usd(label, v); return c === null ? null : c / 100; };
+    const dollars = (label: string, v: string | undefined) => { const c = usd(label, v); return centsToDollarsOrNull(c); };
     listing = {
       mode: i.listingMode, bin: dollars('--bin', i.bin), floor: dollars('--floor', i.floor), walkaway: dollars('--walkaway', i.walkaway),
       min_offer: dollars('--min-offer', i.minOffer), pricing_exception: i.pricingException !== undefined, pricing_exception_reason: i.pricingException ?? null,

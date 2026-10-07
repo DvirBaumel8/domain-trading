@@ -1,7 +1,7 @@
 // v2.13.0 (CR-012 part D, Q-5): the path to lifting the buy hold as a list of steps, derived from data. Information only: nothing acts on it.
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
-import { formatUsd } from '../money.js';
+import { formatUsd } from '../core/money.js';
 import { holdSuites, suiteStatuses } from './replay.js';
 import type { SelectionValuesT } from './settings.js';
 

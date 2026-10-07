@@ -5,13 +5,13 @@ import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import type { Database } from '../db/types.js';
 import { COHORT_OPEN_DAYS, cohortReport, freezeCohortIfReady, latestOutcomes } from '../drops/cohorts.js';
-import { DROP_LIST_NAME_RE, namesDroppingBetween, todayIdt } from '../drops/drop-lists.js';
+import { DROP_LIST_NAME_RE, namesDroppingBetween } from '../drops/drop-lists.js';
 import { AppError } from '../http/errors.js';
 import { HEARTBEAT_STALE_MS, createRun, type InputName, type ScreeningWorker } from '../screening/engine.js';
 import { LABEL_RE, selectionSettingsByLabel } from '../screening/settings.js';
 import { TEST_SET_CHECKS, TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, splitKey } from '../screening/test-sets.js';
 import { normalizeDomain } from '../domain-name.js';
-import { toJerusalemIso } from '../time.js';
+import { idtDay, toJerusalemIso } from '../core/dates.js';
 import { parseWindow, ymd } from './drop-lists.js';
 
 export interface CohortsDeps { db: Kysely<Database>; now: () => number; worker: ScreeningWorker }
@@ -51,7 +51,7 @@ export function registerCohorts(app: FastifyInstance, deps: CohortsDeps): void {
       if (!(await selectionSettingsByLabel(db, label))) throw new AppError(404, 'SETTINGS_NOT_FOUND', `No selection settings version "${label}"`);
     }
     const nowMs = deps.now();
-    const today = todayIdt(nowMs);
+    const today = idtDay(nowMs);
     let cands: { domain: string; expected: string; source: string }[];
     let source: object;
     if (b.names) {

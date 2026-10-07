@@ -4,7 +4,7 @@
 // Web Risk usage counter and one audit row. `/report` raises REGISTRY_MISMATCH, LANDER_DOWN and OWNED_NAME_BLOCKLISTED from those rows.
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
-import { jerusalemDate } from '../dates.js';
+import { idtDay } from '../core/dates.js';
 import { newAuditId } from '../http/audit.js';
 import { BlockedError, safeFetch } from '../net/safe-fetch.js';
 import { USER_AGENT, type RdapLookupFn } from '../rdap.js';
@@ -151,9 +151,9 @@ export class PortfolioCheckJob {
       .orderBy('id', 'desc').limit(1).executeTakeFirst();
     if (!last) return true;
     // weekly by IDT calendar day: due when the last check's day is at least 7 days before today's
-    const today = jerusalemDate(new Date(this.deps.now()));
-    const dueDay = jerusalemDate(new Date(Date.parse(`${today}T12:00:00Z`) - BLOCKLIST_EVERY_DAYS * 86_400_000));
-    return jerusalemDate(last.at) <= dueDay;
+    const today = idtDay(new Date(this.deps.now()));
+    const dueDay = idtDay(new Date(Date.parse(`${today}T12:00:00Z`) - BLOCKLIST_EVERY_DAYS * 86_400_000));
+    return idtDay(last.at) <= dueDay;
   }
 
   private async blocklist(domain: string, shared: Map<string, unknown>, dryRun: boolean): Promise<{ status: Status; details: Record<string, unknown> }> {

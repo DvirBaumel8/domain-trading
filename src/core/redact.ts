@@ -32,3 +32,12 @@ export function redactFreeText(value: unknown, depth = 0): unknown {
   }
   return value;
 }
+
+export const REDACTED = '[REDACTED]';
+
+/** Replaces every occurrence of each non-empty secret value in `text` (an API key, a token) with [REDACTED]. */
+export function scrubSecrets(text: string, secrets: Iterable<string | undefined | null>): string {
+  let m = text;
+  for (const v of secrets) if (v) m = m.split(v).join(REDACTED);
+  return m;
+}

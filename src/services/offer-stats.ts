@@ -1,8 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
-import { jerusalemDate } from '../dates.js';
-import { formatUsd } from '../money.js';
-import { toJerusalemIso } from '../time.js';
+import { idtDay, idtDayStart, toJerusalemIso } from '../core/dates.js';
+import { formatUsd } from '../core/money.js';
 import type { Band } from './offer-rules.js';
 
 export interface Money { cents: number; display: string }
@@ -25,12 +24,6 @@ const STRATEGY: Record<string, string> = { geo: 'S2', trend: 'S3', b2b: 'S3/S4',
 
 const money = (c: number): Money => ({ cents: c, display: formatUsd(c) });
 const round = (n: number, dp: number) => Math.round((n + Number.EPSILON) * 10 ** dp) / 10 ** dp;
-
-/** The instant an IDT calendar day (YYYY-MM-DD) starts. */
-export async function idtDayStart(db: Kysely<Database>, date: string, plusDays = 0): Promise<Date> {
-  const r = await sql<{ t: Date }>`select ((${date}::date + ${plusDays}::int)::timestamp at time zone 'Asia/Jerusalem') as t`.execute(db);
-  return r.rows[0]!.t;
-}
 
 interface Row {
   domain_id: number; domain: string; category: string | null; amount_cents: number; received_at: Date; bin: number | null;
@@ -73,8 +66,8 @@ function bandShares(rs: Row[]): Record<Band, number> {
 }
 
 export async function perDomainOffers(db: Kysely<Database>, now: Date): Promise<Map<number, PerDomainOffers>> {
-  const today = jerusalemDate(now);
-  const [s30, s90] = [await idtDayStart(db, today, -29), await idtDayStart(db, today, -89)];
+  const today = idtDay(now);
+  const [s30, s90] = [idtDayStart(today, -29), idtDayStart(today, -89)];
   const out = new Map<number, PerDomainOffers>();
   const empty = (): PerDomainOffers => ({ count_30d: 0, highest_30d: null, count_90d: 0, highest_90d: null, count_all: 0, highest_all: null,
     highest_all_pct_of_bin: null, last_offer_at: null, open_for_dvir: 0 });
@@ -101,7 +94,7 @@ export async function perDomainOffers(db: Kysely<Database>, now: Date): Promise<
  * per-listed-name rate is consistent); median/max/band shares are all-time over every offer of the category.
  */
 export async function offersByStrategy(db: Kysely<Database>, now: Date): Promise<StrategyRow[]> {
-  const s90 = await idtDayStart(db, jerusalemDate(now), -89);
+  const s90 = idtDayStart(idtDay(now), -89);
   const offers = await loadOffers(db);
   const listed = await db.selectFrom('domains').select(['id', 'category']).where('status', '=', 'listed').execute();
   const cats = new Set<string>([...listed.map((d) => d.category ?? 'other'), ...offers.map((o) => o.category ?? 'other')]);

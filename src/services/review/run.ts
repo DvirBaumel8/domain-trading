@@ -1,5 +1,7 @@
 // The service's one AI call: the outside review (founder rule 9, changed 7 Oct 2026). Builds and stores a packet with the existing code,
 // asks Gemini through src/services/review/gemini.ts, and stores the answer as feedback (provider `gemini`).
+import { scrubSecrets } from '../../core/redact.js';
+import { idtDay } from '../../core/dates.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
@@ -7,7 +9,7 @@ import { checkText, type BlockCategory } from '../blocklist.js';
 import { storeFeedback } from './feedback.js';
 import { callGemini, geminiCostUsd } from './gemini.js';
 import { currentReviewSettings, type ReviewSettings } from './settings.js';
-import { buildPacket, idtDay, insertPacket, latestDocument, monthSpend, newPacketId, REVIEW_MONTHLY_CAP_USD, sha256 } from './packet.js';
+import { buildPacket, insertPacket, latestDocument, monthSpend, newPacketId, REVIEW_MONTHLY_CAP_USD, sha256 } from './packet.js';
 
 export interface ReviewRunDeps {
   db: Kysely<Database>;
@@ -59,7 +61,7 @@ async function callAndStore(
       await db.insertInto('review_retries').values({ packet_id: a.packetId, day: idtDay(a.now), created_at: now }).execute();
       return { packet_id: a.packetId, kind: a.kind, status: 'retry_pending', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason: 'retry_pending', detail: `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: retry at the 08:30 UTC tick` };
     }
-    const raw = `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: ${g.reason}`.replaceAll(apiKey, '[REDACTED]').slice(0, 500);
+    const raw = scrubSecrets(`HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: ${g.reason}`, [apiKey]).slice(0, 500);
     const blockedReason = await checkText(db, raw, { secretValues: deps.secretValues });
     const reason = blockedReason.ok ? raw : `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: reason withheld by the block list`;
     await storeFeedback(db, { packetId: a.packetId, createdBy: a.createdBy, now, input: { status: 'unknown', provider: 'gemini', model: settings.model, reason } });

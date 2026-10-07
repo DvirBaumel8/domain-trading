@@ -1,3 +1,4 @@
+import { addDays, addMonthsClamped } from '../core/dates.js';
 import { ceil95, nice95, pct, round5 } from './round.js';
 import type { Category, ListingMode, PriceScheduleEvent, PriceScheduleStatus } from '../db/types.js';
 import type { Cents } from './int.js';
@@ -11,32 +12,8 @@ export interface ScheduleEvent {
   binCents: Cents | null; floorCents: Cents | null; walkawayCents: Cents | null; status: ScheduleStatus | PriceScheduleStatus;
 }
 
-const DATE = new RegExp('^(\\d{4})-(\\d{2})-(\\d{2})$');
 const BPS = 10000;
 const DROP_NAMES: readonly ScheduleEventName[] = ['drop1_m6', 'drop2_m18'];
-
-function parse(date: string): [number, number, number] {
-  const m = DATE.exec(date);
-  if (!m) throw new Error(`Not a date: ${date}`);
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const back = new Date(Date.UTC(y, mo - 1, d));
-  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) throw new Error(`Not a date: ${date}`);
-  return [y, mo, d];
-}
-const fmt = (d: Date) => d.toISOString().slice(0, 10);
-
-/** Same day N months later; clamps to the last day of a shorter month. */
-export function addMonthsClamped(date: string, months: number): string {
-  const [y, mo, d] = parse(date);
-  const target = new Date(Date.UTC(y, mo - 1 + months, 1));
-  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
-  return fmt(new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), Math.min(d, lastDay))));
-}
-
-export function addDays(date: string, days: number): string {
-  const [y, mo, d] = parse(date);
-  return fmt(new Date(Date.UTC(y, mo - 1, d + days)));
-}
 
 export interface SchedulePlan {
   category: Category; mode: ListingMode; grade: 'strong' | 'weaker' | null;

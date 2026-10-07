@@ -2,12 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import type { Config } from '../config.js';
-import { jerusalemDate } from '../dates.js';
+import { idtDay, isIsoWithOffset, isRealDate } from '../core/dates.js';
 import type { Database } from '../db/types.js';
 import { AppError } from '../http/errors.js';
 import type { JobRunner } from '../jobs/runner.js';
 import { jobRunsView, triggerFromKey } from '../services/job-runs.js';
-import { ISO_WITH_OFFSET } from '../services/offers.js';
 
 const Body = z.object({ job: z.enum(['tick', 'daily']) }).strict();
 const PreviewBody = z.object({ today: z.string().optional() }).strict();
@@ -29,12 +28,11 @@ interface JobsDeps {
 
 /** A real YYYY-MM-DD, not before today (IDT) and at most 3 years ahead. */
 function previewDay(v: string, today: string): string {
-  const t = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00Z`) : null;
-  if (!t || Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== v) throw new AppError(422, 'VALIDATION_ERROR', 'today must be a real date (YYYY-MM-DD)');
+  if (!isRealDate(v)) throw new AppError(422, 'VALIDATION_ERROR', 'today must be a real date (YYYY-MM-DD)');
   const max = new Date(`${today}T00:00:00Z`);
   max.setUTCFullYear(max.getUTCFullYear() + 3);
   if (v < today) throw new AppError(422, 'VALIDATION_ERROR', 'today must not be in the past');
-  if (t.getTime() > max.getTime()) throw new AppError(422, 'VALIDATION_ERROR', 'today must be at most 3 years ahead');
+  if (new Date(`${v}T00:00:00Z`).getTime() > max.getTime()) throw new AppError(422, 'VALIDATION_ERROR', 'today must be at most 3 years ahead');
   return v;
 }
 
@@ -63,13 +61,13 @@ export function registerJobs(app: FastifyInstance, runner: JobRunner, deps: Jobs
     const q = p.data;
     const limit = q.limit === undefined ? 50 : Number(q.limit);
     if (limit < 1 || limit > 500) throw bad('limit must be 1 to 500');
-    if (q.since !== undefined && (!ISO_WITH_OFFSET.test(q.since) || Number.isNaN(Date.parse(q.since)))) throw bad('since must be an ISO 8601 time with an offset');
+    if (q.since !== undefined && (!isIsoWithOffset(q.since))) throw bad('since must be an ISO 8601 time with an offset');
     return jobRunsView(deps.db, deps.config, deps.now(), { job: q.job, since: q.since ? new Date(q.since) : undefined, limit });
   });
 
   app.post('/jobs/preview', async (req) => {
     const b = PreviewBody.parse(req.body ?? {});
-    const real = jerusalemDate(new Date(deps.now()));
+    const real = idtDay(new Date(deps.now()));
     const today = b.today === undefined ? real : previewDay(b.today, real);
     const price = await deps.priceJob.runOnce({ today, dryRun: true });
     const drop = await deps.dropJob.runOnce({ today, dryRun: true });

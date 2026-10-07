@@ -1,13 +1,12 @@
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
 import type { Database, LedgerEntriesTable } from '../db/types.js';
-import { jerusalemDate } from '../dates.js';
+import { idtDay } from '../core/dates.js';
 import { AppError } from '../http/errors.js';
-import { formatUsd } from '../money.js';
+import { formatUsd, pair } from '../core/money.js';
 import { checkApproval } from './approval.js';
 import { manualDelist } from './export-state.js';
 import { withDomainLock } from './plan-store.js';
-import { pair } from './report/money.js';
 
 export const VENUES = ['afternic', 'sedo', 'afternic_checkout', 'escrow', 'other'] as const;
 export const EVIDENCE_SOURCES = ['afternic_email', 'sedo_email', 'afternic_dashboard', 'sedo_dashboard', 'escrow', 'other'] as const;
@@ -81,7 +80,7 @@ export class SoldService {
       if (!SELLABLE.includes(row.status)) {
         throw new AppError(409, 'NOT_SELLABLE_STATE', `${domain} is ${row.status}; only owned, listed or delisted domains can be sold`);
       }
-      if (row.buy_date !== null && jerusalemDate(i.soldAt) < row.buy_date) {
+      if (row.buy_date !== null && idtDay(i.soldAt) < row.buy_date) {
         throw new AppError(422, 'VALIDATION_ERROR', 'sold_at is before the domain was bought', { buy_date: row.buy_date });
       }
       if (i.offerId !== null) {
@@ -95,7 +94,7 @@ export class SoldService {
         .where('domain_id', '=', row.id).where('type', 'in', ['registration', 'renewal', 'fee']).executeTakeFirstOrThrow();
       const acquisitionCosts = Number(acq.c);
 
-      const occurredOn = jerusalemDate(i.soldAt);
+      const occurredOn = idtDay(i.soldAt);
       const base = { occurred_on: occurredOn, domain_id: row.id, deal_id: row.deal_id, counterparty: i.venue, receipt_ref: i.transactionRef, audit_id: ctx.auditId };
       const rows: Omit<LedgerEntriesTable, 'id' | 'currency' | 'created_at'>[] = [{ ...base, type: 'sale', amount_cents: i.saleCents, note: null }];
       if (i.commissionCents > 0) rows.push({ ...base, type: 'commission', amount_cents: -i.commissionCents, note: null });

@@ -1,14 +1,7 @@
-import { formatUsd } from '../money.js';
+import { wholeUsd } from '../core/money.js';
 import type { Cents } from './int.js';
 import type { Plan } from './plan.js';
 import type { ScheduleEvent, ScheduleEventName } from './schedule.js';
-
-const CENTS_PER_DOLLAR = 100;
-
-export function wholeUsd(c: Cents): string {
-  const s = formatUsd(c);
-  return c % CENTS_PER_DOLLAR === 0 && s.endsWith('.00') ? s.slice(0, -3) : s;
-}
 
 const LABELS: Record<ScheduleEventName, string> = {
   drop1_m6: 'M6', drop2_m18: 'M18', geo_drop_m12: 'M12', final_push: 'final push', delist: 'delist',

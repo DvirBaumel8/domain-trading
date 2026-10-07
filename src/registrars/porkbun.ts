@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { usdStringToCents } from '../money.js';
+import { usdStringToCents } from '../core/money.js';
 import {
   RegistrarError, type AccountState, type Capabilities, type DomainInfo, type Quote, type RegisterDryRun,
   type RegisterInput, type RegisterSuccess, type RegistrarAdapter, type RegistrationRecord,

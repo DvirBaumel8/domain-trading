@@ -1,6 +1,6 @@
 import type { Kysely, Transaction } from 'kysely';
 import type { Database } from '../db/types.js';
-import { jerusalemDate } from '../dates.js';
+import { idtDay, isYmd } from '../core/dates.js';
 import { newAuditId } from '../http/audit.js';
 import { withDomainLock } from '../services/plan-store.js';
 
@@ -11,7 +11,6 @@ export interface DropJobResult {
   dropped: string[]; failed: { domain: string; reason: string }[];
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Marks domains whose drop_date has passed as `dropped` and cancels their planned schedule rows. Touches only DB rows. */
 export class DropJob {
@@ -23,8 +22,8 @@ export class DropJob {
   }) {}
 
   async runOnce(opts: { today?: string; dryRun?: boolean } = {}): Promise<DropJobResult> {
-    const today = opts.today ?? jerusalemDate(new Date(this.deps.now()));
-    if (!DATE.test(today)) throw new Error(`today must be YYYY-MM-DD, got ${today}`);
+    const today = opts.today ?? idtDay(new Date(this.deps.now()));
+    if (!isYmd(today)) throw new Error(`today must be YYYY-MM-DD, got ${today}`);
     const dryRun = opts.dryRun ?? false;
     const out: DropJobResult = { today, dryRun, skipped: false, dropped: [], failed: [] };
     if (this.running) return { ...out, skipped: true };

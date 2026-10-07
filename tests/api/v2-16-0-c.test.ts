@@ -282,7 +282,7 @@ describe('review concurrency and cost (v2.16.0)', () => {
     expect((await t.post('/reviews/packet')).statusCode).toBe(201); // B: no feedback
     t.clock.t += 3_600_000;
     const preview = await t.post('/reviews/packet', { preview: true });
-    const { toJerusalemIso } = await import('../../src/time.js');
+    const { toJerusalemIso } = await import('../../src/core/dates.js');
     expect(preview.json().content.dom_changes.since).toBe(toJerusalemIso(aAt));
   });
 });

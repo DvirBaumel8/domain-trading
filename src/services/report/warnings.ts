@@ -1,13 +1,13 @@
+import { pair } from '../../core/money.js';
 import { sql, type Kysely } from 'kysely';
-import { jerusalemDate } from '../../dates.js';
+import { idtDay, toJerusalemIso } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
 import { computePlan } from '../../pricing/plan.js';
 import { settingsByVersion } from '../../pricing/settings.js';
-import { toJerusalemIso } from '../../time.js';
 import { manualDelist, pendingDomains, VENUES } from '../export-state.js';
 import { JOBS_OVERDUE_HOURS, jobsOverdue } from '../job-runs.js';
 import { DROP_FEED_STALE_DAYS, daysBetween } from '../../drops/drop-lists.js';
-import { pair, priceValues } from './money.js';
+import { priceValues } from './money.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
 export interface ReportWarning { code: string; level: WarningLevel; domain?: string; message: string; details: Record<string, unknown> }
@@ -24,7 +24,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   const out: ReportWarning[] = [];
   const add = (code: string, level: WarningLevel, message: string, domain?: string, details: Record<string, unknown> = {}) =>
     out.push({ code, level, ...(domain ? { domain } : {}), message, details });
-  const today = jerusalemDate(now);
+  const today = idtDay(now);
 
   // CR-005 N-2: the schedule itself. A manual daily run counts; a tick or a skipped overlap does not.
   const overdue = await jobsOverdue(db, now.getTime());
@@ -63,8 +63,8 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
       let streak = 0;
       while (streak < recent.length && recent[streak]!.status === 'fail') streak++;
       const since = recent[streak - 1]!.at;
-      const days = new Set(recent.slice(0, streak).map((r) => jerusalemDate(r.at)));
-      const twoFails = streak >= 2 && jerusalemDate(recent[0]!.at) !== jerusalemDate(recent[1]!.at);
+      const days = new Set(recent.slice(0, streak).map((r) => idtDay(r.at)));
+      const twoFails = streak >= 2 && idtDay(recent[0]!.at) !== idtDay(recent[1]!.at);
       add('LANDER_DOWN', twoFails && days.size >= LANDER_DOWN_ERROR_DAYS ? 'error' : 'warn', `${d}: the for-sale lander is not answering as expected.`, d, {
         checked_at: checkedAt, since: toJerusalemIso(since), status_code: c.details.status_code ?? null, reason: c.details.reason ?? null,
       });

@@ -1,6 +1,6 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
-import { toJerusalemIso } from '../../time.js';
+import { toJerusalemIso } from '../../core/dates.js';
 import { offersByStrategy } from '../offer-stats.js';
 import { applied7d, perDomain } from './domains.js';
 import { TrancheService } from '../tranches.js';

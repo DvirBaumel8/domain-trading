@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
-import { toJerusalemIso } from '../time.js';
+import { addDays, idtMidnightIso, toJerusalemIso } from '../core/dates.js';
 import { latestByCheck } from './derive.js';
 import { loadRows } from './engine.js';
 import { decideReplayRow, cell, type LabelledFeatures, type LabelledRow } from './replay.js';
@@ -23,19 +23,8 @@ export const TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS = 7;
 export const TEST_SET_CHECKS: CheckId[] = ['form', 'census', 'ext_dates'];
 export const TEST_SET_LANE: Lane = 'S7';
 
-/** `YYYY-MM-DD` at 00:00 Asia/Jerusalem as ISO 8601 with its offset (the offset on that day: DST changes happen after midnight). */
-export function midnightJerusalem(day: string): string {
-  const noon = toJerusalemIso(new Date(`${day}T12:00:00Z`)).slice(-6);
-  for (const off of [noon, '+03:00', '+02:00']) {
-    const cand = `${day}T00:00:00${off}`;
-    if (toJerusalemIso(new Date(cand)) === cand) return cand;
-  }
-  return `${day}T00:00:00${noon}`;
-}
-
-export function dayBefore(day: string): string {
-  return new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-}
+export const midnightJerusalem = idtMidnightIso;
+export const dayBefore = (day: string): string => addDays(day, -1);
 
 export const splitKey = (seed: string, domain: string): string => createHash('sha256').update(`${seed}:${domain}`).digest('hex');
 

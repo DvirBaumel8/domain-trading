@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.16.1 (2026-10-08): refactor R1a, shared core
+PATCH, **no contract change**. Release note: `docs/releases/v2.16.1.md`. One home (`src/core/`) for dates, money, validation and redaction; the duplicate copies are removed, and a test stops new copies. Responses, codes and messages are unchanged.
+
 ## 2.16.0 (2026-10-08): tech-debt pass, CR-014, CR-015
 MINOR. Release note: `docs/releases/v2.16.0.md`. Mostly fixes. Additive fields and one new route. A few checks are now stricter, each listed here.
 - **New:** `POST /candidates/daily/rebuild` (6 a day); `token_name` on `GET /audit` rows; `checked_at` on `POST /candidates/{domain}/records`; `unknowns` lists undecided names, with `unread` and `unknown_inputs`; cohort status `abandoned`; post statuses `pending` and `unknown`; `REVIEW_IN_PROGRESS`; admin `resolve-purchase`.

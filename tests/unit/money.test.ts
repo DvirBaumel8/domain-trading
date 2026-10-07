@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatUsd, usdStringToCents } from '../../src/money.js';
+import { formatUsd, usdStringToCents } from '../../src/core/money.js';
 
 describe('usdStringToCents', () => {
   it.each([
@@ -27,7 +27,7 @@ describe('formatUsd', () => {
   });
 });
 
-import { dollarsToCents } from '../../src/money.js';
+import { dollarsToCents } from '../../src/core/money.js';
 
 describe('dollarsToCents', () => {
   it.each([[11.5, 1150], [11.08, 1108], [10, 1000], [1995, 199500], [0.01, 1]])('%d → %i', (d, c) => {

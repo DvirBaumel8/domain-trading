@@ -6,9 +6,9 @@ import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
-import { toJerusalemIso } from '../../time.js';
+import { toJerusalemIso } from '../../core/dates.js';
 import { checkText, type BlockCategory } from '../blocklist.js';
-import { idtDay } from '../review/packet.js';
+import { idtDay, nextIdtMidnight } from '../../core/dates.js';
 import { BufferClient, BufferError, type BufferPart } from './buffer.js';
 import { inspectImage, MAX_ALT_CHARS, MAX_IMAGES_PER_PART, type ImageReason, type InspectedImage } from './images.js';
 import { X_LIMIT, xWeightedLength } from './x-length.js';
@@ -119,11 +119,6 @@ export async function postingState(db: Kysely<Database>): Promise<PostingState> 
   return r ? { paused: r.paused, reason: r.reason, since: r.at, by: r.by } : { paused: false, reason: null, since: null, by: null };
 }
 
-export async function nextMidnightIdt(db: Kysely<Database>, nowMs: number): Promise<Date> {
-  const r = await sql<{ t: Date }>`select ((${idtDay(nowMs)}::date + 1)::timestamp at time zone 'Asia/Jerusalem') as t`.execute(db);
-  return r.rows[0]!.t;
-}
-
 export const newPostId = () => `pst_${randomBytes(6).toString('hex')}`;
 
 const failText = (e: BufferError) => `${e.kind}${e.status ? ` (HTTP ${e.status})` : ''}: ${e.message}`.slice(0, 500);
@@ -172,7 +167,7 @@ export async function createPost(
     if (st.paused) throw new AppError(409, 'POSTING_PAUSED', 'Posting is paused', { reason: st.reason, since: st.since ? toJerusalemIso(st.since) : null });
     const cur = await allowanceNow(trx, nowMs);
     if (cur.remaining <= 0) {
-      throw new AppError(409, 'POST_DAILY_CAP', 'The daily post allowance is used up', { ...cur, next_allowed_at: toJerusalemIso(await nextMidnightIdt(trx, nowMs)) });
+      throw new AppError(409, 'POST_DAILY_CAP', 'The daily post allowance is used up', { ...cur, next_allowed_at: toJerusalemIso(nextIdtMidnight(nowMs)) });
     }
     await trx.insertInto('posts').values({ ...base, status: 'pending', buffer_post_id: null }).execute();
     if (stored.length > 0) {

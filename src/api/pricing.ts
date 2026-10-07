@@ -1,21 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
-import { jerusalemDate } from '../dates.js';
+import { addMonthsClamped, idtDay, isRealDate, ymd } from '../core/dates.js';
 import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { dollarsToCents, formatUsd } from '../money.js';
+import { dollarsToCents, formatUsd, wholeUsd } from '../core/money.js';
 import { computePlan, type PlanCategory } from '../pricing/plan.js';
-import { sellPlanLine, wholeUsd } from '../pricing/present.js';
+import { sellPlanLine } from '../pricing/present.js';
 import { pct } from '../pricing/round.js';
-import { addMonthsClamped, buildSchedule } from '../pricing/schedule.js';
+import { buildSchedule } from '../pricing/schedule.js';
 import { currentSettings } from '../pricing/settings.js';
 import { afternicRow } from '../services/export.js';
 import { isCategory } from '../services/listing-v2.js';
 import { scheduleView } from '../services/plan-view.js';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const NET_BPS = 8500; // display only: net after Afternic's 15% Basic commission
 
@@ -25,8 +24,8 @@ const Query = z.object({
   grade: z.enum(['strong', 'weaker']).optional(),
   floor: z.string().optional(),
   walkaway: z.string().optional(),
-  listed_on: z.string().regex(DATE).optional(),
-  drop_date: z.string().regex(DATE).optional(),
+  listed_on: ymd.optional(),
+  drop_date: ymd.optional(),
   domain: z.string().optional(),
 }).strict();
 
@@ -41,8 +40,7 @@ const cents = (v: string | undefined, f: string) => {
 };
 
 function validDate(d: string, f: string): string {
-  const t = new Date(`${d}T00:00:00Z`);
-  if (Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== d) throw new AppError(400, 'VALIDATION_ERROR', `${f} is not a real date`);
+  if (!isRealDate(d)) throw new AppError(400, 'VALIDATION_ERROR', `${f} is not a real date`);
   return d;
 }
 
@@ -63,7 +61,7 @@ export function registerPricing(app: FastifyInstance, deps: { db: Kysely<Databas
     if (!r.ok) throw new AppError(422, r.code, r.message, r.details ?? {});
     const plan = r.plan;
 
-    const today = jerusalemDate(now);
+    const today = idtDay(now);
     const listedOn = q.listed_on ? validDate(q.listed_on, 'listed_on') : today;
     let domainKey = 'example.com';
     let name = 'example.com';

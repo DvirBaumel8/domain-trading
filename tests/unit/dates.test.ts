@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addOneYear, jerusalemDate } from '../../src/dates.js';
+import { addOneYear, idtDay as jerusalemDate } from '../../src/core/dates.js';
 
 describe('dates', () => {
   it('jerusalemDate uses the local calendar day', () => {

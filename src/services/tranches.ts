@@ -5,7 +5,7 @@ import type { Kysely, Selectable } from 'kysely';
 import type { Database, TrancheMembersTable, TranchesTable } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { formatUsd } from '../money.js';
+import { formatUsd } from '../core/money.js';
 import { latestByCheck } from '../screening/derive.js';
 import { assemble, effectiveHold, fullPlanRunOrThrow, toResultRow } from '../screening/engine.js';
 import { activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';

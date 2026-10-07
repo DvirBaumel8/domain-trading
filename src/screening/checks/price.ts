@@ -1,6 +1,6 @@
 // G9 price (CAP-18): EV, renew ratio at the BIN and at the floor, LANDER-1, score. Every number comes from `evaluateMoney` (never
 // duplicated here). Inputs: the BIN (item, else the default for the lane), the quote, the tier and the NameBio counts of this run.
-import { formatUsd, dollarsToCents } from '../../money.js';
+import { dollarsToCents, formatUsd } from '../../core/money.js';
 import { currentSettings } from '../../pricing/settings.js';
 import { evaluateMoney, syllableCount } from '../money.js';
 import { CHECK_IDS } from '../settings.js';

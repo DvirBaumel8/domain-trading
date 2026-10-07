@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely';
-import { addOneYear } from '../dates.js';
+import { addOneYear } from '../core/dates.js';
 import type { Category, Database, PurchaseState, RegistrarApi } from '../db/types.js';
 import type { Capabilities } from '../registrars/types.js';
 

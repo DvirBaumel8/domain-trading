@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { Category, ListingMode } from '../db/types.js';
-import { dollarsToCents, formatUsd } from '../money.js';
+import { dollarsToCents, wholeUsd } from '../core/money.js';
 import { computePlan, FAST_TRANSFER_MAX_CENTS, hybridBinMin } from '../pricing/plan.js';
-import { addMonthsClamped } from '../pricing/schedule.js';
+import { addMonthsClamped, isRealDate, ymd } from '../core/dates.js';
 import { isV3, type PricingSettings } from '../pricing/settings.js';
 
 export const CATEGORIES: readonly Category[] = ['geo', 'trend', 'b2b', 'collision', 'regulation', 'buzzword', 'other'];
@@ -12,7 +12,6 @@ const MIN_OFFER_FLOOR = 2000; // $20: Afternic's minimum (A3), not a pricing set
 const LTO_BIN_MIN = 49_500; // $495: Afternic LTO rule
 const LTO_BIN_MAX = 500_000_000; // $5,000,000: Afternic LTO rule
 const RATIONALE_MAX = 500;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface ListingRequest {
   mode?: unknown; bin?: number | null; floor?: number | null; walkaway?: number | null; min_offer?: number | null;
@@ -39,11 +38,6 @@ export type ListingResult = { ok: true; plan: ListingPlan } | Fail;
 
 const fail = (code: string, message: string, details?: Record<string, unknown>, status: 422 | 409 = 422): Fail =>
   ({ ok: false, status, code, message, ...(details ? { details } : {}) });
-
-function wholeDollars(c: number): string {
-  const s = formatUsd(c);
-  return s.endsWith('.00') ? s.slice(0, -3) : s;
-}
 
 export function validateListing(req: ListingRequest, ctx: ListingContext): ListingResult {
   // V1
@@ -128,13 +122,13 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
     if (!r.ok) {
       const d = r.details ?? {};
       const display = Object.fromEntries(Object.entries(d).filter(([k]) => k.endsWith('_cents') && typeof d[k] === 'number')
-        .map(([k, val]) => [k.slice(0, -'_cents'.length), wholeDollars(val as number)]));
+        .map(([k, val]) => [k.slice(0, -'_cents'.length), wholeUsd(val as number)]));
       return fail(r.code, r.message, { ...d, ...display });
     }
     const p = r.plan;
     if (exception && !req.pricing_exception_reason?.trim()) return fail('EXCEPTION_REASON_REQUIRED', 'A pricing exception needs pricing_exception_reason');
     if (exception && !ctx.approvalValid) return fail('APPROVAL_REQUIRED', "A pricing exception needs a valid approval_ref (Dvir's words)");
-    if (min !== null && min !== p.minOfferCents) return fail('MIN_OFFER_FIXED', 'min_offer is set by the server', { min_offer_cents: p.minOfferCents, min_offer: wholeDollars(p.minOfferCents) });
+    if (min !== null && min !== p.minOfferCents) return fail('MIN_OFFER_FIXED', 'min_offer is set by the server', { min_offer_cents: p.minOfferCents, min_offer: wholeUsd(p.minOfferCents) });
     if (lto !== null) {
       if (!Number.isInteger(lto) || lto < 2 || lto > 60 || p.binCents < LTO_BIN_MIN || p.binCents > LTO_BIN_MAX
         || (ctx.dropDate !== null && addMonthsClamped(ctx.today, lto) >= ctx.dropDate)) {
@@ -177,7 +171,7 @@ function isUsd(n: number): boolean {
 export const CompSchema = z.object({
   domain: z.string().trim().min(3).max(253),
   price_usd: z.number().refine(isUsd, 'a positive USD amount with at most 2 decimals'),
-  sold_on: z.string().regex(DATE),
+  sold_on: ymd,
   venue: z.string().trim().min(1).max(100),
   source_url: z.string().url().refine((u) => u.startsWith('https://'), 'https only'),
 }).strict();
@@ -192,8 +186,7 @@ export function validateComps(e: Evidence | null | undefined, s: PricingSettings
   for (const [i, raw] of list.entries()) {
     const r = CompSchema.safeParse(raw);
     if (!r.success) return fail('COMPS_INVALID', `comps[${i}] is invalid`, { index: i, issues: r.error.issues.map((x) => x.message) });
-    const t = new Date(`${r.data.sold_on}T00:00:00Z`);
-    if (Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== r.data.sold_on) return fail('COMPS_INVALID', `comps[${i}].sold_on is not a real date`, { index: i });
+    if (!isRealDate(r.data.sold_on)) return fail('COMPS_INVALID', `comps[${i}].sold_on is not a real date`, { index: i });
     if (r.data.sold_on > today) return fail('COMPS_INVALID', `comps[${i}].sold_on is in the future`, { index: i });
     comps.push(r.data);
   }

@@ -1,7 +1,7 @@
 // G9 quote (CAP-17): the cheapest first year + one renewal from the live registrar quotes (the check service, 60 s cache, never a
 // create call, never a top-up), else a fresh manual quote for a registrar that cannot be machine-quoted. A missing renewal is
 // UNKNOWN, never 0 (CK-7); never Cloudflare. A live adapter error is SOURCE_ERROR, never a reason to fall back to a manual quote.
-import { formatUsd } from '../../money.js';
+import { formatUsd } from '../../core/money.js';
 import { pickWinner } from '../../services/selection.js';
 import type { SelectionValuesT } from '../settings.js';
 import { outcome, type Check } from '../types.js';

@@ -1,4 +1,4 @@
-import { formatUsd } from '../money.js';
+import { formatUsd } from '../core/money.js';
 
 export type OfferSource = 'afternic' | 'godaddy' | 'sedo' | 'domainagents' | 'email_inbound' | 'outbound_reply' | 'other';
 export const OFFER_SOURCES: readonly OfferSource[] = ['afternic', 'godaddy', 'sedo', 'domainagents', 'email_inbound', 'outbound_reply', 'other'];

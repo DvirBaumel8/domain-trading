@@ -2,7 +2,7 @@
 // `dropWatch` and `cohortOutcomes`. Nothing here calls a registrar or marketplace; the only outside call is RDAP, 4 at a time, 250 ms apart, adaptive.
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
-import { jerusalemDate } from '../dates.js';
+import { addDays, dayNumber, idtDay } from '../core/dates.js';
 import type { Database } from '../db/types.js';
 import { TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS, lookupCached, Pacer, type CachedLookup } from '../screening/rdap-batch.js';
 import { activeSelectionSettings } from '../screening/settings.js';
@@ -21,11 +21,9 @@ export const PENDING_DELETE_DAYS = 5;
 export const REDEMPTION_DAYS = 35;
 export const DROP_LIST_NAME_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;
 
-export const addDays = (ymd: string, n: number): string => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
-export const daysBetween = (a: string, b: string): number => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
-export const todayIdt = (nowMs: number): string => jerusalemDate(new Date(nowMs));
+export const daysBetween = (a: string, b: string): number => dayNumber(b) - dayNumber(a);
 /** The oldest list_date a read still uses. */
-export const retentionCutoff = (nowMs: number): string => addDays(todayIdt(nowMs), -DROP_LIST_RETENTION_DAYS);
+export const retentionCutoff = (nowMs: number): string => addDays(idtDay(nowMs), -DROP_LIST_RETENTION_DAYS);
 
 export type RemovedReason = 'DOMAIN_INVALID' | 'DUPLICATE_IN_UPLOAD' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'NO_SPLIT' | 'TOO_MANY_WORDS' | 'ONE_WORD';
 export const MAX_WORDS = 3;
@@ -53,7 +51,7 @@ export function filterDropName(raw: string, seen: Set<string>): FilteredName {
 const squash = (s: string) => s.toLowerCase().replace(/\s+/g, '');
 export const isPendingDelete = (f: RdapFacts | null): boolean => !!f && f.statuses.some((s) => squash(s) === 'pendingdelete');
 export const isRedemption = (f: RdapFacts | null): boolean => !!f && f.statuses.some((s) => squash(s) === 'redemptionperiod');
-const dateOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? jerusalemDate(new Date(Date.parse(iso))) : null);
+const dateOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? idtDay(new Date(Date.parse(iso))) : null);
 
 export interface WatchStatus {
   status: 'pending_delete' | 'redemption' | 'registered' | 'not_registered' | 'unknown';

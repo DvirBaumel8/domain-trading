@@ -5,14 +5,13 @@ import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Database } from '../db/types.js';
-import { DROP_LIST_NAME_RE, daysBetween, filterDropName, namesDroppingBetween, todayIdt } from '../drops/drop-lists.js';
+import { DROP_LIST_NAME_RE, daysBetween, filterDropName, namesDroppingBetween } from '../drops/drop-lists.js';
 import { splitV2 } from '../screening/split-v2.js';
 import { AppError } from '../http/errors.js';
-import { toJerusalemIso } from '../time.js';
-
+import { idtDay, realYmd, toJerusalemIso } from '../core/dates.js';
 export interface DropListsDeps { db: Kysely<Database>; now: () => number }
 
-export const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s), 'a calendar date');
+export const ymd = realYmd;
 const Body = z.object({ name: z.string().regex(DROP_LIST_NAME_RE), list_date: ymd, domains: z.array(z.string().max(300)).min(1).max(20_000) }).strict();
 const WindowQuery = z.object({ drop_from: ymd, drop_to: ymd }).strict();
 export const MAX_WINDOW_DAYS = 31;
@@ -41,7 +40,7 @@ export function registerDropLists(app: FastifyInstance, deps: DropListsDeps): vo
 
   app.post('/selection/drop-lists', { bodyLimit: 2 * 1024 * 1024 }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
-    if (b.list_date > todayIdt(deps.now())) throw new AppError(422, 'VALIDATION_ERROR', 'list_date must not be in the future', { list_date: b.list_date });
+    if (b.list_date > idtDay(deps.now())) throw new AppError(422, 'VALIDATION_ERROR', 'list_date must not be in the future', { list_date: b.list_date });
     if (await db.selectFrom('drop_lists').select('name').where('name', '=', b.name).executeTakeFirst()) {
       throw new AppError(409, 'DROP_LIST_NAME_TAKEN', `A drop list named ${b.name} exists`, { name: b.name });
     }

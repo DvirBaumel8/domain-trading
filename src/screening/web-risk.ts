@@ -1,3 +1,4 @@
+import { utcMonth } from '../core/dates.js';
 // Google Web Risk, Lookup API only (CR-007 G-6): GET v1/uris:search. The Update API is never used (a static test checks src/).
 // The key travels in the `x-goog-api-key` header, never in a URL, and is never logged. A monthly counter (api_usage) stops the service at
 // WEB_RISK_MONTHLY_CAP lookups per UTC calendar month, so the free tier can never turn into a bill.
@@ -32,8 +33,6 @@ export function parseWebRiskError(text: string): WebRiskError | null {
   };
 }
 const unknownOf = (reason: 'QUOTA' | 'QUOTA_CAP' | 'SOURCE_ERROR', httpStatus: number | null = null, error: WebRiskError | null = null): WebRiskResult => ({ kind: 'unknown', reason, httpStatus, error });
-
-export const utcMonth = (ms: number): string => new Date(ms).toISOString().slice(0, 7);
 
 /** Counts one lookup for the month; returns the new count. Atomic, so concurrent callers never share a number. */
 async function takeLookup(db: Kysely<Database>, month: string): Promise<number> {

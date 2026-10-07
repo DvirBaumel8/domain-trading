@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { sql } from 'kysely';
 import type { LedgerType } from '../../src/db/types.js';
 import type { FastifyInstance } from 'fastify';
-import { addOneYear } from '../../src/dates.js';
+import { addOneYear } from '../../src/core/dates.js';
 import { offersByStrategy, perDomainOffers } from '../../src/services/offer-stats.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, seedDailyRun, testDb as db } from '../helpers/db.js';

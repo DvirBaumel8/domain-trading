@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toJerusalemIso } from '../../src/time.js';
+import { toJerusalemIso } from '../../src/core/dates.js';
 
 describe('toJerusalemIso', () => {
   it('summer (IDT, +03:00)', () => {

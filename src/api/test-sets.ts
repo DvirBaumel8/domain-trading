@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { Database } from '../db/types.js';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { dollarsToCents } from '../money.js';
+import { centsToDollarsOrNull, dollarsToCents } from '../core/money.js';
 import { HEARTBEAT_STALE_MS, createRun, type ScreeningWorker } from '../screening/engine.js';
 import { analyzeForm } from '../screening/form.js';
 import { decideReplayRow, gateContext, toLabelledRow } from '../screening/replay.js';
@@ -19,11 +19,10 @@ import type { LabelledFeatures } from '../screening/replay.js';
 import type { InputName } from '../screening/engine.js';
 import { unknownInputsOf } from '../screening/tier.js';
 import { unknownCounts, unknownNames, unknownsOf, type UndecidedMap } from '../screening/unknowns.js';
-import { toJerusalemIso } from '../time.js';
-
+import { realYmd, toJerusalemIso } from '../core/dates.js';
 export interface TestSetsDeps { db: Kysely<Database>; now: () => number; worker: ScreeningWorker }
 
-const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s), 'a calendar date');
+const ymd = realYmd;
 const usd = z.number().positive().refine((n) => { try { dollarsToCents(n); return true; } catch { return false; } }, 'a positive USD amount with at most 2 decimals');
 const NAME = /^[A-Z0-9][A-Z0-9-]{2,31}$/;
 
@@ -159,7 +158,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
         if (rows.length === 0) throw new AppError(422, 'TEST_SET_EMPTY', `No name of ${b.from_set} had an unknown feature among these slices; nothing was stored`, { from_set: b.from_set, before_n: had.size });
       }
       stored = rows.map((r) => ({
-        domain: r.domain, label: r.label, as_of: r.as_of!, source: r.source, price_usd: r.price_cents === null ? null : r.price_cents / 100, report_lane: r.report_lane, role: null, kept: true, reason: null,
+        domain: r.domain, label: r.label, as_of: r.as_of!, source: r.source, price_usd: centsToDollarsOrNull(r.price_cents), report_lane: r.report_lane, role: null, kept: true, reason: null,
       }));
     }
 

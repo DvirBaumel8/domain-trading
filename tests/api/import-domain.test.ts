@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { addOneYear, jerusalemDate } from '../../src/dates.js';
+import { addOneYear, idtDay as jerusalemDate } from '../../src/core/dates.js';
 import { http, HttpResponse } from 'msw';
 import { importDomain, type ImportInput } from '../../src/admin/import-domain.js';
 import { GoDaddyAdapter } from '../../src/registrars/godaddy.js';

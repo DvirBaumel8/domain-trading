@@ -3,6 +3,7 @@
 //   diagnostic: tier/DEMAND-2 decisions on a feature table; never counts toward clearing buy_hold.
 //   holdout:    DOM recomputes CAP-01 (form) and CAP-02 (brand, big-company lists) from the domain; TM-1, TN-1 and HIST-2 + guard come
 //               from the uploaded row with source and date; gates apply per row; a leakage lint must find 0 rows.
+import { isYmd } from '../core/dates.js';
 import { createHash } from 'node:crypto';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
@@ -256,10 +257,10 @@ const DATED: [feature: keyof LabelledFeatures, input: string][] = [
 export function missingGates(rows: LabelledRow[], notAssessed: readonly GateKey[] = []): { domain: string; missing: string[] }[] {
   const out: { domain: string; missing: string[] }[] = [];
   for (const r of rows) {
-    const miss: string[] = GATE_KEYS.filter((k) => !notAssessed.includes(k)).filter((k) => { const g = r.features.gates?.[k]; return !g || !g.source || !/^\d{4}-\d{2}-\d{2}$/.test(g.date); });
+    const miss: string[] = GATE_KEYS.filter((k) => !notAssessed.includes(k)).filter((k) => { const g = r.features.gates?.[k]; return !g || !g.source || !isYmd(g.date); });
     for (const [feat, input] of DATED) {
       const col = `input_dates.${input}`;
-      if (known(r.features[feat]) && !/^\d{4}-\d{2}-\d{2}$/.test(r.features.input_dates?.[input] ?? '') && !miss.includes(col)) miss.push(col);
+      if (known(r.features[feat]) && !isYmd(r.features.input_dates?.[input] ?? '') && !miss.includes(col)) miss.push(col);
     }
     if (miss.length > 0) out.push({ domain: r.domain, missing: miss });
   }

@@ -1,10 +1,11 @@
 // v2.14.0 (CR-012 part C): scouts send names (POST /candidates/intake); the daily step `intakeScreening` screens them (with the drop-list names that are about
 // to drop) in ONE full-plan run and records what it took. Nothing here calls a registrar or marketplace; the screening run does its own lookups.
+import { hasAtSign, piiError } from '../core/validation.js';
 import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
-import { jerusalemDate } from '../dates.js';
+import { addDays, idtDay, isRealDate } from '../core/dates.js';
 import type { Database } from '../db/types.js';
-import { filterDropName, namesDroppingBetween, addDays, todayIdt, type RemovedReason } from '../drops/drop-lists.js';
+import { filterDropName, namesDroppingBetween, type RemovedReason } from '../drops/drop-lists.js';
 import { newAuditId } from '../http/audit.js';
 import { AppError } from '../http/errors.js';
 import { CompSchema } from '../services/listing-v2.js';
@@ -55,7 +56,7 @@ export function checkIntakePii(body: IntakeBodyT): void {
   body.names.forEach((n, index) => {
     for (const field of ['note', 'source'] as const) {
       const v = n[field];
-      if (v != null && v.includes('@')) throw new AppError(422, 'NO_PII', `names[${index}].${field} must not contain an email address or '@'`, { index, field });
+      if (hasAtSign(v)) throw piiError(`names[${index}].${field} must not contain an email address or '@'`, { index, field });
     }
   });
 }
@@ -63,8 +64,7 @@ export function checkIntakePii(body: IntakeBodyT): void {
 /** Comparable sales must be real, past dates (the same rule as /buy). */
 export function checkIntakeComps(body: IntakeBodyT, today: string): void {
   body.names.forEach((n, ni) => (n.comps ?? []).forEach((c, i) => {
-    const t = new Date(`${c.sold_on}T00:00:00Z`);
-    if (Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== c.sold_on) throw new AppError(422, 'COMPS_INVALID', `names[${ni}].comps[${i}].sold_on is not a real date`, { index: ni, comp: i });
+    if (!isRealDate(c.sold_on)) throw new AppError(422, 'COMPS_INVALID', `names[${ni}].comps[${i}].sold_on is not a real date`, { index: ni, comp: i });
     if (c.sold_on > today) throw new AppError(422, 'COMPS_INVALID', `names[${ni}].comps[${i}].sold_on is in the future`, { index: ni, comp: i });
   }));
 }
@@ -82,7 +82,7 @@ export interface IntakeResult {
 }
 
 export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: { tokenName: string; auditId: string | null; now: Date }): Promise<IntakeResult> {
-  checkIntakeComps(body, jerusalemDate(ctx.now));
+  checkIntakeComps(body, idtDay(ctx.now));
   checkIntakePii(body);
   const out: IntakeResult = { accepted: [], duplicates: [], removed: [] };
   const checked = body.names.map((n) => ({ n, ...intakeFormReason(n.domain) }));
@@ -139,7 +139,7 @@ export class IntakeScreeningJob {
       const { worker } = this.deps;
       const nowMs = this.deps.now();
       const now = new Date(nowMs);
-      const today = todayIdt(nowMs);
+      const today = idtDay(nowMs);
       // v2.16.0: one transaction, serialised by an advisory lock, from the queue read to the bookkeeping rows, so two instances (or a retried trigger)
       // cannot screen the same names. The run itself is created on its own connection (createRun opens its own transaction); if anything after it
       // fails, the run is cancelled (it must not run with no bookkeeping) and the error is rethrown.

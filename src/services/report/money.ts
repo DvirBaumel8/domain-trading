@@ -1,14 +1,8 @@
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
-import { formatUsd } from '../../money.js';
-import { wholeUsd } from '../../pricing/present.js';
+import { pair, wholeUsd, type Pair } from '../../core/money.js';
 import { activeDomainCount, spentCents } from '../budget.js';
 
-export type Pair<K extends string> = { [P in `${K}_cents`]: number | null } & { [P in K]: string | null };
-/** A money field as the flat pair `<key>_cents` + `<key>` (display string), e.g. spent_cents: 2107, spent: "$21.07". */
-export function pair<K extends string>(key: K, cents: number | null): Pair<K> {
-  return { [`${key}_cents`]: cents, [key]: cents === null ? null : formatUsd(cents) } as Pair<K>;
-}
 /** The private walk-away: whole dollars with a "(private)" mark, like plan-view ("$960 (private)"). */
 export function walkawayPair(cents: number | null): Pair<'walkaway'> {
   return { walkaway_cents: cents, walkaway: cents === null ? null : `${wholeUsd(cents)} (private)` } as Pair<'walkaway'>;

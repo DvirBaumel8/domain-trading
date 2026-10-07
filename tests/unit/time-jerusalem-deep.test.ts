@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jerusalemDeep } from '../../src/time.js';
+import { jerusalemDeep } from '../../src/core/dates.js';
 
 describe('jerusalemDeep (BUG-2)', () => {
   it('rewrites UTC Z strings and Dates to the Asia/Jerusalem offset, nested, whole seconds', () => {

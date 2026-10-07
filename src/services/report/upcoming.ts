@@ -1,8 +1,7 @@
 import type { Kysely } from 'kysely';
-import { jerusalemDate } from '../../dates.js';
+import { addDays, dayNumber, idtDay } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
 import { currentSettings, settingsByVersion } from '../../pricing/settings.js';
-import { addDays, dayNumber } from './domains.js';
 import { priceValues } from './money.js';
 
 const LIVE = ['owned', 'listed', 'delisted'] as const;
@@ -15,7 +14,7 @@ export interface UpcomingEvent {
 const stageOf = (days: number, stages: number[]) => stages.find((s) => days <= s)!;
 
 export async function upcoming90d(db: Kysely<Database>, now: Date): Promise<UpcomingEvent[]> {
-  const today = jerusalemDate(now);
+  const today = idtDay(now);
   const t = dayNumber(today);
   const out: UpcomingEvent[] = [];
   const fp = await db.selectFrom('price_schedule').select(['domain_id', 'plan_id', 'due_on']).where('event', '=', 'final_push').where('status', 'in', ['planned', 'applied']).execute();

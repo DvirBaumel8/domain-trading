@@ -4,7 +4,7 @@ import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import type { Database } from '../db/types.js';
 import { AppError } from '../http/errors.js';
-import { dollarsToCents } from '../money.js';
+import { dollarsToCents } from '../core/money.js';
 import { TrancheService } from '../services/tranches.js';
 
 export interface TrancheApiDeps { db: Kysely<Database>; now: () => number }

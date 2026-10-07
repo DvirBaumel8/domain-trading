@@ -5,8 +5,7 @@ import type { Database } from '../db/types.js';
 import { canonicalJson } from './canonical-json.js';
 import { AppError } from './errors.js';
 import { isMutating } from './methods.js';
-import { toJerusalemIso } from '../time.js';
-
+import { toJerusalemIso } from '../core/dates.js';
 declare module 'fastify' {
   interface FastifyRequest {
     idem: { key: string; claimed: boolean } | null;

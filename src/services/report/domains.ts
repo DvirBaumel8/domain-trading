@@ -1,17 +1,15 @@
+import { pair } from '../../core/money.js';
 import { sql, type Kysely } from 'kysely';
-import { jerusalemDate } from '../../dates.js';
+import { addDays, dayNumber, idtDay, toJerusalemIso } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
-import { toJerusalemIso } from '../../time.js';
 import { pendingDomains } from '../export-state.js';
 import { perDomainOffers } from '../offer-stats.js';
-import { pair, priceValues, walkawayPair } from './money.js';
+import { priceValues, walkawayPair } from './money.js';
 
-export const dayNumber = (d: string) => Math.floor(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
-export const addDays = (d: string, n: number) => new Date((dayNumber(d) + n) * 86_400_000).toISOString().slice(0, 10);
 const iso = (d: Date | null) => (d ? toJerusalemIso(d) : null);
 
 export async function perDomain(db: Kysely<Database>, now: Date) {
-  const today = jerusalemDate(now);
+  const today = idtDay(now);
   const domains = await db.selectFrom('domains').selectAll().where('status', '!=', 'pending_purchase').orderBy('domain').execute();
   const offers = await perDomainOffers(db, now);
   const costRows = await sql<{ domain_id: number; cost: string }>`
@@ -22,7 +20,7 @@ export async function perDomain(db: Kysely<Database>, now: Date) {
   return domains.map((d) => {
     const next = planned.find((p) => p.domain_id === d.id && p.plan_id === d.plan_id);
     // days held stop at the sale (sold) or the drop date (dropped); otherwise they run to today
-    const end = d.status === 'sold' && d.sold_at ? jerusalemDate(d.sold_at) : d.status === 'dropped' && d.drop_date ? d.drop_date : today;
+    const end = d.status === 'sold' && d.sold_at ? idtDay(d.sold_at) : d.status === 'dropped' && d.drop_date ? d.drop_date : today;
     return {
       domain: d.domain, status: d.status, registrar: d.registrar, registrar_api: d.registrar_api, category: d.category, price_grade: d.price_grade,
       listing_mode: d.listing_mode, ...pair('bin', d.bin_cents), ...pair('floor', d.floor_cents), ...walkawayPair(d.walkaway_cents),

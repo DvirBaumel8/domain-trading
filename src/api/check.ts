@@ -2,12 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { formatUsd } from '../money.js';
+import { formatUsdOrNull } from '../core/money.js';
 import type { CheckResult, CheckService } from '../services/check.js';
 import type { EvaluatedQuote } from '../services/selection.js';
-import { toJerusalemIso } from '../time.js';
-
-const usd = (c: number | null) => (c === null ? null : formatUsd(c));
+import { toJerusalemIso } from '../core/dates.js';
 
 function presentQuote(q: EvaluatedQuote) {
   return {
@@ -21,9 +19,9 @@ function presentQuote(q: EvaluatedQuote) {
     renewal_cents: q.renewalCents,
     privacy_cents_per_year: q.privacyCentsPerYear,
     two_year_cents: q.twoYearCents,
-    first_year: usd(q.firstYearCents),
-    renewal: usd(q.renewalCents),
-    two_year: usd(q.twoYearCents),
+    first_year: formatUsdOrNull(q.firstYearCents),
+    renewal: formatUsdOrNull(q.renewalCents),
+    two_year: formatUsdOrNull(q.twoYearCents),
   };
 }
 
@@ -36,7 +34,7 @@ export function presentCheck(r: CheckResult) {
     rdap: r.rdap,
     winner: r.winner && {
       registrar: r.winner.registrar,
-      first_year: usd(r.winner.firstYearCents), renewal: usd(r.winner.renewalCents), two_year: usd(r.winner.twoYearCents),
+      first_year: formatUsdOrNull(r.winner.firstYearCents), renewal: formatUsdOrNull(r.winner.renewalCents), two_year: formatUsdOrNull(r.winner.twoYearCents),
       first_year_cents: r.winner.firstYearCents, renewal_cents: r.winner.renewalCents, two_year_cents: r.winner.twoYearCents,
     },
     quotes: r.quotes.map(presentQuote),

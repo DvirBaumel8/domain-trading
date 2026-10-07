@@ -1,8 +1,9 @@
+import { ISO_WITH_OFFSET } from '../core/dates.js';
+
 export type ApprovalCheck =
   | { ok: true; approvedAt: Date }
   | { ok: false; code: 'APPROVAL_INVALID' | 'APPROVAL_EXPIRED'; reason: string };
 
-const ISO_WITH_TZ = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 const SKEW_MS = 60_000;
 
 /** A name (domain, settings label, list name) must appear on label boundaries: `x.com` is not named by `ba.com`, `x.com.au`, `www.x.com`, `x.company`; `v1` is not named by `v1b`. */
@@ -37,7 +38,7 @@ export function checkApproval(
 
 function checkTime(ref: { approved_at?: unknown }, now: Date, maxAgeHours: number): ApprovalCheck {
   const bad = (reason: string): ApprovalCheck => ({ ok: false, code: 'APPROVAL_INVALID', reason });
-  if (typeof ref.approved_at !== 'string' || !ISO_WITH_TZ.test(ref.approved_at)) {
+  if (typeof ref.approved_at !== 'string' || !ISO_WITH_OFFSET.test(ref.approved_at)) {
     return bad('approval_ref.approved_at must be ISO 8601 with a timezone offset');
   }
   const approvedAt = new Date(ref.approved_at);

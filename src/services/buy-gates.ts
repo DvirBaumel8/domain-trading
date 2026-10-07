@@ -3,7 +3,7 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { AppError } from '../http/errors.js';
-import { formatUsd } from '../money.js';
+import { formatUsd } from '../core/money.js';
 import { latestPackFor } from '../screening/pack.js';
 import { activeSelectionSettings } from '../screening/settings.js';
 import { latestScreeningRun, screeningHold } from './buy-hold.js';

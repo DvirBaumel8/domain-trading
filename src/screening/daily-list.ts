@@ -3,10 +3,10 @@
 // private walk-away, and nothing in it is an approval.
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
-import { jerusalemDate } from '../dates.js';
+import { addDays, idtDay } from '../core/dates.js';
 import type { Database } from '../db/types.js';
-import { addDays, namesDroppingBetween, todayIdt } from '../drops/drop-lists.js';
-import { formatUsd } from '../money.js';
+import { namesDroppingBetween } from '../drops/drop-lists.js';
+import { formatUsd } from '../core/money.js';
 import { priceFormula } from '../pricing/plan.js';
 import { currentSettings } from '../pricing/settings.js';
 import { buyBlocks } from '../services/buy-gates.js';
@@ -105,7 +105,7 @@ async function collectPool(db: Kysely<Database>, nowMs: number): Promise<{ pool:
 export async function buildDailyList(deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number; waitMs?: number; noWait?: boolean; builtBy?: 'daily' | 'rebuild' }): Promise<{ id: string; day: string; entries_n: number; almost_ready_n: number; upcoming_n: number; partial: boolean; version: number }> {
   const { db } = deps;
   const nowMs = deps.now();
-  const today = todayIdt(nowMs);
+  const today = idtDay(nowMs);
   // noWait (a manual rebuild): build from what is done now; a run still going marks the list partial below.
   const timedOut = deps.noWait ? false : await waitForRuns(db, deps.worker, today, deps.waitMs ?? DAILY_LIST_WAIT_MS);
   const nowAfter = deps.now();
@@ -150,7 +150,7 @@ export async function buildDailyList(deps: { db: Kysely<Database>; worker: Scree
   for (const p of pool) {
     const domain = p.item.domain;
     const latest = latestByCheck(p.rows);
-    const createdToday = jerusalemDate(p.run.created_at) === today;
+    const createdToday = idtDay(p.run.created_at) === today;
     if (createdToday) screenedToday++;
     if (owned.has(domain)) continue;
     const gating = p.plan.filter((c) => !features.includes(c));
@@ -256,7 +256,7 @@ export async function buildDailyList(deps: { db: Kysely<Database>; worker: Scree
     return { domain: e.domain, was_rank: e.rank, reason };
   });
 
-  const partial = timedOut || pool.some((p) => p.run.status !== 'done' && jerusalemDate(p.run.created_at) === today);
+  const partial = timedOut || pool.some((p) => p.run.status !== 'done' && idtDay(p.run.created_at) === today);
   const waiting = new Set([...almost.map((a) => a.domain as string), ...upcoming.filter((u) => (u.missing_records as Missing[]).length > 0).map((u) => u.domain as string)]);
   const summary: Json = {
     screened_today: screenedToday, failed_by_check, waiting_for_records: waiting.size, unknown_by_reason, partial,

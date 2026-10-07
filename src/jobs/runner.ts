@@ -1,7 +1,7 @@
+import { scrubSecrets } from '../core/redact.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
-import { jerusalemDate } from '../dates.js';
-
+import { idtDay } from '../core/dates.js';
 export interface StepResult {
   ok: boolean;
   skipped?: boolean;
@@ -128,8 +128,7 @@ export class JobRunner {
   }
 
   private clean(message: string): string {
-    let m = message;
-    for (const v of this.deps.secretValues ?? []) if (v) m = m.split(v).join('[REDACTED]');
+    const m = scrubSecrets(message, this.deps.secretValues ?? []);
     return m.length > 200 ? `${m.slice(0, 200)}...` : m;
   }
 
@@ -138,7 +137,7 @@ export class JobRunner {
     const last = await this.deps.db.selectFrom('audit_log').select('at').where('path', '=', 'ns-verify')
       .orderBy('at', 'desc').limit(1).executeTakeFirst();
     // Once per IDT day: a 00:05 UTC run is never skipped because the last one was a few minutes under 24 h ago.
-    return !last || jerusalemDate(last.at) < jerusalemDate(new Date(this.deps.now()));
+    return !last || idtDay(last.at) < idtDay(new Date(this.deps.now()));
   }
 
   /** The standalone tick: the base steps, then the review retry (the daily run does not retry; it just ran the review). */

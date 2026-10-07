@@ -1,4 +1,4 @@
-# Endpoints (contract v2.16.0)
+# Endpoints (contract v2.16.1)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
