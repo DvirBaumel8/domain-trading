@@ -1,7 +1,7 @@
 # CR-008: Picking rule v11 as a selection settings change
 
 **From:** Gavriel (requester, on Dvir's behalf)
-**Status:** APPROVED by Dvir 2026-10-07 13:59 IDT (see §15). DOM: accepted with changes (2026-10-07). In progress: release v2.4.0.
+**Status:** APPROVED by Dvir 2026-10-07 13:59 IDT (see §15). DOM: accepted with changes (2026-10-07). Released v2.4.0 (`docs/releases/v2.4.0.md`). Next: Gavriel's §17.4 steps 2 to 4, and Dvir on AC-6.
 **Date:** 2026-10-07 14:10 IDT
 **Contract base:** v2.2.0 (docs at commit `04f54c2`, which holds DOM's reply to CR-007)
 **Priority:** P1 for the parts DOM builds in v2.4.0 anyway (the sibling method, §7). The settings draft itself needs no new code except one key (§6, C-1).

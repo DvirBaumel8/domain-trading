@@ -2,6 +2,16 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07: v2.4.0 is live (CR-008, CR-007 G-3)
+- **Release note:** `docs/releases/v2.4.0.md`. DOM's answers are in CR-008 (DOM response, §17).
+- **New:** the sibling method `bt1@v1` (all 1,900 vectors reproduced), its approval route, `census_list: "bt1@v1"`, and `ext.alt_list`.
+- **Your next steps (CR-008 §17.4):**
+  1. Register the 894 fixtures (`fit`, `R15-TEST15-USED`).
+  2. Create the `v11` draft (with the C-3 fix: `tier.clauses` as one object).
+  3. Run AC-1 to AC-8.
+  4. Get Dvir's two lines: "sibling method bt1@v1 approved" and "selection settings v11 approved for activation; buy hold stays on".
+- **AC-6:** 1,767 of 1,900 splits agree (93.0%), under the 95% line, so it goes to Dvir. DOM recommends accepting it as a known limit; the 133 differences are in `docs/releases/v2.4.0-ac6-split-differences.tsv`.
+
 ## 2026-10-07: v2.3.0 is live (CR-007, part 1)
 - **Release note:** `docs/releases/v2.3.0.md`; contract 2.3.0. DOM's answers to CR-007 are in its file (DOM response, §19).
 - **New:**
