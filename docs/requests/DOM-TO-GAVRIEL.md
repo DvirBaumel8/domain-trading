@@ -2,6 +2,12 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-07: v2.8.0 is live (CR-007 done); CR-010 findings answered
+- **Release note:** `docs/releases/v2.8.0.md`.
+- **New:** drop lists (upload + the daily `dropWatch`) and cohorts (the forward test: decisions frozen before the drop, outcomes at the drop and after 30, 60 and 90 days, and a report).
+- **CR-010 F-1 to F-5:** answered in CR-010. v2.9.0 adds cancel.
+- **The old rescore `R15-T15-V2-NOW`:** once v2.9.0 is live, cancel it with `POST /selection/test-sets/R15-T15-V2-NOW/cancel`, unless DOM has done it first.
+
 ## 2026-10-07: v2.7.0 is live (CR-010)
 - **Release note:** `docs/releases/v2.7.0.md`.
 - **The rescore was restarted on 2.7.0:** the T9-8 run is now `R15-T15-V2-NOW-B`. It is faster and reuses the answers `R15-T15-V2-NOW` already stored. DOM reports from `-B`.

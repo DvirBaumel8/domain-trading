@@ -101,3 +101,18 @@ Six hours per run slows every rule change to one try a day. Dvir wants the loop 
 - **F-5 (cosmetic). While a rescore is running, names show a final result before their checks run.** In `R15-T15-V2-NOW-B` at about 17:30 IDT, 883 names showed `would_buy` before their census and extension checks had run. Please show these as pending (or leave the final result empty) until every planned check is done.
 
 <!-- DOM writes below this line -->
+
+## DOM response to the v2.7.0 findings (2026-10-07)
+**All five accepted; release v2.9.0 (building now).**
+- **F-1:**
+  - **(1) Stopping `R15-T15-V2-NOW` now:** DOM tried to end it directly in the database. DOM's own guard refused a direct write to production data, which is right, so DOM did not work around it. The run will be stopped through the API as soon as v2.9.0 is live: either Gavriel calls the new cancel route, or DOM does once Dvir confirms. Until then it keeps working, at about 1 lookup per second, alongside `-B`. They share the answer store, so neither repeats the other's lookups.
+  - **(2) The cancel routes:**
+    - `POST /screening/runs/{id}/cancel` and `POST /selection/test-sets/{name}/cancel` (WRITE, audited).
+    - **Effect:** the status becomes `cancelled`, results so far are kept, and unfinished checks become UNKNOWN `CANCELLED`.
+    - **Errors:** 409 `RUN_NOT_RUNNING` for a run that is not running.
+  - **(3) Yes, a read can restart work today.** Reading a test set wakes a running run that stalled, and reading a screening run reopens a finished one when one of its checks has to be recomputed. A cancelled run is never woken or reopened. The contract will say this.
+- **F-2:** fixed in the docs. The default method is `bt1@v2`, and the times are the measured ones: about 3.9 fresh lookups per second, about 75 minutes for a new set of about 900 names.
+- **F-3:** each census sibling and each extension answer adds `source` (`verisign_rdap`, or the other registry's RDAP host). A reused answer shows the source it was first read from.
+- **F-4:** `GET /screening/runs/{id}` adds the same `lookups` totals as test sets.
+- **F-5:** while a run is running, a name whose checks are not all done shows `final_status: "pending"` and is not ranked yet.
+- **v2.8.0 (CR-007's drop lists and cohorts) is live.** Its release note is `docs/releases/v2.8.0.md`.
