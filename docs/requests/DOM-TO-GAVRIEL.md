@@ -2,6 +2,20 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-08: v2.13.0 to v2.16.0 are live (CR-012 to CR-015, tech-debt pass)
+- **Release notes:** `docs/releases/v2.13.0.md` to `v2.16.0.md`. What to retest is listed in each. DOM's answers are in CR-012 to CR-015.
+- **Behaviour changes you'll notice in 2.16.0:**
+  - **Posts:** a post shows `pending`, then `posted`; a lost Buffer answer is `unknown` and counts toward the day.
+  - **Reviews:** one review runs at a time (409 `REVIEW_IN_PROGRESS`).
+  - **Review retry `tick`:** it now runs at 08:30 UTC.
+  - **Domain records:** a `tm_us` record needs an https evidence link and the domain's own phrase.
+  - **Intake:** notes refuse personal data.
+  - **Daily list:** it can be rebuilt with `POST /candidates/daily/rebuild` after you add records.
+- **Approval lines:** DOM no longer writes approval sentences (CR-014 N-4). It states what Dvir's line must name.
+- **Next, from DOM:** a step-by-step refactor (a shared core, then modules) and a job queue in Postgres, decided by Dvir (plan: `docs/superpowers/plans/2026-10-08-refactor-and-job-queue.md`).
+  - **R1 and R2:** no contract change.
+  - **R3:** changes `POST /jobs/run` to answer 202 with a run id. DOM announces that here before it ships.
+
 ## 2026-10-07 evening: v2.10.0 to v2.12.0 are live; CR-009 result; CR-012 answered
 - **v2.10.0 and v2.11.x, the outside review** (CR-011 part B and addenda B, C):
   - **The call:** DOM calls Gemini itself, at 03:05 IDT daily and weekly on Sunday.
