@@ -8,12 +8,31 @@ import { RDAP_COM_BASE, USER_AGENT, type RdapFacts, type RdapLookup } from '../r
 import { storeEvidence } from './evidence.js';
 import type { CheckContext, ScreeningDeps } from './types.js';
 
-/** At most `concurrency` calls in flight and at least `minMsBetween` between two starts. `sleep` is injected (tests pass a no-op). */
+export const TEST_SET_RDAP_CONCURRENCY = 4;
+export const TEST_SET_RDAP_MIN_MS = 250;
+/** Adaptive slow-down (v2.7.0): each 429 or refusal doubles the gap up to this cap; after two of them concurrency drops to 1. */
+export const RDAP_MAX_MIN_MS = 4000;
+
+/** At most `concurrency` calls in flight and at least `minMsBetween` between two starts. `sleep` is injected (tests pass a no-op). `slowDown()` halves the rate. */
 export class Pacer {
   private active = 0;
   private waiting: (() => void)[] = [];
   private nextStart = 0;
-  constructor(private readonly minMsBetween: number, private readonly concurrency: number, private readonly sleep: (ms: number) => Promise<void>, private readonly clock: () => number = Date.now) {}
+  private halvings = 0;
+  /** How many times the rate was halved (a 429 or a refusal was seen). */
+  slowdowns = 0;
+  constructor(private minMsBetween: number, private concurrency: number, private readonly sleep: (ms: number) => Promise<void>, private readonly clock: () => number = Date.now) {}
+
+  get minGapMs(): number { return this.minMsBetween; }
+  get maxConcurrency(): number { return this.concurrency; }
+
+  /** Halve the rate: double the minimum gap (cap RDAP_MAX_MIN_MS); after the second halving, one call at a time. */
+  slowDown(): void {
+    this.slowdowns++;
+    this.halvings++;
+    this.minMsBetween = Math.min(Math.max(this.minMsBetween, 1) * 2, RDAP_MAX_MIN_MS);
+    if (this.halvings >= 2) this.concurrency = 1;
+  }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
     if (this.active >= this.concurrency) await new Promise<void>((r) => this.waiting.push(r));
@@ -25,44 +44,79 @@ export class Pacer {
       if (start > t) await this.sleep(start - t);
       return await fn();
     } finally {
-      const next = this.waiting.shift();
-      if (next) next(); // hand the slot over
-      else this.active--;
+      this.active--;
+      while (this.waiting.length > 0 && this.active < this.concurrency) {
+        this.active++;
+        this.waiting.shift()!(); // hand the slot over
+      }
     }
   }
 }
 
-export interface LookupOpts { maxAgeHours: number; baseUrl?: string; evidenceMaxBytes: number; pace: Pacer; now?: () => number; timeoutMs?: number; /** ms epoch: past it no query is sent (UNKNOWN TIMEOUT). */ deadline?: number }
-export type CachedLookup = RdapLookup & { cached: boolean; evidenceId: number | null };
+export interface LookupOpts {
+  maxAgeHours: number; baseUrl?: string; evidenceMaxBytes: number; pace: Pacer; now?: () => number; timeoutMs?: number; /** ms epoch: past it no query is sent (UNKNOWN TIMEOUT). */ deadline?: number;
+  /** v2.7.0 date safety: a stored answer is reusable only if checked_at >= max(now - maxAge, notBefore). */
+  notBefore?: Date;
+  /** v2.7.0: stored answers read in one query by `prefetchStored`; a domain absent from the map has no reusable answer (no per-lookup query). */
+  prefetched?: Map<string, StoredLookup>;
+}
+export type CachedLookup = RdapLookup & { cached: boolean; evidenceId: number | null; /** When the answer was read (the stored row's checked_at); provenance in v2.7.0. */ checkedAt: Date; /** 429s / refusals this lookup met (v2.7.0). */ rateLimited: number };
+
+export type StoredLookup = { outcome: string; http_status: number | null; checked_at: Date; facts: unknown; evidence_id: string | null };
 
 const MAX_RETRY_AFTER_MS = 10_000;
 
+const cutoffOf = (nowMs: number, maxAgeHours: number, notBefore?: Date): Date | null => {
+  if (!(maxAgeHours > 0)) return null;
+  return new Date(Math.max(nowMs - maxAgeHours * 3_600_000, notBefore?.getTime() ?? -Infinity));
+};
+
+/** One query for the newest reusable stored answer of each domain (registered / not_registered, checked_at at or after the cutoff). */
+export async function prefetchStored(db: Kysely<Database>, domains: string[], o: { maxAgeHours: number; notBefore?: Date; now?: () => number }): Promise<Map<string, StoredLookup>> {
+  const out = new Map<string, StoredLookup>();
+  const cutoff = cutoffOf((o.now ?? Date.now)(), o.maxAgeHours, o.notBefore);
+  if (cutoff === null || domains.length === 0) return out;
+  const rows = await db.selectFrom('rdap_lookups').select(['domain', 'outcome', 'http_status', 'checked_at', 'facts', 'evidence_id']).where('domain', 'in', domains)
+    .where('outcome', '!=', 'unknown').where('checked_at', '>=', cutoff).orderBy('checked_at', 'desc').orderBy('id', 'desc').execute();
+  for (const r of rows) if (!out.has(r.domain)) out.set(r.domain, r);
+  return out;
+}
+
+const refused = (x: RdapLookup): boolean => x.reasonCode === 'RATE_LIMITED' || x.httpStatus === 429 || x.httpStatus === 403;
+
 /**
- * A lookup through the cache. Only `registered` and `not_registered` rows are reused; `unknown` is never an answer. A fresh lookup
- * runs inside the pacer, retries once on a 429 whose Retry-After is at most 10 s, stores its body as evidence and its outcome as a row.
+ * A lookup through the cache. Only `registered` and `not_registered` rows are reused; `unknown` is never an answer. A stored answer is
+ * reused only within the age limit and not before `notBefore`, and never goes through the pacer. A fresh lookup runs inside the pacer,
+ * retries once on a 429 whose Retry-After is at most 10 s, slows the pacer down on a 429 or refusal, stores its body as evidence and its outcome as a row.
  */
 export async function lookupCached(db: Kysely<Database>, deps: ScreeningDeps, domain: string, o: LookupOpts): Promise<CachedLookup> {
   const now = o.now ?? Date.now;
-  if (o.maxAgeHours > 0) {
-    const row = await db.selectFrom('rdap_lookups').selectAll().where('domain', '=', domain).where('outcome', '!=', 'unknown')
-      .where('checked_at', '>=', new Date(now() - o.maxAgeHours * 3_600_000)).orderBy('checked_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+  const cutoff = cutoffOf(now(), o.maxAgeHours, o.notBefore);
+  if (cutoff !== null) {
+    const row: StoredLookup | undefined = o.prefetched
+      ? o.prefetched.get(domain)
+      : await db.selectFrom('rdap_lookups').selectAll().where('domain', '=', domain).where('outcome', '!=', 'unknown')
+        .where('checked_at', '>=', cutoff).orderBy('checked_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
     if (row) {
       return {
         outcome: row.outcome as 'registered' | 'not_registered', reasonCode: null, httpStatus: row.http_status, url: '', retrievedAt: row.checked_at,
-        body: null, facts: (row.facts as RdapFacts | null) ?? null, cached: true, evidenceId: row.evidence_id === null ? null : Number(row.evidence_id),
+        body: null, facts: (row.facts as RdapFacts | null) ?? null, cached: true, evidenceId: row.evidence_id === null ? null : Number(row.evidence_id), checkedAt: row.checked_at, rateLimited: 0,
       };
     }
   }
-  const late = (): CachedLookup => ({ outcome: 'unknown', reasonCode: 'TIMEOUT', httpStatus: null, url: '', retrievedAt: new Date(now()), body: null, facts: null, cached: false, evidenceId: null });
+  const late = (): CachedLookup => ({ outcome: 'unknown', reasonCode: 'TIMEOUT', httpStatus: null, url: '', retrievedAt: new Date(now()), body: null, facts: null, cached: false, evidenceId: null, checkedAt: new Date(now()), rateLimited: 0 });
   if (o.deadline !== undefined && now() > o.deadline) return late();
   const call = () => deps.rdapLookup(domain, { baseUrl: o.baseUrl, timeoutMs: o.timeoutMs });
   let skipped = false;
+  let limited = 0;
   const r = await o.pace.run(async () => {
     if (o.deadline !== undefined && now() > o.deadline) { skipped = true; return late(); } // checked again after the wait in the pacer queue
     let x = await call();
+    if (refused(x)) { limited++; o.pace.slowDown(); }
     if (x.reasonCode === 'RATE_LIMITED' && x.retryAfterMs != null && x.retryAfterMs <= MAX_RETRY_AFTER_MS) {
       await deps.sleep(x.retryAfterMs);
       x = await call();
+      if (refused(x)) { limited++; o.pace.slowDown(); }
     }
     return x;
   });
@@ -72,11 +126,24 @@ export async function lookupCached(db: Kysely<Database>, deps: ScreeningDeps, do
   if (text !== null) {
     evidenceId = await storeEvidence(db, { source: 'rdap', url: r.url, retrievedAt: r.retrievedAt, httpStatus: r.httpStatus, contentType: 'application/rdap+json', body: text, text, maxBytes: o.evidenceMaxBytes });
   }
+  const checkedAt = new Date(now());
   await db.insertInto('rdap_lookups').values({
     domain, outcome: r.outcome, reason_code: r.reasonCode, http_status: r.httpStatus, facts: r.facts ? JSON.stringify(r.facts) : null,
-    evidence_id: evidenceId === null ? null : String(evidenceId), checked_at: new Date(now()),
+    evidence_id: evidenceId === null ? null : String(evidenceId), checked_at: checkedAt,
   }).execute();
-  return { ...r, cached: false, evidenceId };
+  return { ...r, cached: false, evidenceId, checkedAt, rateLimited: limited };
+}
+
+/**
+ * Which stored answers a check may reuse (v2.7.0). Test-set runs use `max_answer_age_days` instead of the settings' freshness_hours;
+ * with an explicit as_of (a full run) an answer read before that as_of is never reused, except for a features_as_of 'now' set,
+ * where only the age limit counts. Live runs: the settings' freshness only.
+ */
+export function answerPolicy(ctx: CheckContext, kind: 'census' | 'ext_dates'): { maxAgeHours: number; notBefore?: Date } {
+  const ts = ctx.run.testSet;
+  const maxAgeHours = ts ? ts.maxAnswerAgeDays * 24 : ctx.settings.freshness_hours[kind] ?? 0;
+  const notBefore = ctx.run.mode === 'full' && ctx.item.as_of && !ts?.asOfIsNow ? new Date(ctx.item.as_of) : undefined;
+  return { maxAgeHours, ...(notBefore && !Number.isNaN(notBefore.getTime()) && { notBefore }) };
 }
 
 // ---- IANA bootstrap ----
@@ -180,7 +247,9 @@ export function pacerFor(ctx: CheckContext, baseUrl: string = RDAP_COM_BASE): Pa
   const key = `rdap_pacer:${host}`;
   const hit = ctx.shared.get(key) as Pacer | undefined;
   if (hit) return hit;
-  const p = new Pacer(ctx.settings.run.rdap_min_ms_between, ctx.settings.run.rdap_concurrency, ctx.deps.sleep);
+  const p = ctx.run.testSet
+    ? new Pacer(TEST_SET_RDAP_MIN_MS, TEST_SET_RDAP_CONCURRENCY, ctx.deps.sleep)
+    : new Pacer(ctx.settings.run.rdap_min_ms_between, ctx.settings.run.rdap_concurrency, ctx.deps.sleep);
   ctx.shared.set(key, p);
   return p;
 }

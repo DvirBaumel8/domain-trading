@@ -223,7 +223,7 @@ describe('IANA bootstrap cooldown, per-host pacing, deadline', () => {
   it('one pacer per RDAP host: the same host shares it (com and net are both rdap.verisign.com), another host has its own, and the settings set the pace', async () => {
     const { pacerFor } = await import('../../src/screening/rdap-batch.js');
     const shared = new Map<string, unknown>();
-    const ctx = { shared, settings: { run: { rdap_min_ms_between: 1000, rdap_concurrency: 1 } }, deps: { sleep: async () => {} } } as never;
+    const ctx = { shared, run: {}, settings: { run: { rdap_min_ms_between: 1000, rdap_concurrency: 1 } }, deps: { sleep: async () => {} } } as never;
     const com = pacerFor(ctx, 'https://rdap.verisign.com/com/v1/');
     expect(pacerFor(ctx, 'https://rdap.verisign.com/net/v1/')).toBe(com);
     expect(pacerFor(ctx, 'https://rdap.identitydigital.services/rdap/')).not.toBe(com);

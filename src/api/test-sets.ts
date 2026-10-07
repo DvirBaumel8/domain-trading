@@ -13,7 +13,7 @@ import { gateContext, toLabelledRow } from '../screening/replay.js';
 import { LABEL_RE, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
 import { methodApproval } from '../screening/sibling-methods.js';
 import {
-  LEGACY_TEST_SET_METHOD, TEST_SET_CHECKS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, dayBefore, featuresOfRun, memberHashOf, midnightJerusalem, rescoreReport, splitRoles,
+  LEGACY_TEST_SET_METHOD, TEST_SET_CHECKS, TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, dayBefore, featuresOfRun, memberHashOf, midnightJerusalem, rescoreReport, splitRoles,
 } from '../screening/test-sets.js';
 import type { LabelledFeatures } from '../screening/replay.js';
 import type { InputName } from '../screening/engine.js';
@@ -37,14 +37,15 @@ const Filters = z.object({
   min_words: z.number().int().min(1).optional(), max_words: z.number().int().min(1).optional(), max_chars: z.number().int().min(1).optional(),
   exclude_geo: z.boolean().default(true), min_price_usd: z.number().positive().optional(), as_of_from: ymd.optional(), as_of_to: ymd.optional(),
 }).strict();
+const AnswerAge = z.number().int().min(0).max(30).default(TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS);
 const NewBody = z.object({
   name: z.string().regex(NAME), purpose: z.literal('new'), sibling_method: z.enum(TEST_SET_METHODS).default(TEST_SET_DEFAULT_METHOD), seed: z.string().min(1).max(64),
-  test_share: z.number().gt(0).lt(1).default(0.5), filters: Filters.default({ exclude_geo: true }),
+  test_share: z.number().gt(0).lt(1).default(0.5), max_answer_age_days: AnswerAge, filters: Filters.default({ exclude_geo: true }),
   rows: z.array(SourceRow).min(1).max(2000),
 }).strict();
 const RescoreBody = z.object({
   name: z.string().regex(NAME), purpose: z.literal('rescore'), slices: z.array(z.string().min(1).max(60)).min(1).max(20), settings: z.string().regex(LABEL_RE).optional(),
-  sibling_method: z.enum(TEST_SET_METHODS).default(TEST_SET_DEFAULT_METHOD), features_as_of: z.enum(['row', 'now']).default('row'),
+  sibling_method: z.enum(TEST_SET_METHODS).default(TEST_SET_DEFAULT_METHOD), features_as_of: z.enum(['row', 'now']).default('row'), max_answer_age_days: AnswerAge,
 }).strict();
 const Body = z.discriminatedUnion('purpose', [NewBody, RescoreBody]);
 
@@ -145,13 +146,13 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     const asOfNow = b.purpose === 'rescore' && b.features_as_of === 'now';
     const names: InputName[] = kept.map((k) => ({ domain: k.domain, lane: TEST_SET_LANE, census_list: b.sibling_method, as_of: asOfNow ? createdAt.toISOString() : midnightJerusalem(k.as_of) }));
     const run = await createRun(db, { mode: 'full', checks: TEST_SET_CHECKS, names, ...(b.purpose === 'rescore' && b.settings !== undefined && { settings: b.settings }) },
-      { createdBy: req.auth!.name, auditId: req.auditId!, now: createdAt, deadlineHours: TEST_SET_RUN_HOURS, allowUnapprovedMethod: b.purpose === 'rescore' }, worker.checks);
+      { createdBy: req.auth!.name, auditId: req.auditId!, now: createdAt, deadlineHours: TEST_SET_RUN_HOURS, allowUnapprovedMethod: b.purpose === 'rescore', testSet: { maxAnswerAgeDays: b.max_answer_age_days, asOfIsNow: asOfNow } }, worker.checks);
     try {
       await db.transaction().execute(async (trx) => {
         await trx.insertInto('test_sets').values({
           name: b.name, purpose: b.purpose, settings_label: settingsLabel, seed, test_share: share === null ? null : String(share), filters: JSON.stringify(filters),
           run_id: run.id, created_at: createdAt, created_by: req.auth!.name, status: 'computing',
-          sibling_method: b.sibling_method, features_as_of: b.purpose === 'rescore' ? b.features_as_of : null,
+          sibling_method: b.sibling_method, features_as_of: b.purpose === 'rescore' ? b.features_as_of : null, max_answer_age_days: b.max_answer_age_days,
         }).execute();
         for (let i = 0; i < stored.length; i += 500) {
           await trx.insertInto('test_set_rows').values(stored.slice(i, i + 500).map((s) => ({
@@ -169,7 +170,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     }
     worker.kick(run.id);
     return reply.code(202).send({
-      name: b.name, purpose: b.purpose, sibling_method: b.sibling_method, status: 'computing', run_id: run.id, kept_n: kept.length, removed_n: stored.length - kept.length,
+      name: b.name, purpose: b.purpose, sibling_method: b.sibling_method, max_answer_age_days: b.max_answer_age_days, status: 'computing', run_id: run.id, kept_n: kept.length, removed_n: stored.length - kept.length,
       test_n: kept.filter((k) => k.role === 'test').length, dev_n: kept.filter((k) => k.role === 'dev').length, poll: `/selection/test-sets/${b.name}`,
     });
   });
@@ -189,11 +190,13 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
       report = rescoreReport(labelled, feats.byDomain, sel.label, sel.values, { features_as_of: set.features_as_of ?? 'row', sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD });
     }
     return {
-      name: set.name, purpose: set.purpose, sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD, ...(set.purpose === 'rescore' && { features_as_of: set.features_as_of ?? 'row' }), status, settings_version: set.settings_label, seed: set.seed, test_share: set.test_share === null ? null : Number(set.test_share),
+      name: set.name, purpose: set.purpose, sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD, ...(set.purpose === 'rescore' && { features_as_of: set.features_as_of ?? 'row' }), status, max_answer_age_days: set.max_answer_age_days ?? TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, settings_version: set.settings_label, seed: set.seed, test_share: set.test_share === null ? null : Number(set.test_share),
       filters: set.filters, created_at: set.created_at.toISOString(),
       kept_n: kept.length, removed_n: rows.length - kept.length, test_n: kept.filter((r) => r.role === 'test').length, dev_n: kept.filter((r) => r.role === 'dev').length,
       removed: rows.filter((r) => !r.kept).map((r) => ({ domain: r.domain, reason: r.reason })),
       run: { id: run.id, status: run.status, names_n: feats.names_n, done_n: feats.done_n },
+      lookups: feats.lookups,
+      timing: { started_at: toJerusalemIso(set.created_at), finished_at: run.finished_at ? toJerusalemIso(run.finished_at) : null, minutes: run.finished_at ? Math.round((run.finished_at.getTime() - set.created_at.getTime()) / 600) / 100 : null },
       features: finished ? { census_known_n: [...feats.byDomain.values()].filter((f) => f.registered_share !== null).length, alt_known_n: [...feats.byDomain.values()].filter((f) => f.alt_tld_before_n !== null).length } : null,
       sealed_at: set.sealed_at ? set.sealed_at.toISOString() : null, member_count: set.member_count, member_hash: set.member_hash, report,
     };

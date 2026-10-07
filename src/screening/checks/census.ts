@@ -6,7 +6,7 @@ import { methodApproval } from '../sibling-methods.js';
 import { isKnownMethod, siblingsBt1, usesSplitV2 } from '../siblings.js';
 import { splitV2OfDomain } from '../split-v2.js';
 import { formFieldsOf } from './form.js';
-import { lookupCached, pacerFor, type CachedLookup } from '../rdap-batch.js';
+import { answerPolicy, lookupCached, pacerFor, prefetchStored, type CachedLookup } from '../rdap-batch.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 
 const REF = /^([a-z0-9_]{3,64})(?:@v(\d+))?$/;
@@ -61,36 +61,41 @@ export const censusCheck: Check = {
     const pace = pacerFor(ctx);
     const results: CachedLookup[] = [];
     let calls = 0;
+    const policy = answerPolicy(ctx, 'census');
+    // One query reads every stored answer of the 20 siblings; a stored answer never waits in the pacer.
+    const prefetched = await prefetchStored(ctx.db, terms, { ...policy, now: ctx.now });
     await Promise.all(terms.map(async (d, i) => {
-      const r = await lookupCached(ctx.db, ctx.deps, d, { maxAgeHours: ctx.settings.freshness_hours.census ?? 0, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace, now: ctx.now, deadline: ctx.deadline });
+      const r = await lookupCached(ctx.db, ctx.deps, d, { ...policy, prefetched, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace, now: ctx.now, deadline: ctx.deadline });
       if (!r.cached && r.reasonCode !== 'TIMEOUT') calls++;
       results[i] = r;
     }));
+    const rateLimited = results.reduce((n, r) => n + r.rateLimited, 0);
 
     let nRegistered = 0, nUnknown = 0, undated = 0, after = 0;
     const siblings = terms.map((d, i) => {
       const r = results[i]!;
-      if (r.outcome === 'unknown') { nUnknown++; return { domain: d, status: 'unknown', created_at: null, counted: false, reason_code: r.reasonCode }; }
-      if (r.outcome === 'not_registered') return { domain: d, status: 'not_registered', created_at: null, counted: false };
+      const prov = { checked_at: r.checkedAt.toISOString(), reused: r.cached };
+      if (r.outcome === 'unknown') { nUnknown++; return { domain: d, status: 'unknown', created_at: null, counted: false, reason_code: r.reasonCode, ...prov }; }
+      if (r.outcome === 'not_registered') return { domain: d, status: 'not_registered', created_at: null, counted: false, ...prov };
       const created = r.facts?.created_at ?? null;
       if (created === null) {
         // Registered, creation date unknown: with an explicit as_of it cannot be placed before or after it (A2): out of numerator and denominator.
-        if (explicit) { undated++; return { domain: d, status: 'registered', created_at: null, counted: false, reason_code: 'UNDATED' }; }
+        if (explicit) { undated++; return { domain: d, status: 'registered', created_at: null, counted: false, reason_code: 'UNDATED', ...prov }; }
         nRegistered++;
-        return { domain: d, status: 'registered', created_at: null, counted: true };
+        return { domain: d, status: 'registered', created_at: null, counted: true, ...prov };
       }
-      if (Date.parse(created) < asOf.getTime()) { nRegistered++; return { domain: d, status: 'registered', created_at: created, counted: true }; }
+      if (Date.parse(created) < asOf.getTime()) { nRegistered++; return { domain: d, status: 'registered', created_at: created, counted: true, ...prov }; }
       after++;
-      return { domain: d, status: 'registered', created_at: created, counted: false };
+      return { domain: d, status: 'registered', created_at: created, counted: false, ...prov };
     });
     const asOfExact = ctx.now() - asOf.getTime() <= ctx.settings.census.as_of_exact_max_days * DAY_MS;
     const total = terms.length;
     const nChecked = total - undated;
     // Nothing countable (every sibling undated) is no evidence at all: UNKNOWN, never 0 of 0 read as a share.
-    if (nChecked === 0) return outcome('UNKNOWN', 'TOO_MANY_UNKNOWN', `All ${total} siblings are undated: no registered share can be computed`, { list: listName, ...extraFields, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: 0, n_checked: 0, n_unknown: nUnknown, registered_after_as_of_n: after, undated_excluded_n: undated, siblings, in_use_share: null, registered_share: null }, { upstreamCalls: calls, evidenceIds: [...new Set(results.map((r) => r.evidenceId).filter((x): x is number => x !== null))], dataAsOf: new Date(Math.min(...results.map((r) => r.retrievedAt.getTime()))) });
+    if (nChecked === 0) return outcome('UNKNOWN', 'TOO_MANY_UNKNOWN', `All ${total} siblings are undated: no registered share can be computed`, { list: listName, ...extraFields, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: 0, n_checked: 0, n_unknown: nUnknown, registered_after_as_of_n: after, undated_excluded_n: undated, rate_limited_n: rateLimited, siblings, in_use_share: null, registered_share: null }, { upstreamCalls: calls, evidenceIds: [...new Set(results.map((r) => r.evidenceId).filter((x): x is number => x !== null))], dataAsOf: new Date(Math.min(...results.map((r) => r.retrievedAt.getTime()))) });
     const fields = {
       list: listName, ...extraFields, as_of: asOf.toISOString(), as_of_exact: asOfExact, n_registered: nRegistered, n_checked: nChecked, n_unknown: nUnknown,
-      registered_after_as_of_n: after, undated_excluded_n: undated, siblings, in_use_share: null,
+      registered_after_as_of_n: after, undated_excluded_n: undated, rate_limited_n: rateLimited, siblings, in_use_share: null,
     };
     const extra = { upstreamCalls: calls, evidenceIds: [...new Set(results.map((r) => r.evidenceId).filter((x): x is number => x !== null))], dataAsOf: new Date(Math.min(...results.map((r) => r.retrievedAt.getTime()))) };
     if ((nUnknown + undated) / total > ctx.settings.census.max_unknown_share) {

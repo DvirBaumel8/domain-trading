@@ -599,6 +599,8 @@ export interface TestSetsTable {
   member_hash: string | null;
   sibling_method: 'bt1@v1' | 'bt1@v2' | null;
   features_as_of: 'row' | 'now' | null;
+  /** v2.7.0: NULL (sets before it) reads as 7. */
+  max_answer_age_days: number | null;
 }
 
 export interface TestSetRowsTable {

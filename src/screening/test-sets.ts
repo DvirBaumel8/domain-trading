@@ -18,6 +18,8 @@ export type TestSetMethod = (typeof TEST_SET_METHODS)[number];
 /** Default for a new set (v2.6.0); sets stored before v2.6.0 have no method and read as bt1@v1. */
 export const TEST_SET_DEFAULT_METHOD: TestSetMethod = 'bt1@v2';
 export const LEGACY_TEST_SET_METHOD: TestSetMethod = 'bt1@v1';
+/** v2.7.0: how old a stored registry answer may be and still be reused by a test-set run (days); 0 = always ask again. */
+export const TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS = 7;
 export const TEST_SET_CHECKS: CheckId[] = ['form', 'census', 'ext_dates'];
 export const TEST_SET_LANE: Lane = 'S7';
 
@@ -65,19 +67,39 @@ export interface DomFeatures {
 type RunRowT = { id: string; input: unknown; gate_plan: unknown };
 
 /** The features DOM computed for each name of a test-set run (null unless the check PASSED; nothing is read as zero). */
-export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise<{ byDomain: Map<string, DomFeatures>; done_n: number; names_n: number }> {
+export interface LookupCounts { fresh: number; reused: number; unknown: number; rate_limited: number }
+
+/** v2.7.0: the registry lookups behind a run's census and ext_dates results, read from the per-sibling / per-extension `reused` flags (`rate_limited_n` is summed). */
+function countLookups(rows: { fields: Record<string, unknown> }[], into: LookupCounts): void {
+  for (const r of rows) {
+    const f = r.fields;
+    for (const list of [f.siblings, f.extensions]) {
+      if (!Array.isArray(list)) continue;
+      for (const x of list as { status?: string; reused?: boolean }[]) {
+        if (x.status === 'unknown') into.unknown++;
+        else if (x.reused === true) into.reused++;
+        else into.fresh++;
+      }
+    }
+    if (typeof f.rate_limited_n === 'number') into.rate_limited += f.rate_limited_n;
+  }
+}
+
+export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise<{ byDomain: Map<string, DomFeatures>; done_n: number; names_n: number; lookups: LookupCounts }> {
   const items = (run.input as { names: RunItem[] }).names;
   const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
   const byItem = new Map<number, Awaited<ReturnType<typeof loadRows>>>();
   for (const r of await loadRows(db, run.id)) (byItem.get(r.item_idx) ?? byItem.set(r.item_idx, []).get(r.item_idx)!).push(r);
   const byDomain = new Map<string, DomFeatures>();
   let done = 0;
+  const lookups: LookupCounts = { fresh: 0, reused: 0, unknown: 0, rate_limited: 0 };
   for (const it of items) {
     const latest = latestByCheck(byItem.get(it.idx) ?? []);
     if ((plan[it.lane] ?? []).every((c) => latest.has(c))) done++;
     const form = latest.get('form')?.fields as { word_count?: number; sld_len?: number; city?: string | null; trade?: string | null } | undefined;
     const census = latest.get('census');
     const ext = latest.get('ext_dates');
+    countLookups([census, ext].filter((x): x is NonNullable<typeof x> => x !== undefined), lookups);
     const share = census?.status === 'PASS' && typeof census.fields.registered_share === 'number' ? census.fields.registered_share : null;
     const alt = ext?.status === 'PASS' && typeof ext.fields.alt_tld_before_n === 'number' ? ext.fields.alt_tld_before_n : null;
     byDomain.set(it.domain, {
@@ -86,7 +108,7 @@ export async function featuresOfRun(db: Kysely<Database>, run: RunRowT): Promise
       is_geo: form?.city && form?.trade ? 1 : 0,
     });
   }
-  return { byDomain, done_n: done, names_n: items.length };
+  return { byDomain, done_n: done, names_n: items.length, lookups };
 }
 
 export interface RescoreReport {

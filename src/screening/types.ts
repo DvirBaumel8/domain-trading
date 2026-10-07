@@ -81,6 +81,8 @@ export interface RunView {
   createdAt: Date;
   /** v2.6.0: set only by the test-set rescore path (run input `allow_unapproved_method`); the census then skips the sibling-method approval check. */
   allowUnapprovedMethod?: boolean;
+  /** v2.7.0: set only for test-set runs (run input `test_set`): the answer age limit, the 4-at-a-time RDAP pacer, and whether items are as of the creation instant (features_as_of 'now'). */
+  testSet?: { maxAnswerAgeDays: number; asOfIsNow: boolean };
 }
 
 /** Outside access for checks: every network and DNS call goes through one of these so tests inject fakes. */

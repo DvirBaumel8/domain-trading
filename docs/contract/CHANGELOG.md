@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.7.0 (2026-10-07): CR-010 fast test runs
+MINOR, **additive**. Release note: `docs/releases/v2.7.0.md`.
+- **Provenance:** each census sibling and `ext_dates` extension shows `checked_at` and `reused`; census and `ext_dates` fields add `rate_limited_n`.
+- **Test sets:** `max_answer_age_days` (default 7); `GET` adds `lookups {fresh, reused, unknown, rate_limited}` and `timing`. A stored answer is reused for an `as_of` only if read on or after it.
+- **Speed:** test-set runs ask each registry up to 4 at a time, 250 ms apart, slowing down automatically on a 429 or refusal; stored answers are read in one query per name and never wait for the pacer. Live screening is unchanged.
+
 ## 2.6.0 (2026-10-07): CR-009 sibling method bt1@v2 (frequency-aware split) and acceptance fixes
 MINOR, **additive**. Release note: `docs/releases/v2.6.0.md`.
 - **Sibling method `bt1@v2` (N-8):** the `bt1` recipe on a frozen word split that prefers common words (SCOWL size levels, DOM's term lists, fixed costs; `data/bt1/bt1_v2_split.json` with its sha256). It agrees with the research split on 1,810 of 1,900 vectors (95.3%). `GET /selection/sibling-methods/{method}` adds `split_sha256`. `bt1@v1` is unchanged.
