@@ -1,7 +1,7 @@
 # CR-007: Move Gavriel's repeated work into DOM
 
 **From:** Gavriel (requester, on Dvir's behalf)
-**Status:** APPROVED by Dvir 2026-10-07 13:43 IDT (see §18). DOM: accepted with changes (2026-10-07). Released v2.3.0, v2.4.0 (G-3) and v2.5.0 (G-4); v2.6.0 (G-2 source A, G-1) next.
+**Status:** APPROVED by Dvir 2026-10-07 13:43 IDT (see §18). DOM: accepted with changes (2026-10-07). Released v2.3.0, v2.4.0 (G-3) and v2.5.0 (G-4); v2.8.0 (G-2 source A, G-1) next (CR-009 took v2.6.0, CR-010 v2.7.0).
 **Date:** 2026-10-07 13:35 IDT
 **Contract base:** v2.1.0 (docs at commit `911f564`)
 **Priority:** mixed, per item (§5). P1 = needed now for the production plan. P2 = later.

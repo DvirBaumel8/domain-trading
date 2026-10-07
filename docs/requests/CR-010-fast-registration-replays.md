@@ -1,7 +1,7 @@
 # CR-010: make registration-heavy test runs fast (target: under 15 minutes)
 
 - **From:** Gavriel (acceptance tester), on Dvir's behalf.
-- **Status:** APPROVED by Dvir 2026-10-07 16:37 IDT, in chat, verbatim: "ask DOM to make it shorter and suggest him the 3 items you raised."
+- **Status:** DOM: accepted with changes (2026-10-07); release v2.7.0. APPROVED by Dvir 2026-10-07 16:37 IDT, in chat, verbatim: "ask DOM to make it shorter and suggest him the 3 items you raised."
 - **Does not block CR-009.** Please start the `bt1@v2` rescore of `R15-TEST15-USED` as planned. This request is for every run after it.
 - **Kind of change:** a business need with input/output targets. The three ideas in §3 are suggestions; how to get there is DOM's choice.
 
@@ -35,3 +35,50 @@ Six hours per run slows every rule change to one try a day. Dvir wants the loop 
 - Whether Dvir needs to do anything (for example open a CZDS account).
 
 <!-- DOM writes below this line -->
+## DOM response (2026-10-07)
+**Verdict: accepted with changes.**
+- **Picked:** suggestion 1 (reuse answers), which already half exists, completed and made visible, and a careful version of suggestion 2 (parallel lookups with automatic slow-down).
+- **Not picked:** suggestion 3 (CZDS), for the reason below.
+- **Release:** v2.7.0, before CR-007's drop list and forward test (those move to v2.8.0).
+- **The `bt1@v2` rescore** of `R15-TEST15-USED` was started at 16:4x IDT (`R15-T15-V2-NOW`, run `run_823a67a9…`). DOM polls it and reports in CR-009.
+
+### What exists today
+- **Every registry answer is stored** (`rdap_lookups`: the answer, the facts, `checked_at`, an evidence row).
+- **Reuse:** the census and `ext_dates` reuse an answer for `freshness_hours.census` (720 hours in the active v1, 168 in `v11`).
+- **Cost of a rerun:** only the time to read the stored answers.
+- **Shared store:** the stored answers already feed live screening too (T10-6).
+- **Why the first run is slow:** the 18,000 sibling lookups are new, and they are paced at 1 per second (`run.rdap_concurrency` 1, `run.rdap_min_ms_between` 1000), about 5 hours.
+
+### v2.7.0
+1. **Provenance (T10-4).**
+   - **Per sibling:** each census sibling and each extension in `ext_dates` shows `checked_at` and `reused: true|false`.
+   - **Per run:** the test set's `GET` reports `lookups: {fresh, reused, unknown}`.
+   - **Age limit:** a test set takes `max_answer_age_days` (default **7**; 0 = always ask again).
+2. **Date safety (T10-5).**
+   - **Rule:** an answer may be reused for a name's `as_of` only if it was read **on or after** that `as_of` and within the age limit.
+   - **Why this direction is safe:** a newer answer is safe for an older date, because the creation date shows whether the sibling already existed. An answer read before the date could miss a sibling registered in between, so it is never reused.
+   - **For `features_as_of: "now"`:** this means "within the age limit".
+3. **Faster fresh lookups (T10-7).**
+   - **Concurrency:** test-set runs ask Verisign RDAP **4 at a time**, at least 250 ms apart: about 4 per second instead of 1.
+   - **Automatic slow-down:** on a 429 or a refusal, the run halves its rate, honours `Retry-After`, and records it (`lookups.rate_limited`).
+   - **Never a silent answer:** a lookup that still fails is UNKNOWN `RATE_LIMITED` / `SOURCE_ERROR`, never "not registered".
+   - **Unchanged:** live screening keeps its own pacing.
+   - **Why not faster:** Verisign publishes no rate for RDAP, so DOM stays well under anything that looks like abuse.
+4. **Timing in the report:** each test set's `GET` shows `started_at`, `finished_at` and the minutes taken, so T10-1 and T10-2 can be read directly.
+
+### Expected times (to be measured and written in the v2.7.0 release note)
+| Test | Expected |
+|---|---|
+| **T10-1** (rerun within 7 days) | **A few minutes.** Every sibling is already stored, so there are no registry calls, only database reads. **Meets < 15 min.** |
+| **T10-2** (≤ 10% of splits changed) | About 10% of 18,000 = ≤ 1,800 new siblings at about 4 per second ≈ **8 minutes** plus the reads. **Meets < 15 min.** |
+| **T10-3** (about 900 new names, nothing stored) | About 18,000 lookups at about 4 per second ≈ **75 minutes** (5 hours today). **Under 15 minutes is not reachable safely through RDAP.** |
+
+### Suggestion 3 (CZDS): still not the right answer, for the census
+- **It measures a different thing.** The zone file lists names **published in DNS**, not names **registered**. A registered name on hold, or with no nameservers, is registered but not in the zone. RDAP, which the research and v11's cut-off used, counts it as registered. Using the zone would quietly lower every share, and the 0.55 cut-off was never tested on that measure.
+- **It has no dates.** It can't answer `features_as_of: "row"` (creation dates), as you note.
+- **What Dvir would need, if wanted later:**
+  - an account at czds.icann.org and a request for `.com`, which Verisign approves, typically in days to weeks;
+  - two Render secrets (`CZDS_USERNAME`, `CZDS_PASSWORD`).
+- **Cost and terms:** streaming the file daily could fit $0. DOM would review the terms before building.
+- **Possible later use:** it may fit the drop list (CR-007 G-2 source B) better than the census.
+- **DVIR:** nothing needed now. T10-3 stays at about 75 minutes unless Dvir accepts the zone's different measure, which DOM does not recommend.
