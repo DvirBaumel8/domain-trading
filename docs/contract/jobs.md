@@ -1,4 +1,4 @@
-# Jobs (contract v2.0.2)
+# Jobs (contract v2.1.0)
 
 The service runs **no timers of its own**. All scheduled work goes through one route, called by a Cloudflare Worker cron (`jobs-trigger/`). Since 2.1.0 the cron fires **once a day** (00:05 UTC) and runs `daily` only; `tick` stays callable by hand. Bots don't call it; they see the results in `GET /audit` and `GET /report`.
 
@@ -16,6 +16,10 @@ The service runs **no timers of its own**. All scheduled work goes through one r
   - `summary` is the step's own result object (counts and names, see below). Its fields are informational, not part of the contract.
 - **Audit:** one `audit_log` row with scope `job` and a summary such as `tick: ok`, `daily: failed backupExport` or `daily: skipped`.
 - **Rate limit:** 10 calls per minute for the job token.
+
+## Reading the runs (2.1.0)
+- `GET /jobs/runs` (READ) lists every run recorded since 2.1.0 with its trigger and the full step results; `POST /jobs/preview` (WRITE) shows what `priceJob` and `dropJob` would do on a chosen day (`endpoints.md`). Both are read-only toward registrars and marketplaces.
+- **Overdue:** `/report` raises the error warning `JOB_OVERDUE` and `GET /health` shows `jobs: "overdue"` when no `daily` run has finished in the last **26 hours** (a constant in the service, `JOBS_OVERDUE_HOURS`; a change needs a release). A run started by hand counts; `tick`, a skipped overlap and a preview do not.
 
 ## Schedules (Cloudflare Worker cron, UTC)
 

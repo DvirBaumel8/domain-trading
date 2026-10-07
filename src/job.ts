@@ -37,7 +37,7 @@ async function main(argv: string[]): Promise<number> {
       // The same app wiring as the server (never listening), so the runner has the server's adapters, locks and scrubbing.
       const app = await buildApp({ config, db, backupExport: new BackupExporter({ db, config, now: Date.now, log }) });
       try {
-        const r = await app.jobRunner.run(positionals[0]);
+        const r = await app.jobRunner.run(positionals[0], { trigger: 'cli' });
         const failed = Object.entries(r.steps).filter(([, st]) => !st.ok).map(([k]) => k);
         // The run-level audit row POST /jobs/run gets from the middleware (a skipped overlap is recorded too).
         await db.insertInto('audit_log').values({

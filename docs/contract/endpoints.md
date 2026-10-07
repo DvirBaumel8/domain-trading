@@ -1,4 +1,4 @@
-# Endpoints (contract v2.0.2)
+# Endpoints (contract v2.1.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -28,6 +28,8 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/tranches`, `/tranches/{id}/members`, `/tranches/{id}/close` | WRITE | Tranches |
 | GET | `/tranches` | READ | Tranches |
 | POST | `/jobs/run` | job token | Jobs (`jobs.md`) |
+| GET | `/jobs/runs` | READ | Jobs (`jobs.md`) |
+| POST | `/jobs/preview` | WRITE | Jobs (`jobs.md`) |
 
 ---
 
@@ -39,7 +41,8 @@ The only public route. No auth, no DB access (Render's health check uses it).
 
 ### `GET /health`
 Any valid bot token (READ or WRITE).
-- **200** `{status: "ok", db: "ok", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` when the DB can't be reached.
+- **200** `{status: "ok", db: "ok", jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
+- `jobs` (2.1.0, additive) is `overdue` when no `daily` run has finished in the last 26 hours (the same rule as the `/report` warning `JOB_OVERDUE`), else `ok`. A run started by hand counts. `GET /health/ping` is unchanged (no DB).
 - `version` is the service build version (`package.json`), not the contract version. The only scheduled job is the daily run at 00:05 UTC (`jobs.md`); its rows are in `GET /audit` (scope `job`). No secret, key prefix or balance is ever shown.
 
 ---
@@ -82,7 +85,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
   | `override`, `override_reason` | bool?, string \| null | only when `proposed_listing` needs a guard override (uses this call's `approval_ref`) |
   | `deal_id` | string \| null | `D-` + 3 or more digits; creates/updates the deal |
   | `registrar` | string \| null | pin one registrar; no fallback |
-  | `dry_run` | bool? | default `false` |
+  | `dry_run` | bool \| `"strict"`? | default `false`. `true`: a dry run. `"strict"` (2.1.0): a dry run that returns the first real-buy gate refusal as the error (below). Any other value → 422 `VALIDATION_ERROR` |
   | `auto_list` | bool? | default `true`: after the buy, point NS at the lander and store the listing |
 
 - **Checks, in order (any failure stops the call; no registrar call before check 6):** approval (`APPROVAL_INVALID` / `APPROVAL_EXPIRED`) → `proposed_listing.mode` (`MODE_INVALID`) → category (`CATEGORY_REQUIRED`) → grade (`GEO_GRADE_REQUIRED` / `GRADE_NOT_GEO`) → the listing rules for `proposed_listing` (the `/list` listing codes, plus `PRICING_FORMULA_MISMATCH`; a geo BIN must equal the grade price; under `pricing_settings` v3 also `BIN_NOT_IN_PRICE_LIST` and `LANDER_EXCEPTION_REQUIRED`) → comps (`COMPS_REQUIRED` / `COMPS_INVALID`) → settings version (409 `SETTINGS_VERSION_CHANGED`) → **buy hold** (409 `BUY_HOLD`, real buys only, see below) → **screening pack** (409 `SCREENING_PACK_REQUIRED`, real buys only, v2.0.0) → **open tranche** (409 `NO_TRANCHE`, real buys only, v2.0.0) → not owned (409 `ALREADY_OWNED_OR_PENDING` / `ALREADY_IN_PORTFOLIO`) → domain cap (409 `DOMAIN_CAP_REACHED`) → live re-check, no cache (409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE`) → price caps, then the cheapest two-year (409 `PRICE_ABOVE_MAX`, `details.cheapest`) → **tranche spend cap** (409 `TRANCHE_SPEND_CAP`, v2.0.0; also re-checked under the global buy lock) → POC cap $1,500 including open purchases (409 `POC_CAP_EXCEEDED`, `details` `cap_cents`, `spent_cents`, `spent`, `pending_cents`, `remaining_cents`, `remaining`, `cost_cents`) → registrar account (409 `REGISTRAR_STATE_UNKNOWN` / `REGISTRAR_AUTO_TOPUP_ON` / `REGISTRAR_FUNDS`) → the registrar's own dry run with the exact cost (409 `REGISTRAR_DRY_RUN_FAILED` with `details.registrar_code`; a price change re-quotes once and re-checks the caps; an ambiguous answer → 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`).
@@ -98,6 +101,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
     advisories: [string], warnings: [string] }
   ```
   Writes only the audit row and the quotes. The same key can't be reused for a real buy (different body → 409).
+  **`dry_run: "strict"` (2.1.0, additive).** The same call as `dry_run: true` (same checks, same 200 body when nothing blocks, same side effects: only the audit row and the quotes), except that the first real-buy gate refusal is returned **as the error**, in the contract order: 409 `BUY_HOLD`, then `SCREENING_PACK_REQUIRED` (with `details.reason` and `details.pack_id`), then `NO_TRANCHE`, then `TRANCHE_SPEND_CAP` (after the quote is known; its `details` as for a real buy). These errors carry exactly the details a real buy gives (no `would_be_blocked` field). It never registers or charges. Use it to see each gate's real error without a purchase; use `dry_run: true` to see which gate would block.
   **Dry-run errors after the DOM gates (2.0.2, additive).** In a dry run, any error thrown after the DOM gates were evaluated (from the not-owned check on: `ALREADY_OWNED_OR_PENDING`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS`, `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, and so on) adds `would_be_blocked`, `screening_pack` and `advisories` to its `error.details`, with the same shapes as the 200 body. Errors before the gates (approval, validation, comps, settings version) and all real buys are unchanged. Example: with the Porkbun balance at $0, a dry run answers 409 `REGISTRAR_FUNDS` with `details.would_be_blocked: "BUY_HOLD"` (or the first blocking gate).
   **`would_be_blocked` (2.0.0, breaking type change: was the literal `"BUY_HOLD"`).** The first gate a real `/buy` would refuse on now, in this order, or `null`: `BUY_HOLD` → `SCREENING_PACK_REQUIRED` → `NO_TRANCHE` → `TRANCHE_SPEND_CAP`. `screening_pack` is the **latest** pack of the domain (`none` when it has none). `advisories` is unchanged (`"SCREENING_PACK_REQUIRED"` unless that pack is `complete`, `"PACK_NOT_FROM_LATEST_RUN"` when its run is not the domain's latest); it duplicates the gate and is kept for callers of 1.2.0.
 - **Screening pack gate (2.0.0, breaking).** A real `/buy` (not a dry run) needs the domain's **latest** pack to be `complete`, from the domain's **latest** screening run, issued while its settings version was active and still **the active version**, and issued at most `pack.max_age_at_buy_hours` (default 72) before the call. Otherwise 409 `SCREENING_PACK_REQUIRED` with `details.reason` (`NO_PACK`, `INCOMPLETE`, `NOT_FROM_LATEST_RUN`, `SETTINGS_NOT_ACTIVE`, `PACK_TOO_OLD`) and `details.pack_id` (null for `NO_PACK`). Checked after `BUY_HOLD` and before any registrar call or money write. Manual imports (`import-domain`) are not affected.
@@ -490,6 +494,32 @@ A closed tranche is read-only in the database as well (an update of the tranche 
 
 ### `POST /jobs/run`
 The job token only (see `jobs.md`). Body `{"job": "tick" | "daily"}` (strict; anything else → 422 `VALIDATION_ERROR`). Needs `Idempotency-Key`. **200** `{job, skipped: bool, steps: {<step>: {ok, skipped?, error?, summary}}, started_at, finished_at}`. **503** `JOBS_DISABLED` when the job token isn't configured.
+
+---
+
+### `GET /jobs/runs`
+READ (any `GET` token; not the job token). Query (all optional; an unknown parameter or a bad value → **400** `VALIDATION_ERROR`): `job` (`tick` | `daily`), `since` (ISO 8601 with an offset; runs that finished at or after it), `limit` (1 to 500, default 50). **200:**
+```
+{ runs: [ { job, trigger: "scheduled" | "manual" | "cli", scheduled_for: ISO | null,
+            started_at, finished_at, skipped: bool, ok: bool,
+            steps: { <step>: { ok, skipped?, error?, summary } } } ],          // newest first
+  jobs: { tick: { last_run_at, last_ok_at, next_due_at: null },
+          daily: { last_run_at, last_ok_at, next_due_at } },                   // ISO | null
+  reference: { popularity: { list_id, list_date, rows, refreshed_at } | null,
+               iana: { refreshed_at: ISO | null }, namebio: { enabled: false } },
+  backup: { configured: bool, last_status: "ok" | "failed" | "skipped" | null } }
+```
+- `trigger`: `scheduled` when the `Idempotency-Key` of the `POST /jobs/run` call is the Worker's `<job>-<ms>` (`scheduled_for` is that time), `manual` for any other call, `cli` for `npm run job`. `steps` are the step results exactly as `POST /jobs/run` returned them (`jobs.md`). A skipped overlap is listed (`skipped: true`, `steps: {}`); a failed run has `ok: false`.
+- `last_run_at` / `last_ok_at` ignore skipped overlaps. `next_due_at` is the next 00:05 UTC for `daily`; `tick` has no schedule (`null`).
+- `reference` is the snapshot in use now. `backup.last_status` is the last daily run's `backupExport` step (`null` before any run). Times use the Asia/Jerusalem offset. No secret, token or repository address is ever shown. Only runs since 2.1.0 are listed.
+
+### `POST /jobs/preview`
+WRITE. Body (strict): `{today?: "YYYY-MM-DD"}`. `today` is an Asia/Jerusalem day, default today, at most 3 years ahead; a past day, a later day, a non-date or an unknown field → **422** `VALIDATION_ERROR`. Needs `Idempotency-Key`. Runs `priceJob` and `dropJob` as a dry run on the real data as of that day. **200:**
+```
+{ today, priceJob: { would_apply: [...], would_supersede: [...], held: [...], would_delist: [...] },
+  dropJob: { would_drop: [...] } }
+```
+The arrays are the `applied`, `superseded`, `held`, `delisted` and `dropped` fields of the jobs' dry-run summaries (`jobs.md`). A job that was already running adds `skipped: true`. Writes only the audit row (summary `preview <day>: ok`); it never calls a registrar, a marketplace or a nameserver, it does not touch the domains or the schedule, and it is **not** a run (it does not appear in `GET /jobs/runs` and does not satisfy `JOB_OVERDUE`). The other job steps are not previewed.
 
 ---
 

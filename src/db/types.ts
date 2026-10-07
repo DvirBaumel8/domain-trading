@@ -283,6 +283,18 @@ export interface ExportUploadsTable {
   created_at: TimestampDefault;
 }
 
+export interface JobRunsTable {
+  id: Generated<number>;
+  job: 'tick' | 'daily';
+  trigger: 'scheduled' | 'manual' | 'cli';
+  scheduled_for: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  started_at: Timestamp;
+  finished_at: Timestamp;
+  skipped: boolean;
+  ok: boolean;
+  steps: Json;
+}
+
 export interface PricingSettingsTable {
   version: number;
   effective_at: Timestamp;
@@ -627,6 +639,7 @@ export interface Database {
   manual_quotes: ManualQuotesTable;
   rdap_lookups: RdapLookupsTable;
   reference_files: ReferenceFilesTable;
+  job_runs: JobRunsTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

@@ -6,7 +6,7 @@ import { TEST_DATABASE_URL } from './env.js';
 export const testDb: Kysely<Database> = createDb(TEST_DATABASE_URL);
 
 const TABLES = [
-  'replay_runs', 'holdout_suites', 'labelled_names', 'registrar_presence', 'rdap_lookups', 'reference_files', 'manual_quotes', 'tranche_members', 'tranches', 'screening_packs', 'screening_verdicts', 'screening_results', 'screening_runs', 'screening_evidence', 'selection_lists', 'selection_settings',
+  'job_runs', 'replay_runs', 'holdout_suites', 'labelled_names', 'registrar_presence', 'rdap_lookups', 'reference_files', 'manual_quotes', 'tranche_members', 'tranches', 'screening_packs', 'screening_verdicts', 'screening_results', 'screening_runs', 'screening_evidence', 'selection_lists', 'selection_settings',
   'sales', 'offers', 'price_schedule', 'pricing_evidence', 'pricing_settings', 'export_uploads', 'export_runs', 'idempotency_keys', 'audit_log', 'receipts', 'purchases', 'quotes', 'listing_history',
   'ledger_entries', 'domains', 'deals', 'api_tokens',
 ];
@@ -23,6 +23,13 @@ export async function resetDb(db: Kysely<Database>): Promise<void> {
     await sql`DELETE FROM settings`.execute(conn);
     await sql`INSERT INTO settings DEFAULT VALUES`.execute(conn);
   });
+}
+
+/** A finished daily job run one hour before `atMs`, so /report carries no JOB_OVERDUE warning (v2.1.0). */
+export async function seedDailyRun(db: Kysely<Database>, atMs: number): Promise<void> {
+  await db.insertInto('job_runs').values({
+    job: 'daily', trigger: 'scheduled', started_at: new Date(atMs - 3_660_000), finished_at: new Date(atMs - 3_600_000), skipped: false, ok: true, steps: '{}',
+  }).execute();
 }
 
 export async function insertOwnedDomain(db: Kysely<Database>, overrides: Partial<DomainInsert> = {}): Promise<number> {

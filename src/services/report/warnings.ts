@@ -5,6 +5,7 @@ import { computePlan } from '../../pricing/plan.js';
 import { settingsByVersion } from '../../pricing/settings.js';
 import { toJerusalemIso } from '../../time.js';
 import { manualDelist, pendingDomains, VENUES } from '../export-state.js';
+import { JOBS_OVERDUE_HOURS, jobsOverdue } from '../job-runs.js';
 import { pair, priceValues } from './money.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
@@ -19,6 +20,14 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   const add = (code: string, level: WarningLevel, message: string, domain?: string, details: Record<string, unknown> = {}) =>
     out.push({ code, level, ...(domain ? { domain } : {}), message, details });
   const today = jerusalemDate(now);
+
+  // CR-005 N-2: the schedule itself. A manual daily run counts; a tick or a skipped overlap does not.
+  const overdue = await jobsOverdue(db, now.getTime());
+  if (overdue.overdue) {
+    add('JOB_OVERDUE', 'error', `No daily job run has finished in the last ${JOBS_OVERDUE_HOURS} hours.`, undefined, {
+      job: 'daily', last_run_at: overdue.lastRunAt ? toJerusalemIso(overdue.lastRunAt) : null, expected_every: '24h',
+    });
+  }
   const domains = await db.selectFrom('domains').selectAll().where('status', '!=', 'pending_purchase').orderBy('domain').execute();
   const nameOf = new Map(domains.map((d) => [d.id, d.domain]));
   const statusOf = new Map(domains.map((d) => [d.id, d.status]));

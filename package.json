@@ -1,6 +1,6 @@
 {
   "name": "domain-trading",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -21,6 +21,7 @@
     "job": "tsx --env-file-if-exists=.env src/job.ts",
     "db:up": "docker compose up -d --wait db",
     "record:screening": "tsx --env-file-if-exists=.env scripts/record-screening-fixtures.ts",
+    "evidence": "tsx scripts/evidence.ts",
     "contract:refresh-spec": "tsx scripts/refresh-porkbun-spec.ts"
   },
   "dependencies": {

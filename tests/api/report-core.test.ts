@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { addOneYear } from '../../src/dates.js';
 import { offersByStrategy, perDomainOffers } from '../../src/services/offer-stats.js';
 import { makeApp } from '../helpers/app.js';
-import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
+import { insertOwnedDomain, seedDailyRun, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
 import { issueToken } from '../helpers/tokens.js';
@@ -56,6 +56,7 @@ async function r1Fixture() {
 describe('GET /report core: money', () => {
   it('R-1: fixture ledger gives the spec figures', async () => {
     await r1Fixture();
+    await seedDailyRun(db, NOW); // a recent daily run, so JOB_OVERDUE (v2.1.0) is not raised
     const t = await boot();
     const r = await t.report();
     expect(r.budget).toMatchObject({ spent_cents: 2107, spent: '$21.07', remaining_cents: 147893, remaining: '$1,478.93', poc_cap_cents: 150000, poc_cap: '$1,500.00' });

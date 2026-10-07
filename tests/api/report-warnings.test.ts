@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { makeApp } from '../helpers/app.js';
-import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
+import { insertOwnedDomain, seedDailyRun, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
 import { issueToken } from '../helpers/tokens.js';
@@ -40,6 +40,7 @@ describe('GET /report warnings', () => {
   it('a clean fixture has none of the warnings', async () => {
     await insertOwnedDomain(db, { domain: 'clean-one.com' });
     await insertOwnedDomain(db, { domain: 'clean-geo.com', status: 'listed', category: 'geo', price_grade: 'weaker', listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, walkaway_cents: 39900, min_offer_cents: 39900, pricing_source: 'formula', pricing_settings_version: 2 });
+    await seedDailyRun(db, NOW); // a recent daily run, so JOB_OVERDUE (v2.1.0) is not raised
     const t = await boot();
     expect(await t.warnings()).toEqual([]);
   });

@@ -30,7 +30,7 @@ export interface BuyInput {
   dealId: string | null; category: string | null;
   priceGrade: 'strong' | 'weaker' | null; pricingEvidence: unknown; expectedSettingsVersion: number | null;
   proposedListing: ListingRequest | null; override: boolean; overrideReason: string | null;
-  registrar: string | null; dryRun: boolean; autoList: boolean; requestBody: unknown;
+  registrar: string | null; dryRun: boolean; /** `dry_run: "strict"`: a dry run whose first real-buy gate refusal is the answer (CR-005 N-7). */ strictDry?: boolean; autoList: boolean; requestBody: unknown;
 }
 export interface BuyCtx { idempotencyKey: string; requestHash: string; auditId: string }
 export interface BuyResult { status: number; body: Record<string, unknown> }
@@ -114,9 +114,11 @@ export class BuyService {
     const ver = checkSettingsVersion(input.expectedSettingsVersion, pricing);
     if (ver) throw new AppError(ver.status, ver.code, ver.message, ver.details);
 
+    const gateRefuses = !input.dryRun || input.strictDry === true; // a real buy, or a strict dry run, is refused at the first gate
+
     // 3c. buy hold (v1.1.0, R1): only a name that was screened. A dry run reports it instead of refusing.
     const hold = await screeningHold(db, input.domain);
-    if (hold && !input.dryRun) {
+    if (hold && gateRefuses) {
       throw new AppError(409, 'BUY_HOLD', `${input.domain} was screened under selection settings "${hold.settingsVersion}" while buy_hold is on (or the version is a backtest or no longer active); no real buy`,
         { settings_version: hold.settingsVersion, run_id: hold.runId });
     }
@@ -124,10 +126,10 @@ export class BuyService {
     // 3d. v2.0.0: a complete, current screening pack, then an open tranche (the spend cap is checked once the quote is known). A dry run reports the first.
     let blocked: BuyBlock | null = hold ? 'BUY_HOLD' : null;
     const pg = await packGate(db, input.domain, now.getTime());
-    if (pg && !input.dryRun) throw gateError(pg);
+    if (pg && gateRefuses) throw gateError(pg);
     blocked ??= pg?.code ?? null;
     const tg = await trancheGate(db, input.domain);
-    if ('gate' in tg && !input.dryRun) throw gateError(tg.gate);
+    if ('gate' in tg && gateRefuses) throw gateError(tg.gate);
     blocked ??= 'gate' in tg ? tg.gate.code : null;
     const trancheId = 'trancheId' in tg ? tg.trancheId : null;
 
@@ -176,7 +178,7 @@ export class BuyService {
       // 8b. tranche spend cap on this quote (re-checked under the global lock for real buys)
       if (trancheId) {
         const cg = await spendCapGate(db, trancheId, winner.firstYearCents!);
-        if (cg && !input.dryRun) throw gateError(cg);
+        if (cg && gateRefuses) throw gateError(cg);
         blocked ??= cg?.code ?? null;
       }
 
@@ -188,7 +190,7 @@ export class BuyService {
         { input, ctx, approvedAt: appr.approvedAt, check, category, trancheId });
 
     } catch (e) {
-      if (input.dryRun && e instanceof AppError) {
+      if (input.dryRun && e instanceof AppError && !(input.strictDry && e.code === 'TRANCHE_SPEND_CAP')) {
         throw new AppError(e.status, e.code, e.message, { ...e.details, ...(await this.gateFields(input.domain, blocked)) });
       }
       throw e;

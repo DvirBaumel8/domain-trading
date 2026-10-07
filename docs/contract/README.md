@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 2.0.2** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 2.1.0** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -10,6 +10,7 @@
 | `reports.md` | `GET /report` fields and warnings (with levels) |
 | `selection.md` | Selection and screening checks: statuses, codes, shapes (v1.1.0) |
 | `formats.md` | The Afternic CSV, the Sedo file, the ledger CSV, and other exported shapes |
+| `test-evidence.md` | Generated map: every code in the code index, and every guarantee, to the automated tests that prove it (2.1.0) |
 | `CHANGELOG.md` | Contract versions |
 
 **Versioning (semver).** A MAJOR change breaks a caller: a route, field or code removed or renamed, a type or meaning changed, a rule tightened. A MINOR change adds something optional: a route, a response field, a warning, an error code on a new path. A PATCH fixes the docs or fixes behaviour back to what this contract already says. Every change is listed in `CHANGELOG.md` and announced in a release note (`docs/releases/`). Callers must ignore unknown response fields.
@@ -31,6 +32,7 @@
 - **An unauthenticated request writes nothing** to the database: no audit row, no idempotency row. This covers refusals, unknown routes and framework errors (bad URL encoding and the like; answered with `INVALID_REQUEST`).
 - **Failed-auth limiter:** 20 or more failed authentications from one client IP (the 21st request is refused) within a rolling 10 minutes → **429** `RATE_LIMITED` with `Retry-After` (seconds) and `details.retry_after_seconds`, before any token lookup. While an IP is blocked, a bot token verified in the last 10 minutes and the correct job token still get through (a revoked token never does).
 - **Rate limits per token:** 60 GET and 10 POST per minute (sliding window; the job token has its own). Over the limit → **429** `RATE_LIMITED` with `Retry-After`. A 429 never claims an `Idempotency-Key`.
+- **Rate-limit headers (2.1.0):** every authenticated response, a 429 included, carries `RateLimit-Limit` (60 for a GET, 10 for a POST), `RateLimit-Remaining` (calls left in the window for that token and method class) and `RateLimit-Reset` (seconds until the oldest counted call leaves the window; on a 429 it equals `Retry-After`). `GET /health/ping` and refused (401) requests carry none.
 - `HEAD` is answered for every `GET` route, with the same auth. On `/export/afternic.csv` and `/export/sedo.csv` a HEAD runs the GET handler: it writes an `export_runs` row and returns an `X-Export-Id`.
 
 ## Idempotency (every POST)
@@ -71,6 +73,8 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 10. **No LLM calls** inside the service.
 11. **Buy hold (v1.1.0):** while a screened name's latest screening run has `buy_hold` on (or is a backtest or no longer the active settings version), a real `/buy` of it is refused (409 `BUY_HOLD`). A name never screened is not held.
 12. **Hosting costs $0:** Render free web service, Neon free Postgres and a Cloudflare Worker cron.
+
+**Evidence (2.1.0).** `test-evidence.md` maps every code in the code index, and guarantees 6 (every append-only table), 9 and 10, the no-top-up rule and the network-blocked test suite, to the automated tests that prove them. It is generated from the test sources (`npm run evidence`), and a test in the default suite fails when it is out of date or when a code has no test.
 
 **Known limits:**
 - Export pending and manual-delist flags (`X-Pending-Changes`, `X-Manual-Delist`, `EXPORT_PENDING`, `MANUAL_DELIST`) assume Gavriel calls the API **sequentially**. A `/list` change that races a concurrent export may be counted as already exported. They also compare timestamps taken from the app clock.

@@ -10,6 +10,14 @@ export interface StepResult {
 
 export type JobKind = 'tick' | 'daily';
 
+export type JobTrigger = 'scheduled' | 'manual' | 'cli';
+
+export interface RunOptions {
+  /** `scheduled` = the Worker's `<job>-<ms>` key, `manual` = any other job-token call, `cli` = `npm run job`. Default `manual`. */
+  trigger?: JobTrigger;
+  scheduledFor?: Date | null;
+}
+
 export interface JobRunResult {
   job: JobKind;
   skipped: boolean;
@@ -50,13 +58,32 @@ export class JobRunner {
 
   constructor(private readonly deps: JobRunnerDeps) {}
 
-  async run(job: JobKind): Promise<JobRunResult> {
-    if (this.active.has(job)) return { job, skipped: true, steps: {} };
+  async run(job: JobKind, opts: RunOptions = {}): Promise<JobRunResult> {
+    const started = new Date(this.deps.now());
+    if (this.active.has(job)) {
+      const skipped: JobRunResult = { job, skipped: true, steps: {} };
+      await this.record(skipped, opts, started);
+      return skipped;
+    }
     this.active.add(job);
     try {
-      return { job, skipped: false, steps: job === 'tick' ? await this.tick() : await this.daily() };
+      const result: JobRunResult = { job, skipped: false, steps: job === 'tick' ? await this.tick() : await this.daily() };
+      await this.record(result, opts, started);
+      return result;
     } finally {
       this.active.delete(job);
+    }
+  }
+
+  /** Keeps the run's step summaries (job_runs, append-only). Best effort: a failed write never fails or changes the run. */
+  private async record(r: JobRunResult, opts: RunOptions, started: Date): Promise<void> {
+    try {
+      await this.deps.db.insertInto('job_runs').values({
+        job: r.job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, started_at: started,
+        finished_at: new Date(this.deps.now()), skipped: r.skipped, ok: Object.values(r.steps).every((s) => s.ok), steps: JSON.stringify(r.steps),
+      }).execute();
+    } catch {
+      // not recorded; the audit row still records the run
     }
   }
 

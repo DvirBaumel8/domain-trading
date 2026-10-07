@@ -121,7 +121,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerIdempotency(app, deps.db); // preHandler (after scope) + onSend (before audit write)
   registerAuditWrite(app, auditWriter); // onSend (last)
 
-  registerHealth(app, deps.config, deps.db);
+  registerHealth(app, deps.config, deps.db, deps.now ?? Date.now);
   const adapters = deps.adapters ?? createAdapters(deps.config);
   const checkService = new CheckService({
     db: deps.db,
@@ -175,7 +175,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     dropJob: app.dropJob, registrarCheckJob: app.registrarCheckJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
     secretValues: deps.config.secretValues,
   }));
-  registerJobs(app, app.jobRunner);
+  registerJobs(app, app.jobRunner, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   deps.registerExtraRoutes?.(app);
   return app;
 }

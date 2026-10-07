@@ -31,7 +31,7 @@ const BuyBody = z.object({
   override: z.boolean().optional(),
   override_reason: z.string().nullable().optional(),
   registrar: z.string().nullable().optional(),
-  dry_run: z.boolean().optional(),
+  dry_run: z.union([z.boolean(), z.literal('strict')]).optional(),
   auto_list: z.boolean().optional(),
 }).strict();
 
@@ -62,7 +62,8 @@ export function registerBuy(app: FastifyInstance, service: BuyService): void {
         override: b.override ?? false,
         overrideReason: b.override_reason ?? null,
         registrar: b.registrar ?? null,
-        dryRun: b.dry_run ?? false,
+        dryRun: b.dry_run === true || b.dry_run === 'strict',
+        strictDry: b.dry_run === 'strict',
         autoList: b.auto_list ?? true,
         requestBody: req.body,
       },
