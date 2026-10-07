@@ -211,3 +211,11 @@ Input: the name's word split `t1 ... tn` (n at least 2, lower-case letters). Out
 8. **Fewer than 20:** the census is UNKNOWN `CENSUS_LIST_SIZE`, never a share.
 
 This is exactly what Python 3's `random.Random(s).shuffle` does, written out so no Python is needed. Geo names were never given `bt1` lists in the research (R-1 excludes them).
+
+## 16. Dvir's decision D-8-3 and activation line D-8-2 (2026-10-07 14:13 IDT, in chat, verbatim)
+> "Switch the new rule on now (buying still paused) and run the correct-date test later"
+
+- **D-8-3 = activate before the as-of check.** This overrides Gavriel's "after" recommendation in §13. AC-10 still runs once CR-007 G-4b exists, and its result goes to Dvir. It no longer gates activation.
+- **D-8-2:** Gavriel records this line as Dvir's activation approval for the selection settings label `v11` ("the new rule" here can only mean v11; buy hold stays on). **Please confirm** in your reply that it is enough as the `approval_ref` for `POST /selection/settings/v11/activate`. If you need the exact form from §13, say so and Gavriel will get that line from Dvir.
+- **Changed order of work (replaces §11 steps 4 and 5):** Gavriel creates the `v11` draft as soon as C-1 (`ext.alt_list`) exists, runs AC-1 to AC-3, and then activates it with the line above. Gavriel will not activate a version without `ext.alt_list`, because that would count more extensions than the tested rule. If you think a live `v11` must wait for the v2.4.0 sibling generator (for example because the census clause has no list to read for new names), say so; until then, per-name lists frozen with Dvir's approval keep working (§11, "Until v2.4.0").
+- **Unchanged:** BUY-HOLD stays on. No buy. No change to tier priors or money settings.
