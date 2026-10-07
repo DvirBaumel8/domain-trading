@@ -37,6 +37,8 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'screening_packs', file: 'tables/screening_packs.json' },
   { table: 'manual_quotes', file: 'tables/manual_quotes.json' },
   { table: 'tranche_members', file: 'tables/tranche_members.json' },
+  { table: 'test_sets', file: 'tables/test_sets.json' },
+  { table: 'test_set_rows', file: 'tables/test_set_rows.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 
@@ -44,7 +46,7 @@ const ORDER: { table: string; file: string; jsonl?: true }[] = [
 const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log', 'screening_runs', 'screening_evidence', 'manual_quotes', 'tranches'];
 
 /** Tables without a serial `id` column. */
-const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches']);
+const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets']);
 
 async function readRows(dir: string, f: { file: string; jsonl?: true }): Promise<Row[]> {
   let text: string;

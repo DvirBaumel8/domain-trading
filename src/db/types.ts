@@ -578,6 +578,39 @@ export interface HoldoutSuitesTable {
   approval_text: string;
   approval_at: Date;
   audit_id: string | null;
+  /** v2.5.0: NULL (rows before it) reads as none / false. */
+  gates_not_assessed: string[] | null;
+  clears_hold: boolean | null;
+}
+
+export interface TestSetsTable {
+  name: string;
+  purpose: 'new' | 'rescore';
+  settings_label: string | null;
+  seed: string | null;
+  test_share: string | null;
+  filters: Json;
+  run_id: string;
+  created_at: TimestampDefault;
+  created_by: string;
+  status: 'computing' | 'ready' | 'sealed';
+  sealed_at: Date | null;
+  member_count: number | null;
+  member_hash: string | null;
+}
+
+export interface TestSetRowsTable {
+  id: Generated<string>;
+  set_name: string;
+  domain: string;
+  label: 'sold' | 'dropped';
+  as_of: DateString;
+  source: string;
+  price_usd: string | null;
+  report_lane: 'expired' | 'fresh' | 'aged' | 'geo' | null;
+  role: 'test' | 'dev' | null;
+  kept: boolean;
+  reason: string | null;
 }
 
 export interface ReplayRunsTable {
@@ -663,6 +696,8 @@ export interface Database {
   labelled_names: LabelledNamesTable;
   replay_runs: ReplayRunsTable;
   holdout_suites: HoldoutSuitesTable;
+  test_sets: TestSetsTable;
+  test_set_rows: TestSetRowsTable;
   screening_results: ScreeningResultsTable;
   screening_verdicts: ScreeningVerdictsTable;
   screening_packs: ScreeningPacksTable;

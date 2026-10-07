@@ -111,7 +111,7 @@ const CAUSE_TEXT = {
 };
 
 export async function createRun(
-  db: Kysely<Database>, body: RunBody, ctx: { createdBy: string; auditId: string; now: Date }, registry: Partial<Record<CheckId, Check>> = CHECKS,
+  db: Kysely<Database>, body: RunBody, ctx: { createdBy: string; auditId: string; now: Date; /** v2.5.0 test sets: a run deadline in hours instead of run.time_budget_minutes. */ deadlineHours?: number }, registry: Partial<Record<CheckId, Check>> = CHECKS,
 ): Promise<CreatedRun> {
   const active = await activeSelectionSettings(db);
   let sel = { id: active.id, label: active.label, values: active.values };
@@ -167,7 +167,7 @@ export async function createRun(
       buy_hold: sel.values.buy_hold, tranche_id: body.tranche_id ?? null,
       input: JSON.stringify({ names: items, ...(body.checks && { checks: body.checks }) }), gate_plan: JSON.stringify(gate_plan),
       list_versions: JSON.stringify(list_versions), status: 'running',
-      deadline_at: new Date(ctx.now.getTime() + sel.values.run.time_budget_minutes * 60_000),
+      deadline_at: new Date(ctx.now.getTime() + (ctx.deadlineHours !== undefined ? ctx.deadlineHours * 3_600_000 : sel.values.run.time_budget_minutes * 60_000)),
     }).execute();
     for (const it of items.filter((i) => i.input_error)) {
       await trx.insertInto('screening_results').values({

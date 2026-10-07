@@ -73,8 +73,8 @@ export interface RowOutcome {
 export const laneOf = (r: Pick<LabelledRow, 'report_lane' | 'features'>): ReplayLane | 'unknown' =>
   r.report_lane ?? (r.features.is_geo === 1 ? 'geo' : r.features.prior_history === 1 ? 'expired' : r.features.prior_history === 0 ? 'fresh' : 'unknown');
 
-/** Holdout mode: recompute CAP-01 and CAP-02 from the domain, merge the recomputed form fields, apply the supplied TM/TN/HIST gates. */
-export function decideHoldoutRow(row: LabelledRow, sel: SelectionValuesT, ctx: GateContext): RowOutcome {
+/** Holdout mode (gates in `notAssessed` are skipped): recompute CAP-01 and CAP-02 from the domain, merge the recomputed form fields, apply the supplied TM/TN/HIST gates. */
+export function decideHoldoutRow(row: LabelledRow, sel: SelectionValuesT, ctx: GateContext, notAssessed: readonly GateKey[] = []): RowOutcome {
   const f = row.features;
   const isGeo = f.is_geo === 1;
   const form = analyzeForm(row.domain, isGeo ? 'S2' : 'S3', ctx.lexicon, sel.form, { city: f.geo_city ?? undefined, trade: f.geo_trade ?? undefined });
@@ -89,7 +89,8 @@ export function decideHoldoutRow(row: LabelledRow, sel: SelectionValuesT, ctx: G
     const list = ctx.lists[name];
     gates[name] = !list ? 'unknown' : matchTerms(tokens, geoTok, list.terms).length > 0 ? 'fail' : 'pass';
   }
-  for (const k of GATE_KEYS) {
+  // A gate the suite definition leaves out (v2.5.0 `gates_not_assessed`) is neither applied nor makes the row undecided.
+  for (const k of GATE_KEYS.filter((x) => !notAssessed.includes(x))) {
     const g = f.gates?.[k];
     gates[k] = !g ? 'unknown' : g.result === 'FAIL' ? 'fail' : g.result === 'UNKNOWN' ? 'unknown' : g.result === 'FLAG' ? 'flag' : 'pass';
   }
@@ -252,10 +253,10 @@ const DATED: [feature: keyof LabelledFeatures, input: string][] = [
 ];
 
 /** Holdout rows need the four gate results (source and date) and an input date for every non-null dated feature. */
-export function missingGates(rows: LabelledRow[]): { domain: string; missing: string[] }[] {
+export function missingGates(rows: LabelledRow[], notAssessed: readonly GateKey[] = []): { domain: string; missing: string[] }[] {
   const out: { domain: string; missing: string[] }[] = [];
   for (const r of rows) {
-    const miss: string[] = GATE_KEYS.filter((k) => { const g = r.features.gates?.[k]; return !g || !g.source || !/^\d{4}-\d{2}-\d{2}$/.test(g.date); });
+    const miss: string[] = GATE_KEYS.filter((k) => !notAssessed.includes(k)).filter((k) => { const g = r.features.gates?.[k]; return !g || !g.source || !/^\d{4}-\d{2}-\d{2}$/.test(g.date); });
     for (const [feat, input] of DATED) {
       const col = `input_dates.${input}`;
       if (known(r.features[feat]) && !/^\d{4}-\d{2}-\d{2}$/.test(r.features.input_dates?.[input] ?? '') && !miss.includes(col)) miss.push(col);
@@ -289,14 +290,25 @@ export interface SuiteStatus {
 export const judgedOf = (report: unknown): Counts => (report as { judged: Counts }).judged;
 
 /**
- * Per required suite, for one settings version: a FAILING holdout replay sticks (no latest-wins; a re-run or a changed definition never
+ * The suites that clear `buy_hold` (v2.5.0): those whose LATEST definition has `clears_hold`; when none has, `holdout.required_suites`.
+ */
+export async function holdSuites(db: Kysely<Database>, holdout: SelectionValuesT['holdout']): Promise<{ suites: string[]; source: 'clears_hold' | 'required_suites' }> {
+  const defs = await db.selectFrom('holdout_suites').select(['suite', 'version', 'clears_hold']).orderBy('suite').orderBy('version', 'desc').execute();
+  const latest = new Map<string, boolean>();
+  for (const d of defs) if (!latest.has(d.suite)) latest.set(d.suite, d.clears_hold === true);
+  const clearing = [...latest].filter(([, c]) => c).map(([suite]) => suite);
+  return clearing.length > 0 ? { suites: clearing, source: 'clears_hold' } : { suites: holdout.required_suites, source: 'required_suites' };
+}
+
+/**
+ * Per hold suite (see holdSuites), for one settings version: a FAILING holdout replay sticks (no latest-wins; a re-run or a changed definition never
  * erases it). Otherwise the suite passes only when its latest definition version has a passing replay (judged again by the ACTIVE
  * version's `holdout` settings, with 0 leaking rows). Diagnostic replays are never considered. `variants_scored`: how many settings
  * versions have a holdout replay of the suite (the pre-registered variants).
  */
 export async function suiteStatuses(db: Kysely<Database>, settingsId: number, holdout: SelectionValuesT['holdout']): Promise<SuiteStatus[]> {
   const out: SuiteStatus[] = [];
-  for (const suite of holdout.required_suites) {
+  for (const suite of (await holdSuites(db, holdout)).suites) {
     const def = await db.selectFrom('holdout_suites').select(['id', 'version']).where('suite', '=', suite).orderBy('version', 'desc').limit(1).executeTakeFirst();
     const runs = await db.selectFrom('replay_runs').select(['id', 'report', 'leakage_rows', 'suite_def_id']).where('suite', '=', suite).where('mode', '=', 'holdout').where('settings_id', '=', settingsId)
       .orderBy('created_at').orderBy('id').execute();

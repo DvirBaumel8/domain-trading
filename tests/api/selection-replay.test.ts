@@ -235,8 +235,9 @@ describe('replay', () => {
     expect([noAppr.statusCode, noAppr.json().error.code]).toEqual([422, 'APPROVAL_REQUIRED']);
     const wrongName = await post('/selection/holdout-suites', { suite: 'BT10-1', slices: ['s1'], approval_ref: approval('Dvir: freeze BT10-9') });
     expect([wrongName.statusCode, wrongName.json().error.code]).toEqual([422, 'APPROVAL_INVALID']);
-    const unknown = await post('/selection/holdout-suites', { suite: 'EASY-1', slices: ['s1'], approval_ref: approval('Dvir: freeze EASY-1') });
-    expect([unknown.statusCode, unknown.json().error.code]).toEqual([422, 'SUITE_UNKNOWN']);
+    // v2.5.0 (CR-007 G-4c): any well-formed suite id may be frozen, so SUITE_UNKNOWN is gone from this route; a malformed id is VALIDATION_ERROR.
+    const malformed = await post('/selection/holdout-suites', { suite: 'easy_1', slices: ['s1'], approval_ref: approval('Dvir: freeze easy_1') });
+    expect([malformed.statusCode, malformed.json().error.code]).toEqual([422, 'VALIDATION_ERROR']);
     expect((await post('/selection/holdout-suites', { suite: 'BT10-1', approval_ref: approval('Dvir: freeze BT10-1') })).statusCode).toBe(422);
     expect((await freeze(post, 'BT10-1', ['s1'])).json()).toMatchObject({ suite: 'BT10-1', version: 1, slices: ['s1'], cell: 'pooled', approval_text: 'Dvir: freeze BT10-1' });
     expect((await freeze(post, 'BT10-1', ['s1'])).json().version).toBe(2); // not scored yet: a new version is fine

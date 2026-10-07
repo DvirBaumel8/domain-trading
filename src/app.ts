@@ -9,6 +9,7 @@ import { registerReport } from './api/report.js';
 import { registerSold } from './api/sold.js';
 import { registerSelection } from './api/selection.js';
 import { registerScreening } from './api/screening.js';
+import { registerTestSets } from './api/test-sets.js';
 import { registerPacks } from './api/packs.js';
 import { registerTranches } from './api/tranches.js';
 import { ScreeningWorker } from './screening/engine.js';
@@ -164,6 +165,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('screeningWorker', screeningWorker);
   app.addHook('onClose', async () => screeningWorker.idle());
   registerScreening(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
+  registerTestSets(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerPacks(app, { db: deps.db, now: deps.now ?? Date.now });
   registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });

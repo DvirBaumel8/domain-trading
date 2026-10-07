@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.5.0 (2026-10-07): CR-007 G-4 test sets and suites, CR-008 AC-10 rescore
+MINOR, **additive** (one widening: a suite outside `holdout.required_suites` can now be frozen). Release note: `docs/releases/v2.5.0.md`.
+- **Test sets:** `POST /selection/test-sets` (`new`: DOM filters, removes names used before, splits by seed and computes as-of features; `rescore`: as-of features and a report for names already registered), `GET /selection/test-sets/{name}`, `POST /selection/test-sets/{name}/seal` (registers the rows, freezes the test membership). New codes `SIBLING_METHOD_NOT_APPROVED`, `TEST_SET_NAME_TAKEN`, `TEST_SET_EMPTY`, `TEST_SET_NOT_FOUND`, `TEST_SET_NOT_READY`, `TEST_SET_ALREADY_SEALED`, `TEST_SET_NOT_SEALABLE`. New tables `test_sets`, `test_set_rows` (in the data backup).
+- **Suites:** any suite id; new fields `gates_not_assessed` and `clears_hold`, each named in Dvir's approval. Holdout replays apply only the assessed gates and report `accepts_at_risk`.
+- **Buy hold:** the hold suites are those with `clears_hold`; with none, `holdout.required_suites` as before. `GET /selection/buy-hold` adds `hold_suites_source`.
+
 ## 2.4.0 (2026-10-07): CR-008 sibling method bt1@v1 and ext.alt_list (CR-007 G-3)
 MINOR, **additive**. Release note: `docs/releases/v2.4.0.md`.
 - **Sibling method `bt1@v1`:** `GET /selection/sibling-methods/{method}` (READ: frozen pools, approval state, the 20 siblings for a domain or a word split) and `POST /selection/sibling-methods/{method}/approve` (WRITE, Dvir's `approval_ref` naming the method, once). New codes `SIBLING_METHOD_NOT_FOUND`, `SIBLING_METHOD_ALREADY_APPROVED`. New append-only table `sibling_method_approvals` (in the data backup).
