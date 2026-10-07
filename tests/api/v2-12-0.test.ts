@@ -314,7 +314,7 @@ describe('GET /media/:token (public)', () => {
     expect(gone.statusCode).toBe(404);
     expect(gone.json().error.code).toBe('NOT_FOUND');
     expect((await t.app.inject({ method: 'GET', url: `/media/${'0'.repeat(32)}` })).statusCode).toBe(404);
-    expect((await t.app.inject({ method: 'GET', url: '/media/abc' })).statusCode).toBe(401); // not a media token: not public
+    expect((await t.app.inject({ method: 'GET', url: '/media/abc' })).statusCode).toBe(404); // v2.15.0 (CR-013 F-6): the whole /media/* path is public; an unknown token is 404
     expect((await t.app.inject({ method: 'POST', url: `/media/${token}`, headers: { 'idempotency-key': 'k' } })).statusCode).toBe(401);
   });
 });

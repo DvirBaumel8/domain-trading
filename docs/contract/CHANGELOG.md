@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.15.0 (2026-10-08): CR-013 acceptance fixes
+MINOR, **additive**. Release note: `docs/releases/v2.15.0.md`.
+- **Review:** one weekly rule (a failed review never uses up the full-document packet, F-1); actor and token ids in packets become `operator` (F-2); a 503, timeout or network error is retried at 10:30 IDT like a 429 (F-3); `GET /reviews/settings/history` (F-10); only calls that reach Google count toward 3 per hour (F-9).
+- **Block list:** more key shapes, listed in the contract (F-4); a trailing `s`, `es` or `'s` matches a listed term (F-8); `POST /company/forbidden-terms/{id}/retire` (F-2). Codes `TERM_NOT_FOUND`, `TERM_ALREADY_RETIRED`.
+- **Smaller fixes:** any unknown `/media/` token is 404 (F-6); removed drop-list rows show their tokens, and an empty cohort window names its reason (F-11).
+- **Docs:** the cohort report shape (F-5), dry runs answer 200 (F-7), the remove 404 (F-11a).
+
 ## 2.14.0 (2026-10-07): CR-012 parts B and C, scout intake and the daily candidate list
 MINOR, **additive**. Release note: `docs/releases/v2.14.0.md`.
 - **Token scope `intake`:** may only `POST /candidates/intake` and `POST /selection/drop-lists`.

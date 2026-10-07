@@ -9,6 +9,7 @@ import { checkText } from '../services/blocklist.js';
 import { runReview, skipToError, type ReviewRunDeps } from '../services/review/run.js';
 import { ALLOWED_REVIEW_MODELS } from '../services/review/gemini.js';
 import { allowedModelsView, currentReviewSettings } from '../services/review/settings.js';
+import { markReviewReachedGoogle } from '../http/rate-limit.js';
 import { toJerusalemIso } from '../time.js';
 import { storeFeedback, type FeedbackInput } from '../services/review/feedback.js';
 import { buildPacket, insertPacket, latestDocument, monthSpend, newPacketId, REVIEW_MONTHLY_CAP_USD, sha256 } from '../services/review/packet.js';
@@ -68,7 +69,7 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
 
   // v2.11.0: the service's one AI call. WRITE token, Idempotency-Key, audited; 3 per hour per token (src/http/rate-limit.ts).
   app.post('/reviews/run', async (req) => {
-    const r = await runReview({ ...deps.review, db, secretValues: deps.secretValues, version: deps.version }, { trigger: 'manual', now: deps.now(), createdBy: req.auth!.name });
+    const r = await runReview({ ...deps.review, onGoogleCall: () => markReviewReachedGoogle(req), db, secretValues: deps.secretValues, version: deps.version }, { trigger: 'manual', now: deps.now(), createdBy: req.auth!.name });
     if ('skipped' in r) throw skipToError(r);
     return r;
   });
@@ -83,6 +84,19 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
 
   // v2.11.2 (CR-011 addendum C): the review's switch, model and tier. History = review_settings_changes (append-only).
   app.get('/reviews/settings', async () => settingsView());
+
+  // v2.15.0 (CR-013 F-10): every change with its old and new values, newest first.
+  app.get('/reviews/settings/history', async () => {
+    const rows = await sql<{ at: Date; by: string; idempotency_key: string | null; enabled: boolean; model: string; tier: string; note: string | null; old: { enabled: boolean; model: string; tier: string } }>`
+      select c.at, c.by, a.idempotency_key, c.enabled, c.model, c.tier, c.note, c.old
+      from review_settings_changes c left join audit_log a on a.id = c.audit_id order by c.id desc`.execute(db);
+    return {
+      changes: rows.rows.map((r) => ({
+        at: toJerusalemIso(r.at), by: r.by, idempotency_key: r.idempotency_key,
+        old: { enabled: r.old.enabled, model: r.old.model, tier: r.old.tier }, new: { enabled: r.enabled, model: r.model, tier: r.tier }, note: r.note,
+      })),
+    };
+  });
 
   app.post('/reviews/settings', async (req) => {
     const p = SettingsBody.safeParse(req.body ?? {});

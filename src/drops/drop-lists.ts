@@ -44,8 +44,9 @@ export function filterDropName(raw: string, seen: Set<string>): FilteredName {
   if (sld.includes('-')) return { ...out('HAS_HYPHEN'), domain };
   const tokens = splitV2(sld);
   if (tokens.length === 0) return { ...out('NO_SPLIT'), domain };
-  if (tokens.length > MAX_WORDS) return { ...out('TOO_MANY_WORDS'), domain };
-  if (tokens.length < 2) return { ...out('ONE_WORD'), domain };
+  // v2.15.0 (CR-013 F-11b): a removed row keeps the split DOM used.
+  if (tokens.length > MAX_WORDS) return { ...out('TOO_MANY_WORDS'), domain, tokens };
+  if (tokens.length < 2) return { ...out('ONE_WORD'), domain, tokens };
   return { domain, kept: true, reason: null, tokens };
 }
 

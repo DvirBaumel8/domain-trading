@@ -6,6 +6,7 @@ import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Database } from '../db/types.js';
 import { DROP_LIST_NAME_RE, daysBetween, filterDropName, namesDroppingBetween, todayIdt } from '../drops/drop-lists.js';
+import { splitV2 } from '../screening/split-v2.js';
 import { AppError } from '../http/errors.js';
 import { toJerusalemIso } from '../time.js';
 
@@ -26,6 +27,13 @@ export function parseWindow(q: unknown): { from: string; to: string } {
   if (to < from) throw bad('drop_to must not be before drop_from');
   if (daysBetween(from, to) > MAX_WINDOW_DAYS) throw bad(`The window drop_from..drop_to is at most ${MAX_WINDOW_DAYS} days`);
   return { from, to };
+}
+
+/** Rows stored before v2.15.0 have no tokens for a TOO_MANY_WORDS or ONE_WORD removal (the table is append-only): the split is recomputed on read. */
+function legacyTokens(r: { domain: string; reason: string | null }): string[] | null {
+  if (r.reason !== 'TOO_MANY_WORDS' && r.reason !== 'ONE_WORD') return null;
+  const m = /^([a-z]+)\.com$/.exec(r.domain);
+  return m ? splitV2(m[1]!) : null;
 }
 
 export function registerDropLists(app: FastifyInstance, deps: DropListsDeps): void {
@@ -66,7 +74,7 @@ export function registerDropLists(app: FastifyInstance, deps: DropListsDeps): vo
       where r.list_name = ${list.name} order by r.id`.execute(db)).rows;
     return {
       name: list.name, list_date: list.list_date, created_at: toJerusalemIso(list.created_at), created_by: list.created_by, received_n: list.received_n, kept_n: list.kept_n,
-      rows: rows.map((r) => ({ domain: r.domain, kept: r.kept, reason: r.reason, tokens: r.tokens, status: r.status, expected_drop_date: r.expected_drop_date, drop_date_source: r.drop_date_source, checked_at: r.checked_at ? toJerusalemIso(r.checked_at) : null })),
+      rows: rows.map((r) => ({ domain: r.domain, kept: r.kept, reason: r.reason, tokens: r.tokens ?? legacyTokens(r), status: r.status, expected_drop_date: r.expected_drop_date, drop_date_source: r.drop_date_source, checked_at: r.checked_at ? toJerusalemIso(r.checked_at) : null })),
     };
   });
 

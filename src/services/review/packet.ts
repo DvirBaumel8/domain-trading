@@ -1,6 +1,6 @@
 // v2.10.0 (CR-011 part B): the review packet. Built from the database only; the service calls nobody.
 import { createHash, randomBytes } from 'node:crypto';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { currentSettings } from '../../pricing/settings.js';
 import { activeSelectionSettings } from '../../screening/settings.js';
@@ -40,6 +40,34 @@ export function stripWalkaway(v: unknown): unknown {
   return v;
 }
 
+const ACTOR_KEYS = new Set(['opened_by', 'created_by', 'closed_by', 'updated_by', 'set_by', 'triggered_by', 'token_name', 'cancelled_by', 'recorded_by', 'checked_by', 'by']);
+
+/**
+ * CR-013 R-3: every actor or token identifier DOM writes into a packet becomes "operator" (a key from ACTOR_KEYS, or any string equal to an API token name,
+ * at any depth), so a bot's name can sit on the block list without refusing DOM's own packet.
+ */
+export function anonymizeActors(v: unknown, tokenNames: ReadonlySet<string>): unknown {
+  if (Array.isArray(v)) return v.map((x) => anonymizeActors(x, tokenNames));
+  if (typeof v === 'string') return tokenNames.has(v.toLowerCase()) ? 'operator' : v;
+  if (v !== null && typeof v === 'object') {
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, ACTOR_KEYS.has(k) && typeof x === 'string' ? 'operator' : anonymizeActors(x, tokenNames)]));
+  }
+  return v;
+}
+
+/**
+ * CR-013 F-1, the one weekly rule (packet route and review run): a packet is `weekly` (it carries the whole document) on a Sunday (IDT), or when no packet
+ * whose feedback is `ok` has carried the full document in the last 7 days. A packet with unknown or no feedback never counts.
+ */
+export async function weeklyDue(db: Kysely<Database>, now: Date): Promise<boolean> {
+  if (idtIsSunday(now.getTime())) return true;
+  const since = new Date(now.getTime() - WEEKLY_EVERY_MS);
+  const r = await sql<{ n: number }>`
+    select count(*)::int as n from review_packets p join review_feedback f on f.packet_id = p.id
+    where f.status = 'ok' and p.created_at >= ${since} and p.content::jsonb -> 'document' ->> 'text' is not null`.execute(db);
+  return (r.rows[0]?.n ?? 0) === 0;
+}
+
 export interface PacketBuild { kind: 'daily' | 'weekly'; documentVersion: number; content: Record<string, unknown> }
 
 /** Throws nothing for a missing document: the caller checks `latestDocument` first. */
@@ -59,13 +87,12 @@ export async function insertPacket(db: Kysely<Database>, a: { id: string; create
   }).execute();
 }
 
-export async function buildPacket(db: Kysely<Database>, now: Date, serviceVersion: string, opts: { forceWeekly?: boolean } = {}): Promise<PacketBuild | null> {
+export async function buildPacket(db: Kysely<Database>, now: Date, serviceVersion: string, ): Promise<PacketBuild | null> {
   const doc = await latestDocument(db);
   if (!doc) return null;
-  const lastWeekly = await db.selectFrom('review_packets').select('created_at').where('kind', '=', 'weekly').orderBy('created_at', 'desc').limit(1).executeTakeFirst();
-  const kind: 'daily' | 'weekly' = opts.forceWeekly || !lastWeekly || lastWeekly.created_at.getTime() < now.getTime() - WEEKLY_EVERY_MS ? 'weekly' : 'daily';
+  const kind: 'daily' | 'weekly' = (await weeklyDue(db, now)) ? 'weekly' : 'daily';
   const prev = await db.selectFrom('review_packets').select(['created_at', 'document_version']).orderBy('created_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
-  const full = kind === 'weekly' || !prev;
+  const full = kind === 'weekly';
   let diffSince: { from_version: number; diff: string } | null = null;
   if (!full && prev) {
     const old = await db.selectFrom('company_documents').select('text').where('version', '=', prev.document_version).executeTakeFirstOrThrow();
@@ -102,12 +129,13 @@ export async function buildPacket(db: Kysely<Database>, now: Date, serviceVersio
     }
   }
 
-  const numbers = stripWalkaway(await buildReport(db, now));
+  const tokenNames = new Set((await db.selectFrom('api_tokens').select('name').execute()).map((t) => t.name.toLowerCase()));
+  const numbers = anonymizeActors(stripWalkaway(await buildReport(db, now)), tokenNames);
   const content = {
     kind,
     generated_at: iso(now),
     document: { version: doc.version, sha256: doc.sha256, text: full ? doc.text : null, diff_since: diffSince },
-    dom_changes: {
+    dom_changes: anonymizeActors({
       since: prev ? iso(prev.created_at) : null,
       service_version: serviceVersion,
       settings_versions: settingsVersions,
@@ -115,7 +143,7 @@ export async function buildPacket(db: Kysely<Database>, now: Date, serviceVersio
       offers,
       sales,
       failed_job_steps: failed.slice(-PACKET_LIST_LIMIT),
-    },
+    }, tokenNames),
     numbers,
   };
   return { kind, documentVersion: doc.version, content };

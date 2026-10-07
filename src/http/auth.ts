@@ -23,8 +23,8 @@ declare module 'fastify' {
 /** Only liveness is public (no DB), plus GET /media/<token> (MEDIA_PATH). Everything else, /health included, needs a bot token (Dvir, 6 Oct 2026: bots are the only customers). */
 export const PUBLIC_PATHS: ReadonlySet<string> = new Set(['/health/ping']);
 
-/** v2.12.0: the one other public read. Buffer fetches post images from GET /media/<32 hex token> (unguessable, expires after 7 days). It writes nothing. */
-export const MEDIA_PATH = /^\/media\/[0-9a-f]{32}$/;
+/** v2.12.0: the one other public read. Buffer fetches post images from GET /media/<32 hex token> (unguessable, expires after 7 days). The whole /media/* path is public (v2.15.0): any unknown token is 404 NOT_FOUND. It writes nothing. */
+export const MEDIA_PATH = /^\/media\/.+$/;
 
 export const FAILED_AUTH_LIMIT = 20;
 export const FAILED_AUTH_WINDOW_MS = 10 * 60_000;

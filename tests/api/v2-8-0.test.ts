@@ -56,7 +56,7 @@ describe('drop lists: upload and filters (G-2)', () => {
     expect(g).toMatchObject({ name: 'snap-1006', list_date: '2026-10-06', received_n: 12, kept_n: 3 });
     expect(g.rows).toHaveLength(12);
     expect(g.rows.filter((q: any) => q.kept).map((q: any) => [q.domain, q.tokens])).toEqual([['superhealth.com', ['super', 'health']], ['supertech.com', ['super', 'tech']], ['theeventhouse.com', ['the', 'event', 'house']]]);
-    expect(g.rows.find((q: any) => q.domain === 'thebestcoffeeshop.com')).toMatchObject({ kept: false, reason: 'TOO_MANY_WORDS', tokens: null, status: null, expected_drop_date: null, checked_at: null });
+    expect(g.rows.find((q: any) => q.domain === 'thebestcoffeeshop.com')).toMatchObject({ kept: false, reason: 'TOO_MANY_WORDS', tokens: ['the', 'best', 'coffee', 'shop'], status: null, expected_drop_date: null, checked_at: null });
     expect(g.rows.find((q: any) => q.domain === 'mountain.com').reason).toBe('ONE_WORD');
   });
   it('V28-2 DROP_LIST_NAME_TAKEN (409), DROP_LIST_NOT_FOUND (404), a bad name, a future list_date and an empty list are refused and store nothing', async () => {

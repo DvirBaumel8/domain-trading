@@ -750,6 +750,14 @@ export interface ForbiddenTermsTable {
   created_at: TimestampDefault;
   created_by: string;
 }
+export interface ForbiddenTermRetirementsTable {
+  id: Generated<number>;
+  term_id: number;
+  at: TimestampDefault;
+  by: string;
+  audit_id: string | null;
+  reason: string | null;
+}
 export interface ReviewPacketsTable {
   id: string;
   created_at: TimestampDefault;
@@ -971,6 +979,7 @@ export interface Database {
   cohort_outcomes: CohortOutcomesTable;
   company_documents: CompanyDocumentsTable;
   forbidden_terms: ForbiddenTermsTable;
+  forbidden_term_retirements: ForbiddenTermRetirementsTable;
   review_packets: ReviewPacketsTable;
   review_feedback: ReviewFeedbackTable;
   review_items: ReviewItemsTable;

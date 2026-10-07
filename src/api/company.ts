@@ -14,6 +14,8 @@ export interface CompanyDeps { db: Kysely<Database>; now: () => number; secretVa
 const DocBody = z.object({ text: z.string().min(1).max(65536) }).strict();
 const TermBody = z.object({ term: z.string().trim().min(2).max(200), category: z.literal('listed_term').optional() }).strict();
 
+const RetireBody = z.object({ reason: z.string().trim().min(1).max(200).optional() }).strict();
+
 export function registerCompany(app: FastifyInstance, deps: CompanyDeps): void {
   const { db } = deps;
 
@@ -62,7 +64,27 @@ export function registerCompany(app: FastifyInstance, deps: CompanyDeps): void {
   });
 
   app.get('/company/forbidden-terms', async () => {
-    const terms = await db.selectFrom('forbidden_terms').select(['id', 'category', 'created_at']).orderBy('id').execute();
+    const terms = await db.selectFrom('forbidden_terms as t').leftJoin('forbidden_term_retirements as r', 'r.term_id', 't.id')
+      .select(['t.id', 't.category', 't.created_at', 'r.at as retired_at']).orderBy('t.id').execute();
     return { terms };
+  });
+
+  // v2.15.0 (CR-013 R-4): a retired term no longer blocks. Append-only: the term row stays, one retirement row records who, when and why.
+  app.post<{ Params: { id: string } }>('/company/forbidden-terms/:id/retire', async (req) => {
+    const b = RetireBody.parse(req.body ?? {});
+    const raw = req.params.id;
+    const notFound = () => new AppError(404, 'TERM_NOT_FOUND', 'No such forbidden term', { id: raw });
+    if (!/^\d{1,9}$/.test(raw)) throw notFound();
+    const id = Number(raw);
+    if (!(await db.selectFrom('forbidden_terms').select('id').where('id', '=', id).executeTakeFirst())) throw notFound();
+    try {
+      const row = await db.insertInto('forbidden_term_retirements').values({ term_id: id, at: new Date(deps.now()), by: req.auth!.name, audit_id: req.auditId, reason: b.reason ?? null })
+        .returning(['term_id', 'at', 'by', 'reason']).executeTakeFirstOrThrow();
+      req.auditSummary = `forbidden term ${id} retired`;
+      return { id: row.term_id, retired_at: row.at, retired_by: row.by, reason: row.reason };
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') throw new AppError(409, 'TERM_ALREADY_RETIRED', 'This term is already retired', { id });
+      throw e;
+    }
   });
 }

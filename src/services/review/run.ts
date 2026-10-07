@@ -7,7 +7,7 @@ import { checkText, type BlockCategory } from '../blocklist.js';
 import { storeFeedback } from './feedback.js';
 import { callGemini, geminiCostUsd } from './gemini.js';
 import { currentReviewSettings, type ReviewSettings } from './settings.js';
-import { buildPacket, idtDay, idtIsSunday, insertPacket, latestDocument, monthSpend, newPacketId, REVIEW_MONTHLY_CAP_USD, sha256 } from './packet.js';
+import { buildPacket, idtDay, insertPacket, latestDocument, monthSpend, newPacketId, REVIEW_MONTHLY_CAP_USD, sha256 } from './packet.js';
 
 export interface ReviewRunDeps {
   db: Kysely<Database>;
@@ -16,15 +16,22 @@ export interface ReviewRunDeps {
   secretValues: string[];
   version: string;
   timeoutMs?: number;
+  /** Called just before the request goes to Google (POST /reviews/run counts only such calls toward its hourly limit). */
+  onGoogleCall?: () => void;
 }
 export type ReviewSkip = 'NO_KEY' | 'DISABLED' | 'DOCUMENT_MISSING' | 'COST_CAP' | 'ALREADY_DONE_TODAY' | 'TEXT_BLOCKED' | 'NOTHING_PENDING';
 export type ReviewRunResult =
   | { skipped: ReviewSkip; category?: BlockCategory }
-  | { packet_id: string; kind: 'daily' | 'weekly'; status: 'ok' | 'unknown' | 'retry_pending'; items_n: number; new_n: number; repeat_n: number; cost_usd: number; dropped_n: number; reason?: string };
+  | { packet_id: string; kind: 'daily' | 'weekly'; status: 'ok' | 'unknown' | 'retry_pending'; items_n: number; new_n: number; repeat_n: number; cost_usd: number; dropped_n: number; reason?: string; detail?: string };
+
+/** CR-013 F-3: Google's "try again later" answers: 429, 503, UNAVAILABLE, a timeout or a network error. */
+export function isTransientFailure(g: { httpStatus: number | null; errorStatus: string | null; reason: string }): boolean {
+  return g.httpStatus === 429 || g.httpStatus === 503 || g.errorStatus === 'UNAVAILABLE' || g.reason === 'timeout' || g.reason === 'network error';
+}
 
 /**
- * Calls Gemini for a stored packet and stores the answer. `onRateLimit`: 'store' = a 429 is stored as UNKNOWN at once (manual run, retry);
- * 'defer' = a 429 stores no feedback and marks the packet in review_retries for the 10:30 IDT tick (the scheduled daily run).
+ * Calls Gemini for a stored packet and stores the answer. `onRateLimit`: 'store' = a transient failure (429, 503/UNAVAILABLE, timeout, network error) is stored as UNKNOWN at once (manual run, retry);
+ * 'defer' = a transient failure stores no feedback and marks the packet in review_retries for the 10:30 IDT tick (the scheduled daily run).
  * Never another key or model.
  */
 async function callAndStore(
@@ -34,11 +41,12 @@ async function callAndStore(
   const { db } = deps;
   const apiKey = deps.apiKey!;
   const now = new Date(a.now);
+  deps.onGoogleCall?.();
   const g = await callGemini({ fetch: deps.fetch, apiKey, model: settings.model, timeoutMs: deps.timeoutMs }, a.text);
   if (g.kind === 'unknown') {
-    if (g.httpStatus === 429 && a.onRateLimit === 'defer') {
+    if (isTransientFailure(g) && a.onRateLimit === 'defer') {
       await db.insertInto('review_retries').values({ packet_id: a.packetId, day: idtDay(a.now), created_at: now }).execute();
-      return { packet_id: a.packetId, kind: a.kind, status: 'retry_pending', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason: 'HTTP 429: retry at the next tick' };
+      return { packet_id: a.packetId, kind: a.kind, status: 'retry_pending', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason: 'retry_pending', detail: `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: retry at the 10:30 tick` };
     }
     const raw = `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: ${g.reason}`.replaceAll(apiKey, '[REDACTED]').slice(0, 500);
     const blockedReason = await checkText(db, raw, { secretValues: deps.secretValues });
@@ -74,7 +82,7 @@ export async function runReview(deps: ReviewRunDeps, opts: { trigger: 'scheduled
     if (await db.selectFrom('review_retries').select('id').where('day', '=', today).executeTakeFirst()) return { skipped: 'ALREADY_DONE_TODAY' };
   }
   const now = new Date(opts.now);
-  const built = await buildPacket(db, now, deps.version, { forceWeekly: idtIsSunday(opts.now) });
+  const built = await buildPacket(db, now, deps.version);
   if (!built) return { skipped: 'DOCUMENT_MISSING' };
   const text = JSON.stringify(built.content);
   const blocked = await checkText(db, text, { secretValues: deps.secretValues });
@@ -86,7 +94,7 @@ export async function runReview(deps: ReviewRunDeps, opts: { trigger: 'scheduled
 }
 
 /**
- * The tick's reviewRetry step: today's packet (IDT) that got a 429 and has no feedback is sent to Gemini once more, as stored.
+ * The tick's reviewRetry step: today's packet (IDT) that got a transient failure and has no feedback is sent to Gemini once more, as stored.
  * ok -> feedback; any failure, a second 429 included -> UNKNOWN feedback with Google's status and reason.
  */
 export async function retryReview(deps: ReviewRunDeps, opts: { now: number }): Promise<ReviewRunResult> {

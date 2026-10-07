@@ -85,6 +85,10 @@ export function registerCohorts(app: FastifyInstance, deps: CohortsDeps): void {
     const included = stored.filter((s) => s.included);
     const excluded: Record<string, number> = {};
     for (const s of stored) if (s.reason) excluded[s.reason] = (excluded[s.reason] ?? 0) + 1;
+    if (b.from_drop_lists && cands.length === 0) {
+      const w = parseWindow({ drop_from: b.from_drop_lists.drop_from, drop_to: b.from_drop_lists.drop_to });
+      throw new AppError(422, 'COHORT_EMPTY', 'No name with a pending drop falls in the window; nothing was stored', { reason: 'NO_PENDING_NAMES_IN_WINDOW', drop_from: w.from, drop_to: w.to, excluded });
+    }
     if (included.length === 0) throw new AppError(422, 'COHORT_EMPTY', 'No name is left after the exclusions; nothing was stored', { excluded });
 
     const createdAt = new Date(nowMs);

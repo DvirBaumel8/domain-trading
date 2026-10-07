@@ -77,7 +77,7 @@ describe('block list (T11-3)', () => {
       'Revenue was $1,488,000 in 2026, up 12-15 percent; order 12345678.',
       `sha ${'1234567890'.repeat(6)}ab and ${'a1b2c3d4'.repeat(8)}`,
       'The company buys short .com names, renews once, and sells at a fixed price. Contact: the chief of staff.',
-      'We discussed zetas and zetabyte storage only in the abstract.',
+      'We discussed xzetax and zetabyte storage only in the abstract.',
       'Floors at 65% of BIN; min offer $100; 50 names; 2 years.',
     ];
     for (const text of ok) expect(await checkText(db, text, { secretValues: [] }), text).toEqual({ ok: true });
@@ -146,7 +146,7 @@ describe('forbidden terms', () => {
     expect(r.json()).toEqual({ id: 1, category: 'listed_term', created_at: expect.any(String) });
     expect(r.body).not.toMatch(/codename/i);
     const g = await t.get('/company/forbidden-terms');
-    expect(g.json()).toEqual({ terms: [{ id: 1, category: 'listed_term', created_at: expect.any(String) }] });
+    expect(g.json()).toEqual({ terms: [{ id: 1, category: 'listed_term', created_at: expect.any(String), retired_at: null }] });
     expect(g.body).not.toMatch(/codename/i);
     const audit = JSON.stringify(await db.selectFrom('audit_log').selectAll().execute());
     expect(audit).not.toMatch(/codename/i);
@@ -176,6 +176,8 @@ describe('review packet (T11-15..17, T11-24, T11-25)', () => {
     expect(c1.content.dom_changes.settings_versions.some((s: { active: boolean }) => s.active)).toBe(true);
     expect(c1.content.numbers.budget).toBeDefined();
 
+    // v2.15.0 (CR-013 F-1): a packet counts as the weekly one only after a review with status ok has received it
+    expect((await t.post(`/reviews/${c1.packet_id}/feedback`, feedbackOk())).statusCode).toBe(201);
     t.clock.t = T0 + 2 * HOUR;
     await t.doc('Company v1\nNew paragraph\n');
     const p2 = (await t.post('/reviews/packet')).json();
