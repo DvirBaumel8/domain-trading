@@ -103,7 +103,7 @@ Envelope, cross-cutting codes, money and time conventions: `docs/contract/README
 ## 8. Hosting ($0; Dvir, 5 Oct 2026)
 - **Render free web service** (`render.yaml`, Blueprint; sleeps when idle, ~50 s cold start). Health check `/health/ping` (no DB, so it never wakes Neon). Deploy in its own free workspace (750 instance-hours per workspace; no keep-warm ping).
 - **Neon free Postgres**, **direct** connection (production refuses a `-pooler` host: the per-domain lock is a session advisory lock), TLS `sslmode=verify-full` (`DATABASE_SSL=true`). No paid PITR: recovery = the nightly export + the restore drill (`backup.md`).
-- **Cloudflare Worker cron** (`jobs-trigger/`) calls `POST /jobs/run`: one cron `5 * * * *` (the Cloudflare free plan allows 5 per account): `tick` every hour at :05, and at 00:05 UTC `daily` right after it. The service runs no timers; locally `npm run job -- tick|daily` runs the same `JobRunner` (backup skipped with a warning when unconfigured; exit 1 if a step failed, 2 on bad args; audited with scope `job`, method `CLI`).
+- **Cloudflare Worker cron** (`jobs-trigger/`) calls `POST /jobs/run`: one cron `5 0 * * *` (daily-only since 2.1.0, CR-005 Amendment A): `daily` at 00:05 UTC, which runs the former hourly `tick` steps (reconciler, NS verifier, screening resume) first and then the daily steps. `tick` stays callable by hand. The service runs no timers; locally `npm run job -- tick|daily` runs the same `JobRunner` (backup skipped with a warning when unconfigured; exit 1 if a step failed, 2 on bad args; audited with scope `job`, method `CLI`).
 - **Outbound IPs:** Render free uses shared regional ranges; Porkbun's IP allowlist is skipped. Namecheap needs fixed IPv4s (paid), so it stays out.
 - Setup steps: `docs/DEPLOYMENT.md`.
 
@@ -114,6 +114,6 @@ Envelope, cross-cutting codes, money and time conventions: `docs/contract/README
 | A false sale recorded automatically | `/sold` needs `transaction_ref` + evidence without approval; duplicates → `SALE_ALREADY_RECORDED`; unconfirmed sales listed (`SALE_UNCONFIRMED`); a sale moves no money and the registrar still holds the name. `DOMAIN_LEFT_ACCOUNT` catches a name gone without a sale |
 | WRITE token leak | Rotate every 90 days; revoke on suspicion; the caps limit damage to ≤ $1,500 |
 | Double purchase | Idempotency key, one open purchase per domain, per-domain advisory lock, registrar-side `Idempotency-Key`, a `findDomain` check before registering |
-| Lost bookkeeping after a crash | `purchases.state = register_sent` + the hourly reconciler (`buy.md` §6) |
+| Lost bookkeeping after a crash | `purchases.state = register_sent` + the reconciler, run by the daily job (`buy.md` §6) |
 | Data loss | Nightly export to the private data repo + the restore drill before G4 (`backup.md`) |
 | The price job cuts a price wrongly or twice | Rows computed and shown on the buy card before approval; applies only `planned` rows with exact amounts; idempotent (unique per event); re-validates V5/V6; never calls a registrar or marketplace; every change a `listing_history` row; the live price changes only when a bot uploads the export |

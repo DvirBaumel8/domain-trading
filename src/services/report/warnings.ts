@@ -50,8 +50,12 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
       add('NS_UNVERIFIED', 'warn', `${d.domain}: the nameservers are not verified as the lander's.`, d.domain, { lander: d.lander, lander_ns: d.lander_ns });
     }
     // unreachable under the domains_category_once_owned CHECK; kept as a defensive rule
+    if (d.lander_pending && (d.status === 'owned' || d.status === 'listed')) {
+      add('LANDER_PENDING', 'info', `${d.domain} is listed with no lander yet (listed with lander "none"); call POST /list with a lander when the nameservers should change.`, d.domain, { lander: null });
+    }
     if (d.status === 'listed' && d.category === null) add('CATEGORY_MISSING', 'warn', `${d.domain} is listed without a category.`, d.domain);
-    if (d.renewals_used === 0 && d.renewal_price_cents === null && d.status !== 'sold' && d.status !== 'dropped') {
+    const dropsAtFirstExpiry = d.drop_date !== null && d.drop_date === d.expiry_date; // no renewal is planned, so no renewal price is needed
+    if (d.renewals_used === 0 && d.renewal_price_cents === null && d.status !== 'sold' && d.status !== 'dropped' && !dropsAtFirstExpiry) {
       add('RENEWAL_PRICE_UNKNOWN', 'warn', `${d.domain} has no renewal price on record.`, d.domain);
     }
     if (d.status === 'listed' && (d.listing_mode === 'hybrid' || d.listing_mode === 'offer') && d.floor_cents !== null && d.bin_cents !== null && d.floor_cents < d.bin_cents) {
@@ -116,6 +120,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     const dom = domains.find((d) => d.domain === p.domain);
     if (dom) {
       const ev = await db.selectFrom('pricing_evidence').select('id').where('domain_id', '=', dom.id).limit(1).executeTakeFirst();
+      // an imported legacy_no_comps name has an evidence row (comps null + legacy reason): that is complete, not "incomplete"
       if (!ev) add('POST_BUY_INCOMPLETE', 'warn', `${p.domain} was bought without pricing evidence (comps); add the sell plan.`, p.domain, { purchase_id: p.id });
     }
   }

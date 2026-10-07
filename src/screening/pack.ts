@@ -5,6 +5,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import { z } from 'zod';
 import type { Database, ScreeningPacksTable } from '../db/types.js';
+import { jerusalemDeep } from '../time.js';
 import { AppError } from '../http/errors.js';
 import { canonicalJson } from '../http/canonical-json.js';
 import { quoteIsStale } from './checks/quote.js';
@@ -120,13 +121,13 @@ export async function issuePack(db: Kysely<Database>, i: { runId: string; domain
     const verdicts = await verdictsFor(trx, run.id);
     const settingsActive = (await activeSelectionSettings(trx)).label === run.settings_label;
     const res = assessPack({ lane: it.item.lane, plan: it.plan, latest, verdicts, judgment: i.judgment, sel: sel.values, now: i.now.getTime(), settingsActive });
-    const content = {
+    const content = jerusalemDeep({
       domain: i.domain, lane: it.item.lane, run_id: run.id, settings_version: run.settings_label, settings_label: run.settings_label, settings_active: settingsActive,
       buy_hold_effective: hold, list_versions: run.list_versions,
       screened_at: run.created_at.toISOString(), screened_by: run.created_by, status: res.status, missing: res.missing, gates: res.gates, judgment: i.judgment,
       money: pick(latest.get('price')?.fields, ['ev_cents', 'ratio_at_bin', 'ratio_at_floor', 'bin_in_allowed_set', 'floor_cents', 'bin_cents']),
       quote: pick(latest.get('quote')?.fields, ['registrar', 'first_year_cents', 'renewal_cents', 'registrar_ft_capable', 'quoted_at', 'quote_source']),
-    };
+    }); // BUG-2: frozen with the Asia/Jerusalem offset, so the stored bytes, the hash and the response agree
     const sha = createHash('sha256').update(canonicalJson(content)).digest('hex');
     const last = await trx.selectFrom('screening_packs').selectAll().where('domain', '=', i.domain).orderBy('version', 'desc').limit(1).executeTakeFirst();
     if (last && last.content_sha256 === sha) return { row: last, created: false };

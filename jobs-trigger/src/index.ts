@@ -11,12 +11,12 @@ export interface Logger {
 
 export const TIMEOUT_MS = 90_000;
 
-// One cron trigger only (the Cloudflare free plan allows 5 per account): every hour at :05 runs `tick`;
-// the 00:05 UTC firing also runs `daily` afterwards.
-export const CRON = '5 * * * *';
+// One cron trigger, once a day (CR-005 Amendment A): 00:05 UTC runs `daily` only. `daily` includes the former hourly steps
+// (reconciler, nsVerifier, screeningResume).
+export const CRON = '5 0 * * *';
 
-export function jobsFor(scheduledTime: number): Job[] {
-  return new Date(scheduledTime).getUTCHours() === 0 ? ['tick', 'daily'] : ['tick'];
+export function jobsFor(_scheduledTime: number): Job[] {
+  return ['daily'];
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;

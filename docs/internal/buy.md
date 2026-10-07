@@ -34,7 +34,7 @@ Other v9.1 points (with CR-001): `proposed_listing.bin` follows `pricing_setting
 ## Never
 Call a top-up endpoint; register for more than 1 year; buy premium or aftermarket names; fall back when a registrar is pinned; retry a definite failure, or any purchase, with a new idempotency key.
 
-## Reconciler (§6; the hourly `tick`, `npm run job -- tick`)
+## Reconciler (§6; a step of the `daily` job since 2.1.0, also `npm run job -- tick`)
 For every `purchases.state` in (`register_sent`, `unknown`) older than 2 min: `findDomain` at that registrar; present → finish the bookkeeping (from the invoice), `succeeded`; absent + RDAP 404 + older than 30 min → `failed` (stored response 409 `PURCHASE_FAILED`). Also fails `created` purchases older than 10 min (never sent; pending row deleted), every transition guarded by the selected state; fetches missing receipts; never registers; never runs post-buy steps (`/report` flags them: `POST_BUY_INCOMPLETE`, `RECEIPT_MISSING`). Reconciler-booked purchases get no comps or plan (they remain in `purchases.request`).
 
 ## Max one renewal

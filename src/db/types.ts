@@ -69,6 +69,8 @@ export interface DomainsTable {
   lander: string | null;
   lander_ns: string[] | null;
   lander_set_at: Timestamp | null;
+  /** True after POST /list with lander "none" and before any lander is chosen (v2.1.0). */
+  lander_pending: Generated<boolean>;
   ns_verified_at: Timestamp | null;
   registrar_api: RegistrarApi | null;
   sold_at: Timestamp | null;

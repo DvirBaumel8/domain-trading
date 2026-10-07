@@ -154,6 +154,12 @@ describe('applySet (dotted-path drafts)', () => {
     expect(code(() => applySet(D, { 'priors_v91.p_passive.S2': 0.02 }))).toBe('SETTINGS_KEY_LOCKED');
     expect(code(() => applySet(D, { 'priors_v91': { p_passive: { S2: 0.02, S3: 0.004, S4: 0.004, S6: 0.005, S7: 0.004 } } }))).toBe('SETTINGS_KEY_LOCKED');
     expect(code(() => applySet(D, { lead: { ...D.lead, p_lead: { ...D.lead.p_lead, S3: 0.5 } } }))).toBe('SETTINGS_KEY_LOCKED');
+    // BUG-5: replacing a locked parent with a value of the wrong shape is still LOCKED (not SETTINGS_INVALID), with details.path
+    for (const [k, v] of [['tier.p_passive', 0.1], ['lead.p_lead', 0.1], ['priors_v91', 0.1], ['priors_v91', { p_passive: 5 }]] as const) {
+      let err: { code?: string; details?: { path?: string } } = {};
+      try { applySet(D, { [k]: v }); } catch (e) { err = e as typeof err; }
+      expect([k, err.code, err.details?.path]).toEqual([k, 'SETTINGS_KEY_LOCKED', k]);
+    }
   });
 
   it('replacing a parent that keeps the locked values the same is fine', () => {

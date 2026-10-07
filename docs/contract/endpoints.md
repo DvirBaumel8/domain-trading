@@ -1,4 +1,4 @@
-# Endpoints (contract v1.0.0)
+# Endpoints (contract v2.0.2)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -21,6 +21,12 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | Reads |
 | GET | `/selection/settings`, `/selection/lists/{name}`, `/selection/namebio`, `/selection/replays/{id}`, `/selection/buy-hold`, `/selection/holdout-suites` | READ | Selection (`selection.md`) |
 | POST | `/selection/settings`, `/selection/settings/{label}/activate`, `/selection/lists/{name}`, `/selection/evaluate`, `/selection/labelled-names`, `/selection/replays`, `/selection/holdout-suites` | WRITE | Selection (`selection.md`) |
+| POST | `/screening/runs`, `/screening/runs/{id}/manual`, `/screening/runs/{id}/verdicts`, `/quotes/manual` | WRITE | Screening |
+| GET | `/screening/runs/{id}`, `/screening/evidence/{id}` | READ | Screening |
+| POST | `/screening/packs` | WRITE | Screening packs |
+| GET | `/screening/packs`, `/screening/packs/{id}` | READ | Screening packs |
+| POST | `/tranches`, `/tranches/{id}/members`, `/tranches/{id}/close` | WRITE | Tranches |
+| GET | `/tranches` | READ | Tranches |
 | POST | `/jobs/run` | job token | Jobs (`jobs.md`) |
 
 ---
@@ -34,7 +40,7 @@ The only public route. No auth, no DB access (Render's health check uses it).
 ### `GET /health`
 Any valid bot token (READ or WRITE).
 - **200** `{status: "ok", db: "ok", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` when the DB can't be reached.
-- `version` is the service build version (`package.json`), not the contract version. No secret, key prefix or balance is ever shown.
+- `version` is the service build version (`package.json`), not the contract version. The only scheduled job is the daily run at 00:05 UTC (`jobs.md`); its rows are in `GET /audit` (scope `job`). No secret, key prefix or balance is ever shown.
 
 ---
 
@@ -106,7 +112,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
     warnings: [string], audit_id }
   ```
   A post-buy failure never undoes the purchase; it is a warning (`PRIVACY_OFF`, `PRIVACY_UNKNOWN`, `AUTO_RENEW_FAILED`, `AUTO_RENEW_NOT_CONFIRMED`, `API_ACCESS_DISABLED`, `LANDER_CUSTOM`, `LANDER_MISMATCH`, `LANDER_FAILED`, `NS_PENDING`, `EVIDENCE_SAVE_FAILED`, `LISTING_SAVE_FAILED`, `POST_BUY_FAILED`, `TOTALS_UNAVAILABLE`, `EXPIRY_ESTIMATED`, `FOUND_IN_ACCOUNT`, `CHARGE_ABOVE_MAX`, `RECONSTRUCTED`). Warnings are strings that start with the code (`"CODE: text"`).
-- **202 (state unknown):** `{status: "unknown", code: "PURCHASE_STATE_UNKNOWN", domain, purchase_id, audit_id, message}`. The registrar may have registered it; the hourly reconciler books or fails it. Retry only with the **same** key (re-evaluated, never re-registered).
+- **202 (state unknown):** `{status: "unknown", code: "PURCHASE_STATE_UNKNOWN", domain, purchase_id, audit_id, message}`. The registrar may have registered it; the reconciler (a step of the daily job since 2.1.0) books or fails it. Retry only with the **same** key (re-evaluated, never re-registered).
 - **409 after contacting the registrar:** `REGISTRAR_REJECTED` (`details.registrar`, `details.registrar_code`; nothing charged), `PURCHASE_ABANDONED`, and on a replay `PURCHASE_FAILED` (the reconciler found it was never registered).
 - **Other errors:** 422 `VALIDATION_ERROR` (schema, or an amount that isn't a positive USD amount with ≤ 2 decimals) · 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED` · 409 `IDEMPOTENCY_KEY_MISMATCH` (the key was used for another domain) · 500 `PRICING_SETTINGS_MISSING`.
 
@@ -146,7 +152,7 @@ Points the domain at the for-sale lander and/or sets its listing mode and prices
   | `replan` | bool? | recompute from the stored BIN with the **current** `pricing_settings` |
   | `pricing_hold`, `pricing_hold_reason` | bool \| null, string \| null | pause/resume the drop schedule; `true` needs a reason |
   | `override`, `override_reason` | bool?, string \| null | pass a category guard (with `approval_ref`) |
-  | `lander` | string? | `afternic` (default from settings) \| `sedo` \| `custom` (`dan` → `LANDER_RETIRED`) |
+  | `lander` | string? | `afternic` (default from settings) \| `sedo` \| `custom` (`dan` → `LANDER_RETIRED`) \| `none` (2.1.0): store or change the listing and plan with **no nameserver action** (no registrar call, no DNS lookup); `ns` is refused. The name is `lander_pending` until a later call picks a lander |
   | `ns` | string[] \| null | only with `custom`: 2–4 hostnames |
   | `display_name` | string \| null | same name, other ASCII capitalisation |
   | `dry_run` | bool? | validate and preview only |
@@ -157,9 +163,10 @@ Points the domain at the for-sale lander and/or sets its listing mode and prices
 - **200:**
   ```
   { domain, status, category, listing: null | <plan view>, pricing_hold: bool, lander, ns: [string],
-    ns_status: "set"|"mismatch"|"unverified"|"manual"|"pending", manual_steps?: [string],
+    lander_pending: bool, ns_status: "set"|"mismatch"|"unverified"|"manual"|"pending"|"skipped", manual_steps?: [string],
     ns_public: "match"|"pending"|"unknown", checklist: [string], warnings: [string] }
   ```
+  **`lander: "none"` (2.1.0, additive):** the response has `lander_pending: true` (while the name has no lander), `ns_status: "skipped"`, `ns_public: "unknown"`, and `lander` / `ns` show what is stored (`null` / `[]` when no lander was ever set). `/report` carries the info-level warning `LANDER_PENDING` instead of any nameserver warning. A later call with `lander: "afternic"` (or `sedo` / `custom`, or no `lander` for the default) switches the nameservers as usual and clears `lander_pending`. Every other response has `lander_pending: false`. The price fields, the plan, the schedule and `listing_history` work exactly as without `none`. A dry run with `none` adds `lander_pending`.
   `manual` = the registrar has no NS API for this domain (do it by hand; `manual_steps`). `pending` = the registrar accepted but is still applying (warning `NS_PENDING`). The daily DNS check confirms either.
 - **200 dry run:** `{dry_run: true, valid: true, domain, category, listing: null | <plan view>, lander, ns, preview: {afternic: row | null, sedo: row | null}, warnings}`. Nothing is written except the audit row.
 - **Plan view** (also in `/buy`): `{mode, category, price_grade, bin (pair), floor (pair), walkaway_cents, walkaway: "$… (private)", min_offer (pair), lto_max_months, pricing_source, settings_version, override: bool, schedule: [{event, due_on, bin?, floor?, walkaway?, status}] (schedule prices are whole-dollar display strings only, with no `_cents`; the walk-away there has no `(private)` suffix), sell_plan_line: string | null}`. Events: `drop1_m6`, `drop2_m18`, `geo_drop_m12`, `final_push`, `delist`. Statuses: `planned`, `applied`, `skipped_at_minimum`, `skipped_no_change`, `skipped_disabled`, `superseded`, `superseded_by_final_push`, `cancelled`, `failed`.
@@ -314,7 +321,7 @@ WRITE. Creates a **draft** version; nothing changes for runs until it is activat
 - **Body (strict):** `label` (`^[a-z0-9][a-z0-9._-]{0,31}$`), `based_on?` (a label; default: the active one), `set` (an object of dotted paths to JSON values, at least one, e.g. `{"thresholds.registered_share_min": 0.4}`), `note?` (≤ 500 chars).
 - **Paths:** a path must exist in the settings document. New keys may be added only under `thresholds`, `tier.clauses` and `run.gates`. An array element is addressed by its index (`price.forbidden_bands_cents.0`). A path may name a whole object.
 - **201:** `{label, values, based_on}` (the full resulting document).
-- **Errors:** 422 `SETTINGS_KEY_UNKNOWN` (`details.path`) · 422 `SETTINGS_KEY_LOCKED` (the priors `tier.p_passive`, `lead.p_lead` and `priors_v91` can't be changed by a draft, whether by a leaf path or by replacing a parent; only a migration changes them; `holdout` is locked too; the check also compares with the active version; `details.path`) · 422 `SETTINGS_INVALID` (the resulting document breaks a rule: `details.issues[] {path, message}`; see `selection.md` §Validation) · 422 `SETTINGS_NO_CHANGE` (identical to the active version; a copy of a version that is not active is allowed, which is how an older version is brought back) · 409 `SETTINGS_LABEL_TAKEN` · 404 `SETTINGS_NOT_FOUND` (`based_on`) · 422 `VALIDATION_ERROR`.
+- **Errors:** 422 `SETTINGS_KEY_UNKNOWN` (`details.path`) · 422 `SETTINGS_KEY_LOCKED` (the priors `tier.p_passive`, `lead.p_lead` and `priors_v91` can't be changed by a draft, whether by a leaf path or by replacing a parent (a different value of any type or shape, e.g. `"tier.p_passive": 0.1`, is `SETTINGS_KEY_LOCKED`, not `SETTINGS_INVALID`, since 2.1.0); only a migration changes them; `holdout` is locked too; the check also compares with the active version; `details.path`) · 422 `SETTINGS_INVALID` (the resulting document breaks a rule: `details.issues[] {path, message}`; see `selection.md` §Validation) · 422 `SETTINGS_NO_CHANGE` (identical to the active version; a copy of a version that is not active is allowed, which is how an older version is brought back) · 409 `SETTINGS_LABEL_TAKEN` · 404 `SETTINGS_NOT_FOUND` (`based_on`) · 422 `VALIDATION_ERROR`.
 
 ### `POST /selection/settings/{label}/activate`
 WRITE. Makes a draft the active version, for runs started afterwards (a run keeps the version it started with).
@@ -360,13 +367,13 @@ WRITE. The CAP-21a **name registry**: every labelled name is recorded once, as `
   - **Row:** `{domain, role: fit|dev|test, label: sold|dropped, source (1–120 chars), slice (1–60 chars), report_lane?: expired|fresh|aged|geo, price_usd? (sale price of a sold name), as_of? (YYYY-MM-DD or null), features: {registered_share?: 0..1|null, prior_history?: 0|1|null, pre_cls?: string|null, alt_tld_before_n?: int|null, n_words?: int|null, sld_chars?: int|null, is_geo?: 0|1, city_trade_ok?: bool|null, short?: 0|1|null, geo_city?, geo_trade?, archive_span_years?, input_dates?: {<input>: YYYY-MM-DD}, gates?: {tm_us?, tn?, hist2?, hist2_guard?: {result: PASS|FAIL|FLAG|UNKNOWN, source: string, date: YYYY-MM-DD}}}}`. A missing or null feature is **unknown**; nothing is imputed.
   - **CSV columns** (a leading BOM is ignored): `domain,label,slice,role` (as in `features.csv`; `role` was called `split` in the plan, and it is `role` everywhere in the API), optional `source` (default: the slice), `report_lane`, `sale_price_usd`, `as_of`, `registered_share`, `prior_history`, `pre_cls`, `alt_tld_before_n`, `n_words`, `sld_chars`, `is_geo` (explicit; else derived: either `geo_city` or `geo_trade` filled makes the row geo), `geo_city`, `geo_trade`, `archive_span_years`, `census_date`, `ext_dates_date`, `history_date` (become `input_dates.census`, `.ext_dates`, `.history`), and for each gate `g` in `tm_us`, `tn`, `hist2`, `hist2_guard`: `g_result`, `g_source`, `g_date`. An empty cell is null.
 - **200:** `{inserted, duplicates, conflicts: [{domain, existing_role}]}`. An identical re-upload is a duplicate. The same domain with any different value is a conflict and is never overwritten (a name is recorded once).
-- **Errors:** 422 `ROWS_INVALID` (`details.rows: [{index, domain, message}]`; nothing is recorded) · 422 `VALIDATION_ERROR` (neither or both of `rows` and `csv`, or not 1 to 200 rows).
+- **Errors:** 422 `ROWS_INVALID` (`details.rows: [{index, domain, message}]`; nothing is recorded) · 422 `VALIDATION_ERROR` (neither or both of `rows` and `csv`, or not 1 to 200 rows) · 409 `LABELLED_NAME_CONFLICT` (rare: a concurrent upload recorded one of the names between the check and the insert; nothing from this call is stored; retry and the name shows as a duplicate or a conflict; `details.domain`).
 
 ### `POST /selection/replays`
 WRITE. **CAP-21a replay** over the registered names. Every row goes through the same tier and DEMAND-2 code as live screening (`evaluateTier` with the chosen settings); nothing is a second implementation.
 - **Body (strict):** `suite`, `mode` (`diagnostic` | `holdout`), `settings?` (a label; default the active version).
   - **`diagnostic`** also takes the filters `slices?`, `sources?`, `roles?`, `domains?` (AND) and `profit?`. `suite` is only a label. It refuses any selection that contains a `test` row: 422 `HOLDOUT_CONTAMINATED` ("Test rows are scored only by holdout replays").
-  - **`holdout`** takes **only** `suite` and `settings` (any filter or `profit` → 422 `VALIDATION_ERROR`). `suite` must be one of `holdout.required_suites` with a frozen definition (`POST /selection/holdout-suites`, else 422 `SUITE_NOT_DEFINED`); the latest definition version selects the names and names the judged cell.
+  - **`holdout`** takes **only** `suite` and `settings` (any filter or `profit` → 422 `VALIDATION_ERROR`). `suite` must be one of `holdout.required_suites` with a frozen definition (`POST /selection/holdout-suites`). A suite that is **not** in `holdout.required_suites` → 422 `SUITE_UNKNOWN` (`details.required_suites`, checked first, v2.1.0; before it gave `SUITE_NOT_DEFINED`). A required suite with **no frozen definition** → 422 `SUITE_NOT_DEFINED`; the latest definition version selects the names and names the judged cell.
 - **`diagnostic`:** decisions from the features alone, no gates; `gates_applied: false`; it **never counts toward the hold**. Missing as_of or gate columns are fine; an unknown `city_trade_ok` is unknown, not true.
 - **`holdout`:** the selected names must all be registered as `test` (a `fit`/`dev` name in the selection is refused first), carry an `as_of`, all four gate results (`tm_us`, `tn`, `hist2`, `hist2_guard`, each with source and date) and an input date for every non-null dated feature (`input_dates.census` for `registered_share`, `ext_dates` for `alt_tld_before_n`, `history` for `prior_history`, `pre_cls`, `archive_span_years`). DOM **recomputes** CAP-01 (form: word count, length, G-FORM-1, a form `FAIL`) and CAP-02 (the `brand` and `bigco` lists at their current versions) from the domain; the supplied gate results and `is_geo` are trusted as uploaded, with their source. Decisions are shown **before** and **after** the gates. A row is `reject` when any gate fails; an `accept` becomes `undecided` when a gate is unknown (an uploaded `UNKNOWN`, or no `brand`/`bigco` list); a `reject` stays a reject. `FLAG` results count as pass (as in live screening).
 - **Decisions:** `accept` / `reject` / `undecided`. A row is `undecided` unless the decision is the same whichever way the missing data falls; rates use n **including** undecided; undecided is never dropped.
@@ -491,11 +498,11 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Cross-cutting errors:** `UNAUTHORIZED`, `SCOPE_FORBIDDEN`, `RATE_LIMITED`, `IDEMPOTENCY_KEY_REQUIRED`, `IDEMPOTENCY_KEY_MISMATCH`, `IDEMPOTENCY_KEY_IN_USE`, `VALIDATION_ERROR`, `INVALID_BODY`, `INVALID_REQUEST`, `NOT_FOUND`, `INTERNAL`, `AUDIT_WRITE_FAILED`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `JOBS_DISABLED`, `DOMAIN_BUSY`, `PRICING_SETTINGS_MISSING`.
 
-**Buying errors:** `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `BUY_HOLD`, `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
+**Buying errors:** `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `MODE_INVALID`, `BUY_HOLD`, `SCREENING_PACK_REQUIRED` (409), `NO_TRANCHE` (409), `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
 
-**Listing errors:** the listing rule codes under `POST /list/{domain}`, plus `NOT_IN_PORTFOLIO`, `API_ACCESS_DISABLED`, `REGISTRAR_UNAVAILABLE`, `LISTING_CHANGED_CONCURRENTLY`, `DOMAIN_NOT_FOUND`.
+**Listing errors:** the listing rule codes under `POST /list/{domain}`, plus `NOT_IN_PORTFOLIO`, `API_ACCESS_DISABLED`, `REGISTRAR_UNAVAILABLE`, `LISTING_CHANGED_CONCURRENTLY`, `DOMAIN_NOT_FOUND`, `DISPLAY_NAME_MISMATCH`, `REPLAN_NOTHING_LISTED`, `OVERRIDE_NEEDS_APPROVAL`, `DROP_DATE_UNKNOWN`, `LANDER_RETIRED`, `LANDER_INVALID`, `NS_INVALID`.
 
-**Screening errors:** `DRAFT_NOT_ALLOWED_LIVE`, `AS_OF_LIVE_REFUSED`, `RUN_NOT_FOUND`, `NAME_NOT_IN_RUN`, `CHECK_NOT_MANUAL`, `EVIDENCE_NOT_FOUND`, `OBSERVED_AT_INVALID`, `CHECKED_AT_INVALID`, `VERDICT_RESULT_NOT_FLAG`, `VERDICT_RESULT_STALE`, `RESULT_NOT_FOUND`, `DECIDED_AT_INVALID` (1.2.0), `REGISTRAR_UNKNOWN` (and `REGISTRAR_NOT_ALLOWED`; and `SETTINGS_NOT_FOUND`, `VALIDATION_ERROR`). Result reason codes are in `selection.md` §Screening runs.
+**Screening errors:** `RUN_RUNNING` (409, `POST /screening/packs`), `PACK_NOT_FOUND` (404, `GET /screening/packs/{id}`), `JUDGED_AT_INVALID` (422, `POST /screening/packs`), `MANUAL_REQUIRED` (409, `POST /tranches/{id}/members`), `DRAFT_NOT_ALLOWED_LIVE`, `AS_OF_LIVE_REFUSED`, `RUN_NOT_FOUND`, `NAME_NOT_IN_RUN`, `CHECK_NOT_MANUAL`, `EVIDENCE_NOT_FOUND`, `OBSERVED_AT_INVALID`, `CHECKED_AT_INVALID`, `VERDICT_RESULT_NOT_FLAG`, `VERDICT_RESULT_STALE`, `RESULT_NOT_FOUND`, `DECIDED_AT_INVALID` (1.2.0), `REGISTRAR_UNKNOWN` (and `REGISTRAR_NOT_ALLOWED`; and `SETTINGS_NOT_FOUND`, `VALIDATION_ERROR`). Result reason codes are in `selection.md` §Screening runs.
 
 **Tranche errors:** `TRANCHE_NOT_FOUND` (404; also on a screening run), `TRANCHE_ALREADY_OPEN`, `TRANCHE_NAME_TAKEN`, `TRANCHE_CLOSED`, `TRANCHE_FULL`, `GEO_CAP`, `TRANCHE_SPEND_CAP`, `TRANCHE_BELOW_TARGET`, `MAIN_LANE_QUOTA`, `NOT_SCREENED_OK`, `MEMBER_NOT_FOUND` (and `NAME_NOT_IN_RUN`, `RUN_NOT_FOUND`, `DOMAIN_INVALID`, `VALIDATION_ERROR`).
 

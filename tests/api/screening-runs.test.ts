@@ -235,7 +235,7 @@ describe('cache and the freshness window', () => {
     expect([rec.statusCode, rec.json().status]).toEqual([201, 'PASS']);
     const second = await runDone(body);
     const n = byDomain(second.body, 'tampapoolsco.com');
-    expect(res(n, 'web_risk')).toMatchObject({ status: 'PASS', cached: true, source: 'cache', checked_at: '2026-10-06T07:30:00.000Z', duration_ms: 0, upstream_calls: 0 });
+    expect(res(n, 'web_risk')).toMatchObject({ status: 'PASS', cached: true, source: 'cache', checked_at: '2026-10-06T10:30:00+03:00', duration_ms: 0, upstream_calls: 0 });
     expect(res(n, 'web_risk').evidence).toHaveLength(1);
     expect(res(n, 'form').cached).toBe(false); // form has no freshness window
     expect(res(n, 'tm_us').status).toBe('MANUAL_REQUIRED'); // a MANUAL_REQUIRED row is never reused

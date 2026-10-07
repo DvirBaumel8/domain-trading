@@ -103,4 +103,15 @@ describe('audit (AL)', () => {
     expect(await httpAuditRows()).toHaveLength(0);
     expect(await db.selectFrom('idempotency_keys').selectAll().execute()).toHaveLength(0);
   });
+
+  it('BUG-6: a truncated percent-encoding (GET /portfolio/%E0%A4%A) gets 400 INVALID_REQUEST in the error shape, with the READ token', async () => {
+    app = await makeApp();
+    const r = await issueToken('read');
+    for (const url of ['/portfolio/%E0%A4%A', '/portfolio/%E0%A4%A%', '/portfolio/%', '/portfolio/%FF']) {
+      const res = await app.inject({ method: 'GET', url, headers: r.auth });
+      expect([url, res.statusCode]).toEqual([url, 400]);
+      expect(res.headers['content-type']).toContain('application/json');
+      expect(res.json().error).toMatchObject({ code: 'INVALID_REQUEST', details: {} });
+    }
+  });
 });

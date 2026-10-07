@@ -101,19 +101,17 @@ describe('scheduled', () => {
     }
   };
 
-  it('runs tick at :05 on non-midnight hours', async () => {
-    const t = Date.UTC(2026, 9, 7, 13, 5);
-    const { fetchMock } = await run('5 * * * *', t);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]![1].body).toBe('{"job":"tick"}');
-    expect(fetchMock.mock.calls[0]![1].headers['Idempotency-Key']).toBe(`tick-${t}`);
+  it('runs daily only, at 00:05 UTC', async () => {
+    const t = Date.UTC(2026, 9, 7, 0, 5);
+    const { fetchMock } = await run('5 0 * * *', t);
+    expect(fetchMock.mock.calls.map((c) => c[1].body)).toEqual(['{"job":"daily"}']);
+    expect(fetchMock.mock.calls[0]![1].headers['Idempotency-Key']).toBe(`daily-${t}`);
   });
 
-  it('runs tick then daily at 00:05 UTC', async () => {
-    const t = Date.UTC(2026, 9, 7, 0, 5);
-    const { fetchMock } = await run('5 * * * *', t);
-    expect(fetchMock.mock.calls.map((c) => c[1].body)).toEqual(['{"job":"tick"}', '{"job":"daily"}']);
-    expect(fetchMock.mock.calls[1]![1].headers['Idempotency-Key']).toBe(`daily-${t}`);
+  it('refuses the retired hourly cron (no request)', async () => {
+    const { fetchMock, errSpy } = await run('5 * * * *', Date.UTC(2026, 9, 7, 13, 5));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(errSpy.calls).toBe(1);
   });
 
   it('logs an unknown cron and sends nothing', async () => {

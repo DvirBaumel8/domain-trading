@@ -225,6 +225,10 @@ describe('replay', () => {
     await upload(post, suiteRows('s1'));
     const none = await post('/selection/replays', { suite: 'BT10-1', mode: 'holdout' });
     expect([none.statusCode, none.json().error.code]).toEqual([422, 'SUITE_NOT_DEFINED']);
+    // DOCS-3: a suite outside holdout.required_suites is SUITE_UNKNOWN with details.required_suites (not SUITE_NOT_DEFINED).
+    const notRequired = await post('/selection/replays', { suite: 'QA-XYZ', mode: 'holdout' });
+    expect([notRequired.statusCode, notRequired.json().error.code]).toEqual([422, 'SUITE_UNKNOWN']);
+    expect(notRequired.json().error.details.required_suites).toEqual(['BT10-1', 'BT10-9', 'BT10-11']);
     const filt = await post('/selection/replays', { suite: 'BT10-1', mode: 'holdout', slices: ['s1'] });
     expect([filt.statusCode, filt.json().error.code]).toEqual([422, 'VALIDATION_ERROR']);
     const noAppr = await post('/selection/holdout-suites', { suite: 'BT10-1', slices: ['s1'] });

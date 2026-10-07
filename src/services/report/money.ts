@@ -43,8 +43,11 @@ export async function reportMoney(db: Kysely<Database>) {
   const [gross, commission, fees, costs, n] = [Number(x.gross), Number(x.commission), Number(x.sale_fees), Number(x.costs), Number(x.n)];
   const net = gross - commission - fees;
   const profit = net - costs;
+  // A name set to drop at first expiry (drop_date = expiry_date, CR-004 §10.3) will not be renewed: it commits no forward cost.
   const fwd = await db.selectFrom('domains').select(['domain', 'renewal_price_cents'])
-    .where('renewals_used', '=', 0).where('status', 'not in', ['sold', 'dropped', 'pending_purchase']).orderBy('domain').execute();
+    .where('renewals_used', '=', 0).where('status', 'not in', ['sold', 'dropped', 'pending_purchase'])
+    .where((eb) => eb.or([eb('drop_date', 'is', null), eb('expiry_date', 'is', null), eb('drop_date', '<>', eb.ref('expiry_date'))]))
+    .orderBy('domain').execute();
   const missing = fwd.filter((d) => d.renewal_price_cents === null).map((d) => d.domain);
   const total = fwd.reduce((s, d) => s + (d.renewal_price_cents ?? 0), 0);
   return {

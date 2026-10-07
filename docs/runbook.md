@@ -35,7 +35,7 @@ curl -sS -X POST "$API/jobs/run" \
   -d '{"job":"tick"}'          # or {"job":"daily"}
 ```
 
-The Worker has one cron, `5 * * * *`: `tick` every hour at :05, plus `daily` after it at 00:05 UTC (the Cloudflare free plan allows 5 cron triggers per account). A Worker log saying "timed out" does **not** mean the job failed (the cold start can exceed the Worker's wait while the job still runs): check `GET /audit` for the `/jobs/run` row and its summary.
+The Worker has one cron, `5 0 * * *`: `daily` at 00:05 UTC (since 2.1.0 `daily` also runs the former hourly `tick` steps first; `tick` is by hand only). A Worker log saying "timed out" does **not** mean the job failed (the cold start can exceed the Worker's wait while the job still runs): check `GET /audit` for the `/jobs/run` row and its summary.
 
 The reply has a per-step result. A second run while one is still running returns `skipped`. 401 = wrong token, 503 `JOBS_DISABLED` = `JOB_TRIGGER_TOKEN` not set in Render.
 Allow up to ~60 s for a cold start.

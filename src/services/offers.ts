@@ -150,9 +150,18 @@ export class OffersService {
       : q.where('domain_id', '=', domainId).where('amount_cents', '=', amountCents).where('received_at', '=', receivedAt).executeTakeFirst();
   }
 
+  /** Body-only checks of an outcome call. They run before the offer id is looked at (BUG-4): an invalid body is always 422. */
+  static checkOutcomeBody(body: OutcomeBody): void {
+    if (!(OUTCOMES as readonly string[]).includes(body.outcome)) {
+      throw new AppError(422, 'VALIDATION_ERROR', `outcome must be one of ${OUTCOMES.join(', ')}`);
+    }
+    if (body.note != null && body.note.includes('@')) throw new AppError(422, 'NO_PII', "note must not contain an email address or '@'");
+  }
+
   async outcome(id: number, body: OutcomeBody) {
     const { db } = this.deps;
     const now = new Date(this.deps.now());
+    OffersService.checkOutcomeBody(body);
     const o = await db.selectFrom('offers').selectAll().where('id', '=', id).executeTakeFirst();
     if (!o) throw new AppError(404, 'OFFER_NOT_FOUND', `Offer ${id} not found`);
     const d = await db.selectFrom('domains').selectAll().where('id', '=', o.domain_id).executeTakeFirstOrThrow();

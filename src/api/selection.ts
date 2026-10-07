@@ -401,9 +401,12 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     let q = db.selectFrom('labelled_names').selectAll().orderBy('domain');
     let filter: Record<string, unknown>;
     if (b.mode === 'holdout') {
+      // DOCS-3: a suite outside holdout.required_suites is SUITE_UNKNOWN (checked first); a required suite with no frozen definition is SUITE_NOT_DEFINED.
+      if (!active.values.holdout.required_suites.includes(b.suite)) {
+        throw new AppError(422, 'SUITE_UNKNOWN', `${b.suite} is not one of holdout.required_suites`, { required_suites: active.values.holdout.required_suites });
+      }
       def = await latestSuite(b.suite);
       if (!def) throw new AppError(422, 'SUITE_NOT_DEFINED', `Suite ${b.suite} has no frozen definition; freeze it (POST /selection/holdout-suites) before any holdout scoring`);
-      if (!active.values.holdout.required_suites.includes(b.suite)) throw new AppError(422, 'SUITE_UNKNOWN', `${b.suite} is not one of holdout.required_suites`);
       if (def.slices) q = q.where('slice', 'in', def.slices);
       if (def.sources) q = q.where('source', 'in', def.sources);
       filter = { suite_version: def.version, slices: def.slices, sources: def.sources, cell: def.cell };

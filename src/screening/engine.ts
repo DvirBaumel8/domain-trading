@@ -1,5 +1,5 @@
 // CAP-20 screening run engine. A run is persisted per (item, check): Render free sleeps, so a run resumes where it stopped
-// (the hourly tick and the next poll call resumeStalled/kick). Results are append-only; a check that is not built yet answers
+// (the daily job and the next poll call resumeStalled/kick). Results are append-only; a check that is not built yet answers
 // NOT_RUN / NOT_IMPLEMENTED; a run that outlives its time budget finishes as `partial` with every open check UNKNOWN / TIMEOUT.
 import { createHash, randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Selectable } from 'kysely';
@@ -301,7 +301,7 @@ export class ScreeningWorker {
 
   /**
    * Running runs this process is not working on: past the deadline they are finalised (`partial`), else resumed when the
-   * heartbeat is missing or older than HEARTBEAT_STALE_MS. Called by the hourly tick. `finalized` lists only runs whose status changed.
+   * heartbeat is missing or older than HEARTBEAT_STALE_MS. Called by the daily job (and the tick). `finalized` lists only runs whose status changed.
    */
   async resumeStalled(): Promise<{ resumed: string[]; finalized: string[] }> {
     const now = this.deps.now();

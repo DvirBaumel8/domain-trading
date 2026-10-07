@@ -84,7 +84,7 @@ export class JobRunner {
     return m.length > 200 ? `${m.slice(0, 200)}...` : m;
   }
 
-  /** A verifier that throws writes no marker, so it is retried on the next hourly tick by design. */
+  /** A verifier that throws writes no marker, so it is retried on the next run by design. */
   private async nsVerifyDue(): Promise<boolean> {
     const last = await this.deps.db.selectFrom('audit_log').select('at').where('path', '=', 'ns-verify')
       .orderBy('at', 'desc').limit(1).executeTakeFirst();
@@ -103,7 +103,8 @@ export class JobRunner {
   }
 
   private async daily(): Promise<Record<string, StepResult>> {
-    const steps: Record<string, StepResult> = {};
+    // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.
+    const steps: Record<string, StepResult> = await this.tick();
     steps.priceJob = await this.step(() => this.deps.priceJob.runOnce());
     steps.dropJob = await this.step(() => this.deps.dropJob.runOnce());
     steps.registrarCheck = await this.step(() => this.deps.registrarCheckJob.runOnce());

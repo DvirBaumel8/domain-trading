@@ -439,6 +439,16 @@ export const LABEL_RE = /^[a-z0-9][a-z0-9._-]{0,31}$/;
 
 export function applySet(base: SelectionValuesT, set: Record<string, unknown>, active: SelectionValuesT = base): SelectionValuesT {
   const doc = clone(base) as unknown as Record<string, unknown>;
+  // BUG-5: replacing a locked parent (tier.p_passive, lead.p_lead, priors_v91, holdout) or an ancestor of one with a different value
+  // is SETTINGS_KEY_LOCKED, even when the new value would also fail the shape check.
+  for (const [path, value] of Object.entries(set)) {
+    for (const locked of LOCKED_PREFIXES) {
+      let differs: boolean | undefined;
+      if (path === locked) differs = !deepEqual(value, getPath(base, locked));
+      else if (locked.startsWith(`${path}.`)) differs = !deepEqual(getPath(value, locked.slice(path.length + 1)), getPath(base, locked));
+      if (differs) throw new AppError(422, 'SETTINGS_KEY_LOCKED', `${locked} is locked: priors change only by migration (SEL9-2)`, { path: locked });
+    }
+  }
   for (const [path, value] of Object.entries(set)) setPath(doc, path, clone(value));
   const r = SelectionValues.safeParse(doc);
   if (!r.success) {

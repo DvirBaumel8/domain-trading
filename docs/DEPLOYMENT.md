@@ -92,7 +92,7 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
 
 ## 6. Cloudflare Worker cron (GitHub repo settings)
 
-The Worker calls `POST /jobs/run` hourly (`tick`: reconciler, NS verifier if due) and daily at 00:05 UTC (shortly after the 00:00 tick, on the instance it already woke) (`daily`: price job, drops, registrar check, backup export).
+The Worker calls `POST /jobs/run` once a day at 00:05 UTC with `daily` (since 2.1.0): reconciler, NS verifier if due, screening resume, then price job, drops, registrar check, reference refresh, backup export. `tick` is no longer scheduled; it stays callable by hand.
 
 1. Repo -> Settings -> Secrets and variables -> Actions -> **Secrets**:
    - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`: the same values as the trader repo. GitHub secrets cannot be read back: if you did not store the old token, create a new one in Cloudflare (My Profile -> API Tokens -> Create Token, template **Edit Cloudflare Workers**).
@@ -152,14 +152,14 @@ Check the `export` step in the reply, then that the `data-backup` branch has a n
 
 ## 11. Caveats
 
-- **Render 750 instance-hours per workspace per month.** trader and sapako each run a 24/7 keep-alive (~730 h each), so this service needs its own workspace (step 5). It is woken hourly (~180 h/month). **Do not add a keep-warm ping**;
+- **Render 750 instance-hours per workspace per month.** trader and sapako each run a 24/7 keep-alive (~730 h each), so this service needs its own workspace (step 5). It is woken once a day by the Worker (a few instance-hours a month). **Do not add a keep-warm ping**;
   if a workspace runs out, every free service in it stops.
 - **Cold start ~50 s.** Bots should use request timeouts of at least 60 s and retry once. The Worker uses 90 s.
-- **Reconciler runs hourly** in production (was every 10 min), so a stuck purchase resolves within about 90 min.
-- **Neon free:** 100 CU-hours per project per month, 1 GB, scale-to-zero after 5 min, only 6 hours of point-in-time history. The nightly `data-backup` export and your monthly manual dump are the real safety net. Hourly wakes use roughly 15 CU-h.
+- **The reconciler runs daily** (a step of `daily`, since 2.1.0), so a stuck purchase resolves by the next 00:05 UTC run, up to about 24 h; start a run by hand (`POST /jobs/run`) to settle one sooner.
+- **Neon free:** 100 CU-hours per project per month, 1 GB, scale-to-zero after 5 min, only 6 hours of point-in-time history. The nightly `data-backup` export and your monthly manual dump are the real safety net. Daily wakes use far less.
 - **GoDaddy:** changing nameservers through the PAT may be refused for this account (403 `ACCOUNT_NOT_ELIGIBLE`). Then change NS by hand in GoDaddy and the NS verifier checks public DNS (`docs/internal/list.md`). GoDaddy is never a buying source here.
 - Check in GoDaddy that auto-renew is OFF for D-001 (renewals bill the card; the server cap cannot block them).
-- **Idempotency keys:** the hourly Worker calls add a small `idempotency_keys` row each (about 8,800 a year). The growth is fine for now (1 GB Neon); prune later if it ever matters.
+- **Idempotency keys:** the daily Worker call adds a small `idempotency_keys` row (about 365 a year). The growth is fine for now (1 GB Neon); prune later if it ever matters.
 
 
 ## Bot permissions (Gavriel writes only `docs/requests/`)

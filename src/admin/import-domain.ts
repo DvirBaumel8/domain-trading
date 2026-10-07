@@ -214,7 +214,7 @@ export async function importDomain(
     rationale = ev.rationale;
   }
 
-  if (p.renewalCents === null) warnings.push('RENEWAL_PRICE_UNKNOWN: the renewal price is not known; committed_forward is incomplete');
+  if (p.renewalCents === null && dropDate !== expiryDate) warnings.push('RENEWAL_PRICE_UNKNOWN: the renewal price is not known; committed_forward is incomplete');
   if (p.legacy !== null) warnings.push('LEGACY_NO_COMPS: imported without comparable sales (bought before the comps rule)');
   if (expiryDate < p.today) warnings.push(`EXPIRY_IN_PAST: ${expiryDate} has passed; the daily job decides what happens next`);
   if (plan) warnings.push(...plan.warnings);

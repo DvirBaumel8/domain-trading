@@ -39,7 +39,7 @@ describe('POST /screening/runs/{id}/manual: web_risk', () => {
     expect(r.statusCode).toBe(201);
     expect(r.json()).toMatchObject({
       domain: 'tampapoolsco.com', check: 'web_risk', gate: 'G5', status: 'UNKNOWN', reason_code: 'HISTORY_NOT_FINAL', source: 'manual', cached: false,
-      checked_at: '2026-10-06T07:30:00.000Z', recorded_by: 'gavriel', fields: { raw_status: 6, hist1_clean: null, evidence_url: URL_, note: 'looked at it by hand' },
+      checked_at: '2026-10-06T10:30:00+03:00', recorded_by: 'gavriel', fields: { raw_status: 6, hist1_clean: null, evidence_url: URL_, note: 'looked at it by hand' },
     });
     const ev = r.json().evidence as number[];
     expect(ev).toHaveLength(1);
@@ -151,7 +151,7 @@ describe('POST /quotes/manual', () => {
     const { post } = await h();
     const r = await post('/quotes/manual', body({ source_url: 'https://www.godaddy.com/renew' }));
     expect(r.statusCode).toBe(201);
-    expect(r.json()).toEqual({ id: expect.any(Number), domain: 'promptinjectionaudit.com', registrar: 'godaddy', renewal_cents: 2299, renewal: '$22.99', valid_until: '2026-11-04T12:00:00.000Z' });
+    expect(r.json()).toEqual({ id: expect.any(Number), domain: 'promptinjectionaudit.com', registrar: 'godaddy', renewal_cents: 2299, renewal: '$22.99', valid_until: '2026-11-04T14:00:00+02:00' });
     const row = await db.selectFrom('manual_quotes').selectAll().executeTakeFirstOrThrow();
     expect(row).toMatchObject({ domain: 'promptinjectionaudit.com', registrar: 'godaddy', renewal_cents: 2299, first_year_cents: 1373, source_url: 'https://www.godaddy.com/renew', recorded_by: 'gavriel' });
     expect(row.audit_id).toBeTruthy();

@@ -225,6 +225,17 @@ describe('POST /offers/{id}/outcome', () => {
     expect((await outcome(w, 9999, { outcome: 'declined' })).json().error.code).toBe('OFFER_NOT_FOUND');
     expect((await outcome(r, em, { outcome: 'declined' })).statusCode).toBe(403);
   });
+
+  it('BUG-4: an invalid body is checked before the id (422), on a bad id and on an unknown id', async () => {
+    const { w } = await setup();
+    for (const id of ['abc', '9999']) {
+      const call = (payload: object) => app.inject({ method: 'POST', url: `/offers/${id}/outcome`, headers: { ...w, 'idempotency-key': randomUUID() }, payload });
+      const bad = await call({ outcome: 'maybe' });
+      expect([id, bad.statusCode, bad.json().error.code]).toEqual([id, 422, 'VALIDATION_ERROR']);
+      expect((await call({ outcome: 'declined', note: 'a@b.com' })).json().error.code).toBe('NO_PII');
+      expect((await call({ outcome: 'declined' })).json().error.code).toBe('OFFER_NOT_FOUND');
+    }
+  });
 });
 
 describe('GET /offers and no side effects', () => {

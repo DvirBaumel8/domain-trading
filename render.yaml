@@ -5,11 +5,11 @@
 #   - Postgres: Neon free (NOT declared here; DATABASE_URL is set by hand). Use the DIRECT (non-pooler)
 #     connection string: the per-domain lock is a session advisory lock. The server refuses a "-pooler." host
 #     when APP_ENV=production.
-#   - Scheduled work: a free Cloudflare Worker cron (jobs-trigger/) calls POST /jobs/run hourly (tick) and daily
-#     (daily jobs + nightly backup export). The service itself runs no timers.
+#   - Scheduled work: a free Cloudflare Worker cron (jobs-trigger/) calls POST /jobs/run once a day (daily: reconciler, NS check,
+#     price job, drops, registrar check, backup export). The service itself runs no timers.
 #   - Render free allows 750 instance hours per WORKSPACE per month. trader and sapako each run a 24/7 keep-alive
 #     (~730 h each), so deploy this Blueprint in its OWN (new, free) workspace, or one with no always-on service.
-#     This service is NOT kept warm: the hourly wake uses about 180 h/month. Do not add a keep-warm ping.
+#     This service is NOT kept warm: the daily wake uses a few hours a month. Do not add a keep-warm ping.
 #   - LANDER_TARGET is not an env var the server reads (it is a DB setting, default afternic).
 #   - Render crons and Postgres are billed, so neither is used. Backups go to a private data repo (backup.md).
 # Setup steps: docs/DEPLOYMENT.md.

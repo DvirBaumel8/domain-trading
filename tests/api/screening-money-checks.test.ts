@@ -53,7 +53,7 @@ describe('typo (CAP-02, TYPO-1)', () => {
     const { runDone } = await h();
     const clean = ['boisesolarco', 'paytransparencyaudit', 'ragsecurityaudit', 'tampapoolsco', 'memphisplumbingpros', 'pittsburghroofpros', 'doraictcompliance', 'promptinjectionaudit', 'hvacchicago', 'netextend'];
     const { body } = await runDone({ checks: ['typo'], names: clean.map((t) => nonGeo(`${t}.com`)) });
-    for (const n of body.names) expect(res(n, 'typo')).toMatchObject({ status: 'PASS', data_as_of: '2026-10-06T00:00:00.000Z', fields: { attribution: 'Majestic Million, Majestic (https://majestic.com), CC BY 3.0', typo_note: 'TOP_N_EXCEEDS_LIST', list_rows: 1000 } });
+    for (const n of body.names) expect(res(n, 'typo')).toMatchObject({ status: 'PASS', data_as_of: '2026-10-06T03:00:00+03:00', fields: { attribution: 'Majestic Million, Majestic (https://majestic.com), CC BY 3.0', typo_note: 'TOP_N_EXCEEDS_LIST', list_rows: 1000 } });
   });
 
   it('a 9-day-old list is UNKNOWN STALE_DATA (7 days is still fine); no list at all is the same', async () => {

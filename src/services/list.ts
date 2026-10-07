@@ -150,8 +150,13 @@ export class ListService {
     // Lander target
     const lander = body.lander ?? settings.lander_target;
     let ns: string[];
-    if (lander === 'dan') throw new AppError(422, 'LANDER_RETIRED', 'Dan.com retired 2025-06-27; use afternic');
-    if (lander === 'custom') {
+    // lander "none" (v2.1.0, CR-004 §10.3): store the listing and plan only; no nameserver action, no DNS lookup.
+    const noLander = lander === 'none';
+    if (noLander) {
+      if (body.ns) throw new AppError(422, 'NS_INVALID', 'ns is only allowed with lander "custom"');
+      ns = [];
+    } else if (lander === 'dan') throw new AppError(422, 'LANDER_RETIRED', 'Dan.com retired 2025-06-27; use afternic');
+    else if (lander === 'custom') {
       const list = [...new Set((body.ns ?? []).map((n) => n.trim().toLowerCase().replace(/\.$/, '')))];
       if (list.length < 2 || list.length > 4 || !list.every((n) => HOST.test(n))) {
         throw new AppError(422, 'NS_INVALID', 'custom lander needs 2–4 valid nameserver hostnames');
@@ -159,7 +164,7 @@ export class ListService {
       ns = list;
     } else {
       const known = landerNameservers(lander);
-      if (!known) throw new AppError(422, 'LANDER_INVALID', 'lander must be afternic, sedo or custom');
+      if (!known) throw new AppError(422, 'LANDER_INVALID', 'lander must be afternic, sedo, custom or none');
       if (body.ns) throw new AppError(422, 'NS_INVALID', 'ns is only allowed with lander "custom"');
       ns = [...known];
     }
@@ -178,6 +183,7 @@ export class ListService {
       const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter }) : await this.currentEvents(db, row.id, row.plan_id);
       return {
         dry_run: true, valid: true, domain, category, listing: shown ? planView(shown, previewEvents) : null, lander, ns,
+        ...(noLander ? { lander_pending: row.lander === null } : {}),
         preview: {
           afternic: a && 'cells' in a.row ? a.row.cells.join(',') : null,
           sedo: t && exportDomain ? sedoRow(exportDomain, t, settings.sedo_hybrid_as).join(',') : null,
@@ -187,13 +193,14 @@ export class ListService {
     }
 
     // Nameservers (before saving; L5)
-    const ns_result = await this.setNameservers(row, ns, warnings);
+    const ns_result: { status: 'set' | 'mismatch' | 'unverified' | 'manual' | 'pending' | 'skipped'; steps?: string[] } = noLander
+      ? { status: 'skipped' } : await this.setNameservers(row, ns, warnings);
     let ns_public: 'match' | 'pending' | 'unknown' = 'unknown';
-    const seen = await this.deps.nsLookup(domain).catch(() => null);
+    const seen = noLander ? null : await this.deps.nsLookup(domain).catch(() => null);
     if (seen) ns_public = sameNsSet(seen, ns) ? 'match' : 'pending';
 
     // Save + history (one transaction)
-    const historyChange = changing || (row.lander !== null && row.lander !== lander);
+    const historyChange = changing || (!noLander && row.lander !== null && row.lander !== lander);
     const displayChanged = body.display_name != null && body.display_name !== row.display_name;
     await db.transaction().execute(async (trx) => {
       const cur = await trx.selectFrom('domains').selectAll().where('id', '=', row.id).forUpdate().executeTakeFirst();
@@ -207,7 +214,7 @@ export class ListService {
         || (cur.first_listed_at?.getTime() ?? null) !== (row.first_listed_at?.getTime() ?? null)) {
         throw new AppError(409, 'LISTING_CHANGED_CONCURRENTLY', 'The listing changed while this request was running; retry');
       }
-      const nsChanged = !row.lander_ns || !sameNsSet(row.lander_ns, ns);
+      const nsChanged = !noLander && (!row.lander_ns || !sameNsSet(row.lander_ns, ns));
       await trx.updateTable('domains').set({
         ...(plan ? {
           ...domainPlanColumns(plan), status: 'listed' as const, category: plan.category, price_grade: plan.category === 'geo' ? plan.grade : null,
@@ -218,8 +225,10 @@ export class ListService {
         }),
         ...(plan || displayChanged ? changedColumns(cur, now) : {}),
         ...(body.display_name != null ? { display_name: body.display_name } : {}),
-        lander, lander_ns: ns, lander_set_at: now,
-        ns_verified_at: ns_public === 'match' ? now : nsChanged ? null : row.ns_verified_at,
+        ...(noLander ? { lander_pending: cur.lander === null } : {
+          lander, lander_ns: ns, lander_set_at: now, lander_pending: false,
+          ns_verified_at: ns_public === 'match' ? now : nsChanged ? null : row.ns_verified_at,
+        }),
         updated_at: now,
       }).where('id', '=', row.id).execute();
       if (holdChange) {
@@ -230,7 +239,7 @@ export class ListService {
       }
       if (historyChange) {
         await trx.insertInto('listing_history').values(historyRow({
-          domainId: row.id, source: 'list', plan: shown, category, grade, lander, override: overrideUsed,
+          domainId: row.id, source: 'list', plan: shown, category, grade, lander: noLander ? row.lander : lander, override: overrideUsed,
           overrideReason: overrideUsed ? (body.override_reason ?? null) : null,
           approvalText: body.approval_ref ? String(body.approval_ref.text) : null, approvalAt: approvedAt, auditId: ctx.auditId,
           planAuditId: plan ? ctx.auditId : row.plan_audit_id, at: now,
@@ -251,7 +260,8 @@ export class ListService {
     return {
       domain, status: plan ? 'listed' : row.status, category,
       listing: shown ? planView(shown, events) : null, pricing_hold: after.pricing_hold,
-      lander, ns, ns_status: ns_result.status, ...(ns_result.steps ? { manual_steps: ns_result.steps } : {}), ns_public,
+      lander: noLander ? row.lander : lander, ns: noLander ? (row.lander_ns ?? []) : ns, lander_pending: noLander ? row.lander === null : false,
+      ns_status: ns_result.status, ...(ns_result.steps ? { manual_steps: ns_result.steps } : {}), ns_public,
       checklist, warnings,
     };
   }

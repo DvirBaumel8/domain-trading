@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { normalizeDomain } from '../domain-name.js';
 import { AppError } from '../http/errors.js';
-import { ISO_WITH_OFFSET, OFFER_BANDS, type OffersService } from '../services/offers.js';
+import { ISO_WITH_OFFSET, OFFER_BANDS, OffersService } from '../services/offers.js';
 import { OFFER_SOURCES } from '../services/offer-rules.js';
 import { idtDayStart, reportOffers } from '../services/offer-stats.js';
 import { jerusalemDate } from '../dates.js';
@@ -51,6 +51,7 @@ export function registerOffers(app: FastifyInstance, service: OffersService, sta
 
   app.post<{ Params: { id: string } }>('/offers/:id/outcome', async (req) => {
     const body = OutcomeSchema.parse(req.body ?? {});
+    OffersService.checkOutcomeBody(body); // the body is checked before the id (BUG-4)
     if (!/^\d{1,15}$/.test(req.params.id)) throw new AppError(404, 'OFFER_NOT_FOUND', 'Offer not found');
     return service.outcome(Number(req.params.id), body);
   });

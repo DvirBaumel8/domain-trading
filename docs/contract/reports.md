@@ -1,4 +1,4 @@
-# Reports (contract v1.0.0)
+# Reports (contract v2.0.2)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -10,7 +10,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | Field | Content |
 |---|---|
 | `generated_at` | ISO time |
-| `budget` | `poc_cap`, `spent`, `remaining` (pairs). `spent` = −Σ ledger `registration` + `renewal` + `fee` rows (the figure `/buy` checks against the cap). `committed_forward: {total (pair), complete: bool, missing: [domain]}` = one renewal for each live name with `renewals_used = 0` (`missing` = names without a known renewal price). `domains: {count, max}` (owned + listed + delisted + pending purchases, vs 50) |
+| `budget` | `poc_cap`, `spent`, `remaining` (pairs). `spent` = −Σ ledger `registration` + `renewal` + `fee` rows (the figure `/buy` checks against the cap). `committed_forward: {total (pair), complete: bool, missing: [domain]}` = one renewal for each live name with `renewals_used = 0`, except a name with `drop_date` = `expiry_date` (drop at first expiry: no renewal is planned, 2.1.0) (`missing` = names without a known renewal price). `domains: {count, max}` (owned + listed + delisted + pending purchases, vs 50) |
 | `sales` | `count`, `gross`, `commission`, `fees` (sale-side fees: `/sold` fee and adjustment rows and `payout_fee`), `net` (pairs) |
 | `profit` | pair: `net − costs`. Costs = `registration`, `renewal`, `refund` (lowers costs), `tool`, `ai`, and `fee`/`adjustment` rows not written by `/sold` |
 | `roi`, `roi_pct` | `profit / costs`: a number with 2 decimals, and a whole percent; both `null` while costs are 0 |
@@ -42,13 +42,14 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `DOMAIN_LEFT_ACCOUNT` | error | The daily registrar check found the name gone and no sale is recorded (status unchanged) | `registrar`, `first_absent_at`, `last_checked_at` |
 | `EXPORT_PENDING` | warn; **error after 7 days** | A listed name changed since the last confirmed Afternic upload | `days_pending`, `export_pending_since` |
 | `MANUAL_DELIST` | warn | A sold, delisted or dropped name must be removed by hand at a marketplace | `status`, `venues[]` |
-| `POST_BUY_INCOMPLETE` | warn | A bought name has no stored pricing evidence (comps) | `purchase_id` |
+| `POST_BUY_INCOMPLETE` | warn | A bought name has no stored pricing evidence (comps). Never raised for a name imported with `legacy_no_comps` (2.1.0: its evidence row records the legacy reason) | `purchase_id` |
+| `LANDER_PENDING` | info | The name was listed with `lander: "none"` and no lander has been chosen yet (2.1.0); no nameserver action is pending in the service | `lander` (null) |
 | `NS_UNVERIFIED` | warn | Public DNS doesn't show the lander nameservers yet | `lander`, `lander_ns` |
 | `EXPORT_STALE` | warn | No confirmed Afternic upload in 7 days while listings changed | `pending[]` |
 | `HOLD_STALE` | warn | A pricing hold has been on for more than 30 days | `reason`, `since` |
 | `PAST_DROP_DATE` | warn | A live name is past its `drop_date` | `drop_date` |
 | `RECEIPT_MISSING` | warn | A completed purchase has no registrar receipt | `purchase_id` |
-| `RENEWAL_PRICE_UNKNOWN` | warn | No renewal price on record (`committed_forward` is incomplete) | — |
+| `RENEWAL_PRICE_UNKNOWN` | warn | No renewal price on record (`committed_forward` is incomplete). Not raised for a name with `drop_date` = `expiry_date` (drop at first expiry, 2.1.0: no renewal is planned) | — |
 | `BIN_MISSING` | warn | Listed in `bin`/`hybrid` without a BIN | — |
 | `CATEGORY_MISSING` | warn | Listed without a category (defensive; the DB prevents it) | — |
 | `OFFER_NEEDS_DVIR` | warn | A Dvir-routed offer is still `open`/`countered` 48 h after it was recorded | `offer_id`, `amount`, `source`, `outcome`, `logged_at` |

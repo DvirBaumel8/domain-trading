@@ -116,8 +116,12 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
  * nothing (bots-only access, Dvir 6 Oct 2026).
  */
 export function auditFrameworkError(err: FastifyError, _req: FastifyRequest, reply: FastifyReply): void {
+  // BUG-6 (CR-005): a malformed percent-encoding must never reach the proxy as an unparseable reply (Cloudflare showed 520).
+  // The body is plain ASCII and never echoes the raw path; the connection is closed so no half-read request is reused.
+  const body = JSON.stringify(errorBody('INVALID_REQUEST', 'The request path or query is malformed (invalid percent-encoding or URL component)'));
   void reply
-    .code(err.statusCode ?? 400)
+    .code(err.statusCode && err.statusCode >= 400 && err.statusCode < 500 ? err.statusCode : 400)
+    .header('connection', 'close')
     .type('application/json; charset=utf-8')
-    .send(JSON.stringify(errorBody('INVALID_REQUEST', err.message)));
+    .send(body);
 }

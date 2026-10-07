@@ -245,7 +245,7 @@ export class BuyService {
       status: 202,
       body: {
         status: 'unknown', code: 'PURCHASE_STATE_UNKNOWN', domain, purchase_id: purchaseId, audit_id: auditId,
-        message: 'The registrar may or may not have registered the domain. The bookkeeping resolves on the next hourly reconciler run. Do not retry with a new Idempotency-Key.',
+        message: 'The registrar may or may not have registered the domain. The bookkeeping resolves on the next daily run (00:05 UTC) or when a job run is started by hand. Do not retry with a new Idempotency-Key.',
       },
     };
   }

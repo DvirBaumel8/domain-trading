@@ -28,6 +28,7 @@ import { registerAuth, registerScope } from './http/auth.js';
 import { registerIdempotency } from './http/idempotency.js';
 import { registerRateLimit } from './http/rate-limit.js';
 import { errorBody, registerErrorHandling } from './http/errors.js';
+import { jerusalemDeep } from './time.js';
 import { rdapLookup, rdapStatus, type RdapFn } from './rdap.js';
 import { RegistrarCheckJob } from './jobs/registrar-check.js';
 import { createAdapters } from './registrars/registry.js';
@@ -93,6 +94,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     frameworkErrors: (err, req, reply) => auditFrameworkError(err, req, reply),
   });
 
+  // BUG-3 (CR-005): Fastify's built-in text/plain parser would pass a string body on to the zod schema (422). Remove it, so
+  // text/plain (like every non-JSON type) is a 415 INVALID_BODY.
+  app.removeContentTypeParser('text/plain');
+
   const routeTable: { method: string; url: string }[] = [];
   app.decorate('routeTable', routeTable);
   app.addHook('onRoute', (r) => {
@@ -100,6 +105,15 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   registerErrorHandling(app);
+  // BUG-2 (CR-005): every response timestamp uses the Asia/Jerusalem offset, except the documented UTC fields.
+  const UTC_FIELDS: Record<string, ReadonlySet<string>> = {
+    '/export/:venue/uploaded': new Set(['uploaded_at']),
+    '/jobs/run': new Set(['started_at', 'finished_at']),
+  };
+  app.addHook('preSerialization', async (req, _reply, payload) => {
+    if (payload === null || typeof payload !== 'object' || Buffer.isBuffer(payload)) return payload;
+    return jerusalemDeep(payload, UTC_FIELDS[req.routeOptions?.url ?? '']);
+  });
   registerAuditId(app); // onRequest (first)
   registerAuth(app, deps.db, deps.config.jobTriggerToken, deps.now); // onRequest
   registerRateLimit(app, deps.now); // preHandler (first, so a 429 never claims an idempotency key)
