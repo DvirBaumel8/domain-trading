@@ -42,6 +42,8 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
   const jobStarts = new SlidingWindowLimiter(WRITE_JOB_RUNS_PER_HOUR, 3_600_000, now);
   app.addHook('preHandler', async (req, reply) => {
     const key = req.auth ? String(req.auth.tokenId) : req.jobAuth && isJobRoute(req) ? 'job' : null;
+    // v2.6.0 (N-4): POST /jobs/run by a token that is not WRITE is refused 401 by the scope hook; it never counts against (or reports) the WRITE limiter.
+    if (req.auth && !req.jobAuth && isJobRoute(req) && req.auth.scope !== 'write') return;
     if (key === null) return; // public routes (/health) are not limited
     // CR-007 T-2: a WRITE token starting a job has its own, tighter limit (instead of the general write limit).
     const limiter = req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method) ? writes : reads;

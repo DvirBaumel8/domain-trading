@@ -213,9 +213,20 @@ describe('portfolioCheck: blocklist (weekly)', () => {
     await job({ webRiskApiKey: 'wr_fake_key_0000000000000000' }).runOnce();
     expect(calls).toBe(1);
     const last = (await rows('blocklist')).at(-1)!;
-    expect(last).toMatchObject({ status: 'ok' }); // SURBL clean, Web Risk unknown: it never clears nor raises by itself
+    expect(last).toMatchObject({ status: 'unknown' }); // v2.6.0 (N-3): SURBL clean but Web Risk (asked) unknown: not ok; it never clears nor raises by itself
     expect(last.details).toMatchObject({ unknown: { web_risk: 'QUOTA_CAP' } });
-    expect(await warnings()).toEqual([]); // the newest non-unknown blocklist row is the clean SURBL one
+    // the newest non-unknown blocklist row is still the Web Risk match: an unknown source never clears a warning
+    expect((await warnings())[0]).toMatchObject({ code: 'OWNED_NAME_BLOCKLISTED' });
+  });
+
+  it('N-3 (v2.6.0): SURBL unknown while Web Risk answered clean is unknown, not ok; both clean is ok', async () => {
+    await d001();
+    mswServer.use(http.get('https://webrisk.googleapis.com/v1/uris:search', () => HttpResponse.json({})));
+    const r = await job({ webRiskApiKey: 'wr_fake_key_0000000000000000', resolveNs: async () => { throw new Error('dns'); }, resolve4: async () => { throw new Error('dns'); } }).runOnce();
+    expect(r.blocklist).toMatchObject({ unknown: 1, ok: 0 });
+    expect((await rows('blocklist')).at(-1)!.details).toMatchObject({ clean: ['web_risk'], unknown: { surbl: expect.any(String) } });
+    clock.t += 8 * DAY;
+    expect((await job({ webRiskApiKey: 'wr_fake_key_0000000000000000' }).runOnce()).blocklist).toMatchObject({ ok: 1, unknown: 0 });
   });
 
   it('every source unknown: an unknown row, no warning', async () => {

@@ -23,7 +23,7 @@ interface JobsDeps {
   db: Kysely<Database>;
   now: () => number;
   config: Pick<Config, 'backup'>;
-  priceJob: { runOnce(o: { today?: string; dryRun?: boolean }): Promise<{ applied: unknown[]; superseded: unknown[]; held: unknown[]; delisted: unknown[]; skipped: boolean }> };
+  priceJob: { runOnce(o: { today?: string; dryRun?: boolean }): Promise<{ applied: unknown[]; superseded: unknown[]; held: unknown[]; delisted: unknown[]; cancelled?: number[]; failed?: { domain: string; rowId: number; reason: string }[]; skipped: boolean }> };
   dropJob: { runOnce(o: { today?: string; dryRun?: boolean }): Promise<{ dropped: unknown[]; skipped: boolean }> };
 }
 
@@ -73,10 +73,19 @@ export function registerJobs(app: FastifyInstance, runner: JobRunner, deps: Jobs
     const today = b.today === undefined ? real : previewDay(b.today, real);
     const price = await deps.priceJob.runOnce({ today, dryRun: true });
     const drop = await deps.dropJob.runOnce({ today, dryRun: true });
+    // v2.6.0 (N-2): what the real run would cancel (a due delist cancels the name's other open rows; a sold or dropped name's planned rows) and fail (rows that no longer pass rowValid).
+    const cancelled = price.cancelled ?? [];
+    const failed = (price.failed ?? []).filter((f) => f.rowId > 0);
+    const ids = [...new Set([...cancelled, ...failed.map((f) => f.rowId)])];
+    const rows = ids.length === 0 ? [] : await deps.db.selectFrom('price_schedule').innerJoin('domains', 'domains.id', 'price_schedule.domain_id')
+      .select(['price_schedule.id as id', 'price_schedule.event as event', 'domains.domain as domain']).where('price_schedule.id', 'in', ids).execute();
+    const info = new Map(rows.map((r) => [Number(r.id), r]));
+    const would_cancel = cancelled.flatMap((id) => { const r = info.get(id); return r ? [{ row_id: id, domain: r.domain, event: r.event }] : []; });
+    const would_fail = failed.map((f) => ({ row_id: f.rowId, domain: f.domain, event: info.get(f.rowId)?.event ?? null, reason: f.reason }));
     req.auditSummary = `preview ${today}: ok`;
     return {
       today,
-      priceJob: { would_apply: price.applied, would_supersede: price.superseded, held: price.held, would_delist: price.delisted, ...(price.skipped ? { skipped: true } : {}) },
+      priceJob: { would_apply: price.applied, would_supersede: price.superseded, would_cancel, would_fail, held: price.held, would_delist: price.delisted, ...(price.skipped ? { skipped: true } : {}) },
       dropJob: { would_drop: drop.dropped, ...(drop.skipped ? { skipped: true } : {}) },
     };
   });

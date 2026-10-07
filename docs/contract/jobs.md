@@ -1,9 +1,9 @@
-# Jobs (contract v2.5.0)
+# Jobs (contract v2.6.0)
 
 The service runs **no timers of its own**. All scheduled work goes through one route, called by a Cloudflare Worker cron (`jobs-trigger/`). Since 2.1.0 the cron fires **once a day** (00:05 UTC) and runs `daily` only; `tick` stays callable by hand. Since 2.3.0 a bot with the WRITE token may also start `daily` or `tick` by hand (after a real buy, or when testing); the results are in `GET /jobs/runs`, `GET /audit` and `GET /report`.
 
 ## `POST /jobs/run`
-- **Auth:** `Authorization: Bearer <JOB_TRIGGER_TOKEN>`, or (2.3.0, CR-007 T-2) a **WRITE** bot token. A WRITE token may start only `daily` or `tick` (the body rule below), at most **4 calls per hour per token** (429 `RATE_LIMITED` after that), with the same overlap lock; its runs show `trigger: "manual"` and `triggered_by` = the token's name in `GET /jobs/runs`. A READ token is refused (401), and the job token works on no other route (401). If the server has no job token configured → **503** `JOBS_DISABLED` (for any POST to this route, even without a token).
+- **Auth:** `Authorization: Bearer <JOB_TRIGGER_TOKEN>`, or (2.3.0, CR-007 T-2) a **WRITE** bot token. A WRITE token may start only `daily` or `tick` (the body rule below), at most **4 calls per hour per token** (429 `RATE_LIMITED` after that; every call made with the WRITE token counts, a 422 for a bad body included; a refused call with any other token gets 401 with no `RateLimit-*` headers and counts nothing: 2.6.0, CR-009 N-4, N-5), with the same overlap lock; its runs show `trigger: "manual"` and `triggered_by` = the token's name in `GET /jobs/runs`. A READ token is refused (401), and the job token works on no other route (401). If the server has no job token configured → **503** `JOBS_DISABLED` (for any POST to this route, even without a token).
 - **Headers:** `Idempotency-Key` required (the Worker sends `<job>-<scheduled time in ms>`). Same key + same body → the stored response is replayed and the job doesn't run again.
 - **Body (strict):** `{"job": "tick"}` or `{"job": "daily"}`. `daily` runs the `tick` steps first, then its own (so a manual `daily` is the full run; `tick` alone is the old hourly subset). Anything else → **422** `VALIDATION_ERROR`.
 - **200** (even when a step failed):
@@ -14,7 +14,7 @@ The service runs **no timers of its own**. All scheduled work goes through one r
   - `skipped: true` with `steps: {}`: the same job was already running in this instance.
   - Each step is isolated: a failing step (`ok: false`, `error` = a message of at most 200 characters with secrets redacted) doesn't stop the next one. A step has `skipped: true` only when its own summary says so (already running, not due, or backup not configured). A step with nothing to do (an empty price or drop job) returns `ok: true` without `skipped`.
   - `summary` is the step's own result object (counts and names, see below). Its fields are informational, not part of the contract.
-- **Audit:** one `audit_log` row with scope `job` and a summary such as `tick: ok`, `daily: failed backupExport` or `daily: skipped`.
+- **Audit:** one `audit_log` row, with scope `job` for a scheduled or job-token run and the bot token's scope (`write`) for a run a WRITE token started (2.6.0, CR-009 N-6), and a summary such as `tick: ok`, `daily: failed backupExport` or `daily: skipped`.
 - **Rate limit:** 10 calls per minute for the job token.
 
 ## Reading the runs (2.1.0)
@@ -35,7 +35,7 @@ Summary objects: `reconciler` `{booked, failed, abandoned, receipts, skipped}`, 
 **`portfolioCheck` (2.3.0, CR-007 G-5).** For every owned, listed or delisted name; it never calls a registrar API, never changes nameservers, listings or the domain, and sends nothing.
 - **Registry, daily:** an RDAP lookup at the registry (Verisign). It must show the name registered, at our registrar, with our expiry date, and with none of `client hold`, `server hold`, `pending delete`, `redemption period`. Otherwise `/report` error `REGISTRY_MISMATCH`. This covers names bought by hand (`registrar_api: none`), which `registrarCheck` skips.
 - **Web answer, daily:** only for a listed name whose lander nameservers are verified (not `lander: "none"`). A plain `GET http://<domain>/` (not following redirects) must answer 2xx or 3xx and match the lander's signature (Afternic: a `/lander`, Afternic or GoDaddy reference in the redirect or the start of the page; the list is a constant in the service). Otherwise `LANDER_DOWN`.
-- **Blocklists, weekly per name:** SURBL, and Google Web Risk when the server has its key. A listing gives `OWNED_NAME_BLOCKLISTED`.
+- **Blocklists, weekly per name:** SURBL, and Google Web Risk when the server has its key. A listing gives `OWNED_NAME_BLOCKLISTED`. The result is `ok` only when every source asked answered clean; a source that failed while none listed the name makes it `unknown` (2.6.0, CR-009 N-3).
 - **Failures and clearing:** a lookup that fails is `unknown` in the summary, never `ok`, and neither raises nor clears a warning. A warning clears when the next completed check of that kind passes. The marketplace page's price is **not** checked (the marketplace refuses non-browser requests; CR-007 Q-7).
 
 **Which day a job acts (2.2.0, CR-006 Q-2, Q-3).** A run's `today` is the IDT calendar date at the moment it runs (00:05 UTC = 03:05 IDT, 02:05 in winter).

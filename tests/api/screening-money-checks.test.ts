@@ -91,7 +91,7 @@ describe('namebio (CAP-11)', () => {
     const x = await h();
     const { body } = await x.runDone({ checks: ['namebio'], names: [geo('plumbing')] });
     expect(res(body.names[0], 'namebio')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED', fields: { attribution: 'Data from NameBio' } });
-    expect(body.names[0].final_status).toBe('would_buy');
+    expect(body.names[0].final_status).toBe('not_screened'); // v2.6.0 (N-7): a plan of feature checks only has no gate
   });
 
   it('geo bands from the cache: 73+22 -> 9, 1+1 -> 2, 3+8 -> 6 (CAP-11 #1-#3); attribution on the card', async () => {

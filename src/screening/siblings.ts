@@ -3,13 +3,19 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { SPLIT_V2_SHA256 } from './split-v2.js';
 
 export interface SiblingPools { first_pool: string[]; last_pool: string[]; tech: string[]; trades: string[] }
 
 /** Known method versions: the frozen pools file (under data/) and its sha256, checked whenever the pools are loaded. */
-export const KNOWN_METHODS: Record<string, { file: string; sha256: string }> = {
-  'bt1@v1': { file: 'bt1/bt1_pools_v1.json', sha256: 'a984b85e06ed79cf972590518214ccd35c6ea12887a8e08d8a5e807e1a7df48b' },
+const BT1_POOLS = { file: 'bt1/bt1_pools_v1.json', sha256: 'a984b85e06ed79cf972590518214ccd35c6ea12887a8e08d8a5e807e1a7df48b' };
+/** `bt1@v2` (CR-009 N-8) is the same recipe and pools applied to the split-v2 tokens (data/bt1/bt1_v2_split.json); `split` names that file's sha256. */
+export const KNOWN_METHODS: Record<string, { file: string; sha256: string; split: string | null }> = {
+  'bt1@v1': { ...BT1_POOLS, split: null },
+  'bt1@v2': { ...BT1_POOLS, split: SPLIT_V2_SHA256 },
 };
+/** The word split a method is applied to for a name: DOM's own `form` tokens (v1) or the frozen split-v2 tokens. */
+export const usesSplitV2 = (method: string): boolean => KNOWN_METHODS[method]?.split != null;
 export const isKnownMethod = (m: string): boolean => Object.prototype.hasOwnProperty.call(KNOWN_METHODS, m);
 
 const cache = new Map<string, SiblingPools>();

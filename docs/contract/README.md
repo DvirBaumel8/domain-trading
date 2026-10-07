@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 2.5.0** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 2.6.0** (7 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -57,7 +57,7 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
   - an escape that is not hex (`/portfolio/%ZZ`, `%zz`): **400** with a `text/html` Cloudflare page;
   - a truncated escape (`/portfolio/%E0%A4%A`, `a%`): **520** with `text/plain` `error code: 520`.
 
-  A complete escape that decodes to invalid UTF-8 (`/portfolio/%C3%28`) does reach the service and gets 400 `INVALID_REQUEST` in the error shape. Branch on the status and the `Content-Type`: only `application/json` bodies are the service's. Clients should send well-formed URLs. The service's own 400 asks to close the connection, but HTTP/2 drops connection headers at the edge, so a client sees no `Connection` header.
+  A complete escape that decodes to invalid UTF-8 (`/portfolio/%C3%28`) does reach the service and gets 400 `INVALID_REQUEST` in the error shape. Branch on the status and the `Content-Type`: only `application/json` bodies are the service's. Clients should send well-formed URLs. The service's own 400 asks to close the connection, but that header never reaches a client: over **HTTP/2** there is no `Connection` header at all, and over **HTTP/1.1** the edge sends its own `Connection: keep-alive` on every response, this 400 included (2.6.0, CR-009 N-1).
 
 ## Conventions
 - **Money:** integer **cents, USD**. Every money field is a pair: `<key>_cents` (integer) plus `<key>` (display string such as `"$11.08"`). Display strings for listing prices differ by place. The plan view (`/list`, `/buy`, `/pricing/preview`, including its `schedule` entries) uses whole dollars (`"$1,995"`). `/report`, `/portfolio`, `next_price_event`, upcoming `values`, `applied_7d`, an offer `snapshot` and listing history use the standard money format (`"$1,995.00"`). The walk-away display is whole dollars with `(private)` everywhere except the plan-view `schedule` entries (no suffix there). **Request** amounts are USD numbers or strings as stated per route (for example `max_price: 11.5`, `amount_usd: "450.00"`), with at most 2 decimals.

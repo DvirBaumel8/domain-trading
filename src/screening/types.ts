@@ -79,6 +79,8 @@ export interface RunView {
   buyHold: boolean;
   trancheId: string | null;
   createdAt: Date;
+  /** v2.6.0: set only by the test-set rescore path (run input `allow_unapproved_method`); the census then skips the sibling-method approval check. */
+  allowUnapprovedMethod?: boolean;
 }
 
 /** Outside access for checks: every network and DNS call goes through one of these so tests inject fakes. */

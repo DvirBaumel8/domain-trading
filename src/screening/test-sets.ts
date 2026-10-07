@@ -1,5 +1,5 @@
 // v2.5.0 (CR-007 §21, G-4a/G-4b, CR-008 AC-10): test sets. A set stores a selection of names with their labels and `as_of` dates; DOM computes the
-// features itself by a back-test screening run (form, census with bt1@v1, ext_dates) as of each name's date. Pure helpers live here; the routes
+// features itself by a back-test screening run (form, census with a sibling method (bt1@v1 or bt1@v2), ext_dates) as of each name's date. Pure helpers live here; the routes
 // are in src/api/test-sets.ts.
 import { createHash } from 'node:crypto';
 import type { Kysely } from 'kysely';
@@ -13,7 +13,11 @@ import type { CheckId, Lane, RunItem } from './types.js';
 
 /** A test-set run's deadline (hours), instead of `run.time_budget_minutes`: about 24 registry lookups per name at polite pacing. */
 export const TEST_SET_RUN_HOURS = 48;
-export const TEST_SET_METHOD = 'bt1@v1';
+export const TEST_SET_METHODS = ['bt1@v1', 'bt1@v2'] as const;
+export type TestSetMethod = (typeof TEST_SET_METHODS)[number];
+/** Default for a new set (v2.6.0); sets stored before v2.6.0 have no method and read as bt1@v1. */
+export const TEST_SET_DEFAULT_METHOD: TestSetMethod = 'bt1@v2';
+export const LEGACY_TEST_SET_METHOD: TestSetMethod = 'bt1@v1';
 export const TEST_SET_CHECKS: CheckId[] = ['form', 'census', 'ext_dates'];
 export const TEST_SET_LANE: Lane = 'S7';
 
@@ -90,13 +94,16 @@ export interface RescoreReport {
   sold: ReturnType<typeof cell>['sold'] & { wilson95: [number, number] | null };
   dropped: ReturnType<typeof cell>['dropped'] & { wilson95: [number, number] | null };
   features_unknown_n: number; rows_changed_vs_registered: number; as_of_reconstructed: true;
+  features_as_of: 'row' | 'now'; sibling_method: string;
 }
 
 /**
  * Decisions of the registered rows under `sel`, with DOM's own registered_share, alt_tld_before_n, n_words, sld_chars and is_geo
  * (null stays unknown) in place of the uploaded ones; every other uploaded feature is kept so the tier sees the same inputs.
  */
-export function rescoreReport(rows: LabelledRow[], feats: Map<string, DomFeatures>, label: string, sel: SelectionValuesT): RescoreReport {
+export function rescoreReport(
+  rows: LabelledRow[], feats: Map<string, DomFeatures>, label: string, sel: SelectionValuesT, meta: { features_as_of: 'row' | 'now'; sibling_method: string } = { features_as_of: 'row', sibling_method: LEGACY_TEST_SET_METHOD },
+): RescoreReport {
   const dec: { label: 'sold' | 'dropped'; d: ReturnType<typeof decideReplayRow>['decision'] }[] = [];
   let unknown = 0;
   let changed = 0;
@@ -118,5 +125,6 @@ export function rescoreReport(rows: LabelledRow[], feats: Map<string, DomFeature
     sold: { ...c.sold, wilson95: wilson95(c.sold.accepted, c.sold.n) },
     dropped: { ...c.dropped, wilson95: wilson95(c.dropped.rejected, c.dropped.n) },
     features_unknown_n: unknown, rows_changed_vs_registered: changed, as_of_reconstructed: true,
+    features_as_of: meta.features_as_of, sibling_method: meta.sibling_method,
   };
 }

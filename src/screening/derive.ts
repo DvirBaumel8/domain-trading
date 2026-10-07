@@ -2,7 +2,7 @@
 import { GATE_OF } from './checks/index.js';
 import type { CheckId, Lane, ResultRow } from './types.js';
 
-export type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'invalid' | 'running';
+export type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'invalid' | 'running' | 'not_screened';
 
 export interface Derived {
   final_status: FinalStatus;
@@ -41,6 +41,7 @@ export const EXEMPT_UNBUILT: CheckId[] = ['pack', 'leads'];
  * - `invalid`: the name could not be read (`form` FAIL `INPUT_INVALID`).
  * - `rejected`: a gating check FAILed (first in plan order is `first_fail`; in live mode later checks were never run).
  * - `unknown`: a gating check is UNKNOWN, or the run is finished and a planned gating check has no result.
+ * - `not_screened`: the effective plan holds no gating check (only feature checks, e.g. `checks: ["census"]`).
  * - `running`: no FAIL/UNKNOWN yet and the run is not finished with a gating check still to come.
  * - `pending_manual`: everything else passed but a MANUAL_REQUIRED record is outstanding.
  * - `would_buy` while `buyHold` (CR-002: never a BUY card while the hold is on), else `buy_candidate`.
@@ -56,6 +57,8 @@ export function deriveItem(results: ResultRow[], plan: CheckId[], featureChecks:
     return { ...none, final_status: 'invalid', first_fail: { check: 'form', gate: form.gate, reason_code: 'INPUT_INVALID' } };
   }
   const gating = plan.filter((c) => !featureChecks.includes(c));
+  // v2.6.0 (N-7): a plan cut to feature checks only has no gate; the name was not screened and is never ranked.
+  if (gating.length === 0) return { ...none, flags: plan.filter((c) => latest.get(c)?.status === 'FLAG'), final_status: 'not_screened' };
   const notImpl = (r: ResultRow | undefined) => r?.status === 'NOT_RUN' && r.reason_code === 'NOT_IMPLEMENTED';
   const flags = plan.filter((c) => latest.get(c)?.status === 'FLAG');
   const not_implemented = plan.filter((c) => notImpl(latest.get(c)));

@@ -13,7 +13,25 @@ const THREATS = ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE'];
 export type WebRiskResult =
   | { kind: 'match'; threatTypes: string[]; expireTime: string | null }
   | { kind: 'clean' }
-  | { kind: 'unknown'; reason: 'QUOTA' | 'QUOTA_CAP' | 'SOURCE_ERROR' };
+  | { kind: 'unknown'; reason: 'QUOTA' | 'QUOTA_CAP' | 'SOURCE_ERROR'; httpStatus: number | null; error: WebRiskError | null };
+
+/** Google's error body, parsed (v2.6.0, CR-009 N-3): `error.status`, the first `error.details[].reason`, else `error.message` cut to 200 chars. Never the key. */
+export interface WebRiskError { status: string | null; reason: string | null; message: string | null }
+
+export function parseWebRiskError(text: string): WebRiskError | null {
+  let j: unknown;
+  try { j = JSON.parse(text); } catch { return null; }
+  const e = (j as { error?: unknown } | null)?.error;
+  if (typeof e !== 'object' || e === null) return null;
+  const x = e as { status?: unknown; message?: unknown; details?: unknown };
+  const reasons = Array.isArray(x.details) ? x.details.map((d) => (d as { reason?: unknown } | null)?.reason).filter((r): r is string => typeof r === 'string') : [];
+  const reason = reasons[0] ?? null;
+  return {
+    status: typeof x.status === 'string' ? x.status.slice(0, 80) : null, reason: reason === null ? null : reason.slice(0, 120),
+    message: reason === null && typeof x.message === 'string' ? x.message.slice(0, 200) : null,
+  };
+}
+const unknownOf = (reason: 'QUOTA' | 'QUOTA_CAP' | 'SOURCE_ERROR', httpStatus: number | null = null, error: WebRiskError | null = null): WebRiskResult => ({ kind: 'unknown', reason, httpStatus, error });
 
 export const utcMonth = (ms: number): string => new Date(ms).toISOString().slice(0, 7);
 
@@ -30,32 +48,28 @@ export async function webRiskLookup(
   domain: string,
 ): Promise<WebRiskResult> {
   // The count is taken before the call: a call that then fails still counts (the cap is a ceiling on attempts).
-  if ((await takeLookup(deps.db, utcMonth(deps.now()))) > WEB_RISK_MONTHLY_CAP) return { kind: 'unknown', reason: 'QUOTA_CAP' };
+  if ((await takeLookup(deps.db, utcMonth(deps.now()))) > WEB_RISK_MONTHLY_CAP) return unknownOf('QUOTA_CAP');
   const q = [...THREATS.map((t) => `threatTypes=${t}`), `uri=${encodeURIComponent(`http://${domain}/`)}`].join('&');
+  let httpStatus: number | null = null;
   try {
     const res = await deps.fetch(`${ENDPOINT}?${q}`, { headers: { 'x-goog-api-key': deps.apiKey, accept: 'application/json' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (res.status === 429) {
-      void res.body?.cancel().catch(() => {});
-      return { kind: 'unknown', reason: 'QUOTA' };
-    }
-    if (res.status === 403) {
-      // 403 is a quota answer only when the error body says so (otherwise it is a key or permission problem).
-      const text = (await res.text().catch(() => '')).slice(0, 4000);
-      return { kind: 'unknown', reason: /quota|rateLimit|RESOURCE_EXHAUSTED/i.test(text) ? 'QUOTA' : 'SOURCE_ERROR' };
-    }
+    httpStatus = res.status;
     if (res.status !== 200) {
-      void res.body?.cancel().catch(() => {});
-      return { kind: 'unknown', reason: 'SOURCE_ERROR' };
+      const text = (await res.text().catch(() => '')).slice(0, 4000);
+      const error = parseWebRiskError(text);
+      // 429 is a quota answer; 403 only when the error body says so (otherwise it is a key or permission problem).
+      const quota = res.status === 429 || (res.status === 403 && /quota|rateLimit|RESOURCE_EXHAUSTED/i.test(text));
+      return unknownOf(quota ? 'QUOTA' : 'SOURCE_ERROR', res.status, error);
     }
     const body: unknown = JSON.parse(await res.text());
-    if (typeof body !== 'object' || body === null || Array.isArray(body)) return { kind: 'unknown', reason: 'SOURCE_ERROR' };
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) return unknownOf('SOURCE_ERROR', httpStatus);
     const threat = (body as { threat?: unknown }).threat;
     if (threat === undefined) return { kind: 'clean' };
-    if (typeof threat !== 'object' || threat === null) return { kind: 'unknown', reason: 'SOURCE_ERROR' };
+    if (typeof threat !== 'object' || threat === null) return unknownOf('SOURCE_ERROR', httpStatus);
     const t = threat as { threatTypes?: unknown; expireTime?: unknown };
-    if (!Array.isArray(t.threatTypes) || t.threatTypes.length === 0 || !t.threatTypes.every((x) => typeof x === 'string')) return { kind: 'unknown', reason: 'SOURCE_ERROR' };
+    if (!Array.isArray(t.threatTypes) || t.threatTypes.length === 0 || !t.threatTypes.every((x) => typeof x === 'string')) return unknownOf('SOURCE_ERROR', httpStatus);
     return { kind: 'match', threatTypes: t.threatTypes as string[], expireTime: typeof t.expireTime === 'string' ? t.expireTime : null };
   } catch {
-    return { kind: 'unknown', reason: 'SOURCE_ERROR' };
+    return unknownOf('SOURCE_ERROR', httpStatus);
   }
 }

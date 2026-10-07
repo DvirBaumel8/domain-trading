@@ -136,6 +136,33 @@ describe('POST /jobs/preview', () => {
     expect((await warnings()).some((w) => w.code === 'JOB_OVERDUE')).toBe(true); // a preview never counts as a run
   });
 
+  it('N-2 (v2.6.0): a due delist lists the name\'s other open rows as would_cancel; a row that fails rowValid is would_fail; nothing is written', async () => {
+    await make();
+    const id = await listedWithDrop();
+    const other = await db.insertInto('price_schedule').values({ domain_id: id, plan_id: 'pl_x', event: 'final_push', due_on: '2028-07-06', bin_cents: 99_500, floor_cents: 96_700, walkaway_cents: 50_000, settings_version: 2, status: 'planned' })
+      .returning('id').executeTakeFirstOrThrow();
+    const res = await preview({ today: '2028-10-05' });
+    expect(res.statusCode).toBe(200);
+    const p = res.json().priceJob;
+    expect(p.would_delist).toEqual([D]);
+    expect(p.would_cancel).toEqual([{ row_id: Number(other.id), domain: D, event: 'final_push' }]);
+    expect(p.would_fail).toEqual([]);
+    expect(p.would_supersede).toEqual([]);
+    expect((await db.selectFrom('price_schedule').select('status').where('id', '=', other.id).executeTakeFirstOrThrow()).status).toBe('planned');
+  });
+
+  it('N-2 (v2.6.0): a planned row whose prices are not whole dollars on a listed name is would_fail with its event and reason', async () => {
+    await make();
+    const id = await insertOwnedDomain(db, { domain: D, status: 'listed', category: 'trend', price_grade: null, drop_date: '2028-10-04' });
+    await db.updateTable('domains').set({ plan_id: 'pl_x', first_listed_at: new Date('2026-10-12T09:00:00Z') }).where('id', '=', id).execute();
+    const bad = await db.insertInto('price_schedule').values({ domain_id: id, plan_id: 'pl_x', event: 'drop1_m6', due_on: '2027-04-12', bin_cents: 99_550, floor_cents: 96_700, walkaway_cents: 50_000, settings_version: 2, status: 'planned' })
+      .returning('id').executeTakeFirstOrThrow();
+    const p = (await preview({ today: '2027-04-12' })).json().priceJob;
+    expect(p.would_fail).toEqual([{ row_id: Number(bad.id), domain: D, event: 'drop1_m6', reason: 'prices are not whole dollars' }]);
+    expect(p.would_apply).toEqual([]);
+    expect((await db.selectFrom('price_schedule').select('status').where('id', '=', bad.id).executeTakeFirstOrThrow()).status).toBe('planned');
+  });
+
   it('defaults to today (IDT) and accepts a day up to 3 years ahead', async () => {
     await make();
     expect((await preview({})).json().today).toBe('2027-04-12');

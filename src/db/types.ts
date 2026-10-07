@@ -597,6 +597,8 @@ export interface TestSetsTable {
   sealed_at: Date | null;
   member_count: number | null;
   member_hash: string | null;
+  sibling_method: 'bt1@v1' | 'bt1@v2' | null;
+  features_as_of: 'row' | 'now' | null;
 }
 
 export interface TestSetRowsTable {

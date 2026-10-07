@@ -18,8 +18,9 @@ import {
   LABEL_RE, LANES, activate, deepEqual, activeSelectionSettings, createDraft, listSelectionVersions, selectionSettingsByLabel,
   type HoldoutCheck, type SelectionValuesT,
 } from '../screening/settings.js';
-import { approveMethod, methodApproval, methodSha, splitOfDomain } from '../screening/sibling-methods.js';
-import { KNOWN_METHODS, isKnownMethod, loadPools, siblingsBt1 } from '../screening/siblings.js';
+import { approveMethod, methodApproval, methodSha, methodSplitSha, splitOfDomain } from '../screening/sibling-methods.js';
+import { KNOWN_METHODS, isKnownMethod, loadPools, siblingsBt1, usesSplitV2 } from '../screening/siblings.js';
+import { splitV2OfDomain } from '../screening/split-v2.js';
 import { evaluateTier, type TierFeatures } from '../screening/tier.js';
 import {
   GATE_KEYS, cell, csvToUploadRow, decideHoldoutRow, decideReplayRow, gateContext, holdoutCheck as replayHoldoutCheck, laneOf, leakageLint, missingGates,
@@ -206,13 +207,13 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       tokens = q.data.tokens.split(',');
       if (tokens.length < 2 || tokens.some((t) => !/^[a-z]{1,40}$/.test(t))) throw new AppError(400, 'VALIDATION_ERROR', 'tokens must be at least 2 comma-separated lower-case words (letters only)');
     } else if (q.data.domain !== undefined) {
-      tokens = (await splitOfDomain(db, q.data.domain, (await activeSelectionSettings(db)).values)).tokens;
+      tokens = usesSplitV2(method) ? splitV2OfDomain(normalizeDomain(q.data.domain)) : (await splitOfDomain(db, q.data.domain, (await activeSelectionSettings(db)).values)).tokens;
     }
     const pools = loadPools(method);
     const ap = await methodApproval(db, method);
     const list = tokens === null ? null : siblingsBt1(tokens, pools);
     return {
-      method, pools_sha256: methodSha(method), pools, approved: ap !== null, approval_text: ap?.text ?? null, approved_at: ap ? ap.approvedAt.toISOString() : null,
+      method, pools_sha256: methodSha(method), split_sha256: methodSplitSha(method), pools, approved: ap !== null, approval_text: ap?.text ?? null, approved_at: ap ? ap.approvedAt.toISOString() : null,
       ...(tokens !== null && { siblings: { tokens, list: list!, size: list!.length } }),
     };
   });

@@ -13,7 +13,7 @@ import { gateContext, toLabelledRow } from '../screening/replay.js';
 import { LABEL_RE, activeSelectionSettings, selectionSettingsByLabel } from '../screening/settings.js';
 import { methodApproval } from '../screening/sibling-methods.js';
 import {
-  TEST_SET_CHECKS, TEST_SET_LANE, TEST_SET_METHOD, TEST_SET_RUN_HOURS, dayBefore, featuresOfRun, memberHashOf, midnightJerusalem, rescoreReport, splitRoles,
+  LEGACY_TEST_SET_METHOD, TEST_SET_CHECKS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, dayBefore, featuresOfRun, memberHashOf, midnightJerusalem, rescoreReport, splitRoles,
 } from '../screening/test-sets.js';
 import type { LabelledFeatures } from '../screening/replay.js';
 import type { InputName } from '../screening/engine.js';
@@ -38,12 +38,13 @@ const Filters = z.object({
   exclude_geo: z.boolean().default(true), min_price_usd: z.number().positive().optional(), as_of_from: ymd.optional(), as_of_to: ymd.optional(),
 }).strict();
 const NewBody = z.object({
-  name: z.string().regex(NAME), purpose: z.literal('new'), seed: z.string().min(1).max(64),
+  name: z.string().regex(NAME), purpose: z.literal('new'), sibling_method: z.enum(TEST_SET_METHODS).default(TEST_SET_DEFAULT_METHOD), seed: z.string().min(1).max(64),
   test_share: z.number().gt(0).lt(1).default(0.5), filters: Filters.default({ exclude_geo: true }),
   rows: z.array(SourceRow).min(1).max(2000),
 }).strict();
 const RescoreBody = z.object({
   name: z.string().regex(NAME), purpose: z.literal('rescore'), slices: z.array(z.string().min(1).max(60)).min(1).max(20), settings: z.string().regex(LABEL_RE).optional(),
+  sibling_method: z.enum(TEST_SET_METHODS).default(TEST_SET_DEFAULT_METHOD), features_as_of: z.enum(['row', 'now']).default('row'),
 }).strict();
 const Body = z.discriminatedUnion('purpose', [NewBody, RescoreBody]);
 
@@ -66,15 +67,16 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
   };
   const loadRun = (conn: Kysely<Database>, id: string) => conn.selectFrom('screening_runs').selectAll().where('id', '=', id).executeTakeFirst();
 
-  const requireMethod = async () => {
-    if (!(await methodApproval(db, TEST_SET_METHOD))) {
-      throw new AppError(409, 'SIBLING_METHOD_NOT_APPROVED', `Sibling method ${TEST_SET_METHOD} has no approval recorded (POST /selection/sibling-methods/${TEST_SET_METHOD}/approve)`, { method: TEST_SET_METHOD });
+  const requireMethod = async (method: string) => {
+    if (!(await methodApproval(db, method))) {
+      throw new AppError(409, 'SIBLING_METHOD_NOT_APPROVED', `Sibling method ${method} has no approval recorded (POST /selection/sibling-methods/${method}/approve)`, { method });
     }
   };
 
   app.post('/selection/test-sets', { bodyLimit: 2 * 1024 * 1024 }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
-    await requireMethod();
+    // A new set registers labelled names, so its method must be approved; a rescore registers nothing and may use an unapproved method (v2.6.0).
+    if (b.purpose === 'new') await requireMethod(b.sibling_method);
     if (await db.selectFrom('test_sets').select('name').where('name', '=', b.name).executeTakeFirst()) {
       throw new AppError(409, 'TEST_SET_NAME_TAKEN', `A test set named ${b.name} exists`, { name: b.name });
     }
@@ -138,14 +140,18 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     }
 
     const kept = stored.filter((s) => s.kept);
-    const names: InputName[] = kept.map((k) => ({ domain: k.domain, lane: TEST_SET_LANE, census_list: TEST_SET_METHOD, as_of: midnightJerusalem(k.as_of) }));
+    // features_as_of 'now': every item is as of the creation instant (the run then reads registration as of today's registry).
+    const createdAt = now();
+    const asOfNow = b.purpose === 'rescore' && b.features_as_of === 'now';
+    const names: InputName[] = kept.map((k) => ({ domain: k.domain, lane: TEST_SET_LANE, census_list: b.sibling_method, as_of: asOfNow ? createdAt.toISOString() : midnightJerusalem(k.as_of) }));
     const run = await createRun(db, { mode: 'full', checks: TEST_SET_CHECKS, names, ...(b.purpose === 'rescore' && b.settings !== undefined && { settings: b.settings }) },
-      { createdBy: req.auth!.name, auditId: req.auditId!, now: now(), deadlineHours: TEST_SET_RUN_HOURS }, worker.checks);
+      { createdBy: req.auth!.name, auditId: req.auditId!, now: createdAt, deadlineHours: TEST_SET_RUN_HOURS, allowUnapprovedMethod: b.purpose === 'rescore' }, worker.checks);
     try {
       await db.transaction().execute(async (trx) => {
         await trx.insertInto('test_sets').values({
           name: b.name, purpose: b.purpose, settings_label: settingsLabel, seed, test_share: share === null ? null : String(share), filters: JSON.stringify(filters),
-          run_id: run.id, created_at: now(), created_by: req.auth!.name, status: 'computing',
+          run_id: run.id, created_at: createdAt, created_by: req.auth!.name, status: 'computing',
+          sibling_method: b.sibling_method, features_as_of: b.purpose === 'rescore' ? b.features_as_of : null,
         }).execute();
         for (let i = 0; i < stored.length; i += 500) {
           await trx.insertInto('test_set_rows').values(stored.slice(i, i + 500).map((s) => ({
@@ -163,7 +169,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     }
     worker.kick(run.id);
     return reply.code(202).send({
-      name: b.name, purpose: b.purpose, status: 'computing', run_id: run.id, kept_n: kept.length, removed_n: stored.length - kept.length,
+      name: b.name, purpose: b.purpose, sibling_method: b.sibling_method, status: 'computing', run_id: run.id, kept_n: kept.length, removed_n: stored.length - kept.length,
       test_n: kept.filter((k) => k.role === 'test').length, dev_n: kept.filter((k) => k.role === 'dev').length, poll: `/selection/test-sets/${b.name}`,
     });
   });
@@ -180,10 +186,10 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     if (set.purpose === 'rescore' && finished) {
       const sel = (await selectionSettingsByLabel(db, set.settings_label!))!;
       const labelled = (await db.selectFrom('labelled_names').selectAll().where('domain', 'in', kept.map((k) => k.domain)).execute()).map(toLabelledRow);
-      report = rescoreReport(labelled, feats.byDomain, sel.label, sel.values);
+      report = rescoreReport(labelled, feats.byDomain, sel.label, sel.values, { features_as_of: set.features_as_of ?? 'row', sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD });
     }
     return {
-      name: set.name, purpose: set.purpose, status, settings_version: set.settings_label, seed: set.seed, test_share: set.test_share === null ? null : Number(set.test_share),
+      name: set.name, purpose: set.purpose, sibling_method: set.sibling_method ?? LEGACY_TEST_SET_METHOD, ...(set.purpose === 'rescore' && { features_as_of: set.features_as_of ?? 'row' }), status, settings_version: set.settings_label, seed: set.seed, test_share: set.test_share === null ? null : Number(set.test_share),
       filters: set.filters, created_at: set.created_at.toISOString(),
       kept_n: kept.length, removed_n: rows.length - kept.length, test_n: kept.filter((r) => r.role === 'test').length, dev_n: kept.filter((r) => r.role === 'dev').length,
       removed: rows.filter((r) => !r.kept).map((r) => ({ domain: r.domain, reason: r.reason })),

@@ -63,7 +63,7 @@ export const webRiskCheck: Check = {
     const extra = { dataAsOf: checkedAt, upstreamCalls: r.kind === 'unknown' && r.reason === 'QUOTA_CAP' ? 0 : 1 };
     if (r.kind === 'unknown') {
       const why = r.reason === 'QUOTA' ? 'Web Risk answered with a quota limit' : r.reason === 'QUOTA_CAP' ? 'the monthly Web Risk lookup cap is reached (no call was made)' : 'Web Risk could not be read';
-      return outcome('UNKNOWN', r.reason, `${why}: record the lookup by hand if needed. ${HOW}`, { ...base, threat_types: [] }, extra);
+      return outcome('UNKNOWN', r.reason, `${why}: record the lookup by hand if needed. ${HOW}`, { ...base, threat_types: [], http_status: r.httpStatus, error_status: r.error?.status ?? null, error_reason: r.error?.reason ?? null, error_message: r.error?.message ?? null }, extra);
     }
     if (r.kind === 'match') {
       return outcome('FAIL', 'UNSAFE', `Web Risk lists ${ctx.item.domain}: ${r.threatTypes.join(', ')}`, { ...base, threat_types: r.threatTypes, expire_time: r.expireTime }, extra);

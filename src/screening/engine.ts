@@ -111,7 +111,7 @@ const CAUSE_TEXT = {
 };
 
 export async function createRun(
-  db: Kysely<Database>, body: RunBody, ctx: { createdBy: string; auditId: string; now: Date; /** v2.5.0 test sets: a run deadline in hours instead of run.time_budget_minutes. */ deadlineHours?: number }, registry: Partial<Record<CheckId, Check>> = CHECKS,
+  db: Kysely<Database>, body: RunBody, ctx: { createdBy: string; auditId: string; now: Date; /** v2.5.0 test sets: a run deadline in hours instead of run.time_budget_minutes. */ deadlineHours?: number; /** v2.6.0: internal only (test-set rescore); never reachable from POST /screening/runs. */ allowUnapprovedMethod?: boolean }, registry: Partial<Record<CheckId, Check>> = CHECKS,
 ): Promise<CreatedRun> {
   const active = await activeSelectionSettings(db);
   let sel = { id: active.id, label: active.label, values: active.values };
@@ -165,7 +165,7 @@ export async function createRun(
     await trx.insertInto('screening_runs').values({
       id, created_at: ctx.now, created_by: ctx.createdBy, audit_id: ctx.auditId, mode: body.mode, backtest, settings_id: sel.id, settings_label: sel.label,
       buy_hold: sel.values.buy_hold, tranche_id: body.tranche_id ?? null,
-      input: JSON.stringify({ names: items, ...(body.checks && { checks: body.checks }) }), gate_plan: JSON.stringify(gate_plan),
+      input: JSON.stringify({ names: items, ...(body.checks && { checks: body.checks }), ...(ctx.allowUnapprovedMethod && { allow_unapproved_method: true }) }), gate_plan: JSON.stringify(gate_plan),
       list_versions: JSON.stringify(list_versions), status: 'running',
       deadline_at: new Date(ctx.now.getTime() + (ctx.deadlineHours !== undefined ? ctx.deadlineHours * 3_600_000 : sel.values.run.time_budget_minutes * 60_000)),
     }).execute();
@@ -406,7 +406,7 @@ export class ScreeningWorker {
       if (l) lists[name] = { version: l.version, terms: l.terms };
     }
     const lexicon = buildLexicon(loadDataLexicon(), lists, { cityOneToken: values.form.geo_city_one_token, cityWordAllowlist: values.form.city_word_allowlist });
-    const runView: RunView = { id: run.id, mode: run.mode, backtest: run.backtest, buyHold: run.buy_hold, trancheId: run.tranche_id, createdAt: run.created_at };
+    const runView: RunView = { id: run.id, mode: run.mode, backtest: run.backtest, buyHold: run.buy_hold, trancheId: run.tranche_id, createdAt: run.created_at, allowUnapprovedMethod: (run.input as { allow_unapproved_method?: boolean }).allow_unapproved_method === true };
     let deadline = run.deadline_at.getTime();
     const features = values.run.feature_checks;
     const order = [...items].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.idx - b.idx);

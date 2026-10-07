@@ -12,6 +12,7 @@ import { KNOWN_METHODS, isKnownMethod } from './siblings.js';
 
 export interface MethodApproval { text: string; approvedAt: Date }
 
+export const methodSplitSha = (method: string): string | null => KNOWN_METHODS[method]!.split;
 export const methodSha = (method: string): string => KNOWN_METHODS[method]!.sha256;
 
 /** The approval of the method's current pools, or null. */

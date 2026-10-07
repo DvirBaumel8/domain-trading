@@ -65,7 +65,7 @@ describe('helpers', () => {
 
 describe('test sets, purpose new', () => {
   const FILTERS = { min_words: 2, max_chars: 14, min_price_usd: 500, as_of_from: '2024-01-01', as_of_to: '2025-12-31' };
-  const body = (rows: object[], extra: object = {}) => ({ name: 'TS-ONE', purpose: 'new', seed: 'seed-1', filters: FILTERS, rows, ...extra });
+  const body = (rows: object[], extra: object = {}) => ({ name: 'TS-ONE', purpose: 'new', sibling_method: 'bt1@v1', seed: 'seed-1', filters: FILTERS, rows, ...extra });
 
   it('TS-1 every removal reason, each with its row; kept rows are split; nothing is stored when the method is not approved', async () => {
     const x = await h();
@@ -94,7 +94,7 @@ describe('test sets, purpose new', () => {
       { domain: 'austinroofing.com', reason: 'FORM_FILTER' }, { domain: 'superbox.com', reason: 'PRICE_BELOW_MIN' }, { domain: 'superlabs.com', reason: 'OUTSIDE_WINDOW' },
       { domain: 'superpay.com', reason: 'OUTSIDE_WINDOW' },
     ]);
-    expect(got).toMatchObject({ purpose: 'new', seed: 'seed-1', test_share: 0.5, settings_version: 'v1', kept_n: 2, removed_n: 10, test_n: 1, dev_n: 1, sealed_at: null, member_count: null, member_hash: null, report: null });
+    expect(got).toMatchObject({ purpose: 'new', sibling_method: 'bt1@v1', seed: 'seed-1', test_share: 0.5, settings_version: 'v1', kept_n: 2, removed_n: 10, test_n: 1, dev_n: 1, sealed_at: null, member_count: null, member_hash: null, report: null });
     expect(got.filters).toEqual({ ...FILTERS, exclude_geo: true });
   });
 
@@ -102,7 +102,7 @@ describe('test sets, purpose new', () => {
     const x = await h();
     await approveMethod(x);
     const ds = ['superhealth.com', 'supertech.com', 'superpro.com', 'superbox.com', 'supercapital.com'];
-    const r = await x.post('/selection/test-sets', { name: 'TS-SPLIT', purpose: 'new', seed: 'abc', test_share: 0.4, rows: ds.map((d, i) => row(d, i % 2 ? 'dropped' : 'sold', i < 2 ? '2024-06-01' : '2024-01-15')) });
+    const r = await x.post('/selection/test-sets', { name: 'TS-SPLIT', purpose: 'new', sibling_method: 'bt1@v1', seed: 'abc', test_share: 0.4, rows: ds.map((d, i) => row(d, i % 2 ? 'dropped' : 'sold', i < 2 ? '2024-06-01' : '2024-01-15')) });
     expect(r.statusCode, r.body).toBe(202);
     expect(r.json()).toMatchObject({ kept_n: 5, removed_n: 0, test_n: 2, dev_n: 3 });
     const stored = await db.selectFrom('test_set_rows').selectAll().where('set_name', '=', 'TS-SPLIT').execute();
@@ -149,7 +149,7 @@ describe('test sets, purpose new', () => {
     const rdap = fakeRdap({ ...Object.fromEntries(sibsOf(['super', 'health'], 11).map((d) => [d, registered('2015-06-01T00:00:00Z')])), 'superhealth.net': registered('2016-01-01T00:00:00Z') });
     const x = await h({ stopAfterResults: 1, screening: { rdapLookup: rdap } });
     await approveMethod(x);
-    const r = await x.post('/selection/test-sets', { name: 'TS-SEAL', purpose: 'new', seed: 'k', rows: [row(A, 'sold', '2024-06-01', { report_lane: 'fresh' }), row(B, 'dropped', '2024-06-01')] });
+    const r = await x.post('/selection/test-sets', { name: 'TS-SEAL', purpose: 'new', sibling_method: 'bt1@v1', seed: 'k', rows: [row(A, 'sold', '2024-06-01', { report_lane: 'fresh' }), row(B, 'dropped', '2024-06-01')] });
     expect(r.statusCode, r.body).toBe(202);
     await app!.screeningWorker.idle();
     const early = (await x.get('/selection/test-sets/TS-SEAL')).json();
@@ -184,17 +184,17 @@ describe('test sets, purpose new', () => {
     expect(await db.selectFrom('labelled_names').selectAll().execute()).toHaveLength(2);
 
     // a later set excludes the sealed names, and a set that still holds a name blocks it too
-    const later = await x.post('/selection/test-sets', { name: 'TS-LATER', purpose: 'new', seed: 'k', rows: [row(A, 'sold', '2024-06-01'), row('superpro.com', 'sold', '2024-06-01')] });
+    const later = await x.post('/selection/test-sets', { name: 'TS-LATER', purpose: 'new', sibling_method: 'bt1@v1', seed: 'k', rows: [row(A, 'sold', '2024-06-01'), row('superpro.com', 'sold', '2024-06-01')] });
     expect(later.json()).toMatchObject({ kept_n: 1, removed_n: 1 });
     expect((await x.get('/selection/test-sets/TS-LATER')).json().removed).toEqual([{ domain: A, reason: 'ALREADY_REGISTERED' }]);
-    const third = await x.post('/selection/test-sets', { name: 'TS-THIRD', purpose: 'new', seed: 'k', rows: [row('superpro.com', 'sold', '2024-06-01')] });
+    const third = await x.post('/selection/test-sets', { name: 'TS-THIRD', purpose: 'new', sibling_method: 'bt1@v1', seed: 'k', rows: [row('superpro.com', 'sold', '2024-06-01')] });
     expect([third.statusCode, third.json().error.code]).toEqual([422, 'TEST_SET_EMPTY']);
   });
 
   it('TS-5 seal refuses a name registered meanwhile (LABELLED_NAME_CONFLICT, nothing stored); the test_set_rows table is append-only', async () => {
     const x = await h();
     await approveMethod(x);
-    const r = await x.post('/selection/test-sets', { name: 'TS-RACE', purpose: 'new', seed: 'k', rows: [row('superhealth.com', 'sold', '2024-06-01'), row('supertech.com', 'dropped', '2024-06-01')] });
+    const r = await x.post('/selection/test-sets', { name: 'TS-RACE', purpose: 'new', sibling_method: 'bt1@v1', seed: 'k', rows: [row('superhealth.com', 'sold', '2024-06-01'), row('supertech.com', 'dropped', '2024-06-01')] });
     await app!.screeningWorker.runToEnd(r.json().run_id);
     await x.post('/selection/labelled-names', { rows: [{ domain: 'supertech.com', role: 'fit', label: 'sold', source: 'other', slice: 'other', features: {} }] });
     const seal = await x.post('/selection/test-sets/TS-RACE/seal', {});
@@ -224,13 +224,13 @@ describe('test sets, purpose rescore', () => {
     expect(up.statusCode, up.body).toBe(200);
     const before = await db.selectFrom('labelled_names').selectAll().orderBy('domain').execute();
 
-    const r = await x.post('/selection/test-sets', { name: 'RS-ONE', purpose: 'rescore', slices: ['R15'] });
+    const r = await x.post('/selection/test-sets', { name: 'RS-ONE', purpose: 'rescore', sibling_method: 'bt1@v1', slices: ['R15'] });
     expect(r.statusCode, r.body).toBe(202);
     expect(r.json()).toMatchObject({ purpose: 'rescore', status: 'computing', kept_n: 5, removed_n: 0, test_n: 0, dev_n: 0 });
     await app!.screeningWorker.runToEnd(r.json().run_id);
     const got = (await x.get('/selection/test-sets/RS-ONE')).json();
     expect(got).toMatchObject({ status: 'ready', settings_version: 'v1', seed: null, test_share: null, features: { census_known_n: 5, alt_known_n: 5 } });
-    expect(Object.keys(got.report).sort()).toEqual(['as_of_reconstructed', 'dropped', 'features_unknown_n', 'rows_changed_vs_registered', 'settings_version', 'sold']);
+    expect(Object.keys(got.report).sort()).toEqual(['as_of_reconstructed', 'dropped', 'features_as_of', 'features_unknown_n', 'rows_changed_vs_registered', 'settings_version', 'sibling_method', 'sold']);
 
     // expected by the replay's own tier code
     const v1 = SelectionValues.parse((await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow()).values);
@@ -252,18 +252,19 @@ describe('test sets, purpose rescore', () => {
     expect(rows.every((s) => s.role === null && s.kept)).toBe(true);
     // the same slice can be rescored again under another settings label (a draft), and an unknown label is 404
     expect((await x.post('/selection/settings', { label: 'vb', based_on: 'v1', set: { 'ext.alt_list': ['net', 'org'] } })).statusCode).toBe(201);
-    const again = await x.post('/selection/test-sets', { name: 'RS-TWO', purpose: 'rescore', slices: ['R15'], settings: 'vb' });
+    const again = await x.post('/selection/test-sets', { name: 'RS-TWO', purpose: 'rescore', sibling_method: 'bt1@v1', slices: ['R15'], settings: 'vb' });
     expect(again.statusCode, again.body).toBe(202);
     await app!.screeningWorker.runToEnd(again.json().run_id);
     expect((await x.get('/selection/test-sets/RS-TWO')).json()).toMatchObject({ status: 'ready', settings_version: 'vb', report: { settings_version: 'vb' } });
-    const nf = await x.post('/selection/test-sets', { name: 'RS-NF', purpose: 'rescore', slices: ['R15'], settings: 'nope' });
+    const nf = await x.post('/selection/test-sets', { name: 'RS-NF', purpose: 'rescore', sibling_method: 'bt1@v1', slices: ['R15'], settings: 'nope' });
     expect([nf.statusCode, nf.json().error.code]).toEqual([404, 'SETTINGS_NOT_FOUND']);
   });
 
-  it('TS-7 rescore refuses test rows (HOLDOUT_CONTAMINATED with the first 20 domains and the count), an empty slice (TEST_SET_EMPTY), rows without as_of (AS_OF_REQUIRED), an unapproved method', async () => {
+  it('TS-7 rescore refuses test rows (HOLDOUT_CONTAMINATED with the first 20 domains and the count), an empty slice (TEST_SET_EMPTY), rows without as_of (AS_OF_REQUIRED); an unapproved method is allowed for a rescore', async () => {
     const x = await h();
     const t = await x.post('/selection/test-sets', { name: 'RS-A', purpose: 'rescore', slices: ['S'] });
-    expect([t.statusCode, t.json().error.code]).toEqual([409, 'SIBLING_METHOD_NOT_APPROVED']);
+    // v2.6.0: a rescore may use an unapproved method (it registers nothing), so this reaches the empty-slice check.
+    expect([t.statusCode, t.json().error.code]).toEqual([422, 'TEST_SET_EMPTY']);
     await approveMethod(x);
     const names = Array.from({ length: 25 }, (_, i) => `contam${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + ((i * 7) % 26))}.com`);
     await x.post('/selection/labelled-names', { rows: [...names.map((d) => reg(d, 'test', 'sold', 'S')), reg('superpro.com', 'fit', 'sold', 'S')] });

@@ -3,7 +3,8 @@
 // More than `census.max_unknown_share` unknown siblings makes the share UNKNOWN: an error is never read as "not registered".
 import { isCensusListName } from '../lists.js';
 import { methodApproval } from '../sibling-methods.js';
-import { isKnownMethod, siblingsBt1 } from '../siblings.js';
+import { isKnownMethod, siblingsBt1, usesSplitV2 } from '../siblings.js';
+import { splitV2OfDomain } from '../split-v2.js';
 import { formFieldsOf } from './form.js';
 import { lookupCached, pacerFor, type CachedLookup } from '../rdap-batch.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
@@ -31,8 +32,8 @@ export const censusCheck: Check = {
     if (ctx.item.census_list && isKnownMethod(ctx.item.census_list)) {
       // CR-008 C-2: a frozen sibling method builds the 20 siblings from the name's own word split, once Dvir approved the method version.
       const method = ctx.item.census_list;
-      if (!(await methodApproval(ctx.db, method))) return outcome('UNKNOWN', 'CENSUS_METHOD_NOT_APPROVED', `Sibling method ${method} has no approval recorded (POST /selection/sibling-methods/${method}/approve)`, { ...nul, list: method });
-      const tokens = formFieldsOf(ctx).tokens;
+      if (!ctx.run.allowUnapprovedMethod && !(await methodApproval(ctx.db, method))) return outcome('UNKNOWN', 'CENSUS_METHOD_NOT_APPROVED', `Sibling method ${method} has no approval recorded (POST /selection/sibling-methods/${method}/approve)`, { ...nul, list: method });
+      const tokens = usesSplitV2(method) ? splitV2OfDomain(ctx.item.domain) : formFieldsOf(ctx).tokens;
       listTerms = siblingsBt1(tokens).map((l) => `${l}.com`);
       listName = method;
       extraFields.sibling_tokens = tokens;

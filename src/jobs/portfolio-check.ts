@@ -172,7 +172,8 @@ export class PortfolioCheckJob {
       else unknown.web_risk = w.reason;
     }
     if (hits.length > 0) return { status: 'fail', details: { sources: hits, clean, unknown } };
-    if (clean.length > 0) return { status: 'ok', details: { sources: [], clean, unknown } };
+    // v2.6.0 (N-3): ok only when every source that was asked answered clean; one unknown source leaves the name unknown.
+    if (clean.length > 0 && Object.keys(unknown).length === 0) return { status: 'ok', details: { sources: [], clean, unknown } };
     return { status: 'unknown', details: { sources: [], clean, unknown } };
   }
 }

@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 2.6.0 (2026-10-07): CR-009 sibling method bt1@v2 (frequency-aware split) and acceptance fixes
+MINOR, **additive**. Release note: `docs/releases/v2.6.0.md`.
+- **Sibling method `bt1@v2` (N-8):** the `bt1` recipe on a frozen word split that prefers common words (SCOWL size levels, DOM's term lists, fixed costs; `data/bt1/bt1_v2_split.json` with its sha256). It agrees with the research split on 1,810 of 1,900 vectors (95.3%). `GET /selection/sibling-methods/{method}` adds `split_sha256`. `bt1@v1` is unchanged.
+- **Test sets:** `sibling_method` (default `bt1@v2`) and, for `rescore`, `features_as_of: "row" | "now"`. A rescore may use a method not yet approved (it registers nothing); a `new` set and live screening still need the approval.
+- **`POST /jobs/preview`:** adds `would_cancel` and `would_fail`; each array's item shape is documented (N-2).
+- **Web Risk:** an UNKNOWN adds `http_status`, `error_status`, `error_reason`, `error_message` (never the key). The weekly blocklist check is `unknown` when a source failed and none listed the name (N-3).
+- **`/jobs/run`:** a refused (401) call carries no `RateLimit-*` headers and uses no manual-run slot (N-4); every WRITE call counts, a 422 included (N-5); a WRITE-started run is audited under scope `write` (N-6).
+- **Screening:** a name whose plan has no gating check is `not_screened` and left out of `ranking` (N-7).
+- **Docs:** the `Connection` header over HTTP/1.1 and HTTP/2 (N-1).
+
 ## 2.5.0 (2026-10-07): CR-007 G-4 test sets and suites, CR-008 AC-10 rescore
 MINOR, **additive** (one widening: a suite outside `holdout.required_suites` can now be frozen). Release note: `docs/releases/v2.5.0.md`.
 - **Test sets:** `POST /selection/test-sets` (`new`: DOM filters, removes names used before, splits by seed and computes as-of features; `rescore`: as-of features and a report for names already registered), `GET /selection/test-sets/{name}`, `POST /selection/test-sets/{name}/seal` (registers the rows, freezes the test membership). New codes `SIBLING_METHOD_NOT_APPROVED`, `TEST_SET_NAME_TAKEN`, `TEST_SET_EMPTY`, `TEST_SET_NOT_FOUND`, `TEST_SET_NOT_READY`, `TEST_SET_ALREADY_SEALED`, `TEST_SET_NOT_SEALABLE`. New tables `test_sets`, `test_set_rows` (in the data backup).
