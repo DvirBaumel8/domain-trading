@@ -1,8 +1,8 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { AppDeps } from '../../src/app.js';
-import type { RdapFn } from '../../src/rdap.js';
-import type { RegistrarAdapter } from '../../src/registrars/types.js';
+import type { RdapFn } from '../../src/core/rdap.js';
+import type { RegistrarAdapter } from '../../src/modules/registrars/types.js';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../src/db/types.js';
 import { testDb } from './db.js';

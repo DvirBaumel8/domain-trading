@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDb, testDb as db } from '../helpers/db.js';
 import { V2 } from '../helpers/pricing.js';
-import { currentSettings, rowToSettings, settingsByVersion } from '../../src/pricing/settings.js';
+import { currentSettings, rowToSettings, settingsByVersion } from '../../src/modules/listing/pricing/settings.js';
 
 async function insertV3(effectiveAt: Date): Promise<void> {
   const v2 = await db.selectFrom('pricing_settings').selectAll().where('version', '=', 2).executeTakeFirstOrThrow();

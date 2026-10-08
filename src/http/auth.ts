@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
-import { hashToken } from '../auth/tokens.js';
+import { hashToken } from '../core/tokens.js';
 import type { Database, Scope } from '../db/types.js';
 import { AppError } from './errors.js';
 import { isMutating } from './methods.js';

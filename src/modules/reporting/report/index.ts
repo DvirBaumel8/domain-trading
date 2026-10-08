@@ -3,7 +3,7 @@ import type { Database } from '../../../db/types.js';
 import { toJerusalemIso } from '../../../core/dates.js';
 import { offersByStrategy } from '../../selling/index.js';
 import { applied7d, perDomain } from './domains.js';
-import { TrancheService } from '../../../services/tranches.js';
+import { TrancheService } from '../../buying/index.js';
 import { reportMoney } from './money.js';
 import { upcoming90d } from './upcoming.js';
 import { buildWarnings } from './warnings.js';

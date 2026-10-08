@@ -2,14 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { Writable } from 'node:stream';
 import { z } from 'zod';
-import type { NsLookup } from '../../src/dns/ns-lookup.js';
-import type { RdapFn } from '../../src/rdap.js';
-import type { RegistrarAdapter } from '../../src/registrars/types.js';
+import type { NsLookup } from '../../src/core/ns-lookup.js';
+import type { RdapFn } from '../../src/core/rdap.js';
+import type { RegistrarAdapter } from '../../src/modules/registrars/types.js';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
 import type { Database } from '../../src/db/types.js';
 import type { AuditWriter } from '../../src/http/audit.js';
-import type { HoldoutCheck } from '../../src/screening/settings.js';
+import type { HoldoutCheck } from '../../src/modules/selection/settings.js';
 import { testDb } from './db.js';
 import { testEnv } from './env.js';
 

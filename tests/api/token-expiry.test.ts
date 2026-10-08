@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { expireApiToken, listApiTokens } from '../../src/admin/tokens.js';
+import { expireApiToken, listApiTokens } from '../../src/modules/ops/admin/tokens.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { testEnv } from '../helpers/env.js';
@@ -43,7 +43,7 @@ describe('api token expiry', () => {
 
 describe('npm run admin -- token expire', () => {
   const run = promisify(execFile);
-  const cli = (args: string[]) => run('npx', ['tsx', 'src/admin.ts', ...args], { env: { ...process.env, ...testEnv() } });
+  const cli = (args: string[]) => run('npx', ['tsx', 'src/modules/ops/admin.ts', ...args], { env: { ...process.env, ...testEnv() } });
   it('refuses an unparseable time (exit 2) and lists an expiry', async () => {
     const tok = await issueToken('read', 'cli-exp');
     await expect(cli(['token', 'expire', '--id', String(tok.id), '--at', 'tomorrow'])).rejects.toMatchObject({ code: 2 });

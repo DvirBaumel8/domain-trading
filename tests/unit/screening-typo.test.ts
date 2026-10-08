@@ -1,7 +1,7 @@
 // TYPO-1 building blocks (CAP-02): the banded Damerau distance and the popularity CSV parser. Pure.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { editDistanceWithin, parsePopularityCsv, PopularityListError, registrableLabel } from '../../src/screening/popularity.js';
+import { editDistanceWithin, parsePopularityCsv, PopularityListError, registrableLabel } from '../../src/modules/selection/popularity.js';
 
 const csv = readFileSync(new URL('../fixtures/screening/majestic-million-top.csv', import.meta.url), 'utf8');
 

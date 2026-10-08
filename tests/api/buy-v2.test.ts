@@ -1,12 +1,12 @@
 // v2.0.0: a real /buy needs a complete, current screening pack and an active member of the open tranche (spend cap included).
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapFn } from '../../src/rdap.js';
+import type { RdapFn } from '../../src/core/rdap.js';
 import { makeApp } from '../helpers/app.js';
 import { DOMAIN, T0, buyBody, postBuy, readyToBuy } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
-import { RegistrarError } from '../../src/registrars/types.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
 import { issueToken } from '../helpers/tokens.js';
 
 let app: FastifyInstance;

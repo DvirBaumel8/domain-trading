@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { RegistrarCheckJob } from '../../src/jobs/registrar-check.js';
-import { RegistrarError } from '../../src/registrars/types.js';
+import { RegistrarCheckJob } from '../../src/modules/ops/jobs/registrar-check.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';

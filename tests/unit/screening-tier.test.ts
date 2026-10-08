@@ -1,7 +1,7 @@
 // CAP-24 rule tier and DEMAND-2 (CR-002) with the CAP-21 missing-data rule: a missing input is unknown, never a pass or a fail.
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SELECTION_VALUES as D } from '../../src/screening/settings.js';
-import { evaluateTier, type TierFeatures } from '../../src/screening/tier.js';
+import { DEFAULT_SELECTION_VALUES as D } from '../../src/modules/selection/settings.js';
+import { evaluateTier, type TierFeatures } from '../../src/modules/selection/tier.js';
 
 const F = (o: Partial<TierFeatures>): TierFeatures => ({
   registered_share: null, prior_history: null, alt_tld_before_n: null, n_words: null, sld_chars: null, is_geo: 0, gform1_pass: null, short: null, ...o,

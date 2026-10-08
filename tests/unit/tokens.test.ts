@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateToken, hashToken } from '../../src/auth/tokens.js';
+import { generateToken, hashToken } from '../../src/core/tokens.js';
 
 describe('tokens', () => {
   it('generates dt_ + ≥32 random bytes (base64url, 43 chars)', () => {

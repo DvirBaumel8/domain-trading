@@ -2,7 +2,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { placeKey } from '../../scripts/build-wordlists.js';
-import { buildLexicon, loadDataLexicon } from '../../src/screening/lexicon.js';
+import { buildLexicon, loadDataLexicon } from '../../src/modules/selection/lexicon.js';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 

@@ -7,7 +7,7 @@
 //    Porkbun paths may be called (the adapter's own plus the sandbox-only /sandbox/reset; no top-up of any kind, founder rule 6),
 //    and every response must say it is a sandbox (header and, where documented, body.sandbox === true).
 //  - no top-up of a real account: /account/topup*, /account/autoTopup are never allowed.
-import { PORKBUN_ENDPOINTS } from '../../src/registrars/porkbun.js';
+import { PORKBUN_ENDPOINTS } from '../../src/modules/registrars/porkbun.js';
 
 export const SANDBOX_BASE = 'https://api.porkbun.com/api/json/v3';
 const API_PREFIX = '/api/json/v3';

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { manualDelist } from '../../src/services/export-state.js';
+import { manualDelist } from '../../src/modules/listing/export-state.js';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { buyBody, postBuy } from '../helpers/buy.js';
@@ -10,7 +10,7 @@ import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
 import { issueToken } from '../helpers/tokens.js';
 import { withDomainLock } from '../../src/core/locks.js';
-import { PriceScheduleJob } from '../../src/jobs/price-schedule.js';
+import { PriceScheduleJob } from '../../src/modules/ops/jobs/price-schedule.js';
 
 let app: FastifyInstance;
 afterEach(async () => app?.close());

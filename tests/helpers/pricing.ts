@@ -1,7 +1,7 @@
 import type { Kysely } from 'kysely';
-import { newPricingSettings } from '../../src/admin/pricing-settings.js';
+import { newPricingSettings } from '../../src/modules/ops/admin/pricing-settings.js';
 import type { Database } from '../../src/db/types.js';
-import type { PricingSettings } from '../../src/pricing/settings.js';
+import type { PricingSettings } from '../../src/modules/listing/pricing/settings.js';
 
 
 export const V2: PricingSettings = {

@@ -5,7 +5,7 @@ import { insertOwnedDomain, seedDailyRun, testDb as db } from '../helpers/db.js'
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
 import { issueToken } from '../helpers/tokens.js';
-import { RegistrarCheckJob } from '../../src/jobs/registrar-check.js';
+import { RegistrarCheckJob } from '../../src/modules/ops/jobs/registrar-check.js';
 
 const apps: FastifyInstance[] = [];
 afterEach(async () => { await Promise.all(apps.splice(0).map((a) => a.close())); });

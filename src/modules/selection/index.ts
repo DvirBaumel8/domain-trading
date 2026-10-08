@@ -1,0 +1,23 @@
+// Public entry of the selection module.
+export { registerPacks } from './api/packs.js';
+export { registerScreening } from './api/screening.js';
+export { registerSelection } from './api/selection.js';
+export { registerTestSets } from './api/test-sets.js';
+export { HistoryManual, phraseKey, priorPhraseOf, TmManual } from './checks/manual.js';
+export { surblCheck } from './checks/surbl.js';
+export { latestByCheck } from './derive.js';
+export { assemble, createRun, effectiveHold, fullPlanRunOrThrow, HEARTBEAT_STALE_MS, type InputName, loadRows, ScreeningWorker, toResultRow } from './engine.js';
+export { NAMEBIO_NAME, refreshNameBio } from './namebio.js';
+export { latestPackFor } from './pack.js';
+export { latestPopularity, refreshPopularity } from './popularity.js';
+export { type CachedLookup, lookupCached, Pacer, rdapBaseFor, TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS } from './rdap-batch.js';
+export { decideReplayRow, type Decision, type LabelledFeatures } from './replay.js';
+export { activeSelectionSettings, type HoldoutCheck, LABEL_RE, selectionSettingsByLabel } from './settings.js';
+export { methodApproval } from './sibling-methods.js';
+export { splitV2 } from './split-v2.js';
+export { featuresOfRun, splitKey, TEST_SET_CHECKS, TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, wilson95 } from './test-sets.js';
+export { type CheckContext, type CheckId, type Lane, type ResultRow, type RunItem, type ScreeningDeps } from './types.js';
+export { readCappedBytes } from './wayback.js';
+export { webRiskLookup } from './web-risk.js';
+export { freshDomainRecord, freshUntil, isFresh, RECORD_FRESH_DAYS, RECORD_KINDS, type RecordKind } from './domain-records.js';
+export { geoMembers, openTrancheFor } from './tranche-members.js';

@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../../src/config.js';
 import pg from 'pg';
 import { poolConfig } from '../../src/db/client.js';
-import { JobRunner } from '../../src/jobs/runner.js';
-import { BackupExporter } from '../../src/jobs/backup-export.js';
+import { JobRunner } from '../../src/modules/ops/jobs/runner.js';
+import { BackupExporter } from '../../src/modules/ops/jobs/backup-export.js';
 import { testEnv } from '../helpers/env.js';
 
 function fakeApp(backupExport?: { runOnce(): Promise<unknown> }) {

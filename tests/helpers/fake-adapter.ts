@@ -1,7 +1,7 @@
 import type {
   AccountState, Capabilities, DomainInfo, Quote, RegisterDryRun, RegisterInput, RegisterSuccess, RegistrarAdapter, RegistrationRecord,
-} from '../../src/registrars/types.js';
-import { RegistrarError } from '../../src/registrars/types.js';
+} from '../../src/modules/registrars/types.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
 
 type Maybe<T> = T | RegistrarError;
 const isErr = (v: unknown): v is RegistrarError => v instanceof RegistrarError;

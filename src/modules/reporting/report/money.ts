@@ -1,7 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../db/types.js';
 import { pair, wholeUsd, type Pair } from '../../../core/money.js';
-import { activeDomainCount, spentCents } from '../../../services/budget.js';
+import { activeDomainCount, spentCents } from '../../buying/index.js';
 
 /** The private walk-away: whole dollars with a "(private)" mark, like plan-view ("$960 (private)"). */
 export function walkawayPair(cents: number | null): Pair<'walkaway'> {

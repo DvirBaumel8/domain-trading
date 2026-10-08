@@ -1,9 +1,9 @@
 // CAP-18 (selection.md §2.1, SEL9-1/SEL9-10) and CR-002 CAP-18: EV, renew ratio at the BIN and at the floor, LANDER-1, score.
 import { describe, expect, it } from 'vitest';
-import type { Lane } from '../../src/screening/form.js';
-import { evaluateMoney, geoLadderBottomCents, syllableCount, type MoneyInput } from '../../src/screening/money.js';
-import { DEFAULT_SELECTION_VALUES as D, type SelectionValuesT } from '../../src/screening/settings.js';
-import { laneList } from '../../src/pricing/schedule.js';
+import type { Lane } from '../../src/modules/selection/form.js';
+import { evaluateMoney, geoLadderBottomCents, syllableCount, type MoneyInput } from '../../src/modules/selection/money.js';
+import { DEFAULT_SELECTION_VALUES as D, type SelectionValuesT } from '../../src/modules/selection/settings.js';
+import { laneList } from '../../src/modules/listing/pricing/schedule.js';
 import { V2, V3 } from '../helpers/pricing.js';
 
 const ARA = 1108; // $11.08, lifetime $22.16

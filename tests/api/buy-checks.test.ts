@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapFn } from '../../src/rdap.js';
-import { RegistrarError } from '../../src/registrars/types.js';
+import type { RdapFn } from '../../src/core/rdap.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
 import { makeApp } from '../helpers/app.js';
 import { DOMAIN, T0, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';

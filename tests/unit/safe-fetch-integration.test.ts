@@ -3,7 +3,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { isBlockedAddress, safeFetch } from '../../src/net/safe-fetch.js';
+import { isBlockedAddress, safeFetch } from '../../src/core/safe-fetch.js';
 
 let server: http.Server;
 let port: string;

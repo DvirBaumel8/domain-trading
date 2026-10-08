@@ -1,8 +1,8 @@
 // CAP-12 site classification (Task 2): pure, no network. The pages are synthetic (tests/fixtures/screening/sites/synthetic-*.html).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
-import { classifySite, phraseUse, robotsAllows, type PageFetch } from '../../src/screening/site.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/modules/selection/settings.js';
+import { classifySite, phraseUse, robotsAllows, type PageFetch } from '../../src/modules/selection/site.js';
 
 const S = DEFAULT_SELECTION_VALUES.same_name;
 const lists = { parked: ['parked:this domain is parked', 'parked:coming soon'], forsale: ['forsale:this domain is for sale', 'forsale:afternic.com'] };

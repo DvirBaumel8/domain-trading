@@ -1,8 +1,8 @@
 // CAP-11 parser. The sample is SYNTHETIC (NameBio is disabled and its real header could not be read: docs/internal/sources.md).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseRetailStats, refreshNameBio } from '../../src/screening/namebio.js';
-import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
+import { parseRetailStats, refreshNameBio } from '../../src/modules/selection/namebio.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/modules/selection/settings.js';
 
 const csv = readFileSync(new URL('../fixtures/screening/namebio/retailstats-sample.csv', import.meta.url), 'utf8');
 

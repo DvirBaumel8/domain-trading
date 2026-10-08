@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computePlan, hybridBinMin } from '../../src/pricing/plan.js';
-import { sellPlanLine } from '../../src/pricing/present.js';
+import { computePlan, hybridBinMin } from '../../src/modules/listing/pricing/plan.js';
+import { sellPlanLine } from '../../src/modules/listing/pricing/present.js';
 import { V2 } from '../helpers/pricing.js';
 const hy = (bin: number, extra: object = {}) => computePlan({ category: 'trend', binCents: bin, ...extra }, V2);
 const ok = (r: ReturnType<typeof computePlan>) => {

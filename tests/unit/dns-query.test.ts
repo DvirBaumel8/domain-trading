@@ -1,6 +1,6 @@
 // The generic DNS query: A/NS encode and parse with crafted buffers (NXDOMAIN, 127.0.0.2, wrong id, truncated).
 import { describe, expect, it } from 'vitest';
-import { encodeDnsQuery, encodeNsQuery, parseDnsResponse } from '../../src/dns/ns-lookup.js';
+import { encodeDnsQuery, encodeNsQuery, parseDnsResponse } from '../../src/core/ns-lookup.js';
 
 const name = (n: string) => Buffer.concat([...n.split('.').map((l) => Buffer.concat([Buffer.from([l.length]), Buffer.from(l, 'ascii')])), Buffer.from([0])]);
 

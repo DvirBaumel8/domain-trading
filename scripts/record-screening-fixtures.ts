@@ -7,11 +7,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RDAP_COM_BASE, USER_AGENT } from '../src/rdap.js';
-import { POPULARITY_URL } from '../src/screening/popularity.js';
-import { IANA_RDAP_URL, parseBootstrap } from '../src/screening/rdap-batch.js';
-import { cdxCaptures, fetchCapture, parseCdx, pickDecisive } from '../src/screening/wayback.js';
-import { DEFAULT_SELECTION_VALUES } from '../src/screening/settings.js';
+import { RDAP_COM_BASE, USER_AGENT } from '../src/core/rdap.js';
+import { POPULARITY_URL } from '../src/modules/selection/popularity.js';
+import { IANA_RDAP_URL, parseBootstrap } from '../src/modules/selection/rdap-batch.js';
+import { cdxCaptures, fetchCapture, parseCdx, pickDecisive } from '../src/modules/selection/wayback.js';
+import { DEFAULT_SELECTION_VALUES } from '../src/modules/selection/settings.js';
 
 if (process.env.RECORD_FIXTURES !== '1') {
   console.error('Refusing to run: set RECORD_FIXTURES=1 (this script makes real network requests).');

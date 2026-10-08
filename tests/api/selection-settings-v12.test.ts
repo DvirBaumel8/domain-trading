@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testDb as db } from '../helpers/db.js';
 import { screeningHarness } from '../helpers/screening.js';
-import { SelectionValues, DEFAULT_SELECTION_VALUES, activeSelectionSettings, applySet } from '../../src/screening/settings.js';
+import { SelectionValues, DEFAULT_SELECTION_VALUES, activeSelectionSettings, applySet } from '../../src/modules/selection/settings.js';
 
 describe('v1.2.0 settings keys', () => {
   it('the stored v1 row (no v1.2 keys) parses and gets every default', async () => {

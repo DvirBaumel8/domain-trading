@@ -1,4 +1,4 @@
-import { createApiToken } from '../../src/admin/tokens.js';
+import { createApiToken } from '../../src/modules/ops/admin/tokens.js';
 import { testDb } from './db.js';
 
 let n = 0;

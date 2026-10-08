@@ -1,7 +1,7 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createDb } from './db/client.js';
-import { BackupExporter } from './jobs/backup-export.js';
+import { BackupExporter } from './modules/ops/index.js';
 
 const config = loadConfig(process.env);
 const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });

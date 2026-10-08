@@ -1,8 +1,8 @@
 // CAP-20 final status and funnel (pure). CR-002 CAP-20 acceptance: never a BUY card while buy_hold is on.
 import { describe, expect, it } from 'vitest';
-import { GATE_OF } from '../../src/screening/checks/index.js';
-import { deriveItem, funnel, latestByCheck } from '../../src/screening/derive.js';
-import type { CheckId, ResultRow, Status } from '../../src/screening/types.js';
+import { GATE_OF } from '../../src/modules/selection/checks/index.js';
+import { deriveItem, funnel, latestByCheck } from '../../src/modules/selection/derive.js';
+import type { CheckId, ResultRow, Status } from '../../src/modules/selection/types.js';
 
 let id = 0;
 function row(check: CheckId, status: Status, reason_code: string | null = status === 'PASS' ? null : 'X', item_idx = 0): ResultRow {

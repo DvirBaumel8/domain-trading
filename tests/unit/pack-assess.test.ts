@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { assessPack, requiredChecks, type JudgmentT } from '../../src/screening/pack.js';
-import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
-import type { CheckId, Lane, ResultRow, Status } from '../../src/screening/types.js';
-import type { VerdictRow } from '../../src/screening/verdicts.js';
+import { assessPack, requiredChecks, type JudgmentT } from '../../src/modules/selection/pack.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/modules/selection/settings.js';
+import type { CheckId, Lane, ResultRow, Status } from '../../src/modules/selection/types.js';
+import type { VerdictRow } from '../../src/modules/selection/verdicts.js';
 
 const NOW = Date.parse('2026-10-06T12:00:00Z');
 const H = 3_600_000;

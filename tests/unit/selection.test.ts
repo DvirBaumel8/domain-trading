@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Capabilities, Quote } from '../../src/registrars/types.js';
-import { RegistrarError } from '../../src/registrars/types.js';
+import type { Capabilities, Quote } from '../../src/modules/registrars/types.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
 import {
   evaluateQuote, firstYearWarning, overallAvailability, pickWinner, shouldCall, sortByAdapterOrder, twoYearCents,
   type EvaluatedQuote, type QuoteOutcome,
-} from '../../src/services/selection.js';
+} from '../../src/modules/registrars/selection.js';
 
 const caps = (over: Partial<Capabilities> = {}): Capabilities => ({
   canQuote: true, canRegister: true, canManageNs: true, customNs: true,

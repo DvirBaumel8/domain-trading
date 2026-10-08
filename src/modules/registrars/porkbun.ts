@@ -1,0 +1,292 @@
+import { z } from 'zod';
+import { usdStringToCents } from '../../core/money.js';
+import {
+  RegistrarError, type AccountState, type Capabilities, type DomainInfo, type Quote, type RegisterDryRun,
+  type RegisterInput, type RegisterSuccess, type RegistrarAdapter, type RegistrationRecord,
+} from './types.js';
+
+export const PORKBUN_DEFAULT_BASE = 'https://api.porkbun.com/api/json/v3';
+/** quotes.*_cents are Postgres integer columns. */
+const PG_INT_MAX = 2_147_483_647;
+
+const NAME = 'porkbun';
+
+/**
+ * Every Porkbun operation the adapter calls: the single source for method + path template.
+ * The offline contract test (tests/unit/porkbun-contract.test.ts) checks each entry against the
+ * pinned OpenAPI snapshot. No top-up endpoint may ever appear here (founder rule 6).
+ */
+export const PORKBUN_ENDPOINTS = {
+  checkDomain: { method: 'POST', path: '/domain/checkDomain/{domain}' },
+  create: { method: 'POST', path: '/domain/create/{domain}' },
+  getDomain: { method: 'GET', path: '/domain/get/{domain}' },
+  getNs: { method: 'POST', path: '/domain/getNs/{domain}' },
+  updateNs: { method: 'POST', path: '/domain/updateNs/{domain}' },
+  updateAutoRenew: { method: 'POST', path: '/domain/updateAutoRenew/{domain}' },
+  balance: { method: 'GET', path: '/account/balance' },
+  apiSettings: { method: 'GET', path: '/account/apiSettings' },
+  invoices: { method: 'GET', path: '/account/invoices' },
+  invoice: { method: 'GET', path: '/account/invoice/{orderId}' },
+} as const satisfies Record<string, { method: 'GET' | 'POST'; path: string }>;
+export type PorkbunEndpoint = keyof typeof PORKBUN_ENDPOINTS;
+
+export function expandPath(template: string, params: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => {
+    const v = params[k];
+    if (v === undefined) throw new Error(`missing path param: ${k}`);
+    return encodeURIComponent(v);
+  });
+}
+
+type Json = Record<string, unknown>;
+const isObj = (v: unknown): v is Json => v !== null && typeof v === 'object' && !Array.isArray(v);
+const normNs = (n: string) => n.trim().toLowerCase().replace(/\.$/, '');
+const flag = (v: unknown): boolean | null => (v === 1 || v === '1' ? true : v === 0 || v === '0' ? false : null);
+
+const CheckResponse = z.object({
+  avail: z.enum(['yes', 'no']),
+  price: z.string().optional(),
+  premium: z.enum(['yes', 'no']),
+  minDuration: z.number().int().optional(),
+  additional: z.object({ renewal: z.object({ price: z.string() }).optional() }).optional(),
+});
+
+/** Numeric/limit fields worth keeping from an error body. Never the message text for branching. */
+function errorDetails(obj: Json): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of ['cost', 'balance', 'shortfall', 'ttlRemaining', 'limitSource']) if (k in obj) out[k] = obj[k];
+  return out;
+}
+
+const INVOICE_DROP = new Set(['billTo', 'paymentMethods', 'url', 'pdfUrl', 'downloadUrl', 'downloadExpires']);
+
+/** Strip billing identity and sign-in-free download links before an invoice is stored anywhere. */
+export function redactInvoice(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(redactInvoice);
+  if (isObj(v)) return Object.fromEntries(Object.entries(v).filter(([k]) => !INVOICE_DROP.has(k)).map(([k, x]) => [k, redactInvoice(x)]));
+  return v;
+}
+
+export class PorkbunAdapter implements RegistrarAdapter {
+  readonly name = NAME;
+  readonly capabilities: Capabilities;
+  private readonly base: string;
+
+  constructor(private readonly opts: { apiKey: string; secretKey: string; baseUrl?: string; timeoutMs?: number }) {
+    this.base = (opts.baseUrl ?? PORKBUN_DEFAULT_BASE).replace(/\/$/, '');
+    this.capabilities = {
+      canQuote: true, canRegister: true, canManageNs: true, customNs: true,
+      prepaid: true, freePrivacy: true, afternicFastTransfer: true,
+      sandbox: opts.apiKey.startsWith('pk1_sb_'),
+    };
+  }
+
+  private bad(message: string, httpStatus?: number): RegistrarError {
+    return new RegistrarError(NAME, 'REGISTRAR_BAD_RESPONSE', message, { httpStatus, ambiguous: true });
+  }
+
+  /** One HTTP call. Returns the SUCCESS body or throws RegistrarError. Keys travel only in headers. */
+  protected async call(
+    endpoint: PorkbunEndpoint,
+    o: { params?: Record<string, string>; query?: Record<string, string | number>; body?: Json; idempotencyKey?: string; signal?: AbortSignal } = {},
+  ): Promise<Json> {
+    const { method, path: template } = PORKBUN_ENDPOINTS[endpoint];
+    const qs = o.query ? `?${new URLSearchParams(Object.entries(o.query).map(([k, v]) => [k, String(v)])).toString()}` : '';
+    const path = expandPath(template, o.params ?? {}) + qs;
+    const headers: Record<string, string> = {
+      accept: 'application/json',
+      'X-API-Key': this.opts.apiKey,
+      'X-Secret-API-Key': this.opts.secretKey,
+    };
+    if (method === 'POST') headers['content-type'] = 'application/json';
+    if (o.idempotencyKey) headers['Idempotency-Key'] = o.idempotencyKey;
+    const timeout = AbortSignal.timeout(this.opts.timeoutMs ?? 15_000);
+    const signal = o.signal ? AbortSignal.any([o.signal, timeout]) : timeout;
+
+    let res: Response;
+    try {
+      res = await fetch(`${this.base}${path}`, {
+        method, headers, signal, body: method === 'POST' ? JSON.stringify(o.body ?? {}) : undefined,
+      });
+    } catch (err) {
+      const n = (err as Error).name;
+      if (n === 'TimeoutError' || n === 'AbortError') {
+        throw new RegistrarError(NAME, 'REGISTRAR_TIMEOUT', 'Porkbun did not answer in time', { ambiguous: true });
+      }
+      throw new RegistrarError(NAME, 'REGISTRAR_NETWORK', 'Could not reach Porkbun', { ambiguous: true });
+    }
+
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(await res.text());
+    } catch (err) {
+      const n = (err as Error).name;
+      if (n === 'TimeoutError' || n === 'AbortError') {
+        throw new RegistrarError(NAME, 'REGISTRAR_TIMEOUT', 'Porkbun did not answer in time', { ambiguous: true });
+      }
+      parsed = null;
+    }
+    if (isObj(parsed) && parsed.status === 'SUCCESS' && res.ok) return parsed;
+    if (isObj(parsed) && parsed.status === 'ERROR') {
+      const code = typeof parsed.code === 'string' && parsed.code ? parsed.code : 'UNKNOWN_REGISTRAR_ERROR';
+      const retry = Number(res.headers.get('retry-after'));
+      throw new RegistrarError(NAME, code, `Porkbun error ${code}`, {
+        httpStatus: res.status,
+        ambiguous: res.status >= 500 || undefined,
+        retryAfterSeconds: Number.isFinite(retry) && retry > 0 ? retry : undefined,
+        details: errorDetails(parsed),
+      });
+    }
+    if (res.status >= 500) {
+      throw new RegistrarError(NAME, 'REGISTRAR_HTTP_5XX', `Porkbun HTTP ${res.status}`, { httpStatus: res.status, ambiguous: true });
+    }
+    throw this.bad(`Unexpected Porkbun response (HTTP ${res.status})`, res.status);
+  }
+
+  async quote(domain: string, o: { signal?: AbortSignal } = {}): Promise<Quote> {
+    const body = await this.call('checkDomain', { params: { domain }, signal: o.signal });
+    const r = CheckResponse.safeParse(body.response);
+    if (!r.success) throw this.bad('Unexpected checkDomain shape');
+    try {
+      const cap = (c: number | null) => (c !== null && c > PG_INT_MAX ? null : c);
+      return {
+        available: r.data.avail === 'yes',
+        premium: r.data.premium === 'yes',
+        firstYearCents: cap(r.data.price !== undefined ? usdStringToCents(r.data.price) : null),
+        renewalCents: cap(r.data.additional?.renewal ? usdStringToCents(r.data.additional.renewal.price) : null),
+        privacyCentsPerYear: 0,
+        currency: 'USD',
+        minDurationYears: r.data.minDuration ?? null,
+        raw: body,
+      };
+    } catch {
+      throw this.bad('Unparseable price in checkDomain');
+    }
+  }
+
+  async accountState(): Promise<AccountState> {
+    const [bal, api] = await Promise.all([this.call('balance'), this.call('apiSettings')]);
+    const settings = isObj(api.settings) ? api.settings : {};
+    const spend = isObj(api.spendLimit) ? api.spendLimit : {};
+    return {
+      balanceCents: Number.isSafeInteger(bal.balance) ? (bal.balance as number) : null,
+      spendLimitRemainingCents: Number.isSafeInteger(spend.remaining) ? (spend.remaining as number) : null,
+      autoTopupEnabled: typeof settings.autoTopup === 'boolean' ? settings.autoTopup : null,
+    };
+  }
+
+  async register(domain: string, input: RegisterInput): Promise<RegisterSuccess | RegisterDryRun> {
+    if (!Number.isInteger(input.costCents) || input.costCents <= 0) {
+      throw new RegistrarError(NAME, 'INVALID_COST', 'cost must be a positive integer number of cents');
+    }
+    if (typeof input.idempotencyKey !== 'string' || input.idempotencyKey.trim() === '') {
+      throw new RegistrarError(NAME, 'INVALID_IDEMPOTENCY_KEY', 'idempotency key must be a non-empty string');
+    }
+    const body: Json = { cost: input.costCents, agreeToTerms: 'yes', whoisPrivacy: true };
+    if (input.dryRun) body.dryRun = true;
+    const r = await this.call('create', {
+      params: { domain }, body, idempotencyKey: input.idempotencyKey,
+    });
+    const isDry = r.dryRun === true;
+    if (input.dryRun !== isDry) {
+      // Asked for a dry run and got a real answer (or vice versa): a charge may have happened.
+      throw this.bad(input.dryRun ? 'Dry run answered as a real registration' : 'Registration answered as a dry run');
+    }
+    if (isDry) {
+      if (typeof r.duration !== 'number') throw this.bad('Dry run without a numeric duration');
+      if (typeof r.cost !== 'number' || !Number.isSafeInteger(r.cost)) throw this.bad('Dry run without a safe-integer cost');
+      if (r.duration !== 1) {
+        throw new RegistrarError(NAME, 'MULTI_YEAR_TERM', `Registry minimum term is ${String(r.duration)} years; only 1-year registrations are allowed`);
+      }
+      return {
+        kind: 'dry_run',
+        wouldSucceed: r.wouldSucceed === true,
+        costCents: r.cost,
+        durationYears: 1,
+        balanceCents: Number.isSafeInteger(r.balance) ? (r.balance as number) : null,
+        shortfallCents: Number.isSafeInteger(r.shortfall) ? (r.shortfall as number) : null,
+        withinMonthlySpendLimit: typeof r.withinMonthlySpendLimit === 'boolean' ? r.withinMonthlySpendLimit : null,
+        raw: r,
+      };
+    }
+    if ((typeof r.orderId !== 'number' && typeof r.orderId !== 'string') || !Number.isSafeInteger(r.cost)) {
+      throw this.bad('Registration success without orderId/cost');
+    }
+    return {
+      kind: 'registered',
+      orderId: String(r.orderId),
+      chargedCents: r.cost as number,
+      balanceCents: Number.isSafeInteger(r.balance) ? (r.balance as number) : null,
+      raw: r,
+    };
+  }
+
+  async findDomain(domain: string): Promise<DomainInfo | null> {
+    let r: Json;
+    try {
+      r = await this.call('getDomain', { params: { domain } });
+    } catch (e) {
+      if (e instanceof RegistrarError && e.code === 'DOMAIN_NOT_FOUND' && !e.ambiguous) return null; // S7: only this code means "not ours"
+      throw e;
+    }
+    const d = isObj(r.domain) ? r.domain : {};
+    const exp = typeof d.expireDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d.expireDate) ? d.expireDate.slice(0, 10) : null;
+    let ns: string[] | null = null;
+    try {
+      ns = [...(await this.getNameservers(domain))].sort();
+    } catch (e) {
+      if (!(e instanceof RegistrarError && e.code === 'API_ACCESS_DISABLED')) throw e;
+    }
+    return { expiryDate: exp, whoisPrivacy: flag(d.whoisPrivacy), autoRenew: flag(d.autoRenew), apiAccess: flag(d.apiAccess), ns };
+  }
+
+  async setNameservers(domain: string, ns: string[]): Promise<void> {
+    await this.call('updateNs', { params: { domain }, body: { ns } });
+  }
+
+  async getNameservers(domain: string): Promise<Set<string>> {
+    const r = await this.call('getNs', { params: { domain } });
+    if (!Array.isArray(r.ns)) throw this.bad('getNs without ns array');
+    return new Set(r.ns.filter((n): n is string => typeof n === 'string').map(normNs));
+  }
+
+  async setAutoRenew(domain: string, on: boolean): Promise<void> {
+    const r = await this.call('updateAutoRenew', { params: { domain }, body: { status: on ? 'on' : 'off' } });
+    const results = isObj(r.results) ? r.results : {};
+    const mine = results[domain];
+    if (isObj(mine) && mine.status !== 'SUCCESS') {
+      throw new RegistrarError(NAME, 'AUTO_RENEW_UPDATE_FAILED', 'Porkbun did not change auto-renew for this domain');
+    }
+  }
+
+  async getReceipt(orderId: string): Promise<unknown> {
+    return redactInvoice(await this.call('invoice', { params: { orderId } }));
+  }
+
+  async findRegistration(domain: string, opts: { since: string }): Promise<RegistrationRecord | null> {
+    const fromYear = Number(opts.since.slice(0, 4));
+    // Wall clock on purpose: the adapter has no injected clock, and only the upper bound of the invoice-year scan depends on it (a year too many costs one extra call).
+    const toYear = new Date().getUTCFullYear();
+    for (let year = toYear; year >= fromYear; year--) {
+      const list = await this.call('invoices', { query: { year, limit: 100 } });
+      const invoices = Array.isArray(list.invoices) ? list.invoices.filter(isObj) : [];
+      for (const inv of invoices) {
+        const date = typeof inv.date === 'string' ? inv.date.slice(0, 10) : '';
+        const domains = Array.isArray(inv.domains) ? inv.domains : [];
+        if (date < opts.since || !domains.includes(domain)) continue;
+        if (inv.state !== 'PAID' && inv.state !== 'PARTIALLY_REFUNDED') continue;
+        const body = await this.call('invoice', { params: { orderId: String(inv.id) } });
+        const detail = isObj(body.invoice) ? body.invoice : {};
+        const items = Array.isArray(detail.items) ? detail.items.filter(isObj) : [];
+        const line = items.find(
+          (i) => i.domain === domain && i.status === 'SUCCESS' && typeof i.product === 'string' && /registration/i.test(i.product),
+        );
+        if (!line || !Number.isSafeInteger(line.price_cents)) continue;
+        const discount = Number.isSafeInteger(line.discount_cents) ? (line.discount_cents as number) : 0;
+        const exp = typeof line.expires === 'string' && /^\d{4}-\d{2}-\d{2}/.test(line.expires) ? line.expires.slice(0, 10) : null;
+        return { orderId: String(inv.id), chargedCents: (line.price_cents as number) - discount, expiryDate: exp, invoiceDate: date, raw: redactInvoice(body) };
+      }
+    }
+    return null;
+  }
+}

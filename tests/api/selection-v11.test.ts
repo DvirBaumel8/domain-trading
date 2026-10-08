@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/modules/selection/settings.js';
 import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { testDb as db } from '../helpers/db.js';
 
@@ -78,8 +78,8 @@ describe('CR-008 v11 draft and fixtures', () => {
     expect(rep.json().report.leakage_lint).toBeDefined();
 
     // row by row, through the real tier code with the stored v11 settings
-    const { decideReplayRow } = await import('../../src/screening/replay.js');
-    const { selectionSettingsByLabel } = await import('../../src/screening/settings.js');
+    const { decideReplayRow } = await import('../../src/modules/selection/replay.js');
+    const { selectionSettingsByLabel } = await import('../../src/modules/selection/settings.js');
     const sel = (await selectionSettingsByLabel(db, 'v11'))!.values;
     const stored = await db.selectFrom('labelled_names').selectAll().where('slice', '=', 'R15-TEST15-USED').execute();
     expect(stored).toHaveLength(894);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NsVerifier } from '../../src/jobs/ns-verify.js';
+import { NsVerifier } from '../../src/modules/ops/jobs/ns-verify.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 
 const NOW = Date.parse('2026-10-06T03:00:00Z');

@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { csvToUploadRow, parseCsv } from '../../src/screening/replay.js';
+import { csvToUploadRow, parseCsv } from '../../src/modules/selection/replay.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';

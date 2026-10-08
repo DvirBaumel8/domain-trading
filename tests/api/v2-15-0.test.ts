@@ -11,8 +11,8 @@ import { screeningHarness } from '../helpers/screening.js';
 import { issueToken } from '../helpers/tokens.js';
 import { mswServer } from '../setup/network.js';
 
-vi.mock('../../src/screening/test-sets.js', async (orig) => {
-  const real = await orig<typeof import('../../src/screening/test-sets.js')>();
+vi.mock('../../src/modules/selection/test-sets.js', async (orig) => {
+  const real = await orig<typeof import('../../src/modules/selection/test-sets.js')>();
   return { ...real, featuresOfRun: async (...a: Parameters<typeof real.featuresOfRun>) => (globalThis as { __featuresOverride?: unknown }).__featuresOverride ?? real.featuresOfRun(...a) };
 });
 

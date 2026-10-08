@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { insertOwnedDomain, resetDb, testDb as db } from '../helpers/db.js';
-import { changedColumns, manualDelist, pendingDomains } from '../../src/services/export-state.js';
+import { changedColumns, manualDelist, pendingDomains } from '../../src/modules/listing/export-state.js';
 
 const T = (m: number) => new Date(Date.UTC(2026, 9, 5, 10, m));
 let n = 0;

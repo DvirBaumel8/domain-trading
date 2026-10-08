@@ -58,7 +58,42 @@ describe('module boundaries (refactor R2)', () => {
     expect(violations('src/x.ts', "const m = await import('./modules/selling/sold.js');")).toHaveLength(1);
   });
 
-  it('the three modules exist with an index.ts', () => {
-    for (const m of ['outreach', 'reporting', 'selling']) expect(statSync(join(MODULES, m, 'index.ts')).isFile()).toBe(true);
+  it('every module has an index.ts', () => {
+    const mods = readdirSync(MODULES).filter((n) => statSync(join(MODULES, n)).isDirectory());
+    expect(mods.sort()).toEqual(['buying', 'candidates', 'listing', 'ops', 'outreach', 'registrars', 'reporting', 'selection', 'selling']);
+    for (const m of mods) expect(statSync(join(MODULES, m, 'index.ts')).isFile()).toBe(true);
+  });
+
+  it('every .ts under src is in core, modules, http, db or the top-level allow-list (no leftover services, screening, api, ...)', () => {
+    const TOP = new Set(['app.ts', 'main.ts', 'config.ts', 'domain-name.ts']);
+    const leftovers = files(SRC).map((f) => relative(SRC, f).split(sep)).filter((p) => !(p.length === 1 ? TOP.has(p[0]!) : ['core', 'modules', 'http', 'db'].includes(p[0]!)));
+    expect(leftovers).toEqual([]);
+  });
+
+  it('core, http and db never import a module (shared code sits below the modules)', () => {
+    const bad = ['core', 'http', 'db'].flatMap((d) => files(join(SRC, d))).filter((f) => /from\s*['"][^'"]*\/modules\//.test(readFileSync(f, 'utf8')));
+    expect(bad).toEqual([]);
+  });
+
+  it('module indexes form no cycle (the dependency graph between modules is acyclic)', () => {
+    const graph = new Map<string, Set<string>>();
+    for (const f of files(MODULES)) {
+      const own = moduleOf(f)!.name;
+      for (const spec of specifiers(readFileSync(f, 'utf8'))) {
+        if (!spec.startsWith('.')) continue;
+        const t = moduleOf(normalize(join(dirname(f), spec)).replace(/\.js$/, '.ts'));
+        if (t && t.name !== own) (graph.get(own) ?? graph.set(own, new Set()).get(own)!).add(t.name);
+      }
+    }
+    const state = new Map<string, number>();
+    const visit = (n: string, stack: string[]): string[] | null => {
+      if (state.get(n) === 1) return [...stack, n];
+      if (state.get(n) === 2) return null;
+      state.set(n, 1);
+      for (const m of graph.get(n) ?? []) { const c = visit(m, [...stack, n]); if (c) return c; }
+      state.set(n, 2);
+      return null;
+    };
+    for (const n of graph.keys()) expect(visit(n, [])).toBeNull();
   });
 });

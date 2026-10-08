@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { canonicalJson } from '../../src/http/canonical-json.js';
-import { computePlan, type PlanInput } from '../../src/pricing/plan.js';
-import { buildSchedule } from '../../src/pricing/schedule.js';
-import { currentSettings, ruleFields } from '../../src/pricing/settings.js';
+import { computePlan, type PlanInput } from '../../src/modules/listing/pricing/plan.js';
+import { buildSchedule } from '../../src/modules/listing/pricing/schedule.js';
+import { currentSettings, ruleFields } from '../../src/modules/listing/pricing/settings.js';
 import { testDb as db } from '../helpers/db.js';
 
 const V = JSON.parse(readFileSync('tests/fixtures/pricing-vectors.v2.json', 'utf8'));

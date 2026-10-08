@@ -4,12 +4,12 @@ import { readFileSync } from 'node:fs';
 import { http } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { DnsAnswer } from '../../src/dns/ns-lookup.js';
-import type { RdapLookup, RdapLookupFn } from '../../src/rdap.js';
-import { readEvidence } from '../../src/screening/evidence.js';
-import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
-import { BootstrapError, Pacer, lookupCached, rdapBaseFor } from '../../src/screening/rdap-batch.js';
-import type { ScreeningDeps } from '../../src/screening/types.js';
+import type { DnsAnswer } from '../../src/core/ns-lookup.js';
+import type { RdapLookup, RdapLookupFn } from '../../src/core/rdap.js';
+import { readEvidence } from '../../src/modules/selection/evidence.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/modules/selection/settings.js';
+import { BootstrapError, Pacer, lookupCached, rdapBaseFor } from '../../src/modules/selection/rdap-batch.js';
+import type { ScreeningDeps } from '../../src/modules/selection/types.js';
 import { testDb as db } from '../helpers/db.js';
 import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { fixture, RANDOM_COM, respond } from '../helpers/screening-fixtures.js';
@@ -221,7 +221,7 @@ describe('IANA bootstrap cooldown, per-host pacing, deadline', () => {
   });
 
   it('one pacer per RDAP host: the same host shares it (com and net are both rdap.verisign.com), another host has its own, and the settings set the pace', async () => {
-    const { pacerFor } = await import('../../src/screening/rdap-batch.js');
+    const { pacerFor } = await import('../../src/modules/selection/rdap-batch.js');
     const shared = new Map<string, unknown>();
     const ctx = { shared, run: {}, settings: { run: { rdap_min_ms_between: 1000, rdap_concurrency: 1 } }, deps: { sleep: async () => {} } } as never;
     const com = pacerFor(ctx, 'https://rdap.verisign.com/com/v1/');

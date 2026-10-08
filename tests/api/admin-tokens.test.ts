@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createApiToken, listApiTokens, revokeApiToken } from '../../src/admin/tokens.js';
-import { hashToken } from '../../src/auth/tokens.js';
+import { createApiToken, listApiTokens, revokeApiToken } from '../../src/modules/ops/admin/tokens.js';
+import { hashToken } from '../../src/core/tokens.js';
 import { testDb as db } from '../helpers/db.js';
 
 describe('admin token functions', () => {

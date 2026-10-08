@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { KNOWN_METHODS, loadPools, siblingsBt1 } from '../../src/screening/siblings.js';
+import { KNOWN_METHODS, loadPools, siblingsBt1 } from '../../src/modules/selection/siblings.js';
 
 const REF = new URL('../../docs/requests/CR-008-reference/', import.meta.url);
 const vectors = readFileSync(new URL('bt1_vectors.csv', REF), 'utf8').split(/\r?\n/).filter((l) => l.trim() !== '').slice(1)

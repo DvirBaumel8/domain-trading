@@ -3,10 +3,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import type { FastifyInstance } from 'fastify';
-import { PortfolioCheckJob } from '../../src/jobs/portfolio-check.js';
-import type { RdapLookup } from '../../src/rdap.js';
-import type { ScreeningDeps } from '../../src/screening/types.js';
-import { WEB_RISK_MONTHLY_CAP } from '../../src/screening/web-risk.js';
+import { PortfolioCheckJob } from '../../src/modules/ops/jobs/portfolio-check.js';
+import type { RdapLookup } from '../../src/core/rdap.js';
+import type { ScreeningDeps } from '../../src/modules/selection/types.js';
+import { WEB_RISK_MONTHLY_CAP } from '../../src/modules/selection/web-risk.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';

@@ -1,9 +1,9 @@
 // CAP-01 name form (CR-001 CAP-01 + CR-002 CAP-01: FORM-2, G-FORM-1, multi-word cities and compound trade words).
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../../src/http/errors.js';
-import { analyzeForm, gform1, type FormSettings, type Lane } from '../../src/screening/form.js';
-import { buildLexicon, loadDataLexicon } from '../../src/screening/lexicon.js';
-import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
+import { analyzeForm, gform1, type FormSettings, type Lane } from '../../src/modules/selection/form.js';
+import { buildLexicon, loadDataLexicon } from '../../src/modules/selection/lexicon.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/modules/selection/settings.js';
 
 /** Fixed test lists (not the production lists). */
 const LISTS = {

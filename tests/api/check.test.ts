@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { RegistrarError } from '../../src/registrars/types.js';
-import type { RdapFn } from '../../src/rdap.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
+import type { RdapFn } from '../../src/core/rdap.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';

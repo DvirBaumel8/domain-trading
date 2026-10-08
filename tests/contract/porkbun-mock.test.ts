@@ -4,8 +4,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { PORKBUN_DEFAULT_BASE, PORKBUN_ENDPOINTS, PorkbunAdapter, type PorkbunEndpoint } from '../../src/registrars/porkbun.js';
-import { RegistrarError } from '../../src/registrars/types.js';
+import { PORKBUN_DEFAULT_BASE, PORKBUN_ENDPOINTS, PorkbunAdapter, type PorkbunEndpoint } from '../../src/modules/registrars/porkbun.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
 
 const MOCK_BASE = `${PORKBUN_DEFAULT_BASE}/mock`;
 const SPEC_URL = 'https://porkbun.com/api/json/v3/spec';

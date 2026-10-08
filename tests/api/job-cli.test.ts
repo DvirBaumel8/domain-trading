@@ -5,7 +5,7 @@ import { testEnv } from '../helpers/env.js';
 
 const run = promisify(execFile);
 const cli = (args: string[]) =>
-  run('npx', ['tsx', 'src/job.ts', ...args], { env: { ...process.env, ...testEnv() } });
+  run('npx', ['tsx', 'src/modules/ops/job.ts', ...args], { env: { ...process.env, ...testEnv() } });
 
 describe('job CLI', () => {
   it('price-schedule --dry-run prints JSON and exits 0', async () => {

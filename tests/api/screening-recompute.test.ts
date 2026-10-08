@@ -4,10 +4,10 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { DEPENDS_ON, GATE_OF } from '../../src/screening/checks/index.js';
-import { planFor, recomputePending, reopenRun, staleChecks, toResultRow } from '../../src/screening/engine.js';
-import { outcome, type Check, type CheckId, type ResultRow } from '../../src/screening/types.js';
-import { currentLists } from '../../src/screening/lists.js';
+import { DEPENDS_ON, GATE_OF } from '../../src/modules/selection/checks/index.js';
+import { planFor, recomputePending, reopenRun, staleChecks, toResultRow } from '../../src/modules/selection/engine.js';
+import { outcome, type Check, type CheckId, type ResultRow } from '../../src/modules/selection/types.js';
+import { currentLists } from '../../src/modules/selection/lists.js';
 import { testDb as db } from '../helpers/db.js';
 import { patchActiveSettings, putBrandLists, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 

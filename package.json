@@ -1,6 +1,6 @@
 {
   "name": "domain-trading",
-  "version": "2.16.3",
+  "version": "2.16.4",
   "private": true,
   "type": "module",
   "engines": {
@@ -17,8 +17,8 @@
     "test:contract:mock": "VITEST_CONTRACT=1 vitest run --project porkbun-mock",
     "test:contract:sandbox": "VITEST_CONTRACT=1 vitest run --project porkbun-sandbox",
     "migrate": "node-pg-migrate -m migrations -j sql",
-    "admin": "tsx --env-file-if-exists=.env src/admin.ts",
-    "job": "tsx --env-file-if-exists=.env src/job.ts",
+    "admin": "tsx --env-file-if-exists=.env src/modules/ops/admin.ts",
+    "job": "tsx --env-file-if-exists=.env src/modules/ops/job.ts",
     "db:up": "docker compose up -d --wait db",
     "record:screening": "tsx --env-file-if-exists=.env scripts/record-screening-fixtures.ts",
     "evidence": "tsx scripts/evidence.ts",

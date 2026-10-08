@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ceilDiv, div } from '../../src/pricing/int.js';
-import { ceil95, nice95, nice99, pct, round5 } from '../../src/pricing/round.js';
+import { ceilDiv, div } from '../../src/modules/listing/pricing/int.js';
+import { ceil95, nice95, nice99, pct, round5 } from '../../src/modules/listing/pricing/round.js';
 
 describe('integer helpers', () => {
   it('div floors, ceilDiv ceils (positive and negative)', () => {

@@ -10,8 +10,8 @@ import { Ajv, type ValidateFunction } from 'ajv';
 import _addFormats from 'ajv-formats';
 import { http, HttpResponse } from 'msw';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PORKBUN_ENDPOINTS, PorkbunAdapter, type PorkbunEndpoint } from '../../src/registrars/porkbun.js';
-import { AMBIGUOUS_CODES } from '../../src/registrars/types.js';
+import { PORKBUN_ENDPOINTS, PorkbunAdapter, type PorkbunEndpoint } from '../../src/modules/registrars/porkbun.js';
+import { AMBIGUOUS_CODES } from '../../src/modules/registrars/types.js';
 import { mswServer } from '../setup/network.js';
 import { FAKE_KEYS, PORKBUN_BASE, record, recorded } from '../helpers/porkbun-msw.js';
 
@@ -286,7 +286,7 @@ describe('Porkbun contract (pinned OpenAPI v3.53, offline)', () => {
   });
 
   it('PK-C7: expandPath throws on a missing template param', async () => {
-    const { expandPath } = await import('../../src/registrars/porkbun.js');
+    const { expandPath } = await import('../../src/modules/registrars/porkbun.js');
     expect(expandPath('/domain/get/{domain}', { domain: 'a.com' })).toBe('/domain/get/a.com');
     expect(() => expandPath('/domain/get/{domain}', {})).toThrow(/missing path param: domain/);
   });

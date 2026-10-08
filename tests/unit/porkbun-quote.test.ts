@@ -1,7 +1,7 @@
 import { http, HttpResponse, delay } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { PorkbunAdapter } from '../../src/registrars/porkbun.js';
-import { RegistrarError } from '../../src/registrars/types.js';
+import { PorkbunAdapter } from '../../src/modules/registrars/porkbun.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
 import { mswServer } from '../setup/network.js';
 import { checkDomainBody, FAKE_KEYS, PORKBUN_BASE, pbError, record, recorded } from '../helpers/porkbun-msw.js';
 

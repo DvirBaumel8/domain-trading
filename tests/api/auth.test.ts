@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { revokeApiToken } from '../../src/admin/tokens.js';
+import { revokeApiToken } from '../../src/modules/ops/admin/tokens.js';
 import { FailedAuthLimiter } from '../../src/http/auth.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb } from '../helpers/db.js';

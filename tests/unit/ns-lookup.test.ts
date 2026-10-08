@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encodeNsQuery, parseNsResponse } from '../../src/dns/ns-lookup.js';
+import { encodeNsQuery, parseNsResponse } from '../../src/core/ns-lookup.js';
 
 /** Test-only encoder for a DNS response carrying NS records in the answer or authority section. */
 function encodeName(name: string): Buffer {

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { testDb as db, insertOwnedDomain } from '../helpers/db.js';
 import { OFFLINE, enableWayback, putBrandLists, putList, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
-import { outcome } from '../../src/screening/types.js';
+import { outcome } from '../../src/modules/selection/types.js';
 import { HttpResponse } from 'msw';
 import { recordedSite, syntheticSite, waybackHandlers } from '../helpers/screening-fixtures.js';
 import { mswServer } from '../setup/network.js';
@@ -468,7 +468,7 @@ describe('fix round 1', () => {
     const { app: a, run } = await h();
     const slow = { id: 'availability' as const, gate: 'G2', ruleIds: [], lists: [], async run() { await new Promise((r) => setTimeout(r, 15)); return outcome('PASS', null, null); } };
     a.screeningWorker.checks.availability = slow;
-    const { ScreeningWorker } = await import('../../src/screening/engine.js');
+    const { ScreeningWorker } = await import('../../src/modules/selection/engine.js');
     const other = new ScreeningWorker({ db, now: () => Date.parse('2026-10-06T08:00:20Z'), log: { warn() {}, error() {} }, screening: {} as never });
     other.checks.availability = slow;
     const { id } = await run({ checks: plan, names: [nonGeo('tampapoolsco.com'), nonGeo('tulsaroofingco.com')] });

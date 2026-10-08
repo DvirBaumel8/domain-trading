@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DropJob } from '../../src/jobs/drop.js';
-import { manualDelist } from '../../src/services/export-state.js';
+import { DropJob } from '../../src/modules/ops/jobs/drop.js';
+import { manualDelist } from '../../src/modules/listing/export-state.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 
 const D = 'examplecityroofing.com';

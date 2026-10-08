@@ -1,7 +1,7 @@
 // rdapLookup (CR-001 CAP-03 #1-#4, Review Focus 2) against recorded Verisign fixtures.
 import { http, HttpResponse, delay } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { rdapLookup, rdapStatus } from '../../src/rdap.js';
+import { rdapLookup, rdapStatus } from '../../src/core/rdap.js';
 import { mswServer } from '../setup/network.js';
 import { fixture, RANDOM_COM, respond } from '../helpers/screening-fixtures.js';
 

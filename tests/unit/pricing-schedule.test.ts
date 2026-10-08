@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { computePlan } from '../../src/pricing/plan.js';
+import { computePlan } from '../../src/modules/listing/pricing/plan.js';
 import { addDays, addMonthsClamped } from '../../src/core/dates.js';
-import { buildSchedule, type ScheduleEvent, type SchedulePlan } from '../../src/pricing/schedule.js';
-import type { Plan } from '../../src/pricing/plan.js';
+import { buildSchedule, type ScheduleEvent, type SchedulePlan } from '../../src/modules/listing/pricing/schedule.js';
+import type { Plan } from '../../src/modules/listing/pricing/plan.js';
 import { V2 } from '../helpers/pricing.js';
 
 const plan = (bin: number, extra: object = {}): Plan => {

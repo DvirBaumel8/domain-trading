@@ -1,0 +1,121 @@
+import { parseArgs } from 'node:util';
+import { loadConfig } from '../../config.js';
+import { createDb } from '../../db/client.js';
+import { idtDay, isRealDate } from '../../core/dates.js';
+import { DropJob } from './jobs/drop.js';
+import { RegistrarCheckJob } from './jobs/registrar-check.js';
+import { createAdapters } from '../registrars/index.js';
+import { PriceScheduleJob } from './jobs/price-schedule.js';
+import { BackupExporter } from './jobs/backup-export.js';
+import { importBackup } from './jobs/backup-import.js';
+import { buildApp } from '../../app.js';
+import { newAuditId } from '../../http/audit.js';
+
+const USAGE = `usage:
+  npm run job -- tick | daily     (the same runner and steps as POST /jobs/run)
+  npm run job -- price-schedule [--dry-run] [--today YYYY-MM-DD]
+  npm run job -- drop [--dry-run] [--today YYYY-MM-DD]
+  npm run job -- registrar-check [--dry-run]
+  npm run job -- export-backup
+  npm run job -- import-backup <dir containing backup/>`;
+
+class UsageError extends Error {}
+
+async function main(argv: string[]): Promise<number> {
+  const { positionals, values } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: { 'dry-run': { type: 'boolean' }, today: { type: 'string' } },
+  });
+  if (positionals[0] === 'tick' || positionals[0] === 'daily') {
+    if (positionals.length !== 1) throw new UsageError(`wrong arguments for ${positionals[0]}`);
+    if (values['dry-run'] || values.today !== undefined) throw new UsageError('--dry-run and --today do not apply to tick or daily');
+    const config = loadConfig(process.env);
+    const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });
+    const log = { warn: (m: string) => console.warn(`warning: ${m}`) };
+    try {
+      // The same app wiring as the server (never listening), so the runner has the server's adapters, locks and scrubbing.
+      const app = await buildApp({ config, db, backupExport: new BackupExporter({ db, config, now: Date.now, log }) });
+      try {
+        const r = await app.jobRunner.run(positionals[0], { trigger: 'cli' });
+        const failed = Object.entries(r.steps).filter(([, st]) => !st.ok).map(([k]) => k);
+        // The run-level audit row POST /jobs/run gets from the middleware (a skipped overlap is recorded too).
+        await db.insertInto('audit_log').values({
+          id: newAuditId(), scope: 'job', method: 'CLI', path: `job ${positionals[0]}`,
+          request: JSON.stringify({ job: positionals[0], steps: Object.fromEntries(Object.entries(r.steps).map(([k, st]) => [k, st.ok ? (st.skipped ? 'skipped' : 'ok') : 'failed'])) }),
+          status_code: failed.length ? 500 : 200,
+          result_summary: r.skipped ? `${positionals[0]}: skipped` : failed.length ? `${positionals[0]}: failed ${failed.join(',')}` : `${positionals[0]}: ok`,
+        }).execute();
+        console.log(JSON.stringify(r, null, 2));
+        return failed.length ? 1 : 0;
+      } finally {
+        await app.close();
+      }
+    } finally {
+      await db.destroy();
+    }
+  }
+  const backupCmd = positionals[0] === 'export-backup' || positionals[0] === 'import-backup';
+  if (backupCmd) {
+    if (positionals[0] === 'export-backup' ? positionals.length !== 1 : positionals.length !== 2) throw new UsageError(`wrong arguments for ${positionals[0]}`);
+    if (values['dry-run'] || values.today !== undefined) throw new UsageError('--dry-run and --today do not apply to backup commands');
+    const config = loadConfig(process.env);
+    const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });
+    try {
+      if (positionals[0] === 'import-backup') {
+        console.log(JSON.stringify({ imported: await importBackup(db, positionals[1]!) }, null, 2));
+      } else {
+        // A missing token or repo is a warning and a result of {skipped:true}, never a failure (BK-4).
+        const log = { warn: (m: string) => console.warn(`warning: ${m}`) };
+        console.log(JSON.stringify(await new BackupExporter({ db, config, now: Date.now, log }).runOnce(), null, 2));
+      }
+      return 0;
+    } finally {
+      await db.destroy();
+    }
+  }
+  if ((positionals[0] !== 'price-schedule' && positionals[0] !== 'drop' && positionals[0] !== 'registrar-check') || positionals.length > 1) {
+    throw new UsageError(`unknown command: ${positionals.join(' ') || '(none)'}`);
+  }
+  const today = values.today;
+  if (today !== undefined) {
+    if (!isRealDate(today)) {
+      throw new UsageError('--today must be a valid YYYY-MM-DD date');
+    }
+    if (!values['dry-run'] && today > idtDay(new Date())) {
+      throw new UsageError('--today in the future is only allowed with --dry-run');
+    }
+  }
+  const config = loadConfig(process.env);
+  const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });
+  try {
+    if (positionals[0] === 'registrar-check') {
+      if (today !== undefined) throw new UsageError('--today does not apply to registrar-check');
+      const r = await new RegistrarCheckJob({ db, adapters: createAdapters(config), now: Date.now }).runOnce({ dryRun: values['dry-run'] ?? false });
+      console.log(JSON.stringify(r, null, 2));
+      return 0;
+    }
+    const job = positionals[0] === 'drop' ? new DropJob({ db, now: Date.now }) : new PriceScheduleJob({ db, now: Date.now });
+    const result = await job.runOnce({ today, dryRun: values['dry-run'] ?? false });
+    console.log(JSON.stringify(result, null, 2));
+    return 0;
+  } finally {
+    await db.destroy();
+  }
+}
+
+main(process.argv.slice(2)).then(
+  (code) => {
+    process.exitCode = code;
+  },
+  (err: unknown) => {
+    const code = (err as { code?: unknown }).code;
+    if (err instanceof UsageError || (typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS_'))) {
+      console.error(`${(err as Error).message}\n${USAGE}`);
+      process.exitCode = 2;
+      return;
+    }
+    console.error(`error: ${(err as Error).message}`);
+    process.exitCode = 1;
+  },
+);

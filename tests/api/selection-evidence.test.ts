@@ -1,7 +1,7 @@
 // Evidence store (CR-001 §11 P-4): sha256 of the full response, gzip'd capped text, never raw HTML; append-only.
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { readEvidence, storeEvidence, truncateUtf8 } from '../../src/screening/evidence.js';
+import { readEvidence, storeEvidence, truncateUtf8 } from '../../src/modules/selection/evidence.js';
 import { testDb as db } from '../helpers/db.js';
 
 const base = { source: 'wayback', url: 'https://web.archive.org/web/2020/https://example.com/', retrievedAt: new Date('2026-10-06T07:00:00Z'), httpStatus: 200, contentType: 'text/html', maxBytes: 32768 };

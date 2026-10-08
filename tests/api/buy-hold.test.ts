@@ -1,7 +1,7 @@
 // Task 8 (R1): BUY_HOLD on /buy for a screened name only; a dry run reports it; a never-screened name keeps today's behaviour.
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapFn } from '../../src/rdap.js';
+import type { RdapFn } from '../../src/core/rdap.js';
 import { DOMAIN, T0, buyBody, readyToBuy } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';

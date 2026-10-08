@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config.js';
-import { adapterStatus } from '../../src/registrars/registry.js';
+import { adapterStatus } from '../../src/modules/registrars/registry.js';
 import { testEnv } from '../helpers/env.js';
 
 describe('loadConfig', () => {

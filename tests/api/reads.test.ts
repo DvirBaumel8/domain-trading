@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { revokeApiToken } from '../../src/admin/tokens.js';
-import { importDomain, type ImportInput } from '../../src/admin/import-domain.js';
+import { revokeApiToken } from '../../src/modules/ops/admin/tokens.js';
+import { importDomain, type ImportInput } from '../../src/modules/ops/admin/import-domain.js';
 import { makeApp } from '../helpers/app.js';
 import { T0, buyBody, postBuy } from '../helpers/buy.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';

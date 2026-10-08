@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { computePlan, hybridBinMin, type PlanInput } from '../../src/pricing/plan.js';
-import { pct, roundDollar } from '../../src/pricing/round.js';
-import { buildSchedule, ladderStep } from '../../src/pricing/schedule.js';
-import { isV3, ruleFields, type PricingSettings } from '../../src/pricing/settings.js';
+import { computePlan, hybridBinMin, type PlanInput } from '../../src/modules/listing/pricing/plan.js';
+import { pct, roundDollar } from '../../src/modules/listing/pricing/round.js';
+import { buildSchedule, ladderStep } from '../../src/modules/listing/pricing/schedule.js';
+import { isV3, ruleFields, type PricingSettings } from '../../src/modules/listing/pricing/settings.js';
 import { V2, V3 } from '../helpers/pricing.js';
 
 const VEC = JSON.parse(readFileSync('tests/fixtures/pricing-vectors.v3.json', 'utf8'));

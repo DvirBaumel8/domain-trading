@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { RegistrarError } from '../../src/registrars/types.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
 import { makeApp } from '../helpers/app.js';
-import { newPricingSettings } from '../../src/admin/pricing-settings.js';
+import { newPricingSettings } from '../../src/modules/ops/admin/pricing-settings.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';

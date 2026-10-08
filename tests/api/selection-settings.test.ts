@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_SELECTION_VALUES, SelectionValues } from '../../src/screening/settings.js';
+import { DEFAULT_SELECTION_VALUES, SelectionValues } from '../../src/modules/selection/settings.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';

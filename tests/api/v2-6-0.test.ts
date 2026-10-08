@@ -3,10 +3,10 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapLookup, RdapLookupFn } from '../../src/rdap.js';
-import { deriveItem } from '../../src/screening/derive.js';
-import { siblingsBt1 } from '../../src/screening/siblings.js';
-import { splitV2 } from '../../src/screening/split-v2.js';
+import type { RdapLookup, RdapLookupFn } from '../../src/core/rdap.js';
+import { deriveItem } from '../../src/modules/selection/derive.js';
+import { siblingsBt1 } from '../../src/modules/selection/siblings.js';
+import { splitV2 } from '../../src/modules/selection/split-v2.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';

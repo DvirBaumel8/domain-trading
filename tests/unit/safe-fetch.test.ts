@@ -1,8 +1,8 @@
-// The outbound guard (src/net/safe-fetch.ts) and fetchPage on top of it. Pure: lookups and fetch are fakes.
+// The outbound guard (src/core/safe-fetch.ts) and fetchPage on top of it. Pure: lookups and fetch are fakes.
 import { describe, expect, it } from 'vitest';
-import { BlockedError, isBlockedAddress, safeFetch, vetUrl, vettedLookup, type LookupAll } from '../../src/net/safe-fetch.js';
-import { Pacer } from '../../src/screening/rdap-batch.js';
-import { fetchPage, type FetchPageOpts } from '../../src/screening/site.js';
+import { BlockedError, isBlockedAddress, safeFetch, vetUrl, vettedLookup, type LookupAll } from '../../src/core/safe-fetch.js';
+import { Pacer } from '../../src/modules/selection/rdap-batch.js';
+import { fetchPage, type FetchPageOpts } from '../../src/modules/selection/site.js';
 
 const PUBLIC: LookupAll = async () => [{ address: '93.184.216.34', family: 4 }];
 const never = ['linkedin.com'];

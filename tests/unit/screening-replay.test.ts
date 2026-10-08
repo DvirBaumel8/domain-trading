@@ -2,8 +2,8 @@
 // leakage lint, profit report (Amendment A3). Synthetic rows; the real reference data is in selection-replay-cr002.test.ts.
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../../src/http/errors.js';
-import { bandLabels, bandOf, cell, csvToUploadRow, decideReplayRow, laneOf, leakageLint, missingGates, parseCsv, profitReport, replayReport, type Entry, type LabelledRow } from '../../src/screening/replay.js';
-import { DEFAULT_SELECTION_VALUES as D, type SelectionValuesT } from '../../src/screening/settings.js';
+import { bandLabels, bandOf, cell, csvToUploadRow, decideReplayRow, laneOf, leakageLint, missingGates, parseCsv, profitReport, replayReport, type Entry, type LabelledRow } from '../../src/modules/selection/replay.js';
+import { DEFAULT_SELECTION_VALUES as D, type SelectionValuesT } from '../../src/modules/selection/settings.js';
 
 const row = (o: Partial<LabelledRow> & { f?: LabelledRow['features'] } = {}): LabelledRow => ({
   domain: 'x.com', role: 'test', label: 'sold', source: 's', slice: 'a', report_lane: null, price_cents: null, as_of: '2026-06-01',

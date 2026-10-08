@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapFn } from '../../src/rdap.js';
-import { RegistrarError } from '../../src/registrars/types.js';
-import { failPurchase, markUnknown } from '../../src/services/bookkeeping.js';
-import { Reconciler } from '../../src/services/reconciler.js';
+import type { RdapFn } from '../../src/core/rdap.js';
+import { RegistrarError } from '../../src/modules/registrars/types.js';
+import { failPurchase, markUnknown } from '../../src/modules/buying/bookkeeping.js';
+import { Reconciler } from '../../src/modules/buying/reconciler.js';
 import { makeApp } from '../helpers/app.js';
 import { DOMAIN, T0, approvalNow, buyBody, postBuy, readyToBuy, seedOwnedDomains, seedSpent } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';

@@ -1,6 +1,6 @@
 import { http, HttpResponse, delay } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { rdapStatus } from '../../src/rdap.js';
+import { rdapStatus } from '../../src/core/rdap.js';
 import { mswServer } from '../setup/network.js';
 
 const URL_ = 'https://rdap.verisign.com/com/v1/domain/:d';

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { poolConfig } from './db/client.js';
-import { REGISTRAR_ENV } from './registrars/registry.js';
+import { REGISTRAR_ENV } from './modules/registrars/index.js';
 
 /** The code repo. The backup token must never be able to touch it. */
 const CODE_REPO = 'DvirBaumel8/domain-trading';

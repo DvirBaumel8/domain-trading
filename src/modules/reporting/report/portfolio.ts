@@ -2,7 +2,7 @@ import { pair } from '../../../core/money.js';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../db/types.js';
 import { toJerusalemIso } from '../../../core/dates.js';
-import { pendingDomains, VENUES, type Venue } from '../../../services/export-state.js';
+import { pendingDomains, VENUES, type Venue } from '../../listing/index.js';
 import { perDomain } from './domains.js';
 import { priceValues } from './money.js';
 

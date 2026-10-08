@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CheckService } from '../../src/services/check.js';
+import { CheckService } from '../../src/modules/registrars/check.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 

@@ -3,11 +3,11 @@
 // (v1) npx tsx --env-file-if-exists=.env scripts/ac6-split.ts   (reads the versioned word lists from DATABASE_URL, else TEST_DATABASE_URL)
 import { readFileSync } from 'node:fs';
 import { createDb } from '../src/db/client.js';
-import { analyzeForm } from '../src/screening/form.js';
-import { buildLexicon, loadDataLexicon } from '../src/screening/lexicon.js';
-import { currentLists } from '../src/screening/lists.js';
-import { splitV2OfDomain } from '../src/screening/split-v2.js';
-import { DEFAULT_SELECTION_VALUES } from '../src/screening/settings.js';
+import { analyzeForm } from '../src/modules/selection/form.js';
+import { buildLexicon, loadDataLexicon } from '../src/modules/selection/lexicon.js';
+import { currentLists } from '../src/modules/selection/lists.js';
+import { splitV2OfDomain } from '../src/modules/selection/split-v2.js';
+import { DEFAULT_SELECTION_VALUES } from '../src/modules/selection/settings.js';
 
 const mi = process.argv.indexOf('--method');
 const method = mi >= 0 ? process.argv[mi + 1] : 'bt1@v1';

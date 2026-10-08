@@ -3,8 +3,8 @@ import type { FastifyInstance } from 'fastify';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { dropAtFirstExpiry } from '../../src/admin/drop-date.js';
-import { PriceScheduleJob } from '../../src/jobs/price-schedule.js';
+import { dropAtFirstExpiry } from '../../src/modules/ops/admin/drop-date.js';
+import { PriceScheduleJob } from '../../src/modules/ops/jobs/price-schedule.js';
 import { makeApp } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { testEnv } from '../helpers/env.js';
@@ -94,7 +94,7 @@ describe('admin drop-at-first-expiry', () => {
   it('ADM-2 CLI: --approval-at in the future exits 2, nothing changed', async () => {
     await insertOwnedDomain(db, { domain: D });
     const run = promisify(execFile);
-    await expect(run('npx', ['tsx', 'src/admin.ts', 'drop-at-first-expiry', '--domain', D, '--approval-text', 'yes', '--approval-at', '2999-01-01T00:00:00Z'],
+    await expect(run('npx', ['tsx', 'src/modules/ops/admin.ts', 'drop-at-first-expiry', '--domain', D, '--approval-text', 'yes', '--approval-at', '2999-01-01T00:00:00Z'],
       { env: { ...process.env, ...testEnv() } })).rejects.toMatchObject({ code: 2 });
     expect((await dom()).drop_date).toBe('2028-10-04');
   });

@@ -1,7 +1,7 @@
 // v2.1.0 (CR-005 N-7): dry_run "strict" returns the first real-buy gate refusal as the error; otherwise it is today's dry run.
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapFn } from '../../src/rdap.js';
+import type { RdapFn } from '../../src/core/rdap.js';
 import { makeApp } from '../helpers/app.js';
 import { DOMAIN, T0, buyBody, postBuy, readyToBuy } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';

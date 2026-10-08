@@ -2,12 +2,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { GATE_OF } from '../../src/screening/checks/index.js';
-import { tmEuCheck } from '../../src/screening/checks/manual.js';
-import { outcome } from '../../src/screening/types.js';
-import { planFor } from '../../src/screening/engine.js';
-import { DEFAULT_SELECTION_VALUES } from '../../src/screening/settings.js';
-import type { CheckContext } from '../../src/screening/types.js';
+import { GATE_OF } from '../../src/modules/selection/checks/index.js';
+import { tmEuCheck } from '../../src/modules/selection/checks/manual.js';
+import { outcome } from '../../src/modules/selection/types.js';
+import { planFor } from '../../src/modules/selection/engine.js';
+import { DEFAULT_SELECTION_VALUES } from '../../src/modules/selection/settings.js';
+import type { CheckContext } from '../../src/modules/selection/types.js';
 import { testDb as db } from '../helpers/db.js';
 import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 

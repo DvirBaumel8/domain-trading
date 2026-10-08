@@ -2,9 +2,9 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { GATE_OF } from '../../src/screening/checks/index.js';
-import { planFor } from '../../src/screening/engine.js';
-import type { Lane } from '../../src/screening/types.js';
+import { GATE_OF } from '../../src/modules/selection/checks/index.js';
+import { planFor } from '../../src/modules/selection/engine.js';
+import type { Lane } from '../../src/modules/selection/types.js';
 import { testDb as db } from '../helpers/db.js';
 import { putBrandLists, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 

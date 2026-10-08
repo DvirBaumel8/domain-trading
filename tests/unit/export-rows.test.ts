@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AFTERNIC_HEADER, afternicRow, sedoRow, toCsv, type ExportDomain, type SedoTemplate } from '../../src/services/export.js';
+import { AFTERNIC_HEADER, afternicRow, sedoRow, toCsv, type ExportDomain, type SedoTemplate } from '../../src/modules/listing/export.js';
 
 const d = (over: Partial<ExportDomain>): ExportDomain => ({
   domain: 'example.com', display_name: null, listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, min_offer_cents: 39900, lto_max_months: null, ...over,

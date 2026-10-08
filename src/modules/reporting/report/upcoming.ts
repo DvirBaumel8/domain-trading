@@ -1,7 +1,7 @@
 import type { Kysely } from 'kysely';
 import { addDays, dayNumber, idtDay } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
-import { currentSettings, settingsByVersion } from '../../../pricing/settings.js';
+import { currentSettings, settingsByVersion } from '../../listing/index.js';
 import { priceValues } from './money.js';
 
 const LIVE = ['owned', 'listed', 'delisted'] as const;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeDomainCount, pendingCents, spentCents } from '../../src/services/budget.js';
+import { activeDomainCount, pendingCents, spentCents } from '../../src/modules/buying/budget.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 
 const ledger = (type: string, amount_cents: number) =>

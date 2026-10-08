@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { rdapStatus, type RdapFn } from '../../src/rdap.js';
+import { rdapStatus, type RdapFn } from '../../src/core/rdap.js';
 import { mswServer } from '../setup/network.js';
-import { failPurchase } from '../../src/services/bookkeeping.js';
-import { Reconciler } from '../../src/services/reconciler.js';
+import { failPurchase } from '../../src/modules/buying/bookkeeping.js';
+import { Reconciler } from '../../src/modules/buying/reconciler.js';
 import { DOMAIN } from '../helpers/buy.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';

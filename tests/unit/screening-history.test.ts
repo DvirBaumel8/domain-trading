@@ -1,9 +1,9 @@
 // Pure parts of the history check (CAP-07): the CDX reader, the decisive-capture picker, the classifier and the business-name reader.
 import { describe, expect, it } from 'vitest';
-import { businessNameCandidate, nameTokens, pickBusinessName } from '../../src/screening/prior-business.js';
-import { hiddenSignals, metaRefreshTarget, visibleText } from '../../src/screening/html-text.js';
-import { failClassOf } from '../../src/screening/checks/history.js';
-import { classifyCapture, matchSignatures, parseCdx, pickDecisive, redirectTarget, scanPaths, timestampMs, toTimestamp, type Capture, type SignatureLists } from '../../src/screening/wayback.js';
+import { businessNameCandidate, nameTokens, pickBusinessName } from '../../src/modules/selection/prior-business.js';
+import { hiddenSignals, metaRefreshTarget, visibleText } from '../../src/modules/selection/html-text.js';
+import { failClassOf } from '../../src/modules/selection/checks/history.js';
+import { classifyCapture, matchSignatures, parseCdx, pickDecisive, redirectTarget, scanPaths, timestampMs, toTimestamp, type Capture, type SignatureLists } from '../../src/modules/selection/wayback.js';
 
 const lists: SignatureLists = {
   strong: ['adult:xxx', 'pharma:viagra', 'pbn:buy backlinks'], weak: ['gambling:casino', 'pbn:guest post'],

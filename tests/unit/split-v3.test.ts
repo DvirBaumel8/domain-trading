@@ -2,8 +2,8 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { SPLIT_V3_SHA256, loadSplitV2, splitV2, splitV2OfDomain } from '../../src/screening/split-v2.js';
-import { KNOWN_METHODS, siblingsBt1, usesSplitV2 } from '../../src/screening/siblings.js';
+import { SPLIT_V3_SHA256, loadSplitV2, splitV2, splitV2OfDomain } from '../../src/modules/selection/split-v2.js';
+import { KNOWN_METHODS, siblingsBt1, usesSplitV2 } from '../../src/modules/selection/siblings.js';
 
 const vectors = readFileSync(new URL('../../docs/requests/CR-008-reference/bt1_vectors.csv', import.meta.url), 'utf8').split(/\r?\n/).filter((l) => l.trim() !== '').slice(1)
   .map((l) => { const c = l.split(','); return { domain: c[0]!, tokens: c[1]!.split(' ') }; });

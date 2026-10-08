@@ -2,8 +2,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { TABLE_FILES } from '../../src/jobs/backup-export.js';
-import { ORDER } from '../../src/jobs/backup-import.js';
+import { TABLE_FILES } from '../../src/modules/ops/jobs/backup-export.js';
+import { ORDER } from '../../src/modules/ops/jobs/backup-import.js';
 
 /** Written to their own files by collectBackupFiles (not under tables/). */
 const SPECIAL = ['purchases', 'receipts', 'sales', 'audit_log'];

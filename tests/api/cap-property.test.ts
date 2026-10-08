@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CheckService } from '../../src/services/check.js';
-import { BuyService } from '../../src/services/buy.js';
-import { spentCents } from '../../src/services/budget.js';
+import { CheckService } from '../../src/modules/registrars/check.js';
+import { BuyService } from '../../src/modules/buying/buy.js';
+import { spentCents } from '../../src/modules/buying/budget.js';
 import { resetDb, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { COMPS, T0, readyToBuy, seedSpent } from '../helpers/buy.js';

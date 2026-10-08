@@ -5,9 +5,9 @@ import { normalizeDomain } from '../../domain-name.js';
 import { AppError } from '../../http/errors.js';
 import { formatUsd, usdStringToCents, wholeUsd } from '../../core/money.js';
 import { isIsoWithOffset, toJerusalemIso } from '../../core/dates.js';
-import { checkApproval } from '../../services/approval.js';
+import { checkApproval } from '../../core/approval.js';
 import { classify, BUYER_TYPES, OFFER_SOURCES, type BuyerType, type OfferSnapshot, type OfferSource } from './offer-rules.js';
-import { applyHold } from '../../services/plan-store.js';
+import { applyHold } from '../listing/index.js';
 import { withDomainLock } from '../../core/locks.js';
 
 type OfferRow = Selectable<OffersTable>;

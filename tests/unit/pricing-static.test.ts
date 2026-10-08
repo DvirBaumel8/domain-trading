@@ -28,7 +28,7 @@ function code(src: string): string {
 }
 
 describe('PR-10: no floats in the pricing module', () => {
-  const dir = 'src/pricing';
+  const dir = 'src/modules/listing/pricing';
   const files = readdirSync(dir).filter((f) => f.endsWith('.ts'));
   it('has files', () => expect(files.length).toBeGreaterThan(3));
   it('the stripper is not fooled by strings containing comment markers', () => {

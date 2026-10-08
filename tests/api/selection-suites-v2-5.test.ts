@@ -3,7 +3,7 @@ import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { loadDataLexicon } from '../../src/screening/lexicon.js';
+import { loadDataLexicon } from '../../src/modules/selection/lexicon.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';

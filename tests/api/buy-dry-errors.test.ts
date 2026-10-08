@@ -1,7 +1,7 @@
 // v2.0.2: a dry-run /buy error thrown after the DOM gates carries would_be_blocked, screening_pack and advisories.
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapFn } from '../../src/rdap.js';
+import type { RdapFn } from '../../src/core/rdap.js';
 import { makeApp } from '../helpers/app.js';
 import { DOMAIN, T0, buyBody, postBuy, readyToBuy } from '../helpers/buy.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';

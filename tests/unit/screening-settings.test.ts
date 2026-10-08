@@ -1,7 +1,7 @@
 // CAP-00 settings schema: cross-field validation happens when a draft is made, never mid-run (plan Review Focus 3).
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../../src/http/errors.js';
-import { DEFAULT_SELECTION_VALUES as D, SelectionValues, applySet, deepEqual, type SelectionValuesT } from '../../src/screening/settings.js';
+import { DEFAULT_SELECTION_VALUES as D, SelectionValues, applySet, deepEqual, type SelectionValuesT } from '../../src/modules/selection/settings.js';
 
 const clone = (): SelectionValuesT => JSON.parse(JSON.stringify(D));
 const issues = (v: unknown) => {

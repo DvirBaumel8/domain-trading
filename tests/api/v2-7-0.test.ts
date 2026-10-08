@@ -2,10 +2,10 @@
 import { http } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapLookup, RdapLookupFn } from '../../src/rdap.js';
-import { HOST_BREAKER_REFUSALS, Pacer, TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS, lookupCached, pacerFor, prefetchStored } from '../../src/screening/rdap-batch.js';
-import { siblingsBt1 } from '../../src/screening/siblings.js';
-import type { ScreeningDeps } from '../../src/screening/types.js';
+import type { RdapLookup, RdapLookupFn } from '../../src/core/rdap.js';
+import { HOST_BREAKER_REFUSALS, Pacer, TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS, lookupCached, pacerFor, prefetchStored } from '../../src/modules/selection/rdap-batch.js';
+import { siblingsBt1 } from '../../src/modules/selection/siblings.js';
+import type { ScreeningDeps } from '../../src/modules/selection/types.js';
 import { testDb as db } from '../helpers/db.js';
 import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { fixture, respond } from '../helpers/screening-fixtures.js';

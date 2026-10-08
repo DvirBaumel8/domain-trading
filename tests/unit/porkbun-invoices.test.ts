@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { PorkbunAdapter, redactInvoice } from '../../src/registrars/porkbun.js';
+import { PorkbunAdapter, redactInvoice } from '../../src/modules/registrars/porkbun.js';
 import { mswServer } from '../setup/network.js';
 import { FAKE_KEYS, PORKBUN_BASE, pbError, record, recorded } from '../helpers/porkbun-msw.js';
 

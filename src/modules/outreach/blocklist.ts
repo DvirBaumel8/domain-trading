@@ -10,7 +10,7 @@ export interface BlockOpts { secretValues?: readonly string[] }
 /** A configured secret shorter than this is ignored (a short value would match ordinary words). */
 export const MIN_SECRET_LENGTH = 8;
 
-// A DOM bearer token: `dt_` + 32 random bytes in base64url (43 characters), see src/auth/tokens.ts.
+// A DOM bearer token: `dt_` + 32 random bytes in base64url (43 characters), see src/core/tokens.ts.
 const DOM_TOKEN = /(?<![A-Za-z0-9])dt_[A-Za-z0-9_-]{40,}/;
 // Common key shapes (CR-013 F-4, listed in the contract): Porkbun pk1_/sk1_, Google AIza, GitHub ghp_ and github_pat_, OpenAI/Anthropic sk- (sk-proj-, sk-ant-),
 // Slack xoxb-/xoxp-/xoxa-/xapp-, AWS AKIA + 16, Render rnd_, and a JWT (three base64url parts, the first starting eyJ).

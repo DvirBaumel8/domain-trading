@@ -7,10 +7,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { addOneYear, idtDay as jerusalemDate } from '../../src/core/dates.js';
 import { http, HttpResponse } from 'msw';
-import { importDomain, type ImportInput } from '../../src/admin/import-domain.js';
-import { GoDaddyAdapter } from '../../src/registrars/godaddy.js';
-import { RegistrarError, type RegistrarAdapter } from '../../src/registrars/types.js';
-import { spentAndPending } from '../../src/services/budget.js';
+import { importDomain, type ImportInput } from '../../src/modules/ops/admin/import-domain.js';
+import { GoDaddyAdapter } from '../../src/modules/registrars/godaddy.js';
+import { RegistrarError, type RegistrarAdapter } from '../../src/modules/registrars/types.js';
+import { spentAndPending } from '../../src/modules/buying/budget.js';
 import { makeApp } from '../helpers/app.js';
 import { COMPS, buyBody, postBuy, seedOwnedDomains, seedSpent, T0 } from '../helpers/buy.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
@@ -305,11 +305,11 @@ describe('admin import-domain', () => {
       '--deal', 'D-001', '--category', 'trend', '--listing-mode', 'hybrid', '--bin', '1995', '--floor', '1295', '--walkaway', '950',
       '--pricing-exception', 'Dvir approved 2026-10-05 00:39 IDT', '--comps-file', compsFile,
       '--approval-text', 'Approve the prices, but wait for the software to list it', '--approval-at', '2026-10-05T00:39:00+03:00', '--manual', '--expiry', expiry, '--dry-run'];
-    const { stdout } = await run('npx', ['tsx', 'src/admin.ts', 'import-domain', ...args], { env: { ...process.env, ...testEnv() } });
+    const { stdout } = await run('npx', ['tsx', 'src/modules/ops/admin.ts', 'import-domain', ...args], { env: { ...process.env, ...testEnv() } });
     const j = JSON.parse(stdout);
     expect(j).toMatchObject({ dry_run: true, domain: D, status: 'listed', drop_date: addOneYear(expiry) });
     for (const secret of ['pk1_', 'sk1_', 'fake_godaddy_pat', 'github_pat_fake']) expect(stdout).not.toContain(secret);
     expect(await count('domains')).toBe(0);
-    await expect(run('npx', ['tsx', 'src/admin.ts', 'import-domain', '--domain', D], { env: { ...process.env, ...testEnv() } })).rejects.toMatchObject({ code: 2 });
+    await expect(run('npx', ['tsx', 'src/modules/ops/admin.ts', 'import-domain', '--domain', D], { env: { ...process.env, ...testEnv() } })).rejects.toMatchObject({ code: 2 });
   });
 });

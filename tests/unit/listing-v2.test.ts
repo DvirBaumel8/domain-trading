@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkSettingsVersion, validateComps, validateListing, type ListingContext, type ListingRequest } from '../../src/services/listing-v2.js';
+import { checkSettingsVersion, validateComps, validateListing, type ListingContext, type ListingRequest } from '../../src/modules/listing/listing-v2.js';
 import { V2 } from '../helpers/pricing.js';
 
 const ctx = (o: Partial<ListingContext> = {}): ListingContext => ({

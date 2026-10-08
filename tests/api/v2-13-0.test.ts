@@ -2,9 +2,9 @@
 import { http } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { RdapLookup, RdapLookupFn } from '../../src/rdap.js';
-import { siblingsBt1 } from '../../src/screening/siblings.js';
-import { splitV2OfDomain } from '../../src/screening/split-v2.js';
+import type { RdapLookup, RdapLookupFn } from '../../src/core/rdap.js';
+import { siblingsBt1 } from '../../src/modules/selection/siblings.js';
+import { splitV2OfDomain } from '../../src/modules/selection/split-v2.js';
 import { enableWayback, patchActiveSettings, putBrandLists, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { testDb as db } from '../helpers/db.js';
 import { fixture, respond } from '../helpers/screening-fixtures.js';

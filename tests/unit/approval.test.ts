@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkApproval } from '../../src/services/approval.js';
+import { checkApproval } from '../../src/core/approval.js';
 
 const D = 'examplecityroofing.com';
 const now = new Date('2026-10-05T09:00:00Z');

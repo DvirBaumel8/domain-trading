@@ -4,7 +4,7 @@ import { gzipSync } from 'node:zlib';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { POPULARITY_URL, latestPopularity } from '../../src/screening/popularity.js';
+import { POPULARITY_URL, latestPopularity } from '../../src/modules/selection/popularity.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { makeApp } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';

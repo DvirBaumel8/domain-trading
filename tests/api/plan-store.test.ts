@@ -1,11 +1,11 @@
 import { sql } from 'kysely';
 import { describe, expect, it } from 'vitest';
-import { buildSchedule } from '../../src/pricing/schedule.js';
-import { currentSettings } from '../../src/pricing/settings.js';
-import { validateListing, type ListingPlan, type ListingRequest } from '../../src/services/listing-v2.js';
-import { domainPlanColumns, historyRow, newPlanId, writePlan } from '../../src/services/plan-store.js';
+import { buildSchedule } from '../../src/modules/listing/pricing/schedule.js';
+import { currentSettings } from '../../src/modules/listing/pricing/settings.js';
+import { validateListing, type ListingPlan, type ListingRequest } from '../../src/modules/listing/listing-v2.js';
+import { domainPlanColumns, historyRow, newPlanId, writePlan } from '../../src/modules/listing/plan-store.js';
 import { withDomainLock } from '../../src/core/locks.js';
-import { planView } from '../../src/services/plan-view.js';
+import { planView } from '../../src/modules/listing/plan-view.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 
 const NOW = new Date('2026-10-12T09:00:00Z');

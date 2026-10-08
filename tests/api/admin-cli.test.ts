@@ -6,7 +6,7 @@ import { testEnv } from '../helpers/env.js';
 
 const run = promisify(execFile);
 const cli = (args: string[]) =>
-  run('npx', ['tsx', 'src/admin.ts', ...args], { env: { ...process.env, ...testEnv() } });
+  run('npx', ['tsx', 'src/modules/ops/admin.ts', ...args], { env: { ...process.env, ...testEnv() } });
 
 describe('admin CLI', () => {
   it('token create prints the token once and stores only its hash', async () => {

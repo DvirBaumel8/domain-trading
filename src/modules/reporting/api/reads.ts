@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { Database, DomainStatus, LedgerType } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
 import { AppError } from '../../../http/errors.js';
-import { toCsv } from '../../../services/export.js';
+import { toCsv } from '../../listing/index.js';
 import { auditRows, dealView, ledgerCsvRows, ledgerJson, ledgerRows, portfolioDetail, portfolioRows } from '../report/portfolio.js';
 
 const STATUSES: readonly DomainStatus[] = ['owned', 'listed', 'delisted', 'sold', 'dropped'];

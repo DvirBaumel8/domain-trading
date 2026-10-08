@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { newPricingSettings } from '../../src/admin/pricing-settings.js';
-import { currentSettings } from '../../src/pricing/settings.js';
+import { newPricingSettings } from '../../src/modules/ops/admin/pricing-settings.js';
+import { currentSettings } from '../../src/modules/listing/pricing/settings.js';
 import { testDb as db } from '../helpers/db.js';
 import { testEnv } from '../helpers/env.js';
 import { makeApp } from '../helpers/app.js';
@@ -89,19 +89,19 @@ describe('pricing-settings admin (PR-31, PR-32)', () => {
 
   it('CLI: new + show work; missing --approval-text exits non-zero; output has no secret', async () => {
     const env = { ...process.env, ...testEnv() };
-    await expect(run('npx', ['tsx', 'src/admin.ts', 'pricing-settings', 'new', '--from-current', '--set', 'floor_bps=6000'], { env })).rejects.toMatchObject({ code: 2 });
-    const ok = await run('npx', ['tsx', 'src/admin.ts', 'pricing-settings', 'new', '--from-current', '--set', 'floor_bps=6000',
+    await expect(run('npx', ['tsx', 'src/modules/ops/admin.ts', 'pricing-settings', 'new', '--from-current', '--set', 'floor_bps=6000'], { env })).rejects.toMatchObject({ code: 2 });
+    const ok = await run('npx', ['tsx', 'src/modules/ops/admin.ts', 'pricing-settings', 'new', '--from-current', '--set', 'floor_bps=6000',
       '--approval-text', 'Dvir: 60%', '--approval-at', hourAgo], { env });
     expect(ok.stdout).toMatch(/version 3/);
-    const show = await run('npx', ['tsx', 'src/admin.ts', 'pricing-settings', 'show'], { env });
+    const show = await run('npx', ['tsx', 'src/modules/ops/admin.ts', 'pricing-settings', 'show'], { env });
     expect(show.stdout).toMatch(/"floor_bps": 6000/);
     expect(show.stdout).not.toMatch(/pk1_|sk1_/);
   });
 
   it('CLI: --from-current is optional; no --set exits 2', async () => {
     const env = { ...process.env, ...testEnv() };
-    await expect(run('npx', ['tsx', 'src/admin.ts', 'pricing-settings', 'new', '--approval-text', 'x', '--approval-at', hourAgo], { env })).rejects.toMatchObject({ code: 2 });
-    const ok = await run('npx', ['tsx', 'src/admin.ts', 'pricing-settings', 'new', '--set', 'floor_bps=6000', '--approval-text', 'Dvir: 60%', '--approval-at', hourAgo], { env });
+    await expect(run('npx', ['tsx', 'src/modules/ops/admin.ts', 'pricing-settings', 'new', '--approval-text', 'x', '--approval-at', hourAgo], { env })).rejects.toMatchObject({ code: 2 });
+    const ok = await run('npx', ['tsx', 'src/modules/ops/admin.ts', 'pricing-settings', 'new', '--set', 'floor_bps=6000', '--approval-text', 'Dvir: 60%', '--approval-at', hourAgo], { env });
     expect(ok.stdout).toMatch(/version 3/);
   });
 

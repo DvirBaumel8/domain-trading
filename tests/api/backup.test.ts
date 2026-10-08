@@ -8,10 +8,10 @@ import { promisify } from 'node:util';
 import { sql } from 'kysely';
 import { http, HttpResponse } from 'msw';
 import type { FastifyInstance } from 'fastify';
-import { BackupExporter, collectBackupFiles, gitBlobSha } from '../../src/jobs/backup-export.js';
-import { importBackup } from '../../src/jobs/backup-import.js';
+import { BackupExporter, collectBackupFiles, gitBlobSha } from '../../src/modules/ops/jobs/backup-export.js';
+import { importBackup } from '../../src/modules/ops/jobs/backup-import.js';
 import { newAuditId } from '../../src/http/audit.js';
-import { readEvidence, storeEvidence } from '../../src/screening/evidence.js';
+import { readEvidence, storeEvidence } from '../../src/modules/selection/evidence.js';
 import { loadConfig } from '../../src/config.js';
 import { buildReport } from '../../src/modules/reporting/report/index.js';
 import { makeApp } from '../helpers/app.js';
@@ -348,7 +348,7 @@ describe('BK-4 missing token', () => {
 
   it('the job CLI exits 0 with a warning and {skipped:true}', async () => {
     const run = promisify(execFile);
-    const { stdout, stderr } = await run('npx', ['tsx', 'src/job.ts', 'export-backup'], {
+    const { stdout, stderr } = await run('npx', ['tsx', 'src/modules/ops/job.ts', 'export-backup'], {
       env: { ...process.env, ...testEnv({ GITHUB_BACKUP_TOKEN: '', GITHUB_BACKUP_REPO: '' }) },
     });
     expect(JSON.parse(stdout)).toMatchObject({ skipped: true });

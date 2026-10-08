@@ -77,7 +77,7 @@ describe('contract: routes', () => {
 
 describe('contract: codes', () => {
   /** Admin and job CLIs are DOM-internal (docs/internal/cli.md), not the API. */
-  const CLI_ONLY = ['src/admin', 'src/admin.ts', 'src/job.ts', 'src/jobs/backup-import.ts'];
+  const CLI_ONLY = ['src/modules/ops/admin', 'src/modules/ops/admin.ts', 'src/modules/ops/job.ts', 'src/modules/ops/jobs/backup-import.ts'];
   /** UPPER_SNAKE literals in src that are not codes the API emits. */
   const NOT_CODES = new Set([
     'FST_ERR_VALIDATION', // Fastify's internal code; answered as VALIDATION_ERROR

@@ -3,8 +3,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { PorkbunAdapter } from '../../src/registrars/porkbun.js';
-import { RegistrarError, type RegisterSuccess } from '../../src/registrars/types.js';
+import { PorkbunAdapter } from '../../src/modules/registrars/porkbun.js';
+import { RegistrarError, type RegisterSuccess } from '../../src/modules/registrars/types.js';
 import { logCapture, makeApp } from '../helpers/app.js';
 import { COMPS } from '../helpers/buy.js';
 import { resetDb, testDb as db } from '../helpers/db.js';

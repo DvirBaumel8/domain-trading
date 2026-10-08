@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import type { FastifyInstance } from 'fastify';
 import { loadConfig } from '../../src/config.js';
-import { WEB_RISK_MONTHLY_CAP } from '../../src/screening/web-risk.js';
+import { WEB_RISK_MONTHLY_CAP } from '../../src/modules/selection/web-risk.js';
 import { testDb as db } from '../helpers/db.js';
 import { testEnv } from '../helpers/env.js';
 import { screeningHarness } from '../helpers/screening.js';

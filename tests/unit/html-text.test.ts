@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeEntities, metaRefreshTarget, ogSiteName, titleOf, visibleText } from '../../src/screening/html-text.js';
+import { decodeEntities, metaRefreshTarget, ogSiteName, titleOf, visibleText } from '../../src/modules/selection/html-text.js';
 
 describe('visibleText', () => {
   it('drops script, style, noscript, template and comments; keeps the words', () => {

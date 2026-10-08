@@ -3,10 +3,10 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { GATE_OF } from '../../src/screening/checks/index.js';
-import { planFor } from '../../src/screening/engine.js';
-import { outcome } from '../../src/screening/types.js';
-import { currentLists } from '../../src/screening/lists.js';
+import { GATE_OF } from '../../src/modules/selection/checks/index.js';
+import { planFor } from '../../src/modules/selection/engine.js';
+import { outcome } from '../../src/modules/selection/types.js';
+import { currentLists } from '../../src/modules/selection/lists.js';
 import { testDb as db } from '../helpers/db.js';
 import { putBrandLists, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 

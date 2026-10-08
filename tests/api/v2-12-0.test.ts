@@ -567,7 +567,7 @@ describe('config and backup', () => {
     await t.post('/posts/burst', { day: '2026-10-20', cap: 2 });
     await t.post('/posts/pause', { paused: false });
     await t.post('/posts', { text: 'exported', images: [img(png(), 'alt for export')] });
-    const { collectBackupFiles } = await import('../../src/jobs/backup-export.js');
+    const { collectBackupFiles } = await import('../../src/modules/ops/jobs/backup-export.js');
     const files = await collectBackupFiles(db);
     const posts = JSON.parse(files.get('backup/tables/posts.json')!) as { text: string }[];
     const images = JSON.parse(files.get('backup/tables/post_images.json')!) as Record<string, unknown>[];
