@@ -53,7 +53,7 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
   app.post('/posts/schema-check', async (req) => {
     const r = await postSchemaCheck(deps);
     req.auditSummary = r.ok ? 'schema ok' : `schema: ${r.problems.length} problem(s)`;
-    return { ok: r.ok, problems: r.problems, checked_types: r.checked_types };
+    return { ok: r.ok, problems: r.problems, checked_types: r.checked_types, types: r.types };
   });
 
   app.get('/posts', async (req) => {

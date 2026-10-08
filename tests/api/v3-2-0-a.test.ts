@@ -92,12 +92,13 @@ describe('T17-1 the createPost input follows Buffer\'s reference', () => {
 });
 
 describe('T17-2 POST /posts/schema-check', () => {
-  it('T17-2 ok against the reference types: read-only introspection only, no create, audited, Idempotency-Key required', async () => {
+  it('T17-2 T17-2b ok against the reference types (and returns the types): read-only introspection only, no create, audited, Idempotency-Key required', async () => {
     bufferMock();
     const t = await boot();
     const r = await t.post('/posts/schema-check');
     expect(r.statusCode, r.body).toBe(200);
     expect(r.json()).toMatchObject({ ok: true, problems: [], checked_types: expect.arrayContaining(['CreatePostInput', 'AssetInput', 'ImageAssetInput', 'TwitterPostMetadataInput', 'ThreadedPostInput']) });
+    expect(r.json().types.CreatePostInput).toMatchObject({ kind: 'input_object', fields: expect.objectContaining({ text: 'String!' }) }); // T17-2b (3.2.1): Buffer's definitions are returned
     expect(new Set(ops())).toEqual(new Set(['schema']));
     const audit = await db.selectFrom('audit_log').selectAll().where('path', '=', '/posts/schema-check').executeTakeFirstOrThrow();
     expect(audit).toMatchObject({ status_code: 200 });

@@ -66,7 +66,8 @@ fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofT
 
 export interface TypeRef { kind: string; name: string | null; ofType?: TypeRef | null }
 export interface IntroType { name: string; kind: string; inputFields?: { name: string; type: TypeRef }[] | null; enumValues?: { name: string }[] | null }
-export interface SchemaCheck { ok: boolean; problems: string[]; checked_types: string[] }
+export interface TypeDef { kind: string; fields?: Record<string, string>; values?: string[] }
+export interface SchemaCheck { ok: boolean; problems: string[]; checked_types: string[]; types: Record<string, TypeDef> }
 
 type Gql = { data?: Record<string, any> | null; errors?: { message?: unknown }[] };
 
@@ -89,6 +90,10 @@ export const SAMPLE_INPUT = buildCreateInput(
   { text: 'sample', images: [{ url: 'https://example.invalid/media/sample', altText: 'sample' }] },
   [{ text: 'sample part', images: [{ url: 'https://example.invalid/media/sample', altText: 'sample' }] }],
 );
+
+const SCHEMA_TYPES_MAX = 25;
+const BUILTIN_SCALARS = new Set(['String', 'Boolean', 'Int', 'Float', 'ID']);
+const baseName = (t: TypeRef | null | undefined): string | null => (!t ? null : t.ofType ? baseName(t.ofType) : t.name);
 
 /** GraphQL's __TypeKind, lower-cased (so the kind names are not mistaken for API error codes). */
 const kindOf = (t: TypeRef): string => t.kind.toLowerCase();
@@ -218,8 +223,23 @@ export class BufferClient {
     for (const n of SCHEMA_CHECK_TYPES) {
       if (!(await load(n))) problems.push(`Buffer has no type ${n}`);
     }
+    // v3.2.1: Buffer's own definitions of every input type reachable from CreatePostInput (names and types only), so a mismatch can be fixed from the answer.
+    const types: Record<string, TypeDef> = {};
+    const queue = ['CreatePostInput'];
+    while (queue.length > 0 && Object.keys(types).length < SCHEMA_TYPES_MAX) {
+      const n = queue.shift()!;
+      if (types[n]) continue;
+      const t = await load(n);
+      if (!t) continue;
+      const kind = t.kind.toLowerCase();
+      if (t.inputFields) {
+        types[n] = { kind, fields: Object.fromEntries(t.inputFields.map((f) => [f.name, typeText(f.type)])) };
+        for (const f of t.inputFields) { const base = baseName(f.type); if (base && !BUILTIN_SCALARS.has(base) && !types[base]) queue.push(base); }
+      } else if (t.enumValues) types[n] = { kind, values: t.enumValues.map((v) => v.name) };
+      else types[n] = { kind };
+    }
     if (problems.length > 0) this.types.clear(); // a mismatch is never kept: the next check asks Buffer again
-    return { ok: problems.length === 0, problems: [...new Set(problems)], checked_types: checked };
+    return { ok: problems.length === 0, problems: [...new Set(problems)], checked_types: checked, types };
   }
 
   /** Publishes now (shareNow). `thread` = the later parts of a thread, in order. */

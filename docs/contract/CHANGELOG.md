@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.2.1 (2026-10-09): schema check returns Buffer's types
+PATCH, additive. `POST /posts/schema-check` adds `types` (Buffer's live input definitions). The live check on 3.2.0 showed Buffer's live API differs from its published reference (`mode`, `schedulingType` and `needsApproval` are required; `ImageAssetInput` has no `altText`); 3.2.2 fixes the input from these definitions. Release note: `docs/releases/v3.2.1.md`.
+
 ## 3.2.0 (2026-10-08): CR-017, CR-018, CR-019 part C, CR-020
 MINOR, **additive** (except: `summary.partial` narrowed to its documented meaning, and pending-delete names leave `failed_by_check.availability`). Release note: `docs/releases/v3.2.0.md`.
 - **Posting (CR-017):**
