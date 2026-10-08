@@ -5,7 +5,7 @@ import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
 import { addDays, idtDay } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
-import { namesDroppingBetween } from './drop-lists.js';
+import { leftoverNames, namesDroppingBetween } from './drop-lists.js';
 import { formatUsd } from '../../core/money.js';
 import { priceFormula } from '../listing/index.js';
 import { currentSettings } from '../listing/index.js';
@@ -13,8 +13,9 @@ import { buyBlocks } from '../buying/index.js';
 import { latestByCheck } from '../selection/index.js';
 import { RECORD_FRESH_DAYS, RECORD_KINDS, isFresh, freshDomainRecord, type RecordKind } from '../selection/index.js';
 import { assemble, effectiveHold, fullPlanRunOrThrow, loadRows, type ScreeningWorker } from '../selection/index.js';
+import { advisoryXactLock } from '../../core/locks.js';
 import { OWNED_STATUSES } from './intake.js';
-import { activeSelectionSettings } from '../selection/index.js';
+import { activeSelectionSettings, laneFitter } from '../selection/index.js';
 import type { CheckId, Lane, ResultRow, RunItem } from '../selection/index.js';
 
 export const DAILY_LIST_DEFAULT_LIMIT = 10;
@@ -36,6 +37,54 @@ export interface DailyEntry extends Json {
   changed_since_first?: { reason: string; changes: string[] };
 }
 export interface DailyList { day: string; entries: DailyEntry[]; sections: { almost_ready: Json[]; upcoming: Json[]; removed_since_first?: Json[] }; summary: Json }
+
+/** The most names `summary.dropping` lists (the count `dropping_n` is always the whole number). */
+export const DROPPING_LIST_MAX = 50;
+const CHECK_LABEL: Record<string, string> = {
+  form: 'name form', quote: 'price quote', price: 'price check', history: 'history check', tier: 'demand check', web_risk: 'web-risk check', surbl: 'blocklist check',
+  same_name: 'same-name check', tm_us: 'US trademark check', tm_eu: 'EU trademark check', typo: 'typo check', census: 'census check', ext_dates: 'other-extension check',
+};
+const names = (n: number) => `${n} ${n === 1 ? 'name' : 'names'}`;
+const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
+
+/**
+ * v3.2.0 (CR-018 B): one plain sentence group from the summary facts, rebuilt with every build or rebuild (never a stored string): what was screened, what failed and why,
+ * what timed out, what waits for records, what is still dropping, what fits no kept lane, what passed, what waits for tomorrow, and whether screening is still running.
+ */
+export function buildWhy(sm: Json): string {
+  const screened = num(sm.screened_today);
+  const passed = num(sm.candidates_n);
+  const failed = (sm.failed_by_check ?? {}) as Record<string, number>;
+  const unknown = (sm.unknown_by_reason ?? {}) as Record<string, number>;
+  const out: string[] = [];
+  if (screened === 0) {
+    out.push('No names were screened today.');
+  } else {
+    const bits: string[] = [];
+    if (failed.availability) bits.push(`${failed.availability} already taken`);
+    for (const [check, n] of Object.entries(failed)) if (check !== 'availability' && n > 0) bits.push(`${n} failed the ${CHECK_LABEL[check] ?? `${check} check`}`);
+    const timedOut = unknown.TIMEOUT ?? 0;
+    if (timedOut > 0) bits.push(`${timedOut} timed out`);
+    const manual = Object.entries(unknown).filter(([k]) => k.startsWith('MANUAL_REQUIRED')).reduce((a, [, n]) => a + n, 0);
+    const other = Object.entries(unknown).filter(([k]) => k !== 'TIMEOUT' && !k.startsWith('MANUAL_REQUIRED')).reduce((a, [, n]) => a + n, 0);
+    if (other > 0) bits.push(`${other} could not be checked`);
+    if (manual > 0) bits.push(`${manual} need a manual check`);
+    bits.push(`${passed} passed`);
+    out.push(`Screened ${names(screened)} today: ${bits.join(', ')}.`);
+  }
+  if (num(sm.scout_screened_n) === 0 && num(sm.queued_waiting_n) === 0) {
+    out.push(num(sm.drop_list_screened_n) > 0 ? 'No scout names came in, so only drop-list names were screened.' : 'Intake was empty: no scout names were waiting.');
+  }
+  if (num(sm.waiting_for_records) > 0) out.push(`${names(num(sm.waiting_for_records))} wait for records.`);
+  if (num(sm.dropping_n) > 0) out.push(`${names(num(sm.dropping_n))} on the drop lists ${num(sm.dropping_n) === 1 ? 'is' : 'are'} still dropping and will be screened only if free after the drop.`);
+  if (num(sm.no_kept_lane_n) > 0) out.push(`${names(num(sm.no_kept_lane_n))} from the drop lists ${num(sm.no_kept_lane_n) === 1 ? 'was' : 'were'} skipped because ${num(sm.no_kept_lane_n) === 1 ? 'it fits' : 'they fit'} no kept lane.`);
+  const retry = (sm.timeout_retry ?? {}) as Record<string, number>;
+  if (num(retry.resolved) > 0) out.push(`${num(retry.resolved)} ${num(retry.resolved) === 1 ? 'lookup' : 'lookups'} that timed out cleared on a retry.`);
+  if (num(sm.left_for_tomorrow_n) > 0) out.push(`${num(sm.left_for_tomorrow_n)} more wait for tomorrow.`);
+  if (sm.partial === true) out.push('Screening is still running, so this may change.');
+  else if (sm.screening_ended_partial === true) out.push('The screening run ran out of time before every name was checked.');
+  return out.join(' ');
+}
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 
@@ -102,7 +151,7 @@ async function collectPool(db: Kysely<Database>, nowMs: number): Promise<{ pool:
   return { pool, hold: sel.values.buy_hold, values: sel.values, label: sel.label };
 }
 
-export async function buildDailyList(deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number; waitMs?: number; noWait?: boolean; builtBy?: 'daily' | 'rebuild' }): Promise<{ id: string; day: string; entries_n: number; almost_ready_n: number; upcoming_n: number; partial: boolean; version: number }> {
+export async function buildDailyList(deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number; waitMs?: number; noWait?: boolean; builtBy?: 'daily' | 'rebuild' | 'auto' }): Promise<{ id: string; day: string; entries_n: number; almost_ready_n: number; upcoming_n: number; partial: boolean; version: number }> {
   const { db } = deps;
   const nowMs = deps.now();
   const today = idtDay(nowMs);
@@ -118,9 +167,20 @@ export async function buildDailyList(deps: { db: Kysely<Database>; worker: Scree
   // Sources: scouts (every intake row of the name that is not removed) and drop lists.
   const sources = new Map<string, Source[]>();
   const comps = new Map<string, unknown>();
+  const whoChases = new Map<string, string>();
   const firstReceived = new Map<string, number>();
+  // v3.2.0 (CR-019 C-4): where a screened name came from: the scout intake or a drop list (a name that came both ways counts as intake).
+  const origins = new Map<string, 'intake' | 'drop_list'>();
+  const poolRuns = [...new Set(pool.map((p) => p.run.id))];
+  if (poolRuns.length) {
+    for (const r of await db.selectFrom('candidate_screenings').select(['run_id', 'domain', 'origin']).where('run_id', 'in', poolRuns).execute()) {
+      const k = `${r.run_id}|${r.domain}`;
+      if (origins.get(k) !== 'intake') origins.set(k, r.origin);
+    }
+  }
   if (domains.length) {
     for (const r of await db.selectFrom('candidate_intake').selectAll().where('domain', 'in', domains).where('status', 'in', ['queued', 'duplicate']).orderBy('id').execute()) {
+      if (r.who_chases) whoChases.set(r.domain, r.who_chases); // the newest intake row that carries one
       (sources.get(r.domain) ?? sources.set(r.domain, []).get(r.domain)!).push({ source: r.source, received_at: r.received_at.toISOString(), token_name: r.token_name });
       if (!firstReceived.has(r.domain)) firstReceived.set(r.domain, r.received_at.getTime());
       if (r.comps) comps.set(r.domain, r.comps);
@@ -141,6 +201,7 @@ export async function buildDailyList(deps: { db: Kysely<Database>; worker: Scree
   const failed_by_check: Record<string, number> = {};
   const unknown_by_reason: Record<string, number> = {};
   let screenedToday = 0;
+  const retry = { timed_out_first: 0, resolved: 0, still_timeout: 0, tries: {} as Record<string, number> };
   const eligible: (DailyEntry & { _score: number; _ratio: number; _exact: boolean; _at: number })[] = [];
   const almost: Json[] = [];
   const upcoming: Json[] = [];
@@ -151,19 +212,33 @@ export async function buildDailyList(deps: { db: Kysely<Database>; worker: Scree
     const domain = p.item.domain;
     const latest = latestByCheck(p.rows);
     const createdToday = idtDay(p.run.created_at) === today;
-    if (createdToday) screenedToday++;
+    if (createdToday) {
+      screenedToday++;
+      // v3.2.0 (CR-019 C-2): a name whose availability lookup timed out is asked again at the end of the run; count what the retries settled.
+      const tries = p.rows.filter((r) => r.check_id === 'availability');
+      if (tries.some((r) => r.status === 'UNKNOWN' && r.reason_code === 'TIMEOUT')) {
+        const last = latest.get('availability');
+        const still = last?.status === 'UNKNOWN' && last.reason_code === 'TIMEOUT';
+        retry.timed_out_first++;
+        if (still) retry.still_timeout++; else retry.resolved++;
+        retry.tries[String(tries.length)] = (retry.tries[String(tries.length)] ?? 0) + 1;
+      }
+    }
     if (owned.has(domain)) continue;
     const gating = p.plan.filter((c) => !features.includes(c));
     const fs = p.derived.final_status;
     const drop = dropOf.get(domain);
     const base = {
       domain, lane: p.item.lane, run_id: p.run.id, settings_version: p.run.settings_label, sources: sources.get(domain) ?? [],
+      origin: origins.get(`${p.run.id}|${domain}`) ?? null, who_chases: whoChases.get(domain) ?? null,
     };
     const needRecords = async () => recordsFor(db, domain, latest, nowAfter);
 
     if (fs === 'rejected') {
       const ff = p.derived.first_fail!;
-      if (createdToday) failed_by_check[ff.check] = (failed_by_check[ff.check] ?? 0) + 1;
+      // v3.2.0 (CR-019 C-3): a name registered but in pending delete or redemption is "dropping on <date>", not taken.
+      const isDropping = ff.check === 'availability' && ff.reason_code === 'REGISTERED' && !!drop && ['pending_delete', 'redemption'].includes(drop.status);
+      if (createdToday && !isDropping) failed_by_check[ff.check] = (failed_by_check[ff.check] ?? 0) + 1;
       const otherFail = gating.filter((c) => latest.get(c)?.status === 'FAIL' && c !== 'availability');
       const badUnknown = gating.filter((c) => latest.get(c)?.status === 'UNKNOWN' && !NEEDS_AVAILABLE.includes(c));
       if (ff.check === 'availability' && ff.reason_code === 'REGISTERED' && drop && drop.expected_drop_date >= today && drop.expected_drop_date <= weekEnd && otherFail.length === 0 && badUnknown.length === 0) {
@@ -256,12 +331,41 @@ export async function buildDailyList(deps: { db: Kysely<Database>; worker: Scree
     return { domain: e.domain, was_rank: e.rank, reason };
   });
 
-  const partial = timedOut || pool.some((p) => p.run.status !== 'done' && idtDay(p.run.created_at) === today);
+  // v3.2.0 (CR-020 C): `partial` = a screening run of today was still running when the list was built (a rebuild reads it again); `screening_ended_partial` = a run of today
+  // ended `partial` (its time budget ran out; names left TIMEOUT). The two are different facts and never share a field.
+  const todayScreenings = await db.selectFrom('candidate_screenings as c').innerJoin('screening_runs as r', 'r.id', 'c.run_id').select(['c.run_id', 'r.status', 'c.origin', 'c.domain']).where('c.day', '=', today).execute();
+  const statusesToday = new Set([...todayScreenings.map((r) => r.status as string), ...pool.filter((p) => idtDay(p.run.created_at) === today).map((p) => p.run.status)]);
+  const partial = timedOut || statusesToday.has('running');
+  const screeningEndedPartial = statusesToday.has('partial');
+  const timeoutN = unknown_by_reason.TIMEOUT ?? 0;
   const waiting = new Set([...almost.map((a) => a.domain as string), ...upcoming.filter((u) => (u.missing_records as Missing[]).length > 0).map((u) => u.domain as string)]);
+
+  // Drop-list facts (CR-019 C-3/C-4, CR-020 A): names still dropping, leftovers (free after their drop date), and the leftovers that fit no kept lane.
+  const dropping = dropWindow.filter((d) => ['pending_delete', 'redemption'].includes(d.status) && d.expected_drop_date >= addDays(today, -7));
+  const fit = await laneFitter(db, values);
+  const leftAll = await leftoverNames(db, nowAfter, today);
+  const leftOwned = new Set<string>();
+  if (leftAll.length) for (const r of await db.selectFrom('domains').select('domain').where('status', 'in', [...OWNED_STATUSES]).where('domain', 'in', leftAll.map((l) => l.domain)).execute()) leftOwned.add(r.domain);
+  const leftovers = leftAll.filter((l) => !leftOwned.has(l.domain));
+  const noKeptLane = leftovers.filter((l) => fit(l.domain) === null).length;
+  const recentlyScreened = new Set((await db.selectFrom('candidate_screenings').select('domain').where('at', '>', new Date(nowAfter - 7 * 86_400_000)).execute()).map((r) => r.domain));
+  const queuedWaiting = Number((await sql<{ n: string }>`
+    select count(distinct i.domain)::text as n from candidate_intake i
+    where i.status = 'queued' and not exists (select 1 from candidate_screenings s where s.intake_id = i.id)
+      and not exists (select 1 from domains d where d.domain = i.domain and d.status in ('pending_purchase','owned','listed','delisted'))`.execute(db)).rows[0]!.n);
+  const leftForTomorrow = queuedWaiting + leftovers.filter((l) => fit(l.domain) !== null && !recentlyScreened.has(l.domain)).length;
+  const scoutScreened = new Set(todayScreenings.filter((r) => r.origin === 'intake').map((r) => r.domain)).size;
+  const dropScreened = new Set(todayScreenings.filter((r) => r.origin === 'drop_list').map((r) => r.domain)).size;
   const summary: Json = {
     screened_today: screenedToday, failed_by_check, waiting_for_records: waiting.size, unknown_by_reason, partial,
-    candidates_n: entries.length, almost_ready_n: almost.length, upcoming_n: upcoming.length, settings_version: label,
+    screening_ended_partial: screeningEndedPartial, timeout_n: timeoutN, timeout_retry: retry,
+    candidates_n: entries.length, almost_ready_n: almost.length, upcoming_n: upcoming.length,
+    dropping_n: dropping.length, dropping: dropping.slice(0, DROPPING_LIST_MAX).map((d) => ({ domain: d.domain, status: d.status, expected_drop_date: d.expected_drop_date, list_name: d.list_name })),
+    leftovers_n: leftovers.length, no_kept_lane_n: noKeptLane,
+    scout_screened_n: scoutScreened, drop_list_screened_n: dropScreened, queued_waiting_n: queuedWaiting, left_for_tomorrow_n: leftForTomorrow,
+    settings_version: label,
   };
+  summary.why = buildWhy(summary);
   const sections = { almost_ready: almost, upcoming, ...(first ? { removed_since_first: removed } : {}) };
   const row = await db.insertInto('daily_candidate_lists').values({
     day: today, built_at: new Date(nowAfter), entries: JSON.stringify(entries), sections: JSON.stringify(sections), summary: JSON.stringify(summary), built_by: deps.builtBy ?? 'daily',
@@ -296,4 +400,21 @@ export async function readDailyList(db: Kysely<Database>, day: string, limit: nu
     date: day, built_at: iso(row.built_at), version, limit, entries: (row.entries as DailyEntry[]).slice(0, limit), sections: row.sections, summary: row.summary,
     record_freshness_days: RECORD_FRESH_DAYS,
   };
+}
+
+/**
+ * v3.2.0 (CR-018 A): when the intake screening run of today ends, the day's list is rebuilt (the first order is kept, changes are marked; built_by `auto`, which does not count
+ * toward the manual rebuilds). Nothing happens for a run that is not today's intake run, or while the daily job's own `buildDailyList` step is still to come (it builds then).
+ * Returns whether a list was built.
+ */
+export async function autoRebuildDailyList(deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number }, runId: string): Promise<boolean> {
+  const { db } = deps;
+  const today = idtDay(deps.now());
+  if (!(await db.selectFrom('candidate_screenings').select('id').where('run_id', '=', runId).where('day', '=', today).limit(1).executeTakeFirst())) return false;
+  if (await db.selectFrom('job_steps').select('id').where('step', '=', 'buildDailyList').where('status', 'in', ['queued', 'running']).limit(1).executeTakeFirst()) return false;
+  await db.transaction().execute(async (trx) => {
+    await advisoryXactLock(trx, 'daily_rebuild');
+    await buildDailyList({ db, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'auto' });
+  });
+  return true;
 }

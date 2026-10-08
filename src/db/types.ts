@@ -458,6 +458,7 @@ export interface CandidateIntakeTable {
   audit_id: string | null;
   status: 'queued' | 'duplicate' | 'removed';
   reason: string | null;
+  who_chases: string | null;
 }
 export interface CandidateScreeningsTable {
   id: Generated<string>;
@@ -475,7 +476,7 @@ export interface DailyCandidateListsTable {
   entries: Json;
   sections: Json;
   summary: Json;
-  built_by: Generated<'daily' | 'rebuild'>;
+  built_by: Generated<'daily' | 'rebuild' | 'auto'>;
 }
 export interface DomainRecordsTable {
   id: Generated<string>;

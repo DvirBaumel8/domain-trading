@@ -112,14 +112,18 @@ export class TrancheService {
     const latest = latestByCheck(it.rows);
     const lane = it.item.lane;
     const pass = (s?: string) => s === 'PASS' || s === 'PASS_WITH_NOTE';
+    // v3.2.0 (CR-020 D): the main-lane set is a setting (`tranche.main_lanes`); its default is the v3.1.x rule (S7 with a clean expired-drop history, S3 passing DEMAND-2).
+    const rule = (await activeSelectionSettings(this.db)).values.tranche.main_lanes.find((m) => m.lane === lane);
     let mainLane = false;
-    if (lane === 'S7') {
+    if (rule?.require === 'none') {
+      mainLane = true;
+    } else if (rule?.require === 'clean_history') {
       const h = latest.get('history');
       // Only a passing history with an inferred expired_drop source lane counts; `fresh` and `unknown` do not. A manual record (CR-002
       // Amendment B5.4) also counts as FLAG_PRIOR_BUSINESS (a disclosed risk, not a rejection); its lane is expired_drop only when it says
       // the archive held captures (a capture year, or the flag itself).
       mainLane = !!h && (pass(h.status) || (h.status === 'FLAG' && h.fields.manual === true)) && h.fields.source_lane === 'expired_drop';
-    } else if (lane === 'S3') {
+    } else if (rule?.require === 'demand2') {
       mainLane = latest.get('tier')?.status === 'PASS';
     }
     return { lane, mainLane };

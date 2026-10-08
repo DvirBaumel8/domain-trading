@@ -99,11 +99,17 @@ export async function freshLookups(db: Kysely<Database>, deps: ScreeningDeps, no
 
 export interface WindowName { domain: string; list_name: string; status: string; expected_drop_date: string; drop_date_source: string | null; tokens: string[] | null }
 
-/** Kept names (lists within retention) whose latest check has an expected drop date in [from, to]; one row per domain (its latest check), by date then domain. */
+/**
+ * Kept names (lists within retention) whose last known expected drop date is in [from, to]; one row per domain, by date then domain. `status` is its latest check's;
+ * `expected_drop_date` is the date of the latest check that had one (v3.2.0, CR-019 C-4: a name asked again after its drop date answers free or registered with no date,
+ * and keeps the date it dropped on).
+ */
 export async function namesDroppingBetween(db: Kysely<Database>, nowMs: number, from: string, to: string): Promise<WindowName[]> {
   const r = await sql<WindowName>`
     select domain, list_name, status, expected_drop_date::text as expected_drop_date, drop_date_source, tokens from (
-      select distinct on (c.domain) c.domain, c.list_name, c.status, c.expected_drop_date, c.drop_date_source,
+      select distinct on (c.domain) c.domain, c.list_name, c.status,
+        (select k.expected_drop_date from drop_list_checks k where k.list_name = c.list_name and k.domain = c.domain and k.expected_drop_date is not null order by k.id desc limit 1) as expected_drop_date,
+        (select k.drop_date_source from drop_list_checks k where k.list_name = c.list_name and k.domain = c.domain and k.expected_drop_date is not null order by k.id desc limit 1) as drop_date_source,
         (select r.tokens from drop_list_rows r where r.list_name = c.list_name and r.domain = c.domain and r.kept order by r.id limit 1) as tokens
       from drop_list_checks c join drop_lists l on l.name = c.list_name
       where l.list_date >= ${retentionCutoff(nowMs)}::date
@@ -111,5 +117,28 @@ export async function namesDroppingBetween(db: Kysely<Database>, nowMs: number, 
       order by c.domain, c.id desc) x
     where expected_drop_date between ${from}::date and ${to}::date
     order by expected_drop_date, domain`.execute(db);
+  return r.rows;
+}
+
+/** v3.2.0 (CR-019 C-4): a drop-list name is re-checked daily from its expected drop date for this many days; one that the registry shows free in that time is a leftover. */
+export const LEFTOVER_RECHECK_DAYS = 7;
+
+/**
+ * v3.2.0 (CR-019 C-4): leftovers = kept names (lists within retention) whose latest registry check says `not_registered` and whose last known expected drop date
+ * (the date of the latest check that had one: the name was in pending delete or redemption) is within [today - 7, today]. `expected_drop_date` is that date.
+ * A name registered again after its drop has a later `registered` check and is not here (it is taken). One row per domain, oldest drop first.
+ */
+export async function leftoverNames(db: Kysely<Database>, nowMs: number, today: string): Promise<WindowName[]> {
+  const r = await sql<WindowName>`
+    select domain, list_name, status, last_expected::text as expected_drop_date, drop_date_source, tokens from (
+      select distinct on (c.domain) c.domain, c.list_name, c.status, c.drop_date_source,
+        (select k.expected_drop_date from drop_list_checks k where k.list_name = c.list_name and k.domain = c.domain and k.expected_drop_date is not null order by k.id desc limit 1) as last_expected,
+        (select r.tokens from drop_list_rows r where r.list_name = c.list_name and r.domain = c.domain and r.kept order by r.id limit 1) as tokens
+      from drop_list_checks c join drop_lists l on l.name = c.list_name
+      where l.list_date >= ${retentionCutoff(nowMs)}::date
+        and exists (select 1 from drop_list_rows r where r.list_name = c.list_name and r.domain = c.domain and r.kept)
+      order by c.domain, c.id desc) x
+    where status = 'not_registered' and last_expected between ${addDays(today, -LEFTOVER_RECHECK_DAYS)}::date and ${today}::date
+    order by last_expected, domain`.execute(db);
   return r.rows;
 }

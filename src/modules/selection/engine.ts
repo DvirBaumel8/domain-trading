@@ -25,6 +25,9 @@ const MAX_RECOMPUTE_PASSES = 5;
 /** R1b: how often a run writes its heartbeat (HEARTBEAT_STALE_MS is 120 s) and re-reads its status for a cancel from another process. Wall-clock, so a fake `now` does not stop them. */
 export const HEARTBEAT_EVERY_MS = 10_000;
 export const CANCEL_CHECK_EVERY_MS = 5_000;
+/** v3.2.0 (CR-019 C-2): an availability lookup that timed out is asked again at the end of the same run, this many more times, this far apart (inside the run's deadline). */
+export const AVAILABILITY_RETRIES = 2;
+export const AVAILABILITY_RETRY_GAP_MS = 30_000;
 
 export interface InputName {
   domain: string; lane: Lane; city?: string; state?: string; trade?: string; price_grade?: 'strong' | 'weaker';
@@ -285,6 +288,24 @@ export class ScreeningWorker {
     this.stopAfterResults = deps.stopAfterResults;
   }
 
+  private readonly finishedHooks: ((runId: string) => Promise<void>)[] = [];
+
+  /** v3.2.0 (CR-018 A): `fn` runs after a run of this process ends `done` or `partial` (the daily list is rebuilt this way). A throw is logged, never raised. */
+  onFinished(fn: (runId: string) => Promise<void>): void {
+    this.finishedHooks.push(fn);
+  }
+
+  private async notifyFinished(runId: string): Promise<void> {
+    if (this.finishedHooks.length === 0) return;
+    try {
+      const st = await this.deps.db.selectFrom('screening_runs').select('status').where('id', '=', runId).executeTakeFirst();
+      if (st?.status !== 'done' && st?.status !== 'partial') return;
+      for (const fn of this.finishedHooks) await fn(runId);
+    } catch (e) {
+      this.deps.log.error({ err: (e as Error).message, runId }, 'screening run finished hook failed');
+    }
+  }
+
   /** Starts the run in this process unless it is already running here. Returns at once. */
   kick(runId: string): void {
     if (this.active.has(runId)) return;
@@ -294,6 +315,7 @@ export class ScreeningWorker {
         // A run that keeps failing must still end: past its deadline it finishes partial with SOURCE_ERROR rows.
         await this.closeOut(runId, 'SOURCE_ERROR', String((e as Error).message ?? e).slice(0, 200), true).catch(() => {});
       })
+      .then(() => this.notifyFinished(runId))
       .finally(() => { if (this.active.get(runId) === p) this.active.delete(runId); this.lastHeartbeat.delete(runId); this.lastCancelCheck.delete(runId); if (this.active.size === 0) settleHostPacers(this.deps.screening.sleep); });
     this.active.set(runId, p);
   }
@@ -343,7 +365,7 @@ export class ScreeningWorker {
    * Running runs this process is not working on: past the deadline they are finalised (`partial`), else resumed when the
    * heartbeat is missing or older than HEARTBEAT_STALE_MS. Called by the daily job (and the tick). `finalized` lists only runs whose status changed.
    */
-  async resumeStalled(): Promise<{ resumed: string[]; finalized: string[] }> {
+  async resumeStalled(opts: { /** Process start: a run no one here works on is resumed whatever its heartbeat says (the process that wrote it is gone). */ atStart?: boolean } = {}): Promise<{ resumed: string[]; finalized: string[] }> {
     const now = this.deps.now();
     const rows = await this.deps.db.selectFrom('screening_runs').select(['id', 'deadline_at', 'heartbeat_at']).where('status', '=', 'running').execute();
     const resumed: string[] = [];
@@ -355,7 +377,7 @@ export class ScreeningWorker {
         await this.closeOut(r.id, 'TIMEOUT', 'The run ran out of its time budget before this check', true); // a no-op when execute already ended it
         const st = await this.deps.db.selectFrom('screening_runs').select('status').where('id', '=', r.id).executeTakeFirst();
         if (st && st.status !== 'running') finalized.push(r.id);
-      } else if (!r.heartbeat_at || now - r.heartbeat_at.getTime() > HEARTBEAT_STALE_MS) {
+      } else if (opts.atStart || !r.heartbeat_at || now - r.heartbeat_at.getTime() > HEARTBEAT_STALE_MS) {
         this.kick(r.id);
         resumed.push(r.id);
       }
@@ -519,6 +541,49 @@ export class ScreeningWorker {
       return false;
     };
 
+    /**
+     * v3.2.0 (CR-019 C-2): the names whose availability lookup timed out are asked again at the end of the pass, after all the other names, up to AVAILABILITY_RETRIES more
+     * times, AVAILABILITY_RETRY_GAP_MS apart, and only while the wait still fits inside the run's deadline. A retry appends a new availability row (its `inputs` {retry: n}
+     * makes it a new generation), so the checks that read availability become stale and the next pass recomputes them. True when a row was written (the pass runs again).
+     */
+    const retryTimeouts = async (): Promise<boolean> => {
+      const check = this.checks.availability;
+      if (!check) return false;
+      const tries = new Map<number, number>();
+      for (const r of await loadRows(db, runId)) if (r.check_id === 'availability') tries.set(r.item_idx, (tries.get(r.item_idx) ?? 0) + 1);
+      const timedOut = (it: RunItem) => {
+        const r = latestOf(it.idx).get('availability');
+        return !it.input_error && (plan[it.lane] ?? []).includes('availability') && r?.status === 'UNKNOWN' && r.reason_code === 'TIMEOUT' && r.source !== 'manual' && (tries.get(it.idx) ?? 0) < 1 + AVAILABILITY_RETRIES;
+      };
+      let wrote = false;
+      for (;;) {
+        const open = order.filter(timedOut);
+        if (open.length === 0) return wrote;
+        if (await this.cancelledNow(runId)) return wrote;
+        if (this.deps.now() + AVAILABILITY_RETRY_GAP_MS >= deadline) return wrote;
+        await this.deps.screening.sleep(AVAILABILITY_RETRY_GAP_MS);
+        for (const it of open) {
+          if (await this.cancelledNow(runId)) return wrote;
+          if (this.deps.now() >= deadline) return wrote;
+          const n = tries.get(it.idx) ?? 0;
+          tries.set(it.idx, n + 1);
+          const snap = new Map(latestOf(it.idx));
+          const t0 = this.deps.now();
+          let o: CheckOutcome;
+          try {
+            o = await check.run({
+              db, run: runView, item: it, settings: values, settingsLabel: run.settings_label, latest: (c) => snap.get(c),
+              ahead: () => [], lists, lexicon, deps: this.deps.screening, now: this.deps.now, deadline, shared, isCancelled: () => this.cancelledHere.has(runId),
+            });
+          } catch (e) {
+            o = outcome('UNKNOWN', 'SOURCE_ERROR', String((e as Error).message ?? e).slice(0, 200));
+          }
+          if (this.cancelledHere.has(runId)) return wrote;
+          if (await write(it, 'availability', o, { source: 'auto', durationMs: this.deps.now() - t0, checkedAt: new Date(t0), listVersions: {}, inputs: { retry: n } })) wrote = true;
+        }
+      }
+    };
+
     const merged = [...new Set(Object.values(plan).flat() as CheckId[])]; // lane lists agree on order (checked when the settings are drafted)
     // After the run ends, a manual record that landed meanwhile (a history record posted while this worker was finishing) may have staled
     // a row: the run is then reopened here too, so no record is missed whichever side commits first. Bounded; each pass only appends.
@@ -560,6 +625,8 @@ export class ScreeningWorker {
         if (wrote && stopNow()) return;
       }
     }
+    if (await retryTimeouts()) { await load(); continue; } // a retry wrote a row: the next pass recomputes what read the old one
+    if (this.cancelledHere.has(runId)) return;
     if (!(await this.finalize(run, 'done'))) return;
     const fresh = await loadRows(db, runId);
     if (!recomputePending(items, plan, fresh, features, run.mode === 'live')) return;

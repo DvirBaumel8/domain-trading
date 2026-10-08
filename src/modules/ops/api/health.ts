@@ -61,11 +61,28 @@ async function reviewModel(db: Kysely<Database>): Promise<string | null> {
   }
 }
 
-/** Google's short status and reason from the latest gemini feedback (e.g. `HTTP 503 UNAVAILABLE: ...`), at most 120 characters. The reason was scrubbed of the key when it was stored. */
+/** v3.2.0 (N-4): `CODE: text` from the latest gemini feedback, CODE = Google's error status (UNAVAILABLE) or `HTTP <n>`; at most 200 characters, cut at a word with an ellipsis; never the key. */
+export const REVIEW_REASON_MAX = 200;
+export function shapeReviewReason(raw: string, secrets: string[]): string {
+  const clean = scrubSecrets(raw, secrets).replace(/\s+/g, ' ').trim();
+  // Stored form is `HTTP 503 UNAVAILABLE: text` (or `HTTP 429: text`, or free text).
+  const m = /^HTTP (\d{3}|none) ([A-Za-z_]+)(?::\s*(.*))?$/s.exec(clean);
+  let out = clean;
+  if (m) {
+    const status = m[2] !== 'none' ? m[2]! : null;
+    const code = status ?? (m[1] !== 'none' ? `HTTP ${m[1]}` : 'UNKNOWN');
+    out = m[3] ? `${code}: ${m[3]}` : code;
+  }
+  if (out.length <= REVIEW_REASON_MAX) return out;
+  const cut = out.slice(0, REVIEW_REASON_MAX - 1);
+  const sp = cut.lastIndexOf(' ');
+  return `${(sp > 20 ? cut.slice(0, sp) : cut).replace(/[\s,.;:]+$/, '')}\u2026`;
+}
+
 async function reviewReason(db: Kysely<Database>, config: Config): Promise<string | null> {
   try {
     const last = await db.selectFrom('review_feedback').select('reason').where('provider', '=', 'gemini').orderBy('id', 'desc').limit(1).executeTakeFirst();
-    return last?.reason ? scrubSecrets(last.reason, config.geminiApiKey ? [config.geminiApiKey] : []).slice(0, 120) : null;
+    return last?.reason ? shapeReviewReason(last.reason, config.geminiApiKey ? [config.geminiApiKey] : []) : null;
   } catch {
     return null;
   }

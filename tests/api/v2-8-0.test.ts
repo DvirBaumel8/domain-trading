@@ -93,7 +93,7 @@ describe('dropWatch (G-2)', () => {
   it('V28-3 mapping: pending delete + last changed -> +5 days (rdap_last_changed); redemption -> +35 days (estimate); registered; not registered; unknown with its reason; summary', async () => {
     const x = await setup();
     const s = await watch(x).runOnce();
-    expect(s).toEqual({ dryRun: false, skipped: false, checked: 6, pending_delete: 2, redemption: 1, registered: 1, not_registered: 1, unknown: 1, left_for_next_run: 0 });
+    expect(s).toEqual({ dryRun: false, skipped: false, checked: 6, pending_delete: 2, redemption: 1, registered: 1, not_registered: 1, unknown: 1, left_for_next_run: 0, rechecked: 0 });
     expect(await latest('superhealth.com')).toMatchObject({ status: 'pending_delete', last_changed: '2026-10-04', expected_drop_date: '2026-10-09', drop_date_source: 'rdap_last_changed' });
     expect(await latest('supertech.com')).toMatchObject({ status: 'redemption', last_changed: '2026-09-20', expected_drop_date: '2026-10-25', drop_date_source: 'estimate' });
     expect(await latest('superpro.com')).toMatchObject({ status: 'registered', expected_drop_date: null, drop_date_source: null });
@@ -116,7 +116,11 @@ describe('dropWatch (G-2)', () => {
       x.clock.t += DAY;
       rdap.calls = [];
       const s = await watch(x).runOnce();
-      if (day <= 4) { expect(s).toMatchObject({ checked: 1, unknown: 1 }); expect(rdap.calls).toEqual(['supermedia.com']); } else { expect(s.checked).toBe(0); expect(rdap.calls).toEqual([]); }
+      // v3.2.0 (CR-019 C-4): superhealth (expected drop 10-09) is also asked each day from its drop date for 7 days (days 3 to 6 here); the unknown one as before
+      const expected = [...(day >= 3 ? ['superhealth.com'] : []), ...(day <= 4 ? ['supermedia.com'] : [])].sort();
+      expect(s.checked).toBe(expected.length);
+      expect([...rdap.calls].sort()).toEqual(expected);
+      expect(s.rechecked).toBe(day >= 3 ? 1 : 0);
     }
     expect(await db.selectFrom('drop_list_checks').select('id').where('domain', '=', 'supermedia.com').execute()).toHaveLength(5);
     // a later answer replaces the unknown one in reads: it became not registered on day 2 here

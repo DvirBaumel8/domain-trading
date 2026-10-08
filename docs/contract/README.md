@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 3.1.0** (8 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 3.2.0** (8 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -32,7 +32,7 @@
 - **Refused requests:** a missing, malformed, unknown, expired or revoked token → **401** `UNAUTHORIZED`. A READ token on a POST → **403** `SCOPE_FORBIDDEN`. A READ token on `/jobs/run`, or the job token anywhere else → 401 (since 2.3.0 a WRITE token may start `daily` or `tick`). An unknown **GET** route → 401 without a valid token, 404 `NOT_FOUND` with one. An unknown **POST** (or other mutating) route runs the same checks as a real one: a READ token → 403 `SCOPE_FORBIDDEN`, a WRITE token without `Idempotency-Key` → 400 `IDEMPOTENCY_KEY_REQUIRED`, and only with a key → 404 `NOT_FOUND` (audited, and the key is claimed). `POST /jobs/run` with no job token configured answers 503 `JOBS_DISABLED` before the auth check, even without a token.
 - **An unauthenticated request writes nothing** to the database: no audit row, no idempotency row. This covers refusals, unknown routes and framework errors (bad URL encoding and the like; answered with `INVALID_REQUEST`).
 - **Failed-auth limiter:** 20 or more failed authentications from one client IP (the 21st request is refused) within a rolling 10 minutes → **429** `RATE_LIMITED` with `Retry-After` (seconds) and `details.retry_after_seconds`, before any token lookup. While an IP is blocked, a bot token verified in the last 10 minutes and the correct job token still get through (a revoked token never does).
-- **Rate limits per token:** 60 GET and 10 POST per minute (sliding window; the job token has its own). Over the limit → **429** `RATE_LIMITED` with `Retry-After`. A 429 never claims an `Idempotency-Key`.
+- **Rate limits per token:** 60 GET and 10 POST per minute (sliding window; the job token has its own). Over the limit → **429** `RATE_LIMITED` with `Retry-After`. A 429 never claims an `Idempotency-Key`. **A replay** (the same key and body after the call completed) **takes no slot** (3.2.0, CR-017 N-5); a stored 202 that `/buy` re-runs still counts.
 - **Rate-limit headers (2.1.0):** every authenticated response, a 429 included, carries `RateLimit-Limit` (60 for a GET, 10 for a POST), `RateLimit-Remaining` (calls left in the window for that token and method class) and `RateLimit-Reset` (seconds until the oldest counted call leaves the window; on a 429 it equals `Retry-After`). `GET /health/ping` and refused (401) requests carry none.
 - `HEAD` is answered for every `GET` route, with the same auth. On `/export/afternic.csv` and `/export/sedo.csv` a HEAD runs the GET handler: it writes an `export_runs` row and returns an `X-Export-Id`.
 

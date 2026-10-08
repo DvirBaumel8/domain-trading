@@ -34,6 +34,9 @@ export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 6
 
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
 
+/** v3.2.0 (N-3): who started a run. The WRITE token's name, else `cli` for the CLI, else `job-token` (the Worker and any job-token call). Never null. */
+export const triggeredByOf = (o: { trigger?: JobTrigger; triggeredBy?: string | null }): string => o.triggeredBy ?? (o.trigger === 'cli' ? 'cli' : 'job-token');
+
 export interface RunOptions {
   /** `scheduled` = the Worker's `<job>-<ms>` key, `manual` = any other job-token call, `cli` = `npm run job`. Default `manual`. */
   trigger?: JobTrigger;
@@ -186,7 +189,7 @@ export class JobRunner {
     try {
       await this.deps.db.insertInto('job_runs').values({
         job: r.job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, started_at: started,
-        finished_at: new Date(this.deps.now()), skipped: r.skipped, ok: Object.values(r.steps).every((s) => s.ok), steps: JSON.stringify(r.steps), triggered_by: opts.triggeredBy ?? null,
+        finished_at: new Date(this.deps.now()), skipped: r.skipped, ok: Object.values(r.steps).every((s) => s.ok), steps: JSON.stringify(r.steps), triggered_by: triggeredByOf(opts),
       }).execute();
     } catch {
       // not recorded; the audit row still records the run

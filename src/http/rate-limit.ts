@@ -1,7 +1,10 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { isJobRoute } from './auth.js';
 import { AppError } from './errors.js';
 import { isMutating } from './methods.js';
+import { requestHash } from './idempotency.js';
+import type { Kysely } from 'kysely';
+import type { Database } from '../db/types.js';
 
 /** POST /jobs/run by a WRITE token: calls per hour per token (the job token keeps the general 10 per minute). */
 export const WRITE_JOB_RUNS_PER_HOUR = 4;
@@ -61,7 +64,24 @@ export class SlidingWindowLimiter {
   }
 }
 
-export function registerRateLimit(app: FastifyInstance, now: () => number = Date.now): void {
+/**
+ * v3.2.0 (N-5): is this request the replay of an already completed request (same Idempotency-Key, same request)? It then only replays the stored answer
+ * (see http/idempotency.ts) and does not use a rate-limit slot. A stored 202 on POST /buy is re-run by the handler, so it does count.
+ */
+async function isIdempotentReplay(db: Kysely<Database>, req: FastifyRequest): Promise<boolean> {
+  const key = req.headers['idempotency-key'];
+  if (typeof key !== 'string' || key.length === 0 || key.length > 255) return false;
+  try {
+    const row = await db.selectFrom('idempotency_keys').select(['request_hash', 'state', 'status_code']).where('key', '=', key).executeTakeFirst();
+    if (!row || row.state !== 'completed' || row.status_code === null) return false;
+    if (row.request_hash !== requestHash(req.method, req.url, req.body)) return false;
+    return !(row.status_code === 202 && req.routeOptions?.url === '/buy');
+  } catch {
+    return false;
+  }
+}
+
+export function registerRateLimit(app: FastifyInstance, now: () => number = Date.now, db?: Kysely<Database>): void {
   const reads = new SlidingWindowLimiter(60, 60_000, now);
   const writes = new SlidingWindowLimiter(10, 60_000, now);
   const jobStarts = new SlidingWindowLimiter(WRITE_JOB_RUNS_PER_HOUR, 3_600_000, now);
@@ -82,8 +102,9 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
     const reviewRun = req.auth && req.routeOptions?.url === '/reviews/run' && req.method === 'POST' && req.auth.scope === 'write';
     const limiter = reviewRun ? reviewRuns : req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method) ? writes : reads;
     // POST /reviews/run is counted only when the call reaches Google (the slot is taken just before the Google call); here it is only refused when the hour is already used up.
-    if (reviewRun) reviewSlotTakers.set(req, () => { reviewRuns.take(key); });
-    const wait = reviewRun ? limiter.peek(key) : limiter.take(key);
+    const replay = db !== undefined && isMutating(req.method) && (await isIdempotentReplay(db, req));
+    if (reviewRun && !replay) reviewSlotTakers.set(req, () => { reviewRuns.take(key); });
+    const wait = replay ? 0 : reviewRun ? limiter.peek(key) : limiter.take(key);
     // CR-005 N-8a: the caller's own limit for this method class (GET vs POST), on every authenticated response, a 429 included.
     const st = limiter.state(key);
     reply.header('ratelimit-limit', String(limiter.limit));

@@ -7,7 +7,7 @@ import { AppError } from '../../../http/errors.js';
 import { keepIdempotencyKey } from '../../../http/idempotency.js';
 import { SlidingWindowLimiter } from '../../../http/rate-limit.js';
 import { idtDay, isRealDate, nextIdtMidnight, ymd } from '../../../core/dates.js';
-import { allowanceNow, createPost, PostBody, POST_BODY_LIMIT, postingState, removePost, throwIfInvalid, validatePost, type PostingDeps } from '../posting/posts.js';
+import { allowanceNow, createPost, PostBody, postSchemaCheck, POST_BODY_LIMIT, postingState, removePost, throwIfInvalid, validatePost, type PostingDeps } from '../posting/posts.js';
 import { toJerusalemIso } from '../../../core/dates.js';
 const RemoveBody = z.object({ reason: z.string().trim().min(1).max(300), marked_removed_by_hand: z.boolean().optional() }).strict();
 const PauseBody = z.object({ paused: z.boolean(), reason: z.string().trim().min(1).max(300).optional() }).strict();
@@ -47,6 +47,13 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
     return reply.code(201).send({
       post_id: r.post_id, buffer_post_id: r.buffer_post_id, status: r.status, external_link: r.external_link, sent_at: iso(r.sent_at), images: r.images, allowance: r.allowance,
     });
+  });
+
+  // v3.2.0 (CR-017): WRITE (the global scope rule for POST), Idempotency-Key, audited. Reads Buffer's type definitions (introspection) and validates the post shape; publishes nothing.
+  app.post('/posts/schema-check', async (req) => {
+    const r = await postSchemaCheck(deps);
+    req.auditSummary = r.ok ? 'schema ok' : `schema: ${r.problems.length} problem(s)`;
+    return { ok: r.ok, problems: r.problems, checked_types: r.checked_types };
   });
 
   app.get('/posts', async (req) => {

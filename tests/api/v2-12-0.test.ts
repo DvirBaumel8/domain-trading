@@ -9,6 +9,7 @@ import { testDb as db } from '../helpers/db.js';
 import { b64, commentSegment, exifSegment, makeJpeg, makePng, textChunk } from '../helpers/images.js';
 import { issueToken } from '../helpers/tokens.js';
 import { mswServer } from '../setup/network.js';
+import { introspectionAnswer, refuseBadCreate } from '../helpers/buffer-schema.js';
 import { inspectImage } from '../../src/modules/outreach/posting/images.js';
 
 const KEY = 'buf_fake_key_0123456789abcdefABCDEF';
@@ -20,7 +21,7 @@ afterEach(async () => { await Promise.all(apps.splice(0).map((a) => a.close()));
 
 interface Call { op: string; body: { query: string; variables: { input?: any } }; auth: string | null }
 const calls: Call[] = [];
-const opOf = (q: string) => (q.includes('createPost') ? 'create' : q.includes('deletePost') ? 'delete' : q.includes('GetPost') ? 'get' : q.includes('organizations') ? 'account' : q.includes('channels') ? 'channels' : 'other');
+const opOf = (q: string) => (q.includes('__type(') ? 'schema' : q.includes('createPost') ? 'create' : q.includes('deletePost') ? 'delete' : q.includes('GetPost') ? 'get' : q.includes('organizations') ? 'account' : q.includes('channels') ? 'channels' : 'other');
 type Answer = (c: Call) => Response | undefined;
 const created = (over: Record<string, unknown> = {}) => HttpResponse.json({ data: { createPost: { __typename: 'PostActionSuccess', post: { id: 'buf_post_1', status: 'sending', externalLink: null, sentAt: null, ...over } } } });
 function bufferMock(answer: Answer = () => undefined) {
@@ -29,8 +30,10 @@ function bufferMock(answer: Answer = () => undefined) {
     const body = (await request.json()) as Call['body'];
     const c: Call = { op: opOf(body.query), body, auth: request.headers.get('authorization') };
     calls.push(c);
+    if (c.op === 'schema') return introspectionAnswer((body.variables as { name: string }).name);
     const a = answer(c);
     if (a) return a;
+    if (c.op === 'create') { const bad = refuseBadCreate(body.variables.input); if (bad) return bad; }
     if (c.op === 'account') return HttpResponse.json({ data: { account: { organizations: [{ id: 'org1' }] } } });
     if (c.op === 'channels') return HttpResponse.json({ data: { channels: [{ id: 'ch_ig', name: 'ig', service: 'instagram' }, { id: 'ch_x', name: 'x', service: 'twitter' }] } });
     if (c.op === 'create') return created();
@@ -229,18 +232,19 @@ describe('a real post (T11-4, T11-7, T11-28)', () => {
       sent_at: '2026-10-20T13:00:03+03:00', allowance: { today_cap: 1, used_today: 1, remaining: 0 },
     });
     expect(j.images.map((i: { part: number; position: number }) => [i.part, i.position])).toEqual([[1, 1], [1, 2], [2, 1]]);
-    expect(calls.map((c) => c.op)).toEqual(['account', 'channels', 'create']);
+    expect(calls.map((c) => c.op).filter((o) => o !== 'schema')).toEqual(['account', 'channels', 'create']);
     expect(calls.every((c) => c.auth === `Bearer ${KEY}`)).toBe(true);
-    const input = calls[2]!.body.variables.input;
-    expect(input).toMatchObject({ text: 'Launch day', channelId: 'ch_x', schedulingType: 'automatic', mode: 'shareNow' });
-    const urls = input.assets.images.map((i: { url: string }) => i.url);
+    const input = calls.find((c) => c.op === 'create')!.body.variables.input;
+    expect(input).toMatchObject({ text: 'Launch day', channelId: 'ch_x', shareMode: 'shareNow' });
+    expect(input).not.toHaveProperty('mode');
+    const urls = input.assets.map((a: { image: { url: string } }) => a.image.url);
     expect(urls).toHaveLength(2);
     for (const u of urls) expect(u).toMatch(new RegExp(`^${BASE}/media/[0-9a-f]{32}$`));
-    expect(input.assets.images.map((i: { altText: string }) => i.altText)).toEqual(['first picture', 'second picture']);
+    expect(input.assets.map((a: { image: { altText: string } }) => a.image.altText)).toEqual(['first picture', 'second picture']);
     const thread = input.metadata.twitter.thread;
     expect(thread.map((p: { text: string }) => p.text)).toEqual(['Part two', 'Part three']);
-    expect(thread[0].assets.images).toEqual([{ url: expect.stringMatching(/\/media\/[0-9a-f]{32}$/), altText: 'third picture' }]);
-    expect(thread[1].assets).toBeUndefined();
+    expect(thread[0].assets).toEqual([{ image: { url: expect.stringMatching(/\/media\/[0-9a-f]{32}$/), altText: 'third picture' } }]);
+    expect(thread[1].assets).toEqual([]); // ThreadedPostInput.assets is required
     // the row, the images (metadata-free bytes) and the READ routes
     const [row] = await postRows();
     expect(row).toMatchObject({ id: j.post_id, status: 'posted', created_by: expect.any(String), idt_day: '2026-10-20', thread: [{ text: 'Part two' }, { text: 'Part three' }] });
@@ -285,8 +289,8 @@ describe('a real post (T11-4, T11-7, T11-28)', () => {
     bufferMock();
     const a = await boot({ env: { BUFFER_API_KEY: KEY, BUFFER_CHANNEL_ID: 'ch_fixed' } });
     expect((await a.post('/posts', { text: 'x' })).statusCode).toBe(201);
-    expect(calls.map((c) => c.op)).toEqual(['create']);
-    expect(calls[0]!.body.variables.input.channelId).toBe('ch_fixed');
+    expect(calls.map((c) => c.op).filter((o) => o !== 'schema')).toEqual(['create']);
+    expect(calls.find((c) => c.op === 'create')!.body.variables.input.channelId).toBe('ch_fixed');
     bufferMock((c) => (c.op === 'channels' ? HttpResponse.json({ data: { channels: [{ id: 'a', service: 'twitter' }, { id: 'b', service: 'x' }] } }) : undefined));
     const b = await boot({ clock: { t: T0 + DAY } });
     const r = await b.post('/posts', { text: 'x' });
@@ -543,7 +547,7 @@ describe('founder rule 10: publish only', () => {
     const posts = t.app.routeTable.filter((r) => /post|media/.test(r.url)).map((r) => `${r.method} ${r.url}`).sort();
     expect(posts).toEqual([
       'GET /media/:token', 'GET /posts', 'GET /posts/:id/images/:part/:position', 'HEAD /media/:token', 'HEAD /posts', 'HEAD /posts/:id/images/:part/:position',
-      'POST /posts', 'POST /posts/:id/remove', 'POST /posts/burst', 'POST /posts/pause',
+      'POST /posts', 'POST /posts/:id/remove', 'POST /posts/burst', 'POST /posts/pause', 'POST /posts/schema-check',
     ]);
     for (const r of t.app.routeTable) expect(r.url).not.toMatch(/repl(y|ies)|like|follow|mention|dm\b|message|retweet/i);
   });

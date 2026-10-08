@@ -9,7 +9,7 @@ import { newAuditId } from '../../http/audit.js';
 import { advisoryXactLock, trySessionLock, type LockKey } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { stepView } from '../reporting/index.js';
-import type { JobKind, JobRunner, PlanStep, RunOptions, StepResult } from './jobs/runner.js';
+import { triggeredByOf, type JobKind, type JobRunner, type PlanStep, type RunOptions, type StepResult } from './jobs/runner.js';
 
 /** Extra time on a step's lock beyond its timeout, so the in-process timeout always fires before the lock counts as expired. */
 const LOCK_GRACE_MS = 5_000;
@@ -30,6 +30,8 @@ export interface JobQueueDeps {
   log?: { warn: (obj: unknown, msg?: string) => void };
   /** Test hook: per-step overrides of the attempts and the timeout, applied when a run is enqueued. */
   overrides?: Record<string, { maxAttempts?: number; timeoutMs?: number }>;
+  /** v3.2.0 (CR-018 A): resumes screening runs a dead process left `running`; called by every kickIfNeeded, `atStart` true on the first call of this process. */
+  resumeScreening?: (atStart: boolean) => Promise<unknown>;
   /** Off when absent. While the worker is busy, GET `${url}/health/ping` every KEEPALIVE_MS so the instance is not spun down mid-run. */
   keepAlive?: { url: string; fetch?: typeof fetch };
 }
@@ -45,6 +47,7 @@ export class JobQueue {
   readonly instanceId = `${process.pid}-${randomUUID().slice(0, 8)}`;
   private active: Promise<void> | null = null;
   private stopped = false;
+  private resumedScreening = false;
 
   constructor(private readonly deps: JobQueueDeps) {}
 
@@ -63,7 +66,7 @@ export class JobQueue {
       }
       const runId = `run_${randomUUID()}`;
       await trx.insertInto('job_queue_runs').values({
-        id: runId, job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, triggered_by: opts.triggeredBy ?? null, created_at: new Date(this.deps.now()),
+        id: runId, job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, triggered_by: triggeredByOf(opts), created_at: new Date(this.deps.now()),
       }).execute();
       const plan = this.deps.runner.plan(job);
       await trx.insertInto('job_steps').values(plan.map((e, position) => ({
@@ -85,7 +88,17 @@ export class JobQueue {
 
   /** Kicks the worker when unfinished steps exist and none is working in this process (a cheap check: used by GET /jobs/runs and GET /health). */
   async kickIfNeeded(): Promise<void> {
-    if (this.active || this.stopped) return;
+    if (this.stopped) return;
+    if (this.deps.resumeScreening) {
+      const atStart = !this.resumedScreening;
+      this.resumedScreening = true;
+      try {
+        await this.deps.resumeScreening(atStart);
+      } catch (e) {
+        this.deps.log?.warn({ err: e instanceof Error ? e.message : String(e) }, 'screening resume failed');
+      }
+    }
+    if (this.active) return;
     try {
       const open = await this.deps.db.selectFrom('job_steps').select('id').where('status', 'in', OPEN).limit(1).executeTakeFirst();
       if (open) this.kick();

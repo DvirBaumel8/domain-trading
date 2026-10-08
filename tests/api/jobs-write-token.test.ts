@@ -31,12 +31,12 @@ describe('POST /jobs/run with a WRITE token', () => {
     expect(audit).toMatchObject({ scope: 'write', token_id: write.id, status_code: 202, result_summary: 'daily: queued' });
   });
 
-  it('the job token keeps working (triggered_by null) and still cannot call other routes', async () => {
+  it('the job token keeps working (triggered_by job-token, N-3) and still cannot call other routes', async () => {
     await make();
     const read = await issueToken('read');
     expect((await post(app, 'tick', jobBearer)).statusCode).toBe(202);
     const runs = (await app.inject({ method: 'GET', url: '/jobs/runs?job=tick', headers: read.auth })).json().runs;
-    expect(runs[0]).toMatchObject({ trigger: 'manual', triggered_by: null });
+    expect(runs[0]).toMatchObject({ trigger: 'manual', triggered_by: 'job-token' });
     expect((await app.inject({ method: 'GET', url: '/portfolio', headers: jobBearer })).statusCode).toBe(401);
   });
 

@@ -1,4 +1,4 @@
-# Selection checks (contract v3.1.0)
+# Selection checks (contract v3.2.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -45,7 +45,8 @@ One JSON document per version (`values`). A version is immutable; a draft is mad
 | `form.city_word_allowlist` | 126 major cities | Gazetteer names that are also dictionary words and still count as cities |
 | `typo` | edit distance 1, top 10000, list at most 7 days old | TYPO-1 |
 | `concentration` | per attribute 2, lane share 0.40 (`lane_share_enforced` false) | The 40% rule is report-only (ruling R2) |
-| `tranche` | size 15, main lane 10, geo max 1 (ruling R6), `required_for_buy` true | Tranche rules (`GET /tranches`: geo cap on every addition, main-lane quota at close; a real `/buy` needs an active member of the open tranche since 2.0.0: 409 `NO_TRANCHE`, and the optional spend cap as 409 `TRANCHE_SPEND_CAP`; `required_for_buy` itself is not read) |
+| `tranche` | size 15, main lane 10, geo max 1 (ruling R6), `required_for_buy` true; `main_lanes` (3.2.0, CR-020 D): `[{lane, require: clean_history \| demand2 \| none}]`, default `[{S7, clean_history}, {S3, demand2}]` (today's rule; `v11` unchanged); a draft may change it or set `min_main_lane` 0, activated by Dvir's line | Tranche rules (`GET /tranches`: geo cap on every addition, main-lane quota at close; a real `/buy` needs an active member of the open tranche since 2.0.0: 409 `NO_TRANCHE`, and the optional spend cap as 409 `TRANCHE_SPEND_CAP`; `required_for_buy` itself is not read) |
+| `intake` | `drop_list_max_share` 1.0 (3.2.0, CR-020 A; absent = default) | The most of the 30-a-day screening budget drop-list names may take after scout names; 1.0 = no extra limit |
 | `surbl` | zone `multi.surbl.org`, control `test.surbl.org`, blocked answers `["127.0.0.1"]`, bit names, `ns_override`, 3000 ms | SURBL lookup |
 | `history` | per-name fetch cap 6, 1000 ms between calls, 20 s timeout, 2 retries, 200 chars of text, parked/for-sale placeholder up to 1500 characters (`parked_max_text_chars`), `url_terms` (words that flag an archived URL); actions strong FAIL, weak FLAG, redirect FLAG, for-sale PASS, parked PASS | CAP-07; parked and for-sale prior pages are positive |
 | `census` | 20 siblings, at most 25% unknown, as-of exact for 365 days | CAP-10; `sibling_count` is also the size of a census list |

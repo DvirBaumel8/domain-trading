@@ -4,8 +4,9 @@
 // find the channel.
 //
 // ASSUMED SHAPES (from Buffer's public docs, not verified against the live API; every one is a constant below):
-//   createPost(input: {text, channelId, schedulingType: automatic, mode: shareNow, assets: {images: [{url, altText}]},
-//                      metadata: {twitter: {thread: [{text, assets}]}}})  ->  union: PostActionSuccess {post {id status externalLink sentAt}} | MutationError {message}
+//   createPost(input: {text, channelId, shareMode: shareNow, assets: [{image: {url, altText}}],
+//                      metadata: {twitter: {thread: [{text, assets: [{image: {url, altText}}]}]}}})   (v3.2.0, CR-017: Buffer's reference;
+//                      `assets` is a LIST of AssetInput with exactly one of image/link/video/document; ThreadedPostInput.assets is required)  ->  union: PostActionSuccess {post {id status externalLink sentAt}} | MutationError {message}
 //   post(input: {id}) {id status externalLink sentAt}        deletePost(input: {id})  ->  MutationError {message} | anything else = success
 //   account {organizations {id}}                             channels(input: {organizationId}) {id name service}
 import { scrubSecrets } from '../../../core/redact.js';
@@ -48,16 +49,96 @@ export class BufferError extends Error {
 export interface BufferPost { id: string; status: string | null; externalLink: string | null; sentAt: Date | null }
 export interface BufferImage { url: string; altText: string }
 export interface BufferPart { text: string; images: BufferImage[] }
-export interface BufferDeps { fetch: typeof fetch; apiKey: string; channelId?: string; timeoutMs?: number }
+export interface BufferDeps { fetch: typeof fetch; apiKey: string; channelId?: string; timeoutMs?: number; now?: () => number }
+
+/** The input types the schema check always reads (read-only introspection), in this order; others are read when the input reaches them. */
+export const SCHEMA_CHECK_TYPES = ['CreatePostInput', 'AssetInput', 'ImageAssetInput', 'TwitterPostMetadataInput', 'ThreadedPostInput'] as const;
+/** How long an introspection answer is reused. */
+export const SCHEMA_CACHE_MS = 3_600_000;
+export const SCHEMA_TYPE_QUERY = `query SchemaType($name: String!) {
+  __type(name: $name) {
+    name kind
+    inputFields { name type { ...TypeRef } }
+    enumValues { name }
+  }
+}
+fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } }`;
+
+export interface TypeRef { kind: string; name: string | null; ofType?: TypeRef | null }
+export interface IntroType { name: string; kind: string; inputFields?: { name: string; type: TypeRef }[] | null; enumValues?: { name: string }[] | null }
+export interface SchemaCheck { ok: boolean; problems: string[]; checked_types: string[] }
 
 type Gql = { data?: Record<string, any> | null; errors?: { message?: unknown }[] };
 
 const clip = (s: string, n = 300) => (s.length > n ? `${s.slice(0, n)}...` : s);
 
-const assets = (images: BufferImage[]) => (images.length > 0 ? { assets: { images: images.map((i) => ({ url: i.url, altText: i.altText })) } } : {});
+const assetList = (images: BufferImage[]) => images.map((i) => ({ image: { url: i.url, altText: i.altText } }));
+const assets = (images: BufferImage[]) => (images.length > 0 ? { assets: assetList(images) } : {});
+
+/** The exact `input` of the createPost mutation (also what the schema check validates). A thread part always carries `assets` (required by ThreadedPostInput). */
+export function buildCreateInput(channelId: string, first: BufferPart, thread: BufferPart[]): Record<string, unknown> {
+  return {
+    text: first.text, channelId, shareMode: 'shareNow', ...assets(first.images),
+    ...(thread.length > 0 ? { metadata: { twitter: { thread: thread.map((p) => ({ text: p.text, assets: assetList(p.images) })) } } } : {}),
+  };
+}
+
+/** A post with one image and one thread part that carries an image: the shape the schema check validates. */
+export const SAMPLE_INPUT = buildCreateInput(
+  'schema-check-sample',
+  { text: 'sample', images: [{ url: 'https://example.invalid/media/sample', altText: 'sample' }] },
+  [{ text: 'sample part', images: [{ url: 'https://example.invalid/media/sample', altText: 'sample' }] }],
+);
+
+/** GraphQL's __TypeKind, lower-cased (so the kind names are not mistaken for API error codes). */
+const kindOf = (t: TypeRef): string => t.kind.toLowerCase();
+const typeText = (t: TypeRef | null | undefined): string => (!t ? '?' : kindOf(t) === 'non_null' ? `${typeText(t.ofType)}!` : kindOf(t) === 'list' ? `[${typeText(t.ofType)}]` : (t.name ?? '?'));
+
+/** Checks `value` against the introspected type: every field exists, lists and nesting match, required fields are present. Pure; `load` reads one type by name. */
+export async function validateAgainstSchema(
+  value: unknown, ref: TypeRef, path: string, load: (name: string) => Promise<IntroType | null>, problems: string[],
+): Promise<void> {
+  if (kindOf(ref) === 'non_null') {
+    if (value === null || value === undefined) { problems.push(`${path} is required (${typeText(ref)}) but missing`); return; }
+    return validateAgainstSchema(value, ref.ofType!, path, load, problems);
+  }
+  if (value === null || value === undefined) return;
+  if (kindOf(ref) === 'list') {
+    if (!Array.isArray(value)) { problems.push(`${path} must be a list (${typeText(ref)}) but is not`); return; }
+    for (const [i, v] of value.entries()) await validateAgainstSchema(v, ref.ofType!, `${path}[${i}]`, load, problems);
+    return;
+  }
+  const name = ref.name ?? '?';
+  if (Array.isArray(value)) { problems.push(`${path} must not be a list (${name})`); return; }
+  if (kindOf(ref) === 'scalar') {
+    if ((name === 'String' || name === 'ID') && typeof value !== 'string') problems.push(`${path} must be a string (${name})`);
+    return;
+  }
+  const t = await load(name);
+  if (!t) { problems.push(`${path}: Buffer has no type ${name}`); return; }
+  if (kindOf(ref) === 'enum') {
+    const names = (t.enumValues ?? []).map((e) => e.name);
+    if (typeof value !== 'string' || !names.includes(value)) problems.push(`${path}: ${JSON.stringify(value)} is not a value of ${name} (${names.join(', ')})`);
+    return;
+  }
+  if (kindOf(ref) !== 'input_object') return;
+  if (typeof value !== 'object') { problems.push(`${path} must be an object (${name})`); return; }
+  const obj = value as Record<string, unknown>;
+  const fields = t.inputFields ?? [];
+  for (const k of Object.keys(obj)) {
+    if (!fields.some((f) => f.name === k)) problems.push(`${path}.${k} is not a field of ${name}`);
+  }
+  for (const f of fields) {
+    const present = obj[f.name] !== undefined && obj[f.name] !== null;
+    if (kindOf(f.type) === 'non_null' && !present) problems.push(`${path}.${f.name} is required (${typeText(f.type)}) but missing`);
+    else if (present) await validateAgainstSchema(obj[f.name], f.type, `${path}.${f.name}`, load, problems);
+  }
+  if (name === 'AssetInput' && Object.keys(obj).length !== 1) problems.push(`${path} must have exactly one of its fields (image, link, video, document)`);
+}
 
 export class BufferClient {
   private channel: string | undefined;
+  private readonly types = new Map<string, { at: number; type: IntroType | null }>();
 
   constructor(private readonly deps: BufferDeps) {}
 
@@ -115,12 +196,35 @@ export class BufferClient {
     return this.channel;
   }
 
+  /** One `__type` introspection (read-only, publishes nothing), cached in memory for an hour. */
+  private async introspect(name: string): Promise<IntroType | null> {
+    const now = (this.deps.now ?? Date.now)();
+    const hit = this.types.get(name);
+    if (hit && now - hit.at < SCHEMA_CACHE_MS) return hit.type;
+    const data = await this.call(SCHEMA_TYPE_QUERY, { name });
+    const t = data.__type as IntroType | null | undefined;
+    const type = t && typeof t.name === 'string' ? t : null;
+    this.types.set(name, { at: now, type });
+    return type;
+  }
+
+  /** Validates the exact createPost input DOM builds (a sample with an image and a thread part by default) against Buffer's own type definitions. Throws BufferError when Buffer cannot be asked. */
+  async checkSchema(input: Record<string, unknown> = SAMPLE_INPUT): Promise<SchemaCheck> {
+    const checked: string[] = [];
+    const load = async (name: string) => { const t = await this.introspect(name); if (!checked.includes(name)) checked.push(name); return t; };
+    for (const n of SCHEMA_CHECK_TYPES) await load(n);
+    const problems: string[] = [];
+    await validateAgainstSchema(input, { kind: 'input_object', name: 'CreatePostInput' }, 'input', load, problems);
+    for (const n of SCHEMA_CHECK_TYPES) {
+      if (!(await load(n))) problems.push(`Buffer has no type ${n}`);
+    }
+    if (problems.length > 0) this.types.clear(); // a mismatch is never kept: the next check asks Buffer again
+    return { ok: problems.length === 0, problems: [...new Set(problems)], checked_types: checked };
+  }
+
   /** Publishes now (shareNow). `thread` = the later parts of a thread, in order. */
   async createPost(channelId: string, first: BufferPart, thread: BufferPart[]): Promise<BufferPost> {
-    const input = {
-      text: first.text, channelId, schedulingType: 'automatic', mode: 'shareNow', ...assets(first.images),
-      ...(thread.length > 0 ? { metadata: { twitter: { thread: thread.map((p) => ({ text: p.text, ...assets(p.images) })) } } } : {}),
-    };
+    const input = buildCreateInput(channelId, first, thread);
     const data = await this.call(CREATE_POST_MUTATION, { input });
     const r = data.createPost as { __typename?: string; message?: unknown; post?: Record<string, unknown> } | null | undefined;
     if (!r) throw new BufferError('unavailable', 'Buffer sent an answer this service cannot read');

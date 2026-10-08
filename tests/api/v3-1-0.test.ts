@@ -153,8 +153,8 @@ describe('B R-2 only an ok review counts for the day; /health review_reason (T16
     await t.post('/reviews/run');
     const h = (await t.get('/health')).json();
     expect(h.review).toBe('failed');
-    expect(h.review_reason).toMatch(/^HTTP 503 UNAVAILABLE/);
-    expect(h.review_reason.length).toBeLessThanOrEqual(120);
+    expect(h.review_reason).toMatch(/^UNAVAILABLE: /); // v3.2.0 N-4: `CODE: text`
+    expect(h.review_reason.length).toBeLessThanOrEqual(200);
     expect(JSON.stringify(h)).not.toContain(KEY);
     serve(answer);
     t.clock.t += HOUR;

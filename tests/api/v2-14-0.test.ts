@@ -10,7 +10,7 @@ import { planFor } from '../../src/modules/selection/engine.js';
 import { INTAKE_DAILY_MAX, INTAKE_DEDUPE_DAYS, IntakeScreeningJob, intakeCensusList } from '../../src/modules/candidates/intake.js';
 import type { ScreeningWorker } from '../../src/modules/selection/engine.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
-import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
+import { putList, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { fixture, respond } from '../helpers/screening-fixtures.js';
 import { issueToken } from '../helpers/tokens.js';
 import type { RdapLookup } from '../../src/core/rdap.js';
@@ -148,22 +148,30 @@ describe('intakeScreening (CR-012 T12-16, T12-17, T12-19)', () => {
     expect(await db.selectFrom('screening_runs').select('id').execute()).toHaveLength(2);
   });
 
-  it('V214-5 drop-list names about to drop join the run after the intake names, are not screened again within 7 days, and an owned name never is', async () => {
+  it('V214-5 (v3.2.0) drop-list leftovers that fit a kept lane join the run after the intake names, names in pending delete or redemption are not screened, a name is not screened again within 7 days, and an owned name never is', async () => {
     const x = await h();
+    await putList('trade', ['roofing', 'plumbing'], 2);
     const s = await scout(x);
     await s.intake([{ domain: 'quickmedia.com', lane: 'S3', source: 'scout' }]);
-    await db.insertInto('drop_lists').values({ name: 'dl-1', list_date: '2026-10-06', created_by: 'scout-1', received_n: 5, kept_n: 5 }).execute();
-    const names = ['dropone.com', 'droptwo.com', 'dropthree.com', 'dropfour.com', 'dropfive.com'];
+    await db.insertInto('drop_lists').values({ name: 'dl-1', list_date: '2026-10-06', created_by: 'scout-1', received_n: 6, kept_n: 6 }).execute();
+    const names = ['austinroofing.com', 'dallasplumbing.com', 'denverroofing.com', 'bostonroofing.com', 'tampaplumbing.com', 'happyhouse.com'];
     await db.insertInto('drop_list_rows').values(names.map((domain) => ({ list_name: 'dl-1', domain, kept: true, reason: null, tokens: ['drop', 'x'] }))).execute();
-    const checks = [['dropone.com', 'pending_delete', '2026-10-08'], ['droptwo.com', 'redemption', '2026-10-12'], ['dropthree.com', 'registered', null], ['dropfour.com', 'pending_delete', '2026-10-30'], ['dropfive.com', 'pending_delete', '2026-10-09']] as const;
-    await db.insertInto('drop_list_checks').values(checks.map(([domain, status, d]) => ({ list_name: 'dl-1', domain, checked_at: new Date(x.clock.t), status, last_changed: null, expected_drop_date: d, drop_date_source: d ? 'estimate' : null, reason_code: null }))).execute();
-    await insertOwnedDomain(db, { domain: 'dropfive.com' });
+    // 1-2 dropped and free (leftovers), 3 still in pending delete, 4 re-registered at the drop, 5 free but owned, 6 free but fits no kept lane
+    const checks: [string, string, string | null][] = [
+      ['austinroofing.com', 'pending_delete', '2026-10-05'], ['austinroofing.com', 'not_registered', null], ['dallasplumbing.com', 'redemption', '2026-10-04'], ['dallasplumbing.com', 'not_registered', null],
+      ['denverroofing.com', 'pending_delete', '2026-10-09'], ['bostonroofing.com', 'pending_delete', '2026-10-05'], ['bostonroofing.com', 'registered', null],
+      ['tampaplumbing.com', 'pending_delete', '2026-10-05'], ['tampaplumbing.com', 'not_registered', null], ['happyhouse.com', 'pending_delete', '2026-10-05'], ['happyhouse.com', 'not_registered', null],
+    ];
+    for (const [i, [domain, status, d]] of checks.entries()) {
+      await db.insertInto('drop_list_checks').values({ list_name: 'dl-1', domain, checked_at: new Date(x.clock.t - (100 - i) * 1000), status: status as never, last_changed: null, expected_drop_date: d, drop_date_source: d ? 'estimate' : null, reason_code: null }).execute();
+    }
+    await insertOwnedDomain(db, { domain: 'tampaplumbing.com' });
     const job = intakeJob(x);
     const r = await job.runOnce();
-    expect(r).toMatchObject({ queued_before: 1, screened: 3, from_intake: 1, from_drop_lists: 2, left_for_next_run: 0 });
+    expect(r).toMatchObject({ queued_before: 1, screened: 3, from_intake: 1, from_drop_lists: 2, left_for_next_run: 0, no_kept_lane: 1, dropping: 1, leftovers: 2 });
     const run = await db.selectFrom('screening_runs').selectAll().executeTakeFirstOrThrow();
-    expect((run.input as { names: { domain: string }[] }).names.map((n) => n.domain)).toEqual(['quickmedia.com', 'dropone.com', 'droptwo.com']);
-    expect((await db.selectFrom('candidate_screenings').select(['domain', 'origin', 'intake_id']).orderBy('id').execute()).map((q) => [q.domain, q.origin, q.intake_id === null])).toEqual([['quickmedia.com', 'intake', false], ['dropone.com', 'drop_list', true], ['droptwo.com', 'drop_list', true]]);
+    expect((run.input as { names: { domain: string; lane: string }[] }).names.map((n) => [n.domain, n.lane])).toEqual([['quickmedia.com', 'S3'], ['dallasplumbing.com', 'S2'], ['austinroofing.com', 'S2']]);
+    expect((await db.selectFrom('candidate_screenings').select(['domain', 'origin', 'intake_id']).orderBy('id').execute()).map((q) => [q.domain, q.origin, q.intake_id === null])).toEqual([['quickmedia.com', 'intake', false], ['dallasplumbing.com', 'drop_list', true], ['austinroofing.com', 'drop_list', true]]);
     x.clock.t += 2 * DAY; // inside the 7 days: not again
     expect(await job.runOnce()).toMatchObject({ skipped: true, reason: 'NO_NAMES' });
     expect(await db.selectFrom('screening_runs').select('id').execute()).toHaveLength(1);
@@ -345,7 +353,9 @@ describe('daily candidate list (CR-012 T12-7..T12-13)', () => {
     expect(l.entries).toEqual([]);
     expect(l.sections.upcoming).toHaveLength(1);
     expect(l.sections.upcoming[0]).toMatchObject({ domain: 'dropsoon.com', expected_drop_date: '2026-10-09', buyable_from: '2026-10-09', list_name: 'dl-up', missing_records: [], sources: [{ source: 'dl-up', token_name: 'scout-1' }] });
-    expect(l.summary.failed_by_check).toEqual({ availability: 2 });
+    // v3.2.0 (CR-019 C-3): a name in pending delete is dropping, not taken
+    expect(l.summary.failed_by_check).toEqual({});
+    expect(l.summary.dropping_n).toBe(2);
   });
 
   it('V214-12 same-day rebuild keeps the first build order, appends new names, shows a changed name with its reason and a dropped one in removed_since_first', async () => {

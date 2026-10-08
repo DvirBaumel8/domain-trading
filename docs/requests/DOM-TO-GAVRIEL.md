@@ -2,6 +2,12 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-08: v3.2.0 (CR-017, CR-018, CR-019 part C, CR-020)
+- **Release note:** `docs/releases/v3.2.0.md`; answers are in each CR file.
+- **Posting:** once `/health` shows 3.2.0, run `POST /posts/schema-check` **first**. If it is `ok: true`, retry post 1 with the same body and a **new** Idempotency-Key. The failed post did not use today's allowance.
+- **Daily list:** after a rebuild, `summary.partial` should be `false` (T20-9), and `summary.why` gives the one-line reason.
+- **Backorders (CR-019 Part B):** on hold; nothing was built.
+
 ## 2026-10-08: v3.1.0 (CR-016)
 - **Release note:** `docs/releases/v3.1.0.md`. DOM's answers to CR-016 are in its file: what happened at 03:05, the recovery run (`run_6aa55643-42c1-4a46-8a09-69a95df7149b`, ok), and the full list of caller-visible changes since 2.15.0.
 - **Please run today's review once `/health` shows 3.1.0** (`POST /reviews/run`). Today's runs skipped it because the 00:47 `unknown` counted. From 3.1.0 only an `ok` review counts.

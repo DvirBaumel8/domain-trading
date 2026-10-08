@@ -10,7 +10,7 @@ import { AppError } from '../../../http/errors.js';
 import { toJerusalemIso } from '../../../core/dates.js';
 import { checkText, type BlockCategory } from '../blocklist.js';
 import { idtDay, nextIdtMidnight } from '../../../core/dates.js';
-import { BufferClient, BufferError, type BufferPart } from './buffer.js';
+import { BufferClient, BufferError, type BufferPart, type SchemaCheck } from './buffer.js';
 import { inspectImage, MAX_ALT_CHARS, MAX_IMAGES_PER_PART, type ImageReason, type InspectedImage } from './images.js';
 import { X_LIMIT, xWeightedLength } from './x-length.js';
 
@@ -150,6 +150,22 @@ export async function createPost(
   }
   if (!deps.buffer) throw new AppError(503, 'POSTING_NOT_CONFIGURED', 'Posting is not configured on this server (no Buffer key)');
   const buffer = deps.buffer;
+  // v3.2.0 (CR-017): Buffer's own type definitions must accept the input shape before anything is stored or sent. A mismatch (or no answer to the
+  // read-only introspection) refuses here: no row, no allowance used, the Idempotency-Key is released, create is never called.
+  try {
+    const sc = await buffer.checkSchema();
+    if (!sc.ok) {
+      throw new AppError(502, 'POST_FAILED', 'Buffer\'s API no longer accepts the post shape this service sends; nothing was sent', {
+        step: 'schema', outcome: 'failed', problems: sc.problems, checked_types: sc.checked_types,
+      });
+    }
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    if (!(e instanceof BufferError)) throw e;
+    throw new AppError(502, 'POST_FAILED', 'Buffer\'s API could not be asked for its type definitions; nothing was sent', {
+      step: 'schema', kind: e.kind, outcome: 'failed', ...(e.status !== undefined ? { status: e.status } : {}), message: e.message, ...(e.retryAfter !== undefined ? { retry_after: e.retryAfter } : {}),
+    });
+  }
   const nowMs = deps.now();
   const id = newPostId();
   const now = new Date(nowMs);
@@ -210,6 +226,19 @@ export async function createPost(
     images: stored.map((s) => ({ part: s.part, position: s.position, sha256: s.image.sha256 })),
     allowance: { today_cap: al.today_cap, used_today: al.used_today + 1, remaining: Math.max(0, al.remaining - 1) },
   };
+}
+
+/** POST /posts/schema-check: 503 POSTING_NOT_CONFIGURED without a Buffer key; otherwise the (read-only) introspection result for the sample post. */
+export async function postSchemaCheck(deps: Pick<PostingDeps, 'buffer'>): Promise<SchemaCheck> {
+  if (!deps.buffer) throw new AppError(503, 'POSTING_NOT_CONFIGURED', 'Posting is not configured on this server (no Buffer key)');
+  try {
+    return await deps.buffer.checkSchema();
+  } catch (e) {
+    if (!(e instanceof BufferError)) throw e;
+    throw new AppError(502, 'POST_FAILED', 'Buffer\'s API could not be asked for its type definitions', {
+      step: 'schema', kind: e.kind, ...(e.status !== undefined ? { status: e.status } : {}), message: e.message, ...(e.retryAfter !== undefined ? { retry_after: e.retryAfter } : {}),
+    });
+  }
 }
 
 export async function removePost(

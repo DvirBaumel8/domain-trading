@@ -12,6 +12,7 @@ import { mswServer } from '../setup/network.js';
 import { checkText } from '../../src/modules/outreach/blocklist.js';
 import { requestHash, pruneIdempotencyKeys, STALE_IN_PROGRESS_MS } from '../../src/http/idempotency.js';
 import { postsRefresh } from '../../src/modules/outreach/posting/posts.js';
+import { introspectionAnswer, refuseBadCreate } from '../helpers/buffer-schema.js';
 import { BufferClient } from '../../src/modules/outreach/posting/buffer.js';
 
 const BUF_KEY = 'buf_fake_key_0123456789abcdefABCDEF';
@@ -24,13 +25,16 @@ const bufCalls: string[] = [];
 function bufferMock(onCreate: () => Response | Promise<Response> = () => HttpResponse.json({ data: { createPost: { __typename: 'PostActionSuccess', post: { id: 'buf_post_1', status: 'sending', externalLink: null, sentAt: null } } } })) {
   bufCalls.length = 0;
   mswServer.use(http.post('https://api.buffer.com', async ({ request }) => {
-    const q = ((await request.json()) as { query: string }).query;
+    const body = (await request.json()) as { query: string; variables: { name?: string; input?: unknown } };
+    const q = body.query;
+    if (q.includes('__type(')) return introspectionAnswer(body.variables.name!);
     const op = q.includes('createPost') ? 'create' : q.includes('GetPost') ? 'get' : q.includes('organizations') ? 'account' : q.includes('channels') ? 'channels' : 'other';
     bufCalls.push(op);
     if (op === 'account') return HttpResponse.json({ data: { account: { organizations: [{ id: 'org1' }] } } });
     if (op === 'channels') return HttpResponse.json({ data: { channels: [{ id: 'ch_x', name: 'x', service: 'twitter' }] } });
     if (op === 'get') return HttpResponse.json({ data: { post: { id: 'buf_post_1', status: 'sent', externalLink: 'https://x.com/co/status/1', sentAt: '2026-10-20T10:00:05Z' } } });
-    return onCreate();
+    const bad = refuseBadCreate(body.variables.input);
+    return bad ?? onCreate();
   }));
 }
 const creates = () => bufCalls.filter((c) => c === 'create').length;

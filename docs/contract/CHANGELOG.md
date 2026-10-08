@@ -2,6 +2,26 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.2.0 (2026-10-08): CR-017, CR-018, CR-019 part C, CR-020
+MINOR, **additive** (except: `summary.partial` narrowed to its documented meaning, and pending-delete names leave `failed_by_check.availability`). Release note: `docs/releases/v3.2.0.md`.
+- **Posting (CR-017):**
+  - the Buffer `createPost` input fixed (`assets: [{image}]`, `shareMode`);
+  - new `POST /posts/schema-check`, and a real post checks the schema first;
+  - a failed post doesn't use the allowance;
+  - `review_reason` is `CODE: text`, at most 200;
+  - a replay takes no rate-limit slot;
+  - `triggered_by` is never null for new runs.
+- **Daily (CR-018):** an interrupted screening run resumes at start; the list rebuilds automatically when screening finishes (`built_by: auto`); `summary.why`.
+- **Intake (CR-019 C, CR-020):**
+  - scout names first;
+  - drop-list names only as leftovers that fit a kept lane (S2/S4/S6, else `NO_KEPT_LANE`), capped by `intake.drop_list_max_share`;
+  - timeout retry in the same run;
+  - pending-delete names show as `dropping`;
+  - `dropWatch` re-checks names for 7 days after their drop;
+  - `who_chases`;
+  - `summary.partial` / `screening_ended_partial` / `timeout_n`;
+  - settings `tranche.main_lanes` (default = today's rule).
+
 ## 3.1.0 (2026-10-08): CR-016, missed and stuck runs, review retries
 MINOR, **additive**. Release note: `docs/releases/v3.1.0.md`.
 - **`/report`:** new errors `JOB_MISSED` (today's 00:05 UTC slot passed by 30 minutes with no daily run) and `JOB_RUN_INCOMPLETE` (a daily run open for more than 2 hours). `GET /jobs/runs` `jobs.daily` adds `last_scheduled` and `missed_slot`. `/health` `jobs` is `overdue` in both cases.

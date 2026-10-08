@@ -6,6 +6,7 @@ export { registerTestSets } from './api/test-sets.js';
 export { HistoryManual, phraseKey, priorPhraseOf, TmManual } from './checks/manual.js';
 export { surblCheck } from './checks/surbl.js';
 export { latestByCheck } from './derive.js';
+export { KEPT_LANES, type KeptLane, laneFitter } from './lane-fit.js';
 export { assemble, createRun, effectiveHold, fullPlanRunOrThrow, HEARTBEAT_STALE_MS, type InputName, loadRows, ScreeningWorker, toResultRow } from './engine.js';
 export { NAMEBIO_NAME, refreshNameBio } from './namebio.js';
 export { latestPackFor } from './pack.js';

@@ -44,6 +44,10 @@ const Cond = z.union([
 const Clause = z.union([z.object({ all: z.array(Cond).min(1) }).strict(), z.object({ any: z.array(Cond).min(1) }).strict()]);
 
 // v1.2.0 (CR-001 P1b) settings. The stored v1 row has none of these keys: every one carries a zod default holding the full literal value.
+/** v3.2.0 (CR-020 D): which lanes count as "main lane" for the tranche quota, and what a member of that lane must show. The default is the rule of v3.1.x exactly. */
+export const MAIN_LANES_DEFAULT: { lane: Lane; require: 'clean_history' | 'demand2' | 'none' }[] = [{ lane: 'S7', require: 'clean_history' }, { lane: 'S3', require: 'demand2' }];
+/** v3.2.0 (CR-020 A): the share of the day's intake screening budget that drop-list names may take at most (1 = no extra cap: they only fill what scout names leave). */
+export const INTAKE_DEFAULT = { drop_list_max_share: 1 };
 export const EU_TM_DEFAULT = { required_lanes: ['S6'] as Lane[], freshness_hours: 168 };
 export const SAME_NAME_DEFAULT = {
   min_visible_chars: 200, timeout_ms: 10_000, max_bytes: 512_000, max_redirects: 3, min_ms_between_fetches: 1000,
@@ -95,7 +99,11 @@ const Base = z.object({
   }).strict(),
   typo: z.object({ max_edit_distance: int, top_n: int, max_list_age_days: int }).strict(),
   concentration: z.object({ max_per_attr: int, max_lane_share: share, lane_share_enforced: z.boolean() }).strict(),
-  tranche: z.object({ size: int, min_main_lane: int, geo_max: int, required_for_buy: z.boolean() }).strict(),
+  tranche: z.object({
+    size: int, min_main_lane: int, geo_max: int, required_for_buy: z.boolean(),
+    main_lanes: z.array(z.object({ lane: z.enum(LANES), require: z.enum(['clean_history', 'demand2', 'none']) }).strict()).default(MAIN_LANES_DEFAULT),
+  }).strict(),
+  intake: z.object({ drop_list_max_share: share }).strict().default(INTAKE_DEFAULT),
   surbl: z.object({
     zone: z.string().min(3), control_name: z.string().min(3), blocked_answers: z.array(z.string()),
     list_bits: z.record(z.string().regex(/^\d+$/), z.string()), ns_override: z.array(z.string()), timeout_ms: int,
@@ -275,7 +283,8 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   },
   typo: { max_edit_distance: 1, top_n: 10000, max_list_age_days: 7 },
   concentration: { max_per_attr: 2, max_lane_share: 0.4, lane_share_enforced: false },
-  tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true },
+  tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true, main_lanes: MAIN_LANES_DEFAULT },
+  intake: INTAKE_DEFAULT,
   surbl: { zone: 'multi.surbl.org', control_name: 'test.surbl.org', blocked_answers: ['127.0.0.1'], list_bits: { '4': 'DM', '8': 'PH', '16': 'MW', '32': 'CT', '64': 'ABUSE', '128': 'CR' }, ns_override: [], timeout_ms: 3000 },
   history: {
     max_fetch_per_name: 6, min_ms_between_calls: 1000, timeout_ms: 20000, retries: 2, min_content_chars: 200, parked_max_text_chars: 1500,

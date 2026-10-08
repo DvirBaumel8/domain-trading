@@ -47,7 +47,7 @@ import { ReferenceRefreshJob } from './modules/ops/index.js';
 import { PriceScheduleJob } from './modules/ops/index.js';
 import { registerJobs } from './modules/ops/index.js';
 import { IntakeScreeningJob } from './modules/candidates/index.js';
-import { BuildDailyListJob } from './modules/candidates/index.js';
+import { autoRebuildDailyList, BuildDailyListJob } from './modules/candidates/index.js';
 import { JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
 import { Reconciler } from './modules/buying/index.js';
 
@@ -134,14 +134,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   registerAuditId(app); // onRequest (first)
   registerAuth(app, deps.db, deps.config.jobTriggerToken, deps.now); // onRequest
-  registerRateLimit(app, deps.now); // preHandler (first, so a 429 never claims an idempotency key)
+  registerRateLimit(app, deps.now, deps.db); // preHandler (first, so a 429 never claims an idempotency key)
   registerScope(app); // preHandler
   registerIdempotency(app, deps.db); // preHandler (after scope) + onSend (before audit write)
   registerAuditWrite(app, auditWriter); // onSend (last)
 
   const postingDeps: PostingDeps = {
     db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, publicBaseUrl: deps.config.publicBaseUrl,
-    buffer: deps.config.bufferApiKey ? new BufferClient({ fetch: globalThis.fetch, apiKey: deps.config.bufferApiKey, channelId: deps.config.bufferChannelId }) : null,
+    buffer: deps.config.bufferApiKey ? new BufferClient({ fetch: globalThis.fetch, apiKey: deps.config.bufferApiKey, channelId: deps.config.bufferChannelId, now: deps.now }) : null,
   };
   registerHealth(app, deps.config, deps.db, deps.now ?? Date.now, postingDeps, () => app.jobQueue.kickIfNeeded());
   const adapters = deps.adapters ?? createAdapters(deps.config);
@@ -183,6 +183,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   app.decorate('screeningWorker', screeningWorker);
   app.addHook('onClose', async () => screeningWorker.idle());
+  // CR-018 A: the day's list is rebuilt when the day's intake screening run ends (a run resumed after a restart included).
+  screeningWorker.onFinished(async (runId) => { await autoRebuildDailyList({ db: deps.db, worker: screeningWorker, now: deps.now ?? Date.now }, runId); });
   registerScreening(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerTestSets(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
@@ -221,6 +223,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     secretValues: deps.config.secretValues,
   }));
   app.decorate('jobQueue', new JobQueue({ db: deps.db, now: deps.now ?? Date.now, runner: app.jobRunner, log: app.log, overrides: deps.jobQueueOverrides,
+    resumeScreening: (atStart) => screeningWorker.resumeStalled({ atStart }),
     keepAlive: deps.jobQueueKeepAlive ?? (deps.config.appEnv === 'production' && deps.config.publicBaseUrl ? { url: deps.config.publicBaseUrl } : undefined) }));
   // Closing the app waits for the step in flight, so nothing touches the database after it is closed. Unfinished runs resume at start (main.ts) or on the next GET.
   app.addHook('onClose', async () => app.jobQueue.stop());

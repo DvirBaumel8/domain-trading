@@ -6,7 +6,7 @@ import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Database } from '../../../db/types.js';
 import { DROP_LIST_NAME_RE, daysBetween, filterDropName, namesDroppingBetween } from '../drop-lists.js';
-import { splitV2 } from '../../selection/index.js';
+import { activeSelectionSettings, laneFitter, splitV2 } from '../../selection/index.js';
 import { AppError } from '../../../http/errors.js';
 import { idtDay, realYmd, toJerusalemIso } from '../../../core/dates.js';
 export interface DropListsDeps { db: Kysely<Database>; now: () => number }
@@ -71,15 +71,23 @@ export function registerDropLists(app: FastifyInstance, deps: DropListsDeps): vo
       select r.domain, r.kept, r.reason, r.tokens, c.status, c.expected_drop_date::text as expected_drop_date, c.drop_date_source, c.checked_at
       from drop_list_rows r left join lateral (select * from drop_list_checks k where k.list_name = r.list_name and k.domain = r.domain order by k.id desc limit 1) c on true
       where r.list_name = ${list.name} order by r.id`.execute(db)).rows;
+    // v3.2.0 (CR-020 A): the kept lane a kept name fits (S2, S4 or S6), or `NO_KEPT_LANE`: such a name stays on the list but is never screened.
+    const fit = await laneFitter(db, (await activeSelectionSettings(db)).values);
+    const screening = (r: { domain: string; kept: boolean }) => {
+      if (!r.kept) return { lane: null, reason: null };
+      const lane = fit(r.domain);
+      return { lane, reason: lane === null ? 'NO_KEPT_LANE' : null };
+    };
     return {
       name: list.name, list_date: list.list_date, created_at: toJerusalemIso(list.created_at), created_by: list.created_by, received_n: list.received_n, kept_n: list.kept_n,
-      rows: rows.map((r) => ({ domain: r.domain, kept: r.kept, reason: r.reason, tokens: r.tokens ?? legacyTokens(r), status: r.status, expected_drop_date: r.expected_drop_date, drop_date_source: r.drop_date_source, checked_at: r.checked_at ? toJerusalemIso(r.checked_at) : null })),
+      rows: rows.map((r) => ({ domain: r.domain, kept: r.kept, reason: r.reason, tokens: r.tokens ?? legacyTokens(r), screening: screening(r), status: r.status, expected_drop_date: r.expected_drop_date, drop_date_source: r.drop_date_source, checked_at: r.checked_at ? toJerusalemIso(r.checked_at) : null })),
     };
   });
 
   app.get('/selection/drop-lists', async (req) => {
     const { from, to } = parseWindow(req.query);
-    const names = await namesDroppingBetween(db, deps.now(), from, to);
+    // Only names still in pending delete or redemption (a name asked again after its drop date is listed by its list row, not as dropping).
+    const names = (await namesDroppingBetween(db, deps.now(), from, to)).filter((n) => n.status === 'pending_delete' || n.status === 'redemption');
     return { names };
   });
 }
