@@ -189,7 +189,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
-  const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey };
+  const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey, ...(deps.sleep ? { sleep: deps.sleep } : {}) };
   registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });
   registerPosts(app, postingDeps);
   registerPacks(app, { db: deps.db, now: deps.now ?? Date.now });

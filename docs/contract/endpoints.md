@@ -1,4 +1,4 @@
-# Endpoints (contract v3.0.0)
+# Endpoints (contract v3.1.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -55,6 +55,8 @@ The only public route. No auth, no DB access (Render's health check uses it).
 Any valid bot token (READ or WRITE).
 - **200** `{status: "ok", db: "ok", jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
 - `posting` (2.12.0, additive): `paused`, `not_configured`, `failed` (the latest post failed), else `ok`; `posting_reason` with the pause reason or the failure.
+- `review_reason` (3.1.0): present only when `review` is `failed`: Google's status and short reason from the latest review (at most 120 characters, never a key).
+- `jobs` is also `overdue` (3.1.0) when `JOB_MISSED` or `JOB_RUN_INCOMPLETE` applies.
 - `review` (2.11.0, additive; `disabled` and `review_model` 2.11.2): `disabled` (the switch is off), `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
 - `jobs` (2.1.0, additive) is `overdue` when no `daily` run has finished in the last 26 hours (the same rule as the `/report` warning `JOB_OVERDUE`), else `ok`. A run started by hand counts. `GET /health/ping` is unchanged (no DB).
 - `version` is the service build version (`package.json`), not the contract version. The only scheduled job is the daily run at 00:05 UTC (`jobs.md`); its rows are in `GET /audit` (scope `job`). No secret, key prefix or balance is ever shown.
@@ -574,7 +576,7 @@ READ (any `GET` token; not the job token). Query (all optional; an unknown param
             started_at, finished_at, skipped: bool, ok: bool,
             steps: { <step>: { ok (null while queued or running), status: queued|running|done|failed|skipped, attempts, ms, started_at, finished_at, skipped?, error?, summary } } } ],   // unfinished runs first, then newest first
   jobs: { tick: { last_run_at, last_ok_at, next_due_at: null },
-          daily: { last_run_at, last_ok_at, next_due_at } },                   // ISO | null
+          daily: { last_run_at, last_ok_at, next_due_at, last_scheduled: {run_id, status, ok} | null, missed_slot: ISO | null } },   // last_scheduled, missed_slot: 3.1.0                   // ISO | null
   reference: { popularity: { list_id, list_date, rows, refreshed_at } | null,
                iana: { refreshed_at: ISO | null }, namebio: { enabled: false } },
   backup: { configured: bool, last_status: "ok" | "failed" | "skipped" | null } }
@@ -622,7 +624,7 @@ READ. `{terms: [{id, category, created_at, retired_at}]}` (no term text).
 WRITE. `preview?` (query or body, boolean). Builds what the reviewer gets: `{kind: "daily" | "weekly", generated_at, document: {version, sha256, text (in full on a weekly packet or the first one, else null), diff_since: {from_version, diff} | null}, dom_changes: {since, service_version, settings_versions[], listing_changes[], offers[], sales[], failed_job_steps[]} (each list at most the newest 200), numbers (the /report object without any walk-away field)}`. **Weekly rule (2.15.0, CR-013 F-1; the one rule):** `kind` is `weekly`, and the document goes in full, on Sunday (IDT) or when no packet whose feedback is `ok` has carried the full document in the last 7 days; a packet whose feedback is `unknown`, or has none, never counts. **Actors (2.15.0, F-2):** every actor or token id DOM builds into a packet (`opened_by`, `created_by`, `triggered_by`, a token name …) is written as `operator`. The packet must pass the block list. `preview` → **200** `{preview: true, kind, content, sha256}`, nothing stored; otherwise **201** `{packet_id, kind, document_version, sha256, content}` and the packet is stored exactly as sent. **Errors:** 409 `DOCUMENT_MISSING` · 409 `REVIEW_COST_CAP` (`details.spent_usd`, `cap_usd`; a preview too) · 422 `TEXT_BLOCKED`.
 
 ### `POST /reviews/run`
-WRITE (2.11.0). Runs a review now (for testing); only one review runs at a time (2.16.0: another call meanwhile → 409 `REVIEW_IN_PROGRESS`; the scheduled step skips with `IN_PROGRESS`): the same work as the daily step, but it never skips for "already done today". At most 3 calls per hour per WRITE token that **reach Google** (2.15.0: a refused call does not count; 429 `RATE_LIMITED`); each counts toward the monthly cap. **200:** `{packet_id, kind, status: "ok" | "unknown", items_n, new_n, repeat_n, cost_usd, dropped_n, reason?}`. **Errors:** 503 `REVIEWER_NOT_CONFIGURED` (no key) · 409 `REVIEW_DISABLED` (2.11.2, the switch is off) · 409 `REVIEW_COST_CAP` · 409 `DOCUMENT_MISSING` · 422 `TEXT_BLOCKED` (`details.category`).
+WRITE (2.11.0). Runs a review now (for testing); only one review runs at a time (2.16.0: another call meanwhile → 409 `REVIEW_IN_PROGRESS`; the scheduled step skips with `IN_PROGRESS`): the same work as the daily step, but it never skips for "already done today". At most 3 calls per hour per WRITE token that **reach Google** (2.15.0: a refused call does not count; 429 `RATE_LIMITED`); each counts toward the monthly cap. **200:** `{packet_id, kind, status: "ok" | "unknown", items_n, new_n, repeat_n, cost_usd, dropped_n, attempts (3.1.0: tries made, 1–3), reason?}`. **Google 503 / UNAVAILABLE (3.1.0, CR-016):** retried inside the call, up to 3 tries (waits 20 s, then 40 s); never another key or model. A 429 is not retried in the call. **Errors:** 503 `REVIEWER_NOT_CONFIGURED` (no key) · 409 `REVIEW_DISABLED` (2.11.2, the switch is off) · 409 `REVIEW_COST_CAP` · 409 `DOCUMENT_MISSING` · 422 `TEXT_BLOCKED` (`details.category`).
 
 ### `GET /reviews/settings`
 READ (2.11.2, CR-011 addendum C). `{enabled, model, tier: "free" | "paid", allowed_models: [{model, tier, input_usd_per_m, output_usd_per_m}], updated_at, updated_by}`. Defaults: `enabled: true`, `model: "gemini-3.8-flash"`, `tier: "free"`. Allowed: `gemini-3.8-flash` (free or paid; its paid prices are DOM's placeholders, $0.50 / $3.00 per million tokens), `gemini-3.1-pro-preview` (paid only, $2.00 / $12.00).

@@ -63,7 +63,7 @@ export class JobQueue {
       }
       const runId = `run_${randomUUID()}`;
       await trx.insertInto('job_queue_runs').values({
-        id: runId, job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, triggered_by: opts.triggeredBy ?? null,
+        id: runId, job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, triggered_by: opts.triggeredBy ?? null, created_at: new Date(this.deps.now()),
       }).execute();
       const plan = this.deps.runner.plan(job);
       await trx.insertInto('job_steps').values(plan.map((e, position) => ({

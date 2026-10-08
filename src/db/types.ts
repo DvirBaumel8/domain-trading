@@ -813,6 +813,7 @@ export interface ReviewFeedbackTable {
   model: string | null;
   cost_usd: ColumnType<string, number | string | undefined, never>;
   reason: string | null;
+  attempts: number | null;
 }
 export interface ReviewItemsTable {
   id: Generated<number>;

@@ -5,7 +5,7 @@ import type { Database } from '../../../db/types.js';
 import { computePlan } from '../../listing/index.js';
 import { settingsByVersion } from '../../listing/index.js';
 import { manualDelist, pendingDomains, VENUES } from '../../listing/index.js';
-import { JOBS_OVERDUE_HOURS, jobsOverdue } from '../job-runs.js';
+import { dailyScheduleState, JOBS_OVERDUE_HOURS, JOB_RUN_STUCK_HOURS, jobsOverdue } from '../job-runs.js';
 import { DROP_FEED_STALE_DAYS, daysBetween } from '../../candidates/index.js';
 import { priceValues } from './money.js';
 
@@ -31,6 +31,18 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   if (overdue.overdue) {
     add('JOB_OVERDUE', 'error', `No daily job run has finished in the last ${JOBS_OVERDUE_HOURS} hours.`, undefined, {
       job: 'daily', last_run_at: overdue.lastRunAt ? toJerusalemIso(overdue.lastRunAt) : null, expected_every: '24h',
+    });
+  }
+  // CR-016 R-A3: a daily run left open, and a scheduled slot nobody ran.
+  const sched = await dailyScheduleState(db, now.getTime());
+  if (sched.stuck) {
+    add('JOB_RUN_INCOMPLETE', 'error', `A daily job run has been queued or running for over ${JOB_RUN_STUCK_HOURS} hours.`, undefined, {
+      run_id: sched.stuck.runId, started_at: toJerusalemIso(sched.stuck.startedAt), open_steps: sched.stuck.openSteps,
+    });
+  }
+  if (sched.missed) {
+    add('JOB_MISSED', 'error', 'The scheduled daily run (00:05 UTC) did not start.', undefined, {
+      slot: toJerusalemIso(sched.missed.slot), last_run_at: sched.missed.lastRunAt ? toJerusalemIso(sched.missed.lastRunAt) : null,
     });
   }
   // CR-011 part B: once any review feedback exists, the newest must not be older than REVIEW_OVERDUE_HOURS.

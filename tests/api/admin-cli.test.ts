@@ -42,7 +42,7 @@ describe('admin CLI', () => {
   it('doctor reports DB, migrations and adapters and never prints a secret', async () => {
     const { stdout } = await cli(['doctor']);
     expect(stdout).toMatch(/db: ok/);
-    expect(stdout).toMatch(/migrations: 24 applied/);
+    expect(stdout).toMatch(/migrations: 25 applied/);
     expect(stdout).toMatch(/porkbun: enabled/);
     for (const secret of ['pk1_', 'sk1_', 'fake_godaddy_pat', 'github_pat_fake', ':dt@']) {
       expect(stdout).not.toContain(secret);

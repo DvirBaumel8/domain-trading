@@ -21,11 +21,16 @@ export interface ReviewRunDeps {
   timeoutMs?: number;
   /** Called just before the request goes to Google (POST /reviews/run counts only such calls toward its hourly limit). */
   onGoogleCall?: () => void;
+  /** Waits between the tries of a 503 backoff (tests inject a no-op; default is a real timer). */
+  sleep?: (ms: number) => Promise<void>;
 }
+/** CR-016 R-1: a Google 503 / UNAVAILABLE is retried inside the call: up to 3 tries in all, waiting 20 s and then 40 s. Never another key or model. */
+export const REVIEW_BACKOFF_MS = [20_000, 40_000] as const;
+const isUnavailable = (g: { httpStatus: number | null; errorStatus: string | null }) => g.httpStatus === 503 || g.errorStatus === 'UNAVAILABLE';
 export type ReviewSkip = 'IN_PROGRESS' | 'NO_KEY' | 'DISABLED' | 'DOCUMENT_MISSING' | 'COST_CAP' | 'ALREADY_DONE_TODAY' | 'TEXT_BLOCKED' | 'NOTHING_PENDING';
 export type ReviewRunResult =
   | { skipped: ReviewSkip; category?: BlockCategory }
-  | { packet_id: string; kind: 'daily' | 'weekly'; status: 'ok' | 'unknown' | 'retry_pending'; items_n: number; new_n: number; repeat_n: number; cost_usd: number; dropped_n: number; reason?: string; detail?: string };
+  | { packet_id: string; kind: 'daily' | 'weekly'; status: 'ok' | 'unknown' | 'retry_pending'; items_n: number; new_n: number; repeat_n: number; cost_usd: number; dropped_n: number; reason?: string; detail?: string; attempts?: number };
 
 /** CR-013 F-3: Google's "try again later" answers: 429, 503, UNAVAILABLE, a timeout or a network error. */
 export function isTransientFailure(g: { transient: boolean }): boolean {
@@ -55,17 +60,24 @@ async function callAndStore(
   const apiKey = deps.apiKey!;
   const now = new Date(a.now);
   deps.onGoogleCall?.(); // the hourly-limit slot is taken here, before the request, and never given back
-  const g = await callGemini({ fetch: deps.fetch, apiKey, model: settings.model, timeoutMs: deps.timeoutMs }, a.text);
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let attempts = 1;
+  let g = await callGemini({ fetch: deps.fetch, apiKey, model: settings.model, timeoutMs: deps.timeoutMs }, a.text);
+  while (g.kind === 'unknown' && isUnavailable(g) && attempts <= REVIEW_BACKOFF_MS.length) {
+    await sleep(REVIEW_BACKOFF_MS[attempts - 1]!);
+    attempts++;
+    g = await callGemini({ fetch: deps.fetch, apiKey, model: settings.model, timeoutMs: deps.timeoutMs }, a.text);
+  }
   if (g.kind === 'unknown') {
     if (isTransientFailure(g) && a.onRateLimit === 'defer') {
       await db.insertInto('review_retries').values({ packet_id: a.packetId, day: idtDay(a.now), created_at: now }).execute();
-      return { packet_id: a.packetId, kind: a.kind, status: 'retry_pending', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason: 'retry_pending', detail: `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: retry at the 08:30 UTC tick` };
+      return { packet_id: a.packetId, kind: a.kind, status: 'retry_pending', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason: 'retry_pending', detail: `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: retry at the 08:30 UTC tick`, attempts };
     }
     const raw = scrubSecrets(`HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: ${g.reason}`, [apiKey]).slice(0, 500);
     const blockedReason = await checkText(db, raw, { secretValues: deps.secretValues });
     const reason = blockedReason.ok ? raw : `HTTP ${g.httpStatus ?? 'none'} ${g.errorStatus ?? 'none'}: reason withheld by the block list`;
-    await storeFeedback(db, { packetId: a.packetId, createdBy: a.createdBy, now, input: { status: 'unknown', provider: 'gemini', model: settings.model, reason } });
-    return { packet_id: a.packetId, kind: a.kind, status: 'unknown', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason };
+    await storeFeedback(db, { packetId: a.packetId, createdBy: a.createdBy, now, input: { status: 'unknown', provider: 'gemini', model: settings.model, reason, attempts } });
+    return { packet_id: a.packetId, kind: a.kind, status: 'unknown', items_n: 0, new_n: 0, repeat_n: 0, cost_usd: 0, dropped_n: 0, reason, attempts };
   }
   const kept: typeof g.items = [];
   let dropped = 0;
@@ -74,9 +86,9 @@ async function callAndStore(
     if (b.ok) kept.push(it); else dropped++;
   }
   const cost = geminiCostUsd(g.model, settings.tier, g.inputTokens, g.outputTokens);
-  const stored = await storeFeedback(db, { packetId: a.packetId, createdBy: a.createdBy, now, input: { status: 'ok', provider: 'gemini', model: g.model, cost_usd: cost, items: kept } });
+  const stored = await storeFeedback(db, { packetId: a.packetId, createdBy: a.createdBy, now, input: { status: 'ok', provider: 'gemini', model: g.model, cost_usd: cost, items: kept, attempts } });
   const repeat = stored.items.filter((i) => i.novelty === 'repeat').length;
-  return { packet_id: a.packetId, kind: a.kind, status: 'ok', items_n: stored.items.length, new_n: stored.items.length - repeat, repeat_n: repeat, cost_usd: cost, dropped_n: dropped };
+  return { packet_id: a.packetId, kind: a.kind, status: 'ok', items_n: stored.items.length, new_n: stored.items.length - repeat, repeat_n: repeat, cost_usd: cost, dropped_n: dropped, attempts };
 }
 
 export function runReview(deps: ReviewRunDeps, opts: { trigger: 'scheduled' | 'manual'; now: number; createdBy?: string }): Promise<ReviewRunResult> {
@@ -92,8 +104,9 @@ async function runReviewInner(deps: ReviewRunDeps, opts: { trigger: 'scheduled' 
   if ((await monthSpend(db, opts.now)).spentUsd >= REVIEW_MONTHLY_CAP_USD) return { skipped: 'COST_CAP' };
   if (opts.trigger === 'scheduled') {
     const today = idtDay(opts.now);
+    // CR-016 R-2: only a packet whose feedback is ok counts as the day's review; a manual run that stored unknown does not.
     const recent = await db.selectFrom('review_packets as p').innerJoin('review_feedback as f', 'f.packet_id', 'p.id').select('p.created_at')
-      .where('p.created_at', '>', new Date(opts.now - 36 * 3_600_000)).execute();
+      .where('f.status', '=', 'ok').where('p.created_at', '>', new Date(opts.now - 36 * 3_600_000)).execute();
     if (recent.some((r) => idtDay(r.created_at.getTime()) === today)) return { skipped: 'ALREADY_DONE_TODAY' };
     // A 429 earlier today is waiting for the retry tick; do not ask Google again.
     if (await db.selectFrom('review_retries').select('id').where('day', '=', today).executeTakeFirst()) return { skipped: 'ALREADY_DONE_TODAY' };

@@ -1,4 +1,4 @@
-# Reports (contract v3.0.0)
+# Reports (contract v3.1.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -39,6 +39,8 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `PURCHASE_UNKNOWN` | error | A purchase is in the `unknown` state | `purchase_id` |
 | `PRICE_EVENT_FAILED` | error | A scheduled price event failed (the domain is unchanged) | `events[] {event, due_on, note}` |
 | `EXPIRED_NOT_RENEWED` | error | A live name with `renewals_used = 0` is past its expiry (it is not auto-dropped: grace period) | `expiry_date` |
+| `JOB_MISSED` | error | (3.1.0, CR-016) Today's scheduled slot (00:05 UTC) passed more than 30 minutes ago and no daily run was created at or after it (once any daily run exists) | `slot`, `last_run_at` |
+| `JOB_RUN_INCOMPLETE` | error | (3.1.0) A daily run has been queued or running for more than 2 hours | `run_id`, `started_at`, `open_steps[]` |
 | `JOB_OVERDUE` | error | No `daily` job run has finished in the last 26 hours (2.1.0); a run started by hand counts; a never-run service is overdue | `job` (`daily`), `last_run_at` (null if never), `expected_every` (`24h`) |
 | `REGISTRY_MISMATCH` | error | The daily registry check (`portfolioCheck`, 2.3.0) found the name not registered, at another registrar, with another expiry date, or on hold / pending delete / in redemption | `checked_at`, `differences[] {field, ours, registry}` |
 | `OWNED_NAME_BLOCKLISTED` | error | The weekly blocklist check found the name on SURBL or Google Web Risk (2.3.0) | `checked_at`, `sources[]` |

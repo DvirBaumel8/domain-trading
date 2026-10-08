@@ -161,7 +161,7 @@ describe('F-3 a 503, UNAVAILABLE, timeout or network error is retried like a 429
     t.clock.t = TICK;
     const tick = await t.app.jobRunner.run('tick');
     expect(step(tick, 'reviewRetry')).toMatchObject({ status: 'unknown' });
-    expect(seen).toHaveLength(2);
+    expect(seen).toHaveLength(6); // v3.1.0 (CR-016 R-1): each call is 3 tries in all (backoff on 503), the daily call and the retry
     const fb = await db.selectFrom('review_feedback').selectAll().execute();
     expect(fb).toHaveLength(1);
     expect(fb[0]!.reason).toMatch(/^HTTP 503 UNAVAILABLE: This model is currently experiencing high demand/);

@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.1.0 (2026-10-08): CR-016, missed and stuck runs, review retries
+MINOR, **additive**. Release note: `docs/releases/v3.1.0.md`.
+- **`/report`:** new errors `JOB_MISSED` (today's 00:05 UTC slot passed by 30 minutes with no daily run) and `JOB_RUN_INCOMPLETE` (a daily run open for more than 2 hours). `GET /jobs/runs` `jobs.daily` adds `last_scheduled` and `missed_slot`. `/health` `jobs` is `overdue` in both cases.
+- **Review:**
+  - a Google 503 / UNAVAILABLE is retried inside the call (3 tries, 20 s then 40 s); `attempts` on `POST /reviews/run`;
+  - only an `ok` review counts as the day's review;
+  - `/health` `review_reason` when the review failed.
+
 ## 3.0.0 (2026-10-08): job queue in Postgres (refactor R3)
 **MAJOR** for callers of `POST /jobs/run` (DOM's Worker and workflow, which are updated in this release; Gavriel was told in `DOM-TO-GAVRIEL.md`). Release note: `docs/releases/v3.0.0.md`.
 - **`POST /jobs/run`** answers **202** `{run_id, job, status, skipped, steps}` at once instead of 200 with every step's result. An overlap answers with the running run's id.

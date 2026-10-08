@@ -6,8 +6,8 @@ import { jaccard, noveltyTokens, REPEAT_JACCARD } from './novelty.js';
 
 export interface FeedbackItemInput { category: string; severity: 'low' | 'medium' | 'high'; text: string }
 export type FeedbackInput =
-  | { status: 'ok'; provider: string; model: string; cost_usd: number; items: FeedbackItemInput[] }
-  | { status: 'unknown'; provider: string; model?: string | undefined; cost_usd?: number | undefined; reason: string };
+  | { status: 'ok'; provider: string; model: string; cost_usd: number; items: FeedbackItemInput[]; attempts?: number | undefined }
+  | { status: 'unknown'; provider: string; model?: string | undefined; cost_usd?: number | undefined; reason: string; attempts?: number | undefined };
 
 export interface StoredFeedback {
   feedback_id: number;
@@ -29,7 +29,7 @@ export async function storeFeedback(
     return await db.transaction().execute(async (trx) => {
       const fb = await trx.insertInto('review_feedback').values({
         packet_id: packetId, created_by: args.createdBy, created_at: nowDate, status: b.status, provider: b.provider,
-        model: b.model ?? null, cost_usd: b.cost_usd ?? 0, reason: b.status === 'unknown' ? b.reason : null,
+        model: b.model ?? null, cost_usd: b.cost_usd ?? 0, reason: b.status === 'unknown' ? b.reason : null, attempts: b.attempts ?? null,
       }).returning('id').executeTakeFirstOrThrow();
       const earlier = new Map<string, { id: number; tokens: Set<string>; original: number }[]>();
       const out: StoredFeedback['items'] = [];
