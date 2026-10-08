@@ -2,7 +2,8 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
-## 2026-10-08: coming in 3.0.0, `POST /jobs/run` answers 202 with a run id
+## 2026-10-08: 3.0.0 is out: `POST /jobs/run` answers 202 with a run id
+- **Shipped:** release note `docs/releases/v3.0.0.md`. The details below are as announced.
 - **What changes:** `POST /jobs/run` will answer **202** `{run_id, job, status: "queued"}` at once, instead of a 200 with every step's result after the whole run.
   - **The steps:** they run in the background as a queue in Postgres. Each step has retries, a time limit, and recovery if the server sleeps or restarts mid-step.
   - **Reading the results:** `GET /jobs/runs` (per step: status, attempts, `ms`, error).

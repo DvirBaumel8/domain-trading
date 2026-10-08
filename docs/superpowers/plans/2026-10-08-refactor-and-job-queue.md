@@ -1,5 +1,11 @@
 # Plan: step-by-step refactor and a Postgres job queue (8 Oct 2026)
 
+**Status (8 Oct 2026): done.**
+- **R1:** v2.16.1 (core) and v2.16.2 (locks and efficiency).
+- **R2:** v2.16.3 and v2.16.4 (nine modules).
+- **R3:** v3.0.0 (job queue, with a self keep-alive while it works).
+- **Open follow-up:** running independent steps in parallel under the shared per-registry pacer.
+
 **Decided by Dvir (8 Oct 2026):** a durable job queue in Postgres, **yes**; a step-by-step refactor into modules on a shared core, **"Totally yes!!"**; stay on Render free; no backups; no outside monitoring services. No rewrite: each step is one release, full gate green, deployed and verified before the next. **No contract change** unless a step says so (then it is a MINOR release with a CHANGELOG entry).
 
 ## Why now
