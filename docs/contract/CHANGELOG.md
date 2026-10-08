@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.2.2 (2026-10-09): the Buffer input from Buffer's live schema
+PATCH, a fix back to the contract (posting). `createPost` sends `mode: shareNow`, `schedulingType: automatic`, `needsApproval: false`, always an `assets` list, and the image alt text under `image.metadata.altText`, as Buffer's live schema requires. `types` on `POST /posts/schema-check` follows only X's metadata. Release note: `docs/releases/v3.2.2.md`.
+
 ## 3.2.1 (2026-10-09): schema check returns Buffer's types
 PATCH, additive. `POST /posts/schema-check` adds `types` (Buffer's live input definitions). The live check on 3.2.0 showed Buffer's live API differs from its published reference (`mode`, `schedulingType` and `needsApproval` are required; `ImageAssetInput` has no `altText`); 3.2.2 fixes the input from these definitions. Release note: `docs/releases/v3.2.1.md`.
 

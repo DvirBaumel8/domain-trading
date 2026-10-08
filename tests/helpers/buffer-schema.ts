@@ -4,18 +4,22 @@ import { HttpResponse } from 'msw';
 
 type Fields = Record<string, string>;
 export const BUFFER_TYPES: Record<string, { kind: 'INPUT_OBJECT'; fields: Fields } | { kind: 'ENUM'; values: string[] }> = {
-  CreatePostInput: { kind: 'INPUT_OBJECT', fields: { channelId: 'ID!', assets: '[AssetInput]', metadata: 'PostMetadataInput', shareMode: 'ShareMode!', text: 'String!', dueAt: 'DateTime' } },
-  AssetInput: { kind: 'INPUT_OBJECT', fields: { image: 'ImageAssetInput', link: 'LinkAssetInput', video: 'VideoAssetInput', document: 'DocumentAssetInput' } },
-  ImageAssetInput: { kind: 'INPUT_OBJECT', fields: { url: 'String!', altText: 'String' } },
-  PostMetadataInput: { kind: 'INPUT_OBJECT', fields: { twitter: 'TwitterPostMetadataInput' } },
-  TwitterPostMetadataInput: { kind: 'INPUT_OBJECT', fields: { thread: '[ThreadedPostInput!]' } },
-  ThreadedPostInput: { kind: 'INPUT_OBJECT', fields: { assets: '[AssetInput!]!', text: 'String!', metadata: 'PostMetadataInput' } },
-  LinkAssetInput: { kind: 'INPUT_OBJECT', fields: { url: 'String!' } },
+  // v3.2.2: CreatePostInput, AssetInput, ImageAssetInput, PostInputMetaData, TwitterPostMetadataInput and both enums as Buffer's LIVE schema answered
+  // POST /posts/schema-check on 9 Oct 2026 (trimmed to the fields DOM can send); ImageMetadataInput and ThreadedPostInput were not in that answer and
+  // follow the reference (the live check confirms them before any real post).
+  CreatePostInput: { kind: 'INPUT_OBJECT', fields: { aiAssisted: 'Boolean', assets: '[AssetInput!]!', channelId: 'ChannelId!', dueAt: 'DateTime', metadata: 'PostInputMetaData', mode: 'ShareMode!', needsApproval: 'Boolean!', saveToDraft: 'Boolean', schedulingType: 'SchedulingType!', source: 'String', text: 'String' } },
+  AssetInput: { kind: 'INPUT_OBJECT', fields: { document: 'DocumentAssetInput', image: 'ImageAssetInput', video: 'VideoAssetInput' } },
+  ImageAssetInput: { kind: 'INPUT_OBJECT', fields: { metadata: 'ImageMetadataInput', thumbnailUrl: 'String', url: 'String!' } },
+  ImageMetadataInput: { kind: 'INPUT_OBJECT', fields: { altText: 'String' } },
+  PostInputMetaData: { kind: 'INPUT_OBJECT', fields: { twitter: 'TwitterPostMetadataInput' } },
+  TwitterPostMetadataInput: { kind: 'INPUT_OBJECT', fields: { isAiGenerated: 'Boolean', thread: '[ThreadedPostInput!]' } },
+  ThreadedPostInput: { kind: 'INPUT_OBJECT', fields: { assets: '[AssetInput!]!', text: 'String!' } },
   VideoAssetInput: { kind: 'INPUT_OBJECT', fields: { url: 'String!' } },
-  DocumentAssetInput: { kind: 'INPUT_OBJECT', fields: { url: 'String!' } },
-  ShareMode: { kind: 'ENUM', values: ['addToQueue', 'shareNext', 'shareNow', 'customScheduled'] },
+  DocumentAssetInput: { kind: 'INPUT_OBJECT', fields: { url: 'String!', title: 'String!', thumbnailUrl: 'String!' } },
+  ShareMode: { kind: 'ENUM', values: ['addToQueue', 'customScheduled', 'shareNext', 'shareNow'] },
+  SchedulingType: { kind: 'ENUM', values: ['automatic', 'notification'] },
 };
-const SCALARS = new Set(['ID', 'String', 'DateTime']);
+const SCALARS = new Set(['ID', 'String', 'DateTime', 'Boolean', 'ChannelId']);
 
 interface Ref { kind: string; name: string | null; ofType: Ref | null }
 function parseRef(t: string): Ref {

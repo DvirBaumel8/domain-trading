@@ -3,10 +3,11 @@
 // This client has no call that replies, quotes, likes, follows or messages anyone: it can create a post, read a post, delete a post and
 // find the channel.
 //
-// ASSUMED SHAPES (from Buffer's public docs, not verified against the live API; every one is a constant below):
-//   createPost(input: {text, channelId, shareMode: shareNow, assets: [{image: {url, altText}}],
-//                      metadata: {twitter: {thread: [{text, assets: [{image: {url, altText}}]}]}}})   (v3.2.0, CR-017: Buffer's reference;
-//                      `assets` is a LIST of AssetInput with exactly one of image/link/video/document; ThreadedPostInput.assets is required)  ->  union: PostActionSuccess {post {id status externalLink sentAt}} | MutationError {message}
+// SHAPES (v3.2.2: CreatePostInput, AssetInput and ImageAssetInput read from Buffer's LIVE schema via POST /posts/schema-check on 9 Oct 2026;
+// Buffer's published reference differs (it names `shareMode` and an image `altText`, neither of which the live API has)):
+//   createPost(input: {text, channelId, mode: shareNow, schedulingType: automatic, needsApproval: false (all three required),
+//                      assets: [{image: {url, metadata: {altText}}}] (required, may be empty),
+//                      metadata: {twitter: {thread: [{text, assets: [...]}]}}})  ->  union: PostActionSuccess {post {id status externalLink sentAt}} | MutationError {message}
 //   post(input: {id}) {id status externalLink sentAt}        deletePost(input: {id})  ->  MutationError {message} | anything else = success
 //   account {organizations {id}}                             channels(input: {organizationId}) {id name service}
 import { scrubSecrets } from '../../../core/redact.js';
@@ -52,7 +53,7 @@ export interface BufferPart { text: string; images: BufferImage[] }
 export interface BufferDeps { fetch: typeof fetch; apiKey: string; channelId?: string; timeoutMs?: number; now?: () => number }
 
 /** The input types the schema check always reads (read-only introspection), in this order; others are read when the input reaches them. */
-export const SCHEMA_CHECK_TYPES = ['CreatePostInput', 'AssetInput', 'ImageAssetInput', 'TwitterPostMetadataInput', 'ThreadedPostInput'] as const;
+export const SCHEMA_CHECK_TYPES = ['CreatePostInput', 'AssetInput', 'ImageAssetInput', 'ImageMetadataInput', 'TwitterPostMetadataInput', 'ThreadedPostInput'] as const;
 /** How long an introspection answer is reused. */
 export const SCHEMA_CACHE_MS = 3_600_000;
 export const SCHEMA_TYPE_QUERY = `query SchemaType($name: String!) {
@@ -73,13 +74,12 @@ type Gql = { data?: Record<string, any> | null; errors?: { message?: unknown }[]
 
 const clip = (s: string, n = 300) => (s.length > n ? `${s.slice(0, n)}...` : s);
 
-const assetList = (images: BufferImage[]) => images.map((i) => ({ image: { url: i.url, altText: i.altText } }));
-const assets = (images: BufferImage[]) => (images.length > 0 ? { assets: assetList(images) } : {});
+const assetList = (images: BufferImage[]) => images.map((i) => ({ image: { url: i.url, metadata: { altText: i.altText } } }));
 
 /** The exact `input` of the createPost mutation (also what the schema check validates). A thread part always carries `assets` (required by ThreadedPostInput). */
 export function buildCreateInput(channelId: string, first: BufferPart, thread: BufferPart[]): Record<string, unknown> {
   return {
-    text: first.text, channelId, shareMode: 'shareNow', ...assets(first.images),
+    text: first.text, channelId, mode: 'shareNow', schedulingType: 'automatic', needsApproval: false, assets: assetList(first.images),
     ...(thread.length > 0 ? { metadata: { twitter: { thread: thread.map((p) => ({ text: p.text, assets: assetList(p.images) })) } } } : {}),
   };
 }
@@ -234,7 +234,7 @@ export class BufferClient {
       const kind = t.kind.toLowerCase();
       if (t.inputFields) {
         types[n] = { kind, fields: Object.fromEntries(t.inputFields.map((f) => [f.name, typeText(f.type)])) };
-        for (const f of t.inputFields) { const base = baseName(f.type); if (base && !BUILTIN_SCALARS.has(base) && !types[base]) queue.push(base); }
+        for (const f of t.inputFields) { if (n === 'PostInputMetaData' && f.name !== 'twitter') continue; const base = baseName(f.type); if (base && !BUILTIN_SCALARS.has(base) && !types[base]) queue.push(base); }
       } else if (t.enumValues) types[n] = { kind, values: t.enumValues.map((v) => v.name) };
       else types[n] = { kind };
     }

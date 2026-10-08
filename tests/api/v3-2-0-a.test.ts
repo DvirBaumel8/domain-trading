@@ -51,16 +51,16 @@ async function boot(env: Record<string, string> = { BUFFER_API_KEY: KEY }) {
 const withImage = { text: 'Hello', images: [{ data_base64: b64(makePng(16, 16)), alt: 'A grey square' }], thread: [{ text: 'Part two', images: [{ data_base64: b64(makePng(10, 10)), alt: 'Second' }] }] };
 
 describe('T17-1 the createPost input follows Buffer\'s reference', () => {
-  it('T17-1 a real post with an image (and a thread part) is accepted by the validating Buffer mock: assets is a list of {image}, shareMode shareNow', async () => {
+  it('T17-1 a real post with an image (and a thread part) is accepted by the validating Buffer mock: assets is a list of {image: {url, metadata: {altText}}}, mode shareNow (3.2.2: Buffer\'s live schema)', async () => {
     bufferMock();
     const t = await boot();
     const r = await t.post('/posts', withImage);
     expect(r.statusCode, r.body).toBe(201);
     const input = seen.find((s) => s.op === 'create')!.vars.input;
-    expect(input.shareMode).toBe('shareNow');
-    expect(input).not.toHaveProperty('mode');
-    expect(input.assets).toEqual([{ image: { url: expect.stringMatching(/\/media\/[0-9a-f]{32}$/), altText: 'A grey square' } }]);
-    expect(input.metadata.twitter.thread[0].assets).toEqual([{ image: { url: expect.any(String), altText: 'Second' } }]);
+    expect(input).toMatchObject({ mode: 'shareNow', schedulingType: 'automatic', needsApproval: false });
+    expect(input).not.toHaveProperty('shareMode');
+    expect(input.assets).toEqual([{ image: { url: expect.stringMatching(/\/media\/[0-9a-f]{32}$/), metadata: { altText: 'A grey square' } } }]);
+    expect(input.metadata.twitter.thread[0].assets).toEqual([{ image: { url: expect.any(String), metadata: { altText: 'Second' } } }]);
     expect(createPostErrors(input)).toEqual([]);
   });
 
@@ -68,8 +68,13 @@ describe('T17-1 the createPost input follows Buffer\'s reference', () => {
     const old = { text: 'x', channelId: 'c', schedulingType: 'automatic', mode: 'shareNow', assets: { images: [{ url: 'https://x.test/a', altText: 'a' }] } };
     const errs = createPostErrors(old);
     expect(errs.join('\n')).toMatch(/Field "images" is not defined by type "AssetInput"/);
-    expect(errs.join('\n')).toMatch(/Field "mode" is not defined by type "CreatePostInput"/);
-    expect(errs.join('\n')).toMatch(/shareMode.*required/);
+    expect(errs.join('\n')).toMatch(/needsApproval.*required/);
+    // 3.2.0's shape (shareMode, image altText) is refused too
+    const v320 = { text: 'x', channelId: 'c', shareMode: 'shareNow', assets: [{ image: { url: 'https://x.test/a', altText: 'a' } }] };
+    const errs320 = createPostErrors(v320).join('\n');
+    expect(errs320).toMatch(/Field "shareMode" is not defined by type "CreatePostInput"/);
+    expect(errs320).toMatch(/Field "altText" is not defined by type "ImageAssetInput"/);
+    expect(errs320).toMatch(/mode.*required/);
     // over the wire: a GraphQL error, which the client reports as `refused`
     bufferMock();
     const c = new BufferClient({ fetch: globalThis.fetch, apiKey: KEY });
@@ -82,9 +87,9 @@ describe('T17-1 the createPost input follows Buffer\'s reference', () => {
     expect(bad.problems.join('\n')).toMatch(/input\.assets must be a list/);
   });
 
-  it('the builder: no images = no assets on the post; a thread part always carries assets (required by ThreadedPostInput)', () => {
+  it('the builder: no images = an empty assets list (required by CreatePostInput and ThreadedPostInput)', () => {
     const i = buildCreateInput('c', { text: 'a', images: [] }, [{ text: 'b', images: [] }]) as any;
-    expect(i).not.toHaveProperty('assets');
+    expect(i.assets).toEqual([]);
     expect(i.metadata.twitter.thread).toEqual([{ text: 'b', assets: [] }]);
     expect(createPostErrors(i)).toEqual([]);
     expect(createPostErrors(SAMPLE_INPUT)).toEqual([]);
@@ -98,7 +103,8 @@ describe('T17-2 POST /posts/schema-check', () => {
     const r = await t.post('/posts/schema-check');
     expect(r.statusCode, r.body).toBe(200);
     expect(r.json()).toMatchObject({ ok: true, problems: [], checked_types: expect.arrayContaining(['CreatePostInput', 'AssetInput', 'ImageAssetInput', 'TwitterPostMetadataInput', 'ThreadedPostInput']) });
-    expect(r.json().types.CreatePostInput).toMatchObject({ kind: 'input_object', fields: expect.objectContaining({ text: 'String!' }) }); // T17-2b (3.2.1): Buffer's definitions are returned
+    expect(r.json().types.CreatePostInput).toMatchObject({ kind: 'input_object', fields: expect.objectContaining({ mode: 'ShareMode!', assets: '[AssetInput!]!' }) });
+    expect(Object.keys(r.json().types)).toEqual(expect.arrayContaining(['ImageMetadataInput', 'ThreadedPostInput'])); // only X's metadata is followed, so these fit in the answer // T17-2b (3.2.1): Buffer's definitions are returned
     expect(new Set(ops())).toEqual(new Set(['schema']));
     const audit = await db.selectFrom('audit_log').selectAll().where('path', '=', '/posts/schema-check').executeTakeFirstOrThrow();
     expect(audit).toMatchObject({ status_code: 200 });
@@ -109,7 +115,7 @@ describe('T17-2 POST /posts/schema-check', () => {
   });
 
   it('T17-2 reports problems when Buffer\'s types differ: a missing field, a non-list assets, a missing required field', async () => {
-    // the pre-fix Buffer view: a CreatePostInput with `mode` and no `shareMode`, and assets as an object with `images`
+    // a Buffer that changed: a CreatePostInput without `mode` and `metadata`, with a new required field
     const field = (name: string, type: any) => ({ name, type });
     bufferMock({
       typeOverride: (name) => {
@@ -124,7 +130,7 @@ describe('T17-2 POST /posts/schema-check', () => {
     const j = r.json();
     expect(j.ok).toBe(false);
     const text = j.problems.join('\n');
-    expect(text).toMatch(/input\.shareMode is not a field of CreatePostInput/);
+    expect(text).toMatch(/input\.mode is not a field of CreatePostInput/);
     expect(text).toMatch(/input\.newRequired is required/);
     expect(text).toMatch(/input\.metadata is not a field of CreatePostInput/);
   });

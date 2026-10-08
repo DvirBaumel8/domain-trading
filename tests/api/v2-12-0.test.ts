@@ -235,15 +235,15 @@ describe('a real post (T11-4, T11-7, T11-28)', () => {
     expect(calls.map((c) => c.op).filter((o) => o !== 'schema')).toEqual(['account', 'channels', 'create']);
     expect(calls.every((c) => c.auth === `Bearer ${KEY}`)).toBe(true);
     const input = calls.find((c) => c.op === 'create')!.body.variables.input;
-    expect(input).toMatchObject({ text: 'Launch day', channelId: 'ch_x', shareMode: 'shareNow' });
-    expect(input).not.toHaveProperty('mode');
+    expect(input).toMatchObject({ text: 'Launch day', channelId: 'ch_x', mode: 'shareNow', schedulingType: 'automatic', needsApproval: false });
+    expect(input).not.toHaveProperty('shareMode');
     const urls = input.assets.map((a: { image: { url: string } }) => a.image.url);
     expect(urls).toHaveLength(2);
     for (const u of urls) expect(u).toMatch(new RegExp(`^${BASE}/media/[0-9a-f]{32}$`));
-    expect(input.assets.map((a: { image: { altText: string } }) => a.image.altText)).toEqual(['first picture', 'second picture']);
+    expect(input.assets.map((a: { image: { metadata: { altText: string } } }) => a.image.metadata.altText)).toEqual(['first picture', 'second picture']);
     const thread = input.metadata.twitter.thread;
     expect(thread.map((p: { text: string }) => p.text)).toEqual(['Part two', 'Part three']);
-    expect(thread[0].assets).toEqual([{ image: { url: expect.stringMatching(/\/media\/[0-9a-f]{32}$/), altText: 'third picture' } }]);
+    expect(thread[0].assets).toEqual([{ image: { url: expect.stringMatching(/\/media\/[0-9a-f]{32}$/), metadata: { altText: 'third picture' } } }]);
     expect(thread[1].assets).toEqual([]); // ThreadedPostInput.assets is required
     // the row, the images (metadata-free bytes) and the READ routes
     const [row] = await postRows();
