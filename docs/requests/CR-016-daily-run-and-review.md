@@ -1,4 +1,4 @@
-> Status: Approved by Dvir 2026-10-08 08:51 IDT
+> Status: Approved by Dvir 2026-10-08 08:51 IDT. DOM: accepted, release v3.1.0
 
 # CR-016: daily scheduled run failed to record; review 503s; what changed in v3.0.0
 | Field | Value |
@@ -78,3 +78,70 @@
 4. The v3.0.0 versus 2.15.0 caller-visible change list (§2).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-08)
+**Accepted.** The cause of A was DOM's own doing. Release v3.1.0 adds what 3.0.0 didn't already fix.
+
+### A: what happened on 2026-10-08 (Q1–Q3)
+DOM read the production records (audit rows, idempotency keys, run rows).
+- **03:05:35:** the scheduled daily started (then v2.16.2: one long request; the run's record was written only at the end).
+- **03:05:36–37:** steps 1–9 ran, the ones you saw (through `intakeScreening`, 30 names screened, 35 left). `buildDailyList` then waited, inside the same request, for that screening run to finish (up to 20 minutes).
+- **03:07:10:** the Cloudflare Worker stopped waiting (its limit was 90 s) and retried with the same key. The first call was still working, so 409 `IDEMPOTENCY_KEY_IN_USE` was the correct answer for a running call.
+- **About 03:09:** **DOM's deploy of v2.16.3** (pushed 02:59) restarted the server in the middle of the run. The run never reached its end, so no record was written, and **steps 10–15 did not run on schedule**: `buildDailyList`, `cohortOutcomes`, `referenceRefresh`, `outsideReview`, `postsRefresh`, `backupExport`. `priceJob` and `dropJob` were not reached either; nothing was due for them.
+- **What DOM changed:**
+  - **3.0.0 (live since about 06:00):** every step is a row in Postgres, `POST /jobs/run` answers 202 at once (no long request, so no Worker timeout and no 409 retry), and after a restart the unfinished step is taken over.
+  - **DOM's working rule:** no deploys during the nightly window, 00:05 UTC ± 1 hour.
+- **Recovery:** at 09:1x IDT DOM started the day's daily by hand, on 3.0.0, as `run_6aa55643-42c1-4a46-8a09-69a95df7149b`. All 15 steps finished and the run is `ok`.
+  - **`intakeScreening`:** skipped, `DAILY_MAX_REACHED` (today's 30 were already screened at 03:05).
+  - **`outsideReview`:** skipped, `ALREADY_DONE_TODAY`. Your 00:47 manual run with `unknown` feedback counted; that is B R-2, fixed in 3.1.0. After 3.1.0 is live, `POST /reviews/run` gives today's review.
+  - **`buildDailyList`:** built, `partial` (the 03:05 screening run is still finishing). `POST /candidates/daily/rebuild` refreshes it.
+
+### A: rules
+- **R-A1, met by 3.0.0:** a run's record exists from the moment it is queued (`GET /jobs/runs`: `status` queued, running or finished, each step's state). A crash leaves the step `running`, and the next worker takes it over.
+- **R-A2, met by 3.0.0:** the call no longer holds the request, so a scheduler retry with the same key replays the 202 with the same `run_id`. A call that overlaps a running job gets that run's id.
+- **R-A3, v3.1.0:**
+  - **`next_due_at`** stays "the next 00:05 UTC".
+  - **New `/report` errors:**
+    - `JOB_MISSED` when today's 00:05 UTC slot passed more than 30 minutes ago with no daily run created;
+    - `JOB_RUN_INCOMPLETE` when a daily run has been queued or running for more than 2 hours.
+  - **`GET /jobs/runs` `jobs.daily`** adds `last_scheduled` and `missed_slot`.
+  - **`/health` `jobs`** is `overdue` in both cases.
+
+### B
+- **R-B1, v3.1.0:** a 503 / UNAVAILABLE from Google is retried inside the call, up to 3 tries (20 s, then 40 s), in the daily step, the manual run and the retry tick. Never another key or model. The number of tries is stored with the feedback.
+- **R-B2, v3.1.0:** `/health` adds `review_reason` when `review` is `failed` (Google's status and short reason, never a key).
+- **B R-2 (your question):**
+  - **Before 3.1.0:** yes, a manual run counted as the day's review even when its feedback was `unknown`. That is why today's 03:05 and recovery runs skipped the review.
+  - **From 3.1.0:** only a review with `ok` feedback counts for the day, as you preferred.
+- **B R-3, confirmed:** only the packet's `content` (plus DOM's fixed reviewer instruction) is sent to Google. `created_by`, the packet id, token names and other metadata never leave the server (`review/run.ts` sends `JSON.stringify(content)` only).
+
+### §2: every caller-visible change since 2.15.0
+2.16.1, 2.16.3 and 2.16.4 are internal only (refactor). The changes callers see:
+- **2.16.0** (release note `v2.16.0.md`; answers in CR-014 and CR-015):
+  - **New:**
+    - `POST /candidates/daily/rebuild` (6 a day);
+    - `token_name` on `GET /audit`;
+    - `checked_at` on `POST /candidates/{domain}/records`;
+    - `unknowns` lists undecided names, with `unread` and `unknown_inputs`;
+    - cohort status `abandoned`;
+    - post statuses `pending` and `unknown` (502 `POST_FAILED` with `details.outcome`);
+    - `REVIEW_IN_PROGRESS` 409;
+    - stale `in_progress` keys say `details.stale`;
+    - `/media` at 120 a minute per IP;
+    - `AUTO_TOPUP_UNKNOWN` (a real `/buy` refuses an unknown auto top-up).
+  - **Stricter:**
+    - a `tm_us` domain record needs an https `evidence_url` and the domain's phrase;
+    - intake refuses personal data (`NO_PII`) and removes `NO_SPLIT` / `ONE_WORD`;
+    - seal, and the cohort freeze, need a `done` run;
+    - geo LANDER-1 fails closed without a price list;
+    - bot-posted review cost at most $5, and only Gemini cost counts;
+    - the walk-away is gone from `/jobs/run`, `/jobs/preview` and `/jobs/runs`;
+    - a step with failed items is `ok: false`;
+    - the review-retry tick runs at 08:30 UTC.
+- **2.16.2:**
+  - `ms` on every job step;
+  - a test set's `lookups` and `unknowns` are `null` while its run is going.
+- **3.0.0** (release note `v3.0.0.md`): `POST /jobs/run` answers 202 `{run_id, job, status, skipped, steps}`; `GET /jobs/runs` adds `run_id`, run `status` and per-step `status`, `attempts`, `started_at`, `finished_at`.
+- **3.1.0 (this CR):** `JOB_MISSED`, `JOB_RUN_INCOMPLETE`, `jobs.daily.last_scheduled` / `missed_slot`, `review_reason`, the in-call 503 retry, and only an `ok` review counting for the day.
+
+That is the full set. Release notes v2.16.0, v2.16.2, v3.0.0 and v3.1.0 have the test steps.
