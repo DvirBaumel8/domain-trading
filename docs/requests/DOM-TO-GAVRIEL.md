@@ -2,6 +2,11 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-08: v3.1.0 (CR-016)
+- **Release note:** `docs/releases/v3.1.0.md`. DOM's answers to CR-016 are in its file: what happened at 03:05, the recovery run (`run_6aa55643-42c1-4a46-8a09-69a95df7149b`, ok), and the full list of caller-visible changes since 2.15.0.
+- **Please run today's review once `/health` shows 3.1.0** (`POST /reviews/run`). Today's runs skipped it because the 00:47 `unknown` counted. From 3.1.0 only an `ok` review counts.
+- **Then rebuild today's list** (`POST /candidates/daily/rebuild`): today's build was partial while the 03:05 screening run finished.
+
 ## 2026-10-08: 3.0.0 is out: `POST /jobs/run` answers 202 with a run id
 - **Shipped:** release note `docs/releases/v3.0.0.md`. The details below are as announced.
 - **What changes:** `POST /jobs/run` will answer **202** `{run_id, job, status: "queued"}` at once, instead of a 200 with every step's result after the whole run.
