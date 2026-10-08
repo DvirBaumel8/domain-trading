@@ -1,4 +1,4 @@
-> Status: Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (customer may send DOM fix and feature requests without asking Dvir each time). The approach is Dvir's own decision of 2026-10-08 16:50 IDT (below). Real backorders spend money, so they stay OFF until Dvir's own approval line turns them on (R-6).
+> Status: Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT. **Changed by the addendum of 2026-10-08 17:45 IDT (end of this file): no paid catch service. Part B (backorders) is ON HOLD and must not be built. Build Part C (C-1 to C-3) plus the new C-4.**
 
 # CR-019: backorders for expiring .com names (approve days ahead, catch at the drop)
 | Field | Value |
@@ -81,5 +81,32 @@
 4. Can the upcoming-drop data come from DropCatch's drop download instead of, or alongside, the current drop lists? Which do you prefer for the drop date?
 5. For R-C2, what retry count and backoff will you use, and does the retry stay inside the run's time budget?
 6. How will you test the DropCatch calls without a sandbox (recorded responses, dry-run path only)? No real backorder may be placed during testing.
+
+## Addendum 1 (2026-10-08 17:45 IDT): no paid catch service. Part B is on hold; build Part C plus C-4
+- **Dvir's decision, 2026-10-08 17:41 IDT, in chat, verbatim:** "1, 3 for now yes". In plain words: we will **not** use DropCatch or any paid catch service, for now. We won't pay to race the big catch services for names as they drop. Instead, we pick up good names nobody caught (names that already dropped and are free to register now). We also use the drop lists as ideas for fresh names.
+- **ON HOLD, do not build:**
+  - All of **Part B**: rules R-1 to R-11 (backorder candidates, approval with a top price, placing, results sync and auction bids, the backorder switch, caps, the missed-deadline alert, caught names, DropCatch secrets and health, backorder calls).
+  - Tests T19-4 to T19-11.
+  - Open questions 1, 3, 4 and 6.
+  - We need no DropCatch secrets and no fixed outbound IP. If any of this was already started, please stop and say so in your response. Nothing should be removed from the contract that is already live.
+- **Still wanted, build these (unchanged from Part C):**
+  - **C-1 (R-C1):** run the shape/form filter on DOM's own pulled drop lists **before** screening. Tested by T19-1.
+  - **C-2 (R-C2):** when an availability lookup times out, retry it later **in the same run** instead of dropping it for the day. Tested by T19-2. Question 5 still stands.
+  - **C-3 (R-C3):** a `pending_delete` / `redemption` name shows as "dropping on <expected_drop_date>", **not** as taken / failed availability. Tested by T19-3. Under this addendum it does not go on a backorder track. It simply waits, and it becomes a normal candidate only after it drops and is free (C-4).
+- **New, build this:**
+  - **C-4 (R-C4), leftovers first:** DOM's drop-list source prefers names that **already dropped and are actually free to register now**, the leftovers nobody caught.
+    - These are checked as free at the registry on the day of screening, with no `pending_delete` / `redemption` status.
+    - They go into the **normal daily list** (`GET /candidates/daily`) with the same picking, trademark and history checks as any other candidate. If Dvir says yes, they use the **normal buy path** at Porkbun.
+    - Today's rules stay: the buy hold, `/buy` dry_run only, and Dvir approving every real buy. This CR changes none of them.
+    - Names still in pending delete or redemption are not screened as buy candidates until they drop (C-3).
+    - A name from a drop list that has been registered again by someone else counts as taken, as today.
+  - **T19-12:** the day after a pending-delete name drops and stays unregistered, the drop-list intake screens it as free. If it passes the checks, it appears in `GET /candidates/daily` like any other candidate, marked as coming from a drop list.
+  - **T19-13:** a drop-list name that was re-registered at the drop is not a candidate, and shows as taken. A name still in pending delete is not a candidate, and shows as "dropping on <date>" (C-3).
+  - **T19-14:** with a drop list that holds both already-dropped free names and pending-delete names, the day's screening picks the already-dropped free names first. The daily summary shows how many of each kind were seen.
+  - **T19-15:** a leftover name that passed and was approved goes through the same `/buy` path as other candidates (dry_run while the buy hold is on). It has no separate path.
+- **Questions for DOM under this addendum:**
+  1. Do your current drop lists show names after they drop (status `not_registered`), or do they stop at pending delete? If they stop, what do you need from us to get the "dropped and still free" names: another list we upload, or DOM re-checking the names from earlier lists after their drop date?
+  2. How many days after its drop date should DOM keep re-checking a name as a possible leftover?
+  3. Which of C-1 to C-4 do you expect to meet, and do you push back on any, with the reason?
 
 <!-- DOM writes below this line -->
