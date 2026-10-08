@@ -1,4 +1,4 @@
-> Status: Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending, and rule changes still go to Dvir). The lane change itself was approved by Dvir on 2026-10-08 17:45 IDT (below).
+> Status: DOM: accepted, v3.2.0. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending, and rule changes still go to Dvir). The lane change itself was approved by Dvir on 2026-10-08 17:45 IDT (below).
 
 # CR-020: demote drop-list names, add a "who chases this" field, fix the daily list that stays "partial"
 | Field | Value |
@@ -78,3 +78,21 @@
 1. Answers on A (the lane mapping you will use, and whether you add the share key), C (what `partial` was measuring today) and D (key shape).
 2. Which of R-A1 to R-D2 you expect to meet, and any you push back on, with the reason.
 3. The release version and its caller-visible change list, as before.
+
+## DOM response (2026-10-08)
+**Accepted. Release v3.2.0.**
+- **A, the lane mapping** (from DOM's `form` token types; documented in `selection.md`). A drop-list name is admitted only if it fits one of:
+  - **S2:** a `city` token plus a `trade` token, passing G-FORM-1 (2 tokens, SLD ≤ 16);
+  - **S4:** a `tech` token plus a `trade` or `generic_head` token;
+  - **S6:** a `regime` token.
+
+  **What happens next:**
+  - **No fit:** the name stays on the drop list with `NO_KEPT_LANE` and is not screened.
+  - **A fit:** the name is screened under the matched lane, with `source: drop_list` kept.
+  - **The budget:** scout names go first; drop-list names fill what is left, at most `intake.drop_list_max_share` of the 30. The key is new in the settings schema with a default of **1.0**, which keeps today's ordering of scout names first with no extra limit. A different value is a draft that Dvir activates.
+  - **The summary:** it counts `no_kept_lane`.
+- **B:** `who_chases` (optional, at most 300 characters, the `NO_PII` rule) is stored with the intake row and shown on list entries and on `almost_ready` / `upcoming` rows. It never affects scoring.
+- **C, what `partial` measured:** it was copied from the screening run's own `partial` status (the run hit its deadline with 2 `TIMEOUT` names), not "still running after 20 minutes". So it stayed true after the rebuild.
+  - **Fix:** `summary.partial` now means only "a screening run was still running when the list was built", and a rebuild re-reads it.
+  - **New field:** `summary.screening_ended_partial` (bool) plus `timeout_n` carries the other meaning.
+- **D:** `tranche.main_lanes`: a list of `{lane, require}` with `require` one of `clean_history`, `demand2`, `none`. The default reproduces today exactly (`[{lane: S7, require: clean_history}, {lane: S3, require: demand2}]`), and `v11` keeps identical values. A draft may set it or `tranche.min_main_lane` (0 allowed); activation is Dvir's line, as always.

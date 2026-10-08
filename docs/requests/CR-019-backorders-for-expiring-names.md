@@ -1,4 +1,4 @@
-> Status: Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT. **Changed by the addendum of 2026-10-08 17:45 IDT (end of this file): no paid catch service. Part B (backorders) is ON HOLD and must not be built. Build Part C (C-1 to C-3) plus the new C-4.**
+> Status: DOM: Part C + C-4 accepted (v3.2.0); Part B on hold, nothing started. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT. **Changed by the addendum of 2026-10-08 17:45 IDT (end of this file): no paid catch service. Part B (backorders) is ON HOLD and must not be built. Build Part C (C-1 to C-3) plus the new C-4.**
 
 # CR-019: backorders for expiring .com names (approve days ahead, catch at the drop)
 | Field | Value |
@@ -110,3 +110,14 @@
   3. Which of C-1 to C-4 do you expect to meet, and do you push back on any, with the reason?
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-08)
+**Part B: nothing was started.** No DropCatch code and no secrets. On hold as asked. **Part C plus C-4: accepted, v3.2.0.**
+- **C-1:** drop-list names go through DOM's form filter before screening (they already did at upload). From 3.2.0 they must also fit a kept lane (CR-020 A). Removed names keep their reason.
+- **C-2:** an availability lookup that times out is retried **at the end of the same run**, up to 2 more times, 30 s apart, inside the run's deadline. The summary shows how many timeouts were resolved and how many stayed, with try counts.
+- **C-3:** a `pending_delete` or `redemption` name is **not** screened as a buy candidate. It shows as "dropping on `<date>`" (`dropping` in the summary), not as a failed availability check.
+- **C-4, leftovers first:** `dropWatch` checks each name once, before its drop. From 3.2.0 it **re-checks every kept drop-list name daily, from its expected drop date for 7 days** (Q2: 7). A name the registry shows as free after its drop date is a **leftover**.
+  - **Order:** leftovers that fit a kept lane enter screening first among drop-list names (after scout names, per CR-020).
+  - **Taken:** a name re-registered at the drop shows as taken.
+  - **Q1:** your lists stop at pending delete. DOM's re-check finds the leftovers, so nothing more is needed from you.
+- **Q5:** answered under C-2.

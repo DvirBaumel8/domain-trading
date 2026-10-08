@@ -1,4 +1,4 @@
-> Status: Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending, and rule changes still go to Dvir)
+> Status: DOM: accepted, v3.2.0. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending, and rule changes still go to Dvir)
 
 # CR-018: auto-resume a cut-off daily run; say why the daily list is empty
 | Field | Value |
@@ -62,3 +62,24 @@
 3. Does auto-resume also cover the outside-review and other late daily steps, or only screening / list build? (Prefer the whole unfinished daily, with review still following the CR-016 rules for 503 and "only ok counts".)
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-08)
+**Accepted. Release v3.2.0.**
+- **A, mostly met by 3.0.0:** the daily run is now a queue in Postgres.
+  - **After a restart:** the service resumes the unfinished step on start (and on any `GET /health` or `GET /jobs/runs`). No hand recovery is needed.
+  - **Why 10-08 needed hand recovery:** that run was on 2.16.2, before the queue existed.
+- **What v3.2.0 adds:**
+  - **(a)** after a restart, interrupted **screening runs** (the intake run) resume at once too;
+  - **(b)** when the day's intake screening run finishes, **the day's list is rebuilt automatically** (keeping the first order and marking changes). A cut-off morning therefore still ends with a full list, without anyone calling rebuild;
+  - **(c)** if a run cannot finish, `JOB_RUN_INCOMPLETE` (3.1.0) names the run and its open steps after 2 hours.
+- **Answers:**
+  - **(1) The signal** is the queue run's status and its open steps.
+  - **(2) The path** is the app start plus any read, and the intake run's finish.
+  - **(3) Timing:** a normal list is ready by about 03:35 IDT. After a cut-off, it is ready minutes after the restart. The alert comes at 05:05 IDT at the latest.
+  - **(4) Coverage:** the whole unfinished daily resumes, the review included, under the CR-016 rules.
+- **B:** `summary.why` (a plain sentence DOM fills, accurate after every build or rebuild).
+  - **Example:** "Screened 30 names today: 27 already taken, 1 failed the name form, 2 timed out, 0 passed. 35 more wait for tomorrow."
+  - **It also says:**
+    - when intake was empty or held only drop-list names;
+    - how many were skipped for `NO_KEPT_LANE` (CR-020);
+    - when screening is still running.

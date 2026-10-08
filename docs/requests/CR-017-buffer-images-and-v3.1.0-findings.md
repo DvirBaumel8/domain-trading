@@ -1,4 +1,4 @@
-> Status: Approved by Dvir 2026-10-08 16:41 IDT
+> Status: Approved by Dvir 2026-10-08 16:41 IDT. DOM: accepted, v3.2.0
 
 # CR-017: Buffer create-post images schema rejection; small findings from v3.1.0 acceptance
 | Field | Value |
@@ -80,3 +80,31 @@
 3. Answers on N-1 (`partial`), N-3 (`triggered_by`), and N-2 (what `GITHUB_BACKUP_TOKEN` needs).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-08)
+**Accepted. Release v3.2.0.**
+- **A, the cause:** DOM built the `createPost` input from Buffer's guides, but Buffer's GraphQL reference defines it differently.
+  - **`assets`:** a **list** of `AssetInput`, each with exactly one of `image` / `link` / `video` / `document`. So an image is `assets: [{image: {url, altText}}]`. DOM sent `assets: {images: [...]}`.
+  - **Mode field:** the mode field is **`shareMode`** (`shareNow`).
+  - **Thread parts** take `assets` the same way.
+- **R-A2 (b):** DOM adds `POST /posts/schema-check` (WRITE).
+  - **What it does:** it asks Buffer's GraphQL API for the type definitions (introspection: read-only, publishes nothing) and checks the exact input DOM would send, images and thread included.
+  - **The answer:** `{ok, problems[]}`.
+  - **The real path:** a real post runs the same check first and refuses with 502 `POST_FAILED` (`step: schema`) before sending anything that doesn't match.
+  - **Testing:** DOM can't call Buffer itself (the key lives only on the server and there is no sandbox), so the schema check is the gate; **please run it before the first real post on 3.2.0.**
+- **R-A3, R-A4:**
+  - **The cap:** a **failed** create does not count toward the cap (`used_today` 0 is right; only `posted`, `unknown` and `removed` count).
+  - **Retrying:** retry with a **new** `Idempotency-Key` and the same body. The old key replays the old 502 by design.
+  - **The failed row:** `pst_860913653866` stays as a `failed` record (append-only history), and needs nothing done.
+- **R-A5:** `/health` `posting` follows the **latest** post, so the first successful post makes it `ok` again.
+- **N-4:** `/health` `review_reason` becomes `CODE: text`, for example `UNAVAILABLE: The model is overloaded...`. It is at most 200 characters, cut at a word, and the contract states the limit.
+- **N-5:** an idempotent replay no longer uses a rate-limit slot.
+- **N-6:**
+  - **10-08 is not backfilled:** that run was lost before 3.0.0 existed.
+  - **From 3.0.0:** a scheduled run has a row from the moment it is queued, so `last_scheduled` is set after tonight's run (T17-7).
+- **N-7:** the contract will say a manual `tick` runs `reviewRetry` too, when a review retry is pending (one Google call). There is no flag; that is the point of the retry.
+- **N-1:** see CR-020 C (fixed there).
+- **N-3:** `triggered_by` becomes the token's name for a WRITE token, `job-token` for the job token, and `cli` for the CLI. It is never null for new runs.
+- **N-2, backups:** off **by Dvir's decision** (7 Oct, and again 8 Oct: "No"), so `backupExport` is expected to say not configured.
+  - **What it would need, if Dvir ever reverses that decision:** `GITHUB_BACKUP_TOKEN` (a fine-grained GitHub token with Contents read/write on `DvirBaumel8/domain-trading-data` only) and `GITHUB_BACKUP_REPO=DvirBaumel8/domain-trading-data`, both set on Render.
+  - **Nothing to request now.**
