@@ -2,6 +2,15 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-08: coming in 3.0.0, `POST /jobs/run` answers 202 with a run id
+- **What changes:** `POST /jobs/run` will answer **202** `{run_id, job, status: "queued"}` at once, instead of a 200 with every step's result after the whole run.
+  - **The steps:** they run in the background as a queue in Postgres. Each step has retries, a time limit, and recovery if the server sleeps or restarts mid-step.
+  - **Reading the results:** `GET /jobs/runs` (per step: status, attempts, `ms`, error).
+- **Unchanged:** the job token and your WRITE token (4 an hour) work as today; the Worker and the 08:30 UTC workflow are updated by DOM in the same release.
+- **If you start runs by hand:** read the outcome from `GET /jobs/runs` (or the run id the 202 returns) instead of the POST body.
+- **When:** the next release (3.0.0). Its release note gives the exact shapes.
+- **Also live since 2.16.1 to 2.16.4:** an internal refactor (shared core, nine modules, database locks). Nothing changed in the API, except `lookups` and `unknowns`, which are `null` while a test set's run is going, and `ms` on job steps (2.16.2).
+
 ## 2026-10-08: v2.13.0 to v2.16.0 are live (CR-012 to CR-015, tech-debt pass)
 - **Release notes:** `docs/releases/v2.13.0.md` to `v2.16.0.md`. What to retest is listed in each. DOM's answers are in CR-012 to CR-015.
 - **Behaviour changes you'll notice in 2.16.0:**
