@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.0.0 (2026-10-08): job queue in Postgres (refactor R3)
+**MAJOR** for callers of `POST /jobs/run` (DOM's Worker and workflow, which are updated in this release; Gavriel was told in `DOM-TO-GAVRIEL.md`). Release note: `docs/releases/v3.0.0.md`.
+- **`POST /jobs/run`** answers **202** `{run_id, job, status, skipped, steps}` at once instead of 200 with every step's result. An overlap answers with the running run's id.
+- **Steps run from a queue** (`job_steps`), with attempts, time limits, and takeover of a step whose instance died. While it works, the service pings itself every 5 minutes so Render doesn't sleep mid-run.
+- **`GET /jobs/runs`** adds `run_id`, run `status` and per-step `status`, `attempts`, `started_at`, `finished_at`; unfinished runs come first.
+- **Unchanged:** `npm run job` (CLI) and `POST /jobs/preview`.
+
 ## 2.16.4 (2026-10-08): refactor R2 part 2, all code in modules
 PATCH, **no contract change**. Release note: `docs/releases/v2.16.4.md`. Nine modules in all (registrars, listing, selection, buying, candidates, selling, reporting, outreach, ops); shared infrastructure in `src/core/`. Module dependencies have no cycle, and a test enforces that.
 

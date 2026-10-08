@@ -8,7 +8,7 @@ import { createRun } from '../../src/modules/selection/engine.js';
 import { TEST_SET_RDAP_CONCURRENCY, hostPacer, lookupCached, pacerFor, settleHostPacers } from '../../src/modules/selection/rdap-batch.js';
 import type { RdapLookup, RdapLookupFn } from '../../src/core/rdap.js';
 import type { ScreeningDeps } from '../../src/modules/selection/types.js';
-import { makeApp } from '../helpers/app.js';
+import { makeApp, runJobToEnd } from '../helpers/app.js';
 import { testDb } from '../helpers/db.js';
 import { OFFLINE, putBrandLists, putList, screeningHarness } from '../helpers/screening.js';
 
@@ -22,7 +22,8 @@ const make = async (extra: Parameters<typeof makeApp>[0] = {}) => {
   return a;
 };
 let n = 0;
-const run = (app: FastifyInstance, job: string) => app.inject({ method: 'POST', url: '/jobs/run', headers: { ...bearer, 'idempotency-key': `r1b-${++n}` }, payload: { job } });
+// v3.0.0: enqueue (202) and wait for the worker; an overlap comes back as {skipped:true, steps:{}}.
+const run = (app: FastifyInstance, job: string) => runJobToEnd(app, job, { headers: bearer, key: `r1b-${++n}` });
 const until = async (f: () => boolean) => { for (let i = 0; i < 400 && !f(); i++) await new Promise((r) => setTimeout(r, 10)); expect(f()).toBe(true); };
 
 describe('R1b-1 lock registry', () => {

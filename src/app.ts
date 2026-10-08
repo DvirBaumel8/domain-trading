@@ -48,7 +48,7 @@ import { PriceScheduleJob } from './modules/ops/index.js';
 import { registerJobs } from './modules/ops/index.js';
 import { IntakeScreeningJob } from './modules/candidates/index.js';
 import { BuildDailyListJob } from './modules/candidates/index.js';
-import { JobRunner, type BackupExport } from './modules/ops/index.js';
+import { JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
 import { Reconciler } from './modules/buying/index.js';
 
 declare module 'fastify' {
@@ -66,6 +66,7 @@ declare module 'fastify' {
     cohortOutcomesJob: CohortOutcomesJob;
     referenceRefreshJob: ReferenceRefreshJob;
     jobRunner: JobRunner;
+    jobQueue: JobQueue;
     screeningWorker: ScreeningWorker;
   }
 }
@@ -93,6 +94,10 @@ export interface AppDeps {
   screeningStopAfterResults?: number;
   /** Test-only: how long buildDailyList waits for the day's intake run (default 20 minutes). */
   dailyListWaitMs?: number;
+  /** Test hook: per-step overrides of the queue's attempts and timeout (applied when a run is enqueued). */
+  /** Test hook: turns the queue's keep-alive ping on with a fake fetch (default: on only in production with PUBLIC_BASE_URL set). */
+  jobQueueKeepAlive?: { url: string; fetch?: typeof fetch };
+  jobQueueOverrides?: Record<string, { maxAttempts?: number; timeoutMs?: number }>;
   /** Test-only: replaces the screening checks' outside access (RDAP, DNS, fetch). Production passes nothing. */
   screening?: Partial<Omit<ScreeningDeps, 'checkService'>>;
 }
@@ -138,7 +143,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, publicBaseUrl: deps.config.publicBaseUrl,
     buffer: deps.config.bufferApiKey ? new BufferClient({ fetch: globalThis.fetch, apiKey: deps.config.bufferApiKey, channelId: deps.config.bufferChannelId }) : null,
   };
-  registerHealth(app, deps.config, deps.db, deps.now ?? Date.now, postingDeps);
+  registerHealth(app, deps.config, deps.db, deps.now ?? Date.now, postingDeps, () => app.jobQueue.kickIfNeeded());
   const adapters = deps.adapters ?? createAdapters(deps.config);
   const checkService = new CheckService({
     db: deps.db,
@@ -215,7 +220,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     },
     secretValues: deps.config.secretValues,
   }));
-  registerJobs(app, app.jobRunner, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
+  app.decorate('jobQueue', new JobQueue({ db: deps.db, now: deps.now ?? Date.now, runner: app.jobRunner, log: app.log, overrides: deps.jobQueueOverrides,
+    keepAlive: deps.jobQueueKeepAlive ?? (deps.config.appEnv === 'production' && deps.config.publicBaseUrl ? { url: deps.config.publicBaseUrl } : undefined) }));
+  // Closing the app waits for the step in flight, so nothing touches the database after it is closed. Unfinished runs resume at start (main.ts) or on the next GET.
+  app.addHook('onClose', async () => app.jobQueue.stop());
+  registerJobs(app, app.jobQueue, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   deps.registerExtraRoutes?.(app);
   return app;
 }

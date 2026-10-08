@@ -151,7 +151,7 @@ describe('auth (AU)', () => {
     expect((await app.inject({ method: 'GET', url: '/__test/ping', headers: seen.auth, remoteAddress: ipx })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/__test/ping', headers: unseen.auth, remoteAddress: ipx })).statusCode).toBe(429);
     const job = await app.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: `Bearer ${JOB}`, 'idempotency-key': 'k-job-blocked' }, payload: { job: 'tick' }, remoteAddress: ipx });
-    expect(job.statusCode).toBe(200);
+    expect(job.statusCode).toBe(202);
     const wrongJob = await app.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: 'Bearer wrong', 'idempotency-key': 'k-job-wrong' }, payload: { job: 'tick' }, remoteAddress: ipx });
     expect(wrongJob.statusCode).toBe(429);
   });

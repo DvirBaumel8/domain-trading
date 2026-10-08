@@ -1,4 +1,5 @@
 // v2.14.0 (CR-012 parts B and C): the intake scope and route, the daily intake screening, the daily candidate list.
+import { settleJob } from '../helpers/app.js';
 import { randomUUID } from 'node:crypto';
 import { http } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -191,8 +192,8 @@ describe('intakeScreening (CR-012 T12-16, T12-17, T12-19)', () => {
     const x = await h();
     const s = await scout(x);
     await s.intake([{ domain: 'quickmedia.com', lane: 'S3', source: 'scout' }]);
-    const res = await x.post('/jobs/run', { job: 'daily' });
-    expect(res.statusCode, res.body).toBe(200);
+    const res = await settleJob(x.app, 'daily', await x.post('/jobs/run', { job: 'daily' }));
+    expect(res.statusCode, res.body).toBe(202);
     const steps = Object.keys(res.json().steps);
     expect(steps.slice(steps.indexOf('dropWatch'))).toEqual(['dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
     expect(res.json().steps.intakeScreening).toMatchObject({ ok: true, summary: { queued_before: 1, screened: 1, left_for_next_run: 0, run_id: expect.stringMatching(/^run_/) } });
@@ -202,7 +203,7 @@ describe('intakeScreening (CR-012 T12-16, T12-17, T12-19)', () => {
     expect((await db.selectFrom('screening_runs').select('status').executeTakeFirstOrThrow()).status).toBe('done'); // buildDailyList waited for it
     // the next day: nothing queued, the step is skipped with its reason
     x.clock.t += DAY;
-    const again = await x.post('/jobs/run', { job: 'daily' });
+    const again = await settleJob(x.app, 'daily', await x.post('/jobs/run', { job: 'daily' }));
     expect(again.json().steps.intakeScreening).toMatchObject({ ok: true, skipped: true, summary: { skipped: true, reason: 'NO_NAMES' } });
   }, 60_000);
 });

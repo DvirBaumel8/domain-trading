@@ -7,7 +7,7 @@ import { PortfolioCheckJob } from '../../src/modules/ops/jobs/portfolio-check.js
 import type { RdapLookup } from '../../src/core/rdap.js';
 import type { ScreeningDeps } from '../../src/modules/selection/types.js';
 import { WEB_RISK_MONTHLY_CAP } from '../../src/modules/selection/web-risk.js';
-import { makeApp } from '../helpers/app.js';
+import { makeApp, runJobToEnd } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
@@ -258,8 +258,8 @@ describe('portfolioCheck: in the daily run', () => {
     apps.push(app);
     const read = (await issueToken('read')).auth;
     const before = adapter.calls.length;
-    const res = await app.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: 'Bearer job_token_fake_0123456789abcdef0123456789', 'idempotency-key': 'pc-1' }, payload: { job: 'daily' } });
-    expect(res.statusCode, res.body).toBe(200);
+    const res = await runJobToEnd(app, 'daily', { key: 'pc-1' });
+    expect(res.statusCode, res.body).toBe(202);
     const steps = Object.keys(res.json().steps);
     expect(steps.indexOf('portfolioCheck')).toBe(steps.indexOf('registrarCheck') + 1);
     expect(steps.indexOf('dropWatch')).toBe(steps.indexOf('portfolioCheck') + 1);

@@ -40,6 +40,18 @@ export async function jobsOverdue(db: Kysely<Database>, nowMs: number): Promise<
   return { overdue: last === null || nowMs - last.getTime() > JOBS_OVERDUE_HOURS * HOUR, lastRunAt: last };
 }
 
+/** A queue step in the shape job_runs.steps has always had (ok, skipped, error, ms, summary) plus the queue's status, attempts and times. `ok` is null while the step is still queued or running. */
+export function stepView(r: { status: string; attempt: number; ms: number | null; summary: unknown; error: string | null; started_at: Date | null; finished_at: Date | null }): Record<string, unknown> {
+  return {
+    ok: r.status === 'queued' || r.status === 'running' ? null : r.status !== 'failed',
+    ...(r.status === 'skipped' ? { skipped: true } : {}),
+    ...(r.error ? { error: r.error } : {}),
+    ms: r.ms ?? 0,
+    summary: r.summary ?? null,
+    status: r.status, attempts: r.attempt, started_at: r.started_at, finished_at: r.finished_at,
+  };
+}
+
 export interface RunsQuery { job?: JobName; since?: Date; limit: number }
 
 export async function jobRunsView(db: Kysely<Database>, config: Pick<Config, 'backup'>, nowMs: number, q: RunsQuery) {
@@ -47,6 +59,21 @@ export async function jobRunsView(db: Kysely<Database>, config: Pick<Config, 'ba
   if (q.job) sel = sel.where('job', '=', q.job);
   if (q.since) sel = sel.where('finished_at', '>=', q.since);
   const rows = await sel.execute();
+  // Runs still queued or running (v3.0.0): newest first, ahead of the finished ones, with each step's current state.
+  let open = db.selectFrom('job_queue_runs as r').selectAll('r').orderBy('r.created_at', 'desc').limit(q.limit)
+    .where((eb) => eb.exists(eb.selectFrom('job_steps as s').select('s.id').whereRef('s.run_id', '=', 'r.id').where('s.status', 'in', ['queued', 'running'])));
+  if (q.job) open = open.where('r.job', '=', q.job);
+  if (q.since) open = open.where('r.created_at', '>=', q.since);
+  const openRuns = await open.execute();
+  const openSteps = openRuns.length === 0 ? [] : await db.selectFrom('job_steps').selectAll().where('run_id', 'in', openRuns.map((r) => r.id)).orderBy('position').execute();
+  const inflight = openRuns.map((r) => {
+    const mine = openSteps.filter((s) => s.run_id === r.id);
+    return {
+      run_id: r.id, status: mine.some((s) => s.status === 'running') ? 'running' : 'queued',
+      job: r.job, trigger: r.trigger, scheduled_for: r.scheduled_for, started_at: mine.find((s) => s.started_at)?.started_at ?? null, finished_at: null as Date | null,
+      skipped: false, ok: null as boolean | null, steps: Object.fromEntries(mine.map((s) => [s.step, stepView(s)])) as unknown, triggered_by: r.triggered_by,
+    };
+  });
   const jobs: Record<string, { last_run_at: Date | null; last_ok_at: Date | null; next_due_at: Date | null }> = {};
   for (const job of JOB_NAMES) {
     const last = await db.selectFrom('job_runs').select('finished_at').where('job', '=', job).where('skipped', '=', false).orderBy('finished_at', 'desc').limit(1).executeTakeFirst();
@@ -60,10 +87,11 @@ export async function jobRunsView(db: Kysely<Database>, config: Pick<Config, 'ba
   const backupStep = (lastDaily?.steps as { backupExport?: { ok?: boolean; skipped?: boolean } } | undefined)?.backupExport;
   const lastStatus = !backupStep ? null : backupStep.skipped ? 'skipped' : backupStep.ok ? 'ok' : 'failed';
   return {
-    runs: rows.map((r) => ({
-      job: r.job, trigger: r.trigger, scheduled_for: r.scheduled_for, started_at: r.started_at, finished_at: r.finished_at,
-      skipped: r.skipped, ok: r.ok, steps: r.steps, triggered_by: r.triggered_by,
-    })),
+    runs: [...inflight, ...rows.map((r) => ({
+      run_id: r.queue_run_id, status: 'finished' as string,
+      job: r.job, trigger: r.trigger, scheduled_for: r.scheduled_for, started_at: r.started_at, finished_at: r.finished_at as Date | null,
+      skipped: r.skipped, ok: r.ok as boolean | null, steps: r.steps, triggered_by: r.triggered_by,
+    }))].slice(0, q.limit),
     jobs,
     reference: {
       popularity: pop ? { list_id: pop.listId, list_date: pop.listDate, rows: pop.rows, refreshed_at: pop.fetchedAt } : null,

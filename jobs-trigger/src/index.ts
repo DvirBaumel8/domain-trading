@@ -7,9 +7,12 @@ export interface Env {
 
 export interface Logger {
   error: (message: string) => void;
+  /** Optional: the run id of the queued run is logged here (console.info in the Worker). */
+  info?: (message: string) => void;
 }
 
-export const TIMEOUT_MS = 90_000;
+/** Since 3.0.0 POST /jobs/run only enqueues and answers 202, so this no longer has to cover a whole run. */
+export const TIMEOUT_MS = 30_000;
 /** The wake-up GET /health/ping (the free instance sleeps): a failure never stops the job, it only costs this long. */
 export const WAKE_TIMEOUT_MS = 30_000;
 /** One retry of the POST after a network error or a 5xx (the same Idempotency-Key, so the server never runs it twice). */
@@ -85,11 +88,11 @@ export async function triggerJob(
     logger.error(`jobs-trigger ${job} returned HTTP ${r.res.status}`);
     return;
   }
-  // A Worker cron cannot fail loudly, so a step that reported ok:false is logged as an error (Cloudflare's log shows it).
+  // 202: the run is queued and the server works it (results are in GET /jobs/runs). A Worker cron cannot poll, so it only logs the run id.
   try {
-    const body = (await r.res.json()) as { steps?: Record<string, { ok?: unknown }> } | null;
-    const failed = Object.entries(body?.steps ?? {}).filter(([, s]) => s?.ok === false).map(([name]) => name);
-    if (failed.length > 0) logger.error(`jobs-trigger ${job}: steps failed: ${failed.join(', ')}`);
+    const body = (await r.res.json()) as { run_id?: unknown; skipped?: unknown } | null;
+    const id = typeof body?.run_id === 'string' ? body.run_id : 'unknown';
+    logger.info?.(`jobs-trigger ${job}: ${body?.skipped === true ? 'already queued or running, run' : 'queued run'} ${id}`);
   } catch {
     // an unreadable body on a 2xx is not a failure of the job
   }

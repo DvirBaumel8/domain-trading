@@ -1,4 +1,4 @@
-# Endpoints (contract v2.16.4)
+# Endpoints (contract v3.0.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -563,23 +563,23 @@ A closed tranche is read-only in the database as well (an update of the tranche 
 ## Jobs
 
 ### `POST /jobs/run`
-The job token, or (2.3.0) a WRITE bot token, at most 4 calls per hour per WRITE token (see `jobs.md`). Body `{"job": "tick" | "daily"}` (strict; anything else → 422 `VALIDATION_ERROR`). Needs `Idempotency-Key`. **200** `{job, skipped: bool, steps: {<step>: {ok, skipped?, error?, summary}}, started_at, finished_at}`. **503** `JOBS_DISABLED` when the job token isn't configured.
+The job token, or (2.3.0) a WRITE bot token, at most 4 calls per hour per WRITE token (see `jobs.md`). Body `{"job": "tick" | "daily"}` (strict; anything else → 422 `VALIDATION_ERROR`). Needs `Idempotency-Key`. **202 (3.0.0)** `{run_id, job, status: "queued" | "running", skipped, steps: [name]}`: the steps run in the background from a queue (`jobs.md`); read the results in `GET /jobs/runs`. **503** `JOBS_DISABLED` when the job token isn't configured.
 
 ---
 
 ### `GET /jobs/runs`
 READ (any `GET` token; not the job token). Query (all optional; an unknown parameter or a bad value → **400** `VALIDATION_ERROR`): `job` (`tick` | `daily`), `since` (ISO 8601 with an offset; runs that finished at or after it), `limit` (1 to 500, default 50). **200:**
 ```
-{ runs: [ { job, trigger: "scheduled" | "manual" | "cli", triggered_by: string | null, scheduled_for: ISO | null,
+{ runs: [ { run_id: string | null (3.0.0; null for older and CLI runs), status: "queued" | "running" | "finished" (3.0.0), job, trigger: "scheduled" | "manual" | "cli", triggered_by: string | null, scheduled_for: ISO | null,
             started_at, finished_at, skipped: bool, ok: bool,
-            steps: { <step>: { ok, skipped?, error?, summary } } } ],          // newest first
+            steps: { <step>: { ok (null while queued or running), status: queued|running|done|failed|skipped, attempts, ms, started_at, finished_at, skipped?, error?, summary } } } ],   // unfinished runs first, then newest first
   jobs: { tick: { last_run_at, last_ok_at, next_due_at: null },
           daily: { last_run_at, last_ok_at, next_due_at } },                   // ISO | null
   reference: { popularity: { list_id, list_date, rows, refreshed_at } | null,
                iana: { refreshed_at: ISO | null }, namebio: { enabled: false } },
   backup: { configured: bool, last_status: "ok" | "failed" | "skipped" | null } }
 ```
-- `trigger`: `scheduled` when the `Idempotency-Key` of the `POST /jobs/run` call is the Worker's `<job>-<ms>` (`scheduled_for` is that time), `manual` for any other call, `cli` for `npm run job`. `triggered_by` (2.3.0) is the bot token's name for a run a WRITE token started, else `null`. `steps` are the step results exactly as `POST /jobs/run` returned them (`jobs.md`). A skipped overlap is listed (`skipped: true`, `steps: {}`); a failed run has `ok: false`.
+- `trigger`: `scheduled` when the `Idempotency-Key` of the `POST /jobs/run` call is the Worker's `<job>-<ms>` (`scheduled_for` is that time), `manual` for any other call, `cli` for `npm run job`. `triggered_by` (2.3.0) is the bot token's name for a run a WRITE token started, else `null`. `steps` are the step results exactly as `POST /jobs/run` returned them (`jobs.md`). An unfinished run shows `finished_at: null`, `ok: null` and each step's current state. Since 3.0.0 a call that overlapped a running job adds no run (it answers with the running run's id). A failed run has `ok: false`.
 - `last_run_at` / `last_ok_at` ignore skipped overlaps. `next_due_at` is the next 00:05 UTC for `daily`; `tick` has no schedule (`null`).
 - `reference` is the snapshot in use now. `backup.last_status` is the last daily run's `backupExport` step (`null` before any run). Times use the Asia/Jerusalem offset. No secret, token or repository address is ever shown. Only runs since 2.1.0 are listed.
 

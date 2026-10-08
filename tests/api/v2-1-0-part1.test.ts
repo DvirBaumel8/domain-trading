@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { makeApp } from '../helpers/app.js';
+import { makeApp, runJobToEnd } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { listedDomain } from '../helpers/listing.js';
@@ -39,8 +39,8 @@ describe('BUG-2: Asia/Jerusalem offset on every response timestamp', () => {
 
   it('the documented UTC fields stay UTC: started_at / finished_at on /jobs/run; everything else in the reply uses the offset', async () => {
     app = await makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: JOB } });
-    const res = await app.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: `Bearer ${JOB}`, 'idempotency-key': randomUUID() }, payload: { job: 'daily' } });
-    expect(res.statusCode, res.body).toBe(200);
+    const res = await runJobToEnd(app, 'daily', { headers: { authorization: `Bearer ${JOB}` }, key: randomUUID() });
+    expect(res.statusCode, res.body).toBe(202); // v3.0.0: the POST answers 202 with the run id; the run result (started_at/finished_at, UTC) is read once the worker is done
     expect(res.json().started_at).toMatch(/Z$/);
     expect(res.json().finished_at).toMatch(/Z$/);
   });
@@ -131,7 +131,7 @@ describe('forecast fixes (CR-004 §10.3)', () => {
 describe('daily-only schedule: the daily job runs the former tick steps first', () => {
   it('POST /jobs/run daily returns reconciler, nsVerifier and screeningResume, then the daily steps; tick still works by hand', async () => {
     app = await makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: JOB } });
-    const run = (job: string) => app.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: `Bearer ${JOB}`, 'idempotency-key': randomUUID() }, payload: { job } });
+    const run = (job: string) => runJobToEnd(app, job, { headers: { authorization: `Bearer ${JOB}` }, key: randomUUID() });
     const daily = await run('daily');
     expect(Object.keys(daily.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
     expect(daily.json().steps.reconciler.ok).toBe(true);

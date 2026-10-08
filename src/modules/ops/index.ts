@@ -11,3 +11,4 @@ export { PriceScheduleJob } from './jobs/price-schedule.js';
 export { ReferenceRefreshJob } from './jobs/reference-refresh.js';
 export { RegistrarCheckJob } from './jobs/registrar-check.js';
 export { type BackupExport, JobRunner } from './jobs/runner.js';
+export { JobQueue } from './queue.js';

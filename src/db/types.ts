@@ -296,6 +296,41 @@ export interface JobRunsTable {
   steps: Json;
   /** The WRITE token's name for a manual run started through the API; null for the job token, the Worker and the CLI. */
   triggered_by: ColumnType<string | null, string | null | undefined, never>;
+  /** The queue run (job_queue_runs.id) this record closes; null for a run made by the direct runner (CLI) and for runs before 3.0.0. */
+  queue_run_id: ColumnType<string | null, string | null | undefined, never>;
+}
+
+/** An enqueued job run (v3.0.0). Written once at enqueue; its progress lives in job_steps and its result in job_runs. */
+export interface JobQueueRunsTable {
+  id: string;
+  job: 'tick' | 'daily';
+  trigger: 'scheduled' | 'manual' | 'cli';
+  scheduled_for: ColumnType<Date | null, Date | string | null | undefined, never>;
+  triggered_by: ColumnType<string | null, string | null | undefined, never>;
+  created_at: TimestampDefault;
+}
+
+export type JobStepStatus = 'queued' | 'running' | 'done' | 'failed' | 'skipped';
+
+/** One step of a queued run (v3.0.0); status only moves forward (trigger job_steps_guard). */
+export interface JobStepsTable {
+  id: Generated<number>;
+  run_id: string;
+  job: 'tick' | 'daily';
+  step: string;
+  position: number;
+  status: Generated<JobStepStatus>;
+  attempt: Generated<number>;
+  max_attempts: number;
+  timeout_ms: number;
+  locked_by: ColumnType<string | null, string | null | undefined, string | null>;
+  locked_until: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  started_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  finished_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  ms: ColumnType<number | null, number | null | undefined, number | null>;
+  summary: ColumnType<unknown, string | null | undefined, string | null>;
+  error: ColumnType<string | null, string | null | undefined, string | null>;
+  created_at: TimestampDefault;
 }
 
 export interface ApiUsageTable {
@@ -969,6 +1004,8 @@ export interface Database {
   rdap_lookups: RdapLookupsTable;
   reference_files: ReferenceFilesTable;
   job_runs: JobRunsTable;
+  job_queue_runs: JobQueueRunsTable;
+  job_steps: JobStepsTable;
   api_usage: ApiUsageTable;
   portfolio_checks: PortfolioChecksTable;
   drop_lists: DropListsTable;

@@ -239,6 +239,6 @@ describe('POST /jobs/run by a non-WRITE token (CR-009 N-4)', () => {
     }
     const codes: number[] = [];
     for (let i = 10; i < 14; i++) codes.push((await post(write.auth, i)).statusCode);
-    expect(codes).toEqual([200, 200, 200, 200]);
+    expect(codes).toEqual([202, 202, 202, 202]); // v3.0.0: 202 (queued)
   });
 });

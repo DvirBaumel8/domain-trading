@@ -14,6 +14,24 @@ export interface StepResult {
 
 export type JobKind = 'tick' | 'daily';
 
+/** One step of a job: what the queue stores (limits) and runs (exec). `exec` returns the step's summary and throws on failure. */
+export interface PlanStep {
+  name: string;
+  maxAttempts: number;
+  timeoutMs: number;
+  exec: () => Promise<unknown>;
+  /** A summary with a non-empty `errors` list makes the step not ok (the reference refresh keeps its previous snapshot). */
+  errorsFail?: boolean;
+}
+
+/** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the review steps 1 (they keep their own retry), the rest 2. */
+export const DEFAULT_ATTEMPTS = 2;
+export const STEP_ATTEMPTS: Record<string, number> = {
+  registrarCheck: 3, portfolioCheck: 3, dropWatch: 3, referenceRefresh: 3, postsRefresh: 3, outsideReview: 1, reviewRetry: 1,
+};
+export const DEFAULT_TIMEOUT_MS = 5 * 60_000;
+export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, buildDailyList: 10 * 60_000 };
+
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
 
 export interface RunOptions {
@@ -75,9 +93,73 @@ export interface JobRunnerDeps {
 }
 
 
-/** Orchestrates the scheduled work for POST /jobs/run. Each step is isolated; a database lock per job kind (and one per job) makes overlaps skip, across instances too. */
+/** Orchestrates the scheduled work. `plan(job)` lists the steps in order; the queue (queue.ts) runs them one by one with attempts and timeouts, `run()` runs them in-process once (CLI, tests). A database lock per job kind (and one per job) makes overlaps skip, across instances too. */
 export class JobRunner {
   constructor(private readonly deps: JobRunnerDeps) {}
+
+  /** The steps of `job` in run order, each with its attempts and timeout. */
+  plan(job: JobKind): PlanStep[] {
+    const d = this.deps;
+    const step = (name: string, exec: () => Promise<unknown>, errorsFail = false): PlanStep => ({
+      name, exec, errorsFail, maxAttempts: STEP_ATTEMPTS[name] ?? DEFAULT_ATTEMPTS, timeoutMs: STEP_TIMEOUT_MS[name] ?? DEFAULT_TIMEOUT_MS,
+    });
+    const optional = (name: string, job: Runnable | undefined, reason: string, errorsFail = false) =>
+      step(name, async () => (job ? job.runOnce() : { skipped: true, reason }), errorsFail);
+    const optionalFn = (name: string, fn: (() => Promise<unknown>) | undefined, reason: string) =>
+      step(name, async () => (fn ? fn() : { skipped: true, reason }));
+    const tick: PlanStep[] = [
+      step('reconciler', () => d.reconciler.runOnce()),
+      step('nsVerifier', async () => {
+        if (!(await this.nsVerifyDue())) return { skipped: true, reason: 'already ran today (IDT)' };
+        return d.nsVerifier.runOnce();
+      }),
+      step('screeningResume', () => d.screeningWorker.resumeStalled()),
+    ];
+    if (job === 'tick') return [...tick, optionalFn('reviewRetry', d.reviewRetry, 'review retry not configured')];
+    // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.
+    return [
+      ...tick,
+      step('priceJob', () => d.priceJob.runOnce()),
+      step('dropJob', () => d.dropJob.runOnce()),
+      step('registrarCheck', () => d.registrarCheckJob.runOnce()),
+      optional('portfolioCheck', d.portfolioCheckJob, 'portfolio check not configured'),
+      optional('dropWatch', d.dropWatchJob, 'drop watch not configured'),
+      optional('intakeScreening', d.intakeScreeningJob, 'intake screening not configured'),
+      optional('buildDailyList', d.buildDailyListJob, 'daily list not configured'),
+      optional('cohortOutcomes', d.cohortOutcomesJob, 'cohort outcomes not configured'),
+      optional('referenceRefresh', d.referenceRefresh, 'reference refresh not configured', true),
+      optionalFn('outsideReview', d.outsideReview, 'outside review not configured'),
+      optionalFn('postsRefresh', d.postsRefresh, 'posts refresh not configured'),
+      optional('backupExport', d.backupExport, 'backup export not configured'),
+    ];
+  }
+
+  /** Turns a finished step's summary into its result (skipped, failed items, reference errors). */
+  classify(entry: PlanStep, summary: unknown, ms: number): StepResult {
+    const obj = typeof summary === 'object' && summary !== null ? (summary as { skipped?: unknown; failed?: unknown; errors?: unknown }) : null;
+    if (obj?.skipped === true) return { ok: true, skipped: true, ms, summary };
+    // A step that finished but reports failed items (price job, drop job, ...) is not ok, so the run shows it; the summary is kept.
+    if (Array.isArray(obj?.failed) && obj.failed.length > 0) return { ok: false, error: `${obj.failed.length} item(s) failed`, ms, summary };
+    // A sub-step that failed (previous snapshot kept) makes the step not ok but keeps the summary.
+    if (entry.errorsFail && Array.isArray(obj?.errors) && obj.errors.length > 0) return { ok: false, error: this.clean(obj.errors.join('; ')), ms, summary };
+    return { ok: true, ms, summary };
+  }
+
+  /** The step's error text for a result: secrets scrubbed, 200 characters at most. */
+  errorText(e: unknown): string {
+    return this.clean(e instanceof Error ? e.message : String(e));
+  }
+
+  /** Runs one step once, in-process: errors become `ok:false`. */
+  async runStepOnce(entry: PlanStep): Promise<StepResult> {
+    const t0 = this.deps.now();
+    const ms = () => Math.max(0, this.deps.now() - t0);
+    try {
+      return this.classify(entry, await entry.exec(), ms());
+    } catch (e) {
+      return { ok: false, error: this.errorText(e), ms: ms(), summary: null };
+    }
+  }
 
   async run(job: JobKind, opts: RunOptions = {}): Promise<JobRunResult> {
     const started = new Date(this.deps.now());
@@ -89,7 +171,9 @@ export class JobRunner {
       return skipped;
     }
     try {
-      const result: JobRunResult = { job, skipped: false, steps: job === 'tick' ? await this.tickRun() : await this.daily() };
+      const steps: Record<string, StepResult> = {};
+      for (const entry of this.plan(job)) steps[entry.name] = await this.runStepOnce(entry);
+      const result: JobRunResult = { job, skipped: false, steps };
       await this.record(result, opts, started);
       return result;
     } finally {
@@ -109,30 +193,6 @@ export class JobRunner {
     }
   }
 
-  private async step(fn: () => Promise<unknown>): Promise<StepResult> {
-    const t0 = this.deps.now();
-    const ms = () => Math.max(0, this.deps.now() - t0);
-    try {
-      const summary = await fn();
-      const skipped = typeof summary === 'object' && summary !== null && (summary as { skipped?: unknown }).skipped === true;
-      if (skipped) return { ok: true, skipped: true, ms: ms(), summary };
-      // A step that finished but reports failed items (price job, drop job, ...) is not ok, so the run shows it; the summary is kept.
-      const failed = typeof summary === 'object' && summary !== null ? (summary as { failed?: unknown }).failed : undefined;
-      if (Array.isArray(failed) && failed.length > 0) return { ok: false, error: `${failed.length} item(s) failed`, ms: ms(), summary };
-      return { ok: true, ms: ms(), summary };
-    } catch (e) {
-      return { ok: false, error: this.clean((e as Error).message), ms: ms(), summary: null };
-    }
-  }
-
-  /** A sub-step that failed (previous snapshot kept) makes the step `ok: false` but keeps the summary. */
-  private async referenceStep(ref: Runnable): Promise<StepResult> {
-    const r = await this.step(() => ref.runOnce());
-    const errors = (r.summary as { errors?: unknown } | null)?.errors;
-    if (r.ok && Array.isArray(errors) && errors.length > 0) return { ok: false, error: this.clean(errors.join('; ')), ms: r.ms, summary: r.summary };
-    return r;
-  }
-
   private clean(message: string): string {
     const m = scrubSecrets(message, this.deps.secretValues ?? []);
     return m.length > 200 ? `${m.slice(0, 200)}...` : m;
@@ -144,53 +204,5 @@ export class JobRunner {
       .orderBy('at', 'desc').limit(1).executeTakeFirst();
     // Once per IDT day: a 00:05 UTC run is never skipped because the last one was a few minutes under 24 h ago.
     return !last || idtDay(last.at) < idtDay(new Date(this.deps.now()));
-  }
-
-  /** The standalone tick: the base steps, then the review retry (the daily run does not retry; it just ran the review). */
-  private async tickRun(): Promise<Record<string, StepResult>> {
-    const steps = await this.tick();
-    const retry = this.deps.reviewRetry;
-    steps.reviewRetry = retry ? await this.step(retry) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'review retry not configured' } };
-    return steps;
-  }
-
-  private async tick(): Promise<Record<string, StepResult>> {
-    const steps: Record<string, StepResult> = {};
-    steps.reconciler = await this.step(() => this.deps.reconciler.runOnce());
-    steps.nsVerifier = await this.step(async () => {
-      if (!(await this.nsVerifyDue())) return { skipped: true, reason: 'already ran today (IDT)' };
-      return this.deps.nsVerifier.runOnce();
-    });
-    steps.screeningResume = await this.step(() => this.deps.screeningWorker.resumeStalled());
-    return steps;
-  }
-
-  private async daily(): Promise<Record<string, StepResult>> {
-    // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.
-    const steps: Record<string, StepResult> = await this.tick();
-    steps.priceJob = await this.step(() => this.deps.priceJob.runOnce());
-    steps.dropJob = await this.step(() => this.deps.dropJob.runOnce());
-    steps.registrarCheck = await this.step(() => this.deps.registrarCheckJob.runOnce());
-    const pc = this.deps.portfolioCheckJob;
-    steps.portfolioCheck = pc ? await this.step(() => pc.runOnce()) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'portfolio check not configured' } };
-    const dw = this.deps.dropWatchJob;
-    steps.dropWatch = dw ? await this.step(() => dw.runOnce()) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'drop watch not configured' } };
-    const is = this.deps.intakeScreeningJob;
-    steps.intakeScreening = is ? await this.step(() => is.runOnce()) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'intake screening not configured' } };
-    const bl = this.deps.buildDailyListJob;
-    steps.buildDailyList = bl ? await this.step(() => bl.runOnce()) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'daily list not configured' } };
-    const co = this.deps.cohortOutcomesJob;
-    steps.cohortOutcomes = co ? await this.step(() => co.runOnce()) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'cohort outcomes not configured' } };
-    const ref = this.deps.referenceRefresh;
-    steps.referenceRefresh = ref ? await this.referenceStep(ref) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'reference refresh not configured' } };
-    const review = this.deps.outsideReview;
-    steps.outsideReview = review ? await this.step(review) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'outside review not configured' } };
-    const pr = this.deps.postsRefresh;
-    steps.postsRefresh = pr ? await this.step(pr) : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'posts refresh not configured' } };
-    const backup = this.deps.backupExport;
-    steps.backupExport = backup
-      ? await this.step(() => backup.runOnce())
-      : { ok: true, skipped: true, ms: 0, summary: { skipped: true, reason: 'backup export not configured' } };
-    return steps;
   }
 }

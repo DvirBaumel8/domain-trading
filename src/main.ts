@@ -20,3 +20,5 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
 await app.listen({ port: config.port, host: config.host });
+// Resume the runs a restart interrupted (steps left running or queued in job_steps).
+await app.jobQueue.kickIfNeeded();

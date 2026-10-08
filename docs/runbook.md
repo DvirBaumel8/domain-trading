@@ -35,7 +35,7 @@ curl -sS -X POST "$API/jobs/run" \
   -d '{"job":"tick"}'          # or {"job":"daily"}
 ```
 
-The Worker has one cron, `5 0 * * *`: `daily` at 00:05 UTC. A second schedule lives in GitHub Actions (`.github/workflows/review-retry-tick.yml`, 08:30 UTC, after Google's free-tier reset in both seasons; Cloudflare's free plan allows 5 crons per account): it runs `tick`, whose last step `reviewRetry` retries a review that Google refused at 03:05 IDT. `tick` can also be run by hand. A Worker log saying "timed out" does **not** mean the job failed (the cold start can exceed the Worker's wait while the job still runs): check `GET /audit` for the `/jobs/run` row and its summary.
+The Worker has one cron, `5 0 * * *`: `daily` at 00:05 UTC. A second schedule lives in GitHub Actions (`.github/workflows/review-retry-tick.yml`, 08:30 UTC, after Google's free-tier reset in both seasons; Cloudflare's free plan allows 5 crons per account): it runs `tick`, whose last step `reviewRetry` retries a review that Google refused at 03:05 IDT. `tick` can also be run by hand. Since 3.0.0 the call answers 202 with a run id at once and the steps run from the job queue: check `GET /jobs/runs` for each step's status, attempts and errors (a stalled run resumes on the next `GET /health` or `GET /jobs/runs`).
 
 The reply has a per-step result. A second run while one is still running returns `skipped`. 401 = wrong token, 503 `JOBS_DISABLED` = `JOB_TRIGGER_TOKEN` not set in Render.
 Allow up to ~60 s for a cold start.

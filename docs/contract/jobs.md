@@ -1,4 +1,4 @@
-# Jobs (contract v2.16.4)
+# Jobs (contract v3.0.0)
 
 The service runs **no timers of its own**. All scheduled work goes through one route, called by a Cloudflare Worker cron (`jobs-trigger/`). Since 2.1.0 the cron fires **once a day** (00:05 UTC) and runs `daily` only; `tick` stays callable by hand. Since 2.3.0 a bot with the WRITE token may also start `daily` or `tick` by hand (after a real buy, or when testing); the results are in `GET /jobs/runs`, `GET /audit` and `GET /report`.
 
@@ -6,16 +6,23 @@ The service runs **no timers of its own**. All scheduled work goes through one r
 - **Auth:** `Authorization: Bearer <JOB_TRIGGER_TOKEN>`, or (2.3.0, CR-007 T-2) a **WRITE** bot token. A WRITE token may start only `daily` or `tick` (the body rule below), at most **4 calls per hour per token** (429 `RATE_LIMITED` after that; every call made with the WRITE token counts, a 422 for a bad body included; a refused call with any other token gets 401 with no `RateLimit-*` headers and counts nothing: 2.6.0, CR-009 N-4, N-5), with the same overlap lock; its runs show `trigger: "manual"` and `triggered_by` = the token's name in `GET /jobs/runs`. A READ token is refused (401), and the job token works on no other route (401). If the server has no job token configured → **503** `JOBS_DISABLED` (for any POST to this route, even without a token).
 - **Headers:** `Idempotency-Key` required (the Worker sends `<job>-<scheduled time in ms>`). Same key + same body → the stored response is replayed and the job doesn't run again.
 - **Body (strict):** `{"job": "tick"}` or `{"job": "daily"}`. `daily` runs the `tick` steps first, then its own (so a manual `daily` is the full run; `tick` alone is the old hourly subset). Anything else → **422** `VALIDATION_ERROR`.
-- **200** (even when a step failed):
+- **202 (3.0.0, the job queue):** the run is queued and the call answers at once:
   ```
-  { job: "tick"|"daily", skipped: bool, started_at: ISO, finished_at: ISO,
-    steps: { <step>: { ok: bool, skipped?: true, error?: string, summary: object|null } } }
+  { run_id: "run_<uuid>", job: "tick"|"daily", status: "queued"|"running", skipped: bool, steps: [<step name>] }
   ```
-  - `skipped: true` with `steps: {}`: the same job was already running in this instance.
-  - Each step is isolated; since 2.16.0 a step whose summary lists failed items (`failed: [...]`) is `ok: false` with `error: "N item(s) failed"`, and its run is not ok. A failing step (`ok: false`, `error` = a message of at most 200 characters with secrets redacted) doesn't stop the next one. A step has `skipped: true` only when its own summary says so (already running, not due, or backup not configured). A step with nothing to do (an empty price or drop job) returns `ok: true` without `skipped`.
-  - **`ms`** (2.16.2): how long the step took, in milliseconds.
-  - `summary` is the step's own result object (counts and names, see below). Its fields are informational, not part of the contract.
-- **Audit:** one `audit_log` row, with scope `job` for a scheduled or job-token run and the bot token's scope (`write`) for a run a WRITE token started (2.6.0, CR-009 N-6), and a summary such as `tick: ok`, `daily: failed backupExport` or `daily: skipped`.
+  - **Overlap:** `skipped: true` means a run of the same job is already queued or running. The answer carries **that** run's `run_id`, and nothing new is queued.
+  - **How steps run:** in the background, in today's order (a step starts when the one before it has finished), from a queue in Postgres (`job_steps`):
+    - **Time limit:** each step has one (5 minutes; `intakeScreening` and `buildDailyList` 10).
+    - **Attempts:** usually 2; the outside-facing checks 3; `outsideReview` and `reviewRetry` 1, since they have their own retry and cost quota.
+    - **A thrown error or a timeout** fails the attempt, and the step is queued again while attempts remain.
+    - **A step that finishes with failed items** (`failed: [...]`) is `failed` at once, with no retry.
+    - **A step left `running` by an instance that died or slept** is taken over by the next worker, and the attempt counts.
+    - **Steps are isolated:** a failed step doesn't stop the next one, and the run's `ok` is false if any step failed.
+  - **Keeping the server awake:** while the queue works, the service pings its own `GET /health/ping` every 5 minutes, so Render doesn't put it to sleep mid-run. If it sleeps anyway, the remaining steps continue on the next request (`GET /health` and `GET /jobs/runs` also resume them).
+  - **Results:** read them in `GET /jobs/runs` (each step's `status`, `attempts`, `ms`, `error`, `started_at`, `finished_at`, `summary`).
+  - **`npm run job` (the CLI)** still runs the job at once in-process and prints the full result (trigger `cli`).
+  - **Before 3.0.0** this call answered 200 with every step's result, after the whole run.
+- **Audit:** the call writes one `audit_log` row (summary `<job>: queued` or `<job>: skipped`), and the finished run writes one more (method `QUEUE`, path `job <name>`, summary `daily: ok` or `daily: failed a,b`). Each row has with scope `job` for a scheduled or job-token run and the bot token's scope (`write`) for a run a WRITE token started (2.6.0, CR-009 N-6), and a summary such as `tick: ok`, `daily: failed backupExport` or `daily: skipped`.
 - **Rate limit:** 10 calls per minute for the job token.
 
 ## Reading the runs (2.1.0)
@@ -31,7 +38,7 @@ The service runs **no timers of its own**. All scheduled work goes through one r
 
 Summary objects: `reconciler` `{booked, failed, abandoned, receipts, skipped}`, `nsVerifier` `{checked, verified, cleared, unknown, skipped}`, `screeningResume` `{resumed: [run_id], finalized: [run_id]}`, `priceJob` `{today, dryRun, skipped, applied[], superseded[], failed[], held[], delisted[], cancelled[]}`, `dropJob` `{today, dryRun, skipped, dropped[], failed[]}`, `registrarCheck` `{dryRun, skipped, checked, present, absent, errors, newlyAbsent[]}`, `portfolioCheck` `{checked, registry: {ok, fail, unknown}, web: {ok, fail, unknown, skipped}, blocklist: {ok, fail, unknown, skipped}, names: [{domain, registry, web, blocklist}]}`, `referenceRefresh` `{popularity: {list_id, list_date, rows} | {skipped, reason}, namebio: {skipped, reason}, iana: {refreshed} | {skipped, reason}, pruned, errors[]}` (`popularity` is the Majestic Million list for TYPO-1; a failed sub-step is `{ok: false, error}` there and in `errors`), `backupExport` `{skipped?, reason?, committed?, commit?, files?, changed?}`.
 
-**Cold start:** the Worker waits 90 s. A Worker-side timeout doesn't mean the job failed; the `/audit` row is the record.
+**Cold start:** the Worker waits up to 30 s for the 202. The run's record is `GET /jobs/runs` (and `/audit`).
 
 **`portfolioCheck` (2.3.0, CR-007 G-5).** For every owned, listed or delisted name; it never calls a registrar API, never changes nameservers, listings or the domain, and sends nothing.
 - **Registry, daily:** an RDAP lookup at the registry (Verisign). It must show the name registered, at our registrar, with our expiry date, and with none of `client hold`, `server hold`, `pending delete`, `redemption period`. Otherwise `/report` error `REGISTRY_MISMATCH`. This covers names bought by hand (`registrar_api: none`), which `registrarCheck` skips.

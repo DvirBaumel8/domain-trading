@@ -12,7 +12,7 @@ import { CohortOutcomesJob } from '../../src/modules/ops/jobs/cohort-outcomes.js
 import { DropWatchJob } from '../../src/modules/ops/jobs/drop-watch.js';
 import type { RdapLookup } from '../../src/core/rdap.js';
 import { wilson95 } from '../../src/modules/selection/test-sets.js';
-import { makeApp } from '../helpers/app.js';
+import { makeApp, runJobToEnd } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
 import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
@@ -495,8 +495,8 @@ describe('daily run (G-1, G-2)', () => {
     const up = await a.inject({ method: 'POST', url: '/selection/drop-lists', headers: { ...w, 'idempotency-key': 'dl-1' }, payload: { name: 'snap-day', list_date: '2026-10-20', domains: ['superhealth.com', 'supertech.com'] } });
     expect(up.statusCode, up.body).toBe(201);
     const before = adapter.calls.length;
-    const res = await a.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: 'Bearer job_token_fake_0123456789abcdef0123456789', 'idempotency-key': 'dw-1' }, payload: { job: 'daily' } });
-    expect(res.statusCode, res.body).toBe(200);
+    const res = await runJobToEnd(a, 'daily', { key: 'dw-1' });
+    expect(res.statusCode, res.body).toBe(202);
     const steps = Object.keys(res.json().steps);
     expect(steps.slice(steps.indexOf('portfolioCheck'))).toEqual(['portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'postsRefresh', 'backupExport']);
     expect(res.json().steps.dropWatch).toMatchObject({ ok: true, summary: { checked: 2, pending_delete: 2, left_for_next_run: 0 } });

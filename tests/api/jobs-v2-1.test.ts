@@ -1,7 +1,7 @@
 // v2.1.0 (CR-005 N-1, N-2, N-4, N-5, N-8a): GET /jobs/runs, JOB_OVERDUE and /health jobs, POST /jobs/preview, rate-limit headers.
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { makeApp } from '../helpers/app.js';
+import { makeApp, runJobToEnd } from '../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';
 
@@ -14,8 +14,8 @@ const make = async () => {
   clock = Date.parse('2027-04-12T09:00:00Z');
   app = await makeApp({ testRoutes: false, now: () => clock, env: { JOB_TRIGGER_TOKEN: JOB_TOKEN } });
 };
-const runJob = (job: 'tick' | 'daily', key: string) =>
-  app.inject({ method: 'POST', url: '/jobs/run', headers: { ...jobAuth, 'idempotency-key': key }, payload: { job } });
+// v3.0.0: enqueue (202), then wait for the worker; the result has the pre-3.0.0 shape.
+const runJob = (job: 'tick' | 'daily', key: string) => runJobToEnd(app, job, { headers: jobAuth, key });
 const get = async (url: string, auth?: Record<string, string>) => app.inject({ method: 'GET', url, headers: auth ?? (await issueToken('read')).auth });
 const warnings = async () => ((await get('/report')).json().warnings as { code: string; level: string; details: Record<string, unknown> }[]);
 

@@ -15,6 +15,8 @@ const EXCLUDED: Record<string, string> = {
   rdap_lookups: 'cache of public registry answers; refetched on demand',
   reference_files: 'cache of downloaded public reference lists (popularity list, IANA bootstrap); refreshed daily',
   job_runs: 'operational log of job step summaries; the audit rows keep the facts',
+  job_queue_runs: 'operational queue of job runs (v3.0.0); the finished run is in job_runs',
+  job_steps: 'operational queue of job steps (v3.0.0); a restored database starts with an empty queue',
   portfolio_checks: 'operational daily probes (registry, lander, blocklist); recomputed by the next daily run',
   api_usage: 'rate and Web Risk usage counters; operational',
 };

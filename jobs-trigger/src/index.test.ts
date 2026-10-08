@@ -128,17 +128,21 @@ describe('wake-up, retry and failed steps', () => {
     expect(l5.error).toHaveBeenCalledTimes(1);
   });
 
-  it('logs an error naming every step with ok:false in a 200 answer; an all-ok answer logs nothing', async () => {
-    const bad = JSON.stringify({ skipped: false, steps: { reconciler: { ok: true }, backupExport: { ok: false, error: 'x' }, nsVerifier: { ok: false } } });
-    const fetcher = vi.fn().mockImplementation(async () => new Response(bad, { status: 200 }));
-    const logger = { error: vi.fn() };
-    await triggerJob('daily', env, 1, fetcher, logger, fast);
-    expect(logger.error).toHaveBeenCalledTimes(1);
-    expect(logger.error).toHaveBeenCalledWith('jobs-trigger daily: steps failed: backupExport, nsVerifier');
-    const good = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ steps: { a: { ok: true } } }), { status: 200 }));
-    const l2 = { error: vi.fn() };
-    await triggerJob('daily', env, 1, good, l2, fast);
-    expect(l2.error).not.toHaveBeenCalled();
+  it('accepts 202 and logs the run id (info); an overlap says it is already queued or running; an unreadable 202 body logs no error', async () => {
+    const queued = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ run_id: 'run_abc', job: 'daily', status: 'queued', skipped: false, steps: ['a'] }), { status: 202 }));
+    const logger = { error: vi.fn(), info: vi.fn() };
+    await triggerJob('daily', env, 1, queued, logger, fast);
+    expect(posts(queued)).toHaveLength(1);
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith('jobs-trigger daily: queued run run_abc');
+    const dup = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ run_id: 'run_abc', skipped: true }), { status: 202 }));
+    const l2 = { error: vi.fn(), info: vi.fn() };
+    await triggerJob('daily', env, 1, dup, l2, fast);
+    expect(l2.info).toHaveBeenCalledWith('jobs-trigger daily: already queued or running, run run_abc');
+    const junk = vi.fn().mockImplementation(async () => new Response('not json', { status: 202 }));
+    const l3 = { error: vi.fn(), info: vi.fn() };
+    await triggerJob('daily', env, 1, junk, l3, fast);
+    expect(l3.error).not.toHaveBeenCalled();
   });
 });
 

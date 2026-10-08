@@ -7,13 +7,14 @@ import { adapterStatus } from '../../registrars/index.js';
 import { currentReviewSettings, postingHealth, type PostingDeps } from '../../outreach/index.js';
 import { jobsOverdue } from '../../reporting/index.js';
 
-export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, posting?: PostingDeps): void {
+export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, posting?: PostingDeps, kickQueue?: () => Promise<void>): void {
   // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
   app.get('/health/ping', async () => ({ status: 'ok' }));
 
   // Needs any valid bot token (global auth hook).
   app.get('/health', async (_req, reply) => {
     const dbOk = await pingDb(db);
+    if (dbOk) await kickQueue?.(); // resumes unfinished job steps when this process has no worker running (cheap check)
     const jobs = dbOk ? ((await jobsOverdue(db, now())).overdue ? 'overdue' : 'ok') : 'unknown';
     return reply.code(dbOk ? 200 : 503).send({
       status: dbOk ? 'ok' : 'degraded',

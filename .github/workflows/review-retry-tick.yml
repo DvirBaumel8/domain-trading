@@ -4,7 +4,8 @@ name: review-retry-tick
 # the daily run. Google's free-tier quota resets at midnight Pacific = 07:00 UTC in summer (PDT) and 08:00 UTC in winter (PST);
 # 08:30 UTC is after the reset in both seasons (07:30 UTC was before it in winter).
 # The Cloudflare account is at the Workers Free limit of cron triggers, so this schedule lives here (free).
-# It calls the API like the Worker does (wake-up ping, then POST) and FAILS when a step reports ok:false.
+# It calls the API like the Worker does (wake-up ping, then POST). Since 3.0.0 the POST only enqueues the run and answers 202 with its run id;
+# the server works the steps, so this workflow checks the 202 and logs the run id (it has no READ token to poll GET /jobs/runs, and no secret is added).
 on:
   schedule:
     - cron: '30 8 * * *'
@@ -25,10 +26,11 @@ jobs:
           ms=$(( $(date -u -d "$(date -u +%Y-%m-%d) 08:30:00" +%s) * 1000 ))
           # wake the free instance first (cold start), then run the job
           curl -s -o /dev/null --max-time 90 "$API_BASE_URL/health/ping" || true
-          code=$(curl -s -o out.json -w '%{http_code}' --max-time 300 -X POST "$API_BASE_URL/jobs/run" \
+          code=$(curl -s -o out.json -w '%{http_code}' --max-time 60 -X POST "$API_BASE_URL/jobs/run" \
             -H "Authorization: Bearer $JOB_TRIGGER_TOKEN" -H 'Content-Type: application/json' \
             -H "Idempotency-Key: tick-$ms" -d '{"job":"tick"}')
           echo "HTTP $code"; head -c 2000 out.json; echo
-          test "$code" = 200 || { echo "::error::POST /jobs/run answered HTTP $code"; exit 1; }
-          failed=$(jq -r '[.steps // {} | to_entries[] | select(.value.ok == false) | .key] | join(", ")' out.json) || { echo "::error::the answer is not JSON"; exit 1; }
-          if [ -n "$failed" ]; then echo "::error::tick steps failed: $failed"; exit 1; fi
+          test "$code" = 202 || { echo "::error::POST /jobs/run answered HTTP $code"; exit 1; }
+          run_id=$(jq -r '.run_id // empty' out.json) || { echo "::error::the answer is not JSON"; exit 1; }
+          test -n "$run_id" || { echo "::error::the answer has no run_id"; exit 1; }
+          echo "tick queued: $run_id (skipped: $(jq -r '.skipped' out.json))"

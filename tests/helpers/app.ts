@@ -78,6 +78,8 @@ export async function makeApp(
     holdoutCheck?: HoldoutCheck;
     screeningStopAfterResults?: number;
     screening?: AppDeps['screening'];
+    jobQueueOverrides?: AppDeps['jobQueueOverrides'];
+    jobQueueKeepAlive?: AppDeps['jobQueueKeepAlive'];
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -94,6 +96,8 @@ export async function makeApp(
     backupExport: opts.backupExport,
     holdoutCheck: opts.holdoutCheck,
     screeningStopAfterResults: opts.screeningStopAfterResults,
+    jobQueueOverrides: opts.jobQueueOverrides,
+    jobQueueKeepAlive: opts.jobQueueKeepAlive,
     // No live DNS in tests: a test that needs name servers passes fakes.
     screening: {
       resolveNs: async () => { throw new Error('DNS blocked in tests'); },
@@ -106,4 +110,40 @@ export async function makeApp(
   });
   await app.ready();
   return app;
+}
+
+const TEST_JOB_TOKEN = 'job_token_fake_0123456789abcdef0123456789';
+let jobKeyN = 0;
+
+/**
+ * POST /jobs/run (202, v3.0.0), then waits for this app's queue worker to finish, and returns the run in the shape the endpoint had before 3.0.0:
+ * `json()` = {job, skipped, steps:{name:{ok, skipped?, error?, ms, summary, status, attempts,...}}}. `statusCode` is the POST's (202).
+ * An overlap (the open run of the same job) comes back as {job, skipped:true, steps:{}} without waiting.
+ */
+export async function runJobToEnd(
+  app: FastifyInstance, job: string, opts: { headers?: Record<string, string>; key?: string } = {},
+): Promise<JobRunToEnd> {
+  const res = await app.inject({
+    method: 'POST', url: '/jobs/run',
+    headers: { ...(opts.headers ?? { authorization: `Bearer ${TEST_JOB_TOKEN}` }), 'idempotency-key': opts.key ?? `run-to-end-${++jobKeyN}-${Date.now()}` },
+    payload: { job },
+  });
+  return settleJob(app, job, res);
+}
+
+export interface JobRunToEnd {
+  statusCode: number; headers: Record<string, unknown>; body: string;
+  accepted: { run_id: string; skipped: boolean; steps: string[] };
+  json: () => any; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
+/** Takes a POST /jobs/run response you already have, waits for the worker, and returns the run as `runJobToEnd` does. */
+export async function settleJob(app: FastifyInstance, job: string, res: { statusCode: number; headers: Record<string, unknown>; body: string; json: () => any }): Promise<JobRunToEnd> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (res.statusCode !== 202) return { statusCode: res.statusCode, headers: res.headers, body: res.body, accepted: res.json(), json: () => res.json() };
+  const accepted = res.json() as { run_id: string; skipped: boolean; steps: string[] };
+  if (accepted.skipped) return { statusCode: 202, headers: res.headers, body: res.body, accepted, json: () => ({ job, skipped: true, steps: {} }) };
+  await app.jobQueue.idle();
+  const row = await testDb.selectFrom('job_runs').selectAll().where('queue_run_id', '=', accepted.run_id).executeTakeFirst();
+  if (!row) throw new Error(`run ${accepted.run_id} did not finish (the job lock may be held elsewhere)`);
+  return { statusCode: 202, headers: res.headers, body: res.body, accepted, json: () => ({ run_id: accepted.run_id, job: row.job, skipped: false, ok: row.ok, steps: row.steps, started_at: row.started_at.toISOString(), finished_at: row.finished_at.toISOString() }) };
 }

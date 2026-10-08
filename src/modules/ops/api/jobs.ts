@@ -5,7 +5,7 @@ import type { Config } from '../../../config.js';
 import { idtDay, isIsoWithOffset, isRealDate } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
-import type { JobRunner } from '../jobs/runner.js';
+import type { JobQueue } from '../queue.js';
 import { jobRunsView, triggerFromKey } from '../../reporting/index.js';
 
 const Body = z.object({ job: z.enum(['tick', 'daily']) }).strict();
@@ -37,28 +37,29 @@ function previewDay(v: string, today: string): string {
 }
 
 /**
- * POST /jobs/run: called by the external scheduler (Cloudflare Worker) with the job-trigger bearer, or by Gavriel's WRITE token (own limit, see http/auth.ts and http/rate-limit.ts).
+ * POST /jobs/run (202, v3.0.0): enqueues the run and answers with its id; called by the external scheduler (Cloudflare Worker) with the job-trigger bearer, or by Gavriel's WRITE token (own limit, see http/auth.ts and http/rate-limit.ts).
  * GET /jobs/runs (READ): the recorded runs. POST /jobs/preview (WRITE): the price and drop jobs as a dry run for a chosen day.
  */
-export function registerJobs(app: FastifyInstance, runner: JobRunner, deps: JobsDeps): void {
+export function registerJobs(app: FastifyInstance, queue: JobQueue, deps: JobsDeps): void {
   app.post('/jobs/run', async (req, reply) => {
     const { job } = Body.parse(req.body);
-    const started = new Date().toISOString();
     const key = req.headers['idempotency-key'];
     // A WRITE token's run is always `manual` (whatever its key looks like) and records the token's name; the job token keeps the key rule.
     const trigger = req.auth
       ? { trigger: 'manual' as const, scheduledFor: null, triggeredBy: req.auth.name }
       : triggerFromKey(job, typeof key === 'string' ? key : undefined);
-    const result = await runner.run(job, trigger);
-    const failed = Object.entries(result.steps).filter(([, s]) => !s.ok).map(([k]) => k);
-    req.auditSummary = result.skipped ? `${job}: skipped` : failed.length ? `${job}: failed ${failed.join(',')}` : `${job}: ok`;
-    return reply.code(200).send({ ...result, started_at: started, finished_at: new Date().toISOString() });
+    // Enqueue and answer at once; the in-process worker does the steps. A run of the same job that is still open is returned instead (skipped).
+    const r = await queue.enqueue(job, trigger);
+    queue.kick();
+    req.auditSummary = r.skipped ? `${job}: skipped` : `${job}: queued`;
+    return reply.code(202).send({ run_id: r.runId, job: r.job, status: r.status, skipped: r.skipped, steps: r.steps });
   });
 
   app.get('/jobs/runs', async (req) => {
     const p = RunsQuery.safeParse(req.query);
     if (!p.success) throw bad(`Invalid query: ${p.error.issues.map((i) => i.path.join('.') || i.message).join(', ')}`);
     const q = p.data;
+    await queue.kickIfNeeded();
     const limit = q.limit === undefined ? 50 : Number(q.limit);
     if (limit < 1 || limit > 500) throw bad('limit must be 1 to 500');
     if (q.since !== undefined && (!isIsoWithOffset(q.since))) throw bad('since must be an ISO 8601 time with an offset');

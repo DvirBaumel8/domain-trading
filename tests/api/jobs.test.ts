@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createDb } from '../../src/db/client.js';
 import { trySessionLock } from '../../src/core/locks.js';
-import { makeApp } from '../helpers/app.js';
+import { makeApp, runJobToEnd } from '../helpers/app.js';
 import { testDb } from '../helpers/db.js';
 import { issueToken } from '../helpers/tokens.js';
 import { DOMAIN } from '../helpers/buy.js';
@@ -11,8 +11,9 @@ import { FakeAdapter } from '../helpers/fake-adapter.js';
 const JOB_TOKEN = 'job_token_fake_0123456789abcdef0123456789';
 const bearer = { authorization: `Bearer ${JOB_TOKEN}` };
 let n = 0;
+// v3.0.0: POST /jobs/run answers 202 and the queue works the steps; `post` waits for the worker and returns the finished run's old-shape result.
 const post = (app: FastifyInstance, job: unknown, headers: Record<string, string> = bearer, key = `k-${++n}`) =>
-  app.inject({ method: 'POST', url: '/jobs/run', headers: { ...headers, 'idempotency-key': key }, payload: { job } });
+  runJobToEnd(app, job as string, { headers, key });
 
 let app: FastifyInstance;
 afterEach(async () => {
@@ -70,15 +71,18 @@ describe('POST /jobs/run auth', () => {
     app = await make();
     const spy = vi.spyOn(app.reconciler, 'runOnce');
     const a = await post(app, 'tick', bearer, 'same-key');
-    expect(a.statusCode).toBe(200);
+    expect(a.statusCode).toBe(202);
     const b = await post(app, 'tick', bearer, 'same-key');
-    expect(b.statusCode).toBe(200);
+    expect(b.statusCode).toBe(202);
     expect(b.headers['idempotent-replayed']).toBe('true');
     expect(b.body).toBe(a.body);
     expect(spy).toHaveBeenCalledTimes(1);
     const rows = await testDb.selectFrom('audit_log').selectAll().where('path', '=', '/jobs/run').orderBy('at').execute();
-    expect(rows[0]).toMatchObject({ scope: 'job', token_id: null, status_code: 200, result_summary: 'tick: ok' });
+    // the request row says queued (202); the worker adds the run-level row (method QUEUE) when the run ends; the replay is recorded too
+    expect(rows[0]).toMatchObject({ scope: 'job', token_id: null, status_code: 202, result_summary: 'tick: queued' });
     expect(rows[1]!.result_summary).toBe('replayed:ok');
+    const ended = await testDb.selectFrom('audit_log').selectAll().where('method', '=', 'QUEUE').executeTakeFirstOrThrow();
+    expect(ended).toMatchObject({ scope: 'job', status_code: 200, result_summary: 'tick: ok' });
     const idem = await testDb.selectFrom('idempotency_keys').selectAll().where('key', '=', 'same-key').executeTakeFirstOrThrow();
     expect(idem.token_id).toBeNull();
   });
@@ -88,11 +92,11 @@ describe('encoded paths cannot bypass the job route', () => {
   const enc = (app: FastifyInstance, url: string, headers: Record<string, string>) =>
     app.inject({ method: 'POST', url, headers: { ...headers, 'idempotency-key': `enc-${++n}` }, payload: { job: 'tick' } });
 
-  it.each(['/jobs/%72un', '/%6Aobs/run'])('READ token on %s → 401; the job token → 200', async (url) => {
+  it.each(['/jobs/%72un', '/%6Aobs/run'])('READ token on %s → 401; the job token → 202', async (url) => {
     app = await make();
     const read = await issueToken('read');
     expect((await enc(app, url, read.auth)).statusCode).toBe(401);
-    expect((await enc(app, url, bearer)).statusCode).toBe(200);
+    expect((await enc(app, url, bearer)).statusCode).toBe(202);
   });
 
   it('with no JOB_TRIGGER_TOKEN a READ token on the encoded path is never 200', async () => {
@@ -106,7 +110,7 @@ describe('encoded paths cannot bypass the job route', () => {
     app = await make();
     const codes: number[] = [];
     for (let i = 0; i < 11; i++) codes.push((await post(app, 'tick')).statusCode);
-    expect(codes.slice(0, 10).every((c) => c === 200)).toBe(true);
+    expect(codes.slice(0, 10).every((c) => c === 202)).toBe(true);
     expect(codes[10]).toBe(429);
   });
 });
@@ -147,11 +151,11 @@ describe('tick', () => {
     expect(ns).toHaveBeenCalledTimes(2);
   });
 
-  it('a step whose summary has failed items is ok:false with "N item(s) failed" (summary kept; /jobs/run still 200)', async () => {
+  it('a step whose summary has failed items is ok:false with "N item(s) failed" (summary kept; /jobs/run still 202)', async () => {
     app = await make();
     vi.spyOn(app.priceJob, 'runOnce').mockResolvedValue({ today: '2026-10-06', dryRun: false, skipped: false, applied: [], superseded: [], held: [], delisted: [], cancelled: [], failed: [{ domain: 'x.com', rowId: 1, reason: 'bad' }, { domain: 'y.com', rowId: 2, reason: 'bad' }] });
     const res = await post(app, 'daily');
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(202);
     expect(res.json().steps.priceJob).toMatchObject({ ok: false, error: '2 item(s) failed', summary: { failed: [{ domain: 'x.com' }, { domain: 'y.com' }] } });
     const run = await testDb.selectFrom('job_runs').select('ok').orderBy('id', 'desc').executeTakeFirstOrThrow();
     expect(run.ok).toBe(false);
@@ -162,7 +166,7 @@ describe('tick', () => {
     vi.spyOn(app.reconciler, 'runOnce').mockRejectedValue(new Error('rec boom'));
     const ns = vi.spyOn(app.nsVerifier, 'runOnce');
     const res = await post(app, 'tick');
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(202);
     expect(res.json().steps.reconciler).toMatchObject({ ok: false, error: 'rec boom' });
     expect(ns).toHaveBeenCalledTimes(1);
   });
@@ -188,7 +192,7 @@ describe('tick: reconciler cutoffs through the production path (buy.md §6, B-20
     await app?.close();
     app = await make({ now: () => NOW, adapters, rdap: async () => 'not_registered' });
     const res = await post(app, 'tick');
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(202);
     return res.json();
   };
 
@@ -244,7 +248,7 @@ describe('daily', () => {
     const drop = vi.spyOn(app.dropJob, 'runOnce');
     vi.spyOn(app.referenceRefreshJob, 'runOnce').mockResolvedValue({ skipped: true, reason: 'test' });
     const res = await post(app, 'daily');
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(202);
     const steps = res.json().steps;
     expect(steps.priceJob).toMatchObject({ ok: false, error: 'price boom' });
     expect(steps.dropJob.ok).toBe(true);
@@ -252,7 +256,7 @@ describe('daily', () => {
     expect(steps.registrarCheck).toMatchObject({ ok: false, error: 'reg boom' });
     expect(steps.backupExport.ok).toBe(true);
     expect(backup.runOnce).toHaveBeenCalledTimes(1);
-    const audit = await testDb.selectFrom('audit_log').select('result_summary').where('path', '=', '/jobs/run').executeTakeFirstOrThrow();
+    const audit = await testDb.selectFrom('audit_log').select('result_summary').where('method', '=', 'QUEUE').executeTakeFirstOrThrow();
     expect(audit.result_summary).toBe('daily: failed priceJob,registrarCheck');
   });
 
