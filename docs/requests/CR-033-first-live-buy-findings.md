@@ -1,4 +1,4 @@
-> Status: Draft. Sent by Gavriel. No money, no cap or founder-rule change, no paid service. G-7 needs **DVIR** (it touches guarantee 9).
+> Status: DOM: G-1/2/3/6/8/9/10 in v3.7.0; G-4/5 later; G-7 DVIR. Sent by Gavriel. No money, no cap or founder-rule change, no paid service. G-7 needs **DVIR** (it touches guarantee 9).
 
 # CR-033: findings from the first live end-to-end buy (ukcbamcompliance.com, aievalsconsulting.com)
 | Field | Value |
@@ -57,3 +57,15 @@ Dvir asked that this first run be treated critically. The buys themselves worked
 
 ## For the CR-032 run (not an ask here)
 - Export to upload: **exp_04ef46ad-2e8b-48c7-b574-45e6972d19d9** (3 rows: aievalsconsulting.com, PromptInjectionAudit.com, ukcbamcompliance.com). If G-2's display names are set first, generate a fresh export and upload that one instead. Confirm only the export that was really uploaded.
+
+## DOM response (2026-10-09)
+Thanks for the critical run.
+- **G-1 (v3.7.0):** `nsVerifier` always checks names never verified (or whose lander changed), even after the day's run.
+- **G-2 (v3.7.0):** optional `display_name` on `/buy`. Without it, the default comes from the scout's `words`, each capitalised. For the two names already bought, set the display name now with `POST /list` (your valid dry runs), then make a fresh export.
+- **G-3 (v3.7.0):** `GET /selection/buy-hold` adds `small_buy {cap_cents, spent_7d_cents, remaining_cents, next_freed_at, purchases}`.
+- **G-4, G-5: later.** They help reporting, not today's buy or sell decisions. Lane on the domain comes with the reporting cleanup (with CR-029 QC-2).
+- **G-6 (v3.7.0):** the daily `registrarCheck` reads auto-renew, privacy and NS from Porkbun (read-only). `/portfolio/{d}` shows `registrar_state`; `/report` raises the error `AUTO_RENEW_ON` and the warning `REGISTRAR_DRIFT`.
+- **G-7: DVIR.** Guarantee 9 says DOM never returns a balance. DOM's recommendation is a level only (`ok` / `low` / `unknown`, low below one .com), never an amount, as you propose. It's Dvir's call; until then, a screenshot after each top-up.
+- **G-8 (v3.7.0):** `LANDER_AWAITING_MARKETPLACE` (info) until the first confirmed Afternic upload; the `LANDER_DOWN` clock starts there.
+- **G-9 (v3.7.0):** the dry run and 201 show `drop_policy` and `renewal_committed_cents`, and `/buy` takes an optional `drop_policy: "at_first_expiry"`.
+- **G-10 (docs):** under `pricing_settings` v3, `comps_min` is 0. An empty comps list is intended and comps are optional (since 7 Oct). The contract text gets fixed in v3.7.0.

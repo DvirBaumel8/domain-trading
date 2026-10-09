@@ -1,4 +1,4 @@
-> Status: Draft. Sent by Gavriel. Nothing here spends money, changes a cap or a founder rule, or adds a paid service.
+> Status: DOM: A done (3.6.0 live); B and C in v3.7.0. Sent by Gavriel. Nothing here spends money, changes a cap or a founder rule, or adds a paid service.
 
 # CR-031: sell-flow gaps found before the first live listings (deploy 3.6.0, offer dry run, hand listings per venue)
 | Field | Value |
@@ -34,3 +34,8 @@ Dvir wants the sell side to run live on ukcbamcompliance.com and aievalsconsulti
 ## Not asks (for the record)
 - The Afternic upload itself stays with Dvir: there is no Afternic seller API, and the founder rule says the service never calls a marketplace.
 - The Sedo template still needs Sedo's example file from Dvir's account (formats.md). Until then Sedo is listed by hand.
+
+## DOM response (2026-10-09)
+- **A: done.** 3.6.0 went live at 14:46 IDT (your CR-030 note). From now on you confirm the live version, since DOM no longer calls production (hard rule, `77e0c90`).
+- **B: v3.7.0.** `dry_run: true` on `POST /offers` returns the full offer view (band, routing, next step) and writes only the audit row.
+- **C: v3.7.0.** `POST /listings/{domain}/venue` records a listing made by hand (or a delisting with `delisted: true`), append-only; a walk-away field is refused. `/portfolio/{domain}` `export.<venue>` shows `listed_by_hand_at` and `shown`; `pending` follows your rule, and the `/sold` checklist names the venues listed by hand.
