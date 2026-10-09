@@ -1,6 +1,7 @@
 # Tells Gavriel when a push to main is live on Render (CR-034; Dvir wants event-driven handoffs).
 # Runs after the `ci` workflow passes on main (Render deploys then: autoDeployTrigger checksPass), reads ONLY the
-# public GET /health/ping (no token; CLAUDE.md hard rule), and POSTs once to Gavriel's webhook. Skips quietly without the secrets.
+# public GET /health/ping (no token; CLAUDE.md hard rule), then commits one line to docs/requests/DEPLOYS.md as "DOM (cloud)".
+# No loop: that commit is pushed with the workflow token, which starts no workflow; docs-only pushes are skipped.
 name: deploy-live
 
 on:
@@ -8,6 +9,13 @@ on:
     workflows: [ci]
     types: [completed]
     branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-live
+  cancel-in-progress: false
 
 jobs:
   notify:
@@ -17,22 +25,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-      - name: Wait for the deploy, then tell Gavriel
+          ref: main
+          fetch-depth: 50
+      - name: Wait for the deploy, then note it in DEPLOYS.md
         env:
-          URL: ${{ secrets.GAVRIEL_WEBHOOK_URL }}
-          KEY: ${{ secrets.GAVRIEL_WEBHOOK_KEY }}
           SHA: ${{ github.event.workflow_run.head_sha }}
           BASE: https://domain-trading-api.onrender.com
         run: |
-          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "Gavriel webhook secrets not set; skipping"; exit 0; fi
-          version="$(node -p "require('./package.json').version")"
+          changed="$(git diff --name-only "$SHA~1" "$SHA" 2>/dev/null || true)"
+          if [ -n "$changed" ] && ! echo "$changed" | grep -qv '^docs/'; then echo "docs-only push; no deploy note"; exit 0; fi
+          version="$(git show "$SHA:package.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"
           event=deploy_failed
           for i in $(seq 1 60); do   # up to 20 minutes, every 20 s
             commit="$(curl -s --max-time 20 "$BASE/health/ping" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).commit||"")}catch{console.log("")}})')"
             if [ "$commit" = "$SHA" ]; then event=deploy_live; break; fi
             sleep 20
           done
-          body="{\"event\":\"$event\",\"version\":\"$version\",\"commit\":\"$SHA\"}"
-          curl -s --max-time 30 -X POST "$URL" -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" -d "$body" -o /dev/null -w "webhook HTTP %{http_code}\n"
-          echo "$body"
+          line="$(TZ=Asia/Jerusalem date +%Y-%m-%dT%H:%M:%S%z) $event $version $SHA"
+          git config user.name "DOM (cloud)"
+          git config user.email "dvirbaumel9@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git pull -q --rebase origin main
+            [ -f docs/requests/DEPLOYS.md ] || printf '# Deploys\n\nOne line per push to main that changed code, written by the deploy-live workflow (CR-034): `<time IDT> deploy_live|deploy_failed <version> <commit>`.\n\n' > docs/requests/DEPLOYS.md
+            echo "$line" >> docs/requests/DEPLOYS.md
+            git add docs/requests/DEPLOYS.md
+            git commit -q -m "deploys: $event $version ${SHA:0:7}"
+            git push -q origin HEAD:main && break
+            git reset -q --hard origin/main
+          done
+          echo "$line"

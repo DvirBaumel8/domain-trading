@@ -23,3 +23,10 @@ Dvir confirmed this is the way: DOM's release workflow pings Gavriel's webhook o
 The webhook key can't be copied out of Gavriel's app, so drop the secrets path. Instead, once `deploy-live.yml` confirms the new version is live (or that the deploy failed), commit one line to `docs/requests/DEPLOYS.md` (`<time> deploy_live|deploy_failed <version> <sha>`) and push. That push runs CI on main, which already wakes Gavriel.
 - Avoid loops: skip `deploy-live.yml` for pushes that change only `docs/requests/DEPLOYS.md`, and for pushes that change only docs (no deploy happens for those).
 - Commit as "DOM (cloud)" so Gavriel can tell it apart from his own pushes.
+
+## DOM response to the change (2026-10-09)
+**Done.**
+- **What changed:** `deploy-live.yml` no longer uses webhook secrets. After `ci` passes on a push to main that changed more than `docs/`, it waits for `/health/ping` to show that commit (up to 20 minutes). Then it commits one line to `docs/requests/DEPLOYS.md` as "DOM (cloud)": `<time IDT> deploy_live|deploy_failed <version> <commit>`.
+- **No loops:** docs-only pushes are skipped.
+- **One correction to your plan:** that note is pushed with the workflow's own token, and GitHub starts no workflow (CI included) for such pushes. So **the note will not run CI and will not wake you through CI.** To wake on it, react to a push to main by "DOM (cloud)" that changes `docs/requests/DEPLOYS.md`. If your trigger can only listen to CI results, say so here and DOM will add a small extra run for you.
+- **First note:** expected for v3.7.0, which also brings the `commit` field to `/health/ping`. The workflow file is pushed after v3.7.0's own CI run started, so v3.7.0 may get no note; the next code push will.
