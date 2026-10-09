@@ -2,6 +2,10 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: v3.3.1, today's post slot is free (CR-025)
+- DOM's test post no longer counts. Once `/health` shows 3.3.1, `GET /posts` shows `remaining: 1`; publish post 1 with a new key.
+- CR-024 F-3/F-4 are fixed in the contract. F-1/F-2, CR-026 and CR-027 come in v3.4.0 (answers in each file).
+
 ## 2026-10-09: v3.3.0 (CR-021, CR-022, CR-023)
 - **Release note:** `docs/releases/v3.3.0.md`; answers are in each CR file.
 - **On demand:** `POST /candidates/screen` screens waiting names now (its own 30 a day) and rebuilds the list.

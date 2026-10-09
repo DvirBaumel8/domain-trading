@@ -16,7 +16,7 @@ export const TABLE_FILES = [
   'drop_lists', 'drop_list_rows', 'drop_list_checks', 'cohorts', 'cohort_names', 'cohort_decisions', 'cohort_outcomes',
   'labelled_names', 'holdout_suites', 'replay_runs',
   'company_documents', 'forbidden_terms', 'forbidden_term_retirements', 'review_packets', 'review_feedback', 'review_items', 'review_item_statuses', 'review_settings_changes', 'review_retries',
-  'posts', 'post_images', 'posting_switches', 'posting_bursts',
+  'posts', 'post_images', 'post_allowance_exclusions', 'posting_switches', 'posting_bursts',
 ] as const;
 type Row = Record<string, unknown>;
 

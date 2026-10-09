@@ -108,7 +108,9 @@ export async function allowanceNow(db: Kysely<Database>, nowMs: number): Promise
   const day = idtDay(nowMs);
   const burst = await db.selectFrom('posting_bursts').select('cap').where('day', '=', day).orderBy('id', 'desc').limit(1).executeTakeFirst();
   const cap = burst?.cap ?? POSTS_PER_DAY;
-  const used = await db.selectFrom('posts').select((e) => e.fn.countAll().as('n')).where('idt_day', '=', day).where('status', 'in', ['pending', 'posted', 'removed', 'unknown']).executeTakeFirstOrThrow();
+  const used = await db.selectFrom('posts').select((e) => e.fn.countAll().as('n')).where('idt_day', '=', day).where('status', 'in', ['pending', 'posted', 'removed', 'unknown'])
+    // v3.3.1 (CR-025): DOM's own test posts, listed by a migration, never use the company's allowance
+    .where('id', 'not in', db.selectFrom('post_allowance_exclusions').select('post_id')).executeTakeFirstOrThrow();
   const n = Number(used.n);
   return { today_cap: cap, used_today: n, remaining: Math.max(0, cap - n) };
 }

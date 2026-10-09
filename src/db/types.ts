@@ -881,6 +881,13 @@ export interface PostsTable {
   idt_day: string;
 }
 
+export interface PostAllowanceExclusionsTable {
+  id: Generated<number>;
+  post_id: string;
+  reason: string;
+  created_at: TimestampDefault;
+}
+
 export interface PostImagesTable {
   id: Generated<number>;
   post_id: string;
@@ -1036,6 +1043,7 @@ export interface Database {
   review_retries: ReviewRetriesTable;
   posts: PostsTable;
   post_images: PostImagesTable;
+  post_allowance_exclusions: PostAllowanceExclusionsTable;
   posting_switches: PostingSwitchesTable;
   posting_bursts: PostingBurstsTable;
 }

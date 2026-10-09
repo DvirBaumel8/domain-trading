@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.3.1 (2026-10-09): vendor test posts off the allowance
+PATCH. Release note: `docs/releases/v3.3.1.md`.
+- **Posting (CR-025):** DOM's own test posts don't count toward the daily allowance; the 04:13 IDT test post is excluded, so today's slot is free.
+- **Doc fixes (CR-024 F-3, F-4):** `POST /candidates/daily/rebuild` answers 201 with a summary; `POST /selection/evaluate` lists `features.sellers_verified_n`.
+
 ## 3.3.0 (2026-10-09): CR-021, CR-022, CR-023
 MINOR, additive. Release note: `docs/releases/v3.3.0.md`.
 - **On-demand screening (CR-021):** `POST /candidates/screen`, with its own allowance `intake.on_demand_screen_daily_max` (30), job `screen`, and 409 `ON_DEMAND_SCREEN_CAP` / `ALREADY_RUNNING`.

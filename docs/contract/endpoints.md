@@ -1,4 +1,4 @@
-# Endpoints (contract v3.3.0)
+# Endpoints (contract v3.3.1)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -391,7 +391,7 @@ WRITE. Writes version n+1 of a list; older versions stay readable. Names: the fi
 
 ### `POST /selection/evaluate`
 WRITE (it writes only the audit row; nothing else is stored). Evaluates the tier (CAP-24) and the money rules (CAP-18) for one candidate from features the caller already has. Gavriel uses it for a quote check, a what-if or a backtest of a draft.
-- **Body (strict):** `lane` (`S2` geo, `S3`, `S4`, `S6`, `S7`), `features: {registered_share?: 0..1 | null, prior_history?: 0|1|null, alt_tld_before_n?: int | null, n_words?: int | null, sld_chars?: int | null, is_geo?: 0|1 (default: lane is S2), gform1_pass?: 0|1|null, short?: 0|1|null}` (an omitted or null feature is **unknown**), `leads_ab` (int ≥ 0), `bin_usd?`, `price_grade?` (`strong`|`weaker`, geo), `first_year_usd?`, `renewal_usd?`, `lander_ns?` (`afternic` default | `other`), `retail_start?`, `retail_end?` (NameBio counts), `form?: {geo_band_raw?, sld_len, word_count, short, syllables?}`, `domain?` (only for the syllable count), `risk_flag?`, `intent_raw?`, `timing_raw?` (0..10), `parked_only?`, `settings?` (a label: evaluate against that version instead of the active one). USD fields are positive numbers with at most 2 decimals.
+- **Body (strict):** `lane` (`S2` geo, `S3`, `S4`, `S6`, `S7`), `features: {registered_share?: 0..1 | null, prior_history?: 0|1|null, alt_tld_before_n?: int | null, n_words?: int | null, sld_chars?: int | null, is_geo?: 0|1 (default: lane is S2), gform1_pass?: 0|1|null, short?: 0|1|null, sellers_verified_n?: int (3.3.0; default 0)}` (an omitted or null feature is **unknown**), `leads_ab` (int ≥ 0), `bin_usd?`, `price_grade?` (`strong`|`weaker`, geo), `first_year_usd?`, `renewal_usd?`, `lander_ns?` (`afternic` default | `other`), `retail_start?`, `retail_end?` (NameBio counts), `form?: {geo_band_raw?, sld_len, word_count, short, syllables?}`, `domain?` (only for the syllable count), `risk_flag?`, `intent_raw?`, `timing_raw?` (0..10), `parked_only?`, `settings?` (a label: evaluate against that version instead of the active one). USD fields are positive numbers with at most 2 decimals.
 - **Missing BIN:** non-geo uses the current `pricing_settings` default non-geo BIN; geo uses the grade price (`price_grade`, else the `price.geo_default_grade` setting) of the current pricing settings.
 - **Missing form:** taken from `features` when `sld_chars` and `n_words` are given, otherwise A-Form is unknown (0 points).
 - **200:** `{settings_version: label, backtest: bool (true when `settings` is not the active version), pricing_version: int, bin_cents, tier: {tier: "A"|"I"|"B"|"G"|"none", tier_exact, clauses: {A: "true"|"false"|"unknown", ...}, demand2: "PASS"|"FAIL"|"UNKNOWN", fired: string | null, inputs}, money: {...}, warnings: [string]}`. `money` and `tier` are described in `selection.md` §Tier and §Money. A missing quote makes `ev_cents`, `ratio_at_bin`, `ratio_at_floor` and their `passes` null.
@@ -671,7 +671,7 @@ WRITE (3.2.0, CR-017 R-A2). Asks Buffer's GraphQL API for its input types (intro
 ### `GET /posts`
 READ. Query `limit?` (1–200, default 50). `{posting, allowance, posts: [{post_id, created_at, text, thread, status: pending|posted|failed|unknown|removed (2.16.0), buffer_post_id, external_link, sent_at, error, removed_at, removed_reason, images: [{part, position, mime, bytes, width, height, sha256, alt}]}]}`, newest first. Reach and replies are not read (Buffer's free plan; Dvir accepted).
 
-**Allowance and retries (3.2.0, CR-017 R-A3/R-A4):** a `failed` post does not count toward `allowance.used_today` (only `posted`, `unknown` and `removed` count). To retry after a failure, send the same body with a **new** Idempotency-Key; the old key replays the old 502. The failed row stays as history. `/health` `posting` follows the latest post, so a successful post makes it `ok` again.
+**Allowance and retries (3.2.0, CR-017 R-A3/R-A4):** a `failed` post does not count toward `allowance.used_today` (only `posted`, `unknown` and `removed` count). **Vendor test posts (3.3.1, CR-025)** never count: DOM lists its own test posts in an append-only exclusion list, by a migration only (there is no API for it, so no caller can free a slot). The first is DOM's 2026-10-09 04:13 IDT test post `pst_c1eaba454a6a`. To retry after a failure, send the same body with a **new** Idempotency-Key; the old key replays the old 502. The failed row stays as history. `/health` `posting` follows the latest post, so a successful post makes it `ok` again.
 
 ### `GET /posts/{id}/images/{part}/{position}`
 READ. The stored image bytes. 404 `NOT_FOUND` (also when the bytes were not kept, after a restore: the backup leaves image bytes out).
@@ -725,7 +725,7 @@ WRITE (3.3.0, CR-021). Screens the waiting names now, then rebuilds the day's li
 - **Which run ids:** list entries' `run_id` and `summary.screening_run_id(s)` are the **screening** run ids (`steps.onDemandScreen.summary.run_id`, or `steps.intakeScreening.summary.run_id` for the daily run), not the queue run id.
 
 ### `POST /candidates/daily/rebuild`
-WRITE (2.16.0, CR-015 I-4). Rebuilds today's list now, from the runs already done and the fresh domain records (it does not wait for a run). It keeps the day's first order, adds new names and marks changes, as the nightly build does. **200** the list (as `GET /candidates/daily`). At most **6 a day** (IDT) → 429 `RATE_LIMITED`.
+WRITE (2.16.0, CR-015 I-4). Rebuilds today's list now, from the runs already done and the fresh domain records (it does not wait for a run). It keeps the day's first order, adds new names and marks changes, as the nightly build does. **201** `{id, day, entries_n, almost_ready_n, upcoming_n, partial, version, rebuilds_today, rebuilds_left_today}` (3.3.1, CR-024 F-3: the contract now says what the code has always answered; read the list with `GET /candidates/daily`). At most **6 a day** (IDT) → 429 `RATE_LIMITED`.
 
 ### `GET /candidates/{domain}/records`
 READ. Query `kind?`. `{domain, freshness_days: {tm_us: 30, history: 180}, freshness_hours: {sellers} (3.3.0), records: [{id, kind, record, checked_by, checked_at, evidence_url, note, created_at, source_run_id, fresh_until, fresh}]}`, newest first.

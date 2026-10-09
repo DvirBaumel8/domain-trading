@@ -200,6 +200,22 @@ describe('T17-3 a failed post: cap and retry', () => {
   });
 });
 
+describe('T25-1 vendor test posts do not use the daily allowance (v3.3.1, CR-025)', () => {
+  it('T25-1 a post listed in post_allowance_exclusions no longer counts: the slot is free again and a new post goes out the same day; the list is append-only', async () => {
+    bufferMock();
+    const t = await boot();
+    expect((await t.post('/posts', withImage, randomUUID())).statusCode).toBe(201);
+    expect((await t.get('/posts')).json().allowance).toEqual({ today_cap: 1, used_today: 1, remaining: 0 });
+    expect((await t.post('/posts', withImage, randomUUID())).statusCode).toBe(409);
+    const first = await db.selectFrom('posts').select('id').where('status', '=', 'posted').executeTakeFirstOrThrow();
+    await db.insertInto('post_allowance_exclusions').values({ post_id: first.id, reason: 'vendor test' }).execute();
+    expect((await t.get('/posts')).json().allowance).toEqual({ today_cap: 1, used_today: 0, remaining: 1 });
+    expect((await t.post('/posts', withImage, randomUUID())).statusCode).toBe(201);
+    expect((await t.get('/posts')).json().allowance).toEqual({ today_cap: 1, used_today: 1, remaining: 0 });
+    await expect(db.deleteFrom('post_allowance_exclusions').execute()).rejects.toThrow();
+  });
+});
+
 describe('T17-4 /health posting follows the latest post', () => {
   it('T17-4 failed after a failed post, ok after the next success', async () => {
     bufferMock({ onCreate: () => HttpResponse.json({ errors: [{ message: 'refused' }] }) });

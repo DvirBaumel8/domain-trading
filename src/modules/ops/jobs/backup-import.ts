@@ -65,6 +65,7 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'review_retries', file: 'tables/review_retries.json' },
   { table: 'posts', file: 'tables/posts.json' },
   { table: 'post_images', file: 'tables/post_images.json' }, // without the image bytes: data = null after a restore
+  { table: 'post_allowance_exclusions', file: 'tables/post_allowance_exclusions.json' },
   { table: 'posting_switches', file: 'tables/posting_switches.json' },
   { table: 'posting_bursts', file: 'tables/posting_bursts.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
