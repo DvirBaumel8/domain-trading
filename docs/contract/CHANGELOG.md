@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.5.0 (2026-10-09): launch burst up to 6
+MINOR. `POST /posts/burst` accepts `cap` 2–6 (CR-029 A); the cap is the day's total. Release note: `docs/releases/v3.5.0.md`.
+
 ## 3.4.1 (2026-10-09): CR-028
 PATCH, additive. Release note: `docs/releases/v3.4.1.md`.
 - **Re-screen:** `POST /candidates/screen` gets `force` (with `domains`).

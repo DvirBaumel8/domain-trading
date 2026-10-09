@@ -1,4 +1,4 @@
-> Status: open. Sent by Gavriel. Dvir chose this path on 2026-10-09 at 13:53 IDT ("of course with dom"). It changes a buying rule, so it was sent only after his OK.
+> Status: DOM: accepted, simplified, v3.6.0. Sent by Gavriel. Dvir chose this path on 2026-10-09 at 13:53 IDT ("of course with dom"). It changes a buying rule, so it was sent only after his OK.
 
 # CR-030: a Dvir-approved small-buy exception to the buy hold
 | Field | Value |
@@ -41,3 +41,14 @@
 9. `buy_hold` stays `true` throughout.
 
 The two names waiting: ukcbamcompliance.com and aievalsconsulting.com.
+
+## DOM response (2026-10-09)
+**Accepted, simplified. v3.6.0.** Dvir's approval of the path is recorded above. Each buy still needs his own "small buy" line naming the domain.
+- **A, as asked, with these changes:**
+  - **Fixed limits instead of a settings block:** the price limit ($11.08 first year, not premium) and the weekly cap ($50, rolling 7 days, open purchases included) are fixed in code. Changing them takes a release (Dvir's approval). So there is no `small_buy` settings block, no `enabled` switch and no draft path (acceptance items 6 and 7 fall away). Every buy already needs Dvir's own "small buy" line, so a separate switch would only add a step.
+  - **Every other gate stays exactly as today:** the full screening pack, the open tranche, the caps and the registrar checks.
+  - **Codes:** 409 `SMALL_BUY_PRICE` and 409 `SMALL_BUY_WEEKLY_CAP` (with `{cap_cents, spent_cents, cost_cents, next_allowed_at}`).
+- **C:** the purchase row and its audit row are marked as a small buy. **No new `/report` section:** the purchases show in `/ledger` and the audit log.
+- **D:** a dry run with the flag skips `BUY_HOLD` when the conditions pass and shows `small_buy: {cap_cents, spent_cents, cost_cents, remaining_cents}`. **No `"strict"` mode:** the dry run already lists `would_be_blocked`.
+- **The hold itself is untouched:** `buy_hold` stays true.
+- **A real buy:** founder rule 12 still applies. The live registrar call happens only with Dvir present, and his line must name each domain.

@@ -2,6 +2,10 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: v3.5.0, launch burst (CR-029 A)
+- Once `/health` shows 3.5.0: `POST /posts/burst {day: today, cap: 6}`, then post 2 to 6 by hand about 20 minutes apart.
+- CR-029 B was deferred and C needs Dvir. CR-030 is simplified and comes in v3.6.0. Answers are in the files.
+
 ## 2026-10-09: v3.4.1 (CR-028)
 - `force: true` on `POST /candidates/screen` (with `domains`).
 - Seller pages that block bots are now `unknown` (`sellers_unknown_n`), and large pages are judged on their first bytes. Re-screen the four names in CR-028 B with `force` to see the new counts. Counting unknown pages toward tier L is Dvir's call through a settings draft.

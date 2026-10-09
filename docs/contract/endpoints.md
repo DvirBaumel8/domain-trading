@@ -1,4 +1,4 @@
-# Endpoints (contract v3.4.1)
+# Endpoints (contract v3.5.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -660,7 +660,7 @@ READ. `{month (UTC, YYYY-MM), spent_usd (the reported cost_usd summed), cap_usd 
 
 **Checks (every post, dry run included; a dry run answers 200 with `ok: false` and the reasons, only a real post answers 422, 2.15.0 doc fix):** each part's text has an X weighted length of at most 280 (a link counts 23, CJK and emoji 2, other characters 1: a simplified form of X's rule) → 422 `POST_TOO_LONG` (`details.length`, `limit`, `part`); text and alt text pass the block list → 422 `TEXT_BLOCKED` (`category`, never the match). **Images:** up to 4 per part, PNG or JPEG (by content), at most 5 MB, 4 to 8,192 px each side, alt text 1 to 1,000 characters; metadata is stripped before storing (JPEG APP1–APP15 and comments, which also drops ICC colour profiles; PNG text, time and EXIF chunks and every other non-essential chunk). Any image problem → 422 `POST_INVALID` with `details.images: [{part, position, reason (IMAGE_TYPE, IMAGE_CORRUPT, IMAGE_TOO_LARGE, IMAGE_DIMENSIONS, ALT_MISSING, ALT_TOO_LONG, ALT_BLOCKED, TOO_MANY_IMAGES), category?}]`.
 
-**Daily cap:** 1 post per IDT day (a thread counts as one), or the burst cap set for that day (2–5). A failed post uses no allowance.
+**Daily cap:** 1 post per IDT day (a thread counts as one), or the burst cap set for that day (2–6). A failed post uses no allowance.
 
 ### `POST /posts`
 WRITE. Body (strict) `{text, images?: [{data_base64, alt}], thread?: [{text, images?}] (up to 2 more parts), dry_run?}`; body limit 40 MB on this route. **Dry run** → **200** `{dry_run: true, ok, parts: [{part, length, limit, ok, reason? (TOO_LONG or TEXT_BLOCKED), category?}], images: [{part, position, ok, reason?, width, height, bytes}], allowance: {today_cap, used_today, remaining}}`: nothing is stored, sent or counted. **Real:** the images are stored and served at `/media/{token}`, then Buffer is asked to publish now (`shareNow`, images with alt text in order, the thread parts). **No double post (2.16.0):** under one database lock the pause and the cap are checked and a `pending` row is written **before** Buffer is called. Buffer success → `posted`; a refusal or 4xx → `failed` (no allowance); a lost answer, timeout or 5xx → `unknown` (it **counts** toward the cap, since the post may be live; the daily `postsRefresh` resolves it with Buffer when it can, and a `pending` row older than 15 minutes becomes `unknown`). From the `pending` row on, the `Idempotency-Key` keeps its answer: a retry with the same key replays it and never calls Buffer again. **201** `{post_id, buffer_post_id, status: "posted", external_link (may be null until Buffer reports it), images: [{part, position, sha256}], allowance}`. **Errors:** 409 `POSTING_PAUSED` · 503 `POSTING_NOT_CONFIGURED` · 409 `POST_DAILY_CAP` (`details.next_allowed_at`) · 422 `POST_TOO_LONG` / `POST_INVALID` / `TEXT_BLOCKED` · 502 `POST_FAILED` (`details`: `outcome` `failed` or `unknown` (2.16.0), `post_id` when `unknown`, `step` channel or create, `kind` rate_limited / refused / unavailable, Buffer's `status`, `message`, `retry_after`; the post is recorded as `failed`). **Known limit:** the post record is written after Buffer answers; a server crash in that moment would leave a published post without a record (and a retry with the same key could post again).
@@ -683,7 +683,7 @@ WRITE. Body `{reason (1–300), marked_removed_by_hand?}`. Only a `posted` post 
 WRITE. `{paused, reason?}` → **200** the state. While paused a real post is 409 `POSTING_PAUSED`; a dry run still works.
 
 ### `POST /posts/burst`
-WRITE. `{day (today or later, IDT), cap (2–5)}` → **201**. Phase 1's five posts on one day.
+WRITE. `{day (today or later, IDT), cap (2–6; 6 since 3.5.0, CR-029 A)}` → **201**. Phase 1's launch posts on one day. The cap is the day's total, so posts already made that day count toward it.
 
 ### `GET /media/{token}`
 **Public** (no token). The image bytes with their type and `Cache-Control: public, max-age` = at most 3600 and never past the link's expiry (2.16.0), for 7 days after the post; then 404 `NOT_FOUND`. At most 120 a minute per client IP → 429 `RATE_LIMITED`. Writes nothing. A READ or intake token on `POST /posts` is refused (403) before the body is read.

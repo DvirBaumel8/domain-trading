@@ -336,11 +336,12 @@ describe('the daily cap and the burst (T11-6)', () => {
     expect((await t.post('/posts', { text: 'three' })).statusCode).toBe(201);
   });
 
-  it('a burst of 3 for today allows 3, then POST_DAILY_CAP; a burst needs cap 2..5 and today or later; it ends with the day', async () => {
+  it('a burst of 3 for today allows 3, then POST_DAILY_CAP; a burst needs cap 2..6 (3.5.0, CR-029 A) and today or later; it ends with the day', async () => {
     bufferMock();
     const t = await boot();
     expect((await t.post('/posts/burst', { day: '2026-10-20', cap: 1 })).statusCode).toBe(422);
-    expect((await t.post('/posts/burst', { day: '2026-10-20', cap: 6 })).statusCode).toBe(422);
+    expect((await t.post('/posts/burst', { day: '2026-10-20', cap: 7 })).statusCode).toBe(422);
+    expect((await t.post('/posts/burst', { day: '2026-10-23', cap: 6 })).statusCode).toBe(201);
     expect((await t.post('/posts/burst', { day: '2026-10-19', cap: 3 })).statusCode).toBe(422);
     expect((await t.post('/posts/burst', { day: '2026-02-31', cap: 3 })).statusCode).toBe(422);
     const b = await t.post('/posts/burst', { day: '2026-10-20', cap: 3 });
@@ -353,7 +354,7 @@ describe('the daily cap and the burst (T11-6)', () => {
     t.clock.t += DAY;
     expect((await t.get('/posts')).json().allowance).toEqual({ today_cap: 1, used_today: 0, remaining: 1 });
     expect((await t.post('/posts/burst', { day: '2026-10-22', cap: 5 })).statusCode).toBe(201);
-    expect((await db.selectFrom('posting_bursts').selectAll().execute())).toHaveLength(2);
+    expect((await db.selectFrom('posting_bursts').selectAll().execute())).toHaveLength(3);
   });
 
   it('a removed post still counts toward the cap', async () => {

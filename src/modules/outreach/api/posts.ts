@@ -11,7 +11,7 @@ import { allowanceNow, createPost, PostBody, postSchemaCheck, schemaCheckInput, 
 import { toJerusalemIso } from '../../../core/dates.js';
 const RemoveBody = z.object({ reason: z.string().trim().min(1).max(300), marked_removed_by_hand: z.boolean().optional() }).strict();
 const PauseBody = z.object({ paused: z.boolean(), reason: z.string().trim().min(1).max(300).optional() }).strict();
-const BurstBody = z.object({ day: ymd, cap: z.number().int().min(2).max(5) }).strict();
+const BurstBody = z.object({ day: ymd, cap: z.number().int().min(2).max(6) }).strict();
 const ListQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }).strict();
 const IdParam = z.string().regex(/^pst_[0-9a-f]{12}$/);
 

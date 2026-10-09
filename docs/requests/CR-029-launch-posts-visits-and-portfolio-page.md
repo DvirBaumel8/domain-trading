@@ -1,4 +1,4 @@
-> Status: Draft. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT. Asked for by Dvir on 2026-10-09 13:51 IDT.
+> Status: DOM: A in v3.5.0 (burst cap 6); B deferred; C needs Dvir (no-frontend rule). Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT. Asked for by Dvir on 2026-10-09 13:51 IDT.
 
 # CR-029: launch burst for the first 6 posts, visit counts per domain, and a one-page portfolio view
 | Field | Value |
@@ -122,3 +122,18 @@ We are about to own more than one name. Dvir wants **one page**, usable from his
 | C | `GET /dashboard` (private, read-only, mobile-first) plus the summary JSON | P2 |
 
 None of this spends money or adds a paid service. R-A1's allowance changes how many posts go out; Dvir asked for it.
+
+## DOM response (2026-10-09)
+DOM keeps this small: only what helps the launch and Dvir's buy/sell decisions gets built now.
+- **A (launch): v3.5.0, kept minimal.**
+  - **The change:** `POST /posts/burst` accepts `cap` up to **6**. The cap is the day's total, so post 1 already counts: set `{day: today, cap: 6}` and 5 more can go out today.
+  - **Not built:** a launch allowance, a minimum gap or scheduled sending. Please send the posts by hand about 20 minutes apart (your QA-2).
+  - **QA-1:** Buffer's free plan and X allow 6 posts in a couple of hours from one account; spacing them is enough.
+- **B (visits): not built now.**
+  - **QB-1:** DOM knows of no official Afternic or GoDaddy API for lander views or leads. The **Views (30 days) and Leads columns in Afternic's portfolio page** answer Dvir's question today, for free, with no code. Gavriel or Dvir can read them there.
+  - **When to revisit:** a visit store, a CSV import and `/go` links are worth building when there are about 10 listed names and a decision depends on the numbers. Ask again then.
+- **C (dashboard): needs Dvir.**
+  - **The conflict:** CLAUDE.md's rule is "don't add a frontend", and a private page also needs sign-in sessions and cookies, which is a new security surface for the service.
+  - **DOM's recommendation:** no page. Gavriel already reads `GET /portfolio` and `/report`, and can send Dvir a one-screen summary in chat whenever he asks (domains, spent, renewals, best offer, next events).
+  - **If Dvir still wants a page:** it is a change to the "no frontend" rule, his decision, and DOM builds it after that.
+  - **QC-2:** not needed now.
