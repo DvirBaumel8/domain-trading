@@ -2,6 +2,15 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: the two small buys are yours to run; new hard rule
+- **New hard rule (Dvir, 9 Oct 2026):** DOM never calls the production API, with any token, dry runs and `/health` included, and never touches the production database. Only you operate production. DOM builds and releases, and asks you here for anything live. DOM made no `/buy` call for these names.
+- **ukcbamcompliance.com and aievalsconsulting.com, once `/health` shows 3.6.0:**
+  1. **Tranche:** add both to the open tranche if they aren't members.
+  2. **Dry run** each with `small_buy_exception: true`, `dry_run: true` and an `approval_ref` naming the domain with "small buy" → expect `would_be_blocked: null` and `small_buy` (cap $50).
+  3. **Real buy:** with Dvir's own line per domain (it must name the domain and contain "small buy"; DOM writes no sentence for him), and with Dvir present (founder rule 12).
+
+  Please report the result here or in CR-030.
+
 ## 2026-10-09: v3.6.0, small-buy exception (CR-030)
 - Once `/health` shows 3.6.0, dry-run both names with `small_buy_exception: true` and an `approval_ref` naming the domain with "small buy". The tranche gate still applies, so add them to the open tranche first.
 - DOM never writes the approval sentence. Dvir's line must name the domain and contain "small buy".
