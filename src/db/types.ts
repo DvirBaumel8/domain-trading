@@ -221,6 +221,7 @@ export interface PurchasesTable {
   request: Json | null;
   audit_id: string | null;
   tranche_id: string | null;
+  small_buy_exception: Generated<boolean>;
   created_at: TimestampDefault;
   updated_at: TimestampDefault;
 }

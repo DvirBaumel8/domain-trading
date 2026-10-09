@@ -103,12 +103,13 @@ Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `sc
 | `buy.ts` | `BuyService` (781 lines: approval check, caps, dry run, purchase state machine, ledger/receipt writes) |
 | `buy-gates.ts` | `buyBlocks`, `packGate`, `trancheGate`, `spendCapGate`, `gateError`; block codes `BUY_HOLD`, `SCREENING_PACK_REQUIRED`, `NO_TRANCHE`, `TRANCHE_SPEND_CAP` |
 | `buy-hold.ts` | `screeningHold`, `latestScreeningRun` |
+| `small-buy.ts` | CR-030 small-buy exception to the buy hold: fixed limits `SMALL_BUY_MAX_FIRST_YEAR_CENTS` / `SMALL_BUY_WEEKLY_CAP_CENTS`, `smallBuyRequested`, `smallBuyGate`; codes `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` |
 | `tranches.ts` | `TrancheService` |
 | `budget.ts` | `spentCents`, `activeDomainCount` ($1,500 / 50 caps are applied in `buy.ts` from config) |
 | `bookkeeping.ts` | `failPurchase`, `registrarApiOf` |
 | `reconciler.ts` | `Reconciler` (stuck `unknown`/`register_sent` purchases; job step `reconciler`) |
 
-Tables: `purchases`, `receipts`, `deals`, `ledger_entries`, `tranches`, `tranche_members`, `pricing_evidence`; writes `domains`, `listing_history`. Tests: `tests/api/buy-*.test.ts`, `budget`, `cap-property`, `reconciler`, `tranches`, `buy-hold`, `evidence-gaps`; helper `tests/helpers/buy.ts`.
+Tables: `purchases`, `receipts`, `deals`, `ledger_entries`, `tranches`, `tranche_members`, `pricing_evidence`; writes `domains`, `listing_history`. Tests: `tests/api/buy-*.test.ts`, `budget`, `cap-property`, `reconciler`, `tranches`, `buy-hold`, `evidence-gaps`, `v3-5-0` (small buy); `purchases.small_buy_exception` marks small-buy purchases (migration `1762800000000_v3-5-0-b.sql`); helper `tests/helpers/buy.ts`.
 
 ### candidates
 Intake of candidate names, on-demand screening, the daily list, drop lists, cohorts.
@@ -256,6 +257,7 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 | Change the outside review | `outreach/review/*.ts` (`run.ts`, `packet.ts`, `gemini.ts`), `outreach/api/reviews.ts` | `api/v2-10-0`, `v2-11-0`, `unit/review-pure` |
 | Add a /buy gate or block code | `buying/buy-gates.ts` (`BuyBlock`, `buyBlocks`, gate fn), call in `buying/buy.ts`; code in `docs/contract/endpoints.md` Code index | `api/buy-hold`, `buy-checks`, `buy-v2` |
 | Change a /buy request field or approval rule | `buying/api/buy.ts`, `buying/buy.ts` (`BuyInput`), `core/approval.ts` | `api/buy-*`, `unit/approval` |
+| Change the small-buy exception limits ($11.08 first year, $50 per rolling 7 days) | `buying/small-buy.ts` (needs a release, Dvir's approval) | `api/v3-5-0` |
 | Change caps ($1,500, 50) | migration only (no API); read in `buying/budget.ts`, `buy.ts`; `src/config.ts` | `api/budget`, `cap-property` |
 | Change pricing rules (65%, 48%, ladder, list) | new `pricing_settings` version by admin command (`ops/admin/pricing-settings.ts`) or migration; logic in `listing/pricing/plan.ts`, `schedule.ts`; never hard-code | `unit/pricing-*`, `api/pricing-*`, vectors |
 | Change the scheduled drops | `listing/pricing/schedule.ts` (`buildSchedule`), `ops/jobs/price-schedule.ts`, `drop.ts` | `unit/pricing-schedule`, `api/price-job`, `drop-job` |

@@ -9,7 +9,7 @@ import { activeSelectionSettings } from '../selection/index.js';
 import { latestScreeningRun, screeningHold } from './buy-hold.js';
 import { openTrancheFor } from '../selection/index.js';
 
-export type BuyBlock = 'BUY_HOLD' | 'SCREENING_PACK_REQUIRED' | 'NO_TRANCHE' | 'TRANCHE_SPEND_CAP';
+export type BuyBlock = 'BUY_HOLD' | 'SCREENING_PACK_REQUIRED' | 'NO_TRANCHE' | 'TRANCHE_SPEND_CAP' | 'SMALL_BUY_PRICE' | 'SMALL_BUY_WEEKLY_CAP';
 export type PackReason = 'NO_PACK' | 'INCOMPLETE' | 'NOT_FROM_LATEST_RUN' | 'SETTINGS_NOT_ACTIVE' | 'PACK_TOO_OLD';
 export interface Gate { code: BuyBlock; message: string; details: Record<string, unknown> }
 

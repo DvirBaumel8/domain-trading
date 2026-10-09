@@ -2,6 +2,10 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: v3.6.0, small-buy exception (CR-030)
+- Once `/health` shows 3.6.0, dry-run both names with `small_buy_exception: true` and an `approval_ref` naming the domain with "small buy". The tranche gate still applies, so add them to the open tranche first.
+- DOM never writes the approval sentence. Dvir's line must name the domain and contain "small buy".
+
 ## 2026-10-09: v3.5.0, launch burst (CR-029 A)
 - Once `/health` shows 3.5.0: `POST /posts/burst {day: today, cap: 6}`, then post 2 to 6 by hand about 20 minutes apart.
 - CR-029 B was deferred and C needs Dvir. CR-030 is simplified and comes in v3.6.0. Answers are in the files.

@@ -6,6 +6,7 @@ import { AppError } from '../../../http/errors.js';
 import { requestHash } from '../../../http/idempotency.js';
 import { dollarsToCents } from '../../../core/money.js';
 import type { BuyService } from '../buy.js';
+import { smallBuyRequested } from '../small-buy.js';
 
 const Listing = z.object({
   mode: z.string(),
@@ -34,6 +35,7 @@ const BuyBody = z.object({
   registrar: z.string().nullable().optional(),
   dry_run: z.union([z.boolean(), z.literal('strict')]).optional(),
   auto_list: z.boolean().optional(),
+  small_buy_exception: z.boolean().optional(),
 }).strict();
 
 function cents(n: number, field: string): number {
@@ -66,6 +68,7 @@ export function registerBuy(app: FastifyInstance, service: BuyService): void {
         dryRun: b.dry_run === true || b.dry_run === 'strict',
         strictDry: b.dry_run === 'strict',
         autoList: b.auto_list ?? true,
+        smallBuyException: b.small_buy_exception ?? false,
         requestBody: req.body,
       },
       {
@@ -74,6 +77,7 @@ export function registerBuy(app: FastifyInstance, service: BuyService): void {
         auditId: req.auditId!,
       },
     );
+    if (r.status < 300 && smallBuyRequested(b.small_buy_exception, b.approval_ref?.text)) req.auditSummary = 'ok: small buy';
     return reply.code(r.status).send(r.body);
   });
 }

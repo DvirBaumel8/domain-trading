@@ -24,6 +24,7 @@ import { withDomainLock } from '../../core/locks.js';
 import { currentSettings, type PricingSettings } from '../listing/index.js';
 import { screeningHold } from './buy-hold.js';
 import { gateError, packGate, spendCapGate, trancheGate, type BuyBlock } from './buy-gates.js';
+import { smallBuyError, smallBuyGate, smallBuyRequested, type SmallBuyState } from './small-buy.js';
 import { evaluateQuote, pickWinner, type EvaluatedQuote } from '../registrars/index.js';
 
 export interface BuyInput {
@@ -33,6 +34,7 @@ export interface BuyInput {
   priceGrade: 'strong' | 'weaker' | null; pricingEvidence: unknown; expectedSettingsVersion: number | null;
   proposedListing: ListingRequest | null; override: boolean; overrideReason: string | null;
   registrar: string | null; dryRun: boolean; /** `dry_run: "strict"`: a dry run whose first real-buy gate refusal is the answer (CR-005 N-7). */ strictDry?: boolean; autoList: boolean; requestBody: unknown;
+  /** CR-030: `small_buy_exception` flag of the body. */ smallBuyException?: boolean;
 }
 export interface BuyCtx { idempotencyKey: string; requestHash: string; auditId: string }
 export interface BuyResult { status: number; body: Record<string, unknown> }
@@ -47,6 +49,8 @@ type Caps = { maxFirstYearCents: number; maxTwoYearCents?: number };
 export interface Approved {
   input: BuyInput; ctx: BuyCtx; category: Category; plan: ListingPlan | null; comps: Comp[]; rationale: string | null; pricing: PricingSettings; approvedAt: Date;
   check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: BuyBlock | null; trancheId: string | null;
+  /** CR-030: the small-buy exception is requested (flag + "small buy" in the approval line); its price and weekly checks apply and the purchase is marked. */
+  smallBuy: boolean; smallBuyState: SmallBuyState | null;
   settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
   /** Dry run only: registrar account-state findings that a real buy would refuse on (founder rule 6). */
   accountWarnings?: string[];
@@ -122,13 +126,16 @@ export class BuyService {
 
     // 3c. buy hold (v1.1.0, R1): only a name that was screened. A dry run reports it instead of refusing.
     const hold = await screeningHold(db, input.domain);
-    if (hold && gateRefuses) {
+    // CR-030: with the exception requested, the hold is decided once the quote is known (price and weekly cap), below
+    const smallBuy = smallBuyRequested(input.smallBuyException, input.approval?.text);
+    if (hold && gateRefuses && !smallBuy) {
       throw new AppError(409, 'BUY_HOLD', `${input.domain} was screened under selection settings "${hold.settingsVersion}" while buy_hold is on (or the version is a backtest or no longer active); no real buy`,
         { settings_version: hold.settingsVersion, run_id: hold.runId });
     }
 
     // 3d. v2.0.0: a complete, current screening pack, then an open tranche (the spend cap is checked once the quote is known). A dry run reports the first.
-    let blocked: BuyBlock | null = hold ? 'BUY_HOLD' : null;
+    let blocked: BuyBlock | null = hold && !smallBuy ? 'BUY_HOLD' : null;
+    let smallBuyState: SmallBuyState | null = null;
     const pg = await packGate(db, input.domain, now.getTime());
     if (pg && gateRefuses) throw gateError(pg);
     blocked ??= pg?.code ?? null;
@@ -187,12 +194,21 @@ export class BuyService {
         blocked ??= cg?.code ?? null;
       }
 
+      // 8c. CR-030: the small-buy exception (price, then the rolling 7-day cap); a dry run reports a refusal as would_be_blocked
+      if (smallBuy) {
+        const sg = await smallBuyGate(db, this.deps.now(), winner.firstYearCents!, winner.premium);
+        if ('gate' in sg) {
+          if (gateRefuses) throw gateError(sg.gate);
+          blocked ??= sg.gate.code;
+        } else smallBuyState = sg.state;
+      }
+
       // 9. registrar account state
       accountWarnings = await this.assertAccountState(adapter, winner.firstYearCents!, input.dryRun);
 
       // 10. registrar dry run (re-quote once on COST_MISMATCH)
       dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars,
-        { input, ctx, approvedAt: appr.approvedAt, check, category, trancheId });
+        { input, ctx, approvedAt: appr.approvedAt, check, category, trancheId, smallBuy });
 
     } catch (e) {
       if (input.dryRun && e instanceof AppError && !(input.strictDry && e.code === 'TRANCHE_SPEND_CAP')) {
@@ -203,7 +219,7 @@ export class BuyService {
     winner = dry.winner;
 
     const approved: Approved = {
-      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, accountWarnings,
+      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, smallBuy, smallBuyState, accountWarnings,
       settings: { poc_cap_cents: settings.poc_cap_cents, max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
     if (input.dryRun) return { status: 200, body: await this.dryRunBody(approved) };
@@ -288,7 +304,10 @@ export class BuyService {
         await this.assertPocCap(trx, s.poc_cap_cents, a.cost);
         // v2.0.0: the hold and the pack, re-read under the global lock (a screening run started since the first checks changes both)
         const hold = await screeningHold(trx, a.input.domain);
-        if (hold) {
+        if (a.smallBuy) {
+          const sg = await smallBuyGate(trx, this.deps.now(), a.cost, a.winner.premium);
+          if ('gate' in sg) throw smallBuyError(sg.gate);
+        } else if (hold) {
           throw new AppError(409, 'BUY_HOLD', `${a.input.domain} was screened under selection settings "${hold.settingsVersion}" while buy_hold is on (or the version is a backtest or no longer active); no real buy`,
             { settings_version: hold.settingsVersion, run_id: hold.runId });
         }
@@ -303,7 +322,7 @@ export class BuyService {
           idempotency_key: a.ctx.idempotencyKey, request_hash: a.ctx.requestHash, domain: a.input.domain, state: 'created',
           dry_run: false, registrar: a.winner.registrar, check_id: a.check.checkId, max_price_cents: a.input.maxPriceCents,
           approval_text: String(a.input.approval?.text), approval_at: a.approvedAt, expected_cents: a.cost,
-          request: JSON.stringify(redact(a.input.requestBody)), audit_id: a.ctx.auditId, tranche_id: tg.trancheId,
+          request: JSON.stringify(redact(a.input.requestBody)), audit_id: a.ctx.auditId, tranche_id: tg.trancheId, small_buy_exception: a.smallBuy,
         }).returning('id').executeTakeFirstOrThrow();
         await trx.insertInto('domains').values({
           domain: a.input.domain, status: 'pending_purchase', registrar: a.winner.registrar, category: a.category, price_grade: a.input.priceGrade, deal_id: a.input.dealId,
@@ -662,7 +681,7 @@ export class BuyService {
 
   private async registrarDryRun(
     adapter: RegistrarAdapter, domain: string, winner: EvaluatedQuote, caps: Caps, pocCap: number, allowed: string[],
-    rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category; trancheId: string | null },
+    rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category; trancheId: string | null; smallBuy: boolean },
   ): Promise<{ winner: EvaluatedQuote; cost: number }> {
     let w = winner;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -700,7 +719,7 @@ export class BuyService {
 
   /** An ambiguous dry run may have been a real registration: record an `unknown` purchase so the cap counts it and the reconciler resolves it. */
   private async recordDryRunAmbiguous(
-    adapter: RegistrarAdapter, e: RegistrarError, cost: number, rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category; trancheId: string | null },
+    adapter: RegistrarAdapter, e: RegistrarError, cost: number, rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category; trancheId: string | null; smallBuy: boolean },
   ): Promise<never> {
     this.deps.log?.error({ domain: rec.input.domain, registrar: adapter.name, registrar_code: e.code }, 'dry run ambiguous — possible real charge');
     try {
@@ -711,7 +730,7 @@ export class BuyService {
           idempotency_key: `${rec.ctx.idempotencyKey}#dry-ambiguous-${randomUUID()}`, request_hash: rec.ctx.requestHash, domain: rec.input.domain,
           state: 'unknown', dry_run: false, registrar: adapter.name, check_id: rec.check.checkId, max_price_cents: rec.input.maxPriceCents,
           approval_text: String(rec.input.approval?.text), approval_at: rec.approvedAt, expected_cents: cost,
-          request: JSON.stringify(redact(rec.input.requestBody)), audit_id: rec.ctx.auditId, tranche_id: rec.trancheId,
+          request: JSON.stringify(redact(rec.input.requestBody)), audit_id: rec.ctx.auditId, tranche_id: rec.trancheId, small_buy_exception: rec.smallBuy,
         }).execute();
         await trx.insertInto('domains').values({
           domain: rec.input.domain, status: 'pending_purchase', registrar: adapter.name, category: rec.category, price_grade: rec.input.priceGrade, deal_id: rec.input.dealId,
@@ -775,6 +794,7 @@ export class BuyService {
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
       proposed_listing: a.plan ? planView(a.plan, events) : null, settings_version: a.pricing.version,
       ...gf,
+      ...(a.smallBuyState ? { small_buy: a.smallBuyState } : {}),
       warnings: [...a.check.warnings, ...(a.plan?.warnings ?? []), ...(a.accountWarnings ?? [])],
     };
   }
