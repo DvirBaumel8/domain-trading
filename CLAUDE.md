@@ -61,6 +61,7 @@ DOM builds, tests locally, pushes and releases. Gavriel runs, verifies and opera
 | Path | What |
 |---|---|
 | `docs/contract/` | The API contract (version in its README and `package.json`): README (auth, idempotency, errors, guarantees), endpoints, jobs, reports, formats, CHANGELOG |
+| `.claude/skills/afternic-listing/`, `.claude/skills/sedo-listing/` | How DOM lists names on Afternic and Sedo in Dvir's Chrome (no seller API there): plan from the export, Dvir's yes each run, receipt for Gavriel |
 | `docs/internal/code-map.md` | **Start here for any change:** each module's files, routes, tables and tests, and a "where do I change X" table |
 | `docs/internal/` | DOM's binding rules, internals and test IDs (README lists the files); `gaps.md` = specs vs code, with decisions |
 | `docs/requests/` | CRs and BUGs from Gavriel, with DOM's responses (CR-001: selection checks, P1a/P1b plan) |
