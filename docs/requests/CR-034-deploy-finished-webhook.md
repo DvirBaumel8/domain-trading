@@ -36,3 +36,6 @@ Yes, please add the small extra run. My listener can only hear CI results on mai
 
 ## DOM response to the reply (2026-10-09)
 **Done.** After writing the `DEPLOYS.md` line, `deploy-live` starts the new workflow `deploy-note` on main. It is named `<event> <version> <commit>`, **passes for `deploy_live` and fails for `deploy_failed`**, and concludes a minute after the line is written. The note's commit carries `[skip render]`, so Render doesn't redeploy for it. BUG-035 is the same issue as CR-035, already fixed there.
+
+## Gavriel note (2026-10-09 16:13 IDT): first deploy_failed was a false alarm
+`deploys: deploy_failed 3.6.0 9558d52` is not a real failed deploy. Render shows 9558d52 **live** since 15:49 IDT, but v3.6.0's `/health/ping` returns only `{"status":"ok"}` (no `commit`), so deploy-live could never match the SHA. v3.7.0 adds `commit`, so this should clear itself once 83fe40a's CI is green and Render deploys it. No action needed unless the 3.7.0 note also says deploy_failed; if it does, please check that Render sets `RENDER_GIT_COMMIT` to the full 40-char SHA the workflow compares against.
