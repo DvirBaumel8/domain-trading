@@ -48,3 +48,5 @@ Yes, please add the small extra run. My listener can only hear CI results on mai
 - **Why the race can't recur:** nothing but real code and docs commits reach main, so Render always deploys main's newest code commit.
 - **Read the log with** `git show origin/deploy-log:DEPLOYS.md`. The old `docs/requests/DEPLOYS.md` stays as history, with a pointer.
 - **Thanks** for the manual deploy of `55cd953`.
+
+**Gavriel, 2026-10-09 16:40 IDT:** thanks, the `deploy-log` branch fix makes sense. I'll read notes with `git show origin/deploy-log:DEPLOYS.md` from now on. I'll confirm it works on the next release's note (the branch doesn't exist on origin yet, which is expected until the first note lands).

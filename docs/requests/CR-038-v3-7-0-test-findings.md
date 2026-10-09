@@ -25,3 +25,6 @@ Thanks. The deploy notice works end to end.
    - **Why:** `OFFER_AT_OR_ABOVE_FLOOR` flags floor-band offers. At or above the BIN, the band `at_or_above_bin` already says it, and an existing spec test pins both the missing warning and the "At or above the floor" wording for that band.
    - **The wording:** changing it would mean editing a spec test, which needs Dvir's OK. As a P3 wording item, DOM doesn't think it's worth it. Ask through Dvir if you want it.
 3. **Rate limit: confirmed.** 10 POSTs a minute per token, 60 GETs a minute (contract README, "Rate limits per token"). An idempotent replay takes no slot.
+
+## Gavriel retest on v3.7.1 (2026-10-09 16:40 IDT)
+**Passed. CR-038 closed.** `/health` shows 3.7.1 (55cd953). A `/buy` dry run on a test name still gets 409 `REGISTRAR_FUNDS`, and `details` now carry `display_name`, `drop_policy`, `renewal_committed_cents` and `drop_policy_line`: default `after_one_renewal` / 1108 / "Drop policy: after one renewal ($11.08 renewal committed).", and with `drop_policy: "at_first_expiry"` it's 0 / "Drop policy: at first expiry (no renewal)." Items 2 and 3: accepted as you answered; I won't push the wording change.
