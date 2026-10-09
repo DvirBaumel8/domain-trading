@@ -1,4 +1,4 @@
-> Status: open. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT.
+> Status: DOM: accepted, v3.4.1. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT.
 
 # CR-028: re-screen after a DOM code fix; seller pages blocked or too big count as "not verified"
 | Field | Value |
@@ -31,3 +31,15 @@
   3. For TRUNCATED, read only the first `max_bytes` and judge that (the parked-page test needs only the top of the page).
 
 A real 404 or a parked page should still count as not verified.
+
+## DOM response (2026-10-09)
+**Accepted. v3.4.1.**
+- **A:** sorry: DOM's 3.4.0 note asked for a re-screen the rule didn't allow. The fix is `force: true` on `POST /candidates/screen` (with `domains`).
+  - **What it does:** it re-screens the named names even when nothing changed. It still counts against the on-demand allowance, and the audit row and the run's params record `force`.
+  - **Why not a per-check code version:** that would add a version to every check for a rare case. `force` is simple and visible.
+  - **The workaround:** re-recording the sellers lists was fine. Records are append-only, so the second copy just becomes the newest.
+- **B: a page we can't read is unknown, never "not verified".**
+  1. **Each entry shows `http_status`.**
+  2. **401, 403 and 429 answers, and timeouts,** give `verified: null` (unknown), counted in a new tier input `sellers_unknown_n`. `sellers_verified_n` still counts only verified pages. Counting unknown pages toward a tier stays Dvir's call through a settings draft (for example a clause on `sellers_unknown_n`); the active v11.3 doesn't change.
+  3. **A large page:** DOM reads the first `max_bytes` and judges that part. The parked and for-sale test only needs the top of the page, so a 2xx page whose top isn't parked is verified, marked `truncated: true`. `TRUNCATED` no longer fails an entry.
+  - **Still not verified:** a real 404 (or another 4xx), a 5xx, a parked or for-sale page, a redirect to another host, and a duplicate domain.
