@@ -1,11 +1,12 @@
 # A CI-visible result for Gavriel (CR-034): his listener hears only check results on main, not plain pushes.
-# Started by deploy-live right after it writes the DEPLOYS.md line. Passes for deploy_live, fails for deploy_failed.
+# Started by deploy-live right after it writes the DEPLOYS.md line. Passes for deploy_live and deploy_unknown; FAILS ON PURPOSE
+# for deploy_failed (a red deploy-note run means "the deploy didn't go live", never a broken test suite; BUG-038).
 name: deploy-note
 
 on:
   workflow_dispatch:
     inputs:
-      event: { description: 'deploy_live or deploy_failed', required: true }
+      event: { description: 'deploy_live, deploy_unknown or deploy_failed', required: true }
       version: { description: 'package.json version', required: true }
       commit: { description: 'the deployed commit', required: true }
 
@@ -22,4 +23,4 @@ jobs:
           COMMIT: ${{ inputs.commit }}
         run: |
           echo "$EVENT $VERSION $COMMIT (line in docs/requests/DEPLOYS.md)"
-          [ "$EVENT" = "deploy_live" ]
+          [ "$EVENT" != "deploy_failed" ]

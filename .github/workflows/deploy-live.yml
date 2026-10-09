@@ -37,10 +37,13 @@ jobs:
           changed="$(git diff --name-only "$SHA~1" "$SHA" 2>/dev/null || true)"
           if [ -n "$changed" ] && ! echo "$changed" | grep -qv '^docs/'; then echo "docs-only push; no deploy note"; exit 0; fi
           version="$(git show "$SHA:package.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"
+          # deploy_live: the ping shows this commit. deploy_unknown: the ping answers but has no `commit` field (a server
+          # older than 3.7.0, BUG-038), so we can't tell. deploy_failed: the ping never showed this commit within 20 minutes.
           event=deploy_failed
           for i in $(seq 1 60); do   # up to 20 minutes, every 20 s
-            commit="$(curl -s --max-time 20 "$BASE/health/ping" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).commit||"")}catch{console.log("")}})')"
+            commit="$(curl -s --max-time 20 "$BASE/health/ping" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log("commit" in j ? (j.commit||"none") : "absent")}catch{console.log("")}})')"
             if [ "$commit" = "$SHA" ]; then event=deploy_live; break; fi
+            if [ "$commit" = "absent" ]; then event=deploy_unknown; fi
             sleep 20
           done
           line="$(TZ=Asia/Jerusalem date +%Y-%m-%dT%H:%M:%S%z) $event $version $SHA"
