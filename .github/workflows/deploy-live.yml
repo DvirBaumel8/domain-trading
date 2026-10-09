@@ -1,8 +1,7 @@
 # Tells Gavriel when a push to main is live on Render (CR-034; Dvir wants event-driven handoffs).
 # Runs after the `ci` workflow passes on main (Render deploys then: autoDeployTrigger checksPass), reads ONLY the
-# public GET /health/ping (no token; CLAUDE.md hard rule), then commits one line to docs/requests/DEPLOYS.md as "DOM (cloud)".
-# No loop: that commit is pushed with the workflow token, which starts no workflow, and carries [skip render] (no redeploy);
-# docs-only pushes are skipped. Then it starts deploy-note (workflow_dispatch), a check on main that Gavriel's listener hears.
+# public GET /health/ping (no token; CLAUDE.md hard rule), then appends one line to DEPLOYS.md on the separate branch `deploy-log`
+# (never main, so it can't race with code pushes) and starts deploy-note (workflow_dispatch on main), the check Gavriel's listener hears.
 name: deploy-live
 
 on:
@@ -33,6 +32,7 @@ jobs:
         env:
           SHA: ${{ github.event.workflow_run.head_sha }}
           BASE: https://domain-trading-api.onrender.com
+          GH_TOKEN: ${{ github.token }}
         run: |
           changed="$(git diff --name-only "$SHA~1" "$SHA" 2>/dev/null || true)"
           if [ -n "$changed" ] && ! echo "$changed" | grep -qv '^docs/'; then echo "docs-only push; no deploy note"; exit 0; fi
@@ -47,16 +47,19 @@ jobs:
             sleep 20
           done
           line="$(TZ=Asia/Jerusalem date +%Y-%m-%dT%H:%M:%S%z) $event $version $SHA"
+          echo "$line" > "$RUNNER_TEMP/deploy-line"
+          # The note goes to the separate branch `deploy-log` (BUG fix, CR-034 16:35 note): writing to main raced with code
+          # pushes waiting for CI, and Render deploys only main's newest commit. Nothing here ever pushes to main.
           git config user.name "DOM (cloud)"
           git config user.email "dvirbaumel9@users.noreply.github.com"
           for attempt in 1 2 3; do
-            git pull -q --rebase origin main
-            [ -f docs/requests/DEPLOYS.md ] || printf '# Deploys\n\nOne line per push to main that changed code, written by the deploy-live workflow (CR-034): `<time IDT> deploy_live|deploy_failed <version> <commit>`.\n\n' > docs/requests/DEPLOYS.md
-            echo "$line" >> docs/requests/DEPLOYS.md
-            git add docs/requests/DEPLOYS.md
-            git commit -q -m "deploys: $event $version ${SHA:0:7} [skip render]"
-            git push -q origin HEAD:main && break
-            git reset -q --hard origin/main
+            rm -rf "$RUNNER_TEMP/log" && mkdir -p "$RUNNER_TEMP/log" && cd "$RUNNER_TEMP/log"
+            git init -q && git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            if git fetch -q origin deploy-log 2>/dev/null; then git checkout -q -b deploy-log FETCH_HEAD; else git checkout -q --orphan deploy-log; printf '# Deploys\n\nOne line per push to main that changed code (deploy-live workflow, CR-034): `<time IDT> deploy_live|deploy_unknown|deploy_failed <version> <commit>`.\n\n' > DEPLOYS.md; fi
+            echo "$line" >> DEPLOYS.md
+            git add DEPLOYS.md && git commit -q -m "deploys: $event $version ${SHA:0:7}"
+            git push -q origin deploy-log && break
+            sleep 5
           done
           echo "$line"
       - name: Start deploy-note so Gavriel's CI listener hears it (CR-034)
@@ -65,8 +68,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          git pull -q origin main
-          line="$(grep " $SHA\$" docs/requests/DEPLOYS.md 2>/dev/null | tail -1)"
-          [ -n "$line" ] || { echo "no DEPLOYS line for $SHA (docs-only push or skipped)"; exit 0; }
+          line="$(cat "$RUNNER_TEMP/deploy-line" 2>/dev/null || true)"
+          [ -n "$line" ] || { echo "no deploy line for $SHA (docs-only push)"; exit 0; }
           set -- $line
           gh workflow run deploy-note.yml --ref main -f event="$2" -f version="$3" -f commit="$4"

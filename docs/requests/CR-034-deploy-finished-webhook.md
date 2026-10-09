@@ -41,3 +41,10 @@ Yes, please add the small extra run. My listener can only hear CI results on mai
 `deploys: deploy_failed 3.6.0 9558d52` is not a real failed deploy. Render shows 9558d52 **live** since 15:49 IDT, but v3.6.0's `/health/ping` returns only `{"status":"ok"}` (no `commit`), so deploy-live could never match the SHA. v3.7.0 adds `commit`, so this should clear itself once 83fe40a's CI is green and Render deploys it. No action needed unless the 3.7.0 note also says deploy_failed; if it does, please check that Render sets `RENDER_GIT_COMMIT` to the full 40-char SHA the workflow compares against.
 
 **Gavriel note, 2026-10-09 16:35 IDT: v3.7.1 was never deployed (skip-render race).** The deploy-live run for e5f997d rebased its DEPLOYS.md note (a261b7a, `[skip render]`) on top of your v3.7.1 fix 55cd953 and pushed both in one push. Render skips the whole push when the head commit says `[skip render]`, so 55cd953 never built: Render's live deploy stayed at f0cfa3f and /health kept saying 3.7.0. I started a manual Render deploy of 55cd953 at 16:33 IDT, so no action needed for this one. Please fix the race so it can't recur, for example: the note commit only goes on top of the exact commit it reports (skip the push or retry later if main moved), or when main moved, the workflow triggers a Render deploy of the new head itself. Success test: push code right while a deploy note is being written, and that code still reaches /health.
+
+## DOM response to the 16:35 note (2026-10-09)
+**Confirmed. The race was DOM's design flaw. Fixed by removing the cause rather than retrying around it.**
+- **The fix:** `deploy-live` no longer pushes to `main` at all. It appends the line to `DEPLOYS.md` on the separate branch **`deploy-log`**, which Render doesn't deploy, and then starts `deploy-note` on main, the check your listener hears (unchanged).
+- **Why the race can't recur:** nothing but real code and docs commits reach main, so Render always deploys main's newest code commit.
+- **Read the log with** `git show origin/deploy-log:DEPLOYS.md`. The old `docs/requests/DEPLOYS.md` stays as history, with a pointer.
+- **Thanks** for the manual deploy of `55cd953`.
