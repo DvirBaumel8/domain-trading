@@ -56,6 +56,7 @@ const EvalBody = z.object({
     sld_chars: z.number().int().nonnegative().nullable().optional(), is_geo: bit.optional(),
     gform1_pass: bit.nullable().optional(), short: bit.nullable().optional(),
     sellers_verified_n: z.number().int().nonnegative().nullable().optional(),
+    sellers_unknown_n: z.number().int().nonnegative().nullable().optional(),
   }).strict(),
   domain: z.string().optional(),
   bin_usd: usd.optional(),
@@ -262,7 +263,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const features: TierFeatures = {
       registered_share: f.registered_share ?? null, prior_history: f.prior_history ?? null, alt_tld_before_n: f.alt_tld_before_n ?? null,
       n_words: f.n_words ?? null, sld_chars: f.sld_chars ?? null, is_geo: f.is_geo ?? (geo ? 1 : 0), gform1_pass: f.gform1_pass ?? null, short: f.short ?? null,
-      lane: b.lane, sellers_verified_n: f.sellers_verified_n === undefined ? 0 : f.sellers_verified_n,
+      lane: b.lane, sellers_verified_n: f.sellers_verified_n === undefined ? 0 : f.sellers_verified_n, sellers_unknown_n: f.sellers_unknown_n === undefined ? 0 : f.sellers_unknown_n,
     };
     const tier = evaluateTier(features, sel.tier, sel.thresholds);
 

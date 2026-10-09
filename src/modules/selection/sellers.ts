@@ -29,7 +29,7 @@ export const sellersFresh = (checkedAt: Date, freshHours: number, nowMs: number)
 
 /** Whether any tier clause reads `sellers_verified_n` (only then does a screening run fetch seller pages). */
 export function tierUsesSellers(tier: SelectionValuesT['tier']): boolean {
-  return Object.values(tier.clauses).some((c) => c !== undefined && ('all' in c ? c.all : c.any).some((x) => 'f' in x && x.f === 'sellers_verified_n'));
+  return Object.values(tier.clauses).some((c) => c !== undefined && ('all' in c ? c.all : c.any).some((x) => 'f' in x && (x.f === 'sellers_verified_n' || x.f === 'sellers_unknown_n')));
 }
 
 const SECOND_LEVEL = new Set(['co', 'com', 'org', 'net', 'gov', 'edu', 'ac', 'or', 'ne', 'go']);
@@ -71,7 +71,11 @@ export async function findSellers(db: Kysely<Database>, domain: string, o: { run
   return { state: 'list', source: top.source, at: top.at, list: parsed.success ? parsed.data : [] };
 }
 
-export interface SellerResult { name: string; url: string; verified: boolean; reason: string }
+/**
+ * `verified: null` = unknown (v3.4.1, CR-028): the page could not be read (HTTP 401/403/429, or a timeout), which is not the same as "not verified".
+ * `http_status`: the status of the answer (null when no answer came). `truncated`: a 2xx page longer than `max_bytes`, judged on its first `max_bytes`.
+ */
+export interface SellerResult { name: string; url: string; verified: boolean | null; reason: string; http_status: number | null; truncated: boolean }
 
 function sharedPacer(ctx: CheckContext): Pacer {
   const hit = ctx.shared.get('site_pacer') as Pacer | undefined;
@@ -88,6 +92,12 @@ function sharedRobots(ctx: CheckContext): Map<string, RobotsRule> {
   return m;
 }
 
+/** The number of unknown entries (v3.4.1), one per registrable domain; a domain that is also verified does not count as unknown. */
+export function unknownCount(results: SellerResult[]): number {
+  const dom = (r: SellerResult): string => { try { return registrableDomain(new URL(r.url).hostname); } catch { return r.url; } };
+  const verified = new Set(results.filter((r) => r.verified === true).map(dom));
+  return new Set(results.filter((r) => r.verified === null).map(dom).filter((d) => !verified.has(d))).size;
+}
 /**
  * Fetches each entry's page (robots.txt, pacing, at most `same_name.max_redirects` redirects, the SSRF guard) and decides: verified = a 2xx page that is not parked or for sale.
  * An entry whose registrable domain is already verified is not fetched and counts 0 (`DUPLICATE_DOMAIN`). A missing parked/for-sale signature list verifies nothing (`LIST_MISSING`).
@@ -101,7 +111,7 @@ export async function verifySellers(ctx: CheckContext, list: SellerEntryT[]): Pr
   const results: SellerResult[] = [];
   let calls = 0;
   for (const e of list) {
-    const out = (verified: boolean, reason: string): void => { results.push({ name: e.name, url: e.url, verified, reason }); };
+    const out = (verified: boolean | null, reason: string, http_status: number | null = null, truncated = false): void => { results.push({ name: e.name, url: e.url, verified, reason, http_status, truncated }); };
     let host: string;
     try { host = new URL(e.url).hostname; } catch { out(false, 'URL_NOT_ALLOWED'); continue; }
     const reg = registrableDomain(host);
@@ -110,15 +120,22 @@ export async function verifySellers(ctx: CheckContext, list: SellerEntryT[]): Pr
     if (!lists.sig_parked || !lists.sig_forsale) { out(false, 'LIST_MISSING'); continue; }
     const page = await fetchPage({ fetch: ctx.deps.siteFetch, lookupHost: ctx.deps.lookupHost }, e.url, {
       timeoutMs: s.timeout_ms, maxBytes: s.max_bytes, maxRedirects: s.max_redirects, pace, robots, neverFetchHosts: ctx.settings.lead.verify.never_fetch_hosts,
-      deadline: ctx.deadline, now: ctx.now, onRequest: () => { calls++; },
+      deadline: ctx.deadline, now: ctx.now, onRequest: () => { calls++; }, truncatedOk: true,
     });
-    if (!page.ok) { out(false, page.reasonCode); continue; }
-    if (page.status < 200 || page.status >= 300) { out(false, 'REDIRECT_OFF_SITE'); continue; } // a redirect to another host is not followed (not ours to read)
+    if (!page.ok) {
+      const st = page.status ?? null;
+      // Unknown: a login wall or bot block (401/403), rate limiting (429), a timeout. Everything else that fails stays "not verified".
+      if (st === 401 || st === 403 || st === 429) out(null, `HTTP_${st}`, st);
+      else if (page.reasonCode === 'TIMEOUT') out(null, 'TIMEOUT');
+      else out(false, page.reasonCode, st);
+      continue;
+    }
+    if (page.status < 200 || page.status >= 300) { out(false, 'REDIRECT_OFF_SITE', page.status); continue; } // a redirect to another host is not followed (not ours to read)
     const c = classifySite(page, host, '', [], { parked: lists.sig_parked.terms, forsale: lists.sig_forsale.terms }, s);
-    if (c.site_state === 'parked_or_for_sale') { out(false, 'PARKED_OR_FOR_SALE'); continue; }
-    if (c.site_state === 'redirect_off_domain') { out(false, 'REDIRECT_OFF_SITE'); continue; }
+    if (c.site_state === 'parked_or_for_sale') { out(false, 'PARKED_OR_FOR_SALE', page.status, page.truncated); continue; }
+    if (c.site_state === 'redirect_off_domain') { out(false, 'REDIRECT_OFF_SITE', page.status, page.truncated); continue; }
     verifiedDomains.add(reg);
-    out(true, 'OK');
+    out(true, 'OK', page.status, page.truncated);
   }
   return { results, upstreamCalls: calls };
 }

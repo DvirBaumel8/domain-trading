@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.4.1 (2026-10-09): CR-028
+PATCH, additive. Release note: `docs/releases/v3.4.1.md`.
+- **Re-screen:** `POST /candidates/screen` gets `force` (with `domains`).
+- **Seller pages:** 401/403/429 and timeouts are unknown (`verified: null`), not unverified; a large page is judged on its first bytes; entries show `http_status` and `truncated`; new tier input `sellers_unknown_n` and `fields.sellers.unknown_n`.
+
 ## 3.4.0 (2026-10-09): CR-026, CR-027, CR-024 F-1/F-2
 MINOR. Release note: `docs/releases/v3.4.0.md`.
 - **Scout words (CR-027, a fix back to the contract of 3.3.0):** scout `words` now drive the `form` check and the tier's `n_words` (unknown pieces → PASS_WITH_NOTE `SCOUT_WORDS`); `words` and `split_source` appear on `GET /screening/runs/{id}`.

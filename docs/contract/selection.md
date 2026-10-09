@@ -1,4 +1,4 @@
-# Selection checks (contract v3.4.0)
+# Selection checks (contract v3.4.1)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -108,6 +108,12 @@ Fail classes: `adult` -> adult; `malware`, `phishing` -> malware_phishing; `scam
 - **The `p_passive` lock:** it still holds for existing entries. A draft may only **add** the entry of a tier that neither the base nor the active version has.
 - **Sellers:** the newest of the intake `sellers` list and a `sellers` record (`freshness_hours.sellers`, default 720; older → `sellers_verified_n` null, `SELLERS_STALE`). A drop-list name uses records only. Pages are fetched only when a tier clause reads `sellers_verified_n`, through the outbound guard of `same_name` (public addresses only, robots.txt, paced; a redirect to another host is not followed, `REDIRECT_OFF_SITE`).
   - **Verified:** an entry is verified when its page answers 2xx and is not parked or for sale (`PARKED_OR_FOR_SALE`). One registrable domain counts once (`DUPLICATE_DOMAIN`).
+  - **Since 3.4.1 (CR-028 B):**
+    - each entry has `http_status` and `truncated`, and `verified` is `true`, `false` or **`null` (unknown)**;
+    - **unknown:** 401, 403 and 429 (`HTTP_401`, `HTTP_403`, `HTTP_429`) and timeouts (`TIMEOUT`);
+    - **not verified:** other 4xx (`HTTP_4XX`, 404 included), 5xx, parked or for-sale, an off-site redirect, a duplicate;
+    - **a 2xx page over `max_bytes`** is judged on its first `max_bytes` (`truncated: true`); `TRUNCATED` no longer fails an entry.
+  - **New tier input `sellers_unknown_n`:** unknown entries, deduped by registrable domain (a domain also verified doesn't count); 0 without a list, null when stale. A clause on it also turns on fetching. `fields.sellers` adds `unknown_n`. Counting unknown pages toward a tier is a settings-draft decision; the active settings don't read it.
   - **Shown on the check:** the `tier` check shows `fields.sellers {source, list_at, verified_n, reason_code?, entries: [{name, url, verified, reason}]}`.
 - **Replays** of rows without a lane read them as S2 (geo) or S7, with 0 sellers.
 

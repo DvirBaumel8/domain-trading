@@ -227,9 +227,9 @@ describe('CR-023 B: verifying sellers during screening', () => {
     expect(t.fields.inputs.sellers_verified_n).toBe(1);
     expect(t.fields.sellers).toMatchObject({ source: 'record', verified_n: 1 });
     expect(t.fields.sellers.entries).toEqual([
-      { name: 'Live Firm', url: 'https://live-firm.example/', verified: true, reason: 'OK' },
-      { name: 'Parked Firm', url: 'https://parked-firm.example/', verified: false, reason: 'PARKED_OR_FOR_SALE' },
-      { name: 'Gone Firm', url: 'https://gone-firm.example/', verified: false, reason: 'HTTP_4XX' },
+      { name: 'Live Firm', url: 'https://live-firm.example/', verified: true, reason: 'OK', http_status: 200, truncated: false },
+      { name: 'Parked Firm', url: 'https://parked-firm.example/', verified: false, reason: 'PARKED_OR_FOR_SALE', http_status: 200, truncated: false },
+      { name: 'Gone Firm', url: 'https://gone-firm.example/', verified: false, reason: 'HTTP_4XX', http_status: 404, truncated: false },
     ]);
     expect(t.fields.clauses.L).toBe('false'); // 1 < 2 for S4
     expect(t.upstream_calls ?? 0).toBeGreaterThan(0);
@@ -257,7 +257,7 @@ describe('CR-023 B: verifying sellers during screening', () => {
     const x = await l112();
     const none = await runTier(x, [{ domain: `${SLD}.com`, lane: 'S4' }]);
     expect(tierOf(none.body).fields.inputs.sellers_verified_n).toBe(0);
-    expect(tierOf(none.body).fields.sellers).toEqual({ source: null, verified_n: 0, entries: [] });
+    expect(tierOf(none.body).fields.sellers).toEqual({ source: null, verified_n: 0, unknown_n: 0, entries: [] });
     expect(tierOf(none.body).fields.clauses.L).toBe('false');
     await asRecord(x, `${SLD}.com`, []);
     const empty = await runTier(x, [{ domain: `${SLD}.com`, lane: 'S4' }]);
@@ -319,7 +319,7 @@ describe('CR-023 B: verifying sellers during screening', () => {
     await db.insertInto('candidate_screenings').values({ intake_id: null, domain: `${SLD}.com`, origin: 'drop_list', run_id: run.id, day: '2026-10-06', at: new Date(x.clock.t) }).execute();
     await app!.screeningWorker.runToEnd(run.id);
     let body = (await x.get(`/screening/runs/${run.id}`)).json();
-    expect(tierOf(body).fields.sellers).toEqual({ source: null, verified_n: 0, entries: [] });
+    expect(tierOf(body).fields.sellers).toEqual({ source: null, verified_n: 0, unknown_n: 0, entries: [] });
     await asRecord(x, `${SLD}.com`, [{ name: 'Record Firm', url: 'https://record-firm.example/' }]);
     const run2 = await x.run({ mode: 'full', checks: ['form', 'tier'], names: [{ domain: `${SLD}.com`, lane: 'S4' }] });
     await db.insertInto('candidate_screenings').values({ intake_id: null, domain: `${SLD}.com`, origin: 'drop_list', run_id: run2.id, day: '2026-10-06', at: new Date(x.clock.t) }).execute();

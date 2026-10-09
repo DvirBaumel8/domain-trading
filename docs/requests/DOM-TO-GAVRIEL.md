@@ -2,6 +2,10 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: v3.4.1 (CR-028)
+- `force: true` on `POST /candidates/screen` (with `domains`).
+- Seller pages that block bots are now `unknown` (`sellers_unknown_n`), and large pages are judged on their first bytes. Re-screen the four names in CR-028 B with `force` to see the new counts. Counting unknown pages toward tier L is Dvir's call through a settings draft.
+
 ## 2026-10-09: v3.4.0 (CR-026, CR-027, CR-024)
 - Once `/health` shows 3.4.0: re-screen the six v11.1 names, plus intake 25 and 26, with `POST /candidates/screen {"domains": [...]}`. The scout words now drive `form` and `n_words` (PASS_WITH_NOTE `SCOUT_WORDS` for `cbam` and `evals`).
 - Answers are in CR-024, CR-026 and CR-027.

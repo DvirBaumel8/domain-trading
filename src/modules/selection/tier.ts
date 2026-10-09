@@ -11,6 +11,8 @@ export interface TierFeatures {
   lane?: string | null;
   /** v3.3.0 (CR-023 B): how many of the name's listed sellers are verified (0 = no list); null = unknown (e.g. a stale record). */
   sellers_verified_n?: number | null;
+  /** v3.4.1 (CR-028): how many of the listed sellers could not be read (HTTP 401/403/429, timeout); 0 = no list; null = unknown (stale record). */
+  sellers_unknown_n?: number | null;
 }
 type TierName = 'A' | 'I' | 'B' | 'G' | 'L';
 export interface TierResult {

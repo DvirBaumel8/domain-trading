@@ -191,7 +191,7 @@ export type RescreenSkip = { domain: string; reason: 'NOT_CHANGED' | 'NO_INTAKE'
  * screened again only when the active settings version differs from its last screening's, or a domain record (tm_us, history, sellers) or an intake row of that name
  * was added after its last screening; else it is skipped NOT_CHANGED. No intake row (or only removed ones): NO_INTAKE. An owned name: OWNED.
  */
-async function rescreenCandidates(db: Kysely<Database>, domains: string[], activeLabel: string, waiting: Map<string, { lane: string; ids: string[]; words: string[] | null }>): Promise<{ take: [string, { lane: string; ids: string[]; words: string[] | null }][]; skipped: RescreenSkip[] }> {
+async function rescreenCandidates(db: Kysely<Database>, domains: string[], activeLabel: string, waiting: Map<string, { lane: string; ids: string[]; words: string[] | null }>, force = false): Promise<{ take: [string, { lane: string; ids: string[]; words: string[] | null }][]; skipped: RescreenSkip[] }> {
   const take: [string, { lane: string; ids: string[]; words: string[] | null }][] = [];
   const skipped: RescreenSkip[] = [];
   const owned = await ownedDomains(db, domains);
@@ -209,14 +209,14 @@ async function rescreenCandidates(db: Kysely<Database>, domains: string[], activ
       else if (rows.some((r) => r.received_at.getTime() > last.at.getTime())) changed = true;
       else changed = !!(await db.selectFrom('domain_records').select('id').where('domain', '=', domain).where('created_at', '>', last.at).limit(1).executeTakeFirst());
     }
-    if (!changed) { skipped.push({ domain, reason: 'NOT_CHANGED' }); continue; }
+    if (!changed && !force) { skipped.push({ domain, reason: 'NOT_CHANGED' }); continue; }
     take.push([domain, { lane: newest.lane, ids: [newest.id], words: [...rows].reverse().find((r) => r.words)?.words ?? null }]);
   }
   return { take, skipped };
 }
 
 /** The names waiting to be screened (scout names not yet screened, drop-list leftovers that fit a kept lane). Read-only; the daily run and the on-demand run share it. */
-async function gatherWaiting(db: Kysely<Database>, nowMs: number, today: string, only?: string[]): Promise<Waiting> {
+async function gatherWaiting(db: Kysely<Database>, nowMs: number, today: string, only?: string[], force = false): Promise<Waiting> {
   // Queued intake rows not yet screened, oldest first; one name per domain, an owned name is never screened.
   const queued = (await sql<{ id: string; domain: string; lane: string; words: string[] | null }>`
     select i.id, i.domain, i.lane, i.words from candidate_intake i
@@ -232,7 +232,7 @@ async function gatherWaiting(db: Kysely<Database>, nowMs: number, today: string,
   if (only) {
     // v3.4.0 (CR-026): the named domains only (no drop-list names): the waiting ones as usual, screened ones again when something changed.
     const sel = await activeSelectionSettings(db);
-    const r = await rescreenCandidates(db, only, sel.label, byDomain);
+    const r = await rescreenCandidates(db, only, sel.label, byDomain, force);
     return { sel, byDomain: new Map(r.take), drops: [], counts: { no_kept_lane: 0, dropping: 0, leftovers: 0 }, skipped: r.skipped, named: true };
   }
   // v3.2.0 (CR-019 C-3/C-4, CR-020 A): drop-list names are screened only as leftovers (free at the registry after their drop date, never in pending delete or redemption),
@@ -278,9 +278,9 @@ async function chooseOnDemand(db: Kysely<Database>, w: Waiting, today: string, r
 /**
  * v3.3.0 (CR-021): what an on-demand screening would take right now (read-only): its allowance and how many names (at most `maxNames`, at most what is left of the allowance).
  */
-export async function planOnDemand(db: Kysely<Database>, nowMs: number, maxNames: number | null, domains?: string[]): Promise<{ allowance: OnDemandAllowance; names_n: number; /** Of those, names not yet counted in today's allowance (a re-screen of a name already screened on demand today is free). */ new_n: number; skipped: RescreenSkip[] }> {
+export async function planOnDemand(db: Kysely<Database>, nowMs: number, maxNames: number | null, domains?: string[], force = false): Promise<{ allowance: OnDemandAllowance; names_n: number; /** Of those, names not yet counted in today's allowance (a re-screen of a name already screened on demand today is free). */ new_n: number; skipped: RescreenSkip[] }> {
   const today = idtDay(nowMs);
-  const w = await gatherWaiting(db, nowMs, today, domains);
+  const w = await gatherWaiting(db, nowMs, today, domains, force);
   const max = w.sel.values.intake.on_demand_screen_daily_max;
   const used = await onDemandUsed(db, today);
   const allowance = { daily_max: max, used_today: used, remaining: Math.max(0, max - used) };
@@ -291,7 +291,7 @@ export async function planOnDemand(db: Kysely<Database>, nowMs: number, maxNames
 
 export interface IntakeRunOptions {
   /** On demand (POST /candidates/screen): screens against its own allowance, at most `maxNames` names (null = the allowance). */
-  onDemand?: { maxNames: number | null; /** v3.4.0 (CR-026): screen only these names (re-screens allowed when something changed). */ domains?: string[] };
+  onDemand?: { maxNames: number | null; /** v3.4.0 (CR-026): screen only these names (re-screens allowed when something changed). */ domains?: string[]; /** v3.4.1 (CR-028): re-screen the named names even when nothing changed (NO_INTAKE and OWNED still skip). */ force?: boolean };
 }
 
 export class IntakeScreeningJob {
@@ -299,8 +299,8 @@ export class IntakeScreeningJob {
   constructor(private readonly deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number }) {}
 
   /** The `onDemandScreen` step: the run, with the allowance as it stands after it. */
-  async runOnDemand(maxNames: number | null, domains?: string[]): Promise<IntakeScreeningSummary & { on_demand: true; allowance: OnDemandAllowance }> {
-    const s = await this.runOnce({ onDemand: { maxNames, ...(domains && { domains }) } });
+  async runOnDemand(maxNames: number | null, domains?: string[], force = false): Promise<IntakeScreeningSummary & { on_demand: true; allowance: OnDemandAllowance }> {
+    const s = await this.runOnce({ onDemand: { maxNames, ...(domains && { domains }), ...(domains && force && { force }) } });
     return { ...s, on_demand: true, allowance: await onDemandAllowance(this.deps.db, this.deps.now()) };
   }
 
@@ -322,7 +322,7 @@ export class IntakeScreeningJob {
       try {
       const summary = await this.deps.db.transaction().execute(async (db) => {
       await advisoryXactLock(db, 'intake_screening');
-      const w = await gatherWaiting(db, nowMs, today, onDemand?.domains);
+      const w = await gatherWaiting(db, nowMs, today, onDemand?.domains, onDemand?.force);
       const { sel, byDomain, drops, counts } = w;
       const queuedBefore = byDomain.size;
       // The daily run's 30 count only the names it screened itself; the on-demand allowance counts only on-demand names (CR-021).
@@ -342,7 +342,7 @@ export class IntakeScreeningJob {
       const auditId = newAuditId();
       // on the pool, not the locked transaction: the run row (made on its own connection) refers to this audit row
       await this.deps.db.insertInto('audit_log').values({
-        id: auditId, at: now, scope: 'job', method: 'JOB', path: onDemand ? 'on-demand-screen' : 'intake-screening', request: JSON.stringify({ names: names.length }), status_code: 200,
+        id: auditId, at: now, scope: 'job', method: 'JOB', path: onDemand ? 'on-demand-screen' : 'intake-screening', request: JSON.stringify({ names: names.length, ...(onDemand?.force && { force: true }) }), status_code: 200,
         result_summary: `intake ${takenIntake.length}; drop lists ${takenDrops.length}; left ${queuedBefore + drops.length - names.length}`,
       }).execute();
       const run = await createRun(this.deps.db, { mode: 'full', names }, { createdBy: onDemand ? 'onDemandScreen' : 'intakeScreening', auditId, now }, worker.checks);

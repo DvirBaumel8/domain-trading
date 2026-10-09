@@ -9,7 +9,7 @@ import { AppError } from '../../http/errors.js';
 import { requireNamedApproval } from './approval.js';
 import { DEPENDS_ON } from './depends.js';
 
-export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short', 'lane', 'sellers_verified_n'] as const;
+export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short', 'lane', 'sellers_verified_n', 'sellers_unknown_n'] as const;
 export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads'] as const;
 /** Checks that only produce an input feature (a failed lookup makes the feature unknown, it does not stop the run). */
 export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio'] as const;

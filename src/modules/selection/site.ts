@@ -13,7 +13,7 @@ import { makeMatcher, readCapped } from './wayback.js';
 export type FailReason = 'ADDRESS_BLOCKED' | 'HOST_EXCLUDED' | 'URL_NOT_ALLOWED' | 'UNEXPECTED_CONTENT_TYPE' | 'CLIENT_RENDERED' | 'DNS_NXDOMAIN' | 'CONNECTION_REFUSED' | 'HTTP_4XX' | 'TIMEOUT' | 'HTTP_5XX' | 'TLS_ERROR' | 'ROBOTS_DISALLOWED' | 'TOO_MANY_REDIRECTS' | 'TRUNCATED' | 'SOURCE_ERROR';
 export type PageFetch =
   | { ok: true; finalUrl: string; status: number; html: string; truncated: boolean }
-  | { ok: false; kind: 'no_site' | 'unknown'; reasonCode: FailReason; finalUrl: string | null };
+  | { ok: false; kind: 'no_site' | 'unknown'; reasonCode: FailReason; finalUrl: string | null; /** v3.4.1: the HTTP status of the answer that failed (absent when no answer came). */ status?: number };
 export type SiteState = 'unregistered' | 'registered_no_site' | 'parked_or_for_sale' | 'redirect_off_domain' | 'in_use' | 'unknown';
 export type BusinessUse = 'business_name' | 'service_description' | 'product_name' | 'none';
 export interface SiteClass { site_state: SiteState; business_use: BusinessUse | null; business_name: string | null; final_url: string | null; reason_code: string | null }
@@ -27,6 +27,8 @@ export interface FetchPageOpts {
   now?: () => number;
   /** Called once per request attempted (robots.txt, page, each hop), for `upstream_calls`. */
   onRequest?: () => void;
+  /** v3.4.1 (CR-028): a 2xx body longer than `maxBytes` is returned as its first `maxBytes` with `truncated: true` instead of failing (TRUNCATED). */
+  truncatedOk?: boolean;
 }
 /** `fetch` is a test injection; production passes none and safeFetch uses undici's own fetch. */
 type FetchDeps = { fetch?: typeof fetch; lookupHost?: ScreeningDeps['lookupHost'] };
@@ -211,16 +213,16 @@ async function chain(deps: FetchDeps, startUrl: string, o: FetchPageOpts): Promi
       if (lc !== null && !lc.includes('text/') && !lc.includes('xml')) { drop(res); return failure('unknown', 'UNEXPECTED_CONTENT_TYPE', url); }
       try {
         const body = await readCapped(res, o.maxBytes, ct);
-        if (body.cut) return failure('unknown', 'TRUNCATED', url);
-        return { ok: true, finalUrl: url, status: s, html: body.text, truncated: false };
+        if (body.cut && !o.truncatedOk) return failure('unknown', 'TRUNCATED', url);
+        return { ok: true, finalUrl: url, status: s, html: body.text, truncated: body.cut };
       } catch (e) {
         return { ...failOf(e), finalUrl: url };
       }
     }
     drop(res);
-    if (s === 401 || s === 403) return failure('unknown', 'HTTP_4XX', url); // a login wall or bot block: we do not go around it
-    if (s >= 400 && s < 500 && s !== 429) return failure('no_site', 'HTTP_4XX', url);
-    return failure('unknown', 'HTTP_5XX', url);
+    if (s === 401 || s === 403) return { ...failure('unknown', 'HTTP_4XX', url), status: s }; // a login wall or bot block: we do not go around it
+    if (s >= 400 && s < 500 && s !== 429) return { ...failure('no_site', 'HTTP_4XX', url), status: s };
+    return { ...failure('unknown', 'HTTP_5XX', url), status: s };
   }
 }
 

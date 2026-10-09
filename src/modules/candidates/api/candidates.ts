@@ -40,6 +40,8 @@ export const ScreenBody = z.object({
   max_names: z.number().int().min(1).max(100).optional(),
   /** v3.4.0 (CR-026): screen only these names; a screened name goes in again only when the settings version or its records changed since its last screening. */
   domains: z.array(z.string().trim().min(1).max(253)).min(1).max(30).optional(),
+  /** v3.4.1 (CR-028): with `domains` only: re-screen the named names even when nothing changed (NO_INTAKE and OWNED still skip; the allowance still counts). */
+  force: z.boolean().optional(),
 }).strict();
 const DailyQuery = z.object({ date: ymd.optional(), limit: z.coerce.number().int().min(1).max(DAILY_LIST_MAX_LIMIT).default(DAILY_LIST_DEFAULT_LIMIT) }).strict();
 const Query = z.object({ kind: z.enum(RECORD_KINDS_ALL).optional() }).strict();
@@ -67,11 +69,13 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
       .where((eb) => eb.exists(eb.selectFrom('job_steps as s').select('s.id').whereRef('s.run_id', '=', 'r.id').where('s.status', 'in', ['queued', 'running'])))
       .orderBy('r.created_at').limit(1).executeTakeFirst();
     if (open) throw new AppError(409, 'ALREADY_RUNNING', `A ${open.job} run is still going; try again when it has finished`, { run_id: open.id, job: open.job });
+    if (b.force !== undefined && !b.domains) throw new AppError(422, 'VALIDATION_ERROR', 'force is allowed only together with domains', { field: 'force' });
+    const force = b.force === true;
     let domains: string[] | undefined;
     if (b.domains) {
       try { domains = [...new Set(b.domains.map((d) => normalizeDomain(d)))]; } catch (e) { throw new AppError(422, 'VALIDATION_ERROR', `domains: ${e instanceof Error ? e.message : 'invalid domain'}`, { field: 'domains' }); }
     }
-    const plan = await planOnDemand(db, nowMs, b.max_names ?? null, domains);
+    const plan = await planOnDemand(db, nowMs, b.max_names ?? null, domains, force);
     const allowance = (used: number) => ({ daily_max: plan.allowance.daily_max, used_today: used, remaining: Math.max(0, plan.allowance.daily_max - used) });
     if (plan.allowance.remaining <= 0) {
       throw new AppError(409, 'ON_DEMAND_SCREEN_CAP', 'The on-demand screening allowance of today is used up', { ...plan.allowance, next_allowed_at: toJerusalemIso(nextIdtMidnight(nowMs)) });
@@ -82,15 +86,15 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
         await advisoryXactLock(trx, 'daily_rebuild');
         await buildDailyList({ db, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'auto' });
       });
-      req.auditSummary = 'screen: no names waiting';
+      req.auditSummary = `screen: no names waiting${force ? ' (force)' : ''}`;
       return reply.code(200).send({ run_id: null, names_n: 0, skipped: domains ? plan.skipped : 'NO_NAMES', allowance: allowance(plan.allowance.used_today) });
     }
     const queue = deps.queue?.();
     if (!queue) throw new Error('job queue not wired');
-    const r = await queue.enqueue('screen', { trigger: 'manual', triggeredBy: req.auth!.name, params: { max_names: b.max_names ?? null, ...(domains && { domains }) } });
+    const r = await queue.enqueue('screen', { trigger: 'manual', triggeredBy: req.auth!.name, params: { max_names: b.max_names ?? null, ...(domains && { domains }), ...(force && { force }) } });
     if (r.skipped) throw new AppError(409, 'ALREADY_RUNNING', 'A screen run is still going; try again when it has finished', { run_id: r.runId, job: 'screen' });
     queue.kick();
-    req.auditSummary = `screen: ${plan.names_n} queued${plan.skipped.length ? `, ${plan.skipped.length} skipped` : ''}`;
+    req.auditSummary = `screen: ${plan.names_n} queued${force ? ' (force)' : ''}${plan.skipped.length ? `, ${plan.skipped.length} skipped` : ''}`;
     return reply.code(202).send({ run_id: r.runId, names_n: plan.names_n, skipped: plan.skipped, allowance: allowance(plan.allowance.used_today + plan.new_n) });
   });
 

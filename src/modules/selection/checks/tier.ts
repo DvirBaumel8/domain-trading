@@ -1,7 +1,7 @@
 // G8 tier (CAP-24) and DEMAND-2: the rule tier from the item's other results. A result that is absent (not in the plan) or not usable
 // leaves its feature null, and a null feature makes its conditions `unknown` (never read as a pass or a fail).
 import { condHolds, evaluateTier, type Thresholds, type TierFeatures } from '../tier.js';
-import { findSellers, sellersFreshHours, tierUsesSellers, verifySellers } from '../sellers.js';
+import { findSellers, sellersFreshHours, tierUsesSellers, unknownCount, verifySellers } from '../sellers.js';
 import type { SelectionValuesT } from '../settings.js';
 import { outcome, type Check, type CheckContext, type CheckId } from '../types.js';
 
@@ -30,7 +30,7 @@ export function tierFeatures(ctx: CheckContext): TierFeatures {
     registered_share: num(census?.registered_share), prior_history: bit(history?.prior_history), alt_tld_before_n: num(ext?.alt_tld_before_n),
     n_words: num(form?.word_count), sld_chars: num(form?.sld_len), is_geo: ctx.item.lane === 'S2' ? 1 : 0,
     gform1_pass: bit(form?.gform1_pass), short: bit(form?.short),
-    lane: ctx.item.lane ?? null, sellers_verified_n: 0,
+    lane: ctx.item.lane ?? null, sellers_verified_n: 0, sellers_unknown_n: 0,
   };
 }
 
@@ -76,15 +76,17 @@ export const tierCheck: Check = {
     let sellerCalls = 0;
     if (tierUsesSellers(ctx.settings.tier)) {
       const found = await findSellers(ctx.db, ctx.item.domain, { runId: ctx.run.id, nowMs: ctx.now(), freshHours: sellersFreshHours(ctx.settings) });
-      if (found.state === 'none') sellers = { source: null, verified_n: 0, entries: [] };
+      if (found.state === 'none') sellers = { source: null, verified_n: 0, unknown_n: 0, entries: [] };
       else if (found.state === 'stale') {
         features.sellers_verified_n = null;
-        sellers = { source: found.source, list_at: found.at!.toISOString(), verified_n: null, reason_code: 'SELLERS_STALE', entries: [] };
+        features.sellers_unknown_n = null;
+        sellers = { source: found.source, list_at: found.at!.toISOString(), verified_n: null, unknown_n: null, reason_code: 'SELLERS_STALE', entries: [] };
       } else {
         const v = await verifySellers(ctx, found.list);
         sellerCalls = v.upstreamCalls;
-        features.sellers_verified_n = v.results.filter((r) => r.verified).length;
-        sellers = { source: found.source, list_at: found.at!.toISOString(), verified_n: features.sellers_verified_n, entries: v.results };
+        features.sellers_verified_n = v.results.filter((r) => r.verified === true).length;
+        features.sellers_unknown_n = unknownCount(v.results);
+        sellers = { source: found.source, list_at: found.at!.toISOString(), verified_n: features.sellers_verified_n, unknown_n: features.sellers_unknown_n, entries: v.results };
       }
     }
     const t = evaluateTier(features, ctx.settings.tier, ctx.settings.thresholds);
