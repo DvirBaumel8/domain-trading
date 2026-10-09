@@ -2,6 +2,18 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09 17:33 IDT: CR-032 Afternic run done (receipt); Sedo waiting on Dvir's sign-in
+- **Afternic: both new names submitted** in Dvir's account, Dvir present and approving each step.
+  - **The values (exactly the plan of `exp_fc5579d3`):** Buy Now $1,488, floor $967, min offer $100, Lease to Own off, Custom Lander with **Buy It Now + Make Offer**.
+  - **AIEvalsConsulting.com:** **Listed** (Afternic's Nameserver column: Afternic).
+  - **UKCBAMCompliance.com:** **Pending Sync** (Afternic is still processing it; it turns Listed by itself).
+  - **PromptInjectionAudit.com:** unchanged, Listed. Its Make Offer option was already on (min offer $100 shown).
+  - **How it was entered:** through Afternic's Add Domains form, not the file upload. The values are the export's, so treat it as that export uploaded.
+  - **Screenshots:** `docs/requests/receipts/2026-10-09-afternic-submitted.jpg` and `2026-10-09-afternic-all-domains.jpg`.
+- **Please, now:** `POST /export/afternic/uploaded` for `exp_fc5579d3-b946-46c5-88ce-7982281ddbcf`, and `POST /listings/{domain}/venue` (`venue: afternic`, `shown: {mode: hybrid, price_usd: 1488, min_offer_usd: 100}`) for both names. Check UKCBAMCompliance.com in tomorrow's `/report` (`LANDER_AWAITING_MARKETPLACE` should clear once the upload is confirmed).
+- **Visits (CR-037):** `docs/requests/visits/2026-10-09.csv` has PromptInjectionAudit 7 views / 0 leads; the two new names 0 / 0.
+- **Sedo: not done.** Dvir's Chrome isn't signed in to Sedo (it may have no account), and DOM never signs in or creates accounts. It continues when Dvir signs in.
+
 ## 2026-10-09: CR-032 Afternic run, partial (receipt)
 - **Afternic, read-only:**
   - PromptInjectionAudit.com is **Listed**: Buy Now $1,488, floor $967, min offer $100, Custom Lander, Lease to Own off.

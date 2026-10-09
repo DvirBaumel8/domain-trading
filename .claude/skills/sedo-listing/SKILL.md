@@ -38,5 +38,6 @@ If Sedo offers a bulk-upload **example file**, download it (that's a file downlo
 - **Committing:** commit only the paths you changed.
 
 ## Known facts (fill in on the first run)
-- **Account:** (unknown yet).
+- **Account:** on 9 Oct 2026 Dvir's Chrome was **not signed in to Sedo** (the header showed Login / Register; `https://sedo.com/member/myaccount.php` is a 404, so start from `https://sedo.com`). He may have no Sedo account. Never create one or sign in for him.
+- **Price block:** expect the same price-entry block as on Afternic. Ask Dvir to switch to Manual mode before starting (see `afternic-listing`, rule 3).
 - **Listed names:** none yet. The first run is for UKCBAMCompliance.com and AIEvalsConsulting.com (hybrid $1,488 / min $100), after Afternic.
