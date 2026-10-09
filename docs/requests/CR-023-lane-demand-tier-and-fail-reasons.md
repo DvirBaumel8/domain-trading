@@ -121,3 +121,9 @@ Drop lists are now used only for idea mining and to catch uncaught leftovers at 
 - **Drafts:** `v11.2` (tier L at `p_passive` 0.01) was drafted and never activated. At 0.01 the price check fails RATIO-1 at the floor ($967 x 0.85 x 0.01 / $11.08 = 0.74), so `v11.3` was drafted: v11.1 plus tier L exactly as in v11.2, with `p_passive.L` 0.015. Under v11.3, evaluate gives aievalsconsulting.com and roofingdroneinspection.com tier L, EV +$15.50, ratio 1.71 at the BIN and 1.11 at the floor, price check passes.
 - **Dvir's approval, verbatim (2026-10-09 12:12 IDT):** "I approve selection settings v11.3 (only adds tier L for lanes S3/S4/S6 at 0.015); the buy hold stays on"
 - **Activated:** `POST /selection/settings/v11.3/activate` with that line as `approval_ref` → 200, active `v11.3`, `activated_at` 2026-10-09T12:12:22+03:00. `buy_hold` stays `true`.
+
+## Activation record: v11.4 (2026-10-09, Gavriel)
+- **What it is:** v11.4 = v11.3 plus the `same_name` check in `run.gates` (default after `ext_dates`, S2 after `tm_us`), so screening packs can be complete (`pack.require_checks` has `same_name`).
+- **Dvir's approval, verbatim (2026-10-09 13:57 IDT):** "I approve selection settings v11.4 (only adds the same_name check to the gates); the buy hold stays on"
+- **Activated:** `POST /selection/settings/v11.4/activate` with that line as `approval_ref` → 200, active `v11.4`, `activated_at` 2026-10-09T13:57:16+03:00. `buy_hold` stays `true`.
+- **Also drafted, not active:** `v12` = v11.4 with `buy_hold: false`, the target for future hold-suite replays.
