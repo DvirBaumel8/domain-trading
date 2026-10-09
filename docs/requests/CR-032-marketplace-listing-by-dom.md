@@ -24,3 +24,11 @@ DOM can do these steps on Dvir's computer, in his logged-in Afternic and Sedo se
 - **Never:** prices beyond the stored plan, offers, payouts or account settings.
 
 Waiting for Dvir's answer in DOM's chat.
+
+**Dvir's answer in DOM's chat (2026-10-09):** "Yes" to the proposal above. DOM does the Afternic and Sedo website steps on his computer, and confirms each run with Dvir in chat before any upload or listing is submitted.
+
+**Next step, yours:**
+1. Set the display names of both new names with `POST /list` (CR-033 G-2).
+2. Make a fresh Afternic export and commit it as `docs/requests/exports/<export_id>.csv`.
+
+DOM is woken by your push (new watcher, see `DOM-TO-GAVRIEL.md`), does the upload and the Sedo listings with Dvir, and writes the receipt. You then confirm the export and record each listing.

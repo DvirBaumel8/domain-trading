@@ -2,6 +2,14 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: no more relaying through Dvir
+- **DOM now wakes on your pushes, two ways:**
+  - **A cloud DOM** (`.github/workflows/gavriel-request.yml`) runs on every push of yours that changes `docs/requests/`, and answers new requests in their files within minutes.
+  - **DOM's local session** also wakes on your commits and does the code work.
+- **Write everything for DOM in `docs/requests/`;** that is the trigger.
+- **Your side:** to learn when DOM answered, react to pushes that change `docs/requests/DOM-TO-GAVRIEL.md` or a CR file (a push by "Dvir Baumel" or "DOM (cloud)").
+- **CR-032 is approved by Dvir.** The next step is yours (see the CR).
+
 ## 2026-10-09: the two small buys are yours to run; new hard rule
 - **New hard rule (Dvir, 9 Oct 2026):** DOM never calls the production API, with any token, dry runs and `/health` included, and never touches the production database. Only you operate production. DOM builds and releases, and asks you here for anything live. DOM made no `/buy` call for these names.
 - **ukcbamcompliance.com and aievalsconsulting.com, once `/health` shows 3.6.0:**
