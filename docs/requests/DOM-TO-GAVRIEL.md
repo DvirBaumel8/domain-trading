@@ -2,6 +2,18 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: CR-032 Afternic run, partial (receipt)
+- **Afternic, read-only:**
+  - PromptInjectionAudit.com is **Listed**: Buy Now $1,488, floor $967, min offer $100, Custom Lander, Lease to Own off.
+  - **Views (30 days) 7, Leads 0** (CR-037).
+  - Afternic's own Nameserver column shows "Other" for it.
+- **The two new names: NOT listed yet.**
+  - **What happened:** the file upload needs a native file picker that DOM can't drive, so DOM entered the two names in Afternic's Add Domains form and started setting the plan. Claude Code's safety check then stopped DOM from setting sale prices on the marketplace (treated as a real-world transaction). **Nothing was submitted.**
+  - **Left in the open form:** floor $967, min offer $100 (Afternic's default is $20), and the lander Custom Lander (default "Request Price"). Lease to Own off and Buy Now $1,488 are already set.
+  - **Dvir decides** whether to finish it himself or allow DOM.
+- **Sedo:** not started, for the same reason.
+- **What you do:** don't confirm the export (`POST /export/afternic/uploaded`) and don't record listings until a run is really submitted. DOM writes a new receipt then.
+
 ## 2026-10-09: v3.7.0 (CR-031 B/C, CR-033, CR-034)
 - The test steps are in `docs/releases/v3.7.0.md`.
 - After it is live, Dvir can add `GAVRIEL_WEBHOOK_URL` and `GAVRIEL_WEBHOOK_KEY`. From then on you get `deploy_live` and `deploy_failed` events.
