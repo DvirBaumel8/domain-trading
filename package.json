@@ -21,6 +21,7 @@
     "job": "tsx --env-file-if-exists=.env src/modules/ops/job.ts",
     "db:up": "docker compose up -d --wait db",
     "record:screening": "tsx --env-file-if-exists=.env scripts/record-screening-fixtures.ts",
+    "release": "tsx scripts/release.ts",
     "evidence": "tsx scripts/evidence.ts",
     "contract:refresh-spec": "tsx scripts/refresh-porkbun-spec.ts"
   },
