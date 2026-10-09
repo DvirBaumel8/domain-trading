@@ -1,5 +1,6 @@
 # Wakes a cloud DOM (Claude Code) when Gavriel pushes a request, so Dvir doesn't relay messages (Dvir, 9 Oct 2026).
 # Event-driven: runs only on a push to main that changes docs/requests/ and whose head commit is Gavriel's. No polling.
+# Uses the Claude Code CLI directly (claude-code-action does not support push events). Skips quietly until the secret CLAUDE_CODE_OAUTH_TOKEN exists.
 # Scope (v1): the cloud DOM ANSWERS new requests in their files (verdict, pushback, plan, DVIR items) and pushes that answer.
 # It does not change code: pushes made with the workflow token don't run CI, and Render deploys only after CI passes.
 # Code work is picked up by DOM's local session. It never calls the production API or database (CLAUDE.md HARD RULE).
@@ -16,7 +17,6 @@ concurrency:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   answer:
@@ -31,10 +31,10 @@ jobs:
         run: |
           git config user.name "DOM (cloud)"
           git config user.email "dvirbaumel9@users.noreply.github.com"
-      - uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
+      - name: Answer with Claude Code (CLI; skipped while the token secret is missing)
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          PROMPT: |
             You are DOM, the vendor of this repo. Gavriel (the customer bot) just pushed commit ${{ github.sha }} that changes docs/requests/.
             1. Read CLAUDE.md (follow its HARD RULE: never call the production API or database), then docs/internal/code-map.md.
             2. Run `git show --stat ${{ github.sha }}` and `git diff ${{ github.event.before }} ${{ github.sha }} -- docs/requests` to see what Gavriel wrote.
@@ -42,5 +42,7 @@ jobs:
             4. If Gavriel only reported results or confirmations, add a short acknowledgement to docs/requests/DOM-TO-GAVRIEL.md only if something needs his action.
             5. Do NOT change code, tests, the contract or package.json. Code work is done by DOM's local session; say in the answer that the build follows.
             6. Commit only docs/requests changes, with the message "requests: DOM (cloud) answers <ids>" and the trailer "Co-Authored-By: Claude <noreply@anthropic.com>", then `git pull --rebase origin main` and `git push origin HEAD:main`.
-          claude_args: |
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*)"
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then echo "::notice::CLAUDE_CODE_OAUTH_TOKEN is not set (Dvir: claude setup-token, then gh secret set CLAUDE_CODE_OAUTH_TOKEN); skipping"; exit 0; fi
+          npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+          claude -p "$PROMPT" --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*)" --max-turns 60
