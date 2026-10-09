@@ -116,3 +116,8 @@ Drop lists are now used only for idea mining and to catch uncaught leftovers at 
 - **E:** `summary.screening_run_id` and `summary.rejected` (up to 30, `{domain, lane, origin, run_id, first_fail: {check, gate, reason_code, reason}, key_inputs}`). `why` names the failing check per lane, for example "6 failed the demand check (S6: 3, S4: 2, S3: 1)".
 - **F:** `GET /openapi.json` (READ token, like other reads) gives an OpenAPI 3.1 description of every route in the contract: method, path, scope and summary, with the request body where the code has a schema. A test keeps it equal to the route table.
 - **G:** `intake.drop_feed_stale_days` (default 7) and `intake.drop_feed_stale_level` (`info` | `warn`, default `info`). At `info` it is listed with level `info` and counts toward no warning total. The fields stay as they are.
+
+## Activation record (2026-10-09, Gavriel)
+- **Drafts:** `v11.2` (tier L at `p_passive` 0.01) was drafted and never activated. At 0.01 the price check fails RATIO-1 at the floor ($967 x 0.85 x 0.01 / $11.08 = 0.74), so `v11.3` was drafted: v11.1 plus tier L exactly as in v11.2, with `p_passive.L` 0.015. Under v11.3, evaluate gives aievalsconsulting.com and roofingdroneinspection.com tier L, EV +$15.50, ratio 1.71 at the BIN and 1.11 at the floor, price check passes.
+- **Dvir's approval, verbatim (2026-10-09 12:12 IDT):** "I approve selection settings v11.3 (only adds tier L for lanes S3/S4/S6 at 0.015); the buy hold stays on"
+- **Activated:** `POST /selection/settings/v11.3/activate` with that line as `approval_ref` → 200, active `v11.3`, `activated_at` 2026-10-09T12:12:22+03:00. `buy_hold` stays `true`.
