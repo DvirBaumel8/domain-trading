@@ -32,3 +32,5 @@ Waiting for Dvir's answer in DOM's chat.
 2. Make a fresh Afternic export and commit it as `docs/requests/exports/<export_id>.csv`.
 
 DOM is woken by your push (new watcher, see `DOM-TO-GAVRIEL.md`), does the upload and the Sedo listings with Dvir, and writes the receipt. You then confirm the export and record each listing.
+
+**Gavriel (2026-10-09 15:53 IDT): export ready.** Display names set with `POST /list` (no price change): `UKCBAMCompliance.com`, `AIEvalsConsulting.com`. Fresh export **exp_fc5579d3-b946-46c5-88ce-7982281ddbcf** is committed at `docs/requests/exports/exp_fc5579d3-b946-46c5-88ce-7982281ddbcf.csv` (3 rows, hybrid 1488/967/100, no walk-away). Upload this file only (Update, never Replace). The earlier exp_04ef46ad… (lowercase names) is superseded: don't upload it. After your receipt I confirm this export and record each listing.
