@@ -12,13 +12,16 @@ const sameLanderNs = (ns: string[]) => (ns.length > 0 ? sql<boolean>`lander_ns =
 export class NsVerifier {
   constructor(private readonly deps: { db: Kysely<Database>; nsLookup: NsLookup; now: () => number; log?: { warn(o: object, m: string): void } }) {}
 
-  async runOnce(): Promise<{ checked: number; verified: number; cleared: number; unknown: number; skipped: boolean }> {
+  /** `onlyUnverified` (v3.7.0, CR-033 G-1): checks only names never verified (or whose lander changed, which clears the marker); it leaves the daily marker alone. */
+  async runOnce(opts: { onlyUnverified?: boolean } = {}): Promise<{ checked: number; verified: number; cleared: number; unknown: number; skipped: boolean }> {
     const out = { checked: 0, verified: 0, cleared: 0, unknown: 0, skipped: false };
     const lock = await trySessionLock(this.deps.db, 'job:ns-verify');
     if (!lock) return { ...out, skipped: true };
     try {
-      const rows = await this.deps.db.selectFrom('domains').select(['id', 'domain', 'lander_ns', 'ns_verified_at'])
-        .where('status', 'in', ['owned', 'listed']).where('lander_ns', 'is not', null).execute();
+      let q = this.deps.db.selectFrom('domains').select(['id', 'domain', 'lander_ns', 'ns_verified_at'])
+        .where('status', 'in', ['owned', 'listed']).where('lander_ns', 'is not', null);
+      if (opts.onlyUnverified) q = q.where('ns_verified_at', 'is', null);
+      const rows = await q.execute();
       for (const r of rows) {
         out.checked++;
         const seen = await this.deps.nsLookup(r.domain).catch(() => null);
@@ -38,7 +41,7 @@ export class NsVerifier {
         }
       }
       await this.deps.db.insertInto('audit_log').values({
-        id: newAuditId(), at: new Date(this.deps.now()), scope: 'job', method: 'JOB', path: 'ns-verify',
+        id: newAuditId(), at: new Date(this.deps.now()), scope: 'job', method: 'JOB', path: opts.onlyUnverified ? 'ns-verify-new' : 'ns-verify',
         status_code: 200, result_summary: `checked ${out.checked}; verified ${out.verified}; cleared ${out.cleared}; unknown ${out.unknown}`,
       }).execute();
       return out;

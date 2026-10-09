@@ -32,7 +32,9 @@ describe('auth (AU)', () => {
       expect(bad.statusCode, `bad ${r.method} ${r.url}`).toBe(401);
     }
     expect(await writeCounts()).toEqual(before);
-    expect((await app.inject({ method: 'GET', url: '/health/ping' })).statusCode).toBe(200);
+    const ping = await app.inject({ method: 'GET', url: '/health/ping' });
+    expect(ping.statusCode).toBe(200);
+    expect(Object.keys(ping.json()).sort()).toEqual(['commit', 'status', 'version']); // T34-1 (v3.7.0, CR-034): version and commit, nothing else
     // and the test app's routes too
     const t = await makeApp();
     for (const [method, url] of [['GET', '/__test/ping'], ['POST', '/__test/echo']] as const) {

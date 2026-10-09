@@ -31,7 +31,8 @@ import {
   holdSuites, parseCsv, profitReport, reportOf, rpl, suiteStatuses, toLabelledRow, type Entry, type GateKey, type LabelledRow,
 } from '../replay.js';
 
-export interface SelectionDeps { db: Kysely<Database>; now: () => number; holdoutCheck?: HoldoutCheck }
+export interface SelectionDeps { db: Kysely<Database>; now: () => number; holdoutCheck?: HoldoutCheck;
+  /** v3.7.0 (G-3): the weekly small-buy usage, composed in app.ts (selection does not import buying). */ smallBuy?: (nowMs: number) => Promise<object> }
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 const Approval = approvalRefObject;
@@ -563,6 +564,6 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const hold = await holdSuites(db, active.values.holdout);
     const targetValues = target ? target.values : active.values;
     // Clearable only for a version that actually clears the hold (its own buy_hold is false).
-    return { buy_hold: active.values.buy_hold, settings_version: label, target_buy_hold: targetValues.buy_hold, required_suites: suites, hold_suites: hold.suites, hold_suites_source: hold.source, clearable: !targetValues.buy_hold && suites.length > 0 && suites.every((x) => x.pass), ...(await buyHoldSteps(db, active)) };
+    return { buy_hold: active.values.buy_hold, settings_version: label, target_buy_hold: targetValues.buy_hold, required_suites: suites, hold_suites: hold.suites, hold_suites_source: hold.source, clearable: !targetValues.buy_hold && suites.length > 0 && suites.every((x) => x.pass), ...(await buyHoldSteps(db, active)), ...(deps.smallBuy ? { small_buy: await deps.smallBuy(deps.now()) } : {}) };
   });
 }

@@ -28,6 +28,8 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'export_runs', file: 'tables/export_runs.json' },
   { table: 'export_uploads', file: 'tables/export_uploads.json' },
   { table: 'registrar_presence', file: 'tables/registrar_presence.json' },
+  { table: 'registrar_state_checks', file: 'tables/registrar_state_checks.json' },
+  { table: 'venue_listings', file: 'tables/venue_listings.json' },
   { table: 'selection_settings', file: 'tables/selection_settings.json' },
   { table: 'selection_lists', file: 'tables/selection_lists.json' },
   { table: 'sibling_method_approvals', file: 'tables/sibling_method_approvals.json' },

@@ -4,7 +4,7 @@ import { idtDay, toJerusalemIso } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { computePlan } from '../../listing/index.js';
 import { settingsByVersion } from '../../listing/index.js';
-import { manualDelist, pendingDomains, VENUES } from '../../listing/index.js';
+import { manualDelist, pendingDomains, sameNsSet, VENUES } from '../../listing/index.js';
 import { dailyScheduleState, JOBS_OVERDUE_HOURS, JOB_RUN_STUCK_HOURS, jobsOverdue } from '../job-runs.js';
 import { daysBetween } from '../../candidates/index.js';
 import { activeSelectionSettings } from '../../selection/index.js';
@@ -71,8 +71,23 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     } else if (c.kind === 'blocklist') {
       add('OWNED_NAME_BLOCKLISTED', 'error', `${d} is listed on a blocklist.`, d, { checked_at: checkedAt, sources: c.details.sources ?? [] });
     } else if (c.kind === 'web' && st === 'listed') {
+      // v3.7.0 (CR-033 G-8): until a confirmed Afternic upload covers the name, a failing lander is expected (info); the LANDER_DOWN clock starts at the first confirmed upload
+      let firstUpload: Date | null = null;
+      if (domains.find((x) => x.id === Number(c.domain_id))?.lander === 'afternic') {
+        const u = await sql<{ at: Date | null }>`
+          select min(u.uploaded_at) as at from export_uploads u join export_runs r on r.export_id = u.export_id where u.venue = 'afternic' and ${d} = any(r.domains)`.execute(db);
+        firstUpload = u.rows[0]?.at ?? null;
+        if (firstUpload === null) {
+          add('LANDER_AWAITING_MARKETPLACE', 'info', `${d}: the for-sale lander does not answer yet; the name has not been listed at Afternic (no confirmed upload).`, d, {
+            checked_at: checkedAt, status_code: c.details.status_code ?? null, reason: c.details.reason ?? null,
+          });
+          continue;
+        }
+      }
       const recent = (await sql<{ status: string; at: Date }>`
-        select status, at from portfolio_checks where domain_id = ${c.domain_id} and kind = 'web' and status <> 'unknown' order by id desc limit 400`.execute(db)).rows;
+        select status, at from portfolio_checks where domain_id = ${c.domain_id} and kind = 'web' and status <> 'unknown'
+          ${firstUpload ? sql`and at >= ${firstUpload}` : sql``} order by id desc limit 400`.execute(db)).rows;
+      if (recent.length === 0 || recent[0]!.status !== 'fail') continue;
       let streak = 0;
       while (streak < recent.length && recent[streak]!.status === 'fail') streak++;
       const since = recent[streak - 1]!.at;
@@ -81,6 +96,25 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
       add('LANDER_DOWN', twoFails && days.size >= LANDER_DOWN_ERROR_DAYS ? 'error' : 'warn', `${d}: the for-sale lander is not answering as expected.`, d, {
         checked_at: checkedAt, since: toJerusalemIso(since), status_code: c.details.status_code ?? null, reason: c.details.reason ?? null,
       });
+    }
+  }
+
+  // v3.7.0 (CR-033 G-6): the registrar-side state read by the daily registrarCheck (latest row per name)
+  const regState = await sql<{ domain: string; checked_at: Date; auto_renew: boolean | null; privacy: boolean | null; ns: string[] | null }>`
+    select distinct on (domain) domain, checked_at, auto_renew, privacy, ns from registrar_state_checks order by domain, id desc`.execute(db);
+  const byName = new Map(domains.map((d) => [d.domain, d]));
+  for (const r of regState.rows) {
+    const d = byName.get(r.domain);
+    if (!d || !live(d.status)) continue;
+    const checkedAt = toJerusalemIso(r.checked_at);
+    if (r.auto_renew === true) {
+      add('AUTO_RENEW_ON', 'error', `${d.domain}: auto-renew is ON at ${d.registrar}; turn it off in the registrar dashboard (a renewal there is billed outside the cap).`, d.domain, { registrar: d.registrar, checked_at: checkedAt });
+    }
+    const drift: string[] = [];
+    if (r.privacy === false) drift.push('privacy_off');
+    if (r.ns !== null && d.lander_ns !== null && !sameNsSet(r.ns, d.lander_ns)) drift.push('nameservers');
+    if (drift.length > 0) {
+      add('REGISTRAR_DRIFT', 'warn', `${d.domain}: the registrar state differs from the plan (${drift.join(', ')}).`, d.domain, { drift, privacy: r.privacy, ns: r.ns, lander_ns: d.lander_ns, checked_at: checkedAt });
     }
   }
 

@@ -14,6 +14,7 @@ const EXCLUDED_TESTS = new Set(['tests/unit/test-evidence.test.ts']);
  * Codes in the index that no automated test can produce, each with the reason. Ideally empty. Anything not here must have a test.
  */
 export const UNTESTABLE: Readonly<Record<string, string>> = {
+  DROP_POLICY_FAILED: 'needs the drop-policy update to fail after the registrar purchase has succeeded (a database error between two writes); it cannot be forced from a test without a hook in the service',
   DROP_DATE_UNKNOWN: 'unreachable by design: the database CHECK domains_owned_fields forbids an owned or listed name without a drop_date, so this guard in POST /list is defensive only',
   LABELLED_NAME_CONFLICT: 'needs two uploads of the same new name to race between the duplicate check and the insert (a unique-violation guard); it cannot be forced from a test without a hook in the service',
   OUTCOME_CHANGED_CONCURRENTLY: 'needs two outcome calls on one offer to interleave between the read and the conditional update; the guard is the conditional UPDATE itself and cannot be forced from a test without a hook in the service',
@@ -61,7 +62,7 @@ interface Guarantee { what: string; file: string; test: string; note?: string }
 /** Tables whose rows may never be changed or deleted (database triggers). */
 export const APPEND_ONLY_TABLES = [
   'audit_log', 'cohort_decisions', 'cohort_names', 'cohort_outcomes', 'company_documents', 'domain_records', 'drop_list_checks', 'drop_list_rows', 'drop_lists', 'export_uploads', 'forbidden_terms', 'holdout_suites', 'job_runs', 'labelled_names', 'ledger_entries', 'listing_history', 'manual_quotes', 'pricing_evidence',
-  'pricing_settings', 'portfolio_checks', 'post_images', 'posting_bursts', 'posting_switches', 'replay_runs', 'review_feedback', 'review_item_statuses', 'review_items', 'review_packets', 'review_retries', 'review_settings_changes', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings', 'sibling_method_approvals', 'test_set_rows',
+  'pricing_settings', 'portfolio_checks', 'post_images', 'posting_bursts', 'posting_switches', 'replay_runs', 'review_feedback', 'review_item_statuses', 'review_items', 'review_packets', 'review_retries', 'review_settings_changes', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings', 'sibling_method_approvals', 'test_set_rows', 'registrar_state_checks', 'venue_listings', 'post_allowance_exclusions',
 ] as const;
 
 const GUARANTEES: Guarantee[] = [

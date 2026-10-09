@@ -5,6 +5,7 @@ import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 import { formatUsd } from '../../core/money.js';
+import { toJerusalemIso } from '../../core/dates.js';
 import type { Gate } from './buy-gates.js';
 
 export const SMALL_BUY_MAX_FIRST_YEAR_CENTS = 1108;
@@ -18,11 +19,11 @@ export const smallBuyRequested = (flag: boolean | undefined, approvalText: unkno
 export interface SmallBuyState { cap_cents: number; spent_cents: number; cost_cents: number; remaining_cents: number }
 
 /** First-year cost of small-buy purchases in the last 7 days (open ones at their expected cost, failed ones not counted). */
-export async function smallBuySpend(db: Kysely<Database>, nowMs: number): Promise<{ spentCents: number; rows: { at: Date; cents: number }[] }> {
-  const rows = (await db.selectFrom('purchases').select(['charged_cents', 'expected_cents', 'created_at'])
+export async function smallBuySpend(db: Kysely<Database>, nowMs: number): Promise<{ spentCents: number; rows: { domain: string; at: Date; cents: number }[] }> {
+  const rows = (await db.selectFrom('purchases').select(['domain', 'charged_cents', 'expected_cents', 'created_at'])
     .where('small_buy_exception', '=', true).where('dry_run', '=', false).where('state', '!=', 'failed')
     .where('created_at', '>', new Date(nowMs - WEEK_MS)).orderBy('created_at').execute())
-    .map((r) => ({ at: r.created_at as Date, cents: r.charged_cents ?? r.expected_cents ?? 0 }));
+    .map((r) => ({ domain: r.domain, at: r.created_at as Date, cents: r.charged_cents ?? r.expected_cents ?? 0 }));
   return { spentCents: rows.reduce((s, r) => s + r.cents, 0), rows };
 }
 
@@ -48,3 +49,15 @@ export async function smallBuyGate(db: Kysely<Database>, nowMs: number, costCent
 }
 
 export const smallBuyError = (g: Gate): AppError => new AppError(409, g.code, g.message, g.details);
+
+/** v3.7.0 (CR-033 G-3): the read-only usage of the weekly small-buy cap (for GET /selection/buy-hold). `next_freed_at` = when the oldest counted purchase leaves the 7-day window. */
+export async function smallBuyView(db: Kysely<Database>, nowMs: number): Promise<object> {
+  const { spentCents, rows } = await smallBuySpend(db, nowMs);
+  return {
+    cap_cents: SMALL_BUY_WEEKLY_CAP_CENTS, cap: formatUsd(SMALL_BUY_WEEKLY_CAP_CENTS),
+    spent_7d_cents: spentCents, spent_7d: formatUsd(spentCents),
+    remaining_cents: Math.max(0, SMALL_BUY_WEEKLY_CAP_CENTS - spentCents), remaining: formatUsd(Math.max(0, SMALL_BUY_WEEKLY_CAP_CENTS - spentCents)),
+    next_freed_at: rows[0] ? toJerusalemIso(new Date(rows[0].at.getTime() + WEEK_MS)) : null,
+    purchases: rows.map((r) => ({ domain: r.domain, cost_cents: r.cents, cost: formatUsd(r.cents), at: toJerusalemIso(r.at) })),
+  };
+}

@@ -7,3 +7,4 @@ export { buyBlocks } from './buy-gates.js';
 export { BuyService } from './buy.js';
 export { Reconciler } from './reconciler.js';
 export { TrancheService } from './tranches.js';
+export { smallBuyView } from './small-buy.js';

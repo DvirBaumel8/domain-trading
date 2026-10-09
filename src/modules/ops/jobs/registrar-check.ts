@@ -51,6 +51,11 @@ export class RegistrarCheckJob {
           }
         } else {
           out.present += 1;
+          if (!dryRun && d.registrar === 'porkbun') {
+            // v3.7.0 (CR-033 G-6): the registrar-side state (read-only, from the same getDomain/getNs answer)
+            await this.deps.db.insertInto('registrar_state_checks')
+              .values({ domain: d.domain, checked_at: now, auto_renew: info.autoRenew, privacy: info.whoisPrivacy, ns: info.ns }).execute();
+          }
           if (!dryRun) {
             await this.deps.db.insertInto('registrar_presence')
               .values({ domain_id: d.id, status: 'present', first_absent_at: null, last_checked_at: now })

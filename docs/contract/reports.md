@@ -1,4 +1,4 @@
-# Reports (contract v3.6.0)
+# Reports (contract v3.7.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -45,6 +45,9 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `REGISTRY_MISMATCH` | error | The daily registry check (`portfolioCheck`, 2.3.0) found the name not registered, at another registrar, with another expiry date, or on hold / pending delete / in redemption | `checked_at`, `differences[] {field, ours, registry}` |
 | `OWNED_NAME_BLOCKLISTED` | error | The weekly blocklist check found the name on SURBL or Google Web Risk (2.3.0) | `checked_at`, `sources[]` |
 | `DOMAIN_LEFT_ACCOUNT` | error | The daily registrar check found the name gone and no sale is recorded (status unchanged) | `registrar`, `first_absent_at`, `last_checked_at` |
+| `LANDER_AWAITING_MARKETPLACE` | info | (3.7.0, CR-033 G-8) An `afternic`-lander name whose Afternic export was never confirmed uploaded; Afternic serves no page for it yet. `LANDER_DOWN` counts only from the first confirmed upload | `domain` |
+| `AUTO_RENEW_ON` | error | (3.7.0, CR-033 G-6) The registrar reports auto-renew on (founder rules: auto-renew stays off) | `domain`, `checked_at` |
+| `REGISTRAR_DRIFT` | warn | (3.7.0) The registrar's privacy is off, or its nameservers differ from the lander's | `domain`, `drift: [privacy_off, nameservers]`, `checked_at` |
 | `LANDER_DOWN` | warn; **error from the 2nd day running** | The daily web check of a listed name with verified lander nameservers did not get the lander's answer (2.3.0) | `checked_at`, `since`, `status_code`, `reason` |
 | `EXPORT_PENDING` | warn; **error after 7 days** | A listed name changed since the last confirmed Afternic upload | `days_pending`, `export_pending_since` |
 | `MANUAL_DELIST` | warn | A sold, delisted or dropped name must be removed by hand at a marketplace | `status`, `venues[]` |

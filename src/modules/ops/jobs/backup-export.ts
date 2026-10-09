@@ -9,7 +9,7 @@ import { toCsv } from '../../listing/index.js';
 /** Tables written in full (all columns, every row) under backup/tables/ so a restore is lossless. */
 export const TABLE_FILES = [
   'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'listing_history', 'quotes', 'price_schedule',
-  'pricing_evidence', 'offers', 'export_runs', 'export_uploads', 'registrar_presence',
+  'pricing_evidence', 'offers', 'export_runs', 'export_uploads', 'registrar_presence', 'registrar_state_checks', 'venue_listings',
   'selection_settings', 'selection_lists', 'sibling_method_approvals', 'screening_evidence', 'screening_runs', 'screening_results', 'screening_verdicts', 'screening_packs', 'manual_quotes', 'domain_records',
   'candidate_intake', 'candidate_screenings', 'daily_candidate_lists',
   'tranches', 'tranche_members', 'test_sets', 'test_set_rows',

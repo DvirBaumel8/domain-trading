@@ -10,7 +10,8 @@ import { dailyScheduleState, jobsOverdue } from '../../reporting/index.js';
 
 export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, posting?: PostingDeps, kickQueue?: () => Promise<void>): void {
   // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
-  app.get('/health/ping', async () => ({ status: 'ok' }));
+  // v3.7.0 (CR-034): also the version and the deployed commit (Render sets RENDER_GIT_COMMIT), so the deploy-live workflow can tell a deploy is live without a token.
+  app.get('/health/ping', async () => ({ status: 'ok', version: config.version, commit: process.env.RENDER_GIT_COMMIT ?? null }));
 
   // Needs any valid bot token (global auth hook).
   app.get('/health', async (_req, reply) => {

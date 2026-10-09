@@ -162,7 +162,9 @@ describe('v3.5.0 CR-030 small buy', () => {
     const a = await db.selectFrom('audit_log').selectAll().where('path', '=', '/buy').where('status_code', '=', 201).executeTakeFirstOrThrow();
     expect(a.result_summary).toContain('small buy');
     expect(a.approval_text).toContain('small buy');
-    expect(await holdState(auth)).toEqual(before);
+    const { small_buy: _after, ...afterHold } = await holdState(auth); // v3.7.0 (G-3): small_buy now counts the purchase
+    const { small_buy: _before, ...beforeHold } = before;
+    expect(afterHold).toEqual(beforeHold);
     // the purchase now counts against the week
     expect((await post(auth, sb({ domain: 'tampapoolsco.com', approval_ref: smallLine('tampapoolsco.com'), dry_run: true }))).statusCode).toBe(200);
     await heldReady('tampapoolsco.com');

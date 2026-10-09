@@ -17,6 +17,8 @@ export interface RecordBody {
   buyer_type?: string | null; buyer_ref?: string | null; external_ref?: string | null; note?: string | null;
   pricing_hold?: boolean | null; pricing_hold_reason?: string | null;
   approval_ref?: { text?: unknown; approved_at?: unknown } | null;
+  /** v3.7.0 (CR-031 B): run every check and the classification, write nothing but the audit row. */
+  dry_run?: boolean;
 }
 
 export interface OutcomeBody {
@@ -98,10 +100,21 @@ export class OffersService {
 
     const externalRef = body.external_ref ?? null;
     const existing = await this.findDuplicate(db, d.id, source, amountCents, receivedAt, externalRef);
-    if (existing) return this.duplicate(existing, d.id);
+    if (existing) {
+      const dup = await this.duplicate(existing, d.id);
+      return body.dry_run ? { ...dup, body: { ...dup.body, dry_run: true } } : dup;
+    }
 
     const snap = await snapshotAt(db, d, receivedAt);
     const c = classify(snap, amountCents, source);
+    if (body.dry_run) {
+      // no offer row, no hold, no dedupe key: the view of the row that would be written
+      const would = {
+        id: null, ...offerValues(d.id, { amountCents, source, receivedAt, buyerType, buyerRef: body.buyer_ref ?? null, externalRef, note: body.note ?? null }, snap, c),
+        outcome_at: null, outcome_note: null, recorded_by: ctx.recordedBy,
+      } as unknown as OfferRow;
+      return { status: 200 as const, body: { ...offerView(would, d.domain), dry_run: true, next_step: c.nextStep, warnings: c.warnings } };
+    }
 
     const insert = async (conn: Kysely<Database>): Promise<{ row: OfferRow; duplicate: boolean }> => {
       try {

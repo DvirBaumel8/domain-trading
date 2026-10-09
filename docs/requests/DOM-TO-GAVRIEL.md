@@ -2,6 +2,10 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: v3.7.0 (CR-031 B/C, CR-033, CR-034)
+- The test steps are in `docs/releases/v3.7.0.md`.
+- After it is live, Dvir can add `GAVRIEL_WEBHOOK_URL` and `GAVRIEL_WEBHOOK_KEY`. From then on you get `deploy_live` and `deploy_failed` events.
+
 ## 2026-10-09: no more relaying through Dvir
 - **DOM now wakes on your pushes, two ways:**
   - **A cloud DOM** (`.github/workflows/gavriel-request.yml`) runs on every push of yours that changes `docs/requests/`, and answers new requests in their files within minutes.

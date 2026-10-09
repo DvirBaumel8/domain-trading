@@ -142,11 +142,17 @@ export class SoldService {
 
       const venues: Venue[] = [];
       for (const v of ['afternic', 'sedo'] as const) if ((await manualDelist(trx, v)).includes(domain)) venues.push(v);
+      // v3.7.0 (CR-031 C): venues where the latest hand record says the name is listed (and the file route does not already name them)
+      const hand = await trx.selectFrom('venue_listings').select(['venue', 'delisted']).where('domain', '=', domain).orderBy('id', 'desc').execute();
+      const seenVenue = new Set<string>();
+      const handVenues: Venue[] = [];
+      for (const h of hand) { if (seenVenue.has(h.venue)) continue; seenVenue.add(h.venue); if (!h.delisted && !venues.includes(h.venue)) handVenues.push(h.venue); }
       const checklist = [
         'Remove the listing on the *other* marketplace now (double-sale risk)',
         'Do not send an auth code outside the marketplace flow',
         'Auto-renew stays off',
         ...(venues.length ? [`Remove the listing at ${venues.map((v) => (v === 'afternic' ? 'Afternic' : 'Sedo')).join(' and ')} (see X-Manual-Delist)`] : []),
+        ...(handVenues.length ? [`Remove the listing you made by hand at ${handVenues.map((v) => (v === 'afternic' ? 'Afternic' : 'Sedo')).join(' and ')}`] : []),
       ];
 
       return {

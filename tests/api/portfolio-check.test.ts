@@ -55,6 +55,11 @@ async function warnings() {
   expect(r.statusCode, r.body).toBe(200);
   return (r.json().warnings as { code: string; level: string; domain?: string; details: Record<string, any> }[]).filter((w) => ['REGISTRY_MISMATCH', 'LANDER_DOWN', 'OWNED_NAME_BLOCKLISTED'].includes(w.code));
 }
+/** v3.7.0 (CR-033 G-8): LANDER_DOWN counts from the first confirmed Afternic upload of the name. */
+const confirmedUpload = async (domain: string) => {
+  await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: [domain], export_id: `e_${domain}` }).execute();
+  await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: `e_${domain}`, domains: [domain], uploaded_at: new Date(clock.t - 3_600_000), approval_text: 'uploaded' }).execute();
+};
 const d001 = () => insertOwnedDomain(db, { domain: D001, registrar: 'godaddy', registrar_api: 'manage', expiry_date: '2027-10-04', drop_date: '2027-10-04' });
 
 describe('portfolioCheck: registry', () => {
@@ -133,6 +138,7 @@ describe('portfolioCheck: lander (web)', () => {
   it('a parking page: LANDER_DOWN warn; the next IDT day it is an error; then ok clears it', async () => {
     state.page = { status: 200, body: 'This domain is parked. Sponsored listings.', location: null };
     await verifiedLander();
+    await confirmedUpload('lander-one.com');
     await job().runOnce();
     let w = await warnings();
     expect(w).toHaveLength(1);
@@ -151,6 +157,7 @@ describe('portfolioCheck: lander (web)', () => {
   it('two fails on the same IDT day stay a warning; a network error is unknown and changes nothing', async () => {
     state.page = { status: 503, body: 'down', location: null };
     await verifiedLander();
+    await confirmedUpload('lander-one.com');
     await job().runOnce();
     clock.t += 3_600_000;
     await job().runOnce();

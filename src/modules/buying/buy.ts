@@ -11,6 +11,7 @@ import { nsPendingWarning, RegistrarError, type AccountState, type DomainInfo, t
 import { latestScreeningRun } from './buy-hold.js';
 import { latestPackFor } from '../selection/index.js';
 import { checkApproval } from '../../core/approval.js';
+import { isValidDisplayName } from '../../domain-name.js';
 import { changedColumns } from '../listing/index.js';
 import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
 import { landerNameservers, sameNsSet } from '../listing/index.js';
@@ -35,7 +36,10 @@ export interface BuyInput {
   proposedListing: ListingRequest | null; override: boolean; overrideReason: string | null;
   registrar: string | null; dryRun: boolean; /** `dry_run: "strict"`: a dry run whose first real-buy gate refusal is the answer (CR-005 N-7). */ strictDry?: boolean; autoList: boolean; requestBody: unknown;
   /** CR-030: `small_buy_exception` flag of the body. */ smallBuyException?: boolean;
+  /** v3.7.0 (CR-033 G-2): the CamelCase form for marketplaces; absent = built from the newest intake `words`. */ displayName?: string | null;
+  /** v3.7.0 (CR-033 G-9): `at_first_expiry` = no renewal planned (drop_date = expiry); default `after_one_renewal`. */ dropPolicy?: DropPolicy;
 }
+export type DropPolicy = 'after_one_renewal' | 'at_first_expiry';
 export interface BuyCtx { idempotencyKey: string; requestHash: string; auditId: string }
 export interface BuyResult { status: number; body: Record<string, unknown> }
 export interface BuyDeps {
@@ -51,6 +55,8 @@ export interface Approved {
   check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: BuyBlock | null; trancheId: string | null;
   /** CR-030: the small-buy exception is requested (flag + "small buy" in the approval line); its price and weekly checks apply and the purchase is marked. */
   smallBuy: boolean; smallBuyState: SmallBuyState | null;
+  /** v3.7.0: the display name to store (given, or built from the intake words), and the drop policy. */
+  displayName: string | null; dropPolicy: DropPolicy;
   settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
   /** Dry run only: registrar account-state findings that a real buy would refuse on (founder rule 6). */
   accountWarnings?: string[];
@@ -105,6 +111,14 @@ export class BuyService {
     const category = input.category;
     if (category === 'geo' && !input.priceGrade) throw new AppError(422, 'GEO_GRADE_REQUIRED', 'Geo names need price_grade strong or weaker');
     if (category !== 'geo' && input.priceGrade) throw new AppError(422, 'GRADE_NOT_GEO', 'price_grade is only for geo names');
+    const dropPolicy: DropPolicy = input.dropPolicy ?? 'after_one_renewal';
+    let displayName: string | null = null;
+    if (input.displayName != null) {
+      if (!isValidDisplayName(input.domain, input.displayName)) {
+        throw new AppError(422, 'DISPLAY_NAME_MISMATCH', 'display_name must be the domain with different ASCII capitalisation only');
+      }
+      displayName = input.displayName;
+    } else displayName = await this.defaultDisplayName(input.domain);
     const pricing = await currentSettings(db, now);
     const today = idtDay(now);
     let plan: ListingPlan | null = null;
@@ -112,7 +126,7 @@ export class BuyService {
       const r = validateListing(input.proposedListing, {
         category, grade: input.priceGrade, phase: 'buy', settings: pricing, highValueMinBinCents: settings.high_value_min_bin_cents,
         override: input.override, overrideReason: input.overrideReason, approvalValid: true,
-        today, dropDate: addOneYear(addOneYear(today)), // registered today + 1 y; the drop is 1 y later
+        today, dropDate: dropPolicy === 'at_first_expiry' ? addOneYear(today) : addOneYear(addOneYear(today)), // registered today + 1 y; the drop is 1 y later (none with at_first_expiry)
       });
       if (!r.ok) throw new AppError(r.status, r.code, r.message, r.details);
       plan = r.plan;
@@ -219,11 +233,20 @@ export class BuyService {
     winner = dry.winner;
 
     const approved: Approved = {
-      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, smallBuy, smallBuyState, accountWarnings,
+      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, smallBuy, smallBuyState, displayName, dropPolicy, accountWarnings,
       settings: { poc_cap_cents: settings.poc_cap_cents, max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
     if (input.dryRun) return { status: 200, body: await this.dryRunBody(approved) };
     return this.purchase(approved);
+  }
+
+  /** CR-033 G-2: "UkCbamCompliance.com" from the newest intake `words` of the name (each word capitalised); null when none or not valid. */
+  private async defaultDisplayName(domain: string): Promise<string | null> {
+    const r = await this.deps.db.selectFrom('candidate_intake').select('words').where('domain', '=', domain).where('words', 'is not', null)
+      .orderBy('received_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+    if (!r?.words || r.words.length === 0) return null;
+    const name = `${r.words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')}.com`;
+    return isValidDisplayName(domain, name) ? name : null;
   }
 
   private sleep(ms: number): Promise<void> {
@@ -326,6 +349,7 @@ export class BuyService {
         }).returning('id').executeTakeFirstOrThrow();
         await trx.insertInto('domains').values({
           domain: a.input.domain, status: 'pending_purchase', registrar: a.winner.registrar, category: a.category, price_grade: a.input.priceGrade, deal_id: a.input.dealId,
+          display_name: a.displayName,
         }).execute();
         return id;
       });
@@ -473,6 +497,17 @@ export class BuyService {
       category: a.category, dealId: a.input.dealId, checkId: a.check.checkId, auditId: a.ctx.auditId, receiptRaw: x.receiptRaw ?? null, now: new Date(this.deps.now()),
     });
     this.deps.checkService.invalidate(a.input.domain);
+    // v3.7.0 (CR-033 G-9): the same state `drop-at-first-expiry` sets (drop_date = the first expiry), here at buy time, before the schedule is built
+    let dropDate = addOneYear(expiry);
+    if (a.dropPolicy === 'at_first_expiry') {
+      try {
+        await db.updateTable('domains').set({ drop_date: expiry, updated_at: new Date() }).where('domain', '=', a.input.domain).execute();
+        dropDate = expiry;
+      } catch (e) {
+        this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'drop policy save failed');
+        warnings.push('DROP_POLICY_FAILED: the purchase is booked but drop_date was not moved to the first expiry; run drop-at-first-expiry');
+      }
+    }
 
     // Everything after bookPurchase is best-effort: the purchase is booked and must be reported as 201.
     let post: { privacy: string; auto_renew: string; lander: string; listing: unknown } = { privacy: 'unknown', auto_renew: 'unconfirmed', lander: 'skipped', listing: null };
@@ -488,7 +523,8 @@ export class BuyService {
       charged: formatUsd(x.chargedCents), charged_cents: x.chargedCents,
       renewal: formatUsd(a.winner.renewalCents!), renewal_cents: a.winner.renewalCents,
       two_year: formatUsd(a.winner.twoYearCents!), two_year_cents: a.winner.twoYearCents,
-      expiry_date: expiry, drop_date: addOneYear(expiry), renewals_used: 0,
+      expiry_date: expiry, drop_date: dropDate, renewals_used: 0,
+      display_name: a.displayName, ...this.policyFields(a.dropPolicy, a.winner.renewalCents),
     };
     try {
       const spent = await spentCents(db);
@@ -511,6 +547,22 @@ export class BuyService {
       this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'storing the purchase response failed');
     }
     return result;
+  }
+
+  private policyFields(policy: DropPolicy, renewalCents: number | null) {
+    return { drop_policy: policy, renewal_committed_cents: policy === 'at_first_expiry' ? 0 : renewalCents ?? 0, drop_policy_line: this.policyLine(policy, renewalCents) };
+  }
+
+  /** The drop policy in words (`drop_policy_line`). */
+  private policyLine(policy: DropPolicy, renewalCents: number | null): string {
+    return policy === 'at_first_expiry' ? 'Drop policy: at first expiry (no renewal).' : `Drop policy: after one renewal (${formatUsd(renewalCents ?? 0)} renewal committed).`;
+  }
+
+  /** sell_plan_line carries the policy when it is not the default (the default line stays equal to GET /pricing/preview's). */
+  private withPolicyLine(view: object, policy: DropPolicy, renewalCents: number | null): object {
+    const v = view as { sell_plan_line: string | null };
+    if (!v.sell_plan_line || policy === 'after_one_renewal') return view;
+    return { ...v, sell_plan_line: `${v.sell_plan_line} ${this.policyLine(policy, renewalCents)}` };
   }
 
   /** buy.md step 7: each failure is a warning; nothing here undoes the purchase. */
@@ -614,7 +666,7 @@ export class BuyService {
           domainId: row.id, plan, anchor: idtDay(now), dropDate: row.drop_date, settings: a.pricing, planAuditId: a.ctx.auditId, now,
         })).events;
       }));
-      post.listing = planView(plan, events);
+      post.listing = this.withPolicyLine(planView(plan, events), a.dropPolicy, a.winner.renewalCents);
     } catch (e) {
       // Post-buy never undoes or masks a booked purchase (controller ruling, step 3 Task 2 review).
       this.deps.log?.error({ errMessage: (e as Error).message }, 'post-buy listing save failed');
@@ -779,7 +831,7 @@ export class BuyService {
     const w = a.winner;
     // Same default as GET /pricing/preview with no domain: anchor today (Jerusalem), drop date 24 months later
     const anchor = idtDay(new Date(this.deps.now()));
-    const events = a.plan ? buildSchedule({ plan: a.plan, anchor, dropDate: addMonthsClamped(anchor, 24), settings: a.pricing }) : [];
+    const events = a.plan ? buildSchedule({ plan: a.plan, anchor, dropDate: addMonthsClamped(anchor, a.dropPolicy === 'at_first_expiry' ? 12 : 24), settings: a.pricing }) : [];
     // CAP-19: the latest screening pack of the name (enforced since v2.0.0: `would_be_blocked` names the first blocking gate; `advisories` is kept as before).
     const gf = await this.gateFields(a.input.domain, a.wouldBeBlocked);
     return {
@@ -792,7 +844,8 @@ export class BuyService {
       poc_remaining_after_cents: a.settings.poc_cap_cents - spent - pending - a.cost,
       domains_owned: await activeDomainCount(this.deps.db),
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
-      proposed_listing: a.plan ? planView(a.plan, events) : null, settings_version: a.pricing.version,
+      proposed_listing: a.plan ? { ...this.withPolicyLine(planView(a.plan, events), a.dropPolicy, w.renewalCents), display_name: a.displayName } : null, settings_version: a.pricing.version,
+      display_name: a.displayName, ...this.policyFields(a.dropPolicy, w.renewalCents),
       ...gf,
       ...(a.smallBuyState ? { small_buy: a.smallBuyState } : {}),
       warnings: [...a.check.warnings, ...(a.plan?.warnings ?? []), ...(a.accountWarnings ?? [])],

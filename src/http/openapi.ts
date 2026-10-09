@@ -29,6 +29,7 @@ export const SUMMARIES: Record<string, string> = {
   'POST /buy': 'Buy a name (needs Dvir\'s approval_ref and a complete screening pack); dry_run supported',
   'GET /pricing/preview': 'Preview the sell plan of a price',
   'POST /list/{domain}': 'List an owned name (mode, price, lander)',
+  'POST /listings/{domain}/venue': 'Record a listing made by hand on Afternic or Sedo (or its removal), as shown there',
   'GET /export/afternic.csv': 'Afternic full-file export',
   'GET /export/sedo.csv': 'Sedo full-file export',
   'POST /export/{venue}/uploaded': 'Confirm a marketplace file was uploaded',

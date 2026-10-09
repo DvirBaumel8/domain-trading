@@ -18,6 +18,7 @@ const RecordSchema = z.object({
   external_ref: z.string().nullable().optional(), note: z.string().nullable().optional(),
   pricing_hold: z.boolean().nullable().optional(), pricing_hold_reason: z.string().nullable().optional(),
   approval_ref: Approval,
+  dry_run: z.boolean().optional(),
 }).strict();
 
 const OutcomeSchema = z.object({ outcome: z.string(), note: z.string().nullable().optional(), approval_ref: Approval }).strict();

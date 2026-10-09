@@ -1,8 +1,8 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Kysely } from 'kysely';
-import { registerBuy } from './modules/buying/index.js';
+import { registerBuy, smallBuyView } from './modules/buying/index.js';
 import { registerPricing } from './modules/listing/index.js';
-import { registerList } from './modules/listing/index.js';
+import { registerList, registerVenue } from './modules/listing/index.js';
 import { registerOffers, registerSold, SoldService, OffersService } from './modules/selling/index.js';
 import { registerReads, registerReport } from './modules/reporting/index.js';
 import { registerSelection } from './modules/selection/index.js';
@@ -165,11 +165,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerPricing(app, { db: deps.db, now: deps.now ?? Date.now });
   const nsLookup: NsLookup = deps.nsLookup ?? ((d: string) => queryNs(d, { server: deps.config.dnsNsServer }));
   registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now: deps.now ?? Date.now }));
+  registerVenue(app, { db: deps.db, now: deps.now ?? Date.now });
   registerOffers(app, new OffersService({ db: deps.db, now: deps.now ?? Date.now }), { db: deps.db, now: deps.now ?? Date.now });
   registerReport(app, { db: deps.db, now: deps.now ?? Date.now });
   registerReads(app, { db: deps.db, now: deps.now ?? Date.now });
   registerSold(app, new SoldService({ db: deps.db, now: deps.now ?? Date.now }));
-  registerSelection(app, { db: deps.db, now: deps.now ?? Date.now, holdoutCheck: deps.holdoutCheck });
+  registerSelection(app, { db: deps.db, now: deps.now ?? Date.now, holdoutCheck: deps.holdoutCheck, smallBuy: (n) => smallBuyView(deps.db, n) });
   const screeningDeps: ScreeningDeps = {
     fetch: globalThis.fetch, sleep: deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), checkService,
     rdapLookup, dnsQuery: queryDns,

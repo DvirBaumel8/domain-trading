@@ -342,6 +342,31 @@ export interface ApiUsageTable {
   calls: Generated<number>;
 }
 
+export interface RegistrarStateChecksTable {
+  id: Generated<number>;
+  domain: string;
+  checked_at: TimestampDefault;
+  auto_renew: boolean | null;
+  privacy: boolean | null;
+  ns: string[] | null;
+}
+
+export interface VenueListingsTable {
+  id: Generated<number>;
+  domain: string;
+  venue: 'afternic' | 'sedo';
+  listed_at: Timestamp;
+  delisted: ColumnType<boolean, boolean | undefined, never>;
+  mode: string;
+  price_cents: number | null;
+  min_offer_cents: number | null;
+  evidence: ColumnType<Record<string, unknown> | null, string | null | undefined, never>;
+  note: string | null;
+  token_name: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface PortfolioChecksTable {
   id: Generated<number>;
   domain_id: number;
@@ -1026,6 +1051,8 @@ export interface Database {
   job_steps: JobStepsTable;
   api_usage: ApiUsageTable;
   portfolio_checks: PortfolioChecksTable;
+  registrar_state_checks: RegistrarStateChecksTable;
+  venue_listings: VenueListingsTable;
   drop_lists: DropListsTable;
   drop_list_rows: DropListRowsTable;
   drop_list_checks: DropListChecksTable;

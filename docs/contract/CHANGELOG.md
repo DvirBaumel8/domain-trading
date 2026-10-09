@@ -2,6 +2,19 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.7.0 (2026-10-09): CR-031 B/C, CR-033, CR-034
+MINOR, additive. Release note: `docs/releases/v3.7.0.md`.
+- **Offers:** `POST /offers` `dry_run`.
+- **Listings:** new route `POST /listings/{domain}/venue` (hand listings; `export.<venue>` fields; the `/sold` checklist).
+- **`/buy`:** `display_name` and `drop_policy` (with `renewal_committed_cents` and `drop_policy_line`).
+- **Reads:**
+  - `GET /selection/buy-hold` `small_buy`;
+  - `/portfolio/{domain}` `registrar_state`;
+  - `/report` `AUTO_RENEW_ON`, `REGISTRAR_DRIFT`, `LANDER_AWAITING_MARKETPLACE`.
+- **Jobs and health:**
+  - `nsVerifier` checks never-verified names on every tick;
+  - `/health/ping` adds `version` and `commit`.
+
 ## 3.6.0 (2026-10-09): small-buy exception (CR-030)
 MINOR, additive. `POST /buy` `small_buy_exception` with Dvir's "small buy" line skips `BUY_HOLD` for names at most $11.08 first year, within $50 a week; new 409 `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP`; dry run `small_buy`. Release note: `docs/releases/v3.6.0.md`.
 

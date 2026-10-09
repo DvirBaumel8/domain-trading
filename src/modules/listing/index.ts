@@ -1,6 +1,7 @@
 // Public entry of the listing module.
 export { registerExport } from './api/export.js';
 export { registerList } from './api/list.js';
+export { registerVenue } from './api/venue.js';
 export { registerPricing } from './api/pricing.js';
 export { changedColumns, manualDelist, pendingDomains, type Venue, VENUES } from './export-state.js';
 export { ExportService, toCsv } from './export.js';

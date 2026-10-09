@@ -1,6 +1,6 @@
 # Code map
 
-Where things live, so a change request goes straight to the right files. Paths are from the repo root. Verified against the tree at contract v3.4.1.
+Where things live, so a change request goes straight to the right files. Paths are from the repo root. Verified against the tree at contract v3.4.1; v3.7.0 additions (hand listings, registrar state, offer dry run, small-buy read, buy display name/drop policy) added by hand.
 
 ## 1. How to use this map
 
@@ -42,6 +42,7 @@ Per-domain listing plan (mode, BIN, floor, walk-away, schedule), `POST /list`, p
 | POST /list/:domain | `listing/api/list.ts` |
 | GET /pricing/preview | `listing/api/pricing.ts` |
 | GET /export/afternic.csv, GET /export/sedo.csv, POST /export/:venue/uploaded | `listing/api/export.ts` |
+| POST /listings/:domain/venue (v3.7.0, CR-031 C: a listing made by hand on afternic/sedo, or `delisted: true`; strict schema, no walk-away) | `listing/api/venue.ts` (`registerVenue`) |
 
 | File | Inside |
 |---|---|
@@ -57,7 +58,7 @@ Per-domain listing plan (mode, BIN, floor, walk-away, schedule), `POST /list`, p
 | `export-state.ts` | `pendingDomains`, `changedColumns`, `manualDelist`, `VENUES` |
 | `lander.ts` | `landerNameservers`, `sameNsSet` |
 
-Tables: `domains` (plan columns), `listing_history`, `price_schedule`, `export_runs`, `export_uploads`; reads `pricing_settings`. Tests: `tests/api/list*.test.ts`, `export*.test.ts`, `pricing-*.test.ts`, `plan-store`, `export-state`; `tests/unit/listing-v2`, `pricing-*.test.ts`, `export-rows`; fixtures `tests/fixtures/pricing-vectors.v2.json`, `.v3.json`; helpers `listing.ts`, `pricing.ts`.
+Tables: `domains` (plan columns), `listing_history`, `price_schedule`, `export_runs`, `export_uploads`, `venue_listings` (v3.7.0, append-only; `/portfolio/:domain` `export.<venue>` reads it in `reporting/report/portfolio.ts` `exportBlock`: `listed_by_hand_at`, `shown`, `pending` follows the shown BIN/min offer vs the plan); reads `pricing_settings`. Tests: `tests/api/list*.test.ts`, `export*.test.ts`, `pricing-*.test.ts`, `plan-store`, `export-state`; `tests/unit/listing-v2`, `pricing-*.test.ts`, `export-rows`; fixtures `tests/fixtures/pricing-vectors.v2.json`, `.v3.json`; helpers `listing.ts`, `pricing.ts`.
 
 ### selection
 The largest module (about 8,400 lines). Versioned selection settings, screening runs and checks, tier/lead logic, screening packs, test sets, replays, holdout suites, sellers, buy-hold steps.
@@ -85,7 +86,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `rdap-batch.ts`, `popularity.ts`, `namebio.ts`, `web-risk.ts` | RDAP pacing/cache, popularity list, NameBio, Web Risk lookup |
 | `lists.ts` | versioned signature lists (`writeList`, `currentLists`) |
 | `replay.ts`, `test-sets.ts`, `split-v2.ts`, `siblings.ts`, `sibling-methods.ts` | replays, holdout (`holdoutCheck`), test sets, sibling method `bt1@vN` |
-| `hold-steps.ts` | `buyHoldSteps` (GET /selection/buy-hold) |
+| `hold-steps.ts` | `buyHoldSteps` (GET /selection/buy-hold). The route also adds `small_buy` (v3.7.0, G-3) from `SelectionDeps.smallBuy`, composed in `src/app.ts` from `buying` `smallBuyView` (selection must not import buying) |
 | `unknowns.ts`, `money.ts`, `evidence.ts`, `domain-records.ts`, `tranche-members.ts` | unknown-input reports, EV/Ratio math, evidence rows, cached records, geo members |
 
 Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it). Tests: `tests/api/screening-*.test.ts`, `selection-*.test.ts`, `sibling-methods`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `v2-6/7/9/13/15-0`, `v3-3-0-b`, `v3-4-0`, `v3-4-1`; `tests/unit/screening-*.test.ts`, `selection`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `split-v2/v3`; helpers `screening.ts`, `screening-fixtures.ts`.
@@ -100,10 +101,10 @@ Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `sc
 
 | File | Inside |
 |---|---|
-| `buy.ts` | `BuyService` (781 lines: approval check, caps, dry run, purchase state machine, ledger/receipt writes) |
+| `buy.ts` | `BuyService` (v3.7.0: `display_name` (given, else `defaultDisplayName` from the newest `candidate_intake.words`), `drop_policy` (`at_first_expiry` sets drop_date = expiry in `complete()`), `drop_policy`/`renewal_committed_cents`/`drop_policy_line` in the dry run and the 201; ~830 lines: approval check, caps, dry run, purchase state machine, ledger/receipt writes) |
 | `buy-gates.ts` | `buyBlocks`, `packGate`, `trancheGate`, `spendCapGate`, `gateError`; block codes `BUY_HOLD`, `SCREENING_PACK_REQUIRED`, `NO_TRANCHE`, `TRANCHE_SPEND_CAP` |
 | `buy-hold.ts` | `screeningHold`, `latestScreeningRun` |
-| `small-buy.ts` | CR-030 small-buy exception to the buy hold: fixed limits `SMALL_BUY_MAX_FIRST_YEAR_CENTS` / `SMALL_BUY_WEEKLY_CAP_CENTS`, `smallBuyRequested`, `smallBuyGate`; codes `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` |
+| `small-buy.ts` | CR-030 small-buy exception to the buy hold: fixed limits `SMALL_BUY_MAX_FIRST_YEAR_CENTS` / `SMALL_BUY_WEEKLY_CAP_CENTS`, `smallBuyRequested`, `smallBuyGate`, `smallBuySpend`, `smallBuyView` (read for GET /selection/buy-hold, v3.7.0); codes `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` |
 | `tranches.ts` | `TrancheService` |
 | `budget.ts` | `spentCents`, `activeDomainCount` ($1,500 / 50 caps are applied in `buy.ts` from config) |
 | `bookkeeping.ts` | `failPurchase`, `registrarApiOf` |
@@ -139,10 +140,10 @@ Offers (record, classify, outcome), sold records, offer stats.
 
 | File | Inside |
 |---|---|
-| `offers.ts` | `OffersService`, `validateOffer`, `offerView`, `snapshotAt`, `OFFER_BANDS` |
+| `offers.ts` | `OffersService` (`record` with `dry_run: true`, v3.7.0: classify and return the view, write no row/hold/dedupe), `validateOffer`, `offerView`, `snapshotAt`, `OFFER_BANDS` |
 | `offer-rules.ts` | `classify`, `OFFER_SOURCES`, `BUYER_TYPES` (band and routing rules) |
 | `offer-stats.ts` | `perDomainOffers`, `offersByStrategy`, `reportOffers` |
-| `sold.ts` | `SoldService`, `VENUES`, `EVIDENCE_SOURCES` |
+| `sold.ts` | `SoldService` (checklist names venues the latest `venue_listings` row says are hand-listed), `VENUES`, `EVIDENCE_SOURCES` |
 
 Tables: `offers`, `sales`; writes `domains`, `price_schedule`, `ledger_entries`. Tests: `tests/api/offers`, `offer-stats`, `sold`, `schema`; `tests/unit/offer-rules`.
 
@@ -157,8 +158,8 @@ Read-only reports: `/report`, portfolio, ledger, audit, job-run views.
 | File | Inside |
 |---|---|
 | `report/index.ts` | `buildReport` (assembles sections) |
-| `report/warnings.ts` | `buildWarnings` (every `/report` warning code; `LANDER_DOWN_ERROR_DAYS`, `REVIEW_OVERDUE_HOURS`) |
-| `report/money.ts`, `portfolio.ts`, `domains.ts`, `upcoming.ts`, `pricing-review.ts`, `markdown.ts` | report sections; `ledgerRows`, `ledgerCsvRows`, `usdSigned` in `portfolio.ts` |
+| `report/warnings.ts` | `buildWarnings` (every `/report` warning code; `LANDER_DOWN_ERROR_DAYS`, `REVIEW_OVERDUE_HOURS`; v3.7.0: `LANDER_AWAITING_MARKETPLACE` until the first confirmed Afternic upload, which also starts the LANDER_DOWN clock; `AUTO_RENEW_ON`, `REGISTRAR_DRIFT` from `registrar_state_checks`) |
+| `report/money.ts`, `portfolio.ts` (`portfolioDetail` adds `registrar_state`, v3.7.0), `domains.ts`, `upcoming.ts`, `pricing-review.ts`, `markdown.ts` | report sections; `ledgerRows`, `ledgerCsvRows`, `usdSigned` in `portfolio.ts` |
 | `job-runs.ts` | `jobRunsView`, `jobsOverdue`, `dailyScheduleState`, `stepView`, `triggerFromKey` |
 
 Tables: none owned (reads all). Tests: `tests/api/report-core`, `report-warnings`, `reads`, `pricing-review`, `jobs.test.ts`, `v2-1-0-part1`, `v3-1-0`.
@@ -196,13 +197,13 @@ Jobs and queue, health, admin CLI, backup.
 | `jobs/runner.ts` | `JobRunner.plan(job)` = the step list for `tick`, `daily`, `screen`; `STEP_ATTEMPTS`, `STEP_TIMEOUT_MS`, `classify` |
 | `queue.ts` | `JobQueue` (Postgres queue: enqueue, claim, run step by step, keepalive) |
 | `job.ts` | `npm run job` CLI |
-| `jobs/price-schedule.ts`, `drop.ts`, `registrar-check.ts`, `portfolio-check.ts`, `drop-watch.ts`, `ns-verify.ts`, `cohort-outcomes.ts`, `reference-refresh.ts` | `PriceScheduleJob` (step `priceJob`), `DropJob`, `RegistrarCheckJob`, `PortfolioCheckJob`, `DropWatchJob`, `NsVerifier`, `CohortOutcomesJob`, `ReferenceRefreshJob` |
+| `jobs/price-schedule.ts`, `drop.ts`, `registrar-check.ts`, `portfolio-check.ts`, `drop-watch.ts`, `ns-verify.ts`, `cohort-outcomes.ts`, `reference-refresh.ts` | `PriceScheduleJob` (step `priceJob`), `DropJob`, `RegistrarCheckJob`, `PortfolioCheckJob`, `DropWatchJob`, `NsVerifier` (`runOnce({onlyUnverified})`: the runner calls it for never-verified names even after the day's run, v3.7.0), `CohortOutcomesJob`, `ReferenceRefreshJob`; `RegistrarCheckJob` also appends `registrar_state_checks` (auto-renew, privacy, NS of Porkbun names, read-only) |
 | `jobs/backup-export.ts`, `backup-import.ts` | `BackupExporter`, `TABLE_FILES`, `ORDER`, `migrationNames` |
 | `admin.ts`, `admin/*.ts` | admin CLI (`npm run admin`): `tokens`, `pricing-settings`, `import-domain`, `drop-date`, `resolve-purchase`, `doctor` |
 
 Daily step order (`runner.ts`): reconciler, nsVerifier, screeningResume, priceJob, dropJob, registrarCheck, portfolioCheck, dropWatch, intakeScreening, buildDailyList, cohortOutcomes, referenceRefresh, outsideReview, postsRefresh, backupExport. `tick` = first three + reviewRetry. `screen` = onDemandScreen + buildDailyList.
 
-Tables: `job_runs`, `job_steps`, `job_queue_runs`, `portfolio_checks`, `cohort_outcomes`, `drop_list_checks`, `api_tokens`, `registrar_presence`, `pricing_settings` (admin). Tests: `tests/api/jobs*.test.ts`, `job-queue`, `job-cli`, `price-job`, `drop-job`, `drop-date`, `ns-verify`, `portfolio-check`, `registrar-check`, `admin-cli`, `admin-tokens`, `import-domain`, `backup`, `health`; `tests/unit/jobs-runner-config`, `backup-coverage`.
+Tables: `job_runs`, `job_steps`, `job_queue_runs`, `portfolio_checks`, `cohort_outcomes`, `drop_list_checks`, `api_tokens`, `registrar_presence`, `registrar_state_checks` (v3.7.0, append-only, in the backup), `pricing_settings` (admin). Tests: `tests/api/jobs*.test.ts`, `job-queue`, `job-cli`, `price-job`, `drop-job`, `drop-date`, `ns-verify`, `portfolio-check`, `registrar-check`, `admin-cli`, `admin-tokens`, `import-domain`, `backup`, `health`; `tests/unit/jobs-runner-config`, `backup-coverage`.
 
 ### core (`src/core/`)
 Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
@@ -230,7 +231,7 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb`, `pingDb`, `poolConfig`), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1762600000000_v3-3-1.sql`; 29 files). Run with `npm run migrate`.
+`client.ts` (`createDb`, `pingDb`, `poolConfig`), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1762900000000_v3-7-0.sql`: `registrar_state_checks`, `venue_listings`; 32 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -266,8 +267,9 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 | Add an offer source / buyer type | `selling/offer-rules.ts` (`OFFER_SOURCES`, `BUYER_TYPES`, `classify`), `selling/offers.ts` | `unit/offer-rules`, `api/offers` |
 | Change sold evidence rules | `selling/sold.ts` (`EVIDENCE_SOURCES`, `VENUES`), `selling/api/sold.ts` | `api/sold` |
 | Add a registrar error code mapping | `registrars/porkbun.ts` (or `godaddy.ts`), `registrars/types.ts` (`RegistrarError`, `AMBIGUOUS_CODES`) | `unit/porkbun-*`, `api/check-porkbun` |
-| Add a migration | new `migrations/<epoch>_<name>.sql` (epoch above the latest); `src/db/types.ts`; for a new table: `ops/jobs/backup-export.ts` (`TABLE_FILES`) and `backup-import.ts` (`ORDER`) or `EXCLUDED` in `tests/unit/backup-coverage.test.ts`; `tests/helpers/db.ts` `TABLES`; `APPEND_ONLY_TABLES` in `scripts/evidence.ts` if append-only; the migration count in `tests/api/admin-cli.test.ts` (doctor: `migrations: 29 applied`) | `api/schema`, `append-only`, `backup`, `unit/backup-coverage`, `admin-cli` |
+| Add a migration | new `migrations/<epoch>_<name>.sql` (epoch above the latest); `src/db/types.ts`; for a new table: `ops/jobs/backup-export.ts` (`TABLE_FILES`) and `backup-import.ts` (`ORDER`) or `EXCLUDED` in `tests/unit/backup-coverage.test.ts`; `tests/helpers/db.ts` `TABLES`; `APPEND_ONLY_TABLES` in `scripts/evidence.ts` if append-only; the migration count in `tests/api/admin-cli.test.ts` (doctor: `migrations: 32 applied`) | `api/schema`, `append-only`, `backup`, `unit/backup-coverage`, `admin-cli` |
 | Add an error code | throw `new AppError(status, 'CODE', ...)` (`http/errors.ts`); add to the Code index in `docs/contract/endpoints.md` (line ~734) and the endpoint's section; add a test whose name/body asserts it; `npm run evidence` | `unit/test-evidence`, `contract/contract-doc` |
+| Add a hand-listing field (venue record) | `listing/api/venue.ts` (strict zod; never a walk-away), `venue_listings` columns via migration, `reporting/report/portfolio.ts` `exportBlock` | `api/v3-7-0` |
 | Add a route | module `api/<x>.ts` + its `register*` in the module `index.ts` and `src/app.ts`; route table row and `### METHOD /path` section in `docs/contract/endpoints.md`; `SUMMARIES` in `http/openapi.ts`; scope (READ/WRITE) in `http/auth.ts` if special | `contract/contract-doc`, a new api test |
 | Add a POST that needs an idempotency key | nothing extra: `registerIdempotency` covers all POSTs; add a replay test | `api/idempotency` |
 | Add an env var | `src/config.ts` (`EnvSchema`, `Config`), `.env.example`, `docs/runbook.md` / `DEPLOYMENT.md` if ops-visible | `unit/config`, `contract/contract-doc` |

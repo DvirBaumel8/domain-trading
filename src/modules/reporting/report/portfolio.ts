@@ -55,7 +55,20 @@ async function exportBlock(db: Kysely<Database>, domain: string, domainId: numbe
       .where('domain_id', '=', domainId).where('at', '<=', file.at).orderBy('at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
     if (h) lastUploaded = { ...pair('bin', h.bin_cents), ...pair('floor', h.floor_cents), ...pair('min_offer', h.min_offer_cents) };
   }
-  return { pending: pending.has(domain), last_confirmed_upload_at: iso(file?.uploaded_at ?? null), last_uploaded: lastUploaded };
+  // v3.7.0 (CR-031 C): a listing made by hand on the venue. The latest record decides (a delisting ends it); `pending` then follows what is shown there against the current plan.
+  const hand = await db.selectFrom('venue_listings').selectAll().where('domain', '=', domain).where('venue', '=', venue).orderBy('id', 'desc').limit(1).executeTakeFirst();
+  const handLive = hand && !hand.delisted ? hand : null;
+  let isPending = pending.has(domain);
+  if (handLive) {
+    const plan = await db.selectFrom('domains').select(['bin_cents', 'min_offer_cents']).where('id', '=', domainId).executeTakeFirstOrThrow();
+    isPending = !((handLive.price_cents === null || handLive.price_cents === plan.bin_cents) && (handLive.min_offer_cents === null || handLive.min_offer_cents === plan.min_offer_cents));
+  }
+  return {
+    pending: isPending, last_confirmed_upload_at: iso(file?.uploaded_at ?? null), last_uploaded: lastUploaded,
+    listed_by_hand_at: iso(handLive?.listed_at ?? null),
+    shown: handLive ? { mode: handLive.mode, ...pair('price', handLive.price_cents), ...pair('min_offer', handLive.min_offer_cents) } : null,
+    delisted_by_hand_at: hand?.delisted ? iso(hand.listed_at) : null,
+  };
 }
 
 export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: string) {
@@ -72,6 +85,7 @@ export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: s
   const sale = await db.selectFrom('sales').selectAll().where('domain_id', '=', d.id).orderBy('id', 'desc').limit(1).executeTakeFirst();
   const offers = await db.selectFrom('offers').select(['id', 'amount_cents', 'source', 'received_at', 'buyer_type', 'band', 'routing', 'outcome', 'note'])
     .where('domain_id', '=', d.id).orderBy('received_at', 'desc').orderBy('id', 'desc').limit(50).execute();
+  const rs = await db.selectFrom('registrar_state_checks').select(['checked_at', 'auto_renew', 'privacy', 'ns']).where('domain', '=', domain).orderBy('id', 'desc').limit(1).executeTakeFirst();
   const ex: Record<string, unknown> = {};
   for (const v of VENUES) ex[v] = await exportBlock(db, domain, d.id, v, new Set(await pendingDomains(db, v)));
   return {
@@ -92,6 +106,7 @@ export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: s
       confirmed: sale.confirmed, recorded_by: sale.recorded_by, offer_id: sale.offer_id,
     } : null,
     export: ex,
+    registrar_state: rs ? { auto_renew: rs.auto_renew, privacy: rs.privacy, ns: rs.ns, checked_at: iso(rs.checked_at) } : null,
     offers: offers.map((o) => ({ id: o.id, ...pair('amount', o.amount_cents), source: o.source, received_at: iso(o.received_at), buyer_type: o.buyer_type, band: o.band, routing: o.routing, outcome: o.outcome, note: o.note })),
   };
 }

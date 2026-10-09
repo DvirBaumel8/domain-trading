@@ -67,7 +67,7 @@ export interface JobRunnerDeps {
   db: Kysely<Database>;
   now: () => number;
   reconciler: Runnable;
-  nsVerifier: Runnable;
+  nsVerifier: Runnable & { runOnce(o?: { onlyUnverified?: boolean }): Promise<unknown> };
   priceJob: Runnable;
   dropJob: Runnable;
   registrarCheckJob: Runnable;
@@ -116,7 +116,13 @@ export class JobRunner {
     const tick: PlanStep[] = [
       step('reconciler', () => d.reconciler.runOnce()),
       step('nsVerifier', async () => {
-        if (!(await this.nsVerifyDue())) return { skipped: true, reason: 'already ran today (IDT)' };
+        if (!(await this.nsVerifyDue())) {
+          // v3.7.0 (CR-033 G-1): the daily limit applies only to re-checking verified names; a name never verified is always checked.
+          const waiting = await d.db.selectFrom('domains').select('id').where('status', 'in', ['owned', 'listed'])
+            .where('lander_ns', 'is not', null).where('ns_verified_at', 'is', null).limit(1).executeTakeFirst();
+          if (!waiting) return { skipped: true, reason: 'already ran today (IDT)' };
+          return d.nsVerifier.runOnce({ onlyUnverified: true });
+        }
         return d.nsVerifier.runOnce();
       }),
       step('screeningResume', () => d.screeningWorker.resumeStalled()),

@@ -36,6 +36,8 @@ const BuyBody = z.object({
   dry_run: z.union([z.boolean(), z.literal('strict')]).optional(),
   auto_list: z.boolean().optional(),
   small_buy_exception: z.boolean().optional(),
+  display_name: z.string().nullable().optional(),
+  drop_policy: z.enum(['after_one_renewal', 'at_first_expiry']).optional(),
 }).strict();
 
 function cents(n: number, field: string): number {
@@ -69,6 +71,8 @@ export function registerBuy(app: FastifyInstance, service: BuyService): void {
         strictDry: b.dry_run === 'strict',
         autoList: b.auto_list ?? true,
         smallBuyException: b.small_buy_exception ?? false,
+        displayName: b.display_name ?? null,
+        dropPolicy: b.drop_policy ?? 'after_one_renewal',
         requestBody: req.body,
       },
       {

@@ -119,7 +119,7 @@ describe('GET /portfolio', () => {
       bin_cents: 199500, bin: '$1,995.00', floor_cents: 129500, floor: '$1,295.00', min_offer_cents: 10000, min_offer: '$100.00',
     });
     expect(b.bin_cents).toBe(159500); // the current row differs from what is on the marketplace
-    expect(b.export.sedo).toEqual({ pending: true, last_confirmed_upload_at: null, last_uploaded: null });
+    expect(b.export.sedo).toEqual({ pending: true, last_confirmed_upload_at: null, last_uploaded: null, listed_by_hand_at: null, shown: null, delisted_by_hand_at: null });
     const ex = JSON.stringify(b.export);
     for (const s of ['walkaway', 'private', '96000', '77000', '$960', '$770']) expect(ex, s).not.toContain(s);
   });
