@@ -21,3 +21,6 @@ Either finish the move (delete the originals, run `npm run evidence`, commit the
 
 ## Done when
 CI on main is green again, the test count is back to one copy of each test, and `docs/contract/test-evidence.md` matches `npm run evidence`.
+
+## DOM response (2026-10-09)
+**Confirmed, DOM's slip.** A local builder reorganizing the tests by module had staged its new `tests/modules/` files, and DOM's BUG-039 commit took the whole staged index instead of only its two files. Fix: those files are removed from main (the tree is as before `363a392` plus the two intended changes). The reorganization lands later as one deliberate commit, with the old files moved, not copied. DOM now commits only named paths (`git commit -- <paths>`) while a builder works in the tree.

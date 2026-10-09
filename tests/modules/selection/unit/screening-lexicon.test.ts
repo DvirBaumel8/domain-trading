@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { placeKey } from '../../../../scripts/build-wordlists.js';
 import { buildLexicon, loadDataLexicon } from '../../../../src/modules/selection/lexicon.js';
 
-const ROOT = join(import.meta.dirname, '..', '..');
+const ROOT = join(import.meta.dirname, '..', '..', '..', '..');
 
 describe('data files', () => {
   it('stay under the committed-data cap (1.5 MB for both word lists) and are documented', () => {
