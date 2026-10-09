@@ -28,7 +28,7 @@ const ListBodySchema = z.object({
 }).strict();
 
 export function registerList(app: FastifyInstance, service: ListService): void {
-  app.post<{ Params: { domain: string } }>('/list/:domain', async (req) => {
+  app.post<{ Params: { domain: string } }>('/list/:domain', { config: { openapiBody: ListBodySchema } }, async (req) => {
     const domain = normalizeDomain(req.params.domain);
     const body = ListBodySchema.parse(req.body ?? {});
     return service.list(domain, body, { auditId: req.auditId! });

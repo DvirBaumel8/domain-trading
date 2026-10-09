@@ -6,7 +6,7 @@ import { addDays, dayNumber, idtDay } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
 import { TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS, lookupCached, Pacer, type CachedLookup } from '../selection/index.js';
 import { activeSelectionSettings } from '../selection/index.js';
-import { splitV2 } from '../selection/index.js';
+import { loadSplitV2, splitV2 } from '../selection/index.js';
 import type { ScreeningDeps } from '../selection/index.js';
 import type { RdapFacts } from '../../core/rdap.js';
 
@@ -15,8 +15,8 @@ export const DROP_LIST_RETENTION_DAYS = 60;
 export const DROP_WATCH_MAX_PER_RUN = 3000;
 /** A registry lookup that answered unknown is asked again on later daily runs, at most this many checks in all. */
 export const MAX_UNKNOWN_CHECKS = 5;
-/** `/report` warns DROP_FEED_STALE when the newest list is more than this many days old. */
-export const DROP_FEED_STALE_DAYS = 2;
+/** `/report` raises DROP_FEED_STALE when the newest list is more than `intake.drop_feed_stale_days` days old (v3.3.0: a setting; this is its default, it was a fixed 2 before). */
+export const DROP_FEED_STALE_DAYS = 7;
 export const PENDING_DELETE_DAYS = 5;
 export const REDEMPTION_DAYS = 35;
 export const DROP_LIST_NAME_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;
@@ -30,7 +30,7 @@ export const MAX_WORDS = 3;
 export interface FilteredName { domain: string; kept: boolean; reason: RemovedReason | null; tokens: string[] | null }
 
 /** Lower-cases and filters one uploaded name: a letters-only second-level .com of 2 or 3 words by the bt1@v2 split. */
-export function filterDropName(raw: string, seen: Set<string>): FilteredName {
+export function filterDropName(raw: string, seen: Set<string>, opts: { method?: 'bt1@v2' | 'bt1@v3'; words?: string[] } = {}): FilteredName {
   const domain = raw.trim().toLowerCase();
   const out = (reason: RemovedReason): FilteredName => ({ domain: raw, kept: false, reason, tokens: null });
   const m = /^([a-z0-9-]+)\.com$/.exec(domain);
@@ -40,7 +40,8 @@ export function filterDropName(raw: string, seen: Set<string>): FilteredName {
   const sld = m[1]!;
   if (/\d/.test(sld)) return { ...out('HAS_DIGIT'), domain };
   if (sld.includes('-')) return { ...out('HAS_HYPHEN'), domain };
-  const tokens = splitV2(sld);
+  // v3.3.0 (CR-022): intake reads a name with bt1@v3 (or the scout's own words, which replace the split); a drop list keeps bt1@v2.
+  const tokens = opts.words ?? splitV2(sld, loadSplitV2(opts.method ?? 'bt1@v2'));
   if (tokens.length === 0) return { ...out('NO_SPLIT'), domain };
   // v2.15.0 (CR-013 F-11b): a removed row keeps the split DOM used.
   if (tokens.length > MAX_WORDS) return { ...out('TOO_MANY_WORDS'), domain, tokens };

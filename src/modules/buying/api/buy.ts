@@ -45,7 +45,7 @@ function cents(n: number, field: string): number {
 }
 
 export function registerBuy(app: FastifyInstance, service: BuyService): void {
-  app.post('/buy', async (req, reply) => {
+  app.post('/buy', { config: { openapiBody: BuyBody } }, async (req, reply) => {
     const b = BuyBody.parse(req.body);
     const domain = normalizeDomain(b.domain);
     const r = await service.buy(

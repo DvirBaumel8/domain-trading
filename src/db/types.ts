@@ -286,7 +286,7 @@ export interface ExportUploadsTable {
 
 export interface JobRunsTable {
   id: Generated<number>;
-  job: 'tick' | 'daily';
+  job: 'tick' | 'daily' | 'screen';
   trigger: 'scheduled' | 'manual' | 'cli';
   scheduled_for: ColumnType<Date | null, Date | string | null, Date | string | null>;
   started_at: Timestamp;
@@ -303,10 +303,12 @@ export interface JobRunsTable {
 /** An enqueued job run (v3.0.0). Written once at enqueue; its progress lives in job_steps and its result in job_runs. */
 export interface JobQueueRunsTable {
   id: string;
-  job: 'tick' | 'daily';
+  job: 'tick' | 'daily' | 'screen';
   trigger: 'scheduled' | 'manual' | 'cli';
   scheduled_for: ColumnType<Date | null, Date | string | null | undefined, never>;
   triggered_by: ColumnType<string | null, string | null | undefined, never>;
+  /** v3.3.0: the run's request (`screen`: {max_names}); null for tick and daily. */
+  params: ColumnType<unknown, string | null | undefined, never>;
   created_at: TimestampDefault;
 }
 
@@ -316,7 +318,7 @@ export type JobStepStatus = 'queued' | 'running' | 'done' | 'failed' | 'skipped'
 export interface JobStepsTable {
   id: Generated<number>;
   run_id: string;
-  job: 'tick' | 'daily';
+  job: 'tick' | 'daily' | 'screen';
   step: string;
   position: number;
   status: Generated<JobStepStatus>;
@@ -459,6 +461,10 @@ export interface CandidateIntakeTable {
   status: 'queued' | 'duplicate' | 'removed';
   reason: string | null;
   who_chases: string | null;
+  /** v3.3.0 (CR-023 B): [{name, url}] the scout lists as firms already selling the service; null = none sent. */
+  sellers: Json | null;
+  /** v3.3.0 (CR-022 A): the scout's word pieces for the name; null = the dictionary split decided. */
+  words: ColumnType<string[] | null, string[] | null | undefined, never>;
 }
 export interface CandidateScreeningsTable {
   id: Generated<string>;
@@ -468,6 +474,8 @@ export interface CandidateScreeningsTable {
   run_id: string;
   day: DateString;
   at: TimestampDefault;
+  /** v3.3.0 (CR-021): screened by POST /candidates/screen (counts toward its own allowance, not the daily run's). */
+  on_demand: Generated<boolean>;
 }
 export interface DailyCandidateListsTable {
   id: Generated<string>;
@@ -481,7 +489,7 @@ export interface DailyCandidateListsTable {
 export interface DomainRecordsTable {
   id: Generated<string>;
   domain: string;
-  kind: 'tm_us' | 'history';
+  kind: 'tm_us' | 'history' | 'sellers';
   record: unknown;
   checked_by: string;
   checked_at: Timestamp;

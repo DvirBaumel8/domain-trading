@@ -1,4 +1,4 @@
-# Selection checks (contract v3.2.2)
+# Selection checks (contract v3.3.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -46,7 +46,7 @@ One JSON document per version (`values`). A version is immutable; a draft is mad
 | `typo` | edit distance 1, top 10000, list at most 7 days old | TYPO-1 |
 | `concentration` | per attribute 2, lane share 0.40 (`lane_share_enforced` false) | The 40% rule is report-only (ruling R2) |
 | `tranche` | size 15, main lane 10, geo max 1 (ruling R6), `required_for_buy` true; `main_lanes` (3.2.0, CR-020 D): `[{lane, require: clean_history \| demand2 \| none}]`, default `[{S7, clean_history}, {S3, demand2}]` (today's rule; `v11` unchanged); a draft may change it or set `min_main_lane` 0, activated by Dvir's line | Tranche rules (`GET /tranches`: geo cap on every addition, main-lane quota at close; a real `/buy` needs an active member of the open tranche since 2.0.0: 409 `NO_TRANCHE`, and the optional spend cap as 409 `TRANCHE_SPEND_CAP`; `required_for_buy` itself is not read) |
-| `intake` | `drop_list_max_share` 1.0 (3.2.0, CR-020 A; absent = default) | The most of the 30-a-day screening budget drop-list names may take after scout names; 1.0 = no extra limit |
+| `intake` | `drop_list_max_share` 1.0 (3.2.0, CR-020 A; absent = default); `on_demand_screen_daily_max` 30 (3.3.0, CR-021); `drop_feed_stale_days` 7 and `drop_feed_stale_level` `info` (3.3.0, CR-023 G) | The most of the 30-a-day screening budget drop-list names may take after scout names (1.0 = no extra limit); the on-demand screening allowance (`POST /candidates/screen`); when and how loudly `DROP_FEED_STALE` shows |
 | `surbl` | zone `multi.surbl.org`, control `test.surbl.org`, blocked answers `["127.0.0.1"]`, bit names, `ns_override`, 3000 ms | SURBL lookup |
 | `history` | per-name fetch cap 6, 1000 ms between calls, 20 s timeout, 2 retries, 200 chars of text, parked/for-sale placeholder up to 1500 characters (`parked_max_text_chars`), `url_terms` (words that flag an archived URL); actions strong FAIL, weak FLAG, redirect FLAG, for-sale PASS, parked PASS | CAP-07; parked and for-sale prior pages are positive |
 | `census` | 20 siblings, at most 25% unknown, as-of exact for 365 days | CAP-10; `sibling_count` is also the size of a census list |
@@ -97,6 +97,18 @@ Fail classes: `adult` -> adult; `malware`, `phishing` -> malware_phishing; `scam
 ## Tier (CAP-24) and DEMAND-2
 
 `tier.order` lists the tiers in evaluation order (`A`, `I`, `B`, `G`). `tier.clauses.<tier>` is `{"all": [cond, ...]}` or `{"any": [cond, ...]}`; a condition is `{"f": <feature>, "op": ">="|"<="|">"|"<"|"=="|"!=", "v": <number or "$threshold">}` or `{"tier": <earlier tier>}` (that tier's result). Features: `registered_share`, `prior_history`, `alt_tld_before_n`, `n_words`, `sld_chars`, `is_geo`, `gform1_pass`, `short`.
+
+**3.3.0 (CR-023 A–D, capability only; the active settings don't change):**
+- **New features:**
+  - `lane` (the intake lane, or the kept lane a drop-list name fits; unknown → the clause is `unknown`), read only with `"op": "in"` and a list of lanes (S2, S3, S4, S6, S7);
+  - `sellers_verified_n` (see below; 0 without a list).
+- **Per-lane thresholds:** a threshold may be a per-lane map (for example `lane_sellers_min: {"S3": 5, "S4": 2, "S6": 3}`), and `"$lane_sellers_min"` resolves to the name's lane; a lane missing from the map makes the clause false.
+- **Tier `L`** may appear in `order`, `clauses`, `demand2_pass_tiers` and `p_passive`, and is priced like any tier.
+- **The `p_passive` lock:** it still holds for existing entries. A draft may only **add** the entry of a tier that neither the base nor the active version has.
+- **Sellers:** the newest of the intake `sellers` list and a `sellers` record (`freshness_hours.sellers`, default 720; older → `sellers_verified_n` null, `SELLERS_STALE`). A drop-list name uses records only. Pages are fetched only when a tier clause reads `sellers_verified_n`, through the outbound guard of `same_name` (public addresses only, robots.txt, paced; a redirect to another host is not followed, `REDIRECT_OFF_SITE`).
+  - **Verified:** an entry is verified when its page answers 2xx and is not parked or for sale (`PARKED_OR_FOR_SALE`). One registrable domain counts once (`DUPLICATE_DOMAIN`).
+  - **Shown on the check:** the `tier` check shows `fields.sellers {source, list_at, verified_n, reason_code?, entries: [{name, url, verified, reason}]}`.
+- **Replays** of rows without a lane read them as S2 (geo) or S7, with 0 sellers.
 
 Three-valued: a condition on a missing (null) feature is `unknown`. `all` is false if any condition is false, else unknown if any is unknown, else true. `any` is true if any is true, else unknown if any is unknown, else false. The result `tier` is the first clause in `order` that is true (`none` if none is). `tier_exact` is false when an earlier clause was `unknown` (a later tier decided, but the earlier one could still have applied). `demand2` is `PASS` if any tier in `demand2_pass_tiers` is true, `UNKNOWN` if none is true but one is unknown, else `FAIL`. `fired` is the tier that was chosen. A missing input is never a pass.
 

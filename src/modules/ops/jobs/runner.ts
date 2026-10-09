@@ -12,7 +12,8 @@ export interface StepResult {
   summary: unknown;
 }
 
-export type JobKind = 'tick' | 'daily';
+/** `screen` (v3.3.0, CR-021): one on-demand screening of the waiting intake names, then a rebuild of the day's list. */
+export type JobKind = 'tick' | 'daily' | 'screen';
 
 /** One step of a job: what the queue stores (limits) and runs (exec). `exec` returns the step's summary and throws on failure. */
 export interface PlanStep {
@@ -30,7 +31,7 @@ export const STEP_ATTEMPTS: Record<string, number> = {
   registrarCheck: 3, portfolioCheck: 3, dropWatch: 3, referenceRefresh: 3, postsRefresh: 3, outsideReview: 1, reviewRetry: 1,
 };
 export const DEFAULT_TIMEOUT_MS = 5 * 60_000;
-export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, buildDailyList: 10 * 60_000 };
+export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000 };
 
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
 
@@ -43,6 +44,8 @@ export interface RunOptions {
   scheduledFor?: Date | null;
   /** The WRITE token's name for a manual run started through the API (CR-007 T-2); omitted for the job token, the Worker and the CLI. */
   triggeredBy?: string | null;
+  /** The run's request, stored with the run (`screen`: {max_names}). */
+  params?: unknown;
 }
 
 export interface JobRunResult {
@@ -73,9 +76,9 @@ export interface JobRunnerDeps {
   /** Daily registry check of the kept names of the uploaded drop lists (CR-007 §22 G-2); while undefined, that step reports skipped. */
   dropWatchJob?: Runnable;
   /** Screens the queued scout names and the drop-list names about to drop in one full-plan run (CR-012 part C); while undefined, that step reports skipped. */
-  intakeScreeningJob?: Runnable;
+  intakeScreeningJob?: Runnable & { runOnDemand?: (maxNames: number | null) => Promise<unknown> };
   /** Builds the day's candidate list after the intake run has finished (CR-012 part B); while undefined, that step reports skipped. */
-  buildDailyListJob?: Runnable;
+  buildDailyListJob?: Runnable & { runOnce(o?: { builtBy?: 'daily' | 'rebuild' | 'auto' }): Promise<unknown> };
   /** Freezes cohorts and checks their drop and re-registration outcomes (CR-007 §22 G-1); while undefined, that step reports skipped. */
   cohortOutcomesJob?: Runnable;
   /** Resumes stalled screening runs (CAP-20); its summary is {resumed[], finalized[]}. */
@@ -101,7 +104,7 @@ export class JobRunner {
   constructor(private readonly deps: JobRunnerDeps) {}
 
   /** The steps of `job` in run order, each with its attempts and timeout. */
-  plan(job: JobKind): PlanStep[] {
+  plan(job: JobKind, run?: { params?: unknown }): PlanStep[] {
     const d = this.deps;
     const step = (name: string, exec: () => Promise<unknown>, errorsFail = false): PlanStep => ({
       name, exec, errorsFail, maxAttempts: STEP_ATTEMPTS[name] ?? DEFAULT_ATTEMPTS, timeoutMs: STEP_TIMEOUT_MS[name] ?? DEFAULT_TIMEOUT_MS,
@@ -118,6 +121,14 @@ export class JobRunner {
       }),
       step('screeningResume', () => d.screeningWorker.resumeStalled()),
     ];
+    // v3.3.0 (CR-021): POST /candidates/screen. Screening of the waiting names under the on-demand allowance, then the list; nothing else of the daily run.
+    if (job === 'screen') {
+      const maxNames = (run?.params as { max_names?: unknown } | null | undefined)?.max_names;
+      return [
+        step('onDemandScreen', async () => (d.intakeScreeningJob?.runOnDemand ? d.intakeScreeningJob.runOnDemand(typeof maxNames === 'number' ? maxNames : null) : { skipped: true, reason: 'intake screening not configured' })),
+        step('buildDailyList', async () => (d.buildDailyListJob ? d.buildDailyListJob.runOnce({ builtBy: 'auto' }) : { skipped: true, reason: 'daily list not configured' })),
+      ];
+    }
     if (job === 'tick') return [...tick, optionalFn('reviewRetry', d.reviewRetry, 'review retry not configured')];
     // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.
     return [
@@ -166,7 +177,7 @@ export class JobRunner {
 
   async run(job: JobKind, opts: RunOptions = {}): Promise<JobRunResult> {
     const started = new Date(this.deps.now());
-    const key: LockKey = job === 'tick' ? 'job:tick' : 'job:daily';
+    const key: LockKey = job === 'tick' ? 'job:tick' : job === 'screen' ? 'job:screen' : 'job:daily';
     const lock = await (this.deps.acquireLock ? this.deps.acquireLock(key) : trySessionLock(this.deps.db, key));
     if (!lock) {
       const skipped: JobRunResult = { job, skipped: true, steps: {} };

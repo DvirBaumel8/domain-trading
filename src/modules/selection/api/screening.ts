@@ -61,7 +61,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
   const { db, worker } = deps;
   const now = () => new Date(deps.now());
 
-  app.post('/screening/runs', async (req, reply) => {
+  app.post('/screening/runs', { config: { openapiBody: RunBody } }, async (req, reply) => {
     const body = RunBody.parse(req.body ?? {});
     const run = await createRun(db, body, { createdBy: req.auth!.name, auditId: req.auditId!, now: now() }, worker.checks);
     worker.kick(run.id);
@@ -128,7 +128,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     return { id: run.id, status: 'cancelled' as const, cancelled_at: done.cancelled_at.toISOString(), cancelled_by: req.auth!.name };
   });
 
-  app.post<{ Params: { id: string } }>('/screening/runs/:id/manual', async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/screening/runs/:id/manual', { config: { openapiBody: ManualBody } }, async (req, reply) => {
     const body = ManualBody.parse(req.body ?? {});
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', req.params.id).executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${req.params.id}"`);
@@ -231,7 +231,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     return reply.code(201).send({ domain: item.domain, ...resultJson(toResultRow(row)), recorded_by: req.auth!.name, recompute });
   });
 
-  app.post<{ Params: { id: string } }>('/screening/runs/:id/verdicts', async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/screening/runs/:id/verdicts', { config: { openapiBody: VerdictBody } }, async (req, reply) => {
     const body = VerdictBody.parse(req.body ?? {});
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', req.params.id).executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${req.params.id}"`);
@@ -275,7 +275,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     return { id: e.id, source: e.source, url: e.url, retrieved_at: e.retrieved_at.toISOString(), http_status: e.http_status, sha256: e.sha256, truncated: e.truncated, text: e.text };
   });
 
-  app.post('/quotes/manual', async (req, reply) => {
+  app.post('/quotes/manual', { config: { openapiBody: QuoteBody } }, async (req, reply) => {
     const b = QuoteBody.parse(req.body ?? {});
     const domain = normalizeDomain(b.domain);
     const registrar = b.registrar.toLowerCase();

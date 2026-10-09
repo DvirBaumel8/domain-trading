@@ -2,6 +2,18 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.3.0 (2026-10-09): CR-021, CR-022, CR-023
+MINOR, additive. Release note: `docs/releases/v3.3.0.md`.
+- **On-demand screening (CR-021):** `POST /candidates/screen`, with its own allowance `intake.on_demand_screen_daily_max` (30), job `screen`, and 409 `ON_DEMAND_SCREEN_CAP` / `ALREADY_RUNNING`.
+- **Intake (CR-022):**
+  - `words` on intake;
+  - intake word rules on `bt1@v3`;
+  - `POST /posts/schema-check` takes a real post body (`checked`).
+- **Tier capability (CR-023 A–D):** tier inputs `lane` (`op: in`) and `sellers_verified_n`; `sellers` on intake and as a record kind; per-lane thresholds; tier `L`; adding a new tier's `p_passive` in a draft. The active settings are unchanged.
+- **Daily list (CR-023 E):** `summary.screening_run_id(s)`, `rejected`, `failed_by_check_lane`, and per-lane counts in `why`; rows add `words`, `split_source`, `sellers`, `sellers_verified_n`.
+- **API description (CR-023 F):** `GET /openapi.json`.
+- **Quieter drop feed (CR-023 G):** `DROP_FEED_STALE` is `info` after 7 days by default (settings `drop_feed_stale_days`, `drop_feed_stale_level`).
+
 ## 3.2.2 (2026-10-09): the Buffer input from Buffer's live schema
 PATCH, a fix back to the contract (posting). `createPost` sends `mode: shareNow`, `schedulingType: automatic`, `needsApproval: false`, always an `assets` list, and the image alt text under `image.metadata.altText`, as Buffer's live schema requires. `types` on `POST /posts/schema-check` follows only X's metadata. Release note: `docs/releases/v3.2.2.md`.
 

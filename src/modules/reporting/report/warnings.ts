@@ -6,7 +6,8 @@ import { computePlan } from '../../listing/index.js';
 import { settingsByVersion } from '../../listing/index.js';
 import { manualDelist, pendingDomains, VENUES } from '../../listing/index.js';
 import { dailyScheduleState, JOBS_OVERDUE_HOURS, JOB_RUN_STUCK_HOURS, jobsOverdue } from '../job-runs.js';
-import { DROP_FEED_STALE_DAYS, daysBetween } from '../../candidates/index.js';
+import { daysBetween } from '../../candidates/index.js';
+import { activeSelectionSettings } from '../../selection/index.js';
 import { priceValues } from './money.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
@@ -83,12 +84,14 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     }
   }
 
-  // drop lists (CR-007 §22 G-2): once any list exists, the newest one must not be more than DROP_FEED_STALE_DAYS old
+  // drop lists (CR-007 §22 G-2, v3.3.0 CR-023 G): once any list exists, the newest one must not be more than intake.drop_feed_stale_days old (default 7); the level is
+  // intake.drop_feed_stale_level (default info: it never counts as a warning). days 2 and level warn restore the old behaviour.
   const newest = await sql<{ d: string | null }>`select max(list_date)::text as d from drop_lists`.execute(db);
   const newestDate = newest.rows[0]?.d ?? null;
-  if (newestDate !== null && daysBetween(newestDate, today) > DROP_FEED_STALE_DAYS) {
+  const feed = (await activeSelectionSettings(db)).values.intake;
+  if (newestDate !== null && daysBetween(newestDate, today) > feed.drop_feed_stale_days) {
     const list = await db.selectFrom('drop_lists').select('name').where('list_date', '=', newestDate).orderBy('created_at', 'desc').limit(1).executeTakeFirst();
-    add('DROP_FEED_STALE', 'warn', `The newest drop list is from ${newestDate}; upload today's list.`, undefined, { newest_list: list?.name ?? null, newest_list_date: newestDate });
+    add('DROP_FEED_STALE', feed.drop_feed_stale_level, `The newest drop list is from ${newestDate}; upload today's list.`, undefined, { newest_list: list?.name ?? null, newest_list_date: newestDate });
   }
 
   // sales

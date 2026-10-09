@@ -27,7 +27,7 @@ const MESSAGE_ID = /^<[^<>\s@]+@[^<>\s@]+>$/;
 const cents = (n: number) => usdStringToCents(String(n));
 
 export function registerSold(app: FastifyInstance, service: SoldService): void {
-  app.post<{ Params: { domain: string } }>('/sold/:domain', async (req) => {
+  app.post<{ Params: { domain: string } }>('/sold/:domain', { config: { openapiBody: SoldSchema } }, async (req) => {
     const domain = normalizeDomain(req.params.domain);
     const b = SoldSchema.parse(req.body ?? {});
     if (!b.approval_ref && (!b.transaction_ref || !b.evidence)) {

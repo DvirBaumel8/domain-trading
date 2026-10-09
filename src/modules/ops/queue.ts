@@ -67,6 +67,7 @@ export class JobQueue {
       const runId = `run_${randomUUID()}`;
       await trx.insertInto('job_queue_runs').values({
         id: runId, job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, triggered_by: triggeredByOf(opts), created_at: new Date(this.deps.now()),
+        params: opts.params === undefined ? null : JSON.stringify(opts.params),
       }).execute();
       const plan = this.deps.runner.plan(job);
       await trx.insertInto('job_steps').values(plan.map((e, position) => ({
@@ -151,7 +152,8 @@ export class JobQueue {
     try {
       // With the job lock held, no other process runs a step of this job: a step still `running` was left by a dead process (or an expired lock).
       await this.reclaim(runId);
-      const plan = this.deps.runner.plan(job);
+      const q = await db.selectFrom('job_queue_runs').select('params').where('id', '=', runId).executeTakeFirst();
+      const plan = this.deps.runner.plan(job, { params: q?.params });
       while (!this.stopped) {
         const step = await this.claim(runId);
         if (!step) break;

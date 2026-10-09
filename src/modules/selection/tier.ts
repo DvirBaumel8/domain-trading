@@ -7,8 +7,12 @@ export type Tri = 'true' | 'false' | 'unknown';
 export interface TierFeatures {
   registered_share: number | null; prior_history: 0 | 1 | null; alt_tld_before_n: number | null; n_words: number | null;
   sld_chars: number | null; is_geo: 0 | 1; gform1_pass: 0 | 1 | null; short: 0 | 1 | null;
+  /** v3.3.0 (CR-023 A): the name's lane (intake lane, or the lane a drop-list name fit); null = unknown. */
+  lane?: string | null;
+  /** v3.3.0 (CR-023 B): how many of the name's listed sellers are verified (0 = no list); null = unknown (e.g. a stale record). */
+  sellers_verified_n?: number | null;
 }
-type TierName = 'A' | 'I' | 'B' | 'G';
+type TierName = 'A' | 'I' | 'B' | 'G' | 'L';
 export interface TierResult {
   tier: TierName | 'none';
   /** False when an earlier tier in the order was `unknown`: a later tier decided, but the earlier one could still have applied. */
@@ -34,27 +38,48 @@ export function cmp(op: string, a: number, b: number): boolean {
   }
 }
 
-/** A condition's comparison value: the number itself, or the named threshold for a "$name" string (undefined when the threshold is missing). */
-export const condValue = (v: string | number, thresholds: Record<string, number>): number | undefined => (typeof v === 'string' ? thresholds[v.slice(1)] : v);
+export type Thresholds = SelectionValuesT['thresholds'];
 
-function evalCond(c: Cond, f: TierFeatures, done: Record<string, Tri>, thresholds: Record<string, number>): Tri {
+/**
+ * A condition's comparison value: the number itself, or the named threshold for a "$name" string.
+ * `undefined` = unknown (the threshold is missing, or it is a per-lane map and the lane is unknown); `null` = the name's lane is not in the per-lane map (the condition is false, CR-023 C).
+ */
+export const condValue = (v: string | number, thresholds: Thresholds, lane: string | null = null): number | null | undefined => {
+  if (typeof v !== 'string') return v;
+  const t = thresholds[v.slice(1)];
+  if (t === undefined || typeof t === 'number') return t;
+  if (lane === null) return undefined;
+  return (t as Record<string, number | undefined>)[lane] ?? null;
+};
+
+/** One condition against one feature value: `in` with a list, else a comparison (a lane, a string, can only be tested with `in`). */
+export function condHolds(c: Extract<Cond, { f: string }>, x: number | string, thresholds: Thresholds, lane: string | null): boolean | undefined {
+  if (c.op === 'in') return (c.v as (string | number)[]).includes(x);
+  if (typeof x !== 'number') return false;
+  const v = condValue(c.v, thresholds, lane);
+  if (v === undefined) return undefined;
+  return v === null ? false : cmp(c.op, x, v);
+}
+
+function evalCond(c: Cond, f: TierFeatures, done: Record<string, Tri>, thresholds: Thresholds): Tri {
   if ('tier' in c) return done[c.tier] ?? 'unknown';
-  const x = (f as unknown as Record<string, number | null>)[c.f];
+  const x = (f as unknown as Record<string, number | string | null>)[c.f];
+  // A lane that is not in the per-lane map makes the condition false, whatever the feature is (never a pass, never unknown).
+  if (c.op !== 'in' && typeof c.v === 'string' && f.lane != null && condValue(c.v, thresholds, f.lane) === null) return 'false';
   if (x === null || x === undefined) return 'unknown';
-  const v = condValue(c.v, thresholds);
-  if (v === undefined) return 'unknown';
-  return cmp(c.op, x, v) ? 'true' : 'false';
+  const r = condHolds(c, x, thresholds, f.lane ?? null);
+  return r === undefined ? 'unknown' : r ? 'true' : 'false';
 }
 
 /** all: false if any false, else unknown if any unknown, else true. any: true if any true, else unknown if any unknown, else false. */
-function evalClause(clause: Clause, f: TierFeatures, done: Record<string, Tri>, thresholds: Record<string, number>): Tri {
+function evalClause(clause: Clause, f: TierFeatures, done: Record<string, Tri>, thresholds: Thresholds): Tri {
   const isAll = 'all' in clause;
   const rs = (isAll ? clause.all : clause.any).map((c) => evalCond(c, f, done, thresholds));
   if (isAll) return rs.includes('false') ? 'false' : rs.includes('unknown') ? 'unknown' : 'true';
   return rs.includes('true') ? 'true' : rs.includes('unknown') ? 'unknown' : 'false';
 }
 
-export function evaluateTier(f: TierFeatures, t: SelectionValuesT['tier'], thresholds: Record<string, number>): TierResult {
+export function evaluateTier(f: TierFeatures, t: SelectionValuesT['tier'], thresholds: Thresholds): TierResult {
   const clauses: Record<string, Tri> = {};
   for (const name of t.order) {
     const clause = t.clauses[name];

@@ -19,7 +19,7 @@ const summary = (r: PackRow) => ({
 
 export function registerPacks(app: FastifyInstance, deps: PackApiDeps): void {
   const { db } = deps;
-  app.post('/screening/packs', async (req, reply) => {
+  app.post('/screening/packs', { config: { openapiBody: Body } }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
     let domain: string;
     try { domain = normalizeDomain(b.domain); } catch { throw new AppError(422, 'DOMAIN_INVALID', `"${b.domain}" is not a valid domain`); }

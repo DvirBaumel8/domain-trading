@@ -11,7 +11,7 @@ import { jobRunsView, triggerFromKey } from '../../reporting/index.js';
 const Body = z.object({ job: z.enum(['tick', 'daily']) }).strict();
 const PreviewBody = z.object({ today: z.string().optional() }).strict();
 const RunsQuery = z.object({
-  job: z.enum(['tick', 'daily']).optional(),
+  job: z.enum(['tick', 'daily', 'screen']).optional(),
   since: z.string().optional(),
   limit: z.string().regex(/^\d{1,4}$/).optional(),
 }).strict();
@@ -41,7 +41,7 @@ function previewDay(v: string, today: string): string {
  * GET /jobs/runs (READ): the recorded runs. POST /jobs/preview (WRITE): the price and drop jobs as a dry run for a chosen day.
  */
 export function registerJobs(app: FastifyInstance, queue: JobQueue, deps: JobsDeps): void {
-  app.post('/jobs/run', async (req, reply) => {
+  app.post('/jobs/run', { config: { openapiBody: Body } }, async (req, reply) => {
     const { job } = Body.parse(req.body);
     const key = req.headers['idempotency-key'];
     // A WRITE token's run is always `manual` (whatever its key looks like) and records the token's name; the job token keeps the key rule.
@@ -66,7 +66,7 @@ export function registerJobs(app: FastifyInstance, queue: JobQueue, deps: JobsDe
     return jobRunsView(deps.db, deps.config, deps.now(), { job: q.job, since: q.since ? new Date(q.since) : undefined, limit });
   });
 
-  app.post('/jobs/preview', async (req) => {
+  app.post('/jobs/preview', { config: { openapiBody: PreviewBody } }, async (req) => {
     const b = PreviewBody.parse(req.body ?? {});
     const real = idtDay(new Date(deps.now()));
     const today = b.today === undefined ? real : previewDay(b.today, real);

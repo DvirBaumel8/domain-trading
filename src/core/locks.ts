@@ -9,7 +9,7 @@ type Conn = Kysely<any> | Transaction<any>; // eslint-disable-line @typescript-e
 /** The registry of lock keys. Parameterised keys carry their parameter after the colon. */
 export type LockKey =
   | 'posts_cap' | 'intake_screening' | 'daily_rebuild' | 'holdout_suites' | 'test_sets_seal' | 'company_document' | 'selection_settings_activate'
-  | 'job:tick' | 'job:daily' | 'job_enqueue' | 'review_run'
+  | 'job:tick' | 'job:daily' | 'job:screen' | 'job_enqueue' | 'review_run'
   | `job:${'price' | 'drop' | 'ns-verify' | 'registrar-check' | 'portfolio-check' | 'drop-watch' | 'cohort-outcomes' | 'reference-refresh'}`
   | `selection_list:${string}` | `pack:${string}` | `domain:${string}`;
 

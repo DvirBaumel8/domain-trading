@@ -34,7 +34,7 @@ export const priceCheck: Check = {
       return outcome('UNKNOWN', 'STALE_DATA', 'The quote is older than quote.max_age_hours (manual: quote.manual_max_age_days)', { bin_cents: bin, quoted_at: q.fields.quoted_at ?? null });
     }
     const tierRow = ctx.latest('tier');
-    const tier = (tierRow && tierRow.fields.tier ? (tierRow.fields.tier as string) : 'none') as 'A' | 'I' | 'B' | 'G' | 'none';
+    const tier = (tierRow && tierRow.fields.tier ? (tierRow.fields.tier as string) : 'none') as 'A' | 'I' | 'B' | 'G' | 'L' | 'none';
     const nb = ctx.latest('namebio');
     const nbf = nb && OK.includes(nb.status) ? nb.fields : null;
     const f = formFieldsOf(ctx);

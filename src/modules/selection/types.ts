@@ -25,6 +25,8 @@ export interface RunItem {
   bin_usd?: number;
   leads_ab: number;
   census_list?: string;
+  /** v3.3.0 (CR-022 A): the scout's word pieces (they join to the SLD); the census sibling split uses them instead of the dictionary split. */
+  words?: string[];
   /** ISO time. Live mode: the request time (CR-002 Amendment A2). Full mode: as sent, else absent. Dated inputs use strict `< as_of`. */
   as_of?: string;
   rank?: number;

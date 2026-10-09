@@ -54,7 +54,7 @@ export function registerExport(app: FastifyInstance, service: ExportService): vo
     return send(reply, r);
   });
 
-  app.post<{ Params: { venue: string } }>('/export/:venue/uploaded', async (req) => {
+  app.post<{ Params: { venue: string } }>('/export/:venue/uploaded', { config: { openapiBody: BodySchema } }, async (req) => {
     const venue = VENUES.find((v) => v === req.params.venue) as Venue | undefined;
     if (!venue) throw new AppError(404, 'NOT_FOUND', 'Unknown venue');
     const body = BodySchema.parse(req.body ?? {});

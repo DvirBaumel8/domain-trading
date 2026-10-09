@@ -32,6 +32,8 @@ export const AVAILABILITY_RETRY_GAP_MS = 30_000;
 export interface InputName {
   domain: string; lane: Lane; city?: string; state?: string; trade?: string; price_grade?: 'strong' | 'weaker';
   bin_usd?: number; leads_ab?: number; census_list?: string; as_of?: string; rank?: number;
+  /** v3.3.0 (CR-022 A): the scout's word pieces; the census sibling split of the name uses them instead of the dictionary split. */
+  words?: string[];
 }
 export interface RunBody { mode: 'live' | 'full'; settings?: string; tranche_id?: string; checks?: CheckId[]; names: InputName[] }
 export interface CreatedRun { id: string; status: 'running'; mode: 'live' | 'full'; backtest: boolean; settings_version: string; buy_hold: boolean; names_n: number }
@@ -144,7 +146,7 @@ export async function createRun(
       idx, domain: n.domain.trim().toLowerCase(), lane: n.lane, leads_ab: n.leads_ab ?? 0,
       ...(n.city !== undefined && { city: n.city }), ...(n.state !== undefined && { state: n.state }), ...(n.trade !== undefined && { trade: n.trade }),
       ...(n.price_grade !== undefined && { price_grade: n.price_grade }), ...(n.bin_usd !== undefined && { bin_usd: n.bin_usd }),
-      ...(n.census_list !== undefined && { census_list: n.census_list }), ...(n.rank !== undefined && { rank: n.rank }),
+      ...(n.census_list !== undefined && { census_list: n.census_list }), ...(n.rank !== undefined && { rank: n.rank }), ...(n.words !== undefined && { words: n.words }),
       ...(body.mode === 'live' ? { as_of: asOfNow } : n.as_of !== undefined ? { as_of: n.as_of } : {}),
     };
     try {

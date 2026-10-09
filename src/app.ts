@@ -50,6 +50,7 @@ import { IntakeScreeningJob } from './modules/candidates/index.js';
 import { autoRebuildDailyList, BuildDailyListJob } from './modules/candidates/index.js';
 import { JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
 import { Reconciler } from './modules/buying/index.js';
+import { collectOpenApiRoutes, registerOpenApi } from './http/openapi.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -122,6 +123,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     for (const method of [r.method].flat()) routeTable.push({ method, url: r.url });
   });
 
+  const openApiRoutes = collectOpenApiRoutes(app); // v3.3.0 (CR-023 F): before any route is registered
   registerErrorHandling(app);
   // BUG-2 (CR-005): every response timestamp uses the Asia/Jerusalem offset, except the documented UTC fields.
   const UTC_FIELDS: Record<string, ReadonlySet<string>> = {
@@ -189,7 +191,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerTestSets(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
-  registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
+  registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker, queue: () => app.jobQueue });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
   const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey, ...(deps.sleep ? { sleep: deps.sleep } : {}) };
   registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });
@@ -228,6 +230,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // Closing the app waits for the step in flight, so nothing touches the database after it is closed. Unfinished runs resume at start (main.ts) or on the next GET.
   app.addHook('onClose', async () => app.jobQueue.stop());
   registerJobs(app, app.jobQueue, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
+  registerOpenApi(app, openApiRoutes, deps.config.version);
   deps.registerExtraRoutes?.(app);
   return app;
 }

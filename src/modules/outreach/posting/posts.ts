@@ -10,7 +10,7 @@ import { AppError } from '../../../http/errors.js';
 import { toJerusalemIso } from '../../../core/dates.js';
 import { checkText, type BlockCategory } from '../blocklist.js';
 import { idtDay, nextIdtMidnight } from '../../../core/dates.js';
-import { BufferClient, BufferError, type BufferPart, type SchemaCheck } from './buffer.js';
+import { BufferClient, BufferError, buildCreateInput, type BufferPart, type SchemaCheck } from './buffer.js';
 import { inspectImage, MAX_ALT_CHARS, MAX_IMAGES_PER_PART, type ImageReason, type InspectedImage } from './images.js';
 import { X_LIMIT, xWeightedLength } from './x-length.js';
 
@@ -228,11 +228,20 @@ export async function createPost(
   };
 }
 
+/** v3.3.0 (CR-022 F-2): the createPost input DOM would build for this post body, with placeholder /media URLs for the images (nothing is stored, nothing is published). */
+export function schemaCheckInput(deps: Pick<PostingDeps, 'publicBaseUrl'>, v: Validation): Record<string, unknown> {
+  const placeholder = `${deps.publicBaseUrl}/media/${'0'.repeat(32)}`;
+  const parts: BufferPart[] = v.texts.map((text, i) => ({
+    text, images: v.prepared.filter((p) => p.part === i + 1).sort((a, b) => a.position - b.position).map((p) => ({ url: placeholder, altText: p.alt })),
+  }));
+  return buildCreateInput('schema-check-sample', parts[0]!, parts.slice(1));
+}
+
 /** POST /posts/schema-check: 503 POSTING_NOT_CONFIGURED without a Buffer key; otherwise the (read-only) introspection result for the sample post. */
-export async function postSchemaCheck(deps: Pick<PostingDeps, 'buffer'>): Promise<SchemaCheck> {
+export async function postSchemaCheck(deps: Pick<PostingDeps, 'buffer'>, input?: Record<string, unknown>): Promise<SchemaCheck> {
   if (!deps.buffer) throw new AppError(503, 'POSTING_NOT_CONFIGURED', 'Posting is not configured on this server (no Buffer key)');
   try {
-    return await deps.buffer.checkSchema();
+    return await deps.buffer.checkSchema(input);
   } catch (e) {
     if (!(e instanceof BufferError)) throw e;
     throw new AppError(502, 'POST_FAILED', 'Buffer\'s API could not be asked for its type definitions', {

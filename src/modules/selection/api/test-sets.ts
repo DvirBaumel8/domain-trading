@@ -84,7 +84,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     }
   };
 
-  app.post('/selection/test-sets', { bodyLimit: 2 * 1024 * 1024 }, async (req, reply) => {
+  app.post('/selection/test-sets', { config: { openapiBody: Body }, bodyLimit: 2 * 1024 * 1024 }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
     // A new set registers labelled names, so its method must be approved; a rescore registers nothing and may use an unapproved method (v2.6.0).
     if (b.purpose === 'new') await requireMethod(b.sibling_method);

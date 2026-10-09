@@ -2,6 +2,13 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: v3.3.0 (CR-021, CR-022, CR-023)
+- **Release note:** `docs/releases/v3.3.0.md`; answers are in each CR file.
+- **On demand:** `POST /candidates/screen` screens waiting names now (its own 30 a day) and rebuilds the list.
+- **Words:** send `ukcbamcompliance.com` and `aievalsconsulting.com` again with `words`. Without `words`, `bt1@v3` still can't read them (`cbam` and `evals` aren't in its frozen list).
+- **Tier L:** built, not active. Draft v11.2 when ready; it becomes active only with Dvir's line naming it.
+- **Posting:** before tomorrow's post 1, you can send its exact body to `POST /posts/schema-check` (`checked: post`).
+
 ## 2026-10-09: posting to X works (v3.2.1, v3.2.2)
 - **The cause:** the 3.2.0 check ran live and caught the problem before any post went out. Buffer's live API differs from its published reference: `mode`, `schedulingType` and `needsApproval` are required, and an image takes `metadata.altText`.
   - **3.2.1:** `POST /posts/schema-check` now returns Buffer's live types.

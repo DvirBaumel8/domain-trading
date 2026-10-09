@@ -191,7 +191,7 @@ describe('CR-018 B: summary.why', () => {
     expect((await rebuild(x)).statusCode).toBe(201);
     const l = await daily(x);
     expect(l.summary).toMatchObject({ screened_today: 30, candidates_n: 0, failed_by_check: { availability: 27, form: 1 }, unknown_by_reason: { TIMEOUT: 2 }, timeout_n: 2, queued_waiting_n: 35, left_for_tomorrow_n: 35 });
-    expect(l.summary.why).toBe('Screened 30 names today: 27 already taken, 1 failed the name form, 2 timed out, 0 passed. 35 more wait for tomorrow.');
+    expect(l.summary.why).toBe('Screened 30 names today: 27 already taken, 1 failed the name form (S3: 1), 2 timed out, 0 passed. 35 more wait for tomorrow.');
   });
 
   it('T18-5 after a rebuild the why matches the current summary, not a stale string', async () => {
@@ -511,7 +511,7 @@ describe('CR-020 D: settings', () => {
     const x = await h();
     const got = (await x.get('/selection/settings')).json();
     expect(got.active.values.tranche).toEqual({ size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true, main_lanes: [{ lane: 'S7', require: 'clean_history' }, { lane: 'S3', require: 'demand2' }] });
-    expect(got.active.values.intake).toEqual({ drop_list_max_share: 1 });
+    expect(got.active.values.intake).toEqual({ drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info' }); // v3.3.0 added the three keys at their defaults
     expect(got.active.values).toEqual(DEFAULT_SELECTION_VALUES);
     const stored = await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow();
     const sv = stored.values as { tranche: Record<string, unknown>; intake?: unknown };

@@ -25,6 +25,8 @@ export interface LabelledFeatures {
   registered_share?: number | null; prior_history?: 0 | 1 | null; pre_cls?: string | null; alt_tld_before_n?: number | null;
   n_words?: number | null; sld_chars?: number | null; is_geo?: 0 | 1 | null; city_trade_ok?: boolean | null; short?: 0 | 1 | null;
   geo_city?: string | null; geo_trade?: string | null; archive_span_years?: number | null;
+  /** v3.3.0 (CR-023 A/B): optional scout lane and verified-sellers count. A row without them is read as S2 (geo) or S7 (otherwise) with no sellers (0). */
+  lane?: string | null; sellers_verified_n?: number | null;
   /** Dates (YYYY-MM-DD) of the data each input came from, by input name; used only by the leakage lint. */
   input_dates?: Record<string, string>;
   gates?: Partial<Record<GateKey, GateResult>>;
@@ -57,6 +59,7 @@ export function decideReplayRow(f: LabelledFeatures, sel: SelectionValuesT): { d
     n_words: nWords, sld_chars: sldChars, is_geo: isGeo,
     gform1_pass: gf === null ? null : gf ? 1 : 0,
     short: f.short ?? (known(nWords) && known(sldChars) ? isShort(nWords, sldChars, sel.form) : null),
+    lane: f.lane ?? (isGeo === 1 ? 'S2' : 'S7'), sellers_verified_n: f.sellers_verified_n ?? 0,
   };
   const tier = evaluateTier(features, sel.tier, sel.thresholds);
   if (gf === false) return { decision: 'reject', tier, reason: 'G-FORM-1 failed' };

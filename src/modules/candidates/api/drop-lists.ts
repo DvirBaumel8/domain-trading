@@ -38,7 +38,7 @@ function legacyTokens(r: { domain: string; reason: string | null }): string[] | 
 export function registerDropLists(app: FastifyInstance, deps: DropListsDeps): void {
   const { db } = deps;
 
-  app.post('/selection/drop-lists', { bodyLimit: 2 * 1024 * 1024 }, async (req, reply) => {
+  app.post('/selection/drop-lists', { config: { openapiBody: Body }, bodyLimit: 2 * 1024 * 1024 }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
     if (b.list_date > idtDay(deps.now())) throw new AppError(422, 'VALIDATION_ERROR', 'list_date must not be in the future', { list_date: b.list_date });
     if (await db.selectFrom('drop_lists').select('name').where('name', '=', b.name).executeTakeFirst()) {

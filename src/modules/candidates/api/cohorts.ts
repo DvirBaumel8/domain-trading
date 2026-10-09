@@ -44,7 +44,7 @@ export function registerCohorts(app: FastifyInstance, deps: CohortsDeps): void {
     return { c, run, status };
   };
 
-  app.post('/selection/cohorts', async (req, reply) => {
+  app.post('/selection/cohorts', { config: { openapiBody: Body } }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
     if (await db.selectFrom('cohorts').select('name').where('name', '=', b.name).executeTakeFirst()) throw new AppError(409, 'COHORT_NAME_TAKEN', `A cohort named ${b.name} exists`, { name: b.name });
     for (const label of b.settings) {

@@ -43,13 +43,13 @@ function bound(v: string | undefined, f: string): { date?: string; at?: Date } |
 }
 
 export function registerOffers(app: FastifyInstance, service: OffersService, stats: { db: Kysely<Database>; now: () => number }): void {
-  app.post('/offers', async (req, reply) => {
+  app.post('/offers', { config: { openapiBody: RecordSchema } }, async (req, reply) => {
     const body = RecordSchema.parse(req.body ?? {});
     const r = await service.record({ ...body, domain: normalizeDomain(body.domain) }, { auditId: req.auditId!, recordedBy: req.auth!.name });
     return reply.code(r.status).send(r.body);
   });
 
-  app.post<{ Params: { id: string } }>('/offers/:id/outcome', async (req) => {
+  app.post<{ Params: { id: string } }>('/offers/:id/outcome', { config: { openapiBody: OutcomeSchema } }, async (req) => {
     const body = OutcomeSchema.parse(req.body ?? {});
     OffersService.checkOutcomeBody(body); // the body is checked before the id (BUG-4)
     if (!/^\d{1,15}$/.test(req.params.id)) throw new AppError(404, 'OFFER_NOT_FOUND', 'Offer not found');

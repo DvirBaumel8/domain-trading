@@ -15,7 +15,7 @@ import { wilson95 } from '../../src/modules/selection/test-sets.js';
 import { makeApp, runJobToEnd } from '../helpers/app.js';
 import { testDb as db } from '../helpers/db.js';
 import { FakeAdapter } from '../helpers/fake-adapter.js';
-import { screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
+import { patchActiveSettings, screeningHarness, type ScreeningHarness } from '../helpers/screening.js';
 import { fixture, respond } from '../helpers/screening-fixtures.js';
 import { issueToken } from '../helpers/tokens.js';
 import { mswServer } from '../setup/network.js';
@@ -171,8 +171,9 @@ describe('dropWatch (G-2)', () => {
     expect(await db.selectFrom('drop_list_checks').selectAll().execute()).toHaveLength(6);
     await expect(db.deleteFrom('drop_lists').execute()).rejects.toThrow(/append-only/);
   });
-  it('V28-8 DROP_FEED_STALE: none without a list; none up to 2 days after the newest list_date; a warn (with newest_list, newest_list_date) from the 3rd day', async () => {
+  it('V28-8 DROP_FEED_STALE (v3.3.0: with intake.drop_feed_stale_days 2 and level warn, the old rule): none without a list; none up to 2 days after the newest list_date; a warn (with newest_list, newest_list_date) from the 3rd day', async () => {
     const x = await h();
+    await patchActiveSettings(['intake'], { drop_list_max_share: 1, drop_feed_stale_days: 2, drop_feed_stale_level: 'warn' });
     const stale = async () => (await x.get('/report')).json().warnings.filter((w: any) => w.code === 'DROP_FEED_STALE');
     expect(await stale()).toEqual([]);
     await upload(x, 'snap-s1', ['superhealth.com'], '2026-10-05');

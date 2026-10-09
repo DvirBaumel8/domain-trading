@@ -64,7 +64,7 @@ function landerCheck(i: MoneyInput, sel: SelectionValuesT, p: PricingSettings, i
 
 export function evaluateMoney(i: MoneyInput, sel: SelectionValuesT, pricing: PricingSettings, settingsLabel: string): MoneyResult {
   const useTier = !sel.lead.gate_enabled && i.tier !== 'none';
-  const p_passive = useTier ? (sel.tier.p_passive[i.tier as 'A' | 'I' | 'B' | 'G'] ?? sel.priors_v91.p_passive[i.lane]) : sel.priors_v91.p_passive[i.lane];
+  const p_passive = useTier ? (sel.tier.p_passive[i.tier as 'A' | 'I' | 'B' | 'G' | 'L'] ?? sel.priors_v91.p_passive[i.lane]) : sel.priors_v91.p_passive[i.lane];
   const p_lead = sel.lead.p_lead[i.lane];
   const n = i.leadsAB;
   const years = sel.money.hold_years;

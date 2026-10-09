@@ -13,7 +13,8 @@ export const JOB_RUN_STUCK_HOURS = 2;
 /** CR-016 R-A3: the 00:05 UTC slot counts as missed when it passed more than this many minutes ago and no daily run was created since. */
 export const JOB_MISSED_GRACE_MINUTES = 30;
 
-export type JobName = 'tick' | 'daily';
+/** `screen` (v3.3.0): POST /candidates/screen runs; it has no schedule and no entry in `jobs`. */
+export type JobName = 'tick' | 'daily' | 'screen';
 export const JOB_NAMES: readonly JobName[] = ['tick', 'daily'];
 
 /** The next 00:05 UTC strictly after `nowMs`. */

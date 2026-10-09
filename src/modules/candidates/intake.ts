@@ -10,7 +10,7 @@ import { filterDropName, leftoverNames, namesDroppingBetween, type RemovedReason
 import { newAuditId } from '../../http/audit.js';
 import { AppError } from '../../http/errors.js';
 import { CompSchema } from '../listing/index.js';
-import { createRun, type InputName, type ScreeningWorker } from '../selection/index.js';
+import { createRun, SellersList, type InputName, type ScreeningWorker } from '../selection/index.js';
 import { activeSelectionSettings, laneFitter, methodApproval } from '../selection/index.js';
 
 /** A name sent again within this many days is a duplicate (its extra source is recorded, it is not screened twice). */
@@ -32,13 +32,17 @@ export const IntakeBody = z.object({
     domain: z.string().trim().min(1).max(253), lane: z.enum(INTAKE_LANES), source: text(120), note: z.string().trim().max(500).optional(), comps: IntakeComps.optional(),
     /** v3.2.0 (CR-020 B): who already chases this kind of name at scale, and why not this one. Information only: it never affects scoring. */
     who_chases: z.string().trim().max(300).optional(),
+    /** v3.3.0 (CR-023 B): up to 10 firms that already sell or deploy the exact service, `{name, url}`; screening verifies each page. No personal data (NO_PII). */
+    sellers: SellersList.optional(),
+    /** v3.3.0 (CR-022 A): the scout's own word pieces (1 to 6, lower-case a-z0-9); they must join to the name without `.com` and replace the dictionary split for it. */
+    words: z.array(z.string().regex(/^[a-z0-9]+$/, 'each word is lower-case letters or digits')).min(1).max(6).optional(),
   }).strict()).min(1).max(100),
 }).strict();
 export type IntakeBodyT = z.infer<typeof IntakeBody>;
 
 export type IntakeRemoval = 'DOMAIN_INVALID' | 'NOT_COM' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'NO_SPLIT' | 'TOO_MANY_WORDS' | 'ONE_WORD' | 'OWNED' | 'DUPLICATE_IN_UPLOAD';
 
-/** The form rules of an intake name (before ownership and duplicates): a letters-only second-level .com of at most 3 words by the bt1@v2 split. */
+/** The form rules of an intake name (before ownership and duplicates): a letters-only second-level .com of at most 3 words by the bt1@v3 split (or the scout's `words`). */
 export function intakeFormReason(raw: string): { domain: string; reason: IntakeRemoval | null } {
   const domain = raw.trim().toLowerCase();
   const labels = domain.split('.');
@@ -49,8 +53,9 @@ export function intakeFormReason(raw: string): { domain: string; reason: IntakeR
 }
 
 /** The word rules, after the upload-duplicate test: the drop-list filter's own (digit, hyphen, no split, more than 3 words, one word). v2.16.0: one rule set for both feeds. */
-function wordReason(domain: string): IntakeRemoval | null {
-  const f = filterDropName(domain, new Set());
+function wordReason(domain: string, words?: string[]): IntakeRemoval | null {
+  // v3.3.0 (CR-022): bt1@v3 (the approved method the daily census uses), or the scout's words in its place.
+  const f = filterDropName(domain, new Set(), { method: 'bt1@v3', ...(words && { words }) });
   return f.kept ? null : (f.reason as RemovedReason as IntakeRemoval);
 }
 
@@ -60,6 +65,20 @@ export function checkIntakePii(body: IntakeBodyT): void {
     for (const field of ['note', 'source', 'who_chases'] as const) {
       const v = n[field];
       if (hasAtSign(v)) throw piiError(`names[${index}].${field} must not contain an email address or '@'`, { index, field });
+    }
+    (n.sellers ?? []).forEach((e, entry) => {
+      if (hasAtSign(e.name) || hasAtSign(e.url)) throw piiError(`names[${index}].sellers[${entry}] must not contain an email address or '@'`, { index, field: 'sellers' });
+    });
+  });
+}
+
+/** v3.3.0 (CR-022 A): the scout's `words` must join back to the name without `.com` (422 VALIDATION_ERROR with the name's index and `field: words`). Nothing is stored on a mismatch. */
+export function checkIntakeWords(body: IntakeBodyT): void {
+  body.names.forEach((n, index) => {
+    if (n.words === undefined) return;
+    const d = n.domain.trim().toLowerCase();
+    if (d.endsWith('.com') && n.words.join('') !== d.slice(0, -4)) {
+      throw new AppError(422, 'VALIDATION_ERROR', `names[${index}].words must join to the name without .com ("${d.slice(0, -4)}")`, { index, field: 'words' });
     }
   });
 }
@@ -87,6 +106,7 @@ export interface IntakeResult {
 export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: { tokenName: string; auditId: string | null; now: Date }): Promise<IntakeResult> {
   checkIntakeComps(body, idtDay(ctx.now));
   checkIntakePii(body);
+  checkIntakeWords(body);
   const out: IntakeResult = { accepted: [], duplicates: [], removed: [] };
   const checked = body.names.map((n) => ({ n, ...intakeFormReason(n.domain) }));
   const owned = await ownedDomains(db, checked.map((c) => c.domain));
@@ -94,11 +114,11 @@ export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: {
   await db.transaction().execute(async (trx) => {
     const seen = new Set<string>();
     for (const c of checked) {
-      const row = { lane: c.n.lane, source: c.n.source, note: c.n.note ?? null, who_chases: c.n.who_chases ?? null, comps: c.n.comps ? JSON.stringify(c.n.comps) : null, received_at: ctx.now, token_name: ctx.tokenName, audit_id: ctx.auditId };
+      const row = { lane: c.n.lane, source: c.n.source, note: c.n.note ?? null, who_chases: c.n.who_chases ?? null, sellers: c.n.sellers ? JSON.stringify(c.n.sellers) : null, words: c.n.words ?? null, comps: c.n.comps ? JSON.stringify(c.n.comps) : null, received_at: ctx.now, token_name: ctx.tokenName, audit_id: ctx.auditId };
       let reason: IntakeRemoval | null = c.reason;
       if (reason === null) {
         if (seen.has(c.domain)) reason = 'DUPLICATE_IN_UPLOAD';
-        else { seen.add(c.domain); reason = wordReason(c.domain) ?? (owned.has(c.domain) ? 'OWNED' : null); }
+        else { seen.add(c.domain); reason = wordReason(c.domain, c.n.words) ?? (owned.has(c.domain) ? 'OWNED' : null); }
       }
       if (reason !== null) {
         await trx.insertInto('candidate_intake').values({ ...row, domain: c.domain, status: 'removed', reason }).execute();
@@ -136,11 +156,98 @@ export async function intakeCensusList(db: Kysely<Database>): Promise<string | n
   return null;
 }
 
+/** v3.3.0 (CR-021): the on-demand allowance of one IDT day: names `POST /candidates/screen` may still screen. It never touches the daily run's INTAKE_DAILY_MAX. */
+export interface OnDemandAllowance { daily_max: number; used_today: number; remaining: number }
+
+/** Names already screened on demand today (distinct names; only names actually screened count). */
+async function onDemandUsed(db: Kysely<Database>, today: string): Promise<number> {
+  return Number((await db.selectFrom('candidate_screenings').select(sql<string>`count(distinct domain)`.as('n')).where('day', '=', today).where('on_demand', '=', true).executeTakeFirstOrThrow()).n);
+}
+/** Names the scheduled daily run screened today: the on-demand ones are not part of its 30. */
+async function dailyUsed(db: Kysely<Database>, today: string): Promise<number> {
+  return Number((await db.selectFrom('candidate_screenings').select(sql<string>`count(distinct domain)`.as('n')).where('day', '=', today).where('on_demand', '=', false).executeTakeFirstOrThrow()).n);
+}
+export async function onDemandAllowance(db: Kysely<Database>, nowMs: number): Promise<OnDemandAllowance> {
+  const max = (await activeSelectionSettings(db)).values.intake.on_demand_screen_daily_max;
+  const used = await onDemandUsed(db, idtDay(nowMs));
+  return { daily_max: max, used_today: used, remaining: Math.max(0, max - used) };
+}
+
+interface Waiting {
+  sel: Awaited<ReturnType<typeof activeSelectionSettings>>;
+  byDomain: Map<string, { lane: string; ids: string[]; words: string[] | null }>;
+  drops: { w: Awaited<ReturnType<typeof leftoverNames>>[number]; lane: 'S2' | 'S4' | 'S6' }[];
+  counts: { no_kept_lane: number; dropping: number; leftovers: number };
+}
+
+/** The names waiting to be screened (scout names not yet screened, drop-list leftovers that fit a kept lane). Read-only; the daily run and the on-demand run share it. */
+async function gatherWaiting(db: Kysely<Database>, nowMs: number, today: string): Promise<Waiting> {
+  // Queued intake rows not yet screened, oldest first; one name per domain, an owned name is never screened.
+  const queued = (await sql<{ id: string; domain: string; lane: string; words: string[] | null }>`
+    select i.id, i.domain, i.lane, i.words from candidate_intake i
+    where i.status = 'queued' and not exists (select 1 from candidate_screenings s where s.intake_id = i.id)
+      and not exists (select 1 from domains d where d.domain = i.domain and d.status in ('pending_purchase','owned','listed','delisted'))
+    order by i.id`.execute(db)).rows;
+  const byDomain = new Map<string, { lane: string; ids: string[]; words: string[] | null }>();
+  for (const q of queued) {
+    const e = byDomain.get(q.domain) ?? byDomain.set(q.domain, { lane: q.lane, ids: [], words: null }).get(q.domain)!;
+    e.ids.push(q.id);
+    if (e.words === null && q.words) e.words = q.words;
+  }
+  // v3.2.0 (CR-019 C-3/C-4, CR-020 A): drop-list names are screened only as leftovers (free at the registry after their drop date, never in pending delete or redemption),
+  // not screened in the last 7 days, not owned, and only when they fit a kept lane (S2, S4 or S6). The rest stay on their list (NO_KEPT_LANE) and are counted.
+  const sel = await activeSelectionSettings(db);
+  const fit = await laneFitter(db, sel.values);
+  const dropping = (await namesDroppingBetween(db, nowMs, addDays(today, -DROP_SCREEN_WINDOW_DAYS), addDays(today, 60))).filter((w) => ['pending_delete', 'redemption'].includes(w.status)).length;
+  const left = await leftoverNames(db, nowMs, today);
+  const recent = new Set((await db.selectFrom('candidate_screenings').select('domain').where('at', '>', new Date(nowMs - DROP_SCREEN_WINDOW_DAYS * DAY_MS)).execute()).map((r) => r.domain));
+  const ownedAll = await ownedDomains(db, left.map((w) => w.domain));
+  const fresh = left.filter((w) => !recent.has(w.domain) && !ownedAll.has(w.domain) && !byDomain.has(w.domain)); // kept rows only: the form filter ran at upload (leftoverNames reads kept rows)
+  const laned = fresh.map((w) => ({ w, lane: fit(w.domain) }));
+  const drops = laned.filter((x): x is { w: typeof x.w; lane: 'S2' | 'S4' | 'S6' } => x.lane !== null);
+  return { sel, byDomain, drops, counts: { no_kept_lane: laned.length - drops.length, dropping, leftovers: drops.length } };
+}
+
+/** Scout names first (oldest first). With the default share (1) drop-list names only fill what is left; a smaller share reserves up to that share of the budget for them
+ * (the most they may take), and scout names take the rest. The daily run and the on-demand run order names the same way. */
+function chooseNames(w: Waiting, budget: number): { takenIntake: [string, Waiting['byDomain'] extends Map<string, infer V> ? V : never][]; takenDrops: Waiting['drops'] } {
+  const queuedBefore = w.byDomain.size;
+  const share = w.sel.values.intake.drop_list_max_share;
+  const nDrops = share >= 1 ? Math.min(w.drops.length, Math.max(0, budget - queuedBefore)) : Math.min(w.drops.length, dropListQuota(share, budget));
+  return { takenIntake: [...w.byDomain.entries()].slice(0, Math.max(0, budget - nDrops)), takenDrops: w.drops.slice(0, nDrops) };
+}
+
+/**
+ * v3.3.0 (CR-021): what an on-demand screening would take right now (read-only): its allowance and how many names (at most `maxNames`, at most what is left of the allowance).
+ */
+export async function planOnDemand(db: Kysely<Database>, nowMs: number, maxNames: number | null): Promise<{ allowance: OnDemandAllowance; names_n: number }> {
+  const today = idtDay(nowMs);
+  const w = await gatherWaiting(db, nowMs, today);
+  const max = w.sel.values.intake.on_demand_screen_daily_max;
+  const used = await onDemandUsed(db, today);
+  const allowance = { daily_max: max, used_today: used, remaining: Math.max(0, max - used) };
+  const budget = Math.min(allowance.remaining, maxNames ?? Number.MAX_SAFE_INTEGER);
+  const t = chooseNames(w, budget);
+  return { allowance, names_n: t.takenIntake.length + t.takenDrops.length };
+}
+
+export interface IntakeRunOptions {
+  /** On demand (POST /candidates/screen): screens against its own allowance, at most `maxNames` names (null = the allowance). */
+  onDemand?: { maxNames: number | null };
+}
+
 export class IntakeScreeningJob {
   private running = false;
   constructor(private readonly deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number }) {}
 
-  async runOnce(): Promise<IntakeScreeningSummary> {
+  /** The `onDemandScreen` step: the run, with the allowance as it stands after it. */
+  async runOnDemand(maxNames: number | null): Promise<IntakeScreeningSummary & { on_demand: true; allowance: OnDemandAllowance }> {
+    const s = await this.runOnce({ onDemand: { maxNames } });
+    return { ...s, on_demand: true, allowance: await onDemandAllowance(this.deps.db, this.deps.now()) };
+  }
+
+  async runOnce(opts: IntakeRunOptions = {}): Promise<IntakeScreeningSummary> {
+    const onDemand = opts.onDemand;
     const none = (reason: string, over: Partial<IntakeScreeningSummary> = {}): IntakeScreeningSummary =>
       ({ skipped: true, reason, queued_before: 0, screened: 0, from_intake: 0, from_drop_lists: 0, left_for_next_run: 0, run_id: null, census_list: null, no_kept_lane: 0, dropping: 0, leftovers: 0, ...over });
     if (this.running) return none('ALREADY_RUNNING');
@@ -157,60 +264,35 @@ export class IntakeScreeningJob {
       try {
       const summary = await this.deps.db.transaction().execute(async (db) => {
       await advisoryXactLock(db, 'intake_screening');
-      const doneToday = Number((await db.selectFrom('candidate_screenings').select(sql<string>`count(distinct domain)`.as('n')).where('day', '=', today).executeTakeFirstOrThrow()).n);
-
-      // Queued intake rows not yet screened, oldest first; one name per domain, an owned name is never screened.
-      const queued = (await sql<{ id: string; domain: string; lane: string }>`
-        select i.id, i.domain, i.lane from candidate_intake i
-        where i.status = 'queued' and not exists (select 1 from candidate_screenings s where s.intake_id = i.id)
-          and not exists (select 1 from domains d where d.domain = i.domain and d.status in ('pending_purchase','owned','listed','delisted'))
-        order by i.id`.execute(db)).rows;
-      const byDomain = new Map<string, { lane: string; ids: string[] }>();
-      for (const q of queued) (byDomain.get(q.domain) ?? byDomain.set(q.domain, { lane: q.lane, ids: [] }).get(q.domain)!).ids.push(q.id);
-
-      // v3.2.0 (CR-019 C-3/C-4, CR-020 A): drop-list names are screened only as leftovers (free at the registry after their drop date, never in pending delete or redemption),
-      // not screened in the last 7 days, not owned, and only when they fit a kept lane (S2, S4 or S6). The rest stay on their list (NO_KEPT_LANE) and are counted.
-      const sel = await activeSelectionSettings(db);
-      const fit = await laneFitter(db, sel.values);
-      const dropping = (await namesDroppingBetween(db, nowMs, addDays(today, -DROP_SCREEN_WINDOW_DAYS), addDays(today, 60))).filter((w) => ['pending_delete', 'redemption'].includes(w.status)).length;
-      const left = await leftoverNames(db, nowMs, today);
-      const recent = new Set((await db.selectFrom('candidate_screenings').select('domain').where('at', '>', new Date(nowMs - DROP_SCREEN_WINDOW_DAYS * DAY_MS)).execute()).map((r) => r.domain));
-      const ownedAll = await ownedDomains(db, left.map((w) => w.domain));
-      const fresh = left.filter((w) => !recent.has(w.domain) && !ownedAll.has(w.domain) && !byDomain.has(w.domain)); // kept rows only: the form filter ran at upload (leftoverNames reads kept rows)
-      const laned = fresh.map((w) => ({ w, lane: fit(w.domain) }));
-      const drops = laned.filter((x): x is { w: typeof x.w; lane: 'S2' | 'S4' | 'S6' } => x.lane !== null);
-      const noLane = laned.length - drops.length;
-      const counts = { no_kept_lane: noLane, dropping, leftovers: drops.length };
-
+      const w = await gatherWaiting(db, nowMs, today);
+      const { sel, byDomain, drops, counts } = w;
       const queuedBefore = byDomain.size;
-      const budget = INTAKE_DAILY_MAX - doneToday;
+      // The daily run's 30 count only the names it screened itself; the on-demand allowance counts only on-demand names (CR-021).
+      const budget = onDemand
+        ? Math.min(sel.values.intake.on_demand_screen_daily_max - await onDemandUsed(db, today), onDemand.maxNames ?? Number.MAX_SAFE_INTEGER)
+        : INTAKE_DAILY_MAX - await dailyUsed(db, today);
       if (queuedBefore + drops.length === 0) return none('NO_NAMES', counts);
-      if (budget <= 0) return none('DAILY_MAX_REACHED', { ...counts, queued_before: queuedBefore, left_for_next_run: queuedBefore + drops.length });
+      if (budget <= 0) return none(onDemand ? 'ON_DEMAND_SCREEN_CAP' : 'DAILY_MAX_REACHED', { ...counts, queued_before: queuedBefore, left_for_next_run: queuedBefore + drops.length });
 
-      // Scout names first (oldest first). With the default share (1) drop-list names only fill what is left; a smaller share reserves up to that share of the budget for them
-      // (the most they may take), and scout names take the rest.
-      const share = sel.values.intake.drop_list_max_share;
-      const nDrops = share >= 1 ? Math.min(drops.length, Math.max(0, budget - queuedBefore)) : Math.min(drops.length, dropListQuota(share, budget));
-      const takenIntake = [...byDomain.entries()].slice(0, budget - nDrops);
-      const takenDrops = drops.slice(0, nDrops);
+      const { takenIntake, takenDrops } = chooseNames(w, budget);
       const census = await intakeCensusList(db);
       const names: InputName[] = [
-        ...takenIntake.map(([domain, v]) => ({ domain, lane: v.lane as InputName['lane'], ...(census && { census_list: census }) })),
+        ...takenIntake.map(([domain, v]) => ({ domain, lane: v.lane as InputName['lane'], ...(v.words && { words: v.words }), ...(census && { census_list: census }) })),
         // A drop-list leftover is screened under the kept lane it fits (S2, S4 or S6).
         ...takenDrops.map((d) => ({ domain: d.w.domain, lane: d.lane, ...(census && { census_list: census }) })),
       ];
       const auditId = newAuditId();
       // on the pool, not the locked transaction: the run row (made on its own connection) refers to this audit row
       await this.deps.db.insertInto('audit_log').values({
-        id: auditId, at: now, scope: 'job', method: 'JOB', path: 'intake-screening', request: JSON.stringify({ names: names.length }), status_code: 200,
+        id: auditId, at: now, scope: 'job', method: 'JOB', path: onDemand ? 'on-demand-screen' : 'intake-screening', request: JSON.stringify({ names: names.length }), status_code: 200,
         result_summary: `intake ${takenIntake.length}; drop lists ${takenDrops.length}; left ${queuedBefore + drops.length - names.length}`,
       }).execute();
-      const run = await createRun(this.deps.db, { mode: 'full', names }, { createdBy: 'intakeScreening', auditId, now }, worker.checks);
+      const run = await createRun(this.deps.db, { mode: 'full', names }, { createdBy: onDemand ? 'onDemandScreen' : 'intakeScreening', auditId, now }, worker.checks);
       started.runId = run.id;
       for (const [domain, v] of takenIntake) {
-        for (const id of v.ids) await db.insertInto('candidate_screenings').values({ intake_id: id, domain, origin: 'intake', run_id: run.id, day: today, at: now }).execute();
+        for (const id of v.ids) await db.insertInto('candidate_screenings').values({ intake_id: id, domain, origin: 'intake', run_id: run.id, day: today, at: now, on_demand: !!onDemand }).execute();
       }
-      for (const d of takenDrops) await db.insertInto('candidate_screenings').values({ intake_id: null, domain: d.w.domain, origin: 'drop_list', run_id: run.id, day: today, at: now }).execute();
+      for (const d of takenDrops) await db.insertInto('candidate_screenings').values({ intake_id: null, domain: d.w.domain, origin: 'drop_list', run_id: run.id, day: today, at: now, on_demand: !!onDemand }).execute();
       return {
         queued_before: queuedBefore, screened: names.length, from_intake: takenIntake.length, from_drop_lists: takenDrops.length,
         left_for_next_run: queuedBefore + drops.length - names.length, run_id: run.id, census_list: census, ...counts,

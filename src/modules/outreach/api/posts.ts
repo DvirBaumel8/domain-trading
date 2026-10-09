@@ -7,7 +7,7 @@ import { AppError } from '../../../http/errors.js';
 import { keepIdempotencyKey } from '../../../http/idempotency.js';
 import { SlidingWindowLimiter } from '../../../http/rate-limit.js';
 import { idtDay, isRealDate, nextIdtMidnight, ymd } from '../../../core/dates.js';
-import { allowanceNow, createPost, PostBody, postSchemaCheck, POST_BODY_LIMIT, postingState, removePost, throwIfInvalid, validatePost, type PostingDeps } from '../posting/posts.js';
+import { allowanceNow, createPost, PostBody, postSchemaCheck, schemaCheckInput, POST_BODY_LIMIT, postingState, removePost, throwIfInvalid, validatePost, type PostingDeps } from '../posting/posts.js';
 import { toJerusalemIso } from '../../../core/dates.js';
 const RemoveBody = z.object({ reason: z.string().trim().min(1).max(300), marked_removed_by_hand: z.boolean().optional() }).strict();
 const PauseBody = z.object({ paused: z.boolean(), reason: z.string().trim().min(1).max(300).optional() }).strict();
@@ -24,7 +24,7 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
   const { db } = deps;
 
   // onRequest (after the auth hook, before the body is read): a token that cannot write is refused without parsing up to 40 MB. A body over 40 MB is refused 413 INVALID_BODY by the body limit.
-  app.post('/posts', { bodyLimit: POST_BODY_LIMIT, onRequest: requireWriteBeforeBody }, async (req, reply) => {
+  app.post('/posts', { config: { openapiBody: PostBody }, bodyLimit: POST_BODY_LIMIT, onRequest: requireWriteBeforeBody }, async (req, reply) => {
     const b = PostBody.parse(req.body ?? {});
     const v = await validatePost(deps, b);
     if (b.dry_run) {
@@ -50,10 +50,21 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
   });
 
   // v3.2.0 (CR-017): WRITE (the global scope rule for POST), Idempotency-Key, audited. Reads Buffer's type definitions (introspection) and validates the post shape; publishes nothing.
-  app.post('/posts/schema-check', async (req) => {
-    const r = await postSchemaCheck(deps);
+  // v3.3.0 (CR-022 F-2): the same body as POST /posts (same 40 MB limit and validation); the check runs on the input DOM would build for THAT post, with placeholder /media URLs.
+  // An empty body checks the fixed sample. Nothing is stored and nothing is published.
+  app.post('/posts/schema-check', { bodyLimit: POST_BODY_LIMIT, onRequest: requireWriteBeforeBody }, async (req) => {
+    const raw = req.body;
+    const empty = raw === undefined || raw === null || (typeof raw === 'object' && !Array.isArray(raw) && Object.keys(raw).length === 0);
+    let input: Record<string, unknown> | undefined;
+    if (!empty) {
+      const b = PostBody.parse(raw);
+      const v = await validatePost(deps, b);
+      throwIfInvalid(v);
+      input = schemaCheckInput(deps, v);
+    }
+    const r = await postSchemaCheck(deps, input);
     req.auditSummary = r.ok ? 'schema ok' : `schema: ${r.problems.length} problem(s)`;
-    return { ok: r.ok, problems: r.problems, checked_types: r.checked_types, types: r.types };
+    return { ok: r.ok, problems: r.problems, checked_types: r.checked_types, types: r.types, checked: empty ? 'sample' : 'post' };
   });
 
   app.get('/posts', async (req) => {
@@ -86,7 +97,7 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
     return reply.header('content-type', row.mime).header('cache-control', 'private, no-store').header('x-content-type-options', 'nosniff').send(row.data);
   });
 
-  app.post('/posts/:id/remove', async (req) => {
+  app.post('/posts/:id/remove', { config: { openapiBody: RemoveBody } }, async (req) => {
     const id = (req.params as { id: string }).id;
     if (!IdParam.safeParse(id).success) throw new AppError(404, 'NOT_FOUND', 'No such post');
     const b = RemoveBody.parse(req.body ?? {});
@@ -95,7 +106,7 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
     return { post_id: r.post_id, status: r.status, removed_at: iso(r.removed_at), removed_reason: r.removed_reason, deleted_on_buffer: r.deleted_on_buffer };
   });
 
-  app.post('/posts/pause', async (req) => {
+  app.post('/posts/pause', { config: { openapiBody: PauseBody } }, async (req) => {
     const b = PauseBody.parse(req.body ?? {});
     const at = new Date(deps.now());
     await db.insertInto('posting_switches').values({ at, by: req.auth!.name, audit_id: req.auditId, paused: b.paused, reason: b.reason ?? null }).execute();
@@ -103,7 +114,7 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
     return { paused: b.paused, reason: b.reason ?? null, since: iso(at), by: req.auth!.name };
   });
 
-  app.post('/posts/burst', async (req, reply) => {
+  app.post('/posts/burst', { config: { openapiBody: BurstBody } }, async (req, reply) => {
     const b = BurstBody.parse(req.body ?? {});
     if (!isRealDate(b.day)) throw new AppError(422, 'VALIDATION_ERROR', 'day must be a real calendar date (YYYY-MM-DD)');
     const today = idtDay(deps.now());

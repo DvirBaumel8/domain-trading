@@ -9,7 +9,7 @@ import { AppError } from '../../http/errors.js';
 import { requireNamedApproval } from './approval.js';
 import { DEPENDS_ON } from './depends.js';
 
-export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short'] as const;
+export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short', 'lane', 'sellers_verified_n'] as const;
 export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads'] as const;
 /** Checks that only produce an input feature (a failed lookup makes the feature unknown, it does not stop the run). */
 export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio'] as const;
@@ -17,10 +17,10 @@ export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio'] as const;
 /** `holdout` is locked too: the gate that clears `buy_hold` can't be redefined by the draft that clears it. */
 export const LOCKED_PREFIXES = ['tier.p_passive', 'lead.p_lead', 'priors_v91', 'holdout'];
 export const LANES = ['S2', 'S3', 'S4', 'S6', 'S7'] as const;
-const TIERS = ['A', 'I', 'B', 'G'] as const;
+const TIERS = ['A', 'I', 'B', 'G', 'L'] as const;
 const OPS = ['>=', '<=', '>', '<', '==', '!='] as const;
 /** Dotted paths under which a new key may be added (a map, not a fixed object). */
-const OPEN_MAPS = ['thresholds', 'tier.clauses', 'run.gates', 'freshness_hours'];
+const OPEN_MAPS = ['thresholds', 'tier.clauses', 'tier.p_passive', 'run.gates', 'freshness_hours'];
 /** Optional keys a draft may add although the base document lacks them (v2.4.0: `ext.alt_list`). */
 const OPEN_PATHS = ['ext.alt_list'];
 
@@ -39,6 +39,8 @@ const minBands = z.array(z.object({ min: num, raw: num }).strict()).min(1);
 
 const Cond = z.union([
   z.object({ f: z.string(), op: z.enum(OPS), v: z.union([num, z.string().regex(/^\$[A-Za-z0-9_]+$/)]) }).strict(),
+  // v3.3.0 (CR-023 A): membership in a list, e.g. {"f":"lane","op":"in","v":["S3","S4","S6"]}.
+  z.object({ f: z.string(), op: z.literal('in'), v: z.array(z.union([num, z.string().min(1).max(40)])).min(1).max(20) }).strict(),
   z.object({ tier: z.enum(TIERS) }).strict(),
 ]);
 const Clause = z.union([z.object({ all: z.array(Cond).min(1) }).strict(), z.object({ any: z.array(Cond).min(1) }).strict()]);
@@ -47,7 +49,8 @@ const Clause = z.union([z.object({ all: z.array(Cond).min(1) }).strict(), z.obje
 /** v3.2.0 (CR-020 D): which lanes count as "main lane" for the tranche quota, and what a member of that lane must show. The default is the rule of v3.1.x exactly. */
 export const MAIN_LANES_DEFAULT: { lane: Lane; require: 'clean_history' | 'demand2' | 'none' }[] = [{ lane: 'S7', require: 'clean_history' }, { lane: 'S3', require: 'demand2' }];
 /** v3.2.0 (CR-020 A): the share of the day's intake screening budget that drop-list names may take at most (1 = no extra cap: they only fill what scout names leave). */
-export const INTAKE_DEFAULT = { drop_list_max_share: 1 };
+/** v3.3.0: `on_demand_screen_daily_max` (CR-021) is the most names POST /candidates/screen screens per IDT day (its own allowance); `drop_feed_stale_days` / `drop_feed_stale_level` (CR-023 G) are when `/report` calls the newest drop list stale and at what level. */
+export const INTAKE_DEFAULT = { drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info' as 'info' | 'warn' };
 export const EU_TM_DEFAULT = { required_lanes: ['S6'] as Lane[], freshness_hours: 168 };
 export const SAME_NAME_DEFAULT = {
   min_visible_chars: 200, timeout_ms: 10_000, max_bytes: 512_000, max_redirects: 3, min_ms_between_fetches: 1000,
@@ -82,7 +85,8 @@ const host = z.string().regex(/^[a-z0-9.-]{3,80}$/);
 const words = z.array(z.string().min(1).max(60));
 
 const Base = z.object({
-  thresholds: z.record(z.string().regex(/^[A-Za-z0-9_]{1,40}$/), num),
+  /** A number, or (v3.3.0, CR-023 C) a per-lane map such as `lane_sellers_min`; a `"$name"` reference to a map resolves to the name's lane. */
+  thresholds: z.record(z.string().regex(/^[A-Za-z0-9_]{1,40}$/), z.union([num, z.partialRecord(z.enum(LANES), num)])),
   form: z.object({
     geo_bands: maxCharBands,
     unknown_token_fails: z.boolean(),
@@ -103,7 +107,12 @@ const Base = z.object({
     size: int, min_main_lane: int, geo_max: int, required_for_buy: z.boolean(),
     main_lanes: z.array(z.object({ lane: z.enum(LANES), require: z.enum(['clean_history', 'demand2', 'none']) }).strict()).default(MAIN_LANES_DEFAULT),
   }).strict(),
-  intake: z.object({ drop_list_max_share: share }).strict().default(INTAKE_DEFAULT),
+  intake: z.object({
+    drop_list_max_share: share,
+    on_demand_screen_daily_max: int.max(1000).default(INTAKE_DEFAULT.on_demand_screen_daily_max),
+    drop_feed_stale_days: int.min(1).max(365).default(INTAKE_DEFAULT.drop_feed_stale_days),
+    drop_feed_stale_level: z.enum(['info', 'warn']).default(INTAKE_DEFAULT.drop_feed_stale_level),
+  }).strict().default(INTAKE_DEFAULT),
   surbl: z.object({
     zone: z.string().min(3), control_name: z.string().min(3), blocked_answers: z.array(z.string()),
     list_bits: z.record(z.string().regex(/^\d+$/), z.string()), ns_override: z.array(z.string()), timeout_ms: int,
@@ -213,6 +222,13 @@ export const SelectionValues = Base.superRefine((v, ctx) => {
         return;
       }
       if (!(TIER_FEATURES as readonly string[]).includes(c.f)) bad([...path, 'f'], `unknown tier feature "${c.f}"`);
+      if (c.op === 'in') {
+        if (c.f === 'lane' ? !c.v.every((x) => typeof x === 'string' && (LANES as readonly string[]).includes(x)) : !c.v.every((x) => typeof x === 'number')) {
+          bad([...path, 'v'], c.f === 'lane' ? `the lane list holds lane names (${LANES.join(', ')})` : `the list for ${c.f} holds numbers`);
+        }
+        return;
+      }
+      if (c.f === 'lane') bad([...path, 'op'], 'the lane feature is compared with "in" only');
       if (typeof c.v === 'string' && v.thresholds[c.v.slice(1)] === undefined) bad([...path, 'v'], `unknown threshold ${c.v}`);
     });
   }
@@ -454,6 +470,17 @@ function setPath(doc: Record<string, unknown>, path: string, value: unknown): vo
 
 export const LABEL_RE = /^[a-z0-9][a-z0-9._-]{0,31}$/;
 
+/**
+ * Whether the locked value at `prefix` is unchanged against `ref`. One additive exception (v3.3.0, CR-023 D): `tier.p_passive` may gain the entry of a tier
+ * that neither the base nor the active version has (tier L); an entry that exists in `ref` can't change or be dropped, so no prior is ever re-set.
+ */
+function lockedSame(prefix: string, doc: unknown, ref: unknown): boolean {
+  const a = getPath(doc, prefix);
+  const b = getPath(ref, prefix);
+  if (prefix !== 'tier.p_passive' || !isObj(a) || !isObj(b)) return deepEqual(a, b);
+  return Object.keys(b).every((k) => k in a && deepEqual(a[k], b[k]));
+}
+
 export function applySet(base: SelectionValuesT, set: Record<string, unknown>, active: SelectionValuesT = base): SelectionValuesT {
   const doc = clone(base) as unknown as Record<string, unknown>;
   // BUG-5: replacing a locked parent (tier.p_passive, lead.p_lead, priors_v91, holdout) or an ancestor of one with a different value
@@ -473,7 +500,7 @@ export function applySet(base: SelectionValuesT, set: Record<string, unknown>, a
   }
   for (const prefix of LOCKED_PREFIXES) {
     // against the base AND the active version: a draft based on an old version can't carry old priors or an old holdout gate back in
-    if (!deepEqual(getPath(r.data, prefix), getPath(base, prefix)) || !deepEqual(getPath(r.data, prefix), getPath(active, prefix))) {
+    if (!lockedSame(prefix, r.data, base) || !lockedSame(prefix, r.data, active)) {
       throw new AppError(422, 'SETTINGS_KEY_LOCKED', `${prefix} is locked: priors change only by migration (SEL9-2)`, { path: prefix });
     }
   }

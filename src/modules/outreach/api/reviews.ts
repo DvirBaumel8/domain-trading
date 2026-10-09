@@ -47,7 +47,7 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
     if (!r.ok) throw new AppError(422, 'TEXT_BLOCKED', 'The text is refused by the block list', { category: r.category });
   };
 
-  app.post('/reviews/packet', async (req, reply) => {
+  app.post('/reviews/packet', { config: { openapiBody: PacketBody } }, async (req, reply) => {
     const q = PacketQuery.safeParse(req.query ?? {});
     const b = PacketBody.safeParse(req.body ?? {});
     if (!q.success || !b.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid request: only preview (boolean) is accepted, as a query parameter or in the body');
@@ -98,7 +98,7 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
     };
   });
 
-  app.post('/reviews/settings', async (req) => {
+  app.post('/reviews/settings', { config: { openapiBody: SettingsBody } }, async (req) => {
     const p = SettingsBody.safeParse(req.body ?? {});
     if (!p.success) throw new AppError(400, 'VALIDATION_ERROR', `Invalid request: enabled (boolean), model, tier (free or paid) and note (1..300 characters) are accepted (${p.error.issues.map((i) => i.path.join('.') || i.message).join(', ')})`);
     const b = p.data;
@@ -134,7 +134,7 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
     return { packet_id: p.id, created_at: p.created_at, created_by: p.created_by, kind: p.kind, document_version: p.document_version, sha256: p.sha256, content: p.content };
   });
 
-  app.post('/reviews/:packet_id/feedback', async (req, reply) => {
+  app.post('/reviews/:packet_id/feedback', { config: { openapiBody: Feedback } }, async (req, reply) => {
     const b = Feedback.parse(req.body ?? {});
     const packetId = (req.params as { packet_id: string }).packet_id;
     const packet = await db.selectFrom('review_packets').select('id').where('id', '=', packetId).executeTakeFirst();
@@ -171,7 +171,7 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
     };
   });
 
-  app.post('/reviews/items/:id/status', async (req, reply) => {
+  app.post('/reviews/items/:id/status', { config: { openapiBody: StatusBody } }, async (req, reply) => {
     const b = StatusBody.parse(req.body ?? {});
     const raw = (req.params as { id: string }).id;
     const notFound = () => new AppError(404, 'REVIEW_ITEM_NOT_FOUND', 'No such review item', { item_id: raw });

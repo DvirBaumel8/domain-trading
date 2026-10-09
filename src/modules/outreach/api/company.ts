@@ -21,7 +21,7 @@ export function registerCompany(app: FastifyInstance, deps: CompanyDeps): void {
   const { db } = deps;
 
   // A 64 KB document with JSON escapes can pass the 64 KB default body limit; this route allows more.
-  app.post('/company/document', { bodyLimit: 512 * 1024 }, async (req, reply) => {
+  app.post('/company/document', { config: { openapiBody: DocBody }, bodyLimit: 512 * 1024 }, async (req, reply) => {
     const b = DocBody.parse(req.body ?? {});
     const blocked = await checkText(db, b.text, { secretValues: deps.secretValues });
     if (!blocked.ok) throw new AppError(422, 'TEXT_BLOCKED', 'The text is refused by the block list', { category: blocked.category });
@@ -57,7 +57,7 @@ export function registerCompany(app: FastifyInstance, deps: CompanyDeps): void {
     return { version: v.version, sha256: v.sha256, created_at: v.created_at, text: v.text, diff };
   });
 
-  app.post('/company/forbidden-terms', async (req, reply) => {
+  app.post('/company/forbidden-terms', { config: { openapiBody: TermBody } }, async (req, reply) => {
     const b = TermBody.parse(req.body ?? {});
     const row = await db.insertInto('forbidden_terms').values({ term: b.term, created_by: req.auth!.name, created_at: new Date(deps.now()) })
       .returning(['id', 'category', 'created_at']).executeTakeFirstOrThrow();
@@ -71,7 +71,7 @@ export function registerCompany(app: FastifyInstance, deps: CompanyDeps): void {
   });
 
   // v2.15.0 (CR-013 R-4): a retired term no longer blocks. Append-only: the term row stays, one retirement row records who, when and why.
-  app.post<{ Params: { id: string } }>('/company/forbidden-terms/:id/retire', async (req) => {
+  app.post<{ Params: { id: string } }>('/company/forbidden-terms/:id/retire', { config: { openapiBody: RetireBody } }, async (req) => {
     const b = RetireBody.parse(req.body ?? {});
     const raw = req.params.id;
     const notFound = () => new AppError(404, 'TERM_NOT_FOUND', 'No such forbidden term', { id: raw });

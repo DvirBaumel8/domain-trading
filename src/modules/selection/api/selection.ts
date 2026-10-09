@@ -55,6 +55,7 @@ const EvalBody = z.object({
     alt_tld_before_n: z.number().int().nonnegative().nullable().optional(), n_words: z.number().int().nonnegative().nullable().optional(),
     sld_chars: z.number().int().nonnegative().nullable().optional(), is_geo: bit.optional(),
     gform1_pass: bit.nullable().optional(), short: bit.nullable().optional(),
+    sellers_verified_n: z.number().int().nonnegative().nullable().optional(),
   }).strict(),
   domain: z.string().optional(),
   bin_usd: usd.optional(),
@@ -133,13 +134,13 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     };
   });
 
-  app.post('/selection/settings', async (req, reply) => {
+  app.post('/selection/settings', { config: { openapiBody: DraftBody } }, async (req, reply) => {
     const body = DraftBody.parse(req.body ?? {});
     const r = await createDraft(db, { label: body.label, basedOn: body.based_on, set: body.set, note: body.note, createdBy: req.auth!.name, auditId: req.auditId! });
     return reply.code(201).send({ label: r.label, values: r.values, based_on: r.basedOn });
   });
 
-  app.post<{ Params: { label: string } }>('/selection/settings/:label/activate', async (req) => {
+  app.post<{ Params: { label: string } }>('/selection/settings/:label/activate', { config: { openapiBody: ActivateBody } }, async (req) => {
     const body = ActivateBody.parse(req.body ?? {});
     const r = await activate(db, {
       label: req.params.label, approvalRef: body.approval_ref, now: now(), createdBy: req.auth!.name, auditId: req.auditId!, holdoutCheck,
@@ -178,7 +179,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     return r.cache_date === null || r.stale ? { ...base, stale: true, status: 'UNKNOWN', reason_code: 'STALE_DATA' } : { ...base, stale: false };
   });
 
-  app.post<{ Params: { name: string } }>('/selection/lists/:name', async (req, reply) => {
+  app.post<{ Params: { name: string } }>('/selection/lists/:name', { config: { openapiBody: ListBody } }, async (req, reply) => {
     const body = ListBody.parse(req.body ?? {});
     const { name } = req.params;
     if (!isFixedList(name) && !isCensusListName(name)) {
@@ -258,6 +259,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const features: TierFeatures = {
       registered_share: f.registered_share ?? null, prior_history: f.prior_history ?? null, alt_tld_before_n: f.alt_tld_before_n ?? null,
       n_words: f.n_words ?? null, sld_chars: f.sld_chars ?? null, is_geo: f.is_geo ?? (geo ? 1 : 0), gform1_pass: f.gform1_pass ?? null, short: f.short ?? null,
+      lane: b.lane, sellers_verified_n: f.sellers_verified_n === undefined ? 0 : f.sellers_verified_n,
     };
     const tier = evaluateTier(features, sel.tier, sel.thresholds);
 
@@ -358,7 +360,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
   }).strict().refine((b) => b.slices !== undefined || b.sources !== undefined, 'a suite needs slices and/or sources');
 
   // A suite is frozen BEFORE any holdout scoring: which names it scores and which cell is judged. Versioned, append-only.
-  app.post('/selection/holdout-suites', async (req, reply) => {
+  app.post('/selection/holdout-suites', { config: { openapiBody: SuiteBody } }, async (req, reply) => {
     const b = SuiteBody.parse(req.body ?? {});
     const approval = await requireNamedApproval(db, b.approval_ref, now(), 'Freezing a holdout suite', [b.suite]);
     // v2.5.0: the approval must also name every gate the suite leaves out, and say "clears hold" when the suite clears buy_hold.
@@ -432,7 +434,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     profit: z.boolean().optional(),
   }).strict();
 
-  app.post('/selection/replays', async (req, reply) => {
+  app.post('/selection/replays', { config: { openapiBody: ReplayBody } }, async (req, reply) => {
     const b = ReplayBody.parse(req.body ?? {});
     if (b.mode === 'holdout' && (b.slices || b.sources || b.roles || b.domains || b.profit !== undefined)) {
       throw new AppError(422, 'VALIDATION_ERROR', 'A holdout replay takes only suite, mode and settings: the frozen suite definition selects the names');
