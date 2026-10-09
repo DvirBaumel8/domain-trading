@@ -97,7 +97,7 @@ describe('JOB_OVERDUE and /health jobs', () => {
   it('/health/ping stays DB-free and unchanged', async () => {
     await make();
     const r = await app.inject({ method: 'GET', url: '/health/ping' });
-    expect(r.json()).toEqual({ status: 'ok' });
+    expect(Object.keys(r.json()).sort()).toEqual(['commit', 'status', 'version']); // v3.7.0 (CR-034)
   });
 });
 

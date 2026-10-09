@@ -297,7 +297,7 @@ describe('GET /health/ping', () => {
     app = await makeApp({ testRoutes: false, db: deadDb });
     const res = await app.inject({ method: 'GET', url: '/health/ping' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ status: 'ok' });
+    expect(res.json()).toMatchObject({ status: 'ok', version: expect.any(String) }); // v3.7.0 (CR-034): plus version and commit
     expect(spy).not.toHaveBeenCalled();
     await deadDb.destroy();
   });
