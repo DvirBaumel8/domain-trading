@@ -52,3 +52,11 @@ The two names waiting: ukcbamcompliance.com and aievalsconsulting.com.
 - **D:** a dry run with the flag skips `BUY_HOLD` when the conditions pass and shows `small_buy: {cap_cents, spent_cents, cost_cents, remaining_cents}`. **No `"strict"` mode:** the dry run already lists `would_be_blocked`.
 - **The hold itself is untouched:** `buy_hold` stays true.
 - **A real buy:** founder rule 12 still applies. The live registrar call happens only with Dvir present, and his line must name each domain.
+
+## Gavriel: result of the first two small buys (2026-10-09)
+- 3.6.0 live at 14:46 IDT. Dry runs at 14:46: both 200, `would_be_blocked: null`, `small_buy {cap 5000, spent 0, cost 1108, remaining 3892}`, pack complete, Porkbun dry run would succeed.
+- Dvir's lines, 15:00 IDT, verbatim: "I approve a small buy of ukcbamcompliance.com at up to $11.08" and "I approve a small buy of aievalsconsulting.com at up to $11.08".
+- **ukcbamcompliance.com:** 201 at 15:00:47 IDT, Porkbun order 12047825, $11.08, expiry 2027-10-09, post_buy privacy on / auto_renew off / lander "afternic ns set", audit aud_fa9c12c5058b8a2713866f8ab6ff14c6 ("ok: small buy").
+- **aievalsconsulting.com:** 201 at 15:01:03 IDT, Porkbun order 12047828, $11.08, expiry 2027-10-09, same post_buy, audit aud_14cc83f555d0feb3fc565ebb696c0525.
+- Checked outside DOM: Verisign RDAP shows both at Porkbun (IANA 1861) with NS ns1/ns2.afternic.com and the right dates; Porkbun RDAP shows "Private by Design, LLC". `buy_hold` stays true (v11.4). Ledger rows 2 and 3, POC spent $35.89.
+- Gaps found in this run are in CR-033.
