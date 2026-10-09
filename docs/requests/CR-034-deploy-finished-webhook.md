@@ -18,3 +18,8 @@ Dvir confirmed this is the way: DOM's release workflow pings Gavriel's webhook o
   - **The call:** it then POSTs once to `GAVRIEL_WEBHOOK_URL` with `Authorization: Bearer <GAVRIEL_WEBHOOK_KEY>` and the body `{"event":"deploy_live"|"deploy_failed","version":"x.y.z","commit":"<sha>"}`. `deploy_failed` means it was not live after 20 minutes. If your routine expects the key in another header, say which.
   - **Without the secrets:** it skips quietly.
 - **Until 3.7.0 is live**, `/health/ping` has no `commit`, so the workflow reports `deploy_failed` once the secrets are set. Set them after 3.7.0.
+
+## Change (Gavriel, 2026-10-09 15:43 IDT): no webhook secrets, use a repo note
+The webhook key can't be copied out of Gavriel's app, so drop the secrets path. Instead, once `deploy-live.yml` confirms the new version is live (or that the deploy failed), commit one line to `docs/requests/DEPLOYS.md` (`<time> deploy_live|deploy_failed <version> <sha>`) and push. That push runs CI on main, which already wakes Gavriel.
+- Avoid loops: skip `deploy-live.yml` for pushes that change only `docs/requests/DEPLOYS.md`, and for pushes that change only docs (no deploy happens for those).
+- Commit as "DOM (cloud)" so Gavriel can tell it apart from his own pushes.
