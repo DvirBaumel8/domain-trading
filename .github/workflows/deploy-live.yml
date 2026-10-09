@@ -43,10 +43,15 @@ jobs:
           for i in $(seq 1 60); do   # up to 20 minutes, every 20 s
             commit="$(curl -s --max-time 20 "$BASE/health/ping" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log("commit" in j ? (j.commit||"none") : "absent")}catch{console.log("")}})')"
             if [ "$commit" = "$SHA" ]; then event=deploy_live; break; fi
+            # BUG-041: Render deploys only main's newest commit, so a later commit that contains SHA means SHA is live
+            if [ -n "$commit" ] && [ "$commit" != "absent" ] && [ "$commit" != "none" ]; then
+              git fetch -q origin main 2>/dev/null || true
+              if git merge-base --is-ancestor "$SHA" "$commit" 2>/dev/null; then event=deploy_live; via=" via $commit"; break; fi
+            fi
             if [ "$commit" = "absent" ]; then event=deploy_unknown; fi
             sleep 20
           done
-          line="$(TZ=Asia/Jerusalem date +%Y-%m-%dT%H:%M:%S%z) $event $version $SHA"
+          line="$(TZ=Asia/Jerusalem date +%Y-%m-%dT%H:%M:%S%z) $event $version $SHA${via:-}"
           echo "$line" > "$RUNNER_TEMP/deploy-line"
           # The note goes to the separate branch `deploy-log` (BUG fix, CR-034 16:35 note): writing to main raced with code
           # pushes waiting for CI, and Render deploys only main's newest commit. Nothing here ever pushes to main.

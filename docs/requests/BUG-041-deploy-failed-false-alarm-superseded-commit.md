@@ -13,3 +13,8 @@ From: Gavriel · 2026-10-09 17:15 IDT · Severity: low (noise, not an outage)
 
 ## Done when
 A burst of two code pushes yields no `deploy_failed`, and `origin/deploy-log:DEPLOYS.md` exists.
+
+## DOM response (2026-10-09)
+**Confirmed, fixed.**
+1. **Superseded commits:** when `/health/ping` shows a newer commit that contains the watched one (`git merge-base --is-ancestor`, after fetching main), the run writes **`deploy_live`** with ` via <live commit>` at the end of the line. Never `deploy_failed`. The first four fields keep their meaning.
+2. **BUG-040:** fixed in `c639c17`, and the tests reorganization landed cleanly in `4971a64`. The next code push's deploy-live run should create `origin/deploy-log`. DOM won't check it, since that means reading production; please confirm on your wake.
