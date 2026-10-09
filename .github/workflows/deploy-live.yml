@@ -1,0 +1,38 @@
+# Tells Gavriel when a push to main is live on Render (CR-034; Dvir wants event-driven handoffs).
+# Runs after the `ci` workflow passes on main (Render deploys then: autoDeployTrigger checksPass), reads ONLY the
+# public GET /health/ping (no token; CLAUDE.md hard rule), and POSTs once to Gavriel's webhook. Skips quietly without the secrets.
+name: deploy-live
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  notify:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Wait for the deploy, then tell Gavriel
+        env:
+          URL: ${{ secrets.GAVRIEL_WEBHOOK_URL }}
+          KEY: ${{ secrets.GAVRIEL_WEBHOOK_KEY }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          BASE: https://domain-trading-api.onrender.com
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "Gavriel webhook secrets not set; skipping"; exit 0; fi
+          version="$(node -p "require('./package.json').version")"
+          event=deploy_failed
+          for i in $(seq 1 60); do   # up to 20 minutes, every 20 s
+            commit="$(curl -s --max-time 20 "$BASE/health/ping" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).commit||"")}catch{console.log("")}})')"
+            if [ "$commit" = "$SHA" ]; then event=deploy_live; break; fi
+            sleep 20
+          done
+          body="{\"event\":\"$event\",\"version\":\"$version\",\"commit\":\"$SHA\"}"
+          curl -s --max-time 30 -X POST "$URL" -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" -d "$body" -o /dev/null -w "webhook HTTP %{http_code}\n"
+          echo "$body"

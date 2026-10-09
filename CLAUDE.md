@@ -7,7 +7,7 @@
 - never uses the bot tokens in `.env.bot-tokens` or the job token;
 - never queries or writes the production database directly.
 
-DOM builds, tests locally, pushes and releases. Gavriel runs, verifies and operates, and reports back through `docs/requests/`. When DOM needs a live fact or a live action, it asks Gavriel in `docs/requests/DOM-TO-GAVRIEL.md` or in the CR file. No urgency, request or earlier habit overrides this.
+DOM builds, tests locally, pushes and releases. Gavriel runs, verifies and operates, and reports back through `docs/requests/`. When DOM needs a live fact or a live action, it asks Gavriel in `docs/requests/DOM-TO-GAVRIEL.md` or in the CR file. No urgency, request or earlier habit overrides this. The one automated exception is the `deploy-live` workflow (CR-034), which reads only the public `GET /health/ping` to tell Gavriel a deploy is live.
 
 **Code map rule (Dvir, 9 Oct 2026):** every session and every agent (builders and subagents included) reads `docs/internal/code-map.md` before touching code, and goes straight to the files it names instead of exploring the codebase. Every agent brief points to it. A change that adds, moves or removes a file, route, table or test file updates the map in the same commit.
 
