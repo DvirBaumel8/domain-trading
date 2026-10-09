@@ -226,7 +226,8 @@ export class BuyService {
 
     } catch (e) {
       if (input.dryRun && e instanceof AppError && !(input.strictDry && e.code === 'TRANCHE_SPEND_CAP')) {
-        throw new AppError(e.status, e.code, e.message, { ...e.details, ...(await this.gateFields(input.domain, blocked)) });
+        // v3.7.1 (CR-038 #1): the buy card's display name and drop policy also ride on a dry-run error (e.g. REGISTRAR_FUNDS)
+        throw new AppError(e.status, e.code, e.message, { ...e.details, ...(await this.gateFields(input.domain, blocked)), display_name: displayName, ...this.policyFields(dropPolicy, winner?.renewalCents ?? null) });
       }
       throw e;
     }

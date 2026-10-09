@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.7.1 (2026-10-09): CR-038
+PATCH, additive. A `/buy` dry-run error's `details` carry `display_name` and the drop-policy fields. Release note: `docs/releases/v3.7.1.md`.
+
 ## 3.7.0 (2026-10-09): CR-031 B/C, CR-033, CR-034
 MINOR, additive. Release note: `docs/releases/v3.7.0.md`.
 - **Offers:** `POST /offers` `dry_run`.

@@ -1,4 +1,4 @@
-# Endpoints (contract v3.7.0)
+# Endpoints (contract v3.7.1)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -114,7 +114,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
 - **Display name and drop policy (3.7.0, CR-033 G-2, G-9):**
   - **`display_name` (optional):** must equal the domain case-insensitively, else 422 `DISPLAY_NAME_MISMATCH`. Without it, the default comes from the newest intake `words`, each capitalised, else the domain. It is stored like `POST /list`'s display name and used by the next export.
   - **`drop_policy` (optional):** `after_one_renewal` (the default) or `at_first_expiry` (the `drop_date` is the first expiry; nothing renews).
-  - **In the dry run and the 201:** `display_name`, `drop_policy`, `renewal_committed_cents` (0 for `at_first_expiry`) and `drop_policy_line`. `sell_plan_line` adds the policy only for `at_first_expiry`. If setting the policy fails after the purchase, the answer carries the warning `DROP_POLICY_FAILED`.
+  - **In the dry run and the 201:** `display_name`, `drop_policy`, `renewal_committed_cents` (0 for `at_first_expiry`) and `drop_policy_line`. `sell_plan_line` adds the policy only for `at_first_expiry`. **On a dry-run error** (for example `REGISTRAR_FUNDS`), `details` carry `display_name`, `drop_policy`, `renewal_committed_cents` and `drop_policy_line` too (3.7.1, CR-038). If setting the policy fails after the purchase, the answer carries the warning `DROP_POLICY_FAILED`.
 - **Comps (CR-033 G-10):** the number required is `pricing_settings` `comps_min`, which is **0 under v3** (current). An empty `comps` list is valid.
 - **Small-buy exception (3.6.0, CR-030; approved by Dvir).** Optional body field `small_buy_exception: true`. When `approval_ref.text` also names the domain **and** contains "small buy" (any case), `BUY_HOLD` is skipped for that call, and only then. Two more checks apply when the flag and the words are present:
   - **Price:** the quote must not be premium, and its first year must be at most **$11.08**. Else 409 `SMALL_BUY_PRICE` `{max_first_year_cents, cost_cents, premium}`.

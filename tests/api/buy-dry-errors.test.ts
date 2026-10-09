@@ -27,6 +27,9 @@ describe('v2.0.2 dry-run /buy errors after the DOM gates', () => {
     expect(e.details.would_be_blocked).toBeNull();
     expect(e.details.screening_pack).toMatchObject({ status: 'complete' });
     expect(e.details.advisories).toEqual([]);
+    expect(e.details).toMatchObject({ drop_policy: 'after_one_renewal', drop_policy_line: expect.any(String) }); // T38-1 (v3.7.1, CR-038 #1)
+    expect(e.details).toHaveProperty('display_name');
+    expect(e.details).toHaveProperty('renewal_committed_cents');
   });
 
   it('REGISTRAR_FUNDS (dry run, no pack): would_be_blocked names the first gate', async () => {
