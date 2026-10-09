@@ -66,7 +66,7 @@ export const APPEND_ONLY_TABLES = [
 ] as const;
 
 const GUARANTEES: Guarantee[] = [
-  { what: 'No secret, key or token appears in a response, a log line or an audit row', file: 'tests/api/secrets.test.ts', test: 'responses, logs and audit rows contain no env secret' },
+  { what: 'No secret, key or token appears in a response, a log line or an audit row', file: 'tests/modules/http/secrets.test.ts', test: 'responses, logs and audit rows contain no env secret' },
   { what: 'Tests never reach the network (an unmocked outbound request fails)', file: 'tests/unit/network-block.test.ts', test: 'fails any unmocked outbound HTTP request' },
   { what: 'One AI call only: the outside review (src/modules/outreach/review/gemini.ts); no AI SDK, no other provider host in src/', file: 'tests/unit/no-llm.test.ts', test: 'no LLM SDK dependency' },
   { what: 'No registrar top-up call, ever (no top-up endpoint is referenced in `src/`)', file: 'tests/unit/no-topup.test.ts', test: 'no source file references a top-up endpoint' },
@@ -89,12 +89,12 @@ export function generateEvidence(root = ROOT): string {
     lines.push(`| ${cell(g.what)} | ${ref(found)} |`);
   }
   lines.push('', '### Append-only tables', '');
-  lines.push('Each table below refuses UPDATE, DELETE and TRUNCATE in the database (a trigger). `tests/api/append-only.test.ts` checks the triggers of every table and a refused write on each one. Tests that also check the table on one line with "append-only" or "immutable":', '');
+  lines.push('Each table below refuses UPDATE, DELETE and TRUNCATE in the database (a trigger). `tests/modules/core/append-only.test.ts` checks the triggers of every table and a refused write on each one. Tests that also check the table on one line with "append-only" or "immutable":', '');
   lines.push('| Table | Tests |', '|---|---|');
-  const proof = blocks.find((b) => b.file === 'tests/api/append-only.test.ts' && b.name.includes('refuses UPDATE, DELETE and TRUNCATE'));
-  if (!proof) throw new Error('append-only test missing: tests/api/append-only.test.ts');
+  const proof = blocks.find((b) => b.file === 'tests/modules/core/append-only.test.ts' && b.name.includes('refuses UPDATE, DELETE and TRUNCATE'));
+  if (!proof) throw new Error('append-only test missing: tests/modules/core/append-only.test.ts');
   for (const t of APPEND_ONLY_TABLES) {
-    const extra = blocks.filter((b) => b.file !== 'tests/api/append-only.test.ts' && b.body.split('\n').some((l) => /append-only|immutable/i.test(l) && new RegExp(`\\b${t}\\b`).test(l)));
+    const extra = blocks.filter((b) => b.file !== 'tests/modules/core/append-only.test.ts' && b.body.split('\n').some((l) => /append-only|immutable/i.test(l) && new RegExp(`\\b${t}\\b`).test(l)));
     const names = [proof, ...extra];
     lines.push(`| \`${t}\` | ${names.slice(0, SHOWN).map(ref).join('; ')}${names.length > SHOWN ? ` (${names.length} tests)` : ''} |`);
   }

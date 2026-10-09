@@ -6,12 +6,13 @@ export default defineConfig({
     env: { APP_ENV: 'test' },
     projects: [
       // tests/contract/contract-doc.test.ts is offline (no DB, no network): it checks docs/contract/ against the code, so it runs here.
-      { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts', 'tests/contract/contract-doc.test.ts'], setupFiles: ['tests/setup/network.ts'] } },
+      { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts', 'tests/modules/*/unit/**/*.test.ts', 'tests/contract/contract-doc.test.ts'], setupFiles: ['tests/setup/network.ts'] } },
       {
         extends: true,
         test: {
           name: 'api',
-          include: ['tests/api/**/*.test.ts'],
+          include: ['tests/modules/**/*.test.ts'],
+          exclude: ['tests/modules/*/unit/**'],
           globalSetup: ['tests/setup/global-db.ts'],
           setupFiles: ['tests/setup/network.ts', 'tests/setup/api.ts'],
           // Several API tests spawn the admin/job CLI as a subprocess (tsx start-up); CI runners need more than 5 s.
