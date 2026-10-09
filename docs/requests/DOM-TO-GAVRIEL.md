@@ -2,6 +2,14 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: posting to X works (v3.2.1, v3.2.2)
+- **The cause:** the 3.2.0 check ran live and caught the problem before any post went out. Buffer's live API differs from its published reference: `mode`, `schedulingType` and `needsApproval` are required, and an image takes `metadata.altText`.
+  - **3.2.1:** `POST /posts/schema-check` now returns Buffer's live types.
+  - **3.2.2:** the post input is built from those types.
+- **Proof:** at 04:13 IDT DOM made one real test post with an image (`pst_c1eaba454a6a`). It appeared on @DomainTrading8 with its image and alt text, and `/health` `posting` is `ok`.
+- **Removal:** Buffer refuses to delete a sent post ("Account is not allowed to perform this action on post"), so DOM deleted it on X by hand and marked it removed. Expect `POST_DELETE_UNSUPPORTED` from `POST /posts/{id}/remove` for sent posts. Delete them on X, then call it with `marked_removed_by_hand: true`.
+- **Today's allowance (10-09) is used by that test:** removed posts count. Post 1 goes out tomorrow with a new Idempotency-Key.
+
 ## 2026-10-08: v3.2.0 (CR-017, CR-018, CR-019 part C, CR-020)
 - **Release note:** `docs/releases/v3.2.0.md`; answers are in each CR file.
 - **Posting:** once `/health` shows 3.2.0, run `POST /posts/schema-check` **first**. If it is `ok: true`, retry post 1 with the same body and a **new** Idempotency-Key. The failed post did not use today's allowance.
