@@ -1,4 +1,4 @@
-> Status: Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (the customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending and rule changes still go to Dvir).
+> Status: DOM: F-1 done (3.2.2); A, B (partly), F-2 accepted, v3.3.0. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (the customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending and rule changes still go to Dvir).
 
 # CR-022: intake word-split override, acronyms in the splitter, and v3.2.0 findings
 | Field | Value |
@@ -67,3 +67,20 @@ Both are plain, readable names for real markets (UK CBAM starts 1 Jan 2027; AI e
 1. Answers and release for F-1 (first), then A and B.
 2. Which F-2 option you chose.
 3. A line on F-3.
+
+## DOM response (2026-10-09)
+**F-1: done in 3.2.1 and 3.2.2** (see `DOM-TO-GAVRIEL.md`, 2026-10-09).
+- **The cause:** Buffer's live schema differs from its published reference.
+- **The check now:** `POST /posts/schema-check` is `ok: true`.
+- **Proof:** DOM made one real test post with an image at 04:13 IDT; it went live and was then deleted on X by hand.
+- **Today's allowance is used by that test:** post 1 goes out tomorrow with a new key (T22-9).
+
+**Accepted for v3.3.0:**
+- **A, `words` on intake:** an optional list of 1 to 6 lower-case pieces per name; joined, they must equal the name without `.com`, else 422 `VALIDATION_ERROR` (`details.index`, `field: words`). Every other rule still applies to those words: the word-count limit, form, lane fit, availability, trademark, history and pricing. The words are stored with the intake row, shown on the list entry as `words` plus `split_source: scout | dictionary`, and recorded in the audit row. The census (sibling) split of that name uses the scout words too.
+- **B, partly accepted, with pushback on adding words to the frozen splitter:**
+  - **What changes:** intake's word rules move from `bt1@v2` to **`bt1@v3`**, the approved method the daily census already uses. It already knows common acronyms and country codes (`uk`, `us`, `eu`, `ai`, `llm`, `api`, `saas`, `esg`, `gdpr`, `hr`, `iot`, `ml`, `seo`, `crm`, `ev` and more). So intake and screening read a name the same way (T22-8, for new runs).
+  - **Why no new words in it:** `bt1@v3` is frozen data (its sha256 is part of Dvir's v11 validation), so DOM won't add words to it silently.
+  - **Words it doesn't know** (`cbam`, `eudr`, `evals`): use `words` (A). If such names keep coming, a `bt1@v4` with a wider term list is a normal request, re-validated and approved like v3.
+  - **So:** T22-6 and T22-7 pass with `words`. Without `words`, `ukcbamcompliance.com` still fails while `cbam` is unknown. DOM reports the real `bt1@v3` result in the release note.
+- **F-2:** option (a). `POST /posts/schema-check` accepts the same body as `POST /posts` (40 MB limit) and checks the input DOM would build for **that** post. An empty body checks the fixed sample, as now.
+- **F-3: confirmed.** The 10-09 list (built on 3.2.0) has every 3.2.0 summary field, `why` included. Lists stored earlier are left as they were built.

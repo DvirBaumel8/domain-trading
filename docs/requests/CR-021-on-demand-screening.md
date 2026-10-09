@@ -1,4 +1,4 @@
-> Status: Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending, and rule changes still go to Dvir). Business need stated by Dvir on 2026-10-08 ~18:00 IDT (below).
+> Status: DOM: accepted, v3.3.0. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending, and rule changes still go to Dvir). Business need stated by Dvir on 2026-10-08 ~18:00 IDT (below).
 
 # CR-021: on-demand screening so we can run the full flow without waiting for 03:05
 | Field | Value |
@@ -63,3 +63,17 @@ We need a way to say "screen what is waiting now, and refresh the list," with it
 4. The release version and its caller-visible change list, as before.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-09)
+**Accepted. Release v3.3.0.**
+- **A, the route:** `POST /candidates/screen` (WRITE, Idempotency-Key, audited, body `{}` or `{max_names?}`).
+  - **What it does:** screens the waiting intake names right away, in the same order as the daily run (scout names first, then drop-list leftovers that fit a kept lane), then rebuilds the day's list.
+  - **The answer:** 202 `{run_id, names_n, allowance: {daily_max, used_today, remaining}}`.
+  - **The allowance:** its own, at most `intake.on_demand_screen_daily_max` names a day. The key is new in the settings schema with default 30, the active settings are unchanged, and a different value is a draft Dvir activates.
+  - **What it doesn't touch:** the 03:05 run's quota, the outside review and every other late step, buying, spending and the buy hold.
+  - **Only names screened count** toward the allowance. With nothing waiting, it answers 200 `{run_id: null, names_n: 0, skipped: "NO_NAMES"}`, uses no allowance and still rebuilds the list.
+  - **Errors:** an empty allowance → 409 `ON_DEMAND_SCREEN_CAP` (`details.next_allowed_at`), nothing screened. A replay with the same key returns the first answer and screens nothing more.
+- **R-A5:** each call is a job run on `GET /jobs/runs` with `job: "screen"` (trigger `manual`, `triggered_by` the token name) and the steps `onDemandScreen` and `buildDailyList`, with counts and errors.
+- **Q3:** while a daily run or another screening run is going, the call answers 409 `ALREADY_RUNNING` (`details.run_id`). No interleaving.
+- **B: already there.** Every list entry has `run_id`, the screening run that produced it, and a rebuild keeps it. From 3.3.0 the `almost_ready` and `upcoming` rows carry it too, and `summary.screening_run_ids` lists every run of that day's builds.
+- **C:** as above (T21-10).

@@ -1,4 +1,4 @@
-> Status: Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (the customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending and rule changes still go to Dvir).
+> Status: DOM: accepted, v3.3.0. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT (the customer may send DOM fix and feature requests without asking Dvir each time; buying, selling, spending and rule changes still go to Dvir).
 
 # CR-023: lane-aware demand tier (firm count), per-name fail reasons on the daily list, /openapi.json, quieter DROP_FEED_STALE
 | Field | Value |
@@ -98,3 +98,21 @@ Drop lists are now used only for idea mining and to catch uncaught leftovers at 
 - **Q4:** the S2 lead check (`lead`) is off (`gate_enabled: false`). Can B reuse its page-fetch code?
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-09)
+**Accepted. Release v3.3.0, capability only; the active settings don't change.**
+- **A:** `lane` becomes a tier input (the intake lane, or the lane a drop-list name fit), and clauses get `op: "in"` with a list value (Q2: generic tier inputs, no separate check).
+- **B, `sellers`:**
+  - **Where they come from:**
+    - an optional `sellers` list on intake (at most 10 of `{name ≤ 100, url http(s)}`, under the `NO_PII` rule);
+    - a `sellers` record kind on `POST /candidates/{domain}/records`, fresh for `freshness_hours.sellers` (default 720).
+  - **Which list counts:** the newer of the two.
+  - **Verification:** during screening DOM fetches each URL through its existing safe fetcher (public addresses only, at most 3 redirects, a timeout, paced). An entry counts as verified when the page answers 2xx and isn't parked or for sale (the parked-page detection from `lead`, Q4: yes). One registrable domain counts once.
+  - **Q1:** fine. That's at most 10 fetches a name and 300 a day, read-only, at no cost.
+  - **The result:** tier input `sellers_verified_n` (0 without a list), with each entry's verified/not-verified status and reason shown on the check.
+  - **Q3:** agreed. A drop-list name gets tier L only if a `sellers` record exists.
+- **C:** `thresholds.lane_sellers_min` (a per-lane map) and `$lane_sellers_min` resolve to the name's lane. A lane missing from the map makes the clause false.
+- **D:** the R-D2 draft is expressible and tested (AC-6, AC-7), and `p_passive.L` prices exactly like the other tiers. **The active settings stay as they are;** v11.2 becomes active only with Dvir's line.
+- **E:** `summary.screening_run_id` and `summary.rejected` (up to 30, `{domain, lane, origin, run_id, first_fail: {check, gate, reason_code, reason}, key_inputs}`). `why` names the failing check per lane, for example "6 failed the demand check (S6: 3, S4: 2, S3: 1)".
+- **F:** `GET /openapi.json` (READ token, like other reads) gives an OpenAPI 3.1 description of every route in the contract: method, path, scope and summary, with the request body where the code has a schema. A test keeps it equal to the route table.
+- **G:** `intake.drop_feed_stale_days` (default 7) and `intake.drop_feed_stale_level` (`info` | `warn`, default `info`). At `info` it is listed with level `info` and counts toward no warning total. The fields stay as they are.
