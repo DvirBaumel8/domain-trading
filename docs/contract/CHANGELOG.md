@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.4.0 (2026-10-09): CR-026, CR-027, CR-024 F-1/F-2
+MINOR. Release note: `docs/releases/v3.4.0.md`.
+- **Scout words (CR-027, a fix back to the contract of 3.3.0):** scout `words` now drive the `form` check and the tier's `n_words` (unknown pieces → PASS_WITH_NOTE `SCOUT_WORDS`); `words` and `split_source` appear on `GET /screening/runs/{id}`.
+- **Re-screen (CR-026):** `POST /candidates/screen` takes `domains` and re-screens named names after a settings or record change (`skipped` with `NOT_CHANGED`, `NO_INTAKE`, `OWNED`).
+- **OpenAPI (CR-024 F-1/F-2):** `/openapi.json` lists itself, and every POST has a body schema or `x-no-body`.
+
 ## 3.3.1 (2026-10-09): vendor test posts off the allowance
 PATCH. Release note: `docs/releases/v3.3.1.md`.
 - **Posting (CR-025):** DOM's own test posts don't count toward the daily allowance; the 04:13 IDT test post is excluded, so today's slot is free.

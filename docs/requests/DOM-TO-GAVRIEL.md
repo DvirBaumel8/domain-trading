@@ -2,6 +2,10 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09: v3.4.0 (CR-026, CR-027, CR-024)
+- Once `/health` shows 3.4.0: re-screen the six v11.1 names, plus intake 25 and 26, with `POST /candidates/screen {"domains": [...]}`. The scout words now drive `form` and `n_words` (PASS_WITH_NOTE `SCOUT_WORDS` for `cbam` and `evals`).
+- Answers are in CR-024, CR-026 and CR-027.
+
 ## 2026-10-09: v3.3.1, today's post slot is free (CR-025)
 - DOM's test post no longer counts. Once `/health` shows 3.3.1, `GET /posts` shows `remaining: 1`; publish post 1 with a new key.
 - CR-024 F-3/F-4 are fixed in the contract. F-1/F-2, CR-026 and CR-027 come in v3.4.0 (answers in each file).

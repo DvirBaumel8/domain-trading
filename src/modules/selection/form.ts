@@ -45,9 +45,13 @@ export interface FormResult {
   city_plus_legal: boolean;
   short: 0 | 1;
   gform1_pass: boolean | null;
-  status: 'PASS' | 'FLAG' | 'FAIL';
+  status: 'PASS' | 'PASS_WITH_NOTE' | 'FLAG' | 'FAIL';
   reason_code: string | null;
   reason: string | null;
+  /** v3.4.0 (CR-027): set only when the scout's own words were the tokens. */
+  scout_words?: string[];
+  /** The scout pieces the lexicon does not know (known terms for this name only). */
+  scout_unknown?: string[];
 }
 
 /** Cost of one unknown run: this constant plus one per character, so the search keeps unknown runs as short as it can. */
@@ -239,7 +243,7 @@ export function analyzeForm(
   lane: Lane,
   lex: Lexicon,
   s: FormSettings,
-  hints?: { city?: string; trade?: string },
+  hints?: { city?: string; trade?: string; /** v3.4.0 (CR-027): the scout's word pieces; they replace the dictionary split when they join back to the name. */ words?: string[] },
 ): FormResult {
   const dom = normalizeDomain(domain);
   const sld = dom.slice(0, -'.com'.length);
@@ -277,7 +281,10 @@ export function analyzeForm(
   if (has_hyphen) return { ...base, status: 'FAIL', reason_code: 'HAS_HYPHEN', reason: 'The name contains a hyphen (SPELL-1)' };
 
   const hintTerms = new Set([hints?.city, hints?.trade].filter((h): h is string => !!h).map((h) => h.toLowerCase().replace(/[^a-z]/g, '')));
-  const seg = segment(sld, lex, s, hintTerms);
+  const scout = hints?.words && hints.words.length > 0 && hints.words.join('') === sld ? hints.words : null;
+  const scoutUnknown = scout ? scout.filter((w) => !lex.types.has(w)) : [];
+  // A scout piece the lexicon lacks is a known term for this name only (type `dictionary`), so the unknown-token rule never sees it.
+  const seg: Seg = scout ? { tokens: scout, alternatives: [], unknown: [], forced: new Map() } : segment(sld, lex, s, hintTerms);
   const token_types: TokenType[] = seg.tokens.map((t, idx) => seg.forced.get(idx) ?? pickType(lex.types.get(t) ?? ['dictionary']));
   const word_count = seg.tokens.length;
   const firstOf = (type: TokenType) => {
@@ -311,6 +318,7 @@ export function analyzeForm(
     city_plus_legal: ci >= 0 && hasLegal,
     short,
     gform1_pass: gf,
+    ...(scout && { scout_words: scout, scout_unknown: scoutUnknown }),
   };
 
   if (seg.unknown.length > 0 && s.unknown_token_fails) {
@@ -333,13 +341,16 @@ export function analyzeForm(
   if (result.ambiguous) {
     return { ...result, status: 'FLAG', reason_code: 'AMBIGUOUS_SPLIT', reason: `Several readings: ${[seg.tokens, ...seg.alternatives].map((t) => t.join('·')).join(' / ')}` };
   }
-  // A split made of tiny dictionary words (it, os, ad) is usually a split of a longer word the list does not know.
-  const tiny = seg.tokens.filter((t, idx) => t.length === 2 && token_types[idx] === 'dictionary' && (lex.types.get(t) ?? []).every((x) => x === 'dictionary'));
+  // A split made of tiny dictionary words (it, os, ad) is usually a split of a longer word the list does not know. The scout's own words are not a guess.
+  const tiny = scout ? [] : seg.tokens.filter((t, idx) => t.length === 2 && token_types[idx] === 'dictionary' && (lex.types.get(t) ?? []).every((x) => x === 'dictionary'));
   if (s.short_token_flag_min > 0 && tiny.length >= s.short_token_flag_min) {
     return {
       ...result, ambiguous: true, status: 'FLAG', reason_code: 'AMBIGUOUS_SPLIT',
       reason: `The split ${seg.tokens.join('·')} has ${tiny.length} dictionary-only 2-letter tokens (${tiny.join(', ')}): the reading is unreliable`,
     };
+  }
+  if (scoutUnknown.length > 0) {
+    return { ...result, status: 'PASS_WITH_NOTE', reason_code: 'SCOUT_WORDS', reason: `The scout's words are the tokens (${seg.tokens.join('·')}); not in the dictionary, counted as known for this name: ${scoutUnknown.join(', ')}` };
   }
   return result;
 }

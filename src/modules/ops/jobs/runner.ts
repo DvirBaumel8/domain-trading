@@ -76,7 +76,7 @@ export interface JobRunnerDeps {
   /** Daily registry check of the kept names of the uploaded drop lists (CR-007 §22 G-2); while undefined, that step reports skipped. */
   dropWatchJob?: Runnable;
   /** Screens the queued scout names and the drop-list names about to drop in one full-plan run (CR-012 part C); while undefined, that step reports skipped. */
-  intakeScreeningJob?: Runnable & { runOnDemand?: (maxNames: number | null) => Promise<unknown> };
+  intakeScreeningJob?: Runnable & { runOnDemand?: (maxNames: number | null, domains?: string[]) => Promise<unknown> };
   /** Builds the day's candidate list after the intake run has finished (CR-012 part B); while undefined, that step reports skipped. */
   buildDailyListJob?: Runnable & { runOnce(o?: { builtBy?: 'daily' | 'rebuild' | 'auto' }): Promise<unknown> };
   /** Freezes cohorts and checks their drop and re-registration outcomes (CR-007 §22 G-1); while undefined, that step reports skipped. */
@@ -124,8 +124,9 @@ export class JobRunner {
     // v3.3.0 (CR-021): POST /candidates/screen. Screening of the waiting names under the on-demand allowance, then the list; nothing else of the daily run.
     if (job === 'screen') {
       const maxNames = (run?.params as { max_names?: unknown } | null | undefined)?.max_names;
+      const named = (run?.params as { domains?: unknown } | null | undefined)?.domains;
       return [
-        step('onDemandScreen', async () => (d.intakeScreeningJob?.runOnDemand ? d.intakeScreeningJob.runOnDemand(typeof maxNames === 'number' ? maxNames : null) : { skipped: true, reason: 'intake screening not configured' })),
+        step('onDemandScreen', async () => (d.intakeScreeningJob?.runOnDemand ? d.intakeScreeningJob.runOnDemand(typeof maxNames === 'number' ? maxNames : null, Array.isArray(named) ? (named as string[]) : undefined) : { skipped: true, reason: 'intake screening not configured' })),
         step('buildDailyList', async () => (d.buildDailyListJob ? d.buildDailyListJob.runOnce({ builtBy: 'auto' }) : { skipped: true, reason: 'daily list not configured' })),
       ];
     }

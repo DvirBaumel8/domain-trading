@@ -10,12 +10,16 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /** The zod schema of the JSON request body, for GET /openapi.json. */
     openapiBody?: z.ZodType;
+    /** v3.4.0 (CR-024 F-2): the route takes no request body (the document says `x-no-body: true`). */
+    openapiNoBody?: boolean;
+    /** v3.4.0 (CR-024 F-3): the success status the route answers, when it is not 200. */
+    openapiStatus?: 200 | 201 | 202;
   }
 }
 
 export const OPENAPI_PATH = '/openapi.json';
 
-interface Entry { method: string; url: string; body?: z.ZodType }
+interface Entry { method: string; url: string; body?: z.ZodType; noBody?: boolean; status?: number }
 
 /** One line per route: what it does. Keyed `METHOD /fastify/path`. A route with no line here fails the test that keeps the document complete. */
 export const SUMMARIES: Record<string, string> = {
@@ -131,7 +135,7 @@ export function collectOpenApiRoutes(app: FastifyInstance): Entry[] {
   app.addHook('onRoute', (r) => {
     for (const method of [r.method].flat()) {
       if (method === 'HEAD' || method === 'OPTIONS') continue;
-      entries.push({ method, url: r.url, ...(r.config?.openapiBody && { body: r.config.openapiBody }) });
+      entries.push({ method, url: r.url, ...(r.config?.openapiBody && { body: r.config.openapiBody }), ...(r.config?.openapiNoBody && { noBody: true }), ...(r.config?.openapiStatus && { status: r.config.openapiStatus }) });
     }
   });
   return entries;
@@ -148,7 +152,8 @@ export function buildOpenApi(entries: Entry[], version: string): Record<string, 
       ...(scope === 'none' ? { security: [] } : { security: [{ bearer: [] }] }),
       ...(paramsOf(path).length ? { parameters: paramsOf(path).map((name) => ({ name, in: 'path', required: true, schema: { type: 'string' } })) } : {}),
       ...(isMutating(e.method) ? { 'x-idempotency-key': 'required' } : {}),
-      responses: { '200': { description: 'OK' } },
+      ...(e.noBody ? { 'x-no-body': true } : {}),
+      responses: { [String(e.status ?? 200)]: { description: 'OK' } },
     };
     if (e.body) {
       try {
@@ -167,7 +172,7 @@ export function buildOpenApi(entries: Entry[], version: string): Record<string, 
   };
 }
 
-/** GET /openapi.json (READ). The route table is read when the request comes, so it holds every route registered by then (itself excluded). */
+/** GET /openapi.json (READ). The route table is read when the request comes, so it holds every route registered by then (itself included since 3.4.0). */
 export function registerOpenApi(app: FastifyInstance, entries: Entry[], version: string): void {
-  app.get(OPENAPI_PATH, async () => buildOpenApi(entries.filter((e) => e.url !== OPENAPI_PATH), version));
+  app.get(OPENAPI_PATH, async () => buildOpenApi(entries, version));
 }

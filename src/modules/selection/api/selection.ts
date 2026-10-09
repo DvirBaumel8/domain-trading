@@ -94,6 +94,9 @@ const UploadRow = z.object({
   }).strict(),
 }).strict();
 
+/** Documentation shape of the body: exactly one of `rows` (JSON, 1 to 200) or `csv` (text). */
+const LabelledBody = z.union([z.object({ rows: z.array(UploadRow).min(1).max(200) }).strict(), z.object({ csv: z.string() }).strict()]);
+
 /** Case-insensitive search for a forbidden gate-feature key anywhere in the raw body (SEL5-2). */
 function findForbidden(v: unknown, keys: Set<string>, path = ''): string | null {
   if (Array.isArray(v)) {
@@ -222,13 +225,13 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     };
   });
 
-  app.post<{ Params: { method: string } }>('/selection/sibling-methods/:method/approve', async (req, reply) => {
-    const body = z.object({ approval_ref: Approval.nullable().optional() }).strict().parse(req.body ?? {});
+  app.post<{ Params: { method: string } }>('/selection/sibling-methods/:method/approve', { config: { openapiBody: ActivateBody } }, async (req, reply) => {
+    const body = ActivateBody.parse(req.body ?? {});
     const a = await approveMethod(db, req.params.method, body.approval_ref, now(), { createdBy: req.auth!.name, auditId: req.auditId! });
     return reply.code(201).send({ method: req.params.method, approved: true, approval_text: a.text, approved_at: a.approvedAt.toISOString() });
   });
 
-  app.post('/selection/evaluate', async (req) => {
+  app.post('/selection/evaluate', { config: { openapiBody: EvalBody } }, async (req) => {
     const raw = req.body ?? {};
     const wanted = typeof (raw as { settings?: unknown }).settings === 'string' ? (raw as { settings: string }).settings : undefined;
     const active = await activeSelectionSettings(db);
@@ -299,7 +302,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
   // ---------- CAP-21a: name registry, replay, buy-hold report ----------
 
   // 200 rows with gate results exceed the 64 KB default body limit.
-  app.post('/selection/labelled-names', { bodyLimit: 1024 * 1024 }, async (req) => {
+  app.post('/selection/labelled-names', { bodyLimit: 1024 * 1024, config: { openapiBody: LabelledBody } }, async (req) => {
     const raw = (req.body ?? {}) as { rows?: unknown; csv?: unknown };
     let rowsIn: unknown[];
     if (typeof raw.csv === 'string' && raw.rows === undefined) {

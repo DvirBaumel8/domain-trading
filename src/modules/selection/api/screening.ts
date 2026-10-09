@@ -38,6 +38,7 @@ const RunBody = z.object({
   mode: z.enum(['live', 'full']).default('live'), settings: z.string().regex(LABEL_RE).optional(), tranche_id: text(64).optional(),
   checks: z.array(z.enum(CHECK_IDS)).min(1).optional(), names: z.array(InputName).min(1).max(50),
 }).strict();
+const CancelBody = z.object({ reason: z.string().trim().min(1).max(200).optional() }).strict();
 const ManualBody = z.object({
   domain: z.string().trim().min(1).max(253), check: z.string(), checked_at: IsoTime,
   // Required for web_risk, tm_us and tm_eu; a history record carries its archive links in result.evidence_urls (this one is then optional).
@@ -102,7 +103,11 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       names: a.items.filter((i) => want === null || i.item.domain === want).map((i) => {
         const latest = latestByCheck(i.rows);
         return {
-          domain: i.item.domain, lane: i.item.lane, final_status: i.derived.final_status, first_fail: i.derived.first_fail,
+          domain: i.item.domain, lane: i.item.lane,
+          // v3.4.0 (CR-027): the scout's words when the name came with them, else the form check's dictionary tokens.
+          words: i.item.words ?? (Array.isArray(latest.get('form')?.fields.tokens) ? (latest.get('form')!.fields.tokens as string[]) : null),
+          split_source: i.item.words ? 'scout' : latest.get('form') ? 'dictionary' : null,
+          final_status: i.derived.final_status, first_fail: i.derived.first_fail,
           tier: (latest.get('tier')?.fields.tier as string | undefined) ?? null, score: (latest.get('price')?.fields.score_0_100 as number | undefined) ?? null, short: (latest.get('form')?.fields.short as number | undefined) ?? null,
           flags: i.derived.flags, pending_manual: i.derived.pending_manual, not_implemented: i.derived.not_implemented,
           // Only verdicts bound to a row that is in force now; final_status and flags are not changed by a verdict (v1.1.0 meaning).
@@ -116,8 +121,8 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     };
   });
 
-  app.post<{ Params: { id: string } }>('/screening/runs/:id/cancel', async (req) => {
-    const body = z.object({ reason: z.string().trim().min(1).max(200).optional() }).strict().parse(req.body ?? {});
+  app.post<{ Params: { id: string } }>('/screening/runs/:id/cancel', { config: { openapiBody: CancelBody } }, async (req) => {
+    const body = CancelBody.parse(req.body ?? {});
     const run = await db.selectFrom('screening_runs').select(['id', 'status']).where('id', '=', req.params.id).executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${req.params.id}"`);
     const done = await worker.cancel(run.id, req.auth!.name, body.reason);

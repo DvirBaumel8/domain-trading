@@ -498,14 +498,14 @@ describe('CR-023 E: rejected names and run ids on the daily list', () => {
 });
 
 describe('CR-023 F: GET /openapi.json', () => {
-  it('AC-9 lists exactly the routes Fastify registered (itself excluded), every route of the contract route table, with scope, summary and body schemas', async () => {
+  it('AC-9 lists exactly the routes Fastify registered (itself included), every route of the contract route table, with scope, summary and body schemas', async () => {
     const x = await h();
     const r = await x.get('/openapi.json');
     expect(r.statusCode).toBe(200);
     const doc = r.json();
     expect(doc.openapi).toMatch(/^3\.1/);
     const listed = Object.entries(doc.paths).flatMap(([p, ops]: [string, any]) => Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`)).sort(); // eslint-disable-line @typescript-eslint/no-explicit-any
-    const registered = [...new Set(x.app.routeTable.filter((q) => q.method !== 'HEAD' && q.url !== '/openapi.json').map((q) => `${q.method} ${q.url.replace(/:([A-Za-z0-9_]+)/g, '{$1}')}`))].sort();
+    const registered = [...new Set(x.app.routeTable.filter((q) => q.method !== 'HEAD').map((q) => `${q.method} ${q.url.replace(/:([A-Za-z0-9_]+)/g, '{$1}')}`))].sort();
     expect(listed).toEqual(registered);
     // every route of the contract's route table
     const table = readFileSync('docs/contract/endpoints.md', 'utf8').split('\n').filter((l) => /^\| (GET|POST)/.test(l));
@@ -514,7 +514,7 @@ describe('CR-023 F: GET /openapi.json', () => {
       return [...paths!.matchAll(/`([^`]+)`/g)].map((m) => `${method} ${m[1]!.split('?')[0]}`);
     });
     expect(documented.length).toBeGreaterThan(50);
-    expect(listed).toEqual(expect.arrayContaining(documented.filter((d) => d !== 'GET /openapi.json')));
+    expect(listed).toEqual(expect.arrayContaining(documented));
     for (const [p, ops] of Object.entries(doc.paths) as [string, any][]) { // eslint-disable-line @typescript-eslint/no-explicit-any
       for (const [m, op] of Object.entries(ops) as [string, any][]) { // eslint-disable-line @typescript-eslint/no-explicit-any
         expect(typeof op['x-scope'], `${m} ${p}`).toBe('string');

@@ -8,7 +8,7 @@ export const formCheck: Check = {
   ruleIds: ['SPELL-1', 'FORM-2', 'G-FORM-1', 'CAP-01'],
   lists: ['trade', 'regime', 'tech', 'generic_head', 'state', 'legal', 'city_extra', 'dictionary_extra'],
   async run(ctx) {
-    const f = analyzeForm(ctx.item.domain, ctx.item.lane, ctx.lexicon, ctx.settings.form, { city: ctx.item.city, trade: ctx.item.trade });
+    const f = analyzeForm(ctx.item.domain, ctx.item.lane, ctx.lexicon, ctx.settings.form, { city: ctx.item.city, trade: ctx.item.trade, words: ctx.item.words });
     return outcome(f.status, f.reason_code, f.reason, { ...f }, {});
   },
 };
@@ -17,5 +17,5 @@ export const formCheck: Check = {
 export function formFieldsOf(ctx: CheckContext): FormResult {
   const row = ctx.latest('form');
   if (row && Array.isArray(row.fields.tokens)) return row.fields as unknown as FormResult;
-  return analyzeForm(ctx.item.domain, ctx.item.lane, ctx.lexicon, ctx.settings.form, { city: ctx.item.city, trade: ctx.item.trade });
+  return analyzeForm(ctx.item.domain, ctx.item.lane, ctx.lexicon, ctx.settings.form, { city: ctx.item.city, trade: ctx.item.trade, words: ctx.item.words });
 }

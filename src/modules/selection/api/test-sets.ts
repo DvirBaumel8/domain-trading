@@ -40,6 +40,7 @@ const Filters = z.object({
   exclude_geo: z.boolean().default(true), min_price_usd: z.number().positive().optional(), as_of_from: ymd.optional(), as_of_to: ymd.optional(),
 }).strict();
 const AnswerAge = z.number().int().min(0).max(30).default(TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS);
+const CancelBody = z.object({ reason: z.string().trim().min(1).max(200).optional() }).strict();
 const NewBody = z.object({
   name: z.string().regex(NAME), purpose: z.literal('new'), sibling_method: z.enum(TEST_SET_METHODS).default(TEST_SET_DEFAULT_METHOD), seed: z.string().min(1).max(64),
   test_share: z.number().gt(0).lt(1).default(0.5), max_answer_age_days: AnswerAge, filters: Filters.default({ exclude_geo: true }),
@@ -241,8 +242,8 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     };
   });
 
-  app.post<{ Params: { name: string } }>('/selection/test-sets/:name/cancel', async (req) => {
-    const body = z.object({ reason: z.string().trim().min(1).max(200).optional() }).strict().parse(req.body ?? {});
+  app.post<{ Params: { name: string } }>('/selection/test-sets/:name/cancel', { config: { openapiBody: CancelBody } }, async (req) => {
+    const body = CancelBody.parse(req.body ?? {});
     const set = await db.selectFrom('test_sets').selectAll().where('name', '=', req.params.name).executeTakeFirst();
     if (!set) throw new AppError(404, 'TEST_SET_NOT_FOUND', `No test set "${req.params.name}"`);
     const done = await worker.cancel(set.run_id, req.auth!.name, body.reason);
@@ -254,7 +255,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
     return { name: set.name, status: 'cancelled' as const, run_id: set.run_id, cancelled_at: done.cancelled_at.toISOString(), cancelled_by: req.auth!.name };
   });
 
-  app.post<{ Params: { name: string } }>('/selection/test-sets/:name/seal', async (req, reply) => {
+  app.post<{ Params: { name: string } }>('/selection/test-sets/:name/seal', { config: { openapiNoBody: true } }, async (req, reply) => {
     z.object({}).strict().parse(req.body ?? {});
     const out = await db.transaction().execute(async (trx) => {
       await advisoryXactLock(trx, 'test_sets_seal');

@@ -52,7 +52,7 @@ export function registerPosts(app: FastifyInstance, deps: PostingDeps): void {
   // v3.2.0 (CR-017): WRITE (the global scope rule for POST), Idempotency-Key, audited. Reads Buffer's type definitions (introspection) and validates the post shape; publishes nothing.
   // v3.3.0 (CR-022 F-2): the same body as POST /posts (same 40 MB limit and validation); the check runs on the input DOM would build for THAT post, with placeholder /media URLs.
   // An empty body checks the fixed sample. Nothing is stored and nothing is published.
-  app.post('/posts/schema-check', { bodyLimit: POST_BODY_LIMIT, onRequest: requireWriteBeforeBody }, async (req) => {
+  app.post('/posts/schema-check', { config: { openapiBody: PostBody }, bodyLimit: POST_BODY_LIMIT, onRequest: requireWriteBeforeBody }, async (req) => {
     const raw = req.body;
     const empty = raw === undefined || raw === null || (typeof raw === 'object' && !Array.isArray(raw) && Object.keys(raw).length === 0);
     let input: Record<string, unknown> | undefined;

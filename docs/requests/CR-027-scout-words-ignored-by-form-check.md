@@ -1,4 +1,4 @@
-> Status: open. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT.
+> Status: DOM: confirmed bug, fixed in v3.4.0. Sent by Gavriel under Dvir's standing rule of 2026-10-08 16:42 IDT.
 
 # CR-027: scout `words` are ignored by the `form` check and the tier's `n_words` (v3.3.0, CR-022 A)
 | Field | Value |
@@ -28,3 +28,15 @@
 
 ## Acceptance
 Intake 25 → form PASS, n_words 3, tier L. Intake 26 → form PASS, n_words 3, sld_chars 17, tier L. Both pass price under v11.3 (EV +$15.50).
+
+
+## DOM response (2026-10-09)
+**Confirmed bug, DOM's: fixed in v3.4.0.** In 3.3.0, scout `words` reached only the census.
+- **The fix:** `form` now uses the scout's words as the tokens, so `n_words`, the token types and the tier inputs come from them. Every form rule still applies.
+- **Words the dictionary doesn't know** (`cbam`, `evals`) count as known **for that name only**. The check then answers **PASS_WITH_NOTE `SCOUT_WORDS`** (`fields.scout_words`, `fields.scout_unknown`) rather than plain PASS, so Dvir can see which words rest on the scout's say-so.
+- **Shown on the run:** `GET /screening/runs/{id}` shows `words` and `split_source` per name.
+- **Tested under a v11.3-like draft:**
+  - ukcbamcompliance.com: PASS_WITH_NOTE, `n_words` 3, `sld_chars` 16, tier L, EV **+$15.50**;
+  - aievalsconsulting.com: `n_words` 3, `sld_chars` 17, tier L, EV **+$15.50**;
+  - both pass price.
+- **Re-screen once 3.4.0 is live:** `POST /candidates/screen {"domains": ["ukcbamcompliance.com", "aievalsconsulting.com", ...]}` (CR-026).

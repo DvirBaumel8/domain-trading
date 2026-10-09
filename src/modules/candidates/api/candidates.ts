@@ -36,7 +36,11 @@ const Body = z.object({
   checked_at: z.iso.datetime({ offset: true }).optional(),
 }).strict();
 /** v3.3.0 (CR-021): `max_names` caps the names of one on-demand run (the allowance still applies). */
-export const ScreenBody = z.object({ max_names: z.number().int().min(1).max(100).optional() }).strict();
+export const ScreenBody = z.object({
+  max_names: z.number().int().min(1).max(100).optional(),
+  /** v3.4.0 (CR-026): screen only these names; a screened name goes in again only when the settings version or its records changed since its last screening. */
+  domains: z.array(z.string().trim().min(1).max(253)).min(1).max(30).optional(),
+}).strict();
 const DailyQuery = z.object({ date: ymd.optional(), limit: z.coerce.number().int().min(1).max(DAILY_LIST_MAX_LIMIT).default(DAILY_LIST_DEFAULT_LIMIT) }).strict();
 const Query = z.object({ kind: z.enum(RECORD_KINDS_ALL).optional() }).strict();
 
@@ -63,7 +67,11 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
       .where((eb) => eb.exists(eb.selectFrom('job_steps as s').select('s.id').whereRef('s.run_id', '=', 'r.id').where('s.status', 'in', ['queued', 'running'])))
       .orderBy('r.created_at').limit(1).executeTakeFirst();
     if (open) throw new AppError(409, 'ALREADY_RUNNING', `A ${open.job} run is still going; try again when it has finished`, { run_id: open.id, job: open.job });
-    const plan = await planOnDemand(db, nowMs, b.max_names ?? null);
+    let domains: string[] | undefined;
+    if (b.domains) {
+      try { domains = [...new Set(b.domains.map((d) => normalizeDomain(d)))]; } catch (e) { throw new AppError(422, 'VALIDATION_ERROR', `domains: ${e instanceof Error ? e.message : 'invalid domain'}`, { field: 'domains' }); }
+    }
+    const plan = await planOnDemand(db, nowMs, b.max_names ?? null, domains);
     const allowance = (used: number) => ({ daily_max: plan.allowance.daily_max, used_today: used, remaining: Math.max(0, plan.allowance.daily_max - used) });
     if (plan.allowance.remaining <= 0) {
       throw new AppError(409, 'ON_DEMAND_SCREEN_CAP', 'The on-demand screening allowance of today is used up', { ...plan.allowance, next_allowed_at: toJerusalemIso(nextIdtMidnight(nowMs)) });
@@ -75,15 +83,15 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
         await buildDailyList({ db, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'auto' });
       });
       req.auditSummary = 'screen: no names waiting';
-      return reply.code(200).send({ run_id: null, names_n: 0, skipped: 'NO_NAMES', allowance: allowance(plan.allowance.used_today) });
+      return reply.code(200).send({ run_id: null, names_n: 0, skipped: domains ? plan.skipped : 'NO_NAMES', allowance: allowance(plan.allowance.used_today) });
     }
     const queue = deps.queue?.();
     if (!queue) throw new Error('job queue not wired');
-    const r = await queue.enqueue('screen', { trigger: 'manual', triggeredBy: req.auth!.name, params: { max_names: b.max_names ?? null } });
+    const r = await queue.enqueue('screen', { trigger: 'manual', triggeredBy: req.auth!.name, params: { max_names: b.max_names ?? null, ...(domains && { domains }) } });
     if (r.skipped) throw new AppError(409, 'ALREADY_RUNNING', 'A screen run is still going; try again when it has finished', { run_id: r.runId, job: 'screen' });
     queue.kick();
-    req.auditSummary = `screen: ${plan.names_n} queued`;
-    return reply.code(202).send({ run_id: r.runId, names_n: plan.names_n, allowance: allowance(plan.allowance.used_today + plan.names_n) });
+    req.auditSummary = `screen: ${plan.names_n} queued${plan.skipped.length ? `, ${plan.skipped.length} skipped` : ''}`;
+    return reply.code(202).send({ run_id: r.runId, names_n: plan.names_n, skipped: plan.skipped, allowance: allowance(plan.allowance.used_today + plan.new_n) });
   });
 
   // v2.14.0 (CR-012 part B): the day's candidate list, as built once by the daily step (newest build of the day).
@@ -95,7 +103,7 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
 
   // v2.16.0 (CR-015 I-4): rebuild today's list now (a record posted after the daily step is judged at once). Same rules as the daily step: the day's first order is kept,
   // changes are marked. It waits for nothing (the daily step already did) and reads only the database. At most 6 per IDT day.
-  app.post('/candidates/daily/rebuild', async (req, reply) => {
+  app.post('/candidates/daily/rebuild', { config: { openapiNoBody: true, openapiStatus: 201 } }, async (req, reply) => {
     z.object({}).strict().parse(req.body ?? {});
     const today = idtDay(deps.now());
     // The count and the build run under one advisory lock (the build commits its row before the lock is released), so two calls cannot both take the last slot.

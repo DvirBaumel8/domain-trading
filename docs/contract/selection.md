@@ -1,4 +1,4 @@
-# Selection checks (contract v3.3.1)
+# Selection checks (contract v3.4.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -20,6 +20,7 @@ A place name from the gazetteer that is also a dictionary word (`dent`, `lime`, 
 | `FLAG` | `GEO_ATTR_MISSING` | lane `S2`, shape within the limits, but no city token or no trade token |
 | `FLAG` | `CITY_PLUS_LEGAL` | a city token and a legal term (lawyer, attorney, law) |
 | `FLAG` | `AMBIGUOUS_SPLIT` | `alternative_splits` is not empty, **or** the split has at least `form.short_token_flag_min` (default 2) dictionary-only 2-letter tokens (`animalitos` → `animal·it·os`); `ambiguous` is then true |
+| `PASS_WITH_NOTE` | `SCOUT_WORDS` | (3.4.0, CR-027) the name came with scout `words` and at least one piece is not in the lexicon: those pieces count as known terms **for this name only** (`fields.scout_words`, `fields.scout_unknown`). With scout words the tokens, `word_count` and token types come from them, every other rule above still applies, and the 2-letter `AMBIGUOUS_SPLIT` flag is skipped (the split is not a guess). Words that don't join to the name are ignored |
 | `PASS` | none | none of the above |
 
 

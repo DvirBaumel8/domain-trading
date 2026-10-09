@@ -1,4 +1,4 @@
-# Endpoints (contract v3.3.1)
+# Endpoints (contract v3.4.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -54,7 +54,7 @@ The only public route. No auth, no DB access (Render's health check uses it).
 - **200** `{"status":"ok"}`.
 
 ### `GET /openapi.json`
-READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route: method, path, `x-scope` (`none`, `read`, `write`, `write or intake`, `write or job-trigger token`), a one-line summary, path parameters, and the request body's JSON schema where the route has one. A test keeps it equal to the registered routes and this route table. This contract stays the binding text; the document is a convenience.
+READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024: itself included; every POST has a `requestBody`, or `x-no-body: true` when it takes none): method, path, `x-scope` (`none`, `read`, `write`, `write or intake`, `write or job-trigger token`), a one-line summary, path parameters, and the request body's JSON schema where the route has one. A test keeps it equal to the registered routes and this route table. This contract stays the binding text; the document is a convenience.
 
 ### `GET /health`
 Any valid bot token (READ or WRITE).
@@ -492,7 +492,7 @@ WRITE. Starts a screening run (CAP-20) over 1 to 50 names and returns at once; t
 WRITE (2.9.0, CR-010 F-1). Body (strict) `{reason?}` (at most 200 characters). Stops a running run: its status becomes `cancelled`, `finished_at`, `cancelled_at` and `cancelled_by` (the token's name) are set, the results written so far are kept, and every check not yet done becomes UNKNOWN `CANCELLED`. The worker stops within seconds and a cancelled run is **never** woken or reopened (not by a read, a recompute or the daily run). **200:** `{id, status: "cancelled", cancelled_at, cancelled_by}`. **Errors:** 404 `RUN_NOT_FOUND` · 409 `RUN_NOT_RUNNING` (`details.status`).
 
 ### `GET /screening/runs/{id}`
-READ. `?domain=` (one name), `?view=summary|full` (default `full`; `summary` leaves out `results`). **A READ poll may start background work:** a running run whose last row is older than 120 s (the service slept) continues now, and a finished run with a check to recompute is reopened (never a `cancelled` run, 2.9.0) (it writes result rows in the background); the answer does not wait for it and is not affected by it.
+READ. Each name has `words` and `split_source` (`scout` | `dictionary`, null before `form` ran; 3.4.0, CR-027). `?domain=` (one name), `?view=summary|full` (default `full`; `summary` leaves out `results`). **A READ poll may start background work:** a running run whose last row is older than 120 s (the service slept) continues now, and a finished run with a check to recompute is reopened (never a `cancelled` run, 2.9.0) (it writes result rows in the background); the answer does not wait for it and is not affected by it.
 - **200:** `{run_id, status: "running"|"done"|"partial"|"cancelled" (2.9.0), unknowns (2.13.0, as for rescore test sets; `?domain=` filters it), lookups: {fresh, reused, unknown, rate_limited} (2.9.0, as for test sets), mode, backtest, settings_version, buy_hold, created_at, finished_at, progress: {checks_planned, checks_done}, names: [{domain, lane, final_status, first_fail: {check, gate, reason_code} | null, tier, short, flags: [check], pending_manual: [check], not_implemented: [check], verdicts: [{check, result_id, verdict, reason, decided_by, decided_at}] (1.2.0), source_lane: "expired_drop"|"fresh"|"unknown"|null, results?: [{check, gate, rule_ids, status, reason_code, reason, fields, data_as_of, checked_at, cached, source, settings_version, list_versions, duration_ms, upstream_calls, evidence: [id]}]}], funnel}`. `results` holds the latest result per check, in the order written. `tier` is the tier check's tier (null until that check exists); `short` is the form check's `short`; `source_lane` is the `history` check's inferred source lane (null until that check has a result). `verdicts` (1.2.0) lists the latest FLAG verdict of each result row that is **in force now** (a verdict on a superseded row is not shown); it never changes `final_status` or `flags`.
 - Statuses, final statuses, the funnel and the reason codes: `selection.md` §Screening runs.
 - **Errors:** 404 `RUN_NOT_FOUND` · 400 `VALIDATION_ERROR` (bad query).
@@ -712,7 +712,8 @@ READ (2.14.0, CR-012 part B). Query `date?` (IDT day, default today), `limit?` (
 - **Automatic rebuild (3.2.0, CR-018 A):** when the day's intake screening run finishes after the daily build (for example after a restart), the list is rebuilt automatically (`built_by: auto`). That rebuild does not count toward the 6 manual rebuilds. Nothing in it is an approval.
 
 ### `POST /candidates/screen`
-WRITE (3.3.0, CR-021). Screens the waiting names now, then rebuilds the day's list. Body (strict) `{}` or `{max_names (1–100)}`.
+WRITE (3.3.0, CR-021). Screens the waiting names now, then rebuilds the day's list. Body (strict) `{}` or `{max_names (1–100)}` or (3.4.0, CR-026) `{domains: [1–30 names]}`.
+- **`domains` (3.4.0):** only those names (no drop-list names). A waiting intake name goes in as usual. An already screened name goes in only if the active settings version differs from its last screening's, or a domain record (`tm_us`, `history`, `sellers`) or an intake row of that name was added after it. Others are listed in `skipped: [{domain, reason: NOT_CHANGED | NO_INTAKE | OWNED}]`; 202 always carries `skipped` (empty when none). All skipped → 200 `{run_id: null, names_n: 0, skipped: [...], allowance}`, and the list is still rebuilt. A name screened on demand earlier the same IDT day counts once. **Adding a record never re-queues a name by itself.**
 - **Order:** the same as the daily `intakeScreening`: scout names first (oldest first), then drop-list leftovers that fit a kept lane.
 - **Allowance:** its own, at most `intake.on_demand_screen_daily_max` (default 30) distinct names per IDT day. Only names actually screened count. It never reduces the daily run's 30, and the daily run's 30 counts only its own names.
 - **It touches nothing else:** no outside review or other daily step, and no effect on buying, spending or the buy hold.
@@ -751,7 +752,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Posting errors (2.12.0):** `POST_INVALID`, `POST_TOO_LONG`, `POSTING_PAUSED`, `POSTING_NOT_CONFIGURED`, `POST_DAILY_CAP`, `POST_FAILED`, `POST_NOT_REMOVABLE`, `POST_DELETE_UNSUPPORTED`.
 
-**Candidate screening errors (3.3.0, CR-021):** `ON_DEMAND_SCREEN_CAP` (409; also the `onDemandScreen` skip reason), `ALREADY_RUNNING` (409; also a skip reason of the daily steps).
+**Candidate screening errors (3.3.0, CR-021):** `ON_DEMAND_SCREEN_CAP` (409; also the `onDemandScreen` skip reason), `ALREADY_RUNNING` (409; also a skip reason of the daily steps). Skip reasons of `POST /candidates/screen` `domains` (3.4.0): `NOT_CHANGED`, `NO_INTAKE`, `OWNED`. Form note (3.4.0): `SCOUT_WORDS`.
 
 **Seller check reasons (3.3.0, CR-023 B; in `tier` `fields.sellers`, not errors):** `SELLERS_STALE`, `PARKED_OR_FOR_SALE`, `DUPLICATE_DOMAIN`, `REDIRECT_OFF_SITE`, plus the page fetch reasons of `same_name`.
 

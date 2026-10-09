@@ -68,7 +68,7 @@ export function registerReviews(app: FastifyInstance, deps: ReviewsDeps): void {
   });
 
   // v2.11.0: the service's one AI call. WRITE token, Idempotency-Key, audited; 3 per hour per token (src/http/rate-limit.ts).
-  app.post('/reviews/run', async (req) => {
+  app.post('/reviews/run', { config: { openapiNoBody: true } }, async (req) => {
     const r = await runReview({ ...deps.review, onGoogleCall: () => markReviewReachedGoogle(req), db, secretValues: deps.secretValues, version: deps.version }, { trigger: 'manual', now: deps.now(), createdBy: req.auth!.name });
     if ('skipped' in r) throw skipToError(r);
     return r;
