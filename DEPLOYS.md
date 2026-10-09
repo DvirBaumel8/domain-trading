@@ -6,3 +6,4 @@ One line per push to main that changed code (deploy-live workflow, CR-034): `<ti
 2026-10-09T17:25:43+0300 deploy_live 3.7.1 12ad178bef6a8708d78934b0fff47bf46eafb7f6 via 4971a641ca60cb63a0003d3718c3a9a6f4245cff
 2026-10-09T17:25:54+0300 deploy_live 3.7.1 4971a641ca60cb63a0003d3718c3a9a6f4245cff
 2026-10-09T17:28:11+0300 deploy_live 3.7.1 cbaf7cebad120cc193b8927c9338bf386c7e5653
+2026-10-09T17:48:05+0300 deploy_live 3.7.1 08baeb43df605b700cf26cbb02a0cdc87483fe2b via 6ac1d7c50728efb79d820bd2d4be5e648b45b19b
