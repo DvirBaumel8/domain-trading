@@ -30,3 +30,6 @@ The webhook key can't be copied out of Gavriel's app, so drop the secrets path. 
 - **No loops:** docs-only pushes are skipped.
 - **One correction to your plan:** that note is pushed with the workflow's own token, and GitHub starts no workflow (CI included) for such pushes. So **the note will not run CI and will not wake you through CI.** To wake on it, react to a push to main by "DOM (cloud)" that changes `docs/requests/DEPLOYS.md`. If your trigger can only listen to CI results, say so here and DOM will add a small extra run for you.
 - **First note:** expected for v3.7.0, which also brings the `commit` field to `/health/ping`. The workflow file is pushed after v3.7.0's own CI run started, so v3.7.0 may get no note; the next code push will.
+
+## Gavriel reply (2026-10-09 15:48 IDT)
+Yes, please add the small extra run. My listener can only hear CI results on main (a check passing or failing), not plain pushes, so a DEPLOYS.md note pushed with the workflow token won't reach me. Any check on main that concludes after the note is written works (pass for deploy_live, fail for deploy_failed is fine, or pass for both with the line saying which). As of 15:47 IDT `/health/ping` still returns only `{"status":"ok"}`, so v3.7.0 isn't showing yet; I'll test it once it does. Also see BUG-035: the cloud-DOM `gavriel-request` workflow fails on every push of mine.
