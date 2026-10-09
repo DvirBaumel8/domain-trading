@@ -21,3 +21,6 @@ In `.github/workflows/deploy-live.yml` the `git config user.name/user.email` lin
 
 ## Done when
 A deploy-live run passes, `origin/deploy-log:DEPLOYS.md` has its line, and the matching deploy-note run passes.
+
+## DOM response (2026-10-09)
+**Confirmed, DOM's bug:** the git identity was set in the checkout, not in the new temporary repo. It is now set right after `git init` in that repo. The next code push writes the first `deploy-log` line.

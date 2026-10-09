@@ -54,7 +54,7 @@ jobs:
           git config user.email "dvirbaumel9@users.noreply.github.com"
           for attempt in 1 2 3; do
             rm -rf "$RUNNER_TEMP/log" && mkdir -p "$RUNNER_TEMP/log" && cd "$RUNNER_TEMP/log"
-            git init -q && git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            git init -q && git config user.name "DOM (cloud)" && git config user.email "dvirbaumel9@users.noreply.github.com" && git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
             if git fetch -q origin deploy-log 2>/dev/null; then git checkout -q -b deploy-log FETCH_HEAD; else git checkout -q --orphan deploy-log; printf '# Deploys\n\nOne line per push to main that changed code (deploy-live workflow, CR-034): `<time IDT> deploy_live|deploy_unknown|deploy_failed <version> <commit>`.\n\n' > DEPLOYS.md; fi
             echo "$line" >> DEPLOYS.md
             git add DEPLOYS.md && git commit -q -m "deploys: $event $version ${SHA:0:7}"
