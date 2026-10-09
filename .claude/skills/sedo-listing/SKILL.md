@@ -7,7 +7,7 @@ description: Lists the company's domains on Sedo (Make Offer, the plan's asking 
 
 Sedo is our **second** listing, after Afternic. Every Sedo listing is **Make Offer**, so Afternic holds the only binding price (`docs/contract/formats.md`, Sedo section). There's no Sedo template yet: `GET /export/sedo.csv` answers 501 `SEDO_TEMPLATE_MISSING`. So names are listed by hand, in Dvir's Chrome.
 
-**Status: not yet run end to end.** The first real run must record what the pages actually look like, in "Known facts" below, the way `afternic-listing` does. Treat the steps marked *(verify)* as unconfirmed.
+**Status: run once (9 Oct 2026), 2 names submitted.** The real flow is in "Doing it"; keep "Known facts" current.
 
 ## Before you touch the site
 
@@ -21,13 +21,19 @@ Sedo is our **second** listing, after Afternic. Every Sedo listing is **Make Off
 ## Doing it (Claude in Chrome)
 
 Load the chrome-browser skill and tools, then open a new tab.
-- **Sign in** at `https://sedo.com`. Never type a password. If Dvir's session isn't signed in, stop and ask him to sign in.
-- **Add the name** to his Sedo portfolio *(verify the menu name: "Add domains" / "List domains")*.
-  - **Typing:** Afternic needed a real click into the text area before typing; expect the same here.
-  - **Settings:** Make Offer, currency USD, price, minimum offer.
-  - **Ownership:** Sedo may ask to verify ownership. Our names point at Afternic's nameservers, so DNS-based verification can't be added by DOM. Report it and let Dvir choose.
-- **Check every field** against the plan with a screenshot **before submitting**.
-- **Verify** each name shows as listed with the right values. Save a screenshot (`save_to_disk`). Close your tabs.
+- **Signing in:** start at `https://sedo.com`. Signed in, the header shows "MY SEDO Dvir"; signed out, it shows Login / Register. **Never sign in for him**, not even by clicking Login with his browser's saved password (that is signing in with his credentials). Ask Dvir to sign in.
+- **The menu:** MY SEDO (top right) opens a menu: My Sedo, **Add Domains**, My Domains, Billing, My Account…. Use **Add Domains** (`/member/domainsignup/index.php`).
+- **Step 1 (Enter Domains):**
+  - **Names:** click inside the text area (by coordinates), then type the names one per line.
+  - **The agreement:** the checkbox below the names accepts Sedo's Marketplace, Transfer and User Agreements, plus parking terms if DNS points at Sedo. **That is accepting terms: quote it to Dvir and wait for his explicit yes in chat** before ticking it.
+  - Then **Go to Step 2**.
+- **Step 2 (Price Domains):** a grid row per name with Price, Currency ($US by default), **Price Option** (Not for sale / Buy Now / Make Offer; default Buy Now), Min. Offer and Domain/Project.
+  - **What to set:** Price Option = **Make Offer** (form_input on the combobox), and Price = the BIN.
+  - **Min. Offer stays disabled in this grid:** set it later from My Domains, once the names are approved.
+  - **Refs:** each row's refs follow the order price, currency, option, min offer, type; `find` mislabels rows, so map them with `read_page` (filter interactive).
+- **Step 3 (Activate SedoMLS Premium):** it needs Buy Now listings, so for Make Offer leave it off, and **don't tick its terms**. **Finish Adding Domains** submits.
+- **After submitting:** "Your domains are currently being reviewed". Sedo verifies ownership by hand, and the names appear in My Sedo afterwards. A faster self-verification is offered; it may need DNS, which DOM can't change, so it's Dvir's choice.
+- **Check every field** against the plan with a zoom screenshot **before submitting**. Save a screenshot (`save_to_disk`). Close your tabs.
 
 ## Building the Sedo template (fixes SEDO_TEMPLATE_MISSING)
 If Sedo offers a bulk-upload **example file**, download it (that's a file download: ask Dvir first, stating the name and source). Copy its exact header strings and option values into `templates/sedo_template.json` (shape in `formats.md`). The service never guesses headers. Then list future names through that upload.
@@ -38,6 +44,6 @@ If Sedo offers a bulk-upload **example file**, download it (that's a file downlo
 - **Committing:** commit only the paths you changed.
 
 ## Known facts (fill in on the first run)
-- **Account:** on 9 Oct 2026 Dvir's Chrome was **not signed in to Sedo** (the header showed Login / Register; `https://sedo.com/member/myaccount.php` is a 404, so start from `https://sedo.com`). He may have no Sedo account. Never create one or sign in for him.
+- **Account:** Dvir has a Sedo account (the header shows "Dvir"). Sessions expire; when signed out, ask him to sign in. `/member/myaccount.php` is a 404, so start from `https://sedo.com`.
 - **Price block:** expect the same price-entry block as on Afternic. Ask Dvir to switch to Manual mode before starting (see `afternic-listing`, rule 3).
-- **Listed names:** none yet. The first run is for UKCBAMCompliance.com and AIEvalsConsulting.com (hybrid $1,488 / min $100), after Afternic.
+- **Listed names:** 9 Oct 2026, AIEvalsConsulting.com and UKCBAMCompliance.com submitted (Make Offer, $1,488 USD), in Sedo's ownership review. **Open:** set the $100 min offer in My Domains once they appear, then tell Gavriel to record them.

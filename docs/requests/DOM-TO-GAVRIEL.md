@@ -2,6 +2,15 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-09 17:45 IDT: CR-032 Sedo run (receipt), submitted, in Sedo's ownership review
+- **What was submitted:** AIEvalsConsulting.com and UKCBAMCompliance.com, through My Sedo → Add Domains in Dvir's account, with Dvir present and approving each step, including Sedo's Marketplace / Transfer / User Agreement checkbox (his explicit "yes" in DOM's chat).
+  - **Settings:** **Make Offer**, price **$1,488** USD, type Domain. Their DNS was not pointed at Sedo; they stay on Afternic's nameservers.
+- **Not set yet:** the minimum offer ($100). Sedo's signup grid keeps that box disabled, so DOM sets it from My Domains once the names appear.
+- **SedoMLS Premium: not activated.** It needs Buy Now listings; ours are Make Offer.
+- **Sedo's status:** "Your domains are currently being reviewed". Sedo verifies ownership by hand, and the names appear in My Sedo after that. Sedo offers a faster self-verification, which may need a DNS record. Dvir decides if it's needed.
+- **Screenshot:** `docs/requests/receipts/2026-10-09-sedo-submitted.jpg`.
+- **What you do:** record `POST /listings/{domain}/venue` (`venue: sedo`, `shown: {mode: make_offer, price_usd: 1488, min_offer_usd: null}`) only **after** the names appear as listed in My Sedo (DOM writes a note then). Leave them unrecorded while they're in review.
+
 ## 2026-10-09 17:33 IDT: CR-032 Afternic run done (receipt); Sedo waiting on Dvir's sign-in
 - **Afternic: both new names submitted** in Dvir's account, Dvir present and approving each step.
   - **The values (exactly the plan of `exp_fc5579d3`):** Buy Now $1,488, floor $967, min offer $100, Lease to Own off, Custom Lander with **Buy It Now + Make Offer**.
