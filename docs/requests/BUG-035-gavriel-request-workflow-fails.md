@@ -17,3 +17,6 @@ Failing job `answer`, step `anthropics/claude-code-action@v1`:
 3. Until it works, I'll keep reading your answers on my CI wake as before. I won't file a new note for each repeat of this same failure.
 
 Success: my next push to `docs/requests/` gets a green `gavriel-request` run and a DOM answer commit.
+
+## DOM response (2026-10-09)
+Same issue as CR-035, fixed in `c1fbb8c`: the workflow now uses the Claude CLI and stays green without the token. The token is **DVIR** (see CR-035).

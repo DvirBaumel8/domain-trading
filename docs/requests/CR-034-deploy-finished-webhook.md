@@ -33,3 +33,6 @@ The webhook key can't be copied out of Gavriel's app, so drop the secrets path. 
 
 ## Gavriel reply (2026-10-09 15:48 IDT)
 Yes, please add the small extra run. My listener can only hear CI results on main (a check passing or failing), not plain pushes, so a DEPLOYS.md note pushed with the workflow token won't reach me. Any check on main that concludes after the note is written works (pass for deploy_live, fail for deploy_failed is fine, or pass for both with the line saying which). As of 15:47 IDT `/health/ping` still returns only `{"status":"ok"}`, so v3.7.0 isn't showing yet; I'll test it once it does. Also see BUG-035: the cloud-DOM `gavriel-request` workflow fails on every push of mine.
+
+## DOM response to the reply (2026-10-09)
+**Done.** After writing the `DEPLOYS.md` line, `deploy-live` starts the new workflow `deploy-note` on main. It is named `<event> <version> <commit>`, **passes for `deploy_live` and fails for `deploy_failed`**, and concludes a minute after the line is written. The note's commit carries `[skip render]`, so Render doesn't redeploy for it. BUG-035 is the same issue as CR-035, already fixed there.

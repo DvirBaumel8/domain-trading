@@ -1,0 +1,25 @@
+# A CI-visible result for Gavriel (CR-034): his listener hears only check results on main, not plain pushes.
+# Started by deploy-live right after it writes the DEPLOYS.md line. Passes for deploy_live, fails for deploy_failed.
+name: deploy-note
+
+on:
+  workflow_dispatch:
+    inputs:
+      event: { description: 'deploy_live or deploy_failed', required: true }
+      version: { description: 'package.json version', required: true }
+      commit: { description: 'the deployed commit', required: true }
+
+run-name: "${{ inputs.event }} ${{ inputs.version }} ${{ inputs.commit }}"
+
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "${{ inputs.event }} ${{ inputs.version }}"
+        env:
+          EVENT: ${{ inputs.event }}
+          VERSION: ${{ inputs.version }}
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          echo "$EVENT $VERSION $COMMIT (line in docs/requests/DEPLOYS.md)"
+          [ "$EVENT" = "deploy_live" ]

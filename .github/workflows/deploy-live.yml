@@ -1,7 +1,8 @@
 # Tells Gavriel when a push to main is live on Render (CR-034; Dvir wants event-driven handoffs).
 # Runs after the `ci` workflow passes on main (Render deploys then: autoDeployTrigger checksPass), reads ONLY the
 # public GET /health/ping (no token; CLAUDE.md hard rule), then commits one line to docs/requests/DEPLOYS.md as "DOM (cloud)".
-# No loop: that commit is pushed with the workflow token, which starts no workflow; docs-only pushes are skipped.
+# No loop: that commit is pushed with the workflow token, which starts no workflow, and carries [skip render] (no redeploy);
+# docs-only pushes are skipped. Then it starts deploy-note (workflow_dispatch), a check on main that Gavriel's listener hears.
 name: deploy-live
 
 on:
@@ -12,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: deploy-live
@@ -49,8 +51,19 @@ jobs:
             [ -f docs/requests/DEPLOYS.md ] || printf '# Deploys\n\nOne line per push to main that changed code, written by the deploy-live workflow (CR-034): `<time IDT> deploy_live|deploy_failed <version> <commit>`.\n\n' > docs/requests/DEPLOYS.md
             echo "$line" >> docs/requests/DEPLOYS.md
             git add docs/requests/DEPLOYS.md
-            git commit -q -m "deploys: $event $version ${SHA:0:7}"
+            git commit -q -m "deploys: $event $version ${SHA:0:7} [skip render]"
             git push -q origin HEAD:main && break
             git reset -q --hard origin/main
           done
           echo "$line"
+      - name: Start deploy-note so Gavriel's CI listener hears it (CR-034)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git pull -q origin main
+          line="$(grep " $SHA\$" docs/requests/DEPLOYS.md 2>/dev/null | tail -1)"
+          [ -n "$line" ] || { echo "no DEPLOYS line for $SHA (docs-only push or skipped)"; exit 0; }
+          set -- $line
+          gh workflow run deploy-note.yml --ref main -f event="$2" -f version="$3" -f commit="$4"
