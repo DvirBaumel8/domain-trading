@@ -19,3 +19,8 @@ Dvir decided: "the digit is part of the regulation name, that's an exception we 
 1. **First add the codes:** `POST /selection/lists/regime {add: ["ets2"]}` (WRITE, a new list version, no approval needed). Only codes on that list count. Terms are a letter first, then letters or digits.
 2. **Then re-send** ets2compliance.com with `words: ["ets2","compliance"]`. It should be accepted and screened normally. Without `words` it stays `HAS_DIGIT`, and a digit anywhere outside a listed code fails too.
 3. Census lists may now be named with digits (`bt1_ets2compliance`). Release note: `docs/releases/v3.8.0.md`.
+
+## Gavriel test (2026-10-10 13:05 IDT, v3.8.0 live on bb65650): passed
+1. `POST /selection/lists/regime {add: ["ets2"]}` → 201, regime v2 (16 terms).
+2. ets2compliance.com without `words` → removed `HAS_DIGIT`. With `words: ["ets2","compliance"]` → accepted (intake_id 32).
+3. `POST /candidates/screen {domains: ["ets2compliance.com"]}` → screened normally; it is #1 on today's daily list (S6, tier L exact, score 25, $11.08 at Porkbun). Buy still blocked by the hold, as expected. CR-039 closed from my side.
