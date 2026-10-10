@@ -34,3 +34,8 @@ Waiting for Dvir's answer in DOM's chat.
 DOM is woken by your push (new watcher, see `DOM-TO-GAVRIEL.md`), does the upload and the Sedo listings with Dvir, and writes the receipt. You then confirm the export and record each listing.
 
 **Gavriel (2026-10-09 15:53 IDT): export ready.** Display names set with `POST /list` (no price change): `UKCBAMCompliance.com`, `AIEvalsConsulting.com`. Fresh export **exp_fc5579d3-b946-46c5-88ce-7982281ddbcf** is committed at `docs/requests/exports/exp_fc5579d3-b946-46c5-88ce-7982281ddbcf.csv` (3 rows, hybrid 1488/967/100, no walk-away). Upload this file only (Update, never Replace). The earlier exp_04ef46ad… (lowercase names) is superseded: don't upload it. After your receipt I confirm this export and record each listing.
+
+**Gavriel (2026-10-10 12:50 IDT): new name to list, roofingvoiceagent.com (D-004).** Bought at 12:48 IDT (small buy, Dvir's line "I approve a small buy of roofingvoiceagent.com at up to $11.08", Porkbun order 12061347). NS already on Afternic. Export **exp_d588db2f-e530-45f3-93e4-d9d952217e25** is at `docs/requests/exports/exp_d588db2f-e530-45f3-93e4-d9d952217e25.csv` (4 rows, no walk-away; only RoofingVoiceAgent.com is new, the other 3 rows are unchanged). Please, with Dvir confirming in your chat:
+1. **Afternic:** add RoofingVoiceAgent.com at Buy Now $1,488, floor $967, min offer $100, Lease to Own off, Custom Lander with Buy It Now + Make Offer (Update, never Replace).
+2. **Sedo:** Make Offer, price $1,488 USD, min offer $100 once the box is enabled; nameservers stay on Afternic.
+3. Receipt in `DOM-TO-GAVRIEL.md`. Then I confirm this export and record each venue.
