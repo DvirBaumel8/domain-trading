@@ -496,19 +496,11 @@ export class BuyService {
       purchaseId, domain: a.input.domain, registrar: a.adapter.name, registrarApi: registrarApiOf(a.adapter.capabilities),
       orderId: x.orderId, chargedCents: x.chargedCents, renewalCents: a.winner.renewalCents, expiryDate: expiry, buyDate: x.buyDate,
       category: a.category, dealId: a.input.dealId, checkId: a.check.checkId, auditId: a.ctx.auditId, receiptRaw: x.receiptRaw ?? null, now: new Date(this.deps.now()),
+      // v3.9.0: the drop policy (CR-033 G-9, drop_date = the first expiry) is part of the booking transaction
+      ...(a.dropPolicy === 'at_first_expiry' ? { dropDate: expiry } : {}),
     });
     this.deps.checkService.invalidate(a.input.domain);
-    // v3.7.0 (CR-033 G-9): the same state `drop-at-first-expiry` sets (drop_date = the first expiry), here at buy time, before the schedule is built
-    let dropDate = addOneYear(expiry);
-    if (a.dropPolicy === 'at_first_expiry') {
-      try {
-        await db.updateTable('domains').set({ drop_date: expiry, updated_at: new Date() }).where('domain', '=', a.input.domain).execute();
-        dropDate = expiry;
-      } catch (e) {
-        this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'drop policy save failed');
-        warnings.push('DROP_POLICY_FAILED: the purchase is booked but drop_date was not moved to the first expiry; run drop-at-first-expiry');
-      }
-    }
+    const dropDate = a.dropPolicy === 'at_first_expiry' ? expiry : addOneYear(expiry);
 
     // Everything after bookPurchase is best-effort: the purchase is booked and must be reported as 201.
     let post: { privacy: string; auto_renew: string; lander: string; listing: unknown } = { privacy: 'unknown', auto_renew: 'unconfirmed', lander: 'skipped', listing: null };

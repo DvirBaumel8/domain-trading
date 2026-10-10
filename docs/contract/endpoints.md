@@ -1,4 +1,4 @@
-# Endpoints (contract v3.8.0)
+# Endpoints (contract v3.9.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -114,7 +114,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
 - **Display name and drop policy (3.7.0, CR-033 G-2, G-9):**
   - **`display_name` (optional):** must equal the domain case-insensitively, else 422 `DISPLAY_NAME_MISMATCH`. Without it, the default comes from the newest intake `words`, each capitalised, else the domain. It is stored like `POST /list`'s display name and used by the next export.
   - **`drop_policy` (optional):** `after_one_renewal` (the default) or `at_first_expiry` (the `drop_date` is the first expiry; nothing renews).
-  - **In the dry run and the 201:** `display_name`, `drop_policy`, `renewal_committed_cents` (0 for `at_first_expiry`) and `drop_policy_line`. `sell_plan_line` adds the policy only for `at_first_expiry`. **On a dry-run error** (for example `REGISTRAR_FUNDS`), `details` carry `display_name`, `drop_policy`, `renewal_committed_cents` and `drop_policy_line` too (3.7.1, CR-038). If setting the policy fails after the purchase, the answer carries the warning `DROP_POLICY_FAILED`.
+  - **In the dry run and the 201:** `display_name`, `drop_policy`, `renewal_committed_cents` (0 for `at_first_expiry`) and `drop_policy_line`. `sell_plan_line` adds the policy only for `at_first_expiry`. **On a dry-run error** (for example `REGISTRAR_FUNDS`), `details` carry `display_name`, `drop_policy`, `renewal_committed_cents` and `drop_policy_line` too (3.7.1, CR-038). Since 3.9.0 the drop date is set in the same database transaction as the booking, so `DROP_POLICY_FAILED` can no longer occur (the code is removed); the reconciler honours the policy of the stored request when it books a purchase.
 - **Comps (CR-033 G-10):** the number required is `pricing_settings` `comps_min`, which is **0 under v3** (current). An empty `comps` list is valid.
 - **Small-buy exception (3.6.0, CR-030; approved by Dvir).** Optional body field `small_buy_exception: true`. When `approval_ref.text` also names the domain **and** contains "small buy" (any case), `BUY_HOLD` is skipped for that call, and only then. Two more checks apply when the flag and the words are present:
   - **Price:** the quote must not be premium, and its first year must be at most **$11.08**. Else 409 `SMALL_BUY_PRICE` `{max_first_year_cents, cost_cents, premium}`.
@@ -149,7 +149,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
   ```
   A post-buy failure never undoes the purchase; it is a warning (`PRIVACY_OFF`, `PRIVACY_UNKNOWN`, `AUTO_RENEW_FAILED`, `AUTO_RENEW_NOT_CONFIRMED`, `API_ACCESS_DISABLED`, `LANDER_CUSTOM`, `LANDER_MISMATCH`, `LANDER_FAILED`, `NS_PENDING`, `EVIDENCE_SAVE_FAILED`, `LISTING_SAVE_FAILED`, `POST_BUY_FAILED`, `TOTALS_UNAVAILABLE`, `EXPIRY_ESTIMATED`, `FOUND_IN_ACCOUNT`, `CHARGE_ABOVE_MAX`, `RECONSTRUCTED`). Warnings are strings that start with the code (`"CODE: text"`).
 - **202 (state unknown):** `{status: "unknown", code: "PURCHASE_STATE_UNKNOWN", domain, purchase_id, audit_id, message}`. The registrar may have registered it; the reconciler (a step of the daily job since 2.1.0) books or fails it. Retry only with the **same** key (re-evaluated, never re-registered).
-- **409 after contacting the registrar:** `REGISTRAR_REJECTED` (`details.registrar`, `details.registrar_code`; nothing charged), `PURCHASE_ABANDONED`, and on a replay `PURCHASE_FAILED` (the reconciler found it was never registered).
+- **409 after contacting the registrar:** `REGISTRAR_REJECTED` (`details.registrar`, `details.registrar_code`; nothing charged), `PURCHASE_ABANDONED`, and on a replay `PURCHASE_FAILED` (3.9.0: set only by the administrator's `resolve-purchase` command after checking the registrar account; the reconciler never fails a `register_sent` or `unknown` purchase, it leaves it open and `/report` shows `PURCHASE_UNRESOLVED` after 30 minutes).
 - **Other errors:** 422 `VALIDATION_ERROR` (schema, or an amount that isn't a positive USD amount with ≤ 2 decimals) · 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED` · 409 `IDEMPOTENCY_KEY_MISMATCH` (the key was used for another domain) · 500 `PRICING_SETTINGS_MISSING`.
 
 ---
@@ -738,7 +738,7 @@ WRITE (3.3.0, CR-021). Screens the waiting names now, then rebuilds the day's li
 - **202** `{run_id (the queue run, as on /jobs/runs), names_n, allowance: {daily_max, used_today, remaining}}`. **200** `{run_id: null, names_n: 0, skipped: "NO_NAMES", allowance}` when nothing waits: no allowance used, and the list is still rebuilt.
 - **Errors** (checked in this order):
   - 409 `ALREADY_RUNNING` (`details {run_id, job}`) while a daily or screen run is open;
-  - 409 `ON_DEMAND_SCREEN_CAP` (`details`: the allowance and `next_allowed_at`).
+  - 409 `ON_DEMAND_SCREEN_CAP` (`details`: the allowance and `next_allowed_at`) when the allowance is used up and the call would take no name. Since 3.9.0 a call with `domains` that names a name already screened on demand today (free, see above) is accepted (202) at the cap and re-screens only that name; a new name is still refused.
 - **Replays:** a replay with the same key returns the first answer.
 - **Which run ids:** list entries' `run_id` and `summary.screening_run_id(s)` are the **screening** run ids (`steps.onDemandScreen.summary.run_id`, or `steps.intakeScreening.summary.run_id` for the daily run), not the queue run id.
 
@@ -753,7 +753,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Cross-cutting errors:** `UNAUTHORIZED`, `SCOPE_FORBIDDEN`, `RATE_LIMITED`, `IDEMPOTENCY_KEY_REQUIRED`, `IDEMPOTENCY_KEY_MISMATCH`, `IDEMPOTENCY_KEY_IN_USE`, `VALIDATION_ERROR`, `INVALID_BODY`, `INVALID_REQUEST`, `NOT_FOUND`, `INTERNAL`, `AUDIT_WRITE_FAILED`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `JOBS_DISABLED`, `DOMAIN_BUSY`, `PRICING_SETTINGS_MISSING`.
 
-**Buying errors:** `DROP_POLICY_FAILED` (a 201 warning, 3.7.0), `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` (409, 3.6.0), `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `MODE_INVALID`, `BUY_HOLD`, `SCREENING_PACK_REQUIRED` (409), `NO_TRANCHE` (409), `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
+**Buying errors:** `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` (409, 3.6.0), `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `MODE_INVALID`, `BUY_HOLD`, `SCREENING_PACK_REQUIRED` (409), `NO_TRANCHE` (409), `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
 
 **Listing errors:** the listing rule codes under `POST /list/{domain}`, plus `NOT_IN_PORTFOLIO`, `API_ACCESS_DISABLED`, `REGISTRAR_UNAVAILABLE`, `LISTING_CHANGED_CONCURRENTLY`, `DOMAIN_NOT_FOUND`, `DISPLAY_NAME_MISMATCH`, `REPLAN_NOTHING_LISTED`, `OVERRIDE_NEEDS_APPROVAL`, `DROP_DATE_UNKNOWN`, `LANDER_RETIRED`, `LANDER_INVALID`, `NS_INVALID`.
 

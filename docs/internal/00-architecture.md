@@ -19,7 +19,7 @@ Gavriel --HTTPS + Bearer--> [Render free web service: API] --> Neon Postgres (al
 Cloudflare Worker cron --POST /jobs/run--> API      daily job --git data API--> private data repo (backup)
 ```
 - Stack: Node 22, TypeScript (strict), Fastify 5, zod v4, Kysely + pg, node-pg-migrate (plain SQL), native fetch, Vitest + MSW.
-- Screening (`src/screening/*`): form, brand/typo, RDAP/census, SURBL, history (HIST-2), tier/DEMAND-2, quote/price, runs engine, tranches, replay. Outside sources are read only when their `sources.*` setting is true (terms log: `sources.md`). No LLM calls.
+- Screening (`src/modules/selection/*`): form, brand/typo, RDAP/census, SURBL, history (HIST-2), tier/DEMAND-2, quote/price, runs engine, tranches, replay. Outside sources are read only when their `sources.*` setting is true (terms log: `sources.md`). No LLM calls.
 - Adapters implement one interface (§5). Porkbun is fully implemented; GoDaddy is management-only; others are enabled only when implemented, keyed **and** their contract tests pass (`../research/registrars.md`).
 - Secrets (registrar keys, DB URL, backup PAT, job token) live **only** in server env vars (Render `sync: false`). Never returned, logged or committed.
 

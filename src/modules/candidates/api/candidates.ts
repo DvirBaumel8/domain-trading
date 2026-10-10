@@ -77,15 +77,13 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
     }
     const plan = await planOnDemand(db, nowMs, b.max_names ?? null, domains, force);
     const allowance = (used: number) => ({ daily_max: plan.allowance.daily_max, used_today: used, remaining: Math.max(0, plan.allowance.daily_max - used) });
-    if (plan.allowance.remaining <= 0) {
+    // v3.9.0: names already screened on demand today are free (CR-026), so the cap refuses only when nothing can be taken
+    if (plan.allowance.remaining <= 0 && plan.names_n === 0) {
       throw new AppError(409, 'ON_DEMAND_SCREEN_CAP', 'The on-demand screening allowance of today is used up', { ...plan.allowance, next_allowed_at: toJerusalemIso(nextIdtMidnight(nowMs)) });
     }
     if (plan.names_n === 0) {
       // Nothing waiting: no run, no allowance used; the list is rebuilt anyway (it reads the database only).
-      await db.transaction().execute(async (trx) => {
-        await advisoryXactLock(trx, 'daily_rebuild');
-        await buildDailyList({ db, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'auto' });
-      });
+      await buildDailyList({ db, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'auto' }); // takes the daily_rebuild lock itself (v3.9.0)
       req.auditSummary = `screen: no names waiting${force ? ' (force)' : ''}`;
       return reply.code(200).send({ run_id: null, names_n: 0, skipped: domains ? plan.skipped : 'NO_NAMES', allowance: allowance(plan.allowance.used_today) });
     }
@@ -117,7 +115,7 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
       if (used >= DAILY_REBUILD_MAX_PER_DAY) {
         throw new AppError(429, 'RATE_LIMITED', `At most ${DAILY_REBUILD_MAX_PER_DAY} rebuilds of the daily list per day`, { max_per_day: DAILY_REBUILD_MAX_PER_DAY, day: today });
       }
-      const built = await buildDailyList({ db, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'rebuild' });
+      const built = await buildDailyList({ db: trx, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'rebuild' });
       return { ...built, rebuilds_today: used + 1, rebuilds_left_today: DAILY_REBUILD_MAX_PER_DAY - used - 1 };
     });
     return reply.code(201).send(out);

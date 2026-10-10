@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import worker, { triggerJob, TIMEOUT_MS, WAKE_TIMEOUT_MS, RETRY_DELAY_MS } from './index';
+import worker, { triggerJob, TIMEOUT_MS, WAKE_TIMEOUT_MS, RETRY_DELAY_MS, RETRY_DELAYS_MS } from './index';
 
 const TOKEN = 'secret-token-abc123';
 const env = { API_BASE_URL: 'https://api.example.com', JOB_TRIGGER_TOKEN: TOKEN };
@@ -60,7 +60,7 @@ describe('triggerJob', () => {
       );
       const logger = { error: vi.fn() };
       const p = triggerJob('tick', env, 1, fetcher, logger, fast);
-      await vi.advanceTimersByTimeAsync(WAKE_TIMEOUT_MS + 2 * TIMEOUT_MS + RETRY_DELAY_MS);
+      await vi.advanceTimersByTimeAsync(WAKE_TIMEOUT_MS + 3 * TIMEOUT_MS + RETRY_DELAYS_MS[0]! + RETRY_DELAYS_MS[1]!);
       await p;
       expect(logger.error).toHaveBeenCalledWith(`jobs-trigger tick failed: timed out after ${TIMEOUT_MS} ms`);
     } finally {
@@ -124,8 +124,20 @@ describe('wake-up, retry and failed steps', () => {
     const f5 = vi.fn().mockResolvedValue(new Response('no', { status: 500 }));
     const l5 = { error: vi.fn() };
     await triggerJob('daily', env, 1, f5, l5, fast);
-    expect(posts(f5)).toHaveLength(2);
+    expect(posts(f5)).toHaveLength(3); // v3.9.0: up to 3 tries
     expect(l5.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('v3.9.0: the wake-up waits up to 90 s; the POST retries wait 5 s then 15 s and a third try that works logs nothing', async () => {
+    expect(WAKE_TIMEOUT_MS).toBe(90_000);
+    expect(RETRY_DELAYS_MS).toEqual([5_000, 15_000]);
+    const fetcher = vi.fn().mockResolvedValueOnce(ok()).mockResolvedValueOnce(new Response('x', { status: 502 })).mockRejectedValueOnce(new Error('reset')).mockResolvedValueOnce(ok());
+    const logger = { error: vi.fn() };
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    await triggerJob('daily', env, 9, fetcher, logger, { sleep });
+    expect(sleep.mock.calls.map((c) => c[0])).toEqual([5_000, 15_000]);
+    expect(posts(fetcher)).toHaveLength(3);
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('accepts 202 and logs the run id (info); an overlap says it is already queued or running; an unreadable 202 body logs no error', async () => {

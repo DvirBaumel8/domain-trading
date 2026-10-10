@@ -20,7 +20,7 @@ Never paste a secret into chat, a commit, an issue or a log.
    (no `-pooler` in the host).
 3. Make sure it ends with exactly `?sslmode=verify-full` (production refuses to start with `require` or no sslmode; `verify-full` also makes `npm run migrate` verify the certificate): remove `&channel_binding=require` if Neon added it, and replace `sslmode=require` with `verify-full`.
    Why direct: the per-domain lock is a **session** advisory lock, which breaks behind Neon's transaction-mode pooler.
-   The server refuses a `-pooler.` host when `APP_ENV=production`. Why TLS: Neon requires it, and `node-pg-migrate`
+   The server refuses a `-pooler.` host when `APP_ENV=production`, and (since 3.9.0) refuses to start when `RENDER` is set and `APP_ENV` is not `production`. Why TLS: Neon requires it, and `node-pg-migrate`
    reads TLS settings only from this URL.
 
 Also keep the string for the admin commands (steps 7-8) in a local file, never in `.env` and never inline on a command line:
@@ -104,7 +104,7 @@ The Worker calls `POST /jobs/run` once a day at 00:05 UTC with `daily` (since 2.
    - Cloudflare's free plan limits **cron triggers per account** (check the current limit in the Cloudflare dashboard; trader and sapako already use some). This Worker needs 2.
    - `JOB_TRIGGER_TOKEN`: the same value as in Render.
 2. **Variables** -> `API_BASE_URL` = the Render URL from step 5 (`https://domain-trading-api.onrender.com`, no trailing slash).
-3. Actions -> `deploy-jobs-trigger` -> **Run workflow** (it only deploys on main and when `API_BASE_URL` is set).
+3. (Since 3.9.0 the Worker waits up to 90 s for the wake and tries the POST 3 times; it is deployed by this workflow on push.) Actions -> `deploy-jobs-trigger` -> **Run workflow** (it only deploys on main and when `API_BASE_URL` is set).
 4. Verify: Cloudflare dashboard -> Workers -> `domain-trading-jobs` -> Triggers shows the one cron (`5 0 * * *`). The 08:30 UTC review-retry `tick` runs from GitHub Actions (`.github/workflows/review-retry-tick.yml`), which needs the repo variable `API_BASE_URL` and the repo secret `JOB_TRIGGER_TOKEN`; the account is at Cloudflare's free limit of 5 crons. After the next full hour,
    `GET /audit` (READ token) has a row for `jobs/run` with scope `job`. A 401 there means the tokens differ.
 

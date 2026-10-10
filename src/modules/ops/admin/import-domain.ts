@@ -126,9 +126,8 @@ function parseInput(i: ImportInput, now: Date) {
     if (buyDate >= COMPS_RULE_DATE) {
       throw new AppError(422, 'COMPS_REQUIRED', `A buy on or after ${COMPS_RULE_DATE} needs 2-3 comparable sales (--comps-file); --legacy-no-comps is only for earlier buys`);
     }
-  } else if (!i.evidence) {
-    throw new AppError(422, 'COMPS_REQUIRED', 'Every import needs 2-3 comparable sales (--comps-file) or --legacy-no-comps "<reason>" for a buy before 2026-10-05');
   }
+  // v3.9.0: no comps and no legacy reason is decided against the current pricing settings (comps_min, 0 since pricing v3) in importDomain
 
   let expiry: string | null = null;
   if (manual) {

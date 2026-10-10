@@ -19,9 +19,14 @@ const DAY = 86_400_000;
 export const LANDER_DOWN_ERROR_DAYS = 2;
 /** REVIEW_OVERDUE is raised when the newest review feedback is older than this (CR-011 part B). */
 export const REVIEW_OVERDUE_HOURS = 36;
+/** v3.9.0: PURCHASE_UNRESOLVED is raised for a register_sent/unknown purchase open longer than this (the reconciler never fails one itself). */
+export const PURCHASE_UNRESOLVED_MINUTES = 30;
+/** v3.9.0: Neon's free plan stores 0.5 GB per project; DB_SIZE_HIGH is raised above DB_SIZE_WARN_PERCENT of it. */
+export const NEON_FREE_STORAGE_BYTES = 0.5 * 1024 ** 3;
+export const DB_SIZE_WARN_PERCENT = 70;
 const RANK: Record<WarningLevel, number> = { error: 0, warn: 1, info: 2 };
 
-export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<ReportWarning[]> {
+export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { storageLimitBytes?: number } = {}): Promise<ReportWarning[]> {
   const out: ReportWarning[] = [];
   const add = (code: string, level: WarningLevel, message: string, domain?: string, details: Record<string, unknown> = {}) =>
     out.push({ code, level, ...(domain ? { domain } : {}), message, details });
@@ -44,6 +49,14 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   if (sched.missed) {
     add('JOB_MISSED', 'error', 'The scheduled daily run (00:05 UTC) did not start.', undefined, {
       slot: toJerusalemIso(sched.missed.slot), last_run_at: sched.missed.lastRunAt ? toJerusalemIso(sched.missed.lastRunAt) : null,
+    });
+  }
+  // v3.9.0: the database against Neon's free storage (0.5 GB)
+  const limit = opts.storageLimitBytes ?? NEON_FREE_STORAGE_BYTES;
+  const size = Number((await sql<{ n: string }>`select pg_database_size(current_database())::text as n`.execute(db)).rows[0]!.n);
+  if (size > limit * DB_SIZE_WARN_PERCENT / 100) {
+    add('DB_SIZE_HIGH', 'warn', `The database is ${(size / 1024 ** 2).toFixed(0)} MB, over ${DB_SIZE_WARN_PERCENT}% of the ${(limit / 1024 ** 2).toFixed(0)} MB free-plan limit.`, undefined, {
+      size_bytes: size, limit_bytes: limit, percent: Math.round(size * 1000 / limit) / 10, warn_percent: DB_SIZE_WARN_PERCENT,
     });
   }
   // CR-011 part B: once any review feedback exists, the newest must not be older than REVIEW_OVERDUE_HOURS.
@@ -228,9 +241,10 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
   const withReceipt = new Set<number>();
   if (buyIds.length > 0) for (const r of await db.selectFrom('receipts').select('purchase_id').distinct().where('purchase_id', 'in', buyIds).execute()) withReceipt.add(r.purchase_id as number);
   const domainByName = new Map(domains.map((d) => [d.domain, d]));
-  const withEvidence = new Set<number>();
-  const evDomainIds = purchases.filter((p) => p.state === 'succeeded' && !p.dry_run).map((p) => domainByName.get(p.domain)?.id).filter((x): x is number => x !== undefined);
-  if (evDomainIds.length > 0) for (const r of await db.selectFrom('pricing_evidence').select('domain_id').distinct().where('domain_id', 'in', evDomainIds).execute()) withEvidence.add(r.domain_id as number);
+  // v3.9.0: POST_BUY_INCOMPLETE = a /buy purchase whose name has no screening pack (comps are optional since pricing v3); imports have no purchase row
+  const withPack = new Set<string>();
+  const packNames = purchases.filter((p) => p.state === 'succeeded' && !p.dry_run).map((p) => p.domain);
+  if (packNames.length > 0) for (const r of await db.selectFrom('screening_packs').select('domain').distinct().where('domain', 'in', packNames).execute()) withPack.add(r.domain);
   for (const p of purchases) {
     if (p.state === 'unknown') {
       add('PURCHASE_UNKNOWN', 'error', `The purchase of ${p.domain} is in an unknown state; the reconciler or Dvir must resolve it.`, p.domain, { purchase_id: p.id });
@@ -238,12 +252,18 @@ export async function buildWarnings(db: Kysely<Database>, now: Date): Promise<Re
     }
     if (p.dry_run) continue;
     if (!withReceipt.has(p.id)) add('RECEIPT_MISSING', 'warn', `The purchase of ${p.domain} has no receipt on file.`, p.domain, { purchase_id: p.id });
-    const dom = domainByName.get(p.domain);
-    if (dom) {
-      const ev = withEvidence.has(dom.id);
-      // an imported legacy_no_comps name has an evidence row (comps null + legacy reason): that is complete, not "incomplete"
-      if (!ev) add('POST_BUY_INCOMPLETE', 'warn', `${p.domain} was bought without pricing evidence (comps); add the sell plan.`, p.domain, { purchase_id: p.id });
+    if (domainByName.has(p.domain) && !withPack.has(p.domain)) {
+      add('POST_BUY_INCOMPLETE', 'warn', `${p.domain} was bought without a screening pack on file.`, p.domain, { purchase_id: p.id });
     }
+  }
+  // v3.9.0 (Dvir, 10 Oct 2026): the reconciler never fails an open purchase; resolution is the admin resolve-purchase command after checking the registrar account
+  const open = await db.selectFrom('purchases').select(['id', 'domain', 'state', 'created_at']).where('state', 'in', ['register_sent', 'unknown']).where('dry_run', '=', false)
+    .where('created_at', '<', new Date(now.getTime() - PURCHASE_UNRESOLVED_MINUTES * 60_000)).orderBy('id').execute();
+  for (const p of open) {
+    const ageMinutes = Math.floor((now.getTime() - p.created_at.getTime()) / 60_000);
+    add('PURCHASE_UNRESOLVED', 'warn', `The purchase of ${p.domain} (${p.state}) has been open for ${ageMinutes} minutes; check the registrar account, then resolve it (admin resolve-purchase).`, p.domain, {
+      purchase_id: p.id, state: p.state, age_minutes: ageMinutes, created_at: toJerusalemIso(p.created_at),
+    });
   }
 
   // price events

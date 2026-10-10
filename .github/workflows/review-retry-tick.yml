@@ -11,6 +11,9 @@ on:
     - cron: '30 8 * * *'
   workflow_dispatch:
 
+# v3.9.0: the job needs no token of its own (the API token is a repository secret passed to the step), so the GITHUB_TOKEN gets no permissions
+permissions: {}
+
 jobs:
   tick:
     runs-on: ubuntu-latest
@@ -23,7 +26,12 @@ jobs:
         run: |
           test -n "$API_BASE_URL" || { echo "::error::API_BASE_URL repository variable is empty; the review retry tick cannot run"; exit 1; }
           test -n "$JOB_TRIGGER_TOKEN" || { echo "::error::JOB_TRIGGER_TOKEN repo secret is empty"; exit 1; }
-          ms=$(( $(date -u -d "$(date -u +%Y-%m-%d) 08:30:00" +%s) * 1000 ))
+          # the schedule uses the fixed daily key (a retried run of the same day is deduplicated); a by-hand run gets a key from the current time, so it is a new run
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            ms=$(( $(date -u +%s) * 1000 ))
+          else
+            ms=$(( $(date -u -d "$(date -u +%Y-%m-%d) 08:30:00" +%s) * 1000 ))
+          fi
           # wake the free instance first (cold start), then run the job
           curl -s -o /dev/null --max-time 90 "$API_BASE_URL/health/ping" || true
           code=$(curl -s -o out.json -w '%{http_code}' --max-time 60 -X POST "$API_BASE_URL/jobs/run" \

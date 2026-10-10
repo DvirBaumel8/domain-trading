@@ -14,9 +14,10 @@ export interface Logger {
 /** Since 3.0.0 POST /jobs/run only enqueues and answers 202, so this no longer has to cover a whole run. */
 export const TIMEOUT_MS = 30_000;
 /** The wake-up GET /health/ping (the free instance sleeps): a failure never stops the job, it only costs this long. */
-export const WAKE_TIMEOUT_MS = 30_000;
-/** One retry of the POST after a network error or a 5xx (the same Idempotency-Key, so the server never runs it twice). */
-export const RETRY_DELAY_MS = 5_000;
+export const WAKE_TIMEOUT_MS = 90_000; // v3.9.0: was 30 s; a cold Render free instance can take over a minute
+/** v3.9.0: up to 3 tries of the POST (two retries after a network error or a 5xx, waiting 5 s then 15 s); the same Idempotency-Key, so the server never runs it twice. */
+export const RETRY_DELAYS_MS = [5_000, 15_000];
+export const RETRY_DELAY_MS = RETRY_DELAYS_MS[0]!;
 
 // One cron trigger here: 00:05 UTC runs `daily` (it includes the former hourly steps: reconciler, nsVerifier, screeningResume).
 // The review-retry `tick` is NOT scheduled by this Worker (the Cloudflare account is at the Workers Free limit of cron triggers):
@@ -76,8 +77,9 @@ export async function triggerJob(
     body: JSON.stringify({ job }),
   }, TIMEOUT_MS);
   let r = await post();
-  if ('error' in r || r.res.status >= 500) {
-    await sleep(RETRY_DELAY_MS);
+  for (const delay of RETRY_DELAYS_MS) {
+    if (!('error' in r || r.res.status >= 500)) break;
+    await sleep(delay);
     r = await post();
   }
   if ('error' in r) {

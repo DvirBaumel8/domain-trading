@@ -57,25 +57,25 @@ Defined in `selection.md` §7 (SEL-1–SEL-4, SEL3-*, SEL4-*, SEL5-*, SEL6-*, SE
 ## CR acceptance map (v1.1.0)
 | CR item | Test |
 |---|---|
-| CR-001 CAP-00 (live vs draft, approval, SEL9-2) | `tests/api/selection-settings.test.ts`, `screening-runs.test.ts` |
-| CR-001 CAP-01 #1-#8, CR-002 CAP-01 (FORM-2, G-FORM-1, SEL10-6) | `tests/unit/screening-form.test.ts` |
-| CR-001 CAP-02 #1-#3 | `screening-runs.test.ts` (bigco), `tests/unit/screening-typo.test.ts` |
-| CR-001 CAP-03 #1-#4 (#5 is the P1b pack) | `tests/unit/rdap-lookup.test.ts`, `tests/api/screening-registry.test.ts` |
-| CR-001 CAP-04, CR-002 CAP-04 | `screening-runs.test.ts`, `tests/api/tranches.test.ts` |
+| CR-001 CAP-00 (live vs draft, approval, SEL9-2) | `tests/modules/selection/selection-settings.test.ts`, `screening-runs.test.ts` |
+| CR-001 CAP-01 #1-#8, CR-002 CAP-01 (FORM-2, G-FORM-1, SEL10-6) | `tests/modules/selection/unit/screening-form.test.ts` |
+| CR-001 CAP-02 #1-#3 | `screening-runs.test.ts` (bigco), `tests/modules/selection/unit/screening-typo.test.ts` |
+| CR-001 CAP-03 #1-#4 (#5 is the P1b pack) | `tests/modules/core/unit/rdap-lookup.test.ts`, `tests/modules/selection/screening-registry.test.ts` |
+| CR-001 CAP-04, CR-002 CAP-04 | `screening-runs.test.ts`, `tests/modules/buying/tranches.test.ts` |
 | CR-001 CAP-05 #1-#3 | `screening-registry.test.ts` |
 | CR-001 CAP-06/08 (manual) | `screening-manual.test.ts`, `screening-runs.test.ts` (phrases) |
 | CR-002 CAP-07 #1-#4 (+ CR-001 CAP-07 #2, #3, #8; Amendment A1/A2) | `screening-history.test.ts` (api and unit) |
 | CR-002 CAP-10 #1-#3 | `screening-registry.test.ts`, `screening-money-checks.test.ts` |
-| CR-001 CAP-11 #1-#3, #5, #6 | `tests/unit/screening-namebio.test.ts`, `reference-refresh.test.ts` |
+| CR-001 CAP-11 #1-#3, #5, #6 | `tests/modules/selection/unit/screening-namebio.test.ts`, `reference-refresh.test.ts` |
 | CR-002 CAP-12 | `screening-registry.test.ts` |
 | CR-001 CAP-17 | `screening-money-checks.test.ts`, `screening-manual.test.ts` |
-| CR-001 CAP-18 #1-#8, CR-002 CAP-18, section 5.3 | `tests/unit/screening-money.test.ts`, `selection-evaluate.test.ts` |
-| CR-002 CAP-24 | `tests/unit/screening-tier.test.ts` |
-| CR-001 CAP-20 #2, #3; CR-002 CAP-20 (WOULD-BUY) | `screening-runs.test.ts`, `tests/unit/screening-derive.test.ts` (the DR-003 replay needs recorded DR data: measured after the first deploy, G-65) |
-| CR-002 CAP-21 #5, #6 (+ #1-#4 when reference data lands; Amendment A2/A3) | `selection-replay.test.ts`, `tests/unit/screening-replay.test.ts`, `selection-replay-cr002.test.ts` |
-| BUY_HOLD (NO_TRANCHE is v2.0.0) | `tests/api/buy-hold.test.ts` |
+| CR-001 CAP-18 #1-#8, CR-002 CAP-18, section 5.3 | `tests/modules/selection/unit/screening-money.test.ts`, `selection-evaluate.test.ts` |
+| CR-002 CAP-24 | `tests/modules/selection/unit/screening-tier.test.ts` |
+| CR-001 CAP-20 #2, #3; CR-002 CAP-20 (WOULD-BUY) | `screening-runs.test.ts`, `tests/modules/selection/unit/screening-derive.test.ts` (the DR-003 replay needs recorded DR data: measured after the first deploy, G-65) |
+| CR-002 CAP-21 #5, #6 (+ #1-#4 when reference data lands; Amendment A2/A3) | `selection-replay.test.ts`, `tests/modules/selection/unit/screening-replay.test.ts`, `selection-replay-cr002.test.ts` |
+| BUY_HOLD (NO_TRANCHE is v2.0.0) | `tests/modules/buying/buy-hold.test.ts` |
 | SEL9-9 / section 10.13 vectors | `pricing-v3.test.ts` (api and unit) |
-| CR-002 Amendment B (manual HIST-2) | none: not built (G-55) |
+| CR-002 Amendment B (manual HIST-2) | `screening-manual-history.test.ts` (built in v1.1.0, G-55) |
 
 ## Offers (OF; `listing-strategy.md` §10.11)
 Fixtures: D-001 imported as 1995 / 1295 / 950 / 100, listed 2026-10-12 (the 5 Oct plan); a geo name at $399; a second trend name at 2495 / 1620 / 1200.
@@ -85,6 +85,8 @@ OF-1 D-001 $450 `afternic` → 201, `below_walkaway`, `auto_decline`, `declined_
 SL-1 no approval with no evidence / evidence without ref / an unknown `evidence.source` → 422 `EVIDENCE_REQUIRED` (the last `VALIDATION_ERROR`); nothing written. SL-2 ref AFN-1 + `{afternic_email, "<x@mail.afternic.com>"}`, no approval → 200 `confirmed: false`; one `sales` row with `recorded_by` = token name, evidence, `sale_ledger_id`; ledger as S-1. SL-3 with approval, no evidence → `confirmed: true`, approval stored. SL-4 SL-2 again with a new key (same or another domain) / the same key → 409 `SALE_ALREADY_RECORDED` / replay. SL-5 `/report` → `SALE_UNCONFIRMED` only for SL-2; sales, profit, ROI count both. SL-6 registrar check (mock `findDomain`; `registrar_presence` absent with `first_absent_at`, kept, cleared when present): a listed name → null, no sale; a sold name → null; a timeout; a `none` name → `DOMAIN_LEFT_ACCOUNT` only for the first; no status change; zero registrar writes. SL-7 `sales` UPDATE/DELETE/TRUNCATE → error; duplicate (`venue`, `transaction_ref`) → error; unconfirmed without evidence → CHECK error.
 
 ## Jobs and health (JOB; `docs/contract/jobs.md`)
+**Spec-only (10 Oct 2026):** JOB-1 to JOB-7 have no test with these IDs in their names; the behaviour is covered by `tests/modules/ops/` (`jobs`, `jobs-write-token`, `jobs-run-scope`, `job-queue`, `job-cli`, `health`, `tick-triggers`), and the 3.0.0 job queue changed the step model. Read the text below as the original intent.
+
 JOB-1 `POST /jobs/run` with a READ / WRITE / no / wrong job token → 401 ×4; `JOB_TRIGGER_TOKEN` unset → 503 `JOBS_DISABLED`; no step runs. JOB-2 the job token on any other route → 401. JOB-3 `{"job":"tick"}` twice with the same key → replayed, the reconciler runs once; a concurrent second `tick` → `skipped: true`; a body other than `tick`/`daily` → **422** `VALIDATION_ERROR`. JOB-4 `tick` with the NS verifier last run 2 h / 25 h ago → reconciler runs; verifier `skipped` / runs. JOB-5 `daily` with the backup step throwing → order price → drop → registrar check → backup; backup `ok:false` with a redacted error; others `ok`; one audit row scope `job`. JOB-6 `/health/ping` with the DB down → 200, zero DB queries; `/health` (token) with the DB down → 503 `degraded`, `db: down`. JOB-7 `npm run job -- tick|daily` → JSON with the same steps; backup skipped (ok) without a token; exit 1 if a step failed, 2 on bad args; one audit row.
 
 ## Contract

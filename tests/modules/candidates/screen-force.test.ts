@@ -103,8 +103,16 @@ describe('CR-028 A: POST /candidates/screen {domains, force}', () => {
     await (await scout(x)).intake([{ domain: 'smarttech.com', lane: 'S3', source: 'scout' }]);
     expect((await post('/candidates/screen', {})).json()).toMatchObject({ names_n: 1, allowance: { used_today: 3, remaining: 0 } });
     await settle(x);
-    const cap = await post('/candidates/screen', { domains: ['superpro.com'], force: true });
+    // v3.9.0: the cap refuses a NEW name, but a name already screened on demand today is free (CR-026): its forced re-screen is accepted with the allowance used up
+    await (await scout(x)).intake([{ domain: 'fresh-name.com', lane: 'S3', source: 'scout' }]);
+    const cap = await post('/candidates/screen', { domains: ['fresh-name.com'], force: true });
     expect([cap.statusCode, cap.json().error.code]).toEqual([409, 'ON_DEMAND_SCREEN_CAP']);
+    const free = await post('/candidates/screen', { domains: ['superpro.com'], force: true });
+    expect(free.statusCode, free.body).toBe(202);
+    expect(free.json()).toMatchObject({ names_n: 1, allowance: { used_today: 3, remaining: 0 } });
+    await settle(x);
+    expect((await screenings()).filter((d) => d === 'superpro.com')).toHaveLength(3);
+    expect((await screenings()).includes('fresh-name.com')).toBe(false);
   }, 90_000);
 
   it('T28-4b force is stored in the queue run params and shows in the audit summary and the job audit row', async () => {

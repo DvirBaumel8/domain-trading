@@ -125,7 +125,7 @@ Inputs: BIN + category (+ geo grade) + the current `pricing_settings` version. I
 - **Hold:** `pricing_hold = true` (reason required) keeps due rows `planned`; on release the next run applies only the latest due event (it has the cumulative values) and supersedes earlier ones.
 - Statuses: `planned`, `applied`, `skipped_at_minimum`, `skipped_no_change`, `skipped_disabled`, `superseded`, `superseded_by_final_push`, `cancelled`, `failed`.
 
-### 10.5 Price job (`src/jobs/price-schedule.ts`; first step of `daily`, `npm run job -- price-schedule [--dry-run] [--today D]`)
+### 10.5 Price job (`src/modules/ops/jobs/price-schedule.ts`; first step of `daily`, `npm run job -- price-schedule [--dry-run] [--today D]`)
 - For each `planned` row with `due_on ≤ today` (IDT), one transaction per domain under the per-domain lock: skip unless `listed` and not on hold (delist ignores the hold); else set the domain's prices to the row's values (hybrid min offer stays; geo min offer = new BIN), append `listing_history` (`source=schedule`, `schedule_event_id`, `plan_audit_id`, version), mark the row `applied` (+ `applied_at`, `listing_history_id`), set `export_pending_since` if empty, audit row scope `job`. `delist` → status `delisted`.
 - Idempotent (unique `(domain_id, event, plan_id)`). Never calls a registrar or marketplace, changes NS or sends anything. A row whose values break V5/V6 → `failed` + `PRICE_EVENT_FAILED`, domain unchanged.
 

@@ -44,7 +44,7 @@ Summary
 
 ## Majestic Million (the popularity list for TYPO-1; replaces Tranco)
 - **URL used:** `https://downloads.majestic.com/majestic_million.csv` (`HTTP/2 200`, `content-type: text/csv`, `last-modified: Tue, 06 Oct 2026 05:00:21 GMT`, 81,323,114 bytes, `accept-ranges: bytes`; columns `GlobalRank,TldRank,Domain,TLD,RefSubNets,RefIPs,IDN_Domain,IDN_TLD,PrevGlobalRank,PrevTldRank,PrevRefSubNets,PrevRefIPs`, sorted by rank). Retrieved 2026-10-06 with `curl`.
-- **Purpose:** CAP-02 TYPO-1 popularity list (`src/screening/popularity.ts`, `src/screening/checks/typo.ts`); the settings switch is `sources.popularity`.
+- **Purpose:** CAP-02 TYPO-1 popularity list (`src/modules/selection/popularity.ts`, `src/modules/selection/checks/typo.ts`); the settings switch is `sources.popularity`.
 - **Terms URL:** `https://majestic.com/reports/majestic-million` (the report page, "Export CSV (~80MB)" block).
 - **Quote (licence, verified at the primary source 2026-10-06):** "Licensed under a Creative Commons Attribution 3.0 Unported License". The same wording is repeated by Tranco's own attribution text for its Majestic input: "Majestic (available under a CC BY 3.0 license)".
 - **Why not Tranco:** Tranco has no licence of its own (`/terms` is 404) and one of its inputs is CC BY-NC 4.0 (Cloudflare Radar); a non-commercial upstream is not acceptable for a commercial trading business (gap G-30, resolved).
@@ -72,7 +72,7 @@ Summary
 - **URLs tried:** `https://namebio.com/`, `/terms`, `/terms-of-service`, `/tos`, `/help`, `/faq`, `/api`, `/data`, `/downloads` (all 2026-10-06, also with the honest User-Agent); `https://archive.org/wayback/available?url=namebio.com/terms` (no snapshot).
 - **Result:** every request answers **HTTP 403** with a Cloudflare "Sorry, you have been blocked" page (Ray ID a4627f965f3cc222); the terms of use, the free CSV download URL, the "1 download per hour" limit, attribution wording and storage rights could **not** be read from the primary source. DOM does not spoof a browser to get around the block.
 - **Status:** **UNVERIFIED.** No terms quote, no URL, no limit known; the "1 download per hour" figure in CR-001 is hearsay.
-- **Task 6:** only a disabled stub exists (`src/screening/namebio.ts`: the parser, a cache reader and a `refreshNameBio` that never makes a request). The test sample `tests/fixtures/screening/namebio/retailstats-sample.csv` is **synthetic** with a placeholder header (`keyword,start_count,end_count,exact_count[,avg_price_usd]`); the real header is unknown. Attribution text: `Data from NameBio`.
+- **Task 6:** only a disabled stub exists (`src/modules/selection/namebio.ts`: the parser, a cache reader and a `refreshNameBio` that never makes a request). The test sample `tests/fixtures/screening/namebio/retailstats-sample.csv` is **synthetic** with a placeholder header (`keyword,start_count,end_count,exact_count[,avg_price_usd]`); the real header is unknown. Attribution text: `Data from NameBio`.
 - **Decision:** `disabled`. No NameBio data is fetched or committed; `sources.namebio` defaults to `false` (Task 3); CAP-11 returns `UNKNOWN` / `SOURCE_DISABLED`; the manual path (CR-001 CAP-11 fallback) stays. Logged as a gap for Dvir (`docs/internal/gaps.md`, G-29).
 - **Pacing:** none.
 
@@ -115,7 +115,7 @@ Summary
 
 ## Business websites (CAP-12 operator sites, CAP-15 firm pages)
 - **What is fetched:** the public home page of a site that uses our name on another extension (CAP-12: `https://<sld>.<tld>/`), and, for lead verification (CAP-15), the firm pages the bot supplied. Nothing else: no crawling, no links followed, no search engines, no social networks.
-- **Purpose:** CAP-12 asks whether our exact name is already in use as a business name or a service description under another extension (`src/screening/site.ts`, `src/screening/checks/same-name.ts`); CAP-15 checks that a lead firm really offers the service the name describes.
+- **Purpose:** CAP-12 asks whether our exact name is already in use as a business name or a service description under another extension (`src/modules/selection/site.ts`, `src/modules/selection/checks/same-name.ts`); CAP-15 checks that a lead firm really offers the service the name describes.
 - **Policy (how DOM fetches third-party sites):**
   - one `GET /robots.txt` per origin and run (or batch), read before any page; honoured for the group `User-agent: domain-trading-api` and, when there is no such group, for `User-agent: *`; the longest matching `Allow`/`Disallow` wins, `Allow` on a tie; a missing robots file (404, 410, other 4xx) allows everything, but a robots file that cannot be read (timeout, 5xx, 429, TLS or network error) means the page is **not** fetched and the result is UNKNOWN (never "no site");
   - GET only, for the pages needed (CAP-12: the home page; CAP-15: the bot-supplied URLs), at most **one request per `same_name.min_ms_between_fetches` / `lead.verify.min_ms_between_fetches` milliseconds** (default 1,000) through one pacer for the whole run, redirects followed by hand (at most `same_name.max_redirects`, each one paced, robots checked for each new host; a redirect to another site is recorded and **not** followed), `same_name.timeout_ms` per request and `same_name.max_bytes` per body;

@@ -26,6 +26,13 @@ describe('loadConfig', () => {
     expect(() => loadConfig(testEnv({ APP_ENV: 'test', PORKBUN_BASE_URL: 'http://localhost:1' }))).not.toThrow();
   });
 
+  it('G-89: RENDER set with APP_ENV other than production refuses to start; production passes', () => {
+    expect(() => loadConfig(testEnv({ RENDER: 'true' }))).toThrow(/RENDER is set but APP_ENV is test/);
+    expect(() => loadConfig(testEnv({ RENDER: 'true', APP_ENV: 'development' }))).toThrow(/APP_ENV=production/);
+    expect(() => loadConfig(testEnv({ RENDER: 'true', APP_ENV: 'production', DATABASE_SSL: 'true', DATABASE_URL: 'postgres://u:p@db.example.com/d?sslmode=verify-full' }))).not.toThrow();
+    expect(() => loadConfig(testEnv({ APP_ENV: 'development' }))).not.toThrow();
+  });
+
   it('rejects a missing DATABASE_URL', () => {
     const env = testEnv();
     delete env.DATABASE_URL;

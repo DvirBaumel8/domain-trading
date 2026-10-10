@@ -7,6 +7,7 @@ import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
 import { listedDomain } from '../../helpers/listing.js';
 import { issueToken } from '../../helpers/tokens.js';
+import { readyToBuy } from '../../helpers/buy.js';
 
 let app: FastifyInstance;
 afterEach(async () => app?.close());
@@ -42,15 +43,17 @@ describe('forecast fixes (CR-004 §10.3)', () => {
     expect((await t.get('/report')).json().budget.committed_forward).toMatchObject({ total_cents: 0, complete: true, missing: [] });
   });
 
-  it('POST_BUY_INCOMPLETE is not raised for a name imported as legacy_no_comps (evidence row with the legacy reason)', async () => {
+  it('v3.9.0: POST_BUY_INCOMPLETE = a bought name with no screening pack; comps are not needed, and an imported name (no purchase row) is exempt', async () => {
     const base = { request_hash: 'h', max_price_cents: 2000, approval_text: 'ok', approval_at: new Date(NOW - 86_400_000) };
-    await db.insertInto('purchases').values({ ...base, idempotency_key: 'kl1', domain: 'legacy-name.com', state: 'succeeded' }).execute();
-    await db.insertInto('purchases').values({ ...base, idempotency_key: 'kl2', domain: 'no-evidence.com', state: 'succeeded' }).execute();
-    const legacy = await insertOwnedDomain(db, { domain: 'legacy-name.com' });
-    await insertOwnedDomain(db, { domain: 'no-evidence.com' });
-    await db.insertInto('pricing_evidence').values({ domain_id: legacy, comps: null, rationale: null, legacy_no_comps_reason: 'bought before the comps rule' }).execute();
+    await db.insertInto('purchases').values({ ...base, idempotency_key: 'kl1', domain: 'has-pack.com', state: 'succeeded' }).execute();
+    await db.insertInto('purchases').values({ ...base, idempotency_key: 'kl2', domain: 'no-pack.com', state: 'succeeded' }).execute();
+    await insertOwnedDomain(db, { domain: 'has-pack.com' });
+    await insertOwnedDomain(db, { domain: 'no-pack.com' });
+    const imported = await insertOwnedDomain(db, { domain: 'imported.com' });
+    await db.insertInto('pricing_evidence').values({ domain_id: imported, comps: null, rationale: null, legacy_no_comps_reason: 'bought before the comps rule' }).execute();
+    await readyToBuy('has-pack.com');
     const t = await boot();
     const w = (await t.get('/report')).json().warnings as { code: string; domain: string }[];
-    expect(w.filter((x) => x.code === 'POST_BUY_INCOMPLETE').map((x) => x.domain)).toEqual(['no-evidence.com']);
+    expect(w.filter((x) => x.code === 'POST_BUY_INCOMPLETE').map((x) => x.domain)).toEqual(['no-pack.com']);
   });
 });

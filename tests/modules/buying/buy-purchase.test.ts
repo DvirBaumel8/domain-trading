@@ -415,7 +415,7 @@ describe('POST /buy final-review fixes', () => {
     expect(again.statusCode).toBe(202);
     expect(pb.realRegisterCalls).toBe(calls);
     const owned = new FakeAdapter('porkbun', { alreadyOwned: true });
-    const r = await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => T0 + 10 * 60_000 }).runOnce();
+    const r = await new Reconciler({ db, adapters: [owned], now: () => T0 + 10 * 60_000 }).runOnce();
     expect(r.booked).toBe(1);
     const b = await postBuy(app, buyBody(), auth, 'k-202r');
     expect(b.statusCode).toBe(201);
@@ -441,7 +441,7 @@ describe('POST /buy final-review fixes', () => {
     const send = () => app.inject({ method: 'POST', url: '/%62uy', headers: { ...auth, 'idempotency-key': 'k-enc202' }, payload: buyBody() as object });
     expect((await send()).statusCode).toBe(202);
     const owned = new FakeAdapter('porkbun', { alreadyOwned: true });
-    expect((await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => T0 + 10 * 60_000 }).runOnce()).booked).toBe(1);
+    expect((await new Reconciler({ db, adapters: [owned], now: () => T0 + 10 * 60_000 }).runOnce()).booked).toBe(1);
     const b = await send();
     expect(b.statusCode).toBe(201);
     expect(b.headers['idempotent-replayed']).toBeUndefined();
@@ -465,7 +465,7 @@ describe('POST /buy final-review fixes', () => {
     expect(again.json().error.code).toBe('ALREADY_OWNED_OR_PENDING');
     // (c)
     const owned = new FakeAdapter('porkbun', { alreadyOwned: true });
-    const r = await new Reconciler({ db, adapters: [owned], rdap: rdapFree, now: () => T0 + 10 * 60_000 }).runOnce();
+    const r = await new Reconciler({ db, adapters: [owned], now: () => T0 + 10 * 60_000 }).runOnce();
     expect(r.booked).toBe(1);
     expect(one(await db.selectFrom('ledger_entries').selectAll().execute())).toMatchObject({ amount_cents: -1108, deal_id: 'D-009' });
     expect(one(await db.selectFrom('domains').selectAll().execute())).toMatchObject({ domain: DOMAIN, status: 'owned' });

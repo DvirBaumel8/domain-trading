@@ -15,6 +15,8 @@ export interface BookInput {
   category: Category; dealId: string | null; checkId: string | null; auditId: string; receiptRaw: unknown | null;
   /** The injected clock's current time (used for updated_at). */
   now: Date;
+  /** v3.9.0: set in the same transaction (drop policy `at_first_expiry` = the first expiry); default expiry + 1 year. */
+  dropDate?: string;
 }
 
 /** buy.md step 6: ONE transaction. Idempotent: a succeeded purchase is never booked twice. */
@@ -26,7 +28,7 @@ export async function bookPurchase(db: Kysely<Database>, b: BookInput): Promise<
     const fields = {
       status: 'owned' as const, registrar: b.registrar, registrar_api: b.registrarApi, buy_date: b.buyDate,
       cost_cents: b.chargedCents, expiry_date: b.expiryDate, renewal_price_cents: b.renewalCents, renewals_used: 0,
-      drop_date: addOneYear(b.expiryDate), category: b.category, deal_id: b.dealId, updated_at: now,
+      drop_date: b.dropDate ?? addOneYear(b.expiryDate), category: b.category, deal_id: b.dealId, updated_at: now,
     };
     const existing = await trx.selectFrom('domains').select('id').where('domain', '=', b.domain).executeTakeFirst();
     const domainId = existing

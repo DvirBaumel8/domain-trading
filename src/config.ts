@@ -79,6 +79,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     throw new Error(`Invalid environment: ${msg}`);
   }
   const e = parsed.data;
+  // v3.9.0 (G-89): Render sets RENDER on every service; a service there that is not APP_ENV=production would skip the production checks (verified TLS, direct DB URL)
+  if (env.RENDER && e.APP_ENV !== 'production') {
+    throw new Error(`Invalid environment: RENDER is set but APP_ENV is ${e.APP_ENV}; a Render service must run with APP_ENV=production`);
+  }
   const pbUrl = env.PORKBUN_BASE_URL;
   if (pbUrl && e.APP_ENV !== 'test' && !pbUrl.startsWith('https://')) {
     throw new Error('Invalid environment: PORKBUN_BASE_URL must be https');

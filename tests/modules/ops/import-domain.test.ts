@@ -16,6 +16,8 @@ import { COMPS, buyBody, postBuy, seedOwnedDomains, seedSpent, T0 } from '../../
 import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { testEnv } from '../../helpers/env.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
+import { V3_SET } from '../../helpers/pricing.js';
+import { newPricingSettings } from '../../../src/modules/ops/admin/pricing-settings.js';
 import { FAKE_PAT, GODADDY_BASE } from '../../helpers/godaddy-msw.js';
 import { issueToken } from '../../helpers/tokens.js';
 import { mswServer } from '../../setup/network.js';
@@ -211,6 +213,17 @@ describe('admin import-domain', () => {
     expect((await refused(go({ ...MANUAL, legacyNoComps: undefined })))?.code).toBe('COMPS_REQUIRED');
     expect((await refused(go({ ...MANUAL, legacyNoComps: undefined, evidence: { comps: COMPS.slice(0, 1) } })))?.code).toBe('COMPS_REQUIRED');
     expect(await count('domains')).toBe(0);
+  });
+
+  it('v3.9.0: with comps_min 0 (pricing v3) an import with no comps and no legacy reason works and writes comps [] like /buy; --comps-file still saves its comps', async () => {
+    await newPricingSettings(db, { set: { ...V3_SET, comps_min: '0' }, approvalText: 'Dvir 7 Oct 2026: pricing v3, comps optional', approvalAt: new Date(Date.now() - 3_600_000).toISOString(), now: new Date(Date.now() - 60_000) });
+    const later = new Date(Date.now() + 5 * 60_000);
+    const bare = { ...MANUAL, legacyNoComps: undefined, buyDate: '2026-10-06' };
+    expect(await go(bare, [], later)).toMatchObject({ status: 'owned' });
+    expect(await db.selectFrom('pricing_evidence').selectAll().executeTakeFirstOrThrow()).toMatchObject({ comps: [], rationale: null, legacy_no_comps_reason: null });
+    expect((await db.selectFrom('domains').select('domain').execute()).length).toBe(1);
+    await go({ ...bare, domain: 'second-name.com', evidence: { comps: COMPS, rationale: 'r' } }, [], later);
+    expect((await db.selectFrom('pricing_evidence').selectAll().orderBy('id', 'desc').executeTakeFirstOrThrow()).comps).toHaveLength(COMPS.length);
   });
 
   it('the cost note is free text: an email address is refused (NO_PII)', async () => {

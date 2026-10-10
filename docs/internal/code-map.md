@@ -10,7 +10,7 @@ Where things live, so a change request goes straight to the right files. Paths a
 - Before commit still run `npx tsc --noEmit && npm run build` (the gate in CLAUDE.md).
 - Test files sit under the module they cover and are named by feature (`tests/modules/candidates/screen.test.ts`, `outreach/posting.test.ts`), never by release. Test IDs (T21-1, AC-6, V214-5, ...) are part of the test names, so docs refer to IDs. To find the tests for a route, `grep -l "<path>" -r tests/modules`. Paths in the "Tests" columns below are relative to `tests/modules/` (a `unit/` entry is a pure test).
 
-Test layout: `tests/modules/<module>/*.test.ts` (API tests: Fastify `inject` + test DB, built by `tests/setup/global-db.ts` from `migrations/`; one folder per `src/modules/*` plus `core`, `http`), `tests/modules/<module>/unit/` (pure: no DB, no network), `tests/unit/` (cross-cutting guards: module/core boundaries, no-llm, no-topup, network-block, config, test-evidence, domain-name), `tests/contract/` (`contract-doc.test.ts` runs in the unit project; `porkbun-mock`/`porkbun-sandbox` are opt-in), `tests/helpers/` (`app.ts` makeApp/runJobToEnd/settleJob, `db.ts` TABLES + reset, `buy.ts`, `listing.ts`, `pricing.ts`, `screening.ts`, `screening-fixtures.ts`, `fake-adapter.ts`, `porkbun-msw.ts`, `godaddy-msw.ts`, `buffer-schema.ts`, `images.ts`, `tokens.ts`, `env.ts`, `csv.ts`), `tests/fixtures/` (recorded screening data, Porkbun OpenAPI, pricing vectors), `vitest.config.ts` (projects unit = `tests/unit` + `tests/modules/*/unit` + contract-doc; api = `tests/modules/**` minus `unit/`; porkbun-*).
+Test layout: `tests/modules/<module>/*.test.ts` (API tests: Fastify `inject` + test DB, built by `tests/setup/global-db.ts` from `migrations/`; one folder per `src/modules/*` plus `core`, `http`), `tests/modules/<module>/unit/` (pure: no DB, no network), `tests/unit/` (cross-cutting guards: module/core boundaries, no-llm, no-topup, network-block, config, test-evidence, domain-name), `tests/contract/` (`contract-doc.test.ts` and `version-sync.test.ts` run in the unit project; `porkbun-mock.test.ts`/`porkbun-sandbox.test.ts` are opt-in, with `setup.ts`, `sandbox-guard.ts`, `sandbox-guard-setup.ts`), `tests/helpers/` (`app.ts` makeApp/runJobToEnd/settleJob, `db.ts` TABLES + reset, `buy.ts`, `listing.ts`, `pricing.ts`, `screening.ts`, `screening-fixtures.ts`, `fake-adapter.ts`, `porkbun-msw.ts`, `godaddy-msw.ts`, `buffer-schema.ts`, `images.ts`, `tokens.ts`, `env.ts`, `csv.ts`), `tests/fixtures/` (recorded screening data, Porkbun OpenAPI, pricing vectors), `vitest.config.ts` (projects unit = `tests/unit` + `tests/modules/*/unit` + contract-doc; api = `tests/modules/**` minus `unit/`; porkbun-*).
 
 Top level: `src/app.ts` (`buildApp`: wires hooks in order auth -> rate limit -> scope -> idempotency -> audit, then every `register*`, the job queue, openapi), `src/main.ts` (server start), `src/config.ts` (zod `EnvSchema`, `loadConfig`; tests `tests/unit/config.test.ts`), `src/domain-name.ts` (domain normalisation; `tests/unit/domain-name.test.ts`), `scripts/` (`evidence.ts`, `build-wordlists.ts`, `record-screening-fixtures.ts`, `refresh-porkbun-spec.ts`, `ac6-split.ts`).
 
@@ -87,6 +87,9 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `lists.ts` | versioned signature lists (`writeList`, `currentLists`) |
 | `replay.ts`, `test-sets.ts`, `split-v2.ts`, `siblings.ts`, `sibling-methods.ts` | replays, holdout (`holdoutCheck`), test sets, sibling method `bt1@vN` |
 | `hold-steps.ts` | `buyHoldSteps` (GET /selection/buy-hold). The route also adds `small_buy` (v3.7.0, G-3) from `SelectionDeps.smallBuy`, composed in `src/app.ts` from `buying` `smallBuyView` (selection must not import buying) |
+| `lane-fit.ts` | `laneFitter` (v3.2.0, CR-020 A): which kept lane (S2, S4, S6) a drop-list name fits, from the `form` token types and the current word lists; none = NO_KEPT_LANE (tests `candidates/lane-fit`) |
+| `prior-business.ts` | prior-business guard of the history check (CR-002 A1): takes the business name a captured page gives itself (og:site_name, title, `<Name> LLC` / copyright line), deterministic, linear scans |
+| `verdicts.ts` | `VerdictBody`, `verdictsFor`: human PASS/REJECT verdicts bound to one FLAG result row (append-only `screening_verdicts`; route `POST /screening/runs/:id/verdicts`; tests `selection/screening-verdicts`) |
 | `unknowns.ts`, `money.ts`, `evidence.ts`, `domain-records.ts`, `tranche-members.ts` | unknown-input reports, EV/Ratio math, evidence rows, cached records, geo members |
 
 Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it). Tests: `tests/modules/selection/` (`screening-*`, `selection-*`, `sibling-methods`, `sibling-bt1-v2`, `bt1-v3-records`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `rdap-pacing`, `run-cancel`, `run-integrity`, `lists-current`, `records-unknowns`, `tier-lanes`, `sellers`, `seller-fetch`, `scout-words`, `settings-intake-keys`), `tests/modules/selection/unit/` (`screening-*`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `split-v2/v3`); helpers `screening.ts`, `screening-fixtures.ts`.
@@ -107,8 +110,8 @@ Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `sc
 | `small-buy.ts` | CR-030 small-buy exception to the buy hold: fixed limits `SMALL_BUY_MAX_FIRST_YEAR_CENTS` / `SMALL_BUY_WEEKLY_CAP_CENTS`, `smallBuyRequested`, `smallBuyGate`, `smallBuySpend`, `smallBuyView` (read for GET /selection/buy-hold, v3.7.0); codes `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` |
 | `tranches.ts` | `TrancheService` |
 | `budget.ts` | `spentCents`, `activeDomainCount` ($1,500 / 50 caps are applied in `buy.ts` from config) |
-| `bookkeeping.ts` | `failPurchase`, `registrarApiOf` |
-| `reconciler.ts` | `Reconciler` (stuck `unknown`/`register_sent` purchases; job step `reconciler`) |
+| `bookkeeping.ts` | `bookPurchase` (v3.9.0: optional `dropDate`, set in its transaction; default expiry + 1 year), `failPurchase`, `registrarApiOf` |
+| `reconciler.ts` | `Reconciler` (stuck `unknown`/`register_sent` purchases; job step `reconciler`). v3.9.0: no rdap dependency, never fails an open purchase (`/report` `PURCHASE_UNRESOLVED` + admin `resolve-purchase`); on booking it sets auto-renew off and the drop policy (`at_first_expiry`) |
 
 Tables: `purchases`, `receipts`, `deals`, `ledger_entries`, `tranches`, `tranche_members`, `pricing_evidence`; writes `domains`, `listing_history`. Tests: `tests/modules/buying/` (`buy-*`, `buy-display-drop-policy`, `budget`, `cap-property`, `reconciler`, `tranches`, `evidence-gaps`, `small-buy`, `small-buy-hold`); `purchases.small_buy_exception` marks small-buy purchases (migration `1762800000000_v3-5-0-b.sql`); helper `tests/helpers/buy.ts`.
 
@@ -124,7 +127,7 @@ Intake of candidate names, on-demand screening, the daily list, drop lists, coho
 | File | Inside |
 |---|---|
 | `intake.ts` | `IntakeBody` (zod), `takeIntake`, `intakeFormReason`, `checkIntake*`, `onDemandAllowance`, `planOnDemand`, `IntakeScreeningJob` |
-| `daily-list.ts` | `DailyEntry`, `buildDailyList`, `BuildDailyListJob`, `readDailyList`, `buildWhy`, `autoRebuildDailyList`, limits `DAILY_LIST_*` |
+| `daily-list.ts` | v3.9.0: `buildDailyList` takes the `daily_rebuild` lock itself; `DailyEntry`, `buildDailyList`, `BuildDailyListJob`, `readDailyList`, `buildWhy`, `autoRebuildDailyList`, limits `DAILY_LIST_*` |
 | `drop-lists.ts` | drop-list helpers (`watchStatusOf`, `freshLookups`, `retentionCutoff`, constants) |
 | `cohorts.ts` | `freezeReadyCohorts`, `FINAL_DROP`, `REREG_DAYS` |
 
@@ -158,7 +161,7 @@ Read-only reports: `/report`, portfolio, ledger, audit, job-run views.
 | File | Inside |
 |---|---|
 | `report/index.ts` | `buildReport` (assembles sections) |
-| `report/warnings.ts` | `buildWarnings` (every `/report` warning code; `LANDER_DOWN_ERROR_DAYS`, `REVIEW_OVERDUE_HOURS`; v3.7.0: `LANDER_AWAITING_MARKETPLACE` until the first confirmed Afternic upload, which also starts the LANDER_DOWN clock; `AUTO_RENEW_ON`, `REGISTRAR_DRIFT` from `registrar_state_checks`) |
+| `report/warnings.ts` | `buildWarnings` (every `/report` warning code; `LANDER_DOWN_ERROR_DAYS`, `REVIEW_OVERDUE_HOURS`; v3.9.0: `PURCHASE_UNRESOLVED_MINUTES`, `NEON_FREE_STORAGE_BYTES`, `DB_SIZE_WARN_PERCENT` (`PURCHASE_UNRESOLVED`, `DB_SIZE_HIGH`); v3.7.0: `LANDER_AWAITING_MARKETPLACE` until the first confirmed Afternic upload, which also starts the LANDER_DOWN clock; `AUTO_RENEW_ON`, `REGISTRAR_DRIFT` from `registrar_state_checks`) |
 | `report/money.ts`, `portfolio.ts` (`portfolioDetail` adds `registrar_state`, v3.7.0), `domains.ts`, `upcoming.ts`, `pricing-review.ts`, `markdown.ts` | report sections; `ledgerRows`, `ledgerCsvRows`, `usdSigned` in `portfolio.ts` |
 | `job-runs.ts` | `jobRunsView`, `jobsOverdue`, `dailyScheduleState`, `stepView`, `triggerFromKey` |
 
@@ -195,7 +198,7 @@ Jobs and queue, health, admin CLI, backup.
 | File | Inside |
 |---|---|
 | `jobs/runner.ts` | `JobRunner.plan(job)` = the step list for `tick`, `daily`, `screen`; `STEP_ATTEMPTS`, `STEP_TIMEOUT_MS`, `classify` |
-| `queue.ts` | `JobQueue` (Postgres queue: enqueue, claim, run step by step, keepalive) |
+| `queue.ts` | `JobQueue` (Postgres queue: enqueue, claim, run step by step, keepalive; v3.9.0: a skipped retry after a timeout is marked failed) |
 | `job.ts` | `npm run job` CLI |
 | `jobs/price-schedule.ts`, `drop.ts`, `registrar-check.ts`, `portfolio-check.ts`, `drop-watch.ts`, `ns-verify.ts`, `cohort-outcomes.ts`, `reference-refresh.ts` | `PriceScheduleJob` (step `priceJob`), `DropJob`, `RegistrarCheckJob`, `PortfolioCheckJob`, `DropWatchJob`, `NsVerifier` (`runOnce({onlyUnverified})`: the runner calls it for never-verified names even after the day's run, v3.7.0), `CohortOutcomesJob`, `ReferenceRefreshJob`; `RegistrarCheckJob` also appends `registrar_state_checks` (auto-renew, privacy, NS of Porkbun names, read-only) |
 | `jobs/backup-export.ts`, `backup-import.ts` | `BackupExporter`, `TABLE_FILES`, `ORDER`, `migrationNames` |
@@ -220,6 +223,8 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 | `tokens.ts` | `generateToken`, `hashToken` | `core/unit/tokens` |
 
 ### http (`src/http/`)
+Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks below.
+
 | File | Inside | Test |
 |---|---|---|
 | `auth.ts` | `registerAuth` (bearer tokens, job token), `registerScope` (READ/WRITE), `INTAKE_ROUTES`, `PUBLIC_PATHS` | `http/auth`, `token-expiry` |
@@ -231,7 +236,7 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb`, `pingDb`, `poolConfig`), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1762900000000_v3-7-0.sql`: `registrar_state_checks`, `venue_listings`; 32 files). Run with `npm run migrate`.
+`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1762900000000_v3-7-0.sql`: `registrar_state_checks`, `venue_listings`; 32 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -267,11 +272,13 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 | Add an offer source / buyer type | `selling/offer-rules.ts` (`OFFER_SOURCES`, `BUYER_TYPES`, `classify`), `selling/offers.ts` | `selling/unit/offer-rules`, `selling/offers` |
 | Change sold evidence rules | `selling/sold.ts` (`EVIDENCE_SOURCES`, `VENUES`), `selling/api/sold.ts` | `selling/sold` |
 | Add a registrar error code mapping | `registrars/porkbun.ts` (or `godaddy.ts`), `registrars/types.ts` (`RegistrarError`, `AMBIGUOUS_CODES`) | `registrars/unit/porkbun-*`, `registrars/check-porkbun` |
+| Rule-guard tests (founder rules enforced by tests) | `tests/unit/no-llm.test.ts` (rule 9), `no-topup.test.ts` (rule 6), `no-web-risk-update.test.ts`, `sandbox-guard.test.ts` (rule 12, with `tests/contract/sandbox-guard.ts`), `global-db-guard.test.ts` (tests never touch a real DB), `network-block.test.ts` with `tests/setup/network.ts` (offline: MSW unhandled = error, UDP blocked) | run the guard files after any change near their subject |
 | Add a migration | new `migrations/<epoch>_<name>.sql` (epoch above the latest); `src/db/types.ts`; for a new table: `ops/jobs/backup-export.ts` (`TABLE_FILES`) and `backup-import.ts` (`ORDER`) or `EXCLUDED` in `tests/modules/ops/unit/backup-coverage.test.ts`; `tests/helpers/db.ts` `TABLES`; `APPEND_ONLY_TABLES` in `scripts/evidence.ts` if append-only; the migration count in `tests/modules/ops/admin-cli.test.ts` (doctor: `migrations: 32 applied`) | `core/schema`, `core/append-only`, `ops/backup`, `ops/unit/backup-coverage`, `ops/admin-cli` |
 | Add an error code | throw `new AppError(status, 'CODE', ...)` (`http/errors.ts`); add to the Code index in `docs/contract/endpoints.md` (line ~734) and the endpoint's section; add a test whose name/body asserts it; `npm run evidence` | `unit/test-evidence`, `contract/contract-doc` |
 | Add a hand-listing field (venue record) | `listing/api/venue.ts` (strict zod; never a walk-away), `venue_listings` columns via migration, `reporting/report/portfolio.ts` `exportBlock` | `listing/venue` |
 | Add a route | module `api/<x>.ts` + its `register*` in the module `index.ts` and `src/app.ts`; route table row and `### METHOD /path` section in `docs/contract/endpoints.md`; `SUMMARIES` in `http/openapi.ts`; scope (READ/WRITE) in `http/auth.ts` if special | `contract/contract-doc`, a new test under `tests/modules/<module>/` |
 | Add a POST that needs an idempotency key | nothing extra: `registerIdempotency` covers all POSTs; add a replay test | `http/idempotency` |
+| Change the RENDER/APP_ENV startup guard (refuses to start when `RENDER` is set and `APP_ENV` is not `production`, v3.9.0) | `src/config.ts` (`loadConfig`) | `tests/unit/config` |
 | Add an env var | `src/config.ts` (`EnvSchema`, `Config`), `.env.example`, `docs/runbook.md` / `DEPLOYMENT.md` if ops-visible | `tests/unit/config`, `contract/contract-doc` |
 | Add a secret that must never leak | `config.ts` `secretValues`; check `core/redact.ts` | `http/secrets`, `core/unit/redact` |
 | Add an admin CLI command | `ops/admin.ts` + `ops/admin/<cmd>.ts`; `docs/internal/cli.md` | `ops/admin-cli` |
@@ -292,7 +299,7 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 Anything Gavriel can see (route, field, code, behaviour) needs all of these in the same commit:
 
 1. `docs/contract/README.md`: the contract version line.
-2. The "(contract vX.Y.Z)" label in the first line of `docs/contract/endpoints.md`, `formats.md`, `jobs.md`, `reports.md`, `selection.md`, and `test-evidence.md` (generated, see 5). `tests/contract/contract-doc.test.ts` checks them against `package.json`.
+2. The "(contract vX.Y.Z)" label in the first line of `docs/contract/endpoints.md`, `formats.md`, `jobs.md`, `reports.md`, `selection.md`, and `test-evidence.md` (generated, see 5). `tests/contract/contract-doc.test.ts` checks them against `package.json`, and `tests/contract/version-sync.test.ts` checks the version spots stay in sync.
 3. `docs/contract/CHANGELOG.md` entry and the new `docs/releases/vX.Y.Z.md` (contract changes, impact on Gavriel, how to test with `dry_run`, deploy status).
 4. `package.json` `version` (`src/config.ts` reads it for `/health` and openapi). MAJOR breaks a caller, MINOR adds, PATCH is docs or a fix back to the contract.
 5. `npm run evidence` rewrites `docs/contract/test-evidence.md`; commit the result (`tests/unit/test-evidence.test.ts` fails on a diff or an untested code).

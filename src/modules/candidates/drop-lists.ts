@@ -15,8 +15,6 @@ export const DROP_LIST_RETENTION_DAYS = 60;
 export const DROP_WATCH_MAX_PER_RUN = 3000;
 /** A registry lookup that answered unknown is asked again on later daily runs, at most this many checks in all. */
 export const MAX_UNKNOWN_CHECKS = 5;
-/** `/report` raises DROP_FEED_STALE when the newest list is more than `intake.drop_feed_stale_days` days old (v3.3.0: a setting; this is its default, it was a fixed 2 before). */
-export const DROP_FEED_STALE_DAYS = 7;
 export const PENDING_DELETE_DAYS = 5;
 export const REDEMPTION_DAYS = 35;
 export const DROP_LIST_NAME_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;

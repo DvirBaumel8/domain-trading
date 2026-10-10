@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.9.0 (2026-10-10): tech-debt pass (v3.0-v3.8)
+MINOR, additive (new `/report` warning codes; the `DROP_POLICY_FAILED` 201 warning is removed because it can no longer occur). Release note: `docs/releases/v3.9.0.md`.
+- **Reconciler never fails a purchase (Dvir, 10 Oct 2026).** A `register_sent`/`unknown` purchase whose name is absent at the registrar stays open, however long. `/report` raises the new warning `PURCHASE_UNRESOLVED` (`purchase_id`, `state`, `age_minutes`, `created_at`) after 30 minutes; the admin command `resolve-purchase` closes it. `PURCHASE_FAILED` now comes only from that command.
+- **Reconciler books like `/buy`.** After booking a purchase it turns auto-renew off at the registrar (a failure is logged; `AUTO_RENEW_ON` covers the rest) and honours the stored request's `drop_policy` (`at_first_expiry`: `drop_date` = expiry). In `/buy` the drop date is now set in the booking transaction itself, so `DROP_POLICY_FAILED` is removed.
+- **`/report`:** new `PURCHASE_UNRESOLVED` and `DB_SIZE_HIGH` (database over 70% of Neon's free 0.5 GB). `POST_BUY_INCOMPLETE` now means "a `/buy` purchase with no screening pack" (comps are optional since pricing v3).
+- **`POST /candidates/screen`** with `domains`: a name already screened on demand today is free (CR-026) and is accepted at the cap; `ON_DEMAND_SCREEN_CAP` is answered only when no name can be taken.
+- **Jobs:** a step retried after a timeout that finds the step still busy is `failed` (`previous attempt timed out and may still be running`), not an ok `skipped`. The daily list build takes the `daily_rebuild` lock itself.
+- **Admin `import-domain`:** with `comps_min` 0 an import needs no comps and no legacy reason (same `pricing_evidence` row as `/buy` without comps); `--comps-file` still works.
+- **Not contract-visible:** DB pool error listener and timeouts, refusal to start with `RENDER` set and `APP_ENV` not production (G-89), jobs-trigger Worker wake timeout 90 s and up to 3 POST tries, `review-retry-tick` workflow permissions and by-hand key, version-sync test.
+
 ## 3.8.0 (2026-10-10): CR-039, digits inside regime codes
 MINOR, additive. Approved by Dvir on 10 Oct 2026. A digit inside a scout `words` piece that is on the `regime` list (ets2, nis2) no longer causes `HAS_DIGIT`, at intake or in the screening form check (SPELL-1). The `regime` list accepts terms with digits after a letter (`^[a-z][a-z0-9]{1,39}$`), and census list names may carry digits (`bt1_ets2compliance`). Release note: `docs/releases/v3.8.0.md`.
 

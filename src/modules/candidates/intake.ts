@@ -331,9 +331,11 @@ export class IntakeScreeningJob {
         ? Math.min(sel.values.intake.on_demand_screen_daily_max - await onDemandUsed(db, today), onDemand.maxNames ?? Number.MAX_SAFE_INTEGER)
         : INTAKE_DAILY_MAX - await dailyUsed(db, today);
       if (queuedBefore + drops.length === 0) return none('NO_NAMES', counts);
-      if (budget <= 0) return none(onDemand ? 'ON_DEMAND_SCREEN_CAP' : 'DAILY_MAX_REACHED', { ...counts, queued_before: queuedBefore, left_for_next_run: queuedBefore + drops.length });
+      // v3.9.0: a named run (CR-026) leaves the cap to chooseOnDemand: a name already screened on demand today is free, so a used-up allowance can still take it
+      if (budget <= 0 && !w.named) return none(onDemand ? 'ON_DEMAND_SCREEN_CAP' : 'DAILY_MAX_REACHED', { ...counts, queued_before: queuedBefore, left_for_next_run: queuedBefore + drops.length });
 
       const { takenIntake, takenDrops } = onDemand ? await chooseOnDemand(db, w, today, Math.max(0, sel.values.intake.on_demand_screen_daily_max - await onDemandUsed(db, today)), onDemand.maxNames) : chooseNames(w, budget);
+      if (takenIntake.length + takenDrops.length === 0) return none('ON_DEMAND_SCREEN_CAP', { ...counts, queued_before: queuedBefore, left_for_next_run: queuedBefore + drops.length });
       const census = await intakeCensusList(db);
       const names: InputName[] = [
         ...takenIntake.map(([domain, v]) => ({ domain, lane: v.lane as InputName['lane'], ...(v.words && { words: v.words }), ...(census && { census_list: census }) })),

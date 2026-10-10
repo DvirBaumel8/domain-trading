@@ -15,9 +15,12 @@ These are **DOM's own** working documents: the binding business rules, internals
 | `sold.md` | `/sold`; S-* |
 | `report.md` | Reads, `import-domain`, the daily registrar check, the status lifecycle; R-*, IM-* |
 | `backup.md` | Nightly export, restore, drill; BK-* |
-| `cli.md` | Admin and job commands, the optional `dt` CLI; ADM-*, CLI-* |
+| `cli.md` | Admin and job commands; ADM-*. **Historical for the optional `dt` CLI (CLI-*): dropped, G-13** |
 | `test-plan.md` | Gates G0–G5, cross-cutting tests, LS/LG/LH/LX, PR/PR3, OF, SL, JOB |
-| `selection.md` (+ `selection/`) | Selection v9.1 (Dvir approved 6 Oct 2026): the rules behind CR-001 |
+| `selection.md` | Selection v9.1 (Dvir approved 6 Oct 2026): the rules behind CR-001 |
+| `selection/` | Source READMEs for the census and NameBio data (`census-README.md`, `namebio-README.md`) |
+| `code-map.md` | Where every module, file, route, table and test is (start here for any change) |
+| `sources.md` | Terms log of every outside data source |
 | `gaps.md` | Every gap between these docs and the code, with a decision |
 
 Changes: a CR or BUG (`docs/requests/`) → DOM updates the code, the contract (semver + `CHANGELOG.md`), these docs and `gaps.md` in the same commit, and writes a release note (`docs/releases/`).

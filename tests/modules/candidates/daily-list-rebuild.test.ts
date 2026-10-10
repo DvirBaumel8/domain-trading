@@ -16,6 +16,7 @@ import { BuildDailyListJob } from '../../../src/modules/candidates/daily-list.js
 import { GATE_OF } from '../../../src/modules/selection/checks/index.js';
 import { planFor } from '../../../src/modules/selection/engine.js';
 import { featuresOfRun } from '../../../src/modules/selection/test-sets.js';
+import { advisoryXactLock } from '../../../src/core/locks.js';
 import { testDb as db } from '../../helpers/db.js';
 import { putBrandLists, putList, screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
 import { fixture, respond } from '../../helpers/screening-fixtures.js';
@@ -143,5 +144,25 @@ describe('CR-015 I-4 the daily list is judged at build time, and can be rebuilt 
     const l = (await x.get('/candidates/daily')).json();
     expect(l.sections.almost_ready.find((a: any) => a.domain === 'superpro.com').missing).toEqual([{ kind: 'tm_us', reason: 'STALE' }]);
     expect(l.sections.removed_since_first).toEqual([{ domain: 'superpro.com', was_rank: 1, reason: expect.any(String) }]);
+  });
+  it('v3.9.0: the daily step (BuildDailyListJob) takes the daily_rebuild lock itself; it waits for a holder and builds once it lets go, with version 1 then 2', async () => {
+    const x = await h();
+    await seedRun(x, [{ domain: 'superpro.com' }]);
+    let release!: () => void;
+    const holding = new Promise<void>((r) => { release = r; });
+    let locked!: () => void;
+    const hasLock = new Promise<void>((r) => { locked = r; });
+    const holder = db.transaction().execute(async (trx) => { await advisoryXactLock(trx, 'daily_rebuild'); locked(); await holding; });
+    await hasLock;
+    const job = new BuildDailyListJob({ db, worker: fakeWorker(x), now: () => x.clock.t });
+    let done = false;
+    const run = job.runOnce().then((r) => { done = true; return r; });
+    await new Promise((r) => setTimeout(r, 400));
+    expect(done).toBe(false);
+    expect(await db.selectFrom('daily_candidate_lists').selectAll().execute()).toHaveLength(0);
+    release();
+    await holder;
+    expect(await run).toMatchObject({ version: 1, entries_n: 1 });
+    expect(await job.runOnce()).toMatchObject({ version: 2 });
   });
 });

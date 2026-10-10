@@ -121,6 +121,22 @@ describe('attempts, timeouts, isolation', () => {
     expect(ns).toHaveBeenCalledTimes(1);
   });
 
+  it('Q-7b v3.9.0: a retry after a timeout that finds the step still busy ({skipped:true}) is failed, not stored as an ok "skipped"', async () => {
+    const app = await make({ jobQueueOverrides: { reconciler: { timeoutMs: 60, maxAttempts: 2 } } });
+    let calls = 0;
+    vi.spyOn(app.reconciler, 'runOnce').mockImplementation(() => (++calls === 1 ? new Promise(() => {}) : Promise.resolve({ skipped: true } as never)));
+    const r = await runJobToEnd(app, 'tick');
+    expect(calls).toBe(2);
+    expect(r.json().steps.reconciler).toMatchObject({ ok: false, status: 'failed', attempts: 2, error: 'previous attempt timed out and may still be running' });
+  });
+
+  it('Q-7c v3.9.0: a plain skip (no earlier timeout) stays skipped', async () => {
+    const app = await make();
+    vi.spyOn(app.reconciler, 'runOnce').mockResolvedValue({ skipped: true } as never);
+    const r = await runJobToEnd(app, 'tick');
+    expect(r.json().steps.reconciler).toMatchObject({ status: 'skipped', attempts: 1 });
+  });
+
   it('Q-8 the limits per step are stored with the step (defaults 2 attempts / 5 min; outside readers 3; review 1; intake and daily list 10 min)', async () => {
     const app = await make();
     const e = await app.jobQueue.enqueue('daily');

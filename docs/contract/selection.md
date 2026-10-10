@@ -1,4 +1,4 @@
-# Selection checks (contract v3.8.0)
+# Selection checks (contract v3.9.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -210,7 +210,7 @@ Feature checks (`run.feature_checks`: census, ext_dates, namebio) never reject o
 
 ## Same-run recompute (1.2.0)
 
-Some checks read other checks' rows of the same run (`ctx.latest(...)`). The dependency list (`DEPENDS_ON` in `src/screening/checks/index.ts`):
+Some checks read other checks' rows of the same run (`ctx.latest(...)`). The dependency list (`DEPENDS_ON` in `src/modules/selection/checks/index.ts`):
 
 | Check | Reads |
 |---|---|

@@ -159,12 +159,31 @@ async function collectPool(db: Kysely<Database>, nowMs: number): Promise<{ pool:
   return { pool, hold: sel.values.buy_hold, values: sel.values, label: sel.label };
 }
 
-export async function buildDailyList(deps: { db: Kysely<Database>; worker: ScreeningWorker; now: () => number; waitMs?: number; noWait?: boolean; builtBy?: 'daily' | 'rebuild' | 'auto' }): Promise<{ id: string; day: string; entries_n: number; almost_ready_n: number; upcoming_n: number; partial: boolean; version: number }> {
+type BuildDeps = { db: Kysely<Database>; worker: ScreeningWorker; now: () => number; waitMs?: number; noWait?: boolean; builtBy?: 'daily' | 'rebuild' | 'auto' };
+type BuildResult = { id: string; day: string; entries_n: number; almost_ready_n: number; upcoming_n: number; partial: boolean; version: number };
+
+/**
+ * v3.9.0: takes the `daily_rebuild` advisory lock itself, so the daily step, a rebuild, an auto rebuild and a screen run never build at once. The wait for the day's screening
+ * runs happens first, outside the lock; the read, the insert and the version count are one transaction under it. A caller that is already in a transaction (the rebuild route,
+ * which counts the day's rebuilds under the same lock) passes it as `db`: the lock is then taken again by the same connection (re-entrant) and that transaction is used.
+ */
+export async function buildDailyList(deps: BuildDeps): Promise<BuildResult> {
+  const timedOut = deps.noWait ? false : await waitForRuns(deps.db, deps.worker, idtDay(deps.now()), deps.waitMs ?? DAILY_LIST_WAIT_MS);
+  if (deps.db.isTransaction) {
+    await advisoryXactLock(deps.db, 'daily_rebuild');
+    return buildLocked(deps, timedOut);
+  }
+  return deps.db.transaction().execute(async (trx) => {
+    await advisoryXactLock(trx, 'daily_rebuild');
+    return buildLocked({ ...deps, db: trx }, timedOut);
+  });
+}
+
+async function buildLocked(deps: BuildDeps, timedOut: boolean): Promise<BuildResult> {
   const { db } = deps;
   const nowMs = deps.now();
   const today = idtDay(nowMs);
-  // noWait (a manual rebuild): build from what is done now; a run still going marks the list partial below.
-  const timedOut = deps.noWait ? false : await waitForRuns(db, deps.worker, today, deps.waitMs ?? DAILY_LIST_WAIT_MS);
+  // noWait (a manual rebuild): builds from what is done now; a run still going marks the list partial below.
   const nowAfter = deps.now();
   const { pool, hold, values, label } = await collectPool(db, nowAfter);
   const pricing = await currentSettings(db, new Date(nowAfter));
@@ -450,9 +469,6 @@ export async function autoRebuildDailyList(deps: { db: Kysely<Database>; worker:
   const today = idtDay(deps.now());
   if (!(await db.selectFrom('candidate_screenings').select('id').where('run_id', '=', runId).where('day', '=', today).limit(1).executeTakeFirst())) return false;
   if (await db.selectFrom('job_steps').select('id').where('step', '=', 'buildDailyList').where('status', 'in', ['queued', 'running']).limit(1).executeTakeFirst()) return false;
-  await db.transaction().execute(async (trx) => {
-    await advisoryXactLock(trx, 'daily_rebuild');
-    await buildDailyList({ db, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'auto' });
-  });
+  await buildDailyList({ db, worker: deps.worker, now: deps.now, noWait: true, builtBy: 'auto' }); // takes the lock itself (v3.9.0)
   return true;
 }

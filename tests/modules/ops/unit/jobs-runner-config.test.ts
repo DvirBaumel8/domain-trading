@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../../../../src/config.js';
 import pg from 'pg';
-import { poolConfig } from '../../../../src/db/client.js';
+import { EventEmitter } from 'node:events';
+import { attachPoolErrorHandler, poolConfig } from '../../../../src/db/client.js';
 import { JobRunner } from '../../../../src/modules/ops/jobs/runner.js';
 import { BackupExporter } from '../../../../src/modules/ops/jobs/backup-export.js';
 import { testEnv } from '../../../helpers/env.js';
@@ -132,5 +133,22 @@ describe('DB TLS: production requires sslmode=verify-full', () => {
   });
   it('non-production + require → accepted', () => {
     expect(loadConfig(testEnv({ DATABASE_SSL: 'true', DATABASE_URL: 'postgres://u:p@h/db?sslmode=require' })).databaseSsl).toBe(true);
+  });
+});
+
+describe('v3.9.0 pool', () => {
+  it('timeouts: connect 10 s, idle 30 s, in both ssl modes', () => {
+    for (const c of [poolConfig('postgres://u:p@h/db'), poolConfig('postgres://u:p@h/db', { ssl: true })]) {
+      expect(c).toMatchObject({ max: 10, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 30_000 });
+    }
+  });
+
+  it('an idle-client error is logged as a warning and does not throw (an unhandled "error" event would exit the process)', () => {
+    const pool = new EventEmitter();
+    const warns: [object, string][] = [];
+    attachPoolErrorHandler(pool as never, { warn: (o, m) => warns.push([o, m]) });
+    expect(() => pool.emit('error', new Error('Connection terminated unexpectedly'))).not.toThrow();
+    expect(warns).toHaveLength(1);
+    expect(warns[0]![0]).toEqual({ errMessage: 'Connection terminated unexpectedly' });
   });
 });

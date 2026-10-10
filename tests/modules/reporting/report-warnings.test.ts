@@ -5,6 +5,8 @@ import { insertOwnedDomain, seedDailyRun, testDb as db } from '../../helpers/db.
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
 import { listedDomain } from '../../helpers/listing.js';
 import { issueToken } from '../../helpers/tokens.js';
+import { readyToBuy } from '../../helpers/buy.js';
+import { buildWarnings, DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES } from '../../../src/modules/reporting/report/warnings.js';
 import { RegistrarCheckJob } from '../../../src/modules/ops/jobs/registrar-check.js';
 
 const apps: FastifyInstance[] = [];
@@ -152,13 +154,34 @@ describe('GET /report warnings', () => {
     await db.insertInto('purchases').values({ ...base, idempotency_key: 'k2', domain: 'bought.com', state: 'succeeded' }).execute();
     const ok = await db.insertInto('purchases').values({ ...base, idempotency_key: 'k3', domain: 'fine.com', state: 'succeeded' }).returning('id').executeTakeFirstOrThrow();
     await insertOwnedDomain(db, { domain: 'bought.com' });
-    const fine = await insertOwnedDomain(db, { domain: 'fine.com' });
+    await insertOwnedDomain(db, { domain: 'fine.com' });
     await db.insertInto('receipts').values({ purchase_id: ok.id, registrar: 'porkbun', order_id: 'o1' }).execute();
-    await db.insertInto('pricing_evidence').values({ domain_id: fine, comps: JSON.stringify([]), rationale: 'x' }).execute();
+    await readyToBuy('fine.com'); // v3.9.0: POST_BUY_INCOMPLETE = no screening pack (comps are optional)
     const w = await (await boot()).warnings();
     expect(w.filter((x) => x.code === 'PURCHASE_UNKNOWN').map((x) => [x.domain, x.level])).toEqual([['unk.com', 'error']]);
     expect(w.filter((x) => x.code === 'RECEIPT_MISSING').map((x) => [x.domain, x.level])).toEqual([['bought.com', 'warn']]);
     expect(w.filter((x) => x.code === 'POST_BUY_INCOMPLETE').map((x) => [x.domain, x.level])).toEqual([['bought.com', 'warn']]);
+  });
+
+  it('v3.9.0: PURCHASE_UNRESOLVED for a register_sent/unknown purchase open over 30 min (domain, purchase id, state, age); younger, succeeded and dry-run ones do not', async () => {
+    const base = { request_hash: 'h', max_price_cents: 2000, approval_text: 'ok', approval_at: ago(DAY) };
+    const old = await db.insertInto('purchases').values({ ...base, idempotency_key: 'u1', domain: 'stuck.com', state: 'register_sent', created_at: ago(90 * 60_000) }).returning('id').executeTakeFirstOrThrow();
+    await db.insertInto('purchases').values({ ...base, idempotency_key: 'u2', domain: 'lost.com', state: 'unknown', created_at: ago(35 * 60_000) }).execute();
+    await db.insertInto('purchases').values({ ...base, idempotency_key: 'u3', domain: 'young.com', state: 'register_sent', created_at: ago(10 * 60_000) }).execute();
+    await db.insertInto('purchases').values({ ...base, idempotency_key: 'u4', domain: 'dry.com', state: 'unknown', dry_run: true, created_at: ago(DAY) }).execute();
+    const w = (await (await boot()).warnings()).filter((x) => x.code === 'PURCHASE_UNRESOLVED');
+    expect(w.map((x) => [x.domain, x.level])).toEqual([['lost.com', 'warn'], ['stuck.com', 'warn']]);
+    expect(w.find((x) => x.domain === 'stuck.com')!.details).toMatchObject({ purchase_id: old.id, state: 'register_sent', age_minutes: 90 });
+  });
+
+  it('v3.9.0: DB_SIZE_HIGH above 70% of the Neon free 0.5 GB; not raised for the small test database', async () => {
+    expect(NEON_FREE_STORAGE_BYTES).toBe(0.5 * 1024 ** 3);
+    expect(DB_SIZE_WARN_PERCENT).toBe(70);
+    expect(codes(await buildWarnings(db, new Date(NOW)))).not.toContain('DB_SIZE_HIGH');
+    const w = (await buildWarnings(db, new Date(NOW), { storageLimitBytes: 1000 })).filter((x) => x.code === 'DB_SIZE_HIGH');
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatchObject({ level: 'warn', details: { limit_bytes: 1000, warn_percent: 70 } });
+    expect(w[0]!.details.size_bytes).toBeGreaterThan(700);
   });
 
   it('PAST_DROP_DATE and EXPIRED_NOT_RENEWED', async () => {

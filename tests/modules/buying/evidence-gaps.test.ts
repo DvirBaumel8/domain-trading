@@ -5,6 +5,7 @@ import { sql } from 'kysely';
 import type { FastifyInstance } from 'fastify';
 import { RegistrarError } from '../../../src/modules/registrars/types.js';
 import { Reconciler } from '../../../src/modules/buying/reconciler.js';
+import { resolvePurchaseFailed } from '../../../src/modules/ops/admin/resolve-purchase.js';
 import { makeApp } from '../../helpers/app.js';
 import { DOMAIN, buyBody, postBuy } from '../../helpers/buy.js';
 import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
@@ -95,7 +96,9 @@ describe('codes without a test before 2.1.0', () => {
 
     it('PURCHASE_FAILED: the registrar never registered the name, so the stored answer is 409 PURCHASE_FAILED', async () => {
       await seed(DOMAIN);
-      expect(await new Reconciler({ db, adapters: [new FakeAdapter('porkbun')], rdap: async () => 'not_registered', now: () => NOW }).runOnce()).toMatchObject({ failed: 1 });
+      // v3.9.0: the reconciler no longer fails an absent name; the administrator does (resolve-purchase)
+      const p = await db.selectFrom('purchases').select('id').where('idempotency_key', '=', 'k-settled').executeTakeFirstOrThrow();
+      await resolvePurchaseFailed(db, { purchaseId: p.id, reason: 'checked the registrar account' });
       const res = await retry();
       expect(res.statusCode).toBe(409);
       expect(res.json().error.code).toBe('PURCHASE_FAILED');
@@ -103,7 +106,7 @@ describe('codes without a test before 2.1.0', () => {
 
     it('RECONSTRUCTED: the reconciler booked it, so the answer is a 201 rebuilt from the ledger with a RECONSTRUCTED warning', async () => {
       await seed(DOMAIN);
-      expect(await new Reconciler({ db, adapters: [new FakeAdapter('porkbun', { alreadyOwned: true })], rdap: async () => 'registered', now: () => NOW }).runOnce()).toMatchObject({ booked: 1 });
+      expect(await new Reconciler({ db, adapters: [new FakeAdapter('porkbun', { alreadyOwned: true })], now: () => NOW }).runOnce()).toMatchObject({ booked: 1 });
       const res = await retry();
       expect(res.statusCode).toBe(201);
       expect(res.json().warnings.join(' ')).toContain('RECONSTRUCTED');

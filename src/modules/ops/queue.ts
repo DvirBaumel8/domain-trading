@@ -176,8 +176,8 @@ export class JobQueue {
   }
 
   /** The next step of the run: queued, with every earlier step terminal. SKIP LOCKED so two workers never take the same row. */
-  private async claim(runId: string): Promise<{ id: number; step: string; attempt: number; max_attempts: number; timeout_ms: number } | undefined> {
-    const r = await sql<{ id: string; step: string; attempt: number; max_attempts: number; timeout_ms: number }>`
+  private async claim(runId: string): Promise<{ id: number; step: string; attempt: number; max_attempts: number; timeout_ms: number; error: string | null } | undefined> {
+    const r = await sql<{ id: string; step: string; attempt: number; max_attempts: number; timeout_ms: number; error: string | null }>`
       update job_steps set status = 'running', attempt = attempt + 1, locked_by = ${this.instanceId},
         locked_until = now() + (timeout_ms + ${LOCK_GRACE_MS}) * interval '1 millisecond', started_at = coalesce(started_at, now())
       where id = (
@@ -185,12 +185,12 @@ export class JobQueue {
         where s.run_id = ${runId} and s.status = 'queued'
           and not exists (select 1 from job_steps p where p.run_id = s.run_id and p.position < s.position and p.status in ('queued', 'running'))
         order by s.position limit 1 for update skip locked)
-      returning id, step, attempt, max_attempts, timeout_ms`.execute(this.deps.db);
+      returning id, step, attempt, max_attempts, timeout_ms, error`.execute(this.deps.db);
     const row = r.rows[0];
     return row && { ...row, id: Number(row.id) };
   }
 
-  private async execute(step: { id: number; attempt: number; max_attempts: number; timeout_ms: number }, entry: PlanStep | undefined): Promise<void> {
+  private async execute(step: { id: number; attempt: number; max_attempts: number; timeout_ms: number; error?: string | null }, entry: PlanStep | undefined): Promise<void> {
     const { runner, db } = this.deps;
     const t0 = this.deps.now();
     const ms = () => Math.max(0, this.deps.now() - t0);
@@ -214,8 +214,13 @@ export class JobQueue {
     }
     const done = { locked_by: null, locked_until: null };
     if (result) {
-      const status = result.skipped ? 'skipped' : result.ok ? 'done' : 'failed';
-      await db.updateTable('job_steps').set({ ...done, status, finished_at: new Date(this.deps.now()), ms: result.ms, summary: json(result.summary), error: result.error ?? null }).where('id', '=', step.id).execute();
+      // v3.9.0: a timed-out attempt is only abandoned (it keeps running and holds the step's own lock), so a retry that finds the job busy answers "skipped"; that is not a success
+      const staleTimeout = result.skipped && step.error === 'timeout';
+      const status = staleTimeout ? 'failed' : result.skipped ? 'skipped' : result.ok ? 'done' : 'failed';
+      await db.updateTable('job_steps').set({
+        ...done, status, finished_at: new Date(this.deps.now()), ms: result.ms, summary: json(result.summary),
+        error: staleTimeout ? 'previous attempt timed out and may still be running' : result.error ?? null,
+      }).where('id', '=', step.id).execute();
     } else if (step.attempt < step.max_attempts) {
       await db.updateTable('job_steps').set({ ...done, status: 'queued', error }).where('id', '=', step.id).execute();
     } else {

@@ -195,8 +195,15 @@ describe('CR-026: POST /candidates/screen {domains} re-screens only what changed
     expect(third.json()).toMatchObject({ names_n: 1, allowance: { used_today: 3, remaining: 0 } });
     await settle(x);
     await draftAndActivate(x, 'v2d', { 'freshness_hours.census': 170 });
-    const cap = await post('/candidates/screen', { domains: ['superpro.com'] });
+    // v3.9.0: a NEW name is refused at the cap, but a name already screened on demand today is free (CR-026) and is re-screened
+    await intake3(x, ['newbie.com']);
+    const cap = await post('/candidates/screen', { domains: ['newbie.com'] });
     expect([cap.statusCode, cap.json().error.code]).toEqual([409, 'ON_DEMAND_SCREEN_CAP']);
+    const free = await post('/candidates/screen', { domains: ['superpro.com'] });
+    expect(free.statusCode, free.body).toBe(202);
+    expect(free.json()).toMatchObject({ names_n: 1, allowance: { used_today: 3, remaining: 0 } });
+    await settle(x);
+    await draftAndActivate(x, 'v2e', { 'freshness_hours.census': 171 });
     x.clock.t += DAY; // tomorrow the allowance is whole again
     expect((await post('/candidates/screen', { domains: ['superpro.com'] })).statusCode).toBe(202);
     await settle(x);

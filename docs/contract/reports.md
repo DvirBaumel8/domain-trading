@@ -1,4 +1,4 @@
-# Reports (contract v3.8.0)
+# Reports (contract v3.9.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -37,6 +37,8 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | Code | Level | When | `details` |
 |---|---|---|---|
 | `PURCHASE_UNKNOWN` | error | A purchase is in the `unknown` state | `purchase_id` |
+| `PURCHASE_UNRESOLVED` | warn | (3.9.0) A real purchase has been `register_sent` or `unknown` for more than 30 minutes. The reconciler books it when the registrar shows the name and an invoice, but it never fails it (registrar lag can look like absence). Check the registrar account, then ask DOM to run the admin `resolve-purchase` command (an `unknown` purchase raises `PURCHASE_UNKNOWN` as well) | `purchase_id`, `state`, `age_minutes`, `created_at` |
+| `DB_SIZE_HIGH` | warn | (3.9.0) The database is over 70% of Neon's free storage (0.5 GB); the free plan stops accepting writes at the limit. Tell DOM | `size_bytes`, `limit_bytes`, `percent`, `warn_percent` |
 | `PRICE_EVENT_FAILED` | error | A scheduled price event failed (the domain is unchanged) | `events[] {event, due_on, note}` |
 | `EXPIRED_NOT_RENEWED` | error | A live name with `renewals_used = 0` is past its expiry (it is not auto-dropped: grace period) | `expiry_date` |
 | `JOB_MISSED` | error | (3.1.0, CR-016) Today's scheduled slot (00:05 UTC) passed more than 30 minutes ago and no daily run was created at or after it (once any daily run exists) | `slot`, `last_run_at` |
@@ -51,7 +53,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `LANDER_DOWN` | warn; **error from the 2nd day running** | The daily web check of a listed name with verified lander nameservers did not get the lander's answer (2.3.0) | `checked_at`, `since`, `status_code`, `reason` |
 | `EXPORT_PENDING` | warn; **error after 7 days** | A listed name changed since the last confirmed Afternic upload | `days_pending`, `export_pending_since` |
 | `MANUAL_DELIST` | warn | A sold, delisted or dropped name must be removed by hand at a marketplace | `status`, `venues[]` |
-| `POST_BUY_INCOMPLETE` | warn | A bought name has no stored pricing evidence (comps). Never raised for a name imported with `legacy_no_comps` (2.1.0: its evidence row records the legacy reason) | `purchase_id` |
+| `POST_BUY_INCOMPLETE` | warn | (3.9.0: was "no stored comps") A name bought with `POST /buy` has no screening pack on file. Comps are optional since pricing v3 and no longer matter here. Never raised for an imported name (`import-domain` makes no purchase) | `purchase_id` |
 | `LANDER_PENDING` | info | The name was listed with `lander: "none"` and no lander has been chosen yet (2.1.0); no nameserver action is pending in the service | `lander` (null) |
 | `NS_UNVERIFIED` | warn | Public DNS doesn't show the lander nameservers yet | `lander`, `lander_ns` |
 | `DROP_FEED_STALE` | info (3.3.0; `warn` by setting) | (2.8.0) Drop lists exist, but the newest `list_date` is more than `intake.drop_feed_stale_days` (3.3.0: default 7; was 2) days before today. At `info` (the default, `intake.drop_feed_stale_level`) it counts toward no warning total | `newest_list`, `newest_list_date` |

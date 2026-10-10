@@ -207,7 +207,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('intakeScreeningJob', new IntakeScreeningJob({ db: deps.db, worker: screeningWorker, now: deps.now ?? Date.now }));
   app.decorate('buildDailyListJob', new BuildDailyListJob({ db: deps.db, worker: screeningWorker, now: deps.now ?? Date.now, waitMs: deps.dailyListWaitMs }));
   app.decorate('cohortOutcomesJob', new CohortOutcomesJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now, log: app.log }));
+  app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('dropJob', new DropJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));

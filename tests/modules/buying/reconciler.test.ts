@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { http, HttpResponse } from 'msw';
-import { rdapStatus, type RdapFn } from '../../../src/core/rdap.js';
-import { mswServer } from '../../setup/network.js';
 import { failPurchase } from '../../../src/modules/buying/bookkeeping.js';
+import { RegistrarError } from '../../../src/modules/registrars/index.js';
 import { Reconciler } from '../../../src/modules/buying/reconciler.js';
 import { DOMAIN } from '../../helpers/buy.js';
 import { testDb as db } from '../../helpers/db.js';
@@ -10,8 +8,6 @@ import { FakeAdapter } from '../../helpers/fake-adapter.js';
 
 const NOW = Date.parse('2026-10-05T12:00:00Z');
 const minutesAgo = (m: number) => new Date(NOW - m * 60_000);
-const rdapFree: RdapFn = async () => 'not_registered';
-const rdapTaken: RdapFn = async () => 'registered';
 
 async function seedPurchase(state: 'created' | 'register_sent' | 'unknown', ageMin: number, domain = DOMAIN) {
   await db.insertInto('quotes').values({
@@ -27,7 +23,7 @@ async function seedPurchase(state: 'created' | 'register_sent' | 'unknown', ageM
   await db.insertInto('domains').values({ domain, status: 'pending_purchase', registrar: 'porkbun', category: 'geo', deal_id: 'D-003' }).execute();
   return id;
 }
-const rec = (pb: FakeAdapter, rdap: RdapFn = rdapFree) => new Reconciler({ db, adapters: [pb], rdap, now: () => NOW });
+const rec = (pb: FakeAdapter) => new Reconciler({ db, adapters: [pb], now: () => NOW });
 
 describe('Reconciler', () => {
   it('B-20: crash after register_sent (registrar did register) → completes rows within one run; exactly 1 ledger row', async () => {
@@ -59,28 +55,32 @@ describe('Reconciler', () => {
     expect(await db.selectFrom('ledger_entries').selectAll().execute()).toHaveLength(0);
   });
 
-  it('absent + RDAP 404 + older than 30 min → failed, pending row deleted', async () => {
+  it('v3.9.0: absent at the registrar, even after 30 min and with RDAP unregistered → NEVER auto-failed (stays open for /report PURCHASE_UNRESOLVED + resolve-purchase)', async () => {
     await seedPurchase('unknown', 31);
-    expect(await rec(new FakeAdapter('porkbun')).runOnce()).toMatchObject({ failed: 1 });
-    expect((await db.selectFrom('purchases').selectAll().executeTakeFirstOrThrow()).state).toBe('failed');
-    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(0);
+    await seedPurchase('register_sent', 600, 'older.com');
+    expect(await rec(new FakeAdapter('porkbun')).runOnce()).toMatchObject({ failed: 0, booked: 0 });
+    expect((await db.selectFrom('purchases').select('state').orderBy('id').execute()).map((r) => r.state)).toEqual(['unknown', 'register_sent']);
+    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(2);
   });
 
-  it('absent + older than 30 min but RDAP answers an HTML 404 (a proxy / error page) → NOT failed: rdapStatus says rdap_unknown', async () => {
-    mswServer.use(http.get('https://rdap.verisign.com/com/v1/domain/:d', () => new HttpResponse('<html>Not Found</html>', { status: 404, headers: { 'content-type': 'text/html' } })));
-    await seedPurchase('unknown', 31);
-    expect(await rec(new FakeAdapter('porkbun'), rdapStatus).runOnce()).toMatchObject({ failed: 0 });
-    expect((await db.selectFrom('purchases').selectAll().executeTakeFirstOrThrow()).state).toBe('unknown');
-    expect(await db.selectFrom('domains').selectAll().execute()).toHaveLength(1);
-    mswServer.use(http.get('https://rdap.verisign.com/com/v1/domain/:d', () => new HttpResponse('{"errorCode":404}', { status: 404, headers: { 'content-type': 'application/rdap+json' } })));
-    expect(await rec(new FakeAdapter('porkbun'), rdapStatus).runOnce()).toMatchObject({ failed: 1 }); // a real RDAP 404 still fails it
+  it('v3.9.0: booking turns auto-renew off at the registrar; a setAutoRenew error is only logged and the booking stands', async () => {
+    await seedPurchase('register_sent', 5);
+    const pb = new FakeAdapter('porkbun', { alreadyOwned: true });
+    expect(await rec(pb).runOnce()).toMatchObject({ booked: 1 });
+    expect(pb.calls.some((c) => c.startsWith('setAutoRenew'))).toBe(true);
+    const warns: string[] = [];
+    const pb2 = new FakeAdapter('porkbun', { alreadyOwned: true, setAutoRenew: new RegistrarError('porkbun', 'REGISTRAR_ERROR', 'nope') });
+    await seedPurchase('register_sent', 5, 'second.com');
+    const r = await new Reconciler({ db, adapters: [pb2], now: () => NOW, log: { warn: (_o, m) => { warns.push(m); }, error: () => {} } }).runOnce();
+    expect(r).toMatchObject({ booked: 1 });
+    expect(warns.some((m) => m.includes('setAutoRenew'))).toBe(true);
   });
 
-  it('absent but younger than 30 min, or RDAP says registered → untouched', async () => {
-    await seedPurchase('unknown', 10);
-    expect(await rec(new FakeAdapter('porkbun')).runOnce()).toMatchObject({ failed: 0 });
-    await db.updateTable('purchases').set({ created_at: minutesAgo(31), updated_at: minutesAgo(31) }).execute();
-    expect(await rec(new FakeAdapter('porkbun'), rdapTaken).runOnce()).toMatchObject({ failed: 0 });
+  it('v3.9.0: a stored request with drop_policy at_first_expiry books drop_date = expiry in the booking transaction', async () => {
+    const id = await seedPurchase('register_sent', 5);
+    await db.updateTable('purchases').set({ request: JSON.stringify({ domain: DOMAIN, category: 'geo', deal_id: 'D-003', drop_policy: 'at_first_expiry' }) }).where('id', '=', id).execute();
+    expect(await rec(new FakeAdapter('porkbun', { alreadyOwned: true })).runOnce()).toMatchObject({ booked: 1 });
+    expect(await db.selectFrom('domains').selectAll().executeTakeFirstOrThrow()).toMatchObject({ status: 'owned', drop_date: '2027-10-05', expiry_date: '2027-10-05' });
   });
 
   it('findDomain error → untouched', async () => {
@@ -149,7 +149,7 @@ describe('Reconciler', () => {
     }).execute();
     await db.insertInto('domains').values({ domain: DOMAIN, status: 'pending_purchase', registrar: 'porkbun', category: 'geo' }).execute();
     const errors: object[] = [];
-    const r = new Reconciler({ db, adapters: [new FakeAdapter('porkbun', { alreadyOwned: true })], rdap: rdapFree, now: () => NOW,
+    const r = new Reconciler({ db, adapters: [new FakeAdapter('porkbun', { alreadyOwned: true })], now: () => NOW,
       log: { warn: () => {}, error: (o) => { errors.push(o); } } });
     expect(await r.runOnce()).toMatchObject({ booked: 1 });
     expect(errors).toHaveLength(1);
@@ -160,7 +160,7 @@ describe('Reconciler', () => {
     const id = await seedPurchase('register_sent', 5);
     await db.updateTable('purchases').set({ request: JSON.stringify({ domain: DOMAIN, category: 'geo', proposed_listing: { mode: 'bin' } }) }).where('id', '=', id).execute();
     const warns: object[] = [];
-    const r = new Reconciler({ db, adapters: [new FakeAdapter('porkbun', { alreadyOwned: true })], rdap: rdapFree, now: () => NOW,
+    const r = new Reconciler({ db, adapters: [new FakeAdapter('porkbun', { alreadyOwned: true })], now: () => NOW,
       log: { warn: (o) => { warns.push(o); }, error: () => {} } });
     await r.runOnce();
     expect(warns).toContainEqual({ purchaseId: id, domain: DOMAIN });
