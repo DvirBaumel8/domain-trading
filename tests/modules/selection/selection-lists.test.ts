@@ -78,6 +78,9 @@ describe('word lists', () => {
     expect((await bad('sig_harmful_strong', { replace: ['nonsense:foo'] }))[1]).toBe('LIST_TERM_INVALID');
     expect((await bad('sig_harmful_strong', { replace: ['no class here'] }))[1]).toBe('LIST_TERM_INVALID');
     expect((await post('sig_parked', { add: ['parked:page under maintenance'] })).statusCode).toBe(201);
+    // CR-039: a regime term may carry digits after a letter; no other word list may
+    expect((await post('regime', { add: ['ets2', 'iso27001'] })).statusCode).toBe(201);
+    expect((await bad('regime', { add: ['2ets'] }))[1]).toBe('LIST_TERM_INVALID');
   });
 
   it('at most 5000 terms per list', async () => {

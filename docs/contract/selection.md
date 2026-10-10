@@ -1,4 +1,4 @@
-# Selection checks (contract v3.7.1)
+# Selection checks (contract v3.8.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -12,7 +12,7 @@ A place name from the gazetteer that is also a dictionary word (`dent`, `lime`, 
 
 | Status | `reason_code` | When |
 |---|---|---|
-| `FAIL` | `HAS_DIGIT` | the SLD contains a digit (also for regime names such as NIS2) |
+| `FAIL` | `HAS_DIGIT` | the SLD contains a digit, except inside a scout `words` piece that is on the `regime` list (3.8.0, CR-039: `ets2compliance` with words `ets2`, `compliance`) |
 | `FAIL` | `HAS_HYPHEN` | the SLD contains a hyphen |
 | `FAIL` | `UNKNOWN_TOKEN` | a run of letters is neither a word nor a city nor a listed term (`unknown_token_fails` true); `unknown_tokens` names it, a stray letter stays with its word (`cincinnatio`) |
 | `FAIL` | `GFORM1_WORDS` | lane `S2` and `word_count` is above `geo_max_words` |

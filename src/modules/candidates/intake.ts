@@ -10,7 +10,7 @@ import { filterDropName, leftoverNames, namesDroppingBetween, type RemovedReason
 import { newAuditId } from '../../http/audit.js';
 import { AppError } from '../../http/errors.js';
 import { CompSchema } from '../listing/index.js';
-import { createRun, SellersList, type InputName, type ScreeningWorker } from '../selection/index.js';
+import { createRun, currentLists, SellersList, type InputName, type ScreeningWorker } from '../selection/index.js';
 import { activeSelectionSettings, laneFitter, methodApproval } from '../selection/index.js';
 
 /** A name sent again within this many days is a duplicate (its extra source is recorded, it is not screened twice). */
@@ -53,9 +53,9 @@ export function intakeFormReason(raw: string): { domain: string; reason: IntakeR
 }
 
 /** The word rules, after the upload-duplicate test: the drop-list filter's own (digit, hyphen, no split, more than 3 words, one word). v2.16.0: one rule set for both feeds. */
-function wordReason(domain: string, words?: string[]): IntakeRemoval | null {
+function wordReason(domain: string, words: string[] | undefined, regimeTerms: ReadonlySet<string>): IntakeRemoval | null {
   // v3.3.0 (CR-022): bt1@v3 (the approved method the daily census uses), or the scout's words in its place.
-  const f = filterDropName(domain, new Set(), { method: 'bt1@v3', ...(words && { words }) });
+  const f = filterDropName(domain, new Set(), { method: 'bt1@v3', regimeTerms, ...(words && { words }) });
   return f.kept ? null : (f.reason as RemovedReason as IntakeRemoval);
 }
 
@@ -110,6 +110,7 @@ export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: {
   const out: IntakeResult = { accepted: [], duplicates: [], removed: [] };
   const checked = body.names.map((n) => ({ n, ...intakeFormReason(n.domain) }));
   const owned = await ownedDomains(db, checked.map((c) => c.domain));
+  const regimeTerms = new Set((await currentLists(db, ['regime'])).regime?.terms ?? []);
   const since = new Date(ctx.now.getTime() - INTAKE_DEDUPE_DAYS * DAY_MS);
   await db.transaction().execute(async (trx) => {
     const seen = new Set<string>();
@@ -118,7 +119,7 @@ export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: {
       let reason: IntakeRemoval | null = c.reason;
       if (reason === null) {
         if (seen.has(c.domain)) reason = 'DUPLICATE_IN_UPLOAD';
-        else { seen.add(c.domain); reason = wordReason(c.domain, c.n.words) ?? (owned.has(c.domain) ? 'OWNED' : null); }
+        else { seen.add(c.domain); reason = wordReason(c.domain, c.n.words, regimeTerms) ?? (owned.has(c.domain) ? 'OWNED' : null); }
       }
       if (reason !== null) {
         await trx.insertInto('candidate_intake').values({ ...row, domain: c.domain, status: 'removed', reason }).execute();

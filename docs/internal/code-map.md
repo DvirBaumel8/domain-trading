@@ -80,7 +80,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `types.ts` | `CheckId`, `Lane`, `Check`, `CheckContext`, `ResultRow`, `RunItem` |
 | `derive.ts` | `deriveItem`, `latestByCheck`, `funnel`, final status (`buy_candidate`, `would_buy`, ...) |
 | `tier.ts` | `evaluateTier`, `condHolds`, `cmp`, `unknownInputsOf` (clause ops and tier feature inputs) |
-| `form.ts`, `lexicon.ts`, `typo` data | name form (`analyzeForm`, `gform1`, `isShort`) |
+| `form.ts`, `lexicon.ts`, `typo` data | name form (`analyzeForm`, `gform1`, `isShort`, `regimeDigitsOk` (CR-039, also used by intake)) |
 | `pack.ts` | screening pack: `assessPack`, `issuePack`, `latestPackFor`, `requiredChecks` |
 | `sellers.ts`, `site.ts`, `html-text.ts`, `wayback.ts` | seller pages and site classification, HTML text, Wayback history |
 | `rdap-batch.ts`, `popularity.ts`, `namebio.ts`, `web-risk.ts` | RDAP pacing/cache, popularity list, NameBio, Web Risk lookup |

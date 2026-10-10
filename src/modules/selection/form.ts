@@ -238,6 +238,12 @@ function spanOf(tokens: string[], idx: number): [number, number] {
   return [start, start + tokens[idx]!.length];
 }
 
+/** CR-039: true when the scout's words join to the SLD and every word with a digit is a regime term (letters first, then digits allowed). */
+export function regimeDigitsOk(sld: string, words: readonly string[] | undefined, isRegime: (term: string) => boolean): boolean {
+  if (!words || words.length === 0 || words.join('') !== sld) return false;
+  return words.every((w) => !/[0-9]/.test(w) || (/^[a-z][a-z0-9]+$/.test(w) && isRegime(w)));
+}
+
 export function analyzeForm(
   domain: string,
   lane: Lane,
@@ -277,7 +283,8 @@ export function analyzeForm(
     reason_code: null,
     reason: null,
   };
-  if (has_digit) return { ...base, status: 'FAIL', reason_code: 'HAS_DIGIT', reason: 'The name contains a digit (SPELL-1: no digits, even in regime names)' };
+  // CR-039 (Dvir, 10 Oct 2026): a digit passes only inside a scout word on the `regime` list (ets2, nis2); anywhere else it fails.
+  if (has_digit && !regimeDigitsOk(sld, hints?.words, (t) => !!lex.types.get(t)?.includes('regime'))) return { ...base, status: 'FAIL', reason_code: 'HAS_DIGIT', reason: 'The name contains a digit outside a regime code on the regime list (SPELL-1)' };
   if (has_hyphen) return { ...base, status: 'FAIL', reason_code: 'HAS_HYPHEN', reason: 'The name contains a hyphen (SPELL-1)' };
 
   const hintTerms = new Set([hints?.city, hints?.trade].filter((h): h is string => !!h).map((h) => h.toLowerCase().replace(/[^a-z]/g, '')));

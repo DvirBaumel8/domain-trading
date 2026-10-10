@@ -85,6 +85,8 @@ The decision history lives in git, `docs/internal/` and `docs/contract/CHANGELOG
 - **Outward services (7 Oct 2026):** the outside review calls Google Gemini on the free tier (`GEMINI_API_KEY` from a project without billing; switch, model and tier in `/reviews/settings`); posting to X goes through Buffer's free plan (`BUFFER_API_KEY`); Web Risk uses the billed Google project `robots-508113` (Lookup API only, 10,000 a month cap).
 - **Approval lines (CR-012 §1, CR-014 N-4):** DOM never writes or offers a ready-made approval sentence for Dvir; it states only what his line must name (the domain, the label, the method, the suite and "clears hold").
 
+- **Digits in regime codes (Dvir, 10 Oct 2026, CR-039):** a digit is allowed when it is part of a regulation name: a scout `words` piece on the `regime` list (ets2, nis2) passes intake and SPELL-1; every other digit still fails.
+
 - **Backup and restore drill dropped (Dvir, 7 Oct 2026):** the nightly export stays built but unconfigured (the daily step is skipped). BK-5 no longer gates G4. Accepted risk: Neon free keeps about 6 h of history, so older data loss can't be recovered.
 
 ## Don't

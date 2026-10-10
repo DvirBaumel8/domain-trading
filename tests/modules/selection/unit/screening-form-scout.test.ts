@@ -46,4 +46,16 @@ describe('CR-027 scout words in the form check', () => {
     expect(r.scout_words).toBeUndefined();
     expect(r.tokens.join('')).toBe('roofingcompliance');
   });
+
+  it('T39-1 CR-039: a digit passes only inside a scout word on the regime list; without words, off the list or elsewhere it fails', () => {
+    const lexR = buildLexicon(loadDataLexicon(), { regime: { version: 1, terms: ['ets2', 'nis2'] }, generic_head: { version: 1, terms: ['compliance'] } }, { cityOneToken: true, cityWordAllowlist: S.city_word_allowlist });
+    const f = (d: string, words?: string[]) => analyzeForm(d, 'S6', lexR, S, { ...(words && { words }) });
+    const ok = f('ets2compliance.com', ['ets2', 'compliance']);
+    expect(ok.status).not.toBe('FAIL');
+    expect(ok.token_types).toEqual(['regime', 'generic_head']);
+    expect(f('ets2compliance.com').reason_code).toBe('HAS_DIGIT');
+    expect(f('ets3compliance.com', ['ets3', 'compliance']).reason_code).toBe('HAS_DIGIT');
+    expect(f('nis2compliance2.com', ['nis2', 'compliance2']).reason_code).toBe('HAS_DIGIT');
+    expect(f('ets2compliance.com', ['ets', '2compliance']).reason_code).toBe('HAS_DIGIT');
+  });
 });

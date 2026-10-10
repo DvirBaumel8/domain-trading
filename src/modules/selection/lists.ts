@@ -17,7 +17,7 @@ const SIGNATURE_CLASSES: Record<string, string[]> = {
   sig_harmful_strong: HARMFUL_CLASSES, sig_harmful_weak: HARMFUL_CLASSES, sig_parked: ['parked'], sig_forsale: ['forsale'],
 };
 /** A census list: `bt1_<sld>` (CR-002 CAP-10) or `s6_regime_audit`; the DB name check is ^[a-z0-9_]{3,64}$. */
-const CENSUS_NAME = /^(bt1_[a-z]{2,59}|s6_regime_audit)$/;
+const CENSUS_NAME = /^(bt1_[a-z][a-z0-9]{1,58}|s6_regime_audit)$/; // CR-039: a regime digit name (bt1_ets2compliance)
 
 export const isFixedList = (name: string): boolean => (FIXED_LISTS as readonly string[]).includes(name);
 export const isCensusListName = (name: string): boolean => !isFixedList(name) && CENSUS_NAME.test(name);
@@ -56,6 +56,8 @@ function normaliseTerms(name: string, raw: string[], settings: SelectionValuesT)
       const m = /^([a-z_]+):([a-z0-9][a-z0-9 .'-]{1,80})$/.exec(t);
       ok = !!m && sig.includes(m[1]!);
     } else if (PHRASE_LISTS.includes(name)) ok = /^[a-z]{2,40}( [a-z]{1,40}){0,3}$/.test(t);
+    // CR-039: a regime term may carry digits after a letter (ets2, nis2, iso27001); every other word list is letters only.
+    else if (name === 'regime') ok = /^[a-z][a-z0-9]{1,39}$/.test(t);
     else ok = /^[a-z]{2,40}$/.test(t);
     if (!ok) bad.push(t0);
     else out.add(t);
@@ -63,7 +65,7 @@ function normaliseTerms(name: string, raw: string[], settings: SelectionValuesT)
   if (bad.length > 0) {
     throw invalid('LIST_TERM_INVALID', `Invalid term in list ${name}`, {
       list: name, terms: bad.slice(0, 20),
-      expected: sig ? `class:phrase with class in ${sig.join(', ')}` : PHRASE_LISTS.includes(name) ? 'lowercase letters, words separated by single spaces' : 'lowercase letters only, 2 to 40',
+      expected: sig ? `class:phrase with class in ${sig.join(', ')}` : PHRASE_LISTS.includes(name) ? 'lowercase letters, words separated by single spaces' : name === 'regime' ? 'lowercase letters, then letters or digits, 2 to 40' : 'lowercase letters only, 2 to 40',
     });
   }
   // A phrase is matched without its spaces, so two spellings of one phrase are one term.

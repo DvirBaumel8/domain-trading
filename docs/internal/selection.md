@@ -64,7 +64,7 @@ Geo names now need about 10–12 owner-level leads to pay. Non-geo names need �
 
 | ID | Rule | Delta vs v8 |
 |---|---|---|
-| SPELL-1 | No hyphens or numbers. Ambiguous tokenization → FLAG (not auto-reject) | — |
+| SPELL-1 | No hyphens or numbers, except a digit inside a scout word that is on the `regime` list (CR-039, Dvir 10 Oct 2026: "the digit is part of the regulation name"; `regimeDigitsOk`). Ambiguous tokenization → FLAG (not auto-reject) | T39-1, T39-2 |
 | BRAND-1 / BIGCO-1 / TM-1 / TN-1 | Unchanged in spirit. BIGCO web check limited to non-geo tokens | — |
 | HIST-1 | Content or redirect → REJECT. Parked-only → PASS + note **and −10 score**. **Incomplete → cannot pass Gate A** | — |
 | WEB-RISK-1 | Google Web Risk / Safe Browsing must be clean. **Until an API key exists:** PASS iff Transparency Report status ∈ {no unsafe content, no data} **and** HIST-1 is clean; record the raw status. With a key: Lookup API no-match = PASS | **v9.1 C16** |

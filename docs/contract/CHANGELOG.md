@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.8.0 (2026-10-10): CR-039, digits inside regime codes
+MINOR, additive. Approved by Dvir on 10 Oct 2026. A digit inside a scout `words` piece that is on the `regime` list (ets2, nis2) no longer causes `HAS_DIGIT`, at intake or in the screening form check (SPELL-1). The `regime` list accepts terms with digits after a letter (`^[a-z][a-z0-9]{1,39}$`), and census list names may carry digits (`bt1_ets2compliance`). Release note: `docs/releases/v3.8.0.md`.
+
 ## 3.7.1 (2026-10-09): CR-038
 PATCH, additive. A `/buy` dry-run error's `details` carry `display_name` and the drop-policy fields. Release note: `docs/releases/v3.7.1.md`.
 

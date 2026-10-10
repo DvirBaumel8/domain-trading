@@ -182,6 +182,19 @@ describe('CR-022 A/B: scout words and the bt1@v3 intake split', () => {
     expect(r.json().accepted).toEqual([]);
   });
 
+  it('T39-2 CR-039: with words, a digit inside a regime-list word is accepted at intake; without words or off the list it stays HAS_DIGIT', async () => {
+    const x = await h();
+    await db.insertInto('selection_lists').values({ name: 'regime', version: 99, terms: ['ets2', 'nis2'], created_by: 'test' }).execute();
+    const s = await scout(x);
+    const r = await s.intake([
+      { domain: 'ets2compliance.com', lane: 'S6', source: 'scout', words: ['ets2', 'compliance'] },
+      { domain: 'nis2audit.com', lane: 'S6', source: 'scout' },
+      { domain: 'ets3compliance.com', lane: 'S6', source: 'scout', words: ['ets3', 'compliance'] },
+    ]);
+    expect(r.json().accepted.map((a: { domain: string }) => a.domain)).toEqual(['ets2compliance.com']);
+    expect(r.json().removed).toEqual([{ domain: 'nis2audit.com', reason: 'HAS_DIGIT' }, { domain: 'ets3compliance.com', reason: 'HAS_DIGIT' }]);
+  });
+
   it('T22-5 without words nothing changes: a readable name is accepted, an unreadable one is NO_SPLIT, a duplicate is a duplicate', async () => {
     const x = await h();
     const s = await scout(x);

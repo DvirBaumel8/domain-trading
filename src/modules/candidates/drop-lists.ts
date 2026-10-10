@@ -6,7 +6,7 @@ import { addDays, dayNumber, idtDay } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
 import { TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS, lookupCached, Pacer, type CachedLookup } from '../selection/index.js';
 import { activeSelectionSettings } from '../selection/index.js';
-import { loadSplitV2, splitV2 } from '../selection/index.js';
+import { loadSplitV2, regimeDigitsOk, splitV2 } from '../selection/index.js';
 import type { ScreeningDeps } from '../selection/index.js';
 import type { RdapFacts } from '../../core/rdap.js';
 
@@ -30,7 +30,7 @@ export const MAX_WORDS = 3;
 export interface FilteredName { domain: string; kept: boolean; reason: RemovedReason | null; tokens: string[] | null }
 
 /** Lower-cases and filters one uploaded name: a letters-only second-level .com of 2 or 3 words by the bt1@v2 split. */
-export function filterDropName(raw: string, seen: Set<string>, opts: { method?: 'bt1@v2' | 'bt1@v3'; words?: string[] } = {}): FilteredName {
+export function filterDropName(raw: string, seen: Set<string>, opts: { method?: 'bt1@v2' | 'bt1@v3'; words?: string[]; regimeTerms?: ReadonlySet<string> } = {}): FilteredName {
   const domain = raw.trim().toLowerCase();
   const out = (reason: RemovedReason): FilteredName => ({ domain: raw, kept: false, reason, tokens: null });
   const m = /^([a-z0-9-]+)\.com$/.exec(domain);
@@ -38,7 +38,8 @@ export function filterDropName(raw: string, seen: Set<string>, opts: { method?: 
   if (seen.has(domain)) return { ...out('DUPLICATE_IN_UPLOAD'), domain };
   seen.add(domain);
   const sld = m[1]!;
-  if (/\d/.test(sld)) return { ...out('HAS_DIGIT'), domain };
+  // CR-039: intake lets a digit through only inside a scout word on the regime list; drop lists pass no regime terms.
+  if (/\d/.test(sld) && !(opts.regimeTerms && regimeDigitsOk(sld, opts.words, (t) => opts.regimeTerms!.has(t)))) return { ...out('HAS_DIGIT'), domain };
   if (sld.includes('-')) return { ...out('HAS_HYPHEN'), domain };
   // v3.3.0 (CR-022): intake reads a name with bt1@v3 (or the scout's own words, which replace the split); a drop list keeps bt1@v2.
   const tokens = opts.words ?? splitV2(sld, loadSplitV2(opts.method ?? 'bt1@v2'));
