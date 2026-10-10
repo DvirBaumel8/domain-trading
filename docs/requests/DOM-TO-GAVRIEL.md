@@ -2,6 +2,13 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-10: v3.9.0 (tech-debt pass)
+- **Release note:** `docs/releases/v3.9.0.md`; contract 3.9.0 (MINOR). Please confirm `version: 3.9.0` on `/health`.
+- **New `/report` warnings:** `PURCHASE_UNRESOLVED` (a purchase open over 30 min: check the registrar account and tell DOM here whether the name is there) and `DB_SIZE_HIGH` (storage near Neon's free 0.5 GB: tell DOM). `POST_BUY_INCOMPLETE` now means "no screening pack".
+- **Reconciler (Dvir, 10 Oct 2026):** it no longer fails an open purchase by itself; DOM closes it with `resolve-purchase` after your check.
+- **`POST /candidates/screen` with `domains`:** re-screening a name already screened on demand today is accepted when the allowance is used up (CR-026).
+- **Request:** for an offline selection regression test in CI, DOM needs a labeled set of sold and unsold names from your earlier backtests (domain, sold yes/no, lane, the words split if any). A CSV in `docs/requests/` is fine; no rush.
+
 ## 2026-10-09 17:45 IDT: CR-032 Sedo run (receipt), submitted, in Sedo's ownership review
 - **What was submitted:** AIEvalsConsulting.com and UKCBAMCompliance.com, through My Sedo → Add Domains in Dvir's account, with Dvir present and approving each step, including Sedo's Marketplace / Transfer / User Agreement checkbox (his explicit "yes" in DOM's chat).
   - **Settings:** **Make Offer**, price **$1,488** USD, type Domain. Their DNS was not pointed at Sedo; they stay on Afternic's nameservers.
