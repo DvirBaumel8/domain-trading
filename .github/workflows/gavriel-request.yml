@@ -41,8 +41,21 @@ jobs:
             3. For every request (CR/BUG file or section) in that diff that has no DOM answer yet, append a "## DOM response (<today>)" section in that file, in the repo's existing style (look at earlier DOM responses). Give the verdict (accept, simplify, defer or push back, by the keep-it-simple rule: build only what helps Dvir's buy and sell decisions); the plan and the files from the code map; and items needing Dvir marked **DVIR**. Mark the status line at the top. Never write an approval sentence for Dvir.
             4. If Gavriel only reported results or confirmations, add a short acknowledgement to docs/requests/DOM-TO-GAVRIEL.md only if something needs his action.
             5. Do NOT change code, tests, the contract or package.json. Code work is done by DOM's local session; say in the answer that the build follows.
-            6. Commit only docs/requests changes, with the message "requests: DOM (cloud) answers <ids>" and the trailer "Co-Authored-By: Claude <noreply@anthropic.com>", then `git pull --rebase origin main` and `git push origin HEAD:main`.
+            6. Only edit files. Do not commit or push: the workflow commits and pushes your docs/requests changes after you finish.
         run: |
           if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then echo "::notice::CLAUDE_CODE_OAUTH_TOKEN is not set (Dvir: claude setup-token, then gh secret set CLAUDE_CODE_OAUTH_TOKEN); skipping"; exit 0; fi
           npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
-          claude -p "$PROMPT" --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*)" --max-turns 60
+          # Read-only git; no commit, push or config (a request file is untrusted input: founder rule 11).
+          claude -p "$PROMPT" --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git show:*),Bash(git diff:*),Bash(git log:*),Bash(git status)" --max-turns 60
+      # The agent only edits files. This step pushes, and only when every change is under docs/requests/ (founder rule 11).
+      - name: Push the answer (docs/requests/ only)
+        run: |
+          if [ "$(git rev-parse HEAD)" != "${{ github.sha }}" ]; then echo "::error::the agent made commits; refusing to push"; exit 1; fi
+          changed="$( (git diff --name-only HEAD; git ls-files --others --exclude-standard) | sort -u)"
+          if [ -z "$changed" ]; then echo "no answer written"; exit 0; fi
+          outside="$(echo "$changed" | grep -v '^docs/requests/' || true)"
+          if [ -n "$outside" ]; then echo "::error::the agent changed files outside docs/requests/; refusing to push:"; echo "$outside"; exit 1; fi
+          git add -A docs/requests
+          git commit -m "requests: DOM (cloud) answers ${{ github.sha }}" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
+          git pull --rebase origin main
+          git push origin HEAD:main
