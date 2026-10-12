@@ -34,6 +34,9 @@ jobs:
           BASE: https://domain-trading-api.onrender.com
           GH_TOKEN: ${{ github.token }}
         run: |
+          # CR-041: while production runs on the Mac mini (Render suspended), the Mac deploys release tags only and Gavriel checks
+          # /health himself, so no Render note is written (it would always say deploy_failed). Back to `render` before Render resumes.
+          if [ "$(cat .github/deploy-target 2>/dev/null)" = "mac" ]; then echo "deploy target is the Mac host (CR-041); no Render deploy note"; exit 0; fi
           changed="$(git diff --name-only "$SHA~1" "$SHA" 2>/dev/null || true)"
           if [ -n "$changed" ] && ! echo "$changed" | grep -qv '^docs/'; then echo "docs-only push; no deploy note"; exit 0; fi
           version="$(git show "$SHA:package.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"

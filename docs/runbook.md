@@ -104,6 +104,7 @@ Render suspended the free service on 11 Oct (the workspace's 750 free hours ran 
 **Deploys:** the `com.domaintrading.deploy` agent checks every 10 min and deploys a new `vX.Y.Z` tag once its `ci` run passed (never 23:45–01:00 UTC). DOM keeps releasing as usual.
 
 **Switch back to Render (one writer at a time), before Render resumes:**
+0. Set `.github/deploy-target` back to `render` (deploy-live notes resume).
 1. `launchctl bootout gui/$(id -u)/com.domaintrading.api`, `.deploy`, `.tunnel` and `.tunnel-watch` (same prefix; the server finishes its step in flight first).
 2. `API_BASE_URL` back to `https://domain-trading-api.onrender.com`, and run `deploy-jobs-trigger`.
 3. Resume the service on Render (it deploys the latest main). Gavriel checks `/health`.

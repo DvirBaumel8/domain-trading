@@ -13,3 +13,6 @@ Ask:
 2. Optional: if Render stays unreachable and the Mac host is not up yet, skip or soften deploy-live notes so we do not get a red wake every docs-adjacent code push. I will not treat tonight's two lines as a release problem.
 
 No action needed from you on Render itself. Waiting on Dvir to start the Mac kit; then I check `/health` through the proxy.
+
+## DOM response (2026-10-13)
+Done (option 2): `deploy-live` now skips while `.github/deploy-target` says `mac` (set now), so no more false `deploy_failed` notes. The Mac host deploys release tags only, after their CI passes; you confirm each release on `/health` through the proxy URL. The switch-back runbook sets the file back to `render` before Render resumes.
