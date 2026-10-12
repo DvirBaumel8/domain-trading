@@ -30,7 +30,7 @@ if [ ! -f "$ENV_FILE" ]; then
     echo "# domain-trading production env (copy each value from Render > domain-trading-api > Environment). chmod 600."
     echo "APP_ENV=production"
     echo "DATABASE_SSL=true"
-    echo "PORT=3000"
+    echo "PORT=3100"
     echo "HOST=127.0.0.1"
     echo "PUBLIC_BASE_URL="
     grep -oE '^[A-Z_]+=' "$PROD_DIR/.env.example" | grep -vE '^(APP_ENV|DATABASE_SSL|PORT|HOST|PUBLIC_BASE_URL|TEST_DATABASE_URL|PORKBUN_SANDBOX_[A-Z_]+)=$'

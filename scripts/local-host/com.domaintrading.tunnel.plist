@@ -7,7 +7,7 @@
   <key>ProgramArguments</key>
   <array>
     <string>__CLOUDFLARED__</string><string>tunnel</string><string>--no-autoupdate</string>
-    <string>--url</string><string>http://127.0.0.1:3000</string>
+    <string>--url</string><string>http://127.0.0.1:3100</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>__PATH__</string><key>HOME</key><string>__HOME__</string></dict>

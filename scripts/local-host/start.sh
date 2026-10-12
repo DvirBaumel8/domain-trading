@@ -10,5 +10,7 @@ grep -qE '^DATABASE_URL=.+' "$ENV_FILE" || { echo "DATABASE_URL is empty in $ENV
 while IFS= read -r line || [ -n "$line" ]; do
   [[ "$line" =~ ^([A-Z_][A-Z0-9_]*)=(.*)$ ]] && [ -n "${BASH_REMATCH[2]}" ] && export "${BASH_REMATCH[1]}=${BASH_REMATCH[2]}"
 done < "$ENV_FILE"
+# The Mac's port 3000 is taken by another project (sapako), so the host always listens on 3100 (the tunnel points there).
+export PORT="${LOCAL_HOST_PORT:-3100}" HOST=127.0.0.1
 npm run --silent migrate up
 exec node dist/main.js

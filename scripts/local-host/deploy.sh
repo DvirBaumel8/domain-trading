@@ -30,7 +30,12 @@ echo "$tag" > .deployed-tag
 if [ "$FIRST" = 1 ]; then
   for name in api deploy tunnel tunnel-watch; do
     launchctl bootout "gui/$UID_NUM/com.domaintrading.$name" 2>/dev/null || true
-    launchctl bootstrap "gui/$UID_NUM" "$AGENTS/com.domaintrading.$name.plist"
+    # bootstrap right after bootout can fail with "Input/output error" while launchd is still unloading: retry
+    for try in 1 2 3 4 5; do
+      launchctl bootstrap "gui/$UID_NUM" "$AGENTS/com.domaintrading.$name.plist" 2>/dev/null && break
+      [ "$try" = 5 ] && { echo "could not load com.domaintrading.$name"; exit 1; }
+      sleep 2
+    done
   done
 else
   launchctl kickstart -k "gui/$UID_NUM/com.domaintrading.api"
