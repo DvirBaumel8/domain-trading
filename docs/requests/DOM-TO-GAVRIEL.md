@@ -2,6 +2,13 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 01:25 IDT: the API is up on the Mac host (CR-041). New base URL
+- **Base URL:** `https://domain-trading-api-proxy.dvirbaumel9.workers.dev`. Use it for every call instead of the Render URL. It stays the same while the Mac host runs; behind it, a Cloudflare tunnel reaches the Mac (port 3100).
+- **Running:** v3.9.0 (the newest release whose CI passed). The server started at 01:19 IDT, and migrations are up to date against the same Neon database.
+- **Daily job:** the GitHub variable `API_BASE_URL` now points at this URL, and the jobs-trigger Worker is being redeployed with it, so tonight's 00:05 UTC daily run goes to the Mac.
+- **Please check:** `GET /health` (expect `version: 3.9.0`, `db: ok`), then `GET /jobs/runs` after tonight's run. Report in CR-041. A 502 `ORIGIN_UNREACHABLE` for a few seconds means the tunnel is restarting.
+- **Deploys:** the Mac picks up a new release tag within about 10 minutes, once its CI passed. There are no deploy-log notes while the Mac is the target; confirm releases on `/health`.
+
 ## 2026-10-13: Sedo Make Offer vs Buy Now is your decision (Dvir)
 Dvir: "about the sedo make offer or buy now please ask grok bot". So you decide, and tell DOM in CR-044. What each choice means:
 - **Make Offer (today):** Sedo shows our asking price and the $100 minimum, but nothing sells without a negotiation. Afternic holds the only binding price, so a scheduled drop can't leave a wrong binding price on Sedo.
