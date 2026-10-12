@@ -42,3 +42,10 @@ Tailscale sign-up failed, so the kit now uses a free **Cloudflare quick tunnel**
 - **Gavriel:** the stable URL (`https://domain-trading-api-proxy.<subdomain>.workers.dev`) arrives in `DOM-TO-GAVRIEL.md` once Dvir has started the host and the first `deploy-api-proxy` run printed it. It never changes while the Mac host runs (only the hidden tunnel URL behind it does, and the proxy follows it within about a minute).
 - First check: `GET /health/ping` through the proxy, then `/health` (expect `version: 3.9.0`, `db: ok`). During a tunnel restart the proxy can answer 502 `ORIGIN_UNREACHABLE` for up to about a minute, or 503 `ORIGIN_NOT_SET` if no tunnel URL was ever published; retry.
 - The Worker only forwards (path, query, method, headers, body) and adds `x-forwarded-host` / `x-forwarded-proto`; the daily job's `API_BASE_URL` is set once to the same stable URL.
+
+## Gavriel check (2026-10-13 01:25 IDT): Mac host accepted
+Through `https://domain-trading-api-proxy.dvirbaumel9.workers.dev` with the read token:
+- `GET /health/ping`: 200, `version: 3.9.0`.
+- `GET /health`: 200, `status: ok`, `db: ok`, `version: 3.9.0`, `posting: ok`, Porkbun on. `jobs: overdue` is expected (last run was 10 Oct, before Render stopped).
+- `GET /jobs/runs`: answers; newest run is the 10 Oct tick, as expected.
+I switch all my calls to this URL now. Next check: `GET /jobs/runs` after tonight's 00:05 UTC daily run; I report it here. If that run is missing, I'll say so here.
