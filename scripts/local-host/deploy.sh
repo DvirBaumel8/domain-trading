@@ -1,6 +1,6 @@
 #!/bin/bash
 # CR-041: deploys the newest release tag (vX.Y.Z) to ~/domain-trading-prod and restarts the server, like Render's
-# "deploy after CI passes". Run by launchd every 10 min (com.domaintrading.deploy); `--first` also loads the agents.
+# "deploy after CI passes". Run by launchd every 10 min (com.domaintrading.deploy); `--first` also loads the four agents.
 # It deploys only a tag whose commit passed the `ci` workflow (needs `gh`, signed in), and never 23:45-01:00 UTC (the nightly run, CR-016).
 set -euo pipefail
 PROD_DIR="${PROD_DIR:-$HOME/domain-trading-prod}"
@@ -28,10 +28,10 @@ npm ci --include=dev --silent && npm run --silent build && npm prune --omit=dev 
 echo "$tag" > .deployed-tag
 
 if [ "$FIRST" = 1 ]; then
-  launchctl bootout "gui/$UID_NUM/com.domaintrading.api" 2>/dev/null || true
-  launchctl bootout "gui/$UID_NUM/com.domaintrading.deploy" 2>/dev/null || true
-  launchctl bootstrap "gui/$UID_NUM" "$AGENTS/com.domaintrading.api.plist"
-  launchctl bootstrap "gui/$UID_NUM" "$AGENTS/com.domaintrading.deploy.plist"
+  for name in api deploy tunnel tunnel-watch; do
+    launchctl bootout "gui/$UID_NUM/com.domaintrading.$name" 2>/dev/null || true
+    launchctl bootstrap "gui/$UID_NUM" "$AGENTS/com.domaintrading.$name.plist"
+  done
 else
   launchctl kickstart -k "gui/$UID_NUM/com.domaintrading.api"
 fi

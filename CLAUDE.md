@@ -69,6 +69,7 @@ DOM builds, tests locally, pushes and releases. Gavriel runs, verifies and opera
 | `docs/DEPLOYMENT.md` / `docs/runbook.md` | One-time hosting setup / operations (tokens, jobs, secrets, restore drill) |
 | `docs/research/` | Registrar and marketplace research with sources |
 | `render.yaml`, `jobs-trigger/`, `.github/workflows/review-retry-tick.yml`, `.env.example` | Render blueprint, the Cloudflare Worker (the one daily cron, 00:05 UTC), the GitHub Actions schedule for the review-retry `tick` (Cloudflare's free plan allows 5 crons per account), every server env var |
+| `api-proxy/` | Cloudflare Worker `domain-trading-api-proxy`: the stable workers.dev URL in front of the Mac host's quick tunnel (CR-041); deployed by `.github/workflows/deploy-api-proxy.yml` |
 | `docs/superpowers/plans/` | Past build plans (history only) |
 
 ## Decisions

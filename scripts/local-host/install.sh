@@ -3,8 +3,9 @@
 # Dvir runs this, not DOM (CLAUDE.md HARD RULE). It sets up, but does not start, the service:
 #   - a separate checkout at ~/domain-trading-prod (DOM's working copy is never what runs);
 #   - an env file at ~/.config/domain-trading/prod.env (chmod 600) with every key and EMPTY values: Dvir pastes the Render values;
-#   - LaunchAgents: com.domaintrading.api (the server, restarted if it exits) and com.domaintrading.deploy (every 10 min, deploys a new release tag).
-# Then: fill the env file, run deploy.sh once, and set up the tunnel (docs/runbook.md, "Local host").
+#   - LaunchAgents: com.domaintrading.api (the server, restarted if it exits), com.domaintrading.deploy (every 10 min, deploys a new release tag),
+#     com.domaintrading.tunnel (cloudflared quick tunnel) and com.domaintrading.tunnel-watch (every 60 s, publishes a changed tunnel URL to the api-proxy Worker).
+# Then: fill the env file, run deploy.sh --first (docs/runbook.md, "Local host").
 set -euo pipefail
 
 PROD_DIR="${PROD_DIR:-$HOME/domain-trading-prod}"
@@ -18,8 +19,9 @@ REPO_URL="${REPO_URL:-https://github.com/DvirBaumel8/domain-trading.git}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 command -v node >/dev/null || { echo "node is missing (brew install node@22)"; exit 1; }
+command -v cloudflared >/dev/null || { echo "cloudflared is missing (brew install cloudflared)"; exit 1; }
 mkdir -p "$ENV_DIR" "$LOG_DIR" "$AGENTS" "$HOST_DIR"
-cp "$HERE/start.sh" "$HERE/deploy.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
+cp "$HERE/start.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
 [ -d "$PROD_DIR/.git" ] || git clone --quiet "$REPO_URL" "$PROD_DIR"
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -37,9 +39,13 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "Created $ENV_FILE: fill in the values from Render."
 fi
 
-for name in api deploy; do
+for name in api deploy tunnel tunnel-watch; do
   sed -e "s#__HOST_DIR__#$HOST_DIR#g" -e "s#__PROD_DIR__#$PROD_DIR#g" -e "s#__LOG_DIR__#$LOG_DIR#g" -e "s#__HOME__#$HOME#g" -e "s#__PATH__#$PATH#g" \
     "$HERE/com.domaintrading.$name.plist" > "$AGENTS/com.domaintrading.$name.plist"
 done
 echo "LaunchAgents written to $AGENTS (not loaded yet)."
-echo "Next: fill $ENV_FILE, then run: $HOST_DIR/deploy.sh --first   (re-run install.sh after a kit change)"
+echo "Next:"
+echo "  1. Fill $ENV_FILE from Render (PUBLIC_BASE_URL = the api-proxy URL, known after the first deploy-api-proxy run; fill it then and restart the api agent)."
+echo "  2. $HOST_DIR/deploy.sh --first   (loads all four agents; re-run install.sh after a kit change)"
+echo "  3. Within a minute tunnel-watch sets the GitHub variable TUNNEL_URL and runs deploy-api-proxy; its log prints https://domain-trading-api-proxy.<subdomain>.workers.dev."
+echo "  4. Set the GitHub variable API_BASE_URL to that URL (once) and run deploy-jobs-trigger."

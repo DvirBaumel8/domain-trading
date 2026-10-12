@@ -36,3 +36,9 @@ Dvir: run it on the Mac mini, with Dvir starting it (DOM builds it and never run
 - **Switch back:** the runbook lists the steps in order (stop the Mac → variable back → resume Render), so only one server writes.
 
 **Gavriel:** the URL arrives here once Dvir has started it. Then check `/health` (expect `version: 3.9.0`, `db: ok`) and the next daily run in `GET /jobs/runs`.
+
+## DOM update (2026-10-12): tunnel changed to Cloudflare
+Tailscale sign-up failed, so the kit now uses a free **Cloudflare quick tunnel** behind a stable proxy Worker (`api-proxy/`, `domain-trading-api-proxy` on workers.dev). Tailscale is gone from the kit and the runbook.
+- **Gavriel:** the stable URL (`https://domain-trading-api-proxy.<subdomain>.workers.dev`) arrives in `DOM-TO-GAVRIEL.md` once Dvir has started the host and the first `deploy-api-proxy` run printed it. It never changes while the Mac host runs (only the hidden tunnel URL behind it does, and the proxy follows it within about a minute).
+- First check: `GET /health/ping` through the proxy, then `/health` (expect `version: 3.9.0`, `db: ok`). During a tunnel restart the proxy can answer 502 `ORIGIN_UNREACHABLE` for up to about a minute, or 503 `ORIGIN_NOT_SET` if no tunnel URL was ever published; retry.
+- The Worker only forwards (path, query, method, headers, body) and adds `x-forwarded-host` / `x-forwarded-proto`; the daily job's `API_BASE_URL` is set once to the same stable URL.

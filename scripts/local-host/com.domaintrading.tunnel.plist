@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CR-041: Cloudflare quick tunnel to the local API (its trycloudflare.com URL changes on every start; tunnel-watch republishes it). install.sh fills the __PLACEHOLDERS__. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.domaintrading.tunnel</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>cloudflared</string><string>tunnel</string><string>--no-autoupdate</string>
+    <string>--url</string><string>http://127.0.0.1:3000</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>__PATH__</string><key>HOME</key><string>__HOME__</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>__LOG_DIR__/tunnel.log</string>
+  <key>StandardErrorPath</key><string>__LOG_DIR__/tunnel.log</string>
+</dict>
+</plist>

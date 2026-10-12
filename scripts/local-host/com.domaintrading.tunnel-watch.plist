@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CR-041: every 60 s, publish a changed quick-tunnel URL to the api-proxy Worker. install.sh fills the __PLACEHOLDERS__. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.domaintrading.tunnel-watch</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>__HOST_DIR__/tunnel-watch.sh</string></array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>__PATH__</string><key>HOME</key><string>__HOME__</string></dict>
+  <key>StartInterval</key><integer>60</integer>
+  <key>StandardOutPath</key><string>__LOG_DIR__/tunnel-watch.log</string>
+  <key>StandardErrorPath</key><string>__LOG_DIR__/tunnel-watch.log</string>
+</dict>
+</plist>

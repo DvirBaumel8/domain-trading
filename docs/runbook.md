@@ -89,21 +89,23 @@ Render deploys **every push to `main` after the GitHub `ci` workflow passes** (`
 ## Local host (CR-041, Dvir 12 Oct 2026): production on the Mac mini while Render is suspended
 Render suspended the free service on 11 Oct (the workspace's 750 free hours ran out). Until it resumes (about 1 Nov), the API runs on Dvir's Mac mini. **Dvir sets it up and starts it; DOM only wrote the kit and never reads the env file or calls the server (CLAUDE.md HARD RULE). Gavriel verifies.** Same database (Neon), same secrets, so nothing is copied or migrated.
 
+**How the URL works:** the server listens on `127.0.0.1:3000`. A Cloudflare **quick tunnel** (`cloudflared`, free, no account or domain) publishes it at a random `https://<x>.trycloudflare.com` URL that changes on every tunnel restart. So a small Worker, `api-proxy/` (`domain-trading-api-proxy`), gives everyone one **stable** URL, `https://domain-trading-api-proxy.<subdomain>.workers.dev`, and forwards every request to the current tunnel URL. The `tunnel-watch` agent notices a new tunnel URL, sets the GitHub variable `TUNNEL_URL` and runs the `deploy-api-proxy` workflow. The stable URL never changes while the Mac host runs. Only `.trycloudflare.com` https origins are accepted; if the tunnel is down the proxy answers 502 `ORIGIN_UNREACHABLE`, if `TUNNEL_URL` is empty 503 `ORIGIN_NOT_SET`.
+
 **One-time setup (Dvir):**
-1. `bash scripts/local-host/install.sh` (from any checkout). It clones `~/domain-trading-prod`, creates `~/.config/domain-trading/prod.env` (chmod 600, every key with an empty value) and writes two LaunchAgents. It starts nothing.
-2. Open `prod.env` and paste each value from Render → domain-trading-api → Environment. Keep `HOST=127.0.0.1` (only the tunnel reaches it). Set `PUBLIC_BASE_URL` after step 4.
+1. `brew install cloudflared`, then `bash scripts/local-host/install.sh` (from any checkout). It clones `~/domain-trading-prod`, creates `~/.config/domain-trading/prod.env` (chmod 600, every key with an empty value), copies the host scripts to `~/.local/share/domain-trading-host` and writes four LaunchAgents (api, deploy, tunnel, tunnel-watch). It starts nothing.
+2. Open `prod.env` and paste each value from Render → domain-trading-api → Environment. Keep `HOST=127.0.0.1` (only the tunnel reaches it). `PUBLIC_BASE_URL` can stay empty for now (the server then uses the Render default); set it in step 6.
 3. Keep the Mac awake: System Settings → Energy → "Prevent automatic sleeping when the display is off" on, and "Start up automatically after a power failure" on. LaunchAgents run while Dvir is logged in, so turn on automatic login, or log in after a reboot.
-4. **Tunnel (Tailscale Funnel, free, fixed URL):** install the Tailscale app (`brew install --cask tailscale`), sign in, then `tailscale funnel --bg 3000` (it asks once to enable Funnel for the tailnet). The URL is `https://<machine>.<tailnet>.ts.net`; put it in `PUBLIC_BASE_URL`.
-5. `gh auth status` must show signed in (deploy.sh checks CI with `gh`).
-6. `~/.local/share/domain-trading-host/deploy.sh --first` (install.sh copies the host scripts there, outside the release checkout; re-run install.sh after a kit change): builds the newest release tag whose CI passed, then loads both agents. Logs: `~/Library/Logs/domain-trading/{api,deploy}.log`.
-7. GitHub → Settings → Variables → `API_BASE_URL` = the tunnel URL, then run the `deploy-jobs-trigger` workflow by hand so the daily Worker calls the Mac. `review-retry-tick` reads the same variable.
-8. Write the URL in `docs/requests/DOM-TO-GAVRIEL.md` (or tell DOM to): Gavriel switches his calls and checks `/health`.
+4. `gh auth status` must show signed in, with rights to set repository variables and run workflows (deploy.sh checks CI with `gh`; tunnel-watch sets `TUNNEL_URL`). The repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` already serve `deploy-jobs-trigger`; `deploy-api-proxy` uses the same two.
+5. `~/.local/share/domain-trading-host/deploy.sh --first`: builds the newest release tag whose CI passed, then loads all four agents. Logs: `~/Library/Logs/domain-trading/{api,deploy,tunnel,tunnel-watch}.log`.
+6. Within a minute the first `tunnel-watch` run sets `TUNNEL_URL` and runs `deploy-api-proxy` (GitHub → Actions; its log ends with `Deployed URL: https://domain-trading-api-proxy.<subdomain>.workers.dev`). Put that URL in `prod.env` as `PUBLIC_BASE_URL`, then `launchctl kickstart -k gui/$(id -u)/com.domaintrading.api`.
+7. GitHub → Settings → Variables → `API_BASE_URL` = the proxy URL (once; it never changes), then run the `deploy-jobs-trigger` workflow by hand so the daily Worker calls the Mac. `review-retry-tick` reads the same variable.
+8. Write the proxy URL in `docs/requests/DOM-TO-GAVRIEL.md` (or tell DOM to): Gavriel switches his calls and checks `/health/ping` and `/health` through it.
 
 **Deploys:** the `com.domaintrading.deploy` agent checks every 10 min and deploys a new `vX.Y.Z` tag once its `ci` run passed (never 23:45–01:00 UTC). DOM keeps releasing as usual.
 
 **Switch back to Render (one writer at a time), before Render resumes:**
-1. `launchctl bootout gui/$(id -u)/com.domaintrading.api` and `launchctl bootout gui/$(id -u)/com.domaintrading.deploy` (the server finishes its step in flight first).
+1. `launchctl bootout gui/$(id -u)/com.domaintrading.api`, `.deploy`, `.tunnel` and `.tunnel-watch` (same prefix; the server finishes its step in flight first).
 2. `API_BASE_URL` back to `https://domain-trading-api.onrender.com`, and run `deploy-jobs-trigger`.
 3. Resume the service on Render (it deploys the latest main). Gavriel checks `/health`.
-4. `tailscale funnel reset`; delete `prod.env` if it's not needed any more.
+4. Set the repo variable `TUNNEL_URL` to empty (the proxy then answers 503) or delete the `domain-trading-api-proxy` Worker in the Cloudflare dashboard; delete `prod.env` if it's not needed any more.
 If Render resumes by itself while the Mac still runs, do step 1 at once: two servers would run two daily jobs.
