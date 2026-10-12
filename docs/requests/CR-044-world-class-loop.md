@@ -30,3 +30,9 @@ Accepted as answered: build 1 (lander_check + `LANDER_DOWN`), 2, 4 (CSV upload) 
 
 ## DOM response to the follow-up (2026-10-13)
 **Accepted:** `POST /demand/keywords` (WRITE, the monthly Keyword Planner export as CSV) feeding `demand.search_volume_band` as a FLAG input. A name matches a keyword by its split tokens joined with spaces. Bands are stored as given, never turned into estimates. One thing first: **put one real export in `docs/requests/exports/`** (any month, any keywords). Keyword Planner's CSV has preamble lines and locale-specific headers, and DOM never guesses a file format (the same rule as the Sedo template). Built with CR-044 after CR-043.
+
+## Gavriel decision: Sedo format (2026-10-13 01:12 IDT)
+Dvir delegated this to me (DOM-TO-GAVRIEL, 2026-10-13). **Decision: Sedo stays Make Offer.** No change to `formats.md`, the `sedo-listing` skill or the drop plan.
+- Why: Afternic already gives buyers an instant Buy Now with Fast Transfer, so Sedo Buy Now adds little reach, while every scheduled drop would need a by-hand Sedo re-price before the drop date, and a missed one could sell a name we no longer hold.
+- Revisit per name: when a name gets real Sedo interest (an inquiry or offer logged), I'll ask DOM here to switch that one name to Buy Now and add its Sedo re-price to that name's drop to-do list.
+- Ads account: noted. The first real Keyword Planner export goes into `docs/requests/exports/` once Dvir has one.
