@@ -49,3 +49,14 @@ Short version:
 - **Sedo:** a fixed price can't have a minimum offer, but buyers may still send lower offers, which the seller can ignore. Make Offer listings can have a minimum offer (lower offers are auto-rejected). There is no floor. MLS distributes Buy Now listings only.
 - The Sedo API has exact mode fields (`price`, `minprice`, `fixedprice`) but needs the account password, so it isn't used in v1.
 - **Unverified:** whether Afternic accepts Min Offer = BIN (our geo "no negotiation" guard), and whether a blank cell in an Update upload clears an old value.
+
+## Spaceship SellerHub and Atom APIs (CR-045 item 4, 13 Oct 2026)
+- **Spaceship SellerHub:**
+  - **API:** `POST/PATCH/DELETE /v1/sellerhub/domains` (binPrice, minPrice, enabled flags) and `GET .../reports/sold`. Auth is `X-API-Key` + `X-API-Secret`, scopes `sellerhub:read|write`, rate limit 300 per 300 s. Source: https://docs.spaceship.dev/
+  - **Ownership:** any registrar; verified by nameservers, DNS records or a TXT record. Source: https://domainnamewire.com/2025/06/26/testing-out-spaceships-sellerhub-domain-sales-platform/
+  - **Fees:** commission 10% since 11 Feb 2026 (5% on checkout links). Source: https://domainnamewire.com/2026/02/11/spaceship-increasing-sellerhub-commission-to-10/
+  - **UNVERIFIED:** no listing fee, no approval step, no exclusivity, and that the terms allow automated listing (the SellerHub help and terms pages answered 403).
+- **Atom:**
+  - **API:** a limited beta, approval needed, 500+ listings to be considered; the token is a query parameter. Sources: https://www.atom.com/help/en/articles/5698350-atom-seller-api-access and https://apidocs.atom.com/api-reference/seller_apis/domains
+  - **Commissions:** Standard 7.5%, Plus 15%, Premium 15–30% (exclusive, Atom nameservers). Source: https://www.atom.com/help/en/articles/4393509-atom-com-marketplace-commission-structure
+  - **Nameservers:** whether Standard needs Atom's nameservers is UNVERIFIED (the seller terms are ambiguous): https://www.atom.com/help/en/articles/997701-domain-marketplace-terms-conditions-sellers
