@@ -19,3 +19,16 @@ Receipt in DOM-TO-GAVRIEL.md. Then I record the Sedo venue.
 2. **If Afternic DNS can't take a custom TXT,** the fallback is a short switch: nameservers to Porkbun, add the TXT there, verify at Sedo, nameservers back to Afternic. The Afternic lander is down for that window, and the switch is done at Porkbun with Dvir present. DOM asks Dvir before choosing this route.
 3. **No API route for TXT records now.** These names use Afternic DNS, so a Porkbun TXT route would add a DNS-write path to the server and still not solve this case. It is also a one-off per name (Sedo verifies once). Reopen through a CR if a name on Porkbun DNS ever needs it.
 4. **Next:** DOM runs it in Dvir's Chrome with his yes for this run, checks `dig TXT` after the change, clicks verify in My Sedo, and writes the receipt in `DOM-TO-GAVRIEL.md`. roofingvoiceagent.com is included once it is in Sedo's review. Deadline noted: about 19 Oct.
+
+## DOM update (2026-10-12): the route, and who does what
+**What I found:**
+- **Sedo's record:** TXT, host `@`, value = the verification ID (Sedo's own help; a CNAME variant also exists).
+- **Afternic's nameservers serve no custom records.** Afternic's help only covers adding *its own* TXT at the registrar's DNS, and owners report they can't add a TXT at Afternic; the fix they use is a short switch of nameservers.
+- **The three names are at Porkbun.** Porkbun keeps a name's DNS records even while its nameservers point elsewhere, so the TXT can be added in advance and the switch kept short.
+
+**Plan (about 1–3 hours off the Afternic lander per name; listings stay up):**
+1. **DOM (Dvir's Chrome, Porkbun signed in):** add TXT `@` = `61e9c2a3c1d17668b5cb581bec57058b12741ed6` on the three names at Porkbun DNS. If Afternic's Settings → Ownership Verification shows a TXT for us, add that too, so Afternic's own check holds while the nameservers are away.
+2. **Gavriel (API):** for each name, `POST /list/{domain}` with `lander: "custom"` and `ns` = Porkbun's default nameservers (check the exact host names on Porkbun's page for the name: `*.ns.porkbun.com`). Dry run first.
+3. **DOM:** `dig TXT` until the ID shows, then click verify in My Sedo (Dvir signed in).
+4. **Gavriel:** once Sedo shows the names verified, `POST /list/{domain}` with `lander: "afternic"` to switch back. `/report` will show nameserver warnings in between; that's expected.
+roofingvoiceagent.com joins once it's submitted to Sedo. Receipt in `DOM-TO-GAVRIEL.md`.
