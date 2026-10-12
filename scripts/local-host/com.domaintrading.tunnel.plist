@@ -6,7 +6,7 @@
   <key>Label</key><string>com.domaintrading.tunnel</string>
   <key>ProgramArguments</key>
   <array>
-    <string>cloudflared</string><string>tunnel</string><string>--no-autoupdate</string>
+    <string>__CLOUDFLARED__</string><string>tunnel</string><string>--no-autoupdate</string>
     <string>--url</string><string>http://127.0.0.1:3000</string>
   </array>
   <key>EnvironmentVariables</key>

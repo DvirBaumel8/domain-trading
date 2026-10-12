@@ -19,7 +19,7 @@ REPO_URL="${REPO_URL:-https://github.com/DvirBaumel8/domain-trading.git}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 command -v node >/dev/null || { echo "node is missing (brew install node@22)"; exit 1; }
-command -v cloudflared >/dev/null || { echo "cloudflared is missing (brew install cloudflared)"; exit 1; }
+CLOUDFLARED="$(command -v cloudflared)" || { echo "cloudflared is missing (brew install cloudflared)"; exit 1; }  # launchd needs the full path (no PATH lookup)
 mkdir -p "$ENV_DIR" "$LOG_DIR" "$AGENTS" "$HOST_DIR"
 cp "$HERE/start.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
 [ -d "$PROD_DIR/.git" ] || git clone --quiet "$REPO_URL" "$PROD_DIR"
@@ -40,7 +40,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 for name in api deploy tunnel tunnel-watch; do
-  sed -e "s#__HOST_DIR__#$HOST_DIR#g" -e "s#__PROD_DIR__#$PROD_DIR#g" -e "s#__LOG_DIR__#$LOG_DIR#g" -e "s#__HOME__#$HOME#g" -e "s#__PATH__#$PATH#g" \
+  sed -e "s#__CLOUDFLARED__#$CLOUDFLARED#g" -e "s#__HOST_DIR__#$HOST_DIR#g" -e "s#__PROD_DIR__#$PROD_DIR#g" -e "s#__LOG_DIR__#$LOG_DIR#g" -e "s#__HOME__#$HOME#g" -e "s#__PATH__#$PATH#g" \
     "$HERE/com.domaintrading.$name.plist" > "$AGENTS/com.domaintrading.$name.plist"
 done
 echo "LaunchAgents written to $AGENTS (not loaded yet)."
