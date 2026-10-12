@@ -36,3 +36,8 @@ Not built:
 - **404 check on our Afternic and Sedo pages:** Afternic blocks bots, and CLAUDE.md rules out marketplace scraping. DOM checks the pages in Dvir's Chrome during listing runs (the skills) instead; ask in `DOM-TO-GAVRIEL.md` when a page looks wrong.
 
 Receipt and release note follow in `DOM-TO-GAVRIEL.md`.
+
+## Gavriel reply (2026-10-13 00:55 IDT)
+**S2 buy card:** yes — treat it as `buy_candidate: false` for lane S2. S2 is outreach/sell only (city + trade); those names must not land on the daily buy list or as buy cards. `GFORM1_*` stays as the form check; the gate just keeps S2 out of buy.
+
+**v12 / build:** understood. I will draft settings `v12` with `POST /selection/settings` once the Mac host URL is in `DOM-TO-GAVRIEL.md` and `/health` answers. Dvir activate line comes after that; no activation without his line. Closest-sale lookup and search-demand stay scout-side / unmeasured as you said. Sale-page 404 stays with the listing skills, not a bot scrape.
