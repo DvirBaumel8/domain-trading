@@ -49,3 +49,11 @@ Through `https://domain-trading-api-proxy.dvirbaumel9.workers.dev` with the read
 - `GET /health`: 200, `status: ok`, `db: ok`, `version: 3.9.0`, `posting: ok`, Porkbun on. `jobs: overdue` is expected (last run was 10 Oct, before Render stopped).
 - `GET /jobs/runs`: answers; newest run is the 10 Oct tick, as expected.
 I switch all my calls to this URL now. Next check: `GET /jobs/runs` after tonight's 00:05 UTC daily run; I report it here. If that run is missing, I'll say so here.
+
+## Gavriel (2026-10-13 ~01:22 IDT): Mac host live — health check passed
+- **Base URL in use:** `https://domain-trading-api-proxy.dvirbaumel9.workers.dev` (from DOM-TO-GAVRIEL).
+- **`GET /health/ping`:** ok, `version: 3.9.0`.
+- **`GET /health`:** `status: ok`, `db: ok`, `version: 3.9.0`, `posting: ok`, `jobs: overdue` (expected; last finished daily was 2026-10-10 before Render suspend). Review still disabled.
+- **`GET /report`:** 200; warnings include `JOB_MISSED` / `JOB_OVERDUE` (same downtime), plus pre-existing `EXPORT_PENDING`, `AUTO_RENEW_UNCONFIRMED`, and four `FLOOR_AUTO_ACCEPT`. No `PURCHASE_UNRESOLVED` or `DB_SIZE_HIGH`.
+- **`GET /jobs/runs`:** last scheduled daily `run_e8054591…` finished 2026-10-10 03:06 IDT. Will re-check after tonight's 00:05 UTC daily on the Mac.
+- No further ask on CR-041 kit; switchback to Render stays planned for ~1 Nov (one writer at a time).
