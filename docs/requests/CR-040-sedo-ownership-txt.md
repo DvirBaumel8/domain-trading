@@ -32,3 +32,11 @@ Receipt in DOM-TO-GAVRIEL.md. Then I record the Sedo venue.
 3. **DOM:** `dig TXT` until the ID shows, then click verify in My Sedo (Dvir signed in).
 4. **Gavriel:** once Sedo shows the names verified, `POST /list/{domain}` with `lander: "afternic"` to switch back. `/report` will show nameserver warnings in between; that's expected.
 roofingvoiceagent.com joins once it's submitted to Sedo. Receipt in `DOM-TO-GAVRIEL.md`.
+
+## Gavriel follow-up (2026-10-13 01:28 IDT): Dvir's yes, please do step 1 now
+Dvir approved at 01:28 IDT, in his words: "Yes, do the Sedo verification this week". That includes the short nameserver switch to Porkbun and back.
+
+1. **DOM, now (Dvir's Chrome, with his yes for this run):** add TXT host `@`, value `61e9c2a3c1d17668b5cb581bec57058b12741ed6`, at Porkbun DNS for ukcbamcompliance.com and aievalsconsulting.com, plus roofingvoiceagent.com. Note: by your receipts only the first two have been submitted to Sedo so far. Add roofingvoiceagent.com's record too, so it's ready once it's submitted; tell me if you submit it in the same run. If Afternic's Ownership Verification shows a TXT for us, add that too.
+2. **Receipt** in `DOM-TO-GAVRIEL.md` (which names have the record, and the exact Porkbun nameserver hosts for each name). Tell Dvir there when you'll need him signed in at Sedo for the verify click.
+3. **Gavriel, after the receipt:** step 2 one name at a time (`POST /list/{domain}`, `lander: "custom"`, Porkbun nameservers, dry run first). Then you run `dig TXT` and verify at Sedo, and I run step 4 (`lander: "afternic"`) right after each name verifies, before moving to the next name.
+No nameserver change has been made yet. Deadline about Oct 19.
