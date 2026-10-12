@@ -10,6 +10,7 @@ import { concentrationCheck } from './concentration.js';
 import { extDatesCheck } from './ext-dates.js';
 import { formCheck } from './form.js';
 import { historyCheck } from './history.js';
+import { lookalikesCheck } from './lookalikes.js';
 import { tmEuCheck, tmUsCheck, webRiskCheck } from './manual.js';
 import { namebioCheck } from './namebio.js';
 import { priceCheck } from './price.js';
@@ -33,6 +34,7 @@ export const CHECKS: Partial<Record<CheckId, Check>> = {
   ext_dates: extDatesCheck,
   same_name: sameNameCheck,
   typo: typoCheck,
+  lookalikes: lookalikesCheck,
   tier: tierCheck,
   namebio: namebioCheck,
   quote: quoteCheck,
@@ -42,5 +44,5 @@ export const CHECKS: Partial<Record<CheckId, Check>> = {
 /** Gate label per check (also the label of an unimplemented check's NOT_RUN row). */
 export const GATE_OF: Record<CheckId, string> = {
   form: 'G0', brand_lists: 'G1', typo: 'G1', availability: 'G2', concentration: 'G3', surbl: 'G4', web_risk: 'G5', history: 'G6',
-  tm_us: 'G7', tm_eu: 'G7', census: 'G8', ext_dates: 'G8', same_name: 'G8', tier: 'G8', namebio: 'G8', quote: 'G9', price: 'G9', pack: 'G10', leads: 'G12',
+  tm_us: 'G7', tm_eu: 'G7', census: 'G8', ext_dates: 'G8', same_name: 'G8', tier: 'G8', namebio: 'G8', quote: 'G9', price: 'G9', pack: 'G10', leads: 'G12', lookalikes: 'G8',
 };

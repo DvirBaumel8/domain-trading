@@ -113,7 +113,7 @@ describe('CR-020 D: settings', () => {
     const x = await h();
     const got = (await x.get('/selection/settings')).json();
     expect(got.active.values.tranche).toEqual({ size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true, main_lanes: [{ lane: 'S7', require: 'clean_history' }, { lane: 'S3', require: 'demand2' }] });
-    expect(got.active.values.intake).toEqual({ drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info' }); // v3.3.0 added the three keys at their defaults
+    expect(got.active.values.intake).toEqual({ drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info', require_sellers_min: 0, require_comps: false, topic_window_days: 30 }); // v3.3.0 added three keys at their defaults; v3.10.0 (CR-043) three more, all with the new rejects off
     expect(got.active.values).toEqual(DEFAULT_SELECTION_VALUES);
     const stored = await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow();
     const sv = stored.values as { tranche: Record<string, unknown>; intake?: unknown };

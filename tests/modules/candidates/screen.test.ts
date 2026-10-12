@@ -29,7 +29,7 @@ const T_TAKEN = (): RdapLookup => ({ outcome: 'registered', reasonCode: null, ht
 
 async function h(opts: Parameters<typeof screeningHarness>[0] = {}): Promise<ScreeningHarness> {
   mswServer.use(http.get('https://data.iana.org/rdap/dns.json', () => respond(fixture('iana-dns.json'))));
-  const x = await screeningHarness({ ...opts, screening: { rdapLookup: async () => T_FREE(), sleep: async () => {}, ...opts.screening } });
+  const x = await screeningHarness({ ...opts, screening: { rdapLookup: async () => T_FREE(), sleep: async () => {}, siteFetch: (async () => { throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' }) }); }) as typeof fetch, ...opts.screening } });
   app = x.app;
   return x;
 }
@@ -256,7 +256,7 @@ describe('CR-021 POST /candidates/screen', () => {
   it('T21-10 the settings key is shipped at its default 30 and the active version is untouched', async () => {
     const x = await h();
     const g = (await x.get('/selection/settings')).json();
-    expect(g.active.values.intake).toEqual({ drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info' });
+    expect(g.active.values.intake).toEqual({ drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info', require_sellers_min: 0, require_comps: false, topic_window_days: 30 }); // v3.10.0 (CR-043) added three keys, all off
     expect(g.active.label).toBe('v1');
     // the stored row has no new key: reading gives the default, the row itself is not changed
     const row = await db.selectFrom('selection_settings').select('values').where('label', '=', 'v1').executeTakeFirstOrThrow();

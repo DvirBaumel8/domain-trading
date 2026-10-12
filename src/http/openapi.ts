@@ -75,6 +75,7 @@ export const SUMMARIES: Record<string, string> = {
   'POST /screening/runs/{id}/manual': 'Record a manual check result for a run',
   'POST /screening/runs/{id}/verdicts': 'Record a verdict for a run',
   'GET /screening/runs/{id}': 'One screening run with its results',
+  'GET /screening/runs/{id}/report.csv': 'One row per name of a screening run, as CSV (verdict, EV, ratio, lookalikes, topic, sellers, comps)',
   'GET /screening/evidence/{id}': 'One piece of screening evidence',
   'POST /quotes/manual': 'Record a manual registrar quote',
   'GET /screening/packs': 'Screening packs',

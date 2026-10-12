@@ -48,7 +48,13 @@ export async function proxy(request: Request, env: Env, fetcher: Fetcher = (r) =
   if (hasBody) init.duplex = 'half';
 
   try {
-    return await fetcher(new Request(target, init));
+    const res = await fetcher(new Request(target, init));
+    // BUG-043: when the Mac server is down or restarting, the tunnel answers with Cloudflare's own HTML error page
+    // (502/530). The API only ever answers JSON, so an HTML 5xx is the tunnel's: return the API's error shape instead.
+    if (res.status >= 500 && (res.headers.get('content-type') ?? '').includes('text/html')) {
+      return errorResponse(502, 'ORIGIN_UNREACHABLE', `The Mac host did not answer (tunnel status ${res.status}); retry with the same Idempotency-Key.`);
+    }
+    return res;
   } catch {
     return errorResponse(502, 'ORIGIN_UNREACHABLE', 'The Mac host did not answer (tunnel down or restarting).');
   }

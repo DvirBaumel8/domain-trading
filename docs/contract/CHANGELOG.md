@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 3.10.0 (2026-10-13): CR-043 scout checks
+MINOR, additive. Every new reject is **off** under the active settings (v11); a settings version activated with Dvir's `approval_ref` turns them on. Release note: `docs/releases/v3.10.0.md`.
+- **New selection settings keys** (old stored versions read the defaults): `form.max_sld_chars` (null), `intake.require_sellers_min` (0), `intake.require_comps` (false), `intake.topic_window_days` (30), `lookalikes.*`, `buy.exclude_lanes` ([]). Codes: `SLD_TOO_LONG` (form check and intake), `SELLERS_TOO_FEW`, `COMPS_MISSING` (`tier`), `LANE_NOT_FOR_BUY` (final status `not_for_buy`).
+- **`lookalikes` check** (G-70; feature check, never rejects): `fields.lookalikes {registered_n, in_use_n, unknown_n, items}`.
+- **`POST /candidates/intake`:** optional `topic`; accepted names carry `topic` and `flags[TOPIC_REUSED]` with the earlier intake ids and times.
+- **New route** `GET /screening/runs/{id}/report.csv` (READ).
+- Not built: closest-past-sale lookup, search demand, the 404 check of sale pages, `competing_forsale_n`.
+
 ## 3.9.0 (2026-10-10): tech-debt pass (v3.0-v3.8)
 MINOR, additive (new `/report` warning codes; the `DROP_POLICY_FAILED` 201 warning is removed because it can no longer occur). Release note: `docs/releases/v3.9.0.md`.
 - **Reconciler never fails a purchase (Dvir, 10 Oct 2026).** A `register_sent`/`unknown` purchase whose name is absent at the registrar stays open, however long. `/report` raises the new warning `PURCHASE_UNRESOLVED` (`purchase_id`, `state`, `age_minutes`, `created_at`) after 30 minutes; the admin command `resolve-purchase` closes it. `PURCHASE_FAILED` now comes only from that command.

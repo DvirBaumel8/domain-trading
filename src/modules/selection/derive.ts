@@ -2,7 +2,7 @@
 import { GATE_OF } from './checks/index.js';
 import type { CheckId, Lane, ResultRow } from './types.js';
 
-export type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'invalid' | 'running' | 'pending' | 'not_screened';
+export type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'not_for_buy' | 'invalid' | 'running' | 'pending' | 'not_screened';
 
 export interface Derived {
   final_status: FinalStatus;
@@ -11,6 +11,8 @@ export interface Derived {
   pending_manual: CheckId[];
   /** Planned checks that answered NOT_RUN / NOT_IMPLEMENTED: shown, never counted as a pass or a fail. */
   not_implemented: CheckId[];
+  /** v3.10.0 (CR-043): set with final_status `not_for_buy` (`buy.exclude_lanes`). */
+  reason_code?: 'LANE_NOT_FOR_BUY';
 }
 
 /**

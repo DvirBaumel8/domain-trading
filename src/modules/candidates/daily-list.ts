@@ -10,7 +10,7 @@ import { formatUsd } from '../../core/money.js';
 import { priceFormula } from '../listing/index.js';
 import { currentSettings } from '../listing/index.js';
 import { buyBlocks } from '../buying/index.js';
-import { latestByCheck } from '../selection/index.js';
+import { featureChecksOf, latestByCheck } from '../selection/index.js';
 import { RECORD_FRESH_DAYS, RECORD_KINDS, isFresh, freshDomainRecord, type RecordKind } from '../selection/index.js';
 import { assemble, effectiveHold, fullPlanRunOrThrow, loadRows, type ScreeningWorker } from '../selection/index.js';
 import { advisoryXactLock } from '../../core/locks.js';
@@ -239,7 +239,7 @@ async function buildLocked(deps: BuildDeps, timedOut: boolean): Promise<BuildRes
   const eligible: (DailyEntry & { _score: number; _ratio: number; _exact: boolean; _at: number })[] = [];
   const almost: Json[] = [];
   const upcoming: Json[] = [];
-  const features = values.run.feature_checks as CheckId[];
+  const features = featureChecksOf(values) as CheckId[];
   const weekEnd = addDays(today, 7);
 
   for (const p of pool) {

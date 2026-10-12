@@ -21,6 +21,8 @@ export interface FormSettings {
   short_token_flag_min: number;
   /** Read by buildLexicon: a place name that is also a dictionary word counts as a city only if listed here (or in city_extra). */
   city_word_allowlist: string[];
+  /** v3.10.0 (CR-043): null or absent = off. A second-level label longer than this is FAIL SLD_TOO_LONG. */
+  max_sld_chars?: number | null;
 }
 
 export interface FormResult {
@@ -286,6 +288,7 @@ export function analyzeForm(
   // CR-039 (Dvir, 10 Oct 2026): a digit passes only inside a scout word on the `regime` list (ets2, nis2); anywhere else it fails.
   if (has_digit && !regimeDigitsOk(sld, hints?.words, (t) => !!lex.types.get(t)?.includes('regime'))) return { ...base, status: 'FAIL', reason_code: 'HAS_DIGIT', reason: 'The name contains a digit outside a regime code on the regime list (SPELL-1)' };
   if (has_hyphen) return { ...base, status: 'FAIL', reason_code: 'HAS_HYPHEN', reason: 'The name contains a hyphen (SPELL-1)' };
+  if (s.max_sld_chars != null && sld.length > s.max_sld_chars) return { ...base, status: 'FAIL', reason_code: 'SLD_TOO_LONG', reason: `The name is ${sld.length} characters before .com (the settings allow at most ${s.max_sld_chars})` };
 
   const hintTerms = new Set([hints?.city, hints?.trade].filter((h): h is string => !!h).map((h) => h.toLowerCase().replace(/[^a-z]/g, '')));
   const scout = hints?.words && hints.words.length > 0 && hints.words.join('') === sld ? hints.words : null;

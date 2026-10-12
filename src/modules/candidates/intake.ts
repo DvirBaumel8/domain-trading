@@ -11,7 +11,7 @@ import { newAuditId } from '../../http/audit.js';
 import { AppError } from '../../http/errors.js';
 import { CompSchema } from '../listing/index.js';
 import { createRun, currentLists, SellersList, type InputName, type ScreeningWorker } from '../selection/index.js';
-import { activeSelectionSettings, laneFitter, methodApproval } from '../selection/index.js';
+import { activeSelectionSettings, earlierWithTopic, laneFitter, methodApproval, normalizeTopic, TOPIC_MAX_CHARS, topicFor, type TopicEarlier } from '../selection/index.js';
 
 /** A name sent again within this many days is a duplicate (its extra source is recorded, it is not screened twice). */
 export const INTAKE_DEDUPE_DAYS = 30;
@@ -36,11 +36,13 @@ export const IntakeBody = z.object({
     sellers: SellersList.optional(),
     /** v3.3.0 (CR-022 A): the scout's own word pieces (1 to 6, lower-case a-z0-9); they must join to the name without `.com` and replace the dictionary split for it. */
     words: z.array(z.string().regex(/^[a-z0-9]+$/, 'each word is lower-case letters or digits')).min(1).max(6).optional(),
+    /** v3.10.0 (CR-043): the scout's topic for the name (free text, trimmed and lower-cased); absent = `<lane>:<first two content words>`. A topic seen on another name in the last `intake.topic_window_days` days is flagged TOPIC_REUSED. */
+    topic: z.string().trim().min(1).max(TOPIC_MAX_CHARS).transform(normalizeTopic).optional(),
   }).strict()).min(1).max(100),
 }).strict();
 export type IntakeBodyT = z.infer<typeof IntakeBody>;
 
-export type IntakeRemoval = 'DOMAIN_INVALID' | 'NOT_COM' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'NO_SPLIT' | 'TOO_MANY_WORDS' | 'ONE_WORD' | 'OWNED' | 'DUPLICATE_IN_UPLOAD';
+export type IntakeRemoval = 'DOMAIN_INVALID' | 'NOT_COM' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'NO_SPLIT' | 'TOO_MANY_WORDS' | 'ONE_WORD' | 'OWNED' | 'DUPLICATE_IN_UPLOAD' | 'SLD_TOO_LONG';
 
 /** The form rules of an intake name (before ownership and duplicates): a letters-only second-level .com of at most 3 words by the bt1@v3 split (or the scout's `words`). */
 export function intakeFormReason(raw: string): { domain: string; reason: IntakeRemoval | null } {
@@ -53,10 +55,10 @@ export function intakeFormReason(raw: string): { domain: string; reason: IntakeR
 }
 
 /** The word rules, after the upload-duplicate test: the drop-list filter's own (digit, hyphen, no split, more than 3 words, one word). v2.16.0: one rule set for both feeds. */
-function wordReason(domain: string, words: string[] | undefined, regimeTerms: ReadonlySet<string>): IntakeRemoval | null {
+function wordReason(domain: string, words: string[] | undefined, regimeTerms: ReadonlySet<string>): { reason: IntakeRemoval | null; tokens: string[] | null } {
   // v3.3.0 (CR-022): bt1@v3 (the approved method the daily census uses), or the scout's words in its place.
   const f = filterDropName(domain, new Set(), { method: 'bt1@v3', regimeTerms, ...(words && { words }) });
-  return f.kept ? null : (f.reason as RemovedReason as IntakeRemoval);
+  return { reason: f.kept ? null : (f.reason as RemovedReason as IntakeRemoval), tokens: f.tokens };
 }
 
 /** v2.16.0 (CR-015 I-1): `note` and `source` carry no personal data: the rule of /offers (no '@'), 422 NO_PII with the name's index and the field. */
@@ -97,8 +99,10 @@ export const ownedDomains = async (db: Kysely<Database>, domains: string[]): Pro
   return new Set(rows.map((r) => r.domain));
 };
 
+/** v3.10.0 (CR-043): a non-rejecting flag on an accepted name. */
+export interface IntakeFlag { code: 'TOPIC_REUSED'; topic: string; earlier: TopicEarlier[] }
 export interface IntakeResult {
-  accepted: { domain: string; intake_id: number }[];
+  accepted: { domain: string; intake_id: number; topic?: string; flags?: IntakeFlag[] }[];
   duplicates: { domain: string; first_intake_id: number }[];
   removed: { domain: string; reason: IntakeRemoval }[];
 }
@@ -111,15 +115,24 @@ export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: {
   const checked = body.names.map((n) => ({ n, ...intakeFormReason(n.domain) }));
   const owned = await ownedDomains(db, checked.map((c) => c.domain));
   const regimeTerms = new Set((await currentLists(db, ['regime'])).regime?.terms ?? []);
+  const { values: sv } = await activeSelectionSettings(db);
+  const maxSld = sv.form.max_sld_chars;
   const since = new Date(ctx.now.getTime() - INTAKE_DEDUPE_DAYS * DAY_MS);
   await db.transaction().execute(async (trx) => {
     const seen = new Set<string>();
     for (const c of checked) {
-      const row = { lane: c.n.lane, source: c.n.source, note: c.n.note ?? null, who_chases: c.n.who_chases ?? null, sellers: c.n.sellers ? JSON.stringify(c.n.sellers) : null, words: c.n.words ?? null, comps: c.n.comps ? JSON.stringify(c.n.comps) : null, received_at: ctx.now, token_name: ctx.tokenName, audit_id: ctx.auditId };
+      const row = { topic: null as string | null, lane: c.n.lane, source: c.n.source, note: c.n.note ?? null, who_chases: c.n.who_chases ?? null, sellers: c.n.sellers ? JSON.stringify(c.n.sellers) : null, words: c.n.words ?? null, comps: c.n.comps ? JSON.stringify(c.n.comps) : null, received_at: ctx.now, token_name: ctx.tokenName, audit_id: ctx.auditId };
       let reason: IntakeRemoval | null = c.reason;
       if (reason === null) {
         if (seen.has(c.domain)) reason = 'DUPLICATE_IN_UPLOAD';
-        else { seen.add(c.domain); reason = wordReason(c.domain, c.n.words, regimeTerms) ?? (owned.has(c.domain) ? 'OWNED' : null); }
+        else {
+          seen.add(c.domain);
+          const w = wordReason(c.domain, c.n.words, regimeTerms);
+          // v3.10.0 (CR-043): form.max_sld_chars (null = off) removes a name longer than it; the form check of a screening run FAILs it the same way
+          const tooLong = maxSld != null && c.domain.length - '.com'.length > maxSld ? 'SLD_TOO_LONG' as const : null;
+          reason = w.reason ?? tooLong ?? (owned.has(c.domain) ? 'OWNED' : null);
+          row.topic = topicFor(c.n.lane, w.tokens, c.n.topic);
+        }
       }
       if (reason !== null) {
         await trx.insertInto('candidate_intake').values({ ...row, domain: c.domain, status: 'removed', reason }).execute();
@@ -133,8 +146,10 @@ export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: {
         out.duplicates.push({ domain: c.domain, first_intake_id: Number(first.id) });
         continue;
       }
+      // TOPIC_REUSED is read before this row exists, so a name never reuses its own topic
+      const earlier = row.topic ? await earlierWithTopic(trx, { topic: row.topic, domain: c.domain, at: ctx.now, windowDays: sv.intake.topic_window_days }) : [];
       const r = await trx.insertInto('candidate_intake').values({ ...row, domain: c.domain, status: 'queued' }).returning('id').executeTakeFirstOrThrow();
-      out.accepted.push({ domain: c.domain, intake_id: Number(r.id) });
+      out.accepted.push({ domain: c.domain, intake_id: Number(r.id), ...(c.n.topic && { topic: row.topic! }), ...(earlier.length > 0 && { flags: [{ code: 'TOPIC_REUSED' as const, topic: row.topic!, earlier }] }) });
     }
   });
   return out;

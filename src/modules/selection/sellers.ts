@@ -77,14 +77,14 @@ export async function findSellers(db: Kysely<Database>, domain: string, o: { run
  */
 export interface SellerResult { name: string; url: string; verified: boolean | null; reason: string; http_status: number | null; truncated: boolean }
 
-function sharedPacer(ctx: CheckContext): Pacer {
+export function sharedPacer(ctx: CheckContext): Pacer {
   const hit = ctx.shared.get('site_pacer') as Pacer | undefined;
   if (hit) return hit;
   const p = new Pacer(ctx.settings.same_name.min_ms_between_fetches, 1, ctx.deps.sleep, ctx.now);
   ctx.shared.set('site_pacer', p);
   return p;
 }
-function sharedRobots(ctx: CheckContext): Map<string, RobotsRule> {
+export function sharedRobots(ctx: CheckContext): Map<string, RobotsRule> {
   const hit = ctx.shared.get('site_robots') as Map<string, RobotsRule> | undefined;
   if (hit) return hit;
   const m = new Map<string, RobotsRule>();

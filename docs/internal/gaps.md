@@ -23,7 +23,7 @@ Owner: DOM, DVIR (needs Dvir's decision or key) or Gavriel. Details of older ite
 | G-41 / G-68 | Signature lists (history check) and prior-business capture rules are starter lists; grow them through the lists API from real captures (the replay measures them) | Gavriel | medium | - |
 | G-42 | HIST-2 follows a quick meta refresh (<= 5 s) but not a JavaScript redirect or a slow refresh (P2) | DOM | low | - |
 | G-62 | Packs are evidence only; CAP-21b (as-of refetch) is P2; the NameBio spot API is not built (NameBio disabled, G-29) | DOM | low | - |
-| G-70 | CAP-12 `ext.variants` (`get<sld>.com` and similar) and `competing_forsale_n` are not built (P2) | DOM | low | - |
+| G-70 | `lookalikes` check built in 3.10.0 (CR-043: endings, hyphen, get/try; RDAP + home page). `competing_forsale_n` is not built (P2) | DOM | low | - |
 | G-53 / G-54 / G-67 | Replay data: `reg_to_sale_months`, the 226/224 row set, gate columns with dates, sale prices, per-row census dates; holdout suite definitions (BT10-1, BT10-9, BT10-11) uploaded and approved by Dvir; the BT10-1 rule set (tier B on or off) | Gavriel / DVIR | medium | - |
 | G-98 | Ledger CSV cells are not escaped against spreadsheet formulas (a cell starting with `=`, `+`, `-`, `@`) | DOM | low | - |
 | G-99 | Buffer post id is lost if the DB update after `createPost` fails (the post exists on X, the row has no id) | DOM | low | - |
@@ -126,7 +126,7 @@ Every place where the specs DOM inherited (`docs/internal/*`, which still descri
 | G-67 | Replay data (G-52, G-53, G-54): `reg_to_sale_months`, the 226/224 row set, gate columns with dates, sale prices, per-row census dates; suite definitions uploaded and approved by Dvir; the BT10-1 rule set (tier B on or off) | **Open** | **Gavriel / DVIR** |
 | G-68 | Signature lists (G-41) and prior-business capture rules need real captures | **Open** | Gavriel (lists API) |
 | G-69 | Web Risk and US trademark checks stay manual until an official API and key exist (G-9) | **Open** | **DVIR** (Google Cloud project, USPTO key) |
-| G-70 | CAP-12 `ext.variants` (`get<sld>.com` and similar) and `competing_forsale_n` are not built | **Open (P2)** | DOM |
+| G-70 | Lookalikes built in 3.10.0 (CR-043). `competing_forsale_n` is not built | **Part built; `competing_forsale_n` open (P2)** | DOM |
 | G-71 | The business-use rule (`business_name` / `service_description` / `product_name` / `none`) is deterministic and conservative: it reads text, not meaning (a Title Case service heading reads as product-style; non-English pages are not understood). Any 401/403 page is UNKNOWN, not "no site" (a bot wall can hide an operator) | **Accepted** | DOM |
 | G-72 | An unreadable same-name site is a FLAG (`SITE_UNKNOWN`) for a bot verdict, not UNKNOWN, so a human can resolve it through the verdict route | **Accepted** | DOM |
 | G-73 | `undici` (8.x, needs Node >= 22.19) is a direct dependency for the vetted-IP Agent of the outbound guard. Passing the npm Agent to Node 22's built-in fetch (bundled undici 6) fails every request (`UND_ERR_INVALID_ARG`), so `safeFetch` uses undici's own `fetch` with its own `Agent`; the injectable fetch is for tests only (`ScreeningDeps.siteFetch`). `package.json` `engines` is now `>=22.19`. An offline integration test (real 127.0.0.1 server, test-only address allowance) pins it | **Fixed** (verified on Node 22.23.3 and 26.8.1) | DOM |

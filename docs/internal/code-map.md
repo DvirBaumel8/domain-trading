@@ -67,7 +67,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 |---|---|
 | GET/POST /selection/settings, POST /selection/settings/:label/activate, GET /selection/namebio, GET/POST /selection/lists/:name, GET/POST /selection/sibling-methods/:method(/approve) | `selection/api/selection.ts` |
 | POST /selection/evaluate, labelled-names, holdout-suites, replays, GET /selection/buy-hold | `selection/api/selection.ts` |
-| POST /screening/runs, GET /screening/runs/:id, POST /screening/runs/:id/(cancel, manual, verdicts), GET /screening/evidence/:id, POST /quotes/manual | `selection/api/screening.ts` |
+| POST /screening/runs, GET /screening/runs/:id, GET /screening/runs/:id/report.csv, POST /screening/runs/:id/(cancel, manual, verdicts), GET /screening/evidence/:id, POST /quotes/manual | `selection/api/screening.ts` |
 | POST/GET /screening/packs, GET /screening/packs/:id | `selection/api/packs.ts` |
 | POST /selection/test-sets, GET /selection/test-sets/:name, POST /selection/test-sets/:name/(seal, cancel) | `selection/api/test-sets.ts` |
 
@@ -84,6 +84,9 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `pack.ts` | screening pack: `assessPack`, `issuePack`, `latestPackFor`, `requiredChecks` |
 | `sellers.ts`, `site.ts`, `html-text.ts`, `wayback.ts` | seller pages and site classification, HTML text, Wayback history |
 | `rdap-batch.ts`, `popularity.ts`, `namebio.ts`, `web-risk.ts` | RDAP pacing/cache, popularity list, NameBio, Web Risk lookup |
+| `checks/lookalikes.ts` | v3.10.0 (CR-043, G-70): `lookalikesCheck`, `lookalikeNames` (feature check appended to every plan by `planFor` while `lookalikes.enabled`; `featureChecksOf` in `settings.ts`) |
+| `topic.ts` | v3.10.0: `topicFor`, `earlierWithTopic` (TOPIC_REUSED; used by intake and the report) |
+| `run-report.ts` | v3.10.0: `runReportCsv`, `csvSafe` (`GET /screening/runs/:id/report.csv`, route in `api/screening.ts`) |
 | `lists.ts` | versioned signature lists (`writeList`, `currentLists`) |
 | `replay.ts`, `test-sets.ts`, `split-v2.ts`, `siblings.ts`, `sibling-methods.ts` | replays, holdout (`holdoutCheck`), test sets, sibling method `bt1@vN` |
 | `hold-steps.ts` | `buyHoldSteps` (GET /selection/buy-hold). The route also adds `small_buy` (v3.7.0, G-3) from `SelectionDeps.smallBuy`, composed in `src/app.ts` from `buying` `smallBuyView` (selection must not import buying) |
@@ -92,7 +95,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `verdicts.ts` | `VerdictBody`, `verdictsFor`: human PASS/REJECT verdicts bound to one FLAG result row (append-only `screening_verdicts`; route `POST /screening/runs/:id/verdicts`; tests `selection/screening-verdicts`) |
 | `unknowns.ts`, `money.ts`, `evidence.ts`, `domain-records.ts`, `tranche-members.ts` | unknown-input reports, EV/Ratio math, evidence rows, cached records, geo members |
 
-Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it). Tests: `tests/modules/selection/` (`screening-*`, `selection-*`, `sibling-methods`, `sibling-bt1-v2`, `bt1-v3-records`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `rdap-pacing`, `run-cancel`, `run-integrity`, `lists-current`, `records-unknowns`, `tier-lanes`, `sellers`, `seller-fetch`, `scout-words`, `settings-intake-keys`), `tests/modules/selection/unit/` (`screening-*`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `split-v2/v3`); helpers `screening.ts`, `screening-fixtures.ts`.
+Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it). Tests: `tests/modules/selection/` (`screening-*`, `selection-*`, `sibling-methods`, `sibling-bt1-v2`, `bt1-v3-records`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `rdap-pacing`, `run-cancel`, `run-integrity`, `lists-current`, `records-unknowns`, `tier-lanes`, `sellers`, `seller-fetch`, `scout-words`, `settings-intake-keys`, `cr043-scout-checks`), `tests/modules/selection/unit/` (`screening-*`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `split-v2/v3`); helpers `screening.ts`, `screening-fixtures.ts`.
 
 ### buying
 `POST /buy` (approval, gates, registrar register, ledger), tranches, reconciler, budget.
@@ -236,7 +239,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1762900000000_v3-7-0.sql`: `registrar_state_checks`, `venue_listings`; 32 files). Run with `npm run migrate`.
+`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763000000000_v3-10-0.sql`: `candidate_intake.topic`; 33 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -273,7 +276,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Change sold evidence rules | `selling/sold.ts` (`EVIDENCE_SOURCES`, `VENUES`), `selling/api/sold.ts` | `selling/sold` |
 | Add a registrar error code mapping | `registrars/porkbun.ts` (or `godaddy.ts`), `registrars/types.ts` (`RegistrarError`, `AMBIGUOUS_CODES`) | `registrars/unit/porkbun-*`, `registrars/check-porkbun` |
 | Rule-guard tests (founder rules enforced by tests) | `tests/unit/no-llm.test.ts` (rule 9), `no-topup.test.ts` (rule 6), `no-web-risk-update.test.ts`, `sandbox-guard.test.ts` (rule 12, with `tests/contract/sandbox-guard.ts`), `global-db-guard.test.ts` (tests never touch a real DB), `network-block.test.ts` with `tests/setup/network.ts` (offline: MSW unhandled = error, UDP blocked) | run the guard files after any change near their subject |
-| Add a migration | new `migrations/<epoch>_<name>.sql` (epoch above the latest); `src/db/types.ts`; for a new table: `ops/jobs/backup-export.ts` (`TABLE_FILES`) and `backup-import.ts` (`ORDER`) or `EXCLUDED` in `tests/modules/ops/unit/backup-coverage.test.ts`; `tests/helpers/db.ts` `TABLES`; `APPEND_ONLY_TABLES` in `scripts/evidence.ts` if append-only; the migration count in `tests/modules/ops/admin-cli.test.ts` (doctor: `migrations: 32 applied`) | `core/schema`, `core/append-only`, `ops/backup`, `ops/unit/backup-coverage`, `ops/admin-cli` |
+| Add a migration | new `migrations/<epoch>_<name>.sql` (epoch above the latest); `src/db/types.ts`; for a new table: `ops/jobs/backup-export.ts` (`TABLE_FILES`) and `backup-import.ts` (`ORDER`) or `EXCLUDED` in `tests/modules/ops/unit/backup-coverage.test.ts`; `tests/helpers/db.ts` `TABLES`; `APPEND_ONLY_TABLES` in `scripts/evidence.ts` if append-only; the migration count in `tests/modules/ops/admin-cli.test.ts` (doctor: `migrations: 33 applied`) | `core/schema`, `core/append-only`, `ops/backup`, `ops/unit/backup-coverage`, `ops/admin-cli` |
 | Add an error code | throw `new AppError(status, 'CODE', ...)` (`http/errors.ts`); add to the Code index in `docs/contract/endpoints.md` (line ~734) and the endpoint's section; add a test whose name/body asserts it; `npm run evidence` | `unit/test-evidence`, `contract/contract-doc` |
 | Add a hand-listing field (venue record) | `listing/api/venue.ts` (strict zod; never a walk-away), `venue_listings` columns via migration, `reporting/report/portfolio.ts` `exportBlock` | `listing/venue` |
 | Add a route | module `api/<x>.ts` + its `register*` in the module `index.ts` and `src/app.ts`; route table row and `### METHOD /path` section in `docs/contract/endpoints.md`; `SUMMARIES` in `http/openapi.ts`; scope (READ/WRITE) in `http/auth.ts` if special | `contract/contract-doc`, a new test under `tests/modules/<module>/` |

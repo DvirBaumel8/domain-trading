@@ -10,9 +10,9 @@ import { requireNamedApproval } from './approval.js';
 import { DEPENDS_ON } from './depends.js';
 
 export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short', 'lane', 'sellers_verified_n', 'sellers_unknown_n'] as const;
-export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads'] as const;
+export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads', 'lookalikes'] as const;
 /** Checks that only produce an input feature (a failed lookup makes the feature unknown, it does not stop the run). */
-export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio'] as const;
+export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio', 'lookalikes'] as const;
 /** Settings the API can never draft a change to (SEL9-2): only a migration changes them. */
 /** `holdout` is locked too: the gate that clears `buy_hold` can't be redefined by the draft that clears it. */
 export const LOCKED_PREFIXES = ['tier.p_passive', 'lead.p_lead', 'priors_v91', 'holdout'];
@@ -50,7 +50,23 @@ const Clause = z.union([z.object({ all: z.array(Cond).min(1) }).strict(), z.obje
 export const MAIN_LANES_DEFAULT: { lane: Lane; require: 'clean_history' | 'demand2' | 'none' }[] = [{ lane: 'S7', require: 'clean_history' }, { lane: 'S3', require: 'demand2' }];
 /** v3.2.0 (CR-020 A): the share of the day's intake screening budget that drop-list names may take at most (1 = no extra cap: they only fill what scout names leave). */
 /** v3.3.0: `on_demand_screen_daily_max` (CR-021) is the most names POST /candidates/screen screens per IDT day (its own allowance); `drop_feed_stale_days` / `drop_feed_stale_level` (CR-023 G) are when `/report` calls the newest drop list stale and at what level. */
-export const INTAKE_DEFAULT = { drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info' as 'info' | 'warn' };
+export const INTAKE_DEFAULT = {
+  drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info' as 'info' | 'warn',
+  /** v3.10.0 (CR-043): 0 = off. At least this many VERIFIED sellers, else the tier check FAILs SELLERS_TOO_FEW. */
+  require_sellers_min: 0,
+  /** v3.10.0 (CR-043): false = off. true: a name with no intake comps FAILs COMPS_MISSING in the tier check. */
+  require_comps: false,
+  /** v3.10.0 (CR-043): a topic seen in another name's intake row within this many days is flagged TOPIC_REUSED. */
+  topic_window_days: 30,
+};
+/** v3.10.0 (CR-043, G-70): the lookalike check (other endings, hyphenated, get-/try-). A feature check: it informs, never rejects. */
+export const LOOKALIKES_DEFAULT = {
+  enabled: true, endings: ['net', 'org', 'io', 'co', 'ai', 'co.uk'], prefixes: ['get', 'try'],
+  /** Home-page fetch of a registered lookalike: tight timeout and body cap. */
+  timeout_ms: 5000, max_bytes: 100_000,
+  /** Most lookalike names checked per name (RDAP + page fetches are capped by this). */
+  max_checks: 12,
+};
 export const EU_TM_DEFAULT = { required_lanes: ['S6'] as Lane[], freshness_hours: 168 };
 export const SAME_NAME_DEFAULT = {
   min_visible_chars: 200, timeout_ms: 10_000, max_bytes: 512_000, max_redirects: 3, min_ms_between_fetches: 1000,
@@ -100,6 +116,8 @@ const Base = z.object({
     short_token_flag_min: int,
     /** A place name that is also a dictionary word counts as a city only if it is listed here (or in the city_extra list). */
     city_word_allowlist: z.array(z.string().regex(/^[a-z]{2,40}$/)),
+    /** v3.10.0 (CR-043): null = off. A second-level label longer than this FAILs SLD_TOO_LONG (form check and intake). */
+    max_sld_chars: int.min(1).nullable().default(null),
   }).strict(),
   typo: z.object({ max_edit_distance: int, top_n: int, max_list_age_days: int }).strict(),
   concentration: z.object({ max_per_attr: int, max_lane_share: share, lane_share_enforced: z.boolean() }).strict(),
@@ -112,7 +130,18 @@ const Base = z.object({
     on_demand_screen_daily_max: int.max(1000).default(INTAKE_DEFAULT.on_demand_screen_daily_max),
     drop_feed_stale_days: int.min(1).max(365).default(INTAKE_DEFAULT.drop_feed_stale_days),
     drop_feed_stale_level: z.enum(['info', 'warn']).default(INTAKE_DEFAULT.drop_feed_stale_level),
+    require_sellers_min: int.max(10).default(INTAKE_DEFAULT.require_sellers_min),
+    require_comps: z.boolean().default(INTAKE_DEFAULT.require_comps),
+    topic_window_days: int.min(1).max(365).default(INTAKE_DEFAULT.topic_window_days),
   }).strict().default(INTAKE_DEFAULT),
+  lookalikes: z.object({
+    enabled: z.boolean(),
+    endings: z.array(z.string().regex(/^[a-z]{2,10}(\.[a-z]{2,10})?$/)).max(12),
+    prefixes: z.array(z.string().regex(/^[a-z]{2,10}$/)).max(4),
+    timeout_ms: int.min(500).max(20_000), max_bytes: int.min(1000).max(512_000), max_checks: int.min(1).max(30),
+  }).strict().default(LOOKALIKES_DEFAULT),
+  /** v3.10.0 (CR-043): lanes whose names are never a buy candidate (final status `not_for_buy`, reason LANE_NOT_FOR_BUY). Default none. */
+  buy: z.object({ exclude_lanes: z.array(z.enum(LANES)) }).strict().default({ exclude_lanes: [] }),
   surbl: z.object({
     zone: z.string().min(3), control_name: z.string().min(3), blocked_answers: z.array(z.string()),
     list_bits: z.record(z.string().regex(/^\d+$/), z.string()), ns_override: z.array(z.string()), timeout_ms: int,
@@ -195,6 +224,12 @@ const Base = z.object({
 }).strict();
 
 export type SelectionValuesT = z.infer<typeof Base>;
+
+/**
+ * Checks that only inform and never gate a name. `run.feature_checks` plus `lookalikes` (v3.10.0, CR-043): the lookalike check is appended to every plan
+ * (planFor) when `lookalikes.enabled`, so a settings version stored before it still has it as a feature check.
+ */
+export const featureChecksOf = (v: Pick<SelectionValuesT, 'run'>): string[] => (v.run.feature_checks.includes('lookalikes') ? v.run.feature_checks : [...v.run.feature_checks, 'lookalikes']);
 export type SameNameSettings = SelectionValuesT['same_name'];
 export type ClauseT = z.infer<typeof Clause>;
 export type CondT = z.infer<typeof Cond>;
@@ -295,12 +330,14 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
     geo_bands: [{ max_chars: 12, raw: 10 }, { max_chars: 16, raw: 7 }, { max_chars: 20, raw: 4 }, { max_chars: null, raw: 1 }],
     unknown_token_fails: true, ambiguity_margin: 2, token_costs: { typed: 1, dict3: 2, dict2: 3 },
     short_max_words: 2, short_max_chars: 12, geo_max_words: 2, geo_max_chars: 16, geo_city_one_token: true,
-    formB_max_words: 2, legal_terms_list: 'legal', short_token_flag_min: 2, city_word_allowlist: MAJOR_CITY_WORDS,
+    formB_max_words: 2, legal_terms_list: 'legal', short_token_flag_min: 2, city_word_allowlist: MAJOR_CITY_WORDS, max_sld_chars: null,
   },
   typo: { max_edit_distance: 1, top_n: 10000, max_list_age_days: 7 },
   concentration: { max_per_attr: 2, max_lane_share: 0.4, lane_share_enforced: false },
   tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true, main_lanes: MAIN_LANES_DEFAULT },
   intake: INTAKE_DEFAULT,
+  lookalikes: LOOKALIKES_DEFAULT,
+  buy: { exclude_lanes: [] },
   surbl: { zone: 'multi.surbl.org', control_name: 'test.surbl.org', blocked_answers: ['127.0.0.1'], list_bits: { '4': 'DM', '8': 'PH', '16': 'MW', '32': 'CT', '64': 'ABUSE', '128': 'CR' }, ns_override: [], timeout_ms: 3000 },
   history: {
     max_fetch_per_name: 6, min_ms_between_calls: 1000, timeout_ms: 20000, retries: 2, min_content_chars: 200, parked_max_text_chars: 1500,

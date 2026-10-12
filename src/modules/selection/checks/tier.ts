@@ -7,6 +7,12 @@ import { outcome, type Check, type CheckContext, type CheckId } from '../types.j
 
 const USABLE = ['PASS', 'PASS_WITH_NOTE', 'FLAG'];
 
+/** The number of comparable sales the scout sent with the name's newest intake row that has any (0 when none). */
+export async function compsOf(db: CheckContext['db'], domain: string): Promise<number> {
+  const row = await db.selectFrom('candidate_intake').select('comps').where('domain', '=', domain).where('status', 'in', ['queued', 'duplicate']).where('comps', 'is not', null).orderBy('received_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+  return Array.isArray(row?.comps) ? row.comps.length : 0;
+}
+
 /** Which check supplies each tier feature. */
 const SOURCE_OF: Record<string, CheckId> = {
   registered_share: 'census', prior_history: 'history', alt_tld_before_n: 'ext_dates',
@@ -74,7 +80,8 @@ export const tierCheck: Check = {
     // v3.3.0 (CR-023 B): the sellers list is read and its pages fetched only when a tier clause uses `sellers_verified_n`.
     let sellers: Record<string, unknown> | null = null;
     let sellerCalls = 0;
-    if (tierUsesSellers(ctx.settings.tier)) {
+    const minSellers = ctx.settings.intake.require_sellers_min;
+    if (tierUsesSellers(ctx.settings.tier) || minSellers > 0) {
       const found = await findSellers(ctx.db, ctx.item.domain, { runId: ctx.run.id, nowMs: ctx.now(), freshHours: sellersFreshHours(ctx.settings) });
       if (found.state === 'none') sellers = { source: null, verified_n: 0, unknown_n: 0, entries: [] };
       else if (found.state === 'stale') {
@@ -88,6 +95,18 @@ export const tierCheck: Check = {
         features.sellers_unknown_n = unknownCount(v.results);
         sellers = { source: found.source, list_at: found.at!.toISOString(), verified_n: features.sellers_verified_n, unknown_n: features.sellers_unknown_n, entries: v.results };
       }
+    }
+    // v3.10.0 (CR-043): the rejects below are off unless a settings version turns them on (intake.require_sellers_min > 0, intake.require_comps true).
+    if (minSellers > 0) {
+      const verified = features.sellers_verified_n ?? 0;
+      if (features.sellers_verified_n === null) return outcome('UNKNOWN', 'SELLERS_STALE', `The sellers list is older than the window, so the ${minSellers} verified sellers required cannot be counted`, { sellers }, { upstreamCalls: sellerCalls });
+      if (verified < minSellers) {
+        return outcome('FAIL', 'SELLERS_TOO_FEW', `${verified} verified seller${verified === 1 ? '' : 's'}; the settings require at least ${minSellers}`, { sellers_required_min: minSellers, ...(sellers && { sellers }) }, { upstreamCalls: sellerCalls });
+      }
+    }
+    if (ctx.settings.intake.require_comps) {
+      const comps = await compsOf(ctx.db, ctx.item.domain);
+      if (comps === 0) return outcome('FAIL', 'COMPS_MISSING', 'The name has no comparable sales (intake comps); the settings require them', { comps_n: 0, ...(sellers && { sellers }) }, { upstreamCalls: sellerCalls });
     }
     const t = evaluateTier(features, ctx.settings.tier, ctx.settings.thresholds);
     // Inputs that came from a FLAG result (e.g. history FLAG): recorded; the verdict still needs a human before any buy (buy_hold now, the pack later).

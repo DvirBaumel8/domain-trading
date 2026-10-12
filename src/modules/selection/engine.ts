@@ -13,7 +13,7 @@ import { beats, deriveItem, funnel, latestByCheck, type Derived, type Funnel } f
 import { loadDataLexicon, buildLexicon } from './lexicon.js';
 import { listVersion, currentLists } from './lists.js';
 import {
-  activeSelectionSettings, deepEqual, selectionSettingsByLabel, type SelectionValuesT,
+  activeSelectionSettings, deepEqual, featureChecksOf, selectionSettingsByLabel, type SelectionValuesT,
 } from './settings.js';
 import {
   outcome, type Check, type CheckId, type CheckOutcome, type Lane, type ResultRow, type RunItem, type RunView, type ScreeningDeps, type Status,
@@ -109,7 +109,9 @@ const isFeature = (c: CheckId, featureChecks: readonly string[]) => featureCheck
 
 /** The plan of one lane: the settings' gate list (lane list, else `default`), in settings order, cut to `checks` when given. */
 export function planFor(values: SelectionValuesT, lane: Lane, checks?: CheckId[]): CheckId[] {
-  const list = (values.run.gates[lane] ?? values.run.gates.default ?? []) as CheckId[];
+  const base = (values.run.gates[lane] ?? values.run.gates.default ?? []) as CheckId[];
+  // v3.10.0 (CR-043): the lookalike check is a feature check that every plan ends with while `lookalikes.enabled` (it never gates a name).
+  const list = (values.lookalikes?.enabled ?? true) && !base.includes('lookalikes') ? [...base, 'lookalikes' as CheckId] : base;
   return checks ? list.filter((c) => checks.includes(c)) : list;
 }
 
@@ -226,7 +228,7 @@ export function assemble(
 ): AssembledRun {
   const byItem = new Map<number, ResultRow[]>();
   for (const r of rows) (byItem.get(r.item_idx) ?? byItem.set(r.item_idx, []).get(r.item_idx)!).push(r);
-  const features = values.run.feature_checks as CheckId[];
+  const features = featureChecksOf(values) as CheckId[];
   let planned = 0;
   let done = 0;
   const out: AssembledItem[] = items.map((item) => {
@@ -236,7 +238,11 @@ export function assemble(
     const stale = item.input_error ? new Set<CheckId>() : staleChecks(latestByCheck(all), p);
     const rs = stale.size === 0 ? all : all.filter((r) => !stale.has(r.check_id));
     if (stale.size > 0) byItem.set(item.idx, rs);
-    const derived = deriveItem(rs, p, features, buyHold, runDone, live);
+    let derived = deriveItem(rs, p, features, buyHold, runDone, live);
+    // v3.10.0 (CR-043): a lane in buy.exclude_lanes (S2 in the v12 draft) is never a buy candidate, whatever its checks said.
+    if ((values.buy?.exclude_lanes ?? []).includes(item.lane) && ['buy_candidate', 'would_buy', 'pending_manual'].includes(derived.final_status)) {
+      derived = { ...derived, final_status: 'not_for_buy', reason_code: 'LANE_NOT_FOR_BUY' };
+    }
     if (!item.input_error) {
       planned += p.length;
       const latest = latestByCheck(rs);
@@ -450,7 +456,7 @@ export class ScreeningWorker {
     const { db } = this.deps;
     const runId = run.id;
     const sel = await selectionSettingsByLabel(db, run.settings_label);
-    const features = sel!.values.run.feature_checks;
+    const features = featureChecksOf(sel!.values);
     const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
     const latest = new Map<number, Map<CheckId, ResultRow>>();
     const by = new Map<number, ResultRow[]>();
@@ -494,7 +500,7 @@ export class ScreeningWorker {
     const tsIn = (run.input as { test_set?: { max_answer_age_days: number; as_of_is_now: boolean } }).test_set;
     if (tsIn) runView.testSet = { maxAnswerAgeDays: tsIn.max_answer_age_days, asOfIsNow: tsIn.as_of_is_now === true };
     let deadline = run.deadline_at.getTime();
-    const features = values.run.feature_checks;
+    const features = featureChecksOf(values);
     const order = [...items].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.idx - b.idx);
 
     const state = new Map<number, Map<CheckId, ResultRow>>();

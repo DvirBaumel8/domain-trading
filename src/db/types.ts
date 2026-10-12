@@ -491,6 +491,8 @@ export interface CandidateIntakeTable {
   sellers: Json | null;
   /** v3.3.0 (CR-022 A): the scout's word pieces for the name; null = the dictionary split decided. */
   words: ColumnType<string[] | null, string[] | null | undefined, never>;
+  /** v3.10.0 (CR-043): the resolved topic (the scout's, else `<lane>:<first two content tokens>`), lower-case, at most 60 characters; null = none. */
+  topic: string | null;
 }
 export interface CandidateScreeningsTable {
   id: Generated<string>;

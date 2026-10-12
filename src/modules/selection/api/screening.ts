@@ -14,9 +14,10 @@ import { listVersion } from '../lists.js';
 import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, loadRows, recomputePending, refreshSummary, staleChecks, reopenRun, toResultRow, type ScreeningWorker } from '../engine.js';
 import { REGISTRAR_ENV } from '../../registrars/index.js';
 import { readEvidence, storeEvidence } from '../evidence.js';
-import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, selectionSettingsByLabel } from '../settings.js';
+import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, featureChecksOf, selectionSettingsByLabel } from '../settings.js';
 import { lookupsOf } from '../test-sets.js';
 import { unknownsOf } from '../unknowns.js';
+import { runReportCsv } from '../run-report.js';
 import { VerdictBody, verdictsFor } from '../verdicts.js';
 import type { ResultRow, RunItem } from '../types.js';
 import type { CheckId, Lane } from '../types.js';
@@ -107,7 +108,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
           // v3.4.0 (CR-027): the scout's words when the name came with them, else the form check's dictionary tokens.
           words: i.item.words ?? (Array.isArray(latest.get('form')?.fields.tokens) ? (latest.get('form')!.fields.tokens as string[]) : null),
           split_source: i.item.words ? 'scout' : latest.get('form') ? 'dictionary' : null,
-          final_status: i.derived.final_status, first_fail: i.derived.first_fail,
+          final_status: i.derived.final_status, first_fail: i.derived.first_fail, ...(i.derived.reason_code && { reason_code: i.derived.reason_code }),
           tier: (latest.get('tier')?.fields.tier as string | undefined) ?? null, score: (latest.get('price')?.fields.score_0_100 as number | undefined) ?? null, short: (latest.get('form')?.fields.short as number | undefined) ?? null,
           flags: i.derived.flags, pending_manual: i.derived.pending_manual, not_implemented: i.derived.not_implemented,
           // Only verdicts bound to a row that is in force now; final_status and flags are not changed by a verdict (v1.1.0 meaning).
@@ -119,6 +120,17 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       ranking,
       funnel: a.funnel,
     };
+  });
+
+  // v3.10.0 (CR-043): one CSV row per name of the run.
+  app.get<{ Params: { id: string } }>('/screening/runs/:id/report.csv', async (req, reply) => {
+    const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', req.params.id).executeTakeFirst();
+    if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${req.params.id}"`);
+    const sel = await selectionSettingsByLabel(db, run.settings_label);
+    const input = run.input as { names: RunItem[] };
+    const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
+    const a = assemble(input.names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values, await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
+    return reply.type('text/csv; charset=utf-8').send(await runReportCsv(db, a.items, { topicWindowDays: sel!.values.intake.topic_window_days }));
   });
 
   app.post<{ Params: { id: string } }>('/screening/runs/:id/cancel', { config: { openapiBody: CancelBody } }, async (req) => {
@@ -226,7 +238,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       const planned = plan[item.lane] ?? [];
       // Only a record some planned dependent reads can change anything.
       const reads = planned.some((c) => (DEPENDS_ON[c] ?? []).includes(check as CheckId));
-      const pending = reads && recomputePending(names, plan, rows, sel.values.run.feature_checks as CheckId[], run.mode === 'live');
+      const pending = reads && recomputePending(names, plan, rows, featureChecksOf(sel.values) as CheckId[], run.mode === 'live');
       if (pending) await reopenRun(db, run.id, new Date(deps.now()), sel.values.run.time_budget_minutes); // false when it is running already
       const live = (await db.selectFrom('screening_runs').select('status').where('id', '=', run.id).executeTakeFirstOrThrow()).status === 'running';
       // A run that is still running is kicked and answers true when a dependent is in the name's plan (the worker re-checks before it ends).

@@ -1,4 +1,4 @@
-# Selection checks (contract v3.9.0)
+# Selection checks (contract v3.10.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -36,6 +36,12 @@ One JSON document per version (`values`). A version is immutable; a draft is mad
 |---|---|---|
 | `thresholds` | `registered_share_min` 0.50, `registered_share_min_B` 0.60, `form_B_max_words` 2, `alt_tld_before_min` 1 | Named numbers the tier clauses refer to as `"$name"`. New names can be added by a draft. |
 | `form.geo_bands` | ≤12 chars 10, ≤16 7, ≤20 4, longer 1 | Geo A-Form raw score by SLD length (`max_chars` null = open end) |
+| `form.max_sld_chars` | null (off) | 3.10.0 (CR-043). When set, a name longer than this before `.com` is `FAIL` `SLD_TOO_LONG` in the form check and is removed at intake (`SLD_TOO_LONG`). The v12 draft sets 20. |
+| `intake.require_sellers_min` | 0 (off) | 3.10.0. At least this many **verified** sellers, else the `tier` check is `FAIL` `SELLERS_TOO_FEW` (pages are fetched when this is above 0 even if no tier clause reads sellers; a stale sellers list is `UNKNOWN` `SELLERS_STALE`). |
+| `intake.require_comps` | false (off) | 3.10.0. true: a name with no comps at intake is `FAIL` `COMPS_MISSING` in the `tier` check. |
+| `intake.topic_window_days` | 30 | 3.10.0. The window of `TOPIC_REUSED` (intake flag; `report.csv` `topic_reused`). |
+| `lookalikes` | `enabled` true, `endings` net, org, io, co, ai, co.uk, `prefixes` get, try, `timeout_ms` 5000, `max_bytes` 100000, `max_checks` 12 | 3.10.0. The `lookalikes` check (below). `enabled` false removes it from the plan. |
+| `buy.exclude_lanes` | [] | 3.10.0. Lanes whose names are never a buy candidate: their final status becomes `not_for_buy` (reason `LANE_NOT_FOR_BUY`) instead of `buy_candidate`, `would_buy` or `pending_manual`; they stay off the daily buy list and out of tranches. The v12 draft sets `["S2"]`. |
 | `form.unknown_token_fails` | true | A run of letters no list explains → `FAIL` `UNKNOWN_TOKEN` |
 | `form.ambiguity_margin`, `form.token_costs` | 2; typed 1, dict3 2, dict2 3 | Tokenizer search: how much more a reading may cost and still count as an alternative; cost of a typed term, a dictionary word of 3+ letters, a 2-letter dictionary word |
 | `form.short_max_words`, `form.short_max_chars` | 2, 12 | FORM-2 `short` |
@@ -259,10 +265,17 @@ A replay re-decides recorded, labelled names with the **same tier / DEMAND-2 cod
 - **Suites that leave gates out (2.5.0, CR-007 G-4d).** A suite definition may list `gates_not_assessed` (any of TM-1 `tm_us`, TN-1 `tn`, HIST-2 `hist2`, the prior-business guard `hist2_guard`), named one by one in Dvir's approval. A holdout replay of it needs, and applies, only the other gates; the gates left out neither reject nor make a row undecided. The report adds `gates_not_assessed` and `accepts_at_risk` (accepted rows in the judged cell that those gates could still turn into rejects). Live screening still runs every gate before any buy.
 - **Hold-clearing rule.** The **hold suites** are the suites whose latest definition has `clears_hold: true` (2.5.0, set only with Dvir's approval saying "clears hold"); while there is none, they are `holdout.required_suites`. `buy_hold` can be cleared (a draft with `buy_hold: false`, activated) only when **each** hold suite has passed as a **holdout-mode** replay of its latest frozen definition on that draft (judged cell: sold accepted ≥ 70%, dropped rejected ≥ 75%, n ≥ 50 per class, 0 leaking rows), judged with the **active** version's `holdout` settings, **and no holdout replay of that suite on that draft has ever failed**: a failure sticks, with no latest-wins (a re-run or a changed definition does not erase it). Otherwise 409 `HOLDOUT_NOT_PASSED` (`details.suites`). The activation also needs Dvir's `approval_ref`: DOM never clears the hold itself. `GET /selection/buy-hold` shows the state (`clearable` is false while the target's own `buy_hold` is true).
 
+## Lookalikes (3.10.0, CR-043, G-70)
+Check `lookalikes` (G8, a **feature check**: it informs, never rejects, never changes a verdict; it ends every plan while `lookalikes.enabled`). For the name's SLD it checks, by RDAP only (never system DNS): the other endings in `lookalikes.endings`, the hyphenated form(s) at the word boundaries of the best split (`a-b.com`; three words also `a-bc.com`, `ab-c.com`), and `get<sld>.com` / `try<sld>.com`, at most `lookalikes.max_checks` names (`skipped_n` counts the rest). An ending with no RDAP service in the IANA bootstrap (often .io, .ai) is `registered: null` with `reason_code` `NO_REGISTRY_SERVICE`, never guessed. For a registered one the home page is fetched through the outbound guard of `same_name` (robots.txt, paced, `timeout_ms`, `max_bytes`) and read with the parked / for-sale signature lists: `in_use` true = a real site; false = parked, for sale or no site; null = could not be read (redirect off the domain, client-rendered, timeout, a missing list: `reason_code`). Result `fields`: `lookalikes: {registered_n, in_use_n, unknown_n, items: [{domain, kind: ending|hyphen|prefix, registered, in_use, reason_code}]}`, `checked_n`, `skipped_n`; `unknown_n` counts names RDAP could not answer or whose page could not be read. Status PASS, or UNKNOWN `AS_OF_NOT_SUPPORTED` in a full run with an `as_of`. Its lookups are in `upstream_calls`. It never decides a screening pack. `competing_forsale_n` is not built.
+
 ## Status and reason codes (so far)
 
 | Code | Where |
 |---|---|
+| `SLD_TOO_LONG` (3.10.0, only with `form.max_sld_chars`) | form check, intake |
+| `SELLERS_TOO_FEW`, `COMPS_MISSING` (3.10.0, only with `intake.require_sellers_min` / `intake.require_comps`) | `tier` result |
+| `LANE_NOT_FOR_BUY` (3.10.0, `buy.exclude_lanes`; final status `not_for_buy`, also `reason_code` on the name in `GET /screening/runs/{id}`) | run name |
+| `TOPIC_REUSED` (3.10.0, intake flag) | `POST /candidates/intake` |
 | `HAS_DIGIT`, `HAS_HYPHEN`, `UNKNOWN_TOKEN`, `GFORM1_WORDS`, `GFORM1_LENGTH`, `GEO_ATTR_MISSING`, `CITY_PLUS_LEGAL`, `AMBIGUOUS_SPLIT` | name form (above) |
 | `BIN_NOT_IN_PRICE_LIST`, `PRICE_LIST_MISSING`, `LANDER_EXCEPTION_NOT_MET` | `money.lander1.reason` |
 | `PRICING_V3_MISSING` | `POST /selection/evaluate` `warnings` |
