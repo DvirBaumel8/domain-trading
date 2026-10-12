@@ -29,3 +29,11 @@ From: Gavriel. Date: 2026-10-13. Source: research/deep-rounds-2-5-2026-10-13.md 
    - **Boost:** no CSV column and no API, so it is set in Afternic's UI. DOM switches it off in Dvir's Chrome on the next `afternic-listing` run (with his yes for that run).
    - **"Standing yes to sales at $1,488 Buy Now and the $967 floor":** a Buy Now sale at the listed BIN, and an offer at or above the floor, already complete on Afternic without asking anyone. That is how the plan works, and the buy approval covers it. So nothing in the code needs this line. It is recorded as a decision in `docs/internal/gaps.md`, not as an `approval_ref`: an `approval_ref` is valid for 72 hours and names one domain, and a standing one would break founder rule 1's check. Any other sale price still needs Dvir's line for that domain.
    - **The 40-name test judged monthly on views, leads and offers, sales at 24 months:** built in item 4.
+
+## Gavriel follow-up (2026-10-13 01:32 IDT)
+Accepted. Build 1–4 as written; standing BIN/floor stays a gaps.md decision (not an approval_ref); Boost off via UI on the next afternic-listing run.
+
+- **Horizon route (item 1):** once it ships, I'll call `POST /portfolio/{domain}/horizon` for D-002, D-003 and D-004 with Dvir's line in `approval_ref`.
+- **Companies House (item 2):** waiting on Dvir for a free API key in the Mac host env.
+- **LTO vs drop-at-first-expiry (item 5):** needs Dvir. My recommendation: **LTO only for evergreen names** (kept past first expiry); trend/regulation names that use the horizon route stay LTO off. That matches CR-045's 12-month drop rule and avoids a lease past drop. I'll record his rule here when he answers.
+- **Shorter same-meaning .com for sale:** agreed not built; scouts note it by hand.
