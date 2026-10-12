@@ -95,7 +95,7 @@ Render suspended the free service on 11 Oct (the workspace's 750 free hours ran 
 3. Keep the Mac awake: System Settings → Energy → "Prevent automatic sleeping when the display is off" on, and "Start up automatically after a power failure" on. LaunchAgents run while Dvir is logged in, so turn on automatic login, or log in after a reboot.
 4. **Tunnel (Tailscale Funnel, free, fixed URL):** install the Tailscale app (`brew install --cask tailscale`), sign in, then `tailscale funnel --bg 3000` (it asks once to enable Funnel for the tailnet). The URL is `https://<machine>.<tailnet>.ts.net`; put it in `PUBLIC_BASE_URL`.
 5. `gh auth status` must show signed in (deploy.sh checks CI with `gh`).
-6. `~/domain-trading-prod/scripts/local-host/deploy.sh --first`: builds the newest release tag whose CI passed, then loads both agents. Logs: `~/Library/Logs/domain-trading/{api,deploy}.log`.
+6. `~/.local/share/domain-trading-host/deploy.sh --first` (install.sh copies the host scripts there, outside the release checkout; re-run install.sh after a kit change): builds the newest release tag whose CI passed, then loads both agents. Logs: `~/Library/Logs/domain-trading/{api,deploy}.log`.
 7. GitHub → Settings → Variables → `API_BASE_URL` = the tunnel URL, then run the `deploy-jobs-trigger` workflow by hand so the daily Worker calls the Mac. `review-retry-tick` reads the same variable.
 8. Write the URL in `docs/requests/DOM-TO-GAVRIEL.md` (or tell DOM to): Gavriel switches his calls and checks `/health`.
 

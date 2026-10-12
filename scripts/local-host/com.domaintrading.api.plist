@@ -5,7 +5,7 @@
 <dict>
   <key>Label</key><string>com.domaintrading.api</string>
   <key>ProgramArguments</key>
-  <array><string>/bin/bash</string><string>__PROD_DIR__/scripts/local-host/start.sh</string></array>
+  <array><string>/bin/bash</string><string>__HOST_DIR__/start.sh</string></array>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>__PATH__</string><key>HOME</key><string>__HOME__</string></dict>
   <key>RunAtLoad</key><true/>
