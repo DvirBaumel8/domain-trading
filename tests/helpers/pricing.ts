@@ -36,11 +36,11 @@ export const V3_SET: Record<string, string> = {
   final_push_mode: 'bin_to_lowest_listed_ge_floor',
 };
 
-/** Create v3 through the admin function (effective a minute ago); returns the new version. */
-export async function createV3(db: Kysely<Database>): Promise<number> {
+/** Create v3 through the admin function (effective a minute before `at`, default the real clock; tests that fix their own clock pass it); returns the new version. */
+export async function createV3(db: Kysely<Database>, at: number = Date.now()): Promise<number> {
   const { version } = await newPricingSettings(db, {
     set: V3_SET, approvalText: 'Dvir 6 Oct 2026: pricing v3 incl. M6/M18 non-geo, M12 geo, final push to lowest list price >= floor, no exception carry',
-    approvalAt: new Date(Date.now() - 3_600_000).toISOString(), now: new Date(Date.now() - 60_000),
+    approvalAt: new Date(at - 3_600_000).toISOString(), now: new Date(at - 60_000),
   });
   return version;
 }

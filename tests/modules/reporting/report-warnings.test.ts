@@ -141,7 +141,7 @@ describe('GET /report warnings', () => {
     await db.updateTable('domains').set({ listing_changed_at: ago(8 * DAY), export_pending_since: ago(8 * DAY) }).where('domain', '=', 'p-three.com').execute();
     w = await t.warnings();
     expect(w.filter((x) => x.code === 'EXPORT_PENDING').map((x) => [x.level, x.details.days_pending])).toEqual([['error', 8]]);
-    await db.insertInto('export_runs').values({ marketplace: 'afternic', domains: ['other.com'], export_id: 'exp_1' }).execute();
+    await db.insertInto('export_runs').values({ marketplace: 'afternic', at: ago(9 * DAY), domains: ['other.com'], export_id: 'exp_1' }).execute();
     await db.insertInto('export_uploads').values({ venue: 'afternic', export_id: 'exp_1', domains: ['other.com'], uploaded_at: ago(2 * DAY) }).execute();
     w = await t.warnings();
     expect(codes(w)).not.toContain('EXPORT_STALE');

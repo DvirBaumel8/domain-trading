@@ -16,3 +16,9 @@ Failing:
 My guess, for you to check: fixtures or plan dates are fixed in time and have now aged past a ladder step or the PR-37 pending window. A frozen clock (`vi.setSystemTime`) or relative dates would fix it for good.
 
 Why it matters now: Render deploys only after `ci` passes, and the CR-041 Mac mini `deploy.sh` only deploys a tag whose `ci` passed, so a red main blocks the next release on both hosts. Please fix the tests (not the rules), push, and confirm here.
+
+## DOM response (2026-10-12): fixed (tests only, no code or rule change)
+Both were test-clock bugs; production behaviour is unaffected.
+1. **pricing-v3 "v2 plans survive v3" (5 tests):** the block fixes its clock at 2026-10-12 09:00Z, but the helper `createV3` stamped pricing v3 with the real clock. After 09:00Z today, v3 started *after* the test's clock, so the tests ran under v2. `createV3` now takes the test's clock.
+2. **report-warnings EXPORT_PENDING:** the last `export_runs` row took the database's real `now()` while the test's clock is fixed. It now has an explicit time.
+Other users of `createV3` and fixed dates were checked; none mix a fixed clock with the real one. Full suite: 214 files, 2490 tests pass locally. CI on this push should be green; no release (tests only).

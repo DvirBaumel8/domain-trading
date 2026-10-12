@@ -97,7 +97,7 @@ describe('v2 plans survive v3 (Review Focus 5)', () => {
 
   it('v2 plan keeps v2 drops after v3 exists: the price job applies the v2 M6 numbers, history says v2', async () => {
     await setup({ mode: 'hybrid', bin: 1995, approval_ref: approval() }, { category: 'trend', price_grade: null });
-    await createV3(db);
+    await createV3(db, NOW);
     const r = await new PriceScheduleJob({ db, now: () => NOW }).runOnce({ today: '2027-04-12' });
     expect(r.failed).toEqual([]);
     expect(r.applied).toHaveLength(1);
@@ -108,7 +108,7 @@ describe('v2 plans survive v3 (Review Focus 5)', () => {
   });
 
   it('a v3 plan applies ladder drops through the job (M6 1488 → 1088, recomputed floor/walk-away)', async () => {
-    await createV3(db);
+    await createV3(db, NOW);
     await setup({ mode: 'hybrid', bin: 1488, approval_ref: approval() }, { category: 'trend', price_grade: null });
     const r = await new PriceScheduleJob({ db, now: () => NOW }).runOnce({ today: '2027-04-12' });
     expect(r.failed).toEqual([]);
@@ -117,7 +117,7 @@ describe('v2 plans survive v3 (Review Focus 5)', () => {
   });
 
   it('manual geo /list change under v3: $349 → 422 BIN_NOT_IN_PRICE_LIST, $299 → accepted (off-grade needs approval); v2 plans keep v2 range rules', async () => {
-    await createV3(db); // a first listing uses the current version
+    await createV3(db, NOW); // a first listing uses the current version
     const list = await setup({ mode: 'bin', bin: 399 }, { category: 'geo', price_grade: 'weaker' });
     const bad = await list({ mode: 'bin', bin: 349, approval_ref: approval() });
     expect(bad.statusCode).toBe(422);
@@ -130,12 +130,12 @@ describe('v2 plans survive v3 (Review Focus 5)', () => {
 
   it('a geo domain planned under v2 still accepts $349 after v3 exists (its plan version governs manual changes)', async () => {
     const list = await setup({ mode: 'bin', bin: 399 }, { category: 'geo', price_grade: 'weaker' });
-    await createV3(db);
+    await createV3(db, NOW);
     expect((await list({ mode: 'bin', bin: 349, approval_ref: approval() })).statusCode).toBe(200);
   });
 
   it('an override never waives the price list: geo $549, non-geo bin $999 / $1,995 refused; a list value with override accepted', async () => {
-    await createV3(db);
+    await createV3(db, NOW);
     const geoList = await setup({ mode: 'bin', bin: 399 }, { category: 'geo', price_grade: 'weaker' });
     const o = { override: true, override_reason: 'test', approval_ref: approval() };
     const g = await geoList({ mode: 'bin', bin: 549, ...o });
@@ -143,7 +143,7 @@ describe('v2 plans survive v3 (Review Focus 5)', () => {
   });
 
   it('non-geo plain bin under v3: off-list BIN refused even with an override; list BIN with an override accepted', async () => {
-    await createV3(db);
+    await createV3(db, NOW);
     const list = await setup({ mode: 'hybrid', bin: 1488, approval_ref: approval() }, { category: 'trend', price_grade: null });
     const o = { override: true, override_reason: 'test', approval_ref: approval() };
     for (const bin of [999, 1995]) {
@@ -156,7 +156,7 @@ describe('v2 plans survive v3 (Review Focus 5)', () => {
 
   it('PR3-9: D-001 reprice via replan with the exception + approval under v3 → 1488 / 967 / 950, approved_exception', async () => {
     const list = await setup({ mode: 'hybrid', bin: 1995, floor: 1295, walkaway: 950, pricing_exception: true, pricing_exception_reason: 'D-001 approved plan', approval_ref: approval() }, { category: 'trend', price_grade: null });
-    await createV3(db);
+    await createV3(db, NOW);
     const r = await list({ replan: true, mode: 'hybrid', bin: 1488, floor: 967, walkaway: 950, pricing_exception: true, pricing_exception_reason: 'D-001 reprice (6 Oct)', approval_ref: approval() });
     expect(r.statusCode).toBe(200);
     const d = await db.selectFrom('domains').selectAll().where('domain', '=', D).executeTakeFirstOrThrow();
