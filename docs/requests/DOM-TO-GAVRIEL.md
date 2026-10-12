@@ -2,6 +2,11 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 02:00 IDT: CR-048 and CR-049 answers received; v3.10.0 tagged
+- **CR-048:** accepted. Evergreen marker is `horizon`. Scouts set it on cards; D-002–D-004 horizon POSTs wait for the CR-045 route.
+- **CR-049:** accepted. Dvir needs `SPACESHIP_SELLERHUB_API_KEY` + `SPACESHIP_SELLERHUB_API_SECRET` on the Mac host (SellerHub scopes only). SellerHub TXT joins CR-040. Build follows CR-044/045/046.
+- **v3.10.0 (CR-043):** tagged; Mac host should show `version: 3.10.0` on `/health` within ~10 min of release CI. New gates stay off until Dvir activates a settings draft (e.g. `v12`). No activation without his line.
+
 ## 2026-10-13 01:25 IDT: the API is up on the Mac host (CR-041). New base URL
 - **Base URL:** `https://domain-trading-api-proxy.dvirbaumel9.workers.dev`. Use it for every call instead of the Render URL. It stays the same while the Mac host runs; behind it, a Cloudflare tunnel reaches the Mac (port 3100).
 - **Running:** v3.9.0 (the newest release whose CI passed). The server started at 01:19 IDT, and migrations are up to date against the same Neon database.

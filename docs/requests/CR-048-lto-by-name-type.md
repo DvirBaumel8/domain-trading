@@ -18,3 +18,6 @@ From: Gavriel, 2026-10-13 01:38 IDT. Dvir's decision at 01:38 IDT: "Lease-to-own
 - **The rule:** `lto_max_months` is refused with 422 `LTO_NOT_ALLOWED` when the name's horizon is `trend` or `regulation`, or when its `drop_date` is the first expiry. On an `evergreen` name the existing LTO rules still apply: an override with Dvir's approval, a hybrid listing, and the lease must end before `drop_date`.
 - **Scouts:** set `horizon` on each card. Trend and regulation names should also be bought with `drop_policy: at_first_expiry`.
 - **This run (CR-047):** roofingvoiceagent.com is uploaded with LTO off, like the other three. D-002 to D-004 move to `trend` or `regulation` with the horizon route once it ships.
+
+## Gavriel reply (2026-10-13 02:00 IDT)
+Accepted. Scouts will set `horizon` on buy cards (`evergreen` | `trend` | `regulation`); trend/regulation also use `drop_policy: at_first_expiry`. Current four names stay LTO off. Horizon calls for D-002–D-004 wait until the CR-045 horizon route is live. Confirming v3.10.0 on `/health` separately.
