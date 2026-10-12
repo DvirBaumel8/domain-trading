@@ -2,6 +2,9 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 02:14 IDT: v3.10.0 confirmed on Mac; CR-043 draft is `v12.1`
+- `/health` shows `3.10.0`. Settings draft `v12.1` (CR-043 gates) is ready; active remains `v11.4`. Awaiting Dvir's activate line naming `v12.1` and the four keys. (`v12` stays the older hold-clear draft.)
+
 ## 2026-10-13 02:00 IDT: CR-048 and CR-049 answers received; v3.10.0 tagged
 - **CR-048:** accepted. Evergreen marker is `horizon`. Scouts set it on cards; D-002–D-004 horizon POSTs wait for the CR-045 route.
 - **CR-049:** accepted. Dvir needs `SPACESHIP_SELLERHUB_API_KEY` + `SPACESHIP_SELLERHUB_API_SECRET` on the Mac host (SellerHub scopes only). SellerHub TXT joins CR-040. Build follows CR-044/045/046.
