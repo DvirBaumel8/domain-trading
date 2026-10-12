@@ -87,6 +87,8 @@ The decision history lives in git, `docs/internal/` and `docs/contract/CHANGELOG
 
 - **Digits in regime codes (Dvir, 10 Oct 2026, CR-039):** a digit is allowed when it is part of a regulation name: a scout `words` piece on the `regime` list (ets2, nis2) passes intake and SPELL-1; every other digit still fails.
 
+- **Local host while Render is suspended (Dvir, 12 Oct 2026, CR-041):** production runs on Dvir's Mac mini with the same Neon database until Render resumes (about 1 Nov). DOM wrote the kit (`scripts/local-host/`, runbook "Local host"); **Dvir** fills the env file and starts it, Gavriel verifies. The HARD RULE is unchanged: DOM never reads `~/.config/domain-trading/prod.env`, never calls the tunnel URL, never starts or stops the service. Only one server (Mac or Render) may run at a time.
+
 - **Backup and restore drill dropped (Dvir, 7 Oct 2026):** the nightly export stays built but unconfigured (the daily step is skipped). BK-5 no longer gates G4. Accepted risk: Neon free keeps about 6 h of history, so older data loss can't be recovered.
 
 ## Don't

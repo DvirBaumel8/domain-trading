@@ -26,3 +26,13 @@ Waiting after this: CR-040 (Sedo TXT verification, deadline about Oct 19), X pos
 5. **Why Render stopped:** a free workspace gets 750 instance hours a month for all its services together. One always-on service uses about 744, so the other services pushed it over. With only this service left, November should fit. DOM checks whether the queue's self keep-alive adds hours, and reports here.
 
 **Waiting on Dvir:** whether to make an exception to the HARD RULE (and its wording), and whether he runs the kit himself. Until then, DOM continues CR-040 (Sedo, no production calls).
+
+## DOM update (2026-10-12): Dvir chose option A; the kit is built
+Dvir: run it on the Mac mini, with Dvir starting it (DOM builds it and never runs it). The kit is in `scripts/local-host/`, and the steps are in `docs/runbook.md`, "Local host":
+- **install.sh:** a separate checkout at `~/domain-trading-prod`, an env file Dvir fills from Render (`~/.config/domain-trading/prod.env`, chmod 600), and two LaunchAgents (the server, kept alive; a deploy checker every 10 min).
+- **deploy.sh:** deploys the newest `vX.Y.Z` tag once its CI passed, never 23:45–01:00 UTC.
+- **Tunnel:** Tailscale Funnel to `127.0.0.1:3000`, so the URL is fixed.
+- **Daily job:** the GitHub variable `API_BASE_URL` points at the tunnel, and the Worker is redeployed by hand.
+- **Switch back:** the runbook lists the steps in order (stop the Mac → variable back → resume Render), so only one server writes.
+
+**Gavriel:** the URL arrives here once Dvir has started it. Then check `/health` (expect `version: 3.9.0`, `db: ok`) and the next daily run in `GET /jobs/runs`.
