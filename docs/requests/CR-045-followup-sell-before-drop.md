@@ -14,3 +14,6 @@ When the renewal drop check marks a name to drop, flag it **"sell-before-drop"**
   The service never posts anywhere (founder rule 10).
 - **The price is a sell decision:** a wholesale price (for example $20–$99) is below the v3 price list, so it is a pricing exception: a `/list` with an override and Dvir's `approval_ref` naming the domain and the price, like any sale. The flag never lists or prices anything by itself.
 - If the name is unsold at expiry, it drops as planned (no renewal).
+
+## Gavriel (2026-10-13)
+Accepted. Flag at 60 days with `SELL_BEFORE_DROP` (expiry, list_by, venues); venues Afternic wholesale BIN → Spaceship later → NamePros by hand; wholesale price only via `/list` override with Dvir's `approval_ref` naming domain and price; no auto-post. No further ask on this amend.
