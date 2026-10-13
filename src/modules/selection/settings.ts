@@ -10,9 +10,11 @@ import { requireNamedApproval } from './approval.js';
 import { DEPENDS_ON } from './depends.js';
 
 export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short', 'lane', 'sellers_verified_n', 'sellers_unknown_n'] as const;
-export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads', 'lookalikes'] as const;
+export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads', 'lookalikes', 'demand', 'companies'] as const;
 /** Checks that only produce an input feature (a failed lookup makes the feature unknown, it does not stop the run). */
-export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio', 'lookalikes'] as const;
+export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio', 'lookalikes', 'demand', 'companies'] as const;
+/** Feature checks that every plan ends with while their own `enabled` setting is on (v3.10.0 lookalikes, v4.2.0 demand and companies). */
+export const APPENDED_FEATURE_CHECKS = ['lookalikes', 'demand', 'companies'] as const;
 /** Settings the API can never draft a change to (SEL9-2): only a migration changes them. */
 /** `holdout` is locked too: the gate that clears `buy_hold` can't be redefined by the draft that clears it. */
 export const LOCKED_PREFIXES = ['tier.p_passive', 'lead.p_lead', 'priors_v91', 'holdout'];
@@ -67,6 +69,10 @@ export const LOOKALIKES_DEFAULT = {
   /** Most lookalike names checked per name (RDAP + page fetches are capped by this). */
   max_checks: 12,
 };
+/** v4.2.0 (CR-044 item 3): the keyword demand input (the monthly Keyword Planner upload). A feature check: it informs, never rejects. `keep_min_searches`: the renewal drop check keeps a name at or above it. */
+export const DEMAND_DEFAULT = { enabled: true, keep_min_searches: 10 };
+/** v4.2.0 (CR-046 item 2): Companies House company-name matches (UK, free API key). A feature check: it informs, never rejects. Needs COMPANIES_HOUSE_API_KEY; without it the check answers UNKNOWN SOURCE_DISABLED. */
+export const COMPANIES_DEFAULT = { enabled: true, max_per_minute: 60, timeout_ms: 8000 };
 /**
  * v4.1.0 (CR-050): the sibling scan. Endings and prefixes checked next to the .com, the lead points (10 per live business sibling, 2 per registered-but-parked
  * one, at most `max`), how many of each count, the most names checked per scan, and the time budget of one POST (seconds). Page timeout and size come from `lookalikes`.
@@ -166,6 +172,8 @@ const Base = z.object({
     prefixes: z.array(z.string().regex(/^[a-z]{2,10}$/)).max(4),
     timeout_ms: int.min(500).max(20_000), max_bytes: int.min(1000).max(512_000), max_checks: int.min(1).max(30),
   }).strict().default(LOOKALIKES_DEFAULT),
+  demand: z.object({ enabled: z.boolean(), keep_min_searches: int.max(10_000_000) }).strict().default(DEMAND_DEFAULT),
+  companies: z.object({ enabled: z.boolean(), max_per_minute: int.min(1).max(600), timeout_ms: int.min(500).max(30_000) }).strict().default(COMPANIES_DEFAULT),
   siblings: z.object({
     endings: z.array(z.string().regex(/^[a-z]{2,10}(\.[a-z]{2,10})?$/)).max(12),
     prefixes: z.array(z.string().regex(/^[a-z]{2,10}$/)).max(4),
@@ -276,7 +284,7 @@ export type SelectionValuesT = z.infer<typeof Base>;
  * Checks that only inform and never gate a name. `run.feature_checks` plus `lookalikes` (v3.10.0, CR-043): the lookalike check is appended to every plan
  * (planFor) when `lookalikes.enabled`, so a settings version stored before it still has it as a feature check.
  */
-export const featureChecksOf = (v: Pick<SelectionValuesT, 'run'>): string[] => (v.run.feature_checks.includes('lookalikes') ? v.run.feature_checks : [...v.run.feature_checks, 'lookalikes']);
+export const featureChecksOf = (v: Pick<SelectionValuesT, 'run'>): string[] => [...v.run.feature_checks, ...APPENDED_FEATURE_CHECKS.filter((c) => !v.run.feature_checks.includes(c))];
 export type SameNameSettings = SelectionValuesT['same_name'];
 export type ClauseT = z.infer<typeof Clause>;
 export type CondT = z.infer<typeof Cond>;
@@ -384,6 +392,8 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true, main_lanes: MAIN_LANES_DEFAULT },
   intake: INTAKE_DEFAULT,
   lookalikes: LOOKALIKES_DEFAULT,
+  demand: DEMAND_DEFAULT,
+  companies: COMPANIES_DEFAULT,
   siblings: SIBLINGS_DEFAULT,
   buy: BUY_DEFAULT,
   renewal: RENEWAL_DEFAULT,

@@ -122,3 +122,13 @@ describe('SellerHub env (v4.0.0, CR-049)', () => {
     expect(loadConfig(testEnv({ SPACESHIP_SELLERHUB_API_KEY: '' })).sellerhub.apiKey).toBeUndefined();
   });
 });
+
+describe('Companies House env (v4.2.0, CR-046)', () => {
+  it('CHC-1: COMPANIES_HOUSE_API_KEY is optional, an empty value is unset, and a set value is a redacted secret', () => {
+    expect(loadConfig(testEnv()).companiesHouseApiKey).toBeUndefined();
+    expect(loadConfig(testEnv({ COMPANIES_HOUSE_API_KEY: '' })).companiesHouseApiKey).toBeUndefined();
+    const c = loadConfig(testEnv({ COMPANIES_HOUSE_API_KEY: 'fake-ch-key-1' }));
+    expect(c.companiesHouseApiKey).toBe('fake-ch-key-1');
+    expect(c.secretValues).toContain('fake-ch-key-1');
+  });
+});

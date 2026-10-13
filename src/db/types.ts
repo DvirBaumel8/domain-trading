@@ -434,6 +434,30 @@ export interface SalesPatternRowsTable {
   venue: string | null;
 }
 
+export interface KeywordDemandUploadsTable {
+  id: Generated<number>;
+  uploaded_at: Timestamp;
+  title_line: string | null;
+  date_range_line: string | null;
+  location: string | null;
+  month: string | null;
+  rows_n: number;
+  skipped_n: Generated<number>;
+  recorded_by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+export interface KeywordDemandTable {
+  id: Generated<number>;
+  upload_id: number;
+  keyword: string;
+  avg_monthly_searches: number | null;
+  competition_index: number | null;
+  three_month_change: string | null;
+  yoy_change: string | null;
+}
+
 export interface SiblingScansTable {
   id: Generated<number>;
   domain: string;
@@ -1157,6 +1181,8 @@ export interface Database {
   sales_pattern_rows: SalesPatternRowsTable;
   listing_sync_log: ListingSyncLogTable;
   sibling_scans: SiblingScansTable;
+  keyword_demand_uploads: KeywordDemandUploadsTable;
+  keyword_demand: KeywordDemandTable;
   drop_lists: DropListsTable;
   drop_list_rows: DropListRowsTable;
   drop_list_checks: DropListChecksTable;

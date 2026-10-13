@@ -4,7 +4,7 @@ import { sql, type Kysely, type Selectable } from 'kysely';
 import { addDays, dayNumber, toJerusalemIso } from '../../../core/dates.js';
 import { pair } from '../../../core/money.js';
 import type { Database, DomainsTable } from '../../../db/types.js';
-import { activeSelectionSettings } from '../../selection/index.js';
+import { activeSelectionSettings, searchesOfDomain } from '../../selection/index.js';
 import type { WarningLevel } from './warnings.js';
 
 type Add = (code: string, level: WarningLevel, message: string, domain?: string, details?: Record<string, unknown>) => void;
@@ -17,10 +17,10 @@ export const SELL_BEFORE_DROP_VENUES = [
   'namepros: a sale thread, posted by hand (the service never posts)',
 ];
 
-export interface Signals { offers: number; inquiries: number; lookalike_rise: boolean; lookalikes_at_buy: number | null; lookalikes_now: number | null; search_band_above_unmeasured: boolean }
+export interface Signals { offers: number; inquiries: number; lookalike_rise: boolean; lookalikes_at_buy: number | null; lookalikes_now: number | null; search_band_above_unmeasured: boolean; keyword_searches: number | null }
 
-/** The keep-signals of a name: offers, inquiries or leads, a rise in lookalikes in use since the screening before the buy, a measured search demand (no source yet: always false). */
-export async function signalsFor(db: Kysely<Database>, domain: string, domainId: number): Promise<Signals> {
+/** The keep-signals of a name: offers, inquiries or leads, a rise in lookalikes in use since the screening before the buy, a measured search demand (the latest keyword upload has at least `demand.keep_min_searches` average monthly searches for the name). */
+export async function signalsFor(db: Kysely<Database>, domain: string, domainId: number, keepMinSearches: number): Promise<Signals> {
   const offers = Number((await sql<{ n: string }>`select count(*)::text as n from offers where domain_id = ${domainId}`.execute(db)).rows[0]!.n);
   const inq = Number((await sql<{ n: string }>`select coalesce(sum(coalesce(inquiries, 0) + coalesce(leads, 0)), 0)::text as n from portfolio_stats where domain = ${domain}`.execute(db)).rows[0]!.n);
   const base = await sql<{ n: number | null }>`
@@ -29,9 +29,10 @@ export async function signalsFor(db: Kysely<Database>, domain: string, domainId:
   const now = await sql<{ n: number | null }>`
     select (details->>'in_use_n')::int as n from portfolio_checks pc join domains d on d.id = pc.domain_id where d.domain = ${domain} and pc.kind = 'lookalikes' and pc.status = 'ok'
     order by pc.id desc limit 1`.execute(db);
+  const searches = await searchesOfDomain(db, domain);
   const at = base.rows[0]?.n ?? null;
   const cur = now.rows[0]?.n ?? null;
-  return { offers, inquiries: inq, lookalike_rise: at !== null && cur !== null && cur > at, lookalikes_at_buy: at, lookalikes_now: cur, search_band_above_unmeasured: false };
+  return { offers, inquiries: inq, lookalike_rise: at !== null && cur !== null && cur > at, lookalikes_at_buy: at, lookalikes_now: cur, search_band_above_unmeasured: searches !== null && searches >= keepMinSearches, keyword_searches: searches };
 }
 
 export async function lifecycleWarnings(db: Kysely<Database>, now: Date, today: string, domains: Dom[], add: Add): Promise<void> {
@@ -43,7 +44,7 @@ export async function lifecycleWarnings(db: Kysely<Database>, now: Date, today: 
     if (d.renewals_used === 0) {
       const days = daysBetweenYmd(today, d.expiry_date);
       if (days >= 0 && days <= r.drop_check_days) {
-        const s = await signalsFor(db, d.domain, d.id);
+        const s = await signalsFor(db, d.domain, d.id, sel.demand.keep_min_searches);
         const keep = s.offers > 0 || s.inquiries > 0 || s.lookalike_rise || s.search_band_above_unmeasured;
         const card = (d.buy_card ?? null) as { stre_bp?: number | null; renewal_math?: { commission_bp?: number } } | null;
         let math: Record<string, unknown> | null = null;

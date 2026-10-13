@@ -39,6 +39,12 @@ export function registerAuditId(app: FastifyInstance): void {
   });
 }
 
+/** A base64 file upload (POST /demand/keywords) is recorded by its size, not its bytes: the audit log stays small. */
+function elideFile(b: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (b === null || typeof b.file_base64 !== 'string' || b.file_base64.length <= 200) return b;
+  return { ...b, file_base64: `[base64, ${b.file_base64.length} characters]` };
+}
+
 function bodyObject(req: FastifyRequest): Record<string, unknown> | null {
   const b = req.body;
   return b !== null && typeof b === 'object' && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
@@ -75,7 +81,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
   app.addHook('onSend', async (req, reply, payload) => {
     // Bots only (Dvir, 6 Oct 2026): a request that never authenticated writes nothing.
     if (!req.auditId || (!req.auth && !req.jobAuth)) return payload;
-    const body = bodyObject(req);
+    const body = elideFile(bodyObject(req));
     const approval = extractApproval(body);
     const replayed = reply.getHeader('idempotent-replayed') === 'true';
     const summary = req.auditSummary ?? summarize(reply.statusCode, payload);

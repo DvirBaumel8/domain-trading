@@ -66,6 +66,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | Route | File |
 |---|---|
 | GET/POST /selection/settings, POST /selection/settings/:label/activate, GET /selection/namebio, GET/POST /selection/lists/:name, GET/POST /selection/sibling-methods/:method(/approve) | `selection/api/selection.ts` |
+| POST/GET /demand/keywords (v4.2.0, CR-044 item 3) | `selection/api/demand.ts` (`registerDemand`, called from `src/app.ts`; the 2 MB route body limit; logic in `selection/demand.ts`) |
 | POST /selection/sibling-scan, GET /selection/sibling-scan/:domain (v4.1.0, CR-050) | `selection/api/sibling-scan.ts` (`registerSiblingScan`, called from `src/app.ts` after `screeningDeps`) |
 | POST /selection/evaluate, labelled-names, holdout-suites, replays, GET /selection/buy-hold | `selection/api/selection.ts` |
 | POST /screening/runs, GET /screening/runs/:id, GET /screening/runs/:id/report.csv, POST /screening/runs/:id/(cancel, manual, verdicts), GET /screening/evidence/:id, POST /quotes/manual | `selection/api/screening.ts` |
@@ -86,6 +87,8 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `sellers.ts`, `site.ts`, `html-text.ts`, `wayback.ts` | seller pages and site classification, HTML text, Wayback history |
 | `rdap-batch.ts`, `popularity.ts`, `namebio.ts`, `web-risk.ts` | RDAP pacing/cache, popularity list, NameBio, Web Risk lookup |
 | `checks/lookalikes.ts` | v3.10.0 (CR-043, G-70): `lookalikesCheck`, `lookalikeNames` (feature check appended to every plan by `planFor` while `lookalikes.enabled`; `featureChecksOf` in `settings.ts`); v4.1.0: the per-name RDAP + home-page work is `probeLookalike`, shared with the sibling scan |
+| `demand.ts` | v4.2.0 (CR-044 item 3): `decodeKeywordFile` (UTF-16LE/BE/UTF-8, BOM), `parseKeywordExport` (by header name, `KEYWORD_CSV_INVALID`), `storeKeywordUpload`, `latestKeyword`, `demandForKeywords`, `keywordCandidates`, `keywordsOfDomain`, `searchesOfDomain` (the renewal keep-signal in `reporting/report/lifecycle.ts`) |
+| `checks/demand.ts`, `checks/companies.ts` | v4.2.0 feature checks (G8, never reject, never decide a pack), appended to every plan by `planFor` while `demand.enabled` / `companies.enabled` (`APPENDED_FEATURE_CHECKS` in `settings.ts`). `companies`: Companies House search through `safeFetch` (HTTP Basic, key `COMPANIES_HOUSE_API_KEY` as `ScreeningDeps.companiesHouseApiKey`), `Pacer` from `companies.max_per_minute`, `titleMatches`, `companyMatches` |
 | `sibling-scan.ts` | v4.1.0 (CR-050): `scanSiblings` (per name: `lookalikeNames` with `siblings.endings` + `probeLookalike`, then company / `contactUrlOf` / `leadPointsOf`; one `sibling_scans` row per name), `latestSiblingScan`, `contactUrlOf` (same-site contact page URL, never an email), `leadPointsOf` (weights from `siblings` settings). `anchorLinks` is in `html-text.ts` |
 | `topic.ts` | v3.10.0: `topicFor`, `earlierWithTopic` (TOPIC_REUSED; used by intake and the report) |
 | `run-report.ts` | v3.10.0: `runReportCsv`, `csvSafe` (`GET /screening/runs/:id/report.csv`, route in `api/screening.ts`) |
@@ -97,7 +100,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `verdicts.ts` | `VerdictBody`, `verdictsFor`: human PASS/REJECT verdicts bound to one FLAG result row (append-only `screening_verdicts`; route `POST /screening/runs/:id/verdicts`; tests `selection/screening-verdicts`) |
 | `unknowns.ts`, `money.ts`, `evidence.ts`, `domain-records.ts`, `tranche-members.ts` | unknown-input reports, EV/Ratio math, evidence rows, cached records, geo members |
 
-Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it), `sibling_scans` (v4.1.0, append-only). Tests: `tests/modules/selection/` (`screening-*`, `selection-*`, `sibling-methods`, `sibling-bt1-v2`, `bt1-v3-records`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `rdap-pacing`, `run-cancel`, `run-integrity`, `lists-current`, `records-unknowns`, `tier-lanes`, `sellers`, `seller-fetch`, `scout-words`, `settings-intake-keys`, `cr043-scout-checks`, `sibling-scan`), `tests/modules/selection/unit/` (`screening-*`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `sibling-scan` (CR-050), `split-v2/v3`, `sibling-scan`); helpers `screening.ts`, `screening-fixtures.ts`.
+Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it), `sibling_scans` (v4.1.0, append-only), `keyword_demand_uploads`, `keyword_demand` (v4.2.0, append-only, in the backup). Tests: `tests/modules/selection/` (`screening-*`, `selection-*`, `sibling-methods`, `sibling-bt1-v2`, `bt1-v3-records`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `rdap-pacing`, `run-cancel`, `run-integrity`, `lists-current`, `records-unknowns`, `tier-lanes`, `sellers`, `seller-fetch`, `scout-words`, `settings-intake-keys`, `cr043-scout-checks`, `sibling-scan`, `keyword-demand` (v4.2.0: KD-1..KD-7, CH-2..CH-6)), `tests/modules/selection/unit/` (`screening-*`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `sibling-scan` (CR-050), `keyword-demand` (v4.2.0 parser, Companies House match), `split-v2/v3`, `sibling-scan`); helpers `screening.ts`, `screening-fixtures.ts`.
 
 ### buying
 `POST /buy` (approval, gates, registrar register, ledger), tranches, reconciler, budget.
@@ -174,7 +177,7 @@ Read-only reports: `/report`, portfolio, ledger, audit, job-run views.
 | `report/money.ts`, `portfolio.ts` (`portfolioDetail` adds `registrar_state`, v3.7.0), `domains.ts`, `upcoming.ts`, `pricing-review.ts`, `markdown.ts` | report sections; `ledgerRows`, `ledgerCsvRows`, `usdSigned` in `portfolio.ts` |
 | `job-runs.ts` | `jobRunsView`, `jobsOverdue`, `dailyScheduleState`, `stepView`, `triggerFromKey` |
 
-Tables: none owned (reads all). Tests: `tests/modules/reporting/` (`report-core`, `report-warnings`, `reads`, `pricing-review`, `forecast`, `drop-feed-stale`); the schedule view is also in `tests/modules/ops/jobs.test.ts`, `missed-runs`.
+Tables: none owned (reads all). Tests: `tests/modules/reporting/` (`report-core`, `report-warnings`, `reads`, `pricing-review`, `forecast`, `drop-feed-stale`, `keyword-keep-signal` (v4.2.0)); the schedule view is also in `tests/modules/ops/jobs.test.ts`, `missed-runs`.
 
 ### outreach
 Outward voice and outside review: Buffer posting to X, Gemini review, company documents, forbidden-term block list.
@@ -251,7 +254,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 34 files). Run with `npm run migrate`.
+`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 36 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -259,6 +262,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 
 | Change | Code | Tests |
 |---|---|---|
+| Change the keyword upload or the demand / companies inputs (v4.2.0) | `selection/demand.ts`, `selection/checks/demand.ts`, `selection/checks/companies.ts`, `selection/api/demand.ts`, settings `demand` / `companies` in `selection/settings.ts`, fixture `tests/fixtures/keywords/` (copy of the real export) | `selection/keyword-demand`, `selection/unit/keyword-demand`, `reporting/keyword-keep-signal` |
 | Change the sibling scan (CR-050: endings, points, contact page) | `selection/sibling-scan.ts`, settings `siblings` in `selection/settings.ts` (`SIBLINGS_DEFAULT`), `selection/api/sibling-scan.ts` | `selection/sibling-scan`, `selection/unit/sibling-scan` |
 | Add a field to POST /candidates/intake | `candidates/intake.ts` (`IntakeBody`, `takeIntake`; store column via migration), `candidates/api/candidates.ts` | `candidates/intake`, `intake-rules`, `screen`, `screen-domains`, `scout-split` |
 | Add a field to a daily list entry | `candidates/daily-list.ts` (`DailyEntry`, `buildDailyList`, `buildWhy`) | `candidates/daily-list`, `daily-list-fields`, `daily-list-rejected`, `daily-list-rebuild` |

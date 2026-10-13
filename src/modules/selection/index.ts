@@ -2,6 +2,8 @@
 export { registerPacks } from './api/packs.js';
 export { registerScreening } from './api/screening.js';
 export { registerSiblingScan } from './api/sibling-scan.js';
+export { registerDemand } from './api/demand.js';
+export { searchesOfDomain } from './demand.js';
 export { registerSelection } from './api/selection.js';
 export { registerTestSets } from './api/test-sets.js';
 export { HistoryManual, phraseKey, priorPhraseOf, TmManual } from './checks/manual.js';

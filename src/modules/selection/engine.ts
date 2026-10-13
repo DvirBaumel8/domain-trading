@@ -13,7 +13,7 @@ import { beats, deriveItem, funnel, latestByCheck, type Derived, type Funnel } f
 import { loadDataLexicon, buildLexicon } from './lexicon.js';
 import { listVersion, currentLists } from './lists.js';
 import {
-  activeSelectionSettings, deepEqual, featureChecksOf, selectionSettingsByLabel, type SelectionValuesT,
+  activeSelectionSettings, APPENDED_FEATURE_CHECKS, deepEqual, featureChecksOf, selectionSettingsByLabel, type SelectionValuesT,
 } from './settings.js';
 import {
   outcome, type Check, type CheckId, type CheckOutcome, type Lane, type ResultRow, type RunItem, type RunView, type ScreeningDeps, type Status,
@@ -111,7 +111,9 @@ const isFeature = (c: CheckId, featureChecks: readonly string[]) => featureCheck
 export function planFor(values: SelectionValuesT, lane: Lane, checks?: CheckId[]): CheckId[] {
   const base = (values.run.gates[lane] ?? values.run.gates.default ?? []) as CheckId[];
   // v3.10.0 (CR-043): the lookalike check is a feature check that every plan ends with while `lookalikes.enabled` (it never gates a name).
-  const list = (values.lookalikes?.enabled ?? true) && !base.includes('lookalikes') ? [...base, 'lookalikes' as CheckId] : base;
+  // v4.2.0: so do `demand` (keyword searches) and `companies` (Companies House) while their `enabled` is on.
+  const on: Record<string, boolean> = { lookalikes: values.lookalikes?.enabled ?? true, demand: values.demand?.enabled ?? true, companies: values.companies?.enabled ?? true };
+  const list = [...base, ...(APPENDED_FEATURE_CHECKS.filter((c) => on[c] && !base.includes(c)) as CheckId[])];
   return checks ? list.filter((c) => checks.includes(c)) : list;
 }
 

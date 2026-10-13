@@ -102,6 +102,8 @@ export interface ScreeningDeps {
   /** Test injection for the outbound site guard: production leaves it out and the guard uses undici's own fetch (never `fetch` above). */
   /** Google Web Risk Lookup API key; undefined → the web_risk check answers MANUAL_REQUIRED (CR-007 G-6). */
   webRiskApiKey?: string;
+  /** Companies House API key (v4.2.0, CR-046 item 2); undefined → the companies check answers UNKNOWN SOURCE_DISABLED. */
+  companiesHouseApiKey?: string;
   siteFetch?: typeof fetch;
   /** All addresses of a host (system resolver), for the outbound site guard (`src/core/safe-fetch.ts`). Default: dns.lookup all:true. */
   lookupHost?: (host: string) => Promise<{ address: string; family: number }[]>;

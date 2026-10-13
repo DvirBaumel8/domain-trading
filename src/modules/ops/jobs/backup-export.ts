@@ -10,7 +10,7 @@ import { toCsv } from '../../listing/index.js';
 export const TABLE_FILES = [
   'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'listing_history', 'quotes', 'price_schedule',
   'pricing_evidence', 'offers', 'export_runs', 'export_uploads', 'registrar_presence', 'registrar_state_checks', 'venue_listings',
-  'portfolio_stats', 'outreach_emails', 'holdout', 'sales_pattern_uploads', 'sales_pattern_rows', 'listing_sync_log', 'sibling_scans',
+  'portfolio_stats', 'outreach_emails', 'holdout', 'sales_pattern_uploads', 'sales_pattern_rows', 'listing_sync_log', 'sibling_scans', 'keyword_demand_uploads', 'keyword_demand',
   'selection_settings', 'selection_lists', 'sibling_method_approvals', 'screening_evidence', 'screening_runs', 'screening_results', 'screening_verdicts', 'screening_packs', 'manual_quotes', 'domain_records',
   'candidate_intake', 'candidate_screenings', 'daily_candidate_lists',
   'tranches', 'tranche_members', 'test_sets', 'test_set_rows',

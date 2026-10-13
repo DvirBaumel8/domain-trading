@@ -59,6 +59,8 @@ export const SUMMARIES: Record<string, string> = {
   'POST /selection/settings/{label}/activate': 'Activate a settings draft (needs Dvir\'s approval_ref)',
   'GET /selection/lists/{name}': 'A frozen selection list',
   'POST /selection/lists/{name}': 'Freeze a selection list version',
+  'POST /demand/keywords': 'Upload the monthly Keyword Planner export (base64 CSV) as keyword demand',
+  'GET /demand/keywords': 'The latest stored demand of a keyword',
   'POST /selection/sibling-scan': 'Scan the same words on other endings (CR-050), store the result',
   'GET /selection/sibling-scan/{domain}': 'The newest stored sibling scan of a name',
   'GET /selection/sibling-methods/{method}': 'A sibling method and its approval',

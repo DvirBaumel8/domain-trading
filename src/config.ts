@@ -22,6 +22,7 @@ const EnvSchema = z.object({
   DNS_NS_SERVER: z.string().default('192.5.6.30'),
   JOB_TRIGGER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\S{32,}$/, 'JOB_TRIGGER_TOKEN must be at least 32 non-space characters (openssl rand -hex 32)').optional()),
   GOOGLE_WEB_RISK_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  COMPANIES_HOUSE_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   GEMINI_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   BUFFER_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   SPACESHIP_SELLERHUB_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
@@ -53,6 +54,7 @@ export interface Config {
   geminiApiKey: string | undefined;
   /** Google Web Risk Lookup API key (header `x-goog-api-key`, never in a URL). undefined → the web_risk check stays MANUAL_REQUIRED. */
   webRiskApiKey: string | undefined;
+  companiesHouseApiKey: string | undefined;
   /** Buffer API key for X posting (founder rule 10: the company's own account only). undefined -> POST /posts answers 503 POSTING_NOT_CONFIGURED. */
   bufferApiKey: string | undefined;
   /** Optional Buffer channel id; else the single X channel of the account is used. */
@@ -70,7 +72,7 @@ export interface Config {
   secretValues: string[];
 }
 
-const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'GEMINI_API_KEY', 'BUFFER_API_KEY', 'SPACESHIP_SELLERHUB_API_KEY', 'SPACESHIP_SELLERHUB_API_SECRET', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
+const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'COMPANIES_HOUSE_API_KEY', 'GEMINI_API_KEY', 'BUFFER_API_KEY', 'SPACESHIP_SELLERHUB_API_KEY', 'SPACESHIP_SELLERHUB_API_SECRET', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
 
 function readVersion(): string {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -149,6 +151,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     sellerhub: { apiKey: e.SPACESHIP_SELLERHUB_API_KEY, apiSecret: e.SPACESHIP_SELLERHUB_API_SECRET, baseUrl: e.SPACESHIP_SELLERHUB_BASE_URL.replace(/\/+$/, '') },
     publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
     webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,
+    companiesHouseApiKey: e.COMPANIES_HOUSE_API_KEY ? e.COMPANIES_HOUSE_API_KEY : undefined,
     backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },
     version: readVersion(),
     env: Object.freeze(strings),

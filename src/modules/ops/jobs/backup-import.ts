@@ -37,6 +37,8 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'sales_pattern_rows', file: 'tables/sales_pattern_rows.json' },
   { table: 'listing_sync_log', file: 'tables/listing_sync_log.json' },
   { table: 'sibling_scans', file: 'tables/sibling_scans.json' },
+  { table: 'keyword_demand_uploads', file: 'tables/keyword_demand_uploads.json' },
+  { table: 'keyword_demand', file: 'tables/keyword_demand.json' },
   { table: 'selection_settings', file: 'tables/selection_settings.json' },
   { table: 'selection_lists', file: 'tables/selection_lists.json' },
   { table: 'sibling_method_approvals', file: 'tables/sibling_method_approvals.json' },

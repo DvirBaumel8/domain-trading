@@ -55,6 +55,8 @@ services:
         sync: false
       - key: GOOGLE_WEB_RISK_API_KEY # optional: Web Risk Lookup API key (free tier, 10,000 lookups a month cap in code); unset keeps web_risk manual
         sync: false
+      - key: COMPANIES_HOUSE_API_KEY # optional: UK Companies House API key (free; HTTP Basic, key as the user name); unset makes the companies check UNKNOWN SOURCE_DISABLED
+        sync: false
       - key: GEMINI_API_KEY      # optional: the one outside review (Gemini): key from a new AI Studio project with no billing (free tier); unset skips the daily outsideReview step
         sync: false
       - key: BUFFER_API_KEY      # optional: X posting through Buffer (the company's own account only); unset answers 503 POSTING_NOT_CONFIGURED

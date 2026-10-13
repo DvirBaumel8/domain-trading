@@ -38,8 +38,8 @@ const OK = ['PASS', 'PASS_WITH_NOTE'];
 
 /** The checks that decide a pack: the plan minus pack.exclude_checks, plus pack.require_checks, tm_eu only for eu_tm.required_lanes. */
 export function requiredChecks(lane: Lane, plan: CheckId[], s: SelectionValuesT): CheckId[] {
-  // `lookalikes` (v3.10.0, CR-043) only informs: it never decides a pack.
-  const req = plan.filter((c) => c !== 'lookalikes' && !s.pack.exclude_checks.includes(c));
+  // `lookalikes` (v3.10.0, CR-043), `demand` and `companies` (v4.2.0) only inform: they never decide a pack.
+  const req = plan.filter((c) => c !== 'lookalikes' && c !== 'demand' && c !== 'companies' && !s.pack.exclude_checks.includes(c));
   for (const c of s.pack.require_checks) if (!req.includes(c)) req.push(c);
   const eu = s.eu_tm.required_lanes.includes(lane);
   if (eu && !req.includes('tm_eu')) req.push('tm_eu');

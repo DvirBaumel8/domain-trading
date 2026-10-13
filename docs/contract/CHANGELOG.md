@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 4.2.0 (2026-10-13): keyword demand upload, Companies House matches
+MINOR (additive; CR-044 item 3 follow-up, CR-046 item 2). Release note: `docs/releases/v4.2.0.md`.
+- **New routes:** `POST /demand/keywords` (WRITE; body `{file_base64, location?, month?}`: the monthly Google Keyword Planner export, read by header name) and `GET /demand/keywords?keyword=` (READ; the latest stored values of a keyword). Codes `KEYWORD_CSV_INVALID` (422, `details.missing_headers`) and `KEYWORD_NOT_FOUND` (404).
+- **New screening checks (feature checks, FLAG-level inputs, never a reject, no verdict changes):** `demand` (`fields.demand {keyword, avg_monthly_searches, competition_index, as_of}` or `{status: "unmeasured"}`; UNKNOWN `KEYWORD_NOT_IN_UPLOAD` when unmeasured) and `companies` (`fields.companies {uk_matches_n, items [{title, company_number, company_status}]}`, max 5, active first; UNKNOWN `SOURCE_DISABLED` without the key). Both end every plan while their `enabled` setting is on and never decide a pack.
+- **`/report`:** the keep-signal of `RENEWAL_DROP_SUGGESTED` is now live: a name whose latest keyword upload shows at least `demand.keep_min_searches` average monthly searches is kept; `details.signals` gains `keyword_searches`.
+- **Selection settings:** new `demand` (`enabled` true, `keep_min_searches` 10) and `companies` (`enabled` true, `max_per_minute` 60, `timeout_ms` 8000); a stored version without them reads the defaults, so no settings version changes.
+- **Env (host):** `COMPANIES_HOUSE_API_KEY` (optional). **New append-only tables** `keyword_demand_uploads`, `keyword_demand` (migration `1763300000000_v4-2-0.sql`).
+
 ## 4.1.0 (2026-10-13): CR-050 sibling scan
 MINOR (additive; CR-050 part 1, part 2 is not built). Release note: `docs/releases/v4.1.0.md`.
 - **New routes:** `POST /selection/sibling-scan` (WRITE, 1 to 20 `.com` names; other endings 422 `TLD_NOT_SUPPORTED`) and `GET /selection/sibling-scan/{domain}` (READ, the newest stored scan). Per sibling: `domain`, `kind` (ending / hyphen / prefix), `registered` (RDAP; `null` with `reason_code`), `live_business`, `site_state`, `url`, `http_status`, `fetched_at`, `title`, `company`, `contact_url`; per scan a `lead_points` block `{points, formula, live_n, parked_n}`. No email address and no person name is stored: only the company name a page shows and the URL of its contact page.

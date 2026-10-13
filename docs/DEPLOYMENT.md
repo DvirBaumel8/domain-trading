@@ -78,6 +78,7 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `GITHUB_BACKUP_TOKEN` | the PAT from step 2 (optional: the export is not configured by decision, 7 Oct 2026) |
    | `GITHUB_BACKUP_REPO` | `DvirBaumel8/domain-trading-data` (optional, as above) |
    | `JOB_TRIGGER_TOKEN` | the value from step 3 |
+   | `COMPANIES_HOUSE_API_KEY` | optional: the free UK Companies House API key (Dvir registers it); unset makes the `companies` screening input UNKNOWN `SOURCE_DISABLED` |
    | `GOOGLE_WEB_RISK_API_KEY` | optional: a key restricted to the Web Risk API, from a Google project **with** billing (Lookup API only; DOM caps itself at 10,000 a month) |
    | `GEMINI_API_KEY` | optional: the outside review; a Gemini key from a **new Google AI Studio project with no billing** (free tier) |
    | `BUFFER_API_KEY` | optional: posting to X; from publish.buffer.com/settings/api |
