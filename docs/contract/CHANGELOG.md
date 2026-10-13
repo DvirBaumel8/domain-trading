@@ -2,6 +2,17 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.0.0 (2026-10-14): G-86: the service no longer tracks a money budget (POC cap, tranche spend cap, small-buy weekly cap and the /report budget block removed); Gavriel owns the budget
+Release note: `docs/releases/v5.0.0.md`.
+MAJOR (removed codes and fields). Dvir, 14 Oct 2026: "You shouldn't be aware of budget at all. That topic should be managed by grok bot." The service no longer knows a money budget. Gavriel owns it.
+- **Removed codes:** `POC_CAP_EXCEEDED` (409, `/buy` and the admin `record-renewal`), `TRANCHE_SPEND_CAP` (409, `/buy` and `POST /tranches/{id}/members`), `SMALL_BUY_WEEKLY_CAP` (409, `/buy`). Warning `POC_CAP_EXCEEDED_BY_IMPORT` (admin `import-domain`) is removed too; `DOMAIN_CAP_EXCEEDED_BY_IMPORT` stays.
+- **`POST /buy` (dry run and 201):** `poc_spent`, `poc_spent_cents`, `poc_remaining_after`, `poc_remaining_after_cents` (dry run) and `poc_spent_after`, `poc_spent_after_cents`, `poc_remaining`, `poc_remaining_cents` (201) are gone; so is the dry-run `small_buy` block. `would_be_blocked` loses `TRANCHE_SPEND_CAP` and `SMALL_BUY_WEEKLY_CAP`. `dry_run: "strict"` no longer returns `TRANCHE_SPEND_CAP`. The 201 `TOTALS_UNAVAILABLE` warning now means the domain count (`domains_owned`) could not be computed.
+- **Tranches:** `POST /tranches` no longer takes `spend_cap`; `POST /tranches/{id}/members` no longer takes `est_cost`; the tranche view loses `spend_cap_cents`, `spend_cap`, `committed_cents`, `committed` and member `est_cost_cents` (a body that still sends the removed inputs is 422 `VALIDATION_ERROR`, strict schema). Geo cap, main-lane quota, size and `NO_TRANCHE` are unchanged.
+- **`GET /selection/buy-hold`:** `small_buy` is now `{max_first_year_cents, max_first_year}` (the weekly figures are gone); step 7's evidence loses `cap_cents` and `cap`.
+- **`GET /report`:** the `budget` block is renamed `spend` and keeps `spent` (pair), `committed_forward` and `domains` (count, max 40); `poc_cap` and `remaining` are gone. The markdown digest says `## Spend`.
+- **Unchanged:** the 40-domain cap (`DOMAIN_CAP_REACHED`), per-call `max_price` / `max_two_year_price`, the approval rules, the ledger and `/ledger`, sales, profit and ROI in `/report`, founder rule 6 (never top up a registrar balance).
+- **Database (migration `1763400000000_v5-0-0.sql`):** drops `settings.poc_cap_cents`, `tranches.spend_cap_cents` and `tranche_members.est_cost_cents`.
+
 ## 4.2.2 (2026-10-14): CR-052 follow-up: default hosting pages are not live businesses; no junk form-split hyphens
 PATCH (fixes back to the contract; one additive `site_state` value). Release note: `docs/releases/v4.2.2.md`.
 - **Sibling scan (S-3):** a registered sibling whose home page title is a hosting or web-server default or placeholder page is `site_state: "default_page"`, `live_business: false`, `company: null`, and counts like a parked one in `lead_points`.

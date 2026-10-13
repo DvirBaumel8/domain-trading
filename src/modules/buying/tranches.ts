@@ -5,7 +5,6 @@ import type { Kysely, Selectable } from 'kysely';
 import type { Database, TrancheMembersTable, TranchesTable } from '../../db/types.js';
 import { normalizeDomain } from '../../domain-name.js';
 import { AppError } from '../../http/errors.js';
-import { formatUsd } from '../../core/money.js';
 import { latestByCheck } from '../selection/index.js';
 import { assemble, effectiveHold, fullPlanRunOrThrow, toResultRow } from '../selection/index.js';
 import { activeSelectionSettings, selectionSettingsByLabel } from '../selection/index.js';
@@ -44,15 +43,11 @@ export class TrancheService {
   async view(db: Kysely<Database>, t: Trn): Promise<Record<string, unknown>> {
     const ms = await db.selectFrom('tranche_members').selectAll().where('tranche_id', '=', t.id).where('removed_at', 'is', null).orderBy('id').execute();
     const c = counts(ms);
-    const committed = ms.reduce((s, m) => s + (m.est_cost_cents ?? 0), 0);
     return {
       id: t.id, name: t.name, status: t.status, opened_at: iso(t.opened_at), opened_by: t.opened_by, closed_at: iso(t.closed_at), closed_by: t.closed_by,
       opened_under: t.settings_label,
-      spend_cap_cents: t.spend_cap_cents, spend_cap: t.spend_cap_cents === null ? null : formatUsd(t.spend_cap_cents),
-      committed_cents: committed, committed: formatUsd(committed),
       members: ms.map((m) => ({
         domain: m.domain, lane: m.lane, is_geo: m.is_geo, main_lane: m.main_lane, run_id: m.run_id, added_at: iso(m.added_at),
-        est_cost_cents: m.est_cost_cents,
       })),
       counts: c, close_report: t.close_report,
     };
@@ -67,12 +62,12 @@ export class TrancheService {
     return this.view(this.db, await this.load(this.db, id));
   }
 
-  async open(name: string, spendCapCents: number | null, a: Actor): Promise<Record<string, unknown>> {
+  async open(name: string, a: Actor): Promise<Record<string, unknown>> {
     const sel = await activeSelectionSettings(this.db);
     const id = `trn_${randomBytes(6).toString('hex')}`;
     try {
       await this.db.insertInto('tranches').values({
-        id, name, status: 'open', opened_at: a.now, opened_by: a.by, settings_label: sel.label, spend_cap_cents: spendCapCents, audit_id: a.auditId,
+        id, name, status: 'open', opened_at: a.now, opened_by: a.by, settings_label: sel.label, audit_id: a.auditId,
       }).execute();
     } catch (e) {
       const err = e as { code?: string; constraint?: string };
@@ -129,7 +124,7 @@ export class TrancheService {
     return { lane, mainLane };
   }
 
-  async addMember(id: string, domainIn: string, runId: string, estCostCents: number | null, a: Actor): Promise<{ duplicate: boolean; tranche: Record<string, unknown> }> {
+  async addMember(id: string, domainIn: string, runId: string, a: Actor): Promise<{ duplicate: boolean; tranche: Record<string, unknown> }> {
     let domain: string;
     try { domain = normalizeDomain(domainIn); } catch { throw new AppError(422, 'DOMAIN_INVALID', `"${domainIn}" is not a valid domain`); }
     const t0 = await this.load(this.db, id);
@@ -148,16 +143,8 @@ export class TrancheService {
       const isGeo = st.lane === 'S2';
       const geo = ms.filter((m) => m.is_geo).length;
       if (isGeo && geo >= geo_max) throw new AppError(409, 'GEO_CAP', `The tranche already has ${geo} geo name(s) (geo_max ${geo_max}); add geo names in Ratio order, the lowest-ranked is the one refused`, { geo_max, geo_members: geo });
-      if (t.spend_cap_cents !== null) {
-        if (estCostCents === null) throw new AppError(422, 'VALIDATION_ERROR', 'est_cost is required: this tranche has a spend cap');
-        const committed = ms.reduce((s, m) => s + (m.est_cost_cents ?? 0), 0);
-        if (committed + estCostCents > t.spend_cap_cents) {
-          throw new AppError(409, 'TRANCHE_SPEND_CAP', `Adding ${formatUsd(estCostCents)} would pass the tranche spend cap of ${formatUsd(t.spend_cap_cents)}`,
-            { spend_cap_cents: t.spend_cap_cents, committed_cents: committed, est_cost_cents: estCostCents });
-        }
-      }
       await trx.insertInto('tranche_members').values({
-        tranche_id: id, domain, lane: st.lane, is_geo: isGeo, main_lane: st.mainLane, est_cost_cents: estCostCents, run_id: runId, added_at: a.now, added_by: a.by,
+        tranche_id: id, domain, lane: st.lane, is_geo: isGeo, main_lane: st.mainLane, run_id: runId, added_at: a.now, added_by: a.by,
       }).execute();
       return false;
     });

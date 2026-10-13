@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 4.2.2** (14 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 5.0.0** (14 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -49,7 +49,7 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 
 ## Errors
 ```json
-{ "error": { "code": "POC_CAP_EXCEEDED", "message": "…", "details": { } } }
+{ "error": { "code": "PRICE_ABOVE_MAX", "message": "…", "details": { } } }
 ```
 - **Branch on `code`, never on `message`.** Codes are stable within a MAJOR version; messages may change at any time. `details` is always an object (may be empty).
 - Cross-cutting codes: `UNAUTHORIZED` 401 · `SCOPE_FORBIDDEN` 403 · `RATE_LIMITED` 429 · `IDEMPOTENCY_KEY_REQUIRED` 400 · `IDEMPOTENCY_KEY_MISMATCH` / `IDEMPOTENCY_KEY_IN_USE` 409 · `VALIDATION_ERROR` **422** for a request body (strict schemas: an unknown field is a 422, except inside `pricing_evidence`, whose problems are `COMPS_INVALID`; with `details.issues[] {path, message}`), **400** for most query-string errors (exceptions are listed per route) · `INVALID_BODY` 400/413/415 (unparseable JSON, body over 64 KB, wrong content type, `text/plain` included) · `INVALID_REQUEST` 4xx (malformed URL and other framework rejections that reach the service; some malformed paths never do: see **Platform responses** below) · `DOMAIN_INVALID` 422 (not a second-level name like `name.com`) · `TLD_NOT_SUPPORTED` 422 (only `.com` in v1) · `NOT_FOUND` 404 (unknown route) · `INTERNAL` 500 · `AUDIT_WRITE_FAILED` 500.
@@ -67,7 +67,7 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 - **`approval_ref`** = `{ "text": "<Dvir's verbatim words>", "approved_at": "<ISO 8601 with offset>" }`. Valid when `text` is non-empty, `approved_at` has an offset, is not more than 60 s in the future and not older than 72 h, and (except on `/export/{venue}/uploaded`) the text **names the domain** on label boundaries (`ba.com`, `x.com.au` and `www.x.com` don't name `x.com`). An invalid one → 422 `APPROVAL_INVALID` or `APPROVAL_EXPIRED`. It is **required only for buy and sell decisions**: `POST /buy`, an offer `countered`/`accepted` outcome that isn't pre-approved, a pricing exception and an override on `/list` or `/buy`. It is also required (the text must name the settings label, or the list name or target sld, instead of a domain) to **activate a selection settings version** (`POST /selection/settings/{label}/activate`) and to **freeze a census list** (`POST /selection/lists/{name}` for `bt1_<sld>` and `s6_regime_audit`). Elsewhere it is validated and stored only where a route says so (`POST /offers` with `pricing_hold: true`; an outcome that needs it); otherwise it is ignored, and only the audit row keeps the text.
 
 ## Guarantees
-1. **Caps are server-side and can't be changed through the API:** total spend ≤ **$1,500** (POC cap), at most **50** domains (owned + listed + delisted + pending purchases), and the per-call `max_price` / `max_two_year_price` on `/buy`. Only DOM's admin command or a migration changes the caps, and only on Dvir's word.
+1. **Caps are server-side and can't be changed through the API:** at most **40** domains (owned + listed + delisted + pending purchases) and the per-call `max_price` / `max_two_year_price` on `/buy`. Only a migration changes the domain cap, and only on Dvir's word. **The service tracks no money budget (5.0.0, G-86):** Gavriel owns the budget and checks spend (the ledger, `/report` `spend`) before he asks Dvir to approve a buy.
 2. **No purchase without Dvir's approval:** `/buy` refuses without a valid `approval_ref` naming the domain. The server can't prove that a human wrote the text; that trust boundary is accepted. A real purchase happens only when Dvir has approved that domain in chat.
 3. **`dry_run` for all testing.** `POST /buy` and `POST /list/{domain}` accept `"dry_run": true`: every check runs (including the live registrar quote and the registrar's own dry run on `/buy`) and the response shows what would happen, but nothing is bought, changed or booked. Only the audit row (and, on `/buy`, the stored quotes) is written. One exception: if the registrar answers a `/buy` dry run ambiguously (it may have registered), the service records an `unknown` purchase so the caps count it, and answers 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`. Gavriel tests with `dry_run: true` only.
 4. **No top-up:** the service never calls a registrar top-up endpoint. A registrar with auto top-up on is refused (`REGISTRAR_AUTO_TOPUP_ON`). The prepaid credit is a second spending limit.

@@ -59,14 +59,14 @@ describe('GET /report core: money', () => {
     await seedDailyRun(db, NOW); // a recent daily run, so JOB_OVERDUE (v2.1.0) is not raised
     const t = await boot();
     const r = await t.report();
-    expect(r.budget).toMatchObject({ spent_cents: 2107, spent: '$21.07', remaining_cents: 147893, remaining: '$1,478.93', poc_cap_cents: 150000, poc_cap: '$1,500.00' });
-    expect(r.budget.domains).toEqual({ count: 1, max: 40 });
+    expect(r.spend).toMatchObject({ spent_cents: 2107, spent: '$21.07' });
+    expect(r.spend.domains).toEqual({ count: 1, max: 40 });
     expect(r.sales).toMatchObject({ count: 1, net_cents: 169575, net: '$1,695.75', gross_cents: 199500, gross: '$1,995.00', commission_cents: 29925, fees_cents: 0, fees: '$0.00' });
     expect(r).toMatchObject({ profit_cents: 167468, profit: '$1,674.68', roi: 79.48, roi_pct: 7948 });
     // beta-two.com has no renewal price (the fixture's committed_forward gap), which Task 2 reports
     // v4.0.0: alpha-one.com is sold and still to be removed at the hand venues (DELIST_NEEDED)
     expect(r.warnings.map((w: { code: string; domain: string }) => [w.code, w.domain])).toEqual([['DELIST_NEEDED', 'alpha-one.com'], ['RENEWAL_PRICE_UNKNOWN', 'beta-two.com']]);
-    expect(JSON.stringify(r.budget)).not.toContain('"cents"'); // flat pairs only
+    expect(JSON.stringify(r.spend)).not.toContain('"cents"'); // flat pairs only
   });
 
   it('roi is null when there are no costs', async () => {
@@ -105,8 +105,7 @@ describe('GET /report core: money', () => {
     expect(before.sales).toMatchObject({ count: 2, gross_cents: gross, commission_cents: commission, fees_cents: saleFees, net_cents: gross - commission - saleFees });
     expect(before.profit_cents).toBe(gross - commission - saleFees - costs);
     expect(before.roi_pct).toBe(Math.round(((gross - commission - saleFees - costs) * 100) / costs));
-    expect(before.budget.spent_cents).toBe(spent); // the cap figure: registration + renewal + fee rows
-    expect(before.budget.remaining_cents).toBe(150000 - spent);
+    expect(before.spend.spent_cents).toBe(spent); // registration + renewal + fee rows
     expect(before.per_domain.find((d: { domain: string }) => d.domain === 'beta-two.com').cost_cents).toBe(
       await sum(`select -sum(amount_cents) v from ledger_entries where type in ('registration','renewal') and domain_id = ${b}`));
   });
@@ -120,12 +119,12 @@ describe('GET /report core: committed_forward, upcoming', () => {
     await db.updateTable('domains').set({ status: 'sold' }).where('id', '=', s).execute();
     const t = await boot();
     let r = await t.report();
-    expect(r.budget.committed_forward).toEqual({ total_cents: 1250, total: '$12.50', complete: true, missing: [] });
+    expect(r.spend.committed_forward).toEqual({ total_cents: 1250, total: '$12.50', complete: true, missing: [] });
     await insertOwnedDomain(db, { domain: 'unknown-price.com', renewals_used: 0, renewal_price_cents: null });
     r = await t.report();
-    expect(r.budget.committed_forward.complete).toBe(false);
-    expect(r.budget.committed_forward.missing).toEqual(['unknown-price.com']);
-    expect(r.budget.committed_forward.total_cents).toBe(1250);
+    expect(r.spend.committed_forward.complete).toBe(false);
+    expect(r.spend.committed_forward.missing).toEqual(['unknown-price.com']);
+    expect(r.spend.committed_forward.total_cents).toBe(1250);
   });
 
   it('R-4 / R-5 / R-6: first renewal stage 60, final expiry stage 30 with no renew option, fast transfer buy_date+60', async () => {
@@ -254,7 +253,7 @@ describe('GET /report core: per-domain, timezone, offers, auth', () => {
       cost_cents: 1373, cost: '$13.73', bin_cents: 199500, bin: '$1,995.00', min_offer_cents: 10000, min_offer: '$100.00', pricing_settings_version: 2,
       walkaway_cents: 96000, walkaway: '$960 (private)',
     });
-    expect(r.budget.domains.count).toBe(3); // activeDomainCount includes pending_purchase
+    expect(r.spend.domains.count).toBe(3); // activeDomainCount includes pending_purchase
   });
 
   it('days_held stops at sold_at for a sold domain and at drop_date for a dropped one', async () => {

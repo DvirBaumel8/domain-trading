@@ -90,51 +90,26 @@ describe('v2.0.0 /buy: tranche', () => {
     expect(trancheId).toMatch(/^trn_/);
   });
 
-  it('TRANCHE_SPEND_CAP: this buy on top of the tranche\'s purchases passes the cap; nothing is charged', async () => {
-    const { pb, auth } = await setup();
-    await readyToBuy(DOMAIN, { spendCapCents: 1000 });
-    const res = await real(auth);
-    expect(res.statusCode).toBe(409);
-    expect(res.json().error).toMatchObject({ code: 'TRANCHE_SPEND_CAP', details: { spend_cap_cents: 1000, spent_cents: 0, cost_cents: 1108 } });
-    expect(pb.charges).toBe(0);
-  });
-
   it('happy path: complete pack + open tranche -> 201 and the purchase records the tranche id', async () => {
     const { pb, auth } = await setup();
-    const { trancheId } = await readyToBuy(DOMAIN, { spendCapCents: 5000 });
+    const { trancheId } = await readyToBuy(DOMAIN);
     const res = await real(auth);
     expect(res.statusCode).toBe(201);
     expect(pb.realRegisterCalls).toBe(1);
     expect(await db.selectFrom('purchases').select(['state', 'tranche_id']).execute()).toEqual([{ state: 'succeeded', tranche_id: trancheId }]);
   });
 
-  it('two concurrent buys against a spend cap that fits one: exactly one passes', async () => {
-    const { pb, auth } = await setup();
-    const { trancheId } = await readyToBuy(DOMAIN, { spendCapCents: 1500 });
-    await readyToBuy(OTHER); // joins the same open tranche
-    const [a, b] = await Promise.all([real(auth, DOMAIN), real(auth, OTHER)]);
-    expect([a.statusCode, b.statusCode].sort()).toEqual([201, 409]);
-    const loser = a.statusCode === 409 ? a : b;
-    expect(loser.json().error.code).toBe('TRANCHE_SPEND_CAP');
-    expect(pb.realRegisterCalls).toBe(1);
-    const rows = await db.selectFrom('purchases').select(['state', 'tranche_id']).where('state', '!=', 'failed').execute();
-    expect(rows).toEqual([{ state: 'succeeded', tranche_id: trancheId }]);
-  });
 });
 
 describe('v2.0.0 /buy: dry run', () => {
   it('would_be_blocked is the first blocking code, in order, or absent', async () => {
     const { auth } = await setup();
     expect((await dry(auth)).would_be_blocked).toBe('SCREENING_PACK_REQUIRED'); // no pack at all
-    await readyToBuy(DOMAIN, { spendCapCents: 1000 });
+    await readyToBuy(DOMAIN);
     await db.updateTable('tranche_members').set({ removed_at: new Date(T0), removed_by: 'test' }).execute();
     expect((await dry(auth)).would_be_blocked).toBe('NO_TRANCHE');
     const gone = await db.selectFrom('tranche_members').selectAll().executeTakeFirstOrThrow();
-    await db.insertInto('tranche_members').values({ tranche_id: gone.tranche_id, domain: gone.domain, lane: gone.lane, is_geo: false, main_lane: true, est_cost_cents: null, run_id: gone.run_id, added_by: 'test' }).execute();
-    const capped = await dry(auth);
-    expect(capped.would_be_blocked).toBe('TRANCHE_SPEND_CAP');
-    expect(capped.dry_run).toBe(true);
-    await db.updateTable('tranches').set({ spend_cap_cents: 5000 }).execute();
+    await db.insertInto('tranche_members').values({ tranche_id: gone.tranche_id, domain: gone.domain, lane: gone.lane, is_geo: false, main_lane: true, run_id: gone.run_id, added_by: 'test' }).execute();
     expect((await dry(auth)).would_be_blocked).toBeNull();
     await laterRun(DOMAIN);
     expect((await dry(auth)).would_be_blocked).toBe('SCREENING_PACK_REQUIRED'); // not from the latest run
@@ -144,18 +119,15 @@ describe('v2.0.0 /buy: dry run', () => {
 });
 
 describe('v2.0.0 /buy: money-path re-checks', () => {
-  it('an ambiguous registrar dry run counts against the tranche spend cap (the unknown purchase carries the tranche id)', async () => {
+  it('an ambiguous registrar dry run records an unknown purchase that carries the tranche id', async () => {
     const pb = new FakeAdapter('porkbun', { dryRun: (n) => (n === 0 ? new RegistrarError('porkbun', 'REGISTRAR_TIMEOUT', 't', { ambiguous: true }) : undefined) });
     app = await makeApp({ adapters: [pb], rdap: rdapFree, now: () => T0, sleep: async () => {} });
     const auth = (await issueToken('write')).auth;
-    const { trancheId } = await readyToBuy(DOMAIN, { spendCapCents: 1500 });
+    const { trancheId } = await readyToBuy(DOMAIN);
     await readyToBuy(OTHER);
     const a = await real(auth, DOMAIN);
     expect(a.json().error.code).toBe('REGISTRAR_DRY_RUN_AMBIGUOUS');
     expect(await db.selectFrom('purchases').select(['state', 'tranche_id']).execute()).toEqual([{ state: 'unknown', tranche_id: trancheId }]);
-    const b = await real(auth, OTHER);
-    expect(b.statusCode).toBe(409);
-    expect(b.json().error).toMatchObject({ code: 'TRANCHE_SPEND_CAP', details: { spent_cents: 1108 } });
   });
 
   it('a screening run of the name started after the first checks is caught under the lock: NOT_FROM_LATEST_RUN, no register call', async () => {

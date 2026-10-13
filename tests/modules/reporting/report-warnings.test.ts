@@ -262,9 +262,8 @@ describe('GET /report?format=md', () => {
     expect(r.statusCode).toBe(200);
     expect(r.headers['content-type']).toBe('text/markdown; charset=utf-8');
     const md = r.body;
-    for (const h of ['## Budget', '## Sales & ROI', '## Domains', '## Upcoming (90 days)', '## Warnings']) expect(md).toContain(h);
+    for (const h of ['## Spend', '## Sales & ROI', '## Domains', '## Upcoming (90 days)', '## Warnings']) expect(md).toContain(h);
     expect(md).toContain('$1,995');
-    expect(md).toContain('$1,500.00');
     expect(md).not.toMatch(/960|walk/i);
     const lines = md.split('\n');
     let tables = 0;

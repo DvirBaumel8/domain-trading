@@ -1,16 +1,16 @@
-# Reports (contract v4.2.2)
+# Reports (contract v5.0.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
 ## `GET /report`
 READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 400 `VALIDATION_ERROR`.
-- `md` returns `text/markdown`: a compact chat digest (budget, sales and ROI, domains, upcoming, warnings by level). It **never** contains the walk-away. Its layout isn't part of the contract.
+- `md` returns `text/markdown`: a compact chat digest (spend, sales and ROI, domains, upcoming, warnings by level). It **never** contains the walk-away. Its layout isn't part of the contract.
 - `json` returns:
 
 | Field | Content |
 |---|---|
 | `generated_at` | ISO time |
-| `budget` | `poc_cap`, `spent`, `remaining` (pairs). `spent` = −Σ ledger `registration` + `renewal` + `fee` rows (the figure `/buy` checks against the cap). `committed_forward: {total (pair), complete: bool, missing: [domain]}` = one renewal for each live name with `renewals_used = 0`, except a name with `drop_date` = `expiry_date` (drop at first expiry: no renewal is planned, 2.1.0) (`missing` = names without a known renewal price). `domains: {count, max}` (owned + listed + delisted + pending purchases, vs 50) |
+| `spend` | (5.0.0, G-86: was `budget`; the `poc_cap` and `remaining` pairs are gone, the service holds no budget.) `spent` (pair) = −Σ ledger `registration` + `renewal` + `fee` rows (a plain accounting figure; nothing checks it). `committed_forward: {total (pair), complete: bool, missing: [domain]}` = one renewal for each live name with `renewals_used = 0`, except a name with `drop_date` = `expiry_date` (drop at first expiry: no renewal is planned, 2.1.0) (`missing` = names without a known renewal price). `domains: {count, max}` (owned + listed + delisted + pending purchases, vs 40) |
 | `sales` | `count`, `gross`, `commission`, `fees` (sale-side fees: `/sold` fee and adjustment rows and `payout_fee`), `net` (pairs) |
 | `profit` | pair: `net − costs`. Costs = `registration`, `renewal`, `refund` (lowers costs), `tool`, `ai`, and `fee`/`adjustment` rows not written by `/sold` |
 | `roi`, `roi_pct` | `profit / costs`: a number with 2 decimals, and a whole percent; both `null` while costs are 0 |

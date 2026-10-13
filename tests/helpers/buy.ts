@@ -30,7 +30,7 @@ let seedQueue: Promise<void> = Promise.resolve();
  * v2.0.0: seeds what a real /buy now needs for `domain`: buy_hold off in the active settings, a done screening run that lists the name (dated after any run a test made), a complete
  * pack from it (issued 1 h before T0) and an active member of the open tranche (opened here if none is). Idempotent per domain.
  */
-export async function readyToBuy(domain: string, o: { spendCapCents?: number | null; pack?: Partial<{ status: 'complete' | 'incomplete'; issuedAt: Date; settingsActive: boolean }> } = {}): Promise<{ runId: string; packId: string; trancheId: string }> {
+export async function readyToBuy(domain: string, o: { pack?: Partial<{ status: 'complete' | 'incomplete'; issuedAt: Date; settingsActive: boolean }> } = {}): Promise<{ runId: string; packId: string; trancheId: string }> {
   await patchActiveSettings(['buy_hold'], false);
   const n = ++seq;
   const sel = await testDb.selectFrom('selection_settings').select(['id', 'label']).where('activation_seq', 'is not', null).orderBy('activation_seq', 'desc').executeTakeFirstOrThrow();
@@ -50,9 +50,9 @@ export async function readyToBuy(domain: string, o: { spendCapCents?: number | n
   let t = await testDb.selectFrom('tranches').select('id').where('status', '=', 'open').executeTakeFirst();
   if (!t) {
     t = { id: `trn_${String(n).padStart(12, '0')}` };
-    await testDb.insertInto('tranches').values({ id: t.id, name: `t-${n}`, status: 'open', opened_by: 'test', settings_label: sel.label, spend_cap_cents: o.spendCapCents ?? null }).execute();
+    await testDb.insertInto('tranches').values({ id: t.id, name: `t-${n}`, status: 'open', opened_by: 'test', settings_label: sel.label }).execute();
   }
-  await testDb.insertInto('tranche_members').values({ tranche_id: t.id, domain, lane: 'S3', is_geo: false, main_lane: true, est_cost_cents: null, run_id: runId, added_by: 'test' }).execute();
+  await testDb.insertInto('tranche_members').values({ tranche_id: t.id, domain, lane: 'S3', is_geo: false, main_lane: true, run_id: runId, added_by: 'test' }).execute();
   return { runId, packId, trancheId: t.id };
 }
 

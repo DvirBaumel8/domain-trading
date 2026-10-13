@@ -48,7 +48,7 @@ describe('read endpoints: auth', () => {
     expect((await t.get('/health', {})).statusCode).toBe(401);
     const r = await t.get('/health');
     expect(r.statusCode).toBe(200);
-    for (const k of ['domain', 'domains', 'ledger', 'per_domain', 'budget', 'sales']) expect(Object.keys(r.json())).not.toContain(k);
+    for (const k of ['domain', 'domains', 'ledger', 'per_domain', 'spend', 'sales']) expect(Object.keys(r.json())).not.toContain(k);
   });
 });
 

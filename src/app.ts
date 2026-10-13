@@ -179,7 +179,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const listingSync = new ListingSyncJob({ db: deps.db, client: sellerhub, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, log: app.log });
   app.decorate('listingSyncJob', listingSync);
   registerSold(app, new SoldService({ db: deps.db, now: deps.now ?? Date.now, afterSold: async (d) => { await listingSync.delist(d); } }));
-  registerSelection(app, { db: deps.db, now: deps.now ?? Date.now, holdoutCheck: deps.holdoutCheck, smallBuy: (n) => smallBuyView(deps.db, n) });
+  registerSelection(app, { db: deps.db, now: deps.now ?? Date.now, holdoutCheck: deps.holdoutCheck, smallBuy: () => Promise.resolve(smallBuyView()) });
   const screeningDeps: ScreeningDeps = {
     fetch: globalThis.fetch, sleep: deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), checkService,
     rdapLookup, dnsQuery: queryDns,

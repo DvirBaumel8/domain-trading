@@ -14,7 +14,7 @@ Registers a domain at the cheapest qualifying registrar (first year + one renewa
 | 5 | Domain cap: `owned` + `listed` + `delisted` + `pending_purchase` < `max_domains` (40 since 4.0.0) | 409 `DOMAIN_CAP_REACHED` |
 | 6 | Live re-check (the `/check` logic, no cache, doesn't write the cache): `availability = available` and an eligible winner (or the pinned registrar, no fallback) | 409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE` |
 | 7 | Price caps: keep eligible quotes with `first_year ≤ max_price` (and `two_year ≤ max_two_year_price`), then the lowest `two_year` | 409 `PRICE_ABOVE_MAX` (cheapest quote in `details`) |
-| 8 | POC cap: `spent + pending + first_year ≤ poc_cap_cents` ($1,500). `spent` = −Σ `registration` + `renewal` + `fee`; `pending` = Σ `expected_cents` of non-dry-run purchases in `created`/`register_sent`/`unknown`. One-statement read; re-checked **under a global lock** (`SELECT … FOR UPDATE` on `settings`) in the reservation | 409 `POC_CAP_EXCEEDED` (spent, pending, remaining, cost) |
+| 8 | *(removed in 5.0.0, G-86: the service tracks no money budget; Gavriel owns it and checks spend before Dvir approves.)* | none |
 | 9 | Registrar account: state readable, auto top-up off, balance ≥ cost and spend-limit remaining ≥ cost where known. **No top-up is ever attempted** | 409 `REGISTRAR_STATE_UNKNOWN` / `REGISTRAR_AUTO_TOPUP_ON` / `REGISTRAR_FUNDS` (shortfall, or `reason: MONTHLY_SPEND_LIMIT`) |
 | 10 | Registrar dry run with the exact `cost` (Porkbun `dryRun:true`): must answer as a dry run that would succeed. `COST_MISMATCH` → re-quote once, re-check every cap (incl. 9), retry. An ambiguous answer → record an `unknown` purchase + `pending_purchase` row (so the caps count it) | 409 `REGISTRAR_DRY_RUN_FAILED` (`registrar_code`) / `REGISTRAR_DRY_RUN_AMBIGUOUS` |
 
@@ -53,8 +53,8 @@ Comparison = first year + exactly one renewal. At purchase `renewals_used = 0`, 
 | B-8 | `max_price` 10.00 vs best 11.08 | 409 `PRICE_ABOVE_MAX`, details $11.08 |
 | B-9 | `max_two_year_price` below the best 2-yr | 409 |
 | B-10 | Caps before the min: A $11.60 / $20.00 2-yr, B $11.08 / $22.16, `max_price` 11.50 | B chosen |
-| B-11 | Spent $1,495.00, quote $11.08 | 409 `POC_CAP_EXCEEDED` (remaining $5.00) |
-| B-12 | Spent $1,480, two parallel $11.08 buys of different domains | Exactly one succeeds |
+| B-11 | G-86: spent $1,495.00, quote $11.08 | 201 (no money cap in the service) |
+| B-12 | Two parallel $11.08 buys of different domains | Both succeed (G-86) |
 | B-13 | 50 owned | 409 `DOMAIN_CAP_REACHED` |
 | B-14 | RDAP 200 / adapter not available | 409 `NOT_AVAILABLE`, 0 register calls |
 | B-15 | Pinned registrar ineligible | 409 `PINNED_REGISTRAR_INELIGIBLE`, no fallback |

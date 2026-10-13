@@ -32,22 +32,18 @@ describe('POST /buy dry_run "strict"', () => {
     expect(p.json().would_be_blocked).toBe('SCREENING_PACK_REQUIRED');
   });
 
-  it('BUY_HOLD comes first, then the pack, then the tranche, then the spend cap (contract order)', async () => {
+  it('BUY_HOLD comes first, then the pack, then the tranche (contract order)', async () => {
     const { auth } = await setup();
-    const { runId } = await readyToBuy(DOMAIN, { spendCapCents: 1000, pack: { status: 'incomplete' } });
+    const { runId } = await readyToBuy(DOMAIN, { pack: { status: 'incomplete' } });
     await db.updateTable('screening_runs').set({ buy_hold: true }).where('id', '=', runId).execute();
     expect((await strict(auth)).json().error.code).toBe('BUY_HOLD');
     await db.updateTable('screening_runs').set({ buy_hold: false }).where('id', '=', runId).execute();
     expect((await strict(auth)).json().error).toMatchObject({ code: 'SCREENING_PACK_REQUIRED', details: { reason: 'INCOMPLETE' } });
   });
 
-  it('NO_TRANCHE, then TRANCHE_SPEND_CAP (returned as the error, with its details)', async () => {
+  it('NO_TRANCHE (returned as the error)', async () => {
     const { pb, auth } = await setup();
-    await readyToBuy(DOMAIN, { spendCapCents: 1000 });
-    const cap = await strict(auth);
-    expect(cap.statusCode).toBe(409);
-    expect(cap.json().error).toMatchObject({ code: 'TRANCHE_SPEND_CAP', details: { spend_cap_cents: 1000, spent_cents: 0, cost_cents: 1108 } });
-    expect(cap.json().error.details.would_be_blocked).toBeUndefined();
+    await readyToBuy(DOMAIN);
     await db.updateTable('tranche_members').set({ removed_at: new Date(T0), removed_by: 'test' }).where('domain', '=', DOMAIN).execute();
     expect((await strict(auth)).json().error.code).toBe('NO_TRANCHE');
     expect(pb.charges).toBe(0);
@@ -56,7 +52,7 @@ describe('POST /buy dry_run "strict"', () => {
 
   it('every gate passing: the same 200 as dry_run true, with no purchase, no charge, no ledger row', async () => {
     const { pb, auth } = await setup();
-    await readyToBuy(DOMAIN, { spendCapCents: 5000 });
+    await readyToBuy(DOMAIN);
     const s = await strict(auth);
     const p = await plain(auth);
     expect(s.statusCode).toBe(200);

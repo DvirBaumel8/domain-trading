@@ -105,7 +105,7 @@ describe('contract: codes', () => {
   }
 
   it('finds the codes it is meant to find', () => {
-    for (const c of ['UNAUTHORIZED', 'INTERNAL', 'PREMIUM', 'POC_CAP_EXCEEDED', 'NS_PENDING', 'SALE_UNCONFIRMED']) expect(codes.has(c), c).toBe(true);
+    for (const c of ['UNAUTHORIZED', 'INTERNAL', 'PREMIUM', 'NS_PENDING', 'SALE_UNCONFIRMED']) expect(codes.has(c), c).toBe(true);
     expect(codes.has('DATABASE_URL')).toBe(false);
   });
 

@@ -29,7 +29,6 @@ export interface ApiTokensTable {
 
 export interface SettingsTable {
   id: Generated<boolean>;
-  poc_cap_cents: Generated<number>;
   max_domains: Generated<number>;
   approval_max_age_hours: Generated<number>;
   lander_target: Generated<'afternic' | 'sedo' | 'custom'>;
@@ -768,7 +767,6 @@ export interface TranchesTable {
   closed_at: Date | null;
   closed_by: string | null;
   settings_label: string;
-  spend_cap_cents: number | null;
   close_report: Json | null;
   audit_id: string | null;
 }
@@ -780,7 +778,6 @@ export interface TrancheMembersTable {
   lane: string;
   is_geo: boolean;
   main_lane: boolean;
-  est_cost_cents: number | null;
   run_id: string;
   added_at: TimestampDefault;
   added_by: string;

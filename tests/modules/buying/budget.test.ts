@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeDomainCount, pendingCents, spentCents } from '../../../src/modules/buying/budget.js';
+import { activeDomainCount } from '../../../src/modules/buying/budget.js';
 import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 
 const ledger = (type: string, amount_cents: number) =>
@@ -10,25 +10,7 @@ const purchase = (key: string, state: string, expected: number, domain: string) 
     approval_text: domain, approval_at: new Date(), expected_cents: expected,
   }).execute();
 
-describe('budget queries', () => {
-  it('spent = −Σ registration+renewal+fee only', async () => {
-    expect(await spentCents(db)).toBe(0);
-    await ledger('registration', -1108);
-    await ledger('renewal', -999);
-    await ledger('fee', -100);
-    await ledger('sale', 199500);
-    await ledger('commission', -29925);
-    await ledger('refund', 500);
-    expect(await spentCents(db)).toBe(1108 + 999 + 100);
-  });
-  it('pending = Σ expected_cents of created/register_sent/unknown purchases', async () => {
-    await purchase('k1', 'created', 1108, 'a.com');
-    await purchase('k2', 'register_sent', 999, 'b.com');
-    await purchase('k3', 'unknown', 1000, 'c.com');
-    await purchase('k4', 'succeeded', 5000, 'd.com');
-    await purchase('k5', 'failed', 5000, 'e.com');
-    expect(await pendingCents(db)).toBe(1108 + 999 + 1000);
-  });
+describe('domain count (G-86: no money budget)', () => {
   it('active domains = owned + listed + delisted + pending_purchase', async () => {
     await insertOwnedDomain(db, { domain: 'a.com' });
     await insertOwnedDomain(db, { domain: 'b.com', status: 'listed' });

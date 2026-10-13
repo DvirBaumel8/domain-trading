@@ -1,6 +1,6 @@
 # domain-trading
 
-A backend service (HTTP API + Postgres, no frontend) for a small domain-trading proof of concept: at most 50 .com names, a $1,500 cap, each name held at most 2 years. Built, owned and run by **DOM** (the vendor); the only API user is Dvir's bot **Gavriel**, with READ/WRITE bearer tokens. Every purchase requires Dvir's explicit approval in chat.
+A backend service (HTTP API + Postgres, no frontend) for a small domain-trading proof of concept: at most 40 .com names, each name held at most 2 years. Built, owned and run by **DOM** (the vendor); the only API user is Dvir's bot **Gavriel**, with READ/WRITE bearer tokens. Every purchase requires Dvir's explicit approval in chat.
 
 - **API contract (the interface):** `docs/contract/` (v1.0.0; changes in `docs/contract/CHANGELOG.md`).
 - **DOM's manual:** `CLAUDE.md` (founder rules, conventions, workflow). Internal rules and test IDs: `docs/internal/` (gaps vs the code: `docs/internal/gaps.md`).

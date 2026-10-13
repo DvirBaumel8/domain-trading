@@ -103,7 +103,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it), `sibling_scans` (v4.1.0, append-only), `keyword_demand_uploads`, `keyword_demand` (v4.2.0, append-only, in the backup). Tests: `tests/modules/selection/` (`screening-*`, `selection-*`, `sibling-methods`, `sibling-bt1-v2`, `bt1-v3-records`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `rdap-pacing`, `run-cancel`, `run-integrity`, `lists-current`, `records-unknowns`, `tier-lanes`, `sellers`, `seller-fetch`, `scout-words`, `settings-intake-keys`, `cr043-scout-checks`, `sibling-scan`, `keyword-demand` (v4.2.0: KD-1..KD-7, CH-2..CH-6)), `tests/modules/selection/unit/` (`screening-*`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `sibling-scan` (CR-050), `keyword-demand` (v4.2.0 parser, Companies House match), `split-v2/v3`, `sibling-scan`); helpers `screening.ts`, `screening-fixtures.ts`.
 
 ### buying
-`POST /buy` (approval, gates, registrar register, ledger), tranches, reconciler, budget.
+`POST /buy` (approval, gates, registrar register, ledger), tranches, reconciler, domain count.
 
 | Route | File |
 |---|---|
@@ -113,16 +113,16 @@ Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `sc
 | File | Inside |
 |---|---|
 | `buy.ts` | `BuyService` (v3.7.0: `display_name` (given, else `defaultDisplayName` from the newest `candidate_intake.words`), `drop_policy` (`at_first_expiry` sets drop_date = expiry in `complete()`), `drop_policy`/`renewal_committed_cents`/`drop_policy_line` in the dry run and the 201; ~830 lines: approval check, caps, dry run, purchase state machine, ledger/receipt writes) |
-| `buy-gates.ts` | `buyBlocks`, `packGate`, `trancheGate`, `spendCapGate`, `gateError`; block codes `BUY_HOLD`, `SCREENING_PACK_REQUIRED`, `NO_TRANCHE`, `TRANCHE_SPEND_CAP` |
+| `buy-gates.ts` | `buyBlocks`, `packGate`, `trancheGate`, `gateError`; block codes `BUY_HOLD`, `SCREENING_PACK_REQUIRED`, `NO_TRANCHE` |
 | `buy-hold.ts` | `screeningHold`, `latestScreeningRun` |
 | `renewal-math.ts` | v4.0.0: `renewalMath` (BIN x (1 - commission) x STRe / renewal cost, integer cents and basis points), `binForMath`, `screeningGroupOf` (`passed` / `borderline` from FLAG results of the latest run); `buy.ts` stores `horizon`, `screening_group`, `buy_card` and sets `sell_or_drop_by`; the domain cap is 40 (`settings.max_domains`, migration) and a dry run reports `DOMAIN_CAP_REACHED` as `would_be_blocked` |
-| `small-buy.ts` | CR-030 small-buy exception to the buy hold: fixed limits `SMALL_BUY_MAX_FIRST_YEAR_CENTS` / `SMALL_BUY_WEEKLY_CAP_CENTS`, `smallBuyRequested`, `smallBuyGate`, `smallBuySpend`, `smallBuyView` (read for GET /selection/buy-hold, v3.7.0); codes `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` |
+| `small-buy.ts` | CR-030 small-buy exception to the buy hold: fixed limit `SMALL_BUY_MAX_FIRST_YEAR_CENTS`, `smallBuyRequested`, `smallBuyGate`, `smallBuyView` (the price ceiling for GET /selection/buy-hold); code `SMALL_BUY_PRICE`. 5.0.0 (G-86): no weekly money cap |
 | `tranches.ts` | `TrancheService` |
-| `budget.ts` | `spentCents`, `activeDomainCount` ($1,500 / 50 caps are applied in `buy.ts` from config) |
+| `budget.ts` | `activeDomainCount` only (the 40-domain cap, `settings.max_domains`, is applied in `buy.ts`). 5.0.0 (G-86): no money budget in the service; `spentCents`, `pendingCents`, `spentAndPending` are gone |
 | `bookkeeping.ts` | `bookPurchase` (v3.9.0: optional `dropDate`, set in its transaction; default expiry + 1 year), `failPurchase`, `registrarApiOf` |
 | `reconciler.ts` | `Reconciler` (stuck `unknown`/`register_sent` purchases; job step `reconciler`). v3.9.0: no rdap dependency, never fails an open purchase (`/report` `PURCHASE_UNRESOLVED` + admin `resolve-purchase`); on booking it sets auto-renew off and the drop policy (`at_first_expiry`) |
 
-Tables: `purchases`, `receipts`, `deals`, `ledger_entries`, `tranches`, `tranche_members`, `pricing_evidence`; writes `domains`, `listing_history`. Tests: `tests/modules/buying/` (`buy-*`, `buy-display-drop-policy`, `budget`, `cap-property`, `reconciler`, `tranches`, `evidence-gaps`, `small-buy`, `small-buy-hold`); `purchases.small_buy_exception` marks small-buy purchases (migration `1762800000000_v3-5-0-b.sql`); helper `tests/helpers/buy.ts`.
+Tables: `purchases`, `receipts`, `deals`, `ledger_entries`, `tranches`, `tranche_members`, `pricing_evidence`; writes `domains`, `listing_history`. Tests: `tests/modules/buying/` (`buy-*`, `buy-display-drop-policy`, `budget` (domain count only), `reconciler`, `tranches`, `evidence-gaps`, `small-buy`, `small-buy-hold`); `purchases.small_buy_exception` marks small-buy purchases (migration `1762800000000_v3-5-0-b.sql`); helper `tests/helpers/buy.ts`.
 
 ### candidates
 Intake of candidate names, on-demand screening, the daily list, drop lists, cohorts.
@@ -254,7 +254,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 36 files). Run with `npm run migrate`.
+`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 37 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -283,8 +283,8 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Change the outside review | `outreach/review/*.ts` (`run.ts`, `packet.ts`, `gemini.ts`), `outreach/api/reviews.ts` | `outreach/review-packet`, `review-run`, `review-settings`, `outreach/unit/review-pure` |
 | Add a /buy gate or block code | `buying/buy-gates.ts` (`BuyBlock`, `buyBlocks`, gate fn), call in `buying/buy.ts`; code in `docs/contract/endpoints.md` Code index | `buying/buy-hold`, `buy-checks`, `buy-v2` |
 | Change a /buy request field or approval rule | `buying/api/buy.ts`, `buying/buy.ts` (`BuyInput`), `core/approval.ts` | `buying/buy-*`, `core/unit/approval` |
-| Change the small-buy exception limits ($11.08 first year, $50 per rolling 7 days) | `buying/small-buy.ts` (needs a release, Dvir's approval) | `buying/small-buy`, `small-buy-hold` |
-| Change caps ($1,500, 40) | migration only (no API; the last one is `1763100000000_v3-11-0.sql`); read in `buying/budget.ts`, `buy.ts`; `src/config.ts` | `buying/budget`, `cap-property`, `buying/portfolio-buy` |
+| Change the small-buy exception limit ($11.08 first year) | `buying/small-buy.ts` (needs a release, Dvir's approval) | `buying/small-buy`, `small-buy-hold` |
+| Change the domain cap (40) | migration only (no API; the last one is `1763400000000_v5-0-0.sql`, which dropped the money columns); read in `buying/budget.ts`, `buy.ts` | `buying/budget`, `buying/portfolio-buy` |
 | Change the renewal maths gate, STRe or the commission | `buying/renewal-math.ts`, `buy.ts` (step 7b), selection settings `buy.*` (`selection/settings.ts` `BUY_DEFAULT`) | `buying/portfolio-buy` |
 | Change the renewal drop check, SELL_BEFORE_DROP, HORIZON_DUE, DELIST_NEEDED | `reporting/report/lifecycle.ts`, settings `renewal.*` | `reporting/portfolio-lifecycle` |
 | Change the outcomes reports | `reporting/report/outcomes.ts` | `reporting/portfolio-lifecycle` (OC-1, OC-2, RN-5) |

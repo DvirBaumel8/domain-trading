@@ -49,12 +49,12 @@ Money = integer cents (USD). Timestamps = `timestamptz` (UTC). Calendar dates = 
 | `screening_evidence` | `id`, `source`, `url`, `text`, `sha256`, `fetched_at` | Hash-addressed evidence (HIST-2 captures, manual URLs) |
 | `manual_quotes` | `domain`, `registrar`, `renewal_cents`, `observed_at` | Kept apart from `quotes`: those rows are tied to a `/check` and carry registrar raw data |
 | `rdap_lookups`, `reference_files` | cache of RDAP answers; downloaded reference files (popularity list, IANA bootstrap) | Caches, not in the backup export |
-| `tranches`, `tranche_members` | name, size, `spend_cap`, `opened_under`, status, per-member lane and `est_cost` | Closed rows read-only by DB trigger |
+| `tranches`, `tranche_members` | name, size, `opened_under`, status, per-member lane (5.0.0: `spend_cap` and `est_cost` dropped) | Closed rows read-only by DB trigger |
 | `labelled_names`, `holdout_suites`, `replay_runs` | append-only registry (`fit`/`dev`/`test`), pre-registered suite definitions (frozen with approval), replay reports | A failing holdout sticks per settings version |
 | `audit_log` | `id` (`aud_…`), `at`, `token_id`, `scope` (`read`/`write`/`job`/`admin`), `method`, `path`, `idempotency_key`, `approval_text`, `approval_at`, `request` (redacted), `status_code`, `result_summary`, `client_ip` | **Append-only.** One row per authenticated POST, job run and admin command |
 | `idempotency_keys` | `key` (PK), `request_hash`, `method`, `path`, `token_id`, `state`, `status_code`, `response_body`, `response_content_type`, `completed_at` | Never exported |
 | `api_tokens` | `id`, `name`, `scope` (`read`/`write`), `token_sha256`, `created_at`, `revoked_at`, `last_used_at` | Plain token shown once by the admin command. Never exported |
-| `settings` | `poc_cap_cents` (150000), `max_domains` (40 since 4.0.0), `approval_max_age_hours` (72), `lander_target` (`afternic`), `allowed_registrars` (`{porkbun}`; never cloudflare), `high_value_min_bin_cents` (250000), `sedo_hybrid_as` (`make_offer`) | One row. Changed only by an admin command or a migration, never the API |
+| `settings` | `max_domains` (40 since 4.0.0), `approval_max_age_hours` (72), `lander_target` (`afternic`), `allowed_registrars` (`{porkbun}`; never cloudflare), `high_value_min_bin_cents` (250000), `sedo_hybrid_as` (`make_offer`) | One row. Changed only by an admin command or a migration, never the API |
 
 ## 5. Registrar adapter interface
 ```
@@ -110,9 +110,9 @@ Envelope, cross-cutting codes, money and time conventions: `docs/contract/README
 ## 9. Risks and bounds
 | Risk | Bound |
 |---|---|
-| A bot spends without real approval (prompt injection, bug) | Gavriel calls `/buy` only after Dvir's explicit chat yes, quoted verbatim. Server caps: $1,500 total, 50 domains, per-call `max_price`, approval ≤ 72 h naming the domain. Registrar limits: Porkbun's monthly API spend limit and a small prepaid credit. Every buy audited and visible in `/report`; the WRITE token revocable in seconds. **Residual:** the server can't prove the text came from Dvir |
+| A bot spends without real approval (prompt injection, bug) | Gavriel calls `/buy` only after Dvir's explicit chat yes, quoted verbatim. Server caps: 40 domains (the money budget is Gavriel's, G-86), per-call `max_price`, approval ≤ 72 h naming the domain. Registrar limits: Porkbun's monthly API spend limit and a small prepaid credit. Every buy audited and visible in `/report`; the WRITE token revocable in seconds. **Residual:** the server can't prove the text came from Dvir |
 | A false sale recorded automatically | `/sold` needs `transaction_ref` + evidence without approval; duplicates → `SALE_ALREADY_RECORDED`; unconfirmed sales listed (`SALE_UNCONFIRMED`); a sale moves no money and the registrar still holds the name. `DOMAIN_LEFT_ACCOUNT` catches a name gone without a sale |
-| WRITE token leak | Rotate every 90 days; revoke on suspicion; the caps limit damage to ≤ $1,500 |
+| WRITE token leak | Rotate every 90 days; revoke on suspicion; the domain cap and Dvir's per-buy approval limit damage; Gavriel owns the money budget (G-86) |
 | Double purchase | Idempotency key, one open purchase per domain, per-domain advisory lock, registrar-side `Idempotency-Key`, a `findDomain` check before registering |
 | Lost bookkeeping after a crash | `purchases.state = register_sent` + the reconciler, run by the daily job (`buy.md` §6) |
 | Data loss | Nightly export to the private data repo + the restore drill before G4 (`backup.md`) |

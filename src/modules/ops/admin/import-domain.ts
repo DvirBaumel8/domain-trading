@@ -9,7 +9,7 @@ import { normalizeDomain } from '../../../domain-name.js';
 import { buildSchedule } from '../../listing/index.js';
 import { currentSettings } from '../../listing/index.js';
 import { RegistrarError, type RegistrarAdapter } from '../../registrars/index.js';
-import { activeDomainCount, spentCents } from '../../buying/index.js';
+import { activeDomainCount } from '../../buying/index.js';
 import { registrarApiOf } from '../../buying/index.js';
 import { changedColumns } from '../../listing/index.js';
 import { isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from '../../listing/index.js';
@@ -176,7 +176,7 @@ export async function importDomain(
       warnings.push(`EXPIRY_MISMATCH: --expiry ${p.expiry} differs from the registrar's ${info.expiryDate}; using the registrar's`);
     }
     expiry = info.expiryDate ?? p.expiry;
-    if (info.autoRenew === true) warnings.push(`AUTO_RENEW_ON: turn auto-renew OFF at ${p.registrar} (renewals there are billed outside the $1,500 cap)`);
+    if (info.autoRenew === true) warnings.push(`AUTO_RENEW_ON: turn auto-renew OFF at ${p.registrar} (renewals there are billed outside the ledger)`);
     else if (p.registrar === 'godaddy' || info.autoRenew == null) warnings.push(`AUTO_RENEW_UNCONFIRMED: check auto-renew is OFF in the ${p.registrar} dashboard`);
     if (info.whoisPrivacy === false) warnings.push(`PRIVACY_OFF: WHOIS privacy is off at ${p.registrar}; turn it on in the dashboard`);
     if (p.registrar === 'porkbun' && info.apiAccess === false) warnings.push('API_ACCESS_DISABLED: turn on API access for this domain at porkbun.com/account/api');
@@ -266,11 +266,9 @@ export async function importDomain(
       })).execute();
       written = (await writePlan(trx, { domainId: row.id, plan, anchor: p.today, dropDate, settings: s, planAuditId: auditId, now })).events;
     }
-    // Caps count the import. An import over a cap succeeds (the money is already spent) and says so.
+    // The domain cap counts the import. An import over it succeeds (the money is already spent) and says so.
     const n = await activeDomainCount(trx);
     if (n > settings.max_domains) warnings.push(`DOMAIN_CAP_EXCEEDED_BY_IMPORT: ${n}/${settings.max_domains} domains; /buy is refused until under the cap`);
-    const spent = await spentCents(trx);
-    if (spent > settings.poc_cap_cents) warnings.push(`POC_CAP_EXCEEDED_BY_IMPORT: spent ${formatUsd(spent)} of ${formatUsd(settings.poc_cap_cents)}`);
     return written;
   }));
   return { domain, status: plan ? 'listed' : 'owned', registrar_api: registrarApi, expiry_date: expiryDate, drop_date: dropDate,

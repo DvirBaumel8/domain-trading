@@ -196,11 +196,11 @@ describe('record-renewal (G-85)', () => {
     expect(await db.selectFrom('ledger_entries').select('id').where('type', '=', 'renewal').execute()).toHaveLength(1);
   });
 
-  it('RN-3: refused over the $1,500 POC cap (POC_CAP_EXCEEDED) and nothing is written', async () => {
+  it('RN-3: G-86: no money cap on a renewal (a large prior spend does not refuse it)', async () => {
     await setup();
     await db.insertInto('ledger_entries').values({ occurred_on: '2027-01-01', type: 'registration', amount_cents: -149900, domain_id: null }).execute();
-    await expect(recordRenewal(db, ok)).rejects.toMatchObject({ code: 'POC_CAP_EXCEEDED' });
-    expect(await dom()).toMatchObject({ renewals_used: 0, expiry_date: '2027-10-04' });
+    await expect(recordRenewal(db, ok)).resolves.toMatchObject({ domain: D });
+    expect(await dom()).toMatchObject({ renewals_used: 1 });
   });
 
   it('RN-4: a name whose drop_date is its first expiry is RENEWAL_NOT_PLANNED; a sold name is INVALID_STATE; an unknown one DOMAIN_NOT_FOUND', async () => {

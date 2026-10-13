@@ -1,7 +1,6 @@
 // v2.13.0 (CR-012 part D, Q-5): the path to lifting the buy hold as a list of steps, derived from data. Information only: nothing acts on it.
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
-import { formatUsd } from '../../core/money.js';
 import { holdSuites, suiteStatuses } from './replay.js';
 import type { SelectionValuesT } from './settings.js';
 
@@ -57,8 +56,8 @@ export async function buyHoldSteps(db: Kysely<Database>, active: { label: string
   const s6 = mk(6, 'Dvir activates the draft (lifts the hold)', active.values.buy_hold === false ? 'done' : 'open', 'dvir', active.values.buy_hold === false ? { label: active.label, activated_at: activeRow?.activated_at ? iso(activeRow.activated_at) : null } : null);
 
   // 7. an open production (non-probe) tranche
-  const tr = (await db.selectFrom('tranches').select(['id', 'name', 'spend_cap_cents']).where('status', '=', 'open').orderBy('opened_at', 'desc').execute()).find((t) => !isProbeTranche(t.name));
-  const s7 = mk(7, 'A production tranche is open', tr ? 'done' : 'open', 'dvir', tr ? { tranche_id: tr.id, name: tr.name, cap_cents: tr.spend_cap_cents, cap: tr.spend_cap_cents === null ? null : formatUsd(tr.spend_cap_cents) } : null);
+  const tr = (await db.selectFrom('tranches').select(['id', 'name']).where('status', '=', 'open').orderBy('opened_at', 'desc').execute()).find((t) => !isProbeTranche(t.name));
+  const s7 = mk(7, 'A production tranche is open', tr ? 'done' : 'open', 'dvir', tr ? { tranche_id: tr.id, name: tr.name } : null);
 
   const steps = [s1, s2, s3, s4, s5, s6, s7];
   return { steps, ready: steps.slice(0, 5).every((s) => s.status === 'done') };

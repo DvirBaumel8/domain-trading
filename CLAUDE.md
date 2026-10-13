@@ -14,11 +14,11 @@ DOM builds, tests locally, pushes and releases. Gavriel runs, verifies and opera
 ## Customer model
 - **Dvir** (founder) decides and approves. He decides only **buy** and **sell**, and approves money, founder-rule and cap changes. He talks only to Gavriel.
 - **Gavriel** (Dvir's chief of staff, a bot on another machine) is the **only API user**: READ/WRITE bearer tokens over HTTPS. He sends requests (`docs/requests/`) and reads release notes (`docs/releases/`). Gizbar (the CFO bot) reads `/report` and `/ledger` with a READ token. Bots also act on the marketplace and registrar websites (uploads, removals).
-- The product: a small backend (HTTP API + Postgres, no frontend) for a domain-trading proof of concept: **$1,500 total budget, at most 40 .com names, each held at most 2 years** (bought for 1 year, renewed at most once). It checks prices across registrars, buys after Dvir's chat approval, points names at a for-sale lander, computes each name's sell plan and applies its scheduled drops, logs offers, exports marketplace files, records sales and reports spend, sales, ROI and dates.
+- The product: a small backend (HTTP API + Postgres, no frontend) for a domain-trading proof of concept: **at most 40 .com names, each held at most 2 years** (bought for 1 year, renewed at most once). It checks prices across registrars, buys after Dvir's chat approval, points names at a for-sale lander, computes each name's sell plan and applies its scheduled drops, logs offers, exports marketplace files, records sales and reports spend, sales, ROI and dates.
 
 ## Founder rules (non-negotiable; enforce them in code, not just in docs)
 1. **Every purchase requires Dvir's explicit chat approval.** Gavriel passes it as `approval_ref {text, approved_at}`. The server validates it: present, ≤72 h old, not in the future, names the domain. The server **can't** prove a human said it; that trust boundary is accepted and documented.
-2. **Caps live on the server:** $1,500 POC cap, 40 domains, per-call `max_price`. Caps change only through the admin command or a migration, **never through the API**.
+2. **Caps live on the server:** 40 domains and per-call `max_price`. Caps change only through a migration, **never through the API**. The service tracks no money budget (G-86): Gavriel owns it.
 3. **Max one renewal per domain.** Prices are compared on first year + one renewal. `renewals_used` is 0..1 (DB CHECK). `drop_date = expiry + 1 year`. 1-year registrations only.
 4. **Listing and pricing by category** (`docs/internal/listing-strategy.md`; pricing process adopted by Dvir on 5 Oct 2026, 00:46 IDT):
    - **Geo names:** `bin` only, at a fixed grade price ($499 strong / $399 weaker), with no offers and no negotiation. One scheduled drop at month 12, one rung down the ladder 499 → 399 → 299 (*a $399 name may drop to $299: Dvir, 6 Oct 2026, 01:01; replaces the 5 Oct "a $399 name never drops" rule*).
@@ -75,7 +75,8 @@ DOM builds, tests locally, pushes and releases. Gavriel runs, verifies and opera
 ## Decisions
 The decision history lives in git, `docs/internal/` and `docs/contract/CHANGELOG.md`. Still-binding one-liners:
 - Operating model (Dvir, 5 Oct 2026, 20:07): `approval_ref` only for buy and sell decisions; everything else is bot-only within the rules, audited. `/sold` is system-triggered (evidence required without approval).
-- Caps $1,500 (Dvir, 5 Oct 2026, 01:04) / 40 domains (Dvir, 13 Oct 2026; was 50; migration in 4.0.0). Pricing settings v3 is current (7 Oct 2026). Caps change only by a migration (there is no cap admin command).
+- Domain cap 40 (Dvir, 13 Oct 2026; was 50; migration in 4.0.0). Pricing settings v3 is current (7 Oct 2026). Caps change only by a migration (there is no cap admin command).
+- **Budget (Dvir, 14 Oct 2026, G-86):** the service tracks no money budget; Gavriel owns it (spend is still in the ledger and /report).
 - D-001 promptinjectionaudit.com: bought by hand at GoDaddy (registered 2026-10-04, $13.73), imported with `npm run admin -- import-domain`; current plan 1488 / 967 / 950 (exception) / min offer 100, drop at the first expiry 2027-10-04 (`docs/internal/listing-strategy.md` §8). GoDaddy is a management-only adapter.
 - Default lander Afternic (Dan.com retired 27 Jun 2025); Sedo is a second listing. No marketplace API except Spaceship SellerHub (listing sync only, 4.0.0); uploads by bots, full-file Afternic **Update**. No mail-watching.
 - 6 Oct 2026 (Dvir): bots-only access (unauthenticated requests write nothing); offers CSV import and payouts removed; exports always full-file; jobs only via `POST /jobs/run` / `npm run job`; DOM owns everything (vendor model).

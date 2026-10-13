@@ -338,7 +338,7 @@ async function buildLocked(deps: BuildDeps, timedOut: boolean): Promise<BuildRes
     const plan = bin === null ? null : p.item.lane === 'S2'
       ? { bin_cents: bin, bin: formatUsd(bin), floor_cents: bin, floor: formatUsd(bin), min_offer_cents: bin, min_offer: formatUsd(bin), pricing_settings_version: pricing.version }
       : (() => { const f = priceFormula(bin, pricing); return { bin_cents: bin, bin: formatUsd(bin), floor_cents: f.floorCents, floor: formatUsd(f.floorCents), min_offer_cents: pricing.hybridMinOfferCents, min_offer: formatUsd(pricing.hybridMinOfferCents), pricing_settings_version: pricing.version }; })();
-    const blocked = await buyBlocks(db, domain, nowAfter, firstYear);
+    const blocked = await buyBlocks(db, domain, nowAfter);
     const entry = {
       ...base, rank: 0, final_status: fs, held: hold || fs === 'would_buy',
       price: firstYear === null ? null : { registrar: quote.registrar ?? null, first_year_cents: firstYear, first_year: formatUsd(firstYear), renewal_cents: renewal, renewal: renewal === null ? null : formatUsd(renewal), quoted_at: quote.quoted_at ?? null },

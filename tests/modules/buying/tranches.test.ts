@@ -159,36 +159,6 @@ describe('tranches', () => {
     expect([a!, b!].find((r) => r.statusCode === 409)!.json().error.code).toBe('GEO_CAP');
   });
 
-  it('concurrent adds against the spend cap: one wins, one is 409 TRANCHE_SPEND_CAP; a concurrent duplicate add is reported as a duplicate', async () => {
-    const x = await h();
-    const id = await open(x, 'T1', { spend_cap: 30 });
-    const run = await seedRun([s3('tampapoolsco.com'), s3('austinbarbers.com')]);
-    const doms = ['tampapoolsco.com', 'austinbarbers.com'] as const;
-    const rs = await Promise.all(doms.map((domain) => x.post(members(id), { action: 'add', domain, run_id: run, est_cost: 20 })));
-    // which add wins the race is not fixed: read the winner from the responses, then assert per winner and per loser
-    expect(rs.map((r) => r.statusCode).sort()).toEqual([200, 409]);
-    const w = rs.findIndex((r) => r.statusCode === 200);
-    const winner = doms[w]!;
-    const loser = doms[1 - w]!;
-    expect(rs[1 - w]!.json().error.code).toBe('TRANCHE_SPEND_CAP');
-    expect(rs[w]!.json()).toMatchObject({ duplicate: false });
-    expect((await db.selectFrom('tranche_members').select('domain').where('tranche_id', '=', id).where('removed_at', 'is', null).execute()).map((m) => m.domain)).toEqual([winner]);
-    const [d1, d2] = await Promise.all([1, 2].map(() => x.post(members(id), { action: 'add', domain: winner, run_id: run, est_cost: 5 })));
-    expect([d1!.statusCode, d2!.statusCode]).toEqual([200, 200]);
-    expect([d1!, d2!].map((r) => r.json().duplicate)).toEqual([true, true]);
-    const e1 = await Promise.all([1, 2].map(() => x.post(members(id), { action: 'add', domain: loser, run_id: run, est_cost: 5 })));
-    expect(e1.map((r) => r.statusCode).sort()).toEqual([200, 200]);
-    expect(e1.map((r) => r.json().duplicate).sort()).toEqual([false, true]);
-  });
-
-  it('spend_cap and est_cost above the POC cap are 422, never a 500', async () => {
-    const x = await h();
-    expect((await x.post('/tranches', { name: 'big', spend_cap: 99_999_999_999 })).statusCode).toBe(422);
-    expect((await x.post('/tranches', { name: 'big', spend_cap: 1501 })).statusCode).toBe(422);
-    const id = await open(x, 'T1', { spend_cap: 1500 });
-    const run = await seedRun([s3('tampapoolsco.com')]);
-    expect((await x.post(members(id), { action: 'add', domain: 'tampapoolsco.com', run_id: run, est_cost: 99_999_999_999 })).statusCode).toBe(422);
-  });
 });
 
 describe('close, the main-lane quota and read-only', () => {
@@ -257,16 +227,6 @@ describe('close, the main-lane quota and read-only', () => {
     expect(rep.tranches[0].members).toBeUndefined();
   });
 
-  it('spend cap: est_cost is required and the sum may not pass the cap; it shows in the view', async () => {
-    const x = await h();
-    const id = await open(x, 'T1', { spend_cap: 30 });
-    const run = await seedRun([s3('tampapoolsco.com'), s3('austinbarbers.com'), s3('denverwidgets.com')]);
-    expect((await x.post(members(id), { action: 'add', domain: 'tampapoolsco.com', run_id: run })).statusCode).toBe(422);
-    expect((await x.post(members(id), { action: 'add', domain: 'tampapoolsco.com', run_id: run, est_cost: 14 })).statusCode).toBe(200);
-    expect((await x.post(members(id), { action: 'add', domain: 'austinbarbers.com', run_id: run, est_cost: 14 })).statusCode).toBe(200);
-    expect((await x.post(members(id), { action: 'add', domain: 'denverwidgets.com', run_id: run, est_cost: 14 })).json().error.code).toBe('TRANCHE_SPEND_CAP');
-    expect((await x.get('/tranches')).json().tranches[0]).toMatchObject({ spend_cap_cents: 3000, committed_cents: 2800 });
-  });
 });
 
 describe('screening runs and the geo cap with real members', () => {

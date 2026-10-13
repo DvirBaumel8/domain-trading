@@ -48,7 +48,7 @@ describe('review packet (T11-15..17, T11-24, T11-25)', () => {
     expect(c1.content.dom_changes.since).toBeNull();
     expect(c1.content.dom_changes.service_version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(c1.content.dom_changes.settings_versions.some((s: { active: boolean }) => s.active)).toBe(true);
-    expect(c1.content.numbers.budget).toBeDefined();
+    expect(c1.content.numbers.spend).toBeDefined();
 
     // v2.15.0 (CR-013 F-1): a packet counts as the weekly one only after a review with status ok has received it
     expect((await t.post(`/reviews/${c1.packet_id}/feedback`, feedbackOk())).statusCode).toBe(201);

@@ -265,12 +265,12 @@ describe('buy-hold steps (CR-012 part D)', () => {
     expect(b.steps[6].status).toBe('open');
 
     // a production tranche (a probe does not count)
-    await db.insertInto('tranches').values({ id: 'trn_0000000000c1', name: 'accept-v2-probe-20261007', status: 'open', opened_by: 'gavriel', settings_label: 'v1', spend_cap_cents: 20_000 }).execute();
+    await db.insertInto('tranches').values({ id: 'trn_0000000000c1', name: 'accept-v2-probe-20261007', status: 'open', opened_by: 'gavriel', settings_label: 'v1' }).execute();
     expect((await steps(x)).steps[6].status).toBe('open');
     await db.updateTable('tranches').set({ status: 'closed', closed_at: new Date(), closed_by: 'gavriel', close_report: '{}' }).where('id', '=', 'trn_0000000000c1').execute(); // only one tranche is open at a time
-    await db.insertInto('tranches').values({ id: 'trn_0000000000d2', name: 'production-1', status: 'open', opened_by: 'gavriel', settings_label: 'v1', spend_cap_cents: 50_000 }).execute();
+    await db.insertInto('tranches').values({ id: 'trn_0000000000d2', name: 'production-1', status: 'open', opened_by: 'gavriel', settings_label: 'v1' }).execute();
     b = await steps(x);
-    expect(b.steps[6]).toMatchObject({ status: 'done', evidence: { tranche_id: 'trn_0000000000d2', cap_cents: 50_000, cap: '$500.00' } });
+    expect(b.steps[6]).toMatchObject({ status: 'done', evidence: { tranche_id: 'trn_0000000000d2' } });
 
     // a failed holdout replay sticks (steps 3 and 5)
     await replay('rpl_0000000000b2', false);

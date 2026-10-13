@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { sql } from 'kysely';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -10,9 +11,8 @@ import { http, HttpResponse } from 'msw';
 import { importDomain, type ImportInput } from '../../../src/modules/ops/admin/import-domain.js';
 import { GoDaddyAdapter } from '../../../src/modules/registrars/godaddy.js';
 import { RegistrarError, type RegistrarAdapter } from '../../../src/modules/registrars/types.js';
-import { spentAndPending } from '../../../src/modules/buying/budget.js';
 import { makeApp } from '../../helpers/app.js';
-import { COMPS, buyBody, postBuy, seedOwnedDomains, seedSpent, T0 } from '../../helpers/buy.js';
+import { COMPS, buyBody, postBuy, seedOwnedDomains, T0 } from '../../helpers/buy.js';
 import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { testEnv } from '../../helpers/env.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
@@ -43,6 +43,8 @@ const count = async (t: 'domains' | 'ledger_entries' | 'pricing_evidence' | 'aud
 const refused = async (p: Promise<unknown>) => (await p.then(() => null, (e: unknown) => e)) as { code?: string; message: string } | null;
 const dom = () => db.selectFrom('domains').selectAll().where('domain', '=', D).executeTakeFirstOrThrow();
 
+const spentLedger = async (): Promise<number> => Number((await db.selectFrom('ledger_entries').select(sql<string>`coalesce(-sum(amount_cents), 0)`.as('s')).where('type', 'in', ['registration', 'renewal', 'fee']).executeTakeFirstOrThrow()).s);
+
 describe('admin import-domain', () => {
   it('IM-1: a Porkbun import has the same rows as a /buy success', async () => {
     const r = await go({ domain: D, registrar: 'porkbun', buyDate: '2026-10-04', cost: '11.08', renewalPrice: '11.08', category: 'geo', grade: 'weaker',
@@ -55,7 +57,7 @@ describe('admin import-domain', () => {
     const led = await db.selectFrom('ledger_entries').selectAll().executeTakeFirstOrThrow();
     expect(led).toMatchObject({ type: 'registration', amount_cents: -1108, counterparty: 'porkbun', receipt_ref: 'porkbun:none', domain_id: d.id });
     expect(await db.selectFrom('pricing_evidence').selectAll().executeTakeFirstOrThrow()).toMatchObject({ legacy_no_comps_reason: null, rationale: 'r' });
-    expect((await spentAndPending(db)).spent).toBe(1108);
+    expect(await spentLedger()).toBe(1108);
     expect(await count('audit_log')).toBe(1);
   });
 
@@ -161,17 +163,6 @@ describe('admin import-domain', () => {
     expect(await count('domains')).toBe(0);
   });
 
-  it('IM-10: the import counts toward the POC cap and the domain cap', async () => {
-    app = await makeApp({ adapters: [new FakeAdapter('porkbun')], rdap: async () => 'not_registered', now: () => T0 });
-    const { auth } = await issueToken('write');
-    await go({ ...MANUAL, cost: '13.73' });
-    expect((await spentAndPending(db)).spent).toBe(1373);
-    await seedSpent(150000 - 1373 - 500); // $5.00 left
-    const res = await postBuy(app, buyBody({ domain: 'examplecityroofing.com' }), auth);
-    expect(res.statusCode).toBe(409);
-    expect(res.json().error.code).toBe('POC_CAP_EXCEEDED');
-  });
-
   it('IM-10: with 40 domains the import succeeds with DOMAIN_CAP_EXCEEDED_BY_IMPORT and /buy is then DOMAIN_CAP_REACHED', async () => {
     app = await makeApp({ adapters: [new FakeAdapter('porkbun')], rdap: async () => 'not_registered', now: () => T0 });
     const { auth } = await issueToken('write');
@@ -257,7 +248,7 @@ describe('admin import-domain', () => {
   it('registrar status warnings (dry run, one per case)', async () => {
     const dry = (info: object) => go({ ...MANUAL, registrar: 'porkbun', manual: false, expiry: undefined, dryRun: true }, [pb(info as never)]);
     const cases: [string, object, (x: string) => boolean][] = [
-      ['auto-renew on', { autoRenew: true }, (x) => x === 'AUTO_RENEW_ON: turn auto-renew OFF at porkbun (renewals there are billed outside the $1,500 cap)'],
+      ['auto-renew on', { autoRenew: true }, (x) => x === 'AUTO_RENEW_ON: turn auto-renew OFF at porkbun (renewals there are billed outside the ledger)'],
       ['privacy off', { whoisPrivacy: false }, (x) => x.startsWith('PRIVACY_OFF')],
       ['auto-renew null', { autoRenew: null }, (x) => x === 'AUTO_RENEW_UNCONFIRMED: check auto-renew is OFF in the porkbun dashboard'],
       ['api access off', { apiAccess: false }, (x) => x.startsWith('API_ACCESS_DISABLED: turn on API access for this domain at porkbun.com/account/api')],

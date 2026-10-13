@@ -32,7 +32,7 @@ describe('forecast fixes (CR-004 §10.3)', () => {
     await insertOwnedDomain(db, { domain: 'renews-unknown.com', expiry_date: '2027-10-05', drop_date: '2028-10-05', renewal_price_cents: null });
     const t = await boot();
     const rep = (await t.get('/report')).json();
-    expect(rep.budget.committed_forward).toMatchObject({ total_cents: 1500, complete: false, missing: ['renews-unknown.com'] });
+    expect(rep.spend.committed_forward).toMatchObject({ total_cents: 1500, complete: false, missing: ['renews-unknown.com'] });
     const unknown = (rep.warnings as { code: string; domain: string }[]).filter((x) => x.code === 'RENEWAL_PRICE_UNKNOWN').map((x) => x.domain);
     expect(unknown).toEqual(['renews-unknown.com']);
   });
@@ -40,7 +40,7 @@ describe('forecast fixes (CR-004 §10.3)', () => {
   it('only drop-at-first-expiry names without a renewal price: committed_forward is complete', async () => {
     await insertOwnedDomain(db, { domain: 'first-expiry.com', expiry_date: '2027-10-05', drop_date: '2027-10-05', renewal_price_cents: null });
     const t = await boot();
-    expect((await t.get('/report')).json().budget.committed_forward).toMatchObject({ total_cents: 0, complete: true, missing: [] });
+    expect((await t.get('/report')).json().spend.committed_forward).toMatchObject({ total_cents: 0, complete: true, missing: [] });
   });
 
   it('v3.9.0: POST_BUY_INCOMPLETE = a bought name with no screening pack; comps are not needed, and an imported name (no purchase row) is exempt', async () => {

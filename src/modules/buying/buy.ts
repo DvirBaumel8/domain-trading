@@ -15,7 +15,7 @@ import { isValidDisplayName } from '../../domain-name.js';
 import { changedColumns } from '../listing/index.js';
 import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
 import { landerNameservers, sameNsSet } from '../listing/index.js';
-import { activeDomainCount, spentAndPending, spentCents } from './budget.js';
+import { activeDomainCount } from './budget.js';
 import type { CheckResult, CheckService } from '../registrars/index.js';
 import { checkSettingsVersion, isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from '../listing/index.js';
 import { planView } from '../listing/index.js';
@@ -24,8 +24,8 @@ import { domainPlanColumns, historyRow, writePlan } from '../listing/index.js';
 import { withDomainLock } from '../../core/locks.js';
 import { currentSettings, type PricingSettings } from '../listing/index.js';
 import { screeningHold } from './buy-hold.js';
-import { gateError, packGate, spendCapGate, trancheGate, type BuyBlock } from './buy-gates.js';
-import { smallBuyError, smallBuyGate, smallBuyRequested, type SmallBuyState } from './small-buy.js';
+import { gateError, packGate, trancheGate, type BuyBlock } from './buy-gates.js';
+import { smallBuyError, smallBuyGate, smallBuyRequested } from './small-buy.js';
 import { binForMath, renewalMath, screeningGroupOf, type RenewalMath } from './renewal-math.js';
 import { activeSelectionSettings } from '../selection/index.js';
 import { evaluateQuote, pickWinner, type EvaluatedQuote } from '../registrars/index.js';
@@ -58,11 +58,11 @@ export interface Approved {
   input: BuyInput; ctx: BuyCtx; category: Category; plan: ListingPlan | null; comps: Comp[]; rationale: string | null; pricing: PricingSettings; approvedAt: Date;
   check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: BuyBlock | null; trancheId: string | null;
   /** CR-030: the small-buy exception is requested (flag + "small buy" in the approval line); its price and weekly checks apply and the purchase is marked. */
-  smallBuy: boolean; smallBuyState: SmallBuyState | null;
+  smallBuy: boolean;
   /** v3.7.0: the display name to store (given, or built from the intake words), and the drop policy. */
   displayName: string | null; dropPolicy: DropPolicy;
   horizon: Horizon; screeningGroup: 'passed' | 'borderline' | null; math: RenewalMath | null; streReason: string | null;
-  settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
+  settings: { max_domains: number; lander_target: string };
   /** Dry run only: registrar account-state findings that a real buy would refuse on (founder rule 6). */
   accountWarnings?: string[];
 }
@@ -147,16 +147,15 @@ export class BuyService {
 
     // 3c. buy hold (v1.1.0, R1): only a name that was screened. A dry run reports it instead of refusing.
     const hold = await screeningHold(db, input.domain);
-    // CR-030: with the exception requested, the hold is decided once the quote is known (price and weekly cap), below
+    // CR-030: with the exception requested, the hold is decided once the quote is known (price), below
     const smallBuy = smallBuyRequested(input.smallBuyException, input.approval?.text);
     if (hold && gateRefuses && !smallBuy) {
       throw new AppError(409, 'BUY_HOLD', `${input.domain} was screened under selection settings "${hold.settingsVersion}" while buy_hold is on (or the version is a backtest or no longer active); no real buy`,
         { settings_version: hold.settingsVersion, run_id: hold.runId });
     }
 
-    // 3d. v2.0.0: a complete, current screening pack, then an open tranche (the spend cap is checked once the quote is known). A dry run reports the first.
+    // 3d. v2.0.0: a complete, current screening pack, then an open tranche . A dry run reports the first.
     let blocked: BuyBlock | null = hold && !smallBuy ? 'BUY_HOLD' : null;
-    let smallBuyState: SmallBuyState | null = null;
     const pg = await packGate(db, input.domain, now.getTime());
     if (pg && gateRefuses) throw gateError(pg);
     blocked ??= pg?.code ?? null;
@@ -224,34 +223,24 @@ export class BuyService {
         }
       }
 
-      // 8. POC cap (unlocked here; re-checked under the global lock for real buys)
-      await this.assertPocCap(db, settings.poc_cap_cents, winner.firstYearCents!);
-
-      // 8b. tranche spend cap on this quote (re-checked under the global lock for real buys)
-      if (trancheId) {
-        const cg = await spendCapGate(db, trancheId, winner.firstYearCents!);
-        if (cg && gateRefuses) throw gateError(cg);
-        blocked ??= cg?.code ?? null;
-      }
-
-      // 8c. CR-030: the small-buy exception (price, then the rolling 7-day cap); a dry run reports a refusal as would_be_blocked
+      // 8. CR-030: the small-buy exception (price); a dry run reports a refusal as would_be_blocked
       if (smallBuy) {
-        const sg = await smallBuyGate(db, this.deps.now(), winner.firstYearCents!, winner.premium);
-        if ('gate' in sg) {
+        const sg = smallBuyGate(winner.firstYearCents!, winner.premium);
+        if (sg) {
           if (gateRefuses) throw gateError(sg.gate);
           blocked ??= sg.gate.code;
-        } else smallBuyState = sg.state;
+        }
       }
 
       // 9. registrar account state
       accountWarnings = await this.assertAccountState(adapter, winner.firstYearCents!, input.dryRun);
 
       // 10. registrar dry run (re-quote once on COST_MISMATCH)
-      dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.poc_cap_cents, settings.allowed_registrars,
+      dry = await this.registrarDryRun(adapter, input.domain, winner, caps, settings.allowed_registrars,
         { input, ctx, approvedAt: appr.approvedAt, check, category, trancheId, smallBuy });
 
     } catch (e) {
-      if (input.dryRun && e instanceof AppError && !(input.strictDry && e.code === 'TRANCHE_SPEND_CAP')) {
+      if (input.dryRun && e instanceof AppError) {
         // v3.7.1 (CR-038 #1): the buy card's display name and drop policy also ride on a dry-run error (e.g. REGISTRAR_FUNDS)
         throw new AppError(e.status, e.code, e.message, { ...e.details, ...(await this.gateFields(input.domain, blocked)), display_name: displayName, ...this.policyFields(dropPolicy, winner?.renewalCents ?? null) });
       }
@@ -260,9 +249,9 @@ export class BuyService {
     winner = dry.winner;
 
     const approved: Approved = {
-      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, smallBuy, smallBuyState, displayName, dropPolicy, accountWarnings,
+      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, smallBuy, displayName, dropPolicy, accountWarnings,
       horizon, screeningGroup: await screeningGroupOf(db, input.domain), math, streReason: input.streReason ?? null,
-      settings: { poc_cap_cents: settings.poc_cap_cents, max_domains: settings.max_domains, lander_target: settings.lander_target },
+      settings: { max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
     if (input.dryRun) return { status: 200, body: await this.dryRunBody(approved) };
     return this.purchase(approved);
@@ -349,26 +338,23 @@ export class BuyService {
     try {
       return await db.transaction().execute(async (trx) => {
         await advisoryXactLock(trx, `domain:${a.input.domain}`);
-        const s = await trx.selectFrom('settings').select(['poc_cap_cents', 'max_domains']).forUpdate().executeTakeFirstOrThrow();
+        const s = await trx.selectFrom('settings').select(['max_domains']).forUpdate().executeTakeFirstOrThrow();
         await this.assertNotOwned(trx, a.input.domain);
         await this.assertDomainCap(trx, s.max_domains);
-        await this.assertPocCap(trx, s.poc_cap_cents, a.cost);
         // v2.0.0: the hold and the pack, re-read under the global lock (a screening run started since the first checks changes both)
         const hold = await screeningHold(trx, a.input.domain);
         if (a.smallBuy) {
-          const sg = await smallBuyGate(trx, this.deps.now(), a.cost, a.winner.premium);
-          if ('gate' in sg) throw smallBuyError(sg.gate);
+          const sg = smallBuyGate(a.cost, a.winner.premium);
+          if (sg) throw smallBuyError(sg.gate);
         } else if (hold) {
           throw new AppError(409, 'BUY_HOLD', `${a.input.domain} was screened under selection settings "${hold.settingsVersion}" while buy_hold is on (or the version is a backtest or no longer active); no real buy`,
             { settings_version: hold.settingsVersion, run_id: hold.runId });
         }
         const pg = await packGate(trx, a.input.domain, this.deps.now());
         if (pg) throw gateError(pg);
-        // the tranche, re-read under the global lock, so two buys against one spend cap cannot both pass
+        // the tranche, re-read under the global lock
         const tg = await trancheGate(trx, a.input.domain);
         if ('gate' in tg) throw gateError(tg.gate);
-        const cg = await spendCapGate(trx, tg.trancheId, a.cost);
-        if (cg) throw gateError(cg);
         const { id } = await trx.insertInto('purchases').values({
           idempotency_key: a.ctx.idempotencyKey, request_hash: a.ctx.requestHash, domain: a.input.domain, state: 'created',
           dry_run: false, registrar: a.winner.registrar, check_id: a.check.checkId, max_price_cents: a.input.maxPriceCents,
@@ -553,17 +539,14 @@ export class BuyService {
       horizon: a.horizon, screening_group: a.screeningGroup, ...(a.math ? { renewal_math: a.math } : {}),
     };
     try {
-      const spent = await spentCents(db);
       const owned = await db.selectFrom('domains').select(sql<number>`count(*)::int`.as('n'))
         .where('status', 'in', ['owned', 'listed', 'delisted']).executeTakeFirstOrThrow();
       Object.assign(body, {
-        poc_spent_after: formatUsd(spent), poc_spent_after_cents: spent,
-        poc_remaining: formatUsd(a.settings.poc_cap_cents - spent), poc_remaining_cents: a.settings.poc_cap_cents - spent,
         domains_owned: Number(owned.n),
       });
     } catch (e) {
       this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'post-buy totals failed');
-      warnings.push('TOTALS_UNAVAILABLE: the purchase is booked; budget totals could not be computed');
+      warnings.push('TOTALS_UNAVAILABLE: the purchase is booked; the domain count could not be computed');
     }
     warnings.push(...this.horizonWarnings(a));
     Object.assign(body, { post_buy: post, warnings, audit_id: a.ctx.auditId });
@@ -723,17 +706,6 @@ export class BuyService {
     if (n >= maxDomains) throw new AppError(409, 'DOMAIN_CAP_REACHED', `Domain cap reached (${n}/${maxDomains})`, { domains: n, max_domains: maxDomains });
   }
 
-  protected async assertPocCap(db: Kysely<Database>, capCents: number, costCents: number): Promise<void> {
-    const { spent, pending } = await spentAndPending(db);
-    const remaining = capCents - spent - pending;
-    if (costCents > remaining) {
-      throw new AppError(409, 'POC_CAP_EXCEEDED', `This purchase would exceed the ${formatUsd(capCents)} POC cap`, {
-        cap_cents: capCents, spent_cents: spent, spent: formatUsd(spent), pending_cents: pending,
-        remaining_cents: remaining, remaining: formatUsd(remaining), cost_cents: costCents,
-      });
-    }
-  }
-
   private async assertAccountState(adapter: RegistrarAdapter, cost: number, dryRun: boolean): Promise<string[]> {
     const warnings: string[] = [];
     let st: AccountState;
@@ -765,7 +737,7 @@ export class BuyService {
   }
 
   private async registrarDryRun(
-    adapter: RegistrarAdapter, domain: string, winner: EvaluatedQuote, caps: Caps, pocCap: number, allowed: string[],
+    adapter: RegistrarAdapter, domain: string, winner: EvaluatedQuote, caps: Caps, allowed: string[],
     rec: { input: BuyInput; ctx: BuyCtx; approvedAt: Date; check: CheckResult; category: Category; trancheId: string | null; smallBuy: boolean },
   ): Promise<{ winner: EvaluatedQuote; cost: number }> {
     let w = winner;
@@ -789,7 +761,7 @@ export class BuyService {
         if (!(e instanceof RegistrarError)) throw e;
         if (e.ambiguous) await this.recordDryRunAmbiguous(adapter, e, cost, rec);
         if (e.code === 'COST_MISMATCH' && attempt === 0) {
-          w = await this.requote(adapter, domain, caps, pocCap, allowed, rec.input.dryRun);
+          w = await this.requote(adapter, domain, caps, allowed, rec.input.dryRun);
           continue;
         }
         if (e.code === 'INSUFFICIENT_FUNDS') throw funds(e.details.shortfall as number | undefined);
@@ -831,7 +803,7 @@ export class BuyService {
       { registrar: adapter.name, registrar_code: e.code });
   }
 
-  private async requote(adapter: RegistrarAdapter, domain: string, caps: Caps, pocCap: number, allowed: string[], dryRun: boolean): Promise<EvaluatedQuote> {
+  private async requote(adapter: RegistrarAdapter, domain: string, caps: Caps, allowed: string[], dryRun: boolean): Promise<EvaluatedQuote> {
     let ev: EvaluatedQuote;
     try {
       ev = evaluateQuote({ registrar: adapter.name, capabilities: adapter.capabilities, quote: await adapter.quote(domain), error: null }, allowed);
@@ -842,7 +814,6 @@ export class BuyService {
     }
     if (!ev.eligible) throw new AppError(409, 'NO_ELIGIBLE_REGISTRAR', 'After a price change the registrar is no longer eligible', { exclusion_reason: ev.exclusionReason });
     if (!pickWinner([ev], caps)) throw new AppError(409, 'PRICE_ABOVE_MAX', 'The price changed and is now above your cap', { cheapest: priceDetails(ev) });
-    await this.assertPocCap(this.deps.db, pocCap, ev.firstYearCents!);
     await this.assertAccountState(adapter, ev.firstYearCents!, dryRun);
     return ev;
   }
@@ -860,7 +831,6 @@ export class BuyService {
   }
 
   private async dryRunBody(a: Approved): Promise<Record<string, unknown>> {
-    const { spent, pending } = await spentAndPending(this.deps.db);
     const w = a.winner;
     // Same default as GET /pricing/preview with no domain: anchor today (Jerusalem), drop date 24 months later
     const anchor = idtDay(new Date(this.deps.now()));
@@ -872,16 +842,12 @@ export class BuyService {
       first_year: formatUsd(w.firstYearCents!), first_year_cents: w.firstYearCents,
       renewal: formatUsd(w.renewalCents!), renewal_cents: w.renewalCents,
       two_year: formatUsd(w.twoYearCents!), two_year_cents: w.twoYearCents,
-      poc_spent: formatUsd(spent), poc_spent_cents: spent,
-      poc_remaining_after: formatUsd(a.settings.poc_cap_cents - spent - pending - a.cost),
-      poc_remaining_after_cents: a.settings.poc_cap_cents - spent - pending - a.cost,
       domains_owned: await activeDomainCount(this.deps.db),
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
       proposed_listing: a.plan ? { ...this.withPolicyLine(planView(a.plan, events), a.dropPolicy, w.renewalCents), display_name: a.displayName } : null, settings_version: a.pricing.version,
       display_name: a.displayName, ...this.policyFields(a.dropPolicy, w.renewalCents),
       horizon: a.horizon, screening_group: a.screeningGroup, ...(a.math ? { renewal_math: a.math } : {}),
       ...gf,
-      ...(a.smallBuyState ? { small_buy: a.smallBuyState } : {}),
       warnings: [...a.check.warnings, ...(a.plan?.warnings ?? []), ...(a.accountWarnings ?? []), ...this.horizonWarnings(a)],
     };
   }

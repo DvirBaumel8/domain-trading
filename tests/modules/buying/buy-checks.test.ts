@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { RdapFn } from '../../../src/core/rdap.js';
 import { RegistrarError } from '../../../src/modules/registrars/types.js';
 import { makeApp } from '../../helpers/app.js';
-import { DOMAIN, T0, buyBody, postBuy, seedOwnedDomains, seedSpent } from '../../helpers/buy.js';
+import { DOMAIN, T0, buyBody, postBuy, readyToBuy, seedOwnedDomains, seedSpent } from '../../helpers/buy.js';
 import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
 import { issueToken } from '../../helpers/tokens.js';
@@ -90,11 +90,11 @@ describe('POST /buy checks (no money moves)', () => {
     expect(pb.calls).toEqual([]);
   });
 
-  it('CAP-5: a cap field in the body is rejected (strict schema); settings unchanged', async () => {
+  it('CAP-5: a cap field in the body is rejected (strict schema)', async () => {
     const auth = await setup();
-    const res = await postBuy(app, buyBody({ poc_cap: 999999 }), auth);
+    const res = await postBuy(app, buyBody({ max_domains: 999999 }), auth);
     expect(res.statusCode).toBe(422);
-    expect((await db.selectFrom('settings').select('poc_cap_cents').executeTakeFirstOrThrow()).poc_cap_cents).toBe(150000);
+    expect((await db.selectFrom('settings').select('max_domains').executeTakeFirstOrThrow()).max_domains).toBe(40);
   });
 
   it('B-14: RDAP says registered → 409 NOT_AVAILABLE, zero register calls', async () => {
@@ -126,11 +126,11 @@ describe('POST /buy checks (no money moves)', () => {
     expect(res.json()).toMatchObject({ dry_run: true, registrar: 'porkbun' });
   });
 
-  it('B-11/CAP-1: spent $495.00 + $11.08 → 409 POC_CAP_EXCEEDED with remaining $5.00', async () => {
+  it('B-11/G-86: a large prior spend does not refuse a buy (the service tracks no money budget)', async () => {
     const auth = await setup();
     await seedSpent(149500);
     const res = await postBuy(app, buyBody(), auth);
-    expect(res.json().error).toMatchObject({ code: 'POC_CAP_EXCEEDED', details: { remaining: '$5.00', remaining_cents: 500 } });
+    expect(res.statusCode).toBe(201);
   });
 
   it('B-13/CAP-2: 40 domains owned → 409 DOMAIN_CAP_REACHED', async () => {
@@ -276,7 +276,7 @@ describe('POST /buy checks (no money moves)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       dry_run: true, domain: DOMAIN, registrar: 'porkbun', first_year: '$11.08', renewal: '$11.08', two_year: '$22.16',
-      poc_spent: '$0.00', poc_remaining_after: '$1,488.92', registrar_dry_run: { would_succeed: true, cost: '$11.08', cost_cents: 1108 },
+      registrar_dry_run: { would_succeed: true, cost: '$11.08', cost_cents: 1108 },
       proposed_listing: { mode: 'bin', bin: '$399', floor: '$399', min_offer: '$399', lto_max_months: null, settings_version: 2 },
       settings_version: 2,
     });
@@ -287,10 +287,11 @@ describe('POST /buy checks (no money moves)', () => {
     expect(await db.selectFrom('audit_log').selectAll().where('path', '=', '/buy').execute()).toHaveLength(1);
   });
 
-  it('DR-2: dry run enforces every check (POC cap)', async () => {
+  it('DR-2: dry run enforces every check (domain cap)', async () => {
     const auth = await setup();
-    await seedSpent(149500);
-    expect((await postBuy(app, buyBody({ dry_run: true }), auth)).json().error.code).toBe('POC_CAP_EXCEEDED');
+    await readyToBuy(DOMAIN);
+    await seedOwnedDomains(40);
+    expect((await postBuy(app, buyBody({ dry_run: true }), auth)).json().would_be_blocked).toBe('DOMAIN_CAP_REACHED');
   });
 
   it('DR-3: dry run, then the real call with the same key → 409 (different request hash)', async () => {

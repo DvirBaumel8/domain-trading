@@ -72,7 +72,7 @@ The scratch DB is local docker (service `db`, user `dt`, password `dt`, port 543
 ## Where warnings show
 
 `GET /report` (READ) lists warnings with levels (error/warn/info, `docs/contract/reports.md`), for example `RENEWAL_PRICE_UNKNOWN` or `EXPORT_PENDING`, plus upcoming renewal/drop dates and the
-budget and cap headroom. `GET /audit` shows every POST including `jobs/run` rows (a failed step is in the summary, e.g. `daily: failed backupExport`).
+spend and domain-cap headroom. `GET /audit` shows every POST including `jobs/run` rows (a failed step is in the summary, e.g. `daily: failed backupExport`).
 `GET /health` (needs a READ or WRITE token) shows the DB and adapter state. Render logs (Dashboard -> Logs) hold startup and migration output.
 
 ## Releasing (DOM)

@@ -35,7 +35,7 @@ describe('POST /buy purchase', () => {
     expect(b).toMatchObject({
       domain: DOMAIN, registrar: 'porkbun', order_id: 'ord-1', charged: '$11.08', charged_cents: 1108,
       renewal: '$11.08', two_year: '$22.16', expiry_date: '2027-10-05', drop_date: '2028-10-05', renewals_used: 0,
-      poc_spent_after: '$11.08', poc_remaining: '$1,488.92', domains_owned: 1,
+      domains_owned: 1,
       post_buy: { privacy: 'on', auto_renew: 'off', lander: 'afternic ns set', listing: null },
       warnings: [],
     });
@@ -95,14 +95,13 @@ describe('POST /buy purchase', () => {
     expect(pb.realRegisterCalls).toBe(1);
   });
 
-  it('B-12/CAP-1: spent $480, two parallel $11.08 buys of different domains → exactly one succeeds', async () => {
+  it('B-12/G-86: two parallel buys of different domains both succeed (no money cap in the service)', async () => {
     const pb = new FakeAdapter('porkbun');
     const { auth } = await setup(pb);
     await seedSpent(148000);
     const res = await Promise.all([postBuy(app, buyBody({ domain: 'alpha.com' }), auth), postBuy(app, buyBody({ domain: 'bravo.com' }), auth)]);
-    expect(res.map((r) => r.statusCode).sort()).toEqual([201, 409]);
-    expect(res.find((r) => r.statusCode === 409)!.json().error.code).toBe('POC_CAP_EXCEEDED');
-    expect(pb.charges).toBe(1);
+    expect(res.map((r) => r.statusCode)).toEqual([201, 201]);
+    expect(pb.charges).toBe(2);
   });
 
   it('CAP-2: an unresolved (unknown) purchase counts toward the 40-domain cap', async () => {

@@ -1,5 +1,5 @@
-// v2.0.0 /buy gates: a complete, current screening pack (SEL7-1) and an open tranche with room under its spend cap. Pure reads: the caller
-// throws (real buy) or reports (dry run). The spend cap is re-checked under the global buy lock in BuyService.reserve.
+// v2.0.0 /buy gates: a complete, current screening pack (SEL7-1) and an open tranche. Pure reads: the caller
+// throws (real buy) or reports (dry run). 
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
@@ -9,7 +9,7 @@ import { activeSelectionSettings } from '../selection/index.js';
 import { latestScreeningRun, screeningHold } from './buy-hold.js';
 import { openTrancheFor } from '../selection/index.js';
 
-export type BuyBlock = 'BUY_HOLD' | 'SCREENING_PACK_REQUIRED' | 'NO_TRANCHE' | 'TRANCHE_SPEND_CAP' | 'SMALL_BUY_PRICE' | 'SMALL_BUY_WEEKLY_CAP' | 'DOMAIN_CAP_REACHED';
+export type BuyBlock = 'BUY_HOLD' | 'SCREENING_PACK_REQUIRED' | 'NO_TRANCHE' | 'SMALL_BUY_PRICE' | 'DOMAIN_CAP_REACHED';
 export type PackReason = 'NO_PACK' | 'INCOMPLETE' | 'NOT_FROM_LATEST_RUN' | 'SETTINGS_NOT_ACTIVE' | 'PACK_TOO_OLD';
 export interface Gate { code: BuyBlock; message: string; details: Record<string, unknown> }
 
@@ -38,38 +38,19 @@ export async function trancheGate(db: Kysely<Database>, domain: string): Promise
   return { trancheId: t.trancheId };
 }
 
-/** The tranche's spend cap against what its purchases already cost (open ones at their expected cost) plus this buy's cost. */
-export async function spendCapGate(db: Kysely<Database>, trancheId: string, costCents: number): Promise<Gate | null> {
-  const t = await db.selectFrom('tranches').select('spend_cap_cents').where('id', '=', trancheId).executeTakeFirstOrThrow();
-  if (t.spend_cap_cents === null) return null;
-  const rows = await db.selectFrom('purchases').select(['charged_cents', 'expected_cents'])
-    .where('tranche_id', '=', trancheId).where('state', '!=', 'failed').execute();
-  const spent = rows.reduce((s, r) => s + (r.charged_cents ?? r.expected_cents ?? 0), 0);
-  if (spent + costCents <= t.spend_cap_cents) return null;
-  return {
-    code: 'TRANCHE_SPEND_CAP',
-    message: `This buy (${formatUsd(costCents)}) on top of ${formatUsd(spent)} already bought would pass the tranche spend cap of ${formatUsd(t.spend_cap_cents)}`,
-    details: { tranche_id: trancheId, spend_cap_cents: t.spend_cap_cents, spent_cents: spent, cost_cents: costCents },
-  };
-}
-
 export const gateError = (g: Gate): AppError => new AppError(409, g.code, g.message, g.details);
 
 /**
  * v2.14.0 (CR-012 T12-7): every gate a real buy of `domain` would hit today, in the order /buy checks them (the same functions as a /buy dry run:
- * the buy hold of its latest screening run, the screening pack, the open tranche, then the tranche spend cap when a quote is known).
+ * the buy hold of its latest screening run, the screening pack, the open tranche).
  * A /buy dry run reports only the first; the daily list reports all of them.
  */
-export async function buyBlocks(db: Kysely<Database>, domain: string, nowMs: number, firstYearCents: number | null): Promise<BuyBlock[]> {
+export async function buyBlocks(db: Kysely<Database>, domain: string, nowMs: number): Promise<BuyBlock[]> {
   const out: BuyBlock[] = [];
   if (await screeningHold(db, domain)) out.push('BUY_HOLD');
   const pg = await packGate(db, domain, nowMs);
   if (pg) out.push(pg.code);
   const tg = await trancheGate(db, domain);
   if ('gate' in tg) out.push(tg.gate.code);
-  else if (firstYearCents !== null) {
-    const cg = await spendCapGate(db, tg.trancheId, firstYearCents);
-    if (cg) out.push(cg.code);
-  }
   return out;
 }

@@ -32,7 +32,7 @@ import {
 } from '../replay.js';
 
 export interface SelectionDeps { db: Kysely<Database>; now: () => number; holdoutCheck?: HoldoutCheck;
-  /** v3.7.0 (G-3): the weekly small-buy usage, composed in app.ts (selection does not import buying). */ smallBuy?: (nowMs: number) => Promise<object> }
+  /** v3.7.0 (G-3): the small-buy price rule, composed in app.ts (selection does not import buying). */ smallBuy?: (nowMs: number) => Promise<object> }
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 const Approval = approvalRefObject;

@@ -1,7 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../db/types.js';
 import { pair, wholeUsd, type Pair } from '../../../core/money.js';
-import { activeDomainCount, spentCents } from '../../buying/index.js';
+import { activeDomainCount } from '../../buying/index.js';
 
 /** The private walk-away: whole dollars with a "(private)" mark, like plan-view ("$960 (private)"). */
 export function walkawayPair(cents: number | null): Pair<'walkaway'> {
@@ -19,11 +19,12 @@ const LINKED = sql`(audit_id is not null and audit_id in (select audit_id from s
  * Every figure is a SQL sum over ledger_entries (R-2). Q1/Q12:
  *  - costs = -sum(registration, renewal, refund, tool, ai) and -sum(fee, adjustment) NOT linked to a sale;
  *  - sale fees = -sum(fee, adjustment) linked to a sale (audit_id in sales) and -sum(payout_fee);
- *  - budget.spent stays spentCents (the /buy cap figure).
+ *  - spend.spent = -sum(registration, renewal, fee): plain accounting, no cap.
  */
 export async function reportMoney(db: Kysely<Database>) {
-  const cfg = await db.selectFrom('settings').select(['poc_cap_cents', 'max_domains']).executeTakeFirstOrThrow();
-  const spent = await spentCents(db);
+  const cfg = await db.selectFrom('settings').select(['max_domains']).executeTakeFirstOrThrow();
+  const sp = await sql<{ spent: string }>`select coalesce(-sum(amount_cents), 0)::bigint as spent from ledger_entries where type in ('registration', 'renewal', 'fee')`.execute(db);
+  const spent = Number(sp.rows[0]!.spent);
   const r = await sql<{ gross: string; commission: string; sale_fees: string; costs: string; n: string }>`
     select
       coalesce(sum(amount_cents) filter (where type = 'sale'), 0)::bigint as gross,
@@ -45,8 +46,8 @@ export async function reportMoney(db: Kysely<Database>) {
   const missing = fwd.filter((d) => d.renewal_price_cents === null).map((d) => d.domain);
   const total = fwd.reduce((s, d) => s + (d.renewal_price_cents ?? 0), 0);
   return {
-    budget: {
-      ...pair('poc_cap', cfg.poc_cap_cents), ...pair('spent', spent), ...pair('remaining', cfg.poc_cap_cents - spent),
+    spend: {
+      ...pair('spent', spent),
       committed_forward: { ...pair('total', total), complete: missing.length === 0, missing },
       domains: { count: await activeDomainCount(db), max: cfg.max_domains },
     },
