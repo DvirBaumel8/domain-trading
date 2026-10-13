@@ -61,7 +61,7 @@ export interface Approved {
   smallBuy: boolean; smallBuyState: SmallBuyState | null;
   /** v3.7.0: the display name to store (given, or built from the intake words), and the drop policy. */
   displayName: string | null; dropPolicy: DropPolicy;
-  horizon: Horizon; screeningGroup: 'passed' | 'borderline'; math: RenewalMath | null; streReason: string | null;
+  horizon: Horizon; screeningGroup: 'passed' | 'borderline' | null; math: RenewalMath | null; streReason: string | null;
   settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
   /** Dry run only: registrar account-state findings that a real buy would refuse on (founder rule 6). */
   accountWarnings?: string[];

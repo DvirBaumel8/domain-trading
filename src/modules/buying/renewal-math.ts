@@ -28,10 +28,13 @@ export function binForMath(category: Category, grade: 'strong' | 'weaker' | null
   return p.nongeoDefaultBinCents;
 }
 
-/** The test group of a bought name (CR-045 item 3): `borderline` when its latest screening run holds a FLAG result, else `passed`. */
-export async function screeningGroupOf(db: Kysely<Database>, domain: string): Promise<'passed' | 'borderline'> {
+/** The test group of a bought name (CR-045 item 3): `borderline` when its latest screening run holds a FLAG result, else `passed`;
+ * null when the name has no screening pack (CR-051 B-1: a name with no pack is in neither test group). */
+export async function screeningGroupOf(db: Kysely<Database>, domain: string): Promise<'passed' | 'borderline' | null> {
+  const pack = await db.selectFrom('screening_packs').select('id').where('domain', '=', domain).limit(1).executeTakeFirst();
+  if (!pack) return null;
   const run = await latestScreeningRun(db, domain);
-  if (!run) return 'passed';
+  if (!run) return null;
   const r = await sql<{ n: string }>`
     select count(*)::text as n from (select distinct on (check_id) status from screening_results where run_id = ${run.id} and domain = ${domain} order by check_id, checked_at desc, id desc) x
     where status = 'FLAG'`.execute(db);

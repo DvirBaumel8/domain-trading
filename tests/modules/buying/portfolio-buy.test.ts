@@ -135,3 +135,11 @@ describe('v4.0.0 /buy: horizon, group, cap (CR-045)', () => {
     expect((await dom()).screening_group).toBe('borderline');
   });
 });
+
+describe('CR-051 B-1: screening group without a pack', () => {
+  it('GRP-2: a name with no screening pack is in neither test group (null)', async () => {
+    const { screeningGroupOf } = await import('../../../src/modules/buying/renewal-math.js');
+    const { testDb } = await import('../../helpers/db.js');
+    expect(await screeningGroupOf(testDb, 'neverscreened-cr051.com')).toBeNull();
+  });
+});

@@ -5,7 +5,7 @@ import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import { checkApproval } from '../../../core/approval.js';
 import { addMonthsClamped, idtDay, isYmd, isRealDate, dayNumber } from '../../../core/dates.js';
-import { assertNoteNoPii, approvalRef } from '../../../core/validation.js';
+import { approvalRef, hasAtSign, piiError } from '../../../core/validation.js';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
 import { AppError } from '../../../http/errors.js';
@@ -60,7 +60,7 @@ export function registerPortfolioWrites(app: FastifyInstance, deps: { db: Kysely
     if (b.views === undefined && b.leads === undefined && b.inquiries === undefined && b.offers === undefined) {
       throw new AppError(422, 'VALIDATION_ERROR', 'at least one of views, leads, inquiries, offers is required');
     }
-    assertNoteNoPii(b.source);
+    if (hasAtSign(b.source)) throw piiError("source must not contain an email address or '@'", { field: 'source' }); // CR-051 B-2
     const d = await deps.db.selectFrom('domains').select(['id', 'status']).where('domain', '=', domain).executeTakeFirst();
     if (!d || d.status === 'pending_purchase') throw new AppError(404, 'DOMAIN_NOT_FOUND', `${domain} is not in the portfolio`);
     const row = await deps.db.insertInto('portfolio_stats').values({

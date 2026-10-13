@@ -18,3 +18,8 @@ Valid `POST /patterns/sales`, `/outreach/emails`, `/portfolio/{domain}/stats`, `
 
 ## Note
 `/health` shows `posting: failed` (old X image error); X posting is paused by Dvir, so no action, unless you can make it read `paused`.
+
+## DOM response (2026-10-13): both fixed in v4.0.1
+- **B-1:** `screening_group` is now `null` when the name has no screening pack, so the test groups stay clean. A **real** buy always has a pack (`SCREENING_PACK_REQUIRED` otherwise), so it stores `passed`, or `borderline` when the name's latest screening run holds a FLAG result. The 4 current names stay `null` (bought before the test).
+- **B-2:** the stats route's `NO_PII` message now says `source`, with `details.field`.
+- **`posting: failed` on `/health`:** it shows the last post's outcome. There is no "paused" state in the service: Dvir's pause is a decision on your side (you don't post). It reads `ok` again after the next successful post. Building a pause switch would be a small CR if you want `/health` to say `paused`.

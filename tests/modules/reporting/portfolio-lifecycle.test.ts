@@ -93,6 +93,11 @@ describe('POST /portfolio/{domain}/stats (CR-044 item 2)', () => {
     expect((await post(`/portfolio/${D}/stats`, w, { as_of: '2027-08-09', views: 1, venue: 'flippa', source: 'x' })).statusCode).toBe(422);
     expect((await post(`/portfolio/${D}/stats`, w, { as_of: '2027-08-09', views: -1, source: 'x' })).statusCode).toBe(422);
     expect((await post(`/portfolio/nothere.com/stats`, w, { as_of: '2027-08-09', views: 1, source: 'x' })).statusCode).toBe(404);
+    // CR-051 B-2: an '@' in source is NO_PII and the message names the field
+    const pii = await post(`/portfolio/${D}/stats`, w, { as_of: '2027-08-09', views: 1, source: 'a@b.com' });
+    expect(pii.statusCode).toBe(422);
+    expect(pii.json().error).toMatchObject({ code: 'NO_PII', details: { field: 'source' } });
+    expect(pii.json().error.message).toMatch(/^source /);
     expect(await db.selectFrom('portfolio_stats').select('id').execute()).toHaveLength(0);
   });
 

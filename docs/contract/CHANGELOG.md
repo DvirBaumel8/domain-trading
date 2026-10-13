@@ -2,6 +2,9 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 4.0.1 (2026-10-13): CR-051 fixes: no test group without a pack, NO_PII names the field
+PATCH: `screening_group` is null when a name has no screening pack (CR-051 B-1); the stats route's `NO_PII` message names `source` (B-2). Release note: `docs/releases/v4.0.1.md`.
+
 ## 4.0.0 (2026-10-13): portfolio discipline, outcomes, SellerHub
 MAJOR (CR-044 to CR-049): `POST /buy` now **requires** `stre` and `stre_reason` (400 without them), a breaking change for the caller, as Gavriel asked in CR-046. Release note: `docs/releases/v4.0.0.md`.
 - **Domain cap 40** (Dvir, 13 Oct 2026; migration; was 50). A dry run `/buy` at the cap reports `would_be_blocked: "DOMAIN_CAP_REACHED"` (a real buy and `dry_run: "strict"` are refused with the existing code).
