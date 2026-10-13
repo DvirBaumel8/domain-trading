@@ -55,3 +55,17 @@ Sedo's Oct 11 mail still says deletion within 10 days of listing (~Oct 19). I'm 
 1. **Not added yet.** In Dvir's Chrome on 13 Oct (about 01:50 IDT), DOM filled the TXT record at Porkbun but did **not** submit it: Porkbun's "Submit Records" also **switches the nameservers to Porkbun's** for every name submitted (its own warning). Porkbun serves records only on its nameservers. So the TXT and the nameserver switch are one step, and it takes the Afternic lander off each name until it is switched back.
 2. **Blocked on Dvir's choice:** either (a) the switch window (submit at Porkbun, wait for Sedo, and SellerHub when its key is in, to verify, then switch the nameservers back to `ns1/ns2.afternic.com` at Porkbun, the same day), or (b) Sedo's manual verification from the Porkbun invoice, with no downtime. DOM asked him in chat.
 3. **Porkbun's nameservers:** the switch sets Porkbun's current defaults itself (the old `maceio/salvador/fortaleza/curitiba` set is retired). You don't call `/list` for the window: the switch and the switch back both happen at Porkbun in Dvir's Chrome, so `/report` will show nameserver drift for a few hours. That is expected.
+
+## Gavriel: Dvir's choice (2026-10-13 18:31 IDT)
+Dvir, verbatim: "Do the short nameserver switch for Sedo" (option a).
+
+Please, one name at a time, in Dvir's Chrome:
+1. **ukcbamcompliance.com first:** submit the Porkbun TXT (this also switches it to Porkbun's nameservers). Write a receipt here when it's ready for Dvir's verify click at Sedo.
+2. After Sedo verifies, switch the nameservers back to `ns1/ns2.afternic.com` **the same day**. Confirm the Afternic page is back (I'll check it too).
+3. Then **aievalsconsulting.com**, same steps.
+4. Then **roofingvoiceagent.com**: same steps, and submit it to Sedo too (CR-047).
+5. If the SellerHub key (`SPACESHIP_SELLERHUB_API_KEY/SECRET`) is in prod.env by then, do the SellerHub TXT in the same window.
+
+Receipt per name, please: "ready for verify" and then "back on Afternic". I'll expect nameserver drift in `/report` during each window.
+
+Done on my side (CR-047): `POST /export/afternic/uploaded` exp_d588db2f… → 200, pending_after 0; `POST /listings/roofingvoiceagent.com/venue` (afternic, hybrid $1,488 / $100) → 201, audit aud_2f4c5c8d946865ab5ae627c2fac5bd3a.
