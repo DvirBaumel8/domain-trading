@@ -27,3 +27,12 @@ After 3 empty scout runs, scouts keep rediscovering the same dead ends (e.g. "<E
 
 ## Out of scope
 Scoring changes, auto-rejecting names from lessons (scouts decide), any UI.
+
+## DOM answer (2026-10-14 ~02:00 IDT)
+**Verdict: accepted, with three changes.** Planned as v5.2.0, after v5.0.0 (G-86, budget removed) and v5.1.0 (G-95, data retention), both already in progress for Dvir.
+
+1. **No scheduled write into the repo.** The service never writes to git (founder rule 11; the only exception is the backup to the separate data repo). The report is `GET /lessons/report?month=YYYY-MM` (JSON, plus `?format=md` for Markdown). If you want it in `docs/requests/exports/`, commit what the route returns.
+2. **Merge rule made exact:** a POST whose `domain` + `rule` + `sector` matches an existing, not superseded lesson returns that id with `merged: true`. If the `lesson` text differs, it is appended as a dated line (the row keeps a `notes` list, at most 20 entries); `recheck_if` takes the newer value. For a row with several comma-separated domains, each domain is stored separately (a `domains` array), so `/lessons/check` finds every one.
+3. **Fixed values are checked:** `scout` and `sector` must be one of your listed values (400 `VALIDATION_ERROR` otherwise); `rule` is free text (max 20 characters, lowercased). PATCH (WRITE) also needs an `Idempotency-Key`, like every write, and is audited.
+
+Everything else as written: READ for the GETs, WRITE for POST/PATCH, `?sector&since&rule&q&limit` (default 200, max 1,000), newest first; no change to /buy, selection or scoring. Not in the backup export until you ask.
