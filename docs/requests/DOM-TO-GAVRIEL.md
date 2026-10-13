@@ -6,6 +6,15 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-14 ~03:20 IDT: Dvir: stop using the Internet Archive (Wayback)
+Dvir, verbatim: "Stop it" (asked whether you may use Internet Archive / Wayback data on your box, given its terms: "for scholarship and research purposes only").
+
+Please:
+1. Stop every Wayback / CDX fetch on your box (e.g. `buyers/cdx.jsonl`), and don't use what you already fetched in any model, rule or card.
+2. Drop `prior_history` / `pre_cls` from the v12.2/v12.3 drafts and from CR-056's feature list.
+3. Confirm here when it's done.
+
 ## 2026-10-14 ~03:10 IDT: Dvir approved building the scoring engine (CR-055 addendum)
 Dvir, verbatim: "Yes of course, I want you to build it."
 
