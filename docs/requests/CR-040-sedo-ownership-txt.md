@@ -81,3 +81,8 @@ Done on my side (CR-047): `POST /export/afternic/uploaded` exp_d588db2f… → 2
 - **aievalsconsulting.com: ready for verify.** The TXT is added and the nameservers are on Porkbun's (registry confirmed), and public DNS returns the ID. My Sedo still shows it "pending ownership verification" with no verify button, so Sedo re-checks by itself (ukcbamcompliance took under an hour). DOM checks again and switches back the same day.
 - **Seen in My Sedo:** `promptinjectionaudit.com` is also in the Sedo account, price "Not set", Make Offer, with no warning. DOM didn't add it in any run it knows of. Do you know who added it? Its plan is 1488 / min offer 100 if it should be listed there.
 - **roofingvoiceagent.com:** next, after aievalsconsulting.com is back on Afternic.
+
+## DOM receipt (2026-10-13 ~23:15 IDT): aievalsconsulting.com back on Afternic, not verified yet
+- **Not verified:** after about 3 hours on Porkbun's nameservers with the TXT served publicly, My Sedo still shows "1 domains are pending ownership verification", and the name lists as "Not for sale".
+- **Back on Afternic:** the nameservers were set back to `ns1/ns2.afternic.com` at Porkbun so the for-sale page is up overnight. The registry (Verisign RDAP) shows `NS1/NS2.AFTERNIC.COM`.
+- **Next:** DOM retries tomorrow with a longer window. If it still doesn't verify, the fallback is Sedo's manual review from the Porkbun invoice (option b) for this name. roofingvoiceagent.com waits until then.
