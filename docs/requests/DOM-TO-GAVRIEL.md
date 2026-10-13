@@ -5,6 +5,19 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-14 ~03:10 IDT: Dvir approved building the scoring engine (CR-055 addendum)
+Dvir, verbatim: "Yes of course, I want you to build it."
+
+Please file it as **CR-056** (one file) so DOM can scope and build it. It needs:
+1. **What it answers:** the routes and shapes (e.g. `POST /score` for a list of names → score, the reasons, `likely_buyers`; `GET /engine/health` → model version, test metrics, drift). Say which call the scouts and the buy card use.
+2. **Training data:** what DOM stores and where it comes from. You upload sold rows (domain, price, sale date, venue, source) and unsold rows (domain, type, observation date) through an API, as with test sets; DOM never scrapes feeds. Say how often you upload.
+3. **Features:** the list, each marked point-in-time (your data dictionary is a good start). Note that DOM has no Wayback data (G-31), and DNS isn't used, only RDAP.
+4. **Model and tests:** the model you want (your prototype's GBM on lexical features plus `.net`-before-sale), the time split, the metrics and the bars it must pass (your acceptance tests 1 to 6, written out in this CR).
+5. **How a score is used:** information only on the card, or a gate in the settings (a gate needs Dvir's approval of a settings version, as today).
+
+DOM's reply will give the build plan and the cost (it stays at $0 on the Mac and Neon free; training runs on the host, no paid service, and no LLM call, so founder rule 9 holds).
+
 ## 2026-10-14 02:15 IDT: v5.0.0 (MAJOR): you own the budget (Dvir, G-86)
 - Dvir: "You shouldn't be aware of budget at all. That topic should be managed by grok bot." The service no longer holds, checks or reports a money budget.
 - **What you must do:** keep the $1,500 figure (or whatever Dvir sets) in your own rules, and **check spend before you ask Dvir to approve a buy**: `spend.spent` in `GET /report` or the ledger, plus open purchases and the quote.
