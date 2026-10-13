@@ -16,3 +16,22 @@ Gavriel will draft a settings version based on v12.1 (label `v12.2`, not activat
 
 ## Acceptance
 Test set sealed with n ≥150/150, no overlap with earlier sets (hash + overlap check shown), report fields above present, endpoint answers for 3 known names.
+
+## DOM answer (2026-10-14 ~02:30 IDT)
+**Verdict: mostly no build needed; one pushback, one small build.**
+
+### 1. TEST-V25: you gather the rows, the existing API seals it (pushback on who collects)
+- **DOM does not collect the rows.** Scraping DNW / DNJournal / NamePros threads and NameBio is marketplace scraping, which CLAUDE.md forbids, and NameBio blocks automated requests anyway (G-29). Pending-delete names come only from lists you upload (`POST /selection/drop-lists`). So the sold and unsold rows are your research, as with TEST15.
+- **Everything else exists:** `POST /selection/test-sets` with `purpose: "new"` takes up to 2,000 rows `{domain, label: sold|dropped, as_of, source, price_usd?}`, applies your filters (`max_chars`, `min_words`/`max_words`, `min_price_usd`, digits and hyphens out), and removes every name already used by any earlier set, holdout, cohort or registry role with `ALREADY_REGISTERED`. That is your overlap check, and the 202 shows `removed_n` with reasons. Then `POST /selection/test-sets/TEST-V25/seal` freezes `member_count` and `member_hash`. Use `sibling_method: "bt1@v3"`.
+- **Scout batches** are not in the name registry, so they are not excluded automatically: leave them out of your rows (or wait for CR-053's lessons store and check names there first).
+- **Report fields:** the set computes `registered_share`, `alt_tld_before_n`, `n_words`, `sld_chars` as of each row. `prior_history` / `pre_cls` and sibling-scan `live_n` are not computed for test sets (the archive is off for good, and the sibling scan reads today's sites, which would leak future information into an as-of test). The 70 %/75 % bars and the false-pass list with the passing clause come from your holdout replay (`POST /selection/replays`), as today.
+
+### 2. Registered share for one name: no new route needed
+Run `POST /screening/runs` with `{mode: "live", checks: ["form", "census"], names: [{domain, lane}]}`; the `census` result has `registered_share`, `in_use_share` (null, G-34), `n_registered`, `n_checked`, `n_unknown`, `siblings`, with the approved `bt1@v3` and cached registry answers, and no approval step. `forsale_n` isn't computed by the census; the sibling scan's `parked_n` is the closest.
+
+### 3. Settings paths for your v12.2 draft
+- **Max SLD length 15:** `form.max_sld_chars` = 15.
+- **Registered-share minimum 0.5:** `thresholds.registered_share_min` = 0.5 (`registered_share_min_B` is tier B's).
+- **Max words 2:** `thresholds.form_B_max_words` and the `n_words` feature in `tier.clauses`.
+- **Not expressible today:** "3 words only with a `regime` token", the same-words-use clause on a **live sibling**, and rule 10's **lead ≥ 60**. The tier clauses can only use `TIER_FEATURES` (`registered_share`, `prior_history`, `alt_tld_before_n`, `n_words`, `sld_chars`, `is_geo`, `gform1_pass`, `short`, `lane`, `sellers_verified_n`, `sellers_unknown_n`). `alt_tld_before_n ≥ 1` works as an `any` clause now.
+- **Small build offered:** add the tier features `regime_n` (from `form`) and `lead_points` / `sibling_live_n` (from the newest sibling scan of the name, live runs only, null in back-tests). Say yes and I'll schedule it after CR-053 (v5.3.0); then the three clauses are plain settings.
