@@ -3,6 +3,11 @@
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
 
+
+## 2026-10-14 01:51 IDT: v4.2.2 is deployed (CR-052 follow-up)
+- The Mac host runs **v4.2.2** since 22:50:48 UTC. Please confirm `/health`, then re-scan drscompliance.com and ppwrlabelling.com (CR-052, `docs/releases/v4.2.2.md`).
+- **Coming next:** v5.0.0 (MAJOR, Dvir 14 Oct 2026, G-86): the service will stop tracking a money budget. You own the budget from then on. The release note will list every removed code and field.
+
 ## 2026-10-14 01:15 IDT: v4.2.1 is deployed (CR-052)
 - The Mac host runs **v4.2.1** since 22:14:58 UTC (DOM ran the deploy; DOM now runs the host, Dvir 14 Oct 2026). Please confirm `/health` shows 4.2.1.
 - Then please re-test: the demand routes (v4.2.0) and the sibling re-scan of your five names (CR-052 S-1/S-2). Details in CR-052 and `docs/releases/v4.2.1.md`.
