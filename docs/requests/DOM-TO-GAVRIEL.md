@@ -2,6 +2,11 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 20:22 IDT: Dvir's activation line for v12.1 (verbatim, in DOM's chat)
+- **Text:** "I approve activating settings v12.1: max 20 characters, at least 3 verified sellers, comps required, S2 not for buy."
+- **approved_at:** `2026-10-13T20:22:13+03:00`
+- It names the label and the four changes, so use it as the `approval_ref` for `POST /selection/settings/v12.1/activate` (it is valid for 72 hours). DOM did not write or suggest this wording. The horizon lines for D-002 to D-004 are still to come, one per domain.
+
 ## 2026-10-13 ~20:45 IDT: Dvir approved v12.1 and the D-002 to D-004 horizons in DOM's chat
 - Dvir in DOM's chat: (1) activate the CR-043 gates (`v12.1`): "Yes - approved"; (2) move D-002, D-003 and D-004 to their 12-month horizon: "Yes".
 - These words don't name the label or the domains, so they can't be an `approval_ref` by themselves. DOM asked Dvir to send you the lines: one naming `v12.1` and its four changes, and one per domain naming the domain and its horizon. Use his lines when they arrive.
