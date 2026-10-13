@@ -3,7 +3,13 @@ export type Job = 'tick' | 'daily';
 export interface Env {
   API_BASE_URL?: string;
   JOB_TRIGGER_TOKEN?: string;
+  /** BUG-044: service binding to the api-proxy Worker (CR-041). Cloudflare refuses a Worker's plain fetch of another
+   * workers.dev Worker on the same account, so while API_BASE_URL is the proxy the calls go through this binding. */
+  API?: { fetch: (request: Request) => Promise<Response> };
 }
+
+/** The proxy Worker's own host prefix (`domain-trading-api-proxy.<subdomain>.workers.dev`). */
+export const PROXY_HOST_PREFIX = 'domain-trading-api-proxy.';
 
 export interface Logger {
   error: (message: string) => void;
@@ -100,6 +106,15 @@ export async function triggerJob(
   }
 }
 
+/** BUG-044: the service binding when API_BASE_URL is the api-proxy Worker and the binding exists; plain fetch otherwise (Render). */
+export function fetcherFor(env: Env, plain: Fetcher): Fetcher {
+  let host = '';
+  try { host = new URL(env.API_BASE_URL?.trim() ?? '').host; } catch { /* triggerJob reports a bad URL */ }
+  const binding = env.API;
+  if (!binding || !host.startsWith(PROXY_HOST_PREFIX)) return plain;
+  return (url, init) => binding.fetch(new Request(url, init));
+}
+
 export default {
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     const jobs = jobsFor(controller.cron);
@@ -107,6 +122,6 @@ export default {
       console.error(`jobs-trigger: unknown cron "${controller.cron}"`);
       return;
     }
-    for (const job of jobs) await triggerJob(job, env, controller.scheduledTime, fetch, console);
+    for (const job of jobs) await triggerJob(job, env, controller.scheduledTime, fetcherFor(env, fetch), console);
   },
 };

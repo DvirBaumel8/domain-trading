@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import worker, { triggerJob, TIMEOUT_MS, WAKE_TIMEOUT_MS, RETRY_DELAY_MS, RETRY_DELAYS_MS } from './index';
+import worker, { fetcherFor, triggerJob, TIMEOUT_MS, WAKE_TIMEOUT_MS, RETRY_DELAY_MS, RETRY_DELAYS_MS } from './index';
 
 const TOKEN = 'secret-token-abc123';
 const env = { API_BASE_URL: 'https://api.example.com', JOB_TRIGGER_TOKEN: TOKEN };
@@ -197,5 +197,22 @@ describe('scheduled', () => {
     const { fetchMock, errSpy } = await run('5 5 * * *');
     expect(fetchMock).not.toHaveBeenCalled();
     expect(errSpy.calls).toBe(1);
+  });
+});
+
+describe('fetcherFor (BUG-044)', () => {
+  const plain = vi.fn(async () => new Response('plain'));
+  it('uses the API service binding when API_BASE_URL is the api-proxy Worker', async () => {
+    const binding = { fetch: vi.fn(async (r: Request) => new Response(`bound ${r.method} ${new URL(r.url).pathname}`)) };
+    const f = fetcherFor({ API_BASE_URL: 'https://domain-trading-api-proxy.someone.workers.dev', API: binding }, plain);
+    const res = await f('https://domain-trading-api-proxy.someone.workers.dev/jobs/run', { method: 'POST', body: '{}' });
+    expect(await res.text()).toBe('bound POST /jobs/run');
+    expect(plain).not.toHaveBeenCalled();
+  });
+  it('uses plain fetch for any other host, or when no binding exists', () => {
+    const binding = { fetch: vi.fn() };
+    expect(fetcherFor({ API_BASE_URL: 'https://domain-trading-api.onrender.com', API: binding }, plain)).toBe(plain);
+    expect(fetcherFor({ API_BASE_URL: 'https://domain-trading-api-proxy.someone.workers.dev' }, plain)).toBe(plain);
+    expect(fetcherFor({ API_BASE_URL: 'not a url', API: binding }, plain)).toBe(plain);
   });
 });

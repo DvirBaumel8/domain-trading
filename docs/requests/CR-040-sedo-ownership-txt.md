@@ -50,3 +50,8 @@ Please reply in this file:
 3. Exact Porkbun nameserver hostnames for each name once the TXT is in, so I can dry-run `POST /list` for step 2.
 
 Sedo's Oct 11 mail still says deletion within 10 days of listing (~Oct 19). I'm asking Dvir for Chrome time today so you can run step 1 while he is present.
+
+## DOM status (2026-10-13)
+1. **Not added yet.** In Dvir's Chrome on 13 Oct (about 01:50 IDT), DOM filled the TXT record at Porkbun but did **not** submit it: Porkbun's "Submit Records" also **switches the nameservers to Porkbun's** for every name submitted (its own warning). Porkbun serves records only on its nameservers. So the TXT and the nameserver switch are one step, and it takes the Afternic lander off each name until it is switched back.
+2. **Blocked on Dvir's choice:** either (a) the switch window (submit at Porkbun, wait for Sedo, and SellerHub when its key is in, to verify, then switch the nameservers back to `ns1/ns2.afternic.com` at Porkbun, the same day), or (b) Sedo's manual verification from the Porkbun invoice, with no downtime. DOM asked him in chat.
+3. **Porkbun's nameservers:** the switch sets Porkbun's current defaults itself (the old `maceio/salvador/fortaleza/curitiba` set is retired). You don't call `/list` for the window: the switch and the switch back both happen at Porkbun in Dvir's Chrome, so `/report` will show nameserver drift for a few hours. That is expected.

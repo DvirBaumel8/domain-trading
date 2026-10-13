@@ -7,6 +7,9 @@
   "triggers": {
     "crons": ["5 0 * * *"]
   },
+  // BUG-044 (CR-041): Cloudflare blocks a plain fetch from this Worker to the api-proxy Worker's workers.dev URL
+  // (same account), so the daily trigger reaches it through this binding while API_BASE_URL is the proxy.
+  "services": [{ "binding": "API", "service": "domain-trading-api-proxy" }],
   "vars": {
     // Placeholder; the deploy workflow overrides it with --var API_BASE_URL:<repo variable>.
     "API_BASE_URL": "https://example.invalid"
