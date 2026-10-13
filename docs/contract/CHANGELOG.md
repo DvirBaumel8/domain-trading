@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.1.0 (2026-10-14): G-95: daily data retention (old unbought screening data, old job logs and checks; tighter when the database nears the free-plan limit)
+Release note: `docs/releases/v5.1.0.md`.
+MINOR (additive). Dvir, 14 Oct 2026: "G-95: Yes, setup a smart retention ability (cron job deletes big old data)."
+- **New daily step `retention`** (after `postsRefresh`, before `backupExport`; `jobs.md`): deletes old data of names never bought and never packed, and old job logs, in batches. Ages are normal / tight (halved when the database is at or over 70% of the 0.5 GB free-plan limit): screening results 180 / 90 days, screening evidence nothing points to 180 / 90, empty finished screening runs 180 / 90, sibling scans and registrar-state checks (not the newest per name) 90 / 45, quotes (not those a purchase names, not the newest check per name) 180 / 90, job steps and `job_runs` 60 / 30. Step summary: `{mode, dry_run, db_bytes_before, db_bytes_after, partial, tables}`.
+- **Never pruned:** `audit_log`, `ledger_entries`, `sales`, `offers`, `listing_history`, pricing data, `manual_quotes`, verdicts, screening packs, `domains`, `purchases`, test sets, cohorts, labelled names, holdout suites, replay runs. Guarantee 6 now says the other append-only tables are deleted only by this step.
+- **New `/report` warning `DAILY_JOB_MISSED`** (warn): no scheduled `daily` run (`job_runs.trigger = scheduled`) started in the last 26 hours; details `{last_scheduled_at, hours_since}`; silent on a database with no job run at all. `reports.md`.
+- **No route or field changed.** Migration `1763500000000_v5-1-0.sql`: a delete trigger function that allows a DELETE only inside a transaction that set `app.retention = on` (used by the retention step only) on `screening_results`, `screening_evidence`, `candidate_screenings`, `sibling_scans`, `job_runs`, `registrar_state_checks`; UPDATE and TRUNCATE stay forbidden.
+
 ## 5.0.0 (2026-10-14): G-86: the service no longer tracks a money budget (POC cap, tranche spend cap, small-buy weekly cap and the /report budget block removed); Gavriel owns the budget
 Release note: `docs/releases/v5.0.0.md`.
 MAJOR (removed codes and fields). Dvir, 14 Oct 2026: "You shouldn't be aware of budget at all. That topic should be managed by grok bot." The service no longer knows a money budget. Gavriel owns it.

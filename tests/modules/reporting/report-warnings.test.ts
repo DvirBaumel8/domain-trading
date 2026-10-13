@@ -184,6 +184,20 @@ describe('GET /report warnings', () => {
     expect(w[0]!.details.size_bytes).toBeGreaterThan(700);
   });
 
+  it('v5.1.0: DAILY_JOB_MISSED when no scheduled daily started in 26 h; a manual daily does not count; silent on a database with no job run', async () => {
+    expect(codes(await buildWarnings(db, new Date(NOW)))).not.toContain('DAILY_JOB_MISSED'); // no run at all
+    const run = (trigger: string, startedAt: number) => db.insertInto('job_runs').values({ job: 'daily', trigger: trigger as 'manual', started_at: new Date(startedAt), finished_at: new Date(startedAt + 60_000), skipped: false, ok: true, steps: '{}' }).execute();
+    await run('manual', NOW - 3_600_000);
+    const w = (await buildWarnings(db, new Date(NOW))).filter((x) => x.code === 'DAILY_JOB_MISSED');
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatchObject({ level: 'warn', details: { last_scheduled_at: null, hours_since: null } });
+    await run('scheduled', NOW - 27 * 3_600_000);
+    const w2 = (await buildWarnings(db, new Date(NOW))).filter((x) => x.code === 'DAILY_JOB_MISSED');
+    expect(w2[0]!.details).toMatchObject({ hours_since: 27 });
+    await run('scheduled', NOW - 25 * 3_600_000);
+    expect(codes(await buildWarnings(db, new Date(NOW)))).not.toContain('DAILY_JOB_MISSED');
+  });
+
   it('PAST_DROP_DATE and EXPIRED_NOT_RENEWED', async () => {
     await insertOwnedDomain(db, { domain: 'late-drop.com', expiry_date: '2026-10-10', drop_date: '2026-10-10', renewals_used: 1 });
     await insertOwnedDomain(db, { domain: 'lapsed.com', expiry_date: '2026-10-10', drop_date: '2027-10-10' });

@@ -75,6 +75,10 @@ The scratch DB is local docker (service `db`, user `dt`, password `dt`, port 543
 spend and domain-cap headroom. `GET /audit` shows every POST including `jobs/run` rows (a failed step is in the summary, e.g. `daily: failed backupExport`).
 `GET /health` (needs a READ or WRITE token) shows the DB and adapter state. Render logs (Dashboard -> Logs) hold startup and migration output.
 
+## Data retention (v5.1.0, G-95)
+
+The daily `retention` step (`src/modules/ops/jobs/retention.ts`) deletes old data of names never bought or packed, old sibling scans, registrar checks, quotes and job logs, at most 60 seconds a night in batches of 5,000 rows. When the database is at or over 70% of the 0.5 GB Neon limit (the `DB_SIZE_HIGH` threshold) every age is halved. Ages are constants in that file. Its summary (`mode`, bytes before and after, rows deleted per table, `partial`) is in the `retention` step of `GET /jobs/runs`; Gavriel reads it, DOM does not call it. Postgres reuses the freed space rather than shrinking the files, so `db_bytes_after` may not drop at once. A delete only works inside the job's own transaction (`app.retention = on`); anything else on these tables still fails. If `DB_SIZE_HIGH` stays on after a few nights, the remaining weight is in tables the job never touches (`audit_log`, `ledger_entries`): raise it with Dvir.
+
 ## Releasing (DOM)
 
 1. Full gate green: `npx vitest run && npx tsc --noEmit && npm run build`.

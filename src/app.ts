@@ -43,7 +43,7 @@ import { ExportService } from './modules/listing/index.js';
 import { ListService } from './modules/listing/index.js';
 import { NsVerifier } from './modules/ops/index.js';
 import { DropJob } from './modules/ops/index.js';
-import { ReferenceRefreshJob } from './modules/ops/index.js';
+import { ReferenceRefreshJob, RetentionJob } from './modules/ops/index.js';
 import { PriceScheduleJob } from './modules/ops/index.js';
 import { registerJobs } from './modules/ops/index.js';
 import { IntakeScreeningJob } from './modules/candidates/index.js';
@@ -215,6 +215,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });
   app.decorate('referenceRefreshJob', referenceRefresh);
+  const retention = new RetentionJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log });
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: screeningDeps.rdapLookup, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('dropWatchJob', new DropWatchJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
@@ -228,7 +229,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh,
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention,
     outsideReview: async () => {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: (deps.now ?? Date.now)() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;

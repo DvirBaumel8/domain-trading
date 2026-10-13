@@ -10,7 +10,7 @@ type Conn = Kysely<any> | Transaction<any>; // eslint-disable-line @typescript-e
 export type LockKey =
   | 'posts_cap' | 'intake_screening' | 'daily_rebuild' | 'holdout_suites' | 'test_sets_seal' | 'company_document' | 'selection_settings_activate'
   | 'job:tick' | 'job:daily' | 'job:screen' | 'job_enqueue' | 'review_run'
-  | `job:${'price' | 'drop' | 'ns-verify' | 'registrar-check' | 'portfolio-check' | 'drop-watch' | 'cohort-outcomes' | 'reference-refresh' | 'portfolio-lifecycle' | 'listing-sync'}`
+  | `job:${'price' | 'drop' | 'ns-verify' | 'registrar-check' | 'portfolio-check' | 'drop-watch' | 'cohort-outcomes' | 'reference-refresh' | 'portfolio-lifecycle' | 'listing-sync' | 'retention'}`
   | `selection_list:${string}` | `pack:${string}` | `domain:${string}`;
 
 /** The text that is hashed. A domain key hashes the bare domain name: the same key /buy has always used. */

@@ -9,6 +9,7 @@ export { DropJob } from './jobs/drop.js';
 export { NsVerifier } from './jobs/ns-verify.js';
 export { PortfolioCheckJob } from './jobs/portfolio-check.js';
 export { PriceScheduleJob } from './jobs/price-schedule.js';
+export { RetentionJob } from './jobs/retention.js';
 export { ReferenceRefreshJob } from './jobs/reference-refresh.js';
 export { RegistrarCheckJob } from './jobs/registrar-check.js';
 export { type BackupExport, JobRunner } from './jobs/runner.js';

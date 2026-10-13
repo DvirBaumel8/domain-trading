@@ -96,6 +96,8 @@ export interface JobRunnerDeps {
   backupExport?: BackupExport;
   /** Daily popularity list / IANA bootstrap / cache pruning (CAP-02); while undefined, that step reports skipped. */
   referenceRefresh?: Runnable;
+  /** v5.1.0 (G-95): daily data retention (old unbought screening data, old job logs and checks); runs after postsRefresh, before backupExport. While undefined, that step reports skipped. */
+  retention?: Runnable;
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
   /** Takes the run lock (default: a database session lock). Tests of the step order pass a stub. */
@@ -158,6 +160,7 @@ export class JobRunner {
       optional('referenceRefresh', d.referenceRefresh, 'reference refresh not configured', true),
       optionalFn('outsideReview', d.outsideReview, 'outside review not configured'),
       optionalFn('postsRefresh', d.postsRefresh, 'posts refresh not configured'),
+      optional('retention', d.retention, 'retention not configured'),
       optional('backupExport', d.backupExport, 'backup export not configured'),
     ];
   }

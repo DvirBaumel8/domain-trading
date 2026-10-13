@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 5.0.0** (14 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 5.1.0** (14 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -72,7 +72,7 @@ Every authenticated POST writes exactly one `audit_log` row: success, refusal (i
 3. **`dry_run` for all testing.** `POST /buy` and `POST /list/{domain}` accept `"dry_run": true`: every check runs (including the live registrar quote and the registrar's own dry run on `/buy`) and the response shows what would happen, but nothing is bought, changed or booked. Only the audit row (and, on `/buy`, the stored quotes) is written. One exception: if the registrar answers a `/buy` dry run ambiguously (it may have registered), the service records an `unknown` purchase so the caps count it, and answers 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`. Gavriel tests with `dry_run: true` only.
 4. **No top-up:** the service never calls a registrar top-up endpoint. A registrar with auto top-up on is refused (`REGISTRAR_AUTO_TOPUP_ON`). The prepaid credit is a second spending limit.
 5. **1-year registrations only, at most one renewal,** compared on first year + one renewal. Never premium or aftermarket names, never Cloudflare Registrar.
-6. **Append-only records:** the ledger, the audit log, listing history, pricing settings and sales facts can't be updated or deleted (database triggers). Corrections are new reversing rows.
+6. **Append-only records:** the ledger, the audit log, listing history, pricing settings and sales facts can't be updated or deleted (database triggers). Corrections are new reversing rows. Other append-only tables (screening results and evidence, job logs and the like) can't be updated either, and are deleted only by the daily `retention` step (5.1.0, G-95) for old data of names that were never bought and have no screening pack; packs, bought names, the ledger and the audit log are never pruned.
 7. **No outbound contact:** the service never sends email or chat, never contacts buyers, never calls a marketplace. Scheduled price changes reach a marketplace only when a bot uploads the export file.
 8. **The private walk-away is never written to an export file** (Afternic, Sedo, the preview's `afternic_row`). Read endpoints show it to the bots, marked `(private)`. `GET /report?format=md` leaves it out.
 9. **No secrets in responses or logs:** registrar keys live only in server environment variables. No route returns a key, a key prefix or an account balance.

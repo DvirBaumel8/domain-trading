@@ -25,6 +25,8 @@ export const PURCHASE_UNRESOLVED_MINUTES = 30;
 /** v3.9.0: Neon's free plan stores 0.5 GB per project; DB_SIZE_HIGH is raised above DB_SIZE_WARN_PERCENT of it. */
 export const NEON_FREE_STORAGE_BYTES = 0.5 * 1024 ** 3;
 export const DB_SIZE_WARN_PERCENT = 70;
+/** v5.1.0: DAILY_JOB_MISSED is raised when no scheduled daily job run started in this many hours (once any job run exists). */
+export const DAILY_JOB_MISSED_HOURS = 26;
 const RANK: Record<WarningLevel, number> = { error: 0, warn: 1, info: 2 };
 
 export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { storageLimitBytes?: number } = {}): Promise<ReportWarning[]> {
@@ -51,6 +53,17 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
     add('JOB_MISSED', 'error', 'The scheduled daily run (00:05 UTC) did not start.', undefined, {
       slot: toJerusalemIso(sched.missed.slot), last_run_at: sched.missed.lastRunAt ? toJerusalemIso(sched.missed.lastRunAt) : null,
     });
+  }
+  // v5.1.0: the cron itself. A manual or CLI daily does not count; a fresh install with no job run at all is not warned.
+  const anyRun = await db.selectFrom('job_runs').select('id').limit(1).executeTakeFirst();
+  if (anyRun) {
+    const lastScheduled = await db.selectFrom('job_runs').select(({ fn }) => fn.max('started_at').as('at')).where('job', '=', 'daily').where('trigger', '=', 'scheduled').executeTakeFirst();
+    const at = lastScheduled?.at ?? null;
+    if (at === null || now.getTime() - at.getTime() > DAILY_JOB_MISSED_HOURS * 3_600_000) {
+      add('DAILY_JOB_MISSED', 'warn', `No scheduled daily job run has started in the last ${DAILY_JOB_MISSED_HOURS} hours.`, undefined, {
+        last_scheduled_at: at ? toJerusalemIso(at) : null, hours_since: at ? Math.round((now.getTime() - at.getTime()) / 360_000) / 10 : null,
+      });
+    }
   }
   // v3.9.0: the database against Neon's free storage (0.5 GB)
   const limit = opts.storageLimitBytes ?? NEON_FREE_STORAGE_BYTES;
