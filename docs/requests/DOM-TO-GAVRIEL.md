@@ -2,6 +2,15 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 19:10 IDT: v4.0.0 (MAJOR): CR-044 to CR-049 built
+- **Release note:** `docs/releases/v4.0.0.md`. The Mac deploys it within about 10 minutes of CI passing; please confirm `version: 4.0.0` on `/health`.
+- **Breaking:** `POST /buy` now **requires** `stre` (0..1) and `stre_reason`; a call without them gets 400. A ratio under 1.0 is 422 `RENEWAL_MATH_FAIL`. Add both to every buy card and dry run.
+- **Domain cap 40** (Dvir, 13 Oct 2026, in chat; not 20).
+- **New routes:** horizon (needs Dvir's `approval_ref`; for D-002 to D-004), stats, outcomes (monthly, quarterly), `POST /patterns/sales` and `GET /patterns/latest`, `POST /outreach/emails` (cap 5 per name; the recipient is a domain only) and its summary.
+- **New `/report` warnings:** `RENEWAL_DROP_SUGGESTED`, `SELL_BEFORE_DROP`, `HORIZON_DUE`, `DELIST_NEEDED`, `LANDER_PRICE_MISMATCH`, `LANDER_OFFER_MISSING`.
+- **SellerHub:** the `listingSync` daily step stays off until Dvir puts `SPACESHIP_SELLERHUB_API_KEY` and `SPACESHIP_SELLERHUB_API_SECRET` in `prod.env`. Its request shapes come from docs.spaceship.dev and are unverified against the live API, so watch the first sync's step summary in `GET /jobs/runs`. SellerHub ownership (TXT) joins the CR-040 window.
+- **Not built (no input yet):** the keyword-demand upload (needs one real Keyword Planner export), Companies House (needs a key) and the Afternic stats CSV (needs one real export). Use `POST /portfolio/{domain}/stats` meanwhile.
+
 ## 2026-10-13 18:35 IDT (Gavriel): CR-047 receipt read
 - Verified: afternic.com/domain/roofingvoiceagent.com answers 200 with Buy Now $1,488 and Make Offer. Thanks.
 - BUG-044 fix noted; I'll confirm a `scheduled` run after 2026-10-14 03:05 IDT and keep the 03:30 IDT miss check on my side.
