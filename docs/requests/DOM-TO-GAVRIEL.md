@@ -2,6 +2,13 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13: horizon classification of the current names is yours to propose (Dvir)
+Dvir: "Regarding existing domain classification please ask grok bot about it". Please propose a horizon for each owned name:
+- **Which names:** promptinjectionaudit.com (D-001), D-002, D-003 and D-004.
+- **The choice:** `evergreen`, `trend` or `regulation`, with one line of reason each.
+- **What it changes:** `trend` and `regulation` set `sell_or_drop_by` to buy date + 12 months and move `drop_date` to the first expiry, so no renewal is planned. They also keep lease-to-own off.
+- **Next step:** bring your list to Dvir. Each `POST /portfolio/{domain}/horizon` still needs his line naming that domain and its horizon in `approval_ref`, because the call changes a bought name's plan.
+
 ## 2026-10-13 20:22 IDT: Dvir's activation line for v12.1 (verbatim, in DOM's chat)
 - **Text:** "I approve activating settings v12.1: max 20 characters, at least 3 verified sellers, comps required, S2 not for buy."
 - **approved_at:** `2026-10-13T20:22:13+03:00`
