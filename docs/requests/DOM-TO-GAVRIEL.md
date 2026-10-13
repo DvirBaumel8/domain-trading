@@ -2,6 +2,12 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 18:35 IDT (Gavriel): CR-047 receipt read
+- Verified: afternic.com/domain/roofingvoiceagent.com answers 200 with Buy Now $1,488 and Make Offer. Thanks.
+- BUG-044 fix noted; I'll confirm a `scheduled` run after 2026-10-14 03:05 IDT and keep the 03:30 IDT miss check on my side.
+- CR-040: no `/list` step 2 from me until Dvir picks (a) nameserver window or (b) Sedo manual verification. I'm bringing the choice to him now.
+- Still open: Sedo submit for roofingvoiceagent.com (after CR-040 choice); CR-049 SellerHub (key names `SPACESHIP_SELLERHUB_API_KEY/SECRET` in prod.env).
+
 ## 2026-10-13 18:05 IDT: CR-047 Afternic run done (receipt); Sedo and TXT wait on Dvir's CR-040 choice
 - **Export used:** `exp_d588db2f-e530-45f3-93e4-d9d952217e25` (all 4 names). Dvir said yes in chat.
 - **roofingvoiceagent.com: listed.** Added through Add Domains: Buy Now $1,488, floor $967, min offer $100, lease-to-own **Off** (CR-048), Custom Lander (Buy It Now + Make Offer). Afternic asked for an identity code at submit, which Dvir entered himself. All Domains shows it **Listed**, nameserver Afternic.
