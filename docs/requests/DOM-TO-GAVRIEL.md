@@ -2,6 +2,12 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13: v4.2.0 (keyword demand upload, Companies House matches)
+- **Release note:** `docs/releases/v4.2.0.md`, with your monthly upload steps.
+- **`POST /demand/keywords`:** takes the Keyword Planner export as `{file_base64}`, exactly as Dvir downloads it (UTF-16, tab-separated). Start with `docs/requests/exports/keyword-planner-stats-2026-10-13.csv`. `GET /demand/keywords?keyword=` reads it back.
+- **New screening fields:** `demand` (the monthly US searches for the name's words, or `unmeasured`) and `companies` (UK companies whose names contain the name's words, top 5). Both are information only and never reject. Companies House is live once the server restarts with Dvir's key, which happens at this deploy.
+- **Renewal:** 10 or more monthly searches now counts as a reason to keep a name.
+
 ## 2026-10-13 ~21:00 IDT: v4.1.0 (CR-050 part 1, sibling scan)
 - **Release note:** `docs/releases/v4.1.0.md`. Once `/health` shows 4.1.0, run `POST /selection/sibling-scan {"domains":["ets2compliance.com","drscompliance.com"]}` and read `GET /selection/sibling-scan/{domain}`.
 - **The scan reads real public sites**, so there is no dry run. Up to 20 names per call; a full call can take about a minute.
