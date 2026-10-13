@@ -168,3 +168,23 @@ describe('applySet (dotted-path drafts)', () => {
     expect(deepEqual(next.lead.p_lead, D.lead.p_lead)).toBe(true);
   });
 });
+
+describe('v4.0.0 portfolio settings keys (CR-045, CR-046, CR-044)', () => {
+  it('PS-1: the defaults are renewal.drop_check_days 60, outreach.max_emails_per_name 5, buy.renewal_math_min 1 with Afternic 20%, holdout 20/20 after 6 months, sales judged at 24 months', () => {
+    expect(D.renewal).toMatchObject({ drop_check_days: 60, list_by_days_before_expiry: 30, horizon_months: 12, horizon_due_days: 30 });
+    expect(D.outreach).toEqual({ max_emails_per_name: 5 });
+    expect(D.buy).toMatchObject({ renewal_math_min: 1, math_venue: 'afternic', commission: { afternic: 0.2, sellerhub: 0.1 } });
+    expect(D.portfolio).toMatchObject({ holdout_passed_n: 20, holdout_failed_n: 20, holdout_recheck_months: 6, patterns_min_cents: 100000, patterns_max_cents: 500000, judge_sales_months: 24 });
+  });
+
+  it('PS-2: an older stored version without the keys reads the defaults; an unknown key or a commission over 100% is refused', () => {
+    const old = JSON.parse(JSON.stringify(D)) as Record<string, unknown>;
+    delete old.renewal; delete old.outreach; delete old.portfolio; old.buy = { exclude_lanes: [] };
+    const r = SelectionValues.safeParse(old);
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.renewal.drop_check_days).toBe(60);
+    expect(r.success && r.data.buy.commission.afternic).toBe(0.2);
+    expect(SelectionValues.safeParse({ ...D, renewal: { ...D.renewal, extra: 1 } }).success).toBe(false);
+    expect(SelectionValues.safeParse({ ...D, buy: { ...D.buy, commission: { afternic: 1.5 } } }).success).toBe(false);
+  });
+});

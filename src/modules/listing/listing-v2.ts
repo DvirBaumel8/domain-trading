@@ -23,6 +23,8 @@ export interface ListingContext {
   settings: PricingSettings; highValueMinBinCents: number;
   override: boolean; overrideReason: string | null; approvalValid: boolean;
   today: string; dropDate: string | null; // LTO must end before dropDate
+  /** v4.0.0 (CR-048): the name is flagged for the 12-month drop (horizon trend or regulation, or drop_date = the first expiry): lease-to-own is refused, no override. */
+  noLto?: boolean;
   /** Re-validating the stored plan unchanged (category/grade change): keep the stored hybrid values and source, skip the formula match. */
   carried?: { pricingSource: 'formula' | 'approved_exception' };
 }
@@ -56,6 +58,7 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
     return fail('LISTING_PRICE_INVALID', 'Prices must be positive USD amounts with at most 2 decimals');
   }
   const lto = req.lto_max_months ?? null;
+  if (lto !== null && ctx.noLto) return fail('LTO_NOT_ALLOWED', 'Lease-to-own is not allowed on a name that drops at its first expiry (horizon trend or regulation): the lease would run past the drop date');
   const exception = req.pricing_exception === true;
   const carried = ctx.carried !== undefined;
   const s = ctx.settings;

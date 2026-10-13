@@ -71,7 +71,7 @@ describe('CR-043 buy.exclude_lanes', () => {
     expect(status(DEFAULT_SELECTION_VALUES)).toEqual([['buy_candidate', null], ['buy_candidate', null]]);
   });
   it('CR43-61 exclude_lanes ["S2"]: S2 becomes not_for_buy with LANE_NOT_FOR_BUY (also while the buy hold is on), S3 is unchanged', () => {
-    const v = { ...DEFAULT_SELECTION_VALUES, buy: { exclude_lanes: ['S2' as const] } };
+    const v = { ...DEFAULT_SELECTION_VALUES, buy: { ...DEFAULT_SELECTION_VALUES.buy, exclude_lanes: ['S2' as const] } };
     expect(status(v)).toEqual([['buy_candidate', null], ['not_for_buy', 'LANE_NOT_FOR_BUY']]);
     expect(assemble(items, plan, [row(0, 'S3'), row(1, 'S2')], v, true, true).items.map((i) => i.derived.final_status)).toEqual(['would_buy', 'not_for_buy']);
   });

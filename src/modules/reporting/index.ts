@@ -4,3 +4,4 @@ export { registerReport } from './api/report.js';
 export { buildReport } from './report/index.js';
 export { ledgerCsvRows, ledgerRows, usdSigned } from './report/portfolio.js';
 export { jobRunsView, stepView, jobsOverdue, dailyScheduleState, triggerFromKey } from './job-runs.js';
+export { registerOutcomes } from './api/outcomes.js';

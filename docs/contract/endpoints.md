@@ -1,4 +1,4 @@
-# Endpoints (contract v3.10.0)
+# Endpoints (contract v4.0.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -21,6 +21,12 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/sold/{domain}` | WRITE | Sales |
 | GET | `/report`, `/report/pricing-review` | READ | Reports (`reports.md`) |
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | Reads |
+| GET | `/portfolio/outcomes`, `/portfolio/outcomes/monthly`, `/portfolio/outcomes/quarterly` | READ | Portfolio outcomes (4.0.0) |
+| POST | `/portfolio/{domain}/horizon`, `/portfolio/{domain}/stats` | WRITE | Portfolio outcomes (4.0.0) |
+| POST | `/outreach/emails` | WRITE | Outreach log (4.0.0) |
+| GET | `/outreach/emails/summary` | READ | Outreach log (4.0.0) |
+| POST | `/patterns/sales` | WRITE | Sales patterns (4.0.0) |
+| GET | `/patterns/latest` | READ | Sales patterns (4.0.0) |
 | GET | `/selection/settings`, `/selection/lists/{name}`, `/selection/sibling-methods/{method}`, `/selection/test-sets/{name}`, `/selection/drop-lists`, `/selection/drop-lists/{name}`, `/selection/cohorts/{name}`, `/selection/cohorts/report`, `/selection/namebio`, `/selection/replays/{id}`, `/selection/buy-hold`, `/selection/holdout-suites` | READ | Selection (`selection.md`) |
 | POST | `/selection/settings`, `/selection/settings/{label}/activate`, `/selection/lists/{name}`, `/selection/sibling-methods/{method}/approve`, `/selection/test-sets`, `/selection/test-sets/{name}/seal`, `/selection/test-sets/{name}/cancel`, `/selection/drop-lists`, `/selection/cohorts`, `/selection/evaluate`, `/selection/labelled-names`, `/selection/replays`, `/selection/holdout-suites` | WRITE | Selection (`selection.md`) |
 | POST | `/screening/runs`, `/screening/runs/{id}/cancel`, `/screening/runs/{id}/manual`, `/screening/runs/{id}/verdicts`, `/quotes/manual` | WRITE | Screening |
@@ -109,12 +115,18 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
   | `registrar` | string \| null | pin one registrar; no fallback |
   | `dry_run` | bool \| `"strict"`? | default `false`. `true`: a dry run. `"strict"` (2.1.0): a dry run that returns the first real-buy gate refusal as the error (below). Any other value → 422 `VALIDATION_ERROR` |
   | `auto_list` | bool? | default `true`: after the buy, point NS at the lander and store the listing |
+  | `stre` | number 0..1 | **required (4.0.0, CR-046 item 3)**: the scout's expected sell-through over the renewal period; missing → 400 `VALIDATION_ERROR` |
+  | `stre_reason` | string 3..500 | **required (4.0.0)**: why |
+  | `horizon` | `"evergreen"` \| `"trend"` \| `"regulation"`? | (4.0.0, CR-045 item 2, CR-048) default `evergreen`. A trend or regulation name should be bought with `drop_policy: at_first_expiry`; otherwise the dry run and the 201 carry the warning `HORIZON_DROP_POLICY_MISMATCH`. Its `sell_or_drop_by` is set to the buy date + `renewal.horizon_months` (12) |
 
 - **Checks, in order (any failure stops the call; no registrar call before check 6):** approval (`APPROVAL_INVALID` / `APPROVAL_EXPIRED`) → `proposed_listing.mode` (`MODE_INVALID`) → category (`CATEGORY_REQUIRED`) → grade (`GEO_GRADE_REQUIRED` / `GRADE_NOT_GEO`) → the listing rules for `proposed_listing` (the `/list` listing codes, plus `PRICING_FORMULA_MISMATCH`; a geo BIN must equal the grade price; under `pricing_settings` v3 also `BIN_NOT_IN_PRICE_LIST` and `LANDER_EXCEPTION_REQUIRED`) → comps (`COMPS_REQUIRED` / `COMPS_INVALID`) → settings version (409 `SETTINGS_VERSION_CHANGED`) → **buy hold** (409 `BUY_HOLD`, real buys only, see below) → **screening pack** (409 `SCREENING_PACK_REQUIRED`, real buys only, v2.0.0) → **open tranche** (409 `NO_TRANCHE`, real buys only, v2.0.0) → not owned (409 `ALREADY_OWNED_OR_PENDING` / `ALREADY_IN_PORTFOLIO`) → domain cap (409 `DOMAIN_CAP_REACHED`) → live re-check, no cache (409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE`) → price caps, then the cheapest two-year (409 `PRICE_ABOVE_MAX`, `details.cheapest`) → **tranche spend cap** (409 `TRANCHE_SPEND_CAP`, v2.0.0; also re-checked under the global buy lock) → POC cap $1,500 including open purchases (409 `POC_CAP_EXCEEDED`, `details` `cap_cents`, `spent_cents`, `spent`, `pending_cents`, `remaining_cents`, `remaining`, `cost_cents`) → registrar account (409 `REGISTRAR_STATE_UNKNOWN` / `REGISTRAR_AUTO_TOPUP_ON` / `REGISTRAR_FUNDS`; since 2.16.0 a real buy is also refused with `REGISTRAR_STATE_UNKNOWN` (`details.registrar_code: AUTO_TOPUP_UNKNOWN`) when the registrar doesn't say whether auto top-up is on, founder rule 6; a dry run warns `AUTO_TOPUP_UNKNOWN` instead) → the registrar's own dry run with the exact cost (409 `REGISTRAR_DRY_RUN_FAILED` with `details.registrar_code`; a price change re-quotes once and re-checks the caps; an ambiguous answer → 409 `REGISTRAR_DRY_RUN_AMBIGUOUS`).
 - **Display name and drop policy (3.7.0, CR-033 G-2, G-9):**
   - **`display_name` (optional):** must equal the domain case-insensitively, else 422 `DISPLAY_NAME_MISMATCH`. Without it, the default comes from the newest intake `words`, each capitalised, else the domain. It is stored like `POST /list`'s display name and used by the next export.
   - **`drop_policy` (optional):** `after_one_renewal` (the default) or `at_first_expiry` (the `drop_date` is the first expiry; nothing renews).
   - **In the dry run and the 201:** `display_name`, `drop_policy`, `renewal_committed_cents` (0 for `at_first_expiry`) and `drop_policy_line`. `sell_plan_line` adds the policy only for `at_first_expiry`. **On a dry-run error** (for example `REGISTRAR_FUNDS`), `details` carry `display_name`, `drop_policy`, `renewal_committed_cents` and `drop_policy_line` too (3.7.1, CR-038). Since 3.9.0 the drop date is set in the same database transaction as the booking, so `DROP_POLICY_FAILED` can no longer occur (the code is removed); the reconciler honours the policy of the stored request when it books a purchase.
+- **Renewal maths gate (4.0.0, CR-046 item 3).** `ratio = BIN x (1 - commission) x STRe / renewal cost`, in integer cents and basis points. BIN is the proposed plan's, else the grade price (geo) or the current default BIN; the commission comes from the settings (`buy.commission[buy.math_venue]`, Afternic 20%). A ratio under `buy.renewal_math_min` (1.0) is **422 `RENEWAL_MATH_FAIL`** with `details.renewal_math {venue, bin_cents, commission_bp, stre_bp, renewal_cents, expected_net_cents, ratio, min, pass}`, in a dry run too. A passing ratio is in the dry-run body and the 201 as `renewal_math` and stored on the name with STRe and its reason (`domains.buy_card`).
+- **Horizon, group and cap (4.0.0, CR-045 items 2 and 3).** The dry run and the 201 carry `horizon` and `screening_group`: `borderline` when the name's latest screening run holds a `FLAG` result, else `passed` (the groups of the 40-name test). The domain cap is **40** (migration; was 50): a real `/buy` at the cap is 409 `DOMAIN_CAP_REACHED`; a dry run reports it as `would_be_blocked: "DOMAIN_CAP_REACHED"` and `dry_run: "strict"` returns it as the error.
+- **Lease-to-own by name type (4.0.0, CR-048).** `proposed_listing.lto_max_months` is refused with 422 `LTO_NOT_ALLOWED` (no override helps) when `horizon` is `trend` or `regulation`, or the drop policy is `at_first_expiry`; the lease would run past the drop date. On an evergreen name the existing LTO rules apply.
 - **Comps (CR-033 G-10):** the number required is `pricing_settings` `comps_min`, which is **0 under v3** (current). An empty `comps` list is valid.
 - **Small-buy exception (3.6.0, CR-030; approved by Dvir).** Optional body field `small_buy_exception: true`. When `approval_ref.text` also names the domain **and** contains "small buy" (any case), `BUY_HOLD` is skipped for that call, and only then. Two more checks apply when the flag and the words are present:
   - **Price:** the quote must not be premium, and its first year must be at most **$11.08**. Else 409 `SMALL_BUY_PRICE` `{max_first_year_cents, cost_cents, premium}`.
@@ -128,7 +140,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
     poc_spent (pair), poc_remaining_after (pair), domains_owned: int (owned + listed + delisted + pending purchases),
     registrar_dry_run: { would_succeed: true, cost, cost_cents },
     proposed_listing: null | <plan view, with the schedule anchored today and drop date +24 months>,
-    settings_version: int, would_be_blocked: null | "BUY_HOLD" | "SCREENING_PACK_REQUIRED" | "NO_TRANCHE" | "TRANCHE_SPEND_CAP" | "SMALL_BUY_PRICE" | "SMALL_BUY_WEEKLY_CAP" (3.6.0),
+    settings_version: int, would_be_blocked: null | "BUY_HOLD" | "SCREENING_PACK_REQUIRED" | "NO_TRANCHE" | "TRANCHE_SPEND_CAP" | "SMALL_BUY_PRICE" | "SMALL_BUY_WEEKLY_CAP" (3.6.0) | "DOMAIN_CAP_REACHED" (4.0.0),
     screening_pack: { status: "none" | "complete" | "incomplete", pack_id: string | null, version: int | null, issued_at: string | null },
     advisories: [string], warnings: [string] }
   ```
@@ -348,6 +360,48 @@ READ. Newest first.
 - **Errors:** 400 `VALIDATION_ERROR`.
 
 ---
+
+## Portfolio outcomes (4.0.0)
+
+Life of each bought name from idea to outcome (CR-044 item 2, CR-045, CR-046 item 4, CR-049 item 5). No registrar and no venue is contacted. No floor or walk-away is shown.
+
+### `GET /portfolio/outcomes`
+READ. `{as_of, judge_sales_after_months: 24, names: [...]}`, one row per name that is not a pending purchase: `domain, status, category, horizon, screening_group, buy_date, days_held, card {lane, tier, words, sld_len, length_band, lookalikes_registered, lookalikes_in_use, pack_id}` (from the latest screening pack and the latest lookalike re-check), `sell_or_drop_by, drop_date, expiry_date, renewals_used, cost (pair), renewal_paid (pair), sold {price (pair), sold_at, venue} | null, sale_judged` (bought at least 24 months ago), `offers_logged, stats {views, leads, inquiries, offers}, stats_by_venue {afternic?, sedo?, sellerhub?}, inquiries_6m, inquiries_12m` (inquiries plus leads up to 6 and 12 months after the buy month), `listing_changes, interest` (any offer, inquiry, lead or sale).
+
+### `GET /portfolio/outcomes/monthly`
+READ. Query (strict): `month=YYYY-MM` (default the current IDT month; anything else 422). `{month, as_of, by_feature, passed_vs_borderline, by_venue, per_name_and_venue, venue_comparison_after_12_months}`:
+- **`by_feature`:** for each of `lane, word_count, length_band, tier, lookalikes_registered, category`, groups `{value, names, with_interest, without_interest, views, leads, offers, sales}`. Interest in the month = a stats row of that month with leads, inquiries or offers.
+- **`passed_vs_borderline`:** `[{group: "passed"|"borderline", names, with_interest, views, leads, offers, inquiries_6m, inquiries_12m, sales, sales_judged_after_months: 24, names_old_enough_to_judge_sales}]`.
+- **`by_venue`:** `[{venue, month {views, leads, offers}, all_time {...}, sales}]` for afternic, sedo and sellerhub; `per_name_and_venue` the same per name; `venue_comparison_after_12_months` is `null` until a name has been held 12 months.
+
+### `GET /portfolio/outcomes/quarterly`
+READ. `{quarters: [{quarter: "2027-Q3", renewals, renewal_cost (pair), registration_cost (pair), sales, sales_total (pair), sales_minus_renewals (pair)}]}`: the renewal cost against the sales per calendar quarter.
+
+### `POST /portfolio/{domain}/horizon`
+WRITE. Body (strict) `{horizon: "evergreen" | "trend" | "regulation", approval_ref}`. **Dvir's `approval_ref` is required** (it names the domain; a missing or bad one is 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED`) because it changes the plan of a bought name. For `trend` and `regulation` it sets `sell_or_drop_by` = buy date + `renewal.horizon_months` (12) and moves `drop_date` to the first expiry (the same regeneration of the price schedule as the admin `drop-at-first-expiry`); calling it again changes nothing more. `evergreen` clears `sell_or_drop_by` and leaves `drop_date`. **200** `{domain, horizon, sell_or_drop_by, drop_date, expiry_date, warnings, audit_id}`; `warnings` may hold `LTO_STILL_ON` (a lease is set on the name: change it with `POST /list`). Errors: 404 `DOMAIN_NOT_FOUND` (not a live name), 422 `MAX_ONE_RENEWAL_USED` (a renewed name can no longer drop at its first expiry).
+
+### `POST /portfolio/{domain}/stats`
+WRITE. Append-only. Body (strict) `{as_of: YYYY-MM-DD (not in the future), month?: YYYY-MM (default the month of as_of), venue?: "afternic" | "sedo" | "sellerhub" (default afternic), views?, leads?, inquiries?, offers?: int >= 0, source: string 1..100}`; at least one count is required. **201** `{id, domain, as_of, month, venue, views, leads, inquiries, offers, source, audit_id}`. Errors: 404 `DOMAIN_NOT_FOUND`, 422 `VALIDATION_ERROR`, 422 `NO_PII` (`source` with `@`).
+
+## Outreach log (4.0.0)
+
+The service never sends email (founder rule 10). Gavriel logs each send; the log enforces the cap (CR-045 item 5, as amended).
+
+### `POST /outreach/emails`
+WRITE. Body (strict) `{domain, recipient_domain, sent_at (ISO with an offset, not in the future), reply?: bool, outcome?: "interested" | "declined" | "offer" | "sold" | "bounced" | "other" | null}`. `recipient_domain` is the company's domain only (for example `acme.com`); anything with `@`, spaces, a path or a scheme is 422 `NO_PII`, anything else that is not a domain name 422 `VALIDATION_ERROR`. **201** `{id, domain, recipient_domain, sent_at, reply, outcome, emails_for_name, max_emails_per_name, audit_id}`. The **6th** email for one name (`outreach.max_emails_per_name` 5) is **409 `EMAIL_CAP`** `{domain, emails, max_emails_per_name}` and nothing is stored. Posting the same send again (same `domain`, `recipient_domain`, `sent_at`) is **200** and only sets its `reply` and `outcome`; it is not another email. Errors: 404 `DOMAIN_NOT_FOUND`. The "10 sends and no reply" stop rule cannot trigger under a cap of 5 and is not built.
+
+### `GET /outreach/emails/summary`
+READ. `{emails, replies, sales_after_outreach, replies_per_100_emails, sales_per_100_emails, max_emails_per_name, names: [{domain, emails, replies, sold_after_outreach, at_cap}]}`. A sale counts when it happened at or after the name's first logged email. The rates are `null` before the first email.
+
+## Sales patterns (4.0.0)
+
+The service fetches no sales data (NameBio blocks bots; no source allows an automated pull). Gavriel uploads them (CR-044 item 4).
+
+### `POST /patterns/sales`
+WRITE. Body (strict) `{csv: string}` of at most 60,000 characters and 2,000 rows; the header is exactly `domain,price_usd,date,venue` (`venue` may be empty; double quotes and a `$` or thousands separators in the price are read). Any bad row, a wrong header or no rows is 422 `PATTERN_CSV_INVALID` (`details.errors[] {line, error}`) and nothing is stored. **201** `{upload_id, rows, audit_id}`. Append-only.
+
+### `GET /patterns/latest`
+READ. Query (strict) `min_usd`, `max_usd` (whole dollars; default `portfolio.patterns_min_cents` / `portfolio.patterns_max_cents`, $1,000 to $5,000), `tld` (default `com`); a reversed band is 422. Clusters the **latest** upload within the filter, split with the frozen `bt1@v3` split: `{upload_id, uploaded_at, method, filter {min_price (pair), max_price (pair), tld}, rows_in_upload, rows_after_filter, rows_split, rows_unsplit, by_word_count, by_structure, by_length_band, topic_tokens}`. Each cluster is `{value, n, median_price (pair), examples[]}`; `by_structure` writes each word as `city`, `special` (company suffix, acronym, general term) or `word`, for example `word+city`; `topic_tokens` are the 25 most common words `{token, n}`. 404 `NO_PATTERN_UPLOAD` before the first upload. The service writes nothing into the repository: Gavriel turns this answer into `docs/requests/patterns/<date>.md`.
 
 ## Selection
 The selection settings, the word lists and the pure tier + money evaluation. Shapes, defaults and meanings of every setting are in `selection.md`. **Settings drafts and list edits are WRITE and take effect only as a draft or a new list version; activating a settings version and freezing a census list need Dvir's `approval_ref`** naming the label or the list. `pricing_settings` is **not** reachable here: it changes only through DOM's admin command.
@@ -756,13 +810,15 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Cross-cutting errors:** `UNAUTHORIZED`, `SCOPE_FORBIDDEN`, `RATE_LIMITED`, `IDEMPOTENCY_KEY_REQUIRED`, `IDEMPOTENCY_KEY_MISMATCH`, `IDEMPOTENCY_KEY_IN_USE`, `VALIDATION_ERROR`, `INVALID_BODY`, `INVALID_REQUEST`, `NOT_FOUND`, `INTERNAL`, `AUDIT_WRITE_FAILED`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `JOBS_DISABLED`, `DOMAIN_BUSY`, `PRICING_SETTINGS_MISSING`.
 
-**Buying errors:** `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` (409, 3.6.0), `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `MODE_INVALID`, `BUY_HOLD`, `SCREENING_PACK_REQUIRED` (409), `NO_TRANCHE` (409), `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
+**Buying errors:** `RENEWAL_MATH_FAIL` (422, 4.0.0), `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` (409, 3.6.0), `APPROVAL_INVALID`, `APPROVAL_EXPIRED`, `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `GRADE_NOT_GEO`, `COMPS_REQUIRED`, `COMPS_INVALID`, `SETTINGS_VERSION_CHANGED`, `MODE_INVALID`, `BUY_HOLD`, `SCREENING_PACK_REQUIRED` (409), `NO_TRANCHE` (409), `ALREADY_OWNED_OR_PENDING`, `ALREADY_IN_PORTFOLIO`, `DOMAIN_CAP_REACHED`, `NOT_AVAILABLE`, `NO_ELIGIBLE_REGISTRAR`, `PINNED_REGISTRAR_INELIGIBLE`, `PRICE_ABOVE_MAX`, `POC_CAP_EXCEEDED`, `REGISTRAR_STATE_UNKNOWN`, `REGISTRAR_AUTO_TOPUP_ON`, `REGISTRAR_FUNDS` (`details.reason` may be `MONTHLY_SPEND_LIMIT`; `details.shortfall_cents` + `details.shortfall` when known), `REGISTRAR_DRY_RUN_FAILED`, `REGISTRAR_DRY_RUN_AMBIGUOUS`, `REGISTRAR_REJECTED`, `PURCHASE_ABANDONED`, `PURCHASE_FAILED`, `PURCHASE_STATE_UNKNOWN` (202 body `code`).
 
 **Listing errors:** the listing rule codes under `POST /list/{domain}`, plus `NOT_IN_PORTFOLIO`, `API_ACCESS_DISABLED`, `REGISTRAR_UNAVAILABLE`, `LISTING_CHANGED_CONCURRENTLY`, `DOMAIN_NOT_FOUND`, `DISPLAY_NAME_MISMATCH`, `REPLAN_NOTHING_LISTED`, `OVERRIDE_NEEDS_APPROVAL`, `DROP_DATE_UNKNOWN`, `LANDER_RETIRED`, `LANDER_INVALID`, `NS_INVALID`.
 
 **Screening errors:** `RUN_NOT_RUNNING` (409, the cancel routes, 2.9.0), `RUN_RUNNING` (409, `POST /screening/packs`), `PACK_NOT_FOUND` (404, `GET /screening/packs/{id}`), `JUDGED_AT_INVALID` (422, `POST /screening/packs`), `MANUAL_REQUIRED` (409, `POST /tranches/{id}/members`), `DRAFT_NOT_ALLOWED_LIVE`, `AS_OF_LIVE_REFUSED`, `RUN_NOT_FOUND`, `NAME_NOT_IN_RUN`, `CHECK_NOT_MANUAL`, `EVIDENCE_NOT_FOUND`, `OBSERVED_AT_INVALID`, `CHECKED_AT_INVALID`, `VERDICT_RESULT_NOT_FLAG`, `VERDICT_RESULT_STALE`, `RESULT_NOT_FOUND`, `DECIDED_AT_INVALID` (1.2.0), `REGISTRAR_UNKNOWN` (and `REGISTRAR_NOT_ALLOWED`; and `SETTINGS_NOT_FOUND`, `VALIDATION_ERROR`). Result reason codes are in `selection.md` §Screening runs.
 
 **Tranche errors:** `TRANCHE_NOT_FOUND` (404; also on a screening run), `TRANCHE_ALREADY_OPEN`, `TRANCHE_NAME_TAKEN`, `TRANCHE_CLOSED`, `TRANCHE_FULL`, `GEO_CAP`, `TRANCHE_SPEND_CAP`, `TRANCHE_BELOW_TARGET`, `MAIN_LANE_QUOTA`, `NOT_SCREENED_OK`, `MEMBER_NOT_FOUND` (and `NAME_NOT_IN_RUN`, `RUN_NOT_FOUND`, `DOMAIN_INVALID`, `VALIDATION_ERROR`).
+
+**Portfolio, outreach and pattern errors (4.0.0):** `EMAIL_CAP` (409, `POST /outreach/emails`), `PATTERN_CSV_INVALID` (422), `NO_PATTERN_UPLOAD` (404), `MAX_ONE_RENEWAL_USED` (422, `POST /portfolio/{domain}/horizon`), `LTO_NOT_ALLOWED` (422, also from `/buy` and `POST /list/{domain}` on a trend, regulation or first-expiry name), `DOMAIN_CAP_REACHED` (now 40 names).
 
 **Export errors:** `SEDO_TEMPLATE_MISSING`, `SEDO_TEMPLATE_INVALID`, `EXPORT_NOT_FOUND`, `EXPORT_ALREADY_CONFIRMED`, `UPLOADED_AT_INVALID`, `NO_PII`.
 

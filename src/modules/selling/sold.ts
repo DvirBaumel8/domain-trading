@@ -55,7 +55,11 @@ function commissionWarning(i: SoldInput, lander: string | null, landerSetAt: Dat
 const alreadyRecorded = (i: SoldInput) => new AppError(409, 'SALE_ALREADY_RECORDED', `A sale with ${i.venue} transaction_ref ${i.transactionRef} is already recorded`);
 
 export class SoldService {
-  constructor(private readonly deps: { db: Kysely<Database>; now: () => number }) {}
+  constructor(private readonly deps: {
+    db: Kysely<Database>; now: () => number;
+    /** v4.0.0 (CR-049 item 4): called after a sale is committed, to delist the name at SellerHub right away. Best effort: an error never fails the sale. */
+    afterSold?: (domain: string) => Promise<void>;
+  }) {}
 
   async sold(domain: string, i: SoldInput, ctx: { auditId: string; recordedBy: string }): Promise<Record<string, unknown>> {
     const now = new Date(this.deps.now());
@@ -70,7 +74,7 @@ export class SoldService {
     }
     const approvalText = i.approvalRef ? String(i.approvalRef.text) : null;
 
-    return withDomainLock(this.deps.db, domain, (conn) => conn.transaction().execute(async (trx) => {
+    const result = await withDomainLock(this.deps.db, domain, (conn) => conn.transaction().execute(async (trx) => {
       if (i.transactionRef !== null) {
         const dup = await trx.selectFrom('sales').select('id').where('venue', '=', i.venue).where('transaction_ref', '=', i.transactionRef).limit(1).executeTakeFirst();
         if (dup) throw alreadyRecorded(i);
@@ -164,5 +168,7 @@ export class SoldService {
         checklist, warnings,
       };
     }));
+    try { await this.deps.afterSold?.(domain); } catch { /* the daily listingSync deletes it at SellerHub; the sale stays */ }
+    return result;
   }
 }

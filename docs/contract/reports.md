@@ -1,4 +1,4 @@
-# Reports (contract v3.10.0)
+# Reports (contract v4.0.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -41,6 +41,12 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `DB_SIZE_HIGH` | warn | (3.9.0) The database is over 70% of Neon's free storage (0.5 GB); the free plan stops accepting writes at the limit. Tell DOM | `size_bytes`, `limit_bytes`, `percent`, `warn_percent` |
 | `PRICE_EVENT_FAILED` | error | A scheduled price event failed (the domain is unchanged) | `events[] {event, due_on, note}` |
 | `EXPIRED_NOT_RENEWED` | error | A live name with `renewals_used = 0` is past its expiry (it is not auto-dropped: grace period) | `expiry_date` |
+| `RENEWAL_DROP_SUGGESTED` | warn | (4.0.0, CR-045 item 1) A name with `renewals_used` 0 and a later `drop_date` is within `renewal.drop_check_days` (60) of its first expiry and shows none of: a logged offer, an inquiry or lead (`POST /portfolio/{domain}/stats`), a rise of lookalikes in use since the screening before the buy, a measured search band (no source yet); or its renewal maths ratio (BIN x (1 - commission) x STRe / renewal price) is under `buy.renewal_math_min`. Drop it instead of renewing | `expiry`, `days_to_expiry`, `signals {offers, inquiries, lookalike_rise, lookalikes_at_buy, lookalikes_now, search_band_above_unmeasured}`, `renewal` (pair), `renewal_math?` |
+| `SELL_BEFORE_DROP` | warn | (4.0.0, CR-045 follow-up) The same condition (also for a name that drops at its first expiry, which needs no renewal decision): list it for a small wholesale exit about 30 days before expiry. The flag lists nothing and prices nothing; a wholesale price is a pricing exception (`POST /list` with an override and Dvir's `approval_ref` naming the domain and the price) | `expiry`, `list_by` (expiry - 30 days), `venues[]` (Afternic wholesale BIN, SellerHub, a NamePros thread by hand), `drop_suggested?` |
+| `HORIZON_DUE` | warn; **error once past** | (4.0.0, CR-045 item 2) A `trend` or `regulation` name is within `renewal.horizon_due_days` (30) of its `sell_or_drop_by` date (buy date + 12 months) | `horizon`, `sell_or_drop_by`, `days_left` |
+| `DELIST_NEEDED` | error | (4.0.0, CR-049 item 4) A name sold in the last 30 days is still to be removed at `afternic` and/or `sedo` (cleared per venue by `POST /listings/{domain}/venue` with `delisted: true`), or SellerHub reported a sale of a name not yet recorded as sold (`reason: sellerhub_sold_report`: record the sale too). SellerHub itself is delisted by the service | `venues[]`, `reason` (`sold`, `sellerhub_sold_report`), `sold_at?`, `seen_at?` |
+| `LANDER_PRICE_MISMATCH` | warn | (4.0.0, CR-049 item 3) The Buy Now amount the lander page shows is not the plan's BIN | `checked_at`, `shown` (pair), `expected` (pair) |
+| `LANDER_OFFER_MISSING` | info | (4.0.0) The plan has a make-offer option (hybrid or offer) but the lander page shows none | `checked_at` |
 | `JOB_MISSED` | error | (3.1.0, CR-016) Today's scheduled slot (00:05 UTC) passed more than 30 minutes ago and no daily run was created at or after it (once any daily run exists) | `slot`, `last_run_at` |
 | `JOB_RUN_INCOMPLETE` | error | (3.1.0) A daily run has been queued or running for more than 2 hours | `run_id`, `started_at`, `open_steps[]` |
 | `JOB_OVERDUE` | error | No `daily` job run has finished in the last 26 hours (2.1.0); a run started by hand counts; a never-run service is overdue | `job` (`daily`), `last_run_at` (null if never), `expected_every` (`24h`) |
@@ -50,7 +56,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `LANDER_AWAITING_MARKETPLACE` | info | (3.7.0, CR-033 G-8) An `afternic`-lander name whose Afternic export was never confirmed uploaded; Afternic serves no page for it yet. `LANDER_DOWN` counts only from the first confirmed upload | `domain` |
 | `AUTO_RENEW_ON` | error | (3.7.0, CR-033 G-6) The registrar reports auto-renew on (founder rules: auto-renew stays off) | `domain`, `checked_at` |
 | `REGISTRAR_DRIFT` | warn | (3.7.0) The registrar's privacy is off, or its nameservers differ from the lander's | `domain`, `drift: [privacy_off, nameservers]`, `checked_at` |
-| `LANDER_DOWN` | warn; **error from the 2nd day running** | The daily web check of a listed name with verified lander nameservers did not get the lander's answer (2.3.0) | `checked_at`, `since`, `status_code`, `reason` |
+| `LANDER_DOWN` | warn; **error from the 2nd day running** | The daily web check of a listed name with verified lander nameservers did not get the lander's answer (2.3.0; 4.0.0: https, and a TLS failure counts, `reason: tls_error`) | `checked_at`, `since`, `status_code`, `reason` |
 | `EXPORT_PENDING` | warn; **error after 7 days** | A listed name changed since the last confirmed Afternic upload | `days_pending`, `export_pending_since` |
 | `MANUAL_DELIST` | warn | A sold, delisted or dropped name must be removed by hand at a marketplace | `status`, `venues[]` |
 | `POST_BUY_INCOMPLETE` | warn | (3.9.0: was "no stored comps") A name bought with `POST /buy` has no screening pack on file. Comps are optional since pricing v3 and no longer matter here. Never raised for an imported name (`import-domain` makes no purchase) | `purchase_id` |

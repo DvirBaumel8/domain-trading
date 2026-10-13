@@ -118,18 +118,18 @@ describe('portfolioCheck: registry', () => {
 const verifiedLander = (over: object = {}) => listedDomain({ domain: 'lander-one.com', registrar: 'godaddy', registrar_api: 'manage', lander: 'afternic', lander_ns: ['ns1.afternic.com', 'ns2.afternic.com'], ns_verified_at: new Date(clock.t), expiry_date: '2027-10-04', ...over });
 
 describe('portfolioCheck: lander (web)', () => {
-  it('a listed name with verified afternic NS and a body containing /lander: ok, fetched over http without following redirects', async () => {
+  it('a listed name with verified afternic NS and a body containing /lander: ok, fetched over https (v4.0.0)', async () => {
     sites.length = 0;
     state.page = { status: 200, body: '<a href="/lander/lander-one.com">', location: null };
     await verifiedLander();
     const r = await job().runOnce();
     expect(r.web).toEqual({ ok: 1, fail: 0, unknown: 0, skipped: 0 });
-    expect(sites).toEqual(['http://lander-one.com/']);
+    expect(sites).toEqual(['https://lander-one.com/']);
     expect((await rows('web'))[0]).toMatchObject({ status: 'ok' });
     expect(await warnings()).toEqual([]);
   });
 
-  it('a Location header with a signature is ok too (a 301 is not followed)', async () => {
+  it('a Location header with a signature is ok too (redirects are followed up to 3 hops)', async () => {
     state.page = { status: 301, body: '', location: 'https://www.afternic.com/forsale/lander-one.com' };
     await verifiedLander();
     expect((await job().runOnce()).web.ok).toBe(1);
@@ -283,5 +283,77 @@ describe('portfolioCheck: in the daily run', () => {
     const direct = new FakeAdapter('porkbun');
     await job().runOnce();
     expect(direct.calls).toEqual([]);
+  });
+});
+
+// v4.0.0 (CR-049 item 3): the lander check reads https, a TLS failure is a miss, and the page's Buy Now price is checked against the plan's BIN.
+describe('portfolioCheck: lander price and TLS (v4.0.0)', () => {
+  const page = (buyNow: string, extra = '') => `<a href="/lander/lander-one.com">Afternic</a><div>Buy Now ${buyNow}</div>${extra}`;
+  const price = async () => (await rows('price' as never)).at(-1);
+  const reportCodes = async () => {
+    const app = await makeApp({ now: () => clock.t, adapters: [new FakeAdapter('porkbun')] });
+    apps.push(app);
+    const read = (await issueToken('read')).auth;
+    return (await app.inject({ method: 'GET', url: '/report', headers: read })).json().warnings as { code: string; level: string; domain?: string; details: Record<string, any> }[];
+  };
+
+  it('LP-1: the shown Buy Now equal to the plan BIN is price ok, with the make-offer option seen', async () => {
+    state.page = { status: 200, body: page('$1,488', '<button>Make an offer</button>'), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect(await price()).toMatchObject({ status: 'ok', details: { expected_cents: 148800, shown_cents: 148800, make_offer_shown: true, make_offer_expected: true } });
+    expect((await reportCodes()).filter((w) => w.code.startsWith('LANDER_'))).toEqual([]);
+  });
+
+  it('LP-2: a different Buy Now is LANDER_PRICE_MISMATCH with the shown and expected prices; fixing the page clears it', async () => {
+    state.page = { status: 200, body: page('$1,988.00', 'Make offer'), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    let w = (await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH');
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatchObject({ level: 'warn', domain: 'lander-one.com', details: { shown_cents: 198800, shown: '$1,988.00', expected_cents: 148800, expected: '$1,488.00' } });
+    clock.t += 3_600_000;
+    state.page = { status: 200, body: page('$1,488', 'Make offer'), location: null };
+    await job().runOnce();
+    w = (await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH');
+    expect(w).toHaveLength(0);
+  });
+
+  it('LP-3: a page that shows no price text is unknown (script-rendered pages), never a mismatch; a missing make-offer on a hybrid plan is the info LANDER_OFFER_MISSING', async () => {
+    state.page = { status: 200, body: '<a href="/lander/x">Afternic</a>', location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect(await price()).toMatchObject({ status: 'unknown', details: { reason: 'no_price_text' } });
+    expect((await reportCodes()).filter((w) => w.code.startsWith('LANDER_'))).toEqual([]);
+    clock.t += 3_600_000;
+    state.page = { status: 200, body: page('$1,488'), location: null };
+    await job().runOnce();
+    expect((await reportCodes()).filter((w) => w.code === 'LANDER_OFFER_MISSING')).toMatchObject([{ level: 'info', domain: 'lander-one.com' }]);
+  });
+
+  it('LP-4: a TLS failure is a miss (LANDER_DOWN reason tls_error); a plain network error stays unknown', async () => {
+    state.page = 'down';
+    await verifiedLander({ bin_cents: 148800 });
+    await confirmedUpload('lander-one.com');
+    const tls = job({ siteFetch: (async () => { throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('certificate has expired'), { code: 'CERT_HAS_EXPIRED' }) }); }) as typeof fetch });
+    const r = await tls.runOnce();
+    expect(r.web).toEqual({ ok: 0, fail: 1, unknown: 0, skipped: 0 });
+    expect((await rows('web'))[0]).toMatchObject({ status: 'fail', details: { reason: 'tls_error', tls_code: 'CERT_HAS_EXPIRED' } });
+    expect((await reportCodes()).filter((w) => w.code === 'LANDER_DOWN')).toMatchObject([{ details: { reason: 'tls_error' } }]);
+    clock.t += 3_600_000;
+    expect((await job().runOnce()).web.unknown).toBe(1);
+  });
+
+  it('LP-5: a redirect to the Afternic page is followed (up to 3 hops) and the price is read there; only guarded fetches are made', async () => {
+    const seen: string[] = [];
+    const fetcher = (async (input: unknown) => {
+      seen.push(String(input));
+      if (seen.length === 1) return new Response('', { status: 302, headers: { location: 'https://www.afternic.com/forsale/lander-one.com' } });
+      return new Response(page('$999', 'Make an offer'), { status: 200 });
+    }) as typeof fetch;
+    await verifiedLander({ bin_cents: 148800 });
+    await job({ siteFetch: fetcher }).runOnce();
+    expect(seen).toEqual(['https://lander-one.com/', 'https://www.afternic.com/forsale/lander-one.com']);
+    expect(await price()).toMatchObject({ status: 'fail', details: { shown_cents: 99900 } });
   });
 });

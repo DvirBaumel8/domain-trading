@@ -18,7 +18,7 @@ export { decideReplayRow, type Decision, type LabelledFeatures } from './replay.
 export { activeSelectionSettings, featureChecksOf, type HoldoutCheck, LABEL_RE, selectionSettingsByLabel } from './settings.js';
 export { earlierWithTopic, normalizeTopic, TOPIC_MAX_CHARS, topicFor, type TopicEarlier } from './topic.js';
 export { methodApproval } from './sibling-methods.js';
-export { loadSplitV2, splitV2 } from './split-v2.js';
+export { loadSplitV2, splitClasses, splitV2 } from './split-v2.js';
 export { featuresOfRun, splitKey, TEST_SET_CHECKS, TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, wilson95 } from './test-sets.js';
 export { type CheckContext, type CheckId, type Lane, type ResultRow, type RunItem, type ScreeningDeps } from './types.js';
 export { readCappedBytes } from './wayback.js';
@@ -26,3 +26,4 @@ export { webRiskLookup } from './web-risk.js';
 export { findSellers, SellersList, SELLERS_KIND, sellersFresh, sellersFreshHours, sellersFreshUntil, type SellerEntryT } from './sellers.js';
 export { freshDomainRecord, freshUntil, isFresh, RECORD_FRESH_DAYS, RECORD_KINDS, type RecordKind } from './domain-records.js';
 export { geoMembers, openTrancheFor } from './tranche-members.js';
+export { type LookalikeCounts, rerunLookalikes, screenedNames, type ScreenedName } from './portfolio-support.js';

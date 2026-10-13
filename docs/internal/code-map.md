@@ -1,6 +1,6 @@
 # Code map
 
-Where things live, so a change request goes straight to the right files. Paths are from the repo root. Verified against the tree at contract v3.4.1; v3.7.0 additions (hand listings, registrar state, offer dry run, small-buy read, buy display name/drop policy) added by hand.
+Where things live, so a change request goes straight to the right files. Paths are from the repo root. Verified against the tree at contract v3.4.1 (v4.0.0 additions by hand: portfolio outcomes, horizon, stats, outreach log, sales patterns, SellerHub sync, renewal path); v3.7.0 additions (hand listings, registrar state, offer dry run, small-buy read, buy display name/drop policy) added by hand.
 
 ## 1. How to use this map
 
@@ -110,6 +110,7 @@ Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `sc
 | `buy.ts` | `BuyService` (v3.7.0: `display_name` (given, else `defaultDisplayName` from the newest `candidate_intake.words`), `drop_policy` (`at_first_expiry` sets drop_date = expiry in `complete()`), `drop_policy`/`renewal_committed_cents`/`drop_policy_line` in the dry run and the 201; ~830 lines: approval check, caps, dry run, purchase state machine, ledger/receipt writes) |
 | `buy-gates.ts` | `buyBlocks`, `packGate`, `trancheGate`, `spendCapGate`, `gateError`; block codes `BUY_HOLD`, `SCREENING_PACK_REQUIRED`, `NO_TRANCHE`, `TRANCHE_SPEND_CAP` |
 | `buy-hold.ts` | `screeningHold`, `latestScreeningRun` |
+| `renewal-math.ts` | v4.0.0: `renewalMath` (BIN x (1 - commission) x STRe / renewal cost, integer cents and basis points), `binForMath`, `screeningGroupOf` (`passed` / `borderline` from FLAG results of the latest run); `buy.ts` stores `horizon`, `screening_group`, `buy_card` and sets `sell_or_drop_by`; the domain cap is 40 (`settings.max_domains`, migration) and a dry run reports `DOMAIN_CAP_REACHED` as `would_be_blocked` |
 | `small-buy.ts` | CR-030 small-buy exception to the buy hold: fixed limits `SMALL_BUY_MAX_FIRST_YEAR_CENTS` / `SMALL_BUY_WEEKLY_CAP_CENTS`, `smallBuyRequested`, `smallBuyGate`, `smallBuySpend`, `smallBuyView` (read for GET /selection/buy-hold, v3.7.0); codes `SMALL_BUY_PRICE`, `SMALL_BUY_WEEKLY_CAP` |
 | `tranches.ts` | `TrancheService` |
 | `budget.ts` | `spentCents`, `activeDomainCount` ($1,500 / 50 caps are applied in `buy.ts` from config) |
@@ -124,6 +125,7 @@ Intake of candidate names, on-demand screening, the daily list, drop lists, coho
 | Route | File |
 |---|---|
 | POST /candidates/intake, POST /candidates/screen, GET /candidates/daily, POST /candidates/daily/rebuild, GET/POST /candidates/:domain/records | `candidates/api/candidates.ts` |
+| POST /patterns/sales, GET /patterns/latest (v4.0.0, CR-044 item 4) | `candidates/api/patterns.ts` (`registerPatterns`; logic `candidates/patterns.ts`: `parseSalesCsv`, `storeSales`, `clusterSales`; the split is `bt1@v3` via `selection` `loadSplitV2`/`splitClasses`) |
 | POST/GET /selection/drop-lists, GET /selection/drop-lists/:name | `candidates/api/drop-lists.ts` |
 | POST /selection/cohorts, GET /selection/cohorts/report, GET /selection/cohorts/:name | `candidates/api/cohorts.ts` |
 
@@ -134,7 +136,7 @@ Intake of candidate names, on-demand screening, the daily list, drop lists, coho
 | `drop-lists.ts` | drop-list helpers (`watchStatusOf`, `freshLookups`, `retentionCutoff`, constants) |
 | `cohorts.ts` | `freezeReadyCohorts`, `FINAL_DROP`, `REREG_DAYS` |
 
-Tables: `candidate_intake`, `candidate_screenings`, `daily_candidate_lists`, `drop_lists`, `drop_list_rows`, `cohorts`, `cohort_names`, `cohort_decisions` (`drop_list_checks`, `cohort_outcomes` written by ops jobs). Tests: `tests/modules/candidates/` (`intake`, `intake-resume`, `intake-rules`, `screen`, `screen-domains`, `screen-force`, `scout-split`, `lane-fit`, `daily-list`, `daily-list-fields`, `daily-list-rebuild`, `daily-list-rejected`, `drop-lists`, `cohorts`, `cohorts-freeze`, `cohort-settings`).
+Tables (v4.0.0 patterns tests: `candidates/patterns`): `candidate_intake`, `candidate_screenings`, `daily_candidate_lists`, `drop_lists`, `drop_list_rows`, `cohorts`, `cohort_names`, `cohort_decisions` (`drop_list_checks`, `cohort_outcomes` written by ops jobs). Tests: `tests/modules/candidates/` (`intake`, `intake-resume`, `intake-rules`, `screen`, `screen-domains`, `screen-force`, `scout-split`, `lane-fit`, `daily-list`, `daily-list-fields`, `daily-list-rebuild`, `daily-list-rejected`, `drop-lists`, `cohorts`, `cohorts-freeze`, `cohort-settings`).
 
 ### selling
 Offers (record, classify, outcome), sold records, offer stats.
@@ -149,7 +151,7 @@ Offers (record, classify, outcome), sold records, offer stats.
 | `offers.ts` | `OffersService` (`record` with `dry_run: true`, v3.7.0: classify and return the view, write no row/hold/dedupe), `validateOffer`, `offerView`, `snapshotAt`, `OFFER_BANDS` |
 | `offer-rules.ts` | `classify`, `OFFER_SOURCES`, `BUYER_TYPES` (band and routing rules) |
 | `offer-stats.ts` | `perDomainOffers`, `offersByStrategy`, `reportOffers` |
-| `sold.ts` | `SoldService` (checklist names venues the latest `venue_listings` row says are hand-listed), `VENUES`, `EVIDENCE_SOURCES` |
+| `sold.ts` | `SoldService` (v4.0.0: optional `afterSold` callback, wired in `app.ts` to the SellerHub delist; checklist names venues the latest `venue_listings` row says are hand-listed), `VENUES`, `EVIDENCE_SOURCES` |
 
 Tables: `offers`, `sales`; writes `domains`, `price_schedule`, `ledger_entries`. Tests: `tests/modules/selling/` (`offers`, `offers-dry-run`, `offer-stats`, `sold`), `tests/modules/selling/unit/offer-rules`; the table CHECKs and triggers are in `tests/modules/core/schema.test.ts`.
 
@@ -165,6 +167,8 @@ Read-only reports: `/report`, portfolio, ledger, audit, job-run views.
 |---|---|
 | `report/index.ts` | `buildReport` (assembles sections) |
 | `report/warnings.ts` | `buildWarnings` (every `/report` warning code; `LANDER_DOWN_ERROR_DAYS`, `REVIEW_OVERDUE_HOURS`; v3.9.0: `PURCHASE_UNRESOLVED_MINUTES`, `NEON_FREE_STORAGE_BYTES`, `DB_SIZE_WARN_PERCENT` (`PURCHASE_UNRESOLVED`, `DB_SIZE_HIGH`); v3.7.0: `LANDER_AWAITING_MARKETPLACE` until the first confirmed Afternic upload, which also starts the LANDER_DOWN clock; `AUTO_RENEW_ON`, `REGISTRAR_DRIFT` from `registrar_state_checks`) |
+| `report/lifecycle.ts` | v4.0.0: `lifecycleWarnings` (`RENEWAL_DROP_SUGGESTED`, `SELL_BEFORE_DROP`, `HORIZON_DUE`, `DELIST_NEEDED`), `signalsFor` (offers, inquiries, lookalike rise) |
+| `report/outcomes.ts`, `api/outcomes.ts` | v4.0.0: `GET /portfolio/outcomes`, `/monthly`, `/quarterly` (`outcomes`, `outcomesMonthly`, `outcomesQuarterly`) |
 | `report/money.ts`, `portfolio.ts` (`portfolioDetail` adds `registrar_state`, v3.7.0), `domains.ts`, `upcoming.ts`, `pricing-review.ts`, `markdown.ts` | report sections; `ledgerRows`, `ledgerCsvRows`, `usdSigned` in `portfolio.ts` |
 | `job-runs.ts` | `jobRunsView`, `jobsOverdue`, `dailyScheduleState`, `stepView`, `triggerFromKey` |
 
@@ -176,6 +180,7 @@ Outward voice and outside review: Buffer posting to X, Gemini review, company do
 | Route | File |
 |---|---|
 | POST /posts, /posts/schema-check, GET /posts, GET /posts/:id/images/:part/:position, POST /posts/:id/remove, /posts/pause, /posts/burst, GET /media/:token | `outreach/api/posts.ts` |
+| POST /outreach/emails, GET /outreach/emails/summary (v4.0.0, CR-045 item 5) | `outreach/api/emails.ts` (`registerEmails`; cap `outreach.max_emails_per_name`; table `outreach_emails`) |
 | POST /reviews/packet, /reviews/run, GET/POST /reviews/settings (+ history), GET /reviews/packets/:id, POST /reviews/:packet_id/feedback, GET /reviews/items, POST /reviews/items/:id/status, GET /reviews/cost | `outreach/api/reviews.ts` |
 | POST /company/document, GET /company/document/versions(/:n), POST/GET /company/forbidden-terms, POST /company/forbidden-terms/:id/retire | `outreach/api/company.ts` |
 
@@ -188,7 +193,7 @@ Outward voice and outside review: Buffer posting to X, Gemini review, company do
 | `review/gemini.ts`, `packet.ts`, `diff.ts`, `feedback.ts`, `novelty.ts`, `settings.ts` | Gemini call, packet building, diffing, feedback, novelty, `currentReviewSettings` |
 | `blocklist.ts` | `checkText` (secret/email/phone/forbidden term) |
 
-Tables: `posts`, `post_images`, `post_allowance_exclusions`, `posting_switches`, `posting_bursts`, `review_*` (packets, feedback, items, item_statuses, settings_changes, retries), `company_documents`, `forbidden_terms`, `forbidden_term_retirements`. Tests: `tests/modules/outreach/` (`posting`, `posting-buffer`, `posting-guards`, `schema-check-body`, `blocklist`, `blocklist-redos`, `company-document`, `review-run`, `review-settings`, `review-packet`, `review-hardening`, `review-backoff`, `review-concurrency`), `tests/modules/outreach/unit/review-pure`, `tests/unit/no-llm`; helpers `buffer-schema.ts`, `images.ts`.
+Tables: `posts`, `post_images`, `post_allowance_exclusions`, `posting_switches`, `posting_bursts`, `review_*` (packets, feedback, items, item_statuses, settings_changes, retries), `company_documents`, `forbidden_terms`, `forbidden_term_retirements`, `outreach_emails` (v4.0.0). Tests: `tests/modules/outreach/` (`emails` (EM-1..EM-6), `posting`, `posting-buffer`, `posting-guards`, `schema-check-body`, `blocklist`, `blocklist-redos`, `company-document`, `review-run`, `review-settings`, `review-packet`, `review-hardening`, `review-backoff`, `review-concurrency`), `tests/modules/outreach/unit/review-pure`, `tests/unit/no-llm`; helpers `buffer-schema.ts`, `images.ts`.
 
 ### ops
 Jobs and queue, health, admin CLI, backup.
@@ -197,6 +202,7 @@ Jobs and queue, health, admin CLI, backup.
 |---|---|
 | POST /jobs/run, GET /jobs/runs, POST /jobs/preview | `ops/api/jobs.ts` |
 | GET /health/ping, GET /health | `ops/api/health.ts` |
+| POST /portfolio/:domain/horizon, POST /portfolio/:domain/stats (v4.0.0) | `ops/api/portfolio.ts` (`registerPortfolioWrites`; horizon reuses `admin/drop-date.ts` `dropAtFirstExpiry`; tables `portfolio_stats`) |
 
 | File | Inside |
 |---|---|
@@ -204,12 +210,16 @@ Jobs and queue, health, admin CLI, backup.
 | `queue.ts` | `JobQueue` (Postgres queue: enqueue, claim, run step by step, keepalive; v3.9.0: a skipped retry after a timeout is marked failed) |
 | `job.ts` | `npm run job` CLI |
 | `jobs/price-schedule.ts`, `drop.ts`, `registrar-check.ts`, `portfolio-check.ts`, `drop-watch.ts`, `ns-verify.ts`, `cohort-outcomes.ts`, `reference-refresh.ts` | `PriceScheduleJob` (step `priceJob`), `DropJob`, `RegistrarCheckJob`, `PortfolioCheckJob`, `DropWatchJob`, `NsVerifier` (`runOnce({onlyUnverified})`: the runner calls it for never-verified names even after the day's run, v3.7.0), `CohortOutcomesJob`, `ReferenceRefreshJob`; `RegistrarCheckJob` also appends `registrar_state_checks` (auto-renew, privacy, NS of Porkbun names, read-only) |
+| `jobs/listing-sync.ts`, `sellerhub.ts` | v4.0.0 (CR-049): `ListingSyncJob` (step `listingSync`; `delist(domain)` is also called after `/sold`) and `SellerHubClient` (Spaceship SellerHub REST, headers X-API-Key / X-API-Secret, env `SPACESHIP_SELLERHUB_API_KEY` / `_SECRET`; tests mock it with MSW only); table `listing_sync_log` |
+| `jobs/portfolio-lifecycle.ts` | v4.0.0: `PortfolioLifecycleJob` (step `portfolioLifecycle`): expired unrenewed names, lookalike re-check in the renewal window, monthly holdout and its re-check (table `holdout`); uses `selection` `screenedNames` / `rerunLookalikes` (`selection/portfolio-support.ts`) |
+| `admin/record-renewal.ts` | v4.0.0 (G-85): `recordRenewal` (admin `record-renewal`: `renewal` ledger row, `renewals_used` 1, expiry + 1 year, POC cap) |
+| `jobs/portfolio-check.ts` | v4.0.0: the lander check reads `https://`, follows 3 redirects, a TLS failure is a miss, `landerPriceCheck` (kind `price`) |
 | `jobs/backup-export.ts`, `backup-import.ts` | `BackupExporter`, `TABLE_FILES`, `ORDER`, `migrationNames` |
 | `admin.ts`, `admin/*.ts` | admin CLI (`npm run admin`): `tokens`, `pricing-settings`, `import-domain`, `drop-date`, `resolve-purchase`, `doctor` |
 
-Daily step order (`runner.ts`): reconciler, nsVerifier, screeningResume, priceJob, dropJob, registrarCheck, portfolioCheck, dropWatch, intakeScreening, buildDailyList, cohortOutcomes, referenceRefresh, outsideReview, postsRefresh, backupExport. `tick` = first three + reviewRetry. `screen` = onDemandScreen + buildDailyList.
+Daily step order (`runner.ts`): reconciler, nsVerifier, screeningResume, priceJob, dropJob, listingSync, portfolioLifecycle, registrarCheck, portfolioCheck, dropWatch, intakeScreening, buildDailyList, cohortOutcomes, referenceRefresh, outsideReview, postsRefresh, backupExport. `tick` = first three + reviewRetry. `screen` = onDemandScreen + buildDailyList.
 
-Tables: `job_runs`, `job_steps`, `job_queue_runs`, `portfolio_checks`, `cohort_outcomes`, `drop_list_checks`, `api_tokens`, `registrar_presence`, `registrar_state_checks` (v3.7.0, append-only, in the backup), `pricing_settings` (admin). Tests: `tests/modules/ops/` (`jobs*`, `job-queue`, `job-cli`, `jobs-run-scope`, `daily-schedule`, `daily-run-cohorts`, `tick-triggers`, `missed-runs`, `price-job`, `drop-job`, `drop-date`, `drop-watch`, `drop-watch-idt`, `cohort-outcomes`, `ns-verify`, `ns-verify-new-names`, `portfolio-check`, `lander-awaiting`, `registrar-check`, `registrar-check-fields`, `admin-cli`, `admin-tokens`, `import-domain`, `backup`, `health`, `health-posting-review`), `tests/modules/ops/unit/` (`jobs-runner-config`, `backup-coverage`).
+Tables: `job_runs`, `job_steps`, `job_queue_runs`, `portfolio_checks`, `cohort_outcomes`, `drop_list_checks`, `api_tokens`, `registrar_presence`, `registrar_state_checks` (v3.7.0, append-only, in the backup), `pricing_settings` (admin). Tests: `tests/modules/ops/` (`jobs*`, `job-queue`, `job-cli`, `jobs-run-scope`, `daily-schedule`, `daily-run-cohorts`, `tick-triggers`, `missed-runs`, `price-job`, `drop-job`, `drop-date`, `drop-watch`, `drop-watch-idt`, `cohort-outcomes`, `ns-verify`, `ns-verify-new-names`, `portfolio-check`, `lander-awaiting`, `registrar-check`, `registrar-check-fields`, `admin-cli`, `admin-tokens`, `import-domain`, `backup`, `health`, `health-posting-review`), `tests/modules/ops/unit/` (`jobs-runner-config`, `backup-coverage`). v4.0.0: `listing_sync_log` (append-only), `holdout`, `portfolio_stats` (append-only, written by `ops/api/portfolio.ts`), `outreach_emails`, `sales_pattern_uploads`, `sales_pattern_rows` (append-only); `domains` gains `horizon`, `sell_or_drop_by`, `screening_group`, `buy_card`; `portfolio_checks` kinds `price`, `lookalikes`.
 
 ### core (`src/core/`)
 Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
@@ -239,7 +249,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763000000000_v3-10-0.sql`: `candidate_intake.topic`; 33 files). Run with `npm run migrate`.
+`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 34 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -267,7 +277,14 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Add a /buy gate or block code | `buying/buy-gates.ts` (`BuyBlock`, `buyBlocks`, gate fn), call in `buying/buy.ts`; code in `docs/contract/endpoints.md` Code index | `buying/buy-hold`, `buy-checks`, `buy-v2` |
 | Change a /buy request field or approval rule | `buying/api/buy.ts`, `buying/buy.ts` (`BuyInput`), `core/approval.ts` | `buying/buy-*`, `core/unit/approval` |
 | Change the small-buy exception limits ($11.08 first year, $50 per rolling 7 days) | `buying/small-buy.ts` (needs a release, Dvir's approval) | `buying/small-buy`, `small-buy-hold` |
-| Change caps ($1,500, 50) | migration only (no API); read in `buying/budget.ts`, `buy.ts`; `src/config.ts` | `buying/budget`, `cap-property` |
+| Change caps ($1,500, 40) | migration only (no API; the last one is `1763100000000_v3-11-0.sql`); read in `buying/budget.ts`, `buy.ts`; `src/config.ts` | `buying/budget`, `cap-property`, `buying/portfolio-buy` |
+| Change the renewal maths gate, STRe or the commission | `buying/renewal-math.ts`, `buy.ts` (step 7b), selection settings `buy.*` (`selection/settings.ts` `BUY_DEFAULT`) | `buying/portfolio-buy` |
+| Change the renewal drop check, SELL_BEFORE_DROP, HORIZON_DUE, DELIST_NEEDED | `reporting/report/lifecycle.ts`, settings `renewal.*` | `reporting/portfolio-lifecycle` |
+| Change the outcomes reports | `reporting/report/outcomes.ts` | `reporting/portfolio-lifecycle` (OC-1, OC-2, RN-5) |
+| Change the SellerHub sync | `ops/jobs/listing-sync.ts`, `ops/sellerhub.ts` | `ops/listing-sync` |
+| Change the lander check or its price check | `ops/jobs/portfolio-check.ts` (`web`, `landerPriceCheck`), `reporting/report/warnings.ts` | `ops/portfolio-check` (LP-1..LP-5) |
+| Book a renewal | admin `record-renewal` (`ops/admin/record-renewal.ts`) | `reporting/portfolio-lifecycle` (RN-1..RN-4), `ops/admin-cli` |
+| Change the holdout or the expiry step | `ops/jobs/portfolio-lifecycle.ts`, `selection/portfolio-support.ts` | `ops/portfolio-lifecycle`, `selection/portfolio-support` |
 | Change pricing rules (65%, 48%, ladder, list) | new `pricing_settings` version by admin command (`ops/admin/pricing-settings.ts`) or migration; logic in `listing/pricing/plan.ts`, `schedule.ts`; never hard-code | `listing/unit/pricing-*`, `listing/pricing-*` (incl. `pricing-vectors`) |
 | Change the scheduled drops | `listing/pricing/schedule.ts` (`buildSchedule`), `ops/jobs/price-schedule.ts`, `drop.ts` | `listing/unit/pricing-schedule`, `ops/price-job`, `drop-job` |
 | Change POST /list behaviour | `listing/list.ts`, `listing/listing-v2.ts` | `listing/list`, `list-concurrency`, `buying/buy-listing` |
@@ -276,7 +293,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Change sold evidence rules | `selling/sold.ts` (`EVIDENCE_SOURCES`, `VENUES`), `selling/api/sold.ts` | `selling/sold` |
 | Add a registrar error code mapping | `registrars/porkbun.ts` (or `godaddy.ts`), `registrars/types.ts` (`RegistrarError`, `AMBIGUOUS_CODES`) | `registrars/unit/porkbun-*`, `registrars/check-porkbun` |
 | Rule-guard tests (founder rules enforced by tests) | `tests/unit/no-llm.test.ts` (rule 9), `no-topup.test.ts` (rule 6), `no-web-risk-update.test.ts`, `sandbox-guard.test.ts` (rule 12, with `tests/contract/sandbox-guard.ts`), `global-db-guard.test.ts` (tests never touch a real DB), `network-block.test.ts` with `tests/setup/network.ts` (offline: MSW unhandled = error, UDP blocked) | run the guard files after any change near their subject |
-| Add a migration | new `migrations/<epoch>_<name>.sql` (epoch above the latest); `src/db/types.ts`; for a new table: `ops/jobs/backup-export.ts` (`TABLE_FILES`) and `backup-import.ts` (`ORDER`) or `EXCLUDED` in `tests/modules/ops/unit/backup-coverage.test.ts`; `tests/helpers/db.ts` `TABLES`; `APPEND_ONLY_TABLES` in `scripts/evidence.ts` if append-only; the migration count in `tests/modules/ops/admin-cli.test.ts` (doctor: `migrations: 33 applied`) | `core/schema`, `core/append-only`, `ops/backup`, `ops/unit/backup-coverage`, `ops/admin-cli` |
+| Add a migration | new `migrations/<epoch>_<name>.sql` (epoch above the latest); `src/db/types.ts`; for a new table: `ops/jobs/backup-export.ts` (`TABLE_FILES`) and `backup-import.ts` (`ORDER`) or `EXCLUDED` in `tests/modules/ops/unit/backup-coverage.test.ts`; `tests/helpers/db.ts` `TABLES`; `APPEND_ONLY_TABLES` in `scripts/evidence.ts` if append-only; the migration count in `tests/modules/ops/admin-cli.test.ts` (doctor: `migrations: 34 applied`) | `core/schema`, `core/append-only`, `ops/backup`, `ops/unit/backup-coverage`, `ops/admin-cli` |
 | Add an error code | throw `new AppError(status, 'CODE', ...)` (`http/errors.ts`); add to the Code index in `docs/contract/endpoints.md` (line ~734) and the endpoint's section; add a test whose name/body asserts it; `npm run evidence` | `unit/test-evidence`, `contract/contract-doc` |
 | Add a hand-listing field (venue record) | `listing/api/venue.ts` (strict zod; never a walk-away), `venue_listings` columns via migration, `reporting/report/portfolio.ts` `exportBlock` | `listing/venue` |
 | Add a route | module `api/<x>.ts` + its `register*` in the module `index.ts` and `src/app.ts`; route table row and `### METHOD /path` section in `docs/contract/endpoints.md`; `SUMMARIES` in `http/openapi.ts`; scope (READ/WRITE) in `http/auth.ts` if special | `contract/contract-doc`, a new test under `tests/modules/<module>/` |

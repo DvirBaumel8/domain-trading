@@ -81,6 +81,7 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `GOOGLE_WEB_RISK_API_KEY` | optional: a key restricted to the Web Risk API, from a Google project **with** billing (Lookup API only; DOM caps itself at 10,000 a month) |
    | `GEMINI_API_KEY` | optional: the outside review; a Gemini key from a **new Google AI Studio project with no billing** (free tier) |
    | `BUFFER_API_KEY` | optional: posting to X; from publish.buffer.com/settings/api |
+   | `SPACESHIP_SELLERHUB_API_KEY`, `SPACESHIP_SELLERHUB_API_SECRET` | optional: Spaceship SellerHub listing sync; an API Manager key pair with only the `sellerhub:read` and `sellerhub:write` scopes |
    | `BUFFER_CHANNEL_ID` | optional: only if the Buffer account has more than one X channel |
    | `PUBLIC_BASE_URL` | optional: the public base URL for post images (default `https://domain-trading-api.onrender.com`) |
 

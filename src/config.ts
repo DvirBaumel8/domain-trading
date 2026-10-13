@@ -24,6 +24,9 @@ const EnvSchema = z.object({
   GOOGLE_WEB_RISK_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   GEMINI_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   BUFFER_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  SPACESHIP_SELLERHUB_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  SPACESHIP_SELLERHUB_API_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  SPACESHIP_SELLERHUB_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().default('https://spaceship.dev/api')),
   BUFFER_CHANNEL_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).max(100).optional()),
   PUBLIC_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine((v) => /^https?:\/\//.test(v), 'PUBLIC_BASE_URL must be http(s)').default(DEFAULT_PUBLIC_BASE_URL)),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
@@ -54,6 +57,8 @@ export interface Config {
   bufferApiKey: string | undefined;
   /** Optional Buffer channel id; else the single X channel of the account is used. */
   bufferChannelId: string | undefined;
+  /** v4.0.0 (CR-049): Spaceship SellerHub key and secret (scopes sellerhub:read, sellerhub:write only). Either missing -> the listingSync step is skipped. */
+  sellerhub: { apiKey: string | undefined; apiSecret: string | undefined; baseUrl: string };
   /** Public base URL of this service, without a trailing slash (image links for Buffer). */
   publicBaseUrl: string;
   /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
@@ -65,7 +70,7 @@ export interface Config {
   secretValues: string[];
 }
 
-const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'GEMINI_API_KEY', 'BUFFER_API_KEY', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
+const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'GEMINI_API_KEY', 'BUFFER_API_KEY', 'SPACESHIP_SELLERHUB_API_KEY', 'SPACESHIP_SELLERHUB_API_SECRET', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
 
 function readVersion(): string {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -141,6 +146,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     geminiApiKey: e.GEMINI_API_KEY ? e.GEMINI_API_KEY : undefined,
     bufferApiKey: e.BUFFER_API_KEY ? e.BUFFER_API_KEY : undefined,
     bufferChannelId: e.BUFFER_CHANNEL_ID ? e.BUFFER_CHANNEL_ID : undefined,
+    sellerhub: { apiKey: e.SPACESHIP_SELLERHUB_API_KEY, apiSecret: e.SPACESHIP_SELLERHUB_API_SECRET, baseUrl: e.SPACESHIP_SELLERHUB_BASE_URL.replace(/\/+$/, '') },
     publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
     webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,
     backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },

@@ -105,10 +105,10 @@ describe('POST /buy purchase', () => {
     expect(pb.charges).toBe(1);
   });
 
-  it('CAP-2: an unresolved (unknown) purchase counts toward the 50-domain cap', async () => {
+  it('CAP-2: an unresolved (unknown) purchase counts toward the 40-domain cap', async () => {
     const stuck = new FakeAdapter('porkbun', { register: () => timeout(), findDomain: (_d, n) => (n === 0 ? null : new Error('down')) });
     const { auth } = await setup(stuck);
-    await seedOwnedDomains(49);
+    await seedOwnedDomains(39);
     expect((await postBuy(app, buyBody({ domain: 'stuck.com' }), auth)).statusCode).toBe(202);
     expect((await postBuy(app, buyBody({ domain: 'next.com' }), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
   });
@@ -472,11 +472,11 @@ describe('POST /buy final-review fixes', () => {
     expect(one(await db.selectFrom('purchases').selectAll().execute()).state).toBe('succeeded');
   });
 
-  it('ambiguous dry run counts toward the 50-domain cap: 49 owned + ambiguous A → buy of B is DOMAIN_CAP_REACHED', async () => {
+  it('ambiguous dry run counts toward the 40-domain cap: 39 owned + ambiguous A → buy of B is DOMAIN_CAP_REACHED', async () => {
     const amb = new RegistrarError('porkbun', 'REGISTRAR_BAD_RESPONSE', 'x', { ambiguous: true });
     const pb = new FakeAdapter('porkbun', { dryRun: (n) => (n === 0 ? amb : undefined) });
     const { auth } = await setup(pb);
-    await seedOwnedDomains(49);
+    await seedOwnedDomains(39);
     expect((await postBuy(app, buyBody({ domain: 'a-amb.com' }), auth)).json().error.code).toBe('REGISTRAR_DRY_RUN_AMBIGUOUS');
     expect((await postBuy(app, buyBody({ domain: 'b-next.com' }), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
   });

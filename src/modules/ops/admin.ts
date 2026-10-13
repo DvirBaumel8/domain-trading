@@ -4,6 +4,7 @@ import { createApiToken, expireApiToken, listApiTokens, revokeApiToken } from '.
 import { newPricingSettings, showPricingSettings } from './admin/pricing-settings.js';
 import { DropDateInputError, dropAtFirstExpiry } from './admin/drop-date.js';
 import { ResolvePurchaseInputError, resolvePurchaseFailed } from './admin/resolve-purchase.js';
+import { RenewalInputError, recordRenewal } from './admin/record-renewal.js';
 import { runDoctor } from './admin/doctor.js';
 import { ImportInputError, importDomain, type ImportInput } from './admin/import-domain.js';
 import { createAdapters } from '../registrars/index.js';
@@ -24,6 +25,7 @@ const USAGE = `usage:
       [--cost-note "<text>"] [--order <id>|none] [--deal D-NNN] [--listing-mode bin|hybrid|offer --bin N [--floor N --walkaway N --pricing-exception "<reason>"] [--min-offer N] [--override --override-reason "<why>"]]
       [--comps-file comps.json | --legacy-no-comps "<reason>"] [--approval-text "<words>" --approval-at <ISO>] [--manual --expiry YYYY-MM-DD] [--renewal-price N] [--dry-run]
   npm run admin -- resolve-purchase --id <purchase_id> --fail --reason "<text>"   (a purchase stuck in unknown/register_sent; check the registrar account first)
+  npm run admin -- record-renewal <domain> --charged-cents N --approval-text "<words>" --approval-at <ISO>   (the one renewal, paid by hand at the registrar; books the ledger row and renewals_used=1)
   npm run admin -- doctor`;
 
 class UsageError extends Error {}
@@ -41,7 +43,7 @@ async function main(argv: string[]): Promise<number> {
       deal: { type: 'string' }, category: { type: 'string' }, grade: { type: 'string' }, 'listing-mode': { type: 'string' }, bin: { type: 'string' },
       floor: { type: 'string' }, walkaway: { type: 'string' }, 'min-offer': { type: 'string' }, 'pricing-exception': { type: 'string' },
       override: { type: 'boolean' }, 'override-reason': { type: 'string' }, 'comps-file': { type: 'string' }, 'legacy-no-comps': { type: 'string' },
-      manual: { type: 'boolean' }, expiry: { type: 'string' }, 'renewal-price': { type: 'string' }, 'dry-run': { type: 'boolean' }, fail: { type: 'boolean' }, reason: { type: 'string' },
+      manual: { type: 'boolean' }, expiry: { type: 'string' }, 'renewal-price': { type: 'string' }, 'dry-run': { type: 'boolean' }, fail: { type: 'boolean' }, reason: { type: 'string' }, 'charged-cents': { type: 'string' },
     },
   });
   const [cmd, sub] = positionals;
@@ -126,6 +128,24 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       } catch (e) {
         if (e instanceof ResolvePurchaseInputError) throw new UsageError(e.message);
+        if (!(e instanceof AppError)) throw e;
+        console.error(`${e.code}: ${e.message}`);
+        return 1;
+      }
+    }
+    if (cmd === 'record-renewal') {
+      const domain = sub ?? values.domain;
+      if (!domain) throw new UsageError('the domain is required: record-renewal <domain>');
+      const cents = Number(values['charged-cents']);
+      if (!values['charged-cents'] || !Number.isInteger(cents) || cents <= 0) throw new UsageError('--charged-cents must be a positive integer');
+      if (!values['approval-text']?.trim()) throw new UsageError('--approval-text is required');
+      if (!values['approval-at']) throw new UsageError('--approval-at is required');
+      try {
+        const r = await recordRenewal(db, { domain, chargedCents: cents, approvalText: values['approval-text'], approvalAt: values['approval-at'], now: new Date() });
+        console.log(`renewal of ${r.domain} booked: ${r.chargedCents} cents; expiry ${r.expiryFrom} -> ${r.expiryTo}; drop_date ${r.dropDate}; renewals_used 1; audit ${r.auditId}`);
+        return 0;
+      } catch (e) {
+        if (e instanceof RenewalInputError) throw new UsageError(e.message);
         if (!(e instanceof AppError)) throw e;
         console.error(`${e.code}: ${e.message}`);
         return 1;

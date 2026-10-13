@@ -26,6 +26,8 @@ import { currentSettings, type PricingSettings } from '../listing/index.js';
 import { screeningHold } from './buy-hold.js';
 import { gateError, packGate, spendCapGate, trancheGate, type BuyBlock } from './buy-gates.js';
 import { smallBuyError, smallBuyGate, smallBuyRequested, type SmallBuyState } from './small-buy.js';
+import { binForMath, renewalMath, screeningGroupOf, type RenewalMath } from './renewal-math.js';
+import { activeSelectionSettings } from '../selection/index.js';
 import { evaluateQuote, pickWinner, type EvaluatedQuote } from '../registrars/index.js';
 
 export interface BuyInput {
@@ -37,8 +39,10 @@ export interface BuyInput {
   registrar: string | null; dryRun: boolean; /** `dry_run: "strict"`: a dry run whose first real-buy gate refusal is the answer (CR-005 N-7). */ strictDry?: boolean; autoList: boolean; requestBody: unknown;
   /** CR-030: `small_buy_exception` flag of the body. */ smallBuyException?: boolean;
   /** v3.7.0 (CR-033 G-2): the CamelCase form for marketplaces; absent = built from the newest intake `words`. */ displayName?: string | null;
+  /** v4.0.0 (CR-045/046): horizon, and the scout's STRe with its reason (the renewal maths gate). */ horizon?: Horizon; stre?: number; streReason?: string;
   /** v3.7.0 (CR-033 G-9): `at_first_expiry` = no renewal planned (drop_date = expiry); default `after_one_renewal`. */ dropPolicy?: DropPolicy;
 }
+export type Horizon = 'evergreen' | 'trend' | 'regulation';
 export type DropPolicy = 'after_one_renewal' | 'at_first_expiry';
 export interface BuyCtx { idempotencyKey: string; requestHash: string; auditId: string }
 export interface BuyResult { status: number; body: Record<string, unknown> }
@@ -57,6 +61,7 @@ export interface Approved {
   smallBuy: boolean; smallBuyState: SmallBuyState | null;
   /** v3.7.0: the display name to store (given, or built from the intake words), and the drop policy. */
   displayName: string | null; dropPolicy: DropPolicy;
+  horizon: Horizon; screeningGroup: 'passed' | 'borderline'; math: RenewalMath | null; streReason: string | null;
   settings: { poc_cap_cents: number; max_domains: number; lander_target: string };
   /** Dry run only: registrar account-state findings that a real buy would refuse on (founder rule 6). */
   accountWarnings?: string[];
@@ -112,6 +117,7 @@ export class BuyService {
     if (category === 'geo' && !input.priceGrade) throw new AppError(422, 'GEO_GRADE_REQUIRED', 'Geo names need price_grade strong or weaker');
     if (category !== 'geo' && input.priceGrade) throw new AppError(422, 'GRADE_NOT_GEO', 'price_grade is only for geo names');
     const dropPolicy: DropPolicy = input.dropPolicy ?? 'after_one_renewal';
+    const horizon: Horizon = input.horizon ?? 'evergreen';
     let displayName: string | null = null;
     if (input.displayName != null) {
       if (!isValidDisplayName(input.domain, input.displayName)) {
@@ -126,6 +132,7 @@ export class BuyService {
       const r = validateListing(input.proposedListing, {
         category, grade: input.priceGrade, phase: 'buy', settings: pricing, highValueMinBinCents: settings.high_value_min_bin_cents,
         override: input.override, overrideReason: input.overrideReason, approvalValid: true,
+        noLto: horizon !== 'evergreen' || dropPolicy === 'at_first_expiry',
         today, dropDate: dropPolicy === 'at_first_expiry' ? addOneYear(today) : addOneYear(addOneYear(today)), // registered today + 1 y; the drop is 1 y later (none with at_first_expiry)
       });
       if (!r.ok) throw new AppError(r.status, r.code, r.message, r.details);
@@ -164,10 +171,17 @@ export class BuyService {
     let adapter!: RegistrarAdapter;
     let dry!: Awaited<ReturnType<BuyService['registrarDryRun']>>;
     let accountWarnings: string[] = [];
+    let math: RenewalMath | null = null;
     try {
       // 4, 5
       await this.assertNotOwned(db, input.domain);
-      await this.assertDomainCap(db, settings.max_domains);
+      try {
+        await this.assertDomainCap(db, settings.max_domains);
+      } catch (e) {
+        // v4.0.0 (CR-045 item 3): a dry run reports the domain cap as would_be_blocked; a real buy (or a strict dry run) is refused
+        if (gateRefuses || !(e instanceof AppError) || e.code !== 'DOMAIN_CAP_REACHED') throw e;
+        blocked ??= 'DOMAIN_CAP_REACHED';
+      }
 
       // 6. live re-check (no cache)
       check = await this.deps.checkService.check(input.domain, { useCache: false });
@@ -197,6 +211,18 @@ export class BuyService {
       }
       winner = picked;
       adapter = this.adapter(winner.registrar);
+
+      // 7b. v4.0.0 (CR-046 item 3): the renewal maths. Refused under buy.renewal_math_min; a dry run gets the same 422 with the numbers.
+      const sel = (await activeSelectionSettings(db)).values.buy;
+      const binForRatio = binForMath(category, input.priceGrade, plan?.binCents ?? null, pricing);
+      if (binForRatio !== null && winner.renewalCents && input.stre !== undefined) {
+        const commission = sel.commission[sel.math_venue];
+        if (commission === undefined) throw new AppError(500, 'INTERNAL', `buy.commission has no entry for ${sel.math_venue}`);
+        math = renewalMath({ binCents: binForRatio, commission, stre: input.stre, renewalCents: winner.renewalCents, min: sel.renewal_math_min, venue: sel.math_venue });
+        if (!math.pass) {
+          throw new AppError(422, 'RENEWAL_MATH_FAIL', `BIN x (1 - commission) x STRe is ${math.ratio}x the renewal cost, under the minimum ${math.min}`, { renewal_math: math });
+        }
+      }
 
       // 8. POC cap (unlocked here; re-checked under the global lock for real buys)
       await this.assertPocCap(db, settings.poc_cap_cents, winner.firstYearCents!);
@@ -235,6 +261,7 @@ export class BuyService {
 
     const approved: Approved = {
       input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, smallBuy, smallBuyState, displayName, dropPolicy, accountWarnings,
+      horizon, screeningGroup: await screeningGroupOf(db, input.domain), math, streReason: input.streReason ?? null,
       settings: { poc_cap_cents: settings.poc_cap_cents, max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
     if (input.dryRun) return { status: 200, body: await this.dryRunBody(approved) };
@@ -350,7 +377,8 @@ export class BuyService {
         }).returning('id').executeTakeFirstOrThrow();
         await trx.insertInto('domains').values({
           domain: a.input.domain, status: 'pending_purchase', registrar: a.winner.registrar, category: a.category, price_grade: a.input.priceGrade, deal_id: a.input.dealId,
-          display_name: a.displayName,
+          display_name: a.displayName, horizon: a.horizon, screening_group: a.screeningGroup,
+          buy_card: JSON.stringify({ stre_bp: a.math?.stre_bp ?? null, stre_reason: a.streReason, renewal_math: a.math }),
         }).execute();
         return id;
       });
@@ -499,6 +527,10 @@ export class BuyService {
       // v3.9.0: the drop policy (CR-033 G-9, drop_date = the first expiry) is part of the booking transaction
       ...(a.dropPolicy === 'at_first_expiry' ? { dropDate: expiry } : {}),
     });
+    if (a.horizon !== 'evergreen') {
+      const months = (await activeSelectionSettings(db)).values.renewal.horizon_months;
+      await db.updateTable('domains').set({ sell_or_drop_by: addMonthsClamped(x.buyDate, months) }).where('domain', '=', a.input.domain).execute();
+    }
     this.deps.checkService.invalidate(a.input.domain);
     const dropDate = a.dropPolicy === 'at_first_expiry' ? expiry : addOneYear(expiry);
 
@@ -518,6 +550,7 @@ export class BuyService {
       two_year: formatUsd(a.winner.twoYearCents!), two_year_cents: a.winner.twoYearCents,
       expiry_date: expiry, drop_date: dropDate, renewals_used: 0,
       display_name: a.displayName, ...this.policyFields(a.dropPolicy, a.winner.renewalCents),
+      horizon: a.horizon, screening_group: a.screeningGroup, ...(a.math ? { renewal_math: a.math } : {}),
     };
     try {
       const spent = await spentCents(db);
@@ -532,6 +565,7 @@ export class BuyService {
       this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'post-buy totals failed');
       warnings.push('TOTALS_UNAVAILABLE: the purchase is booked; budget totals could not be computed');
     }
+    warnings.push(...this.horizonWarnings(a));
     Object.assign(body, { post_buy: post, warnings, audit_id: a.ctx.auditId });
     const result = { status: 201, body };
     try {
@@ -540,6 +574,12 @@ export class BuyService {
       this.deps.log?.error({ purchaseId, errMessage: (e as Error).message }, 'storing the purchase response failed');
     }
     return result;
+  }
+
+  /** v4.0.0 (CR-045 item 2): a trend or regulation name should drop at its first expiry. */
+  private horizonWarnings(a: { horizon: Horizon; dropPolicy: DropPolicy }): string[] {
+    return a.horizon !== 'evergreen' && a.dropPolicy !== 'at_first_expiry'
+      ? [`HORIZON_DROP_POLICY_MISMATCH: horizon is ${a.horizon} but drop_policy is ${a.dropPolicy}; a ${a.horizon} name should be bought with drop_policy at_first_expiry`] : [];
   }
 
   private policyFields(policy: DropPolicy, renewalCents: number | null) {
@@ -839,9 +879,10 @@ export class BuyService {
       registrar_dry_run: { would_succeed: true, cost: formatUsd(a.cost), cost_cents: a.cost },
       proposed_listing: a.plan ? { ...this.withPolicyLine(planView(a.plan, events), a.dropPolicy, w.renewalCents), display_name: a.displayName } : null, settings_version: a.pricing.version,
       display_name: a.displayName, ...this.policyFields(a.dropPolicy, w.renewalCents),
+      horizon: a.horizon, screening_group: a.screeningGroup, ...(a.math ? { renewal_math: a.math } : {}),
       ...gf,
       ...(a.smallBuyState ? { small_buy: a.smallBuyState } : {}),
-      warnings: [...a.check.warnings, ...(a.plan?.warnings ?? []), ...(a.accountWarnings ?? [])],
+      warnings: [...a.check.warnings, ...(a.plan?.warnings ?? []), ...(a.accountWarnings ?? []), ...this.horizonWarnings(a)],
     };
   }
 }

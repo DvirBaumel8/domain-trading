@@ -172,10 +172,10 @@ describe('admin import-domain', () => {
     expect(res.json().error.code).toBe('POC_CAP_EXCEEDED');
   });
 
-  it('IM-10: with 50 domains the import succeeds with DOMAIN_CAP_EXCEEDED_BY_IMPORT and /buy is then DOMAIN_CAP_REACHED', async () => {
+  it('IM-10: with 40 domains the import succeeds with DOMAIN_CAP_EXCEEDED_BY_IMPORT and /buy is then DOMAIN_CAP_REACHED', async () => {
     app = await makeApp({ adapters: [new FakeAdapter('porkbun')], rdap: async () => 'not_registered', now: () => T0 });
     const { auth } = await issueToken('write');
-    await seedOwnedDomains(50);
+    await seedOwnedDomains(40);
     const r = await go(MANUAL);
     expect(r.warnings.some((w) => w.startsWith('DOMAIN_CAP_EXCEEDED_BY_IMPORT'))).toBe(true);
     const res = await postBuy(app, buyBody({ domain: 'examplecityroofing.com' }), auth);

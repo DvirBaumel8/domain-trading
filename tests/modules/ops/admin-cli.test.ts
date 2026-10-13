@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { testDb as db } from '../../helpers/db.js';
+import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { testEnv } from '../../helpers/env.js';
 
 const run = promisify(execFile);
@@ -42,7 +42,7 @@ describe('admin CLI', () => {
   it('doctor reports DB, migrations and adapters and never prints a secret', async () => {
     const { stdout } = await cli(['doctor']);
     expect(stdout).toMatch(/db: ok/);
-    expect(stdout).toMatch(/migrations: 33 applied/);
+    expect(stdout).toMatch(/migrations: 34 applied/);
     expect(stdout).toMatch(/porkbun: enabled/);
     for (const secret of ['pk1_', 'sk1_', 'fake_godaddy_pat', 'github_pat_fake', ':dt@']) {
       expect(stdout).not.toContain(secret);
@@ -89,5 +89,19 @@ describe('admin CLI', () => {
       await expect(cli(['resolve-purchase', '--id', String(sent), '--reason', 'x'])).rejects.toMatchObject({ code: 2 });
       await expect(cli(['resolve-purchase', '--id', '99999', '--fail', '--reason', 'x'])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('PURCHASE_NOT_FOUND') });
     });
+  });
+
+  it('G-85 record-renewal books the renewal through the CLI (ledger row, renewals_used 1, expiry + 1 year); bad usage exits 2; a refusal exits 1', async () => {
+    await insertOwnedDomain(db, { domain: 'renewme.com', status: 'listed', category: 'trend', price_grade: null, expiry_date: '2027-10-04', drop_date: '2028-10-04' });
+    const at = new Date(Date.now() - 3_600_000).toISOString();
+    await expect(cli(['record-renewal', 'renewme.com', '--approval-text', 'x', '--approval-at', at])).rejects.toMatchObject({ code: 2 });
+    await expect(cli(['record-renewal', '--charged-cents', '1208', '--approval-text', 'x', '--approval-at', at])).rejects.toMatchObject({ code: 2 });
+    await expect(cli(['record-renewal', 'renewme.com', '--charged-cents', '12.5', '--approval-text', 'x', '--approval-at', at])).rejects.toMatchObject({ code: 2 });
+    await expect(cli(['record-renewal', 'renewme.com', '--charged-cents', '1208', '--approval-text', 'yes renew it', '--approval-at', at])).rejects.toMatchObject({ code: 1 });
+    const ok = await cli(['record-renewal', 'renewme.com', '--charged-cents', '1208', '--approval-text', 'yes renew renewme.com', '--approval-at', at]);
+    expect(ok.stdout).toContain('expiry 2027-10-04 -> 2028-10-04');
+    expect(await db.selectFrom('domains').select(['renewals_used', 'expiry_date']).where('domain', '=', 'renewme.com').executeTakeFirstOrThrow()).toMatchObject({ renewals_used: 1, expiry_date: '2028-10-04' });
+    expect(await db.selectFrom('ledger_entries').select(['type', 'amount_cents']).execute()).toEqual([{ type: 'renewal', amount_cents: -1208 }]);
+    await expect(cli(['record-renewal', 'renewme.com', '--charged-cents', '1208', '--approval-text', 'yes renew renewme.com', '--approval-at', at])).rejects.toMatchObject({ code: 1 });
   });
 });

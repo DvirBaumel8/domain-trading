@@ -183,7 +183,7 @@ describe('schema: settings', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       poc_cap_cents: 150000,
-      max_domains: 50,
+      max_domains: 40,
       approval_max_age_hours: 72,
       lander_target: 'afternic',
       allowed_registrars: ['porkbun'],

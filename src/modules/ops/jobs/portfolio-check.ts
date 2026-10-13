@@ -16,7 +16,7 @@ import { readCappedBytes } from '../../selection/index.js';
 import { webRiskLookup } from '../../selection/index.js';
 
 type Status = 'ok' | 'fail' | 'unknown';
-type Kind = 'registry' | 'web' | 'blocklist';
+type Kind = 'registry' | 'web' | 'blocklist' | 'price';
 
 /** How our `domains.registrar` code appears in an RDAP registrar name. An unlisted code is compared as a case-insensitive substring. */
 export const REGISTRAR_NAME_PATTERNS: Readonly<Record<string, RegExp>> = { godaddy: /godaddy/i, porkbun: /porkbun/i, dynadot: /dynadot/i };
@@ -26,6 +26,27 @@ export const BAD_REGISTRY_STATUSES = ['client hold', 'server hold', 'pending del
 export const LANDER_SIGNATURES: Readonly<Record<string, RegExp[]>> = { afternic: [/\/lander/i, /afternic/i, /godaddy/i], sedo: [/sedo/i] };
 export const WEB_CHECK_TIMEOUT_MS = 10_000;
 export const WEB_BODY_BYTES = 4096;
+/** v4.0.0 (CR-049 item 3): the lander page is read up to this many bytes per hop, through at most LANDER_MAX_HOPS redirects. */
+export const LANDER_BODY_BYTES = 200_000;
+export const LANDER_MAX_HOPS = 3;
+const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME|HOSTNAME_MISMATCH/i;
+
+/** The Buy Now amount a lander page shows (an amount within 80 characters after "buy now" / "buy it now"), in cents, or null when the page shows none. */
+export function shownBuyNowCents(text: string): number | null {
+  const m = /buy\s*(?:it\s*)?now[^$]{0,80}\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?/i.exec(text) ?? /\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?[^<]{0,40}buy\s*(?:it\s*)?now/i.exec(text);
+  if (!m) return null;
+  return Number(m[1]!.replace(/,/g, '')) * 100 + Number(m[2] ?? 0);
+}
+/** The price check of a readable lander page: shown Buy Now against the plan BIN; null shown = the page shows no amount (often script-rendered): unknown, never a mismatch. */
+export function landerPriceCheck(text: string, d: { bin_cents: number | null; listing_mode: string | null }): { status: Status; details: Record<string, unknown> } | null {
+  if (d.bin_cents === null) return null;
+  const shown = shownBuyNowCents(text);
+  const makeOffer = /make\s+(?:an\s+)?offer|submit\s+(?:an\s+)?offer|your\s+offer/i.test(text);
+  const wantsOffer = d.listing_mode === 'hybrid' || d.listing_mode === 'offer';
+  const details = { expected_cents: d.bin_cents, shown_cents: shown, make_offer_shown: makeOffer, make_offer_expected: wantsOffer };
+  if (shown === null) return { status: 'unknown', details: { ...details, reason: 'no_price_text' } };
+  return { status: shown === d.bin_cents ? 'ok' : 'fail', details };
+}
 /** A name's blocklist lookup is repeated when its latest one is at least this old. */
 export const BLOCKLIST_EVERY_DAYS = 7;
 
@@ -54,7 +75,7 @@ export class PortfolioCheckJob {
     try {
       const { db } = this.deps;
       const doms = await db.selectFrom('domains')
-        .select(['id', 'domain', 'status', 'registrar', 'expiry_date', 'lander', 'lander_ns', 'ns_verified_at', 'lander_pending'])
+        .select(['id', 'domain', 'status', 'registrar', 'expiry_date', 'lander', 'lander_ns', 'ns_verified_at', 'lander_pending', 'bin_cents', 'listing_mode'])
         .where('status', 'in', ['owned', 'listed', 'delisted']).orderBy('domain').execute();
       const shared = new Map<string, unknown>([['surbl_no_evidence', true]]); // one SURBL proof per run, and no screening evidence rows
       for (const d of doms) {
@@ -65,11 +86,14 @@ export class PortfolioCheckJob {
         out.registry[reg.status] += 1;
         await this.write(d.id, 'registry', reg, dryRun);
 
-        const web = d.status === 'listed' && d.lander_ns !== null && d.ns_verified_at !== null && !d.lander_pending ? await this.web(d).catch((e: Error) => ({ status: 'unknown' as Status, details: { reason: 'ERROR', message: e.message.slice(0, 120) } })) : null;
-        if (web) {
-          row.web = web.status;
-          out.web[web.status] += 1;
-          await this.write(d.id, 'web', web, dryRun);
+        const both = d.status === 'listed' && d.lander_ns !== null && d.ns_verified_at !== null && !d.lander_pending
+          ? await this.web(d).catch((e: Error) => ({ web: { status: 'unknown' as Status, details: { reason: 'ERROR', message: e.message.slice(0, 120) } }, price: null }))
+          : null;
+        if (both) {
+          row.web = both.web.status;
+          out.web[both.web.status] += 1;
+          await this.write(d.id, 'web', both.web, dryRun);
+          if (both.price) await this.write(d.id, 'price', both.price, dryRun);
         } else out.web.skipped += 1;
 
         if (await this.blocklistDue(d.id)) {
@@ -120,29 +144,52 @@ export class PortfolioCheckJob {
     return { status: 'ok', details: { registrar: f.registrar, expiry_date: expiry, statuses: f.statuses } };
   }
 
-  private async web(d: { domain: string; lander: string | null }): Promise<{ status: Status; details: Record<string, unknown> }> {
+  /**
+   * The daily lander check of our own name (CR-044 item 1, CR-049 item 3): GET https://<name>/ through the outbound guard, following up to LANDER_MAX_HOPS redirects
+   * (Afternic's lander), a TLS failure is a miss. `price` is the second check on the page the buyer sees: the Buy Now amount shown against the plan's BIN, and a make-offer option.
+   */
+  private async web(d: { domain: string; lander: string | null; bin_cents: number | null; listing_mode: string | null }): Promise<{ web: { status: Status; details: Record<string, unknown> }; price: { status: Status; details: Record<string, unknown> } | null }> {
     const { screening } = this.deps;
-    let res: Response;
-    try {
-      res = await safeFetch({ fetch: screening.siteFetch, lookupHost: screening.lookupHost }, `http://${d.domain}/`,
-        { redirect: 'manual', headers: { 'user-agent': USER_AGENT, accept: 'text/html,*/*;q=0.5' }, signal: AbortSignal.timeout(WEB_CHECK_TIMEOUT_MS) });
-    } catch (e) {
-      const name = (e as { name?: string })?.name;
-      const reason = e instanceof BlockedError ? e.code : name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network_error';
-      return { status: 'unknown', details: { reason } };
-    }
-    const location = res.headers.get('location');
+    const unknown = (reason: string, extra: Record<string, unknown> = {}) => ({ web: { status: 'unknown' as Status, details: { reason, ...extra } }, price: null });
+    let url = `https://${d.domain}/`;
+    let res: Response | null = null;
     let body = '';
-    try {
-      body = (await readCappedBytes(res, WEB_BODY_BYTES)).bytes.toString('utf8');
-    } catch {
-      return { status: 'unknown', details: { reason: 'network_error', status_code: res.status } };
+    const locations: string[] = [];
+    const bodies: string[] = [];
+    for (let hop = 0; hop <= LANDER_MAX_HOPS; hop++) {
+      try {
+        res = await safeFetch({ fetch: screening.siteFetch, lookupHost: screening.lookupHost }, url,
+          { redirect: 'manual', headers: { 'user-agent': USER_AGENT, accept: 'text/html,*/*;q=0.5' }, signal: AbortSignal.timeout(WEB_CHECK_TIMEOUT_MS) });
+      } catch (e) {
+        const name = (e as { name?: string })?.name;
+        const code = (e as { cause?: { code?: string } })?.cause?.code ?? (e as { code?: string })?.code ?? '';
+        if (TLS_ERROR.test(code)) return { web: { status: 'fail', details: { reason: 'tls_error', tls_code: code, ...(hop > 0 ? { url } : {}) } }, price: null };
+        return unknown(e instanceof BlockedError ? e.code : name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network_error');
+      }
+      const location = res.headers.get('location');
+      if (location) locations.push(location);
+      try {
+        body = (await readCappedBytes(res, LANDER_BODY_BYTES)).bytes.toString('utf8');
+      } catch {
+        return unknown('network_error', { status_code: res.status });
+      }
+      bodies.push(body);
+      if (res.status >= 300 && res.status < 400 && location && hop < LANDER_MAX_HOPS) {
+        try { url = new URL(location, url).toString(); } catch { break; }
+        continue;
+      }
+      break;
     }
-    const code = res.status;
-    if (code < 200 || code >= 400) return { status: 'fail', details: { status_code: code, ...(location ? { location } : {}), reason: 'http_status' } };
+    const code = res!.status;
+    const location = locations[0] ?? null;
+    if (code < 200 || code >= 400) return { web: { status: 'fail', details: { status_code: code, ...(location ? { location } : {}), reason: 'http_status' } }, price: null };
     const sigs = d.lander ? LANDER_SIGNATURES[d.lander] : undefined;
-    if (!sigs || sigs.length === 0 || sigs.some((re) => re.test(location ?? '') || re.test(body))) return { status: 'ok', details: { status_code: code, ...(location ? { location } : {}) } };
-    return { status: 'fail', details: { status_code: code, ...(location ? { location } : {}), reason: 'no_lander_signature' } };
+    const hay = [...locations, ...bodies].join('\n');
+    const matches = !sigs || sigs.length === 0 || sigs.some((re) => re.test(hay));
+    const web = matches
+      ? { status: 'ok' as Status, details: { status_code: code, ...(location ? { location } : {}) } }
+      : { status: 'fail' as Status, details: { status_code: code, ...(location ? { location } : {}), reason: 'no_lander_signature' } };
+    return { web, price: matches ? landerPriceCheck(bodies.join('\n'), d) : null };
   }
 
   private async blocklistDue(domainId: number): Promise<boolean> {

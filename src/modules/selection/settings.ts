@@ -67,6 +67,23 @@ export const LOOKALIKES_DEFAULT = {
   /** Most lookalike names checked per name (RDAP + page fetches are capped by this). */
   max_checks: 12,
 };
+/** v4.0.0 (CR-046 item 3): the renewal maths at /buy. ratio = BIN x (1 - commission) x STRe / renewal cost; under `renewal_math_min` the buy is refused. */
+export const BUY_DEFAULT = {
+  exclude_lanes: [] as Lane[],
+  renewal_math_min: 1,
+  /** The venue whose commission the maths uses, and the commission per venue as a share (Afternic 20%, SellerHub 10%). */
+  math_venue: 'afternic',
+  commission: { afternic: 0.2, sellerhub: 0.1 } as Record<string, number>,
+};
+/** v4.0.0 (CR-045): the renewal-time drop check (days before expiry), the sell-before-drop listing lead, and the horizon rule (months; warning days before the date). */
+export const RENEWAL_DEFAULT = { drop_check_days: 60, list_by_days_before_expiry: 30, horizon_months: 12, horizon_due_days: 30 };
+/** v4.0.0 (CR-045 item 5, as amended): the outreach log cap per name. */
+export const OUTREACH_DEFAULT = { max_emails_per_name: 5 };
+/** v4.0.0 (CR-044 items 4 and 6, CR-045 item 3): the monthly holdout sample and its re-check delay; the sales-pattern default price band; sales judged after this many months. */
+export const PORTFOLIO_DEFAULT = {
+  holdout_passed_n: 20, holdout_failed_n: 20, holdout_recheck_months: 6,
+  patterns_min_cents: 100_000, patterns_max_cents: 500_000, judge_sales_months: 24,
+};
 export const EU_TM_DEFAULT = { required_lanes: ['S6'] as Lane[], freshness_hours: 168 };
 export const SAME_NAME_DEFAULT = {
   min_visible_chars: 200, timeout_ms: 10_000, max_bytes: 512_000, max_redirects: 3, min_ms_between_fetches: 1000,
@@ -141,7 +158,21 @@ const Base = z.object({
     timeout_ms: int.min(500).max(20_000), max_bytes: int.min(1000).max(512_000), max_checks: int.min(1).max(30),
   }).strict().default(LOOKALIKES_DEFAULT),
   /** v3.10.0 (CR-043): lanes whose names are never a buy candidate (final status `not_for_buy`, reason LANE_NOT_FOR_BUY). Default none. */
-  buy: z.object({ exclude_lanes: z.array(z.enum(LANES)) }).strict().default({ exclude_lanes: [] }),
+  buy: z.object({
+    exclude_lanes: z.array(z.enum(LANES)),
+    renewal_math_min: z.number().min(0).max(100).default(BUY_DEFAULT.renewal_math_min),
+    math_venue: z.string().regex(/^[a-z]{3,20}$/).default(BUY_DEFAULT.math_venue),
+    commission: z.record(z.string().regex(/^[a-z]{3,20}$/), share).default(BUY_DEFAULT.commission),
+  }).strict().default(BUY_DEFAULT),
+  renewal: z.object({
+    drop_check_days: int.min(1).max(365), list_by_days_before_expiry: int.min(1).max(365),
+    horizon_months: int.min(1).max(60), horizon_due_days: int.min(1).max(365),
+  }).strict().default(RENEWAL_DEFAULT),
+  outreach: z.object({ max_emails_per_name: int.min(1).max(100) }).strict().default(OUTREACH_DEFAULT),
+  portfolio: z.object({
+    holdout_passed_n: int.max(200), holdout_failed_n: int.max(200), holdout_recheck_months: int.min(1).max(60),
+    patterns_min_cents: int.positive(), patterns_max_cents: int.positive(), judge_sales_months: int.min(1).max(120),
+  }).strict().default(PORTFOLIO_DEFAULT),
   surbl: z.object({
     zone: z.string().min(3), control_name: z.string().min(3), blocked_answers: z.array(z.string()),
     list_bits: z.record(z.string().regex(/^\d+$/), z.string()), ns_override: z.array(z.string()), timeout_ms: int,
@@ -337,7 +368,10 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true, main_lanes: MAIN_LANES_DEFAULT },
   intake: INTAKE_DEFAULT,
   lookalikes: LOOKALIKES_DEFAULT,
-  buy: { exclude_lanes: [] },
+  buy: BUY_DEFAULT,
+  renewal: RENEWAL_DEFAULT,
+  outreach: OUTREACH_DEFAULT,
+  portfolio: PORTFOLIO_DEFAULT,
   surbl: { zone: 'multi.surbl.org', control_name: 'test.surbl.org', blocked_answers: ['127.0.0.1'], list_bits: { '4': 'DM', '8': 'PH', '16': 'MW', '32': 'CT', '64': 'ABUSE', '128': 'CR' }, ns_override: [], timeout_ms: 3000 },
   history: {
     max_fetch_per_name: 6, min_ms_between_calls: 1000, timeout_ms: 20000, retries: 2, min_content_chars: 200, parked_max_text_chars: 1500,

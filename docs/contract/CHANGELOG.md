@@ -2,6 +2,18 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 4.0.0 (2026-10-13): portfolio discipline, outcomes, SellerHub
+MAJOR (CR-044 to CR-049): `POST /buy` now **requires** `stre` and `stre_reason` (400 without them), a breaking change for the caller, as Gavriel asked in CR-046. Release note: `docs/releases/v4.0.0.md`.
+- **Domain cap 40** (Dvir, 13 Oct 2026; migration; was 50). A dry run `/buy` at the cap reports `would_be_blocked: "DOMAIN_CAP_REACHED"` (a real buy and `dry_run: "strict"` are refused with the existing code).
+- **`POST /buy`:** required `stre` (0..1) and `stre_reason`; the renewal maths gate (422 `RENEWAL_MATH_FAIL`, `renewal_math` in the dry run and the 201); optional `horizon` (`evergreen` default, `trend`, `regulation`; warning `HORIZON_DROP_POLICY_MISMATCH`); `screening_group` (`passed` | `borderline`) and `horizon` in the dry run and the 201. `LTO_NOT_ALLOWED` on a trend, regulation or first-expiry name (also `POST /list/{domain}`; CR-048).
+- **New routes:** `POST /portfolio/{domain}/horizon` (Dvir's `approval_ref`), `POST /portfolio/{domain}/stats`, `GET /portfolio/outcomes`, `/portfolio/outcomes/monthly`, `/portfolio/outcomes/quarterly`, `POST /outreach/emails` (409 `EMAIL_CAP` at the 6th for a name), `GET /outreach/emails/summary`, `POST /patterns/sales`, `GET /patterns/latest`.
+- **`/report` warnings:** `RENEWAL_DROP_SUGGESTED`, `SELL_BEFORE_DROP`, `HORIZON_DUE`, `DELIST_NEEDED`, `LANDER_PRICE_MISMATCH`, `LANDER_OFFER_MISSING`; `LANDER_DOWN` now reads `https://` and counts a TLS failure.
+- **Daily steps:** `listingSync` (Spaceship SellerHub, off without keys) and `portfolioLifecycle` (expired unrenewed names, lookalike re-check in the renewal window, monthly holdout), both after `dropJob`.
+- **Selection settings keys** (old stored versions read the defaults): `buy.renewal_math_min`, `buy.math_venue`, `buy.commission`, `renewal.*`, `outreach.max_emails_per_name`, `portfolio.*`.
+- **Env (host):** `SPACESHIP_SELLERHUB_API_KEY`, `SPACESHIP_SELLERHUB_API_SECRET`.
+- **Admin command** `record-renewal` (G-85; not an API route). Migration `1763100000000_v3-11-0.sql`.
+- **Not built:** `POST /demand/keywords` (no real Keyword Planner export yet), the Companies House clue (no key), an Afternic stats CSV import (no real export).
+
 ## 3.10.0 (2026-10-13): CR-043 scout checks
 MINOR, additive. Every new reject is **off** under the active settings (v11); a settings version activated with Dvir's `approval_ref` turns them on. Release note: `docs/releases/v3.10.0.md`.
 - **New selection settings keys** (old stored versions read the defaults): `form.max_sld_chars` (null), `intake.require_sellers_min` (0), `intake.require_comps` (false), `intake.topic_window_days` (30), `lookalikes.*`, `buy.exclude_lanes` ([]). Codes: `SLD_TOO_LONG` (form check and intake), `SELLERS_TOO_FEW`, `COMPS_MISSING` (`tier`), `LANE_NOT_FOR_BUY` (final status `not_for_buy`).

@@ -87,6 +87,13 @@ export interface DomainsTable {
   plan_audit_id: string | null;
   export_pending_since: Timestamp | null;
   listing_changed_at: Timestamp | null;
+  /** v4.0.0 (CR-045/048): evergreen | trend | regulation; a trend or regulation name carries a sell-or-drop date. */
+  horizon: Generated<'evergreen' | 'trend' | 'regulation'>;
+  sell_or_drop_by: DateString | null;
+  /** v4.0.0 (CR-045 item 3): the group of the 40-name test, from the screening verdicts at buy. */
+  screening_group: 'passed' | 'borderline' | null;
+  /** v4.0.0 (CR-046 item 3): STRe, its reason and the renewal maths at buy. */
+  buy_card: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>;
   created_at: TimestampDefault;
   updated_at: TimestampDefault;
 }
@@ -367,11 +374,83 @@ export interface VenueListingsTable {
   created_at: TimestampDefault;
 }
 
+export interface PortfolioStatsTable {
+  id: Generated<number>;
+  domain: string;
+  as_of: DateString;
+  month: string;
+  venue: Generated<'afternic' | 'sedo' | 'sellerhub'>;
+  views: number | null;
+  leads: number | null;
+  inquiries: number | null;
+  offers: number | null;
+  source: string;
+  token_name: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+export interface OutreachEmailsTable {
+  id: Generated<number>;
+  domain: string;
+  recipient_domain: string;
+  sent_at: Timestamp;
+  reply: Generated<boolean>;
+  outcome: 'interested' | 'declined' | 'offer' | 'sold' | 'bounced' | 'other' | null;
+  token_name: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+  updated_at: TimestampDefault;
+}
+
+export interface HoldoutTable {
+  id: Generated<number>;
+  month: string;
+  domain: string;
+  grp: 'passed' | 'failed';
+  run_id: string | null;
+  seed: string;
+  picked_at: TimestampDefault;
+  lookalikes_at_pick: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>;
+  recheck_at: Timestamp | null;
+  lookalikes_recheck: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>;
+  delta: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>;
+}
+
+export interface SalesPatternUploadsTable {
+  id: Generated<number>;
+  uploaded_at: TimestampDefault;
+  rows_n: number;
+  token_name: string | null;
+  audit_id: string | null;
+}
+
+export interface SalesPatternRowsTable {
+  id: Generated<number>;
+  upload_id: number;
+  domain: string;
+  price_cents: number;
+  sold_on: DateString;
+  venue: string | null;
+}
+
+export interface ListingSyncLogTable {
+  id: Generated<number>;
+  domain: string;
+  venue: 'sellerhub';
+  action: 'create' | 'update' | 'delete' | 'sold_seen' | 'error';
+  bin_cents: number | null;
+  min_offer_cents: number | null;
+  http_status: number | null;
+  detail: string | null;
+  at: TimestampDefault;
+}
+
 export interface PortfolioChecksTable {
   id: Generated<number>;
   domain_id: number;
   at: TimestampDefault;
-  kind: 'registry' | 'web' | 'blocklist';
+  kind: 'registry' | 'web' | 'blocklist' | 'price' | 'lookalikes';
   status: 'ok' | 'fail' | 'unknown';
   details: ColumnType<Record<string, unknown>, string | undefined, never>;
 }
@@ -1055,6 +1134,12 @@ export interface Database {
   portfolio_checks: PortfolioChecksTable;
   registrar_state_checks: RegistrarStateChecksTable;
   venue_listings: VenueListingsTable;
+  portfolio_stats: PortfolioStatsTable;
+  outreach_emails: OutreachEmailsTable;
+  holdout: HoldoutTable;
+  sales_pattern_uploads: SalesPatternUploadsTable;
+  sales_pattern_rows: SalesPatternRowsTable;
+  listing_sync_log: ListingSyncLogTable;
   drop_lists: DropListsTable;
   drop_list_rows: DropListRowsTable;
   drop_list_checks: DropListChecksTable;

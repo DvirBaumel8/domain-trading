@@ -21,7 +21,7 @@ export const COMPS = [
 export function buyBody(over: Record<string, unknown> = {}) {
   const domain = (over.domain as string | undefined) ?? DOMAIN;
   return { domain, max_price: 11.5, approval_ref: approvalNow(domain), category: 'geo', price_grade: 'weaker',
-    pricing_evidence: { comps: COMPS, rationale: 'fixture' }, ...over };
+    pricing_evidence: { comps: COMPS, rationale: 'fixture' }, stre: 0.05, stre_reason: 'fixture: a thin search market', ...over };
 }
 
 let seq = 0;

@@ -85,3 +85,18 @@ export function splitUnread(sld: string, table: SplitV2Table = loadSplitV2('bt1@
   }
   return longest >= n ? null : sld.slice(longest);
 }
+
+const classCache = new Map<string, Map<string, string>>();
+/** v4.0.0 (CR-044 item 4): the class of each known token in a method's frozen split file (35..70 = dictionary frequency level, city, special). */
+export function splitClasses(method = 'bt1@v3'): Map<string, string> {
+  const hit = classCache.get(method);
+  if (hit) return hit;
+  const f = SPLIT_FILES[method];
+  if (!f) throw new Error(`Sibling method ${method} has no split file`);
+  loadSplitV2(method); // verifies the sha256
+  const j = JSON.parse(readFileSync(fileURLToPath(new URL(`../../../data/${f.file}`, import.meta.url)), 'utf8')) as { classes: Record<string, string[]> };
+  const m = new Map<string, string>();
+  for (const [cls, tokens] of Object.entries(j.classes)) for (const t of tokens) m.set(t, cls);
+  classCache.set(method, m);
+  return m;
+}

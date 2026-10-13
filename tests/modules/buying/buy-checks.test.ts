@@ -133,10 +133,10 @@ describe('POST /buy checks (no money moves)', () => {
     expect(res.json().error).toMatchObject({ code: 'POC_CAP_EXCEEDED', details: { remaining: '$5.00', remaining_cents: 500 } });
   });
 
-  it('B-13/CAP-2: 50 domains owned → 409 DOMAIN_CAP_REACHED', async () => {
+  it('B-13/CAP-2: 40 domains owned → 409 DOMAIN_CAP_REACHED', async () => {
     const pb = new FakeAdapter('porkbun');
     const auth = await setup([pb]);
-    await seedOwnedDomains(50);
+    await seedOwnedDomains(40);
     expect((await postBuy(app, buyBody(), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
     expect(pb.calls).toEqual([]);
   });

@@ -112,3 +112,13 @@ describe('ENABLED_REGISTRARS validation (S8)', () => {
     expect(loadConfig(testEnv({ ENABLED_REGISTRARS: '' })).enabledRegistrars).toEqual([]);
   });
 });
+
+describe('SellerHub env (v4.0.0, CR-049)', () => {
+  it('SHC-1: the key pair is optional (both absent: sync off), read as separate variables, and both are secrets', () => {
+    expect(loadConfig(testEnv()).sellerhub).toEqual({ apiKey: undefined, apiSecret: undefined, baseUrl: 'https://spaceship.dev/api' });
+    const c = loadConfig(testEnv({ SPACESHIP_SELLERHUB_API_KEY: 'fake-key-1', SPACESHIP_SELLERHUB_API_SECRET: 'fake-secret-1', SPACESHIP_SELLERHUB_BASE_URL: 'https://spaceship.test/api/' }));
+    expect(c.sellerhub).toEqual({ apiKey: 'fake-key-1', apiSecret: 'fake-secret-1', baseUrl: 'https://spaceship.test/api' });
+    expect(c.secretValues).toEqual(expect.arrayContaining(['fake-key-1', 'fake-secret-1']));
+    expect(loadConfig(testEnv({ SPACESHIP_SELLERHUB_API_KEY: '' })).sellerhub.apiKey).toBeUndefined();
+  });
+});

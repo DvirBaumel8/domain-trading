@@ -1,4 +1,4 @@
-# Selection checks (contract v3.10.0)
+# Selection checks (contract v4.0.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -42,6 +42,15 @@ One JSON document per version (`values`). A version is immutable; a draft is mad
 | `intake.topic_window_days` | 30 | 3.10.0. The window of `TOPIC_REUSED` (intake flag; `report.csv` `topic_reused`). |
 | `lookalikes` | `enabled` true, `endings` net, org, io, co, ai, co.uk, `prefixes` get, try, `timeout_ms` 5000, `max_bytes` 100000, `max_checks` 12 | 3.10.0. The `lookalikes` check (below). `enabled` false removes it from the plan. |
 | `buy.exclude_lanes` | [] | 3.10.0. Lanes whose names are never a buy candidate: their final status becomes `not_for_buy` (reason `LANE_NOT_FOR_BUY`) instead of `buy_candidate`, `would_buy` or `pending_manual`; they stay off the daily buy list and out of tranches. The v12 draft sets `["S2"]`. |
+| `buy.renewal_math_min` | 1 | 4.0.0 (CR-046 item 3). `POST /buy` is refused with 422 `RENEWAL_MATH_FAIL` when BIN x (1 - commission) x STRe / renewal cost is under this. |
+| `buy.math_venue`, `buy.commission` | `afternic`, `{afternic: 0.2, sellerhub: 0.1}` | 4.0.0. The venue whose commission the maths uses, and each venue's commission as a share (never hard-coded). |
+| `renewal.drop_check_days` | 60 | 4.0.0 (CR-045). Days before the first expiry at which `/report` raises `RENEWAL_DROP_SUGGESTED` and `SELL_BEFORE_DROP`. |
+| `renewal.list_by_days_before_expiry` | 30 | 4.0.0. `SELL_BEFORE_DROP.list_by` = expiry minus this. |
+| `renewal.horizon_months`, `renewal.horizon_due_days` | 12, 30 | 4.0.0. A trend or regulation name is sold or dropped by buy date + `horizon_months`; `HORIZON_DUE` is raised `horizon_due_days` before. |
+| `outreach.max_emails_per_name` | 5 | 4.0.0 (CR-045 item 5). The 6th logged email for one name is 409 `EMAIL_CAP`. |
+| `portfolio.holdout_passed_n`, `portfolio.holdout_failed_n`, `portfolio.holdout_recheck_months` | 20, 20, 6 | 4.0.0 (CR-044 item 6). The monthly holdout sample and the delay of its lookalike re-check. |
+| `portfolio.patterns_min_cents`, `portfolio.patterns_max_cents` | 100000, 500000 | 4.0.0 (CR-044 item 4). The default price band of `GET /patterns/latest`. |
+| `portfolio.judge_sales_months` | 24 | 4.0.0 (CR-046 item 4). Sales of the 40-name test are judged after this many months. |
 | `form.unknown_token_fails` | true | A run of letters no list explains → `FAIL` `UNKNOWN_TOKEN` |
 | `form.ambiguity_margin`, `form.token_costs` | 2; typed 1, dict3 2, dict2 3 | Tokenizer search: how much more a reading may cost and still count as an alternative; cost of a typed term, a dictionary word of 3+ letters, a 2-letter dictionary word |
 | `form.short_max_words`, `form.short_max_chars` | 2, 12 | FORM-2 `short` |

@@ -59,6 +59,10 @@ services:
         sync: false
       - key: BUFFER_API_KEY      # optional: X posting through Buffer (the company's own account only); unset answers 503 POSTING_NOT_CONFIGURED
         sync: false
+      - key: SPACESHIP_SELLERHUB_API_KEY    # optional: Spaceship SellerHub listing sync (scopes sellerhub:read, sellerhub:write only); unset skips the listingSync step
+        sync: false
+      - key: SPACESHIP_SELLERHUB_API_SECRET # optional: the secret that goes with the SellerHub key
+        sync: false
       - key: BUFFER_CHANNEL_ID   # optional: the Buffer channel id; unset uses the account's single X channel
         sync: false
       - key: PUBLIC_BASE_URL     # where Buffer fetches post images (GET /media/<token>)

@@ -6,3 +6,4 @@ export { BufferClient } from './posting/buffer.js';
 export { postsRefresh, postingHealth, type PostingDeps } from './posting/posts.js';
 export { retryReview, runReview } from './review/run.js';
 export { currentReviewSettings } from './review/settings.js';
+export { registerEmails } from './api/emails.js';

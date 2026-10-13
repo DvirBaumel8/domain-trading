@@ -60,11 +60,12 @@ describe('GET /report core: money', () => {
     const t = await boot();
     const r = await t.report();
     expect(r.budget).toMatchObject({ spent_cents: 2107, spent: '$21.07', remaining_cents: 147893, remaining: '$1,478.93', poc_cap_cents: 150000, poc_cap: '$1,500.00' });
-    expect(r.budget.domains).toEqual({ count: 1, max: 50 });
+    expect(r.budget.domains).toEqual({ count: 1, max: 40 });
     expect(r.sales).toMatchObject({ count: 1, net_cents: 169575, net: '$1,695.75', gross_cents: 199500, gross: '$1,995.00', commission_cents: 29925, fees_cents: 0, fees: '$0.00' });
     expect(r).toMatchObject({ profit_cents: 167468, profit: '$1,674.68', roi: 79.48, roi_pct: 7948 });
     // beta-two.com has no renewal price (the fixture's committed_forward gap), which Task 2 reports
-    expect(r.warnings.map((w: { code: string; domain: string }) => [w.code, w.domain])).toEqual([['RENEWAL_PRICE_UNKNOWN', 'beta-two.com']]);
+    // v4.0.0: alpha-one.com is sold and still to be removed at the hand venues (DELIST_NEEDED)
+    expect(r.warnings.map((w: { code: string; domain: string }) => [w.code, w.domain])).toEqual([['DELIST_NEEDED', 'alpha-one.com'], ['RENEWAL_PRICE_UNKNOWN', 'beta-two.com']]);
     expect(JSON.stringify(r.budget)).not.toContain('"cents"'); // flat pairs only
   });
 

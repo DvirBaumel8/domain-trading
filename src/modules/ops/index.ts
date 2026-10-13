@@ -1,5 +1,6 @@
 // Public entry of the ops module.
 export { registerHealth } from './api/health.js';
+export { registerPortfolioWrites } from './api/portfolio.js';
 export { registerJobs } from './api/jobs.js';
 export { BackupExporter } from './jobs/backup-export.js';
 export { CohortOutcomesJob } from './jobs/cohort-outcomes.js';
@@ -12,3 +13,6 @@ export { ReferenceRefreshJob } from './jobs/reference-refresh.js';
 export { RegistrarCheckJob } from './jobs/registrar-check.js';
 export { type BackupExport, JobRunner } from './jobs/runner.js';
 export { JobQueue } from './queue.js';
+export { ListingSyncJob } from './jobs/listing-sync.js';
+export { PortfolioLifecycleJob } from './jobs/portfolio-lifecycle.js';
+export { SellerHubClient } from './sellerhub.js';

@@ -9,6 +9,7 @@ import { dailyScheduleState, JOBS_OVERDUE_HOURS, JOB_RUN_STUCK_HOURS, jobsOverdu
 import { daysBetween } from '../../candidates/index.js';
 import { activeSelectionSettings } from '../../selection/index.js';
 import { priceValues } from './money.js';
+import { lifecycleWarnings } from './lifecycle.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
 export interface ReportWarning { code: string; level: WarningLevel; domain?: string; message: string; details: Record<string, unknown> }
@@ -77,8 +78,22 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   for (const c of latestChecks.rows) {
     const d = nameOf.get(Number(c.domain_id));
     const st = statusOf.get(Number(c.domain_id));
-    if (d === undefined || st === undefined || !live(st) || c.status !== 'fail') continue;
+    if (d === undefined || st === undefined || !live(st)) continue;
     const checkedAt = toJerusalemIso(c.at);
+    if (c.kind === 'price') {
+      // v4.0.0 (CR-049 item 3): the Buy Now amount the lander shows against the plan's BIN, and the make-offer option
+      if (st !== 'listed') continue;
+      if (c.status === 'fail') {
+        add('LANDER_PRICE_MISMATCH', 'warn', `${d}: the lander shows a Buy Now price that is not the plan's BIN.`, d, {
+          checked_at: checkedAt, ...pair('shown', c.details.shown_cents ?? 0), ...pair('expected', c.details.expected_cents ?? 0),
+        });
+      }
+      if (c.details.make_offer_expected === true && c.details.make_offer_shown === false) {
+        add('LANDER_OFFER_MISSING', 'info', `${d}: the plan has a make-offer option but the lander page shows none.`, d, { checked_at: checkedAt });
+      }
+      continue;
+    }
+    if (c.status !== 'fail') continue;
     if (c.kind === 'registry') {
       add('REGISTRY_MISMATCH', 'error', `${d}: the registry does not agree with our record.`, d, { checked_at: checkedAt, differences: c.details.differences ?? [] });
     } else if (c.kind === 'blocklist') {
@@ -265,6 +280,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
       purchase_id: p.id, state: p.state, age_minutes: ageMinutes, created_at: toJerusalemIso(p.created_at),
     });
   }
+
+  // v4.0.0: renewal drop check, horizon, delist after a sale
+  await lifecycleWarnings(db, now, today, domains, add);
 
   // price events
   const failed = await db.selectFrom('price_schedule').select(['domain_id', 'event', 'due_on', 'note']).where('status', '=', 'failed').orderBy('domain_id').orderBy('due_on').execute();

@@ -28,7 +28,7 @@ export interface PlanStep {
 /** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the review steps 1 (they keep their own retry), the rest 2. */
 export const DEFAULT_ATTEMPTS = 2;
 export const STEP_ATTEMPTS: Record<string, number> = {
-  registrarCheck: 3, portfolioCheck: 3, dropWatch: 3, referenceRefresh: 3, postsRefresh: 3, outsideReview: 1, reviewRetry: 1,
+  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, postsRefresh: 3, outsideReview: 1, reviewRetry: 1,
 };
 export const DEFAULT_TIMEOUT_MS = 5 * 60_000;
 export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000 };
@@ -71,6 +71,10 @@ export interface JobRunnerDeps {
   priceJob: Runnable;
   dropJob: Runnable;
   registrarCheckJob: Runnable;
+  /** v4.0.0 (CR-049): pushes each listed name's BIN and public min offer to SellerHub and deletes the listings of names that are gone; while undefined, that step reports skipped. */
+  listingSyncJob?: Runnable;
+  /** v4.0.0: expired unrenewed names, lookalike re-checks for the renewal drop check, the monthly holdout; while undefined, that step reports skipped. */
+  portfolioLifecycleJob?: Runnable;
   /** Daily registry, lander and blocklist checks of the live names (CR-007 G-5); while undefined, that step reports skipped. */
   portfolioCheckJob?: Runnable;
   /** Daily registry check of the kept names of the uploaded drop lists (CR-007 §22 G-2); while undefined, that step reports skipped. */
@@ -143,6 +147,8 @@ export class JobRunner {
       ...tick,
       step('priceJob', () => d.priceJob.runOnce()),
       step('dropJob', () => d.dropJob.runOnce()),
+      optional('listingSync', d.listingSyncJob, 'listing sync not configured'),
+      optional('portfolioLifecycle', d.portfolioLifecycleJob, 'portfolio lifecycle not configured'),
       step('registrarCheck', () => d.registrarCheckJob.runOnce()),
       optional('portfolioCheck', d.portfolioCheckJob, 'portfolio check not configured'),
       optional('dropWatch', d.dropWatchJob, 'drop watch not configured'),

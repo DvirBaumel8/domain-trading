@@ -38,6 +38,11 @@ const BuyBody = z.object({
   small_buy_exception: z.boolean().optional(),
   display_name: z.string().nullable().optional(),
   drop_policy: z.enum(['after_one_renewal', 'at_first_expiry']).optional(),
+  /** v4.0.0 (CR-045 item 2): optional, default evergreen. */
+  horizon: z.enum(['evergreen', 'trend', 'regulation']).optional(),
+  /** v4.0.0 (CR-046 item 3): the scout's expected sell-through over the renewal period (0..1) and why; both required (400 VALIDATION_ERROR when missing, checked in the handler). */
+  stre: z.number().min(0).max(1).optional(),
+  stre_reason: z.string().trim().min(3).max(500).optional(),
 }).strict();
 
 function cents(n: number, field: string): number {
@@ -51,6 +56,7 @@ function cents(n: number, field: string): number {
 export function registerBuy(app: FastifyInstance, service: BuyService): void {
   app.post('/buy', { config: { openapiBody: BuyBody } }, async (req, reply) => {
     const b = BuyBody.parse(req.body);
+    if (b.stre === undefined || b.stre_reason === undefined) throw new AppError(400, 'VALIDATION_ERROR', 'stre (0..1) and stre_reason are required: the scout\'s expected sell-through over the renewal period and why');
     const domain = normalizeDomain(b.domain);
     const r = await service.buy(
       {
@@ -73,6 +79,9 @@ export function registerBuy(app: FastifyInstance, service: BuyService): void {
         smallBuyException: b.small_buy_exception ?? false,
         displayName: b.display_name ?? null,
         dropPolicy: b.drop_policy ?? 'after_one_renewal',
+        horizon: b.horizon ?? 'evergreen',
+        stre: b.stre,
+        streReason: b.stre_reason,
         requestBody: req.body,
       },
       {

@@ -54,7 +54,7 @@ Money = integer cents (USD). Timestamps = `timestamptz` (UTC). Calendar dates = 
 | `audit_log` | `id` (`aud_…`), `at`, `token_id`, `scope` (`read`/`write`/`job`/`admin`), `method`, `path`, `idempotency_key`, `approval_text`, `approval_at`, `request` (redacted), `status_code`, `result_summary`, `client_ip` | **Append-only.** One row per authenticated POST, job run and admin command |
 | `idempotency_keys` | `key` (PK), `request_hash`, `method`, `path`, `token_id`, `state`, `status_code`, `response_body`, `response_content_type`, `completed_at` | Never exported |
 | `api_tokens` | `id`, `name`, `scope` (`read`/`write`), `token_sha256`, `created_at`, `revoked_at`, `last_used_at` | Plain token shown once by the admin command. Never exported |
-| `settings` | `poc_cap_cents` (150000), `max_domains` (50), `approval_max_age_hours` (72), `lander_target` (`afternic`), `allowed_registrars` (`{porkbun}`; never cloudflare), `high_value_min_bin_cents` (250000), `sedo_hybrid_as` (`make_offer`) | One row. Changed only by an admin command or a migration, never the API |
+| `settings` | `poc_cap_cents` (150000), `max_domains` (40 since 4.0.0), `approval_max_age_hours` (72), `lander_target` (`afternic`), `allowed_registrars` (`{porkbun}`; never cloudflare), `high_value_min_bin_cents` (250000), `sedo_hybrid_as` (`make_offer`) | One row. Changed only by an admin command or a migration, never the API |
 
 ## 5. Registrar adapter interface
 ```
