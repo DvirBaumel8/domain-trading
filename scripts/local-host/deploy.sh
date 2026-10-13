@@ -20,6 +20,14 @@ if [ "$tag" = "$current" ] && [ "$FIRST" = 0 ]; then exit 0; fi
 
 sha="$(git rev-list -n 1 "$tag")"
 ci="$(gh run list --repo DvirBaumel8/domain-trading --workflow ci --commit "$sha" --json conclusion -q '.[0].conclusion' 2>/dev/null || true)"
+if [ "$ci" != "success" ]; then
+  # CI cancels an older run on main when a newer push arrives, so the tag's own run may be "cancelled".
+  # A passed run on a later main commit that contains the tag commit also covers it (the same rule as deploy-live, BUG-041).
+  for later in $(gh run list --repo DvirBaumel8/domain-trading --workflow ci --branch main --status success --limit 20 --json headSha -q '.[].headSha' 2>/dev/null); do
+    git cat-file -e "$later" 2>/dev/null || git fetch --quiet origin main
+    if git merge-base --is-ancestor "$sha" "$later" 2>/dev/null; then ci=success; break; fi
+  done
+fi
 if [ "$ci" != "success" ]; then echo "$(date -u +%FT%TZ) $tag: ci is '${ci:-unknown}', not deploying"; exit 0; fi
 
 echo "$(date -u +%FT%TZ) deploying $tag ($sha)"
