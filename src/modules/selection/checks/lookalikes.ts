@@ -2,6 +2,7 @@
 // and get<sld>.com / try<sld>.com. Each name: is it registered (RDAP only, never system DNS; an ending with no RDAP service is `null`, never guessed),
 // and for a registered one, is its home page in use (a paced, robots-aware, size-capped fetch through the outbound guard; parked or for-sale pages
 // are not in use). A feature check: it always answers PASS (or UNKNOWN when it cannot run); it never FAILs or FLAGs a name, so verdicts do not change.
+import { RDAP_FALLBACK_BASES } from '../../../core/rdap.js';
 import { fetchPage, classifySite, type PageFetch, type RobotsRule, type SiteClass } from '../site.js';
 import { lookupCached, pacerFor, rdapBaseFor, type Pacer } from '../rdap-batch.js';
 import { sharedPacer, sharedRobots } from '../sellers.js';
@@ -12,13 +13,42 @@ export type LookalikeKind = 'ending' | 'hyphen' | 'prefix';
 export interface LookalikeName { domain: string; kind: LookalikeKind }
 export interface LookalikeItem { domain: string; kind: LookalikeKind; registered: boolean | null; in_use: boolean | null; reason_code: string | null }
 
-/** The names to check, in priority order, de-duplicated and never our own name. Pure. */
-export function lookalikeNames(sld: string, tokens: string[], s: { endings: string[]; prefixes: string[] }): LookalikeName[] {
+const isDigit = (c: string): boolean => c >= '0' && c <= '9';
+const MIN_WORD = 4;
+
+/**
+ * v4.2.1 (CR-052 S-1): hyphen points from real words, not from the form split (which broke `drscompliance` into dr-sc-om-pl-ian-ce).
+ * The longest dictionary word ending the name (`drs|compliance`, `ppwr|labelling`), the longest one starting it (`roofing|voiceagent`),
+ * and a digit followed by a letter (`ets2|compliance`, `fsma204|audit`), so an acronym with its number (ets2, fsma204) stays whole.
+ * A letter followed by a digit (`fsma|204`) is used only in the form with every point. A British double l counts (labelling = labeling). Pure.
+ */
+export function wordHyphenNames(sld: string, dictionary: ReadonlySet<string>): string[] {
+  const isWord = (w: string): boolean => w.length >= MIN_WORD && /^[a-z]+$/.test(w) && (dictionary.has(w) || dictionary.has(w.replace('ll', 'l')));
+  const single = new Set<number>();
+  for (let i = 1; i <= sld.length - MIN_WORD; i++) if (isWord(sld.slice(i))) { single.add(i); break; }
+  for (let j = sld.length - 1; j >= MIN_WORD; j--) if (isWord(sld.slice(0, j))) { single.add(j); break; }
+  const all = new Set(single);
+  for (let i = 1; i < sld.length; i++) {
+    if (isDigit(sld[i - 1]!) && !isDigit(sld[i]!)) { single.add(i); all.add(i); }
+    else if (!isDigit(sld[i - 1]!) && isDigit(sld[i]!)) all.add(i);
+  }
+  const cut = (at: number[]): string => { let out = ''; let from = 0; for (const b of at) { out += `${sld.slice(from, b)}-`; from = b; } return `${out}${sld.slice(from)}.com`; };
+  const out = [...single].sort((a, b) => a - b).map((b) => cut([b]));
+  if (all.size >= 2) out.push(cut([...all].sort((a, b) => a - b)));
+  return out;
+}
+
+/**
+ * The names to check, in priority order, de-duplicated and never our own name. Pure.
+ * With a `dictionary` (the sibling scan, CR-052) the hyphen forms come from `wordHyphenNames` first, and the form split is used only when it has at most three pieces.
+ */
+export function lookalikeNames(sld: string, tokens: string[], s: { endings: string[]; prefixes: string[] }, dictionary?: ReadonlySet<string>): LookalikeName[] {
   const out: LookalikeName[] = [];
   const seen = new Set<string>([`${sld}.com`]);
   const add = (domain: string, kind: LookalikeKind): void => { if (!seen.has(domain)) { seen.add(domain); out.push({ domain, kind }); } };
   for (const e of s.endings) add(`${sld}.${e}`, 'ending');
-  if (tokens.length >= 2 && tokens.join('') === sld) {
+  if (dictionary) for (const d of wordHyphenNames(sld, dictionary)) add(d, 'hyphen');
+  if (tokens.length >= 2 && tokens.join('') === sld && (!dictionary || tokens.length <= 3)) {
     add(`${tokens.join('-')}.com`, 'hyphen');
     // three words: each single boundary too (a-bc, ab-c); more words: the full hyphenated form only
     if (tokens.length === 3) for (let i = 1; i < 3; i++) add(`${tokens.slice(0, i).join('')}-${tokens.slice(i).join('')}.com`, 'hyphen');
@@ -46,7 +76,8 @@ export async function probeLookalike(
   if (!sourceOn) { item.reason_code = 'SOURCE_DISABLED'; return out; }
   let base: string | null;
   try {
-    base = await rdapBaseFor(ctx.db, ctx.deps, tld, { enabled: ctx.settings.sources.iana_bootstrap || tld === 'com', now: ctx.now });
+    // v4.2.1 (CR-052 S-2): co, us and io are missing from IANA's RDAP list; their registries' own servers are used instead.
+    base = (await rdapBaseFor(ctx.db, ctx.deps, tld, { enabled: ctx.settings.sources.iana_bootstrap || tld === 'com', now: ctx.now })) ?? RDAP_FALLBACK_BASES[tld] ?? null;
   } catch {
     item.reason_code = 'SOURCE_ERROR';
     return out;

@@ -25,6 +25,15 @@ export type RdapLookupFn = (domain: string, opts?: { baseUrl?: string; timeoutMs
 /** Honest identification for every outbound request of the screening sources (sources.md). */
 export const USER_AGENT = 'domain-trading-api/2.0.0 (+https://github.com/DvirBaumel8/domain-trading)';
 export const RDAP_COM_BASE = 'https://rdap.verisign.com/com/v1/';
+/**
+ * v4.2.1 (CR-052 S-2): RDAP servers for endings missing from IANA's bootstrap file (data.iana.org/rdap/dns.json, checked 14 Oct 2026).
+ * Each answered 200 for a registered name and 404 for a free one on 14 Oct 2026. Used only by the lookalike probe (lookalikes check, sibling scan).
+ */
+export const RDAP_FALLBACK_BASES: Readonly<Record<string, string>> = {
+  co: 'https://rdap.registry.co/co/',
+  us: 'https://rdap.nic.us/',
+  io: 'https://rdap.identitydigital.services/rdap/',
+};
 const MAX_BODY_CHARS = 1_000_000;
 
 const isoOrNull = (v: unknown): string | null => {

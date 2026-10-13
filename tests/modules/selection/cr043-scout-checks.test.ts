@@ -118,7 +118,7 @@ describe('CR-043 lookalikes', () => {
     expect(by(`${SLD}.net`)).toMatchObject({ kind: 'ending', registered: true, in_use: true });
     expect(by(`${SLD}.org`)).toMatchObject({ registered: true, in_use: false });
     expect(by(`${SLD}.ai`)).toMatchObject({ registered: false, in_use: null });
-    expect(by(`${SLD}.io`)).toMatchObject({ registered: null, in_use: null, reason_code: 'NO_REGISTRY_SERVICE' });
+    expect(by(`${SLD}.io`)).toMatchObject({ registered: false, in_use: null, reason_code: null }); // v4.2.1 (CR-052 S-2): io/co/us via their registries' RDAP
     expect(by(`${SLD}.co.uk`)).toMatchObject({ registered: null, reason_code: 'NO_REGISTRY_SERVICE' });
     const tokens = resultOf(body, 'form').fields.tokens as string[];
     expect(tokens.join('')).toBe(SLD);
@@ -126,7 +126,7 @@ describe('CR-043 lookalikes', () => {
     expect(by(`get${SLD}.com`)).toMatchObject({ kind: 'prefix', registered: false });
     expect(r.fields.lookalikes).toMatchObject({ registered_n: 3, in_use_n: expect.any(Number) });
     expect(r.fields.lookalikes.in_use_n).toBeGreaterThanOrEqual(1);
-    expect(r.fields.lookalikes.unknown_n).toBe(3); // .io, .co, .co.uk
+    expect(r.fields.lookalikes.unknown_n).toBe(1); // .co.uk (v4.2.1: .io and .co are looked up)
     expect(r.upstream_calls).toBeGreaterThan(0);
   });
 

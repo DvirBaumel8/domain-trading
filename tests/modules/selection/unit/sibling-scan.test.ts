@@ -1,5 +1,7 @@
 // CR-050 part 1 (v4.1.0): pure parts of the sibling scan (contact page, lead points mapping, settings defaults). No DB, no network.
 import { describe, expect, it } from 'vitest';
+import { RDAP_FALLBACK_BASES } from '../../../../src/core/rdap.js';
+import { lookalikeNames, wordHyphenNames } from '../../../../src/modules/selection/checks/lookalikes.js';
 import { anchorLinks } from '../../../../src/modules/selection/html-text.js';
 import { DEFAULT_SELECTION_VALUES, SelectionValues, SIBLINGS_DEFAULT } from '../../../../src/modules/selection/settings.js';
 import { contactUrlOf, leadPointsOf } from '../../../../src/modules/selection/sibling-scan.js';
@@ -68,5 +70,27 @@ describe('CR-050 settings', () => {
     expect(SelectionValues.parse(old).siblings).toEqual(SIBLINGS_DEFAULT);
     expect(SelectionValues.safeParse({ ...old, siblings: { ...SIBLINGS_DEFAULT, points_live: 'x' } }).success).toBe(false);
     expect(SelectionValues.safeParse({ ...old, siblings: { ...SIBLINGS_DEFAULT, extra: 1 } }).success).toBe(false);
+  });
+});
+
+describe('CR-052 hyphen forms and RDAP fallbacks (v4.2.1)', () => {
+  const dict = new Set(['compliance', 'labeling', 'audit', 'testing', 'consulting', 'roofing', 'agent', 'voice']);
+  const hy = (sld: string, tokens: string[] = []) => lookalikeNames(sld, tokens, { endings: [], prefixes: [] }, dict).map((n) => n.domain);
+
+  it('SIB-U20 the hyphen goes before the longest word ending the name, so an acronym stays whole (drs-compliance, not dr-sc-om-pl-ian-ce)', () => {
+    expect(hy('drscompliance', ['dr', 'sc', 'om', 'pl', 'ian', 'ce'])).toEqual(['drs-compliance.com']);
+    expect(hy('ppwrlabelling')).toEqual(['ppwr-labelling.com']); // British double l
+  });
+  it('SIB-U21 an acronym with its number stays whole; the letter/number split is only in the all-points form', () => {
+    expect(hy('fsma204audit')).toEqual(['fsma204-audit.com', 'fsma-204-audit.com']);
+    expect(hy('ets2compliance')).toEqual(['ets2-compliance.com', 'ets-2-compliance.com']);
+  });
+  it('SIB-U22 a word starting the name, both points, and the form split when it has at most three pieces', () => {
+    expect(hy('roofingvoiceagent', ['roofing', 'voice', 'agent'])).toEqual(['roofing-voiceagent.com', 'roofingvoice-agent.com', 'roofing-voice-agent.com']);
+    expect(wordHyphenNames('abcxyz', dict)).toEqual([]);
+  });
+  it('SIB-U23 co, us and io have RDAP servers although IANA lists none', () => {
+    expect(Object.keys(RDAP_FALLBACK_BASES).sort()).toEqual(['co', 'io', 'us']);
+    for (const b of Object.values(RDAP_FALLBACK_BASES)) expect(b).toMatch(/^https:\/\/[a-z.]+\/([a-z]+\/)?$/);
   });
 });

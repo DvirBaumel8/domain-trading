@@ -59,7 +59,8 @@ describe('CR-050 sibling scan (POST/GET /selection/sibling-scan)', () => {
     expect(sib(s, hy)).toMatchObject({ kind: 'hyphen', registered: true, live_business: true });
     expect(sib(s, `get${SLD}.com`)).toMatchObject({ kind: 'prefix', registered: true, live_business: false }); // too little content: not a business site
     expect(sib(s, `${SLD}.ai`)).toMatchObject({ registered: false, live_business: false, url: null, http_status: null, company: null, contact_url: null });
-    expect(sib(s, `${SLD}.io`)).toMatchObject({ registered: null, reason_code: 'NO_REGISTRY_SERVICE', live_business: null });
+    expect(sib(s, `${SLD}.io`)).toMatchObject({ registered: false, reason_code: null }); // v4.2.1 (CR-052 S-2): io via its registry's RDAP
+    expect(sib(s, `${SLD}.co.uk`)).toMatchObject({ registered: null, reason_code: 'NO_REGISTRY_SERVICE', live_business: null });
     expect(s.lead_points).toMatchObject({ live_n: 2, parked_n: expect.any(Number), points: expect.any(Number) });
     expect(s.lead_points.points).toBe(20 + 2 * s.lead_points.parked_n);
     expect(s.lead_points.formula).toContain('min(30,');

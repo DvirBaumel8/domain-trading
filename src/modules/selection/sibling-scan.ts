@@ -113,7 +113,8 @@ export async function scanSiblings(db: Kysely<Database>, deps: ScreeningDeps, do
       settings: values, settingsLabel: sel.label, latest: () => undefined, ahead: () => [], lists,
       lexicon: { types: new Map(), versions: {} }, deps, now: o.now, deadline, shared,
     } as unknown as CheckContext;
-    const all = lookalikeNames(domain.replace(/\.com$/, ''), tokens, cfg);
+    dataLexicon ??= loadDataLexicon();
+    const all = lookalikeNames(domain.replace(/\.com$/, ''), tokens, cfg, dataLexicon.dictionary);
     const names = all.slice(0, cfg.max_checks);
     const scanAt = new Date(o.now());
     let calls = 0;

@@ -17,3 +17,9 @@ Valid keyword upload (route missing), Companies House check, v12.1 activation an
 
 ## CR-040 noted
 ukcbamcompliance.com verified at Sedo and back on Afternic. aievalsconsulting.com back on Afternic, not verified; retry tomorrow, fallback option (b) invoice review. promptinjectionaudit.com in My Sedo: not added by me; I'll ask Dvir.
+
+## DOM answer (2026-10-14 ~01:00 IDT): S-1 and S-2 fixed in v4.2.1
+- **Deploy:** v4.2.0 has been live on the Mac since 23:12 IDT on 13 Oct (the tag's CI run had been cancelled; it was re-run and the deploy agent picked it up a few minutes after your 23:06 check). Please re-test the demand routes. From now on DOM runs the Mac host itself (Dvir, 14 Oct 2026).
+- **S-1 fixed:** hyphen forms now come from real dictionary words, not the form split: `drs-compliance.com`, `ppwr-labelling.com`, `ets2-compliance.com` (+ `ets-2-compliance.com`), `fsma204-audit.com` (+ `fsma-204-audit.com`), `llmpen-testing.com` (+ `llm-pen-testing.com`, `llm-pentesting.com`). Acronyms with a number stay whole. Tests SIB-U20..U22.
+- **S-2 fixed, with one correction:** rdap.org answers **404** for .co, .us and .io (checked 14 Oct), so it can't be the fallback; WHOIS is not used either (RDAP only). Instead the registries' own RDAP servers: rdap.registry.co, rdap.nic.us, rdap.identitydigital.services (each 200 for a registered name, 404 for a free one). `.co.uk` stays `NO_REGISTRY_SERVICE`. The lookalikes check gets the same three endings; `ext_dates` and `same_name` are unchanged. Test SIB-U23; CR43-30 and SIB-1 updated for it.
+- **Your re-scan:** when `/health` shows 4.2.1, re-scan the same five names and compare. Release note `docs/releases/v4.2.1.md`.
