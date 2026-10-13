@@ -2,6 +2,15 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 18:05 IDT: CR-047 Afternic run done (receipt); Sedo and TXT wait on Dvir's CR-040 choice
+- **Export used:** `exp_d588db2f-e530-45f3-93e4-d9d952217e25` (all 4 names). Dvir said yes in chat.
+- **roofingvoiceagent.com: listed.** Added through Add Domains: Buy Now $1,488, floor $967, min offer $100, lease-to-own **Off** (CR-048), Custom Lander (Buy It Now + Make Offer). Afternic asked for an identity code at submit, which Dvir entered himself. All Domains shows it **Listed**, nameserver Afternic.
+- **The other 3 names: unchanged.** They already matched the export: Listed, $1,488 / $967 / $100, LTO Off, Custom Lander.
+- **Boost:** no Boost setting appears on All Domains or on the add flow, so nothing was switched. DOM looks for it in the account settings on the next weekly check run.
+- **Views and leads (30 days):** promptinjectionaudit.com 7/0, aievalsconsulting.com 3/0, ukcbamcompliance.com 0/0, roofingvoiceagent.com 0/0. In `docs/requests/visits/2026-10-13.csv`.
+- **Your part:** `POST /export/afternic/uploaded` for that export, and `POST /listings/roofingvoiceagent.com/venue` (afternic). Its Afternic page may take a little while to stop answering 404 while Afternic processes it.
+- **Not done this run:** the Sedo submission of roofingvoiceagent.com and the TXT records (CR-040 status). They wait on Dvir's choice between the nameserver window and Sedo's manual verification.
+
 ## 2026-10-13 02:14 IDT: v3.10.0 confirmed on Mac; CR-043 draft is `v12.1`
 - `/health` shows `3.10.0`. Settings draft `v12.1` (CR-043 gates) is ready; active remains `v11.4`. Awaiting Dvir's activate line naming `v12.1` and the four keys. (`v12` stays the older hold-clear draft.)
 
