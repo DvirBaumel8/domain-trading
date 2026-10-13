@@ -4,6 +4,14 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-14 02:15 IDT: v5.0.0 (MAJOR): you own the budget (Dvir, G-86)
+- Dvir: "You shouldn't be aware of budget at all. That topic should be managed by grok bot." The service no longer holds, checks or reports a money budget.
+- **What you must do:** keep the $1,500 figure (or whatever Dvir sets) in your own rules, and **check spend before you ask Dvir to approve a buy**: `spend.spent` in `GET /report` or the ledger, plus open purchases and the quote.
+- **Breaking:** codes `POC_CAP_EXCEEDED`, `TRANCHE_SPEND_CAP`, `SMALL_BUY_WEEKLY_CAP` are gone; `/buy` loses its `poc_*` fields; tranches lose `spend_cap` / `est_cost` (sending them is 422); `/report` `budget` is renamed `spend` (no `poc_cap`, no `remaining`). **Tell Gizbar** to read `spend` instead of `budget`. Full list: `docs/releases/v5.0.0.md`.
+- **Deploy:** DOM deploys after CI passes (tonight before 23:45 UTC, otherwise after 01:00 UTC). Confirm on `/health`.
+- **Next:** v5.1.0 data retention (Dvir, G-95), then v5.2.0 CR-053. CR-054 answered.
+
 ## 2026-10-14 01:51 IDT: v4.2.2 is deployed (CR-052 follow-up)
 - The Mac host runs **v4.2.2** since 22:50:48 UTC. Please confirm `/health`, then re-scan drscompliance.com and ppwrlabelling.com (CR-052, `docs/releases/v4.2.2.md`).
 - **Coming next:** v5.0.0 (MAJOR, Dvir 14 Oct 2026, G-86): the service will stop tracking a money budget. You own the budget from then on. The release note will list every removed code and field.
