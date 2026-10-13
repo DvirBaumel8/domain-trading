@@ -21,7 +21,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 command -v node >/dev/null || { echo "node is missing (brew install node@22)"; exit 1; }
 CLOUDFLARED="$(command -v cloudflared)" || { echo "cloudflared is missing (brew install cloudflared)"; exit 1; }  # launchd needs the full path (no PATH lookup)
 mkdir -p "$ENV_DIR" "$LOG_DIR" "$AGENTS" "$HOST_DIR"
-cp "$HERE/start.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
+cp "$HERE/start.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
 [ -d "$PROD_DIR/.git" ] || git clone --quiet "$REPO_URL" "$PROD_DIR"
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -39,11 +39,11 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "Created $ENV_FILE: fill in the values from Render."
 fi
 
-for name in api deploy tunnel tunnel-watch; do
+for name in api deploy tunnel tunnel-watch backup; do
   sed -e "s#__CLOUDFLARED__#$CLOUDFLARED#g" -e "s#__HOST_DIR__#$HOST_DIR#g" -e "s#__PROD_DIR__#$PROD_DIR#g" -e "s#__LOG_DIR__#$LOG_DIR#g" -e "s#__HOME__#$HOME#g" -e "s#__PATH__#$PATH#g" \
     "$HERE/com.domaintrading.$name.plist" > "$AGENTS/com.domaintrading.$name.plist"
 done
-echo "LaunchAgents written to $AGENTS (not loaded yet)."
+echo "LaunchAgents written to $AGENTS (not loaded yet; the backup agent stays off until Dvir turns backups on: runbook \"Backups\")."
 echo "Next:"
 echo "  1. Fill $ENV_FILE from Render (PUBLIC_BASE_URL = the api-proxy URL, known after the first deploy-api-proxy run; fill it then and restart the api agent)."
 echo "  2. $HOST_DIR/deploy.sh --first   (loads all four agents; re-run install.sh after a kit change)"

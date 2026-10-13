@@ -110,3 +110,18 @@ Render suspended the free service on 11 Oct (the workspace's 750 free hours ran 
 3. Resume the service on Render (it deploys the latest main). Gavriel checks `/health`.
 4. Set the repo variable `TUNNEL_URL` to empty (the proxy then answers 503) or delete the `domain-trading-api-proxy` Worker in the Cloudflare dashboard; delete `prod.env` if it's not needed any more.
 If Render resumes by itself while the Mac still runs, do step 1 at once: two servers would run two daily jobs.
+
+## Backups (built 14 Oct 2026, off until Dvir turns them on)
+Dvir, 14 Oct 2026: "implement it and we will turn it on soon". Two parts, both $0:
+1. **Nightly encrypted copy on the Mac** (`scripts/local-host/backup.sh`, agent `com.domaintrading.backup`, 01:30 UTC): `pg_dump` (custom format) of the Neon database, encrypted with AES-256 (openssl, PBKDF2) using a passphrase, saved in `~/domain-trading-backups/`, kept 14 days. The script reads `prod.env` itself and prints no secret.
+2. **Off-machine copy:** the existing nightly export step (`backupExport`) to the private repo `DvirBaumel8/domain-trading-data`, branch `data-backup`. It is skipped while `GITHUB_BACKUP_TOKEN` is empty.
+
+**To turn on (Dvir, at the Mac):**
+- **Local copy:**
+  1. Add to `~/.config/domain-trading/prod.env`: `BACKUP_ENABLED=1` and `BACKUP_PASSPHRASE=<a long random phrase>`. Keep the phrase in your password manager too: without it a backup can't be opened.
+  2. Then DOM loads the agent (`launchctl bootstrap gui/501 ~/Library/LaunchAgents/com.domaintrading.backup.plist`) and runs it once to check (`backup.log` shows `backup ok <file> <size>`).
+- **Off-machine copy:** create a fine-grained GitHub token for `DvirBaumel8/domain-trading-data` only (Contents: read and write, 1-year expiry), add `GITHUB_BACKUP_TOKEN=<token>` to `prod.env`, then DOM restarts the api agent.
+
+**Restore (into a scratch database first, never straight over production):**
+`openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE -in <file>.dump.enc | pg_restore --no-owner --dbname <scratch database URL>`
+
