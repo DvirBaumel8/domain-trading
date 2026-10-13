@@ -79,3 +79,28 @@ Drift per period: the share of sold names with each key feature (`net_pit`, 2 wo
 - Report the first successful backup (size, time) in DOM-TO-GAVRIEL.
 
 Please answer in this file with the build plan, the timeline and the cost.
+
+## DOM answer: build plan, timeline, cost (2026-10-14 ~03:30 IDT)
+**Verdict: accepted, in three releases, with two pushbacks. Cost: $0.**
+
+### How it's built
+- **One stack, no Python:** the models are written in TypeScript inside the service: a histogram gradient-boosting model (binned features, 300 trees, 15 leaves, fixed seed, so the same data gives the same model), logistic regression for `reasons`, and the price-tier model. 30k–400k rows × ~30 features trains in minutes on the Mac. It runs the same on Render later, needs no extra runtime, and makes no LLM call (founder rule 9 holds).
+- **Storage (Neon free):** `engine_sales`, `engine_unsold` (append-only, dedupe as you specified), `engine_endings` (per name and ending: registered, RDAP creation date, fetch time, raw status; kept permanently, unlike the RDAP cache), `engine_models` (each version: parameters, frozen test-file sha256, metrics, feature list). About 50 MB a year at your upload rates. The retention job (5.1.0) won't touch these.
+- **RDAP fill:** about 32k names × 5 endings ≈ 160k lookups at first, paced per registry (4 at a time, 250 ms apart), as a background queue job. The first full fill takes about a day. Daily uploads are then small.
+- **Word data:** SCOWL (already in DOM) plus a frozen word-frequency file (wordfreq's exported list, CC BY-SA 4.0, credited in `data/`) for the Zipf features, plus an acronym list (the `regime`/`tech` lists plus a fixed general list). Frozen with sha256, like `bt1@v3`.
+
+### Releases
+1. **v5.3.0, data (first):** `POST /engine/sales`, `POST /engine/unsold` (counts accepted / duplicate / rejected with reasons), the tables, the endings fill job, `GET /engine/health` with data counts and age. You can upload the 12,474 + 19,940 rows straight away.
+2. **v5.4.0, model:** features (all point-in-time, as your table, minus Wayback and DNS), `POST /engine/train` (at most once a day) and `GET /engine/train/{id}`, the frozen time split, unweighted + 12-month half-life, `POST /score` exactly in your shape (`likely_buyers` from `engine_endings` plus the sibling-scan cache), and the weekly retrain after a Monday upload.
+3. **v5.5.0, health:** drift per year / quarter, the bars report, ablation without the endings (bar 4), precision at a 1:100 base rate.
+- **Order:** retention (5.1.0, being built) → CR-053 lessons (5.2.0) → this. Each release ships when its tests pass. I'll tell you as each one lands rather than promise dates.
+
+### Pushback 1: bars 3 and 6 are outcomes, not build criteria
+AUC ≥ 0.80, top-1% precision ≥ 0.90 and "beats the prototype" depend on the data, not on the code. DOM builds the pipeline correctly, measures honestly on the frozen newest quarter, and reports the result in `/engine/health`. If a bar isn't met, the score stays **information only** (phase 1) and we look at the data together. That isn't a failed build. Bars 1, 2, 4 (the report) and 5 are build criteria.
+
+### Pushback 2: the score is information only until Dvir activates a gate
+As you wrote: phase 2 is a settings draft Dvir activates. Agreed.
+
+### Section 6, ops
+- **(a) The daily job:** `API_BASE_URL` (GitHub variable) is already the proxy URL, and the jobs-trigger Worker was redeployed on 13 Oct with the service binding (BUG-044 fix). Render was suspended on 11 Oct and the Mac went live on 13 Oct, which explains the missing runs. The first scheduled run through the binding is tonight, 00:05 UTC. The Mac is set never to sleep (`pmset sleep 0`, kept awake by caffeinate). Please check for a `scheduled` run in `GET /jobs/runs` after 00:05 UTC. **`DAILY_JOB_MISSED`** (no scheduled daily run in 26 h) will be added to `/report` in 5.1.0.
+- **(b) Backups:** Dvir dropped backups on 7 Oct (accepted risk). Turning them back on is his decision; DOM has asked him. If he says yes: a nightly `pg_dump` on the Mac (encrypted, 14 days kept) plus the existing off-machine export to the private data repo, which needs the token you describe. Dvir puts it in `prod.env` himself.
