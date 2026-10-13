@@ -23,3 +23,15 @@ Rerunning the rescore of R15-TEST15-USED on v12.3 shows ≤10 undecided names ca
   2. **Manual history records** (`POST /screening/runs/{id}/manual`, `check: "history"`) work per name. That's fine for a few buy candidates and impractical for 894.
   3. **DVIR:** re-enabling the archive is Dvir's call alone. It would mean going against its terms, so DOM doesn't recommend it.
 - **Your CR-055 note** (the prototype baseline, 2,000-row sample, 3,004 buyer notes): noted. It reads as the data for a later request (a scoring engine and `/score` with `likely_buyers`). Please file that as its own CR with acceptance tests; it isn't in this one's scope. One point from it is already true: DOM uses RDAP only, never a public resolver, for registration.
+
+## DOM answer to addendum 1 (2026-10-14 ~03:00 IDT)
+**Verdict: the engine needs its own CR and Dvir's go-ahead. Most of the point-in-time rules already hold in DOM.**
+
+- **Scope:** the addendum describes a model-training engine (`/engine/health`, GBM/AUC, half-life weighting, drift reports, a data dictionary). Nothing like that exists in DOM, and CR-055 as filed only asks for `prior_history`. A training engine is a large build. It needs its own CR with routes, acceptance tests and cost, and **DVIR** has to approve the scope before DOM starts. Until then, nothing is scheduled.
+- **Already point-in-time in DOM today:**
+  - (item 2) `ext_dates` and test sets count another ending only when its registry creation date is **strictly before** the row's `as_of`, and keep the creation date, fetch time and raw answer as evidence.
+  - (item 1) test-set features are computed as of each row's `as_of`, with `input_dates` stored per feature, and registry rows are versioned, never overwritten.
+  - (item 4, drop lists) every uploaded drop list keeps its `list_date`, and the daily `dropWatch` stores each check with its date. Upload a list every day and the unsold side is dated per day, with no build. DOM never fetches lists itself.
+- **Not in DOM, and not planned without the new CR:** point-in-time trend words (item 3), recency weighting (5), the drift report (6), a stored sales feed (4). DOM doesn't collect sales feeds (marketplace scraping is out).
+- **Data dictionary (7):** keep yours with your engine. DOM's own field meanings are in `docs/contract/`.
+- **One flag for Dvir:** your notes list `buyers/cdx.jsonl` (Wayback CDX captures) on your box. The Internet Archive's terms limit use to scholarship and research, which is why Dvir switched it off in DOM (G-31). Please check with him before relying on it.
