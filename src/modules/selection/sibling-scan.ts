@@ -59,7 +59,7 @@ export function contactUrlOf(html: string, finalUrl: string): string | null {
 /** Pure: the lead points of a set of siblings (CR-050). Weights and caps are the settings'; nothing is hard-coded. */
 export function leadPointsOf(siblings: Pick<Sibling, 'live_business' | 'site_state'>[], s: SelectionValuesT['siblings']): LeadPoints {
   const live_n = siblings.filter((x) => x.live_business === true).length;
-  const parked_n = siblings.filter((x) => x.live_business === false && (x.site_state === 'parked_or_for_sale' || x.site_state === 'redirect_off_domain')).length;
+  const parked_n = siblings.filter((x) => x.live_business === false && (x.site_state === 'parked_or_for_sale' || x.site_state === 'redirect_off_domain' || x.site_state === 'default_page')).length;
   const lc = Math.min(live_n, s.live_counted_max);
   const pc = Math.min(parked_n, s.parked_counted_max);
   const raw = lc * s.points_live + pc * s.points_parked;
@@ -87,6 +87,10 @@ async function tokensOf(db: Kysely<Database>, domain: string, values: SelectionV
     return [sld];
   }
 }
+
+/** v4.2.2 (CR-052 S-3): titles of web-server and hosting default or placeholder pages. */
+const DEFAULT_PAGE_TITLE = /\b(default (web )?(site|page)|welcome to (nginx|openresty|caddy)|apache2?\b.*\b(default|test) page|test page for|index of \/|coming soon|under construction|it works!?$|site not (configured|found)|domain (has been )?registered|future home of)/i;
+export const isDefaultPageTitle = (title: string): boolean => DEFAULT_PAGE_TITLE.test(title.trim());
 
 const statusOf = (p: PageFetch | null): number | null => (p === null ? null : p.status ?? null);
 
@@ -127,16 +131,19 @@ export async function scanSiblings(db: Kysely<Database>, deps: ScreeningDeps, do
       const it = pr.item;
       const page = pr.page;
       const read = page !== null && page.ok && page.html !== '' ? page : null;
-      const live = pr.site?.site_state === 'in_use' && page?.ok === true && page.status === 200;
+      const title = read ? scrub(titleOf(read.html)) : null;
+      // v4.2.2 (CR-052 S-3): a hosting default page ("Default Site - Home", "Welcome to nginx", "Index of /") is registered but not a business.
+      const defaultPage = pr.site?.site_state === 'in_use' && title !== null && isDefaultPageTitle(title);
+      const live = pr.site?.site_state === 'in_use' && !defaultPage && page?.ok === true && page.status === 200;
       const s: Sibling = {
         domain: it.domain, kind: it.kind, registered: it.registered, reason_code: it.reason_code,
         live_business: it.registered === false ? false : it.registered === null ? null : live ? true : pr.site !== null && pr.site.site_state !== 'unknown' ? false : null,
-        site_state: pr.site?.site_state ?? null,
+        site_state: defaultPage ? 'default_page' : pr.site?.site_state ?? null,
         url: page === null ? null : page.finalUrl ?? `https://${it.domain}/`,
         http_status: statusOf(page),
         fetched_at: (page !== null ? new Date(o.now()) : pr.rdapCheckedAt ?? scanAt).toISOString(),
-        title: read ? scrub(titleOf(read.html)) : null,
-        company: read ? scrub(ogSiteName(read.html) ?? titleOf(read.html)) : null,
+        title,
+        company: read && !defaultPage ? scrub(ogSiteName(read.html) ?? titleOf(read.html)) : null,
         contact_url: read && live ? contactUrlOf(read.html, read.finalUrl) : null,
       };
       siblings.push(s);

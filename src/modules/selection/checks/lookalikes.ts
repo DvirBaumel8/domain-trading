@@ -40,7 +40,7 @@ export function wordHyphenNames(sld: string, dictionary: ReadonlySet<string>): s
 
 /**
  * The names to check, in priority order, de-duplicated and never our own name. Pure.
- * With a `dictionary` (the sibling scan, CR-052) the hyphen forms come from `wordHyphenNames` first, and the form split is used only when it has at most three pieces.
+ * With a `dictionary` (the sibling scan, CR-052) the hyphen forms come from `wordHyphenNames` first, and the form split is used only when it has at most three pieces of 3+ letters (v4.2.2: no `ppwr-la-belling`).
  */
 export function lookalikeNames(sld: string, tokens: string[], s: { endings: string[]; prefixes: string[] }, dictionary?: ReadonlySet<string>): LookalikeName[] {
   const out: LookalikeName[] = [];
@@ -48,7 +48,7 @@ export function lookalikeNames(sld: string, tokens: string[], s: { endings: stri
   const add = (domain: string, kind: LookalikeKind): void => { if (!seen.has(domain)) { seen.add(domain); out.push({ domain, kind }); } };
   for (const e of s.endings) add(`${sld}.${e}`, 'ending');
   if (dictionary) for (const d of wordHyphenNames(sld, dictionary)) add(d, 'hyphen');
-  if (tokens.length >= 2 && tokens.join('') === sld && (!dictionary || tokens.length <= 3)) {
+  if (tokens.length >= 2 && tokens.join('') === sld && (!dictionary || (tokens.length <= 3 && tokens.every((t) => t.length >= 3)))) {
     add(`${tokens.join('-')}.com`, 'hyphen');
     // three words: each single boundary too (a-bc, ab-c); more words: the full hyphenated form only
     if (tokens.length === 3) for (let i = 1; i < 3; i++) add(`${tokens.slice(0, i).join('')}-${tokens.slice(i).join('')}.com`, 'hyphen');

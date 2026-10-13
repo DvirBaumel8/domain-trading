@@ -2,10 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 4.2.2 (2026-10-14): CR-052 follow-up: default hosting pages are not live businesses; no junk form-split hyphens
+PATCH (fixes back to the contract; one additive `site_state` value). Release note: `docs/releases/v4.2.2.md`.
+- **Sibling scan (S-3):** a registered sibling whose home page title is a hosting or web-server default or placeholder page is `site_state: "default_page"`, `live_business: false`, `company: null`, and counts like a parked one in `lead_points`.
+- **Hyphen forms:** the form split is used only when every piece has 3+ letters (no `ppwr-la-belling.com`).
+- **Correction to 4.2.1:** `.co.uk` siblings are answered by Nominet's RDAP, so `registered` true/false is a real answer (not `NO_REGISTRY_SERVICE`).
+
 ## 4.2.1 (2026-10-14): CR-052: sibling scan hyphen forms from real words (drs-compliance, fsma204-audit); .co/.us/.io via their registries' RDAP
 PATCH (a fix back to the contract; no route, field or code change). Release note: `docs/releases/v4.2.1.md`.
 - **Sibling scan hyphen forms (S-1):** built from real words, not the form split: a hyphen before the longest dictionary word ending the name (`drs-compliance.com`, `ppwr-labelling.com`), after the longest one starting it, and after a number followed by a letter (`ets2-compliance.com`, `fsma204-audit.com`); then the all-points form (`fsma-204-audit.com`), then the best split when it has at most three words. The lookalikes check keeps its old hyphen forms.
-- **`.co`, `.us`, `.io` (S-2):** not in IANA's RDAP list, so they were always `NO_REGISTRY_SERVICE`; the sibling scan and the lookalikes check now ask the registries' own RDAP servers (rdap.registry.co, rdap.nic.us, rdap.identitydigital.services). `.co.uk` stays `NO_REGISTRY_SERVICE`. `ext_dates` and `same_name` are unchanged.
+- **`.co`, `.us`, `.io` (S-2):** not in IANA's RDAP list, so they were always `NO_REGISTRY_SERVICE`; the sibling scan and the lookalikes check now ask the registries' own RDAP servers (rdap.registry.co, rdap.nic.us, rdap.identitydigital.services). `ext_dates` and `same_name` are unchanged.
 
 ## 4.2.0 (2026-10-13): keyword demand upload, Companies House matches
 MINOR (additive; CR-044 item 3 follow-up, CR-046 item 2). Release note: `docs/releases/v4.2.0.md`.

@@ -4,7 +4,7 @@ import { RDAP_FALLBACK_BASES } from '../../../../src/core/rdap.js';
 import { lookalikeNames, wordHyphenNames } from '../../../../src/modules/selection/checks/lookalikes.js';
 import { anchorLinks } from '../../../../src/modules/selection/html-text.js';
 import { DEFAULT_SELECTION_VALUES, SelectionValues, SIBLINGS_DEFAULT } from '../../../../src/modules/selection/settings.js';
-import { contactUrlOf, leadPointsOf } from '../../../../src/modules/selection/sibling-scan.js';
+import { contactUrlOf, isDefaultPageTitle, leadPointsOf } from '../../../../src/modules/selection/sibling-scan.js';
 
 const S = DEFAULT_SELECTION_VALUES.siblings;
 const live = { live_business: true, site_state: 'in_use' };
@@ -92,5 +92,21 @@ describe('CR-052 hyphen forms and RDAP fallbacks (v4.2.1)', () => {
   it('SIB-U23 co, us and io have RDAP servers although IANA lists none', () => {
     expect(Object.keys(RDAP_FALLBACK_BASES).sort()).toEqual(['co', 'io', 'us']);
     for (const b of Object.values(RDAP_FALLBACK_BASES)) expect(b).toMatch(/^https:\/\/[a-z.]+\/([a-z]+\/)?$/);
+  });
+});
+
+describe('CR-052 follow-up (v4.2.2)', () => {
+  it('SIB-U24 hosting default and placeholder page titles are recognised; real business titles are not', () => {
+    for (const t of ['Default Site - Home', 'Welcome to nginx!', 'Apache2 Ubuntu Default Page: It works', 'Index of /', 'Coming Soon', 'Site under construction', 'Future home of something quite cool'])
+      expect(isDefaultPageTitle(t), t).toBe(true);
+    for (const t of ['DRS Compliance | Deposit Return Scheme consultants', 'Acme Roofing - Home', 'Default Risk Analytics Ltd'])
+      expect(isDefaultPageTitle(t), t).toBe(false);
+  });
+  it('SIB-U25 a default page counts as registered-but-not-live (parked points), never live', () => {
+    expect(leadPointsOf([{ live_business: false, site_state: 'default_page' }], S)).toMatchObject({ live_n: 0, parked_n: 1, points: 2 });
+  });
+  it('SIB-U26 with a dictionary, a form split with a piece under 3 letters is not used (no ppwr-la-belling)', () => {
+    const dict = new Set(['labeling', 'belling']);
+    expect(lookalikeNames('ppwrlabelling', ['ppwr', 'la', 'belling'], { endings: [], prefixes: [] }, dict).map((n) => n.domain)).toEqual(['ppwr-labelling.com']);
   });
 });

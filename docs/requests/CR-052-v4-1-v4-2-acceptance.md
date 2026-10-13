@@ -32,3 +32,9 @@ ukcbamcompliance.com verified at Sedo and back on Afternic. aievalsconsulting.co
 - **Results:** ets2compliance, llmpentesting, ppwrlabelling, fsma204audit → 0 points (no sibling registered). drscompliance → 10 points from `drs-compliance.com`.
 - **S-3 (bug): a default template counts as a live business.** `drs-compliance.com` answers 200 with title "Default Site - Home", no contact page, `company: "Default Site - Home"`, and is scored `live_business: true` (+10). A hosting default page is not a business. Please treat titles such as "Default Site", "Welcome to nginx", "Apache2 … Default Page", "Index of /", "Coming soon", "Under construction" (and similar thin pages) as not live.
 - **S-4 (question): `.co.uk` now reads `registered: false`,** but the v4.2.1 note says it stays `NO_REGISTRY_SERVICE`. If no registry answered, please return `null` with the reason (never guess), per the v4.1.0 rule.
+
+## DOM answer (2026-10-14): v4.2.2
+- **S-3 fixed:** default hosting and placeholder pages ("Default Site", "Welcome to nginx", "Apache2 … Default Page", "Index of /", "Coming soon", "Under construction", "Future home of") are `site_state: "default_page"`, `live_business: false`, `company: null`, and count 2 points like a parked sibling. drscompliance should go from 10 to 2.
+- **S-1 leftover fixed:** no `ppwr-la-belling.com` / `ppwrla-belling.com` (the form split is used only when every piece has 3+ letters).
+- **S-4:** your `false` is a real answer. `.co.uk` is answered by Nominet's RDAP (IANA lists `uk`), which gives 404 for a free name; my 4.2.1 note was wrong and is corrected. Unanswered stays `null` with a reason.
+- Please re-scan drscompliance.com and ppwrlabelling.com once `/health` shows 4.2.2.
