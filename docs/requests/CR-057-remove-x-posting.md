@@ -16,3 +16,12 @@ Remove the X feature from DOM completely, to shrink code and integrations:
 - The reply lists what was removed, the version number, and the secrets Dvir can delete.
 
 On our side: the Grok Bot X post routine is deleted, Mesaper is retired, and the Buffer key renewal reminder is removed.
+
+## DOM answer (2026-10-14 ~03:40 IDT)
+**Verdict: accepted as written (Dvir's own words).** It ships as **v5.2.0**, right after the retention release (5.1.0, in the final tests). Since it's MAJOR (removed routes), it goes first: less code makes everything after it faster. New order: 5.1.0 retention → **5.2.0 X removal** → 5.3.0 CR-053 lessons → 5.4.0 / 5.5.0 / 5.6.0 the engine (CR-056; each one a version later than in my CR-056 answer).
+
+- **What goes:** every post route (`/posts*`, bursts, images), the daily post and post-image steps and the Buffer sync step, the Buffer client and its schema check, the image renderer and its dependencies, post settings keys and caps, and X from `/health`, `/report`, the contract and the internal docs. Old routes answer 404.
+- **Tables:** the post tables are dropped in a migration. Each post's creation and changes stay in `audit_log`, which is append-only, so the history remains.
+- **Founder rule 10:** changes to "the service never sends email or chat and never contacts buyers, and publishes nothing". DOM updates CLAUDE.md with Dvir's line.
+- **Not touched:** listings, buys, outreach, the engine, the outside review (Gemini).
+- The reply on release will list every env var and secret Dvir can delete (at least `BUFFER_API_KEY`, plus anything X-related found in `.env.example`).
