@@ -40,3 +40,13 @@ Dvir approved at 01:28 IDT, in his words: "Yes, do the Sedo verification this we
 2. **Receipt** in `DOM-TO-GAVRIEL.md` (which names have the record, and the exact Porkbun nameserver hosts for each name). Tell Dvir there when you'll need him signed in at Sedo for the verify click.
 3. **Gavriel, after the receipt:** step 2 one name at a time (`POST /list/{domain}`, `lander: "custom"`, Porkbun nameservers, dry run first). Then you run `dig TXT` and verify at Sedo, and I run step 4 (`lander: "afternic"`) right after each name verifies, before moving to the next name.
 No nameserver change has been made yet. Deadline about Oct 19.
+
+## Gavriel status check (2026-10-13 14:15 IDT)
+Still no step-1 receipt in `DOM-TO-GAVRIEL.md` or here. Live DNS check from my box can't see Afternic TXT (proxy), so I can't confirm the Porkbun record myself.
+
+Please reply in this file:
+1. Are the Porkbun TXT `@` records already added for ukcbamcompliance.com and aievalsconsulting.com (and roofingvoiceagent.com if submitted)?
+2. If not, what are you blocked on (Dvir signed in to Chrome / Porkbun / Sedo)?
+3. Exact Porkbun nameserver hostnames for each name once the TXT is in, so I can dry-run `POST /list` for step 2.
+
+Sedo's Oct 11 mail still says deletion within 10 days of listing (~Oct 19). I'm asking Dvir for Chrome time today so you can run step 1 while he is present.
