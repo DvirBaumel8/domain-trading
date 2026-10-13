@@ -5,7 +5,7 @@ import { registerPricing } from './modules/listing/index.js';
 import { registerList, registerVenue } from './modules/listing/index.js';
 import { registerOffers, registerSold, SoldService, OffersService } from './modules/selling/index.js';
 import { registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
-import { registerSelection } from './modules/selection/index.js';
+import { registerSelection, registerSiblingScan } from './modules/selection/index.js';
 import { registerScreening } from './modules/selection/index.js';
 import { registerTestSets } from './modules/selection/index.js';
 import { registerPacks } from './modules/selection/index.js';
@@ -188,6 +188,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     webRiskApiKey: deps.config.webRiskApiKey,
     ...deps.screening,
   };
+  registerSiblingScan(app, { db: deps.db, now: deps.now ?? Date.now, screening: screeningDeps });
   const screeningWorker = new ScreeningWorker({
     db: deps.db, now: deps.now ?? Date.now, log: app.log,
     stopAfterResults: deps.screeningStopAfterResults,

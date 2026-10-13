@@ -164,3 +164,29 @@ export function hiddenSignals(html: string): string {
 export function visibleText(html: string): { title: string | null; text: string; truncatedMarkup: boolean } {
   return scan(html);
 }
+
+/**
+ * The `<a href>` links of a page as `{href, text}` (href as written and decoded, text decoded and collapsed, at most 200 characters), at most `max` of them.
+ * Forward scan, no backtracking regex over page text. The caller keeps only same-site contact links.
+ */
+export function anchorLinks(html: string, max = 300): { href: string; text: string }[] {
+  const fold = asciiFold(html);
+  const out: { href: string; text: string }[] = [];
+  let i = fold.indexOf('<a');
+  for (let tried = 0; i >= 0 && tried < 5000 && out.length < max; tried++) {
+    const after = fold[i + 2];
+    if (after === ' ' || after === '\n' || after === '\t' || after === '\r') {
+      const end = tagEnd(html, i, 2000);
+      if (end > 0) {
+        const href = attr(html.slice(i, end + 1), 'href');
+        const close = fold.indexOf('</a', end);
+        const inner = html.slice(end + 1, close < 0 ? Math.min(html.length, end + 400) : Math.min(close, end + 2000));
+        if (href !== null && href.trim() !== '') out.push({ href: decodeEntities(href).trim(), text: collapse(decodeEntities(inner.replace(/<[^<>]*>/g, ' '))).slice(0, 200) });
+        i = fold.indexOf('<a', end);
+        continue;
+      }
+    }
+    i = fold.indexOf('<a', i + 2);
+  }
+  return out;
+}

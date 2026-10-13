@@ -66,6 +66,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | Route | File |
 |---|---|
 | GET/POST /selection/settings, POST /selection/settings/:label/activate, GET /selection/namebio, GET/POST /selection/lists/:name, GET/POST /selection/sibling-methods/:method(/approve) | `selection/api/selection.ts` |
+| POST /selection/sibling-scan, GET /selection/sibling-scan/:domain (v4.1.0, CR-050) | `selection/api/sibling-scan.ts` (`registerSiblingScan`, called from `src/app.ts` after `screeningDeps`) |
 | POST /selection/evaluate, labelled-names, holdout-suites, replays, GET /selection/buy-hold | `selection/api/selection.ts` |
 | POST /screening/runs, GET /screening/runs/:id, GET /screening/runs/:id/report.csv, POST /screening/runs/:id/(cancel, manual, verdicts), GET /screening/evidence/:id, POST /quotes/manual | `selection/api/screening.ts` |
 | POST/GET /screening/packs, GET /screening/packs/:id | `selection/api/packs.ts` |
@@ -84,7 +85,8 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `pack.ts` | screening pack: `assessPack`, `issuePack`, `latestPackFor`, `requiredChecks` |
 | `sellers.ts`, `site.ts`, `html-text.ts`, `wayback.ts` | seller pages and site classification, HTML text, Wayback history |
 | `rdap-batch.ts`, `popularity.ts`, `namebio.ts`, `web-risk.ts` | RDAP pacing/cache, popularity list, NameBio, Web Risk lookup |
-| `checks/lookalikes.ts` | v3.10.0 (CR-043, G-70): `lookalikesCheck`, `lookalikeNames` (feature check appended to every plan by `planFor` while `lookalikes.enabled`; `featureChecksOf` in `settings.ts`) |
+| `checks/lookalikes.ts` | v3.10.0 (CR-043, G-70): `lookalikesCheck`, `lookalikeNames` (feature check appended to every plan by `planFor` while `lookalikes.enabled`; `featureChecksOf` in `settings.ts`); v4.1.0: the per-name RDAP + home-page work is `probeLookalike`, shared with the sibling scan |
+| `sibling-scan.ts` | v4.1.0 (CR-050): `scanSiblings` (per name: `lookalikeNames` with `siblings.endings` + `probeLookalike`, then company / `contactUrlOf` / `leadPointsOf`; one `sibling_scans` row per name), `latestSiblingScan`, `contactUrlOf` (same-site contact page URL, never an email), `leadPointsOf` (weights from `siblings` settings). `anchorLinks` is in `html-text.ts` |
 | `topic.ts` | v3.10.0: `topicFor`, `earlierWithTopic` (TOPIC_REUSED; used by intake and the report) |
 | `run-report.ts` | v3.10.0: `runReportCsv`, `csvSafe` (`GET /screening/runs/:id/report.csv`, route in `api/screening.ts`) |
 | `lists.ts` | versioned signature lists (`writeList`, `currentLists`) |
@@ -95,7 +97,7 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `verdicts.ts` | `VerdictBody`, `verdictsFor`: human PASS/REJECT verdicts bound to one FLAG result row (append-only `screening_verdicts`; route `POST /screening/runs/:id/verdicts`; tests `selection/screening-verdicts`) |
 | `unknowns.ts`, `money.ts`, `evidence.ts`, `domain-records.ts`, `tranche-members.ts` | unknown-input reports, EV/Ratio math, evidence rows, cached records, geo members |
 
-Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it). Tests: `tests/modules/selection/` (`screening-*`, `selection-*`, `sibling-methods`, `sibling-bt1-v2`, `bt1-v3-records`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `rdap-pacing`, `run-cancel`, `run-integrity`, `lists-current`, `records-unknowns`, `tier-lanes`, `sellers`, `seller-fetch`, `scout-words`, `settings-intake-keys`, `cr043-scout-checks`), `tests/modules/selection/unit/` (`screening-*`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `split-v2/v3`); helpers `screening.ts`, `screening-fixtures.ts`.
+Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `screening_runs/results/verdicts/packs/evidence`, `manual_quotes`, `domain_records`, `test_sets`, `test_set_rows`, `labelled_names`, `holdout_suites`, `replay_runs`, `rdap_lookups`, `reference_files`, `api_usage`, `registrar_presence` (ops writes it), `sibling_scans` (v4.1.0, append-only). Tests: `tests/modules/selection/` (`screening-*`, `selection-*`, `sibling-methods`, `sibling-bt1-v2`, `bt1-v3-records`, `test-sets`, `web-risk`, `reference-refresh`, `r1b-*`, `rdap-pacing`, `run-cancel`, `run-integrity`, `lists-current`, `records-unknowns`, `tier-lanes`, `sellers`, `seller-fetch`, `scout-words`, `settings-intake-keys`, `cr043-scout-checks`, `sibling-scan`), `tests/modules/selection/unit/` (`screening-*`, `pack-assess`, `sellers`, `site-classify`, `html-text`, `sibling-bt1`, `sibling-scan` (CR-050), `split-v2/v3`, `sibling-scan`); helpers `screening.ts`, `screening-fixtures.ts`.
 
 ### buying
 `POST /buy` (approval, gates, registrar register, ledger), tranches, reconciler, budget.
@@ -257,6 +259,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 
 | Change | Code | Tests |
 |---|---|---|
+| Change the sibling scan (CR-050: endings, points, contact page) | `selection/sibling-scan.ts`, settings `siblings` in `selection/settings.ts` (`SIBLINGS_DEFAULT`), `selection/api/sibling-scan.ts` | `selection/sibling-scan`, `selection/unit/sibling-scan` |
 | Add a field to POST /candidates/intake | `candidates/intake.ts` (`IntakeBody`, `takeIntake`; store column via migration), `candidates/api/candidates.ts` | `candidates/intake`, `intake-rules`, `screen`, `screen-domains`, `scout-split` |
 | Add a field to a daily list entry | `candidates/daily-list.ts` (`DailyEntry`, `buildDailyList`, `buildWhy`) | `candidates/daily-list`, `daily-list-fields`, `daily-list-rejected`, `daily-list-rebuild` |
 | Add a field to the daily list summary / sections | `candidates/daily-list.ts` (`DailyList`, `readDailyList`) | same |

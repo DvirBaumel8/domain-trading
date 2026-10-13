@@ -1,4 +1,4 @@
-# Selection checks (contract v4.0.1)
+# Selection checks (contract v4.1.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 
@@ -41,6 +41,7 @@ One JSON document per version (`values`). A version is immutable; a draft is mad
 | `intake.require_comps` | false (off) | 3.10.0. true: a name with no comps at intake is `FAIL` `COMPS_MISSING` in the `tier` check. |
 | `intake.topic_window_days` | 30 | 3.10.0. The window of `TOPIC_REUSED` (intake flag; `report.csv` `topic_reused`). |
 | `lookalikes` | `enabled` true, `endings` net, org, io, co, ai, co.uk, `prefixes` get, try, `timeout_ms` 5000, `max_bytes` 100000, `max_checks` 12 | 3.10.0. The `lookalikes` check (below). `enabled` false removes it from the plan. |
+| `siblings` | `endings` net, org, io, co, ai, us, co.uk, `prefixes` get, try, `points_live` 10, `points_parked` 2, `max` 30, `live_counted_max` 3, `parked_counted_max` 3, `max_checks` 14, `time_budget_seconds` 80 | 4.1.0 (CR-050). The sibling scan `POST /selection/sibling-scan` (`endpoints.md`): lead points per live business sibling and per registered-but-parked sibling. A settings version stored before 4.1.0 reads these defaults. Page timeout and size come from `lookalikes`. |
 | `buy.exclude_lanes` | [] | 3.10.0. Lanes whose names are never a buy candidate: their final status becomes `not_for_buy` (reason `LANE_NOT_FOR_BUY`) instead of `buy_candidate`, `would_buy` or `pending_manual`; they stay off the daily buy list and out of tranches. The v12 draft sets `["S2"]`. |
 | `buy.renewal_math_min` | 1 | 4.0.0 (CR-046 item 3). `POST /buy` is refused with 422 `RENEWAL_MATH_FAIL` when BIN x (1 - commission) x STRe / renewal cost is under this. |
 | `buy.math_venue`, `buy.commission` | `afternic`, `{afternic: 0.2, sellerhub: 0.1}` | 4.0.0. The venue whose commission the maths uses, and each venue's commission as a share (never hard-coded). |

@@ -23,7 +23,7 @@ Owner: DOM, DVIR (needs Dvir's decision or key) or Gavriel. Details of older ite
 | G-41 / G-68 | Signature lists (history check) and prior-business capture rules are starter lists; grow them through the lists API from real captures (the replay measures them) | Gavriel | medium | - |
 | G-42 | HIST-2 follows a quick meta refresh (<= 5 s) but not a JavaScript redirect or a slow refresh (P2) | DOM | low | - |
 | G-62 | Packs are evidence only; CAP-21b (as-of refetch) is P2; the NameBio spot API is not built (NameBio disabled, G-29) | DOM | low | - |
-| G-70 | `lookalikes` check built in 3.10.0 (CR-043: endings, hyphen, get/try; RDAP + home page). `competing_forsale_n` is not built (P2) | DOM | low | - |
+| G-70 | `lookalikes` check built in 3.10.0 (CR-043: endings, hyphen, get/try; RDAP + home page; 4.1.0: its per-name probe is shared with the CR-050 sibling scan). `competing_forsale_n` is not built (P2) | DOM | low | - |
 | G-53 / G-54 / G-67 | Replay data: `reg_to_sale_months`, the 226/224 row set, gate columns with dates, sale prices, per-row census dates; holdout suite definitions (BT10-1, BT10-9, BT10-11) uploaded and approved by Dvir; the BT10-1 rule set (tier B on or off) | Gavriel / DVIR | medium | - |
 | G-98 | Ledger CSV cells are not escaped against spreadsheet formulas (a cell starting with `=`, `+`, `-`, `@`) | DOM | low | - |
 | G-99 | Buffer post id is lost if the DB update after `createPost` fails (the post exists on X, the row has no id) | DOM | low | - |

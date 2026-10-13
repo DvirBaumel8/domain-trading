@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 4.1.0 (2026-10-13): CR-050 sibling scan
+MINOR (additive; CR-050 part 1, part 2 is not built). Release note: `docs/releases/v4.1.0.md`.
+- **New routes:** `POST /selection/sibling-scan` (WRITE, 1 to 20 `.com` names; other endings 422 `TLD_NOT_SUPPORTED`) and `GET /selection/sibling-scan/{domain}` (READ, the newest stored scan). Per sibling: `domain`, `kind` (ending / hyphen / prefix), `registered` (RDAP; `null` with `reason_code`), `live_business`, `site_state`, `url`, `http_status`, `fetched_at`, `title`, `company`, `contact_url`; per scan a `lead_points` block `{points, formula, live_n, parked_n}`. No email address and no person name is stored: only the company name a page shows and the URL of its contact page.
+- **New code:** `SIBLING_SCAN_NOT_FOUND` (404).
+- **Selection settings:** new `siblings` key (endings, prefixes, `points_live` 10, `points_parked` 2, `max` 30, counted maxima, `max_checks`, `time_budget_seconds`); a stored settings version without it reads the defaults, so no settings version changes.
+- **New append-only table** `sibling_scans` (migration `1763200000000_v4-1-0.sql`). Built on the CR-043 lookalike probe, which is now shared code; the lookalikes check's answers are unchanged.
+
 ## 4.0.1 (2026-10-13): CR-051 fixes: no test group without a pack, NO_PII names the field
 PATCH: `screening_group` is null when a name has no screening pack (CR-051 B-1); the stats route's `NO_PII` message names `source` (B-2). Release note: `docs/releases/v4.0.1.md`.
 

@@ -67,6 +67,15 @@ export const LOOKALIKES_DEFAULT = {
   /** Most lookalike names checked per name (RDAP + page fetches are capped by this). */
   max_checks: 12,
 };
+/**
+ * v4.1.0 (CR-050): the sibling scan. Endings and prefixes checked next to the .com, the lead points (10 per live business sibling, 2 per registered-but-parked
+ * one, at most `max`), how many of each count, the most names checked per scan, and the time budget of one POST (seconds). Page timeout and size come from `lookalikes`.
+ */
+export const SIBLINGS_DEFAULT = {
+  endings: ['net', 'org', 'io', 'co', 'ai', 'us', 'co.uk'], prefixes: ['get', 'try'],
+  points_live: 10, points_parked: 2, max: 30, live_counted_max: 3, parked_counted_max: 3,
+  max_checks: 14, time_budget_seconds: 80,
+};
 /** v4.0.0 (CR-046 item 3): the renewal maths at /buy. ratio = BIN x (1 - commission) x STRe / renewal cost; under `renewal_math_min` the buy is refused. */
 export const BUY_DEFAULT = {
   exclude_lanes: [] as Lane[],
@@ -157,6 +166,13 @@ const Base = z.object({
     prefixes: z.array(z.string().regex(/^[a-z]{2,10}$/)).max(4),
     timeout_ms: int.min(500).max(20_000), max_bytes: int.min(1000).max(512_000), max_checks: int.min(1).max(30),
   }).strict().default(LOOKALIKES_DEFAULT),
+  siblings: z.object({
+    endings: z.array(z.string().regex(/^[a-z]{2,10}(\.[a-z]{2,10})?$/)).max(12),
+    prefixes: z.array(z.string().regex(/^[a-z]{2,10}$/)).max(4),
+    points_live: int.max(100), points_parked: int.max(100), max: int.max(1000),
+    live_counted_max: int.max(20), parked_counted_max: int.max(20),
+    max_checks: int.min(1).max(30), time_budget_seconds: int.min(5).max(300),
+  }).strict().default(SIBLINGS_DEFAULT),
   /** v3.10.0 (CR-043): lanes whose names are never a buy candidate (final status `not_for_buy`, reason LANE_NOT_FOR_BUY). Default none. */
   buy: z.object({
     exclude_lanes: z.array(z.enum(LANES)),
@@ -368,6 +384,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
   tranche: { size: 15, min_main_lane: 10, geo_max: 1, required_for_buy: true, main_lanes: MAIN_LANES_DEFAULT },
   intake: INTAKE_DEFAULT,
   lookalikes: LOOKALIKES_DEFAULT,
+  siblings: SIBLINGS_DEFAULT,
   buy: BUY_DEFAULT,
   renewal: RENEWAL_DEFAULT,
   outreach: OUTREACH_DEFAULT,

@@ -434,6 +434,22 @@ export interface SalesPatternRowsTable {
   venue: string | null;
 }
 
+export interface SiblingScansTable {
+  id: Generated<number>;
+  domain: string;
+  fetched_at: Timestamp;
+  settings_label: string;
+  siblings: Json;
+  lead_points: Json;
+  complete: boolean;
+  skipped_n: Generated<number>;
+  upstream_calls: number;
+  evidence_ids: Json;
+  recorded_by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface ListingSyncLogTable {
   id: Generated<number>;
   domain: string;
@@ -1140,6 +1156,7 @@ export interface Database {
   sales_pattern_uploads: SalesPatternUploadsTable;
   sales_pattern_rows: SalesPatternRowsTable;
   listing_sync_log: ListingSyncLogTable;
+  sibling_scans: SiblingScansTable;
   drop_lists: DropListsTable;
   drop_list_rows: DropListRowsTable;
   drop_list_checks: DropListChecksTable;

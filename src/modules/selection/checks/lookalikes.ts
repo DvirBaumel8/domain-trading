@@ -2,8 +2,8 @@
 // and get<sld>.com / try<sld>.com. Each name: is it registered (RDAP only, never system DNS; an ending with no RDAP service is `null`, never guessed),
 // and for a registered one, is its home page in use (a paced, robots-aware, size-capped fetch through the outbound guard; parked or for-sale pages
 // are not in use). A feature check: it always answers PASS (or UNKNOWN when it cannot run); it never FAILs or FLAGs a name, so verdicts do not change.
-import { fetchPage, classifySite } from '../site.js';
-import { lookupCached, pacerFor, rdapBaseFor } from '../rdap-batch.js';
+import { fetchPage, classifySite, type PageFetch, type RobotsRule, type SiteClass } from '../site.js';
+import { lookupCached, pacerFor, rdapBaseFor, type Pacer } from '../rdap-batch.js';
 import { sharedPacer, sharedRobots } from '../sellers.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 import { formFieldsOf } from './form.js';
@@ -24,6 +24,58 @@ export function lookalikeNames(sld: string, tokens: string[], s: { endings: stri
     if (tokens.length === 3) for (let i = 1; i < 3; i++) add(`${tokens.slice(0, i).join('')}-${tokens.slice(i).join('')}.com`, 'hyphen');
   }
   for (const p of s.prefixes) add(`${p}${sld}.com`, 'prefix');
+  return out;
+}
+
+export interface LookalikeProbe { item: LookalikeItem; calls: number; evidence: number[]; page: PageFetch | null; site: SiteClass | null; rdapCheckedAt: Date | null }
+
+/**
+ * One name: RDAP (cached, paced), then for a registered one its home page (paced, robots-aware, size-capped) classified parked / for sale / in use.
+ * Shared by the lookalike check and the sibling scan (CR-050). Never throws for an upstream failure; the reason is in `item.reason_code`.
+ */
+export async function probeLookalike(
+  ctx: CheckContext, n: LookalikeName,
+  o: { maxAgeHours: number; lists: { parked: string[]; forsale: string[] } | null; pace: Pacer; robots: Map<string, RobotsRule> },
+): Promise<LookalikeProbe> {
+  const cfg = ctx.settings.lookalikes;
+  const item: LookalikeItem = { domain: n.domain, kind: n.kind, registered: null, in_use: null, reason_code: null };
+  const out: LookalikeProbe = { item, calls: 0, evidence: [], page: null, site: null, rdapCheckedAt: null };
+  if (ctx.now() > ctx.deadline || ctx.isCancelled?.()) { item.reason_code = 'TIMEOUT'; return out; }
+  const tld = n.domain.slice(n.domain.lastIndexOf('.') + 1); // the registry label: co.uk is asked at uk
+  const sourceOn = tld === 'com' ? ctx.settings.sources.rdap_com : ctx.settings.sources.rdap_other;
+  if (!sourceOn) { item.reason_code = 'SOURCE_DISABLED'; return out; }
+  let base: string | null;
+  try {
+    base = await rdapBaseFor(ctx.db, ctx.deps, tld, { enabled: ctx.settings.sources.iana_bootstrap || tld === 'com', now: ctx.now });
+  } catch {
+    item.reason_code = 'SOURCE_ERROR';
+    return out;
+  }
+  if (base === null) { item.reason_code = 'NO_REGISTRY_SERVICE'; return out; }
+  const r = await lookupCached(ctx.db, ctx.deps, n.domain, {
+    maxAgeHours: o.maxAgeHours, baseUrl: base, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace: pacerFor(ctx, base), now: ctx.now, deadline: ctx.deadline, isCancelled: ctx.isCancelled,
+  });
+  if (!r.cached && r.reasonCode !== 'TIMEOUT') out.calls++;
+  if (r.evidenceId !== null) out.evidence.push(r.evidenceId);
+  out.rdapCheckedAt = r.checkedAt;
+  if (r.outcome === 'unknown') { item.reason_code = r.reasonCode ?? 'SOURCE_ERROR'; return out; }
+  if (r.outcome === 'not_registered') { item.registered = false; return out; }
+  item.registered = true;
+  // The home page of a registered lookalike.
+  if (!ctx.settings.sources.business_sites) { item.reason_code = 'SOURCE_DISABLED'; return out; }
+  if (!o.lists) { item.reason_code = 'LIST_MISSING'; return out; }
+  if (ctx.now() > ctx.deadline) { item.reason_code = 'TIMEOUT'; return out; }
+  const s = ctx.settings.same_name;
+  const page = await fetchPage({ fetch: ctx.deps.siteFetch, lookupHost: ctx.deps.lookupHost }, `https://${n.domain}/`, {
+    timeoutMs: cfg.timeout_ms, maxBytes: cfg.max_bytes, maxRedirects: s.max_redirects, pace: o.pace, robots: o.robots, neverFetchHosts: ctx.settings.lead.verify.never_fetch_hosts,
+    deadline: ctx.deadline, now: ctx.now, onRequest: () => { out.calls++; }, truncatedOk: true,
+  });
+  const c = classifySite(page, n.domain, ctx.item.domain, [], o.lists, s);
+  out.page = page;
+  out.site = c;
+  if (c.site_state === 'in_use') item.in_use = true;
+  else if (c.site_state === 'parked_or_for_sale' || c.site_state === 'registered_no_site') item.in_use = false;
+  else item.reason_code = c.reason_code ?? c.site_state; // redirect_off_domain, unknown: not guessed
   return out;
 }
 
@@ -49,41 +101,10 @@ export const lookalikesCheck: Check = {
     const items: LookalikeItem[] = [];
 
     for (const n of names) {
-      const item: LookalikeItem = { domain: n.domain, kind: n.kind, registered: null, in_use: null, reason_code: null };
-      items.push(item);
-      if (ctx.now() > ctx.deadline || ctx.isCancelled?.()) { item.reason_code = 'TIMEOUT'; continue; }
-      const tld = n.domain.slice(n.domain.lastIndexOf('.') + 1); // the registry label: co.uk is asked at uk
-      const sourceOn = tld === 'com' ? ctx.settings.sources.rdap_com : ctx.settings.sources.rdap_other;
-      if (!sourceOn) { item.reason_code = 'SOURCE_DISABLED'; continue; }
-      let base: string | null;
-      try {
-        base = await rdapBaseFor(ctx.db, ctx.deps, tld, { enabled: ctx.settings.sources.iana_bootstrap || tld === 'com', now: ctx.now });
-      } catch {
-        item.reason_code = 'SOURCE_ERROR';
-        continue;
-      }
-      if (base === null) { item.reason_code = 'NO_REGISTRY_SERVICE'; continue; }
-      const r = await lookupCached(ctx.db, ctx.deps, n.domain, {
-        maxAgeHours, baseUrl: base, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace: pacerFor(ctx, base), now: ctx.now, deadline: ctx.deadline, isCancelled: ctx.isCancelled,
-      });
-      if (!r.cached && r.reasonCode !== 'TIMEOUT') calls++;
-      if (r.evidenceId !== null) evidence.push(r.evidenceId);
-      if (r.outcome === 'unknown') { item.reason_code = r.reasonCode ?? 'SOURCE_ERROR'; continue; }
-      if (r.outcome === 'not_registered') { item.registered = false; continue; }
-      item.registered = true;
-      // The home page of a registered lookalike.
-      if (!ctx.settings.sources.business_sites) { item.reason_code = 'SOURCE_DISABLED'; continue; }
-      if (!lists) { item.reason_code = 'LIST_MISSING'; continue; }
-      if (ctx.now() > ctx.deadline) { item.reason_code = 'TIMEOUT'; continue; }
-      const s = ctx.settings.same_name;
-      const page = await fetchPage({ fetch: ctx.deps.siteFetch, lookupHost: ctx.deps.lookupHost }, `https://${n.domain}/`, {
-        timeoutMs: cfg.timeout_ms, maxBytes: cfg.max_bytes, maxRedirects: s.max_redirects, pace, robots, neverFetchHosts: ctx.settings.lead.verify.never_fetch_hosts,
-        deadline: ctx.deadline, now: ctx.now, onRequest: () => { calls++; }, truncatedOk: true,
-      });
-      const c = classifySite(page, n.domain, ctx.item.domain, [], lists, s);
-      if (c.site_state === 'in_use') item.in_use = true;
-      else if (c.site_state === 'parked_or_for_sale' || c.site_state === 'registered_no_site') item.in_use = false;
-      else item.reason_code = c.reason_code ?? c.site_state; // redirect_off_domain, unknown: not guessed
+      const pr = await probeLookalike(ctx, n, { maxAgeHours, lists, pace, robots });
+      calls += pr.calls;
+      evidence.push(...pr.evidence);
+      items.push(pr.item);
     }
 
     const registered = items.filter((i) => i.registered === true);
