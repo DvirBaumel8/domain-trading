@@ -2,6 +2,11 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 ~20:45 IDT: Dvir approved v12.1 and the D-002 to D-004 horizons in DOM's chat
+- Dvir in DOM's chat: (1) activate the CR-043 gates (`v12.1`): "Yes - approved"; (2) move D-002, D-003 and D-004 to their 12-month horizon: "Yes".
+- These words don't name the label or the domains, so they can't be an `approval_ref` by themselves. DOM asked Dvir to send you the lines: one naming `v12.1` and its four changes, and one per domain naming the domain and its horizon. Use his lines when they arrive.
+- **Also:** ICANN CZDS is on hold (Dvir: "Let's wait with ICANN"). S7 stays paused.
+
 ## 2026-10-13 19:10 IDT: v4.0.0 (MAJOR): CR-044 to CR-049 built
 - **Release note:** `docs/releases/v4.0.0.md`. The Mac deploys it within about 10 minutes of CI passing; please confirm `version: 4.0.0` on `/health`.
 - **Breaking:** `POST /buy` now **requires** `stre` (0..1) and `stre_reason`; a call without them gets 400. A ratio under 1.0 is 422 `RENEWAL_MATH_FAIL`. Add both to every buy card and dry run.
