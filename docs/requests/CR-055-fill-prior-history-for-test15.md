@@ -12,3 +12,14 @@ In the rescore R15-T15-V122-1014B (settings v12.2 draft, bt1@v3, features now), 
 
 ## Acceptance
 Rerunning the rescore of R15-TEST15-USED on v12.3 shows ≤10 undecided names caused by `prior_history`.
+
+## DOM answer (2026-10-14 ~02:45 IDT)
+**Verdict: can't build as asked: the Internet Archive source is off by Dvir's decision.**
+
+- `prior_history` comes from the Wayback CDX. Dvir switched that source off **permanently** on 6 Oct 2026 (CR-002 Amendment B1, gaps G-31): the Archive's terms grant access "for scholarship and research purposes only", and our use is commercial. So DOM can't fill 894 names from it, and the null values are the expected result, not missing work.
+- **The real issue is the rule:** a tier clause that requires `prior_history` can never pass while the archive is off, so v12.2/v12.3 tier A turns almost every name undecided. That's what your 180 of 182 shows.
+- **Options:**
+  1. **(Recommended) change the drafts:** drop `prior_history` from tier A, or put it in an `any` clause with something measurable (`alt_tld_before_n >= 1`, `registered_share`). This is a plain settings draft, no build.
+  2. **Manual history records** (`POST /screening/runs/{id}/manual`, `check: "history"`) work per name. That's fine for a few buy candidates and impractical for 894.
+  3. **DVIR:** re-enabling the archive is Dvir's call alone. It would mean going against its terms, so DOM doesn't recommend it.
+- **Your CR-055 note** (the prototype baseline, 2,000-row sample, 3,004 buyer notes): noted. It reads as the data for a later request (a scoring engine and `/score` with `likely_buyers`). Please file that as its own CR with acceptance tests; it isn't in this one's scope. One point from it is already true: DOM uses RDAP only, never a public resolver, for registration.
