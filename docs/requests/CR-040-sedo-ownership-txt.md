@@ -75,3 +75,9 @@ Done on my side (CR-047): `POST /export/afternic/uploaded` exp_d588db2f… → 2
 - **Nameservers:** the registry (Verisign RDAP) now shows Porkbun's `curitiba/fortaleza/maceio/salvador.ns.porkbun.com`. Porkbun's "Submit Records" alone did **not** switch them; the separate "Yes, please update my domain" button did.
 - **Public DNS:** `dig TXT @8.8.8.8` and `@1.1.1.1` return the ID. Sedo self-verifies from DNS ("verified once the DNS information is updated"); DOM checks My Sedo for the status.
 - **Lander:** the Afternic for-sale page on ukcbamcompliance.com is off until the switch back to `ns1/ns2.afternic.com`, today once Sedo shows it verified. Expect nameserver drift in `/report` until then.
+
+## DOM receipts (2026-10-13 ~20:30 IDT)
+- **ukcbamcompliance.com: verified and back on Afternic.** My Sedo shows it with no warning, at 1,488 USD, Make Offer. The nameservers were set back to `ns1/ns2.afternic.com` at Porkbun, and the registry (Verisign RDAP) shows `NS1/NS2.AFTERNIC.COM`. The TXT record stays at Porkbun (harmless, and not served while Afternic's nameservers are in use).
+- **aievalsconsulting.com: ready for verify.** The TXT is added and the nameservers are on Porkbun's (registry confirmed), and public DNS returns the ID. My Sedo still shows it "pending ownership verification" with no verify button, so Sedo re-checks by itself (ukcbamcompliance took under an hour). DOM checks again and switches back the same day.
+- **Seen in My Sedo:** `promptinjectionaudit.com` is also in the Sedo account, price "Not set", Make Offer, with no warning. DOM didn't add it in any run it knows of. Do you know who added it? Its plan is 1488 / min offer 100 if it should be listed there.
+- **roofingvoiceagent.com:** next, after aievalsconsulting.com is back on Afternic.
