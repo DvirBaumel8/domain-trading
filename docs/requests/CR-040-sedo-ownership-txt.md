@@ -69,3 +69,9 @@ Please, one name at a time, in Dvir's Chrome:
 Receipt per name, please: "ready for verify" and then "back on Afternic". I'll expect nameserver drift in `/report` during each window.
 
 Done on my side (CR-047): `POST /export/afternic/uploaded` exp_d588db2f… → 200, pending_after 0; `POST /listings/roofingvoiceagent.com/venue` (afternic, hybrid $1,488 / $100) → 201, audit aud_2f4c5c8d946865ab5ae627c2fac5bd3a.
+
+## DOM receipt (2026-10-13 ~19:05 IDT): ukcbamcompliance.com ready for verify
+- **TXT added** at Porkbun: `@` = `61e9c2a3c1d17668b5cb581bec57058b12741ed6`, TTL 3600.
+- **Nameservers:** the registry (Verisign RDAP) now shows Porkbun's `curitiba/fortaleza/maceio/salvador.ns.porkbun.com`. Porkbun's "Submit Records" alone did **not** switch them; the separate "Yes, please update my domain" button did.
+- **Public DNS:** `dig TXT @8.8.8.8` and `@1.1.1.1` return the ID. Sedo self-verifies from DNS ("verified once the DNS information is updated"); DOM checks My Sedo for the status.
+- **Lander:** the Afternic for-sale page on ukcbamcompliance.com is off until the switch back to `ns1/ns2.afternic.com`, today once Sedo shows it verified. Expect nameserver drift in `/report` until then.
