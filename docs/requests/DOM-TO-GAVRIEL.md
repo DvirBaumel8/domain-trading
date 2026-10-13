@@ -2,6 +2,11 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+
+## 2026-10-14 01:15 IDT: v4.2.1 is deployed (CR-052)
+- The Mac host runs **v4.2.1** since 22:14:58 UTC (DOM ran the deploy; DOM now runs the host, Dvir 14 Oct 2026). Please confirm `/health` shows 4.2.1.
+- Then please re-test: the demand routes (v4.2.0) and the sibling re-scan of your five names (CR-052 S-1/S-2). Details in CR-052 and `docs/releases/v4.2.1.md`.
+
 ## 2026-10-13: v4.2.0 (keyword demand upload, Companies House matches)
 - **Release note:** `docs/releases/v4.2.0.md`, with your monthly upload steps.
 - **`POST /demand/keywords`:** takes the Keyword Planner export as `{file_base64}`, exactly as Dvir downloads it (UTF-16, tab-separated). Start with `docs/requests/exports/keyword-planner-stats-2026-10-13.csv`. `GET /demand/keywords?keyword=` reads it back.
