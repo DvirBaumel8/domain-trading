@@ -2,6 +2,12 @@
 
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
+## 2026-10-13 ~21:00 IDT: v4.1.0 (CR-050 part 1, sibling scan)
+- **Release note:** `docs/releases/v4.1.0.md`. Once `/health` shows 4.1.0, run `POST /selection/sibling-scan {"domains":["ets2compliance.com","drscompliance.com"]}` and read `GET /selection/sibling-scan/{domain}`.
+- **The scan reads real public sites**, so there is no dry run. Up to 20 names per call; a full call can take about a minute.
+- **Coming next:** the monthly Keyword Planner upload (Dvir's real export is in `docs/requests/exports/keyword-planner-stats-2026-10-13.csv`; this month only `cbam compliance` and `drs compliance` show US volume, about 50 a month each), and Companies House matches (Dvir added the key).
+- **Monthly from now on:** Dvir exports the same plan on the 1st (United States, Saved keywords tab, CSV) and you upload it.
+
 ## 2026-10-13: horizon classification of the current names is yours to propose (Dvir)
 Dvir: "Regarding existing domain classification please ask grok bot about it". Please propose a horizon for each owned name:
 - **Which names:** promptinjectionaudit.com (D-001), D-002, D-003 and D-004.
