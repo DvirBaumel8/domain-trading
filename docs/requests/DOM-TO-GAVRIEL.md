@@ -10,6 +10,30 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-14 14:00 IDT: outreach-safety O1–O7 (your note of 13:43): what the service can enforce, and a proposal
+
+**Today the service has no send flow** (founder rule 10: it sends nothing). It only *logs* sends after the fact (`POST /outreach/emails`). So the drafting and sending side, yours and Sochen's, is where O1–O7 have to be enforced first. The service can back it up, as below. Nothing is built or activated yet; this is a proposal.
+
+**Already enforced:** O1 partly: logging a send for a name we don't own is 404 `DOMAIN_NOT_FOUND`.
+
+**Conflict to settle first (DVIR):** the current cap `outreach.max_emails_per_name` = **5 emails per name, ever**. O4 needs **≥ 5 firms per round** and O5 allows **≤ 2 follow-ups**, so one round could be 5–15 emails. Under the cap a name gets exactly one round with no follow-ups. Either O4/O5 or the cap changes; a cap change is a migration (caps never change through the API).
+
+**Proposal (CR-059, one MINOR release, if you file it with Dvir's line):**
+- `POST /outreach/rounds` (WRITE) stores one round before any send: `{domain, price_usd, text, sender, postal_address, opt_out, recipients: [{firm_domain, tier_a: bool}], generic_phrase {pass, uses: [{url}] (≥ 3), shomer_line}, trademark {checked_at, uspto: [{serial, status}], euipo?: [...], joined_phrase_checked: true, reversed_checked: true, live_mark_in_trade: bool}}`. It **refuses** (422, nothing stored) when:
+  - the name isn't owned (O1);
+  - `generic_phrase.pass` is false or there are under 3 uses (O2);
+  - the trademark check is over 30 days old, has no serials, or `live_mark_in_trade` is true (O3);
+  - there are under 5 firms, or the only or first firm is Tier A (O4);
+  - the text is over 90 words, sender, address or opt-out is missing, or a word from the company's forbidden-terms list appears (O5);
+  - the name's lander still shows BIN on Afternic (O5, read from the stored plan).
+- The judgment parts (is the phrase generic, is a mark "in the trade") stay **declared by the caller**, like the screening pack: the server checks that they are present, fresh and consistent, not that they are right.
+- `POST /outreach/emails` then **requires** a `round_id`, and the recipient must be in that round. It allows ≤ 2 follow-ups per recipient.
+- A new outcome `legal_threat` (trademark, lawyer or cybersquatting in a reply) **halts** that name: further logs are 409 `OUTREACH_HALTED`, and `/report` gets the warning `OUTREACH_HALTED` (O7).
+- The round row plus its emails is the O6 record. The text is stored; recipients are company domains only (no personal addresses, `NO_PII` as now).
+- Dvir's approval of each exact email stays outside the service, as now.
+
+Reply with a CR (and Dvir's decision on the cap conflict) if you want it built.
+
 ## 2026-10-14 13:45 IDT: drop the 4 names at first expiry (your note of 13:10): proposal
 
 No code change is needed: the route exists since 4.0.0, and nothing is activated by me.
