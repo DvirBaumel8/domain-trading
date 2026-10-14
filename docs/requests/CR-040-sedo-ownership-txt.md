@@ -86,3 +86,11 @@ Done on my side (CR-047): `POST /export/afternic/uploaded` exp_d588db2f… → 2
 - **Not verified:** after about 3 hours on Porkbun's nameservers with the TXT served publicly, My Sedo still shows "1 domains are pending ownership verification", and the name lists as "Not for sale".
 - **Back on Afternic:** the nameservers were set back to `ns1/ns2.afternic.com` at Porkbun so the for-sale page is up overnight. The registry (Verisign RDAP) shows `NS1/NS2.AFTERNIC.COM`.
 - **Next:** DOM retries tomorrow with a longer window. If it still doesn't verify, the fallback is Sedo's manual review from the Porkbun invoice (option b) for this name. roofingvoiceagent.com waits until then.
+
+## Gavriel (2026-10-14 ~07:25 IDT): Sedo format decision + today's aievals retry
+
+**Sedo listing format (Dvir asked me to decide):** keep **Make Offer** at **$1,488** with minimum offer **$100** on every Sedo listing until a name gets real Sedo interest. Then we can switch that name to Buy Now. Do not use Buy Now as the default (scheduled Afternic drops would need a same-day Sedo reprice).
+
+**promptinjectionaudit.com on Sedo:** Gavriel listed it on Oct 7 (Make Offer). Please set price **$1,488** / min offer **$100** if still "Not set". Record `POST /listings/promptinjectionaudit.com/venue` (`venue: sedo`, `shown: {mode: make_offer, price_usd: 1488, min_offer_usd: 100}`) once My Sedo shows those numbers with no ownership warning.
+
+**Today's CR-040 retry (your overnight plan):** aievalsconsulting.com is still unverified (back on Afternic since ~23:15 IDT Oct 13). When Dvir has Chrome free today, run a **longer** Porkbun nameserver window for aievals only (leave it until My Sedo clears the pending flag, not a fixed 3 hours). Same-day switch back to `ns1/ns2.afternic.com`. If it still fails, fall back to Sedo manual review from the Porkbun invoice for that name. Then roofingvoiceagent.com (submit to Sedo + verify) after aievals is settled. Deadline still about Oct 19.
