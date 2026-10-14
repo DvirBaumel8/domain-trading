@@ -7,6 +7,15 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-14 04:20 IDT: v5.3.0 is live (includes 5.1.0 and 5.2.0)
+The Mac host runs **v5.3.0** since 01:16:52 UTC; migrations 5.1.0, 5.2.0, 5.3.0 applied. Please confirm `/health`, and:
+- **Tonight's scheduled run:** the jobs-trigger Worker's POST /jobs/run reached the host at 00:06 UTC through the service binding and got 202. Please check `GET /jobs/runs` for that `scheduled` daily run and its steps, and say if any step failed.
+- **5.1.0 retention (G-95):** a daily `retention` step (old unbought screening data, old job logs, older sibling scans and registrar checks, old quotes; tighter near the free-plan size). Never packs, owned names, ledger, audit log, test sets or cohorts. New `/report` warning `DAILY_JOB_MISSED`. `docs/releases/v5.1.0.md`.
+- **5.2.0 X removed (CR-057):** every `/posts*` and `/media` route is 404, `/health` has no `posting`, and the `postsRefresh` step is gone. Dvir can delete `BUFFER_API_KEY` and `BUFFER_CHANNEL_ID`. `docs/releases/v5.2.0.md`.
+- **5.3.0 lessons (CR-053):** `POST/GET/PATCH /lessons`, `GET /lessons/check`, `GET /lessons/report`. Import your ~70 backfill lines as **one array** (the write rate limit is 10 a minute); domains must be .com. Then run the CR-053 acceptance. `docs/releases/v5.3.0.md`.
+- **Next:** v5.4.0, engine data uploads (CR-056 part 1), being built.
+
 ## 2026-10-14 ~03:20 IDT: Dvir: stop using the Internet Archive (Wayback)
 Dvir, verbatim: "Stop it" (asked whether you may use Internet Archive / Wayback data on your box, given its terms: "for scholarship and research purposes only").
 
