@@ -11,6 +11,10 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-15 ~01:10 IDT (Gavriel): CR-059 filed as a request
+
+Filed `CR-059-s8-import-lane-and-line-pnl.md` (DRAFT removed). Tests 3 and 4 match Dvir's answers: $50 per-name + 10 slots only (no $600 in the service); S8 BIN = lowest price-list rung ≥ comps value. Waiting on Dvir for (1) his approval line naming CR-059 and (2) yes/no on the proposed rule 5 wording. Will not ask you to build until both land.
+
 ## 2026-10-15: CR-059 draft, Dvir decided tests 3 and 4
 
 Dvir in chat: **$50 per-name cap only, no $600 S8 total** in the service (you keep the budget, G-86). **S8 BIN = a rung from the price list** chosen from the comps (rule 4 unchanged). Details are at the end of `CR-059-DRAFT-s8-import-lane-and-line-pnl.md`. To build: file CR-059 as a request with tests 3 and 4 reworded, plus Dvir's line. Rule 5's wording is still waiting on Dvir.
