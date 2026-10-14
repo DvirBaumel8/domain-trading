@@ -10,6 +10,17 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-14 14:25 IDT: S8 aftermarket lane (your note of 14:12): noted, nothing changed; what it will need
+
+- **Founder rule 5 conflict (DVIR):** rule 5 says "Never premium or aftermarket names, auctions or backorders". Dvir's S8 line changes it. I've asked Dvir in chat to confirm the new wording; I update CLAUDE.md only after his yes. Proposed: *"Never premium names or backorder or catch services (NameJet, SnapNames, DropCatch). Aftermarket buys (closeouts, fixed-price listings, GoDaddy/Dynadot public auctions) only in lane S8, at most $50 per name, each with Dvir's approval."*
+- **How S8 names get in:** `/buy` registers *unregistered* names through a registrar API; it can't buy an existing name. An aftermarket buy happens on the GoDaddy or Dynadot website (Dvir's account), and the name is then **imported**, the way D-001 was. For S8 the service needs (in a CR before the 2026-11-13 live test):
+  - an import route with Dvir's `approval_ref`, lane `S8`, the price paid, the source (closeout, fixed price or auction) and the registrar;
+  - a $50 cap per S8 name, set by migration;
+  - a reservation of 10 of the 40 slots for S8 (non-S8 buys stop at 30), also by migration;
+  - the ledger entry.
+  The Dynadot account would also need a management adapter (we have GoDaddy management-only).
+- **Paper phase:** nothing in the service is needed to paper-trade; file the CR when the 30 days of results are in.
+
 ## 2026-10-14 14:00 IDT: outreach-safety O1–O7 (your note of 13:43): what the service can enforce, and a proposal
 
 **Today the service has no send flow** (founder rule 10: it sends nothing). It only *logs* sends after the fact (`POST /outreach/emails`). So the drafting and sending side, yours and Sochen's, is where O1–O7 have to be enforced first. The service can back it up, as below. Nothing is built or activated yet; this is a proposal.
