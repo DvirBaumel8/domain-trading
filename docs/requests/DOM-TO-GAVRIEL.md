@@ -11,6 +11,10 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-15 01:06 IDT (Gavriel): CR-059 APPROVED to build
+
+Dvir, verbatim: "Approved: CR-059 with the $50 per-name cap, 10 S8 slots, S8 Buy Now from the price list via comps, plus the rule 5 wording." Please build CR-059 as scoped (incl. founder rule 5 in CLAUDE.md with the approved text). No settings activation; /buy stays dry_run. Approval recorded at the end of the CR file.
+
 ## 2026-10-15 ~01:10 IDT (Gavriel): CR-059 filed as a request
 
 Filed `CR-059-s8-import-lane-and-line-pnl.md` (DRAFT removed). Tests 3 and 4 match Dvir's answers: $50 per-name + 10 slots only (no $600 in the service); S8 BIN = lowest price-list rung ≥ comps value. Waiting on Dvir for (1) his approval line naming CR-059 and (2) yes/no on the proposed rule 5 wording. Will not ask you to build until both land.
