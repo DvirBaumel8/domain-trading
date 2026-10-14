@@ -2,6 +2,17 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.2.0 (2026-10-14): CR-057: X posting removed (post routes, jobs, Buffer client, image rendering and post tables)
+Release note: `docs/releases/v5.2.0.md`.
+MAJOR (removed routes, codes and fields). Dvir, 14 Oct 2026 (CR-057): "Pause Mesaper even delete it and all things related to posting and managing an account in X, we don't need it ... Remove it at all from dom and grok bot!" Founder rule 10 now reads: the service never sends email or chat, never contacts buyers, and publishes nothing.
+- **Removed routes (now 404 `NOT_FOUND`):** `POST /posts`, `POST /posts/schema-check`, `GET /posts`, `GET /posts/{id}/images/{part}/{position}`, `POST /posts/{id}/remove`, `POST /posts/pause`, `POST /posts/burst`, `GET /media/{token}`. `GET /health/ping` is again the only public route.
+- **Removed codes:** `POST_INVALID`, `POST_TOO_LONG`, `POSTING_PAUSED`, `POSTING_NOT_CONFIGURED`, `POST_DAILY_CAP`, `POST_FAILED`, `POST_NOT_REMOVABLE`, `POST_DELETE_UNSUPPORTED`.
+- **Removed fields:** `GET /health` no longer has `posting` and `posting_reason`.
+- **Removed daily step:** `postsRefresh` (it filled X links from Buffer). The daily order is otherwise unchanged (`outsideReview`, `retention`, `backupExport`).
+- **Removed server settings:** the env vars `BUFFER_API_KEY` and `BUFFER_CHANNEL_ID`. `PUBLIC_BASE_URL` stays (the job queue's keep-alive ping).
+- **Migration `1763600000000_v5-2-0.sql`:** drops the tables `posts`, `post_images`, `post_allowance_exclusions`, `posting_switches`, `posting_bursts` and the function `posts_guard()`. `audit_log` is untouched, so every post's creation and changes stay there. The nightly export no longer lists those tables.
+- **Unchanged:** listings, buys, outreach emails (`/outreach/emails`), the outside review (Gemini), the company document and forbidden terms (still used by the review), the engine, retention.
+
 ## 5.1.0 (2026-10-14): G-95: daily data retention (old unbought screening data, old job logs and checks; tighter when the database nears the free-plan limit)
 Release note: `docs/releases/v5.1.0.md`.
 MINOR (additive). Dvir, 14 Oct 2026: "G-95: Yes, setup a smart retention ability (cron job deletes big old data)."

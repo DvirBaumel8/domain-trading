@@ -28,7 +28,7 @@ export interface PlanStep {
 /** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the review steps 1 (they keep their own retry), the rest 2. */
 export const DEFAULT_ATTEMPTS = 2;
 export const STEP_ATTEMPTS: Record<string, number> = {
-  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, postsRefresh: 3, outsideReview: 1, reviewRetry: 1,
+  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1,
 };
 export const DEFAULT_TIMEOUT_MS = 5 * 60_000;
 export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000 };
@@ -91,12 +91,10 @@ export interface JobRunnerDeps {
   outsideReview?: () => Promise<unknown>;
   /** The 10:30 IDT tick retries a review that got a 429 in the daily run (CR-011 addendum C); while undefined, that step reports skipped. */
   reviewRetry?: () => Promise<unknown>;
-  /** Fills the X link and sent time of recent posts from Buffer (v2.12.0); runs after outsideReview, before backupExport. While undefined, that step reports skipped. */
-  postsRefresh?: () => Promise<unknown>;
   backupExport?: BackupExport;
   /** Daily popularity list / IANA bootstrap / cache pruning (CAP-02); while undefined, that step reports skipped. */
   referenceRefresh?: Runnable;
-  /** v5.1.0 (G-95): daily data retention (old unbought screening data, old job logs and checks); runs after postsRefresh, before backupExport. While undefined, that step reports skipped. */
+  /** v5.1.0 (G-95): daily data retention (old unbought screening data, old job logs and checks); runs after outsideReview, before backupExport. While undefined, that step reports skipped. */
   retention?: Runnable;
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
@@ -159,7 +157,6 @@ export class JobRunner {
       optional('cohortOutcomes', d.cohortOutcomesJob, 'cohort outcomes not configured'),
       optional('referenceRefresh', d.referenceRefresh, 'reference refresh not configured', true),
       optionalFn('outsideReview', d.outsideReview, 'outside review not configured'),
-      optionalFn('postsRefresh', d.postsRefresh, 'posts refresh not configured'),
       optional('retention', d.retention, 'retention not configured'),
       optional('backupExport', d.backupExport, 'backup export not configured'),
     ];

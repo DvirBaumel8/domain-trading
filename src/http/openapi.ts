@@ -3,7 +3,7 @@
 // `config: { openapiBody: <zod schema> }`; the request body's JSON schema is then made from that schema (z.toJSONSchema).
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { INTAKE_ROUTES, JOB_PATH, MEDIA_PATH, PUBLIC_PATHS } from './auth.js';
+import { INTAKE_ROUTES, JOB_PATH, PUBLIC_PATHS } from './auth.js';
 import { isMutating } from './methods.js';
 
 declare module 'fastify' {
@@ -24,7 +24,7 @@ interface Entry { method: string; url: string; body?: z.ZodType; noBody?: boolea
 /** One line per route: what it does. Keyed `METHOD /fastify/path`. A route with no line here fails the test that keeps the document complete. */
 export const SUMMARIES: Record<string, string> = {
   'GET /health/ping': 'Liveness (public, no database)',
-  'GET /health': 'Service health: version, database, jobs, posting',
+  'GET /health': 'Service health: version, database, jobs, review',
   'GET /check': 'Price and availability check of a name across registrars',
   'POST /buy': 'Buy a name (needs Dvir\'s approval_ref and a complete screening pack); dry_run supported',
   'GET /pricing/preview': 'Preview the sell plan of a price',
@@ -123,14 +123,6 @@ export const SUMMARIES: Record<string, string> = {
   'GET /reviews/settings': 'Review settings',
   'POST /reviews/settings': 'Change review settings',
   'GET /reviews/settings/history': 'Review settings history',
-  'POST /posts': 'Publish a post to the company X account through Buffer',
-  'GET /posts': 'Posts and today\'s allowance',
-  'POST /posts/schema-check': 'Check the Buffer input for a post body (or the fixed sample) against Buffer\'s live schema; publishes nothing',
-  'GET /posts/{id}/images/{part}/{position}': 'The stored bytes of a post image',
-  'POST /posts/{id}/remove': 'Mark a post removed',
-  'POST /posts/pause': 'Pause or resume posting',
-  'POST /posts/burst': 'Raise the post allowance for a day',
-  'GET /media/{token}': 'A post image for Buffer (public, unguessable token)',
   [`GET ${OPENAPI_PATH}`]: 'This document',
 };
 
@@ -138,7 +130,7 @@ const toOpenApiPath = (url: string): string => url.replace(/:([A-Za-z0-9_]+)/g, 
 const paramsOf = (path: string): string[] => [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]!);
 
 function scopeOf(method: string, url: string): string {
-  if (PUBLIC_PATHS.has(url) || MEDIA_PATH.test(url)) return 'none';
+  if (PUBLIC_PATHS.has(url)) return 'none';
   if (url === JOB_PATH && method === 'POST') return 'write or job-trigger token';
   if (method === 'POST' && INTAKE_ROUTES.has(url)) return 'write or intake';
   return isMutating(method) ? 'write' : 'read';

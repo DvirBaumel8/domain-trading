@@ -1007,66 +1007,6 @@ export interface ReviewRetriesTable {
   created_at: TimestampDefault;
 }
 
-export interface PostsTable {
-  id: string;
-  created_at: TimestampDefault;
-  created_by: string;
-  audit_id: string | null;
-  idempotency_key: string | null;
-  text: string;
-  thread: Json;
-  status: ColumnType<'pending' | 'posted' | 'failed' | 'removed' | 'unknown', 'pending' | 'posted' | 'failed' | 'removed' | 'unknown', 'posted' | 'failed' | 'removed' | 'unknown'>;
-  buffer_post_id: string | null;
-  external_link: ColumnType<string | null, string | null | undefined, string | null>;
-  sent_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
-  error: ColumnType<string | null, string | null | undefined, string | null>;
-  removed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
-  removed_reason: ColumnType<string | null, string | null | undefined, string | null>;
-  idt_day: string;
-}
-
-export interface PostAllowanceExclusionsTable {
-  id: Generated<number>;
-  post_id: string;
-  reason: string;
-  created_at: TimestampDefault;
-}
-
-export interface PostImagesTable {
-  id: Generated<number>;
-  post_id: string;
-  part: number;
-  position: number;
-  mime: 'image/png' | 'image/jpeg';
-  bytes: number;
-  width: number;
-  height: number;
-  sha256: string;
-  alt: string;
-  data: Buffer | null;
-  media_token: string;
-  media_expires_at: Timestamp;
-  created_at: TimestampDefault;
-}
-
-export interface PostingSwitchesTable {
-  id: Generated<number>;
-  at: TimestampDefault;
-  by: string;
-  audit_id: string | null;
-  paused: boolean;
-  reason: string | null;
-}
-
-export interface PostingBurstsTable {
-  id: Generated<number>;
-  day: string;
-  cap: number;
-  at: TimestampDefault;
-  by: string;
-  audit_id: string | null;
-}
-
 export interface ReplayRunsTable {
   id: string;
   suite: string;
@@ -1196,11 +1136,6 @@ export interface Database {
   review_item_statuses: ReviewItemStatusesTable;
   review_settings_changes: ReviewSettingsChangesTable;
   review_retries: ReviewRetriesTable;
-  posts: PostsTable;
-  post_images: PostImagesTable;
-  post_allowance_exclusions: PostAllowanceExclusionsTable;
-  posting_switches: PostingSwitchesTable;
-  posting_bursts: PostingBurstsTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

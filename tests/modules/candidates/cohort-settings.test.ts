@@ -1,5 +1,5 @@
 // v2.15.0 (CR-013 acceptance findings F-1..F-11, Q1): the weekly rule, bot names out of the packet, the term retire route, 503 retry, key shapes,
-// plural/possessive matching, public /media/*, the review run limiter, review settings history, removed drop-list rows, an empty cohort window.
+// plural/possessive matching, the review run limiter, review settings history, removed drop-list rows, an empty cohort window.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';

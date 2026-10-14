@@ -1,4 +1,4 @@
-# Endpoints (contract v5.1.0)
+# Endpoints (contract v5.2.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -42,9 +42,6 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | GET | `/company/document/versions`, `/company/document/versions/{n}`, `/company/forbidden-terms` | READ | Company and reviews |
 | POST | `/reviews/packet`, `/reviews/run`, `/reviews/settings`, `/reviews/{packet_id}/feedback`, `/reviews/items/{id}/status` | WRITE | Company and reviews |
 | GET | `/reviews/packets/{id}`, `/reviews/items`, `/reviews/cost`, `/reviews/settings`, `/reviews/settings/history` | READ | Company and reviews |
-| POST | `/posts`, `/posts/schema-check`, `/posts/{id}/remove`, `/posts/pause`, `/posts/burst` | WRITE | Posting to X |
-| GET | `/posts`, `/posts/{id}/images/{part}/{position}` | READ | Posting to X |
-| GET | `/media/{token}` | none (public) | Posting to X |
 | POST | `/candidates/{domain}/records` | WRITE | Candidates |
 | POST | `/candidates/intake` | WRITE or intake | Candidates |
 | GET | `/candidates/daily` | READ | Candidates |
@@ -66,7 +63,7 @@ READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024
 ### `GET /health`
 Any valid bot token (READ or WRITE).
 - **200** `{status: "ok", db: "ok", jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
-- `posting` (2.12.0, additive): `paused`, `not_configured`, `failed` (the latest post failed), else `ok`; `posting_reason` with the pause reason or the failure.
+- Removed in 5.2.0 (CR-057): `posting` and `posting_reason` are no longer in the answer.
 - `review_reason` (3.1.0): present only when `review` is `failed`: Google's status and short reason from the latest review, never a key. 3.2.0 (CR-017 N-4): `CODE: text`, where CODE is Google's status (e.g. `UNAVAILABLE`) or `HTTP <n>`; at most **200 characters**, cut at a word and ending with `…` when longer.
 - `jobs` is also `overdue` (3.1.0) when `JOB_MISSED` or `JOB_RUN_INCOMPLETE` applies.
 - `review` (2.11.0, additive; `disabled` and `review_model` 2.11.2): `disabled` (the switch is off), `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
@@ -752,39 +749,6 @@ WRITE. Body (strict) `{status: acted|rejected|watching, note (1–500)}` (audite
 ### `GET /reviews/cost`
 READ. `{month (UTC, YYYY-MM), spent_usd (the reported cost_usd summed), cap_usd (5, a constant), feedback_n, unknown_n, enabled, model, tier}` (the last three 2.11.2).
 
-## Posting to X
-2.12.0, CR-011 part A and addendum A. Founder rule 10 (changed by Dvir, 7 Oct 2026): the service publishes to the company's own X account **through Buffer only** and never replies, quotes, likes, follows or messages anyone; no route for any of that exists. Key `BUFFER_API_KEY` (server env only); channel `BUFFER_CHANNEL_ID`, or the account's only X channel. Request texts are audited as `[TEXT n chars]`, images as `[IMAGE n chars]`.
-
-**Checks (every post, dry run included; a dry run answers 200 with `ok: false` and the reasons, only a real post answers 422, 2.15.0 doc fix):** each part's text has an X weighted length of at most 280 (a link counts 23, CJK and emoji 2, other characters 1: a simplified form of X's rule) → 422 `POST_TOO_LONG` (`details.length`, `limit`, `part`); text and alt text pass the block list → 422 `TEXT_BLOCKED` (`category`, never the match). **Images:** up to 4 per part, PNG or JPEG (by content), at most 5 MB, 4 to 8,192 px each side, alt text 1 to 1,000 characters; metadata is stripped before storing (JPEG APP1–APP15 and comments, which also drops ICC colour profiles; PNG text, time and EXIF chunks and every other non-essential chunk). Any image problem → 422 `POST_INVALID` with `details.images: [{part, position, reason (IMAGE_TYPE, IMAGE_CORRUPT, IMAGE_TOO_LARGE, IMAGE_DIMENSIONS, ALT_MISSING, ALT_TOO_LONG, ALT_BLOCKED, TOO_MANY_IMAGES), category?}]`.
-
-**Daily cap:** 1 post per IDT day (a thread counts as one), or the burst cap set for that day (2–6). A failed post uses no allowance.
-
-### `POST /posts`
-WRITE. Body (strict) `{text, images?: [{data_base64, alt}], thread?: [{text, images?}] (up to 2 more parts), dry_run?}`; body limit 40 MB on this route. **Dry run** → **200** `{dry_run: true, ok, parts: [{part, length, limit, ok, reason? (TOO_LONG or TEXT_BLOCKED), category?}], images: [{part, position, ok, reason?, width, height, bytes}], allowance: {today_cap, used_today, remaining}}`: nothing is stored, sent or counted. **Real:** the images are stored and served at `/media/{token}`, then Buffer is asked to publish now (`shareNow`, images with alt text in order, the thread parts). **No double post (2.16.0):** under one database lock the pause and the cap are checked and a `pending` row is written **before** Buffer is called. Buffer success → `posted`; a refusal or 4xx → `failed` (no allowance); a lost answer, timeout or 5xx → `unknown` (it **counts** toward the cap, since the post may be live; the daily `postsRefresh` resolves it with Buffer when it can, and a `pending` row older than 15 minutes becomes `unknown`). From the `pending` row on, the `Idempotency-Key` keeps its answer: a retry with the same key replays it and never calls Buffer again. **201** `{post_id, buffer_post_id, status: "posted", external_link (may be null until Buffer reports it), images: [{part, position, sha256}], allowance}`. **Errors:** 409 `POSTING_PAUSED` · 503 `POSTING_NOT_CONFIGURED` · 409 `POST_DAILY_CAP` (`details.next_allowed_at`) · 422 `POST_TOO_LONG` / `POST_INVALID` / `TEXT_BLOCKED` · 502 `POST_FAILED` (`details`: `outcome` `failed` or `unknown` (2.16.0), `post_id` when `unknown`, `step` channel or create, `kind` rate_limited / refused / unavailable, Buffer's `status`, `message`, `retry_after`; the post is recorded as `failed`). **Known limit:** the post record is written after Buffer answers; a server crash in that moment would leave a published post without a record (and a retry with the same key could post again).
-
-### `POST /posts/schema-check`
-WRITE (3.2.0, CR-017 R-A2). Asks Buffer's GraphQL API for its input types (introspection: read-only, publishes nothing) and checks the exact `createPost` input DOM would send for a sample post with one image and a thread part: every field exists, list and nesting match, required fields are present, enum values are valid. **Body (3.3.0, CR-022 F-2):** empty, which checks a fixed sample, or the same body as `POST /posts` (same limit and validation, same 422 codes), which checks the input DOM would build for **that** post (images as placeholder `/media` URLs; nothing is stored or sent). **200** `{ok, problems: [string], checked: "post" | "sample" (3.3.0), checked_types: [string], types (3.2.1): {<TypeName>: {kind, fields?: {<field>: <type, e.g. String!>}, values?: [enum values]}}}` (Buffer's own definitions of every input type reachable from `CreatePostInput`, following only X's metadata, at most 25; names and types only). The answer is cached in memory for 1 hour; a mismatch is not cached. **Errors:** 503 `POSTING_NOT_CONFIGURED` without a Buffer key; 502 `POST_FAILED` (`details.step: "schema"`) when Buffer can't be asked. **A real `POST /posts` runs the same check first (3.2.0):** a mismatch is 502 `POST_FAILED` with `details {step: "schema", outcome: "failed", problems, checked_types}`, nothing is sent to Buffer, no post row is written (the day's allowance is unused) and the Idempotency-Key is released. The input DOM sends (3.2.2, from Buffer's live schema) is `{channelId, text, mode: shareNow, schedulingType: automatic, needsApproval: false, assets: [{image: {url, metadata: {altText}}}] (always present, may be empty), metadata: {twitter: {thread: [{text, assets}]}}}`.
-
-### `GET /posts`
-READ. Query `limit?` (1–200, default 50). `{posting, allowance, posts: [{post_id, created_at, text, thread, status: pending|posted|failed|unknown|removed (2.16.0), buffer_post_id, external_link, sent_at, error, removed_at, removed_reason, images: [{part, position, mime, bytes, width, height, sha256, alt}]}]}`, newest first. Reach and replies are not read (Buffer's free plan; Dvir accepted).
-
-**Allowance and retries (3.2.0, CR-017 R-A3/R-A4):** a `failed` post does not count toward `allowance.used_today` (only `posted`, `unknown` and `removed` count). **Vendor test posts (3.3.1, CR-025)** never count: DOM lists its own test posts in an append-only exclusion list, by a migration only (there is no API for it, so no caller can free a slot). The first is DOM's 2026-10-09 04:13 IDT test post `pst_c1eaba454a6a`. To retry after a failure, send the same body with a **new** Idempotency-Key; the old key replays the old 502. The failed row stays as history. `/health` `posting` follows the latest post, so a successful post makes it `ok` again.
-
-### `GET /posts/{id}/images/{part}/{position}`
-READ. The stored image bytes. 404 `NOT_FOUND` (also when the bytes were not kept, after a restore: the backup leaves image bytes out).
-
-### `POST /posts/{id}/remove`
-WRITE. Body `{reason (1–300), marked_removed_by_hand?}`. Only a `posted` post (else 409 `POST_NOT_REMOVABLE`; an unknown id is 404 `NOT_FOUND`). DOM asks Buffer to delete it: success → **200** `{..., status: "removed", deleted_on_buffer: true}`; Buffer refuses → 409 `POST_DELETE_UNSUPPORTED` (Buffer's message), unless `marked_removed_by_hand: true` (Dvir deleted it on X), which marks it removed. 503 `POSTING_NOT_CONFIGURED` without a key (unless marked by hand).
-
-### `POST /posts/pause`
-WRITE. `{paused, reason?}` → **200** the state. While paused a real post is 409 `POSTING_PAUSED`; a dry run still works.
-
-### `POST /posts/burst`
-WRITE. `{day (today or later, IDT), cap (2–6; 6 since 3.5.0, CR-029 A)}` → **201**. Phase 1's launch posts on one day. The cap is the day's total, so posts already made that day count toward it.
-
-### `GET /media/{token}`
-**Public** (no token). The image bytes with their type and `Cache-Control: public, max-age` = at most 3600 and never past the link's expiry (2.16.0), for 7 days after the post; then 404 `NOT_FOUND`. At most 120 a minute per client IP → 429 `RATE_LIMITED`. Writes nothing. A READ or intake token on `POST /posts` is refused (403) before the body is read.
-
 ## Candidates
 2.13.0, CR-012 part E. Trademark and history checks belong to the **domain**, not only to one run.
 
@@ -848,8 +812,6 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Offer and sale errors:** `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `HOLD_REASON_REQUIRED`, `EXTERNAL_REF_CONFLICT`, `OFFER_NOT_FOUND`, `APPROVAL_REQUIRED`, `OUTCOME_FINAL`, `OUTCOME_TRANSITION_INVALID`, `OFFER_SOLD_MISMATCH`, `OUTCOME_CHANGED_CONCURRENTLY`, `EVIDENCE_REQUIRED`, `SOLD_AT_IN_FUTURE`, `OFFER_MISMATCH`, `NOT_SELLABLE_STATE`, `SALE_ALREADY_RECORDED`, `DEAL_NOT_FOUND`.
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
-
-**Posting errors (2.12.0):** `POST_INVALID`, `POST_TOO_LONG`, `POSTING_PAUSED`, `POSTING_NOT_CONFIGURED`, `POST_DAILY_CAP`, `POST_FAILED`, `POST_NOT_REMOVABLE`, `POST_DELETE_UNSUPPORTED`.
 
 **Candidate screening errors (3.3.0, CR-021):** `ON_DEMAND_SCREEN_CAP` (409; also the `onDemandScreen` skip reason), `ALREADY_RUNNING` (409; also a skip reason of the daily steps). Skip reasons of `POST /candidates/screen` `domains` (3.4.0): `NOT_CHANGED`, `NO_INTAKE`, `OWNED`. Form note (3.4.0): `SCOUT_WORDS`.
 

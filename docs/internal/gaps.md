@@ -25,7 +25,6 @@ Owner: DOM, DVIR (needs Dvir's decision or key) or Gavriel. Details of older ite
 | G-70 | `lookalikes` check built in 3.10.0 (CR-043: endings, hyphen, get/try; RDAP + home page; 4.1.0: its per-name probe is shared with the CR-050 sibling scan). `competing_forsale_n` is not built (P2) | DOM | low | - |
 | G-53 / G-54 / G-67 | Replay data: `reg_to_sale_months`, the 226/224 row set, gate columns with dates, sale prices, per-row census dates; holdout suite definitions (BT10-1, BT10-9, BT10-11) uploaded and approved by Dvir; the BT10-1 rule set (tier B on or off) | Gavriel / DVIR | medium | - |
 | G-98 | Ledger CSV cells are not escaped against spreadsheet formulas (a cell starting with `=`, `+`, `-`, `@`) | DOM | low | - |
-| G-99 | Buffer post id is lost if the DB update after `createPost` fails (the post exists on X, the row has no id) | DOM | low | - |
 | G-100 | Queue retries have no backoff | DOM | low | - |
 | G-101 | A timed-out step's work is abandoned, not cancelled (3.9.0 marks the retry failed). Real cancellation needs an `AbortSignal` through every step | DOM | low | - |
 | G-102 | Per-request settings/lexicon reloads and N+1 queries on the daily list build | DOM | low | - |
@@ -35,8 +34,8 @@ Owner: DOM, DVIR (needs Dvir's decision or key) or Gavriel. Details of older ite
 ## Accepted decisions
 | ID | Decision |
 |---|---|
+| 14 Oct 2026 (Dvir, CR-057) | X posting removed in 5.2.0: no post routes, no Buffer, no post tables; G-88 and G-99 (post cap, Buffer post id) are gone with it |
 | G-87 | `ext_dates` is PASS when some extensions are unknown, counting only the known ones (deliberate: CR-008 section 6.2 accepted it, and `.biz` is always unknown; changing it would undo v11's measured result) |
-| G-88 | `POST /posts/burst` raises the daily post cap (2-5) without an approval: deliberate. Dvir: posts need no approval (CR-011) |
 | 10 Oct 2026 (Dvir) | The buy approval line also covers listing overrides sent with `/buy` (offer mode, pricing exception, custom floor/walk-away) |
 | 10 Oct 2026 (Dvir) | The reconciler never auto-fails an open purchase; `/report` warns `PURCHASE_UNRESOLVED` and the admin `resolve-purchase` command settles it (3.9.0) |
 | 13 Oct 2026 (Dvir, CR-045 follow-up) | The domain cap is **40** (migration 4.0.0). The 40-name test runs 20 passed + 20 borderline; its sales are judged at 24 months (`portfolio.judge_sales_months`), its views, leads and offers monthly |

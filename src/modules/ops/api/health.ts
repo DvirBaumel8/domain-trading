@@ -5,10 +5,10 @@ import { scrubSecrets } from '../../../core/redact.js';
 import { pingDb } from '../../../db/client.js';
 import type { Database } from '../../../db/types.js';
 import { adapterStatus } from '../../registrars/index.js';
-import { currentReviewSettings, postingHealth, type PostingDeps } from '../../outreach/index.js';
+import { currentReviewSettings } from '../../outreach/index.js';
 import { dailyScheduleState, jobsOverdue } from '../../reporting/index.js';
 
-export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, posting?: PostingDeps, kickQueue?: () => Promise<void>): void {
+export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, kickQueue?: () => Promise<void>): void {
   // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
   // v3.7.0 (CR-034): also the version and the deployed commit (Render sets RENDER_GIT_COMMIT), so the deploy-live workflow can tell a deploy is live without a token.
   app.get('/health/ping', async () => ({ status: 'ok', version: config.version, commit: process.env.RENDER_GIT_COMMIT ?? null }));
@@ -30,7 +30,6 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       review,
       ...(review === 'failed' ? { review_reason: await reviewReason(db, config) } : {}),
       review_model: await reviewModel(db),
-      ...(await postingHealth({ db, buffer: posting?.buffer ?? null })),
       version: config.version,
       adapters: adapterStatus(config).map(({ name, enabled }) => ({ name, enabled })),
     });

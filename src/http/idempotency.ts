@@ -18,7 +18,7 @@ export const STALE_IN_PROGRESS_MS = 15 * 60_000;
 export const KEY_RETENTION_MS = 30 * 86_400_000;
 const PRUNE_EVERY_MS = 86_400_000;
 
-/** Responses that must stay the final answer for their key even when they are 5xx (the work may have happened: POST /posts after the row is written). */
+/** Responses that must stay the final answer for their key even when they are 5xx (the work may have happened). */
 const keepKey = new WeakSet<object>();
 export const keepIdempotencyKey = (req: object): void => { keepKey.add(req); };
 

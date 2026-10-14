@@ -26,6 +26,7 @@ const created = (): string[] => {
   for (const f of readdirSync('migrations').filter((x) => x.endsWith('.sql'))) {
     const up = readFileSync(join('migrations', f), 'utf8').split(/^-- Down Migration/m)[0]!;
     for (const m of up.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(?:public\.)?"?([a-z_]+)"?/gi)) names.add(m[1]!.toLowerCase());
+    for (const m of up.matchAll(/DROP TABLE (?:IF EXISTS )?(?:public\.)?"?([a-z_]+)"?/gi)) names.delete(m[1]!.toLowerCase());
   }
   return [...names].sort();
 };

@@ -131,7 +131,7 @@ describe('CR-024: openapi', () => {
     expect(doc.paths['/reviews/run'].post['x-no-body']).toBe(true);
     expect(doc.paths['/candidates/daily/rebuild'].post).toMatchObject({ 'x-no-body': true, responses: { '201': { description: 'OK' } } });
     expect(doc.paths['/candidates/screen'].post.requestBody.content['application/json'].schema.properties).toHaveProperty('domains');
-    for (const p of ['/selection/test-sets/{name}/cancel', '/screening/runs/{id}/cancel', '/selection/sibling-methods/{method}/approve', '/posts/schema-check']) expect(doc.paths[p].post.requestBody, p).toBeTruthy();
+    for (const p of ['/selection/test-sets/{name}/cancel', '/screening/runs/{id}/cancel', '/selection/sibling-methods/{method}/approve']) expect(doc.paths[p].post.requestBody, p).toBeTruthy();
   });
 
   it('T24-2 F-3 the rebuild code stays as it was: 201 with the summary', async () => {

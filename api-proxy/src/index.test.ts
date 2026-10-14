@@ -74,14 +74,14 @@ describe('proxy', () => {
 describe('proxy: tunnel error pages (BUG-043)', () => {
   it('turns an HTML 5xx from the tunnel into 502 ORIGIN_UNREACHABLE JSON', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response('<html>Bad gateway</html>', { status: 530, headers: { 'content-type': 'text/html; charset=UTF-8' } }));
-    const res = await proxy(new Request('https://p.example.workers.dev/posts', { method: 'POST', body: '{}' }), env, fetcher);
+    const res = await proxy(new Request('https://p.example.workers.dev/list', { method: 'POST', body: '{}' }), env, fetcher);
     expect(res.status).toBe(502);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe('ORIGIN_UNREACHABLE');
   });
   it("passes the API's own JSON 5xx through unchanged", async () => {
     const body = '{"error":{"code":"POST_FAILED","message":"x","details":{}}}';
     const fetcher = vi.fn().mockResolvedValue(new Response(body, { status: 502, headers: { 'content-type': 'application/json' } }));
-    const res = await proxy(new Request('https://p.example.workers.dev/posts', { method: 'POST', body: '{}' }), env, fetcher);
+    const res = await proxy(new Request('https://p.example.workers.dev/list', { method: 'POST', body: '{}' }), env, fetcher);
     expect(res.status).toBe(502);
     expect(await res.text()).toBe(body);
   });

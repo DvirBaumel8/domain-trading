@@ -3,7 +3,7 @@
 **You are DOM**, the vendor that owns 100% of the domain-trading software: code, tests, internal docs, the API contract, releases and deploys. Read this file, then **`docs/internal/code-map.md`** (where every module, file, route, table and test is), then `docs/contract/README.md`, then the internal doc for the area you touch.
 
 **HARD RULE: DOM never operates production (Dvir, 9 Oct 2026).** Only Gavriel (the Grok bot) calls the production API. DOM (Claude Code and every agent it starts):
-- never calls any endpoint of the deployed service, with any token, for any reason: reads, `/health`, dry runs, jobs, posts and buys included;
+- never calls any endpoint of the deployed service, with any token, for any reason: reads, `/health`, dry runs, jobs and buys included;
 - never uses the bot tokens in `.env.bot-tokens` or the job token;
 - never queries or writes the production database directly.
 
@@ -32,7 +32,7 @@ DOM builds, tests locally, pushes and releases. Gavriel runs, verifies and opera
 7. **Registrar keys exist only as server env secrets.** They are never logged, never returned, never in git, and never in test fixtures (use fake values).
 8. **Every POST is idempotent** (`Idempotency-Key` required) and **audited** (`audit_log`, append-only). `ledger_entries` is append-only too; corrections are reversing rows.
 9. **No AI calls inside the service, with one exception:** the daily and weekly outside review of the company (CR-011 part B), one reviewer (Google Gemini) under a monthly cost cap. The reviewer advises; nothing it says triggers an action. *(Changed by Dvir, 7 Oct 2026, 19:07; was "zero runtime tokens".)*
-10. **The service never sends email or chat and never contacts buyers.** Gavriel talks to Dvir. Its one outward voice is publishing to the company's own X account through Buffer: it never replies, quotes, likes, follows or messages anyone. *(Changed by Dvir, 7 Oct 2026, 19:07.)*
+10. **The service never sends email or chat, never contacts buyers, and publishes nothing** (X posting removed by Dvir, 14 Oct 2026, CR-057). Gavriel talks to Dvir.
 11. **Bots never add code to this repo.** Dvir (with you, Claude Code) writes the code. Gavriel only pushes spec docs that Dvir has reviewed. The nightly backup export pushes data only, to the fixed `data-backup` branch of the separate private repo `DvirBaumel8/domain-trading-data` (never this repo; step 6, 5 Oct 2026).
 12. **No live registrar `create` call without Dvir present** and without his chat approval for that domain. Tests use mocks, Porkbun's mock server, or Porkbun's sandbox (`pk1_sb_` keys).
 
@@ -84,7 +84,7 @@ The decision history lives in git, `docs/internal/` and `docs/contract/CHANGELOG
 ## Decisions after handover
 
 - **Old rules can change (Dvir, 7 Oct 2026, 19:07):** "if we set a rule in the past and we think it should be changed, lets change it". A conflict with a founder rule is still flagged, never silently broken; changing the rule, with its new wording, is a normal option for Dvir to approve.
-- **Outward services (7 Oct 2026):** the outside review calls Google Gemini on the free tier (`GEMINI_API_KEY` from a project without billing; switch, model and tier in `/reviews/settings`); posting to X goes through Buffer's free plan (`BUFFER_API_KEY`); Web Risk uses the billed Google project `robots-508113` (Lookup API only, 10,000 a month cap).
+- **Outward services (7 Oct 2026):** the outside review calls Google Gemini on the free tier (`GEMINI_API_KEY` from a project without billing; switch, model and tier in `/reviews/settings`); Web Risk uses the billed Google project `robots-508113` (Lookup API only, 10,000 a month cap).
 - **Approval lines (CR-012 §1, CR-014 N-4):** DOM never writes or offers a ready-made approval sentence for Dvir; it states only what his line must name (the domain, the label, the method, the suite and "clears hold").
 
 - **Digits in regime codes (Dvir, 10 Oct 2026, CR-039):** a digit is allowed when it is part of a regulation name: a scout `words` piece on the `regime` list (ets2, nis2) passes intake and SPELL-1; every other digit still fails.

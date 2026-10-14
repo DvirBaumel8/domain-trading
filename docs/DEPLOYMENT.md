@@ -81,10 +81,8 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `COMPANIES_HOUSE_API_KEY` | optional: the free UK Companies House API key (Dvir registers it); unset makes the `companies` screening input UNKNOWN `SOURCE_DISABLED` |
    | `GOOGLE_WEB_RISK_API_KEY` | optional: a key restricted to the Web Risk API, from a Google project **with** billing (Lookup API only; DOM caps itself at 10,000 a month) |
    | `GEMINI_API_KEY` | optional: the outside review; a Gemini key from a **new Google AI Studio project with no billing** (free tier) |
-   | `BUFFER_API_KEY` | optional: posting to X; from publish.buffer.com/settings/api |
    | `SPACESHIP_SELLERHUB_API_KEY`, `SPACESHIP_SELLERHUB_API_SECRET` | optional: Spaceship SellerHub listing sync; an API Manager key pair with only the `sellerhub:read` and `sellerhub:write` scopes |
-   | `BUFFER_CHANNEL_ID` | optional: only if the Buffer account has more than one X channel |
-   | `PUBLIC_BASE_URL` | optional: the public base URL for post images (default `https://domain-trading-api.onrender.com`) |
+   | `PUBLIC_BASE_URL` | optional: the service's own public URL for the job queue's keep-alive ping (default `https://domain-trading-api.onrender.com`) |
 
    The blueprint already sets `APP_ENV=production`, `DATABASE_SSL=true` and
    `ENABLED_REGISTRARS=porkbun,godaddy` (the lander target is a DB setting, default `afternic`). Later pushes to `main` deploy by themselves once the `ci` workflow passes (`autoDeployTrigger: checksPass`, §Deploys below).

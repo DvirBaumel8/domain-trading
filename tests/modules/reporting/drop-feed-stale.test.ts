@@ -14,8 +14,6 @@ import { testDb as db } from '../../helpers/db.js';
 import { patchActiveSettings, screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
 import { fixture, respond } from '../../helpers/screening-fixtures.js';
 import { issueToken } from '../../helpers/tokens.js';
-import { b64, makePng, textChunk } from '../../helpers/images.js';
-import { introspectionAnswer } from '../../helpers/buffer-schema.js';
 import { mswServer } from '../../setup/network.js';
 import { seedDailyRun } from '../../helpers/db.js';
 import type { RdapLookup } from '../../../src/core/rdap.js';

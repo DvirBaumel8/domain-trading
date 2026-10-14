@@ -1,5 +1,5 @@
 // v2.15.0 (CR-013 acceptance findings F-1..F-11, Q1): the weekly rule, bot names out of the packet, the term retire route, 503 retry, key shapes,
-// plural/possessive matching, public /media/*, the review run limiter, review settings history, removed drop-list rows, an empty cohort window.
+// plural/possessive matching, the review run limiter, review settings history, removed drop-list rows, an empty cohort window.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -112,9 +112,9 @@ describe('F-2 bot names out of the packet; retiring a term (T13-4, T13-5, T13-6)
       expect(p.body.toLowerCase()).not.toContain('gavriel');
       expect(p.body).toContain('"operator"');
       // T13-5: the term still blocks text a bot sends
-      const dry = await x.post('/posts', { text: 'Hello from Gavriel', dry_run: true });
-      expect(dry.json().ok).toBe(false);
-      expect(dry.body).toContain('listed_term');
+      const doc = await x.post('/company/document', { text: 'Hello from Gavriel' });
+      expect(doc.statusCode).toBe(422);
+      expect(doc.body).toContain('listed_term');
     } finally { await x.app.close(); }
   });
 
@@ -200,16 +200,12 @@ describe('F-4 key shapes (T13-9)', () => {
     ['xapp-', () => `xapp-1-${rnd(12)}-${rnd(20)}`], ['AKIA', () => `AKIA${rnd(16, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567')}`], ['rnd_', () => `rnd_${rnd(24)}`],
     ['JWT', () => `eyJ${rnd(20)}.eyJ${rnd(30)}.${rnd(30)}`],
   ];
-  it('V215-9 T13-9: each shape is refused as secret on a post dry run and on the company document; ordinary words pass', async () => {
-    const t = await boot({ BUFFER_API_KEY: 'buf_fake_key_0123456789abcdefABCDEF', GEMINI_API_KEY: KEY });
+  it('V215-9 T13-9: each shape is refused as secret on the company document; ordinary words pass', async () => {
+    const t = await boot({ GEMINI_API_KEY: KEY });
     for (const [name, make] of shapes) {
       const key = make();
       t.clock.t += 61_000; // the write limiter allows 10 per minute
       expect(await checkText(db, `use ${key} now`), name).toEqual({ ok: false, category: 'secret' });
-      const dry = await t.post('/posts', { text: `secret ${key}`, dry_run: true });
-      expect(dry.json().ok, name).toBe(false);
-      expect(dry.body, name).toContain('secret');
-      expect(dry.body).not.toContain(key);
       const doc = await t.post('/company/document', { text: `notes ${key}` });
       expect([name, doc.statusCode, doc.json().error.details.category]).toEqual([name, 422, 'secret']);
     }
@@ -223,19 +219,6 @@ describe('F-8 term matching (T13-13)', () => {
   it('V215-10 a trailing s, es, \'s or ’s also matches; inside a longer word it does not', () => {
     for (const text of ['Shomers', "Shomer's", 'Shomer’s', 'Shomeres', 'the shomer.', '#Shomer', 'Shomer-bot']) expect(termMatches(text, 'Shomer'), text).toBe(true);
     for (const text of ['xshomerx', 'shomerish', 'shomersx', 'ashomer']) expect(termMatches(text, 'Shomer'), text).toBe(false);
-  });
-});
-
-describe('F-6 /media/* is public (T13-11)', () => {
-  it('V215-11 an unknown token of any shape is 404 NOT_FOUND without auth, and nothing is written', async () => {
-    const t = await boot();
-    const before = (await db.selectFrom('audit_log').selectAll().execute()).length;
-    for (const tok of ['abc', 'A'.repeat(43), 'x_-y', '0'.repeat(32)]) {
-      const r = await t.app.inject({ method: 'GET', url: `/media/${tok}` });
-      expect([tok, r.statusCode, r.json().error.code]).toEqual([tok, 404, 'NOT_FOUND']);
-    }
-    expect((await t.app.inject({ method: 'POST', url: '/media/abc', headers: { 'idempotency-key': 'k' } })).statusCode).toBe(401);
-    expect((await db.selectFrom('audit_log').selectAll().execute()).length).toBe(before);
   });
 });
 

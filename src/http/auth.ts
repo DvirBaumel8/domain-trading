@@ -20,11 +20,8 @@ declare module 'fastify' {
   }
 }
 
-/** Only liveness is public (no DB), plus GET /media/<token> (MEDIA_PATH). Everything else, /health included, needs a bot token (Dvir, 6 Oct 2026: bots are the only customers). */
+/** Only liveness is public (no DB). Everything else, /health included, needs a bot token (Dvir, 6 Oct 2026: bots are the only customers). */
 export const PUBLIC_PATHS: ReadonlySet<string> = new Set(['/health/ping']);
-
-/** v2.12.0: the one other public read. Buffer fetches post images from GET /media/<32 hex token> (unguessable, expires after 7 days). The whole /media/* path is public (v2.15.0): any unknown token is 404 NOT_FOUND. It writes nothing. */
-export const MEDIA_PATH = /^\/media\/.+$/;
 
 export const FAILED_AUTH_LIMIT = 20;
 export const FAILED_AUTH_WINDOW_MS = 10 * 60_000;
@@ -114,7 +111,7 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
       failed.fail(req.ip);
       throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
     };
-    if ((PUBLIC_PATHS.has(pathOf(req.url)) || MEDIA_PATH.test(pathOf(req.url))) && !isMutating(req.method)) return;
+    if (PUBLIC_PATHS.has(pathOf(req.url)) && !isMutating(req.method)) return;
     const wait = failed.blockedFor(req.ip);
     const tooMany = (): never => {
       reply.header('retry-after', String(wait));
@@ -163,13 +160,6 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
 export const INTAKE_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake', '/selection/drop-lists']);
 
 const intakeForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'An intake token may only call POST /candidates/intake and POST /selection/drop-lists');
-
-/** onRequest hook for a route that takes a big body (POST /posts): a token that cannot write is refused before the body is read or parsed (F12). */
-export async function requireWriteBeforeBody(req: { auth: AuthContext | null; jobAuth: boolean }): Promise<void> {
-  if (!req.auth || req.jobAuth) return; // unauthenticated requests were already refused 401 in the auth hook
-  if (req.auth.scope === 'intake') throw intakeForbidden();
-  if (req.auth.scope !== 'write') throw new AppError(403, 'SCOPE_FORBIDDEN', 'This token may only call GET endpoints');
-}
 
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
