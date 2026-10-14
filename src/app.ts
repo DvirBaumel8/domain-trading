@@ -35,6 +35,7 @@ import { registerDropLists } from './modules/candidates/index.js';
 import { registerCohorts } from './modules/candidates/index.js';
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
 import { registerCandidates, registerLessons, registerPatterns } from './modules/candidates/index.js';
+import { EndingsJob, registerEngine } from './modules/engine/index.js';
 import { createAdapters } from './modules/registrars/index.js';
 import type { RegistrarAdapter } from './modules/registrars/index.js';
 import { BuyService } from './modules/buying/index.js';
@@ -202,6 +203,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerPatterns(app, { db: deps.db, now: deps.now ?? Date.now });
   registerLessons(app, { db: deps.db, now: deps.now ?? Date.now });
+  registerEngine(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker, queue: () => app.jobQueue });
   registerEmails(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
@@ -225,7 +227,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention,
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention, engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }),
     outsideReview: async () => {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: (deps.now ?? Date.now)() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;

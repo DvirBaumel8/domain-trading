@@ -473,6 +473,53 @@ export interface KeywordDemandTable {
   yoy_change: string | null;
 }
 
+export interface EngineUploadsTable {
+  id: Generated<number>;
+  kind: 'sales' | 'unsold';
+  received_n: number;
+  accepted_n: number;
+  duplicate_n: number;
+  rejected_n: number;
+  rejects: Json;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+export interface EngineSalesTable {
+  id: Generated<number>;
+  domain: string;
+  price_cents: number;
+  sale_date: DateString;
+  venue: string;
+  source: string;
+  source_url: string | null;
+  upload_id: number;
+  created_at: TimestampDefault;
+}
+
+export interface EngineUnsoldTable {
+  id: Generated<number>;
+  domain: string;
+  type: 'dropped_after_held' | 'registered_unsold';
+  observation_date: DateString;
+  caught_by_catcher: boolean | null;
+  upload_id: number;
+  created_at: TimestampDefault;
+}
+
+export interface EngineEndingsTable {
+  id: Generated<number>;
+  name: string;
+  tld: 'net' | 'co' | 'org' | 'io' | 'ai';
+  registered: boolean | null;
+  created_at_registry: Timestamp | null;
+  checked_at: Timestamp;
+  http_status: number | null;
+  reason_code: string | null;
+  evidence: Json | null;
+}
+
 export interface SiblingScansTable {
   id: Generated<number>;
   domain: string;
@@ -1137,6 +1184,10 @@ export interface Database {
   sibling_scans: SiblingScansTable;
   keyword_demand_uploads: KeywordDemandUploadsTable;
   keyword_demand: KeywordDemandTable;
+  engine_uploads: EngineUploadsTable;
+  engine_sales: EngineSalesTable;
+  engine_unsold: EngineUnsoldTable;
+  engine_endings: EngineEndingsTable;
   drop_lists: DropListsTable;
   drop_list_rows: DropListRowsTable;
   drop_list_checks: DropListChecksTable;

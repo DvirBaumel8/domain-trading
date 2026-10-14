@@ -147,6 +147,7 @@ describe('attempts, timeouts, isolation', () => {
     expect(rows.intakeScreening).toMatchObject({ timeout_ms: 600_000 });
     expect(rows.buildDailyList).toMatchObject({ timeout_ms: 600_000 });
     expect(rows.backupExport).toMatchObject({ position: 16 });
+    expect(rows.engineEndings).toMatchObject({ position: 17, max_attempts: 1, timeout_ms: 25 * 60_000 });
   });
 });
 

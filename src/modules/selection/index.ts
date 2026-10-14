@@ -16,7 +16,7 @@ export { regimeDigitsOk } from './form.js';
 export { currentLists } from './lists.js';
 export { latestPackFor } from './pack.js';
 export { latestPopularity, refreshPopularity } from './popularity.js';
-export { type CachedLookup, lookupCached, Pacer, rdapBaseFor, TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS } from './rdap-batch.js';
+export { type CachedLookup, hostPacer, lookupCached, Pacer, rdapBaseFor, TEST_SET_RDAP_CONCURRENCY, TEST_SET_RDAP_MIN_MS } from './rdap-batch.js';
 export { decideReplayRow, type Decision, type LabelledFeatures } from './replay.js';
 export { activeSelectionSettings, featureChecksOf, type HoldoutCheck, LABEL_RE, selectionSettingsByLabel } from './settings.js';
 export { earlierWithTopic, normalizeTopic, TOPIC_MAX_CHARS, topicFor, type TopicEarlier } from './topic.js';

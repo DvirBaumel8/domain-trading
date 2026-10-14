@@ -1,4 +1,4 @@
-# Endpoints (contract v5.3.0)
+# Endpoints (contract v5.4.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -30,6 +30,8 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/lessons` | WRITE | Scout lessons (5.3.0) |
 | PATCH | `/lessons/{id}` | WRITE | Scout lessons (5.3.0) |
 | GET | `/lessons`, `/lessons/check`, `/lessons/report` | READ | Scout lessons (5.3.0) |
+| POST | `/engine/sales`, `/engine/unsold` | WRITE | Scoring engine data (5.4.0) |
+| GET | `/engine/health` | READ | Scoring engine data (5.4.0) |
 | GET | `/selection/settings`, `/selection/lists/{name}`, `/selection/sibling-methods/{method}`, `/selection/test-sets/{name}`, `/selection/drop-lists`, `/selection/drop-lists/{name}`, `/selection/cohorts/{name}`, `/selection/cohorts/report`, `/selection/namebio`, `/selection/sibling-scan/{domain}`, `/demand/keywords`, `/selection/replays/{id}`, `/selection/buy-hold`, `/selection/holdout-suites` | READ | Selection (`selection.md`) |
 | POST | `/selection/settings`, `/selection/settings/{label}/activate`, `/selection/lists/{name}`, `/selection/sibling-methods/{method}/approve`, `/selection/test-sets`, `/selection/test-sets/{name}/seal`, `/selection/test-sets/{name}/cancel`, `/selection/drop-lists`, `/selection/cohorts`, `/selection/sibling-scan`, `/demand/keywords`, `/selection/evaluate`, `/selection/labelled-names`, `/selection/replays`, `/selection/holdout-suites` | WRITE | Selection (`selection.md`) |
 | POST | `/screening/runs`, `/screening/runs/{id}/cancel`, `/screening/runs/{id}/manual`, `/screening/runs/{id}/verdicts`, `/quotes/manual` | WRITE | Screening |
@@ -414,6 +416,28 @@ WRITE (`Idempotency-Key` required). Body (strict, at least one key): `recheck_if
 
 ### `GET /lessons/report`
 READ. Query (strict) `month` (YYYY-MM, required; Israel calendar month of `created_at`), `format` (`json` default, or `md`). **200 JSON:** `{month, lessons_n, sectors: [{sector, lessons_n, top_rules: [{rule, count, recurring, flag?, examples: [{id, domains, lesson}]}]}], recurring: [{sector, rule, count, flag}]}`. Per sector (only those with lessons, in the order S2, S3, S4, S6, S7, cross): the top 5 rules by count (ties by rule), two example lessons each (the oldest of the month). A rule with 3 or more lessons that month has `recurring: true` and `flag` = `recurring – is the rule or the method wrong?`, and is repeated in `recurring`. `format=md` answers `text/markdown` with the same content. 400 `VALIDATION_ERROR` for a bad `month` or `format`.
+
+## Scoring engine data (5.4.0, CR-056 part 1)
+
+The data the name-scoring engine learns from: names that sold, names that did not, and, for every one of those names, whether the same name exists on .net, .co, .org, .io and .ai and since when. This release only stores and reports the data; the model, `POST /score` and training come in later releases. The service fetches nothing from marketplaces: Gavriel uploads the rows. Nothing here changes `/buy`, selection or listing, and the retention job never touches these tables.
+
+### `POST /engine/sales`
+WRITE (`Idempotency-Key` required). Body (strict) `{rows: [{domain, price_usd, sale_date, venue, source, source_url?}]}`, 1 to 20,000 rows per call (body limit 8 MB; chunks of 5,000 to 10,000 are comfortable). A rate limit of 10 writes a minute applies per token. Each row is checked on its own: a bad row is rejected with a reason and the other rows are stored.
+- `domain`: a second-level `.com` name (letters, digits, hyphens; normalised to lower case). The word-shape (regime) filter is applied at training, not here.
+- `price_usd`: a number greater than 0 and at most 100,000,000 (a numeric string such as `"1250.50"` is accepted; at most 2 decimals are kept). Stored as integer cents.
+- `sale_date`: a real `YYYY-MM-DD` day from 2000-01-01 to today (Israel day); a future date is rejected.
+- `venue` (1 to 60 characters), `source` (1 to 200), `source_url` (optional, up to 500).
+- **Duplicates:** a row for a name that already has a stored sale within 20 days of its `sale_date` (before or after, also a repeat inside the same call) is a duplicate: not stored, only counted. The first row of a call wins.
+
+**201:** `{upload_id, received_n, accepted_n, duplicate_n, rejected_n, rejects: [{row, domain, reason}], audit_id}`. `row` is the 0-based position in `rows`; `domain` is the name as normalised, or as sent when it could not be read (null for a row that is not an object); `rejects` holds the first 200. Reasons: `ROW_INVALID`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `PRICE_INVALID`, `DATE_INVALID`, `DATE_IN_FUTURE`, `VENUE_INVALID`, `SOURCE_INVALID`, `SOURCE_URL_INVALID`. `accepted_n + duplicate_n + rejected_n = received_n`. **Errors:** 422 `VALIDATION_ERROR` (no `rows`, empty, more than 20,000, an unknown key) · 400 `IDEMPOTENCY_KEY_REQUIRED` · 401 · 403 `SCOPE_FORBIDDEN` for a READ token · 413 when the body exceeds 8 MB. Repeating a call with the same `Idempotency-Key` returns the same answer and stores nothing again. The audit log records the call by its row count, not the rows.
+
+### `POST /engine/unsold`
+WRITE. Body (strict) `{rows: [{domain, type, observation_date, caught_by_catcher?}]}`, 1 to 20,000 rows. `type` is `dropped_after_held` or `registered_unsold`; `observation_date` is the day the name was seen (same date rule as `sale_date`); `caught_by_catcher` is an optional boolean. **Duplicates:** the same name with the same `observation_date` (the first row wins, whatever its `type`). Answer and errors as above; reasons: `ROW_INVALID`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `TYPE_INVALID`, `DATE_INVALID`, `DATE_IN_FUTURE`, `CAUGHT_BY_CATCHER_INVALID`.
+
+### `GET /engine/health`
+READ. `{model_version: null, data: {sales_n, unsold_n, sales_newest, unsold_newest, data_age_days: {sold, unsold}, last_upload: {sales, unsold}}, endings: {names_n, pairs_n, checked_n, unknown_n, pending_n, by_tld: {net|co|org|io|ai: {checked_n, registered_n, unknown_n, pending_n}}}}`. `sales_newest` / `unsold_newest` are the newest `sale_date` / `observation_date` (null when empty); `data_age_days` counts Israel days from that date to today (null when empty). `last_upload.sales|unsold` is `{upload_id, at, by, received_n, accepted_n, duplicate_n, rejected_n}` or null. **Endings:** `names_n` = distinct names (the part before `.com`) in the two sets; `pairs_n` = `names_n` x 5; `checked_n` = pairs whose newest registry answer says registered or not registered; `unknown_n` = pairs whose last ask got no answer (timeout, error, refusal); `pending_n` = pairs the next daily run would ask (never asked, unanswered for 6 hours, or an answer older than 30 days). `registered_n` counts the names registered on that ending. The model fields (`trained_at`, `test`, `bars_passed`, `drift`) come with the model releases; `model_version` is null until then.
+
+**The endings fill** is the daily step `engineEndings` (`jobs.md`). Per name and ending it keeps: registered or not, the registry creation date, when it was asked, the HTTP status and, for an unanswered ask, the reason. The answers are kept permanently (unlike the screening RDAP cache), so a later model can use them point-in-time: "registered on .net with a creation date before the sale".
 
 ## Sales patterns (4.0.0)
 

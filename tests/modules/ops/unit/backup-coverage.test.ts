@@ -19,6 +19,10 @@ const EXCLUDED: Record<string, string> = {
   job_steps: 'operational queue of job steps (v3.0.0); a restored database starts with an empty queue',
   portfolio_checks: 'operational daily probes (registry, lander, blocklist); recomputed by the next daily run',
   scout_lessons: 'scout lessons (v5.3.0, CR-053): mutable notes kept in a Markdown file by Gavriel too; not in the backup until asked',
+  engine_uploads: 'scoring-engine data (v5.4.0, CR-056): rebuilt from Gavriel\'s upload files; large, and the nightly export is off',
+  engine_sales: 'scoring-engine data (v5.4.0, CR-056): rebuilt from Gavriel\'s upload files; large',
+  engine_unsold: 'scoring-engine data (v5.4.0, CR-056): rebuilt from Gavriel\'s upload files; large',
+  engine_endings: 'scoring-engine registry facts (v5.4.0, CR-056): refetched from RDAP by the daily engineEndings step; large',
   api_usage: 'rate and Web Risk usage counters; operational',
 };
 

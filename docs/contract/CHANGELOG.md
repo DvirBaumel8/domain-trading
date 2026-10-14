@@ -2,6 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.4.0 (2026-10-14): CR-056 part 1: engine data (POST /engine/sales, /engine/unsold, GET /engine/health, daily engineEndings RDAP fill)
+Release note: `docs/releases/v5.4.0.md`.
+MINOR (additive). Gavriel, CR-056 (Dvir approved the build on 14 Oct 2026): the data side of the name-scoring engine.
+- `POST /engine/sales` and `POST /engine/unsold` (WRITE): up to 20,000 rows a call; counts of accepted, duplicate and rejected rows with reasons; sales within 20 days of a stored sale of the same name are duplicates; an unsold name is a duplicate by name and observation date.
+- `GET /engine/health` (READ): data counts, newest dates, data age, last uploads and the progress of the endings fill; `model_version` is null until the model release.
+- Daily job: new last step `engineEndings` (RDAP only): the same name's registration and creation date on .net, .co, .org, .io, .ai, filled in chunks across nights and kept permanently.
+- New tables `engine_uploads`, `engine_sales`, `engine_unsold` (append-only), `engine_endings` (migration `1763800000000_v5-4-0.sql`); not in the backup export, not touched by retention.
+- Release numbers: CR-056's model is now 5.5.0 and its health/drift release 5.6.0 (CR-057 took 5.2.0).
+
 ## 5.3.0 (2026-10-14): CR-053: scout lessons store (POST/GET/PATCH /lessons, /lessons/check, /lessons/report)
 Release note: `docs/releases/v5.3.0.md`.
 MINOR (additive). Gavriel, CR-053 (asked by Dvir): the scouts' lessons live in DOM, so a dead end is not rediscovered.

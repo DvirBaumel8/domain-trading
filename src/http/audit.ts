@@ -45,6 +45,12 @@ function elideFile(b: Record<string, unknown> | null): Record<string, unknown> |
   return { ...b, file_base64: `[base64, ${b.file_base64.length} characters]` };
 }
 
+/** An engine upload (up to 20,000 rows) is recorded by its row count: the rows live in engine_sales / engine_unsold, the counts in engine_uploads. */
+function elideRows(b: Record<string, unknown> | null, url: string): Record<string, unknown> | null {
+  if (b === null || !url.startsWith('/engine/') || !Array.isArray(b.rows) || b.rows.length <= 20) return b;
+  return { ...b, rows: `[${b.rows.length} rows]` };
+}
+
 function bodyObject(req: FastifyRequest): Record<string, unknown> | null {
   const b = req.body;
   return b !== null && typeof b === 'object' && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
@@ -81,7 +87,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
   app.addHook('onSend', async (req, reply, payload) => {
     // Bots only (Dvir, 6 Oct 2026): a request that never authenticated writes nothing.
     if (!req.auditId || (!req.auth && !req.jobAuth)) return payload;
-    const body = elideFile(bodyObject(req));
+    const body = elideRows(elideFile(bodyObject(req)), req.url);
     const approval = extractApproval(body);
     const replayed = reply.getHeader('idempotent-replayed') === 'true';
     const summary = req.auditSummary ?? summarize(reply.statusCode, payload);

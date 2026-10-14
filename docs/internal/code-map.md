@@ -5,7 +5,7 @@ Where things live, so a change request goes straight to the right files. Paths a
 ## 1. How to use this map
 
 - Find the module (section 2), then the file, then its test file. Use section 3 ("Where do I change X?") for the usual change types.
-- Other code may import a module only through its `index.ts` (`tests/unit/module-boundaries.test.ts`). Graph: registrars <- listing <- selection <- buying <- candidates; selling <- reporting <- outreach; ops on top.
+- Other code may import a module only through its `index.ts` (`tests/unit/module-boundaries.test.ts`). Graph: registrars <- listing <- selection <- buying <- candidates; selection <- engine (v5.4.0); selling <- reporting <- outreach; ops on top.
 - Run only the affected tests locally: `npx vitest run tests/modules/<module>/<file>.test.ts` (pure tests: `tests/modules/<module>/unit/`). API tests need Postgres (`npm run db:up`). CI runs the full suite on push.
 - Before commit still run `npx tsc --noEmit && npm run build` (the gate in CLAUDE.md).
 - Test files sit under the module they cover and are named by feature (`tests/modules/candidates/screen.test.ts`, `outreach/review-run.test.ts`), never by release. Test IDs (T21-1, AC-6, V214-5, ...) are part of the test names, so docs refer to IDs. To find the tests for a route, `grep -l "<path>" -r tests/modules`. Paths in the "Tests" columns below are relative to `tests/modules/` (a `unit/` entry is a pure test).
@@ -144,6 +144,21 @@ Intake of candidate names, on-demand screening, the daily list, drop lists, coho
 
 Tables (v4.0.0 patterns tests: `candidates/patterns`; v5.3.0 `scout_lessons`, tests `candidates/lessons` LS-1..LS-8): `candidate_intake`, `candidate_screenings`, `daily_candidate_lists`, `drop_lists`, `drop_list_rows`, `cohorts`, `cohort_names`, `cohort_decisions` (`drop_list_checks`, `cohort_outcomes` written by ops jobs). Tests: `tests/modules/candidates/` (`intake`, `intake-resume`, `intake-rules`, `screen`, `screen-domains`, `screen-force`, `scout-split`, `lane-fit`, `daily-list`, `daily-list-fields`, `daily-list-rebuild`, `daily-list-rejected`, `drop-lists`, `cohorts`, `cohorts-freeze`, `cohort-settings`).
 
+### engine
+v5.4.0 (CR-056 part 1): data for the name-scoring engine. Rules and plan: `docs/internal/engine.md`. Imports `selection` (RDAP helpers); nothing in selection, buying or candidates imports it; ops runs its job through `JobRunnerDeps.engineEndingsJob`.
+
+| Route | File |
+|---|---|
+| POST /engine/sales, POST /engine/unsold, GET /engine/health | `engine/api/engine.ts` (`registerEngine`; 8 MB body limit; the audit log keeps the row count only, `elideRows` in `src/http/audit.ts`) |
+
+| File | Inside |
+|---|---|
+| `uploads.ts` | `storeSales`, `storeUnsold`, `parseSaleRow`, `parseUnsoldRow` (per-row reject reasons), `SALE_DEDUPE_DAYS`, `ENGINE_MAX_ROWS`; one transaction under the `engine_upload` lock |
+| `endings.ts` | `EndingsJob` (daily step `engineEndings`: due pairs, per-host pacing with `hostPacer`, writes `engine_endings`), `endingsHealth`, `ENDINGS_*` constants |
+| `health.ts` | `engineHealth` (GET /engine/health) |
+
+Tables: `engine_uploads`, `engine_sales`, `engine_unsold` (append-only), `engine_endings` (migration `1763800000000_v5-4-0.sql`; not in the backup, not in retention). Tests: `tests/modules/engine/` (`uploads` EN-1..EN-10, `endings` EN-11..EN-20); step order in `tests/modules/ops/jobs.test.ts`.
+
 ### selling
 Offers (record, classify, outcome), sold records, offer stats.
 
@@ -252,7 +267,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 37 files). Run with `npm run migrate`.
+`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763800000000_v5-4-0.sql`: engine_uploads, engine_sales, engine_unsold, engine_endings; before it `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 37 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -273,6 +288,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Add a screening check | new `selection/checks/<id>.ts`; register in `checks/index.ts` (`CHECKS`, `GATE_OF`); `selection/settings.ts` (`CHECK_IDS`, gates per lane); `selection/types.ts` (`CheckId`); `selection/depends.ts`; `docs/contract/selection.md` | new `tests/modules/selection/screening-<id>.test.ts` (see `screening-same-name`), `selection/unit/screening-*` |
 | Change what a screening pack requires | `selection/pack.ts` (`assessPack`, `requiredChecks`), `selection/settings.ts` (`PACK_DEFAULT`) | `selection/unit/pack-assess`, `selection/screening-packs` |
 | Change seller-page checks | `selection/sellers.ts`, `selection/site.ts` | `selection/unit/sellers`, `site-classify`, `selection/sellers`, `seller-fetch` |
+| Change the engine uploads or the endings fill | `engine/uploads.ts`, `engine/endings.ts`, `engine/health.ts`; document in `docs/contract/endpoints.md` (Scoring engine data) and `jobs.md` | `engine/uploads`, `engine/endings` |
 | Add a step to the daily job | `ops/jobs/runner.ts` (`plan()`, `JobRunnerDeps`, `STEP_ATTEMPTS`), new job class under `ops/jobs/`, export in `ops/index.ts`, wire in `src/app.ts`; document in `docs/contract/jobs.md` | `ops/unit/jobs-runner-config`, `ops/jobs`, `job-queue`, `daily-schedule` |
 | Change the daily/overdue schedule view | `reporting/job-runs.ts` (`dailyScheduleState`, `jobsOverdue`) | `ops/jobs`, `missed-runs` |
 | Change the outside review | `outreach/review/*.ts` (`run.ts`, `packet.ts`, `gemini.ts`), `outreach/api/reviews.ts` | `outreach/review-packet`, `review-run`, `review-settings`, `outreach/unit/review-pure` |
