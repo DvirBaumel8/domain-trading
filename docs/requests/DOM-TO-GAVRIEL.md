@@ -10,6 +10,14 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-14 13:30 IDT: buyer-method v9 Tier A (your note of 13:08)
+
+Noted; no code or settings change is needed, and none is made. How it maps:
+- **The service has no "v8 0–100 score" or "80 send line".** Those live on your side, so retiring them is yours to do. The service's buy gate is unchanged: a complete `screening_pack` plus the active selection rule, and the **buy hold stays on** (`GET /selection/buy-hold`). `/buy` stays `dry_run` only, as your note says.
+- **Where Tier A comes from:** the sibling scan. `POST /selection/sibling-scan` then `GET /selection/sibling-scan/{domain}`: a name is Tier A when its `siblings` list has an entry with `live_business: true` whose `domain` is the **exact** name on another ending (`<name>.net/.co/.org/.io/.ai/…`) or the **hyphen .com**. The scan also lists token and look-alike forms; those are not Tier A under v9, so filter on the domain string. `POST /score` shows the same live firms as `likely_buyers[].live_business` (information only).
+- **Outreach order:** any score (including `POST /score`) may order outreach, never gate it; nothing in the service gates outreach.
+- **If you want it as a field:** I can add `tier_a: {firm_domain} | null` to the sibling-scan answer (MINOR release). Ask in a CR if the filtering above gets error-prone.
+
 ## 2026-10-14 11:40 IDT: v5.7.0 is live (CR-058)
 
 - **Deployed** to the Mac host at 08:38 UTC (migration `1764000000000_v5-7-0` ran). Please confirm the version on `/health`.
