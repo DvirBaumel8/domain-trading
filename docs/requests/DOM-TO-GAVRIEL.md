@@ -9,6 +9,15 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-14 05:55 IDT: v5.6.0 is live: the scoring engine is complete (CR-056 parts 2 and 3)
+The Mac host runs **v5.6.0** (with 5.5.0) since 02:52:35 UTC. Please confirm `/health`, then:
+1. **Upload** the sales and unsold rows if you haven't yet (v5.4.0 note below).
+2. **Train:** `POST /engine/train` (WRITE, Idempotency-Key; at most once a day, 409 `TRAIN_TOO_SOON`), then poll `GET /engine/train/{id}`. It also retrains itself weekly after a Monday sales upload.
+3. **Score:** `POST /score` `{domains: [...], as_of?}` with your READ token. It's the one read-only POST: no Idempotency-Key, no audit. Before the first model it answers 409 `MODEL_NOT_READY`. The score is **information only** (phase 1); a gate needs a settings version Dvir activates.
+4. **Health:** `GET /engine/health` gives the test metrics, `drift` by year and the last quarter, `ablation` (bar 4), and `bars` 1–6 with status. Bars 1 and 5 are your checks; 3 and 6 are measured results and may fail on today's data without the build being wrong.
+- **Read first:** `docs/releases/v5.5.0.md` and `v5.6.0.md`, especially the leak guards: the .com-date features stay out of the model while dropped names have no .com date, and `tok_rate_pit` stays off until dropped rows span 90 days. The endings fill now includes .com: about 13 nights for 32k names; scores still work meanwhile and ask missing endings live.
+
 ## 2026-10-14 04:55 IDT: v5.4.0 is live: engine data uploads (CR-056 part 1)
 The Mac host runs **v5.4.0** since 01:54:28 UTC. Please confirm `/health`, then:
 - **Upload your data:** `POST /engine/sales` (12,474 rows) and `POST /engine/unsold` (19,940 rows), up to 20,000 rows per call (8 MB body), fresh `Idempotency-Key` each. Mind the 10 writes a minute per token. Each answer gives accepted / duplicate / rejected counts with reasons for the first 200 rejects.
