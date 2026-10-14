@@ -1,4 +1,4 @@
-# Endpoints (contract v5.2.0)
+# Endpoints (contract v5.3.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -27,6 +27,9 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | GET | `/outreach/emails/summary` | READ | Outreach log (4.0.0) |
 | POST | `/patterns/sales` | WRITE | Sales patterns (4.0.0) |
 | GET | `/patterns/latest` | READ | Sales patterns (4.0.0) |
+| POST | `/lessons` | WRITE | Scout lessons (5.3.0) |
+| PATCH | `/lessons/{id}` | WRITE | Scout lessons (5.3.0) |
+| GET | `/lessons`, `/lessons/check`, `/lessons/report` | READ | Scout lessons (5.3.0) |
 | GET | `/selection/settings`, `/selection/lists/{name}`, `/selection/sibling-methods/{method}`, `/selection/test-sets/{name}`, `/selection/drop-lists`, `/selection/drop-lists/{name}`, `/selection/cohorts/{name}`, `/selection/cohorts/report`, `/selection/namebio`, `/selection/sibling-scan/{domain}`, `/demand/keywords`, `/selection/replays/{id}`, `/selection/buy-hold`, `/selection/holdout-suites` | READ | Selection (`selection.md`) |
 | POST | `/selection/settings`, `/selection/settings/{label}/activate`, `/selection/lists/{name}`, `/selection/sibling-methods/{method}/approve`, `/selection/test-sets`, `/selection/test-sets/{name}/seal`, `/selection/test-sets/{name}/cancel`, `/selection/drop-lists`, `/selection/cohorts`, `/selection/sibling-scan`, `/demand/keywords`, `/selection/evaluate`, `/selection/labelled-names`, `/selection/replays`, `/selection/holdout-suites` | WRITE | Selection (`selection.md`) |
 | POST | `/screening/runs`, `/screening/runs/{id}/cancel`, `/screening/runs/{id}/manual`, `/screening/runs/{id}/verdicts`, `/quotes/manual` | WRITE | Screening |
@@ -388,6 +391,29 @@ WRITE. Body (strict) `{domain, recipient_domain, sent_at (ISO with an offset, no
 
 ### `GET /outreach/emails/summary`
 READ. `{emails, replies, sales_after_outreach, replies_per_100_emails, sales_per_100_emails, max_emails_per_name, names: [{domain, emails, replies, sold_after_outreach, at_cap}]}`. A sale counts when it happened at or after the name's first logged email. The rates are `null` before the first email.
+
+## Scout lessons (5.3.0)
+
+The scouts keep what they learn from rejected near-misses here, so the same dead end is not rediscovered (CR-053). One row is one pattern (`sector` + `rule`) with the names it was seen on. It is not a funnel and keeps no conversion numbers; it changes nothing in `/buy`, selection or scoring, and the scouts decide what a lesson means. The service writes nothing into the repository: Gavriel commits what the report returns. Rows are editable (not append-only), every write is audited, and the table is not in the backup export.
+
+### `POST /lessons`
+WRITE (`Idempotency-Key` required). Body (strict): one lesson or an array of 1 to 200. A lesson is `{scout (tzofeh-geo | rules | signals | drops | other; default other), sector (S2 | S3 | S4 | S6 | S7 | cross; required), rule (1 to 20 characters, stored lowercased; required), lesson (1 to 300 characters; required), domain (a string, several names comma-separated), domains (an array, at most 50; both may be sent, the names are joined), recheck_if (1 to 200 characters; default `never`), source_file (up to 200 characters, optional)}`. Every name goes through the domain normaliser (lowercase, a second-level `.com`); one bad name rejects the whole call and nothing is stored. The names are stored as a `domains` array. A lesson with no name is stored as given and never merges.
+
+**Merge:** a lesson with the same `sector` and `rule`, a name that overlaps a stored lesson, and that stored lesson not superseded, is not stored again. The call returns the stored id with `merged: true`, adds the names to its `domains`, sets `recheck_if` to the new value, appends the new `lesson` text to the row's `notes` (`{at, lesson}`, dated; skipped when the text equals the row's text or a note; at most 20, the oldest drops) and keeps the row's `scout`. The oldest matching row wins. The array is merged in order, in one transaction, so a duplicate inside one call merges too.
+
+**201:** `{results: [{id (les_<hex>), merged}] (same order as the input), audit_id}`. **Errors:** 422 `VALIDATION_ERROR` (missing `sector`, `rule` or `lesson`, a value outside the lists, a text over its length, an unknown key, an empty array or more than 200; `details.issues[]`) · 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED` · 400 `IDEMPOTENCY_KEY_REQUIRED` · 403 `SCOPE_FORBIDDEN` for a READ token. A rate limit of 10 writes a minute applies per token, so import many lines as arrays.
+
+### `GET /lessons`
+READ. Query (strict, every field optional): `sector`, `since` (YYYY-MM-DD, from 00:00 Israel time that day), `rule` (case-insensitive), `q` (case-insensitive substring of the lesson, its notes or its names), `limit` (default 200, max 1,000). Newest first. **200:** `{count, lessons: [Lesson]}` where a Lesson is `{id, created_at, updated_at, scout, sector, domains, rule, lesson, notes [{at, lesson}], recheck_if, source_file, superseded_by, created_by}`. 400 `VALIDATION_ERROR` for a bad query.
+
+### `GET /lessons/check`
+READ. Query `domain` (one name, normalised). **200:** `{domain, count, lessons: [Lesson]}`: every lesson naming it, superseded ones included (read `superseded_by`), newest first. 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED`.
+
+### `PATCH /lessons/{id}`
+WRITE (`Idempotency-Key` required). Body (strict, at least one key): `recheck_if` (1 to 200), `lesson` (1 to 300), `superseded_by` (the id of another lesson, or `null` to clear). Nothing else can be changed. **200:** `{lesson: Lesson, audit_id}`. **Errors:** 404 `LESSON_NOT_FOUND` · 422 `VALIDATION_ERROR` (an unknown key, an empty body, `superseded_by` naming no lesson or the lesson itself).
+
+### `GET /lessons/report`
+READ. Query (strict) `month` (YYYY-MM, required; Israel calendar month of `created_at`), `format` (`json` default, or `md`). **200 JSON:** `{month, lessons_n, sectors: [{sector, lessons_n, top_rules: [{rule, count, recurring, flag?, examples: [{id, domains, lesson}]}]}], recurring: [{sector, rule, count, flag}]}`. Per sector (only those with lessons, in the order S2, S3, S4, S6, S7, cross): the top 5 rules by count (ties by rule), two example lessons each (the oldest of the month). A rule with 3 or more lessons that month has `recurring: true` and `flag` = `recurring – is the rule or the method wrong?`, and is repeated in `recurring`. `format=md` answers `text/markdown` with the same content. 400 `VALIDATION_ERROR` for a bad `month` or `format`.
 
 ## Sales patterns (4.0.0)
 
@@ -804,6 +830,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Screening errors:** `RUN_NOT_RUNNING` (409, the cancel routes, 2.9.0), `RUN_RUNNING` (409, `POST /screening/packs`), `PACK_NOT_FOUND` (404, `GET /screening/packs/{id}`), `JUDGED_AT_INVALID` (422, `POST /screening/packs`), `MANUAL_REQUIRED` (409, `POST /tranches/{id}/members`), `DRAFT_NOT_ALLOWED_LIVE`, `AS_OF_LIVE_REFUSED`, `RUN_NOT_FOUND`, `NAME_NOT_IN_RUN`, `CHECK_NOT_MANUAL`, `EVIDENCE_NOT_FOUND`, `OBSERVED_AT_INVALID`, `CHECKED_AT_INVALID`, `VERDICT_RESULT_NOT_FLAG`, `VERDICT_RESULT_STALE`, `RESULT_NOT_FOUND`, `DECIDED_AT_INVALID` (1.2.0), `REGISTRAR_UNKNOWN` (and `REGISTRAR_NOT_ALLOWED`; and `SETTINGS_NOT_FOUND`, `VALIDATION_ERROR`). Result reason codes are in `selection.md` §Screening runs.
 
 **Tranche errors:** `TRANCHE_NOT_FOUND` (404; also on a screening run), `TRANCHE_ALREADY_OPEN`, `TRANCHE_NAME_TAKEN`, `TRANCHE_CLOSED`, `TRANCHE_FULL`, `GEO_CAP`, `TRANCHE_BELOW_TARGET`, `MAIN_LANE_QUOTA`, `NOT_SCREENED_OK`, `MEMBER_NOT_FOUND` (and `NAME_NOT_IN_RUN`, `RUN_NOT_FOUND`, `DOMAIN_INVALID`, `VALIDATION_ERROR`).
+
+**Scout lesson errors (5.3.0):** `LESSON_NOT_FOUND` (404, `PATCH /lessons/{id}`).
 
 **Portfolio, outreach and pattern errors (4.0.0):** `EMAIL_CAP` (409, `POST /outreach/emails`), `PATTERN_CSV_INVALID` (422), `NO_PATTERN_UPLOAD` (404), `MAX_ONE_RENEWAL_USED` (422, `POST /portfolio/{domain}/horizon`), `LTO_NOT_ALLOWED` (422, also from `/buy` and `POST /list/{domain}` on a trend, regulation or first-expiry name), `DOMAIN_CAP_REACHED` (now 40 names).
 

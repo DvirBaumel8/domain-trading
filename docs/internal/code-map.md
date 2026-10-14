@@ -131,6 +131,7 @@ Intake of candidate names, on-demand screening, the daily list, drop lists, coho
 |---|---|
 | POST /candidates/intake, POST /candidates/screen, GET /candidates/daily, POST /candidates/daily/rebuild, GET/POST /candidates/:domain/records | `candidates/api/candidates.ts` |
 | POST /patterns/sales, GET /patterns/latest (v4.0.0, CR-044 item 4) | `candidates/api/patterns.ts` (`registerPatterns`; logic `candidates/patterns.ts`: `parseSalesCsv`, `storeSales`, `clusterSales`; the split is `bt1@v3` via `selection` `loadSplitV2`/`splitClasses`) |
+| POST/GET/PATCH /lessons, GET /lessons/check, GET /lessons/report (v5.3.0, CR-053) | `candidates/api/lessons.ts` (`registerLessons`, called from `src/app.ts`; logic `candidates/lessons.ts`: `addLessons` (merge rule, one transaction, advisory lock), `listLessons`, `lessonsForDomain`, `patchLesson`, `lessonReport`, `reportMarkdown`; table `scout_lessons`, mutable, not in the backup export, not touched by retention) |
 | POST/GET /selection/drop-lists, GET /selection/drop-lists/:name | `candidates/api/drop-lists.ts` |
 | POST /selection/cohorts, GET /selection/cohorts/report, GET /selection/cohorts/:name | `candidates/api/cohorts.ts` |
 
@@ -141,7 +142,7 @@ Intake of candidate names, on-demand screening, the daily list, drop lists, coho
 | `drop-lists.ts` | drop-list helpers (`watchStatusOf`, `freshLookups`, `retentionCutoff`, constants) |
 | `cohorts.ts` | `freezeReadyCohorts`, `FINAL_DROP`, `REREG_DAYS` |
 
-Tables (v4.0.0 patterns tests: `candidates/patterns`): `candidate_intake`, `candidate_screenings`, `daily_candidate_lists`, `drop_lists`, `drop_list_rows`, `cohorts`, `cohort_names`, `cohort_decisions` (`drop_list_checks`, `cohort_outcomes` written by ops jobs). Tests: `tests/modules/candidates/` (`intake`, `intake-resume`, `intake-rules`, `screen`, `screen-domains`, `screen-force`, `scout-split`, `lane-fit`, `daily-list`, `daily-list-fields`, `daily-list-rebuild`, `daily-list-rejected`, `drop-lists`, `cohorts`, `cohorts-freeze`, `cohort-settings`).
+Tables (v4.0.0 patterns tests: `candidates/patterns`; v5.3.0 `scout_lessons`, tests `candidates/lessons` LS-1..LS-8): `candidate_intake`, `candidate_screenings`, `daily_candidate_lists`, `drop_lists`, `drop_list_rows`, `cohorts`, `cohort_names`, `cohort_decisions` (`drop_list_checks`, `cohort_outcomes` written by ops jobs). Tests: `tests/modules/candidates/` (`intake`, `intake-resume`, `intake-rules`, `screen`, `screen-domains`, `screen-force`, `scout-split`, `lane-fit`, `daily-list`, `daily-list-fields`, `daily-list-rebuild`, `daily-list-rejected`, `drop-lists`, `cohorts`, `cohorts-freeze`, `cohort-settings`).
 
 ### selling
 Offers (record, classify, outcome), sold records, offer stats.

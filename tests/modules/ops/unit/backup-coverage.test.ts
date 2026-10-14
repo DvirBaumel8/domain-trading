@@ -18,6 +18,7 @@ const EXCLUDED: Record<string, string> = {
   job_queue_runs: 'operational queue of job runs (v3.0.0); the finished run is in job_runs',
   job_steps: 'operational queue of job steps (v3.0.0); a restored database starts with an empty queue',
   portfolio_checks: 'operational daily probes (registry, lander, blocklist); recomputed by the next daily run',
+  scout_lessons: 'scout lessons (v5.3.0, CR-053): mutable notes kept in a Markdown file by Gavriel too; not in the backup until asked',
   api_usage: 'rate and Web Risk usage counters; operational',
 };
 

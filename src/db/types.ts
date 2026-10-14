@@ -416,6 +416,22 @@ export interface HoldoutTable {
   delta: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>;
 }
 
+export interface ScoutLessonsTable {
+  id: string;
+  created_at: TimestampDefault;
+  updated_at: TimestampDefault;
+  scout: string;
+  sector: string;
+  domains: string[];
+  rule: string;
+  lesson: string;
+  notes: ColumnType<unknown, string | undefined, string>;
+  recheck_if: string;
+  source_file: string | null;
+  superseded_by: string | null;
+  created_by: string;
+}
+
 export interface SalesPatternUploadsTable {
   id: Generated<number>;
   uploaded_at: TimestampDefault;
@@ -1114,6 +1130,7 @@ export interface Database {
   portfolio_stats: PortfolioStatsTable;
   outreach_emails: OutreachEmailsTable;
   holdout: HoldoutTable;
+  scout_lessons: ScoutLessonsTable;
   sales_pattern_uploads: SalesPatternUploadsTable;
   sales_pattern_rows: SalesPatternRowsTable;
   listing_sync_log: ListingSyncLogTable;

@@ -7,3 +7,4 @@ export { autoRebuildDailyList, BuildDailyListJob, buildWhy } from './daily-list.
 export { daysBetween, DROP_WATCH_MAX_PER_RUN, freshLookups, isPendingDelete, LEFTOVER_RECHECK_DAYS, MAX_UNKNOWN_CHECKS, retentionCutoff, watchStatusOf } from './drop-lists.js';
 export { IntakeScreeningJob } from './intake.js';
 export { registerPatterns } from './api/patterns.js';
+export { registerLessons } from './api/lessons.js';

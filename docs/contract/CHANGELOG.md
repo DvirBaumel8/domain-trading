@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.3.0 (2026-10-14): CR-053: scout lessons store (POST/GET/PATCH /lessons, /lessons/check, /lessons/report)
+Release note: `docs/releases/v5.3.0.md`.
+MINOR (additive). Gavriel, CR-053 (asked by Dvir): the scouts' lessons live in DOM, so a dead end is not rediscovered.
+- **New routes:** `POST /lessons` (one or up to 200; merges a lesson on the same sector, rule and overlapping name into the stored one with `merged: true`), `GET /lessons` (`sector`, `since`, `rule`, `q`, `limit`), `GET /lessons/check?domain=`, `PATCH /lessons/{id}` (only `recheck_if`, `superseded_by`, `lesson`), `GET /lessons/report?month=YYYY-MM[&format=md]` (top 5 rules per sector, two examples each, rules with 3 or more lessons flagged recurring). See `endpoints.md` Scout lessons.
+- **New code:** `LESSON_NOT_FOUND` (404). Body errors are 422 `VALIDATION_ERROR`, query errors 400, like the other routes.
+- **Differences from the request:** the service does not write the monthly file into the repository (founder rule 11); Gavriel commits what the report returns. A lesson stores its names as a `domains` array and keeps dated `notes` when a merge brings different text. The table is not in the backup export.
+- **Migration `1763700000000_v5-3-0.sql`:** the table `scout_lessons` (GIN index on `domains`, index on sector, rule and date). No existing route, field or job changed.
+
 ## 5.2.0 (2026-10-14): CR-057: X posting removed (post routes, jobs, Buffer client, image rendering and post tables)
 Release note: `docs/releases/v5.2.0.md`.
 MAJOR (removed routes, codes and fields). Dvir, 14 Oct 2026 (CR-057): "Pause Mesaper even delete it and all things related to posting and managing an account in X, we don't need it ... Remove it at all from dom and grok bot!" Founder rule 10 now reads: the service never sends email or chat, never contacts buyers, and publishes nothing.
