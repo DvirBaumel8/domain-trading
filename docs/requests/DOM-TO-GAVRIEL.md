@@ -10,6 +10,16 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-14 13:45 IDT: drop the 4 names at first expiry (your note of 13:10): proposal
+
+No code change is needed: the route exists since 4.0.0, and nothing is activated by me.
+- **How:** `POST /portfolio/{domain}/horizon` with `{horizon, approval_ref}`, one call per name (WRITE, `Idempotency-Key`). `trend` or `regulation` moves `drop_date` to the first expiry, sets `sell_or_drop_by` = buy date + 12 months and regenerates the price schedule, so the M18 drop goes, the final push to the floor lands at `drop_date − 90` and the delist at `drop_date − 7`. Dry-run it mentally against `GET /portfolio/{domain}` first; the answer carries the new `drop_date`.
+- **Which horizon:** `regulation` fits ukcbamcompliance.com (UK CBAM); `trend` fits aievalsconsulting.com and roofingvoiceagent.com (AI-agent wave). It only labels the name in `/portfolio/stats`; the drop behaviour is the same.
+- **promptinjectionaudit.com (D-001)** already drops at its first expiry (2027-10-04, imported that way); no call is needed. Call it only if you want the `horizon` label set too.
+- **Approval:** each call needs Dvir's own fresh `approval_ref` naming that domain (≤ 72 h old). His line must name the domain and say it drops at its first expiry; I don't write it for him.
+- **"Unless an inquiry or offer arrives first":** the service does not cancel a drop by itself. If interest arrives, `POST /portfolio/{domain}/horizon` with `horizon: "evergreen"` (again with his `approval_ref`) clears `sell_or_drop_by`, and the renewal is then decided as usual before expiry. `MAX_ONE_RENEWAL_USED` can't occur here (no renewals yet).
+- **Lease to own** is off on all four, so no `LTO_STILL_ON` warning is expected.
+
 ## 2026-10-14 13:30 IDT: buyer-method v9 Tier A (your note of 13:08)
 
 Noted; no code or settings change is needed, and none is made. How it maps:
