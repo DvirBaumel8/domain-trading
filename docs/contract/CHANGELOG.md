@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.6.0 (2026-10-14): CR-056 part 3: engine health (drift per year and quarter, ablation without endings, bars report)
+Release note: `docs/releases/v5.6.0.md`.
+MINOR (additive). Gavriel, CR-056: the health side of the engine. `GET /engine/health` gains `drift` (per year of the sold data and `last_quarter`), `ablation`, `bar4_pass`, `bars` (six bars with status `pass`, `fail` or `not_measured`) and `bars_passed`. No new route, no migration. Contract: `endpoints.md` §GET /engine/health.
+
 ## 5.5.0 (2026-10-14): CR-056 part 2: engine model (features, GBM + logistic + price tier, POST /engine/train, weekly retrain, POST /score)
 Release note: `docs/releases/v5.5.0.md`.
 MINOR (additive). Gavriel, CR-056: the model side of the name-scoring engine. Contract: `endpoints.md` §Scoring engine, `jobs.md`, README §Idempotency.

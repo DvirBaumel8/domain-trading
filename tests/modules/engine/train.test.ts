@@ -198,7 +198,7 @@ describe('engine training', () => {
     expect(h.test.auc95).toHaveLength(2);
     expect(['unweighted', 'half_life_12m']).toContain(h.chosen_weighting);
     expect(h.last_training).toMatchObject({ train_id: 'eng-1.0.1', status: 'done' });
-    expect(h).not.toHaveProperty('drift'); expect(h).not.toHaveProperty('bars_passed'); // 5.6.0
+    expect(h).toHaveProperty('drift'); expect(h).toHaveProperty('bars_passed'); // 5.6.0 (details in health.test.ts)
   });
 });
 

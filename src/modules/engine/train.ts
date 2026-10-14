@@ -7,8 +7,9 @@ import { advisoryXactLock } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 import { baseSplitTable, loadDemand, loadEndings, loadExtraTerms, loadSales, loadUnsold, tokenContext, unsoldSpanDays, UNSOLD_DATED_DAYS } from './data.js';
+import { computeDrift } from './drift.js';
 import { buildDataset, DataError, type EngineDataset, type Row } from './dataset.js';
-import { COM_FEATURES, computeFeatures, extendedTable, FEATURE_NAMES, sldOf, toVector, type FeatureContext, type FeatureName } from './features.js';
+import { COM_FEATURES, computeFeatures, ENDING_FEATURE_TLDS, extendedTable, FEATURE_NAMES, sldOf, toVector, type FeatureContext, type FeatureName } from './features.js';
 import { fitGbm, gbmPredictAll, gbmProba, type GbmModel, type GbmParams } from './model/gbm.js';
 import { fitLogit, logitProba, type LogitModel } from './model/logit.js';
 import { auc, aucWithCi, precisionAtBaseRate, precisionAtTop, quantiles101 } from './model/metrics.js';
@@ -224,6 +225,24 @@ export class EngineTrainer {
     const useW = aucW !== null && aucU !== null && aucW >= aucU + RECENCY_MIN_GAIN;
     const gbm = useW ? gbmW : gbmU;
     const scores = useW ? scoresW : scoresU;
+    const ci0 = aucWithCi(scores, yte, seedOf(`${seed}:bootstrap`), this.deps.bootstrapResamples ?? BOOTSTRAP_RESAMPLES);
+    // ablation (bar 4): the same GBM (same frozen split, same weighting) without the ending features
+    const endingCols = new Set<string>([...ENDING_FEATURE_TLDS.map((t) => `${t}_pit`), 'n_endings_pit']);
+    const keepIdx = features.map((f, i) => (endingCols.has(f) ? -1 : i)).filter((i) => i >= 0);
+    let ablation: { auc_without_endings: number | null; auc95: [number, number] | null; delta: number | null; p_top1_at_1pct_base: number | null; removed: string[]; features_kept: number } | null = null;
+    if (keepIdx.length > 0 && keepIdx.length < F) {
+      const sub = (X: Float64Array, n: number): Float64Array => { const o = new Float64Array(n * keepIdx.length); for (let i = 0; i < n; i++) keepIdx.forEach((c, k) => { o[i * keepIdx.length + k] = X[i * F + c]!; }); return o; };
+      const Fa = keepIdx.length;
+      const gbmA = await fitGbm({
+        X: sub(Xtr, trainRows.length), n: trainRows.length, F: Fa, y: ytr, w: useW ? w : null, classes: 2, featureNames: keepIdx.map((i) => features[i]!), seed: seedOf(`${seed}:${useW ? 'gbm-w' : 'gbm'}`), params: this.deps.gbmParams, yieldFn: yieldTurn, expired,
+      });
+      const scoresA = gbmPredictAll(gbmA, sub(Xte, testRows.length), testRows.length, Fa);
+      const ciA = aucWithCi(scoresA, yte, seedOf(`${seed}:bootstrap`), this.deps.bootstrapResamples ?? BOOTSTRAP_RESAMPLES);
+      ablation = {
+        auc_without_endings: ciA.auc, auc95: ciA.ci, delta: ciA.auc === null || ci0.auc === null ? null : round4(ci0.auc - ciA.auc),
+        p_top1_at_1pct_base: precisionAtBaseRate(scoresA, yte, 0.01, 100), removed: features.filter((f) => endingCols.has(f)), features_kept: Fa,
+      };
+    }
     const logit = fitLogit({ X: Xtr, n: trainRows.length, F, y: ytr, featureNames: [...features] });
     const logitScores = Float64Array.from({ length: testRows.length }, (_, i) => logitProba(logit, Xte.subarray(i * F, (i + 1) * F)));
     // price tier on the sold rows
@@ -245,7 +264,7 @@ export class EngineTrainer {
       tierMetrics = { n_train: ds.trainSold.length, n_test: n, accuracy: n ? round4(hit / n) : null, logloss: n ? round4(ll / n) : null };
     }
     // metrics on the frozen test file
-    const ci = aucWithCi(scores, yte, seedOf(`${seed}:bootstrap`), this.deps.bootstrapResamples ?? BOOTSTRAP_RESAMPLES);
+    const ci = ci0;
     const p1 = precisionAtTop(scores, yte, 0.01); const p5 = precisionAtTop(scores, yte, 0.05);
     const base1 = precisionAtBaseRate(scores, yte, 0.01, 100);
     const soldScores: number[] = []; const dropScores: number[] = [];
@@ -253,6 +272,8 @@ export class EngineTrainer {
     const quantiles = { sold: quantiles101(soldScores), dropped: quantiles101(dropScores) };
     const importance = features.map((f, i) => ({ feature: f, gain: gbm.importance[i]! })).sort((a, b) => b.gain - a.gain);
     const featureCoverage = Object.fromEntries(features.map((f) => [f, round4(coverage(f, allIdx))]));
+    // drift per year and for the newest full quarter, each row's features as of its own date (stored so GET /engine/health reads it cheaply)
+    const drift = computeDrift(ctx, sales, unsold, idtDay(now()));
     const metrics = {
       test: {
         window: { label: ds.quarter.label, from: ds.quarter.from, to_exclusive: ds.quarter.to }, unsold_mode: ds.unsoldMode, n_sold: ds.testSold.length, n_unsold: ds.testUnsold.length,
@@ -261,6 +282,8 @@ export class EngineTrainer {
       },
       weighting: { unweighted_auc: aucU, half_life_12m_auc: aucW, rule: `half-life 12 months is kept only if its test AUC is at least ${RECENCY_MIN_GAIN} above unweighted`, chosen: useW ? 'half_life_12m' : 'unweighted' },
       tier: tierMetrics,
+      ablation,
+      drift,
       quantiles,
       importance,
       train: { n_sold: ds.trainSold.length, n_unsold: ds.trainUnsold.length, gbm_iterations: gbm.bestIter, tier_iterations: tier?.bestIter ?? null, logit_iterations: logit.iterations },
