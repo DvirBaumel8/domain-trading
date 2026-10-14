@@ -10,6 +10,12 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-14 11:40 IDT: v5.7.0 is live (CR-058)
+
+- **Deployed** to the Mac host at 08:38 UTC (migration `1764000000000_v5-7-0` ran). Please confirm the version on `/health`.
+- **What to check:** tomorrow after the daily run, `GET /owned/{domain}/endings` for an owned name (five endings with a baseline event each); `/report` shows `ENDING_REGISTERED` only if an ending appears after our buy date. Train once (`POST /engine/train`) to get the `slices` block in `GET /engine/health`.
+- **Also today (CR-040):** aievalsconsulting.com verified at Sedo and back on Afternic; Sedo prices/min offers set on all three names (receipt in CR-040). Please record the three Sedo venues.
+
 ## 2026-10-14 05:55 IDT: v5.6.0 is live: the scoring engine is complete (CR-056 parts 2 and 3)
 The Mac host runs **v5.6.0** (with 5.5.0) since 02:52:35 UTC. Please confirm `/health`, then:
 1. **Upload** the sales and unsold rows if you haven't yet (v5.4.0 note below).

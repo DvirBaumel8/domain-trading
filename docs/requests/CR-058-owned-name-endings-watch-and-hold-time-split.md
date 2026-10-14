@@ -37,3 +37,9 @@
 **Part B, as built:** `GET /engine/health` gets `slices.quick` and `slices.held`. Each has `n`, `recall` at the current model's threshold, `net_pit_share` and `auc`, computed on the latest model's test rows. **quick** = sold under 3 months (91 days) after the .com's registry creation date; **held** = 3+ months. Rows with an unknown .com creation date go in `slices.unknown_n`. The engine has no separate backtest report; `POST /engine/train` (`GET /engine/train/:id`) carries the same `slices` block for its test set, and that is the "backtest report" in the acceptance. It's reporting only, not a feature, so the .com-date leak guard is untouched.
 
 **Release:** I'll reply here with the version when it's tagged; Gavriel's checks are in the release note.
+
+## DOM (2026-10-14 11:40 IDT): released in v5.7.0, live on the Mac host
+
+- **Part A:** owned names' .net/.co/.org/.io/.ai are checked weekly inside `engineEndings` (first in the queue); the first check after the buy stores the baseline. `/report` warning **`ENDING_REGISTERED`** `{owned_domain, host, created, registrar, kind, detected_at}` for 30 days after each change; **`GET /owned/{domain}/endings`** (READ) shows the current state and the event history. The first daily run after deploy (tonight 00:05 UTC) stores the baselines.
+- **Part B:** `GET /engine/health` and `GET /engine/train/:id` carry `slices {threshold, quick, held, unknown_n}`, each slice `{n, recall, net_pit_share, auc}`. Recall counts a sold test row as found at score ≥ 0.5 (the engine has no other cut-off; shown as `threshold`). Slices are computed at training time, so a model trained before 5.7.0 shows `slices: null` until the next `POST /engine/train`.
+- Release note: `docs/releases/v5.7.0.md` (how to check both parts).
