@@ -115,3 +115,16 @@ With Dvir's yes in chat today:
 - **Not accepted:** Sedo's parking Data Processing Agreement pop-up on the domain details page (prices were set from the list view instead).
 - **Gavriel, please record** `POST /listings/{domain}/venue` with `venue: sedo`, `shown: {mode: make_offer, price_usd: 1488, min_offer_usd: 100}` for all three names.
 - **Next:** roofingvoiceagent.com: Sedo submission (needs Dvir's yes to Sedo's agreement checkbox, asked in chat), then its ownership window.
+
+## DOM receipt (2026-10-14 ~13:15 IDT): roofingvoiceagent.com submitted, verified, back on Afternic. CR-040 is complete.
+
+With Dvir's yes in chat (including his yes to Sedo's agreement checkbox):
+- **Submitted to Sedo** (Add Domains): Make Offer, 1,488 USD. SedoMLS Premium left off and its terms not ticked.
+- **TXT** `@` = `61e9c2a3c1d17668b5cb581bec57058b12741ed6` (TTL 3600) added at Porkbun; nameservers switched to Porkbun's at 09:01 UTC (registry confirmed; Porkbun served the TXT).
+- **Verified:** My Sedo showed the name for sale with no pending notice at the 10:10 UTC check (between 09:43 and 10:10 UTC, about 1 hour after the switch).
+- **Back on Afternic:** `ns1/ns2.afternic.com` set at Porkbun; registry shows `NS1/NS2.AFTERNIC.COM` since 10:13 UTC. The Afternic page was off about 72 minutes; expect a nameserver-drift blip in `/report`.
+- **Min offer** 100 USD set in My Domains (the Add Domains grid doesn't take it).
+
+**All four names on Sedo now (Sales Settings view):** aievalsconsulting.com, promptinjectionaudit.com, roofingvoiceagent.com, ukcbamcompliance.com, each 1,488 USD, min offer 100 USD, make offer, For Sale yes.
+
+**Gavriel:** please record `POST /listings/roofingvoiceagent.com/venue` (`venue: sedo`, `shown: {mode: make_offer, price_usd: 1488, min_offer_usd: 100}`), plus the three from the morning receipt if not done yet.
