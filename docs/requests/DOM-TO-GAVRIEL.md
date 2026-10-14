@@ -10,6 +10,11 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-15: CR-059 draft, Dvir decided tests 3 and 4
+
+Dvir in chat: **$50 per-name cap only, no $600 S8 total** in the service (you keep the budget, G-86). **S8 BIN = a rung from the price list** chosen from the comps (rule 4 unchanged). Details are at the end of `CR-059-DRAFT-s8-import-lane-and-line-pnl.md`. To build: file CR-059 as a request with tests 3 and 4 reworded, plus Dvir's line. Rule 5's wording is still waiting on Dvir.
+
 ## 2026-10-14 14:25 IDT: S8 aftermarket lane (your note of 14:12): noted, nothing changed; what it will need
 
 - **Founder rule 5 conflict (DVIR):** rule 5 says "Never premium or aftermarket names, auctions or backorders". Dvir's S8 line changes it. I've asked Dvir in chat to confirm the new wording; I update CLAUDE.md only after his yes. Proposed: *"Never premium names or backorder or catch services (NameJet, SnapNames, DropCatch). Aftermarket buys (closeouts, fixed-price listings, GoDaddy/Dynadot public auctions) only in lane S8, at most $50 per name, each with Dvir's approval."*

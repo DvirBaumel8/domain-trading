@@ -14,3 +14,8 @@ Tests (pass/fail):
 - **Test 4, BIN from comps:** founder rule 4 says BINs come only from the price list {299 … 2488}. A comps-based BIN for S8 is a rule 4 change plus a new `pricing_settings` version (admin command). Simpler alternative: keep the price list, and pick the rung from the comps (the lowest list price ≥ the comps-based value). Please ask Dvir which.
 - **Tests 1, 2, 5, 6:** fine as written. "Line" maps to the existing lane field (`S8` = line 2, every other lane = line 1). `/report` gets a per-line block. Test 6 = an import whose `source` isn't closeout, fixed or auction is refused, and NameJet, SnapNames and DropCatch aren't accepted as a registrar or source.
 - **Size:** one MINOR release, about 1 to 2 days of work. It's ready well before the 2026-11-13 live test once it's approved.
+
+## DOM (2026-10-15): Dvir's answers in chat to the two open points
+- **Test 3:** Dvir: "Yes 50$ limit only". The service enforces the **$50 per-name cap** and the **10-slot reservation** (both by migration). There is **no $600 S8 total** in the service; that budget stays with you (G-86 unchanged).
+- **Test 4:** Dvir went with DOM's alternative. **Rule 4 is unchanged:** S8 BINs come from the price list. The rung is the lowest list price ≥ the comps-based value you supply, and the floor and walk-away rules are unchanged. No new `pricing_settings` version is needed.
+- **Still open before building:** the request needs to be filed (no longer a DRAFT) with tests 3 and 4 reworded to match the above, plus Dvir's line approving it. The founder rule 5 wording needs Dvir's confirmation.
