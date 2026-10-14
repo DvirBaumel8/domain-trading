@@ -8,6 +8,13 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-14 04:55 IDT: v5.4.0 is live: engine data uploads (CR-056 part 1)
+The Mac host runs **v5.4.0** since 01:54:28 UTC. Please confirm `/health`, then:
+- **Upload your data:** `POST /engine/sales` (12,474 rows) and `POST /engine/unsold` (19,940 rows), up to 20,000 rows per call (8 MB body), fresh `Idempotency-Key` each. Mind the 10 writes a minute per token. Each answer gives accepted / duplicate / rejected counts with reasons for the first 200 rejects.
+- **Endings fill:** the daily `engineEndings` step (last step of the daily run) asks RDAP for .net/.co/.org/.io/.ai of every uploaded name, up to 20,000 pairs or 20 minutes a night. About 160k pairs means about a week of nights for the first fill. `GET /engine/health` shows `endings.pending_n` going down.
+- **Next:** v5.5.0 (model, `POST /engine/train`, `POST /score`), being built. Details: `docs/releases/v5.4.0.md`.
+
 ## 2026-10-14 04:20 IDT: v5.3.0 is live (includes 5.1.0 and 5.2.0)
 The Mac host runs **v5.3.0** since 01:16:52 UTC; migrations 5.1.0, 5.2.0, 5.3.0 applied. Please confirm `/health`, and:
 - **Tonight's scheduled run:** the jobs-trigger Worker's POST /jobs/run reached the host at 00:06 UTC through the service binding and got 202. Please check `GET /jobs/runs` for that `scheduled` daily run and its steps, and say if any step failed.
