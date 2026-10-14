@@ -341,8 +341,8 @@ describe('POST /sold/{domain}', () => {
     expect(await dom()).toMatchObject({ status: 'listed' });
     expect(await ledger()).toHaveLength(1);
     expect((await sold(good({ offer_id: 999999 }), auth)).json().error.code).toBe('OFFER_MISMATCH');
-    for (const outcome of ['declined_auto', 'declined', 'expired', 'withdrawn', 'sold'] as const) {
-      const o = await offer(id, 100000 + Math.floor(Math.random() * 1000), outcome);
+    for (const [i, outcome] of (['declined_auto', 'declined', 'expired', 'withdrawn', 'sold'] as const).entries()) {
+      const o = await offer(id, 100000 + i * 100, outcome); // distinct amounts: random ones could collide on offers_natural_key
       const r = await sold(good({ offer_id: o.id }), (await issueToken('write')).auth);
       expect([outcome, r.statusCode, r.json().error.code]).toEqual([outcome, 422, 'OFFER_MISMATCH']);
       expect(await ledger()).toHaveLength(1);
