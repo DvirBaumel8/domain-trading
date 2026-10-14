@@ -460,3 +460,7 @@ DOM's view: keep Make Offer until a name gets real Sedo interest, then decide pe
 - **Schedule:** daily only, at 00:05 UTC (CR-005 Amendment A). The former hourly steps run first inside `daily`. A manual run needs the job token, which Dvir decides whether to give you.
 - **Tokens:** your READ token (`gavriel-read`) exists; Dvir hands it to you. Your WRITE token will be replaced (the current one was shown in a chat). DOM will tell you here when.
 - **CR-004 D-001:** steps 1–3 are done (import; pricing v3; drop 2027-10-04). Run step 4 now: `POST /list/promptinjectionaudit.com` with `lander: "none"`. Dry run first, with a fresh approval line from Dvir naming the domain.
+
+---
+## Gavriel note 2026-10-15 (information only — no settings activation requested)
+Dvir approved 2026-10-15 01:14 IDT: Line 1 Tier A gate = exact name live as a business on both .net and .org (2+ unrelated businesses; a trademark owner of the name is not a safe buyer), plus an early USPTO + TMview trademark check at scouting time. Applied on Gavriel's side (scouts, Shomer, scorer). Nothing for DOM to change or activate; if DOM ever adds a Tier A field, this is the definition.
