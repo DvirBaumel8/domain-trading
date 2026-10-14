@@ -58,7 +58,10 @@ export const SUMMARIES: Record<string, string> = {
   'PATCH /lessons/{id}': 'Edit a lesson: recheck_if, superseded_by or lesson text',
   'POST /engine/sales': 'Upload sold names for the scoring engine (1 to 20,000 rows; counts accepted, duplicate, rejected with reasons)',
   'POST /engine/unsold': 'Upload unsold names (dropped after held, registered unsold) for the scoring engine',
-  'GET /engine/health': 'Scoring engine data counts, age, last uploads and the other-endings fill progress',
+  'GET /engine/health': 'Scoring engine data counts, age, last uploads, the endings fill progress and the active model',
+  'POST /engine/train': 'Start a scoring-engine training run on the job queue (at most one a day)',
+  'GET /engine/train/{id}': 'A training run: status, metrics, frozen test-file hash',
+  'POST /score': 'Score .com names with the active model (READ scope; the one read-only POST)',
   'GET /ledger': 'The ledger (JSON or CSV)',
   'GET /deals/{id}': 'One deal',
   'GET /audit': 'The audit log',
@@ -141,7 +144,7 @@ function scopeOf(method: string, url: string): string {
   if (PUBLIC_PATHS.has(url)) return 'none';
   if (url === JOB_PATH && method === 'POST') return 'write or job-trigger token';
   if (method === 'POST' && INTAKE_ROUTES.has(url)) return 'write or intake';
-  return isMutating(method) ? 'write' : 'read';
+  return isMutating(method, url) ? 'write' : 'read';
 }
 
 /** Installs the route collector. Call it BEFORE any route is registered. */
@@ -166,7 +169,7 @@ export function buildOpenApi(entries: Entry[], version: string): Record<string, 
       'x-scope': scope,
       ...(scope === 'none' ? { security: [] } : { security: [{ bearer: [] }] }),
       ...(paramsOf(path).length ? { parameters: paramsOf(path).map((name) => ({ name, in: 'path', required: true, schema: { type: 'string' } })) } : {}),
-      ...(isMutating(e.method) ? { 'x-idempotency-key': 'required' } : {}),
+      ...(isMutating(e.method, e.url) ? { 'x-idempotency-key': 'required' } : {}),
       ...(e.noBody ? { 'x-no-body': true } : {}),
       responses: { [String(e.status ?? 200)]: { description: 'OK' } },
     };

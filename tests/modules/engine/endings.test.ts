@@ -1,7 +1,7 @@
 // v5.4.0 (CR-056 part 1): the daily step engineEndings (RDAP only; mocked here) and the endings numbers of GET /engine/health.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { RDAP_FALLBACK_BASES, type RdapLookup, type RdapLookupFn } from '../../../src/core/rdap.js';
+import { RDAP_COM_BASE, RDAP_FALLBACK_BASES, type RdapLookup, type RdapLookupFn } from '../../../src/core/rdap.js';
 import { EndingsJob } from '../../../src/modules/engine/index.js';
 import type { ScreeningDeps } from '../../../src/modules/selection/index.js';
 import { makeApp } from '../../helpers/app.js';
@@ -49,9 +49,9 @@ const find = async (name: string, tld: string) => (await rowsOf()).filter((r) =>
 describe('engine endings fill', () => {
   it('EN-11: a registered name keeps its registry creation date, a 404 is not registered, every row has the host and no DNS is used', async () => {
     await seed(['septicdrone'], ['unsoldone']);
-    const h = harness((host, domain) => (domain === 'septicdrone.net' ? reg('2019-04-02T10:00:00.000Z', { registrar: 'Reg Inc' }) : domain === 'septicdrone.io' ? reg('2023-01-01T00:00:00Z') : free));
+    const h = harness((host, domain) => (domain === 'septicdrone.net' ? reg('2019-04-02T10:00:00.000Z', { registrar: 'Reg Inc' }) : domain === 'septicdrone.com' ? reg('2014-06-01T00:00:00.000Z') : domain === 'septicdrone.io' ? reg('2023-01-01T00:00:00Z') : free));
     const s = await h.job().runOnce();
-    expect(s).toMatchObject({ skipped: false, due: 10, asked: 10, registered: 2, not_registered: 8, unknown: 0, inserted: 10, updated: 0, left_for_next_run: 0, partial: false });
+    expect(s).toMatchObject({ skipped: false, due: 12, asked: 12, registered: 3, not_registered: 9, unknown: 0, inserted: 12, updated: 0, left_for_next_run: 0, partial: false });
     expect(s.by_tld.net).toEqual({ asked: 2, registered: 1, not_registered: 1, unknown: 0 });
     const [net] = await find('septicdrone', 'net');
     expect(net).toMatchObject({ registered: true, http_status: 200, reason_code: null });
@@ -62,8 +62,11 @@ describe('engine endings fill', () => {
     expect(h.asked.find((a) => a.domain === 'septicdrone.co')!.base).toBe(RDAP_FALLBACK_BASES.co);
     expect(h.asked.find((a) => a.domain === 'septicdrone.ai')!.base).toBe(BASES.ai);
     expect(h.asked.find((a) => a.domain === 'septicdrone.org')!.base).toBe(BASES.org);
+    // v5.5.0: the name's own .com is asked at Verisign and its creation date is kept (the acquisition feature)
+    expect(h.asked.find((a) => a.domain === 'septicdrone.com')!.base).toBe(RDAP_COM_BASE);
+    expect((await find('septicdrone', 'com'))[0]!.created_at_registry!.toISOString()).toBe('2014-06-01T00:00:00.000Z');
     expect((await db.selectFrom('rdap_lookups').select('id').execute()).length).toBe(0);
-    expect((await db.selectFrom('audit_log').select('result_summary').where('path', '=', 'engine-endings').executeTakeFirstOrThrow()).result_summary).toContain('asked 10');
+    expect((await db.selectFrom('audit_log').select('result_summary').where('path', '=', 'engine-endings').executeTakeFirstOrThrow()).result_summary).toContain('asked 12');
   });
 
   it('EN-12: a timeout is stored as unanswered with its reason, asked again on a later run (not the same hour) and updated in place', async () => {
@@ -71,9 +74,9 @@ describe('engine endings fill', () => {
     let failing = true;
     const h = harness((_h, d) => (d === 'alpha.org' && failing ? unk('TIMEOUT') : free));
     let s = await h.job().runOnce();
-    expect(s).toMatchObject({ asked: 5, unknown: 1, not_registered: 4, inserted: 5 });
+    expect(s).toMatchObject({ asked: 6, unknown: 1, not_registered: 5, inserted: 6 });
     expect((await find('alpha', 'org'))[0]).toMatchObject({ registered: null, reason_code: 'TIMEOUT', created_at_registry: null, http_status: null });
-    expect((await db.selectFrom('engine_endings').select('id').execute()).length).toBe(5);
+    expect((await db.selectFrom('engine_endings').select('id').execute()).length).toBe(6);
     // the same hour: nothing is due
     s = await h.job().runOnce();
     expect(s).toMatchObject({ due: 0, asked: 0 });
@@ -97,7 +100,7 @@ describe('engine endings fill', () => {
     now += 2 * DAY; // 31 days after the first answers
     created = reg('2026-10-20T00:00:00.000Z');
     const s = await h.job().runOnce();
-    expect(s).toMatchObject({ due: 5, asked: 5, registered: 1, inserted: 5 });
+    expect(s).toMatchObject({ due: 6, asked: 6, registered: 1, inserted: 6 });
     const rows = await find('alpha', 'net');
     expect(rows.map((r) => r.registered)).toEqual([false, true]);
     expect(rows[1]!.created_at_registry!.toISOString()).toBe('2026-10-20T00:00:00.000Z');
@@ -111,7 +114,7 @@ describe('engine endings fill', () => {
     now += 31 * DAY;
     down = true;
     const s = await h.job().runOnce();
-    expect(s).toMatchObject({ asked: 5, unknown: 1, registered: 4, inserted: 4 });
+    expect(s).toMatchObject({ asked: 6, unknown: 1, registered: 5, inserted: 5 });
     const ai = await find('alpha', 'ai');
     expect(ai).toHaveLength(1);
     expect(ai[0]).toMatchObject({ registered: true });
@@ -125,7 +128,7 @@ describe('engine endings fill', () => {
     await seed(Array.from({ length: 12 }, (_, i) => `name${i}`));
     const h = harness(() => free);
     await h.job().runOnce();
-    expect(h.asked).toHaveLength(60);
+    expect(h.asked).toHaveLength(72);
     // 12 names on one host: starts are queued 250 ms apart, so the waits grow in steps of 250 ms
     const waits = [...new Set(h.sleeps)].sort((a, b) => a - b);
     expect(waits.length).toBeGreaterThan(0);
@@ -137,14 +140,14 @@ describe('engine endings fill', () => {
     await seed(['aaa', 'bbb']);
     const h = harness(() => free);
     let s = await h.job({ maxPairs: 4 }).runOnce();
-    expect(s).toMatchObject({ due: 10, asked: 4, left_for_next_run: 6 });
+    expect(s).toMatchObject({ due: 12, asked: 4, left_for_next_run: 8 });
     expect((await rowsOf()).length).toBe(4);
     s = await h.job({ maxPairs: 4 }).runOnce();
-    expect(s).toMatchObject({ due: 6, asked: 4, left_for_next_run: 2 });
+    expect(s).toMatchObject({ due: 8, asked: 4, left_for_next_run: 4 });
     s = await h.job({ maxPairs: 4 }).runOnce();
-    expect(s).toMatchObject({ due: 2, asked: 2, left_for_next_run: 0 });
-    expect(new Set((await rowsOf()).map((r) => `${r.name}.${r.tld}`)).size).toBe(10);
-    expect(h.asked).toHaveLength(10);
+    expect(s).toMatchObject({ due: 4, asked: 4, left_for_next_run: 0 });
+    expect(new Set((await rowsOf()).map((r) => `${r.name}.${r.tld}`)).size).toBe(12);
+    expect(h.asked).toHaveLength(12);
   });
 
   it('EN-17: a 429 with a short Retry-After is retried once after sleeping that long; an answer is stored; a refusal slows the host', async () => {
@@ -155,7 +158,7 @@ describe('engine endings fill', () => {
       return free;
     });
     const s = await h.job().runOnce();
-    expect(s).toMatchObject({ asked: 5, not_registered: 5, unknown: 0 });
+    expect(s).toMatchObject({ asked: 6, not_registered: 6, unknown: 0 });
     expect(h.sleeps).toContain(1500);
     expect(h.asked.filter((a) => a.domain === 'alpha.net')).toHaveLength(2);
     expect((await find('alpha', 'net'))[0]).toMatchObject({ registered: false });
@@ -168,8 +171,8 @@ describe('engine endings fill', () => {
     const s = await h.job({ budgetMs: 5 * 60_000 }).runOnce();
     expect(s.partial).toBe(true);
     expect(s.asked).toBeGreaterThan(0);
-    expect(s.asked).toBeLessThan(15);
-    expect(s.left_for_next_run).toBe(15 - s.asked);
+    expect(s.asked).toBeLessThan(18);
+    expect(s.left_for_next_run).toBe(18 - s.asked);
     expect(calls).toBe(s.asked);
   });
 
@@ -180,8 +183,8 @@ describe('engine endings fill', () => {
     const noAi = JSON.stringify({ publication: '2026-10-02T00:00:00Z', services: [[['net'], [BASES.net]], [['org'], [BASES.org]]] });
     const screening = { rdapLookup, sleep: async () => {}, fetch: (async () => new Response(noAi, { status: 200 })) as unknown as typeof globalThis.fetch } as unknown as ScreeningDeps;
     const s = await new EndingsJob({ db, screening, now: () => now }).runOnce();
-    expect(s).toMatchObject({ asked: 4, skipped_tlds: ['ai'], partial: true, left_for_next_run: 1 });
-    expect(asked.sort()).toEqual(['alpha.co', 'alpha.io', 'alpha.net', 'alpha.org']);
+    expect(s).toMatchObject({ asked: 5, skipped_tlds: ['ai'], partial: true, left_for_next_run: 1 });
+    expect(asked.sort()).toEqual(['alpha.co', 'alpha.com', 'alpha.io', 'alpha.net', 'alpha.org']);
     expect(await find('alpha', 'ai')).toHaveLength(0);
   });
 
@@ -190,17 +193,17 @@ describe('engine endings fill', () => {
     app = await makeApp({ adapters: [new FakeAdapter('porkbun')], now: () => now, screening: { rdapLookup: (async (domain: string, o?: { baseUrl?: string }) => ({ outcome: domain.startsWith('alpha.') ? 'registered' : 'not_registered', reasonCode: null, httpStatus: domain.startsWith('alpha.') ? 200 : 404, url: `${o?.baseUrl}x`, retrievedAt: new Date(now), body: null, facts: domain.startsWith('alpha.') ? { registrar: null, created_at: '2018-05-05T00:00:00.000Z', expires_at: null, updated_at: null, statuses: [], nameservers: [] } : null })) as RdapLookupFn, fetch: (async () => new Response(BOOTSTRAP, { status: 200 })) as unknown as typeof globalThis.fetch, sleep: async () => {} } });
     const w = (await issueToken('write', 'gavriel')).auth;
     const plan = app.jobRunner.plan('daily').map((p) => p.name);
-    expect(plan[plan.length - 1]).toBe('engineEndings');
+    expect(plan.slice(-2)).toEqual(['engineEndings', 'engineTrain']);
     const step = app.jobRunner.plan('daily').find((p) => p.name === 'engineEndings')!;
     expect(step.maxAttempts).toBe(1);
     expect(step.timeoutMs).toBe(25 * 60_000);
     const before = (await app.inject({ method: 'GET', url: '/engine/health', headers: w })).json();
-    expect(before.endings).toMatchObject({ names_n: 2, checked_n: 0, pending_n: 10 });
+    expect(before.endings).toMatchObject({ names_n: 2, checked_n: 0, pending_n: 12 });
     const r = await app.jobRunner.runStepOnce(step);
     expect(r.ok).toBe(true);
-    expect(r.summary).toMatchObject({ asked: 10, registered: 5, not_registered: 5 });
+    expect(r.summary).toMatchObject({ asked: 12, registered: 6, not_registered: 6 });
     const h = (await app.inject({ method: 'GET', url: '/engine/health', headers: w })).json();
-    expect(h.endings).toMatchObject({ names_n: 2, pairs_n: 10, checked_n: 10, unknown_n: 0, pending_n: 0 });
+    expect(h.endings).toMatchObject({ names_n: 2, pairs_n: 12, checked_n: 12, unknown_n: 0, pending_n: 0 });
     expect(h.endings.by_tld.net).toEqual({ checked_n: 2, registered_n: 1, unknown_n: 0, pending_n: 0 });
   });
 });

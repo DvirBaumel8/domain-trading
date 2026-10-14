@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.5.0 (2026-10-14): CR-056 part 2: engine model (features, GBM + logistic + price tier, POST /engine/train, weekly retrain, POST /score)
+Release note: `docs/releases/v5.5.0.md`.
+MINOR (additive). Gavriel, CR-056: the model side of the name-scoring engine. Contract: `endpoints.md` §Scoring engine, `jobs.md`, README §Idempotency.
+- **New:** `POST /engine/train` (WRITE, `Idempotency-Key`, 202; at most one per 24 hours, else 409 `TRAIN_TOO_SOON` with `details.next_allowed_at`), `GET /engine/train/{id}` (READ), `POST /score` (READ token; **the one read-only POST**: no `Idempotency-Key`, no audit row; 409 `MODEL_NOT_READY` before the first training).
+- **New codes:** `TRAIN_TOO_SOON`, `MODEL_NOT_READY`; in a failed run's `error` text `NOT_ENOUGH_DATA`, `TRAIN_TIME_BUDGET`.
+- **Changed (additive):** `GET /engine/health` now fills `model_version` and adds `trained_at`, `train_rows`, `test`, `chosen_weighting`, `last_training` (null before the first model). The endings fill also asks the name's own `.com`, so `engine_endings` has a `com` row per name, `endings.pairs_n` is `names_n` x 6, `by_tld` gains `com`, and the first full fill takes longer: .com shares Verisign's request pacing with .net, so the Verisign asks double (about 13 nights for 32,000 names instead of about 7).
+- **Jobs:** new last daily step `engineTrain` (the weekly retrain decision) and a new queue job kind `train` (step `trainModel`); neither is accepted by `POST /jobs/run`. `GET /jobs/runs?job=train` lists the trainings.
+- **Model:** TypeScript only, no new dependency and no LLM call: histogram gradient boosting (the score), logistic regression (the reasons), 4-class boosting (price tier); time split on the newest full calendar quarter, test file hashed before training; word frequency is a SCOWL-level proxy (the split table's piece costs on a 0 to 8 scale), `wordfreq` is not used.
+- **Migration:** `1763900000000_v5-5-0.sql` (table `engine_models`; `engine_endings.tld` accepts `com`; job kind `train`).
+
 ## 5.4.0 (2026-10-14): CR-056 part 1: engine data (POST /engine/sales, /engine/unsold, GET /engine/health, daily engineEndings RDAP fill)
 Release note: `docs/releases/v5.4.0.md`.
 MINOR (additive). Gavriel, CR-056 (Dvir approved the build on 14 Oct 2026): the data side of the name-scoring engine.

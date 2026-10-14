@@ -100,9 +100,9 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
     if (key === null) return; // public routes (/health) are not limited
     // CR-007 T-2: a WRITE token starting a job has its own, tighter limit (instead of the general write limit).
     const reviewRun = req.auth && req.routeOptions?.url === '/reviews/run' && req.method === 'POST' && req.auth.scope === 'write';
-    const limiter = reviewRun ? reviewRuns : req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method) ? writes : reads;
+    const limiter = reviewRun ? reviewRuns : req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method, req.routeOptions?.url) ? writes : reads;
     // POST /reviews/run is counted only when the call reaches Google (the slot is taken just before the Google call); here it is only refused when the hour is already used up.
-    const replay = db !== undefined && isMutating(req.method) && (await isIdempotentReplay(db, req));
+    const replay = db !== undefined && isMutating(req.method, req.routeOptions?.url) && (await isIdempotentReplay(db, req));
     if (reviewRun && !replay) reviewSlotTakers.set(req, () => { reviewRuns.take(key); });
     const wait = replay ? 0 : reviewRun ? limiter.peek(key) : limiter.take(key);
     // CR-005 N-8a: the caller's own limit for this method class (GET vs POST), on every authenticated response, a 429 included.

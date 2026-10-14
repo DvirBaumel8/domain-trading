@@ -111,7 +111,7 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
       failed.fail(req.ip);
       throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
     };
-    if (PUBLIC_PATHS.has(pathOf(req.url)) && !isMutating(req.method)) return;
+    if (PUBLIC_PATHS.has(pathOf(req.url)) && !isMutating(req.method, req.routeOptions?.url)) return;
     const wait = failed.blockedFor(req.ip);
     const tooMany = (): never => {
       reply.header('retry-after', String(wait));
@@ -172,10 +172,10 @@ export function registerScope(app: FastifyInstance): void {
     if (req.jobAuth) return; // authenticated by the job-trigger bearer, no API-token scope
     if (!req.auth) {
       // Only public GET/HEAD/OPTIONS routes reach here without auth; fail closed for mutations.
-      if (isMutating(req.method)) throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
+      if (isMutating(req.method, req.routeOptions?.url)) throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
       return;
     }
-    if (isMutating(req.method) && req.auth.scope !== 'write') {
+    if (isMutating(req.method, req.routeOptions?.url) && req.auth.scope !== 'write') {
       throw new AppError(403, 'SCOPE_FORBIDDEN', 'This token may only call GET endpoints');
     }
   });

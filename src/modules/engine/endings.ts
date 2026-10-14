@@ -1,5 +1,6 @@
 // Daily step `engineEndings` (v5.4.0, CR-056 part 1): for every name in the uploaded sold and unsold sets, asks the registry (RDAP only, never DNS)
-// whether the same name is registered on .net, .co, .org, .io and .ai, and when it was created. The answers go to engine_endings and are kept for good.
+// whether the same name is registered on .net, .co, .org, .io and .ai, and when it was created. Since v5.5.0 it also asks .com itself (Verisign), for the
+// acquisition feature: the .com's registry creation date. POST /score reuses the same asking code (askRdap, saveAnswer) for names it has no answer for. The answers go to engine_endings and are kept for good.
 // A run works through at most ENDINGS_MAX_PAIRS_PER_RUN (name, ending) pairs inside ENDINGS_TIME_BUDGET_MS, never-asked pairs first, then the oldest answers;
 // the next night continues, so the first full fill takes a day or more. Per registry host: 4 in flight, 250 ms between starts (the shared host pacer), slower
 // after a refusal. It calls no registrar, marketplace or outside service besides the registries' RDAP servers, and sends nothing.
@@ -13,8 +14,10 @@ import { newAuditId } from '../../http/audit.js';
 import { hostPacer, rdapBaseFor, type ScreeningDeps } from '../selection/index.js';
 
 export const ENDING_TLDS = ['net', 'co', 'org', 'io', 'ai'] as const;
-export type EndingTld = (typeof ENDING_TLDS)[number];
-/** About 4,000 names x 5 endings; at 4 requests a second per registry host that is a little under 20 minutes. */
+/** The five other endings plus the name's own .com (v5.5.0). */
+export const ENGINE_TLDS = [...ENDING_TLDS, 'com'] as const;
+export type EndingTld = (typeof ENGINE_TLDS)[number];
+/** About 3,300 names x 6 endings; at 4 requests a second per registry host (net and com share one) that is a little under 20 minutes. */
 export const ENDINGS_MAX_PAIRS_PER_RUN = 20_000;
 export const ENDINGS_TIME_BUDGET_MS = 20 * 60_000;
 /** An answer older than this is asked again (and a new row is appended). */
@@ -30,7 +33,7 @@ const DAY = 86_400_000;
 function pairsCte() {
   return sql`
     names as (select split_part(domain, '.', 1) as name from engine_sales union select split_part(domain, '.', 1) from engine_unsold),
-    tlds(tld) as (values ('net'), ('co'), ('org'), ('io'), ('ai')),
+    tlds(tld) as (values ('net'), ('co'), ('org'), ('io'), ('ai'), ('com')),
     cur as (select distinct on (name, tld) id, name, tld, registered, checked_at from engine_endings order by name, tld, checked_at desc, id desc),
     pairs as (select n.name, t.tld, c.id, c.registered, c.checked_at from names n cross join tlds t left join cur c on c.name = n.name and c.tld = t.tld)`;
 }
@@ -55,24 +58,65 @@ export interface EndingsSummary {
   skipped_tlds: string[];
 }
 
-interface Pair { name: string; tld: EndingTld; prevId: number | null; prevRegistered: boolean | null }
-interface Answer { registered: boolean | null; createdAt: Date | null; httpStatus: number | null; reason: string | null; evidence: unknown }
+export interface Pair { name: string; tld: EndingTld; prevId: number | null; prevRegistered: boolean | null }
+export interface Answer { registered: boolean | null; createdAt: Date | null; httpStatus: number | null; reason: string | null; evidence: unknown }
 
 const refused = (x: RdapLookup): boolean => x.reasonCode === 'RATE_LIMITED' || x.httpStatus === 429 || x.httpStatus === 403;
+
+/** The RDAP base of an ending: the fixed fallback for .co and .io (IANA's file lacks them), else the IANA bootstrap (.com: Verisign). null = no registry service known / bootstrap unavailable. */
+export async function endingBase(db: Kysely<Database>, screening: ScreeningDeps, now: () => number, tld: EndingTld, log?: { warn(o: object, m: string): void }): Promise<string | null> {
+  const fallback = RDAP_FALLBACK_BASES[tld];
+  if (fallback) return fallback;
+  try {
+    return await rdapBaseFor(db, screening, tld, { enabled: true, now });
+  } catch (e) {
+    log?.warn({ tld, errMessage: (e as Error).message }, 'engine endings: RDAP base unavailable');
+    return null;
+  }
+}
+
+/** One paced RDAP query (one retry after a short 429 Retry-After); a refusal slows the host's pacer down. `timeoutMs` bounds one lookup. */
+export async function askRdap(screening: ScreeningDeps, domain: string, base: string, pace: ReturnType<typeof hostPacer>, timeoutMs: number = LOOKUP_TIMEOUT_MS): Promise<Answer> {
+  const call = async (): Promise<RdapLookup> => {
+    const x = await pace.run(() => screening.rdapLookup(domain, { baseUrl: base, timeoutMs }));
+    if (refused(x)) pace.slowDown(); else pace.noteNotRefused();
+    return x;
+  };
+  let x = await call();
+  if (x.reasonCode === 'RATE_LIMITED' && x.retryAfterMs != null && x.retryAfterMs <= MAX_RETRY_AFTER_MS && !pace.breakerOpen) {
+    await screening.sleep(x.retryAfterMs);
+    x = await call();
+  }
+  const host = new URL(base).host;
+  if (x.outcome === 'registered') {
+    const f = x.facts;
+    const created = f?.created_at ? new Date(f.created_at) : null;
+    return {
+      registered: true, createdAt: created && !Number.isNaN(created.getTime()) ? created : null, httpStatus: x.httpStatus, reason: null,
+      evidence: { host, registrar: f?.registrar ?? null, expires_at: f?.expires_at ?? null, statuses: (f?.statuses ?? []).slice(0, 6) },
+    };
+  }
+  if (x.outcome === 'not_registered') return { registered: false, createdAt: null, httpStatus: x.httpStatus, reason: null, evidence: { host } };
+  return { registered: null, createdAt: null, httpStatus: x.httpStatus, reason: x.reasonCode ?? 'SOURCE_ERROR', evidence: null };
+}
+
+/** Never asked: insert. An unanswered row: update it in place. An answered row (older than 30 days): append a row for a new answer, keep the old one on an unanswered ask. Returns what was done. */
+export async function saveAnswer(db: Kysely<Database>, nowMs: number, p: Pair, a: Answer): Promise<'inserted' | 'updated' | 'kept'> {
+  const row = { registered: a.registered, created_at_registry: a.createdAt, checked_at: new Date(nowMs), http_status: a.httpStatus, reason_code: a.reason, evidence: a.evidence == null ? null : JSON.stringify(a.evidence) };
+  if (p.prevId !== null && p.prevRegistered === null) {
+    await db.updateTable('engine_endings').set(row).where('id', '=', p.prevId).execute();
+    return 'updated';
+  }
+  if (p.prevId !== null && a.registered === null) return 'kept'; // keep the known answer; the pair stays due and is asked again on the next run
+  await db.insertInto('engine_endings').values({ name: p.name, tld: p.tld, ...row }).execute();
+  return 'inserted';
+}
 
 export class EndingsJob {
   constructor(private readonly deps: { db: Kysely<Database>; screening: ScreeningDeps; now: () => number; maxPairs?: number; budgetMs?: number; log?: { warn(o: object, m: string): void } }) {}
 
-  /** The RDAP base of an ending: the fixed fallback for .co and .io (IANA's file lacks them), else the IANA bootstrap. null = no registry service known / bootstrap unavailable. */
-  private async baseOf(tld: EndingTld): Promise<string | null> {
-    const fallback = RDAP_FALLBACK_BASES[tld];
-    if (fallback) return fallback;
-    try {
-      return await rdapBaseFor(this.deps.db, this.deps.screening, tld, { enabled: true, now: this.deps.now });
-    } catch (e) {
-      this.deps.log?.warn({ tld, errMessage: (e as Error).message }, 'engine endings: RDAP base unavailable');
-      return null;
-    }
+  private baseOf(tld: EndingTld): Promise<string | null> {
+    return endingBase(this.deps.db, this.deps.screening, this.deps.now, tld, this.deps.log);
   }
 
   async runOnce(): Promise<EndingsSummary> {
@@ -126,45 +170,13 @@ export class EndingsJob {
     }
   }
 
-  /** One paced RDAP query (one retry after a short 429 Retry-After); a refusal slows the host's pacer down. */
-  private async ask(domain: string, base: string, pace: ReturnType<typeof hostPacer>): Promise<Answer> {
-    const { screening } = this.deps;
-    const call = async (): Promise<RdapLookup> => {
-      const x = await pace.run(() => screening.rdapLookup(domain, { baseUrl: base, timeoutMs: LOOKUP_TIMEOUT_MS }));
-      if (refused(x)) pace.slowDown(); else pace.noteNotRefused();
-      return x;
-    };
-    let x = await call();
-    if (x.reasonCode === 'RATE_LIMITED' && x.retryAfterMs != null && x.retryAfterMs <= MAX_RETRY_AFTER_MS && !pace.breakerOpen) {
-      await screening.sleep(x.retryAfterMs);
-      x = await call();
-    }
-    const host = new URL(base).host;
-    if (x.outcome === 'registered') {
-      const f = x.facts;
-      const created = f?.created_at ? new Date(f.created_at) : null;
-      return {
-        registered: true, createdAt: created && !Number.isNaN(created.getTime()) ? created : null, httpStatus: x.httpStatus, reason: null,
-        evidence: { host, registrar: f?.registrar ?? null, expires_at: f?.expires_at ?? null, statuses: (f?.statuses ?? []).slice(0, 6) },
-      };
-    }
-    if (x.outcome === 'not_registered') return { registered: false, createdAt: null, httpStatus: x.httpStatus, reason: null, evidence: { host } };
-    return { registered: null, createdAt: null, httpStatus: x.httpStatus, reason: x.reasonCode ?? 'SOURCE_ERROR', evidence: null };
+  private ask(domain: string, base: string, pace: ReturnType<typeof hostPacer>): Promise<Answer> {
+    return askRdap(this.deps.screening, domain, base, pace);
   }
 
-  /** Never asked: insert. An unanswered row: update it in place. An answered row (older than 30 days): append a row for a new answer, keep the old one on an unanswered ask. */
   private async save(p: Pair, a: Answer, out: EndingsSummary): Promise<void> {
-    const { db, now } = this.deps;
-    const row = { registered: a.registered, created_at_registry: a.createdAt, checked_at: new Date(now()), http_status: a.httpStatus, reason_code: a.reason, evidence: a.evidence == null ? null : JSON.stringify(a.evidence) };
-    if (p.prevId !== null && p.prevRegistered === null) {
-      await db.updateTable('engine_endings').set(row).where('id', '=', p.prevId).execute();
-      out.updated += 1;
-    } else if (p.prevId !== null && a.registered === null) {
-      // keep the known answer; the pair stays due and is asked again on the next run
-    } else {
-      await db.insertInto('engine_endings').values({ name: p.name, tld: p.tld, ...row }).execute();
-      out.inserted += 1;
-    }
+    const r = await saveAnswer(this.deps.db, this.deps.now(), p, a);
+    if (r === 'inserted') out.inserted += 1; else if (r === 'updated') out.updated += 1;
   }
 }
 
@@ -184,7 +196,7 @@ export async function endingsHealth(db: Kysely<Database>, nowMs: number): Promis
     from pairs group by tld`.execute(db)).rows;
   const names = await sql<{ n: string }>`with ${pairsCte()} select count(distinct name)::text as n from pairs`.execute(db);
   const by_tld: EndingsHealth['by_tld'] = {};
-  for (const t of ENDING_TLDS) by_tld[t] = { checked_n: 0, registered_n: 0, unknown_n: 0, pending_n: 0 };
+  for (const t of ENGINE_TLDS) by_tld[t] = { checked_n: 0, registered_n: 0, unknown_n: 0, pending_n: 0 };
   const sum = { checked_n: 0, unknown_n: 0, pending_n: 0 };
   for (const r of rows) {
     const v = { checked_n: Number(r.checked_n), registered_n: Number(r.registered_n), unknown_n: Number(r.unknown_n), pending_n: Number(r.pending_n) };
@@ -192,5 +204,5 @@ export async function endingsHealth(db: Kysely<Database>, nowMs: number): Promis
     sum.checked_n += v.checked_n; sum.unknown_n += v.unknown_n; sum.pending_n += v.pending_n;
   }
   const namesN = Number(names.rows[0]?.n ?? 0);
-  return { names_n: namesN, pairs_n: namesN * ENDING_TLDS.length, ...sum, by_tld };
+  return { names_n: namesN, pairs_n: namesN * ENGINE_TLDS.length, ...sum, by_tld };
 }

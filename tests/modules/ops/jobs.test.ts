@@ -236,7 +236,7 @@ describe('daily', () => {
     vi.spyOn(app.referenceRefreshJob, 'runOnce').mockImplementation(async () => { order.push('reference'); return { skipped: true, reason: 'test' }; });
     const res = await post(app, 'daily');
     expect(order).toEqual(['price', 'drop', 'registrar', 'reference', 'backup']);
-    expect(Object.keys(res.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'listingSync', 'portfolioLifecycle', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'retention', 'backupExport', 'engineEndings']);
+    expect(Object.keys(res.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'listingSync', 'portfolioLifecycle', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'retention', 'backupExport', 'engineEndings', 'engineTrain']);
     expect(res.json().steps.backupExport).toMatchObject({ ok: true, summary: { committed: false } });
   });
 

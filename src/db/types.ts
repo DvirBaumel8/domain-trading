@@ -293,7 +293,7 @@ export interface ExportUploadsTable {
 
 export interface JobRunsTable {
   id: Generated<number>;
-  job: 'tick' | 'daily' | 'screen';
+  job: 'tick' | 'daily' | 'screen' | 'train';
   trigger: 'scheduled' | 'manual' | 'cli';
   scheduled_for: ColumnType<Date | null, Date | string | null, Date | string | null>;
   started_at: Timestamp;
@@ -310,7 +310,7 @@ export interface JobRunsTable {
 /** An enqueued job run (v3.0.0). Written once at enqueue; its progress lives in job_steps and its result in job_runs. */
 export interface JobQueueRunsTable {
   id: string;
-  job: 'tick' | 'daily' | 'screen';
+  job: 'tick' | 'daily' | 'screen' | 'train';
   trigger: 'scheduled' | 'manual' | 'cli';
   scheduled_for: ColumnType<Date | null, Date | string | null | undefined, never>;
   triggered_by: ColumnType<string | null, string | null | undefined, never>;
@@ -325,7 +325,7 @@ export type JobStepStatus = 'queued' | 'running' | 'done' | 'failed' | 'skipped'
 export interface JobStepsTable {
   id: Generated<number>;
   run_id: string;
-  job: 'tick' | 'daily' | 'screen';
+  job: 'tick' | 'daily' | 'screen' | 'train';
   step: string;
   position: number;
   status: Generated<JobStepStatus>;
@@ -511,13 +511,32 @@ export interface EngineUnsoldTable {
 export interface EngineEndingsTable {
   id: Generated<number>;
   name: string;
-  tld: 'net' | 'co' | 'org' | 'io' | 'ai';
+  tld: 'net' | 'co' | 'org' | 'io' | 'ai' | 'com';
   registered: boolean | null;
   created_at_registry: Timestamp | null;
   checked_at: Timestamp;
   http_status: number | null;
   reason_code: string | null;
   evidence: Json | null;
+}
+
+export interface EngineModelsTable {
+  n: Generated<number>;
+  id: ColumnType<string, undefined, never>;
+  created_at: TimestampDefault;
+  finished_at: Generated<Date | null>;
+  status: Generated<'running' | 'done' | 'failed'>;
+  error: Generated<string | null>;
+  trained_by: string;
+  audit_id: Generated<string | null>;
+  queue_run_id: Generated<string | null>;
+  dataset: ColumnType<unknown, string | null | undefined, string | null>;
+  test_sha256: Generated<string | null>;
+  params: ColumnType<unknown, string | null | undefined, string | null>;
+  metrics: ColumnType<unknown, string | null | undefined, string | null>;
+  chosen_weighting: Generated<'unweighted' | 'half_life_12m' | null>;
+  feature_list: ColumnType<unknown, string | null | undefined, string | null>;
+  test_rows: ColumnType<unknown, string | null | undefined, string | null>;
 }
 
 export interface SiblingScansTable {
@@ -1188,6 +1207,7 @@ export interface Database {
   engine_sales: EngineSalesTable;
   engine_unsold: EngineUnsoldTable;
   engine_endings: EngineEndingsTable;
+  engine_models: EngineModelsTable;
   drop_lists: DropListsTable;
   drop_list_rows: DropListRowsTable;
   drop_list_checks: DropListChecksTable;

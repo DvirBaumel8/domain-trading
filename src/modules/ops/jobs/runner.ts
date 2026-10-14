@@ -13,7 +13,7 @@ export interface StepResult {
 }
 
 /** `screen` (v3.3.0, CR-021): one on-demand screening of the waiting intake names, then a rebuild of the day's list. */
-export type JobKind = 'tick' | 'daily' | 'screen';
+export type JobKind = 'tick' | 'daily' | 'screen' | 'train';
 
 /** One step of a job: what the queue stores (limits) and runs (exec). `exec` returns the step's summary and throws on failure. */
 export interface PlanStep {
@@ -28,10 +28,10 @@ export interface PlanStep {
 /** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the review steps 1 (they keep their own retry), the rest 2. */
 export const DEFAULT_ATTEMPTS = 2;
 export const STEP_ATTEMPTS: Record<string, number> = {
-  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1, engineEndings: 1,
+  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1, engineEndings: 1, engineTrain: 1, trainModel: 1,
 };
 export const DEFAULT_TIMEOUT_MS = 5 * 60_000;
-export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000 };
+export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000 };
 
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
 
@@ -98,6 +98,8 @@ export interface JobRunnerDeps {
   retention?: Runnable;
   /** v5.4.0 (CR-056): fills the registry facts of the scoring engine's names on .net, .co, .org, .io, .ai (RDAP only), in chunks across nights; the last step of the day. While undefined, that step reports skipped. */
   engineEndingsJob?: Runnable;
+  /** v5.5.0 (CR-056 part 2): `weekly()` is the daily step engineTrain (decides and queues a `train` run); `runById` is the `train` job's step trainModel. */
+  engineTrainer?: { weekly(): Promise<unknown>; runById(id: string): Promise<unknown> };
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
   /** Takes the run lock (default: a database session lock). Tests of the step order pass a stub. */
@@ -143,6 +145,11 @@ export class JobRunner {
         step('buildDailyList', async () => (d.buildDailyListJob ? d.buildDailyListJob.runOnce({ builtBy: 'auto' }) : { skipped: true, reason: 'daily list not configured' })),
       ];
     }
+    // v5.5.0 (CR-056 part 2): POST /engine/train and the weekly retrain. One step: train the run named in the job's params.
+    if (job === 'train') {
+      const trainId = (run?.params as { train_id?: unknown } | null | undefined)?.train_id;
+      return [step('trainModel', async () => (d.engineTrainer && typeof trainId === 'string' ? d.engineTrainer.runById(trainId) : { skipped: true, reason: 'engine trainer not configured or no train_id' }))];
+    }
     if (job === 'tick') return [...tick, optionalFn('reviewRetry', d.reviewRetry, 'review retry not configured')];
     // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.
     return [
@@ -163,6 +170,8 @@ export class JobRunner {
       optional('backupExport', d.backupExport, 'backup export not configured'),
       // Last, so its up to 20 minutes of paced RDAP asks never hold up the steps above; one attempt (it works in chunks and the next night continues).
       optional('engineEndings', d.engineEndingsJob, 'engine endings not configured'),
+      // v5.5.0: after the endings fill, so a retrain sees the newest answers; it only decides and queues the `train` job, which runs after this run ends.
+      optionalFn('engineTrain', d.engineTrainer ? () => d.engineTrainer!.weekly() : undefined, 'engine trainer not configured'),
     ];
   }
 
@@ -195,7 +204,7 @@ export class JobRunner {
 
   async run(job: JobKind, opts: RunOptions = {}): Promise<JobRunResult> {
     const started = new Date(this.deps.now());
-    const key: LockKey = job === 'tick' ? 'job:tick' : job === 'screen' ? 'job:screen' : 'job:daily';
+    const key: LockKey = job === 'tick' ? 'job:tick' : job === 'screen' ? 'job:screen' : job === 'train' ? 'job:train' : 'job:daily';
     const lock = await (this.deps.acquireLock ? this.deps.acquireLock(key) : trySessionLock(this.deps.db, key));
     if (!lock) {
       const skipped: JobRunResult = { job, skipped: true, steps: {} };

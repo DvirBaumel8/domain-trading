@@ -35,7 +35,7 @@ import { registerDropLists } from './modules/candidates/index.js';
 import { registerCohorts } from './modules/candidates/index.js';
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
 import { registerCandidates, registerLessons, registerPatterns } from './modules/candidates/index.js';
-import { EndingsJob, registerEngine } from './modules/engine/index.js';
+import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
 import { createAdapters } from './modules/registrars/index.js';
 import type { RegistrarAdapter } from './modules/registrars/index.js';
 import { BuyService } from './modules/buying/index.js';
@@ -102,6 +102,10 @@ export interface AppDeps {
   /** Test hook: turns the queue's keep-alive ping on with a fake fetch (default: on only in production with PUBLIC_BASE_URL set). */
   jobQueueKeepAlive?: { url: string; fetch?: typeof fetch };
   jobQueueOverrides?: Record<string, { maxAttempts?: number; timeoutMs?: number }>;
+  /** Tests: smaller training parameters, a shorter bootstrap, a time source for the budget guard. */
+  engineTrain?: Partial<Pick<TrainDeps, 'clock' | 'budgetMs' | 'gbmParams' | 'tierParams' | 'bootstrapResamples' | 'minTrainPerClass' | 'minTestPerClass'>>;
+  /** Tests: the budget for live registry asks in POST /score and its time source. */
+  engineScore?: { budgetMs?: number; clock?: () => number };
   /** Test-only: replaces the screening checks' outside access (RDAP, DNS, fetch). Production passes nothing. */
   screening?: Partial<Omit<ScreeningDeps, 'checkService'>>;
 }
@@ -203,7 +207,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
   registerPatterns(app, { db: deps.db, now: deps.now ?? Date.now });
   registerLessons(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerEngine(app, { db: deps.db, now: deps.now ?? Date.now });
+  const engineTrainer = new EngineTrainer({
+    db: deps.db, now: deps.now ?? Date.now, log: app.log, ...deps.engineTrain,
+    enqueue: async (trainId, by) => { const r = await app.jobQueue.enqueue('train', { trigger: 'manual', triggeredBy: by, params: { train_id: trainId } }); app.jobQueue.kick(); return r; },
+  });
+  const engineScorer = new Scorer({ db: deps.db, now: deps.now ?? Date.now, screening: screeningDeps, log: app.log, ...deps.engineScore });
+  registerEngine(app, { db: deps.db, now: deps.now ?? Date.now, trainer: engineTrainer, scorer: engineScorer });
   registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker, queue: () => app.jobQueue });
   registerEmails(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
@@ -227,7 +236,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention, engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }),
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention, engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }), engineTrainer,
     outsideReview: async () => {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: (deps.now ?? Date.now)() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;

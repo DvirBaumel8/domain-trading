@@ -145,9 +145,9 @@ describe('engine uploads', () => {
     const { r } = await setup();
     const res = await app.inject({ method: 'GET', url: '/engine/health', headers: r });
     expect(res.json()).toEqual({
-      model_version: null,
+      model_version: null, trained_at: null, train_rows: null, test: null, chosen_weighting: null, last_training: null,
       data: { sales_n: 0, unsold_n: 0, sales_newest: null, unsold_newest: null, data_age_days: { sold: null, unsold: null }, last_upload: { sales: null, unsold: null } },
-      endings: { names_n: 0, pairs_n: 0, checked_n: 0, unknown_n: 0, pending_n: 0, by_tld: Object.fromEntries(['net', 'co', 'org', 'io', 'ai'].map((t) => [t, { checked_n: 0, registered_n: 0, unknown_n: 0, pending_n: 0 }])) },
+      endings: { names_n: 0, pairs_n: 0, checked_n: 0, unknown_n: 0, pending_n: 0, by_tld: Object.fromEntries(['net', 'co', 'org', 'io', 'ai', 'com'].map((t) => [t, { checked_n: 0, registered_n: 0, unknown_n: 0, pending_n: 0 }])) },
     });
   });
 
@@ -160,7 +160,7 @@ describe('engine uploads', () => {
     expect(h.data).toMatchObject({ sales_n: 2, unsold_n: 2, sales_newest: '2026-10-10', unsold_newest: '2026-10-13', data_age_days: { sold: 4, unsold: 1 } });
     expect(h.data.last_upload.sales).toMatchObject({ received_n: 2, accepted_n: 2, duplicate_n: 0, rejected_n: 0, by: 'gavriel' });
     expect(h.data.last_upload.unsold).toMatchObject({ upload_id: 2, accepted_n: 2 });
-    expect(h.endings).toMatchObject({ names_n: 3, pairs_n: 15, checked_n: 0, unknown_n: 0, pending_n: 15 });
+    expect(h.endings).toMatchObject({ names_n: 3, pairs_n: 18, checked_n: 0, unknown_n: 0, pending_n: 18 });
     expect(h.endings.by_tld.net).toEqual({ checked_n: 0, registered_n: 0, unknown_n: 0, pending_n: 3 });
   });
 });

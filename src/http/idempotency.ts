@@ -42,7 +42,7 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
   let lastPrune = 0;
 
   app.addHook('preHandler', async (req, reply) => {
-    if (!isMutating(req.method)) return;
+    if (!isMutating(req.method, req.routeOptions?.url)) return;
     const key = req.headers['idempotency-key'];
     if (typeof key !== 'string' || !KEY.test(key)) {
       throw new AppError(

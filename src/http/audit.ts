@@ -35,7 +35,7 @@ export function registerAuditId(app: FastifyInstance): void {
   app.decorateRequest('auditId', null);
   app.decorateRequest('auditSummary', null);
   app.addHook('onRequest', async (req) => {
-    if (isMutating(req.method)) req.auditId = newAuditId();
+    if (isMutating(req.method, req.routeOptions?.url)) req.auditId = newAuditId();
   });
 }
 

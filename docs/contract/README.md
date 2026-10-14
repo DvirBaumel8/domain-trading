@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 5.4.0** (14 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 5.5.0** (14 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -37,7 +37,8 @@
 - `HEAD` is answered for every `GET` route, with the same auth. On `/export/afternic.csv` and `/export/sedo.csv` a HEAD runs the GET handler: it writes an `export_runs` row and returns an `X-Export-Id`.
 
 ## Idempotency (every POST)
-- `Idempotency-Key: <1–255 visible ASCII characters>` is **required** on every POST. Missing or malformed → **400** `IDEMPOTENCY_KEY_REQUIRED`.
+- `Idempotency-Key: <1–255 visible ASCII characters>` is **required** on every POST that writes. Missing or malformed → **400** `IDEMPOTENCY_KEY_REQUIRED`.
+- **The one read-only POST (5.5.0): `POST /score`.** It uses POST only because it carries a list of names in a body; it changes nothing the caller owns. It takes a **READ** token, needs **no** `Idempotency-Key` and writes **no** audit row. Its only side effect is caching new public registry (RDAP) answers in `engine_endings`. Founder rule 8 (every POST idempotent and audited) is about writes; no other route is excepted. A missing or invalid token is still 401.
 - **Same key, same method, path and body** (canonical JSON): the stored response is replayed with the header `Idempotent-Replayed: true`. The side effects happen once.
 - **Same key, different request** → **409** `IDEMPOTENCY_KEY_MISMATCH`. **Same key while the first call is still running** → **409** `IDEMPOTENCY_KEY_IN_USE` (2.16.0: with `details: {stale: true, started_at}` when the first call started more than 15 minutes ago and may have died; the key is not released, so retry with a new key only after checking whether the first call acted). Completed keys are kept 30 days.
 - A 5xx response releases the key, so a retry with the same key runs again. Exception: `AUDIT_WRITE_FAILED` (500) means the request **was processed** but not audited. Retry with the same key to get the stored result.

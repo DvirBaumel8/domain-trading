@@ -80,6 +80,8 @@ export async function makeApp(
     screening?: AppDeps['screening'];
     jobQueueOverrides?: AppDeps['jobQueueOverrides'];
     jobQueueKeepAlive?: AppDeps['jobQueueKeepAlive'];
+    engineTrain?: AppDeps['engineTrain'];
+    engineScore?: AppDeps['engineScore'];
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -98,6 +100,8 @@ export async function makeApp(
     screeningStopAfterResults: opts.screeningStopAfterResults,
     jobQueueOverrides: opts.jobQueueOverrides,
     jobQueueKeepAlive: opts.jobQueueKeepAlive,
+    engineTrain: opts.engineTrain,
+    engineScore: opts.engineScore,
     // No live DNS in tests: a test that needs name servers passes fakes.
     screening: {
       resolveNs: async () => { throw new Error('DNS blocked in tests'); },

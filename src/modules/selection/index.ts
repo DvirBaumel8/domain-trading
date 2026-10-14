@@ -21,7 +21,7 @@ export { decideReplayRow, type Decision, type LabelledFeatures } from './replay.
 export { activeSelectionSettings, featureChecksOf, type HoldoutCheck, LABEL_RE, selectionSettingsByLabel } from './settings.js';
 export { earlierWithTopic, normalizeTopic, TOPIC_MAX_CHARS, topicFor, type TopicEarlier } from './topic.js';
 export { methodApproval } from './sibling-methods.js';
-export { loadSplitV2, splitClasses, splitV2 } from './split-v2.js';
+export { loadSplitV2, splitClasses, splitUnread, splitV2, type SplitV2Table } from './split-v2.js';
 export { featuresOfRun, splitKey, TEST_SET_CHECKS, TEST_SET_DEFAULT_MAX_ANSWER_AGE_DAYS, TEST_SET_DEFAULT_METHOD, TEST_SET_LANE, TEST_SET_METHODS, TEST_SET_RUN_HOURS, wilson95 } from './test-sets.js';
 export { type CheckContext, type CheckId, type Lane, type ResultRow, type RunItem, type ScreeningDeps } from './types.js';
 export { readCappedBytes } from './wayback.js';

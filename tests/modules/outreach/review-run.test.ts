@@ -222,7 +222,7 @@ describe('outsideReview daily step', () => {
     const t = await boot({ key: null });
     const r = await t.app.jobRunner.run('daily');
     const names = Object.keys(r.steps);
-    expect(names.slice(-5)).toEqual(['referenceRefresh', 'outsideReview', 'retention', 'backupExport', 'engineEndings']);
+    expect(names.slice(-5)).toEqual(['outsideReview', 'retention', 'backupExport', 'engineEndings', 'engineTrain']);
     expect(r.steps.outsideReview).toMatchObject({ ok: true, skipped: true, summary: { skipped: true, reason: 'NO_KEY' } });
   });
 

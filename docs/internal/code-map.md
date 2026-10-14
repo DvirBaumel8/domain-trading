@@ -145,19 +145,28 @@ Intake of candidate names, on-demand screening, the daily list, drop lists, coho
 Tables (v4.0.0 patterns tests: `candidates/patterns`; v5.3.0 `scout_lessons`, tests `candidates/lessons` LS-1..LS-8): `candidate_intake`, `candidate_screenings`, `daily_candidate_lists`, `drop_lists`, `drop_list_rows`, `cohorts`, `cohort_names`, `cohort_decisions` (`drop_list_checks`, `cohort_outcomes` written by ops jobs). Tests: `tests/modules/candidates/` (`intake`, `intake-resume`, `intake-rules`, `screen`, `screen-domains`, `screen-force`, `scout-split`, `lane-fit`, `daily-list`, `daily-list-fields`, `daily-list-rebuild`, `daily-list-rejected`, `drop-lists`, `cohorts`, `cohorts-freeze`, `cohort-settings`).
 
 ### engine
-v5.4.0 (CR-056 part 1): data for the name-scoring engine. Rules and plan: `docs/internal/engine.md`. Imports `selection` (RDAP helpers); nothing in selection, buying or candidates imports it; ops runs its job through `JobRunnerDeps.engineEndingsJob`.
+v5.4.0 (CR-056 part 1): data for the name-scoring engine; v5.5.0 (part 2): features, models, training, scoring. Rules and plan: `docs/internal/engine.md`. Imports `selection` (RDAP helpers, split table, lists); nothing in selection, buying or candidates imports it; ops runs its jobs through `JobRunnerDeps.engineEndingsJob` and `JobRunnerDeps.engineTrainer`.
 
 | Route | File |
 |---|---|
 | POST /engine/sales, POST /engine/unsold, GET /engine/health | `engine/api/engine.ts` (`registerEngine`; 8 MB body limit; the audit log keeps the row count only, `elideRows` in `src/http/audit.ts`) |
+| POST /engine/train, GET /engine/train/:id (v5.5.0) | `engine/api/engine.ts` (`EngineTrainer.start` / `get`) |
+| POST /score (v5.5.0, the one read-only POST) | `engine/api/engine.ts` (`Scorer.score`); read-only status comes from `READ_ONLY_POSTS` in `src/http/methods.ts` (`isMutating(method, routeUrl)`: scope, idempotency, audit, rate class, openapi) |
 
 | File | Inside |
 |---|---|
 | `uploads.ts` | `storeSales`, `storeUnsold`, `parseSaleRow`, `parseUnsoldRow` (per-row reject reasons), `SALE_DEDUPE_DAYS`, `ENGINE_MAX_ROWS`; one transaction under the `engine_upload` lock |
 | `endings.ts` | `EndingsJob` (daily step `engineEndings`: due pairs, per-host pacing with `hostPacer`, writes `engine_endings`), `endingsHealth`, `ENDINGS_*` constants |
-| `health.ts` | `engineHealth` (GET /engine/health) |
+| `health.ts` | `engineHealth` (GET /engine/health; v5.5.0: model fields) |
+| `features.ts` | v5.5.0: pure point-in-time features (`computeFeatures`, `FEATURE_NAMES`, `buildTokenIndex`, `extendedTable`, `inRegime`, `zipfOfCost`, `COM_FEATURES`) |
+| `data.ts` | v5.5.0: database loaders (`loadSales`, `loadUnsold`, `loadEndings`, `loadDemand`, `loadExtraTerms`, `tokenContext`) |
+| `dataset.ts` | v5.5.0: sold / unsold rows, `quarterOf`, the time split, `frozenHash` (`buildDataset`, `DataError`) |
+| `train.ts` | v5.5.0: `EngineTrainer` (`start`, `get`, `runById` = queue step `trainModel`, `weekly` = daily step `engineTrain`), `ModelParams`, `TIERS` |
+| `score.ts` | v5.5.0: `Scorer` (`score`, `activeModel`, live registry asks inside `SCORE_LIVE_BUDGET_MS`) |
+| `reasons.ts` | v5.5.0: plain-English reason texts from the logistic contributions |
+| `model/gbm.ts`, `logit.ts`, `metrics.ts`, `rng.ts` | v5.5.0: histogram gradient boosting (binary and softmax), L2 logistic regression (IRLS), AUC / bootstrap / precision / quantiles, seeded randomness; pure, no dependency |
 
-Tables: `engine_uploads`, `engine_sales`, `engine_unsold` (append-only), `engine_endings` (migration `1763800000000_v5-4-0.sql`; not in the backup, not in retention). Tests: `tests/modules/engine/` (`uploads` EN-1..EN-10, `endings` EN-11..EN-20); step order in `tests/modules/ops/jobs.test.ts`.
+Tables: `engine_uploads`, `engine_sales`, `engine_unsold` (append-only), `engine_endings` (migration `1763800000000_v5-4-0.sql`; v5.5.0 adds tld `com`), `engine_models` (migration `1763900000000_v5-5-0.sql`, which also adds queue job kind `train`); none in the backup, none in retention. Tests: `tests/modules/engine/` (`uploads` EN-1..EN-10, `endings` EN-11..EN-20, `model-math` EN-21..EN-30, `features` EN-31..EN-38, `train` EN-40..EN-52, `score` EN-60..EN-70; helper `tests/helpers/engine-data.ts`); step order in `tests/modules/ops/jobs.test.ts`.
 
 ### selling
 Offers (record, classify, outcome), sold records, offer stats.
@@ -223,7 +232,7 @@ Jobs and queue, health, admin CLI, backup.
 
 | File | Inside |
 |---|---|
-| `jobs/runner.ts` | `JobRunner.plan(job)` = the step list for `tick`, `daily`, `screen`; `STEP_ATTEMPTS`, `STEP_TIMEOUT_MS`, `classify` |
+| `jobs/runner.ts` | `JobRunner.plan(job)` = the step list for `tick`, `daily`, `screen`, `train` (v5.5.0: step `trainModel`; daily gets `engineTrain` last); `STEP_ATTEMPTS`, `STEP_TIMEOUT_MS`, `classify` |
 | `queue.ts` | `JobQueue` (Postgres queue: enqueue, claim, run step by step, keepalive; v3.9.0: a skipped retry after a timeout is marked failed) |
 | `job.ts` | `npm run job` CLI |
 | `jobs/price-schedule.ts`, `drop.ts`, `registrar-check.ts`, `portfolio-check.ts`, `drop-watch.ts`, `ns-verify.ts`, `cohort-outcomes.ts`, `reference-refresh.ts` | `PriceScheduleJob` (step `priceJob`), `DropJob`, `RegistrarCheckJob`, `PortfolioCheckJob`, `DropWatchJob`, `NsVerifier` (`runOnce({onlyUnverified})`: the runner calls it for never-verified names even after the day's run, v3.7.0), `CohortOutcomesJob`, `ReferenceRefreshJob`; `RegistrarCheckJob` also appends `registrar_state_checks` (auto-renew, privacy, NS of Porkbun names, read-only) |
@@ -267,7 +276,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763800000000_v5-4-0.sql`: engine_uploads, engine_sales, engine_unsold, engine_endings; before it `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 37 files). Run with `npm run migrate`.
+`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1763900000000_v5-5-0.sql`: engine_models, tld com, job kind train; before it `1763800000000_v5-4-0.sql`: engine_uploads, engine_sales, engine_unsold, engine_endings; before it `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 37 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -288,7 +297,11 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Add a screening check | new `selection/checks/<id>.ts`; register in `checks/index.ts` (`CHECKS`, `GATE_OF`); `selection/settings.ts` (`CHECK_IDS`, gates per lane); `selection/types.ts` (`CheckId`); `selection/depends.ts`; `docs/contract/selection.md` | new `tests/modules/selection/screening-<id>.test.ts` (see `screening-same-name`), `selection/unit/screening-*` |
 | Change what a screening pack requires | `selection/pack.ts` (`assessPack`, `requiredChecks`), `selection/settings.ts` (`PACK_DEFAULT`) | `selection/unit/pack-assess`, `selection/screening-packs` |
 | Change seller-page checks | `selection/sellers.ts`, `selection/site.ts` | `selection/unit/sellers`, `site-classify`, `selection/sellers`, `seller-fetch` |
-| Change the engine uploads or the endings fill | `engine/uploads.ts`, `engine/endings.ts`, `engine/health.ts`; document in `docs/contract/endpoints.md` (Scoring engine data) and `jobs.md` | `engine/uploads`, `engine/endings` |
+| Change the engine uploads or the endings fill | `engine/uploads.ts`, `engine/endings.ts`, `engine/health.ts`; document in `docs/contract/endpoints.md` (Scoring engine) and `jobs.md` | `engine/uploads`, `engine/endings` |
+| Add or change an engine feature | `engine/features.ts` (`FEATURE_NAMES`, `computeFeatures`), the loader in `engine/data.ts`, the reason text in `engine/reasons.ts`; engine.md features table; a feature with no data is left out by `train.ts` | `engine/features`, `engine/train`, `engine/score` |
+| Change the training split, metrics or weighting | `engine/dataset.ts`, `engine/train.ts`, `engine/model/metrics.ts`; engine.md and `endpoints.md` (POST /engine/train) | `engine/train`, `engine/model-math` |
+| Change a model | `engine/model/gbm.ts`, `logit.ts` (a changed model changes every score: bump the model version note in the release) | `engine/model-math`, `engine/train` |
+| Make another POST read-only | `READ_ONLY_POSTS` in `src/http/methods.ts` (and the README §Idempotency note) | `engine/score` EN-61 |
 | Add a step to the daily job | `ops/jobs/runner.ts` (`plan()`, `JobRunnerDeps`, `STEP_ATTEMPTS`), new job class under `ops/jobs/`, export in `ops/index.ts`, wire in `src/app.ts`; document in `docs/contract/jobs.md` | `ops/unit/jobs-runner-config`, `ops/jobs`, `job-queue`, `daily-schedule` |
 | Change the daily/overdue schedule view | `reporting/job-runs.ts` (`dailyScheduleState`, `jobsOverdue`) | `ops/jobs`, `missed-runs` |
 | Change the outside review | `outreach/review/*.ts` (`run.ts`, `packet.ts`, `gemini.ts`), `outreach/api/reviews.ts` | `outreach/review-packet`, `review-run`, `review-settings`, `outreach/unit/review-pure` |
