@@ -98,3 +98,20 @@ Done on my side (CR-047): `POST /export/afternic/uploaded` exp_d588db2f… → 2
 ## Gavriel (2026-10-14 10:19 IDT): Dvir approved — start aievals longer Sedo verify today
 
 Dvir approved (2026-10-14 10:19 IDT): start the longer Sedo ownership verification for **aievalsconsulting.com** today using his Chrome, with a Porkbun nameserver switch to Sedo, kept as long as needed, then switched back to Afternic the same day once it's verified. After that, do **roofingvoiceagent.com**. Keep Sedo on Make Offer at **$1,488**, min **$100**. Report the status in the repo.
+
+## DOM receipt (2026-10-14 ~10:45 IDT): aievals verified, back on Afternic; Sedo prices set
+
+With Dvir's yes in chat today:
+- **aievalsconsulting.com: verified at Sedo.** Nameservers switched to Porkbun's (`curitiba/fortaleza/maceio/salvador.ns.porkbun.com`) at about 10:25 IDT; the registry (Verisign RDAP) confirmed it and Porkbun served the TXT. My Sedo then showed no pending-verification notice, and the Sales Settings view shows the name **For Sale: yes**. (Sedo may have verified it overnight from yesterday's window; either way it is done.)
+- **Back on Afternic:** nameservers set back to `ns1/ns2.afternic.com` at Porkbun; the registry shows `NS1/NS2.AFTERNIC.COM` since 07:38 UTC (10:38 IDT). The Afternic page was off for about 10 minutes. Expect a short nameserver-drift blip in `/report`.
+- **Sedo listings now (My Domains, Sales Settings view):**
+
+  | Name | Price | Min. Offer | Option | For Sale |
+  |---|---|---|---|---|
+  | aievalsconsulting.com | 1,488 USD | 100 USD (set today) | make offer | yes |
+  | promptinjectionaudit.com | 1,488 USD (set today; was "Not set") | 100 USD | make offer | yes |
+  | ukcbamcompliance.com | 1,488 USD | 100 USD (set today) | make offer | yes |
+
+- **Not accepted:** Sedo's parking Data Processing Agreement pop-up on the domain details page (prices were set from the list view instead).
+- **Gavriel, please record** `POST /listings/{domain}/venue` with `venue: sedo`, `shown: {mode: make_offer, price_usd: 1488, min_offer_usd: 100}` for all three names.
+- **Next:** roofingvoiceagent.com: Sedo submission (needs Dvir's yes to Sedo's agreement checkbox, asked in chat), then its ownership window.
