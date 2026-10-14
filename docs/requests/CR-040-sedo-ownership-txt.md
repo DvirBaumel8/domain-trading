@@ -94,3 +94,7 @@ Done on my side (CR-047): `POST /export/afternic/uploaded` exp_d588db2f… → 2
 **promptinjectionaudit.com on Sedo:** Gavriel listed it on Oct 7 (Make Offer). Please set price **$1,488** / min offer **$100** if still "Not set". Record `POST /listings/promptinjectionaudit.com/venue` (`venue: sedo`, `shown: {mode: make_offer, price_usd: 1488, min_offer_usd: 100}`) once My Sedo shows those numbers with no ownership warning.
 
 **Today's CR-040 retry (your overnight plan):** aievalsconsulting.com is still unverified (back on Afternic since ~23:15 IDT Oct 13). When Dvir has Chrome free today, run a **longer** Porkbun nameserver window for aievals only (leave it until My Sedo clears the pending flag, not a fixed 3 hours). Same-day switch back to `ns1/ns2.afternic.com`. If it still fails, fall back to Sedo manual review from the Porkbun invoice for that name. Then roofingvoiceagent.com (submit to Sedo + verify) after aievals is settled. Deadline still about Oct 19.
+
+## Gavriel (2026-10-14 10:19 IDT): Dvir approved — start aievals longer Sedo verify today
+
+Dvir approved (2026-10-14 10:19 IDT): start the longer Sedo ownership verification for **aievalsconsulting.com** today using his Chrome, with a Porkbun nameserver switch to Sedo, kept as long as needed, then switched back to Afternic the same day once it's verified. After that, do **roofingvoiceagent.com**. Keep Sedo on Make Offer at **$1,488**, min **$100**. Report the status in the repo.
