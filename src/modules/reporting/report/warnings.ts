@@ -27,6 +27,8 @@ export const NEON_FREE_STORAGE_BYTES = 0.5 * 1024 ** 3;
 export const DB_SIZE_WARN_PERCENT = 70;
 /** v5.1.0: DAILY_JOB_MISSED is raised when no scheduled daily job run started in this many hours (once any job run exists). */
 export const DAILY_JOB_MISSED_HOURS = 26;
+/** v5.7.0: ENDING_REGISTERED is raised for an event this recent. */
+export const ENDING_REGISTERED_DAYS = 30;
 const RANK: Record<WarningLevel, number> = { error: 0, warn: 1, info: 2 };
 
 export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { storageLimitBytes?: number } = {}): Promise<ReportWarning[]> {
@@ -296,6 +298,15 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
 
   // v4.0.0: renewal drop check, horizon, delist after a sale
   await lifecycleWarnings(db, now, today, domains, add);
+  // v5.7.0 (CR-058): another ending of an owned name was registered (or re-registered) after we bought it; a possible buyer. One warning per event, for 30 days.
+  const endingEvents = await db.selectFrom('owned_ending_events').select(['domain', 'tld', 'kind', 'created_at_registry', 'registrar', 'created_at'])
+    .where('kind', '<>', 'baseline').where('created_at', '>', new Date(now.getTime() - ENDING_REGISTERED_DAYS * DAY)).orderBy('id').execute();
+  for (const e of endingEvents) {
+    const host = `${e.domain.slice(0, -4)}.${e.tld}`;
+    add('ENDING_REGISTERED', 'warn', `${host} was ${e.kind === 'newly_registered' ? 'newly registered' : 're-registered'} while we hold ${e.domain}; the registrant is a possible buyer (nothing is sent automatically).`, e.domain, {
+      owned_domain: e.domain, host, created: e.created_at_registry ? toJerusalemIso(e.created_at_registry) : null, registrar: e.registrar, kind: e.kind, detected_at: toJerusalemIso(e.created_at),
+    });
+  }
 
   // price events
   const failed = await db.selectFrom('price_schedule').select(['domain_id', 'event', 'due_on', 'note']).where('status', '=', 'failed').orderBy('domain_id').orderBy('due_on').execute();

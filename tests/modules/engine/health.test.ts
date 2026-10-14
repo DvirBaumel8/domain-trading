@@ -12,6 +12,7 @@ import { computeDrift } from '../../../src/modules/engine/drift.js';
 import type { EndingFact, EngineTld, FeatureContext } from '../../../src/modules/engine/features.js';
 import { computeBars } from '../../../src/modules/engine/health.js';
 import { makeRng } from '../../../src/modules/engine/model/rng.js';
+import { holdSlices } from '../../../src/modules/engine/slices.js';
 
 let app: FastifyInstance | undefined;
 afterEach(async () => { await app?.close(); app = undefined; });
@@ -132,5 +133,53 @@ describe('training stores drift and ablation; health shows them', () => {
     // stored on the model's metrics too
     const m = (await app!.inject({ method: 'GET', url: '/engine/train/eng-1.0.1', headers: r })).json();
     expect(m.metrics.ablation.delta).toBe(h.ablation.delta); expect(m.metrics.drift['2025']).toBeDefined();
+  });
+});
+
+describe('hold-time slices (v5.7.0, CR-058 part B)', () => {
+  const row = (label: number, asOf: string, score: number, netPit: number | null, com: string | null) => ({ label, asOf, score, netPit, comCreatedMs: com ? ms(com) : null });
+
+  it('EN-88: quick = sold under 91 days after the .com creation, held = later, unknown .com date counted apart; recall, net_pit share and AUC by hand', () => {
+    const rows = [
+      row(1, '2026-03-01', 0.9, 1, '2026-01-01'), // 59 days: quick, found, net
+      row(1, '2026-04-01', 0.2, 0, '2026-01-01'), // 90 days: quick, missed
+      row(1, '2026-04-02', 0.8, 1, '2026-01-01'), // 91 days: held (not under 91), found, net
+      row(1, '2026-09-01', 0.3, null, '2020-01-01'), // held, missed, net_pit unknown
+      row(1, '2026-09-01', 0.7, 1, null), // unknown com date
+      row(0, '2026-09-01', 0.1, 0, null), row(0, '2026-09-01', 0.5, 0, null), row(0, '2026-09-01', 0.25, 1, null), row(0, '2026-09-01', 0.6, 0, null),
+    ];
+    const s = holdSlices(rows);
+    expect(s.unknown_n).toBe(1);
+    expect(s.threshold).toBe(0.5);
+    // quick scores 0.9, 0.2 against negatives 0.1, 0.5, 0.25, 0.6: 0.9 beats 4, 0.2 beats 1 -> 5/8
+    expect(s.quick).toEqual({ n: 2, recall: 0.5, net_pit_share: 0.5, auc: 0.625 });
+    // held scores 0.8, 0.3: 0.8 beats 4, 0.3 beats 2 (0.1, 0.25) -> 6/8
+    expect(s.held).toEqual({ n: 2, recall: 0.5, net_pit_share: 0.5, auc: 0.75 });
+    // an empty slice, and a one-row slice (no AUC)
+    expect(holdSlices(rows.filter((r) => r.label === 0 || r.comCreatedMs === null)).quick).toEqual({ n: 0, recall: null, net_pit_share: null, auc: null });
+    expect(holdSlices(rows.slice(0, 1).concat(rows.slice(5))).quick).toMatchObject({ n: 1, recall: 1, auc: null });
+  });
+
+  it('EN-89: GET /engine/health and GET /engine/train/:id carry slices from the latest model\'s test rows; before a model slices is null', async () => {
+    const seed = await seedEngineData(db);
+    app = await makeApp({ adapters: [new FakeAdapter('porkbun')], now: () => Date.parse('2026-10-14T09:00:00Z'), engineTrain: { ...FAST_TRAIN } });
+    const w = (await issueToken('write', 'gavriel')).auth; const r = (await issueToken('read')).auth;
+    expect((await app.inject({ method: 'GET', url: '/engine/health', headers: r })).json().slices).toBeNull();
+    // 10 test names get a .com created shortly before their sale (quick), 5 lose the .com answer (unknown); the other 25 stay held (.com from 2020)
+    const testNames = seed.sold.filter((s) => s.date >= '2026-07-01').map((s) => s.domain.slice(0, -4));
+    expect(testNames).toHaveLength(40);
+    await db.updateTable('engine_endings').set({ created_at_registry: new Date('2026-06-30T00:00:00Z') }).where('tld', '=', 'com').where('name', 'in', testNames.slice(0, 10)).execute();
+    await db.deleteFrom('engine_endings').where('tld', '=', 'com').where('name', 'in', testNames.slice(10, 15)).execute();
+    await app.inject({ method: 'POST', url: '/engine/train', headers: { ...w, 'idempotency-key': randomUUID() }, payload: {} });
+    await app.jobQueue.idle();
+    const h = (await app.inject({ method: 'GET', url: '/engine/health', headers: r })).json();
+    expect(h.slices).toMatchObject({ threshold: 0.5, quick: { n: 10 }, held: { n: 25 }, unknown_n: 5 });
+    for (const k of ['quick', 'held']) {
+      expect(h.slices[k]).toEqual({ n: expect.any(Number), recall: expect.any(Number), net_pit_share: expect.any(Number), auc: expect.any(Number) });
+      expect(h.slices[k].recall).toBeGreaterThanOrEqual(0); expect(h.slices[k].auc).toBeLessThanOrEqual(1);
+    }
+    const t = (await app.inject({ method: 'GET', url: '/engine/train/eng-1.0.1', headers: r })).json();
+    expect(t.slices).toEqual(h.slices);
+    expect(t.metrics.slices).toEqual(h.slices);
   });
 });

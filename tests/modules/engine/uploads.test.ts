@@ -148,7 +148,7 @@ describe('engine uploads', () => {
     expect(h.bars.map((b: { id: number }) => b.id)).toEqual([1, 2, 3, 4, 5, 6]); // 5.6.0, see health.test.ts
     delete h.bars;
     expect(h).toEqual({
-      model_version: null, trained_at: null, train_rows: null, test: null, chosen_weighting: null, last_training: null, ablation: null, bar4_pass: null, drift: null, bars_passed: [],
+      model_version: null, trained_at: null, train_rows: null, test: null, chosen_weighting: null, last_training: null, ablation: null, bar4_pass: null, drift: null, slices: null, bars_passed: [],
       data: { sales_n: 0, unsold_n: 0, sales_newest: null, unsold_newest: null, data_age_days: { sold: null, unsold: null }, last_upload: { sales: null, unsold: null } },
       endings: { names_n: 0, pairs_n: 0, checked_n: 0, unknown_n: 0, pending_n: 0, by_tld: Object.fromEntries(['net', 'co', 'org', 'io', 'ai', 'com'].map((t) => [t, { checked_n: 0, registered_n: 0, unknown_n: 0, pending_n: 0 }])) },
     });

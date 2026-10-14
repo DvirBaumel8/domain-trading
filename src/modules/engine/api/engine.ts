@@ -1,4 +1,5 @@
 // v5.4.0 (CR-056 part 1): POST /engine/sales, POST /engine/unsold (WRITE, Idempotency-Key), GET /engine/health (READ).
+// v5.7.0 (CR-058): GET /owned/:domain/endings (READ).
 // v5.5.0 (part 2): POST /engine/train (WRITE, Idempotency-Key, 202), GET /engine/train/:id (READ), POST /score (READ scope: the one read-only POST, no Idempotency-Key, no audit row).
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
@@ -7,6 +8,7 @@ import { idtDay, realYmd } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
 import { AppError } from '../../../http/errors.js';
+import { ownedEndingsView } from '../endings.js';
 import { engineHealth } from '../health.js';
 import { SCORE_MAX_DOMAINS, type Scorer } from '../score.js';
 import type { EngineTrainer } from '../train.js';
@@ -43,6 +45,15 @@ export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database
   });
 
   app.get('/engine/health', async () => engineHealth(deps.db, deps.now()));
+
+  // v5.7.0 (CR-058): the other endings of an owned name, current state and event history.
+  app.get<{ Params: { domain: string } }>('/owned/:domain/endings', async (req) => {
+    let domain: string;
+    try { domain = normalizeDomain(req.params.domain); } catch { throw new AppError(404, 'DOMAIN_NOT_FOUND', 'Domain not found'); }
+    const r = await ownedEndingsView(deps.db, domain);
+    if (!r) throw new AppError(404, 'DOMAIN_NOT_FOUND', `${domain} is not an owned domain`);
+    return r;
+  });
 
   // v5.5.0: starts a training run on the job queue (at most one per 24 hours: 409 TRAIN_TOO_SOON); the answer comes from GET /engine/train/:id.
   app.post('/engine/train', { config: { openapiBody: EmptyBody, openapiStatus: 202 } }, async (req, reply) => {

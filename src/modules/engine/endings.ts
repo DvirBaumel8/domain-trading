@@ -7,6 +7,7 @@
 // It does not go through lookupCached: that would write a screening_evidence row and an rdap_lookups row for each of ~160,000 asks (free-plan size);
 // the compact answer in engine_endings is the permanent record.
 import { sql, type Kysely } from 'kysely';
+import { toJerusalemIso } from '../../core/dates.js';
 import { trySessionLock } from '../../core/locks.js';
 import { RDAP_FALLBACK_BASES, type RdapLookup } from '../../core/rdap.js';
 import type { Database } from '../../db/types.js';
@@ -28,6 +29,9 @@ const CONCURRENCY = 4;
 const LOOKUP_TIMEOUT_MS = 8_000;
 const MAX_RETRY_AFTER_MS = 10_000;
 const DAY = 86_400_000;
+/** v5.7.0 (CR-058): an owned name's five endings are asked again once the newest answer is this old. */
+export const OWNED_RECHECK_DAYS = 7;
+const OWNED_STATUSES = ['owned', 'listed', 'delisted'] as const;
 
 /** The pairs of the uploaded names and the current (newest) row of each; shared by the job's pick and the health counts. */
 function pairsCte() {
@@ -58,7 +62,7 @@ export interface EndingsSummary {
   skipped_tlds: string[];
 }
 
-export interface Pair { name: string; tld: EndingTld; prevId: number | null; prevRegistered: boolean | null }
+export interface Pair { name: string; tld: EndingTld; prevId: number | null; prevRegistered: boolean | null; /** v5.7.0: set for the pairs of an owned name (the owned .com and its buy date). */ owned?: { domain: string; buyDate: string | null } }
 export interface Answer { registered: boolean | null; createdAt: Date | null; httpStatus: number | null; reason: string | null; evidence: unknown }
 
 const refused = (x: RdapLookup): boolean => x.reasonCode === 'RATE_LIMITED' || x.httpStatus === 429 || x.httpStatus === 403;
@@ -102,7 +106,8 @@ export async function askRdap(screening: ScreeningDeps, domain: string, base: st
 
 /** Never asked: insert. An unanswered row: update it in place. An answered row (older than 30 days): append a row for a new answer, keep the old one on an unanswered ask. Returns what was done. */
 export async function saveAnswer(db: Kysely<Database>, nowMs: number, p: Pair, a: Answer): Promise<'inserted' | 'updated' | 'kept'> {
-  const row = { registered: a.registered, created_at_registry: a.createdAt, checked_at: new Date(nowMs), http_status: a.httpStatus, reason_code: a.reason, evidence: a.evidence == null ? null : JSON.stringify(a.evidence) };
+  const registrar = (a.evidence as { registrar?: string | null } | null)?.registrar ?? null;
+  const row = { registered: a.registered, created_at_registry: a.createdAt, checked_at: new Date(nowMs), http_status: a.httpStatus, reason_code: a.reason, evidence: a.evidence == null ? null : JSON.stringify(a.evidence), registrar };
   if (p.prevId !== null && p.prevRegistered === null) {
     await db.updateTable('engine_endings').set(row).where('id', '=', p.prevId).execute();
     return 'updated';
@@ -129,14 +134,18 @@ export class EndingsJob {
       const deadline = start + (this.deps.budgetMs ?? ENDINGS_TIME_BUDGET_MS);
       const cut = dueCutoffs(start);
       const max = this.deps.maxPairs ?? ENDINGS_MAX_PAIRS_PER_RUN;
-      const total = await sql<{ n: string }>`with ${pairsCte()} select count(*)::text as n from pairs where checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck}`.execute(db);
-      out.due = Number(total.rows[0]?.n ?? 0);
+      // v5.7.0 (CR-058): the owned names' pairs come first, weekly; the bulk pairs below leave them out.
+      const ownedPairs = (await this.ownedDue(start)).slice(0, max);
+      const allOwned = (await sql<{ name: string }>`select split_part(domain, '.', 1) as name from domains where status in (${sql.join(OWNED_STATUSES)}) and domain like '%.com'`.execute(db)).rows.map((r) => r.name);
+      const total = await sql<{ n: string }>`with ${pairsCte()} select count(*)::text as n from pairs where (checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck}) and not (tld <> 'com' and name = any(${allOwned}))`.execute(db);
+      out.due = Number(total.rows[0]?.n ?? 0) + ownedPairs.length;
       const picked = (await sql<{ name: string; tld: EndingTld; id: string | null; registered: boolean | null }>`
         with ${pairsCte()}
         select name, tld, id::text as id, registered from pairs
-        where checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck}
-        order by checked_at asc nulls first, name, tld limit ${max}`.execute(db)).rows;
+        where (checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck}) and not (tld <> 'com' and name = any(${allOwned}))
+        order by checked_at asc nulls first, name, tld limit ${Math.max(0, max - ownedPairs.length)}`.execute(db)).rows;
       const byTld = new Map<EndingTld, Pair[]>();
+      for (const p of ownedPairs) (byTld.get(p.tld) ?? byTld.set(p.tld, []).get(p.tld)!).push(p);
       for (const r of picked) (byTld.get(r.tld) ?? byTld.set(r.tld, []).get(r.tld)!).push({ name: r.name, tld: r.tld, prevId: r.id === null ? null : Number(r.id), prevRegistered: r.registered });
       let stopped = false;
       await Promise.all([...byTld.entries()].map(async ([tld, pairs]) => {
@@ -154,6 +163,7 @@ export class EndingsJob {
             stats.asked += 1; out.asked += 1;
             if (a.registered === true) { stats.registered += 1; out.registered += 1; } else if (a.registered === false) { stats.not_registered += 1; out.not_registered += 1; } else { stats.unknown += 1; out.unknown += 1; }
             await this.save(p, a, out);
+            if (p.owned) await recordOwnedEvent(db, now(), p, a);
           }
         };
         await Promise.all(Array.from({ length: CONCURRENCY }, worker));
@@ -170,6 +180,21 @@ export class EndingsJob {
     }
   }
 
+  /** The five endings of every owned name that are due: never asked, asked over 7 days ago, or unanswered for 6 hours. */
+  private async ownedDue(nowMs: number): Promise<Pair[]> {
+    const weekAgo = new Date(nowMs - OWNED_RECHECK_DAYS * DAY);
+    const unknownCut = new Date(nowMs - ENDINGS_UNKNOWN_RETRY_HOURS * 3_600_000);
+    const rows = (await sql<{ domain: string; name: string; tld: EndingTld; buy_date: string | null; id: string | null; registered: boolean | null }>`
+      with own as (select domain, split_part(domain, '.', 1) as name, to_char(buy_date, 'YYYY-MM-DD') as buy_date from domains where status in (${sql.join(OWNED_STATUSES)}) and domain like '%.com'),
+      tlds(tld) as (values ('net'), ('co'), ('org'), ('io'), ('ai')),
+      cur as (select distinct on (name, tld) id, name, tld, registered, checked_at from engine_endings order by name, tld, checked_at desc, id desc)
+      select o.domain, o.name, t.tld, o.buy_date, c.id::text as id, c.registered
+      from own o cross join tlds t left join cur c on c.name = o.name and c.tld = t.tld
+      where c.checked_at is null or c.checked_at < ${weekAgo} or (c.registered is null and c.checked_at < ${unknownCut})
+      order by c.checked_at asc nulls first, o.name, t.tld`.execute(this.deps.db)).rows;
+    return rows.map((r) => ({ name: r.name, tld: r.tld, prevId: r.id === null ? null : Number(r.id), prevRegistered: r.registered, owned: { domain: r.domain, buyDate: r.buy_date } }));
+  }
+
   private ask(domain: string, base: string, pace: ReturnType<typeof hostPacer>): Promise<Answer> {
     return askRdap(this.deps.screening, domain, base, pace);
   }
@@ -178,6 +203,50 @@ export class EndingsJob {
     const r = await saveAnswer(this.deps.db, this.deps.now(), p, a);
     if (r === 'inserted') out.inserted += 1; else if (r === 'updated') out.updated += 1;
   }
+}
+
+/**
+ * v5.7.0 (CR-058): after an owned pair's answer, appends at most one event to owned_ending_events. The first answer after the buy is the baseline, or
+ * `newly_registered` when the ending was created after the buy date; later, an unregistered ending that is now registered is `newly_registered` and a
+ * changed registry creation date is `re_registered`. An unknown answer writes nothing, and an event is only written when the state differs from the newest event.
+ */
+export async function recordOwnedEvent(db: Kysely<Database>, nowMs: number, p: Pair, a: Answer): Promise<'baseline' | 'newly_registered' | 're_registered' | null> {
+  if (!p.owned || a.registered === null) return null;
+  const prev = await db.selectFrom('owned_ending_events').select(['registered', 'created_at_registry']).where('domain', '=', p.owned.domain).where('tld', '=', p.tld as 'net').orderBy('id', 'desc').limit(1).executeTakeFirst();
+  let kind: 'baseline' | 'newly_registered' | 're_registered' | null = null;
+  if (!prev) {
+    kind = a.registered && a.createdAt && p.owned.buyDate && a.createdAt.toISOString().slice(0, 10) > p.owned.buyDate ? 'newly_registered' : 'baseline';
+  } else if (!prev.registered && a.registered) {
+    kind = 'newly_registered';
+  } else if (prev.registered && a.registered && prev.created_at_registry && a.createdAt && prev.created_at_registry.getTime() !== a.createdAt.getTime()) {
+    kind = 're_registered';
+  }
+  if (!kind) return null;
+  const cur = await db.selectFrom('engine_endings').select(['id', 'registrar']).where('name', '=', p.name).where('tld', '=', p.tld).orderBy('checked_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+  await db.insertInto('owned_ending_events').values({
+    domain: p.owned.domain, tld: p.tld as 'net', kind, registered: a.registered, created_at_registry: a.createdAt, registrar: cur?.registrar ?? null, ending_id: cur?.id ?? null, created_at: new Date(nowMs),
+  }).execute();
+  return kind;
+}
+
+/** GET /owned/:domain/endings (v5.7.0): the current state of the five endings of an owned name plus its event history; null when the name is not owned. */
+export async function ownedEndingsView(db: Kysely<Database>, domain: string) {
+  const d = await db.selectFrom('domains').select(['domain', 'buy_date']).where('domain', '=', domain).where('status', 'in', [...OWNED_STATUSES]).executeTakeFirst();
+  if (!d) return null;
+  const name = domain.slice(0, -4);
+  const cur = (await sql<{ tld: EndingTld; registered: boolean | null; created_at_registry: Date | null; registrar: string | null; checked_at: Date }>`
+    select distinct on (tld) tld, registered, created_at_registry, registrar, checked_at from engine_endings where name = ${name} and tld <> 'com'
+    order by tld, (registered is not null) desc, checked_at desc, id desc`.execute(db)).rows;
+  const events = await db.selectFrom('owned_ending_events').selectAll().where('domain', '=', domain).orderBy('id').execute();
+  const iso = (x: Date | null) => (x ? toJerusalemIso(x) : null);
+  return {
+    domain, buy_date: d.buy_date,
+    endings: ENDING_TLDS.map((tld) => {
+      const r = cur.find((c) => c.tld === tld);
+      return { tld, host: `${name}.${tld}`, registered: r?.registered ?? null, created: iso(r?.created_at_registry ?? null), registrar: r?.registrar ?? null, checked_at: iso(r?.checked_at ?? null) };
+    }),
+    events: events.map((e) => ({ id: e.id, tld: e.tld, kind: e.kind, registered: e.registered, created: iso(e.created_at_registry), registrar: e.registrar, at: toJerusalemIso(e.created_at) })),
+  };
 }
 
 export interface EndingsHealth {

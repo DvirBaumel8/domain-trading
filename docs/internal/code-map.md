@@ -151,12 +151,14 @@ v5.4.0 (CR-056 part 1): data for the name-scoring engine; v5.5.0 (part 2): featu
 |---|---|
 | POST /engine/sales, POST /engine/unsold, GET /engine/health | `engine/api/engine.ts` (`registerEngine`; 8 MB body limit; the audit log keeps the row count only, `elideRows` in `src/http/audit.ts`) |
 | POST /engine/train, GET /engine/train/:id (v5.5.0) | `engine/api/engine.ts` (`EngineTrainer.start` / `get`) |
+| GET /owned/:domain/endings (v5.7.0, CR-058) | `engine/api/engine.ts` (`ownedEndingsView` in `endings.ts`) |
 | POST /score (v5.5.0, the one read-only POST) | `engine/api/engine.ts` (`Scorer.score`); read-only status comes from `READ_ONLY_POSTS` in `src/http/methods.ts` (`isMutating(method, routeUrl)`: scope, idempotency, audit, rate class, openapi) |
 
 | File | Inside |
 |---|---|
 | `uploads.ts` | `storeSales`, `storeUnsold`, `parseSaleRow`, `parseUnsoldRow` (per-row reject reasons), `SALE_DEDUPE_DAYS`, `ENGINE_MAX_ROWS`; one transaction under the `engine_upload` lock |
-| `endings.ts` | `EndingsJob` (daily step `engineEndings`: due pairs, per-host pacing with `hostPacer`, writes `engine_endings`), `endingsHealth`, `ENDINGS_*` constants |
+| `endings.ts` | `EndingsJob` (daily step `engineEndings`: due pairs, per-host pacing with `hostPacer`, writes `engine_endings`; v5.7.0: owned names first and weekly (`ownedDue`), `recordOwnedEvent`, `ownedEndingsView`, `OWNED_RECHECK_DAYS`), `endingsHealth`, `ENDINGS_*` constants |
+| `slices.ts` | v5.7.0 (CR-058): `holdSlices` (quick / held split of the sold test rows; run by `train.ts`, stored in `metrics.slices`, shown by `health.ts`), `RECALL_THRESHOLD`, `QUICK_SALE_DAYS` |
 | `health.ts` | `engineHealth` (GET /engine/health; v5.5.0: model fields; v5.6.0: ablation, drift, `computeBars`, bar thresholds) |
 | `drift.ts` | v5.6.0: `computeDrift` / `driftBlock` (drift per year and last quarter, point-in-time; run by `train.ts`, stored in metrics) |
 | `features.ts` | v5.5.0: pure point-in-time features (`computeFeatures`, `FEATURE_NAMES`, `buildTokenIndex`, `extendedTable`, `inRegime`, `zipfOfCost`, `COM_FEATURES`) |
@@ -167,7 +169,7 @@ v5.4.0 (CR-056 part 1): data for the name-scoring engine; v5.5.0 (part 2): featu
 | `reasons.ts` | v5.5.0: plain-English reason texts from the logistic contributions |
 | `model/gbm.ts`, `logit.ts`, `metrics.ts`, `rng.ts` | v5.5.0: histogram gradient boosting (binary and softmax), L2 logistic regression (IRLS), AUC / bootstrap / precision / quantiles, seeded randomness; pure, no dependency |
 
-Tables: `engine_uploads`, `engine_sales`, `engine_unsold` (append-only), `engine_endings` (migration `1763800000000_v5-4-0.sql`; v5.5.0 adds tld `com`), `engine_models` (migration `1763900000000_v5-5-0.sql`, which also adds queue job kind `train`); none in the backup, none in retention. Tests: `tests/modules/engine/` (`uploads` EN-1..EN-10, `endings` EN-11..EN-20, `model-math` EN-21..EN-30, `features` EN-31..EN-38, `train` EN-40..EN-52, `score` EN-60..EN-70, `health` EN-80..EN-87; helper `tests/helpers/engine-data.ts`); step order in `tests/modules/ops/jobs.test.ts`.
+Tables: `engine_uploads`, `engine_sales`, `engine_unsold` (append-only), `engine_endings` (migration `1763800000000_v5-4-0.sql`; v5.5.0 adds tld `com`), `engine_models` (migration `1763900000000_v5-5-0.sql`, which also adds queue job kind `train`), `owned_ending_events` (v5.7.0, append-only, migration `1764000000000_v5-7-0.sql` which also adds `engine_endings.registrar`; `/report` `ENDING_REGISTERED` reads it in `reporting/report/warnings.ts`); none in the backup, none in retention. Tests: `tests/modules/engine/` (`uploads` EN-1..EN-10, `endings` EN-11..EN-20, `model-math` EN-21..EN-30, `features` EN-31..EN-38, `train` EN-40..EN-52, `score` EN-60..EN-70, `health` EN-80..EN-89 (EN-88/89: hold-time slices), `owned-endings` EN-90..EN-99; helper `tests/helpers/engine-data.ts`); step order in `tests/modules/ops/jobs.test.ts`.
 
 ### selling
 Offers (record, classify, outcome), sold records, offer stats.

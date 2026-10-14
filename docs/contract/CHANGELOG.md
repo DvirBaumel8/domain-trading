@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.7.0 (2026-10-14): CR-058 owned-name endings watch (ENDING_REGISTERED, GET /owned/:domain/endings) and engine health hold-time slices
+Release note: `docs/releases/v5.7.0.md`.
+MINOR (additive). Gavriel, CR-058 (accepted with two changes, see the CR file).
+- **New route:** `GET /owned/{domain}/endings` (READ): the current state of the .net, .co, .org, .io and .ai endings of an owned name plus its event history; 404 `DOMAIN_NOT_FOUND` for a name we do not own.
+- **New warning:** `ENDING_REGISTERED` in `/report` (warn): one per `newly_registered` / `re_registered` event in the last 30 days; `details {owned_domain, host, created, registrar, kind, detected_at}`. This warning and the route are the lead list (no separate list is written; nothing is sent).
+- **Job:** `engineEndings` also watches the owned names: their five endings are due weekly and are asked before the bulk names; each answer writes a `baseline`, `newly_registered` or `re_registered` event when the state changed (no event for an unanswered ask, never a duplicate).
+- **Changed (additive):** `GET /engine/health` and `GET /engine/train/{id}` gain `slices {threshold, quick, held, unknown_n}` (hold-time split of the newest model's test rows: `n`, `recall`, `net_pit_share`, `auc` each); null for a model trained before 5.7.0 until the next training.
+- **Migration:** `1764000000000_v5-7-0.sql` (table `owned_ending_events`, append-only; column `engine_endings.registrar`).
+- **Not built:** no hyphen `.com` (the sibling scan covers it), no per-name leads list.
+
 ## 5.6.0 (2026-10-14): CR-056 part 3: engine health (drift per year and quarter, ablation without endings, bars report)
 Release note: `docs/releases/v5.6.0.md`.
 MINOR (additive). Gavriel, CR-056: the health side of the engine. `GET /engine/health` gains `drift` (per year of the sold data and `last_quarter`), `ablation`, `bar4_pass`, `bars` (six bars with status `pass`, `fail` or `not_measured`) and `bars_passed`. No new route, no migration. Contract: `endpoints.md` §GET /engine/health.

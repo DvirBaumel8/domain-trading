@@ -59,6 +59,7 @@ export const SUMMARIES: Record<string, string> = {
   'POST /engine/sales': 'Upload sold names for the scoring engine (1 to 20,000 rows; counts accepted, duplicate, rejected with reasons)',
   'POST /engine/unsold': 'Upload unsold names (dropped after held, registered unsold) for the scoring engine',
   'GET /engine/health': 'Scoring engine data counts, age, last uploads, the endings fill progress and the active model',
+  'GET /owned/{domain}/endings': 'Current state and event history of the other endings (.net .co .org .io .ai) of an owned name',
   'POST /engine/train': 'Start a scoring-engine training run on the job queue (at most one a day)',
   'GET /engine/train/{id}': 'A training run: status, metrics, frozen test-file hash',
   'POST /score': 'Score .com names with the active model (READ scope; the one read-only POST)',

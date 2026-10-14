@@ -1,5 +1,6 @@
 // Training of the scoring engine (CR-056 part 2). One run = one engine_models row (running -> done | failed) worked by the queue job `train` (step trainModel).
 // The data, the split and the test file are fixed by dataset.ts; the models are the TypeScript ones in model/. No random choice depends on anything but the seed.
+import { holdSlices } from './slices.js';
 import { createHash } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { dayNumber, idtDay, toJerusalemIso } from '../../core/dates.js';
@@ -57,6 +58,8 @@ export interface TrainDeps {
 export interface TrainView {
   train_id: string; status: 'running' | 'done' | 'failed'; created_at: string; finished_at: string | null; trained_by: string; error: string | null;
   dataset: unknown; test_sha256: string | null; chosen_weighting: string | null; metrics: unknown; feature_list: unknown;
+  /** v5.7.0 (CR-058): hold-time split of the test rows; null for a model trained before 5.7.0. */
+  slices: unknown;
 }
 
 const yieldTurn = (): Promise<void> => new Promise((r) => { setImmediate(r); });
@@ -65,6 +68,7 @@ export function viewOf(m: { id: string; status: 'running' | 'done' | 'failed'; c
   return {
     train_id: m.id, status: m.status, created_at: toJerusalemIso(m.created_at), finished_at: m.finished_at ? toJerusalemIso(m.finished_at) : null, trained_by: m.trained_by, error: m.error,
     dataset: m.dataset, test_sha256: m.test_sha256, chosen_weighting: m.chosen_weighting, metrics: m.metrics, feature_list: m.feature_list,
+    slices: (m.metrics as { slices?: unknown } | null)?.slices ?? null,
   };
 }
 
@@ -274,7 +278,9 @@ export class EngineTrainer {
     const featureCoverage = Object.fromEntries(features.map((f) => [f, round4(coverage(f, allIdx))]));
     // drift per year and for the newest full quarter, each row's features as of its own date (stored so GET /engine/health reads it cheaply)
     const drift = computeDrift(ctx, sales, unsold, idtDay(now()));
+    const slices = holdSlices(testRows.map((r, i) => ({ label: r.label, asOf: r.asOf, score: scores[i]!, netPit: testFeat[i]!.values.net_pit, comCreatedMs: testFeat[i]!.comCreatedMs })));
     const metrics = {
+      slices,
       test: {
         window: { label: ds.quarter.label, from: ds.quarter.from, to_exclusive: ds.quarter.to }, unsold_mode: ds.unsoldMode, n_sold: ds.testSold.length, n_unsold: ds.testUnsold.length,
         auc: ci.auc, auc95: ci.ci, p_top1: { precision: p1.precision, ci95: p1.ci, n_top: p1.n_top }, p_top5: { precision: p5.precision, ci95: p5.ci, n_top: p5.n_top },

@@ -73,7 +73,7 @@ export async function engineHealth(db: Kysely<Database>, nowMs: number) {
   const age = (d: string | null) => (d === null ? null : Math.max(0, today - dayNumber(d)));
   const model = await db.selectFrom('engine_models').select(['id', 'finished_at', 'dataset', 'metrics', 'chosen_weighting']).where('status', '=', 'done').orderBy('n', 'desc').limit(1).executeTakeFirst();
   const lastRun = await db.selectFrom('engine_models').select(['id', 'status', 'created_at', 'error']).orderBy('n', 'desc').limit(1).executeTakeFirst();
-  const m = model?.metrics as { drift?: unknown; ablation?: AblationM | null; test?: Record<string, unknown> & { p_top1?: { precision: number | null; ci95: unknown }; p_top5?: { precision: number | null; ci95: unknown } } } | undefined;
+  const m = model?.metrics as { slices?: unknown; drift?: unknown; ablation?: AblationM | null; test?: Record<string, unknown> & { p_top1?: { precision: number | null; ci95: unknown }; p_top5?: { precision: number | null; ci95: unknown } } } | undefined;
   const ds = model?.dataset as { train_sold?: number; train_unsold?: number } | undefined;
   const t = m?.test;
   const newestSale = (s.newest as string | null) ?? null;
@@ -91,6 +91,7 @@ export async function engineHealth(db: Kysely<Database>, nowMs: number) {
     ablation: m?.ablation ?? null,
     bar4_pass: m?.ablation && m.ablation.delta !== null ? m.ablation.delta <= BAR_ABLATION_MAX_DELTA : null,
     drift: m?.drift ?? null,
+    slices: m?.slices ?? null,
     bars,
     bars_passed: bars.filter((b) => b.status === 'pass').map((b) => b.id),
     last_training: lastRun ? { train_id: lastRun.id, status: lastRun.status, at: toJerusalemIso(lastRun.created_at), error: lastRun.error } : null,

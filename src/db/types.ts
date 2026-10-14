@@ -518,6 +518,21 @@ export interface EngineEndingsTable {
   http_status: number | null;
   reason_code: string | null;
   evidence: Json | null;
+  /** v5.7.0: the registrar entity's name from the RDAP answer, null when the registry gives none. */
+  registrar: string | null;
+}
+
+/** v5.7.0 (CR-058): append-only baseline and change log of the other endings of owned names. */
+export interface OwnedEndingEventsTable {
+  id: Generated<number>;
+  domain: string;
+  tld: 'net' | 'co' | 'org' | 'io' | 'ai';
+  kind: 'baseline' | 'newly_registered' | 're_registered';
+  registered: boolean;
+  created_at_registry: Timestamp | null;
+  registrar: string | null;
+  ending_id: number | null;
+  created_at: TimestampDefault;
 }
 
 export interface EngineModelsTable {
@@ -1207,6 +1222,7 @@ export interface Database {
   engine_sales: EngineSalesTable;
   engine_unsold: EngineUnsoldTable;
   engine_endings: EngineEndingsTable;
+  owned_ending_events: OwnedEndingEventsTable;
   engine_models: EngineModelsTable;
   drop_lists: DropListsTable;
   drop_list_rows: DropListRowsTable;
