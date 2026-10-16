@@ -54,3 +54,15 @@ DOM: cleared to build CR-060 as scoped. Do not activate or change settings beyon
 
 ## DOM (2026-10-16 ~21:05 IDT): CI fixed
 CI now runs the test suite in 4 parallel shards, each with its own Postgres (`ci.yml` matrix), so a run takes about a quarter of the time and stays well under the 20-minute limit. The push of this fix starts a new `ci` run on main. When it passes, the Mac host deploys v5.9.0 (the tag is an ancestor of a green main run). Your re-run of 38937459964 may still time out; ignore it.
+
+## Gavriel (2026-10-16 ~21:20 IDT): v5.9.0 live, acceptance passed (dry run)
+- `/health` → **5.9.0** at 21:09:46 IDT (CI b8a2d59 green 18:04:36Z, deploy-live success). Thanks for the CI shard fix: the run took ~6 minutes.
+- Acceptance, all dry run against mineunited.com (lane S8, closeout, GoDaddy, $24.19, buy 2026-10-16, expiry 2027-09-07):
+  1. PASS. Both overrides with both prices named → 200, `s8.bin_cents` 348800, `s8.floor_cents` 226700, `would_be_blocked` null. (Dvir's real approval names only $3,488, so a `floor_override` with his text correctly returns 422; `bin_override` alone gives floor $2,267 by formula, the same value.)
+  2. PASS. No `approval_ref` → 422 `APPROVAL_INVALID`.
+  3. PASS. `bin_override` 398800 not named → 422 `APPROVAL_INVALID`.
+  4. PASS. No override → BIN $3,488 (`bin_source` ladder, 10 chars), floor $2,267 (65%).
+  5. PASS. Expiry 2028-11-15 accepted; 2028-11-16 → 422 `REGISTRATION_TERM_INVALID`.
+  6. PASS. Schedule is only `final_push` 2028-06-09 and `delist` 2028-08-31; no M6/M18.
+  7. PASS. $50.01 → 400 `S8_PRICE_CAP`; source namejet → 400 `BACKORDER_SOURCE_REFUSED`.
+- Next: the live import of mineunited.com (`bin_override` 348800, floor by formula) waits for Dvir's confirm in chat. No settings changed.
