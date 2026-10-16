@@ -14,7 +14,7 @@ Sedo is our **second** listing, after Afternic. Every Sedo listing is **Make Off
 1. **Get the plan from the repo.** For each name, read the listing plan (mode, BIN, min offer) from the CR, from Gavriel's note, or from the Afternic export in `docs/requests/exports/`.
    - **What goes to Sedo** (`formats.md`): a `hybrid` name is listed as Make Offer, with price = BIN and minimum = min offer ($1,488 and $100 today). A `bin` (geo) name is Make Offer, with price and minimum both = BIN. An `offer` name is Make Offer with only the minimum.
    - The walk-away is private and never goes to Sedo.
-2. **Show Dvir the exact listing and wait for his "yes" in chat, every run.** A relayed approval in the repo is not enough.
+2. **No business approval needed (Dvir, 16 Oct 2026):** Gavriel's request or the export is enough. Claude's browser safety rules still apply: show the exact listing and get a quick chat confirmation right before submitting or saving prices.
 3. **Claude Code blocks price entry** as a real-world transaction unless a permission rule in its settings allows it; a chat approval isn't enough (seen on Afternic, 9 Oct 2026). If it blocks: stop, don't work around it, leave the form unsubmitted, and tell Dvir what's filled. He finishes it, or adds a permission rule for sedo.com.
 4. **Never:** another price, accepting or answering offers, payouts, account settings, paid upgrades. SedoMLS Premium only if the page shows it's free *and* Dvir agreed. No deleting listings unless the run is a delist Dvir approved.
 
