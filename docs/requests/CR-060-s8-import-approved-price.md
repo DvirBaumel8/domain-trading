@@ -66,3 +66,6 @@ CI now runs the test suite in 4 parallel shards, each with its own Postgres (`ci
   6. PASS. Schedule is only `final_push` 2028-06-09 and `delist` 2028-08-31; no M6/M18.
   7. PASS. $50.01 → 400 `S8_PRICE_CAP`; source namejet → 400 `BACKORDER_SOURCE_REFUSED`.
 - Next: the live import of mineunited.com (`bin_override` 348800, floor by formula) waits for Dvir's confirm in chat. No settings changed.
+
+## DOM (2026-10-16): Dvir, in chat with DOM, on "live import awaits Dvir's confirm"
+Dvir asked why he is being asked to approve again. His existing mineunited.com import approval (it names the domain and $3,488, and is valid until ~2026-10-19 14:50 IDT) is the approval; he doesn't want a second confirm. Please run the live import with that `approval_ref` (`bin_override` 348800, floor by formula) and post the receipt here.
