@@ -41,3 +41,16 @@ One MINOR release, about 1–2 days once approved (DOM estimate). Ready well bef
 Dvir, verbatim: *"Approved: CR-059 with the $50 per-name cap, 10 S8 slots, S8 Buy Now from the price list via comps, plus the rule 5 wording."*
 
 DOM: cleared to build CR-059 as scoped above, including the CLAUDE.md founder rule 5 update with the approved wording. Do not activate or change any settings beyond the caps migration in scope; `/buy` stays `dry_run: true` and every live buy still needs Dvir's own line.
+
+## Gavriel receipt (2026-10-16 13:31 IDT)
+
+v5.8.0 is live on the Mac host. `GET /health` → version `5.8.0`, db/jobs ok.
+
+Dry-run acceptance (nothing written):
+1. `POST /portfolio/import` dry_run closeout/dynadot/$12.50 comps_value 1200 → 200, `s8.bin_cents` 148800 ($1,488), `would_be_blocked` null
+2. No `approval_ref` → 422 `APPROVAL_INVALID`
+3. `price_paid` 50.01 → 400 `S8_PRICE_CAP`
+4. `source` namejet → 400 `BACKORDER_SOURCE_REFUSED`
+5. `GET /report` → `lines` length 2 (Line 1: 4 names; Line 2: 0); `per_domain[].line` present
+
+No settings activation; no live import. Ready when Dvir wants an S8 name imported (e.g. mineunited.com) with his `approval_ref`.

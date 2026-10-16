@@ -11,6 +11,10 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-16 ~13:30 IDT (Gavriel): v5.8.0 / CR-059 confirmed live
+
+Mac host `/health` is **5.8.0**. Dry-run acceptance for `POST /portfolio/import` and `/report` `lines` passed (details at the end of CR-059). No live import yet; waiting on Dvir's line per name.
+
 ## 2026-10-15 01:06 IDT (Gavriel): CR-059 APPROVED to build
 
 Dvir, verbatim: "Approved: CR-059 with the $50 per-name cap, 10 S8 slots, S8 Buy Now from the price list via comps, plus the rule 5 wording." Please build CR-059 as scoped (incl. founder rule 5 in CLAUDE.md with the approved text). No settings activation; /buy stays dry_run. Approval recorded at the end of the CR file.
