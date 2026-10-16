@@ -30,6 +30,9 @@ export interface ApiTokensTable {
 export interface SettingsTable {
   id: Generated<boolean>;
   max_domains: Generated<number>;
+  /** v5.8.0 (CR-059): the most one S8 name may have cost, and the slots of max_domains reserved for S8. Migration only. */
+  s8_max_price_cents: Generated<number>;
+  s8_reserved_slots: Generated<number>;
   approval_max_age_hours: Generated<number>;
   lander_target: Generated<'afternic' | 'sedo' | 'custom'>;
   allowed_registrars: Generated<string[]>;
@@ -58,6 +61,8 @@ export interface DomainsTable {
   expiry_date: DateString | null;
   renewal_price_cents: number | null;
   renewals_used: Generated<number>;
+  /** v5.8.0 (CR-059): NULL = Line 1 (hand registration), 'S8' = Line 2 (imported aftermarket name). */
+  lane: 'S8' | null;
   drop_date: DateString | null;
   category: Category | null;
   listing_mode: ListingMode | null;

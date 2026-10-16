@@ -4,6 +4,7 @@ import { toJerusalemIso } from '../../../core/dates.js';
 import { offersByStrategy } from '../../selling/index.js';
 import { applied7d, perDomain } from './domains.js';
 import { TrancheService } from '../../buying/index.js';
+import { reportLines } from './lines.js';
 import { reportMoney } from './money.js';
 import { upcoming90d } from './upcoming.js';
 import { buildWarnings } from './warnings.js';
@@ -13,6 +14,7 @@ export async function buildReport(db: Kysely<Database>, now: Date) {
   return {
     generated_at: toJerusalemIso(now),
     ...m,
+    lines: await reportLines(db),
     per_domain: await perDomain(db, now),
     upcoming_90d: await upcoming90d(db, now),
     offers_by_strategy: await offersByStrategy(db, now),

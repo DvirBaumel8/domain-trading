@@ -79,6 +79,7 @@ export async function seedSpent(cents: number) {
   }).execute();
 }
 
-export async function seedOwnedDomains(n: number) {
-  for (let i = 0; i < n; i++) await insertOwnedDomain(testDb, { domain: `owned${i}.com` });
+/** n owned names; the last `s8` of them are Line 2 (lane S8), so a total near the 40-name cap is not stopped first by the Line 1 limit (30, 10 slots reserved for S8). */
+export async function seedOwnedDomains(n: number, s8 = 0) {
+  for (let i = 0; i < n; i++) await insertOwnedDomain(testDb, { domain: `owned${i}.com`, lane: i >= n - s8 ? 'S8' : null });
 }

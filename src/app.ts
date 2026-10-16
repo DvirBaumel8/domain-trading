@@ -15,7 +15,7 @@ import type { ScreeningDeps } from './modules/selection/index.js';
 import type { HoldoutCheck } from './modules/selection/index.js';
 import { registerExport } from './modules/listing/index.js';
 import { registerCheck } from './modules/registrars/index.js';
-import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerPortfolioWrites } from './modules/ops/index.js';
+import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerPortfolioImport, registerPortfolioWrites } from './modules/ops/index.js';
 import dns from 'node:dns';
 import { queryDns, queryNs, type NsLookup } from './core/ns-lookup.js';
 import type { Config } from './config.js';
@@ -172,6 +172,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerOffers(app, new OffersService({ db: deps.db, now: deps.now ?? Date.now }), { db: deps.db, now: deps.now ?? Date.now });
   registerReport(app, { db: deps.db, now: deps.now ?? Date.now });
   registerPortfolioWrites(app, { db: deps.db, now: deps.now ?? Date.now });
+  registerPortfolioImport(app, { db: deps.db, adapters, now: deps.now ?? Date.now });
   registerOutcomes(app, { db: deps.db, now: deps.now ?? Date.now });
   registerReads(app, { db: deps.db, now: deps.now ?? Date.now });
   const sellerhub = deps.config.sellerhub.apiKey && deps.config.sellerhub.apiSecret

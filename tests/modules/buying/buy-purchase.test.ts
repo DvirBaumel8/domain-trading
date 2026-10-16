@@ -107,7 +107,7 @@ describe('POST /buy purchase', () => {
   it('CAP-2: an unresolved (unknown) purchase counts toward the 40-domain cap', async () => {
     const stuck = new FakeAdapter('porkbun', { register: () => timeout(), findDomain: (_d, n) => (n === 0 ? null : new Error('down')) });
     const { auth } = await setup(stuck);
-    await seedOwnedDomains(39);
+    await seedOwnedDomains(39, 10);
     expect((await postBuy(app, buyBody({ domain: 'stuck.com' }), auth)).statusCode).toBe(202);
     expect((await postBuy(app, buyBody({ domain: 'next.com' }), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
   });
@@ -475,7 +475,7 @@ describe('POST /buy final-review fixes', () => {
     const amb = new RegistrarError('porkbun', 'REGISTRAR_BAD_RESPONSE', 'x', { ambiguous: true });
     const pb = new FakeAdapter('porkbun', { dryRun: (n) => (n === 0 ? amb : undefined) });
     const { auth } = await setup(pb);
-    await seedOwnedDomains(39);
+    await seedOwnedDomains(39, 10);
     expect((await postBuy(app, buyBody({ domain: 'a-amb.com' }), auth)).json().error.code).toBe('REGISTRAR_DRY_RUN_AMBIGUOUS');
     expect((await postBuy(app, buyBody({ domain: 'b-next.com' }), auth)).json().error.code).toBe('DOMAIN_CAP_REACHED');
   });

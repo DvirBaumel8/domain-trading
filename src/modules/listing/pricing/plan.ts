@@ -112,3 +112,14 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
     pricingSource, settingsVersion: s.version, warnings, formula: { floorCents: f.floorCents, walkawayCents: f.walkawayCents },
   } };
 }
+
+/**
+ * v5.8.0 (CR-059): the BIN of an imported S8 name = the lowest price-list price >= the comps value (founder rule 4: BINs come only from the list).
+ * Only prices a non-geo hybrid name may carry are candidates: at or above the non-geo minimum BIN and not a LANDER-1 exception price.
+ * A comps value above the top candidate gets the top candidate. Needs a price list (pricing v3 or later).
+ */
+export function s8BinFor(compsValueCents: Cents, s: PricingSettings): Cents {
+  const eligible = (s.allowedBinsCents ?? []).filter((v) => v >= hybridBinMin(s) && !s.landerExceptionBinsCents.includes(v));
+  if (eligible.length === 0) throw new Error('pricing_settings: no price-list BIN is open to a non-geo name');
+  return eligible.find((v) => v >= compsValueCents) ?? eligible[eligible.length - 1]!;
+}

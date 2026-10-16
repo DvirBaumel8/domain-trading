@@ -11,7 +11,7 @@ Registers a domain at the cheapest qualifying registrar (first year + one renewa
 | 3b | `proposed_listing.mode` valid first; `category` valid (geo: `price_grade`; a grade on non-geo refused); `proposed_listing`, if given, passes `listing-strategy.md` V1–V8 with `phase=buy` (geo BIN = grade price) **and equals the server-computed plan** (an exception or override uses this call's `approval_ref`; `pricing_exception`, its reason and `walkaway` go inside `proposed_listing`); `pricing_evidence` passes V11; `expected_settings_version` matches (V12) | 422 `MODE_INVALID` / `CATEGORY_REQUIRED` / `GEO_GRADE_REQUIRED` / `GRADE_NOT_GEO` / the listing code / `PRICING_FORMULA_MISMATCH` / `COMPS_REQUIRED` / `COMPS_INVALID`; 409 `SETTINGS_VERSION_CHANGED` |
 | 3c | **Not built (CR-001 P1b; selection v9.1 SCREEN-1, SEL7-1):** `screening_pack {id}` present (else **400** `SCREENING_PACK_REQUIRED`) naming a complete pack for this domain, validated ≤ 72 h before, every hard gate passing: non-geo DEMAND-1 (census `pattern_id@version`, `in_use_share ≥ 0.25`, retailstats start/end count ≥ 1 with `cache_date`), LEAD-1, RATIO-1 at BIN and floor, EV-1, LANDER-1 (pack BIN = `proposed_listing.bin`, on the price list), `registrar_ft_capable`, WEB-RISK-1 / HIST-1 / SURBL-1 / TM-1. Comps then become optional | 400 `SCREENING_PACK_REQUIRED` / 422 `SCREENING_PACK_INVALID` (`details.failed_gates`); v3 listing codes `BIN_NOT_IN_PRICE_LIST` / `LANDER_EXCEPTION_REQUIRED` |
 | 4 | Not in `domains` as `pending_purchase`/`owned`/`listed`/`delisted`, and no open purchase; `sold`/`dropped` → 409 `ALREADY_IN_PORTFOLIO` | 409 `ALREADY_OWNED_OR_PENDING` |
-| 5 | Domain cap: `owned` + `listed` + `delisted` + `pending_purchase` < `max_domains` (40 since 4.0.0) | 409 `DOMAIN_CAP_REACHED` |
+| 5 | Domain cap: `owned` + `listed` + `delisted` + `pending_purchase` < `max_domains` (40 since 4.0.0), and Line 1 (names with `domains.lane` NULL) < `max_domains - s8_reserved_slots` (30 since 5.8.0, CR-059: 10 slots are reserved for the S8 import lane) | 409 `DOMAIN_CAP_REACHED` |
 | 6 | Live re-check (the `/check` logic, no cache, doesn't write the cache): `availability = available` and an eligible winner (or the pinned registrar, no fallback) | 409 `NOT_AVAILABLE` / `NO_ELIGIBLE_REGISTRAR` / `PINNED_REGISTRAR_INELIGIBLE` |
 | 7 | Price caps: keep eligible quotes with `first_year ≤ max_price` (and `two_year ≤ max_two_year_price`), then the lowest `two_year` | 409 `PRICE_ABOVE_MAX` (cheapest quote in `details`) |
 | 8 | *(removed in 5.0.0, G-86: the service tracks no money budget; Gavriel owns it and checks spend before Dvir approves.)* | none |
@@ -75,3 +75,19 @@ Comparison = first year + exactly one renewal. At purchase `renewals_used = 0`, 
 | B-30 | **Spec-only (no test with this ID; shipped as 409 `SCREENING_PACK_REQUIRED` with `details.reason`, see `gaps.md` G-3; covered by `tests/modules/selection/screening-packs.test.ts`, `tests/modules/buying/buy-v2.test.ts`).** **CR-001:** no pack / pack for another domain / DEMAND-1 failed / pack BIN 1488 vs listing 1088 | 400 `SCREENING_PACK_REQUIRED` / 422 `SCREENING_PACK_INVALID` ×3; 0 registrar calls (SEL7-1) |
 | B-31 | **Spec-only (no test with this ID; the codes are tested in the listing and buy tests).** **v3:** hybrid 1495 / 1988 without LANDER-1 | 422 `BIN_NOT_IN_PRICE_LIST` / `LANDER_EXCEPTION_REQUIRED`, 0 registrar calls (SEL9-3) |
 | B-32 | **FT-1 (CR-001 P2):** buy 2026-10-04 (eligible 2026-12-03); job on 10-12, 12-10, 12-11 without confirm; then a confirm with another BIN | No flag on 10-12 or 12-10; on 12-11 `DISTRIBUTION_INCOMPLETE` + flag (SEL9-6); mismatch → 422 `DISTRIBUTION_BIN_MISMATCH` |
+
+## S8 import lane (v5.8.0, CR-059; Dvir 14-15 Oct 2026)
+`POST /portfolio/import` (route `ops/api/portfolio-import.ts`, logic `importDomain` with `lane: 'S8'`) books an existing .com Dvir bought on a registrar website. Rules, all enforced in code: approval_ref validated as at `/buy` (rule 1); `source` closeout|fixed|auction; NameJet, SnapNames, DropCatch refused as source or registrar; price_paid <= `settings.s8_max_price_cents` ($50) and S8 names < `settings.s8_reserved_slots` (10) and total < `max_domains` (rule 2, migration only; no money total, G-86); BIN = `s8BinFor(comps_value)` = the lowest open price-list price >= the comps value (rule 4; open = at or above the non-geo minimum and not a LANDER-1 exception price; above the top = the top); a geo name takes the grade price. Books `domains.lane = 'S8'`, one `registration` ledger row, `pricing_evidence`, the plan and its schedule, the deal row when `deal_id` is given. Tests (`tests/modules/buying/s8-import.test.ts`):
+
+| ID | Case |
+|---|---|
+| S8-1 | missing, wrong-domain, expired or future approval_ref refused; lane other than S8 refused; nothing written |
+| S8-2 | source not closeout/fixed/auction refused; NameJet/SnapNames/DropCatch refused as source or registrar |
+| S8-3 | $50.01 is `S8_PRICE_CAP`, $50.00 accepted; the cap is not settable through the API |
+| S8-4 | the import books lane S8, ledger row, evidence, hybrid plan; BIN rung from comps (788/1088/1488, top = 1488); geo grade price; manual registrar needs expiry |
+| S8-5 | 30 Line 1 names close `/buy` (`DOMAIN_CAP_REACHED`, dry run `would_be_blocked`), S8 import still allowed; 10 S8 names give `S8_SLOTS_FULL` (dry run `would_be_blocked`) |
+| S8-6 | total cap 40 holds for an S8 import |
+| S8-7 | `/report` `lines` and `per_domain[].line` |
+| S8-8 | idempotent replay, dry run writes nothing, owned name and READ token refused |
+| S8-9 | a registrar adapter that reports no expiry: 422 `EXPIRY_UNKNOWN` |
+| S8-10 | pricing settings without a price list: 409 `PRICING_SETTINGS_NO_PRICE_LIST` |

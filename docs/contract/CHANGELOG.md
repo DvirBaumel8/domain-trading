@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.8.0 (2026-10-16): CR-059 S8 aftermarket import lane (Line 2): POST /portfolio/import, S8 slot reservation, /report lines
+Release note: `docs/releases/v5.8.0.md`.
+MINOR (additive; one behaviour tightening below). Gavriel, CR-059 (Dvir's decisions, 15 Oct 2026: "$50 limit only"; BIN rung from the price list).
+- **New route:** `POST /portfolio/import` (WRITE, `Idempotency-Key`, audited, `dry_run`). Imports an existing .com that Dvir bought on a registrar website (`source`: `closeout`, `fixed` or `auction`; `registrar` e.g. `godaddy`, `dynadot`) as a Line 2 (S8) name. Needs Dvir's `approval_ref` (validated as at `/buy`). The BIN is the lowest price-list price at or above `comps_value` (founder rule 4 unchanged; no new `pricing_settings` version); floor, walk-away, minimum offer and the drop schedule are computed as for any non-geo hybrid name.
+- **New codes:** `S8_SOURCE_INVALID` (400), `BACKORDER_SOURCE_REFUSED` (400; NameJet, SnapNames, DropCatch as source or registrar), `S8_PRICE_CAP` (400; over $50), `S8_SLOTS_FULL` (409).
+- **Changed (additive):** `GET /report` gains `lines` (Line 1 and Line 2: names, spend, sales, P&L, committed renewals) and `per_domain[].line` / `lane`.
+- **Changed (behaviour):** the 40-name cap now reserves 10 slots for S8: `POST /buy` is refused with 409 `DOMAIN_CAP_REACHED` once Line 1 (every name that is not S8) holds 30 names (a dry run reports `would_be_blocked: "DOMAIN_CAP_REACHED"`; `details` adds `line1_domains`, `line1_max`, `s8_reserved_slots`). Names held before this release are all Line 1.
+- **Not built:** no money total for S8 (G-86: the budget stays with Gavriel). No API to change the caps.
+- **Migration:** `1764100000000_v5-8-0.sql` (`domains.lane`, `settings.s8_max_price_cents` 5000, `settings.s8_reserved_slots` 10).
+
 ## 5.7.0 (2026-10-14): CR-058 owned-name endings watch (ENDING_REGISTERED, GET /owned/:domain/endings) and engine health hold-time slices
 Release note: `docs/releases/v5.7.0.md`.
 MINOR (additive). Gavriel, CR-058 (accepted with two changes, see the CR file).

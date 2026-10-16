@@ -6,10 +6,10 @@ import { newAuditId } from '../../../http/audit.js';
 import { addOneYear, idtDay, isRealDate } from '../../../core/dates.js';
 import { centsToDollarsOrNull, formatUsd, usdStringToCents } from '../../../core/money.js';
 import { normalizeDomain } from '../../../domain-name.js';
-import { buildSchedule } from '../../listing/index.js';
+import { buildSchedule, isV3, s8BinFor } from '../../listing/index.js';
 import { currentSettings } from '../../listing/index.js';
 import { RegistrarError, type RegistrarAdapter } from '../../registrars/index.js';
-import { activeDomainCount } from '../../buying/index.js';
+import { activeDomainCount, activeLaneCounts, laneCapBlock } from '../../buying/index.js';
 import { registrarApiOf } from '../../buying/index.js';
 import { changedColumns } from '../../listing/index.js';
 import { isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from '../../listing/index.js';
@@ -31,11 +31,18 @@ export interface ImportInput {
   evidence?: { comps?: unknown; rationale?: unknown } | null; legacyNoComps?: string;
   approvalText?: string; approvalAt?: string;
   manual?: boolean; expiry?: string; renewalPrice?: string; dryRun?: boolean;
+  /** v5.8.0 (CR-059): the S8 aftermarket import (POST /portfolio/import). The BIN is the price-list rung for `compsValueCents`; any registrar name is accepted. */
+  lane?: 'S8'; s8Source?: string; compsValueCents?: number;
+  /** v5.8.0: the HTTP audit id; the import then writes no audit row of its own (the audit hook writes it). */
+  auditId?: string;
 }
 
 export interface ImportResult {
   dry_run?: true; domain: string; status: 'owned' | 'listed'; registrar_api: string; expiry_date: string; drop_date: string;
   listing: object | null; warnings: string[];
+  /** v5.8.0 (S8 imports): the lane, the price-list rung chosen from the comps value, and what would refuse the import (a dry run reports it; a real import throws it). */
+  lane?: 'S8'; s8?: { source: string; comps_value_cents: number | null; bin_cents: number | null; s8_names: number; s8_reserved_slots: number; s8_max_price_cents: number };
+  would_be_blocked?: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | null;
 }
 
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
@@ -63,7 +70,9 @@ function parseInput(i: ImportInput, now: Date) {
   if (!i.registrar?.trim()) throw new ImportInputError('--registrar is required');
   const registrar = i.registrar.trim().toLowerCase();
   if (registrar === 'cloudflare') throw new ImportInputError('Cloudflare Registrar is never used (founder rule 5)');
-  if (!['porkbun', 'godaddy', 'other'].includes(registrar)) throw new ImportInputError('--registrar must be porkbun, godaddy or other');
+  if (i.lane === 'S8') {
+    if (!/^[a-z0-9][a-z0-9.-]{1,40}$/.test(registrar)) throw new ImportInputError('registrar must be a registrar name such as godaddy or dynadot');
+  } else if (!['porkbun', 'godaddy', 'other'].includes(registrar)) throw new ImportInputError('--registrar must be porkbun, godaddy or other');
   const manual = i.manual === true;
   if (!manual && registrar === 'other') throw new ImportInputError('--registrar other needs --manual');
   const today = idtDay(now);
@@ -136,7 +145,7 @@ function parseInput(i: ImportInput, now: Date) {
   } else if (i.expiry !== undefined) expiry = realDate('--expiry', i.expiry);
 
   return {
-    domain, registrar, manual, today, buyDate, costCents, renewalCents, order, category, grade, listing, approval, expiry,
+    domain, registrar, manual, today, buyDate, lane: i.lane ?? null, costCents, renewalCents, order, category, grade, listing, approval, expiry,
     override: i.override === true, overrideReason: i.overrideReason ?? null, legacy: legacy?.trim() ?? null,
   };
 }
@@ -152,6 +161,32 @@ export async function importDomain(
   if (existing) throw new AppError(409, 'ALREADY_IN_PORTFOLIO', `${domain} is already in the portfolio as ${existing.status}`, { status: existing.status });
 
   const warnings: string[] = [];
+  const settings = await db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
+  const s = await currentSettings(db, now);
+
+  // v5.8.0 (CR-059): S8 caps. The per-name price cap and the slot reservation come from the settings row (migration only).
+  let wouldBeBlocked: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | null = null;
+  let s8Listing: ListingRequest | null = null;
+  if (p.lane === 'S8') {
+    if (p.costCents > settings.s8_max_price_cents) {
+      throw new AppError(400, 'S8_PRICE_CAP', `price_paid ${formatUsd(p.costCents)} is over the S8 per-name cap ${formatUsd(settings.s8_max_price_cents)}`,
+        { price_paid_cents: p.costCents, s8_max_price_cents: settings.s8_max_price_cents });
+    }
+    const counts = await activeLaneCounts(db);
+    wouldBeBlocked = laneCapBlock('S8', counts, settings);
+    if (wouldBeBlocked && !input.dryRun) throw s8CapError(wouldBeBlocked, counts, settings);
+    if (!p.listing) {
+      if (!isV3(s)) throw new AppError(409, 'PRICING_SETTINGS_NO_PRICE_LIST', 'The current pricing settings have no price list; an S8 BIN comes from the price list');
+      if (p.category === 'geo') {
+        s8Listing = { mode: 'bin', bin: (p.grade === 'strong' ? s.geoBinStrongCents : s.geoBinWeakerCents) / 100 };
+      } else {
+        if (!input.compsValueCents || input.compsValueCents <= 0) throw new ImportInputError('comps_value is required for a non-geo S8 name');
+        s8Listing = { mode: 'hybrid', bin: s8BinFor(input.compsValueCents, s) / 100 };
+      }
+    }
+  }
+  const listingReq: ListingRequest | null = p.listing ?? s8Listing;
+
   // Registrar data
   let registrarApi: 'full' | 'manage' | 'none' = 'none';
   let expiry = p.expiry;
@@ -192,13 +227,10 @@ export async function importDomain(
   }
   const dropDate = addOneYear(expiryDate);
 
-  const settings = await db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
-  const s = await currentSettings(db, now);
-
   let plan: ListingPlan | null = null;
-  if (p.listing) {
+  if (listingReq) {
     if (dropDate <= p.today) throw new AppError(422, 'DROP_DATE_PASSED', `drop_date ${dropDate} is not in the future; a listing cannot be scheduled`);
-    const r = validateListing(p.listing, {
+    const r = validateListing(listingReq, {
       category: p.category, grade: p.grade, phase: 'buy', settings: s, highValueMinBinCents: settings.high_value_min_bin_cents,
       override: p.override, overrideReason: p.overrideReason, approvalValid: p.approval !== null, today: p.today, dropDate,
     });
@@ -222,18 +254,25 @@ export async function importDomain(
   if (input.dryRun) {
     const events = plan ? buildSchedule({ plan, anchor: p.today, dropDate, settings: s }) : [];
     return { dry_run: true, domain, status: plan ? 'listed' : 'owned', registrar_api: registrarApi, expiry_date: expiryDate, drop_date: dropDate,
-      listing: plan ? planView(plan, events) : null, warnings };
+      listing: plan ? planView(plan, events) : null, warnings, ...(await s8Fields(db, p.lane, input, plan, settings, wouldBeBlocked)) };
   }
 
-  const auditId = newAuditId();
+  const auditId = input.auditId ?? newAuditId();
   const events = await withDomainLock(db, domain, (conn) => conn.transaction().execute(async (trx) => {
     const dup = await trx.selectFrom('domains').select('status').where('domain', '=', domain).executeTakeFirst();
     if (dup) throw new AppError(409, 'ALREADY_IN_PORTFOLIO', `${domain} is already in the portfolio as ${dup.status}`, { status: dup.status });
-    await trx.insertInto('audit_log').values({
+    if (p.lane === 'S8') {
+      // authoritative re-check under the settings lock (two imports at once must not both take the last slot)
+      const cfg = await trx.selectFrom('settings').select(['max_domains', 's8_reserved_slots']).forUpdate().executeTakeFirstOrThrow();
+      const counts = await activeLaneCounts(trx);
+      const block = laneCapBlock('S8', counts, cfg);
+      if (block) throw s8CapError(block, counts, cfg);
+    }
+    if (!input.auditId) await trx.insertInto('audit_log').values({
       id: auditId, scope: 'admin', method: 'ADMIN', path: 'import-domain',
       request: JSON.stringify({
         domain, registrar: p.registrar, manual: p.manual, buy_date: p.buyDate, cost_cents: p.costCents, order: p.order, deal: input.deal ?? null,
-        category: p.category, grade: p.grade, listing: p.listing, override: p.override, override_reason: p.overrideReason,
+        category: p.category, grade: p.grade, listing: listingReq, lane: p.lane, s8_source: input.s8Source ?? null, override: p.override, override_reason: p.overrideReason,
         comps: comps?.length ?? 0, legacy_no_comps: p.legacy, expiry: expiryDate, renewal_price_cents: p.renewalCents,
       }),
       approval_text: p.approval?.text ?? null, approval_at: p.approval?.at ?? null, status_code: 200,
@@ -242,13 +281,13 @@ export async function importDomain(
     const row = await trx.insertInto('domains').values({
       domain, status: plan ? 'listed' : 'owned', registrar: p.registrar, registrar_api: registrarApi,
       buy_date: p.buyDate, cost_cents: p.costCents, expiry_date: expiryDate, renewal_price_cents: p.renewalCents, renewals_used: 0,
-      drop_date: dropDate, category: p.category, price_grade: p.grade, deal_id: input.deal ?? null, updated_at: now,
+      drop_date: dropDate, category: p.category, price_grade: p.grade, deal_id: input.deal ?? null, lane: p.lane, updated_at: now,
       ...(plan ? { ...domainPlanColumns(plan), first_listed_at: now, ...changedColumns({ export_pending_since: null }, now) } : {}),
     }).returning('id').executeTakeFirstOrThrow();
     await trx.insertInto('ledger_entries').values({
       occurred_on: p.buyDate, domain_id: row.id, deal_id: input.deal ?? null, type: 'registration', amount_cents: -p.costCents,
       counterparty: p.registrar, receipt_ref: `${p.registrar}:${p.order}`,
-      note: ['import', input.costNote?.trim(), `approval ${auditId}`].filter(Boolean).join('; '), audit_id: auditId,
+      note: ['import', p.lane === 'S8' ? `S8 ${input.s8Source ?? ''}`.trim() : undefined, input.costNote?.trim(), `approval ${auditId}`].filter(Boolean).join('; '), audit_id: auditId,
     }).execute();
     await trx.insertInto('pricing_evidence').values({
       domain_id: row.id, comps: comps ? JSON.stringify(comps) : null, rationale, legacy_no_comps_reason: p.legacy, audit_id: auditId,
@@ -272,5 +311,23 @@ export async function importDomain(
     return written;
   }));
   return { domain, status: plan ? 'listed' : 'owned', registrar_api: registrarApi, expiry_date: expiryDate, drop_date: dropDate,
-    listing: plan ? planView(plan, events) : null, warnings };
+    listing: plan ? planView(plan, events) : null, warnings, ...(await s8Fields(db, p.lane, input, plan, settings, null)) };
+}
+
+function s8CapError(code: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED', c: { total: number; s8: number }, cfg: { max_domains: number; s8_reserved_slots: number }): AppError {
+  return code === 'S8_SLOTS_FULL'
+    ? new AppError(409, 'S8_SLOTS_FULL', `All ${cfg.s8_reserved_slots} S8 slots are taken`, { s8_names: c.s8, s8_reserved_slots: cfg.s8_reserved_slots })
+    : new AppError(409, 'DOMAIN_CAP_REACHED', `Domain cap reached (${c.total}/${cfg.max_domains})`, { domains: c.total, max_domains: cfg.max_domains });
+}
+
+async function s8Fields(
+  db: Kysely<Database>, lane: 'S8' | null, input: ImportInput, plan: ListingPlan | null,
+  settings: { s8_max_price_cents: number; s8_reserved_slots: number }, blocked: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | null,
+): Promise<Pick<ImportResult, 'lane' | 's8' | 'would_be_blocked'>> {
+  if (lane !== 'S8') return {};
+  return {
+    lane: 'S8', would_be_blocked: blocked,
+    s8: { source: input.s8Source ?? '', comps_value_cents: input.compsValueCents ?? null, bin_cents: plan?.binCents ?? null,
+      s8_names: (await activeLaneCounts(db)).s8, s8_reserved_slots: settings.s8_reserved_slots, s8_max_price_cents: settings.s8_max_price_cents },
+  };
 }

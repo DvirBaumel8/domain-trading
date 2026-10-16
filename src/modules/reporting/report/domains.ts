@@ -22,7 +22,7 @@ export async function perDomain(db: Kysely<Database>, now: Date) {
     // days held stop at the sale (sold) or the drop date (dropped); otherwise they run to today
     const end = d.status === 'sold' && d.sold_at ? idtDay(d.sold_at) : d.status === 'dropped' && d.drop_date ? d.drop_date : today;
     return {
-      domain: d.domain, status: d.status, registrar: d.registrar, registrar_api: d.registrar_api, category: d.category, price_grade: d.price_grade,
+      domain: d.domain, line: d.lane === 'S8' ? 2 : 1, lane: d.lane, status: d.status, registrar: d.registrar, registrar_api: d.registrar_api, category: d.category, price_grade: d.price_grade,
       listing_mode: d.listing_mode, ...pair('bin', d.bin_cents), ...pair('floor', d.floor_cents), ...walkawayPair(d.walkaway_cents),
       ...pair('min_offer', d.min_offer_cents), pricing_source: d.pricing_source, pricing_settings_version: d.pricing_settings_version,
       offers: offers.get(d.id)!,

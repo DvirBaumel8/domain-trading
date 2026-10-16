@@ -1,4 +1,4 @@
-# Endpoints (contract v5.7.0)
+# Endpoints (contract v5.8.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -23,6 +23,7 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | Reads |
 | GET | `/portfolio/outcomes`, `/portfolio/outcomes/monthly`, `/portfolio/outcomes/quarterly` | READ | Portfolio outcomes (4.0.0) |
 | POST | `/portfolio/{domain}/horizon`, `/portfolio/{domain}/stats` | WRITE | Portfolio outcomes (4.0.0) |
+| POST | `/portfolio/import` | WRITE | S8 import lane (5.8.0, CR-059) |
 | POST | `/outreach/emails` | WRITE | Outreach log (4.0.0) |
 | GET | `/outreach/emails/summary` | READ | Outreach log (4.0.0) |
 | POST | `/patterns/sales` | WRITE | Sales patterns (4.0.0) |
@@ -129,7 +130,7 @@ Registers a domain at the cheapest qualifying registrar, **only with Dvir's appr
   - **`drop_policy` (optional):** `after_one_renewal` (the default) or `at_first_expiry` (the `drop_date` is the first expiry; nothing renews).
   - **In the dry run and the 201:** `display_name`, `drop_policy`, `renewal_committed_cents` (0 for `at_first_expiry`) and `drop_policy_line`. `sell_plan_line` adds the policy only for `at_first_expiry`. **On a dry-run error** (for example `REGISTRAR_FUNDS`), `details` carry `display_name`, `drop_policy`, `renewal_committed_cents` and `drop_policy_line` too (3.7.1, CR-038). Since 3.9.0 the drop date is set in the same database transaction as the booking, so `DROP_POLICY_FAILED` can no longer occur (the code is removed); the reconciler honours the policy of the stored request when it books a purchase.
 - **Renewal maths gate (4.0.0, CR-046 item 3).** `ratio = BIN x (1 - commission) x STRe / renewal cost`, in integer cents and basis points. BIN is the proposed plan's, else the grade price (geo) or the current default BIN; the commission comes from the settings (`buy.commission[buy.math_venue]`, Afternic 20%). A ratio under `buy.renewal_math_min` (1.0) is **422 `RENEWAL_MATH_FAIL`** with `details.renewal_math {venue, bin_cents, commission_bp, stre_bp, renewal_cents, expected_net_cents, ratio, min, pass}`, in a dry run too. A passing ratio is in the dry-run body and the 201 as `renewal_math` and stored on the name with STRe and its reason (`domains.buy_card`).
-- **Horizon, group and cap (4.0.0, CR-045 items 2 and 3).** The dry run and the 201 carry `horizon` and `screening_group`: `borderline` when the name's latest screening run holds a `FLAG` result, else `passed` (the groups of the 40-name test). The domain cap is **40** (migration; was 50): a real `/buy` at the cap is 409 `DOMAIN_CAP_REACHED`; a dry run reports it as `would_be_blocked: "DOMAIN_CAP_REACHED"` and `dry_run: "strict"` returns it as the error.
+- **Horizon, group and cap (4.0.0, CR-045 items 2 and 3).** The dry run and the 201 carry `horizon` and `screening_group`: `borderline` when the name's latest screening run holds a `FLAG` result, else `passed` (the groups of the 40-name test). The domain cap is **40** (migration; was 50), of which **10 are reserved for S8** (5.8.0, CR-059; Line 1 holds at most 30): a real `/buy` at the cap is 409 `DOMAIN_CAP_REACHED`; a dry run reports it as `would_be_blocked: "DOMAIN_CAP_REACHED"` and `dry_run: "strict"` returns it as the error.
 - **Lease-to-own by name type (4.0.0, CR-048).** `proposed_listing.lto_max_months` is refused with 422 `LTO_NOT_ALLOWED` (no override helps) when `horizon` is `trend` or `regulation`, or the drop policy is `at_first_expiry`; the lease would run past the drop date. On an evergreen name the existing LTO rules apply.
 - **Comps (CR-033 G-10):** the number required is `pricing_settings` `comps_min`, which is **0 under v3** (current). An empty `comps` list is valid.
 - **Small-buy exception (3.6.0, CR-030; approved by Dvir).** Optional body field `small_buy_exception: true`. When `approval_ref.text` also names the domain **and** contains "small buy" (any case), `BUY_HOLD` is skipped for that call, and only then. Two more checks apply when the flag and the words are present:
@@ -385,6 +386,23 @@ WRITE. Body (strict) `{horizon: "evergreen" | "trend" | "regulation", approval_r
 
 ### `POST /portfolio/{domain}/stats`
 WRITE. Append-only. Body (strict) `{as_of: YYYY-MM-DD (not in the future), month?: YYYY-MM (default the month of as_of), venue?: "afternic" | "sedo" | "sellerhub" (default afternic), views?, leads?, inquiries?, offers?: int >= 0, source: string 1..100}`; at least one count is required. **201** `{id, domain, as_of, month, venue, views, leads, inquiries, offers, source, audit_id}`. Errors: 404 `DOMAIN_NOT_FOUND`, 422 `VALIDATION_ERROR`, 422 `NO_PII` (`source` with `@`).
+
+## S8 import lane (5.8.0, CR-059)
+
+Line 2 of the company: an existing .com that Dvir bought on a registrar website (a GoDaddy or Dynadot closeout, a fixed-price listing or a public auction) is recorded here. Line 1 is hand registration through `/buy`; every other name is Line 1. The line is stored on the name (`lane`: absent = Line 1, `S8` = Line 2) and shown by `/report` (`lines`, `per_domain[].line`).
+
+### `POST /portfolio/import`
+WRITE, `Idempotency-Key`, audited. `dry_run: true` validates, computes the plan and reports what would refuse the import, and writes nothing (200 instead of 201). No registrar or marketplace is contacted except the read-only lookup of an enabled registrar adapter (`godaddy`, `porkbun`); for any other registrar (e.g. `dynadot`) the import is manual and `expiry_date` is required.
+
+Body (strict):
+`{domain: ".com name", approval_ref: {text, approved_at}, lane: "S8", registrar: string (where the name sits now, e.g. "godaddy", "dynadot"), source: "closeout" | "fixed" | "auction", price_paid: USD number > 0 (2 decimals; the all-in price), buy_date: "YYYY-MM-DD", expiry_date?: "YYYY-MM-DD" (required unless the registrar adapter reads it), category: geo|trend|b2b|collision|regulation|buzzword|other, price_grade?: "strong" | "weaker" (geo only, required for geo), comps_value: USD number > 0 (required unless geo: the value the comparable sales support), pricing_evidence?: {comps?, rationale?} (optional, as at /buy), renewal_price?: USD number, order?: string, deal_id?: "D-NNN", dry_run?: bool}`.
+
+- **Approval (founder rule 1):** `approval_ref` is required and validated exactly as at `/buy` (text names the domain, `approved_at` not in the future and at most 72 h old): 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED`. The server cannot prove a human said it; same accepted trust boundary.
+- **Refusals (400):** `S8_SOURCE_INVALID` (source is not one of the three), `BACKORDER_SOURCE_REFUSED` (NameJet, SnapNames or DropCatch as `source` or `registrar`, in any spelling), `S8_PRICE_CAP` (`price_paid` over the per-name cap, $50; `details {price_paid_cents, s8_max_price_cents}`). Cloudflare Registrar is refused (founder rule 5). **409:** `S8_SLOTS_FULL` (the reserved S8 slots are all taken; `details {s8_names, s8_reserved_slots}`), `DOMAIN_CAP_REACHED` (40 names held), `ALREADY_IN_PORTFOLIO`, `NOT_IN_ACCOUNT`. **422:** `CATEGORY_REQUIRED`, `GEO_GRADE_REQUIRED`, `COMPS_INVALID`, `EXPIRY_UNKNOWN`, `REGISTRATION_TERM_INVALID` (expiry more than one year after `buy_date`: 1-year registrations only), plus `VALIDATION_ERROR` for a bad field.
+- **Caps (founder rule 2):** `settings.s8_max_price_cents` (5,000) and `settings.s8_reserved_slots` (10) change only by migration, never through the API. The service holds **no money total** for S8 (G-86). Of the 40 names, 10 are reserved: a `/buy` is refused with 409 `DOMAIN_CAP_REACHED` once Line 1 holds 30 names (`details` adds `line1_domains`, `line1_max`, `s8_reserved_slots`; a `/buy` dry run reports it as `would_be_blocked: "DOMAIN_CAP_REACHED"`), and an S8 import needs fewer than 10 S8 names and fewer than 40 names in all.
+- **Pricing (founder rule 4 unchanged):** the BIN is the lowest price-list price at or above `comps_value`, taken from the current `pricing_settings` (never hard-coded). Only prices a non-geo hybrid name may carry are candidates (at or above the non-geo minimum BIN, not a LANDER-1 exception price); a `comps_value` above the top candidate gets the top candidate. Floor, walk-away, minimum offer, the M6/M18 ladder drops, the final push and the delist are computed exactly as for any other non-geo hybrid name; a geo name follows the geo rule (`bin` at the grade price). No new `pricing_settings` version.
+- **Books (one transaction):** the `domains` row (`lane: "S8"`, status `listed`, `registrar_api` `none`/`manage`/`full`, `drop_date = expiry + 1 year`), one `registration` ledger row of `-price_paid` (note `import; S8 <source>`), the `pricing_evidence` row, the plan and its `listing_history`/`price_schedule` rows, the `deals` row when `deal_id` is given. Auto-renew is not confirmable here: the `warnings` say `AUTO_RENEW_UNCONFIRMED`; turn it off at the registrar.
+- **201 / 200:** `{domain, lane: "S8", status, registrar_api, expiry_date, drop_date, listing (the plan view), warnings: [string], s8: {source, comps_value_cents, bin_cents, s8_names, s8_reserved_slots, s8_max_price_cents}, audit_id}`; a dry run also has `dry_run: true` and `would_be_blocked: null | "S8_SLOTS_FULL" | "DOMAIN_CAP_REACHED"`.
 
 ## Outreach log (4.0.0)
 
@@ -892,6 +910,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Scout lesson errors (5.3.0):** `LESSON_NOT_FOUND` (404, `PATCH /lessons/{id}`).
 
 **Scoring engine errors (5.5.0):** `TRAIN_TOO_SOON` (409, `POST /engine/train`; `details.next_allowed_at`), `MODEL_NOT_READY` (409, `POST /score`), and in a failed run's `error` text: `NOT_ENOUGH_DATA`, `TRAIN_TIME_BUDGET`. Upload reasons (5.4.0) are listed under `POST /engine/sales` and `/engine/unsold`.
+
+**S8 import errors (5.8.0, CR-059, `POST /portfolio/import`):** `S8_SOURCE_INVALID` (400), `BACKORDER_SOURCE_REFUSED` (400), `S8_PRICE_CAP` (400), `S8_SLOTS_FULL` (409); also `DOMAIN_CAP_REACHED` (now also when Line 1 holds `max_domains - s8_reserved_slots` names), `ALREADY_IN_PORTFOLIO`, `NOT_IN_ACCOUNT`, `PRICING_SETTINGS_NO_PRICE_LIST` (409, current pricing settings without a price list), `ADAPTER_NOT_ENABLED`, `ACCOUNT_NOT_ELIGIBLE`, `REGISTRAR_ERROR`, `EXPIRY_UNKNOWN`, `REGISTRATION_TERM_INVALID`.
 
 **Portfolio, outreach and pattern errors (4.0.0):** `EMAIL_CAP` (409, `POST /outreach/emails`), `PATTERN_CSV_INVALID` (422), `NO_PATTERN_UPLOAD` (404), `MAX_ONE_RENEWAL_USED` (422, `POST /portfolio/{domain}/horizon`), `LTO_NOT_ALLOWED` (422, also from `/buy` and `POST /list/{domain}` on a trend, regulation or first-expiry name), `DOMAIN_CAP_REACHED` (now 40 names).
 

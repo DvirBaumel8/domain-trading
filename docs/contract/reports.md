@@ -1,4 +1,4 @@
-# Reports (contract v5.7.0)
+# Reports (contract v5.8.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -14,6 +14,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `sales` | `count`, `gross`, `commission`, `fees` (sale-side fees: `/sold` fee and adjustment rows and `payout_fee`), `net` (pairs) |
 | `profit` | pair: `net − costs`. Costs = `registration`, `renewal`, `refund` (lowers costs), `tool`, `ai`, and `fee`/`adjustment` rows not written by `/sold` |
 | `roi`, `roi_pct` | `profit / costs`: a number with 2 decimals, and a whole percent; both `null` while costs are 0 |
+| `lines` | (5.8.0, CR-059) Two rows, Line 1 (hand registration) then Line 2 (S8 aftermarket): `{line: 1|2, name, names (active names), max_names (30 and 10: `max_domains - s8_reserved_slots`, `s8_reserved_slots`), spend: {spent (pair)}, sales: {count, gross (pair)}, pnl (pair), committed_forward: {total (pair), complete, missing: [domain]}}`. Every figure is a sum over the ledger rows of the line's names: `spent` = −Σ `registration` + `renewal` + `fee`, `gross` = Σ `sale`, `pnl` = Σ of every ledger row of the line (sales in; commissions, fees, registrations, renewals out). Ledger rows with no name (tool, ai) belong to no line, so the two `pnl` figures need not add up to `profit`. `committed_forward` follows the same rule as `spend.committed_forward` |
 | `per_domain` | One row per domain (pending purchases excluded), see below |
 | `upcoming_90d` | Events within 90 days, see below |
 | `offers_by_strategy` | `[{category, strategy, names_listed, names_with_offers, offers_90d, offers_per_listed_name_per_month (2 decimals), median_offer_pct_of_bin, max_offer_pct_of_bin, band_shares: {<band>: share}}]` (`names_listed`, `names_with_offers` and `offers_90d` count currently listed names; `median_offer_pct_of_bin`, `max_offer_pct_of_bin` and `band_shares` cover all offers ever logged for the category; `strategy` is the service's strategy label for the category, `S2`..`S7`) |
@@ -22,7 +23,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `warnings` | `[{code, level: "error"|"warn"|"info", domain?, message, details}]`, sorted error → warn → info, then by code and domain |
 
 ### `per_domain` row
-`domain`, `status` (`owned`, `listed`, `delisted`, `sold`, `dropped`), `registrar`, `registrar_api` (`full`, `manage`, `none`), `category`, `price_grade`, `listing_mode` (`bin`/`hybrid`/`offer`/null), `bin`, `floor` (pairs), `walkaway_cents` + `walkaway` (`"$960 (private)"`), `min_offer` (pair), `pricing_source`, `pricing_settings_version`, `offers: {count_30d, highest_30d, count_90d, highest_90d, count_all, highest_all, highest_all_pct_of_bin, last_offer_at, open_for_dvir}` (highest = `{cents, display}` or null; periods in IDT days; keys always present), `next_price_event: null | {event, due_on, bin_cents, bin, floor_cents, floor, walkaway_cents, walkaway}`, `pricing_hold`, `export_pending_since`, `cost` (pair: registration + renewal rows), `renewal_price` (pair), `renewals_used` (0 or 1), `expiry_date`, `drop_date`, `lander`, `ns_verified: bool`, `days_held` (stops at the sale or drop date), `sold_at`, `delisted_at`.
+`domain`, `line` (1 or 2, 5.8.0) and `lane` (`null` or `"S8"`), `status` (`owned`, `listed`, `delisted`, `sold`, `dropped`), `registrar`, `registrar_api` (`full`, `manage`, `none`), `category`, `price_grade`, `listing_mode` (`bin`/`hybrid`/`offer`/null), `bin`, `floor` (pairs), `walkaway_cents` + `walkaway` (`"$960 (private)"`), `min_offer` (pair), `pricing_source`, `pricing_settings_version`, `offers: {count_30d, highest_30d, count_90d, highest_90d, count_all, highest_all, highest_all_pct_of_bin, last_offer_at, open_for_dvir}` (highest = `{cents, display}` or null; periods in IDT days; keys always present), `next_price_event: null | {event, due_on, bin_cents, bin, floor_cents, floor, walkaway_cents, walkaway}`, `pricing_hold`, `export_pending_since`, `cost` (pair: registration + renewal rows), `renewal_price` (pair), `renewals_used` (0 or 1), `expiry_date`, `drop_date`, `lander`, `ns_verified: bool`, `days_held` (stops at the sale or drop date), `sold_at`, `delisted_at`.
 
 ### `upcoming_90d` item
 `{domain, kind, date, stage?, headsup?, event?, values?, note}`, sorted by date. Kinds:

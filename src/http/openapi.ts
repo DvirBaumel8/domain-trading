@@ -26,6 +26,7 @@ export const SUMMARIES: Record<string, string> = {
   'GET /health/ping': 'Liveness (public, no database)',
   'GET /health': 'Service health: version, database, jobs, review',
   'GET /check': 'Price and availability check of a name across registrars',
+  'POST /portfolio/import': 'Import an S8 (Line 2) aftermarket name Dvir bought on a registrar website (needs approval_ref; price cap and S8 slots); dry_run supported',
   'POST /buy': 'Buy a name (needs Dvir\'s approval_ref and a complete screening pack); dry_run supported',
   'GET /pricing/preview': 'Preview the sell plan of a price',
   'POST /list/{domain}': 'List an owned name (mode, price, lander)',

@@ -15,7 +15,7 @@ import { isValidDisplayName } from '../../domain-name.js';
 import { changedColumns } from '../listing/index.js';
 import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
 import { landerNameservers, sameNsSet } from '../listing/index.js';
-import { activeDomainCount } from './budget.js';
+import { activeDomainCount, activeLaneCounts, laneCapBlock } from './budget.js';
 import type { CheckResult, CheckService } from '../registrars/index.js';
 import { checkSettingsVersion, isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from '../listing/index.js';
 import { planView } from '../listing/index.js';
@@ -175,7 +175,7 @@ export class BuyService {
       // 4, 5
       await this.assertNotOwned(db, input.domain);
       try {
-        await this.assertDomainCap(db, settings.max_domains);
+        await this.assertDomainCap(db, settings);
       } catch (e) {
         // v4.0.0 (CR-045 item 3): a dry run reports the domain cap as would_be_blocked; a real buy (or a strict dry run) is refused
         if (gateRefuses || !(e instanceof AppError) || e.code !== 'DOMAIN_CAP_REACHED') throw e;
@@ -338,9 +338,9 @@ export class BuyService {
     try {
       return await db.transaction().execute(async (trx) => {
         await advisoryXactLock(trx, `domain:${a.input.domain}`);
-        const s = await trx.selectFrom('settings').select(['max_domains']).forUpdate().executeTakeFirstOrThrow();
+        const s = await trx.selectFrom('settings').select(['max_domains', 's8_reserved_slots']).forUpdate().executeTakeFirstOrThrow();
         await this.assertNotOwned(trx, a.input.domain);
-        await this.assertDomainCap(trx, s.max_domains);
+        await this.assertDomainCap(trx, s);
         // v2.0.0: the hold and the pack, re-read under the global lock (a screening run started since the first checks changes both)
         const hold = await screeningHold(trx, a.input.domain);
         if (a.smallBuy) {
@@ -701,9 +701,13 @@ export class BuyService {
     if (open) throw new AppError(409, 'ALREADY_OWNED_OR_PENDING', `A purchase of ${domain} is in progress`, { state: open.state });
   }
 
-  protected async assertDomainCap(db: Kysely<Database>, maxDomains: number): Promise<void> {
-    const n = await activeDomainCount(db);
-    if (n >= maxDomains) throw new AppError(409, 'DOMAIN_CAP_REACHED', `Domain cap reached (${n}/${maxDomains})`, { domains: n, max_domains: maxDomains });
+  /** The domain cap, with the S8 slots reserved (v5.8.0, CR-059): Line 1 may hold at most max_domains - s8_reserved_slots names. */
+  protected async assertDomainCap(db: Kysely<Database>, cfg: { max_domains: number; s8_reserved_slots: number }): Promise<void> {
+    const c = await activeLaneCounts(db);
+    if (laneCapBlock(null, c, cfg) !== null) {
+      throw new AppError(409, 'DOMAIN_CAP_REACHED', `Domain cap reached (${c.total}/${cfg.max_domains}; Line 1 ${c.line1}/${cfg.max_domains - cfg.s8_reserved_slots}, ${cfg.s8_reserved_slots} slots reserved for S8)`,
+        { domains: c.total, max_domains: cfg.max_domains, line1_domains: c.line1, line1_max: cfg.max_domains - cfg.s8_reserved_slots, s8_reserved_slots: cfg.s8_reserved_slots });
+    }
   }
 
   private async assertAccountState(adapter: RegistrarAdapter, cost: number, dryRun: boolean): Promise<string[]> {

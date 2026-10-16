@@ -13,6 +13,8 @@ export function reportMarkdown(r: Report): string {
   const parts: string[] = [`# Domain trading report\n\nGenerated ${r.generated_at}\n`];
   parts.push(`## Spend\n\n- Spent: ${b.spent}\n- Committed forward (renewals): ${b.committed_forward.total}${b.committed_forward.complete ? '' : ` (incomplete: ${b.committed_forward.missing.join(', ')})`}\n- Domains: ${b.domains.count} of ${b.domains.max}\n`);
   parts.push(`## Sales & ROI\n\n- Sales: ${r.sales.count}\n- Gross: ${r.sales.gross}\n- Commission: ${r.sales.commission}\n- Fees: ${r.sales.fees}\n- Net: ${r.sales.net}\n- Profit: ${r.profit}\n- ROI: ${r.roi_pct === null ? 'n/a' : `${r.roi_pct}%`}\n`);
+  parts.push(`## Lines\n\n${table(['Line', 'Names', 'Spent', 'Sales', 'Gross', 'P&L', 'Committed renewals'],
+    r.lines.map((l) => [`${l.line} (${l.name})`, `${l.names} of ${l.max_names}`, l.spend.spent, l.sales.count, l.sales.gross, l.pnl, l.committed_forward.total]))}`);
   parts.push(`## Domains\n\n${table(['Domain', 'Status', 'Mode', 'BIN', 'Floor', 'Next event'],
     r.per_domain.map((d) => [d.domain, d.status, d.listing_mode ?? '', d.bin ?? '', d.floor ?? '', d.next_price_event ? `${d.next_price_event.event} ${d.next_price_event.due_on}` : '']))}`);
   parts.push(`## Upcoming (90 days)\n\n${table(['Date', 'Domain', 'Kind', 'Note'], r.upcoming_90d.map((e) => [e.date, e.domain, e.kind, e.note]))}`);

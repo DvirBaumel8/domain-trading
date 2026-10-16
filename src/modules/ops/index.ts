@@ -1,6 +1,7 @@
 // Public entry of the ops module.
 export { registerHealth } from './api/health.js';
 export { registerPortfolioWrites } from './api/portfolio.js';
+export { registerPortfolioImport } from './api/portfolio-import.js';
 export { registerJobs } from './api/jobs.js';
 export { BackupExporter } from './jobs/backup-export.js';
 export { CohortOutcomesJob } from './jobs/cohort-outcomes.js';
