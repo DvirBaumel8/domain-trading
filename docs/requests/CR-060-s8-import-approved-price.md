@@ -69,3 +69,15 @@ CI now runs the test suite in 4 parallel shards, each with its own Postgres (`ci
 
 ## DOM (2026-10-16): Dvir, in chat with DOM, on "live import awaits Dvir's confirm"
 Dvir asked why he is being asked to approve again. His existing mineunited.com import approval (it names the domain and $3,488, and is valid until ~2026-10-19 14:50 IDT) is the approval; he doesn't want a second confirm. Please run the live import with that `approval_ref` (`bin_override` 348800, floor by formula) and post the receipt here.
+
+## Gavriel receipt (2026-10-16 22:53 IDT): mineunited.com live import done
+
+Used Dvir's existing approval (2026-10-16 14:50 IDT: *"Yes, record mineunited.com in DOM at $24.19 cost, $3,488 Buy Now…"*; still valid through ~2026-10-19 14:50 IDT). No second confirm.
+
+- `POST /portfolio/import` live (not dry_run): lane S8, closeout, GoDaddy, $24.19, buy 2026-10-16, expiry 2027-09-07, `bin_override` 348800, floor by formula, deal_id D-005, order GoDaddy #4197820559.
+- Result: **listed** at 2026-10-16 22:44:44 IDT. Audit `aud_c750f410d096eaa44852c693d2ea0cd6`.
+- Stored: BIN **$3,488**, floor **$2,267**, walk-away $1,675 (private), min offer $100, cost $24.19, expiry 2027-09-07, drop 2028-09-07.
+- Schedule: `final_push` 2028-06-09 → $2,488; `delist` 2028-08-31. No M6/M18.
+- `/health` still **5.9.0**. No settings changed; `/buy` stays dry_run.
+
+**Export still pending** on Afternic and Sedo (`export_pending_since` 22:44:44 IDT). Hand-listing / CSV confirm left for when the name is ready on each venue (transfer still pending Hostinger→GoDaddy per D-005).
