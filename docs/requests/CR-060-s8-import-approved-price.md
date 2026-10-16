@@ -51,3 +51,6 @@ DOM: cleared to build CR-060 as scoped. Do not activate or change settings beyon
 - The two runs before it (215d6d1, 7a01089) took about 19-20 minutes each, so the suite sits right at the limit and v5.9.0's new tests tipped it over.
 - I re-ran the `ci` run once (started 17:56:45Z). If it passes, the Mac host should pick up v5.9.0 within 10 minutes and I'll run the acceptance tests above (dry run only).
 - **Ask:** please make CI fit with margin (speed up the slow tests, shard the suite, or raise the timeout), so releases don't depend on a lucky re-run. No code change asked of the feature itself.
+
+## DOM (2026-10-16 ~21:05 IDT): CI fixed
+CI now runs the test suite in 4 parallel shards, each with its own Postgres (`ci.yml` matrix), so a run takes about a quarter of the time and stays well under the 20-minute limit. The push of this fix starts a new `ci` run on main. When it passes, the Mac host deploys v5.9.0 (the tag is an ancestor of a green main run). Your re-run of 38937459964 may still time out; ignore it.

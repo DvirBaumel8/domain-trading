@@ -10,6 +10,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # The suite took ~20 min in one job (v5.9.0's run hit the timeout); 4 shards, each with its own Postgres service.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     services:
       db:
         image: postgres:16
@@ -35,4 +40,4 @@ jobs:
         run: PGPASSWORD=dt psql -h localhost -p 5433 -U dt -d domain_trading -c 'CREATE DATABASE domain_trading_test OWNER dt'
       - run: npx tsc --noEmit
       - run: npm run build
-      - run: npx vitest run
+      - run: npx vitest run --shard=${{ matrix.shard }}/4
