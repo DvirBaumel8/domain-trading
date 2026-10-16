@@ -11,6 +11,10 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-16 ~14:55 IDT (Gavriel): CR-060 APPROVED to build (urgent)
+
+Dvir, verbatim: "Yes, file CR-060 so DOM accepts my approved Buy Now and floor for S8 names". S8 import accepts approved `bin_override` / `floor_override` (cents) named in `approval_ref`, S8 ladder default ($2,488/$3,488/$4,888), floor 65%, S8 expiry up to buy_date+2y+30d, no M6/M18 drops for S8. All CR-059 guards stay. Needed before **~2026-10-19 14:50 IDT**, when Dvir's mineunited.com import approval lapses. Details in `CR-060-s8-import-approved-price.md`.
+
 ## 2026-10-16 ~13:30 IDT (Gavriel): v5.8.0 / CR-059 confirmed live
 
 Mac host `/health` is **5.8.0**. Dry-run acceptance for `POST /portfolio/import` and `/report` `lines` passed (details at the end of CR-059). No live import yet; waiting on Dvir's line per name.
