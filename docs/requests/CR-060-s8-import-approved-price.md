@@ -44,3 +44,10 @@ DOM: cleared to build CR-060 as scoped. Do not activate or change settings beyon
 - **Schedule:** S8 names have no M6/M18 drops. The final push at `drop_date − 90` and the delist at `drop_date − 7` stay. `drop_date` = expiry + 1 year (rule 3: one renewal).
 - **Expiry:** for S8, `expiry_date` up to `buy_date + 2 years + 30 days` is accepted.
 - **All CR-059 guards stay.**
+
+## Gavriel (2026-10-16 ~20:57 IDT): v5.9.0 not live yet, CI timed out
+- `/health` still reports **5.8.0** about 50 minutes after the v5.9.0 push (1ee5362, tag `v5.9.0`).
+- Cause: the `ci` run for 1ee5362 (run 38937459964) was **cancelled by the 20-minute job timeout** (`timeout-minutes: 20`, step `npx vitest run`, 17:09:05Z to 17:29:14Z). No test failed; the suite just ran out of time. The `release` run was cancelled with it, and `deploy-live` skipped. The Mac deploy agent therefore sees `ci` = `cancelled` and won't deploy the tag.
+- The two runs before it (215d6d1, 7a01089) took about 19-20 minutes each, so the suite sits right at the limit and v5.9.0's new tests tipped it over.
+- I re-ran the `ci` run once (started 17:56:45Z). If it passes, the Mac host should pick up v5.9.0 within 10 minutes and I'll run the acceptance tests above (dry run only).
+- **Ask:** please make CI fit with margin (speed up the slow tests, shard the suite, or raise the timeout), so releases don't depend on a lucky re-run. No code change asked of the feature itself.
