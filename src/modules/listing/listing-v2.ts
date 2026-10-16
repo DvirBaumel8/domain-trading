@@ -25,6 +25,8 @@ export interface ListingContext {
   today: string; dropDate: string | null; // LTO must end before dropDate
   /** v4.0.0 (CR-048): the name is flagged for the 12-month drop (horizon trend or regulation, or drop_date = the first expiry): lease-to-own is refused, no override. */
   noLto?: boolean;
+  /** v5.9.0 (CR-060): the name's lane. S8 (Line 2) BINs are exempt from the Line 1 price list and the LANDER-1 exception prices. */
+  lane?: 'S8' | null;
   /** Re-validating the stored plan unchanged (category/grade change): keep the stored hybrid values and source, skip the formula match. */
   carried?: { pricingSource: 'formula' | 'approved_exception' };
 }
@@ -75,7 +77,7 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
     if (lto !== null) return fail('LTO_NOT_ALLOWED', 'Lease-to-own is only allowed in hybrid mode');
     if (bin < MIN_OFFER_FLOOR) return fail('MIN_OFFER_TOO_LOW', 'bin mode needs a BIN of at least $20');
     // v3: the price list is never waived, not even by an override (an override relaxes mode guards only)
-    if (isV3(s) && !carried) {
+    if (isV3(s) && !carried && !(ctx.lane === 'S8' && ctx.category !== 'geo')) {
       const geo = ctx.category === 'geo';
       const lane = (s.allowedBinsCents ?? []).filter((v) => (geo ? v >= s.geoBinMinCents && v <= s.geoBinMaxCents : v >= hybridBinMin(s)));
       if (!lane.includes(bin)) return fail('BIN_NOT_IN_PRICE_LIST', 'A BIN must be on the price list', { allowed_bins_cents: lane });
@@ -121,7 +123,7 @@ export function validateListing(req: ListingRequest, ctx: ListingContext): Listi
       : { code: 'MODE_NOT_ALLOWED_FOR_CATEGORY', message: 'offer mode needs an override' });
   } else {
     // V5
-    const r = computePlan({ category: ctx.category, mode: 'hybrid', grade: ctx.grade, binCents: bin, floorCents: floor, walkawayCents: walk, exception: exception || carried, carried }, s);
+    const r = computePlan({ category: ctx.category, mode: 'hybrid', grade: ctx.grade, binCents: bin, floorCents: floor, walkawayCents: walk, exception: exception || carried, carried, s8: ctx.lane === 'S8' && ctx.category !== 'geo' }, s);
     if (!r.ok) {
       const d = r.details ?? {};
       const display = Object.fromEntries(Object.entries(d).filter(([k]) => k.endsWith('_cents') && typeof d[k] === 'number')

@@ -6,7 +6,7 @@ import { newAuditId } from '../../../http/audit.js';
 import { addOneYear, idtDay, isRealDate } from '../../../core/dates.js';
 import { centsToDollarsOrNull, formatUsd, usdStringToCents } from '../../../core/money.js';
 import { normalizeDomain } from '../../../domain-name.js';
-import { buildSchedule, isV3, s8BinFor } from '../../listing/index.js';
+import { buildSchedule, isV3, priceFormula, s8LadderBin } from '../../listing/index.js';
 import { currentSettings } from '../../listing/index.js';
 import { RegistrarError, type RegistrarAdapter } from '../../registrars/index.js';
 import { activeDomainCount, activeLaneCounts, laneCapBlock } from '../../buying/index.js';
@@ -33,6 +33,8 @@ export interface ImportInput {
   manual?: boolean; expiry?: string; renewalPrice?: string; dryRun?: boolean;
   /** v5.8.0 (CR-059): the S8 aftermarket import (POST /portfolio/import). The BIN is the price-list rung for `compsValueCents`; any registrar name is accepted. */
   lane?: 'S8'; s8Source?: string; compsValueCents?: number;
+  /** v5.9.0 (CR-060): Dvir's approved BIN and floor (cents, S8 only; the caller has checked the approval names them). */
+  binOverrideCents?: number; floorOverrideCents?: number;
   /** v5.8.0: the HTTP audit id; the import then writes no audit row of its own (the audit hook writes it). */
   auditId?: string;
 }
@@ -41,7 +43,7 @@ export interface ImportResult {
   dry_run?: true; domain: string; status: 'owned' | 'listed'; registrar_api: string; expiry_date: string; drop_date: string;
   listing: object | null; warnings: string[];
   /** v5.8.0 (S8 imports): the lane, the price-list rung chosen from the comps value, and what would refuse the import (a dry run reports it; a real import throws it). */
-  lane?: 'S8'; s8?: { source: string; comps_value_cents: number | null; bin_cents: number | null; s8_names: number; s8_reserved_slots: number; s8_max_price_cents: number };
+  lane?: 'S8'; s8?: { source: string; comps_value_cents: number | null; bin_cents: number | null; floor_cents: number | null; bin_source: 'override' | 'ladder' | 'grade_price' | null; floor_source: 'override' | 'formula' | null; s8_names: number; s8_reserved_slots: number; s8_max_price_cents: number };
   would_be_blocked?: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | null;
 }
 
@@ -178,10 +180,23 @@ export async function importDomain(
     if (!p.listing) {
       if (!isV3(s)) throw new AppError(409, 'PRICING_SETTINGS_NO_PRICE_LIST', 'The current pricing settings have no price list; an S8 BIN comes from the price list');
       if (p.category === 'geo') {
+        // geo S8 keeps the CR-059 behaviour: the grade price, strict BIN; CR-060 overrides do not apply to geo
+        if (input.binOverrideCents !== undefined || input.floorOverrideCents !== undefined) {
+          throw new ImportInputError('bin_override and floor_override do not apply to a geo name (geo is a strict grade-price BIN)');
+        }
         s8Listing = { mode: 'bin', bin: (p.grade === 'strong' ? s.geoBinStrongCents : s.geoBinWeakerCents) / 100 };
       } else {
-        if (!input.compsValueCents || input.compsValueCents <= 0) throw new ImportInputError('comps_value is required for a non-geo S8 name');
-        s8Listing = { mode: 'hybrid', bin: s8BinFor(input.compsValueCents, s) / 100 };
+        // CR-060: the BIN is Dvir's approved override, else the S8 ladder by name length; the floor is his override, else 65% of the BIN (the pricing-settings share)
+        const binCents = input.binOverrideCents ?? s8LadderBin(domain, settings.s8_bin_ladder);
+        if (input.floorOverrideCents !== undefined && input.floorOverrideCents > binCents) {
+          throw new ImportInputError(`floor_override ${formatUsd(input.floorOverrideCents)} must not be above the BIN ${formatUsd(binCents)}`);
+        }
+        s8Listing = { mode: 'hybrid', bin: binCents / 100 };
+        if (input.floorOverrideCents !== undefined) {
+          const f = priceFormula(binCents, s);
+          s8Listing = { ...s8Listing, floor: input.floorOverrideCents / 100, walkaway: Math.min(input.floorOverrideCents, f.walkawayCents) / 100,
+            pricing_exception: true, pricing_exception_reason: 'S8 approved floor (CR-060)' };
+        }
       }
     }
   }
@@ -220,10 +235,13 @@ export async function importDomain(
   if (p.manual) warnings.push(`AUTO_RENEW_UNCONFIRMED: check auto-renew is OFF in the ${p.registrar} dashboard`);
   const expiryDate = expiry!;
   // Founder rule 3: 1-year registrations only. Allow 7 days of slack for registry rounding and time zones.
-  const maxExpiry = new Date(`${addOneYear(p.buyDate)}T00:00:00Z`);
-  maxExpiry.setUTCDate(maxExpiry.getUTCDate() + 7);
+  // v5.9.0 (CR-060): an S8 closeout may carry the transfer year on top: buy_date + 2 years + 30 days.
+  const maxExpiry = new Date(`${addOneYear(p.lane === 'S8' ? addOneYear(p.buyDate) : p.buyDate)}T00:00:00Z`);
+  maxExpiry.setUTCDate(maxExpiry.getUTCDate() + (p.lane === 'S8' ? 30 : 7));
   if (expiryDate > maxExpiry.toISOString().slice(0, 10)) {
-    throw new AppError(422, 'REGISTRATION_TERM_INVALID', `expiry ${expiryDate} is more than one year after the buy date ${p.buyDate}; only 1-year registrations are allowed (founder rule 3)`);
+    throw new AppError(422, 'REGISTRATION_TERM_INVALID', p.lane === 'S8'
+      ? `expiry ${expiryDate} is more than 2 years and 30 days after the buy date ${p.buyDate}; an S8 name may carry its transfer year but no more`
+      : `expiry ${expiryDate} is more than one year after the buy date ${p.buyDate}; only 1-year registrations are allowed (founder rule 3)`);
   }
   const dropDate = addOneYear(expiryDate);
 
@@ -232,7 +250,7 @@ export async function importDomain(
     if (dropDate <= p.today) throw new AppError(422, 'DROP_DATE_PASSED', `drop_date ${dropDate} is not in the future; a listing cannot be scheduled`);
     const r = validateListing(listingReq, {
       category: p.category, grade: p.grade, phase: 'buy', settings: s, highValueMinBinCents: settings.high_value_min_bin_cents,
-      override: p.override, overrideReason: p.overrideReason, approvalValid: p.approval !== null, today: p.today, dropDate,
+      override: p.override, overrideReason: p.overrideReason, approvalValid: p.approval !== null, today: p.today, dropDate, lane: p.lane,
     });
     if (!r.ok) throw new AppError(r.status, r.code, r.message, r.details);
     plan = r.plan;
@@ -252,7 +270,7 @@ export async function importDomain(
   if (plan) warnings.push(...plan.warnings);
 
   if (input.dryRun) {
-    const events = plan ? buildSchedule({ plan, anchor: p.today, dropDate, settings: s }) : [];
+    const events = plan ? buildSchedule({ plan, anchor: p.today, dropDate, settings: s, lane: p.lane }) : [];
     return { dry_run: true, domain, status: plan ? 'listed' : 'owned', registrar_api: registrarApi, expiry_date: expiryDate, drop_date: dropDate,
       listing: plan ? planView(plan, events) : null, warnings, ...(await s8Fields(db, p.lane, input, plan, settings, wouldBeBlocked)) };
   }
@@ -303,7 +321,7 @@ export async function importDomain(
         override: plan.overrideUsed, overrideReason: plan.overrideUsed ? p.overrideReason : null,
         approvalText: p.approval?.text ?? null, approvalAt: p.approval?.at ?? null, auditId, planAuditId: auditId, at: now,
       })).execute();
-      written = (await writePlan(trx, { domainId: row.id, plan, anchor: p.today, dropDate, settings: s, planAuditId: auditId, now })).events;
+      written = (await writePlan(trx, { domainId: row.id, plan, anchor: p.today, dropDate, settings: s, planAuditId: auditId, now, lane: p.lane })).events;
     }
     // The domain cap counts the import. An import over it succeeds (the money is already spent) and says so.
     const n = await activeDomainCount(trx);
@@ -327,7 +345,9 @@ async function s8Fields(
   if (lane !== 'S8') return {};
   return {
     lane: 'S8', would_be_blocked: blocked,
-    s8: { source: input.s8Source ?? '', comps_value_cents: input.compsValueCents ?? null, bin_cents: plan?.binCents ?? null,
+    s8: { source: input.s8Source ?? '', comps_value_cents: input.compsValueCents ?? null, bin_cents: plan?.binCents ?? null, floor_cents: plan?.floorCents ?? null,
+      bin_source: !plan ? null : plan.category === 'geo' ? 'grade_price' : input.binOverrideCents !== undefined ? 'override' : 'ladder',
+      floor_source: !plan || plan.category === 'geo' ? null : input.floorOverrideCents !== undefined ? 'override' : 'formula',
       s8_names: (await activeLaneCounts(db)).s8, s8_reserved_slots: settings.s8_reserved_slots, s8_max_price_cents: settings.s8_max_price_cents },
   };
 }

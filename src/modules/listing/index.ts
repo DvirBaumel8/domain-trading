@@ -10,6 +10,6 @@ export { ListService } from './list.js';
 export { checkSettingsVersion, type Comp, CompSchema, isCategory, type ListingPlan, type ListingRequest, validateComps, validateListing } from './listing-v2.js';
 export { applyHold, currentPlan, domainPlanColumns, historyRow, writePlan } from './plan-store.js';
 export { planView } from './plan-view.js';
-export { computePlan, hybridBinMin, priceFormula, s8BinFor } from './pricing/plan.js';
+export { computePlan, hybridBinMin, priceFormula, s8LadderBin, parseS8Ladder } from './pricing/plan.js';
 export { buildSchedule, laneList } from './pricing/schedule.js';
 export { currentSettings, isV3, type PricingSettings, rowToSettings, ruleFields, settingsByVersion } from './pricing/settings.js';

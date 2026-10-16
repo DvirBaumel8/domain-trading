@@ -53,7 +53,7 @@ export async function dropAtFirstExpiry(
         .where('status', 'in', ['applied', 'skipped_at_minimum', 'skipped_no_change', 'skipped_disabled']).executeTakeFirst();
       planId = (await writePlan(trx, {
         domainId: cur.id, plan, anchor: idtDay(cur.first_listed_at), dropDate: cur.expiry_date,
-        settings, planAuditId: auditId, startAfter: done?.d ?? undefined, now,
+        settings, planAuditId: auditId, startAfter: done?.d ?? undefined, now, lane: cur.lane,
       })).planId;
     }
     const rows = cur.status === 'listed' && planId

@@ -77,17 +77,26 @@ Comparison = first year + exactly one renewal. At purchase `renewals_used = 0`, 
 | B-32 | **FT-1 (CR-001 P2):** buy 2026-10-04 (eligible 2026-12-03); job on 10-12, 12-10, 12-11 without confirm; then a confirm with another BIN | No flag on 10-12 or 12-10; on 12-11 `DISTRIBUTION_INCOMPLETE` + flag (SEL9-6); mismatch → 422 `DISTRIBUTION_BIN_MISMATCH` |
 
 ## S8 import lane (v5.8.0, CR-059; Dvir 14-15 Oct 2026)
-`POST /portfolio/import` (route `ops/api/portfolio-import.ts`, logic `importDomain` with `lane: 'S8'`) books an existing .com Dvir bought on a registrar website. Rules, all enforced in code: approval_ref validated as at `/buy` (rule 1); `source` closeout|fixed|auction; NameJet, SnapNames, DropCatch refused as source or registrar; price_paid <= `settings.s8_max_price_cents` ($50) and S8 names < `settings.s8_reserved_slots` (10) and total < `max_domains` (rule 2, migration only; no money total, G-86); BIN = `s8BinFor(comps_value)` = the lowest open price-list price >= the comps value (rule 4; open = at or above the non-geo minimum and not a LANDER-1 exception price; above the top = the top); a geo name takes the grade price. Books `domains.lane = 'S8'`, one `registration` ledger row, `pricing_evidence`, the plan and its schedule, the deal row when `deal_id` is given. Tests (`tests/modules/buying/s8-import.test.ts`):
+`POST /portfolio/import` (route `ops/api/portfolio-import.ts`, logic `importDomain` with `lane: 'S8'`) books an existing .com Dvir bought on a registrar website. Rules, all enforced in code: approval_ref validated as at `/buy` (rule 1); `source` closeout|fixed|auction; NameJet, SnapNames, DropCatch refused as source or registrar; price_paid <= `settings.s8_max_price_cents` ($50) and S8 names < `settings.s8_reserved_slots` (10) and total < `max_domains` (rule 2, migration only; no money total, G-86); BIN (v5.9.0, CR-060) = `bin_override` (named in `approval_ref.text`, exact dollar amount, else 422 `APPROVAL_INVALID`) or `s8LadderBin` from `settings.s8_bin_ladder` by name length (<= 8 $4,888, 9-12 $3,488, 13+ $2,488); S8 BINs are exempt from the price list and the LANDER-1 exception check everywhere (rule 4 exception by Dvir, CR-060; `gaps.md` G-105); floor = `floor_override` (named, <= BIN) or the formula (65%, whole dollar); `comps_value` is evidence only; expiry window buy_date + 2y + 30d; no M6/M18 drops (final push and delist stay); a geo name takes the grade price and refuses overrides. (v5.8.0 used the price-list rung from comps; replaced.) Books `domains.lane = 'S8'`, one `registration` ledger row, `pricing_evidence`, the plan and its schedule, the deal row when `deal_id` is given. Tests (`tests/modules/buying/s8-import.test.ts`):
 
 | ID | Case |
 |---|---|
 | S8-1 | missing, wrong-domain, expired or future approval_ref refused; lane other than S8 refused; nothing written |
 | S8-2 | source not closeout/fixed/auction refused; NameJet/SnapNames/DropCatch refused as source or registrar |
 | S8-3 | $50.01 is `S8_PRICE_CAP`, $50.00 accepted; the cap is not settable through the API |
-| S8-4 | the import books lane S8, ledger row, evidence, hybrid plan; BIN rung from comps (788/1088/1488, top = 1488); geo grade price; manual registrar needs expiry |
+| S8-4 | the import books lane S8, ledger row, evidence, hybrid plan; BIN from the S8 ladder (v5.9.0); comps optional; geo grade price; manual registrar needs expiry |
 | S8-5 | 30 Line 1 names close `/buy` (`DOMAIN_CAP_REACHED`, dry run `would_be_blocked`), S8 import still allowed; 10 S8 names give `S8_SLOTS_FULL` (dry run `would_be_blocked`) |
 | S8-6 | total cap 40 holds for an S8 import |
 | S8-7 | `/report` `lines` and `per_domain[].line` |
 | S8-8 | idempotent replay, dry run writes nothing, owned name and READ token refused |
 | S8-9 | a registrar adapter that reports no expiry: 422 `EXPIRY_UNKNOWN` |
 | S8-10 | pricing settings without a price list: 409 `PRICING_SETTINGS_NO_PRICE_LIST` |
+| S8-11 | (v5.9.0, CR-060) dry run with `bin_override` 348800 and `floor_override` 226700 named in the approval: echoed, `would_be_blocked` null; real import stores them |
+| S8-12 | no `approval_ref`: 422 `APPROVAL_INVALID` |
+| S8-13 | override price not named (or only inside a larger number): 422 `APPROVAL_INVALID` with `details.override`; amount forms `$3488`, `$3,488.00`; floor above BIN refused |
+| S8-14 | no override: ladder by length (8, 9, 10, 12, 13 characters), floor 65% whole dollar, ladder in the settings row |
+| S8-15 | expiry buy+2y+30d accepted, one day later `REGISTRATION_TERM_INVALID` |
+| S8-16, S8-16b | no M6/M18 rows; final push + delist stay; `POST /jobs/preview` does not fail an off-list S8 BIN |
+| S8-17 | CR-059 guards stand (`S8_PRICE_CAP`, `BACKORDER_SOURCE_REFUSED`) |
+| S8-18 | geo S8 keeps the grade price, refuses overrides |
+| S8-19 | `POST /list` replan keeps an off-list S8 BIN; a Line 1 name still gets `BIN_NOT_IN_PRICE_LIST` |

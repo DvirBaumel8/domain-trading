@@ -2,6 +2,17 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.9.0 (2026-10-16): CR-060 S8 import accepts Dvir's approved Buy Now and floor; S8 ladder by name length; S8 expiry window; no M6/M18 drops for S8
+Release note: `docs/releases/v5.9.0.md`.
+MINOR (additive request fields; S8 pricing and schedule change, S8 only). Gavriel, CR-060 (approved by Dvir 2026-10-16 14:51 IDT).
+- **New request fields** on `POST /portfolio/import` (`lane: "S8"`): `bin_override` and `floor_override` (integer cents). Each price must be named in `approval_ref.text` as a dollar amount (`$3,488`, `$3488`, `$3,488.00`, `$3488.00`; exact match), else 422 `APPROVAL_INVALID` (`details.override` names which). `floor_override` above the BIN is 422 `VALIDATION_ERROR`. Overrides on a geo name are refused (422).
+- **Changed (S8 pricing):** without an override the BIN comes from the S8 ladder by name length (characters before `.com`): up to 8 **$4,888**, 9 to 12 **$3,488**, 13 or more **$2,488** (`settings.s8_bin_ladder`, migration only). This replaces the 5.8.0 price-list rung from `comps_value`; `comps_value` is now optional and stored as evidence only. Floor = 65% of the BIN to the whole dollar (or `floor_override`); walk-away max(48%, $500) never above the floor; minimum offer $100. S8 BINs are exempt from the Line 1 price list and the LANDER-1 check (also on `POST /list`, `replan` and the daily price job); Line 1 is unchanged.
+- **Changed (S8 expiry):** `expiry_date` up to `buy_date` + 2 years + 30 days is accepted for S8; one day later is 422 `REGISTRATION_TERM_INVALID`. Line 1 and `/buy` are unchanged (one year + 7 days).
+- **Changed (S8 schedule):** S8 names get no M6/M18 drops. The final push (`drop_date - 90`) and the delist (`drop_date - 7`) stay.
+- **Changed (response):** `s8` gains `floor_cents`, `bin_source` (`override` | `ladder` | `grade_price`) and `floor_source` (`override` | `formula` | null).
+- **Unchanged:** every CR-059 guard (approval, `S8_PRICE_CAP`, 10 slots, backorder refusal, sources). No new `pricing_settings` version, no settings activation; `/buy` unchanged.
+- **Migration:** `1764200000000_v5-9-0.sql` (`settings.s8_bin_ladder`).
+
 ## 5.8.0 (2026-10-16): CR-059 S8 aftermarket import lane (Line 2): POST /portfolio/import, S8 slot reservation, /report lines
 Release note: `docs/releases/v5.8.0.md`.
 MINOR (additive; one behaviour tightening below). Gavriel, CR-059 (Dvir's decisions, 15 Oct 2026: "$50 limit only"; BIN rung from the price list).

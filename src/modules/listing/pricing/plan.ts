@@ -8,6 +8,7 @@ export interface PlanInput {
   category: PlanCategory; grade?: 'strong' | 'weaker' | null; binCents?: Cents | null;
   floorCents?: Cents | null; walkawayCents?: Cents | null; exception?: boolean;
   mode?: 'hybrid'; // 'hybrid' on a geo category = hybrid math (geo override)
+  s8?: boolean; // v5.9.0 (CR-060): an S8 (Line 2) name: its BIN is exempt from the Line 1 price list and the LANDER-1 exception prices
   carried?: boolean; // re-validating a stored plan unchanged: the v3 price list does not apply to it
 }
 export interface Plan {
@@ -69,10 +70,13 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
   if (v3) {
     // v3 (§10.13): the price list replaces the x95 and minimum-BIN rules; an exception never waives it
     const list = s.allowedBinsCents ?? [];
-    if (!list.includes(bin) || bin < hybridBinMin(s)) {
+    if (input.s8 === true) {
+      // v5.9.0 (CR-060, Dvir): S8 BINs come from the S8 ladder or an approved override, not the price list; only the minimum BIN holds
+      if (bin < hybridBinMin(s)) return fail('BIN_BELOW_FLOOR_MIN', 'BIN is below the minimum hybrid BIN', { min_bin_cents: hybridBinMin(s) });
+    } else if (!list.includes(bin) || bin < hybridBinMin(s)) {
       return fail('BIN_NOT_IN_PRICE_LIST', 'A hybrid BIN must be on the price list', { allowed_bins_cents: list.filter((v) => v >= hybridBinMin(s)), min_bin_cents: hybridBinMin(s) });
     }
-    if (s.landerExceptionBinsCents.includes(bin)) {
+    if (input.s8 !== true && s.landerExceptionBinsCents.includes(bin)) {
       return fail('LANDER_EXCEPTION_REQUIRED', 'This BIN needs LANDER-1 evidence from the screening pack', { bin_cents: bin, needs: 'screening_pack (CR-001 P1b)' });
     }
   } else {
@@ -113,13 +117,24 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
   } };
 }
 
+export interface S8LadderStep { max_len: number | null; bin_cents: number }
+
+/** The S8 ladder from the settings row (`settings.s8_bin_ladder`): ascending by max_len, the last step has max_len null. Throws on a malformed row. */
+export function parseS8Ladder(raw: unknown): S8LadderStep[] {
+  const ok = Array.isArray(raw) && raw.length > 0 && raw.every((x, i) => x && typeof x === 'object'
+    && Number.isSafeInteger((x as S8LadderStep).bin_cents) && (x as S8LadderStep).bin_cents > 0
+    && (((x as S8LadderStep).max_len === null && i === raw.length - 1) || Number.isSafeInteger((x as S8LadderStep).max_len)));
+  if (!ok) throw new Error('settings.s8_bin_ladder is malformed');
+  return raw as S8LadderStep[];
+}
+
 /**
- * v5.8.0 (CR-059): the BIN of an imported S8 name = the lowest price-list price >= the comps value (founder rule 4: BINs come only from the list).
- * Only prices a non-geo hybrid name may carry are candidates: at or above the non-geo minimum BIN and not a LANDER-1 exception price.
- * A comps value above the top candidate gets the top candidate. Needs a price list (pricing v3 or later).
+ * v5.9.0 (CR-060): the default BIN of an imported S8 name = the first ladder step whose max_len is >= the name's length (characters before ".com").
+ * Replaces the CR-059 comps rung. The ladder is not the Line 1 price list (Dvir's CR-060 decision).
  */
-export function s8BinFor(compsValueCents: Cents, s: PricingSettings): Cents {
-  const eligible = (s.allowedBinsCents ?? []).filter((v) => v >= hybridBinMin(s) && !s.landerExceptionBinsCents.includes(v));
-  if (eligible.length === 0) throw new Error('pricing_settings: no price-list BIN is open to a non-geo name');
-  return eligible.find((v) => v >= compsValueCents) ?? eligible[eligible.length - 1]!;
+export function s8LadderBin(domain: string, ladder: unknown): Cents {
+  const steps = parseS8Ladder(ladder);
+  const len = domain.endsWith('.com') ? domain.length - 4 : domain.length;
+  const step = steps.find((x) => x.max_len === null || len <= x.max_len) ?? steps[steps.length - 1]!;
+  return step.bin_cents;
 }

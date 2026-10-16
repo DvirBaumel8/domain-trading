@@ -53,8 +53,10 @@ function applyDrop(v: Values, pctBps: number, s: PricingSettings): Values | null
 
 export function buildSchedule(input: {
   plan: SchedulePlan; anchor: string; dropDate: string; settings: PricingSettings; startAfter?: string;
+  /** v5.9.0 (CR-060): S8 (Line 2) names have no M6/M18 drops; the final push and the delist stay. */
+  lane?: 'S8' | null;
 }): ScheduleEvent[] {
-  const { plan, anchor, dropDate, settings: s, startAfter } = input;
+  const { plan, anchor, dropDate, settings: s, startAfter, lane } = input;
   const keep = (list: ScheduleEvent[]) => (startAfter ? list.filter((e) => e.event === 'delist' || e.dueOn > startAfter) : list);
   const out: ScheduleEvent[] = [];
   const delistOn = addDays(dropDate, -s.delistDaysBeforeDrop);
@@ -94,7 +96,7 @@ export function buildSchedule(input: {
   const finalOn = addDays(dropDate, -s.finalPushDaysBeforeDrop);
   if (plan.binCents === null || plan.floorCents === null || plan.walkawayCents === null) throw new Error('hybrid plan without prices');
   let cur: Values = { bin: plan.binCents, floor: plan.floorCents, walk: plan.walkawayCents };
-  s.drops.forEach((d, i) => {
+  (lane === 'S8' ? [] : s.drops).forEach((d, i) => {
     const name = DROP_NAMES[i];
     if (!name) return;
     const due = addMonthsClamped(anchor, d.afterMonths);
@@ -119,7 +121,10 @@ export function buildSchedule(input: {
     }
   });
 
-  const pushedBin = s.finalPushMode === 'bin_to_lowest_listed_ge_floor' && isV3(s)
+  // S8: the lowest list price in [floor, BIN] if one exists, else the floor itself (the S8 BIN may sit above the whole list)
+  const pushedBin = lane === 'S8'
+    ? (laneList('nongeo', s).find((x) => x >= cur.floor && x <= cur.bin) ?? cur.floor)
+    : s.finalPushMode === 'bin_to_lowest_listed_ge_floor' && isV3(s)
     ? lowestListedAtOrAboveFloor(cur, s)
     : Math.min(cur.bin, Math.max(ceil95(cur.floor), hybridBinMin(s)));
   out.push(pushedBin === cur.bin ? ev('final_push', finalOn, cur, 'skipped_no_change') : ev('final_push', finalOn, { ...cur, bin: pushedBin }, 'planned'));

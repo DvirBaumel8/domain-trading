@@ -10,14 +10,14 @@ export const newPlanId = (): string => `pl_${randomUUID()}`;
 
 export async function writePlan(trx: Transaction<Database>, o: {
   domainId: number; plan: ListingPlan; anchor: string; dropDate: string; settings: PricingSettings;
-  planAuditId: string; startAfter?: string; now: Date;
+  planAuditId: string; startAfter?: string; now: Date; lane?: 'S8' | null;
 }): Promise<{ planId: string; events: ScheduleEvent[] }> {
   if (o.settings.version !== o.plan.settingsVersion) {
     throw new Error(`writePlan: settings v${o.settings.version} does not match plan v${o.plan.settingsVersion}`);
   }
   await trx.updateTable('price_schedule').set({ status: 'superseded', updated_at: o.now })
     .where('domain_id', '=', o.domainId).where('status', '=', 'planned').execute();
-  const events = buildSchedule({ plan: o.plan, anchor: o.anchor, dropDate: o.dropDate, settings: o.settings, startAfter: o.startAfter });
+  const events = buildSchedule({ plan: o.plan, anchor: o.anchor, dropDate: o.dropDate, settings: o.settings, startAfter: o.startAfter, lane: o.lane });
   const planId = newPlanId();
   if (events.length > 0) {
     await trx.insertInto('price_schedule').values(events.map((e) => ({

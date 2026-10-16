@@ -122,7 +122,7 @@ export class ListService {
       const r = validateListing(req, {
         category, grade, phase: 'change', settings: s, highValueMinBinCents: settings.high_value_min_bin_cents,
         override: body.override ?? false, overrideReason: body.override_reason ?? null, approvalValid,
-        today: idtDay(now), dropDate: row.drop_date,
+        today: idtDay(now), dropDate: row.drop_date, lane: row.lane,
         noLto: row.horizon !== 'evergreen' || (row.drop_date !== null && row.drop_date === row.expiry_date),
         ...(!priceChange && !replan && (row.listing_mode === 'hybrid' || row.listing_mode === 'bin') ? { carried: { pricingSource: row.pricing_source ?? 'formula' } } : {}),
       });
@@ -176,7 +176,7 @@ export class ListService {
     if (body.dry_run) {
       const a = exportDomain ? afternicRow(exportDomain) : null;
       const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath).catch(() => null);
-      const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter }) : await this.currentEvents(db, row.id, row.plan_id);
+      const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter, lane: row.lane }) : await this.currentEvents(db, row.id, row.plan_id);
       return {
         dry_run: true, valid: true, domain, category, listing: shown ? planView(shown, previewEvents) : null, lander, ns,
         ...(noLander ? { lander_pending: row.lander === null } : {}),
@@ -231,7 +231,7 @@ export class ListService {
         await applyHold(trx, cur, { hold: body.pricing_hold!, reason: body.pricing_hold_reason ?? null, approvalText: null, approvalAt: null, auditId: ctx.auditId, now, history: false });
       }
       if (plan) {
-        await writePlan(trx, { domainId: row.id, plan, anchor, dropDate: row.drop_date!, settings: s, planAuditId: ctx.auditId, startAfter, now });
+        await writePlan(trx, { domainId: row.id, plan, anchor, dropDate: row.drop_date!, settings: s, planAuditId: ctx.auditId, startAfter, now, lane: row.lane });
       }
       if (historyChange) {
         await trx.insertInto('listing_history').values(historyRow({

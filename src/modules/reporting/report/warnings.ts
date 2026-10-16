@@ -240,7 +240,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
       let formula: Record<string, unknown> | null = null;
       const st = d.pricing_settings_version === null ? null : settingsOf.get(d.pricing_settings_version) ?? null;
       if (st && d.category && d.bin_cents !== null) {
-        const r = computePlan({ category: d.category, grade: d.price_grade, binCents: d.bin_cents, floorCents: d.floor_cents, walkawayCents: d.walkaway_cents, exception: true, mode: 'hybrid' }, st);
+        const r = computePlan({ category: d.category, grade: d.price_grade, binCents: d.bin_cents, floorCents: d.floor_cents, walkawayCents: d.walkaway_cents, exception: true, mode: 'hybrid', s8: d.lane === 'S8' }, st);
         if (r.ok && r.plan.formula) formula = priceValues({ bin_cents: d.bin_cents, floor_cents: r.plan.formula.floorCents, walkaway_cents: r.plan.formula.walkawayCents });
       }
       add('PRICING_EXCEPTION', 'info', `${d.domain} is priced by an approved exception, not the formula.`, d.domain, {

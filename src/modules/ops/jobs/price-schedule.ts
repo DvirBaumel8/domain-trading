@@ -21,7 +21,7 @@ export interface PriceJobResult {
 
 
 /** V5/V6 re-check of a planned row against the settings version it was planned under (R8). Returns a reason or null. */
-export function rowValid(row: Pick<Row, 'bin_cents' | 'floor_cents' | 'walkaway_cents'>, s: PricingSettings, mode: ListingMode | null): string | null {
+export function rowValid(row: Pick<Row, 'bin_cents' | 'floor_cents' | 'walkaway_cents'>, s: PricingSettings, mode: ListingMode | null, lane: 'S8' | null = null): string | null {
   const { bin_cents: bin, floor_cents: floor, walkaway_cents: walk } = row;
   if (bin === null || floor === null || walk === null) return 'row has no prices';
   if ([bin, floor, walk].some((v) => v % 100 !== 0)) return 'prices are not whole dollars';
@@ -29,7 +29,7 @@ export function rowValid(row: Pick<Row, 'bin_cents' | 'floor_cents' | 'walkaway_
     if (!(s.walkawayMinCents <= walk && walk <= floor && floor <= bin)) return 'walk-away/floor/BIN order or walk-away minimum violated';
     if (floor < s.floorMinCents) return 'floor below the floor minimum';
     if (bin < hybridBinMin(s)) return 'BIN below the minimum hybrid BIN';
-    if (isV3(s) && !(s.allowedBinsCents ?? []).includes(bin)) return 'BIN not on the price list';
+    if (isV3(s) && lane !== 'S8' && !(s.allowedBinsCents ?? []).includes(bin)) return 'BIN not on the price list'; // v5.9.0 (CR-060): S8 BINs are not on the Line 1 list
     return null;
   }
   if (mode === 'bin') {
@@ -159,7 +159,7 @@ export class PriceScheduleJob {
       const row = due[i]!;
       if (chosen) { olderIdx.push(row.id); continue; }
       const settings = await settingsByVersion(q, row.settings_version);
-      const reason = settings ? rowValid(row, settings, cur.listing_mode) : `pricing settings v${row.settings_version} not found`;
+      const reason = settings ? rowValid(row, settings, cur.listing_mode, cur.lane) : `pricing settings v${row.settings_version} not found`;
       if (reason) {
         await setStatus([row.id], 'failed', reason);
         await audit(row.event, row.id, reason, 422);

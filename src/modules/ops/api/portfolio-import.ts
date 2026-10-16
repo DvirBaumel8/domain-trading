@@ -31,12 +31,23 @@ const ImportBody = z.object({
   category: z.string().nullable().optional(),
   price_grade: z.enum(['strong', 'weaker']).nullable().optional(),
   comps_value: Usd.optional(),
+  bin_override: z.number().int().positive().optional(),
+  floor_override: z.number().int().positive().optional(),
   pricing_evidence: z.unknown().optional(),
   renewal_price: Usd.optional(),
   order: z.string().trim().min(1).max(80).optional(),
   deal_id: z.string().regex(/^D-\d{3,}$/).nullable().optional(),
   dry_run: z.boolean().optional(),
 }).strict();
+
+/** The whole-dollar amounts a text names as `$3,488`, `$3488`, `$3,488.00` or `$3488.00` (in cents); `$13,488` or `$34,880` is not `$3,488`. */
+export function namedAmountsCents(text: string): Set<number> {
+  const out = new Set<number>();
+  for (const m of text.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?(?!\d|,\d|\.\d)/g)) {
+    out.add(Number(m[1]!.replace(/,/g, '')) * 100 + Number(m[2] ?? 0));
+  }
+  return out;
+}
 
 function cents(n: number, field: string): number {
   try {
@@ -63,6 +74,17 @@ export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely
     }
     if (!domain.endsWith('.com') || domain.split('.').length !== 2) throw new AppError(422, 'VALIDATION_ERROR', 'Only .com names');
 
+    // CR-060: an approved BIN / floor must be named in Dvir's approval line
+    const named = namedAmountsCents(String(b.approval_ref?.text));
+    for (const [field, v] of [['bin_override', b.bin_override], ['floor_override', b.floor_override]] as const) {
+      if (v !== undefined && !named.has(v)) {
+        throw new AppError(422, 'APPROVAL_INVALID', `approval_ref.text must name the ${field} price ($${(v / 100).toLocaleString('en-US')}) as a dollar amount`, { override: field, [`${field}_cents`]: v });
+      }
+    }
+    if (b.bin_override !== undefined && b.floor_override !== undefined && b.floor_override > b.bin_override) {
+      throw new AppError(422, 'VALIDATION_ERROR', 'floor_override must not be above bin_override');
+    }
+
     const registrar = b.registrar.toLowerCase();
     const manual = !deps.adapters.some((a) => a.name === registrar);
     const dollars = (n: number | undefined, f: string) => (n === undefined ? undefined : (cents(n, f) / 100).toFixed(2));
@@ -74,6 +96,7 @@ export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely
         approvalText: String(b.approval_ref?.text), approvalAt: String(b.approval_ref?.approved_at),
         manual, expiry: b.expiry_date, renewalPrice: dollars(b.renewal_price, 'renewal_price'),
         lane: 'S8', s8Source: b.source, compsValueCents: b.comps_value === undefined ? undefined : cents(b.comps_value, 'comps_value'),
+        binOverrideCents: b.bin_override, floorOverrideCents: b.floor_override,
         dryRun: b.dry_run === true, auditId: req.auditId ?? undefined,
       }, { adapters: deps.adapters, now });
     } catch (e) {
