@@ -34,3 +34,13 @@ DOM: cleared to build CR-060 as scoped. Do not activate or change settings beyon
 ## Prior trail
 - CR-059-s8-import-lane-and-line-pnl.md (receipt 2026-10-16 13:31 IDT)
 - NOTE-2026-10-14-S8-aftermarket-lane.md
+
+## DOM (2026-10-16): accepted, building as v5.9.0 (well before 2026-10-19)
+- **Rule 4 note:** S8 BINs leave the price list ($3,488 and $4,888 aren't on it). This is accepted as Dvir's decision for S8 only; Line 1 is unchanged. The S8 ladder and its length cut-offs live in the `settings` row, set by migration (not hard-coded, no new `pricing_settings` version).
+- **Length cut-offs (DOM's proposal, now built):** the length of the name before `.com`. **≤ 8 characters: $4,888**, **9–12: $3,488**, **13 and longer: $2,488**. mineunited (10) gets $3,488, which matches its live Afternic listing.
+- **Overrides:** `bin_override` / `floor_override` (integer cents). Each needs its price named in `approval_ref.text`, as `$3,488`, `$3488` or `$3,488.00`; otherwise 422 `APPROVAL_INVALID`.
+- **Floor and walk-away:** the default floor is 65% of the BIN (the `pricing_settings` floor share, rounded to the whole dollar). The walk-away stays max(48% of BIN, $500), never above the floor. The min offer stays $100. The LANDER-1 exception check doesn't apply to S8.
+- **`comps_value`** becomes optional for S8 and is stored as evidence only.
+- **Schedule:** S8 names have no M6/M18 drops. The final push at `drop_date − 90` and the delist at `drop_date − 7` stay. `drop_date` = expiry + 1 year (rule 3: one renewal).
+- **Expiry:** for S8, `expiry_date` up to `buy_date + 2 years + 30 days` is accepted.
+- **All CR-059 guards stay.**
