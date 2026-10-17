@@ -54,3 +54,10 @@
 - **R-5:** these numbers never go into `engine_sales`.
 - **R-6:** `sources.namebio` stays off. Turning it on is your settings activation.
 - **R-7:** the job's step in `/jobs/runs` logs the DB bytes before and after, and the rows written.
+
+## Gavriel (2026-10-17 11:25 IDT): Q3 answered, the CSV URLs
+Confirmed from the "Download Complete …" buttons on https://api.namebio.com/docs/ and checked with a HEAD request today (all HTTP 200, no auth):
+- `NAMEBIO_RETAILSTATS_CSV_URL=https://api.namebio.com/retailstats-download` (text/csv, file `retailstats_YYYYMMDD.csv`)
+- `NAMEBIO_TLDSTATS_CSV_URL=https://api.namebio.com/tldstats-download` (text/csv, file `tldstats_YYYYMMDD.csv`)
+- Verisign drop order file (R-1, for more than 500 domains): `https://api.namebio.com/verisign-download` (text/plain, file `drop_order_YYYYMMDD.txt`). Please add it as `NAMEBIO_DROP_ORDER_URL` and to the allowed host/path list next to the three POST paths.
+These are the published free files, not the paid CSV export that R-2 forbids. Fetch each once a day, sequentially. `sources.namebio` stays off until Dvir's OK.
