@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { RegistrarError } from '../../../src/modules/registrars/types.js';
 import { withDomainLock } from '../../../src/core/locks.js';
 import { makeApp } from '../../helpers/app.js';
-import { testDb as db } from '../../helpers/db.js';
+import { testDb as db, waitFor } from '../../helpers/db.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
 import { listedDomain } from '../../helpers/listing.js';
 import { issueToken } from '../../helpers/tokens.js';
@@ -41,9 +41,9 @@ describe('POST /list concurrency and NS hardening', () => {
     await listedDomain({ domain: D });
     let secondDone = false;
     const first = list({ mode: 'hybrid', bin: 2495, approval_ref: approval() }, auth);
-    while (!pb.calls.some((c) => c.startsWith('setNameservers'))) await sleep(5);
+    await waitFor(() => pb.calls.some((c) => c.startsWith('setNameservers')));
     const second = list({ mode: 'hybrid', bin: 2995, approval_ref: approval() }, auth).then((r) => { secondDone = true; return r; });
-    await sleep(250);
+    await sleep(120); // two lock-poll rounds (50 ms each) while the holder still has the lock
     expect(secondDone).toBe(false); // blocked on the lock while the first holds it
     expect(pb.calls.filter((c) => c.startsWith('setNameservers'))).toHaveLength(1);
     g.release();
@@ -72,7 +72,7 @@ describe('POST /list concurrency and NS hardening', () => {
     await inside;
     let done = false;
     const call = list({ mode: 'hybrid', bin: 2495, approval_ref: approval() }, auth).then((r) => { done = true; return r; });
-    await sleep(250);
+    await sleep(120); // two lock-poll rounds (50 ms each) while the holder still has the lock
     expect(done).toBe(false);
     expect((await dom()).bin_cents).toBe(199500);
     g.release();

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { resetDb, testDb as db } from '../../helpers/db.js';
+import { describe, expect, it } from 'vitest';
+import { testDb as db } from '../../helpers/db.js';
 import { V2 } from '../../helpers/pricing.js';
 import { currentSettings, rowToSettings, settingsByVersion } from '../../../src/modules/listing/pricing/settings.js';
 
@@ -12,8 +12,6 @@ async function insertV3(effectiveAt: Date): Promise<void> {
 }
 
 describe('pricing settings loader', () => {
-  beforeEach(async () => { await resetDb(db); });
-
   it('currentSettings returns v2 with camelCase jsonb', async () => {
     const s = await currentSettings(db, new Date());
     expect(s.version).toBe(2);

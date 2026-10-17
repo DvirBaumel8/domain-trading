@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config';
+import { TEST_WORKERS } from './tests/setup/workers.js';
 
 export default defineConfig({
   test: {
-    fileParallelism: false,
+    // API test files run in parallel, each worker on its own database (tests/setup/global-db.ts); the unit project is DB-free.
+    maxWorkers: TEST_WORKERS,
     env: { APP_ENV: 'test' },
     projects: [
       // tests/contract/contract-doc.test.ts is offline (no DB, no network): it checks docs/contract/ against the code, so it runs here.

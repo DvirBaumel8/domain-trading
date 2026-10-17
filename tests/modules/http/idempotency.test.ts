@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { dbAuditWriter, type AuditWriter } from '../../../src/http/audit.js';
-import { makeApp, sideEffects } from '../../helpers/app.js';
+import { armSlowRoute, makeApp, sideEffects } from '../../helpers/app.js';
 import { testDb as db } from '../../helpers/db.js';
 import { issueToken } from '../../helpers/tokens.js';
 
@@ -98,7 +98,13 @@ describe('idempotency (ID)', () => {
   it('concurrent same key: one executes, the other gets 409 IDEMPOTENCY_KEY_IN_USE', async () => {
     app = await makeApp();
     const { auth } = await issueToken('write');
-    const [a, b] = await Promise.all([post('/__test/slow', 'k-c', {}, auth), post('/__test/slow', 'k-c', {}, auth)]);
+    const release = armSlowRoute();
+    const pa = post('/__test/slow', 'k-c', {}, auth);
+    const pb = post('/__test/slow', 'k-c', {}, auth);
+    // The loser answers at once while the winner is held open; only then may the winner finish.
+    expect((await Promise.race([pa, pb])).statusCode).toBe(409);
+    release();
+    const [a, b] = await Promise.all([pa, pb]);
     const codes = [a.statusCode, b.statusCode].sort();
     expect(codes).toEqual([201, 409]);
     const conflict = a.statusCode === 409 ? a : b;

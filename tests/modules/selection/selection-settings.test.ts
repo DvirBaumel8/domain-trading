@@ -9,11 +9,13 @@ import { issueToken } from '../../helpers/tokens.js';
 
 let app: FastifyInstance;
 afterEach(async () => app?.close());
-const approval = (text = 'Dvir: activate it', ageMs = 3_600_000) => ({ text, approved_at: new Date(Date.now() - ageMs).toISOString() });
+/** Fixed test clock start: approvals are aged against it, never against the real clock. */
+const T0 = Date.parse('2026-10-12T09:00:00Z');
+const approval = (text = 'Dvir: activate it', ageMs = 3_600_000) => ({ text, approved_at: new Date(T0 - ageMs).toISOString() });
 
 async function setup(opts: Parameters<typeof makeApp>[0] = {}) {
   // The write limiter allows 10 POSTs a minute per token: every request moves this clock on by 7 s.
-  let clock = Date.now();
+  let clock = T0;
   app = await makeApp({ ...opts, now: () => clock });
   const w = await issueToken('write', 'gavriel');
   const r = await issueToken('read', 'gizbar');
@@ -76,10 +78,10 @@ describe('selection settings (CAP-00)', () => {
     const { post, get } = await setup();
     await post('/selection/settings', { label: 'v1b', set: { 'tranche.size': 12 } });
     const cases: [object, string][] = [
-      [{ text: '', approved_at: new Date().toISOString() }, 'APPROVAL_INVALID'],
+      [{ text: '', approved_at: new Date(T0).toISOString() }, 'APPROVAL_INVALID'],
       [{ text: 'ok', approved_at: 'yesterday' }, 'APPROVAL_INVALID'],
       [approval('ok', 80 * 3_600_000), 'APPROVAL_EXPIRED'],
-      [{ text: 'ok', approved_at: new Date(Date.now() + 3_600_000).toISOString() }, 'APPROVAL_INVALID'],
+      [{ text: 'ok', approved_at: new Date(T0 + 3_600_000 + 60_000).toISOString() }, 'APPROVAL_INVALID'],
     ];
     for (const [ref, code] of cases) {
       const r = await post('/selection/settings/v1b/activate', { approval_ref: ref });

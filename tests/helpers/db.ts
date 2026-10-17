@@ -13,8 +13,36 @@ const TABLES = [
   'ledger_entries', 'domains', 'deals', 'api_tokens',
 ];
 
-/** Wipe all data. Append-only triggers are bypassed with replication role on ONE connection. */
-export async function resetDb(db: Kysely<Database>): Promise<void> {
+/** What one table looks like: row count, newest row-version xid and (for tables with a serial id) the sequence position. */
+type Fingerprint = Map<string, string>;
+
+// `settings` is not in TABLES (it is emptied and re-inserted, never truncated) but a test can change it, so it is fingerprinted too.
+const fingerprintSql = [...TABLES, 'settings'].map((t) => `SELECT '${t}' AS t, count(*)::text || ':' || coalesce(max(xmin::text::bigint), 0)::text AS f FROM ${t}`).join(' UNION ALL ');
+// sequence -> owning table, read once per process (the schema does not change while tests run)
+const sequenceOwnersSql = `SELECT s.relname AS seq, t.relname AS tbl FROM pg_class s JOIN pg_depend d ON d.objid = s.oid AND d.deptype IN ('a', 'i') JOIN pg_class t ON t.oid = d.refobjid WHERE s.relkind = 'S'`;
+let sequenceOwners: Map<string, string> | undefined;
+
+async function fingerprint(db: Kysely<Database>): Promise<Fingerprint> {
+  const fp: Fingerprint = new Map();
+  for (const r of (await sql.raw<{ t: string; f: string }>(fingerprintSql).execute(db)).rows) fp.set(r.t, r.f);
+  if (!sequenceOwners) {
+    sequenceOwners = new Map((await sql.raw<{ seq: string; tbl: string }>(sequenceOwnersSql).execute(db)).rows.map((r) => [r.seq, r.tbl]));
+  }
+  // A test that inserted and deleted rows (or rolled back) leaves the table empty but the sequence advanced; count that as dirty too.
+  for (const r of (await sql<{ sequencename: string; last_value: string | null }>`SELECT sequencename, last_value::text FROM pg_sequences WHERE schemaname = 'public'`.execute(db)).rows) {
+    const tbl = sequenceOwners.get(r.sequencename);
+    if (tbl && fp.has(tbl)) fp.set(tbl, `${fp.get(tbl)}:${r.last_value ?? ''}`);
+  }
+  return fp;
+}
+
+const clean = new WeakMap<Kysely<Database>, Fingerprint>();
+
+function differing(now: Fingerprint, base: Fingerprint): string[] {
+  return [...now].filter(([t, f]) => base.get(t) !== f).map(([t]) => t);
+}
+
+async function fullReset(db: Kysely<Database>): Promise<void> {
   await db.connection().execute(async (conn) => {
     await sql`SET session_replication_role = replica`.execute(conn);
     await sql.raw(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`).execute(conn);
@@ -24,6 +52,46 @@ export async function resetDb(db: Kysely<Database>): Promise<void> {
     await sql`SET session_replication_role = origin`.execute(conn);
     await sql`DELETE FROM settings`.execute(conn);
     await sql`INSERT INTO settings DEFAULT VALUES`.execute(conn);
+  });
+  clean.set(db, await fingerprint(db));
+}
+
+/**
+ * Bring the database back to its seeded state. The first reset on a Kysely instance is a full one (truncate everything, re-seed) and
+ * fingerprints the clean state; later resets read one fingerprint, truncate only the tables that differ and leave the rest alone (a test
+ * touches a handful of the ~90 tables). A change to a seeded table (pricing_settings, selection_*, settings, ...) or any doubt falls back
+ * to the full reset. Append-only triggers are bypassed with replication role on ONE connection.
+ */
+export async function resetDb(db: Kysely<Database>): Promise<void> {
+  const base = clean.get(db);
+  if (!base) return fullReset(db);
+  const dirty = differing(await fingerprint(db), base);
+  if (dirty.length === 0) return;
+  const seeded = (t: string) => !/^0:0(:|$)/.test(base.get(t) ?? '');
+  if (dirty.some(seeded)) return fullReset(db);
+  await db.connection().execute(async (conn) => {
+    await sql`SET session_replication_role = replica`.execute(conn);
+    await sql.raw(`TRUNCATE ${dirty.join(', ')} RESTART IDENTITY CASCADE`).execute(conn);
+    await sql`SET session_replication_role = origin`.execute(conn);
+  });
+  // CASCADE may have emptied a seeded child table; if anything is off, start over.
+  if (differing(await fingerprint(db), base).length > 0) await fullReset(db);
+}
+
+/** Poll until `check()` holds (10 ms steps, `timeoutMs` at most), then return; throws on timeout. A condition wait instead of a fixed sleep. */
+export async function waitFor(check: () => boolean | Promise<boolean>, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error(`waitFor: condition not met within ${timeoutMs} ms`);
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
+/** Resolves once some session is blocked on a (transaction) advisory lock in this database, i.e. a waiter is really queued behind the holder. */
+export async function waitForLockWaiter(db: Kysely<Database>): Promise<void> {
+  await waitFor(async () => {
+    const r = await sql<{ n: string }>`select count(*)::text as n from pg_locks where locktype = 'advisory' and not granted and database = (select oid from pg_database where datname = current_database())`.execute(db);
+    return Number(r.rows[0]?.n) > 0;
   });
 }
 

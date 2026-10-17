@@ -18,6 +18,9 @@ import { issueToken } from '../../helpers/tokens.js';
 import type { RdapLookup } from '../../../src/core/rdap.js';
 import { mswServer } from '../../setup/network.js';
 
+/** Fixed test clock start (no real-clock dependence). */
+const T0 = Date.parse('2026-10-12T09:00:00Z');
+
 let app: FastifyInstance | undefined;
 afterEach(async () => app?.close());
 const T_FREE = (): RdapLookup => ({ outcome: 'not_registered', reasonCode: null, httpStatus: 404, url: 'https://rdap.example/domain/x', retrievedAt: new Date(), body: null, facts: null });
@@ -71,7 +74,7 @@ const CHECKS = ['form', 'history', 'census', 'ext_dates', 'tier', 'quote', 'pric
 async function l113(): Promise<ScreeningHarness> {
   mswServer.use(...[1, 2, 3, 4, 5].flatMap((i) => site(`firm${i}.example`, LIVE)));
   const x = await screeningHarness({
-    start: Date.now(), adapters: [new FakeAdapter('porkbun', { capabilities: { afternicFastTransfer: true } })], rdap: async () => 'not_registered' as const,
+    start: T0, adapters: [new FakeAdapter('porkbun', { capabilities: { afternicFastTransfer: true } })], rdap: async () => 'not_registered' as const,
     screening: { sleep: async () => {}, siteFetch: ((i: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => globalThis.fetch(i, init)) as typeof fetch },
   });
   app = x.app;

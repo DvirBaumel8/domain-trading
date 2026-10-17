@@ -17,7 +17,7 @@ import { GATE_OF } from '../../../src/modules/selection/checks/index.js';
 import { planFor } from '../../../src/modules/selection/engine.js';
 import { featuresOfRun } from '../../../src/modules/selection/test-sets.js';
 import { advisoryXactLock } from '../../../src/core/locks.js';
-import { testDb as db } from '../../helpers/db.js';
+import { testDb as db, waitForLockWaiter } from '../../helpers/db.js';
 import { putBrandLists, putList, screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
 import { fixture, respond } from '../../helpers/screening-fixtures.js';
 import { issueToken } from '../../helpers/tokens.js';
@@ -157,7 +157,7 @@ describe('CR-015 I-4 the daily list is judged at build time, and can be rebuilt 
     const job = new BuildDailyListJob({ db, worker: fakeWorker(x), now: () => x.clock.t });
     let done = false;
     const run = job.runOnce().then((r) => { done = true; return r; });
-    await new Promise((r) => setTimeout(r, 400));
+    await waitForLockWaiter(db); // the build is queued on the daily_rebuild lock
     expect(done).toBe(false);
     expect(await db.selectFrom('daily_candidate_lists').selectAll().execute()).toHaveLength(0);
     release();

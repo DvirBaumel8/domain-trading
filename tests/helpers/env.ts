@@ -1,5 +1,18 @@
-export const TEST_DATABASE_URL =
+/** The database the test run is configured with (globalSetup migrates it and uses it as the template for the worker databases). */
+export const BASE_TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? 'postgres://dt:dt@localhost:5433/domain_trading_test';
+
+/** `.../domain_trading_test` -> `.../domain_trading_w2_test` (still ends in `_test`, so the wipe guard accepts it). */
+export function workerDatabaseUrl(base: string, worker: number): string {
+  const u = new URL(base);
+  u.pathname = u.pathname.replace(/_test$/, `_w${worker}_test`);
+  return u.toString();
+}
+
+// Every vitest worker (VITEST_POOL_ID, 1-based) has its own database, so API test files run in parallel. The main process
+// (globalSetup) and runs outside vitest have no pool id and use the base database.
+const POOL_ID = Number(process.env.VITEST_POOL_ID ?? '');
+export const TEST_DATABASE_URL = Number.isInteger(POOL_ID) && POOL_ID > 0 ? workerDatabaseUrl(BASE_TEST_DATABASE_URL, POOL_ID) : BASE_TEST_DATABASE_URL;
 
 /** A complete, fake-valued env for tests. Never put real keys here. */
 export function testEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {

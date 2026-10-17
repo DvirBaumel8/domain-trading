@@ -16,6 +16,14 @@ import { testEnv } from './env.js';
 /** Counts handler executions, to prove side effects happen once. */
 export const sideEffects = { count: 0 };
 
+let slowGate: Promise<void> = Promise.resolve();
+/** Hold the next `/__test/slow` handlers open until the returned function is called (replaces a fixed 300 ms sleep: the test decides when the first request may finish). */
+export function armSlowRoute(): () => void {
+  let open!: () => void;
+  slowGate = new Promise<void>((r) => { open = r; });
+  return open;
+}
+
 export function registerTestRoutes(app: FastifyInstance): void {
   app.get('/__test/ping', async () => ({ pong: true }));
 
@@ -43,7 +51,7 @@ export function registerTestRoutes(app: FastifyInstance): void {
   });
 
   app.post('/__test/slow', async (_req, reply) => {
-    await new Promise((r) => setTimeout(r, 300));
+    await slowGate;
     sideEffects.count += 1;
     return reply.code(201).send({ ok: true });
   });

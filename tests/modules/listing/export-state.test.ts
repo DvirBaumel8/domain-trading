@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { insertOwnedDomain, resetDb, testDb as db } from '../../helpers/db.js';
+import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { changedColumns, manualDelist, pendingDomains } from '../../../src/modules/listing/export-state.js';
 
 const T = (m: number) => new Date(Date.UTC(2026, 9, 5, 10, m));
 let n = 0;
 
-beforeEach(async () => { await resetDb(db); n = 0; });
+beforeEach(() => { n = 0; });
 
 /** A confirmed file: an export_runs row (snapshot time `at`) and its upload. */
 async function file(venue: 'afternic' | 'sedo', at: Date, domains: string[] = []) {

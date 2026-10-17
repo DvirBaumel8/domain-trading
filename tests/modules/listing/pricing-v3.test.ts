@@ -63,7 +63,7 @@ describe('pricing_settings v3 via the admin command (§10.13)', () => {
     ]);
   });
 
-  it('preview: off-list BIN → 422 BIN_NOT_IN_PRICE_LIST; lander-exception BIN → 422 LANDER_EXCEPTION_REQUIRED', async () => {
+  it('LS-16b preview: off-list BIN → 422 BIN_NOT_IN_PRICE_LIST; lander-exception BIN → 422 LANDER_EXCEPTION_REQUIRED', async () => {
     await createV3(db);
     app = await makeApp();
     const { auth } = await issueToken('read');

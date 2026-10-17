@@ -30,12 +30,15 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # The suite took ~20 min in one job (v5.9.0's run hit the timeout); 4 shards, each with its own Postgres service.
+    timeout-minutes: 15
+    # The suite took ~20 min serially in one job (v5.9.0's run hit the timeout). Since the fast-suite change the API test files run in
+    # parallel inside a job (one database per vitest worker, tests/setup/global-db.ts; DT_TEST_WORKERS = the runner's 2 vCPUs), which cut
+    # the full suite to about a quarter of its serial time locally, so 2 shards (each with its own Postgres service) keep a run under ~8 min
+    # and use half the CI minutes of the old 4 shards.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2]
     services:
       db:
         image: postgres:16
@@ -50,6 +53,7 @@ jobs:
     env:
       DATABASE_URL: postgres://dt:dt@localhost:5433/domain_trading
       TEST_DATABASE_URL: postgres://dt:dt@localhost:5433/domain_trading_test
+      DT_TEST_WORKERS: 2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,4 +63,4 @@ jobs:
       - run: npm ci
       - name: Create the test database (docker/initdb does this locally)
         run: PGPASSWORD=dt psql -h localhost -p 5433 -U dt -d domain_trading -c 'CREATE DATABASE domain_trading_test OWNER dt'
-      - run: npx vitest run --shard=${{ matrix.shard }}/4
+      - run: npx vitest run --shard=${{ matrix.shard }}/2

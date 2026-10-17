@@ -6,7 +6,7 @@ import { validateListing, type ListingPlan, type ListingRequest } from '../../..
 import { domainPlanColumns, historyRow, newPlanId, writePlan } from '../../../src/modules/listing/plan-store.js';
 import { withDomainLock } from '../../../src/core/locks.js';
 import { planView } from '../../../src/modules/listing/plan-view.js';
-import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
+import { insertOwnedDomain, testDb as db, waitForLockWaiter } from '../../helpers/db.js';
 
 const NOW = new Date('2026-10-12T09:00:00Z');
 async function mk(req: ListingRequest, over: { override?: boolean } = {}): Promise<{ plan: ListingPlan; settings: Awaited<ReturnType<typeof currentSettings>> }> {
@@ -19,7 +19,6 @@ async function mk(req: ListingRequest, over: { override?: boolean } = {}): Promi
   return { plan: r.plan, settings };
 }
 const rows = (id: number) => db.selectFrom('price_schedule').selectAll().where('domain_id', '=', id).orderBy('id').execute();
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe('writePlan', () => {
   it('writes the schedule, sets plan_id, supersedes on rewrite and leaves non-planned rows alone', async () => {
@@ -61,18 +60,24 @@ describe('withDomainLock', () => {
   it('serialises the same domain', async () => {
     const t: Record<string, number> = {};
     const held = gate();
-    const p1 = withDomainLock(db, 'x.com', async () => { t.start1 = Date.now(); held.open(); await sleep(200); t.end1 = Date.now(); });
+    const hold = gate();
+    const p1 = withDomainLock(db, 'x.com', async () => { t.start1 = Date.now(); held.open(); await hold.p; t.end1 = Date.now(); });
     await held.p;
     const p2 = withDomainLock(db, 'x.com', async () => { t.start2 = Date.now(); });
+    await new Promise((r) => setTimeout(r, 120)); // a couple of lock-poll rounds (50 ms each) while the first still holds it
+    expect(t.start2).toBeUndefined();
+    hold.open();
     await Promise.all([p1, p2]);
     expect(t.start2).toBeGreaterThanOrEqual(t.end1!);
   });
   it('does not block a different domain', async () => {
     const t: Record<string, number> = {};
     const held = gate();
-    const p1 = withDomainLock(db, 'x.com', async () => { held.open(); await sleep(200); t.end1 = Date.now(); });
+    const hold = gate();
+    const p1 = withDomainLock(db, 'x.com', async () => { held.open(); await hold.p; t.end1 = Date.now(); });
     await held.p;
     await withDomainLock(db, 'y.com', async () => { t.start2 = Date.now(); });
+    hold.open();
     await p1;
     expect(t.start2).toBeLessThan(t.end1!);
   });
@@ -87,20 +92,26 @@ describe('withDomainLock', () => {
   it('blocks /buy-style pg_advisory_xact_lock(hashtext(domain)) until released', async () => {
     const t: Record<string, number> = {};
     const held = gate();
-    const p1 = withDomainLock(db, 'x.com', async () => { held.open(); await sleep(200); t.end1 = Date.now(); });
+    const hold = gate();
+    const p1 = withDomainLock(db, 'x.com', async () => { held.open(); await hold.p; t.end1 = Date.now(); });
     await held.p;
     const p2 = db.transaction().execute(async (trx) => {
       await sql`select pg_advisory_xact_lock(hashtext(${'x.com'}))`.execute(trx);
       t.got = Date.now();
     });
+    await waitForLockWaiter(db); // the /buy-style lock is queued behind the holder
+    expect(t.got).toBeUndefined();
+    hold.open();
     await Promise.all([p1, p2]);
     expect(t.got).toBeGreaterThanOrEqual(t.end1!);
   });
   it('times out with DOMAIN_BUSY while another holder has the lock', async () => {
     const held = gate();
-    const p1 = withDomainLock(db, 'x.com', async () => { held.open(); await sleep(500); });
+    const hold = gate();
+    const p1 = withDomainLock(db, 'x.com', async () => { held.open(); await hold.p; });
     await held.p;
     await expect(withDomainLock(db, 'x.com', async () => 1, { timeoutMs: 200 })).rejects.toMatchObject({ status: 503, code: 'DOMAIN_BUSY' });
+    hold.open();
     await p1;
   });
   it('fn error propagates and the lock is released at once', async () => {

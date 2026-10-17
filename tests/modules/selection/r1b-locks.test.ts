@@ -9,7 +9,7 @@ import { TEST_SET_RDAP_CONCURRENCY, hostPacer, lookupCached, pacerFor, settleHos
 import type { RdapLookup, RdapLookupFn } from '../../../src/core/rdap.js';
 import type { ScreeningDeps } from '../../../src/modules/selection/types.js';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
-import { testDb } from '../../helpers/db.js';
+import { testDb, waitFor, waitForLockWaiter } from '../../helpers/db.js';
 import { OFFLINE, putBrandLists, putList, screeningHarness } from '../../helpers/screening.js';
 
 const JOB_TOKEN = 'job_token_fake_0123456789abcdef0123456789';
@@ -24,7 +24,7 @@ const make = async (extra: Parameters<typeof makeApp>[0] = {}) => {
 let n = 0;
 // v3.0.0: enqueue (202) and wait for the worker; an overlap comes back as {skipped:true, steps:{}}.
 const run = (app: FastifyInstance, job: string) => runJobToEnd(app, job, { headers: bearer, key: `r1b-${++n}` });
-const until = async (f: () => boolean) => { for (let i = 0; i < 400 && !f(); i++) await new Promise((r) => setTimeout(r, 10)); expect(f()).toBe(true); };
+const until = async (f: () => boolean) => { await waitFor(f, 4_000); expect(f()).toBe(true); };
 
 describe('R1b-1 lock registry', () => {
   it('a domain key hashes the bare domain (the key /buy has always used); other keys hash as written', () => {
@@ -59,7 +59,7 @@ describe('R1b-1 lock registry', () => {
     const first = withAdvisoryLock(testDb, 'company_document', async () => { order.push('first in'); await gate; order.push('first out'); });
     await until(() => order.includes('first in'));
     const second = withAdvisoryLock(testDb, 'company_document', async () => { order.push('second in'); });
-    await new Promise((r) => setTimeout(r, 100));
+    await waitForLockWaiter(testDb); // the second transaction is queued behind the first
     expect(order).toEqual(['first in']);
     release();
     await Promise.all([first, second]);
