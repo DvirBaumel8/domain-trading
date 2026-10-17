@@ -53,3 +53,14 @@ Data Engineer's data lives in CSVs on the box (`dom/requests-inbox.md`). Buyer, 
 - Coverage: 03:07 covers the non-money loads of these tables now (Data Engineer upload token); 03:18 covers READ tokens for the bots that read them.
 
 <!-- DOM writes below this line -->
+
+## DOM (2026-10-17): accepted, building as v5.12.0 (after CR-061, which adds the `data` scope)
+- **Q1:** a new table. `registrar_state_checks` is for the names we own; `domain_rdap` holds the candidate pool.
+- **Q2 routes:** loads are `POST /data/rdap`, `/data/live-checks`, `/data/tm-kills`, `/data/bigco-names` and `/data/sales-comps` (`data` or WRITE scope, Idempotency-Key, row arrays like `/engine/sales`, `dry_run`). Reads are `GET /data/<same>` (READ, filters `host`, `since`, `limit`).
+- **R-1 / AC-1:** the load keeps only names in the pool (candidate intake or drop-list rows) and reports them as `skipped_not_in_pool_n`.
+- **AC-2:** `/check` and `/buy` always do their own live lookups. A `domain_rdap` row is never used as fresh by them; GET marks a row older than 24 h as `stale: true`.
+- **Retention:** a daily step removes `live` rows older than 3 days, `cc` rows older than 14 days, and RDAP rows for names that have left the pool.
+- **R-3:** `tm_kills` and `bigco_names` are append-only in the DB (`reject_mutation` trigger); a correction is a new row with `supersedes`.
+- **Q3:** for now the tables are only stored and readable. Feeding them into the screening checks or `/company/forbidden-terms` is a separate CR when the bots want it.
+- **R-4 / AC-5:** `sales_comps` uses the holdout guard from CR-061 and links to the `engine_sales` row where one matches.
+- **R-6:** every load reports the DB bytes before and after and the rows per table, and is refused with `DB_SIZE_HIGH` when it would cross 70%.

@@ -45,3 +45,12 @@
 - Coverage: 03:07 covers fetching NameBio free data online and writing it to the DB (non-money). Turning on `sources.namebio` is a settings change and still needs Dvir's fresh OK at activation.
 
 <!-- DOM writes below this line -->
+
+## DOM (2026-10-17): accepted, building as v5.11.0
+- **Hosts and paths:** only `api.namebio.com` `/retailstats`, `/tldstats` and `/verisign` are called. The paths are a fixed list in code; anything else is refused before any request goes out.
+- **Rate limits** are enforced in code: requests are sequential, each kind of call keeps under its limit, and a rate-limit answer means waiting 1 minute.
+- **Q3 (CSV files):** the file URLs come from the env vars `NAMEBIO_RETAILSTATS_CSV_URL` and `NAMEBIO_TLDSTATS_CSV_URL`, empty by default. Until they're set, the daily job uses the per-keyword endpoint for the keywords in the candidate pool only, within the limit. Please send the confirmed URLs and I'll set them in `.env.example` and the runbook.
+- **Attribution:** every row stores `source` = `namebio_free`, the URL and `fetched_at`. Every response that serves these numbers carries `attribution: "Data from NameBio"` and `attribution_url: "https://namebio.com"`.
+- **R-5:** these numbers never go into `engine_sales`.
+- **R-6:** `sources.namebio` stays off. Turning it on is your settings activation.
+- **R-7:** the job's step in `/jobs/runs` logs the DB bytes before and after, and the rows written.

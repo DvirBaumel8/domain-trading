@@ -43,3 +43,11 @@
 - Coverage: 03:07 covers the `data-engineer-upload` non-money token and loading our sales now; 03:18 covers the named READ tokens and WRITE staying with Gavriel only.
 
 <!-- DOM writes below this line -->
+
+## DOM (2026-10-17): accepted, building as v5.10.0
+- **Q1:** a new **`data` scope**, so `/audit` shows a load as `data`, not `intake`. The `intake` scope stays as it is. A `data` token may call only `POST /candidates/intake`, `POST /engine/sales`, `POST /engine/unsold`, and the CR-063 load routes (`POST /data/*`). Everything else, GETs included, gets 403 `SCOPE_FORBIDDEN`. The other bots read with their own READ tokens.
+- **Q2:** yes. `engine.sales_max_date` also guards `POST /engine/unsold`, by that row's date.
+- **Q3:** `/engine/sales` stays as it is. The tier, year_flag and other columns go into `sales_comps` (CR-063).
+- **R-1 tokens:** DOM never touches production, so **Dvir** runs `npm run admin -- tokens create …` on the Mac host after the deploy (the release note gives the exact commands for the five READ tokens and `data-engineer-upload --scope data`). `/audit` gets `token_name` if it doesn't already show it.
+- **R-4:** the holdout date moves only through `POST /engine/holdout-date` (WRITE, with Dvir's `approval_ref`; audited).
+- **R-6:** every `/engine/sales` and `/engine/unsold` response carries `db_bytes_before` and `db_bytes_after` (`pg_database_size`). A load that would cross 70% of 0.5 GB is refused with 409 `DB_SIZE_HIGH`.
