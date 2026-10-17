@@ -21,8 +21,8 @@ export interface Logger {
 export const TIMEOUT_MS = 30_000;
 /** The wake-up GET /health/ping (the free instance sleeps): a failure never stops the job, it only costs this long. */
 export const WAKE_TIMEOUT_MS = 90_000; // v3.9.0: was 30 s; a cold Render free instance can take over a minute
-/** v3.9.0: up to 3 tries of the POST (two retries after a network error or a 5xx, waiting 5 s then 15 s); the same Idempotency-Key, so the server never runs it twice. */
-export const RETRY_DELAYS_MS = [5_000, 15_000];
+/** Up to 6 tries of the POST (five retries after a network error or a 5xx, waiting 5, 15, 30, 60 then 90 s = 200 s, about 3 minutes, enough for the Mac host or a tunnel to come back); the same Idempotency-Key, so the server never runs it twice. */
+export const RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 90_000];
 export const RETRY_DELAY_MS = RETRY_DELAYS_MS[0]!;
 
 // One cron trigger here: 00:05 UTC runs `daily` (it includes the former hourly steps: reconciler, nsVerifier, screeningResume).

@@ -10,7 +10,8 @@ REPO="DvirBaumel8/domain-trading"
 SAVED="$HOST_DIR/.tunnel-url"
 
 [ -f "$LOG" ] || exit 0
-url="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG" | grep -v '^https://api\.' | tail -1 || true)"  # api.trycloudflare.com shows up in cloudflared's own error lines
+# Only the log tail (the log can be large between rotations, rotate-logs.sh): the newest URL is always near the end.
+url="$(tail -n 2000 "$LOG" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | grep -v '^https://api\.' | tail -1 || true)"  # api.trycloudflare.com shows up in cloudflared's own error lines
 [ -n "$url" ] || exit 0
 [ "$url" != "$(cat "$SAVED" 2>/dev/null || true)" ] || exit 0
 

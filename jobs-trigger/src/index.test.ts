@@ -60,7 +60,7 @@ describe('triggerJob', () => {
       );
       const logger = { error: vi.fn() };
       const p = triggerJob('tick', env, 1, fetcher, logger, fast);
-      await vi.advanceTimersByTimeAsync(WAKE_TIMEOUT_MS + 3 * TIMEOUT_MS + RETRY_DELAYS_MS[0]! + RETRY_DELAYS_MS[1]!);
+      await vi.advanceTimersByTimeAsync(WAKE_TIMEOUT_MS + 6 * TIMEOUT_MS + RETRY_DELAYS_MS.reduce((a, b) => a + b, 0));
       await p;
       expect(logger.error).toHaveBeenCalledWith(`jobs-trigger tick failed: timed out after ${TIMEOUT_MS} ms`);
     } finally {
@@ -124,13 +124,14 @@ describe('wake-up, retry and failed steps', () => {
     const f5 = vi.fn().mockResolvedValue(new Response('no', { status: 500 }));
     const l5 = { error: vi.fn() };
     await triggerJob('daily', env, 1, f5, l5, fast);
-    expect(posts(f5)).toHaveLength(3); // v3.9.0: up to 3 tries
+    expect(posts(f5)).toHaveLength(6); // up to 6 tries
     expect(l5.error).toHaveBeenCalledTimes(1);
   });
 
   it('v3.9.0: the wake-up waits up to 90 s; the POST retries wait 5 s then 15 s and a third try that works logs nothing', async () => {
     expect(WAKE_TIMEOUT_MS).toBe(90_000);
-    expect(RETRY_DELAYS_MS).toEqual([5_000, 15_000]);
+    expect(RETRY_DELAYS_MS).toEqual([5_000, 15_000, 30_000, 60_000, 90_000]);
+    expect(RETRY_DELAYS_MS.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(180_000); // H3: retries span about 3 minutes
     const fetcher = vi.fn().mockResolvedValueOnce(ok()).mockResolvedValueOnce(new Response('x', { status: 502 })).mockRejectedValueOnce(new Error('reset')).mockResolvedValueOnce(ok());
     const logger = { error: vi.fn() };
     const sleep = vi.fn().mockResolvedValue(undefined);

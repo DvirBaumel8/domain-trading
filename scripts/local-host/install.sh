@@ -1,7 +1,8 @@
 #!/bin/bash
 # CR-041 (Dvir, 12 Oct 2026): run the production API on Dvir's Mac mini while Render is suspended.
 # Dvir runs this, not DOM (CLAUDE.md HARD RULE). It sets up, but does not start, the service:
-#   - a separate checkout at ~/domain-trading-prod (DOM's working copy is never what runs);
+#   - a separate clone at ~/domain-trading-prod (DOM's working copy is never what runs). Since the atomic deploy it is only the clone:
+#     deploy.sh builds each release tag in ~/domain-trading-prod-releases/<tag> and switches the symlink ~/domain-trading-prod-current to it;
 #   - an env file at ~/.config/domain-trading/prod.env (chmod 600) with every key and EMPTY values: Dvir pastes the Render values;
 #   - LaunchAgents: com.domaintrading.api (the server, restarted if it exits), com.domaintrading.deploy (every 10 min, deploys a new release tag),
 #     com.domaintrading.tunnel (cloudflared quick tunnel) and com.domaintrading.tunnel-watch (every 60 s, publishes a changed tunnel URL to the api-proxy Worker).
@@ -21,7 +22,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 command -v node >/dev/null || { echo "node is missing (brew install node@22)"; exit 1; }
 CLOUDFLARED="$(command -v cloudflared)" || { echo "cloudflared is missing (brew install cloudflared)"; exit 1; }  # launchd needs the full path (no PATH lookup)
 mkdir -p "$ENV_DIR" "$LOG_DIR" "$AGENTS" "$HOST_DIR"
-cp "$HERE/start.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
+cp "$HERE/start.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HERE/rotate-logs.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
 [ -d "$PROD_DIR/.git" ] || git clone --quiet "$REPO_URL" "$PROD_DIR"
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -43,9 +44,17 @@ for name in api deploy tunnel tunnel-watch backup; do
   sed -e "s#__CLOUDFLARED__#$CLOUDFLARED#g" -e "s#__HOST_DIR__#$HOST_DIR#g" -e "s#__PROD_DIR__#$PROD_DIR#g" -e "s#__LOG_DIR__#$LOG_DIR#g" -e "s#__HOME__#$HOME#g" -e "s#__PATH__#$PATH#g" \
     "$HERE/com.domaintrading.$name.plist" > "$AGENTS/com.domaintrading.$name.plist"
 done
+# One-time migration from the old in-place layout (the server ran from $PROD_DIR itself): nothing is moved or stopped here.
+# start.sh falls back to $PROD_DIR until the symlink exists, so the running server and a restart both keep working;
+# the next deploy.sh run (the 10-min agent or `deploy.sh --first`) builds the newest tag into the releases dir, switches the link and restarts the api.
+if [ ! -L "$PROD_DIR-current" ] && [ -d "$PROD_DIR/dist" ]; then
+  echo "Old in-place layout found: the next deploy.sh run builds into $PROD_DIR-releases and switches to $PROD_DIR-current."
+  echo "After that works, the old build in $PROD_DIR (node_modules, dist) is no longer used and can be deleted to save space."
+fi
+mkdir -p "$PROD_DIR-releases"
 echo "LaunchAgents written to $AGENTS (not loaded yet; the backup agent stays off until Dvir turns backups on: runbook \"Backups\")."
 echo "Next:"
 echo "  1. Fill $ENV_FILE from Render (PUBLIC_BASE_URL = the api-proxy URL, known after the first deploy-api-proxy run; fill it then and restart the api agent)."
-echo "  2. $HOST_DIR/deploy.sh --first   (loads all four agents; re-run install.sh after a kit change)"
+echo "  2. $HOST_DIR/deploy.sh --first   (builds the newest tag into a release dir, switches the link, loads all four agents; re-run install.sh after a kit change)"
 echo "  3. Within a minute tunnel-watch sets the GitHub variable TUNNEL_URL and runs deploy-api-proxy; its log prints https://domain-trading-api-proxy.<subdomain>.workers.dev."
 echo "  4. Set the GitHub variable API_BASE_URL to that URL (once) and run deploy-jobs-trigger."
