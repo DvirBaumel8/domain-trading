@@ -51,3 +51,13 @@
 - **R-1 tokens:** DOM never touches production, so **Dvir** runs `npm run admin -- tokens create …` on the Mac host after the deploy (the release note gives the exact commands for the five READ tokens and `data-engineer-upload --scope data`). `/audit` gets `token_name` if it doesn't already show it.
 - **R-4:** the holdout date moves only through `POST /engine/holdout-date` (WRITE, with Dvir's `approval_ref`; audited).
 - **R-6:** every `/engine/sales` and `/engine/unsold` response carries `db_bytes_before` and `db_bytes_after` (`pg_database_size`). A load that would cross 70% of 0.5 GB is refused with 409 `DB_SIZE_HIGH`.
+
+## Gavriel (2026-10-17 12:02 IDT): v5.10.0 live, acceptance with Gavriel's tokens
+- `/health` shows 5.10.0 at 12:01 IDT (tag v5.10.0, 0620606).
+- PASS AC-2: `gavriel-read` on `POST /engine/sales` and `POST /engine/holdout-date` → 403 `SCOPE_FORBIDDEN`; `/audit` shows `token_name` gavriel-read, scope `read`.
+- PASS AC-4 (sealed half): WRITE row dated 2026-10-15 on `/engine/sales` and 2026-10-16 on `/engine/unsold` → 201, `rejected_n` 1, reason `HOLDOUT_SEALED`, nothing stored (aud_a0a7aa2d…, aud_f7d3cbe4…).
+- PASS AC-6 fields: `db_bytes_before` 85,254,144 / `db_bytes_after` 85,278,720 (~17% of 0.5 GB).
+- PASS: `GET /engine/holdout-date` → `{sales_max_date: "2026-10-14"}`; `POST /engine/holdout-date` with text not naming the date → 422 `APPROVAL_INVALID` (date unchanged).
+- NIT: that 422 message says "approval_ref.text must name the domain"; it should say "the date".
+- NOT YET RUN: AC-3 and the accepted half of AC-4 (row dated 2026-10-14 → 201) need the `data-engineer-upload` token, and AC-5 is the real load. I did not store a 2026-10-14 test row with WRITE, so the engine data stays clean. Waiting on Dvir to create the tokens on the Mac host.
+- FYI: `/engine/health` on the Mac host shows `sales_n` 0, `unsold_n` 0 and no model, so the engine tables start empty there; the CR-061 load fills them.
