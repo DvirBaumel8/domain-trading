@@ -860,6 +860,8 @@ export interface ScreeningRunsTable {
   status: 'running' | 'done' | 'partial' | 'cancelled';
   cancelled_at: Date | null;
   cancelled_by: string | null;
+  /** v5.13.0: the `reason` of the cancel call (at most 200 characters), else null. */
+  cancel_reason: string | null;
   deadline_at: Timestamp;
   heartbeat_at: Date | null;
   finished_at: Date | null;

@@ -2,6 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.13.0 (2026-10-17): idempotency keys bound to their token; cancel `reason` stored; DB_SIZE_HIGH threshold 1 GB; money-path fixes
+Release note: `docs/releases/v5.13.0.md`.
+MINOR (additive field, one stricter rule, one threshold). Tech-debt pass R2.
+- **Changed (idempotency, M3):** an `Idempotency-Key` belongs to the token that first used it. The same key from a different token is **409 `IDEMPOTENCY_KEY_MISMATCH`** (before: it replayed the first token's stored answer when the body matched, or mismatched on a different body). The owning token replays as before. No new code. Use a fresh key per token.
+- **Changed (cancel, M15):** `POST /screening/runs/{id}/cancel` and `POST /selection/test-sets/{name}/cancel` now **store** `reason` (at most 200 characters; it was accepted and dropped). Both 200 answers gain `cancel_reason` (the reason, else null); `GET /screening/runs/{id}` shows `cancel_reason` next to `cancelled_at` / `cancelled_by` on a cancelled run.
+- **Changed (size threshold, M7):** Neon's free plan is 1 GB per project, so `NEON_FREE_STORAGE_BYTES` is 1 GB (was 0.5 GB). `/report` `DB_SIZE_HIGH`, the 409 `DB_SIZE_HIGH` guard on `/engine/sales`, `/engine/unsold` and `/data/*` (70% of the limit: now 717 MB, was 358 MB) and the retention step's tight-age switch all move with it. `details.limit_bytes` on the 409 and `limit_bytes` on the warning read 1,073,741,824.
+- **Fixed (no contract change):** `POST /portfolio/import` (S8) and the admin `import-domain` refuse any registrar that contains "cloudflare" after dropping punctuation (M1); a name bought through the reconciler gets `sell_or_drop_by` like a `/buy` completion (M2); the engine holdout date is read inside the upload lock and `POST /engine/holdout-date` takes the same lock (M4); `GET /data/tm-kills` and `/data/bigco-names` filter `host` case-insensitively (M6); the job queue's keep-alive ping runs only on Render (M8); `api_tokens.last_used_at` is written at most once a minute per token (M9).
+- **Migration:** `1764600000000_v5-13-0.sql` (`screening_runs.cancel_reason`).
+
 ## 5.12.0 (2026-10-17): CR-063 data tables: domain_rdap (pool only), live_checks, tm_kills, bigco_names, sales_comps
 Release note: `docs/releases/v5.12.0.md`.
 MINOR (additive routes and tables). Gavriel / Dvir's bots, CR-063 (approved by Dvir 2026-10-17 03:07 and 03:18 IDT).

@@ -30,7 +30,7 @@ Part of `daily` after the price and drop jobs; by hand `npm run job -- registrar
 
 ## Warnings added in 3.9.0
 - `PURCHASE_UNRESOLVED` (warn): a `register_sent`/`unknown` purchase open longer than 30 min (`PURCHASE_UNRESOLVED_MINUTES`); the reconciler never fails one, the admin `resolve-purchase` command closes it.
-- `DB_SIZE_HIGH` (warn): the database is over 70% (`DB_SIZE_WARN_PERCENT`) of Neon free's 0.5 GiB (`NEON_FREE_STORAGE_BYTES`); constants in `src/modules/reporting/report/warnings.ts`.
+- `DB_SIZE_HIGH` (warn): the database is over 70% (`DB_SIZE_WARN_PERCENT`) of Neon free's 1 GiB (5.13.0; was 0.5) (`NEON_FREE_STORAGE_BYTES`); constants in `src/modules/reporting/report/warnings.ts`.
 - `POST_BUY_INCOMPLETE` now means a `/buy` purchase with no screening pack on file (imports are exempt; it no longer checks comps).
 
 ## Status lifecycle

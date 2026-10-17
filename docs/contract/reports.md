@@ -1,4 +1,4 @@
-# Reports (contract v5.12.0)
+# Reports (contract v5.13.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -40,7 +40,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `PURCHASE_UNKNOWN` | error | A purchase is in the `unknown` state | `purchase_id` |
 | `PURCHASE_UNRESOLVED` | warn | (3.9.0) A real purchase has been `register_sent` or `unknown` for more than 30 minutes. The reconciler books it when the registrar shows the name and an invoice, but it never fails it (registrar lag can look like absence). Check the registrar account, then ask DOM to run the admin `resolve-purchase` command (an `unknown` purchase raises `PURCHASE_UNKNOWN` as well) | `purchase_id`, `state`, `age_minutes`, `created_at` |
 | `ENDING_REGISTERED` | warn | (5.7.0, CR-058) Another ending (.net, .co, .org, .io or .ai) of an owned name was registered after our baseline check (`newly_registered`) or its registry creation date changed (`re_registered`). One warning per event for 30 days. The registrant is a lead; nothing is sent | `owned_domain`, `host` (e.g. `name.net`), `created`, `registrar`, `kind`, `detected_at` |
-| `DB_SIZE_HIGH` | warn | (3.9.0) The database is over 70% of Neon's free storage (0.5 GB); the free plan stops accepting writes at the limit. Tell DOM | `size_bytes`, `limit_bytes`, `percent`, `warn_percent` |
+| `DB_SIZE_HIGH` | warn | (3.9.0) The database is over 70% of Neon's free storage (1 GB since 5.13.0; 0.5 GB before); the free plan stops accepting writes at the limit. Tell DOM | `size_bytes`, `limit_bytes`, `percent`, `warn_percent` |
 | `PRICE_EVENT_FAILED` | error | A scheduled price event failed (the domain is unchanged) | `events[] {event, due_on, note}` |
 | `EXPIRED_NOT_RENEWED` | error | A live name with `renewals_used = 0` is past its expiry (it is not auto-dropped: grace period) | `expiry_date` |
 | `RENEWAL_DROP_SUGGESTED` | warn | (4.0.0, CR-045 item 1) A name with `renewals_used` 0 and a later `drop_date` is within `renewal.drop_check_days` (60) of its first expiry and shows none of: a logged offer, an inquiry or lead (`POST /portfolio/{domain}/stats`), a rise of lookalikes in use since the screening before the buy, measured search demand (4.2.0: the latest keyword upload shows at least `demand.keep_min_searches` average monthly searches for the name; `details.signals.keyword_searches` has the number); or its renewal maths ratio (BIN x (1 - commission) x STRe / renewal price) is under `buy.renewal_math_min`. Drop it instead of renewing | `expiry`, `days_to_expiry`, `signals {offers, inquiries, lookalike_rise, lookalikes_at_buy, lookalikes_now, search_band_above_unmeasured}`, `renewal` (pair), `renewal_math?` |

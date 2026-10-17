@@ -7,7 +7,7 @@ import { advisoryXactLock } from '../../core/locks.js';
 import { formatUsd } from '../../core/money.js';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
-import { centsOf, chunks, dateOf, domainOf, ENGINE_MAX_REJECTS, isObj, rawDomain, textOf, type Reject } from './uploads.js';
+import { centsOf, chunks, dateOf, domainOf, ENGINE_MAX_REJECTS, isObj, rawDomain, resolveSealed, textOf, type Reject, type SealedAfter } from './uploads.js';
 
 export const DATA_MAX_ROWS = 20_000;
 export const DATA_TABLES = ['domain_rdap', 'live_checks', 'tm_kills', 'bigco_names', 'sales_comps'] as const;
@@ -22,7 +22,7 @@ export interface DataLoadResult {
   table: DataTable; dry_run: boolean; received_n: number; accepted_n: number; duplicate_n: number; rejected_n: number;
   skipped_not_in_pool_n?: number; rejects: Reject[];
 }
-interface Ctx { by: string; auditId: string | null; now: number; dryRun: boolean; sealedAfter: string }
+interface Ctx { by: string; auditId: string | null; now: number; dryRun: boolean; sealedAfter: SealedAfter }
 type Parsed<T> = { ok: true; value: T } | { ok: false; domain: string | null; reason: string };
 
 /** An instant from an ISO timestamp or a plain day; null when it does not read as a real one. */
@@ -137,19 +137,20 @@ export function parseCompRow(raw: unknown, today: string, sealedAfter: string): 
 // ---- loader skeleton -----------------------------------------------------------------------------------------------------------------------
 type Trx = Kysely<Database>;
 async function run<T>(
-  db: Kysely<Database>, table: DataTable, rows: unknown[], ctx: Ctx, parse: (raw: unknown) => Parsed<T>,
+  db: Kysely<Database>, table: DataTable, rows: unknown[], ctx: Ctx, parse: (raw: unknown, sealedAfter: string | undefined) => Parsed<T>,
   apply: (trx: Trx, valid: { i: number; v: T }[], rejects: Reject[]) => Promise<{ accepted: number; duplicate: number; skipped?: number }>,
 ): Promise<DataLoadResult> {
   if (rows.length < 1 || rows.length > DATA_MAX_ROWS) throw new AppError(422, 'VALIDATION_ERROR', `rows must hold 1 to ${DATA_MAX_ROWS} rows`);
-  const rejects: Reject[] = [];
-  const valid: { i: number; v: T }[] = [];
-  rows.forEach((raw, i) => {
-    const p = parse(raw);
-    if (p.ok) valid.push({ i, v: p.value });
-    else rejects.push({ row: i, domain: p.domain, reason: p.reason });
-  });
   return db.transaction().execute(async (trx) => {
     await advisoryXactLock(trx, 'engine_upload');
+    const sealedAfter = await resolveSealed(ctx.sealedAfter, trx);
+    const rejects: Reject[] = [];
+    const valid: { i: number; v: T }[] = [];
+    rows.forEach((raw, i) => {
+      const p = parse(raw, sealedAfter);
+      if (p.ok) valid.push({ i, v: p.value });
+      else rejects.push({ row: i, domain: p.domain, reason: p.reason });
+    });
     const r = await apply(trx, valid, rejects);
     rejects.sort((a, b) => a.row - b.row);
     return {
@@ -250,7 +251,7 @@ export const loadBigcoNames = loadTerms('bigco_names');
 
 export function loadSalesComps(db: Kysely<Database>, rows: unknown[], ctx: Ctx): Promise<DataLoadResult> {
   const today = idtDay(ctx.now);
-  return run<CompRow>(db, 'sales_comps', rows, ctx, (raw) => parseCompRow(raw, today, ctx.sealedAfter), async (trx, valid) => {
+  return run<CompRow>(db, 'sales_comps', rows, ctx, (raw, sealed) => parseCompRow(raw, today, sealed!), async (trx, valid) => {
     const domains = [...new Set(valid.map((x) => x.v.domain))];
     const seen = new Set<string>();
     const engine = new Map<string, number>();
@@ -310,7 +311,7 @@ export async function readData(db: Kysely<Database>, table: DataTable, q: DataQu
     case 'tm_kills': case 'bigco_names': {
       const field = table === 'tm_kills' ? 'term' : 'name';
       let s = (db as Kysely<any>).selectFrom(table).selectAll(); // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (q.host) s = s.where(field, '=', q.host);
+      if (q.host) s = s.where(sql`lower(${sql.ref(field)})`, '=', q.host.toLowerCase()); // M6: terms keep the case they were loaded with; the filter is case-insensitive
       if (since) s = s.where('created_at', '>=', since);
       const got = (await s.orderBy('id', 'desc').limit(q.limit).execute()) as Record<string, unknown>[];
       const rows = got.map((r) => ({ id: r.id, [field]: r[field], reason: r.reason, source: r.source, raw: r.raw, supersedes: r.supersedes, by: r.by, created_at: iso(r.created_at as Date) }));

@@ -2,6 +2,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { sql } from 'kysely';
+import { advisoryXactLock } from '../../../src/core/locks.js';
 import { makeApp } from '../../helpers/app.js';
 import { testDb as db } from '../../helpers/db.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
@@ -84,8 +86,8 @@ describe('holdout guard', () => {
     }
   });
 
-  it('HG-7: when the size plus the payload would pass 70% of 0.5 GB the load is refused with 409 DB_SIZE_HIGH and nothing is stored', async () => {
-    const limit = 0.5 * 1024 ** 3;
+  it('HG-7: when the size plus the payload would pass 70% of 1 GB the load is refused with 409 DB_SIZE_HIGH and nothing is stored', async () => {
+    const limit = 1024 ** 3; // 5.13.0: Neon free is 1 GB
     const { d } = await setup({ engineDbSize: { bytes: async () => limit * 0.7 - 10 } });
     const res = await post('/engine/sales', d, { rows: [sale()] });
     expect(res.statusCode).toBe(409);
@@ -95,10 +97,39 @@ describe('holdout guard', () => {
   });
 
   it('HG-8: a size just under the ceiling still loads', async () => {
-    const limit = 0.5 * 1024 ** 3;
+    const limit = 1024 ** 3; // 5.13.0: Neon free is 1 GB
     const { d } = await setup({ engineDbSize: { bytes: async () => limit * 0.7 - 100_000 } });
     const res = await post('/engine/sales', d, { rows: [sale()] });
     expect(res.statusCode).toBe(201);
     expect(res.json().db_bytes_before).toBe(limit * 0.7 - 100_000);
+  });
+
+  it('HG-9: M4 the sealed date is read inside the upload lock: an upload waiting for the lock sees a date changed meanwhile; POST /engine/holdout-date waits for the lock', async () => {
+    const { w, d } = await setup();
+    let release!: () => void;
+    const hold = new Promise<void>((r) => { release = r; });
+    let held!: () => void;
+    const holding = new Promise<void>((r) => { held = r; });
+    const trxDone = db.transaction().execute(async (trx) => {
+      await advisoryXactLock(trx, 'engine_upload');
+      held();
+      await hold;
+      await sql`update settings set engine_sales_max_date = '2026-10-20'`.execute(trx);
+    });
+    await holding;
+    // an upload dated 10-15 starts while the date is still 10-14 on disk: it must wait, then see 10-20
+    let uploadDone = false;
+    const upload = post('/engine/sales', d, { rows: [sale({ sale_date: '2026-10-15' })] }).then((r) => { uploadDone = true; return r; });
+    let setDone = false;
+    const set = post('/engine/holdout-date', w, { date: '2026-10-22', approval_ref: approval('Dvir approves unseal up to 2026-10-22') }).then((r) => { setDone = true; return r; });
+    await new Promise((r) => setTimeout(r, 300));
+    expect([uploadDone, setDone]).toEqual([false, false]);
+    release();
+    await trxDone;
+    const [u, sres] = await Promise.all([upload, set]);
+    expect(u.statusCode, u.body).toBe(201);
+    expect(u.json()).toMatchObject({ accepted_n: 1, rejected_n: 0 });
+    expect(sres.statusCode, sres.body).toBe(200);
+    expect(sres.json()).toMatchObject({ sales_max_date: '2026-10-22' });
   });
 });

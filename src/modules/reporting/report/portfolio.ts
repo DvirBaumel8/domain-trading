@@ -1,4 +1,4 @@
-import { pair } from '../../../core/money.js';
+import { pair, usdSigned } from '../../../core/money.js';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../db/types.js';
 import { toJerusalemIso } from '../../../core/dates.js';
@@ -8,11 +8,6 @@ import { priceValues } from './money.js';
 
 const iso = (d: Date | null) => (d ? toJerusalemIso(d) : null);
 
-/** Signed cents as "-11.08" (no float, always 2 decimals). */
-export function usdSigned(cents: number): string {
-  const abs = Math.abs(cents);
-  return `${cents < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-}
 
 export interface LedgerFilter { type?: string; domain?: string; from?: string; to?: string }
 

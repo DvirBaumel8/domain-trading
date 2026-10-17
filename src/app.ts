@@ -254,7 +254,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   }));
   app.decorate('jobQueue', new JobQueue({ db: deps.db, now: deps.now ?? Date.now, runner: app.jobRunner, log: app.log, overrides: deps.jobQueueOverrides,
     resumeScreening: (atStart) => screeningWorker.resumeStalled({ atStart }),
-    keepAlive: deps.jobQueueKeepAlive ?? (deps.config.appEnv === 'production' && deps.config.publicBaseUrl ? { url: deps.config.publicBaseUrl } : undefined) }));
+    keepAlive: deps.jobQueueKeepAlive ?? (deps.config.appEnv === 'production' && deps.config.onRender && deps.config.publicBaseUrl ? { url: deps.config.publicBaseUrl } : undefined) }));
   // Closing the app waits for the step in flight, so nothing touches the database after it is closed. Unfinished runs resume at start (main.ts) or on the next GET.
   app.addHook('onClose', async () => app.jobQueue.stop());
   registerJobs(app, app.jobQueue, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });

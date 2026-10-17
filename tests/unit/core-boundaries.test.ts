@@ -13,7 +13,7 @@ const files = walk(SRC).filter((f) => !relative(SRC, f).startsWith(`core${sep}`)
 const NAMES = [
   'addDays', 'addMonthsClamped', 'addOneYear', 'dayNumber', 'idtDay', 'idtDayStart', 'idtIsSunday', 'nextIdtMidnight', 'isRealDate', 'isIsoWithOffset',
   'utcMonth', 'todayIdt', 'jerusalemDate', 'toJerusalemIso', 'jerusalemDeep', 'monthOf',
-  'formatUsd', 'wholeUsd', 'wholeDollars', 'pair', 'centsToDollars',
+  'formatUsd', 'wholeUsd', 'apiCents', 'usdSigned', 'wholeDollars', 'pair', 'centsToDollars',
   'ISO_WITH_OFFSET', 'ISO_WITH_TZ',
   'redact', 'redactFreeText', 'scrubSecrets',
 ];

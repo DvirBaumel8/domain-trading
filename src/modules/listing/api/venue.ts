@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import { isIsoWithOffset, isRealDate, toJerusalemIso } from '../../../core/dates.js';
-import { dollarsToCents, pair } from '../../../core/money.js';
+import { apiCents, pair } from '../../../core/money.js';
 import { assertNoteNoPii } from '../../../core/validation.js';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
@@ -27,10 +27,7 @@ const VenueBody = z.object({
   delisted: z.boolean().optional(),
 }).strict();
 
-const cents = (n: number | null | undefined, field: string): number | null => {
-  if (n == null) return null;
-  try { return dollarsToCents(n); } catch { throw new AppError(422, 'VALIDATION_ERROR', `${field} must be a positive USD amount with at most 2 decimals`); }
-};
+const cents = (n: number | null | undefined, field: string): number | null => (n == null ? null : apiCents(n, field));
 
 export function registerVenue(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number }): void {
   app.post<{ Params: { domain: string } }>('/listings/:domain/venue', { config: { openapiBody: VenueBody } }, async (req, reply) => {

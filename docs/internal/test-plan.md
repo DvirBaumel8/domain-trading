@@ -17,7 +17,7 @@ Per-area test IDs: `check.md` CK-*, `buy.md` B-*, `list.md` L-*, `export-csv.md`
 
 **Caps (CAP):** CAP-1 removed in 5.0.0 (G-86: no money budget in the service; B-11, B-12 now expect success). CAP-2 40-domain cap (B-13), `pending_purchase` counts. CAP-3 per-call `max_price` (B-8–B-10). CAP-4 approval age, future time, domain mismatch (B-7) → 422. CAP-5 no route writes `settings`; a body field `poc_cap` is rejected. CAP-6 property (200 random sequences): −Σ(registration + renewal + fee) ≤ `poc_cap_cents`.
 
-**Idempotency (ID):** ID-1 missing key on each POST → 400. ID-2 replay on each POST (B-3, L-8, S-5) → same response, side effects once. ID-3 same key, other body → 409. ID-4 the registrar key derives from the purchase id and is reused on retries (B-19).
+**Idempotency (ID):** ID-1 missing key on each POST → 400. ID-2 replay on each POST (B-3, L-8, S-5) → same response, side effects once. ID-3 same key, other body → 409. ID-3b same key and body from another token → 409 `IDEMPOTENCY_KEY_MISMATCH` (5.13.0). ID-4 the registrar key derives from the purchase id and is reused on retries (B-19).
 
 **Dry run (DR):** DR-1 `/buy dry_run` (B-16): no ledger/domain rows; audit row; registrar dry run with the exact cost. DR-2 a dry run enforces every check (cap, approval, `max_price`). DR-3 a dry run's key reused for the real call → 409 (new hash); use a new key.
 

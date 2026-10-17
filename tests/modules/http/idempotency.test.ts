@@ -73,6 +73,21 @@ describe('idempotency (ID)', () => {
     expect(sideEffects.count).toBe(1);
   });
 
+  it('ID-3b: M3 the same key and body from a different token → 409 IDEMPOTENCY_KEY_MISMATCH (never another token\'s stored answer); the owner still replays', async () => {
+    app = await makeApp();
+    const a = await issueToken('write');
+    const b = await issueToken('write');
+    const first = await post('/__test/echo', 'k-owner', { value: 'x' }, a.auth);
+    expect(first.statusCode).toBe(201);
+    const other = await post('/__test/echo', 'k-owner', { value: 'x' }, b.auth);
+    expect(other.statusCode).toBe(409);
+    expect(other.json().error.code).toBe('IDEMPOTENCY_KEY_MISMATCH');
+    expect(other.body).not.toBe(first.body);
+    expect(sideEffects.count).toBe(1);
+    const again = await post('/__test/echo', 'k-owner', { value: 'x' }, a.auth);
+    expect(again.headers['idempotent-replayed']).toBe('true');
+  });
+
   it('ID-3: same key on a different path → 409 mismatch', async () => {
     app = await makeApp();
     const { auth } = await issueToken('write');

@@ -189,11 +189,6 @@ export function reportOf(entries: Entry[], sel: SelectionValuesT): ReplayReport 
   return { pooled: cell(dec(entries), h), by_slice: by((e) => e.row.slice), by_band, by_lane: by((e) => e.lane), history_types };
 }
 
-/** Diagnostic replay: decisions straight from the features (no gates). */
-export function replayReport(rows: LabelledRow[], sel: SelectionValuesT): ReplayReport {
-  return reportOf(rows.map((row) => ({ row, d: decideReplayRow(row.features, sel).decision, lane: laneOf(row) })), sel);
-}
-
 export interface LeakageLint { rows_checked: number; rows_leaking: number; rows_without_as_of: number; rows_without_dated_inputs: number }
 export function leakageLint(rows: LabelledRow[]): LeakageLint {
   const out: LeakageLint = { rows_checked: 0, rows_leaking: 0, rows_without_as_of: 0, rows_without_dated_inputs: 0 };

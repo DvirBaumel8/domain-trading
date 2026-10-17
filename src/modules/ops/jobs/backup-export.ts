@@ -3,7 +3,8 @@ import { sql, type Kysely } from 'kysely';
 import type { Config } from '../../../config.js';
 import type { Database } from '../../../db/types.js';
 import { redactInvoice } from '../../registrars/index.js';
-import { ledgerCsvRows, ledgerRows, usdSigned } from '../../reporting/index.js';
+import { usdSigned } from '../../../core/money.js';
+import { ledgerCsvRows, ledgerRows } from '../../reporting/index.js';
 import { toCsv } from '../../listing/index.js';
 
 /** Tables written in full (all columns, every row) under backup/tables/ so a restore is lossless. */

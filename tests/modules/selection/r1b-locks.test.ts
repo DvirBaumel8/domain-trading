@@ -29,7 +29,7 @@ const until = async (f: () => boolean) => { for (let i = 0; i < 400 && !f(); i++
 describe('R1b-1 lock registry', () => {
   it('a domain key hashes the bare domain (the key /buy has always used); other keys hash as written', () => {
     expect(lockText('domain:example.com')).toBe('example.com');
-    expect(lockText('posts_cap')).toBe('posts_cap');
+    expect(lockText('company_document')).toBe('company_document');
     expect(lockText('pack:example.com')).toBe('pack:example.com');
   });
 
@@ -56,9 +56,9 @@ describe('R1b-1 lock registry', () => {
     const order: string[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
-    const first = withAdvisoryLock(testDb, 'posts_cap', async () => { order.push('first in'); await gate; order.push('first out'); });
+    const first = withAdvisoryLock(testDb, 'company_document', async () => { order.push('first in'); await gate; order.push('first out'); });
     await until(() => order.includes('first in'));
-    const second = withAdvisoryLock(testDb, 'posts_cap', async () => { order.push('second in'); });
+    const second = withAdvisoryLock(testDb, 'company_document', async () => { order.push('second in'); });
     await new Promise((r) => setTimeout(r, 100));
     expect(order).toEqual(['first in']);
     release();

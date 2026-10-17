@@ -1,7 +1,8 @@
 import type { Kysely } from 'kysely';
-import { addOneYear } from '../../core/dates.js';
+import { addMonthsClamped, addOneYear } from '../../core/dates.js';
 import type { Category, Database, PurchaseState, RegistrarApi } from '../../db/types.js';
 import type { Capabilities } from '../registrars/index.js';
+import { activeSelectionSettings } from '../selection/index.js';
 
 export function registrarApiOf(c: Capabilities): RegistrarApi {
   if (c.canRegister && c.canManageNs) return 'full';
@@ -21,6 +22,11 @@ export interface BookInput {
 
 /** buy.md step 6: ONE transaction. Idempotent: a succeeded purchase is never booked twice. */
 export async function bookPurchase(db: Kysely<Database>, b: BookInput): Promise<{ booked: boolean }> {
+  // sell_or_drop_by (CR-045): a trend / regulation name (horizon stored on the pending row) is booked with buy date + horizon_months,
+  // here, so /buy and the reconciler set it the same way.
+  const pending = await db.selectFrom('domains').select('horizon').where('domain', '=', b.domain).executeTakeFirst();
+  const sellOrDropBy = pending && pending.horizon !== 'evergreen'
+    ? addMonthsClamped(b.buyDate, (await activeSelectionSettings(db)).values.renewal.horizon_months) : null;
   return db.transaction().execute(async (trx) => {
     const p = await trx.selectFrom('purchases').select('state').where('id', '=', b.purchaseId).forUpdate().executeTakeFirstOrThrow();
     if (p.state === 'succeeded') return { booked: false };
@@ -29,6 +35,7 @@ export async function bookPurchase(db: Kysely<Database>, b: BookInput): Promise<
       status: 'owned' as const, registrar: b.registrar, registrar_api: b.registrarApi, buy_date: b.buyDate,
       cost_cents: b.chargedCents, expiry_date: b.expiryDate, renewal_price_cents: b.renewalCents, renewals_used: 0,
       drop_date: b.dropDate ?? addOneYear(b.expiryDate), category: b.category, deal_id: b.dealId, updated_at: now,
+      ...(sellOrDropBy ? { sell_or_drop_by: sellOrDropBy } : {}),
     };
     const existing = await trx.selectFrom('domains').select('id').where('domain', '=', b.domain).executeTakeFirst();
     const domainId = existing

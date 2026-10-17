@@ -94,7 +94,7 @@ Branch on the error `code`, never the message. A coded error on HTTP < 500 is **
 - **Job trigger:** `POST /jobs/run` accepts only `JOB_TRIGGER_TOKEN` (≥ 32 chars, constant-time compare, no DB); unset → 503 `JOBS_DISABLED`. Steps and schedule: `docs/contract/jobs.md`.
 - **Per-token rate limit:** 60 GET / 10 POST per minute (in memory, one instance). Body limit 64 KB.
 - **Audit:** every authenticated POST (success, refusal incl. 403, dry run, replay, error) → one `audit_log` row. A failed audit write turns the reply into 500 `AUDIT_WRITE_FAILED` (processed; retry with the same key).
-- **Idempotency:** claimed in a preHandler after auth and scope; stored in `onSend`; released on 5xx; a stored 202 on `/buy` is re-run (the handler never re-registers).
+- **Idempotency:** claimed in a preHandler after auth and scope; stored in `onSend`; released on 5xx; a stored 202 on `/buy` is re-run (the handler never re-registers). Since 5.13.0 a key is bound to the token that first used it (`idempotency_keys.token_id`): another token gets 409 `IDEMPOTENCY_KEY_MISMATCH`. `api_tokens.last_used_at` is refreshed at most once a minute per token (`LAST_USED_EVERY_MS`, `src/http/auth.ts`).
 - **Approvals:** `approval_ref` only for buy and sell decisions (Dvir, 5 Oct 2026, 20:07): `/buy` (and the future renewal), non-pre-approved offer `countered`/`accepted`, pricing exceptions (V5), overrides (V8). Everything else is bot-only. The server records Dvir's words but can't verify a human said them (trust boundary, §9).
 
 ## 7. Errors and conventions

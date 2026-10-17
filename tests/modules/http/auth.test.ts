@@ -255,4 +255,19 @@ describe('auth (AU)', () => {
     const row = await testDb.selectFrom('api_tokens').select('last_used_at').where('id', '=', id).executeTakeFirstOrThrow();
     expect(row.last_used_at).not.toBeNull();
   });
+
+  it('M9: last_used_at is not rewritten within a minute, and is refreshed after it', async () => {
+    app = await makeApp();
+    const { id, auth } = await issueToken('read');
+    await app.inject({ method: 'GET', url: '/__test/ping', headers: auth });
+    const first = (await testDb.selectFrom('api_tokens').select('last_used_at').where('id', '=', id).executeTakeFirstOrThrow()).last_used_at!;
+    await app.inject({ method: 'GET', url: '/__test/ping', headers: auth });
+    const second = (await testDb.selectFrom('api_tokens').select('last_used_at').where('id', '=', id).executeTakeFirstOrThrow()).last_used_at!;
+    expect(second.getTime()).toBe(first.getTime());
+    const old = new Date(Date.now() - 120_000);
+    await testDb.updateTable('api_tokens').set({ last_used_at: old }).where('id', '=', id).execute();
+    await app.inject({ method: 'GET', url: '/__test/ping', headers: auth });
+    const third = (await testDb.selectFrom('api_tokens').select('last_used_at').where('id', '=', id).executeTakeFirstOrThrow()).last_used_at!;
+    expect(third.getTime()).toBeGreaterThan(old.getTime() + 60_000);
+  });
 });

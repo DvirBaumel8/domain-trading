@@ -70,6 +70,8 @@ export interface Config {
   sellerhub: { apiKey: string | undefined; apiSecret: string | undefined; baseUrl: string };
   /** Public base URL of this service, without a trailing slash (the job queue's keep-alive ping). */
   publicBaseUrl: string;
+  /** True when the host sets RENDER (a Render service). The keep-alive ping only makes sense there (M8); on the Mac host it would ping a suspended Render URL. */
+  onRender: boolean;
   /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
   backup: { token: string | undefined; repo: string | undefined };
   version: string;
@@ -155,6 +157,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     geminiApiKey: e.GEMINI_API_KEY ? e.GEMINI_API_KEY : undefined,
     sellerhub: { apiKey: e.SPACESHIP_SELLERHUB_API_KEY, apiSecret: e.SPACESHIP_SELLERHUB_API_SECRET, baseUrl: e.SPACESHIP_SELLERHUB_BASE_URL.replace(/\/+$/, '') },
     publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
+    onRender: Boolean(env.RENDER),
     webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,
     companiesHouseApiKey: e.COMPANIES_HOUSE_API_KEY ? e.COMPANIES_HOUSE_API_KEY : undefined,
     namebio: { retailstatsCsvUrl: e.NAMEBIO_RETAILSTATS_CSV_URL, tldstatsCsvUrl: e.NAMEBIO_TLDSTATS_CSV_URL, dropOrderUrl: e.NAMEBIO_DROP_ORDER_URL },

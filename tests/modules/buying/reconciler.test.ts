@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { failPurchase } from '../../../src/modules/buying/bookkeeping.js';
 import { RegistrarError } from '../../../src/modules/registrars/index.js';
 import { Reconciler } from '../../../src/modules/buying/reconciler.js';
+import { addMonthsClamped } from '../../../src/core/dates.js';
 import { DOMAIN } from '../../helpers/buy.js';
 import { testDb as db } from '../../helpers/db.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
@@ -164,5 +165,15 @@ describe('Reconciler', () => {
       log: { warn: (o) => { warns.push(o); }, error: () => {} } });
     await r.runOnce();
     expect(warns).toContainEqual({ purchaseId: id, domain: DOMAIN });
+  });
+
+  it('M2: the reconciler path sets sell_or_drop_by for a trend name (buy date + horizon months), and leaves an evergreen name null', async () => {
+    await seedPurchase('register_sent', 5);
+    await db.updateTable('domains').set({ horizon: 'trend' }).where('domain', '=', DOMAIN).execute();
+    await seedPurchase('register_sent', 5, 'evergreen-one.com');
+    expect(await rec(new FakeAdapter('porkbun', { alreadyOwned: true })).runOnce()).toMatchObject({ booked: 2 });
+    const trend = await db.selectFrom('domains').select(['buy_date', 'sell_or_drop_by']).where('domain', '=', DOMAIN).executeTakeFirstOrThrow();
+    expect(trend.sell_or_drop_by).toBe(addMonthsClamped(trend.buy_date!, 12));
+    expect((await db.selectFrom('domains').select('sell_or_drop_by').where('domain', '=', 'evergreen-one.com').executeTakeFirstOrThrow()).sell_or_drop_by).toBeNull();
   });
 });

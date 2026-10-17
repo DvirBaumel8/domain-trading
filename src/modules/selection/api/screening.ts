@@ -100,7 +100,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       created_at: run.created_at.toISOString(), finished_at: iso(run.finished_at), progress: a.progress,
       lookups: lookupsOf(a.items.map((i) => latestByCheck(i.rows))),
       unknowns: await unknownsOf(db, a.items.filter((i) => want === null || i.item.domain === want).map((i) => ({ domain: i.item.domain, latest: latestByCheck(i.rows) }))),
-      ...(run.status === 'cancelled' && { cancelled_at: iso(run.cancelled_at), cancelled_by: run.cancelled_by }),
+      ...(run.status === 'cancelled' && { cancelled_at: iso(run.cancelled_at), cancelled_by: run.cancelled_by, cancel_reason: run.cancel_reason }),
       names: a.items.filter((i) => want === null || i.item.domain === want).map((i) => {
         const latest = latestByCheck(i.rows);
         return {
@@ -142,7 +142,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
       const st = (await db.selectFrom('screening_runs').select('status').where('id', '=', run.id).executeTakeFirstOrThrow()).status;
       throw new AppError(409, 'RUN_NOT_RUNNING', `Run ${run.id} is ${st}, not running; only a running run can be cancelled`, { status: st });
     }
-    return { id: run.id, status: 'cancelled' as const, cancelled_at: done.cancelled_at.toISOString(), cancelled_by: req.auth!.name };
+    return { id: run.id, status: 'cancelled' as const, cancelled_at: done.cancelled_at.toISOString(), cancelled_by: req.auth!.name, cancel_reason: body.reason ?? null };
   });
 
   app.post<{ Params: { id: string } }>('/screening/runs/:id/manual', { config: { openapiBody: ManualBody } }, async (req, reply) => {

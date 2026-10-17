@@ -22,8 +22,8 @@ export const LANDER_DOWN_ERROR_DAYS = 2;
 export const REVIEW_OVERDUE_HOURS = 36;
 /** v3.9.0: PURCHASE_UNRESOLVED is raised for a register_sent/unknown purchase open longer than this (the reconciler never fails one itself). */
 export const PURCHASE_UNRESOLVED_MINUTES = 30;
-/** v3.9.0: Neon's free plan stores 0.5 GB per project; DB_SIZE_HIGH is raised above DB_SIZE_WARN_PERCENT of it. */
-export const NEON_FREE_STORAGE_BYTES = 0.5 * 1024 ** 3;
+/** v3.9.0: Neon's free plan stores 1 GB per project (5.13.0; it was 0.5 GB); DB_SIZE_HIGH is raised above DB_SIZE_WARN_PERCENT of it. */
+export const NEON_FREE_STORAGE_BYTES = 1024 ** 3;
 export const DB_SIZE_WARN_PERCENT = 70;
 /** v5.1.0: DAILY_JOB_MISSED is raised when no scheduled daily job run started in this many hours (once any job run exists). */
 export const DAILY_JOB_MISSED_HOURS = 26;
@@ -67,7 +67,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
       });
     }
   }
-  // v3.9.0: the database against Neon's free storage (0.5 GB)
+  // v3.9.0: the database against Neon's free storage (1 GB)
   const limit = opts.storageLimitBytes ?? NEON_FREE_STORAGE_BYTES;
   const size = Number((await sql<{ n: string }>`select pg_database_size(current_database())::text as n`.execute(db)).rows[0]!.n);
   if (size > limit * DB_SIZE_WARN_PERCENT / 100) {

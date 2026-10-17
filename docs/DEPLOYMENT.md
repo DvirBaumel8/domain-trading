@@ -83,7 +83,7 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `NAMEBIO_RETAILSTATS_CSV_URL`, `NAMEBIO_TLDSTATS_CSV_URL`, `NAMEBIO_DROP_ORDER_URL` | optional (v5.11.0, CR-062): `https://api.namebio.com/retailstats-download`, `.../tldstats-download`, `.../verisign-download`, the free NameBio files, used only while `sources.namebio` is on (off by default). Empty RetailStats URL = per-keyword RetailStats instead |
    | `GEMINI_API_KEY` | optional: the outside review; a Gemini key from a **new Google AI Studio project with no billing** (free tier) |
    | `SPACESHIP_SELLERHUB_API_KEY`, `SPACESHIP_SELLERHUB_API_SECRET` | optional: Spaceship SellerHub listing sync; an API Manager key pair with only the `sellerhub:read` and `sellerhub:write` scopes |
-   | `PUBLIC_BASE_URL` | optional: the service's own public URL for the job queue's keep-alive ping (default `https://domain-trading-api.onrender.com`) |
+   | `PUBLIC_BASE_URL` | optional: the service's own public URL for the job queue's keep-alive ping (default `https://domain-trading-api.onrender.com`); the ping runs only when `RENDER` is set (5.13.0), so the Mac host never pings it |
 
    The blueprint already sets `APP_ENV=production`, `DATABASE_SSL=true` and
    `ENABLED_REGISTRARS=porkbun,godaddy` (the lander target is a DB setting, default `afternic`). Later pushes to `main` deploy by themselves once the `ci` workflow passes (`autoDeployTrigger: checksPass`, §Deploys below).

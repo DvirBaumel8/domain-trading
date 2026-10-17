@@ -174,8 +174,8 @@ describe('GET /report warnings', () => {
     expect(w.find((x) => x.domain === 'stuck.com')!.details).toMatchObject({ purchase_id: old.id, state: 'register_sent', age_minutes: 90 });
   });
 
-  it('v3.9.0: DB_SIZE_HIGH above 70% of the Neon free 0.5 GB; not raised for the small test database', async () => {
-    expect(NEON_FREE_STORAGE_BYTES).toBe(0.5 * 1024 ** 3);
+  it('v3.9.0: DB_SIZE_HIGH above 70% of the Neon free 1 GB; not raised for the small test database', async () => {
+    expect(NEON_FREE_STORAGE_BYTES).toBe(1024 ** 3);
     expect(DB_SIZE_WARN_PERCENT).toBe(70);
     expect(codes(await buildWarnings(db, new Date(NOW)))).not.toContain('DB_SIZE_HIGH');
     const w = (await buildWarnings(db, new Date(NOW), { storageLimitBytes: 1000 })).filter((x) => x.code === 'DB_SIZE_HIGH');

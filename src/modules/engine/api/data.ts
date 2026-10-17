@@ -10,6 +10,7 @@ import {
   dataRowCounts, DATA_MAX_ROWS, loadBigcoNames, loadLive, loadRdap, loadSalesComps, loadTmKills, readData, type DataLoadResult, type DataTable,
 } from '../data-tables.js';
 import { databaseBytes, guardDbSize, salesMaxDate, type DbSizeGuard } from '../holdout.js';
+import type { SealedAfter } from '../uploads.js';
 
 const BODY_LIMIT = 8 * 1024 * 1024;
 const Body = z.object({ rows: z.array(z.unknown()).min(1).max(DATA_MAX_ROWS), dry_run: z.boolean().optional() }).strict();
@@ -20,7 +21,7 @@ const Query = z.object({
   limit: z.coerce.number().int().min(1).max(5000).default(1000),
 }).strict();
 
-type Loader = (db: Kysely<Database>, rows: unknown[], ctx: { by: string; auditId: string | null; now: number; dryRun: boolean; sealedAfter: string }) => Promise<DataLoadResult>;
+type Loader = (db: Kysely<Database>, rows: unknown[], ctx: { by: string; auditId: string | null; now: number; dryRun: boolean; sealedAfter: SealedAfter }) => Promise<DataLoadResult>;
 const TABLES: { path: string; table: DataTable; load: Loader }[] = [
   { path: 'rdap', table: 'domain_rdap', load: loadRdap },
   { path: 'live-checks', table: 'live_checks', load: loadLive },
@@ -36,7 +37,7 @@ export function registerData(app: FastifyInstance, deps: { db: Kysely<Database>;
       const b = Body.parse(req.body ?? {});
       const before = await guardDbSize(deps.db, deps.dbSize, Buffer.byteLength(JSON.stringify(b.rows)));
       const r = await t.load(deps.db, b.rows, {
-        by: req.auth?.name ?? 'unknown', auditId: req.auditId ?? null, now: deps.now(), dryRun: b.dry_run === true, sealedAfter: await salesMaxDate(deps.db),
+        by: req.auth?.name ?? 'unknown', auditId: req.auditId ?? null, now: deps.now(), dryRun: b.dry_run === true, sealedAfter: salesMaxDate,
       });
       const after = await sizeNow();
       const rows = await dataRowCounts(deps.db);

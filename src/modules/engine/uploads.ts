@@ -17,7 +17,10 @@ export type UnsoldType = (typeof UNSOLD_TYPES)[number];
 
 export interface Reject { row: number; domain: string | null; reason: string }
 export interface UploadResult { upload_id: number; received_n: number; accepted_n: number; duplicate_n: number; rejected_n: number; rejects: Reject[] }
-interface Ctx { by: string; auditId: string | null; now: number; /** v5.10.0: rows dated after this are HOLDOUT_SEALED (default: no guard). */ sealedAfter?: string }
+/** A fixed date, or a reader called inside the upload lock (M4: the date is read under the same lock `setSalesMaxDate` takes). */
+export type SealedAfter = string | ((trx: Kysely<Database>) => Promise<string>);
+export const resolveSealed = (s: SealedAfter | undefined, trx: Kysely<Database>): Promise<string | undefined> => (typeof s === 'function' ? s(trx) : Promise.resolve(s));
+interface Ctx { by: string; auditId: string | null; now: number; /** v5.10.0: rows dated after this are HOLDOUT_SEALED (default: no guard). */ sealedAfter?: SealedAfter }
 
 interface SaleRow { domain: string; price_cents: number; sale_date: string; venue: string; source: string; source_url: string | null }
 interface UnsoldRow { domain: string; type: UnsoldType; observation_date: string; caught_by_catcher: boolean | null }
@@ -97,15 +100,16 @@ async function store<T extends { domain: string }>(
 ): Promise<UploadResult> {
   if (rows.length < 1 || rows.length > ENGINE_MAX_ROWS) throw new AppError(422, 'VALIDATION_ERROR', `rows must hold 1 to ${ENGINE_MAX_ROWS} rows`);
   const today = idtDay(ctx.now);
-  const rejects: Reject[] = [];
-  const valid: { i: number; v: T }[] = [];
-  rows.forEach((raw, i) => {
-    const p = parse(raw, today, ctx.sealedAfter);
-    if (p.ok) valid.push({ i, v: p.value });
-    else rejects.push({ row: i, domain: p.domain, reason: p.reason });
-  });
   return db.transaction().execute(async (trx) => {
     await advisoryXactLock(trx, 'engine_upload');
+    const sealedAfter = await resolveSealed(ctx.sealedAfter, trx);
+    const rejects: Reject[] = [];
+    const valid: { i: number; v: T }[] = [];
+    rows.forEach((raw, i) => {
+      const p = parse(raw, today, sealedAfter);
+      if (p.ok) valid.push({ i, v: p.value });
+      else rejects.push({ row: i, domain: p.domain, reason: p.reason });
+    });
     const dup = await isDuplicate(trx, valid.map((x) => x.v));
     const accepted: T[] = [];
     let duplicates = 0;

@@ -69,7 +69,6 @@ function lowerBound(a: Int32Array, x: number): number {
 export const sldOf = (domain: string): string => (domain.endsWith('.com') ? domain.slice(0, -4) : domain);
 
 /** The words of a name by the frozen split (letters only; [] when the name has no reading). */
-export const wordsOf = (sld: string, table: SplitV2Table): string[] => splitV2(sld, table);
 
 /** In the regime the model was tested on: letters only, 6..20 characters, 2..3 real words, all of them known. */
 export function inRegime(sld: string, table: SplitV2Table): boolean {

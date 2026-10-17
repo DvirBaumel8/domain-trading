@@ -1,7 +1,6 @@
 // Training of the scoring engine (CR-056 part 2). One run = one engine_models row (running -> done | failed) worked by the queue job `train` (step trainModel).
 // The data, the split and the test file are fixed by dataset.ts; the models are the TypeScript ones in model/. No random choice depends on anything but the seed.
 import { holdSlices } from './slices.js';
-import { createHash } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { dayNumber, idtDay, toJerusalemIso } from '../../core/dates.js';
 import { advisoryXactLock } from '../../core/locks.js';
@@ -215,7 +214,7 @@ export class EngineTrainer {
     const scoresU = gbmPredictAll(gbmU, Xte, testRows.length, F);
     const aucU = auc(scoresU, yte);
     // recency: half-life 12 months, rescaled per class so the class balance is unchanged
-    const newest = Math.max(...trainRows.map((r) => dayNumber(r.asOf)));
+    const newest = trainRows.reduce((m, r) => Math.max(m, dayNumber(r.asOf)), -Infinity);
     const w = new Float64Array(trainRows.length);
     trainRows.forEach((r, i) => { w[i] = 0.5 ** ((newest - dayNumber(r.asOf)) / RECENCY_HALF_LIFE_DAYS); });
     for (const lab of [0, 1]) {
@@ -314,5 +313,4 @@ const round4 = (x: number): number => Math.round(x * 10_000) / 10_000;
 const rowOrder = (a: Row, b: Row): number => (a.domain < b.domain ? -1 : a.domain > b.domain ? 1 : a.asOf < b.asOf ? -1 : a.asOf > b.asOf ? 1 : a.label - b.label);
 
 /** A short stable fingerprint of a model's parameters (for logs and tests). */
-export const paramsFingerprint = (p: ModelParams): string => createHash('sha256').update(JSON.stringify(p)).digest('hex').slice(0, 16);
 export { sldOf };

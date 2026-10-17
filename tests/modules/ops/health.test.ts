@@ -31,9 +31,14 @@ describe('GET /health (R-11)', () => {
 
   it('returns 503 degraded when the DB is down', async () => {
     const deadDb = createDb('postgres://dt:dt@127.0.0.1:1/nothing_test');
-    // Token lookup (updateTable) goes to the live test DB; the health ping hits the dead one.
+    // Token lookup (selectFrom('api_tokens'), and the last_used_at updateTable, since 5.13.0 two statements) goes to the live test DB; the health ping and every other read hit the dead one.
+    const bound = (t: object, p: string | symbol) => ((Reflect.get(t, p) as unknown) instanceof Function ? (Reflect.get(t, p) as (...a: unknown[]) => unknown).bind(t) : Reflect.get(t, p));
     const mixed = new Proxy(deadDb, {
-      get: (t, p) => (p === 'updateTable' ? testDb.updateTable.bind(testDb) : (Reflect.get(t, p) as unknown) instanceof Function ? (Reflect.get(t, p) as (...a: unknown[]) => unknown).bind(t) : Reflect.get(t, p)),
+      get: (t, p) => {
+        if (p === 'updateTable') return testDb.updateTable.bind(testDb);
+        if (p === 'selectFrom') return (table: string, ...rest: unknown[]) => ((table === 'api_tokens' ? testDb : t) as unknown as { selectFrom: (...a: unknown[]) => unknown }).selectFrom(table, ...rest);
+        return bound(t, p);
+      },
     });
     app = await makeApp({ testRoutes: false, db: mixed });
     const { auth } = await issueToken('read');

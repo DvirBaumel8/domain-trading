@@ -1,6 +1,6 @@
 {
   "name": "domain-trading",
-  "version": "5.12.0",
+  "version": "5.13.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -26,7 +26,6 @@
     "contract:refresh-spec": "tsx scripts/refresh-porkbun-spec.ts"
   },
   "dependencies": {
-    "dotenv": "^18.0.5",
     "fastify": "^5.12.5",
     "kysely": "^0.29.6",
     "node-pg-migrate": "^9.0.0",

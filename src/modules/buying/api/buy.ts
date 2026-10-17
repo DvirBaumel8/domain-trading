@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { normalizeDomain } from '../../../domain-name.js';
 import { AppError } from '../../../http/errors.js';
 import { requestHash } from '../../../http/idempotency.js';
-import { dollarsToCents } from '../../../core/money.js';
+import { apiCents } from '../../../core/money.js';
 import type { BuyService } from '../buy.js';
 import { smallBuyRequested } from '../small-buy.js';
 
@@ -45,14 +45,6 @@ const BuyBody = z.object({
   stre_reason: z.string().trim().min(3).max(500).optional(),
 }).strict();
 
-function cents(n: number, field: string): number {
-  try {
-    return dollarsToCents(n);
-  } catch {
-    throw new AppError(422, 'VALIDATION_ERROR', `${field} must be a positive USD amount with at most 2 decimals`);
-  }
-}
-
 export function registerBuy(app: FastifyInstance, service: BuyService): void {
   app.post('/buy', { config: { openapiBody: BuyBody } }, async (req, reply) => {
     const b = BuyBody.parse(req.body);
@@ -61,8 +53,8 @@ export function registerBuy(app: FastifyInstance, service: BuyService): void {
     const r = await service.buy(
       {
         domain,
-        maxPriceCents: cents(b.max_price, 'max_price'),
-        maxTwoYearCents: b.max_two_year_price == null ? null : cents(b.max_two_year_price, 'max_two_year_price'),
+        maxPriceCents: apiCents(b.max_price, 'max_price'),
+        maxTwoYearCents: b.max_two_year_price == null ? null : apiCents(b.max_two_year_price, 'max_two_year_price'),
         approval: b.approval_ref ?? null,
         dealId: b.deal_id ?? null,
         category: b.category ?? null,

@@ -111,8 +111,17 @@ export type NameDemand = { keyword: string; avg_monthly_searches: number; compet
 
 /** The demand of a name: the first keyword (its split tokens joined with spaces, then the scout `words`) whose newest row has a number. */
 export async function demandForKeywords(db: Kysely<Database>, keywords: string[]): Promise<NameDemand> {
-  for (const k of [...new Set(keywords.filter((x) => x !== ''))]) {
-    const v = await latestKeyword(db, k);
+  const norm = (k: string): string => k.toLowerCase().replace(/\s+/g, ' ').trim();
+  const order = [...new Set(keywords.filter((x) => x !== '').map(norm))].filter((x) => x !== '');
+  if (order.length === 0) return { status: 'unmeasured' };
+  // M10: one query for all candidates (newest upload first); the newest row of each keyword decides, the first keyword in `order` with a number wins.
+  const rows = await db.selectFrom('keyword_demand as k').innerJoin('keyword_demand_uploads as u', 'u.id', 'k.upload_id')
+    .select(['k.keyword', 'k.avg_monthly_searches', 'k.competition_index', 'u.uploaded_at'])
+    .where('k.keyword', 'in', order).orderBy('k.upload_id', 'desc').execute();
+  const newest = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) if (!newest.has(r.keyword)) newest.set(r.keyword, r);
+  for (const k of order) {
+    const v = newest.get(k);
     if (v && v.avg_monthly_searches !== null) {
       return { keyword: v.keyword, avg_monthly_searches: v.avg_monthly_searches, competition_index: v.competition_index, as_of: toJerusalemIso(v.uploaded_at) };
     }
@@ -128,7 +137,7 @@ export async function keywordsOfDomain(db: Kysely<Database>, domain: string): Pr
   const f = await db.selectFrom('screening_results').select('fields').where('domain', '=', domain).where('check_id', '=', 'form').orderBy('id', 'desc').limit(1).executeTakeFirst();
   const tokens = (f?.fields as { tokens?: unknown } | undefined)?.tokens;
   const t = Array.isArray(tokens) && tokens.every((x) => typeof x === 'string') ? (tokens as string[]) : [];
-  const i = await db.selectFrom('candidate_intake').select('words').where('domain', '=', domain).orderBy('id', 'desc').limit(1).executeTakeFirst().catch(() => undefined);
+  const i = await db.selectFrom('candidate_intake').select('words').where('domain', '=', domain).orderBy('id', 'desc').limit(1).executeTakeFirst(); // M10: a database error is an error, not "unmeasured"
   return keywordCandidates(t, i?.words ?? null);
 }
 

@@ -5,7 +5,7 @@ import { addMonthsClamped, idtDay, isRealDate, ymd } from '../../../core/dates.j
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
 import { AppError } from '../../../http/errors.js';
-import { dollarsToCents, formatUsd, wholeUsd } from '../../../core/money.js';
+import { apiCents, formatUsd, wholeUsd } from '../../../core/money.js';
 import { computePlan, type PlanCategory } from '../pricing/plan.js';
 import { sellPlanLine } from '../pricing/present.js';
 import { pct } from '../pricing/round.js';
@@ -32,11 +32,7 @@ const Query = z.object({
 const cents = (v: string | undefined, f: string) => {
   if (v === undefined) return undefined;
   if (!MONEY.test(v)) throw new AppError(400, 'VALIDATION_ERROR', `${f} must be a positive USD amount with at most 2 decimals`);
-  try {
-    return dollarsToCents(Number(v));
-  } catch {
-    throw new AppError(400, 'VALIDATION_ERROR', `${f} must be a positive USD amount with at most 2 decimals`);
-  }
+  return apiCents(Number(v), f, 400);
 };
 
 function validDate(d: string, f: string): string {

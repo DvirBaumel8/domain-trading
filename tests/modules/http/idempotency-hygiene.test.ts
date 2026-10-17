@@ -20,10 +20,10 @@ describe('idempotency hygiene (v2.16.0)', () => {
   it('an in_progress key older than 15 minutes is still 409 IN_USE but says stale with started_at; a fresh one has no stale flag', async () => {
     const app = await makeApp();
     apps.push(app);
-    const { auth } = await issueToken('write');
+    const { auth, id } = await issueToken('write');
     const body = { value: 'x' };
     const hash = requestHash('POST', '/__test/echo', body);
-    const mk = (key: string, ageMs: number) => db.insertInto('idempotency_keys').values({ key, request_hash: hash, method: 'POST', path: '/__test/echo', state: 'in_progress', created_at: new Date(Date.now() - ageMs) }).execute();
+    const mk = (key: string, ageMs: number) => db.insertInto('idempotency_keys').values({ key, request_hash: hash, method: 'POST', path: '/__test/echo', state: 'in_progress', token_id: id, created_at: new Date(Date.now() - ageMs) }).execute();
     await mk('old-key', STALE_IN_PROGRESS_MS + 60_000);
     await mk('new-key', 60_000);
     const call = (key: string) => app.inject({ method: 'POST', url: '/__test/echo', headers: { ...auth, 'idempotency-key': key, 'content-type': 'application/json' }, payload: JSON.stringify(body) });

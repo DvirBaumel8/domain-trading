@@ -1,3 +1,5 @@
+import { AppError } from '../http/errors.js';
+
 const USD = /^(\d+)(?:\.(\d{1,2}))?$/;
 
 /** "9.73" → 973. Exact string arithmetic; floats never touch money. */
@@ -21,6 +23,21 @@ export function formatUsd(cents: number): string {
 export function dollarsToCents(n: number): number {
   if (!Number.isFinite(n) || n <= 0) throw new Error(`Not a positive USD amount: ${n}`);
   return usdStringToCents(String(n));
+}
+
+/** A USD amount from a request body (number, dollars) → cents, or an AppError (default 422 VALIDATION_ERROR) naming the field. One copy for every route. */
+export function apiCents(n: number, field: string, status: 400 | 422 = 422): number {
+  try {
+    return dollarsToCents(n);
+  } catch {
+    throw new AppError(status, 'VALIDATION_ERROR', `${field} must be a positive USD amount with at most 2 decimals`);
+  }
+}
+
+/** Signed cents as "-11.08" (no float, always 2 decimals). */
+export function usdSigned(cents: number): string {
+  const abs = Math.abs(cents);
+  return `${cents < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
 }
 
 /** formatUsd without the cents when they are .00: $499 or $11.08. */

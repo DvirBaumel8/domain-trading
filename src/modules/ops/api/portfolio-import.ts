@@ -5,7 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import { checkApproval } from '../../../core/approval.js';
-import { dollarsToCents } from '../../../core/money.js';
+import { apiCents } from '../../../core/money.js';
 import { approvalRef } from '../../../core/validation.js';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
@@ -49,13 +49,6 @@ export function namedAmountsCents(text: string): Set<number> {
   return out;
 }
 
-function cents(n: number, field: string): number {
-  try {
-    return dollarsToCents(n);
-  } catch {
-    throw new AppError(422, 'VALIDATION_ERROR', `${field} must be a positive USD amount with at most 2 decimals`);
-  }
-}
 
 export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely<Database>; adapters: RegistrarAdapter[]; now: () => number }): void {
   app.post('/portfolio/import', { config: { openapiBody: ImportBody } }, async (req, reply) => {
@@ -87,15 +80,15 @@ export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely
 
     const registrar = b.registrar.toLowerCase();
     const manual = !deps.adapters.some((a) => a.name === registrar);
-    const dollars = (n: number | undefined, f: string) => (n === undefined ? undefined : (cents(n, f) / 100).toFixed(2));
+    const optCents = (n: number | undefined, f: string) => (n === undefined ? undefined : apiCents(n, f));
     let r;
     try {
       r = await importDomain(deps.db, {
-        domain, registrar, buyDate: b.buy_date, cost: dollars(b.price_paid, 'price_paid')!, order: b.order, deal: b.deal_id ?? undefined,
+        domain, registrar, buyDate: b.buy_date, costCents: apiCents(b.price_paid, 'price_paid'), order: b.order, deal: b.deal_id ?? undefined,
         category: b.category ?? undefined, grade: b.price_grade ?? undefined, evidence: b.pricing_evidence as { comps?: unknown; rationale?: unknown } | null | undefined,
         approvalText: String(b.approval_ref?.text), approvalAt: String(b.approval_ref?.approved_at),
-        manual, expiry: b.expiry_date, renewalPrice: dollars(b.renewal_price, 'renewal_price'),
-        lane: 'S8', s8Source: b.source, compsValueCents: b.comps_value === undefined ? undefined : cents(b.comps_value, 'comps_value'),
+        manual, expiry: b.expiry_date, renewalPriceCents: optCents(b.renewal_price, 'renewal_price'),
+        lane: 'S8', s8Source: b.source, compsValueCents: optCents(b.comps_value, 'comps_value'),
         binOverrideCents: b.bin_override, floorOverrideCents: b.floor_override,
         dryRun: b.dry_run === true, auditId: req.auditId ?? undefined,
       }, { adapters: deps.adapters, now });

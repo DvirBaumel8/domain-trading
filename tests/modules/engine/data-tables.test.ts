@@ -117,6 +117,16 @@ describe('data tables (CR-063)', () => {
     expect((await post('/data/bigco-names', d, { rows: [{ name: '' }] })).json().rejects[0].reason).toBe('NAME_INVALID');
   });
 
+  it('DT-11: M6 GET /data/tm-kills and /data/bigco-names filter case-insensitively on a term loaded with capitals', async () => {
+    const { d, r } = await setup();
+    await post('/data/tm-kills', d, { rows: [{ term: 'Acme Corp', reason: 'tm' }] });
+    await post('/data/bigco-names', d, { rows: [{ name: 'BigCo' }] });
+    const t = await get('/data/tm-kills?host=ACME%20corp', r);
+    expect(t.json()).toMatchObject({ count: 1, rows: [{ term: 'Acme Corp' }] });
+    expect((await get('/data/bigco-names?host=bigco', r)).json()).toMatchObject({ count: 1, rows: [{ name: 'BigCo' }] });
+    expect((await get('/data/bigco-names?host=other', r)).json().count).toBe(0);
+  });
+
   it('DT-7: AC-5: sales_comps rejects HOLDOUT_SEALED (after 2026-10-14), DATE_INVALID and a missing date, links engine_sale_id on a domain+date+price match, and counts add up', async () => {
     const { d, r } = await setup();
     const up = await db.insertInto('engine_uploads').values({ kind: 'sales', received_n: 0, accepted_n: 0, duplicate_n: 0, rejected_n: 0, rejects: '[]', by: 'test', audit_id: null, created_at: new Date(NOW) }).returning('id').executeTakeFirstOrThrow();
@@ -143,8 +153,8 @@ describe('data tables (CR-063)', () => {
     expect(JSON.stringify(a.request)).toContain('[25 rows]');
   });
 
-  it('DT-9: AC-6: when the size plus the payload would pass 70% of 0.5 GB the load is refused with 409 DB_SIZE_HIGH and nothing is stored', async () => {
-    const limit = 0.5 * 1024 ** 3;
+  it('DT-9: AC-6: when the size plus the payload would pass 70% of 1 GB the load is refused with 409 DB_SIZE_HIGH and nothing is stored', async () => {
+    const limit = 1024 ** 3; // 5.13.0: Neon free is 1 GB
     const { d } = await setup({ engineDbSize: { bytes: async () => limit * 0.7 - 10 } });
     for (const [p, row] of [['rdap', rdap('a.com')], ['live-checks', { host: 'a.com', source: 'live', checked_utc: iso(NOW) }], ['tm-kills', { term: 'x' }], ['bigco-names', { name: 'x' }], ['sales-comps', comp()]] as const) {
       const res = await post(`/data/${p}`, d, { rows: [row] });

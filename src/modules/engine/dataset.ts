@@ -73,7 +73,9 @@ export function buildDataset(sales: readonly SaleRow[], unsold: readonly UnsoldR
   const testSold = soldAll.filter((s) => s.asOf >= q.from && s.asOf < q.to);
   const trainSold = soldAll.filter((s) => s.asOf < q.from);
   // unsold: dated split when the rows span enough days and the quarter has some, else a seeded hash
-  const span = unsoldAll.length ? Math.max(...unsoldAll.map((u) => dayNumber(u.asOf))) - Math.min(...unsoldAll.map((u) => dayNumber(u.asOf))) : 0;
+  let hi = -Infinity; let lo = Infinity; // loop, not Math.max(...spread): the row count can pass the argument limit
+  for (const u of unsoldAll) { const n = dayNumber(u.asOf); if (n > hi) hi = n; if (n < lo) lo = n; }
+  const span = unsoldAll.length ? hi - lo : 0;
   const unsoldMode: 'dated' | 'hash' = span >= UNSOLD_DATED_DAYS && unsoldAll.some((u) => u.asOf >= q.from && u.asOf < q.to) ? 'dated' : 'hash';
   let testUnsoldAll: Row[]; let trainUnsoldAll: Row[];
   if (unsoldMode === 'dated') {

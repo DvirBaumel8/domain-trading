@@ -1,6 +1,7 @@
 // v5.10.0 (CR-061): the holdout guard (engine.sales_max_date) and the database-size guard of the engine uploads.
 import { sql, type Kysely } from 'kysely';
 import { checkApproval } from '../../core/approval.js';
+import { advisoryXactLock } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 
@@ -17,6 +18,7 @@ export interface HoldoutChange { previous: string; date: string; approved_at: st
 /** POST /engine/holdout-date: the approval text must name the date; same age and future rules as every approval (settings.approval_max_age_hours). */
 export async function setSalesMaxDate(db: Kysely<Database>, date: string, ref: { text?: unknown; approved_at?: unknown } | null | undefined, now: Date): Promise<HoldoutChange> {
   return db.transaction().execute(async (trx) => {
+    await advisoryXactLock(trx, 'engine_upload'); // M4: waits for an upload in flight; later uploads read the new date under the same lock
     const s = await trx.selectFrom('settings').select(['engine_sales_max_date', 'approval_max_age_hours']).forUpdate().executeTakeFirstOrThrow();
     const a = checkApproval(ref, date, now, s.approval_max_age_hours);
     if (!a.ok) throw new AppError(422, a.code, a.reason.replace('name the domain', 'name the date'));

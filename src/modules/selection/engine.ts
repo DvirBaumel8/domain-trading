@@ -335,11 +335,11 @@ export class ScreeningWorker {
    * stops this process's paced lookups and check loop, and every open check of a name that is not already stopped gets UNKNOWN `CANCELLED`
    * (results already written are kept). Returns null when the run is not `running` (the caller reads its status).
    */
-  async cancel(runId: string, by: string, _reason?: string): Promise<{ cancelled_at: Date } | null> {
+  async cancel(runId: string, by: string, reason?: string): Promise<{ cancelled_at: Date } | null> {
     const { db } = this.deps;
     this.cancelledHere.add(runId);
     const at = new Date(this.deps.now());
-    const r = await db.updateTable('screening_runs').set({ status: 'cancelled', finished_at: at, cancelled_at: at, cancelled_by: by })
+    const r = await db.updateTable('screening_runs').set({ status: 'cancelled', finished_at: at, cancelled_at: at, cancelled_by: by, cancel_reason: reason ?? null })
       .where('id', '=', runId).where('status', '=', 'running').executeTakeFirst();
     if (Number(r.numUpdatedRows) === 0) { this.cancelledHere.delete(runId); return null; }
     await this.closeCancelled(runId);

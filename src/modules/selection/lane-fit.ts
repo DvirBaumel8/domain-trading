@@ -9,7 +9,6 @@ import { currentLists } from './lists.js';
 import type { SelectionValuesT } from './settings.js';
 
 export type KeptLane = 'S2' | 'S4' | 'S6';
-export const KEPT_LANES: readonly KeptLane[] = ['S2', 'S4', 'S6'];
 const FORM_LISTS = ['trade', 'regime', 'tech', 'generic_head', 'state', 'legal', 'city_extra', 'dictionary_extra'];
 
 /** A function from a domain to the kept lane it fits (null = none), built from the current versioned word lists and the given settings. */

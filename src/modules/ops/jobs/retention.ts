@@ -120,7 +120,7 @@ export interface RetentionDeps {
   db: Kysely<Database>;
   now: () => number;
   log?: { warn(obj: object, msg: string): void };
-  /** Tests inject the free-plan limit; default 0.5 GB (NEON_FREE_STORAGE_BYTES). */
+  /** Tests inject the free-plan limit; default 1 GB (NEON_FREE_STORAGE_BYTES). */
   storageLimitBytes?: number;
   /** Tests inject the database size in bytes; default pg_database_size. */
   dbBytes?: () => Promise<number>;

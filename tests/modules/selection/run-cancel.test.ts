@@ -56,7 +56,7 @@ describe('cancel (CR-010 F-1, T10-8)', () => {
     expect((await x.get('/selection/test-sets/CAN-1')).json()).toMatchObject({ status: 'computing', run: { status: 'running' } });
     const c = await x.post('/selection/test-sets/CAN-1/cancel', { reason: 'replaced by CAN-2' });
     expect(c.statusCode, c.body).toBe(200);
-    expect(c.json()).toMatchObject({ name: 'CAN-1', status: 'cancelled', run_id: runId, cancelled_by: 'gavriel' });
+    expect(c.json()).toMatchObject({ name: 'CAN-1', status: 'cancelled', run_id: runId, cancelled_by: 'gavriel', cancel_reason: 'replaced by CAN-2' });
     const got = (await x.get('/selection/test-sets/CAN-1')).json();
     expect(got).toMatchObject({ status: 'cancelled', run: { status: 'cancelled' } });
     expect(got.timing.finished_at).not.toBeNull();
@@ -124,12 +124,13 @@ describe('cancel (CR-010 F-1, T10-8)', () => {
     const read = await issueToken('read');
     const denied = await app.inject({ method: 'POST', url: `/screening/runs/${id}/cancel`, headers: { ...read.auth, 'idempotency-key': randomUUID() }, payload: {} });
     expect(denied.statusCode).toBe(403);
-    const c = await x.post(`/screening/runs/${id}/cancel`, {});
+    const c = await x.post(`/screening/runs/${id}/cancel`, { reason: 'wrong list uploaded' });
     expect(c.statusCode, c.body).toBe(200);
-    expect(c.json()).toMatchObject({ id, status: 'cancelled', cancelled_by: 'gavriel' });
+    expect(c.json()).toMatchObject({ id, status: 'cancelled', cancelled_by: 'gavriel', cancel_reason: 'wrong list uploaded' }); // M15: the reason is kept, no longer dropped
     expect(Date.parse(c.json().cancelled_at)).toBe(x.clock.t);
     const body = (await x.get(`/screening/runs/${id}`)).json();
-    expect(body).toMatchObject({ status: 'cancelled', cancelled_by: 'gavriel' });
+    expect(body).toMatchObject({ status: 'cancelled', cancelled_by: 'gavriel', cancel_reason: 'wrong list uploaded' });
+    expect((await db.selectFrom('screening_runs').select('cancel_reason').where('id', '=', id).executeTakeFirstOrThrow()).cancel_reason).toBe('wrong list uploaded');
     expect(body.finished_at).toBe(body.cancelled_at);
     const rows = await db.selectFrom('screening_results').select(['check_id', 'status', 'reason_code']).where('run_id', '=', id).execute();
     expect(rows.filter((r) => r.status === 'UNKNOWN').every((r) => r.reason_code === 'CANCELLED')).toBe(true);

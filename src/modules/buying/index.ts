@@ -2,7 +2,7 @@
 export { registerBuy } from './api/buy.js';
 export { registerTranches } from './api/tranches.js';
 export { failPurchase, registrarApiOf } from './bookkeeping.js';
-export { activeDomainCount, activeLaneCounts, laneCapBlock, type LaneCounts } from './budget.js';
+export { activeDomainCount, activeLaneCounts, laneCapBlock, type LaneCounts } from './caps.js';
 export { buyBlocks } from './buy-gates.js';
 export { BuyService } from './buy.js';
 export { Reconciler } from './reconciler.js';

@@ -252,7 +252,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
       throw new AppError(409, 'RUN_NOT_RUNNING', `The run of ${set.name} is ${st}, not running; only a running set can be cancelled`, { status: st, run_id: set.run_id });
     }
     await db.updateTable('test_sets').set({ status: 'cancelled' }).where('name', '=', set.name).where('status', '=', 'computing').execute();
-    return { name: set.name, status: 'cancelled' as const, run_id: set.run_id, cancelled_at: done.cancelled_at.toISOString(), cancelled_by: req.auth!.name };
+    return { name: set.name, status: 'cancelled' as const, run_id: set.run_id, cancelled_at: done.cancelled_at.toISOString(), cancelled_by: req.auth!.name, cancel_reason: body.reason ?? null };
   });
 
   app.post<{ Params: { name: string } }>('/selection/test-sets/:name/seal', { config: { openapiNoBody: true } }, async (req, reply) => {

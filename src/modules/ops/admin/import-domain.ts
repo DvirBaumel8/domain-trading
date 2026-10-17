@@ -24,13 +24,13 @@ export class ImportInputError extends Error {}
 export const COMPS_RULE_DATE = '2026-10-05';
 
 export interface ImportInput {
-  domain: string; registrar: string; buyDate: string; cost: string; costNote?: string; order?: string; deal?: string;
+  domain: string; registrar: string; buyDate: string; cost?: string; /** The API passes cents (no dollars-string round trip); the CLI passes `cost`. */ costCents?: number; costNote?: string; order?: string; deal?: string;
   category?: string; grade?: string;
   listingMode?: string; bin?: string; floor?: string; walkaway?: string; minOffer?: string;
   pricingException?: string; override?: boolean; overrideReason?: string;
   evidence?: { comps?: unknown; rationale?: unknown } | null; legacyNoComps?: string;
   approvalText?: string; approvalAt?: string;
-  manual?: boolean; expiry?: string; renewalPrice?: string; dryRun?: boolean;
+  manual?: boolean; expiry?: string; renewalPrice?: string; renewalPriceCents?: number; dryRun?: boolean;
   /** v5.8.0 (CR-059): the S8 aftermarket import (POST /portfolio/import). The BIN is the price-list rung for `compsValueCents`; any registrar name is accepted. */
   lane?: 'S8'; s8Source?: string; compsValueCents?: number;
   /** v5.9.0 (CR-060): Dvir's approved BIN and floor (cents, S8 only; the caller has checked the approval names them). */
@@ -71,7 +71,7 @@ function parseInput(i: ImportInput, now: Date) {
   const domain = normalizeDomain(i.domain);
   if (!i.registrar?.trim()) throw new ImportInputError('--registrar is required');
   const registrar = i.registrar.trim().toLowerCase();
-  if (registrar === 'cloudflare') throw new ImportInputError('Cloudflare Registrar is never used (founder rule 5)');
+  if (registrar.replace(/[^a-z0-9]/g, '').includes('cloudflare')) throw new ImportInputError('Cloudflare Registrar is never used (founder rule 5)');
   if (i.lane === 'S8') {
     if (!/^[a-z0-9][a-z0-9.-]{1,40}$/.test(registrar)) throw new ImportInputError('registrar must be a registrar name such as godaddy or dynadot');
   } else if (!['porkbun', 'godaddy', 'other'].includes(registrar)) throw new ImportInputError('--registrar must be porkbun, godaddy or other');
@@ -80,9 +80,9 @@ function parseInput(i: ImportInput, now: Date) {
   const today = idtDay(now);
   const buyDate = realDate('--buy-date', i.buyDate);
   if (buyDate > today) throw new ImportInputError('--buy-date must not be in the future');
-  const costCents = usd('--cost', i.cost);
+  const costCents = i.costCents ?? usd('--cost', i.cost);
   if (costCents === null || costCents <= 0) throw new ImportInputError('--cost must be a positive USD amount');
-  const renewalCents = usd('--renewal-price', i.renewalPrice);
+  const renewalCents = i.renewalPriceCents ?? usd('--renewal-price', i.renewalPrice);
   if (renewalCents !== null && renewalCents <= 0) throw new ImportInputError('--renewal-price must be a positive USD amount');
   if (i.costNote !== undefined && EMAIL.test(i.costNote)) throw new AppError(422, 'NO_PII', 'The cost note must not contain an email address');
   if (i.deal !== undefined && !DEAL.test(i.deal)) throw new ImportInputError('--deal must look like D-001');

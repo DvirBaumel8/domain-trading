@@ -18,10 +18,6 @@ export const STALE_IN_PROGRESS_MS = 15 * 60_000;
 export const KEY_RETENTION_MS = 30 * 86_400_000;
 const PRUNE_EVERY_MS = 86_400_000;
 
-/** Responses that must stay the final answer for their key even when they are 5xx (the work may have happened). */
-const keepKey = new WeakSet<object>();
-export const keepIdempotencyKey = (req: object): void => { keepKey.add(req); };
-
 export async function pruneIdempotencyKeys(db: Kysely<Database>, nowMs: number = Date.now()): Promise<number> {
   const r = await db.deleteFrom('idempotency_keys').where('state', '=', 'completed').where('completed_at', '<', new Date(nowMs - KEY_RETENTION_MS)).executeTakeFirst();
   return Number(r.numDeletedRows);
@@ -74,8 +70,8 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
       return;
     }
     const existing = await db.selectFrom('idempotency_keys').selectAll().where('key', '=', key).executeTakeFirst();
-    if (existing && existing.request_hash !== hash) {
-      throw new AppError(409, 'IDEMPOTENCY_KEY_MISMATCH', 'This Idempotency-Key was used with a different request');
+    if (existing && (existing.request_hash !== hash || existing.token_id !== (req.auth?.tokenId ?? null))) {
+      throw new AppError(409, 'IDEMPOTENCY_KEY_MISMATCH', 'This Idempotency-Key was used with a different request or by a different token');
     }
     if (!existing || existing.state !== 'completed' || existing.status_code === null) {
       const stale = existing?.state === 'in_progress' && Date.now() - existing.created_at.getTime() > STALE_IN_PROGRESS_MS;
@@ -108,7 +104,7 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
     if (!idem?.claimed) return payload;
     idem.claimed = false;
     try {
-      if (reply.statusCode >= 500 && !keepKey.has(req)) {
+      if (reply.statusCode >= 500) {
         await db.deleteFrom('idempotency_keys').where('key', '=', idem.key).where('state', '=', 'in_progress').execute();
       } else {
         const ct = reply.getHeader('content-type');

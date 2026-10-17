@@ -15,7 +15,7 @@ import { isValidDisplayName } from '../../domain-name.js';
 import { changedColumns } from '../listing/index.js';
 import { bookPurchase, failPurchase, markUnknown, registrarApiOf, storeResponse } from './bookkeeping.js';
 import { landerNameservers, sameNsSet } from '../listing/index.js';
-import { activeDomainCount, activeLaneCounts, laneCapBlock } from './budget.js';
+import { activeDomainCount, activeLaneCounts, laneCapBlock } from './caps.js';
 import type { CheckResult, CheckService } from '../registrars/index.js';
 import { checkSettingsVersion, isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from '../listing/index.js';
 import { planView } from '../listing/index.js';
@@ -513,10 +513,6 @@ export class BuyService {
       // v3.9.0: the drop policy (CR-033 G-9, drop_date = the first expiry) is part of the booking transaction
       ...(a.dropPolicy === 'at_first_expiry' ? { dropDate: expiry } : {}),
     });
-    if (a.horizon !== 'evergreen') {
-      const months = (await activeSelectionSettings(db)).values.renewal.horizon_months;
-      await db.updateTable('domains').set({ sell_or_drop_by: addMonthsClamped(x.buyDate, months) }).where('domain', '=', a.input.domain).execute();
-    }
     this.deps.checkService.invalidate(a.input.domain);
     const dropDate = a.dropPolicy === 'at_first_expiry' ? expiry : addOneYear(expiry);
 

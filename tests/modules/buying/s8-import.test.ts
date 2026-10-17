@@ -182,8 +182,9 @@ describe('S8 import lane (CR-059)', () => {
     expect(dry.json()).toMatchObject({ dry_run: true, lane: 'S8', would_be_blocked: null, s8: { bin_cents: 248800, comps_value_cents: 120000 } });
     for (const t of ['domains', 'ledger_entries', 'pricing_evidence', 'listing_history', 'price_schedule'] as const) expect(await count(t), t).toBe(0);
     const key = randomUUID();
-    const a = await post(body(), key);
-    const b = await post(body(), key);
+    const owner = (await issueToken('write')).auth; // 5.13.0: a key belongs to one token, so both calls use the same token
+    const a = await post(body(), key, owner);
+    const b = await post(body(), key, owner);
     expect(a.statusCode).toBe(201);
     expect(b.statusCode).toBe(201);
     expect(b.json()).toEqual(a.json());
@@ -351,5 +352,15 @@ describe('S8 import: approved price, ladder, expiry window, schedule (CR-060)', 
     const l1 = await app.inject({ method: 'POST', url: '/list/handreg.com', headers: { ...(await issueToken('write')).auth, 'idempotency-key': randomUUID() }, payload: { mode: 'hybrid', bin: 3488, dry_run: true } });
     expect(l1.statusCode, l1.body).toBe(422);
     expect(l1.json().error.code).toBe('BIN_NOT_IN_PRICE_LIST');
+  });
+
+  it('S8-20: M1 a registrar that contains "cloudflare" is refused however it is spelled; the DB stays empty', async () => {
+    for (const registrar of ['cloudflare', 'Cloudflare', 'Cloud-flare', 'cloudflare.com', 'CloudFlare Registrar']) {
+      const r = await post(body({ registrar, dry_run: true }));
+      expect(r.statusCode, registrar).toBe(422);
+      expect(r.json().error.code, registrar).toBe('VALIDATION_ERROR');
+      expect(r.json().error.message, registrar).toMatch(/Cloudflare/);
+    }
+    expect(await count('domains')).toBe(0);
   });
 });

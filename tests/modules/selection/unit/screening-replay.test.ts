@@ -2,7 +2,7 @@
 // leakage lint, profit report (Amendment A3). Synthetic rows; the real reference data is in selection-replay-cr002.test.ts.
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../../../../src/http/errors.js';
-import { bandLabels, bandOf, cell, csvToUploadRow, decideReplayRow, laneOf, leakageLint, missingGates, parseCsv, profitReport, replayReport, type Entry, type LabelledRow } from '../../../../src/modules/selection/replay.js';
+import { bandLabels, bandOf, cell, csvToUploadRow, decideReplayRow, laneOf, leakageLint, missingGates, parseCsv, profitReport, reportOf, type Entry, type LabelledRow } from '../../../../src/modules/selection/replay.js';
 import { DEFAULT_SELECTION_VALUES as D, type SelectionValuesT } from '../../../../src/modules/selection/settings.js';
 
 const row = (o: Partial<LabelledRow> & { f?: LabelledRow['features'] } = {}): LabelledRow => ({
@@ -87,7 +87,7 @@ describe('rates, bands, precision', () => {
       row({ domain: 'b.com', slice: 's2', price_cents: 150_000, f: { ...accept, prior_history: 0, registered_share: 0.1 } }),
       row({ domain: 'c.com', slice: 's2', label: 'dropped', f: { ...accept, prior_history: 0, registered_share: 0.1, pre_cls: null as unknown as undefined } }),
     ];
-    const r = replayReport(rows, D);
+    const r = reportOf(rows.map((row) => ({ row, d: decideReplayRow(row.features, D).decision, lane: laneOf(row) })), D);
     expect(Object.keys(r.by_slice).sort()).toEqual(['s1', 's2']);
     expect(r.by_band['<$1000']).toMatchObject({ n: 1, accepted: 1 });
     expect(r.by_band['$1000-<$2500']).toMatchObject({ n: 1, accepted: 0, rejected: 1 });

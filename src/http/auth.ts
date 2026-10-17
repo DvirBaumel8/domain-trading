@@ -6,6 +6,9 @@ import type { Database, Scope } from '../db/types.js';
 import { AppError } from './errors.js';
 import { isMutating } from './methods.js';
 
+/** M9: how often `api_tokens.last_used_at` is refreshed. */
+export const LAST_USED_EVERY_MS = 60_000;
+
 export interface AuthContext {
   tokenId: number;
   scope: Scope;
@@ -139,14 +142,17 @@ export function registerAuth(app: FastifyInstance, db: Kysely<Database>, jobTrig
     if (wait > 0 && (!hash || !recent.get(hash))) return tooMany();
     if (!hash) return unauthenticated();
     const row = await db
-      .updateTable('api_tokens')
-      .set({ last_used_at: new Date() })
+      .selectFrom('api_tokens')
+      .select(['id', 'scope', 'name', 'last_used_at'])
       .where('token_sha256', '=', hash)
       .where('revoked_at', 'is', null)
       // An expired token is an unknown token: same 401, no hint (CR-007 T-3).
       .where((eb) => eb.or([eb('expires_at', 'is', null), eb('expires_at', '>', new Date(now()))]))
-      .returning(['id', 'scope', 'name'])
       .executeTakeFirst();
+    // M9: last_used_at is written at most once a minute per token, not on every request (one dead row version per call otherwise).
+    if (row && (row.last_used_at === null || Date.now() - row.last_used_at.getTime() >= LAST_USED_EVERY_MS)) {
+      await db.updateTable('api_tokens').set({ last_used_at: new Date() }).where('id', '=', row.id).execute();
+    }
     if (!row) {
       recent.drop(hash);
       return wait > 0 ? tooMany() : unauthenticated();
