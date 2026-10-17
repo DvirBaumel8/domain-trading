@@ -47,7 +47,7 @@ function elideFile(b: Record<string, unknown> | null): Record<string, unknown> |
 
 /** An engine upload (up to 20,000 rows) is recorded by its row count: the rows live in engine_sales / engine_unsold, the counts in engine_uploads. */
 function elideRows(b: Record<string, unknown> | null, url: string): Record<string, unknown> | null {
-  if (b === null || !url.startsWith('/engine/') || !Array.isArray(b.rows) || b.rows.length <= 20) return b;
+  if (b === null || !(url.startsWith('/engine/') || url.startsWith('/data/')) || !Array.isArray(b.rows) || b.rows.length <= 20) return b;
   return { ...b, rows: `[${b.rows.length} rows]` };
 }
 

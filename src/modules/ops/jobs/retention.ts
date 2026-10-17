@@ -10,6 +10,7 @@
 import { sql, type Kysely, type RawBuilder } from 'kysely';
 import { trySessionLock } from '../../../core/locks.js';
 import type { Database } from '../../../db/types.js';
+import { pruneDataTables } from '../../engine/index.js';
 import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES } from '../../reporting/index.js';
 
 export const RETENTION_BATCH_ROWS = 5_000;
@@ -174,6 +175,10 @@ export class RetentionJob {
           cursor = rule.idStart === '' ? ids.reduce((a, b) => (a > b ? a : b)) : String(ids.reduce((a, b) => (BigInt(a) > BigInt(b) ? a : b)));
         }
       }
+      // v5.12.0 (CR-063): loaded data tables (live checks 3 / cc 14 days, RDAP rows of names that left the pool); fixed TTLs, the same in tight mode.
+      const data = await pruneDataTables(db, now(), dryRun);
+      tables.live_checks = { deleted: data.live_checks.deleted, mode, days: data.live_checks.days };
+      tables.domain_rdap = { deleted: data.domain_rdap.deleted, mode, days: 0 };
       return { mode, dry_run: dryRun, db_bytes_before: before, db_bytes_after: dryRun ? before : await this.size(), tables, partial };
     } finally {
       await lock.release();

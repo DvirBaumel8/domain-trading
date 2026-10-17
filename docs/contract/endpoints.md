@@ -1,4 +1,4 @@
-# Endpoints (contract v5.11.0)
+# Endpoints (contract v5.12.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -32,6 +32,8 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | PATCH | `/lessons/{id}` | WRITE | Scout lessons (5.3.0) |
 | GET | `/lessons`, `/lessons/check`, `/lessons/report` | READ | Scout lessons (5.3.0) |
 | POST | `/engine/sales`, `/engine/unsold` | WRITE or data (5.10.0) | Scoring engine (5.4.0, 5.10.0) |
+| POST | `/data/rdap`, `/data/live-checks`, `/data/tm-kills`, `/data/bigco-names`, `/data/sales-comps` | WRITE or data | Loaded data tables (5.12.0, CR-063) |
+| GET | `/data/rdap`, `/data/live-checks`, `/data/tm-kills`, `/data/bigco-names`, `/data/sales-comps` | READ (a data token gets 403) | Loaded data tables (5.12.0, CR-063) |
 | POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
 | POST | `/engine/holdout-date` | WRITE only (not a data token) | Holdout guard (5.10.0, CR-061) |
 | GET | `/engine/holdout-date` | READ | Holdout guard (5.10.0, CR-061) |
@@ -503,6 +505,54 @@ READ token (the one read-only POST: `Idempotency-Key` not needed, no audit row; 
 ### `GET /owned/{domain}/endings` (5.7.0, CR-058)
 READ. The other endings of a name we own (status `owned`, `listed` or `delisted`). `{domain, buy_date, endings: [{tld, host, registered, created, registrar, checked_at}], events: [{id, tld, kind, registered, created, registrar, at}]}`. `endings` has one entry for each of `net`, `co`, `org`, `io`, `ai` with the newest registry answer (`registered` null and the rest null when never answered; `created` = the registry creation date; `registrar` = the registrar entity's name from RDAP, null when the registry gives none; times ISO 8601 with offset). `events` are the append-only changes, oldest first: `kind` `baseline` (the first answer after the buy), `newly_registered` (not registered before and registered now, or the first answer shows a registry creation date after the buy date) or `re_registered` (the creation date changed). An ending that is dropped writes no event. 404 `DOMAIN_NOT_FOUND` when the name is not an owned domain. `/report` raises `ENDING_REGISTERED` for each non-baseline event for 30 days. Nothing is sent; the registrant is a lead for Sochen's draft and Dvir's per-email approval.
 
+## Loaded data tables (5.12.0, CR-063)
+
+Five tables the bots load once so Buyer, Shomer and the Scoring Scientist read one copy instead of box CSVs. They are stored and readable only: nothing here changes `/check`, `/buy`, selection, listing or `/company/forbidden-terms` (feeding the screening checks from `tm_kills` / `bigco_names` is a separate CR). **Scopes:** loads (`POST /data/...`) take a WRITE token or a `data` token; reads (`GET /data/...`) take a READ or WRITE token and a `data` token gets 403 `SCOPE_FORBIDDEN`; a READ token gets 403 on the loads.
+
+### `POST /data/rdap`
+The five loads share one shape; the other four are `POST /data/live-checks`, `/data/tm-kills`, `/data/bigco-names` and `/data/sales-comps` (their headings follow).
+
+Body `{rows: [..], dry_run?: boolean}`, 1 to 20,000 rows, 8 MB. `Idempotency-Key` required (also with `dry_run`). Each row is checked on its own: a bad row is rejected with a reason, the rest are stored (one transaction). `dry_run: true` runs every check and counts, and stores nothing.
+
+| Path | Row fields | Notes |
+|---|---|---|
+| `/data/rdap` | `host` (.com), `reg` (bool), `checked_at` (or `checked_utc`; ISO instant or day), optional `created`, `expires` (ISO instant or day), `registrar`, `kind` (ignored, always `rdap`) | **Only names in the candidate pool are stored:** a non-removed `candidate_intake` name or a kept `drop_list_rows` name. Others are counted in `skipped_not_in_pool_n` (not a reject). One row per host: a row with a newer `checked_at` updates it (counted accepted), an equal or older one is a duplicate. |
+| `/data/live-checks` | `host` (.com), `source` (`live` \| `livefail` \| `cc`), `checked_at` (or `checked_utc`), optional `label`, `park`, `value_json` (any JSON, 20,000 characters at most) | Duplicate = same `(host, source, checked_at)`. |
+| `/data/tm-kills` | `term`, optional `reason`, `source`, `raw` (object), `supersedes` (id of an earlier `tm_kills` row) | **Append-only** in the database (`reject_mutation`: no UPDATE, DELETE or TRUNCATE). A wrong row is fixed by a new row with `supersedes`; an unknown id is rejected `SUPERSEDES_NOT_FOUND`. Duplicate = same `(term, reason, source, supersedes)`. |
+| `/data/bigco-names` | `name`, optional `reason`, `source`, `raw`, `supersedes` | As `tm-kills`. |
+| `/data/sales-comps` | `domain`, `sale_date`, `price_usd`, `tier` (`T1`..`T4`), optional `year_flag`, `sale_year` (must equal the year of `sale_date`; default from it), `reg_date_at_sale`, `net_reg_at_sale`, `org_reg_at_sale`, `source_url`, `dup_sources` | The holdout guard of `/engine/sales` applies: `sale_date` after `GET /engine/holdout-date` is `HOLDOUT_SEALED`. `engine_sale_id` is set when an `engine_sales` row has the same domain, `sale_date` and price. Duplicate = same `(domain, sale_date, price)`. |
+
+**201:** `{table, dry_run, received_n, accepted_n, duplicate_n, rejected_n, skipped_not_in_pool_n (rdap only), rejects: [{row, domain, reason}], db_bytes_before, db_bytes_after, rows: {domain_rdap, live_checks, tm_kills, bigco_names, sales_comps}, audit_id}`. `accepted_n + duplicate_n + rejected_n (+ skipped_not_in_pool_n) = received_n`. `rows` = rows per table after the load. `rejects` holds the first 200. The same numbers are in the audit row summary (`GET /audit`). **Size guard:** when `db_bytes_before` plus the size of the rows would pass 70% of 0.5 GB the answer is 409 `DB_SIZE_HIGH` and nothing is stored (same as `/engine/sales`). Reject reasons: `ROW_INVALID`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `REG_INVALID`, `CHECKED_AT_INVALID`, `CHECKED_AT_IN_FUTURE`, `CREATED_INVALID`, `EXPIRES_INVALID`, `REGISTRAR_INVALID`, `SOURCE_INVALID`, `LABEL_INVALID`, `PARK_INVALID`, `VALUE_JSON_INVALID`, `TERM_INVALID`, `NAME_INVALID`, `REASON_INVALID`, `RAW_INVALID`, `SUPERSEDES_INVALID`, `SUPERSEDES_NOT_FOUND`, `DATE_INVALID`, `DATE_IN_FUTURE`, `HOLDOUT_SEALED`, `PRICE_INVALID`, `TIER_INVALID`, `SALE_YEAR_INVALID`, `YEAR_FLAG_INVALID`, `REG_DATE_INVALID`, `NET_REG_INVALID`, `ORG_REG_INVALID`, `SOURCE_URL_INVALID`, `DUP_SOURCES_INVALID`. **Errors:** 422 `VALIDATION_ERROR` (no rows, more than 20,000, unknown key) · 400 `IDEMPOTENCY_KEY_REQUIRED` · 401 · 403 `SCOPE_FORBIDDEN` · 409 `DB_SIZE_HIGH` · 413. The audit log records the call by its row count.
+
+### `POST /data/live-checks`
+Load as described under `POST /data/rdap` (row fields in the table above).
+
+### `POST /data/tm-kills`
+Load as described under `POST /data/rdap` (row fields in the table above).
+
+### `POST /data/bigco-names`
+Load as described under `POST /data/rdap` (row fields in the table above).
+
+### `POST /data/sales-comps`
+Load as described under `POST /data/rdap` (row fields in the table above).
+
+### `GET /data/rdap`
+READ. Query `host` (exact; `domain` for sales-comps, `term` / `name` for the two term tables), `since` (a day or ISO instant with an offset: `checked_at` for rdap and live checks, `created_at` for the term tables, `sale_date` for sales comps), `limit` (1 to 5,000, default 1,000). Newest first. Answer `{table, count, rows}`. **`domain_rdap` rows carry `stale: true` when `checked_at` is older than 24 hours.** `/check` and `/buy` always do their own live lookups and never read `domain_rdap`; a stale or fresh row is information for the bots only. `sales_comps` rows add `price_cents` and `price`.
+
+### `GET /data/live-checks`
+Read as described under `GET /data/rdap`.
+
+### `GET /data/tm-kills`
+Read as described under `GET /data/rdap`.
+
+### `GET /data/bigco-names`
+Read as described under `GET /data/rdap`.
+
+### `GET /data/sales-comps`
+Read as described under `GET /data/rdap`.
+
+**Retention (daily step `retention`, `jobs.md`):** `live` and `livefail` rows older than 3 days, `cc` rows older than 14 days, and `domain_rdap` rows of names that left the pool are deleted. `tm_kills`, `bigco_names` and `sales_comps` are never pruned.
+
 ## Sales patterns (4.0.0)
 
 The service fetches no sales data (NameBio blocks bots; no source allows an automated pull). Gavriel uploads them (CR-044 item 4).
@@ -924,6 +974,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Scout lesson errors (5.3.0):** `LESSON_NOT_FOUND` (404, `PATCH /lessons/{id}`).
 
 **Engine upload codes (5.10.0, CR-061):** `DB_SIZE_HIGH` (409, `POST /engine/sales` and `/engine/unsold`: the load would pass 70% of the 0.5 GB free-plan limit; the same code is a `/report` warning), `HOLDOUT_SEALED` (a per-row reject reason, not an error status).
+
+**Loaded data tables (5.12.0, CR-063):** `DB_SIZE_HIGH` (409) also on `POST /data/*`; per-row reject reasons are listed under `POST /data/rdap`.
 
 **Scoring engine errors (5.5.0):** `TRAIN_TOO_SOON` (409, `POST /engine/train`; `details.next_allowed_at`), `MODEL_NOT_READY` (409, `POST /score`), and in a failed run's `error` text: `NOT_ENOUGH_DATA`, `TRAIN_TIME_BUDGET`. Upload reasons (5.4.0) are listed under `POST /engine/sales` and `/engine/unsold`.
 

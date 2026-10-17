@@ -35,7 +35,7 @@ import { registerDropLists } from './modules/candidates/index.js';
 import { registerCohorts } from './modules/candidates/index.js';
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
 import { registerCandidates, registerLessons, registerPatterns } from './modules/candidates/index.js';
-import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
+import { EndingsJob, EngineTrainer, registerData, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
 import { createAdapters } from './modules/registrars/index.js';
 import type { RegistrarAdapter } from './modules/registrars/index.js';
 import { BuyService } from './modules/buying/index.js';
@@ -217,6 +217,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   const engineScorer = new Scorer({ db: deps.db, now: deps.now ?? Date.now, screening: screeningDeps, log: app.log, ...deps.engineScore });
   registerEngine(app, { db: deps.db, now: deps.now ?? Date.now, trainer: engineTrainer, scorer: engineScorer, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
+  registerData(app, { db: deps.db, now: deps.now ?? Date.now, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
   registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker, queue: () => app.jobQueue });
   registerEmails(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });

@@ -5,3 +5,5 @@ export { engineHealth } from './health.js';
 export { EngineTrainer, type TrainDeps } from './train.js';
 export { Scorer } from './score.js';
 export { DEFAULT_SALES_MAX_DATE, salesMaxDate, setSalesMaxDate, type DbSizeGuard } from './holdout.js';
+export { registerData } from './api/data.js';
+export { pruneDataTables, type DataPruneSummary } from './data-tables.js';

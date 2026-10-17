@@ -23,10 +23,10 @@ interface SaleRow { domain: string; price_cents: number; sale_date: string; venu
 interface UnsoldRow { domain: string; type: UnsoldType; observation_date: string; caught_by_catcher: boolean | null }
 type Parsed<T> = { ok: true; value: T } | { ok: false; domain: string | null; reason: string };
 
-const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-const rawDomain = (r: Record<string, unknown>): string | null => (typeof r.domain === 'string' ? r.domain.slice(0, 253) : null);
+export const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+export const rawDomain = (r: Record<string, unknown>): string | null => (typeof r.domain === 'string' ? r.domain.slice(0, 253) : null);
 
-function domainOf(r: Record<string, unknown>): { domain: string } | { reason: string } {
+export function domainOf(r: Record<string, unknown>): { domain: string } | { reason: string } {
   if (typeof r.domain !== 'string') return { reason: 'DOMAIN_INVALID' };
   try {
     return { domain: normalizeDomain(r.domain) };
@@ -36,21 +36,21 @@ function domainOf(r: Record<string, unknown>): { domain: string } | { reason: st
 }
 
 /** A real calendar date from the earliest allowed one to today (IDT). */
-function dateOf(v: unknown, today: string, sealedAfter?: string): { date: string } | { reason: string } {
+export function dateOf(v: unknown, today: string, sealedAfter?: string): { date: string } | { reason: string } {
   if (typeof v !== 'string' || !isRealDate(v) || v < ENGINE_EARLIEST_DATE) return { reason: 'DATE_INVALID' };
   if (v > today) return { reason: 'DATE_IN_FUTURE' };
   if (sealedAfter !== undefined && v > sealedAfter) return { reason: 'HOLDOUT_SEALED' };
   return { date: v };
 }
 
-function centsOf(v: unknown): number | null {
+export function centsOf(v: unknown): number | null {
   const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d{1,9}(\.\d{1,2})?$/.test(v.trim()) ? Number(v.trim()) : NaN;
   if (!Number.isFinite(n) || n <= 0 || n > 100_000_000) return null;
   const cents = Math.round(n * 100);
   return cents >= 1 ? cents : null;
 }
 
-const textOf = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim().length >= 1 && v.trim().length <= max ? v.trim() : null);
+export const textOf = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim().length >= 1 && v.trim().length <= max ? v.trim() : null);
 
 export function parseSaleRow(raw: unknown, today: string, sealedAfter?: string): Parsed<SaleRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
@@ -87,7 +87,7 @@ export function parseUnsoldRow(raw: unknown, today: string, sealedAfter?: string
 }
 
 const CHUNK = 2_000;
-const chunks = <T>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, (i + 1) * n));
+export const chunks = <T>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, (i + 1) * n));
 
 async function store<T extends { domain: string }>(
   db: Kysely<Database>, kind: 'sales' | 'unsold', rows: unknown[], ctx: Ctx,

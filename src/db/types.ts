@@ -507,6 +507,71 @@ export interface EngineSalesTable {
   created_at: TimestampDefault;
 }
 
+export interface DomainRdapTable {
+  id: Generated<number>;
+  host: string;
+  created: Timestamp | null;
+  expires: Timestamp | null;
+  registrar: string | null;
+  reg: boolean;
+  checked_at: Timestamp;
+  loaded_at: TimestampDefault;
+}
+
+export interface LiveChecksTable {
+  id: Generated<number>;
+  host: string;
+  source: 'live' | 'livefail' | 'cc';
+  label: string | null;
+  park: string | null;
+  checked_at: Timestamp;
+  value_json: Json | null;
+  loaded_at: TimestampDefault;
+}
+
+/** tm_kills (term) and bigco_names (name) share every other column; both append-only. */
+export interface TmKillsTable {
+  id: Generated<number>;
+  term: string;
+  reason: string | null;
+  source: string | null;
+  raw: Json | null;
+  supersedes: number | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+export interface BigcoNamesTable {
+  id: Generated<number>;
+  name: string;
+  reason: string | null;
+  source: string | null;
+  raw: Json | null;
+  supersedes: number | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+export interface SalesCompsTable {
+  id: Generated<number>;
+  domain: string;
+  sale_date: DateString;
+  price_cents: number;
+  tier: 'T1' | 'T2' | 'T3' | 'T4';
+  year_flag: string | null;
+  sale_year: number;
+  reg_date_at_sale: string | null;
+  net_reg_at_sale: string | null;
+  org_reg_at_sale: string | null;
+  source_url: string | null;
+  dup_sources: string | null;
+  engine_sale_id: number | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface EngineUnsoldTable {
   id: Generated<number>;
   domain: string;
@@ -1253,6 +1318,11 @@ export interface Database {
   engine_uploads: EngineUploadsTable;
   engine_sales: EngineSalesTable;
   engine_unsold: EngineUnsoldTable;
+  domain_rdap: DomainRdapTable;
+  live_checks: LiveChecksTable;
+  tm_kills: TmKillsTable;
+  bigco_names: BigcoNamesTable;
+  sales_comps: SalesCompsTable;
   engine_endings: EngineEndingsTable;
   owned_ending_events: OwnedEndingEventsTable;
   engine_models: EngineModelsTable;

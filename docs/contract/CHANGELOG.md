@@ -2,6 +2,17 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.12.0 (2026-10-17): CR-063 data tables: domain_rdap (pool only), live_checks, tm_kills, bigco_names, sales_comps
+Release note: `docs/releases/v5.12.0.md`.
+MINOR (additive routes and tables). Gavriel / Dvir's bots, CR-063 (approved by Dvir 2026-10-17 03:07 and 03:18 IDT).
+- **New routes:** `POST /data/rdap`, `/data/live-checks`, `/data/tm-kills`, `/data/bigco-names`, `/data/sales-comps` (WRITE or `data` scope, `Idempotency-Key`, `{rows, dry_run?}`, 20,000 rows, 8 MB; per-row reject reasons; answer `accepted_n`, `duplicate_n`, `rejected_n`, `rejects`, `skipped_not_in_pool_n` (rdap), `db_bytes_before`, `db_bytes_after`, `rows` per table); `GET /data/<same>` (READ; filters `host` (`domain` for sales comps), `since`, `limit`; a `data` token gets 403).
+- **Pool rule:** `domain_rdap` stores only names in the candidate pool (a non-removed intake name or a kept drop-list row); others are counted in `skipped_not_in_pool_n`. `GET /data/rdap` marks a row older than 24 h `stale: true`. `/check` and `/buy` never read `domain_rdap`.
+- **Append-only:** `tm_kills` and `bigco_names` reject UPDATE, DELETE and TRUNCATE in the database; a correction is a new row with `supersedes`.
+- **Holdout and size guards:** `sales_comps` rows dated after `GET /engine/holdout-date` are `HOLDOUT_SEALED`; `engine_sale_id` links the matching `engine_sales` row. A load that would pass 70% of 0.5 GB is refused with 409 `DB_SIZE_HIGH`.
+- **Retention (daily step):** deletes `live`/`livefail` rows over 3 days, `cc` rows over 14 days and `domain_rdap` rows of names that left the pool; summary adds `tables.live_checks` and `tables.domain_rdap`. The three other tables are never pruned.
+- **Not in this release:** DB bytes are in each load answer and its audit summary, not in `GET /jobs/runs`; `tm_kills` / `bigco_names` do not feed the screening checks or `/company/forbidden-terms` (separate CR).
+- **Migration:** `1764500000000_v5-12-0.sql` (five tables).
+
 ## 5.11.0 (2026-10-17): CR-062 NameBio free endpoints only, with attribution; GET /selection/namebio serves RetailStats placement stats
 Release note: `docs/releases/v5.11.0.md`.
 MINOR (additive fields; `source` value changes). Gavriel, CR-062 (approved by Dvir 2026-10-17 03:07 and 03:18 IDT).
