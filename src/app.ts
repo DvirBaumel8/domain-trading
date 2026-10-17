@@ -4,7 +4,7 @@ import { registerBuy, smallBuyView } from './modules/buying/index.js';
 import { registerPricing } from './modules/listing/index.js';
 import { registerList, registerVenue } from './modules/listing/index.js';
 import { registerOffers, registerSold, SoldService, OffersService } from './modules/selling/index.js';
-import { registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
+import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
 import { registerDemand, registerSelection, registerSiblingScan } from './modules/selection/index.js';
 import { registerScreening } from './modules/selection/index.js';
 import { registerTestSets } from './modules/selection/index.js';
@@ -104,6 +104,8 @@ export interface AppDeps {
   jobQueueOverrides?: Record<string, { maxAttempts?: number; timeoutMs?: number }>;
   /** Tests: smaller training parameters, a shorter bootstrap, a time source for the budget guard. */
   engineTrain?: Partial<Pick<TrainDeps, 'clock' | 'budgetMs' | 'gbmParams' | 'tierParams' | 'bootstrapResamples' | 'minTrainPerClass' | 'minTestPerClass'>>;
+  /** Tests: the size guard of the engine uploads (limit, and a fake size reader). */
+  engineDbSize?: { limitBytes?: number; bytes?: () => Promise<number> };
   /** Tests: the budget for live registry asks in POST /score and its time source. */
   engineScore?: { budgetMs?: number; clock?: () => number };
   /** Test-only: replaces the screening checks' outside access (RDAP, DNS, fetch). Production passes nothing. */
@@ -213,7 +215,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     enqueue: async (trainId, by) => { const r = await app.jobQueue.enqueue('train', { trigger: 'manual', triggeredBy: by, params: { train_id: trainId } }); app.jobQueue.kick(); return r; },
   });
   const engineScorer = new Scorer({ db: deps.db, now: deps.now ?? Date.now, screening: screeningDeps, log: app.log, ...deps.engineScore });
-  registerEngine(app, { db: deps.db, now: deps.now ?? Date.now, trainer: engineTrainer, scorer: engineScorer });
+  registerEngine(app, { db: deps.db, now: deps.now ?? Date.now, trainer: engineTrainer, scorer: engineScorer, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
   registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker, queue: () => app.jobQueue });
   registerEmails(app, { db: deps.db, now: deps.now ?? Date.now });
   registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });

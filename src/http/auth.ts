@@ -161,10 +161,21 @@ export const INTAKE_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake',
 
 const intakeForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'An intake token may only call POST /candidates/intake and POST /selection/drop-lists');
 
+/** v5.10.0 (CR-061): the routes a `data` token may call (all POST): intake, the two engine uploads, and every route under `/data/` (CR-063). Everything else, GETs included, is 403 SCOPE_FORBIDDEN. */
+export const DATA_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake', '/engine/sales', '/engine/unsold']);
+export const DATA_PREFIX = '/data/';
+export const isDataRoute = (routeUrl: string): boolean => DATA_ROUTES.has(routeUrl) || routeUrl.startsWith(DATA_PREFIX);
+
+const dataForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A data token may only call POST /candidates/intake, POST /engine/sales, POST /engine/unsold and POST /data/*');
+
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
     if (req.auth?.scope === 'intake' && !req.jobAuth) {
       if (req.method !== 'POST' || !INTAKE_ROUTES.has(req.routeOptions?.url ?? '')) throw intakeForbidden();
+      return;
+    }
+    if (req.auth?.scope === 'data' && !req.jobAuth) {
+      if (req.method !== 'POST' || !isDataRoute(req.routeOptions?.url ?? '')) throw dataForbidden();
       return;
     }
     // POST /jobs/run: the job-trigger bearer, or a WRITE token (CR-007 T-2). A READ token is refused like any other credential.

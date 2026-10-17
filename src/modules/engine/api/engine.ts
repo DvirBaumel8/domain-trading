@@ -7,11 +7,13 @@ import { z } from 'zod';
 import { idtDay, realYmd } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
+import { approvalRef } from '../../../core/validation.js';
 import { AppError } from '../../../http/errors.js';
 import { ownedEndingsView } from '../endings.js';
 import { engineHealth } from '../health.js';
 import { SCORE_MAX_DOMAINS, type Scorer } from '../score.js';
 import type { EngineTrainer } from '../train.js';
+import { databaseBytes, guardDbSize, salesMaxDate, setSalesMaxDate, type DbSizeGuard } from '../holdout.js';
 import { ENGINE_MAX_ROWS, storeSales, storeUnsold, UNSOLD_TYPES } from '../uploads.js';
 
 /** Up to 20,000 rows of about 300 bytes each. */
@@ -25,23 +27,39 @@ const SalesDoc = z.object({ rows: z.array(SaleDoc).min(1).max(ENGINE_MAX_ROWS) }
 const UnsoldBodyDoc = z.object({ rows: z.array(UnsoldDoc).min(1).max(ENGINE_MAX_ROWS) }).strict();
 
 const ScoreBody = z.object({ domains: z.array(z.string().min(1).max(253)).min(1).max(SCORE_MAX_DOMAINS), as_of: realYmd.optional() }).strict();
+const HoldoutBody = z.object({ date: realYmd, approval_ref: approvalRef }).strict();
+const HoldoutDoc = z.object({ date: realYmd, approval_ref: z.object({ text: z.string(), approved_at: z.string() }) }).strict();
 const EmptyBody = z.object({}).strict();
 
-export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; trainer: EngineTrainer; scorer: Scorer }): void {
+export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; trainer: EngineTrainer; scorer: Scorer; dbSize: DbSizeGuard }): void {
   const ctx = (req: { auth?: { name: string } | null; auditId?: string | null }) => ({ by: req.auth?.name ?? 'unknown', auditId: req.auditId ?? null, now: deps.now() });
 
   app.post('/engine/sales', { config: { openapiBody: SalesDoc }, bodyLimit: BODY_LIMIT }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
-    const r = await storeSales(deps.db, b.rows, ctx(req));
+    const before = await guardDbSize(deps.db, deps.dbSize, Buffer.byteLength(JSON.stringify(b.rows)));
+    const r = await storeSales(deps.db, b.rows, { ...ctx(req), sealedAfter: await salesMaxDate(deps.db) });
+    const after = await (deps.dbSize.bytes ?? (() => databaseBytes(deps.db)))();
     req.auditSummary = `engine sales: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}`;
-    return reply.code(201).send({ ...r, audit_id: req.auditId ?? null });
+    return reply.code(201).send({ ...r, db_bytes_before: before, db_bytes_after: after, audit_id: req.auditId ?? null });
   });
 
   app.post('/engine/unsold', { config: { openapiBody: UnsoldBodyDoc }, bodyLimit: BODY_LIMIT }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
-    const r = await storeUnsold(deps.db, b.rows, ctx(req));
+    const before = await guardDbSize(deps.db, deps.dbSize, Buffer.byteLength(JSON.stringify(b.rows)));
+    const r = await storeUnsold(deps.db, b.rows, { ...ctx(req), sealedAfter: await salesMaxDate(deps.db) });
+    const after = await (deps.dbSize.bytes ?? (() => databaseBytes(deps.db)))();
     req.auditSummary = `engine unsold: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}`;
-    return reply.code(201).send({ ...r, audit_id: req.auditId ?? null });
+    return reply.code(201).send({ ...r, db_bytes_before: before, db_bytes_after: after, audit_id: req.auditId ?? null });
+  });
+
+  // v5.10.0 (CR-061): the holdout guard date. WRITE only (a data token cannot reach it), Dvir's approval_ref must name the date.
+  app.get('/engine/holdout-date', async () => ({ sales_max_date: await salesMaxDate(deps.db) }));
+
+  app.post('/engine/holdout-date', { config: { openapiBody: HoldoutDoc } }, async (req) => {
+    const b = HoldoutBody.parse(req.body ?? {});
+    const r = await setSalesMaxDate(deps.db, b.date, b.approval_ref, new Date(deps.now()));
+    req.auditSummary = `engine holdout date ${r.previous} -> ${r.date}`;
+    return { sales_max_date: r.date, previous: r.previous, approved_at: r.approved_at, audit_id: req.auditId ?? null };
   });
 
   app.get('/engine/health', async () => engineHealth(deps.db, deps.now()));

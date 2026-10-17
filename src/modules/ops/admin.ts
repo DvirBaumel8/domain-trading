@@ -14,7 +14,7 @@ import { loadConfig } from '../../config.js';
 import { createDb } from '../../db/client.js';
 
 const USAGE = `usage:
-  npm run admin -- token create --scope read|write|intake --name <name>
+  npm run admin -- token create --scope read|write|intake|data --name <name>
   npm run admin -- token revoke --id <id>
   npm run admin -- token expire --id <id> --at <ISO 8601 time with an offset>
   npm run admin -- token list
@@ -56,7 +56,7 @@ async function main(argv: string[]): Promise<number> {
     }
     if (cmd === 'token' && sub === 'create') {
       const scope = values.scope;
-      if (scope !== 'read' && scope !== 'write' && scope !== 'intake') throw new UsageError('--scope must be read, write or intake');
+      if (scope !== 'read' && scope !== 'write' && scope !== 'intake' && scope !== 'data') throw new UsageError('--scope must be read, write, intake or data');
       if (!values.name) throw new UsageError('--name is required');
       const { id, token } = await createApiToken(db, { name: values.name, scope });
       console.log(`Created token ${id} (${scope}, "${values.name}"). It is shown ONCE; store it now:`);

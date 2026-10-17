@@ -82,6 +82,9 @@ export async function makeApp(
     jobQueueKeepAlive?: AppDeps['jobQueueKeepAlive'];
     engineTrain?: AppDeps['engineTrain'];
     engineScore?: AppDeps['engineScore'];
+    engineDbSize?: AppDeps['engineDbSize'];
+    /** Extra routes registered after the test routes (e.g. a POST /data/x). */
+    extraRoutes?: (app: FastifyInstance) => void;
   } = {},
 ): Promise<FastifyInstance> {
   sideEffects.count = 0;
@@ -102,6 +105,7 @@ export async function makeApp(
     jobQueueKeepAlive: opts.jobQueueKeepAlive,
     engineTrain: opts.engineTrain,
     engineScore: opts.engineScore,
+    engineDbSize: opts.engineDbSize,
     // No live DNS in tests: a test that needs name servers passes fakes.
     screening: {
       resolveNs: async () => { throw new Error('DNS blocked in tests'); },
@@ -110,7 +114,7 @@ export async function makeApp(
     },
     sleep: opts.sleep ?? (async () => {}),
     logger: opts.logStream ? { level: 'info', stream: opts.logStream } : false,
-    registerExtraRoutes: opts.testRoutes === false ? undefined : registerTestRoutes,
+    registerExtraRoutes: opts.testRoutes === false && !opts.extraRoutes ? undefined : (a) => { if (opts.testRoutes !== false) registerTestRoutes(a); opts.extraRoutes?.(a); },
   });
   await app.ready();
   return app;

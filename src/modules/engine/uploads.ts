@@ -17,7 +17,7 @@ export type UnsoldType = (typeof UNSOLD_TYPES)[number];
 
 export interface Reject { row: number; domain: string | null; reason: string }
 export interface UploadResult { upload_id: number; received_n: number; accepted_n: number; duplicate_n: number; rejected_n: number; rejects: Reject[] }
-interface Ctx { by: string; auditId: string | null; now: number }
+interface Ctx { by: string; auditId: string | null; now: number; /** v5.10.0: rows dated after this are HOLDOUT_SEALED (default: no guard). */ sealedAfter?: string }
 
 interface SaleRow { domain: string; price_cents: number; sale_date: string; venue: string; source: string; source_url: string | null }
 interface UnsoldRow { domain: string; type: UnsoldType; observation_date: string; caught_by_catcher: boolean | null }
@@ -36,9 +36,10 @@ function domainOf(r: Record<string, unknown>): { domain: string } | { reason: st
 }
 
 /** A real calendar date from the earliest allowed one to today (IDT). */
-function dateOf(v: unknown, today: string): { date: string } | { reason: string } {
+function dateOf(v: unknown, today: string, sealedAfter?: string): { date: string } | { reason: string } {
   if (typeof v !== 'string' || !isRealDate(v) || v < ENGINE_EARLIEST_DATE) return { reason: 'DATE_INVALID' };
   if (v > today) return { reason: 'DATE_IN_FUTURE' };
+  if (sealedAfter !== undefined && v > sealedAfter) return { reason: 'HOLDOUT_SEALED' };
   return { date: v };
 }
 
@@ -51,14 +52,14 @@ function centsOf(v: unknown): number | null {
 
 const textOf = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim().length >= 1 && v.trim().length <= max ? v.trim() : null);
 
-export function parseSaleRow(raw: unknown, today: string): Parsed<SaleRow> {
+export function parseSaleRow(raw: unknown, today: string, sealedAfter?: string): Parsed<SaleRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf(raw);
   if ('reason' in d) return { ok: false, domain: rawDomain(raw), reason: d.reason };
   const fail = (reason: string): Parsed<SaleRow> => ({ ok: false, domain: d.domain, reason });
   const cents = centsOf(raw.price_usd);
   if (cents === null) return fail('PRICE_INVALID');
-  const date = dateOf(raw.sale_date, today);
+  const date = dateOf(raw.sale_date, today, sealedAfter);
   if ('reason' in date) return fail(date.reason);
   const venue = textOf(raw.venue, 60);
   if (venue === null) return fail('VENUE_INVALID');
@@ -72,13 +73,13 @@ export function parseSaleRow(raw: unknown, today: string): Parsed<SaleRow> {
   return { ok: true, value: { domain: d.domain, price_cents: cents, sale_date: date.date, venue, source, source_url: sourceUrl } };
 }
 
-export function parseUnsoldRow(raw: unknown, today: string): Parsed<UnsoldRow> {
+export function parseUnsoldRow(raw: unknown, today: string, sealedAfter?: string): Parsed<UnsoldRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf(raw);
   if ('reason' in d) return { ok: false, domain: rawDomain(raw), reason: d.reason };
   const fail = (reason: string): Parsed<UnsoldRow> => ({ ok: false, domain: d.domain, reason });
   if (typeof raw.type !== 'string' || !(UNSOLD_TYPES as readonly string[]).includes(raw.type)) return fail('TYPE_INVALID');
-  const date = dateOf(raw.observation_date, today);
+  const date = dateOf(raw.observation_date, today, sealedAfter);
   if ('reason' in date) return fail(date.reason);
   const c = raw.caught_by_catcher;
   if (c !== undefined && c !== null && typeof c !== 'boolean') return fail('CAUGHT_BY_CATCHER_INVALID');
@@ -90,7 +91,7 @@ const chunks = <T>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(
 
 async function store<T extends { domain: string }>(
   db: Kysely<Database>, kind: 'sales' | 'unsold', rows: unknown[], ctx: Ctx,
-  parse: (raw: unknown, today: string) => Parsed<T>,
+  parse: (raw: unknown, today: string, sealedAfter?: string) => Parsed<T>,
   isDuplicate: (trx: Kysely<Database>, valid: T[]) => Promise<(r: T) => boolean>,
   insert: (trx: Kysely<Database>, uploadId: number, accepted: T[]) => Promise<void>,
 ): Promise<UploadResult> {
@@ -99,7 +100,7 @@ async function store<T extends { domain: string }>(
   const rejects: Reject[] = [];
   const valid: { i: number; v: T }[] = [];
   rows.forEach((raw, i) => {
-    const p = parse(raw, today);
+    const p = parse(raw, today, ctx.sealedAfter);
     if (p.ok) valid.push({ i, v: p.value });
     else rejects.push({ row: i, domain: p.domain, reason: p.reason });
   });

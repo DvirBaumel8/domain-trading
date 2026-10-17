@@ -44,7 +44,7 @@ Allow up to ~60 s for a cold start.
 
 | Secret | How |
 |---|---|
-| API token (Gavriel/Gizbar) | `npm run admin -- token create --scope write\|read --name <name>`, hand it over, then `npm run admin -- token revoke --id <old id>` (`token list` shows ids) |
+| API token (Gavriel/Gizbar; since 5.10.0 one named READ token per other bot, and `data-engineer-upload` with scope `data`) | `npm run admin -- token create --scope write\|read\|intake\|data --name <name>`, hand it over, then `npm run admin -- token revoke --id <old id>` (`token list` shows ids) |
 | `JOB_TRIGGER_TOKEN` | `openssl rand -hex 32`; update Render env (Dashboard -> Environment) **and** the GitHub repo secret; re-run the `deploy-jobs-trigger` workflow; Render restarts on env change |
 | Porkbun keys | create a new pair at porkbun.com/account/api, update Render, restart, then delete the old pair |
 | `GODADDY_PAT` | create a new PAT, update Render, revoke the old one |

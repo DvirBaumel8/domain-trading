@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 5.9.0** (16 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 5.10.0** (17 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -26,6 +26,7 @@
 | **READ** bot token | `Authorization: Bearer <token>` | Every `GET` |
 | **WRITE** bot token | same | Every route; `POST /jobs/run` only for `daily` and `tick`, at most 4 calls per hour per token (2.3.0) |
 | **Intake** bot token (2.14.0, one per scout) | same | `POST /candidates/intake` and `POST /selection/drop-lists` only; anything else 403 `SCOPE_FORBIDDEN` |
+| **Data** bot token (5.10.0, CR-061; for a bot that loads data, never money) | same | `POST /candidates/intake`, `POST /engine/sales`, `POST /engine/unsold` and every `POST /data/*` route only; anything else, GETs included, 403 `SCOPE_FORBIDDEN`. Named READ tokens (one per bot) read as above; `/audit` shows each call's `token_name` and `scope` |
 | **Job token** (`JOB_TRIGGER_TOKEN`, held by the Cloudflare Worker cron) | same | `POST /jobs/run` only |
 
 - DOM creates, expires and revokes bot tokens with an admin command. No API route creates, lists or reveals a token. A token may carry an **expiry time** (2.3.0): after it, the token is refused exactly like an unknown one. DOM announces every expiry in `docs/requests/DOM-TO-GAVRIEL.md` with the exact time.

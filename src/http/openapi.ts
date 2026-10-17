@@ -3,7 +3,7 @@
 // `config: { openapiBody: <zod schema> }`; the request body's JSON schema is then made from that schema (z.toJSONSchema).
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { INTAKE_ROUTES, JOB_PATH, PUBLIC_PATHS } from './auth.js';
+import { DATA_ROUTES, DATA_PREFIX, INTAKE_ROUTES, JOB_PATH, PUBLIC_PATHS } from './auth.js';
 import { isMutating } from './methods.js';
 
 declare module 'fastify' {
@@ -61,6 +61,8 @@ export const SUMMARIES: Record<string, string> = {
   'POST /engine/unsold': 'Upload unsold names (dropped after held, registered unsold) for the scoring engine',
   'GET /engine/health': 'Scoring engine data counts, age, last uploads, the endings fill progress and the active model',
   'GET /owned/{domain}/endings': 'Current state and event history of the other endings (.net .co .org .io .ai) of an owned name',
+  'GET /engine/holdout-date': 'The holdout guard date: sales and unsold rows dated after it are rejected (HOLDOUT_SEALED)',
+  'POST /engine/holdout-date': 'Move the holdout guard date (WRITE only; the approval_ref text must name the date)',
   'POST /engine/train': 'Start a scoring-engine training run on the job queue (at most one a day)',
   'GET /engine/train/{id}': 'A training run: status, metrics, frozen test-file hash',
   'POST /score': 'Score .com names with the active model (READ scope; the one read-only POST)',
@@ -145,7 +147,8 @@ const paramsOf = (path: string): string[] => [...path.matchAll(/\{([^}]+)\}/g)].
 function scopeOf(method: string, url: string): string {
   if (PUBLIC_PATHS.has(url)) return 'none';
   if (url === JOB_PATH && method === 'POST') return 'write or job-trigger token';
-  if (method === 'POST' && INTAKE_ROUTES.has(url)) return 'write or intake';
+  if (method === 'POST' && INTAKE_ROUTES.has(url)) return DATA_ROUTES.has(url) ? 'write or intake or data' : 'write or intake';
+  if (method === 'POST' && (DATA_ROUTES.has(url) || url.startsWith(DATA_PREFIX))) return 'write or data';
   return isMutating(method, url) ? 'write' : 'read';
 }
 

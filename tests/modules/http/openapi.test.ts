@@ -113,7 +113,7 @@ describe('CR-023 F: GET /openapi.json', () => {
       }
     }
     expect(doc.paths['/candidates/screen'].post).toMatchObject({ 'x-scope': 'write', requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { max_names: { type: 'integer' } } } } } } });
-    expect(doc.paths['/candidates/intake'].post['x-scope']).toBe('write or intake');
+    expect(doc.paths['/candidates/intake'].post['x-scope']).toBe('write or intake or data');
     expect(doc.paths['/candidates/intake'].post.requestBody.content['application/json'].schema.properties.names.items.properties).toHaveProperty('words');
     expect(doc.paths['/health/ping'].get['x-scope']).toBe('none');
     expect(doc.paths['/report'].get['x-scope']).toBe('read');

@@ -1,4 +1,4 @@
-# Endpoints (contract v5.9.0)
+# Endpoints (contract v5.10.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -31,7 +31,10 @@ Derived from the route registrations in `src/app.ts` and the zod schemas in `src
 | POST | `/lessons` | WRITE | Scout lessons (5.3.0) |
 | PATCH | `/lessons/{id}` | WRITE | Scout lessons (5.3.0) |
 | GET | `/lessons`, `/lessons/check`, `/lessons/report` | READ | Scout lessons (5.3.0) |
-| POST | `/engine/sales`, `/engine/unsold`, `/engine/train` | WRITE | Scoring engine (5.4.0, 5.5.0, 5.6.0) |
+| POST | `/engine/sales`, `/engine/unsold` | WRITE or data (5.10.0) | Scoring engine (5.4.0, 5.10.0) |
+| POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
+| POST | `/engine/holdout-date` | WRITE only (not a data token) | Holdout guard (5.10.0, CR-061) |
+| GET | `/engine/holdout-date` | READ | Holdout guard (5.10.0, CR-061) |
 | GET | `/engine/health`, `/engine/train/{id}` | READ | Scoring engine (5.4.0, 5.5.0) |
 | GET | `/owned/{domain}/endings` | READ | Owned-name endings watch (5.7.0, CR-058) |
 | POST | `/score` | READ (the one read-only POST: no `Idempotency-Key`, no audit row) | Scoring engine (5.5.0) |
@@ -66,7 +69,7 @@ The only public route. No auth, no DB access (Render's health check uses it). **
 - **200** `{"status":"ok"}`.
 
 ### `GET /openapi.json`
-READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024: itself included; every POST has a `requestBody`, or `x-no-body: true` when it takes none): method, path, `x-scope` (`none`, `read`, `write`, `write or intake`, `write or job-trigger token`), a one-line summary, path parameters, and the request body's JSON schema where the route has one. A test keeps it equal to the registered routes and this route table. This contract stays the binding text; the document is a convenience.
+READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024: itself included; every POST has a `requestBody`, or `x-no-body: true` when it takes none): method, path, `x-scope` (`none`, `read`, `write`, `write or intake`, `write or intake or data`, `write or data`, `write or job-trigger token`), a one-line summary, path parameters, and the request body's JSON schema where the route has one. A test keeps it equal to the registered routes and this route table. This contract stays the binding text; the document is a convenience.
 
 ### `GET /health`
 Any valid bot token (READ or WRITE).
@@ -360,7 +363,7 @@ READ. `{id, domain, strategy, status_note, created_at, approvals: [{audit_id, at
 ### `GET /audit`
 READ. Newest first.
 - **Query (strict):** `since` (ISO with offset), `limit` (1–500, default 100).
-- **200:** `{rows: [{id, at, token_id, token_name (2.16.0; the admin name of the token, never its secret; null for job and admin rows), scope: "read"|"write"|"intake"|"job"|"admin"|null, method, path, idempotency_key, approval_text, approval_at, request (the redacted request as a JSON object, or null; not a string), status_code, result_summary, client_ip}]}`. Job runs appear with scope `job` (`path` `/jobs/run`, or `job tick|daily` for a CLI run).
+- **200:** `{rows: [{id, at, token_id, token_name (2.16.0; the admin name of the token, never its secret; null for job and admin rows), scope: "read"|"write"|"intake"|"data"|"job"|"admin"|null, method, path, idempotency_key, approval_text, approval_at, request (the redacted request as a JSON object, or null; not a string), status_code, result_summary, client_ip}]}`. Job runs appear with scope `job` (`path` `/jobs/run`, or `job tick|daily` for a CLI run).
 - **Errors:** 400 `VALIDATION_ERROR`.
 
 ---
@@ -444,17 +447,24 @@ READ. Query (strict) `month` (YYYY-MM, required; Israel calendar month of `creat
 The data the name-scoring engine learns from: names that sold, names that did not, and, for every one of those names, whether the same name exists on .net, .co, .org, .io and .ai (and the .com's own registry creation date, 5.5.0) and since when. 5.4.0 stores and reports the data; 5.5.0 adds the model (`POST /engine/train`, `GET /engine/train/{id}`, `POST /score`). Drift, the bars report and the ablation come in 5.6.0. The service fetches nothing from marketplaces: Gavriel uploads the rows. Nothing here changes `/buy`, selection or listing, and the retention job never touches these tables.
 
 ### `POST /engine/sales`
-WRITE (`Idempotency-Key` required). Body (strict) `{rows: [{domain, price_usd, sale_date, venue, source, source_url?}]}`, 1 to 20,000 rows per call (body limit 8 MB; chunks of 5,000 to 10,000 are comfortable). A rate limit of 10 writes a minute applies per token. Each row is checked on its own: a bad row is rejected with a reason and the other rows are stored.
+WRITE or data token (`Idempotency-Key` required). Body (strict) `{rows: [{domain, price_usd, sale_date, venue, source, source_url?}]}`, 1 to 20,000 rows per call (body limit 8 MB; chunks of 5,000 to 10,000 are comfortable). A rate limit of 10 writes a minute applies per token. Each row is checked on its own: a bad row is rejected with a reason and the other rows are stored.
 - `domain`: a second-level `.com` name (letters, digits, hyphens; normalised to lower case). The word-shape (regime) filter is applied at training, not here.
 - `price_usd`: a number greater than 0 and at most 100,000,000 (a numeric string such as `"1250.50"` is accepted; at most 2 decimals are kept). Stored as integer cents.
-- `sale_date`: a real `YYYY-MM-DD` day from 2000-01-01 to today (Israel day); a future date is rejected.
+- `sale_date`: a real `YYYY-MM-DD` day from 2000-01-01 to today (Israel day); a future date is rejected. 5.10.0 (CR-061): a date after the holdout date (`GET /engine/holdout-date`, default 2026-10-14) is rejected with `HOLDOUT_SEALED`.
 - `venue` (1 to 60 characters), `source` (1 to 200), `source_url` (optional, up to 500).
 - **Duplicates:** a row for a name that already has a stored sale within 20 days of its `sale_date` (before or after, also a repeat inside the same call) is a duplicate: not stored, only counted. The first row of a call wins.
 
-**201:** `{upload_id, received_n, accepted_n, duplicate_n, rejected_n, rejects: [{row, domain, reason}], audit_id}`. `row` is the 0-based position in `rows`; `domain` is the name as normalised, or as sent when it could not be read (null for a row that is not an object); `rejects` holds the first 200. Reasons: `ROW_INVALID`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `PRICE_INVALID`, `DATE_INVALID`, `DATE_IN_FUTURE`, `VENUE_INVALID`, `SOURCE_INVALID`, `SOURCE_URL_INVALID`. `accepted_n + duplicate_n + rejected_n = received_n`. **Errors:** 422 `VALIDATION_ERROR` (no `rows`, empty, more than 20,000, an unknown key) · 400 `IDEMPOTENCY_KEY_REQUIRED` · 401 · 403 `SCOPE_FORBIDDEN` for a READ token · 413 when the body exceeds 8 MB. Repeating a call with the same `Idempotency-Key` returns the same answer and stores nothing again. The audit log records the call by its row count, not the rows.
+**201:** `{upload_id, received_n, accepted_n, duplicate_n, rejected_n, rejects: [{row, domain, reason}], db_bytes_before, db_bytes_after, audit_id}` (`db_bytes_*` 5.10.0: `pg_database_size` before and after the load, same on `/engine/unsold`). **Size guard (5.10.0):** when `db_bytes_before` plus the size of the rows would pass 70% of 0.5 GB, nothing is stored and the answer is 409 `DB_SIZE_HIGH` (`details.db_bytes_before`, `payload_bytes`, `limit_bytes`, `warn_percent`). `row` is the 0-based position in `rows`; `domain` is the name as normalised, or as sent when it could not be read (null for a row that is not an object); `rejects` holds the first 200. Reasons: `ROW_INVALID`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `PRICE_INVALID`, `DATE_INVALID`, `DATE_IN_FUTURE`, `HOLDOUT_SEALED`, `VENUE_INVALID`, `SOURCE_INVALID`, `SOURCE_URL_INVALID`. `accepted_n + duplicate_n + rejected_n = received_n`. **Errors:** 422 `VALIDATION_ERROR` (no `rows`, empty, more than 20,000, an unknown key) · 400 `IDEMPOTENCY_KEY_REQUIRED` · 401 · 403 `SCOPE_FORBIDDEN` for a READ token · 413 when the body exceeds 8 MB. Repeating a call with the same `Idempotency-Key` returns the same answer and stores nothing again. The audit log records the call by its row count, not the rows.
 
 ### `POST /engine/unsold`
-WRITE. Body (strict) `{rows: [{domain, type, observation_date, caught_by_catcher?}]}`, 1 to 20,000 rows. `type` is `dropped_after_held` or `registered_unsold`; `observation_date` is the day the name was seen (same date rule as `sale_date`); `caught_by_catcher` is an optional boolean. **Duplicates:** the same name with the same `observation_date` (the first row wins, whatever its `type`). Answer and errors as above; reasons: `ROW_INVALID`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `TYPE_INVALID`, `DATE_INVALID`, `DATE_IN_FUTURE`, `CAUGHT_BY_CATCHER_INVALID`.
+WRITE or data token. Body (strict) `{rows: [{domain, type, observation_date, caught_by_catcher?}]}`, 1 to 20,000 rows. `type` is `dropped_after_held` or `registered_unsold`; `observation_date` is the day the name was seen (same date rule as `sale_date`); `caught_by_catcher` is an optional boolean. **Duplicates:** the same name with the same `observation_date` (the first row wins, whatever its `type`). Answer and errors as above; reasons: `ROW_INVALID`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `TYPE_INVALID`, `DATE_INVALID`, `DATE_IN_FUTURE`, `HOLDOUT_SEALED` (5.10.0: `observation_date` after the holdout date), `CAUGHT_BY_CATCHER_INVALID`.
+
+### `GET /engine/holdout-date`
+5.10.0 (CR-061). The holdout guard: sales and unsold rows dated after `engine.sales_max_date` (default `2026-10-14`, an Israel calendar day, stored in `settings.engine_sales_max_date`) are rejected per row with `HOLDOUT_SEALED`; the other rows of the call are stored, and `accepted_n + duplicate_n + rejected_n = received_n` still holds. A future date is still `DATE_IN_FUTURE`; a row with no valid date keeps its `DATE_INVALID`.
+READ: `{sales_max_date}`.
+
+### `POST /engine/holdout-date`
+WRITE only ( a data token is `SCOPE_FORBIDDEN`; `Idempotency-Key` required; audited): body (strict) `{date: "YYYY-MM-DD", approval_ref: {text, approved_at}}`. The approval is Dvir's line after the Scoring Scientist logs the unseal: `text` must name the date (for example contain `2026-10-20`), `approved_at` ISO 8601 with an offset, not in the future, not older than the settings approval age (72 h). **200:** `{sales_max_date, previous, approved_at, audit_id}`. **Errors:** 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` · 422 `VALIDATION_ERROR` (not a real date, an unknown key) · 400 `IDEMPOTENCY_KEY_REQUIRED` · 403 `SCOPE_FORBIDDEN` for a READ or data token.
 
 ### `GET /engine/health`
 READ. `{model_version, trained_at, train_rows, test, chosen_weighting, ablation, bar4_pass, drift, slices, bars, bars_passed, last_training, data: {sales_n, unsold_n, sales_newest, unsold_newest, data_age_days: {sold, unsold}, last_upload: {sales, unsold}}, endings: {names_n, pairs_n, checked_n, unknown_n, pending_n, by_tld: {net|co|org|io|ai: {checked_n, registered_n, unknown_n, pending_n}}}}`. `sales_newest` / `unsold_newest` are the newest `sale_date` / `observation_date` (null when empty); `data_age_days` counts Israel days from that date to today (null when empty). `last_upload.sales|unsold` is `{upload_id, at, by, received_n, accepted_n, duplicate_n, rejected_n}` or null. **Endings:** `names_n` = distinct names (the part before `.com`) in the two sets; `pairs_n` = `names_n` x 6 (the five other endings and, since 5.5.0, the name's own .com); `checked_n` = pairs whose newest registry answer says registered or not registered; `unknown_n` = pairs whose last ask got no answer (timeout, error, refusal); `pending_n` = pairs the next daily run would ask (never asked, unanswered for 6 hours, or an answer older than 30 days). `registered_n` counts the names registered on that ending. **Model fields (5.5.0):** `model_version` (e.g. `eng-1.0.3`, the newest finished training; null before the first), `trained_at` (ISO), `train_rows {sold, unsold}`, `test {window {label, from, to_exclusive}, n_sold, n_unsold, auc, auc95 [low, high], p_top1, p_top1_ci95, p_top5, p_top5_ci95, p_top1_at_1pct_base}`, `chosen_weighting` (`unweighted` or `half_life_12m`), and `last_training {train_id, status, at, error}` (the newest run of any status, so a failure is visible). All null before the first model. `auc95` is a seeded 1,000-resample bootstrap; `p_top1` / `p_top5` are the precision among the top 1% / 5% of the frozen test file by score (Wilson 95% ranges in `*_ci95`); `p_top1_at_1pct_base` is the precision in the top 1% of the test file re-weighted so that there is one sold name per 100 unsold. 
@@ -910,6 +920,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Tranche errors:** `TRANCHE_NOT_FOUND` (404; also on a screening run), `TRANCHE_ALREADY_OPEN`, `TRANCHE_NAME_TAKEN`, `TRANCHE_CLOSED`, `TRANCHE_FULL`, `GEO_CAP`, `TRANCHE_BELOW_TARGET`, `MAIN_LANE_QUOTA`, `NOT_SCREENED_OK`, `MEMBER_NOT_FOUND` (and `NAME_NOT_IN_RUN`, `RUN_NOT_FOUND`, `DOMAIN_INVALID`, `VALIDATION_ERROR`).
 
 **Scout lesson errors (5.3.0):** `LESSON_NOT_FOUND` (404, `PATCH /lessons/{id}`).
+
+**Engine upload codes (5.10.0, CR-061):** `DB_SIZE_HIGH` (409, `POST /engine/sales` and `/engine/unsold`: the load would pass 70% of the 0.5 GB free-plan limit; the same code is a `/report` warning), `HOLDOUT_SEALED` (a per-row reject reason, not an error status).
 
 **Scoring engine errors (5.5.0):** `TRAIN_TOO_SOON` (409, `POST /engine/train`; `details.next_allowed_at`), `MODEL_NOT_READY` (409, `POST /score`), and in a failed run's `error` text: `NOT_ENOUGH_DATA`, `TRAIN_TIME_BUDGET`. Upload reasons (5.4.0) are listed under `POST /engine/sales` and `/engine/unsold`.
 

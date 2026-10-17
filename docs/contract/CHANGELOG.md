@@ -2,6 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.10.0 (2026-10-17): CR-061 `data` token scope, holdout guard on engine uploads, DB size in upload answers
+Release note: `docs/releases/v5.10.0.md`.
+MINOR (additive). Gavriel for Dvir, CR-061 (approved by Dvir 2026-10-17 03:07 and 03:18 IDT).
+- **New token scope `data`** (admin: `token create --scope data`). A data token may call only `POST /candidates/intake`, `POST /engine/sales`, `POST /engine/unsold` and every `POST /data/*` route (CR-063). Everything else, GETs included, is 403 `SCOPE_FORBIDDEN`. Idempotency and audit are as for any write; `/audit` shows scope `data` and the token name. WRITE tokens can still call all of these. Named READ tokens need no code (`/audit` already carries `token_name`).
+- **New routes:** `GET /engine/holdout-date` (READ) and `POST /engine/holdout-date` (WRITE only, `Idempotency-Key`, audited; body `{date, approval_ref}`; the approval text must name the date, at most 72 h old, not in the future; 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED`).
+- **Holdout guard:** `POST /engine/sales` and `POST /engine/unsold` reject, per row, a `sale_date` / `observation_date` after the holdout date (default `2026-10-14`) with reason `HOLDOUT_SEALED`. Counts still add up (`accepted_n + duplicate_n + rejected_n = received_n`). A future date stays `DATE_IN_FUTURE`; a row with no valid date stays `DATE_INVALID`.
+- **Changed (additive):** both upload answers gain `db_bytes_before` and `db_bytes_after` (`pg_database_size`). A load whose rows would take the database over 70% of 0.5 GB is refused before anything is written: 409 `DB_SIZE_HIGH` (`details.db_bytes_before`, `payload_bytes`, `limit_bytes`, `warn_percent`).
+- **Migration:** `1764300000000_v5-10-0.sql` (`api_tokens` and `audit_log` scope checks allow `data`; `settings.engine_sales_max_date`, default 2026-10-14).
+
 ## 5.9.0 (2026-10-16): CR-060 S8 import accepts Dvir's approved Buy Now and floor; S8 ladder by name length; S8 expiry window; no M6/M18 drops for S8
 Release note: `docs/releases/v5.9.0.md`.
 MINOR (additive request fields; S8 pricing and schedule change, S8 only). Gavriel, CR-060 (approved by Dvir 2026-10-16 14:51 IDT).

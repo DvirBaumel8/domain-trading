@@ -6,7 +6,7 @@ type Timestamp = ColumnType<Date, Date | string, Date | string>;
 type TimestampDefault = ColumnType<Date, Date | string | undefined, Date | string>;
 type Json = ColumnType<unknown, string, string>; // insert/update with JSON.stringify(...)
 
-export type Scope = 'read' | 'write' | 'intake';
+export type Scope = 'read' | 'write' | 'intake' | 'data';
 export type Category = 'geo' | 'trend' | 'b2b' | 'collision' | 'regulation' | 'buzzword' | 'other';
 export type ListingMode = 'bin' | 'offer' | 'hybrid';
 export type DomainStatus = 'pending_purchase' | 'owned' | 'listed' | 'delisted' | 'sold' | 'dropped';
@@ -35,6 +35,8 @@ export interface SettingsTable {
   s8_reserved_slots: Generated<number>;
   /** v5.9.0 (CR-060): the S8 default BIN ladder by name length: [{max_len, bin_cents}], last max_len null. Migration only. */
   s8_bin_ladder: Generated<unknown>;
+  /** v5.10.0 (CR-061): engine.sales_max_date, the holdout guard. Sales and unsold rows dated after it are rejected. Changed only by POST /engine/holdout-date. */
+  engine_sales_max_date: Generated<DateString>;
   approval_max_age_hours: Generated<number>;
   lander_target: Generated<'afternic' | 'sedo' | 'custom'>;
   allowed_registrars: Generated<string[]>;

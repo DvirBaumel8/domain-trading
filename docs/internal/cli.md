@@ -5,7 +5,7 @@ All admin and job commands are DOM-only; they run locally (production: in a `.en
 ## Admin (`npm run admin -- …`)
 | Command | What |
 |---|---|
-| `token create --scope read\|write --name <n>` / `token revoke --id <id>` / `token list` | Bot tokens (printed once; stored as SHA-256). The only way to create a token |
+| `token create --scope read\|write\|intake\|data --name <n>` (data: v5.10.0) / `token revoke --id <id>` / `token list` | Bot tokens (printed once; stored as SHA-256). The only way to create a token |
 | `pricing-settings new [--from-current] --set k=v … --approval-text "<Dvir's words>" --approval-at <ISO> [--note]` / `pricing-settings show [--version N]` | A new `pricing_settings` version (`listing-strategy.md` §10.1). Never via the API |
 
 **Creating v3 (DOM runs this at the gate; Dvir's words and time go in the approval, citing the 6 Oct 2026 decisions):**

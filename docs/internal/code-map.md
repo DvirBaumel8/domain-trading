@@ -149,7 +149,7 @@ v5.4.0 (CR-056 part 1): data for the name-scoring engine; v5.5.0 (part 2): featu
 
 | Route | File |
 |---|---|
-| POST /engine/sales, POST /engine/unsold, GET /engine/health | `engine/api/engine.ts` (`registerEngine`; 8 MB body limit; the audit log keeps the row count only, `elideRows` in `src/http/audit.ts`) |
+| POST /engine/sales, POST /engine/unsold, GET /engine/health; v5.10.0 (CR-061): GET/POST /engine/holdout-date, `db_bytes_*` and the 409 DB_SIZE_HIGH guard (logic `engine/holdout.ts`: `salesMaxDate`, `setSalesMaxDate`, `guardDbSize`; HOLDOUT_SEALED in `uploads.ts` `dateOf`) | `engine/api/engine.ts` (`registerEngine`; 8 MB body limit; the audit log keeps the row count only, `elideRows` in `src/http/audit.ts`) |
 | POST /engine/train, GET /engine/train/:id (v5.5.0) | `engine/api/engine.ts` (`EngineTrainer.start` / `get`) |
 | GET /owned/:domain/endings (v5.7.0, CR-058) | `engine/api/engine.ts` (`ownedEndingsView` in `endings.ts`) |
 | POST /score (v5.5.0, the one read-only POST) | `engine/api/engine.ts` (`Scorer.score`); read-only status comes from `READ_ONLY_POSTS` in `src/http/methods.ts` (`isMutating(method, routeUrl)`: scope, idempotency, audit, rate class, openapi) |
@@ -272,7 +272,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 
 | File | Inside | Test |
 |---|---|---|
-| `auth.ts` | `registerAuth` (bearer tokens, job token), `registerScope` (READ/WRITE), `INTAKE_ROUTES`, `PUBLIC_PATHS` | `http/auth`, `token-expiry` |
+| `auth.ts` | `registerAuth` (bearer tokens, job token), `registerScope` (READ/WRITE/intake/data), `INTAKE_ROUTES`, `DATA_ROUTES`/`DATA_PREFIX` (v5.10.0), `PUBLIC_PATHS` | `http/auth`, `token-expiry`, `http/data-scope` (DS-1..DS-6) |
 | `idempotency.ts` | `registerIdempotency`, `requestHash`, `pruneIdempotencyKeys` | `http/idempotency`, `idempotency-hygiene`, `http/unit/canonical-json` |
 | `audit.ts` | `registerAuditId`, `registerAuditWrite`, `dbAuditWriter` | `http/audit`, `audit-token`, `timestamps` |
 | `errors.ts` | `AppError`, `errorBody`, `registerErrorHandling` | `http/errors` |
@@ -281,7 +281,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1764200000000_v5-9-0.sql`: `settings.s8_bin_ladder` (CR-060); before it `1764100000000_v5-8-0.sql`: `domains.lane` (NULL = Line 1, `S8` = Line 2), `settings.s8_max_price_cents`, `settings.s8_reserved_slots`; before it `1764000000000_v5-7-0.sql`: owned_ending_events; before it `1763900000000_v5-5-0.sql`: engine_models, tld com, job kind train; before it `1763800000000_v5-4-0.sql`: engine_uploads, engine_sales, engine_unsold, engine_endings; before it `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 45 files). Run with `npm run migrate`.
+`client.ts` (`createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1764300000000_v5-10-0.sql`: token scope `data` (api_tokens and audit_log CHECKs), `settings.engine_sales_max_date` (CR-061); before it `1764200000000_v5-9-0.sql`: `settings.s8_bin_ladder` (CR-060); before it `1764100000000_v5-8-0.sql`: `domains.lane` (NULL = Line 1, `S8` = Line 2), `settings.s8_max_price_cents`, `settings.s8_reserved_slots`; before it `1764000000000_v5-7-0.sql`: owned_ending_events; before it `1763900000000_v5-5-0.sql`: engine_models, tld com, job kind train; before it `1763800000000_v5-4-0.sql`: engine_uploads, engine_sales, engine_unsold, engine_endings; before it `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; 46 files). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 
@@ -302,7 +302,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Add a screening check | new `selection/checks/<id>.ts`; register in `checks/index.ts` (`CHECKS`, `GATE_OF`); `selection/settings.ts` (`CHECK_IDS`, gates per lane); `selection/types.ts` (`CheckId`); `selection/depends.ts`; `docs/contract/selection.md` | new `tests/modules/selection/screening-<id>.test.ts` (see `screening-same-name`), `selection/unit/screening-*` |
 | Change what a screening pack requires | `selection/pack.ts` (`assessPack`, `requiredChecks`), `selection/settings.ts` (`PACK_DEFAULT`) | `selection/unit/pack-assess`, `selection/screening-packs` |
 | Change seller-page checks | `selection/sellers.ts`, `selection/site.ts` | `selection/unit/sellers`, `site-classify`, `selection/sellers`, `seller-fetch` |
-| Change the engine uploads or the endings fill | `engine/uploads.ts`, `engine/endings.ts`, `engine/health.ts`; document in `docs/contract/endpoints.md` (Scoring engine) and `jobs.md` | `engine/uploads`, `engine/endings` |
+| Change the engine uploads or the endings fill | `engine/uploads.ts`, `engine/endings.ts`, `engine/health.ts`; document in `docs/contract/endpoints.md` (Scoring engine) and `jobs.md` | `engine/uploads`, `engine/endings`, `engine/holdout-guard` (HG-1..HG-8) |
 | Add or change an engine feature | `engine/features.ts` (`FEATURE_NAMES`, `computeFeatures`), the loader in `engine/data.ts`, the reason text in `engine/reasons.ts`; engine.md features table; a feature with no data is left out by `train.ts` | `engine/features`, `engine/train`, `engine/score` |
 | Change the training split, metrics or weighting | `engine/dataset.ts`, `engine/train.ts`, `engine/model/metrics.ts`; engine.md and `endpoints.md` (POST /engine/train) | `engine/train`, `engine/model-math` |
 | Change a model | `engine/model/gbm.ts`, `logit.ts` (a changed model changes every score: bump the model version note in the release) | `engine/model-math`, `engine/train` |

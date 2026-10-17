@@ -4,3 +4,4 @@ export { ENDING_TLDS, ENGINE_TLDS, ENDINGS_MAX_PAIRS_PER_RUN, ENDINGS_RECHECK_DA
 export { engineHealth } from './health.js';
 export { EngineTrainer, type TrainDeps } from './train.js';
 export { Scorer } from './score.js';
+export { DEFAULT_SALES_MAX_DATE, salesMaxDate, setSalesMaxDate, type DbSizeGuard } from './holdout.js';
