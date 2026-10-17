@@ -22,7 +22,7 @@ const MAX_SERVERS_PER_NAME = 3;
 const isIPv4 = (s: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s);
 
 /** Decodes the last octet of a 127.0.0.x answer with the settings' list_bits. */
-export function decodeBits(lastOctet: number, listBits: Record<string, string>): string[] {
+function decodeBits(lastOctet: number, listBits: Record<string, string>): string[] {
   return Object.entries(listBits).filter(([bit]) => (lastOctet & Number(bit)) !== 0).sort((a, b) => Number(a[0]) - Number(b[0])).map(([, name]) => name);
 }
 

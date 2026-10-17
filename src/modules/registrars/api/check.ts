@@ -25,7 +25,7 @@ function presentQuote(q: EvaluatedQuote) {
   };
 }
 
-export function presentCheck(r: CheckResult) {
+function presentCheck(r: CheckResult) {
   return {
     domain: r.domain,
     check_id: r.checkId,

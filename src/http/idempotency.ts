@@ -15,7 +15,7 @@ declare module 'fastify' {
 /** An in_progress key this old probably belongs to a request that died (the caller is told so, the key is still not re-run). */
 export const STALE_IN_PROGRESS_MS = 15 * 60_000;
 /** Completed keys older than this are deleted (lazily, at most once a day). */
-export const KEY_RETENTION_MS = 30 * 86_400_000;
+const KEY_RETENTION_MS = 30 * 86_400_000;
 const PRUNE_EVERY_MS = 86_400_000;
 
 export async function pruneIdempotencyKeys(db: Kysely<Database>, nowMs: number = Date.now()): Promise<number> {

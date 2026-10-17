@@ -2,7 +2,6 @@
 import { advisoryXactLock } from '../../../core/locks.js';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
-import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';

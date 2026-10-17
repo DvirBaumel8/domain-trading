@@ -26,12 +26,12 @@ export interface PlanStep {
 }
 
 /** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the review steps 1 (they keep their own retry), the rest 2. */
-export const DEFAULT_ATTEMPTS = 2;
-export const STEP_ATTEMPTS: Record<string, number> = {
+const DEFAULT_ATTEMPTS = 2;
+const STEP_ATTEMPTS: Record<string, number> = {
   registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1, engineEndings: 1, engineTrain: 1, trainModel: 1,
 };
-export const DEFAULT_TIMEOUT_MS = 5 * 60_000;
-export const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000 };
+const DEFAULT_TIMEOUT_MS = 5 * 60_000;
+const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000 };
 
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
 

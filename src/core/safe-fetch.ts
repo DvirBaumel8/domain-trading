@@ -21,7 +21,7 @@ export class BlockedError extends Error {
 }
 
 export type LookupAll = (host: string) => Promise<{ address: string; family: number }[]>;
-export const systemLookup: LookupAll = (host) => dns.promises.lookup(host, { all: true, verbatim: true });
+const systemLookup: LookupAll = (host) => dns.promises.lookup(host, { all: true, verbatim: true });
 
 // ---------- address classes ----------
 
@@ -115,7 +115,7 @@ const normHost = (h: string): string => {
   while (x.startsWith('.')) x = x.slice(1);
   return domainToASCII(x) || x;
 };
-export const hostExcluded = (host: string, neverFetchHosts: string[]): boolean => {
+const hostExcluded = (host: string, neverFetchHosts: string[]): boolean => {
   const h = normHost(host);
   return neverFetchHosts.some((x) => { const e = normHost(x); return e !== '' && (h === e || h.endsWith(`.${e}`)); });
 };

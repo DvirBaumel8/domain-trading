@@ -3,14 +3,13 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
-import { formatUsd } from '../../core/money.js';
 import { latestPackFor } from '../selection/index.js';
 import { activeSelectionSettings } from '../selection/index.js';
 import { latestScreeningRun, screeningHold } from './buy-hold.js';
 import { openTrancheFor } from '../selection/index.js';
 
 export type BuyBlock = 'BUY_HOLD' | 'SCREENING_PACK_REQUIRED' | 'NO_TRANCHE' | 'SMALL_BUY_PRICE' | 'DOMAIN_CAP_REACHED';
-export type PackReason = 'NO_PACK' | 'INCOMPLETE' | 'NOT_FROM_LATEST_RUN' | 'SETTINGS_NOT_ACTIVE' | 'PACK_TOO_OLD';
+type PackReason = 'NO_PACK' | 'INCOMPLETE' | 'NOT_FROM_LATEST_RUN' | 'SETTINGS_NOT_ACTIVE' | 'PACK_TOO_OLD';
 export interface Gate { code: BuyBlock; message: string; details: Record<string, unknown> }
 
 export async function packGate(db: Kysely<Database>, domain: string, nowMs: number, latestRun?: Awaited<ReturnType<typeof latestScreeningRun>> | null): Promise<Gate | null> {

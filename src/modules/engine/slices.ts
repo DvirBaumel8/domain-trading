@@ -2,12 +2,12 @@
 // drop-catch resale), held = 91 days or more. Report only: not a feature, so the .com-date leak guard is untouched. Pure.
 import { auc } from './model/metrics.js';
 
-export const QUICK_SALE_DAYS = 91;
+const QUICK_SALE_DAYS = 91;
 /** A test row counts as found when its score reaches this probability (the engine has no other cut-off; the same 0.5 is shown in the block). */
-export const RECALL_THRESHOLD = 0.5;
+const RECALL_THRESHOLD = 0.5;
 const DAY = 86_400_000;
 
-export interface SliceStats { n: number; recall: number | null; net_pit_share: number | null; auc: number | null }
+interface SliceStats { n: number; recall: number | null; net_pit_share: number | null; auc: number | null }
 export interface HoldSlices { threshold: number; quick: SliceStats; held: SliceStats; unknown_n: number }
 export interface SliceRow { label: number; asOf: string; score: number; netPit: number | null; comCreatedMs: number | null }
 

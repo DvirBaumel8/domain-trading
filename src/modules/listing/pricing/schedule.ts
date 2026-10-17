@@ -6,7 +6,7 @@ import { hybridBinMin, priceFormula } from './plan.js';
 import { isV3, type PricingSettings } from './settings.js';
 
 export type ScheduleEventName = PriceScheduleEvent;
-export type ScheduleStatus = Extract<PriceScheduleStatus, 'planned' | 'skipped_at_minimum' | 'skipped_no_change' | 'skipped_disabled' | 'superseded_by_final_push'>;
+type ScheduleStatus = Extract<PriceScheduleStatus, 'planned' | 'skipped_at_minimum' | 'skipped_no_change' | 'skipped_disabled' | 'superseded_by_final_push'>;
 export interface ScheduleEvent {
   event: ScheduleEventName; dueOn: string;
   binCents: Cents | null; floorCents: Cents | null; walkawayCents: Cents | null; status: ScheduleStatus | PriceScheduleStatus;

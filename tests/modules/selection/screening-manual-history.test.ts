@@ -1,5 +1,5 @@
 // CR-002 Amendment B: the manual HIST-2 record (POST /screening/runs/{id}/manual, check "history"). The Internet Archive is never
-// automated (sources.wayback false): the name waits for the record, and the record decides the history gate exactly as the automated check would.
+// automated (sources.wayback is always false): the name waits for the record, and the record decides the history gate exactly as the automated check would.
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
@@ -31,7 +31,7 @@ const URL1 = 'https://web.archive.org/web/20190412093000/http://officeprepexampl
 const URL2 = 'https://web.archive.org/web/20210301000000/http://officeprepexample.com/about';
 
 /** A finished live S7 run on the full plan: every check PASS (no network) except `history`, which is MANUAL_REQUIRED, as the live run leaves it. */
-async function seedRun(domains: string[] = [DOMAIN], history: 'MANUAL_REQUIRED' | 'FAIL' = 'MANUAL_REQUIRED'): Promise<string> {
+async function seedRun(domains: string[] = [DOMAIN]): Promise<string> {
   const sel = await db.selectFrom('selection_settings').select(['id', 'values']).where('label', '=', 'v1').executeTakeFirstOrThrow();
   const plan = planFor(sel.values as never, 'S7');
   const lists = await currentLists(db, ['brand', 'bigco']);
@@ -47,7 +47,7 @@ async function seedRun(domains: string[] = [DOMAIN], history: 'MANUAL_REQUIRED' 
       const manual = check === 'history';
       await db.insertInto('screening_results').values({
         run_id: id, item_idx: idx, domain: d, lane: 'S7', check_id: check, gate: GATE_OF[check as keyof typeof GATE_OF], rule_ids: ['X'],
-        status: manual ? history : 'PASS', reason_code: manual ? (history === 'FAIL' ? 'HARMFUL_HISTORY' : 'MANUAL_SOURCE') : null, reason: null, fields: JSON.stringify({}),
+        status: manual ? 'MANUAL_REQUIRED' : 'PASS', reason_code: manual ? 'MANUAL_SOURCE' : null, reason: null, fields: JSON.stringify({}),
         checked_at: new Date(), settings_label: 'v1', list_versions: '{}', duration_ms: 0, upstream_calls: 0, source: 'auto',
       }).execute();
     }
@@ -129,7 +129,7 @@ describe('manual HIST-2 record (CR-002 Amendment B)', () => {
     expect([j.statusCode, j.json().members[0].main_lane]).toEqual([200, true]);
   });
 
-  it('A1 guard: a prior business name on the brand or big-company list FAILs the history result', async () => {
+  it('A1 guard (BRAND-1): a prior business name on the brand or big-company list FAILs the history result', async () => {
     const x = await h();
     const id = await seedRun();
     const a = await x.post(`/screening/runs/${id}/manual`, rec(x, { result: 'FLAG_PRIOR_BUSINESS', prior_business_name: 'ZzBrand Office', evidence_urls: [URL1] }));
@@ -155,14 +155,11 @@ describe('manual HIST-2 record (CR-002 Amendment B)', () => {
     expect(JSON.stringify(audit.request)).toContain('checked_by');
   });
 
-  it('fail closed: an automated history FAIL is never outranked by a manual PASS; the evidence row names the first archive link', async () => {
+  it('the evidence row names the first archive link, not a top-level evidence_url', async () => {
     const x = await h();
-    const id = await seedRun([DOMAIN], 'FAIL');
+    const id = await seedRun([DOMAIN]);
     const r = await x.post(`/screening/runs/${id}/manual`, rec(x, {}, { evidence_url: 'https://example.com/ignored' }));
     expect(r.statusCode).toBe(201);
-    const n = await nameOf(x, id);
-    expect(res(n, 'history')).toMatchObject({ status: 'FAIL', source: 'auto' });
-    expect(n.final_status).toBe('rejected');
     const ev = await x.get(`/screening/evidence/${r.json().evidence[0]}`);
     expect(ev.json().url).toBe(URL1);
   });

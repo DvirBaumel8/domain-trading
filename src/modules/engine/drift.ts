@@ -15,11 +15,11 @@ const featuresOf = (ctx: FeatureContext, domain: string, asOf: string, cache?: F
 import type { SaleRow, UnsoldRow } from './data.js';
 
 /** `handreg_share` is null when the .com creation date is known for less than this share of the rows (the dropped names have no registry record). */
-export const DRIFT_MIN_COM_KNOWN = 0.3;
+const DRIFT_MIN_COM_KNOWN = 0.3;
 
-export interface DriftRow { domain: string; asOf: string; priceCents: number | null }
+interface DriftRow { domain: string; asOf: string; priceCents: number | null }
 
-export interface DriftBlock {
+interface DriftBlock {
   n: number;
   /** among rows with a known .net answer */
   net_pit_share: number | null;
@@ -40,7 +40,7 @@ export interface DriftBlock {
 export interface DriftPeriod { window: { from: string; to_exclusive: string; label?: string }; sold: DriftBlock | null; dropped: DriftBlock | null }
 
 const round4 = (x: number): number => Math.round(x * 10_000) / 10_000;
-export function median(xs: number[]): number | null {
+function median(xs: number[]): number | null {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1;
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
@@ -48,7 +48,7 @@ export function median(xs: number[]): number | null {
 const medCents = (xs: number[]): number | null => { const m = median(xs); return m === null ? null : Math.round(m); };
 const share = (k: number, n: number): number | null => (n === 0 ? null : round4(k / n));
 
-export function driftBlock(ctx: FeatureContext, rows: readonly DriftRow[], withPrice: boolean, cache?: FeatureCache): DriftBlock | null {
+function driftBlock(ctx: FeatureContext, rows: readonly DriftRow[], withPrice: boolean, cache?: FeatureCache): DriftBlock | null {
   if (rows.length === 0) return null;
   let netKnown = 0; let netYes = 0; let wordsKnown = 0; let two = 0; let comKnown = 0; let hand = 0;
   const lens: number[] = [];

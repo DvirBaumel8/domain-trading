@@ -7,9 +7,9 @@ import { AppError } from './errors.js';
 import { isMutating } from './methods.js';
 
 /** M9: how often `api_tokens.last_used_at` is refreshed. */
-export const LAST_USED_EVERY_MS = 60_000;
+const LAST_USED_EVERY_MS = 60_000;
 
-export interface AuthContext {
+interface AuthContext {
   tokenId: number;
   scope: Scope;
   name: string;
@@ -26,8 +26,8 @@ declare module 'fastify' {
 /** Only liveness is public (no DB). Everything else, /health included, needs a bot token (Dvir, 6 Oct 2026: bots are the only customers). */
 export const PUBLIC_PATHS: ReadonlySet<string> = new Set(['/health/ping']);
 
-export const FAILED_AUTH_LIMIT = 20;
-export const FAILED_AUTH_WINDOW_MS = 10 * 60_000;
+const FAILED_AUTH_LIMIT = 20;
+const FAILED_AUTH_WINDOW_MS = 10 * 60_000;
 const MAX_TRACKED_IPS = 10_000;
 
 /** In-memory per-IP failed-auth counter (rolling window). Consulted before any DB access. */
@@ -73,7 +73,7 @@ export function isJobRoute(req: { routeOptions?: { url?: string } }): boolean {
 }
 const BEARER = /^Bearer ([A-Za-z0-9_-]+)$/i;
 
-export function pathOf(url: string): string {
+function pathOf(url: string): string {
   return url.split('?')[0] ?? url;
 }
 
@@ -170,7 +170,7 @@ const intakeForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'An intake to
 /** v5.10.0 (CR-061): the routes a `data` token may call (all POST): intake, the two engine uploads, and every route under `/data/` (CR-063). Everything else, GETs included, is 403 SCOPE_FORBIDDEN. */
 export const DATA_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake', '/engine/sales', '/engine/unsold']);
 export const DATA_PREFIX = '/data/';
-export const isDataRoute = (routeUrl: string): boolean => DATA_ROUTES.has(routeUrl) || routeUrl.startsWith(DATA_PREFIX);
+const isDataRoute = (routeUrl: string): boolean => DATA_ROUTES.has(routeUrl) || routeUrl.startsWith(DATA_PREFIX);
 
 const dataForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A data token may only call POST /candidates/intake, POST /engine/sales, POST /engine/unsold and POST /data/*');
 

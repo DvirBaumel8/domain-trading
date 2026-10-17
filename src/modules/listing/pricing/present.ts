@@ -1,12 +1,11 @@
 import { wholeUsd } from '../../../core/money.js';
-import type { Cents } from './int.js';
 import type { Plan } from './plan.js';
 import type { ScheduleEvent, ScheduleEventName } from './schedule.js';
 
 const LABELS: Record<ScheduleEventName, string> = {
   drop1_m6: 'M6', drop2_m18: 'M18', geo_drop_m12: 'M12', final_push: 'final push', delist: 'delist',
 };
-export const eventLabel = (e: ScheduleEventName) => LABELS[e];
+const eventLabel = (e: ScheduleEventName) => LABELS[e];
 
 const SKIP_TEXT: Partial<Record<ScheduleEvent['status'], string>> = {
   skipped_at_minimum: 'skipped (minimum)', skipped_no_change: 'skipped (no change)', skipped_disabled: 'skipped (disabled)',

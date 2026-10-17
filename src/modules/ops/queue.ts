@@ -5,7 +5,7 @@
 // When every step is terminal the run is written once to job_runs (append-only), which keeps JOB_OVERDUE and the history working as before.
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
-import { newAuditId } from '../../http/audit.js';
+import { writeJobAudit } from '../../http/audit.js';
 import { advisoryXactLock, trySessionLock, type LockKey } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { stepView } from '../reporting/index.js';
@@ -37,7 +37,7 @@ export interface JobQueueDeps {
 }
 
 /** Render free sleeps 15 min after the last inbound request; while the worker runs, the service pings itself this often. */
-export const KEEPALIVE_MS = 300_000;
+const KEEPALIVE_MS = 300_000;
 const PING_TIMEOUT_MS = 10_000;
 
 const TIMEOUT = Symbol('step timeout');
@@ -244,12 +244,10 @@ export class JobQueue {
     if (!inserted) return;
     // The run-level audit row POST /jobs/run used to get when it ran the job in the request (the CLI writes the same kind of row).
     const failed = rows.filter((r) => r.status === 'failed').map((r) => r.step);
-    await db.insertInto('audit_log').values({
-      id: newAuditId(), scope: 'job', method: 'QUEUE', path: `job ${q.job}`,
-      request: JSON.stringify({ job: q.job, run_id: runId, steps: Object.fromEntries(rows.map((r) => [r.step, r.status])) }),
-      status_code: failed.length ? 500 : 200,
-      result_summary: failed.length ? `${q.job}: failed ${failed.join(',')}` : `${q.job}: ok`,
-    }).execute();
+    await writeJobAudit(db, {
+      method: 'QUEUE', path: `job ${q.job}`, request: { job: q.job, run_id: runId, steps: Object.fromEntries(rows.map((r) => [r.step, r.status])) },
+      status: failed.length ? 500 : 200, summary: failed.length ? `${q.job}: failed ${failed.join(',')}` : `${q.job}: ok`,
+    });
   }
 }
 

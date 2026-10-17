@@ -8,7 +8,7 @@ import { outcome, type Check, type CheckContext, type CheckId } from '../types.j
 const USABLE = ['PASS', 'PASS_WITH_NOTE', 'FLAG'];
 
 /** The number of comparable sales the scout sent with the name's newest intake row that has any (0 when none). */
-export async function compsOf(db: CheckContext['db'], domain: string): Promise<number> {
+async function compsOf(db: CheckContext['db'], domain: string): Promise<number> {
   const row = await db.selectFrom('candidate_intake').select('comps').where('domain', '=', domain).where('status', 'in', ['queued', 'duplicate']).where('comps', 'is not', null).orderBy('received_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
   return Array.isArray(row?.comps) ? row.comps.length : 0;
 }
@@ -27,7 +27,7 @@ const fieldsOf = (ctx: CheckContext, id: CheckId): Record<string, unknown> | nul
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const bit = (v: unknown): 0 | 1 | null => (v === 1 || v === true ? 1 : v === 0 || v === false ? 0 : null);
 
-export function tierFeatures(ctx: CheckContext): TierFeatures {
+function tierFeatures(ctx: CheckContext): TierFeatures {
   const census = fieldsOf(ctx, 'census');
   const history = fieldsOf(ctx, 'history');
   const ext = fieldsOf(ctx, 'ext_dates');

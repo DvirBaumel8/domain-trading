@@ -5,7 +5,7 @@ import { toCsv } from '../listing/index.js';
 import type { AssembledItem } from './engine.js';
 import { latestByCheck } from './derive.js';
 
-export const REPORT_HEADER = [
+const REPORT_HEADER = [
   'domain', 'lane', 'status', 'first_fail', 'ev_cents', 'ratio', 'score', 'tier', 'lookalikes_registered', 'lookalikes_in_use', 'topic', 'topic_reused',
   'sellers_verified_n', 'comps_n', 'reason_codes',
 ] as const;

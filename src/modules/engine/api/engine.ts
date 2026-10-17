@@ -13,14 +13,11 @@ import { ownedEndingsView } from '../endings.js';
 import { engineHealth } from '../health.js';
 import { SCORE_MAX_DOMAINS, type Scorer } from '../score.js';
 import type { EngineTrainer } from '../train.js';
-import { databaseBytes, guardDbSize, payloadBytesOf, salesMaxDate, setSalesMaxDate, type DbSizeGuard } from '../holdout.js';
+import { salesMaxDate, setSalesMaxDate, type DbSizeGuard } from '../holdout.js';
+import { registerBulkRoute } from '../bulk.js';
 import { ENGINE_MAX_ROWS, storeSales, storeUnsold, UNSOLD_TYPES } from '../uploads.js';
 
-/** Up to 20,000 rows of about 300 bytes each. */
-const BODY_LIMIT = 8 * 1024 * 1024;
-
-// Rows are checked one by one in the handler (a bad row is rejected with a reason, the rest are stored), so the body schema only fixes the envelope.
-const Body = z.object({ rows: z.array(z.unknown()).min(1).max(ENGINE_MAX_ROWS) }).strict();
+// Rows are checked one by one in the loader (a bad row is rejected with a reason, the rest are stored); the route skeleton is `registerBulkRoute` (bulk.ts).
 const SaleDoc = z.object({ domain: z.string(), price_usd: z.number().positive(), sale_date: z.string(), venue: z.string(), source: z.string(), source_url: z.string().optional() });
 const UnsoldDoc = z.object({ domain: z.string(), type: z.enum(UNSOLD_TYPES), observation_date: z.string(), caught_by_catcher: z.boolean().optional() });
 const SalesDoc = z.object({ rows: z.array(SaleDoc).min(1).max(ENGINE_MAX_ROWS) }).strict();
@@ -32,24 +29,15 @@ const HoldoutDoc = z.object({ date: realYmd, approval_ref: z.object({ text: z.st
 const EmptyBody = z.object({}).strict();
 
 export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; trainer: EngineTrainer; scorer: Scorer; dbSize: DbSizeGuard }): void {
-  const ctx = (req: { auth?: { name: string } | null; auditId?: string | null }) => ({ by: req.auth?.name ?? 'unknown', auditId: req.auditId ?? null, now: deps.now() });
-
-  app.post('/engine/sales', { config: { openapiBody: SalesDoc }, bodyLimit: BODY_LIMIT }, async (req, reply) => {
-    const b = Body.parse(req.body ?? {});
-    const before = await guardDbSize(deps.db, deps.dbSize, payloadBytesOf(req, b.rows));
-    const r = await storeSales(deps.db, b.rows, { ...ctx(req), sealedAfter: salesMaxDate });
-    const after = await (deps.dbSize.bytes ?? (() => databaseBytes(deps.db)))();
-    req.auditSummary = `engine sales: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}`;
-    return reply.code(201).send({ ...r, db_bytes_before: before, db_bytes_after: after, audit_id: req.auditId ?? null });
+  registerBulkRoute(app, deps, {
+    path: '/engine/sales', doc: SalesDoc, dryRun: false,
+    load: (rows, c) => storeSales(deps.db, rows, c),
+    summary: (r) => `engine sales: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}`,
   });
-
-  app.post('/engine/unsold', { config: { openapiBody: UnsoldBodyDoc }, bodyLimit: BODY_LIMIT }, async (req, reply) => {
-    const b = Body.parse(req.body ?? {});
-    const before = await guardDbSize(deps.db, deps.dbSize, payloadBytesOf(req, b.rows));
-    const r = await storeUnsold(deps.db, b.rows, { ...ctx(req), sealedAfter: salesMaxDate });
-    const after = await (deps.dbSize.bytes ?? (() => databaseBytes(deps.db)))();
-    req.auditSummary = `engine unsold: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}`;
-    return reply.code(201).send({ ...r, db_bytes_before: before, db_bytes_after: after, audit_id: req.auditId ?? null });
+  registerBulkRoute(app, deps, {
+    path: '/engine/unsold', doc: UnsoldBodyDoc, dryRun: false,
+    load: (rows, c) => storeUnsold(deps.db, rows, c),
+    summary: (r) => `engine unsold: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}`,
   });
 
   // v5.10.0 (CR-061): the holdout guard date. WRITE only (a data token cannot reach it), Dvir's approval_ref must name the date.

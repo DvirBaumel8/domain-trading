@@ -8,14 +8,14 @@ import { asciiFold, hiddenSignals, metaRefreshTarget, ogSiteName, titleOf, visib
 import type { Pacer } from './rdap-batch.js';
 import type { SameNameSettings } from './settings.js';
 import type { ScreeningDeps } from './types.js';
-import { makeMatcher, readCapped } from './wayback.js';
+import { makeMatcher, readCapped } from './capped-read.js';
 
-export type FailReason = 'ADDRESS_BLOCKED' | 'HOST_EXCLUDED' | 'URL_NOT_ALLOWED' | 'UNEXPECTED_CONTENT_TYPE' | 'CLIENT_RENDERED' | 'DNS_NXDOMAIN' | 'CONNECTION_REFUSED' | 'HTTP_4XX' | 'TIMEOUT' | 'HTTP_5XX' | 'TLS_ERROR' | 'ROBOTS_DISALLOWED' | 'TOO_MANY_REDIRECTS' | 'TRUNCATED' | 'SOURCE_ERROR';
+type FailReason = 'ADDRESS_BLOCKED' | 'HOST_EXCLUDED' | 'URL_NOT_ALLOWED' | 'UNEXPECTED_CONTENT_TYPE' | 'CLIENT_RENDERED' | 'DNS_NXDOMAIN' | 'CONNECTION_REFUSED' | 'HTTP_4XX' | 'TIMEOUT' | 'HTTP_5XX' | 'TLS_ERROR' | 'ROBOTS_DISALLOWED' | 'TOO_MANY_REDIRECTS' | 'TRUNCATED' | 'SOURCE_ERROR';
 export type PageFetch =
   | { ok: true; finalUrl: string; status: number; html: string; truncated: boolean }
   | { ok: false; kind: 'no_site' | 'unknown'; reasonCode: FailReason; finalUrl: string | null; /** v3.4.1: the HTTP status of the answer that failed (absent when no answer came). */ status?: number };
-export type SiteState = 'unregistered' | 'registered_no_site' | 'parked_or_for_sale' | 'redirect_off_domain' | 'in_use' | 'unknown';
-export type BusinessUse = 'business_name' | 'service_description' | 'product_name' | 'none';
+type SiteState = 'unregistered' | 'registered_no_site' | 'parked_or_for_sale' | 'redirect_off_domain' | 'in_use' | 'unknown';
+type BusinessUse = 'business_name' | 'service_description' | 'product_name' | 'none';
 export interface SiteClass { site_state: SiteState; business_use: BusinessUse | null; business_name: string | null; final_url: string | null; reason_code: string | null }
 export interface RobotsRule { text: string }
 export interface FetchPageOpts {
@@ -34,7 +34,7 @@ export interface FetchPageOpts {
 type FetchDeps = { fetch?: typeof fetch; lookupHost?: ScreeningDeps['lookupHost'] };
 
 /** The product token our robots.txt group is named by (the `User-Agent` header carries it as `domain-trading-api/<version>`). */
-export const ROBOTS_TOKEN = 'domain-trading-api';
+const ROBOTS_TOKEN = 'domain-trading-api';
 const MAX_TEXT = 200_000;
 const MAX_ROBOTS_BYTES = 500_000;
 const MAX_ROBOTS_RULES = 2000;

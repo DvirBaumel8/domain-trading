@@ -6,8 +6,8 @@ import { Pacer } from '../rdap-batch.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 import { formFieldsOf } from './form.js';
 
-export const COMPANIES_HOST = 'api.company-information.service.gov.uk';
-export const COMPANIES_MAX_ITEMS = 5;
+const COMPANIES_HOST = 'api.company-information.service.gov.uk';
+const COMPANIES_MAX_ITEMS = 5;
 export interface CompanyItem { title: string; company_number: string; company_status: string }
 
 const pacers = new Map<(ms: number) => Promise<void>, { gap: number; pacer: Pacer }>();

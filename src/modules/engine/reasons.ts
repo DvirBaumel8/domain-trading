@@ -9,7 +9,7 @@ const num = (x: number): string => (Number.isInteger(x) ? String(x) : x.toFixed(
 const WORDS = ['no words', 'one word', 'two words', 'three words', 'four words'];
 
 /** The words for one feature value as of a day. */
-export function reasonText(f: FeatureName, v: number | null, asOf: string): string {
+function reasonText(f: FeatureName, v: number | null, asOf: string): string {
   if (v === null) return `${f.replace(/_/g, ' ')} is unknown`;
   const end = (tld: string) => (v === 1 ? `.${tld} registered before ${asOf}` : `.${tld} not registered before ${asOf}`);
   switch (f) {

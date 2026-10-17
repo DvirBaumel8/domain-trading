@@ -15,7 +15,7 @@ export const REGISTRAR_ENV: Record<string, readonly string[]> = {
 };
 
 /** Adapters with code behind them. */
-export const IMPLEMENTED_ADAPTERS: ReadonlySet<string> = new Set<string>(['porkbun', 'godaddy']);
+const IMPLEMENTED_ADAPTERS: ReadonlySet<string> = new Set<string>(['porkbun', 'godaddy']);
 
 export function adapterStatus(config: Config): { name: string; enabled: boolean; reason: string | null }[] {
   return Object.entries(REGISTRAR_ENV).map(([name, keys]) => {

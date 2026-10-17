@@ -5,7 +5,7 @@ import { dayNumber } from '../../core/dates.js';
 import { splitUnread, splitV2, type SplitV2Table } from '../selection/index.js';
 
 export const ENDING_FEATURE_TLDS = ['net', 'co', 'org', 'io', 'ai'] as const;
-export type EndingFeatureTld = (typeof ENDING_FEATURE_TLDS)[number];
+type EndingFeatureTld = (typeof ENDING_FEATURE_TLDS)[number];
 export type EngineTld = EndingFeatureTld | 'com';
 
 /** The numeric columns of the model, in order. `acq` (text) is shown next to them in /score and enters the model as the three acq_* columns. */
@@ -22,9 +22,9 @@ export type FeatureValues = Record<FeatureName, number | null>;
 /** Features that depend on the .com's registry creation date. They are in the model only when enough dropped names have an answer (see train.ts). */
 export const COM_FEATURES: readonly FeatureName[] = ['acq_handreg', 'acq_aftermarket_or_old', 'acq_created_after', 'com_age_years'];
 
-export const TREND_WINDOW_DAYS = 365;
+const TREND_WINDOW_DAYS = 365;
 /** A .com registered up to this many months before the as_of day counts as hand-registered; older = aftermarket or old. */
-export const HANDREG_MONTHS = 36;
+const HANDREG_MONTHS = 36;
 const MONTH_MS = 30.4375 * 86_400_000;
 
 /** Word-frequency proxy on a 0..8 scale from a piece's cost in the frozen split table (the table's costs come from SCOWL size levels): cost 8 -> 7, 10 -> 6.75, 22 -> 5.25, 40 -> 3, 60 -> 0.5. */

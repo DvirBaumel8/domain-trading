@@ -119,7 +119,7 @@ export function nextIdtMidnight(instant: Date | number): Date {
 const UTC_Z = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
 /** Keys whose value is a check's own recorded data (RDAP dates, as_of cut-offs, quote times) or the caller's own echoed judgment (a pack's `judgment`): passed through exactly as recorded. */
-export const OPAQUE_KEYS: ReadonlySet<string> = new Set(['fields', 'judgment']);
+const OPAQUE_KEYS: ReadonlySet<string> = new Set(['fields', 'judgment']);
 
 /**
  * Rewrites every UTC `Z` timestamp (a Date, or a string that is exactly an ISO instant ending in Z) inside a JSON-like value to

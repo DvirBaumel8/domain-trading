@@ -1,6 +1,6 @@
 // Versioned word lists and frozen census lists (append-only selection_lists). A write never changes a row: it adds version n+1.
 import { advisoryXactLock } from '../../core/locks.js';
-import { sql, type Kysely } from 'kysely';
+import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { normalizeDomain } from '../../domain-name.js';
 import { AppError } from '../../http/errors.js';
@@ -10,7 +10,7 @@ export const FIXED_LISTS = [
   'dictionary_extra', 'city_extra', 'trade', 'regime', 'tech', 'generic_head', 'state', 'legal', 'brand', 'bigco', 'event',
   'sig_harmful_strong', 'sig_harmful_weak', 'sig_parked', 'sig_forsale',
 ] as const;
-export const MAX_LIST_TERMS = 5000;
+const MAX_LIST_TERMS = 5000;
 const PHRASE_LISTS = ['brand', 'bigco', 'event'];
 const HARMFUL_CLASSES = ['adult', 'pharma', 'gambling', 'malware', 'phishing', 'hacked_spam', 'pbn', 'scam', 'trademark'];
 const SIGNATURE_CLASSES: Record<string, string[]> = {

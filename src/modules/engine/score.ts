@@ -15,7 +15,7 @@ import { TIERS, type ModelParams } from './train.js';
 
 export const SCORE_MAX_DOMAINS = 500;
 /** Time allowed for live registry asks in one call; names not answered by then are unknown. */
-export const SCORE_LIVE_BUDGET_MS = 4_000;
+const SCORE_LIVE_BUDGET_MS = 4_000;
 const LIVE_CONCURRENCY = 4;
 const LIVE_LOOKUP_TIMEOUT_MS = 3_000;
 
@@ -34,7 +34,7 @@ export interface ScoreResult {
 }
 
 const r4 = (x: number): number => Math.round(x * 10_000) / 10_000;
-export const OUT_OF_REGIME_WARNING = 'Outside the regime the model was tested on (letters only, 6 to 20 characters, 2 to 3 known words); the score is less reliable.';
+const OUT_OF_REGIME_WARNING = 'Outside the regime the model was tested on (letters only, 6 to 20 characters, 2 to 3 known words); the score is less reliable.';
 
 export class Scorer {
   private cachedModel: ActiveModel | null = null;

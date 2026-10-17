@@ -7,10 +7,10 @@ import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 
 /** POST /jobs/run by a WRITE token: calls per hour per token (the job token keeps the general 10 per minute). */
-export const WRITE_JOB_RUNS_PER_HOUR = 4;
+const WRITE_JOB_RUNS_PER_HOUR = 4;
 
 /** POST /reviews/run: calls per hour per WRITE token (the outside review costs money and counts toward the monthly cap). */
-export const REVIEW_RUNS_PER_HOUR = 3;
+const REVIEW_RUNS_PER_HOUR = 3;
 
 /**
  * POST /reviews/run counts toward its hourly limit only when the call reaches Google, and the slot is taken right BEFORE the Google call

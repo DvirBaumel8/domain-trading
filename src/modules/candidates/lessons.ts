@@ -7,12 +7,12 @@ import { AppError } from '../../http/errors.js';
 
 export const SCOUTS = ['tzofeh-geo', 'rules', 'signals', 'drops', 'other'] as const;
 export const SECTORS = ['S2', 'S3', 'S4', 'S6', 'S7', 'cross'] as const;
-export const MAX_NOTES = 20;
-export const RECURRING_MIN = 3;
-export const RECURRING_FLAG = 'recurring – is the rule or the method wrong?';
+const MAX_NOTES = 20;
+const RECURRING_MIN = 3;
+const RECURRING_FLAG = 'recurring – is the rule or the method wrong?';
 
 type Row = Selectable<ScoutLessonsTable>;
-export interface Note { at: string; lesson: string }
+interface Note { at: string; lesson: string }
 export interface NewLesson {
   scout: (typeof SCOUTS)[number]; sector: (typeof SECTORS)[number]; domains: string[]; rule: string; lesson: string;
   recheck_if: string; source_file: string | null;
@@ -22,7 +22,7 @@ export interface Actor { by: string; auditId: string | null; now: Date }
 const newId = (): string => `les_${randomBytes(8).toString('hex')}`;
 const notesOf = (r: Row): Note[] => (Array.isArray(r.notes) ? (r.notes as Note[]) : []);
 
-export function lessonView(r: Row) {
+function lessonView(r: Row) {
   return {
     id: r.id, created_at: toJerusalemIso(r.created_at), updated_at: toJerusalemIso(r.updated_at), scout: r.scout, sector: r.sector,
     domains: r.domains, rule: r.rule, lesson: r.lesson, notes: notesOf(r), recheck_if: r.recheck_if, source_file: r.source_file,
@@ -105,8 +105,8 @@ export async function patchLesson(db: Kysely<Database>, id: string, patch: Lesso
   });
 }
 
-export interface ReportRule { rule: string; count: number; recurring: boolean; flag?: string; examples: { id: string; domains: string[]; lesson: string }[] }
-export interface ReportSector { sector: string; lessons_n: number; top_rules: ReportRule[] }
+interface ReportRule { rule: string; count: number; recurring: boolean; flag?: string; examples: { id: string; domains: string[]; lesson: string }[] }
+interface ReportSector { sector: string; lessons_n: number; top_rules: ReportRule[] }
 export interface LessonReport { month: string; lessons_n: number; sectors: ReportSector[]; recurring: { sector: string; rule: string; count: number; flag: string }[] }
 
 export async function lessonReport(db: Kysely<Database>, month: string): Promise<LessonReport> {

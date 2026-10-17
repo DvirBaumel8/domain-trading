@@ -63,8 +63,8 @@ async function reviewState(db: Kysely<Database>, config: Config): Promise<{ stat
 }
 
 /** v3.2.0 (N-4): `CODE: text` from the latest gemini feedback, CODE = Google's error status (UNAVAILABLE) or `HTTP <n>`; at most 200 characters, cut at a word with an ellipsis; never the key. */
-export const REVIEW_REASON_MAX = 200;
-export function shapeReviewReason(raw: string, secrets: string[]): string {
+const REVIEW_REASON_MAX = 200;
+function shapeReviewReason(raw: string, secrets: string[]): string {
   const clean = scrubSecrets(raw, secrets).replace(/\s+/g, ' ').trim();
   // Stored form is `HTTP 503 UNAVAILABLE: text` (or `HTTP 429: text`, or free text).
   const m = /^HTTP (\d{3}|none) ([A-Za-z_]+)(?::\s*(.*))?$/s.exec(clean);

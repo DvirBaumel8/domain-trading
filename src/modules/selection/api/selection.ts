@@ -4,7 +4,7 @@ import { advisoryXactLock } from '../../../core/locks.js';
 import { approvalRefObject } from '../../../core/validation.js';
 import { ymd } from '../../../core/dates.js';
 import type { FastifyInstance } from 'fastify';
-import { sql, type Kysely } from 'kysely';
+import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import { memberHashOf } from '../test-sets.js';
 import type { Database } from '../../../db/types.js';

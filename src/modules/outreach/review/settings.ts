@@ -7,7 +7,7 @@ import { ALLOWED_REVIEW_MODELS } from './gemini.js';
 export interface ReviewSettings { enabled: boolean; model: string; tier: 'free' | 'paid' }
 export interface ReviewSettingsView extends ReviewSettings { updatedAt: Date | null; updatedBy: string | null }
 
-export const DEFAULT_REVIEW_SETTINGS: ReviewSettings = { enabled: true, model: 'gemini-3.8-flash', tier: 'free' };
+const DEFAULT_REVIEW_SETTINGS: ReviewSettings = { enabled: true, model: 'gemini-3.8-flash', tier: 'free' };
 
 export async function currentReviewSettings(db: Kysely<Database>): Promise<ReviewSettingsView> {
   const r = await db.selectFrom('review_settings_changes').select(['enabled', 'model', 'tier', 'at', 'by']).orderBy('id', 'desc').limit(1).executeTakeFirst();

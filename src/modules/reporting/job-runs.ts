@@ -11,14 +11,14 @@ const HOUR = 3_600_000;
 /** CR-016 R-A3: a `daily` queue run still queued or running after this many hours raises JOB_RUN_INCOMPLETE. */
 export const JOB_RUN_STUCK_HOURS = 2;
 /** CR-016 R-A3: the 00:05 UTC slot counts as missed when it passed more than this many minutes ago and no daily run was created since. */
-export const JOB_MISSED_GRACE_MINUTES = 30;
+const JOB_MISSED_GRACE_MINUTES = 30;
 
 /** `screen` (v3.3.0): POST /candidates/screen runs; `train` (v5.5.0): POST /engine/train and the weekly retrain. Neither has a schedule or an entry in `jobs`. */
 export type JobName = 'tick' | 'daily' | 'screen' | 'train';
-export const JOB_NAMES: readonly JobName[] = ['tick', 'daily'];
+const JOB_NAMES: readonly JobName[] = ['tick', 'daily'];
 
 /** The next 00:05 UTC strictly after `nowMs`. */
-export function nextDailyDue(nowMs: number): Date {
+function nextDailyDue(nowMs: number): Date {
   const d = new Date(nowMs);
   const t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), DAILY_AT_UTC.hour, DAILY_AT_UTC.minute);
   return new Date(t > nowMs ? t : t + 24 * HOUR);
@@ -33,7 +33,7 @@ export function triggerFromKey(job: JobName, key: string | undefined): { trigger
 }
 
 /** The latest 00:05 UTC slot at or before `nowMs`. */
-export function lastDailySlot(nowMs: number): Date {
+function lastDailySlot(nowMs: number): Date {
   return new Date(nextDailyDue(nowMs).getTime() - 24 * HOUR);
 }
 
@@ -68,7 +68,7 @@ export async function dailyScheduleState(db: Kysely<Database>, nowMs: number): P
 }
 
 /** The last daily run that finished (a skipped overlap is not a run), or null. */
-export async function lastDailyFinished(db: Kysely<Database>): Promise<Date | null> {
+async function lastDailyFinished(db: Kysely<Database>): Promise<Date | null> {
   const r = await db.selectFrom('job_runs').select('finished_at').where('job', '=', 'daily').where('skipped', '=', false)
     .orderBy('finished_at', 'desc').limit(1).executeTakeFirst();
   return r?.finished_at ?? null;

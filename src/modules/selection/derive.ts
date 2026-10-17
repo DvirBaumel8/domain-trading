@@ -2,7 +2,7 @@
 import { GATE_OF } from './checks/index.js';
 import type { CheckId, Lane, ResultRow } from './types.js';
 
-export type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'not_for_buy' | 'invalid' | 'running' | 'pending' | 'not_screened';
+type FinalStatus = 'buy_candidate' | 'would_buy' | 'pending_manual' | 'rejected' | 'unknown' | 'not_for_buy' | 'invalid' | 'running' | 'pending' | 'not_screened';
 
 export interface Derived {
   final_status: FinalStatus;
@@ -15,17 +15,9 @@ export interface Derived {
   reason_code?: 'LANE_NOT_FOR_BUY';
 }
 
-/**
- * The result per check: a manual record always outranks an automatic or cached row, except an automated history FAIL (whatever the ids: a human record posted
- * while the worker was still running must not be hidden by the auto row that lands later); within a kind the highest id wins.
- */
-export const beats = (a: ResultRow, b: ResultRow): boolean => {
-  // Fail closed: an automated history FAIL (only possible with sources.wayback on; a cached manual row carries fields.manual) is never outranked by a manual row.
-  const autoFail = (r: ResultRow) => r.check_id === 'history' && r.source !== 'manual' && r.status === 'FAIL' && r.fields.manual !== true;
-  if (a.source === 'manual' && autoFail(b)) return false;
-  if (b.source === 'manual' && autoFail(a)) return true;
-  return (a.source === 'manual') !== (b.source === 'manual') ? a.source === 'manual' : a.id > b.id;
-};
+/** The result per check: a manual record always outranks an automatic or cached row; within a kind the highest id wins. */
+export const beats = (a: ResultRow, b: ResultRow): boolean =>
+  (a.source === 'manual') !== (b.source === 'manual') ? a.source === 'manual' : a.id > b.id;
 
 export function latestByCheck(results: ResultRow[]): Map<CheckId, ResultRow> {
   const m = new Map<CheckId, ResultRow>();
@@ -37,7 +29,7 @@ export function latestByCheck(results: ResultRow[]): Map<CheckId, ResultRow> {
 }
 
 /** Checks that stay unbuilt in v1.1.0 (P1b screening pack, post-buy leads): never block a name. */
-export const EXEMPT_UNBUILT: CheckId[] = ['pack', 'leads'];
+const EXEMPT_UNBUILT: CheckId[] = ['pack', 'leads'];
 
 /**
  * - `invalid`: the name could not be read (`form` FAIL `INPUT_INVALID`).

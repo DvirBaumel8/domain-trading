@@ -1,6 +1,6 @@
 import { pair } from '../../../core/money.js';
 import { sql, type Kysely } from 'kysely';
-import { addDays, dayNumber, idtDay, toJerusalemIso } from '../../../core/dates.js';
+import { dayNumber, idtDay, toJerusalemIso } from '../../../core/dates.js';
 import type { Database, DomainRow } from '../../../db/types.js';
 import { pendingDomains } from '../../listing/index.js';
 import { perDomainOffers, type OfferRow } from '../../selling/index.js';

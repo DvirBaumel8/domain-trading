@@ -8,12 +8,12 @@ import { unknownInputsOf, type TierResult } from './tier.js';
 import type { CheckId, ResultRow } from './types.js';
 
 /** At most this many names are listed; `total_n` always counts all of them. */
-export const UNKNOWNS_MAX_ENTRIES = 200;
+const UNKNOWNS_MAX_ENTRIES = 200;
 const FEATURE_CHECKS: CheckId[] = ['census', 'ext_dates'];
 
-export interface UnknownLookup { name: string; source: string | null; reason_code: string | null; tries: number; last_try_at: string | null }
-export interface UnknownFeature { check: string; reason_code: string | null; detail: Record<string, unknown> | null }
-export interface UnknownEntry { domain: string; features: UnknownFeature[] }
+interface UnknownLookup { name: string; source: string | null; reason_code: string | null; tries: number; last_try_at: string | null }
+interface UnknownFeature { check: string; reason_code: string | null; detail: Record<string, unknown> | null }
+interface UnknownEntry { domain: string; features: UnknownFeature[] }
 export interface Unknowns { total_n: number; truncated: boolean; entries: UnknownEntry[] }
 export interface UnknownCounts { total_n: number; by_check_reason: Record<string, number> }
 

@@ -8,13 +8,13 @@ import { UNSOLD_DATED_DAYS, type SaleRow, type UnsoldRow } from './data.js';
 import { inRegime, sldOf } from './features.js';
 import { hashUnit } from './model/rng.js';
 
-export const MIN_SALE_CENTS = 10_000;
+const MIN_SALE_CENTS = 10_000;
 /** Unsold rows kept per sold row in the test file (a mix of at least this many unsold per sale; all of them when fewer exist). */
-export const TEST_UNSOLD_PER_SALE = 3;
+const TEST_UNSOLD_PER_SALE = 3;
 /** Training keeps at most this many unsold rows per sold row (deterministic hash order); it only bites once the daily unsold uploads have piled up. */
-export const TRAIN_UNSOLD_PER_SALE_MAX = 10;
+const TRAIN_UNSOLD_PER_SALE_MAX = 10;
 /** Without this many days of dated unsold rows, a seeded hash puts this share of the unsold rows into the test file. */
-export const HASH_TEST_SHARE = 0.2;
+const HASH_TEST_SHARE = 0.2;
 
 export interface Row { domain: string; label: 0 | 1; asOf: string; priceCents: number | null }
 
@@ -41,7 +41,7 @@ export interface EngineDataset {
   counts: Record<string, number>;
 }
 
-export const frozenHash = (rows: readonly Row[]): string =>
+const frozenHash = (rows: readonly Row[]): string =>
   createHash('sha256').update(rows.map((r) => `${r.domain}|${r.label}|${r.asOf}`).sort().join('\n')).digest('hex');
 
 /** Sorted by a seeded hash (ties by domain). The hash of each row is computed once (decorate, sort, undecorate), not twice per comparison. */

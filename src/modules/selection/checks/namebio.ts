@@ -6,7 +6,7 @@ import { outcome, type Check, type CheckContext } from '../types.js';
 import { formFieldsOf } from './form.js';
 
 /** Geo: the trade token. Non-geo: the first and the last non-generic token (CR-001 CAP-11). */
-export function namebioKeywords(ctx: CheckContext): string[] {
+function namebioKeywords(ctx: CheckContext): string[] {
   const f = formFieldsOf(ctx);
   if (ctx.item.lane === 'S2') return f.trade ? [f.trade] : ctx.item.trade ? [ctx.item.trade.toLowerCase()] : [];
   const k = f.keywords;

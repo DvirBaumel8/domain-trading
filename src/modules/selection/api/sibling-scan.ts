@@ -10,7 +10,7 @@ import type { ScreeningDeps } from '../types.js';
 
 export interface SiblingScanApiDeps { db: Kysely<Database>; now: () => number; screening: ScreeningDeps }
 
-export const SIBLING_SCAN_MAX_DOMAINS = 20;
+const SIBLING_SCAN_MAX_DOMAINS = 20;
 const Body = z.object({ domains: z.array(z.string().trim().min(1).max(253)).min(1).max(SIBLING_SCAN_MAX_DOMAINS) }).strict();
 
 export function registerSiblingScan(app: FastifyInstance, deps: SiblingScanApiDeps): void {

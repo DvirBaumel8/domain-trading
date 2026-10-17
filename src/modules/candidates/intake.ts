@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { addDays, idtDay, isRealDate } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
 import { filterDropName, leftoverNames, namesDroppingBetween, type RemovedReason } from './drop-lists.js';
-import { newAuditId } from '../../http/audit.js';
+import { newAuditId, writeJobAudit } from '../../http/audit.js';
 import { AppError } from '../../http/errors.js';
 import { CompSchema } from '../listing/index.js';
 import { createRun, currentLists, SellersList, type InputName, type ScreeningWorker } from '../selection/index.js';
@@ -18,15 +18,15 @@ export const INTAKE_DEDUPE_DAYS = 30;
 /** The most names one IDT day's intake screening takes (intake names first, then drop-list names). */
 export const INTAKE_DAILY_MAX = 30;
 /** A drop-list name is not screened again for this many days (v3.2.0: only leftovers, names free after their drop date, are screened; a name in pending delete or redemption is not). */
-export const DROP_SCREEN_WINDOW_DAYS = 7;
+const DROP_SCREEN_WINDOW_DAYS = 7;
 /** Sibling methods the intake run uses for the census, newest first; the first that is approved wins, none approved leaves the census UNKNOWN. */
-export const INTAKE_CENSUS_PREFERENCE = ['bt1@v3', 'bt1@v2'] as const;
-export const INTAKE_LANES = ['S2', 'S3', 'S4', 'S6', 'S7'] as const;
+const INTAKE_CENSUS_PREFERENCE = ['bt1@v3', 'bt1@v2'] as const;
+const INTAKE_LANES = ['S2', 'S3', 'S4', 'S6', 'S7'] as const;
 export const OWNED_STATUSES = ['pending_purchase', 'owned', 'listed', 'delisted'] as const;
 const DAY_MS = 86_400_000;
 
 const text = (max: number) => z.string().trim().min(1).max(max);
-export const IntakeComps = z.array(CompSchema).min(2).max(3);
+const IntakeComps = z.array(CompSchema).min(2).max(3);
 export const IntakeBody = z.object({
   names: z.array(z.object({
     domain: z.string().trim().min(1).max(253), lane: z.enum(INTAKE_LANES), source: text(120), note: z.string().trim().max(500).optional(), comps: IntakeComps.optional(),
@@ -42,10 +42,10 @@ export const IntakeBody = z.object({
 }).strict();
 export type IntakeBodyT = z.infer<typeof IntakeBody>;
 
-export type IntakeRemoval = 'DOMAIN_INVALID' | 'NOT_COM' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'NO_SPLIT' | 'TOO_MANY_WORDS' | 'ONE_WORD' | 'OWNED' | 'DUPLICATE_IN_UPLOAD' | 'SLD_TOO_LONG';
+type IntakeRemoval = 'DOMAIN_INVALID' | 'NOT_COM' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'NO_SPLIT' | 'TOO_MANY_WORDS' | 'ONE_WORD' | 'OWNED' | 'DUPLICATE_IN_UPLOAD' | 'SLD_TOO_LONG';
 
 /** The form rules of an intake name (before ownership and duplicates): a letters-only second-level .com of at most 3 words by the bt1@v3 split (or the scout's `words`). */
-export function intakeFormReason(raw: string): { domain: string; reason: IntakeRemoval | null } {
+function intakeFormReason(raw: string): { domain: string; reason: IntakeRemoval | null } {
   const domain = raw.trim().toLowerCase();
   const labels = domain.split('.');
   const validLabel = (l: string) => /^[a-z0-9-]{1,63}$/.test(l) && !l.startsWith('-') && !l.endsWith('-');
@@ -62,7 +62,7 @@ function wordReason(domain: string, words: string[] | undefined, regimeTerms: Re
 }
 
 /** v2.16.0 (CR-015 I-1): `note` and `source` carry no personal data: the rule of /offers (no '@'), 422 NO_PII with the name's index and the field. */
-export function checkIntakePii(body: IntakeBodyT): void {
+function checkIntakePii(body: IntakeBodyT): void {
   body.names.forEach((n, index) => {
     for (const field of ['note', 'source', 'who_chases'] as const) {
       const v = n[field];
@@ -75,7 +75,7 @@ export function checkIntakePii(body: IntakeBodyT): void {
 }
 
 /** v3.3.0 (CR-022 A): the scout's `words` must join back to the name without `.com` (422 VALIDATION_ERROR with the name's index and `field: words`). Nothing is stored on a mismatch. */
-export function checkIntakeWords(body: IntakeBodyT): void {
+function checkIntakeWords(body: IntakeBodyT): void {
   body.names.forEach((n, index) => {
     if (n.words === undefined) return;
     const d = n.domain.trim().toLowerCase();
@@ -86,21 +86,21 @@ export function checkIntakeWords(body: IntakeBodyT): void {
 }
 
 /** Comparable sales must be real, past dates (the same rule as /buy). */
-export function checkIntakeComps(body: IntakeBodyT, today: string): void {
+function checkIntakeComps(body: IntakeBodyT, today: string): void {
   body.names.forEach((n, ni) => (n.comps ?? []).forEach((c, i) => {
     if (!isRealDate(c.sold_on)) throw new AppError(422, 'COMPS_INVALID', `names[${ni}].comps[${i}].sold_on is not a real date`, { index: ni, comp: i });
     if (c.sold_on > today) throw new AppError(422, 'COMPS_INVALID', `names[${ni}].comps[${i}].sold_on is in the future`, { index: ni, comp: i });
   }));
 }
 
-export const ownedDomains = async (db: Kysely<Database>, domains: string[]): Promise<Set<string>> => {
+const ownedDomains = async (db: Kysely<Database>, domains: string[]): Promise<Set<string>> => {
   if (domains.length === 0) return new Set();
   const rows = await db.selectFrom('domains').select('domain').where('status', 'in', [...OWNED_STATUSES]).where('domain', 'in', domains).execute();
   return new Set(rows.map((r) => r.domain));
 };
 
 /** v3.10.0 (CR-043): a non-rejecting flag on an accepted name. */
-export interface IntakeFlag { code: 'TOPIC_REUSED'; topic: string; earlier: TopicEarlier[] }
+interface IntakeFlag { code: 'TOPIC_REUSED'; topic: string; earlier: TopicEarlier[] }
 export interface IntakeResult {
   accepted: { domain: string; intake_id: number; topic?: string; flags?: IntakeFlag[] }[];
   duplicates: { domain: string; first_intake_id: number }[];
@@ -162,7 +162,7 @@ export interface IntakeScreeningSummary {
 }
 
 /** The lanes a drop-list leftover may be screened under, and how many of the day's names the drop list may take (CR-020 A). */
-export function dropListQuota(share: number, budget: number): number {
+function dropListQuota(share: number, budget: number): number {
   return share >= 1 ? budget : Math.min(budget, Math.floor(share * budget));
 }
 
@@ -183,7 +183,7 @@ async function onDemandUsed(db: Kysely<Database>, today: string): Promise<number
 async function dailyUsed(db: Kysely<Database>, today: string): Promise<number> {
   return Number((await db.selectFrom('candidate_screenings').select(sql<string>`count(distinct domain)`.as('n')).where('day', '=', today).where('on_demand', '=', false).executeTakeFirstOrThrow()).n);
 }
-export async function onDemandAllowance(db: Kysely<Database>, nowMs: number): Promise<OnDemandAllowance> {
+async function onDemandAllowance(db: Kysely<Database>, nowMs: number): Promise<OnDemandAllowance> {
   const max = (await activeSelectionSettings(db)).values.intake.on_demand_screen_daily_max;
   const used = await onDemandUsed(db, idtDay(nowMs));
   return { daily_max: max, used_today: used, remaining: Math.max(0, max - used) };
@@ -359,10 +359,10 @@ export class IntakeScreeningJob {
       ];
       const auditId = newAuditId();
       // on the pool, not the locked transaction: the run row (made on its own connection) refers to this audit row
-      await this.deps.db.insertInto('audit_log').values({
-        id: auditId, at: now, scope: 'job', method: 'JOB', path: onDemand ? 'on-demand-screen' : 'intake-screening', request: JSON.stringify({ names: names.length, ...(onDemand?.force && { force: true }) }), status_code: 200,
-        result_summary: `intake ${takenIntake.length}; drop lists ${takenDrops.length}; left ${queuedBefore + drops.length - names.length}`,
-      }).execute();
+      await writeJobAudit(this.deps.db, {
+        id: auditId, at: now, path: onDemand ? 'on-demand-screen' : 'intake-screening', request: { names: names.length, ...(onDemand?.force && { force: true }) },
+        summary: `intake ${takenIntake.length}; drop lists ${takenDrops.length}; left ${queuedBefore + drops.length - names.length}`,
+      });
       const run = await createRun(this.deps.db, { mode: 'full', names }, { createdBy: onDemand ? 'onDemandScreen' : 'intakeScreening', auditId, now }, worker.checks);
       started.runId = run.id;
       for (const [domain, v] of takenIntake) {

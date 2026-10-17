@@ -10,7 +10,7 @@ import { withDomainLock } from '../../core/locks.js';
 
 export const VENUES = ['afternic', 'sedo', 'afternic_checkout', 'escrow', 'other'] as const;
 export const EVIDENCE_SOURCES = ['afternic_email', 'sedo_email', 'afternic_dashboard', 'sedo_dashboard', 'escrow', 'other'] as const;
-export type Venue = (typeof VENUES)[number];
+type Venue = (typeof VENUES)[number];
 
 export interface SoldInput {
   venue: Venue;

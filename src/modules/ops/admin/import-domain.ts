@@ -14,14 +14,14 @@ import { registrarApiOf } from '../../buying/index.js';
 import { changedColumns } from '../../listing/index.js';
 import { isCategory, validateComps, validateListing, type Comp, type ListingPlan, type ListingRequest } from '../../listing/index.js';
 import { planView } from '../../listing/index.js';
-import { domainPlanColumns, historyRow, writePlan } from '../../listing/index.js';
+import { applyPlan, domainPlanColumns } from '../../listing/index.js';
 import { withDomainLock } from '../../../core/locks.js';
 
 /** Bad or missing arguments (the CLI exits 2). Business refusals are AppErrors (exit 1, code in the message). */
 export class ImportInputError extends Error {}
 
 /** The comps rule started on 5 Oct 2026: an earlier buy may carry a legacy reason instead of comps (V11). */
-export const COMPS_RULE_DATE = '2026-10-05';
+const COMPS_RULE_DATE = '2026-10-05';
 
 export interface ImportInput {
   domain: string; registrar: string; buyDate: string; cost?: string; /** The API passes cents (no dollars-string round trip); the CLI passes `cost`. */ costCents?: number; costNote?: string; order?: string; deal?: string;
@@ -314,15 +314,12 @@ export async function importDomain(
       await trx.insertInto('deals').values({ id: input.deal, domain })
         .onConflict((oc) => oc.column('id').doUpdateSet({ domain, updated_at: now })).execute();
     }
-    let written: Awaited<ReturnType<typeof writePlan>>['events'] = [];
-    if (plan) {
-      await trx.insertInto('listing_history').values(historyRow({
-        domainId: row.id, source: 'import', plan, category: p.category, grade: plan.grade, lander: null,
-        override: plan.overrideUsed, overrideReason: plan.overrideUsed ? p.overrideReason : null,
-        approvalText: p.approval?.text ?? null, approvalAt: p.approval?.at ?? null, auditId, planAuditId: auditId, at: now,
-      })).execute();
-      written = (await writePlan(trx, { domainId: row.id, plan, anchor: p.today, dropDate, settings: s, planAuditId: auditId, now, lane: p.lane })).events;
-    }
+    const written = plan
+      ? await applyPlan(trx, {
+        domainId: row.id, plan, source: 'import', category: p.category, lander: null, override: plan.overrideUsed, overrideReason: plan.overrideUsed ? p.overrideReason : null,
+        approvalText: p.approval?.text ?? null, approvalAt: p.approval?.at ?? null, auditId, anchor: p.today, dropDate, settings: s, now, lane: p.lane,
+      })
+      : [];
     // The domain cap counts the import. An import over it succeeds (the money is already spent) and says so.
     const n = await activeDomainCount(trx);
     if (n > settings.max_domains) warnings.push(`DOMAIN_CAP_EXCEEDED_BY_IMPORT: ${n}/${settings.max_domains} domains; /buy is refused until under the cap`);

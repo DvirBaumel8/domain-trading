@@ -37,7 +37,7 @@ function choleskySolve(A: Float64Array, b: Float64Array, n: number): Float64Arra
 }
 
 /** The design vector of one row: standardised features (missing = 0), then the missing indicators. */
-export function logitDesign(m: LogitModel, x: ArrayLike<number>): Float64Array {
+function logitDesign(m: LogitModel, x: ArrayLike<number>): Float64Array {
   const F = m.means.length;
   const d = new Float64Array(F + m.missingCols.length);
   for (let f = 0; f < F; f++) {

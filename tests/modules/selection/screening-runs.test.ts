@@ -2,11 +2,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { testDb as db, insertOwnedDomain } from '../../helpers/db.js';
-import { OFFLINE, enableWayback, putBrandLists, putList, screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
+import { OFFLINE, putBrandLists, putList, screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
 import { outcome } from '../../../src/modules/selection/types.js';
-import { HttpResponse } from 'msw';
-import { recordedSite, syntheticSite, waybackHandlers } from '../../helpers/screening-fixtures.js';
-import { mswServer } from '../../setup/network.js';
 
 let app: FastifyInstance | undefined;
 afterEach(async () => app?.close());
@@ -517,41 +514,25 @@ describe('the worker keeps the same precedence as derive (a manual record outran
 describe('history in a full plan (CAP-07)', () => {
   const wr = (domain: string) => ({ domain, check: 'web_risk', checked_at: '2026-10-06T07:30:00Z', evidence_url: 'https://transparencyreport.google.com/safe-browsing/search?url=x', result: { raw_status: 6 } });
 
-  it('the v10 order is respected (web_risk before history before tm_us); a manual web_risk record turns UNKNOWN HISTORY_NOT_FINAL into PASS once history has passed', async () => {
+  it('the v10 order is respected (web_risk before history before tm_us); a manual web_risk record turns UNKNOWN HISTORY_NOT_FINAL into PASS once a manual history record has passed', async () => {
     await putBrandLists();
-    await enableWayback();
     const x = await screeningHarness({ screening: { sleep: async () => {}, rdapLookup: async () => ({ outcome: 'not_registered', reasonCode: null, httpStatus: 404, url: 'https://rdap.example/x', retrievedAt: new Date(), body: null, facts: null }) } });
     app = x.app;
     const plan = ['form', 'availability', 'web_risk', 'history', 'tm_us'];
-    // 1) the archive is down: history is UNKNOWN, so a Web Risk "safe" record is not final
-    mswServer.use(...waybackHandlers({}, undefined, { cdx: () => new HttpResponse('x', { status: 500 }) }));
+    // 1) the archive is never automated: history waits for a human record, so a Web Risk "safe" record is not final
     const a = await x.runDone({ checks: plan, mode: 'full', names: [nonGeo('memphisplumbingpros.com')] });
     const na = byDomain(a.body, 'memphisplumbingpros.com');
-    expect(na.results.map((r: any) => [r.check, r.gate, r.status])).toEqual([['form', 'G0', 'PASS'], ['availability', 'G2', 'PASS'], ['web_risk', 'G5', 'MANUAL_REQUIRED'], ['history', 'G6', 'UNKNOWN'], ['tm_us', 'G7', 'MANUAL_REQUIRED']]);
+    expect(na.results.map((r: any) => [r.check, r.gate, r.status])).toEqual([['form', 'G0', 'PASS'], ['availability', 'G2', 'PASS'], ['web_risk', 'G5', 'MANUAL_REQUIRED'], ['history', 'G6', 'MANUAL_REQUIRED'], ['tm_us', 'G7', 'MANUAL_REQUIRED']]);
     const ids = await db.selectFrom('screening_results').select(['check_id', 'id']).where('run_id', '=', a.id).orderBy('id').execute();
     expect(ids.map((r) => r.check_id)).toEqual(['form', 'availability', 'web_risk', 'history', 'tm_us']);
     const r1 = await x.post(`/screening/runs/${a.id}/manual`, wr('memphisplumbingpros.com'));
     expect([r1.statusCode, r1.json().status, r1.json().reason_code]).toEqual([201, 'UNKNOWN', 'HISTORY_NOT_FINAL']);
-    // 2) a new run: history PASS (no captures), then the same record is PASS
-    mswServer.resetHandlers();
-    mswServer.use(...waybackHandlers({ 'memphisplumbingpros.com': recordedSite('memphisplumbingpros.com') }));
-    const b = await x.runDone({ checks: plan, mode: 'full', names: [nonGeo('memphisplumbingpros.com')] });
-    expect(res(byDomain(b.body, 'memphisplumbingpros.com'), 'history')).toMatchObject({ status: 'PASS', fields: { pre_cls: 'none' } });
-    const r2 = await x.post(`/screening/runs/${b.id}/manual`, wr('memphisplumbingpros.com'));
+    // 2) a manual history PASS, then the same record is PASS
+    const hi = await x.post(`/screening/runs/${a.id}/manual`, { domain: 'memphisplumbingpros.com', check: 'history', checked_at: '2026-10-06T07:30:00Z', result: { result: 'PASS', checked_by: 'gavriel' } });
+    expect(hi.statusCode, hi.body).toBe(201);
+    await app!.screeningWorker.idle();
+    const r2 = await x.post(`/screening/runs/${a.id}/manual`, wr('memphisplumbingpros.com'));
     expect([r2.statusCode, r2.json().status]).toEqual([201, 'PASS']);
-    expect(res(byDomain((await x.get(`/screening/runs/${b.id}`)).json(), 'memphisplumbingpros.com'), 'web_risk')).toMatchObject({ status: 'PASS', source: 'manual' });
-  });
-
-  it('a harmful history stops a live name at G6: the later gates never run', async () => {
-    await putBrandLists();
-    await enableWayback();
-    const x = await screeningHarness({ screening: { sleep: async () => {}, rdapLookup: async () => ({ outcome: 'not_registered', reasonCode: null, httpStatus: 404, url: 'https://rdap.example/x', retrievedAt: new Date(), body: null, facts: null }) } });
-    app = x.app;
-    const s = syntheticSite('synthetic-pharma');
-    mswServer.use(...waybackHandlers({ [s.domain]: s }));
-    const { body } = await x.runDone({ checks: ['form', 'availability', 'history', 'tm_us'], names: [nonGeo(s.domain)] });
-    const n = byDomain(body, s.domain);
-    expect(n.results.map((r: any) => r.check)).toEqual(['form', 'availability', 'history']);
-    expect(n).toMatchObject({ final_status: 'rejected', first_fail: { check: 'history', gate: 'G6', reason_code: 'HARMFUL_HISTORY' }, source_lane: 'expired_drop' });
+    expect(res(byDomain((await x.get(`/screening/runs/${a.id}`)).json(), 'memphisplumbingpros.com'), 'web_risk')).toMatchObject({ status: 'PASS', source: 'manual' });
   });
 });

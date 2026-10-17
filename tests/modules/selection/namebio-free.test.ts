@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { loadConfig } from '../../../src/config.js';
 import {
-  NameBioRateLimited, NameBioRequestRefused, fetchDropOrderFile, parseDropOrderFile, assertNameBioRequest, namebioPost, refreshNameBio, verisignDropOrder, parseRetailStatsCsv, keywordCounts,
+  NameBioRequestRefused, MAX_CSV_BYTES, assertNameBioRequest, namebioPost, refreshNameBio, parseRetailStatsCsv, keywordCounts,
 } from '../../../src/modules/selection/namebio.js';
 import { DEFAULT_SELECTION_VALUES } from '../../../src/modules/selection/settings.js';
 import type { ScreeningDeps } from '../../../src/modules/selection/types.js';
-import { testDb as db } from '../../helpers/db.js';
+import { testDb as db, insertOwnedDomain } from '../../helpers/db.js';
 import { testEnv } from '../../helpers/env.js';
 import { patchActiveSettings, screeningHarness } from '../../helpers/screening.js';
 import { mswServer } from '../../setup/network.js';
@@ -18,8 +18,6 @@ const sample = readFileSync(new URL('../../fixtures/screening/namebio/retailstat
 const ON = { ...DEFAULT_SELECTION_VALUES, sources: { ...DEFAULT_SELECTION_VALUES.sources, namebio: true } };
 const API = 'https://api.namebio.com';
 const RS_CSV = 'https://api.namebio.com/retailstats-download';
-const TLD_CSV = 'https://api.namebio.com/tldstats-download';
-const DROP = 'https://api.namebio.com/verisign-download';
 let app: FastifyInstance | undefined;
 afterEach(async () => { await app?.close(); app = undefined; });
 
@@ -43,15 +41,16 @@ function serveRetail(handler?: (kw: string, n: number) => Response | null) {
 }
 
 describe('NameBio free endpoints (CR-062)', () => {
-  it('NB-1 allow-list: only POST api.namebio.com /retailstats /tldstats /verisign, and https namebio.com files; any other path or host is refused before sending', async () => {
-    for (const p of ['/retailstats', '/tldstats', '/verisign']) expect(assertNameBioRequest(`${API}${p}`, 'POST').pathname).toBe(p);
-    for (const p of ['comps', 'checkdomain', 'dailysales', 'topsales', 'keywordstats', 'search']) {
+  it('NB-1 allow-list: only POST api.namebio.com /retailstats and GET /retailstats-download, and https namebio.com files; any other path or host is refused before sending', async () => {
+    expect(assertNameBioRequest(`${API}/retailstats`, 'POST').pathname).toBe('/retailstats');
+    for (const p of ['tldstats', 'verisign', 'comps', 'checkdomain', 'dailysales', 'topsales', 'keywordstats', 'search']) {
       expect(() => assertNameBioRequest(`${API}/${p}`, 'POST')).toThrow(NameBioRequestRefused);
     }
     expect(() => assertNameBioRequest(`${API}/retailstats`, 'GET')).toThrow(NameBioRequestRefused);
     expect(() => assertNameBioRequest(`${API}/retailstats-download`, 'POST')).toThrow(NameBioRequestRefused);
     expect(() => assertNameBioRequest(`${API}/comps-download`, 'GET')).toThrow(NameBioRequestRefused);
-    for (const p of ['retailstats-download', 'tldstats-download', 'verisign-download']) expect(assertNameBioRequest(`${API}/${p}`, 'GET').pathname).toBe(`/${p}`);
+    expect(assertNameBioRequest(`${API}/retailstats-download`, 'GET').pathname).toBe('/retailstats-download');
+    for (const p of ['tldstats-download', 'verisign-download']) expect(() => assertNameBioRequest(`${API}/${p}`, 'GET')).toThrow(NameBioRequestRefused);
     expect(() => assertNameBioRequest(`${API}/retailstats?x=1`, 'POST')).toThrow(NameBioRequestRefused);
     expect(() => assertNameBioRequest('http://api.namebio.com/retailstats', 'POST')).toThrow(NameBioRequestRefused);
     expect(() => assertNameBioRequest('https://evil.example/retailstats', 'POST')).toThrow(NameBioRequestRefused);
@@ -144,29 +143,15 @@ describe('NameBio free endpoints (CR-062)', () => {
     expect(k.c.sleeps).toContain(60_000);
   });
 
-  it('NB-7 verisign: at most 100 domains a call and 5 calls per 24 h (persisted)', async () => {
-    const k = clock();
-    let n = 0;
-    mswServer.use(http.post(`${API}/verisign`, () => { n++; return HttpResponse.json({ ok: true }); }));
-    const d = { fetch: globalThis.fetch, ...k };
-    await expect(verisignDropOrder(db, d, [])).rejects.toThrow(NameBioRequestRefused);
-    await expect(verisignDropOrder(db, d, Array.from({ length: 101 }, (_, i) => `a${i}.com`))).rejects.toThrow(NameBioRequestRefused);
-    for (let i = 0; i < 5; i++) await verisignDropOrder(db, d, ['a.com']);
-    await expect(verisignDropOrder(db, d, ['a.com'])).rejects.toThrow(NameBioRateLimited);
-    expect(n).toBe(5);
-    k.c.t += 24 * 3_600_000 + 1000;
-    await verisignDropOrder(db, d, ['a.com']);
-    expect(n).toBe(6);
-  });
-
   it('NB-8 CSV path: with the URL set the step downloads the file and upserts; no per-keyword request; once a day; logs file bytes and rows', async () => {
     const k = clock();
     let downloads = 0;
     mswServer.use(http.get(RS_CSV, () => { downloads++; return new HttpResponse(sample, { headers: { 'content-type': 'text/csv' } }); }));
     serveRetail();
     await intake('plumbing.com', ['plumbing']);
+    await intake('roofingpros.com', ['roofing', 'pros']);
     const r = await refreshNameBio(db, depsOf(k, { retailstatsCsvUrl: RS_CSV }), ON, k.now);
-    expect(r).toMatchObject({ mode: 'csv', rows_written: 5, file_bytes: Buffer.byteLength(sample), requests: 1, errors: [] });
+    expect(r).toMatchObject({ mode: 'csv', rows_written: 2, file_bytes: Buffer.byteLength(sample), requests: 1, errors: [] });
     expect(downloads).toBe(1);
     expect(hits.rs).toEqual([]);
     const row = await db.selectFrom('namebio_keyword_stats').selectAll().where('keyword', '=', 'plumbing').executeTakeFirstOrThrow();
@@ -180,23 +165,29 @@ describe('NameBio free endpoints (CR-062)', () => {
     expect(await db.selectFrom('engine_sales').select('id').execute()).toHaveLength(0);
   });
 
-  it('NB-9 TLDStats CSV is stored in namebio_tld_stats', async () => {
+  it('NB-9 CSV keyword filter and byte cap: only keywords of intake names, owned domains and screened names are stored; a file over the cap is refused whole', async () => {
     const k = clock();
-    mswServer.use(http.get(TLD_CSV, () => new HttpResponse('tld,sale_count,price_avg\ncom,1200,3400\n.net,300,900\n')));
-    const r = await refreshNameBio(db, depsOf(k, { tldstatsCsvUrl: TLD_CSV }), ON, k.now);
-    expect(r).toMatchObject({ mode: 'csv', rows_written: 2 });
-    const rows = await db.selectFrom('namebio_tld_stats').selectAll().orderBy('tld').execute();
-    expect(rows.map((x) => x.tld)).toEqual(['com', 'net']);
-    expect(rows[0]).toMatchObject({ source: 'namebio_free', source_url: TLD_CSV, stats: { sale_count: 1200, price_avg: 3400 } });
+    mswServer.use(http.get(RS_CSV, () => new HttpResponse(sample)));
+    await intake('plumbing.com', ['plumbing']);
+    await intake('other.com', null);
+    await insertOwnedDomain(db, { domain: 'audit.com' });
+    expect(parseRetailStatsCsv(sample, new Set(['solar'])).size).toBe(1);
+    const r = await refreshNameBio(db, depsOf(k, { retailstatsCsvUrl: RS_CSV }), ON, k.now);
+    expect(r).toMatchObject({ rows_written: 2, errors: [] });
+    expect((await db.selectFrom('namebio_keyword_stats').select('keyword').orderBy('keyword').execute()).map((x) => x.keyword)).toEqual(['audit', 'plumbing']);
+    await db.deleteFrom('namebio_keyword_stats').execute();
+    mswServer.use(http.get(RS_CSV, () => new HttpResponse(new ReadableStream({ start(c) { c.enqueue(new Uint8Array(MAX_CSV_BYTES + 1)); c.close(); } }))));
+    const k2 = clock(k.c.t + 25 * 3_600_000);
+    const big = await refreshNameBio(db, depsOf(k2, { retailstatsCsvUrl: RS_CSV }), ON, k2.now) as { errors: string[] };
+    expect(big.errors[0]).toMatch(/over the .* cap/);
+    expect(await db.selectFrom('namebio_keyword_stats').select('keyword').execute()).toHaveLength(0);
   });
 
   it('NB-10 a CSV URL outside namebio.com is refused before any request (config and module); a changed CSV header stops the refresh', async () => {
     expect(() => loadConfig(testEnv({ NAMEBIO_RETAILSTATS_CSV_URL: 'https://evil.example/x.csv' }))).toThrow(/NAMEBIO_RETAILSTATS_CSV_URL/);
-    expect(() => loadConfig(testEnv({ NAMEBIO_TLDSTATS_CSV_URL: 'https://api.namebio.com/comps' }))).toThrow(/NAMEBIO_TLDSTATS_CSV_URL/);
-    expect(loadConfig(testEnv({ NAMEBIO_RETAILSTATS_CSV_URL: RS_CSV })).namebio).toEqual({ retailstatsCsvUrl: RS_CSV, tldstatsCsvUrl: undefined, dropOrderUrl: undefined });
-    expect(loadConfig(testEnv()).namebio).toEqual({ retailstatsCsvUrl: undefined, tldstatsCsvUrl: undefined, dropOrderUrl: undefined });
-    expect(loadConfig(testEnv({ NAMEBIO_DROP_ORDER_URL: DROP })).namebio.dropOrderUrl).toBe(DROP);
-    expect(() => loadConfig(testEnv({ NAMEBIO_DROP_ORDER_URL: 'https://api.namebio.com/dailysales' }))).toThrow(/NAMEBIO_DROP_ORDER_URL/);
+    expect(() => loadConfig(testEnv({ NAMEBIO_RETAILSTATS_CSV_URL: 'https://api.namebio.com/tldstats-download' }))).toThrow(/NAMEBIO_RETAILSTATS_CSV_URL/);
+    expect(loadConfig(testEnv({ NAMEBIO_RETAILSTATS_CSV_URL: RS_CSV })).namebio).toEqual({ retailstatsCsvUrl: RS_CSV });
+    expect(loadConfig(testEnv()).namebio).toEqual({ retailstatsCsvUrl: undefined });
     const k = clock();
     const r = await refreshNameBio(db, depsOf(k, { retailstatsCsvUrl: 'https://evil.example/x.csv' }), ON, k.now);
     expect((r as { errors: string[] }).errors[0]).toMatch(/refused/);
@@ -222,9 +213,11 @@ describe('NameBio free endpoints (CR-062)', () => {
   it('NB-12 AC-4 / R-7: the summary carries db bytes before and after, rows written and file bytes', async () => {
     const k = clock();
     mswServer.use(http.get(RS_CSV, () => new HttpResponse(sample)));
+    await intake('five.com', ['plumbing', 'roofing', 'solar', 'audit', 'hvac']);
     const r = await refreshNameBio(db, depsOf(k, { retailstatsCsvUrl: RS_CSV }), ON, k.now) as { db_bytes_before: number; db_bytes_after: number; rows_written: number; file_bytes: number };
+    // pg_database_size is not monotonic (checkpoints and autovacuum can shrink it between the two reads), so only presence is asserted
     expect(r.db_bytes_before).toBeGreaterThan(0);
-    expect(r.db_bytes_after).toBeGreaterThanOrEqual(r.db_bytes_before);
+    expect(r.db_bytes_after).toBeGreaterThan(0);
     expect(r).toMatchObject({ rows_written: 5, file_bytes: sample.length });
   });
 
@@ -246,20 +239,5 @@ describe('NameBio free endpoints (CR-062)', () => {
     await db.insertInto('namebio_keyword_stats').values({ keyword: 'cloud', placements: JSON.stringify({ exact: { sale_count: 2, price_sum: null, price_avg: null, price_max: null, price_stddev: null } }), source: 'namebio_free', source_url: 'u', fetched_at: new Date(k.c.t - 72 * 3_600_000) } as never).execute();
     const r = await keywordCounts(db, ['cloud'], ON, k.now);
     expect(r).toMatchObject({ stale: true, cache_date: '2026-10-14', stats: { cloud: { exact_count: 2, start_count: null } } });
-  });
-
-  it('NB-15 drop-order file: parsed defensively; fetched at most once a day', async () => {
-    const k = clock();
-    let n = 0;
-    mswServer.use(http.get(DROP, () => { n++; return new HttpResponse('# header\r\nExample.com\nfoo-bar.com, 2026-10-20\n\nnot a domain\nbaz.net.\nexample.com\n', { headers: { 'content-type': 'text/plain' } }); }));
-    expect(parseDropOrderFile('a.com\n\n???\nb.org\tx')).toEqual(['a.com', 'b.org']);
-    const d = { fetch: globalThis.fetch, ...k };
-    expect(await fetchDropOrderFile(db, d, DROP)).toEqual(['example.com', 'foo-bar.com', 'baz.net']);
-    await expect(fetchDropOrderFile(db, d, DROP)).rejects.toThrow(NameBioRateLimited);
-    expect(n).toBe(1);
-    k.c.t += 25 * 3_600_000;
-    await fetchDropOrderFile(db, d, DROP);
-    expect(n).toBe(2);
-    await expect(fetchDropOrderFile(db, d, 'https://api.namebio.com/dailysales')).rejects.toThrow(NameBioRequestRefused);
   });
 });

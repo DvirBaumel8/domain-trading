@@ -1,11 +1,11 @@
 # Code map
 
-Where things live, so a change request goes straight to the right files. Paths are from the repo root. Kept in step with the tree by the commit that changes it (a change that adds, moves or removes a file, route, table or test file updates this map); last full check at contract v5.13.0. Which release added what is in `docs/contract/CHANGELOG.md` and `docs/releases/`, so the `vX.Y.Z` tags below are history, not a promise of completeness.
+Where things live, so a change request goes straight to the right files. Paths are from the repo root. Kept in step with the tree by the commit that changes it (a change that adds, moves or removes a file, route, table or test file updates this map); last full check at contract v5.15.0. Which release added what is in `docs/contract/CHANGELOG.md` and `docs/releases/`, so the `vX.Y.Z` tags below are history, not a promise of completeness.
 
 ## 1. How to use this map
 
 - Find the module (section 2), then the file, then its test file. Use section 3 ("Where do I change X?") for the usual change types.
-- Other code may import a module only through its `index.ts` (`tests/unit/module-boundaries.test.ts`). Graph: registrars <- listing <- selection <- buying <- candidates; selection <- engine (v5.4.0); selling <- reporting <- outreach; ops on top.
+- Other code may import a module only through its `index.ts` (`tests/unit/module-boundaries.test.ts`). Graph: registrars <- listing <- selection <- buying <- candidates; selection <- engine (v5.4.0); engine and candidates <- data (v5.15.0); selling <- reporting <- outreach; ops on top.
 - Run only the affected tests locally: `npx vitest run tests/modules/<module>/<file>.test.ts` (pure tests: `tests/modules/<module>/unit/`). API tests need Postgres (`npm run db:up`). CI runs the full suite on push.
 - Before commit still run `npx tsc --noEmit && npm run build` (the gate in CLAUDE.md).
 - Test files sit under the module they cover and are named by feature (`tests/modules/candidates/screen.test.ts`, `outreach/review-run.test.ts`), never by release. Test IDs (T21-1, AC-6, V214-5, ...) are part of the test names, so docs refer to IDs. To find the tests for a route, `grep -l "<path>" -r tests/modules`. Paths in the "Tests" columns below are relative to `tests/modules/` (a `unit/` entry is a pure test).
@@ -52,7 +52,7 @@ Per-domain listing plan (mode, BIN, floor, walk-away, schedule), `POST /list`, p
 | `pricing/schedule.ts` | `buildSchedule`, `ladderStep`, `laneList` (drops M6/M18, final push, delist) |
 | `pricing/settings.ts` | `PricingSettings`, `currentSettings`, `settingsByVersion`, `rowToSettings`, `ruleFields`, `RULE_KEYS` |
 | `pricing/round.ts`, `int.ts`, `present.ts` | rounding (x95), integer helpers, display |
-| `plan-store.ts` | `writePlan`, `currentPlan`, `applyHold`, `historyRow`, `domainPlanColumns` |
+| `plan-store.ts` | `applyPlan` (v5.15.0: the history row, then `writePlan`; the one way /buy, /list and the import store a new plan), `writePlan`, `currentPlan`, `applyHold`, `historyRow`, `domainPlanColumns` |
 | `plan-view.ts` | `planView` (API shape of a plan; walk-away never exposed) |
 | `export.ts` | `ExportService`, `AFTERNIC_HEADER`, `afternicRow`, `sedoRow`, `loadSedoTemplate`, `toCsv` |
 | `export-state.ts` | `pendingDomains`, `changedColumns`, `manualDelist`, `VENUES` |
@@ -78,13 +78,13 @@ The largest module (about 8,400 lines). Versioned selection settings, screening 
 | `settings.ts` | zod `SelectionValues`, `DEFAULT_SELECTION_VALUES`, `TIER_FEATURES`, `CHECK_IDS`, `LANES`, `LOCKED_PREFIXES`, `applySet`, `createDraft`, `activate`, `activeSelectionSettings` |
 | `engine.ts` | `createRun`, `ScreeningWorker` (runs checks, heartbeat, resume; v5.14.0: `prefetchCached` reads the reusable cache rows of a check for all names in one query), `assemble`, `assembleRun` (a stored run through `assemble`: the one helper for reading a run), `groupByItem`, `loadRowsForRuns`, `planFor`, `effectiveHold`, `heldByActive` |
 | `checks/index.ts` | `CHECKS` registry, `GATE_OF`, `DEPENDS_ON` (from `depends.ts`) |
-| `checks/*.ts` | one check each: `form`, `brand-lists`, `typo`, `availability`, `concentration`, `surbl`, `history` (Wayback), `census`, `ext-dates`, `namebio`, `same-name`, `tier`, `quote`, `price`, `manual` (web_risk, tm_us/tm_eu) |
+| `checks/*.ts` | one check each: `form`, `brand-lists`, `typo`, `availability`, `concentration`, `surbl`, `history` (manual HIST-2 records only since 5.15.0), `census`, `ext-dates`, `namebio`, `same-name`, `tier`, `quote`, `price`, `manual` (web_risk, tm_us/tm_eu) |
 | `types.ts` | `CheckId`, `Lane`, `Check`, `CheckContext`, `ResultRow`, `RunItem` |
 | `derive.ts` | `deriveItem`, `latestByCheck`, `funnel`, final status (`buy_candidate`, `would_buy`, ...) |
 | `tier.ts` | `evaluateTier`, `condHolds`, `cmp`, `unknownInputsOf` (clause ops and tier feature inputs) |
 | `form.ts`, `lexicon.ts`, `typo` data | name form (`analyzeForm`, `gform1`, `isShort`, `regimeDigitsOk` (CR-039, also used by intake)) |
 | `pack.ts` | screening pack: `assessPack`, `issuePack`, `latestPackFor`, `requiredChecks` |
-| `sellers.ts`, `site.ts`, `html-text.ts`, `wayback.ts` | seller pages and site classification, HTML text, Wayback history |
+| `sellers.ts`, `site.ts`, `html-text.ts`, `capped-read.ts` | seller pages and site classification, HTML text, bounded body reads and the `makeMatcher` signature matcher (was `wayback.ts` until 5.15.0) |
 | `rdap-batch.ts`, `popularity.ts`, `namebio.ts`, `web-risk.ts` | RDAP pacing/cache, popularity list, NameBio (v5.11.0, CR-062: free endpoints only, `assertNameBioRequest` allow-list, persisted rate limits in `namebio_calls`, `refreshNameBio`, `keywordCounts`, tables `namebio_keyword_stats` / `namebio_tld_stats` / `namebio_calls`; test `tests/modules/selection/namebio-free.test.ts`), Web Risk lookup |
 | `checks/lookalikes.ts` | v3.10.0 (CR-043, G-70): `lookalikesCheck`, `lookalikeNames` (feature check appended to every plan by `planFor` while `lookalikes.enabled`; `featureChecksOf` in `settings.ts`); v4.1.0: the per-name RDAP + home-page work is `probeLookalike`, shared with the sibling scan; v4.2.1 (CR-052): `wordHyphenNames` (hyphen forms from dictionary words, used when `lookalikeNames` gets a dictionary: the sibling scan only), and `.co/.us/.io` RDAP from `RDAP_FALLBACK_BASES` in `src/core/rdap.ts` |
 | `demand.ts` | v4.2.0 (CR-044 item 3): `decodeKeywordFile` (UTF-16LE/BE/UTF-8, BOM), `parseKeywordExport` (by header name, `KEYWORD_CSV_INVALID`), `storeKeywordUpload`, `latestKeyword`, `demandForKeywords`, `keywordCandidates`, `keywordsOfDomain`, `searchesOfDomain` (the renewal keep-signal in `reporting/report/lifecycle.ts`) |
@@ -112,13 +112,18 @@ Tables: `selection_settings`, `selection_lists`, `sibling_method_approvals`, `sc
 
 | File | Inside |
 |---|---|
-| `buy.ts` | `BuyService` (v3.7.0: `display_name` (given, else `defaultDisplayName` from the newest `candidate_intake.words`), `drop_policy` (`at_first_expiry` sets drop_date = expiry in `complete()`), `drop_policy`/`renewal_committed_cents`/`drop_policy_line` in the dry run and the 201; ~830 lines: approval check, caps, dry run, purchase state machine, ledger/receipt writes) |
+| `buy.ts` | `BuyService` (v5.15.0, split from one 855-line file): `buy()` runs the checks in order (approval, category, proposed listing, hold, pack, tranche, availability, caps, renewal maths, account state, registrar dry run) and hands over to the dry-run body or the money phase; `defaultDisplayName` (newest `candidate_intake.words`) |
+| `buy-types.ts` | `BuyInput`, `BuyCtx`, `BuyResult`, `BuyDeps`, `Approved`, `Horizon`, `DropPolicy`; the drop-policy words (`policyFields`, `policyLine`, `withPolicyLine`, `horizonWarnings`) |
+| `buy-reserve.ts` | `reservePending` (the `purchases` row and the `pending_purchase` domains row, shared by the reservation and the dry-run ambiguity record), `assertNotOwned`, `assertDomainCap`, `isUniqueViolation` |
+| `buy-dryrun.ts` | `assertAccountState`, `registrarDryRun` (re-quote once on COST_MISMATCH), `recordDryRunAmbiguous`, `gateFields`, `dryRunBody` (the `dry_run` 200 body), `priceDetails` |
+| `buy-register.ts` | the money phase: `priorOutcome` (idempotent replay), `purchase` (reserve under the locks, `register_sent` before the registrar call, retries, ambiguity, `finishFound`, `finishRegistered`, `complete` = booking + the 201 body; `drop_policy` `at_first_expiry` sets drop_date = expiry here) |
+| `buy-postbuy.ts` | after booking (buy.md step 7): `postBuy` (pricing evidence, privacy, auto-renew off, lander nameservers `saveLander`, the proposed listing `saveListing` through `applyPlan`) |
 | `buy-gates.ts` | `buyBlocks`, `packGate`, `trancheGate`, `gateError`; block codes `BUY_HOLD`, `SCREENING_PACK_REQUIRED`, `NO_TRANCHE` |
 | `buy-hold.ts` | `screeningHold`, `latestScreeningRun` |
 | `renewal-math.ts` | v4.0.0: `renewalMath` (BIN x (1 - commission) x STRe / renewal cost, integer cents and basis points), `binForMath`, `screeningGroupOf` (`passed` / `borderline` from FLAG results of the latest run); `buy.ts` stores `horizon`, `screening_group`, `buy_card` (`sell_or_drop_by` is set by `bookkeeping.ts` `bookPurchase`); the domain cap is 40 (`settings.max_domains`, migration) and a dry run reports `DOMAIN_CAP_REACHED` as `would_be_blocked` |
 | `small-buy.ts` | CR-030 small-buy exception to the buy hold: fixed limit `SMALL_BUY_MAX_FIRST_YEAR_CENTS`, `smallBuyRequested`, `smallBuyGate`, `smallBuyView` (the price ceiling for GET /selection/buy-hold); code `SMALL_BUY_PRICE`. 5.0.0 (G-86): no weekly money cap |
 | `tranches.ts` | `TrancheService` |
-| `caps.ts` | (renamed from `budget.ts` in 5.13.0) `activeDomainCount`; v5.8.0 (CR-059): `activeLaneCounts`, `laneCapBlock` (the 40-name cap with `settings.s8_reserved_slots` reserved for S8; `buy.ts` `assertDomainCap` applies it to Line 1, `import-domain.ts` to S8). The 40-domain cap, `settings.max_domains`, is applied in `buy.ts`. 5.0.0 (G-86): no money budget in the service; `spentCents`, `pendingCents`, `spentAndPending` are gone |
+| `caps.ts` | (renamed from `budget.ts` in 5.13.0) `activeDomainCount`; v5.8.0 (CR-059): `activeLaneCounts`, `laneCapBlock` (the 40-name cap with `settings.s8_reserved_slots` reserved for S8; `buy-reserve.ts` `assertDomainCap` applies it to Line 1, `import-domain.ts` to S8). The 40-domain cap, `settings.max_domains`, is applied in `buy-reserve.ts` and `buy.ts`. 5.0.0 (G-86): no money budget in the service; `spentCents`, `pendingCents`, `spentAndPending` are gone |
 | `bookkeeping.ts` | `bookPurchase` (v3.9.0: optional `dropDate`, set in its transaction; default expiry + 1 year; 5.13.0: also sets `sell_or_drop_by` = buy date + `renewal.horizon_months` for a trend / regulation name, so `/buy` and the reconciler agree; test `buying/reconciler` M2), `failPurchase`, `registrarApiOf` |
 | `reconciler.ts` | `Reconciler` (stuck `unknown`/`register_sent` purchases; job step `reconciler`). v3.9.0: no rdap dependency, never fails an open purchase (`/report` `PURCHASE_UNRESOLVED` + admin `resolve-purchase`); on booking it sets auto-renew off and the drop policy (`at_first_expiry`) |
 
@@ -141,6 +146,7 @@ Intake of candidate names, on-demand screening, the daily list, drop lists, coho
 | `daily-list.ts` | v3.9.0: `buildDailyList` takes the `daily_rebuild` lock itself; `DailyEntry`, `buildDailyList`, `BuildDailyListJob`, `readDailyList`, `buildWhy`, `autoRebuildDailyList`, limits `DAILY_LIST_*` |
 | `drop-lists.ts` | drop-list helpers (`watchStatusOf`, `freshLookups`, `retentionCutoff`, constants) |
 | `cohorts.ts` | `freezeReadyCohorts`, `FINAL_DROP`, `REREG_DAYS` |
+| `pool.ts` | v5.15.0: `candidatePoolHosts` (which of some hosts are in the pool: a non-removed intake name or a kept drop-list row; used by the `data` module's RDAP load) |
 
 Tables (v4.0.0 patterns tests: `candidates/patterns`; v5.3.0 `scout_lessons`, tests `candidates/lessons` LS-1..LS-8): `candidate_intake`, `candidate_screenings`, `daily_candidate_lists`, `drop_lists`, `drop_list_rows`, `cohorts`, `cohort_names`, `cohort_decisions` (`drop_list_checks`, `cohort_outcomes` written by ops jobs). Tests: `tests/modules/candidates/` (`intake`, `intake-resume`, `intake-rules`, `screen`, `screen-domains`, `screen-force`, `scout-split`, `lane-fit`, `daily-list`, `daily-list-fields`, `daily-list-rebuild`, `daily-list-rejected`, `drop-lists`, `cohorts`, `cohorts-freeze`, `cohort-settings`).
 
@@ -149,15 +155,16 @@ v5.4.0 (CR-056 part 1): data for the name-scoring engine; v5.5.0 (part 2): featu
 
 | Route | File |
 |---|---|
-| POST /engine/sales, POST /engine/unsold, GET /engine/health; v5.10.0 (CR-061): GET/POST /engine/holdout-date, `db_bytes_*` and the 409 DB_SIZE_HIGH guard (logic `engine/holdout.ts`: `salesMaxDate`, `setSalesMaxDate`, `guardDbSize`; HOLDOUT_SEALED in `uploads.ts` `dateOf`) | `engine/api/engine.ts` (`registerEngine`; 8 MB body limit; the audit log keeps the row count only, `elideRows` in `src/http/audit.ts`) |
+| POST /engine/sales, POST /engine/unsold, GET /engine/health; v5.10.0 (CR-061): GET/POST /engine/holdout-date, `db_bytes_*` and the 409 DB_SIZE_HIGH guard (logic `engine/holdout.ts`: `salesMaxDate`, `setSalesMaxDate`, `guardDbSize`; HOLDOUT_SEALED in `bulk.ts` `dateOf`) | `engine/api/engine.ts` (`registerEngine`; the two upload routes are `registerBulkRoute` from `engine/bulk.ts`: 8 MB body limit; the audit log keeps the row count only, `elideRows` in `src/http/audit.ts`) |
 | POST /engine/train, GET /engine/train/:id (v5.5.0) | `engine/api/engine.ts` (`EngineTrainer.start` / `get`) |
-| POST/GET /data/rdap, /data/live-checks, /data/tm-kills, /data/bigco-names, /data/sales-comps (v5.12.0, CR-063; WRITE or `data` loads, READ reads, `stale` flag on rdap) | `engine/api/data.ts` (`registerData`, called from `src/app.ts`; logic `engine/data-tables.ts`: `loadRdap`, `loadLive`, `loadTmKills`, `loadBigcoNames`, `loadSalesComps`, `readData`, `poolHosts`, `dataRowCounts`, `pruneDataTables` (called by `ops/jobs/retention.ts`); row helpers exported from `uploads.ts`) |
+| POST/GET /data/rdap, /data/live-checks, /data/tm-kills, /data/bigco-names, /data/sales-comps (v5.12.0, CR-063; WRITE or `data` loads, READ reads, `stale` flag on rdap) | moved to the `data` module in v5.15.0: see section `data` |
 | GET /owned/:domain/endings (v5.7.0, CR-058) | `engine/api/engine.ts` (`ownedEndingsView` in `endings.ts`) |
 | POST /score (v5.5.0, the one read-only POST) | `engine/api/engine.ts` (`Scorer.score`); read-only status comes from `READ_ONLY_POSTS` in `src/http/methods.ts` (`isMutating(method, routeUrl)`: scope, idempotency, audit, rate class, openapi) |
 
 | File | Inside |
 |---|---|
-| `uploads.ts` | `storeSales`, `storeUnsold`, `parseSaleRow`, `parseUnsoldRow` (per-row reject reasons), `SALE_DEDUPE_DAYS`, `ENGINE_MAX_ROWS`; one transaction under the `engine_upload` lock |
+| `uploads.ts` | `storeSales`, `storeUnsold`, `parseSaleRow`, `parseUnsoldRow` (per-row reject reasons), `SALE_DEDUPE_DAYS`; on `bulkLoad` |
+| `bulk.ts` | v5.15.0: the bulk-upload skeleton shared with the `data` module: `bulkLoad` (per-row rejects, one transaction under the `engine_upload` lock), `registerBulkRoute` (DB_SIZE_HIGH guard, 8 MB body, audit summary, 201 with the byte counts), the row validators (`domainOf`, `dateOf`, `centsOf`, `textOf`, `isObj`, `rawDomain`), `ENGINE_MAX_ROWS`, `Reject`, `SealedAfter`; exported through `engine/index.ts` |
 | `endings.ts` | `EndingsJob` (daily step `engineEndings`: due pairs, per-host pacing with `hostPacer`, writes `engine_endings`; v5.7.0: owned names first and weekly (`ownedDue`), `recordOwnedEvent`, `ownedEndingsView`, `OWNED_RECHECK_DAYS`), `endingsHealth`, `ENDINGS_*` constants |
 | `slices.ts` | v5.7.0 (CR-058): `holdSlices` (quick / held split of the sold test rows; run by `train.ts`, stored in `metrics.slices`, shown by `health.ts`), `RECALL_THRESHOLD`, `QUICK_SALE_DAYS` |
 | `health.ts` | `engineHealth` (GET /engine/health; v5.5.0: model fields; v5.6.0: ablation, drift, `computeBars`, bar thresholds) |
@@ -170,7 +177,20 @@ v5.4.0 (CR-056 part 1): data for the name-scoring engine; v5.5.0 (part 2): featu
 | `reasons.ts` | v5.5.0: plain-English reason texts from the logistic contributions |
 | `model/gbm.ts`, `logit.ts`, `metrics.ts`, `rng.ts` | v5.5.0: histogram gradient boosting (binary and softmax), L2 logistic regression (IRLS), AUC / bootstrap / precision / quantiles, seeded randomness; pure, no dependency |
 
-Tables: `engine_uploads`, `engine_sales`, `engine_unsold` (append-only), `engine_endings` (migration `1763800000000_v5-4-0.sql`; v5.5.0 adds tld `com`), `engine_models` (migration `1763900000000_v5-5-0.sql`, which also adds queue job kind `train`), `owned_ending_events` (v5.7.0, append-only, migration `1764000000000_v5-7-0.sql` which also adds `engine_endings.registrar`; `/report` `ENDING_REGISTERED` reads it in `reporting/report/warnings.ts`); none in the backup, none in retention. v5.12.0 (CR-063): `domain_rdap`, `live_checks` (both pruned by `pruneDataTables`), `tm_kills`, `bigco_names` (append-only), `sales_comps` (migration `1764500000000_v5-12-0.sql`; none in the backup). Tests: `tests/modules/engine/` (`data-tables` DT-1..DT-10 (v5.12.0), `uploads` EN-1..EN-10, `endings` EN-11..EN-20, `model-math` EN-21..EN-30, `features` EN-31..EN-38, `train` EN-40..EN-52, `score` EN-60..EN-70, `health` EN-80..EN-89 (EN-88/89: hold-time slices), `owned-endings` EN-90..EN-99; helper `tests/helpers/engine-data.ts`); step order in `tests/modules/ops/jobs.test.ts`.
+Tables: `engine_uploads`, `engine_sales`, `engine_unsold` (append-only), `engine_endings` (migration `1763800000000_v5-4-0.sql`; v5.5.0 adds tld `com`), `engine_models` (migration `1763900000000_v5-5-0.sql`, which also adds queue job kind `train`), `owned_ending_events` (v5.7.0, append-only, migration `1764000000000_v5-7-0.sql` which also adds `engine_endings.registrar`; `/report` `ENDING_REGISTERED` reads it in `reporting/report/warnings.ts`); none in the backup, none in retention. Tests: `tests/modules/engine/` (`uploads` EN-1..EN-10, `endings` EN-11..EN-20, `model-math` EN-21..EN-30, `features` EN-31..EN-38, `train` EN-40..EN-52, `score` EN-60..EN-70, `health` EN-80..EN-89 (EN-88/89: hold-time slices), `owned-endings` EN-90..EN-99; helper `tests/helpers/engine-data.ts`); step order in `tests/modules/ops/jobs.test.ts`.
+
+### data
+v5.12.0 (CR-063), its own module since v5.15.0. Research data tables loaded by bots. Imports `engine` (`bulk.ts` skeleton and validators, the holdout date) and `candidates` (`candidatePoolHosts`); only `app.ts` and `ops` (retention) import it.
+
+| Route | File |
+|---|---|
+| POST/GET /data/rdap, /data/live-checks, /data/tm-kills, /data/bigco-names, /data/sales-comps (WRITE or `data` loads, READ reads, `stale` flag on rdap) | `data/api/data.ts` (`registerData`, called from `src/app.ts`; every POST is `registerBulkRoute`) |
+
+| File | Inside |
+|---|---|
+| `tables.ts` | `loadRdap`, `loadLive`, `loadTmKills`, `loadBigcoNames`, `loadSalesComps` (row parsers per table), `readData`, `dataRowCounts`, `pruneDataTables` (called by `ops/jobs/retention.ts`) |
+
+Tables: `domain_rdap`, `live_checks` (both pruned by `pruneDataTables`), `tm_kills`, `bigco_names` (append-only), `sales_comps` (migration `1764500000000_v5-12-0.sql`; none in the backup). Tests: `tests/modules/data/` (`data-tables` DT-1..DT-10); scope tests `tests/modules/http/data-scope.test.ts`.
 
 ### selling
 Offers (record, classify, outcome), sold records, offer stats.
@@ -241,6 +261,7 @@ Jobs and queue, health, admin CLI, backup.
 | `jobs/runner.ts` | `JobRunner.plan(job)` = the step list for `tick`, `daily`, `screen`, `train` (v5.5.0: step `trainModel`; daily gets `engineTrain` last); `STEP_ATTEMPTS`, `STEP_TIMEOUT_MS`, `classify` |
 | `queue.ts` | `JobQueue` (Postgres queue: enqueue, claim, run step by step, keepalive; v3.9.0: a skipped retry after a timeout is marked failed) |
 | `job.ts` | `npm run job` CLI |
+| `cli.ts` | v5.15.0: `withDb` (config + pool lifetime), `exitWith` (exit codes, usage errors), `UsageError`; shared by `job.ts` and `admin.ts` |
 | `jobs/price-schedule.ts`, `drop.ts`, `registrar-check.ts`, `portfolio-check.ts`, `drop-watch.ts`, `ns-verify.ts`, `cohort-outcomes.ts`, `reference-refresh.ts` | `PriceScheduleJob` (step `priceJob`), `DropJob`, `RegistrarCheckJob`, `PortfolioCheckJob`, `DropWatchJob`, `NsVerifier` (`runOnce({onlyUnverified})`: the runner calls it for never-verified names even after the day's run, v3.7.0), `CohortOutcomesJob`, `ReferenceRefreshJob`; `RegistrarCheckJob` also appends `registrar_state_checks` (auto-renew, privacy, NS of Porkbun names, read-only) |
 | `jobs/listing-sync.ts`, `sellerhub.ts` | v4.0.0 (CR-049): `ListingSyncJob` (step `listingSync`; `delist(domain)` is also called after `/sold`) and `SellerHubClient` (Spaceship SellerHub REST, headers X-API-Key / X-API-Secret, env `SPACESHIP_SELLERHUB_API_KEY` / `_SECRET`; tests mock it with MSW only); table `listing_sync_log` |
 | `jobs/portfolio-lifecycle.ts` | v4.0.0: `PortfolioLifecycleJob` (step `portfolioLifecycle`): expired unrenewed names, lookalike re-check in the renewal window, monthly holdout and its re-check (table `holdout`); uses `selection` `screenedNames` / `rerunLookalikes` (`selection/portfolio-support.ts`) |
@@ -267,6 +288,7 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 | `locks.ts` | `withDomainLock`, `withDomainLocks` (v5.14.0: many names on one connection, sorted, one deadline; used by the export confirm), `withAdvisoryLock`, `trySessionLock` | `selection/r1b-locks`, `listing/list-concurrency` |
 | `rdap.ts`, `ns-lookup.ts`, `safe-fetch.ts` | RDAP, DNS NS lookup, SSRF-safe fetch (`safeFetch`) | `core/unit/rdap*`, `ns-lookup`, `dns-query`, `safe-fetch*` |
 | `tokens.ts` | `generateToken`, `hashToken` | `core/unit/tokens` |
+| `chunks.ts` | `chunks` (bulk insert and `in (...)` pieces) | none |
 
 ### http (`src/http/`)
 Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks below.
@@ -275,14 +297,14 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 |---|---|---|
 | `auth.ts` | `registerAuth` (bearer tokens, job token), `registerScope` (READ/WRITE/intake/data), `INTAKE_ROUTES`, `DATA_ROUTES`/`DATA_PREFIX` (v5.10.0), `PUBLIC_PATHS` | `http/auth`, `token-expiry`, `http/data-scope` (DS-1..DS-6) |
 | `idempotency.ts` | `registerIdempotency`, `requestHash`, `pruneIdempotencyKeys` | `http/idempotency`, `idempotency-hygiene`, `http/unit/canonical-json` |
-| `audit.ts` | `registerAuditId`, `registerAuditWrite`, `dbAuditWriter`, `elideArrays` (v5.14.0, D2: an array over 50 items is stored as `[N items, sha256:<hex>]`; AL-4) | `http/audit`, `audit-token`, `timestamps` |
+| `audit.ts` | `registerAuditId`, `registerAuditWrite`, `dbAuditWriter`, `writeJobAudit` (v5.15.0: the one writer of job, queue and CLI audit rows), `elideArrays` (v5.14.0, D2: an array over 50 items is stored as `[N items, sha256:<hex>]`; AL-4) | `http/audit`, `audit-token`, `timestamps` |
 | `errors.ts` | `AppError`, `errorBody`, `registerErrorHandling` | `http/errors` |
 | `rate-limit.ts` | `registerRateLimit` | `http/rate-limit`, `rate-limit-replay`, `http/unit/rate-limit` |
 | `openapi.ts` | `SUMMARIES` map, `collectOpenApiRoutes`, `buildOpenApi`, `registerOpenApi` | `contract/contract-doc`, `http/openapi`, `openapi-schema` |
 | `canonical-json.ts`, `methods.ts` | request hashing, method list | `http/unit/canonical-json` |
 
 ### db (`src/db/`)
-`client.ts` (pool max 20 since v5.14.0: `/report` runs its parts together; `createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1764700000000_v5-14-0.sql`: R3 indexes (`screening_results (run_id, item_idx)`, `(cached_from)`, `screening_packs (run_id)`, `domain_records (source_run_id)`, kept-only `drop_list_rows` indexes, `audit_log (path, at desc)`, GIN `screening_runs.input jsonb_path_ops` for the buy-hold lookup), the retention delete-carve-out on five more append-only tables, and the one-off cleanup of identical consecutive `engine_endings` rows; before it `1764600000000_v5-13-0.sql`: `screening_runs.cancel_reason` (M15); before it `1764500000000_v5-12-0.sql`: domain_rdap, live_checks, tm_kills, bigco_names, sales_comps (CR-063); before it `1764400000000_v5-11-0.sql`: namebio_keyword_stats, namebio_tld_stats, namebio_calls (CR-062); before it `1764300000000_v5-10-0.sql`: token scope `data` (api_tokens and audit_log CHECKs), `settings.engine_sales_max_date` (CR-061); before it `1764200000000_v5-9-0.sql`: `settings.s8_bin_ladder` (CR-060); before it `1764100000000_v5-8-0.sql`: `domains.lane` (NULL = Line 1, `S8` = Line 2), `settings.s8_max_price_cents`, `settings.s8_reserved_slots`; before it `1764000000000_v5-7-0.sql`: owned_ending_events; before it `1763900000000_v5-5-0.sql`: engine_models, tld com, job kind train; before it `1763800000000_v5-4-0.sql`: engine_uploads, engine_sales, engine_unsold, engine_endings; before it `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; one file per migration, `ls migrations`). Run with `npm run migrate`.
+`client.ts` (pool max 20 since v5.14.0: `/report` runs its parts together; `createDb` with a `log` option, `pingDb`, `poolConfig`; v3.9.0: `attachPoolErrorHandler`, pool connection/idle timeouts), `types.ts` (Kysely `Database` interface, one table type per table; about 1,050 lines, hand-written). Migrations: `migrations/<epoch-ms>_<name>.sql`, plain SQL for node-pg-migrate, ordered by the numeric prefix (latest `1764800000000_v5-15-0.sql`: drops `namebio_tld_stats`; before it `1764700000000_v5-14-0.sql`: R3 indexes (`screening_results (run_id, item_idx)`, `(cached_from)`, `screening_packs (run_id)`, `domain_records (source_run_id)`, kept-only `drop_list_rows` indexes, `audit_log (path, at desc)`, GIN `screening_runs.input jsonb_path_ops` for the buy-hold lookup), the retention delete-carve-out on five more append-only tables, and the one-off cleanup of identical consecutive `engine_endings` rows; before it `1764600000000_v5-13-0.sql`: `screening_runs.cancel_reason` (M15); before it `1764500000000_v5-12-0.sql`: domain_rdap, live_checks, tm_kills, bigco_names, sales_comps (CR-063); before it `1764400000000_v5-11-0.sql`: namebio_keyword_stats, namebio_tld_stats, namebio_calls (CR-062); before it `1764300000000_v5-10-0.sql`: token scope `data` (api_tokens and audit_log CHECKs), `settings.engine_sales_max_date` (CR-061); before it `1764200000000_v5-9-0.sql`: `settings.s8_bin_ladder` (CR-060); before it `1764100000000_v5-8-0.sql`: `domains.lane` (NULL = Line 1, `S8` = Line 2), `settings.s8_max_price_cents`, `settings.s8_reserved_slots`; before it `1764000000000_v5-7-0.sql`: owned_ending_events; before it `1763900000000_v5-5-0.sql`: engine_models, tld com, job kind train; before it `1763800000000_v5-4-0.sql`: engine_uploads, engine_sales, engine_unsold, engine_endings; before it `1763400000000_v5-0-0.sql`: G-86 drops `settings.poc_cap_cents`, `tranches.spend_cap_cents`, `tranche_members.est_cost_cents`; before it `1763300000000_v4-2-0.sql`: keyword_demand_uploads, keyword_demand; before it `1763200000000_v4-1-0.sql` sibling_scans and `1763100000000_v3-11-0.sql`: cap 40, horizon / group / buy card columns, portfolio_stats, outreach_emails, holdout, sales patterns, listing_sync_log; one file per migration, `ls migrations`). Run with `npm run migrate`.
 
 ## 3. Where do I change X?
 

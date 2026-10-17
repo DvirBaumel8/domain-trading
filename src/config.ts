@@ -7,13 +7,13 @@ import { REGISTRAR_ENV } from './modules/registrars/index.js';
 const CODE_REPO = 'DvirBaumel8/domain-trading';
 
 /** The service's own public URL (the job queue's keep-alive ping). */
-export const DEFAULT_PUBLIC_BASE_URL = 'https://domain-trading-api.onrender.com';
+const DEFAULT_PUBLIC_BASE_URL = 'https://domain-trading-api.onrender.com';
 
 /** CR-062: a published NameBio file is fetched only from an https URL on namebio.com (the module re-checks before every request). */
 const isNameBioFileUrl = (v: string): boolean => {
   const u = new URL(v);
   if (u.protocol !== 'https:' || u.search !== '') return false;
-  if (u.hostname === 'api.namebio.com') return ['/retailstats-download', '/tldstats-download', '/verisign-download'].includes(u.pathname);
+  if (u.hostname === 'api.namebio.com') return ['/retailstats-download'].includes(u.pathname);
   return u.hostname === 'namebio.com' || u.hostname.endsWith('.namebio.com');
 };
 
@@ -32,8 +32,6 @@ const EnvSchema = z.object({
   GOOGLE_WEB_RISK_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   COMPANIES_HOUSE_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   NAMEBIO_RETAILSTATS_CSV_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine(isNameBioFileUrl, 'NAMEBIO_RETAILSTATS_CSV_URL must be an https URL on namebio.com').optional()),
-  NAMEBIO_TLDSTATS_CSV_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine(isNameBioFileUrl, 'NAMEBIO_TLDSTATS_CSV_URL must be an https URL on namebio.com').optional()),
-  NAMEBIO_DROP_ORDER_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine(isNameBioFileUrl, 'NAMEBIO_DROP_ORDER_URL must be an https URL on namebio.com').optional()),
   GEMINI_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   SPACESHIP_SELLERHUB_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   SPACESHIP_SELLERHUB_API_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
@@ -65,7 +63,7 @@ export interface Config {
   webRiskApiKey: string | undefined;
   companiesHouseApiKey: string | undefined;
   /** v5.11.0 (CR-062): the published NameBio CSV file URLs; both undefined -> the daily step asks RetailStats per keyword. */
-  namebio: { retailstatsCsvUrl: string | undefined; tldstatsCsvUrl: string | undefined; dropOrderUrl: string | undefined };
+  namebio: { retailstatsCsvUrl: string | undefined };
   /** v4.0.0 (CR-049): Spaceship SellerHub key and secret (scopes sellerhub:read, sellerhub:write only). Either missing -> the listingSync step is skipped. */
   sellerhub: { apiKey: string | undefined; apiSecret: string | undefined; baseUrl: string };
   /** Public base URL of this service, without a trailing slash (the job queue's keep-alive ping). */
@@ -160,7 +158,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     onRender: Boolean(env.RENDER),
     webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,
     companiesHouseApiKey: e.COMPANIES_HOUSE_API_KEY ? e.COMPANIES_HOUSE_API_KEY : undefined,
-    namebio: { retailstatsCsvUrl: e.NAMEBIO_RETAILSTATS_CSV_URL, tldstatsCsvUrl: e.NAMEBIO_TLDSTATS_CSV_URL, dropOrderUrl: e.NAMEBIO_DROP_ORDER_URL },
+    namebio: { retailstatsCsvUrl: e.NAMEBIO_RETAILSTATS_CSV_URL },
     backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },
     version: readVersion(),
     env: Object.freeze(strings),

@@ -101,13 +101,13 @@ export async function collectBackupFiles(db: Kysely<Database>): Promise<Map<stri
   });
 }
 
-export class BackupError extends Error {}
+class BackupError extends Error {}
 
 export interface BackupResult { skipped?: boolean; reason?: string; committed?: boolean; commit?: string; files?: number; changed?: number }
 
 const API = 'https://api.github.com';
 /** The only branch the job ever writes. Fixed in code, not configurable: no env value can steer a write to main. */
-export const BACKUP_BRANCH = 'data-backup';
+const BACKUP_BRANCH = 'data-backup';
 const enc = encodeURIComponent;
 
 /** git blob sha: sha1("blob <bytes>\0<content>"). */

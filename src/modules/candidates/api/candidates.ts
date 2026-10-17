@@ -20,13 +20,13 @@ import { RECORD_FRESH_DAYS, RECORD_KINDS, freshUntil, isFresh, type RecordKind }
 const parseRecord = (kind: RecordKind, record: unknown) => (kind === 'tm_us' ? TmManual.parse(record) : HistoryManual.parse(record));
 
 /** What POST /candidates/screen needs of the job queue (the ops module is above this one, so app.ts passes it in). */
-export interface ScreenQueue {
+interface ScreenQueue {
   enqueue(job: 'screen', opts: { trigger: 'manual'; triggeredBy: string; params: unknown }): Promise<{ runId: string; skipped: boolean }>;
   kick(): void;
 }
 export interface CandidatesDeps { db: Kysely<Database>; now: () => number; worker: ScreeningWorker; queue?: () => ScreenQueue }
 /** Manual rebuilds of today's list allowed per IDT day (the daily step does not count). */
-export const DAILY_REBUILD_MAX_PER_DAY = 6;
+const DAILY_REBUILD_MAX_PER_DAY = 6;
 
 const RECORD_KINDS_ALL = [...RECORD_KINDS, SELLERS_KIND] as const; // v3.3.0 (CR-023 B): `sellers` is a record kind of its own (its window is the setting freshness_hours.sellers)
 const Body = z.object({
@@ -36,7 +36,7 @@ const Body = z.object({
   checked_at: z.iso.datetime({ offset: true }).optional(),
 }).strict();
 /** v3.3.0 (CR-021): `max_names` caps the names of one on-demand run (the allowance still applies). */
-export const ScreenBody = z.object({
+const ScreenBody = z.object({
   max_names: z.number().int().min(1).max(100).optional(),
   /** v3.4.0 (CR-026): screen only these names; a screened name goes in again only when the settings version or its records changed since its last screening. */
   domains: z.array(z.string().trim().min(1).max(253)).min(1).max(30).optional(),

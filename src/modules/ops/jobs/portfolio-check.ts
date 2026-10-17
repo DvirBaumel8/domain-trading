@@ -6,7 +6,7 @@ import { trySessionLock } from '../../../core/locks.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../../db/types.js';
 import { idtDay } from '../../../core/dates.js';
-import { newAuditId } from '../../../http/audit.js';
+import { writeJobAudit } from '../../../http/audit.js';
 import { BlockedError, safeFetch } from '../../../core/safe-fetch.js';
 import { USER_AGENT, type RdapLookupFn } from '../../../core/rdap.js';
 import { surblCheck } from '../../selection/index.js';
@@ -19,26 +19,25 @@ type Status = 'ok' | 'fail' | 'unknown';
 type Kind = 'registry' | 'web' | 'blocklist' | 'price';
 
 /** How our `domains.registrar` code appears in an RDAP registrar name. An unlisted code is compared as a case-insensitive substring. */
-export const REGISTRAR_NAME_PATTERNS: Readonly<Record<string, RegExp>> = { godaddy: /godaddy/i, porkbun: /porkbun/i, dynadot: /dynadot/i };
+const REGISTRAR_NAME_PATTERNS: Readonly<Record<string, RegExp>> = { godaddy: /godaddy/i, porkbun: /porkbun/i, dynadot: /dynadot/i };
 /** Statuses that mean the name is not freely ours (compared lowercase, without spaces, so `pendingDelete` and `pending delete` are the same). */
-export const BAD_REGISTRY_STATUSES = ['client hold', 'server hold', 'pending delete', 'redemption period'] as const;
+const BAD_REGISTRY_STATUSES = ['client hold', 'server hold', 'pending delete', 'redemption period'] as const;
 /** What a working lander's front page (or its Location header) contains. A lander without an entry only has to answer 2xx or 3xx. */
-export const LANDER_SIGNATURES: Readonly<Record<string, RegExp[]>> = { afternic: [/\/lander/i, /afternic/i, /godaddy/i], sedo: [/sedo/i] };
-export const WEB_CHECK_TIMEOUT_MS = 10_000;
-export const WEB_BODY_BYTES = 4096;
+const LANDER_SIGNATURES: Readonly<Record<string, RegExp[]>> = { afternic: [/\/lander/i, /afternic/i, /godaddy/i], sedo: [/sedo/i] };
+const WEB_CHECK_TIMEOUT_MS = 10_000;
 /** v4.0.0 (CR-049 item 3): the lander page is read up to this many bytes per hop, through at most LANDER_MAX_HOPS redirects. */
-export const LANDER_BODY_BYTES = 200_000;
-export const LANDER_MAX_HOPS = 3;
+const LANDER_BODY_BYTES = 200_000;
+const LANDER_MAX_HOPS = 3;
 const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME|HOSTNAME_MISMATCH/i;
 
 /** The Buy Now amount a lander page shows (an amount within 80 characters after "buy now" / "buy it now"), in cents, or null when the page shows none. */
-export function shownBuyNowCents(text: string): number | null {
+function shownBuyNowCents(text: string): number | null {
   const m = /buy\s*(?:it\s*)?now[^$]{0,80}\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?/i.exec(text) ?? /\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?[^<]{0,40}buy\s*(?:it\s*)?now/i.exec(text);
   if (!m) return null;
   return Number(m[1]!.replace(/,/g, '')) * 100 + Number(m[2] ?? 0);
 }
 /** The price check of a readable lander page: shown Buy Now against the plan BIN; null shown = the page shows no amount (often script-rendered): unknown, never a mismatch. */
-export function landerPriceCheck(text: string, d: { bin_cents: number | null; listing_mode: string | null }): { status: Status; details: Record<string, unknown> } | null {
+function landerPriceCheck(text: string, d: { bin_cents: number | null; listing_mode: string | null }): { status: Status; details: Record<string, unknown> } | null {
   if (d.bin_cents === null) return null;
   const shown = shownBuyNowCents(text);
   const makeOffer = /make\s+(?:an\s+)?offer|submit\s+(?:an\s+)?offer|your\s+offer/i.test(text);
@@ -48,7 +47,7 @@ export function landerPriceCheck(text: string, d: { bin_cents: number | null; li
   return { status: shown === d.bin_cents ? 'ok' : 'fail', details };
 }
 /** A name's blocklist lookup is repeated when its latest one is at least this old. */
-export const BLOCKLIST_EVERY_DAYS = 7;
+const BLOCKLIST_EVERY_DAYS = 7;
 
 const squash = (s: string) => s.toLowerCase().replace(/\s+/g, '');
 const tally = () => ({ ok: 0, fail: 0, unknown: 0 });
@@ -105,10 +104,10 @@ export class PortfolioCheckJob {
         out.names.push(row);
       }
       if (!dryRun) {
-        await db.insertInto('audit_log').values({
-          id: newAuditId(), at: new Date(this.deps.now()), scope: 'job', method: 'JOB', path: 'portfolio-check', request: JSON.stringify({}), status_code: 200,
-          result_summary: `checked ${out.checked}; registry fail ${out.registry.fail}; web fail ${out.web.fail}; blocklist fail ${out.blocklist.fail}`,
-        }).execute();
+        await writeJobAudit(db, {
+          path: 'portfolio-check', request: {}, at: new Date(this.deps.now()),
+          summary: `checked ${out.checked}; registry fail ${out.registry.fail}; web fail ${out.web.fail}; blocklist fail ${out.blocklist.fail}`,
+        });
       }
       return out;
     } finally {

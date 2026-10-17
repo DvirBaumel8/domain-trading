@@ -27,7 +27,7 @@ function counts(ms: Mem[]): Counts {
 }
 
 /** Main-lane share needed for `n` members: `min_main_lane` of `size`, rounded up (a full 15 needs 10; 3 members need 2). */
-export const requiredMainLane = (n: number, size: number, min: number): number => (size > 0 ? Math.ceil((n * min) / size) : 0);
+const requiredMainLane = (n: number, size: number, min: number): number => (size > 0 ? Math.ceil((n * min) / size) : 0);
 
 export class TrancheService {
   constructor(private readonly db: Kysely<Database>) {}

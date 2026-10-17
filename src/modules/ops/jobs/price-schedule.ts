@@ -3,7 +3,7 @@ import { trySessionLock } from '../../../core/locks.js';
 import type { Database, DomainRow, ListingMode, PriceScheduleTable } from '../../../db/types.js';
 import type { Selectable } from 'kysely';
 import { idtDay, isYmd } from '../../../core/dates.js';
-import { newAuditId } from '../../../http/audit.js';
+import { writeJobAudit } from '../../../http/audit.js';
 import { hybridBinMin } from '../../listing/index.js';
 import { isV3, settingsByVersion, type PricingSettings } from '../../listing/index.js';
 import { changedColumns } from '../../listing/index.js';
@@ -21,7 +21,7 @@ export interface PriceJobResult {
 
 
 /** V5/V6 re-check of a planned row against the settings version it was planned under (R8). Returns a reason or null. */
-export function rowValid(row: Pick<Row, 'bin_cents' | 'floor_cents' | 'walkaway_cents'>, s: PricingSettings, mode: ListingMode | null, lane: 'S8' | null = null): string | null {
+function rowValid(row: Pick<Row, 'bin_cents' | 'floor_cents' | 'walkaway_cents'>, s: PricingSettings, mode: ListingMode | null, lane: 'S8' | null = null): string | null {
   const { bin_cents: bin, floor_cents: floor, walkaway_cents: walk } = row;
   if (bin === null || floor === null || walk === null) return 'row has no prices';
   if ([bin, floor, walk].some((v) => v % 100 !== 0)) return 'prices are not whole dollars';
@@ -76,10 +76,7 @@ export class PriceScheduleJob {
           out.failed.push({ domain: d.domain, rowId: 0, reason: 'error' });
           if (!dryRun) {
             try {
-              await this.deps.db.insertInto('audit_log').values({
-                id: newAuditId(), scope: 'job', method: 'JOB', path: 'price-schedule',
-                request: JSON.stringify({ domain: d.domain, today }), status_code: 500, result_summary: `error: ${message}`,
-              }).execute();
+              await writeJobAudit(this.deps.db, { path: 'price-schedule', request: { domain: d.domain, today }, status: 500, summary: `error: ${message}` });
             } catch (ae) {
               this.deps.log?.error({ domain: d.domain, errMessage: (ae as Error).message }, 'price job error audit failed');
             }
@@ -106,10 +103,7 @@ export class PriceScheduleJob {
     };
     const audit = async (event: string, rowId: number, summary: string, code = 200) => {
       if (dry) return;
-      await q.insertInto('audit_log').values({
-        id: newAuditId(), scope: 'job', method: 'JOB', path: 'price-schedule',
-        request: JSON.stringify({ domain, event, row_id: rowId, today }), status_code: code, result_summary: summary,
-      }).execute();
+      await writeJobAudit(q, { path: 'price-schedule', request: { domain, event, row_id: rowId, today }, status: code, summary });
     };
 
     // other plans' planned rows should not exist; retire them

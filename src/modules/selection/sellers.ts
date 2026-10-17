@@ -11,15 +11,15 @@ import { classifySite, fetchPage, type RobotsRule } from './site.js';
 import type { CheckContext } from './types.js';
 
 export const SELLERS_KIND = 'sellers';
-export const SELLERS_MAX = 10;
+const SELLERS_MAX = 10;
 /** The window of a sellers list when the settings have no `freshness_hours.sellers` (hours). */
-export const SELLERS_FRESH_HOURS_DEFAULT = 720;
+const SELLERS_FRESH_HOURS_DEFAULT = 720;
 const HOUR_MS = 3_600_000;
 
 const httpUrl = z.string().trim().min(1).max(500).refine((u) => {
   try { return /^https?:$/.test(new URL(u).protocol); } catch { return false; }
 }, 'an http or https URL');
-export const SellerEntry = z.object({ name: z.string().trim().min(1).max(100), url: httpUrl }).strict();
+const SellerEntry = z.object({ name: z.string().trim().min(1).max(100), url: httpUrl }).strict();
 export const SellersList = z.array(SellerEntry).max(SELLERS_MAX);
 export type SellerEntryT = z.infer<typeof SellerEntry>;
 

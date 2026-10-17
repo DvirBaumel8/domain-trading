@@ -61,6 +61,3 @@ export async function patchActiveSettings(path: string[], value: unknown): Promi
     await sql`SET session_replication_role = origin`.execute(conn);
   });
 }
-
-/** Switches `sources.wayback` on in the active (seeded) settings. It ships off for good (Amendment B1); only these tests switch it on. */
-export const enableWayback = (): Promise<void> => patchActiveSettings(['sources', 'wayback'], true);

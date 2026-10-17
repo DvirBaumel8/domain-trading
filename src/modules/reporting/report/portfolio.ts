@@ -22,7 +22,7 @@ export async function ledgerRows(db: Kysely<Database>, f: LedgerFilter) {
   return q.orderBy('ledger_entries.occurred_on').orderBy('ledger_entries.id').execute();
 }
 
-export const LEDGER_CSV_HEADER = ['date', 'type', 'domain', 'deal_id', 'amount_usd', 'counterparty', 'receipt_ref', 'note'];
+const LEDGER_CSV_HEADER = ['date', 'type', 'domain', 'deal_id', 'amount_usd', 'counterparty', 'receipt_ref', 'note'];
 export const ledgerCsvRows = (rows: Awaited<ReturnType<typeof ledgerRows>>): string[][] => [
   LEDGER_CSV_HEADER,
   ...rows.map((r) => [r.occurred_on, r.type, r.domain ?? '', r.deal_id ?? '', usdSigned(r.amount_cents), r.counterparty ?? '', r.receipt_ref ?? '', r.note ?? '']),

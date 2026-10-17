@@ -5,7 +5,7 @@ import { MIGRATIONS_FILE, migrationNames } from './backup-export.js';
 import { newAuditId } from '../../../http/audit.js';
 import type { Database } from '../../../db/types.js';
 
-export class ImportError extends Error {}
+class ImportError extends Error {}
 
 type Row = Record<string, unknown>;
 

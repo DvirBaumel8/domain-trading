@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
-import { addDays, idtMidnightIso, toJerusalemIso } from '../../core/dates.js';
+import { addDays, idtMidnightIso } from '../../core/dates.js';
 import { latestByCheck } from './derive.js';
 import { loadRows } from './engine.js';
 import { decideReplayRow, cell, type LabelledFeatures, type LabelledRow } from './replay.js';

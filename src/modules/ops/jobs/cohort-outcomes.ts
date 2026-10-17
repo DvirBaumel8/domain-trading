@@ -8,7 +8,7 @@ import { addDays, idtDay } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { COHORT_OUTCOMES_MAX_PER_RUN, FINAL_DROP, REREG_DAYS, freezeReadyCohorts } from '../../candidates/index.js';
 import { MAX_UNKNOWN_CHECKS, freshLookups, isPendingDelete } from '../../candidates/index.js';
-import { newAuditId } from '../../../http/audit.js';
+import { writeJobAudit } from '../../../http/audit.js';
 import type { CachedLookup } from '../../selection/index.js';
 import type { ScreeningDeps } from '../../selection/index.js';
 
@@ -39,7 +39,7 @@ export function dropOutcomeOf(r: Pick<CachedLookup, 'outcome' | 'facts' | 'reaso
 }
 
 /** A re-registration outcome: registered with a creation date at or after the drop outcome's check is yes; not registered is no; anything else unknown. */
-export function rereg(r: Pick<CachedLookup, 'outcome' | 'facts' | 'reasonCode'>, dropAt: Date): Outcome {
+function rereg(r: Pick<CachedLookup, 'outcome' | 'facts' | 'reasonCode'>, dropAt: Date): Outcome {
   const blank = { created_at_registry: null, registrar: null, reason_code: null };
   if (r.outcome === 'not_registered') return { result: 'no', ...blank };
   if (r.outcome === 'unknown' || !r.facts) return { result: 'unknown', ...blank, reason_code: r.reasonCode ?? 'SOURCE_ERROR' };
@@ -111,10 +111,7 @@ export class CohortOutcomesJob {
         if (!dryRun) await db.insertInto('cohort_outcomes').values(values).execute();
       });
       if (!dryRun) {
-        await db.insertInto('audit_log').values({
-          id: newAuditId(), at: new Date(now()), scope: 'job', method: 'JOB', path: 'cohort-outcomes', request: JSON.stringify({}), status_code: 200,
-          result_summary: `frozen ${out.frozen}; checked ${out.checked}; left ${out.left_for_next_run}`,
-        }).execute();
+        await writeJobAudit(db, { path: 'cohort-outcomes', request: {}, at: new Date(now()), summary: `frozen ${out.frozen}; checked ${out.checked}; left ${out.left_for_next_run}` });
       }
       return out;
     } finally {

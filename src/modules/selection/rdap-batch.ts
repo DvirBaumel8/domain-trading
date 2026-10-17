@@ -11,7 +11,7 @@ import type { CheckContext, ScreeningDeps } from './types.js';
 export const TEST_SET_RDAP_CONCURRENCY = 4;
 export const TEST_SET_RDAP_MIN_MS = 250;
 /** Adaptive slow-down (v2.7.0): each 429 or refusal doubles the gap up to this cap; after two of them concurrency drops to 1. */
-export const RDAP_MAX_MIN_MS = 4000;
+const RDAP_MAX_MIN_MS = 4000;
 /** v2.11.1 circuit breaker: after this many refusals in a row from one host (within one pacer's life) that host is not asked again; lookups return UNKNOWN RATE_LIMITED at once. */
 export const HOST_BREAKER_REFUSALS = 5;
 
@@ -238,7 +238,7 @@ async function bodyOf(db: Kysely<Database>, row: NonNullable<FileRow>): Promise<
  * (the caller answers UNKNOWN, not "no registry"). null = the bootstrap has no entry for the TLD. `enabled` false returns null.
  */
 const failedAt = new WeakMap<ScreeningDeps, number>(); // per app: when the last bootstrap refresh failed
-export const BOOTSTRAP_COOLDOWN_MINUTES = 60;
+const BOOTSTRAP_COOLDOWN_MINUTES = 60;
 
 export async function rdapBaseFor(db: Kysely<Database>, deps: ScreeningDeps, tld: string, o: { enabled: boolean; now?: () => number; cooldownMinutes?: number }): Promise<string | null> {
   if (!o.enabled) return null;
@@ -281,7 +281,7 @@ export async function rdapBaseFor(db: Kysely<Database>, deps: ScreeningDeps, tld
 }
 
 /** What lookupCached needs from a pacer. */
-export interface Pace {
+interface Pace {
   run<T>(fn: () => Promise<T>): Promise<T>;
   slowDown(): void;
   noteNotRefused(): void;

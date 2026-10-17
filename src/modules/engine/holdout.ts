@@ -5,8 +5,6 @@ import { advisoryXactLock } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 
-export const DEFAULT_SALES_MAX_DATE = '2026-10-14';
-
 /** Rows dated after this IDT calendar date are rejected with HOLDOUT_SEALED (sales by sale_date, unsold by observation_date). */
 export async function salesMaxDate(db: Kysely<Database>): Promise<string> {
   const r = await db.selectFrom('settings').select('engine_sales_max_date').executeTakeFirstOrThrow();

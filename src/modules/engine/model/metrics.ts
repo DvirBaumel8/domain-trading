@@ -67,7 +67,7 @@ export function aucWithCi(scores: ArrayLike<number>, labels: ArrayLike<number>, 
 }
 
 /** Rows ordered best score first; equal scores keep input order. */
-export function bestFirst(scores: ArrayLike<number>): Int32Array {
+function bestFirst(scores: ArrayLike<number>): Int32Array {
   const idx = Int32Array.from({ length: scores.length }, (_, i) => i);
   return idx.sort((a, b) => scores[b]! - scores[a]! || a - b);
 }

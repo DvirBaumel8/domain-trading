@@ -2,22 +2,22 @@
 // clauses and the gate list per lane. Code holds mechanics only. Drafts come in by dotted path; activation needs Dvir's
 // approval_ref; the priors are locked against API drafts (SEL9-2).
 import { advisoryXactLock } from '../../core/locks.js';
-import { sql, type Kysely, type Selectable } from 'kysely';
+import type { Kysely, Selectable } from 'kysely';
 import { z } from 'zod';
 import type { Database, SelectionSettingsTable } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 import { requireNamedApproval } from './approval.js';
 import { DEPENDS_ON } from './depends.js';
 
-export const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short', 'lane', 'sellers_verified_n', 'sellers_unknown_n'] as const;
+const TIER_FEATURES = ['registered_share', 'prior_history', 'alt_tld_before_n', 'n_words', 'sld_chars', 'is_geo', 'gform1_pass', 'short', 'lane', 'sellers_verified_n', 'sellers_unknown_n'] as const;
 export const CHECK_IDS = ['form', 'brand_lists', 'typo', 'availability', 'concentration', 'surbl', 'web_risk', 'history', 'tm_us', 'tm_eu', 'census', 'ext_dates', 'same_name', 'tier', 'namebio', 'quote', 'price', 'pack', 'leads', 'lookalikes', 'demand', 'companies'] as const;
 /** Checks that only produce an input feature (a failed lookup makes the feature unknown, it does not stop the run). */
-export const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio', 'lookalikes', 'demand', 'companies'] as const;
+const FEATURE_CHECK_IDS = ['census', 'ext_dates', 'namebio', 'lookalikes', 'demand', 'companies'] as const;
 /** Feature checks that every plan ends with while their own `enabled` setting is on (v3.10.0 lookalikes, v4.2.0 demand and companies). */
 export const APPENDED_FEATURE_CHECKS = ['lookalikes', 'demand', 'companies'] as const;
 /** Settings the API can never draft a change to (SEL9-2): only a migration changes them. */
 /** `holdout` is locked too: the gate that clears `buy_hold` can't be redefined by the draft that clears it. */
-export const LOCKED_PREFIXES = ['tier.p_passive', 'lead.p_lead', 'priors_v91', 'holdout'];
+const LOCKED_PREFIXES = ['tier.p_passive', 'lead.p_lead', 'priors_v91', 'holdout'];
 export const LANES = ['S2', 'S3', 'S4', 'S6', 'S7'] as const;
 const TIERS = ['A', 'I', 'B', 'G', 'L'] as const;
 const OPS = ['>=', '<=', '>', '<', '==', '!='] as const;
@@ -49,10 +49,10 @@ const Clause = z.union([z.object({ all: z.array(Cond).min(1) }).strict(), z.obje
 
 // v1.2.0 (CR-001 P1b) settings. The stored v1 row has none of these keys: every one carries a zod default holding the full literal value.
 /** v3.2.0 (CR-020 D): which lanes count as "main lane" for the tranche quota, and what a member of that lane must show. The default is the rule of v3.1.x exactly. */
-export const MAIN_LANES_DEFAULT: { lane: Lane; require: 'clean_history' | 'demand2' | 'none' }[] = [{ lane: 'S7', require: 'clean_history' }, { lane: 'S3', require: 'demand2' }];
+const MAIN_LANES_DEFAULT: { lane: Lane; require: 'clean_history' | 'demand2' | 'none' }[] = [{ lane: 'S7', require: 'clean_history' }, { lane: 'S3', require: 'demand2' }];
 /** v3.2.0 (CR-020 A): the share of the day's intake screening budget that drop-list names may take at most (1 = no extra cap: they only fill what scout names leave). */
 /** v3.3.0: `on_demand_screen_daily_max` (CR-021) is the most names POST /candidates/screen screens per IDT day (its own allowance); `drop_feed_stale_days` / `drop_feed_stale_level` (CR-023 G) are when `/report` calls the newest drop list stale and at what level. */
-export const INTAKE_DEFAULT = {
+const INTAKE_DEFAULT = {
   drop_list_max_share: 1, on_demand_screen_daily_max: 30, drop_feed_stale_days: 7, drop_feed_stale_level: 'info' as 'info' | 'warn',
   /** v3.10.0 (CR-043): 0 = off. At least this many VERIFIED sellers, else the tier check FAILs SELLERS_TOO_FEW. */
   require_sellers_min: 0,
@@ -62,7 +62,7 @@ export const INTAKE_DEFAULT = {
   topic_window_days: 30,
 };
 /** v3.10.0 (CR-043, G-70): the lookalike check (other endings, hyphenated, get-/try-). A feature check: it informs, never rejects. */
-export const LOOKALIKES_DEFAULT = {
+const LOOKALIKES_DEFAULT = {
   enabled: true, endings: ['net', 'org', 'io', 'co', 'ai', 'co.uk'], prefixes: ['get', 'try'],
   /** Home-page fetch of a registered lookalike: tight timeout and body cap. */
   timeout_ms: 5000, max_bytes: 100_000,
@@ -70,9 +70,9 @@ export const LOOKALIKES_DEFAULT = {
   max_checks: 12,
 };
 /** v4.2.0 (CR-044 item 3): the keyword demand input (the monthly Keyword Planner upload). A feature check: it informs, never rejects. `keep_min_searches`: the renewal drop check keeps a name at or above it. */
-export const DEMAND_DEFAULT = { enabled: true, keep_min_searches: 10 };
+const DEMAND_DEFAULT = { enabled: true, keep_min_searches: 10 };
 /** v4.2.0 (CR-046 item 2): Companies House company-name matches (UK, free API key). A feature check: it informs, never rejects. Needs COMPANIES_HOUSE_API_KEY; without it the check answers UNKNOWN SOURCE_DISABLED. */
-export const COMPANIES_DEFAULT = { enabled: true, max_per_minute: 60, timeout_ms: 8000 };
+const COMPANIES_DEFAULT = { enabled: true, max_per_minute: 60, timeout_ms: 8000 };
 /**
  * v4.1.0 (CR-050): the sibling scan. Endings and prefixes checked next to the .com, the lead points (10 per live business sibling, 2 per registered-but-parked
  * one, at most `max`), how many of each count, the most names checked per scan, and the time budget of one POST (seconds). Page timeout and size come from `lookalikes`.
@@ -83,7 +83,7 @@ export const SIBLINGS_DEFAULT = {
   max_checks: 14, time_budget_seconds: 80,
 };
 /** v4.0.0 (CR-046 item 3): the renewal maths at /buy. ratio = BIN x (1 - commission) x STRe / renewal cost; under `renewal_math_min` the buy is refused. */
-export const BUY_DEFAULT = {
+const BUY_DEFAULT = {
   exclude_lanes: [] as Lane[],
   renewal_math_min: 1,
   /** The venue whose commission the maths uses, and the commission per venue as a share (Afternic 20%, SellerHub 10%). */
@@ -91,16 +91,16 @@ export const BUY_DEFAULT = {
   commission: { afternic: 0.2, sellerhub: 0.1 } as Record<string, number>,
 };
 /** v4.0.0 (CR-045): the renewal-time drop check (days before expiry), the sell-before-drop listing lead, and the horizon rule (months; warning days before the date). */
-export const RENEWAL_DEFAULT = { drop_check_days: 60, list_by_days_before_expiry: 30, horizon_months: 12, horizon_due_days: 30 };
+const RENEWAL_DEFAULT = { drop_check_days: 60, list_by_days_before_expiry: 30, horizon_months: 12, horizon_due_days: 30 };
 /** v4.0.0 (CR-045 item 5, as amended): the outreach log cap per name. */
-export const OUTREACH_DEFAULT = { max_emails_per_name: 5 };
+const OUTREACH_DEFAULT = { max_emails_per_name: 5 };
 /** v4.0.0 (CR-044 items 4 and 6, CR-045 item 3): the monthly holdout sample and its re-check delay; the sales-pattern default price band; sales judged after this many months. */
-export const PORTFOLIO_DEFAULT = {
+const PORTFOLIO_DEFAULT = {
   holdout_passed_n: 20, holdout_failed_n: 20, holdout_recheck_months: 6,
   patterns_min_cents: 100_000, patterns_max_cents: 500_000, judge_sales_months: 24,
 };
-export const EU_TM_DEFAULT = { required_lanes: ['S6'] as Lane[], freshness_hours: 168 };
-export const SAME_NAME_DEFAULT = {
+const EU_TM_DEFAULT = { required_lanes: ['S6'] as Lane[], freshness_hours: 168 };
+const SAME_NAME_DEFAULT = {
   min_visible_chars: 200, timeout_ms: 10_000, max_bytes: 512_000, max_redirects: 3, min_ms_between_fetches: 1000,
   max_unknown_sites: 0, parked_max_text_chars: 1500, product_markers: ['\u2122', '\u00ae', '(tm)', '(r)'],
 };
@@ -110,7 +110,7 @@ export const PACK_DEFAULT = {
   availability_max_age_hours: 24,
   max_age_at_buy_hours: 72, // v2.0.0 (ruling G-75, DOM default): how old the pack may be at a real /buy
 };
-export const LEAD_VERIFY_DEFAULT = {
+const LEAD_VERIFY_DEFAULT = {
   time_budget_minutes: 15, fetch_timeout_ms: 10_000, min_ms_between_fetches: 1000, max_bytes: 512_000,
   size_max: 10, long_sld_min: 16, d1_min_unrelated_users: 3, verified_max_age_days: 14,
   weaker_share_min: 0.8, never_pitch_share_max: 0.3,
@@ -253,7 +253,9 @@ const Base = z.object({
     risk_raw: z.object({ clean: nonneg, flag: nonneg }).strict(),
     forbidden_feature_keys: z.array(z.string().min(1)),
   }).strict(),
-  namebio: z.object({ max_cache_age_hours: int, spot_max_per_min: int, attribution: z.string() }).strict(),
+  /** `spot_max_per_min` (unused since CR-062, the rate limits live in code) is dropped when a stored version still carries it, so old versions parse. */
+  namebio: z.preprocess((v) => { if (typeof v === 'object' && v !== null) { const { spot_max_per_min: _legacy, ...rest } = v as Record<string, unknown>; return rest; } return v; },
+    z.object({ max_cache_age_hours: int, attribution: z.string() }).strict()),
   quote: z.object({ max_age_hours: int, manual_max_age_days: int }).strict(),
   web_risk: z.object({ safe_statuses: z.array(int), unsafe_statuses: z.array(int), requires_clean_history: z.boolean() }).strict(),
   freshness_hours: z.record(z.string(), int),
@@ -271,7 +273,8 @@ const Base = z.object({
     report_bands: z.array(int), lane_report: z.boolean(), base_rates: z.array(share),
   }).strict(),
   sources: z.object({
-    surbl: z.boolean(), popularity: z.boolean(), namebio: z.boolean(), wayback: z.boolean(),
+    /** The Internet Archive is never automated (Dvir 6 and 14 Oct 2026): kept so stored settings parse; only false is valid. */
+    surbl: z.boolean(), popularity: z.boolean(), namebio: z.boolean(), wayback: z.literal(false),
     rdap_com: z.boolean(), rdap_other: z.boolean(), iana_bootstrap: z.boolean(),
     /** Operator and firm home pages (CAP-12, CAP-15); recorded in docs/internal/sources.md before any code reads it. */
     business_sites: z.boolean().default(true),
@@ -449,7 +452,7 @@ export const DEFAULT_SELECTION_VALUES: SelectionValuesT = {
     risk_raw: { clean: 10, flag: 5 },
     forbidden_feature_keys: ['govalue_usd', 'estibot_value', 'humbleworth_usd', 'alexa_rank', 'appraisal_usd'],
   },
-  namebio: { max_cache_age_hours: 48, spot_max_per_min: 4, attribution: 'Data from NameBio' },
+  namebio: { max_cache_age_hours: 48, attribution: 'Data from NameBio' },
   quote: { max_age_hours: 24, manual_max_age_days: 30 },
   web_risk: { safe_statuses: [1, 6], unsafe_statuses: [2, 3], requires_clean_history: true },
   freshness_hours: { availability: 1, surbl: 24, typo: 24, history: 168, census: 720, ext_dates: 168, namebio: 24, quote: 24, web_risk: 168, tm_us: 168 },
@@ -535,7 +538,7 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
-export function getPath(doc: unknown, path: string): unknown {
+function getPath(doc: unknown, path: string): unknown {
   let cur: unknown = doc;
   for (const seg of path.split('.')) {
     if (Array.isArray(cur) && /^\d+$/.test(seg)) cur = cur[Number(seg)];

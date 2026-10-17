@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { sql, type Insertable, type Kysely, type Transaction, type Updateable } from 'kysely';
+import type { Insertable, Transaction, Updateable } from 'kysely';
 import type { Category, Database, DomainRow, DomainsTable, ListingHistoryTable } from '../../db/types.js';
 import { buildSchedule, type ScheduleEvent } from './pricing/schedule.js';
 import type { PricingSettings } from './pricing/settings.js';
-import { AppError } from '../../http/errors.js';
 import type { ListingPlan } from './listing-v2.js';
 
 export const newPlanId = (): string => `pl_${randomUUID()}`;
@@ -83,4 +82,23 @@ export function currentPlan(row: DomainRow, fallbackVersion: number): ListingPla
     ltoMaxMonths: row.lto_max_months, pricingSource: row.pricing_source ?? 'formula', settingsVersion: row.pricing_settings_version ?? fallbackVersion,
     overrideUsed: false, warnings: [], formula: null,
   };
+}
+
+/**
+ * A new listing plan, applied under the caller's domain lock inside `trx`: the history row (source `buy`, `import` or `list`) first, then the
+ * schedule and the plan pointer (`writePlan`). The caller has already updated the `domains` row (plan columns, status, first_listed_at, lander).
+ */
+export async function applyPlan(trx: Transaction<Database>, o: {
+  domainId: number; plan: ListingPlan; source: 'buy' | 'import' | 'list'; category: Category; lander: string | null; override: boolean; overrideReason: string | null;
+  approvalText: string | null; approvalAt: Date | null; auditId: string; anchor: string; dropDate: string; settings: PricingSettings; startAfter?: string; now: Date; lane?: 'S8' | null;
+}): Promise<ScheduleEvent[]> {
+  await trx.insertInto('listing_history').values(historyRow({
+    domainId: o.domainId, source: o.source, plan: o.plan, category: o.category, grade: o.plan.grade, lander: o.lander,
+    override: o.override, overrideReason: o.overrideReason,
+    approvalText: o.approvalText, approvalAt: o.approvalAt, auditId: o.auditId, planAuditId: o.auditId, at: o.now,
+  })).execute();
+  return (await writePlan(trx, {
+    domainId: o.domainId, plan: o.plan, anchor: o.anchor, dropDate: o.dropDate, settings: o.settings, planAuditId: o.auditId,
+    startAfter: o.startAfter, now: o.now, lane: o.lane,
+  })).events;
 }

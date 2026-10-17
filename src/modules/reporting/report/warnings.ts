@@ -17,18 +17,18 @@ export interface ReportWarning { code: string; level: WarningLevel; domain?: str
 const LIVE = ['owned', 'listed', 'delisted'] as const;
 const DAY = 86_400_000;
 /** LANDER_DOWN turns from warn to error when the lander failed on this many different IDT days in a row (CR-007 G-5). */
-export const LANDER_DOWN_ERROR_DAYS = 2;
+const LANDER_DOWN_ERROR_DAYS = 2;
 /** REVIEW_OVERDUE is raised when the newest review feedback is older than this (CR-011 part B). */
-export const REVIEW_OVERDUE_HOURS = 36;
+const REVIEW_OVERDUE_HOURS = 36;
 /** v3.9.0: PURCHASE_UNRESOLVED is raised for a register_sent/unknown purchase open longer than this (the reconciler never fails one itself). */
-export const PURCHASE_UNRESOLVED_MINUTES = 30;
+const PURCHASE_UNRESOLVED_MINUTES = 30;
 /** v3.9.0: Neon's free plan stores 1 GB per project (5.13.0; it was 0.5 GB); DB_SIZE_HIGH is raised above DB_SIZE_WARN_PERCENT of it. */
 export const NEON_FREE_STORAGE_BYTES = 1024 ** 3;
 export const DB_SIZE_WARN_PERCENT = 70;
 /** v5.1.0: DAILY_JOB_MISSED is raised when no scheduled daily job run started in this many hours (once any job run exists). */
-export const DAILY_JOB_MISSED_HOURS = 26;
+const DAILY_JOB_MISSED_HOURS = 26;
 /** v5.7.0: ENDING_REGISTERED is raised for an event this recent. */
-export const ENDING_REGISTERED_DAYS = 30;
+const ENDING_REGISTERED_DAYS = 30;
 const RANK: Record<WarningLevel, number> = { error: 0, warn: 1, info: 2 };
 
 /** `opts.domains` / `opts.pendingAfternic`: rows the caller already loaded for the same report (loadReportDomains, pendingDomains(db, 'afternic')). */

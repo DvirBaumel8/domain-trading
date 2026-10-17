@@ -4,7 +4,7 @@ import { dollarsToCents, formatUsd } from '../../../core/money.js';
 import { currentSettings } from '../../listing/index.js';
 import { evaluateMoney, syllableCount } from '../money.js';
 import { CHECK_IDS } from '../settings.js';
-import { outcome, type Check, type CheckContext } from '../types.js';
+import { outcome, type Check } from '../types.js';
 import { formFieldsOf } from './form.js';
 import { quoteIsStale } from './quote.js';
 

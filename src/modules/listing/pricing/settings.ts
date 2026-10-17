@@ -21,14 +21,14 @@ export interface PricingSettings {
 /** v3 = the settings version has a price list. */
 export const isV3 = (s: PricingSettings): boolean => s.allowedBinsCents !== null;
 
-export const RULE_KEYS = [
+const RULE_KEYS = [
   'geoBinStrongCents', 'geoBinWeakerCents', 'geoBinMinCents', 'geoBinMaxCents', 'geoDropsEnabled', 'geoDrops',
   'floorBps', 'floorMinCents', 'walkawayBps', 'walkawayMinCents', 'hybridMinOfferCents', 'drops',
   'finalPushDaysBeforeDrop', 'finalPushMode', 'delistDaysBeforeDrop', 'headsupDaysBefore', 'compsMin', 'compsMax', 'publicLto',
 ] as const satisfies readonly (keyof PricingSettings)[];
 
 // Only present in a v3 fingerprint, so the v2 rule fingerprint (pricing-vectors.v2.json) is unchanged.
-export const V3_RULE_KEYS = [
+const V3_RULE_KEYS = [
   'allowedBinsCents', 'nongeoBinMinCents', 'nongeoDefaultBinCents', 'landerExceptionBinsCents', 'floorRounding', 'dropMode',
 ] as const satisfies readonly (keyof PricingSettings)[];
 

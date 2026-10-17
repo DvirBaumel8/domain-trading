@@ -14,23 +14,23 @@ import type { Database } from '../../db/types.js';
 import { newAuditId } from '../../http/audit.js';
 import { hostPacer, rdapBaseFor, type ScreeningDeps } from '../selection/index.js';
 
-export const ENDING_TLDS = ['net', 'co', 'org', 'io', 'ai'] as const;
+const ENDING_TLDS = ['net', 'co', 'org', 'io', 'ai'] as const;
 /** The five other endings plus the name's own .com (v5.5.0). */
 export const ENGINE_TLDS = [...ENDING_TLDS, 'com'] as const;
 export type EndingTld = (typeof ENGINE_TLDS)[number];
 /** About 3,300 names x 6 endings; at 4 requests a second per registry host (net and com share one) that is a little under 20 minutes. */
-export const ENDINGS_MAX_PAIRS_PER_RUN = 20_000;
-export const ENDINGS_TIME_BUDGET_MS = 20 * 60_000;
+const ENDINGS_MAX_PAIRS_PER_RUN = 20_000;
+const ENDINGS_TIME_BUDGET_MS = 20 * 60_000;
 /** An answer older than this is asked again (and a new row is appended). */
-export const ENDINGS_RECHECK_DAYS = 30;
+const ENDINGS_RECHECK_DAYS = 30;
 /** An unanswered ask (timeout, error, refusal) is asked again once it is this old, so a run never asks one name twice. */
-export const ENDINGS_UNKNOWN_RETRY_HOURS = 6;
+const ENDINGS_UNKNOWN_RETRY_HOURS = 6;
 const CONCURRENCY = 4;
 const LOOKUP_TIMEOUT_MS = 8_000;
 const MAX_RETRY_AFTER_MS = 10_000;
 const DAY = 86_400_000;
 /** v5.7.0 (CR-058): an owned name's five endings are asked again once the newest answer is this old. */
-export const OWNED_RECHECK_DAYS = 7;
+const OWNED_RECHECK_DAYS = 7;
 const OWNED_STATUSES = ['owned', 'listed', 'delisted'] as const;
 
 /** The pairs of the uploaded names and the current (newest) row of each; shared by the job's pick and the health counts. */
@@ -224,7 +224,7 @@ export class EndingsJob {
  * `newly_registered` when the ending was created after the buy date; later, an unregistered ending that is now registered is `newly_registered` and a
  * changed registry creation date is `re_registered`. An unknown answer writes nothing, and an event is only written when the state differs from the newest event.
  */
-export async function recordOwnedEvent(db: Kysely<Database>, nowMs: number, p: Pair, a: Answer): Promise<'baseline' | 'newly_registered' | 're_registered' | null> {
+async function recordOwnedEvent(db: Kysely<Database>, nowMs: number, p: Pair, a: Answer): Promise<'baseline' | 'newly_registered' | 're_registered' | null> {
   if (!p.owned || a.registered === null) return null;
   const prev = await db.selectFrom('owned_ending_events').select(['registered', 'created_at_registry']).where('domain', '=', p.owned.domain).where('tld', '=', p.tld as 'net').orderBy('id', 'desc').limit(1).executeTakeFirst();
   let kind: 'baseline' | 'newly_registered' | 're_registered' | null = null;

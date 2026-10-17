@@ -19,7 +19,7 @@ export type Decision = 'accept' | 'reject' | 'undecided';
 export type ReplayLane = 'expired' | 'fresh' | 'aged' | 'geo';
 export const GATE_KEYS = ['tm_us', 'tn', 'hist2', 'hist2_guard'] as const;
 export type GateKey = (typeof GATE_KEYS)[number];
-export interface GateResult { result: 'PASS' | 'FAIL' | 'FLAG' | 'UNKNOWN'; source: string; date: string }
+interface GateResult { result: 'PASS' | 'FAIL' | 'FLAG' | 'UNKNOWN'; source: string; date: string }
 
 export interface LabelledFeatures {
   registered_share?: number | null; prior_history?: 0 | 1 | null; pre_cls?: string | null; alt_tld_before_n?: number | null;
@@ -106,7 +106,7 @@ export function decideHoldoutRow(row: LabelledRow, sel: SelectionValuesT, ctx: G
 }
 
 /** Whether any dated input of the row is dated at or after its as_of (strict `<` is the rule). null: the row can't be checked. */
-export function rowLeaks(r: LabelledRow): boolean | null {
+function rowLeaks(r: LabelledRow): boolean | null {
   if (!r.as_of) return null;
   const dates = [...Object.values(r.features.input_dates ?? {}), ...GATE_KEYS.map((k) => r.features.gates?.[k]?.date).filter((d): d is string => !!d)];
   if (dates.length === 0) return null;
@@ -143,7 +143,7 @@ export function cell(decisions: { label: 'sold' | 'dropped'; d: Decision }[], h:
   };
 }
 
-export const meets = (c: { sold: { n: number; accept_rate: number | null }; dropped: { n: number; reject_rate: number | null } }, h: SelectionValuesT['holdout']): boolean =>
+const meets = (c: { sold: { n: number; accept_rate: number | null }; dropped: { n: number; reject_rate: number | null } }, h: SelectionValuesT['holdout']): boolean =>
   c.sold.accept_rate !== null && c.dropped.reject_rate !== null &&
   c.sold.accept_rate >= h.sold_accept_min && c.dropped.reject_rate >= h.drop_reject_min && c.sold.n >= h.min_n && c.dropped.n >= h.min_n;
 
@@ -286,7 +286,7 @@ export interface SuiteStatus {
 }
 
 /** A holdout replay's judged cell (`pooled` or `lane:<lane>`) from its stored report. */
-export const judgedOf = (report: unknown): Counts => (report as { judged: Counts }).judged;
+const judgedOf = (report: unknown): Counts => (report as { judged: Counts }).judged;
 
 /**
  * The suites that clear `buy_hold` (v2.5.0): those whose LATEST definition has `clears_hold`; when none has, `holdout.required_suites`.

@@ -8,8 +8,8 @@ import { AppError } from '../../http/errors.js';
 import { loadSplitV2, splitClasses, splitV2 } from '../selection/index.js';
 
 export const PATTERN_METHOD = 'bt1@v3';
-export const PATTERN_MAX_ROWS = 2000;
-export const PATTERN_HEADER = ['domain', 'price_usd', 'date', 'venue'];
+const PATTERN_MAX_ROWS = 2000;
+const PATTERN_HEADER = ['domain', 'price_usd', 'date', 'venue'];
 
 export interface SaleRow { domain: string; price_cents: number; sold_on: string; venue: string | null }
 

@@ -6,15 +6,15 @@ import { endingsHealth } from './endings.js';
 
 type Kind = 'sales' | 'unsold';
 
-export const BAR_ROWS_MIN = 10_000;
-export const BAR_AUC_MIN = 0.8;
-export const BAR_P_TOP1_MIN = 0.9;
-export const BAR_MIX_MIN = 3;
-export const BAR_ABLATION_MAX_DELTA = 0.05;
-export const PROTOTYPE_AUC = 0.85;
-export const TREND_REFERENCE_AUC = 0.809;
+const BAR_ROWS_MIN = 10_000;
+const BAR_AUC_MIN = 0.8;
+const BAR_P_TOP1_MIN = 0.9;
+const BAR_MIX_MIN = 3;
+const BAR_ABLATION_MAX_DELTA = 0.05;
+const PROTOTYPE_AUC = 0.85;
+const TREND_REFERENCE_AUC = 0.809;
 
-export type BarStatus = 'pass' | 'fail' | 'not_measured';
+type BarStatus = 'pass' | 'fail' | 'not_measured';
 export interface Bar { id: number; name: string; status: BarStatus; value: unknown; detail: string }
 
 interface TestM { window?: { label?: string }; n_sold?: number; n_unsold?: number; auc?: number | null; p_top1?: { precision: number | null }; p_top1_at_1pct_base?: number | null }

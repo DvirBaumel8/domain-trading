@@ -1228,13 +1228,6 @@ export interface NamebioKeywordStatsTable {
   source_url: string;
   fetched_at: Timestamp;
 }
-export interface NamebioTldStatsTable {
-  tld: string;
-  stats: Json;
-  source: string;
-  source_url: string;
-  fetched_at: Timestamp;
-}
 export interface NamebioCallsTable {
   id: Generated<string>;
   kind: 'retailstats' | 'tldstats' | 'verisign' | 'verisign_file';
@@ -1298,7 +1291,6 @@ export interface Database {
   rdap_lookups: RdapLookupsTable;
   reference_files: ReferenceFilesTable;
   namebio_keyword_stats: NamebioKeywordStatsTable;
-  namebio_tld_stats: NamebioTldStatsTable;
   namebio_calls: NamebioCallsTable;
   job_runs: JobRunsTable;
   job_queue_runs: JobQueueRunsTable;

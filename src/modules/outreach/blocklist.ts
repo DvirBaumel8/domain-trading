@@ -8,7 +8,7 @@ export type BlockResult = { ok: true } | { ok: false; category: BlockCategory };
 export interface BlockOpts { secretValues?: readonly string[] }
 
 /** A configured secret shorter than this is ignored (a short value would match ordinary words). */
-export const MIN_SECRET_LENGTH = 8;
+const MIN_SECRET_LENGTH = 8;
 
 // A DOM bearer token: `dt_` + 32 random bytes in base64url (43 characters), see src/core/tokens.ts.
 const DOM_TOKEN = /(?<![A-Za-z0-9])dt_[A-Za-z0-9_-]{40,}/;
@@ -30,7 +30,7 @@ const ISO_DATE = /\d{4}-\d{2}-\d{2}/g;
 // A candidate run of digits with spaces, dashes and parentheses, not glued to letters or digits (so a hex hash never matches).
 const PHONE_RUN = /(?<![\w])\+?\(?\d[\d ()-]{6,}\d\)?(?![\w])/g;
 
-export const PHONE_MIN_DIGITS = 9;
+const PHONE_MIN_DIGITS = 9;
 
 function hasPhone(text: string): boolean {
   const t = text.replace(ISO_DATE, ' ');

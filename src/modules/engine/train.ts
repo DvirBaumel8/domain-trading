@@ -8,23 +8,23 @@ import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 import { baseSplitTable, countRegisteredUnsold, loadDemand, loadEndings, loadExtraTerms, loadSales, loadUnsold, tokenContext, unsoldSpanDays, UNSOLD_DATED_DAYS } from './data.js';
 import { computeDriftYielding } from './drift.js';
-import { buildDataset, DataError, type EngineDataset, type Row } from './dataset.js';
+import { buildDataset, DataError, type Row } from './dataset.js';
 import { COM_FEATURES, computeFeatures, ENDING_FEATURE_TLDS, extendedTable, FEATURE_NAMES, sldOf, toVector, type FeatureContext, type FeatureName } from './features.js';
 import { fitGbm, gbmPredictAll, gbmProba, type GbmModel, type GbmParams } from './model/gbm.js';
 import { fitLogit, logitProba, type LogitModel } from './model/logit.js';
 import { auc, aucWithCi, precisionAtBaseRate, precisionAtTop, quantiles101 } from './model/metrics.js';
 import { seedOf } from './model/rng.js';
 
-export const TRAIN_MIN_INTERVAL_MS = 24 * 3_600_000;
-export const TRAIN_TIME_BUDGET_MS = 25 * 60_000;
-export const TRAIN_SEED = 56;
-export const RECENCY_HALF_LIFE_DAYS = 365.25;
-export const RECENCY_MIN_GAIN = 0.01;
-export const COM_MIN_UNSOLD_COVERAGE = 0.3;
-export const KEEP_PARAMS_FOR_NEWEST = 4;
-export const BOOTSTRAP_RESAMPLES = 1000;
+const TRAIN_MIN_INTERVAL_MS = 24 * 3_600_000;
+const TRAIN_TIME_BUDGET_MS = 25 * 60_000;
+const TRAIN_SEED = 56;
+const RECENCY_HALF_LIFE_DAYS = 365.25;
+const RECENCY_MIN_GAIN = 0.01;
+const COM_MIN_UNSOLD_COVERAGE = 0.3;
+const KEEP_PARAMS_FOR_NEWEST = 4;
+const BOOTSTRAP_RESAMPLES = 1000;
 export const TIERS = ['lt1k', '1k_5k', '5k_25k', 'gt25k'] as const;
-export const tierOf = (cents: number): number => (cents < 100_000 ? 0 : cents < 500_000 ? 1 : cents < 2_500_000 ? 2 : 3);
+const tierOf = (cents: number): number => (cents < 100_000 ? 0 : cents < 500_000 ? 1 : cents < 2_500_000 ? 2 : 3);
 const TIER_PARAMS: Partial<GbmParams> = { maxIter: 150, patience: 15 };
 
 /** What a finished training stores in engine_models.params (JSON). */
@@ -63,7 +63,7 @@ export interface TrainView {
 
 const yieldTurn = (): Promise<void> => new Promise((r) => { setImmediate(r); });
 /** A long synchronous loop gives the event loop a turn every this many rows, so the API keeps answering while a training runs. */
-export const YIELD_EVERY_ROWS = 2_000;
+const YIELD_EVERY_ROWS = 2_000;
 async function mapYielding<T, U>(rows: readonly T[], fn: (x: T) => U): Promise<U[]> {
   const out: U[] = new Array<U>(rows.length);
   for (let i = 0; i < rows.length; i++) {
@@ -73,7 +73,7 @@ async function mapYielding<T, U>(rows: readonly T[], fn: (x: T) => U): Promise<U
   return out;
 }
 
-export function viewOf(m: { id: string; status: 'running' | 'done' | 'failed'; created_at: Date; finished_at: Date | null; trained_by: string; error: string | null; dataset: unknown; test_sha256: string | null; chosen_weighting: string | null; metrics: unknown; feature_list: unknown }): TrainView {
+function viewOf(m: { id: string; status: 'running' | 'done' | 'failed'; created_at: Date; finished_at: Date | null; trained_by: string; error: string | null; dataset: unknown; test_sha256: string | null; chosen_weighting: string | null; metrics: unknown; feature_list: unknown }): TrainView {
   return {
     train_id: m.id, status: m.status, created_at: toJerusalemIso(m.created_at), finished_at: m.finished_at ? toJerusalemIso(m.finished_at) : null, trained_by: m.trained_by, error: m.error,
     dataset: m.dataset, test_sha256: m.test_sha256, chosen_weighting: m.chosen_weighting, metrics: m.metrics, feature_list: m.feature_list,
@@ -82,7 +82,7 @@ export function viewOf(m: { id: string; status: 'running' | 'done' | 'failed'; c
 }
 
 /** A running row this old has no worker any more (the step's own limit is 30 minutes). */
-export const TRAIN_STALE_MS = 45 * 60_000;
+const TRAIN_STALE_MS = 45 * 60_000;
 
 export class EngineTrainer {
   constructor(private readonly deps: TrainDeps) {}

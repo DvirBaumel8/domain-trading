@@ -7,12 +7,10 @@ import { webRiskLookup } from '../web-risk.js';
 import { freshDomainRecord } from '../domain-records.js';
 import type { SelectionValuesT } from '../settings.js';
 import { outcome, type Check, type CheckOutcome, type ResultRow } from '../types.js';
-import { nameTokens } from '../prior-business.js';
 import { matchTerms } from './brand-lists.js';
 import { formFieldsOf } from './form.js';
 
 export const MANUAL_CHECKS = ['web_risk', 'tm_us', 'history', 'tm_eu'] as const;
-export type ManualCheckId = (typeof MANUAL_CHECKS)[number];
 
 export const WebRiskManual = z.object({ raw_status: z.number().int(), threat_types: z.array(z.string().max(80)).max(20).optional() }).strict();
 const Mark = z.object({ mark: z.string().max(200), serial: z.string().max(40), owner: z.string().max(200), status: z.string().max(100) }).strict();
@@ -31,7 +29,7 @@ export const priorPhraseOf = (name: string): string => name.toUpperCase().replac
 export const phraseKey = (p: string): string => priorPhraseOf(p);
 
 /** Phrases to search at USPTO for a name (CAP-08): the exact phrase, city + trade, the distinctive core, generic-head pairs. */
-export function tmPhrases(tokens: string[], types: string[], city: string | null, trade: string | null): string[] {
+function tmPhrases(tokens: string[], types: string[], city: string | null, trade: string | null): string[] {
   const up = (xs: string[]) => xs.join(' ').toUpperCase();
   const out: string[] = [];
   const add = (p: string) => { if (p && !out.includes(p)) out.push(p); };
@@ -159,10 +157,10 @@ export function tmFromManual(rec: z.infer<typeof TmManual>, evidenceUrl: string,
 
 // ---- manual HIST-2 (CR-002 Amendment B) ----
 
-export const HISTORY_RESULTS = ['PASS', 'REJECT_HARMFUL', 'FLAG_PRIOR_BUSINESS'] as const;
-export const HISTORY_CATEGORIES = ['malware_phishing', 'spam', 'adult', 'scam', 'trademark_abuse'] as const;
+const HISTORY_RESULTS = ['PASS', 'REJECT_HARMFUL', 'FLAG_PRIOR_BUSINESS'] as const;
+const HISTORY_CATEGORIES = ['malware_phishing', 'spam', 'adult', 'scam', 'trademark_abuse'] as const;
 /** A capture link of the Internet Archive: https://web.archive.org/web/<timestamp>[flags]/<original url>. */
-export const ARCHIVE_URL_RE = /^https:\/\/web\.archive\.org\/web\/\d{4,14}[a-z_]{0,4}\/\S+$/;
+const ARCHIVE_URL_RE = /^https:\/\/web\.archive\.org\/web\/\d{4,14}[a-z_]{0,4}\/\S+$/;
 const Year = z.number().int().min(1990).max(2100);
 
 export const HistoryManual = z.object({
@@ -181,6 +179,8 @@ export const HistoryManual = z.object({
   if (r.first_capture_year !== undefined && r.last_capture_year !== undefined && r.last_capture_year < r.first_capture_year) ctx.addIssue({ code: 'custom', path: ['last_capture_year'], message: 'last_capture_year is before first_capture_year' });
 });
 
+/** Lower-case alphanumeric tokens of a business name (what the brand and big-company lists are matched against). */
+const nameTokens = (name: string): string[] => name.toLowerCase().match(/[a-z0-9]+/g) ?? [];
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /**

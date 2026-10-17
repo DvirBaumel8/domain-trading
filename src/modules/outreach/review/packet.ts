@@ -11,9 +11,9 @@ import { unifiedDiff } from './diff.js';
 /** The month's review spend limit in USD (CR-011 T11-22). A constant, not a setting. */
 export const REVIEW_MONTHLY_CAP_USD = 5;
 /** A weekly packet is due when the newest weekly one is older than this. */
-export const WEEKLY_EVERY_MS = 7 * 86_400_000;
+const WEEKLY_EVERY_MS = 7 * 86_400_000;
 /** Each list in `dom_changes` keeps at most this many of the newest rows. */
-export const PACKET_LIST_LIMIT = 200;
+const PACKET_LIST_LIMIT = 200;
 
 export const newPacketId = (): string => `rvp_${randomBytes(6).toString('hex')}`;
 export const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
@@ -56,7 +56,7 @@ export function anonymizeActors(v: unknown, tokenNames: ReadonlySet<string>): un
  * CR-013 F-1, the one weekly rule (packet route and review run): a packet is `weekly` (it carries the whole document) on a Sunday (IDT), or when no packet
  * whose feedback is `ok` has carried the full document in the last 7 days. A packet with unknown or no feedback never counts.
  */
-export async function weeklyDue(db: Kysely<Database>, now: Date): Promise<boolean> {
+async function weeklyDue(db: Kysely<Database>, now: Date): Promise<boolean> {
   if (idtIsSunday(now.getTime())) return true;
   const since = new Date(now.getTime() - WEEKLY_EVERY_MS);
   const r = await sql<{ n: number }>`

@@ -22,6 +22,21 @@ export function newAuditId(): string {
   return `aud_${randomBytes(16).toString('hex')}`;
 }
 
+/**
+ * The audit row of a job, queue run or CLI call (scope `job`): what ran, the outcome code and a one-line summary. `request` is stored as JSON when given.
+ * Returns the audit id. Pass the transaction when the row must commit with other work.
+ */
+export async function writeJobAudit(db: Kysely<Database>, o: {
+  path: string; summary: string; request?: unknown; status?: number; method?: 'JOB' | 'QUEUE' | 'CLI'; at?: Date; id?: string;
+}): Promise<string> {
+  const id = o.id ?? newAuditId();
+  await db.insertInto('audit_log').values({
+    id, ...(o.at && { at: o.at }), scope: 'job', method: o.method ?? 'JOB', path: o.path,
+    ...(o.request !== undefined && { request: JSON.stringify(o.request) }), status_code: o.status ?? 200, result_summary: o.summary,
+  }).execute();
+  return id;
+}
+
 export function dbAuditWriter(db: Kysely<Database>): AuditWriter {
   return {
     async write(row) {
@@ -51,10 +66,10 @@ function elideRows(b: Record<string, unknown> | null, url: string): Record<strin
   return { ...b, rows: `[${b.rows.length} rows]` };
 }
 
-export const AUDIT_ARRAY_MAX = 50;
+const AUDIT_ARRAY_MAX = 50;
 
 /** v5.14.0 (D2): any array longer than 50 items (drop-list rows, test-set names, labelled names, intake lists, ...) is recorded as its count and a sha256 of its JSON, so the audit stays small but can still prove what was sent. */
-export function elideArrays(value: unknown, depth = 0): unknown {
+function elideArrays(value: unknown, depth = 0): unknown {
   if (Array.isArray(value)) {
     if (value.length > AUDIT_ARRAY_MAX) return `[${value.length} items, sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}]`;
     return depth < 6 ? value.map((v) => elideArrays(v, depth + 1)) : value;

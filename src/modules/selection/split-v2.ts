@@ -5,13 +5,13 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export const SPLIT_V2_FILE = 'bt1/bt1_v2_split.json';
+const SPLIT_V2_FILE = 'bt1/bt1_v2_split.json';
 export const SPLIT_V2_SHA256 = '69e659c242ef3a6ea7f55c76dba5680db2199c81ef281d0e80adaf1547f80d73';
 // v2.13.0 (CR-012): bt1@v3 is the same recipe on the split of data/bt1/bt1_v3_split.json (same shape; v2 plus a short general token list).
-export const SPLIT_V3_FILE = 'bt1/bt1_v3_split.json';
+const SPLIT_V3_FILE = 'bt1/bt1_v3_split.json';
 export const SPLIT_V3_SHA256 = 'a76396a60d25d38c699ae94194b28d6ea354551419c4baf9c9b70d1d33f70d5e';
 /** The frozen split files by sibling method (methods that use a split file). */
-export const SPLIT_FILES: Record<string, { file: string; sha256: string }> = {
+const SPLIT_FILES: Record<string, { file: string; sha256: string }> = {
   'bt1@v2': { file: SPLIT_V2_FILE, sha256: SPLIT_V2_SHA256 },
   'bt1@v3': { file: SPLIT_V3_FILE, sha256: SPLIT_V3_SHA256 },
 };

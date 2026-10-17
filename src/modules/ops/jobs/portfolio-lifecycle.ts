@@ -12,9 +12,9 @@ import type { Database } from '../../../db/types.js';
 import { newAuditId } from '../../../http/audit.js';
 import { activeSelectionSettings, rerunLookalikes, screenedNames, type ScreeningDeps } from '../../selection/index.js';
 
-export const LOOKALIKE_RECHECK_DAYS = 30;
-export const LOOKALIKE_MAX_PER_RUN = 10;
-export const HOLDOUT_RECHECK_MAX_PER_RUN = 10;
+const LOOKALIKE_RECHECK_DAYS = 30;
+const LOOKALIKE_MAX_PER_RUN = 10;
+const HOLDOUT_RECHECK_MAX_PER_RUN = 10;
 const seeded = (seed: string, domain: string): string => createHash('sha256').update(`${seed}:${domain}`).digest('hex');
 
 export interface LifecycleSummary {

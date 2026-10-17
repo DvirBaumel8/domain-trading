@@ -15,7 +15,6 @@ const EXCLUDED: Record<string, string> = {
   rdap_lookups: 'cache of public registry answers; refetched on demand',
   reference_files: 'cache of downloaded public reference lists (popularity list, IANA bootstrap); refreshed daily',
   namebio_keyword_stats: 'cache of NameBio free-endpoint keyword stats (v5.11.0, CR-062); refetched by the daily referenceRefresh step',
-  namebio_tld_stats: 'cache of NameBio free TLDStats (v5.11.0, CR-062); refetched by the daily referenceRefresh step',
   namebio_calls: 'NameBio request log that enforces the rate limits (v5.11.0, CR-062); operational',
   job_runs: 'operational log of job step summaries; the audit rows keep the facts',
   job_queue_runs: 'operational queue of job runs (v3.0.0); the finished run is in job_runs',

@@ -4,12 +4,12 @@ import type { Database } from '../../db/types.js';
 import { holdSuites, suiteStatuses } from './replay.js';
 import type { SelectionValuesT } from './settings.js';
 
-export type StepStatus = 'done' | 'open' | 'failed';
-export type StepActor = 'gavriel' | 'dvir';
+type StepStatus = 'done' | 'open' | 'failed';
+type StepActor = 'gavriel' | 'dvir';
 export interface HoldStep { n: number; step: string; status: StepStatus; evidence: Record<string, unknown> | null; next_actor: StepActor | null }
 
 /** A tranche whose name contains "probe" is a test probe (CR-012: `accept-v2-probe-20261007`), not a production tranche. */
-export const isProbeTranche = (name: string): boolean => /probe/i.test(name);
+const isProbeTranche = (name: string): boolean => /probe/i.test(name);
 
 export async function buyHoldSteps(db: Kysely<Database>, active: { label: string; values: SelectionValuesT }, holdIn?: Awaited<ReturnType<typeof holdSuites>>): Promise<{ steps: HoldStep[]; ready: boolean }> {
   const iso = (d: Date) => d.toISOString();

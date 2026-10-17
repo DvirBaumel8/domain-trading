@@ -53,7 +53,7 @@ export function pair<K extends string>(key: K, cents: number | null): Pair<K> {
 }
 
 /** Integer cents → dollars as a number, computed from the integer parts (never a float division of money). */
-export function centsToDollars(c: number): number {
+function centsToDollars(c: number): number {
   if (!Number.isSafeInteger(c)) return c / 100; // not integer cents: same arithmetic as before, nothing new to throw
   const abs = Math.abs(c);
   return Number(`${c < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`);

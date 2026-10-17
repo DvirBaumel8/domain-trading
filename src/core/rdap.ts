@@ -55,7 +55,7 @@ function registrarOf(entities: unknown): string | null {
 }
 
 /** Facts of a domain object; null when the body is not an RDAP domain object for `domain` (HTML, other JSON, another name). */
-export function parseRdapDomain(body: string, domain: string): RdapFacts | null {
+function parseRdapDomain(body: string, domain: string): RdapFacts | null {
   let j: unknown;
   try {
     j = JSON.parse(body);

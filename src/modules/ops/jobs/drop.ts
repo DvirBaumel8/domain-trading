@@ -2,7 +2,7 @@ import type { Kysely, Transaction } from 'kysely';
 import { trySessionLock } from '../../../core/locks.js';
 import type { Database } from '../../../db/types.js';
 import { idtDay, isYmd } from '../../../core/dates.js';
-import { newAuditId } from '../../../http/audit.js';
+import { writeJobAudit } from '../../../http/audit.js';
 import { withDomainLock } from '../../../core/locks.js';
 
 type Q = Kysely<Database> | Transaction<Database>;
@@ -43,10 +43,7 @@ export class DropJob {
           out.failed.push({ domain: d.domain, reason: 'error' });
           if (!dryRun) {
             try {
-              await this.deps.db.insertInto('audit_log').values({
-                id: newAuditId(), scope: 'job', method: 'JOB', path: 'drop',
-                request: JSON.stringify({ domain: d.domain, today }), status_code: 500, result_summary: `error: ${message}`,
-              }).execute();
+              await writeJobAudit(this.deps.db, { path: 'drop', request: { domain: d.domain, today }, status: 500, summary: `error: ${message}` });
             } catch (ae) {
               this.deps.log?.error({ domain: d.domain, errMessage: (ae as Error).message }, 'drop job error audit failed');
             }
@@ -72,11 +69,7 @@ export class DropJob {
     }).where('id', '=', domainId).execute();
     const cancelled = await q.updateTable('price_schedule').set({ status: 'cancelled', note: 'dropped', updated_at: now })
       .where('domain_id', '=', domainId).where('status', '=', 'planned').returning('id').execute();
-    await q.insertInto('audit_log').values({
-      id: newAuditId(), scope: 'job', method: 'JOB', path: 'drop',
-      request: JSON.stringify({ domain, from: cur.status, drop_date: cur.drop_date, today }), status_code: 200,
-      result_summary: `dropped; ${cancelled.length} planned price rows cancelled`,
-    }).execute();
+    await writeJobAudit(q, { path: 'drop', request: { domain, from: cur.status, drop_date: cur.drop_date, today }, summary: `dropped; ${cancelled.length} planned price rows cancelled` });
     return true;
   }
 }

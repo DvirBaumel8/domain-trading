@@ -14,7 +14,7 @@ export interface DropListsDeps { db: Kysely<Database>; now: () => number }
 export const ymd = realYmd;
 const Body = z.object({ name: z.string().regex(DROP_LIST_NAME_RE), list_date: ymd, domains: z.array(z.string().max(300)).min(1).max(20_000) }).strict();
 const WindowQuery = z.object({ drop_from: ymd, drop_to: ymd }).strict();
-export const MAX_WINDOW_DAYS = 31;
+const MAX_WINDOW_DAYS = 31;
 
 const bad = (m: string) => new AppError(400, 'VALIDATION_ERROR', m);
 

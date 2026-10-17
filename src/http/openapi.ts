@@ -17,12 +17,12 @@ declare module 'fastify' {
   }
 }
 
-export const OPENAPI_PATH = '/openapi.json';
+const OPENAPI_PATH = '/openapi.json';
 
 interface Entry { method: string; url: string; body?: z.ZodType; noBody?: boolean; status?: number }
 
 /** One line per route: what it does. Keyed `METHOD /fastify/path`. A route with no line here fails the test that keeps the document complete. */
-export const SUMMARIES: Record<string, string> = {
+const SUMMARIES: Record<string, string> = {
   'GET /health/ping': 'Liveness (public, no database)',
   'GET /health': 'Service health: version, database, jobs, review',
   'GET /check': 'Price and availability check of a name across registrars',
@@ -174,7 +174,7 @@ export function collectOpenApiRoutes(app: FastifyInstance): Entry[] {
   return entries;
 }
 
-export function buildOpenApi(entries: Entry[], version: string): Record<string, unknown> {
+function buildOpenApi(entries: Entry[], version: string): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {};
   for (const e of [...entries].sort((a, b) => a.url.localeCompare(b.url) || a.method.localeCompare(b.method))) {
     const path = toOpenApiPath(e.url);

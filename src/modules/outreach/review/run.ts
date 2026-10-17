@@ -25,7 +25,7 @@ export interface ReviewRunDeps {
   sleep?: (ms: number) => Promise<void>;
 }
 /** CR-016 R-1: a Google 503 / UNAVAILABLE is retried inside the call: up to 3 tries in all, waiting 20 s and then 40 s. Never another key or model. */
-export const REVIEW_BACKOFF_MS = [20_000, 40_000] as const;
+const REVIEW_BACKOFF_MS = [20_000, 40_000] as const;
 const isUnavailable = (g: { httpStatus: number | null; errorStatus: string | null }) => g.httpStatus === 503 || g.errorStatus === 'UNAVAILABLE';
 export type ReviewSkip = 'IN_PROGRESS' | 'NO_KEY' | 'DISABLED' | 'DOCUMENT_MISSING' | 'COST_CAP' | 'ALREADY_DONE_TODAY' | 'TEXT_BLOCKED' | 'NOTHING_PENDING';
 export type ReviewRunResult =
@@ -33,7 +33,7 @@ export type ReviewRunResult =
   | { packet_id: string; kind: 'daily' | 'weekly'; status: 'ok' | 'unknown' | 'retry_pending'; items_n: number; new_n: number; repeat_n: number; cost_usd: number; dropped_n: number; reason?: string; detail?: string; attempts?: number };
 
 /** CR-013 F-3: Google's "try again later" answers: 429, 503, UNAVAILABLE, a timeout or a network error. */
-export function isTransientFailure(g: { transient: boolean }): boolean {
+function isTransientFailure(g: { transient: boolean }): boolean {
   return g.transient;
 }
 

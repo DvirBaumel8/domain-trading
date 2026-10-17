@@ -11,17 +11,17 @@
 import { sql, type Kysely, type RawBuilder } from 'kysely';
 import { trySessionLock } from '../../../core/locks.js';
 import type { Database } from '../../../db/types.js';
-import { pruneDataTables } from '../../engine/index.js';
+import { pruneDataTables } from '../../data/index.js';
 import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES } from '../../reporting/index.js';
 
-export const RETENTION_BATCH_ROWS = 5_000;
-export const RETENTION_TIME_BUDGET_MS = 60_000;
+const RETENTION_BATCH_ROWS = 5_000;
+const RETENTION_TIME_BUDGET_MS = 60_000;
 const DAY = 86_400_000;
 
-export type RetentionMode = 'normal' | 'tight';
+type RetentionMode = 'normal' | 'tight';
 
 /** Everything the job may prune: keys of the summary, in run order. `days` = [normal, tight]. */
-export const RETENTION_RULES = [
+const RETENTION_RULES = [
   { key: 'screening_results', days: [180, 90], idStart: '0' },
   { key: 'screening_evidence', days: [180, 90], idStart: '0' },
   { key: 'candidate_screenings', days: [180, 90], idStart: '0' },
@@ -40,7 +40,7 @@ export const RETENTION_RULES = [
   { key: 'namebio_calls', days: [30, 30], idStart: '0' },
   { key: 'listing_sync_log', days: [180, 90], idStart: '0' },
 ] as const;
-export type RetentionKey = (typeof RETENTION_RULES)[number]['key'];
+type RetentionKey = (typeof RETENTION_RULES)[number]['key'];
 type Rule = { key: RetentionKey; days: readonly [number, number]; idStart: string; pk?: string };
 
 export interface RetentionSummary {

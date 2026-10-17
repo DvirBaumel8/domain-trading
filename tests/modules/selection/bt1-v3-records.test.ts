@@ -5,7 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import type { RdapLookup, RdapLookupFn } from '../../../src/core/rdap.js';
 import { siblingsBt1 } from '../../../src/modules/selection/siblings.js';
 import { splitV2OfDomain } from '../../../src/modules/selection/split-v2.js';
-import { enableWayback, patchActiveSettings, putBrandLists, screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
+import { patchActiveSettings, putBrandLists, screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
 import { testDb as db } from '../../helpers/db.js';
 import { fixture, respond } from '../../helpers/screening-fixtures.js';
 import { mswServer } from '../../setup/network.js';
@@ -174,10 +174,6 @@ describe('records per domain (CR-012 part E)', () => {
     await app!.screeningWorker.idle();
     const after = (await x.get(`/screening/runs/${live.id}`)).json().names[0];
     expect(at(after, 'tm_us')).toMatchObject({ status: 'FLAG', reason_code: 'TM_GENERIC_HITS' });
-    // with the automated archive on, the history check runs its own source and never reads the record
-    await enableWayback();
-    const auto = (await x.runDone({ checks: ['form', 'history'], mode: 'full', names: [{ domain: D, lane: 'S3', as_of: '2026-01-01T00:00:00Z' }] })).body.names[0];
-    expect(at(auto, 'history').fields.domain_record_id).toBeUndefined();
   });
 
   it('V213-7 the per-run manual route also writes a domain record (source_run_id), reused by a later run of the name', async () => {

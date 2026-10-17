@@ -6,7 +6,7 @@ import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 
 export const WEB_RISK_MONTHLY_CAP = 10_000;
-export const WEB_RISK_SOURCE = 'web_risk';
+const WEB_RISK_SOURCE = 'web_risk';
 const ENDPOINT = 'https://webrisk.googleapis.com/v1/uris:search';
 const TIMEOUT_MS = 8000;
 const THREATS = ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE'];
@@ -17,9 +17,9 @@ export type WebRiskResult =
   | { kind: 'unknown'; reason: 'QUOTA' | 'QUOTA_CAP' | 'SOURCE_ERROR'; httpStatus: number | null; error: WebRiskError | null };
 
 /** Google's error body, parsed (v2.6.0, CR-009 N-3): `error.status`, the first `error.details[].reason`, else `error.message` cut to 200 chars. Never the key. */
-export interface WebRiskError { status: string | null; reason: string | null; message: string | null }
+interface WebRiskError { status: string | null; reason: string | null; message: string | null }
 
-export function parseWebRiskError(text: string): WebRiskError | null {
+function parseWebRiskError(text: string): WebRiskError | null {
   let j: unknown;
   try { j = JSON.parse(text); } catch { return null; }
   const e = (j as { error?: unknown } | null)?.error;

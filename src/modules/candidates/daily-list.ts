@@ -21,9 +21,9 @@ import type { CheckId, ResultRow, RunItem } from '../selection/index.js';
 export const DAILY_LIST_DEFAULT_LIMIT = 10;
 export const DAILY_LIST_MAX_LIMIT = 25;
 /** How long buildDailyList waits for the day's intake screening run before it builds from what is done (the list is then marked partial). */
-export const DAILY_LIST_WAIT_MS = 20 * 60_000;
+const DAILY_LIST_WAIT_MS = 20 * 60_000;
 /** A screening run older than this is too old for the list (the /buy pack rule). */
-export const DAILY_LIST_RUN_MAX_AGE_HOURS = 72;
+const DAILY_LIST_RUN_MAX_AGE_HOURS = 72;
 const HOUR_MS = 3_600_000;
 /** Checks that cannot answer for a name that is still registered: they wait for the drop (`upcoming` names only). */
 const NEEDS_AVAILABLE: CheckId[] = ['quote', 'price'];
@@ -32,16 +32,15 @@ type Json = Record<string, unknown>;
 interface Source { source: string; received_at: string; token_name: string }
 interface Missing { kind: RecordKind; reason: 'NO_RECORD' | 'STALE' }
 
-export interface DailyEntry extends Json {
+interface DailyEntry extends Json {
   domain: string; rank: number; run_id: string; settings_version: string; lane: string; final_status: string; held: boolean; would_be_blocked: string[];
   changed_since_first?: { reason: string; changes: string[] };
 }
-export interface DailyList { day: string; entries: DailyEntry[]; sections: { almost_ready: Json[]; upcoming: Json[]; removed_since_first?: Json[] }; summary: Json }
 
 /** The most names `summary.dropping` lists (the count `dropping_n` is always the whole number). */
-export const DROPPING_LIST_MAX = 50;
+const DROPPING_LIST_MAX = 50;
 /** The most names `summary.rejected` lists (v3.3.0; `rejected_n` is the whole number). */
-export const REJECTED_LIST_MAX = 30;
+const REJECTED_LIST_MAX = 30;
 const CHECK_LABEL: Record<string, string> = {
   form: 'name form', quote: 'price quote', price: 'price check', history: 'history check', tier: 'demand check', web_risk: 'web-risk check', surbl: 'blocklist check',
   same_name: 'same-name check', tm_us: 'US trademark check', tm_eu: 'EU trademark check', typo: 'typo check', census: 'census check', ext_dates: 'other-extension check',

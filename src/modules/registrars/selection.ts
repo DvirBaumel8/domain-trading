@@ -2,9 +2,9 @@ import { formatUsd } from '../../core/money.js';
 import type { RdapStatus } from '../../core/rdap.js';
 import type { Capabilities, Quote, RegistrarError } from './types.js';
 
-export const ADAPTER_ORDER: readonly string[] = ['porkbun', 'dynadot', 'namecom'];
+const ADAPTER_ORDER: readonly string[] = ['porkbun', 'dynadot', 'namecom'];
 
-export type ExclusionReason =
+type ExclusionReason =
   | 'NO_CUSTOM_NAMESERVERS' | 'NO_AVAILABILITY_ACCESS' | 'REGISTRAR_NOT_ALLOWED' | 'ADAPTER_ERROR'
   | 'NOT_AVAILABLE' | 'PREMIUM' | 'NOT_USD' | 'MULTI_YEAR_MINIMUM' | 'NO_FIRST_YEAR_PRICE' | 'NO_RENEWAL_PRICE';
 

@@ -8,13 +8,13 @@ import {
  * changes its nameservers. It never quotes, registers, renews or touches money. Every other method throws
  * NOT_SUPPORTED without an HTTP call.
  */
-export const GODADDY_DEFAULT_BASE = 'https://api.godaddy.com';
+const GODADDY_DEFAULT_BASE = 'https://api.godaddy.com';
 // UNVERIFIED (check at G2/G3 contract tests)
-export const GODADDY_DOMAIN_PATH = (domain: string): string => `/v3/domains/domain-names/${encodeURIComponent(domain)}`;
+const GODADDY_DOMAIN_PATH = (domain: string): string => `/v3/domains/domain-names/${encodeURIComponent(domain)}`;
 // UNVERIFIED (check at G2/G3 contract tests)
-export const GODADDY_NS_PATH = (domain: string): string => `${GODADDY_DOMAIN_PATH(domain)}/nameservers`;
+const GODADDY_NS_PATH = (domain: string): string => `${GODADDY_DOMAIN_PATH(domain)}/nameservers`;
 // UNVERIFIED (check at G2/G3 contract tests)
-export const GODADDY_OPERATION_PATH = (id: string): string => `/v3/domains/operations/${encodeURIComponent(id)}`;
+const GODADDY_OPERATION_PATH = (id: string): string => `/v3/domains/operations/${encodeURIComponent(id)}`;
 
 const NAME = 'godaddy';
 const DONE = new Set(['SUCCESS', 'DONE']);

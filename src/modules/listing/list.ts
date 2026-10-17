@@ -13,7 +13,7 @@ import { addDays, idtDay } from '../../core/dates.js';
 import { buildSchedule, type ScheduleEvent } from './pricing/schedule.js';
 import { currentSettings, settingsByVersion } from './pricing/settings.js';
 import { isCategory, validateListing, type ListingPlan, type ListingRequest } from './listing-v2.js';
-import { applyHold, currentPlan, domainPlanColumns, historyRow, writePlan } from './plan-store.js';
+import { applyHold, applyPlan, currentPlan, domainPlanColumns, historyRow } from './plan-store.js';
 import { withDomainLock } from '../../core/locks.js';
 import { isValidDisplayName } from '../../domain-name.js';
 import { planView } from './plan-view.js';
@@ -231,14 +231,17 @@ export class ListService {
         await applyHold(trx, cur, { hold: body.pricing_hold!, reason: body.pricing_hold_reason ?? null, approvalText: null, approvalAt: null, auditId: ctx.auditId, now, history: false });
       }
       if (plan) {
-        await writePlan(trx, { domainId: row.id, plan, anchor, dropDate: row.drop_date!, settings: s, planAuditId: ctx.auditId, startAfter, now, lane: row.lane });
-      }
-      if (historyChange) {
+        await applyPlan(trx, {
+          domainId: row.id, plan, source: 'list', category: plan.category, lander: noLander ? row.lander : lander, override: overrideUsed,
+          overrideReason: overrideUsed ? (body.override_reason ?? null) : null, approvalText: body.approval_ref ? String(body.approval_ref.text) : null,
+          approvalAt: approvedAt, auditId: ctx.auditId, anchor, dropDate: row.drop_date!, settings: s, startAfter, now, lane: row.lane,
+        });
+      } else if (historyChange) {
         await trx.insertInto('listing_history').values(historyRow({
           domainId: row.id, source: 'list', plan: shown, category, grade, lander: noLander ? row.lander : lander, override: overrideUsed,
           overrideReason: overrideUsed ? (body.override_reason ?? null) : null,
           approvalText: body.approval_ref ? String(body.approval_ref.text) : null, approvalAt: approvedAt, auditId: ctx.auditId,
-          planAuditId: plan ? ctx.auditId : row.plan_audit_id, at: now,
+          planAuditId: row.plan_audit_id, at: now,
         })).execute();
       }
     });

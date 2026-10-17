@@ -58,7 +58,7 @@ export function parsePopularityCsv(text: string, max: number): { rows: Popularit
 }
 
 /** Country-code second-level suffixes handled as one suffix (a small set; the full public suffix list is not shipped). */
-export const CC_SLDS = new Set(['co.uk', 'com.au', 'co.jp', 'gov.uk', 'gov.cn', 'com.br', 'co.in', 'org.uk', 'ac.uk', 'net.au']);
+const CC_SLDS = new Set(['co.uk', 'com.au', 'co.jp', 'gov.uk', 'gov.cn', 'com.br', 'co.in', 'org.uk', 'ac.uk', 'net.au']);
 
 /**
  * The registrable label of a listed host: the label just left of the public suffix (play.google.com -> google, bbc.co.uk -> bbc).

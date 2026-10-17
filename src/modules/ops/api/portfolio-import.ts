@@ -13,7 +13,7 @@ import { AppError } from '../../../http/errors.js';
 import type { RegistrarAdapter } from '../../registrars/index.js';
 import { ImportInputError, importDomain } from '../admin/import-domain.js';
 
-export const S8_SOURCES = ['closeout', 'fixed', 'auction'] as const;
+const S8_SOURCES = ['closeout', 'fixed', 'auction'] as const;
 /** Backorder / catch services: never a registrar or a source of an S8 name (Dvir, 14 Oct 2026). */
 const BACKORDER = ['namejet', 'snapnames', 'dropcatch'];
 const isBackorder = (v: string): boolean => BACKORDER.includes(v.toLowerCase().replace(/[^a-z0-9]/g, ''));
@@ -41,7 +41,7 @@ const ImportBody = z.object({
 }).strict();
 
 /** The whole-dollar amounts a text names as `$3,488`, `$3488`, `$3,488.00` or `$3488.00` (in cents); `$13,488` or `$34,880` is not `$3,488`. */
-export function namedAmountsCents(text: string): Set<number> {
+function namedAmountsCents(text: string): Set<number> {
   const out = new Set<number>();
   for (const m of text.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?(?!\d|,\d|\.\d)/g)) {
     out.add(Number(m[1]!.replace(/,/g, '')) * 100 + Number(m[2] ?? 0));

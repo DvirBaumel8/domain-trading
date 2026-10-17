@@ -11,7 +11,7 @@ import { currentLists } from './lists.js';
 import { Pacer, prefetchStored } from './rdap-batch.js';
 import { activeSelectionSettings, type SelectionValuesT } from './settings.js';
 import type { PageFetch } from './site.js';
-import type { CheckContext, CheckId, ScreeningDeps } from './types.js';
+import type { CheckContext, ScreeningDeps } from './types.js';
 
 export interface Sibling {
   domain: string; kind: LookalikeKind;

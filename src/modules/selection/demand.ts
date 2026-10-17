@@ -7,13 +7,13 @@ import { toJerusalemIso } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 
-export const KEYWORD_MAX_ROWS = 5000;
+const KEYWORD_MAX_ROWS = 5000;
 export const KEYWORD_MAX_FILE_BYTES = 1_000_000;
 /** Header names that must be present (compared case-insensitively, trimmed). */
-export const KEYWORD_REQUIRED_HEADERS = ['Keyword', 'Avg. monthly searches', 'Competition (indexed value)'] as const;
+const KEYWORD_REQUIRED_HEADERS = ['Keyword', 'Avg. monthly searches', 'Competition (indexed value)'] as const;
 const OPTIONAL = { three: 'three month change', yoy: 'yoy change' };
 
-export interface KeywordRow { keyword: string; avg_monthly_searches: number | null; competition_index: number | null; three_month_change: string | null; yoy_change: string | null }
+interface KeywordRow { keyword: string; avg_monthly_searches: number | null; competition_index: number | null; three_month_change: string | null; yoy_change: string | null }
 export interface ParsedKeywords { title_line: string | null; date_range_line: string | null; rows: KeywordRow[]; skipped_n: number }
 
 /** UTF-16LE / UTF-16BE (by BOM, or by the NUL bytes of ASCII text without one) or UTF-8; a BOM is dropped. */

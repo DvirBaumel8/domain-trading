@@ -10,8 +10,7 @@ import { ImportInputError, importDomain, type ImportInput } from './admin/import
 import { createAdapters } from '../registrars/index.js';
 import { readFileSync } from 'node:fs';
 import { AppError } from '../../http/errors.js';
-import { loadConfig } from '../../config.js';
-import { createDb } from '../../db/client.js';
+import { exitWith, UsageError, withDb } from './cli.js';
 
 const USAGE = `usage:
   npm run admin -- token create --scope read|write|intake|data --name <name>
@@ -27,8 +26,6 @@ const USAGE = `usage:
   npm run admin -- resolve-purchase --id <purchase_id> --fail --reason "<text>"   (a purchase stuck in unknown/register_sent; check the registrar account first)
   npm run admin -- record-renewal <domain> --charged-cents N --approval-text "<words>" --approval-at <ISO>   (the one renewal, paid by hand at the registrar; books the ledger row and renewals_used=1)
   npm run admin -- doctor`;
-
-class UsageError extends Error {}
 
 async function main(argv: string[]): Promise<number> {
   const { positionals, values } = parseArgs({
@@ -47,9 +44,7 @@ async function main(argv: string[]): Promise<number> {
     },
   });
   const [cmd, sub] = positionals;
-  const config = loadConfig(process.env);
-  const db = createDb(config.databaseUrl, { ssl: config.databaseSsl });
-  try {
+  return withDb(async ({ config, db }) => {
     if (cmd === 'doctor') {
       for (const line of await runDoctor(config, db)) console.log(line);
       return 0;
@@ -195,23 +190,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     throw new UsageError(`unknown command: ${positionals.join(' ') || '(none)'}`);
-  } finally {
-    await db.destroy();
-  }
+  });
 }
 
-main(process.argv.slice(2)).then(
-  (code) => {
-    process.exitCode = code; // no process.exit(): lets stdout flush when piped
-  },
-  (err: unknown) => {
-    const code = (err as { code?: unknown }).code;
-    if (err instanceof UsageError || (typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS_'))) {
-      console.error(`${(err as Error).message}\n${USAGE}`);
-      process.exitCode = 2;
-      return;
-    }
-    console.error(`error: ${(err as Error).message}`);
-    process.exitCode = 1;
-  },
-);
+exitWith(main(process.argv.slice(2)), USAGE);

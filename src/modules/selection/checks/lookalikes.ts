@@ -11,7 +11,7 @@ import { formFieldsOf } from './form.js';
 
 export type LookalikeKind = 'ending' | 'hyphen' | 'prefix';
 export interface LookalikeName { domain: string; kind: LookalikeKind }
-export interface LookalikeItem { domain: string; kind: LookalikeKind; registered: boolean | null; in_use: boolean | null; reason_code: string | null }
+interface LookalikeItem { domain: string; kind: LookalikeKind; registered: boolean | null; in_use: boolean | null; reason_code: string | null }
 
 const isDigit = (c: string): boolean => c >= '0' && c <= '9';
 const MIN_WORD = 4;

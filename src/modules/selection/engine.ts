@@ -23,11 +23,11 @@ import {
 export const HEARTBEAT_STALE_MS = 120_000;
 const MAX_RECOMPUTE_PASSES = 5;
 /** R1b: how often a run writes its heartbeat (HEARTBEAT_STALE_MS is 120 s) and re-reads its status for a cancel from another process. Wall-clock, so a fake `now` does not stop them. */
-export const HEARTBEAT_EVERY_MS = 10_000;
-export const CANCEL_CHECK_EVERY_MS = 5_000;
+const HEARTBEAT_EVERY_MS = 10_000;
+const CANCEL_CHECK_EVERY_MS = 5_000;
 /** v3.2.0 (CR-019 C-2): an availability lookup that timed out is asked again at the end of the same run, this many more times, this far apart (inside the run's deadline). */
-export const AVAILABILITY_RETRIES = 2;
-export const AVAILABILITY_RETRY_GAP_MS = 30_000;
+const AVAILABILITY_RETRIES = 2;
+const AVAILABILITY_RETRY_GAP_MS = 30_000;
 
 export interface InputName {
   domain: string; lane: Lane; city?: string; state?: string; trade?: string; price_grade?: 'strong' | 'weaker';
@@ -51,12 +51,12 @@ export function toResultRow(r: Row): ResultRow {
 
 /** The dependency row ids (DEPENDS_ON; null = no row) a computation of `c` reads from `latest`. null for a check without dependencies. */
 export type Inputs = Record<string, number | null>;
-export function inputsOf(latest: Map<CheckId, ResultRow>, c: CheckId): Inputs | null {
+function inputsOf(latest: Map<CheckId, ResultRow>, c: CheckId): Inputs | null {
   const deps = DEPENDS_ON[c];
   return deps ? Object.fromEntries(deps.map((d) => [d, latest.get(d)?.id ?? null])) : null;
 }
 /** Uniqueness discriminator of an automatic row: a hash of its inputs (identical inputs collide, so two workers write one row). 0 without inputs. */
-export const generationOf = (inputs: Inputs | null): number =>
+const generationOf = (inputs: Inputs | null): number =>
   inputs === null ? 0 : parseInt(createHash('sha256').update(JSON.stringify(Object.entries(inputs).sort(([a], [b]) => (a < b ? -1 : 1)))).digest('hex').slice(0, 12), 16);
 
 /**
@@ -274,7 +274,7 @@ export interface ScreeningWorkerDeps {
 type RunRow = Selectable<Database['screening_runs']>;
 
 /** Rows by item index, each list in row (id) order. */
-export function groupByItem(rows: readonly ResultRow[]): Map<number, ResultRow[]> {
+function groupByItem(rows: readonly ResultRow[]): Map<number, ResultRow[]> {
   const by = new Map<number, ResultRow[]>();
   for (const r of rows) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
   return by;

@@ -3,18 +3,17 @@
 // /check and /buy never read these tables (they do their own live lookups); the retention step prunes domain_rdap and live_checks (`pruneDataTables`).
 import { sql, type Kysely } from 'kysely';
 import { idtDay, isRealDate } from '../../core/dates.js';
-import { advisoryXactLock } from '../../core/locks.js';
 import { formatUsd } from '../../core/money.js';
 import type { Database } from '../../db/types.js';
-import { AppError } from '../../http/errors.js';
-import { centsOf, chunks, dateOf, domainOf, ENGINE_MAX_REJECTS, isObj, rawDomain, resolveSealed, textOf, type Reject, type SealedAfter } from './uploads.js';
+import { chunks } from '../../core/chunks.js';
+import { candidatePoolHosts } from '../candidates/index.js';
+import { bulkLoad, centsOf, dateOf, domainOf, ENGINE_MAX_REJECTS, isObj, rawDomain, textOf, type Parsed, type Reject, type SealedAfter } from '../engine/index.js';
 
-export const DATA_MAX_ROWS = 20_000;
-export const DATA_TABLES = ['domain_rdap', 'live_checks', 'tm_kills', 'bigco_names', 'sales_comps'] as const;
+const DATA_TABLES = ['domain_rdap', 'live_checks', 'tm_kills', 'bigco_names', 'sales_comps'] as const;
 export type DataTable = (typeof DATA_TABLES)[number];
-export const RDAP_STALE_HOURS = 24;
-export const LIVE_TTL_DAYS = 3;
-export const CC_TTL_DAYS = 14;
+const RDAP_STALE_HOURS = 24;
+const LIVE_TTL_DAYS = 3;
+const CC_TTL_DAYS = 14;
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
 
@@ -23,7 +22,6 @@ export interface DataLoadResult {
   skipped_not_in_pool_n?: number; rejects: Reject[];
 }
 interface Ctx { by: string; auditId: string | null; now: number; dryRun: boolean; sealedAfter: SealedAfter }
-type Parsed<T> = { ok: true; value: T } | { ok: false; domain: string | null; reason: string };
 
 /** An instant from an ISO timestamp or a plain day; null when it does not read as a real one. */
 function instantOf(v: unknown): Date | null {
@@ -39,7 +37,7 @@ const boolOf = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : v =
 
 // ---- parsers -------------------------------------------------------------------------------------------------------------------------------
 interface RdapRow { host: string; created: Date | null; expires: Date | null; registrar: string | null; reg: boolean; checked_at: Date }
-export function parseRdapRow(raw: unknown, now: number): Parsed<RdapRow> {
+function parseRdapRow(raw: unknown, now: number): Parsed<RdapRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf({ domain: raw.host });
   if ('reason' in d) return { ok: false, domain: typeof raw.host === 'string' ? raw.host.slice(0, 253) : null, reason: d.reason };
@@ -58,7 +56,7 @@ export function parseRdapRow(raw: unknown, now: number): Parsed<RdapRow> {
 }
 
 interface LiveRow { host: string; source: 'live' | 'livefail' | 'cc'; label: string | null; park: string | null; checked_at: Date; value_json: string | null }
-export function parseLiveRow(raw: unknown, now: number): Parsed<LiveRow> {
+function parseLiveRow(raw: unknown, now: number): Parsed<LiveRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf({ domain: raw.host });
   if ('reason' in d) return { ok: false, domain: typeof raw.host === 'string' ? raw.host.slice(0, 253) : null, reason: d.reason };
@@ -108,7 +106,7 @@ interface CompRow {
   domain: string; sale_date: string; price_cents: number; tier: 'T1' | 'T2' | 'T3' | 'T4'; year_flag: string | null; sale_year: number;
   reg_date_at_sale: string | null; net_reg_at_sale: string | null; org_reg_at_sale: string | null; source_url: string | null; dup_sources: string | null;
 }
-export function parseCompRow(raw: unknown, today: string, sealedAfter: string): Parsed<CompRow> {
+function parseCompRow(raw: unknown, today: string, sealedAfter: string): Parsed<CompRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf(raw);
   if ('reason' in d) return { ok: false, domain: rawDomain(raw), reason: d.reason };
@@ -140,41 +138,18 @@ async function run<T>(
   db: Kysely<Database>, table: DataTable, rows: unknown[], ctx: Ctx, parse: (raw: unknown, sealedAfter: string | undefined) => Parsed<T>,
   apply: (trx: Trx, valid: { i: number; v: T }[], rejects: Reject[]) => Promise<{ accepted: number; duplicate: number; skipped?: number }>,
 ): Promise<DataLoadResult> {
-  if (rows.length < 1 || rows.length > DATA_MAX_ROWS) throw new AppError(422, 'VALIDATION_ERROR', `rows must hold 1 to ${DATA_MAX_ROWS} rows`);
-  return db.transaction().execute(async (trx) => {
-    await advisoryXactLock(trx, 'engine_upload');
-    const sealedAfter = await resolveSealed(ctx.sealedAfter, trx);
-    const rejects: Reject[] = [];
-    const valid: { i: number; v: T }[] = [];
-    rows.forEach((raw, i) => {
-      const p = parse(raw, sealedAfter);
-      if (p.ok) valid.push({ i, v: p.value });
-      else rejects.push({ row: i, domain: p.domain, reason: p.reason });
-    });
-    const r = await apply(trx, valid, rejects);
-    rejects.sort((a, b) => a.row - b.row);
-    return {
-      table, dry_run: ctx.dryRun, received_n: rows.length, accepted_n: r.accepted, duplicate_n: r.duplicate, rejected_n: rejects.length,
-      ...(r.skipped !== undefined && { skipped_not_in_pool_n: r.skipped }), rejects: rejects.slice(0, ENGINE_MAX_REJECTS),
-    };
-  });
+  const { result: r, rejects } = await bulkLoad(db, rows, { sealedAfter: ctx.sealedAfter, parse, apply });
+  return {
+    table, dry_run: ctx.dryRun, received_n: rows.length, accepted_n: r.accepted, duplicate_n: r.duplicate, rejected_n: rejects.length,
+    ...(r.skipped !== undefined && { skipped_not_in_pool_n: r.skipped }), rejects: rejects.slice(0, ENGINE_MAX_REJECTS),
+  };
 }
 
 const CHUNK = 2_000;
 
-/** Hosts (of `hosts`) that are in the candidate pool: a non-removed intake name or a kept drop-list row. */
-export async function poolHosts(trx: Trx, hosts: string[]): Promise<Set<string>> {
-  const out = new Set<string>();
-  for (const part of chunks([...new Set(hosts)], 5_000)) {
-    for (const r of await trx.selectFrom('candidate_intake').select('domain').where('domain', 'in', part).where('status', '<>', 'removed').execute()) out.add(r.domain);
-    for (const r of await trx.selectFrom('drop_list_rows').select('domain').where('domain', 'in', part).where('kept', '=', true).execute()) out.add(r.domain);
-  }
-  return out;
-}
-
 export function loadRdap(db: Kysely<Database>, rows: unknown[], ctx: Ctx): Promise<DataLoadResult> {
   return run<RdapRow>(db, 'domain_rdap', rows, ctx, (raw) => parseRdapRow(raw, ctx.now), async (trx, valid) => {
-    const pool = await poolHosts(trx, valid.map((x) => x.v.host));
+    const pool = await candidatePoolHosts(trx, valid.map((x) => x.v.host));
     const inPool = valid.filter((x) => pool.has(x.v.host));
     const skipped = valid.length - inPool.length;
     const have = new Map<string, number>();

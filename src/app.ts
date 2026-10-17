@@ -1,21 +1,12 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Kysely } from 'kysely';
-import { registerBuy, smallBuyView } from './modules/buying/index.js';
-import { registerPricing } from './modules/listing/index.js';
-import { registerList, registerVenue } from './modules/listing/index.js';
+import { registerBuy, smallBuyView, registerTranches, BuyService, Reconciler } from './modules/buying/index.js';
+import { registerPricing, registerList, registerVenue, registerExport, ExportService, ListService } from './modules/listing/index.js';
 import { registerOffers, registerSold, SoldService, OffersService } from './modules/selling/index.js';
 import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
-import { registerDemand, registerSelection, registerSiblingScan } from './modules/selection/index.js';
-import { registerScreening } from './modules/selection/index.js';
-import { registerTestSets } from './modules/selection/index.js';
-import { registerPacks } from './modules/selection/index.js';
-import { registerTranches } from './modules/buying/index.js';
-import { ScreeningWorker } from './modules/selection/index.js';
-import type { ScreeningDeps } from './modules/selection/index.js';
-import type { HoldoutCheck } from './modules/selection/index.js';
-import { registerExport } from './modules/listing/index.js';
-import { registerCheck } from './modules/registrars/index.js';
-import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerPortfolioImport, registerPortfolioWrites } from './modules/ops/index.js';
+import { registerDemand, registerSelection, registerSiblingScan, registerScreening, registerTestSets, registerPacks, ScreeningWorker, type ScreeningDeps, type HoldoutCheck } from './modules/selection/index.js';
+import { registerCheck, createAdapters, type RegistrarAdapter, CheckService } from './modules/registrars/index.js';
+import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerPortfolioImport, registerPortfolioWrites, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
 import dns from 'node:dns';
 import { queryDns, queryNs, type NsLookup } from './core/ns-lookup.js';
 import type { Config } from './config.js';
@@ -27,30 +18,10 @@ import { registerRateLimit } from './http/rate-limit.js';
 import { registerErrorHandling } from './http/errors.js';
 import { jerusalemDeep } from './core/dates.js';
 import { rdapLookup, rdapStatus, type RdapFn } from './core/rdap.js';
-import { RegistrarCheckJob } from './modules/ops/index.js';
-import { PortfolioCheckJob } from './modules/ops/index.js';
-import { DropWatchJob } from './modules/ops/index.js';
-import { CohortOutcomesJob } from './modules/ops/index.js';
-import { registerDropLists } from './modules/candidates/index.js';
-import { registerCohorts } from './modules/candidates/index.js';
+import { registerDropLists, registerCohorts, registerCandidates, registerLessons, registerPatterns, IntakeScreeningJob, autoRebuildDailyList, BuildDailyListJob } from './modules/candidates/index.js';
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
-import { registerCandidates, registerLessons, registerPatterns } from './modules/candidates/index.js';
-import { EndingsJob, EngineTrainer, registerData, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
-import { createAdapters } from './modules/registrars/index.js';
-import type { RegistrarAdapter } from './modules/registrars/index.js';
-import { BuyService } from './modules/buying/index.js';
-import { CheckService } from './modules/registrars/index.js';
-import { ExportService } from './modules/listing/index.js';
-import { ListService } from './modules/listing/index.js';
-import { NsVerifier } from './modules/ops/index.js';
-import { DropJob } from './modules/ops/index.js';
-import { ReferenceRefreshJob, RetentionJob } from './modules/ops/index.js';
-import { PriceScheduleJob } from './modules/ops/index.js';
-import { registerJobs } from './modules/ops/index.js';
-import { IntakeScreeningJob } from './modules/candidates/index.js';
-import { autoRebuildDailyList, BuildDailyListJob } from './modules/candidates/index.js';
-import { JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
-import { Reconciler } from './modules/buying/index.js';
+import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
+import { registerData } from './modules/data/index.js';
 import { collectOpenApiRoutes, registerOpenApi } from './http/openapi.js';
 
 declare module 'fastify' {
@@ -113,6 +84,8 @@ export interface AppDeps {
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
+  const now = deps.now ?? Date.now;
+  const base = { db: deps.db, now };
   const auditWriter = deps.audit ?? dbAuditWriter(deps.db);
   const app = Fastify({
     logger: deps.logger ?? { level: deps.config.logLevel, redact: ['req.headers.authorization'] },
@@ -150,40 +123,40 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerIdempotency(app, deps.db); // preHandler (after scope) + onSend (before audit write)
   registerAuditWrite(app, auditWriter); // onSend (last)
 
-  registerHealth(app, deps.config, deps.db, deps.now ?? Date.now, () => app.jobQueue.kickIfNeeded());
+  registerHealth(app, deps.config, deps.db, now, () => app.jobQueue.kickIfNeeded());
   const adapters = deps.adapters ?? createAdapters(deps.config);
   const checkService = new CheckService({
     db: deps.db,
     adapters,
     rdap: deps.rdap ?? rdapStatus,
-    now: deps.now ?? Date.now,
+    now,
     quoteTimeoutMs: deps.quoteTimeoutMs,
     log: app.log,
   });
   registerCheck(app, checkService);
   const buyService = new BuyService({
-    db: deps.db, adapters, checkService, rdap: deps.rdap ?? rdapStatus, now: deps.now ?? Date.now,
+    db: deps.db, adapters, checkService, rdap: deps.rdap ?? rdapStatus, now,
     sleep: deps.sleep, log: app.log,
   });
   registerBuy(app, buyService);
-  registerExport(app, new ExportService({ db: deps.db, config: deps.config, now: deps.now ?? Date.now, lockTimeoutMs: deps.exportLockTimeoutMs }));
-  registerPricing(app, { db: deps.db, now: deps.now ?? Date.now });
+  registerExport(app, new ExportService({ db: deps.db, config: deps.config, now, lockTimeoutMs: deps.exportLockTimeoutMs }));
+  registerPricing(app, base);
   const nsLookup: NsLookup = deps.nsLookup ?? ((d: string) => queryNs(d, { server: deps.config.dnsNsServer }));
-  registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now: deps.now ?? Date.now }));
-  registerVenue(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerOffers(app, new OffersService({ db: deps.db, now: deps.now ?? Date.now }), { db: deps.db, now: deps.now ?? Date.now });
-  registerReport(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerPortfolioWrites(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerPortfolioImport(app, { db: deps.db, adapters, now: deps.now ?? Date.now });
-  registerOutcomes(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerReads(app, { db: deps.db, now: deps.now ?? Date.now });
+  registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now }));
+  registerVenue(app, base);
+  registerOffers(app, new OffersService(base), base);
+  registerReport(app, base);
+  registerPortfolioWrites(app, base);
+  registerPortfolioImport(app, { db: deps.db, adapters, now });
+  registerOutcomes(app, base);
+  registerReads(app, base);
   const sellerhub = deps.config.sellerhub.apiKey && deps.config.sellerhub.apiSecret
     ? new SellerHubClient({ fetch: globalThis.fetch, baseUrl: deps.config.sellerhub.baseUrl, apiKey: deps.config.sellerhub.apiKey, apiSecret: deps.config.sellerhub.apiSecret })
     : null;
-  const listingSync = new ListingSyncJob({ db: deps.db, client: sellerhub, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, log: app.log });
+  const listingSync = new ListingSyncJob({ db: deps.db, client: sellerhub, now, secretValues: deps.config.secretValues, log: app.log });
   app.decorate('listingSyncJob', listingSync);
-  registerSold(app, new SoldService({ db: deps.db, now: deps.now ?? Date.now, afterSold: async (d) => { await listingSync.delist(d); } }));
-  registerSelection(app, { db: deps.db, now: deps.now ?? Date.now, holdoutCheck: deps.holdoutCheck, smallBuy: () => Promise.resolve(smallBuyView()) });
+  registerSold(app, new SoldService({ ...base, afterSold: async (d) => { await listingSync.delist(d); } }));
+  registerSelection(app, { ...base, holdoutCheck: deps.holdoutCheck, smallBuy: () => Promise.resolve(smallBuyView()) });
   const screeningDeps: ScreeningDeps = {
     fetch: globalThis.fetch, sleep: deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), checkService,
     rdapLookup, dnsQuery: queryDns,
@@ -191,73 +164,73 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     resolve4: (host) => dns.promises.resolve4(host),
     webRiskApiKey: deps.config.webRiskApiKey,
     companiesHouseApiKey: deps.config.companiesHouseApiKey,
-    namebio: { ...(deps.config.namebio.retailstatsCsvUrl && { retailstatsCsvUrl: deps.config.namebio.retailstatsCsvUrl }), ...(deps.config.namebio.tldstatsCsvUrl && { tldstatsCsvUrl: deps.config.namebio.tldstatsCsvUrl }), ...(deps.config.namebio.dropOrderUrl && { dropOrderUrl: deps.config.namebio.dropOrderUrl }) },
+    namebio: { ...(deps.config.namebio.retailstatsCsvUrl && { retailstatsCsvUrl: deps.config.namebio.retailstatsCsvUrl }), },
     ...deps.screening,
   };
-  registerDemand(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerSiblingScan(app, { db: deps.db, now: deps.now ?? Date.now, screening: screeningDeps });
+  registerDemand(app, base);
+  registerSiblingScan(app, { ...base, screening: screeningDeps });
   const screeningWorker = new ScreeningWorker({
-    db: deps.db, now: deps.now ?? Date.now, log: app.log,
+    ...base, log: app.log,
     stopAfterResults: deps.screeningStopAfterResults,
     screening: screeningDeps,
   });
   app.decorate('screeningWorker', screeningWorker);
   app.addHook('onClose', async () => screeningWorker.idle());
   // CR-018 A: the day's list is rebuilt when the day's intake screening run ends (a run resumed after a restart included).
-  screeningWorker.onFinished(async (runId) => { await autoRebuildDailyList({ db: deps.db, worker: screeningWorker, now: deps.now ?? Date.now }, runId); });
-  registerScreening(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
-  registerTestSets(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
-  registerDropLists(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerCohorts(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker });
-  registerPatterns(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerLessons(app, { db: deps.db, now: deps.now ?? Date.now });
+  screeningWorker.onFinished(async (runId) => { await autoRebuildDailyList({ db: deps.db, worker: screeningWorker, now }, runId); });
+  registerScreening(app, { ...base, worker: screeningWorker });
+  registerTestSets(app, { ...base, worker: screeningWorker });
+  registerDropLists(app, base);
+  registerCohorts(app, { ...base, worker: screeningWorker });
+  registerPatterns(app, base);
+  registerLessons(app, base);
   const engineTrainer = new EngineTrainer({
-    db: deps.db, now: deps.now ?? Date.now, log: app.log, ...deps.engineTrain,
+    ...base, log: app.log, ...deps.engineTrain,
     enqueue: async (trainId, by) => { const r = await app.jobQueue.enqueue('train', { trigger: 'manual', triggeredBy: by, params: { train_id: trainId } }); app.jobQueue.kick(); return r; },
   });
-  const engineScorer = new Scorer({ db: deps.db, now: deps.now ?? Date.now, screening: screeningDeps, log: app.log, ...deps.engineScore });
-  registerEngine(app, { db: deps.db, now: deps.now ?? Date.now, trainer: engineTrainer, scorer: engineScorer, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
-  registerData(app, { db: deps.db, now: deps.now ?? Date.now, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
-  registerCandidates(app, { db: deps.db, now: deps.now ?? Date.now, worker: screeningWorker, queue: () => app.jobQueue });
-  registerEmails(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerCompany(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues });
+  const engineScorer = new Scorer({ ...base, screening: screeningDeps, log: app.log, ...deps.engineScore });
+  registerEngine(app, { ...base, trainer: engineTrainer, scorer: engineScorer, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
+  registerData(app, { ...base, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
+  registerCandidates(app, { ...base, worker: screeningWorker, queue: () => app.jobQueue });
+  registerEmails(app, base);
+  registerCompany(app, { ...base, secretValues: deps.config.secretValues });
   const reviewDeps = { fetch: globalThis.fetch, apiKey: deps.config.geminiApiKey, ...(deps.sleep ? { sleep: deps.sleep } : {}) };
-  registerReviews(app, { db: deps.db, now: deps.now ?? Date.now, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });
-  registerPacks(app, { db: deps.db, now: deps.now ?? Date.now });
-  registerTranches(app, { db: deps.db, now: deps.now ?? Date.now });
-  const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log });
+  registerReviews(app, { ...base, secretValues: deps.config.secretValues, version: deps.config.version, review: reviewDeps });
+  registerPacks(app, base);
+  registerTranches(app, base);
+  const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now, log: app.log });
   app.decorate('referenceRefreshJob', referenceRefresh);
-  const retention = new RetentionJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log });
-  app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: screeningDeps.rdapLookup, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('dropWatchJob', new DropWatchJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('intakeScreeningJob', new IntakeScreeningJob({ db: deps.db, worker: screeningWorker, now: deps.now ?? Date.now }));
-  app.decorate('buildDailyListJob', new BuildDailyListJob({ db: deps.db, worker: screeningWorker, now: deps.now ?? Date.now, waitMs: deps.dailyListWaitMs }));
-  app.decorate('cohortOutcomesJob', new CohortOutcomesJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('portfolioLifecycleJob', new PortfolioLifecycleJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('dropJob', new DropJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
-  app.decorate('priceJob', new PriceScheduleJob({ db: deps.db, now: deps.now ?? Date.now, log: app.log }));
+  const retention = new RetentionJob({ ...base, log: app.log });
+  app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now, log: app.log }));
+  app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: screeningDeps.rdapLookup, screening: screeningDeps, now, log: app.log }));
+  app.decorate('dropWatchJob', new DropWatchJob({ db: deps.db, screening: screeningDeps, now, log: app.log }));
+  app.decorate('intakeScreeningJob', new IntakeScreeningJob({ db: deps.db, worker: screeningWorker, now }));
+  app.decorate('buildDailyListJob', new BuildDailyListJob({ db: deps.db, worker: screeningWorker, now, waitMs: deps.dailyListWaitMs }));
+  app.decorate('cohortOutcomesJob', new CohortOutcomesJob({ db: deps.db, screening: screeningDeps, now, log: app.log }));
+  app.decorate('portfolioLifecycleJob', new PortfolioLifecycleJob({ db: deps.db, screening: screeningDeps, now, log: app.log }));
+  app.decorate('reconciler', new Reconciler({ db: deps.db, adapters, now, log: app.log }));
+  app.decorate('nsVerifier', new NsVerifier({ db: deps.db, nsLookup, now, log: app.log }));
+  app.decorate('dropJob', new DropJob({ ...base, log: app.log }));
+  app.decorate('priceJob', new PriceScheduleJob({ ...base, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
-    db: deps.db, now: deps.now ?? Date.now, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention, engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now: deps.now ?? Date.now, log: app.log }), engineTrainer,
+    ...base, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention, engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer,
     outsideReview: async () => {
-      const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: (deps.now ?? Date.now)() });
+      const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: now() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;
     },
     reviewRetry: async () => {
-      const r = await retryReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { now: (deps.now ?? Date.now)() });
+      const r = await retryReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { now: now() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped } : r;
     },
     secretValues: deps.config.secretValues,
   }));
-  app.decorate('jobQueue', new JobQueue({ db: deps.db, now: deps.now ?? Date.now, runner: app.jobRunner, log: app.log, overrides: deps.jobQueueOverrides,
+  app.decorate('jobQueue', new JobQueue({ ...base, runner: app.jobRunner, log: app.log, overrides: deps.jobQueueOverrides,
     resumeScreening: (atStart) => screeningWorker.resumeStalled({ atStart }),
     keepAlive: deps.jobQueueKeepAlive ?? (deps.config.appEnv === 'production' && deps.config.onRender && deps.config.publicBaseUrl ? { url: deps.config.publicBaseUrl } : undefined) }));
   // Closing the app waits for the step in flight, so nothing touches the database after it is closed. Unfinished runs resume at start (main.ts) or on the next GET.
   app.addHook('onClose', async () => app.jobQueue.stop());
-  registerJobs(app, app.jobQueue, { db: deps.db, now: deps.now ?? Date.now, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
+  registerJobs(app, app.jobQueue, { ...base, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   registerOpenApi(app, openApiRoutes, deps.config.version);
   deps.registerExtraRoutes?.(app);
   return app;

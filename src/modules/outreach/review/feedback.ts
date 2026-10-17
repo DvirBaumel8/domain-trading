@@ -4,7 +4,7 @@ import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
 import { jaccard, noveltyTokens, REPEAT_JACCARD } from './novelty.js';
 
-export interface FeedbackItemInput { category: string; severity: 'low' | 'medium' | 'high'; text: string }
+interface FeedbackItemInput { category: string; severity: 'low' | 'medium' | 'high'; text: string }
 export type FeedbackInput =
   | { status: 'ok'; provider: string; model: string; cost_usd: number; items: FeedbackItemInput[]; attempts?: number | undefined }
   | { status: 'unknown'; provider: string; model?: string | undefined; cost_usd?: number | undefined; reason: string; attempts?: number | undefined };

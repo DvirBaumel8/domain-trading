@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 export const GEMINI_HOST = 'https://generativelanguage.googleapis.com';
-export const GEMINI_TIMEOUT_MS = 60_000;
+const GEMINI_TIMEOUT_MS = 60_000;
 /**
  * The models the review may use (CR-011 addendum C), with Google's list prices in USD per million tokens. `free: true` = the model
  * has a free tier; a model with `free: false` needs tier `paid`. The paid prices of gemini-3.8-flash are DOM's placeholder list prices.
@@ -12,9 +12,9 @@ export const ALLOWED_REVIEW_MODELS = [
   { model: 'gemini-3.8-flash', free: true, input_usd_per_m: 0.50, output_usd_per_m: 3.00 },
   { model: 'gemini-3.1-pro-preview', free: false, input_usd_per_m: 2.00, output_usd_per_m: 12.00 },
 ] as const;
-export const REVIEW_CATEGORIES = ['strategy', 'pricing', 'risk', 'operations', 'data', 'cost', 'other'] as const;
+const REVIEW_CATEGORIES = ['strategy', 'pricing', 'risk', 'operations', 'data', 'cost', 'other'] as const;
 
-export const REVIEWER_INSTRUCTION = [
+const REVIEWER_INSTRUCTION = [
   'You are an outside reviewer of a small domain-trading company run by bots.',
   'Read the document, the changes and the numbers in the user message.',
   'Give at most 10 concrete feedback items.',
@@ -23,7 +23,7 @@ export const REVIEWER_INSTRUCTION = [
   'Reply only with JSON that follows the response schema.',
 ].join(' ');
 
-export interface GeminiItem { category: string; severity: 'low' | 'medium' | 'high'; text: string }
+interface GeminiItem { category: string; severity: 'low' | 'medium' | 'high'; text: string }
 export type GeminiResult =
   | { kind: 'ok'; items: GeminiItem[]; inputTokens: number; outputTokens: number; model: string }
   | { kind: 'unknown'; httpStatus: number | null; errorStatus: string | null; reason: string; /** Google's "try again later": 429, 503/UNAVAILABLE, a timeout or a network error. */ transient: boolean };

@@ -3,7 +3,7 @@
 // availability and the quote are fresh at pack time, and the three judgment calls are PASS. An incomplete pack is issued too, with what is missing.
 import { advisoryXactLock } from '../../core/locks.js';
 import { createHash, randomBytes } from 'node:crypto';
-import { sql, type Kysely, type Selectable } from 'kysely';
+import type { Kysely, Selectable } from 'kysely';
 import { z } from 'zod';
 import type { Database, ScreeningPacksTable } from '../../db/types.js';
 import { jerusalemDeep } from '../../core/dates.js';

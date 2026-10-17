@@ -104,8 +104,8 @@ export interface ScreeningDeps {
   webRiskApiKey?: string;
   /** Companies House API key (v4.2.0, CR-046 item 2); undefined → the companies check answers UNKNOWN SOURCE_DISABLED. */
   companiesHouseApiKey?: string;
-  /** v5.11.0 (CR-062): the published NameBio CSV file URLs (env NAMEBIO_*_CSV_URL); both absent -> the daily step asks RetailStats per keyword. */
-  namebio?: { retailstatsCsvUrl?: string; tldstatsCsvUrl?: string; dropOrderUrl?: string };
+  /** v5.11.0 (CR-062): the published NameBio RetailStats CSV file URL (env NAMEBIO_RETAILSTATS_CSV_URL); absent -> the daily step asks RetailStats per keyword. */
+  namebio?: { retailstatsCsvUrl?: string };
   siteFetch?: typeof fetch;
   /** All addresses of a host (system resolver), for the outbound site guard (`src/core/safe-fetch.ts`). Default: dns.lookup all:true. */
   lookupHost?: (host: string) => Promise<{ address: string; family: number }[]>;

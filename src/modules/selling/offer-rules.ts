@@ -5,7 +5,7 @@ export const OFFER_SOURCES: readonly OfferSource[] = ['afternic', 'godaddy', 'se
 export type BuyerType = 'end_user' | 'investor' | 'broker' | 'unknown';
 export const BUYER_TYPES: readonly BuyerType[] = ['end_user', 'investor', 'broker', 'unknown'];
 export type Band = 'below_min' | 'below_walkaway' | 'mid_range' | 'at_or_above_floor' | 'at_or_above_bin' | 'geo_below_bin' | 'unpriced';
-export type Routing = 'auto_decline' | 'dvir' | 'auto_accept' | 'accept_preapproved';
+type Routing = 'auto_decline' | 'dvir' | 'auto_accept' | 'accept_preapproved';
 
 export interface OfferSnapshot {
   mode: 'bin' | 'hybrid' | 'offer' | null;

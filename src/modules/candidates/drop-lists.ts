@@ -15,8 +15,8 @@ export const DROP_LIST_RETENTION_DAYS = 60;
 export const DROP_WATCH_MAX_PER_RUN = 3000;
 /** A registry lookup that answered unknown is asked again on later daily runs, at most this many checks in all. */
 export const MAX_UNKNOWN_CHECKS = 5;
-export const PENDING_DELETE_DAYS = 5;
-export const REDEMPTION_DAYS = 35;
+const PENDING_DELETE_DAYS = 5;
+const REDEMPTION_DAYS = 35;
 export const DROP_LIST_NAME_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;
 
 export const daysBetween = (a: string, b: string): number => dayNumber(b) - dayNumber(a);
@@ -24,7 +24,7 @@ export const daysBetween = (a: string, b: string): number => dayNumber(b) - dayN
 export const retentionCutoff = (nowMs: number): string => addDays(idtDay(nowMs), -DROP_LIST_RETENTION_DAYS);
 
 export type RemovedReason = 'DOMAIN_INVALID' | 'DUPLICATE_IN_UPLOAD' | 'HAS_DIGIT' | 'HAS_HYPHEN' | 'NO_SPLIT' | 'TOO_MANY_WORDS' | 'ONE_WORD';
-export const MAX_WORDS = 3;
+const MAX_WORDS = 3;
 export interface FilteredName { domain: string; kept: boolean; reason: RemovedReason | null; tokens: string[] | null }
 
 /** Lower-cases and filters one uploaded name: a letters-only second-level .com of 2 or 3 words by the bt1@v2 split. */
@@ -50,7 +50,7 @@ export function filterDropName(raw: string, seen: Set<string>, opts: { method?: 
 
 const squash = (s: string) => s.toLowerCase().replace(/\s+/g, '');
 export const isPendingDelete = (f: RdapFacts | null): boolean => !!f && f.statuses.some((s) => squash(s) === 'pendingdelete');
-export const isRedemption = (f: RdapFacts | null): boolean => !!f && f.statuses.some((s) => squash(s) === 'redemptionperiod');
+const isRedemption = (f: RdapFacts | null): boolean => !!f && f.statuses.some((s) => squash(s) === 'redemptionperiod');
 const dateOf = (iso: string | null | undefined): string | null => (iso && !Number.isNaN(Date.parse(iso)) ? idtDay(new Date(Date.parse(iso))) : null);
 
 export interface WatchStatus {

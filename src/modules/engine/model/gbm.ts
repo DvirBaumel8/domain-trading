@@ -14,10 +14,10 @@ export interface GbmParams {
   /** Share of the training rows held out (seeded) for early stopping; 0 = no early stopping. */
   validationFraction: number;
 }
-export const GBM_DEFAULTS: GbmParams = { maxLeafNodes: 15, minSamplesLeaf: 20, learningRate: 0.1, maxIter: 300, maxBins: 255, l2: 0, patience: 20, validationFraction: 0.1 };
+const GBM_DEFAULTS: GbmParams = { maxLeafNodes: 15, minSamplesLeaf: 20, learningRate: 0.1, maxIter: 300, maxBins: 255, l2: 0, patience: 20, validationFraction: 0.1 };
 
 /** One tree as parallel arrays: node i is a leaf when f[i] is -1 (value v[i], learning rate already applied); else it goes left when x <= t[i] (a missing x goes left when m[i] is 1). */
-export interface TreeJson { f: number[]; t: number[]; m: number[]; l: number[]; r: number[]; v: number[] }
+interface TreeJson { f: number[]; t: number[]; m: number[]; l: number[]; r: number[]; v: number[] }
 export interface GbmModel {
   kind: 'gbm'; classes: number; featureNames: string[];
   /** Per feature the upper edges of its bins: bin j holds x <= edges[j] (and above edges[j-1]); the last bin holds the rest. */

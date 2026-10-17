@@ -11,16 +11,16 @@ type Add = (code: string, level: WarningLevel, message: string, domain?: string,
 type Dom = Selectable<DomainsTable>;
 const daysBetweenYmd = (a: string, b: string): number => dayNumber(b) - dayNumber(a);
 const LIVE = ['owned', 'listed', 'delisted'];
-export const SELL_BEFORE_DROP_VENUES = [
+const SELL_BEFORE_DROP_VENUES = [
   'afternic: the same listing at a wholesale BIN (a pricing exception: POST /list with an override and Dvir\'s approval_ref naming the domain and the price)',
   'sellerhub: a wholesale BIN through the listing sync, once the plan carries it',
   'namepros: a sale thread, posted by hand (the service never posts)',
 ];
 
-export interface Signals { offers: number; inquiries: number; lookalike_rise: boolean; lookalikes_at_buy: number | null; lookalikes_now: number | null; search_band_above_unmeasured: boolean; keyword_searches: number | null }
+interface Signals { offers: number; inquiries: number; lookalike_rise: boolean; lookalikes_at_buy: number | null; lookalikes_now: number | null; search_band_above_unmeasured: boolean; keyword_searches: number | null }
 
 /** The keep-signals of a name: offers, inquiries or leads, a rise in lookalikes in use since the screening before the buy, a measured search demand (the latest keyword upload has at least `demand.keep_min_searches` average monthly searches for the name). */
-export async function signalsFor(db: Kysely<Database>, domain: string, domainId: number, keepMinSearches: number): Promise<Signals> {
+async function signalsFor(db: Kysely<Database>, domain: string, domainId: number, keepMinSearches: number): Promise<Signals> {
   const offers = Number((await sql<{ n: string }>`select count(*)::text as n from offers where domain_id = ${domainId}`.execute(db)).rows[0]!.n);
   const inq = Number((await sql<{ n: string }>`select coalesce(sum(coalesce(inquiries, 0) + coalesce(leads, 0)), 0)::text as n from portfolio_stats where domain = ${domain}`.execute(db)).rows[0]!.n);
   const base = await sql<{ n: number | null }>`

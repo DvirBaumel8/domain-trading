@@ -5,7 +5,7 @@ import { computePlan, FAST_TRANSFER_MAX_CENTS, hybridBinMin } from './pricing/pl
 import { addMonthsClamped, isRealDate, ymd } from '../../core/dates.js';
 import { isV3, type PricingSettings } from './pricing/settings.js';
 
-export const CATEGORIES: readonly Category[] = ['geo', 'trend', 'b2b', 'collision', 'regulation', 'buzzword', 'other'];
+const CATEGORIES: readonly Category[] = ['geo', 'trend', 'b2b', 'collision', 'regulation', 'buzzword', 'other'];
 export const isCategory = (v: unknown): v is Category => typeof v === 'string' && (CATEGORIES as readonly string[]).includes(v);
 const MODES: readonly ListingMode[] = ['bin', 'offer', 'hybrid'];
 const MIN_OFFER_FLOOR = 2000; // $20: Afternic's minimum (A3), not a pricing setting

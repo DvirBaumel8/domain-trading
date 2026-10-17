@@ -2,7 +2,7 @@
 // A missing feature (null) makes its condition `unknown`; it is never read as a pass or a fail (CR-002 CAP-21 missing-data rule).
 import type { ClauseT, CondT, SelectionValuesT } from './settings.js';
 
-export type Tri = 'true' | 'false' | 'unknown';
+type Tri = 'true' | 'false' | 'unknown';
 
 export interface TierFeatures {
   registered_share: number | null; prior_history: 0 | 1 | null; alt_tld_before_n: number | null; n_words: number | null;
@@ -29,7 +29,7 @@ type Clause = ClauseT;
 type Cond = CondT;
 
 /** The one comparison of a tier condition (also used by the tier check to tell which conditions decided a clause). */
-export function cmp(op: string, a: number, b: number): boolean {
+function cmp(op: string, a: number, b: number): boolean {
   switch (op) {
     case '>=': return a >= b;
     case '<=': return a <= b;
@@ -46,7 +46,7 @@ export type Thresholds = SelectionValuesT['thresholds'];
  * A condition's comparison value: the number itself, or the named threshold for a "$name" string.
  * `undefined` = unknown (the threshold is missing, or it is a per-lane map and the lane is unknown); `null` = the name's lane is not in the per-lane map (the condition is false, CR-023 C).
  */
-export const condValue = (v: string | number, thresholds: Thresholds, lane: string | null = null): number | null | undefined => {
+const condValue = (v: string | number, thresholds: Thresholds, lane: string | null = null): number | null | undefined => {
   if (typeof v !== 'string') return v;
   const t = thresholds[v.slice(1)];
   if (t === undefined || typeof t === 'number') return t;

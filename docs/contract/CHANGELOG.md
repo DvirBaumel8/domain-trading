@@ -2,6 +2,17 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.15.0 (2026-10-17): the Internet Archive reader and unused NameBio calls are removed; the data tables are their own module
+Release note: `docs/releases/v5.15.0.md`.
+MINOR (two visible settings changes, one narrowed outbound allow-list, no route, field or error code added or changed). Tech-debt pass R4 (structure and dead features).
+- **Removed (history check, S1):** the automated Internet Archive path (CDX index, capture fetches, classifier, `history.*` actions, the `ARCHIVE_UNAVAILABLE` family of reasons) is deleted. Dvir disabled it for good on 6 Oct 2026 and again on 14 Oct 2026. The `history` check still answers MANUAL_REQUIRED `MANUAL_SOURCE`, or uses a fresh domain record, exactly as before; manual HIST-2 records are unchanged. A manual record is now never ranked below an automated row (there is no automated history row any more).
+- **Changed (settings):** `sources.wayback` accepts only `false` (a draft that sets it `true` is 422 `SETTINGS_INVALID`; stored versions with `false` parse as before). The unused `namebio.spot_max_per_min` key is no longer in `GET /selection/settings` (a stored version that still carries it is read without it; a draft that sets it is accepted and the key is dropped). The `history.*` keys stay in the document, unused.
+- **Changed (NameBio, S2):** only POST `api.namebio.com/retailstats` and GET `/retailstats-download` can be called (TLDStats, the Verisign drop order and their file URLs were never read by any check or route). The table `namebio_tld_stats` is dropped; env `NAMEBIO_TLDSTATS_CSV_URL` and `NAMEBIO_DROP_ORDER_URL` are ignored. The nightly RetailStats CSV is read up to 100 MB (a longer file is refused whole, `errors[]` of the `referenceRefresh` NameBio summary) and only keywords of intake names, owned domains and names screened in the last 90 days are stored; `GET /selection/namebio` for any other keyword answers null until the name enters the pool.
+- **Unchanged answers, new structure (S3, S4, S5):** `POST /buy`, `POST /list` and `import-domain` store a plan through one function (`applyPlan`); `buy.ts` is split into types, reservation, dry run, money phase and post-buy files; the five `/data/*` tables are the new `data` module on the shared bulk-upload helper (`/engine/sales`, `/engine/unsold` use the same one); job audit rows come from one writer; the admin and job commands share their start-up. Routes, codes and bodies are byte-identical.
+- **Internal (S6):** unused barrel exports and about 380 exports nothing imported were un-exported; unused imports and constants removed.
+- **Fixed (tests):** the flaky "manual history with a LOWER id" recompute test (the worker kicked by the manual POST raced with the test's sequence bump) and NB-12 (`pg_database_size` is not monotonic).
+- **Migration:** `1764800000000_v5-15-0.sql` (drops `namebio_tld_stats`).
+
 ## 5.14.0 (2026-10-17): audit log keeps a count and hash for long lists; more data pruned; `/report` and other reads faster
 Release note: `docs/releases/v5.14.0.md`.
 MINOR (one stored-value change, retention scope, no route or field changed). Tech-debt pass R3 (database efficiency and growth).

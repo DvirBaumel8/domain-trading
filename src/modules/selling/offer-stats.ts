@@ -1,10 +1,10 @@
-import { sql, type Kysely } from 'kysely';
+import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { idtDay, idtDayStart, toJerusalemIso } from '../../core/dates.js';
 import { formatUsd } from '../../core/money.js';
 import type { Band } from './offer-rules.js';
 
-export interface Money { cents: number; display: string }
+interface Money { cents: number; display: string }
 export interface PerDomainOffers {
   count_30d: number; highest_30d: Money | null; count_90d: number; highest_90d: Money | null;
   count_all: number; highest_all: Money | null; highest_all_pct_of_bin: number | null; last_offer_at: string | null; open_for_dvir: number;

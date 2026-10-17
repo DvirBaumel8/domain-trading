@@ -240,11 +240,20 @@ describe('same-run recompute after a manual history record', () => {
     expect(await statusOf(rid)).toBe('done');
     const autoHist = (await rowsOf(rid, 'history')).at(-1)!;
     await sql`select setval(${seq}, ${now0 + 10})`.execute(db);
+    // The manual POST kicks the worker in the background. The rows it writes must get ids above the run's old ones, so the first check of the recompute lifts the
+    // sequence before it can insert (a bump in the test body after the POST raced with the worker: under load the worker won and the rows kept low ids, recomputing forever).
+    let armed = true;
+    for (const c of Object.keys(x.app.screeningWorker.checks) as CheckId[]) {
+      const orig = x.app.screeningWorker.checks[c]!;
+      x.app.screeningWorker.checks[c] = { ...orig, async run(ctx) {
+        if (armed) { armed = false; await sql`select setval(${seq}, ${now0 + 500})`.execute(db); }
+        return orig.run(ctx);
+      } };
+    }
     const r = await x.post(`/screening/runs/${rid}/manual`, historyPass(x));
     expect(r.statusCode).toBe(201);
     expect(Number(r.json().id ?? 0) || 0).toBeLessThan(Number(autoHist.id)); // the manual row's id is lower than the auto history's
     expect(r.json().recompute).toBe(true);
-    await sql`select setval(${seq}, ${now0 + 500})`.execute(db); // later rows get higher ids again
     await x.app.screeningWorker.runToEnd(rid);
     expect(tierCalls.at(-1)).toBe('manual');
     const t = await rowsOf(rid, 'tier');

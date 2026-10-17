@@ -1,7 +1,6 @@
 import { assertNoteNoPii, hasAtSign } from '../../core/validation.js';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import type { Database, DomainRow, OffersTable } from '../../db/types.js';
-import { normalizeDomain } from '../../domain-name.js';
 import { AppError } from '../../http/errors.js';
 import { formatUsd, usdStringToCents, wholeUsd } from '../../core/money.js';
 import { isIsoWithOffset, toJerusalemIso } from '../../core/dates.js';
@@ -34,11 +33,10 @@ const AFTER: Record<string, readonly string[]> = {
   countered: ['countered', 'accepted', 'declined', 'expired', 'withdrawn'],
   accepted: ['sold', 'withdrawn'],
 };
-const APPROVAL_OUTCOMES: readonly string[] = ['countered', 'accepted', 'sold'];
 
 const money = (cents: number | null) => (cents === null ? { cents: null, display: null } : { cents, display: formatUsd(cents) });
 
-export function offerView(o: OfferRow, domain: string) {
+function offerView(o: OfferRow, domain: string) {
   const bin = money(o.bin_cents_at); const floor = money(o.floor_cents_at); const min = money(o.min_offer_cents_at);
   return {
     id: o.id, domain, amount_cents: o.amount_cents, amount: formatUsd(o.amount_cents), source: o.source,
@@ -55,7 +53,7 @@ export function offerView(o: OfferRow, domain: string) {
 }
 
 /** The prices in force at `receivedAt`: the latest history row with a mode at or before it, else the latest at all, else the domain's own columns. */
-export async function snapshotAt(db: Kysely<Database>, d: DomainRow, receivedAt: Date): Promise<OfferSnapshot> {
+async function snapshotAt(db: Kysely<Database>, d: DomainRow, receivedAt: Date): Promise<OfferSnapshot> {
   const base = () => db.selectFrom('listing_history').selectAll().where('domain_id', '=', d.id).where('mode', 'is not', null)
     .orderBy('at', 'desc').orderBy('id', 'desc');
   const h = (await base().where('at', '<=', receivedAt).executeTakeFirst()) ?? (await base().executeTakeFirst());
@@ -221,12 +219,12 @@ export class OffersService {
 }
 
 /** An AppError that knows which input field it is about. */
-export class FieldError extends AppError {
+class FieldError extends AppError {
   constructor(public readonly field: string, status: number, code: string, message: string) { super(status, code, message); }
 }
 
 /** The field rules for an offer (POST /offers): every problem, in field order. */
-export function validateOfferAll(
+function validateOfferAll(
   body: { amount_usd: string; source: string; received_at: string; buyer_type?: string | null; buyer_ref?: string | null; note?: string | null },
   now: Date,
 ): { errors: FieldError[]; value: { amountCents: number; source: OfferSource; buyerType: BuyerType; receivedAt: Date } | null } {
@@ -254,7 +252,7 @@ export function validateOfferAll(
 }
 
 /** POST /offers: the first problem is thrown. */
-export function validateOffer(body: Parameters<typeof validateOfferAll>[0], now: Date): NonNullable<ReturnType<typeof validateOfferAll>['value']> {
+function validateOffer(body: Parameters<typeof validateOfferAll>[0], now: Date): NonNullable<ReturnType<typeof validateOfferAll>['value']> {
   const r = validateOfferAll(body, now);
   if (r.errors[0]) throw r.errors[0];
   return r.value!;

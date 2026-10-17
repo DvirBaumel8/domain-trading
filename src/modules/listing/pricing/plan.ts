@@ -117,10 +117,10 @@ export function computePlan(input: PlanInput, s: PricingSettings): PlanResult {
   } };
 }
 
-export interface S8LadderStep { max_len: number | null; bin_cents: number }
+interface S8LadderStep { max_len: number | null; bin_cents: number }
 
 /** The S8 ladder from the settings row (`settings.s8_bin_ladder`): ascending by max_len, the last step has max_len null. Throws on a malformed row. */
-export function parseS8Ladder(raw: unknown): S8LadderStep[] {
+function parseS8Ladder(raw: unknown): S8LadderStep[] {
   const ok = Array.isArray(raw) && raw.length > 0 && raw.every((x, i) => x && typeof x === 'object'
     && Number.isSafeInteger((x as S8LadderStep).bin_cents) && (x as S8LadderStep).bin_cents > 0
     && (((x as S8LadderStep).max_len === null && i === raw.length - 1) || Number.isSafeInteger((x as S8LadderStep).max_len)));

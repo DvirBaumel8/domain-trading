@@ -1,61 +1,24 @@
 // v5.4.0 (CR-056 part 1): uploads of sold and unsold names for the scoring engine. Each row is checked on its own: a bad row is rejected with a
 // reason and the rest are stored. A whole upload is one transaction under one advisory lock, so two uploads never race on the duplicate check.
 import type { Kysely } from 'kysely';
-import { dayNumber, idtDay, isRealDate } from '../../core/dates.js';
-import { advisoryXactLock } from '../../core/locks.js';
+import { chunks } from '../../core/chunks.js';
+import { dayNumber, idtDay } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
-import { normalizeDomain } from '../../domain-name.js';
-import { AppError } from '../../http/errors.js';
+import { bulkLoad, centsOf, ENGINE_MAX_REJECTS, dateOf, domainOf, isObj, rawDomain, textOf, type Parsed, type Reject, type SealedAfter } from './bulk.js';
 
-export const ENGINE_MAX_ROWS = 20_000;
-export const ENGINE_MAX_REJECTS = 200;
+export { ENGINE_MAX_ROWS } from './bulk.js';
 /** Two sales of one name within this many days (either way) are the same sale reported twice. */
-export const SALE_DEDUPE_DAYS = 20;
-export const ENGINE_EARLIEST_DATE = '2000-01-01';
+const SALE_DEDUPE_DAYS = 20;
 export const UNSOLD_TYPES = ['dropped_after_held', 'registered_unsold'] as const;
-export type UnsoldType = (typeof UNSOLD_TYPES)[number];
+type UnsoldType = (typeof UNSOLD_TYPES)[number];
 
-export interface Reject { row: number; domain: string | null; reason: string }
 export interface UploadResult { upload_id: number; received_n: number; accepted_n: number; duplicate_n: number; rejected_n: number; rejects: Reject[] }
-/** A fixed date, or a reader called inside the upload lock (M4: the date is read under the same lock `setSalesMaxDate` takes). */
-export type SealedAfter = string | ((trx: Kysely<Database>) => Promise<string>);
-export const resolveSealed = (s: SealedAfter | undefined, trx: Kysely<Database>): Promise<string | undefined> => (typeof s === 'function' ? s(trx) : Promise.resolve(s));
 interface Ctx { by: string; auditId: string | null; now: number; /** v5.10.0: rows dated after this are HOLDOUT_SEALED (default: no guard). */ sealedAfter?: SealedAfter }
 
 interface SaleRow { domain: string; price_cents: number; sale_date: string; venue: string; source: string; source_url: string | null }
 interface UnsoldRow { domain: string; type: UnsoldType; observation_date: string; caught_by_catcher: boolean | null }
-type Parsed<T> = { ok: true; value: T } | { ok: false; domain: string | null; reason: string };
 
-export const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-export const rawDomain = (r: Record<string, unknown>): string | null => (typeof r.domain === 'string' ? r.domain.slice(0, 253) : null);
-
-export function domainOf(r: Record<string, unknown>): { domain: string } | { reason: string } {
-  if (typeof r.domain !== 'string') return { reason: 'DOMAIN_INVALID' };
-  try {
-    return { domain: normalizeDomain(r.domain) };
-  } catch (e) {
-    return { reason: e instanceof AppError ? e.code : 'DOMAIN_INVALID' };
-  }
-}
-
-/** A real calendar date from the earliest allowed one to today (IDT). */
-export function dateOf(v: unknown, today: string, sealedAfter?: string): { date: string } | { reason: string } {
-  if (typeof v !== 'string' || !isRealDate(v) || v < ENGINE_EARLIEST_DATE) return { reason: 'DATE_INVALID' };
-  if (v > today) return { reason: 'DATE_IN_FUTURE' };
-  if (sealedAfter !== undefined && v > sealedAfter) return { reason: 'HOLDOUT_SEALED' };
-  return { date: v };
-}
-
-export function centsOf(v: unknown): number | null {
-  const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d{1,9}(\.\d{1,2})?$/.test(v.trim()) ? Number(v.trim()) : NaN;
-  if (!Number.isFinite(n) || n <= 0 || n > 100_000_000) return null;
-  const cents = Math.round(n * 100);
-  return cents >= 1 ? cents : null;
-}
-
-export const textOf = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim().length >= 1 && v.trim().length <= max ? v.trim() : null);
-
-export function parseSaleRow(raw: unknown, today: string, sealedAfter?: string): Parsed<SaleRow> {
+function parseSaleRow(raw: unknown, today: string, sealedAfter?: string): Parsed<SaleRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf(raw);
   if ('reason' in d) return { ok: false, domain: rawDomain(raw), reason: d.reason };
@@ -76,7 +39,7 @@ export function parseSaleRow(raw: unknown, today: string, sealedAfter?: string):
   return { ok: true, value: { domain: d.domain, price_cents: cents, sale_date: date.date, venue, source, source_url: sourceUrl } };
 }
 
-export function parseUnsoldRow(raw: unknown, today: string, sealedAfter?: string): Parsed<UnsoldRow> {
+function parseUnsoldRow(raw: unknown, today: string, sealedAfter?: string): Parsed<UnsoldRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf(raw);
   if ('reason' in d) return { ok: false, domain: rawDomain(raw), reason: d.reason };
@@ -90,7 +53,6 @@ export function parseUnsoldRow(raw: unknown, today: string, sealedAfter?: string
 }
 
 const CHUNK = 2_000;
-export const chunks = <T>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, (i + 1) * n));
 
 async function store<T extends { domain: string }>(
   db: Kysely<Database>, kind: 'sales' | 'unsold', rows: unknown[], ctx: Ctx,
@@ -98,32 +60,27 @@ async function store<T extends { domain: string }>(
   isDuplicate: (trx: Kysely<Database>, valid: T[]) => Promise<(r: T) => boolean>,
   insert: (trx: Kysely<Database>, uploadId: number, accepted: T[]) => Promise<void>,
 ): Promise<UploadResult> {
-  if (rows.length < 1 || rows.length > ENGINE_MAX_ROWS) throw new AppError(422, 'VALIDATION_ERROR', `rows must hold 1 to ${ENGINE_MAX_ROWS} rows`);
   const today = idtDay(ctx.now);
-  return db.transaction().execute(async (trx) => {
-    await advisoryXactLock(trx, 'engine_upload');
-    const sealedAfter = await resolveSealed(ctx.sealedAfter, trx);
-    const rejects: Reject[] = [];
-    const valid: { i: number; v: T }[] = [];
-    rows.forEach((raw, i) => {
-      const p = parse(raw, today, sealedAfter);
-      if (p.ok) valid.push({ i, v: p.value });
-      else rejects.push({ row: i, domain: p.domain, reason: p.reason });
-    });
-    const dup = await isDuplicate(trx, valid.map((x) => x.v));
-    const accepted: T[] = [];
-    let duplicates = 0;
-    for (const { v } of valid) {
-      if (dup(v)) duplicates += 1;
-      else accepted.push(v);
-    }
-    const up = await trx.insertInto('engine_uploads').values({
-      kind, received_n: rows.length, accepted_n: accepted.length, duplicate_n: duplicates, rejected_n: rejects.length,
-      rejects: JSON.stringify(rejects.slice(0, ENGINE_MAX_REJECTS)), by: ctx.by, audit_id: ctx.auditId, created_at: new Date(ctx.now),
-    }).returning('id').executeTakeFirstOrThrow();
-    await insert(trx, up.id, accepted);
-    return { upload_id: up.id, received_n: rows.length, accepted_n: accepted.length, duplicate_n: duplicates, rejected_n: rejects.length, rejects: rejects.slice(0, ENGINE_MAX_REJECTS) };
+  const { result, rejects } = await bulkLoad(db, rows, {
+    sealedAfter: ctx.sealedAfter,
+    parse: (raw, sealedAfter) => parse(raw, today, sealedAfter),
+    apply: async (trx, valid, rejected) => {
+      const dup = await isDuplicate(trx, valid.map((x) => x.v));
+      const accepted: T[] = [];
+      let duplicates = 0;
+      for (const { v } of valid) {
+        if (dup(v)) duplicates += 1;
+        else accepted.push(v);
+      }
+      const up = await trx.insertInto('engine_uploads').values({
+        kind, received_n: rows.length, accepted_n: accepted.length, duplicate_n: duplicates, rejected_n: rejected.length,
+        rejects: JSON.stringify(rejected.slice(0, ENGINE_MAX_REJECTS)), by: ctx.by, audit_id: ctx.auditId, created_at: new Date(ctx.now),
+      }).returning('id').executeTakeFirstOrThrow();
+      await insert(trx, up.id, accepted);
+      return { upload_id: up.id, accepted_n: accepted.length, duplicate_n: duplicates };
+    },
   });
+  return { upload_id: result.upload_id, received_n: rows.length, accepted_n: result.accepted_n, duplicate_n: result.duplicate_n, rejected_n: rejects.length, rejects: rejects.slice(0, ENGINE_MAX_REJECTS) };
 }
 
 export function storeSales(db: Kysely<Database>, rows: unknown[], ctx: Ctx): Promise<UploadResult> {
