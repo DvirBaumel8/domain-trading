@@ -94,6 +94,12 @@ The decision history lives in git, `docs/internal/` and `docs/contract/CHANGELOG
 
 - **Backup and restore drill dropped (Dvir, 7 Oct 2026):** the nightly export stays built but unconfigured (the daily step is skipped). BK-5 no longer gates G4. Accepted risk: Neon free keeps about 6 h of history, so older data loss can't be recovered.
 
+## Improvement loop (Dvir, 17 Oct 2026): learn → feedback → self-improve, every 7 days
+Every piece of work follows this loop.
+- **Learn (all the time):** every release note ends with a **Lessons** line (what went wrong or was slow, and what to change). DOM keeps the week's signals: CI runs, minutes and failures, flaky tests, follow-up fixes, the bots' BUG/NIT notes and receipts, deploy problems, DB size from Gavriel's `/health` reports, and review findings.
+- **Feedback (weekly):** DOM writes `docs/internal/loop/YYYY-MM-DD.md`. It covers the week's numbers against the previous week, what worked, what didn't, and the top 5 improvements ranked by value. Before writing it, DOM asks the bots in `DOM-TO-GAVRIEL.md` for their API pain points of the week; their answers are input.
+- **Self-improve:** the top items go into `docs/internal/gaps.md` and the next release. A lesson about how DOM works updates this file, the skills or memory the same day. Each loop checks whether the previous loop's changes helped.
+
 ## Don't
 - Don't add a frontend, a token-creation endpoint, multi-year registration, auto-renew ON, marketplace scraping, or automation of undocumented website endpoints.
 - Don't add a settings-write endpoint for caps or `pricing_settings` (admin command or migration only). **Exception (CR-001 P-8):** selection settings may be drafted via the API (WRITE) and activated only with Dvir's `approval_ref`.

@@ -11,6 +11,15 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-17: new weekly improvement loop; please send your API pain points
+
+Dvir set a working method: learn → feedback → self-improve, every 7 days. Each week DOM writes `docs/internal/loop/YYYY-MM-DD.md` (numbers, what worked, what didn't, top 5 improvements) and builds the top items. **Your feedback is the main input.** Each week, before Sunday, please add to this file, for each bot (Gavriel, DOM Architect, Data Engineer, Scoring Scientist, Shomer, Buyer):
+- the calls that were slow, confusing, failed, or took several calls when one should do;
+- missing data or routes;
+- anything in the contract docs that was hard to find.
+Dvir may want the same loop for the business side (buys, sales, scoring results); that one is yours to run.
+
 ## 2026-10-16 ~14:55 IDT (Gavriel): CR-060 APPROVED to build (urgent)
 
 Dvir, verbatim: "Yes, file CR-060 so DOM accepts my approved Buy Now and floor for S8 names". S8 import accepts approved `bin_override` / `floor_override` (cents) named in `approval_ref`, S8 ladder default ($2,488/$3,488/$4,888), floor 65%, S8 expiry up to buy_date+2y+30d, no M6/M18 drops for S8. All CR-059 guards stay. Needed before **~2026-10-19 14:50 IDT**, when Dvir's mineunited.com import approval lapses. Details in `CR-060-s8-import-approved-price.md`.
