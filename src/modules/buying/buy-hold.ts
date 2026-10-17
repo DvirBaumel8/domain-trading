@@ -5,18 +5,25 @@ import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { effectiveHold } from '../selection/index.js';
 
-export async function latestScreeningRun(db: Kysely<Database>, domain: string) {
+type ScreeningRun = NonNullable<Awaited<ReturnType<typeof latestScreeningRunRow>>>;
+
+async function latestScreeningRunRow(db: Kysely<Database>, domain: string) {
+  // Two indexed branches (screening_results_domain_check, screening_runs_input_names GIN, v5.14.0): the runs that wrote a result for the name,
+  // and the runs that list it in their input but have not written one yet (a held version holds the name from the start).
   return await db.selectFrom('screening_runs').selectAll()
-    .where((eb) => eb.or([
-      eb('id', 'in', db.selectFrom('screening_results').select('run_id').where('domain', '=', domain)),
-      // a run that lists the name but has not written a result for it yet counts too (a held version holds the name from the start)
-      sql<boolean>`input @> ${JSON.stringify({ names: [{ domain }] })}::jsonb`,
-    ]))
+    .where('id', 'in', sql<string>`(
+      select run_id from screening_results where domain = ${domain}
+      union select id from screening_runs where input @> ${JSON.stringify({ names: [{ domain }] })}::jsonb)`)
     .orderBy('created_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
 }
 
-export async function screeningHold(db: Kysely<Database>, domain: string): Promise<{ settingsVersion: string; runId: string } | null> {
-  const run = await latestScreeningRun(db, domain);
-  if (!run) return null;
-  return (await effectiveHold(db, run)) ? { settingsVersion: run.settings_label, runId: run.id } : null;
+export async function latestScreeningRun(db: Kysely<Database>, domain: string): Promise<ScreeningRun | undefined> {
+  return latestScreeningRunRow(db, domain);
+}
+
+/** `run` = the name's latest run when the caller already read it (one read per /buy); undefined = read it here. */
+export async function screeningHold(db: Kysely<Database>, domain: string, run?: ScreeningRun | null): Promise<{ settingsVersion: string; runId: string } | null> {
+  const r = run === undefined ? await latestScreeningRun(db, domain) : run;
+  if (!r) return null;
+  return (await effectiveHold(db, r)) ? { settingsVersion: r.settings_label, runId: r.id } : null;
 }

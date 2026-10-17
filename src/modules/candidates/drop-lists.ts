@@ -10,7 +10,7 @@ import { loadSplitV2, regimeDigitsOk, splitV2 } from '../selection/index.js';
 import type { ScreeningDeps } from '../selection/index.js';
 import type { RdapFacts } from '../../core/rdap.js';
 
-/** Reads ignore a list more than this many days after its list_date; rows are never deleted (append-only). */
+/** Reads ignore a list more than this many days after its list_date. The rows are append-only; the daily retention step deletes a list past 90 days (60 in tight mode), v5.14.0. */
 export const DROP_LIST_RETENTION_DAYS = 60;
 export const DROP_WATCH_MAX_PER_RUN = 3000;
 /** A registry lookup that answered unknown is asked again on later daily runs, at most this many checks in all. */

@@ -560,10 +560,10 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const label = target ? target.label : active.label;
     const id = (await db.selectFrom('selection_settings').select('id').where('label', '=', label).executeTakeFirstOrThrow()).id;
     // The ACTIVE version's holdout settings judge every version (they are locked, so equal in all of them).
-    const suites = await suiteStatuses(db, id, active.values.holdout);
     const hold = await holdSuites(db, active.values.holdout);
+    const suites = await suiteStatuses(db, id, active.values.holdout, hold);
     const targetValues = target ? target.values : active.values;
     // Clearable only for a version that actually clears the hold (its own buy_hold is false).
-    return { buy_hold: active.values.buy_hold, settings_version: label, target_buy_hold: targetValues.buy_hold, required_suites: suites, hold_suites: hold.suites, hold_suites_source: hold.source, clearable: !targetValues.buy_hold && suites.length > 0 && suites.every((x) => x.pass), ...(await buyHoldSteps(db, active)), ...(deps.smallBuy ? { small_buy: await deps.smallBuy(deps.now()) } : {}) };
+    return { buy_hold: active.values.buy_hold, settings_version: label, target_buy_hold: targetValues.buy_hold, required_suites: suites, hold_suites: hold.suites, hold_suites_source: hold.source, clearable: !targetValues.buy_hold && suites.length > 0 && suites.every((x) => x.pass), ...(await buyHoldSteps(db, active, hold)), ...(deps.smallBuy ? { small_buy: await deps.smallBuy(deps.now()) } : {}) };
   });
 }

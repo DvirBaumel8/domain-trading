@@ -6,10 +6,10 @@ import type { Database } from './types.js';
 pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v));
 pg.types.setTypeParser(pg.types.builtins.DATE, (v) => v);
 
-/** v3.9.0: a connect that hangs fails after 10 s; an idle client is closed after 30 s (before Neon drops it). */
+/** v5.14.0: max 20 (was 10): one /report now runs its 8 parts together, and a job step or a training can hold a connection for minutes (Neon free allows far more). v3.9.0: a connect that hangs fails after 10 s; an idle client is closed after 30 s (before Neon drops it). */
 export const POOL_CONNECTION_TIMEOUT_MS = 10_000;
 export const POOL_IDLE_TIMEOUT_MS = 30_000;
-const POOL_LIMITS = { max: 10, connectionTimeoutMillis: POOL_CONNECTION_TIMEOUT_MS, idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS };
+const POOL_LIMITS = { max: 20, connectionTimeoutMillis: POOL_CONNECTION_TIMEOUT_MS, idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS };
 
 const SSLMODE = /([?&])sslmode=([^&]*)(&|$)/i;
 

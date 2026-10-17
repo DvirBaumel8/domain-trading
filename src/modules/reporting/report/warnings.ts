@@ -1,7 +1,7 @@
 import { pair } from '../../../core/money.js';
 import { sql, type Kysely } from 'kysely';
 import { idtDay, toJerusalemIso } from '../../../core/dates.js';
-import type { Database } from '../../../db/types.js';
+import type { Database, DomainRow } from '../../../db/types.js';
 import { computePlan } from '../../listing/index.js';
 import { settingsByVersion } from '../../listing/index.js';
 import { manualDelist, pendingDomains, sameNsSet, VENUES } from '../../listing/index.js';
@@ -31,7 +31,8 @@ export const DAILY_JOB_MISSED_HOURS = 26;
 export const ENDING_REGISTERED_DAYS = 30;
 const RANK: Record<WarningLevel, number> = { error: 0, warn: 1, info: 2 };
 
-export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { storageLimitBytes?: number } = {}): Promise<ReportWarning[]> {
+/** `opts.domains` / `opts.pendingAfternic`: rows the caller already loaded for the same report (loadReportDomains, pendingDomains(db, 'afternic')). */
+export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { storageLimitBytes?: number; domains?: DomainRow[]; pendingAfternic?: Set<string> } = {}): Promise<ReportWarning[]> {
   const out: ReportWarning[] = [];
   const add = (code: string, level: WarningLevel, message: string, domain?: string, details: Record<string, unknown> = {}) =>
     out.push({ code, level, ...(domain ? { domain } : {}), message, details });
@@ -80,7 +81,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   if (lastFeedback && now.getTime() - lastFeedback.created_at.getTime() > REVIEW_OVERDUE_HOURS * 3_600_000) {
     add('REVIEW_OVERDUE', 'warn', `No review feedback has been recorded for over ${REVIEW_OVERDUE_HOURS} hours.`, undefined, { last_feedback_at: toJerusalemIso(lastFeedback.created_at) });
   }
-  const domains = await db.selectFrom('domains').selectAll().where('status', '!=', 'pending_purchase').orderBy('domain').execute();
+  const domains = opts.domains ?? await db.selectFrom('domains').selectAll().where('status', '!=', 'pending_purchase').orderBy('domain').execute();
   const nameOf = new Map(domains.map((d) => [d.id, d.domain]));
   const statusOf = new Map(domains.map((d) => [d.id, d.status]));
   const registrarOf = new Map(domains.map((d) => [d.id, d.registrar]));
@@ -190,7 +191,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   }
 
   // domains
-  const pending = new Set(await pendingDomains(db, 'afternic'));
+  const pending = opts.pendingAfternic ?? new Set(await pendingDomains(db, 'afternic'));
   // batched lookups for the per-row rules below (no query inside the loop)
   const heldIds = domains.filter((d) => d.pricing_hold).map((d) => d.id);
   const lastHistoryAt = new Map<number, Date>(); // newest listing_history row (by id) of each held name

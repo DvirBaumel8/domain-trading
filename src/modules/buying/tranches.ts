@@ -6,9 +6,9 @@ import type { Database, TrancheMembersTable, TranchesTable } from '../../db/type
 import { normalizeDomain } from '../../domain-name.js';
 import { AppError } from '../../http/errors.js';
 import { latestByCheck } from '../selection/index.js';
-import { assemble, effectiveHold, fullPlanRunOrThrow, toResultRow } from '../selection/index.js';
+import { assembleRun, fullPlanRunOrThrow } from '../selection/index.js';
 import { activeSelectionSettings, selectionSettingsByLabel } from '../selection/index.js';
-import type { CheckId, Lane, RunItem } from '../selection/index.js';
+import type { Lane } from '../selection/index.js';
 import { geoMembers, openTrancheFor } from '../selection/index.js';
 
 type Trn = Selectable<TranchesTable>;
@@ -90,9 +90,7 @@ export class TrancheService {
     if (run.status === 'running' && !run.backtest) throw new AppError(409, 'NOT_SCREENED_OK', 'The run is still running; wait until it has finished', { run_id: runId, reason: 'RUNNING' });
     const sel = await selectionSettingsByLabel(db, run.settings_label);
     fullPlanRunOrThrow(run, sel!); // a backtest (also a running one) and a cut plan never admit a name
-    const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
-    const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values,
-      await effectiveHold(db, run), true, run.mode === 'live'); // not running (refused above)
+    const a = await assembleRun(db, run, sel!, { runDone: true }); // not running (refused above)
     const it = a.items.find((i) => i.item.domain === domain && !i.item.input_error);
     if (!it) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${domain}" is not a screened name of run ${runId}`);
     // CR-002 Amendment B5.2: a name whose history is still waiting for the human HIST-2 record never joins (it is not rejected, so say what is missing).

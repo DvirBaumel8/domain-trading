@@ -161,7 +161,6 @@ async function run<T>(
 }
 
 const CHUNK = 2_000;
-const nameCount = async (trx: Trx, t: DataTable): Promise<number> => Number((await sql<{ n: string }>`select count(*)::text as n from ${sql.table(t)}`.execute(trx)).rows[0]!.n);
 
 /** Hosts (of `hosts`) that are in the candidate pool: a non-removed intake name or a kept drop-list row. */
 export async function poolHosts(trx: Trx, hosts: string[]): Promise<Set<string>> {
@@ -278,8 +277,10 @@ export function loadSalesComps(db: Kysely<Database>, rows: unknown[], ctx: Ctx):
 
 /** Rows per data table (the answer of every load). */
 export async function dataRowCounts(db: Kysely<Database>): Promise<Record<DataTable, number>> {
+  // one statement for all the tables (v5.14.0)
+  const r = await sql<{ t: string; n: string }>`${sql.join(DATA_TABLES.map((t) => sql`select ${t}::text as t, count(*)::text as n from ${sql.table(t)}`), sql` union all `)}`.execute(db);
   const out = {} as Record<DataTable, number>;
-  for (const t of DATA_TABLES) out[t] = await nameCount(db, t);
+  for (const t of DATA_TABLES) out[t] = Number(r.rows.find((x) => x.t === t)?.n ?? 0);
   return out;
 }
 

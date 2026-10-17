@@ -56,7 +56,7 @@ type Caps = { maxFirstYearCents: number; maxTwoYearCents?: number };
 /** Everything the purchase phase needs once checks 1–10 passed. */
 export interface Approved {
   input: BuyInput; ctx: BuyCtx; category: Category; plan: ListingPlan | null; comps: Comp[]; rationale: string | null; pricing: PricingSettings; approvedAt: Date;
-  check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: BuyBlock | null; trancheId: string | null;
+  check: CheckResult; winner: EvaluatedQuote; cost: number; adapter: RegistrarAdapter; wouldBeBlocked: BuyBlock | null; latestRun: Awaited<ReturnType<typeof latestScreeningRun>> | null; trancheId: string | null;
   /** CR-030: the small-buy exception is requested (flag + "small buy" in the approval line); its price and weekly checks apply and the purchase is marked. */
   smallBuy: boolean;
   /** v3.7.0: the display name to store (given, or built from the intake words), and the drop policy. */
@@ -146,7 +146,8 @@ export class BuyService {
     const gateRefuses = !input.dryRun || input.strictDry === true; // a real buy, or a strict dry run, is refused at the first gate
 
     // 3c. buy hold (v1.1.0, R1): only a name that was screened. A dry run reports it instead of refusing.
-    const hold = await screeningHold(db, input.domain);
+    const latestRun = (await latestScreeningRun(db, input.domain)) ?? null; // read once per /buy (v5.14.0): the hold, the pack gate and the dry-run fields share it
+    const hold = await screeningHold(db, input.domain, latestRun);
     // CR-030: with the exception requested, the hold is decided once the quote is known (price), below
     const smallBuy = smallBuyRequested(input.smallBuyException, input.approval?.text);
     if (hold && gateRefuses && !smallBuy) {
@@ -156,7 +157,7 @@ export class BuyService {
 
     // 3d. v2.0.0: a complete, current screening pack, then an open tranche . A dry run reports the first.
     let blocked: BuyBlock | null = hold && !smallBuy ? 'BUY_HOLD' : null;
-    const pg = await packGate(db, input.domain, now.getTime());
+    const pg = await packGate(db, input.domain, now.getTime(), latestRun);
     if (pg && gateRefuses) throw gateError(pg);
     blocked ??= pg?.code ?? null;
     const tg = await trancheGate(db, input.domain);
@@ -242,14 +243,14 @@ export class BuyService {
     } catch (e) {
       if (input.dryRun && e instanceof AppError) {
         // v3.7.1 (CR-038 #1): the buy card's display name and drop policy also ride on a dry-run error (e.g. REGISTRAR_FUNDS)
-        throw new AppError(e.status, e.code, e.message, { ...e.details, ...(await this.gateFields(input.domain, blocked)), display_name: displayName, ...this.policyFields(dropPolicy, winner?.renewalCents ?? null) });
+        throw new AppError(e.status, e.code, e.message, { ...e.details, ...(await this.gateFields(input.domain, blocked, latestRun)), display_name: displayName, ...this.policyFields(dropPolicy, winner?.renewalCents ?? null) });
       }
       throw e;
     }
     winner = dry.winner;
 
     const approved: Approved = {
-      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, trancheId, smallBuy, displayName, dropPolicy, accountWarnings,
+      input, ctx, category, plan, comps: ev.comps, rationale: ev.rationale, pricing, approvedAt: appr.approvedAt, check, winner, cost: dry.cost, adapter, wouldBeBlocked: blocked, latestRun, trancheId, smallBuy, displayName, dropPolicy, accountWarnings,
       horizon, screeningGroup: await screeningGroupOf(db, input.domain), math, streReason: input.streReason ?? null,
       settings: { max_domains: settings.max_domains, lander_target: settings.lander_target },
     };
@@ -819,10 +820,10 @@ export class BuyService {
   }
 
   /** `would_be_blocked`, `screening_pack` and `advisories` of a dry run (the 200 body, and the details of a dry-run error after the DOM gates). */
-  private async gateFields(domain: string, wouldBeBlocked: BuyBlock | null): Promise<Record<string, unknown>> {
+  private async gateFields(domain: string, wouldBeBlocked: BuyBlock | null, run: Awaited<ReturnType<typeof latestScreeningRun>> | null): Promise<Record<string, unknown>> {
     // CAP-19: the latest screening pack of the name (enforced since v2.0.0: `would_be_blocked` names the first blocking gate; `advisories` is kept as before).
     const pack = await latestPackFor(this.deps.db, domain);
-    const latestRun = pack ? await latestScreeningRun(this.deps.db, domain) : null;
+    const latestRun = run;
     return {
       would_be_blocked: wouldBeBlocked,
       screening_pack: { status: pack ? pack.status : 'none', pack_id: pack?.id ?? null, version: pack?.version ?? null, issued_at: pack?.issued_at.toISOString() ?? null },
@@ -836,7 +837,7 @@ export class BuyService {
     const anchor = idtDay(new Date(this.deps.now()));
     const events = a.plan ? buildSchedule({ plan: a.plan, anchor, dropDate: addMonthsClamped(anchor, a.dropPolicy === 'at_first_expiry' ? 12 : 24), settings: a.pricing }) : [];
     // CAP-19: the latest screening pack of the name (enforced since v2.0.0: `would_be_blocked` names the first blocking gate; `advisories` is kept as before).
-    const gf = await this.gateFields(a.input.domain, a.wouldBeBlocked);
+    const gf = await this.gateFields(a.input.domain, a.wouldBeBlocked, a.latestRun);
     return {
       dry_run: true, domain: a.input.domain, check_id: a.check.checkId, registrar: w.registrar,
       first_year: formatUsd(w.firstYearCents!), first_year_cents: w.firstYearCents,

@@ -5,7 +5,7 @@ import type { Kysely } from 'kysely';
 import { AppError } from '../../http/errors.js';
 import { checkTimedApproval } from '../../core/approval.js';
 import { manualDelist, pendingDomains, type Venue } from './export-state.js';
-import { withDomainLock } from '../../core/locks.js';
+import { withDomainLocks } from '../../core/locks.js';
 import { z } from 'zod';
 import type { Config } from '../../config.js';
 import { ISO_WITH_OFFSET, idtDay } from '../../core/dates.js';
@@ -227,14 +227,14 @@ export class ExportService {
     if (await db.selectFrom('export_uploads').select('id').where('export_id', '=', run.export_id).executeTakeFirst()) throw already();
     // Clears first, the upload record last: a failed clear leaves no upload, so a retry re-runs cleanly.
     if (venue === 'afternic') {
-      for (const domain of [...run.domains].sort()) {
-        await withDomainLock(db, domain, async (conn) => {
-          await conn.updateTable('domains').set({ export_pending_since: null })
-            .where('domain', '=', domain)
-            .where((eb) => eb.or([eb('listing_changed_at', 'is', null), eb('listing_changed_at', '<=', run.at)]))
-            .execute();
-        }, { timeoutMs: this.deps.lockTimeoutMs });
-      }
+      // one statement for the whole file, under every name's domain lock (taken in sorted order on one connection; v5.14.0)
+      await withDomainLocks(db, run.domains, async (conn) => {
+        if (run.domains.length === 0) return;
+        await conn.updateTable('domains').set({ export_pending_since: null })
+          .where('domain', 'in', run.domains)
+          .where((eb) => eb.or([eb('listing_changed_at', 'is', null), eb('listing_changed_at', '<=', run.at)]))
+          .execute();
+      }, { timeoutMs: this.deps.lockTimeoutMs });
     }
     try {
       await db.insertInto('export_uploads').values({

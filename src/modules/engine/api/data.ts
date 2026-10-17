@@ -9,7 +9,7 @@ import { AppError } from '../../../http/errors.js';
 import {
   dataRowCounts, DATA_MAX_ROWS, loadBigcoNames, loadLive, loadRdap, loadSalesComps, loadTmKills, readData, type DataLoadResult, type DataTable,
 } from '../data-tables.js';
-import { databaseBytes, guardDbSize, salesMaxDate, type DbSizeGuard } from '../holdout.js';
+import { databaseBytes, guardDbSize, payloadBytesOf, salesMaxDate, type DbSizeGuard } from '../holdout.js';
 import type { SealedAfter } from '../uploads.js';
 
 const BODY_LIMIT = 8 * 1024 * 1024;
@@ -35,7 +35,7 @@ export function registerData(app: FastifyInstance, deps: { db: Kysely<Database>;
   for (const t of TABLES) {
     app.post(`/data/${t.path}`, { config: { openapiBody: Doc }, bodyLimit: BODY_LIMIT }, async (req, reply) => {
       const b = Body.parse(req.body ?? {});
-      const before = await guardDbSize(deps.db, deps.dbSize, Buffer.byteLength(JSON.stringify(b.rows)));
+      const before = await guardDbSize(deps.db, deps.dbSize, payloadBytesOf(req, b.rows));
       const r = await t.load(deps.db, b.rows, {
         by: req.auth?.name ?? 'unknown', auditId: req.auditId ?? null, now: deps.now(), dryRun: b.dry_run === true, sealedAfter: salesMaxDate,
       });

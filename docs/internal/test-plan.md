@@ -21,7 +21,7 @@ Per-area test IDs: `check.md` CK-*, `buy.md` B-*, `list.md` L-*, `export-csv.md`
 
 **Dry run (DR):** DR-1 `/buy dry_run` (B-16): no ledger/domain rows; audit row; registrar dry run with the exact cost. DR-2 a dry run enforces every check (cap, approval, `max_price`). DR-3 a dry run's key reused for the real call → 409 (new hash); use a new key.
 
-**Audit (AL):** AL-1 every authenticated POST → exactly one `audit_log` row (incl. a valid-token 4xx); unauthenticated requests and framework errors write nothing. AL-2 UPDATE/DELETE on `ledger_entries` and `audit_log` → DB error. AL-3 row content: scope, token id, approval text and time, status code; no secrets.
+**Audit (AL):** AL-1 every authenticated POST → exactly one `audit_log` row (incl. a valid-token 4xx); unauthenticated requests and framework errors write nothing. AL-2 UPDATE/DELETE on `ledger_entries` and `audit_log` → DB error. AL-3 row content: scope, token id, approval text and time, status code; no secrets. AL-4 (5.14.0) an array of more than 50 items in a request body is stored as `[N items, sha256:<hex>]` (any route, nested too); 50 or fewer stay whole; the approval columns are untouched.
 
 **Max one renewal (RN):** RN-1 two-year = first year + one renewal (CK-9). RN-2 `drop_date` = expiry + 1 y (B-21, B-22). RN-3 `renewals_used = 2` insert fails. RN-4 `committed_forward` ≤ 1 renewal (R-3). RN-5 no renew option at final expiry (R-5). RN-6 `register` always with years = 1.
 

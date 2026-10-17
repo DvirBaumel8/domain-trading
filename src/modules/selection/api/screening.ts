@@ -11,7 +11,7 @@ import { GATE_OF } from '../checks/index.js';
 import { DEPENDS_ON } from '../checks/index.js';
 import { beats, latestByCheck } from '../derive.js';
 import { listVersion } from '../lists.js';
-import { HEARTBEAT_STALE_MS, assemble, createRun, effectiveHold, loadRows, recomputePending, refreshSummary, staleChecks, reopenRun, toResultRow, type ScreeningWorker } from '../engine.js';
+import { HEARTBEAT_STALE_MS, assembleRun, createRun, loadRows, recomputePending, refreshSummary, staleChecks, reopenRun, toResultRow, type ScreeningWorker } from '../engine.js';
 import { REGISTRAR_ENV } from '../../registrars/index.js';
 import { readEvidence, storeEvidence } from '../evidence.js';
 import { CHECK_IDS, LABEL_RE, LANES, activeSelectionSettings, featureChecksOf, selectionSettingsByLabel } from '../settings.js';
@@ -81,9 +81,8 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     // A running run nobody has worked on lately (the service slept) continues now.
     if (run.status === 'running' && (!run.heartbeat_at || deps.now() - run.heartbeat_at.getTime() > HEARTBEAT_STALE_MS)) worker.kick(run.id);
     const sel = await selectionSettingsByLabel(db, run.settings_label);
-    const input = run.input as { names: RunItem[] };
-    const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
-    const a = assemble(input.names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values, await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
+    const rows = await loadRows(db, run.id);
+    const a = await assembleRun(db, run, sel!, { rows });
     const want = q.data.domain === undefined ? null : q.data.domain.trim().toLowerCase().replace(/\.$/, '');
     const tierOrder: string[] = sel!.values.tier.order;
     const verdicts = await verdictsFor(db, run.id);
@@ -127,9 +126,7 @@ export function registerScreening(app: FastifyInstance, deps: ScreeningApiDeps):
     const run = await db.selectFrom('screening_runs').selectAll().where('id', '=', req.params.id).executeTakeFirst();
     if (!run) throw new AppError(404, 'RUN_NOT_FOUND', `No screening run "${req.params.id}"`);
     const sel = await selectionSettingsByLabel(db, run.settings_label);
-    const input = run.input as { names: RunItem[] };
-    const rows = (await db.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
-    const a = assemble(input.names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel!.values, await effectiveHold(db, run), run.status !== 'running', run.mode === 'live');
+    const a = await assembleRun(db, run, sel!);
     return reply.type('text/csv; charset=utf-8').send(await runReportCsv(db, a.items, { topicWindowDays: sel!.values.intake.topic_window_days }));
   });
 

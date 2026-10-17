@@ -3,6 +3,15 @@
 // Point-in-time: every row's features are computed as of its own sale / observation date (features.ts), so a .net created later never counts.
 import { quarterOf } from './dataset.js';
 import { computeFeatures, sldOf, type FeatureContext } from './features.js';
+
+type NamedFeatures = ReturnType<typeof computeFeatures>;
+/** Features by `domain|asOf`: a row in both its year and the last quarter is computed once. */
+export type FeatureCache = Map<string, NamedFeatures>;
+const featuresOf = (ctx: FeatureContext, domain: string, asOf: string, cache?: FeatureCache): NamedFeatures => {
+  if (!cache) return computeFeatures(ctx, domain, asOf);
+  const k = `${domain}|${asOf}`;
+  return cache.get(k) ?? cache.set(k, computeFeatures(ctx, domain, asOf)).get(k)!;
+};
 import type { SaleRow, UnsoldRow } from './data.js';
 
 /** `handreg_share` is null when the .com creation date is known for less than this share of the rows (the dropped names have no registry record). */
@@ -39,13 +48,13 @@ export function median(xs: number[]): number | null {
 const medCents = (xs: number[]): number | null => { const m = median(xs); return m === null ? null : Math.round(m); };
 const share = (k: number, n: number): number | null => (n === 0 ? null : round4(k / n));
 
-export function driftBlock(ctx: FeatureContext, rows: readonly DriftRow[], withPrice: boolean): DriftBlock | null {
+export function driftBlock(ctx: FeatureContext, rows: readonly DriftRow[], withPrice: boolean, cache?: FeatureCache): DriftBlock | null {
   if (rows.length === 0) return null;
   let netKnown = 0; let netYes = 0; let wordsKnown = 0; let two = 0; let comKnown = 0; let hand = 0;
   const lens: number[] = [];
   const pr = { all: [] as number[], netYes: [] as number[], netNo: [] as number[], two: [] as number[], three: [] as number[], hand: [] as number[], other: [] as number[] };
   for (const r of rows) {
-    const f = computeFeatures(ctx, r.domain, r.asOf);
+    const f = featuresOf(ctx, r.domain, r.asOf, cache);
     lens.push(sldOf(r.domain).length);
     const net = f.values.net_pit; const nw = f.values.n_words;
     if (net !== null) { netKnown++; if (net === 1) netYes++; }
@@ -79,15 +88,28 @@ export function driftBlock(ctx: FeatureContext, rows: readonly DriftRow[], withP
  * Drift per year present in the sold data (2024, 2025, ...) and `last_quarter` (the newest full calendar quarter before `today` with a sale).
  * Sold = every stored sale; dropped = dropped_after_held rows not marked caught by a catcher. A period with no dropped row has `dropped: null`.
  */
-export function computeDrift(ctx: FeatureContext, sales: readonly SaleRow[], unsold: readonly UnsoldRow[], today: string): Record<string, DriftPeriod> {
+export function computeDrift(ctx: FeatureContext, sales: readonly SaleRow[], unsold: readonly UnsoldRow[], today: string, cache: FeatureCache = new Map()): Record<string, DriftPeriod> {
   const sold: DriftRow[] = sales.map((s) => ({ domain: s.domain, asOf: s.sale_date, priceCents: s.price_cents }));
   const dropped: DriftRow[] = unsold.filter((u) => u.type === 'dropped_after_held' && u.caught_by_catcher !== true).map((u) => ({ domain: u.domain, asOf: u.observation_date, priceCents: null }));
   const inWin = (rows: DriftRow[], from: string, to: string): DriftRow[] => rows.filter((r) => r.asOf >= from && r.asOf < to);
-  const period = (from: string, to: string): DriftPeriod => ({ window: { from, to_exclusive: to }, sold: driftBlock(ctx, inWin(sold, from, to), true), dropped: driftBlock(ctx, inWin(dropped, from, to), false) });
+  const period = (from: string, to: string): DriftPeriod => ({ window: { from, to_exclusive: to }, sold: driftBlock(ctx, inWin(sold, from, to), true, cache), dropped: driftBlock(ctx, inWin(dropped, from, to), false, cache) });
   const out: Record<string, DriftPeriod> = {};
   for (const y of [...new Set(sold.map((s) => s.asOf.slice(0, 4)))].sort()) out[y] = period(`${y}-01-01`, `${Number(y) + 1}-01-01`);
   let q: ReturnType<typeof quarterOf> | null = null;
   for (const s of sold) { const c = quarterOf(s.asOf); if (c.to <= today && (q === null || c.from > q.from)) q = c; }
   if (q) { const p = period(q.from, q.to); out.last_quarter = { ...p, window: { ...p.window, label: q.label } }; }
   return out;
+}
+
+/** computeDrift with the features of every row computed first in a cache, handing the event loop a turn every 2,000 rows; the result is the same. */
+export async function computeDriftYielding(ctx: FeatureContext, sales: readonly SaleRow[], unsold: readonly UnsoldRow[], today: string, yieldFn: () => Promise<void>): Promise<Record<string, DriftPeriod>> {
+  const cache: FeatureCache = new Map();
+  let n = 0;
+  const warm = async (domain: string, asOf: string): Promise<void> => {
+    featuresOf(ctx, domain, asOf, cache);
+    if (++n % 2_000 === 0) await yieldFn();
+  };
+  for (const s of sales) await warm(s.domain, s.sale_date);
+  for (const u of unsold) if (u.type === 'dropped_after_held' && u.caught_by_catcher !== true) await warm(u.domain, u.observation_date);
+  return computeDrift(ctx, sales, unsold, today, cache);
 }

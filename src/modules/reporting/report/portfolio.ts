@@ -67,22 +67,26 @@ async function exportBlock(db: Kysely<Database>, domain: string, domainId: numbe
 }
 
 export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: string) {
-  const row = (await perDomain(db, now)).find((r) => r.domain === domain);
+  // one name: its row is built from this name's data only (v5.14.0), and the independent reads run together
+  const row = (await perDomain(db, now, { domain }))[0];
   if (!row) return null;
   const d = await db.selectFrom('domains').select(['id', 'plan_id']).where('domain', '=', domain).executeTakeFirstOrThrow();
-  const ledger = await ledgerRows(db, { domain });
-  const purchases = await db.selectFrom('purchases').select(['id', 'state', 'dry_run', 'registrar', 'charged_cents', 'created_at']).where('domain', '=', domain).orderBy('id').execute();
-  const latest = await db.selectFrom('quotes').select('check_id').where('domain', '=', domain).orderBy('quoted_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
-  const quotes = latest ? await db.selectFrom('quotes').select(['registrar', 'quoted_at', 'available', 'premium', 'first_year_cents', 'renewal_cents', 'eligible', 'exclusion_reason'])
-    .where('check_id', '=', latest.check_id).where('domain', '=', domain).orderBy('id').execute() : [];
-  const history = await db.selectFrom('listing_history').selectAll().where('domain_id', '=', d.id).orderBy('id', 'desc').execute();
-  const sched = d.plan_id ? await db.selectFrom('price_schedule').selectAll().where('domain_id', '=', d.id).where('plan_id', '=', d.plan_id).orderBy('due_on').orderBy('id').execute() : [];
-  const sale = await db.selectFrom('sales').selectAll().where('domain_id', '=', d.id).orderBy('id', 'desc').limit(1).executeTakeFirst();
+  const [ledger, purchases, quotes, history, sched, sale, rs, ex] = await Promise.all([
+    ledgerRows(db, { domain }),
+    db.selectFrom('purchases').select(['id', 'state', 'dry_run', 'registrar', 'charged_cents', 'created_at']).where('domain', '=', domain).orderBy('id').execute(),
+    (async () => {
+      const latest = await db.selectFrom('quotes').select('check_id').where('domain', '=', domain).orderBy('quoted_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+      return latest ? db.selectFrom('quotes').select(['registrar', 'quoted_at', 'available', 'premium', 'first_year_cents', 'renewal_cents', 'eligible', 'exclusion_reason'])
+        .where('check_id', '=', latest.check_id).where('domain', '=', domain).orderBy('id').execute() : [];
+    })(),
+    db.selectFrom('listing_history').selectAll().where('domain_id', '=', d.id).orderBy('id', 'desc').execute(),
+    d.plan_id ? db.selectFrom('price_schedule').selectAll().where('domain_id', '=', d.id).where('plan_id', '=', d.plan_id).orderBy('due_on').orderBy('id').execute() : Promise.resolve([]),
+    db.selectFrom('sales').selectAll().where('domain_id', '=', d.id).orderBy('id', 'desc').limit(1).executeTakeFirst(),
+    db.selectFrom('registrar_state_checks').select(['checked_at', 'auto_renew', 'privacy', 'ns']).where('domain', '=', domain).orderBy('id', 'desc').limit(1).executeTakeFirst(),
+    Promise.all(VENUES.map(async (v) => [v, await exportBlock(db, domain, d.id, v, new Set(await pendingDomains(db, v)))] as const)).then((e) => Object.fromEntries(e) as Record<string, unknown>),
+  ]);
   const offers = await db.selectFrom('offers').select(['id', 'amount_cents', 'source', 'received_at', 'buyer_type', 'band', 'routing', 'outcome', 'note'])
     .where('domain_id', '=', d.id).orderBy('received_at', 'desc').orderBy('id', 'desc').limit(50).execute();
-  const rs = await db.selectFrom('registrar_state_checks').select(['checked_at', 'auto_renew', 'privacy', 'ns']).where('domain', '=', domain).orderBy('id', 'desc').limit(1).executeTakeFirst();
-  const ex: Record<string, unknown> = {};
-  for (const v of VENUES) ex[v] = await exportBlock(db, domain, d.id, v, new Set(await pendingDomains(db, v)));
   return {
     ...row,
     ledger: ledgerJson(ledger),

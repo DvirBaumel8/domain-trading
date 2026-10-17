@@ -6,8 +6,8 @@ import { dayNumber, idtDay, toJerusalemIso } from '../../core/dates.js';
 import { advisoryXactLock } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
-import { baseSplitTable, loadDemand, loadEndings, loadExtraTerms, loadSales, loadUnsold, tokenContext, unsoldSpanDays, UNSOLD_DATED_DAYS } from './data.js';
-import { computeDrift } from './drift.js';
+import { baseSplitTable, countRegisteredUnsold, loadDemand, loadEndings, loadExtraTerms, loadSales, loadUnsold, tokenContext, unsoldSpanDays, UNSOLD_DATED_DAYS } from './data.js';
+import { computeDriftYielding } from './drift.js';
 import { buildDataset, DataError, type EngineDataset, type Row } from './dataset.js';
 import { COM_FEATURES, computeFeatures, ENDING_FEATURE_TLDS, extendedTable, FEATURE_NAMES, sldOf, toVector, type FeatureContext, type FeatureName } from './features.js';
 import { fitGbm, gbmPredictAll, gbmProba, type GbmModel, type GbmParams } from './model/gbm.js';
@@ -62,6 +62,16 @@ export interface TrainView {
 }
 
 const yieldTurn = (): Promise<void> => new Promise((r) => { setImmediate(r); });
+/** A long synchronous loop gives the event loop a turn every this many rows, so the API keeps answering while a training runs. */
+export const YIELD_EVERY_ROWS = 2_000;
+async function mapYielding<T, U>(rows: readonly T[], fn: (x: T) => U): Promise<U[]> {
+  const out: U[] = new Array<U>(rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    out[i] = fn(rows[i]!);
+    if ((i + 1) % YIELD_EVERY_ROWS === 0) await yieldTurn();
+  }
+  return out;
+}
 
 export function viewOf(m: { id: string; status: 'running' | 'done' | 'failed'; created_at: Date; finished_at: Date | null; trained_by: string; error: string | null; dataset: unknown; test_sha256: string | null; chosen_weighting: string | null; metrics: unknown; feature_list: unknown }): TrainView {
   return {
@@ -145,11 +155,11 @@ export class EngineTrainer {
     if (last?.status === 'running' && now() - last.created_at.getTime() < TRAIN_STALE_MS) return { skipped: true, reason: `training ${last.id} is running` };
     const upload = await db.selectFrom('engine_uploads').select((eb) => eb.fn.max('created_at').as('at')).where('kind', '=', 'sales').executeTakeFirst();
     const lastSalesUpload = upload?.at ?? null;
-    const counts = await db.selectFrom('engine_sales').select((eb) => eb.fn.countAll<string>().as('n')).executeTakeFirstOrThrow();
-    const unsoldN = await db.selectFrom('engine_unsold').select((eb) => eb.fn.countAll<string>().as('n')).executeTakeFirstOrThrow();
+    const anySales = await db.selectFrom('engine_sales').select('id').limit(1).executeTakeFirst();
+    const anyUnsold = await db.selectFrom('engine_unsold').select('id').limit(1).executeTakeFirst();
     let reason: string;
     if (!active) {
-      if (Number(counts.n) === 0 || Number(unsoldN.n) === 0) return { skipped: true, reason: 'no model yet and no data to train on' };
+      if (!anySales || !anyUnsold) return { skipped: true, reason: 'no model yet and no data to train on' };
       if (last?.status === 'failed' && (!lastSalesUpload || lastSalesUpload.getTime() <= last.created_at.getTime())) return { skipped: true, reason: `the last training (${last.id}) failed and no sales upload arrived since` };
       reason = 'no model yet';
     } else {
@@ -179,7 +189,8 @@ export class EngineTrainer {
     const extra = await loadExtraTerms(db);
     const table = extendedTable(baseTable, extra);
     const [sales, unsold] = [await loadSales(db), await loadUnsold(db)];
-    const ds = buildDataset(sales, unsold, { table, today: idtDay(now()), seed, minTrainPerClass: this.deps.minTrainPerClass, minTestPerClass: this.deps.minTestPerClass });
+    const registeredUnsold = await countRegisteredUnsold(db);
+    const ds = buildDataset(sales, unsold, { table, today: idtDay(now()), seed, registeredUnsold, minTrainPerClass: this.deps.minTrainPerClass, minTestPerClass: this.deps.minTestPerClass });
     // the test file is frozen (hashed and stored) before any model sees a row
     await db.updateTable('engine_models').set({ dataset: JSON.stringify({ ...ds.counts, quarter: ds.quarter.label, unsold_mode: ds.unsoldMode, test_from: ds.quarter.from, test_to_exclusive: ds.quarter.to }), test_sha256: ds.testSha256 }).where('id', '=', id).execute();
     const tokRateEnabled = unsoldSpanDays(unsold) >= UNSOLD_DATED_DAYS;
@@ -187,8 +198,8 @@ export class EngineTrainer {
     const trainRows = [...ds.trainSold, ...ds.trainUnsold].sort(rowOrder);
     const testRows = [...ds.testSold, ...ds.testUnsold].sort(rowOrder);
     const featOf = (r: Row) => computeFeatures(ctx, r.domain, r.asOf);
-    const trainFeat = trainRows.map(featOf);
-    const testFeat = testRows.map(featOf);
+    const trainFeat = await mapYielding(trainRows, featOf);
+    const testFeat = await mapYielding(testRows, featOf);
     // which features enter the model
     const excluded: ModelParams['excluded'] = [];
     const coverage = (name: FeatureName, rows: number[]): number => (rows.length ? rows.filter((i) => trainFeat[i]!.values[name] !== null).length / rows.length : 0);
@@ -276,7 +287,7 @@ export class EngineTrainer {
     const importance = features.map((f, i) => ({ feature: f, gain: gbm.importance[i]! })).sort((a, b) => b.gain - a.gain);
     const featureCoverage = Object.fromEntries(features.map((f) => [f, round4(coverage(f, allIdx))]));
     // drift per year and for the newest full quarter, each row's features as of its own date (stored so GET /engine/health reads it cheaply)
-    const drift = computeDrift(ctx, sales, unsold, idtDay(now()));
+    const drift = await computeDriftYielding(ctx, sales, unsold, idtDay(now()), yieldTurn);
     const slices = holdSlices(testRows.map((r, i) => ({ label: r.label, asOf: r.asOf, score: scores[i]!, netPit: testFeat[i]!.values.net_pit, comCreatedMs: testFeat[i]!.comCreatedMs })));
     const metrics = {
       slices,

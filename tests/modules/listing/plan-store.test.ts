@@ -4,7 +4,7 @@ import { buildSchedule } from '../../../src/modules/listing/pricing/schedule.js'
 import { currentSettings } from '../../../src/modules/listing/pricing/settings.js';
 import { validateListing, type ListingPlan, type ListingRequest } from '../../../src/modules/listing/listing-v2.js';
 import { domainPlanColumns, historyRow, newPlanId, writePlan } from '../../../src/modules/listing/plan-store.js';
-import { withDomainLock } from '../../../src/core/locks.js';
+import { withDomainLock, withDomainLocks } from '../../../src/core/locks.js';
 import { planView } from '../../../src/modules/listing/plan-view.js';
 import { insertOwnedDomain, testDb as db, waitForLockWaiter } from '../../helpers/db.js';
 
@@ -79,7 +79,7 @@ describe('withDomainLock', () => {
     await withDomainLock(db, 'y.com', async () => { t.start2 = Date.now(); });
     hold.open();
     await p1;
-    expect(t.start2).toBeLessThan(t.end1!);
+    expect(t.start2).toBeLessThanOrEqual(t.end1!); // same millisecond is fine: a blocked second domain would have timed out instead
   });
   it('supports a transaction on the connection and commits', async () => {
     const id = await insertOwnedDomain(db, { category: 'trend', price_grade: null });
@@ -113,6 +113,18 @@ describe('withDomainLock', () => {
     await expect(withDomainLock(db, 'x.com', async () => 1, { timeoutMs: 200 })).rejects.toMatchObject({ status: 503, code: 'DOMAIN_BUSY' });
     hold.open();
     await p1;
+  });
+  it('withDomainLocks (v5.14.0): holds every name at once; a busy name times out with DOMAIN_BUSY and releases the ones already taken', async () => {
+    const held = gate();
+    const hold = gate();
+    const p1 = withDomainLock(db, 'b.com', async () => { held.open(); await hold.p; });
+    await held.p;
+    await expect(withDomainLocks(db, ['c.com', 'b.com', 'a.com'], async () => 1, { timeoutMs: 200 })).rejects.toMatchObject({ status: 503, code: 'DOMAIN_BUSY' });
+    expect(await withDomainLock(db, 'a.com', async () => 'free', { timeoutMs: 100 })).toBe('free'); // taken first (sorted), released on the failure
+    hold.open();
+    await p1;
+    expect(await withDomainLocks(db, ['b.com', 'a.com', 'a.com'], async () => 'all', { timeoutMs: 100 })).toBe('all');
+    expect(await withDomainLocks(db, [], async () => 'none')).toBe('none');
   });
   it('fn error propagates and the lock is released at once', async () => {
     await expect(withDomainLock(db, 'x.com', async () => { throw new Error('boom'); })).rejects.toThrow('boom');

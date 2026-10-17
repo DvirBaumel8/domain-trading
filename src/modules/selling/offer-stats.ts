@@ -29,11 +29,14 @@ interface Row {
   domain_id: number; domain: string; category: string | null; amount_cents: number; received_at: Date; bin: number | null;
   band: Band; source: string; routing: string; outcome: string;
 }
-async function loadOffers(db: Kysely<Database>): Promise<Row[]> {
-  const rows = await db.selectFrom('offers').innerJoin('domains', 'domains.id', 'offers.domain_id')
+export type OfferRow = Row;
+/** Every offer with its name and category (`domainIds` limits the load to those names). One read can feed `perDomainOffers` and `offersByStrategy`. */
+export async function loadOffers(db: Kysely<Database>, domainIds?: number[]): Promise<Row[]> {
+  let q = db.selectFrom('offers').innerJoin('domains', 'domains.id', 'offers.domain_id')
     .select(['offers.domain_id', 'domains.domain', 'domains.category', 'offers.amount_cents', 'offers.received_at', 'offers.bin_cents_at as bin',
-      'offers.band', 'offers.source', 'offers.routing', 'offers.outcome']).execute();
-  return rows as Row[];
+      'offers.band', 'offers.source', 'offers.routing', 'offers.outcome']);
+  if (domainIds) q = q.where('offers.domain_id', 'in', domainIds.length ? domainIds : [-1]);
+  return (await q.execute()) as Row[];
 }
 
 const pct = (r: Row) => (r.bin ? r.amount_cents / r.bin : null);
@@ -65,15 +68,17 @@ function bandShares(rs: Row[]): Record<Band, number> {
   return out;
 }
 
-export async function perDomainOffers(db: Kysely<Database>, now: Date): Promise<Map<number, PerDomainOffers>> {
+/** `o.offers`: the offers already loaded (shared with `offersByStrategy`); `o.domainIds`: only these names (one-name reads). */
+export async function perDomainOffers(db: Kysely<Database>, now: Date, o: { offers?: Row[]; domainIds?: number[] } = {}): Promise<Map<number, PerDomainOffers>> {
   const today = idtDay(now);
   const [s30, s90] = [idtDayStart(today, -29), idtDayStart(today, -89)];
   const out = new Map<number, PerDomainOffers>();
   const empty = (): PerDomainOffers => ({ count_30d: 0, highest_30d: null, count_90d: 0, highest_90d: null, count_all: 0, highest_all: null,
     highest_all_pct_of_bin: null, last_offer_at: null, open_for_dvir: 0 });
-  for (const d of await db.selectFrom('domains').select('id').execute()) out.set(d.id, empty());
+  if (o.domainIds) for (const id of o.domainIds) out.set(id, empty());
+  else for (const d of await db.selectFrom('domains').select('id').execute()) out.set(d.id, empty());
   const by = new Map<number, Row[]>();
-  for (const r of await loadOffers(db)) { const l = by.get(r.domain_id); if (l) l.push(r); else by.set(r.domain_id, [r]); }
+  for (const r of o.offers ?? await loadOffers(db, o.domainIds)) { const l = by.get(r.domain_id); if (l) l.push(r); else by.set(r.domain_id, [r]); }
   for (const [id, rs] of by) {
     const r30 = rs.filter((r) => r.received_at >= s30);
     const r90 = rs.filter((r) => r.received_at >= s90);
@@ -93,9 +98,9 @@ export async function perDomainOffers(db: Kysely<Database>, now: Date): Promise<
  * Per category. offers_90d and names_with_offers count only names currently `listed` (same set as names_listed, so the
  * per-listed-name rate is consistent); median/max/band shares are all-time over every offer of the category.
  */
-export async function offersByStrategy(db: Kysely<Database>, now: Date): Promise<StrategyRow[]> {
+export async function offersByStrategy(db: Kysely<Database>, now: Date, preloaded?: Row[]): Promise<StrategyRow[]> {
   const s90 = idtDayStart(idtDay(now), -89);
-  const offers = await loadOffers(db);
+  const offers = preloaded ?? await loadOffers(db);
   const listed = await db.selectFrom('domains').select(['id', 'category']).where('status', '=', 'listed').execute();
   const cats = new Set<string>([...listed.map((d) => d.category ?? 'other'), ...offers.map((o) => o.category ?? 'other')]);
   return [...cats].sort().map((category) => {

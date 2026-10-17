@@ -240,4 +240,20 @@ describe('engine weekly retrain (daily step engineTrain)', () => {
     expect(await step().exec()).toMatchObject({ started: true });
     await app!.jobQueue.idle();
   });
+  it('EN-73: the unsold loader reads only dropped-after-held rows; the dataset still reports every unsold row and the registered-unsold ones not used (v5.14.0, D5)', async () => {
+    await seedEngineData(db);
+    const dropped = Number((await db.selectFrom('engine_unsold').select((eb) => eb.fn.countAll<string>().as('n')).where('type', '=', 'dropped_after_held').executeTakeFirstOrThrow()).n);
+    const up = await db.selectFrom('engine_uploads').select('id').limit(1).executeTakeFirstOrThrow();
+    await db.insertInto('engine_unsold').values([
+      { domain: 'zzregone.com', type: 'registered_unsold', observation_date: '2026-09-01', caught_by_catcher: null, upload_id: up.id },
+      { domain: 'zzregtwo.com', type: 'registered_unsold', observation_date: '2026-09-02', caught_by_catcher: null, upload_id: up.id },
+    ]).execute();
+    const { loadUnsold, countRegisteredUnsold } = await import('../../../src/modules/engine/data.js');
+    expect((await loadUnsold(db)).length).toBe(dropped);
+    expect(await countRegisteredUnsold(db)).toBe(2);
+    const h = await setup();
+    const t = await trainAndWait(h.w);
+    const done = (await get(`/engine/train/${t.train_id}`, h.r)).json() as { dataset: { unsold_rows: number; registered_unsold_not_used: number } };
+    expect(done.dataset).toMatchObject({ unsold_rows: dropped + 2, registered_unsold_not_used: 2 });
+  });
 });

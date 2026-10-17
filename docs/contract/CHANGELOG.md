@@ -2,6 +2,18 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.14.0 (2026-10-17): audit log keeps a count and hash for long lists; more data pruned; `/report` and other reads faster
+Release note: `docs/releases/v5.14.0.md`.
+MINOR (one stored-value change, retention scope, no route or field changed). Tech-debt pass R3 (database efficiency and growth).
+- **Changed (audit, D2):** in `GET /audit` `request`, any array of more than 50 items, at any depth (drop-list rows, test-set or labelled names, intake lists, document sections), is now stored as the string `"[N items, sha256:<hex>]"` (N = the count, the hash is taken over the array's JSON). Before, only `/engine/*` and `/data/*` uploads were shortened (that `"[N rows]"` form is unchanged). Approval text and time are never shortened.
+- **Changed (retention, D3):** the daily `retention` step also deletes drop-list checks, rows and lists once the list is more than 90 days past its `list_date` (60 days in tight mode; reads already ignored a list after 60 days), daily candidate lists older than 90 days (45 tight; never the newest), NameBio call counters older than 30 days, and `listing_sync_log` rows older than 180 days (90 tight) except the newest per name, venue and action. The `tables` object of the step summary has six more keys (`drop_list_checks`, `drop_list_rows`, `drop_lists`, `daily_candidate_lists`, `namebio_calls`, `listing_sync_log`). `audit_log`, `ledger_entries` and `listing_history` are still never pruned.
+- **Changed (engine endings, D4):** an ending asked again that comes back with the same answer (same registered state, same registry creation date) updates its row in place instead of appending one. `engineEndings` summary: such a pair counts in `updated`, not `inserted`. A one-off migration deleted older rows of consecutive identical answers.
+- **Changed (size guard, D9):** `details.payload_bytes` of the 409 `DB_SIZE_HIGH` on `/engine/*` and `/data/*` is the request body size from `Content-Length` when the client sent one (else the rows as JSON, as before).
+- **Unchanged answers, faster:** `GET /report` (domains, offers and the Afternic pending set read once, the parts run together, applied events in two statements), `GET /portfolio/{domain}` (one name, not the portfolio), `POST /buy` and its dry run (the latest screening run read once), the buy-hold lookup (indexed), `GET /screening/runs/{id}/report.csv`, `GET /selection/buy-hold`, `GET /health`, the daily candidate list build, run checks (cache rows and registry answers read in bulk), engine training and the drift report (feature cache, event-loop turns), `/score` (cheaper cache key), `POST /export/{venue}/uploaded` (one statement under every name's lock).
+- **Internal:** db pool max 10 to 20 (one `/report` now uses up to 8 connections at once).
+- **Migration:** `1764700000000_v5-14-0.sql` (indexes on `screening_results`, `screening_packs`, `domain_records`, `drop_list_rows`, `audit_log` and a GIN index on `screening_runs.input`; the retention delete carve-out on five more append-only tables; the `engine_endings` cleanup).
+- **Docs (from the R4a cleanup):** `endpoints.md` gains a "Start here" table of the main routes by task and scope; the contract README Base URL describes the Mac host behind the Cloudflare proxy until Render resumes. Runtime moves to Node 26; `npm run admin` / `npm run job` run the compiled `dist/`.
+
 ## 5.13.0 (2026-10-17): idempotency keys bound to their token; cancel `reason` stored; DB_SIZE_HIGH threshold 1 GB; money-path fixes
 Release note: `docs/releases/v5.13.0.md`.
 MINOR (additive field, one stricter rule, one threshold). Tech-debt pass R2.

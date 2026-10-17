@@ -83,8 +83,7 @@ export function staleChecks(latest: Map<CheckId, ResultRow>, plan: CheckId[]): S
  * outside the stale checks (live mode only). The worker and the manual route use the same test, so a run is reopened only for work that happens.
  */
 export function recomputePending(items: RunItem[], plan: Partial<Record<Lane, CheckId[]>>, rows: ResultRow[], features: readonly string[], live: boolean): boolean {
-  const by = new Map<number, ResultRow[]>();
-  for (const r of rows) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
+  const by = groupByItem(rows);
   for (const it of items) {
     if (it.input_error) continue;
     const p = plan[it.lane] ?? [];
@@ -183,13 +182,14 @@ export async function createRun(
       list_versions: JSON.stringify(list_versions), status: 'running',
       deadline_at: new Date(ctx.now.getTime() + (ctx.deadlineHours !== undefined ? ctx.deadlineHours * 3_600_000 : sel.values.run.time_budget_minutes * 60_000)),
     }).execute();
-    for (const it of items.filter((i) => i.input_error)) {
-      await trx.insertInto('screening_results').values({
-        run_id: id, item_idx: it.idx, domain: it.domain, lane: it.lane, check_id: 'form', gate: GATE_OF.form, rule_ids: ['INPUT'],
-        status: 'FAIL', reason_code: 'INPUT_INVALID', reason: `${it.input_error}: ${CAUSE_TEXT[it.input_error as keyof typeof CAUSE_TEXT]}`,
+    const invalid = items.filter((i) => i.input_error);
+    for (let i = 0; i < invalid.length; i += 500) { // multi-row inserts (a list can have thousands of bad rows)
+      await trx.insertInto('screening_results').values(invalid.slice(i, i + 500).map((it) => ({
+        run_id: id, item_idx: it.idx, domain: it.domain, lane: it.lane, check_id: 'form' as const, gate: GATE_OF.form, rule_ids: ['INPUT'],
+        status: 'FAIL' as const, reason_code: 'INPUT_INVALID', reason: `${it.input_error}: ${CAUSE_TEXT[it.input_error as keyof typeof CAUSE_TEXT]}`,
         fields: JSON.stringify({ cause: it.input_error, input: body.names[it.idx]!.domain }), checked_at: ctx.now, settings_label: sel.label,
-        list_versions: '{}', duration_ms: 0, upstream_calls: 0, source: 'auto',
-      }).execute();
+        list_versions: '{}', duration_ms: 0, upstream_calls: 0, source: 'auto' as const,
+      }))).execute();
     }
   });
   return { id, status: 'running', mode: body.mode, backtest, settings_version: sel.label, buy_hold: sel.values.buy_hold, names_n: items.length };
@@ -208,8 +208,12 @@ export interface AssembledRun {
  */
 export async function effectiveHold(db: Kysely<Database>, run: { buy_hold: boolean; backtest: boolean; settings_label: string }): Promise<boolean> {
   if (run.buy_hold || run.backtest) return true;
-  return (await activeSelectionSettings(db)).label !== run.settings_label;
+  return heldByActive(run, (await activeSelectionSettings(db)).label);
 }
+
+/** effectiveHold when the caller already holds the active settings label (a loop over many runs reads it once). */
+export const heldByActive = (run: { buy_hold: boolean; backtest: boolean; settings_label: string }, activeLabel: string): boolean =>
+  run.buy_hold || run.backtest || activeLabel !== run.settings_label;
 
 /**
  * Throws 409 NOT_SCREENED_OK when the run is a backtest (reason BACKTEST) or used a cut plan, a `checks` subset or any lane plan narrower than the
@@ -228,8 +232,7 @@ export function fullPlanRunOrThrow(run: { id: string; backtest: boolean; gate_pl
 export function assemble(
   items: RunItem[], plan: Partial<Record<Lane, CheckId[]>>, rows: ResultRow[], values: SelectionValuesT, buyHold: boolean, runDone: boolean, live = true,
 ): AssembledRun {
-  const byItem = new Map<number, ResultRow[]>();
-  for (const r of rows) (byItem.get(r.item_idx) ?? byItem.set(r.item_idx, []).get(r.item_idx)!).push(r);
+  const byItem = groupByItem(rows);
   const features = featureChecksOf(values) as CheckId[];
   let planned = 0;
   let done = 0;
@@ -270,16 +273,40 @@ export interface ScreeningWorkerDeps {
 
 type RunRow = Selectable<Database['screening_runs']>;
 
+/** Rows by item index, each list in row (id) order. */
+export function groupByItem(rows: readonly ResultRow[]): Map<number, ResultRow[]> {
+  const by = new Map<number, ResultRow[]>();
+  for (const r of rows) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
+  return by;
+}
+
+/**
+ * A stored run assembled for reading (v5.14.0, one place for what six callers did by hand): its names, plan and rows through `assemble`.
+ * `o.rows` / `o.hold` when the caller already has them; `o.runDone` defaults to "the run is not running".
+ */
+export async function assembleRun(db: Kysely<Database>, run: RunRow, sel: { values: SelectionValuesT }, o: { rows?: ResultRow[]; hold?: boolean; runDone?: boolean } = {}): Promise<AssembledRun> {
+  return assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, o.rows ?? await loadRows(db, run.id),
+    sel.values, o.hold ?? await effectiveHold(db, run), o.runDone ?? run.status !== 'running', run.mode === 'live');
+}
+
 export const loadRows = async (db: Kysely<Database>, runId: string): Promise<ResultRow[]> =>
   (await db.selectFrom('screening_results').selectAll().where('run_id', '=', runId).orderBy('id').execute()).map(toResultRow);
+
+/** The rows of several runs in one statement, by run id, each list in row (id) order. */
+export async function loadRowsForRuns(db: Kysely<Database>, runIds: string[]): Promise<Map<string, ResultRow[]>> {
+  const out = new Map<string, ResultRow[]>(runIds.map((id) => [id, []]));
+  if (runIds.length === 0) return out;
+  const rows = await db.selectFrom('screening_results').selectAll().where(sql<boolean>`run_id = any(${runIds})`).orderBy('id').execute();
+  for (const r of rows) out.get(r.run_id)?.push(toResultRow(r));
+  return out;
+}
 
 /** Recomputes the funnel summary of a run that has ended (also after a manual record changes a name). */
 export async function refreshSummary(db: Kysely<Database>, run: RunRow): Promise<void> {
   if (run.status === 'running') return;
   const sel = await selectionSettingsByLabel(db, run.settings_label);
   if (!sel) return;
-  const items = (run.input as { names: RunItem[] }).names;
-  const a = assemble(items, run.gate_plan as Partial<Record<Lane, CheckId[]>>, await loadRows(db, run.id), sel.values, await effectiveHold(db, run), true, run.mode === 'live');
+  const a = await assembleRun(db, run, sel, { runDone: true });
   await db.updateTable('screening_runs').set({ summary: JSON.stringify({ ...a.funnel, progress: a.progress }) }).where('id', '=', run.id).execute();
 }
 
@@ -426,7 +453,7 @@ export class ScreeningWorker {
   private async finalize(run: RunRow, status: 'done' | 'partial'): Promise<boolean> {
     const { db } = this.deps;
     const sel = await selectionSettingsByLabel(db, run.settings_label);
-    const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, await loadRows(db, run.id), sel!.values, await effectiveHold(db, run), true, run.mode === 'live');
+    const a = await assembleRun(db, run, sel!, { runDone: true });
     const r = await db.updateTable('screening_runs').set({ status, finished_at: new Date(this.deps.now()), summary: JSON.stringify({ ...a.funnel, progress: a.progress }) })
       .where('id', '=', run.id).where('status', '=', 'running').executeTakeFirst();
     return Number(r.numUpdatedRows) > 0;
@@ -461,9 +488,7 @@ export class ScreeningWorker {
     const features = featureChecksOf(sel!.values);
     const plan = run.gate_plan as Partial<Record<Lane, CheckId[]>>;
     const latest = new Map<number, Map<CheckId, ResultRow>>();
-    const by = new Map<number, ResultRow[]>();
-    for (const r of await loadRows(db, runId)) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
-    for (const [idx, rs] of by) latest.set(idx, latestByCheck(rs));
+    for (const [idx, rs] of groupByItem(await loadRows(db, runId))) latest.set(idx, latestByCheck(rs));
     for (const it of (run.input as { names: RunItem[] }).names) {
       if (it.input_error) continue;
       const all = latest.get(it.idx) ?? new Map<CheckId, ResultRow>();
@@ -508,14 +533,13 @@ export class ScreeningWorker {
     const state = new Map<number, Map<CheckId, ResultRow>>();
     // Checks whose in-force row an earlier dependency outdated: dropped from `state` so the loop below recomputes them (appending a row), never cached.
     const staleByItem = new Map<number, Set<CheckId>>();
+    const itemByIdx = new Map(items.map((i) => [i.idx, i]));
     const load = async () => {
       state.clear();
       staleByItem.clear();
-      const by = new Map<number, ResultRow[]>();
-      for (const r of await loadRows(db, runId)) (by.get(r.item_idx) ?? by.set(r.item_idx, []).get(r.item_idx)!).push(r);
-      for (const [idx, m] of by) {
+      for (const [idx, m] of groupByItem(await loadRows(db, runId))) {
         const latest = latestByCheck(m);
-        const it = items.find((i) => i.idx === idx);
+        const it = itemByIdx.get(idx);
         const stale = it && !it.input_error ? staleChecks(latest, plan[it.lane] ?? []) : new Set<CheckId>();
         for (const c of stale) latest.delete(c);
         if (stale.size > 0) staleByItem.set(idx, stale);
@@ -599,6 +623,8 @@ export class ScreeningWorker {
     // a row: the run is then reopened here too, so no record is missed whichever side commits first. Bounded; each pass only appends.
     for (let pass = 0; pass < MAX_RECOMPUTE_PASSES; pass++) {
     for (const checkId of merged) {
+      // the reusable results of this check for every name still to compute, in one query (not one per name)
+      const pre = await this.prefetchCached(run, values, order.filter((it) => !it.input_error && (plan[it.lane] ?? []).includes(checkId) && !latestOf(it.idx).has(checkId)), checkId);
       for (const it of order) {
         if (it.input_error || !(plan[it.lane] ?? []).includes(checkId) || latestOf(it.idx).has(checkId) || stopped(it)) continue;
         if (await this.cancelledNow(runId)) return; // cancelled (POST .../cancel): no further lookups, no rows
@@ -612,7 +638,7 @@ export class ScreeningWorker {
           wrote = await write(it, checkId, outcome('NOT_RUN', 'NOT_IMPLEMENTED', `The ${checkId} check is not built yet`), { source: 'auto', durationMs: 0, checkedAt: new Date(t0), listVersions: {}, inputs });
         } else {
           const lv = Object.fromEntries(check.lists.filter((n) => versions[n] !== undefined).map((n) => [n, versions[n]!]));
-          const hit = await this.cached(run, values, it, checkId, lv); // never for a check with dependencies (so never for a stale row)
+          const hit = await this.cached(run, values, it, checkId, lv, pre); // never for a check with dependencies (so never for a stale row)
           if (hit) {
             wrote = await write(it, checkId, { status: hit.status, reasonCode: hit.reason_code, reason: hit.reason, fields: hit.fields, dataAsOf: hit.data_as_of, evidenceIds: hit.evidence_ids, upstreamCalls: 0 },
               { source: 'cache', durationMs: 0, checkedAt: hit.checked_at, listVersions: hit.list_versions, cachedFrom: hit.id, inputs });
@@ -656,19 +682,42 @@ export class ScreeningWorker {
    * Never when this item is as of a past date (a full run with `as_of`), and never from a run that was as of a past date: a dated
    * result is not "now". Only runs without explicit as_of (live runs, full runs that sent none) are sources.
    */
-  private async cached(run: RunRow, values: SelectionValuesT, it: RunItem, checkId: CheckId, lv: Record<string, number>): Promise<ResultRow | null> {
-    if (DEPENDS_ON[checkId] !== undefined) return null; // a check that reads other rows of its run is never served from another run's cache
+  private async cached(run: RunRow, values: SelectionValuesT, it: RunItem, checkId: CheckId, lv: Record<string, number>, pre?: Map<string, ResultRow>): Promise<ResultRow | null> {
+    if (!this.cacheable(run, values, it, checkId)) return null;
     const hours = values.freshness_hours[checkId] ?? 0;
-    if (hours <= 0) return null;
-    if (run.mode === 'full' && it.as_of !== undefined) return null;
-    const r = await this.deps.db.selectFrom('screening_results as r').innerJoin('screening_runs as u', 'u.id', 'r.run_id').selectAll('r')
-      .where('r.domain', '=', it.domain).where('r.check_id', '=', checkId).where('r.source', 'in', ['auto', 'manual'])
+    let row: ResultRow | undefined;
+    if (pre) {
+      row = pre.get(it.domain); // read for the whole pass by prefetchCached (v5.14.0): no query per name
+    } else {
+      const r = await this.cachedQuery(run, checkId, hours).where('r.domain', '=', it.domain).orderBy('r.checked_at', 'desc').orderBy('r.id', 'desc').limit(1).executeTakeFirst();
+      row = r ? toResultRow(r) : undefined;
+    }
+    return row && deepEqual(row.list_versions, lv) ? row : null;
+  }
+
+  /** The guards of the cache: a check that reads other rows of its run, a check with no freshness window, and a dated item never come from it. */
+  private cacheable(run: RunRow, values: SelectionValuesT, it: RunItem, checkId: CheckId): boolean {
+    if (DEPENDS_ON[checkId] !== undefined) return false; // a check that reads other rows of its run is never served from another run's cache
+    if ((values.freshness_hours[checkId] ?? 0) <= 0) return false;
+    return !(run.mode === 'full' && it.as_of !== undefined);
+  }
+
+  private cachedQuery(run: RunRow, checkId: CheckId, hours: number) {
+    return this.deps.db.selectFrom('screening_results as r').innerJoin('screening_runs as u', 'u.id', 'r.run_id').selectAll('r')
+      .where('r.check_id', '=', checkId).where('r.source', 'in', ['auto', 'manual'])
       .where('r.status', 'not in', ['UNKNOWN', 'NOT_RUN', 'MANUAL_REQUIRED']).where('r.settings_label', '=', run.settings_label)
       .where('u.backtest', '=', run.backtest).where('r.checked_at', '>=', new Date(this.deps.now() - hours * 3_600_000))
-      .where(sql<boolean>`(u.mode = 'live' or not jsonb_path_exists(u.input, '$.names[*].as_of'))`)
-      .orderBy('r.checked_at', 'desc').orderBy('r.id', 'desc').limit(1).executeTakeFirst();
-    if (!r) return null;
-    const row = toResultRow(r);
-    return deepEqual(row.list_versions, lv) ? row : null;
+      .where(sql<boolean>`(u.mode = 'live' or not jsonb_path_exists(u.input, '$.names[*].as_of'))`);
+  }
+
+  /** The newest reusable row of each of `items` for `checkId` in one query (what `cached` finds one name at a time); empty when the check is never cached. */
+  private async prefetchCached(run: RunRow, values: SelectionValuesT, items: RunItem[], checkId: CheckId): Promise<Map<string, ResultRow>> {
+    const out = new Map<string, ResultRow>();
+    const domains = [...new Set(items.filter((it) => this.cacheable(run, values, it, checkId)).map((it) => it.domain))];
+    if (domains.length === 0) return out;
+    const rows = await this.cachedQuery(run, checkId, values.freshness_hours[checkId] ?? 0).where(sql<boolean>`r.domain = any(${domains})`)
+      .orderBy('r.domain').orderBy('r.checked_at', 'desc').orderBy('r.id', 'desc').execute();
+    for (const r of rows) if (!out.has(r.domain)) out.set(r.domain, toResultRow(r));
+    return out;
   }
 }

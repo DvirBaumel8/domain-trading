@@ -52,7 +52,7 @@ export interface EndingsSummary {
   registered: number;
   not_registered: number;
   unknown: number;
-  /** Rows inserted / unanswered rows updated in place. */
+  /** Rows inserted / rows updated in place (an unanswered row, or an answer that did not change). */
   inserted: number;
   updated: number;
   left_for_next_run: number;
@@ -104,7 +104,11 @@ export async function askRdap(screening: ScreeningDeps, domain: string, base: st
   return { registered: null, createdAt: null, httpStatus: x.httpStatus, reason: x.reasonCode ?? 'SOURCE_ERROR', evidence: null };
 }
 
-/** Never asked: insert. An unanswered row: update it in place. An answered row (older than 30 days): append a row for a new answer, keep the old one on an unanswered ask. Returns what was done. */
+/**
+ * Never asked: insert. An unanswered row: update it in place. An answered row: when the new answer says the same (same registered, same registry creation date)
+ * the row is updated in place (checked_at, http status, evidence, registrar; v5.14.0, D4), so a 30-day re-ask of a stable name does not grow the table; a changed
+ * answer appends a row; an unanswered ask keeps the known row. Returns what was done.
+ */
 export async function saveAnswer(db: Kysely<Database>, nowMs: number, p: Pair, a: Answer): Promise<'inserted' | 'updated' | 'kept'> {
   const registrar = (a.evidence as { registrar?: string | null } | null)?.registrar ?? null;
   const row = { registered: a.registered, created_at_registry: a.createdAt, checked_at: new Date(nowMs), http_status: a.httpStatus, reason_code: a.reason, evidence: a.evidence == null ? null : JSON.stringify(a.evidence), registrar };
@@ -113,6 +117,11 @@ export async function saveAnswer(db: Kysely<Database>, nowMs: number, p: Pair, a
     return 'updated';
   }
   if (p.prevId !== null && a.registered === null) return 'kept'; // keep the known answer; the pair stays due and is asked again on the next run
+  if (p.prevId !== null) {
+    const same = await sql`update engine_endings set checked_at = ${row.checked_at}, http_status = ${row.http_status}, reason_code = ${row.reason_code}, evidence = ${row.evidence}::jsonb, registrar = ${row.registrar}
+      where id = ${p.prevId} and registered is not distinct from ${row.registered} and created_at_registry is not distinct from ${row.created_at_registry} and checked_at <= ${row.checked_at}`.execute(db);
+    if (Number(same.numAffectedRows ?? 0) > 0) return 'updated';
+  }
   await db.insertInto('engine_endings').values({ name: p.name, tld: p.tld, ...row }).execute();
   return 'inserted';
 }
@@ -137,13 +146,18 @@ export class EndingsJob {
       // v5.7.0 (CR-058): the owned names' pairs come first, weekly; the bulk pairs below leave them out.
       const ownedPairs = (await this.ownedDue(start)).slice(0, max);
       const allOwned = (await sql<{ name: string }>`select split_part(domain, '.', 1) as name from domains where status in (${sql.join(OWNED_STATUSES)}) and domain like '%.com'`.execute(db)).rows.map((r) => r.name);
-      const total = await sql<{ n: string }>`with ${pairsCte()} select count(*)::text as n from pairs where (checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck}) and not (tld <> 'com' and name = any(${allOwned}))`.execute(db);
-      out.due = Number(total.rows[0]?.n ?? 0) + ownedPairs.length;
-      const picked = (await sql<{ name: string; tld: EndingTld; id: string | null; registered: boolean | null }>`
+      // one statement: the pairs CTE is built once; the count of due pairs is a window over the rows before the limit
+      const room = Math.max(0, max - ownedPairs.length);
+      const picked = (await sql<{ name: string; tld: EndingTld; id: string | null; registered: boolean | null; due: string }>`
         with ${pairsCte()}
-        select name, tld, id::text as id, registered from pairs
+        select name, tld, id::text as id, registered, count(*) over ()::text as due from pairs
         where (checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck}) and not (tld <> 'com' and name = any(${allOwned}))
-        order by checked_at asc nulls first, name, tld limit ${Math.max(0, max - ownedPairs.length)}`.execute(db)).rows;
+        order by checked_at asc nulls first, name, tld limit ${room}`.execute(db)).rows;
+      let bulkDue = picked.length > 0 ? Number(picked[0]!.due) : 0;
+      if (picked.length === 0 && room === 0) {
+        bulkDue = Number((await sql<{ n: string }>`with ${pairsCte()} select count(*)::text as n from pairs where (checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck}) and not (tld <> 'com' and name = any(${allOwned}))`.execute(db)).rows[0]?.n ?? 0);
+      }
+      out.due = bulkDue + ownedPairs.length;
       const byTld = new Map<EndingTld, Pair[]>();
       for (const p of ownedPairs) (byTld.get(p.tld) ?? byTld.set(p.tld, []).get(p.tld)!).push(p);
       for (const r of picked) (byTld.get(r.tld) ?? byTld.set(r.tld, []).get(r.tld)!).push({ name: r.name, tld: r.tld, prevId: r.id === null ? null : Number(r.id), prevRegistered: r.registered });
@@ -257,13 +271,14 @@ export interface EndingsHealth {
 /** Counts of the endings fill for GET /engine/health. `checked_n` = pairs whose newest row holds an answer; `pending_n` = pairs the next run would ask. */
 export async function endingsHealth(db: Kysely<Database>, nowMs: number): Promise<EndingsHealth> {
   const cut = dueCutoffs(nowMs);
-  const rows = (await sql<{ tld: string; checked_n: string; registered_n: string; unknown_n: string; pending_n: string }>`
+  // one statement (v5.14.0): the pairs CTE is built once, the name count rides on every row
+  const rows = (await sql<{ tld: string; checked_n: string; registered_n: string; unknown_n: string; pending_n: string; names_n: string }>`
     with ${pairsCte()}
     select tld, count(*) filter (where registered is not null)::text as checked_n, count(*) filter (where registered)::text as registered_n,
       count(*) filter (where checked_at is not null and registered is null)::text as unknown_n,
-      count(*) filter (where checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck})::text as pending_n
+      count(*) filter (where checked_at is null or (registered is null and checked_at < ${cut.unknown}) or checked_at < ${cut.recheck})::text as pending_n,
+      (select count(*) from names)::text as names_n
     from pairs group by tld`.execute(db)).rows;
-  const names = await sql<{ n: string }>`with ${pairsCte()} select count(distinct name)::text as n from pairs`.execute(db);
   const by_tld: EndingsHealth['by_tld'] = {};
   for (const t of ENGINE_TLDS) by_tld[t] = { checked_n: 0, registered_n: 0, unknown_n: 0, pending_n: 0 };
   const sum = { checked_n: 0, unknown_n: 0, pending_n: 0 };
@@ -272,6 +287,6 @@ export async function endingsHealth(db: Kysely<Database>, nowMs: number): Promis
     by_tld[r.tld] = v;
     sum.checked_n += v.checked_n; sum.unknown_n += v.unknown_n; sum.pending_n += v.pending_n;
   }
-  const namesN = Number(names.rows[0]?.n ?? 0);
+  const namesN = Number(rows[0]?.names_n ?? 0);
   return { names_n: namesN, pairs_n: namesN * ENGINE_TLDS.length, ...sum, by_tld };
 }

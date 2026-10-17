@@ -73,6 +73,28 @@ export function buildLexicon(
   lists: Record<string, { version: number; terms: string[] }>,
   opts: { cityOneToken: boolean; cityWordAllowlist?: readonly string[] },
 ): Lexicon {
+  // v5.14.0: building the map walks the whole dictionary; the same data, lists (name, version, terms) and options give the same lexicon, so it is built once.
+  // Callers only read it. A few entries per data object are kept (the active settings and the odd replay variant).
+  let perData = memo.get(data);
+  if (!perData) memo.set(data, (perData = new Map()));
+  const key = createHash('sha1').update(JSON.stringify([Object.entries(lists).map(([n, l]) => [n, l.version, l.terms.length]), opts.cityOneToken, [...(opts.cityWordAllowlist ?? [])].sort()]))
+    .update(Object.values(lists).map((l) => l.terms.join(',')).join('|')).digest('hex');
+  const hit = perData.get(key);
+  if (hit) return hit;
+  const built = buildLexiconUncached(data, lists, opts);
+  if (perData.size >= MEMO_PER_DATA) perData.delete(perData.keys().next().value!);
+  perData.set(key, built);
+  return built;
+}
+
+const MEMO_PER_DATA = 6;
+const memo = new WeakMap<object, Map<string, Lexicon>>();
+
+function buildLexiconUncached(
+  data: Pick<DataLexicon, 'dictionary' | 'cities' | 'versions'> & Partial<Pick<DataLexicon, 'multiWord'>>,
+  lists: Record<string, { version: number; terms: string[] }>,
+  opts: { cityOneToken: boolean; cityWordAllowlist?: readonly string[] },
+): Lexicon {
   const types = new Map<string, TokenType[]>();
   const add = (term: string, type: TokenType) => {
     if (term.length < 2) return; // single letters are never tokens

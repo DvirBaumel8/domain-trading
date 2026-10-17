@@ -4,7 +4,7 @@
 // are not in use). A feature check: it always answers PASS (or UNKNOWN when it cannot run); it never FAILs or FLAGs a name, so verdicts do not change.
 import { RDAP_FALLBACK_BASES } from '../../../core/rdap.js';
 import { fetchPage, classifySite, type PageFetch, type RobotsRule, type SiteClass } from '../site.js';
-import { lookupCached, pacerFor, rdapBaseFor, type Pacer } from '../rdap-batch.js';
+import { lookupCached, pacerFor, prefetchStored, rdapBaseFor, type Pacer, type StoredLookup } from '../rdap-batch.js';
 import { sharedPacer, sharedRobots } from '../sellers.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 import { formFieldsOf } from './form.js';
@@ -65,7 +65,7 @@ export interface LookalikeProbe { item: LookalikeItem; calls: number; evidence: 
  */
 export async function probeLookalike(
   ctx: CheckContext, n: LookalikeName,
-  o: { maxAgeHours: number; lists: { parked: string[]; forsale: string[] } | null; pace: Pacer; robots: Map<string, RobotsRule> },
+  o: { maxAgeHours: number; lists: { parked: string[]; forsale: string[] } | null; pace: Pacer; robots: Map<string, RobotsRule>; /** Stored RDAP answers read in one query (`prefetchStored`) for every name of the scan: no per-name lookup query. */ prefetched?: Map<string, StoredLookup> },
 ): Promise<LookalikeProbe> {
   const cfg = ctx.settings.lookalikes;
   const item: LookalikeItem = { domain: n.domain, kind: n.kind, registered: null, in_use: null, reason_code: null };
@@ -84,7 +84,7 @@ export async function probeLookalike(
   }
   if (base === null) { item.reason_code = 'NO_REGISTRY_SERVICE'; return out; }
   const r = await lookupCached(ctx.db, ctx.deps, n.domain, {
-    maxAgeHours: o.maxAgeHours, baseUrl: base, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace: pacerFor(ctx, base), now: ctx.now, deadline: ctx.deadline, isCancelled: ctx.isCancelled,
+    maxAgeHours: o.maxAgeHours, baseUrl: base, evidenceMaxBytes: ctx.settings.evidence.max_text_bytes, pace: pacerFor(ctx, base), now: ctx.now, deadline: ctx.deadline, isCancelled: ctx.isCancelled, prefetched: o.prefetched,
   });
   if (!r.cached && r.reasonCode !== 'TIMEOUT') out.calls++;
   if (r.evidenceId !== null) out.evidence.push(r.evidenceId);
@@ -131,8 +131,9 @@ export const lookalikesCheck: Check = {
     const evidence: number[] = [];
     const items: LookalikeItem[] = [];
 
+    const prefetched = await prefetchStored(ctx.db, names.map((n) => n.domain), { maxAgeHours, now: ctx.now });
     for (const n of names) {
-      const pr = await probeLookalike(ctx, n, { maxAgeHours, lists, pace, robots });
+      const pr = await probeLookalike(ctx, n, { maxAgeHours, lists, pace, robots, prefetched });
       calls += pr.calls;
       evidence.push(...pr.evidence);
       items.push(pr.item);

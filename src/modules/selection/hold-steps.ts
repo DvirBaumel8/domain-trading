@@ -1,5 +1,5 @@
 // v2.13.0 (CR-012 part D, Q-5): the path to lifting the buy hold as a list of steps, derived from data. Information only: nothing acts on it.
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { holdSuites, suiteStatuses } from './replay.js';
 import type { SelectionValuesT } from './settings.js';
@@ -11,7 +11,7 @@ export interface HoldStep { n: number; step: string; status: StepStatus; evidenc
 /** A tranche whose name contains "probe" is a test probe (CR-012: `accept-v2-probe-20261007`), not a production tranche. */
 export const isProbeTranche = (name: string): boolean => /probe/i.test(name);
 
-export async function buyHoldSteps(db: Kysely<Database>, active: { label: string; values: SelectionValuesT }): Promise<{ steps: HoldStep[]; ready: boolean }> {
+export async function buyHoldSteps(db: Kysely<Database>, active: { label: string; values: SelectionValuesT }, holdIn?: Awaited<ReturnType<typeof holdSuites>>): Promise<{ steps: HoldStep[]; ready: boolean }> {
   const iso = (d: Date) => d.toISOString();
   const mk = (n: number, step: string, status: StepStatus, actor: StepActor, evidence: Record<string, unknown> | null): HoldStep => ({ n, step, status, evidence, next_actor: status === 'done' ? null : actor });
 
@@ -35,24 +35,24 @@ export async function buyHoldSteps(db: Kysely<Database>, active: { label: string
     : mk(3, 'A hold suite that clears the hold is frozen', newest ? 'done' : 'open', 'gavriel', newest ? { suite: newest.suite, version: newest.version, created_at: iso(newest.created_at), suites: clearing.map((c) => ({ suite: c.suite, version: c.version, created_at: iso(c.created_at) })) } : null);
 
   // 4. a draft (settings version) with buy_hold false: the active one when it has none, else the newest
-  const versions = await db.selectFrom('selection_settings').select(['id', 'label', 'values', 'activation_seq', 'activated_at']).orderBy('id', 'desc').execute();
-  const unheld = versions.filter((v) => (v.values as { buy_hold?: boolean }).buy_hold === false);
+  // the filter runs in SQL: the settings documents themselves are not loaded
+  const unheld = await db.selectFrom('selection_settings').select(['id', 'label']).where(sql<boolean>`"values"->>'buy_hold' = 'false'`).orderBy('id', 'desc').execute();
   const draft = unheld.find((v) => v.label === active.label) ?? unheld[0];
   const s4 = mk(4, 'A settings draft with buy_hold false exists', draft ? 'done' : 'open', 'gavriel', draft ? { label: draft.label } : null);
 
   // 5. a passing holdout replay of every hold suite on that draft (a failure sticks)
-  const hold = await holdSuites(db, active.values.holdout);
+  const hold = holdIn ?? await holdSuites(db, active.values.holdout);
   let s5: HoldStep;
   if (!draft || hold.suites.length === 0) s5 = mk(5, 'Every hold suite passes its holdout replay on that draft', 'open', 'gavriel', null);
   else {
-    const st = await suiteStatuses(db, draft.id, active.values.holdout);
+    const st = await suiteStatuses(db, draft.id, active.values.holdout, hold);
     const ev = { settings: draft.label, replays: st.map((x) => ({ suite: x.suite, replay_id: x.replay_id, pass: x.pass })) };
     const failed = st.some((x) => x.failed_before);
     s5 = mk(5, 'Every hold suite passes its holdout replay on that draft', failed ? 'failed' : st.length > 0 && st.every((x) => x.pass) ? 'done' : 'open', 'gavriel', st.some((x) => x.replay_id !== null) || failed ? ev : null);
   }
 
   // 6. that draft is active (buy_hold false in force)
-  const activeRow = versions.find((v) => v.label === active.label);
+  const activeRow = active.values.buy_hold === false ? await db.selectFrom('selection_settings').select('activated_at').where('label', '=', active.label).executeTakeFirst() : undefined;
   const s6 = mk(6, 'Dvir activates the draft (lifts the hold)', active.values.buy_hold === false ? 'done' : 'open', 'dvir', active.values.buy_hold === false ? { label: active.label, activated_at: activeRow?.activated_at ? iso(activeRow.activated_at) : null } : null);
 
   // 7. an open production (non-probe) tranche

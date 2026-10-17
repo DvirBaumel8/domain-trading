@@ -13,13 +13,13 @@ export type BuyBlock = 'BUY_HOLD' | 'SCREENING_PACK_REQUIRED' | 'NO_TRANCHE' | '
 export type PackReason = 'NO_PACK' | 'INCOMPLETE' | 'NOT_FROM_LATEST_RUN' | 'SETTINGS_NOT_ACTIVE' | 'PACK_TOO_OLD';
 export interface Gate { code: BuyBlock; message: string; details: Record<string, unknown> }
 
-export async function packGate(db: Kysely<Database>, domain: string, nowMs: number): Promise<Gate | null> {
+export async function packGate(db: Kysely<Database>, domain: string, nowMs: number, latestRun?: Awaited<ReturnType<typeof latestScreeningRun>> | null): Promise<Gate | null> {
   const block = (reason: PackReason, packId: string | null, message: string): Gate =>
     ({ code: 'SCREENING_PACK_REQUIRED', message, details: { reason, pack_id: packId } });
   const pack = await latestPackFor(db, domain);
   if (!pack) return block('NO_PACK', null, `${domain} has no screening pack: screen it, judge it and issue a pack (POST /screening/packs)`);
   if (pack.status !== 'complete') return block('INCOMPLETE', pack.id, `The latest pack of ${domain} is incomplete; fix what it lists as missing and issue a new one`);
-  const run = await latestScreeningRun(db, domain);
+  const run = latestRun === undefined ? await latestScreeningRun(db, domain) : latestRun;
   if (!run || run.id !== pack.run_id) return block('NOT_FROM_LATEST_RUN', pack.id, `The latest pack of ${domain} is not from its latest screening run; issue a pack from that run`);
   const active = await activeSelectionSettings(db);
   const content = pack.content as { settings_active?: unknown };
@@ -47,8 +47,9 @@ export const gateError = (g: Gate): AppError => new AppError(409, g.code, g.mess
  */
 export async function buyBlocks(db: Kysely<Database>, domain: string, nowMs: number): Promise<BuyBlock[]> {
   const out: BuyBlock[] = [];
-  if (await screeningHold(db, domain)) out.push('BUY_HOLD');
-  const pg = await packGate(db, domain, nowMs);
+  const run = (await latestScreeningRun(db, domain)) ?? null;
+  if (await screeningHold(db, domain, run)) out.push('BUY_HOLD');
+  const pg = await packGate(db, domain, nowMs, run);
   if (pg) out.push(pg.code);
   const tg = await trancheGate(db, domain);
   if ('gate' in tg) out.push(tg.gate.code);

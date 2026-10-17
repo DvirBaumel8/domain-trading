@@ -1,6 +1,6 @@
 import type { Kysely } from 'kysely';
 import { addDays, dayNumber, idtDay } from '../../../core/dates.js';
-import type { Database } from '../../../db/types.js';
+import type { Database, DomainRow } from '../../../db/types.js';
 import { currentSettings, settingsByVersion } from '../../listing/index.js';
 import { priceValues } from './money.js';
 
@@ -13,13 +13,17 @@ export interface UpcomingEvent {
 
 const stageOf = (days: number, stages: number[]) => stages.find((s) => days <= s)!;
 
-export async function upcoming90d(db: Kysely<Database>, now: Date): Promise<UpcomingEvent[]> {
+/** `reportDomains`: the rows of loadReportDomains when the caller has them (the live ones are picked here, in domain order). */
+export async function upcoming90d(db: Kysely<Database>, now: Date, reportDomains?: DomainRow[]): Promise<UpcomingEvent[]> {
   const today = idtDay(now);
   const t = dayNumber(today);
   const out: UpcomingEvent[] = [];
   const fp = await db.selectFrom('price_schedule').select(['domain_id', 'plan_id', 'due_on']).where('event', '=', 'final_push').where('status', 'in', ['planned', 'applied']).execute();
   const planOf = new Map<number, string | null>();
-  const domains = await db.selectFrom('domains').selectAll().where('status', 'in', LIVE).orderBy('domain').execute();
+  const domains = reportDomains
+    ? reportDomains.filter((d) => (LIVE as readonly string[]).includes(d.status))
+    : await db.selectFrom('domains').selectAll().where('status', 'in', LIVE).orderBy('domain').execute();
+  let finalPushDays: number | null = null; // the pricing settings in force, read at most once
   for (const d of domains) planOf.set(d.id, d.plan_id);
   const finalPush = new Map(fp.filter((f) => planOf.get(f.domain_id) === f.plan_id).map((f) => [f.domain_id, f.due_on]));
   for (const d of domains) {
@@ -31,7 +35,7 @@ export async function upcoming90d(db: Kysely<Database>, now: Date): Promise<Upco
           out.push({ domain: d.domain, kind: 'first_renewal', date: d.expiry_date, stage: stageOf(days, [7, 30, 60]),
             note: `First renewal decision: expires in ${days} days. Dvir decides whether to renew (once at most).` });
         } else {
-          const push = finalPush.get(d.id) ?? (d.drop_date ? addDays(d.drop_date, -(await currentSettings(db, now)).finalPushDaysBeforeDrop) : 'drop_date − 90');
+          const push = finalPush.get(d.id) ?? (d.drop_date ? addDays(d.drop_date, -(finalPushDays ??= (await currentSettings(db, now)).finalPushDaysBeforeDrop)) : 'drop_date − 90');
           out.push({ domain: d.domain, kind: 'final_expiry', date: d.expiry_date, stage: days <= 30 ? 30 : 60,
             note: `Final expiry: won't be renewed again; the final push price is already scheduled at ${push}; consider an outreach push (Gate C).` });
         }

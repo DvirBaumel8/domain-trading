@@ -11,12 +11,12 @@ import { priceFormula } from '../listing/index.js';
 import { currentSettings } from '../listing/index.js';
 import { buyBlocks } from '../buying/index.js';
 import { featureChecksOf, latestByCheck } from '../selection/index.js';
-import { RECORD_FRESH_DAYS, RECORD_KINDS, isFresh, freshDomainRecord, type RecordKind } from '../selection/index.js';
-import { assemble, effectiveHold, fullPlanRunOrThrow, loadRows, type ScreeningWorker } from '../selection/index.js';
+import { RECORD_FRESH_DAYS, RECORD_KINDS, isFresh, prefetchDomainRecords, recordKey, type RecordKind, type RecordsPrefetch } from '../selection/index.js';
+import { assembleRun, fullPlanRunOrThrow, heldByActive, loadRowsForRuns, type ScreeningWorker } from '../selection/index.js';
 import { advisoryXactLock } from '../../core/locks.js';
 import { OWNED_STATUSES } from './intake.js';
 import { activeSelectionSettings, laneFitter, loadSplitV2, splitV2 } from '../selection/index.js';
-import type { CheckId, Lane, ResultRow, RunItem } from '../selection/index.js';
+import type { CheckId, ResultRow, RunItem } from '../selection/index.js';
 
 export const DAILY_LIST_DEFAULT_LIMIT = 10;
 export const DAILY_LIST_MAX_LIMIT = 25;
@@ -115,12 +115,13 @@ async function waitForRuns(db: Kysely<Database>, worker: ScreeningWorker, today:
 
 const checkLine = (r: ResultRow) => ({ check: r.check_id, status: r.status, reason_code: r.reason_code });
 
-async function recordsFor(db: Kysely<Database>, domain: string, latest: Map<CheckId, ResultRow>, nowMs: number): Promise<{ records: Json; missing: Missing[] }> {
+/** `pre`: the fresh records and the existing kinds of every pool name, read in a few statements (prefetchDomainRecords) instead of up to four per name. */
+function recordsFor(pre: RecordsPrefetch, domain: string, latest: Map<CheckId, ResultRow>, nowMs: number): { records: Json; missing: Missing[] } {
   const records: Json = {};
   const missing: Missing[] = [];
   for (const kind of RECORD_KINDS) {
     const row = latest.get(kind);
-    const rec = await freshDomainRecord(db, domain, kind, nowMs);
+    const rec = pre.fresh.get(recordKey(domain, kind));
     if (rec) {
       records[kind] = { result: row?.status ?? null, reason_code: row?.reason_code ?? null, checked_at: rec.checkedAt.toISOString(), checked_by: rec.checkedBy, source: 'domain_record', evidence_url: rec.evidenceUrl };
       continue;
@@ -130,14 +131,15 @@ async function recordsFor(db: Kysely<Database>, domain: string, latest: Map<Chec
       records[kind] = { result: row.status, reason_code: row.reason_code, checked_at: row.checked_at.toISOString(), checked_by: row.recorded_by, source: 'run_record', evidence_url: null };
       continue;
     }
-    const any = await db.selectFrom('domain_records').select('id').where('domain', '=', domain).where('kind', '=', kind).limit(1).executeTakeFirst();
-    missing.push({ kind, reason: any ? 'STALE' : 'NO_RECORD' });
+    missing.push({ kind, reason: pre.any.has(recordKey(domain, kind)) ? 'STALE' : 'NO_RECORD' });
     records[kind] = null;
   }
   return { records, missing };
 }
 
-interface PoolItem { run: { id: string; created_at: Date; settings_label: string; status: string; mode: string }; item: RunItem; plan: CheckId[]; rows: ResultRow[]; derived: ReturnType<typeof assemble>['items'][number]['derived'] }
+const RUN_ROWS_CHUNK = 4;
+
+interface PoolItem { run: { id: string; created_at: Date; settings_label: string; status: string; mode: string }; item: RunItem; plan: CheckId[]; rows: ResultRow[]; derived: Awaited<ReturnType<typeof assembleRun>>['items'][number]['derived'] }
 
 /** Newest screening of each domain among the finished or running, non-backtest, full-plan runs of the last 72 hours on the active settings. */
 async function collectPool(db: Kysely<Database>, nowMs: number): Promise<{ pool: PoolItem[]; hold: boolean; values: Awaited<ReturnType<typeof activeSelectionSettings>>['values']; label: string }> {
@@ -146,14 +148,18 @@ async function collectPool(db: Kysely<Database>, nowMs: number): Promise<{ pool:
     .where('backtest', '=', false).where('settings_label', '=', sel.label).where('status', '!=', 'cancelled').orderBy('created_at', 'desc').orderBy('id', 'desc').execute();
   const seen = new Set<string>();
   const pool: PoolItem[] = [];
-  for (const run of runs) {
-    try { fullPlanRunOrThrow(run, sel); } catch { continue; }
-    const hold = await effectiveHold(db, run);
-    const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, await loadRows(db, run.id), sel.values, hold, run.status !== 'running', run.mode === 'live');
-    for (const it of a.items) {
-      if (it.item.input_error || seen.has(it.item.domain)) continue;
-      seen.add(it.item.domain);
-      pool.push({ run: { id: run.id, created_at: run.created_at, settings_label: run.settings_label, status: run.status, mode: run.mode }, item: it.item, plan: it.plan, rows: it.rows, derived: it.derived });
+  const usable = runs.filter((run) => { try { fullPlanRunOrThrow(run, sel); return true; } catch { return false; } });
+  // the rows of a few runs per statement (not one statement per run, and not every run's rows in memory at once)
+  for (let i = 0; i < usable.length; i += RUN_ROWS_CHUNK) {
+    const chunk = usable.slice(i, i + RUN_ROWS_CHUNK);
+    const rowsOf = await loadRowsForRuns(db, chunk.map((r) => r.id));
+    for (const run of chunk) {
+      const a = await assembleRun(db, run, sel, { rows: rowsOf.get(run.id), hold: heldByActive(run, sel.label) }); // the active label is already in `sel`: no query per run
+      for (const it of a.items) {
+        if (it.item.input_error || seen.has(it.item.domain)) continue;
+        seen.add(it.item.domain);
+        pool.push({ run: { id: run.id, created_at: run.created_at, settings_label: run.settings_label, status: run.status, mode: run.mode }, item: it.item, plan: it.plan, rows: it.rows, derived: it.derived });
+      }
     }
   }
   return { pool, hold: sel.values.buy_hold, values: sel.values, label: sel.label };
@@ -188,6 +194,7 @@ async function buildLocked(deps: BuildDeps, timedOut: boolean): Promise<BuildRes
   const { pool, hold, values, label } = await collectPool(db, nowAfter);
   const pricing = await currentSettings(db, new Date(nowAfter));
   const domains = pool.map((p) => p.item.domain);
+  const recordsPre = await prefetchDomainRecords(db, domains, nowAfter);
   const owned = new Set<string>();
   if (domains.length) for (const r of await db.selectFrom('domains').select('domain').where('status', 'in', [...OWNED_STATUSES]).where('domain', 'in', domains).execute()) owned.add(r.domain);
 
@@ -271,7 +278,7 @@ async function buildLocked(deps: BuildDeps, timedOut: boolean): Promise<BuildRes
       sellers: scoutSellers.get(domain) ?? null,
       sellers_verified_n: ((latest.get('tier')?.fields?.sellers as { verified_n?: unknown } | undefined)?.verified_n as number | null | undefined) ?? null,
     };
-    const needRecords = async () => recordsFor(db, domain, latest, nowAfter);
+    const needRecords = async () => recordsFor(recordsPre, domain, latest, nowAfter);
 
     if (fs === 'rejected') {
       const ff = p.derived.first_fail!;

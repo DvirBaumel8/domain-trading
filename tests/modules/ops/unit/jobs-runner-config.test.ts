@@ -139,7 +139,7 @@ describe('DB TLS: production requires sslmode=verify-full', () => {
 describe('v3.9.0 pool', () => {
   it('timeouts: connect 10 s, idle 30 s, in both ssl modes', () => {
     for (const c of [poolConfig('postgres://u:p@h/db'), poolConfig('postgres://u:p@h/db', { ssl: true })]) {
-      expect(c).toMatchObject({ max: 10, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 30_000 });
+      expect(c).toMatchObject({ max: 20, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 30_000 });
     }
   });
 

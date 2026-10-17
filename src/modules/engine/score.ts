@@ -55,9 +55,9 @@ export class Scorer {
 
   private async tokenIndex(model: ActiveModel, table: ReturnType<typeof extendedTable>): Promise<FeatureContext['tokens']> {
     const { db } = this.deps;
-    const k = await sql<{ s: string; si: string; u: string; ui: string }>`select (select count(*) from engine_sales)::text as s, (select coalesce(max(id), 0) from engine_sales)::text as si,
-      (select count(*) from engine_unsold)::text as u, (select coalesce(max(id), 0) from engine_unsold)::text as ui`.execute(db);
-    const key = `${model.id}|${k.rows[0]!.s}|${k.rows[0]!.si}|${k.rows[0]!.u}|${k.rows[0]!.ui}`;
+    // the key follows the upload history: every upload (sales or unsold) is one engine_uploads row written in the same transaction as its rows
+    const k = await sql<{ n: string }>`select coalesce(max(id), 0)::text as n from engine_uploads`.execute(db);
+    const key = `${model.id}|${k.rows[0]!.n}`;
     if (this.cachedTokens?.key === key) return this.cachedTokens.tokens;
     const [sales, unsold] = [await loadSales(db), await loadUnsold(db)];
     const tokens = tokenContext(sales, unsold, table);

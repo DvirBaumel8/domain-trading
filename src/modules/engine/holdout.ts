@@ -27,6 +27,13 @@ export async function setSalesMaxDate(db: Kysely<Database>, date: string, ref: {
   });
 }
 
+/** The size of a request body for the size guard: the Content-Length header when the client sent one, else the rows serialised (the 8 MB body limit is checked by Fastify either way). */
+export function payloadBytesOf(req: { headers: Record<string, unknown> }, rows: unknown): number {
+  const h = req.headers['content-length'];
+  const n = typeof h === 'string' && /^\d+$/.test(h) ? Number(h) : NaN;
+  return Number.isFinite(n) ? n : Buffer.byteLength(JSON.stringify(rows));
+}
+
 export async function databaseBytes(db: Kysely<Database>): Promise<number> {
   return Number((await sql<{ n: string }>`select pg_database_size(current_database())::text as n`.execute(db)).rows[0]!.n);
 }

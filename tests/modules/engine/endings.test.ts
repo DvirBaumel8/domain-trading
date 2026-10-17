@@ -1,4 +1,6 @@
 // v5.4.0 (CR-056 part 1): the daily step engineEndings (RDAP only; mocked here) and the endings numbers of GET /engine/health.
+import { readFileSync } from 'node:fs';
+import { sql } from 'kysely';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { RDAP_COM_BASE, RDAP_FALLBACK_BASES, type RdapLookup, type RdapLookupFn } from '../../../src/core/rdap.js';
@@ -100,10 +102,48 @@ describe('engine endings fill', () => {
     now += 2 * DAY; // 31 days after the first answers
     created = reg('2026-10-20T00:00:00.000Z');
     const s = await h.job().runOnce();
-    expect(s).toMatchObject({ due: 6, asked: 6, registered: 1, inserted: 6 });
+    // v5.14.0 (D4): the five unchanged answers update their row in place; only the changed one appends
+    expect(s).toMatchObject({ due: 6, asked: 6, registered: 1, inserted: 1, updated: 5 });
     const rows = await find('alpha', 'net');
     expect(rows.map((r) => r.registered)).toEqual([false, true]);
     expect(rows[1]!.created_at_registry!.toISOString()).toBe('2026-10-20T00:00:00.000Z');
+    expect(await find('alpha', 'org')).toHaveLength(1);
+  });
+
+  it('EN-74: a re-ask with the same answer updates checked_at and evidence in place (same row id); a changed registry creation date appends a row', async () => {
+    await seed(['alpha']);
+    let created = '2020-01-01T00:00:00Z';
+    const h = harness((_h, d) => (d === 'alpha.net' ? reg(created) : free));
+    await h.job().runOnce();
+    const first = (await find('alpha', 'net'))[0]!;
+    now += 31 * DAY;
+    await h.job().runOnce();
+    const again = await find('alpha', 'net');
+    expect(again).toHaveLength(1);
+    expect(again[0]!.id).toBe(first.id);
+    expect(again[0]!.checked_at.getTime()).toBeGreaterThan(first.checked_at.getTime());
+    now += 31 * DAY;
+    created = '2026-10-01T00:00:00Z';
+    await h.job().runOnce();
+    expect((await find('alpha', 'net')).map((r) => r.created_at_registry!.toISOString())).toEqual(['2020-01-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z']);
+  });
+
+  it('EN-75: the 5.14.0 migration cleanup keeps the newest of consecutive identical answers, every change, and rows an owned-ending event points to', async () => {
+    const ins = (name: string, registered: boolean | null, created: string | null, day: number) => sql`insert into engine_endings (name, tld, registered, created_at_registry, checked_at, reason_code)
+      values (${name}, 'net', ${registered}, ${created}, ${new Date(T0 + day * DAY)}, ${registered === null ? 'SOURCE_ERROR' : null}) returning id`.execute(db);
+    for (const d of [1, 2, 3]) await ins('same', false, null, d);                       // three identical: only the newest stays
+    await ins('flip', false, null, 1); await ins('flip', true, '2020-01-01T00:00:00Z', 2); await ins('flip', true, '2020-01-01T00:00:00Z', 3); await ins('flip', false, null, 4);
+    await ins('unk', null, null, 1); await ins('unk', null, null, 2);                    // unanswered rows are never collapsed
+    const owned = (await ins('own', true, '2020-01-01T00:00:00Z', 1)).rows[0] as { id: string }; await ins('own', true, '2020-01-01T00:00:00Z', 2);
+    await sql`insert into owned_ending_events (domain, tld, kind, registered, created_at_registry, ending_id, created_at) values ('own.com', 'net', 'baseline', true, '2020-01-01T00:00:00Z', ${owned.id}, ${new Date(T0)})`.execute(db);
+    const file = readFileSync(new URL('../../../migrations/1764700000000_v5-14-0.sql', import.meta.url), 'utf8');
+    const cleanup = file.slice(file.indexOf('DELETE FROM public.engine_endings'), file.indexOf('-- Down Migration'));
+    await sql.raw(cleanup).execute(db);
+    const left = async (n: string) => (await find(n, 'net')).map((r) => `${r.registered}`);
+    expect(await left('same')).toEqual(['false']);
+    expect(await left('flip')).toEqual(['false', 'true', 'false']);
+    expect(await left('unk')).toEqual(['null', 'null']);
+    expect(await left('own')).toEqual(['true', 'true']);
   });
 
   it('EN-14: when the re-ask of a known answer gets no answer, the known row stays and the pair is asked again on the next run', async () => {
@@ -114,14 +154,14 @@ describe('engine endings fill', () => {
     now += 31 * DAY;
     down = true;
     const s = await h.job().runOnce();
-    expect(s).toMatchObject({ asked: 6, unknown: 1, registered: 5, inserted: 5 });
+    expect(s).toMatchObject({ asked: 6, unknown: 1, registered: 5, inserted: 0, updated: 5 });
     const ai = await find('alpha', 'ai');
     expect(ai).toHaveLength(1);
     expect(ai[0]).toMatchObject({ registered: true });
     down = false;
     now += 3_600_000;
-    expect(await h.job().runOnce()).toMatchObject({ due: 1, asked: 1, registered: 1, inserted: 1 });
-    expect(await find('alpha', 'ai')).toHaveLength(2);
+    expect(await h.job().runOnce()).toMatchObject({ due: 1, asked: 1, registered: 1, inserted: 0, updated: 1 });
+    expect(await find('alpha', 'ai')).toHaveLength(1);
   });
 
   it('EN-15: asks to one registry host are paced through the injected sleep (250 ms apart, 4 at a time)', async () => {

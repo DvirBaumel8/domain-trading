@@ -13,7 +13,7 @@ import { ownedEndingsView } from '../endings.js';
 import { engineHealth } from '../health.js';
 import { SCORE_MAX_DOMAINS, type Scorer } from '../score.js';
 import type { EngineTrainer } from '../train.js';
-import { databaseBytes, guardDbSize, salesMaxDate, setSalesMaxDate, type DbSizeGuard } from '../holdout.js';
+import { databaseBytes, guardDbSize, payloadBytesOf, salesMaxDate, setSalesMaxDate, type DbSizeGuard } from '../holdout.js';
 import { ENGINE_MAX_ROWS, storeSales, storeUnsold, UNSOLD_TYPES } from '../uploads.js';
 
 /** Up to 20,000 rows of about 300 bytes each. */
@@ -36,7 +36,7 @@ export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database
 
   app.post('/engine/sales', { config: { openapiBody: SalesDoc }, bodyLimit: BODY_LIMIT }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
-    const before = await guardDbSize(deps.db, deps.dbSize, Buffer.byteLength(JSON.stringify(b.rows)));
+    const before = await guardDbSize(deps.db, deps.dbSize, payloadBytesOf(req, b.rows));
     const r = await storeSales(deps.db, b.rows, { ...ctx(req), sealedAfter: salesMaxDate });
     const after = await (deps.dbSize.bytes ?? (() => databaseBytes(deps.db)))();
     req.auditSummary = `engine sales: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}`;
@@ -45,7 +45,7 @@ export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database
 
   app.post('/engine/unsold', { config: { openapiBody: UnsoldBodyDoc }, bodyLimit: BODY_LIMIT }, async (req, reply) => {
     const b = Body.parse(req.body ?? {});
-    const before = await guardDbSize(deps.db, deps.dbSize, Buffer.byteLength(JSON.stringify(b.rows)));
+    const before = await guardDbSize(deps.db, deps.dbSize, payloadBytesOf(req, b.rows));
     const r = await storeUnsold(deps.db, b.rows, { ...ctx(req), sealedAfter: salesMaxDate });
     const after = await (deps.dbSize.bytes ?? (() => databaseBytes(deps.db)))();
     req.auditSummary = `engine unsold: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}`;

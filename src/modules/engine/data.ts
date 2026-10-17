@@ -23,9 +23,16 @@ export async function loadSales(db: Kysely<Database>): Promise<SaleRow[]> {
   return rows.map((r) => ({ domain: r.domain, price_cents: Number(r.price_cents), sale_date: String(r.sale_date) }));
 }
 
+/** Only the dropped-after-held rows (the only ones the features, the token index and the drift read); `countRegisteredUnsold` counts the rest. */
 export async function loadUnsold(db: Kysely<Database>): Promise<UnsoldRow[]> {
-  const rows = await db.selectFrom('engine_unsold').select(['domain', 'type', 'observation_date', 'caught_by_catcher']).orderBy('id').execute();
+  const rows = await db.selectFrom('engine_unsold').select(['domain', 'type', 'observation_date', 'caught_by_catcher']).where('type', '=', 'dropped_after_held').orderBy('id').execute();
   return rows.map((r) => ({ domain: r.domain, type: r.type, observation_date: String(r.observation_date), caught_by_catcher: r.caught_by_catcher }));
+}
+
+/** The registered-unsold rows (never used for training); only their number is reported in the dataset counts. */
+export async function countRegisteredUnsold(db: Kysely<Database>): Promise<number> {
+  const r = await db.selectFrom('engine_unsold').select((eb) => eb.fn.countAll<string>().as('n')).where('type', '=', 'registered_unsold').executeTakeFirstOrThrow();
+  return Number(r.n);
 }
 
 type EndingsMap = Map<string, Partial<Record<EngineTld, EndingFact>>>;

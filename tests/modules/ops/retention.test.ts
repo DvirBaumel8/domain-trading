@@ -168,4 +168,55 @@ describe('RT retention (v5.1.0, G-95)', () => {
     expect([await count('audit_log'), await count('ledger_entries'), await count('screening_packs')]).toEqual(before);
     expect(await count('screening_runs', "id = 'r1'")).toBe(1);
   });
+  it('RT-10 drop lists (v5.14.0, D3): a list more than 90 days past its list_date goes with its rows and checks; a younger list stays whole; tight mode uses 60 days', async () => {
+    const day = (d: number) => ago(d).toISOString().slice(0, 10);
+    for (const [name, age] of [['old-list', 200], ['mid-list', 70], ['new-list', 10]] as const) {
+      await sql`insert into drop_lists (name, list_date, created_at, created_by, received_n, kept_n) values (${name}, ${day(age)}::date, ${ago(age)}, 'test', 2, 2)`.execute(db);
+      await sql`insert into drop_list_rows (list_name, domain, kept) values (${name}, ${name + '-a.com'}, true), (${name}, ${name + '-b.com'}, false)`.execute(db);
+      await sql`insert into drop_list_checks (list_name, domain, checked_at, status) values (${name}, ${name + '-a.com'}, ${ago(age)}, 'registered')`.execute(db);
+    }
+    const dry = await job().runOnce({ dryRun: true });
+    expect('tables' in dry && [dry.tables.drop_list_checks!.deleted, dry.tables.drop_list_rows!.deleted, dry.tables.drop_lists!.deleted]).toEqual([1, 2, 0]) // the list itself is counted once its rows are gone;
+    expect(await count('drop_lists')).toBe(3);
+    const s = await job().runOnce();
+    expect('tables' in s && s.tables.drop_lists).toMatchObject({ deleted: 1, days: 90 });
+    expect(await count('drop_lists', "name = 'old-list'")).toBe(0);
+    expect(await count('drop_list_rows', "list_name = 'old-list'")).toBe(0);
+    expect(await count('drop_list_checks', "list_name = 'old-list'")).toBe(0);
+    expect(await count('drop_list_rows')).toBe(4);
+    const tight = await job({ bytes: 800_000 }).runOnce();
+    expect('tables' in tight && tight.tables.drop_lists).toMatchObject({ deleted: 1, mode: 'tight', days: 60 });
+    expect(await count('drop_lists')).toBe(1);
+    await expect(sql`delete from drop_lists`.execute(db)).rejects.toThrow(/append-only/);
+  });
+
+  it('RT-11 daily candidate lists keep the newest and the last 90 days; NameBio call counters go past 30 days; listing-sync log keeps the newest per (domain, venue, action)', async () => {
+    const dl = (d: number) => sql`insert into daily_candidate_lists (day, built_at, entries, sections, summary) values (${ago(d).toISOString().slice(0, 10)}::date, ${ago(d)}, '[]', '{}', '{}')`.execute(db);
+    await dl(400); await dl(300); await dl(100); await dl(5);
+    await sql`insert into namebio_calls (kind, called_at) values ('retailstats', ${ago(40)}), ('retailstats', ${ago(1)})`.execute(db);
+    const ls = (domain: string, action: string, d: number) => sql`insert into listing_sync_log (domain, venue, action, at) values (${domain}, 'sellerhub', ${action}, ${ago(d)})`.execute(db);
+    await ls('a.com', 'sold_seen', 400); await ls('a.com', 'sold_seen', 300); await ls('a.com', 'update', 300); await ls('b.com', 'sold_seen', 10);
+    const s = await job().runOnce();
+    expect('tables' in s && [s.tables.daily_candidate_lists!.deleted, s.tables.namebio_calls!.deleted, s.tables.listing_sync_log!.deleted]).toEqual([3, 1, 1]);
+    expect(await count('daily_candidate_lists')).toBe(1);
+    expect(await count('namebio_calls')).toBe(1);
+    expect(await count('listing_sync_log')).toBe(3);
+    // only the newest list is kept even when it is old
+    await sql`delete from daily_candidate_lists where false`.execute(db);
+    const t = await new RetentionJob({ db, now: () => NOW + 500 * 86_400_000, dbBytes: async () => 1 }).runOnce();
+    expect('tables' in t && t.tables.daily_candidate_lists!.deleted).toBe(0);
+    expect(await count('daily_candidate_lists')).toBe(1);
+  });
+
+  it('RT-12 evidence: the referenced set is a temp table built once per run and dropped afterwards (the same answer over many batches)', async () => {
+    await run('r1');
+    const keep = await evidence(300);
+    await result('r1', 'k.com', 'form', 5, [keep]);
+    for (let i = 0; i < 7; i++) await evidence(300);
+    const s = await job().runOnce(); // batch of 2: four evidence batches
+    expect('tables' in s && s.tables.screening_evidence!.deleted).toBe(7);
+    expect((await ids('screening_evidence')).map(Number)).toEqual([keep]);
+    const gone = await sql<{ r: string | null }>`select to_regclass('pg_temp.retention_evidence_refs')::text as r`.execute(db);
+    expect(gone.rows[0]!.r).toBeNull();
+  });
 });

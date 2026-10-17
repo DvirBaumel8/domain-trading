@@ -305,9 +305,10 @@ export async function holdSuites(db: Kysely<Database>, holdout: SelectionValuesT
  * version's `holdout` settings, with 0 leaking rows). Diagnostic replays are never considered. `variants_scored`: how many settings
  * versions have a holdout replay of the suite (the pre-registered variants).
  */
-export async function suiteStatuses(db: Kysely<Database>, settingsId: number, holdout: SelectionValuesT['holdout']): Promise<SuiteStatus[]> {
+export async function suiteStatuses(db: Kysely<Database>, settingsId: number, holdout: SelectionValuesT['holdout'], hold?: { suites: string[] }): Promise<SuiteStatus[]> {
   const out: SuiteStatus[] = [];
-  for (const suite of (await holdSuites(db, holdout)).suites) {
+  // `hold`: the caller's own holdSuites() answer (one read for a whole request)
+  for (const suite of (hold ?? await holdSuites(db, holdout)).suites) {
     const def = await db.selectFrom('holdout_suites').select(['id', 'version']).where('suite', '=', suite).orderBy('version', 'desc').limit(1).executeTakeFirst();
     const runs = await db.selectFrom('replay_runs').select(['id', 'report', 'leakage_rows', 'suite_def_id']).where('suite', '=', suite).where('mode', '=', 'holdout').where('settings_id', '=', settingsId)
       .orderBy('created_at').orderBy('id').execute();

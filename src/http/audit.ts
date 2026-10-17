@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
 import type { AuditRowInsert, Database } from '../db/types.js';
@@ -51,6 +51,20 @@ function elideRows(b: Record<string, unknown> | null, url: string): Record<strin
   return { ...b, rows: `[${b.rows.length} rows]` };
 }
 
+export const AUDIT_ARRAY_MAX = 50;
+
+/** v5.14.0 (D2): any array longer than 50 items (drop-list rows, test-set names, labelled names, intake lists, ...) is recorded as its count and a sha256 of its JSON, so the audit stays small but can still prove what was sent. */
+export function elideArrays(value: unknown, depth = 0): unknown {
+  if (Array.isArray(value)) {
+    if (value.length > AUDIT_ARRAY_MAX) return `[${value.length} items, sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}]`;
+    return depth < 6 ? value.map((v) => elideArrays(v, depth + 1)) : value;
+  }
+  if (value !== null && typeof value === 'object' && depth < 6) {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, elideArrays(v, depth + 1)]));
+  }
+  return value;
+}
+
 function bodyObject(req: FastifyRequest): Record<string, unknown> | null {
   const b = req.body;
   return b !== null && typeof b === 'object' && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
@@ -87,7 +101,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
   app.addHook('onSend', async (req, reply, payload) => {
     // Bots only (Dvir, 6 Oct 2026): a request that never authenticated writes nothing.
     if (!req.auditId || (!req.auth && !req.jobAuth)) return payload;
-    const body = elideRows(elideFile(bodyObject(req)), req.url);
+    const body = elideArrays(elideRows(elideFile(bodyObject(req)), req.url)) as Record<string, unknown> | null;
     const approval = extractApproval(body);
     const replayed = reply.getHeader('idempotent-replayed') === 'true';
     const summary = req.auditSummary ?? summarize(reply.statusCode, payload);

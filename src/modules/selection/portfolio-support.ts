@@ -3,10 +3,10 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { lookalikesCheck } from './checks/lookalikes.js';
-import { assemble, effectiveHold, fullPlanRunOrThrow, loadRows } from './engine.js';
+import { assembleRun, fullPlanRunOrThrow, heldByActive } from './engine.js';
 import { currentLists } from './lists.js';
 import { activeSelectionSettings } from './settings.js';
-import type { CheckContext, CheckId, Lane, RunItem, ScreeningDeps } from './types.js';
+import type { CheckContext, CheckId, ScreeningDeps } from './types.js';
 
 export interface ScreenedName { domain: string; run_id: string; passed: boolean }
 
@@ -19,8 +19,7 @@ export async function screenedNames(db: Kysely<Database>, since: Date): Promise<
   const out: ScreenedName[] = [];
   for (const run of runs) {
     try { fullPlanRunOrThrow(run, sel); } catch { continue; }
-    const hold = await effectiveHold(db, run);
-    const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, await loadRows(db, run.id), sel.values, hold, true, run.mode === 'live');
+    const a = await assembleRun(db, run, sel, { hold: heldByActive(run, sel.label), runDone: true });
     for (const it of a.items) {
       if (it.item.input_error || seen.has(it.item.domain)) continue;
       seen.add(it.item.domain);

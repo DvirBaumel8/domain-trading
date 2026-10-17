@@ -264,10 +264,11 @@ export async function refreshNameBio(db: Kysely<Database>, deps: ScreeningDeps, 
         const text = await downloadCsv(deps, tldUrl);
         fileBytes += Buffer.byteLength(text);
         requests++;
-        for (const [tld, stats] of parseTldStatsCsv(text)) {
-          await db.insertInto('namebio_tld_stats').values({ tld, stats: JSON.stringify(stats), source: NAMEBIO_SOURCE, source_url: tldUrl, fetched_at: at } as never)
+        const parsed = [...parseTldStatsCsv(text)]; // one tld once (a map): safe for a multi-row upsert
+        for (let i = 0; i < parsed.length; i += 200) {
+          await db.insertInto('namebio_tld_stats').values(parsed.slice(i, i + 200).map(([tld, stats]) => ({ tld, stats: JSON.stringify(stats), source: NAMEBIO_SOURCE, source_url: tldUrl, fetched_at: at })) as never)
             .onConflict((oc) => oc.column('tld').doUpdateSet((eb) => ({ stats: eb.ref('excluded.stats'), source_url: eb.ref('excluded.source_url'), fetched_at: eb.ref('excluded.fetched_at') }))).execute();
-          rows++;
+          rows += Math.min(200, parsed.length - i);
         }
       }
     } catch (e) { errors.push(`tldstats_csv: ${String((e as Error).message).slice(0, 120)}`); }

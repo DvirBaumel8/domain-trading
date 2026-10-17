@@ -11,9 +11,9 @@ import { AppError } from '../../http/errors.js';
 import { canonicalJson } from '../../http/canonical-json.js';
 import { quoteIsStale } from './checks/quote.js';
 import { latestByCheck } from './derive.js';
-import { assemble, effectiveHold, fullPlanRunOrThrow, toResultRow } from './engine.js';
+import { assembleRun, effectiveHold, fullPlanRunOrThrow } from './engine.js';
 import { activeSelectionSettings, selectionSettingsByLabel, type SelectionValuesT } from './settings.js';
-import type { CheckId, Lane, ResultRow, RunItem } from './types.js';
+import type { CheckId, Lane, ResultRow } from './types.js';
 import { verdictsFor, type VerdictRow } from './verdicts.js';
 
 const Verdict = z.object({ verdict: z.enum(['PASS', 'REJECT']), reason: z.string().trim().min(1).max(300) }).strict();
@@ -114,9 +114,8 @@ export async function issuePack(db: Kysely<Database>, i: { runId: string; domain
     const judgedAt = Date.parse(i.judgment.judged_at);
     if (judgedAt > i.now.getTime() + 60_000) throw new AppError(422, 'JUDGED_AT_INVALID', 'judged_at is in the future');
     if (judgedAt < run.created_at.getTime()) throw new AppError(422, 'JUDGED_AT_INVALID', 'judged_at is earlier than the run it judges', { run_created_at: run.created_at.toISOString() });
-    const rows = (await trx.selectFrom('screening_results').selectAll().where('run_id', '=', run.id).orderBy('id').execute()).map(toResultRow);
     const hold = await effectiveHold(trx, run);
-    const a = assemble((run.input as { names: RunItem[] }).names, run.gate_plan as Partial<Record<Lane, CheckId[]>>, rows, sel.values, hold, true, run.mode === 'live');
+    const a = await assembleRun(trx, run, sel, { hold, runDone: true });
     const it = a.items.find((x) => x.item.domain === i.domain && !x.item.input_error);
     if (!it) throw new AppError(404, 'NAME_NOT_IN_RUN', `"${i.domain}" is not a screened name of run ${run.id}`);
     const latest = latestByCheck(it.rows);

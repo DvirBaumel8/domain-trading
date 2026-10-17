@@ -111,3 +111,50 @@ export async function withDomainLock<T, D = any>( // eslint-disable-line @typesc
     return result as T;
   });
 }
+
+/**
+ * v5.14.0: the domain locks of several names on ONE connection, taken in sorted order (so two callers cannot wait on each other), one bounded deadline for all;
+ * released together. Lets a caller change many names with one statement. An empty list just runs `fn`.
+ */
+export async function withDomainLocks<T, D = any>( // eslint-disable-line @typescript-eslint/no-explicit-any
+  db: Kysely<D>, domains: readonly string[], fn: (conn: Kysely<D>) => Promise<T>, opts?: { timeoutMs?: number },
+): Promise<T> {
+  const texts = [...new Set(domains)].sort().map((d) => lockText(`domain:${d}`));
+  const deadline = Date.now() + (opts?.timeoutMs ?? LOCK_TIMEOUT_MS);
+  return db.connection().execute(async (conn) => {
+    const held: string[] = [];
+    const releaseAll = async (): Promise<void> => {
+      for (const t of held.splice(0).reverse()) await release(conn, t);
+    };
+    try {
+      for (const text of texts) {
+        for (;;) {
+          const r = await sql<{ ok: boolean }>`select pg_try_advisory_lock(hashtext(${text})) as ok`.execute(conn);
+          if (r.rows[0]?.ok) break;
+          if (Date.now() >= deadline) throw new AppError(503, 'DOMAIN_BUSY', 'Another change to this domain is in progress; retry shortly');
+          await sleep(LOCK_POLL_MS);
+        }
+        held.push(text);
+      }
+    } catch (e) {
+      await releaseAll().catch(() => undefined);
+      throw e;
+    }
+    let result: T | undefined;
+    let failed = false;
+    let error: unknown;
+    try {
+      result = await fn(conn);
+    } catch (e) {
+      failed = true;
+      error = e;
+    }
+    try {
+      await releaseAll();
+    } catch (e) {
+      if (!failed) throw e;
+    }
+    if (failed) throw error;
+    return result as T;
+  });
+}

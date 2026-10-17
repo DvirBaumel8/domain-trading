@@ -44,12 +44,15 @@ export interface EngineDataset {
 export const frozenHash = (rows: readonly Row[]): string =>
   createHash('sha256').update(rows.map((r) => `${r.domain}|${r.label}|${r.asOf}`).sort().join('\n')).digest('hex');
 
-const byHash = (seed: number, tag: string) => (a: Row, b: Row): number => {
-  const ha = hashUnit(`${seed}:${tag}:${a.domain}|${a.asOf}`); const hb = hashUnit(`${seed}:${tag}:${b.domain}|${b.asOf}`);
-  return ha - hb || (a.domain < b.domain ? -1 : a.domain > b.domain ? 1 : 0);
-};
+/** Sorted by a seeded hash (ties by domain). The hash of each row is computed once (decorate, sort, undecorate), not twice per comparison. */
+function sortByHash(rows: readonly Row[], seed: number, tag: string): Row[] {
+  const dec = rows.map((r) => ({ r, h: hashUnit(`${seed}:${tag}:${r.domain}|${r.asOf}`) }));
+  dec.sort((a, b) => a.h - b.h || (a.r.domain < b.r.domain ? -1 : a.r.domain > b.r.domain ? 1 : 0));
+  return dec.map((d) => d.r);
+}
 
-export interface BuildOptions { table: SplitV2Table; today: string; seed: number; minTrainPerClass?: number; minTestPerClass?: number }
+/** `registeredUnsold`: registered-unsold rows that were not loaded into `unsold` (the loader reads only dropped-after-held rows); they are counted, never used. */
+export interface BuildOptions { table: SplitV2Table; today: string; seed: number; minTrainPerClass?: number; minTestPerClass?: number; registeredUnsold?: number }
 
 export function buildDataset(sales: readonly SaleRow[], unsold: readonly UnsoldRow[], o: BuildOptions): EngineDataset {
   const minTrain = o.minTrainPerClass ?? 20; const minTest = o.minTestPerClass ?? 5;
@@ -58,8 +61,8 @@ export function buildDataset(sales: readonly SaleRow[], unsold: readonly UnsoldR
   const soldAll: Row[] = sales.filter((s) => s.price_cents >= MIN_SALE_CENTS && inReg(s.domain)).map((s) => ({ domain: s.domain, label: 1 as const, asOf: s.sale_date, priceCents: s.price_cents }));
   const unsoldAll: Row[] = unsold.filter((u) => u.type === 'dropped_after_held' && u.caught_by_catcher !== true && inReg(u.domain)).map((u) => ({ domain: u.domain, label: 0 as const, asOf: u.observation_date, priceCents: null }));
   const counts: Record<string, number> = {
-    sales_rows: sales.length, sold_eligible: soldAll.length, unsold_rows: unsold.length, unsold_eligible: unsoldAll.length,
-    registered_unsold_not_used: unsold.filter((u) => u.type === 'registered_unsold').length,
+    sales_rows: sales.length, sold_eligible: soldAll.length, unsold_rows: unsold.length + (o.registeredUnsold ?? 0), unsold_eligible: unsoldAll.length,
+    registered_unsold_not_used: unsold.filter((u) => u.type === 'registered_unsold').length + (o.registeredUnsold ?? 0),
     dropped_caught_by_catcher_excluded: unsold.filter((u) => u.type === 'dropped_after_held' && u.caught_by_catcher === true).length,
   };
   // the newest full calendar quarter (one that ended before today) with a sale
@@ -86,9 +89,9 @@ export function buildDataset(sales: readonly SaleRow[], unsold: readonly UnsoldR
     trainUnsoldAll = unsoldAll.filter((u) => hashUnit(`${o.seed}:${u.domain}`) >= HASH_TEST_SHARE);
   }
   const testCap = TEST_UNSOLD_PER_SALE * testSold.length;
-  const testUnsold = testUnsoldAll.length > testCap ? [...testUnsoldAll].sort(byHash(o.seed, 'test')).slice(0, testCap) : testUnsoldAll;
+  const testUnsold = testUnsoldAll.length > testCap ? sortByHash(testUnsoldAll, o.seed, 'test').slice(0, testCap) : testUnsoldAll;
   const trainCap = TRAIN_UNSOLD_PER_SALE_MAX * trainSold.length;
-  const trainUnsold = trainUnsoldAll.length > trainCap ? [...trainUnsoldAll].sort(byHash(o.seed, 'train')).slice(0, trainCap) : trainUnsoldAll;
+  const trainUnsold = trainUnsoldAll.length > trainCap ? sortByHash(trainUnsoldAll, o.seed, 'train').slice(0, trainCap) : trainUnsoldAll;
   Object.assign(counts, {
     train_sold: trainSold.length, train_unsold: trainUnsold.length, train_unsold_available: trainUnsoldAll.length, test_sold: testSold.length, test_unsold: testUnsold.length, test_unsold_available: testUnsoldAll.length,
   });

@@ -10,7 +10,7 @@ export { HistoryManual, phraseKey, priorPhraseOf, TmManual } from './checks/manu
 export { surblCheck } from './checks/surbl.js';
 export { latestByCheck } from './derive.js';
 export { type KeptLane, laneFitter } from './lane-fit.js';
-export { assemble, createRun, effectiveHold, fullPlanRunOrThrow, HEARTBEAT_STALE_MS, type InputName, loadRows, ScreeningWorker, toResultRow } from './engine.js';
+export { assemble, assembleRun, createRun, effectiveHold, fullPlanRunOrThrow, groupByItem, heldByActive, HEARTBEAT_STALE_MS, type InputName, loadRows, loadRowsForRuns, ScreeningWorker, toResultRow } from './engine.js';
 export { refreshNameBio } from './namebio.js';
 export { regimeDigitsOk } from './form.js';
 export { currentLists } from './lists.js';
@@ -27,6 +27,6 @@ export { type CheckContext, type CheckId, type Lane, type ResultRow, type RunIte
 export { readCappedBytes } from './wayback.js';
 export { webRiskLookup } from './web-risk.js';
 export { findSellers, SellersList, SELLERS_KIND, sellersFresh, sellersFreshHours, sellersFreshUntil, type SellerEntryT } from './sellers.js';
-export { freshDomainRecord, freshUntil, isFresh, RECORD_FRESH_DAYS, RECORD_KINDS, type RecordKind } from './domain-records.js';
+export { freshDomainRecord, freshUntil, isFresh, prefetchDomainRecords, recordKey, RECORD_FRESH_DAYS, RECORD_KINDS, type RecordKind, type RecordsPrefetch } from './domain-records.js';
 export { geoMembers, openTrancheFor } from './tranche-members.js';
 export { type LookalikeCounts, rerunLookalikes, screenedNames, type ScreenedName } from './portfolio-support.js';

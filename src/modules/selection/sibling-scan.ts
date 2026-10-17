@@ -8,7 +8,7 @@ import { lookalikeNames, probeLookalike, type LookalikeKind } from './checks/loo
 import { anchorLinks, ogSiteName, titleOf } from './html-text.js';
 import { buildLexicon, loadDataLexicon, type Lexicon } from './lexicon.js';
 import { currentLists } from './lists.js';
-import { Pacer } from './rdap-batch.js';
+import { Pacer, prefetchStored } from './rdap-batch.js';
 import { activeSelectionSettings, type SelectionValuesT } from './settings.js';
 import type { PageFetch } from './site.js';
 import type { CheckContext, CheckId, ScreeningDeps } from './types.js';
@@ -124,8 +124,9 @@ export async function scanSiblings(db: Kysely<Database>, deps: ScreeningDeps, do
     let calls = 0;
     const evidence: number[] = [];
     const siblings: Sibling[] = [];
+    const prefetched = await prefetchStored(db, names.map((n) => n.domain), { maxAgeHours, now: o.now });
     for (const n of names) {
-      const pr = await probeLookalike(ctx, n, { maxAgeHours, lists: pageLists, pace, robots });
+      const pr = await probeLookalike(ctx, n, { maxAgeHours, lists: pageLists, pace, robots, prefetched });
       calls += pr.calls;
       evidence.push(...pr.evidence);
       const it = pr.item;

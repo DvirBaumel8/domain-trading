@@ -1,6 +1,6 @@
 // v2.13.0 (CR-012 part E, Q-6): records per domain. A US trademark search or a history check done by a human is kept against the NAME, not one run,
 // so later runs of that name reuse it while it is fresh. Append-only (domain_records); the newest fresh row of a kind is used.
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 
 export const RECORD_KINDS = ['tm_us', 'history'] as const;
@@ -20,4 +20,25 @@ export async function freshDomainRecord(db: Kysely<Database>, domain: string, ki
     .where('checked_at', '>', new Date(nowMs - RECORD_FRESH_DAYS[kind] * DAY_MS)).where('checked_at', '<=', new Date(nowMs + 60_000))
     .orderBy('checked_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
   return r ? { id: Number(r.id), record: r.record, checkedAt: r.checked_at, evidenceUrl: r.evidence_url, note: r.note, checkedBy: r.checked_by } : null;
+}
+
+/** What `recordsFor` of the daily list reads for many names at once: the newest fresh record per (domain, kind) and the (domain, kind) pairs that have any record. */
+export interface RecordsPrefetch { fresh: Map<string, FreshRecord>; any: Set<string> }
+export const recordKey = (domain: string, kind: RecordKind): string => `${domain}|${kind}`;
+
+/** One statement per kind (distinct on domain) for the fresh records, one for the existing kinds: the same answers as `freshDomainRecord` per name. */
+export async function prefetchDomainRecords(db: Kysely<Database>, domains: string[], nowMs: number): Promise<RecordsPrefetch> {
+  const out: RecordsPrefetch = { fresh: new Map(), any: new Set() };
+  if (domains.length === 0) return out;
+  for (const kind of RECORD_KINDS) {
+    const rows = await db.selectFrom('domain_records').selectAll().where(sql<boolean>`domain = any(${domains})`).where('kind', '=', kind)
+      .where('checked_at', '>', new Date(nowMs - RECORD_FRESH_DAYS[kind] * DAY_MS)).where('checked_at', '<=', new Date(nowMs + 60_000))
+      .orderBy('domain').orderBy('checked_at', 'desc').orderBy('id', 'desc').execute();
+    for (const r of rows) {
+      const k = recordKey(r.domain, kind);
+      if (!out.fresh.has(k)) out.fresh.set(k, { id: Number(r.id), record: r.record, checkedAt: r.checked_at, evidenceUrl: r.evidence_url, note: r.note, checkedBy: r.checked_by });
+    }
+  }
+  for (const r of await db.selectFrom('domain_records').select(['domain', 'kind']).distinct().where(sql<boolean>`domain = any(${domains})`).execute()) out.any.add(recordKey(r.domain, r.kind as RecordKind));
+  return out;
 }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { makeApp } from '../../helpers/app.js';
@@ -71,6 +72,25 @@ describe('audit (AL)', () => {
     });
     const [row] = await httpAuditRows();
     expect(row).toMatchObject({ status_code: 422, result_summary: 'VALIDATION_ERROR' });
+  });
+
+  it('AL-4: an array of more than 50 items is recorded as its count and sha256 (any route, nested too); 50 or fewer stay whole', async () => {
+    app = await makeApp();
+    const w = await issueToken('write');
+    const big = Array.from({ length: 51 }, (_, i) => `d${i}.com`);
+    const small = Array.from({ length: 50 }, (_, i) => `d${i}.com`);
+    await app.inject({
+      method: 'POST', url: '/__test/echo', headers: { ...w.auth, 'idempotency-key': 'k-al4' },
+      payload: { value: 'x', names: big, nested: { rows: big, few: small }, approval_ref: approval },
+    });
+    const [row] = await httpAuditRows();
+    const req = row!.request as { names: string; nested: { rows: string; few: string[] } };
+    const hash = createHash('sha256').update(JSON.stringify(big)).digest('hex');
+    expect(req.names).toBe(`[51 items, sha256:${hash}]`);
+    expect(req.nested.rows).toBe(`[51 items, sha256:${hash}]`);
+    expect(req.nested.few).toEqual(small);
+    expect(row!.approval_text).toBe(approval.text);
+    expect(JSON.stringify(row!.request).length).toBeLessThan(1_000);
   });
 
   it('a 401 (no token) writes no audit row and no idempotency row (bots only)', async () => {
