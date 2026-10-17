@@ -1,4 +1,4 @@
-# Endpoints (contract v5.10.0)
+# Endpoints (contract v5.11.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -554,13 +554,15 @@ READ. Query (strict): `version?` (integer ≥ 1; default the newest).
 - **Errors:** 404 `LIST_NOT_FOUND` (unknown name, no such version, or a list nobody has uploaded yet such as `brand`) · 400 `VALIDATION_ERROR`.
 
 ### `GET /selection/namebio`
-READ. `?keywords=a,b,c` (1 to 50 words of letters, digits and hyphens; lower-cased, duplicates dropped; anything else, an empty list or an unknown query key → 400 `VALIDATION_ERROR`). Counts come from the stored nightly cache only: **this route never calls NameBio** (the source is disabled in this release: `sources.namebio` false). 200:
+READ. `?keywords=a,b,c` (1 to 50 words of letters, digits and hyphens; lower-cased, duplicates dropped; anything else, an empty list or an unknown query key → 400 `VALIDATION_ERROR`). Stats come from the stored copies only: **this route never calls NameBio**. Since 5.11.0 (CR-062) the numbers are NameBio's **free** RetailStats (keyword aggregates, retail sales of $100 or more; never per-sale rows), stored by the daily `referenceRefresh` step when `sources.namebio` is on (off by default; turning it on is a settings activation with Dvir's OK). 200:
 ```
-{ cache_date: "YYYY-MM-DD"|null, data_as_of: "YYYY-MM-DD"|null, source: "nightly_csv", attribution: "Data from NameBio", stale?: bool,
+{ cache_date: "YYYY-MM-DD"|null, data_as_of: "YYYY-MM-DD"|null, source: "namebio_free",
+  attribution: "Data from NameBio", attribution_url: "https://namebio.com", stale?: bool,
   status?: "UNKNOWN", reason_code?: "STALE_DATA"|"SOURCE_DISABLED",
-  keywords: { <word>: { start_count, end_count, exact_count } | null } }
+  keywords: { <word>: { start_count, end_count, exact_count, middle_count, fetched_at,
+                        placements: { exact|start|end|middle: { sale_count, price_sum, price_avg, price_max, price_stddev } } } | null } }
 ```
-A missing or too old cache (`namebio.max_cache_age_hours`) is 200 with `stale: true`, `status: "UNKNOWN"`, `reason_code: "STALE_DATA"` and every count null; the disabled source is `SOURCE_DISABLED`. A word not in the cache is `null`. Show `attribution` on any card that uses the numbers.
+`data_as_of` is the fetch date of the oldest requested keyword that is stored (none stored: the newest fetch date of the table; empty table: null). Older than `namebio.max_cache_age_hours`, or empty, is 200 with `stale: true`, `status: "UNKNOWN"`, `reason_code: "STALE_DATA"`; the disabled source is `SOURCE_DISABLED` (every keyword null). A word not stored is `null`. The `*_count` fields are the placement `sale_count`s (kept from earlier versions; `source` changed from `nightly_csv` to `namebio_free`). Every response carries `attribution` and `attribution_url`; show them on any card that uses the numbers.
 
 ### `POST /selection/sibling-scan`
 WRITE (CR-050 part 1, 4.1.0). Body (strict): `{domains: [string]}`, 1 to 20 names, each a second-level `.com` name (case and a trailing dot are normalised; duplicates are scanned once). A name that is not a valid `.com` name refuses the whole call before anything is fetched. Idempotent (`Idempotency-Key`) and audited. Scans each name in turn and stores one scan per name (append-only table `sibling_scans`, with `fetched_at`).

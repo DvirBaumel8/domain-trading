@@ -6,5 +6,5 @@ Nightly backend job (selection v9.1 C20; DR-002 V9-07) writes:
 - `retailstats-YYYYMMDD.csv`
 - `tldstats-YYYYMMDD.csv` (when available)
 
-Files are never deleted. `/comps/keyword` serves from this cache with `cache_date`.
-**Bots and agents are forbidden** to call the NameBio retailstats-download URL.
+Superseded by CR-062 (v5.11.0): the service fetches the free files itself (`api.namebio.com/retailstats-download`, `/tldstats-download`) into the database; see `docs/internal/sources.md`.
+Bots and agents still never call NameBio directly.

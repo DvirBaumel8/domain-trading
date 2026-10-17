@@ -11,7 +11,7 @@ export { surblCheck } from './checks/surbl.js';
 export { latestByCheck } from './derive.js';
 export { KEPT_LANES, type KeptLane, laneFitter } from './lane-fit.js';
 export { assemble, createRun, effectiveHold, fullPlanRunOrThrow, HEARTBEAT_STALE_MS, type InputName, loadRows, ScreeningWorker, toResultRow } from './engine.js';
-export { NAMEBIO_NAME, refreshNameBio } from './namebio.js';
+export { refreshNameBio } from './namebio.js';
 export { regimeDigitsOk } from './form.js';
 export { currentLists } from './lists.js';
 export { latestPackFor } from './pack.js';

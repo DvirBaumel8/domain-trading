@@ -4,7 +4,7 @@ import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { RegistrarError } from '../../../src/modules/registrars/types.js';
-import { NAMEBIO_NAME } from '../../../src/modules/selection/namebio.js';
+import { parseRetailStatsCsv } from '../../../src/modules/selection/namebio.js';
 import { POPULARITY_NAME, parsePopularityCsv } from '../../../src/modules/selection/popularity.js';
 import { outcome, type Check, type CheckId } from '../../../src/modules/selection/types.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
@@ -79,10 +79,10 @@ describe('typo (CAP-02, TYPO-1)', () => {
 
 describe('namebio (CAP-11)', () => {
   const seedNameBio = async (ageDays: number, clockT: number) => {
-    await db.insertInto('reference_files').values({
-      name: NAMEBIO_NAME, source_url: 'file', fetched_at: new Date(clockT - ageDays * DAY), data_date: new Date(clockT - ageDays * DAY).toISOString().slice(0, 10), sha256: 'n'.padEnd(64, '0'),
-      bytes: sample.length, body_gz: gzipSync(Buffer.from(sample)), same_as_id: null,
-    }).execute();
+    const at = new Date(clockT - ageDays * DAY);
+    await db.insertInto('namebio_keyword_stats').values([...parseRetailStatsCsv(sample)].map(([keyword, placements]) => ({
+      keyword, placements: JSON.stringify(placements), source: 'namebio_free', source_url: 'https://namebio.com/file.csv', fetched_at: at,
+    })) as never).execute();
   };
   const on = async (x: ScreeningHarness) => { await x.post('/selection/settings', { label: 'v1n', set: { 'sources.namebio': true } }); return { mode: 'full', settings: 'v1n' }; };
   const geo = (trade: string) => ({ domain: `tulsa${trade}.com`, lane: 'S2', city: 'tulsa', state: 'ok', trade });
@@ -135,7 +135,7 @@ describe('GET /selection/namebio', () => {
     const x = await h();
     const r = await x.get('/selection/namebio?keywords=Plumbing,roofing');
     expect(r.statusCode).toBe(200);
-    expect(r.json()).toMatchObject({ stale: true, status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED', source: 'nightly_csv', attribution: 'Data from NameBio', keywords: { plumbing: null, roofing: null } });
+    expect(r.json()).toMatchObject({ stale: true, status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED', source: 'namebio_free', attribution: 'Data from NameBio', attribution_url: 'https://namebio.com', keywords: { plumbing: null, roofing: null } });
   });
 });
 

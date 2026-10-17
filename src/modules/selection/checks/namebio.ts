@@ -19,12 +19,12 @@ export const namebioCheck: Check = {
   ruleIds: ['CAP-11', 'SCORE-D'],
   lists: [],
   async run(ctx) {
-    const nul = { keywords: {}, retail_start: null, retail_end: null, geo_d_raw: null, cache_date: null, attribution: ctx.settings.namebio.attribution };
+    const nul = { keywords: {}, retail_start: null, retail_end: null, geo_d_raw: null, cache_date: null, attribution: ctx.settings.namebio.attribution, attribution_url: 'https://namebio.com' };
     if (!ctx.settings.sources.namebio) return outcome('UNKNOWN', 'SOURCE_DISABLED', 'NameBio is switched off (sources.namebio)', nul);
     const kws = namebioKeywords(ctx);
     if (kws.length === 0) return outcome('UNKNOWN', 'NO_KEYWORDS', 'The name has no keyword to look up', nul);
     const r = await keywordCounts(ctx.db, kws, ctx.settings, ctx.now);
-    const fields = { ...nul, keywords: r.stats, cache_date: r.cache_date, attribution: r.attribution, source: r.source };
+    const fields = { ...nul, keywords: r.stats, cache_date: r.cache_date, attribution: r.attribution, attribution_url: r.attribution_url, source: r.source };
     const asOf = r.cache_date ? new Date(`${r.cache_date}T00:00:00Z`) : null;
     if (r.cache_date === null || r.stale) return outcome('UNKNOWN', 'STALE_DATA', 'The NameBio cache is missing or older than namebio.max_cache_age_hours', fields, { dataAsOf: asOf });
     const first = r.stats[kws[0]!] ?? null;

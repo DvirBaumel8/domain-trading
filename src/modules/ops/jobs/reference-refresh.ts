@@ -1,11 +1,11 @@
-// Daily step `referenceRefresh`: popularity list (TYPO-1), NameBio (disabled stub), IANA RDAP bootstrap, cache pruning.
+// Daily step `referenceRefresh`: popularity list (TYPO-1), NameBio (free endpoints, CR-062), IANA RDAP bootstrap, cache pruning.
 // Read-only toward the outside world: one GET per source per day, honest User-Agent, no registrar or marketplace call, never a
 // create or top-up. Each sub-step is isolated; a failure keeps the previous snapshot and is reported in `errors` (the runner
 // shows the step as failed). Nothing here is on a request path: checks only read the stored copies.
 import { trySessionLock } from '../../../core/locks.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../../db/types.js';
-import { refreshNameBio, NAMEBIO_NAME } from '../../selection/index.js';
+import { refreshNameBio } from '../../selection/index.js';
 import { rdapBaseFor } from '../../selection/index.js';
 import { activeSelectionSettings } from '../../selection/index.js';
 import { refreshPopularity } from '../../selection/index.js';
@@ -38,7 +38,7 @@ export class ReferenceRefreshJob {
         }
       };
       const popularity = await sub('popularity', () => refreshPopularity(db, screening, s, now));
-      const namebio = await sub('namebio', () => refreshNameBio(db, screening, s));
+      const namebio = await sub('namebio', () => refreshNameBio(db, screening, s, now));
       const iana = await sub('iana', async () => {
         if (!s.sources.iana_bootstrap) return { skipped: true, reason: 'SOURCE_DISABLED' };
         const newest = () => db.selectFrom('reference_files').select(['id', 'fetched_at']).where('name', '=', 'iana_rdap_dns').orderBy('id', 'desc').limit(1).executeTakeFirst();
@@ -57,11 +57,11 @@ export class ReferenceRefreshJob {
     }
   }
 
-  /** rdap_lookups older than 30 days; reference_files beyond the newest 10 per name (NameBio snapshots are kept for good, C20). */
+  /** rdap_lookups older than 30 days; reference_files beyond the newest 10 per name. */
   private async prune(): Promise<number> {
     const { db, now } = this.deps;
     const lookups = await db.deleteFrom('rdap_lookups').where('checked_at', '<', new Date(now() - RDAP_LOOKUP_KEEP_DAYS * 86_400_000)).executeTakeFirst();
-    const rows = await db.selectFrom('reference_files').select(['id', 'name', 'same_as_id']).where('name', '!=', NAMEBIO_NAME).orderBy('fetched_at', 'desc').orderBy('id', 'desc').execute();
+    const rows = await db.selectFrom('reference_files').select(['id', 'name', 'same_as_id']).orderBy('fetched_at', 'desc').orderBy('id', 'desc').execute();
     const seen = new Map<string, number>();
     const keep = new Set<string>();
     for (const r of rows) {

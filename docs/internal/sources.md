@@ -11,7 +11,7 @@ Summary
 | Majestic Million | CAP-02 TYPO-1 | **enabled** (CC BY 3.0; replaces Tranco) | 1 download per day, first N rows only |
 | Tranco | CAP-02 TYPO-1 | **not used** (no licence of its own, CC BY-NC upstream) | none |
 | SURBL `multi` | CAP-05 | enabled | <= 5 queries/s, control lookup per batch |
-| NameBio | CAP-11 | **disabled, UNVERIFIED** | none |
+| NameBio | CAP-11 | **free endpoints only (CR-062, v5.11.0); `sources.namebio` off until Dvir turns it on** | free endpoints need no auth; attribution required |
 | Internet Archive CDX | CAP-07 | **disabled pending written permission** (terms: "scholarship and research purposes only"; Dvir 6 Oct) | <= 1 request/s |
 | IANA RDAP bootstrap | CAP-03 | enabled | 1 fetch per day |
 | Verisign RDAP (.com, .net) | CAP-03 | enabled | <= 1 query/s, back off on 429 |
@@ -69,6 +69,7 @@ Summary
 - **Decision:** `enabled`. **Pacing:** <= 5 queries/s in total, rotate over the ten servers, one control lookup per batch, no repeat lookups inside the cache window.
 
 ## NameBio
+- **Update (17 Oct 2026, CR-062, v5.11.0):** NameBio's docs (https://api.namebio.com/docs/, updated 2026-07-18) say the free endpoints "are available to everyone at no cost and require no authentication. You may incorporate this data into other products and services, but attribution is required"; the paid API may not be used without written permission. DOM now calls only POST `api.namebio.com` `/retailstats`, `/tldstats`, `/verisign` and GET `/retailstats-download`, `/tldstats-download`, `/verisign-download` (Gavriel confirmed the file URLs). The allow-list is `assertNameBioRequest` in `src/modules/selection/namebio.ts`; limits: retailstats and tldstats 4 a minute, verisign 5 calls per 24 h and 100 domains a call; a rate-limit answer waits 60 s, one retry. Rows keep `source = namebio_free`, the URL and `fetched_at`; responses carry `Data from NameBio` and https://namebio.com. The 6 Oct text below is history (the 403 block seen then and the unverified terms); the synthetic sample CSV now uses the DOM-defined header `keyword,<placement>_sale_count,...` and the RetailStats POST/answer shapes are assumed from the docs (G-106).
 - **URLs tried:** `https://namebio.com/`, `/terms`, `/terms-of-service`, `/tos`, `/help`, `/faq`, `/api`, `/data`, `/downloads` (all 2026-10-06, also with the honest User-Agent); `https://archive.org/wayback/available?url=namebio.com/terms` (no snapshot).
 - **Result:** every request answers **HTTP 403** with a Cloudflare "Sorry, you have been blocked" page (Ray ID a4627f965f3cc222); the terms of use, the free CSV download URL, the "1 download per hour" limit, attribution wording and storage rights could **not** be read from the primary source. DOM does not spoof a browser to get around the block.
 - **Status:** **UNVERIFIED.** No terms quote, no URL, no limit known; the "1 download per hour" figure in CR-001 is hearsay.

@@ -1,4 +1,4 @@
-// Daily step referenceRefresh (CAP-02, CAP-11): popularity list, NameBio (disabled stub), IANA bootstrap, pruning. MSW only.
+// Daily step referenceRefresh (CAP-02, CAP-11): popularity list, NameBio (off by default), IANA bootstrap, pruning. MSW only.
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { http, HttpResponse } from 'msw';
@@ -115,7 +115,7 @@ describe('referenceRefresh (daily step)', () => {
     await x.post('/selection/settings', { label: 'v1n', set: { 'sources.namebio': true } });
     for (const trade of ['plumbing', 'solar', 'hvac']) {
       const { body } = await x.runDone({ checks: ['namebio'], mode: 'full', settings: 'v1n', names: [{ domain: `tulsa${trade}.com`, lane: 'S2', city: 'tulsa', state: 'ok', trade }] });
-      expect(body.names[0].results[0]).toMatchObject({ check: 'namebio', status: 'UNKNOWN', reason_code: 'STALE_DATA' }); // enabled, but there is no cache and no fetcher
+      expect(body.names[0].results[0]).toMatchObject({ check: 'namebio', status: 'UNKNOWN', reason_code: 'STALE_DATA' }); // enabled, but nothing is stored yet
     }
     for (let i = 0; i < 3; i++) expect((await x.get('/selection/namebio?keywords=plumbing')).statusCode).toBe(200);
     expect(await app.jobRunner.run('daily')).toMatchObject({ job: 'daily' });
@@ -133,7 +133,7 @@ describe('referenceRefresh (daily step)', () => {
     expect(r.steps.referenceRefresh!.error).toMatch(/iana/);
   });
 
-  it('prune: rdap_lookups over 30 days; reference_files beyond the newest 10 per name (a kept row keeps the body it borrows); NameBio snapshots are kept', async () => {
+  it('prune: rdap_lookups over 30 days; reference_files beyond the newest 10 per name (a kept row keeps the body it borrows)', async () => {
     clock.t = Date.parse('2026-10-06T08:00:00Z');
     serve(() => csv);
     const gz = gzipSync(Buffer.from('1,google.com'));
@@ -143,7 +143,6 @@ describe('referenceRefresh (daily step)', () => {
     const oldest = await ins('popularity_list', 100, 'a', gz, null); // the body that newer rows borrow
     for (let i = 0; i < 11; i++) await ins('popularity_list', 50 - i, `b${i}`, gz, null);
     const borrower = await ins('popularity_list', 0.5, 'a', null, Number(oldest.id)); // newest: kept, borrows the oldest body: must survive
-    for (let i = 0; i < 12; i++) await ins('namebio_retailstats', 90 - i, `n${i}`, gz, null);
     await db.insertInto('rdap_lookups').values([
       { domain: 'old.com', outcome: 'registered', checked_at: new Date(clock.t - 31 * DAY) },
       { domain: 'new.com', outcome: 'registered', checked_at: new Date(clock.t - 29 * DAY) },
@@ -152,8 +151,7 @@ describe('referenceRefresh (daily step)', () => {
     const s = r.steps.referenceRefresh!.summary as { pruned: number };
     const pop = await db.selectFrom('reference_files').select('id').where('name', '=', 'popularity_list').execute();
     const names = new Map((await db.selectFrom('reference_files').select('name').execute()).map((x) => [x.name, 0]));
-    expect(names.has('namebio_retailstats')).toBe(true);
-    expect(await db.selectFrom('reference_files').select('id').where('name', '=', 'namebio_retailstats').execute()).toHaveLength(12);
+    expect(names.size).toBeGreaterThan(0);
     expect(pop.map((x) => Number(x.id))).toContain(Number(oldest.id)); // borrowed by a kept row
     expect(pop.map((x) => Number(x.id))).toContain(Number(borrower.id));
     expect((await db.selectFrom('rdap_lookups').select('domain').execute()).map((x) => x.domain)).toEqual(['new.com']);

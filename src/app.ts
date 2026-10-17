@@ -191,6 +191,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     resolve4: (host) => dns.promises.resolve4(host),
     webRiskApiKey: deps.config.webRiskApiKey,
     companiesHouseApiKey: deps.config.companiesHouseApiKey,
+    namebio: { ...(deps.config.namebio.retailstatsCsvUrl && { retailstatsCsvUrl: deps.config.namebio.retailstatsCsvUrl }), ...(deps.config.namebio.tldstatsCsvUrl && { tldstatsCsvUrl: deps.config.namebio.tldstatsCsvUrl }), ...(deps.config.namebio.dropOrderUrl && { dropOrderUrl: deps.config.namebio.dropOrderUrl }) },
     ...deps.screening,
   };
   registerDemand(app, { db: deps.db, now: deps.now ?? Date.now });

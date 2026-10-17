@@ -1154,6 +1154,26 @@ export interface ReferenceFilesTable {
   same_as_id: string | null;
 }
 
+export interface NamebioKeywordStatsTable {
+  keyword: string;
+  placements: Json;
+  source: string;
+  source_url: string;
+  fetched_at: Timestamp;
+}
+export interface NamebioTldStatsTable {
+  tld: string;
+  stats: Json;
+  source: string;
+  source_url: string;
+  fetched_at: Timestamp;
+}
+export interface NamebioCallsTable {
+  id: Generated<string>;
+  kind: 'retailstats' | 'tldstats' | 'verisign' | 'verisign_file';
+  called_at: Timestamp;
+}
+
 export interface ManualQuotesTable {
   id: Generated<string>;
   domain: string;
@@ -1210,6 +1230,9 @@ export interface Database {
   manual_quotes: ManualQuotesTable;
   rdap_lookups: RdapLookupsTable;
   reference_files: ReferenceFilesTable;
+  namebio_keyword_stats: NamebioKeywordStatsTable;
+  namebio_tld_stats: NamebioTldStatsTable;
+  namebio_calls: NamebioCallsTable;
   job_runs: JobRunsTable;
   job_queue_runs: JobQueueRunsTable;
   job_steps: JobStepsTable;

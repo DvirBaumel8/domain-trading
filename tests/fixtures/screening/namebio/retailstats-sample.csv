@@ -1,6 +1,6 @@
-keyword,start_count,end_count,exact_count,avg_price_usd
-plumbing,73,22,4,1450
-roofing,41,38,2,1200
-solar,1,1,0,
-audit,5,19,1,900
-hvac,3,8,0,
+keyword,exact_sale_count,start_sale_count,end_sale_count,middle_sale_count,start_price_avg,exact_price_avg
+plumbing,4,73,22,10,1450,2100
+roofing,2,41,38,7,1200,1800
+solar,0,1,1,0,,
+audit,1,5,19,3,900,1500
+hvac,0,3,8,1,,

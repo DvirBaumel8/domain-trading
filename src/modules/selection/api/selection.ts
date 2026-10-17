@@ -15,7 +15,7 @@ import { currentSettings } from '../../listing/index.js';
 import { requireNamedApproval } from '../approval.js';
 import { namesToken } from '../../../core/approval.js';
 import { isCensusListName, isFixedList, listVersion, writeList, FIXED_LISTS } from '../lists.js';
-import { keywordCounts } from '../namebio.js';
+import { keywordCounts, NAMEBIO_ATTRIBUTION_URL, NAMEBIO_SOURCE } from '../namebio.js';
 import { evaluateMoney, syllableCount } from '../money.js';
 import {
   LABEL_RE, LANES, activate, deepEqual, activeSelectionSettings, createDraft, listSelectionVersions, selectionSettingsByLabel,
@@ -166,7 +166,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     return { name: r.name, version: r.version, terms: r.terms, created_at: iso(r.created_at), created_by: r.created_by };
   });
 
-  // NameBio keyword counts from the nightly cache only: this route never calls NameBio (CAP-11 #4, SEL9-13).
+  // NameBio keyword stats (free endpoints, CR-062) from the nightly cache only: this route never calls NameBio (CAP-11 #4, SEL9-13).
   app.get('/selection/namebio', async (req) => {
     const q = z.object({ keywords: z.string() }).strict().safeParse(req.query);
     const kws = q.success ? [...new Set(q.data.keywords.split(',').map((k) => k.trim().toLowerCase()).filter((k) => k !== ''))] : [];
@@ -176,11 +176,11 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
     const sel = (await activeSelectionSettings(db)).values;
     const attribution = sel.namebio.attribution;
     if (!sel.sources.namebio) {
-      return { cache_date: null, data_as_of: null, source: 'nightly_csv', attribution, stale: true, status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED', keywords: Object.fromEntries(kws.map((k) => [k, null])) };
+      return { cache_date: null, data_as_of: null, source: NAMEBIO_SOURCE, attribution, attribution_url: NAMEBIO_ATTRIBUTION_URL, stale: true, status: 'UNKNOWN', reason_code: 'SOURCE_DISABLED', keywords: Object.fromEntries(kws.map((k) => [k, null])) };
     }
     const r = await keywordCounts(db, kws, sel, deps.now);
-    const keywords = Object.fromEntries(kws.map((k) => { const x = r.stats[k] ?? null; return [k, x && { start_count: x.start_count, end_count: x.end_count, exact_count: x.exact_count }]; }));
-    const base = { cache_date: r.cache_date, data_as_of: r.cache_date, source: r.source, attribution: r.attribution, keywords };
+    const keywords = Object.fromEntries(kws.map((k) => { const x = r.stats[k] ?? null; return [k, x && { start_count: x.start_count, end_count: x.end_count, exact_count: x.exact_count, middle_count: x.middle_count, placements: x.placements, fetched_at: x.fetched_at }]; }));
+    const base = { cache_date: r.cache_date, data_as_of: r.cache_date, source: r.source, attribution: r.attribution, attribution_url: r.attribution_url, keywords };
     return r.cache_date === null || r.stale ? { ...base, stale: true, status: 'UNKNOWN', reason_code: 'STALE_DATA' } : { ...base, stale: false };
   });
 

@@ -90,6 +90,9 @@ The daily `retention` step (`src/modules/ops/jobs/retention.ts`) deletes old dat
 ## Deploys (since 7 Oct 2026)
 Render deploys **every push to `main` after the GitHub `ci` workflow passes** (`autoDeployTrigger: checksPass`). A `vX.Y.Z` tag marks a release; the `release` workflow checks that it matches package.json and the CHANGELOG, and runs the tests. `RENDER_DEPLOY_HOOK` is no longer needed. To deploy manually: Render dashboard → Manual Deploy, or the Render API.
 
+## NameBio free data (CR-062, v5.11.0)
+Off by default (`sources.namebio` false; turning it on is a settings activation with Dvir's OK). Env, all optional, in `prod.env` / Render: `NAMEBIO_RETAILSTATS_CSV_URL=https://api.namebio.com/retailstats-download`, `NAMEBIO_TLDSTATS_CSV_URL=https://api.namebio.com/tldstats-download`, `NAMEBIO_DROP_ORDER_URL=https://api.namebio.com/verisign-download` (the free files, each fetched at most once a day; defaults in `.env.example`). With the RetailStats URL empty, the daily `referenceRefresh` step asks the free per-keyword endpoint for candidate-pool keywords (at most 20 a night, 4 a minute; request counts persist in `namebio_calls`). Only `api.namebio.com` `/retailstats`, `/tldstats`, `/verisign` (POST) and the three `-download` files (GET) are ever called; the paid API never. Check the step's `namebio` summary in `GET /jobs/runs` (`rows_written`, `file_bytes`, `db_bytes_before/after`) against the 0.5 GB limit.
+
 ## Local host (CR-041, Dvir 12 Oct 2026): production on the Mac mini while Render is suspended
 Render suspended the free service on 11 Oct (the workspace's 750 free hours ran out). Until it resumes (about 1 Nov), the API runs on Dvir's Mac mini. **Dvir sets it up and starts it; DOM only wrote the kit and never reads the env file or calls the server (CLAUDE.md HARD RULE). Gavriel verifies.** Same database (Neon), same secrets, so nothing is copied or migrated.
 

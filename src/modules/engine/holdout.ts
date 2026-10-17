@@ -19,7 +19,7 @@ export async function setSalesMaxDate(db: Kysely<Database>, date: string, ref: {
   return db.transaction().execute(async (trx) => {
     const s = await trx.selectFrom('settings').select(['engine_sales_max_date', 'approval_max_age_hours']).forUpdate().executeTakeFirstOrThrow();
     const a = checkApproval(ref, date, now, s.approval_max_age_hours);
-    if (!a.ok) throw new AppError(422, a.code, a.reason);
+    if (!a.ok) throw new AppError(422, a.code, a.reason.replace('name the domain', 'name the date'));
     await trx.updateTable('settings').set({ engine_sales_max_date: date, updated_at: now }).execute();
     return { previous: s.engine_sales_max_date, date, approved_at: a.approvedAt.toISOString() };
   });

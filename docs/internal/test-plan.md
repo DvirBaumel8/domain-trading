@@ -66,7 +66,7 @@ Defined in `selection.md` §7 (SEL-1–SEL-4, SEL3-*, SEL4-*, SEL5-*, SEL6-*, SE
 | CR-001 CAP-06/08 (manual) | `screening-manual.test.ts`, `screening-runs.test.ts` (phrases) |
 | CR-002 CAP-07 #1-#4 (+ CR-001 CAP-07 #2, #3, #8; Amendment A1/A2) | `screening-history.test.ts` (api and unit) |
 | CR-002 CAP-10 #1-#3 | `screening-registry.test.ts`, `screening-money-checks.test.ts` |
-| CR-001 CAP-11 #1-#3, #5, #6 | `tests/modules/selection/unit/screening-namebio.test.ts`, `reference-refresh.test.ts` |
+| CR-001 CAP-11 #1-#3, #5, #6 | `tests/modules/selection/screening-money-checks.test.ts`, `reference-refresh.test.ts`; CR-062 NB-1..NB-15: `tests/modules/selection/namebio-free.test.ts` |
 | CR-002 CAP-12 | `screening-registry.test.ts` |
 | CR-001 CAP-17 | `screening-money-checks.test.ts`, `screening-manual.test.ts` |
 | CR-001 CAP-18 #1-#8, CR-002 CAP-18, section 5.3 | `tests/modules/selection/unit/screening-money.test.ts`, `selection-evaluate.test.ts` |

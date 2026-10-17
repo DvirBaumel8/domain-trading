@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.11.0 (2026-10-17): CR-062 NameBio free endpoints only, with attribution; GET /selection/namebio serves RetailStats placement stats
+Release note: `docs/releases/v5.11.0.md`.
+MINOR (additive fields; `source` value changes). Gavriel, CR-062 (approved by Dvir 2026-10-17 03:07 and 03:18 IDT).
+- **Changed (`GET /selection/namebio`):** the numbers are NameBio's free RetailStats: per keyword `start_count`, `end_count`, `exact_count` (kept), plus `middle_count`, `fetched_at` and `placements {exact|start|end|middle: {sale_count, price_sum, price_avg, price_max, price_stddev}}`. `source` is now `"namebio_free"` (was `"nightly_csv"`). New field `attribution_url: "https://namebio.com"` next to `attribution: "Data from NameBio"` on every response, also `SOURCE_DISABLED`. `data_as_of` is the fetch date of the oldest requested keyword that is stored. `stale` follows `namebio.max_cache_age_hours` as before. The same `attribution_url`, `middle_count`, `placements`, `fetched_at` appear in the `namebio` check's `fields`.
+- **Changed (daily `referenceRefresh` step):** while `sources.namebio` is on it fetches NameBio data (off by default, so nothing changes until Dvir turns it on): the free files `api.namebio.com/retailstats-download` and `/tldstats-download` (env `NAMEBIO_RETAILSTATS_CSV_URL`, `NAMEBIO_TLDSTATS_CSV_URL`, each at most once a day), else per-keyword `POST /retailstats` for candidate-pool keywords not cached within 24 h (at most 20 a night, 4 a minute). The `namebio` summary is `{mode, rows_written, file_bytes, requests, keywords_pending, errors[], db_bytes_before, db_bytes_after}`.
+- **Allow-list (R-1, R-2):** only POST `api.namebio.com` `/retailstats`, `/tldstats`, `/verisign` and GET `/retailstats-download`, `/tldstats-download`, `/verisign-download` are ever called; any other host or path is refused before a request is sent. Rate limits in code and persisted: retailstats and tldstats 4 a minute, verisign 5 per 24 h and 100 domains a call; HTTP 429 waits 60 s and retries once. `NAMEBIO_DROP_ORDER_URL` (the drop-order file, at most once a day) is parsed but no daily step uses it yet.
+- **Stored (R-4, R-5):** tables `namebio_keyword_stats` (`source = namebio_free`, `source_url`, `fetched_at`), `namebio_tld_stats`, `namebio_calls`. Nothing goes into `engine_sales`.
+- **Unchanged:** `sources.namebio` stays false (R-6). No settings change, no new `pricing_settings` or selection settings version.
+- **Migration:** `1764400000000_v5-11-0.sql`. New optional env: `NAMEBIO_RETAILSTATS_CSV_URL`, `NAMEBIO_TLDSTATS_CSV_URL`, `NAMEBIO_DROP_ORDER_URL`.
+
 ## 5.10.0 (2026-10-17): CR-061 `data` token scope, holdout guard on engine uploads, DB size in upload answers
 Release note: `docs/releases/v5.10.0.md`.
 MINOR (additive). Gavriel for Dvir, CR-061 (approved by Dvir 2026-10-17 03:07 and 03:18 IDT).
