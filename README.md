@@ -13,8 +13,9 @@ A backend service (HTTP API + Postgres, no frontend) for a small domain-trading 
 1. `npm install`
 2. `npm run db:up` (Postgres 16 in docker on port 5433; creates `domain_trading` and `domain_trading_test`)
 3. `cp .env.example .env` (fake/blank keys are fine for local work)
-4. `npm run migrate up`
-5. `npm run admin -- token create --scope write --name dvir-local` (printed once)
+4. `npm run migrate up` (Node 24 LTS; `.nvmrc`)
+5. `npm run build`, then `npm run admin -- token create --scope write --name dvir-local` (printed once)
+(`npm run admin` and `npm run job` run the compiled `dist/`, so `tsx` is a dev dependency only; rebuild after editing code, or use `npm run admin:dev` / `npm run job:dev` to run from source.)
 6. `npm run dev` serves the API only; nothing runs on timers. Run scheduled work with `npm run job -- tick` or `npm run job -- daily` (the same runner as `POST /jobs/run`). Check `curl localhost:3000/health/ping` and `curl -H "Authorization: Bearer $TOKEN" localhost:3000/health` (every route except `/health/ping` needs a token).
 
 Tests: `npx vitest run && npx tsc --noEmit && npm run build` (unit + API + the contract-doc check; needs the docker Postgres from step 2). Network is blocked in tests.

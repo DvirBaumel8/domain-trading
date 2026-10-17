@@ -1,5 +1,7 @@
 # Deployment (free: Render + Neon + Cloudflare Worker)
 
+> **Status (17 Oct 2026):** this page is the one-time setup for the Render hosting. Production currently runs on Dvir's Mac mini (CR-041, until Render resumes, about 1 Nov 2026): see `docs/runbook.md` "Local host" and `scripts/local-host/`. The Neon database, the Cloudflare Worker cron and the data repo steps below apply to both hosts. Only one server (Mac or Render) may run at a time. The runtime is Node 26 LTS (`package.json` engines, `.nvmrc`, `render.yaml` NODE_VERSION). `npm run admin` and `npm run job` run the compiled `dist/`: run `npm run build` first in a source checkout (or use `npm run admin:dev`).
+
 Everything runs at $0/month, the same pattern as trader and sapako.
 
 | Piece | Host | Config |

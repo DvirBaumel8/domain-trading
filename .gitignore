@@ -18,6 +18,9 @@ coverage/
 *.tsbuildinfo
 .vitest/
 
+# Local agent scratch
+.superpowers/
+
 # OS / editors
 .DS_Store
 .idea/

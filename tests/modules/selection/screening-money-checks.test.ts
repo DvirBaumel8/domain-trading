@@ -13,6 +13,7 @@ import { createV3 } from '../../helpers/pricing.js';
 import { screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
 
 const DAY = 86_400_000;
+const T0 = Date.parse('2026-10-06T08:00:00Z'); // the harness's own fixed clock: nothing here depends on the wall clock
 const csv = readFileSync(new URL('../../fixtures/screening/majestic-million-top.csv', import.meta.url), 'utf8');
 const sample = readFileSync(new URL('../../fixtures/screening/namebio/retailstats-sample.csv', import.meta.url), 'utf8');
 let app: FastifyInstance | undefined;
@@ -152,8 +153,8 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
   const checks = ['form', 'history', 'census', 'ext_dates', 'tier', 'quote', 'price'];
 
   it('a fresh name, tier A, Porkbun $11.08 / $11.08 at $1,488: ratios 2.28 / 1.48, PASS, would_buy while buy_hold is on', async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun', { capabilities: { afternicFastTransfer: true } })], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun', { capabilities: { afternicFastTransfer: true } })], rdap });
+    await createV3(db, T0);
     withFakes(x);
     const { body } = await x.runDone({ checks, names: [nonGeo(name, { bin_usd: 1488 })] });
     const n = body.names[0];
@@ -171,8 +172,8 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
   });
 
   it('ranking is exact: tier order (A, I, B), then short names first, then score', async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun', { quote: { firstYearCents: 500, renewalCents: 500 } })], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun', { quote: { firstYearCents: 500, renewalCents: 500 } })], rdap });
+    await createV3(db, T0);
     // domain -> [registered_share, prior_history, alt_tld_before_n, word_count, sld_len, short]; the checks are fakes so each name's tier and form are set.
     const T: Record<string, [number, number, number, number, number, 0 | 1]> = {
       'atierb.com': [0.6, 0, 0, 2, 9, 0],   // tier B
@@ -198,8 +199,8 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
   });
 
   it('history FLAG with share 0.65: tier A is PASS_WITH_NOTE TIER_FROM_FLAGGED_INPUT, tier_exact false, flagged_inputs lists history', async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun')], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun')], rdap });
+    await createV3(db, T0);
     withFakes(x);
     x.app.screeningWorker.checks.history = fake('history', 'G6', { prior_history: 1 }, 'FLAG');
     const { body } = await x.runDone({ checks, names: [nonGeo(name, { bin_usd: 1488 })] });
@@ -213,8 +214,8 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
   });
 
   it('the s6_regime_audit pattern (census 0.20, prior 1, alt 0): tier FAIL DEMAND2_FAIL (CR-002 CAP-10 #2); price still computed from the facts it has', async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun')], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun')], rdap });
+    await createV3(db, T0);
     withFakes(x, { share: 0.2, prior: 1, alt: 0 });
     const { body } = await x.runDone({ checks, names: [nonGeo(name, { bin_usd: 1488 })] });
     expect(res(body.names[0], 'tier')).toMatchObject({ status: 'FAIL', reason_code: 'DEMAND2_FAIL', fields: { tier: 'none', demand2: 'FAIL' } });
@@ -223,16 +224,16 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
   });
 
   it('a missing feature (history not run) leaves DEMAND-2 undecided: UNKNOWN DEMAND2_UNDECIDED', async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun')], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun')], rdap });
+    await createV3(db, T0);
     withFakes(x);
     const { body } = await x.runDone({ checks: ['form', 'tier'], names: [nonGeo(name, { bin_usd: 1488 })] });
     expect(res(body.names[0], 'tier')).toMatchObject({ status: 'UNKNOWN', reason_code: 'DEMAND2_UNDECIDED' });
   });
 
   it('an adapter error: quote UNKNOWN SOURCE_ERROR, never a manual fallback, renewal never 0; price needs a quote', async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun', { error: new RegistrarError('porkbun', 'REGISTRAR_UNAVAILABLE', 'down') })], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun', { error: new RegistrarError('porkbun', 'REGISTRAR_UNAVAILABLE', 'down') })], rdap });
+    await createV3(db, T0);
     withFakes(x);
     const { body } = await x.runDone({ checks, names: [nonGeo(name, { bin_usd: 1488 })] });
     expect(res(body.names[0], 'quote')).toMatchObject({ status: 'UNKNOWN', reason_code: 'SOURCE_ERROR', fields: { renewal_cents: null } });
@@ -246,8 +247,8 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
 
   it('a management-only registrar (no quote access) may be quoted by hand: fallback_reason REGISTRAR_NOT_MACHINE_QUOTABLE; a machine-quotable registrar may not', async () => {
     const gd = new FakeAdapter('godaddy', { capabilities: { canQuote: false, canRegister: false, afternicFastTransfer: true } });
-    const x = await h({ start: Date.now(), adapters: [gd], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [gd], rdap });
+    await createV3(db, T0);
     withFakes(x);
     await x.post('/quotes/manual', { domain: name, registrar: 'godaddy', renewal_usd: 12.99, first_year_usd: 9.99, source_note: 'renewal page', observed_at: new Date(x.clock.t - DAY).toISOString() });
     const { body } = await x.runDone({ checks: ['quote'], names: [nonGeo(name, { bin_usd: 1488 })] });
@@ -255,8 +256,8 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
   });
 
   it('a manual quote for a registrar that can be machine-quoted is ignored (porkbun taken name: no winner, no fallback)', async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun', { quote: { available: false } })], rdap: async () => 'registered' });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun', { quote: { available: false } })], rdap: async () => 'registered' });
+    await createV3(db, T0);
     await x.post('/quotes/manual', { domain: name, registrar: 'porkbun', renewal_usd: 12.99, first_year_usd: 9.99, source_note: 'by hand', observed_at: new Date(x.clock.t - DAY).toISOString() });
     const { body } = await x.runDone({ checks: ['quote'], names: [nonGeo(name, { bin_usd: 1488 })] });
     expect(res(body.names[0], 'quote')).toMatchObject({ status: 'UNKNOWN', reason_code: 'NO_QUOTE' });
@@ -264,14 +265,14 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
 
   it('a cheaper Cloudflare adapter never wins (the database refuses it in allowed_registrars; the check also filters it): the next live quote is used (founder rule 5)', async () => {
     const cf = new FakeAdapter('cloudflare', { quote: { firstYearCents: 800, renewalCents: 800 } });
-    const x = await h({ start: Date.now(), adapters: [cf, new FakeAdapter('porkbun')], rdap });
+    const x = await h({ start: T0, adapters: [cf, new FakeAdapter('porkbun')], rdap });
     const { body } = await x.runDone({ checks: ['quote'], names: [nonGeo(name, { bin_usd: 1488 })] });
     expect(res(body.names[0], 'quote')).toMatchObject({ status: 'PASS', fields: { registrar: 'porkbun', quote_source: 'live' } });
   });
 
   it('price judges the quote by its original quoted_at: a live quote over quote.max_age_hours (24) or a manual one over 30 days is UNKNOWN STALE_DATA', async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun')], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun')], rdap });
+    await createV3(db, T0);
     withFakes(x);
     const at = (ms: number) => new Date(x.clock.t - ms).toISOString();
     const base = { registrar: 'porkbun', first_year_cents: 1108, renewal_cents: 1108 };
@@ -287,8 +288,8 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
   });
 
   it('a fresh manual quote is used when no adapter quotes (GoDaddy-style); an old one is not; Cloudflare is never used', async () => {
-    const x = await h({ start: Date.now(), adapters: [], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [], rdap });
+    await createV3(db, T0);
     withFakes(x);
     const q = (extra: object) => x.post('/quotes/manual', { domain: name, registrar: 'godaddy', renewal_usd: 12.99, first_year_usd: 9.99, source_note: 'renewal page', observed_at: new Date(x.clock.t - 2 * DAY).toISOString(), ...extra });
     expect((await q({ observed_at: new Date(x.clock.t - 2 * DAY).toISOString() })).statusCode).toBe(201);
@@ -303,8 +304,8 @@ describe('quote (CAP-17), tier (CAP-24 / DEMAND-2) and price (CAP-18)', () => {
   });
 
   const failure = (code: string, quote: object, bin: number, settings?: object) => async () => {
-    const x = await h({ start: Date.now(), adapters: [new FakeAdapter('porkbun', { quote })], rdap });
-    await createV3(db);
+    const x = await h({ start: T0, adapters: [new FakeAdapter('porkbun', { quote })], rdap });
+    await createV3(db, T0);
     withFakes(x);
     if (settings) await x.post('/selection/settings', { label: 'v1c', set: settings });
     const { body } = await x.runDone({ checks, mode: 'full', ...(settings && { settings: 'v1c' }), names: [nonGeo(name, { bin_usd: bin })] });

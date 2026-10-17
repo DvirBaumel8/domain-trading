@@ -1,6 +1,24 @@
 # Endpoints (contract v5.13.0)
 
-Derived from the route registrations in `src/app.ts` and the zod schemas in `src/api/*.ts`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
+Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
+
+## Start here: the main routes by task
+
+Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake and data tokens are narrower (see the table below). Every POST needs `Idempotency-Key`. Details for each route are in the sections further down.
+
+| Task | Routes | Scope |
+|---|---|---|
+| Check a name's price across registrars | `GET /check` | READ |
+| Buy (needs Dvir's `approval_ref` and a complete `screening_pack`; try `dry_run: true` first) | `POST /buy` | WRITE |
+| Import a bought S8 name (aftermarket, lane S8) | `POST /portfolio/import` | WRITE |
+| Set the listing plan, list, record a hand listing | `GET /pricing/preview`, `POST /list/{domain}`, `POST /listings/{domain}/venue` | READ, WRITE, WRITE |
+| Export marketplace files and confirm the upload | `GET /export/afternic.csv`, `GET /export/sedo.csv`, `POST /export/{venue}/uploaded` | READ, READ, WRITE |
+| Offers and sales | `POST /offers`, `POST /offers/{id}/outcome`, `GET /offers`, `POST /sold/{domain}` (evidence needed without approval) | WRITE (GETs READ) |
+| Reports and books | `GET /report`, `GET /report/pricing-review`, `GET /ledger`, `GET /portfolio`, `GET /portfolio/{domain}`, `GET /audit` | READ |
+| Load data for the scoring engine and score names | `POST /engine/sales`, `POST /engine/unsold`, `POST /data/*` (rdap, live-checks, tm-kills, bigco-names, sales-comps), `POST /score`, `GET /engine/health` | WRITE or data token for the loads; READ for `GET` and `POST /score` |
+| Selection and screening | `GET /selection/settings`, `POST /selection/evaluate`, `POST /screening/runs`, `POST /screening/packs`, `GET /selection/buy-hold`, `POST /candidates/intake`, `GET /candidates/daily` | READ for `GET`, WRITE for `POST` (`/candidates/intake` also takes an intake or data token) |
+| Jobs | `POST /jobs/run` (`tick`, `daily`), `GET /jobs/runs` | job token or WRITE; READ |
+| Health | `GET /health/ping` (no token), `GET /health` | none, READ |
 
 **Notation:** `field: type` · `?` = optional · `| null` = may be `null` · "USD number" = a JSON number with at most 2 decimals · "money pair" = `x_cents` + `x` (README §Conventions). Every POST needs `Idempotency-Key` (README §Idempotency). Every body schema is **strict**: an unknown field → 422 `VALIDATION_ERROR` (exception: `pricing_evidence` on `/buy` is checked by the comps rules, so an extra key or a bad comp → 422 `COMPS_INVALID`). The cross-cutting errors (401, 403, 429, `IDEMPOTENCY_KEY_*`, `INVALID_BODY`, `INTERNAL`, `AUDIT_WRITE_FAILED`) apply everywhere and aren't repeated per route.
 

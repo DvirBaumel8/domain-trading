@@ -7,7 +7,7 @@ name: ci
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/requests/**', 'docs/releases/**', 'docs/research/**', 'docs/superpowers/**', '.claude/**', 'CLAUDE.md']
+    paths-ignore: ['docs/requests/**', 'docs/releases/**', 'docs/research/**', 'docs/superpowers/**', 'docs/archive/**', '.claude/**', 'CLAUDE.md']
   workflow_call:
 
 concurrency:
@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
       - run: npm ci
       - name: Create the test database (docker/initdb does this locally)

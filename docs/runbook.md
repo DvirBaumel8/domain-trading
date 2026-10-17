@@ -3,6 +3,7 @@
 Short ops page for DOM. Setup is in `docs/DEPLOYMENT.md`; the API contract is `docs/contract/`. All commands run from the repo root. For anything that talks to
 production, put `DATABASE_URL` (Neon **direct** string) and `DATABASE_SSL=true` in `.env.neon` (gitignored, `chmod 600`; never in `.env`) and run in a subshell:
 `(set -a; . ./.env.neon; set +a; npm run admin -- ...)`. Never inline the URL on a command line.
+`npm run admin` and `npm run job` run the compiled `dist/` (Node 26; the production release dir is built with `npm run build` and then `npm prune --omit=dev`, so `tsx` is not there). In a source checkout run `npm run build` first, or use `npm run admin:dev` / `npm run job:dev` (tsx).
 
 ## Tests
 

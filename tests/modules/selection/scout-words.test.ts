@@ -20,7 +20,8 @@ import { mswServer } from '../../setup/network.js';
 
 let app: FastifyInstance | undefined;
 afterEach(async () => app?.close());
-const T_FREE = (): RdapLookup => ({ outcome: 'not_registered', reasonCode: null, httpStatus: 404, url: 'https://rdap.example/domain/x', retrievedAt: new Date(), body: null, facts: null });
+const T_FREE = (): RdapLookup => ({ outcome: 'not_registered', reasonCode: null, httpStatus: 404, url: 'https://rdap.example/domain/x', retrievedAt: new Date(T0), body: null, facts: null });
+const T0 = Date.parse('2026-10-06T08:00:00Z'); // the harness's own fixed clock: nothing here depends on the wall clock
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
 
@@ -71,11 +72,11 @@ const CHECKS = ['form', 'history', 'census', 'ext_dates', 'tier', 'quote', 'pric
 async function l113(): Promise<ScreeningHarness> {
   mswServer.use(...[1, 2, 3, 4, 5].flatMap((i) => site(`firm${i}.example`, LIVE)));
   const x = await screeningHarness({
-    start: Date.now(), adapters: [new FakeAdapter('porkbun', { capabilities: { afternicFastTransfer: true } })], rdap: async () => 'not_registered' as const,
+    start: T0, adapters: [new FakeAdapter('porkbun', { capabilities: { afternicFastTransfer: true } })], rdap: async () => 'not_registered' as const,
     screening: { sleep: async () => {}, siteFetch: ((i: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => globalThis.fetch(i, init)) as typeof fetch },
   });
   app = x.app;
-  await createV3(db);
+  await createV3(db, T0);
   await draftAndActivate(x, 'v113', V113_SET);
   const c = x.app.screeningWorker.checks;
   c.census = fake('census', 'G8', { registered_share: 0 });

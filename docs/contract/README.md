@@ -16,7 +16,7 @@
 **Versioning (semver).** A MAJOR change breaks a caller: a route, field or code removed or renamed, a type or meaning changed, a rule tightened. A MINOR change adds something optional: a route, a response field, a warning, an error code on a new path. A PATCH fixes the docs or fixes behaviour back to what this contract already says. Every change is listed in `CHANGELOG.md` and announced in a release note (`docs/releases/`). Callers must ignore unknown response fields.
 
 ## Base URL
-`https://<service>.onrender.com` (expected: `https://domain-trading-api.onrender.com`; the release note gives the real one once it's deployed). HTTPS only. The service sleeps when idle and needs **up to ~60 s** for a cold start, so use request timeouts of at least 60 s and retry an idempotent call once (same `Idempotency-Key`).
+The base URL is given to Gavriel in the release notes and `docs/requests/`. Until Render resumes (about 1 Nov 2026) production runs on Dvir's Mac mini behind the stable Cloudflare Worker proxy (`https://domain-trading-api-proxy.<account>.workers.dev`, CR-041); after that it returns to `https://domain-trading-api.onrender.com`. HTTPS only. A cold start (Render's free plan sleeps when idle; the Mac host restarts after a deploy) can take **up to ~60 s**, so use request timeouts of at least 60 s and retry an idempotent call once (same `Idempotency-Key`).
 
 ## Who may call
 **Bots only.** Every request needs a credential, except `GET /health/ping`.
