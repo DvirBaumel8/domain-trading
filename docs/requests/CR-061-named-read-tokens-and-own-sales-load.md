@@ -1,4 +1,4 @@
-> Status: Draft (local, not committed)
+> Status: Approved by Dvir 2026-10-17
 
 # CR-061 — Named read-only tokens, a limited upload token for Data Engineer, and loading our own sales with a holdout date guard
 | Field | Value |

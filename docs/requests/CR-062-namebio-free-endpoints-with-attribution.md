@@ -1,4 +1,4 @@
-> Status: Draft (local, not committed)
+> Status: Approved by Dvir 2026-10-17
 
 # CR-062 — NameBio data from the free public endpoints only, with attribution
 | Field | Value |

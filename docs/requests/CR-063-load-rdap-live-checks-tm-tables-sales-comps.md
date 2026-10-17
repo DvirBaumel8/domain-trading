@@ -1,4 +1,4 @@
-> Status: Draft (local, not committed)
+> Status: Approved by Dvir 2026-10-17
 
 # CR-063 — Load our existing data: domain_rdap (candidate pool only), live_checks, tm_kills, bigco_names, sales_comps
 | Field | Value |
