@@ -3,7 +3,7 @@ name: release
 # Pushing a tag vX.Y.Z marks a release. Render deploys every push to main itself, once CI passes
 # (autoDeployTrigger: checksPass), so this workflow only verifies the tag:
 #   1. the tag commit must be on main (an ancestor of origin/main), equal package.json's version, have a CHANGELOG heading and a release note;
-#   2. the full test suite must pass (ci.yml);
+#   2. the full test suite already ran on the push to main (ci.yml); the Mac deploy (deploy.sh) deploys a tag only when ci passed for it;
 on:
   push:
     tags: ['v*.*.*']
@@ -28,6 +28,3 @@ jobs:
           grep -Fq "## ${tag} (" docs/contract/CHANGELOG.md || { echo "::error::no '## ${tag} (' heading in docs/contract/CHANGELOG.md"; exit 1; }
           [ -f "docs/releases/v${tag}.md" ] || { echo "::error::docs/releases/v${tag}.md does not exist"; exit 1; }
 
-  test:
-    needs: check-version
-    uses: ./.github/workflows/ci.yml

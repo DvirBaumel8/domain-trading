@@ -1,12 +1,33 @@
 name: ci
 
 # Full test suite on every push to main (Postgres 16 service, same as docker compose).
+# Cost (private repo, 2,000 free minutes a month): typecheck and build run once, not per shard; pushes that change only
+# bot request files, release notes or research skip CI (a release commit always changes package.json, so it always runs);
+# a newer push to main cancels the older run (deploy.sh accepts a tag that is an ancestor of a later green main run).
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/requests/**', 'docs/releases/**', 'docs/research/**', 'docs/superpowers/**', '.claude/**', 'CLAUDE.md']
   workflow_call:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -38,6 +59,4 @@ jobs:
       - run: npm ci
       - name: Create the test database (docker/initdb does this locally)
         run: PGPASSWORD=dt psql -h localhost -p 5433 -U dt -d domain_trading -c 'CREATE DATABASE domain_trading_test OWNER dt'
-      - run: npx tsc --noEmit
-      - run: npm run build
       - run: npx vitest run --shard=${{ matrix.shard }}/4
