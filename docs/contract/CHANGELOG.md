@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.16.0 (2026-10-18): ledger CSV formula guard, test clock guard (loop 2026-10-18)
+Release note: `docs/releases/v5.16.0.md`.
+MINOR (the ledger CSV text cells change; no route, field or error code added or changed). Improvement loop 2026-10-18.
+- `GET /ledger?format=csv`: a text cell (`type`, `domain`, `deal_id`, `counterparty`, `receipt_ref`, `note`) that starts with `=`, `+`, `-`, `@`, a tab or a CR now gets a leading apostrophe, so a spreadsheet shows it as text instead of running it as a formula. `amount_usd` is never changed (a negative amount stays `-11.08`). The header, column order, row order and the JSON form of `/ledger` are unchanged. The Afternic and Sedo exports are unchanged.
+
 ## 5.15.0 (2026-10-17): the Internet Archive reader and unused NameBio calls are removed; the data tables are their own module
 Release note: `docs/releases/v5.15.0.md`.
 MINOR (two visible settings changes, one narrowed outbound allow-list, no route, field or error code added or changed). Tech-debt pass R4 (structure and dead features).
