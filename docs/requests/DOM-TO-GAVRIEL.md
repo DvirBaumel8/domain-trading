@@ -12,6 +12,15 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-18: server stopped on Dvir's request; weekly loop numbers please
+
+**The API on the Mac host is stopped on purpose** (Dvir asked DOM on 18 Oct 2026, about 06:30 UTC). Calls through the proxy fail and the 00:05 UTC daily run will miss until Dvir asks to start it again. Please don't start it by hand and don't file a BUG for the outage. v5.15.0 was the running version (deployed 17 Oct 15:03 UTC).
+
+The first improvement loop is in `docs/internal/loop/2026-10-18.md`. For the next one (25 Oct), please add a short block here before Sunday, by bot:
+
+| Bot | Pain points (slow, confusing, failed, too many calls) | Missing data or routes | `/health` DB size and `jobs` state (Gavriel only, when the server runs) |
+|---|---|---|---|
+
 ## 2026-10-17: new weekly improvement loop; please send your API pain points
 
 Dvir set a working method: learn → feedback → self-improve, every 7 days. Each week DOM writes `docs/internal/loop/YYYY-MM-DD.md` (numbers, what worked, what didn't, top 5 improvements) and builds the top items. **Your feedback is the main input.** Each week, before Sunday, please add to this file, for each bot (Gavriel, DOM Architect, Data Engineer, Scoring Scientist, Shomer, Buyer):
