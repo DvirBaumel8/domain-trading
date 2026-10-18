@@ -22,7 +22,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 command -v node >/dev/null || { echo "node is missing (brew install node)"; exit 1; }
 CLOUDFLARED="$(command -v cloudflared)" || { echo "cloudflared is missing (brew install cloudflared)"; exit 1; }  # launchd needs the full path (no PATH lookup)
 mkdir -p "$ENV_DIR" "$LOG_DIR" "$AGENTS" "$HOST_DIR"
-cp "$HERE/start.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HERE/rotate-logs.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
+cp "$HERE/start.sh" "$HERE/stop.sh" "$HERE/resume.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HERE/rotate-logs.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
 [ -d "$PROD_DIR/.git" ] || git clone --quiet "$REPO_URL" "$PROD_DIR"
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -52,6 +52,7 @@ if [ ! -L "$PROD_DIR-current" ] && [ -d "$PROD_DIR/dist" ]; then
   echo "After that works, the old build in $PROD_DIR (node_modules, dist) is no longer used and can be deleted to save space."
 fi
 mkdir -p "$PROD_DIR-releases"
+if [ -f "$HOST_DIR/PAUSED" ]; then echo "The host is PAUSED ($(cat "$HOST_DIR/PAUSED")): install.sh loads no agent; deploy.sh --first does nothing until resume.sh."; fi
 echo "LaunchAgents written to $AGENTS (not loaded yet; the backup agent stays off until Dvir turns backups on: runbook \"Backups\")."
 echo "Next:"
 echo "  1. Fill $ENV_FILE from Render (PUBLIC_BASE_URL = the api-proxy URL, known after the first deploy-api-proxy run; fill it then and restart the api agent)."

@@ -3,6 +3,10 @@
 # Runs the built release behind the stable `current` symlink (deploy.sh builds a release elsewhere and swaps the link atomically).
 # Before the first deploy with the new layout there is no link yet: fall back to the old in-place checkout.
 set -euo pipefail
+# G-109: while stop.sh's pause flag exists the server does not start (a reboot or login must not bring it back). KeepAlive restarts this
+# script, so it sleeps and re-checks; resume.sh removes the flag and kickstarts the agent.
+PAUSE_FLAG="${PAUSE_FLAG:-$HOME/.local/share/domain-trading-host/PAUSED}"
+if [ -f "$PAUSE_FLAG" ]; then echo "$(date -u +%FT%TZ) paused ($(cat "$PAUSE_FLAG")): not starting"; sleep 600; exit 0; fi
 PROD_DIR="${PROD_DIR:-$HOME/domain-trading-prod}"
 APP_DIR="${APP_DIR:-$PROD_DIR-current}"
 [ -e "$APP_DIR/dist/main.js" ] || APP_DIR="$PROD_DIR"

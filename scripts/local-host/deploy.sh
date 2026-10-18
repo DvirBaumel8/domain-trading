@@ -14,6 +14,9 @@ AGENTS="$HOME/Library/LaunchAgents"
 UID_NUM="$(id -u)"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 "$HERE/rotate-logs.sh" || true   # size-capped log rotation (H2); never blocks a deploy
+# G-109: stop.sh paused the host on purpose; a pause means no fetch, no build, no switch, no restart (resume.sh ends it).
+PAUSE_FLAG="${PAUSE_FLAG:-$HOME/.local/share/domain-trading-host/PAUSED}"
+if [ -f "$PAUSE_FLAG" ]; then echo "$(date -u +%FT%TZ) paused since $(cut -d' ' -f1 "$PAUSE_FLAG"), not deploying"; exit 0; fi
 cd "$PROD_DIR"
 mkdir -p "$RELEASES"
 
@@ -36,7 +39,16 @@ STAGE="$RELEASES/.build-$tag"
 trap 'rm -rf "$STAGE"; rmdir "$LOCK" 2>/dev/null || true' EXIT
 
 sha="$(git rev-list -n 1 "$tag")"
-ci="$(gh run list --repo DvirBaumel8/domain-trading --workflow ci --commit "$sha" --json conclusion -q '.[0].conclusion' 2>/dev/null || true)"
+ci_status() { gh run list --repo DvirBaumel8/domain-trading --workflow ci --commit "$sha" --json status,conclusion -q '.[0] | if .status == "completed" then .conclusion else .status end' 2>/dev/null || true; }
+ci="$(ci_status)"
+# G-110: a CI run still going (in_progress / queued / waiting / pending) is waited for inside the lock: every 60 s, up to 15 min.
+# A failure (or cancelled / unknown) is not waited for.
+waited=0
+while [ "$waited" -lt 900 ]; do
+  case "$ci" in in_progress|queued|waiting|pending|requested) ;; *) break ;; esac
+  echo "$(date -u +%FT%TZ) $tag: ci is '$ci', checking again in 60 s"
+  sleep 60; waited=$((waited + 60)); ci="$(ci_status)"
+done
 if [ "$ci" != "success" ]; then
   # CI cancels an older run on main when a newer push arrives, so the tag's own run may be "cancelled".
   # A passed run on a later main commit that contains the tag commit also covers it (the same rule as deploy-live, BUG-041).
