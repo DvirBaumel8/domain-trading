@@ -142,7 +142,7 @@ describe('POST /list/{domain}', () => {
   it('LG-13: a price change without approval_ref -> 200 (bot autonomy); history row with null approval; an invalid approval_ref sent is still refused', async () => {
     const { auth } = await setup();
     await insertOwnedDomain(db, { domain: D, category: 'trend', price_grade: null });
-    const bad = await list({ mode: 'hybrid', bin: 1995, approval_ref: { text: 'nope', approved_at: new Date().toISOString() } }, auth);
+    const bad = await list({ mode: 'hybrid', bin: 1995, approval_ref: { text: 'nope', approved_at: new Date(NOW).toISOString() } }, auth);
     expect([bad.statusCode, bad.json().error.code]).toEqual([422, 'APPROVAL_INVALID']);
     expect(await history()).toHaveLength(0);
     expect((await list({ mode: 'hybrid', bin: 1995 }, auth)).statusCode).toBe(200);

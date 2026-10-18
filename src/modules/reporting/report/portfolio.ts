@@ -23,9 +23,14 @@ export async function ledgerRows(db: Kysely<Database>, f: LedgerFilter) {
 }
 
 const LEDGER_CSV_HEADER = ['date', 'type', 'domain', 'deal_id', 'amount_usd', 'counterparty', 'receipt_ref', 'note'];
+/** G-98: a free-text cell that starts with = + - @ (or a tab / CR) would run as a formula in a spreadsheet: prefix an apostrophe. Not for `amount_usd` (a signed number). */
+export const csvSafeText = (v: string): string => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
 export const ledgerCsvRows = (rows: Awaited<ReturnType<typeof ledgerRows>>): string[][] => [
   LEDGER_CSV_HEADER,
-  ...rows.map((r) => [r.occurred_on, r.type, r.domain ?? '', r.deal_id ?? '', usdSigned(r.amount_cents), r.counterparty ?? '', r.receipt_ref ?? '', r.note ?? '']),
+  ...rows.map((r) => [
+    r.occurred_on, csvSafeText(r.type), csvSafeText(r.domain ?? ''), csvSafeText(String(r.deal_id ?? '')), usdSigned(r.amount_cents),
+    csvSafeText(r.counterparty ?? ''), csvSafeText(r.receipt_ref ?? ''), csvSafeText(r.note ?? ''),
+  ]),
 ];
 export const ledgerJson = (rows: Awaited<ReturnType<typeof ledgerRows>>) => rows.map((r) => ({
   id: r.id, date: r.occurred_on, type: r.type, domain: r.domain, deal_id: r.deal_id, ...pair('amount', r.amount_cents),

@@ -21,7 +21,7 @@ Owner: DOM, DVIR (needs Dvir's decision or key) or Gavriel. Details of older ite
 | G-62 | Packs are evidence only; CAP-21b (as-of refetch) is P2; the NameBio spot API is not built (NameBio disabled, G-29) | DOM | low | - |
 | G-70 | `lookalikes` check built in 3.10.0 (CR-043: endings, hyphen, get/try; RDAP + home page; 4.1.0: its per-name probe is shared with the CR-050 sibling scan). `competing_forsale_n` is not built (P2) | DOM | low | - |
 | G-53 / G-54 / G-67 | Replay data: `reg_to_sale_months`, the 226/224 row set, gate columns with dates, sale prices, per-row census dates; holdout suite definitions (BT10-1, BT10-9, BT10-11) uploaded and approved by Dvir; the BT10-1 rule set (tier B on or off) | Gavriel / DVIR | medium | - |
-| G-98 | Ledger CSV cells are not escaped against spreadsheet formulas (a cell starting with `=`, `+`, `-`, `@`). Raised by loop 2026-10-18 (#4), planned for 5.16.0 | DOM | medium | 5.16.0 |
+| G-98 | Ledger CSV cells are not escaped against spreadsheet formulas (a cell starting with `=`, `+`, `-`, `@`). Raised by loop 2026-10-18 (#4), planned for 5.16.0 | DOM | medium | **Built in 5.16.0:** `csvSafeText` in `reporting/report/portfolio.ts` prefixes an apostrophe on the six text columns of the ledger CSV (not `amount_usd`, not the Afternic/Sedo exports); L516-1 |
 | G-100 | Queue retries have no backoff | DOM | low | - |
 | G-101 | A timed-out step's work is abandoned, not cancelled (3.9.0 marks the retry failed). Real cancellation needs an `AbortSignal` through every step | DOM | low | - |
 | G-102 | Per-request settings/lexicon reloads and N+1 queries on the daily list build | DOM | low | **Mostly closed in 5.14.0 (R3 D7, D10):** the lexicon is memoised, runs are read through `assembleRun` with rows loaded a few runs per statement, the domain records of the pool in a few statements, `/report`, run-report and the buy-hold steps share their reads. Still per call: the settings read in `activeSelectionSettings` |
@@ -29,7 +29,7 @@ Owner: DOM, DVIR (needs Dvir's decision or key) or Gavriel. Details of older ite
 | G-104 | HTML parser test cases from messy parked-page captures, before considering parse5 | DOM | low | - |
 | G-109 | Mac host kit has no pause: a stop Dvir asks for (18 Oct 2026) is done by unloading agents, and a later deploy or install can bring the server back. Add `stop.sh` / resume with a pause flag `deploy.sh` honours (loop 2026-10-18 #1) | DOM | medium | next kit commit |
 | G-110 | `deploy.sh` exits when the tag's CI is still running and waits a full 10-min tick (about 10 min lost per release). Re-check every 60 s up to 15 min inside the lock (loop 2026-10-18 #2) | DOM | medium | next kit commit |
-| G-111 | Nothing stops a new real-clock time bomb in tests (BUG-042 pattern). Add a clock-shifted CI step or a guard test (loop 2026-10-18 #3) | DOM | medium | 5.16.0 |
+| G-111 | Nothing stops a new real-clock time bomb in tests (BUG-042 pattern). Add a clock-shifted CI step or a guard test (loop 2026-10-18 #3) | DOM | medium | **Built in 5.16.0:** guard test `tests/unit/test-clock-guard.test.ts` (L516-2) scans test files for `approved_at` built from the real clock beside a fixed-date app clock, or a fixed date literal with no fixed app clock; allow-list with reasons. Also fixed one latent mix in `listing/list.test.ts` |
 | G-112 | The loop has no bot input: no pain points and no DB size reading reached the repo. Fixed weekly ask table in DOM-TO-GAVRIEL.md (loop 2026-10-18 #5) | DOM + Gavriel | medium | 25 Oct loop |
 
 ## Accepted decisions

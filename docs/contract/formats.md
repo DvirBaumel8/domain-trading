@@ -45,6 +45,7 @@ Sedo's exact header strings and option values aren't public, so they're **config
 date,type,domain,deal_id,amount_usd,counterparty,receipt_ref,note
 ```
 - `date` = `YYYY-MM-DD` (IDT day the money moved); `type` ∈ `registration`, `renewal`, `fee`, `commission`, `sale`, `payout_fee`, `refund`, `tool`, `ai`, `adjustment`; `amount_usd` signed with 2 decimals (`-11.08` = money out, `1995.00` = in); empty cells for missing values. Rows in date order. The same filters as the JSON form apply.
+- **Formula guard (5.16.0):** a text cell (`type`, `domain`, `deal_id`, `counterparty`, `receipt_ref`, `note`) that starts with `=`, `+`, `-`, `@`, a tab or a CR gets a leading apostrophe (`'=SUM(A1)`) so a spreadsheet shows it as text; `amount_usd` is a number and is never prefixed (`-11.08` stays `-11.08`). The JSON form is unchanged.
 
 ## Offers (JSON)
 `GET /offers` returns `{offers: [<offer view>], truncated}` and `POST /offers` returns one offer view (shape in `endpoints.md` §Offers). Offers are recorded one at a time with `POST /offers`; there is no CSV import.
