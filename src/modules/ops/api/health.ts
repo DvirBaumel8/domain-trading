@@ -1,14 +1,14 @@
 import type { FastifyInstance } from 'fastify';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Config } from '../../../config.js';
 import { scrubSecrets } from '../../../core/redact.js';
 import { pingDb } from '../../../db/client.js';
 import type { Database } from '../../../db/types.js';
 import { adapterStatus } from '../../registrars/index.js';
 import { currentReviewSettings } from '../../outreach/index.js';
-import { dailyScheduleState, jobsOverdue } from '../../reporting/index.js';
+import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, dailyScheduleState, jobsOverdue } from '../../reporting/index.js';
 
-export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, kickQueue?: () => Promise<void>): void {
+export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, kickQueue?: () => Promise<void>, storageLimitBytes: number = NEON_FREE_STORAGE_BYTES): void {
   // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
   // v3.7.0 (CR-034): also the version and the deployed commit (Render sets RENDER_GIT_COMMIT), so the deploy-live workflow can tell a deploy is live without a token.
   app.get('/health/ping', async () => ({ status: 'ok', version: config.version, commit: process.env.RENDER_GIT_COMMIT ?? null }));
@@ -18,9 +18,10 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
     const dbOk = await pingDb(db);
     if (dbOk) await kickQueue?.(); // resumes unfinished job steps when this process has no worker running (cheap check)
     // v5.14.0: the independent reads run together, and the review settings are read once for both the state and the model
-    const [jobs, review] = await Promise.all([
+    const [jobs, review, size] = await Promise.all([
       dbOk ? jobsState(db, now()) : Promise.resolve('unknown'),
       reviewState(db, config),
+      dbOk ? dbSize(db, storageLimitBytes) : Promise.resolve(null),
     ]);
     return reply.code(dbOk ? 200 : 503).send({
       status: dbOk ? 'ok' : 'degraded',
@@ -29,10 +30,22 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       review: review.state,
       ...(review.state === 'failed' ? { review_reason: review.reason } : {}),
       review_model: review.model,
+      // v5.17.0 (loop 2026-10-18, Gavriel): the database size against Neon's free 1 GB, so it can be reported with a READ token
+      db_size: size,
       version: config.version,
       adapters: adapterStatus(config).map(({ name, enabled }) => ({ name, enabled })),
     });
   });
+}
+
+/** The database size against the free-plan limit (the same numbers as /report's DB_SIZE_HIGH); null when it can't be read. */
+async function dbSize(db: Kysely<Database>, limitBytes: number): Promise<{ bytes: number; limit_bytes: number; percent: number; warn_percent: number } | null> {
+  try {
+    const bytes = Number((await sql<{ n: string }>`select pg_database_size(current_database())::text as n`.execute(db)).rows[0]!.n);
+    return { bytes, limit_bytes: limitBytes, percent: Math.round(bytes * 1000 / limitBytes) / 10, warn_percent: DB_SIZE_WARN_PERCENT };
+  } catch {
+    return null;
+  }
 }
 
 async function jobsState(db: Kysely<Database>, nowMs: number): Promise<'ok' | 'overdue'> {

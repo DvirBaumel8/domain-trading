@@ -9,17 +9,28 @@ let app: FastifyInstance;
 afterEach(async () => app?.close());
 
 describe('GET /health (R-11)', () => {
-  it('needs a bot token (401 without, 200 with READ) and returns exactly status, db, jobs, review, review_model, version, adapters', async () => {
+  it('needs a bot token (401 without, 200 with READ) and returns exactly status, db, db_size, jobs, review, review_model, version, adapters', async () => {
     app = await makeApp({ testRoutes: false });
     expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(401);
     const { auth } = await issueToken('read');
     const res = await app.inject({ method: 'GET', url: '/health', headers: auth });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(Object.keys(body).sort()).toEqual(['adapters', 'db', 'jobs', 'review', 'review_model', 'status', 'version']);
+    expect(Object.keys(body).sort()).toEqual(['adapters', 'db', 'db_size', 'jobs', 'review', 'review_model', 'status', 'version']);
     expect(body).toMatchObject({ status: 'ok', db: 'ok' });
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
     for (const a of body.adapters) expect(Object.keys(a).sort()).toEqual(['enabled', 'name']);
+  });
+
+  it('L517-1: db_size reports the database bytes against the 1 GB free-plan limit (READ token)', async () => {
+    app = await makeApp({ testRoutes: false });
+    const { auth } = await issueToken('read');
+    const body = (await app.inject({ method: 'GET', url: '/health', headers: auth })).json();
+    expect(Object.keys(body.db_size).sort()).toEqual(['bytes', 'limit_bytes', 'percent', 'warn_percent']);
+    expect(body.db_size.bytes).toBeGreaterThan(0);
+    expect(body.db_size.limit_bytes).toBe(1024 ** 3);
+    expect(body.db_size.percent).toBe(Math.round(body.db_size.bytes * 1000 / 1024 ** 3) / 10);
+    expect(body.db_size.warn_percent).toBe(70);
   });
 
   it('never reveals secrets or key prefixes', async () => {

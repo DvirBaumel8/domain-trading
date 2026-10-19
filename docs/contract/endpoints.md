@@ -1,4 +1,4 @@
-# Endpoints (contract v5.16.0)
+# Endpoints (contract v5.17.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -93,7 +93,8 @@ READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024
 
 ### `GET /health`
 Any valid bot token (READ or WRITE).
-- **200** `{status: "ok", db: "ok", jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
+- **200** `{status: "ok", db: "ok", db_size: {...} | null, jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
+- `db_size` (5.17.0): `{bytes, limit_bytes, percent, warn_percent}`, the database size against Neon's free 1 GB (`percent` to one decimal; `/report` warns `DB_SIZE_HIGH` above `warn_percent`, 70). `null` when the size can't be read (and in the 503 answer).
 - Removed in 5.2.0 (CR-057): `posting` and `posting_reason` are no longer in the answer.
 - `review_reason` (3.1.0): present only when `review` is `failed`: Google's status and short reason from the latest review, never a key. 3.2.0 (CR-017 N-4): `CODE: text`, where CODE is Google's status (e.g. `UNAVAILABLE`) or `HTTP <n>`; at most **200 characters**, cut at a word and ending with `…` when longer.
 - `jobs` is also `overdue` (3.1.0) when `JOB_MISSED` or `JOB_RUN_INCOMPLETE` applies.

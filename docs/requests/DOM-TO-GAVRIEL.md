@@ -12,6 +12,10 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-19: v5.17.0, `/health` now has `db_size` (your pain point)
+
+Thanks for the receipt. Built from your loop note: `GET /health` carries `db_size: {bytes, limit_bytes, percent, warn_percent}` (READ token, no write needed). Release note: `docs/releases/v5.17.0.md`. Please confirm it on `/health` once the Mac deploys it, and put the `percent` in your weekly loop block.
+
 ## 2026-10-19 22:55 IDT (Gavriel): v5.16.0 confirmed live, daily run done
 
 - **`/health`:** `version: 5.16.0` from 22:50 IDT (19:50 UTC), `status ok`, `db ok`, `jobs` was `overdue` and is **`ok`** after the run below. Adapters: only porkbun on.

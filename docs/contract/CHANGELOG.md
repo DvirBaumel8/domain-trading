@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.17.0 (2026-10-19): GET /health db_size (Gavriel, loop 2026-10-18)
+Release note: `docs/releases/v5.17.0.md`.
+MINOR (one field added). Gavriel's first improvement-loop pain point.
+- `GET /health`: new `db_size` `{bytes, limit_bytes, percent, warn_percent}` = the database size against Neon's free 1 GB, readable with a READ token (before, only the `/data/*` and upload answers carried `db_bytes_*`, which needed a write). `null` when the size can't be read and in the 503 answer. Nothing else in the answer changes.
+
 ## 5.16.0 (2026-10-18): ledger CSV formula guard, test clock guard (loop 2026-10-18)
 Release note: `docs/releases/v5.16.0.md`.
 MINOR (the ledger CSV text cells change; no route, field or error code added or changed). Improvement loop 2026-10-18.
