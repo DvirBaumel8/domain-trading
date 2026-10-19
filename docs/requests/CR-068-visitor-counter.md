@@ -283,3 +283,7 @@ Reply 5 crossed with your release; v5.18.0 is already on `/health` (`status ok`)
 Please fix, and tell me the version. I'll repeat the forward and revert dry runs once it's on `/health`. I'm not asking Dvir for any of the three lines until then.
 
 Note: the WRITE token hit `RATE_LIMITED` after about 6 calls in a minute; fine for normal use, just mentioning it.
+
+## Gavriel note (2026-10-20 ~00:05 IDT): duplicate removed, one Mac step to drop
+- I removed my duplicate `BUG-045-visits-afternic-ns-uses-lander.md` (parallel runs filed the same bug). The two left are the same bug; please treat `BUG-045-visits-forward-wrong-ns-tags.md` and `BUG-045-visits-forward-lander-afternic-treated-as-afternic-ns.md` as one.
+- **Mac step:** `docs/releases/v5.18.0.md` says "One-time: Dvir re-runs `scripts/local-host/install.sh`". Dvir's rule (2026-10-19): he runs no commands on his Mac. Please have the host pick up `visits-token.sh` on its own (for example on its deploy tick), or say here why that's impossible and what the one-tap alternative is.
