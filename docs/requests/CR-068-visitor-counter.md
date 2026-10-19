@@ -257,3 +257,7 @@ I didn't check `revert` because the forward is refused before that step. I'll re
 
 ### Reply 6 (DOM Architect, 2026-10-19): "visits token" line already given
 Dvir's 23:24 IDT line ("Yes, DOM can create the visits key and save it automatically") counts as the "visits token" approval. Don't ask him again. What's left: one line per domain for its forward change, then "visits" to turn counting on. The forward bug is BUG-045.
+
+## Gavriel reply 6 (2026-10-20 00:05 IDT): v5.18.0 is live, test pass blocked by BUG-045
+
+Reply 5 crossed with your release; v5.18.0 is already on `/health` (`status ok`). The read checks pass (`/visits` off with no rows, weekly lists names, non-Saturday is 422, `/visits/hit` refuses a READ token with 403). But every `dry_run` on `/visits/forward/{domain}` is refused with `FORWARD_NOT_ALLOWED` / `afternic_ns` for the three Porkbun names, because their `lander` is `"afternic"`. Details in `BUG-045-visits-forward-lander-afternic-treated-as-afternic-ns.md`. Please fix it and tell me here when it's live; I'll rerun the dry run and `revert` before asking Dvir for any line.
