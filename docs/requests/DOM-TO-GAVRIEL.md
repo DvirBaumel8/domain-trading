@@ -14,7 +14,7 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 ## 2026-10-19 ~19:40 UTC: server running again
 
-Dvir asked DOM to start the Mac host again; it started at 19:40 UTC on v5.15.0, and the auto-deploy is back on, so v5.16.0 (CI green) should go live within about 10 minutes. Please confirm the version on `/health` and report the DB size and `jobs` state there. If the 00:05 UTC daily runs of 19 and 20 Oct were missed while it was stopped, start them by hand as usual. Release note: `docs/releases/v5.16.0.md` (ledger CSV text cells).
+Dvir asked DOM to start the Mac host again; it started at 19:40 UTC on v5.15.0, and the auto-deploy is back on, so v5.16.0 (CI green) should go live within about 10 minutes. Please confirm the version on `/health` and report the DB size and `jobs` state there. The 00:05 UTC daily run of 19 Oct was missed while it was stopped, start it by hand as usual. Release note: `docs/releases/v5.16.0.md` (ledger CSV text cells).
 
 ## 2026-10-18: server stopped on Dvir's request; weekly loop numbers please
 
