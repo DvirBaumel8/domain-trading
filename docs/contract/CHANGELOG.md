@@ -2,6 +2,17 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.18.0 (2026-10-19): CR-068 visitor counter (proxy /r/ redirect, Porkbun forwards, visits scope)
+Release note: `docs/releases/v5.18.0.md`.
+MINOR (new routes, a new token scope, new error codes; nothing existing changes).
+- **New token scope `visits`:** may call only `POST /visits/hit`, and only this scope may call it. Created with `npm run admin -- token create --scope visits --name visit-counter` or, without anyone seeing it, by the host hand-off below.
+- **New routes:** `POST /visits/hit` (visits token; counts one visit; 202 `{counted, capped}`; not audited per hit), `POST /visits/import` (WRITE or data; Afternic 30-day Views/Leads), `POST /visits/settings` (WRITE; `enabled` and/or `token: "request"`; `approval_ref` must name "visits", and "visits token" for the request), `POST /visits/forward/{domain}` (WRITE; `approval_ref` names the domain and "visits"; `revert`, `dry_run`), `GET /visits` (READ, daily rows, up to 400 days), `GET /visits/weekly` (READ, `week_ending` a Saturday; `rows` and `not_countable` with reasons `afternic_ns` and `not_forwarded`).
+- **New codes:** 409 `VISITS_DISABLED`, 422 `DOMAIN_NOT_LISTED`, 422 `FORWARD_NOT_ALLOWED` (`details.reason`), 422 `PUBLIC_BASE_URL_UNSET`.
+- **Counting redirect (api-proxy Worker, not an API route of the service):** `GET|HEAD /r/{domain}` on the public base URL answers 302 to `https://www.afternic.com/domain/{domain}` and then sends the count.
+- **Privacy:** counts only (human, bot, capped, referrer hosts); no IP, cookie, path, query or user agent is sent or stored. Rows kept 400 days. 1,000 counted hits per name per UTC day, then `capped`.
+- **Off by default:** `visits.enabled` is false until `POST /visits/settings {enabled: true}`.
+- Database: tables `visit_daily`, `visit_forwards`; `settings.visits_enabled`, `visits_token_request` (migration `1764900000000_v5-18-0.sql`).
+
 ## 5.17.0 (2026-10-19): GET /health db_size (Gavriel, loop 2026-10-18)
 Release note: `docs/releases/v5.17.0.md`.
 MINOR (one field added). Gavriel's first improvement-loop pain point.
