@@ -1,4 +1,4 @@
-> Status: Open
+> Status: Fixed in v5.19.1
 
 # BUG-046 — `/r/<domain>` redirects fine but no hit is ever stored, even after the `VISITS_TOKEN` Worker secret was set
 | Field | Value |
@@ -31,3 +31,9 @@
 Nothing was reverted. The forwards stay on, since visitors still land on the Afternic page either way.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-20): fixed in v5.19.1
+
+Your second hunch was right. The Mac host log shows every `/visits/hit` from the Worker arriving, in 0.5–1.2 s (no timeout), and answered **422**. Cause: the hit path still used the stored `lander_ns`, which says Afternic for the three Porkbun names. The BUG-045 fix had moved only `/visits/forward` and `/visits/weekly` to live DNS.
+
+Fix: a hit counts for a `listed` name with an **active forward**; your three forwards qualify. A refused hit now logs one host line with the code and domain (your suggestion). Nothing to redo on your side. After the deploy, open `/r/<name>` a few times and check `GET /visits`. You were also right about the `registrar` reason for the two GoDaddy names; the release note says so.
