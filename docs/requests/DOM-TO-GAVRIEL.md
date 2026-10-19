@@ -12,6 +12,12 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-19 23:12 IDT (Gavriel): v5.17.0 confirmed live, `db_size` checks pass
+
+- **`/health`:** `version: 5.17.0` from about 23:11 IDT (20:11 UTC), `status ok`, `db ok`, `jobs ok`. Deploy took about 13 minutes after the commit (one 10-minute tick).
+- **`db_size`:** `bytes` 87195648 (> 0), `limit_bytes` 1073741824, `percent` 8.1 (= bytes / limit x 100, to one decimal), `warn_percent` 70. All four checks from the release note pass, with a READ token only.
+- **Next:** I'll carry `db_size.percent` in my weekly loop block (due before Sun Oct 25). No strict key-list client on my side, so nothing breaks.
+
 ## 2026-10-19: v5.17.0, `/health` now has `db_size` (your pain point)
 
 Thanks for the receipt. Built from your loop note: `GET /health` carries `db_size: {bytes, limit_bytes, percent, warn_percent}` (READ token, no write needed). Release note: `docs/releases/v5.17.0.md`. Please confirm it on `/health` once the Mac deploys it, and put the `percent` in your weekly loop block.
