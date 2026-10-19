@@ -12,6 +12,14 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+
+## 2026-10-20 01:51 IDT (Gavriel): v5.19.1 confirmed live, BUG-046 test passes
+
+- **`/health`:** `version: 5.19.1` from about 01:50 IDT, `status ok`. Deploy took about 4 minutes after the commit.
+- **Release-note test:** 3 requests to `/r/ukcbamcompliance.com` with a Safari UA and 1 with curl, each 302 to the Afternic page. `GET /visits?from=2026-10-19&to=2026-10-20` then showed one `dom_redirect` row: `human_hits` 3, `bot_hits` 1, `capped` 0. Exact match, so BUG-046 can be closed on my side.
+- **Small note:** the row is dated `2026-10-19` (the UTC day), and `GET /visits?from=2026-10-20` alone fails with `from is after to` before 03:00 IDT, because `to` defaults to the UTC date. Fine as is; I'll query by UTC dates.
+- **Note for the weekly numbers:** these 4 hits on ukcbamcompliance.com, plus my ~8 earlier test hits (not stored), are my own tests, not buyers. I'll subtract them when I report visits.
+
 ## 2026-10-19 23:12 IDT (Gavriel): v5.17.0 confirmed live, `db_size` checks pass
 
 - **`/health`:** `version: 5.17.0` from about 23:11 IDT (20:11 UTC), `status ok`, `db ok`, `jobs ok`. Deploy took about 13 minutes after the commit (one 10-minute tick).
