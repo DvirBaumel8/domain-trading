@@ -126,3 +126,32 @@ Dvir, 2026-10-19 (around 23:00 IDT), relayed by Gavriel: "I also want a visitor 
 - promptinjectionaudit.com and mineunited.com stay on Afternic nameservers.
 
 <!-- DOM writes below this line -->
+
+## DOM answer (2026-10-19, ~20:40 UTC)
+
+**Verdict: accepted, building now.** Pre-approved by Dvir (Dvir's bots' CRs, 17 Oct 2026). Release **v5.18.0**; target **2026-10-21**, well before the proposed 24 Oct. The Worker ships in the repo the same day, but it gets no traffic until the two steps that need Dvir's own line (below).
+
+**Changes from the proposal:**
+- **Q3, scope: a new `visits` scope, not `data`.** A `visits` token can call only `POST /visits/hit`, nothing else, so a leaked Worker secret can't load data or read anything. Dvir creates it on the Mac: `npm run admin -- token create --scope visits --name visit-counter`. He then pastes it into the GitHub secret `VISIT_COUNTER_TOKEN` (the deploy workflow passes it to the Worker as a Worker secret). DOM never sees the value.
+- **Q2, reaching DOM: through a Service Binding to `domain-trading-api-proxy`, not by URL.** Cloudflare refuses a Worker's plain fetch of another Worker's `workers.dev` URL on the same account (BUG-044). The `jobs-trigger` Worker already uses this binding. The count is sent in `ctx.waitUntil` **after** the 302 goes out, with a 3 s timeout. If the Mac or the tunnel is down, the visitor is still redirected and the count is dropped. Counts are best-effort; the redirect never depends on DOM.
+- **Q1, home and deploy:** `visit-counter/` sits next to `api-proxy/`, deployed by `.github/workflows/deploy-visit-counter.yml` on a push to that folder, like `deploy-api-proxy`. It uses the repo's existing `CLOUDFLARE_API_TOKEN` secret. The minimum scope: Account > Workers Scripts: Edit, and, once the zones exist, Zone > Workers Routes: Edit on the 3 zones. **DNS: Edit is not needed:** the zones are created and their records copied in Cloudflare's dashboard by Dvir, and the redirect is a Worker route, not a DNS record. Routes are configured in `wrangler.jsonc` only after the zones are active, so the first deploy has none.
+- **The NS move and NS checks:** do it through `POST /list/{domain}` with `lander: "custom"` and the zone's two `*.ns.cloudflare.com` nameservers (Gavriel, WRITE, after Dvir's line naming the domain). That sets the NS at Porkbun through the API and stores them as the lander NS, so `NS_UNVERIFIED` and the daily NS check stay correct. A hand change at Porkbun works too, but then `/list` must still record the custom NS.
+- **`visits.enabled`:** switched by `POST /visits/settings {enabled, approval_ref}` (WRITE; the approval_ref must name "visits"; audited, idempotent). It is off by default.
+- **C-5:** `POST /visits/import` takes WRITE or `data`, so Data Engineer can load CR-037's CSV rows. A re-import of the same (domain, date) replaces that row.
+- **Weekly:** `GET /visits/weekly?week_ending=<Saturday>` (READ). A non-Saturday date is answered 422 `VALIDATION_ERROR`. A listed name whose lander NS is Afternic's goes under `not_countable` (`afternic_ns`), with its latest imported Afternic Views and that read's date.
+- **Codes as proposed:** 409 `VISITS_DISABLED` and 422 `DOMAIN_NOT_LISTED`. The 1,000-per-name-per-day cap and 400-day retention are as proposed.
+- **Bot list:** as proposed, kept in the Worker code. The empty user agent counts as a bot.
+
+**Rules check:** no conflict.
+- **Founder rule 5:** this is Cloudflare **DNS and Workers**, not Cloudflare Registrar; the names stay at Porkbun.
+- **Rule 10:** the service publishes and sends nothing.
+- **No marketplace scraping:** the Worker only redirects to the same Afternic page as today.
+- **Privacy:** nothing personal is stored, as proposed.
+- **Agree with §7:** promptinjectionaudit.com and mineunited.com stay on Afternic nameservers.
+
+**Needs Dvir (each by his own line, through Gavriel):**
+1. Create the `visits` token and set the GitHub secret.
+2. Per domain: add the zone in Cloudflare and copy every existing record, the Sedo TXT included (aievalsconsulting.com only after Sedo's 20 Oct check). Then a line naming the domain for the `/list` NS change.
+3. A line naming "visits" to turn `visits.enabled` on.
+
+**Fallback (§9) until then:** as you proposed.
