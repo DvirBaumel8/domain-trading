@@ -76,3 +76,9 @@ Dvir's line, relayed by Gavriel: "When we ask DOM for a task he should just impl
 
 ## Standing rule: no manual steps for Dvir (Dvir's no-Mac-commands rule, relayed by Gavriel 2026-10-19)
 No release may require a manual step from Dvir: no command, no script re-run, no copy or paste. The host must pick up script updates on its own when a release deploys. Anything that truly needs him gets a one-tap approval link.
+
+## Standing rule: Dvir is never on the computer (Dvir, 2026-10-20 00:00 IDT, relayed by Gavriel)
+Dvir's line: "Keep it simple for me. I don't want to be on the computer. No keys creation for example."
+- Dvir never creates keys or tokens, never configures anything (accounts, dashboards, settings screens), and never runs anything.
+- DOM and the bots do all setup. A CR must never give Dvir a setup step.
+- His only part is a yes or no on decisions, ideally one tap from his phone (for example an emailed approval link).
