@@ -24,7 +24,7 @@ const PBNS = ['curitiba.ns.porkbun.com', 'fortaleza.ns.porkbun.com'];
 
 async function setup(opts: { adapters?: FakeAdapter[] | PorkbunAdapter[]; enabled?: boolean } = {}) {
   app = await makeApp({ adapters: opts.adapters ?? [new FakeAdapter('porkbun')], now: () => NOW, env: { PUBLIC_BASE_URL: PROXY } });
-  if (opts.enabled !== false) await db.updateTable('settings').set({ visits_enabled: true }).execute();
+  await db.updateTable('settings').set({ visits_enabled: opts.enabled !== false }).execute();
   return {
     v: (await issueToken('visits', 'visit-counter')).auth, w: (await issueToken('write', 'gavriel')).auth,
     r: (await issueToken('read')).auth, d: (await issueToken('data', 'data-engineer')).auth,
@@ -38,7 +38,7 @@ const approval = (text: string) => ({ text, approved_at: '2026-10-20T11:30:00+03
 const seed = (domain = LISTED, over: Parameters<typeof listedDomain>[0] = {}) => listedDomain({ domain, lander: 'custom', lander_ns: PBNS, ...over });
 
 describe('visits: hit', () => {
-  it('V518-1: AT-1: with visits.enabled off POST /visits/hit is 409 VISITS_DISABLED and stores nothing; POST /visits/settings needs a line naming "visits"', async () => {
+  it('V518-1: AT-1: with visits.enabled off POST /visits/hit is 409 VISITS_DISABLED and stores nothing; POST /visits/settings (WRITE) switches it with no approval line (5.19.0)', async () => {
     const { v, w, r } = await setup({ enabled: false });
     await seed();
     const res = await hit(v);
@@ -46,14 +46,15 @@ describe('visits: hit', () => {
     expect(res.json().error.code).toBe('VISITS_DISABLED');
     expect(await db.selectFrom('visit_daily').selectAll().execute()).toEqual([]);
 
-    expect((await post('/visits/settings', w, { enabled: true, approval_ref: approval('Dvir: yes, switch it on') })).statusCode).toBe(422);
-    expect((await post('/visits/settings', r, { enabled: true, approval_ref: approval('Dvir: turn on VISITS') })).statusCode).toBe(403);
-    const on = await post('/visits/settings', w, { enabled: true, approval_ref: approval('Dvir: turn on VISITS') });
+    expect((await post('/visits/settings', r, { enabled: true })).statusCode).toBe(403);
+    const on = await post('/visits/settings', w, { enabled: true });
     expect(on.statusCode, on.body).toBe(200);
     expect(on.json()).toMatchObject({ enabled: true, previous: false });
     expect((await hit(v)).statusCode).toBe(202);
     const audit = await db.selectFrom('audit_log').select(['path', 'approval_text']).where('path', '=', '/visits/settings').execute();
-    expect(audit.length).toBeGreaterThanOrEqual(2); // the refused call and the accepted one are both audited
+    expect(audit.length).toBeGreaterThanOrEqual(1);
+    // a sent approval_ref is still accepted (and ignored)
+    expect((await post('/visits/settings', w, { enabled: true, approval_ref: approval('anything') })).statusCode).toBe(200);
   });
 
   it('V518-2: AT-3: 3 human and 2 bot hits show as human_hits 3 and bot_hits 2 for the UTC day', async () => {
@@ -274,14 +275,31 @@ describe('visits: forward', () => {
     expect(week.not_countable.map((n: { reason: string }) => n.reason)).toEqual(['not_forwarded']);
   });
 
-  it('V518-15: the forward is refused without a line naming the domain and "visits", for a name not listed, not at Porkbun, on Afternic nameservers, or when PUBLIC_BASE_URL is the default; a READ token is 403', async () => {
+  it('V519-2: BUG-045: lander "afternic" with Porkbun nameservers is forwardable (live NS decides); live Afternic NS refuses even when the stored NS are empty; weekly follows the live NS', async () => {
+    recorded.length = 0;
+    mockPorkbun(old);
+    const live: Record<string, string[] | null> = { [LISTED]: PBNS, 'pia.com': AFNS, 'nolookup.com': null };
+    app = await makeApp({ adapters: [new PorkbunAdapter({ ...FAKE_KEYS, timeoutMs: 500 })], now: () => NOW, env: { PUBLIC_BASE_URL: PROXY }, nsLookup: async (d: string) => live[d] ?? null });
+    const w = (await issueToken('write', 'gavriel')).auth;
+    const r = (await issueToken('read')).auth;
+    await seed(LISTED, { lander: 'afternic', lander_ns: null });
+    await seed('pia.com', { lander: 'afternic', lander_ns: null });
+    await seed('nolookup.com', { lander: 'afternic', lander_ns: null });
+    const ok = await post(`/visits/forward/${LISTED}`, w, { dry_run: true });
+    expect(ok.statusCode, ok.body).toBe(200);
+    const no = await post('/visits/forward/pia.com', w, { dry_run: true });
+    expect(no.json().error).toMatchObject({ code: 'FORWARD_NOT_ALLOWED', details: { reason: 'afternic_ns' } });
+    const week = (await get('/visits/weekly?week_ending=2026-10-17', r)).json();
+    const reasons = Object.fromEntries(week.not_countable.map((n: { domain: string; reason: string }) => [n.domain, n.reason]));
+    expect(reasons).toEqual({ [LISTED]: 'not_forwarded', 'pia.com': 'afternic_ns', 'nolookup.com': 'not_forwarded' });
+  });
+
+  it('V518-15: the forward needs no approval line (5.19.0); it is refused for a name not listed, not at Porkbun, on Afternic nameservers, or when PUBLIC_BASE_URL is the default; a READ token is 403', async () => {
     const { w, r } = await setup({ adapters: [new FakeAdapter('porkbun')] });
     await seed();
     const url = `/visits/forward/${LISTED}`;
     expect((await post(url, r, { approval_ref: line() })).statusCode).toBe(403);
-    expect((await post(url, w, { dry_run: true })).statusCode).toBe(422);
-    expect((await post(url, w, { approval_ref: approval(`Dvir: yes ${LISTED}`), dry_run: true })).json().error.code).toBe('APPROVAL_INVALID');
-    expect((await post(url, w, { approval_ref: approval('Dvir: yes, for visits'), dry_run: true })).json().error.code).toBe('APPROVAL_INVALID');
+    expect((await post(url, w, { dry_run: true })).json().error?.code).not.toBe('APPROVAL_INVALID');
     const cases: [string, Parameters<typeof listedDomain>[0], string][] = [
       ['delisted-one.com', { status: 'delisted' }, 'not_listed'], ['at-godaddy.com', { registrar: 'godaddy', registrar_api: 'manage' }, 'registrar'], ['on-afternic.com', { lander: 'afternic', lander_ns: AFNS }, 'afternic_ns'],
     ];

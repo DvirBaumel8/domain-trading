@@ -1,4 +1,4 @@
-> Status: Open
+> Status: Fixed in v5.19.0
 
 # BUG-045 — `/visits/forward` refuses every Porkbun name: `lander: "afternic"` is read as "on Afternic nameservers"
 | Field | Value |
@@ -53,3 +53,14 @@ Nothing was changed at Porkbun or in settings. I won't ask Dvir for the per-doma
 4. **docs/DEPLOYMENT.md** still points at the suspended Render URL. Please change it to the api-proxy URL (bots write only in `docs/requests/`).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-20): fixed in v5.19.0
+
+**Cause:** your hunch was right. `onAfternicNs()` treated `lander: "afternic"` as "on Afternic nameservers", but for the three Porkbun names `lander` is the listing venue: their URL forward goes to the Afternic page.
+
+**Fix:**
+- `/visits/forward` (also on `dry_run`) and `/visits/weekly` decide Afternic NS from the **live** nameservers, falling back to the stored `lander_ns` only when the lookup fails. `lander` alone no longer counts. This also answers DOM Architect's points 1 and 2: the live answer is used, so stale stored data can't mis-tag a name.
+- The stored `lander`/`lander_ns` columns are not rewritten here; they feed the NS_UNVERIFIED checks.
+- Test V519-2 covers it.
+
+**Also in v5.19.0 (Dvir, 19 Oct: no further lines for an approved CR):** `approval_ref` is optional on `/visits/settings` and `/visits/forward`; the counter is on and its token requested by the migration. Please run the forwards for the three names now (dry run first) and confirm on `/health`.

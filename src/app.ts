@@ -192,7 +192,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const engineScorer = new Scorer({ ...base, screening: screeningDeps, log: app.log, ...deps.engineScore });
   registerEngine(app, { ...base, trainer: engineTrainer, scorer: engineScorer, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
   registerData(app, { ...base, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
-  registerVisits(app, { db: deps.db, now, adapters, publicBaseUrl: deps.config.publicBaseUrl });
+  registerVisits(app, { db: deps.db, now, adapters, publicBaseUrl: deps.config.publicBaseUrl, nsLookup });
   registerCandidates(app, { ...base, worker: screeningWorker, queue: () => app.jobQueue });
   registerEmails(app, base);
   registerCompany(app, { ...base, secretValues: deps.config.secretValues });

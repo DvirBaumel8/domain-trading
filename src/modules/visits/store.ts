@@ -29,11 +29,25 @@ export async function visitsEnabled(db: Kysely<Database>): Promise<boolean> {
   return (await db.selectFrom('settings').select('visits_enabled').executeTakeFirstOrThrow()).visits_enabled;
 }
 
-/** Is this name on Afternic's nameservers (so Afternic, not our redirect, serves its page)? */
-export function onAfternicNs(row: { lander: string | null; lander_ns: string[] | null }): boolean {
-  if (row.lander === 'afternic') return true;
+/** Does this nameserver list include Afternic's (so Afternic, not our redirect, serves the page)? */
+export function hasAfternicNs(ns: readonly string[] | null | undefined): boolean {
   const af = new Set(landerNameservers('afternic')!);
-  return (row.lander_ns ?? []).some((n) => af.has(n.trim().toLowerCase().replace(/\.$/, '')));
+  return (ns ?? []).some((n) => af.has(n.trim().toLowerCase().replace(/\.$/, '')));
+}
+
+/**
+ * Is this name on Afternic's nameservers? BUG-045 (v5.19.0): `lander: "afternic"` names the listing venue (a Porkbun name forwards to its Afternic page),
+ * not the nameservers, so it no longer counts. The live NS answer decides when there is one; otherwise the stored `lander_ns`.
+ */
+export function onAfternicNs(row: { lander_ns: string[] | null }, liveNs?: string[] | null): boolean {
+  return hasAfternicNs(liveNs ?? row.lander_ns);
+}
+
+/** Live nameservers per name (null when the lookup fails), looked up in parallel. */
+export async function liveNsOf(domains: readonly string[], nsLookup?: (d: string) => Promise<string[] | null>): Promise<Map<string, string[] | null>> {
+  if (!nsLookup) return new Map();
+  const answers = await Promise.all(domains.map(async (d) => [d, await nsLookup(d).catch(() => null)] as const));
+  return new Map(answers);
 }
 
 /** A name a hit can be counted for: status listed and not on Afternic's nameservers. */
@@ -123,8 +137,9 @@ export interface NotCountable { domain: string; reason: 'afternic_ns' | 'not_for
  * The week (Sunday..Saturday, UTC days `from`..`to`): a row for every listed name that is counted (an active forward to the counting redirect, not on Afternic's
  * nameservers; zeros when nothing came), and under not_countable the other listed names: `afternic_ns` (Afternic serves the page) or `not_forwarded` (no active forward yet).
  */
-export async function weekly(db: Kysely<Database>, from: string, to: string): Promise<{ rows: WeeklyRow[]; not_countable: NotCountable[] }> {
+export async function weekly(db: Kysely<Database>, from: string, to: string, nsLookup?: (d: string) => Promise<string[] | null>): Promise<{ rows: WeeklyRow[]; not_countable: NotCountable[] }> {
   const listed = await db.selectFrom('domains').select(['domain', 'lander', 'lander_ns']).where('status', '=', 'listed').orderBy('domain').execute();
+  const live = await liveNsOf(listed.map((d) => d.domain), nsLookup);
   const active = new Set((await db.selectFrom('visit_forwards').select('domain').where('reverted_at', 'is', null).execute()).map((r) => r.domain));
   const data = (await readDaily(db, from, to)).filter((r) => r.source === 'dom_redirect');
   const byDomain = new Map<string, WeeklyRow & { hosts: Map<string, number> }>();
@@ -135,7 +150,7 @@ export async function weekly(db: Kysely<Database>, from: string, to: string): Pr
   };
   const notCountable: NotCountable[] = [];
   for (const d of listed) {
-    const afternicNs = onAfternicNs(d);
+    const afternicNs = onAfternicNs(d, live.get(d.domain));
     if (afternicNs || !active.has(d.domain)) {
       const last = await db.selectFrom('visit_daily').select(['views_30d', 'leads_30d', 'date_utc']).where('domain', '=', d.domain).where('source', '=', 'afternic').orderBy('date_utc', 'desc').limit(1).executeTakeFirst();
       notCountable.push({ domain: d.domain, reason: afternicNs ? 'afternic_ns' : 'not_forwarded', afternic_views_30d: last?.views_30d ?? null, afternic_leads_30d: last?.leads_30d ?? null, afternic_read_date: last?.date_utc ?? null });

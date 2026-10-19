@@ -1,10 +1,9 @@
 // v5.18.0 (CR-068): the $0 visitor counter.
-//   POST /visits/hit (visits token only, Idempotency-Key, not audited per hit), POST /visits/import (WRITE or data), POST /visits/settings (WRITE + approval_ref naming "visits"),
-//   POST /visits/forward/{domain} (WRITE + approval_ref naming the domain and "visits"), GET /visits, GET /visits/weekly (READ).
+//   POST /visits/hit (visits token only, Idempotency-Key, not audited per hit), POST /visits/import (WRITE or data), POST /visits/settings (WRITE; v5.19.0: approval_ref optional and ignored),
+//   POST /visits/forward/{domain} (WRITE; v5.19.0: approval_ref optional and ignored, live NS check), GET /visits, GET /visits/weekly (READ).
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
-import { checkTimedApproval } from '../../../core/approval.js';
 import { dayNumber, realYmd } from '../../../core/dates.js';
 import { approvalRef } from '../../../core/validation.js';
 import type { Database } from '../../../db/types.js';
@@ -16,10 +15,10 @@ import { importAfternic, isCountable, normalizeReferrerHost, readDaily, recordHi
 
 const HitBody = z.object({ domain: z.string().min(1).max(253), ua_class: z.enum(['human', 'bot']), referrer_host: z.string().max(2048).nullable().optional() }).strict();
 const ImportBody = z.object({ domain: z.string().min(1).max(253), date: realYmd, views_30d: z.number().int().min(0).max(100_000_000), leads_30d: z.number().int().min(0).max(100_000_000) }).strict();
-const SettingsBody = z.object({ enabled: z.boolean().optional(), token: z.literal('request').optional(), approval_ref: approvalRef }).strict();
-const SettingsDoc = z.object({ enabled: z.boolean().optional(), token: z.literal('request').optional(), approval_ref: z.object({ text: z.string(), approved_at: z.string() }) }).strict();
-const ForwardBody = z.object({ approval_ref: approvalRef, revert: z.boolean().optional(), dry_run: z.boolean().optional() }).strict();
-const ForwardDoc = z.object({ approval_ref: z.object({ text: z.string(), approved_at: z.string() }), revert: z.boolean().optional(), dry_run: z.boolean().optional() }).strict();
+const SettingsBody = z.object({ enabled: z.boolean().optional(), token: z.literal('request').optional(), approval_ref: approvalRef.optional() }).strict();
+const SettingsDoc = z.object({ enabled: z.boolean().optional(), token: z.literal('request').optional(), approval_ref: z.object({ text: z.string(), approved_at: z.string() }).optional() }).strict();
+const ForwardBody = z.object({ approval_ref: approvalRef.optional(), revert: z.boolean().optional(), dry_run: z.boolean().optional() }).strict();
+const ForwardDoc = z.object({ approval_ref: z.object({ text: z.string(), approved_at: z.string() }).optional(), revert: z.boolean().optional(), dry_run: z.boolean().optional() }).strict();
 const RangeQuery = z.object({ from: realYmd.optional(), to: realYmd.optional() }).strict();
 const WeeklyQuery = z.object({ week_ending: realYmd }).strict();
 
@@ -29,7 +28,7 @@ const issues = (e: z.ZodError) => ({ issues: e.issues.map((i) => ({ path: i.path
 const invalid = (message: string, path: string): AppError => new AppError(422, 'VALIDATION_ERROR', message, { issues: [{ path, message }] });
 const dayMs = (ymd: string): number => dayNumber(ymd) * DAY;
 
-export function registerVisits(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; adapters: RegistrarAdapter[]; publicBaseUrl: string }): void {
+export function registerVisits(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; adapters: RegistrarAdapter[]; publicBaseUrl: string; nsLookup?: (d: string) => Promise<string[] | null> }): void {
   const { db } = deps;
 
   // From the api-proxy Worker, once per redirected visitor. Counts only; the answer says nothing but whether it was counted.
@@ -55,17 +54,11 @@ export function registerVisits(app: FastifyInstance, deps: { db: Kysely<Database
     return { domain, date: b.date, source: 'afternic', views_30d: b.views_30d, leads_30d: b.leads_30d, audit_id: req.auditId ?? null };
   });
 
-  // The switch, and the request for the visit-counter token. Dvir's line must name "visits" (and "visits token" for a token request).
+  // The switch, and the request for the visit-counter token. v5.19.0 (Dvir, 19 Oct 2026): no approval line needed; a sent approval_ref is accepted and ignored.
   app.post('/visits/settings', { config: { openapiBody: SettingsDoc } }, async (req) => {
     const b = SettingsBody.parse(req.body ?? {});
     if (b.enabled === undefined && b.token === undefined) throw invalid('enabled or token is required', 'enabled');
-    const cfg = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
-    const a = checkTimedApproval(b.approval_ref ?? null, new Date(deps.now()), cfg.approval_max_age_hours);
-    if (!a.ok) throw new AppError(422, a.code, a.reason);
-    const text = String(b.approval_ref?.text ?? '').toLowerCase();
-    if (!text.includes('visits')) throw new AppError(422, 'APPROVAL_INVALID', 'approval_ref.text must name "visits"');
-    if (b.token !== undefined && !text.includes('visits token')) throw new AppError(422, 'APPROVAL_INVALID', 'approval_ref.text must name "visits token"');
-    const out: Record<string, unknown> = { approved_at: a.approvedAt.toISOString() };
+    const out: Record<string, unknown> = {};
     const parts: string[] = [];
     if (b.enabled !== undefined) {
       const previous = await setVisitsEnabled(db, b.enabled, new Date(deps.now()));
@@ -86,7 +79,7 @@ export function registerVisits(app: FastifyInstance, deps: { db: Kysely<Database
     let domain: string;
     try { domain = normalizeDomain(req.params.domain); } catch { throw new AppError(404, 'DOMAIN_NOT_FOUND', 'Domain not found'); }
     const b = ForwardBody.parse(req.body ?? {});
-    const r = await setForward({ db, adapters: deps.adapters, publicBaseUrl: deps.publicBaseUrl, now: deps.now }, { domain, revert: b.revert === true, dryRun: b.dry_run === true, approvalRef: b.approval_ref ?? null });
+    const r = await setForward({ db, adapters: deps.adapters, publicBaseUrl: deps.publicBaseUrl, now: deps.now, nsLookup: deps.nsLookup }, { domain, revert: b.revert === true, dryRun: b.dry_run === true });
     req.auditSummary = `visits forward ${domain}${r.revert ? ' revert' : ''}${r.dry_run ? ' (dry run)' : ''}`;
     return { domain: r.domain, before: r.before, after: r.after, dry_run: r.dry_run, audit_id: req.auditId ?? null };
   });
@@ -107,7 +100,7 @@ export function registerVisits(app: FastifyInstance, deps: { db: Kysely<Database
     const end = q.data.week_ending;
     if (new Date(dayMs(end)).getUTCDay() !== 6) throw invalid('week_ending must be a Saturday', 'week_ending');
     const from = utcDay(dayMs(end) - 6 * DAY);
-    const w = await weekly(db, from, end);
+    const w = await weekly(db, from, end, deps.nsLookup);
     return { week_ending: end, week_start: from, enabled: await visitsEnabled(db), rows: w.rows, not_countable: w.not_countable };
   });
 }

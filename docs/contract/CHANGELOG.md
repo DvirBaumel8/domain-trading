@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.19.0 (2026-10-20): visitor counter on without approval lines; BUG-045 live NS check
+Release note: `docs/releases/v5.19.0.md`.
+MINOR (two request fields become optional; one rule fixed). Dvir, 19 Oct 2026: an approved CR needs no further lines from him.
+- `POST /visits/settings` and `POST /visits/forward/{domain}`: `approval_ref` is optional and ignored (was required, naming "visits"). The settings answer no longer carries `approved_at`.
+- Migration `1765000000000_v5-19-0.sql`: `visits.enabled` is on (default true), and the visit-counter token is requested, so the Mac host hands it to the api-proxy Worker on its next deploy tick.
+- **BUG-045:** "on Afternic nameservers" is decided by the live nameservers (also on `dry_run`), with the stored `lander_ns` as fallback. `lander: "afternic"` alone (the listing venue) no longer blocks `/visits/forward` or marks a name `afternic_ns` in `/visits/weekly`.
+
 ## 5.18.0 (2026-10-19): CR-068 visitor counter (proxy /r/ redirect, Porkbun forwards, visits scope)
 Release note: `docs/releases/v5.18.0.md`.
 MINOR (new routes, a new token scope, new error codes; nothing existing changes).

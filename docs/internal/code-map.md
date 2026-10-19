@@ -206,7 +206,7 @@ v5.18.0 (CR-068): the $0 visitor counter (rules and test IDs `docs/internal/visi
 
 Other files of the feature: `registrars/porkbun.ts` (`getUrlForwards`, `addUrlForward`, `deleteUrlForward`), `ops/admin/visits-token.ts` + `ops/admin.ts` (`visits-token-handoff [--done|--failed]`), `scripts/local-host/visits-token.sh` (called by `deploy.sh`), `api-proxy/src/index.ts` (`countingRedirect`, GET|HEAD `/r/<domain>`), `.github/workflows/deploy-api-proxy.yml` (sets the Worker secret `VISITS_TOKEN`), `http/auth.ts` (`VISITS_HIT_ROUTE`, scope `visits`, `/visits/import` in `DATA_ROUTES`), `http/audit.ts` (`UNAUDITED_POSTS`), `http/rate-limit.ts` (600 a minute for a visits token), `ops/jobs/retention.ts` (`visit_daily`, 400 days).
 
-Tables: `visit_daily`, `visit_forwards`; `settings.visits_enabled`, `visits_token_request` (migration `1764900000000_v5-18-0.sql`; not in the backup). Tests: `tests/modules/visits/` (`visits` V518-1..V518-15, `token-handoff` V518-16..V518-18), `api-proxy/src/index.test.ts` ("counting redirect").
+Tables: `visit_daily`, `visit_forwards`; `settings.visits_enabled`, `visits_token_request` (migration `1764900000000_v5-18-0.sql`; v5.19.0 `1765000000000_v5-19-0.sql` turns the counter on and requests the token; not in the backup). Tests: `tests/modules/visits/` (`visits` V518-1..V518-15, `token-handoff` V518-16..V518-18), `api-proxy/src/index.test.ts` ("counting redirect").
 
 ### selling
 Offers (record, classify, outcome), sold records, offer stats.

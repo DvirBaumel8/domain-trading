@@ -2,7 +2,6 @@
 // api-proxy Worker, which 302s on to the Afternic page and counts the hit), or back to the Afternic page (revert). Only the root and www forwards are touched.
 // Nothing else at the registrar changes (no nameserver, no DNS record, no price). The state is kept in visit_forwards.
 import type { Kysely } from 'kysely';
-import { checkApproval } from '../../core/approval.js';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 import { RegistrarError, type RegistrarAdapter, type UrlForward } from '../registrars/index.js';
@@ -16,20 +15,19 @@ const view = (f: Pick<UrlForward, 'subdomain' | 'location' | 'type' | 'includePa
 
 export interface ForwardResult { domain: string; before: ForwardView[]; after: ForwardView[]; dry_run: boolean; revert: boolean }
 
-export async function setForward(deps: { db: Kysely<Database>; adapters: RegistrarAdapter[]; publicBaseUrl: string; now: () => number }, o: {
-  domain: string; revert: boolean; dryRun: boolean; approvalRef: { text?: unknown; approved_at?: unknown } | null | undefined;
+export async function setForward(deps: { db: Kysely<Database>; adapters: RegistrarAdapter[]; publicBaseUrl: string; now: () => number; nsLookup?: (d: string) => Promise<string[] | null> }, o: {
+  domain: string; revert: boolean; dryRun: boolean;
 }): Promise<ForwardResult> {
   const { db } = deps;
-  const settings = await db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
-  const a = checkApproval(o.approvalRef, o.domain, new Date(deps.now()), settings.approval_max_age_hours);
-  if (!a.ok) throw new AppError(422, a.code, a.reason);
-  if (!String(o.approvalRef?.text ?? '').toLowerCase().includes('visits')) throw new AppError(422, 'APPROVAL_INVALID', 'approval_ref.text must name "visits"');
+  // v5.19.0 (Dvir, 19 Oct 2026): no approval line; CR-068 was approved as a whole. A sent approval_ref is accepted and ignored.
 
   const row = await db.selectFrom('domains').select(['status', 'registrar', 'lander', 'lander_ns']).where('domain', '=', o.domain).executeTakeFirst();
   if (!row) throw new AppError(404, 'DOMAIN_NOT_FOUND', 'Domain not found');
   if (row.status !== 'listed') throw new AppError(422, 'FORWARD_NOT_ALLOWED', `${o.domain} is not listed`, { reason: 'not_listed', status: row.status });
   if (row.registrar !== 'porkbun') throw new AppError(422, 'FORWARD_NOT_ALLOWED', 'URL forwards are set only at Porkbun', { reason: 'registrar', registrar: row.registrar });
-  if (onAfternicNs(row)) throw new AppError(422, 'FORWARD_NOT_ALLOWED', 'The name is on Afternic nameservers: Afternic serves its page, a registrar forward would not be used', { reason: 'afternic_ns' });
+  // BUG-045: the live nameservers decide (also on dry_run); the stored lander_ns only when the lookup fails.
+  const liveNs = deps.nsLookup ? await deps.nsLookup(o.domain).catch(() => null) : null;
+  if (onAfternicNs(row, liveNs)) throw new AppError(422, 'FORWARD_NOT_ALLOWED', 'The name is on Afternic nameservers: Afternic serves its page, a registrar forward would not be used', { reason: 'afternic_ns' });
 
   const counting = `${deps.publicBaseUrl.replace(/\/+$/, '')}/r/${o.domain}`;
   if (!o.revert && (deps.publicBaseUrl === DEFAULT_PUBLIC_BASE_URL || deps.publicBaseUrl.trim() === '')) {
