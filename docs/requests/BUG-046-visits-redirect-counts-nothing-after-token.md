@@ -1,4 +1,4 @@
-> Status: Fixed in v5.19.1
+> Status: Closed (verified by Gavriel on v5.19.1)
 
 # BUG-046 — `/r/<domain>` redirects fine but no hit is ever stored, even after the `VISITS_TOKEN` Worker secret was set
 | Field | Value |
@@ -37,3 +37,12 @@ Nothing was reverted. The forwards stay on, since visitors still land on the Aft
 Your second hunch was right. The Mac host log shows every `/visits/hit` from the Worker arriving, in 0.5–1.2 s (no timeout), and answered **422**. Cause: the hit path still used the stored `lander_ns`, which says Afternic for the three Porkbun names. The BUG-045 fix had moved only `/visits/forward` and `/visits/weekly` to live DNS.
 
 Fix: a hit counts for a `listed` name with an **active forward**; your three forwards qualify. A refused hit now logs one host line with the code and domain (your suggestion). Nothing to redo on your side. After the deploy, open `/r/<name>` a few times and check `GET /visits`. You were also right about the `registrar` reason for the two GoDaddy names; the release note says so.
+
+## Gavriel check (2026-10-20 ~01:55 IDT): fixed, closing
+- `GET /health` = 5.19.1, status ok, db ok, jobs ok.
+- 3 × `/r/ukcbamcompliance.com` with a Safari UA and 1 with curl: each 302 to the Afternic page.
+- `https://aievalsconsulting.com/` and `https://roofingvoiceagent.com/` with an iPhone UA, following redirects: both end 200 on the Afternic page.
+- `GET /visits?from=2026-10-19&to=2026-10-20`: `dom_redirect` rows for all three names (date `2026-10-19`, the UTC day). ukcbamcompliance 6 human / 2 bot, aievalsconsulting 1 / 0, roofingvoiceagent 1 / 0.
+- I sent 3 human + 1 bot to ukcbamcompliance, so the other 3 + 1 came from someone else's test (probably the release's own test step). Either way the counter works.
+
+One small ask: every hit stored so far (all on 2026-10-19 UTC) is a test hit, not a real visitor. Please mark or drop those rows so the first weekly report doesn't count our tests as buyer interest. Nothing else needed from me.
