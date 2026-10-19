@@ -22,6 +22,7 @@ import { registerDropLists, registerCohorts, registerCandidates, registerLessons
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
 import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
 import { registerData } from './modules/data/index.js';
+import { registerVisits } from './modules/visits/index.js';
 import { collectOpenApiRoutes, registerOpenApi } from './http/openapi.js';
 
 declare module 'fastify' {
@@ -191,6 +192,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const engineScorer = new Scorer({ ...base, screening: screeningDeps, log: app.log, ...deps.engineScore });
   registerEngine(app, { ...base, trainer: engineTrainer, scorer: engineScorer, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
   registerData(app, { ...base, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
+  registerVisits(app, { db: deps.db, now, adapters, publicBaseUrl: deps.config.publicBaseUrl });
   registerCandidates(app, { ...base, worker: screeningWorker, queue: () => app.jobQueue });
   registerEmails(app, base);
   registerCompany(app, { ...base, secretValues: deps.config.secretValues });

@@ -16,6 +16,8 @@ export interface RegisterDryRun {
 }
 export interface DomainInfo { expiryDate: string | null; whoisPrivacy: boolean | null; autoRenew: boolean | null; apiAccess: boolean | null; ns: string[] | null }
 export interface RegistrationRecord { orderId: string; chargedCents: number; expiryDate: string | null; invoiceDate: string; raw: unknown }
+/** v5.18.0 (CR-068): a registrar-side URL forward (Porkbun). `subdomain` is '' for the root. */
+export interface UrlForward { id: string; subdomain: string; location: string; type: 'temporary' | 'permanent' | 'masked'; includePath: boolean; wildcard: boolean }
 export interface RegistrarAdapter {
   readonly name: string;
   readonly capabilities: Capabilities;
@@ -30,6 +32,10 @@ export interface RegistrarAdapter {
   getReceipt(orderId: string): Promise<unknown>;
   /** The registration invoice for a domain in our account, on or after `since` (YYYY-MM-DD); null if none. */
   findRegistration(domain: string, opts: { since: string }): Promise<RegistrationRecord | null>;
+  /** v5.18.0 (CR-068): URL forwarding, only on adapters that have it (Porkbun). */
+  getUrlForwards?(domain: string): Promise<UrlForward[]>;
+  addUrlForward?(domain: string, f: { subdomain: string; location: string; temporary: boolean; includePath: boolean; wildcard: boolean }): Promise<void>;
+  deleteUrlForward?(domain: string, id: string): Promise<void>;
 }
 
 /** Codes for outcomes where the registrar may or may not have acted (never retry a purchase with a new key). */

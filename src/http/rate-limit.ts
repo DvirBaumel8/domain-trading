@@ -9,6 +9,9 @@ import type { Database } from '../db/types.js';
 /** POST /jobs/run by a WRITE token: calls per hour per token (the job token keeps the general 10 per minute). */
 const WRITE_JOB_RUNS_PER_HOUR = 4;
 
+/** v5.18.0 (CR-068): POST /visits/hit by the api-proxy Worker: its own limit per token (every redirected visitor is one call; a bot burst must not eat the general 10 a minute). */
+const VISIT_HITS_PER_MINUTE = 600;
+
 /** POST /reviews/run: calls per hour per WRITE token (the outside review costs money and counts toward the monthly cap). */
 const REVIEW_RUNS_PER_HOUR = 3;
 
@@ -86,6 +89,7 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
   const writes = new SlidingWindowLimiter(10, 60_000, now);
   const jobStarts = new SlidingWindowLimiter(WRITE_JOB_RUNS_PER_HOUR, 3_600_000, now);
   const reviewRuns = new SlidingWindowLimiter(REVIEW_RUNS_PER_HOUR, 3_600_000, now);
+  const visitHits = new SlidingWindowLimiter(VISIT_HITS_PER_MINUTE, 60_000, now);
   app.addHook('onSend', async (req, reply, payload) => {
     if (!req.auth || !reachedGoogle.has(req)) return payload;
     const st = reviewRuns.state(String(req.auth.tokenId));
@@ -100,7 +104,7 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
     if (key === null) return; // public routes (/health) are not limited
     // CR-007 T-2: a WRITE token starting a job has its own, tighter limit (instead of the general write limit).
     const reviewRun = req.auth && req.routeOptions?.url === '/reviews/run' && req.method === 'POST' && req.auth.scope === 'write';
-    const limiter = reviewRun ? reviewRuns : req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method, req.routeOptions?.url) ? writes : reads;
+    const limiter = reviewRun ? reviewRuns : req.auth?.scope === 'visits' ? visitHits : req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method, req.routeOptions?.url) ? writes : reads;
     // POST /reviews/run is counted only when the call reaches Google (the slot is taken just before the Google call); here it is only refused when the hour is already used up.
     const replay = db !== undefined && isMutating(req.method, req.routeOptions?.url) && (await isIdempotentReplay(db, req));
     if (reviewRun && !replay) reviewSlotTakers.set(req, () => { reviewRuns.take(key); });

@@ -7,7 +7,7 @@ import { REGISTRAR_ENV } from './modules/registrars/index.js';
 const CODE_REPO = 'DvirBaumel8/domain-trading';
 
 /** The service's own public URL (the job queue's keep-alive ping). */
-const DEFAULT_PUBLIC_BASE_URL = 'https://domain-trading-api.onrender.com';
+export const DEFAULT_PUBLIC_BASE_URL = 'https://domain-trading-api.onrender.com';
 
 /** CR-062: a published NameBio file is fetched only from an https URL on namebio.com (the module re-checks before every request). */
 const isNameBioFileUrl = (v: string): boolean => {

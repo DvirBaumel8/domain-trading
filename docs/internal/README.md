@@ -21,6 +21,7 @@ These are **DOM's own** working documents: the binding business rules, internals
 | `selection/` | Source READMEs for the census and NameBio data (`census-README.md`, `namebio-README.md`) |
 | `code-map.md` | Where every module, file, route, table and test is (start here for any change) |
 | `engine.md` | Scoring engine (CR-056): release plan, data model, endings fill and point-in-time rules; EN-* |
+| `visits.md` | Visitor counter (CR-068, 5.18.0): privacy rules, scope, the forward, the token hand-off; V518-* |
 | `sources.md` | Terms log of every outside data source |
 | `gaps.md` | Every gap between these docs and the code, with a decision |
 

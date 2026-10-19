@@ -45,12 +45,18 @@ export function dbAuditWriter(db: Kysely<Database>): AuditWriter {
   };
 }
 
+/**
+ * v5.18.0 (CR-068): POST routes that are not written to audit_log, one row per call being the bloat: POST /visits/hit (a counter hit from the visit-counter Worker,
+ * every redirected visitor). It still needs a visits token and an Idempotency-Key; the visit_daily row is the record, and nothing but the three counted fields is sent.
+ */
+const UNAUDITED_POSTS: ReadonlySet<string> = new Set(['/visits/hit']);
+
 /** onRequest, registered FIRST so even a 401 gets an id. */
 export function registerAuditId(app: FastifyInstance): void {
   app.decorateRequest('auditId', null);
   app.decorateRequest('auditSummary', null);
   app.addHook('onRequest', async (req) => {
-    if (isMutating(req.method, req.routeOptions?.url)) req.auditId = newAuditId();
+    if (isMutating(req.method, req.routeOptions?.url) && !(req.method === 'POST' && UNAUDITED_POSTS.has(req.routeOptions?.url ?? ''))) req.auditId = newAuditId();
   });
 }
 

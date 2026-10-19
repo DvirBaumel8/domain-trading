@@ -17,6 +17,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | Reports and books | `GET /report`, `GET /report/pricing-review`, `GET /ledger`, `GET /portfolio`, `GET /portfolio/{domain}`, `GET /audit` | READ |
 | Load data for the scoring engine and score names | `POST /engine/sales`, `POST /engine/unsold`, `POST /data/*` (rdap, live-checks, tm-kills, bigco-names, sales-comps), `POST /score`, `GET /engine/health` | WRITE or data token for the loads; READ for `GET` and `POST /score` |
 | Selection and screening | `GET /selection/settings`, `POST /selection/evaluate`, `POST /screening/runs`, `POST /screening/packs`, `GET /selection/buy-hold`, `POST /candidates/intake`, `GET /candidates/daily` | READ for `GET`, WRITE for `POST` (`/candidates/intake` also takes an intake or data token) |
+| Count visitors of the listed names (off until Dvir's line) | `POST /visits/forward/{domain}`, `POST /visits/settings`, `POST /visits/import`, `GET /visits`, `GET /visits/weekly` (the counting itself is `POST /visits/hit`, visits token only) | WRITE, WRITE, WRITE or data, READ, READ |
 | Jobs | `POST /jobs/run` (`tick`, `daily`), `GET /jobs/runs` | job token or WRITE; READ |
 | Health | `GET /health/ping` (no token), `GET /health` | none, READ |
 
@@ -55,6 +56,10 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
 | POST | `/engine/holdout-date` | WRITE only (not a data token) | Holdout guard (5.10.0, CR-061) |
 | GET | `/engine/holdout-date` | READ | Holdout guard (5.10.0, CR-061) |
+| POST | `/visits/hit` | visits token only | Visitor counter (5.18.0, CR-068) |
+| POST | `/visits/import` | WRITE or data | Visitor counter (5.18.0, CR-068) |
+| POST | `/visits/settings`, `/visits/forward/{domain}` | WRITE only | Visitor counter (5.18.0, CR-068) |
+| GET | `/visits`, `/visits/weekly` | READ (data and visits tokens get 403) | Visitor counter (5.18.0, CR-068) |
 | GET | `/engine/health`, `/engine/train/{id}` | READ | Scoring engine (5.4.0, 5.5.0) |
 | GET | `/owned/{domain}/endings` | READ | Owned-name endings watch (5.7.0, CR-058) |
 | POST | `/score` | READ (the one read-only POST: no `Idempotency-Key`, no audit row) | Scoring engine (5.5.0) |
@@ -572,6 +577,28 @@ Read as described under `GET /data/rdap`.
 
 **Retention (daily step `retention`, `jobs.md`):** `live` and `livefail` rows older than 3 days, `cc` rows older than 14 days, and `domain_rdap` rows of names that left the pool are deleted. `tm_kills`, `bigco_names` and `sales_comps` are never pruned.
 
+## Visitor counter (5.18.0, CR-068)
+
+A $0 count of visitors to our listed names. The Porkbun URL forward of a name points at the counting redirect `GET /r/{domain}` on the api-proxy Worker (the stable public URL, `PUBLIC_BASE_URL`). The Worker answers `302` to `https://www.afternic.com/domain/{domain}` at once (no cookie, nothing cached), then sends one count to `POST /visits/hit` with a `visits` token. **Counts only:** per name, UTC day and source: `human_hits`, `bot_hits`, `capped` and referrer **hosts**. No IP (raw or hashed), cookie, path, query or user-agent string is sent or stored; the body of a hit has exactly three fields. If the Mac host is down, the visitor is still redirected and the count is dropped. Rows are kept 400 days (retention job). **Off until Dvir's line:** `visits.enabled` is false (`POST /visits/hit` → 409 `VISITS_DISABLED`, nothing stored). Names on Afternic's nameservers (`ns1/ns2.afternic.com`) cannot be counted (Afternic serves their page): their Afternic Views and Leads (CR-037) are loaded with `POST /visits/import` and shown by `GET /visits/weekly`.
+
+### `POST /visits/hit`
+`visits` token only (README §Who may call): a WRITE, READ or data token is 403 `SCOPE_FORBIDDEN`, and a visits token can call nothing else. `Idempotency-Key` required (the Worker sends a random UUID per hit). Body (strict) `{domain, ua_class: "human"|"bot", referrer_host?: string|null}`. `referrer_host` is reduced to a lowercase host (a URL that slips in loses scheme, user info, port, path, query and fragment; a value that is not a host, or over 253 characters, is stored as `other`). Per name per UTC day: the first 1,000 hits (human + bot) are counted; every further hit only adds to `capped` and changes no other count. Per day, the first 10 distinct referrer hosts keep their own count, the rest add to `other`. **Not audited per hit** (one `audit_log` row per redirected visitor would be the bulk of the log): the `visit_daily` row is the record; the other `/visits` writes are audited. Its token has its own limit of 600 calls per minute. **202** `{counted, capped}`. **Errors:** 409 `VISITS_DISABLED` · 422 `DOMAIN_NOT_LISTED` (not in the portfolio, status not `listed`, or on Afternic's nameservers) · 422 `VALIDATION_ERROR` (an unknown key such as `ip`) · 400 `IDEMPOTENCY_KEY_REQUIRED` · 403 `SCOPE_FORBIDDEN`.
+
+### `POST /visits/import`
+WRITE or data token. Body (strict) `{domain, date: "YYYY-MM-DD", views_30d, leads_30d}` (integers ≥ 0; `date` a real day, not in the future): Afternic's 30-day Views and Leads read on `date` (CR-037). Stored as the `afternic` source row of that day; a re-import of the same `(domain, date)` replaces it. **200** `{domain, date, source: "afternic", views_30d, leads_30d, audit_id}`. **Errors:** 422 `DOMAIN_NOT_LISTED` (a name that is not in the portfolio) · 422 `VALIDATION_ERROR` · 400 `IDEMPOTENCY_KEY_REQUIRED` · 403 for a READ token.
+
+### `POST /visits/settings`
+WRITE only (audited, `Idempotency-Key` required). Body (strict) `{enabled?: boolean, token?: "request", approval_ref: {text, approved_at}}`, at least one of `enabled` and `token`. The `approval_ref` is Dvir's line: its `text` must contain `visits` (case-insensitive), and `visits token` for `token: "request"`; `approved_at` ISO 8601 with an offset, not in the future, not older than 72 h. `enabled` switches the counter (`visits.enabled`). `token: "request"` sets `visits.token_request` to `requested`: the Mac host then creates a `visits` token named `visit-counter` (revoking the older one), puts it into the GitHub secret `VISIT_COUNTER_TOKEN` and starts `deploy-api-proxy`, which sets it on the Worker; no person and no API response ever shows the token. **200** `{enabled?, previous?, token_request?: "requested", token_request_before?, approved_at, audit_id}`. **Errors:** 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` · 422 `VALIDATION_ERROR` · 403 for a READ, data or visits token.
+
+### `POST /visits/forward/{domain}`
+WRITE only (audited, `Idempotency-Key` required). Body (strict) `{approval_ref: {text, approved_at}, revert?: boolean, dry_run?: boolean}`. The `approval_ref` must name the domain and contain `visits`. Allowed only for a name that is `listed`, registered at Porkbun and not on Afternic's nameservers. It reads the name's URL forwards at Porkbun, deletes the root and `www` ones, and adds temporary (302) forwards, wildcard as the old root forward had it (default yes), path not appended, to `{PUBLIC_BASE_URL}/r/{domain}` (the root, and `www` when it had one). `revert: true` restores `https://www.afternic.com/domain/{domain}`. Other forwards (for example a `blog` subdomain), nameservers and DNS records are never touched. `dry_run: true` reads the current forwards and returns the plan; nothing is changed. The state is kept per name (`visit_forwards`). **200** `{domain, before: [forward], after: [forward], dry_run, audit_id}` with forward = `{subdomain ("" = root), location, type, include_path, wildcard}`. **Errors:** 404 `DOMAIN_NOT_FOUND` · 422 `FORWARD_NOT_ALLOWED` (`details.reason`: `not_listed`, `registrar`, `afternic_ns`) · 422 `PUBLIC_BASE_URL_UNSET` (the server's `PUBLIC_BASE_URL` is still the default, so the redirect address is unknown) · 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` · 502 `REGISTRAR_ERROR` (`details.registrar_code`) · 503 `REGISTRAR_UNAVAILABLE` (Porkbun adapter not configured) · 403 for a READ, data or visits token.
+
+### `GET /visits`
+READ (a data or visits token is 403). Query `from`, `to` (`YYYY-MM-DD`, UTC days; default the last 30 days; at most 400 days; an unknown parameter or `from` after `to` is 422 `VALIDATION_ERROR`). **200** `{from, to, enabled, rows: [{domain, date, source: "dom_redirect"|"afternic", human_hits, bot_hits, capped, referrer_hosts: {host: n}, views_30d, leads_30d}]}` (`views_30d`/`leads_30d` only for the `afternic` source, null otherwise).
+
+### `GET /visits/weekly`
+READ. Query `week_ending=YYYY-MM-DD`, required, must be a Saturday (else 422 `VALIDATION_ERROR`); the week runs Sunday to Saturday in UTC. **200** `{week_ending, week_start, enabled, rows, not_countable}`. `rows`: one per listed name that is counted (an active forward to the counting redirect, not on Afternic's nameservers; zeros when nothing came): `{domain, source: "dom_redirect", human_hits, bot_hits, capped, top_referrers: [{host, n}]}` (top 5). `not_countable`: the other listed names, `{domain, reason: "afternic_ns"|"not_forwarded", afternic_views_30d, afternic_leads_30d, afternic_read_date}` where the Afternic fields come from the newest imported row (any date; null when none).
+
 ## Sales patterns (4.0.0)
 
 The service fetches no sales data (NameBio blocks bots; no source allows an automated pull). Gavriel uploads them (CR-044 item 4).
@@ -993,6 +1020,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Scout lesson errors (5.3.0):** `LESSON_NOT_FOUND` (404, `PATCH /lessons/{id}`).
 
 **Engine upload codes (5.10.0, CR-061):** `DB_SIZE_HIGH` (409, `POST /engine/sales` and `/engine/unsold`: the load would pass 70% of the 1 GB free-plan limit (0.5 GB before 5.13.0); the same code is a `/report` warning), `HOLDOUT_SEALED` (a per-row reject reason, not an error status).
+
+**Visitor counter (5.18.0, CR-068):** `VISITS_DISABLED` (409), `DOMAIN_NOT_LISTED` (422), `FORWARD_NOT_ALLOWED` (422), `PUBLIC_BASE_URL_UNSET` (422); also `REGISTRAR_ERROR` (502, `POST /visits/forward`), `REGISTRAR_UNAVAILABLE`, `DOMAIN_NOT_FOUND`, `APPROVAL_INVALID`, `APPROVAL_EXPIRED`.
 
 **Loaded data tables (5.12.0, CR-063):** `DB_SIZE_HIGH` (409) also on `POST /data/*`; per-row reject reasons are listed under `POST /data/rdap`.
 

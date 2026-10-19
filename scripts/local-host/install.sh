@@ -22,7 +22,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 command -v node >/dev/null || { echo "node is missing (brew install node)"; exit 1; }
 CLOUDFLARED="$(command -v cloudflared)" || { echo "cloudflared is missing (brew install cloudflared)"; exit 1; }  # launchd needs the full path (no PATH lookup)
 mkdir -p "$ENV_DIR" "$LOG_DIR" "$AGENTS" "$HOST_DIR"
-cp "$HERE/start.sh" "$HERE/stop.sh" "$HERE/resume.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HERE/rotate-logs.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
+cp "$HERE/start.sh" "$HERE/stop.sh" "$HERE/resume.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HERE/rotate-logs.sh" "$HERE/visits-token.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
 [ -d "$PROD_DIR/.git" ] || git clone --quiet "$REPO_URL" "$PROD_DIR"
 
 if [ ! -f "$ENV_FILE" ]; then

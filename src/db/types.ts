@@ -6,7 +6,7 @@ type Timestamp = ColumnType<Date, Date | string, Date | string>;
 type TimestampDefault = ColumnType<Date, Date | string | undefined, Date | string>;
 type Json = ColumnType<unknown, string, string>; // insert/update with JSON.stringify(...)
 
-export type Scope = 'read' | 'write' | 'intake' | 'data';
+export type Scope = 'read' | 'write' | 'intake' | 'data' | 'visits';
 export type Category = 'geo' | 'trend' | 'b2b' | 'collision' | 'regulation' | 'buzzword' | 'other';
 export type ListingMode = 'bin' | 'offer' | 'hybrid';
 export type DomainStatus = 'pending_purchase' | 'owned' | 'listed' | 'delisted' | 'sold' | 'dropped';
@@ -37,6 +37,12 @@ export interface SettingsTable {
   s8_bin_ladder: Generated<unknown>;
   /** v5.10.0 (CR-061): engine.sales_max_date, the holdout guard. Sales and unsold rows dated after it are rejected. Changed only by POST /engine/holdout-date. */
   engine_sales_max_date: Generated<DateString>;
+  /** v5.18.0 (CR-068): visits.enabled. Off until Dvir's line; changed only by POST /visits/settings. */
+  visits_enabled: Generated<boolean>;
+  /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
+  visits_token_request: Generated<'requested' | 'issued' | null>;
+  visits_token_requested_at: Generated<Date | null>;
+  visits_token_issued_at: Generated<Date | null>;
   approval_max_age_hours: Generated<number>;
   lander_target: Generated<'afternic' | 'sedo' | 'custom'>;
   allowed_registrars: Generated<string[]>;
@@ -551,6 +557,33 @@ export interface BigcoNamesTable {
   by: string;
   audit_id: string | null;
   created_at: TimestampDefault;
+}
+
+/** v5.18.0 (CR-068): daily visitor counts per domain and source; aggregates only. */
+export interface VisitDailyTable {
+  id: Generated<number>;
+  domain: string;
+  date_utc: DateString;
+  source: 'dom_redirect' | 'afternic';
+  human_hits: Generated<number>;
+  bot_hits: Generated<number>;
+  capped: Generated<number>;
+  referrer_hosts: ColumnType<Record<string, number>, string | undefined, string>;
+  views_30d: number | null;
+  leads_30d: number | null;
+  imported_at: Timestamp | null;
+  created_at: TimestampDefault;
+  updated_at: TimestampDefault;
+}
+
+/** v5.18.0 (CR-068): the URL forward POST /visits/forward set at the registrar (active while reverted_at is null). */
+export interface VisitForwardsTable {
+  id: Generated<number>;
+  domain: string;
+  target: string;
+  before_forwards: ColumnType<unknown, string | undefined, string>;
+  set_at: Timestamp;
+  reverted_at: Timestamp | null;
 }
 
 export interface SalesCompsTable {
@@ -1317,6 +1350,8 @@ export interface Database {
   tm_kills: TmKillsTable;
   bigco_names: BigcoNamesTable;
   sales_comps: SalesCompsTable;
+  visit_forwards: VisitForwardsTable;
+  visit_daily: VisitDailyTable;
   engine_endings: EngineEndingsTable;
   owned_ending_events: OwnedEndingEventsTable;
   engine_models: EngineModelsTable;

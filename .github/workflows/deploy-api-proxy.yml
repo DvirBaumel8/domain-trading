@@ -58,3 +58,20 @@ jobs:
           # The deployed URL (the stable PUBLIC_BASE_URL / API_BASE_URL) is printed by wrangler: "https://domain-trading-api-proxy.<subdomain>.workers.dev".
           npx wrangler deploy --var "TUNNEL_URL:${{ vars.TUNNEL_URL }}" 2>&1 | tee deploy.log
           echo "Deployed URL: $(grep -oE 'https://domain-trading-api-proxy\.[a-z0-9-]+\.workers\.dev' deploy.log | head -1)"
+
+      # CR-068: the visits-scope token for the counting redirect (/r/<domain>). The Mac host puts it into the VISIT_COUNTER_TOKEN repo secret
+      # (scripts/local-host/visits-token.sh) and starts this workflow; a Worker secret survives later deploys. No secret yet: nothing to do.
+      # The value goes through an environment variable into wrangler's stdin; it is never echoed.
+      - name: Set the VISITS_TOKEN Worker secret
+        timeout-minutes: 3
+        if: github.ref == 'refs/heads/main' && vars.TUNNEL_URL != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VISIT_COUNTER_TOKEN: ${{ secrets.VISIT_COUNTER_TOKEN }}
+        run: |
+          if [ -z "$VISIT_COUNTER_TOKEN" ]; then
+            echo "::notice::VISIT_COUNTER_TOKEN is not set; the counting redirect redirects but counts nothing."
+            exit 0
+          fi
+          printf '%s' "$VISIT_COUNTER_TOKEN" | npx wrangler secret put VISITS_TOKEN

@@ -3,7 +3,7 @@
 // `config: { openapiBody: <zod schema> }`; the request body's JSON schema is then made from that schema (z.toJSONSchema).
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { DATA_ROUTES, DATA_PREFIX, INTAKE_ROUTES, JOB_PATH, PUBLIC_PATHS } from './auth.js';
+import { DATA_ROUTES, DATA_PREFIX, INTAKE_ROUTES, JOB_PATH, PUBLIC_PATHS, VISITS_HIT_ROUTE } from './auth.js';
 import { isMutating } from './methods.js';
 
 declare module 'fastify' {
@@ -145,6 +145,12 @@ const SUMMARIES: Record<string, string> = {
   'POST /reviews/items/{id}/status': 'Set the status of a review item',
   'POST /reviews/{packet_id}/feedback': 'Record review feedback',
   'GET /reviews/cost': 'Review cost this month',
+  'POST /visits/hit': 'Count one visit (visits token only; sent by the api-proxy counting redirect)',
+  'POST /visits/import': 'Load Afternic 30-day Views/Leads for a name (WRITE or data)',
+  'POST /visits/settings': 'Switch the visitor counter on or off, or request the visit-counter token (WRITE; the approval_ref must name "visits")',
+  'POST /visits/forward/{domain}': 'Point the Porkbun URL forward of a listed name at the counting redirect, or revert it (WRITE; approval_ref names the domain and "visits")',
+  'GET /visits': 'Daily visitor counts',
+  'GET /visits/weekly': 'Weekly visitor counts per name (Sunday to Saturday, UTC) and the names that cannot be counted',
   'GET /reviews/settings': 'Review settings',
   'POST /reviews/settings': 'Change review settings',
   'GET /reviews/settings/history': 'Review settings history',
@@ -157,6 +163,7 @@ const paramsOf = (path: string): string[] => [...path.matchAll(/\{([^}]+)\}/g)].
 function scopeOf(method: string, url: string): string {
   if (PUBLIC_PATHS.has(url)) return 'none';
   if (url === JOB_PATH && method === 'POST') return 'write or job-trigger token';
+  if (method === 'POST' && url === VISITS_HIT_ROUTE) return 'visits';
   if (method === 'POST' && INTAKE_ROUTES.has(url)) return DATA_ROUTES.has(url) ? 'write or intake or data' : 'write or intake';
   if (method === 'POST' && (DATA_ROUTES.has(url) || url.startsWith(DATA_PREFIX))) return 'write or data';
   return isMutating(method, url) ? 'write' : 'read';

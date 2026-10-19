@@ -17,6 +17,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # G-109: stop.sh paused the host on purpose; a pause means no fetch, no build, no switch, no restart (resume.sh ends it).
 PAUSE_FLAG="${PAUSE_FLAG:-$HOME/.local/share/domain-trading-host/PAUSED}"
 if [ -f "$PAUSE_FLAG" ]; then echo "$(date -u +%FT%TZ) paused since $(cut -d' ' -f1 "$PAUSE_FLAG"), not deploying"; exit 0; fi
+# CR-068: hands a requested visit-counter token to the GitHub secret (every tick, also outside the nightly window). Non-fatal; prints no token.
+"$HERE/visits-token.sh" || true
 cd "$PROD_DIR"
 mkdir -p "$RELEASES"
 

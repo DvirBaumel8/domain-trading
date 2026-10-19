@@ -168,11 +168,15 @@ export const INTAKE_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake',
 const intakeForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'An intake token may only call POST /candidates/intake and POST /selection/drop-lists');
 
 /** v5.10.0 (CR-061): the routes a `data` token may call (all POST): intake, the two engine uploads, and every route under `/data/` (CR-063). Everything else, GETs included, is 403 SCOPE_FORBIDDEN. */
-export const DATA_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake', '/engine/sales', '/engine/unsold']);
+export const DATA_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake', '/engine/sales', '/engine/unsold', '/visits/import']);
 export const DATA_PREFIX = '/data/';
 const isDataRoute = (routeUrl: string): boolean => DATA_ROUTES.has(routeUrl) || routeUrl.startsWith(DATA_PREFIX);
 
-const dataForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A data token may only call POST /candidates/intake, POST /engine/sales, POST /engine/unsold and POST /data/*');
+const dataForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A data token may only call POST /candidates/intake, POST /engine/sales, POST /engine/unsold, POST /visits/import and POST /data/*');
+
+/** v5.18.0 (CR-068): the one route a `visits` token may call, and the only scope that may call it (WRITE, READ and data tokens are 403). */
+export const VISITS_HIT_ROUTE = '/visits/hit';
+const visitsForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A visits token may only call POST /visits/hit, and only a visits token may call it');
 
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
@@ -180,6 +184,11 @@ export function registerScope(app: FastifyInstance): void {
       if (req.method !== 'POST' || !INTAKE_ROUTES.has(req.routeOptions?.url ?? '')) throw intakeForbidden();
       return;
     }
+    if (req.auth?.scope === 'visits' && !req.jobAuth) {
+      if (req.method !== 'POST' || req.routeOptions?.url !== VISITS_HIT_ROUTE) throw visitsForbidden();
+      return;
+    }
+    if (req.routeOptions?.url === VISITS_HIT_ROUTE && !req.jobAuth && req.auth) throw visitsForbidden();
     if (req.auth?.scope === 'data' && !req.jobAuth) {
       if (req.method !== 'POST' || !isDataRoute(req.routeOptions?.url ?? '')) throw dataForbidden();
       return;

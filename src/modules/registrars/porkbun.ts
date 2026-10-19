@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { usdStringToCents } from '../../core/money.js';
 import {
   RegistrarError, type AccountState, type Capabilities, type DomainInfo, type Quote, type RegisterDryRun,
-  type RegisterInput, type RegisterSuccess, type RegistrarAdapter, type RegistrationRecord,
+  type RegisterInput, type RegisterSuccess, type RegistrarAdapter, type RegistrationRecord, type UrlForward,
 } from './types.js';
 
 export const PORKBUN_DEFAULT_BASE = 'https://api.porkbun.com/api/json/v3';
@@ -23,6 +23,9 @@ export const PORKBUN_ENDPOINTS = {
   getNs: { method: 'POST', path: '/domain/getNs/{domain}' },
   updateNs: { method: 'POST', path: '/domain/updateNs/{domain}' },
   updateAutoRenew: { method: 'POST', path: '/domain/updateAutoRenew/{domain}' },
+  getUrlForwarding: { method: 'POST', path: '/domain/getUrlForwarding/{domain}' },
+  addUrlForward: { method: 'POST', path: '/domain/addUrlForward/{domain}' },
+  deleteUrlForward: { method: 'POST', path: '/domain/deleteUrlForward/{domain}/{id}' },
   balance: { method: 'GET', path: '/account/balance' },
   apiSettings: { method: 'GET', path: '/account/apiSettings' },
   invoices: { method: 'GET', path: '/account/invoices' },
@@ -257,6 +260,27 @@ export class PorkbunAdapter implements RegistrarAdapter {
     if (isObj(mine) && mine.status !== 'SUCCESS') {
       throw new RegistrarError(NAME, 'AUTO_RENEW_UPDATE_FAILED', 'Porkbun did not change auto-renew for this domain');
     }
+  }
+
+  /** v5.18.0 (CR-068): the domain's URL forwards (root is subdomain ''). */
+  async getUrlForwards(domain: string): Promise<UrlForward[]> {
+    const r = await this.call('getUrlForwarding', { params: { domain } });
+    if (!Array.isArray(r.forwards)) throw this.bad('getUrlForwarding without forwards array');
+    return r.forwards.filter(isObj).map((f) => ({
+      id: String(f.id), subdomain: typeof f.subdomain === 'string' ? f.subdomain : '', location: typeof f.location === 'string' ? f.location : '',
+      type: f.type === 'permanent' || f.type === 'masked' ? f.type : 'temporary', includePath: f.includePath === 'yes', wildcard: f.wildcard === 'yes',
+    }));
+  }
+
+  async addUrlForward(domain: string, f: { subdomain: string; location: string; temporary: boolean; includePath: boolean; wildcard: boolean }): Promise<void> {
+    await this.call('addUrlForward', {
+      params: { domain },
+      body: { ...(f.subdomain ? { subdomain: f.subdomain } : {}), location: f.location, type: f.temporary ? 'temporary' : 'permanent', ...(f.temporary ? { redirectType: '302' } : {}), includePath: f.includePath ? 'yes' : 'no', wildcard: f.wildcard ? 'yes' : 'no' },
+    });
+  }
+
+  async deleteUrlForward(domain: string, id: string): Promise<void> {
+    await this.call('deleteUrlForward', { params: { domain, id } });
   }
 
   async getReceipt(orderId: string): Promise<unknown> {

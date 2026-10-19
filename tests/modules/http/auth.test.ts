@@ -239,9 +239,10 @@ describe('auth (AU)', () => {
     app = await makeApp({ testRoutes: false });
     // The caps (`settings`) and `pricing_settings` have no route. The selection settings routes are the one deliberate
     // exception (CR-001 CAP-00; drafts are WRITE, activation needs approval_ref; they hold no cap and no price).
-    for (const r of app.routeTable.filter((x) => !x.url.startsWith('/selection/settings') && x.url !== '/reviews/settings' && x.url !== '/reviews/settings/history')) {
+    for (const r of app.routeTable.filter((x) => !x.url.startsWith('/selection/settings') && x.url !== '/reviews/settings' && x.url !== '/reviews/settings/history' && x.url !== '/visits/settings')) {
       expect(r.url).not.toMatch(/token|settings/i);
     }
+    // /visits/settings (v5.18.0, CR-068) is the visitor counter's switch and token request: no cap, no price, no token reveal (the token is handed host to secret store).
     // /reviews/settings (v2.11.2) is the outside review's switch, model and tier: no cap, no price.
     expect(app.routeTable.filter((x) => x.url.startsWith('/selection/settings')).map((x) => `${x.method} ${x.url}`).sort()).toEqual([
       'GET /selection/settings', 'HEAD /selection/settings', 'POST /selection/settings', 'POST /selection/settings/:label/activate',

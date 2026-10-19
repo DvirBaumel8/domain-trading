@@ -39,6 +39,7 @@ const RETENTION_RULES = [
   { key: 'daily_candidate_lists', days: [90, 45], idStart: '0' },
   { key: 'namebio_calls', days: [30, 30], idStart: '0' },
   { key: 'listing_sync_log', days: [180, 90], idStart: '0' },
+  { key: 'visit_daily', days: [400, 400], idStart: '0' }, // v5.18.0 (CR-068): daily visitor counts, 400 days
 ] as const;
 type RetentionKey = (typeof RETENTION_RULES)[number]['key'];
 type Rule = { key: RetentionKey; days: readonly [number, number]; idStart: string; pk?: string };
@@ -109,6 +110,8 @@ function candidates(key: RetentionKey, cut: Date, cursor: string, limit: number)
       return sql`select t.id from listing_sync_log t
         where t.id > ${cursor} and t.at < ${cut} and exists (select 1 from listing_sync_log n where n.domain = t.domain and n.venue = t.venue and n.action = t.action and n.id > t.id)
         order by t.id limit ${limit}`;
+    case 'visit_daily':
+      return sql`select t.id from visit_daily t where t.id > ${cursor} and t.date_utc < ${cut}::date order by t.id limit ${limit}`;
     case 'candidate_screenings':
       return sql`select t.id from candidate_screenings t
         where t.id > ${cursor} and t.run_id in (${emptyOldRun(cut)}) order by t.id limit ${limit}`;

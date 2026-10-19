@@ -10,10 +10,11 @@ import { ImportInputError, importDomain, type ImportInput } from './admin/import
 import { createAdapters } from '../registrars/index.js';
 import { readFileSync } from 'node:fs';
 import { AppError } from '../../http/errors.js';
+import { failVisitsTokenHandoff, issueVisitsToken, markVisitsTokenIssued } from './admin/visits-token.js';
 import { exitWith, UsageError, withDb } from './cli.js';
 
 const USAGE = `usage:
-  npm run admin -- token create --scope read|write|intake|data --name <name>
+  npm run admin -- token create --scope read|write|intake|data|visits --name <name>
   npm run admin -- token revoke --id <id>
   npm run admin -- token expire --id <id> --at <ISO 8601 time with an offset>
   npm run admin -- token list
@@ -25,6 +26,7 @@ const USAGE = `usage:
       [--comps-file comps.json | --legacy-no-comps "<reason>"] [--approval-text "<words>" --approval-at <ISO>] [--manual --expiry YYYY-MM-DD] [--renewal-price N] [--dry-run]
   npm run admin -- resolve-purchase --id <purchase_id> --fail --reason "<text>"   (a purchase stuck in unknown/register_sent; check the registrar account first)
   npm run admin -- record-renewal <domain> --charged-cents N --approval-text "<words>" --approval-at <ISO>   (the one renewal, paid by hand at the registrar; books the ledger row and renewals_used=1)
+  npm run admin -- visits-token-handoff [--done | --failed]   (CR-068; run by the host kit: prints only the raw token when one was requested, else nothing and exit 3)
   npm run admin -- doctor`;
 
 async function main(argv: string[]): Promise<number> {
@@ -32,7 +34,7 @@ async function main(argv: string[]): Promise<number> {
     args: argv,
     allowPositionals: true,
     options: {
-      scope: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, at: { type: 'string' },
+      done: { type: 'boolean' }, failed: { type: 'boolean' }, scope: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, at: { type: 'string' },
       set: { type: 'string', multiple: true }, 'from-current': { type: 'boolean' },
       'approval-text': { type: 'string' }, domain: { type: 'string' }, 'approval-at': { type: 'string' },
       note: { type: 'string' }, version: { type: 'string' },
@@ -51,7 +53,7 @@ async function main(argv: string[]): Promise<number> {
     }
     if (cmd === 'token' && sub === 'create') {
       const scope = values.scope;
-      if (scope !== 'read' && scope !== 'write' && scope !== 'intake' && scope !== 'data') throw new UsageError('--scope must be read, write, intake or data');
+      if (scope !== 'read' && scope !== 'write' && scope !== 'intake' && scope !== 'data' && scope !== 'visits') throw new UsageError('--scope must be read, write, intake, data or visits');
       if (!values.name) throw new UsageError('--name is required');
       const { id, token } = await createApiToken(db, { name: values.name, scope });
       console.log(`Created token ${id} (${scope}, "${values.name}"). It is shown ONCE; store it now:`);
@@ -83,6 +85,16 @@ async function main(argv: string[]): Promise<number> {
            t.expires_at ? `expires ${t.expires_at.toISOString()}` : 'no expiry'].join('  '),
         );
       }
+      return 0;
+    }
+    if (cmd === 'visits-token-handoff') {
+      if (values.done && values.failed) throw new UsageError('--done and --failed cannot be used together');
+      if (values.done) return (await markVisitsTokenIssued(db, new Date())) ? 0 : 3;
+      if (values.failed) return (await failVisitsTokenHandoff(db)) ? 0 : 3;
+      const token = await issueVisitsToken(db);
+      if (token === null) return 3;
+      console.error('visits token created; pipe it to the secret store, then run again with --done (or --failed)');
+      console.log(token);
       return 0;
     }
     if (cmd === 'import-domain') {
