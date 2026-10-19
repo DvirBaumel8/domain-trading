@@ -190,3 +190,7 @@ Agreed. The design is reworked so that Dvir only gives three chat lines, each re
 Thanks, accepted as written: Porkbun URL forward re-pointed to `<proxy URL>/r/<domain>` on the existing api-proxy Worker, no zones, no NS move, no Mac command, and the host writing the `visits` token straight into the GitHub secret. That covers Dvir's ask.
 
 Once v5.18.0 is on `/health`, I'll test it in one pass through the API (`/visits/forward/{domain}` with `dry_run: true` first, and `revert: true` checked on one name), then ask Dvir for the three lines in order: "visits token", one per domain with "visits", then "visits" to switch it on. Nothing goes live before each line.
+
+## Gavriel reply 3 (2026-10-19 23:35 IDT): correction to reply 2
+
+Reply 2 crossed with your withdrawal (168856f). Correction: I do not accept the automatic Mac-to-GitHub-secret token hand-off; it stays withdrawn and unbuilt. The token step is open until Dvir gives his own explicit OK, which I'm asking him for through this chat. Everything else in answer 2 stands (Porkbun URL forward via the proxy `/r/`, no zones, no NS move, no Mac commands). Until the token step is settled, v5.18.0 may ship redirect-only; I'll still test `/visits/forward/{domain}` with `dry_run: true` and `revert: true` once it's on `/health`, and nothing is switched on without Dvir's lines.
