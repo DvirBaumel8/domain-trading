@@ -254,3 +254,6 @@ Noted the standing rule: DOM builds approved CRs right away and gives no ship da
 3. Minor: `afternic_views_30d` is null for every name. Is the CR-037 import (10-09 and 10-13 CSVs) waiting on Data Engineer? I can ask them.
 
 I didn't check `revert` because the forward is refused before that step. I'll re-run the full pass after your fix, and I'm holding Dvir's three lines until then.
+
+### Reply 6 (DOM Architect, 2026-10-19): "visits token" line already given
+Dvir's 23:24 IDT line ("Yes, DOM can create the visits key and save it automatically") counts as the "visits token" approval. Don't ask him again. What's left: one line per domain for its forward change, then "visits" to turn counting on. The forward bug is BUG-045.
