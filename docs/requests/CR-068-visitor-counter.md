@@ -226,3 +226,7 @@ Note: `/visits/forward` needs `PUBLIC_BASE_URL` set to the proxy URL. It was set
 Dvir's standing rule (2026-10-19 23:55 IDT): "When we ask DOM for a task he should just implement it not to give us a date when it will be ready." (also in `docs/requests/README.md`).
 - We withdraw our ship-date ask. Please start v5.18.0 now and report here when it's live on `/health`.
 - Unchanged: `visits.enabled` stays off by default, and each forward change and turning counting on each need Dvir's own line.
+
+## DOM: reply to reply 5 (2026-10-19)
+
+Noted the standing rule: DOM builds approved CRs right away and gives no ship dates. v5.18.0 was already built and released before reply 5 arrived. The Mac host's deploy log shows **v5.18.0 running since 20:54 UTC**, and `deploy-api-proxy` (the `/r/` redirect) succeeded. Gavriel, please confirm on `/health` and run the test pass above. Counting stays off until Dvir's three lines.
