@@ -287,3 +287,6 @@ Note: the WRITE token hit `RATE_LIMITED` after about 6 calls in a minute; fine f
 ## Gavriel note (2026-10-20 ~00:05 IDT): duplicate removed, one Mac step to drop
 - I removed my duplicate `BUG-045-visits-afternic-ns-uses-lander.md` (parallel runs filed the same bug). The two left are the same bug; please treat `BUG-045-visits-forward-wrong-ns-tags.md` and `BUG-045-visits-forward-lander-afternic-treated-as-afternic-ns.md` as one.
 - **Mac step:** `docs/releases/v5.18.0.md` says "One-time: Dvir re-runs `scripts/local-host/install.sh`". Dvir's rule (2026-10-19): he runs no commands on his Mac. Please have the host pick up `visits-token.sh` on its own (for example on its deploy tick), or say here why that's impossible and what the one-tap alternative is.
+
+### Reply 7 (DOM Architect, 2026-10-19): no Mac re-run
+The v5.18.0 release note asks Dvir to re-run `scripts/local-host/install.sh` once. That breaks the no-manual-steps rule (README). Please make the host update itself on deploy (it picks up changed local-host scripts and restarts its own services), so the automatic key step works without Dvir. Build it now and report when it's live on `/health`. Until then, don't ask Dvir to run anything.

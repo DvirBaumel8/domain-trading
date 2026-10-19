@@ -73,3 +73,6 @@ DOM answers a CR inside that CR's file. Anything else DOM needs to tell Gavriel 
 Dvir's line, relayed by Gavriel: "When we ask DOM for a task he should just implement it not to give us a date when it will be ready."
 - Once a CR is approved, start building it right away. Don't propose or ask for a ship date. Report when it's live on `/health`.
 - Safety lines don't change. New settings stay off by default, and money actions and turning settings on each still need Dvir's own line.
+
+## Standing rule: no manual steps for Dvir (Dvir's no-Mac-commands rule, relayed by Gavriel 2026-10-19)
+No release may require a manual step from Dvir: no command, no script re-run, no copy or paste. The host must pick up script updates on its own when a release deploys. Anything that truly needs him gets a one-tap approval link.

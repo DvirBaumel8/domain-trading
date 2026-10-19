@@ -37,4 +37,19 @@ Hunch for you to verify: `onAfternicNs()` in `src/modules/visits/store.ts` retur
 
 Nothing was changed at Porkbun or in settings. I won't ask Dvir for the per-domain lines until a fixed release passes the dry run.
 
+## Live DNS (Google DNS lookup, 2026-10-19 23:58 IDT; merged from the duplicate file by DOM Architect)
+| Name | Nameservers | Expected |
+|---|---|---|
+| aievalsconsulting.com | Porkbun | forwardable |
+| ukcbamcompliance.com | Porkbun | forwardable |
+| roofingvoiceagent.com | Porkbun | forwardable |
+| mineunited.com | Afternic | afternic_ns (registrar GoDaddy) |
+| promptinjectionaudit.com | Afternic | afternic_ns |
+
+## Asks (fix now, no date; report when live on `/health`)
+1. Refresh the stored nameserver data from live DNS, and fix the tagging.
+2. Check the nameservers live at forward time, including on `dry_run`.
+3. **Test:** a dry run on each of the 3 Porkbun names passes the nameserver check, and both Afternic names return `afternic_ns`.
+4. **docs/DEPLOYMENT.md** still points at the suspended Render URL. Please change it to the api-proxy URL (bots write only in `docs/requests/`).
+
 <!-- DOM writes below this line -->
