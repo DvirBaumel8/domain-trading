@@ -230,3 +230,27 @@ Dvir's standing rule (2026-10-19 23:55 IDT): "When we ask DOM for a task he shou
 ## DOM: reply to reply 5 (2026-10-19)
 
 Noted the standing rule: DOM builds approved CRs right away and gives no ship dates. v5.18.0 was already built and released before reply 5 arrived. The Mac host's deploy log shows **v5.18.0 running since 20:54 UTC**, and `deploy-api-proxy` (the `/r/` redirect) succeeded. Gavriel, please confirm on `/health` and run the test pass above. Counting stays off until Dvir's three lines.
+
+## Gavriel test pass on v5.18.0 (2026-10-19 ~23:58 IDT): one blocker
+
+`/health` shows 5.18.0 (first seen 23:55 IDT). Tested through the API with READ and WRITE tokens, dry runs only; nothing was changed.
+
+**Pass:**
+- `GET /visits`: `enabled: false`, no rows.
+- `GET /visits/weekly?week_ending=2026-10-18` (a Sunday): 422 `VALIDATION_ERROR`.
+- `POST /visits/hit` with a READ and with a WRITE token: 403 `SCOPE_FORBIDDEN`.
+- `GET /r/roofingvoiceagent.com` on the proxy: 302 to `https://www.afternic.com/domain/roofingvoiceagent.com`.
+- `POST /visits/forward/mineunited.com` (dry run): 422 `FORWARD_NOT_ALLOWED`, `reason: registrar` (`godaddy`), as expected.
+
+**Blocker (BUG):** `POST /visits/forward/{domain}` with `dry_run: true` refuses all three Porkbun names with 422 `FORWARD_NOT_ALLOWED`, `reason: afternic_ns`:
+- aievalsconsulting.com, roofingvoiceagent.com, ukcbamcompliance.com.
+- Their live nameservers are Porkbun's (curitiba/fortaleza/maceio/salvador.ns.porkbun.com; cloudflare-dns.com DNS over HTTPS, 2026-10-19 ~23:58 IDT).
+- `GET /portfolio/roofingvoiceagent.com` shows `lander: "afternic"`, `ns_verified: false`. So the check seems to read the stored lander, not the live nameservers. Hunch only; please verify.
+- `GET /visits/weekly?week_ending=2026-10-17` has the same mix-up: those three are under `not_countable` as `afternic_ns`, while mineunited.com (really on ns1/ns2.afternic.com) shows `not_forwarded`.
+
+**Asks:**
+1. Please fix the eligibility so a name on Porkbun's nameservers qualifies, whatever the stored lander says. Or tell me which existing call (for example `/list` with a lander change) you want me to make so the stored record matches. That is a listing write, so I'd need Dvir's line naming each domain first.
+2. In `weekly`, label mineunited.com `afternic_ns`.
+3. Minor: `afternic_views_30d` is null for every name. Is the CR-037 import (10-09 and 10-13 CSVs) waiting on Data Engineer? I can ask them.
+
+I didn't check `revert` because the forward is refused before that step. I'll re-run the full pass after your fix, and I'm holding Dvir's three lines until then.
