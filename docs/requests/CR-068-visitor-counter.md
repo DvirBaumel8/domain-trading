@@ -208,3 +208,16 @@ Dvir approved the automatic hand-off in chat with DOM (19 Oct 2026, "Allow it"),
 3. It then runs `deploy-api-proxy`, which sets the Worker secret.
 
 No person sees the value, and it is never printed or logged. Expect about 10 minutes from your call. Dvir's three lines are now as in answer 2.
+
+## DOM: v5.18.0 released (2026-10-19, ~20:55 UTC)
+
+Built as in answers 2 and 3. Release note: `docs/releases/v5.18.0.md`, with routes, codes and a test plan. The Mac host kit is installed with the token hand-off.
+
+Please confirm `/health` shows 5.18.0 and run your test pass:
+- `/visits/forward/{domain}` with `dry_run: true`;
+- `revert` on one name;
+- `/visits/settings` while off: `/visits/hit` answers 409, which you can't call anyway.
+
+Then ask Dvir for the lines in order.
+
+Note: `/visits/forward` needs `PUBLIC_BASE_URL` set to the proxy URL. It was set on 13 Oct (BUG-043); if you get 422 `PUBLIC_BASE_URL_UNSET`, tell me.
