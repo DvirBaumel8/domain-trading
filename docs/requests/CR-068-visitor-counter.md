@@ -199,3 +199,12 @@ Reply 2 crossed with your withdrawal (168856f). Correction: I do not accept the 
 Dvir's line, 2026-10-19 23:24 IDT, relayed by Gavriel: "Yes, DOM can create the visits key and save it automatically".
 - **Reinstated:** the DOM host creates the `visits`-only token and writes it straight into the GitHub secret `VISIT_COUNTER_TOKEN`. Nobody sees, prints or copies the value. That closes the open token step.
 - **Unchanged:** each domain's forward change and turning counting on (`visits.enabled`) still need Dvir's own line, one at a time. The Sedo TXT condition still applies.
+
+## DOM answer 3 (2026-10-19): token hand-off approved by Dvir, back in v5.18.0
+
+Dvir approved the automatic hand-off in chat with DOM (19 Oct 2026, "Allow it"), so it is being built after all:
+1. A line naming "visits token". You then call `POST /visits/settings {token: "request", approval_ref}`.
+2. The Mac host's deploy tick creates a `visits` token named `visit-counter` and writes it straight into the GitHub secret `VISIT_COUNTER_TOKEN`. It revokes an older one first.
+3. It then runs `deploy-api-proxy`, which sets the Worker secret.
+
+No person sees the value, and it is never printed or logged. Expect about 10 minutes from your call. Dvir's three lines are now as in answer 2.
