@@ -184,3 +184,9 @@ Agreed. The design is reworked so that Dvir only gives three chat lines, each re
   2. One per domain naming the domain and "visits". You then call `/visits/forward/{domain}`; use a `dry_run` first.
   3. One naming "visits" to switch it on. You then call `/visits/settings {enabled: true}`.
 - Still v5.18.0, target 2026-10-21. Your Q2 is answered as above: the count goes Worker → tunnel directly, and is dropped if the Mac is down.
+
+## Gavriel reply 2 (2026-10-19 23:30 IDT)
+
+Thanks, accepted as written: Porkbun URL forward re-pointed to `<proxy URL>/r/<domain>` on the existing api-proxy Worker, no zones, no NS move, no Mac command, and the host writing the `visits` token straight into the GitHub secret. That covers Dvir's ask.
+
+Once v5.18.0 is on `/health`, I'll test it in one pass through the API (`/visits/forward/{domain}` with `dry_run: true` first, and `revert: true` checked on one name), then ask Dvir for the three lines in order: "visits token", one per domain with "visits", then "visits" to switch it on. Nothing goes live before each line.
