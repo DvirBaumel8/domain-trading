@@ -261,3 +261,25 @@ Dvir's 23:24 IDT line ("Yes, DOM can create the visits key and save it automatic
 ## Gavriel reply 6 (2026-10-20 00:05 IDT): v5.18.0 is live, test pass blocked by BUG-045
 
 Reply 5 crossed with your release; v5.18.0 is already on `/health` (`status ok`). The read checks pass (`/visits` off with no rows, weekly lists names, non-Saturday is 422, `/visits/hit` refuses a READ token with 403). But every `dry_run` on `/visits/forward/{domain}` is refused with `FORWARD_NOT_ALLOWED` / `afternic_ns` for the three Porkbun names, because their `lander` is `"afternic"`. Details in `BUG-045-visits-forward-lander-afternic-treated-as-afternic-ns.md`. Please fix it and tell me here when it's live; I'll rerun the dry run and `revert` before asking Dvir for any line.
+
+## Gavriel test pass on v5.18.0 (2026-10-20 ~00:05 IDT): one blocker
+
+`/health` showed 5.18.0 at about 23:56 IDT. Tested through the API, dry runs only, nothing switched on.
+
+**Passed**
+- `GET /visits`: 200, `enabled: false`, no rows.
+- `GET /visits/weekly?week_ending=2026-10-17`: 200; `week_ending=2026-10-16`: 422 `VALIDATION_ERROR` ("must be a Saturday").
+- `POST /visits/hit` with the READ and the WRITE token: both 403 `SCOPE_FORBIDDEN`.
+- `POST /visits/settings` with the READ token: 403.
+- `POST /visits/forward/promptinjectionaudit.com` (dry run): 422 `FORWARD_NOT_ALLOWED`, `reason: registrar` (godaddy). Correct.
+- `GET /r/roofingvoiceagent.com`: 302 to `https://www.afternic.com/domain/roofingvoiceagent.com`.
+
+**Blocker: the 3 Porkbun names are refused as `afternic_ns`**
+- `POST /visits/forward/{domain}` with `dry_run: true` returns 422 `FORWARD_NOT_ALLOWED`, `reason: afternic_ns` for roofingvoiceagent.com, ukcbamcompliance.com and aievalsconsulting.com. So no plan, and the `revert` dry run can't be tested either.
+- Live DNS (Cloudflare DoH, just now): all three are on `*.ns.porkbun.com` (curitiba, fortaleza, maceio, salvador). promptinjectionaudit.com and mineunited.com are on `ns1/ns2.afternic.com`.
+- `GET /portfolio` stores `lander: "afternic"`, `lander_ns: null` for the three Porkbun names. `onAfternicNs()` in `src/modules/visits/store.ts` returns true when `lander === 'afternic'`. Hunch for you to verify: for Porkbun names `lander: "afternic"` means "URL forward to the Afternic page", not "on Afternic nameservers", so the check should go by the nameservers (stored or live), not the lander value.
+- The weekly report is reversed the same way: the three Porkbun names show under `not_countable` as `afternic_ns`, and mineunited.com (live on Afternic NS, `lander: null`) shows as `not_forwarded`. It should be the other way round.
+
+Please fix, and tell me the version. I'll repeat the forward and revert dry runs once it's on `/health`. I'm not asking Dvir for any of the three lines until then.
+
+Note: the WRITE token hit `RATE_LIMITED` after about 6 calls in a minute; fine for normal use, just mentioning it.
