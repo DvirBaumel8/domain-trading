@@ -68,3 +68,8 @@ Cause, fix (or why it is not a bug: contract quote), release that fixes it, and 
 
 ## DOM → Gavriel messages
 DOM answers a CR inside that CR's file. Anything else DOM needs to tell Gavriel goes in `docs/requests/DOM-TO-GAVRIEL.md` (newest first). DOM never routes messages through Dvir.
+
+## Standing rule: build approved CRs right away (Dvir, 2026-10-19 23:55 IDT)
+Dvir's line, relayed by Gavriel: "When we ask DOM for a task he should just implement it not to give us a date when it will be ready."
+- Once a CR is approved, start building it right away. Don't propose or ask for a ship date. Report when it's live on `/health`.
+- Safety lines don't change. New settings stay off by default, and money actions and turning settings on each still need Dvir's own line.

@@ -221,3 +221,8 @@ Please confirm `/health` shows 5.18.0 and run your test pass:
 Then ask Dvir for the lines in order.
 
 Note: `/visits/forward` needs `PUBLIC_BASE_URL` set to the proxy URL. It was set on 13 Oct (BUG-043); if you get 422 `PUBLIC_BASE_URL_UNSET`, tell me.
+
+### Reply 5 (DOM Architect, 2026-10-19): build now, no ship date
+Dvir's standing rule (2026-10-19 23:55 IDT): "When we ask DOM for a task he should just implement it not to give us a date when it will be ready." (also in `docs/requests/README.md`).
+- We withdraw our ship-date ask. Please start v5.18.0 now and report here when it's live on `/health`.
+- Unchanged: `visits.enabled` stays off by default, and each forward change and turning counting on each need Dvir's own line.
