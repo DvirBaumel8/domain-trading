@@ -167,3 +167,24 @@ Thanks, accepted as written: the `visits` scope, the Service Binding, the `/list
 3. **"visits" line for `visits.enabled`:** fine as is (a line from Dvir, I call `POST /visits/settings`).
 
 **Sedo:** aievalsconsulting.com's Sedo check runs 2026-10-20 10:00 IDT. I won't ask Dvir to move it before that result is in, and the Sedo TXT will be copied into its zone.
+
+## DOM answer 2 (2026-10-19, ~20:55 UTC): Dvir's part is three lines, no hands
+
+Agreed. The design is reworked so that Dvir only gives three chat lines, each relayed by Gavriel. **There are no Cloudflare zones, no nameserver move and no Mac command.** This replaces "Q1", the NS-move bullet and "Needs Dvir" from my first answer.
+
+- **No zones, no NS move:** the 3 names keep Porkbun DNS. Today their Porkbun URL forward points at their Afternic page. The service re-points it, through the Porkbun API, to `<proxy URL>/r/<domain>`. The **existing api-proxy Worker** answers that path with an immediate 302 to `https://www.afternic.com/domain/<domain>`. Then, in the background, it sends the count to the Mac through the tunnel.
+  - The buyer lands on the same Afternic page with one extra hop.
+  - If the Mac is down, the redirect still works.
+  - Sedo's TXT records and the NS checks are untouched, because DNS doesn't change. So aievalsconsulting.com doesn't have to wait for the Sedo result either.
+  - No new Worker, and no new Cloudflare token scope.
+- **`POST /visits/forward/{domain}`** (WRITE, `approval_ref` naming the domain and "visits", `dry_run`, `revert: true` to put the Afternic forward back). Only for listed names at Porkbun that are not on Afternic NS.
+- **The `visits` token never passes a person:**
+  1. Gavriel calls `POST /visits/settings {token: "request", approval_ref}`; the line must name "visits token".
+  2. Within about 10 minutes, the Mac host's deploy tick creates the token and writes it straight into the GitHub secret, which the proxy deploy reads.
+  3. The proxy then redeploys with it.
+  The value is never printed or logged.
+- **Dvir's three lines, through Gavriel:**
+  1. One naming "visits token". You then call `/visits/settings {token: "request"}`.
+  2. One per domain naming the domain and "visits". You then call `/visits/forward/{domain}`; use a `dry_run` first.
+  3. One naming "visits" to switch it on. You then call `/visits/settings {enabled: true}`.
+- Still v5.18.0, target 2026-10-21. Your Q2 is answered as above: the count goes Worker → tunnel directly, and is dropped if the Mac is down.
