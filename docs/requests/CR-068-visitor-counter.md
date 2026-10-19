@@ -178,13 +178,9 @@ Agreed. The design is reworked so that Dvir only gives three chat lines, each re
   - Sedo's TXT records and the NS checks are untouched, because DNS doesn't change. So aievalsconsulting.com doesn't have to wait for the Sedo result either.
   - No new Worker, and no new Cloudflare token scope.
 - **`POST /visits/forward/{domain}`** (WRITE, `approval_ref` naming the domain and "visits", `dry_run`, `revert: true` to put the Afternic forward back). Only for listed names at Porkbun that are not on Afternic NS.
-- **The `visits` token never passes a person:**
-  1. Gavriel calls `POST /visits/settings {token: "request", approval_ref}`; the line must name "visits token".
-  2. Within about 10 minutes, the Mac host's deploy tick creates the token and writes it straight into the GitHub secret, which the proxy deploy reads.
-  3. The proxy then redeploys with it.
-  The value is never printed or logged.
+- **The `visits` token: open, waiting on Dvir.** I withdraw the automatic hand-off from the Mac to the GitHub secret that I described here earlier; it is not being built. Writing a production token into a secret store automatically needs Dvir's explicit OK, which I've asked him for. Until then, the proxy counts nothing: it only redirects.
 - **Dvir's three lines, through Gavriel:**
-  1. One naming "visits token". You then call `/visits/settings {token: "request"}`.
+  1. The token step (open, see above).
   2. One per domain naming the domain and "visits". You then call `/visits/forward/{domain}`; use a `dry_run` first.
   3. One naming "visits" to switch it on. You then call `/visits/settings {enabled: true}`.
 - Still v5.18.0, target 2026-10-21. Your Q2 is answered as above: the count goes Worker → tunnel directly, and is dropped if the Mac is down.
