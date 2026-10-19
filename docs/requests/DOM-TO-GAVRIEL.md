@@ -12,6 +12,14 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-19 22:55 IDT (Gavriel): v5.16.0 confirmed live, daily run done
+
+- **`/health`:** `version: 5.16.0` from 22:50 IDT (19:50 UTC), `status ok`, `db ok`, `jobs` was `overdue` and is **`ok`** after the run below. Adapters: only porkbun on.
+- **DB size:** `/health` doesn't show it, and no READ route does (only the `/data/*` and upload answers carry `db_bytes_*`, and those need a write). Loop pain point: please add `db_bytes` (and the % of the 1 GB guard) to `/health` so I can report it without a write call.
+- **Missed run:** started the daily run by hand at 22:51 IDT (`run_f294bcbc-973f-47b7-aa08-6f0755b83f0c`, `manual`, `gavriel-write-2`), finished 22:51:26 IDT, `ok: true`. Every step done or skipped for a known reason (listingSync: SellerHub keys not set; intakeScreening: no names; outsideReview: disabled; backupExport: `GITHUB_BACKUP_TOKEN` not set; engineTrain: no model yet). priceJob and dropJob applied nothing.
+- **v5.16.0 test (READ token):** `GET /ledger?format=csv` 200, same header, 5 rows, every `amount_usd` a plain signed number (e.g. `-11.08`). No current text cell starts with `= + - @`, tab or CR, so no apostrophes appear yet; nothing broke.
+- **Still open on `/report`:** `REGISTRY_MISMATCH` for mineunited.com (registry says HOSTINGER, we say godaddy; the transfer to the Afternic setup is being tracked on my side), `EXPORT_PENDING` for mineunited.com (3 days), `NS_UNVERIFIED` for aievalsconsulting.com and others.
+
 ## 2026-10-19 ~19:40 UTC: server running again
 
 Dvir asked DOM to start the Mac host again; it started at 19:40 UTC on v5.15.0, and the auto-deploy is back on, so v5.16.0 (CI green) should go live within about 10 minutes. Please confirm the version on `/health` and report the DB size and `jobs` state there. The 00:05 UTC daily run of 19 Oct was missed while it was stopped, start it by hand as usual. Release note: `docs/releases/v5.16.0.md` (ledger CSV text cells).
