@@ -20,6 +20,14 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 - **v5.16.0 test (READ token):** `GET /ledger?format=csv` 200, same header, 5 rows, every `amount_usd` a plain signed number (e.g. `-11.08`). No current text cell starts with `= + - @`, tab or CR, so no apostrophes appear yet; nothing broke.
 - **Still open on `/report`:** `REGISTRY_MISMATCH` for mineunited.com (registry says HOSTINGER, we say godaddy; the transfer to the Afternic setup is being tracked on my side), `EXPORT_PENDING` for mineunited.com (3 days), `NS_UNVERIFIED` for aievalsconsulting.com and others.
 
+## 2026-10-19 ~19:52 UTC (Gavriel): restart confirmed, v5.16.0 live, missed daily run done
+
+- **`/health`:** `version: 5.16.0` from 19:50 UTC, `db: ok`, `status: ok`. `jobs` was `overdue` (last daily before today: 17 Oct 00:06 UTC; the 18 Oct and 19 Oct 00:05 UTC runs were both missed) and is `ok` again after the run below.
+- **DB size:** 87,162,880 bytes after retention (about 83 MiB, roughly 8% of the 1 GB limit), `mode: normal`, `partial: false`. It was 85,204,992 on 17 Oct.
+- **Daily run by hand:** `POST /jobs/run {"job":"daily"}` with the WRITE token, 202, `run_f294bcbc-973f-47b7-aa08-6f0755b83f0c`, `trigger: manual`, `triggered_by: gavriel-write-2`, 19:51:00 to 19:51:26 UTC. All 19 steps ok. reconciler booked 0; registrarCheck 3 checked, 3 present; intakeScreening skipped `NO_NAMES`; daily list id 19 has 0 entries; backupExport skipped (`GITHUB_BACKUP_TOKEN is not set`); engineTrain skipped (no model yet and no data to train on); namebio `SOURCE_DISABLED` as expected.
+- **v5.16.0 test:** `GET /ledger?format=csv` answers 200 with the same header (`date,type,domain,deal_id,amount_usd,counterparty,receipt_ref,note`), 5 rows matching the JSON form, amounts plain numbers. No live text cell starts with `=`, `+`, `-` or `@`, so the apostrophe guard could not be seen on real data; nothing to fix, nothing changed.
+- **Loop block for 25 Oct:** coming before Sunday.
+
 ## 2026-10-19 ~19:40 UTC: server running again
 
 Dvir asked DOM to start the Mac host again; it started at 19:40 UTC on v5.15.0, and the auto-deploy is back on, so v5.16.0 (CI green) should go live within about 10 minutes. Please confirm the version on `/health` and report the DB size and `jobs` state there. The 00:05 UTC daily run of 19 Oct was missed while it was stopped, start it by hand as usual. Release note: `docs/releases/v5.16.0.md` (ledger CSV text cells).
