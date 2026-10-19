@@ -35,12 +35,15 @@ const post = (url: string, h: Record<string, string>, payload: unknown, key: str
 const get = (url: string, h: Record<string, string>) => app.inject({ method: 'GET', url, headers: h });
 const hit = (h: Record<string, string>, over: Record<string, unknown> = {}) => post('/visits/hit', h, { domain: LISTED, ua_class: 'human', ...over });
 const approval = (text: string) => ({ text, approved_at: '2026-10-20T11:30:00+03:00' });
+/** 5.19.1 (BUG-046): a hit counts only for a name with an active forward. */
+const forwarded = (domain: string = LISTED) => db.insertInto('visit_forwards').values({ domain, target: `${PROXY}/r/${domain}`, set_at: new Date(NOW) }).execute();
 const seed = (domain = LISTED, over: Parameters<typeof listedDomain>[0] = {}) => listedDomain({ domain, lander: 'custom', lander_ns: PBNS, ...over });
 
 describe('visits: hit', () => {
   it('V518-1: AT-1: with visits.enabled off POST /visits/hit is 409 VISITS_DISABLED and stores nothing; POST /visits/settings (WRITE) switches it with no approval line (5.19.0)', async () => {
     const { v, w, r } = await setup({ enabled: false });
     await seed();
+    await forwarded(LISTED);
     const res = await hit(v);
     expect(res.statusCode).toBe(409);
     expect(res.json().error.code).toBe('VISITS_DISABLED');
@@ -57,9 +60,20 @@ describe('visits: hit', () => {
     expect((await post('/visits/settings', w, { enabled: true, approval_ref: approval('anything') })).statusCode).toBe(200);
   });
 
+  it('V519-3: BUG-046: a hit counts for a listed name with an active forward even when the stored lander_ns are Afternic NS; without a forward, or reverted, it is 422 DOMAIN_NOT_LISTED', async () => {
+    const { v } = await setup();
+    await seed(LISTED, { lander: 'afternic', lander_ns: AFNS });
+    expect((await hit(v)).statusCode).toBe(422);
+    await forwarded(LISTED);
+    expect((await hit(v)).statusCode).toBe(202);
+    await db.updateTable('visit_forwards').set({ reverted_at: new Date(NOW) }).execute();
+    expect((await hit(v)).statusCode).toBe(422);
+  });
+
   it('V518-2: AT-3: 3 human and 2 bot hits show as human_hits 3 and bot_hits 2 for the UTC day', async () => {
     const { v, r } = await setup();
     await seed();
+    await forwarded(LISTED);
     for (let i = 0; i < 3; i++) expect((await hit(v)).json()).toEqual({ counted: true, capped: false });
     for (let i = 0; i < 2; i++) await hit(v, { ua_class: 'bot' });
     const res = await get('/visits?from=2026-10-20&to=2026-10-20', r);
@@ -86,7 +100,9 @@ describe('visits: hit', () => {
   it('V518-4: AT-5: a referrer URL is stored as its host only; no path, query, port or user agent reaches any table or the audit log', async () => {
     const { v } = await setup();
     await seed();
+    await forwarded(LISTED);
     await seed('second-listed.com');
+    await forwarded('second-listed.com');
     await hit(v, { referrer_host: 'https://X.com:8443/abc?utm=1#frag' });
     await hit(v, { referrer_host: 'x.com' });
     await hit(v, { referrer_host: 'a'.repeat(300) + '.com' });
@@ -100,6 +116,7 @@ describe('visits: hit', () => {
   it('V518-5: AT-8: the 1,001st hit of a name in a UTC day adds to capped; human and bot counts stay', async () => {
     const { v } = await setup();
     await seed();
+    await forwarded(LISTED);
     await db.insertInto('visit_daily').values({ domain: LISTED, date_utc: '2026-10-20', source: 'dom_redirect', human_hits: 990, bot_hits: 9, capped: 0, referrer_hosts: '{}' }).execute();
     expect((await hit(v)).json()).toEqual({ counted: true, capped: false }); // the 1,000th
     for (let i = 0; i < 2; i++) expect((await hit(v, { ua_class: i ? 'bot' : 'human', referrer_host: 'late.example' })).json()).toEqual({ counted: false, capped: true });
@@ -110,6 +127,7 @@ describe('visits: hit', () => {
   it('V518-6: concurrent hits lose no count; the first ten referrer hosts of a day keep their own key, the rest go to "other"', async () => {
     const { v } = await setup();
     await seed();
+    await forwarded(LISTED);
     const res = await Promise.all(Array.from({ length: 12 }, (_, i) => hit(v, { referrer_host: `site${i}.example` })));
     expect(res.every((x) => x.statusCode === 202)).toBe(true);
     const row = await db.selectFrom('visit_daily').selectAll().where('domain', '=', LISTED).executeTakeFirstOrThrow();
@@ -123,6 +141,7 @@ describe('visits: hit', () => {
   it('V518-7: AT-9: a visits token can call only POST /visits/hit; READ, WRITE and data tokens cannot call it; the data token cannot GET /visits', async () => {
     const { v, w, r, d } = await setup();
     await seed();
+    await forwarded(LISTED);
     for (const h of [r, w, d]) {
       const res = await hit(h);
       expect(res.statusCode).toBe(403);
@@ -139,6 +158,7 @@ describe('visits: hit', () => {
   it('V518-8: a hit needs an Idempotency-Key, a replay of the same key counts once, and no audit_log row is written per hit', async () => {
     const { v } = await setup();
     await seed();
+    await forwarded(LISTED);
     const noKey = await app.inject({ method: 'POST', url: '/visits/hit', headers: v, payload: { domain: LISTED, ua_class: 'human' } });
     expect(noKey.statusCode).toBe(400);
     expect(noKey.json().error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');

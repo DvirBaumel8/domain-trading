@@ -37,7 +37,10 @@ export function registerVisits(app: FastifyInstance, deps: { db: Kysely<Database
     if (!(await visitsEnabled(db))) throw new AppError(409, 'VISITS_DISABLED', 'The visitor counter is switched off');
     let domain: string;
     try { domain = normalizeDomain(b.domain); } catch { throw new AppError(422, 'DOMAIN_NOT_LISTED', 'Not a listed name we count'); }
-    if (!(await isCountable(db, domain))) throw new AppError(422, 'DOMAIN_NOT_LISTED', 'Not a listed name we count', { domain });
+    if (!(await isCountable(db, domain))) {
+      req.log.warn({ code: 'DOMAIN_NOT_LISTED', domain }, 'visits hit refused'); // BUG-046: the host log shows why a hit was not counted (no request data)
+      throw new AppError(422, 'DOMAIN_NOT_LISTED', 'Not a listed name we count', { domain });
+    }
     const r = await recordHit(db, { domain, ua: b.ua_class, referrer: normalizeReferrerHost(b.referrer_host), nowMs: deps.now() });
     return reply.code(202).send({ counted: r.counted, capped: r.capped });
   });

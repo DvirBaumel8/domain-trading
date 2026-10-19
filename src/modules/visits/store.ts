@@ -50,10 +50,14 @@ export async function liveNsOf(domains: readonly string[], nsLookup?: (d: string
   return new Map(answers);
 }
 
-/** A name a hit can be counted for: status listed and not on Afternic's nameservers. */
+/**
+ * A name a hit can be counted for: status listed and an active forward to the counting redirect (BUG-046, 5.19.1). The forward is the proof the
+ * name is ours to count; the stored `lander_ns` is not used here (it can be stale: the three Porkbun names stored Afternic's NS while live DNS is Porkbun's).
+ */
 export async function isCountable(db: Kysely<Database>, domain: string): Promise<boolean> {
-  const row = await db.selectFrom('domains').select(['status', 'lander', 'lander_ns']).where('domain', '=', domain).executeTakeFirst();
-  return row !== undefined && row.status === 'listed' && !onAfternicNs(row);
+  const row = await db.selectFrom('domains').innerJoin('visit_forwards', 'visit_forwards.domain', 'domains.domain')
+    .select('domains.status').where('domains.domain', '=', domain).where('visit_forwards.reverted_at', 'is', null).executeTakeFirst();
+  return row !== undefined && row.status === 'listed';
 }
 
 /**

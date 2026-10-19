@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.19.1 (2026-10-20): BUG-046 visitor hits counted by active forward
+Release note: `docs/releases/v5.19.1.md`.
+PATCH (a fix back to the contract: hits for the forwarded names were refused).
+- **BUG-046:** `POST /visits/hit` counts a hit for a `listed` name with an active forward (`POST /visits/forward`, not reverted). The stored `lander_ns` is no longer used here: it was stale and still said Afternic for the three Porkbun names, so every hit was 422 `DOMAIN_NOT_LISTED`. A refused hit is now logged on the host with its code and domain only.
+
 ## 5.19.0 (2026-10-20): visitor counter on without approval lines; BUG-045 live NS check
 Release note: `docs/releases/v5.19.0.md`.
 MINOR (two request fields become optional; one rule fixed). Dvir, 19 Oct 2026: an approved CR needs no further lines from him.
