@@ -16,6 +16,8 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'pricing_settings', file: 'tables/pricing_settings.json' },
   { table: 'domains', file: 'tables/domains.json' },
   { table: 'ledger_entries', file: 'tables/ledger_entries.json' },
+  { table: 'forward_cost_plans', file: 'tables/forward_cost_plans.json' },
+  { table: 'forward_cost_lines', file: 'tables/forward_cost_lines.json' },
   { table: 'listing_history', file: 'tables/listing_history.json' },
   { table: 'tranches', file: 'tables/tranches.json' },
   { table: 'purchases', file: 'purchases.json' }, // after tranches: purchases.tranche_id references it (v2.0.0)

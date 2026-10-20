@@ -1429,6 +1429,27 @@ export interface MarketMatchedSetsTable {
   created_at: TimestampDefault;
 }
 
+export interface ForwardCostPlansTable {
+  id: Generated<number>;
+  domain_id: number;
+  version: number;
+  line_count: number;
+  token_name: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+export interface ForwardCostLinesTable {
+  id: Generated<number>;
+  plan_id: number;
+  line_no: number;
+  month: string;
+  item: string;
+  planned_cents: number;
+  basis: string;
+  cost_type: string;
+}
+
 export interface Database {
   api_tokens: ApiTokensTable;
   settings: SettingsTable;
@@ -1440,6 +1461,8 @@ export interface Database {
   market_names: MarketNamesTable;
   market_dq_runs: MarketDqRunsTable;
   market_matched_sets: MarketMatchedSetsTable;
+  forward_cost_plans: ForwardCostPlansTable;
+  forward_cost_lines: ForwardCostLinesTable;
   deals: DealsTable;
   domains: DomainsTable;
   ledger_entries: LedgerEntriesTable;

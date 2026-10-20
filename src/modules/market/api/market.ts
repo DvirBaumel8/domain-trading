@@ -61,7 +61,7 @@ export function registerMarket(app: FastifyInstance, deps: { db: Kysely<Database
   app.get('/market/matched', async (req) => {
     const p = MatchedQuery.safeParse(req.query ?? {});
     if (!p.success) throw bad(p);
-    return matchedSet(db, p.data);
+    return matchedSet(db, p.data, utcDay(deps.now()));
   });
 
   app.get('/market/dq', async () => latestDq(db));

@@ -24,6 +24,7 @@ These are **DOM's own** working documents: the binding business rules, internals
 | `visits.md` | Visitor counter (CR-068, 5.18.0): privacy rules, scope, the forward, the token hand-off; V518-* |
 | `bots-token.md` | Shared `bots` token (CR-069, 5.20.0): scope rule, the route classification table, rotation, X-Bot-Name; B520-* |
 | `datasave.md` | Daily data save job (CR-071, 5.21.0): steps, sealing, retention, health rule, Dynadot TODO; DS521-* |
+| `books.md` | Ledger cost rows, forward-cost plans (versioned), `GET /costs/forward`, `GET /books.csv` (CR-070, 5.25.0): rules, files, BK525-* |
 | `market.md` | Market episodes, labels, sales reports, matched sets, data-quality checks (CR-075, 5.23.0): rules, files, MK523-* |
 | `sources.md` | Terms log of every outside data source |
 | `gaps.md` | Every gap between these docs and the code, with a decision |

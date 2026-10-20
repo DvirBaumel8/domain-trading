@@ -18,7 +18,7 @@ Binding rules and test IDs for the `market` module. The interface is `docs/contr
 7. **`price_band`** from the sale price when sold, else the last list price: `500-999`, `1k-2.5k`, `2.5k-5k`, `5k-10k`, `10k+`.
 8. **Idempotent.** The write compares each derived row with the stored one and writes only changes (`derived_at` stays); rows no longer derived (a sold-only episode a late listing now explains) are deleted. `feat_asof` is never written or cleared by the job.
 9. **`POST /data/sales`**: parsed row by row with a reason; any bad row -> 422 for the whole call; a conflicting stored key with another price -> 409 `APPEND_ONLY` for the whole call; identical -> duplicate. `source`/`source_url` containing `namebio` (any case) and a missing `tier` are refused. PUT/PATCH/DELETE (also with `/{id}`) -> 405 `APPEND_ONLY` from a route-level `onRequest` hook (answers before the idempotency check). The audit row keeps `[n rows]` (`http/audit.ts` `elideRows`). In `BOTS_ROUTES` as `allowed` (all seven entries); under `DATA_PREFIX` so a data token may POST.
-10. **Matched** (rule `m1`): positives = sold `.com`, `sale_date <= asof`, clean features; negatives = `UNSOLD_60D` `.com`, `first_seen <= asof - 60`, clean features, same band, same letters-only flag (`^[a-z]+$` of the name before the first dot), different name, `[first_seen, last_seen]` overlapping `sale_date -30 .. +30`; each negative once; per-positive Fisher-Yates with mulberry32 seeded by sha256(`asof|ratio|seed|positive episode_id`) (a local copy; the engine's `makeRng` is not exported across modules). Frozen in `market_matched_sets` on the first call; sha256 over `canonicalJson` of the payload.
+10. **Matched** (rule `m1`): positives = sold `.com`, `sale_date <= asof`, clean features; negatives = `UNSOLD_60D` `.com`, `first_seen <= asof - 60`, clean features, same band, same letters-only flag (`^[a-z]+$` of the name before the first dot), different name, `[first_seen, last_seen]` overlapping `sale_date -30 .. +30`; each negative once; per-positive Fisher-Yates with mulberry32 seeded by sha256(`asof|ratio|seed|positive episode_id`) (a local copy; the engine's `makeRng` is not exported across modules). Frozen in `market_matched_sets` on the first call; sha256 over `canonicalJson` of the payload. **v5.25.0:** an `asof` after the newest sealed source day (max `data_date` of complete `dynadot_aftermarket` / `dynadot_closed_auctions` manifests; today UTC when none) is 409 `MATCHED_ASOF_FUTURE` and nothing is stored (MK525-1); a set with 0 positives is returned `frozen: false`, `frozen_at: null` and is not stored (MK525-2); the migration `1765700000000_v5-25-0.sql` deletes the stored sets with 0 positives (MK525-3).
 11. **dqMarket** (`dq.ts`): `duplicates`, `survivorship` (fails above 90% only after 30 sealed days), `leakage` (`feat_asof` > `first_seen` or > `sale_date`; rows excluded from matched), `price_sanity` (>10x day-to-day jump in the last 30 days; sale < $100; sale vs list >10x either way), `coverage` (dynadot_aftermarket and dynadot_closed_auctions; a sealed day of the last 7 under 50% of the median of the 7 days before, needing 3 prior days), `tier_present`. Any fail -> run status `alert` -> `/health.dq_market` and `DQ_MARKET_FAIL` (error). The step itself stays ok.
 12. **Coverage targets**: 1,000 `unsold_30d` (UNSOLD_30D + UNSOLD_60D) by 2026-11-25; 2,000 `unsold_60d_matched` (negatives of a matched set for today, ratio 4, seed 1, not stored) by 2026-12-20.
 
@@ -48,3 +48,12 @@ Binding rules and test IDs for the `market` module. The interface is `docs/contr
 | MK523-20 | price sanity flags |
 | MK523-21 | left the source: unknown until 90 days, then UNSOLD_60D |
 | MK523-22 | per-row reject reasons |
+
+## v5.25.0 follow-up tests
+| ID | What |
+|---|---|
+| MK525-1 | future `asof` is 409 `MATCHED_ASOF_FUTURE`, nothing stored; the newest sealed day itself is accepted; with no sealed day the limit is today |
+| MK525-2 | an empty set is not frozen; a later call with data freezes a non-empty set |
+| MK525-3 | the migration deletes only sets with 0 positives (readFileSync check) |
+
+Tests MK523-6 and MK523-7 now ask for `asof` on or before the newest sealed day (2026-12-01), not 2026-12-20.

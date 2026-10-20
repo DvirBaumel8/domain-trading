@@ -4,6 +4,7 @@
 import { sql, type Kysely } from 'kysely';
 import { withAdvisoryLock } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
+import { AppError } from '../../http/errors.js';
 import { canonicalJson } from '../../http/canonical-json.js';
 import { addDays, lettersOnly, sha256 } from './common.js';
 import { CLEAN_FEATURES, episodeOut, type MarketRow } from './read.js';
@@ -58,17 +59,31 @@ export async function buildMatched(db: Kysely<Database>, asof: string, ratio: nu
   };
 }
 
-export async function matchedSet(db: Kysely<Database>, q: { asof: string; ratio: number; seed: number }) {
+/** The newest sealed source day of the market sources (complete manifests; GoDaddy saves feed the auction endings), or `todayUtc` when none is sealed yet. */
+export async function newestSealedDay(db: Kysely<Database>, todayUtc: string): Promise<string> {
+  const r = await db.selectFrom('snapshot_manifests').select((eb) => eb.fn.max<string | Date | null>('data_date').as('d'))
+    .where('status', '=', 'complete').where('source', 'in', ['dynadot_aftermarket', 'dynadot_closed_auctions', 'godaddy_inventory']).executeTakeFirst();
+  const d = r?.d;
+  if (d === null || d === undefined) return todayUtc;
+  return typeof d === 'string' ? d.slice(0, 10) : d.toISOString().slice(0, 10);
+}
+
+export async function matchedSet(db: Kysely<Database>, q: { asof: string; ratio: number; seed: number }, todayUtc: string) {
   const read = async (d: Kysely<Database>) => d.selectFrom('market_matched_sets').selectAll().where('asof', '=', q.asof).where('ratio', '=', q.ratio).where('seed', '=', q.seed).executeTakeFirst();
   const out = (r: { payload: unknown; sha256: string; created_at: Date }, frozen: boolean) => ({ ...(r.payload as MatchedSet), sha256: r.sha256, frozen, frozen_at: r.created_at.toISOString() });
   const stored = await read(db);
   if (stored) return out(stored, true);
+  // v5.25.0: an as-of date after the newest sealed source day would freeze a set with no data behind it (MATCHED_ASOF_FUTURE)
+  const newest = await newestSealedDay(db, todayUtc);
+  if (q.asof > newest) throw new AppError(409, 'MATCHED_ASOF_FUTURE', `asof ${q.asof} is after the newest sealed source day (${newest}); nothing was stored`, { asof: q.asof, newest_sealed_day: newest });
   return withAdvisoryLock(db, 'market_matched', async (t) => {
     const trx = t as unknown as Kysely<Database>;
     const again = await read(trx);
     if (again) return out(again, true);
     const set = await buildMatched(trx, q.asof, q.ratio, q.seed);
     const sha = sha256(canonicalJson(set));
+    // v5.25.0: a set with no positives is returned but not stored, so a later call can freeze a real one
+    if (set.summary.positives_n === 0) return { ...set, sha256: sha, frozen: false, frozen_at: null };
     const ins = await trx.insertInto('market_matched_sets').values({ asof: q.asof, ratio: q.ratio, seed: q.seed, sha256: sha, payload: JSON.stringify(set) }).returningAll().executeTakeFirstOrThrow();
     return out(ins, true);
   });

@@ -211,6 +211,8 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /tokens/bots/rotate': 'allowed',
   'POST /portfolio/{domain}/renewal-price': 'allowed',
   'POST /portfolio/{domain}/stats': 'allowed',
+  'POST /ledger/costs': 'allowed', // v5.25.0 (CR-070 R-1): records tool, ai and adjustment costs only; no money moves
+  'PUT /portfolio/{domain}/forward-costs': 'allowed', // v5.25.0 (CR-070 R-2): a planned-cost note, nothing is spent
   'POST /candidates/{domain}/records': 'allowed',
   'POST /candidates/daily/rebuild': 'allowed',
   'POST /candidates/intake': 'allowed',

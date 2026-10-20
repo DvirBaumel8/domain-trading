@@ -1,4 +1,4 @@
-# Endpoints (contract v5.24.0)
+# Endpoints (contract v5.25.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -15,6 +15,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | Export marketplace files and confirm the upload | `GET /export/afternic.csv`, `GET /export/sedo.csv`, `POST /export/{venue}/uploaded` | READ, READ, WRITE |
 | Offers and sales | `POST /offers`, `POST /offers/{id}/outcome`, `GET /offers`, `POST /sold/{domain}` (evidence needed without approval) | WRITE (GETs READ) |
 | Reports and books | `GET /report`, `GET /report/pricing-review`, `GET /ledger`, `GET /portfolio`, `GET /portfolio/{domain}`, `GET /audit` | READ |
+| Costs and the private books (5.25.0, CR-070) | `POST /ledger/costs`, `PUT /portfolio/{domain}/forward-costs`, `GET /portfolio/{domain}/forward-costs`, `GET /costs/forward`, `GET /books.csv` | WRITE or bots for the writes; READ or bots for the GETs |
 | Load data for the scoring engine and score names | `POST /engine/sales`, `POST /engine/unsold`, `POST /data/*` (rdap, live-checks, tm-kills, bigco-names, sales-comps), `POST /score`, `GET /engine/health` | WRITE or data token for the loads; READ for `GET` and `POST /score` |
 | Selection and screening | `GET /selection/settings`, `POST /selection/evaluate`, `POST /screening/runs`, `POST /screening/packs`, `GET /selection/buy-hold`, `POST /candidates/intake`, `GET /candidates/daily` | READ for `GET`, WRITE for `POST` (`/candidates/intake` also takes an intake or data token) |
 | Count visitors of the listed names (off until Dvir's line) | `POST /visits/forward/{domain}`, `POST /visits/settings`, `POST /visits/import`, `GET /visits`, `GET /visits/weekly` (the counting itself is `POST /visits/hit`, visits token only) | WRITE, WRITE, WRITE or data, READ, READ |
@@ -43,6 +44,9 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | GET | `/portfolio/outcomes`, `/portfolio/outcomes/monthly`, `/portfolio/outcomes/quarterly` | READ | Portfolio outcomes (4.0.0) |
 | POST | `/portfolio/{domain}/horizon`, `/portfolio/{domain}/stats` | WRITE | Portfolio outcomes (4.0.0) |
 | POST | `/portfolio/{domain}/renewal-price` | WRITE or bots | Portfolio outcomes (5.20.0, BUG-047) |
+| POST | `/ledger/costs` | WRITE or bots | Costs and books (5.25.0, CR-070) |
+| PUT | `/portfolio/{domain}/forward-costs` | WRITE or bots | Costs and books (5.25.0, CR-070) |
+| GET | `/portfolio/{domain}/forward-costs`, `/costs/forward`, `/books.csv` | READ or bots | Costs and books (5.25.0, CR-070) |
 | POST | `/tokens/bots/rotate` | WRITE or bots | Health (Shared bots token, 5.20.0, CR-069) |
 | POST | `/portfolio/import` | WRITE | S8 import lane (5.8.0, CR-059) |
 | POST | `/outreach/emails` | WRITE | Outreach log (4.0.0) |
@@ -397,6 +401,30 @@ READ. Ledger rows in date order.
 - **200 JSON:** `{count, rows: [{id, date, type, domain, deal_id, amount (pair, signed: negative = money out), amount_usd: "-11.08", counterparty, receipt_ref, note}]}`. **CSV:** `formats.md` §Ledger.
 - **Errors:** 400 `VALIDATION_ERROR`.
 
+### `POST /ledger/costs`
+WRITE or bots (5.25.0, CR-070 R-1). `Idempotency-Key` required; audited (the audit row has the count and the total). Appends **non-money cost rows** to the ledger. Body (strict): `{rows: [{date, type, amount_usd, note, domain?}], dry_run?}`, 1..500 rows.
+- `date` `YYYY-MM-DD` (a real day); `type` is `tool`, `ai` or `adjustment` only; `amount_usd` is a signed USD string with at most 2 decimals, not zero (a cost is negative, `"-1.20"`; a reversal is positive); `note` 1..200 characters; `domain` optional (a name in the portfolio; the row is then tied to it).
+- **200** with `dry_run: true`, **201** otherwise: `{dry_run, received_n, accepted_n, rejected_n, total (pair), total_usd, audit_id}`. A dry run stores nothing. Rows are written in one transaction.
+- **Corrections** are reversing rows: send the opposite amount with a note. The ledger refuses UPDATE and DELETE.
+- **Errors:** 422 `VALIDATION_ERROR` for any other `type` (registration, renewal, sale, commission, refund, fee, payout_fee come only from their own routes), a bad amount, date or note, an unknown field or an unknown `domain`; `details.issues` = `[{index, field, message}]`; nothing is stored when one row is wrong. 403 `SCOPE_FORBIDDEN` for a READ token.
+
+### `PUT /portfolio/{domain}/forward-costs`
+WRITE or bots (5.25.0, CR-070 R-2). `Idempotency-Key` required; audited. Body (strict): `{lines: [{month: "YYYY-MM", item, planned_usd, basis, cost_type}]}`, 0..240 lines (`[]` clears the plan). `planned_usd` is a USD string with at most 2 decimals, 0 or more; `item` 1..200, `basis` 1..300, `cost_type` 1..60 characters.
+- **Replaces the planned lines of that name as a set.** The old set stays as an earlier version; nothing is deleted. **200** `{domain, version, previous_version, lines_n, lines: [{month, item, planned (pair), planned_usd, basis, cost_type}], planned_total (pair), audit_id}`.
+- **Derived numbers are computed, never typed:** a field named `walkaway`, `walk_away`, `floor`, `min_offer`, `bin`, `renewal_due`, `renewal_due_date`, `renewal_cost`, `renewal`, `renewal_price`, `forward_total`, `committed_forward`, `total`, `planned_total`, `spend`, `expiry`, `expiry_date`, `drop_date`, `cost` or `price` (also with `_cents` or `_usd`), at the top level or in a line, is **422 `DERIVED_FIELD`** (`details.fields`), checked before anything else. DOM does not compare plans with a budget (G-86).
+- **Errors:** 422 `DERIVED_FIELD`, 422 `VALIDATION_ERROR` (any other unknown key, a bad month or amount), 404 `DOMAIN_NOT_FOUND`, 403 `SCOPE_FORBIDDEN` (READ token).
+
+### `GET /portfolio/{domain}/forward-costs`
+READ or bots. `{domain, current: null | {version, created_at, token_name, lines}, versions: [{version, created_at, token_name, lines}]}`, newest first (every earlier plan included). 404 `DOMAIN_NOT_FOUND`.
+
+### `GET /costs/forward`
+READ or bots. Query (strict): `from`, `to` (`YYYY-MM`; default `from` = the current IDT month and `to` = 11 months later; `from` alone gives 12 months; at most 36 months, `from` not after `to`, else 400 `VALIDATION_ERROR`).
+- **200:** `{from, to, months: [{month, planned: [{domain, month, item, planned (pair), planned_usd, basis, cost_type}], renewals: [{domain, due_on, renewal (pair or null), counted, reason?, renewal_price_source?}], planned_total (pair), renewals_total (pair), total (pair), incomplete}], totals: {planned_total, renewals_total, total (pairs), incomplete}, warnings: [{code: "RENEWAL_PRICE_UNKNOWN", domain, month, message}]}`.
+- **Planned lines** are the current plan of every name. **Renewals** are computed from `domains.renewal_price_cents` with the rule `/report` uses for `spend.committed_forward`: a live name (not sold, dropped or pending) with `renewals_used` 0, due in the month of its `expiry_date`. A name whose `drop_date` is its `expiry_date` is not renewed: `renewal` 0, `counted: false`, `reason: "DROPS_AT_FIRST_EXPIRY"`. A name with **no renewal price** has `renewal: null` (cents and display both null), `counted: false`, `reason: "RENEWAL_PRICE_UNKNOWN"`, a warning, and its month and the totals are **`incomplete: true`**: an unknown price is never added as 0 (record it with `POST /portfolio/{domain}/renewal-price`).
+
+### `GET /books.csv`
+READ or bots; never public (it carries the **private walk-away**, which no `/export/*` file ever has). `text/csv; charset=utf-8`, one row per live name (owned, listed or delisted; sold, dropped and pending names are left out), ordered by domain. Columns and cell rules: `formats.md` §Books CSV. Every value equals the same name's `GET /portfolio` row.
+
 ### `GET /deals/{id}`
 READ. `{id, domain, strategy, status_note, created_at, approvals: [{audit_id, at, method, path, approval_text, approval_at, status_code, dry_run}]}` (audit rows with an approval that cite the deal or its domain). `dry_run` (2.2.0, additive) is `true` when that call was a dry run (`dry_run: true` or `"strict"`), so one approval used for a dry run and then the real call shows as one dry run plus one real row.
 - **Errors:** 404 `DEAL_NOT_FOUND`.
@@ -660,12 +688,12 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
 
 ### `GET /market/matched`
 READ (or bots). Query: `asof` (`YYYY-MM-DD`, required), `ratio` (1..20, default 4), `seed` (integer 0..4294967295, default 1). A bad value → **400**. Each **positive** is a sold `.com` episode with `sale_date <= asof`; it gets up to `ratio` **negatives**: `UNSOLD_60D` `.com` episodes (first seen at least 60 days before `asof`) of the **same price band**, the **same letters-only flag** (the name before `.com` is only a-z or not) and whose listing overlaps the **60-day window** centred on the sale date (sale date -30 days .. +30 days). A negative is used for one positive only. The draw is seeded (a hash of `asof|ratio|seed|episode_id` feeds a mulberry32 shuffle), so it never depends on row order. Rows with a feature as-of date after `first_seen` or after the sale date (the leakage check) are **excluded**; `unknown` episodes are never in the set.
-**Frozen and sealed:** the first call for `(asof, ratio, seed)` stores the set with a `sha256` over its canonical JSON (keys sorted) and returns it; every later call with the same triple returns the stored set and the same `sha256`, even after new data arrived. The stored set cannot be changed or deleted. **200:**
+**Frozen and sealed:** the first call for `(asof, ratio, seed)` stores the set with a `sha256` over its canonical JSON (keys sorted) and returns it; every later call with the same triple returns the stored set and the same `sha256`, even after new data arrived. The stored set cannot be changed or deleted. **As-of limit (5.25.0):** an `asof` later than the newest sealed source day (the newest `data_date` of a complete `dynadot_aftermarket`, `dynadot_closed_auctions` or `godaddy_inventory` snapshot, or today UTC when none is sealed) is **409 `MATCHED_ASOF_FUTURE`** (`details.asof`, `details.newest_sealed_day`) and nothing is stored. **A set with no positives** is returned (`frozen: false`, `frozen_at: null`, the `sha256` of that empty set) but **not stored**, so a later call, once data exists, freezes a real set. **200:**
 ```
 { asof, ratio, seed, rule: "m1",
   summary: { positives_n, negatives_n, unmatched_positives_n, excluded_leakage_n },
   pairs: [ { positive: <episode row>, window: {from, to}, negatives: [ <episode row> ] } ],
-  sha256, frozen: true, frozen_at }
+  sha256, frozen: true | false (false only for a set with 0 positives), frozen_at }
 ```
 
 ### `GET /market/dq`
@@ -1164,6 +1192,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Screening errors:** `RUN_NOT_RUNNING` (409, the cancel routes, 2.9.0), `RUN_RUNNING` (409, `POST /screening/packs`), `PACK_NOT_FOUND` (404, `GET /screening/packs/{id}`), `JUDGED_AT_INVALID` (422, `POST /screening/packs`), `MANUAL_REQUIRED` (409, `POST /tranches/{id}/members`), `DRAFT_NOT_ALLOWED_LIVE`, `AS_OF_LIVE_REFUSED`, `RUN_NOT_FOUND`, `NAME_NOT_IN_RUN`, `CHECK_NOT_MANUAL`, `EVIDENCE_NOT_FOUND`, `OBSERVED_AT_INVALID`, `CHECKED_AT_INVALID`, `VERDICT_RESULT_NOT_FLAG`, `VERDICT_RESULT_STALE`, `RESULT_NOT_FOUND`, `DECIDED_AT_INVALID` (1.2.0), `REGISTRAR_UNKNOWN` (and `REGISTRAR_NOT_ALLOWED`; and `SETTINGS_NOT_FOUND`, `VALIDATION_ERROR`). Result reason codes are in `selection.md` §Screening runs.
 
 **Tranche errors:** `TRANCHE_NOT_FOUND` (404; also on a screening run), `TRANCHE_ALREADY_OPEN`, `TRANCHE_NAME_TAKEN`, `TRANCHE_CLOSED`, `TRANCHE_FULL`, `GEO_CAP`, `TRANCHE_BELOW_TARGET`, `MAIN_LANE_QUOTA`, `NOT_SCREENED_OK`, `MEMBER_NOT_FOUND` (and `NAME_NOT_IN_RUN`, `RUN_NOT_FOUND`, `DOMAIN_INVALID`, `VALIDATION_ERROR`).
+
+**Costs and books (5.25.0, CR-070):** `DERIVED_FIELD` (422, `PUT /portfolio/{domain}/forward-costs`), `RENEWAL_PRICE_UNKNOWN` (a warning in `GET /costs/forward`, with `incomplete: true`; not an error status), `MATCHED_ASOF_FUTURE` (409, `GET /market/matched`); also `VALIDATION_ERROR`, `DOMAIN_NOT_FOUND`, `SCOPE_FORBIDDEN`.
 
 **Scout lesson errors (5.3.0):** `LESSON_NOT_FOUND` (404, `PATCH /lessons/{id}`).
 

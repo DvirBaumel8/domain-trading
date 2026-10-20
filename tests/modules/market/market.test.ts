@@ -1,5 +1,6 @@
 // v5.23.0 (CR-075, data program v1): market_names episodes and labels, POST /data/sales (add-only), GET /market/{episodes,matched,dq,coverage}, the dqMarket checks.
 // Fixtures are written straight into the sealed-snapshot tables (dynadot_rows, snapshot_manifests, godaddy_auctions); nothing calls the network.
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
@@ -128,8 +129,8 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
   it('MK523-6 (AT-6) GET /market/matched twice returns the same rows and sha256; every negative shares its positive band, letters flag and window; the set is frozen after new data arrives', async () => {
     const { run, get, post } = await boot('2026-12-20');
     await matchedFixture(post, run);
-    const a = (await get('/market/matched?asof=2026-12-20&ratio=4&seed=1')).json();
-    const b = (await get('/market/matched?asof=2026-12-20&ratio=4&seed=1')).json();
+    const a = (await get('/market/matched?asof=2026-12-01&ratio=4&seed=1')).json();
+    const b = (await get('/market/matched?asof=2026-12-01&ratio=4&seed=1')).json();
     expect(b).toEqual(a);
     expect(a.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(a.summary).toMatchObject({ positives_n: 2 }); // posc.net is not .com
@@ -154,11 +155,11 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
     await post([sale('posd.com', 210000, '2026-11-05')]);
     await am('2026-12-02', [['negh.com', 150000]]);
     await run();
-    const c = (await get('/market/matched?asof=2026-12-20&ratio=4&seed=1')).json();
+    const c = (await get('/market/matched?asof=2026-12-01&ratio=4&seed=1')).json();
     expect(c.sha256).toBe(a.sha256);
     expect(c.pairs).toEqual(a.pairs);
     // another (asof, ratio, seed) is another frozen set built from the data as it is now
-    const d = (await get('/market/matched?asof=2026-12-20&ratio=4&seed=2')).json();
+    const d = (await get('/market/matched?asof=2026-12-01&ratio=4&seed=2')).json();
     expect(d.summary.positives_n).toBe(3);
     expect(d.sha256).not.toBe(a.sha256);
     expect((await db.selectFrom('market_matched_sets').selectAll().execute())).toHaveLength(2);
@@ -172,7 +173,7 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
     const clean = await runDqMarket(db, clock);
     expect(clean.status).toBe('ok');
     expect((await get('/health')).json().dq_market).toBe('ok');
-    const before = (await get('/market/matched?asof=2026-12-19&ratio=4&seed=1')).json();
+    const before = (await get('/market/matched?asof=2026-12-01&ratio=4&seed=1')).json();
     const victim = before.pairs[0].negatives[0].episode_id as string;
     await db.updateTable('market_names').set({ feat_asof: '2026-12-10' }).where('episode_id', '=', victim).execute();
     const bad = await runDqMarket(db, clock);
@@ -185,7 +186,7 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
     const dq = (await get('/market/dq')).json();
     expect(dq).toMatchObject({ status: 'alert', failed_checks: ['leakage'] });
     expect(dq.results.find((r: { check: string }) => r.check === 'leakage')).toMatchObject({ status: 'fail', detail: { rows_n: 1 } });
-    const after = (await get('/market/matched?asof=2026-12-18&ratio=4&seed=1')).json();
+    const after = (await get('/market/matched?asof=2026-11-30&ratio=4&seed=1')).json();
     expect(JSON.stringify(after.pairs)).not.toContain(victim);
     expect(after.summary.excluded_leakage_n).toBe(1);
   });
@@ -432,5 +433,44 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
     await am('2027-01-05', [['other.com', 70000]]);
     await run();
     expect(((await eps(get)).rows as { name: string; outcome_rule: string }[]).find((r) => r.name === 'left.com')).toMatchObject({ outcome: 'unsold', outcome_rule: 'UNSOLD_60D' });
+  });
+
+  it('MK525-1 GET /market/matched with an asof after the newest sealed source day is 409 MATCHED_ASOF_FUTURE and stores nothing; the newest sealed day itself is accepted', async () => {
+    const { run, get, post } = await boot('2026-12-20');
+    await matchedFixture(post, run); // newest sealed day 2026-12-01
+    const r = await get('/market/matched?asof=2026-12-20&ratio=4&seed=1');
+    expect(r.statusCode).toBe(409);
+    expect(r.json().error).toMatchObject({ code: 'MATCHED_ASOF_FUTURE', details: { asof: '2026-12-20', newest_sealed_day: '2026-12-01' } });
+    expect(await db.selectFrom('market_matched_sets').selectAll().execute()).toHaveLength(0);
+    expect((await get('/market/matched?asof=2026-12-01&ratio=4&seed=1')).statusCode).toBe(200);
+  });
+
+  it('MK525-1 with no sealed source day the limit is today (UTC): tomorrow is MATCHED_ASOF_FUTURE, today answers', async () => {
+    const { get } = await boot('2026-12-20');
+    expect((await get('/market/matched?asof=2026-12-21')).json().error.code).toBe('MATCHED_ASOF_FUTURE');
+    expect((await get('/market/matched?asof=2026-12-20')).statusCode).toBe(200);
+  });
+
+  it('MK525-2 a set with no positives is returned with frozen false and not stored; a later call with data freezes a non-empty set', async () => {
+    const { run, get, post } = await boot('2026-12-20');
+    await am('2026-12-01', [['nega.com', 150000]]);
+    await run();
+    const empty = (await get('/market/matched?asof=2026-12-01&ratio=4&seed=1')).json();
+    expect(empty).toMatchObject({ frozen: false, frozen_at: null, summary: { positives_n: 0 } });
+    expect(empty.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(await db.selectFrom('market_matched_sets').selectAll().execute()).toHaveLength(0);
+    await post([sale('posa.com', 200000, '2026-11-01')]);
+    await run();
+    const real = (await get('/market/matched?asof=2026-12-01&ratio=4&seed=1')).json();
+    expect(real).toMatchObject({ frozen: true, summary: { positives_n: 1 } });
+    expect(real.sha256).not.toBe(empty.sha256);
+    expect(await db.selectFrom('market_matched_sets').selectAll().execute()).toHaveLength(1);
+  });
+
+  it('MK525-3 the v5.25.0 migration deletes only matched sets with 0 positives and re-enables the append-only trigger', () => {
+    const sql = readFileSync('migrations/1765700000000_v5-25-0.sql', 'utf8').split(/^-- Down Migration/m)[0]!;
+    expect(sql).toMatch(/DISABLE TRIGGER market_matched_sets_append_only;\s*DELETE FROM public\.market_matched_sets WHERE \(payload->'summary'->>'positives_n'\)::int = 0;\s*ALTER TABLE public\.market_matched_sets ENABLE TRIGGER market_matched_sets_append_only;/);
+    expect(sql.match(/DELETE FROM/g)).toHaveLength(1);
+    expect(sql).not.toMatch(/^TRUNCATE|DROP TABLE public\.market_matched/m);
   });
 });

@@ -12,6 +12,14 @@ export function priceValues(v: { bin_cents: number | null; floor_cents: number |
   return { ...pair('bin', v.bin_cents), ...pair('floor', v.floor_cents), ...walkawayPair(v.walkaway_cents) };
 }
 
+/** A live name that has not been renewed yet (renewals_used 0): the names whose next renewal is a committed forward cost. */
+export async function unrenewedLiveNames(db: Kysely<Database>) {
+  return db.selectFrom('domains').select(['domain', 'renewal_price_cents', 'renewal_price_source', 'expiry_date', 'drop_date'])
+    .where('renewals_used', '=', 0).where('status', 'not in', ['sold', 'dropped', 'pending_purchase']).orderBy('domain').execute();
+}
+/** CR-004 §10.3: a name whose drop date is its first expiry is not renewed. */
+export const dropsAtFirstExpiry = (d: { expiry_date: string | null; drop_date: string | null }): boolean => d.drop_date !== null && d.expiry_date !== null && d.drop_date === d.expiry_date;
+
 /** Sale-linked ledger rows share the sale's audit_id (written in one transaction by /sold). */
 const LINKED = sql`(audit_id is not null and audit_id in (select audit_id from sales where audit_id is not null))`;
 
@@ -39,10 +47,7 @@ export async function reportMoney(db: Kysely<Database>) {
   const net = gross - commission - fees;
   const profit = net - costs;
   // A name set to drop at first expiry (drop_date = expiry_date, CR-004 §10.3) will not be renewed: it commits no forward cost.
-  const fwd = await db.selectFrom('domains').select(['domain', 'renewal_price_cents'])
-    .where('renewals_used', '=', 0).where('status', 'not in', ['sold', 'dropped', 'pending_purchase'])
-    .where((eb) => eb.or([eb('drop_date', 'is', null), eb('expiry_date', 'is', null), eb('drop_date', '<>', eb.ref('expiry_date'))]))
-    .orderBy('domain').execute();
+  const fwd = (await unrenewedLiveNames(db)).filter((d) => !dropsAtFirstExpiry(d));
   const missing = fwd.filter((d) => d.renewal_price_cents === null).map((d) => d.domain);
   const total = fwd.reduce((s, d) => s + (d.renewal_price_cents ?? 0), 0);
   return {

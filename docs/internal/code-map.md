@@ -203,12 +203,12 @@ v5.23.0 (CR-075). Episodes, labels, sale reports, matched sets, data-quality che
 |---|---|
 | `episodes.ts` | `runEpisodes` (derive + label + write, idempotent), `labelUnsold`, `GAP_DAYS`, `SALE_WINDOW_DAYS` |
 | `sales.ts` | `parseSale`, `loadSales`, `SalesBody` |
-| `matched.ts` | `buildMatched`, `matchedSet` (frozen sets) |
+| `matched.ts` | `buildMatched`, `matchedSet` (frozen sets; v5.25.0: `MATCHED_ASOF_FUTURE`, empty sets not stored), `newestSealedDay` |
 | `dq.ts` | `runDqMarket`, `latestDq`, thresholds |
 | `coverage.ts` | `coverage`, `TARGETS` |
 | `read.ts`, `common.ts` | `listEpisodes`, `episodeOut`, `CLEAN_FEATURES`; `bandOf`, `episodeId`, `normalizeName` |
 
-Tables: `market_names`, `market_sales` (append-only), `market_dq_runs`, `market_matched_sets` (append-only), migration `1765500000000_v5-23-0.sql`; none in the backup. Health/report: `reporting/market-dq-state.ts` (`marketDqStatus`), `ops/api/health.ts` (`dq_market`), `reporting/report/warnings.ts` (`DQ_MARKET_FAIL`). Tests: `tests/modules/market/market.test.ts` (MK523-1..22).
+Tables: `market_names`, `market_sales` (append-only), `market_dq_runs`, `market_matched_sets` (append-only), migration `1765500000000_v5-23-0.sql`; none in the backup. Health/report: `reporting/market-dq-state.ts` (`marketDqStatus`), `ops/api/health.ts` (`dq_market`), `reporting/report/warnings.ts` (`DQ_MARKET_FAIL`). Tests: `tests/modules/market/market.test.ts` (MK523-1..22, MK525-1..3).
 
 ### visits
 v5.18.0 (CR-068): the $0 visitor counter (rules and test IDs `docs/internal/visits.md`). Imports `registrars` (URL forwards) and `listing` (`landerNameservers`); only `app.ts` imports it.
@@ -250,6 +250,7 @@ Read-only reports: `/report`, portfolio, ledger, audit, job-run views.
 |---|---|
 | GET /report, GET /report/pricing-review | `reporting/api/report.ts` |
 | GET /portfolio, GET /portfolio/:domain, GET /ledger, GET /deals/:id, GET /audit | `reporting/api/reads.ts` |
+| POST /ledger/costs, PUT/GET /portfolio/:domain/forward-costs, GET /costs/forward, GET /books.csv (v5.25.0, CR-070) | `reporting/api/books.ts` (`registerBooks`; logic `reporting/books.ts`; rules `docs/internal/books.md`) |
 
 | File | Inside |
 |---|---|
@@ -259,9 +260,10 @@ Read-only reports: `/report`, portfolio, ledger, audit, job-run views.
 | `report/outcomes.ts`, `api/outcomes.ts` | v4.0.0: `GET /portfolio/outcomes`, `/monthly`, `/quarterly` (`outcomes`, `outcomesMonthly`, `outcomesQuarterly`) |
 | `report/lines.ts` | v5.8.0 (CR-059): `reportLines` (`/report` `lines`: Line 1 = `domains.lane` NULL, Line 2 = `S8`; names, spend, sales, pnl, committed renewals) |
 | `report/money.ts`, `portfolio.ts` (`portfolioDetail` adds `registrar_state`, v3.7.0), `domains.ts` (`loadReportDomains`, `perDomain` with shared rows or one name, `applied7d` in two statements), `upcoming.ts`, `pricing-review.ts`, `markdown.ts` | report sections; `ledgerRows`, `ledgerCsvRows`, `usdSigned`, `csvSafeText` (G-98, 5.16.0) in `portfolio.ts` |
+| `books.ts` | v5.25.0: `postCosts`, `parseForwardBody`, `putForwardCosts`, `forwardCostHistory`, `forwardCosts`, `booksRows`, `DERIVED_FIELDS`; the shared renewal rule is `unrenewedLiveNames` / `dropsAtFirstExpiry` in `report/money.ts` |
 | `job-runs.ts` | `jobRunsView`, `jobsOverdue`, `dailyScheduleState`, `stepView`, `triggerFromKey` |
 
-Tables: none owned (reads all). Tests: `tests/modules/reporting/` (`report-core`, `report-warnings`, `reads`, `pricing-review`, `forecast`, `drop-feed-stale`, `keyword-keep-signal` (v4.2.0), `ledger-csv-formula` (L516-1)); the schedule view is also in `tests/modules/ops/jobs.test.ts`, `missed-runs`.
+Tables: `forward_cost_plans`, `forward_cost_lines` (v5.25.0, append-only, versioned plan per domain, in the backup; migration `1765700000000_v5-25-0.sql`); otherwise reads all. Tests: `tests/modules/reporting/` (`books` (v5.25.0: BK525-1..13), `report-core`, `report-warnings`, `reads`, `pricing-review`, `forecast`, `drop-feed-stale`, `keyword-keep-signal` (v4.2.0), `ledger-csv-formula` (L516-1)); the schedule view is also in `tests/modules/ops/jobs.test.ts`, `missed-runs`.
 
 ### outreach
 Outside review (Gemini), outreach email log, company documents, forbidden-term block list. (X posting through Buffer was removed in 5.2.0, CR-057.)
@@ -355,6 +357,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Add a field to POST /candidates/intake | `candidates/intake.ts` (`IntakeBody`, `takeIntake`; store column via migration), `candidates/api/candidates.ts` | `candidates/intake`, `intake-rules`, `screen`, `screen-domains`, `scout-split` |
 | Add a field to a daily list entry | `candidates/daily-list.ts` (`DailyEntry`, `buildDailyList`, `buildWhy`) | `candidates/daily-list`, `daily-list-fields`, `daily-list-rejected`, `daily-list-rebuild` |
 | Add a field to the daily list summary / sections | `candidates/daily-list.ts` (`DailyList`, `readDailyList`) | same |
+| Add a cost row type, change the forward-cost plan or the books file (v5.25.0) | `reporting/books.ts`, `reporting/api/books.ts`, `BOTS_ROUTES` in `http/auth.ts`, `docs/contract/formats.md` §Books CSV, `docs/internal/books.md` | `reporting/books` |
 | Add a /report warning | `reporting/report/warnings.ts` (`buildWarnings`) + warning list in `docs/contract/reports.md` | `reporting/report-warnings`, `drop-feed-stale` |
 | Add a /report section or number | `reporting/report/*.ts`, `report/index.ts` | `reporting/report-core`, `forecast` |
 | Add a selection settings key | `selection/settings.ts` (zod `Base`, `DEFAULT_SELECTION_VALUES`; add to `LOCKED_PREFIXES` if founder-level), `docs/contract/selection.md` | `selection/unit/screening-settings`, `selection/selection-settings`, `selection-settings-v12`, `settings-intake-keys` |
