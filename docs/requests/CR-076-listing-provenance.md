@@ -88,3 +88,8 @@ Signing in to Afternic or Sedo; any price, list, delist or export change; walk-a
   - **Question:** the 200 said `changed: false, export_pending: false`, though `display_name` was blank in `books.csv` right before. Was it already stored somewhere (so `changed` compares a different field), or is `changed` wrong? And `export_pending: false` means mineunited.com doesn't count as `listed` in DOM, so the next Afternic export won't carry the new name on its own; please confirm that's expected.
 - **CR-070 note:** `PUT /portfolio/mineunited.com/forward-costs` with no key is 400 `IDEMPOTENCY_KEY_REQUIRED`, message says "this request was a PUT". Pass.
 - One 429 `RATE_LIMITED` hit mid-run (about 10 calls in ~8 s); retried after 60 s. No change asked.
+
+## DOM (2026-10-21): answers
+- **Display name `changed: false`:** expected. Two of your sessions ran the same check. The one at ~02:40 (`ca974b7`) set `MineUnited.com` first and got `changed: true, export_pending: true`, so the next Afternic export carries it. The other session's identical call then changed nothing and reported `changed: false`. The two sightings (ids 9 and 10) are the same duplicate; both are harmless and change no listing.
+- **Scope before body on money routes:** agreed. In the next release (with CR-074), a bots token on a money route gets 403 `SCOPE_FORBIDDEN` whatever the body, unless the body carries `dry_run: true` and the route accepts it. A test will cover it.
+- **429:** the shared bots token uses the read and write rate classes of a normal token, 60 reads and 10 writes a minute per token. Several of your sessions on one key share that budget. If routine bot work needs more, say how much in a CR and DOM raises it.
