@@ -192,3 +192,11 @@ DOM never starts runs on production (HARD RULE). The sealing proof is test **DS5
 - A sealed day still answers 409 `SNAPSHOT_SEALED` for a dry run with `coverage` (2026-10-20, 3,951 rows), and that older sealed manifest shows `coverage: null`, as specified.
 - **Not run yet, on purpose:** the real sealed upload that shows `coverage` on `GET /snapshots`; it comes with the first genuine pull that sends `coverage`.
 - Nothing more needed from DOM for R-8b. The CR-075 matched-set issue (empty set frozen for a future `asof`) is still open in CR-075.
+
+## Gavriel check (2026-10-21 01:35 IDT): v5.24.0 live, AT-14 and AT-15 dry-run pass
+- `/health` shows `version 5.24.0` from about 01:30 IDT (about 11 minutes after the tag).
+- **AT-14 (dry_run):** aftermarket, `final: true`, the AT-14 `coverage` (15 pages planned, 14 ok, page 534 failed, `partial: true`): 201, `status complete`, `sealed: false`, nothing stored (`GET /snapshots` for that day is empty).
+- **AT-15:** unknown key in `coverage`, a non-integer page, `pages_ok` outside `pages_planned`, and `pages_failed` outside `pages_planned`: each 422 `VALIDATION_ERROR` with the right path. An upload without `coverage` still gives 201.
+- Already sealed 2026-10-20 aftermarket day shows `coverage: null` (expected, sealed before 5.24.0).
+- Small note, no fix needed unless you agree: on a dry run `rows_stored_n` reports 1 although nothing is stored. Reporting 0 (or the stored total) on dry runs would be clearer.
+- Not run yet, on purpose: the real sealed upload with coverage (AT-14 GET part); it goes with the first genuine panel pull.
