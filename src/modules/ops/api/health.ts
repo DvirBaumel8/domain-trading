@@ -7,7 +7,7 @@ import { pingDb } from '../../../db/client.js';
 import type { Database } from '../../../db/types.js';
 import { adapterStatus } from '../../registrars/index.js';
 import { currentReviewSettings } from '../../outreach/index.js';
-import { DB_SIZE_WARN_PERCENT, datasaveStatus, NEON_FREE_STORAGE_BYTES, dailyScheduleState, jobsOverdue, lastJobRunAt, tickOverdue } from '../../reporting/index.js';
+import { DB_SIZE_WARN_PERCENT, datasaveStatus, marketDqStatus, NEON_FREE_STORAGE_BYTES, dailyScheduleState, jobsOverdue, lastJobRunAt, tickOverdue } from '../../reporting/index.js';
 
 export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, kickQueue?: () => Promise<void>, storageLimitBytes: number = NEON_FREE_STORAGE_BYTES): void {
   // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
@@ -19,10 +19,11 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
     const dbOk = await pingDb(db);
     if (dbOk) await kickQueue?.(); // resumes unfinished job steps when this process has no worker running (cheap check)
     // v5.14.0: the independent reads run together, and the review settings are read once for both the state and the model
-    const [jobs, jobsLast, datasave, review, size] = await Promise.all([
+    const [jobs, jobsLast, datasave, dqMarket, review, size] = await Promise.all([
       dbOk ? jobsState(db, now()) : Promise.resolve('unknown'),
       dbOk ? jobsLastRun(db) : Promise.resolve({ daily: null, tick: null }),
       dbOk ? datasaveStatus(db, now()).then((d) => d.state).catch(() => 'unknown') : Promise.resolve('unknown'),
+      dbOk ? marketDqStatus(db).then((d) => d.state).catch(() => 'unknown') : Promise.resolve('unknown'),
       reviewState(db, config),
       dbOk ? dbSize(db, storageLimitBytes) : Promise.resolve(null),
     ]);
@@ -34,6 +35,8 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       jobs_last: jobsLast,
       // v5.21.0 (CR-071): the daily data save: ok | overdue | partial | error (does not change the top-level status; Dynadot not_configured never counts)
       datasave,
+      // v5.23.0 (CR-075 R-3): the market data-quality checks: ok | alert | unknown (before the first run); does not change the top-level status
+      dq_market: dqMarket,
       review: review.state,
       ...(review.state === 'failed' ? { review_reason: review.reason } : {}),
       review_model: review.model,

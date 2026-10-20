@@ -6,6 +6,7 @@ import { computePlan } from '../../listing/index.js';
 import { settingsByVersion } from '../../listing/index.js';
 import { manualDelist, pendingDomains, sameNsSet, VENUES } from '../../listing/index.js';
 import { datasaveStatus, missingDays } from '../datasave-state.js';
+import { marketDqStatus } from '../market-dq-state.js';
 import { dailyScheduleState, JOBS_OVERDUE_HOURS, JOB_RUN_STUCK_HOURS, jobsOverdue } from '../job-runs.js';
 import { daysBetween } from '../../candidates/index.js';
 import { activeSelectionSettings } from '../../selection/index.js';
@@ -69,6 +70,13 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
       state: ds.state, sources: ['godaddy_inventory', ...ds.dynadot_missing], missing_files: ds.missing_files, missing_days: days.missing.map((m) => m.date),
       dynadot_missing: ds.dynadot_missing.map((source) => ({ source, data_date: ds.dynadot_due_date })),
       last_complete_at: ds.last_complete_at ? toJerusalemIso(ds.last_complete_at) : null,
+    });
+  }
+  // v5.23.0 (CR-075 R-3): a failed market data-quality check is never silent.
+  const dq = await marketDqStatus(db);
+  if (dq.state === 'alert') {
+    add('DQ_MARKET_FAIL', 'error', `The market data-quality check failed: ${dq.failed_checks.join(', ')}.`, undefined, {
+      checks: dq.failed_checks, failures: dq.failures, checked_at: dq.checked_at ? toJerusalemIso(dq.checked_at) : null, see: 'GET /market/dq',
     });
   }
   // v5.1.0: the cron itself. A manual or CLI daily does not count; a fresh install with no job run at all is not warned.

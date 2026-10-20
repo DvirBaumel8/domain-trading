@@ -2,6 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.23.0 (2026-10-21): CR-075 market episodes, labels, matched sets, data-quality checks
+Release note: `docs/releases/v5.23.0.md`.
+MINOR (additive; migration `1765500000000_v5-23-0.sql`).
+- **New route `POST /data/sales`** (WRITE, bots or data token; `Idempotency-Key`; audited with the row count only; `dry_run` supported; 1..5,000 rows, 4 MB): add-only sale reports `{name, venue, sale_price_cents, sale_date, source, source_url?, tier A..D, listing_type?}`. One bad row rejects the call with 422 `VALIDATION_ERROR` and per-row reasons: a `source` (or `source_url`) containing `namebio` is `SOURCE_NAMEBIO_FORBIDDEN`, a missing `tier` is `TIER_REQUIRED`. The same `(name, venue, sale_date, source)` sent again with a changed price is **409 `APPEND_ONLY`**, with the same price a counted duplicate. **`PUT`, `PATCH`, `DELETE` on `/data/sales` and `/data/sales/{id}` always answer 405 `APPEND_ONLY`.** New code `APPEND_ONLY`.
+- **New routes (READ, bots too; a data token is 403):** `GET /market/episodes` (summary counts, then rows; filters `outcome`, `rule`, `band`, `from`, `to`, `venue`, `limit` up to 1,000), `GET /market/matched?asof=&ratio=4&seed=` (matched sold-vs-unsold set, frozen and sealed with a sha256 on the first call), `GET /market/dq` (latest data-quality checks), `GET /market/coverage` (rows per source per day, labels, bands, the 1,000 / 2,000 targets, `db_rows`).
+- **`datasave` job:** two new steps last, `episodes` (merges the sealed Dynadot and GoDaddy snapshots and the sales into `market_names` episodes with the R-2 labels `SOLD_REPORTED`, `SOLD_BIDS`, `UNSOLD_60D`, `UNSOLD_30D`, `SEEN_ONCE`, `DISAPPEARED`, `TOO_SHORT`; idempotent) and `dqMarket` (duplicates, survivorship, leakage, price sanity, coverage, tier). The step list of `GET /jobs/runs?job=datasave` now has seven steps.
+- **`GET /health`** adds `dq_market`: `ok | alert | unknown` (does not change `status`). **`/report`** adds the warning `DQ_MARKET_FAIL` (`reports.md`).
+- Storage rule (CR-075 Q1): only episodes that can be a positive or a matched negative are stored, nothing under $500 (reported sales, Dynadot $500+ listings, closed auctions and GoDaddy endings of $500 or more). The closeout pool is not in `market_names`.
+
 ## 5.22.0 (2026-10-21): CR-071 R-8..R-10: Dynadot bot uploads, GoDaddy auction endings
 Release note: `docs/releases/v5.22.0.md`.
 MINOR (additive; migration `1765400000000_v5-22-0.sql`).

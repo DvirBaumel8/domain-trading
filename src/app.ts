@@ -22,6 +22,7 @@ import { registerDropLists, registerCohorts, registerCandidates, registerLessons
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
 import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
 import { registerData } from './modules/data/index.js';
+import { registerMarket } from './modules/market/index.js';
 import { registerVisits } from './modules/visits/index.js';
 import { collectOpenApiRoutes, registerOpenApi } from './http/openapi.js';
 
@@ -234,6 +235,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // Closing the app waits for the step in flight, so nothing touches the database after it is closed. Unfinished runs resume at start (main.ts) or on the next GET.
   app.addHook('onClose', async () => app.jobQueue.stop());
   registerSnapshots(app, { db: deps.db, now });
+  registerMarket(app, { db: deps.db, now });
   registerJobs(app, app.jobQueue, { ...base, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   registerOpenApi(app, openApiRoutes, deps.config.version);
   deps.registerExtraRoutes?.(app);

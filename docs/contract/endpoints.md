@@ -1,4 +1,4 @@
-# Endpoints (contract v5.22.0)
+# Endpoints (contract v5.23.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -55,6 +55,11 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/engine/sales`, `/engine/unsold` | WRITE or data (5.10.0) | Scoring engine (5.4.0, 5.10.0) |
 | POST | `/data/rdap`, `/data/live-checks`, `/data/tm-kills`, `/data/bigco-names`, `/data/sales-comps` | WRITE or data | Loaded data tables (5.12.0, CR-063) |
 | GET | `/data/rdap`, `/data/live-checks`, `/data/tm-kills`, `/data/bigco-names`, `/data/sales-comps` | READ (a data token gets 403) | Loaded data tables (5.12.0, CR-063) |
+| POST | `/data/sales` | WRITE, bots or data | Market data (5.23.0, CR-075) |
+| PUT | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
+| PATCH | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
+| DELETE | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
+| GET | `/market/episodes`, `/market/matched`, `/market/dq`, `/market/coverage` | READ or bots (a data token gets 403) | Market data (5.23.0, CR-075) |
 | POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
 | POST | `/engine/holdout-date` | WRITE only (not a data token) | Holdout guard (5.10.0, CR-061) |
 | GET | `/engine/holdout-date` | READ | Holdout guard (5.10.0, CR-061) |
@@ -106,6 +111,7 @@ Any valid bot token (READ or WRITE).
 - `db_size` (5.17.0): `{bytes, limit_bytes, percent, warn_percent}`, the database size against Neon's free 1 GB (`percent` to one decimal; `/report` warns `DB_SIZE_HIGH` above `warn_percent`, 70). `null` when the size can't be read (and in the 503 answer).
 - Removed in 5.2.0 (CR-057): `posting` and `posting_reason` are no longer in the answer.
 - `review_reason` (3.1.0): present only when `review` is `failed`: Google's status and short reason from the latest review, never a key. 3.2.0 (CR-017 N-4): `CODE: text`, where CODE is Google's status (e.g. `UNAVAILABLE`) or `HTTP <n>`; at most **200 characters**, cut at a word and ending with `…` when longer.
+- `dq_market` (5.23.0, CR-075, additive): `ok` (the latest `dqMarket` run passed every check), `alert` (a check failed; `GET /market/dq` names it; `/report` has `DQ_MARKET_FAIL`) or `unknown` (no run yet). It does not change `status`.
 - `datasave` (5.21.0, CR-071, additive): `ok` (every configured GoDaddy inventory file has a complete save within the last 26 hours and the last `datasave` run did not fail), `partial` (some files saved, some not, or the last run failed for some), `error` (the last run's `godaddyInventory` step failed and no file is saved within 26 h), `overdue` (nothing complete within 26 h, also before the first run). It never changes the top-level `status`; the Dynadot steps (`not_configured`) never count. `/report` raises `DATASAVE_MISSED` for any value but `ok` once a save or a run exists.
 - `jobs` is also `overdue` (3.1.0) when `JOB_MISSED` or `JOB_RUN_INCOMPLETE` applies.
 - `review` (2.11.0, additive; `disabled` and `review_model` 2.11.2): `disabled` (the switch is off), `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
@@ -588,6 +594,87 @@ Read as described under `GET /data/rdap`.
 Read as described under `GET /data/rdap`.
 
 **Retention (daily step `retention`, `jobs.md`):** `live` and `livefail` rows older than 3 days, `cc` rows older than 14 days, and `domain_rdap` rows of names that left the pool are deleted. `tm_kills`, `bigco_names` and `sales_comps` are never pruned.
+
+## Market data (5.23.0, CR-075)
+
+The data program's test bed: one row per **name x venue x listing episode** (`market_names`), labelled sold / unsold / unknown by fixed rules, fed by the sealed daily snapshots (`## Daily data saves`) and by sales the bots report. Built so a fair sold-versus-offered-never-sold comparison exists in the same price band and calendar window. Nothing here sends anything, calls a venue or touches money. **NameBio is never used** (its terms ban automated use): a sale whose `source` or `source_url` contains `namebio` is refused. The daily `datasave` job derives the episodes (steps `episodes`, `dqMarket`, `jobs.md`); no route writes an episode.
+
+**What is stored (CR-075 Q1):** only episodes that can be a positive or a matched negative, and **nothing under $500**: every reported sale of $500 or more; Dynadot Buy-Now listings of $500 or more; Dynadot closed auctions and GoDaddy auction endings whose final price is $500 or more. The 40-dollar closeouts stay in the 3-day pool and are not in `market_names`. `GET /market/coverage` shows `db_rows`.
+
+**Episodes.** `episode_id` = sha1 of `name|venue|first_seen` (for an auction, `name|venue|first_seen|auction`, so a Buy-Now listing and an auction of one name that begin the same day never collide). `first_seen` / `last_seen` are the **source's data dates** (the sealed snapshot days), never the run date. A name seen on two sealed snapshot days with no sealed day between them where it is absent is one episode, however many days apart; it is **split** only when it was absent from a sealed day and the gap between the two sightings is **more than 7 days**. `days_listed` = `last_seen - first_seen`.
+
+**Labels (`outcome`, `outcome_rule`)** are recomputed on every run from the sealed sources and the sales (the same inputs give the same rows):
+| `outcome_rule` | `outcome` | Meaning |
+|---|---|---|
+| `SOLD_REPORTED` | `sold` | A sale report (`POST /data/sales`, price >= $500) for the same name on a date from `first_seen` up to 90 days after `last_seen` (the same venue wins, else any venue). A sale with no episode creates a **sold-only** episode (`sale_only: true`, `first_seen = last_seen = sale_date`, `days_listed` 0). |
+| `SOLD_BIDS` | `sold` | A GoDaddy auction ending, or a Dynadot closed auction, with at least 1 bid; the sale price is the final price and the sale date the UTC date of the end time. Counted separately from `SOLD_REPORTED`; a later reported sale for the same episode replaces it. |
+| `UNSOLD_60D` | `unsold` | Seen on two or more sealed snapshot days spanning **60 or more days**, still on the source's latest days (last seen within 7 days of its latest sealed day), never sold. A name that has since left the source counts as `UNSOLD_60D` only once **90 days** have passed since `first_seen` with no sale report (a sale may explain the disappearance). |
+| `UNSOLD_30D` | `unsold` | Provisional, an early read only: the same, spanning 30 to 59 days. |
+| `SEEN_ONCE` | `unknown` | Seen on one snapshot day only. |
+| `DISAPPEARED` | `unknown` | Left the source (or an ended auction with no bid) and not yet explained by 90 days. |
+| `TOO_SHORT` | `unknown` | Still listed, spanning 1 to 29 days. |
+`unknown` is never counted as sold or unsold. `outcome: "delisted"` is reserved and not produced.
+
+**Sources, `tier`, `source_sha256`.** `tier` is the quality of the source: **`A`** = GoDaddy's official inventory files (auction endings), **`B`** = the bots' Dynadot API uploads (`POST /snapshots/dynadot`), and a reported sale carries the `tier` (`A`..`D`) the bot sends (required). An episode that has a reported sale takes the **best** (lowest letter) tier of its snapshot and its sale rows. `source` is `dynadot_aftermarket`, `dynadot_closed_auctions`, `godaddy_auction_end`, or the sale's own source for a sold-only episode. `source_sha256` is the manifest sha256 of the last snapshot day (Dynadot), a hash of the ending (GoDaddy) or of the sale row (sold-only). `price_band` (cents): `500-999`, `1k-2.5k` (1,000-2,499), `2.5k-5k`, `5k-10k`, `10k+`, from the sale price when sold, else the last list price. `feat_asof` is the as-of date of any feature a later program attaches to the row; the episodes job never writes or clears it (the leakage check reads it).
+
+### `POST /data/sales`
+5.23.0, CR-075 R-4. **WRITE, bots or data token** (a READ token is 403 `SCOPE_FORBIDDEN`). `Idempotency-Key` required; audited (the audit row keeps only `[n rows]`). Body limit 4 MB, 1 to 5,000 rows. Body `{rows: [..], dry_run?: boolean}`; each row is strict:
+```
+{ "name": "name.com", "venue": "dnjournal", "sale_price_cents": 125000, "sale_date": "2026-10-14",
+  "source": "dnjournal_weekly", "source_url": "https://..." /* optional */, "tier": "A" | "B" | "C" | "D",
+  "listing_type": "bin" | "offer" | "auction" | "closeout" /* optional, default bin */ }
+```
+`name` is lowercased (IDN as punycode); `venue` is a lowercase label (letters, digits, `_ . -`, 40 characters); `sale_price_cents` an **integer** (cents, 1 or more; a sale under $500 is stored as a report but makes no episode, counted in `below_floor_n`); `sale_date` a real date, not in the future (UTC). **One bad row rejects the whole call: 422 `VALIDATION_ERROR`, nothing stored,** `details.rejects` = `[{row, reason}]` with reasons `SOURCE_REQUIRED`, `SOURCE_NAMEBIO_FORBIDDEN` (`source` or `source_url` contains `namebio`, any case), `TIER_REQUIRED`, `TIER_INVALID`, `NAME_INVALID`, `VENUE_INVALID`, `PRICE_NOT_INTEGER_CENTS`, `DATE_INVALID`, `DATE_IN_FUTURE`, `SOURCE_URL_INVALID`, `LISTING_TYPE_INVALID`, `UNKNOWN_FIELD:<key>`.
+**Add-only.** The key of a row is `(name, venue, sale_date, source)`. The same key re-posted with the **same price** is a duplicate (counted, nothing stored). The same key with a **different price** is **409 `APPEND_ONLY`** for the whole call (`details.conflicts` = `[{row, name, venue, sale_date, source, stored_price_cents, sent_price_cents}]`), nothing stored. The same sale from a **different source** is a new row: all rows are kept; the episode uses the highest tier and lists the other sources in `dup_sources`.
+**201** `{dry_run, received_n, accepted_n, duplicate_n, rejected_n (0), below_floor_n, audit_id}`. `dry_run: true` runs every check and stores nothing. The sale shows in `GET /market/episodes` after the next `episodes` step (the 15:00 UTC datasave run).
+
+### `PUT /data/sales`
+Always **405 `APPEND_ONLY`** (header `Allow: POST`), for any token, with or without an `Idempotency-Key`. Sale reports have no update.
+
+### `PUT /data/sales/{id}`
+Always 405 `APPEND_ONLY`, as `PUT /data/sales`.
+
+### `PATCH /data/sales`
+Always 405 `APPEND_ONLY`, as `PUT /data/sales`.
+
+### `PATCH /data/sales/{id}`
+Always 405 `APPEND_ONLY`, as `PUT /data/sales`.
+
+### `DELETE /data/sales`
+Always 405 `APPEND_ONLY`, as `PUT /data/sales`. Sale reports have no delete; a wrong report is superseded by a correct row from a better source or tier. (The table itself refuses UPDATE, DELETE and TRUNCATE.)
+
+### `DELETE /data/sales/{id}`
+Always 405 `APPEND_ONLY`, as `DELETE /data/sales`.
+
+### `GET /market/episodes`
+READ (or bots; a data token is 403). Query (all optional; a bad value → **400** `VALIDATION_ERROR`): `outcome` (`sold` | `unsold` | `unknown`), `rule` (an `outcome_rule`), `band`, `from`, `to` (`YYYY-MM-DD`, filter on `first_seen`), `venue`, `limit` (1..1000, default 100). **200:**
+```
+{ summary: { total, by_outcome: {...}, by_rule: {...}, by_band: {...} },   // over all rows that match the filters, before the limit
+  limit, returned,
+  rows: [ { episode_id, name, sld, tld, venue, listing_type,
+            list_price_first_cents, list_price_first, list_price_last_cents, list_price_last, price_changes,   // null when unknown (an auction has no first price)
+            first_seen, last_seen, days_listed, seen_days, outcome, outcome_rule,
+            sale_price_cents, sale_price, sale_date, source, source_url, source_sha256, tier, feat_asof,
+            dup_group, dup_sources, price_band, letters_only, sale_only } ] }   // newest first_seen first
+```
+
+### `GET /market/matched`
+READ (or bots). Query: `asof` (`YYYY-MM-DD`, required), `ratio` (1..20, default 4), `seed` (integer 0..4294967295, default 1). A bad value → **400**. Each **positive** is a sold `.com` episode with `sale_date <= asof`; it gets up to `ratio` **negatives**: `UNSOLD_60D` `.com` episodes (first seen at least 60 days before `asof`) of the **same price band**, the **same letters-only flag** (the name before `.com` is only a-z or not) and whose listing overlaps the **60-day window** centred on the sale date (sale date -30 days .. +30 days). A negative is used for one positive only. The draw is seeded (a hash of `asof|ratio|seed|episode_id` feeds a mulberry32 shuffle), so it never depends on row order. Rows with a feature as-of date after `first_seen` or after the sale date (the leakage check) are **excluded**; `unknown` episodes are never in the set.
+**Frozen and sealed:** the first call for `(asof, ratio, seed)` stores the set with a `sha256` over its canonical JSON (keys sorted) and returns it; every later call with the same triple returns the stored set and the same `sha256`, even after new data arrived. The stored set cannot be changed or deleted. **200:**
+```
+{ asof, ratio, seed, rule: "m1",
+  summary: { positives_n, negatives_n, unmatched_positives_n, excluded_leakage_n },
+  pairs: [ { positive: <episode row>, window: {from, to}, negatives: [ <episode row> ] } ],
+  sha256, frozen: true, frozen_at }
+```
+
+### `GET /market/dq`
+READ (or bots). The latest `dqMarket` run: `{id, checked_at, status: "ok" | "alert" | "unknown", failed_checks: [string], results: [{check, status: "pass" | "fail", source?, day?, detail}]}` (`unknown`, empty results, before the first run). Checks: **`duplicates`** (two episodes of one name, venue and listing type with overlapping days), **`survivorship`** (the share of Dynadot Buy-Now episodes first seen on the source's first snapshot day; fails above 90% once the source has 30 sealed days), **`leakage`** (a row whose `feat_asof` is after `first_seen` or `sale_date`; the row is left out of `/market/matched`), **`price_sanity`** (a more than 10x jump between consecutive snapshot days of a name in the last 30 days, a reported sale under $100 that looks like dollars read as cents, a sale more than 10x or less than a tenth of the last list price), **`coverage`** (rows per source per day, for `dynadot_aftermarket` and `dynadot_closed_auctions`: a sealed day of the last 7 with fewer rows than **half the median of the 7 days before it** fails, one entry per source and `day` with `rows` and `median_7d`; needs 3 prior days), **`tier_present`** (a tier on 100% of rows). Any failed check makes `GET /health` `dq_market: "alert"` and `/report` the warning `DQ_MARKET_FAIL` naming the checks.
+
+### `GET /market/coverage`
+READ (or bots). Query `days` (1..120, default 30). **200:** `{as_of, window, per_source_daily: [{source, day, rows, sealed}], labels: {<outcome_rule>: n}, bands: {<band>: {sold, unsold_60d, unsold_30d, unknown}}, unsold_30d_n, unsold_60d_n, unsold_60d_matched_n, sold_n, targets: [{name, label, target, by, current, progress_pct, days_left, met}], db_rows: {market_names, market_sales, market_dq_runs, market_matched_sets, market_names_bytes}}`. `per_source_daily` sources: `dynadot_aftermarket`, `dynadot_closed_auctions` (rows stored per data day), `godaddy_auction_end` (auctions that ended that day), `sales_reported` (sale rows posted that day). `unsold_30d_n` = episodes unsold for 30 days or more (`UNSOLD_30D` plus `UNSOLD_60D`); `unsold_60d_matched_n` = the negatives a matched set for today (`ratio` 4, `seed` 1) would hold. Targets: **1,000** `unsold_30d` by **2026-11-25**, **2,000** `unsold_60d_matched` by **2026-12-20** (`days_left` is negative once past). Nothing is stored by this call.
+
+**Retention:** `market_names` and `market_sales` are never pruned (small by design: only $500+ episodes; `db_rows.market_names_bytes` shows the size); the last 90 `dqMarket` runs are kept. Source rows (`dynadot_rows`, ended auctions) are pruned at 120 days as before; an episode whose oldest rows were pruned keeps its `first_seen` and first price.
 
 ## Visitor counter (5.18.0, CR-068)
 
@@ -1095,6 +1182,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Offer and sale errors:** `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `HOLD_REASON_REQUIRED`, `EXTERNAL_REF_CONFLICT`, `OFFER_NOT_FOUND`, `APPROVAL_REQUIRED`, `OUTCOME_FINAL`, `OUTCOME_TRANSITION_INVALID`, `OFFER_SOLD_MISMATCH`, `OUTCOME_CHANGED_CONCURRENTLY`, `EVIDENCE_REQUIRED`, `SOLD_AT_IN_FUTURE`, `OFFER_MISMATCH`, `NOT_SELLABLE_STATE`, `SALE_ALREADY_RECORDED`, `DEAL_NOT_FOUND`.
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
+
+**Market data (5.23.0, CR-075):** `APPEND_ONLY` (**405** on PUT, PATCH or DELETE of `/data/sales`; **409** on `POST /data/sales` for a stored `(name, venue, sale_date, source)` sent again with a different price). The `rejects[].reason` of a 422 `POST /data/sales`: `SOURCE_REQUIRED`, `SOURCE_NAMEBIO_FORBIDDEN`, `TIER_REQUIRED`, `TIER_INVALID`, `NAME_INVALID`, `VENUE_INVALID`, `PRICE_NOT_INTEGER_CENTS`, `DATE_INVALID`, `DATE_IN_FUTURE`, `SOURCE_URL_INVALID`, `LISTING_TYPE_INVALID`, `UNKNOWN_FIELD`. Episode labels (`outcome_rule`, not errors): `SOLD_REPORTED`, `SOLD_BIDS`, `UNSOLD_60D`, `UNSOLD_30D`, `SEEN_ONCE`, `DISAPPEARED`, `TOO_SHORT`. `/report` warning `DQ_MARKET_FAIL` (`reports.md`).
 
 **Daily data save (5.21.0, CR-071):** `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; since 5.22.0 also **HTTP 409** from `POST /snapshots/dynadot` for a sealed (kind, data_date)). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
 

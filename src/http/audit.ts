@@ -71,6 +71,8 @@ function elideRows(b: Record<string, unknown> | null, url: string): Record<strin
   if (b === null || !Array.isArray(b.rows)) return b;
   // v5.22.0: a Dynadot upload (up to 50,000 rows) is always recorded by its row count; the rows live in dynadot_rows
   if (url.startsWith('/snapshots/dynadot')) return { ...b, rows: `[${b.rows.length} rows]` };
+  // v5.23.0: sale reports (POST /data/sales) are always recorded by their row count too; the rows live in market_sales
+  if (url === '/data/sales') return { ...b, rows: `[${b.rows.length} rows]` };
   if (!(url.startsWith('/engine/') || url.startsWith('/data/')) || b.rows.length <= 20) return b;
   return { ...b, rows: `[${b.rows.length} rows]` };
 }

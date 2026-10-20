@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 5.22.0** (21 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 5.23.0** (21 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -26,7 +26,7 @@ The base URL is given to Gavriel in the release notes and `docs/requests/`. Unti
 | **READ** bot token | `Authorization: Bearer <token>` | Every `GET` |
 | **WRITE** bot token | same | Every route; `POST /jobs/run` only for `daily` and `tick`, at most 4 calls per hour per token (2.3.0) |
 | **Intake** bot token (2.14.0, one per scout) | same | `POST /candidates/intake` and `POST /selection/drop-lists` only; anything else 403 `SCOPE_FORBIDDEN` |
-| **Data** bot token (5.10.0, CR-061; for a bot that loads data, never money) | same | `POST /candidates/intake`, `POST /engine/sales`, `POST /engine/unsold` and every `POST /data/*` route only; anything else, GETs included, 403 `SCOPE_FORBIDDEN`. Named READ tokens (one per bot) read as above; `/audit` shows each call's `token_name` and `scope` |
+| **Data** bot token (5.10.0, CR-061; for a bot that loads data, never money) | same | `POST /candidates/intake`, `POST /engine/sales`, `POST /engine/unsold` and every `POST /data/*` route only (`POST /data/sales`, 5.23.0, included); anything else, GETs included, 403 `SCOPE_FORBIDDEN`. Named READ tokens (one per bot) read as above; `/audit` shows each call's `token_name` and `scope` |
 | **Visits** bot token (5.18.0, CR-068; one, held by the api-proxy Worker) | same | `POST /visits/hit` only (and only this token may call it); anything else, GETs included, 403 `SCOPE_FORBIDDEN`. Created by the host kit on Dvir's request, never shown (`POST /visits/settings` `token: "request"`) |
 | **Bots** shared token (5.20.0, CR-069; one key for all the bots, name `bots-shared`) | same | Every `GET`; every route a data or intake token may call; `POST /visits/*` except `/visits/hit`; and every other mutating route that is **not a money route** (screening, tranches, selection drafts, lessons, company, reviews feedback, stats, renewal-price, the token rotation). A **money route** (a real `/buy`, `/portfolio/import`, `/list`, `/listings/*`, `/export/*/uploaded`, offers, `/sold`, horizon, quotes, review runs and settings, selection activation, sibling approval) works with this token **only with `"dry_run": true` in the JSON body**, else **403** `SCOPE_FORBIDDEN`; `POST /jobs/run` is 401 as for any non-WRITE token. Every route is classified in code (`BOTS_ROUTES`, `src/http/auth.ts`), an unlisted route counts as money. Optional header `X-Bot-Name` (1..40 of `A-Za-z0-9 _.-`, else ignored) is stored in the audit row (`bot_name`, shown by `GET /audit`); it is not a security check |
 | **Job token** (`JOB_TRIGGER_TOKEN`, held by the Cloudflare Worker cron) | same | `POST /jobs/run` only |

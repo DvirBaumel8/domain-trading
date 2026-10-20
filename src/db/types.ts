@@ -1363,6 +1363,70 @@ export interface ManualQuotesTable {
   created_at: TimestampDefault;
 }
 
+/** v5.23.0 (CR-075): add-only sale reports (POST /data/sales). */
+export interface MarketSalesTable {
+  id: Generated<number>;
+  name: string;
+  venue: string;
+  sale_price_cents: number;
+  sale_date: DateString;
+  source: string;
+  source_url: string | null;
+  tier: 'A' | 'B' | 'C' | 'D';
+  listing_type: Generated<'bin' | 'offer' | 'auction' | 'closeout'>;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+/** v5.23.0 (CR-075): one row per name x venue x listing episode (only episodes that can be a positive or a matched negative).  */
+export interface MarketNamesTable {
+  episode_id: string;
+  name: string;
+  sld: string;
+  tld: string;
+  venue: string;
+  listing_type: 'bin' | 'offer' | 'auction' | 'closeout';
+  list_price_cents_first: number | null;
+  list_price_cents_last: number | null;
+  price_changes: number;
+  first_seen: DateString;
+  last_seen: DateString;
+  days_listed: number;
+  seen_days: number;
+  sale_only: boolean;
+  outcome: 'sold' | 'unsold' | 'unknown' | 'delisted';
+  outcome_rule: string;
+  sale_price_cents: number | null;
+  sale_date: DateString | null;
+  source: string;
+  source_url: string | null;
+  source_sha256: string | null;
+  tier: 'A' | 'B' | 'C' | 'D';
+  feat_asof: ColumnType<DateString | null, DateString | null | undefined, DateString | null>;
+  dup_group: string | null;
+  dup_sources: string[] | null;
+  price_band: '500-999' | '1k-2.5k' | '2.5k-5k' | '5k-10k' | '10k+';
+  sale_id: number | null;
+  derived_at: TimestampDefault;
+}
+
+export interface MarketDqRunsTable {
+  id: Generated<number>;
+  checked_at: Timestamp;
+  status: 'ok' | 'alert';
+  results: ColumnType<unknown, string, string>;
+}
+
+export interface MarketMatchedSetsTable {
+  asof: DateString;
+  ratio: number;
+  seed: number;
+  sha256: string;
+  payload: ColumnType<unknown, string, string>;
+  created_at: TimestampDefault;
+}
+
 export interface Database {
   api_tokens: ApiTokensTable;
   settings: SettingsTable;
@@ -1370,6 +1434,10 @@ export interface Database {
   datasave_pool: DatasavePoolTable;
   dynadot_rows: DynadotRowsTable;
   godaddy_auctions: GodaddyAuctionsTable;
+  market_sales: MarketSalesTable;
+  market_names: MarketNamesTable;
+  market_dq_runs: MarketDqRunsTable;
+  market_matched_sets: MarketMatchedSetsTable;
   deals: DealsTable;
   domains: DomainsTable;
   ledger_entries: LedgerEntriesTable;

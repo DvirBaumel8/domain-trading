@@ -221,6 +221,13 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /data/bigco-names': 'allowed',
   'POST /data/live-checks': 'allowed',
   'POST /data/rdap': 'allowed',
+  'POST /data/sales': 'allowed', // v5.23.0 (CR-075 R-4): add-only sale reports, no money
+  'PUT /data/sales': 'allowed', // answers 405 APPEND_ONLY
+  'PUT /data/sales/{id}': 'allowed', // answers 405 APPEND_ONLY
+  'PATCH /data/sales': 'allowed', // answers 405 APPEND_ONLY
+  'PATCH /data/sales/{id}': 'allowed', // answers 405 APPEND_ONLY
+  'DELETE /data/sales': 'allowed', // answers 405 APPEND_ONLY
+  'DELETE /data/sales/{id}': 'allowed', // answers 405 APPEND_ONLY
   'POST /data/sales-comps': 'allowed',
   'POST /data/tm-kills': 'allowed',
   'POST /demand/keywords': 'allowed',

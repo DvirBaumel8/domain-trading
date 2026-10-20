@@ -17,6 +17,7 @@ import { Readable, Transform, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../../db/types.js';
+import { runDqMarket, runEpisodes } from '../../../market/index.js';
 import { listZipEntries, openZipEntry } from './zip.js';
 import { streamArrayItems } from './json-stream.js';
 
@@ -371,6 +372,19 @@ export class DatasaveJob {
       source, status: 'not_configured', reason: this.deps.dynadotKey ? 'a Dynadot key is set but the Dynadot client is not built yet' : 'DYNADOT_API_KEY is not set (no Dynadot key exists)',
       bot_upload: await this.botUpload(source),
     };
+  }
+
+  // ---------- episodes, dqMarket (v5.23.0, CR-075) ----------
+
+  /** Merges every sealed source and the reported sales into market_names and labels the episodes (R-1, R-2). Idempotent: the retry run and the next day derive the same rows again. */
+  async episodes(): Promise<unknown> {
+    return runEpisodes(this.deps.db, this.deps.now());
+  }
+
+  /** The market data-quality checks (R-3); a failed check sets /health.dq_market to alert and /report DQ_MARKET_FAIL. A failed check is data, not a failed step. */
+  async dqMarket(): Promise<unknown> {
+    const r = await runDqMarket(this.deps.db, this.deps.now());
+    return { status: r.status, failed_checks: r.failed_checks, checks_n: r.results.length };
   }
 
   // ---------- buildPanel ----------
