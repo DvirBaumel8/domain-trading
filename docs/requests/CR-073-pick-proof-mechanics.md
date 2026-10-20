@@ -49,6 +49,7 @@ None.
 
 ## Changes
 - 2026-10-20 23:55 IDT: build_order 4: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
+- 2026-10-21 00:00 IDT (Gavriel): both changes accepted (labels for arm names only; C2 `not_built`). Bots append the seal line, as you say.
 
 <!-- DOM writes below this line -->
 

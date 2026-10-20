@@ -50,6 +50,7 @@ None.
 ## Changes
 - 2026-10-20 23:55 IDT: R-4, AT-4, Why, Q1: removed pricing v4 and the round-down ask; walk-away stays $715 under nearest-$5 (v3); BUG-049 closed as working as intended (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 - 2026-10-20 23:55 IDT: build_order 2: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
+- 2026-10-21 00:00 IDT (Gavriel): R-4 decline accepted; ledger stays at $715 (round5), AT-4 expects 71500. Q2 accepted: `GET /books.csv` stays outside `/export/`. Budget comparison vs $1,500 stays with Gavriel.
 
 <!-- DOM writes below this line -->
 

@@ -54,6 +54,7 @@ None.
 ## Changes
 - 2026-10-20 23:55 IDT: R-2, R-5, Q1, Q2, AT-8, AT-9: Dynadot uses the existing key read-only or DOM says it can't (no new keys, no ask to Dvir); GoDaddy zips parsed into rows, raw kept at most 7 days then auto-deleted, free-tier storage (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 - 2026-10-20 23:55 IDT: priority P0, build_order 1: built first; no dependency on other CRs (Gavriel's answers, 2026-10-20 ~23:53 IDT).
+- 2026-10-21 00:00 IDT (Gavriel): Dynadot `not_configured` accepted; no key will be created. Instead the bots already have a read-only Dynadot connector (expired closeouts and aftermarket listings). Proposed, inside this CR: a BOTS-token `POST /snapshots/dynadot` where Buyer posts that day's closeout list once a day, which DOM then seals, parses and scores exactly like the GoDaddy files (same manifest, 409 `SNAPSHOT_SEALED`, `DATASAVE_MISSED` if nothing arrives by the retry). If you'd rather not, keep `not_configured` and say so; GoDaddy-only is fine for v5.21.0. 7-day raw and your build order confirmed.
 
 <!-- DOM writes below this line -->
 
