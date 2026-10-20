@@ -44,6 +44,9 @@ export interface SettingsTable {
   datasave_pool_max_price_cents: Generated<number>;
   datasave_pool_keep_days: Generated<number>;
   datasave_raw_keep_days: Generated<number>;
+  /** v5.22.0: days the bot-uploaded aftermarket / closed-auction rows and the ended GoDaddy auctions are kept. Migration only. */
+  datasave_dynadot_keep_days: Generated<number>;
+  datasave_auction_keep_days: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;
@@ -56,7 +59,7 @@ export interface SettingsTable {
   updated_at: TimestampDefault;
 }
 
-export type SnapshotSource = 'godaddy_inventory' | 'dynadot_closeouts' | 'dynadot_aftermarket';
+export type SnapshotSource = 'godaddy_inventory' | 'dynadot_closeouts' | 'dynadot_aftermarket' | 'dynadot_closed_auctions';
 
 /** v5.21.0 (CR-071): one saved file. Complete rows are sealed (trigger snapshot_manifests_guard): only retention may later set raw_available false. */
 export interface SnapshotManifestsTable {
@@ -79,6 +82,8 @@ export interface SnapshotManifestsTable {
   sealed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
   created_at: TimestampDefault;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  /** v5.22.0: 'fetch' (the job) or 'bot_upload' (POST /snapshots/dynadot). */
+  origin: ColumnType<'fetch' | 'bot_upload', 'fetch' | 'bot_upload' | undefined, 'fetch' | 'bot_upload'>;
 }
 
 /** v5.21.0 (CR-071): the parsed closeouts of the last few days. */
@@ -90,6 +95,35 @@ export interface DatasavePoolTable {
   ends_at: Timestamp;
   score: ColumnType<string | null, number | string | null | undefined, number | string | null>;
   score_reason: ColumnType<string | null, string | null | undefined, string | null>;
+}
+
+/** v5.22.0 (CR-071 R-8, R-9): rows uploaded by the bots (POST /snapshots/dynadot). Unique per listing_id (aftermarket) or per domain (the other kinds), per day. */
+export interface DynadotRowsTable {
+  id: Generated<number>;
+  data_date: DateString;
+  kind: 'aftermarket' | 'closed_auctions' | 'closeouts';
+  domain: string;
+  listing_id: string | null;
+  price_cents: number | null;
+  bid_count: number | null;
+  end_time: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  final_price_cents: number | null;
+  ends_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+}
+
+/** v5.22.0 (CR-071 R-10): a GoDaddy auction that reached $500, followed until it leaves the inventory files. */
+export interface GodaddyAuctionsTable {
+  id: Generated<number>;
+  domain: string;
+  end_time: Timestamp;
+  auction_type: string | null;
+  first_seen: DateString;
+  last_seen: DateString;
+  last_price_cents: number;
+  max_price_cents: number;
+  last_bid_count: Generated<number>;
+  final_state_at: DateString | null;
+  ended: Generated<boolean>;
 }
 
 export interface DealsTable {
@@ -1334,6 +1368,8 @@ export interface Database {
   settings: SettingsTable;
   snapshot_manifests: SnapshotManifestsTable;
   datasave_pool: DatasavePoolTable;
+  dynadot_rows: DynadotRowsTable;
+  godaddy_auctions: GodaddyAuctionsTable;
   deals: DealsTable;
   domains: DomainsTable;
   ledger_entries: LedgerEntriesTable;

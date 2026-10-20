@@ -1,7 +1,9 @@
 // The `datasave` job (v5.21.0, CR-071): the daily data saves. Five steps, each with its own status:
 //   godaddyInventory   fetches GoDaddy's official inventory files (metadata.json lists them), records size / sha256 / Last-Modified per file in a
 //                      write-once manifest, keeps the raw zip on disk (SNAPSHOT_DIR) and parses ONLY closeout_listings.json into datasave_pool.
-//   dynadotCloseouts / dynadotAftermarket   not built: no Dynadot key exists, so they report `not_configured` (never an error, never zero rows).
+//   dynadotCloseouts / dynadotAftermarket   not built: no Dynadot key exists, so they report `not_configured` (never an error, never zero rows). Since v5.22.0 they also
+//                      say whether a bot upload (POST /snapshots/dynadot, dynadot-upload.ts) for today is sealed.
+// v5.22.0 (R-10): the four auction files are also parsed (godaddy_auctions): .com auctions that reached $500, followed until they leave the files.
 //   buildPanel         the day diff of the closeouts pool (names gone before their end).
 //   snapshotRetention  deletes raw zips past their window (manifest stays) and pool rows past their days.
 // It reads only the public inventory host (official files, no scraping) and writes only its own tables and files. Files are keyed by the source's
@@ -23,6 +25,10 @@ export const GODADDY_SOURCE = 'godaddy_inventory' as const;
 export const POOL_SOURCE = 'godaddy_closeouts';
 /** The one file that is parsed into rows; the others are kept raw only. */
 export const CLOSEOUTS_FILE = 'closeout_listings.json.zip';
+/** v5.22.0 (CR-071 R-10): the auction files whose rows are followed in godaddy_auctions (when configured). */
+export const AUCTION_FILES: ReadonlySet<string> = new Set(['all_expiring_auctions.json.zip', 'all_biddable_auctions.json.zip', 'all_listings_ending_today.json.zip', 'auctions_ending_today.json.zip']);
+/** An auction is followed once its price reached $500. */
+export const AUCTION_TRACK_MIN_CENTS = 50_000;
 const MAX_FILE_BYTES = 200 * 1024 * 1024;
 const METADATA_TIMEOUT_MS = 60_000;
 const DOWNLOAD_TIMEOUT_MS = 15 * 60_000;
@@ -78,14 +84,15 @@ export class DatasaveJob {
   private get fetchFn(): typeof fetch { return this.deps.fetch ?? globalThis.fetch; }
 
   private async settings() {
-    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days']).executeTakeFirstOrThrow();
-    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days };
+    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_auction_keep_days']).executeTakeFirstOrThrow();
+    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, auctionKeepDays: s.datasave_auction_keep_days };
   }
 
   // ---------- godaddyInventory ----------
 
   async godaddyInventory(): Promise<unknown> {
     const st = await this.settings();
+    this.auctionsRead = 0;
     const runDate = utcDay(this.deps.now());
     let listing: Map<string, { lastModified: string; size: number | null }>;
     try {
@@ -108,7 +115,8 @@ export class DatasaveJob {
       }
       results.push(await this.saveFile(file, dataDate, entry.lastModified, st.maxPriceCents));
     }
-    return this.summary(results.map((r) => r.data_date).sort().at(-1) ?? runDate, results);
+    const dataDate = results.map((r) => r.data_date).sort().at(-1) ?? runDate;
+    return { ...this.summary(dataDate, results), ...(await this.auctionSummary(st.files, results)) };
   }
 
   private summary(dataDate: string, files: FileResult[]) {
@@ -157,7 +165,8 @@ export class DatasaveJob {
   }
 
   private async saveFile(file: string, dataDate: string, lastModified: string, maxPriceCents: number): Promise<FileResult> {
-    const parse = file === CLOSEOUTS_FILE;
+    const parseKind: 'closeouts' | 'auctions' | null = file === CLOSEOUTS_FILE ? 'closeouts' : AUCTION_FILES.has(file) ? 'auctions' : null;
+    const parse = parseKind !== null;
     // where the raw zip goes; if the folder can't be written the job goes on without raw files
     const rawDir = join(this.deps.snapshotDir, GODADDY_SOURCE, dataDate);
     let rawOk = true;
@@ -200,7 +209,7 @@ export class DatasaveJob {
       let error: string | null = null;
       if (parse && writePath) {
         try {
-          const r = await this.parseCloseouts(writePath, dataDate, maxPriceCents);
+          const r = parseKind === 'auctions' ? await this.parseAuctions(writePath, dataDate) : await this.parseCloseouts(writePath, dataDate, maxPriceCents);
           rows = r.kept; rowsTotal = r.total;
         } catch (e) {
           status = 'partial';
@@ -252,7 +261,94 @@ export class DatasaveJob {
     return { kept, total };
   }
 
-  // ---------- Dynadot (not built) ----------
+  // ---------- GoDaddy auctions (v5.22.0, CR-071 R-10) ----------
+
+  /**
+   * Streams one auction file into godaddy_auctions: only .com, not adult, valid end time, and either a price of $500 or more now or a domain that is
+   * already followed (once a name reached $500 it is followed to its end). A domain in several files merges (max bid count, max price, latest end time).
+   * Returns the rows kept (upserted) and the rows read.
+   */
+  async parseAuctions(zipPath: string, dataDate: string): Promise<{ kept: number; total: number }> {
+    const { db } = this.deps;
+    const tracked = new Set((await db.selectFrom('godaddy_auctions').select('domain').where('ended', '=', false).execute()).map((r) => r.domain));
+    const entries = await listZipEntries(zipPath);
+    const entry = entries.find((e) => /\.json$/i.test(e.name));
+    if (!entry) throw new Error('the zip holds no .json file');
+    const seen = new Map<string, { end: number; type: string | null; price: number; bids: number }>();
+    let total = 0;
+    for await (const raw of streamArrayItems(await openZipEntry(zipPath, entry), 'data')) {
+      total++;
+      const r = raw as { domainName?: unknown; auctionType?: unknown; auctionEndTime?: unknown; price?: unknown; numberOfBids?: unknown; isAdult?: unknown };
+      if (typeof r.domainName !== 'string' || r.isAdult === true) continue;
+      const domain = r.domainName.trim().toLowerCase();
+      if (!domain.endsWith('.com')) continue;
+      const price = priceToCents(r.price);
+      const isTracked = tracked.has(domain);
+      if (!isTracked && (price === null || price < AUCTION_TRACK_MIN_CENTS)) continue;
+      const end = typeof r.auctionEndTime === 'string' ? Date.parse(r.auctionEndTime) : NaN;
+      if (Number.isNaN(end)) continue;
+      const bids = typeof r.numberOfBids === 'number' && Number.isInteger(r.numberOfBids) && r.numberOfBids >= 0 ? r.numberOfBids : 0;
+      const prev = seen.get(domain);
+      seen.set(domain, {
+        end: prev ? Math.max(prev.end, end) : end, type: typeof r.auctionType === 'string' ? r.auctionType.slice(0, 40) : (prev?.type ?? null),
+        price: Math.max(prev?.price ?? 0, price ?? 0), bids: Math.max(prev?.bids ?? 0, bids),
+      });
+    }
+    const all = [...seen.entries()];
+    for (let i = 0; i < all.length; i += INSERT_BATCH) {
+      const b = all.slice(i, i + INSERT_BATCH);
+      await sql`insert into godaddy_auctions (domain, end_time, auction_type, first_seen, last_seen, last_price_cents, max_price_cents, last_bid_count)
+        select d, e::timestamptz, t, ${dataDate}::date, ${dataDate}::date, p, p, n
+        from unnest(${b.map(([d]) => d)}::text[], ${b.map(([, v]) => new Date(v.end).toISOString())}::text[], ${b.map(([, v]) => v.type)}::text[], ${b.map(([, v]) => v.price)}::int[], ${b.map(([, v]) => v.bids)}::int[]) as u(d, e, t, p, n)
+        on conflict (domain) where not ended do update set
+          end_time = case when godaddy_auctions.last_seen = excluded.last_seen then greatest(godaddy_auctions.end_time, excluded.end_time) else excluded.end_time end,
+          auction_type = coalesce(excluded.auction_type, godaddy_auctions.auction_type),
+          last_seen = excluded.last_seen,
+          last_price_cents = case when godaddy_auctions.last_seen = excluded.last_seen then greatest(godaddy_auctions.last_price_cents, excluded.last_price_cents) else excluded.last_price_cents end,
+          max_price_cents = greatest(godaddy_auctions.max_price_cents, excluded.max_price_cents),
+          last_bid_count = case when godaddy_auctions.last_seen = excluded.last_seen then greatest(godaddy_auctions.last_bid_count, excluded.last_bid_count) else excluded.last_bid_count end`.execute(db);
+    }
+    this.auctionsRead += total;
+    return { kept: all.length, total };
+  }
+
+  private auctionsRead = 0;
+
+  /**
+   * When every configured auction file of the data date is saved (complete), a followed auction that was not seen on that date and whose end time has
+   * passed (at or before the files' Last-Modified) has ended: its last bid count and price stay as the final state (0 bids = unsold, for CR-075).
+   * With a missing or failed file nothing ends (absence would prove nothing). Returns the step's auction fields.
+   */
+  private async auctionSummary(configured: string[], results: FileResult[]): Promise<Record<string, unknown>> {
+    const { db } = this.deps;
+    const files = configured.filter((f) => AUCTION_FILES.has(f));
+    if (files.length === 0) return {};
+    const dataDate = results.filter((r) => AUCTION_FILES.has(r.file)).map((r) => r.data_date).sort().at(-1);
+    const read = this.auctionsRead;
+    this.auctionsRead = 0;
+    let detection: string;
+    let endedNow = 0;
+    if (!dataDate) {
+      detection = 'skipped: no auction file was listed';
+    } else {
+      const done = await db.selectFrom('snapshot_manifests').select(['file_name', 'last_modified']).where('source', '=', GODADDY_SOURCE).where('data_date', '=', dataDate).where('status', '=', 'complete').where('file_name', 'in', files).execute();
+      if (done.length < files.length) {
+        detection = `skipped: ${files.length - done.length} auction file(s) not complete for ${dataDate}`;
+      } else {
+        const lastMod = new Date(Math.max(...done.map((d) => d.last_modified?.getTime() ?? 0)));
+        const res = await db.updateTable('godaddy_auctions').set({ ended: true, final_state_at: dataDate })
+          .where('ended', '=', false).where('last_seen', '<', dataDate).where('end_time', '<=', lastMod).executeTakeFirst();
+        endedNow = Number(res.numUpdatedRows ?? 0);
+        detection = 'ran';
+      }
+    }
+    const count = async (q: ReturnType<typeof db.selectFrom<'godaddy_auctions'>>) => Number((await q.select((eb) => eb.fn.countAll<string>().as('n')).executeTakeFirstOrThrow()).n);
+    const trackedN = await count(db.selectFrom('godaddy_auctions').where('ended', '=', false));
+    const endedToday = dataDate ? await count(db.selectFrom('godaddy_auctions').where('ended', '=', true).where('final_state_at', '=', dataDate)) : 0;
+    return { auctions_seen_n: read, tracked_n: trackedN, ended_today_n: endedToday, ended_now_n: endedNow, auction_end_detection: detection };
+  }
+
+  // ---------- Dynadot (the server has no key; the bots upload, v5.22.0) ----------
 
   async dynadotCloseouts(): Promise<unknown> {
     return this.dynadotStub('dynadot_closeouts');
@@ -262,9 +358,19 @@ export class DatasaveJob {
     return this.dynadotStub('dynadot_aftermarket');
   }
 
+  /** Is the bot upload of today's UTC data date sealed for this source? */
+  private async botUpload(source: string) {
+    const dataDate = utcDay(this.deps.now());
+    const m = await this.deps.db.selectFrom('snapshot_manifests').select(['status', 'rows', 'sha256', 'sealed_at']).where('source', '=', source as never).where('data_date', '=', dataDate).where('file_name', '=', 'bot_upload').executeTakeFirst();
+    return { data_date: dataDate, sealed: Boolean(m?.sealed_at), status: m?.status ?? 'none', rows: m?.rows ?? null, sha256: m?.sha256 ?? null };
+  }
+
   // TODO(CR-071 follow-up): build the read-only Dynadot calls once a key exists (closeouts: all pages, 5 s apart, dedupe, price_cents as given; aftermarket: at most 5 calls, dollars to cents). No guessing at Dynadot's API before then.
-  private dynadotStub(source: string) {
-    return { source, status: 'not_configured', reason: this.deps.dynadotKey ? 'a Dynadot key is set but the Dynadot client is not built yet' : 'DYNADOT_API_KEY is not set (no Dynadot key exists)' };
+  private async dynadotStub(source: string) {
+    return {
+      source, status: 'not_configured', reason: this.deps.dynadotKey ? 'a Dynadot key is set but the Dynadot client is not built yet' : 'DYNADOT_API_KEY is not set (no Dynadot key exists)',
+      bot_upload: await this.botUpload(source),
+    };
   }
 
   // ---------- buildPanel ----------
@@ -309,7 +415,18 @@ export class DatasaveJob {
       rawDeleted++;
     }
     const pool = await db.deleteFrom('datasave_pool').where('data_date', '<', poolCut).executeTakeFirst();
-    return { today, raw_cutoff_date: rawCut, raw_deleted: rawDeleted, pool_cutoff_date: poolCut, pool_rows_deleted: Number(pool.numDeletedRows ?? 0) };
+    // v5.22.0: bot-uploaded closeouts follow the pool days; aftermarket and closed-auction rows are kept datasave.dynadot_keep_days (they feed CR-075); manifests stay
+    const dynadotCut = utcDay(nowMs - (st.dynadotKeepDays - 1) * 86_400_000);
+    const closeoutRows = await db.deleteFrom('dynadot_rows').where('kind', '=', 'closeouts').where('data_date', '<', poolCut).executeTakeFirst();
+    const otherRows = await db.deleteFrom('dynadot_rows').where('kind', '<>', 'closeouts').where('data_date', '<', dynadotCut).executeTakeFirst();
+    // ended GoDaddy auctions are kept datasave.auction_keep_days; an open one not seen for that long is dropped too
+    const auctionCut = utcDay(nowMs - st.auctionKeepDays * 86_400_000);
+    const auctions = await db.deleteFrom('godaddy_auctions').where((eb) => eb.or([eb.and([eb('ended', '=', true), eb('final_state_at', '<', auctionCut)]), eb.and([eb('ended', '=', false), eb('last_seen', '<', auctionCut)])])).executeTakeFirst();
+    return {
+      today, raw_cutoff_date: rawCut, raw_deleted: rawDeleted, pool_cutoff_date: poolCut, pool_rows_deleted: Number(pool.numDeletedRows ?? 0),
+      dynadot_closeouts_deleted: Number(closeoutRows.numDeletedRows ?? 0), dynadot_rows_deleted: Number(otherRows.numDeletedRows ?? 0), dynadot_cutoff_date: dynadotCut,
+      auctions_cutoff_date: auctionCut, auctions_deleted: Number(auctions.numDeletedRows ?? 0),
+    };
   }
 
   private async pruneEmptyDirs(file: string): Promise<void> {

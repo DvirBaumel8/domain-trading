@@ -65,8 +65,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
     const from = new Date(now.getTime() - 13 * 86_400_000).toISOString().slice(0, 10);
     const first = (await db.selectFrom('snapshot_manifests').select((eb) => eb.fn.min('data_date').as('d')).where('source', '=', 'godaddy_inventory').executeTakeFirst())?.d ?? from;
     const days = await missingDays(db, first > from ? first : from, to);
-    add('DATASAVE_MISSED', ds.state === 'partial' ? 'warn' : 'error', `The daily data save is ${ds.state}: ${ds.state === 'partial' ? 'some files' : 'no complete save'} within the last 26 hours.`, undefined, {
-      state: ds.state, sources: ['godaddy_inventory'], missing_files: ds.missing_files, missing_days: days.missing.map((m) => m.date),
+    add('DATASAVE_MISSED', ds.state === 'partial' ? 'warn' : 'error', `The daily data save is ${ds.state}: ${ds.state === 'partial' ? 'some files' : 'no complete save'} within the last 26 hours.${ds.dynadot_missing.length ? ` No sealed bot upload for ${ds.dynadot_due_date}: ${ds.dynadot_missing.join(', ')}.` : ''}`, undefined, {
+      state: ds.state, sources: ['godaddy_inventory', ...ds.dynadot_missing], missing_files: ds.missing_files, missing_days: days.missing.map((m) => m.date),
+      dynadot_missing: ds.dynadot_missing.map((source) => ({ source, data_date: ds.dynadot_due_date })),
       last_complete_at: ds.last_complete_at ? toJerusalemIso(ds.last_complete_at) : null,
     });
   }

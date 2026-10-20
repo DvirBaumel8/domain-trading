@@ -1,4 +1,4 @@
-# Endpoints (contract v5.21.0)
+# Endpoints (contract v5.22.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -77,6 +77,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | GET | `/jobs/runs` | READ | Jobs (`jobs.md`) |
 | POST | `/jobs/preview` | WRITE | Jobs (`jobs.md`) |
 | GET | `/snapshots`, `/snapshots/missing` | READ | Daily data saves (`jobs.md`, 5.21.0) |
+| POST | `/snapshots/dynadot` | WRITE or bots | Dynadot rows uploaded by the bots (5.22.0, CR-071 R-8, R-9) |
 | POST | `/company/document`, `/company/forbidden-terms`, `/company/forbidden-terms/{id}/retire` | WRITE | Company and reviews |
 | GET | `/company/document/versions`, `/company/document/versions/{n}`, `/company/forbidden-terms` | READ | Company and reviews |
 | POST | `/reviews/packet`, `/reviews/run`, `/reviews/settings`, `/reviews/{packet_id}/feedback`, `/reviews/items/{id}/status` | WRITE | Company and reviews |
@@ -919,20 +920,47 @@ The arrays are the `applied`, `superseded`, `held`, `delisted`, `cancelled`, `fa
 
 ## Daily data saves (5.21.0, CR-071)
 
-The `datasave` job (`jobs.md`) saves GoDaddy's official inventory files every day at 15:00 UTC and records one write-once manifest per file. These two routes only read; there is no route that writes, re-parses or re-downloads a snapshot, and raw files are never served.
+The `datasave` job (`jobs.md`) saves GoDaddy's official inventory files every day at 15:00 UTC and records one write-once manifest per file. The two GET routes only read. The only route that writes a snapshot is `POST /snapshots/dynadot` (5.22.0, the bots' Dynadot rows); no route re-parses or re-downloads a GoDaddy snapshot, and raw files are never served.
 
 ### `GET /snapshots`
-READ (any `GET` token, bots included). Query (all optional; an unknown parameter or bad value → **400** `VALIDATION_ERROR`): `date` (`YYYY-MM-DD`, the **source's data date**, the UTC date of the file's `Last-Modified`, never the run date; default: the last 14 days), `source` (`godaddy_inventory` | `dynadot_closeouts` | `dynadot_aftermarket`). **200:**
+READ (any `GET` token, bots included). Query (all optional; an unknown parameter or bad value → **400** `VALIDATION_ERROR`): `date` (`YYYY-MM-DD`, the **source's data date**, the UTC date of the file's `Last-Modified`, never the run date; default: the last 14 days), `source` (`godaddy_inventory` | `dynadot_closeouts` | `dynadot_aftermarket` | `dynadot_closed_auctions` | `godaddy_auction_end`), `rows` (5.22.0; 0..1000, with a Dynadot `source`: also return up to that many stored rows). **200:**
 ```
 { date: string | null, source: string | null,
   snapshots: [ { source, data_date, file_name, status: "complete" | "partial" | "error" | "not_configured", bytes: int | null, sha256: string | null,
                  last_modified: ISO | null, rows: int | null, rows_total: int | null, price_unit: "cents" | null, http_status: int | null, error: string | null,
-                 raw_available: bool, raw_deleted_at: ISO | null, raw_note: string | null, sealed: bool, sealed_at: ISO | null } ],   // newest data_date first, at most 500
-  pool: [ { data_date, source: "godaddy_closeouts", rows: int } ] }                                                                 // parsed rows still held (3 days)
+                 raw_available: bool, raw_deleted_at: ISO | null, raw_note: string | null, sealed: bool, sealed_at: ISO | null,
+                 origin: "fetch" | "bot_upload" } ],   // newest data_date first, at most 500 (5.22.0: origin)
+  pool: [ { data_date, source: "godaddy_closeouts", rows: int } ],                                                                 // parsed rows still held (3 days)
+  auctions?: [ { domain, end_time: ISO, auction_type, first_seen, last_seen, final_state_at, bid_count, final_price_cents, max_price_cents, price_unit: "cents" } ],   // only with source=godaddy_auction_end (5.22.0)
+  rows?: [ ... ] }                                                                                                                  // only with a Dynadot source and rows=n; row shapes below
 ```
 - `rows` is set only for the file that is parsed (`closeout_listings.json.zip`): the `.com` names with a price up to the cap (default $40), not adult; `rows_total` is every row of the file. **`rows: null` means not parsed or failed, never zero.** The other four files are fetched, hashed and kept raw only. `price_unit: "cents"` says every price in the parsed rows is integer cents.
 - `status: "error"` carries `http_status` (the inventory host's answer, `null` for a network failure) and `error`; `rows` is `null`. `partial` is a file that was fetched but not parsed. Only `complete` rows are **sealed**; an error or partial row is replaced by the retry.
 - `raw_available` is true only while the raw zip is on the server's disk (7 days at most; the folder `SNAPSHOT_DIR`); after that `raw_available: false` and `raw_deleted_at` is set, and the manifest (sha256, size, rows) stays for good. When the server has no writable disk, `raw_available` is `false` from the start and `raw_note` says why. No server path is ever shown.
+
+- **`source=godaddy_auction_end`** (5.22.0, CR-071 R-10): `snapshots` is empty and `auctions` lists the GoDaddy auctions whose **final state** was recorded on a data date in the range (`date`, else the last 14 days; at most 1,000): they were followed (a `.com` auction that reached $500, kept once it did) and left all the auction files after their end time. `bid_count` and `final_price_cents` are the last values seen (0 bids means unsold), `max_price_cents` the highest price seen. Nothing is stored for auctions that never reached $500.
+- `origin: "bot_upload"` marks a manifest made by `POST /snapshots/dynadot` (file name `bot_upload`, `bytes` null, no raw file). With `rows=n` and a Dynadot source the answer also has `rows`: aftermarket `{data_date, domain, listing_id, price_cents}`, closed auctions `{data_date, domain, end_time, bid_count, final_price_cents}`, closeouts `{data_date, domain, price_cents, ends_at}`.
+
+### `POST /snapshots/dynadot`
+5.22.0, CR-071 R-8, R-9. **WRITE or bots token** (non-money; a READ token is 403 `SCOPE_FORBIDDEN`). `Idempotency-Key` required; audited (the audit row keeps `[n rows]`, never the rows). Body limit **8 MB** (up to 50,000 rows per call; send several calls with the same `kind` and `data_date`). The server has no Dynadot key: the bots pull the data and upload it here.
+```
+{ "kind": "aftermarket" | "closed_auctions" | "closeouts",
+  "data_date": "YYYY-MM-DD",          // UTC data date of the pull; not in the future
+  "rows": [ ... ],                    // may be [] only with final: true
+  "final": true,                      // optional: seal this (kind, data_date) with this call
+  "dry_run": true }                   // optional: validate and count, store nothing
+```
+Row shapes (strict: an unknown key or a wrong type → **422** `VALIDATION_ERROR` for the whole call, nothing stored; prices are **integer cents**, a decimal such as `500.5` is refused; domains are lowercased):
+- `aftermarket`: `{domain, listing_id: string, price_cents: int}`. Rows with `price_cents < 50000` are dropped and counted. Unique per `listing_id` per day.
+- `closed_auctions`: `{domain, end_time: ISO 8601, bid_count: int >= 0, final_price_cents: int >= 0}`. Unique per domain per day.
+- `closeouts`: `{domain, price_cents: int >= 0, ends_at?: ISO 8601}`. Unique per domain per day.
+
+**201** `{kind, data_date, dry_run, final, sealed, status: "partial" | "complete", received_n, accepted_n, duplicate_n, dropped_under_500_n, dropped_below_floor_n (same number), rows_stored_n, sha256: string | null, audit_id}`. `duplicate_n` counts rows repeated in the call or already stored for that day (the first one wins). `rows_stored_n` is the day's total so far.
+- **Sealing.** The manifest (`GET /snapshots?source=dynadot_<kind>`) is `partial` and open while parts arrive. The call with `final: true` seals it: `status: "complete"`, `sealed: true`, `sha256` set. A sealed (kind, data_date) takes nothing more: **409 `SNAPSHOT_SEALED`** (`details` has `kind`, `data_date`, `sha256`, `rows`), nothing changes. Sealing a day with no stored rows is 422.
+- **sha256** = SHA-256 (hex) of the UTF-8 text of `JSON.stringify` of the array of the day's stored rows sorted by `domain`, then `listing_id` (bytewise), each row an object with exactly these keys in this order: aftermarket `{domain, listing_id, price_cents}`; closed auctions `{domain, end_time, bid_count, final_price_cents}` with `end_time` as UTC `YYYY-MM-DDTHH:mm:ss.sssZ`; closeouts `{domain, price_cents, ends_at}` with `ends_at` the same way or `null`.
+- `dry_run: true` runs every check and returns the counts (with `sealed: false`) but stores nothing, not even a manifest; a sealed day still answers 409.
+- Retention: `closeouts` rows 3 days (like the pool), `aftermarket` and `closed_auctions` rows 120 days (`datasave.dynadot_keep_days`); manifests stay for good.
+- `/health.datasave` and `DATASAVE_MISSED` watch a kind only after its first upload ever, and expect the previous day's sealed upload until 16:00 UTC, today's after it.
 
 ### `GET /snapshots/missing`
 READ. Query: `from`, `to` (`YYYY-MM-DD`; default the 14 days up to the last due data date, i.e. yesterday until 16:00 UTC); `from` after `to` or a range over 366 days → **400**. **200** `{source: "godaddy_inventory", from, to, expected_files: [file_name], missing: [{date, missing_files: [file_name], status: "missing" | "partial"}]}`: the days without a complete save of every configured file. A day nobody saved cannot be backfilled (the sources overwrite daily).
@@ -1068,7 +1096,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
 
-**Daily data save (5.21.0, CR-071):** `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; not an HTTP error: no route writes snapshots). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
+**Daily data save (5.21.0, CR-071):** `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; since 5.22.0 also **HTTP 409** from `POST /snapshots/dynadot` for a sealed (kind, data_date)). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
 
 **Candidate screening errors (3.3.0, CR-021):** `ON_DEMAND_SCREEN_CAP` (409; also the `onDemandScreen` skip reason), `ALREADY_RUNNING` (409; also a skip reason of the daily steps). Skip reasons of `POST /candidates/screen` `domains` (3.4.0): `NOT_CHANGED`, `NO_INTAKE`, `OWNED`. Form note (3.4.0): `SCOUT_WORDS`.
 

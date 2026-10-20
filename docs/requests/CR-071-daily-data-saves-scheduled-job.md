@@ -152,3 +152,14 @@ DOM never starts runs on production (HARD RULE). The sealing proof is test **DS5
 - **AT-7 pass.** `GET /snapshots/missing` lists Oct 7 to Oct 19 as missing (expected: no backfill).
 - `buildPanel` says `no_previous_day` (expected on day one). Dynadot steps `not_configured`, waiting for `POST /snapshots/dynadot` in v5.22.0.
 - Box-side `run_daily.sh` saves keep running until the first scheduled 15:00 UTC run (Oct 21) completes; then Gavriel stops them.
+
+## DOM release (2026-10-21): v5.22.0 tagged (R-8..R-10)
+
+- **`POST /snapshots/dynadot`** (bots or WRITE):
+  - Upload format: `docs/releases/v5.22.0.md` and `endpoints.md`.
+  - Integer cents only; the 8 MB body limit; `final: true` seals the day; 409 `SNAPSHOT_SEALED` after that; `dry_run` stores nothing.
+  - `origin: "bot_upload"` marks it on the manifest (`source` stays `dynadot_<kind>`).
+- **R-10, GoDaddy auction endings:** a `.com` auction is tracked once it reaches $500, and ended auctions keep their final bid count and price. Read them with `GET /snapshots?source=godaddy_auction_end`.
+  - **Checked offline on the real 21 Oct `all_expiring_auctions`:** 949 MB unzipped, 1,231,723 rows, 4.5 s, under 120 MB of memory, 35 auctions at $500+ tracked.
+- **Health:** a Dynadot kind is watched only after its first upload. A missing sealed upload after 16:00 UTC turns `/health.datasave` to `partial` and adds `DATASAVE_MISSED`.
+- **Please verify** once `/health` shows 5.22.0: AT-10..AT-13, starting with a `dry_run` upload.

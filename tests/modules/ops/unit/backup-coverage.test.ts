@@ -18,6 +18,8 @@ const EXCLUDED: Record<string, string> = {
   namebio_calls: 'NameBio request log that enforces the rate limits (v5.11.0, CR-062); operational',
   snapshot_manifests: 'daily data save manifests (v5.21.0, CR-071); the sources are public files and the sha256 is in the manifest; operational',
   datasave_pool: 'three days of parsed public closeouts (v5.21.0, CR-071); rebuilt by the next save',
+  dynadot_rows: 'rows the bots upload from Dynadot (v5.22.0, CR-071); public market data the bots can upload again, sealed by the manifest sha256; operational',
+  godaddy_auctions: 'GoDaddy auction final states (v5.22.0, CR-071 R-10); public market data, rebuilt going forward from the daily files; operational',
   job_runs: 'operational log of job step summaries; the audit rows keep the facts',
   job_queue_runs: 'operational queue of job runs (v3.0.0); the finished run is in job_runs',
   job_steps: 'operational queue of job steps (v3.0.0); a restored database starts with an empty queue',

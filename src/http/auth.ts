@@ -252,6 +252,7 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /selection/test-sets': 'allowed',
   'POST /selection/test-sets/{name}/cancel': 'allowed',
   'POST /selection/test-sets/{name}/seal': 'allowed',
+  'POST /snapshots/dynadot': 'allowed', // v5.22.0 (CR-071 R-8, R-9): stores public Dynadot rows the bot pulled; no money
   'POST /visits/import': 'allowed',
   'POST /visits/settings': 'allowed',
   'POST /tranches/{id}/members': 'allowed',

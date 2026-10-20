@@ -3,7 +3,8 @@
 //   partial  some files are saved and some are not (or the last run failed for some files)
 //   error    the last run's godaddyInventory step failed and nothing from that run was saved
 //   overdue  nothing complete within 26 h (also: it never ran)
-// The Dynadot steps (not_configured) never count.
+// The Dynadot steps (not_configured) never count. Since v5.22.0 a bot-uploaded Dynadot kind counts once an upload of that kind has ever arrived: after 16:00 UTC
+// (the 15:00 run plus its 60-minute retry window) the day's sealed upload must exist, else the state is at best `partial` and the kind is in `dynadot_missing`.
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 
@@ -21,6 +22,28 @@ export interface DatasaveStatus {
   complete_files: string[];
   missing_files: string[];
   last_complete_at: Date | null;
+  /** v5.22.0: Dynadot kinds (`dynadot_<kind>`) that have had an upload but have none sealed for the day that is due. */
+  dynadot_missing: string[];
+  /** The UTC data date those uploads are due for (today after 16:00 UTC, else yesterday). */
+  dynadot_due_date: string;
+}
+
+const DYNADOT_SOURCES = ['dynadot_aftermarket', 'dynadot_closed_auctions', 'dynadot_closeouts'] as const;
+const DYNADOT_DUE_HOUR_UTC = 16;
+
+/** The data date a bot upload is due for at `nowMs`: today's from 16:00 UTC on, yesterday's before. */
+export function dynadotDueDate(nowMs: number): string {
+  const d = new Date(nowMs);
+  return new Date(nowMs - (d.getUTCHours() >= DYNADOT_DUE_HOUR_UTC ? 0 : 86_400_000)).toISOString().slice(0, 10);
+}
+
+/** Sources that have had a bot upload (any day) and have no sealed upload for the due date. Quiet until the first upload of a kind. */
+export async function dynadotMissing(db: Kysely<Database>, nowMs: number): Promise<{ due_date: string; started: boolean; missing: string[] }> {
+  const due = dynadotDueDate(nowMs);
+  const ever = await db.selectFrom('snapshot_manifests').select('source').distinct().where('origin', '=', 'bot_upload').execute();
+  const sealed = new Set((await db.selectFrom('snapshot_manifests').select('source').where('origin', '=', 'bot_upload').where('data_date', '=', due).where('status', '=', 'complete').execute()).map((r) => r.source));
+  const missing = DYNADOT_SOURCES.filter((s) => ever.some((e) => e.source === s) && !sealed.has(s));
+  return { due_date: due, started: ever.length > 0, missing };
 }
 
 export async function configuredFiles(db: Kysely<Database>): Promise<string[]> {
@@ -37,7 +60,8 @@ export async function datasaveStatus(db: Kysely<Database>, nowMs: number): Promi
   const lastComplete = recent.filter((r) => r.status === 'complete').map((r) => r.updated_at.getTime()).sort((a, b) => b - a)[0];
   const lastRun = await db.selectFrom('job_runs').select(['started_at', 'finished_at', 'steps']).where('job', '=', 'datasave').where('skipped', '=', false).orderBy('finished_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
   const everManifest = await db.selectFrom('snapshot_manifests').select('id').where('source', '=', SOURCE).limit(1).executeTakeFirst();
-  const started = Boolean(lastRun || everManifest);
+  const dyn = await dynadotMissing(db, nowMs);
+  const started = Boolean(lastRun || everManifest || dyn.started);
   const lastFailed = lastRun !== undefined && (lastRun.steps as { godaddyInventory?: { ok?: boolean } } | null)?.godaddyInventory?.ok === false;
   // the latest run failed its godaddyInventory step: partial when some file is still saved within 26 h, else error
   let state: DatasaveState;
@@ -50,7 +74,9 @@ export async function datasaveStatus(db: Kysely<Database>, nowMs: number): Promi
   } else {
     state = 'overdue';
   }
-  return { state, started, files, complete_files, missing_files, last_complete_at: lastComplete === undefined ? null : new Date(lastComplete) };
+  // a Dynadot upload that is due and missing turns an otherwise ok state into partial
+  if (state === 'ok' && dyn.missing.length > 0) state = 'partial';
+  return { state, started, files, complete_files, missing_files, last_complete_at: lastComplete === undefined ? null : new Date(lastComplete), dynadot_missing: dyn.missing, dynadot_due_date: dyn.due_date };
 }
 
 /** The data dates in [from, to] (YYYY-MM-DD, UTC) that have no complete save of every configured file, with the files each lacks. */

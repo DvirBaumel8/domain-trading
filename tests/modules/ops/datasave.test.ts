@@ -54,7 +54,7 @@ describe('DS521 datasave job', () => {
     for (const s of res.snapshots) expect(s).toMatchObject({ status: 'complete', data_date: '2026-10-20', sealed: true, raw_available: true, http_status: 200 });
     const c = res.snapshots.find((s: { file_name: string }) => s.file_name === 'closeout_listings.json.zip');
     expect(c).toMatchObject({ bytes: closeoutsZip.length, sha256: sha256(closeoutsZip), rows: 2, rows_total: 5, price_unit: 'cents' });
-    expect(res.snapshots.filter((s: { rows: number | null }) => s.rows === null)).toHaveLength(4);
+    expect(res.snapshots.filter((s: { rows: number | null }) => s.rows === 0)).toHaveLength(4); // the four auction files (v5.22.0): parsed, nothing followed in the empty fixtures
     expect(JSON.stringify(res)).not.toContain(SNAP); // no server path in the answer
     expect(res.pool).toEqual([{ data_date: '2026-10-20', source: 'godaddy_closeouts', rows: 2 }]);
     // the pool: cents, lowercase, .com only, <= $40, no adult
@@ -236,7 +236,7 @@ describe('DS521 datasave job', () => {
   it('DS521-16 the folder can not be written: the job goes on without raw files (raw_available false with a reason); a parse failure is partial, never complete', async () => {
     await mkdir(SNAP, { recursive: true });
     await writeFile(join(SNAP, 'godaddy_inventory'), 'a file where the folder should go'); // mkdir fails
-    mswServer.use(...inventoryHandlers({ bodies: { 'closeout_listings.json.zip': closeoutsZip, 'all_biddable_auctions.json.zip': Buffer.from('x') } }));
+    mswServer.use(...inventoryHandlers({ bodies: { 'closeout_listings.json.zip': closeoutsZip } })); // v5.22.0: the auction files are parsed too, so they must be valid zips
     const { get } = await boot();
     await runJobToEnd(app!, 'datasave');
     const snaps = (await get('/snapshots?date=2026-10-20')).json().snapshots as Array<{ file_name: string; status: string; raw_available: boolean; raw_note: string | null; rows: number | null }>;

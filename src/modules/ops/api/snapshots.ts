@@ -5,12 +5,17 @@ import { isRealDate } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
 import { missingDays } from '../../reporting/index.js';
+import { DynadotBody, uploadDynadot } from '../jobs/datasave/dynadot-upload.js';
 
 const day = z.string().refine(isRealDate, 'must be a real date (YYYY-MM-DD)');
 const Query = z.object({
   date: day.optional(),
-  source: z.enum(['godaddy_inventory', 'dynadot_closeouts', 'dynadot_aftermarket']).optional(),
+  source: z.enum(['godaddy_inventory', 'dynadot_closeouts', 'dynadot_aftermarket', 'dynadot_closed_auctions', 'godaddy_auction_end']).optional(),
+  /** v5.22.0: with a Dynadot `source` and a `date`, also return up to this many stored rows. */
+  rows: z.coerce.number().int().min(0).max(1000).optional(),
 }).strict();
+/** Body limit of the Dynadot upload, like the engine bulk routes. */
+const UPLOAD_BODY_LIMIT = 8 * 1024 * 1024;
 const MissingQuery = z.object({ from: day.optional(), to: day.optional() }).strict();
 
 const bad = (p: { error: z.ZodError }) => new AppError(400, 'VALIDATION_ERROR', `Invalid query: ${p.error.issues.map((i) => `${i.path.join('.') || 'query'} ${i.message}`).join('; ')}`);
@@ -31,20 +36,31 @@ export function registerSnapshots(app: FastifyInstance, deps: SnapshotsDeps): vo
     const today = new Date(deps.now()).toISOString().slice(0, 10);
     const from = q.date ?? new Date(deps.now() - 13 * 86_400_000).toISOString().slice(0, 10);
     const to = q.date ?? today;
+    const wantAuctions = q.source === 'godaddy_auction_end';
     let sel = db.selectFrom('snapshot_manifests').selectAll().where('data_date', '>=', from).where('data_date', '<=', to).orderBy('data_date', 'desc').orderBy('file_name');
-    if (q.source) sel = sel.where('source', '=', q.source);
-    const rows = await sel.limit(500).execute();
+    if (q.source && q.source !== 'godaddy_auction_end') sel = sel.where('source', '=', q.source);
+    const rows = wantAuctions ? [] : await sel.limit(500).execute();
     const pool = await sql<{ data_date: string; source: string; rows: string }>`
       select data_date::text as data_date, source, count(*)::text as rows from datasave_pool where data_date between ${from}::date and ${to}::date group by 1, 2 order by 1 desc`.execute(db);
     return {
       date: q.date ?? null, source: q.source ?? null,
       snapshots: rows.map((m) => ({
         source: m.source, data_date: m.data_date, file_name: m.file_name, status: m.status, bytes: m.bytes, sha256: m.sha256, last_modified: iso(m.last_modified),
-        rows: m.rows, rows_total: m.rows_total, http_status: m.http_status, error: m.error, price_unit: m.rows === null ? null : 'cents',
+        origin: m.origin, rows: m.rows, rows_total: m.rows_total, http_status: m.http_status, error: m.error, price_unit: m.rows === null ? null : 'cents',
         raw_available: m.raw_available, raw_deleted_at: iso(m.raw_deleted_at), raw_note: m.raw_note, sealed: m.sealed_at !== null, sealed_at: iso(m.sealed_at),
       })),
       pool: pool.rows.map((r) => ({ data_date: r.data_date, source: r.source, rows: Number(r.rows) })),
+      ...(wantAuctions ? { auctions: await endedAuctions(db, from, to) } : {}),
+      ...(q.source?.startsWith('dynadot_') && q.rows ? { rows: await storedRows(db, q.source, from, to, q.rows) } : {}),
     };
+  });
+
+  // v5.22.0 (CR-071 R-8, R-9): the bots upload the Dynadot rows they pulled; DOM stores and seals them (final: true). Non-money; dry_run validates and stores nothing.
+  app.post('/snapshots/dynadot', { config: { openapiBody: DynadotBody }, bodyLimit: UPLOAD_BODY_LIMIT }, async (req, reply) => {
+    const b = DynadotBody.parse(req.body ?? {});
+    const r = await uploadDynadot(db, b, deps.now());
+    req.auditSummary = `dynadot ${r.kind} ${r.data_date}${r.dry_run ? ' (dry run)' : ''}: ${r.received_n} received, ${r.accepted_n} stored, ${r.duplicate_n} duplicate, ${r.dropped_under_500_n} under $500${r.sealed ? ', sealed' : ''}`;
+    return reply.code(201).send({ ...r, audit_id: req.auditId ?? null });
   });
 
   app.get('/snapshots/missing', async (req) => {
@@ -57,4 +73,25 @@ export function registerSnapshots(app: FastifyInstance, deps: SnapshotsDeps): vo
     const r = await missingDays(db, from, to);
     return { source: 'godaddy_inventory', from, to, expected_files: r.expected_files, missing: r.missing };
   });
+}
+
+/** The GoDaddy auctions whose final state was recorded on a data date in [from, to] (they left the inventory files; last bid count and price are final). */
+async function endedAuctions(db: Kysely<Database>, from: string, to: string) {
+  const rs = await db.selectFrom('godaddy_auctions').selectAll().where('ended', '=', true).where('final_state_at', '>=', from).where('final_state_at', '<=', to)
+    .orderBy('final_state_at', 'desc').orderBy('domain').limit(1000).execute();
+  return rs.map((a) => ({
+    domain: a.domain, end_time: a.end_time.toISOString(), auction_type: a.auction_type, first_seen: a.first_seen, last_seen: a.last_seen, final_state_at: a.final_state_at,
+    bid_count: a.last_bid_count, final_price_cents: a.last_price_cents, max_price_cents: a.max_price_cents, price_unit: 'cents',
+  }));
+}
+
+async function storedRows(db: Kysely<Database>, source: string, from: string, to: string, limit: number) {
+  const kind = source.slice('dynadot_'.length) as 'aftermarket' | 'closed_auctions' | 'closeouts';
+  const rs = await db.selectFrom('dynadot_rows').selectAll().where('kind', '=', kind).where('data_date', '>=', from).where('data_date', '<=', to).orderBy('data_date', 'desc').orderBy('domain').limit(limit).execute();
+  return rs.map((r) => ({
+    data_date: r.data_date, domain: r.domain,
+    ...(kind === 'aftermarket' ? { listing_id: r.listing_id, price_cents: r.price_cents } : {}),
+    ...(kind === 'closed_auctions' ? { end_time: r.end_time?.toISOString() ?? null, bid_count: r.bid_count, final_price_cents: r.final_price_cents } : {}),
+    ...(kind === 'closeouts' ? { price_cents: r.price_cents, ends_at: r.ends_at?.toISOString() ?? null } : {}),
+  }));
 }

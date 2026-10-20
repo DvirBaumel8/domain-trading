@@ -133,6 +133,7 @@ const SUMMARIES: Record<string, string> = {
   'GET /candidates/{domain}/records': 'The records of a name',
   'POST /jobs/run': 'Queue a tick, daily or datasave run',
   'GET /snapshots': 'The daily data saves: manifests (sha256, size, Last-Modified, status, raw_available) and parsed row counts',
+  'POST /snapshots/dynadot': 'Upload Dynadot rows a bot pulled (aftermarket, closed_auctions, closeouts); bots or WRITE, dry_run supported; the part with final true seals the day (409 SNAPSHOT_SEALED after)',
   'GET /snapshots/missing': 'Days with no complete save of every configured inventory file',
   'GET /jobs/runs': 'Job runs (queued, running, finished)',
   'POST /jobs/preview': 'Dry run of the price and drop jobs for a day',

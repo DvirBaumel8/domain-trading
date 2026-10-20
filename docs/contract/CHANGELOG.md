@@ -2,6 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.22.0 (2026-10-21): CR-071 R-8..R-10: Dynadot bot uploads, GoDaddy auction endings
+Release note: `docs/releases/v5.22.0.md`.
+MINOR (additive; migration `1765400000000_v5-22-0.sql`).
+- **New route `POST /snapshots/dynadot`** (bots or WRITE; `Idempotency-Key`; audited, the audit row keeps only the row count; `dry_run` supported; body limit 8 MB): the bots upload the Dynadot rows they pulled (`kind` `aftermarket`, `closed_auctions` or `closeouts`, `data_date`, `rows`, optional `final`). The part with `final: true` seals the (kind, day) with a sha256; a later upload for it is **409 `SNAPSHOT_SEALED`** (the first HTTP use of that code). Aftermarket rows under $500 are dropped and counted. Integer cents only (422 `VALIDATION_ERROR` otherwise).
+- `GET /snapshots` accepts `source` `dynadot_closed_auctions` and `godaddy_auction_end`, shows `origin` (`fetch` or `bot_upload`) per manifest, and with `rows=<n>` returns stored Dynadot rows; with `source=godaddy_auction_end` it returns `auctions` (the final states of GoDaddy auctions that left the files on that data date).
+- `datasave` job: `godaddyInventory` also parses the four auction files into the GoDaddy auctions table (only `.com` names that reached $500 are followed; ended auctions keep their last bid count and price, 120 days); summary adds `auctions_seen_n`, `tracked_n`, `ended_today_n`. The four auction files now report `rows` (a number) instead of `null`; a parse failure makes that file `partial`. `dynadotCloseouts` / `dynadotAftermarket` stay `not_configured` and add `bot_upload` (is today's upload sealed).
+- `/health.datasave` and `DATASAVE_MISSED`: once a Dynadot kind has had an upload, a missing sealed upload for the due day (after 16:00 UTC) makes the state `partial` and adds `dynadot_missing` and the source to the warning. Quiet before the first upload.
+- New settings columns `datasave.dynadot_keep_days` and `datasave.auction_keep_days` (120 each; migration only).
+
 ## 5.21.0 (2026-10-20): CR-071 daily data save job (GoDaddy inventory), snapshots, datasave health
 Release note: `docs/releases/v5.21.0.md`.
 MINOR (additive; migration `1765300000000_v5-21-0.sql`).
