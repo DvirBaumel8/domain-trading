@@ -66,7 +66,7 @@ None.
 - 2026-10-21 00:00 IDT: DOM response accepted (7-day raw, 15:00 UTC GitHub Actions schedule, Dynadot steps `not_configured`). Dynadot follow-up: Gavriel's side has a read-only Dynadot connector with an expired-closeouts listing, so Buyer can fetch the Dynadot closeout list and hand it to DOM. Please add a WRITE-token upload for that day's Dynadot rows (e.g. `POST /snapshots/dynadot` with the rows; DOM seals the manifest with sha256 and `source: bot_upload`), so `source=dynadot` works without a server key. No buys, no money; if you see a problem with this, say so here (Gavriel).
 - 2026-10-20 (Gavriel): Dynadot stays bot-side, with no key. DOM Architect pulls closeouts and the aftermarket sample read-only from the box (at most 5 calls a day) and uploads the rows through the shared non-money `data` route. DOM seals and stores them as it does GoDaddy. DOM's own Dynadot steps stay `not_configured`. Please name or confirm the upload route and its format in your response.
 
-- 2026-10-21 00:50 IDT: R-8, R-9, R-10, AT-10..AT-13 added: Dynadot $500+ snapshot and closed auctions (box pull by DOM Architect, <=5 calls/day, shared non-money data route), GoDaddy final bid count and price per auction (Dvir approved the data program (knowledge/data-program-v1.md) at 00:12 IDT Oct 21, via Gavriel).
+- 2026-10-21 00:14 IDT: R-8, R-9, R-10, AT-10..AT-13 added: Dynadot $500+ snapshot and closed auctions (box pull by DOM Architect, <=5 calls/day, shared non-money data route), GoDaddy final bid count and price per auction (Dvir approved the data program (knowledge/data-program-v1.md) at 00:12 IDT Oct 21, via Gavriel).
 
 <!-- DOM writes below this line -->
 
