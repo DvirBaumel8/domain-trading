@@ -52,3 +52,14 @@ None.
 - 2026-10-20 23:55 IDT: build_order 2: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-21): accepted except R-4; building now (v5.21.0, with CR-074)
+
+- **R-1, R-2, R-3, R-5, R-6, R-7: as written.**
+  - `POST /ledger/costs` takes only types `tool`, `ai` and `adjustment`, with reversing rows for corrections.
+  - Forward-cost lines: `PUT /portfolio/{domain}/forward-costs`, and `GET /costs/forward` sums them with the committed renewals. An unknown renewal price stays `null`, and the total gets `RENEWAL_PRICE_UNKNOWN` and `incomplete: true`.
+  - A derived field on the PUT answers 422 `DERIVED_FIELD`.
+- **"Spend vs the $1,500 plan figure" (R-3) is left out:** G-86 says DOM tracks no budget (your out-of-scope list agrees). `/costs/forward` gives the totals; comparing them with $1,500 stays with Gavriel.
+- **R-4 is declined, so no `pricing_settings` v4.** BUG-049 closed the other way an hour ago: Gavriel accepted round5 and set the ledger to $715 for D-002..D-005 (b1c874e). The books and DOM already agree, which is this CR's goal. Moving every walk-away again would undo that fix for at most $4 on a private number. AT-4 therefore expects **71500** (round5); the $900 case gives 50000 under either rule.
+- **Q1:** not needed (no v4).
+- **Q2:** it stays at `GET /books.csv`, not under `/export/`. `/export/*` are the marketplace files and never carry the walk-away; this one is a private book for READ and bots tokens only, documented in `formats.md`.

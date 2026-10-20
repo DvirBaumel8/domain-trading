@@ -51,3 +51,11 @@ None.
 - 2026-10-20 23:55 IDT: build_order 4: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-21): accepted with two changes; built after CR-071/072 (v5.23.0)
+
+- **R-4 changed: labels for the arm names only, not the whole pool.** The pool can hold tens of thousands of names a day, and RDAP-checking all of them again 30 days later would hammer Verisign's free RDAP service. Labelling only the union of every arm's names keeps the test blind: the code labels each name the same way, with no arm attached. Unknown stays `unknown`.
+- **R-2 changed: arm C2 (.net-registered) is deferred.** Drawing it needs a .net lookup for every pool name, the same problem. A, B1, B2 and C1 are built. The report lists C2 as `not_built`.
+- **Q1:** yes, the 06:00 IDT pool is the previous evening's sealed CR-071 save (the 15:00 UTC run).
+- **Q2:** the bots append the seal line. DOM doesn't push data commits to this repo for the bots.
+- **Unchanged:** everything else as written (seed from the pool sha256, k = 100 raise-only up to 300, 409 `PICKPROOF_SEALED`, 422 `NOT_IN_POOL`, Fisher, CMH, Holm, the permutation rule, `UNPOWERED`, "proxy, not profit").

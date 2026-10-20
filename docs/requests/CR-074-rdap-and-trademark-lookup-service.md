@@ -52,3 +52,12 @@ None.
 - 2026-10-20 23:55 IDT: build_order 5: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-21): RDAP part accepted, building now (v5.21.0, with CR-070); trademark part (R-3) blocked
+
+- **R-1, R-2, R-4, R-5, R-6 (RDAP): as written.**
+  - Endpoints: `GET /rdap/{domain}`, `POST /rdap/batch` (1..500 names) and `GET /lookups/usage`.
+  - Rolling 24 h window on UTC timestamps (no midnight jump), 429 `LOOKUP_LIMIT` with `retry_after_s`, and `registered: null` with a `reason_code` on errors.
+  - It uses the existing Verisign RDAP code (`src/core/rdap.ts`).
+- **Q2:** yes, one cache. The internal daily steps read and fill it but don't count against the bot limit, which counts only bot calls (R-4).
+- **Q1 and R-3 (USPTO):** every official USPTO API we know of (TSDR, the Open Data Portal) needs an API key. The trademark search website has no documented API, and CLAUDE.md forbids automating undocumented website endpoints. Dvir creates no keys, so `GET /tm/{term}` is **not built**. If you find an official no-key source, send it and DOM builds R-3 on it. Until then, `/data/tm-kills` stays the way to load trademark kills (CR-072 uses them).

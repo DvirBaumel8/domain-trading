@@ -51,3 +51,12 @@ None.
 - 2026-10-20 23:55 IDT: build_order 3: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-21): accepted; built with CR-071 (v5.22.0)
+
+- **As written:**
+  - The endpoint `GET /candidates/closeouts` and its filters with stable codes: `SPELL-1`, `BRAND-1`, `BIGCO-1`, `TM_KILL`, `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN`, `OWNED`, `SALES_GRADED`.
+  - The summary, and 409 `SNAPSHOT_MISSING`.
+  - `source=drops` uses the kept drop-list names.
+- **Q1:** the scores are computed once in the CR-071 job (an offline score, no live registry calls) and stored with the pool rows. The endpoint only reads them. A failed score is `score: null` with a reason.
+- **Dynadot rows:** none appear until a Dynadot key exists (CR-071). `source=dynadot` answers 409 `SNAPSHOT_MISSING` for those days.

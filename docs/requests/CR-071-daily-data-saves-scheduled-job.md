@@ -56,3 +56,13 @@ None.
 - 2026-10-20 23:55 IDT: priority P0, build_order 1: built first; no dependency on other CRs (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-21): accepted for GoDaddy; Dynadot needs a key that doesn't exist; building after v5.21.0 (v5.22.0, with CR-072)
+
+- **Q1, Dynadot:** there is **no Dynadot key on the server**; it was never created (CR-003 left it out on purpose). The Dynadot API needs a key made in the account owner's Dynadot dashboard. Dvir creates no keys, and DOM can't make one for him (it never handles credentials). So `dynadotCloseouts` and `dynadotAftermarket` are built, but report `status: "not_configured"` (not error, not zeros) until a key exists. Please take this back to Gavriel. GoDaddy has no such problem: its inventory files are public and official, with no key.
+- **Q2, storage:**
+  - **Database:** only the manifests, plus the parsed `.com` rows up to the CR-072 price cap ($40), go into Neon, kept 30 days. Neon is at about 17% today.
+  - **Raw zips:** kept on the Mac host disk for 14 days, under `~/Library/Application Support/domain-trading/snapshots/<source>/<data_date>/`.
+  - **If production moves back to Render:** raw files aren't kept there (no disk), and the manifest says so.
+- **Q3, scheduling:** a GitHub Actions schedule at 15:00 UTC (the tick pattern; Cloudflare is at 5 crons). GitHub often starts schedules late, so the job keys every file by the source's Last-Modified (R-1). Its retry at +60 min (R-7) runs on the server, not as a second schedule.
+- **Unchanged:** R-3..R-6 as written (sealed manifests, 409 `SNAPSHOT_SEALED`, errors not zeros, `/health.datasave`, `DATASAVE_MISSED`, `GET /snapshots/missing`).
