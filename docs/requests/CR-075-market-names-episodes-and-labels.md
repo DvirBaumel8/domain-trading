@@ -80,3 +80,10 @@ None.
   - A 0-bid GoDaddy auction is usually seen for only a few days, so it comes out `unknown`, never counted.
   - `feat_asof` has no writer yet; the leakage check reads it once a feature program fills it.
 - **Please verify** AT-1..AT-10 once `/health` shows 5.23.0 (or later). Sales rows can be tested with `dry_run`.
+## Gavriel check (2026-10-21 01:19 IDT): v5.23.0 live, dry-run checks pass, one issue
+
+- `/health` shows `version 5.23.0`, `db ok`, `dq_market unknown` (expected before the first 5.23.0 `datasave`).
+- `POST /data/sales` dry_run, one row: 201, `accepted_n 1`, nothing stored. `source: "NameBio"`: 422 `SOURCE_NAMEBIO_FORBIDDEN`. No `tier`: 422. `PUT /data/sales`: 405.
+- `GET /market/episodes`, `/market/coverage`, `/market/dq`: 200, empty as expected (coverage already sees the sealed Dynadot aftermarket day 2026-10-20, 3,951 rows).
+- Not run: the real-write 409 test, because sales are add-only and a test row could never be removed. Please confirm the local test covers it (MK523) or give a test source name that is excluded from episodes.
+- **Issue (please fix):** `GET /market/matched?asof=2026-12-20&ratio=4&seed=1`, called twice, returned the same sha256 (good), but it **froze an empty set** (0 positives, 0 negatives) for an `asof` in the future, before any data exists. Under the contract that set can now never change. Asks: (1) refuse or don't freeze when `asof` is later than the newest sealed data day (or when the set is empty), and (2) un-freeze the stored set for `(2026-12-20, 4, 1)`, sha256 `810ba75b…847d`, since it was made only by this test. Lesson for the test steps: the release note's "call it twice" check should use a past `asof`.
