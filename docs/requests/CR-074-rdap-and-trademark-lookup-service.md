@@ -1,0 +1,49 @@
+---
+id: CR-074
+kind: CR
+status: approved
+owner_bot: dom-architect
+approval: "Dvir 2026-10-20 23:48 IDT freeze exception (via Gavriel)"
+priority: P1
+depends_on: []
+supersedes: []
+max_rounds: 2
+---
+# CR-074: one RDAP and trademark lookup service with cache and a midnight-safe daily limit (move 5 of 5)
+
+**Approval:** Dvir 2026-10-20 23:48 IDT freeze exception (via Gavriel), top-5 move 5. Build right away, no ship date. No step for Dvir.
+
+## Why
+Buyer, Sales and Risk Gate each fetch RDAP and USPTO data ad hoc, repeat the same lookups, and keep a fragile daily-cap counter that breaks around midnight.
+
+## What already exists (reference)
+Verisign RDAP inside /check, sibling-scan, engineEndings, dropWatch and cohortOutcomes; IANA bootstrap refresh; /data/rdap and /data/tm-kills loaded tables (live 0 rows).
+
+## Rules
+- R-1 `GET /rdap/{domain}` (READ/bots): `{registered: true|false|null, created, expires, registrar, status[], checked_at, cache_age_s, source:"rdap", reason_code?}`. Cache TTL setting (default 24 h); `?fresh=true` forces a lookup within the limit.
+- R-2 `POST /rdap/batch` (bots, read-only, 1..500 names): same rows; cached first, live lookups for the rest.
+- R-3 `GET /tm/{term}` (READ/bots): official free USPTO trademark search only; stores raw JSON, timestamp and query, returns `{term, hits_n, live_marks[], raw_ref, checked_at}`. Risk Gate judges conflicts; DOM never says "clear".
+- R-4 **Daily limit** per source (settings; RDAP default 200 live lookups/day for bot calls, outside the internal daily steps): a rolling 24-hour window keyed on UTC timestamps, so no reset jump at midnight IDT; `GET /lookups/usage` shows `used, limit, window_start, resets_gradually:true`.
+- R-5 Over the limit: cached answers still served; a needed live lookup returns 429 `LOOKUP_LIMIT` with `retry_after_s`. Never a guessed answer.
+- R-6 **Errors are not zeros:** timeout or source error → `registered:null` / `hits_n:null` with `reason_code` (`TIMEOUT`, `SOURCE_ERROR`, `RATE_LIMITED`).
+- R-7 No paid data, no keys from Dvir, no scraping of web pages.
+
+## Acceptance tests (via the API)
+- AT-1 `GET /rdap/google.com` → `registered:true`, `created` set; a second call within TTL has `cache_age_s > 0` and uses no limit.
+- AT-2 (negative) Given the limit is used up (fixture limit 2), When a 3rd uncached name is asked, Then 429 `LOOKUP_LIMIT`; a cached name still 200.
+- AT-3 Given 150 lookups at 23:50 IDT and 60 at 00:10 IDT with limit 200, Then the 201st within 24 h is refused (no midnight reset).
+- AT-4 (negative) RDAP mock timeout → `registered:null`, `reason_code:"TIMEOUT"`, never `false`.
+- AT-5 `GET /tm/apple` returns `hits_n > 0` with `raw_ref`; a mock USPTO 500 gives `hits_n:null` + `SOURCE_ERROR`.
+- AT-6 `POST /rdap/batch` with 501 names → 400 `VALIDATION_ERROR`.
+
+## Out of scope
+- Legal judgment; feeding results into /check or /buy gates (separate CR); non-.com TLD bulk scans beyond the existing sibling scan.
+
+## Questions (max 3)
+1. Does the free USPTO API need a key? If yes, tell us; Dvir creates no keys, so we'd look for a no-key path.
+2. Can the internal steps share this cache (one cache), and should they count against the limit?
+
+## DVIR items
+None.
+
+<!-- DOM writes below this line -->
