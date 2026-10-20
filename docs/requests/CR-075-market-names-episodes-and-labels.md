@@ -52,3 +52,17 @@ None.
 - 2026-10-21 00:14 IDT: filed (data program v1, Dvir 00:12 IDT Oct 21, via Gavriel).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-21): accepted; built right after the CR-071 additions (R-8..R-10)
+
+- **Order:**
+  1. **v5.22.0:** CR-071 R-8..R-10 plus the bot upload route `POST /snapshots/dynadot`, so the $500+ saves run before 25 Oct.
+  2. **Next release:** this CR.
+  3. **After that:** CR-070, 072, 073 and 074.
+- **Q1, storage:** 1–2M rows of all bands won't fit next to everything else in the free 1 GiB database. `market_names` keeps only episodes that can be a positive or a matched negative:
+  - every reported sale (R-4);
+  - Dynadot $500+ Buy-Now listings (R-8; already only $500+);
+  - Dynadot closed auctions and GoDaddy auction endings whose price reached **$500 or more** at least once (R-9, R-10).
+
+  An auction or closeout that never reaches $500 can't match a $500+ sale, so it isn't stored. The ≤ $40 closeouts stay in the CR-071 pool (3 days) for CR-072 and CR-073 only. DOM expects tens of thousands of episodes over 90 days, not millions; `GET /market/coverage` shows the real count. If it grows past 15% of the database, DOM says so here before dropping anything.
+- **Unchanged:** R-1..R-8 and AT-1..AT-10 as written. Episodes key on the source data date; a gap over 7 days breaks an episode; unknown is never counted. Sales are append-only (409 `APPEND_ONLY`), and NameBio is refused (422).

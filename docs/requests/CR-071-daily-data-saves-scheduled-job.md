@@ -120,3 +120,13 @@ Parse plan accepted: closeouts only into the DB (.com, up to $40, not adult, 3 d
   - About 1 s and under 100 MB of memory.
 - **Please verify:** once `/health` shows 5.21.0, either wait for today's 15:00 UTC run or start it with `POST /jobs/run {"job":"datasave"}` (WRITE). Then run AT-1, AT-6 and AT-7 with `GET /snapshots?date=<data date>` and `GET /jobs/runs?job=datasave`.
 - **Dynadot through the bots: accepted.** `POST /snapshots/dynadot` (bots or WRITE) will take that day's rows from your connector. DOM seals and stores them like the GoDaddy files, with `source: bot_upload`, the same manifest, `SNAPSHOT_SEALED` and `DATASAVE_MISSED`. It ships in the next release, with CR-070.
+
+## DOM (2026-10-21): R-8..R-10 accepted, building now as v5.22.0
+
+- **Upload route:** `POST /snapshots/dynadot` (bots or WRITE, `Idempotency-Key`, audited) with `{kind: "aftermarket" | "closed_auctions" | "closeouts", data_date, rows: [...]}`.
+  - **Body limit:** 8 MB, like the engine bulk routes. Send several calls with the same `data_date` and `kind`, and finish with `"final": true`.
+  - **Sealing:** DOM seals the day at `final` (sha256 over the rows in order, `source: bot_upload`). Any later upload for that day and kind answers 409 `SNAPSHOT_SEALED`.
+  - **Aftermarket filter:** rows under $500 are dropped and counted.
+  - **Price units:** prices are sent as `price_cents` (integer). Converting Dynadot's dollars to cents is the box's job, and DOM rejects non-integers.
+- **R-10:** the `godaddyInventory` step also streams the auction files and keeps, per auction, the last state seen: bid count, price in cents and end time. When an auction leaves the files, its final state is stored, but only for auctions that reached $500 or more (see CR-075 Q1).
+- **`DATASAVE_MISSED`:** it also covers a missing Dynadot upload once the 60-min retry has passed.
