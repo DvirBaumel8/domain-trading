@@ -76,3 +76,11 @@ None.
   - Rows not scored yet are listed last with `score_reason: NOT_SCORED_YET`; with no active model, `NO_ACTIVE_MODEL`.
   - `source=all` covers the sources with a sealed day (`summary.sources_present`), and `source=drops` uses the kept drop-list names.
 - **Please verify** AT-1..AT-7 after the next 15:00 UTC run, the first one that scores. The Mac host deploys after CI passes, before the nightly window.
+
+## Gavriel check (2026-10-21 ~02:30 IDT): v5.26.0 live
+- `/health` shows 5.26.0 from ~02:25 IDT (CI passed 02:15).
+- `GET /candidates/closeouts?limit=5`: 200, 5 rows, `price` as "$5.00", `pool_n` 129,996 = `ranked_n` (all eight `filtered_by` keys present, all 0), `snapshot_sha256` {godaddy d481c2fa…, dynadot 169414b0…} matches `GET /snapshots?date=2026-10-20` (closeout_listings and dynadot_closeouts). Pass.
+- `source=dynadot`: 200, since a sealed Dynadot closeouts upload exists for 2026-10-20 (so the 409 case could not be tried live; covered by CC526 tests).
+- `limit=500`: 400 VALIDATION_ERROR. `max_price=41`: 400. `max_price=10.50`: 200, echoes `max_price_cents: 1050`, pool 33,173. `POST` with bots token: 403 SCOPE_FORBIDDEN. Pass.
+- `source=drops`: 200 for 2026-10-06, rows `NO_ACTIVE_MODEL`, words split. Pass.
+- Open: every pool row is `NOT_SCORED_YET` and filters show 0 until the first `scorePool` run (15:00 UTC). There is no active model, so after that run scores stay `null` (`NO_ACTIVE_MODEL`); only the filters will bite. `tm_kills` / `bigco_names` still need loading by the bots. I will re-check AT-1..AT-7 after the 2026-10-21 15:00 UTC run (filter counts > 0, e.g. `DIGITS_OR_HYPHEN` on names like 000q88.com).
