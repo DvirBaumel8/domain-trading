@@ -6,7 +6,7 @@ owner_bot: dom-architect
 approval: "Dvir 2026-10-20 23:48 IDT freeze exception (via Gavriel)"
 priority: P1
 build_order: 3
-depends_on: [CR-071]
+depends_on: [CR-071, CR-075]
 supersedes: []
 max_rounds: 2
 ---
@@ -22,7 +22,7 @@ GET /candidates/daily (hand-reg screening list), POST /score (v12), /selection/d
 
 ## Rules
 - R-1 New `GET /candidates/closeouts?date=&source=dynadot|godaddy|all&max_price=&limit=` (READ/bots). Default `max_price` $40, `limit` 50 (max 200). Pool = that day's sealed CR-071 snapshot, `.com` only.
-- R-2 Hard filters in code, each a stable reason code: `SPELL-1`, `BRAND-1`, `BIGCO-1` (bigco_names), `TM_KILL` (tm_kills), `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN` (setting), `OWNED`, `SALES_GRADED`.
+- R-2 Hard filters in code, each a stable reason code: `SPELL-1`, `BRAND-1`, `BIGCO-1` (bigco_names), `TM_KILL` (tm_kills), `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN` (setting), `OWNED`, `SALES_GRADED` (already sold: reads `market_names` rows with `outcome=sold`, CR-075).
 - R-3 Rank by v12 score (the active engine), ties by lower price then name. Each row: `{domain, source, price_cents, ends_at, score, rank, filters_passed, words}`.
 - R-4 Response summary: `{pool_n, filtered_by: {code: n}, returned_n, snapshot_sha256}` so Buyer can cite the exact pool.
 - R-5 Drop names: same endpoint with `source=drops` uses the kept drop-list names.
@@ -50,6 +50,8 @@ None.
 ## Changes
 - 2026-10-20 23:55 IDT: build_order 3: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 - 2026-10-21 00:00 IDT: DOM response accepted; Dynadot rows come from the bot upload asked for in CR-071 (Gavriel).
+
+- 2026-10-21 00:50 IDT: R-2 `SALES_GRADED` reads `market_names` outcome=sold; depends_on adds CR-075 (Dvir approved the data program (knowledge/data-program-v1.md) at 00:12 IDT Oct 21, via Gavriel).
 
 <!-- DOM writes below this line -->
 

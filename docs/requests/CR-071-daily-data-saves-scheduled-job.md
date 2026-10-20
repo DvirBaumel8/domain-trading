@@ -27,6 +27,9 @@ The 00:05 UTC cron + tick, GET /jobs/runs, /health `jobs`/`jobs_last` (BUG-047),
 - R-4 **Errors are not zeros:** a failed fetch is `status:error` with HTTP status; never rows 0 / complete.
 - R-5 New `GET /snapshots?date=&source=` (READ/bots): manifests and row counts; raw files stay internal (not public, never re-published); `raw_available` is true only while the raw zip is within its 7-day window.
 - R-6 **Alert:** `/health.datasave` = `ok | overdue | partial | error`; overdue when no complete GoDaddy or Dynadot save in 26 h; `/report` warning `DATASAVE_MISSED` with the missing sources/day; the missed day is listed in `GET /snapshots/missing`.
+- R-8 `dynadotAftermarketSnapshot` (daily): the Dynadot $500+ Buy-Now listings snapshot (`download_all_listings` or paged `get_listings` with `show_other_registrar=yes`), one row per listing with `listing_id`, `price_cents` (dollars converted), `first_seen`/`data_date`. Pulled read-only **from the box by DOM Architect**, at most **5 Dynadot calls a day** in total, and uploaded through the shared non-money data route; DOM seals it like the GoDaddy files (`source: bot_upload`, sha256, 409 `SNAPSHOT_SEALED`). Rows under $500 are dropped.
+- R-9 `dynadotClosedAuctions` (daily): Dynadot `get_closed_auctions` rows (domain, end time, bid count, final price in cents), same box pull, same cap, same upload route and sealing.
+- R-10 `godaddyAuctionEnd`: for each GoDaddy auction in the inventory files, keep its final state (`bid_count`, `final_price_cents`, `end_time`) when it leaves the files, so 0-bid endings can be labelled unsold (CR-075).
 - R-7 Retry once at +60 min inside the same day. No paid data; no scraping of Sedo, Afternic or GoDaddy web pages (official inventory files only).
 
 ## Acceptance tests (via the API)
@@ -39,6 +42,11 @@ The 00:05 UTC cron + tick, GET /jobs/runs, /health `jobs`/`jobs_last` (BUG-047),
 - AT-7 `buildPanel` summary returns `gone_before_end_n` for the day diff (matches the box panel_diff for a fixture day).
 - AT-8 Given a raw zip saved 8 days ago, When the job runs, Then the zip is gone, its parsed rows and manifest (sha256) remain, and `GET /snapshots` shows `raw_available:false, raw_deleted_at` set.
 - AT-9 (negative) When a raw zip older than 7 days is requested or re-parsed, Then 410 `RAW_EXPIRED`; nothing is re-downloaded for a past day.
+
+- AT-10 Given a box upload for D with source `dynadot_aftermarket`, When `GET /snapshots?date=D&source=dynadot_aftermarket`, Then `status:"complete"`, sha256 set, `source:"bot_upload"`, every row `price_cents` >= 50000, duplicate `listing_id` 0.
+- AT-11 Given a box upload for D with source `dynadot_closed_auctions`, Then each row has `bid_count` and `final_price_cents` (cents), and the manifest is sealed.
+- AT-12 Given a fixture GoDaddy auction present on D-1 and gone on D, When `GET /snapshots?date=D&source=godaddy_auction_end`, Then that auction appears with its last `bid_count` and `final_price_cents`.
+- AT-13 (negative) Given a Dynadot upload for D is already sealed, When a second upload for D arrives, Then 409 `SNAPSHOT_SEALED` and the sha256 is unchanged; an upload carrying a row priced under $500 to `dynadot_aftermarket` drops that row and reports `dropped_below_floor_n`.
 
 ## Out of scope
 - Model training, scoring or candidate ranking (CR-072); Wayback; NameBio retailstats download; any write to a venue.
@@ -57,6 +65,8 @@ None.
 - 2026-10-21 00:00 IDT (Gavriel): Dynadot `not_configured` accepted; no key will be created. Instead the bots already have a read-only Dynadot connector (expired closeouts and aftermarket listings). Proposed, inside this CR: a BOTS-token `POST /snapshots/dynadot` where Buyer posts that day's closeout list once a day, which DOM then seals, parses and scores exactly like the GoDaddy files (same manifest, 409 `SNAPSHOT_SEALED`, `DATASAVE_MISSED` if nothing arrives by the retry). If you'd rather not, keep `not_configured` and say so; GoDaddy-only is fine for v5.21.0. 7-day raw and your build order confirmed.
 - 2026-10-21 00:00 IDT: DOM response accepted (7-day raw, 15:00 UTC GitHub Actions schedule, Dynadot steps `not_configured`). Dynadot follow-up: Gavriel's side has a read-only Dynadot connector with an expired-closeouts listing, so Buyer can fetch the Dynadot closeout list and hand it to DOM. Please add a WRITE-token upload for that day's Dynadot rows (e.g. `POST /snapshots/dynadot` with the rows; DOM seals the manifest with sha256 and `source: bot_upload`), so `source=dynadot` works without a server key. No buys, no money; if you see a problem with this, say so here (Gavriel).
 - 2026-10-20 (Gavriel): Dynadot stays bot-side, with no key. DOM Architect pulls closeouts and the aftermarket sample read-only from the box (at most 5 calls a day) and uploads the rows through the shared non-money `data` route. DOM seals and stores them as it does GoDaddy. DOM's own Dynadot steps stay `not_configured`. Please name or confirm the upload route and its format in your response.
+
+- 2026-10-21 00:50 IDT: R-8, R-9, R-10, AT-10..AT-13 added: Dynadot $500+ snapshot and closed auctions (box pull by DOM Architect, <=5 calls/day, shared non-money data route), GoDaddy final bid count and price per auction (Dvir approved the data program (knowledge/data-program-v1.md) at 00:12 IDT Oct 21, via Gavriel).
 
 <!-- DOM writes below this line -->
 

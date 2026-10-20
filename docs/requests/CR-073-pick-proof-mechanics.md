@@ -6,7 +6,7 @@ owner_bot: dom-architect
 approval: "Dvir 2026-10-20 23:48 IDT freeze exception (via Gavriel)"
 priority: P1
 build_order: 4
-depends_on: [CR-071, CR-072]
+depends_on: [CR-071, CR-072, CR-075]
 supersedes: []
 max_rounds: 2
 ---
@@ -24,7 +24,7 @@ Seeded MT19937 / Fisher-Yates recipe (CR-008), test-set seals, cohorts with 30/6
 - R-1 Pool per day = the CR-071 snapshot at 06:00 IDT of Dynadot + GoDaddy closeouts at <= $40, minus sales-graded names; frozen pool sha256. Seed = first 8 hex of that sha256.
 - R-2 Arms, k=100/day (setting, raise-only up to 300): A BOTS (`POST /pickproof/{date}/picks` from Buyer, scripted, before 16:00 UTC), B1 random from pool, B2 random from K1-passing, C1 random from 2-word <=10 letters, C2 .net-registered (reported only). DOM draws B1, B2, C1, C2.
 - R-3 Seal: `GET /pickproof/{date}/manifest` returns sha256 of pool, seed, each arm, and the frozen recipe shas. The bots append it to docs/requests/pick-proof-seals.md (plan §13: git commit timestamps are the witness). After seal, picks for that day are 409 `PICKPROOF_SEALED`.
-- R-4 Labels: daily step checks T30 ("taken in 30 days": registered at RDAP) for **every pool name**, blind to arms; unknown stays `unknown`, never "not taken".
+- R-4 Labels: daily step checks T30 ("taken in 30 days": registered at RDAP) for **every pool name**, blind to arms; unknown stays `unknown`, never "not taken". Labels are also read from `market_names` (CR-075): an arm name later seen listed and unsold there is a negative example; the seal format is shared with `GET /market/matched`.
 - R-5 `GET /pickproof/report?from=&to=`: per arm n, events, rate; primary A vs C1 one-sided Fisher (alpha 0.05), CMH by price band; Holm-adjusted secondaries (A vs B1, A vs B2); overlap %; if overlap > 5% use the within-day permutation test (10,000 shuffles); fewer than 10 events → `UNPOWERED`. Labeled "proxy, not profit".
 - R-6 No money action; no LLM; no email.
 
@@ -51,6 +51,8 @@ None.
 - 2026-10-20 23:55 IDT: build_order 4: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 - 2026-10-21 00:00 IDT (Gavriel): both changes accepted (labels for arm names only; C2 `not_built`). Bots append the seal line, as you say.
 - 2026-10-21 00:00 IDT: both changes accepted (labels for arm names only; C2 `not_built`); Q1/Q2 answers accepted, bots append the seal line (Gavriel).
+
+- 2026-10-21 00:50 IDT: R-4 labels read from `market_names`; depends_on adds CR-075 (Dvir approved the data program (knowledge/data-program-v1.md) at 00:12 IDT Oct 21, via Gavriel).
 
 <!-- DOM writes below this line -->
 
