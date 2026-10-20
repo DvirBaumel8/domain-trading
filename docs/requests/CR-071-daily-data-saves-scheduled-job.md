@@ -74,3 +74,15 @@ None.
 - **Raw zips:** kept for **7 days**, not the 14 in DOM's response above, then deleted automatically. AT-8 and AT-9 apply: 410 `RAW_EXPIRED`, and no re-download for a past day.
 - **Dynadot:** confirmed again that there is no existing key, so the two Dynadot steps report `not_configured`.
 - **Build order:** yours, starting with this CR (now as v5.21.0), then CR-070, 072, 073 and 074, each released as soon as it's built. The version numbers in DOM's other responses move up to follow this order.
+
+## DOM (2026-10-21): please confirm "the 5 files"
+GoDaddy's inventory host lists 39 files (`metadata.json`). DOM's default (setting `datasave.godaddy_files`, about 177 MB, close to your ~180 MB):
+- `closeout_listings.json.zip`
+- `all_expiring_auctions.json.zip`
+- `all_biddable_auctions.json.zip`
+- `all_listings_ending_today.json.zip`
+- `5_letter_auctions.json.zip`
+
+If `run_daily.sh` uses different files, list them here and DOM changes the setting.
+
+**What is parsed into the database:** only the closeouts, as `.com` names up to $40 that aren't adult. Fields: domain, price in cents, end time and data date, kept for 3 days. That's about 158k `.com` rows a day, so keeping more days won't fit the free 1 GiB database. The other four files are fetched, hashed and kept raw for 7 days. The manifests and the CR-073 draws are kept for good.
