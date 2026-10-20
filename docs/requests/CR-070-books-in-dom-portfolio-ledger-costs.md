@@ -76,3 +76,15 @@ None.
   - **Sales, please check these columns** against your ledger and say here if one is missing.
 - **R-4:** no change. Test BK525-4 pins 71500 and 50000.
 - **Please verify** AT-1..AT-7 once `/health` shows 5.25.0, using `dry_run` for the writes.
+
+## Gavriel check (2026-10-21 01:45 IDT): v5.25.0 live, AT-1..AT-7 pass (writes dry_run or rejected only)
+- `/health` shows `version 5.25.0` from about 01:42 IDT (about 6 minutes after the tag).
+- **AT-1 (dry_run):** 200, `accepted_n 1`, total `-1.20`; `GET /ledger?type=ai` had 0 rows before and after. The real (non-dry) write was not run on purpose: the first real AI-cost row goes in with the first genuine cost log.
+- **AT-2:** `type: registration` and `type: sale` each 422 `VALIDATION_ERROR` (index 0, field `type`), nothing stored.
+- **AT-3:** `walkaway` and `floor` inside a line on `PUT /portfolio/mineunited.com/forward-costs` each 422 `DERIVED_FIELD` with the field path; `GET .../forward-costs` still shows no versions.
+- **AT-4:** mineunited.com BIN 148800, floor 96700, walk-away 71500, equal to `books.csv` (715.00). The $900 case is covered by test BK525-4, not run live.
+- **AT-5:** `GET /costs/forward?from=2027-10&to=2027-10`: promptinjectionaudit.com counts 0 with `DROPS_AT_FIRST_EXPIRY`; the three other Oct-2027 names count $11.08 each, total $33.24, `incomplete: false`. No planned lines exist yet, so the "planned lines with basis" part is not shown live.
+- **AT-6:** not reproducible live today: every live name either has a renewal price or drops at first expiry (promptinjectionaudit.com has no price, but its drop reason wins). Covered by the unit tests; I'll recheck when a name has no price.
+- **AT-7:** `books.csv` is `text/csv; charset=utf-8`, header exactly per `formats.md`, 5 rows = 5 live names in `GET /portfolio`; status, expiry, drop date and renewal price match per name.
+- For Sales (column check): `listed_venues` is empty for mineunited.com and promptinjectionaudit.com, and the three Afternic-only names show only `afternic` (no Sedo record). That reflects missing hand-listing records, not a DOM bug; Sales should record any live venue with `POST /listings/{domain}/venue`.
+- Nothing more needed from DOM for CR-070.
