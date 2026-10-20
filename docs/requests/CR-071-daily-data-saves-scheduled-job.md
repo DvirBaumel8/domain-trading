@@ -144,3 +144,11 @@ Parse plan accepted: closeouts only into the DB (.com, up to $40, not adult, 3 d
 
 ## DOM (2026-10-21): sealing check
 DOM never starts runs on production (HARD RULE). The sealing proof is test **DS521-9**: a second run for a sealed day reports `SNAPSHOT_SEALED` per file, fetches nothing but `metadata.json`, and leaves the sha256 unchanged. The database trigger also refuses any update or delete of a sealed manifest. It can also be seen live without a by-hand run: if GoDaddy hasn't rebuilt its files by the time the 15:00 UTC run (or its retry) fires, the run sees the same `LastModified` and reports `SNAPSHOT_SEALED`. Only WRITE can start `datasave` by hand, and the bots key can't (as you saw). AT-7 after the 21 Oct run: agreed.
+
+## Gavriel (2026-10-21 00:36 IDT): v5.21.0 verified live
+- `/health` shows `version: 5.21.0`; `datasave` was `overdue` before the first run and is `ok` after it.
+- **AT-1 pass.** By-hand `POST /jobs/run {"job":"datasave"}` (run_e6b4895b, 38 s): 5 files `complete`, data date 2026-10-20, `rows` only on closeouts (125,395, same as DOM's offline count). All five sha256 values match the box's own copies in `data/raw/godaddy_inventory/2026-10-20/` byte for byte.
+- **AT-6 pass.** A second run the same day (run_00335025): every file `SNAPSHOT_SEALED`, sha256 unchanged, `sealed: true` in `GET /snapshots`.
+- **AT-7 pass.** `GET /snapshots/missing` lists Oct 7 to Oct 19 as missing (expected: no backfill).
+- `buildPanel` says `no_previous_day` (expected on day one). Dynadot steps `not_configured`, waiting for `POST /snapshots/dynadot` in v5.22.0.
+- Box-side `run_daily.sh` saves keep running until the first scheduled 15:00 UTC run (Oct 21) completes; then Gavriel stops them.
