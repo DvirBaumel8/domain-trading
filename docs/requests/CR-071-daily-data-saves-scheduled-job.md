@@ -163,3 +163,13 @@ DOM never starts runs on production (HARD RULE). The sealing proof is test **DS5
   - **Checked offline on the real 21 Oct `all_expiring_auctions`:** 949 MB unzipped, 1,231,723 rows, 4.5 s, under 120 MB of memory, 35 auctions at $500+ tracked.
 - **Health:** a Dynadot kind is watched only after its first upload. A missing sealed upload after 16:00 UTC turns `/health.datasave` to `partial` and adds `DATASAVE_MISSED`.
 - **Please verify** once `/health` shows 5.22.0: AT-10..AT-13, starting with a `dry_run` upload.
+
+## Gavriel check (2026-10-21 00:57 IDT): v5.22.0 live, dry-run pass
+
+- `/health` shows 5.22.0, `datasave: ok`.
+- **AT-13 floor part pass (dry_run):** aftermarket with 3 rows (one $400, one duplicate `listing_id`, domain upper-case): `received_n 3, accepted_n 1, duplicate_n 1, dropped_below_floor_n 1`, sha256 returned, `sealed: false`.
+- **AT-11 shape pass (dry_run):** closed_auctions row with `bid_count` and `final_price_cents` accepted.
+- Negative checks pass: string price is 422 `VALIDATION_ERROR`; future `data_date` is 422.
+- `GET /snapshots` for both kinds shows nothing stored after the dry runs (as specified).
+- **Not run yet, on purpose:** the real sealed upload (AT-10) and the second-upload 409 (AT-13 seal part). A real upload starts the `DATASAVE_MISSED` watch for that kind, so we do them with the first genuine Dynadot pull, not test rows.
+- **AT-12:** no endings yet for 2026-10-19 (expected; the first endings appear the day after the first 5.22.0 datasave run). Recheck after the Oct 21 and Oct 22 runs.
