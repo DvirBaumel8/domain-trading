@@ -77,3 +77,14 @@ Signing in to Afternic or Sedo; any price, list, delist or export change; walk-a
 - **PUT without a key:** 400 `IDEMPOTENCY_KEY_REQUIRED`, message ends "(this request was a PUT)". Pass.
 - **Small finding (venue route, bots token):** a body that fails the schema gets 422 `VALIDATION_ERROR`, not 403 `SCOPE_FORBIDDEN`, so body validation runs before the scope check. I did not send a valid body with the bots token (that route has no `dry_run`, and a pass would store an `ours_confirmed` row). Please check scope before the body on `money` routes, so a bots token always gets 403 regardless of the body, and add a test for it. Low priority.
 - **Note:** the bots token hit 429 `RATE_LIMITED` after about 8 calls in under a minute during this check; retried after 40 s. No action needed unless that limit is lower than you meant.
+
+## Gavriel check (2026-10-21 ~02:40 IDT): v5.27.0 live, AT-1..AT-5 pass
+- `/health` showed 5.27.0 at 02:35:55 IDT (bots token, read only).
+- **AT-1:** `books.csv` `listed_venues` = `afternic` for promptinjectionaudit.com, ukcbamcompliance.com, aievalsconsulting.com, roofingvoiceagent.com; empty for mineunited.com (`observed_venues` = `afternic` from the seed). `observed_venues` is the last column. Pass.
+- **AT-2:** `POST /listings/mineunited.com/observed` dry_run 200 (id null); real 201 (id 9, same sighting as the seed: $1,488, afternic.com URL, seen 2026-10-20 12:00 UTC). After: `listed_venues` empty, `observed_venues` = `afternic`, `GET /portfolio/mineunited.com` `export` object identical before and after. Pass.
+- **AT-3:** same body plus `provenance: ours_confirmed` is 422 `VALIDATION_ERROR` (unrecognized key). Pass.
+- **AT-4:** a bots-token `POST /listings/{domain}/venue` with a valid body and `provenance: ours_confirmed` is 403 `SCOPE_FORBIDDEN` (tested on a name not in the portfolio so nothing could be stored). Pass. Small note, no change asked: an invalid body on that route returns 422 before the scope check, so a bots token learns the schema before it learns it can't write. Fine by me unless you prefer 403 first.
+- **AT-5:** `Mine-United.com` 422 `DISPLAY_NAME_MISMATCH`; `MineUnited.com` 200 and `books.csv` `display_name` now `MineUnited.com`. Pass.
+  - **Question:** the 200 said `changed: false, export_pending: false`, though `display_name` was blank in `books.csv` right before. Was it already stored somewhere (so `changed` compares a different field), or is `changed` wrong? And `export_pending: false` means mineunited.com doesn't count as `listed` in DOM, so the next Afternic export won't carry the new name on its own; please confirm that's expected.
+- **CR-070 note:** `PUT /portfolio/mineunited.com/forward-costs` with no key is 400 `IDEMPOTENCY_KEY_REQUIRED`, message says "this request was a PUT". Pass.
+- One 429 `RATE_LIMITED` hit mid-run (about 10 calls in ~8 s); retried after 60 s. No change asked.
