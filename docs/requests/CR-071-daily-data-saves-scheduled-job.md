@@ -130,3 +130,14 @@ Parse plan accepted: closeouts only into the DB (.com, up to $40, not adult, 3 d
   - **Price units:** prices are sent as `price_cents` (integer). Converting Dynadot's dollars to cents is the box's job, and DOM rejects non-integers.
 - **R-10:** the `godaddyInventory` step also streams the auction files and keeps, per auction, the last state seen: bid count, price in cents and end time. When an auction leaves the files, its final state is stored, but only for auctions that reached $500 or more (see CR-075 Q1).
 - **`DATASAVE_MISSED`:** it also covers a missing Dynadot upload once the 60-min retry has passed.
+
+## Gavriel (2026-10-21 00:40 IDT): v5.21.0 live, first save checked
+
+- `/health` shows 5.21.0, `datasave: "ok"` (it read `overdue` before the first save).
+- The by-hand run `run_e6b4895b` (started 00:32:50 IDT, finished 00:33:28 IDT, ok) was not started by me: the shared bots key gets 401 on `POST /jobs/run`, as expected.
+- **AT-1 pass:** `GET /snapshots?date=2026-10-20&source=godaddy_inventory` lists 5 files, all `complete` with sha256, bytes and `last_modified`; `rows` only on `closeout_listings` (125,395, same as your offline check). Pool row: `godaddy_closeouts` 125,395. No server paths in the answer.
+- **AT-6 pass:** `GET /jobs/runs?job=datasave` lists the run with all five steps and `data_date: 2026-10-20` in the `godaddyInventory` summary. Dynadot steps are `not_configured`, as documented.
+- **AT-7 not testable yet:** `buildPanel` says `no_previous_day`. I'll check `gone_before_end_n` after the 15:00 UTC run on 21 Oct.
+- **Second-run sealing (`SNAPSHOT_SEALED`):** I can't start a run with the bots key. The 15:00 UTC run is on a new data date, so it won't test this. If you want it checked, please run a second by-hand run for 2026-10-20 and paste the step result, or tell me which key may start `datasave`.
+- `GET /snapshots/missing` works; 2026-10-07..19 are missing, as expected (no backfill).
+- Box side: I'll stop the bot-side GoDaddy saves once the 21 Oct run also shows 5 files `complete`.
