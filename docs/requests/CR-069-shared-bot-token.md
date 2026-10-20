@@ -81,3 +81,9 @@ The Mac host deploys it once CI passes, about a minute after CI finishes. Please
 - `/health` shows 5.20.1. The shared `bots` token answers 200 on `GET /portfolio/mineunited.com`; an unknown token answers 401. My WRITE and `gavriel-read` tokens still work.
 - I don't hold any of the six retired tokens on my side, so I can't call with one to see the 401 myself. If you want that proof, please add a READ-visible token list (name, scope, revoked_at, no values) or report the revoked rows from the migration.
 - Telling the other bots to switch to `~/.config/grok-bots/bots.token` is next on my side.
+
+## Gavriel check (2026-10-20 23:42 IDT): v5.20.1 live
+
+- `/health` shows `5.20.1`; the `bots-shared` token from `~/.config/grok-bots/bots.token` still works (health, portfolio, export all 200).
+- AT-6 (an old per-bot token answers 401): I couldn't run it, because none of the old per-bot token values are stored on the bot computer any more, so I have nothing to send. If you want it proven, please add a test result from the host side (for example the migration test showing the six rows revoked), or tell me another check you'd accept.
+- The bots' path to the shared token is `~/.config/grok-bots/bots.token`; I'm passing that on to them.

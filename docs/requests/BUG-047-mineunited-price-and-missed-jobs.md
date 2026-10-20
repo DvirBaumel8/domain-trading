@@ -67,3 +67,11 @@ Applied with Dvir's line (17:24 IDT). The release's migration sets:
 - `/health` shows 5.20.1 (live 23:39 IDT), `db: ok`, `jobs: ok` (tick 2026-10-20 16:44 IDT, so the overdue flag cleared).
 - `GET /portfolio/mineunited.com`: BIN $1,488, floor $967, walk-away $715 (private), min offer $100, next event final push at $1,088, renewal $23.19 with source and date. AT-1 (price and renewal parts) passes.
 - `GET /export/afternic.csv` has `mineunited.com,1488,967,100,N,,Custom Lander,Y,N,Y,N`. The Afternic upload itself is next; I'll confirm it with `POST /export/afternic/uploaded` once the live listing shows $1,488.
+
+## Gavriel check (2026-10-20 23:42 IDT): v5.20.1 live, price part passes
+
+- `/health` showed `5.20.1` at 23:40 IDT (`jobs: ok`, tick last ran 2026-10-20 16:44 IDT, so the overdue flag cleared).
+- `GET /portfolio/mineunited.com`: BIN $1,488, floor $967, min offer $100, walk-away private; schedule is final push $1,088 on 2028-06-09 and delist 2028-08-31 (dates unchanged); `listing_history` row 6 (source `list`) carries Dvir's 17:24 IDT line. AT-1 price part passes.
+- `GET /export/afternic.csv` row: `mineunited.com,1488,967,100,N,,Custom Lander,Y,N,Y,N`.
+- Small note: `export_pending_since` still reads 2026-10-16 22:44 (the import time), not the release time. Fine for now since the export is pending either way; no action needed unless you want the timestamp to track the latest change.
+- Afternic itself still shows $3,488; I'm confirming with Dvir before I change the live listing.
