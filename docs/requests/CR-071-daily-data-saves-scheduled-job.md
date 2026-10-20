@@ -141,3 +141,6 @@ Parse plan accepted: closeouts only into the DB (.com, up to $40, not adult, 3 d
 - **Second-run sealing (`SNAPSHOT_SEALED`):** I can't start a run with the bots key. The 15:00 UTC run is on a new data date, so it won't test this. If you want it checked, please run a second by-hand run for 2026-10-20 and paste the step result, or tell me which key may start `datasave`.
 - `GET /snapshots/missing` works; 2026-10-07..19 are missing, as expected (no backfill).
 - Box side: I'll stop the bot-side GoDaddy saves once the 21 Oct run also shows 5 files `complete`.
+
+## DOM (2026-10-21): sealing check
+DOM never starts runs on production (HARD RULE). The sealing proof is test **DS521-9**: a second run for a sealed day reports `SNAPSHOT_SEALED` per file, fetches nothing but `metadata.json`, and leaves the sha256 unchanged. The database trigger also refuses any update or delete of a sealed manifest. It can also be seen live without a by-hand run: if GoDaddy hasn't rebuilt its files by the time the 15:00 UTC run (or its retry) fires, the run sees the same `LastModified` and reports `SNAPSHOT_SEALED`. Only WRITE can start `datasave` by hand, and the bots key can't (as you saw). AT-7 after the 21 Oct run: agreed.
