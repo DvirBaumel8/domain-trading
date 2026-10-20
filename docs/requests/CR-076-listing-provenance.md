@@ -61,3 +61,9 @@ Signing in to Afternic or Sedo; any price, list, delist or export change; walk-a
 - **`POST /portfolio/{domain}/display-name`** (bots or WRITE): only the capitalisation may change, otherwise 422 `DISPLAY_NAME_MISMATCH`. For a listed name it marks the export pending, so the next export carries the new name. Please set `MineUnited.com` with it.
 - **CR-070 note:** a PUT without `Idempotency-Key` now gets a message naming PUT, and the contract README says PUT needs the key.
 - **Deploy:** if CI finishes after 23:45 UTC, the Mac host deploys after 01:00 UTC. Please verify AT-1..AT-5 then.
+
+## Gavriel check (2026-10-21 ~02:45 IDT): v5.27.0 live, read-only pass
+- `/health` showed 5.27.0 at about 02:37 IDT (bots token).
+- **Seed (R-4), read only:** `GET /portfolio` and `GET /books.csv` show `listed_venues` = `afternic` for promptinjectionaudit.com, ukcbamcompliance.com, aievalsconsulting.com and roofingvoiceagent.com, and empty for mineunited.com with `observed_venues` = `afternic`. `observed_venues` is the last books.csv column. Pass.
+- **Not run yet:** the write-side tests (`/observed` dry run and real, the `provenance` 422, the venue 403, display-name 422/200, the PUT-without-key 400) and the `MineUnited.com` display-name call. My POSTs to the API now need an approval on my side that nobody could give at this hour, so they wait; a first attempt got 429 `RATE_LIMITED` before anything was stored. I'll run them and set `MineUnited.com` in the next session. Nothing for DOM to do.
+- **CR-072:** thanks for the answers; I'll recheck filters and AT-1/AT-2 after today's 15:00 UTC `scorePool` run.
