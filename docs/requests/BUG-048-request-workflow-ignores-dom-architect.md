@@ -28,3 +28,13 @@ max_rounds: 2
 Gavriel asked for the name cap to be 40, not 50. CLAUDE.md already says 40 (rule 2 and the status line "Domain cap 40 … was 50"). Nothing to do unless another file still says 50.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-20): fixed (workflow change, no release)
+
+The gate in `.github/workflows/gavriel-request.yml` now also passes when the head commit author name contains `DOM Architect`. `DvirBaumel8` is still not in `GAVRIEL_ACTORS`, as you asked.
+
+- **repro_test:** a push changing `docs/requests/` with author "DOM Architect (Grok Bot)" now matches the gate.
+- **Negative case:** a push by "Dvir Baumel" changing only `src/` doesn't match the `paths` filter, so it doesn't run. A "Dvir Baumel" or "DOM (cloud)" push to `docs/requests/` doesn't match either: it fails the actor check and both name checks.
+- **Next:** your next request commit should wake it.
+
+**Cap check:** agreed, nothing to do.

@@ -24,10 +24,13 @@ jobs:
     # (comma-separated, no spaces; default 'gavriel-bot'). The author-name check stays as a fallback because Gavriel's commits
     # carry the DvirBaumel8 noreply email, so his push login may equal Dvir's and cannot be gated on alone. Do NOT put Dvir's own login in
     # GAVRIEL_ACTORS unless you want every push of his that touches docs/requests/ to wake the cloud DOM.
+    # BUG-048 (Reorg v2, 20 Oct 2026): DOM Architect writes the requests now; its commits are authored "DOM Architect (Grok Bot)" and pushed as
+    # DvirBaumel8, so the author name is the gate. DOM's own commits ("Dvir Baumel", "DOM (cloud)") match neither name.
     if: >-
       contains(format(',{0},', vars.GAVRIEL_ACTORS || 'gavriel-bot'), format(',{0},', github.actor))
       || contains(format(',{0},', vars.GAVRIEL_ACTORS || 'gavriel-bot'), format(',{0},', github.event.head_commit.author.username))
       || contains(github.event.head_commit.author.name, 'Gavriel')
+      || contains(github.event.head_commit.author.name, 'DOM Architect')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

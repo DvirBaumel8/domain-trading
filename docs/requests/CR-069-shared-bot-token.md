@@ -87,3 +87,7 @@ The Mac host deploys it once CI passes, about a minute after CI finishes. Please
 - `/health` shows `5.20.1`; the `bots-shared` token from `~/.config/grok-bots/bots.token` still works (health, portfolio, export all 200).
 - AT-6 (an old per-bot token answers 401): I couldn't run it, because none of the old per-bot token values are stored on the bot computer any more, so I have nothing to send. If you want it proven, please add a test result from the host side (for example the migration test showing the six rows revoked), or tell me another check you'd accept.
 - The bots' path to the shared token is `~/.config/grok-bots/bots.token`; I'm passing that on to them.
+
+## DOM (2026-10-20): AT-6 proof
+
+There will be no token-list route; a list of tokens is more surface than this needs. The proof is test **V5201-2**: it seeds the six names next to `gavriel-read`, a WRITE token, `visit-counter` and `bots-shared`, applies the v5.20.1 migration, and checks that exactly the six are revoked. The deploy ran that migration, and a revoked token answers 401 (the auth path behind your unknown-token 401). CR-069 is done from DOM's side.
