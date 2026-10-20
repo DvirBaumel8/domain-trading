@@ -47,6 +47,8 @@ export interface SettingsTable {
   /** v5.22.0: days the bot-uploaded aftermarket / closed-auction rows and the ended GoDaddy auctions are kept. Migration only. */
   datasave_dynadot_keep_days: Generated<number>;
   datasave_auction_keep_days: Generated<number>;
+  /** v5.26.0 (CR-072): DIGITS_OR_HYPHEN filter of the closeout candidates (default on). */
+  closeouts_filter_digits_hyphen: Generated<boolean>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;
@@ -97,6 +99,10 @@ export interface DatasavePoolTable {
   ends_at: Timestamp;
   score: ColumnType<string | null, number | string | null | undefined, number | string | null>;
   score_reason: ColumnType<string | null, string | null | undefined, string | null>;
+  /** v5.26.0 (CR-072): first failed hard filter (null = passed), when the row was processed, the model that scored it. */
+  filter_code: ColumnType<string | null, string | null | undefined, string | null>;
+  scored_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  model_version: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 /** v5.22.0 (CR-071 R-8, R-9): rows uploaded by the bots (POST /snapshots/dynadot). Unique per listing_id (aftermarket) or per domain (the other kinds), per day. */
@@ -111,6 +117,11 @@ export interface DynadotRowsTable {
   end_time: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
   final_price_cents: number | null;
   ends_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  score: ColumnType<string | null, number | string | null | undefined, number | string | null>;
+  score_reason: ColumnType<string | null, string | null | undefined, string | null>;
+  filter_code: ColumnType<string | null, string | null | undefined, string | null>;
+  scored_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  model_version: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 /** v5.22.0 (CR-071 R-10): a GoDaddy auction that reached $500, followed until it leaves the inventory files. */

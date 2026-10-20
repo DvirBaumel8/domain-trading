@@ -100,6 +100,32 @@ export class Scorer {
     }));
   }
 
+  /**
+   * v5.26.0 (CR-072): the model score of many names with ZERO outside calls (no registry asks, no fetch): only the stored facts (engine_endings as they are,
+   * sales, unsold, keyword demand) are read. A name with no stored ending answer keeps that feature unknown, as in `score` when the budget runs out.
+   * Returns null when no model is active; a name the model could not score is absent from the map. Same model and features as `score`, without the explanation blocks.
+   */
+  async scoreOffline(domains: string[], asOfIn?: string): Promise<{ model_version: string; scores: Map<string, number> } | null> {
+    const { db, now } = this.deps;
+    const model = await this.activeModel();
+    if (!model) return null;
+    const p = model.params;
+    const asOf = asOfIn ?? idtDay(now());
+    const table = extendedTable(baseSplitTable(), p.extra_terms);
+    const tokens = await this.tokenIndex(model, table);
+    const unique = [...new Set(domains)];
+    const endings = await loadEndings(db, unique.map(sldOf));
+    const ctx0: FeatureContext = { table, tokens, endings, demand: new Map() };
+    const kws = [...new Set(unique.map((d) => computeFeatures(ctx0, d, asOf).words.join(' ')).filter((k) => k !== ''))];
+    const ctx: FeatureContext = { ...ctx0, demand: await loadDemand(db, kws) };
+    const scores = new Map<string, number>();
+    for (const domain of unique) {
+      const prob = gbmProba(p.gbm, toVector(computeFeatures(ctx, domain, asOf).values, p.features))[0]!;
+      if (Number.isFinite(prob)) scores.set(domain, r4(prob));
+    }
+    return { model_version: model.id, scores };
+  }
+
   async score(domains: string[], asOfIn?: string): Promise<{ model_version: string; results: ScoreResult[] } | null> {
     const { db, now } = this.deps;
     const model = await this.activeModel();

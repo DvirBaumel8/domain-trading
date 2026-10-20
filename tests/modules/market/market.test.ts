@@ -386,7 +386,7 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
     expect((await get('/health')).json().dq_market).toBe('unknown');
     const run = await runJobToEnd(app!, 'datasave');
     const steps = run.json().steps as Record<string, { status: string; summary?: Record<string, unknown> }>;
-    expect(Object.keys(steps)).toEqual(['godaddyInventory', 'dynadotCloseouts', 'dynadotAftermarket', 'buildPanel', 'snapshotRetention', 'episodes', 'dqMarket']);
+    expect(Object.keys(steps)).toEqual(['godaddyInventory', 'dynadotCloseouts', 'dynadotAftermarket', 'scorePool', 'buildPanel', 'snapshotRetention', 'episodes', 'dqMarket']);
     expect(steps.episodes).toMatchObject({ status: 'done' });
     expect(steps.dqMarket).toMatchObject({ status: 'done', summary: { status: 'ok', failed_checks: [] } });
     expect((await get('/health')).json().dq_market).toBe('ok');

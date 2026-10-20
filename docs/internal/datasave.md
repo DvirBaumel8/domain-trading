@@ -3,7 +3,7 @@
 Binding rules and test IDs for the `datasave` job. The interface is `docs/contract/jobs.md` (row `datasave`), `endpoints.md` (§Daily data saves) and `reports.md` (`DATASAVE_MISSED`).
 
 ## Where
-- Job code: `src/modules/ops/jobs/datasave/` (`datasave.ts` = the seven steps (v5.23.0: `episodes`, `dqMarket` last, rules in `market.md`); `zip.ts` = streaming zip reader, no dependency; `json-stream.ts` = streaming reader of `{meta, data:[...]}`, no dependency). Wired in `src/app.ts` (`datasaveJob` of the `JobRunner`); plan in `ops/jobs/runner.ts` (job kind `datasave`, lock `job:datasave`).
+- Job code: `src/modules/ops/jobs/datasave/` (`datasave.ts` = the eight steps (v5.23.0: `episodes`, `dqMarket` last, rules in `market.md`; v5.26.0: `scorePool` after the Dynadot steps, `closeouts.md`); `zip.ts` = streaming zip reader, no dependency; `json-stream.ts` = streaming reader of `{meta, data:[...]}`, no dependency). Wired in `src/app.ts` (`datasaveJob` of the `JobRunner`); plan in `ops/jobs/runner.ts` (job kind `datasave`, lock `job:datasave`).
 - Retry: `ops/queue.ts` `retryDatasave` (run level `not_before`, set when the run is finalized and its `godaddyInventory` step failed; `claim()` skips a run whose `not_before` is in the future by the app clock; `enqueue` for an open waiting run clears `not_before`).
 - Routes: `ops/api/snapshots.ts` (`GET /snapshots`, `GET /snapshots/missing`). Health value and report warning use `reporting/datasave-state.ts` (`datasaveStatus`, `missingDays`).
 - Schedule: `.github/workflows/datasave.yml` (cron `0 15 * * *`).
@@ -37,6 +37,10 @@ Binding rules and test IDs for the `datasave` job. The interface is `docs/contra
 19. Ending: when every configured auction file of the data date is `complete`, open rows with `last_seen < data_date` and `end_time <=` the files' Last-Modified become `ended = true, final_state_at = data_date`; `last_bid_count` and `last_price_cents` stay as the final state. With a failed or missing auction file nothing ends. A parse failure of an auction file is `partial` (rows null, error), never complete, and never blocks the closeouts. Read through `GET /snapshots?source=godaddy_auction_end&date=`.
 20. Retention: ended rows by `final_state_at`, open rows by `last_seen`, `datasave_auction_keep_days` (120).
 21. Step summary: `auctions_seen_n` (rows read this run), `tracked_n`, `ended_today_n`, `ended_now_n`, `auction_end_detection`.
+
+## scorePool (v5.26.0, CR-072)
+22. Step `scorePool` runs after `dynadotAftermarket` and before `buildPanel`. It processes the rows of `datasave_pool` and of sealed `dynadot_rows` (`kind closeouts`) with `scored_at` null: stores `filter_code` (first failed hard filter, null = passed), and for passed rows `score`, `model_version`, or `score_reason` (`NO_ACTIVE_MODEL`, `SCORE_FAILED`). Rules, order and tests: `docs/internal/closeouts.md`. Offline: the score uses `Scorer.scoreOffline` (no fetch, no registry ask). A Dynadot day is processed only when its `bot_upload` manifest is sealed, so a later upload is scored by the next run (the retry run or the next day).
+23. Measured (local, synthetic 125,000 rows, 40,000 of them passing the filters): about 3.6 s for the whole step (classify 0.65 s, scoring 2,000 names about 0.08 s), so every passing row is scored; no row is skipped for time.
 
 ## Dynadot server key (not built)
 No Dynadot key exists on the server (CR-003 left it out; DOM can't create one). `dynadotCloseouts` / `dynadotAftermarket` return `{source, status: "not_configured", reason}` and nothing else. When a key exists: closeouts = all pages, one call at a time at least 5 s apart, dedupe by domain, `price_cents` as given; aftermarket = at most 5 read-only calls, dollars to cents; both into manifests with `status`. Do not guess at Dynadot's API before then. The bots' upload route is built (v5.22.0, above).
@@ -86,3 +90,5 @@ v5.22.0 tests: `tests/modules/ops/datasave-dynadot.test.ts`.
 | DS522-15 | retention of ended and stale open auctions |
 | DS524-1 | coverage stored on a sealed upload, frozen by the seal guard (AT-14) |
 | DS524-2 | invalid coverage 422, missing coverage null (AT-15) |
+
+v5.26.0 tests: `tests/modules/ops/closeouts.test.ts` (CC526-*, table in `closeouts.md`).

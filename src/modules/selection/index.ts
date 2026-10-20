@@ -30,3 +30,4 @@ export { SellersList, SELLERS_KIND, sellersFresh, sellersFreshHours, sellersFres
 export { freshUntil, isFresh, prefetchDomainRecords, recordKey, RECORD_FRESH_DAYS, RECORD_KINDS, type RecordKind, type RecordsPrefetch } from './domain-records.js';
 export { geoMembers, openTrancheFor } from './tranche-members.js';
 export { type LookalikeCounts, rerunLookalikes, screenedNames, type ScreenedName } from './portfolio-support.js';
+export { closeoutNameChecker, termKey, type CloseoutNameChecker, type CloseoutNameCode, type CloseoutNameVerdict } from './closeout-name.js';

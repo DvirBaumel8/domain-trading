@@ -4,6 +4,7 @@
 //   dynadotCloseouts / dynadotAftermarket   not built: no Dynadot key exists, so they report `not_configured` (never an error, never zero rows). Since v5.22.0 they also
 //                      say whether a bot upload (POST /snapshots/dynadot, dynadot-upload.ts) for today is sealed.
 // v5.22.0 (R-10): the four auction files are also parsed (godaddy_auctions): .com auctions that reached $500, followed until they leave the files.
+//   scorePool          (v5.26.0, CR-072) filters and scores the pool and the sealed Dynadot closeouts rows, offline; closeouts/score-pool.ts.
 //   buildPanel         the day diff of the closeouts pool (names gone before their end).
 //   snapshotRetention  deletes raw zips past their window (manifest stays) and pool rows past their days.
 // It reads only the public inventory host (official files, no scraping) and writes only its own tables and files. Files are keyed by the source's
@@ -18,6 +19,7 @@ import { pipeline } from 'node:stream/promises';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../../db/types.js';
 import { runDqMarket, runEpisodes } from '../../../market/index.js';
+import { scorePool, type PoolScorer } from '../../closeouts/score-pool.js';
 import { listZipEntries, openZipEntry } from './zip.js';
 import { streamArrayItems } from './json-stream.js';
 
@@ -42,6 +44,8 @@ export interface DatasaveDeps {
   snapshotDir: string;
   /** DYNADOT_API_KEY when set; the Dynadot client is not built yet either way. */
   dynadotKey?: string;
+  /** v5.26.0 (CR-072): the engine scorer for the `scorePool` step; without it every row gets score null, NO_ACTIVE_MODEL. */
+  scorer?: PoolScorer;
   /** Tests may pass a fetch; default is the global one at call time (MSW patches it). */
   fetch?: typeof fetch;
   log?: { warn: (obj: unknown, msg?: string) => void };
@@ -372,6 +376,13 @@ export class DatasaveJob {
       source, status: 'not_configured', reason: this.deps.dynadotKey ? 'a Dynadot key is set but the Dynadot client is not built yet' : 'DYNADOT_API_KEY is not set (no Dynadot key exists)',
       bot_upload: await this.botUpload(source),
     };
+  }
+
+  // ---------- scorePool (v5.26.0, CR-072) ----------
+
+  /** Filters and scores the closeouts pool and the sealed Dynadot closeouts rows, offline (no registry or other outside call); see closeouts/score-pool.ts. */
+  async scorePool(): Promise<unknown> {
+    return scorePool({ db: this.deps.db, now: this.deps.now, scorer: this.deps.scorer, log: this.deps.log });
   }
 
   // ---------- episodes, dqMarket (v5.23.0, CR-075) ----------

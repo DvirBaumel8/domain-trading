@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.26.0 (2026-10-21): CR-072 ranked closeout and drop candidates
+Release note: `docs/releases/v5.26.0.md`.
+MINOR (additive; migration `1765800000000_v5-26-0.sql`).
+- **New route `GET /candidates/closeouts?date=&source=dynadot|godaddy|all|drops&max_price=&limit=`** (READ or bots; read-only, no POST): the day's closeout rows (GoDaddy pool, sealed Dynadot upload) or the kept drop-list names, minus eight hard filters (`SPELL-1`, `BRAND-1`, `BIGCO-1`, `TM_KILL`, `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN`, `OWNED`, `SALES_GRADED`), ranked by the active scoring model. Rows `{domain, source, price_cents, price, ends_at, score, rank, filters_passed, words}`; summary `{pool_n, filtered_by, ranked_n, returned_n, snapshot_sha256}` with `pool_n - sum(filtered_by) = ranked_n`. `max_price` is integer cents (default and cap 4000), `limit` 1..200 (default 50; 500 is 400 `VALIDATION_ERROR`). A failed score is `score: null` with `score_reason` (`NO_ACTIVE_MODEL`, `SCORE_FAILED`, `NOT_SCORED_YET`), never 0.
+- **New code `SNAPSHOT_MISSING` (409):** no sealed snapshot for the date and source (`source=dynadot` on a day without a sealed Dynadot closeouts upload). Not an empty list.
+- **New `datasave` step `scorePool`** (after the Dynadot steps; `jobs.md`): filters and scores the pool and the sealed Dynadot closeouts rows **once, offline** (no registry ask or other outside call) and stores the result with the rows; the route only reads. New columns `filter_code`, `scored_at`, `model_version` on the pool, `score`, `score_reason`, `filter_code`, `scored_at`, `model_version` on the Dynadot rows, and the setting `closeouts_filter_digits_hyphen` (default on, migration only).
+- **No change** to `POST /score`, `/buy`, the snapshots routes or any existing answer.
+
 ## 5.25.0 (2026-10-21): CR-070 ledger costs, forward-cost plans, books.csv
 Release note: `docs/releases/v5.25.0.md`.
 MINOR (additive; migration `1765700000000_v5-25-0.sql`).

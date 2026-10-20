@@ -144,6 +144,7 @@ const SUMMARIES: Record<string, string> = {
   'POST /candidates/intake': 'A scout sends names for screening',
   'POST /candidates/screen': 'Screen the waiting intake names now (own daily allowance), then rebuild the list',
   'GET /candidates/daily': 'The day\'s candidate list',
+  'GET /candidates/closeouts': 'Ranked closeout and drop-list candidates of a day: eight hard filters with counts, scored offline by the datasave step scorePool; read-only, 409 SNAPSHOT_MISSING without a sealed snapshot',
   'POST /candidates/daily/rebuild': 'Rebuild today\'s candidate list',
   'POST /candidates/{domain}/records': 'Record a manual check (tm_us, history, sellers) for a name',
   'GET /candidates/{domain}/records': 'The records of a name',

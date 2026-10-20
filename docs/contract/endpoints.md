@@ -1,4 +1,4 @@
-# Endpoints (contract v5.25.0)
+# Endpoints (contract v5.26.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -94,6 +94,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/candidates/{domain}/records` | WRITE | Candidates |
 | POST | `/candidates/intake` | WRITE or intake | Candidates |
 | GET | `/candidates/daily` | READ | Candidates |
+| GET | `/candidates/closeouts` | READ or bots | Candidates (5.26.0, CR-072) |
 | POST | `/candidates/daily/rebuild` | WRITE | Candidates |
 | POST | `/candidates/screen` | WRITE | Candidates (3.3.0) |
 | GET | `/candidates/{domain}/records` | READ | Candidates |
@@ -1174,6 +1175,21 @@ WRITE (3.3.0, CR-021). Screens the waiting names now, then rebuilds the day's li
 - **Replays:** a replay with the same key returns the first answer.
 - **Which run ids:** list entries' `run_id` and `summary.screening_run_id(s)` are the **screening** run ids (`steps.onDemandScreen.summary.run_id`, or `steps.intakeScreening.summary.run_id` for the daily run), not the queue run id.
 
+### `GET /candidates/closeouts`
+READ or bots (5.26.0, CR-072). The day's **closeout rows** (the GoDaddy closeouts pool and the sealed Dynadot closeouts upload) or the **kept drop-list names**, minus the hard filters, ranked by the active scoring model (`POST /score`, model v12 or newer), so Buyer reads about 50 rows instead of thousands. **Read-only** (there is no POST; a bots token that tries one gets 403, a WRITE token 404): the filters and the scores are computed **once per day by the `datasave` step `scorePool`** (`jobs.md`), offline (no registry ask, no outside call), and stored with the rows; this route only reads them. Query (strict; an unknown key is 400):
+- `date?` `YYYY-MM-DD`, the **data date** of the snapshot. Default: the newest date with a sealed snapshot for the source (for `drops`: the newest drop list with kept names).
+- `source?` `godaddy` | `dynadot` | `all` | `drops`, default `all` (godaddy plus dynadot).
+- `max_price?` **USD** (`"40"`, `"10.50"`; at most 2 decimals), $0.01..$40, default `40` (the pool cap; `max_price=40.01` is 400). The answer echoes it as `max_price_cents`. Pool rows above it are not in the pool. Ignored for `drops` (no price).
+- `limit?` 1..200, default 50. `limit=500` is 400 `VALIDATION_ERROR`.
+
+**200** `{date, source, max_price_cents, limit, rows, summary}`.
+- `rows[]` (at most `limit`; sorted by `score` descending, a `null` score last, ties by lower `price_cents`, then by name): `{domain, source: "godaddy"|"dynadot"|"drops", price_cents, price ("$10.88"), ends_at, score, rank, filters_passed: true, words, score_reason?}`. `price_cents`, `price` and `ends_at` are `null` for a drop-list name (and `ends_at` for a Dynadot row without one). `words` is the selection split of the name (the `form` check's tokens). `score` is the engine probability of the model (4 decimals); a score that could not be computed is **`score: null` with `score_reason`**, never 0: `NO_ACTIVE_MODEL` (no trained model when the step ran; the row is scored by the first run after a model exists), `SCORE_FAILED`, or `NOT_SCORED_YET` (the step has not processed the row yet; it is listed after every scored row).
+- `summary`: `{pool_n, filtered_by: {CODE: n}, ranked_n, returned_n, snapshot_sha256, sources_present? (all)}`. `pool_n` = rows of the source(s) for the date that are `.com` and at most `max_price`; `filtered_by` has a key for every filter code below (0 when none); **`pool_n - sum(filtered_by) = ranked_n`**; `returned_n` = `rows.length`. `snapshot_sha256` = the `sha256` of the sealed manifest as in `GET /snapshots` (`closeout_listings.json.zip` for `godaddy`, the sealed `bot_upload` for `dynadot`); a map `{godaddy, dynadot}` for `all` (only the sources present); `null` for `drops` (no snapshot).
+- **Hard filters** (first failing code wins, in this order; each name is counted once): `SPELL-1` (the `form` check fails: digit outside a regime code, hyphen, a part no word list explains, too long), `BRAND-1` (the active `brand` list), `BIGCO-1` (the active `bigco` list or a current `bigco_names` row), `TM_KILL` (a current `tm_kills` term), `FORBIDDEN_TERM` (an active `/company/forbidden-terms` term inside the name), `DIGITS_OR_HYPHEN` (a digit or hyphen; the setting `closeouts_filter_digits_hyphen`, default on, changed by migration only), `OWNED` (the name is in the portfolio), `SALES_GRADED` (the name has a reported sale: `POST /engine/sales` or a sold market episode, `POST /data/sales`). A term matches a whole word or a run of consecutive words of the name (the same rule as the screening `brand_lists` check), or the whole name. Geo words (city, state) never make a brand hit.
+- **`source=drops`** filters and scores the kept names of the date's drop list(s) at read time with the same functions (the list is small); a name seen on a list but already screened stays on the list.
+
+**Errors:** 409 `SNAPSHOT_MISSING` when the date (or the default) has no sealed snapshot for the requested source, with `details {source, date?}`: it is not an empty list. For `all`, it is raised only when no source has a sealed snapshot; a day with only one of them returns that one (see `sources_present`). `source=dynadot` is 409 on every day without a sealed Dynadot closeouts upload. 400 `VALIDATION_ERROR` for a bad query. 401 without a token.
+
 ### `POST /candidates/daily/rebuild`
 WRITE (2.16.0, CR-015 I-4). Rebuilds today's list now, from the runs already done and the fresh domain records (it does not wait for a run). It keeps the day's first order, adds new names and marks changes, as the nightly build does. **201** `{id, day, entries_n, almost_ready_n, upcoming_n, partial, version, rebuilds_today, rebuilds_left_today}` (3.3.1, CR-024 F-3: the contract now says what the code has always answered; read the list with `GET /candidates/daily`). At most **6 a day** (IDT) → 429 `RATE_LIMITED`.
 
@@ -1216,6 +1232,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
 
 **Market data (5.23.0, CR-075):** `APPEND_ONLY` (**405** on PUT, PATCH or DELETE of `/data/sales`; **409** on `POST /data/sales` for a stored `(name, venue, sale_date, source)` sent again with a different price). The `rejects[].reason` of a 422 `POST /data/sales`: `SOURCE_REQUIRED`, `SOURCE_NAMEBIO_FORBIDDEN`, `TIER_REQUIRED`, `TIER_INVALID`, `NAME_INVALID`, `VENUE_INVALID`, `PRICE_NOT_INTEGER_CENTS`, `DATE_INVALID`, `DATE_IN_FUTURE`, `SOURCE_URL_INVALID`, `LISTING_TYPE_INVALID`, `UNKNOWN_FIELD`. Episode labels (`outcome_rule`, not errors): `SOLD_REPORTED`, `SOLD_BIDS`, `UNSOLD_60D`, `UNSOLD_30D`, `SEEN_ONCE`, `DISAPPEARED`, `TOO_SHORT`. `/report` warning `DQ_MARKET_FAIL` (`reports.md`).
+
+**Closeout candidates (5.26.0, CR-072):** `SNAPSHOT_MISSING` (409 from `GET /candidates/closeouts`: no sealed snapshot for that date and source). Filter codes in `summary.filtered_by` (not errors): `SPELL-1`, `BRAND-1`, `BIGCO-1`, `TM_KILL`, `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN`, `OWNED`, `SALES_GRADED`. Row `score_reason`: `NO_ACTIVE_MODEL`, `SCORE_FAILED`, `NOT_SCORED_YET`.
 
 **Daily data save (5.21.0, CR-071):** `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; since 5.22.0 also **HTTP 409** from `POST /snapshots/dynadot` for a sealed (kind, data_date)). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
 
