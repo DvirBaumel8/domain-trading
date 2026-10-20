@@ -5,6 +5,7 @@ status: approved
 owner_bot: dom-architect
 approval: "Dvir 2026-10-20 23:48 IDT freeze exception (via Gavriel)"
 priority: P1
+build_order: 5
 depends_on: []
 supersedes: []
 max_rounds: 2
@@ -22,7 +23,7 @@ Verisign RDAP inside /check, sibling-scan, engineEndings, dropWatch and cohortOu
 ## Rules
 - R-1 `GET /rdap/{domain}` (READ/bots): `{registered: true|false|null, created, expires, registrar, status[], checked_at, cache_age_s, source:"rdap", reason_code?}`. Cache TTL setting (default 24 h); `?fresh=true` forces a lookup within the limit.
 - R-2 `POST /rdap/batch` (bots, read-only, 1..500 names): same rows; cached first, live lookups for the rest.
-- R-3 `GET /tm/{term}` (READ/bots): official free USPTO trademark search only; stores raw JSON, timestamp and query, returns `{term, hits_n, live_marks[], raw_ref, checked_at}`. Risk Gate judges conflicts; DOM never says "clear".
+- R-3 `GET /tm/{term}` (READ/bots): the free no-key USPTO route only (bulk data or search); not TSDR, which answers 401 without a key; stores raw JSON, timestamp and query, returns `{term, hits_n, live_marks[], raw_ref, checked_at}`. Risk Gate judges conflicts; DOM never says "clear".
 - R-4 **Daily limit** per source (settings; RDAP default 200 live lookups/day for bot calls, outside the internal daily steps): a rolling 24-hour window keyed on UTC timestamps, so no reset jump at midnight IDT; `GET /lookups/usage` shows `used, limit, window_start, resets_gradually:true`.
 - R-5 Over the limit: cached answers still served; a needed live lookup returns 429 `LOOKUP_LIMIT` with `retry_after_s`. Never a guessed answer.
 - R-6 **Errors are not zeros:** timeout or source error → `registered:null` / `hits_n:null` with `reason_code` (`TIMEOUT`, `SOURCE_ERROR`, `RATE_LIMITED`).
@@ -40,10 +41,14 @@ Verisign RDAP inside /check, sibling-scan, engineEndings, dropWatch and cohortOu
 - Legal judgment; feeding results into /check or /buy gates (separate CR); non-.com TLD bulk scans beyond the existing sibling scan.
 
 ## Questions (max 3)
-1. Does the free USPTO API need a key? If yes, tell us; Dvir creates no keys, so we'd look for a no-key path.
+1. **Answered (Gavriel):** use the free no-key USPTO route (bulk data or search), not TSDR (401 without a key). If there is truly no other way, say so in your response; no key gets created.
 2. Can the internal steps share this cache (one cache), and should they count against the limit?
 
 ## DVIR items
 None.
+
+## Changes
+- 2026-10-20 23:55 IDT: R-3, Q1: USPTO via the free no-key route (bulk data or search), not TSDR; no key gets created (Gavriel's answers, 2026-10-20 ~23:53 IDT).
+- 2026-10-20 23:55 IDT: build_order 5: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 
 <!-- DOM writes below this line -->

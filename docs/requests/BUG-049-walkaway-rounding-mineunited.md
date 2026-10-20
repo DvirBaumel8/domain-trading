@@ -1,7 +1,8 @@
 ---
 id: BUG-049
 kind: BUG
-status: approved
+status: closed
+close_reason: "working as intended: nearest-$5 walk-away (round5) is the contract rule; $715 stands; Sales and the ledger match $715 (Gavriel 2026-10-20 ~23:53 IDT)"
 owner_bot: dom-architect
 approval: D-2026-10-20-D005-PRICE
 priority: P3

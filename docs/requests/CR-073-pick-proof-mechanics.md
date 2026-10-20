@@ -5,6 +5,7 @@ status: approved
 owner_bot: dom-architect
 approval: "Dvir 2026-10-20 23:48 IDT freeze exception (via Gavriel)"
 priority: P1
+build_order: 4
 depends_on: [CR-071, CR-072]
 supersedes: []
 max_rounds: 2
@@ -45,5 +46,8 @@ Seeded MT19937 / Fisher-Yates recipe (CR-008), test-set seals, cohorts with 30/6
 
 ## DVIR items
 None.
+
+## Changes
+- 2026-10-20 23:55 IDT: build_order 4: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 
 <!-- DOM writes below this line -->
