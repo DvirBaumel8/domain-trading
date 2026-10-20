@@ -49,6 +49,7 @@ None.
 
 ## Changes
 - 2026-10-20 23:55 IDT: build_order 3: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
+- 2026-10-21 00:00 IDT: DOM response accepted; Dynadot rows come from the bot upload asked for in CR-071 (Gavriel).
 
 <!-- DOM writes below this line -->
 
