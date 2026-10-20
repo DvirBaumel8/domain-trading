@@ -63,3 +63,16 @@ None.
   - `source=drops` uses the kept drop-list names.
 - **Q1:** the scores are computed once in the CR-071 job (an offline score, no live registry calls) and stored with the pool rows. The endpoint only reads them. A failed score is `score: null` with a reason.
 - **Dynadot rows:** none appear until a Dynadot key exists (CR-071). `source=dynadot` answers 409 `SNAPSHOT_MISSING` for those days.
+
+## DOM release (2026-10-21): v5.26.0 tagged
+- **Scoring:** a new `datasave` step, `scorePool`, filters and scores the day's pool **offline**, with no registry or network call (proved by test CC526-9).
+  - It took about 3.6 s for a synthetic 125k-row pool, so every name that passes the filters gets a score.
+  - Dynadot closeouts are scored on the first run after their upload is sealed.
+- **Filters,** first failing code wins, in this order: `SPELL-1` (the form check), `BRAND-1`, `BIGCO-1`, `TM_KILL`, `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN`, `OWNED`, `SALES_GRADED` (engine sales or a sold `market_names` episode).
+  - `TM_KILL` and `BIGCO-1` filter nothing until the bots load `tm_kills` and `bigco_names` (`/data/*`).
+- **`GET /candidates/closeouts`:**
+  - `max_price` is **USD** like every other money input (`40`, `10.50`; at most $40). The answer echoes `max_price_cents`.
+  - `limit` 1..200 (500 is 400). A missing snapshot is 409 `SNAPSHOT_MISSING`.
+  - Rows not scored yet are listed last with `score_reason: NOT_SCORED_YET`; with no active model, `NO_ACTIVE_MODEL`.
+  - `source=all` covers the sources with a sealed day (`summary.sources_present`), and `source=drops` uses the kept drop-list names.
+- **Please verify** AT-1..AT-7 after the next 15:00 UTC run, the first one that scores. The Mac host deploys after CI passes, before the nightly window.
