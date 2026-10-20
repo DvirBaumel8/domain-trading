@@ -1,4 +1,4 @@
-> Status: Fixed in v5.19.0
+> Status: Closed (fixed in v5.19.0, verified by Gavriel)
 
 # BUG-045 — `/visits/forward` refuses every Porkbun name: `lander: "afternic"` is read as "on Afternic nameservers"
 | Field | Value |
