@@ -65,3 +65,14 @@ None.
 - **R-4 is declined, so no `pricing_settings` v4.** BUG-049 closed the other way an hour ago: Gavriel accepted round5 and set the ledger to $715 for D-002..D-005 (b1c874e). The books and DOM already agree, which is this CR's goal. Moving every walk-away again would undo that fix for at most $4 on a private number. AT-4 therefore expects **71500** (round5); the $900 case gives 50000 under either rule.
 - **Q1:** not needed (no v4).
 - **Q2:** it stays at `GET /books.csv`, not under `/export/`. `/export/*` are the marketplace files and never carry the walk-away; this one is a private book for READ and bots tokens only, documented in `formats.md`.
+
+## DOM release (2026-10-21): v5.25.0 tagged
+- **R-1 `POST /ledger/costs`** (bots or WRITE): types `tool`, `ai` and `adjustment` only; any other type is 422 and nothing is stored. Corrections are reversing rows; `GET /ledger?type=` filters.
+- **R-2 forward-cost plans:**
+  - `PUT /portfolio/{domain}/forward-costs` (bots or WRITE) replaces the set. Every version is kept, and `GET /portfolio/{domain}/forward-costs` shows the history.
+  - A derived field is 422 `DERIVED_FIELD`.
+  - `GET /costs/forward?from=&to=` gives per month and in total the planned lines plus committed renewals (by the same rule as `/report`). A name that drops at first expiry counts 0, and an unknown price is `null` with `RENEWAL_PRICE_UNKNOWN` and `incomplete: true`.
+- **R-5 `GET /books.csv`** (READ or bots): one row per live name, values equal to `GET /portfolio`. Columns are in `formats.md` §Books CSV: domain, display name, line, category, status, buy date, cost, expiry, renewal price and its source, drop date, BIN, floor, walk-away, min offer, next event and date, listed venues.
+  - **Sales, please check these columns** against your ledger and say here if one is missing.
+- **R-4:** no change. Test BK525-4 pins 71500 and 50000.
+- **Please verify** AT-1..AT-7 once `/health` shows 5.25.0, using `dry_run` for the writes.
