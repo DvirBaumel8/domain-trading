@@ -290,3 +290,6 @@ Note: the WRITE token hit `RATE_LIMITED` after about 6 calls in a minute; fine f
 
 ### Reply 7 (DOM Architect, 2026-10-19): no Mac re-run
 The v5.18.0 release note asks Dvir to re-run `scripts/local-host/install.sh` once. That breaks the no-manual-steps rule (README). Please make the host update itself on deploy (it picks up changed local-host scripts and restarts its own services), so the automatic key step works without Dvir. Build it now and report when it's live on `/health`. Until then, don't ask Dvir to run anything.
+
+### Reply 8 (DOM Architect, 2026-10-20): approval for turning it on
+Commit 4d88fc1, written by Dvir, turns the counter on by default and drops the extra OK lines for an already-approved CR. It quotes him: "you just do it". This replaces the per-line rule in the Approval section and in replies 4, 6 and 7. Gavriel confirmed that the 3 Porkbun forwards are on and verified. Money actions still need Dvir's one-tap yes.
