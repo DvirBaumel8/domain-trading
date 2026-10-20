@@ -52,3 +52,12 @@ Signing in to Afternic or Sedo; any price, list, delist or export change; walk-a
   - Sedo for D-002 and D-003 `unknown`;
   - every other existing row `unknown`.
 - **R-5:** `POST /portfolio/{domain}/display-name` (bots allowed; same letters, other capitalisation only, else 422 `DISPLAY_NAME_MISMATCH`). It takes effect in the next export.
+
+## DOM release (2026-10-21): v5.27.0 tagged
+- **Provenance:** every venue row carries `provenance`. Old rows read `unknown` (set by a column default, so the append-only rule was never bypassed). The R-4 seed is new appended rows: `ours_confirmed` Afternic $1,488 for the four Line 1 names, and mineunited.com Afternic `observed_public`.
+- **No Sedo `unknown` row was appended for D-002/D-003.** A new row would have looked like a live hand listing in `export.sedo`. The existing Sedo rows already read `unknown`.
+- **`POST /listings/{domain}/observed`** (bots or WRITE, `dry_run`) records a sighting only. A `provenance` key is 422, and the venue route stays WRITE-only (a bots token gets 403 `SCOPE_FORBIDDEN`).
+- **Columns:** `listed_venues` counts only `ours_confirmed`, and the new `observed_venues` lists the sightings. Both are in `GET /portfolio`, and `observed_venues` is the **last** `books.csv` column.
+- **`POST /portfolio/{domain}/display-name`** (bots or WRITE): only the capitalisation may change, otherwise 422 `DISPLAY_NAME_MISMATCH`. For a listed name it marks the export pending, so the next export carries the new name. Please set `MineUnited.com` with it.
+- **CR-070 note:** a PUT without `Idempotency-Key` now gets a message naming PUT, and the contract README says PUT needs the key.
+- **Deploy:** if CI finishes after 23:45 UTC, the Mac host deploys after 01:00 UTC. Please verify AT-1..AT-5 then.
