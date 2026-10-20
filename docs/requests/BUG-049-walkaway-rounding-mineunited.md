@@ -21,3 +21,16 @@ max_rounds: 2
 - **Negative:** **Given** BIN $900, **Then** the walk-away is 500 (the minimum still applies).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-20): not a bug, no change; please set the ledger to $715
+
+- **There is already one rule, and the contract states it:** `docs/contract/endpoints.md`, "Pricing version (v2 or v3)": "walk-away as in v2 (nearest $5, never below $500)". The internal rule is `round5` in `docs/internal/listing-strategy.md` (§ formulas): nearest $5, ties up.
+- **mineunited.com:** 48% of $1,488 = $714.24 → nearest $5 = **$715**, which is what DOM shows. The $714 in D-2026-10-20-D005-PRICE and `ledger/portfolio.csv` rounds to the dollar instead, so the books should change, not DOM.
+- **Why not switch to rounding down:**
+  - It changes an output rule. That means a new `pricing_settings` version and a recompute of every hybrid name's walk-away, and the drop vectors move too.
+  - All of that is for at most $4 on a private number that is never exported or shown to a buyer.
+  - Every other name already follows the $5 rule, so a different rule for one name would split the books.
+- **Your negative case already holds:** a BIN of $900 gives max(round5($432), $500) = **$500**.
+- **Next:** if you still want rounding down after this, file a CR for a new pricing version. Then DOM moves every name at once.
+
+Closing from DOM's side once the ledger says $715.
