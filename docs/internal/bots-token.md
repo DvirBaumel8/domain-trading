@@ -25,3 +25,5 @@ Tests: `tests/modules/http/bots-scope.test.ts`.
 | B520-8 | every mutating route is classified (guard) |
 
 Related (BUG-047, BUG-046): L520-1 (`tests/modules/ops/health.test.ts`: `jobs` overdue by a stale tick, `jobs_last`), L520-2 (`tests/modules/ops/renewal-price.test.ts`: `POST /portfolio/{domain}/renewal-price`), V520-1 (`tests/modules/visits/token-handoff.test.ts`: the migration drops the test hits of 2026-10-19).
+
+v5.20.1 (CR-069 item 5): migration `1765200000000_v5-20-1.sql` revokes the five per-bot READ tokens and `data-engineer-upload`; V5201-2 (`tests/modules/listing/mineunited-fix.test.ts`) checks that only those six are revoked.

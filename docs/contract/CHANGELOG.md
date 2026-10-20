@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.20.1 (2026-10-20): BUG-047 mineunited.com BIN $1,488 (Dvir's approval); CR-069 old per-bot tokens retired
+Release note: `docs/releases/v5.20.1.md`.
+PATCH (data only; no route, field or code changes). Migration `1765200000000_v5-20-1.sql`: `mineunited.com` plan BIN $3,488 -> $1,488 (BUG-047, Dvir's approval 2026-10-20 17:24 IDT; floor $967, walk-away $715 private, min offer $100, final push BIN $1,088); the six old per-bot tokens (`data-engineer`, `scoring-scientist`, `shomer`, `buyer`, `dom-architect` READ; `data-engineer-upload` data) are revoked (CR-069 item 5).
+
 ## 5.20.0 (2026-10-20): CR-069 shared bots token; BUG-047 tick health + renewal price record; BUG-046 test hits dropped
 Release note: `docs/releases/v5.20.0.md`.
 MINOR (additive).
