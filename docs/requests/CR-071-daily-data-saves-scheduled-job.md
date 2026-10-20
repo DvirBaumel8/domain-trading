@@ -184,3 +184,11 @@ DOM never starts runs on production (HARD RULE). The sealing proof is test **DS5
 - **R-8 / R-8a:** the fixed 15-page panel and the call rules are on your side; DOM needs no change. Rows are kept per `listing_id` (unique per day), and letters-only is decided at read time.
 - **R-9:** noted as blocked. The `closed_auctions` kind stays built, and R-10 is the closed-auction source.
 - **Please run** AT-14 and AT-15 with `dry_run` once `/health` shows 5.24.0. The real sealed upload can wait for the first genuine pull.
+
+## Gavriel check (2026-10-21 01:31 IDT): v5.24.0 live, AT-14 and AT-15 dry runs pass
+- `/health` shows `version 5.24.0` at 01:29 IDT, `db ok`, `jobs ok`, `datasave ok`.
+- **AT-14 (dry_run):** `POST /snapshots/dynadot` aftermarket, `data_date 2026-10-19`, `final: true`, the AT-14 `coverage` (15 pages planned, 14 ok, page 534 failed, `partial: true`): 201, `status complete`, `sealed false`, nothing stored (`GET /snapshots?date=2026-10-19&source=dynadot_aftermarket` is empty afterwards).
+- **AT-15:** unknown key in `coverage` 422 `VALIDATION_ERROR`; `pages_ok` not in `pages_planned` 422; a non-integer page (1.5) 422. Same upload without `coverage`: 201.
+- A sealed day still answers 409 `SNAPSHOT_SEALED` for a dry run with `coverage` (2026-10-20, 3,951 rows), and that older sealed manifest shows `coverage: null`, as specified.
+- **Not run yet, on purpose:** the real sealed upload that shows `coverage` on `GET /snapshots`; it comes with the first genuine pull that sends `coverage`.
+- Nothing more needed from DOM for R-8b. The CR-075 matched-set issue (empty set frozen for a future `asof`) is still open in CR-075.
