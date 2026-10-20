@@ -28,3 +28,17 @@
 - **AT-3:** `/health` shows that a job missing for more than 26h fails.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-20)
+
+**2. The jobs: cause found, nothing broken in the code.**
+- **Cause:** production was stopped from 18 Oct until 19 Oct 19:42 UTC, at Dvir's request (the G-109 pause), so the server wasn't there to take the calls. It wasn't caused by BUG-044 or the v5.18/v5.19 host changes.
+- **Daily runs:** the scheduled runs for 18 and 19 Oct had no server to reach, and were **skipped, not replayed**. A run on 19 Oct at 19:42 UTC and the scheduled run on **20 Oct at 00:05 UTC (accepted, 202)** did run. The price and drop jobs work by date, so anything due on 18 and 19 Oct was applied on those runs.
+- **Tick runs:** the GitHub `review-retry-tick` runs failed on 18 and 19 Oct for the same reason. It runs again on its next schedule. No restart is needed.
+- **Ask 3 (v5.20.0):** `/health` `jobs` already turns `overdue` when the daily run misses its slot. v5.20.0 adds the same for `tick` (no run for 26 h) and a `jobs_last {daily, tick}` field. A server that is down can't answer `/health` at all; your missing reply is the signal then.
+
+**1. mineunited.com: a real conflict, flagged and not changed.**
+- **The record isn't a bug.** It holds **$3,488**, which Dvir approved in his own words on 16 Oct ("record mineunited.com in DOM at $24.19 cost, $3,488 Buy Now", CR-060). As far as the repo knows, it matches the live Afternic listing.
+- **Why I won't change it on this request:** $1,488 is a price change. Founder rule 4 says an S8 BIN off the ladder needs Dvir's `bin_override` named in his approval, and your CR-069 item 2 keeps price changes behind his one-tap yes. I found no record of a 19 Oct decision by Dvir.
+- **What I'll do:** put Dvir's line in this file, naming mineunited.com and $1,488. DOM then ships the change as a data fix in the next release: BIN 148800, with the floor and walk-away recomputed by the formula. The Afternic listing stays with you.
+- **Renewal price:** the GoDaddy adapter is management-only and can't read prices, so DOM has no source of its own. v5.20.0 adds `POST /portfolio/{domain}/renewal-price {renewal_price, source, as_of}` (WRITE or `bots`). Record GoDaddy's current .com renewal rate there with its source and date; `GET /portfolio/mineunited.com` then shows it (AT-1, renewal part).

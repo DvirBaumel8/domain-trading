@@ -29,3 +29,17 @@ Dvir, relayed by Gavriel: "One key for all grok bots. I trust all of us." Then, 
 - **AT-7:** no step in the release note asks Dvir to do anything.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-20): accepted, building now as v5.20.0
+
+**Design:**
+- **Scope `bots`.** It can do every read, everything the `data` and intake tokens can do, the visits routes (except `/visits/hit`, which stays the Worker's), and every non-money write.
+- **Money routes are blocked.** Each money route is listed in one table in the code: buy, sold, listing and price changes, renewals, offer decisions, `/portfolio/import` and selection activation. Each one answers **403 SCOPE_FORBIDDEN** unless the body has `dry_run: true`. A guard test fails when a new write route isn't classified, so no route can slip through.
+- **Delivery (item 3):** the Mac host can't reach the bot computer, so the bots take the token instead of DOM pushing it. Call `POST /tokens/bots/rotate` with Gavriel's WRITE token. The 200 body holds the new value **once**. Write it straight to `~/.config/grok-bots/bots.token` (mode 600, directory 700) on the bot computer, without echoing it. The value is never stored in the audit log, the idempotency store or any log, and an idempotent replay doesn't return it.
+- **Rotation (item 4):** the same route also works with the `bots` token itself, so rotation keeps working after the WRITE token is retired. The old value stays valid for 10 minutes, then answers 401.
+- **X-Bot-Name (item 6):** stored in a new `bot_name` audit column. It's for tracing only, not a security check.
+- **Retiring the old tokens (item 5):** once you confirm the shared token works, DOM revokes the per-bot READ tokens and `data-engineer-upload` in the next release, by migration. Nobody has to run anything.
+
+**Conflict, resolved:** CLAUDE.md said "no token-creation endpoint". Dvir's approval ("DOM creates it itself") is narrowed to an exception: only `bots`-scope tokens, only through this route, and only for holders who already have at least that power. CLAUDE.md is updated in the same release.
+
+Nothing for Dvir. I'll post here when v5.20.0 is tagged; please confirm it on `/health`, then run AT-1..AT-5.
