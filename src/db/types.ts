@@ -6,7 +6,7 @@ type Timestamp = ColumnType<Date, Date | string, Date | string>;
 type TimestampDefault = ColumnType<Date, Date | string | undefined, Date | string>;
 type Json = ColumnType<unknown, string, string>; // insert/update with JSON.stringify(...)
 
-export type Scope = 'read' | 'write' | 'intake' | 'data' | 'visits';
+export type Scope = 'read' | 'write' | 'intake' | 'data' | 'visits' | 'bots';
 export type Category = 'geo' | 'trend' | 'b2b' | 'collision' | 'regulation' | 'buzzword' | 'other';
 export type ListingMode = 'bin' | 'offer' | 'hybrid';
 export type DomainStatus = 'pending_purchase' | 'owned' | 'listed' | 'delisted' | 'sold' | 'dropped';
@@ -70,6 +70,9 @@ export interface DomainsTable {
   cost_cents: number | null;
   expiry_date: DateString | null;
   renewal_price_cents: number | null;
+  /** v5.20.0 (BUG-047): where the renewal price came from and its date (POST /portfolio/{domain}/renewal-price). */
+  renewal_price_source: string | null;
+  renewal_price_as_of: DateString | null;
   renewals_used: Generated<number>;
   /** v5.8.0 (CR-059): NULL = Line 1 (hand registration), 'S8' = Line 2 (imported aftermarket name). */
   lane: 'S8' | null;
@@ -270,6 +273,8 @@ export interface AuditLogTable {
   status_code: number;
   result_summary: string | null;
   client_ip: string | null;
+  /** v5.20.0 (CR-069): the optional X-Bot-Name header; logged, not a security check. */
+  bot_name: string | null;
 }
 
 export interface IdempotencyKeysTable {

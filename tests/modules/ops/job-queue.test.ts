@@ -239,6 +239,8 @@ describe('JOB_OVERDUE and the guard', () => {
     release();
     await app.jobQueue.idle();
     expect((await testDb.selectFrom('job_runs').select('ok').executeTakeFirstOrThrow()).ok).toBe(false);
+    expect(await jobs()).toBe('overdue'); // v5.20.0 (BUG-047): a fresh daily alone is not enough, the tick must have run too
+    await testDb.insertInto('job_runs').values({ job: 'tick', trigger: 'scheduled', started_at: new Date(), finished_at: new Date(), skipped: false, ok: true, steps: '{}' }).execute();
     expect(await jobs()).toBe('ok');
   });
 

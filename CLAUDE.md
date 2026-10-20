@@ -101,7 +101,7 @@ Every piece of work follows this loop.
 - **Self-improve:** the top items go into `docs/internal/gaps.md` and the next release. A lesson about how DOM works updates this file, the skills or memory the same day. Each loop checks whether the previous loop's changes helped.
 
 ## Don't
-- Don't add a frontend, a token-creation endpoint, multi-year registration, auto-renew ON, marketplace scraping, or automation of undocumented website endpoints.
+- Don't add a frontend, a token-creation endpoint (**one narrow exception, Dvir 20 Oct 2026, CR-069: `POST /tokens/bots/rotate`, which makes only a `bots`-scope token and only for a WRITE or bots caller**), multi-year registration, auto-renew ON, marketplace scraping, or automation of undocumented website endpoints.
 - Don't add a settings-write endpoint for caps or `pricing_settings` (admin command or migration only). **Exception (CR-001 P-8):** selection settings may be drafted via the API (WRITE) and activated only with Dvir's `approval_ref`.
 - Don't let the price job touch registrars, marketplaces or nameservers, or send anything: it only changes DB rows and flags the export.
 - Don't put a real key, token or personal address in code, fixtures, logs or commits.

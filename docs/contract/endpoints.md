@@ -1,4 +1,4 @@
-# Endpoints (contract v5.19.1)
+# Endpoints (contract v5.20.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -42,6 +42,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | GET | `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/deals/{id}`, `/audit` | READ | Reads |
 | GET | `/portfolio/outcomes`, `/portfolio/outcomes/monthly`, `/portfolio/outcomes/quarterly` | READ | Portfolio outcomes (4.0.0) |
 | POST | `/portfolio/{domain}/horizon`, `/portfolio/{domain}/stats` | WRITE | Portfolio outcomes (4.0.0) |
+| POST | `/portfolio/{domain}/renewal-price` | WRITE or bots | Portfolio outcomes (5.20.0, BUG-047) |
+| POST | `/tokens/bots/rotate` | WRITE or bots | Health (Shared bots token, 5.20.0, CR-069) |
 | POST | `/portfolio/import` | WRITE | S8 import lane (5.8.0, CR-059) |
 | POST | `/outreach/emails` | WRITE | Outreach log (4.0.0) |
 | GET | `/outreach/emails/summary` | READ | Outreach log (4.0.0) |
@@ -94,7 +96,7 @@ The only public route. No auth, no DB access (Render's health check uses it). **
 - **200** `{"status":"ok"}`.
 
 ### `GET /openapi.json`
-READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024: itself included; every POST has a `requestBody`, or `x-no-body: true` when it takes none): method, path, `x-scope` (`none`, `read`, `write`, `write or intake`, `write or intake or data`, `write or data`, `write or job-trigger token`), a one-line summary, path parameters, and the request body's JSON schema where the route has one. A test keeps it equal to the registered routes and this route table. This contract stays the binding text; the document is a convenience.
+READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024: itself included; every POST has a `requestBody`, or `x-no-body: true` when it takes none): method, path, `x-scope` (`none`, `read`, `write`, `write or intake`, `write or intake or data`, `write or data`, `write or bots` (5.20.0), `write or job-trigger token`), a one-line summary, path parameters, and the request body's JSON schema where the route has one. A test keeps it equal to the registered routes and this route table. This contract stays the binding text; the document is a convenience.
 
 ### `GET /health`
 Any valid bot token (READ or WRITE).
@@ -104,8 +106,12 @@ Any valid bot token (READ or WRITE).
 - `review_reason` (3.1.0): present only when `review` is `failed`: Google's status and short reason from the latest review, never a key. 3.2.0 (CR-017 N-4): `CODE: text`, where CODE is Google's status (e.g. `UNAVAILABLE`) or `HTTP <n>`; at most **200 characters**, cut at a word and ending with `…` when longer.
 - `jobs` is also `overdue` (3.1.0) when `JOB_MISSED` or `JOB_RUN_INCOMPLETE` applies.
 - `review` (2.11.0, additive; `disabled` and `review_model` 2.11.2): `disabled` (the switch is off), `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
+- `jobs_last` (5.20.0, BUG-047, additive): `{daily: ISO | null, tick: ISO | null}`, when each scheduled job last ran (a run counts from the moment it was created; `null` = never). `jobs` is also `overdue` when no `tick` run was created in the last 26 hours (a job that missed its schedule for more than 26 h fails `jobs`, so the next day shows it).
 - `jobs` (2.1.0, additive) is `overdue` when no `daily` run has finished in the last 26 hours (the same rule as the `/report` warning `JOB_OVERDUE`), else `ok`. A run started by hand counts. `GET /health/ping` is unchanged (no DB).
 - `version` is the service build version (`package.json`), not the contract version. The only scheduled job is the daily run at 00:05 UTC (`jobs.md`); its rows are in `GET /audit` (scope `job`). No secret, key prefix or balance is ever shown.
+
+### `POST /tokens/bots/rotate`
+WRITE or bots (5.20.0, CR-069). The only token-creation route: it can make only a `bots`-scope token named `bots-shared`, and only a WRITE token or a bots token (self-rotation) may call it; anyone else 403 `SCOPE_FORBIDDEN`. No body. Idempotency-Key required, audited, normal POST rate limit. **200** `{token, expires_old_at, audit_id}`: `token` is the new raw value, shown **once** (the audit row and the idempotency store never hold it); `expires_old_at` is when the previous `bots-shared` token stops working (10 minutes from now, so a bot that has not picked up the new value keeps working meanwhile) or `null` when there was none. A **replay** of the same Idempotency-Key answers **200** `{token: null, expires_old_at, note: "already rotated; ...", audit_id}`: rotate again with a new key for a new value. The scope table is in `README.md` (Who may call). DOM retires the older per-bot READ tokens and the `data-engineer-upload` token by a later migration, once Gavriel confirms the shared token works.
 
 ---
 
@@ -389,7 +395,7 @@ READ. `{id, domain, strategy, status_note, created_at, approvals: [{audit_id, at
 ### `GET /audit`
 READ. Newest first.
 - **Query (strict):** `since` (ISO with offset), `limit` (1–500, default 100).
-- **200:** `{rows: [{id, at, token_id, token_name (2.16.0; the admin name of the token, never its secret; null for job and admin rows), scope: "read"|"write"|"intake"|"data"|"job"|"admin"|null, method, path, idempotency_key, approval_text, approval_at, request (the redacted request as a JSON object, or null; not a string), status_code, result_summary, client_ip}]}`. Job runs appear with scope `job` (`path` `/jobs/run`, or `job tick|daily` for a CLI run). **Large lists (5.14.0):** in `request`, any array of more than 50 items (at any depth; drop-list rows, test-set or labelled names, intake lists, document sections) is stored as the string `"[N items, sha256:<hex>]"`, N the count and the hash taken over the array's JSON, so a call can still be matched to what was sent; an upload to `/engine/*` or `/data/*` keeps its `"[N rows]"` form. Approval text and time are never elided.
+- **200:** `{rows: [{id, at, token_id, token_name (2.16.0; the admin name of the token, never its secret; null for job and admin rows), scope: "read"|"write"|"intake"|"data"|"visits"|"bots"|"job"|"admin"|null, method, path, idempotency_key, approval_text, approval_at, request (the redacted request as a JSON object, or null; not a string), status_code, result_summary, client_ip, bot_name (5.20.0, CR-069: the optional X-Bot-Name header of the call, else null)}]}`. Job runs appear with scope `job` (`path` `/jobs/run`, or `job tick|daily` for a CLI run). **Large lists (5.14.0):** in `request`, any array of more than 50 items (at any depth; drop-list rows, test-set or labelled names, intake lists, document sections) is stored as the string `"[N items, sha256:<hex>]"`, N the count and the hash taken over the array's JSON, so a call can still be matched to what was sent; an upload to `/engine/*` or `/data/*` keeps its `"[N rows]"` form. Approval text and time are never elided.
 - **Errors:** 400 `VALIDATION_ERROR`.
 
 ---
@@ -415,6 +421,9 @@ WRITE. Body (strict) `{horizon: "evergreen" | "trend" | "regulation", approval_r
 
 ### `POST /portfolio/{domain}/stats`
 WRITE. Append-only. Body (strict) `{as_of: YYYY-MM-DD (not in the future), month?: YYYY-MM (default the month of as_of), venue?: "afternic" | "sedo" | "sellerhub" (default afternic), views?, leads?, inquiries?, offers?: int >= 0, source: string 1..100}`; at least one count is required. **201** `{id, domain, as_of, month, venue, views, leads, inquiries, offers, source, audit_id}`. Errors: 404 `DOMAIN_NOT_FOUND`, 422 `VALIDATION_ERROR`, 422 `NO_PII` (`source` with `@`).
+
+### `POST /portfolio/{domain}/renewal-price`
+WRITE or bots (5.20.0, BUG-047). Not a money action: it records a number, buys and changes nothing at a registrar or venue. Body (strict) `{renewal_price: string "11.08" (a leading $ is allowed, above zero, at most 2 decimals), source: string 1..200 (no @), as_of: YYYY-MM-DD (a real date, not in the future)}`. Sets the name's renewal price (the number `/report` uses for forward renewal cost and the `RENEWAL_PRICE_UNKNOWN` warning) and stores its source and date; a second call replaces them. **200** `{domain, renewal_price_cents, renewal_price, previous_renewal_price_cents, renewal_price_source, renewal_price_as_of, audit_id}`. `GET /portfolio/{domain}` shows `renewal_price_source` and `renewal_price_as_of` (null when never recorded). Errors: 404 `DOMAIN_NOT_FOUND`, 422 `VALIDATION_ERROR`, 422 `NO_PII` (`source` with `@`).
 
 ## S8 import lane (5.8.0, CR-059; pricing, overrides and expiry window changed in 5.9.0, CR-060)
 

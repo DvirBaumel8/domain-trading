@@ -102,6 +102,13 @@ function extractApproval(body: Record<string, unknown> | null): { text: string |
   };
 }
 
+/** v5.20.0 (CR-069): the optional X-Bot-Name header, trimmed, at most 40 characters of [A-Za-z0-9 _.-]; anything else is ignored. Logged, not a security check. */
+export function botNameOf(req: FastifyRequest): string | null {
+  const h = req.headers['x-bot-name'];
+  const v = typeof h === 'string' ? h.trim() : '';
+  return v.length >= 1 && v.length <= 40 && /^[A-Za-z0-9 _.-]+$/.test(v) ? v : null;
+}
+
 function idempotencyKeyOf(req: FastifyRequest): string | null {
   const key = req.headers['idempotency-key'];
   return typeof key === 'string' ? key.slice(0, 255) : null;
@@ -140,6 +147,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
         status_code: reply.statusCode,
         result_summary: replayed ? `replayed:${summary}` : summary,
         client_ip: req.ip,
+        bot_name: botNameOf(req),
       });
       return payload;
     } catch (err) {

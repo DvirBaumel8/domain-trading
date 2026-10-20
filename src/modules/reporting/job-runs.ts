@@ -67,6 +67,22 @@ export async function dailyScheduleState(db: Kysely<Database>, nowMs: number): P
   return { stuck, missed };
 }
 
+/** v5.20.0 (BUG-047): when a job last ran, counted from the moment its run was created (queue) or started (runs from before the queue); a skipped overlap is not a run. Null when it never ran. */
+export async function lastJobRunAt(db: Kysely<Database>, job: 'daily' | 'tick'): Promise<Date | null> {
+  const [q, j] = await Promise.all([
+    db.selectFrom('job_queue_runs').select((eb) => eb.fn.max('created_at').as('at')).where('job', '=', job).executeTakeFirst(),
+    db.selectFrom('job_runs').select((eb) => eb.fn.max('started_at').as('at')).where('job', '=', job).where('skipped', '=', false).executeTakeFirst(),
+  ]);
+  const times = [q?.at, j?.at].filter((d): d is Date => d != null);
+  return times.length ? new Date(Math.max(...times.map((d) => d.getTime()))) : null;
+}
+
+/** v5.20.0 (BUG-047): true when no tick run was created in the last JOBS_OVERDUE_HOURS (never run counts as overdue). */
+export async function tickOverdue(db: Kysely<Database>, nowMs: number): Promise<{ overdue: boolean; lastRunAt: Date | null }> {
+  const last = await lastJobRunAt(db, 'tick');
+  return { overdue: last === null || nowMs - last.getTime() > JOBS_OVERDUE_HOURS * HOUR, lastRunAt: last };
+}
+
 /** The last daily run that finished (a skipped overlap is not a run), or null. */
 async function lastDailyFinished(db: Kysely<Database>): Promise<Date | null> {
   const r = await db.selectFrom('job_runs').select('finished_at').where('job', '=', 'daily').where('skipped', '=', false)

@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 import type { Config } from '../../../config.js';
+import { toJerusalemIso } from '../../../core/dates.js';
 import { scrubSecrets } from '../../../core/redact.js';
 import { pingDb } from '../../../db/client.js';
 import type { Database } from '../../../db/types.js';
 import { adapterStatus } from '../../registrars/index.js';
 import { currentReviewSettings } from '../../outreach/index.js';
-import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, dailyScheduleState, jobsOverdue } from '../../reporting/index.js';
+import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, dailyScheduleState, jobsOverdue, lastJobRunAt, tickOverdue } from '../../reporting/index.js';
 
 export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, kickQueue?: () => Promise<void>, storageLimitBytes: number = NEON_FREE_STORAGE_BYTES): void {
   // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
@@ -18,8 +19,9 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
     const dbOk = await pingDb(db);
     if (dbOk) await kickQueue?.(); // resumes unfinished job steps when this process has no worker running (cheap check)
     // v5.14.0: the independent reads run together, and the review settings are read once for both the state and the model
-    const [jobs, review, size] = await Promise.all([
+    const [jobs, jobsLast, review, size] = await Promise.all([
       dbOk ? jobsState(db, now()) : Promise.resolve('unknown'),
+      dbOk ? jobsLastRun(db) : Promise.resolve({ daily: null, tick: null }),
       reviewState(db, config),
       dbOk ? dbSize(db, storageLimitBytes) : Promise.resolve(null),
     ]);
@@ -27,6 +29,8 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       status: dbOk ? 'ok' : 'degraded',
       db: dbOk ? 'ok' : 'down',
       jobs,
+      // v5.20.0 (BUG-047): when the daily and the tick job last ran (ISO, Asia/Jerusalem offset); null = never
+      jobs_last: jobsLast,
       review: review.state,
       ...(review.state === 'failed' ? { review_reason: review.reason } : {}),
       review_model: review.model,
@@ -49,8 +53,13 @@ async function dbSize(db: Kysely<Database>, limitBytes: number): Promise<{ bytes
 }
 
 async function jobsState(db: Kysely<Database>, nowMs: number): Promise<'ok' | 'overdue'> {
-  const [sched, overdue] = await Promise.all([dailyScheduleState(db, nowMs), jobsOverdue(db, nowMs)]);
-  return overdue.overdue || sched.missed || sched.stuck ? 'overdue' : 'ok';
+  const [sched, overdue, tick] = await Promise.all([dailyScheduleState(db, nowMs), jobsOverdue(db, nowMs), tickOverdue(db, nowMs)]);
+  return overdue.overdue || tick.overdue || sched.missed || sched.stuck ? 'overdue' : 'ok';
+}
+
+async function jobsLastRun(db: Kysely<Database>): Promise<{ daily: string | null; tick: string | null }> {
+  const [daily, tick] = await Promise.all([lastJobRunAt(db, 'daily'), lastJobRunAt(db, 'tick')]);
+  return { daily: daily ? toJerusalemIso(daily) : null, tick: tick ? toJerusalemIso(tick) : null };
 }
 
 /**

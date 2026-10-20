@@ -9,6 +9,8 @@ import { toJerusalemIso } from '../core/dates.js';
 declare module 'fastify' {
   interface FastifyRequest {
     idem: { key: string; claimed: boolean } | null;
+    /** v5.20.0 (CR-069): when a handler sets it, the idempotency store keeps this body instead of the real one (a secret must never be replayed). */
+    idemReplayBody: string | null;
   }
 }
 
@@ -35,6 +37,7 @@ export function requestHash(method: string, url: string, body: unknown): string 
  */
 export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>): void {
   app.decorateRequest('idem', null);
+  app.decorateRequest('idemReplayBody', null);
   let lastPrune = 0;
 
   app.addHook('preHandler', async (req, reply) => {
@@ -113,7 +116,7 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
           .set({
             state: 'completed',
             status_code: reply.statusCode,
-            response_body: typeof payload === 'string' ? payload : payload == null ? '' : String(payload),
+            response_body: req.idemReplayBody ?? (typeof payload === 'string' ? payload : payload == null ? '' : String(payload)),
             response_content_type: typeof ct === 'string' ? ct : null,
             completed_at: new Date(),
           })

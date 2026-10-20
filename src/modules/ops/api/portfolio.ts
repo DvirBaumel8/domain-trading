@@ -5,6 +5,7 @@ import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import { checkApproval } from '../../../core/approval.js';
 import { addMonthsClamped, idtDay, isYmd, isRealDate, dayNumber } from '../../../core/dates.js';
+import { formatUsd, pair, usdStringToCents } from '../../../core/money.js';
 import { approvalRef, hasAtSign, piiError } from '../../../core/validation.js';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
@@ -17,6 +18,12 @@ const Count = z.number().int().min(0).max(100_000_000);
 const StatsBody = z.object({
   as_of: z.string(), month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(), venue: z.enum(['afternic', 'sedo', 'sellerhub']).optional(),
   views: Count.optional(), leads: Count.optional(), inquiries: Count.optional(), offers: Count.optional(), source: z.string().trim().min(1).max(100),
+}).strict();
+
+// BUG-047: records a renewal price with its source and date. Not a money action: it only writes a number the reports read (renewal cost, RENEWAL_PRICE_MISSING).
+const RenewalPriceBody = z.object({
+  renewal_price: z.string().trim().regex(/^\$?\d{1,6}(\.\d{1,2})?$/, 'renewal_price must be a USD amount like "11.08"'),
+  source: z.string().trim().min(1).max(200), as_of: z.string(),
 }).strict();
 
 const domainOf = (raw: string): string => {
@@ -49,6 +56,21 @@ export function registerPortfolioWrites(app: FastifyInstance, deps: { db: Kysely
     await deps.db.updateTable('domains').set({ horizon: b.horizon, sell_or_drop_by: sellOrDropBy, updated_at: now }).where('id', '=', cur.id).execute();
     const after = await deps.db.selectFrom('domains').select(['drop_date', 'expiry_date']).where('id', '=', cur.id).executeTakeFirstOrThrow();
     return reply.code(200).send({ domain, horizon: b.horizon, sell_or_drop_by: sellOrDropBy, drop_date: after.drop_date, expiry_date: after.expiry_date, warnings, audit_id: req.auditId ?? null });
+  });
+
+  app.post<{ Params: { domain: string } }>('/portfolio/:domain/renewal-price', { config: { openapiBody: RenewalPriceBody } }, async (req, reply) => {
+    const domain = domainOf(req.params.domain);
+    const b = RenewalPriceBody.parse(req.body ?? {});
+    if (!isYmd(b.as_of) || !isRealDate(b.as_of)) throw new AppError(422, 'VALIDATION_ERROR', 'as_of must be a real date YYYY-MM-DD');
+    if (dayNumber(b.as_of) > dayNumber(idtDay(new Date(deps.now())))) throw new AppError(422, 'VALIDATION_ERROR', 'as_of must not be in the future');
+    if (hasAtSign(b.source)) throw piiError("source must not contain an email address or '@'", { field: 'source' });
+    const cents = usdStringToCents(b.renewal_price.replace('$', ''));
+    if (cents <= 0) throw new AppError(422, 'VALIDATION_ERROR', 'renewal_price must be above zero');
+    const cur = await deps.db.selectFrom('domains').select(['id', 'status', 'renewal_price_cents']).where('domain', '=', domain).executeTakeFirst();
+    if (!cur || cur.status === 'pending_purchase') throw new AppError(404, 'DOMAIN_NOT_FOUND', `${domain} is not in the portfolio`);
+    await deps.db.updateTable('domains').set({ renewal_price_cents: cents, renewal_price_source: b.source, renewal_price_as_of: b.as_of, updated_at: new Date(deps.now()) }).where('id', '=', cur.id).execute();
+    req.auditSummary = `renewal price ${domain} ${formatUsd(cents)} (${b.source})`;
+    return reply.code(200).send({ domain, ...pair('renewal_price', cents), previous_renewal_price_cents: cur.renewal_price_cents, renewal_price_source: b.source, renewal_price_as_of: b.as_of, audit_id: req.auditId ?? null });
   });
 
   app.post<{ Params: { domain: string } }>('/portfolio/:domain/stats', { config: { openapiBody: StatsBody } }, async (req, reply) => {

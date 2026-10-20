@@ -46,6 +46,8 @@ const SUMMARIES: Record<string, string> = {
   'GET /portfolio/outcomes': 'One row per bought name from idea to outcome: lane, card, views, leads, offers, sale or drop, days held',
   'GET /portfolio/outcomes/monthly': 'The month: names with interest against none by card feature, passed against borderline, venue against venue',
   'GET /portfolio/outcomes/quarterly': 'Renewal cost against sales per quarter',
+  'POST /portfolio/{domain}/renewal-price': 'Record a renewal price with its source and date (not a money action; WRITE or bots)',
+  'POST /tokens/bots/rotate': 'Rotate the shared bots token: a new value is returned once, the old one works 10 more minutes (WRITE or bots)',
   'POST /portfolio/{domain}/horizon': 'Set a name to evergreen, trend or regulation (Dvir\'s approval_ref); trend and regulation drop at the first expiry',
   'POST /portfolio/{domain}/stats': 'Log a month of views, leads, inquiries and offers for a name and venue (append-only)',
   'POST /outreach/emails': 'Log an email sent about a name (recipient company domain only); the 6th for one name is refused',
@@ -166,6 +168,7 @@ function scopeOf(method: string, url: string): string {
   if (method === 'POST' && url === VISITS_HIT_ROUTE) return 'visits';
   if (method === 'POST' && INTAKE_ROUTES.has(url)) return DATA_ROUTES.has(url) ? 'write or intake or data' : 'write or intake';
   if (method === 'POST' && (DATA_ROUTES.has(url) || url.startsWith(DATA_PREFIX))) return 'write or data';
+  if (method === 'POST' && (url === '/tokens/bots/rotate' || /^\/portfolio\/[^/]+\/renewal-price$/.test(url))) return 'write or bots';
   return isMutating(method, url) ? 'write' : 'read';
 }
 

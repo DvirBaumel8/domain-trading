@@ -178,6 +178,92 @@ const dataForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A data token m
 export const VISITS_HIT_ROUTE = '/visits/hit';
 const visitsForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A visits token may only call POST /visits/hit, and only a visits token may call it');
 
+/**
+ * v5.20.0 (CR-069): every mutating route, classified for a `bots` token. A route missing here counts as `money` (fail closed), and a guard test
+ * (tests/modules/http/bots-scope.test.ts, B520-8) fails when a registered mutating route is not listed, so a future route cannot slip through.
+ *  - `allowed`: no money, no price, no listing, no registrar call: always open to a bots token.
+ *  - `money`: spends, prices, lists, renews, approves or activates: open to a bots token ONLY with `dry_run: true` in the JSON body, else 403 SCOPE_FORBIDDEN.
+ *  - `write_only`: refused to a bots token whatever the body (the job runner has its own rule).
+ * `POST /visits/hit` is not here: only a visits token may call it. `/score` is read-only (not mutating).
+ */
+export type BotsClass = 'allowed' | 'money' | 'write_only';
+export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
+  // money
+  'POST /buy': 'money',
+  'POST /portfolio/import': 'money',
+  'POST /list/{domain}': 'money',
+  'POST /listings/{domain}/venue': 'money',
+  'POST /export/{venue}/uploaded': 'money',
+  'POST /offers': 'money',
+  'POST /offers/{id}/outcome': 'money',
+  'POST /sold/{domain}': 'money',
+  'POST /portfolio/{domain}/horizon': 'money',
+  'POST /engine/holdout-date': 'money',
+  'POST /quotes/manual': 'money',
+  'POST /reviews/run': 'money',
+  'POST /reviews/settings': 'money',
+  'POST /selection/settings/{label}/activate': 'money',
+  'POST /selection/sibling-methods/{method}/approve': 'money',
+  'POST /visits/forward/{domain}': 'allowed', // a URL forward at the registrar moves no money (CR-069 item 1 lists the visits routes)
+  // write only (the job runner: the daily job applies prices and drops)
+  'POST /jobs/run': 'write_only',
+  // allowed
+  'POST /tokens/bots/rotate': 'allowed',
+  'POST /portfolio/{domain}/renewal-price': 'allowed',
+  'POST /portfolio/{domain}/stats': 'allowed',
+  'POST /candidates/{domain}/records': 'allowed',
+  'POST /candidates/daily/rebuild': 'allowed',
+  'POST /candidates/intake': 'allowed',
+  'POST /candidates/screen': 'allowed',
+  'POST /company/document': 'allowed',
+  'POST /company/forbidden-terms': 'allowed',
+  'POST /company/forbidden-terms/{id}/retire': 'allowed',
+  'POST /data/bigco-names': 'allowed',
+  'POST /data/live-checks': 'allowed',
+  'POST /data/rdap': 'allowed',
+  'POST /data/sales-comps': 'allowed',
+  'POST /data/tm-kills': 'allowed',
+  'POST /demand/keywords': 'allowed',
+  'POST /engine/sales': 'allowed',
+  'POST /engine/unsold': 'allowed',
+  'POST /engine/train': 'allowed',
+  'POST /jobs/preview': 'allowed',
+  'POST /lessons': 'allowed',
+  'PATCH /lessons/{id}': 'allowed',
+  'POST /outreach/emails': 'allowed',
+  'POST /patterns/sales': 'allowed',
+  'POST /reviews/{packet_id}/feedback': 'allowed',
+  'POST /reviews/items/{id}/status': 'allowed',
+  'POST /reviews/packet': 'allowed',
+  'POST /screening/packs': 'allowed',
+  'POST /screening/runs': 'allowed',
+  'POST /screening/runs/{id}/cancel': 'allowed',
+  'POST /screening/runs/{id}/manual': 'allowed',
+  'POST /screening/runs/{id}/verdicts': 'allowed',
+  'POST /selection/cohorts': 'allowed',
+  'POST /selection/drop-lists': 'allowed',
+  'POST /selection/evaluate': 'allowed',
+  'POST /selection/holdout-suites': 'allowed',
+  'POST /selection/labelled-names': 'allowed',
+  'POST /selection/lists/{name}': 'allowed',
+  'POST /selection/replays': 'allowed',
+  'POST /selection/settings': 'allowed',
+  'POST /selection/sibling-scan': 'allowed',
+  'POST /selection/test-sets': 'allowed',
+  'POST /selection/test-sets/{name}/cancel': 'allowed',
+  'POST /selection/test-sets/{name}/seal': 'allowed',
+  'POST /visits/import': 'allowed',
+  'POST /visits/settings': 'allowed',
+  'POST /tranches/{id}/members': 'allowed',
+  'POST /tranches/{id}/close': 'allowed',
+  'POST /tranches': 'allowed',
+};
+
+/** The Fastify route pattern (`/list/:domain`) in the `{domain}` form the table and the OpenAPI document use. */
+const toBraces = (url: string): string => url.replace(/:([A-Za-z_]+)/g, '{$1}');
+
+const botsForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A bots token cannot do this: money, price, listing and renewal actions need "dry_run": true or a WRITE token');
+
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
     if (req.auth?.scope === 'intake' && !req.jobAuth) {
@@ -200,6 +286,14 @@ export function registerScope(app: FastifyInstance): void {
       // Only public GET/HEAD/OPTIONS routes reach here without auth; fail closed for mutations.
       if (isMutating(req.method, req.routeOptions?.url)) throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid bearer token');
       return;
+    }
+    if (req.auth.scope === 'bots') {
+      const url = req.routeOptions?.url ?? '';
+      if (!isMutating(req.method, url)) return; // every GET (and the read-only POST /score)
+      const cls = BOTS_ROUTES[`${req.method} ${toBraces(url)}`] ?? 'money';
+      if (cls === 'allowed') return;
+      if (cls === 'money' && (req.body as { dry_run?: unknown } | null | undefined)?.dry_run === true) return;
+      throw botsForbidden();
     }
     if (isMutating(req.method, req.routeOptions?.url) && req.auth.scope !== 'write') {
       throw new AppError(403, 'SCOPE_FORBIDDEN', 'This token may only call GET endpoints');

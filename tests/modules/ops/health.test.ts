@@ -2,21 +2,43 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createDb } from '../../../src/db/client.js';
 import { makeApp } from '../../helpers/app.js';
-import { testDb } from '../../helpers/db.js';
+import { seedDailyRun, testDb } from '../../helpers/db.js';
 import { issueToken } from '../../helpers/tokens.js';
 
 let app: FastifyInstance;
 afterEach(async () => app?.close());
 
+describe('GET /health jobs and jobs_last (BUG-047)', () => {
+  it('L520-1: jobs is overdue when no tick ran in the last 26 h (and when it never ran), ok with a fresh tick; jobs_last shows the last daily and tick run', async () => {
+    const NOW = Date.parse('2026-10-20T09:00:00Z');
+    app = await makeApp({ testRoutes: false, now: () => NOW });
+    const { auth } = await issueToken('read');
+    const health = async () => (await app.inject({ method: 'GET', url: '/health', headers: auth })).json();
+    await seedDailyRun(testDb, NOW); // started 61 min before NOW // the daily run is fresh and its slot (00:05 UTC) was served
+    expect(await health()).toMatchObject({ jobs: 'overdue', jobs_last: { tick: null } }); // never ticked
+    const old = new Date(NOW - 27 * 3_600_000);
+    await testDb.insertInto('job_runs').values({ job: 'tick', trigger: 'scheduled', started_at: old, finished_at: old, skipped: false, ok: true, steps: '{}' }).execute();
+    const stale = await health();
+    expect(stale.jobs).toBe('overdue');
+    expect(Date.parse(stale.jobs_last.tick)).toBe(old.getTime());
+    expect(Date.parse(stale.jobs_last.daily)).toBe(NOW - 3_660_000);
+    const fresh = new Date(NOW - 2 * 3_600_000);
+    await testDb.insertInto('job_runs').values({ job: 'tick', trigger: 'scheduled', started_at: fresh, finished_at: fresh, skipped: false, ok: true, steps: '{}' }).execute();
+    const ok = await health();
+    expect(ok.jobs).toBe('ok');
+    expect(Date.parse(ok.jobs_last.tick)).toBe(fresh.getTime());
+  });
+});
+
 describe('GET /health (R-11)', () => {
-  it('needs a bot token (401 without, 200 with READ) and returns exactly status, db, db_size, jobs, review, review_model, version, adapters', async () => {
+  it('needs a bot token (401 without, 200 with READ) and returns exactly status, db, db_size, jobs, jobs_last, review, review_model, version, adapters', async () => {
     app = await makeApp({ testRoutes: false });
     expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(401);
     const { auth } = await issueToken('read');
     const res = await app.inject({ method: 'GET', url: '/health', headers: auth });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(Object.keys(body).sort()).toEqual(['adapters', 'db', 'db_size', 'jobs', 'review', 'review_model', 'status', 'version']);
+    expect(Object.keys(body).sort()).toEqual(['adapters', 'db', 'db_size', 'jobs', 'jobs_last', 'review', 'review_model', 'status', 'version']);
     expect(body).toMatchObject({ status: 'ok', db: 'ok' });
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
     for (const a of body.adapters) expect(Object.keys(a).sort()).toEqual(['enabled', 'name']);

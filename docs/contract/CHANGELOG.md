@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.20.0 (2026-10-20): CR-069 shared bots token; BUG-047 tick health + renewal price record; BUG-046 test hits dropped
+Release note: `docs/releases/v5.20.0.md`.
+MINOR (additive).
+- **CR-069:** new token scope `bots`, the shared non-money key for all bots (every GET, data and visits routes, and every non-money mutating route; a money route only with `dry_run: true`, else 403 `SCOPE_FORBIDDEN`). New route `POST /tokens/bots/rotate` (WRITE or bots; returns the new value once; the old one works 10 more minutes). Optional `X-Bot-Name` header, shown as `bot_name` in `GET /audit` rows. The old tokens are retired later.
+- **BUG-047:** `GET /health` `jobs` is also `overdue` when no `tick` run was created in 26 h, and a new field `jobs_last: {daily, tick}`. New route `POST /portfolio/{domain}/renewal-price` (WRITE or bots, not a money action); `GET /portfolio/{domain}` shows `renewal_price_source` and `renewal_price_as_of`.
+- **BUG-046:** the test hits of the UTC day 2026-10-19 are removed from the visitor counter (data only).
+
 ## 5.19.1 (2026-10-20): BUG-046 visitor hits counted by active forward
 Release note: `docs/releases/v5.19.1.md`.
 PATCH (a fix back to the contract: hits for the forwarded names were refused).

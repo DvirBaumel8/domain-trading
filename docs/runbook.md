@@ -51,6 +51,8 @@ Allow up to ~60 s for a cold start.
 | `GODADDY_PAT` | create a new PAT, update Render, revoke the old one |
 | `GITHUB_BACKUP_TOKEN` | expires yearly: generate a new fine-grained PAT (data repo only, Contents R/W), update Render, delete the old one |
 
+**Shared bots token (CR-069, 5.20.0).** The one key for all the Grok bots (scope `bots`, no money: a real buy, sale, listing or price change is 403, `dry_run: true` works). Rotation is the route `POST /tokens/bots/rotate` (a WRITE or bots token calls it, with an Idempotency-Key): the new value is in the answer once, the old one keeps working 10 minutes. The bot that rotates writes the value to the file the other bots read; nobody prints or pastes it, and nothing here is for Dvir to do. The older per-bot READ tokens and `data-engineer-upload` are retired by a later migration after Gavriel confirms the shared token works. Rules and tests: `docs/internal/bots-token.md`.
+
 Never put a secret in the repo, a log or chat.
 
 ## Restore drill (optional: BK-5 was dropped by Dvir on 7 Oct 2026; the nightly export is built but not configured)

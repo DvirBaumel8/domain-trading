@@ -83,3 +83,11 @@ describe('visits 5.19.0', () => {
     expect(up).toMatch(/visits_token_request = 'requested'.*WHERE visits_token_request IS NULL/);
   });
 });
+
+describe('visits 5.20.0', () => {
+  it('V520-1: the migration deletes the visit_daily rows of the UTC day 2026-10-19 (BUG-046: all test hits) and nothing else', () => {
+    const up = readFileSync('migrations/1765100000000_v5-20-0.sql', 'utf8').split('-- Down Migration')[0]!;
+    const deletes = up.match(/DELETE FROM public\.visit_daily[^;]*;/g) ?? [];
+    expect(deletes).toEqual(["DELETE FROM public.visit_daily WHERE date_utc = DATE '2026-10-19';"]);
+  });
+});

@@ -75,7 +75,7 @@ export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: s
   // one name: its row is built from this name's data only (v5.14.0), and the independent reads run together
   const row = (await perDomain(db, now, { domain }))[0];
   if (!row) return null;
-  const d = await db.selectFrom('domains').select(['id', 'plan_id']).where('domain', '=', domain).executeTakeFirstOrThrow();
+  const d = await db.selectFrom('domains').select(['id', 'plan_id', 'renewal_price_source', 'renewal_price_as_of']).where('domain', '=', domain).executeTakeFirstOrThrow();
   const [ledger, purchases, quotes, history, sched, sale, rs, ex] = await Promise.all([
     ledgerRows(db, { domain }),
     db.selectFrom('purchases').select(['id', 'state', 'dry_run', 'registrar', 'charged_cents', 'created_at']).where('domain', '=', domain).orderBy('id').execute(),
@@ -94,6 +94,7 @@ export async function portfolioDetail(db: Kysely<Database>, now: Date, domain: s
     .where('domain_id', '=', d.id).orderBy('received_at', 'desc').orderBy('id', 'desc').limit(50).execute();
   return {
     ...row,
+    renewal_price_source: d.renewal_price_source, renewal_price_as_of: d.renewal_price_as_of,
     ledger: ledgerJson(ledger),
     purchases: purchases.map((p) => ({ id: p.id, state: p.state, dry_run: p.dry_run, registrar: p.registrar, ...pair('cost', p.charged_cents), created_at: iso(p.created_at) })),
     quotes: quotes.map((q) => ({ registrar: q.registrar, quoted_at: iso(q.quoted_at), available: q.available, premium: q.premium,
@@ -136,6 +137,6 @@ export async function auditRows(db: Kysely<Database>, o: { since?: Date; limit: 
   const rows = await q.orderBy('at', 'desc').orderBy('id', 'desc').limit(o.limit).execute();
   return rows.map((r) => ({
     id: r.id, at: iso(r.at), token_id: r.token_id, scope: r.scope, method: r.method, path: r.path, idempotency_key: r.idempotency_key,
-    approval_text: r.approval_text, approval_at: iso(r.approval_at), request: r.request, status_code: r.status_code, result_summary: r.result_summary, client_ip: r.client_ip,
+    approval_text: r.approval_text, approval_at: iso(r.approval_at), request: r.request, status_code: r.status_code, result_summary: r.result_summary, client_ip: r.client_ip, bot_name: r.bot_name,
   }));
 }
