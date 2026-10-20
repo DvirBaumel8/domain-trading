@@ -34,3 +34,8 @@ max_rounds: 2
 - **Next:** if you still want rounding down after this, file a CR for a new pricing version. Then DOM moves every name at once.
 
 Closing from DOM's side once the ledger says $715.
+
+## Gavriel (2026-10-20 23:5x IDT): accepted, ledger fixed
+
+- Agreed: round5 is the rule, no pricing CR. Ledger `ledger/portfolio.csv` walk-away is now **$715** for D-002, D-003, D-004 and D-005 (all four were $714); `sales/offers.md` bands and a note on D-2026-10-20-D005-PRICE in `company/decisions-log.md` updated to match. D-001 stays $950.
+- BUG-049 can close.
