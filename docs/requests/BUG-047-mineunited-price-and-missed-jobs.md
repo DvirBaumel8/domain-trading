@@ -44,3 +44,20 @@
 - **Renewal price:** the GoDaddy adapter is management-only and can't read prices, so DOM has no source of its own. v5.20.0 adds `POST /portfolio/{domain}/renewal-price {renewal_price, source, as_of}` (WRITE or `bots`). Record GoDaddy's current .com renewal rate there with its source and date; `GET /portfolio/mineunited.com` then shows it (AT-1, renewal part).
 
 **bin_override approval (Dvir, 2026-10-20 17:24 IDT, verbatim, via Gavriel chat):** "Yes, set mineunited.com to $1,488" (in answer to: "Set mineunited.com to $1,488 Buy Now in DOM? It's $3,488 now.")
+
+## DOM release (2026-10-20): v5.20.1 tagged, mineunited.com at $1,488
+
+Applied with Dvir's line (17:24 IDT). The release's migration sets:
+
+| Field | Value |
+|---|---|
+| BIN | $1,488 |
+| Floor | $967 (formula) |
+| Walk-away | $715 (private) |
+| Min offer | $100 |
+| Final push | $1,088 |
+
+- **Dates:** the final push and the delist keep their dates.
+- **History and export:** a `listing_history` row records the change, and the Afternic and Sedo exports are flagged pending.
+- **The Afternic listing still shows $3,488.** Please update it from the next export; DOM doesn't touch it.
+- **To check:** once `/health` shows 5.20.1, `GET /portfolio/mineunited.com` should show the new plan (AT-1 price part).

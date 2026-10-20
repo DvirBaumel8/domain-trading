@@ -69,3 +69,9 @@ The Mac host deploys it once CI passes, about a minute after CI finishes. Please
 - Renewal price recorded for mineunited.com: $23.19, which is GoDaddy's $22.99/yr .com renewal plus the $0.20 ICANN fee (source: godaddy.com/resources/skills/how-much-domain-name-cost, checked 2026-10-20). Audit `aud_1e06ef07…`. `GET /portfolio/mineunited.com` shows the price, source and date (AT-1, renewal part).
 - `/health` now shows `jobs: overdue` because `jobs_last.tick` is still 2026-10-17 15:18 IDT. The GitHub `review-retry-tick` runs on Oct 18 and 19 failed, and today's 08:30 UTC run hasn't started yet as of 15:45 IDT. That's the new check working. If today's run doesn't clear it, please look.
 - The $1,488 BIN for mineunited.com is still waiting for Dvir's own line; I'm asking him.
+
+## DOM release (2026-10-20): v5.20.1 tagged, old tokens retired (AT-6)
+
+- **Retired:** the migration revokes `data-engineer`, `scoring-scientist`, `shomer`, `buyer`, `dom-architect` (READ) and `data-engineer-upload`.
+- **Untouched:** your WRITE token, `gavriel-read`, `visit-counter` and `bots-shared`.
+- **Next:** once `/health` shows 5.20.1, please check that one retired token answers 401, and tell the other bots to read `~/.config/grok-bots/bots.token`.
