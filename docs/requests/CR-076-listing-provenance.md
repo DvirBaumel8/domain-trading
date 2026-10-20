@@ -67,3 +67,13 @@ Signing in to Afternic or Sedo; any price, list, delist or export change; walk-a
 - **Seed (R-4), read only:** `GET /portfolio` and `GET /books.csv` show `listed_venues` = `afternic` for promptinjectionaudit.com, ukcbamcompliance.com, aievalsconsulting.com and roofingvoiceagent.com, and empty for mineunited.com with `observed_venues` = `afternic`. `observed_venues` is the last books.csv column. Pass.
 - **Not run yet:** the write-side tests (`/observed` dry run and real, the `provenance` 422, the venue 403, display-name 422/200, the PUT-without-key 400) and the `MineUnited.com` display-name call. My POSTs to the API now need an approval on my side that nobody could give at this hour, so they wait; a first attempt got 429 `RATE_LIMITED` before anything was stored. I'll run them and set `MineUnited.com` in the next session. Nothing for DOM to do.
 - **CR-072:** thanks for the answers; I'll recheck filters and AT-1/AT-2 after today's 15:00 UTC `scorePool` run.
+
+## Gavriel check (2026-10-21 ~02:40 IDT): v5.27.0 live, pass
+- `/health` showed 5.27.0 at 02:36:02 IDT (5.26.0 until then; CI passed 23:30 UTC).
+- **Sighting:** `POST /listings/mineunited.com/observed` with `dry_run` 200, `id` null. Real call 201 (`id` 10, `observed_public`, $1,488.00). `GET /portfolio/mineunited.com` `export.afternic` and `export.sedo` identical before and after. Pass.
+- **`books.csv`:** `observed_venues` is the last column. The four Line 1 names read `listed_venues` = `afternic`, `observed_venues` empty; mineunited.com reads `listed_venues` empty, `observed_venues` = `afternic`. Pass.
+- **`provenance` key on `/observed`:** 422 `VALIDATION_ERROR` ("Unrecognized key"). Pass.
+- **Display name:** `Mine-United.com` 422 `DISPLAY_NAME_MISMATCH`; `MineUnited.com` 200, `changed: true`, `export_pending: true`. Done as asked, so the next Afternic export carries it.
+- **PUT without a key:** 400 `IDEMPOTENCY_KEY_REQUIRED`, message ends "(this request was a PUT)". Pass.
+- **Small finding (venue route, bots token):** a body that fails the schema gets 422 `VALIDATION_ERROR`, not 403 `SCOPE_FORBIDDEN`, so body validation runs before the scope check. I did not send a valid body with the bots token (that route has no `dry_run`, and a pass would store an `ours_confirmed` row). Please check scope before the body on `money` routes, so a bots token always gets 403 regardless of the body, and add a test for it. Low priority.
+- **Note:** the bots token hit 429 `RATE_LIMITED` after about 8 calls in under a minute during this check; retried after 40 s. No action needed unless that limit is lower than you meant.
