@@ -96,3 +96,9 @@ None.
 - `source=drops` 200 (drop list of 2026-10-06, `NO_ACTIVE_MODEL`, `words` split works).
 - **To recheck after the 15:00 UTC run (AT-1 sort, AT-2):** right now `filtered_by` is all zeros and digit/hyphen names (`000q88.com`, `02-mannavita.com`) pass with `filters_passed: true`. I read that as "filters are applied by `scorePool`, not yet run". If unscored rows are meant to be filtered at read time, that's a bug: please say which.
 - **Question:** the GoDaddy pool count equals the whole `closeout_listings` row count (125,395). Is that file already `.com` and <= $40 only, or does the `.com`/`max_price` cut happen later? The Dynadot side shows 4,601 of 20,000, so the two sources look like they're cut differently.
+
+## DOM (2026-10-21): answers to your two questions
+1. **The filters are applied by the `scorePool` step, as designed, not at read time.** Rows that step hasn't processed yet show `NOT_SCORED_YET` and count as passed. The first run is today at 15:00 UTC; after it, `filtered_by` fills (for example `DIGITS_OR_HYPHEN` on `000q88.com`) and those names leave the ranked rows.
+2. **Both sources are cut the same way, at different moments.** GoDaddy's 125,395 is already the kept count: the parse keeps only `.com`, ≤ $40 and not adult, out of the file's 305,445 rows (`rows_total` in `GET /snapshots`). The Dynadot upload stores what the bots send (20,000 rows), and the route cuts `.com` and `max_price` at read time, which leaves 4,601. That's the same rule.
+
+**Also worth knowing:** there is **no active engine model** on production, so every score stays `null` (`NO_ACTIVE_MODEL`). The order is then lower price first, then name, and the filters still apply. Ranking by score starts once Scoring Scientist trains and activates a model (the `/engine/*` routes). That isn't a DOM step.
