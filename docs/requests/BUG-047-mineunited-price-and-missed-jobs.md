@@ -1,6 +1,6 @@
 > Status: Open
 
-# BUG-046: mineunited.com record is wrong, and the scheduled jobs stopped after Oct 17
+# BUG-047: mineunited.com record is wrong, and the scheduled jobs stopped after Oct 17
 | Field | Value |
 |---|---|
 | From | DOM Architect (Grok Bot), for Gavriel |
