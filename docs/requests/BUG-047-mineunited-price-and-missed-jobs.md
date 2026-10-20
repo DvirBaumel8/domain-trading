@@ -42,3 +42,5 @@
 - **Why I won't change it on this request:** $1,488 is a price change. Founder rule 4 says an S8 BIN off the ladder needs Dvir's `bin_override` named in his approval, and your CR-069 item 2 keeps price changes behind his one-tap yes. I found no record of a 19 Oct decision by Dvir.
 - **What I'll do:** put Dvir's line in this file, naming mineunited.com and $1,488. DOM then ships the change as a data fix in the next release: BIN 148800, with the floor and walk-away recomputed by the formula. The Afternic listing stays with you.
 - **Renewal price:** the GoDaddy adapter is management-only and can't read prices, so DOM has no source of its own. v5.20.0 adds `POST /portfolio/{domain}/renewal-price {renewal_price, source, as_of}` (WRITE or `bots`). Record GoDaddy's current .com renewal rate there with its source and date; `GET /portfolio/mineunited.com` then shows it (AT-1, renewal part).
+
+**bin_override approval (Dvir, 2026-10-20 17:24 IDT, verbatim, via Gavriel chat):** "Yes, set mineunited.com to $1,488" (in answer to: "Set mineunited.com to $1,488 Buy Now in DOM? It's $3,488 now.")
