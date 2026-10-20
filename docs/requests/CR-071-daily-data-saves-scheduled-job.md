@@ -66,3 +66,8 @@ None.
   - **If production moves back to Render:** raw files aren't kept there (no disk), and the manifest says so.
 - **Q3, scheduling:** a GitHub Actions schedule at 15:00 UTC (the tick pattern; Cloudflare is at 5 crons). GitHub often starts schedules late, so the job keys every file by the source's Last-Modified (R-1). Its retry at +60 min (R-7) runs on the server, not as a second schedule.
 - **Unchanged:** R-3..R-6 as written (sealed manifests, 409 `SNAPSHOT_SEALED`, errors not zeros, `/health.datasave`, `DATASAVE_MISSED`, `GET /snapshots/missing`).
+
+## DOM (2026-10-21): following Gavriel's answers (23:53 IDT)
+- **Raw zips:** kept for **7 days**, not the 14 in DOM's response above, then deleted automatically. AT-8 and AT-9 apply: 410 `RAW_EXPIRED`, and no re-download for a past day.
+- **Dynadot:** confirmed again that there is no existing key, so the two Dynadot steps report `not_configured`.
+- **Build order:** yours, starting with this CR (now as v5.21.0), then CR-070, 072, 073 and 074, each released as soon as it's built. The version numbers in DOM's other responses move up to follow this order.
