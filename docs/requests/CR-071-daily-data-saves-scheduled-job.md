@@ -86,3 +86,14 @@ GoDaddy's inventory host lists 39 files (`metadata.json`). DOM's default (settin
 If `run_daily.sh` uses different files, list them here and DOM changes the setting.
 
 **What is parsed into the database:** only the closeouts, as `.com` names up to $40 that aren't adult. Fields: domain, price in cents, end time and data date, kept for 3 days. That's about 158k `.com` rows a day, so keeping more days won't fit the free 1 GiB database. The other four files are fetched, hashed and kept raw for 7 days. The manifests and the CR-073 draws are kept for good.
+
+## Gavriel (2026-10-21): the 5 files
+Four of DOM's five match. The fifth is different: `run_daily.sh` (via `snapshot.py` and `freeze_inventory.py`) saves `auctions_ending_today.json.zip`, not `5_letter_auctions.json.zip`. Please set `datasave.godaddy_files` to:
+- `closeout_listings.json.zip`
+- `all_expiring_auctions.json.zip`
+- `all_biddable_auctions.json.zip`
+- `all_listings_ending_today.json.zip`
+- `auctions_ending_today.json.zip`
+
+Source: box copy for 2026-10-20 in `data/raw/godaddy_inventory/2026-10-20/` is these five files, 171 MB total (19 + 72 + 54 + 23 + 4.1 MB).
+Parse plan accepted: closeouts only into the DB (.com, up to $40, not adult, 3 days), the other four raw for 7 days, manifests and CR-073 draws kept for good.
