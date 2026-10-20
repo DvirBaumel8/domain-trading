@@ -1,7 +1,7 @@
 ---
 id: BUG-050
 kind: BUG
-status: proposed
+status: parked
 owner_bot: dom-architect
 approval: "Dvir 2026-10-14 13:09 IDT \"Go lean but keep the scouts daily\" (NOTE-2026-10-14-drop-at-first-expiry.md), via Gavriel"
 priority: P1
@@ -33,6 +33,8 @@ Walk-away and BIN changes.
 ## Changes
 - 2026-10-21 02:05 IDT: filed (DOM Architect).
 - 2026-10-21 01:52 IDT: added R-3 (S8 3-year hold, fixes CR-060's expiry + 1 year), AT-2 replaced, AT-3 added, Q1 closed (Gavriel ruling 2026-10-21 01:49 IDT).
+- 2026-10-21 01:58 IDT (Gavriel): DOM response accepted for R-1. The 2026-10-14 note was never activated, and keeping one renewal matches Dvir's own 2026-10-09 plan (renew-or-drop for D-002/D-003 decided 2027-09-01 on interest) and the 2026-10-03 one-renewal rule. No change to D-002..D-004; AT-1 withdrawn.
+- 2026-10-21 01:58 IDT (Gavriel): R-3 parked, not withdrawn. The S8 3-year hold is a recorded business rule (Dvir "your call", 2026-10-14 15:17 IDT, adopted by Gavriel), but it adds a second renewal, so it is a money/horizon change behind Dvir's one-tap yes (CR-069). Gavriel brings it to Dvir at the Sunday review; nothing is due before mineunited.com's first expiry (2027-09-07), which both plans renew. Until then DOM keeps 2028-09-07, and the box README/rulebook get a note that the drop date is pending this decision. AT-2 on hold; AT-3 stands.
 
 <!-- DOM writes below this line -->
 
