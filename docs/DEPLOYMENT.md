@@ -1,5 +1,7 @@
 # Deployment (free: Render + Neon + Cloudflare Worker)
 
+> **Live URL (20 Oct 2026, BUG-045 ask 4):** the production API is at the api-proxy Worker, `https://domain-trading-api-proxy.<subdomain>.workers.dev` (`api-proxy/`, runbook "Local host"). The Render URL `https://domain-trading-api.onrender.com` below is suspended since 11 Oct 2026; don't call it, and read every Render URL on this page as "the API URL" while the Mac host runs. The GitHub variable `API_BASE_URL` and the host's `PUBLIC_BASE_URL` hold the api-proxy URL.
+>
 > **Status (17 Oct 2026):** this page is the one-time setup for the Render hosting. Production currently runs on Dvir's Mac mini (CR-041, until Render resumes, about 1 Nov 2026): see `docs/runbook.md` "Local host" and `scripts/local-host/`. The Neon database, the Cloudflare Worker cron and the data repo steps below apply to both hosts. Only one server (Mac or Render) may run at a time. The runtime is Node 26 LTS (`package.json` engines, `.nvmrc`, `render.yaml` NODE_VERSION). `npm run admin` and `npm run job` run the compiled `dist/`: run `npm run build` first in a source checkout (or use `npm run admin:dev`).
 
 Everything runs at $0/month, the same pattern as trader and sapako.
@@ -106,7 +108,7 @@ The Worker calls `POST /jobs/run` once a day at 00:05 UTC with `daily` (since 2.
    - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`: the same values as the trader repo. GitHub secrets cannot be read back: if you did not store the old token, create a new one in Cloudflare (My Profile -> API Tokens -> Create Token, template **Edit Cloudflare Workers**).
    - Cloudflare's free plan limits **cron triggers per account** (check the current limit in the Cloudflare dashboard; trader and sapako already use some). This Worker needs 2.
    - `JOB_TRIGGER_TOKEN`: the same value as in Render.
-2. **Variables** -> `API_BASE_URL` = the Render URL from step 5 (`https://domain-trading-api.onrender.com`, no trailing slash).
+2. **Variables** -> `API_BASE_URL` = the API URL, no trailing slash: today the api-proxy URL (`https://domain-trading-api-proxy.<subdomain>.workers.dev`); on Render, the URL from step 5 (`https://domain-trading-api.onrender.com`).
 3. (Since 3.9.0 the Worker waits up to 90 s for the wake and tries the POST 3 times; it is deployed by this workflow on push.) Actions -> `deploy-jobs-trigger` -> **Run workflow** (it only deploys on main and when `API_BASE_URL` is set).
 4. Verify: Cloudflare dashboard -> Workers -> `domain-trading-jobs` -> Triggers shows the one cron (`5 0 * * *`). The 08:30 UTC review-retry `tick` runs from GitHub Actions (`.github/workflows/review-retry-tick.yml`), which needs the repo variable `API_BASE_URL` and the repo secret `JOB_TRIGGER_TOKEN`; the account is at Cloudflare's free limit of 5 crons. After the next full hour,
    `GET /audit` (READ token) has a row for `jobs/run` with scope `job`. A 401 there means the tokens differ.

@@ -94,3 +94,8 @@ else
   launchctl kickstart -k "gui/$UID_NUM/com.domaintrading.api"
 fi
 echo "$(date -u +%FT%TZ) $tag running"
+# Host kit self-update (DOM Architect, 19 Oct 2026: no release needs a manual step): copy the new release's host scripts into $HOST_DIR.
+# install.sh only copies scripts and writes plists (it loads no agent). The lock is released first (exec skips the EXIT trap),
+# and exec means bash never reads on in this file while install.sh overwrites it. A changed plist still takes effect only on its next load.
+rm -rf "$STAGE"; rmdir "$LOCK" 2>/dev/null || true; trap - EXIT
+if [ -x "$rel/scripts/local-host/install.sh" ]; then exec "$rel/scripts/local-host/install.sh" >/dev/null; fi
