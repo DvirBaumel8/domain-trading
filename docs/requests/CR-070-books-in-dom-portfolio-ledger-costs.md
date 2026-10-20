@@ -88,3 +88,12 @@ None.
 - **AT-7:** `books.csv` is `text/csv; charset=utf-8`, header exactly per `formats.md`, 5 rows = 5 live names in `GET /portfolio`; status, expiry, drop date and renewal price match per name.
 - For Sales (column check): `listed_venues` is empty for mineunited.com and promptinjectionaudit.com, and the three Afternic-only names show only `afternic` (no Sedo record). That reflects missing hand-listing records, not a DOM bug; Sales should record any live venue with `POST /listings/{domain}/venue`.
 - Nothing more needed from DOM for CR-070.
+
+## Gavriel check (2026-10-21 01:50 IDT): v5.25.0 live, checks pass (no real writes)
+- `/health` shows `version 5.25.0` from about 01:44 IDT (about 8 minutes after the tag).
+- **R-1 `POST /ledger/costs`:** `dry_run` ai row -1.20 gives 200 `accepted_n 1`, `total_usd -1.20`; `GET /ledger?type=ai` stays empty. `type: registration` gives 422 `VALIDATION_ERROR` with the per-row issue; amount `-1.205` gives 422. No real 201 row written (no reversing row needed).
+- **R-2:** `PUT /portfolio/mineunited.com/forward-costs` with top-level `walkaway` gives 422 `DERIVED_FIELD`; `floor_usd` inside a line gives 422 `DERIVED_FIELD` with path `lines.0.floor_usd`. Unknown domain gives 404 `DOMAIN_NOT_FOUND`. `GET .../forward-costs` shows `current: null, versions: []`, so nothing was stored. The "real line, version 1 then 2" step was not run on purpose: it leaves permanent plan versions; Sales does it with the first real plan.
+- **`GET /costs/forward`:** 2027-10 has renewals $33.24 (aievalsconsulting, roofingvoiceagent, ukcbamcompliance at $11.08 each; promptinjectionaudit counted 0, `DROPS_AT_FIRST_EXPIRY`), `incomplete: false`. Bare call: $23.19 (mineunited.com in 2027-09), no warnings. A 39-month range is 400 "at most 36 months".
+- **R-5 `GET /books.csv`:** 5 rows, one per live name; `walkaway_usd` 715.00 on every row, equal to `GET /portfolio`.
+- **CR-075 fix:** `GET /market/matched?asof=2026-12-20` gives 409 `MATCHED_ASOF_FUTURE`, `newest_sealed_day 2026-10-20`. The past-`asof` sha256 repeat was not run (it would freeze a real set; Challenger does it when he needs the set).
+- Small notes, no fix needed unless you agree: (1) a `PUT` without `Idempotency-Key` returns 400 `IDEMPOTENCY_KEY_REQUIRED` whose message says "every POST"; the contract does not say PUT needs the key. (2) `listed_venues` is empty for mineunited.com and promptinjectionaudit.com; Sales, please check whether that matches where they are really listed.
