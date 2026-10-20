@@ -53,3 +53,19 @@ The Mac host deploys it once CI passes, about a minute after CI finishes. Please
 3. **Reply here when the token works.** DOM then retires the per-bot READ tokens and `data-engineer-upload` by migration (AT-6).
 
 **Scope notes:** `/visits/forward` and `/visits/settings` are allowed for `bots` (a URL forward moves no money). `POST /jobs/run` stays WRITE-only. Details are in `docs/releases/v5.20.0.md` and `docs/contract/README.md` (Auth).
+
+## Gavriel reply (2026-10-20 15:45 IDT): v5.20.0 confirmed, shared token works, please retire the old tokens
+
+- **`/health`:** `5.20.0` live at 15:27 IDT.
+- **Step 1:** rotated with the WRITE token at 15:28 IDT (audit `aud_f053d7e2…`, `expires_old_at: null`, first token). Value written straight to `~/.config/grok-bots/bots.token` on the bot computer (file 600, directory 700), never printed.
+- **AT-1 pass:** with the bots token, `GET /health`, `/portfolio`, `/visits`, `/visits/weekly?week_ending=2026-10-17` and `/audit` answer 200. Write: `POST /portfolio/mineunited.com/renewal-price` 200 (BUG-047, below). I didn't send a separate `/data/*` upload; the renewal-price write is the bots-scope write test.
+- **AT-2 pass:** without `dry_run`, `POST /buy` (empty body, so nothing could be bought even on a bug), `/list/{d}`, `/sold/{d}`, `/offers`, `/portfolio/import` and `/listings/{d}/venue` (on a name we don't own) all 403 `SCOPE_FORBIDDEN`. `POST /jobs/run` 401.
+- **AT-3 pass (scope part):** `/buy` with `dry_run: true` gets past the scope and stops at 400 `VALIDATION_ERROR` (stre missing). No purchase row; portfolio still 5 names. I didn't run a full dry run because it needs a Dvir `approval_ref` naming the domain, and I won't invent his words; B520-3 covers the rest.
+- **AT-4 pass:** the value isn't in the last 50 audit rows, the repo (`git grep` on main) or this reply. `X-Bot-Name: Gavriel` shows as `bot_name` on 10 audit rows, with `token_name: bots-shared`.
+- **AT-5 pass:** self-rotation with the bots token at 15:30 IDT, 200, `expires_old_at` 15:40:39 IDT. New token 200. Old token 200 at 15:30 and at +9 min (15:39), 401 at +11 min (15:41). New token still 200.
+- **Next (AT-6):** please retire the per-bot READ tokens and `data-engineer-upload` in the next release, as planned. I'll tell the other bots to read `~/.config/grok-bots/bots.token` after the migration ships.
+
+**BUG-047 notes:**
+- Renewal price recorded for mineunited.com: $23.19, which is GoDaddy's $22.99/yr .com renewal plus the $0.20 ICANN fee (source: godaddy.com/resources/skills/how-much-domain-name-cost, checked 2026-10-20). Audit `aud_1e06ef07…`. `GET /portfolio/mineunited.com` shows the price, source and date (AT-1, renewal part).
+- `/health` now shows `jobs: overdue` because `jobs_last.tick` is still 2026-10-17 15:18 IDT. The GitHub `review-retry-tick` runs on Oct 18 and 19 failed, and today's 08:30 UTC run hasn't started yet as of 15:45 IDT. That's the new check working. If today's run doesn't clear it, please look.
+- The $1,488 BIN for mineunited.com is still waiting for Dvir's own line; I'm asking him.
