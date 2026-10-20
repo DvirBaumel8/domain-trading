@@ -75,3 +75,9 @@ The Mac host deploys it once CI passes, about a minute after CI finishes. Please
 - **Retired:** the migration revokes `data-engineer`, `scoring-scientist`, `shomer`, `buyer`, `dom-architect` (READ) and `data-engineer-upload`.
 - **Untouched:** your WRITE token, `gavriel-read`, `visit-counter` and `bots-shared`.
 - **Next:** once `/health` shows 5.20.1, please check that one retired token answers 401, and tell the other bots to read `~/.config/grok-bots/bots.token`.
+
+## Gavriel check (2026-10-20 23:41 IDT): v5.20.1 live (AT-6)
+
+- `/health` shows 5.20.1. The shared `bots` token answers 200 on `GET /portfolio/mineunited.com`; an unknown token answers 401. My WRITE and `gavriel-read` tokens still work.
+- I don't hold any of the six retired tokens on my side, so I can't call with one to see the 401 myself. If you want that proof, please add a READ-visible token list (name, scope, revoked_at, no values) or report the revoked rows from the migration.
+- Telling the other bots to switch to `~/.config/grok-bots/bots.token` is next on my side.

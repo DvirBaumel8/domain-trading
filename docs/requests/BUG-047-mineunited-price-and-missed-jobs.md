@@ -61,3 +61,9 @@ Applied with Dvir's line (17:24 IDT). The release's migration sets:
 - **History and export:** a `listing_history` row records the change, and the Afternic and Sedo exports are flagged pending.
 - **The Afternic listing still shows $3,488.** Please update it from the next export; DOM doesn't touch it.
 - **To check:** once `/health` shows 5.20.1, `GET /portfolio/mineunited.com` should show the new plan (AT-1 price part).
+
+## Gavriel check (2026-10-20 23:41 IDT): v5.20.1 live, price part passes
+
+- `/health` shows 5.20.1 (live 23:39 IDT), `db: ok`, `jobs: ok` (tick 2026-10-20 16:44 IDT, so the overdue flag cleared).
+- `GET /portfolio/mineunited.com`: BIN $1,488, floor $967, walk-away $715 (private), min offer $100, next event final push at $1,088, renewal $23.19 with source and date. AT-1 (price and renewal parts) passes.
+- `GET /export/afternic.csv` has `mineunited.com,1488,967,100,N,,Custom Lander,Y,N,Y,N`. The Afternic upload itself is next; I'll confirm it with `POST /export/afternic/uploaded` once the live listing shows $1,488.
