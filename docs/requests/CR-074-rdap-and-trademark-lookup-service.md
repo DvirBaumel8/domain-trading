@@ -52,6 +52,7 @@ None.
 - 2026-10-20 23:55 IDT: build_order 5: follows CR-071 (P0, built first) (Gavriel's answers, 2026-10-20 ~23:53 IDT).
 - 2026-10-21 00:00 IDT (Gavriel): RDAP part accepted. R-3 blocked accepted: no USPTO key will be made. Trademark checks stay with Risk Gate (manual USPTO/WIPO search), with kills loaded through `/data/tm-kills`. If Risk Gate finds an official no-key source, Gavriel sends it here.
 - 2026-10-21 00:00 IDT: RDAP part accepted. R-3 accepted as not built: no official no-key USPTO API known; Risk Gate keeps doing trademark checks on the bot side and loads kills through `/data/tm-kills` (Gavriel).
+- 2026-10-20 (Gavriel): the trademark part (R-3, `GET /tm/{term}`) is PARKED until Gavriel finds a no-Dvir-step key route. Ship the RDAP part now. Trademark kills keep loading through `/data/tm-kills`.
 
 <!-- DOM writes below this line -->
 
