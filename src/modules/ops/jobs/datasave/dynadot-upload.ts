@@ -25,7 +25,19 @@ const BATCH = 5_000;
 const domain = z.string().trim().min(3).max(253).transform((s) => s.toLowerCase().replace(/\.$/, '')).refine((s) => /^(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/.test(s), 'must be a domain name');
 const cents = z.number().int().min(0).max(2_000_000_000);
 const iso = z.string().refine((s) => /^\d{4}-\d{2}-\d{2}T/.test(s) && !Number.isNaN(Date.parse(s)), 'must be an ISO 8601 date-time');
-const common = { data_date: z.string().refine(isRealDate, 'must be a real date (YYYY-MM-DD)'), final: z.boolean().optional(), dry_run: z.boolean().optional() };
+const page = z.number().int().min(1).max(100_000);
+/** v5.24.0 (CR-071 R-8b): how complete a bot's pull was; a day is sealed even when some pages failed. Stored on the manifest, shown by GET /snapshots. */
+export const Coverage = z.object({
+  partial: z.boolean(), calls_n: z.number().int().min(0).max(1_000), pages_planned: z.array(page).max(1_000),
+  pages_ok: z.array(page).max(1_000), pages_failed: z.array(page).max(1_000), rows_received_n: z.number().int().min(0).max(100_000_000),
+}).strict().superRefine((c, ctx) => {
+  const planned = new Set(c.pages_planned);
+  for (const key of ['pages_ok', 'pages_failed'] as const) {
+    if (c[key].some((p) => !planned.has(p))) ctx.addIssue({ code: 'custom', path: [key], message: 'must be a subset of pages_planned' });
+  }
+});
+export type Coverage = z.infer<typeof Coverage>;
+const common = { data_date: z.string().refine(isRealDate, 'must be a real date (YYYY-MM-DD)'), final: z.boolean().optional(), dry_run: z.boolean().optional(), coverage: Coverage.optional() };
 const rows = <T extends z.ZodType>(row: T) => z.array(row).max(DYNADOT_MAX_ROWS);
 
 export const DynadotBody = z.discriminatedUnion('kind', [
@@ -110,10 +122,11 @@ export async function uploadDynadot(db: Kysely<Database>, b: DynadotBody, nowMs:
       const values = {
         source, data_date: b.data_date, file_name: BOT_UPLOAD_FILE, bytes: null, sha256, last_modified: now, rows: stored, rows_total: b.rows.length,
         status: status as 'complete' | 'partial', http_status: null, error: null, raw_path: null, raw_available: false, raw_note: 'rows uploaded by a bot; no raw file',
-        sealed_at: final ? now : null, created_at: now, updated_at: now, origin: 'bot_upload' as const,
+        sealed_at: final ? now : null, created_at: now, updated_at: now, origin: 'bot_upload' as const, coverage: b.coverage ? JSON.stringify(b.coverage) : null,
       };
       await trx.insertInto('snapshot_manifests').values(values).onConflict((oc) => oc.columns(['source', 'data_date', 'file_name']).doUpdateSet({
         sha256: values.sha256, last_modified: now, rows: stored, status: values.status, sealed_at: values.sealed_at, updated_at: now,
+        coverage: sql`coalesce(excluded.coverage, snapshot_manifests.coverage)`, // the latest part that sends coverage wins
         rows_total: sql`coalesce(snapshot_manifests.rows_total, 0) + ${b.rows.length}`,
       }).where('snapshot_manifests.sealed_at', 'is', null)).execute();
       const result: DynadotResult = {

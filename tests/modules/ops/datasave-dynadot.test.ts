@@ -56,6 +56,31 @@ describe('DS522 Dynadot bot uploads', () => {
     expect(new Set(res.rows.map((r: { listing_id: string }) => r.listing_id)).size).toBe(3);
   });
 
+  it('DS524-1 (AT-14) a final upload with coverage seals the day as complete and GET /snapshots shows the same coverage object', async () => {
+    const { post, get } = await boot();
+    const planned = [40, 78, 116, 154, 192, 230, 268, 306, 344, 382, 420, 458, 496, 534, 572];
+    const coverage = { partial: true, calls_n: 18, pages_planned: planned, pages_ok: planned.filter((p) => p !== 534), pages_failed: [534], rows_received_n: 92000 };
+    const r = await post({ kind: 'aftermarket', data_date: '2026-10-20', rows: [AM('alpha.com', 'L1', 50000)], final: true, coverage });
+    expect(r.statusCode, r.body).toBe(201);
+    const m = (await get('/snapshots?date=2026-10-20&source=dynadot_aftermarket')).json().snapshots[0];
+    expect(m).toMatchObject({ status: 'complete', sealed: true, coverage });
+    // the seal guard freezes coverage too
+    await expect(db.updateTable('snapshot_manifests').set({ coverage: JSON.stringify({ partial: false }) }).where('source', '=', 'dynadot_aftermarket').execute()).rejects.toThrow(/sealed snapshot manifest/);
+  });
+
+  it('DS524-2 (AT-15) coverage with an unknown key, a non-integer page, or pages_ok outside pages_planned is 422 and stores nothing; without coverage the manifest shows coverage null', async () => {
+    const { post, get } = await boot();
+    const base = { partial: false, calls_n: 2, pages_planned: [40, 78], pages_ok: [40, 78], pages_failed: [], rows_received_n: 10 };
+    for (const coverage of [{ ...base, extra: 1 }, { ...base, pages_ok: [40.5] }, { ...base, pages_ok: [40, 99] }, { ...base, pages_failed: [99] }]) {
+      const r = await post({ kind: 'aftermarket', data_date: '2026-10-20', rows: [AM('alpha.com', 'L1', 50000)], final: true, coverage });
+      expect(r.statusCode, JSON.stringify(coverage)).toBe(422);
+      expect(r.json().error.code).toBe('VALIDATION_ERROR');
+    }
+    expect((await get('/snapshots?date=2026-10-20&source=dynadot_aftermarket')).json().snapshots).toEqual([]);
+    expect((await post({ kind: 'aftermarket', data_date: '2026-10-20', rows: [AM('alpha.com', 'L1', 50000)], final: true })).statusCode).toBe(201);
+    expect((await get('/snapshots?date=2026-10-20&source=dynadot_aftermarket')).json().snapshots[0]).toMatchObject({ sealed: true, coverage: null });
+  });
+
   it('DS522-2 (AT-11) closed auctions: each row keeps bid_count and final_price_cents (cents) and the manifest is sealed; a final-only call seals what was stored', async () => {
     const { post, get } = await boot();
     expect((await post({ kind: 'closed_auctions', data_date: '2026-10-20', rows: [CA('Sold.com', 7, 123400), CA('none.com', 0, 0)] })).statusCode).toBe(201);

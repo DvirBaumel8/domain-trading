@@ -46,7 +46,7 @@ export function registerSnapshots(app: FastifyInstance, deps: SnapshotsDeps): vo
       date: q.date ?? null, source: q.source ?? null,
       snapshots: rows.map((m) => ({
         source: m.source, data_date: m.data_date, file_name: m.file_name, status: m.status, bytes: m.bytes, sha256: m.sha256, last_modified: iso(m.last_modified),
-        origin: m.origin, rows: m.rows, rows_total: m.rows_total, http_status: m.http_status, error: m.error, price_unit: m.rows === null ? null : 'cents',
+        origin: m.origin, coverage: m.coverage ?? null, rows: m.rows, rows_total: m.rows_total, http_status: m.http_status, error: m.error, price_unit: m.rows === null ? null : 'cents',
         raw_available: m.raw_available, raw_deleted_at: iso(m.raw_deleted_at), raw_note: m.raw_note, sealed: m.sealed_at !== null, sealed_at: iso(m.sealed_at),
       })),
       pool: pool.rows.map((r) => ({ data_date: r.data_date, source: r.source, rows: Number(r.rows) })),

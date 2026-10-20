@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.24.0 (2026-10-21): CR-071 R-8b: coverage on Dynadot bot uploads
+Release note: `docs/releases/v5.24.0.md`.
+- **Added (MINOR):** optional `coverage` object on `POST /snapshots/dynadot` (CR-071 R-8b: partial seals with pull coverage), stored on the manifest, frozen at the seal and shown by `GET /snapshots` (`coverage`, null when not sent). An unknown key, a non-integer page or pages outside `pages_planned` is 422 `VALIDATION_ERROR`.
+
 ## 5.23.0 (2026-10-21): CR-075 market episodes, labels, matched sets, data-quality checks
 Release note: `docs/releases/v5.23.0.md`.
 MINOR (additive; migration `1765500000000_v5-23-0.sql`).

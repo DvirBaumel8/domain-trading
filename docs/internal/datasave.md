@@ -84,3 +84,5 @@ v5.22.0 tests: `tests/modules/ops/datasave-dynadot.test.ts`.
 | DS522-13 | an absent auction whose end has not come stays open |
 | DS522-14 | auction file parse failure is partial; closeouts still seal; nothing ends |
 | DS522-15 | retention of ended and stale open auctions |
+| DS524-1 | coverage stored on a sealed upload, frozen by the seal guard (AT-14) |
+| DS524-2 | invalid coverage 422, missing coverage null (AT-15) |

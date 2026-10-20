@@ -1,4 +1,4 @@
-# Endpoints (contract v5.23.0)
+# Endpoints (contract v5.24.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -1035,8 +1035,10 @@ READ (any `GET` token, bots included). Query (all optional; an unknown parameter
   "data_date": "YYYY-MM-DD",          // UTC data date of the pull; not in the future
   "rows": [ ... ],                    // may be [] only with final: true
   "final": true,                      // optional: seal this (kind, data_date) with this call
-  "dry_run": true }                   // optional: validate and count, store nothing
+  "dry_run": true,                    // optional: validate and count, store nothing
+  "coverage": { ... } }               // optional (5.24.0, R-8b): how complete the pull was
 ```
+`coverage` (5.24.0, CR-071 R-8b; strict, optional): `{partial: bool, calls_n: int, pages_planned: [int], pages_ok: [int], pages_failed: [int], rows_received_n: int}`, pages are whole numbers ≥ 1, and `pages_ok` and `pages_failed` must be subsets of `pages_planned` (else **422** `VALIDATION_ERROR`, nothing stored). A day is sealed by `final: true` even when `partial` is true. The latest part that sends `coverage` wins until the seal; after it, coverage is frozen with the manifest. `GET /snapshots` shows it as `coverage` (`null` when never sent).
 Row shapes (strict: an unknown key or a wrong type → **422** `VALIDATION_ERROR` for the whole call, nothing stored; prices are **integer cents**, a decimal such as `500.5` is refused; domains are lowercased):
 - `aftermarket`: `{domain, listing_id: string, price_cents: int}`. Rows with `price_cents < 50000` are dropped and counted. Unique per `listing_id` per day.
 - `closed_auctions`: `{domain, end_time: ISO 8601, bid_count: int >= 0, final_price_cents: int >= 0}`. Unique per domain per day.

@@ -84,6 +84,8 @@ export interface SnapshotManifestsTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
   /** v5.22.0: 'fetch' (the job) or 'bot_upload' (POST /snapshots/dynadot). */
   origin: ColumnType<'fetch' | 'bot_upload', 'fetch' | 'bot_upload' | undefined, 'fetch' | 'bot_upload'>;
+  /** v5.24.0 (CR-071 R-8b): a bot upload's pull coverage (jsonb), null when not sent. */
+  coverage: ColumnType<unknown | null, string | null | undefined, string | null>;
 }
 
 /** v5.21.0 (CR-071): the parsed closeouts of the last few days. */
