@@ -5,6 +5,7 @@ import type { Database, DomainRow } from '../../../db/types.js';
 import { computePlan } from '../../listing/index.js';
 import { settingsByVersion } from '../../listing/index.js';
 import { manualDelist, pendingDomains, sameNsSet, VENUES } from '../../listing/index.js';
+import { datasaveStatus, missingDays } from '../datasave-state.js';
 import { dailyScheduleState, JOBS_OVERDUE_HOURS, JOB_RUN_STUCK_HOURS, jobsOverdue } from '../job-runs.js';
 import { daysBetween } from '../../candidates/index.js';
 import { activeSelectionSettings } from '../../selection/index.js';
@@ -55,6 +56,18 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   if (sched.missed) {
     add('JOB_MISSED', 'error', 'The scheduled daily run (00:05 UTC) did not start.', undefined, {
       slot: toJerusalemIso(sched.missed.slot), last_run_at: sched.missed.lastRunAt ? toJerusalemIso(sched.missed.lastRunAt) : null,
+    });
+  }
+  // CR-071 R-6: the daily data save (15:00 UTC job). Raised once a save or a datasave run exists; Dynadot (not_configured) never counts.
+  const ds = await datasaveStatus(db, now.getTime());
+  if (ds.started && ds.state !== 'ok') {
+    const to = new Date(now.getTime() - 16 * 3_600_000).toISOString().slice(0, 10); // today's data date is due after 15:00 UTC plus the retry hour
+    const from = new Date(now.getTime() - 13 * 86_400_000).toISOString().slice(0, 10);
+    const first = (await db.selectFrom('snapshot_manifests').select((eb) => eb.fn.min('data_date').as('d')).where('source', '=', 'godaddy_inventory').executeTakeFirst())?.d ?? from;
+    const days = await missingDays(db, first > from ? first : from, to);
+    add('DATASAVE_MISSED', ds.state === 'partial' ? 'warn' : 'error', `The daily data save is ${ds.state}: ${ds.state === 'partial' ? 'some files' : 'no complete save'} within the last 26 hours.`, undefined, {
+      state: ds.state, sources: ['godaddy_inventory'], missing_files: ds.missing_files, missing_days: days.missing.map((m) => m.date),
+      last_complete_at: ds.last_complete_at ? toJerusalemIso(ds.last_complete_at) : null,
     });
   }
   // v5.1.0: the cron itself. A manual or CLI daily does not count; a fresh install with no job run at all is not warned.

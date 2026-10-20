@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /** The database the test run is configured with (globalSetup migrates it and uses it as the template for the worker databases). */
 export const BASE_TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? 'postgres://dt:dt@localhost:5433/domain_trading_test';
@@ -26,6 +28,7 @@ export function testEnv(overrides: Record<string, string> = {}): NodeJS.ProcessE
     GITHUB_BACKUP_TOKEN: 'github_pat_fake_000000000000',
     PORKBUN_SANDBOX_API_KEY: 'pk1_sb_fake_test_key_0000000',
     PORKBUN_SANDBOX_SECRET_API_KEY: 'sk1_sb_fake_test_secret_00000',
+    SNAPSHOT_DIR: join(tmpdir(), `dt-snapshots-test-${process.env.VITEST_POOL_ID ?? '0'}`),
     ...overrides,
   };
 }

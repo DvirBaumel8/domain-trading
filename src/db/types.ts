@@ -39,6 +39,11 @@ export interface SettingsTable {
   engine_sales_max_date: Generated<DateString>;
   /** v5.18.0 (CR-068): visits.enabled. Off until Dvir's line; changed only by POST /visits/settings. */
   visits_enabled: Generated<boolean>;
+  /** v5.21.0 (CR-071): the datasave job's settings. Migration only. */
+  datasave_godaddy_files: Generated<string[]>;
+  datasave_pool_max_price_cents: Generated<number>;
+  datasave_pool_keep_days: Generated<number>;
+  datasave_raw_keep_days: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;
@@ -49,6 +54,42 @@ export interface SettingsTable {
   high_value_min_bin_cents: Generated<number>;
   sedo_hybrid_as: Generated<'buy_now' | 'make_offer'>;
   updated_at: TimestampDefault;
+}
+
+export type SnapshotSource = 'godaddy_inventory' | 'dynadot_closeouts' | 'dynadot_aftermarket';
+
+/** v5.21.0 (CR-071): one saved file. Complete rows are sealed (trigger snapshot_manifests_guard): only retention may later set raw_available false. */
+export interface SnapshotManifestsTable {
+  id: Generated<number>;
+  source: SnapshotSource;
+  data_date: DateString;
+  file_name: string;
+  bytes: ColumnType<number | null, number | null | undefined, number | null>;
+  sha256: ColumnType<string | null, string | null | undefined, string | null>;
+  last_modified: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  rows: ColumnType<number | null, number | null | undefined, number | null>;
+  rows_total: ColumnType<number | null, number | null | undefined, number | null>;
+  status: 'complete' | 'partial' | 'error' | 'not_configured';
+  http_status: ColumnType<number | null, number | null | undefined, number | null>;
+  error: ColumnType<string | null, string | null | undefined, string | null>;
+  raw_path: ColumnType<string | null, string | null | undefined, string | null>;
+  raw_available: ColumnType<boolean, boolean | undefined, boolean>;
+  raw_note: ColumnType<string | null, string | null | undefined, string | null>;
+  raw_deleted_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  sealed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  created_at: TimestampDefault;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+/** v5.21.0 (CR-071): the parsed closeouts of the last few days. */
+export interface DatasavePoolTable {
+  data_date: DateString;
+  source: string;
+  domain: string;
+  price_cents: number;
+  ends_at: Timestamp;
+  score: ColumnType<string | null, number | string | null | undefined, number | string | null>;
+  score_reason: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 export interface DealsTable {
@@ -313,7 +354,7 @@ export interface ExportUploadsTable {
 
 export interface JobRunsTable {
   id: Generated<number>;
-  job: 'tick' | 'daily' | 'screen' | 'train';
+  job: 'tick' | 'daily' | 'screen' | 'train' | 'datasave';
   trigger: 'scheduled' | 'manual' | 'cli';
   scheduled_for: ColumnType<Date | null, Date | string | null, Date | string | null>;
   started_at: Timestamp;
@@ -330,12 +371,14 @@ export interface JobRunsTable {
 /** An enqueued job run (v3.0.0). Written once at enqueue; its progress lives in job_steps and its result in job_runs. */
 export interface JobQueueRunsTable {
   id: string;
-  job: 'tick' | 'daily' | 'screen' | 'train';
+  job: 'tick' | 'daily' | 'screen' | 'train' | 'datasave';
   trigger: 'scheduled' | 'manual' | 'cli';
   scheduled_for: ColumnType<Date | null, Date | string | null | undefined, never>;
   triggered_by: ColumnType<string | null, string | null | undefined, never>;
   /** v3.3.0: the run's request (`screen`: {max_names}); null for tick and daily. */
   params: ColumnType<unknown, string | null | undefined, never>;
+  /** v5.21.0 (CR-071): the worker takes no step of the run before this time (the datasave retry). */
+  not_before: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
   created_at: TimestampDefault;
 }
 
@@ -345,7 +388,7 @@ export type JobStepStatus = 'queued' | 'running' | 'done' | 'failed' | 'skipped'
 export interface JobStepsTable {
   id: Generated<number>;
   run_id: string;
-  job: 'tick' | 'daily' | 'screen' | 'train';
+  job: 'tick' | 'daily' | 'screen' | 'train' | 'datasave';
   step: string;
   position: number;
   status: Generated<JobStepStatus>;
@@ -1289,6 +1332,8 @@ export interface ManualQuotesTable {
 export interface Database {
   api_tokens: ApiTokensTable;
   settings: SettingsTable;
+  snapshot_manifests: SnapshotManifestsTable;
+  datasave_pool: DatasavePoolTable;
   deals: DealsTable;
   domains: DomainsTable;
   ledger_entries: LedgerEntriesTable;

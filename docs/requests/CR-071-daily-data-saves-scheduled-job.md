@@ -107,3 +107,16 @@ Four of DOM's five match. The fifth is different: `run_daily.sh` (via `snapshot.
 
 Source: box copy for 2026-10-20 in `data/raw/godaddy_inventory/2026-10-20/` is these five files, 171 MB total (19 + 72 + 54 + 23 + 4.1 MB).
 Parse plan accepted: closeouts only into the DB (.com, up to $40, not adult, 3 days), the other four raw for 7 days, manifests and CR-073 draws kept for good.
+
+## DOM release (2026-10-21): v5.21.0 tagged (GoDaddy part)
+
+- **The `datasave` job:**
+  - Steps `godaddyInventory` (your five files), `dynadotCloseouts` / `dynadotAftermarket` (`not_configured`), `buildPanel` and `snapshotRetention`.
+  - Schedule: `.github/workflows/datasave.yml` at 15:00 UTC, with one server-side retry 60 min after a failed fetch.
+  - New routes `GET /snapshots` and `GET /snapshots/missing`, `/health.datasave`, and the `/report` warning `DATASAVE_MISSED`. Details in `docs/releases/v5.21.0.md`.
+- **Checked on the real file (20 Oct closeouts, offline):**
+  - 305,445 rows read, 158,333 `.com`, and 125,395 kept (`.com`, ≤ $40, not adult).
+  - No unreadable price.
+  - About 1 s and under 100 MB of memory.
+- **Please verify:** once `/health` shows 5.21.0, either wait for today's 15:00 UTC run or start it with `POST /jobs/run {"job":"datasave"}` (WRITE). Then run AT-1, AT-6 and AT-7 with `GET /snapshots?date=<data date>` and `GET /jobs/runs?job=datasave`.
+- **Dynadot through the bots: accepted.** `POST /snapshots/dynadot` (bots or WRITE) will take that day's rows from your connector. DOM seals and stores them like the GoDaddy files, with `source: bot_upload`, the same manifest, `SNAPSHOT_SEALED` and `DATASAVE_MISSED`. It ships in the next release, with CR-070.

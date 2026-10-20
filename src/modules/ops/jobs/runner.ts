@@ -13,7 +13,8 @@ export interface StepResult {
 }
 
 /** `screen` (v3.3.0, CR-021): one on-demand screening of the waiting intake names, then a rebuild of the day's list. */
-export type JobKind = 'tick' | 'daily' | 'screen' | 'train';
+/** `datasave` (v5.21.0, CR-071): the daily data saves, scheduled at 15:00 UTC by a GitHub Actions schedule. */
+export type JobKind = 'tick' | 'daily' | 'screen' | 'train' | 'datasave';
 
 /** One step of a job: what the queue stores (limits) and runs (exec). `exec` returns the step's summary and throws on failure. */
 export interface PlanStep {
@@ -28,10 +29,10 @@ export interface PlanStep {
 /** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the review steps 1 (they keep their own retry), the rest 2. */
 const DEFAULT_ATTEMPTS = 2;
 const STEP_ATTEMPTS: Record<string, number> = {
-  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1, engineEndings: 1, engineTrain: 1, trainModel: 1,
+  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1, engineEndings: 1, engineTrain: 1, trainModel: 1, godaddyInventory: 1,
 };
 const DEFAULT_TIMEOUT_MS = 5 * 60_000;
-const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000 };
+const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000, godaddyInventory: 45 * 60_000 };
 
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
 
@@ -44,6 +45,8 @@ export interface RunOptions {
   scheduledFor?: Date | null;
   /** The WRITE token's name for a manual run started through the API (CR-007 T-2); omitted for the job token, the Worker and the CLI. */
   triggeredBy?: string | null;
+  /** v5.21.0 (CR-071): the worker takes no step of the run before this time (the datasave retry). */
+  notBefore?: Date | null;
   /** The run's request, stored with the run (`screen`: {max_names}). */
   params?: unknown;
 }
@@ -100,6 +103,8 @@ export interface JobRunnerDeps {
   engineEndingsJob?: Runnable;
   /** v5.5.0 (CR-056 part 2): `weekly()` is the daily step engineTrain (decides and queues a `train` run); `runById` is the `train` job's step trainModel. */
   engineTrainer?: { weekly(): Promise<unknown>; runById(id: string): Promise<unknown> };
+  /** v5.21.0 (CR-071): the datasave job's five steps; while undefined, each step reports skipped. */
+  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; buildPanel(): Promise<unknown>; snapshotRetention(): Promise<unknown> };
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
   /** Takes the run lock (default: a database session lock). Tests of the step order pass a stub. */
@@ -149,6 +154,13 @@ export class JobRunner {
     if (job === 'train') {
       const trainId = (run?.params as { train_id?: unknown } | null | undefined)?.train_id;
       return [step('trainModel', async () => (d.engineTrainer && typeof trainId === 'string' ? d.engineTrainer.runById(trainId) : { skipped: true, reason: 'engine trainer not configured or no train_id' }))];
+    }
+    // v5.21.0 (CR-071): POST /jobs/run {job:'datasave'}. Each step has its own status; a failed godaddyInventory does not stop the rest.
+    if (job === 'datasave') {
+      const ds = d.datasaveJob;
+      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'buildPanel' | 'snapshotRetention') =>
+        step(name, async () => (ds ? ds[name]() : { skipped: true, reason: 'datasave not configured' }));
+      return [dsStep('godaddyInventory'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket'), dsStep('buildPanel'), dsStep('snapshotRetention')];
     }
     if (job === 'tick') return [...tick, optionalFn('reviewRetry', d.reviewRetry, 'review retry not configured')];
     // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.
@@ -204,7 +216,7 @@ export class JobRunner {
 
   async run(job: JobKind, opts: RunOptions = {}): Promise<JobRunResult> {
     const started = new Date(this.deps.now());
-    const key: LockKey = job === 'tick' ? 'job:tick' : job === 'screen' ? 'job:screen' : job === 'train' ? 'job:train' : 'job:daily';
+    const key: LockKey = job === 'tick' ? 'job:tick' : job === 'screen' ? 'job:screen' : job === 'train' ? 'job:train' : job === 'datasave' ? 'job:datasave' : 'job:daily';
     const lock = await (this.deps.acquireLock ? this.deps.acquireLock(key) : trySessionLock(this.deps.db, key));
     if (!lock) {
       const skipped: JobRunResult = { job, skipped: true, steps: {} };

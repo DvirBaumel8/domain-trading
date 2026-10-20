@@ -4,6 +4,8 @@ export { registerPortfolioWrites } from './api/portfolio.js';
 export { registerTokens } from './api/tokens.js';
 export { registerPortfolioImport } from './api/portfolio-import.js';
 export { registerJobs } from './api/jobs.js';
+export { registerSnapshots } from './api/snapshots.js';
+export { DatasaveJob } from './jobs/datasave/datasave.js';
 export { BackupExporter } from './jobs/backup-export.js';
 export { CohortOutcomesJob } from './jobs/cohort-outcomes.js';
 export { DropWatchJob } from './jobs/drop-watch.js';

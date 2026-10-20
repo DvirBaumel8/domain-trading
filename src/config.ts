@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { z } from 'zod';
 import { poolConfig } from './db/client.js';
 import { REGISTRAR_ENV } from './modules/registrars/index.js';
@@ -16,6 +17,8 @@ const isNameBioFileUrl = (v: string): boolean => {
   if (u.hostname === 'api.namebio.com') return ['/retailstats-download'].includes(u.pathname);
   return u.hostname === 'namebio.com' || u.hostname.endsWith('.namebio.com');
 };
+
+const expandHome = (p: string, home: string): string => (p === '~' ? home : p.startsWith('~/') ? `${home}/${p.slice(2)}` : p);
 
 const EnvSchema = z.object({
   DATABASE_URL: z
@@ -38,6 +41,7 @@ const EnvSchema = z.object({
   SPACESHIP_SELLERHUB_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().default('https://spaceship.dev/api')),
   PUBLIC_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine((v) => /^https?:\/\//.test(v), 'PUBLIC_BASE_URL must be http(s)').default(DEFAULT_PUBLIC_BASE_URL)),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
+  SNAPSHOT_DIR: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string()
     .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/, 'GITHUB_BACKUP_REPO must be owner/name')
     .refine((v) => !v.split('/').some((x) => x === '.' || x === '..'), 'GITHUB_BACKUP_REPO must not contain . or .. segments')
@@ -70,6 +74,8 @@ export interface Config {
   publicBaseUrl: string;
   /** True when the host sets RENDER (a Render service). The keep-alive ping only makes sense there (M8); on the Mac host it would ping a suspended Render URL. */
   onRender: boolean;
+  /** v5.21.0 (CR-071): where the datasave job keeps raw GoDaddy zips for 7 days (default ~/Library/Application Support/domain-trading/snapshots). If it cannot be written, the job runs without raw files. */
+  snapshotDir: string;
   /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
   backup: { token: string | undefined; repo: string | undefined };
   version: string;
@@ -159,6 +165,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,
     companiesHouseApiKey: e.COMPANIES_HOUSE_API_KEY ? e.COMPANIES_HOUSE_API_KEY : undefined,
     namebio: { retailstatsCsvUrl: e.NAMEBIO_RETAILSTATS_CSV_URL },
+    snapshotDir: expandHome(e.SNAPSHOT_DIR ?? '~/Library/Application Support/domain-trading/snapshots', env.HOME ?? homedir()),
     backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },
     version: readVersion(),
     env: Object.freeze(strings),

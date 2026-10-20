@@ -1,4 +1,4 @@
-# Reports (contract v5.20.1)
+# Reports (contract v5.21.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -50,6 +50,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `LANDER_PRICE_MISMATCH` | warn | (4.0.0, CR-049 item 3) The Buy Now amount the lander page shows is not the plan's BIN | `checked_at`, `shown` (pair), `expected` (pair) |
 | `LANDER_OFFER_MISSING` | info | (4.0.0) The plan has a make-offer option (hybrid or offer) but the lander page shows none | `checked_at` |
 | `DAILY_JOB_MISSED` | warn | (5.1.0) No `daily` job run with trigger `scheduled` started in the last 26 hours (the cron did not fire; a manual or CLI daily does not count). Not raised when no job run exists at all (fresh install) | `last_scheduled_at` (ISO or null), `hours_since` (null when none) |
+| `DATASAVE_MISSED` | error / warn | (5.21.0, CR-071) The daily data save is not `ok` (`GET /health` field `datasave`): `overdue` or `error` = error, `partial` = warn. Raised only once any GoDaddy save or `datasave` run exists (a fresh install is not warned). Dynadot (`not_configured`) never counts | `state` (`overdue` / `partial` / `error`), `sources` (`["godaddy_inventory"]`), `missing_files`, `missing_days` (data dates without a complete save, since the first save, at most 14 days back), `last_complete_at` (ISO or null) |
 | `JOB_MISSED` | error | (3.1.0, CR-016) Today's scheduled slot (00:05 UTC) passed more than 30 minutes ago and no daily run was created at or after it (once any daily run exists) | `slot`, `last_run_at` |
 | `JOB_RUN_INCOMPLETE` | error | (3.1.0) A daily run has been queued or running for more than 2 hours | `run_id`, `started_at`, `open_steps[]` |
 | `JOB_OVERDUE` | error | No `daily` job run has finished in the last 26 hours (2.1.0); a run started by hand counts; a never-run service is overdue | `job` (`daily`), `last_run_at` (null if never), `expected_every` (`24h`) |

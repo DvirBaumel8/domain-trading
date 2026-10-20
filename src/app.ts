@@ -6,7 +6,7 @@ import { registerOffers, registerSold, SoldService, OffersService } from './modu
 import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
 import { registerDemand, registerSelection, registerSiblingScan, registerScreening, registerTestSets, registerPacks, ScreeningWorker, type ScreeningDeps, type HoldoutCheck } from './modules/selection/index.js';
 import { registerCheck, createAdapters, type RegistrarAdapter, CheckService } from './modules/registrars/index.js';
-import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerPortfolioImport, registerPortfolioWrites, registerTokens, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
+import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerPortfolioImport, registerPortfolioWrites, registerTokens, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, registerSnapshots, DatasaveJob, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
 import dns from 'node:dns';
 import { queryDns, queryNs, type NsLookup } from './core/ns-lookup.js';
 import type { Config } from './config.js';
@@ -217,7 +217,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ ...base, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     ...base, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention, engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer,
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, log: app.log }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer,
     outsideReview: async () => {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: now() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;
@@ -233,6 +233,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     keepAlive: deps.jobQueueKeepAlive ?? (deps.config.appEnv === 'production' && deps.config.onRender && deps.config.publicBaseUrl ? { url: deps.config.publicBaseUrl } : undefined) }));
   // Closing the app waits for the step in flight, so nothing touches the database after it is closed. Unfinished runs resume at start (main.ts) or on the next GET.
   app.addHook('onClose', async () => app.jobQueue.stop());
+  registerSnapshots(app, { db: deps.db, now });
   registerJobs(app, app.jobQueue, { ...base, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   registerOpenApi(app, openApiRoutes, deps.config.version);
   deps.registerExtraRoutes?.(app);

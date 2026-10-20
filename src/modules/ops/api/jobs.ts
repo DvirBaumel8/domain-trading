@@ -8,10 +8,10 @@ import { AppError } from '../../../http/errors.js';
 import type { JobQueue } from '../queue.js';
 import { jobRunsView, triggerFromKey } from '../../reporting/index.js';
 
-const Body = z.object({ job: z.enum(['tick', 'daily']) }).strict();
+const Body = z.object({ job: z.enum(['tick', 'daily', 'datasave']) }).strict();
 const PreviewBody = z.object({ today: z.string().optional() }).strict();
 const RunsQuery = z.object({
-  job: z.enum(['tick', 'daily', 'screen', 'train']).optional(),
+  job: z.enum(['tick', 'daily', 'screen', 'train', 'datasave']).optional(),
   since: z.string().optional(),
   limit: z.string().regex(/^\d{1,4}$/).optional(),
 }).strict();

@@ -1,4 +1,4 @@
-# Endpoints (contract v5.20.1)
+# Endpoints (contract v5.21.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -18,7 +18,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | Load data for the scoring engine and score names | `POST /engine/sales`, `POST /engine/unsold`, `POST /data/*` (rdap, live-checks, tm-kills, bigco-names, sales-comps), `POST /score`, `GET /engine/health` | WRITE or data token for the loads; READ for `GET` and `POST /score` |
 | Selection and screening | `GET /selection/settings`, `POST /selection/evaluate`, `POST /screening/runs`, `POST /screening/packs`, `GET /selection/buy-hold`, `POST /candidates/intake`, `GET /candidates/daily` | READ for `GET`, WRITE for `POST` (`/candidates/intake` also takes an intake or data token) |
 | Count visitors of the listed names (off until Dvir's line) | `POST /visits/forward/{domain}`, `POST /visits/settings`, `POST /visits/import`, `GET /visits`, `GET /visits/weekly` (the counting itself is `POST /visits/hit`, visits token only) | WRITE, WRITE, WRITE or data, READ, READ |
-| Jobs | `POST /jobs/run` (`tick`, `daily`), `GET /jobs/runs` | job token or WRITE; READ |
+| Jobs | `POST /jobs/run` (`tick`, `daily`, `datasave`), `GET /jobs/runs` | job token or WRITE; READ |
 | Health | `GET /health/ping` (no token), `GET /health` | none, READ |
 
 **Notation:** `field: type` · `?` = optional · `| null` = may be `null` · "USD number" = a JSON number with at most 2 decimals · "money pair" = `x_cents` + `x` (README §Conventions). Every POST needs `Idempotency-Key` (README §Idempotency). Every body schema is **strict**: an unknown field → 422 `VALIDATION_ERROR` (exception: `pricing_evidence` on `/buy` is checked by the comps rules, so an extra key or a bad comp → 422 `COMPS_INVALID`). The cross-cutting errors (401, 403, 429, `IDEMPOTENCY_KEY_*`, `INVALID_BODY`, `INTERNAL`, `AUDIT_WRITE_FAILED`) apply everywhere and aren't repeated per route.
@@ -76,6 +76,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/jobs/run` | job token | Jobs (`jobs.md`) |
 | GET | `/jobs/runs` | READ | Jobs (`jobs.md`) |
 | POST | `/jobs/preview` | WRITE | Jobs (`jobs.md`) |
+| GET | `/snapshots`, `/snapshots/missing` | READ | Daily data saves (`jobs.md`, 5.21.0) |
 | POST | `/company/document`, `/company/forbidden-terms`, `/company/forbidden-terms/{id}/retire` | WRITE | Company and reviews |
 | GET | `/company/document/versions`, `/company/document/versions/{n}`, `/company/forbidden-terms` | READ | Company and reviews |
 | POST | `/reviews/packet`, `/reviews/run`, `/reviews/settings`, `/reviews/{packet_id}/feedback`, `/reviews/items/{id}/status` | WRITE | Company and reviews |
@@ -104,6 +105,7 @@ Any valid bot token (READ or WRITE).
 - `db_size` (5.17.0): `{bytes, limit_bytes, percent, warn_percent}`, the database size against Neon's free 1 GB (`percent` to one decimal; `/report` warns `DB_SIZE_HIGH` above `warn_percent`, 70). `null` when the size can't be read (and in the 503 answer).
 - Removed in 5.2.0 (CR-057): `posting` and `posting_reason` are no longer in the answer.
 - `review_reason` (3.1.0): present only when `review` is `failed`: Google's status and short reason from the latest review, never a key. 3.2.0 (CR-017 N-4): `CODE: text`, where CODE is Google's status (e.g. `UNAVAILABLE`) or `HTTP <n>`; at most **200 characters**, cut at a word and ending with `…` when longer.
+- `datasave` (5.21.0, CR-071, additive): `ok` (every configured GoDaddy inventory file has a complete save within the last 26 hours and the last `datasave` run did not fail), `partial` (some files saved, some not, or the last run failed for some), `error` (the last run's `godaddyInventory` step failed and no file is saved within 26 h), `overdue` (nothing complete within 26 h, also before the first run). It never changes the top-level `status`; the Dynadot steps (`not_configured`) never count. `/report` raises `DATASAVE_MISSED` for any value but `ok` once a save or a run exists.
 - `jobs` is also `overdue` (3.1.0) when `JOB_MISSED` or `JOB_RUN_INCOMPLETE` applies.
 - `review` (2.11.0, additive; `disabled` and `review_model` 2.11.2): `disabled` (the switch is off), `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
 - `jobs_last` (5.20.0, BUG-047, additive): `{daily: ISO | null, tick: ISO | null}`, when each scheduled job last ran (a run counts from the moment it was created; `null` = never). `jobs` is also `overdue` when no `tick` run was created in the last 26 hours (a job that missed its schedule for more than 26 h fails `jobs`, so the next day shows it).
@@ -885,12 +887,12 @@ A closed tranche is read-only in the database as well (an update of the tranche 
 ## Jobs
 
 ### `POST /jobs/run`
-The job token, or (2.3.0) a WRITE bot token, at most 4 calls per hour per WRITE token (see `jobs.md`). Body `{"job": "tick" | "daily"}` (strict; anything else → 422 `VALIDATION_ERROR`). Needs `Idempotency-Key`. **202 (3.0.0)** `{run_id, job, status: "queued" | "running", skipped, steps: [name]}`: the steps run in the background from a queue (`jobs.md`); read the results in `GET /jobs/runs`. **503** `JOBS_DISABLED` when the job token isn't configured.
+The job token, or (2.3.0) a WRITE bot token, at most 4 calls per hour per WRITE token (see `jobs.md`). Body `{"job": "tick" | "daily" | "datasave"}` (5.21.0: `datasave` added; strict; anything else → 422 `VALIDATION_ERROR`). Needs `Idempotency-Key`. **202 (3.0.0)** `{run_id, job, status: "queued" | "running", skipped, steps: [name]}`: the steps run in the background from a queue (`jobs.md`); read the results in `GET /jobs/runs`. **503** `JOBS_DISABLED` when the job token isn't configured.
 
 ---
 
 ### `GET /jobs/runs`
-READ (any `GET` token; not the job token). Query (all optional; an unknown parameter or a bad value → **400** `VALIDATION_ERROR`): `job` (`tick` | `daily`), `since` (ISO 8601 with an offset; runs that finished at or after it), `limit` (1 to 500, default 50). **200:**
+READ (any `GET` token; not the job token). Query (all optional; an unknown parameter or a bad value → **400** `VALIDATION_ERROR`): `job` (`tick` | `daily` | `screen` | `train` | `datasave`), `since` (ISO 8601 with an offset; runs that finished at or after it), `limit` (1 to 500, default 50). **200:**
 ```
 { runs: [ { run_id: string | null (3.0.0; null for older and CLI runs), status: "queued" | "running" | "finished" (3.0.0), job, trigger: "scheduled" | "manual" | "cli", triggered_by: string | null, scheduled_for: ISO | null,
             started_at, finished_at, skipped: bool, ok: bool,
@@ -914,6 +916,26 @@ WRITE. Body (strict): `{today?: "YYYY-MM-DD"}`. `today` is an Asia/Jerusalem day
   dropJob: { would_drop: [domain] } }
 ```
 The arrays are the `applied`, `superseded`, `held`, `delisted`, `cancelled`, `failed` and `dropped` fields of the jobs' dry-run summaries (`jobs.md`). `would_cancel` (2.6.0, CR-009 N-2) lists the open rows the run would cancel (a due delist cancels the name's other open rows; a sold or dropped name's planned rows), and `would_fail` the due rows that would fail the price rules. `would_supersede` stays a list of row ids. A job that was already running adds `skipped: true`. Writes only the audit row (summary `preview <day>: ok`); it never calls a registrar, a marketplace or a nameserver, it does not touch the domains or the schedule, and it is **not** a run (it does not appear in `GET /jobs/runs` and does not satisfy `JOB_OVERDUE`). The other job steps are not previewed.
+
+## Daily data saves (5.21.0, CR-071)
+
+The `datasave` job (`jobs.md`) saves GoDaddy's official inventory files every day at 15:00 UTC and records one write-once manifest per file. These two routes only read; there is no route that writes, re-parses or re-downloads a snapshot, and raw files are never served.
+
+### `GET /snapshots`
+READ (any `GET` token, bots included). Query (all optional; an unknown parameter or bad value → **400** `VALIDATION_ERROR`): `date` (`YYYY-MM-DD`, the **source's data date**, the UTC date of the file's `Last-Modified`, never the run date; default: the last 14 days), `source` (`godaddy_inventory` | `dynadot_closeouts` | `dynadot_aftermarket`). **200:**
+```
+{ date: string | null, source: string | null,
+  snapshots: [ { source, data_date, file_name, status: "complete" | "partial" | "error" | "not_configured", bytes: int | null, sha256: string | null,
+                 last_modified: ISO | null, rows: int | null, rows_total: int | null, price_unit: "cents" | null, http_status: int | null, error: string | null,
+                 raw_available: bool, raw_deleted_at: ISO | null, raw_note: string | null, sealed: bool, sealed_at: ISO | null } ],   // newest data_date first, at most 500
+  pool: [ { data_date, source: "godaddy_closeouts", rows: int } ] }                                                                 // parsed rows still held (3 days)
+```
+- `rows` is set only for the file that is parsed (`closeout_listings.json.zip`): the `.com` names with a price up to the cap (default $40), not adult; `rows_total` is every row of the file. **`rows: null` means not parsed or failed, never zero.** The other four files are fetched, hashed and kept raw only. `price_unit: "cents"` says every price in the parsed rows is integer cents.
+- `status: "error"` carries `http_status` (the inventory host's answer, `null` for a network failure) and `error`; `rows` is `null`. `partial` is a file that was fetched but not parsed. Only `complete` rows are **sealed**; an error or partial row is replaced by the retry.
+- `raw_available` is true only while the raw zip is on the server's disk (7 days at most; the folder `SNAPSHOT_DIR`); after that `raw_available: false` and `raw_deleted_at` is set, and the manifest (sha256, size, rows) stays for good. When the server has no writable disk, `raw_available` is `false` from the start and `raw_note` says why. No server path is ever shown.
+
+### `GET /snapshots/missing`
+READ. Query: `from`, `to` (`YYYY-MM-DD`; default the 14 days up to the last due data date, i.e. yesterday until 16:00 UTC); `from` after `to` or a range over 366 days → **400**. **200** `{source: "godaddy_inventory", from, to, expected_files: [file_name], missing: [{date, missing_files: [file_name], status: "missing" | "partial"}]}`: the days without a complete save of every configured file. A day nobody saved cannot be backfilled (the sources overwrite daily).
 
 ---
 
@@ -1045,6 +1067,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Offer and sale errors:** `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `HOLD_REASON_REQUIRED`, `EXTERNAL_REF_CONFLICT`, `OFFER_NOT_FOUND`, `APPROVAL_REQUIRED`, `OUTCOME_FINAL`, `OUTCOME_TRANSITION_INVALID`, `OFFER_SOLD_MISMATCH`, `OUTCOME_CHANGED_CONCURRENTLY`, `EVIDENCE_REQUIRED`, `SOLD_AT_IN_FUTURE`, `OFFER_MISMATCH`, `NOT_SELLABLE_STATE`, `SALE_ALREADY_RECORDED`, `DEAL_NOT_FOUND`.
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
+
+**Daily data save (5.21.0, CR-071):** `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; not an HTTP error: no route writes snapshots). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
 
 **Candidate screening errors (3.3.0, CR-021):** `ON_DEMAND_SCREEN_CAP` (409; also the `onDemandScreen` skip reason), `ALREADY_RUNNING` (409; also a skip reason of the daily steps). Skip reasons of `POST /candidates/screen` `domains` (3.4.0): `NOT_CHANGED`, `NO_INTAKE`, `OWNED`. Form note (3.4.0): `SCOUT_WORDS`.
 

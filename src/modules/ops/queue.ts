@@ -61,13 +61,15 @@ export class JobQueue {
         .where((eb) => eb.exists(eb.selectFrom('job_steps as s').select('s.id').whereRef('s.run_id', '=', 'r.id').where('s.status', 'in', OPEN)))
         .orderBy('r.created_at').limit(1).executeTakeFirst();
       if (open) {
+        // v5.21.0: a run that waits for its not_before time (the datasave retry) starts now when someone asks for the job again
+        await trx.updateTable('job_queue_runs').set({ not_before: null }).where('id', '=', open.id).where('not_before', 'is not', null).execute();
         const steps = await trx.selectFrom('job_steps').select(['step', 'status']).where('run_id', '=', open.id).orderBy('position').execute();
         return { runId: open.id, job, status: steps.some((s) => s.status === 'running') ? 'running' as const : 'queued' as const, steps: steps.map((s) => s.step), skipped: true };
       }
       const runId = `run_${randomUUID()}`;
       await trx.insertInto('job_queue_runs').values({
         id: runId, job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, triggered_by: triggeredByOf(opts), created_at: new Date(this.deps.now()),
-        params: opts.params === undefined ? null : JSON.stringify(opts.params),
+        params: opts.params === undefined ? null : JSON.stringify(opts.params), not_before: opts.notBefore ?? null,
       }).execute();
       const plan = this.deps.runner.plan(job);
       await trx.insertInto('job_steps').values(plan.map((e, position) => ({
@@ -183,6 +185,7 @@ export class JobQueue {
       where id = (
         select s.id from job_steps s
         where s.run_id = ${runId} and s.status = 'queued'
+          and not exists (select 1 from job_queue_runs q where q.id = s.run_id and q.not_before > ${new Date(this.deps.now())})
           and not exists (select 1 from job_steps p where p.run_id = s.run_id and p.position < s.position and p.status in ('queued', 'running'))
         order by s.position limit 1 for update skip locked)
       returning id, step, attempt, max_attempts, timeout_ms, error`.execute(this.deps.db);
@@ -228,6 +231,21 @@ export class JobQueue {
     }
   }
 
+  /** v5.21.0 (CR-071 R-7): when the godaddyInventory step of a datasave run failed, queue one more run that starts 60 minutes later. */
+  private async retryDatasave(q: { params: unknown }, rows: Array<{ step: string; status: string }>): Promise<void> {
+    const params = typeof q.params === 'string' ? safeJson(q.params) : q.params;
+    if ((params as { retry?: unknown } | null)?.retry === true) return;
+    if (rows.find((r) => r.step === 'godaddyInventory')?.status !== 'failed') return;
+    const at = new Date(this.deps.now() + DATASAVE_RETRY_MS);
+    try {
+      await this.enqueue('datasave', { trigger: 'scheduled', scheduledFor: at, triggeredBy: 'datasave-retry', params: { retry: true }, notBefore: at });
+      // the worker only wakes on a kick; wake it when the hour is up (GET /health and GET /jobs/runs also kick)
+      setTimeout(() => this.kick(), DATASAVE_RETRY_MS + 1_000).unref();
+    } catch (e) {
+      this.deps.log?.warn({ err: e instanceof Error ? e.message : String(e) }, 'datasave retry not queued');
+    }
+  }
+
   /** Writes the run to job_runs once every step is terminal. A second finisher is a no-op (queue_run_id is unique). */
   private async finalize(runId: string): Promise<void> {
     const { db } = this.deps;
@@ -242,6 +260,7 @@ export class JobQueue {
       triggered_by: q.triggered_by, queue_run_id: runId,
     }).onConflict((oc) => oc.doNothing()).returning('id').executeTakeFirst();
     if (!inserted) return;
+    if (q.job === 'datasave') await this.retryDatasave(q, rows);
     // The run-level audit row POST /jobs/run used to get when it ran the job in the request (the CLI writes the same kind of row).
     const failed = rows.filter((r) => r.status === 'failed').map((r) => r.step);
     await writeJobAudit(db, {
@@ -251,5 +270,10 @@ export class JobQueue {
   }
 }
 
+/** The datasave retry is a second run 60 minutes after the first (CR-071 R-7); a retry run never retries again, so it happens once per data day. */
+const DATASAVE_RETRY_MS = 60 * 60_000;
+
 /** JSON for a jsonb column (a NUL character cannot be stored in jsonb). */
+const safeJson = (t: string): unknown => { try { return JSON.parse(t); } catch { return null; } };
+
 const json = (v: unknown): string => (JSON.stringify(v ?? null) as string).replace(/\\u0000/g, '');

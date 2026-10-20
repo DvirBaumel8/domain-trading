@@ -7,7 +7,7 @@ import { pingDb } from '../../../db/client.js';
 import type { Database } from '../../../db/types.js';
 import { adapterStatus } from '../../registrars/index.js';
 import { currentReviewSettings } from '../../outreach/index.js';
-import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, dailyScheduleState, jobsOverdue, lastJobRunAt, tickOverdue } from '../../reporting/index.js';
+import { DB_SIZE_WARN_PERCENT, datasaveStatus, NEON_FREE_STORAGE_BYTES, dailyScheduleState, jobsOverdue, lastJobRunAt, tickOverdue } from '../../reporting/index.js';
 
 export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<Database>, now: () => number = Date.now, kickQueue?: () => Promise<void>, storageLimitBytes: number = NEON_FREE_STORAGE_BYTES): void {
   // Liveness only: the one public route; no auth, no DB (so Render's health checks never wake Neon).
@@ -19,9 +19,10 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
     const dbOk = await pingDb(db);
     if (dbOk) await kickQueue?.(); // resumes unfinished job steps when this process has no worker running (cheap check)
     // v5.14.0: the independent reads run together, and the review settings are read once for both the state and the model
-    const [jobs, jobsLast, review, size] = await Promise.all([
+    const [jobs, jobsLast, datasave, review, size] = await Promise.all([
       dbOk ? jobsState(db, now()) : Promise.resolve('unknown'),
       dbOk ? jobsLastRun(db) : Promise.resolve({ daily: null, tick: null }),
+      dbOk ? datasaveStatus(db, now()).then((d) => d.state).catch(() => 'unknown') : Promise.resolve('unknown'),
       reviewState(db, config),
       dbOk ? dbSize(db, storageLimitBytes) : Promise.resolve(null),
     ]);
@@ -31,6 +32,8 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       jobs,
       // v5.20.0 (BUG-047): when the daily and the tick job last ran (ISO, Asia/Jerusalem offset); null = never
       jobs_last: jobsLast,
+      // v5.21.0 (CR-071): the daily data save: ok | overdue | partial | error (does not change the top-level status; Dynadot not_configured never counts)
+      datasave,
       review: review.state,
       ...(review.state === 'failed' ? { review_reason: review.reason } : {}),
       review_model: review.model,

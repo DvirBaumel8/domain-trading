@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.21.0 (2026-10-20): CR-071 daily data save job (GoDaddy inventory), snapshots, datasave health
+Release note: `docs/releases/v5.21.0.md`.
+MINOR (additive; migration `1765300000000_v5-21-0.sql`).
+- **New job `datasave`** (`POST /jobs/run {"job":"datasave"}`, also `GET /jobs/runs?job=datasave`): the daily data save at 15:00 UTC (GitHub Actions schedule). Steps `godaddyInventory`, `dynadotCloseouts`, `dynadotAftermarket`, `buildPanel`, `snapshotRetention` (`jobs.md`). The five official GoDaddy inventory files (setting `datasave.godaddy_files`: `closeout_listings`, `all_expiring_auctions`, `all_biddable_auctions`, `all_listings_ending_today`, `auctions_ending_today`) are fetched, hashed (sha256, size, Last-Modified) and kept raw for 7 days; only the closeouts are parsed (`.com`, up to $40, not adult, price in cents, kept 3 days). Files are keyed by the source's data date, never the run date.
+- **Sealed manifests:** a complete file is write-once; a second save of a sealed day changes nothing and the step reports the code `SNAPSHOT_SEALED` per file (a step result code, no HTTP 409: no route writes snapshots). A failed fetch is `status: "error"` with `http_status` and `rows: null`, never zero rows. One retry 60 minutes after a failed `godaddyInventory` step. `RAW_EXPIRED` (410) is reserved, not emitted.
+- **Dynadot:** `dynadotCloseouts` and `dynadotAftermarket` report `status: "not_configured"` (no Dynadot key exists); they never fail the run or `/health`.
+- **New routes (READ, bots too):** `GET /snapshots?date=&source=` (manifests, row counts, `raw_available`; never raw contents) and `GET /snapshots/missing?from=&to=`.
+- **`GET /health`** adds `datasave`: `ok | overdue | partial | error` (does not change `status`). **`/report`** adds the warning `DATASAVE_MISSED` (`reports.md`).
+- `POST /jobs/run` accepts `datasave` (WRITE tokens too); `GET /jobs/runs?job=` accepts `datasave`. New optional server env `SNAPSHOT_DIR`.
+
 ## 5.20.1 (2026-10-20): BUG-047 mineunited.com BIN $1,488 (Dvir's approval); CR-069 old per-bot tokens retired
 Release note: `docs/releases/v5.20.1.md`.
 PATCH (data only; no route, field or code changes). Migration `1765200000000_v5-20-1.sql`: `mineunited.com` plan BIN $3,488 -> $1,488 (BUG-047, Dvir's approval 2026-10-20 17:24 IDT; floor $967, walk-away $715 private, min offer $100, final push BIN $1,088); the six old per-bot tokens (`data-engineer`, `scoring-scientist`, `shomer`, `buyer`, `dom-architect` READ; `data-engineer-upload` data) are revoked (CR-069 item 5).

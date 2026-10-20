@@ -1,0 +1,43 @@
+name: datasave
+
+# CR-071 (v5.21.0): the daily data save. One `datasave` job a day at 15:00 UTC (18:00 IDT in summer, 17:00 IST in winter), after GoDaddy's inventory
+# rebuild (about 14:40 UTC). GitHub often starts a schedule late; that is harmless because the job keys every file by the source's Last-Modified date,
+# not by the run date. The retry after a failed GoDaddy step (+60 minutes) runs on the server, not as a second schedule.
+# The Cloudflare account is at the Workers Free limit of cron triggers, so this schedule lives here (free), like review-retry-tick.
+# It calls the API like the Worker does (wake-up ping, then POST). The POST only enqueues the run and answers 202 with its run id; the server works the
+# steps, so this workflow checks the 202 and logs the run id (it has no READ token to poll GET /jobs/runs, and no secret is added).
+on:
+  schedule:
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  datasave:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: POST /jobs/run datasave
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          JOB_TRIGGER_TOKEN: ${{ secrets.JOB_TRIGGER_TOKEN }}
+        run: |
+          test -n "$API_BASE_URL" || { echo "::error::API_BASE_URL repository variable is empty; the data save cannot run"; exit 1; }
+          test -n "$JOB_TRIGGER_TOKEN" || { echo "::error::JOB_TRIGGER_TOKEN repo secret is empty"; exit 1; }
+          # the schedule uses the fixed daily key (a retried workflow of the same day is deduplicated); a by-hand run gets a key from the current time, so it is a new run
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            ms=$(( $(date -u +%s) * 1000 ))
+          else
+            ms=$(( $(date -u -d "$(date -u +%Y-%m-%d) 15:00:00" +%s) * 1000 ))
+          fi
+          # wake the instance first (cold start), then run the job
+          curl -s -o /dev/null --max-time 90 "$API_BASE_URL/health/ping" || true
+          code=$(curl -s -o out.json -w '%{http_code}' --max-time 60 -X POST "$API_BASE_URL/jobs/run" \
+            -H "Authorization: Bearer $JOB_TRIGGER_TOKEN" -H 'Content-Type: application/json' \
+            -H "Idempotency-Key: datasave-$ms" -d '{"job":"datasave"}')
+          echo "HTTP $code"; head -c 2000 out.json; echo
+          test "$code" = 202 || { echo "::error::POST /jobs/run answered HTTP $code"; exit 1; }
+          run_id=$(jq -r '.run_id // empty' out.json) || { echo "::error::the answer is not JSON"; exit 1; }
+          test -n "$run_id" || { echo "::error::the answer has no run_id"; exit 1; }
+          echo "datasave queued: $run_id (skipped: $(jq -r '.skipped' out.json))"
