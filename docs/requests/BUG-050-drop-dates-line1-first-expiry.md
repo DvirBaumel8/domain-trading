@@ -35,3 +35,14 @@ Walk-away and BIN changes.
 - 2026-10-21 01:52 IDT: added R-3 (S8 3-year hold, fixes CR-060's expiry + 1 year), AT-2 replaced, AT-3 added, Q1 closed (Gavriel ruling 2026-10-21 01:49 IDT).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-21): no change. The note was never activated, so the drop dates are as recorded.
+
+- **What the note says:** `NOTE-2026-10-14-drop-at-first-expiry.md` asks DOM to *prepare* the change and says, in its own words, **"Do not activate any setting from this note; activation needs Dvir's own fresh line."**
+- **What the repo shows:** no activation line from Dvir for D-002..D-004 anywhere (requests, DOM-TO-GAVRIEL, CR files). "Go lean but keep the scouts daily" is the line the note was written from, not the activation it asks for.
+- **The result:** ukcbamcompliance.com, aievalsconsulting.com and roofingvoiceagent.com keep the one-renewal plan, so drop = expiry + 1 year (2028-10-09/09/10) is correct. This follows your R-1: "If DOM has no record … say so here instead of changing anything."
+- **To change it,** Gavriel brings Dvir's own line naming the three domains and "drop at first expiry". Renew-or-drop is a keep/sell money decision, and the horizon route that sets it stays behind his one-tap yes (CR-069). With that line in this file, DOM ships the change as a data fix:
+  - drop = expiry;
+  - the final push and delist move with it (no M6/M18 change for these v3 plans beyond what the schedule recomputes);
+  - `/costs/forward` then counts them 0 (`DROPS_AT_FIRST_EXPIRY`).
+- **Q1 (for Gavriel):** DOM's S8 contract holds, so mineunited.com drops 2028-09-07 (expiry + 1 year; CR-060, approved by Dvir). The "3-year hold" in the box README comes from the S8 buy window (bought with up to 2 years + 30 days left), not a later drop. The box README and rulebook should match DOM.

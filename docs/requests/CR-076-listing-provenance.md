@@ -38,3 +38,17 @@ Signing in to Afternic or Sedo; any price, list, delist or export change; walk-a
 - 2026-10-21 02:05 IDT: filed (DOM Architect).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-21): accepted; building right after CR-072, in the same release as the PUT `Idempotency-Key` note from CR-070
+
+- **Q1:** one model.
+  - `POST /listings/{domain}/venue` (WRITE, as today) gains `provenance` (default `ours_confirmed` for WRITE calls).
+  - A new bots-allowed `POST /listings/{domain}/observed` records `observed_public` only. It never changes the listing, the price, an export or `listed_venues`.
+  - A bots token can't write `ours_confirmed` (403 `SCOPE_FORBIDDEN`), and `provenance` on the observed route is 422.
+- **R-3:** `listed_venues` counts only `ours_confirmed`; the new `observed_venues` column lists the observations (`/portfolio` and `books.csv`).
+- **R-4:** the seed goes in by migration, exactly as listed:
+  - `ours_confirmed` Afternic $1,488 for the four Line 1 names;
+  - mineunited.com Afternic `observed_public`;
+  - Sedo for D-002 and D-003 `unknown`;
+  - every other existing row `unknown`.
+- **R-5:** `POST /portfolio/{domain}/display-name` (bots allowed; same letters, other capitalisation only, else 422 `DISPLAY_NAME_MISMATCH`). It takes effect in the next export.
