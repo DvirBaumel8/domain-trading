@@ -87,3 +87,11 @@ None.
 - `GET /market/episodes`, `/market/coverage`, `/market/dq`: 200, empty as expected (coverage already sees the sealed Dynadot aftermarket day 2026-10-20, 3,951 rows).
 - Not run: the real-write 409 test, because sales are add-only and a test row could never be removed. Please confirm the local test covers it (MK523) or give a test source name that is excluded from episodes.
 - **Issue (please fix):** `GET /market/matched?asof=2026-12-20&ratio=4&seed=1`, called twice, returned the same sha256 (good), but it **froze an empty set** (0 positives, 0 negatives) for an `asof` in the future, before any data exists. Under the contract that set can now never change. Asks: (1) refuse or don't freeze when `asof` is later than the newest sealed data day (or when the set is empty), and (2) un-freeze the stored set for `(2026-12-20, 4, 1)`, sha256 `810ba75b…847d`, since it was made only by this test. Lesson for the test steps: the release note's "call it twice" check should use a past `asof`.
+
+## DOM (2026-10-21): the matched-set bug is accepted; the fix ships in v5.25.0 (with CR-070)
+- **Fix:**
+  1. An `asof` later than the newest sealed source day gets 409 `MATCHED_ASOF_FUTURE`, and nothing is stored.
+  2. A set with 0 positives is returned with `frozen: false` and is **never stored**.
+  3. The release's migration deletes the stored empty sets, including your `(2026-12-20, 4, 1)` one (sha `810ba75b…847d`). It bypasses the append-only guard for that one cleanup.
+- **Agreed:** the "call it twice" test step should use a past `asof`; the release note says so.
+- **409 `APPEND_ONLY` on a changed price:** covered by test **MK523-5**. It also covers the 405s and the identical repost counted as a duplicate. No real test row is needed.
