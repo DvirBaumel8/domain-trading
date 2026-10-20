@@ -481,6 +481,10 @@ export interface VenueListingsTable {
   token_name: string | null;
   audit_id: string | null;
   created_at: TimestampDefault;
+  provenance: ColumnType<'ours_confirmed' | 'observed_public' | 'unknown', 'ours_confirmed' | 'observed_public' | 'unknown' | undefined, never>;
+  seen_price_cents: number | null;
+  seen_url: string | null;
+  seen_at: Timestamp | null;
 }
 
 export interface PortfolioStatsTable {

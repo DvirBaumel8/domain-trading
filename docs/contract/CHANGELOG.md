@@ -2,6 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.27.0 (2026-10-21): CR-076 listing provenance, display-name route; PUT Idempotency-Key wording
+Release note: `docs/releases/v5.27.0.md`.
+MINOR (additive; migration `1765900000000_v5-27-0.sql`).
+- **Listing provenance (CR-076):** every `venue_listings` record carries `provenance` (`ours_confirmed` | `observed_public` | `unknown`). `POST /listings/{domain}/venue` (WRITE only, a bots token stays 403 `SCOPE_FORBIDDEN`) takes an optional `provenance` (`ours_confirmed` default, or `unknown`) and echoes it. **New route `POST /listings/{domain}/observed`** (bots or WRITE; `Idempotency-Key`; audited; `dry_run`): `{venue, price_usd: "1488", url, seen_at}` stores an `observed_public` record; a `provenance` key is 422 `VALIDATION_ERROR`; it never changes the listing, price, export, plan, `listing_history` or `listed_venues`.
+- **`listed_venues`** in `GET /portfolio` (new field, array) and `GET /books.csv` counts only the latest `ours_confirmed` record per venue (not a removal). **New `observed_venues`**: `GET /portfolio` field and the **last** books.csv column (header now ends `...,listed_venues,observed_venues`).
+- **Seed (migration, appended rows, no UPDATE):** Afternic $1,488 `ours_confirmed` for promptinjectionaudit.com, ukcbamcompliance.com, aievalsconsulting.com, roofingvoiceagent.com; mineunited.com Afternic `observed_public` (seen 2026-10-20); every earlier record reads `unknown` (the Sedo records of the two names included).
+- **New route `POST /portfolio/{domain}/display-name`** (bots or WRITE; `Idempotency-Key`; audited): `{display_name}` must equal the domain apart from capitalisation, else 422 `DISPLAY_NAME_MISMATCH`; takes effect in the next export (a listed name is flagged `export_pending`).
+- **Fix (docs and message):** a PUT without `Idempotency-Key` was already 400 `IDEMPOTENCY_KEY_REQUIRED`; the message now names the method ("every POST and PUT that changes data needs one (this request was a PUT)") and the README says so.
+
 ## 5.26.0 (2026-10-21): CR-072 ranked closeout and drop candidates
 Release note: `docs/releases/v5.26.0.md`.
 MINOR (additive; migration `1765800000000_v5-26-0.sql`).

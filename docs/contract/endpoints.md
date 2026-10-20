@@ -1,4 +1,4 @@
-# Endpoints (contract v5.26.0)
+# Endpoints (contract v5.27.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -34,6 +34,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | GET | `/pricing/preview` | READ | Listing |
 | POST | `/list/{domain}` | WRITE | Listing |
 | POST | `/listings/{domain}/venue` | WRITE | Listing (3.7.0) |
+| POST | `/listings/{domain}/observed` | WRITE or bots | Listing (5.27.0) |
+| POST | `/portfolio/{domain}/display-name` | WRITE or bots | Listing (5.27.0) |
 | GET | `/export/afternic.csv`, `/export/sedo.csv` | READ | Exports |
 | POST | `/export/{venue}/uploaded` | WRITE | Exports |
 | POST | `/offers`, `/offers/{id}/outcome` | WRITE | Offers |
@@ -240,10 +242,19 @@ The sell plan the server would store: floor, private walk-away, min offer, drop 
 - **Warnings:** `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `BIN_OVER_FAST_TRANSFER_MAX`, `CATEGORY_OTHER`.
 
 ### `POST /listings/{domain}/venue`
-WRITE (3.7.0, CR-031 C). Records a listing made by hand on a venue, append-only. Body (strict) `{venue: afternic|sedo, listed_at (ISO, not in the future), shown?: {mode, price_usd: number|null, min_offer_usd: number|null}, evidence?: {source, ref}, note?, delisted?: bool}`. `shown` is required unless `delisted: true`. Any other field, a walk-away included, gives 422 `VALIDATION_ERROR`. **201** with the record.
+WRITE (3.7.0, CR-031 C). Records a listing made by hand on a venue, append-only. Body (strict) `{venue: afternic|sedo, listed_at (ISO, not in the future), shown?: {mode, price_usd: number|null, min_offer_usd: number|null}, evidence?: {source, ref}, note?, delisted?: bool, provenance?: "ours_confirmed"|"unknown"}` (5.27.0: `provenance` defaults to `ours_confirmed`; `observed_public` is 422, it has its own route). A **bots** token is refused: 403 `SCOPE_FORBIDDEN` (a hand listing is a money-route record; WRITE only). `shown` is required unless `delisted: true`. Any other field, a walk-away included, gives 422 `VALIDATION_ERROR`. **201** with the record.
 - **Shown in `GET /portfolio/{domain}`** as `export.<venue>.listed_by_hand_at`, `shown` and `delisted_by_hand_at`.
 - **`pending`:** false while the latest record isn't a delisting and its shown price and min offer are null or equal the current plan's BIN and min offer. A scheduled price change makes a priced listing pending again.
 - **`/sold`:** its checklist names the venues listed by hand to pull the listing from.
+- **Provenance (5.27.0, CR-076):** every record carries `provenance` (`ours_confirmed` | `observed_public` | `unknown`), shown in the 201. Records made before 5.27.0 are `unknown`, except the migration seed (Afternic $1,488 `ours_confirmed` for promptinjectionaudit.com, ukcbamcompliance.com, aievalsconsulting.com, roofingvoiceagent.com; mineunited.com Afternic `observed_public`). `listed_venues` counts only the latest `ours_confirmed` record per venue (not a removal); a sighting (below) is never a hand listing for `export.<venue>`, `pending` or the `/sold` checklist.
+
+### `POST /listings/{domain}/observed`
+WRITE or bots (5.27.0, CR-076 R-2; `Idempotency-Key`; audited; a record route, not a money route). Logs a listing **seen on a public page**, stored as `observed_public`. Body (strict) `{venue: afternic|sedo, price_usd: "1488" (a USD string, up to 2 decimals), url (http/https), seen_at (ISO with an offset, not in the future), dry_run?: bool}`. Any other key, **`provenance` included**, gives 422 `VALIDATION_ERROR` and nothing is stored. `dry_run: true` answers **200** and stores nothing; otherwise **201** `{id, domain, venue, provenance: "observed_public", seen_price_cents, seen_price, seen_url, seen_at, audit_id}`.
+- **Changes nothing else:** not the listing, the price, an export, the plan, `listing_history`, `export_pending_since` or `listed_venues`. It adds the venue to `observed_venues` (`GET /portfolio`, `GET /books.csv`).
+- **Errors:** 404 `DOMAIN_NOT_FOUND` · 422 `VALIDATION_ERROR` (bad price, URL or `seen_at`, unknown key).
+
+### `POST /portfolio/{domain}/display-name`
+WRITE or bots (5.27.0, CR-076 R-5; `Idempotency-Key`; audited). Body (strict) `{display_name}`: the domain with different ASCII capitalisation only (same letters, digits, hyphens and dots), else **422 `DISPLAY_NAME_MISMATCH`**. **200** `{domain, display_name, changed, export_pending, audit_id}`. The name is in the export rows, so it takes effect in the **next export**: for a `listed` name that changes, `export_pending_since` is set like a plan change (`export_pending: true`); the same name again changes nothing (`changed: false`). Errors: 404 `DOMAIN_NOT_FOUND` · 422 `DISPLAY_NAME_MISMATCH`, `VALIDATION_ERROR`.
 
 ### `POST /list/{domain}`
 Points the domain at the for-sale lander and/or sets its listing mode and prices. WRITE. The domain must be `owned` or `listed`.
@@ -390,6 +401,7 @@ See `reports.md`.
 ### `GET /portfolio`
 READ. `{domains: [<per_domain row>]}` (the row shape is in `reports.md` §per_domain). Pending purchases are never listed.
 - **Query (strict):** `status` = `owned` | `listed` | `delisted` | `sold` | `dropped`. Anything else → 400 `VALIDATION_ERROR`.
+- **Venue fields (5.27.0, CR-076):** each row also carries `listed_venues` (sorted array: venues whose latest `ours_confirmed` record is not a removal) and `observed_venues` (venues whose latest record is a public sighting).
 
 ### `GET /portfolio/{domain}`
 READ. One domain: `registrar_state` (3.7.0, CR-033 G-6: `{auto_renew, privacy, ns, checked_at}` from the daily `registrarCheck`, read-only `domain/get` and `domain/getNs` at Porkbun; null for other registrars or before the first check), the `per_domain` row plus

@@ -38,8 +38,14 @@ export const ledgerJson = (rows: Awaited<ReturnType<typeof ledgerRows>>) => rows
 }));
 
 export async function portfolioRows(db: Kysely<Database>, now: Date, status?: string) {
-  const rows = await perDomain(db, now);
-  return status ? rows.filter((r) => r.status === status) : rows;
+  const rows = (await perDomain(db, now)).filter((r) => !status || r.status === status);
+  // v5.27.0 (CR-076): listed_venues = the venues whose latest ours_confirmed record is not a removal; observed_venues = the venues whose latest record is a public sighting
+  const venues = await sql<{ domain: string; venue: string; kind: 'listed' | 'observed' }>`
+    select domain, venue, 'listed' as kind from (select distinct on (domain, venue) domain, venue, delisted from venue_listings where provenance = 'ours_confirmed' order by domain, venue, id desc) o where not delisted
+    union all
+    select domain, venue, 'observed' as kind from (select distinct on (domain, venue) domain, venue, provenance from venue_listings order by domain, venue, id desc) l where provenance = 'observed_public'`.execute(db);
+  const pick = (domain: string, kind: string) => venues.rows.filter((v) => v.domain === domain && v.kind === kind).map((v) => v.venue).sort();
+  return rows.map((r) => ({ ...r, listed_venues: pick(r.domain, 'listed'), observed_venues: pick(r.domain, 'observed') }));
 }
 
 /** The values in force at the newest confirmed file of the venue that contains the domain (never the walk-away). */
@@ -56,7 +62,7 @@ async function exportBlock(db: Kysely<Database>, domain: string, domainId: numbe
     if (h) lastUploaded = { ...pair('bin', h.bin_cents), ...pair('floor', h.floor_cents), ...pair('min_offer', h.min_offer_cents) };
   }
   // v3.7.0 (CR-031 C): a listing made by hand on the venue. The latest record decides (a delisting ends it); `pending` then follows what is shown there against the current plan.
-  const hand = await db.selectFrom('venue_listings').selectAll().where('domain', '=', domain).where('venue', '=', venue).orderBy('id', 'desc').limit(1).executeTakeFirst();
+  const hand = await db.selectFrom('venue_listings').selectAll().where('domain', '=', domain).where('venue', '=', venue).where('provenance', '!=', 'observed_public').orderBy('id', 'desc').limit(1).executeTakeFirst(); // a sighting (CR-076) never counts as our listing
   const handLive = hand && !hand.delisted ? hand : null;
   let isPending = pending.has(domain);
   if (handLive) {

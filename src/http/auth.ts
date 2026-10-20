@@ -209,6 +209,8 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /jobs/run': 'write_only',
   // allowed
   'POST /tokens/bots/rotate': 'allowed',
+  'POST /listings/{domain}/observed': 'allowed', // v5.27.0 (CR-076 R-2): a public sighting, stored as observed_public; touches no listing, price or export
+  'POST /portfolio/{domain}/display-name': 'allowed', // v5.27.0 (CR-076 R-5): capitalisation of the name only
   'POST /portfolio/{domain}/renewal-price': 'allowed',
   'POST /portfolio/{domain}/stats': 'allowed',
   'POST /ledger/costs': 'allowed', // v5.25.0 (CR-070 R-1): records tool, ai and adjustment costs only; no money moves

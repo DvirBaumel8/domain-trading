@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 5.26.0** (21 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 5.27.0** (21 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -39,8 +39,8 @@ The base URL is given to Gavriel in the release notes and `docs/requests/`. Unti
 - **Rate-limit headers (2.1.0):** every authenticated response, a 429 included, carries `RateLimit-Limit` (60 for a GET, 10 for a POST), `RateLimit-Remaining` (calls left in the window for that token and method class) and `RateLimit-Reset` (seconds until the oldest counted call leaves the window; on a 429 it equals `Retry-After`). `GET /health/ping` and refused (401) requests carry none.
 - `HEAD` is answered for every `GET` route, with the same auth. On `/export/afternic.csv` and `/export/sedo.csv` a HEAD runs the GET handler: it writes an `export_runs` row and returns an `X-Export-Id`.
 
-## Idempotency (every POST)
-- `Idempotency-Key: <1–255 visible ASCII characters>` is **required** on every POST that writes. Missing or malformed → **400** `IDEMPOTENCY_KEY_REQUIRED`.
+## Idempotency (every POST and PUT that writes)
+- `Idempotency-Key: <1–255 visible ASCII characters>` is **required** on every POST that writes, and on every PUT (`PUT /portfolio/{domain}/forward-costs` among them). Missing or malformed → **400** `IDEMPOTENCY_KEY_REQUIRED`; since 5.27.0 the message names the method used ("every POST and PUT that changes data needs one (this request was a PUT)").
 - **The one read-only POST (5.5.0): `POST /score`.** It uses POST only because it carries a list of names in a body; it changes nothing the caller owns. It takes a **READ** token, needs **no** `Idempotency-Key` and writes **no** audit row. Its only side effect is caching new public registry (RDAP) answers in `engine_endings`. Founder rule 8 (every POST idempotent and audited) is about writes; no other route is excepted. A missing or invalid token is still 401.
 - **Same key, same method, path and body** (canonical JSON): the stored response is replayed with the header `Idempotent-Replayed: true`. The side effects happen once.
 - **Same key, different request, or the same key from a different token** (5.13.0: a key belongs to the token that first used it, so one token never reads another token's stored answer) → **409** `IDEMPOTENCY_KEY_MISMATCH`. **Same key while the first call is still running** → **409** `IDEMPOTENCY_KEY_IN_USE` (2.16.0: with `details: {stale: true, started_at}` when the first call started more than 15 minutes ago and may have died; the key is not released, so retry with a new key only after checking whether the first call acted). Completed keys are kept 30 days.

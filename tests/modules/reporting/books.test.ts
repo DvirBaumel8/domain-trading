@@ -138,7 +138,7 @@ describe('CR-070 ledger costs, forward costs, books', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toContain('text/csv');
     const lines = res.body.trimEnd().split('\r\n');
-    expect(lines[0]).toBe('domain,display_name,line,category,status,buy_date,cost_usd,expiry_date,renewal_price_usd,renewal_price_source,drop_date,bin_usd,floor_usd,walkaway_usd,min_offer_usd,next_event,next_event_date,listed_venues');
+    expect(lines[0]).toBe('domain,display_name,line,category,status,buy_date,cost_usd,expiry_date,renewal_price_usd,renewal_price_source,drop_date,bin_usd,floor_usd,walkaway_usd,min_offer_usd,next_event,next_event_date,listed_venues,observed_venues');
     expect(lines).toHaveLength(3);
     const head = lines[0]!.split(',');
     const portfolio = (await call('GET', '/portfolio', read)).json().domains as Record<string, unknown>[];

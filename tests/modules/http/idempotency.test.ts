@@ -24,6 +24,18 @@ describe('idempotency (ID)', () => {
     expect(sideEffects.count).toBe(0);
   });
 
+  it('ID527-1: a PUT without the key is 400 IDEMPOTENCY_KEY_REQUIRED and the message names the PUT', async () => {
+    app = await makeApp();
+    const { auth } = await issueToken('write');
+    const res = await app.inject({ method: 'PUT', url: '/portfolio/example.com/forward-costs', headers: auth, payload: { lines: [] } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+    expect(res.json().error.message).toContain('every POST and PUT that changes data needs one');
+    expect(res.json().error.message).toContain('was a PUT');
+    const post = await app.inject({ method: 'POST', url: '/__test/echo', headers: auth, payload: { value: 'x' } });
+    expect(post.json().error.message).toContain('was a POST');
+  });
+
   it('ID-1: empty or oversized key → 400', async () => {
     app = await makeApp();
     const { auth } = await issueToken('write');

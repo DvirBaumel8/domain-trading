@@ -47,7 +47,7 @@ export function registerIdempotency(app: FastifyInstance, db: Kysely<Database>):
       throw new AppError(
         400,
         'IDEMPOTENCY_KEY_REQUIRED',
-        'An Idempotency-Key header (1–255 visible ASCII characters) is required on every POST',
+        `An Idempotency-Key header (1–255 visible ASCII characters) is required: every POST and PUT that changes data needs one (this request was a ${req.method})`,
       );
     }
     if (Date.now() - lastPrune >= PRUNE_EVERY_MS) {

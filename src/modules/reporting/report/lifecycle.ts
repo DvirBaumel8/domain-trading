@@ -80,7 +80,7 @@ export async function lifecycleWarnings(db: Kysely<Database>, now: Date, today: 
   // CR-049 item 4: a sold name must come off every venue. The venues whose latest hand-listing row is not a removal are still to be cleared in the Chrome run.
   const soldRecent = domains.filter((d) => d.status === 'sold' && d.sold_at && now.getTime() - d.sold_at.getTime() <= 30 * 86_400_000);
   const latestVenue = await sql<{ domain: string; venue: string; delisted: boolean }>`
-    select distinct on (domain, venue) domain, venue, delisted from venue_listings order by domain, venue, id desc`.execute(db);
+    select distinct on (domain, venue) domain, venue, delisted from venue_listings where provenance <> 'observed_public' order by domain, venue, id desc`.execute(db);
   const clearedAt = new Map(latestVenue.rows.filter((v) => v.delisted).map((v) => [`${v.domain}|${v.venue}`, true]));
   for (const d of soldRecent) {
     const venues = ['afternic', 'sedo'].filter((v) => !clearedAt.has(`${d.domain}|${v}`));

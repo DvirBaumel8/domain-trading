@@ -194,23 +194,19 @@ export async function forwardCosts(db: Kysely<Database>, from: string, to: strin
 // ---- R-5 GET /books.csv ----
 /** The header of GET /books.csv (docs/contract/formats.md "Books CSV"). */
 export const BOOKS_HEADER = ['domain', 'display_name', 'line', 'category', 'status', 'buy_date', 'cost_usd', 'expiry_date', 'renewal_price_usd', 'renewal_price_source', 'drop_date',
-  'bin_usd', 'floor_usd', 'walkaway_usd', 'min_offer_usd', 'next_event', 'next_event_date', 'listed_venues'];
+  'bin_usd', 'floor_usd', 'walkaway_usd', 'min_offer_usd', 'next_event', 'next_event_date', 'listed_venues', 'observed_venues'];
 const usd = (c: number | null): string => (c === null ? '' : usdSigned(c));
 
 /** One row per live name (owned, listed or delisted; not sold, dropped or pending). Values come from the same rows as GET /portfolio. */
 export async function booksRows(db: Kysely<Database>, now: Date): Promise<string[][]> {
   const live = (await portfolioRows(db, now)).filter((r) => ['owned', 'listed', 'delisted'].includes(r.status));
   const extra = new Map((await db.selectFrom('domains').select(['domain', 'display_name', 'buy_date', 'renewal_price_source']).where('domain', 'in', live.length ? live.map((r) => r.domain) : ['']).execute()).map((d) => [d.domain, d]));
-  const venues = await sql<{ domain: string; venue: string }>`
-    select domain, venue from (select distinct on (domain, venue) domain, venue, delisted from venue_listings order by domain, venue, id desc) v where not delisted`.execute(db);
-  const listed = new Map<string, string[]>();
-  for (const v of venues.rows) listed.set(v.domain, [...(listed.get(v.domain) ?? []), v.venue].sort());
   return [BOOKS_HEADER, ...live.map((r) => {
     const e = extra.get(r.domain);
     return [
       csvSafeText(r.domain), csvSafeText(e?.display_name ?? ''), String(r.line), csvSafeText(r.category ?? ''), r.status, e?.buy_date ?? '', usd(r.cost_cents), r.expiry_date ?? '',
       usd(r.renewal_price_cents), csvSafeText(e?.renewal_price_source ?? ''), r.drop_date ?? '', usd(r.bin_cents), usd(r.floor_cents), usd(r.walkaway_cents), usd(r.min_offer_cents),
-      r.next_price_event?.event ?? '', r.next_price_event?.due_on ?? '', (listed.get(r.domain) ?? []).join(';'),
+      r.next_price_event?.event ?? '', r.next_price_event?.due_on ?? '', r.listed_venues.join(';'), r.observed_venues.join(';'),
     ];
   })];
 }
