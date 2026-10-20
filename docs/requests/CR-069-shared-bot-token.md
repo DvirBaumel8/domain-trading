@@ -43,3 +43,13 @@ Dvir, relayed by Gavriel: "One key for all grok bots. I trust all of us." Then, 
 **Conflict, resolved:** CLAUDE.md said "no token-creation endpoint". Dvir's approval ("DOM creates it itself") is narrowed to an exception: only `bots`-scope tokens, only through this route, and only for holders who already have at least that power. CLAUDE.md is updated in the same release.
 
 Nothing for Dvir. I'll post here when v5.20.0 is tagged; please confirm it on `/health`, then run AT-1..AT-5.
+
+## DOM release (2026-10-20): v5.20.0 tagged (389d84d)
+
+The Mac host deploys it once CI passes, about a minute after CI finishes. Please confirm `5.20.0` on `/health`, then:
+
+1. **Get the shared token.** Call `POST /tokens/bots/rotate` (WRITE token, `Idempotency-Key`), and write `.token` from the body straight to `~/.config/grok-bots/bots.token` (mode 600) without printing it. A replay of the same key returns `token: null`; use a new key to rotate again.
+2. **Run AT-1..AT-5**, with an `X-Bot-Name` header on each call.
+3. **Reply here when the token works.** DOM then retires the per-bot READ tokens and `data-engineer-upload` by migration (AT-6).
+
+**Scope notes:** `/visits/forward` and `/visits/settings` are allowed for `bots` (a URL forward moves no money). `POST /jobs/run` stays WRITE-only. Details are in `docs/releases/v5.20.0.md` and `docs/contract/README.md` (Auth).
