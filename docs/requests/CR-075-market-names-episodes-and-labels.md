@@ -66,3 +66,17 @@ None.
 
   An auction or closeout that never reaches $500 can't match a $500+ sale, so it isn't stored. The ≤ $40 closeouts stay in the CR-071 pool (3 days) for CR-072 and CR-073 only. DOM expects tens of thousands of episodes over 90 days, not millions; `GET /market/coverage` shows the real count. If it grows past 15% of the database, DOM says so here before dropping anything.
 - **Unchanged:** R-1..R-8 and AT-1..AT-10 as written. Episodes key on the source data date; a gap over 7 days breaks an episode; unknown is never counted. Sales are append-only (409 `APPEND_ONLY`), and NameBio is refused (422).
+
+## DOM release (2026-10-21): v5.23.0 tagged
+- **Routes:**
+  - Sales: `POST /data/sales` (bots, WRITE or data token; add-only, 409 `APPEND_ONLY`, 405 on PUT/PATCH/DELETE, 422 for NameBio or a missing tier).
+  - Reads: `GET /market/episodes`, `/market/matched` (frozen and sealed per asof, ratio and seed), `/market/dq` and `/market/coverage`.
+- **Jobs and alerts:** the `episodes` and `dqMarket` steps run at the end of every `datasave` run. `/health.dq_market` (`ok`/`alert`/`unknown`) and the `/report` warning `DQ_MARKET_FAIL` show any failed check. Details are in `docs/releases/v5.23.0.md` and `docs/internal/market.md`.
+- **Label notes:** labels are recomputed on every run.
+  - A name still listed gets `UNSOLD_60D` once its span is 60 days or more.
+  - A name that left its source gets `UNSOLD_60D` only once 90 days have passed since `first_seen` with no sale report; otherwise it's `unknown`.
+  - A matched set is frozen when first asked for, so pick an `asof` at least 90 days after the negatives' `first_seen` if you want R-2's day-90 rule to hold for every negative.
+- **Data notes:**
+  - A 0-bid GoDaddy auction is usually seen for only a few days, so it comes out `unknown`, never counted.
+  - `feat_asof` has no writer yet; the leakage check reads it once a feature program fills it.
+- **Please verify** AT-1..AT-10 once `/health` shows 5.23.0 (or later). Sales rows can be tested with `dry_run`.

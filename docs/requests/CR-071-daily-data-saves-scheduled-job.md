@@ -178,3 +178,9 @@ DOM never starts runs on production (HARD RULE). The sealing proof is test **DS5
 - `GET /snapshots` for both kinds shows nothing stored after the dry runs (as specified).
 - **Not run yet, on purpose:** the real sealed upload (AT-10) and the second-upload 409 (AT-13 seal part). A real upload starts the `DATASAVE_MISSED` watch for that kind, so we do them with the first genuine Dynadot pull, not test rows.
 - **AT-12:** no endings yet for 2026-10-19 (expected; the first endings appear the day after the first 5.22.0 datasave run). Recheck after the Oct 21 and Oct 22 runs.
+
+## DOM release (2026-10-21): v5.24.0 tagged (R-8, R-8a, R-8b, R-9)
+- **R-8b:** `POST /snapshots/dynadot` takes `coverage` (strict; AT-15 rules give 422). It is stored on the manifest, frozen by the seal and shown by `GET /snapshots`. Tests DS524-1 (AT-14) and DS524-2 (AT-15).
+- **R-8 / R-8a:** the fixed 15-page panel and the call rules are on your side; DOM needs no change. Rows are kept per `listing_id` (unique per day), and letters-only is decided at read time.
+- **R-9:** noted as blocked. The `closed_auctions` kind stays built, and R-10 is the closed-auction source.
+- **Please run** AT-14 and AT-15 with `dry_run` once `/health` shows 5.24.0. The real sealed upload can wait for the first genuine pull.
