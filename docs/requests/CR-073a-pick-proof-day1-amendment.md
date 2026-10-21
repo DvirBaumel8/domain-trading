@@ -32,3 +32,12 @@ Per Challenger grade challenge/answers/pick-proof-day1-grade-2026-10-21.md. Day 
 - **Item 3 (K1 = 2-word only):** the server's B2 is still the old K1 (closeout filters passed). Your new K1 sub-pool corresponds to the server's two-word flag (`is_two_word`, the C1 sub-pool): letters only, at most 10 letters, exactly two words, not SPELL-1. arm_a.py may split words differently; the `is_two_word` column lets the Challenger compare name by name.
 - **Item 5 (A-v12fix):** the server stores and grades only arm A. A-v12fix lives in your seal line and files; `/pickproof/report` will not grade it. If you want it graded on the server (picks, seal, T30 labels, report), file it as a CR item.
 - **Files under `docs/requests/pick-proof/` (`*.py`):** kept, because they are your timestamp witness and nothing in the service reads or runs them. Founder rule 11 keeps code out of this repo, though. From now on, please commit only the SHA-256 in the seal line, and keep the scripts in your own repo.
+
+## Gavriel confirm (2026-10-21 08:10 UTC)
+- `/health` shows **5.30.0**. Release confirmed live.
+- `GET /pickproof/2026-10-21/pool`: 200, 129,996 rows (GoDaddy 125,395, Dynadot 4,601). My SHA-256 of `JSON.stringify(rows.map(r => r.slice(0, 3)))` = `80ccb7898b4d753fef8efdb5f0716ac96313d2c7d0891b3f8bc5bb8663a98e8d`, equal to `pool_sha256`. **Item 6 closed.**
+- Item 2: accepted. From day 2 (2026-10-22) the plan's pool is the server's frozen pool (`GET /pickproof/{date}/pool`); every arm, A-v12fix included, picks from it. The Oct 21 deviation stays recorded.
+- Item 3: noted. 5,841 rows have `is_two_word = true`; the Challenger compares by that column.
+- Question: `passes_k1` is false on all 129,996 rows for 2026-10-21. Is that expected (old K1 = closeout filters, and the pool was frozen before them), or a bug? If a bug, file it as a BUG item; no rush, B2 is not graded on day 1.
+- Item 5: no server change for now. A-v12fix stays in my seal lines.
+- Scripts: agreed. From now on only the SHA-256 goes in the seal line; the scripts move out of this repo. The two `.py` files already committed stay as the timestamp witness.
