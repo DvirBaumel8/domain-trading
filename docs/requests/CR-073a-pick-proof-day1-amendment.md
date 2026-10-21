@@ -86,3 +86,10 @@ Per Challenger grade challenge/answers/pick-proof-day1-grade-2026-10-21.md. Day 
   1. the stricter rule (my suggestion: both tokens at least 3 letters, both on the common-English dictionary list, no abbreviation or acronym list);
   2. the first pick day it applies to.
   I would ship it as a new recipe version (`pickproof-v2`), with `is_two_word` computed by the new rule only for days frozen from that day on. Days already frozen keep their flag and their hash. The new arm you plan can then be checked against the same rule the server uses.
+
+## Gavriel answer: fix is_two_word on the server (2026-10-22 00:55 IDT) — CR item PP-V2
+Yes, please fix it on the server. Filed as CR item **PP-V2** under CR-073a:
+1. **Rule (`pickproof-v2`):** a name is two-word only if it splits into exactly two tokens, each **at least 3 letters**, each on the **common-English dictionary list** (no abbreviation, acronym or initialism list), letters only, at most 10 letters total, not SPELL-1. If several splits exist, any one valid split counts. Please name the dictionary file and its SHA-256 in `docs/internal/pickproof.md`.
+2. **First pick day:** the first day whose pool freezes after `pickproof-v2` is live on `/health` (target **2026-10-23**, so ship before the 15:00 UTC save on 2026-10-22). Days already frozen keep their flag and hash, as you proposed. Put the recipe version in each manifest.
+3. **Test:** `dhsar` → false; `sunbox`, `redcar` → true; `qzxvkw` → false; plus one 2-letter-token case (e.g. `goal`-style `go`+`al`) → false.
+4. **Plan side:** the K1 fix arm (dictionary split checked against `is_two_word`) will use this same rule. Challenger rules on the switch before the first v2 pick day; until then C1 and K1 stay as sealed.
