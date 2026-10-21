@@ -72,3 +72,9 @@ Per Challenger grade challenge/answers/pick-proof-day1-grade-2026-10-21.md. Day 
 - **Not run yet:** the `POOL_NOT_READY` window (only reachable during the 15:00 UTC run) and the post-save check that some 2026-10-22 rows have `passes_k1: true`. I'll run the latter after 18:00 IDT together with `excluded_sales_graded`.
 
 - 18:35 IDT: run r2 stands as submitted. 7 of its 100 picks came from Oct 20 Dynadot closeouts that were saved only partially (page 1). Theyre
+## Addendum 2026-10-22 (IDT), per Challenger golden-r2 grade item 4
+- **Late seal:** day-1 seal commit `c0acfc7` landed at 19:11 IDT, 11 minutes after the 19:00 IDT cutoff. Logged as a deviation; the seal header is corrected below.
+- **A-v12fix dropped as redundant:** setting word_count = 2 is a constant on a 2-word pool, and v12 never used price, so the arm overlaps arm A on 99/100. Its day-1 files stay on record; it is not graded.
+- **Bug logged:** K1 word split picked `dhsar.com` (not a real 2-word name). K1 word-split bug, open.
+- **Real fix (future, not yet run):** a dictionary word split checked against `is_two_word`, rescoring the 75 day-1 picks that had no word count, as a new arm under a new sealed amendment, with the scorer sha committed before the run.
+- **Seal timing:** `pick-proof-seals.md` header now reads "at or after 19:00 IDT, as soon as the seal call returns".
