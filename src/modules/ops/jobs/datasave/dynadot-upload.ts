@@ -20,10 +20,12 @@ export const BOT_UPLOAD_FILE = 'bot_upload';
 /** Aftermarket rows under this price are dropped ($500). */
 export const AFTERMARKET_MIN_CENTS = 50_000;
 export const DYNADOT_MAX_ROWS = 50_000;
+/** The highest price a row may carry (BUG-051: refused with 422 PRICE_CAP, never clamped). */
+export const DYNADOT_MAX_PRICE_CENTS = 2_000_000_000;
 const BATCH = 5_000;
 
 const domain = z.string().trim().min(3).max(253).transform((s) => s.toLowerCase().replace(/\.$/, '')).refine((s) => /^(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/.test(s), 'must be a domain name');
-const cents = z.number().int().min(0).max(2_000_000_000);
+const cents = z.number().int().min(0).max(DYNADOT_MAX_PRICE_CENTS);
 const iso = z.string().refine((s) => /^\d{4}-\d{2}-\d{2}T/.test(s) && !Number.isNaN(Date.parse(s)), 'must be an ISO 8601 date-time');
 const page = z.number().int().min(1).max(100_000);
 /** v5.24.0 (CR-071 R-8b): how complete a bot's pull was; a day is sealed even when some pages failed. Stored on the manifest, shown by GET /snapshots. */

@@ -1,4 +1,4 @@
-# Endpoints (contract v5.31.0)
+# Endpoints (contract v5.32.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -1141,7 +1141,7 @@ READ (any `GET` token, bots included). Query (all optional; an unknown parameter
 - `origin: "bot_upload"` marks a manifest made by `POST /snapshots/dynadot` (file name `bot_upload`, `bytes` null, no raw file). With `rows=n` and a Dynadot source the answer also has `rows`: aftermarket `{data_date, domain, listing_id, price_cents}`, closed auctions `{data_date, domain, end_time, bid_count, final_price_cents}`, closeouts `{data_date, domain, price_cents, ends_at}`.
 
 ### `POST /snapshots/dynadot`
-5.22.0, CR-071 R-8, R-9. **WRITE or bots token** (non-money; a READ token is 403 `SCOPE_FORBIDDEN`). `Idempotency-Key` required; audited (the audit row keeps `[n rows]`, never the rows). Body limit **8 MB** (up to 50,000 rows per call; send several calls with the same `kind` and `data_date`). The server has no Dynadot key: the bots pull the data and upload it here.
+5.22.0, CR-071 R-8, R-9. **WRITE or bots token** (non-money; a READ token is 403 `SCOPE_FORBIDDEN`). `Idempotency-Key` required; audited (the audit row keeps `[n rows]`, never the rows). Body limit **8 MB**. **Limits (5.32.0, BUG-051):** at most **50,000 rows per call** (send several calls with the same `kind` and `data_date`); every price field (`price_cents`, `final_price_cents`) at most **2,000,000,000** cents (about $20M), inclusive. Over the row limit: **422 `ROWS_LIMIT`** `details: {max_rows, received_n}`. A price over the cap: **422 `PRICE_CAP`** `details: {max_cents, rows: [index, up to 20], over_n}` (leave such rows out; prices are never clamped). The row limit is checked first; either way the whole call is refused and nothing is stored. Every other problem stays 422 `VALIDATION_ERROR`. `GET /openapi.json` shows both (`maxItems`, `maximum`). The server has no Dynadot key: the bots pull the data and upload it here.
 ```
 { "kind": "aftermarket" | "closed_auctions" | "closeouts",
   "data_date": "YYYY-MM-DD",          // UTC data date of the pull; not in the future
@@ -1322,7 +1322,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Closeout candidates (5.26.0, CR-072):** `SNAPSHOT_MISSING` (409 from `GET /candidates/closeouts`: no sealed snapshot for that date and source). Filter codes in `summary.filtered_by` (not errors): `SPELL-1`, `BRAND-1`, `BIGCO-1`, `TM_KILL`, `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN`, `OWNED`, `SALES_GRADED`. Row `score_reason`: `NO_ACTIVE_MODEL`, `SCORE_FAILED`, `NOT_SCORED_YET`.
 
-**Daily data save (5.21.0, CR-071):** `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; since 5.22.0 also **HTTP 409** from `POST /snapshots/dynadot` for a sealed (kind, data_date)). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
+**Daily data save (5.21.0, CR-071):** `ROWS_LIMIT` and `PRICE_CAP` (422, `POST /snapshots/dynadot`, 5.32.0, BUG-051); `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; since 5.22.0 also **HTTP 409** from `POST /snapshots/dynadot` for a sealed (kind, data_date)). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
 
 **Candidate screening errors (3.3.0, CR-021):** `ON_DEMAND_SCREEN_CAP` (409; also the `onDemandScreen` skip reason), `ALREADY_RUNNING` (409; also a skip reason of the daily steps). Skip reasons of `POST /candidates/screen` `domains` (3.4.0): `NOT_CHANGED`, `NO_INTAKE`, `OWNED`. Form note (3.4.0): `SCOUT_WORDS`.
 

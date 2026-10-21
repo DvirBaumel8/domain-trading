@@ -90,5 +90,6 @@ v5.22.0 tests: `tests/modules/ops/datasave-dynadot.test.ts`.
 | DS522-15 | retention of ended and stale open auctions |
 | DS524-1 | coverage stored on a sealed upload, frozen by the seal guard (AT-14) |
 | DS524-2 | invalid coverage 422, missing coverage null (AT-15) |
+| DS532-1 | BUG-051: 50,000 rows pass, 50,001 is `ROWS_LIMIT`, a price over the cap is `PRICE_CAP` with indexes, the cap is inclusive, nothing stored, OpenAPI shows both |
 
 v5.26.0 tests: `tests/modules/ops/closeouts.test.ts` (CC526-*, table in `closeouts.md`).

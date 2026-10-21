@@ -56,6 +56,30 @@ describe('DS522 Dynadot bot uploads', () => {
     expect(new Set(res.rows.map((r: { listing_id: string }) => r.listing_id)).size).toBe(3);
   });
 
+  it('DS532-1 (BUG-051) 50,000 rows pass; 50,001 is 422 ROWS_LIMIT; a price over the cap is 422 PRICE_CAP with the row indexes; the cap is inclusive; nothing stored; other errors stay VALIDATION_ERROR', async () => {
+    const { post, get } = await boot();
+    const many = (n: number) => Array.from({ length: n }, (_, i) => AM(`n${i}.com`, `L${i}`, 60000));
+    const ok = await post({ kind: 'aftermarket', data_date: '2026-10-20', dry_run: true, rows: many(50_000) });
+    expect(ok.statusCode, ok.body).toBe(201);
+    expect(ok.json().received_n).toBe(50_000);
+    const big = await post({ kind: 'aftermarket', data_date: '2026-10-20', rows: many(50_001) });
+    expect(big.statusCode).toBe(422);
+    expect(big.json().error).toMatchObject({ code: 'ROWS_LIMIT', details: { max_rows: 50_000, received_n: 50_001 } });
+    const cap = await post({ kind: 'aftermarket', data_date: '2026-10-20', rows: [AM('a.com', 'L1', 60000), AM('naonu.com', 'L2', 5_680_000_000), AM('b.com', 'L3', 2_000_000_000)] });
+    expect(cap.statusCode).toBe(422);
+    expect(cap.json().error).toMatchObject({ code: 'PRICE_CAP', details: { max_cents: 2_000_000_000, rows: [1], over_n: 1 } });
+    const ca = await post({ kind: 'closed_auctions', data_date: '2026-10-20', rows: [CA('c.com', 3, 2_000_000_001)] });
+    expect(ca.json().error).toMatchObject({ code: 'PRICE_CAP', details: { rows: [0] } });
+    const edge = await post({ kind: 'aftermarket', data_date: '2026-10-20', dry_run: true, rows: [AM('b.com', 'L3', 2_000_000_000)] });
+    expect(edge.statusCode).toBe(201);
+    expect((await post({ kind: 'aftermarket', data_date: '2026-10-20', rows: [{ domain: 'a.com', listing_id: 'L1', price_cents: 1.5 }] })).json().error.code).toBe('VALIDATION_ERROR');
+    expect((await get('/snapshots?date=2026-10-20&source=dynadot_aftermarket')).json().snapshots).toHaveLength(0);
+    const spec = (await get('/openapi.json')).json();
+    const body = JSON.stringify(spec.paths['/snapshots/dynadot'].post.requestBody);
+    expect(body).toContain('"maxItems":50000');
+    expect(body).toContain('"maximum":2000000000');
+  });
+
   it('DS524-1 (AT-14) a final upload with coverage seals the day as complete and GET /snapshots shows the same coverage object', async () => {
     const { post, get } = await boot();
     const planned = [40, 78, 116, 154, 192, 230, 268, 306, 344, 382, 420, 458, 496, 534, 572];

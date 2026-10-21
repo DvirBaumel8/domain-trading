@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.32.0 (2026-10-21): BUG-051: /snapshots/dynadot limits documented, ROWS_LIMIT and PRICE_CAP codes
+Release note: `docs/releases/v5.32.0.md`.
+MINOR (additive; no migration).
+- **`POST /snapshots/dynadot` limits stated:** at most 50,000 rows per call; every price field at most 2,000,000,000 cents (inclusive).
+- **New codes (422):** `ROWS_LIMIT` (`details.max_rows`, `details.received_n`) and `PRICE_CAP` (`details.max_cents`, `details.rows` up to 20 indexes, `details.over_n`). The row limit is checked first; the whole call is refused, nothing stored. Other problems stay `VALIDATION_ERROR` (they were all `VALIDATION_ERROR` before).
+
 ## 5.31.0 (2026-10-21): CR-073a: a pick-proof day freezes only after the daily filter step (POOL_NOT_READY)
 Release note: `docs/releases/v5.31.0.md`.
 MINOR (additive; no migration).

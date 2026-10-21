@@ -5,7 +5,7 @@ import { isRealDate } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
 import { missingDays } from '../../reporting/index.js';
-import { DynadotBody, uploadDynadot } from '../jobs/datasave/dynadot-upload.js';
+import { DYNADOT_MAX_PRICE_CENTS, DYNADOT_MAX_ROWS, DynadotBody, uploadDynadot } from '../jobs/datasave/dynadot-upload.js';
 
 const day = z.string().refine(isRealDate, 'must be a real date (YYYY-MM-DD)');
 const Query = z.object({
@@ -57,7 +57,7 @@ export function registerSnapshots(app: FastifyInstance, deps: SnapshotsDeps): vo
 
   // v5.22.0 (CR-071 R-8, R-9): the bots upload the Dynadot rows they pulled; DOM stores and seals them (final: true). Non-money; dry_run validates and stores nothing.
   app.post('/snapshots/dynadot', { config: { openapiBody: DynadotBody }, bodyLimit: UPLOAD_BODY_LIMIT }, async (req, reply) => {
-    const b = DynadotBody.parse(req.body ?? {});
+    const b = parseDynadot(req.body ?? {});
     const r = await uploadDynadot(db, b, deps.now());
     req.auditSummary = `dynadot ${r.kind} ${r.data_date}${r.dry_run ? ' (dry run)' : ''}: ${r.received_n} received, ${r.accepted_n} stored, ${r.duplicate_n} duplicate, ${r.dropped_under_500_n} under $500${r.sealed ? ', sealed' : ''}`;
     return reply.code(201).send({ ...r, audit_id: req.auditId ?? null });
@@ -94,4 +94,20 @@ async function storedRows(db: Kysely<Database>, source: string, from: string, to
     ...(kind === 'closed_auctions' ? { end_time: r.end_time?.toISOString() ?? null, bid_count: r.bid_count, final_price_cents: r.final_price_cents } : {}),
     ...(kind === 'closeouts' ? { price_cents: r.price_cents, ends_at: r.ends_at?.toISOString() ?? null } : {}),
   }));
+}
+
+/** v5.32.0 (BUG-051): the row limit and the price cap get their own 422 codes (ROWS_LIMIT first); every other issue stays VALIDATION_ERROR (thrown by zod). */
+function parseDynadot(body: unknown): DynadotBody {
+  const p = DynadotBody.safeParse(body);
+  if (p.success) return p.data;
+  const rows = (body as { rows?: unknown }).rows;
+  const received = Array.isArray(rows) ? rows.length : 0;
+  if (p.error.issues.some((i) => i.code === 'too_big' && i.path.length === 1 && i.path[0] === 'rows')) {
+    throw new AppError(422, 'ROWS_LIMIT', `At most ${DYNADOT_MAX_ROWS} rows per call (got ${received}); send several calls with the same kind and data_date. Nothing was stored`, { max_rows: DYNADOT_MAX_ROWS, received_n: received });
+  }
+  const over = [...new Set(p.error.issues.filter((i) => i.code === 'too_big' && i.path[0] === 'rows' && typeof i.path[1] === 'number' && (i.path[2] === 'price_cents' || i.path[2] === 'final_price_cents')).map((i) => i.path[1] as number))].sort((a, c) => a - c);
+  if (over.length > 0) {
+    throw new AppError(422, 'PRICE_CAP', `${over.length} row(s) have a price above ${DYNADOT_MAX_PRICE_CENTS} cents; leave them out. Nothing was stored`, { max_cents: DYNADOT_MAX_PRICE_CENTS, rows: over.slice(0, 20), over_n: over.length });
+  }
+  throw p.error;
 }
