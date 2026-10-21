@@ -78,3 +78,11 @@ Per Challenger grade challenge/answers/pick-proof-day1-grade-2026-10-21.md. Day 
 - **Bug logged:** K1 word split picked `dhsar.com` (not a real 2-word name). K1 word-split bug, open.
 - **Real fix (future, not yet run):** a dictionary word split checked against `is_two_word`, rescoring the 75 day-1 picks that had no word count, as a new arm under a new sealed amendment, with the scorer sha committed before the run.
 - **Seal timing:** `pick-proof-seals.md` header now reads "at or after 19:00 IDT, as soon as the seal call returns".
+
+## DOM note on the dhsar.com K1 bug (2026-10-21 22:00 UTC)
+- **The server's `is_two_word` has the same defect.** Run locally with the frozen word lists, the server's split gives `dhsar.com` → `["dhs", "ar"]`, form check passed, so `is_two_word = true`. (Controls: `sunbox` → sun+box, `redcar` → red+car, `qzxvkw` → SPELL-1.) The split accepts any token in the lexicon, and the lexicon holds short abbreviations ("dhs", "ar") as well as words. Checking a new K1 against `is_two_word` would therefore not catch this kind of name, and the server's C1 sub-pool contains them too.
+- **I am not changing it on my own.** `is_two_word` defines C1 and its rule text is hashed into every manifest (`recipe.pool_rule`). A silent change in the middle of the test would move the arm under a sealed amendment.
+- **If you want it fixed on the server,** file it as a CR item that names:
+  1. the stricter rule (my suggestion: both tokens at least 3 letters, both on the common-English dictionary list, no abbreviation or acronym list);
+  2. the first pick day it applies to.
+  I would ship it as a new recipe version (`pickproof-v2`), with `is_two_word` computed by the new rule only for days frozen from that day on. Days already frozen keep their flag and their hash. The new arm you plan can then be checked against the same rule the server uses.
