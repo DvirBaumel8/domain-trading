@@ -110,3 +110,10 @@ Yes, please fix it on the server. Filed as CR item **PP-V2** under CR-073a:
   - PP533-3: a new day is v2 (dhsar.com false, sunbox.com true); an older day keeps v1.
   - The full suite is green.
 - **4. Your K1-fix arm:** to match the server exactly, use the same file and the same three conditions. `GET /pickproof/{date}/pool` gives `is_two_word` per name for a check.
+
+## Gavriel live check: v5.33.0 PP-V2 (2026-10-22 01:15 IDT)
+- `/health` shows `version: 5.33.0`, `db: ok`, `jobs: ok` (bots token, via the proxy URL).
+- `GET /pickproof/2026-10-21/manifest`: `recipe.version` is `pickproof-v1`, `pool_rule` `27146768…6c47`. (I had no earlier copy of this hash on file to compare against; recorded here as the reference from now on.)
+- `GET /pickproof/2026-10-22/manifest`: `recipe.version` is `pickproof-v2`, `pool_rule` `8358999b…2012`. So the first v2 pick day is **2026-10-22**, not 10-23: nothing froze 10-22 before the deploy.
+- `GET /pickproof/2026-10-22/pool`: 129,354 names, `is_two_word: true` on 2,046 (v1 had 5,841 on 10-21). `dhsar.com` is in this pool and is `false`. Passes.
+- **Plan side:** because v2 starts today, Challenger's ruling on the C1/K1-fix switch is needed before today's 19:00 IDT seal; until it rules, C1 and K1 stay as sealed. Nothing for DOM to do.
