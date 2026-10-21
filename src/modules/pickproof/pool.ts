@@ -38,6 +38,9 @@ export async function buildPool(db: Db, day: string, maxPriceCents: number): Pro
   const dataDate = addDays(day, -1);
   const gd = await db.selectFrom('snapshot_manifests').select(['sha256', 'rows']).where('source', '=', 'godaddy_inventory').where('data_date', '=', dataDate).where('file_name', '=', CLOSEOUTS_FILE).where('status', '=', 'complete').where('sealed_at', 'is not', null).executeTakeFirst();
   if (!gd) throw new AppError(409, 'SNAPSHOT_MISSING', `No sealed GoDaddy closeouts snapshot for data date ${dataDate}, so the pool of ${day} cannot be frozen`, { date: day, data_date: dataDate, source: 'godaddy' });
+  // v5.31.0 (CR-073a): do not freeze between the download and scorePool of the same run, or passes_k1 would be false for every unprocessed row
+  const pending = Number((await db.selectFrom('datasave_pool').select((eb) => eb.fn.countAll<string>().as('n')).where('data_date', '=', dataDate).where('source', '=', 'godaddy_closeouts').where('scored_at', 'is', null).executeTakeFirstOrThrow()).n);
+  if (pending > 0) throw new AppError(409, 'POOL_NOT_READY', `${pending} closeout rows of data date ${dataDate} have not passed the daily filter step yet, so the pool of ${day} cannot be frozen; try again after the daily save finishes`, { date: day, data_date: dataDate, pending_n: pending });
   const dy = await db.selectFrom('snapshot_manifests').select(['sha256', 'rows']).where('source', '=', 'dynadot_closeouts').where('data_date', '=', dataDate).where('file_name', '=', 'bot_upload').where('status', '=', 'complete').where('sealed_at', 'is not', null).executeTakeFirst();
 
   const raw = (await sql<{ domain: string; price_cents: number; source: 'godaddy' | 'dynadot'; filter_code: string | null; scored: boolean }>`

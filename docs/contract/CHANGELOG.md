@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.31.0 (2026-10-21): CR-073a: a pick-proof day freezes only after the daily filter step (POOL_NOT_READY)
+Release note: `docs/releases/v5.31.0.md`.
+MINOR (additive; no migration).
+- **New code `POOL_NOT_READY` (409):** a pick-proof call that would freeze day D (picks, manifest, pool) while GoDaddy closeout rows of D-1 have not been through the daily filter step (`scorePool`) answers 409 with `details.pending_n`, and nothing is stored. Retry after the daily save finishes. Days already frozen are unchanged.
+
 ## 5.30.0 (2026-10-21): CR-073a: GET /pickproof/{date}/pool and the pool-hash recipe
 Release note: `docs/releases/v5.30.0.md`.
 MINOR (additive; no migration).

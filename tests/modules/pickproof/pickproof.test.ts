@@ -220,6 +220,19 @@ describe('PP528 pick-proof: pool, picks, seal, arms', () => {
     expect(gone.json().error).toMatchObject({ code: 'PICKPROOF_POOL_PRUNED', details: { pool_sha256: b.pool_sha256 } });
   });
 
+  it('PP531-1 (CR-073a) the pool is not frozen while GoDaddy rows of the data date are not processed by scorePool: 409 POOL_NOT_READY, nothing stored; it freezes once they are', async () => {
+    const { get, picks } = await boot();
+    await standardPool();
+    await db.updateTable('datasave_pool').set({ scored_at: null }).where('domain', '=', twoWord[0]!).execute();
+    const r = await get(`/pickproof/${D}/manifest`);
+    expect(r.statusCode).toBe(409);
+    expect(r.json().error).toMatchObject({ code: 'POOL_NOT_READY', details: { data_date: DD, pending_n: 1 } });
+    expect((await picks([twoWord[1]!])).json().error.code).toBe('POOL_NOT_READY');
+    expect(await db.selectFrom('pickproof_days').selectAll().execute()).toHaveLength(0);
+    await db.updateTable('datasave_pool').set({ scored_at: new Date() }).where('domain', '=', twoWord[0]!).execute();
+    expect((await get(`/pickproof/${D}/pool`)).statusCode).toBe(200);
+  });
+
   it('PP528-18 k is raise-only (a lower value is refused by the database, never above 300) and a raised k applies to the next day', async () => {
     await expect(sql`update settings set pickproof_k = 50`.execute(db)).rejects.toThrow(/can only be raised/);
     await expect(sql`update settings set pickproof_k = 301`.execute(db)).rejects.toThrow();
