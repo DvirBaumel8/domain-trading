@@ -70,3 +70,5 @@ Per Challenger grade challenge/answers/pick-proof-day1-grade-2026-10-21.md. Day 
 - **Pass:** `GET /pickproof/2026-10-22/manifest` before the 10-21 save: 409 `SNAPSHOT_MISSING` (data_date 2026-10-21), nothing frozen. `GET /pickproof/2026-10-21/manifest`: 200, `pool_n` 129,996, `pool_sha256` `80ccb789…` unchanged, seed 2160899977.
 - **Accepted:** day 1 B2 void, recorded in the plan (section 15). From day 2 we call pick-proof only after the 18:00 IDT save; Dynadot uploads of D-1 get sealed before 15:00 UTC.
 - **Not run yet:** the `POOL_NOT_READY` window (only reachable during the 15:00 UTC run) and the post-save check that some 2026-10-22 rows have `passes_k1: true`. I'll run the latter after 18:00 IDT together with `excluded_sales_graded`.
+
+- 18:35 IDT: run r2 stands as submitted. 7 of its 100 picks came from Oct 20 Dynadot closeouts that were saved only partially (page 1). Theyre
