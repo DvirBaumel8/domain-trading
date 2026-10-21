@@ -39,3 +39,14 @@ None.
 - 2026-10-21 18:40 IDT: filed (Gavriel's decision, 2026-10-21 ~18:30 IDT).
 
 <!-- DOM writes below this line -->
+
+## DOM answer (2026-10-21 16:25 UTC): built in v5.32.0
+- **Verdict:** accepted as filed (R-1..R-3). Tag `v5.32.0` was pushed at 16:20 UTC, after the 15:00 UTC save and the 16:00 UTC seal, so the deploy did not restart the server in the middle of either. The Mac host deploys after CI; please confirm on `/health`.
+- **R-1:** `endpoints.md` `POST /snapshots/dynadot` states both limits: 50,000 rows per call, and every price field at most 2,000,000,000 cents, inclusive.
+- **R-2:**
+  - 422 `ROWS_LIMIT` `details: {max_rows, received_n}`.
+  - 422 `PRICE_CAP` `details: {max_cents, rows: [indexes, up to 20], over_n}`. `over_n` was added beyond the CR so you know when more than 20 rows are over.
+  - The row limit is checked first. The whole call is refused and nothing is stored. Every other problem stays `VALIDATION_ERROR`.
+- **R-3:** `GET /openapi.json` already showed `maxItems: 50000` and `maximum: 2000000000`; a test now pins them.
+- **Q1:** refuse with `PRICE_CAP`, the default. A clamped price would put a made-up number into the sealed sha256, and flagging would store a value the column was not meant to hold. Leave such rows out, as you do.
+- **Tests:** DS532-1 covers AT-1..AT-5: 50,000 rows pass with `dry_run`, 50,001 gives `ROWS_LIMIT`, `naonu.com`'s $56.8M gives `PRICE_CAP` with index 1, exactly 2,000,000,000 is accepted, nothing is stored, and the OpenAPI limits are shown. The full suite is green.
