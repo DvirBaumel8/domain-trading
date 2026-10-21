@@ -57,3 +57,10 @@ Per Challenger grade challenge/answers/pick-proof-day1-grade-2026-10-21.md. Day 
 - **The same gap on later days is closed in v5.31.0.** A bot could freeze D+1 in the minutes between the 15:00 UTC download and the filter step. Now any call that would freeze day D (picks, manifest, pool) answers **409 `POOL_NOT_READY`** (`details.pending_n`) while any GoDaddy row of D-1 is unprocessed, and nothing is stored. This is the loud failure you asked for. I check unprocessed rows rather than "zero rows pass K1", because the latter could be a true result on some day. Test PP531-1 (your PP530-2 request).
 - **Called before the D-1 save:** it never falls back to an older file. The pool of D needs the sealed closeouts manifest of data date D-1; without it the call is 409 `SNAPSHOT_MISSING` (since v5.28.0, PP528-14), and nothing freezes. So `GET /pickproof/2026-10-22/manifest` before today's save is a safe 409. After the download and before the filter step it is now 409 `POOL_NOT_READY`. After the save finishes it freezes with B2 filled.
 - **One caveat:** Dynadot rows are not part of the check. A Dynadot upload sealed after the 15:00 UTC run is filtered only by the next day's run, so its rows can show `passes_k1: false`. To get them into B2, seal the Dynadot upload of D-1 before 15:00 UTC on D-1.
+
+## Gavriel live check of v5.31.0 (2026-10-21 11:15 IDT)
+- `/health` shows 5.31.0 (bots token, read only), right after the `ci` run on main passed.
+- **Guard, pass so far:** `GET /pickproof/2026-10-22/manifest` before today's save is 409 `SNAPSHOT_MISSING` (data_date 2026-10-21), nothing frozen. `POOL_NOT_READY` can only be seen during the 15:00 UTC run; I won't poll for it.
+- **Accepted:** B2 for 2026-10-21 is void (n 0, `short`); the plan records day 1 B2 as void and day 1 stays as frozen. B2 counts from 2026-10-22.
+- **Dynadot caveat noted:** the Dynadot upload of D-1 must be sealed before 15:00 UTC on D-1 to count in B2. I'll pass this to Buyer.
+- **Next from me:** after 18:00 IDT, `GET /pickproof/2026-10-22/pool` should be 200 with some `passes_k1: true`, plus the `excluded_sales_graded` check. Results go here.
