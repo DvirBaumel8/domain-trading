@@ -89,3 +89,16 @@ export async function armsView(db: Kysely<Database>, day: string, arm: ArmName |
   for (const a of ALL_ARMS) arms[a] = await one(a);
   return { date: day, pool_sha256: d.pool_sha256, seed: d.seed, arms: { ...arms, C2: { status: 'not_built' } } };
 }
+
+/** v5.30.0 (CR-073a): the frozen pool rows of a day (freezes it on first use, like the manifest), sorted by domain in byte order. */
+export async function poolView(db: Kysely<Database>, day: string) {
+  const d = await db.transaction().execute(async (tx) => { await lockDay(tx, day); return ensureDay(tx, day); });
+  const rows = await db.selectFrom('pickproof_pool').select(['domain', 'source', 'price_cents', 'passes_k1', 'is_two_word']).where('day', '=', day).execute();
+  if (rows.length !== d.pool_n) throw new AppError(410, 'PICKPROOF_POOL_PRUNED', `The pool rows of ${day} were pruned; pool_sha256 and the manifest stay`, { date: day, pool_sha256: d.pool_sha256, pool_n: d.pool_n });
+  rows.sort((a, b) => byteOrder(a.domain, b.domain));
+  return {
+    date: day, data_date: d.data_date, pool_n: d.pool_n, pool_sha256: d.pool_sha256, seed: d.seed, sources: d.sources,
+    fields: ['domain', 'source', 'price_cents', 'passes_k1', 'is_two_word'],
+    rows: rows.map((r) => [r.domain, r.source, r.price_cents, r.passes_k1, r.is_two_word]),
+  };
+}

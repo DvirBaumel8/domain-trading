@@ -52,11 +52,12 @@ export async function buildPool(db: Db, day: string, maxPriceCents: number): Pro
   for (const r of await db.selectFrom('engine_sales').select('domain').distinct().execute()) graded.add(r.domain.toLowerCase());
   for (const r of await db.selectFrom('market_names').select('name').distinct().where('outcome', '=', 'sold').execute()) graded.add(r.name.toLowerCase());
 
-  // one row per domain: the lowest price wins, then godaddy before dynadot
+  // one row per domain: the lowest price wins, then the source in byte order ('dynadot' before 'godaddy'; v5.30.0 doc fix, G-117)
   raw.sort((a, b) => byteOrder(a.domain, b.domain) || a.price_cents - b.price_cents || byteOrder(a.source, b.source));
   const kept: typeof raw = [];
+  const excluded = new Set<string>();
   for (const r of raw) {
-    if (graded.has(r.domain)) continue;
+    if (graded.has(r.domain)) { excluded.add(r.domain); continue; }
     if (kept.length > 0 && kept[kept.length - 1]!.domain === r.domain) continue;
     kept.push(r);
   }
@@ -75,6 +76,8 @@ export async function buildPool(db: Db, day: string, maxPriceCents: number): Pro
   const sources = {
     godaddy: { manifest_sha256: gd.sha256, rows: rows.filter((r) => r.source === 'godaddy').length },
     dynadot: dy ? { status: 'sealed', manifest_sha256: dy.sha256, rows: rows.filter((r) => r.source === 'dynadot').length } : { status: 'missing', manifest_sha256: null, rows: 0 },
+    // v5.30.0 (CR-073a): the names removed as sales-graded, so the pool can be rebuilt from the snapshot files alone
+    excluded_sales_graded: [...excluded].sort(byteOrder),
   };
   return { rows, sources, dataDate };
 }

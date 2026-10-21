@@ -199,6 +199,27 @@ describe('PP528 pick-proof: pool, picks, seal, arms', () => {
     expect(m.arms.C1.short).toBe(true);
   });
 
+  it('PP530-1 (CR-073a) GET /pickproof/{date}/pool returns the frozen rows in byte order; the sha256 of [domain, source, price_cents] is pool_sha256; sales-graded names are listed; a data token is 403', async () => {
+    const { get, data } = await boot();
+    await snapshot([['sunmap.com', 1000, true], ['zed.com', 900, false], ['sunbox.com', 500, true], ['abc-d.com', 700, false]]);
+    const upId = (await db.insertInto('engine_uploads').values({ kind: 'sales', received_n: 1, accepted_n: 1, duplicate_n: 0, rejected_n: 0, rejects: '[]', by: 'test', audit_id: null }).returning('id').executeTakeFirstOrThrow()).id;
+    await db.insertInto('engine_sales').values({ domain: 'sunbox.com', price_cents: 100000, sale_date: '2026-01-01', venue: 'v', source: 's', source_url: null, upload_id: upId }).execute();
+    const r = await get(`/pickproof/${D}/pool`);
+    expect(r.statusCode, r.body).toBe(200);
+    const b = r.json();
+    expect(b).toMatchObject({ date: D, data_date: DD, pool_n: 3, fields: ['domain', 'source', 'price_cents', 'passes_k1', 'is_two_word'] });
+    expect(b.rows.map((x: unknown[]) => x[0])).toEqual(['abc-d.com', 'sunmap.com', 'zed.com']);
+    const { createHash } = await import('node:crypto');
+    expect(createHash('sha256').update(JSON.stringify(b.rows.map((x: unknown[]) => x.slice(0, 3)))).digest('hex')).toBe(b.pool_sha256);
+    expect(b.sources.excluded_sales_graded).toEqual(['sunbox.com']);
+    expect((await get(`/pickproof/${D}/manifest`)).json().pool_sha256).toBe(b.pool_sha256); // the pool call froze the day
+    expect((await get(`/pickproof/${D}/pool`, data.auth)).statusCode).toBe(403);
+    await db.deleteFrom('pickproof_pool').execute(); // pruned after the keep days
+    const gone = await get(`/pickproof/${D}/pool`);
+    expect(gone.statusCode).toBe(410);
+    expect(gone.json().error).toMatchObject({ code: 'PICKPROOF_POOL_PRUNED', details: { pool_sha256: b.pool_sha256 } });
+  });
+
   it('PP528-18 k is raise-only (a lower value is refused by the database, never above 300) and a raised k applies to the next day', async () => {
     await expect(sql`update settings set pickproof_k = 50`.execute(db)).rejects.toThrow(/can only be raised/);
     await expect(sql`update settings set pickproof_k = 301`.execute(db)).rejects.toThrow();

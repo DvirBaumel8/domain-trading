@@ -216,7 +216,7 @@ v5.28.0 (CR-073). The pick-proof test mechanics: frozen daily pool, arms A/B1/B2
 
 | Route | File |
 |---|---|
-| POST /pickproof/:date/picks (bots/WRITE), GET /pickproof/:date/manifest, GET /pickproof/:date/arms, GET /pickproof/report | `pickproof/api/pickproof.ts` (`registerPickproof`, called from `src/app.ts`) |
+| POST /pickproof/:date/picks (bots/WRITE), GET /pickproof/:date/manifest, GET /pickproof/:date/arms, GET /pickproof/:date/pool (v5.30.0), GET /pickproof/report | `pickproof/api/pickproof.ts` (`registerPickproof`, called from `src/app.ts`) |
 
 | File | Inside |
 |---|---|

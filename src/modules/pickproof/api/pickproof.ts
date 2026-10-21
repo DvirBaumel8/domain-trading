@@ -1,5 +1,5 @@
 // CR-073 (v5.28.0). POST /pickproof/{date}/picks (bots or WRITE, Idempotency-Key, audited; non-money), GET /pickproof/{date}/manifest,
-// GET /pickproof/{date}/arms, GET /pickproof/report (READ or bots).
+// GET /pickproof/{date}/arms, GET /pickproof/{date}/pool (v5.30.0, CR-073a), GET /pickproof/report (READ or bots).
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { isRealDate } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
 import { report } from '../report.js';
-import { armsView, manifest, postPicks } from '../store.js';
+import { armsView, manifest, poolView, postPicks } from '../store.js';
 
 const day = z.string().refine(isRealDate, 'must be a real date (YYYY-MM-DD)');
 const PicksBody = z.object({ names: z.array(z.string().min(1).max(253)).min(1).max(300) }).strict();
@@ -39,6 +39,8 @@ export function registerPickproof(app: FastifyInstance, deps: { db: Kysely<Datab
   });
 
   app.get('/pickproof/:date/manifest', async (req) => manifest(db, dayParam(req), deps.now()));
+
+  app.get('/pickproof/:date/pool', async (req) => poolView(db, dayParam(req)));
 
   app.get('/pickproof/:date/arms', async (req) => {
     const date = dayParam(req);

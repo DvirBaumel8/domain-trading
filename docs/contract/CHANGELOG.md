@@ -2,6 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.30.0 (2026-10-21): CR-073a: GET /pickproof/{date}/pool and the pool-hash recipe
+Release note: `docs/releases/v5.30.0.md`.
+MINOR (additive; no migration).
+- **New `GET /pickproof/{date}/pool`** (READ or bots): the frozen pool rows `[domain, source, price_cents, passes_k1, is_two_word]` in byte order, with `pool_sha256`, `seed` and `sources`; the SHA-256 of the first three fields is `pool_sha256`. Freezes the day on first use like the manifest; shows no arm.
+- **Manifest `sources.excluded_sales_graded`:** the names removed as sales-graded when the pool was frozen (days frozen from 5.30.0 on).
+- **New code:** `PICKPROOF_POOL_PRUNED` (410) once the pool rows are removed after 45 days.
+- **Doc fix:** a tie on price between a GoDaddy and a Dynadot row keeps the Dynadot row (byte order of the source name); the internal doc said GoDaddy (G-117). The code did not change.
+- **Pool-hash recipe** written out in `docs/internal/pickproof.md` (CR-073a item 6). Also corrects the 5.29.0 release note: the `POST /rdap/batch` field is `domains`, not `names` (the contract was right).
+
 ## 5.29.0 (2026-10-21): CR-074 RDAP lookup service with cache and rolling limit; bots scope checked before the body
 Release note: `docs/releases/v5.29.0.md`.
 MINOR (additive; migration `1766100000000_v5-29-0.sql`).

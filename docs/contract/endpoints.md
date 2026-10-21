@@ -1,4 +1,4 @@
-# Endpoints (contract v5.29.0)
+# Endpoints (contract v5.30.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -68,7 +68,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | DELETE | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | GET | `/market/episodes`, `/market/matched`, `/market/dq`, `/market/coverage` | READ or bots (a data token gets 403) | Market data (5.23.0, CR-075) |
 | POST | `/pickproof/{date}/picks` | WRITE or bots (non-money; a READ or data token gets 403) | Pick-proof (5.28.0, CR-073) |
-| GET | `/pickproof/{date}/manifest`, `/pickproof/{date}/arms`, `/pickproof/report` | READ or bots (a data token gets 403) | Pick-proof (5.28.0, CR-073) |
+| GET | `/pickproof/{date}/manifest`, `/pickproof/{date}/arms`, `/pickproof/{date}/pool`, `/pickproof/report` | READ or bots (a data token gets 403) | Pick-proof (5.28.0, CR-073; pool 5.30.0, CR-073a) |
 | POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
 | POST | `/engine/holdout-date` | WRITE only (not a data token) | Holdout guard (5.10.0, CR-061) |
 | GET | `/engine/holdout-date` | READ | Holdout guard (5.10.0, CR-061) |
@@ -737,7 +737,8 @@ WRITE or bots (audited, `Idempotency-Key` required). Body (strict) `{names: ["x.
 READ or bots. The **seal**. The first call at or after the deadline draws B1, B2 and C1 from the frozen pool, stores them and seals the day (a sealed day cannot change, not even in the database); every later call returns the same answer (same seed, hashes and draws). Before the deadline the call only freezes the pool and shows A as open.
 ```
 { date, data_date, pool_n, pool_sha256, seed, k,
-  sources: { godaddy: {manifest_sha256, rows}, dynadot: {status: "sealed"|"missing", manifest_sha256, rows} },
+  sources: { godaddy: {manifest_sha256, rows}, dynadot: {status: "sealed"|"missing", manifest_sha256, rows},
+             excluded_sales_graded: [domain] },   // 5.30.0; absent on days frozen before it
   arms: { A: {n, sha256, short, sealed} | {status: "open", n, sealed: false},
           B1, B2, C1: {n, sha256, short, sealed} | {status: "pending_seal", sealed: false},
           C2: {status: "not_built"} },
@@ -745,6 +746,9 @@ READ or bots. The **seal**. The first call at or after the deadline draws B1, B2
   deadline, sealed: bool, sealed_at }
 ```
 An arm's `sha256` is the SHA-256 of the JSON array of its names in rank order. The bots append the seal line (this answer) to `docs/requests/pick-proof-seals.md`; DOM does not commit data. 400 `VALIDATION_ERROR` for a date that is not real; 409 `SNAPSHOT_MISSING`.
+
+### `GET /pickproof/{date}/pool` (5.30.0, CR-073a)
+READ or bots. The frozen pool of the day, so anyone can check `pool_sha256` (freezes the day on first use, like the manifest; shows no arm). **200** `{date, data_date, pool_n, pool_sha256, seed, sources, fields: ["domain","source","price_cents","passes_k1","is_two_word"], rows: [[...], ...]}`, rows sorted by domain in byte order. `pool_sha256` = SHA-256 of the compact JSON of `[[domain, source, price_cents], ...]` (the first three fields of every row). About 130,000 rows (some MB). The recipe that rebuilds the pool from the snapshot files is in `docs/internal/pickproof.md` ("Pool-hash recipe"). **410 `PICKPROOF_POOL_PRUNED`** once the rows are removed (45 days; `details.pool_sha256`); 409 `SNAPSHOT_MISSING`; 400 for a date that is not real.
 
 ### `GET /pickproof/{date}/arms`
 READ or bots. Query (strict) `arm` = `A`, `B1`, `B2`, `C1` or `C2`. Only for a **sealed** day, and only after the first manifest call that sealed it; before that **409 `PICKPROOF_NOT_SEALED`** (so the Buyer cannot see the random arms before picking). **200** one arm `{date, pool_sha256, seed, arm, n, sha256, short, names: [{rank, domain, price_cents}]}`, or all arms under `arms` without `arm`; `C2` answers `{status: "not_built"}`.
@@ -1314,7 +1318,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **RDAP lookup service (5.29.0, CR-074):** `LOOKUP_LIMIT` (429 on `GET /rdap/{domain}` and `POST /rdap/batch`, `details.retry_after_s` and a `Retry-After` header; also the `reason_code` of a batch row that the limit cut off). Row `reason_code` values (not errors, `registered` is `null`): `TIMEOUT`, `SOURCE_ERROR`, `RATE_LIMITED`, `LOOKUP_LIMIT`.
 
-**Pick-proof (5.28.0, CR-073):** `PICKPROOF_SEALED` (409, `POST /pickproof/{date}/picks` from the deadline on or after the seal), `PICKPROOF_NOT_SEALED` (409, `GET /pickproof/{date}/arms` before the day is sealed), `NOT_IN_POOL` (422, picks outside the frozen pool; `details.names`); `SNAPSHOT_MISSING` (409) is also returned when the evening-before snapshot of the pool is not sealed. The `UNPOWERED` status in the report is a result, not an error.
+**Pick-proof (5.28.0, CR-073):** `PICKPROOF_SEALED` (409, `POST /pickproof/{date}/picks` from the deadline on or after the seal), `PICKPROOF_NOT_SEALED` (409, `GET /pickproof/{date}/arms` before the day is sealed), `NOT_IN_POOL` (422, picks outside the frozen pool; `details.names`); `PICKPROOF_POOL_PRUNED` (410, `GET /pickproof/{date}/pool` after the 45 days, 5.30.0); `SNAPSHOT_MISSING` (409) is also returned when the evening-before snapshot of the pool is not sealed. The `UNPOWERED` status in the report is a result, not an error.
 
 **Closeout candidates (5.26.0, CR-072):** `SNAPSHOT_MISSING` (409 from `GET /candidates/closeouts`: no sealed snapshot for that date and source). Filter codes in `summary.filtered_by` (not errors): `SPELL-1`, `BRAND-1`, `BIGCO-1`, `TM_KILL`, `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN`, `OWNED`, `SALES_GRADED`. Row `score_reason`: `NO_ACTIVE_MODEL`, `SCORE_FAILED`, `NOT_SCORED_YET`.
 
