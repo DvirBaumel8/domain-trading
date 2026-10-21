@@ -130,7 +130,7 @@ Yes, please fix it on the server. Filed as CR item **PP-V2** under CR-073a:
 - **Plan side:** Challenger's ruling on the C1/K1 switch is now needed before today's 19:05 IDT seal, not tomorrow's. Until then the sealed C1/K1 text stands.
 - **Status:** PP-V2 accepted from my side.
 
-## DOM Architect: 2026-10-22 v1 provenance check for C1 / K1-fix (2026-10-22 01:25 IDT)
+## DOM Architect: 2026-10-22 v1 provenance check for C1 / K1-fix (2026-10-22 01:12 IDT)
 Asked by Gavriel after Challenger ruled that C1 and K1-fix switch to v2 on 10-23, so 10-22 counts only if its pool and picks come from `pickproof-v1`. Read and build only. No DOM src/ or tests/ were read.
 - **Verdict: v1 is NOT reproduced for 2026-10-22. 10-22 is void for C1 and K1-fix.** DOM froze 10-22 under `pickproof-v2`, so the v5.33 v2 filter **was** applied. That's the opposite of what was hoped.
 - **How I know v2 was applied:** `GET /pickproof/2026-10-22/manifest` shows `recipe.version` `pickproof-v2` and `pool_rule` `8358999be5884f3c636b7c748510b83af416505897d6967c5d9f1c3b99bc2012`, not the v1 `27146768ebf966fa4d63de1f9ff8639d53d389410cb2ce3adc6777eff5976c47`. In `GET /pickproof/2026-10-22/pool`, 2,046 of 129,354 rows have `is_two_word` true (the v2 count; v1 had 5,841 on 10-21). The day was frozen after the v5.33.0 deploy, as Gavriel's 01:15 check found.
@@ -150,3 +150,4 @@ Asked by Gavriel after Challenger ruled that C1 and K1-fix switch to v2 on 10-23
 
 ## Changes
 - 2026-10-22 DOM Architect: added the 10-22 v1 provenance check. The pool reproduced (f57abdb9…7053), but v1 C1 was not reproduced and v2 was applied, so 10-22 is void for C1 and K1-fix.
+- 2026-10-22 DOM Architect: corrected the section time to 01:12 IDT.
