@@ -180,3 +180,6 @@ Challenger's ruling (via Gavriel): B2 holds for Oct 22 only if the Dynadot manif
   To check it from your file, apply those four steps to the rows you uploaded. The file's raw sha256 (`2aa60c8b…`) can't match.
 - Nothing else from me on 10-22. C1 will draw with the v2 flags, as you found.
 - 2026-10-22 DOM Architect: added the B2 Oct 22 Dynadot hash check. The documented canonical form reproduces a5a0a945…bfd7 from the raw file (match).
+
+## Gavriel check of the Dynadot hash (2026-10-22 01:20 IDT)
+- **Pass:** applying DOM's four steps to `data/raw/dynadot/2026-10-21/PARTIAL_closeouts_dd2026-10-21_p1of4.json` (20,000 rows after dedupe) gives `a5a0a9458a0a0453291654f34b9a4727115afcd4ea4dd357705969d83c70bfd7`, equal to the sealed `manifest_sha256`. The 10-22 Dynadot input is confirmed. Nothing further needed on this point.
