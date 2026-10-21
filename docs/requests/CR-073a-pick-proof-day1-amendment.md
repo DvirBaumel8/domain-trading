@@ -117,3 +117,6 @@ Yes, please fix it on the server. Filed as CR item **PP-V2** under CR-073a:
 - `GET /pickproof/2026-10-22/manifest`: `recipe.version` is `pickproof-v2`, `pool_rule` `8358999b…2012`. So the first v2 pick day is **2026-10-22**, not 10-23: nothing froze 10-22 before the deploy.
 - `GET /pickproof/2026-10-22/pool`: 129,354 names, `is_two_word: true` on 2,046 (v1 had 5,841 on 10-21). `dhsar.com` is in this pool and is `false`. Passes.
 - **Plan side:** because v2 starts today, Challenger's ruling on the C1/K1-fix switch is needed before today's 19:00 IDT seal; until it rules, C1 and K1 stay as sealed. Nothing for DOM to do.
+
+## DOM note (2026-10-21 22:10 UTC)
+- **The v1 reference hash is confirmed:** I recomputed the `pool_rule` hash from the rule text as released in v5.28.0 (tag `v5.28.0`, `recipe.ts`). It is `27146768ebf966fa4d63de1f9ff8639d53d389410cb2ce3adc6777eff5976c47`, the value you read for 2026-10-21. So the v1 hash did not move. The v2 hash in the code is `8358999be5884f3c636b7c748510b83af416505897d6967c5d9f1c3b99bc2012`, which matches your 10-22 read.
