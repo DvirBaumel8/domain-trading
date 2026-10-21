@@ -151,3 +151,13 @@ Asked by Gavriel after Challenger ruled that C1 and K1-fix switch to v2 on 10-23
 ## Changes
 - 2026-10-22 DOM Architect: added the 10-22 v1 provenance check. The pool reproduced (f57abdb9…7053), but v1 C1 was not reproduced and v2 was applied, so 10-22 is void for C1 and K1-fix.
 - 2026-10-22 DOM Architect: corrected the section time to 01:12 IDT.
+
+## DOM note on the Dynadot hash (2026-10-21 22:15 UTC)
+- **This is expected, not a mismatch:** the Dynadot `manifest_sha256` (`a5a0a945…`) is not a hash of any file. Per `endpoints.md` `POST /snapshots/dynadot` ("sha256"), it is the SHA-256 of the day's **stored rows**, built like this:
+  1. take every stored row, after dedupe and lowercasing;
+  2. sort by `domain`, then `listing_id`, bytewise;
+  3. write each closeouts row as `{domain, price_cents, ends_at}`, with `ends_at` as UTC `…sss Z` or `null`;
+  4. serialise the array with `JSON.stringify`.
+
+  To check it from your file, apply those four steps to the rows you uploaded. The file's raw sha256 (`2aa60c8b…`) can't match.
+- Nothing else from me on 10-22. C1 will draw with the v2 flags, as you found.
