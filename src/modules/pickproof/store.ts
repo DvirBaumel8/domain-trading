@@ -7,7 +7,7 @@ import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 import { armSha, byteOrder, drawArm } from './draw.js';
 import { ensureDay, getDay, lockDay, type DayRow } from './pool.js';
-import { ALL_ARMS, DRAWN_ARMS, RECIPE_SHAS, RECIPE_VERSION, type ArmName } from './recipe.js';
+import { ALL_ARMS, DRAWN_ARMS, RECIPES, type ArmName } from './recipe.js';
 
 type ArmSummary = { n: number; sha256: string; short: boolean };
 
@@ -73,7 +73,7 @@ export async function manifest(db: Kysely<Database>, day: string, now: number) {
   return {
     date: day, data_date: d.data_date, pool_n: d.pool_n, pool_sha256: d.pool_sha256, seed: d.seed, k: d.k, sources: d.sources,
     arms: { A: arm('A'), B1: arm('B1'), B2: arm('B2'), C1: arm('C1'), C2: { status: 'not_built' } },
-    recipe: { version: RECIPE_VERSION, ...RECIPE_SHAS },
+    recipe: { version: d.recipe_version, ...RECIPES[d.recipe_version] },
     deadline: d.deadline.toISOString(), sealed, sealed_at: d.sealed_at?.toISOString() ?? null,
   };
 }

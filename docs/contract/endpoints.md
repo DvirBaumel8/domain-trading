@@ -1,4 +1,4 @@
-# Endpoints (contract v5.32.0)
+# Endpoints (contract v5.33.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -742,10 +742,10 @@ READ or bots. The **seal**. The first call at or after the deadline draws B1, B2
   arms: { A: {n, sha256, short, sealed} | {status: "open", n, sealed: false},
           B1, B2, C1: {n, sha256, short, sealed} | {status: "pending_seal", sealed: false},
           C2: {status: "not_built"} },
-  recipe: { version: "pickproof-v1", draw, pool_rule, labels_rule },   // SHA-256 of the frozen rule texts
+  recipe: { version: "pickproof-v1" | "pickproof-v2", draw, pool_rule, labels_rule },   // the version the day was frozen with; SHA-256 of its rule texts
   deadline, sealed: bool, sealed_at }
 ```
-An arm's `sha256` is the SHA-256 of the JSON array of its names in rank order. The bots append the seal line (this answer) to `docs/requests/pick-proof-seals.md`; DOM does not commit data. 400 `VALIDATION_ERROR` for a date that is not real; 409 `SNAPSHOT_MISSING`.
+An arm's `sha256` is the SHA-256 of the JSON array of its names in rank order. **`pickproof-v2`** (5.33.0, CR-073a PP-V2) applies to every day frozen from that release on and changes only `is_two_word` (so C1): two common words of 3+ letters each, from a frozen list (`docs/internal/pickproof.md`); days frozen before keep `pickproof-v1` and their flags. The bots append the seal line (this answer) to `docs/requests/pick-proof-seals.md`; DOM does not commit data. 400 `VALIDATION_ERROR` for a date that is not real; 409 `SNAPSHOT_MISSING`.
 
 ### `GET /pickproof/{date}/pool` (5.30.0, CR-073a)
 READ or bots. The frozen pool of the day, so anyone can check `pool_sha256` (freezes the day on first use, like the manifest; shows no arm). **200** `{date, data_date, pool_n, pool_sha256, seed, sources, fields: ["domain","source","price_cents","passes_k1","is_two_word"], rows: [[...], ...]}`, rows sorted by domain in byte order. `pool_sha256` = SHA-256 of the compact JSON of `[[domain, source, price_cents], ...]` (the first three fields of every row). About 130,000 rows (some MB). The recipe that rebuilds the pool from the snapshot files is in `docs/internal/pickproof.md` ("Pool-hash recipe"). **410 `PICKPROOF_POOL_PRUNED`** once the rows are removed (45 days; `details.pool_sha256`); 409 `SNAPSHOT_MISSING`; 400 for a date that is not real.

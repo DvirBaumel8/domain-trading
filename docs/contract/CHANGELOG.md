@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.33.0 (2026-10-22): CR-073a PP-V2: pick-proof two-word rule pickproof-v2 (common words, 3+ letters)
+Release note: `docs/releases/v5.33.0.md`.
+MINOR (additive; migration `1766200000000_v5-33-0.sql`).
+- **Pick-proof recipe `pickproof-v2`** for every day frozen from this release on: `is_two_word` (the C1 sub-pool) = letters only, at most 10 letters, not SPELL-1, and at least one split into two parts of 3+ letters, each with a vowel and each on the frozen common-word list `data/wordlists/en-scowl-35-lower.txt` (sha256 `60ca88eb…41dc16`). `dhsar.com` is no longer two-word.
+- **Manifest `recipe.version`** is now the version the day was frozen with (`pickproof-v1` for days frozen before, with their v1 hashes unchanged; `pickproof-v2` after). The v2 pool-rule text also states the tie rule correctly (dynadot before godaddy) and the `POOL_NOT_READY` freeze condition. `pool_sha256` and the draw are unchanged.
+
 ## 5.32.0 (2026-10-21): BUG-051: /snapshots/dynadot limits documented, ROWS_LIMIT and PRICE_CAP codes
 Release note: `docs/releases/v5.32.0.md`.
 MINOR (additive; no migration).

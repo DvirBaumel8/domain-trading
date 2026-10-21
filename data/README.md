@@ -5,10 +5,11 @@ Committed reference data for `src/screening/lexicon.ts`. Rebuilt only by DOM, wi
 | File | Source URL | Licence | Retrieved | Lines | Bytes | sha256 |
 |---|---|---|---|---|---|---|
 | `wordlists/en-scowl-60.txt` | ESDB/SCOWL custom list, size 60, US spelling, variant level 1, no specials, diacritics stripped (`http://app.aspell.net/create?max_size=60&spelling=US&max_variant=0&diacritic=strip&download=wordlist&encoding=utf-8&format=inline`; ESDB git revision 1e5b7d3, 24 Jun 2026) | Kevin Atkinson permission notice, `wordlists/LICENSE-SCOWL.txt` | 2026-10-06 | 88,853 | 827,834 | `f0cfeea97b8f58aa60648f938bdc5bb2594541d883691ac2328561281423e791` |
+| `wordlists/en-scowl-35-lower.txt` (5.33.0, CR-073a PP-V2) | ESDB/SCOWL custom list, size 35, US spelling, variant level 1, no specials, diacritics stripped (same URL with `max_size=35`; ESDB git revision 1e5b7d3); only the entries written in lowercase by the source, `^[a-z]{3,}$`, kept as written (no lowercasing, so no proper names or upper-case abbreviations) | as above | 2026-10-21 | 38,614 | 343,623 | `60ca88eb55f3738f9a0097e658826c4c1860bbe039069adc2673ce4c1841dc16` |
 | `wordlists/us-places.txt` | Census 2026 Gazetteer, National Places (`https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2026_Gazetteer/2026_Gaz_place_national.zip`) | US Government work, 17 U.S.C. 105, `wordlists/LICENSE-CENSUS.txt` | 2026-10-06 | 32,080 | 469,704 | `7ef121fd6e97bacfcf54165537cdea2b8706da4aa788df7db4b3ced741b8b2bc` |
 | `wordlists/LICENSE-SCOWL.txt`, `wordlists/LICENSE-CENSUS.txt` | as above | - | 2026-10-06 | - | - | - |
 
-Total of the two data files: 1,297,538 bytes (plan cap 1.5 MB).
+Total of the two lexicon files: 1,297,538 bytes (plan cap 1.5 MB). The pick-proof common-word list adds 343,623 bytes (5.33.0); the 21 Oct rebuild of `en-scowl-60.txt` from the same revision reproduced its sha256.
 
 Formats: `en-scowl-60.txt` is one lowercase a-z word per line (length >= 2, sorted, unique). `us-places.txt` is `name<TAB>STATE_USPS<TAB>WORDS`, one line per name/state/word-count triple, names lowercase letters only (`losangeles`, `stlouis`); `WORDS` is how many words the real name has (`Los Angeles` = 2), so a multi-word city can be a single token or not (`geo_city_one_token`).
 

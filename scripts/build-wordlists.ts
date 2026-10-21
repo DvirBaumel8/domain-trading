@@ -13,6 +13,10 @@ const UA = 'domain-trading-api/1.1.0 (+https://github.com/DvirBaumel8/domain-tra
 
 const SCOWL_URL =
   'http://app.aspell.net/create?max_size=60&spelling=US&max_variant=0&diacritic=strip&download=wordlist&encoding=utf-8&format=inline';
+// v5.33.0 (CR-073a PP-V2): SCOWL size 35 (the most common words); only entries the source writes in lowercase (no proper names, no upper-case
+// abbreviations such as DHS or AR), letters only, at least 3 letters, kept exactly as written. Used by the pick-proof two-word rule pickproof-v2.
+const SCOWL35_URL =
+  'http://app.aspell.net/create?max_size=35&spelling=US&max_variant=0&diacritic=strip&download=wordlist&encoding=utf-8&format=inline';
 const GAZ_URL = 'https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2026_Gazetteer/2026_Gaz_place_national.zip';
 
 // Trailing legal/statistical suffixes (longest first). Stripped repeatedly from the end of a Gazetteer NAME.
@@ -71,6 +75,12 @@ async function main(): Promise<void> {
   const wordsTxt = words.join('\n') + '\n';
   writeFileSync(join(outDir, 'en-scowl-60.txt'), wordsTxt);
 
+  const s35 = (await get(SCOWL35_URL)).toString('utf8');
+  const common = [...new Set((s35.split(/^---$/m)[1] ?? '').split('\n').map((w) => w.trim()).filter((w) => /^[a-z]{3,}$/.test(w)))].sort();
+  if (common.length < 30_000) throw new Error(`SCOWL 35 list suspiciously small: ${common.length}`);
+  const commonTxt = common.join('\n') + '\n';
+  writeFileSync(join(outDir, 'en-scowl-35-lower.txt'), commonTxt);
+
   // Gazetteer: pipe- or tab-delimited, header row with USPS and NAME columns.
   const zip = await get(GAZ_URL);
   const tmp = join(outDir, '.gaz.zip');
@@ -95,6 +105,7 @@ async function main(): Promise<void> {
 
   const total = Buffer.byteLength(wordsTxt) + Buffer.byteLength(placesTxt);
   console.log(`en-scowl-60.txt  lines=${words.length} bytes=${Buffer.byteLength(wordsTxt)} sha256=${sha(wordsTxt)}`);
+  console.log(`en-scowl-35-lower.txt lines=${common.length} bytes=${Buffer.byteLength(commonTxt)} sha256=${sha(commonTxt)}`);
   console.log(`us-places.txt    lines=${pairs.size} bytes=${Buffer.byteLength(placesTxt)} sha256=${sha(placesTxt)}`);
   console.log(`total bytes=${total}${total > 1_500_000 ? '  EXCEEDS 1.5 MB: stop and report (fallback: SCOWL size 50)' : ''}`);
 }

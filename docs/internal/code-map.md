@@ -221,12 +221,13 @@ v5.28.0 (CR-073). The pick-proof test mechanics: frozen daily pool, arms A/B1/B2
 | File | Inside |
 |---|---|
 | `pool.ts` | `buildPool`, `poolSha`, `ensureDay` (freeze), `getDay`, `lockDay`, `pickproofSettings` |
+| `two-word.ts` | v5.33.0 (CR-073a PP-V2): `twoWordSplitV2`, `commonWords` (the frozen `data/wordlists/en-scowl-35-lower.txt`, sha256 checked on load) |
 | `store.ts` | `postPicks`, `sealIfDue`, `manifest`, `armsView` |
 | `draw.ts`, `recipe.ts` | `drawArm`, `seedOfPool`, `armSha`; frozen rule texts, `RECIPE_SHAS`, `ARM_CONSTANTS` |
 | `labels.ts` | `pickproofLabels` (datasave step: RDAP T30 labels, pool pruning) |
 | `report.ts`, `stats.ts` | `report` (arms, comparisons, overlap rule); pure `fisherGreater`, `cmh`, `holm`, `permutationTest`, `normalSf` |
 
-Tables: `pickproof_days`, `pickproof_pool`, `pickproof_arms`, `pickproof_picks_history` (append-only), `pickproof_labels`, settings columns `pickproof_*` (migration `1766000000000_v5-28-0.sql`); none in the backup. The seeded MT19937 / Fisher-Yates (CR-008) lives in `src/core/mt19937.ts` (used by `selection/siblings.ts` and here). Tests: `tests/modules/pickproof/` (`pickproof` PP528-10..43), `tests/modules/pickproof/unit/stats.test.ts` (PP528-1..6).
+Tables: `pickproof_days`, `pickproof_pool`, `pickproof_arms`, `pickproof_picks_history` (append-only), `pickproof_labels`, settings columns `pickproof_*` (migration `1766000000000_v5-28-0.sql`; `pickproof_days.recipe_version` by `1766200000000_v5-33-0.sql`); none in the backup. The seeded MT19937 / Fisher-Yates (CR-008) lives in `src/core/mt19937.ts` (used by `selection/siblings.ts` and here). Tests: `tests/modules/pickproof/` (`pickproof` PP528-10..43), `tests/modules/pickproof/unit/stats.test.ts` (PP528-1..6).
 
 ### visits
 v5.18.0 (CR-068): the $0 visitor counter (rules and test IDs `docs/internal/visits.md`). Imports `registrars` (URL forwards) and `listing` (`landerNameservers`); only `app.ts` imports it.

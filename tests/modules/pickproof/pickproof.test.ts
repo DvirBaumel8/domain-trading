@@ -233,6 +233,20 @@ describe('PP528 pick-proof: pool, picks, seal, arms', () => {
     expect((await get(`/pickproof/${D}/pool`)).statusCode).toBe(200);
   });
 
+  it('PP533-3 (PP-V2) a day frozen now is pickproof-v2: dhsar.com is not two-word, sunbox.com is; the manifest names v2; a day frozen before keeps v1 and its v1 rule hashes', async () => {
+    const { get } = await boot();
+    await snapshot([['dhsar.com', 900, true], ['sunbox.com', 900, true], ['goal.com', 900, true]]);
+    const m = (await get(`/pickproof/${D}/manifest`)).json();
+    expect(m.recipe.version).toBe('pickproof-v2');
+    const flags = Object.fromEntries((await db.selectFrom('pickproof_pool').select(['domain', 'is_two_word']).where('day', '=', D).execute()).map((r) => [r.domain, r.is_two_word]));
+    expect(flags).toEqual({ 'dhsar.com': false, 'goal.com': false, 'sunbox.com': true });
+    const old = '2026-12-01';
+    await db.insertInto('pickproof_days').values({ day: old, data_date: '2026-11-30', pool_sha256: 'e'.repeat(64), seed: 1, k: 100, pool_n: 0, sources: '{}', deadline: new Date(at(`${old}T16:00:00Z`)) }).execute();
+    const v1 = (await get(`/pickproof/${old}/manifest`)).json();
+    expect(v1.recipe.version).toBe('pickproof-v1');
+    expect(v1.recipe.pool_rule).not.toBe(m.recipe.pool_rule);
+  });
+
   it('PP528-18 k is raise-only (a lower value is refused by the database, never above 300) and a raised k applies to the next day', async () => {
     await expect(sql`update settings set pickproof_k = 50`.execute(db)).rejects.toThrow(/can only be raised/);
     await expect(sql`update settings set pickproof_k = 301`.execute(db)).rejects.toThrow();

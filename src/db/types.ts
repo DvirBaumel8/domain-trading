@@ -1477,6 +1477,8 @@ export interface PickproofDaysTable {
   arms: ColumnType<unknown, string | null | undefined, string | null>;
   created_at: TimestampDefault;
   sealed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  /** v5.33.0 (CR-073a PP-V2): the recipe the day was frozen with. */
+  recipe_version: ColumnType<string, string | undefined, string>;
 }
 export interface PickproofPoolTable {
   day: DateString;

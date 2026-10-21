@@ -3,6 +3,12 @@
 import { createHash } from 'node:crypto';
 
 export const RECIPE_VERSION = 'pickproof-v1';
+/** v5.33.0 (CR-073a PP-V2): the recipe of every day frozen from now on; a day keeps the version it was frozen with (pickproof_days.recipe_version). */
+export const CURRENT_RECIPE = 'pickproof-v2';
+export type RecipeVersion = 'pickproof-v1' | 'pickproof-v2';
+/** The common-word list of the v2 two-word rule (data/wordlists/en-scowl-35-lower.txt); checked on load. */
+export const COMMON_WORDS_FILE = 'en-scowl-35-lower.txt';
+export const COMMON_WORDS_SHA256 = '60ca88eb55f3738f9a0097e658826c4c1860bbe039069adc2673ce4c1841dc16';
 
 export const DRAW_RECIPE = [
   `${RECIPE_VERSION} draw.`,
@@ -32,8 +38,28 @@ export const LABELS_RULE = [
   'a label belongs to the (name, D) pair, never to an arm.',
 ].join(' ');
 
+const V2_POOL_RULE = [
+  'pickproof-v2 pool.',
+  'pool for pick day D = closeout rows of data date D-1: GoDaddy datasave_pool plus Dynadot closeouts of a sealed bot upload; .com only;',
+  'price_cents <= settings.pickproof_pool_max_price_cents (4000); names with an engine_sales row or a market_names sold episode removed (SALES_GRADED);',
+  'sorted by domain in byte order, one row per domain (the lowest price wins, then the source name in byte order: dynadot before godaddy).',
+  'pool_sha256 = sha256 of the JSON array of [domain, source, price_cents] in that order.',
+  'frozen only when every GoDaddy row of D-1 has been processed by scorePool (else 409 POOL_NOT_READY).',
+  'K1-passing = the stored closeouts filter_code IS NULL on a processed row.',
+  `Two-word = the SLD is letters only, at most 10 letters, the form check does not fail it (SPELL-1), and at least one split into exactly two parts has both parts at least 3 letters, each containing a vowel (a e i o u y) and each on the common-word list ${COMMON_WORDS_FILE} sha256 ${COMMON_WORDS_SHA256} (SCOWL size 35, entries written in lowercase by the source, letters only, 3 letters or more).`,
+].join(' ');
+
 const sha = (s: string): string => createHash('sha256').update(s).digest('hex');
-export const RECIPE_SHAS = { draw: sha(DRAW_RECIPE), pool_rule: sha(POOL_RULE), labels_rule: sha(LABELS_RULE) };
+/** v1 texts are unchanged (their hashes are in every v1 manifest); v2 changes the pool rule and re-labels draw and labels under the new version. */
+export const RECIPES: Record<RecipeVersion, { draw: string; pool_rule: string; labels_rule: string }> = {
+  'pickproof-v1': { draw: sha(DRAW_RECIPE), pool_rule: sha(POOL_RULE), labels_rule: sha(LABELS_RULE) },
+  'pickproof-v2': {
+    draw: sha(DRAW_RECIPE.replace('pickproof-v1 draw.', 'pickproof-v2 draw.')),
+    pool_rule: sha(V2_POOL_RULE),
+    labels_rule: sha(LABELS_RULE.replace('pickproof-v1 labels.', 'pickproof-v2 labels.')),
+  },
+};
+export const RECIPE_SHAS = RECIPES['pickproof-v1'];
 export const sha256Hex = sha;
 
 export const ARM_CONSTANTS = { B1: 0xb1b1b1b1, B2: 0xb2b2b2b2, C1: 0xc1c1c1c1 } as const;

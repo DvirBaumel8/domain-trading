@@ -8,7 +8,8 @@ import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 import { closeoutNameChecker } from '../selection/index.js';
 import { byteOrder, seedOfPool } from './draw.js';
-import { sha256Hex } from './recipe.js';
+import { CURRENT_RECIPE, sha256Hex, type RecipeVersion } from './recipe.js';
+import { twoWordSplitV2 } from './two-word.js';
 
 export type Db = Kysely<Database> | Transaction<Database>;
 export const CLOSEOUTS_FILE = 'closeout_listings.json.zip';
@@ -17,7 +18,7 @@ const INSERT_BATCH = 5_000;
 export interface PoolRow { domain: string; source: 'godaddy' | 'dynadot'; price_cents: number; passes_k1: boolean; is_two_word: boolean }
 export interface DayRow {
   day: string; data_date: string; pool_sha256: string; seed: number; k: number; pool_n: number; sources: Record<string, unknown>;
-  deadline: Date; arms: Record<string, { n: number; sha256: string; short: boolean }> | null; sealed_at: Date | null;
+  deadline: Date; arms: Record<string, { n: number; sha256: string; short: boolean }> | null; sealed_at: Date | null; recipe_version: RecipeVersion;
 }
 
 export const deadlineOf = (day: string, hourUtc: number): Date => new Date(`${day}T${String(hourUtc).padStart(2, '0')}:00:00Z`);
@@ -30,7 +31,7 @@ export async function pickproofSettings(db: Db) {
 export async function getDay(db: Db, day: string): Promise<DayRow | null> {
   const r = await db.selectFrom('pickproof_days').selectAll().where('day', '=', day).executeTakeFirst();
   if (!r) return null;
-  return { day: r.day, data_date: r.data_date, pool_sha256: r.pool_sha256, seed: Number(r.seed), k: r.k, pool_n: r.pool_n, sources: r.sources as Record<string, unknown>, deadline: r.deadline, arms: (r.arms as DayRow['arms']) ?? null, sealed_at: r.sealed_at };
+  return { day: r.day, data_date: r.data_date, pool_sha256: r.pool_sha256, seed: Number(r.seed), k: r.k, pool_n: r.pool_n, sources: r.sources as Record<string, unknown>, deadline: r.deadline, arms: (r.arms as DayRow['arms']) ?? null, sealed_at: r.sealed_at, recipe_version: r.recipe_version as RecipeVersion };
 }
 
 /** The pool rows of D before they are frozen (pure given the tables). Throws 409 SNAPSHOT_MISSING without a sealed GoDaddy closeouts snapshot of D-1. */
@@ -65,15 +66,12 @@ export async function buildPool(db: Db, day: string, maxPriceCents: number): Pro
     kept.push(r);
   }
 
-  // two-word: letters only, at most 10 letters, exactly two tokens that the form check does not fail
+  // two-word (pickproof-v2, v5.33.0): two common words of 3+ letters (two-word.ts) and the form check does not fail the name (SPELL-1).
+  // v1 (the form check's own split into exactly two tokens) took abbreviations such as dhs + ar; days frozen under v1 keep their stored flag.
   const checker = await closeoutNameChecker(db as Kysely<Database>, { bigcoNames: [], tmKills: [] });
   const rows: PoolRow[] = kept.map((r) => {
     const sld = r.domain.slice(0, -4);
-    let two = false;
-    if (/^[a-z]+$/.test(sld) && sld.length <= 10) {
-      const v = checker.check(r.domain);
-      two = v.words.length === 2 && v.code !== 'SPELL-1';
-    }
+    const two = twoWordSplitV2(sld) !== null && checker.check(r.domain).code !== 'SPELL-1';
     return { domain: r.domain, source: r.source, price_cents: r.price_cents, passes_k1: r.filter_code === null && r.scored, is_two_word: two };
   });
   const sources = {
@@ -95,7 +93,7 @@ export async function ensureDay(db: Transaction<Database>, day: string): Promise
   const { rows, sources, dataDate } = await buildPool(db, day, st.maxPriceCents);
   const sha = poolSha(rows);
   await db.insertInto('pickproof_days').values({
-    day, data_date: dataDate, pool_sha256: sha, seed: seedOfPool(sha), k: st.k, pool_n: rows.length, sources: JSON.stringify(sources), deadline: deadlineOf(day, st.deadlineHourUtc),
+    day, data_date: dataDate, pool_sha256: sha, seed: seedOfPool(sha), k: st.k, pool_n: rows.length, sources: JSON.stringify(sources), deadline: deadlineOf(day, st.deadlineHourUtc), recipe_version: CURRENT_RECIPE,
   }).execute();
   for (let i = 0; i < rows.length; i += INSERT_BATCH) {
     const part = rows.slice(i, i + INSERT_BATCH);
