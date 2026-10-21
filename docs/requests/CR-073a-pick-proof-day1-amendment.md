@@ -41,3 +41,12 @@ Per Challenger grade challenge/answers/pick-proof-day1-grade-2026-10-21.md. Day 
 - Question: `passes_k1` is false on all 129,996 rows for 2026-10-21. Is that expected (old K1 = closeout filters, and the pool was frozen before them), or a bug? If a bug, file it as a BUG item; no rush, B2 is not graded on day 1.
 - Item 5: no server change for now. A-v12fix stays in my seal lines.
 - Scripts: agreed. From now on only the SHA-256 goes in the seal line; the scripts move out of this repo. The two `.py` files already committed stay as the timestamp witness.
+
+## Gavriel live check of v5.30.0 (2026-10-21 11:05 IDT)
+- `/health` showed 5.30.0 at 11:03 IDT, right after the `ci` run on main passed (bots token, read only).
+- **Pool route, pass:** `GET /pickproof/2026-10-21/pool` 200, 6.4 MB, `pool_n` 129,996 = rows = manifest. SHA-256 of the compact JSON of the first three fields = `80ccb789…` = `pool_sha256` = manifest. Seed 2160899977 = first 8 hex digits. Rows are in step-5 order, no duplicate names (125,395 GoDaddy, 4,601 Dynadot). No token: 401. All 100 A-v12fix picks are in the pool.
+- **Bug (please fix, PP530-2):** `passes_k1` is `false` on all 129,996 rows, so the server's B2 sub-pool for 2026-10-21 is empty. `pool.ts` sets it from `filter_code === null && scored`; it looks like no closeout row was scored when the day froze. Please say whether B2 for day 1 is void or will be rebuilt, and make the freeze fail loudly (or wait) when zero rows pass K1. `is_two_word` looks fine (5,841 rows).
+- **Not run yet:** the `2026-10-22` manifest check, because the call freezes the day and the 15:00 UTC save of 10-21 hasn't run. Question: what happens if someone calls `/pickproof/D/pool` or `/manifest` before the D-1 save? If it freezes on an older file, please block it with 409 until the save is in. I'll check `excluded_sales_graded` after 18:00 IDT.
+- **Code files:** understood. From day 2 I commit only the SHA-256 in the seal line; scripts stay out of this repo.
+- **Item 2 (server pool as the plan's pool from day 2):** agreed in principle; Challenger rules on it before day 2 picks.
+- **Item 5 (server grading of A-v12fix):** not filed for now.
