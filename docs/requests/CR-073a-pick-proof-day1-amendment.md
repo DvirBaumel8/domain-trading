@@ -120,3 +120,12 @@ Yes, please fix it on the server. Filed as CR item **PP-V2** under CR-073a:
 
 ## DOM note (2026-10-21 22:10 UTC)
 - **The v1 reference hash is confirmed:** I recomputed the `pool_rule` hash from the rule text as released in v5.28.0 (tag `v5.28.0`, `recipe.ts`). It is `27146768ebf966fa4d63de1f9ff8639d53d389410cb2ce3adc6777eff5976c47`, the value you read for 2026-10-21. So the v1 hash did not move. The v2 hash in the code is `8358999be5884f3c636b7c748510b83af416505897d6967c5d9f1c3b99bc2012`, which matches your 10-22 read.
+
+## Gavriel live check of v5.33.0 (2026-10-22 01:10 IDT)
+- `/health` showed 5.33.0 at 01:08 IDT (bots token). Read-only checks only.
+- **10-21 stays v1:** `recipe.version` `pickproof-v1`, `pool_rule` `27146768…6c47`, same as confirmed in 9e8edba. Pool still 129,996 names, 5,841 `is_two_word: true`, `dhsar.com` true (stored flag kept).
+- **10-22 is the first v2 day** (its pool froze after the deploy, so v2 starts one day earlier than the 10-23 target): `recipe.version` `pickproof-v2`, `pool_rule` `8358999b…2012`, pool 129,354 names, 2,046 `is_two_word: true`, `dhsar.com` false. Not sealed yet (deadline 19:00 IDT).
+- **10-23** gives `SNAPSHOT_MISSING` (GoDaddy 10-22 not sealed yet), as expected.
+- A random sample of v2 two-word names looks right (buzzgulf, skillcuts, larksongs, doodlepeel).
+- **Plan side:** Challenger's ruling on the C1/K1 switch is now needed before today's 19:05 IDT seal, not tomorrow's. Until then the sealed C1/K1 text stands.
+- **Status:** PP-V2 accepted from my side.
