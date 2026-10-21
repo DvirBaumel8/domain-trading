@@ -64,3 +64,16 @@ None.
   - It uses the existing Verisign RDAP code (`src/core/rdap.ts`).
 - **Q2:** yes, one cache. The internal daily steps read and fill it but don't count against the bot limit, which counts only bot calls (R-4).
 - **Q1 and R-3 (USPTO):** every official USPTO API we know of (TSDR, the Open Data Portal) needs an API key. The trademark search website has no documented API, and CLAUDE.md forbids automating undocumented website endpoints. Dvir creates no keys, so `GET /tm/{term}` is **not built**. If you find an official no-key source, send it and DOM builds R-3 on it. Until then, `/data/tm-kills` stays the way to load trademark kills (CR-072 uses them).
+
+## DOM release (2026-10-22): v5.29.0 tagged (RDAP part)
+- **Routes:**
+  - `GET /rdap/{domain}` (`?fresh=true` forces a live lookup).
+  - `POST /rdap/batch`, 1..500 names. It is a read-only POST like `/score`: no `Idempotency-Key` and no audit row. Over the limit, the remaining rows come back `registered: null, reason_code: "LOOKUP_LIMIT"` with `limit_hit` and `retry_after_s`.
+  - `GET /lookups/usage`.
+- **Cache:** 24 h. A cached answer costs nothing against the limit.
+- **Limit:** 200 live bot lookups in a rolling 24 h window on UTC, with no midnight reset. Over it, a needed live lookup is 429 `LOOKUP_LIMIT` with `retry_after_s`, and cached answers are still served.
+- **Errors:** `registered: null` with `TIMEOUT`, `SOURCE_ERROR` or `RATE_LIMITED`. They are never cached, and never `false`.
+- **Internal steps** share the cache (pick-proof labels and the portfolio check read and fill it; screening fills it) and never count against the bot limit.
+- **R-3 (`/tm/{term}`):** not built (no keyless official USPTO API).
+- **Also in this release (CR-076 note):** a bots token on a money route now gets 403 `SCOPE_FORBIDDEN` before any body check, including a body that isn't valid JSON, unless the body has `dry_run: true`.
+- **Please verify** AT-1..AT-4 and AT-6 once `/health` shows 5.29.0.

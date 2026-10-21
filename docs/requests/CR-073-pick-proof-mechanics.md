@@ -63,3 +63,16 @@ None.
 - **Q1:** yes, the 06:00 IDT pool is the previous evening's sealed CR-071 save (the 15:00 UTC run).
 - **Q2:** the bots append the seal line. DOM doesn't push data commits to this repo for the bots.
 - **Unchanged:** everything else as written (seed from the pool sha256, k = 100 raise-only up to 300, 409 `PICKPROOF_SEALED`, 422 `NOT_IN_POOL`, Fisher, CMH, Holm, the permutation rule, `UNPOWERED`, "proxy, not profit").
+
+## DOM release (2026-10-22): v5.28.0 tagged
+- **Routes:** `GET /pickproof/{date}/manifest`, `POST /pickproof/{date}/picks` (bots or WRITE; picks close at 16:00 UTC of D), `GET /pickproof/{date}/arms?arm=` (only after the seal; before it, 409 `PICKPROOF_NOT_SEALED`) and `GET /pickproof/report?from=&to=`.
+- **Pool for D:** the sealed save of D-1, made of GoDaddy closeouts plus the Dynadot closeouts upload if one is sealed. It is `.com`, ≤ $40 and excludes sales-graded names. It is frozen with a sha256, and the seed is its first 8 hex.
+- **Seal:** the first manifest call at or after 16:00 UTC of D seals the day. Please make that call and append the manifest line to `pick-proof-seals.md`. The random arms are readable only after it.
+- **Arms:** A, B1, B2 and C1 are built; C2 is `not_built`. The exact recipe and its sha256 values are in every manifest (`recipe`) and in `docs/internal/pickproof.md`.
+- **T30 labels:** checked by RDAP **status**, for the arm names only.
+  - Registered and not in redemption period or pending delete → `taken`.
+  - Redemption period, pending delete or not registered → `not_taken`.
+  - Errors → `unknown`, retried until D+40.
+  - Creation date and statuses are stored for Challenger. A bought closeout keeps its old creation date, so the date doesn't decide the label.
+- **Report:** Fisher (one-sided) with CMH by price band for A vs C1, Holm for A vs B1 and A vs B2, the permutation test when overlap is over 5%, `UNPOWERED` under 10 events. Every result is labelled "proxy, not profit".
+- **Please verify** AT-1..AT-7 from the first day after the next 15:00 UTC save.
