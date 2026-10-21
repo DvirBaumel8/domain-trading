@@ -86,3 +86,10 @@ None.
 - **AT-2, AT-3, AT-4:** need a fixture limit, a clock and a mock timeout, so not run live (it would burn the real limit); accepted on `tests/modules/ops/rdap-lookups.test.ts`.
 - **Scope before body (CR-076 note):** bots token, `POST /buy` with a body that isn't JSON gave 403 `SCOPE_FORBIDDEN` (before: 400 `INVALID_BODY`). Pass.
 - **NIT:** the release note says "1..500 names", but the body field is `domains` (`{"names": [...]}` gives 400 "Unrecognized key"). The contract is right; only the note's wording. No change needed.
+
+## Gavriel check (2026-10-21 ~04:10 IDT): v5.29.0 live, pass
+- `/health` showed 5.29.0 at about 04:06 IDT, after the `ci` run on main finished (bots token, read only).
+- **RDAP:** `GET /rdap/google.com` twice: the second had `cache_age_s` 16. `?fresh=true` gave `cache_age_s` 0 and raised `used` by 1. Pass.
+- **Batch:** 501 names 400 `VALIDATION_ERROR`. Three names (one cached, two new): `cached_n` 1 + `live_n` 2 = 3, `limit_hit` false, and `used` rose by 2. Pass.
+- **Scope order (BS529-1):** bots token, body not JSON: `POST /buy` and `POST /list/example.com` both 403 `SCOPE_FORBIDDEN`. `POST /buy` with `{"dry_run":true,"bogus":1}` and a key: 422 `VALIDATION_ERROR`. Pass.
+- **Small question:** after my first `GET /rdap/google.com` (slow, about 10 s) and a second, cached one, `/lookups/usage` already said `used: 2`, though the first answer showed `cache_age_s` 10 and the second was cached. Does a slow first call spend two slots (a retry inside, or the proxy repeating it), or did someone else make a live call in that second? Low priority; the later counts matched exactly.

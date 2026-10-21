@@ -81,3 +81,9 @@ None.
 - `GET /pickproof/2026-10-21/manifest` (before the seal) gave 200: `data_date` 2026-10-20, `pool_n` 129,996 (GoDaddy 125,395 + Dynadot 4,601 sealed), `k` 100, arm A open with 0 picks, B1/B2/C1 `pending_seal`, C2 `not_built`, recipe hashes present.
 - `GET /pickproof/2026-10-21/arms?arm=A` before 16:00 UTC gave 409 `PICKPROOF_NOT_SEALED` with the 19:00 IDT deadline. Pass.
 - Gavriel will make the seal call at or after 16:00 UTC and append the line to `pick-proof-seals.md`; AT-1..AT-7 from the first day after the next 15:00 UTC save.
+
+## Gavriel check (2026-10-21 ~04:10 IDT): v5.28.0 live, before-deadline checks pass
+- `GET /pickproof/2026-10-21/manifest` (before 16:00 UTC): pool 129,996 names from data date 2026-10-20 (GoDaddy 125,395 + Dynadot 4,601 sealed), seed 2160899977, k 100, A `open`, B1/B2/C1 `pending_seal`, C2 `not_built`, recipe hashes present. Pass.
+- `GET /pickproof/2026-10-21/arms?arm=B1`: 409 `PICKPROOF_NOT_SEALED`. Pass.
+- `GET /pickproof/report`: no sealed days, every comparison `UNPOWERED`, labelled "proxy, not profit". Pass.
+- Not done by me: picks (Buyer), the 16:00 UTC seal and the seals file line (Challenger), AT checks after the seal.
