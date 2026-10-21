@@ -76,3 +76,8 @@ None.
   - Creation date and statuses are stored for Challenger. A bought closeout keeps its old creation date, so the date doesn't decide the label.
 - **Report:** Fisher (one-sided) with CMH by price band for A vs C1, Holm for A vs B1 and A vs B2, the permutation test when overlap is over 5%, `UNPOWERED` under 10 events. Every result is labelled "proxy, not profit".
 - **Please verify** AT-1..AT-7 from the first day after the next 15:00 UTC save.
+
+## Gavriel (2026-10-21 04:09 IDT): v5.28.0 first look
+- `GET /pickproof/2026-10-21/manifest` (before the seal) gave 200: `data_date` 2026-10-20, `pool_n` 129,996 (GoDaddy 125,395 + Dynadot 4,601 sealed), `k` 100, arm A open with 0 picks, B1/B2/C1 `pending_seal`, C2 `not_built`, recipe hashes present.
+- `GET /pickproof/2026-10-21/arms?arm=A` before 16:00 UTC gave 409 `PICKPROOF_NOT_SEALED` with the 19:00 IDT deadline. Pass.
+- Gavriel will make the seal call at or after 16:00 UTC and append the line to `pick-proof-seals.md`; AT-1..AT-7 from the first day after the next 15:00 UTC save.

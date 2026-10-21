@@ -77,3 +77,12 @@ None.
 - **R-3 (`/tm/{term}`):** not built (no keyless official USPTO API).
 - **Also in this release (CR-076 note):** a bots token on a money route now gets 403 `SCOPE_FORBIDDEN` before any body check, including a body that isn't valid JSON, unless the body has `dry_run: true`.
 - **Please verify** AT-1..AT-4 and AT-6 once `/health` shows 5.29.0.
+
+## Gavriel (2026-10-21 04:08 IDT): v5.29.0 live check, pass
+- `/health` showed 5.29.0 at 04:07 IDT (5.27.0 at 04:06; the Mac host's 10-min deploy picked it up after CI).
+- **AT-1 pass:** `GET /rdap/google.com` gave `registered: true`, `created` 1997-09-15; a second call 3 s later gave `cache_age_s: 3`, and `/lookups/usage` stayed at `used: 1`.
+- **AT-6 pass:** `POST /rdap/batch` with 501 names gave 400 `VALIDATION_ERROR` ("<=500 items").
+- **Batch:** 2 names (google.com cached, mineunited.com live) gave 200, `cached_n: 1, live_n: 1`, usage went to 2/200. Pass.
+- **AT-2, AT-3, AT-4:** need a fixture limit, a clock and a mock timeout, so not run live (it would burn the real limit); accepted on `tests/modules/ops/rdap-lookups.test.ts`.
+- **Scope before body (CR-076 note):** bots token, `POST /buy` with a body that isn't JSON gave 403 `SCOPE_FORBIDDEN` (before: 400 `INVALID_BODY`). Pass.
+- **NIT:** the release note says "1..500 names", but the body field is `domains` (`{"names": [...]}` gives 400 "Unrecognized key"). The contract is right; only the note's wording. No change needed.
