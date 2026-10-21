@@ -148,6 +148,24 @@ Asked by Gavriel after Challenger ruled that C1 and K1-fix switch to v2 on 10-23
 - **There is no "Oct 22 v1 pool hash" apart from the one above:** `pool_sha256` is the same under v1 and v2. Only the C1 sub-pool would differ, and it can't be made under v1.
 - **Status:** 10-22 isn't sealed yet (deadline 19:00 IDT). Its C1 draw will use the v2 flags. Arms A, B1 and B2 don't use `is_two_word`. Nothing asked of DOM.
 
+
+## DOM Architect: B2 Oct 22, Dynadot manifest hash reproduced (2026-10-22 01:20 IDT)
+Challenger's ruling (via Gavriel): B2 holds for Oct 22 only if the Dynadot manifest hash `a5a0a945…bfd7` can be rebuilt from the raw file. Docs and reads only.
+- **(a) Canonicalization**, from `docs/contract/endpoints.md`, `POST /snapshots/dynadot`, the "sha256 =" bullet:
+  - **Bytes:** SHA-256, lowercase hex, of the UTF-8 text of `JSON.stringify` (compact: no spaces, no newline, no BOM, standard JSON quoting).
+  - **Rows:** an array of the day's stored rows. Domains are lowercased, the first row wins on a duplicate, and `data_date` is stripped.
+  - **Sort:** by `domain`, bytewise. Closeouts have no `listing_id`, so the second sort key is unused.
+  - **Columns, in this order:** closeouts `{domain, price_cents, ends_at}`. `price_cents` is an integer; `ends_at` is UTC `YYYY-MM-DDTHH:mm:ss.sssZ` or `null`.
+  - The hash is not over the raw file bytes: the file's own sha256 is `2aa60c8b…7111`, as noted above. It is over this canonical row array.
+- **(b) Command** (from `/workspace/domain-trading`, needs jq):
+  `jq -cj '[.rows[]|{domain:(.domain|ascii_downcase),price_cents,ends_at}]|sort_by(.domain)' data/raw/dynadot/2026-10-21/PARTIAL_closeouts_dd2026-10-21_p1of4.json | sha256sum`
+- **(c) Result: matches.** The output is `a5a0a9458a0a0453291654f34b9a4727115afcd4ea4dd357705969d83c70bfd7`, equal to `GET /snapshots?date=2026-10-21&source=dynadot_closeouts` (`sha256`, 20,000 rows, sealed 2026-10-21 18:29 IDT) and to `sources.dynadot.manifest_sha256` in the 10-22 manifest.
+  - Duplicates: the file has 20,000 rows and 20,000 distinct domains, so no dedupe step was needed.
+  - Python check: `json.dumps(sorted rows, separators=(',',':'))` gives the same hash.
+  - Forms that do **not** match, confirming the doc form is the one: file order `b1b8c27b…`, keys sorted `10069e9a…`, arrays `cd132364…`, with `data_date` `2d7d59ab…`, default JSON spacing `c0b344fa…`.
+  - **Negative check:** the same command with `|.[0].price_cents+=1` (one value changed) gives `362c5eba17207576…`, so a change is detected.
+  - **Cross-check:** the same command on `PARTIAL_closeouts_dd2026-10-20_p1of4.json` gives `169414b0b8630f0d98bf0b9e80b7fde59f790aef9350a1fb9567e7ae2500cf59`, the 10-21 manifest's Dynadot hash.
+- **B2 Oct 22: rows verified, hash reproduced.** The documented recipe is enough, so no R or AT is needed from DOM. Reminder: the Oct 22 pool's Dynadot rows are the partial upload (about 29%, `coverage: null` on that manifest).
 ## Changes
 - 2026-10-22 DOM Architect: added the 10-22 v1 provenance check. The pool reproduced (f57abdb9…7053), but v1 C1 was not reproduced and v2 was applied, so 10-22 is void for C1 and K1-fix.
 - 2026-10-22 DOM Architect: corrected the section time to 01:12 IDT.
@@ -161,3 +179,4 @@ Asked by Gavriel after Challenger ruled that C1 and K1-fix switch to v2 on 10-23
 
   To check it from your file, apply those four steps to the rows you uploaded. The file's raw sha256 (`2aa60c8b…`) can't match.
 - Nothing else from me on 10-22. C1 will draw with the v2 flags, as you found.
+- 2026-10-22 DOM Architect: added the B2 Oct 22 Dynadot hash check. The documented canonical form reproduces a5a0a945…bfd7 from the raw file (match).
