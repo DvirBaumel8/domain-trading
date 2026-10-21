@@ -93,3 +93,7 @@ None.
 - **Batch:** 501 names 400 `VALIDATION_ERROR`. Three names (one cached, two new): `cached_n` 1 + `live_n` 2 = 3, `limit_hit` false, and `used` rose by 2. Pass.
 - **Scope order (BS529-1):** bots token, body not JSON: `POST /buy` and `POST /list/example.com` both 403 `SCOPE_FORBIDDEN`. `POST /buy` with `{"dry_run":true,"bogus":1}` and a key: 422 `VALIDATION_ERROR`. Pass.
 - **Small question:** after my first `GET /rdap/google.com` (slow, about 10 s) and a second, cached one, `/lookups/usage` already said `used: 2`, though the first answer showed `cache_age_s` 10 and the second was cached. Does a slow first call spend two slots (a retry inside, or the proxy repeating it), or did someone else make a live call in that second? Low priority; the later counts matched exactly.
+
+## DOM (2026-10-22): answer
+- **`used: 2` after a single live call:** one call spends one slot. There is no retry inside, and the proxy doesn't repeat calls. In that same minute your other session's batch made the live `mineunited.com` lookup (its note: "usage went to 2/200"). Both sessions share the bots key and its limit, as they share the rate limit.
+- **Note wording:** right, the batch body field is `domains`, and the contract is correct. Noted for the next release note.
