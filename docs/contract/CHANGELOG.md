@@ -2,6 +2,17 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.29.0 (2026-10-21): CR-074 RDAP lookup service with cache and rolling limit; bots scope checked before the body
+Release note: `docs/releases/v5.29.0.md`.
+MINOR (additive; migration `1766100000000_v5-29-0.sql`).
+- **New RDAP lookup service (`endpoints.md` §RDAP lookup service):** `GET /rdap/{domain}` (READ or bots; `?fresh=true`), `POST /rdap/batch` (1..500 `.com` names; READ, bots or WRITE; a read-only POST like `POST /score`: no `Idempotency-Key`, no audit row) and `GET /lookups/usage`. Row `{domain, registered: true|false|null, created, expires, registrar, status[], checked_at, cache_age_s, source: "rdap", reason_code?}`. One cache shared with the internal steps (TTL `lookups_rdap_ttl_hours`, default 24); a cached answer costs no limit.
+- **Rolling limit:** `lookups_rdap_daily_limit` (default 200) live lookups per rolling 24 hours on UTC timestamps (no midnight reset), counted only for these routes; the internal daily steps never count. Over the limit: cached answers still 200; a needed live lookup is **429 `LOOKUP_LIMIT`** (`details.retry_after_s`, `Retry-After`). A batch cut off by the limit answers 200 with `limit_hit: true`, `retry_after_s` and `registered: null, reason_code: "LOOKUP_LIMIT"` rows; it is a whole 429 only when no row could be answered.
+- **Errors are not zeros:** timeout, source error and an upstream 429 give `registered: null` with `reason_code` `TIMEOUT`, `SOURCE_ERROR`, `RATE_LIMITED`; never `false`, and never cached.
+- **New code:** `LOOKUP_LIMIT` (429). 501 names in a batch: 400 `VALIDATION_ERROR`.
+- **New settings (migration only):** `lookups_rdap_ttl_hours`, `lookups_rdap_daily_limit`. New tables `rdap_cache`, `lookup_usage` (not in the backup).
+- **Bots scope before the body (CR-076 note):** a bots token on a money route is **403 `SCOPE_FORBIDDEN` whatever the body is**, an unparseable or too large one included (before: 400 `INVALID_BODY` for a body that is not JSON); with `"dry_run": true` the route's own validation follows. A WRITE token is unchanged.
+- **Not built:** `GET /tm/{term}` (CR-074 R-3): no official no-key USPTO source; trademark kills keep loading through `POST /data/tm-kills`.
+
 ## 5.28.0 (2026-10-21): CR-073 pick-proof mechanics
 Release note: `docs/releases/v5.28.0.md`.
 MINOR (additive; migration `1766000000000_v5-28-0.sql`).

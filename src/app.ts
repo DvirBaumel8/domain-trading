@@ -6,7 +6,7 @@ import { registerOffers, registerSold, SoldService, OffersService } from './modu
 import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerBooks, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
 import { registerDemand, registerSelection, registerSiblingScan, registerScreening, registerTestSets, registerPacks, ScreeningWorker, type ScreeningDeps, type HoldoutCheck } from './modules/selection/index.js';
 import { registerCheck, createAdapters, type RegistrarAdapter, CheckService } from './modules/registrars/index.js';
-import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerCloseouts, registerPortfolioImport, registerPortfolioWrites, registerTokens, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, registerSnapshots, DatasaveJob, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
+import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerCloseouts, registerPortfolioImport, registerPortfolioWrites, registerTokens, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, registerSnapshots, registerLookups, DatasaveJob, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
 import dns from 'node:dns';
 import { queryDns, queryNs, type NsLookup } from './core/ns-lookup.js';
 import type { Config } from './config.js';
@@ -18,6 +18,7 @@ import { registerRateLimit } from './http/rate-limit.js';
 import { registerErrorHandling } from './http/errors.js';
 import { jerusalemDeep } from './core/dates.js';
 import { rdapLookup, rdapStatus, type RdapFn } from './core/rdap.js';
+import { cachedRdapLookup } from './core/rdap-cache.js';
 import { registerDropLists, registerCohorts, registerCandidates, registerLessons, registerPatterns, IntakeScreeningJob, autoRebuildDailyList, BuildDailyListJob } from './modules/candidates/index.js';
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
 import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
@@ -208,7 +209,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('referenceRefreshJob', referenceRefresh);
   const retention = new RetentionJob({ ...base, log: app.log });
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now, log: app.log }));
-  app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: screeningDeps.rdapLookup, screening: screeningDeps, now, log: app.log }));
+  app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: cachedRdapLookup(deps.db, screeningDeps.rdapLookup, { now, ttlMs: 0 }), screening: screeningDeps, now, log: app.log }));
   app.decorate('dropWatchJob', new DropWatchJob({ db: deps.db, screening: screeningDeps, now, log: app.log }));
   app.decorate('intakeScreeningJob', new IntakeScreeningJob({ db: deps.db, worker: screeningWorker, now }));
   app.decorate('buildDailyListJob', new BuildDailyListJob({ db: deps.db, worker: screeningWorker, now, waitMs: deps.dailyListWaitMs }));
@@ -237,6 +238,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // Closing the app waits for the step in flight, so nothing touches the database after it is closed. Unfinished runs resume at start (main.ts) or on the next GET.
   app.addHook('onClose', async () => app.jobQueue.stop());
   registerSnapshots(app, { db: deps.db, now });
+  registerLookups(app, { db: deps.db, now, rdapLookup: screeningDeps.rdapLookup });
   registerCloseouts(app, { db: deps.db, now, scorer: engineScorer });
   registerMarket(app, { db: deps.db, now });
   registerPickproof(app, { db: deps.db, now });

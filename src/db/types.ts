@@ -55,6 +55,9 @@ export interface SettingsTable {
   pickproof_pool_max_price_cents: Generated<number>;
   pickproof_labels_max_per_run: Generated<number>;
   pickproof_pool_keep_days: Generated<number>;
+  /** v5.29.0 (CR-074): TTL of a cached RDAP answer (hours) and the live bot lookups allowed per rolling 24 h. Migration only. */
+  lookups_rdap_ttl_hours: Generated<number>;
+  lookups_rdap_daily_limit: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;
@@ -1347,6 +1350,26 @@ export interface RdapLookupsTable {
   source: string | null;
 }
 
+/** v5.29.0 (CR-074): the shared RDAP cache; definite answers only (never an error). */
+export interface RdapCacheTable {
+  domain: string;
+  registered: boolean | null;
+  created: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  expires: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  registrar: string | null;
+  statuses: Generated<string[]>;
+  nameservers: Generated<string[]>;
+  updated_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  checked_at: Timestamp;
+  reason_code: string | null;
+}
+export interface LookupUsageTable {
+  id: Generated<string>;
+  source: 'rdap';
+  at: Timestamp;
+  by_token: string;
+}
+
 export interface ReferenceFilesTable {
   id: Generated<string>;
   name: string;
@@ -1538,6 +1561,8 @@ export interface Database {
   pickproof_arms: PickproofArmsTable;
   pickproof_picks_history: PickproofPicksHistoryTable;
   pickproof_labels: PickproofLabelsTable;
+  rdap_cache: RdapCacheTable;
+  lookup_usage: LookupUsageTable;
   forward_cost_plans: ForwardCostPlansTable;
   forward_cost_lines: ForwardCostLinesTable;
   deals: DealsTable;

@@ -1,5 +1,6 @@
 import type { FastifyError, FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
+import { botsBodyRefusal } from './auth.js';
 
 export class AppError extends Error {
   constructor(
@@ -27,6 +28,8 @@ export function registerErrorHandling(app: FastifyInstance): void {
     }
     const fe = err as FastifyError;
     if (typeof fe.code === 'string' && fe.code.startsWith('FST_ERR_CTP_')) {
+      const refusal = botsBodyRefusal(req);
+      if (refusal) return reply.code(refusal.status).send(errorBody(refusal.code, refusal.message, refusal.details));
       return reply.code(fe.statusCode ?? 400).send(errorBody('INVALID_BODY', fe.message));
     }
     if (typeof fe.statusCode === 'number' && fe.statusCode >= 400 && fe.statusCode <= 499) {

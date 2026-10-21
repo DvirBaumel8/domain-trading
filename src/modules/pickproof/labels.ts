@@ -9,6 +9,7 @@
 import { sql, type Kysely } from 'kysely';
 import { addDays, dayNumber } from '../../core/dates.js';
 import { rdapLookup as realRdap, type RdapLookupFn } from '../../core/rdap.js';
+import { cacheTtlMs, cachedRdapLookup } from '../../core/rdap-cache.js';
 import type { Database } from '../../db/types.js';
 import { pickproofSettings } from './pool.js';
 
@@ -24,7 +25,8 @@ export interface LabelsSummary {
 
 export async function pickproofLabels(deps: LabelsDeps): Promise<LabelsSummary> {
   const { db } = deps;
-  const rdap = deps.rdap ?? realRdap;
+  // CR-074: through the shared RDAP cache (an answer up to lookups_rdap_ttl_hours old is fine for a T30 label); a live answer fills it. Never counts against the bot limit.
+  const rdap = cachedRdapLookup(db, deps.rdap ?? realRdap, { now: deps.now, ttlMs: await cacheTtlMs(db) });
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const st = await pickproofSettings(db);
   const nowMs = deps.now();

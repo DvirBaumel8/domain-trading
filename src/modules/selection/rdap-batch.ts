@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
+import { cachePut } from '../../core/rdap-cache.js';
 import { RDAP_COM_BASE, USER_AGENT, type RdapFacts, type RdapLookup } from '../../core/rdap.js';
 import { storeEvidence } from './evidence.js';
 import type { CheckContext, ScreeningDeps } from './types.js';
@@ -168,6 +169,8 @@ export async function lookupCached(db: Kysely<Database>, deps: ScreeningDeps, do
     domain, outcome: r.outcome, reason_code: r.reasonCode, http_status: r.httpStatus, facts: r.facts ? JSON.stringify(r.facts) : null,
     evidence_id: evidenceId === null ? null : String(evidenceId), checked_at: checkedAt, source: rdapSourceOf(r.url),
   }).execute();
+  // CR-074: a definite live answer also fills the shared RDAP cache the bot routes read (this step asked fresh or had no reusable row; it never counts against the bot limit).
+  if (r.outcome !== 'unknown' && (o.baseUrl === undefined || o.baseUrl === RDAP_COM_BASE) && /\.com$/.test(domain)) await cachePut(db, domain, r, now()).catch(() => {});
   return { ...r, cached: false, evidenceId, checkedAt, rateLimited: limited, source: rdapSourceOf(r.url) };
 }
 

@@ -28,6 +28,8 @@ const EXCLUDED: Record<string, string> = {
   pickproof_pool: 'frozen daily pick-proof pool (v5.28.0, CR-073): about 125,000 rows a day, kept 45 days and derived from the datasave rows; too large for the backup, the sha256 stays in pickproof_days',
   pickproof_arms: 'pick-proof arms (v5.28.0, CR-073): the Buyer\'s picks and the drawn names of each day, small; frozen at the seal, each arm\'s sha256 is in pickproof_days and in the seal line; the nightly export is unconfigured',
   pickproof_picks_history: 'append-only log of every POST of picks (v5.28.0, CR-073): audit_log keeps the call itself; the nightly export is unconfigured',
+  rdap_cache: 'shared RDAP cache (v5.29.0, CR-074): definite registry answers only, re-derived by the next lookup; nothing to restore; the nightly export is unconfigured',
+  lookup_usage: 'rolling 24-hour log of the bots live RDAP lookups (v5.29.0, CR-074): only the last 24 hours matter, older rows are deleted after 7 days; the nightly export is unconfigured',
   pickproof_labels: 'T30 labels of the pick-proof arm names (v5.28.0, CR-073): re-derivable from RDAP only while the name is unchanged, otherwise lost; small; the nightly export is unconfigured',
   job_runs: 'operational log of job step summaries; the audit rows keep the facts',
   job_queue_runs: 'operational queue of job runs (v3.0.0); the finished run is in job_runs',

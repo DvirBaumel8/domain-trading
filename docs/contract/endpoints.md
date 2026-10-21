@@ -1,4 +1,4 @@
-# Endpoints (contract v5.28.0)
+# Endpoints (contract v5.29.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -19,6 +19,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | Load data for the scoring engine and score names | `POST /engine/sales`, `POST /engine/unsold`, `POST /data/*` (rdap, live-checks, tm-kills, bigco-names, sales-comps), `POST /score`, `GET /engine/health` | WRITE or data token for the loads; READ for `GET` and `POST /score` |
 | Selection and screening | `GET /selection/settings`, `POST /selection/evaluate`, `POST /screening/runs`, `POST /screening/packs`, `GET /selection/buy-hold`, `POST /candidates/intake`, `GET /candidates/daily` | READ for `GET`, WRITE for `POST` (`/candidates/intake` also takes an intake or data token) |
 | Count visitors of the listed names (off until Dvir's line) | `POST /visits/forward/{domain}`, `POST /visits/settings`, `POST /visits/import`, `GET /visits`, `GET /visits/weekly` (the counting itself is `POST /visits/hit`, visits token only) | WRITE, WRITE, WRITE or data, READ, READ |
+| Look up RDAP facts of .com names with a cache and a daily limit (5.29.0, CR-074) | `GET /rdap/{domain}`, `POST /rdap/batch`, `GET /lookups/usage` | READ or bots (the batch is a read-only POST) |
 | Jobs | `POST /jobs/run` (`tick`, `daily`, `datasave`), `GET /jobs/runs` | job token or WRITE; READ |
 | Health | `GET /health/ping` (no token), `GET /health` | none, READ |
 
@@ -89,6 +90,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/jobs/run` | job token | Jobs (`jobs.md`) |
 | GET | `/jobs/runs` | READ | Jobs (`jobs.md`) |
 | POST | `/jobs/preview` | WRITE | Jobs (`jobs.md`) |
+| GET | `/rdap/{domain}`, `/lookups/usage` | READ or bots (a data token gets 403) | RDAP lookup service (5.29.0, CR-074) |
+| POST | `/rdap/batch` | READ, bots or WRITE (a read-only POST like `/score`: no `Idempotency-Key`, no audit row) | RDAP lookup service (5.29.0, CR-074) |
 | GET | `/snapshots`, `/snapshots/missing` | READ | Daily data saves (`jobs.md`, 5.21.0) |
 | POST | `/snapshots/dynadot` | WRITE or bots | Dynadot rows uploaded by the bots (5.22.0, CR-071 R-8, R-9) |
 | POST | `/company/document`, `/company/forbidden-terms`, `/company/forbidden-terms/{id}/retire` | WRITE | Company and reviews |
@@ -1090,6 +1093,26 @@ WRITE. Body (strict): `{today?: "YYYY-MM-DD"}`. `today` is an Asia/Jerusalem day
 ```
 The arrays are the `applied`, `superseded`, `held`, `delisted`, `cancelled`, `failed` and `dropped` fields of the jobs' dry-run summaries (`jobs.md`). `would_cancel` (2.6.0, CR-009 N-2) lists the open rows the run would cancel (a due delist cancels the name's other open rows; a sold or dropped name's planned rows), and `would_fail` the due rows that would fail the price rules. `would_supersede` stays a list of row ids. A job that was already running adds `skipped: true`. Writes only the audit row (summary `preview <day>: ok`); it never calls a registrar, a marketplace or a nameserver, it does not touch the domains or the schedule, and it is **not** a run (it does not appear in `GET /jobs/runs` and does not satisfy `JOB_OVERDUE`). The other job steps are not previewed.
 
+## RDAP lookup service (5.29.0, CR-074)
+
+One place to ask "is this .com registered, since when, at whom, with which status?" so the bots stop repeating the same lookups. The answer comes from **one cache** (`rdap_cache`) that the internal steps share: the pick-proof T30 labels read it, and the screening checks, the drop-list watch, the cohort outcomes and the portfolio check fill it with every definite answer they get. Only `.com` names (the Verisign RDAP host). The service never scrapes a page and needs no key. Legal or trademark judgment is not part of it (`GET /tm/{term}` is **not built**: no official no-key USPTO source is known).
+
+**Row shape** (the same in all three routes): `{domain, registered: true | false | null, created, expires, registrar, status: [string], checked_at, cache_age_s, source: "rdap", reason_code?}`. `created` and `expires` are ISO times with an offset (or `null`), `status` are the registry's EPP status words. `cache_age_s` is 0 for an answer just fetched. `registered: null` is **never** a "no": it means the registry could not be asked or did not answer, and `reason_code` says why: `TIMEOUT`, `SOURCE_ERROR` (any other failure, including a page that is not an RDAP answer), `RATE_LIMITED` (the registry answered 429), or `LOOKUP_LIMIT` (only in a batch row: the limit below was reached before this name). An error answer is **not cached** (the next call asks again) and a slot is still spent, because the registry was asked.
+
+**Cache.** A stored answer younger than `lookups_rdap_ttl_hours` (default 24, migration only) is served with no live lookup and no limit used. `?fresh=true` (or `"fresh": true` in the batch body) skips the cache, asks the registry and counts against the limit; the answer fills the cache.
+
+**Limit.** `lookups_rdap_daily_limit` (default 200, migration only) live lookups per **rolling 24 hours**, keyed on UTC timestamps: a lookup stops counting exactly 24 hours after it was made, so there is no midnight reset (and none at midnight Israel time). It counts only live lookups made by these routes (every token, bots and READ and WRITE alike share it). The internal daily steps read and fill the same cache but **never count**. A slot is reserved atomically before the lookup (two calls at once cannot pass the limit).
+
+### `GET /rdap/{domain}`
+READ or bots. Query `fresh` = `true` | `false` (strict, else 400 `VALIDATION_ERROR`). Domain: a second-level `.com` (422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED` like everywhere). **200** the row. A registry error is still 200 with `registered: null` and a `reason_code`. A needed live lookup with the limit used up: **429 `LOOKUP_LIMIT`**, `details {retry_after_s}` and a `Retry-After` header (seconds until the oldest counted lookup is 24 hours old). A cached answer is served even then.
+
+### `POST /rdap/batch`
+READ, bots or WRITE. **A read-only POST** (like `POST /score`): it writes only the cache and the usage log, so it needs no `Idempotency-Key` and leaves no audit row. Body (strict) `{domains: ["x.com", ...], fresh?: boolean}`, 1 to 500 names (501 or 0 names, or an unknown field: **400 `VALIDATION_ERROR`**; a name that is not a valid `.com`: 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED`, nothing looked up). Names are lower-cased; a name twice gives the same row twice, asked once.
+**200** `{count, cached_n, live_n, limit_hit, retry_after_s?, rows: [row]}`; `rows` follow the order of `domains`. Cached names first; the rest are looked up live while slots remain. When the limit runs out, the remaining uncached names come back `registered: null, reason_code: "LOOKUP_LIMIT"` and the answer carries `limit_hit: true` and `retry_after_s`. The call is a whole **429 `LOOKUP_LIMIT`** only when no row at all could be answered (nothing was cached and no slot was free).
+
+### `GET /lookups/usage`
+READ or bots. **200** `{source: "rdap", used, limit, remaining, window_hours: 24, window_start, resets_gradually: true, next_slot_at}`. `used` is the live lookups of the last 24 hours; `next_slot_at` is when the oldest of them stops counting (`null` when none).
+
 ## Daily data saves (5.21.0, CR-071)
 
 The `datasave` job (`jobs.md`) saves GoDaddy's official inventory files every day at 15:00 UTC and records one write-once manifest per file. The two GET routes only read. The only route that writes a snapshot is `POST /snapshots/dynadot` (5.22.0, the bots' Dynadot rows); no route re-parses or re-downloads a GoDaddy snapshot, and raw files are never served.
@@ -1288,6 +1311,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
 
 **Market data (5.23.0, CR-075):** `APPEND_ONLY` (**405** on PUT, PATCH or DELETE of `/data/sales`; **409** on `POST /data/sales` for a stored `(name, venue, sale_date, source)` sent again with a different price). The `rejects[].reason` of a 422 `POST /data/sales`: `SOURCE_REQUIRED`, `SOURCE_NAMEBIO_FORBIDDEN`, `TIER_REQUIRED`, `TIER_INVALID`, `NAME_INVALID`, `VENUE_INVALID`, `PRICE_NOT_INTEGER_CENTS`, `DATE_INVALID`, `DATE_IN_FUTURE`, `SOURCE_URL_INVALID`, `LISTING_TYPE_INVALID`, `UNKNOWN_FIELD`. Episode labels (`outcome_rule`, not errors): `SOLD_REPORTED`, `SOLD_BIDS`, `UNSOLD_60D`, `UNSOLD_30D`, `SEEN_ONCE`, `DISAPPEARED`, `TOO_SHORT`. `/report` warning `DQ_MARKET_FAIL` (`reports.md`).
+
+**RDAP lookup service (5.29.0, CR-074):** `LOOKUP_LIMIT` (429 on `GET /rdap/{domain}` and `POST /rdap/batch`, `details.retry_after_s` and a `Retry-After` header; also the `reason_code` of a batch row that the limit cut off). Row `reason_code` values (not errors, `registered` is `null`): `TIMEOUT`, `SOURCE_ERROR`, `RATE_LIMITED`, `LOOKUP_LIMIT`.
 
 **Pick-proof (5.28.0, CR-073):** `PICKPROOF_SEALED` (409, `POST /pickproof/{date}/picks` from the deadline on or after the seal), `PICKPROOF_NOT_SEALED` (409, `GET /pickproof/{date}/arms` before the day is sealed), `NOT_IN_POOL` (422, picks outside the frozen pool; `details.names`); `SNAPSHOT_MISSING` (409) is also returned when the evening-before snapshot of the pool is not sealed. The `UNPOWERED` status in the report is a result, not an error.
 

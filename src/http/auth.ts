@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
 import { hashToken } from '../core/tokens.js';
 import type { Database, Scope } from '../db/types.js';
@@ -277,6 +277,18 @@ const toBraces = (url: string): string => url.replace(/:([A-Za-z_]+)/g, '{$1}');
 
 const botsForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A bots token cannot do this: money, price, listing and renewal actions need "dry_run": true or a WRITE token');
 
+/**
+ * v5.29.0 (CR-076 note): a body that cannot be parsed (not JSON, too large, wrong media type) never reaches the scope hook. For a bots token on a route that is not
+ * `allowed` the answer is still 403 SCOPE_FORBIDDEN (the body cannot carry `dry_run: true`), so a bots token learns nothing about the body before it learns it may not write.
+ * Called by the error handler; returns null when the request is not such a case.
+ */
+export function botsBodyRefusal(req: FastifyRequest): AppError | null {
+  if (req.auth?.scope !== 'bots' || req.jobAuth) return null;
+  const url = req.routeOptions?.url ?? '';
+  if (!isMutating(req.method, url)) return null;
+  return (BOTS_ROUTES[`${req.method} ${toBraces(url)}`] ?? 'money') === 'allowed' ? null : botsForbidden();
+}
+
 export function registerScope(app: FastifyInstance): void {
   app.addHook('preHandler', async (req) => {
     if (req.auth?.scope === 'intake' && !req.jobAuth) {
@@ -302,7 +314,7 @@ export function registerScope(app: FastifyInstance): void {
     }
     if (req.auth.scope === 'bots') {
       const url = req.routeOptions?.url ?? '';
-      if (!isMutating(req.method, url)) return; // every GET (and the read-only POST /score)
+      if (!isMutating(req.method, url)) return; // every GET (and the read-only POSTs /score, /rdap/batch)
       const cls = BOTS_ROUTES[`${req.method} ${toBraces(url)}`] ?? 'money';
       if (cls === 'allowed') return;
       if (cls === 'money' && (req.body as { dry_run?: unknown } | null | undefined)?.dry_run === true) return;

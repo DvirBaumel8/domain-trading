@@ -307,6 +307,7 @@ Jobs and queue, health, admin CLI, backup.
 |---|---|
 | POST /jobs/run, GET /jobs/runs, POST /jobs/preview | `ops/api/jobs.ts` |
 | GET /candidates/closeouts (v5.26.0, CR-072: ranked closeout and drop candidates, read-only; stored filters and scores from the `scorePool` step) | `ops/api/closeouts.ts` (`registerCloseouts`, called from `src/app.ts`; filters `ops/closeouts/filters.ts`; scoring step `ops/closeouts/score-pool.ts`; name filters `selection/closeout-name.ts`; offline score `engine/score.ts` `Scorer.scoreOffline`). Tests `ops/closeouts` (CC526-1..13); doc `docs/internal/closeouts.md` |
+| GET /rdap/:domain, POST /rdap/batch (read-only POST; tables `rdap_cache`, `lookup_usage`, migration `1766100000000_v5-29-0.sql`, none in the backup), GET /lookups/usage (v5.29.0, CR-074) | `ops/api/lookups.ts` (`registerLookups`; cache and limit in `src/core/rdap-cache.ts`; rules `docs/internal/lookups.md`) |
 | GET /snapshots, GET /snapshots/missing (v5.21.0, CR-071), POST /snapshots/dynadot (v5.22.0, bot uploads of Dynadot rows) | `ops/api/snapshots.ts` (`registerSnapshots`; state in `reporting/datasave-state.ts`; upload service and schemas in `ops/jobs/datasave/dynadot-upload.ts`) |
 | GET /health/ping, GET /health (v5.20.0, BUG-047: `jobs` also overdue by a stale tick, `jobs_last`; `reporting/job-runs.ts` `tickOverdue`, `lastJobRunAt`) | `ops/api/health.ts` |
 | POST /tokens/bots/rotate (v5.20.0, CR-069: the shared `bots` token, see `docs/internal/bots-token.md`) | `ops/api/tokens.ts` (`registerTokens`) |
@@ -344,6 +345,7 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 | `validation.ts` | `approvalRef` zod, `assertNoteNoPii`, `piiError` | via api tests |
 | `redact.ts` | `redact`, `scrubSecrets` | `core/unit/redact` |
 | `locks.ts` | `withDomainLock`, `withDomainLocks` (v5.14.0: many names on one connection, sorted, one deadline; used by the export confirm), `withAdvisoryLock`, `trySessionLock` | `selection/r1b-locks`, `listing/list-concurrency` |
+| `rdap-cache.ts` | v5.29.0 (CR-074): the shared RDAP cache (`rdap_cache`), `cachedRdapLookup` (pickproof labels, portfolio check), `reserveSlots` / `readUsage` (the rolling 24 h bot limit, `lookup_usage`); `lookupCached` in `selection/rdap-batch.ts` fills it | `ops/rdap-lookups` |
 | `rdap.ts`, `ns-lookup.ts`, `safe-fetch.ts` | RDAP, DNS NS lookup, SSRF-safe fetch (`safeFetch`) | `core/unit/rdap*`, `ns-lookup`, `dns-query`, `safe-fetch*` |
 | `tokens.ts` | `generateToken`, `hashToken` | `core/unit/tokens` |
 | `chunks.ts` | `chunks` (bulk insert and `in (...)` pieces) | none |
@@ -437,6 +439,8 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Change the buy-hold lift steps | `selection/hold-steps.ts`, `selection/api/selection.ts` (`/selection/buy-hold`) | `buying/buy-hold`, `selection/bt1-v3-records` |
 | Change backup contents | `ops/jobs/backup-export.ts`, `backup-import.ts` | `ops/backup`, `ops/unit/backup-coverage` |
 | Change the nameserver verify / lander | `core/ns-lookup.ts`, `listing/lander.ts`, `ops/jobs/ns-verify.ts` | `core/unit/ns-lookup`, `ops/ns-verify` |
+| Change the RDAP lookup service (cache TTL, bot limit, rows, which steps share the cache) (v5.29.0, CR-074) | `core/rdap-cache.ts`, `ops/api/lookups.ts`, `selection/rdap-batch.ts` (`cachePut`), `pickproof/labels.ts`, `app.ts` (portfolio check); settings columns `lookups_*` by migration; `docs/internal/lookups.md`, contract §RDAP lookup service | `ops/rdap-lookups` |
+| Change the bots scope order (money route, body) (v5.29.0) | `http/auth.ts` (`registerScope`, `botsBodyRefusal`), `http/errors.ts` | `http/bots-scope-order`, `http/bots-scope` |
 | Change money formatting | `core/money.ts` (`pair`, `formatUsd`) | `core/unit/money` |
 
 ## 4. Release checklist for a change
