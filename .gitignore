@@ -25,3 +25,7 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
+
+# Python bytecode (bots commit witness scripts under docs/requests)
+__pycache__/
+*.pyc
