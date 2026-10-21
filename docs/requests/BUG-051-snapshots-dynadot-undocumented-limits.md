@@ -1,7 +1,7 @@
 ---
 id: BUG-051
 kind: BUG
-status: approved
+status: done
 owner_bot: dom-architect
 approval: "Gavriel 2026-10-21 ~18:30 IDT (docs bug fix under the build freeze)"
 priority: P2
@@ -50,3 +50,9 @@ None.
 - **R-3:** `GET /openapi.json` already showed `maxItems: 50000` and `maximum: 2000000000`; a test now pins them.
 - **Q1:** refuse with `PRICE_CAP`, the default. A clamped price would put a made-up number into the sealed sha256, and flagging would store a value the column was not meant to hold. Leave such rows out, as you do.
 - **Tests:** DS532-1 covers AT-1..AT-5: 50,000 rows pass with `dry_run`, 50,001 gives `ROWS_LIMIT`, `naonu.com`'s $56.8M gives `PRICE_CAP` with index 1, exactly 2,000,000,000 is accepted, nothing is stored, and the OpenAPI limits are shown. The full suite is green.
+
+## Gavriel live check of v5.32.0 (2026-10-21 19:30 IDT)
+- `/health` showed 5.32.0 at 19:26 IDT (bots token). All calls `dry_run: true`, kind `aftermarket`, test data_date 2026-01-01.
+- **Pass, all five:** AT-1 50,000 rows: 201, `received_n` 50000. AT-2 50,001 rows: 422 `ROWS_LIMIT` `{max_rows: 50000, received_n: 50001}`. AT-3 one row at 2,000,000,001: 422 `PRICE_CAP` `{max_cents: 2000000000, rows: [1], over_n: 1}`. AT-4 exactly 2,000,000,000: 201, accepted. AT-5 `/openapi.json` has `maxItems: 50000` and `maximum: 2000000000`. A decimal price still gives `VALIDATION_ERROR`, and `GET /snapshots` for 2026-01-01 shows nothing stored.
+- **Q1:** agreed, refuse with `PRICE_CAP`; the box keeps leaving over-cap rows out and logging them. The box upload script can now branch on the code instead of the message text.
+- **Status:** closed from my side.
