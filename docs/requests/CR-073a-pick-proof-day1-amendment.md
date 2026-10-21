@@ -129,3 +129,24 @@ Yes, please fix it on the server. Filed as CR item **PP-V2** under CR-073a:
 - A random sample of v2 two-word names looks right (buzzgulf, skillcuts, larksongs, doodlepeel).
 - **Plan side:** Challenger's ruling on the C1/K1 switch is now needed before today's 19:05 IDT seal, not tomorrow's. Until then the sealed C1/K1 text stands.
 - **Status:** PP-V2 accepted from my side.
+
+## DOM Architect: 2026-10-22 v1 provenance check for C1 / K1-fix (2026-10-22 01:25 IDT)
+Asked by Gavriel after Challenger ruled that C1 and K1-fix switch to v2 on 10-23, so 10-22 counts only if its pool and picks come from `pickproof-v1`. Read and build only. No DOM src/ or tests/ were read.
+- **Verdict: v1 is NOT reproduced for 2026-10-22. 10-22 is void for C1 and K1-fix.** DOM froze 10-22 under `pickproof-v2`, so the v5.33 v2 filter **was** applied. That's the opposite of what was hoped.
+- **How I know v2 was applied:** `GET /pickproof/2026-10-22/manifest` shows `recipe.version` `pickproof-v2` and `pool_rule` `8358999be5884f3c636b7c748510b83af416505897d6967c5d9f1c3b99bc2012`, not the v1 `27146768ebf966fa4d63de1f9ff8639d53d389410cb2ce3adc6777eff5976c47`. In `GET /pickproof/2026-10-22/pool`, 2,046 of 129,354 rows have `is_two_word` true (the v2 count; v1 had 5,841 on 10-21). The day was frozen after the v5.33.0 deploy, as Gavriel's 01:15 check found.
+- **Why v1 can't be rebuilt:** DOM stores only one `is_two_word` flag per day, and for 10-22 that flag is v2. The v1 two-word rule is `closeoutNameChecker.check` with the SCOWL 60 lexicon. It lives only in DOM code (src/, off limits), and no box script implements it. `sourcing/pick-proof/arm_a.py` uses the bots' own K1 rule (lanes.shape plus wordfreq), not DOM's C1 v1. So a v1 C1 sub-pool for 10-22 can't be produced or proven.
+- **The pool itself reproduces, and it doesn't depend on the version** (pickproof.md: v2 changes only `is_two_word`, which isn't hashed):
+  - `pool_sha256` `f57abdb989fd63f6cd3f22e1cd749981ba2396e3aaac464ece0f740e8a927053`, seed 4118461881, 129,354 rows (GoDaddy 124,762 + Dynadot 4,592). It matches the direct check from `/pool` and an independent rebuild from box files using the "Pool-hash recipe" steps 1-6 (rebuilt row list equals the server's exactly).
+  - GoDaddy input: `data/raw/godaddy_inventory/2026-10-21/closeout_listings.json.zip`, sha256 `7d0a642b…1856`, which equals `sources.godaddy.manifest_sha256`.
+  - Dynadot input: DOM's frozen 10-22 pool **includes** the partial upload (data date 10-21, about 29%, sealed, `manifest_sha256` `a5a0a945…bfd7`). To rebuild it I used `data/raw/dynadot/2026-10-21/PARTIAL_closeouts_dd2026-10-21_p1of4.json` (20,000 rows, 4,592 in pool). That file's raw sha256 is `2aa60c8b…7111`, not `a5a0a945…`: DOM's manifest hash isn't of these file bytes, but the rows reproduce exactly. No other PARTIAL_ file was used.
+  - Excluded sales-graded names: none (`excluded_sales_graded` []).
+- **Commits for Challenger:**
+  - Last v1 release: `v5.32.0` = `eeae12b39bc575c4aa2c1857b07b9b58af613915`.
+  - v1 `pool_rule` text as confirmed by DOM: `v5.28.0` = `f3d05aebd2ea8f2048913c53b7c35f5f4786f642`.
+  - v2 release: `v5.33.0` = `7a8a62da4b0d14ea52625da14a7ca96fcb545eb4` (2026-10-22 01:02 IDT).
+  - Pool-hash recipe doc: `docs/internal/pickproof.md` "Pool-hash recipe" (5.30.0).
+- **There is no "Oct 22 v1 pool hash" apart from the one above:** `pool_sha256` is the same under v1 and v2. Only the C1 sub-pool would differ, and it can't be made under v1.
+- **Status:** 10-22 isn't sealed yet (deadline 19:00 IDT). Its C1 draw will use the v2 flags. Arms A, B1 and B2 don't use `is_two_word`. Nothing asked of DOM.
+
+## Changes
+- 2026-10-22 DOM Architect: added the 10-22 v1 provenance check. The pool reproduced (f57abdb9…7053), but v1 C1 was not reproduced and v2 was applied, so 10-22 is void for C1 and K1-fix.
