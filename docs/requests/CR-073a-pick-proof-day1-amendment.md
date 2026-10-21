@@ -93,3 +93,20 @@ Yes, please fix it on the server. Filed as CR item **PP-V2** under CR-073a:
 2. **First pick day:** the first day whose pool freezes after `pickproof-v2` is live on `/health` (target **2026-10-23**, so ship before the 15:00 UTC save on 2026-10-22). Days already frozen keep their flag and hash, as you proposed. Put the recipe version in each manifest.
 3. **Test:** `dhsar` → false; `sunbox`, `redcar` → true; `qzxvkw` → false; plus one 2-letter-token case (e.g. `goal`-style `go`+`al`) → false.
 4. **Plan side:** the K1 fix arm (dictionary split checked against `is_two_word`) will use this same rule. Challenger rules on the switch before the first v2 pick day; until then C1 and K1 stay as sealed.
+
+## DOM answer: PP-V2 built in v5.33.0 (2026-10-21 22:05 UTC)
+- **Shipped:** tag `v5.33.0`, pushed at 22:04 UTC. The Mac host deploys after CI and runs the migration. Please confirm on `/health`.
+- **1. Rule (`pickproof-v2`):** exactly as you wrote it, with one addition: each part must also contain a vowel (a e i o u y). A name is two-word when:
+  - its SLD is letters only, at most 10 letters, and not SPELL-1;
+  - some split into exactly two parts gives two words of 3+ letters, each with a vowel and each on the common-word list. Any one valid split counts.
+- **The list:** `data/wordlists/en-scowl-35-lower.txt`, sha256 `60ca88eb55f3738f9a0097e658826c4c1860bbe039069adc2673ce4c1841dc16`, 38,614 words. Named in `docs/internal/pickproof.md` and `data/README.md`. The server checks it against the sha256 on load.
+  - It is SCOWL size 35 (the most common words), the same ESDB revision as the old list. I rebuilt the old list from the source and it reproduced its hash exactly.
+  - It keeps only the entries the source writes in lowercase. That removes proper names and upper-case abbreviations (DHS, AR). The old SCOWL 60 list had them because it was lowercased.
+  - At size 35 the one lowercase abbreviation left is `rpm`; the vowel rule removes it.
+- **2. First pick day:** the first day whose pool freezes after the deploy. That is 2026-10-23, or 2026-10-22 if nothing froze 10-22 before the deploy. Each day keeps its own version in `pickproof_days.recipe_version`, and the manifest shows `recipe.version` with that version's hashes. Days frozen before keep `pickproof-v1`, their flags and their `pool_rule` hash. `pool_sha256` and the draw are unchanged.
+- **3. Tests:**
+  - PP533-1: `dhsar` false, `sunbox` and `redcar` true, `qzxvkw` false, `goal` (go + al) false, `gonow` false, 11 letters false, `rpmbox` false.
+  - PP533-2: the list's sha256 and contents.
+  - PP533-3: a new day is v2 (dhsar.com false, sunbox.com true); an older day keeps v1.
+  - The full suite is green.
+- **4. Your K1-fix arm:** to match the server exactly, use the same file and the same three conditions. `GET /pickproof/{date}/pool` gives `is_two_word` per name for a check.
