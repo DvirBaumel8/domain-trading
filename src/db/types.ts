@@ -49,6 +49,12 @@ export interface SettingsTable {
   datasave_auction_keep_days: Generated<number>;
   /** v5.26.0 (CR-072): DIGITS_OR_HYPHEN filter of the closeout candidates (default on). */
   closeouts_filter_digits_hyphen: Generated<boolean>;
+  /** v5.28.0 (CR-073): pick-proof settings. Migration only; k can only be raised (trigger) and is at most 300. */
+  pickproof_k: Generated<number>;
+  pickproof_deadline_hour_utc: Generated<number>;
+  pickproof_pool_max_price_cents: Generated<number>;
+  pickproof_labels_max_per_run: Generated<number>;
+  pickproof_pool_keep_days: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;
@@ -1435,6 +1441,57 @@ export interface MarketDqRunsTable {
   results: ColumnType<unknown, string, string>;
 }
 
+/** v5.28.0 (CR-073): pick-proof. `day` is the pick day D; the pool is the closeouts of data date D-1. */
+export interface PickproofDaysTable {
+  day: DateString;
+  data_date: DateString;
+  pool_sha256: string;
+  seed: number | string;
+  k: number;
+  pool_n: number;
+  sources: ColumnType<unknown, string, string>;
+  deadline: Timestamp;
+  arms: ColumnType<unknown, string | null | undefined, string | null>;
+  created_at: TimestampDefault;
+  sealed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+}
+export interface PickproofPoolTable {
+  day: DateString;
+  domain: string;
+  source: string;
+  price_cents: number;
+  passes_k1: boolean;
+  is_two_word: boolean;
+}
+export interface PickproofArmsTable {
+  day: DateString;
+  arm: 'A' | 'B1' | 'B2' | 'C1';
+  domain: string;
+  rank: number;
+  price_cents: number;
+}
+export interface PickproofPicksHistoryTable {
+  id: Generated<number>;
+  day: DateString;
+  names: ColumnType<unknown, string, string>;
+  n: number;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+export interface PickproofLabelsTable {
+  domain: string;
+  day: DateString;
+  label: 'taken' | 'not_taken' | 'unknown';
+  checked_at: Timestamp;
+  attempts: number;
+  created_at_rdap: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  created_unknown: boolean;
+  created_after_d: boolean | null;
+  statuses: ColumnType<unknown, string | null | undefined, string | null>;
+  reason: string | null;
+}
+
 export interface MarketMatchedSetsTable {
   asof: DateString;
   ratio: number;
@@ -1476,6 +1533,11 @@ export interface Database {
   market_names: MarketNamesTable;
   market_dq_runs: MarketDqRunsTable;
   market_matched_sets: MarketMatchedSetsTable;
+  pickproof_days: PickproofDaysTable;
+  pickproof_pool: PickproofPoolTable;
+  pickproof_arms: PickproofArmsTable;
+  pickproof_picks_history: PickproofPicksHistoryTable;
+  pickproof_labels: PickproofLabelsTable;
   forward_cost_plans: ForwardCostPlansTable;
   forward_cost_lines: ForwardCostLinesTable;
   deals: DealsTable;

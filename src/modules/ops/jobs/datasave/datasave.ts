@@ -19,6 +19,7 @@ import { pipeline } from 'node:stream/promises';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../../db/types.js';
 import { runDqMarket, runEpisodes } from '../../../market/index.js';
+import { pickproofLabels } from '../../../pickproof/index.js';
 import { scorePool, type PoolScorer } from '../../closeouts/score-pool.js';
 import { listZipEntries, openZipEntry } from './zip.js';
 import { streamArrayItems } from './json-stream.js';
@@ -396,6 +397,13 @@ export class DatasaveJob {
   async dqMarket(): Promise<unknown> {
     const r = await runDqMarket(this.deps.db, this.deps.now());
     return { status: r.status, failed_checks: r.failed_checks, checks_n: r.results.length };
+  }
+
+  // ---------- pickproofLabels (v5.28.0, CR-073) ----------
+
+  /** T30 labels of the pick-proof arm names (30 days after the pick day), RDAP only, at most settings.pickproof_labels_max_per_run lookups; also prunes old pool rows. See pickproof/labels.ts. */
+  async pickproofLabels(): Promise<unknown> {
+    return pickproofLabels({ db: this.deps.db, now: this.deps.now, log: this.deps.log });
   }
 
   // ---------- buildPanel ----------

@@ -46,7 +46,7 @@ describe('DS521 datasave job', () => {
     const run = await runJobToEnd(app!, 'datasave');
     expect(run.json().ok).toBe(true);
     const steps = run.json().steps;
-    expect(Object.keys(steps)).toEqual(['godaddyInventory', 'dynadotCloseouts', 'dynadotAftermarket', 'scorePool', 'buildPanel', 'snapshotRetention', 'episodes', 'dqMarket']);
+    expect(Object.keys(steps)).toEqual(['godaddyInventory', 'dynadotCloseouts', 'dynadotAftermarket', 'scorePool', 'buildPanel', 'snapshotRetention', 'episodes', 'dqMarket', 'pickproofLabels']);
     expect(steps.godaddyInventory.summary).toMatchObject({ data_date: '2026-10-20', complete_n: 5 });
     const res = (await get('/snapshots?date=2026-10-20&source=godaddy_inventory')).json();
     expect(res.snapshots).toHaveLength(5);
@@ -89,7 +89,7 @@ describe('DS521 datasave job', () => {
     expect(retries[1]).toMatchObject({ params: { retry: true }, trigger: 'scheduled', triggered_by: 'datasave-retry' });
     expect(retries[1]!.not_before!.getTime()).toBe(NOW + 3_600_000);
     // not run before its time, and a retry never retries again
-    expect((await db.selectFrom('job_steps').select('status').where('job', '=', 'datasave').execute()).filter((s) => s.status === 'queued')).toHaveLength(8);
+    expect((await db.selectFrom('job_steps').select('status').where('job', '=', 'datasave').execute()).filter((s) => s.status === 'queued')).toHaveLength(9);
   });
 
   it('DS521-7 the retry runs once the hour is up (asking for the job again starts the waiting run), saves the day and does not queue a third run', async () => {
@@ -169,7 +169,7 @@ describe('DS521 datasave job', () => {
     const runs = (await get('/jobs/runs?job=datasave')).json().runs;
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ job: 'datasave', status: 'finished', ok: true });
-    expect(Object.fromEntries(Object.entries(runs[0].steps as Record<string, { status: string }>).map(([k, v]) => [k, v.status]))).toEqual({ godaddyInventory: 'done', dynadotCloseouts: 'done', dynadotAftermarket: 'done', scorePool: 'done', buildPanel: 'done', snapshotRetention: 'done', episodes: 'done', dqMarket: 'done' });
+    expect(Object.fromEntries(Object.entries(runs[0].steps as Record<string, { status: string }>).map(([k, v]) => [k, v.status]))).toEqual({ godaddyInventory: 'done', dynadotCloseouts: 'done', dynadotAftermarket: 'done', scorePool: 'done', buildPanel: 'done', snapshotRetention: 'done', episodes: 'done', dqMarket: 'done', pickproofLabels: 'done' });
     expect(runs[0].steps.godaddyInventory.summary.data_date).toBe('2026-10-20');
   });
 

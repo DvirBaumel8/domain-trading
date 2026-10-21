@@ -60,7 +60,7 @@ describe('module boundaries (refactor R2)', () => {
 
   it('every module has an index.ts', () => {
     const mods = readdirSync(MODULES).filter((n) => statSync(join(MODULES, n)).isDirectory());
-    expect(mods.sort()).toEqual(['buying', 'candidates', 'data', 'engine', 'listing', 'market', 'ops', 'outreach', 'registrars', 'reporting', 'selection', 'selling', 'visits']);
+    expect(mods.sort()).toEqual(['buying', 'candidates', 'data', 'engine', 'listing', 'market', 'ops', 'outreach', 'pickproof', 'registrars', 'reporting', 'selection', 'selling', 'visits']);
     for (const m of mods) expect(statSync(join(MODULES, m, 'index.ts')).isFile()).toBe(true);
   });
 

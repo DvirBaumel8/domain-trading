@@ -23,6 +23,7 @@ import { registerEmails, registerCompany, registerReviews, retryReview, runRevie
 import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
 import { registerData } from './modules/data/index.js';
 import { registerMarket } from './modules/market/index.js';
+import { registerPickproof } from './modules/pickproof/index.js';
 import { registerVisits } from './modules/visits/index.js';
 import { collectOpenApiRoutes, registerOpenApi } from './http/openapi.js';
 
@@ -238,6 +239,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerSnapshots(app, { db: deps.db, now });
   registerCloseouts(app, { db: deps.db, now, scorer: engineScorer });
   registerMarket(app, { db: deps.db, now });
+  registerPickproof(app, { db: deps.db, now });
   registerJobs(app, app.jobQueue, { ...base, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   registerOpenApi(app, openApiRoutes, deps.config.version);
   deps.registerExtraRoutes?.(app);

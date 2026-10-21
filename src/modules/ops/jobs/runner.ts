@@ -103,8 +103,8 @@ export interface JobRunnerDeps {
   engineEndingsJob?: Runnable;
   /** v5.5.0 (CR-056 part 2): `weekly()` is the daily step engineTrain (decides and queues a `train` run); `runById` is the `train` job's step trainModel. */
   engineTrainer?: { weekly(): Promise<unknown>; runById(id: string): Promise<unknown> };
-  /** v5.21.0 (CR-071): the datasave job's eight steps (v5.23.0: episodes, dqMarket last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
-  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown> };
+  /** v5.21.0 (CR-071): the datasave job's nine steps (v5.23.0: episodes, dqMarket; v5.28.0: pickproofLabels last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
+  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown>; pickproofLabels(): Promise<unknown> };
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
   /** Takes the run lock (default: a database session lock). Tests of the step order pass a stub. */
@@ -158,9 +158,9 @@ export class JobRunner {
     // v5.21.0 (CR-071): POST /jobs/run {job:'datasave'}. Each step has its own status; a failed godaddyInventory does not stop the rest.
     if (job === 'datasave') {
       const ds = d.datasaveJob;
-      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'snapshotRetention' | 'episodes' | 'dqMarket') =>
+      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels') =>
         step(name, async () => (ds ? ds[name]() : { skipped: true, reason: 'datasave not configured' }));
-      return [dsStep('godaddyInventory'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket')];
+      return [dsStep('godaddyInventory'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels')];
     }
     if (job === 'tick') return [...tick, optionalFn('reviewRetry', d.reviewRetry, 'review retry not configured')];
     // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.

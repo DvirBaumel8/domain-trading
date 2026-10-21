@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.28.0 (2026-10-21): CR-073 pick-proof mechanics
+Release note: `docs/releases/v5.28.0.md`.
+MINOR (additive; migration `1766000000000_v5-28-0.sql`).
+- **New routes (Pick-proof, `endpoints.md`):** `POST /pickproof/{date}/picks` (WRITE or bots, non-money: the Buyer's picks, arm A), `GET /pickproof/{date}/manifest` (the seal), `GET /pickproof/{date}/arms`, `GET /pickproof/report` (READ or bots). The pool of pick day D is the sealed CR-071 save of the evening before (data date D-1): `.com` closeouts of GoDaddy and a sealed Dynadot upload at $40 or less, minus sales-graded names, frozen with a sha256 on first use. Arms of `k` = 100 names (raise-only to 300): A the Buyer's picks, B1 random, B2 random from the K1-passing names, C1 random from two-word names of at most 10 letters; **C2 (.net-registered) is `not_built`** (deferred). Draws use the CR-008 MT19937 / Fisher-Yates recipe with a derived seed per arm.
+- **New codes:** `PICKPROOF_SEALED` (409), `PICKPROOF_NOT_SEALED` (409), `NOT_IN_POOL` (422); `SNAPSHOT_MISSING` (409) is also returned for a pick day whose evening-before snapshot is not sealed.
+- **Seal:** the first manifest call at or after 16:00 UTC of D draws B1, B2, C1 and seals the day; picks close at the same time (409 `PICKPROOF_SEALED`); the arms are shown only after that call. The bots append the manifest to `docs/requests/pick-proof-seals.md` (DOM commits no data).
+- **New `datasave` step `pickproofLabels`** (ninth, last; `jobs.md`): T30 labels (`taken`, `not_taken`, `unknown`) for the names of the sealed arms 30 days after the pick day, Verisign RDAP only, at most 300 lookups a run; the one outside call is the public RDAP host. Changed from CR-073 R-4 as written: arm names only, not every pool name.
+- **Report:** per arm n, events, rate, `unknown_n`; A against C1 (primary, one-sided Fisher, alpha 0.05, CMH by price band), B1 and B2 (Holm); overlap above 5% switches to a seeded within-day permutation test (10,000 shuffles); under 10 events `UNPOWERED`. Every output is labelled "proxy, not profit".
+- **New settings (migration only):** `pickproof_k` (raise-only trigger, 1..300), `pickproof_deadline_hour_utc`, `pickproof_pool_max_price_cents`, `pickproof_labels_max_per_run`, `pickproof_pool_keep_days`. The seeded generator moved to `src/core/mt19937.ts` (bt1 outputs unchanged).
+
 ## 5.27.0 (2026-10-21): CR-076 listing provenance, display-name route; PUT Idempotency-Key wording
 Release note: `docs/releases/v5.27.0.md`.
 MINOR (additive; migration `1765900000000_v5-27-0.sql`).

@@ -1,4 +1,4 @@
-# Endpoints (contract v5.27.0)
+# Endpoints (contract v5.28.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -66,6 +66,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | PATCH | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | DELETE | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | GET | `/market/episodes`, `/market/matched`, `/market/dq`, `/market/coverage` | READ or bots (a data token gets 403) | Market data (5.23.0, CR-075) |
+| POST | `/pickproof/{date}/picks` | WRITE or bots (non-money; a READ or data token gets 403) | Pick-proof (5.28.0, CR-073) |
+| GET | `/pickproof/{date}/manifest`, `/pickproof/{date}/arms`, `/pickproof/report` | READ or bots (a data token gets 403) | Pick-proof (5.28.0, CR-073) |
 | POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
 | POST | `/engine/holdout-date` | WRITE only (not a data token) | Holdout guard (5.10.0, CR-061) |
 | GET | `/engine/holdout-date` | READ | Holdout guard (5.10.0, CR-061) |
@@ -717,6 +719,48 @@ READ (or bots). Query `days` (1..120, default 30). **200:** `{as_of, window, per
 
 **Retention:** `market_names` and `market_sales` are never pruned (small by design: only $500+ episodes; `db_rows.market_names_bytes` shows the size); the last 90 `dqMarket` runs are kept. Source rows (`dynadot_rows`, ended auctions) are pruned at 120 days as before; an episode whose oldest rows were pruned keeps its `first_seen` and first price.
 
+## Pick-proof (5.28.0, CR-073)
+
+Mechanics of the test "do the Buyer's picks beat random names and a simple rule?", so that the picking bot neither draws the comparison arms nor grades itself. DOM freezes the pool, draws the random arms by code, seals the day and computes the statistics. Everything it reports is **a proxy, not profit**: a closeout name registered by someone else within 30 days is demand evidence, not a sale and not money. No money action, no LLM, no email. Rules, the exact recipe and the test IDs are in `docs/internal/pickproof.md`.
+
+**Pick day `D`.** Picks for `D` are made on `D` (UTC) before the **deadline** (16:00 UTC of `D`, `settings.pickproof_deadline_hour_utc`). The **pool** is the sealed CR-071 save of the evening before (data date `D-1`, the 15:00 UTC run): closeout rows of GoDaddy (`datasave` pool) and of a sealed Dynadot closeouts upload, `.com`, at most $40 (`settings.pickproof_pool_max_price_cents`, 4000), without sales-graded names (`engine_sales`, or a sold `market_names` episode), sorted by domain in byte order, one row per domain (lowest price wins). The pool is **frozen when first used** for `D` (a pick, a manifest call): later changes or pruning of the datasave rows change nothing. `pool_sha256` = SHA-256 of the JSON array `[[domain, source, price_cents], ...]`; the **seed** is the first 8 hex digits of it as an unsigned 32-bit number. Without a sealed GoDaddy closeouts snapshot of `D-1`: **409 `SNAPSHOT_MISSING`** (details `{date, data_date, source}`).
+
+**Arms**, `k` names each (`settings.pickproof_k`, default 100, raise-only up to 300, migration only: the database refuses a lower value): **A** = the Buyer's picks; **B1** = `k` random names from the pool; **B2** = `k` random from the K1-passing names (the stored closeouts `filter_code` is null on a processed row; `GET /candidates/closeouts`); **C1** = `k` random from the names whose SLD is letters only, at most 10 letters and exactly two tokens that the form check does not fail; **C2** (.net-registered) is **`not_built`** (deferred; the report and manifest say so). Draws use the CR-008 seeded recipe (MT19937 init by array, Fisher-Yates) with one derived seed per arm; with fewer than `k` names in a sub-pool the arm takes them all and says `short: true`.
+
+### `POST /pickproof/{date}/picks`
+WRITE or bots (audited, `Idempotency-Key` required). Body (strict) `{names: ["x.com", ...]}`, 1 to 300 names (at most the day's `k`, else 422 `VALIDATION_ERROR`; a name twice is 422 too); names are lower-cased. Every name must be in the day's frozen pool, else **422 `NOT_IN_POOL`** with `details {date, names (up to 100), not_in_pool_n, pool_sha256}` and nothing stored. A new call **replaces** the earlier list until the day is closed. From the deadline on, and after the seal, **409 `PICKPROOF_SEALED`** (nothing changes). 409 `SNAPSHOT_MISSING` as above. **200** `{date, arm: "A", n, k, deadline, pool_sha256, sealed: false, audit_id}`. Every call is kept in an append-only history.
+
+### `GET /pickproof/{date}/manifest`
+READ or bots. The **seal**. The first call at or after the deadline draws B1, B2 and C1 from the frozen pool, stores them and seals the day (a sealed day cannot change, not even in the database); every later call returns the same answer (same seed, hashes and draws). Before the deadline the call only freezes the pool and shows A as open.
+```
+{ date, data_date, pool_n, pool_sha256, seed, k,
+  sources: { godaddy: {manifest_sha256, rows}, dynadot: {status: "sealed"|"missing", manifest_sha256, rows} },
+  arms: { A: {n, sha256, short, sealed} | {status: "open", n, sealed: false},
+          B1, B2, C1: {n, sha256, short, sealed} | {status: "pending_seal", sealed: false},
+          C2: {status: "not_built"} },
+  recipe: { version: "pickproof-v1", draw, pool_rule, labels_rule },   // SHA-256 of the frozen rule texts
+  deadline, sealed: bool, sealed_at }
+```
+An arm's `sha256` is the SHA-256 of the JSON array of its names in rank order. The bots append the seal line (this answer) to `docs/requests/pick-proof-seals.md`; DOM does not commit data. 400 `VALIDATION_ERROR` for a date that is not real; 409 `SNAPSHOT_MISSING`.
+
+### `GET /pickproof/{date}/arms`
+READ or bots. Query (strict) `arm` = `A`, `B1`, `B2`, `C1` or `C2`. Only for a **sealed** day, and only after the first manifest call that sealed it; before that **409 `PICKPROOF_NOT_SEALED`** (so the Buyer cannot see the random arms before picking). **200** one arm `{date, pool_sha256, seed, arm, n, sha256, short, names: [{rank, domain, price_cents}]}`, or all arms under `arms` without `arm`; `C2` answers `{status: "not_built"}`.
+
+### `GET /pickproof/report`
+READ or bots. Query (strict) `from`, `to` (`YYYY-MM-DD`; sealed days only; `from` after `to` is 400). Labels are the T30 labels of the `pickproofLabels` datasave step (`jobs.md`): `taken` = RDAP registered and its status list has neither `redemption period` nor `pending delete` (any case or spacing, e.g. `redemptionPeriod`, `pendingDelete`), whatever the creation date (the creation date and `created_after_d` are stored for the Challenger and do not decide: a bought closeout keeps its old creation date); `not_taken` = registered in redemption period or pending delete (an unsold closeout lingers there, then disappears) or not registered (404); `unknown` (excluded from rates, counted in `unknown_n`) (excluded from rates, counted in `unknown_n`; names whose day is not 30 days old yet are `pending_n`). **200**
+```
+{ label: "proxy, not profit", from, to, days: {sealed_n, list},
+  arms: { A|B1|B2|C1: {names_n, n (labelled), events (taken), rate, unknown_n, pending_n, label}, C2: {status: "not_built"} },
+  primary:   <comparison A vs C1>,
+  secondary: [<A vs B1>, <A vs B2>],
+  notes }
+comparison = { vs, role, label, alpha: 0.05, status: "OK" | "UNPOWERED", method: "fisher" | "permutation",
+  n_a, n_b, events_a, events_b, rate_a, rate_b, events_total, overlap_n, overlap_pct,
+  p_value, p_adjusted, result: "pass" | "fail" | null, fisher_p,
+  permutation: {p_value, observed, shuffles: 10000, seed} | null, cmh: {strata: [{band, a, b, c, d}], chi2, z, p_value, odds_ratio, used_strata_n} | null }
+```
+One-sided tests that A has the higher taken rate. `method` is `fisher` (hypergeometric, exact) unless the share of A's names that also sit in the other arm (`overlap_pct`) is above 5%, then `permutation` (within-day shuffles of the pooled labelled names, 10,000 shuffles, seeded from the range's seal hashes, so the same range gives the same p). `cmh` is the Cochran-Mantel-Haenszel test over the price bands $0-9.99, $10-19.99, $20-40 (normal approximation, no continuity correction). `p_value` is the chosen method's p; for the two secondaries `p_adjusted` is the Holm adjustment over the powered ones and `result` uses it; for the primary `p_adjusted` equals `p_value`. With **fewer than 10 events in total** (or an arm without a labelled name) `status` is `UNPOWERED`: `p_value`, `p_adjusted`, `result` are null and nothing is passed or failed.
+
 ## Visitor counter (5.18.0, CR-068)
 
 A $0 count of visitors to our listed names. The Porkbun URL forward of a name points at the counting redirect `GET /r/{domain}` on the api-proxy Worker (the stable public URL, `PUBLIC_BASE_URL`). The Worker answers `302` to `https://www.afternic.com/domain/{domain}` at once (no cookie, nothing cached), then sends one count to `POST /visits/hit` with a `visits` token. **Counts only:** per name, UTC day and source: `human_hits`, `bot_hits`, `capped` and referrer **hosts**. No IP (raw or hashed), cookie, path, query or user-agent string is sent or stored; the body of a hit has exactly three fields. If the Mac host is down, the visitor is still redirected and the count is dropped. Rows are kept 400 days (retention job). **Off until Dvir's line:** `visits.enabled` is false (`POST /visits/hit` → 409 `VISITS_DISABLED`, nothing stored). Names on Afternic's nameservers (`ns1/ns2.afternic.com`) cannot be counted (Afternic serves their page): their Afternic Views and Leads (CR-037) are loaded with `POST /visits/import` and shown by `GET /visits/weekly`.
@@ -1244,6 +1288,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
 
 **Market data (5.23.0, CR-075):** `APPEND_ONLY` (**405** on PUT, PATCH or DELETE of `/data/sales`; **409** on `POST /data/sales` for a stored `(name, venue, sale_date, source)` sent again with a different price). The `rejects[].reason` of a 422 `POST /data/sales`: `SOURCE_REQUIRED`, `SOURCE_NAMEBIO_FORBIDDEN`, `TIER_REQUIRED`, `TIER_INVALID`, `NAME_INVALID`, `VENUE_INVALID`, `PRICE_NOT_INTEGER_CENTS`, `DATE_INVALID`, `DATE_IN_FUTURE`, `SOURCE_URL_INVALID`, `LISTING_TYPE_INVALID`, `UNKNOWN_FIELD`. Episode labels (`outcome_rule`, not errors): `SOLD_REPORTED`, `SOLD_BIDS`, `UNSOLD_60D`, `UNSOLD_30D`, `SEEN_ONCE`, `DISAPPEARED`, `TOO_SHORT`. `/report` warning `DQ_MARKET_FAIL` (`reports.md`).
+
+**Pick-proof (5.28.0, CR-073):** `PICKPROOF_SEALED` (409, `POST /pickproof/{date}/picks` from the deadline on or after the seal), `PICKPROOF_NOT_SEALED` (409, `GET /pickproof/{date}/arms` before the day is sealed), `NOT_IN_POOL` (422, picks outside the frozen pool; `details.names`); `SNAPSHOT_MISSING` (409) is also returned when the evening-before snapshot of the pool is not sealed. The `UNPOWERED` status in the report is a result, not an error.
 
 **Closeout candidates (5.26.0, CR-072):** `SNAPSHOT_MISSING` (409 from `GET /candidates/closeouts`: no sealed snapshot for that date and source). Filter codes in `summary.filtered_by` (not errors): `SPELL-1`, `BRAND-1`, `BIGCO-1`, `TM_KILL`, `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN`, `OWNED`, `SALES_GRADED`. Row `score_reason`: `NO_ACTIVE_MODEL`, `SCORE_FAILED`, `NOT_SCORED_YET`.
 

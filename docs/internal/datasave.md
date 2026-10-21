@@ -3,7 +3,7 @@
 Binding rules and test IDs for the `datasave` job. The interface is `docs/contract/jobs.md` (row `datasave`), `endpoints.md` (§Daily data saves) and `reports.md` (`DATASAVE_MISSED`).
 
 ## Where
-- Job code: `src/modules/ops/jobs/datasave/` (`datasave.ts` = the eight steps (v5.23.0: `episodes`, `dqMarket` last, rules in `market.md`; v5.26.0: `scorePool` after the Dynadot steps, `closeouts.md`); `zip.ts` = streaming zip reader, no dependency; `json-stream.ts` = streaming reader of `{meta, data:[...]}`, no dependency). Wired in `src/app.ts` (`datasaveJob` of the `JobRunner`); plan in `ops/jobs/runner.ts` (job kind `datasave`, lock `job:datasave`).
+- Job code: `src/modules/ops/jobs/datasave/` (`datasave.ts` = the eight steps (v5.23.0: `episodes`, `dqMarket`, rules in `market.md`; v5.28.0: `pickproofLabels` last (ninth step), rules in `pickproof.md`; v5.26.0: `scorePool` after the Dynadot steps, `closeouts.md`); `zip.ts` = streaming zip reader, no dependency; `json-stream.ts` = streaming reader of `{meta, data:[...]}`, no dependency). Wired in `src/app.ts` (`datasaveJob` of the `JobRunner`); plan in `ops/jobs/runner.ts` (job kind `datasave`, lock `job:datasave`).
 - Retry: `ops/queue.ts` `retryDatasave` (run level `not_before`, set when the run is finalized and its `godaddyInventory` step failed; `claim()` skips a run whose `not_before` is in the future by the app clock; `enqueue` for an open waiting run clears `not_before`).
 - Routes: `ops/api/snapshots.ts` (`GET /snapshots`, `GET /snapshots/missing`). Health value and report warning use `reporting/datasave-state.ts` (`datasaveStatus`, `missingDays`).
 - Schedule: `.github/workflows/datasave.yml` (cron `0 15 * * *`).

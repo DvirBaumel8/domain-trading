@@ -225,6 +225,7 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /data/bigco-names': 'allowed',
   'POST /data/live-checks': 'allowed',
   'POST /data/rdap': 'allowed',
+  'POST /pickproof/{date}/picks': 'allowed', // v5.28.0 (CR-073): the Buyer's daily picks (arm A); a list of names, no money, no listing
   'POST /data/sales': 'allowed', // v5.23.0 (CR-075 R-4): add-only sale reports, no money
   'PUT /data/sales': 'allowed', // answers 405 APPEND_ONLY
   'PUT /data/sales/{id}': 'allowed', // answers 405 APPEND_ONLY
