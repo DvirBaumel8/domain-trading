@@ -8,7 +8,7 @@
 // Also prunes pickproof_pool rows older than settings.pickproof_pool_keep_days (the labels need only the arms).
 import { sql, type Kysely } from 'kysely';
 import { addDays, dayNumber } from '../../core/dates.js';
-import { rdapLookup as realRdap, type RdapLookupFn } from '../../core/rdap.js';
+import { dropStatusOf, rdapLookup as realRdap, type RdapLookupFn } from '../../core/rdap.js';
 import { cacheTtlMs, cachedRdapLookup } from '../../core/rdap-cache.js';
 import type { Database } from '../../db/types.js';
 import { pickproofSettings } from './pool.js';
@@ -66,7 +66,7 @@ export async function pickproofLabels(deps: LabelsDeps): Promise<LabelsSummary> 
       if (created === null) createdUnknown = true;
       else afterD = dayNumber(created.slice(0, 10)) > dayNumber(e.day);
       // an unsold closeout lingers in redemption period, then pending delete; any other registered state means someone holds the name
-      label = statuses.some((x) => /redemption|pendingdelete/.test(x.toLowerCase().replace(/[^a-z]/g, ''))) ? 'not_taken' : 'taken';
+      label = dropStatusOf(statuses) !== null ? 'not_taken' : 'taken';
     } else if (r.outcome === 'not_registered') label = 'not_taken';
     else { label = 'unknown'; reason = r.reasonCode ?? 'SOURCE_ERROR'; }
     await sql`insert into pickproof_labels (domain, day, label, checked_at, attempts, created_at_rdap, created_unknown, created_after_d, statuses, reason)

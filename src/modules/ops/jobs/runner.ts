@@ -32,7 +32,7 @@ const STEP_ATTEMPTS: Record<string, number> = {
   registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1, engineEndings: 1, engineTrain: 1, trainModel: 1, godaddyInventory: 1,
 };
 const DEFAULT_TIMEOUT_MS = 5 * 60_000;
-const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000, godaddyInventory: 45 * 60_000 };
+const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000, godaddyInventory: 45 * 60_000, buildPanel: 25 * 60_000 };
 
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
 

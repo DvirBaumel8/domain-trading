@@ -1,4 +1,4 @@
-# Endpoints (contract v5.33.0)
+# Endpoints (contract v5.34.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -695,14 +695,17 @@ Always 405 `APPEND_ONLY`, as `DELETE /data/sales`.
 ### `GET /market/episodes`
 READ (or bots; a data token is 403). Query (all optional; a bad value → **400** `VALIDATION_ERROR`): `outcome` (`sold` | `unsold` | `unknown`), `rule` (an `outcome_rule`), `band`, `from`, `to` (`YYYY-MM-DD`, filter on `first_seen`), `venue`, `limit` (1..1000, default 100). **200:**
 ```
-{ summary: { total, by_outcome: {...}, by_rule: {...}, by_band: {...} },   // over all rows that match the filters, before the limit
+{ summary: { total, by_outcome: {...}, by_rule: {...}, by_band: {...},
+             disappeared_by_tag: { bought, deleted, unknown } },   // 5.34.0: the DISAPPEARED rows by RDAP tag; over all rows that match the filters, before the limit
   limit, returned,
   rows: [ { episode_id, name, sld, tld, venue, listing_type,
             list_price_first_cents, list_price_first, list_price_last_cents, list_price_last, price_changes,   // null when unknown (an auction has no first price)
             first_seen, last_seen, days_listed, seen_days, outcome, outcome_rule,
             sale_price_cents, sale_price, sale_date, source, source_url, source_sha256, tier, feat_asof,
-            dup_group, dup_sources, price_band, letters_only, sale_only } ] }   // newest first_seen first
+            dup_group, dup_sources, price_band, letters_only, sale_only,
+            disappearance_tag, disappearance_tag_reason } ] }   // newest first_seen first
 ```
+**5.34.0 (BUG-052):** `disappearance_tag` is `bought` | `deleted` | `unknown` on a row with `outcome_rule: DISAPPEARED` (`unknown` with reason `NOT_CHECKED` until the datasave step `buildPanel` has looked it up; rules in `jobs.md` row `datasave`), and `null` on every other row. `disappearance_tag_reason`: `NOT_REGISTERED`, `STATUS:<the status>`, `RE_REGISTERED`, `REGISTRAR_CHANGED:<before> -> <now>`, `SAME_REGISTRAR`, `NO_BASELINE`, `NO_REGISTRAR`, `TLD_NOT_CHECKED`, `NOT_CHECKED`, or an RDAP error (`TIMEOUT`, `SOURCE_ERROR`, `RATE_LIMITED`). The tag never changes `outcome` or `outcome_rule`.
 
 ### `GET /market/matched`
 READ (or bots). Query: `asof` (`YYYY-MM-DD`, required), `ratio` (1..20, default 4), `seed` (integer 0..4294967295, default 1). A bad value → **400**. Each **positive** is a sold `.com` episode with `sale_date <= asof`; it gets up to `ratio` **negatives**: `UNSOLD_60D` `.com` episodes (first seen at least 60 days before `asof`) of the **same price band**, the **same letters-only flag** (the name before `.com` is only a-z or not) and whose listing overlaps the **60-day window** centred on the sale date (sale date -30 days .. +30 days). A negative is used for one positive only. The draw is seeded (a hash of `asof|ratio|seed|episode_id` feeds a mulberry32 shuffle), so it never depends on row order. Rows with a feature as-of date after `first_seen` or after the sale date (the leakage check) are **excluded**; `unknown` episodes are never in the set.

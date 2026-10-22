@@ -42,6 +42,14 @@ Binding rules and test IDs for the `datasave` job. The interface is `docs/contra
 22. Step `scorePool` runs after `dynadotAftermarket` and before `buildPanel`. It processes the rows of `datasave_pool` and of sealed `dynadot_rows` (`kind closeouts`) with `scored_at` null: stores `filter_code` (first failed hard filter, null = passed), and for passed rows `score`, `model_version`, or `score_reason` (`NO_ACTIVE_MODEL`, `SCORE_FAILED`). Rules, order and tests: `docs/internal/closeouts.md`. Offline: the score uses `Scorer.scoreOffline` (no fetch, no registry ask). A Dynadot day is processed only when its `bot_upload` manifest is sealed, so a later upload is scored by the next run (the retry run or the next day).
 23. Measured (local, synthetic 125,000 rows, 40,000 of them passing the filters): about 3.6 s for the whole step (classify 0.65 s, scoring 2,000 names about 0.08 s), so every passing row is scored; no row is skipped for time.
 
+## Disappearance tags (v5.34.0, BUG-052)
+24. `buildPanel` first calls `ops/closeouts/disappearances.ts` `tagDisappearances`. Collect: for every pair of consecutive stored days of `datasave_pool` (GoDaddy closeouts) and of sealed `dynadot_rows` closeouts uploads, a name on the earlier day with `ends_at` after the start of the later day and missing from the later day gets a `disappearances` row (`gone_date` = the later day, `prev_date` = the earlier). Every `market_names` row with `outcome_rule = DISAPPEARED` gets one too (`gone_date` = `last_seen` + 1, `episode_id`); a row whose episode is no longer DISAPPEARED (or whose `last_seen` moved) is deleted. Insert is `on conflict do nothing`, so the first run is the backfill (R-5) and later runs add only new pairs.
+25. Baseline (R-3): an `rdap_cache` row with `registered` true and `checked_at` before `gone_date` (`baseline_source rdap_cache`), else the feed's registrar (`feed`: GoDaddy, family regex `godaddy|wildwestdomains` after removing non-letters; Dynadot `dynadot`). Episodes have no feed registrar: no cache row means `NO_BASELINE`.
+26. Rule `tagOf` (R-2), in order: 404 → `deleted NOT_REGISTERED`; RDAP error → `unknown <reasonCode>`; a status with redemption / pending delete (`core/rdap.ts` `dropStatusOf`, also used by `pickproofLabels`) → `deleted STATUS:<status>`; created after `prev_date` → `deleted RE_REGISTERED`; no baseline → `unknown NO_BASELINE`; no registrar in RDAP → `unknown NO_REGISTRAR`; registrar outside the baseline (feed: family regex; cache: same name after removing non-alphanumerics) → `bought REGISTRAR_CHANGED:<before> -> <now>`; else `unknown SAME_REGISTRAR`. Verisign .com RDAP is thin (no registrant), and its `last changed` event moves on any update (renewal by the registrar, a status change), so there is no owner-change signal: bought rests on a registrar change only (Q1).
+27. Lookups: a name not ending in `.com` is `unknown TLD_NOT_CHECKED`, final, without a lookup. Due = not final and not checked today (UTC), ordered never-checked first, closeouts before episodes, newest `gone_date` first. A cache answer counts only if `checked_at` is after the start of `gone_date` and inside `lookups_rdap_ttl_hours`; otherwise a live `rdapLookup` (250 ms apart) that fills the cache. At most `settings.disappearance_lookups_max_per_run` (1,500) live lookups (stop `CAP`); a 429 stops (`RATE_LIMITED`). Not counted in `lookup_usage`: the bots' rolling limit (200 a day) is for bot calls only (CR-074), and sharing it would starve both (G-118).
+28. Final: `bought`, `deleted`, `TLD_NOT_CHECKED` at once; an `unknown` once 7 days have passed since its first check (R-4). Rows older than `settings.disappearance_keep_days` (120) after `gone_date` are deleted by the same call.
+29. `buildPanel` then splits `gone_before_end_n` with `goneByTag` (rows of `godaddy_closeouts` with `gone_date` = the latest day: the same set as the count), adds `dynadot` (the two latest sealed uploads) and `tags` (the run summary). `GET /market/episodes` reads the tag by `episode_id` (`market/read.ts`). Step timeout 25 minutes (`runner.ts`).
+
 ## Dynadot server key (not built)
 No Dynadot key exists on the server (CR-003 left it out; DOM can't create one). `dynadotCloseouts` / `dynadotAftermarket` return `{source, status: "not_configured", reason}` and nothing else. When a key exists: closeouts = all pages, one call at a time at least 5 s apart, dedupe by domain, `price_cents` as given; aftermarket = at most 5 read-only calls, dollars to cents; both into manifests with `status`. Do not guess at Dynadot's API before then. The bots' upload route is built (v5.22.0, above).
 
@@ -68,6 +76,14 @@ No Dynadot key exists on the server (CR-003 left it out; DOM can't create one). 
 | DS521-17 | `GET /snapshots/missing` and query validation |
 | DS521-18 | health partial with one failed file |
 | DS521-19 | settings defaults |
+| BG052-1 | AT-1: redemptionPeriod → deleted, reason names the status (`ops/disappearances.test.ts`) |
+| BG052-2 | AT-2: pendingDelete, "pending delete", 404 → deleted |
+| BG052-3 | AT-3: other registrar, active → bought; rdap_cache baseline used |
+| BG052-4 | AT-4: same registrar / GoDaddy family → unknown, never bought; checked again next day |
+| BG052-5 | AT-5: timeout, 5xx, cap → unknown, step ok, retried for 7 days then final; 429 stops |
+| BG052-6 | AT-6: backfill over stored day pairs, retagged 3 / unknown 2, second run changes nothing |
+| BG052-7 | AT-7: split sums to gone_before_end_n (GoDaddy and Dynadot); `/market/episodes` disappearance_tag |
+| BG052-8 | RE_REGISTERED, NO_BASELINE, NO_REGISTRAR; a non-.com name is not looked up |
 | DS521-20 | FILE_NOT_LISTED and SIZE_CAP errors |
 
 v5.22.0 tests: `tests/modules/ops/datasave-dynadot.test.ts`.

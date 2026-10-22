@@ -29,7 +29,7 @@ const boot = async () => {
   const get = async (url: string) => app!.inject({ method: 'GET', url, headers: auth });
   return { get };
 };
-const job = (now = () => clock) => new DatasaveJob({ db, now, snapshotDir: SNAP });
+const job = (now = () => clock) => new DatasaveJob({ db, now, snapshotDir: SNAP, rdap: async (d) => ({ outcome: 'unknown', reasonCode: 'SOURCE_ERROR', httpStatus: null, url: d, retrievedAt: new Date(now()), body: null, facts: null }), sleep: async () => {} });
 const closeouts = closeoutsJson([
   { domainName: 'Alpha-Deal.COM', price: '$5', auctionEndTime: '2026-10-21T10:00:00Z' },
   { domainName: 'dear.com', price: '$1,250', auctionEndTime: '2026-10-21T11:00:00Z' },
@@ -179,7 +179,7 @@ describe('DS521 datasave job', () => {
       ...rows('2026-10-19', [['stays.com', '2026-10-20T10:00:00Z'], ['gone1.com', '2026-10-20T10:00:00Z'], ['gone2.com', '2026-10-21T10:00:00Z'], ['ended.com', '2026-10-19T20:00:00Z']]),
       ...rows('2026-10-20', [['stays.com', '2026-10-20T10:00:00Z'], ['fresh.com', '2026-10-21T10:00:00Z']]),
     ]).execute();
-    expect(await job().buildPanel()).toEqual({ status: 'ok', data_date: '2026-10-20', previous_date: '2026-10-19', rows: 2, previous_rows: 4, gone_before_end_n: 2, new_n: 1 });
+    expect(await job().buildPanel()).toMatchObject({ status: 'ok', data_date: '2026-10-20', previous_date: '2026-10-19', rows: 2, previous_rows: 4, gone_before_end_n: 2, new_n: 1, gone_bought_n: 0, gone_deleted_n: 0, gone_unknown_n: 2, dynadot: null });
     await db.deleteFrom('datasave_pool').where('data_date', '=', '2026-10-19').execute();
     expect(await job().buildPanel()).toMatchObject({ status: 'no_previous_day', gone_before_end_n: null });
   });

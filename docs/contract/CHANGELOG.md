@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.34.0 (2026-10-22): BUG-052: closeout disappearances tagged bought, deleted or unknown by RDAP
+Release note: `docs/releases/v5.34.0.md`.
+MINOR (additive; migration `1766300000000_v5-34-0.sql`).
+- **Datasave step `buildPanel` tags every disappearance by RDAP** (`jobs.md` row `datasave`): closeout names that left before their `ends_at` (GoDaddy, and sealed Dynadot closeouts uploads) and market episodes labelled `DISAPPEARED` get `bought` (registrar changed, active), `deleted` (404, redemption period / pending delete, or re-registered) or `unknown` (never a guess). The first run backfills every stored day pair. At most 1,500 live lookups a run, outside the bots' RDAP limit; an unknown is checked again daily for 7 days.
+- **`buildPanel` summary adds** `gone_bought_n`, `gone_deleted_n`, `gone_unknown_n` (sum = `gone_before_end_n`), `dynadot` (the same for the two latest sealed Dynadot closeouts uploads) and `tags` (the tagging run). Existing fields keep their meaning.
+- **`GET /market/episodes` adds** `disappearance_tag` and `disappearance_tag_reason` per row (null unless `outcome_rule` is `DISAPPEARED`) and `summary.disappeared_by_tag`.
+
 ## 5.33.0 (2026-10-22): CR-073a PP-V2: pick-proof two-word rule pickproof-v2 (common words, 3+ letters)
 Release note: `docs/releases/v5.33.0.md`.
 MINOR (additive; migration `1766200000000_v5-33-0.sql`).

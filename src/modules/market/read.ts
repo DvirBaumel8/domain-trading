@@ -32,17 +32,27 @@ export async function listEpisodes(db: Kysely<Database>, f: EpisodeFilter) {
     if (f.to) q = q.where('first_seen', '<=', f.to);
     return q;
   };
-  const [total, byOutcome, byRule, byBand, rows] = await Promise.all([
+  const [total, byOutcome, byRule, byBand, rows, byTag] = await Promise.all([
     filtered().select((eb) => eb.fn.countAll<number>().as('n')).executeTakeFirstOrThrow(),
     filtered().select(['outcome', (eb) => eb.fn.countAll<number>().as('n')]).groupBy('outcome').execute(),
     filtered().select(['outcome_rule', (eb) => eb.fn.countAll<number>().as('n')]).groupBy('outcome_rule').execute(),
     filtered().select(['price_band', (eb) => eb.fn.countAll<number>().as('n')]).groupBy('price_band').execute(),
     filtered().selectAll().orderBy('first_seen', 'desc').orderBy('episode_id').limit(f.limit).execute(),
+    // v5.34.0 (BUG-052): the RDAP tags of the DISAPPEARED episodes (bought / deleted / unknown; untagged yet = unknown)
+    filtered().where('outcome_rule', '=', 'DISAPPEARED').leftJoin('disappearances as d', 'd.episode_id', 'market_names.episode_id')
+      .select([sql<string>`coalesce(d.tag, 'unknown')`.as('tag'), (eb) => eb.fn.countAll<number>().as('n')]).groupBy(sql`coalesce(d.tag, 'unknown')`).execute(),
   ]);
+  const ids = rows.filter((r) => r.outcome_rule === 'DISAPPEARED').map((r) => r.episode_id);
+  const tags = new Map(ids.length === 0 ? [] : (await db.selectFrom('disappearances').select(['episode_id', 'tag', 'tag_reason']).where('episode_id', 'in', ids).execute()).map((t) => [t.episode_id!, t]));
+  const tagOut = (r: Row) => {
+    if (r.outcome_rule !== 'DISAPPEARED') return { disappearance_tag: null, disappearance_tag_reason: null };
+    const t = tags.get(r.episode_id);
+    return { disappearance_tag: t?.tag ?? 'unknown', disappearance_tag_reason: t?.tag_reason ?? 'NOT_CHECKED' };
+  };
   const obj = <K extends string>(xs: ({ n: number } & Record<K, string>)[], k: K) => Object.fromEntries(xs.map((x) => [x[k], Number(x.n)]).sort());
   return {
-    summary: { total: Number(total.n), by_outcome: obj(byOutcome, 'outcome'), by_rule: obj(byRule, 'outcome_rule'), by_band: obj(byBand, 'price_band') },
-    limit: f.limit, returned: rows.length, rows: rows.map(episodeOut),
+    summary: { total: Number(total.n), by_outcome: obj(byOutcome, 'outcome'), by_rule: obj(byRule, 'outcome_rule'), by_band: obj(byBand, 'price_band'), disappeared_by_tag: { bought: 0, deleted: 0, unknown: 0, ...obj(byTag, 'tag') } },
+    limit: f.limit, returned: rows.length, rows: rows.map((r) => ({ ...episodeOut(r), ...tagOut(r) })),
   };
 }
 

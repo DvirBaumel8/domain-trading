@@ -58,6 +58,9 @@ export interface SettingsTable {
   /** v5.29.0 (CR-074): TTL of a cached RDAP answer (hours) and the live bot lookups allowed per rolling 24 h. Migration only. */
   lookups_rdap_ttl_hours: Generated<number>;
   lookups_rdap_daily_limit: Generated<number>;
+  /** v5.34.0 (BUG-052): RDAP lookups per datasave run for the disappearance tags, and how long tag rows are kept. Migration only. */
+  disappearance_lookups_max_per_run: Generated<number>;
+  disappearance_keep_days: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;
@@ -1363,6 +1366,27 @@ export interface RdapCacheTable {
   checked_at: Timestamp;
   reason_code: string | null;
 }
+/** v5.34.0 (BUG-052): one row per closeout name gone before its ends_at, or per DISAPPEARED market episode, with its RDAP tag. */
+export interface DisappearancesTable {
+  source: 'godaddy_closeouts' | 'dynadot_closeouts' | 'market_episode';
+  domain: string;
+  gone_date: DateString;
+  prev_date: DateString;
+  ends_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  episode_id: ColumnType<string | null, string | null | undefined, string | null>;
+  baseline_registrar: ColumnType<string | null, string | null | undefined, string | null>;
+  baseline_source: ColumnType<'rdap_cache' | 'feed' | null, 'rdap_cache' | 'feed' | null | undefined, 'rdap_cache' | 'feed' | null>;
+  tag: Generated<'bought' | 'deleted' | 'unknown'>;
+  tag_reason: Generated<string>;
+  final: Generated<boolean>;
+  attempts: Generated<number>;
+  first_checked_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  rdap_checked_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  rdap_registrar: ColumnType<string | null, string | null | undefined, string | null>;
+  rdap_statuses: ColumnType<string[] | null, string | null | undefined, string | null>;
+  rdap_created: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  created_at: Generated<Date>;
+}
 export interface LookupUsageTable {
   id: Generated<string>;
   source: 'rdap';
@@ -1565,6 +1589,7 @@ export interface Database {
   pickproof_labels: PickproofLabelsTable;
   rdap_cache: RdapCacheTable;
   lookup_usage: LookupUsageTable;
+  disappearances: DisappearancesTable;
   forward_cost_plans: ForwardCostPlansTable;
   forward_cost_lines: ForwardCostLinesTable;
   deals: DealsTable;

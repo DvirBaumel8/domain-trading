@@ -5,7 +5,7 @@
 //                      say whether a bot upload (POST /snapshots/dynadot, dynadot-upload.ts) for today is sealed.
 // v5.22.0 (R-10): the four auction files are also parsed (godaddy_auctions): .com auctions that reached $500, followed until they leave the files.
 //   scorePool          (v5.26.0, CR-072) filters and scores the pool and the sealed Dynadot closeouts rows, offline; closeouts/score-pool.ts.
-//   buildPanel         the day diff of the closeouts pool (names gone before their end).
+//   buildPanel         the day diff of the closeouts pool (names gone before their end), split by RDAP tag bought / deleted / unknown (v5.34.0, BUG-052).
 //   snapshotRetention  deletes raw zips past their window (manifest stays) and pool rows past their days.
 // It reads only the public inventory host (official files, no scraping) and writes only its own tables and files. Files are keyed by the source's
 // Last-Modified date, never the run date. A failed fetch is a manifest with status error and the HTTP status, never rows 0.
@@ -20,6 +20,8 @@ import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../../db/types.js';
 import { runDqMarket, runEpisodes } from '../../../market/index.js';
 import { pickproofLabels } from '../../../pickproof/index.js';
+import type { RdapLookupFn } from '../../../../core/rdap.js';
+import { goneByTag, tagDisappearances } from '../../closeouts/disappearances.js';
 import { scorePool, type PoolScorer } from '../../closeouts/score-pool.js';
 import { listZipEntries, openZipEntry } from './zip.js';
 import { streamArrayItems } from './json-stream.js';
@@ -50,6 +52,9 @@ export interface DatasaveDeps {
   /** Tests may pass a fetch; default is the global one at call time (MSW patches it). */
   fetch?: typeof fetch;
   log?: { warn: (obj: unknown, msg?: string) => void };
+  /** v5.34.0 (BUG-052): tests pass an RDAP stub and a no-op sleep for the disappearance tags; default the Verisign lookup. */
+  rdap?: RdapLookupFn;
+  sleep?: (ms: number) => Promise<void>;
 }
 
 interface FileResult {
@@ -408,15 +413,21 @@ export class DatasaveJob {
 
   // ---------- buildPanel ----------
 
-  /** The day diff of the closeouts pool: gone_before_end_n = names of the previous parsed day that were still due to end after the latest day began and are absent from the latest day. */
+  /**
+   * The day diff of the closeouts pool: gone_before_end_n = names of the previous parsed day that were still due to end after the latest day began and are absent from the latest day.
+   * v5.34.0 (BUG-052): first tags every gone closeout name and DISAPPEARED episode by RDAP (closeouts/disappearances.ts), then splits gone_before_end_n by tag
+   * (gone_bought_n + gone_deleted_n + gone_unknown_n), adds the same for the sealed Dynadot closeouts uploads (`dynadot`), and the tagging run (`tags`).
+   */
   async buildPanel(): Promise<unknown> {
     const { db } = this.deps;
+    const tags = await tagDisappearances({ db, now: this.deps.now, rdap: this.deps.rdap, sleep: this.deps.sleep });
+    const dynadot = await this.dynadotPanel();
     const latest = (await db.selectFrom('datasave_pool').select((eb) => eb.fn.max('data_date').as('d')).where('source', '=', POOL_SOURCE).executeTakeFirst())?.d;
-    if (!latest) return { status: 'no_pool', data_date: null, previous_date: null, gone_before_end_n: null, reason: 'no parsed closeouts day yet' };
+    if (!latest) return { status: 'no_pool', data_date: null, previous_date: null, gone_before_end_n: null, reason: 'no parsed closeouts day yet', dynadot, tags };
     const prev = (await db.selectFrom('datasave_pool').select((eb) => eb.fn.max('data_date').as('d')).where('source', '=', POOL_SOURCE).where('data_date', '<', latest).executeTakeFirst())?.d;
     const count = async (d: string) => Number((await db.selectFrom('datasave_pool').select((eb) => eb.fn.countAll<string>().as('n')).where('source', '=', POOL_SOURCE).where('data_date', '=', d).executeTakeFirstOrThrow()).n);
     const todayN = await count(latest);
-    if (!prev) return { status: 'no_previous_day', data_date: latest, previous_date: null, rows: todayN, gone_before_end_n: null };
+    if (!prev) return { status: 'no_previous_day', data_date: latest, previous_date: null, rows: todayN, gone_before_end_n: null, dynadot, tags };
     const start = new Date(`${latest}T00:00:00Z`);
     const gone = await sql<{ n: string }>`select count(*)::text as n from datasave_pool p
       where p.source = ${POOL_SOURCE} and p.data_date = ${prev} and p.ends_at > ${start}
@@ -424,7 +435,23 @@ export class DatasaveJob {
     const added = await sql<{ n: string }>`select count(*)::text as n from datasave_pool t
       where t.source = ${POOL_SOURCE} and t.data_date = ${latest}
         and not exists (select 1 from datasave_pool p where p.source = t.source and p.data_date = ${prev} and p.domain = t.domain)`.execute(db);
-    return { status: 'ok', data_date: latest, previous_date: prev, rows: todayN, previous_rows: await count(prev), gone_before_end_n: Number(gone.rows[0]!.n), new_n: Number(added.rows[0]!.n) };
+    return {
+      status: 'ok', data_date: latest, previous_date: prev, rows: todayN, previous_rows: await count(prev), gone_before_end_n: Number(gone.rows[0]!.n),
+      ...(await goneByTag(db, 'godaddy_closeouts', latest)), new_n: Number(added.rows[0]!.n), dynadot, tags,
+    };
+  }
+
+  /** BUG-052 R-6: the same diff for the two latest sealed Dynadot closeouts uploads; null until two exist. */
+  private async dynadotPanel(): Promise<unknown> {
+    const { db } = this.deps;
+    const days = (await sql<{ d: string }>`select distinct r.data_date::text as d from dynadot_rows r
+      where r.kind = 'closeouts' and exists (select 1 from snapshot_manifests m where m.source = 'dynadot_closeouts' and m.file_name = 'bot_upload' and m.sealed_at is not null and m.data_date = r.data_date)
+      order by 1 desc limit 2`.execute(db)).rows.map((r) => r.d);
+    if (days.length < 2) return null;
+    const [latest, prev] = days as [string, string];
+    const gone = await sql<{ n: string }>`select count(distinct p.domain)::text as n from dynadot_rows p where p.kind = 'closeouts' and p.data_date = ${prev}::date and p.ends_at > ${new Date(`${latest}T00:00:00Z`)}
+      and not exists (select 1 from dynadot_rows t where t.kind = 'closeouts' and t.data_date = ${latest}::date and t.domain = p.domain)`.execute(db);
+    return { data_date: latest, previous_date: prev, gone_before_end_n: Number(gone.rows[0]!.n), ...(await goneByTag(db, 'dynadot_closeouts', latest)) };
   }
 
   // ---------- snapshotRetention ----------

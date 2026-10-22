@@ -36,6 +36,14 @@ export const RDAP_FALLBACK_BASES: Readonly<Record<string, string>> = {
 };
 const MAX_BODY_CHARS = 1_000_000;
 
+/**
+ * The first status that shows a registration on its way out (redemption period or pending delete), else null. Case and spacing do not matter
+ * (`redemptionPeriod`, `redemption period`, `pendingDelete`, `pending delete`). Shared by the pick-proof T30 labels and the disappearance tags (BUG-052).
+ */
+export function dropStatusOf(statuses: readonly string[]): string | null {
+  return statuses.find((x) => /redemption|pendingdelete/.test(x.toLowerCase().replace(/[^a-z]/g, ''))) ?? null;
+}
+
 const isoOrNull = (v: unknown): string | null => {
   if (typeof v !== 'string') return null;
   const t = Date.parse(v);
