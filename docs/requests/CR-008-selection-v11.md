@@ -104,7 +104,7 @@ Most of v11 can be written as a settings draft **today** (`POST /selection/setti
 **The problem.** v11 was validated on siblings built by `bt1@v1`. DOM's reply to CR-007 (§19.3 Q-3) plans a generator `gen1@v1` that will **not** reproduce `bt1` exactly, because `bt1` orders words with Python's shuffle. With different siblings the share is a different measurement, and the 0.55 cut-off was never tested on it.
 
 **Option 1 (recommended): DOM's v2.4.0 generator implements `bt1@v1` exactly.**
-- **Feasible.** The recipe needs no Python. Appendix B writes it out as plain steps: an MD5 seed, the standard MT19937 random-number generator, a Fisher-Yates shuffle, and four frozen word pools. A sketch that uses **no random-number library** reproduces all **1,900 of 1,900** round-15 sibling lists (`CR-008-reference/bt1_reference.py`, checked 2026-10-07 14:05 IDT). MT19937 is a published standard with reference code in every common language.
+- **Feasible.** The recipe needs no Python. Appendix B writes it out as plain steps: an MD5 seed, the standard MT19937 random-number generator, a Fisher-Yates shuffle, and four frozen word pools. A sketch that uses **no random-number library** reproduces all **1,900 of 1,900** round-15 sibling lists (`CR-008-reference/bt1_reference.py`, kept off-repo; hash in `CR-008-reference/bt1_reference.py.sha256`; checked 2026-10-07 14:05 IDT). MT19937 is a published standard with reference code in every common language.
 - **Contract:** for a given word split, DOM's 20 siblings equal the `bt1@v1` siblings (AC-4). The pools are frozen with the method version, **in their order and with their one duplicate** (`cyber` in `tech`). DOM's ordinary lists are stored sorted with duplicates collapsed, so the pools need an ordered form (or the frozen pools file with its sha256). DOM may call the method `bt1@v1` (recommended, so research lists and live lists share a name) or `gen1@v1` defined as identical to `bt1@v1`.
 - **Then** the round-15 evidence carries over to live screening without a new test (subject to §5 point 7).
 
@@ -194,7 +194,7 @@ The as-of caveat in §5 point 7 was found after this approval, while writing thi
 | `v11_fixtures.csv` | 894 used TEST15 rows with stored share, alt and expected decision (AC-2) |
 | `bt1_pools_v1.json` | The four frozen pools of `bt1@v1`, sha256 `a984b85e06ed79cf972590518214ccd35c6ea12887a8e08d8a5e807e1a7df48b` (AC-5) |
 | `bt1_vectors.csv` | 1,900 names with their word split and 20 siblings in order (AC-4) |
-| `bt1_reference.py` | Non-binding sketch of Appendix B with no random-number library; reproduces all 1,900 vectors |
+| `bt1_reference.py.sha256` | Hash of the off-repo (bot box) non-binding sketch of Appendix B with no random-number library; reproduces all 1,900 vectors |
 
 **Test labels:** TEST15 was scored once (2026-10-07 13:53 IDT, rule frozen at 13:53:40 before scoring) and is marked used in Gavriel's name log, so sharing its labels with DOM can't spoil a future test. Please register the names as used (AC-2) so no later set reuses them. No personal data, no sale prices and no tokens are included.
 
