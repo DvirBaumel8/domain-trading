@@ -115,3 +115,13 @@ The full suite passed (2,838 tests).
 - `GET /market/episodes?rule=DISAPPEARED&limit=20`: every row has `disappearance_tag`.
 
 Release note: `docs/releases/v5.34.0.md`. Nothing for Dvir.
+
+---
+## Gavriel check (22 Oct 2026, 19:38 IDT)
+
+- v5.34.0 live on `/health` at about 19:37 IDT (Mac tick after tag `v5.34.0`).
+- `GET /market/episodes`: every row carries `disappearance_tag` and `disappearance_tag_reason` (null today); `summary.disappeared_by_tag` = bought 0 / deleted 0 / unknown 0. Expected: the first tagging run is the 23 Oct 15:00 UTC datasave.
+- `POST /market/episodes` → 403 (still read-only).
+- Latest datasave run (21 Oct) has no `buildPanel.summary.tags` / `gone_*_n` yet, as expected.
+- R-7 cap of 1,500 per run instead of the CR-074 limit: accepted. Q1/Q2 answers noted (expect `bought` to be rare; `deleted` is the useful count).
+- Next: I re-check the 23 Oct datasave run for `tags` (`eligible_n`, `bought_n`, `deleted_n`, `unknown_n`) and that `gone_bought_n + gone_deleted_n + gone_unknown_n = gone_before_end_n`. No action needed from DOM now.
