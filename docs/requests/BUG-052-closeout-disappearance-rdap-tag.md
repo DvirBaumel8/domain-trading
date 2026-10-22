@@ -45,3 +45,73 @@ max_rounds: 2
 - Q2 For names with no first-sight registrar (R-3), is there a stored source we can use in the backfill, or do they stay `unknown`?
 
 No ship date asked. Please report when it's live on `/health` (version) with the AT → test mapping. Dvir does no setup steps.
+
+---
+## DOM response (22 Oct 2026, 15:15 UTC)
+
+**Verdict:** accepted and built as v5.34.0 (commit `8975a49`, tag `v5.34.0`). I'm pushing after 16:20 UTC, once today's datasave run and the 16:00 seal are done. The tags first appear in the 23 Oct 15:00 UTC datasave run; its `buildPanel` is also the backfill.
+
+**One conflict, resolved by DOM:**
+- **R-7 (share the CR-074 daily limit):** not done.
+  - That limit is 200 lookups per rolling day and serves the bots' own `/rdap` calls. Internal steps never count against it (CR-074 design).
+  - Sharing it would starve both: one day of gone closeouts can be thousands of names.
+  - Instead, the tags have their own cap of 1,500 live lookups a run (`settings.disappearance_lookups_max_per_run`, migration only).
+  - A 429 from Verisign stops the tagging, and the step stays ok.
+  - AT-5's `LOOKUP_LIMIT` case is therefore tested as the cap (`stopped_reason: "CAP"`). Names over the cap stay `unknown` / `NOT_CHECKED` and are picked up next run.
+  - Recorded as G-118.
+
+**Answers:**
+- **Q1 (owner-change signal):** none usable, so `bought` rests on a registrar change only.
+  - Verisign `.com` RDAP is thin: it has no registrant.
+  - Its `last changed` event moves on any update (a registrar renewal, a status change).
+  - Consequence: a closeout bought by a customer of the same registrar reads `unknown`, never `bought`. That is the usual case: a GoDaddy closeout stays at GoDaddy, and a transfer is locked for 60 days.
+  - Expect `bought` to be rare. The split's real value is the `deleted` count.
+- **Q2 (no first-sight registrar):** both closeout feeds sell their own expired names, so the feed itself is the baseline.
+  - GoDaddy: any GoDaddy-family registrar, Wild West Domains included, counts as the same.
+  - Dynadot: Dynadot.
+  - If `rdap_cache` holds an answer read before the name left, that registrar is used instead (`baseline_source: "rdap_cache"`).
+  - DISAPPEARED market episodes have no feed registrar. Without a cache answer they get `NO_BASELINE`, so they are only ever `deleted` or `unknown`.
+
+**What was built:**
+- **The rule (R-2), in order:**
+  - 404 → `deleted NOT_REGISTERED`.
+  - RDAP error → `unknown <TIMEOUT|SOURCE_ERROR|RATE_LIMITED>`.
+  - Redemption / pending delete (the same matcher as `pickproofLabels`, now shared as `dropStatusOf`) → `deleted STATUS:<status>`.
+  - Created after the name was last seen → `deleted RE_REGISTERED`. This one was added: the old registration ended.
+  - No baseline → `unknown NO_BASELINE`.
+  - Registrar outside the baseline → `bought REGISTRAR_CHANGED:<before> -> <now>`.
+  - Otherwise → `unknown SAME_REGISTRAR`.
+- **Non-.com names:** `unknown TLD_NOT_CHECKED` with no lookup (Verisign serves `.com` only). The closeout pool is `.com` already.
+- **R-4 (retries):**
+  - `bought` and `deleted` are final.
+  - Every `unknown` is checked again once a day until 7 days after its first check, then it is final.
+  - This covers `SAME_REGISTRAR` too, so a name that reaches redemption a few days later still becomes `deleted`.
+- **R-5 (backfill):** the first run collects every stored day pair (the pool keeps 3 days) and every current DISAPPEARED episode. The insert is idempotent. The summary is in `GET /jobs/runs?job=datasave` → `buildPanel.summary.tags` (`eligible_n`, `retagged_n`, `bought_n`, `deleted_n`, `unknown_n`, …).
+- **R-6 (counts):**
+  - `buildPanel` adds `gone_bought_n` / `gone_deleted_n` / `gone_unknown_n` (sum = `gone_before_end_n`).
+  - It also adds `dynadot` (the same split for the two latest sealed Dynadot closeouts uploads) and `tags`.
+  - `GET /market/episodes` adds `disappearance_tag` and `disappearance_tag_reason` per row (null unless DISAPPEARED), and `summary.disappeared_by_tag`.
+  - No new endpoint.
+  - Episode tags follow the previous run's episodes (`episodes` runs after `buildPanel`), so they lag one day.
+- **Storage:** table `disappearances`, rows kept 120 days.
+
+**AT → test** (`tests/modules/ops/disappearances.test.ts`):
+
+| AT | Test |
+|---|---|
+| AT-1 | BG052-1 |
+| AT-2 | BG052-2 |
+| AT-3 | BG052-3 |
+| AT-4 | BG052-4 |
+| AT-5 | BG052-5 |
+| AT-6 | BG052-6 |
+| AT-7 | BG052-7 |
+| extra | BG052-8 (RE_REGISTERED, NO_BASELINE, non-.com) |
+
+The full suite passed (2,838 tests).
+
+**Live check for Gavriel after 23 Oct 15:00 UTC:**
+- `GET /jobs/runs?job=datasave`: in `buildPanel`, `gone_bought_n + gone_deleted_n + gone_unknown_n == gone_before_end_n`; `tags.status` is `ok` or `stopped` with `CAP`.
+- `GET /market/episodes?rule=DISAPPEARED&limit=20`: every row has `disappearance_tag`.
+
+Release note: `docs/releases/v5.34.0.md`. Nothing for Dvir.
