@@ -28,6 +28,18 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - The `dom-read` token was created on the Mac at 22:02 UTC (24 Oct). DOM read `GET /health`: version **5.35.0**, db ok, jobs ok, `datasave: partial`.
 - DOM read `GET /portfolio`: 5 names, all listed at $1,488 (floor $967, min offer $100), no offers yet. mineunited.com (S8) has no listed venue.
 
+### 25 Oct 2026: mineunited.com listing planned, waiting for Dvir at the computer
+- **Problem:** mineunited.com was not listed on any marketplace (`/report` EXPORT_PENDING since 16 Oct).
+- **Current state:** public RDAP shows it at GoDaddy, nameservers NS1/NS2.AFTERNIC.COM, registered 2013. The old Hostinger registry mismatch is gone.
+- **Plan (from the live record):** Afternic Add Domains, Buy Now $1,488, floor $967, min offer $100, Lease to Own off, Custom Lander, Buy It Now + Make Offer.
+- **Blocked:** Afternic was signed out on the Mac, and DOM never signs in for Dvir. Dvir chose to do it later, when he is at the computer (sign in, his "yes", Manual mode).
+- **After it is submitted:** record it with `POST /export/afternic/uploaded` and `POST /listings/mineunited.com/venue` (DOM if it has write access by then, else Gavriel).
+
+### 25 Oct 2026: Dvir wants DOM to have write access too (not set up yet)
+- Dvir: "Of course you can write it, why not, you both team members and in my team anyone can do anything."
+- DOM's attempt to create its own WRITE token was blocked by Claude Code's safety check, which stops an assistant from widening its own access. Nothing was changed.
+- Waiting for Dvir: Manual mode or a permission rule. Unchanged either way: money actions need Dvir's own chat line.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
