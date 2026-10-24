@@ -24,6 +24,10 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - **How:** a new host-kit script, `scripts/local-host/dom-read-token.sh`, run by `deploy.sh`, creates the token once on the Mac and stores it in a file only the Mac user can read. Nobody types or sees the key. It shows in `token list` as `dom-read` (scope read).
 - **What this means for you:** DOM now knows the real portfolio and numbers, so its answers to you will be about the live state. Live actions are still yours.
 
+### 25 Oct 2026 (01:05 IDT): read access works; v5.35.0 live
+- The `dom-read` token was created on the Mac at 22:02 UTC (24 Oct). DOM read `GET /health`: version **5.35.0**, db ok, jobs ok, `datasave: partial`.
+- DOM read `GET /portfolio`: 5 names, all listed at $1,488 (floor $967, min offer $100), no offers yet. mineunited.com (S8) has no listed venue.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
