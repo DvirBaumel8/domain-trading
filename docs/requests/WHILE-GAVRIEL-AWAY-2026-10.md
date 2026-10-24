@@ -18,6 +18,12 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - Dvir asked to stop development and spend the time understanding the company, the system and the sector in detail, so he can take decisions himself.
 - DOM is teaching him lesson by lesson. Gavriel: expect Dvir to ask more detailed questions and to want plain-language explanations; explain every term you use.
 
+### 25 Oct 2026: DOM gets read-only access to production (Dvir's decision)
+- Dvir was surprised that DOM couldn't see what the company owns. He decided: "Yes of course I want this change! You should have read only access!"
+- **New rule (CLAUDE.md HARD RULE):** DOM may **read** production with its own READ token `dom-read`, GET requests only. Only Gavriel changes anything. DOM still never writes, never runs jobs or money actions, never uses your tokens or the job token, never reads `prod.env`, and never touches the database directly.
+- **How:** a new host-kit script, `scripts/local-host/dom-read-token.sh`, run by `deploy.sh`, creates the token once on the Mac and stores it in a file only the Mac user can read. Nobody types or sees the key. It shows in `token list` as `dom-read` (scope read).
+- **What this means for you:** DOM now knows the real portfolio and numbers, so its answers to you will be about the live state. Live actions are still yours.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
