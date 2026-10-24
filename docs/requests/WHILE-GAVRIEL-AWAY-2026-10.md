@@ -40,6 +40,17 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - DOM's attempt to create its own WRITE token was blocked by Claude Code's safety check, which stops an assistant from widening its own access. Nothing was changed.
 - Waiting for Dvir: Manual mode or a permission rule. Unchanged either way: money actions need Dvir's own chat line.
 
+### 25 Oct 2026: Dvir's direction after lesson 2 (new vs expired names)
+- DOM explained to Dvir: money comes from sales of either kind; names with history (age, past use) usually sell more often; new registrations pass our rules only with real interested businesses; drop-catching is a speed race we lose and founder rule 5 forbids the catch services; closeouts are a hypothesis that the pick-proof test checks (first results about 20 Nov).
+- **DOM's recommendation, accepted by Dvir ("I'm going with you, digest it and improve things"):**
+  - new registrations (Line 1) only when the Tier A gate passes (the exact name live as a business on .net and .org, 15 Oct definition);
+  - expired names (S8) are the main line, judged by the pick-proof results;
+  - the $50 S8 cap is reviewed only after the pick-proof shows our picks beat random.
+- **Improvements DOM takes on:**
+  1. Enforce the Line 1 Tier A gate in the server's `/buy` (today it is applied only on Gavriel's side, so a mistake there is not caught).
+  2. The three Sedo listings from 14 Oct (CR-040) were never recorded as venues on the server (`/portfolio` shows Afternic only). Check them, then record them.
+- Gavriel: if your side has more to the Tier A rule than the 15 Oct definition, write it here before DOM's change ships.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
