@@ -42,6 +42,9 @@ export async function buildPool(db: Db, day: string, maxPriceCents: number): Pro
   // v5.31.0 (CR-073a): do not freeze between the download and scorePool of the same run, or passes_k1 would be false for every unprocessed row
   const pending = Number((await db.selectFrom('datasave_pool').select((eb) => eb.fn.countAll<string>().as('n')).where('data_date', '=', dataDate).where('source', '=', 'godaddy_closeouts').where('scored_at', 'is', null).executeTakeFirstOrThrow()).n);
   if (pending > 0) throw new AppError(409, 'POOL_NOT_READY', `${pending} closeout rows of data date ${dataDate} have not passed the daily filter step yet, so the pool of ${day} cannot be frozen; try again after the daily save finishes`, { date: day, data_date: dataDate, pending_n: pending });
+  // v5.35.0: the datasave rows of D-1 are kept 3 days; a late freeze after they are gone would freeze an empty pool, so it is refused
+  const stored = Number((await db.selectFrom('datasave_pool').select((eb) => eb.fn.countAll<string>().as('n')).where('data_date', '=', dataDate).where('source', '=', 'godaddy_closeouts').executeTakeFirstOrThrow()).n);
+  if (stored === 0 && (gd.rows ?? 0) > 0) throw new AppError(410, 'POOL_SOURCE_PRUNED', `The closeout rows of data date ${dataDate} were already deleted by retention, so the pool of ${day} can no longer be frozen`, { date: day, data_date: dataDate });
   const dy = await db.selectFrom('snapshot_manifests').select(['sha256', 'rows']).where('source', '=', 'dynadot_closeouts').where('data_date', '=', dataDate).where('file_name', '=', 'bot_upload').where('status', '=', 'complete').where('sealed_at', 'is not', null).executeTakeFirst();
 
   const raw = (await sql<{ domain: string; price_cents: number; source: 'godaddy' | 'dynadot'; filter_code: string | null; scored: boolean }>`
@@ -86,11 +89,14 @@ export async function buildPool(db: Db, day: string, maxPriceCents: number): Pro
 export const poolSha = (rows: readonly PoolRow[]): string => sha256Hex(JSON.stringify(rows.map((r) => [r.domain, r.source, r.price_cents])));
 
 /** The day row, frozen on first use. Call inside a transaction that holds the day's advisory lock. */
-export async function ensureDay(db: Transaction<Database>, day: string): Promise<DayRow> {
+export async function ensureDay(db: Transaction<Database>, day: string, frozenBy?: 'datasave'): Promise<DayRow> {
   const have = await getDay(db, day);
   if (have) return have;
   const st = await pickproofSettings(db);
-  const { rows, sources, dataDate } = await buildPool(db, day, st.maxPriceCents);
+  const built = await buildPool(db, day, st.maxPriceCents);
+  const { rows, dataDate } = built;
+  // v5.35.0: a day frozen by the datasave step (no bot used it in time) says so; the pool, hash and draw are computed the same way
+  const sources = frozenBy ? { ...built.sources, frozen_by: frozenBy } : built.sources;
   const sha = poolSha(rows);
   await db.insertInto('pickproof_days').values({
     day, data_date: dataDate, pool_sha256: sha, seed: seedOfPool(sha), k: st.k, pool_n: rows.length, sources: JSON.stringify(sources), deadline: deadlineOf(day, st.deadlineHourUtc), recipe_version: CURRENT_RECIPE,

@@ -4,6 +4,7 @@
 // only after that first manifest call (GET .../arms before it is 409 PICKPROOF_NOT_SEALED), so the bots publish the seal before anyone sees a random arm.
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
+import { addDays } from '../../core/dates.js';
 import { AppError } from '../../http/errors.js';
 import { armSha, byteOrder, drawArm } from './draw.js';
 import { ensureDay, getDay, lockDay, type DayRow } from './pool.js';
@@ -38,12 +39,12 @@ async function armNames(db: Kysely<Database>, day: string, arm: ArmName): Promis
 }
 
 /** Seals the day when its deadline has passed; returns the (possibly just sealed) day. Before the deadline it only freezes the pool. */
-export async function sealIfDue(db: Kysely<Database>, day: string, now: number): Promise<DayRow> {
+export async function sealIfDue(db: Kysely<Database>, day: string, now: number, frozenBy?: 'datasave'): Promise<DayRow> {
   const peek = await getDay(db, day);
   if (peek?.sealed_at) return peek;
   return db.transaction().execute(async (tx) => {
     await lockDay(tx, day);
-    const d = await ensureDay(tx, day);
+    const d = await ensureDay(tx, day, frozenBy);
     if (d.sealed_at || now < d.deadline.getTime()) return d;
     const pool = await tx.selectFrom('pickproof_pool').select(['domain', 'price_cents', 'passes_k1', 'is_two_word']).where('day', '=', day).execute();
     pool.sort((a, b) => byteOrder(a.domain, b.domain));
@@ -101,4 +102,29 @@ export async function poolView(db: Kysely<Database>, day: string) {
     fields: ['domain', 'source', 'price_cents', 'passes_k1', 'is_two_word'],
     rows: rows.map((r) => [r.domain, r.source, r.price_cents, r.passes_k1, r.is_two_word]),
   };
+}
+
+/**
+ * v5.35.0: the datasave step `pickproofSeal`. Every pick day from the first one ever frozen up to yesterday (UTC) that is still unsealed is frozen (if
+ * nothing froze it) and sealed, as the first manifest call after the deadline would do. Today is never touched, so the bots' own freeze, picks and
+ * seal stay first. It runs before snapshotRetention, while the datasave rows of D-1 still exist. The draw depends only on the frozen pool, so a late
+ * seal draws the same arms. A day that cannot be frozen keeps its error code (SNAPSHOT_MISSING, POOL_NOT_READY, POOL_SOURCE_PRUNED).
+ */
+export async function autoSeal(db: Kysely<Database>, now: number): Promise<{ status: 'ok' | 'nothing_due' | 'not_started'; days: Array<{ date: string; result: 'sealed' | 'error'; frozen_now?: boolean; code?: string }> }> {
+  const first = (await db.selectFrom('pickproof_days').select((eb) => eb.fn.min('day').as('d')).executeTakeFirst())?.d;
+  if (!first) return { status: 'not_started', days: [] };
+  const today = new Date(now).toISOString().slice(0, 10);
+  const have = new Map((await db.selectFrom('pickproof_days').select(['day', 'sealed_at']).execute()).map((r) => [String(r.day), r.sealed_at]));
+  const days: Array<{ date: string; result: 'sealed' | 'error'; frozen_now?: boolean; code?: string }> = [];
+  for (let d = String(first); d < today; d = addDays(d, 1)) {
+    if (have.has(d) && have.get(d) !== null) continue;
+    try {
+      await sealIfDue(db, d, now, 'datasave');
+      days.push({ date: d, result: 'sealed', frozen_now: !have.has(d) });
+    } catch (e) {
+      if (!(e instanceof AppError)) throw e;
+      days.push({ date: d, result: 'error', code: e.code });
+    }
+  }
+  return { status: days.length ? 'ok' : 'nothing_due', days };
 }

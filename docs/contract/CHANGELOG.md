@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.35.0 (2026-10-25): the daily save seals pick-proof days that no bot sealed
+Release note: `docs/releases/v5.35.0.md`.
+MINOR (additive; no migration).
+- **New datasave step `pickproofSeal`** (after `buildPanel`, before `snapshotRetention`; the job now has ten steps): every pick-proof day before today (UTC) that is still unsealed is frozen if needed and sealed, as the first manifest call after the deadline would do. Same pool rule, seed and draw. A day it froze itself shows `sources.frozen_by: "datasave"`. Today is never touched.
+- **New code `POOL_SOURCE_PRUNED` (410):** a call that would freeze a day whose closeout rows of D-1 are already deleted (3-day retention). Before, such a call would have frozen an empty pool.
+
 ## 5.34.0 (2026-10-22): BUG-052: closeout disappearances tagged bought, deleted or unknown by RDAP
 Release note: `docs/releases/v5.34.0.md`.
 MINOR (additive; migration `1766300000000_v5-34-0.sql`).

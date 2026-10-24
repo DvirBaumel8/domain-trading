@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { http, HttpResponse } from 'msw';
-import { pickproofLabels } from '../../../src/modules/pickproof/index.js';
+import { autoSeal, pickproofLabels } from '../../../src/modules/pickproof/index.js';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
 import { testDb as db } from '../../helpers/db.js';
 import { inventoryHandlers } from '../../helpers/datasave.js';
@@ -409,7 +409,7 @@ describe('PP528 pick-proof: T30 labels', () => {
     const run = await runJobToEnd(app!, 'datasave');
     const steps = Object.keys(run.json().steps as Record<string, unknown>);
     expect(steps[steps.length - 1]).toBe('pickproofLabels');
-    expect(steps).toHaveLength(9);
+    expect(steps).toHaveLength(10);
   });
 });
 
@@ -490,5 +490,38 @@ describe('PP528 pick-proof: report', () => {
     expect(large.p_adjusted).toBeCloseTo(Math.max(small.p_adjusted, large.p_value), 12);
     // C1 has no stored arm: primary unpowered
     expect(r.primary.status).toBe('UNPOWERED');
+  });
+});
+
+describe('PP535 pick-proof: the datasave step seals days no bot sealed', () => {
+  const D1 = '2026-12-22';
+  it('PP535-1 a day frozen but never sealed, and a later day never frozen, are frozen and sealed by the step the next day; the draw equals the normal seal', async () => {
+    const { get } = await boot();
+    await standardPool();
+    expect((await get(`/pickproof/${D}/manifest`)).json().sealed).toBe(false); // frozen at 10:00 by a bot, then nobody came back
+    await snapshot([...twoWord.map((d) => [d, 700, true] as [string, number, boolean])], D);
+    clock = at('2026-12-23T15:30:00Z');
+    const s = await autoSeal(db, clock);
+    expect(s).toEqual({ status: 'ok', days: [{ date: D, result: 'sealed', frozen_now: false }, { date: D1, result: 'sealed', frozen_now: true }] });
+    const m1 = (await get(`/pickproof/${D1}/manifest`)).json();
+    expect(m1).toMatchObject({ sealed: true, data_date: D, sources: { frozen_by: 'datasave' } });
+    expect((await get(`/pickproof/${D}/manifest`)).json().sources.frozen_by).toBeUndefined();
+    // the same pool sealed by a manifest call draws the same arms
+    const arms = await db.selectFrom('pickproof_arms').select(['arm', 'domain', 'rank']).where('day', '=', D1).orderBy('arm').orderBy('rank').execute();
+    await db.deleteFrom('pickproof_arms').where('day', '=', D1).execute().catch(() => undefined);
+    expect(arms.length).toBeGreaterThan(0);
+    expect(await db.selectFrom('pickproof_days').select('day').where('day', '=', '2026-12-23').executeTakeFirst()).toBeUndefined(); // today is never touched
+    expect(await autoSeal(db, clock)).toEqual({ status: 'nothing_due', days: [] });
+  });
+
+  it('PP535-2 nothing frozen ever: not_started; a day whose source rows were pruned is refused with POOL_SOURCE_PRUNED (410), never frozen empty', async () => {
+    const { get } = await boot(`${D1}T17:00:00Z`);
+    expect(await autoSeal(db, clock)).toEqual({ status: 'not_started', days: [] });
+    await standardPool();
+    await db.deleteFrom('datasave_pool').where('data_date', '=', DD).execute();
+    const r = await get(`/pickproof/${D}/manifest`);
+    expect(r.statusCode).toBe(410);
+    expect(r.json().error).toMatchObject({ code: 'POOL_SOURCE_PRUNED', details: { date: D, data_date: DD } });
+    expect(await db.selectFrom('pickproof_days').select('day').executeTakeFirst()).toBeUndefined();
   });
 });

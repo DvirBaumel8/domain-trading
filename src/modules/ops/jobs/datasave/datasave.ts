@@ -19,7 +19,7 @@ import { pipeline } from 'node:stream/promises';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../../db/types.js';
 import { runDqMarket, runEpisodes } from '../../../market/index.js';
-import { pickproofLabels } from '../../../pickproof/index.js';
+import { autoSeal, pickproofLabels } from '../../../pickproof/index.js';
 import type { RdapLookupFn } from '../../../../core/rdap.js';
 import { goneByTag, tagDisappearances } from '../../closeouts/disappearances.js';
 import { scorePool, type PoolScorer } from '../../closeouts/score-pool.js';
@@ -402,6 +402,13 @@ export class DatasaveJob {
   async dqMarket(): Promise<unknown> {
     const r = await runDqMarket(this.deps.db, this.deps.now());
     return { status: r.status, failed_checks: r.failed_checks, checks_n: r.results.length };
+  }
+
+  // ---------- pickproofSeal (v5.35.0) ----------
+
+  /** Freezes and seals every pick day before today that no bot sealed (pickproof/store.ts autoSeal). Runs before snapshotRetention, while the rows of D-1 exist. */
+  async pickproofSeal(): Promise<unknown> {
+    return autoSeal(this.deps.db, this.deps.now());
   }
 
   // ---------- pickproofLabels (v5.28.0, CR-073) ----------

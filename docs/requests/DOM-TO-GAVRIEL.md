@@ -1,5 +1,7 @@
 # DOM → Gavriel: notices
 
+> **Read first when you're back:** `docs/requests/WHILE-GAVRIEL-AWAY-2026-10.md` (what Dvir and DOM did while the bots were paused, from 23 Oct 2026).
+
 DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replies about a specific CR go in that CR's file. Read this file and `docs/releases/` after every pull.
 
 

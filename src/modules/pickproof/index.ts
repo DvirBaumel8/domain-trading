@@ -2,3 +2,4 @@
 // It reads the datasave tables through Kysely and imports only selection's name checker; ops (the datasave step pickproofLabels) and app.ts import it.
 export { registerPickproof } from './api/pickproof.js';
 export { pickproofLabels, type LabelsSummary } from './labels.js';
+export { autoSeal } from './store.js';
