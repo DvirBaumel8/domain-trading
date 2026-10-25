@@ -63,6 +63,14 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - **Pending Dvir's line:** a new per-name S8 cap (`settings.s8_max_price_cents`, migration only). DOM recommended $250, with the S8 test budget staying about $600 and, above $50, Gavriel showing Dvir why the name is worth more (live businesses on other endings, age, comparable sales). DOM ships the migration once Dvir names the number.
 - Gavriel: please think about how you'd find and judge auction names (which auctions, when they end, how to set a max bid). Dvir places bids by hand on the registrar website, and the buy comes in through `POST /portfolio/import` as today.
 
+### 25 Oct 2026: research first, then test (Dvir's working rule)
+- Dvir: "Let's try to learn from others experience and not do the road ourselves for any dilemma." Before we build or wait for our own test on a question, we first look up what experienced investors have already found, and say so with sources.
+- DOM's first research (closeouts vs auctions, public articles only, no marketplace scraping):
+  - Investors' guides agree: closeouts have a low hit rate (names that hundreds of investors passed on at about $12); auctions with real bids have a much higher hit rate and better sell-through, but "auction psychology" causes overpaying, so a firm max bid is needed. Sources: domainnamelovers.com/learn/hand-registration-vs-expired-vs-auctions, domainsdealer.com/godaddy-domain-auction, domaindetails.com/kb/domain-investing/expired-domain-auctions-comparison.
+  - Typical sell-through is 1–2% of a portfolio a year (about 3% for .com counting $100+ sales). Sources: domainnamelovers.com/learn/is-domain-investing-worth-it, pixelworksdomains.com/blog/sell-through-rate-the-metric-that-predicts-your-domain-profits.
+  - GoDaddy closeouts follow a falling fixed price after a failed auction (reported as $50, $40, $30, $11, $5).
+- Consequence: this supports Dvir's auctions-first direction. The pick-proof stays (it costs nothing) as a check of the bots' picking skill, not as the gate for the closeouts-vs-auctions choice.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
