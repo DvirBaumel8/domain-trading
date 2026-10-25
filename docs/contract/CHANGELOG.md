@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.38.0 (2026-10-25): /health db_size.tables: the 10 largest tables (G-119, DB growth)
+Release note: `docs/releases/v5.38.0.md`.
+MINOR (additive; no migration).
+- **`GET /health` `db_size.tables`:** the 10 largest tables of the public schema, largest first, `[{table, bytes, rows_estimate}]` (`bytes` includes indexes and TOAST; `rows_estimate` is the planner estimate, null before the first analyse). The other `db_size` fields are unchanged.
+
 ## 5.37.0 (2026-10-25): GoDaddy auctions in our buying range kept daily; GET /auctions/live
 Release note: `docs/releases/v5.37.0.md`.
 MINOR (additive; migration `1766500000000_v5-37-0.sql`).

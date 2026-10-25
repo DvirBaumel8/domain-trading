@@ -103,6 +103,11 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - Rule for all research: never read a site through a proxy that gets around its bot protection.
 - Waiting for Dvir: go-ahead on the builds in §6 (auction pre-bid check and bid plan, safety upgrades, new-registration gate code). Gavriel: the new-registration rules in §3–4 become a selection settings draft for Dvir to activate.
 
+### 25 Oct 2026: weekly improvement loop, v5.38.0
+- Report: `docs/internal/loop/2026-10-25.md` (written without your pain-point block, because the bots are paused; please add it when back).
+- **Urgent finding:** the DB grows about 44 MB a day (87 MB on 19 Oct → 350 MB, 32.6%, on 25 Oct). It would reach 70% around 3 Nov. v5.38.0 adds `GET /health` `db_size.tables` (the 10 largest tables) so the cause can be seen. The cut follows (G-119).
+- Also open: `/health datasave: partial` with every 24 Oct file complete (G-120).
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.

@@ -49,13 +49,23 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
 }
 
 /** The database size against the free-plan limit (the same numbers as /report's DB_SIZE_HIGH); null when it can't be read. */
-async function dbSize(db: Kysely<Database>, limitBytes: number): Promise<{ bytes: number; limit_bytes: number; percent: number; warn_percent: number } | null> {
+async function dbSize(db: Kysely<Database>, limitBytes: number): Promise<{ bytes: number; limit_bytes: number; percent: number; warn_percent: number; tables: DbTableSize[] } | null> {
   try {
     const bytes = Number((await sql<{ n: string }>`select pg_database_size(current_database())::text as n`.execute(db)).rows[0]!.n);
-    return { bytes, limit_bytes: limitBytes, percent: Math.round(bytes * 1000 / limitBytes) / 10, warn_percent: DB_SIZE_WARN_PERCENT };
+    return { bytes, limit_bytes: limitBytes, percent: Math.round(bytes * 1000 / limitBytes) / 10, warn_percent: DB_SIZE_WARN_PERCENT, tables: await largestTables(db) };
   } catch {
     return null;
   }
+}
+
+interface DbTableSize { table: string; bytes: number; rows_estimate: number | null }
+
+/** v5.38.0 (loop 2026-10-25, G-119): the 10 largest tables of the public schema (table + indexes + TOAST); rows from the planner estimate (null before the first ANALYZE). */
+async function largestTables(db: Kysely<Database>): Promise<DbTableSize[]> {
+  const rs = await sql<{ table: string; bytes: string; rows: string }>`select c.relname as table, pg_total_relation_size(c.oid)::text as bytes, c.reltuples::bigint::text as rows
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind in ('r', 'p') order by pg_total_relation_size(c.oid) desc, c.relname limit 10`.execute(db);
+  return rs.rows.map((r) => ({ table: r.table, bytes: Number(r.bytes), rows_estimate: Number(r.rows) >= 0 ? Number(r.rows) : null }));
 }
 
 async function jobsState(db: Kysely<Database>, nowMs: number): Promise<'ok' | 'overdue'> {

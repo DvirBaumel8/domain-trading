@@ -48,11 +48,25 @@ describe('GET /health (R-11)', () => {
     app = await makeApp({ testRoutes: false });
     const { auth } = await issueToken('read');
     const body = (await app.inject({ method: 'GET', url: '/health', headers: auth })).json();
-    expect(Object.keys(body.db_size).sort()).toEqual(['bytes', 'limit_bytes', 'percent', 'warn_percent']);
+    expect(Object.keys(body.db_size).sort()).toEqual(['bytes', 'limit_bytes', 'percent', 'tables', 'warn_percent']);
     expect(body.db_size.bytes).toBeGreaterThan(0);
     expect(body.db_size.limit_bytes).toBe(1024 ** 3);
     expect(body.db_size.percent).toBe(Math.round(body.db_size.bytes * 1000 / 1024 ** 3) / 10);
     expect(body.db_size.warn_percent).toBe(70);
+  });
+
+  it('L538-1: db_size.tables lists at most 10 public tables, largest first, with bytes and a row estimate (READ token)', async () => {
+    app = await makeApp({ testRoutes: false });
+    const { auth } = await issueToken('read');
+    const t = (await app.inject({ method: 'GET', url: '/health', headers: auth })).json().db_size.tables as { table: string; bytes: number; rows_estimate: number | null }[];
+    expect(t.length).toBeGreaterThan(0);
+    expect(t.length).toBeLessThanOrEqual(10);
+    for (const r of t) {
+      expect(Object.keys(r).sort()).toEqual(['bytes', 'rows_estimate', 'table']);
+      expect(r.bytes).toBeGreaterThan(0);
+      expect(r.rows_estimate === null || r.rows_estimate >= 0).toBe(true);
+    }
+    expect(t.map((r) => r.bytes)).toEqual([...t.map((r) => r.bytes)].sort((a, b) => b - a));
   });
 
   it('never reveals secrets or key prefixes', async () => {
