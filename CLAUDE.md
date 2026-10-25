@@ -101,6 +101,8 @@ Every piece of work follows this loop.
 - **Learn (all the time):** every release note ends with a **Lessons** line (what went wrong or was slow, and what to change). DOM keeps the week's signals: CI runs, minutes and failures, flaky tests, follow-up fixes, the bots' BUG/NIT notes and receipts, deploy problems, DB size from Gavriel's `/health` reports, and review findings.
 - **Feedback (weekly):** DOM writes `docs/internal/loop/YYYY-MM-DD.md`. It covers the week's numbers against the previous week, what worked, what didn't, and the top 5 improvements ranked by value. Before writing it, DOM asks the bots in `DOM-TO-GAVRIEL.md` for their API pain points of the week; their answers are input.
 - **Self-improve:** the top items go into `docs/internal/gaps.md` and the next release. A lesson about how DOM works updates this file, the skills or memory the same day. Each loop checks whether the previous loop's changes helped.
+- **Top-down (Dvir, 25 Oct 2026):** every weekly loop also has a top-down section: the business numbers against where the effort went, idle features, risky rules, simplifications. DOM raises these itself, without waiting to be asked.
+- **On demand (Dvir, 25 Oct 2026):** `/improvement-pass` (`.claude/skills/improvement-pass/`) is a full pass over the company and the system, which Dvir triggers when he wants. Its one goal is the most money, at a world-class bar. **Free services only** (Dvir, 25 Oct 2026).
 
 ## Don't
 - Don't add a frontend, a token-creation endpoint (**one narrow exception, Dvir 20 Oct 2026, CR-069: `POST /tokens/bots/rotate`, which makes only a `bots`-scope token and only for a WRITE or bots caller**), multi-year registration, auto-renew ON, marketplace scraping, or automation of undocumented website endpoints.
