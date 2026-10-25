@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## Unreleased / 5.40.0 (draft): DB query counter per request and per job step (G-125)
+Release note: `docs/releases/v5.40.0.draft.md`.
+MINOR (additive; no migration).
+- **`GET /jobs/runs`:** each finished step gains `db: {queries, ms, errors?, top?}` next to `ms` (`jobs.md`). `top` (the three most repeated query shapes, SQL text only) appears from 50 queries. Existing fields and `summary` are unchanged.
+- No route, response body or error code changes. The API log line "request completed" gains `db_queries`, `db_ms` and (from 20 queries) `db_top`; that is a host log, not a contract surface.
+
 ## 5.38.0 (2026-10-25): /health db_size.tables: the 10 largest tables (G-119, DB growth)
 Release note: `docs/releases/v5.38.0.md`.
 MINOR (additive; no migration).

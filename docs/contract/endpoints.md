@@ -1091,7 +1091,7 @@ READ (any `GET` token; not the job token). Query (all optional; an unknown param
 ```
 { runs: [ { run_id: string | null (3.0.0; null for older and CLI runs), status: "queued" | "running" | "finished" (3.0.0), job, trigger: "scheduled" | "manual" | "cli", triggered_by: string | null, scheduled_for: ISO | null,
             started_at, finished_at, skipped: bool, ok: bool,
-            steps: { <step>: { ok (null while queued or running), status: queued|running|done|failed|skipped, attempts, ms, started_at, finished_at, skipped?, error?, summary } } } ],   // unfinished runs first, then newest first
+            steps: { <step>: { ok (null while queued or running), status: queued|running|done|failed|skipped, attempts, ms, db?: {queries, ms, errors?, top?} (5.40.0), started_at, finished_at, skipped?, error?, summary } } } ],   // unfinished runs first, then newest first
   jobs: { tick: { last_run_at, last_ok_at, next_due_at: null },
           daily: { last_run_at, last_ok_at, next_due_at, last_scheduled: {run_id, status, ok} | null, missed_slot: ISO | null } },   // last_scheduled, missed_slot: 3.1.0                   // ISO | null
   reference: { popularity: { list_id, list_date, rows, refreshed_at } | null,

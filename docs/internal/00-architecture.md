@@ -107,6 +107,12 @@ Envelope, cross-cutting codes, money and time conventions: `docs/contract/README
 - **Outbound IPs:** Render free uses shared regional ranges; Porkbun's IP allowlist is skipped. Namecheap needs fixed IPv4s (paid), so it stays out.
 - Setup steps: `docs/DEPLOYMENT.md`.
 
+### 8a. DB query counter (v5.40.0, G-125)
+Every DB round trip to Neon costs real time on the Mac host, so the service counts them. `src/core/db-stats.ts` keeps an AsyncLocalStorage scope; the Kysely `log` hook in `src/db/client.ts` adds each executed query to the current scope (count, DB ms, errors, and a counter per shape). A shape is the compiled SQL text with `$1` placeholders, whitespace collapsed, 200 characters at most. **Query parameters are never read or stored** (they can hold domains, approval text, token hashes). A query outside a scope is ignored.
+- **Per API request** (`src/http/db-stats.ts`): `registerDbScope` (onRequest, first) opens the scope; `registerDbStatsLog` (onSend, last, so the audit insert counts) puts `db_queries`, `db_ms` and, from 20 queries, `db_top` (3 shapes) on the "request completed" line of `api.log`. No response body changes.
+- **Per job step** (`ops/queue.ts` `execute`, `jobs/runner.ts` `runStepOnce`): the step runs inside a scope; the record `db: {queries, ms, errors?, top?}` (`top` from 50 queries) is stored inside the step summary as `_db` (no migration) and `reporting/job-runs.ts` `stepView` lifts it next to `ms`. Only an object summary can carry it.
+- **Reading it:** `npm run traffic -- <api.log>` (`scripts/traffic-report.ts`) prints per route calls, avg/max ms, avg/max `db_queries`, total `db_ms`, statuses and the repeated shapes; it never prints query strings or headers. Tests: DQ540-1..6, TR540-1..3.
+
 ## 9. Risks and bounds
 | Risk | Bound |
 |---|---|

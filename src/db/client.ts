@@ -1,6 +1,7 @@
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
 import type { Database } from './types.js';
+import { recordQuery } from '../core/db-stats.js';
 
 // bigint ids fit comfortably in a JS number here; dates stay 'YYYY-MM-DD' strings (no timezone shifts).
 pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v));
@@ -39,7 +40,11 @@ export function attachPoolErrorHandler(pool: pg.Pool, log?: { warn(o: object, m:
 export function createDb(url: string, opts: { ssl?: boolean; log?: { warn(o: object, m: string): void } } = {}): Kysely<Database> {
   const pool = new pg.Pool(poolConfig(url, opts));
   attachPoolErrorHandler(pool, opts.log);
-  return new Kysely<Database>({ dialect: new PostgresDialect({ pool }) });
+  // v5.40.0 (G-125): count queries per request and per job step (SQL text only, never parameters; ignored outside a scope).
+  return new Kysely<Database>({
+    dialect: new PostgresDialect({ pool }),
+    log: (e) => recordQuery(e.query.sql, e.queryDurationMillis, e.level === 'error'),
+  });
 }
 
 export async function pingDb(db: Kysely<Database>, timeoutMs = 2000): Promise<boolean> {

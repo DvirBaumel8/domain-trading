@@ -98,12 +98,21 @@ export async function jobsOverdue(db: Kysely<Database>, nowMs: number): Promise<
 
 /** A queue step in the shape job_runs.steps has always had (ok, skipped, error, ms, summary) plus the queue's status, attempts and times. `ok` is null while the step is still queued or running. */
 export function stepView(r: { status: string; attempt: number; ms: number | null; summary: unknown; error: string | null; started_at: Date | null; finished_at: Date | null }): Record<string, unknown> {
+  // v5.40.0 (G-125): the queue stores the step's DB counter inside the summary as `_db`; it is shown next to `ms`, not in the summary.
+  let summary = r.summary ?? null;
+  let db: unknown;
+  if (typeof summary === 'object' && summary !== null && !Array.isArray(summary) && '_db' in summary) {
+    const { _db, ...rest } = summary as Record<string, unknown>;
+    db = _db;
+    summary = rest;
+  }
   return {
     ok: r.status === 'queued' || r.status === 'running' ? null : r.status !== 'failed',
     ...(r.status === 'skipped' ? { skipped: true } : {}),
     ...(r.error ? { error: r.error } : {}),
     ms: r.ms ?? 0,
-    summary: r.summary ?? null,
+    ...(db ? { db } : {}),
+    summary,
     status: r.status, attempts: r.attempt, started_at: r.started_at, finished_at: r.finished_at,
   };
 }

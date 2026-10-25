@@ -11,7 +11,8 @@ import dns from 'node:dns';
 import { queryDns, queryNs, type NsLookup } from './core/ns-lookup.js';
 import type { Config } from './config.js';
 import type { Database } from './db/types.js';
-import { dbAuditWriter, auditFrameworkError, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
+import { registerDbScope, registerDbStatsLog } from './http/db-stats.js';
+import { dbAuditWriter,auditFrameworkError, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
 import { registerAuth, registerScope } from './http/auth.js';
 import { registerIdempotency } from './http/idempotency.js';
 import { registerRateLimit } from './http/rate-limit.js';
@@ -120,12 +121,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (payload === null || typeof payload !== 'object' || Buffer.isBuffer(payload)) return payload;
     return jerusalemDeep(payload, UTC_FIELDS[req.routeOptions?.url ?? '']);
   });
+  registerDbScope(app); // onRequest (very first: v5.40.0 query counter)
   registerAuditId(app); // onRequest (first)
   registerAuth(app, deps.db, deps.config.jobTriggerToken, deps.now); // onRequest
   registerRateLimit(app, deps.now, deps.db); // preHandler (first, so a 429 never claims an idempotency key)
   registerScope(app); // preHandler
   registerIdempotency(app, deps.db); // preHandler (after scope) + onSend (before audit write)
   registerAuditWrite(app, auditWriter); // onSend (last)
+  registerDbStatsLog(app); // onSend (after the audit write, so its insert is counted)
 
   registerHealth(app, deps.config, deps.db, now, () => app.jobQueue.kickIfNeeded());
   const adapters = deps.adapters ?? createAdapters(deps.config);
