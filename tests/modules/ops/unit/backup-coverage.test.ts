@@ -33,6 +33,7 @@ const EXCLUDED: Record<string, string> = {
   rdap_cache: 'shared RDAP cache (v5.29.0, CR-074): definite registry answers only, re-derived by the next lookup; nothing to restore; the nightly export is unconfigured',
   lookup_usage: 'rolling 24-hour log of the bots live RDAP lookups (v5.29.0, CR-074): only the last 24 hours matter, older rows are deleted after 7 days; the nightly export is unconfigured',
   disappearances: 'RDAP tags of closeout names gone before their end and of DISAPPEARED episodes (v5.34.0, BUG-052): re-derivable only while RDAP still shows the state, kept 120 days; the nightly export is unconfigured',
+  closeout_expiries: 'RDAP checks of GoDaddy closeout names after their end date (v5.46.0): re-derivable only while RDAP still shows the state, kept 120 days; the unsold rows already written to engine_unsold stay there; the nightly export is unconfigured',
   pickproof_labels: 'T30 labels of the pick-proof arm names (v5.28.0, CR-073): re-derivable from RDAP only while the name is unchanged, otherwise lost; small; the nightly export is unconfigured',
   job_runs: 'operational log of job step summaries; the audit rows keep the facts',
   job_queue_runs: 'operational queue of job runs (v3.0.0); the finished run is in job_runs',

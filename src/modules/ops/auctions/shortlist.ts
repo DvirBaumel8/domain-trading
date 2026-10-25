@@ -78,7 +78,7 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
     const sld = r.domain.slice(0, -4);
     const maxBid = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, commission });
     if (maxBid <= r.price_cents) { dropped.no_headroom_n++; continue; }
-    const pre = scoreAuction({ words: v.words.length || 2, letters: sld.length, price_cents: r.price_cents, max_bid_cents: maxBid, bids: r.bid_count, domain_age: r.domain_age, pageviews: r.pageviews, endings: {} });
+    const pre = scoreAuction({ words: v.words.length > 0 ? v.words : [sld], letters: sld.length, price_cents: r.price_cents, max_bid_cents: maxBid, bids: r.bid_count, domain_age: r.domain_age, pageviews: r.pageviews, endings: {} });
     cands.push({ domain: r.domain, sld, end_time: r.end_time, auction_type: r.auction_type, price_cents: r.price_cents, bids: r.bid_count, domain_age: r.domain_age, valuation_cents: r.valuation_cents, pageviews: r.pageviews, words: v.words, max_bid_cents: maxBid, pre, flags: [] });
   }
   const byPre = (a: Cand, b: Cand): number => b.pre.score - a.pre.score || a.end_time.getTime() - b.end_time.getTime() || (a.domain < b.domain ? -1 : 1);
@@ -137,7 +137,7 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
   }
 
   // ---- final score and rank
-  const scored = pool.map((c) => ({ c, s: scoreAuction({ words: c.words.length || 2, letters: c.sld.length, price_cents: c.price_cents, max_bid_cents: c.max_bid_cents, bids: c.bids, domain_age: c.domain_age, pageviews: c.pageviews, endings: known.get(c.sld) ?? {} }) }));
+  const scored = pool.map((c) => ({ c, s: scoreAuction({ words: c.words.length > 0 ? c.words : [c.sld], letters: c.sld.length, price_cents: c.price_cents, max_bid_cents: c.max_bid_cents, bids: c.bids, domain_age: c.domain_age, pageviews: c.pageviews, endings: known.get(c.sld) ?? {} }) }));
   scored.sort((a, b) => b.s.score - a.s.score || a.c.end_time.getTime() - b.c.end_time.getTime() || (a.c.domain < b.c.domain ? -1 : 1));
   // the suggested maximum follows the final score (weaker names get less); a name whose scaled maximum is not above its price has no room left
   for (const x of scored) x.c.max_bid_cents = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, commission, score: x.s.score });

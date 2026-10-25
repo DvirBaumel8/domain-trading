@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.46.0 (2026-10-25): First-run fixes: unsold feed for closeouts that run to their end, auction score v2 (common words, spread), the Mac starts the data save, engine age leak fix
+Release note: `docs/releases/v5.46.0.md`.
+MINOR (migration `1767100000000_v5-46-0.sql`).
+- Datasave step `buildPanel` returns `expiries` (closeout names checked by RDAP after their end date); step `engineFeed` returns `expired_unsold_candidates_n` and `expired_unsold_inserted_n` and writes the dropped names to `engine_unsold`.
+- `GET /auctions/shortlist`: `score_version` `auction-v2`; `parts.name` adds `word_quality`, `word_levels`, `all_common`; the suggested maximum is full from score 85 (was 70).
+- Engine feature `com_age_years` is whole years.
+
 ## 5.45.0 (2026-10-25): Daily auction shortlist with suggested maximum bids, auto pre-bid checks and the weekly buying funnel; first knowledge base load (G-127, CR-078)
 Release note: `docs/releases/v5.45.0.md`.
 MINOR (migration `1767000000000_v5-45-0.sql`).

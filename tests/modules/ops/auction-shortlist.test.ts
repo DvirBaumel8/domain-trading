@@ -84,21 +84,21 @@ describe('AS545 shortlist: filters and score', () => {
     await insertOwnedDomain(db, { domain: 'brightstudio.com' });
     await insertBidPlan(db, { domain: 'bluemarket.com', kind: 'auction' });
     const r = await runStep() as Record<string, any>;
-    expect(r).toMatchObject({ status: 'ok', data_date: DATE, score_version: 'auction-v1', shortlisted_n: 3 });
+    expect(r).toMatchObject({ status: 'ok', data_date: DATE, score_version: 'auction-v2', shortlisted_n: 3 });
     expect(r.dropped).toMatchObject({ owned_n: 1, open_plan_n: 1, name_rules: { 'BRAND-1': 1, 'SPELL-1': 1 } });
     expect((await shortlist()).map((x) => x.domain).sort()).toEqual(['bluecoffee.com', 'brightwidgets.com', 'freshplanet.com']);
   });
 
   it('AS545-6: rows carry rank, score, version, parts, price, bids, end time, valuation (stored, not scored), a maximum bid in whole $5 and reasons; the better name ranks first', async () => {
-    await live('brightwidgets.com', { price: 3000, bids: 9, age: 8 });
+    await live('brightstudio.com', { price: 3000, bids: 9, age: 8 });
     await live('solidharborcoffeeplanet.com', { price: 3000, bids: 9, age: 8, valuation: 5_000_000 }); // 4 words and long: lower shape
     const r = await runStep() as Record<string, any>;
     expect(r.shortlisted_n).toBe(2);
     const rows = await shortlist();
-    expect(rows.map((x) => x.domain)).toEqual(['brightwidgets.com', 'solidharborcoffeeplanet.com']);
+    expect(rows.map((x) => x.domain)).toEqual(['brightstudio.com', 'solidharborcoffeeplanet.com']);
     expect(rows[0]!.rank).toBe(1);
     expect(rows[0]!.score).toBeGreaterThan(rows[1]!.score);
-    expect(rows[0]).toMatchObject({ score_version: 'auction-v1', price_cents: 3000, bids: 9, valuation_cents: 90_000, domain_age: 8, dropped_reason: null, prebid_id: null });
+    expect(rows[0]).toMatchObject({ score_version: 'auction-v2', price_cents: 3000, bids: 9, valuation_cents: 90_000, domain_age: 8, dropped_reason: null, prebid_id: null });
     // the suggested maximum: 20% of the expected net resale ($1,000 less 20% commission = $160), scaled by the score (full from 70), whole $5 (v5.45.0 review)
     expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: Number(rows[0]!.score) }));
     expect(rows[0]!.max_bid_suggested_cents).toBeLessThanOrEqual(16_000);
@@ -113,7 +113,7 @@ describe('AS545 shortlist: filters and score', () => {
     await sql`update settings set shortlist_size = 4`.execute(db);
     await runStep();
     expect(await shortlist()).toHaveLength(4);
-    await db.insertInto('auction_shortlist').values({ data_date: '2026-10-24', domain: 'old.com', rank: 1, score: 50, score_version: 'auction-v1', parts: '{}', price_cents: 100, bids: 1, end_time: new Date(NOW), max_bid_suggested_cents: 500, reasons: [], generated_at: new Date(NOW) }).execute();
+    await db.insertInto('auction_shortlist').values({ data_date: '2026-10-24', domain: 'old.com', rank: 1, score: 50, score_version: 'auction-v2', parts: '{}', price_cents: 100, bids: 1, end_time: new Date(NOW), max_bid_suggested_cents: 500, reasons: [], generated_at: new Date(NOW) }).execute();
     await db.deleteFrom('godaddy_auctions_live').where('domain', '=', nameN(0)).execute();
     await runStep();
     const rows = await shortlist();
@@ -124,12 +124,12 @@ describe('AS545 shortlist: filters and score', () => {
 
   it('AS545-8: no live data is a no_data step answer; the step does not fail on an empty day', async () => {
     expect(await runStep()).toMatchObject({ status: 'no_data', shortlisted_n: 0 });
-    await live('brightwidgets.com', { inH: 100 });
+    await live('brightstudio.com', { inH: 100 });
     expect(await runStep()).toMatchObject({ status: 'ok', shortlisted_n: 0 });
   });
 
   it('AS545-9: BRAND-TYPO-2 against the stored popularity list: a typo or look-alike of a brand is dropped, an ordinary-word brand is kept with a note; no list or an old list skips it', async () => {
-    await live('paypall.com'); await live('brightwidgets.com'); await live('targetmarketing.com');
+    await live('paypall.com'); await live('brightstudio.com'); await live('targetmarketing.com');
     const none = await runStep() as Record<string, any>;
     expect(none.brand_typo).toBe('off');
     await patchActiveSettings(['sources', 'popularity'], true);
@@ -140,15 +140,15 @@ describe('AS545 shortlist: filters and score', () => {
     expect(r.brand_typo).toBe('on');
     expect(r.dropped.brand_typo_n).toBe(1);
     const rows = await shortlist();
-    expect(rows.map((x) => x.domain).sort()).toEqual(['brightwidgets.com', 'targetmarketing.com']);
+    expect(rows.map((x) => x.domain).sort()).toEqual(['brightstudio.com', 'targetmarketing.com']);
     expect(rows.find((x) => x.domain === 'targetmarketing.com')!.reasons.join(' ')).toContain('brand-like');
   });
 });
 
 describe('AS545 shortlist: endings', () => {
   it('AS545-10: the five other endings of the top names are asked (RDAP) when unknown or older than 30 days, stored in engine_endings, and the score uses the answers; fresh answers are not asked again', async () => {
-    await live('brightwidgets.com'); await live('bluecoffee.com'); await live('smartgarden.com');
-    rdapTable['brightwidgets.net'] = registered(); rdapTable['brightwidgets.org'] = registered();
+    await live('brightstudio.com'); await live('bluecoffee.com'); await live('smartgarden.com');
+    rdapTable['brightstudio.net'] = registered(); rdapTable['brightstudio.org'] = registered();
     // bluecoffee: a fresh answer for all five endings (not asked); smartgarden: .net answered 40 days ago (asked again), the rest never asked
     for (const tld of ['net', 'org', 'co', 'io', 'ai']) await sql`insert into engine_endings (name, tld, registered, checked_at) values ('bluecoffee', ${tld}, false, ${new Date(NOW - 5 * DAY)})`.execute(db);
     await sql`insert into engine_endings (name, tld, registered, checked_at) values ('smartgarden', 'net', false, ${new Date(NOW - 40 * DAY)})`.execute(db);
@@ -157,20 +157,20 @@ describe('AS545 shortlist: endings', () => {
     expect(r.endings).toMatchObject({ wanted_n: 2, status: 'ok', partial: false });
     expect(r.endings.asked).toBe(10);
     expect(rdapCalls.filter((c) => c.startsWith('bluecoffee.') && !c.endsWith('.com'))).toEqual([]);
-    const ends = await db.selectFrom('engine_endings').select(['name', 'tld', 'registered']).where('name', '=', 'brightwidgets').execute();
+    const ends = await db.selectFrom('engine_endings').select(['name', 'tld', 'registered']).where('name', '=', 'brightstudio').execute();
     expect(ends).toHaveLength(5);
     expect(ends.filter((e) => e.registered).map((e) => e.tld).sort()).toEqual(['net', 'org']);
     const sm = await db.selectFrom('engine_endings').select(['tld', 'registered']).where('name', '=', 'smartgarden').where('tld', '=', 'net').execute();
     expect(sm.length).toBeGreaterThanOrEqual(1);
     const rows = await shortlist();
-    const bw = rows.find((x) => x.domain === 'brightwidgets.com')!;
+    const bw = rows.find((x) => x.domain === 'brightstudio.com')!;
     expect((bw.parts as { name: { endings_known: number; endings_registered: number } }).name).toMatchObject({ endings_known: 5, endings_registered: 2 });
     expect(bw.reasons.join(' ')).toContain('.net, .org');
-    expect(rows[0]!.domain).toBe('brightwidgets.com'); // the registered endings lift it above the equal-shape names
+    expect(rows[0]!.domain).toBe('brightstudio.com'); // the registered endings lift it above the equal-shape names
   });
 
   it('AS545-11: an unanswered ask stays unknown (the part is rescaled, not zero); the time budget stops asking and reports partial; no screening deps skips the endings', async () => {
-    await live('brightwidgets.com'); await live('bluecoffee.com');
+    await live('brightstudio.com'); await live('bluecoffee.com');
     // every RDAP answer takes 90 s on the clock; the budget is 60 s: each worker asks once and stops
     const slow = screeningDeps({ rdapLookup: async (d: string) => { clock.t += 90_000; rdapCalls.push(d); return { ...free(), outcome: 'unknown', reasonCode: 'TIMEOUT' } as RdapLookup; } });
     await sql`update settings set shortlist_prebid_n = 0`.execute(db);
@@ -284,7 +284,7 @@ describe('AS545 bulk work', () => {
     await live(nameN(0));
     const job = new DatasaveJob({ db, now: () => NOW, snapshotDir: '/tmp/as545-none' });
     expect(await job.auctionShortlist()).toMatchObject({ status: 'ok', shortlisted_n: 1 });
-    await db.insertInto('auction_shortlist').values({ data_date: '2026-06-01', domain: 'old.com', rank: 1, score: 50, score_version: 'auction-v1', parts: '{}', price_cents: 100, bids: 1, end_time: new Date(NOW), max_bid_suggested_cents: 500, reasons: [], generated_at: new Date(NOW) }).execute();
+    await db.insertInto('auction_shortlist').values({ data_date: '2026-06-01', domain: 'old.com', rank: 1, score: 50, score_version: 'auction-v2', parts: '{}', price_cents: 100, bids: 1, end_time: new Date(NOW), max_bid_suggested_cents: 500, reasons: [], generated_at: new Date(NOW) }).execute();
     const ret = await job.snapshotRetention() as Record<string, unknown>;
     expect(ret.shortlist_rows_deleted).toBe(1);
     expect((await db.selectFrom('auction_shortlist').select('domain').execute()).map((x) => x.domain)).toEqual([nameN(0)]);
@@ -308,7 +308,7 @@ describe('AS545 routes', () => {
     const res = await get('/auctions/shortlist', (await issueToken('bots')).auth);
     expect(res.statusCode, res.body).toBe(200);
     const j = res.json();
-    expect(j).toMatchObject({ data_date: DATE, total: 4, settings: { shortlist_size: 25, shortlist_prebid_n: 10, shortlist_horizon_hours: 72, shortlist_endings_n: 50, score_version: 'auction-v1' } });
+    expect(j).toMatchObject({ data_date: DATE, total: 4, settings: { shortlist_size: 25, shortlist_prebid_n: 10, shortlist_horizon_hours: 72, shortlist_endings_n: 50, score_version: 'auction-v2' } });
     expect(j.generated_at).toMatch(/\+0[23]:00$/);
     const top = j.rows[0];
     expect(top).toMatchObject({ rank: 1, domain: 'bluewidgets.com', price_cents: 5000, price: '$50.00', valuation_cents: 90_000, bids: 4 });
@@ -345,13 +345,13 @@ describe('AS545 routes', () => {
     await sql`update settings set shortlist_prebid_n = 4`.execute(db);
     await runStep({ screening: screeningDeps() });
     // a bot pre-bid and a plan that was won and imported, one that was lost
-    const bot = await db.insertInto('prebid_checks').values({ domain: 'brightwidgets.com', venue: 'godaddy', verdict: 'pass', answer: '{}', token_name: 'gavriel', created_at: new Date(NOW) }).returning('id').executeTakeFirstOrThrow();
+    const bot = await db.insertInto('prebid_checks').values({ domain: 'brightstudio.com', venue: 'godaddy', verdict: 'pass', answer: '{}', token_name: 'gavriel', created_at: new Date(NOW) }).returning('id').executeTakeFirstOrThrow();
     expect(bot.id).toBeGreaterThan(0);
-    const won = await insertBidPlan(db, { domain: 'brightwidgets.com', kind: 'auction', status: 'won', createdAt: new Date(NOW - HOUR), finalPriceCents: 4000, maxBidCents: 6000 });
+    const won = await insertBidPlan(db, { domain: 'brightstudio.com', kind: 'auction', status: 'won', createdAt: new Date(NOW - HOUR), finalPriceCents: 4000, maxBidCents: 6000 });
     await insertBidPlan(db, { domain: 'bluecoffee.com', kind: 'auction', status: 'lost', createdAt: new Date(NOW - HOUR), maxBidCents: 5000 });
     await sql`insert into bid_plan_events (plan_id, event, from_status, to_status, created_at) values (${won}, 'imported', 'won', 'won', ${new Date(NOW)})`.execute(db);
-    await insertOwnedDomain(db, { domain: 'brightwidgets.com', status: 'listed', lane: 'S8', buy_date: '2026-10-24' });
-    await sql`insert into visit_daily (domain, date_utc, source, views_30d, leads_30d, human_hits) values ('brightwidgets.com', '2026-10-25', 'afternic', 12, 2, 0)`.execute(db);
+    await insertOwnedDomain(db, { domain: 'brightstudio.com', status: 'listed', lane: 'S8', buy_date: '2026-10-24' });
+    await sql`insert into visit_daily (domain, date_utc, source, views_30d, leads_30d, human_hits) values ('brightstudio.com', '2026-10-25', 'afternic', 12, 2, 0)`.execute(db);
     app = await makeApp({ now: () => NOW });
     const auth = (await issueToken('read')).auth;
     const res = await get(`/auctions/funnel?from=2026-10-19&to=${DATE}`, auth);

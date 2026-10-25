@@ -173,7 +173,8 @@ export function computeFeatures(ctx: FeatureContext, domain: string, asOf: strin
     comCreatedMs = com.createdMs;
     if (com.createdMs >= asOfMs) acq = 'created_after';
     else acq = (asOfMs - com.createdMs) / MONTH_MS <= HANDREG_MONTHS ? 'handreg' : 'aftermarket_or_old';
-    v.com_age_years = acq === 'created_after' ? null : (asOfMs - com.createdMs) / (365.25 * 86_400_000);
+    // v5.46.0: whole years (floor), no sub-year information. A dropped name is dated at its expiry anniversary, so a fractional age (N.0 / N.2) gave the label away (engine lab, 25 Oct 2026).
+    v.com_age_years = acq === 'created_after' ? null : Math.floor((asOfMs - com.createdMs) / (365.25 * 86_400_000));
   }
   if (acq !== null) {
     v.acq_handreg = acq === 'handreg' ? 1 : 0;

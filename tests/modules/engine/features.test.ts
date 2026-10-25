@@ -90,7 +90,7 @@ describe('engine features (point in time)', () => {
     expect(f(ctx({ endings: { septicdrone: { net: e(true) } } }), 'septicdrone.com', '2026-09-01').net_pit).toBeNull();
   });
 
-  it('EN-36: .com acquisition: hand-registered within 36 months, older = aftermarket or old, created after as_of keeps its own category, unknown stays unknown', () => {
+  it('EN-36 + FX546-7 (com_age_years is whole years: ages 3.0 and 3.7 give the same value): .com acquisition: hand-registered within 36 months, older = aftermarket or old, created after as_of keeps its own category, unknown stays unknown', () => {
     const com = (created: string | null, registered: boolean | null = true) => ctx({ endings: { septicdrone: { com: { registered, createdMs: created ? ms(created) : null } } } });
     const acq = (c: FeatureContext, asOf: string) => computeFeatures(c, 'septicdrone.com', asOf);
     expect(acq(com('2024-10-01'), '2026-09-01').acq).toBe('handreg'); // 23 months
@@ -100,7 +100,10 @@ describe('engine features (point in time)', () => {
     const after = acq(com('2026-10-05'), '2026-09-01');
     expect(after.acq).toBe('created_after');
     expect(after.values).toMatchObject({ acq_created_after: 1, acq_handreg: 0, acq_aftermarket_or_old: 0, com_age_years: null });
-    expect(acq(com('2016-01-01'), '2026-09-01').values.com_age_years!).toBeCloseTo(10.67, 1);
+    expect(acq(com('2016-01-01'), '2026-09-01').values.com_age_years).toBe(10); // 10.67 years, whole years (floor)
+    // FX546-7: no sub-year information: ages 3.0 and 3.7 years give the same feature (a dropped name is dated at its expiry anniversary, so a fraction leaked the label)
+    expect(acq(com('2023-09-01'), '2026-09-02').values.com_age_years).toBe(3);
+    expect(acq(com('2023-01-15'), '2026-09-15').values.com_age_years).toBe(3);
     expect(acq(com(null, false), '2026-09-01')).toMatchObject({ acq: null });
     expect(acq(com(null, null), '2026-09-01').values.acq_handreg).toBeNull();
   });

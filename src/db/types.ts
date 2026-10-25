@@ -65,6 +65,10 @@ export interface SettingsTable {
   /** v5.34.0 (BUG-052): RDAP lookups per datasave run for the disappearance tags, and how long tag rows are kept. Migration only. */
   disappearance_lookups_max_per_run: Generated<number>;
   disappearance_keep_days: Generated<number>;
+  /** v5.46.0: closeout_expiries: days after the end date of the first RDAP check, days between checks, days after the end date when a still-open name is closed as unknown. Migration only. */
+  closeout_expiry_wait_days: Generated<number>;
+  closeout_expiry_recheck_days: Generated<number>;
+  closeout_expiry_max_days: Generated<number>;
   /** v5.37.0: days the in-range GoDaddy auctions with bids are kept (godaddy_auctions_live) and the fewest bids to keep one. Migration only. */
   datasave_auction_live_keep_days: Generated<number>;
   datasave_auction_live_min_bids: Generated<number>;
@@ -1440,6 +1444,25 @@ export interface DisappearancesTable {
   rdap_created: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
   created_at: Generated<Date>;
 }
+/** v5.46.0: a GoDaddy closeout name that reached its end date on the list; RDAP decides afterwards whether it dropped unsold. Rules: docs/internal/closeouts.md "Closeout expiries". */
+export interface CloseoutExpiriesTable {
+  domain: string;
+  ends_at: Timestamp;
+  ends_on: DateString;
+  first_seen_on: DateString;
+  tag: Generated<'pending' | 'dropped' | 'held' | 'unknown'>;
+  tag_reason: ColumnType<string | null, string | null | undefined, string | null>;
+  caught: ColumnType<boolean | null, boolean | null | undefined, boolean | null>;
+  attempts: Generated<number>;
+  rdap_checked_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  rdap_registrar: ColumnType<string | null, string | null | undefined, string | null>;
+  rdap_statuses: ColumnType<string[] | null, string | null | undefined, string | null>;
+  rdap_created: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  rdap_expires: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  final: Generated<boolean>;
+  fed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  created_at: Generated<Date>;
+}
 export interface LookupUsageTable {
   id: Generated<string>;
   source: 'rdap';
@@ -1849,6 +1872,7 @@ export interface Database {
   rdap_cache: RdapCacheTable;
   lookup_usage: LookupUsageTable;
   disappearances: DisappearancesTable;
+  closeout_expiries: CloseoutExpiriesTable;
   prebid_checks: PrebidChecksTable;
   bid_plans: BidPlansTable;
   bid_plan_events: BidPlanEventsTable;

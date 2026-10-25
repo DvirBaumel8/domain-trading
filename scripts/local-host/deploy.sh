@@ -83,7 +83,7 @@ mv -fh "$CURRENT_LINK.new" "$CURRENT_LINK" 2>/dev/null || mv -fT "$CURRENT_LINK.
 for old in $(ls -1t "$RELEASES" | grep '^v' | tail -n +4); do [ "$RELEASES/$old" = "$rel" ] || rm -rf "${RELEASES:?}/$old"; done
 
 if [ "$FIRST" = 1 ]; then
-  for name in api deploy tunnel tunnel-watch; do
+  for name in api deploy tunnel tunnel-watch datasave; do
     launchctl bootout "gui/$UID_NUM/com.domaintrading.$name" 2>/dev/null || true
     # bootstrap right after bootout can fail with "Input/output error" while launchd is still unloading: retry
     for try in 1 2 3 4 5; do

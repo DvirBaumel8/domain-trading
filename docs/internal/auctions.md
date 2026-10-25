@@ -66,6 +66,7 @@ The daily datasave step `auctionShortlist` (after `engineFeed`) hands Gavriel a 
 
 | ID | What |
 |---|---|
+| AS546-1..4 | auction-v2 (v5.46.0): word quality levels; real phrases above coined strings and the 50 cap; the spread of the sample; `SCORE_FULL_MAX` 85 |
 | AS545-1..4 | score unit tests: the shape cell, other endings (unknown rescaled, never 0), bids and the SEO halving, age unknown, headroom, no valuation input; the maximum-bid rule in whole $5 |
 | AS545-5 | filters: horizon, ended, cap, bids, data date, owned, open plan, SPELL-1, BRAND-1, with counts |
 | AS545-6 | stored fields, rank order, valuation shown not scored, maximum bid in $5 |
@@ -81,6 +82,14 @@ The daily datasave step `auctionShortlist` (after `engineFeed`) hands Gavriel a 
 | AS545-18 | the datasave step wrapper and the shortlist retention |
 | AS545-19..20 | `GET /auctions/shortlist`: scopes, shape, limit, date, validation, empty, ended |
 | AS545-21..22 | `GET /auctions/funnel`: counts, defaults, validation, one query per table |
+
+## Auction score v2 (v5.46.0, first live run problem 2)
+`AUCTION_SCORE_VERSION = 'auction-v2'` (new rows; stored `auction-v1` rows stay readable). On 25 Oct the top 25 all scored 84-94 (every one got the full $160) and coined strings the splitter reads as two words (thrune, foamira, idward, finsplat, dnasays) scored like real phrases. Changes, all in `ops/auctions/shortlist-score.ts` and `ops/auctions/word-quality.ts`:
+1. **Word quality** (0..1 = half the weakest word's level + half the mean). A word's level comes from frozen offline data: curated trade / tech / regime words of the `bt1@v3` split file (class `special`) and SCOWL size 35 lowercase (`commonWord`) = 1; other pieces by their SCOWL level in the split file (the engine's zipf proxy is the same data): level 35 names and abbreviations 0.6, 40 = 0.5, 50 = 0.7, 60 = 0.35 (widget), 70 = 0.2, a place-only piece 0.5, unknown 0.05; a 2-letter piece at most 0.3 (0.75 if on the curated list: ai, hq). **Common = level >= 0.7.** The name part is multiplied by the quality, and **a name with a word that is not common is capped at `50 x (0.5 + 0.5 x quality)`** (never above 50; about 35 for a coined string).
+2. **Graded shape:** the length axis is interpolated between the band anchors (6, 11, 14, 18 letters) instead of steps, so 8, 10 and 12 letters differ.
+3. **`SCORE_FULL_MAX` 70 -> 85:** the maximum bid is full only from 85 (linear below). On the sample below a good real phrase (score 76-84) gets 90-97% of $160, a coined string (35-43) 41-50%.
+4. The words come from the form tokens (`closeoutNameChecker`), not a separate split.
+Sample (price $50 of a $160 maximum, 5 bids, 5 years old, endings unknown): vetday 84.7, gymnest 82.9, finsplat 81.1, cozyfleece 77.5, kingscapes 77.5, makeplastic 75.7, reachhq 72.0, brooklynair 64.2, dnasays 42.5, foamira 40.6, comphost 37.8, gatherms 36.9, idward 36.9, thrune 35.0, laptopi 33.8. **Known limit:** finsplat (fin + splat) is two ordinary dictionary words, so no offline list separates it from a real phrase; the trained engine (later) has to. The score drops by about 10-15 points when the other endings are all free instead of unknown.
 
 ## Follow-ups
 Done in v5.44.0: the after-auction transfer check (rule 15). Plan `kind` vs import `source` is not compared. Open: the live EUIPO call (needs the founder's key), the live check of the URIBL zone (rule 11).

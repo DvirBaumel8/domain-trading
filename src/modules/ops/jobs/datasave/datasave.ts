@@ -28,6 +28,8 @@ import { runDqMarket, runEpisodes } from '../../../market/index.js';
 import { autoSeal, pickproofLabels } from '../../../pickproof/index.js';
 import type { RdapLookupFn } from '../../../../core/rdap.js';
 import { goneByTag, tagDisappearances } from '../../closeouts/disappearances.js';
+import { checkExpiries } from '../../closeouts/expiries.js';
+import { chunks } from '../../../../core/chunks.js';
 import { scorePool, type PoolScorer } from '../../closeouts/score-pool.js';
 import { runAuctionShortlist } from '../../auctions/shortlist.js';
 import type { ScreeningDeps } from '../../../selection/index.js';
@@ -486,13 +488,14 @@ export class DatasaveJob {
     let regime: RegimeTest | undefined;
     try { regime = await loadRegimeTest(db); } catch (e) { this.deps.log?.warn({ err: shortError(e) }, 'datasave: regime test not loaded, tags keep the plain order'); }
     const tags = await tagDisappearances({ db, now: this.deps.now, rdap: this.deps.rdap, sleep: this.deps.sleep, regime });
+    const expiries = await checkExpiries({ db, now: this.deps.now, rdap: this.deps.rdap, sleep: this.deps.sleep, regime, capLeft: Math.max(0, tags.cap - tags.lookups_n) });
     const dynadot = await this.dynadotPanel();
     const latest = (await db.selectFrom('datasave_pool').select((eb) => eb.fn.max('data_date').as('d')).where('source', '=', POOL_SOURCE).executeTakeFirst())?.d;
-    if (!latest) return { status: 'no_pool', data_date: null, previous_date: null, gone_before_end_n: null, reason: 'no parsed closeouts day yet', dynadot, tags };
+    if (!latest) return { status: 'no_pool', data_date: null, previous_date: null, gone_before_end_n: null, reason: 'no parsed closeouts day yet', dynadot, tags, expiries };
     const prev = (await db.selectFrom('datasave_pool').select((eb) => eb.fn.max('data_date').as('d')).where('source', '=', POOL_SOURCE).where('data_date', '<', latest).executeTakeFirst())?.d;
     const count = async (d: string) => Number((await db.selectFrom('datasave_pool').select((eb) => eb.fn.countAll<string>().as('n')).where('source', '=', POOL_SOURCE).where('data_date', '=', d).executeTakeFirstOrThrow()).n);
     const todayN = await count(latest);
-    if (!prev) return { status: 'no_previous_day', data_date: latest, previous_date: null, rows: todayN, gone_before_end_n: null, dynadot, tags };
+    if (!prev) return { status: 'no_previous_day', data_date: latest, previous_date: null, rows: todayN, gone_before_end_n: null, dynadot, tags, expiries };
     const start = new Date(`${latest}T00:00:00Z`);
     const gone = await sql<{ n: string }>`select count(*)::text as n from datasave_pool p
       where p.source = ${POOL_SOURCE} and p.data_date = ${prev} and p.ends_at > ${start}
@@ -502,7 +505,7 @@ export class DatasaveJob {
         and not exists (select 1 from datasave_pool p where p.source = t.source and p.data_date = ${prev} and p.domain = t.domain)`.execute(db);
     return {
       status: 'ok', data_date: latest, previous_date: prev, rows: todayN, previous_rows: await count(prev), gone_before_end_n: Number(gone.rows[0]!.n),
-      ...(await goneByTag(db, 'godaddy_closeouts', latest)), new_n: Number(added.rows[0]!.n), dynadot, tags,
+      ...(await goneByTag(db, 'godaddy_closeouts', latest)), new_n: Number(added.rows[0]!.n), dynadot, tags, expiries,
     };
   }
 
@@ -532,7 +535,7 @@ export class DatasaveJob {
   async engineFeed(): Promise<unknown> {
     const { db } = this.deps;
     const nowMs = this.deps.now();
-    const out = { status: 'ok' as 'ok' | 'db_size_high', unsold_inserted_n: 0, sales_inserted_n: 0, skipped_dup_n: 0, regime_n: 0, unsold_candidates_n: 0, sales_candidates_n: 0, rejected_n: 0, unsold_upload_id: null as number | null, sales_upload_id: null as number | null, auction_min_cents: 0, db_bytes_before: null as number | null };
+    const out = { status: 'ok' as 'ok' | 'db_size_high', unsold_inserted_n: 0, expired_unsold_candidates_n: 0, expired_unsold_inserted_n: 0, sales_inserted_n: 0, skipped_dup_n: 0, regime_n: 0, unsold_candidates_n: 0, sales_candidates_n: 0, rejected_n: 0, unsold_upload_id: null as number | null, sales_upload_id: null as number | null, auction_min_cents: 0, db_bytes_before: null as number | null };
     const minCents = (await this.settings()).auctionMinCents;
     out.auction_min_cents = minCents;
     const regime = await loadRegimeTest(db).catch(() => null);
@@ -558,6 +561,22 @@ export class DatasaveJob {
       const r = await storeUnsold(db, rows, ctx);
       out.unsold_inserted_n = r.accepted_n; out.skipped_dup_n += r.duplicate_n; out.rejected_n += r.rejected_n; out.unsold_upload_id = r.upload_id;
       if (regime) out.regime_n = gone.filter((g) => regime(g.domain)).length;
+    }
+
+    // ---- unsold, second source (v5.46.0): closeout names that stayed to their end date and dropped (closeout_expiries, tag dropped); observation_date = the end day (IDT)
+    if (out.status === 'ok') {
+      const ex = (await sql<{ domain: string; ends_on: string; caught: boolean | null }>`select e.domain, e.ends_on::text as ends_on, e.caught from closeout_expiries e
+        where e.tag = 'dropped' and e.fed_at is null and e.domain like '%.com' order by e.ends_on, e.domain limit 20000`.execute(db)).rows;
+      out.expired_unsold_candidates_n = ex.length;
+      if (ex.length > 0 && await guard(ex.length)) {
+        const r = await storeUnsold(db, ex.map((g) => ({ domain: g.domain, type: 'dropped_after_held', observation_date: g.ends_on, caught_by_catcher: g.caught })), ctx);
+        out.expired_unsold_inserted_n = r.accepted_n; out.skipped_dup_n += r.duplicate_n; out.rejected_n += r.rejected_n;
+        out.unsold_upload_id ??= r.upload_id;
+        if (regime) out.regime_n += ex.filter((g) => regime(g.domain)).length;
+        // fed once stored (a row the engine already had counts as stored: its duplicate rule); a rejected row stays unfed and is offered again
+        if (r.rejected_n === 0) for (const part of chunks(ex, 5_000)) await sql`update closeout_expiries t set fed_at = ${new Date(nowMs)} from unnest(${part.map((x) => x.domain)}::text[], ${part.map((x) => x.ends_on)}::date[]) as u(domain, ends_on)
+          where t.domain = u.domain and t.ends_on = u.ends_on and t.tag = 'dropped' and t.fed_at is null`.execute(db);
+      }
     }
 
     // ---- sales

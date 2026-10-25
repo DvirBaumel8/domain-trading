@@ -5,7 +5,8 @@
 #     deploy.sh builds each release tag in ~/domain-trading-prod-releases/<tag> and switches the symlink ~/domain-trading-prod-current to it;
 #   - an env file at ~/.config/domain-trading/prod.env (chmod 600) with every key and EMPTY values: Dvir pastes the Render values;
 #   - LaunchAgents: com.domaintrading.api (the server, restarted if it exits), com.domaintrading.deploy (every 10 min, deploys a new release tag),
-#     com.domaintrading.tunnel (cloudflared quick tunnel) and com.domaintrading.tunnel-watch (every 60 s, publishes a changed tunnel URL to the api-proxy Worker).
+#     com.domaintrading.tunnel (cloudflared quick tunnel), com.domaintrading.tunnel-watch (every 60 s, publishes a changed tunnel URL to the api-proxy Worker) and
+#     com.domaintrading.datasave (v5.46.0: hourly at :05, starts the daily data save from 15:00 UTC on through datasave-trigger.sh; GitHub's schedule is the backup).
 # Then: fill the env file, run deploy.sh --first (docs/runbook.md, "Local host").
 set -euo pipefail
 
@@ -22,7 +23,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 command -v node >/dev/null || { echo "node is missing (brew install node)"; exit 1; }
 CLOUDFLARED="$(command -v cloudflared)" || { echo "cloudflared is missing (brew install cloudflared)"; exit 1; }  # launchd needs the full path (no PATH lookup)
 mkdir -p "$ENV_DIR" "$LOG_DIR" "$AGENTS" "$HOST_DIR"
-cp "$HERE/start.sh" "$HERE/stop.sh" "$HERE/resume.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HERE/rotate-logs.sh" "$HERE/visits-token.sh" "$HERE/dom-read-token.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
+cp "$HERE/start.sh" "$HERE/stop.sh" "$HERE/resume.sh" "$HERE/deploy.sh" "$HERE/tunnel-watch.sh" "$HERE/backup.sh" "$HERE/datasave-trigger.sh" "$HERE/rotate-logs.sh" "$HERE/visits-token.sh" "$HERE/dom-read-token.sh" "$HOST_DIR/" && chmod +x "$HOST_DIR"/*.sh
 [ -d "$PROD_DIR/.git" ] || git clone --quiet "$REPO_URL" "$PROD_DIR"
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -40,7 +41,7 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "Created $ENV_FILE: fill in the values from Render."
 fi
 
-for name in api deploy tunnel tunnel-watch backup; do
+for name in api deploy tunnel tunnel-watch backup datasave; do
   sed -e "s#__CLOUDFLARED__#$CLOUDFLARED#g" -e "s#__HOST_DIR__#$HOST_DIR#g" -e "s#__PROD_DIR__#$PROD_DIR#g" -e "s#__LOG_DIR__#$LOG_DIR#g" -e "s#__HOME__#$HOME#g" -e "s#__PATH__#$PATH#g" \
     "$HERE/com.domaintrading.$name.plist" > "$AGENTS/com.domaintrading.$name.plist"
 done

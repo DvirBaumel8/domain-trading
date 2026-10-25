@@ -1,4 +1,4 @@
-# Endpoints (contract v5.45.0)
+# Endpoints (contract v5.46.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -777,20 +777,20 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
 { data_date,              // null when no shortlist is stored yet (then generated_at null, total 0, rows [])
   as_of, generated_at,    // ISO with offset (Asia/Jerusalem)
   settings: { shortlist_horizon_hours, shortlist_size, shortlist_endings_n, shortlist_prebid_n,
-              score_version: "auction-v1", s8_max_price_cents, s8_max_price },
+              score_version: "auction-v2", s8_max_price_cents, s8_max_price },
   total,                  // rows returned
   rows: [ { rank, domain, score,            // 0..100
-            score_version, parts,           // parts: {name, headroom, bids, age}, each {points, max, known}; name also {shape, endings_known, endings_registered, endings_value}; bids also {seo_flag}
+            score_version, parts,           // parts: {name, headroom, bids, age}, each {points, max, known}; name also {shape, word_quality, word_levels, all_common, endings_known, endings_registered, endings_value} (5.46.0: the three word fields); bids also {seo_flag}
             end_time, auction_type, price_cents, price, bids,
-            max_bid_suggested_cents, max_bid_suggested,   // the rule: 20% of a realistic net resale (settings.shortlist_expected_resale_cents, default $1,000, less the Afternic commission) scaled by the score (full from `SCORE_FULL_MAX` = 70), never above the S8 cap, rounded down to whole $5
+            max_bid_suggested_cents, max_bid_suggested,   // the rule: 20% of a realistic net resale (settings.shortlist_expected_resale_cents, default $1,000, less the Afternic commission) scaled by the score (full from `SCORE_FULL_MAX` = 85 since 5.46.0, was 70), never above the S8 cap, rounded down to whole $5
             valuation_cents, valuation,     // GoDaddy's own appraisal: shown, NOT scored
             domain_age, pageviews,          // null when the file had none
             prebid: null | { id, verdict: "pass" | "flag", checked_at, valid_until, flags: [ { id, reason } ] },
             reasons: [string] } ] }         // plain-language lines for Dvir
 ```
-**What is in the list.** The in-range auctions (`GET /auctions/live`: `.com`, price up to the S8 cap, at least 1 bid) of the newest data date that end within `settings.shortlist_horizon_hours` (72), minus: names we own, names with an open or won bid plan, the name rules (SPELL-1, BRAND-1, BIGCO-1, TM_KILL), a typo, look-alike or combosquat of a top brand (BRAND-TYPO-2, same rule as the pre-bid) and names whose maximum bid would not be above the current price. The best `settings.shortlist_size` (25) by the **auction score v1** are stored per data date; the route serves them in rank order, **leaving out** auctions that already ended and names whose automatic pre-bid failed (kept in the table with the reason, not served).
+**What is in the list.** The in-range auctions (`GET /auctions/live`: `.com`, price up to the S8 cap, at least 1 bid) of the newest data date that end within `settings.shortlist_horizon_hours` (72), minus: names we own, names with an open or won bid plan, the name rules (SPELL-1, BRAND-1, BIGCO-1, TM_KILL), a typo, look-alike or combosquat of a top brand (BRAND-TYPO-2, same rule as the pre-bid) and names whose maximum bid would not be above the current price. The best `settings.shortlist_size` (25) by the **auction score** are stored per data date; the route serves them in rank order, **leaving out** auctions that already ended and names whose automatic pre-bid failed (kept in the table with the reason, not served).
 **The automatic pre-bid.** For the top `settings.shortlist_prebid_n` (10) names that do not fail, the step runs the same checks as `POST /auctions/prebid` (venue `godaddy`) and stores each answer in `prebid_checks` (token name `datasave`, no audit row), so `prebid.id` is a fresh `prebid_id` valid for plans for 72 hours (`valid_until`). `prebid` is `null` for a name not reached (rank beyond the pre-bid count, the 8-minute step budget, or an error: the step never fails because of one name). A `flag` still needs a human read (`flags`). The manual items (exact-phrase business search, Wayback) stay manual and are part of the plan body as before.
-**Score (0-100, version `auction-v1`).** Name part 60 (word count and length cell; the other four endings registered, asked from the registry for the top names when unknown or older than 30 days; an ending nobody could check stays unknown and its weight leaves the part, it never counts as 0), price headroom 20, bids 10 (log-scaled, halved for an old name with page views), age 10. GoDaddy's valuation is not in the score. Rules: `docs/internal/auctions.md` "Shortlist".
+**Score (0-100, version `auction-v2` since 5.46.0; rows stored by 5.45.0 keep `auction-v1` in `score_version`).** Name part 60 = word quality x (shape and the other endings): each word of the name must be a common word (frozen word lists; a 2-letter fragment or an unknown word counts little) and a name with a word that is not common never scores above 50 (about 35 for a coined string); shape is graded by letter count (word count and length; the other four endings registered, asked from the registry for the top names when unknown or older than 30 days; an ending nobody could check stays unknown and its weight leaves the part, it never counts as 0), price headroom 20, bids 10 (log-scaled, halved for an old name with page views), age 10. GoDaddy's valuation is not in the score. Rules: `docs/internal/auctions.md` "Shortlist".
 
 ### `GET /auctions/funnel`
 **5.45.0 (G-127).** READ or bots (a data token is 403). The auction funnel counted over a range of days: plain counts, no rates. Query (strict, a bad value or `from` after `to` is **400**, the range is at most 366 days): `from?`, `to?` (`YYYY-MM-DD`, IDT days; default the last 7 days ending today).

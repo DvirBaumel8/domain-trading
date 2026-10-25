@@ -1,20 +1,23 @@
-// v5.45.0 (G-127): the auction score v1 and the maximum-bid rule. Pure functions; test ids AS545-1..4 (rules: docs/internal/auctions.md "Shortlist").
+// v5.45.0 (G-127): the auction score and the maximum-bid rule. Pure functions; test ids AS545-1..4, v5.46.0 (auction-v2) AS546-1..4 (rules: docs/internal/auctions.md "Shortlist", "Auction score v2").
 import { describe, expect, it } from 'vitest';
-import { AUCTION_SCORE_VERSION, maxBidRule, scoreAuction, seoFlag, shapeValue, type ScoreInput } from '../../../../src/modules/ops/auctions/shortlist-score.js';
+import { AUCTION_SCORE_VERSION, maxBidRule, SCORE_FULL_MAX, scoreAuction, seoFlag, shapeValue, UNCOMMON_CAP, type ScoreInput } from '../../../../src/modules/ops/auctions/shortlist-score.js';
+import { COMMON_LEVEL, nameQuality, wordLevel } from '../../../../src/modules/ops/auctions/word-quality.js';
 
-const base: ScoreInput = { words: 2, letters: 10, price_cents: 5000, max_bid_cents: 25_000, bids: 5, domain_age: 5, pageviews: null, endings: {} };
+const base: ScoreInput = { words: ['cozy', 'fleece'], letters: 10, price_cents: 5000, max_bid_cents: 25_000, bids: 5, domain_age: 5, pageviews: null, endings: {} };
 const all = (v: boolean | null) => ({ net: v, co: v, org: v, io: v, ai: v });
 
-describe('AS545 auction score v1', () => {
+describe('AS545 auction score (shape, endings, bids, age, maximum bid)', () => {
   it('AS545-1: the shape cell: 1-2 words beat 3 words beat 4+, shorter beats longer, and the score is 0-100 with a stored version', () => {
     expect(shapeValue(2, 8)).toBeGreaterThan(shapeValue(2, 12));
     expect(shapeValue(2, 12)).toBeGreaterThan(shapeValue(2, 14));
     expect(shapeValue(2, 14)).toBeGreaterThan(shapeValue(2, 20));
+    // v2: graded, not stepped: every extra letter inside a band costs a little
+    expect(shapeValue(2, 9)).toBeGreaterThan(shapeValue(2, 10)); expect(shapeValue(2, 10)).toBeGreaterThan(shapeValue(2, 11));
     expect(shapeValue(1, 8)).toBe(shapeValue(2, 8));
     expect(shapeValue(2, 10)).toBeGreaterThan(shapeValue(3, 10));
     expect(shapeValue(3, 10)).toBeGreaterThan(shapeValue(4, 10));
-    const hi = scoreAuction({ ...base, words: 2, letters: 7 });
-    const lo = scoreAuction({ ...base, words: 4, letters: 18 });
+    const hi = scoreAuction({ ...base, words: ['cozy', 'fleece'], letters: 7 });
+    const lo = scoreAuction({ ...base, words: ['cozy', 'fleece', 'soft', 'wool'], letters: 18 });
     expect(hi.score).toBeGreaterThan(lo.score);
     for (const s of [hi, lo, scoreAuction({ ...base, price_cents: 0, bids: 500, domain_age: 40, endings: all(true) })]) { expect(s.score).toBeGreaterThanOrEqual(0); expect(s.score).toBeLessThanOrEqual(100); expect(s.version).toBe(AUCTION_SCORE_VERSION); }
   });
@@ -23,7 +26,7 @@ describe('AS545 auction score v1', () => {
     const unknown = scoreAuction({ ...base, endings: {} });
     expect(unknown.parts.name).toMatchObject({ endings_known: 0, endings_value: null, known: true });
     // the name part with no endings data is the shape alone, scaled to the full 60 points
-    expect(unknown.parts.name.points).toBeCloseTo(60 * shapeValue(2, 10), 1);
+    expect(unknown.parts.name.points).toBeCloseTo(60 * shapeValue(2, 10), 1); // both words common: word quality 1
     const none = scoreAuction({ ...base, endings: all(false) });
     const one = scoreAuction({ ...base, endings: { ...all(false), net: true } });
     const two = scoreAuction({ ...base, endings: { ...all(false), net: true, org: true } });
@@ -65,12 +68,69 @@ describe('AS545 auction score v1', () => {
 
   it('AS545-4: the maximum bid = min(S8 cap, 20% of the S8 ladder BIN less the commission), rounded down to $5, in integer cents', () => {
     expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2 })).toBe(16_000); // 20% of $800 = $160 (base, no score)
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 70 })).toBe(16_000); // full at 70
+    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 85 })).toBe(16_000); // full at 85 (was 70 in v1)
     expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 95 })).toBe(16_000); // never above the base
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 35 })).toBe(8_000); // half the score, half the maximum
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 10 })).toBe(2_000); // $22.85 -> $20
+    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 70 })).toBe(13_000); // $131.76 -> $130
+    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 42.5 })).toBe(8_000); // half the score, half the maximum
+    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 10 })).toBe(1_500); // $18.8 -> $15
     expect(maxBidRule({ capCents: 25_000, resaleCents: 488_800, commission: 0.2 })).toBe(25_000); // a high resale stops at the cap
     expect(maxBidRule({ capCents: 6_000, resaleCents: 100_000, commission: 0.2 })).toBe(6_000);
     expect(Number.isInteger(maxBidRule({ capCents: 25_000, resaleCents: 99_999, commission: 0.175, score: 41.3 }))).toBe(true);
+  });
+});
+
+// ---- v5.46.0: auction-v2 ----
+const SAMPLE: Array<[string, string[]]> = [
+  ['comphost', ['comp', 'host']], ['gymnest', ['gym', 'nest']], ['laptopi', ['laptop', 'pi']], ['vetday', ['vet', 'day']], ['gatherms', ['gather', 'ms']], ['thrune', ['thru', 'ne']],
+  ['reachhq', ['reach', 'hq']], ['foamira', ['foam', 'ira']], ['cozyfleece', ['cozy', 'fleece']], ['brooklynair', ['brooklyn', 'air']], ['makeplastic', ['make', 'plastic']],
+  ['kingscapes', ['kings', 'capes']], ['idward', ['id', 'ward']], ['finsplat', ['fin', 'splat']], ['dnasays', ['dna', 'says']],
+];
+const typical = (name: string, words: string[]) => scoreAuction({ words, letters: name.length, price_cents: 5000, max_bid_cents: 16_000, bids: 5, domain_age: 5, pageviews: null, endings: all(null) });
+
+describe('AS546 auction score v2', () => {
+  it('AS546-1: word quality: a common word is 1, a 2-letter fragment at most 0.3 (0.75 on the curated list), a rare or unknown word low; the version is auction-v2', () => {
+    expect(AUCTION_SCORE_VERSION).toBe('auction-v2');
+    for (const w of ['cozy', 'fleece', 'kings', 'make', 'plastic', 'vet', 'day', 'reach']) expect(wordLevel(w)).toBe(1);
+    expect(wordLevel('hq')).toBe(0.75);
+    for (const w of ['ms', 'ne', 'id', 'pi']) expect(wordLevel(w)).toBeLessThanOrEqual(0.3);
+    expect(wordLevel('qzxv')).toBeLessThan(0.1);
+    expect(wordLevel('comp')).toBeLessThan(COMMON_LEVEL);
+    expect(nameQuality(['cozy', 'fleece'])).toMatchObject({ quality: 1, allCommon: true });
+    expect(nameQuality(['thru', 'ne']).allCommon).toBe(false);
+    expect(nameQuality(['thru', 'ne']).quality).toBeLessThan(0.5);
+  });
+
+  it('AS546-2: real phrases rank above coined strings (cozyfleece, makeplastic, kingscapes, brooklynair, gymnest, vetday above thrune, foamira, idward, comphost, gatherms, laptopi, dnasays); a name with a word that is not common never scores above 50', () => {
+    const s = Object.fromEntries(SAMPLE.map(([n, w]) => [n, typical(n, w)]));
+    const real = ['cozyfleece', 'makeplastic', 'kingscapes', 'brooklynair', 'gymnest', 'vetday'];
+    const coined = ['thrune', 'foamira', 'idward', 'comphost', 'gatherms', 'laptopi', 'dnasays'];
+    expect(Math.min(...real.map((n) => s[n]!.score))).toBeGreaterThan(Math.max(...coined.map((n) => s[n]!.score)) + 15);
+    for (const n of coined) { expect(s[n]!.score).toBeLessThanOrEqual(UNCOMMON_CAP); expect(s[n]!.parts.name.all_common).toBe(false); expect(s[n]!.reasons.join(' ')).toContain('capped'); }
+    for (const n of real) expect(s[n]!.parts.name.all_common).toBe(true);
+    // the cap grades too: the more coined the string, the lower
+    expect(s.thrune!.score).toBeLessThan(s.comphost!.score);
+    // a perfect name with a coined word is still held down even with every other part full
+    expect(scoreAuction({ ...base, words: ['thru', 'ne'], letters: 6, price_cents: 100, bids: 50, domain_age: 20, endings: all(true) }).score).toBeLessThanOrEqual(UNCOMMON_CAP);
+  });
+
+  it('AS546-3: the scores spread: the sample runs from about 30 to 85 and real phrases are not all equal; a strong name (short, common words, bids, age, other endings registered) reaches the top of the scale', () => {
+    const scores = SAMPLE.map(([n, w]) => typical(n, w).score);
+    expect(Math.min(...scores)).toBeLessThan(40);
+    expect(Math.max(...scores)).toBeGreaterThan(80);
+    const real = ['cozyfleece', 'makeplastic', 'kingscapes', 'brooklynair', 'gymnest', 'vetday'].map((n) => typical(n, SAMPLE.find((x) => x[0] === n)![1]).score);
+    expect(new Set(real).size).toBeGreaterThanOrEqual(5);
+    expect(Math.max(...real) - Math.min(...real)).toBeGreaterThan(8);
+    const strong = scoreAuction({ words: ['gym', 'nest'], letters: 7, price_cents: 1000, max_bid_cents: 16_000, bids: 20, domain_age: 12, pageviews: null, endings: { net: true, org: true, co: false, io: false, ai: false } });
+    expect(strong.score).toBeGreaterThan(90);
+  });
+
+  it('AS546-4: SCORE_FULL_MAX is 85: only a strong name gets the full maximum bid; a typical real phrase gets 90-95% of it, an uncommon-word name at most 59%', () => {
+    expect(SCORE_FULL_MAX).toBe(85);
+    const full = maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2 });
+    const bid = (n: string) => maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: typical(n, SAMPLE.find((x) => x[0] === n)![1]).score });
+    expect(bid('cozyfleece')).toBeLessThan(full);
+    expect(bid('cozyfleece')).toBeGreaterThanOrEqual(full * 0.85);
+    expect(bid('thrune')).toBeLessThanOrEqual(full * 0.59);
+    expect(bid('thrune')).toBeLessThan(bid('makeplastic'));
   });
 });
