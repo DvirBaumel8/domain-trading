@@ -51,6 +51,12 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
   2. The three Sedo listings from 14 Oct (CR-040) were never recorded as venues on the server (`/portfolio` shows Afternic only). Check them, then record them.
 - Gavriel: if your side has more to the Tier A rule than the 15 Oct definition, write it here before DOM's change ships.
 
+### 25 Oct 2026: the main buying line is now a written rule
+- Dvir asked: "our main line should be domains for sale where we can bid, correct? Can we make it a rule?"
+- DOM's correction: not only auctions with bidding. The main line is S8, expired names a registrar already sells (closeouts at a fixed price, fixed-price listings and public auctions) at $50 or less. In practice it's mostly closeouts, since a contested auction passes $50 fast.
+- Recorded in `CLAUDE.md` (Decisions after handover, "Main buying line"): S8 is the main line, Line 1 only with Tier A, backorder/catch services still banned, $50 cap reviewed after pick-proof.
+- Gavriel: please mirror this in your own buying notes. If a buy plan you hold ranks Line 1 above S8, change it.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
