@@ -1,13 +1,16 @@
 // v5.46.0: the unsold feed for GoDaddy closeout names that stayed on the list to their end date (nobody bought them, even at the lowest price). Called by the datasave step
 // `buildPanel` after `tagDisappearances`; `engineFeed` turns the `dropped` rows into engine_unsold. Rules: docs/internal/closeouts.md "Closeout expiries".
-//   1. collect: names of the stored pool days (datasave_pool, GoDaddy closeouts, .com, in the engine's regime when a regime test is given) whose end time is inside the next
+//   1. collect: names of the stored pool days (datasave_pool, GoDaddy closeouts, .com, IN THE ENGINE'S REGIME ONLY) whose end time is inside the next
 //      `datasave_pool_keep_days` days, or already past, get one row per (name, end time) while the pool still holds them (the pool keeps only a few days). `on conflict do nothing`.
+//      v5.47.0 (F19): without a regime test nothing is collected (the 25 Oct first run stored 151,563 names, 21 MB); never-checked rows of names outside the regime are deleted.
 //   2. check: Verisign .com RDAP, first `closeout_expiry_wait_days` after the end day (IDT), then every `closeout_expiry_recheck_days` until the name is decided or
 //      `closeout_expiry_max_days` have passed. At most the lookups the disappearance tags left of the shared per-run cap (`capLeft`), in-regime names first, never-checked first.
 //      Names that left the list before their end (a `disappearances` row) are not here: they have their own tag.
 //   3. `expiryTagOf` is the rule. dropped (final) = 404, a redemption / pending-delete status, or a registration created after the end time (a catcher got it).
 //      held (final) = still registered and the expiry date moved more than 90 days past the end time (bought and renewed). Otherwise pending; unknown at the max day.
 //   4. prune rows older than settings.disappearance_keep_days after the end day.
+//   5. v5.47.0 (F19): delete decided rows `closeout_expiry_keep_days` (7) after they were fed (dropped) or decided (held, unknown). A fed row is needed no more, and the pool
+//      no longer holds the name by then (the keep is at least the pool keep + 1 day), so it is not collected again.
 import { sql, type Kysely } from 'kysely';
 import { addDays, idtDay } from '../../../core/dates.js';
 import { dropStatusOf, RDAP_COM_BASE, rdapLookup as realRdap, type RdapLookup, type RdapLookupFn } from '../../../core/rdap.js';
@@ -42,20 +45,35 @@ export interface ExpirySummary {
   status: 'ok' | 'stopped' | 'nothing_due';
   collected_n: number; due_n: number; regime_due_n: number; lookups_n: number; cache_hits_n: number; cap_left: number; stopped_reason: string | null;
   dropped_n: number; held_n: number; pending_n: number; unknown_n: number; caught_n: number; open_n: number; pruned_n: number;
+  /** v5.47.0 */
+  regime_loaded: boolean; out_of_regime_deleted_n: number; decided_deleted_n: number;
 }
 
 /** Step 1. Bulk: one select of the candidate rows, one multi-row insert per 5,000. */
 async function collect(db: Kysely<Database>, nowMs: number, keepDays: number, regime?: (d: string) => boolean): Promise<number> {
+  if (!regime) return 0; // v5.47.0: never collect without the regime test
   const horizon = new Date(nowMs + keepDays * DAY);
   const rows = (await sql<{ domain: string; ends_at: Date }>`select distinct on (domain, ends_at) domain, ends_at from datasave_pool
     where source = ${POOL_SOURCE} and domain like '%.com' and ends_at <= ${horizon}`.execute(db)).rows;
-  const keep = regime ? rows.filter((r) => regime(r.domain)) : rows;
+  const keep = rows.filter((r) => regime(r.domain));
   const today = idtDay(nowMs);
   let n = 0;
   for (const part of chunks(keep, 5_000)) {
     const res = await sql`insert into closeout_expiries (domain, ends_at, ends_on, first_seen_on)
       select u.domain, u.ends_at, (u.ends_at at time zone 'Asia/Jerusalem')::date, ${today}::date
       from unnest(${part.map((x) => x.domain)}::text[], ${part.map((x) => x.ends_at)}::timestamptz[]) as u(domain, ends_at) on conflict do nothing`.execute(db);
+    n += Number(res.numAffectedRows ?? 0);
+  }
+  return n;
+}
+
+/** F19: rows that were never asked and are not in the engine's regime are junk (collected before v5.47.0); one select, one delete per 5,000. */
+async function deleteOutOfRegime(db: Kysely<Database>, regime: (d: string) => boolean): Promise<number> {
+  const open = (await sql<{ domain: string }>`select distinct domain from closeout_expiries where attempts = 0 and not final`.execute(db)).rows;
+  const junk = open.filter((r) => !regime(r.domain)).map((r) => r.domain);
+  let n = 0;
+  for (const part of chunks(junk, 5_000)) {
+    const res = await sql`delete from closeout_expiries where attempts = 0 and not final and domain = any(${part}::text[])`.execute(db);
     n += Number(res.numAffectedRows ?? 0);
   }
   return n;
@@ -68,11 +86,12 @@ export async function checkExpiries(deps: ExpiryDeps): Promise<ExpirySummary> {
   const nowMs = deps.now();
   const now = new Date(nowMs);
   const today = idtDay(nowMs);
-  const st = await db.selectFrom('settings').select(['closeout_expiry_wait_days', 'closeout_expiry_recheck_days', 'closeout_expiry_max_days', 'datasave_pool_keep_days', 'disappearance_keep_days']).executeTakeFirstOrThrow();
+  const st = await db.selectFrom('settings').select(['closeout_expiry_wait_days', 'closeout_expiry_recheck_days', 'closeout_expiry_max_days', 'datasave_pool_keep_days', 'disappearance_keep_days', 'closeout_expiry_keep_days']).executeTakeFirstOrThrow();
   const out: ExpirySummary = {
     status: 'nothing_due', collected_n: 0, due_n: 0, regime_due_n: 0, lookups_n: 0, cache_hits_n: 0, cap_left: Math.max(0, deps.capLeft), stopped_reason: null,
-    dropped_n: 0, held_n: 0, pending_n: 0, unknown_n: 0, caught_n: 0, open_n: 0, pruned_n: 0,
+    dropped_n: 0, held_n: 0, pending_n: 0, unknown_n: 0, caught_n: 0, open_n: 0, pruned_n: 0, regime_loaded: deps.regime !== undefined, out_of_regime_deleted_n: 0, decided_deleted_n: 0,
   };
+  if (deps.regime) out.out_of_regime_deleted_n = await deleteOutOfRegime(db, deps.regime);
   out.collected_n = await collect(db, nowMs, st.datasave_pool_keep_days, deps.regime);
 
   // due: open, the wait is over, and not checked within the recheck interval (IDT days); names that left the list early have their own tag
@@ -159,5 +178,11 @@ export async function checkExpiries(deps: ExpiryDeps): Promise<ExpirySummary> {
   out.open_n = Number((await sql<{ n: string }>`select count(*)::text as n from closeout_expiries where not final`.execute(db)).rows[0]!.n);
   const del = await sql`delete from closeout_expiries where ends_on < ${addDays(today, -st.disappearance_keep_days)}::date`.execute(db);
   out.pruned_n = Number(del.numAffectedRows ?? 0);
+  // F19: decided rows go after the short keep. The keep is never shorter than the pool keep + 1 day, so a fed name is not collected again from the pool.
+  const keepDecided = Math.max(st.closeout_expiry_keep_days, st.datasave_pool_keep_days + 1);
+  const cut = new Date(nowMs - keepDecided * DAY);
+  const gone = await sql`delete from closeout_expiries where final and (
+      (tag = 'dropped' and fed_at is not null and fed_at < ${cut}) or (tag in ('held', 'unknown') and coalesce(rdap_checked_at, created_at) < ${cut}))`.execute(db);
+  out.decided_deleted_n = Number(gone.numAffectedRows ?? 0);
   return out;
 }

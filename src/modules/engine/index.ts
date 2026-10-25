@@ -7,3 +7,5 @@ export { type DbSizeGuard, guardDbSize } from './holdout.js';
 export { storeSales, storeUnsold, type UploadResult } from './uploads.js';
 export { loadRegimeTest, type RegimeTest } from './regime.js';
 export { bulkLoad, centsOf, dateOf, domainOf, ENGINE_MAX_REJECTS, ENGINE_MAX_ROWS, isObj, rawDomain, registerBulkRoute, textOf, type Parsed, type Reject } from './bulk.js';
+export { LiftTrainJob, liftInputFor, liftTable, loadLiftModel, loadLiftSeed, seedCrossValidatedAuc, trainLift, type LiftModel } from './lift-train.js';
+export { LIFT_VERSION, scoreLift, type LiftInput, type LiftScore } from './lift.js';

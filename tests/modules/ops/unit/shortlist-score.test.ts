@@ -134,3 +134,26 @@ describe('AS546 auction score v2', () => {
     expect(bid('thrune')).toBeLessThan(bid('makeplastic'));
   });
 });
+
+// ---- v5.47.0: auction-v3 ----
+describe('LF547 auction-v3 (lift name part, bids worth 5)', () => {
+  const lift = { sum: 1, score: 73.1, parts: [{ pattern: 'length' as const, bin: '8-9', lift: 1 }] };
+  it('LF547-17: a lift score switches the version to auction-v3 and replaces the shape + endings part; word quality stays the gate', () => {
+    const v2 = scoreAuction(base);
+    const v3 = scoreAuction({ ...base, lift });
+    expect(v2.version).toBe('auction-v2');
+    expect(v3.version).toBe('auction-v3');
+    expect(v3.parts.name.lift).toMatchObject({ sum: 1, score: 73.1 });
+    expect(v3.parts.name.points).toBeCloseTo(60 * 1 * 0.731, 1); // both words common: quality 1
+    const rare = scoreAuction({ ...base, words: ['cozy', 'zxqvk'], lift });
+    expect(rare.parts.name.points).toBeLessThan(v3.parts.name.points);
+    expect(rare.score).toBeLessThanOrEqual(UNCOMMON_CAP);
+  });
+  it('LF547-18 (F8): the bids part is worth 5 points in v3 and still 10 in v2; the suggested-maximum rule is unchanged', () => {
+    expect(scoreAuction({ ...base, bids: 20 }).parts.bids.max).toBe(10);
+    const v3 = scoreAuction({ ...base, bids: 20, lift });
+    expect(v3.parts.bids).toMatchObject({ max: 5, points: 5 });
+    expect(scoreAuction({ ...base, bids: 5, lift }).parts.bids.points).toBeCloseTo(5 * Math.log(6) / Math.log(21), 1);
+    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2 })).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2 }));
+  });
+});

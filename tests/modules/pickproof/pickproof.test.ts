@@ -546,3 +546,65 @@ describe('PP535 pick-proof: the datasave step seals days no bot sealed', () => {
     expect(await db.selectFrom('pickproof_days').select('day').executeTakeFirst()).toBeUndefined();
   });
 });
+
+describe('ST547 pick-proof storage (v5.47.0, F18)', () => {
+  const poolRow = (day: string, domain: string) => ({ day, domain, source: 'godaddy' as const, price_cents: 900, passes_k1: false, is_two_word: false });
+  const poolOf = async (day: string) => (await db.selectFrom('pickproof_pool').select('domain').where('day', '=', day).orderBy('domain').execute()).map((r) => r.domain);
+
+  it('ST547-1 a sealed day older than the keep days keeps only the pool rows of arm names; the pool hash, the arms and the labels stay', async () => {
+    await fixtureDay(L, { A: ['alpha.com', 'beta.com'], B1: ['beta.com', 'gamma.com'] });
+    await db.insertInto('pickproof_pool').values(['alpha.com', 'beta.com', 'gamma.com', 'junk1.com', 'junk2.com', 'junk3.com'].map((d) => poolRow(L, d))).execute();
+    const before = await db.selectFrom('pickproof_days').select(['pool_sha256', 'arms']).where('day', '=', L).executeTakeFirstOrThrow();
+    rdap({ 'alpha.com': { registered: '2026-11-05T00:00:00Z' }, 'beta.com': 'free', 'gamma.com': 'free' });
+    // the day after L: L is still inside the keep window (today and yesterday), nothing is removed
+    const early = await pickproofLabels({ db, now: () => at('2026-11-02T15:00:00Z'), sleep: noSleep });
+    expect(early.pool_rows_deleted_n).toBe(0);
+    expect(await poolOf(L)).toHaveLength(6);
+    // the labels run on day 40: the arm names are labelled, the junk rows go
+    const run = await pickproofLabels({ db, now: () => at('2026-12-10T15:00:00Z'), sleep: noSleep });
+    expect(run).toMatchObject({ status: 'ok', pool_rows_deleted_n: 3 });
+    expect(await poolOf(L)).toEqual(['alpha.com', 'beta.com', 'gamma.com']);
+    expect(await labelRow('alpha.com', L)).toMatchObject({ label: 'taken' });
+    expect(await labelRow('beta.com', L)).toMatchObject({ label: 'not_taken' });
+    const after = await db.selectFrom('pickproof_days').select(['pool_sha256', 'arms']).where('day', '=', L).executeTakeFirstOrThrow();
+    expect(after).toEqual(before);
+    // a second run has nothing more to delete
+    expect((await pickproofLabels({ db, now: () => at('2026-12-10T16:00:00Z'), sleep: noSleep })).pool_rows_deleted_n).toBe(0);
+  });
+
+  it('ST547-2 an unsealed day and a day inside the keep window are never shrunk; the keep days are a setting', async () => {
+    await fixtureDay('2026-11-10', { A: ['keepme.com'] });
+    await db.insertInto('pickproof_pool').values(['keepme.com', 'other.com'].map((d) => poolRow('2026-11-10', d))).execute();
+    await db.insertInto('pickproof_days').values({ day: '2026-11-11', data_date: '2026-11-10', pool_sha256: 'a'.repeat(64), seed: 1, k: 100, pool_n: 2, sources: '{}', deadline: new Date(at('2026-11-11T16:00:00Z')) }).execute();
+    await db.insertInto('pickproof_pool').values(['x.com', 'y.com'].map((d) => poolRow('2026-11-11', d))).execute();
+    const s = await db.selectFrom('settings').select('pickproof_pool_keep_days').executeTakeFirstOrThrow();
+    expect(s.pickproof_pool_keep_days).toBe(1); // migration 5.47.0: 1 = today and yesterday (was 45)
+    const r = await pickproofLabels({ db, now: () => at('2026-11-11T20:00:00Z'), sleep: noSleep });
+    expect(r.pool_rows_deleted_n).toBe(0); // 2026-11-10 is yesterday: inside the window
+    const r2 = await pickproofLabels({ db, now: () => at('2026-11-20T20:00:00Z'), sleep: noSleep });
+    expect(r2.pool_rows_deleted_n).toBe(1); // the sealed 11-10 shrinks; the unsealed 11-11 keeps both rows
+    expect(await poolOf('2026-11-10')).toEqual(['keepme.com']);
+    expect(await poolOf('2026-11-11')).toEqual(['x.com', 'y.com']);
+  });
+
+  it('ST547-3 the pool call of a shrunk day answers 410 PICKPROOF_POOL_PRUNED with the stored hash; the manifest and the arms still answer', async () => {
+    const { get, picks } = await boot();
+    await standardPool();
+    expect((await picks(twoWord.slice(0, 5))).statusCode).toBe(200);
+    afterDeadline();
+    const m = (await get(`/pickproof/${D}/manifest`)).json();
+    expect(m.sealed).toBe(true);
+    const run = await pickproofLabels({ db, now: () => at(`${D}T16:30:00Z`) + 5 * 86_400_000, sleep: noSleep });
+    const armNames = new Set((await db.selectFrom('pickproof_arms').select('domain').where('day', '=', D).execute()).map((r) => r.domain));
+    expect(run.pool_rows_deleted_n).toBe(m.pool_n - armNames.size);
+    expect(run.pool_rows_deleted_n).toBeGreaterThan(50);
+    expect(await poolOf(D)).toEqual([...armNames].sort());
+    const gone = await get(`/pickproof/${D}/pool`);
+    expect(gone.statusCode).toBe(410);
+    expect(gone.json().error).toMatchObject({ code: 'PICKPROOF_POOL_PRUNED', details: { pool_sha256: m.pool_sha256, pool_n: m.pool_n } });
+    expect((await get(`/pickproof/${D}/manifest`)).json()).toMatchObject({ pool_sha256: m.pool_sha256, arms: { A: { n: 5 }, B1: { n: 100 } } });
+    const arms = await get(`/pickproof/${D}/arms`);
+    expect(arms.statusCode).toBe(200);
+    expect(names(arms, 'B1')).toHaveLength(100);
+  });
+});

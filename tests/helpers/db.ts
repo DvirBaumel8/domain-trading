@@ -6,6 +6,7 @@ import { TEST_DATABASE_URL } from './env.js';
 export const testDb: Kysely<Database> = createDb(TEST_DATABASE_URL);
 
 const TABLES = [
+  'lift_models',
   'kb_loads', 'kb_verdicts', 'kb_evidence', 'kb_source_links', 'kb_claims', 'kb_questions', 'kb_sources', 'kb_authors',
   'bid_plan_events', 'bid_plans', 'prebid_checks', 'disappearances', 'closeout_expiries', 'lookup_usage', 'rdap_cache', 'pickproof_labels', 'pickproof_picks_history', 'pickproof_arms', 'pickproof_pool', 'pickproof_days', 'forward_cost_lines', 'forward_cost_plans', 'market_matched_sets', 'market_dq_runs', 'market_names', 'market_sales', 'snapshot_manifests', 'datasave_pool', 'dynadot_rows', 'godaddy_auctions', 'godaddy_auctions_live', 'auction_shortlist', 'daily_candidate_lists', 'candidate_screenings', 'candidate_intake',
   'review_retries', 'review_settings_changes', 'review_item_statuses', 'review_items', 'review_feedback', 'review_packets', 'forbidden_term_retirements', 'forbidden_terms', 'company_documents',

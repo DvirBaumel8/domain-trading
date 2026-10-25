@@ -122,7 +122,21 @@ describe('visits: hit', () => {
     expect((await hit(v)).json()).toEqual({ counted: true, capped: false }); // the 1,000th
     for (let i = 0; i < 2; i++) expect((await hit(v, { ua_class: i ? 'bot' : 'human', referrer_host: 'late.example' })).json()).toEqual({ counted: false, capped: true });
     const row = await db.selectFrom('visit_daily').selectAll().where('domain', '=', LISTED).executeTakeFirstOrThrow();
-    expect([row.human_hits, row.bot_hits, row.capped, row.referrer_hosts]).toEqual([991, 9, 2, {}]);
+    // v5.47.0: a name past 10 human hits a day counts further human-class hits as suspect (the 1,000th hit here), still inside the 1,000 cap
+    expect([row.human_hits, row.bot_hits, row.suspect_hits, row.capped, row.referrer_hosts]).toEqual([990, 9, 1, 2, {}]);
+  });
+
+  it('ST547-6: ua_class suspect is counted apart (suspect_hits); a name past 10 human hits a day counts further human-class hits as suspect; suspect hits count toward the 1,000 cap', async () => {
+    const { v, r } = await setup();
+    await seed();
+    await forwarded(LISTED);
+    for (let i = 0; i < 3; i++) expect((await hit(v, { ua_class: 'suspect' })).json()).toEqual({ counted: true, capped: false });
+    for (let i = 0; i < 12; i++) await hit(v);
+    await hit(v, { ua_class: 'bot' });
+    const res = await get('/visits?from=2026-10-20&to=2026-10-20', r);
+    expect(res.json().rows).toEqual([expect.objectContaining({ domain: LISTED, human_hits: 10, suspect_hits: 5, bot_hits: 1, capped: 0 })]);
+    await db.updateTable('visit_daily').set({ suspect_hits: 990 }).where('domain', '=', LISTED).execute();
+    expect((await hit(v, { ua_class: 'suspect' })).json()).toEqual({ counted: false, capped: true });
   });
 
   it('V518-6: concurrent hits lose no count; the first ten referrer hosts of a day keep their own key, the rest go to "other"', async () => {
@@ -132,7 +146,8 @@ describe('visits: hit', () => {
     const res = await Promise.all(Array.from({ length: 12 }, (_, i) => hit(v, { referrer_host: `site${i}.example` })));
     expect(res.every((x) => x.statusCode === 202)).toBe(true);
     const row = await db.selectFrom('visit_daily').selectAll().where('domain', '=', LISTED).executeTakeFirstOrThrow();
-    expect(row.human_hits).toBe(12);
+    expect(row.human_hits + row.suspect_hits).toBe(12); // v5.47.0: 10 human at most a day, the rest suspect
+    expect(row.human_hits).toBe(10);
     const keys = Object.keys(row.referrer_hosts);
     expect(keys.filter((k) => k !== 'other')).toHaveLength(10);
     expect(Object.values(row.referrer_hosts).reduce((a, b) => a + b, 0)).toBe(12);
@@ -207,7 +222,7 @@ describe('visits: import, read, weekly, retention', () => {
     expect(res.statusCode, res.body).toBe(200);
     const body = res.json();
     expect(body).toMatchObject({ week_ending: '2026-10-17', week_start: '2026-10-11' });
-    expect(body.rows).toEqual([{ domain: LISTED, source: 'dom_redirect', human_hits: 5, bot_hits: 1, capped: 0, top_referrers: [{ host: 'x.com', n: 3 }, { host: 'y.com', n: 1 }] }]);
+    expect(body.rows).toEqual([{ domain: LISTED, source: 'dom_redirect', human_hits: 5, bot_hits: 1, suspect_hits: 0, capped: 0, top_referrers: [{ host: 'x.com', n: 3 }, { host: 'y.com', n: 1 }] }]);
     expect(body.not_countable).toEqual([
       { domain: 'mineunited.com', reason: 'afternic_ns', afternic_views_30d: null, afternic_leads_30d: null, afternic_read_date: null },
       { domain: 'promptinjectionaudit.com', reason: 'afternic_ns', afternic_views_30d: 8, afternic_leads_30d: 1, afternic_read_date: '2026-10-19' },

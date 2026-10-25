@@ -2,6 +2,16 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.47.0 (2026-10-25): Storage cut (pick-proof pool, closeout expiries), adult filter, lift scoring in the shortlist (auction-v3), bot-aware visit counter
+Release note: `docs/releases/v5.47.0.md`.
+MINOR (migration `1767200000000_v5-47-0.sql`: table `lift_models`, `visit_daily.suspect_hits`, `settings.closeout_expiry_keep_days`, `pickproof_pool_keep_days` 45 -> 1).
+- New `GET /engine/lift` (READ or bots): the lift table (patterns, bins, lifts, counts, holdout AUC).
+- New daily step `liftTrain` (after `engineTrain`): trains the lift table from the CR-002 seed and our own sales / unsold rows when they grew.
+- `GET /auctions/shortlist`: `score_version` `auction-v3` when a lift table exists (name part from the lift, `parts.name.lift`, bids worth 5 points instead of 10); adult words and the company's forbidden terms are refused (`dropped.name_rules` `ADULT_TERM`, `FORBIDDEN_TERM`). The suggested-maximum rule is unchanged.
+- `GET /pickproof/{date}/pool`: 410 `PICKPROOF_POOL_PRUNED` from the second day (was 45 days); the step `pickproofLabels` keeps only the arm names of older sealed days (`pool_rows_deleted_n`). Manifest, arms, hashes and labels unchanged.
+- `buildPanel` `expiries` adds `regime_loaded`, `out_of_regime_deleted_n`, `decided_deleted_n`.
+- `POST /visits/hit` accepts `ua_class: "suspect"`; `GET /visits` and `/visits/weekly` rows add `suspect_hits`; a name's human hits count at most 10 a UTC day, the rest are suspect.
+
 ## 5.46.0 (2026-10-25): First-run fixes: unsold feed for closeouts that run to their end, auction score v2 (common words, spread), the Mac starts the data save, engine age leak fix
 Release note: `docs/releases/v5.46.0.md`.
 MINOR (migration `1767100000000_v5-46-0.sql`).

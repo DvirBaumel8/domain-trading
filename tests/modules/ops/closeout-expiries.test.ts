@@ -28,9 +28,9 @@ const mk = (answers: Record<string, RdapLookup>, now = NOW) => {
   const rdap: RdapLookupFn = async (d) => { calls.push(d); return answers[d] ?? err; };
   return { calls, rdap, now: () => now };
 };
-const run = async (answers: Record<string, RdapLookup>, o: { now?: number; capLeft?: number; all?: boolean } = {}) => {
+const run = async (answers: Record<string, RdapLookup>, o: { now?: number; capLeft?: number; all?: boolean; none?: boolean } = {}) => {
   const m = mk(answers, o.now ?? NOW);
-  const regime = o.all ? undefined : await loadRegimeTest(db);
+  const regime = o.none ? undefined : o.all ? () => true : await loadRegimeTest(db);
   const s = await checkExpiries({ db, now: m.now, rdap: m.rdap, sleep: async () => {}, regime, capLeft: o.capLeft ?? 1500 });
   return { s, calls: m.calls };
 };
@@ -131,5 +131,57 @@ describe('FX546 closeout expiries', () => {
     expect((await rows()).filter((x) => x.fed_at !== null).map((x) => x.domain)).toEqual(['roofclean.com', 'septicdrone.com']);
     expect(await job.engineFeed()).toMatchObject({ expired_unsold_candidates_n: 0, expired_unsold_inserted_n: 0, unsold_upload_id: null });
     expect(await db.selectFrom('engine_unsold').select('domain').execute()).toHaveLength(2);
+  });
+});
+
+describe('ST547 closeout expiries storage (v5.47.0, F19)', () => {
+  const put = (domain: string, o: Partial<{ tag: 'pending' | 'dropped' | 'held' | 'unknown'; final: boolean; attempts: number; fed_at: Date | null; rdap_checked_at: Date | null; ends_at: string }> = {}) => {
+    const ends = o.ends_at ?? '2026-10-01T10:00:00Z';
+    return db.insertInto('closeout_expiries').values({ domain, ends_at: new Date(ends), ends_on: ends.slice(0, 10), first_seen_on: '2026-10-02', tag: o.tag ?? 'pending', final: o.final ?? false, attempts: o.attempts ?? 0, fed_at: o.fed_at ?? null, rdap_checked_at: o.rdap_checked_at ?? null }).execute();
+  };
+
+  it('ST547-1 without a regime test nothing is collected (the 25 Oct first run stored every pool name)', async () => {
+    await pool('septicdrone.com');
+    await pool('zzqqxx.com');
+    const a = await run({}, { none: true });
+    expect(a.s).toMatchObject({ collected_n: 0, regime_loaded: false });
+    expect(await rows()).toHaveLength(0);
+    expect((await run({})).s).toMatchObject({ collected_n: 1, regime_loaded: true });
+  });
+
+  it('ST547-2 never-asked rows of names outside the regime are deleted by the next run; a row that was asked, or is in the regime, stays', async () => {
+    await put('zzqqxx.com');                       // out of the regime, never asked: deleted
+    await put('septicdrone.com');                  // in the regime: stays
+    await put('qqzzxx.com', { attempts: 2, tag: 'dropped', final: true }); // out of the regime but already asked: stays (its answer may feed the engine)
+    const r = await run({});
+    expect(r.s.out_of_regime_deleted_n).toBe(1);
+    expect((await rows()).map((x) => x.domain)).toEqual(['qqzzxx.com', 'septicdrone.com']);
+  });
+
+  it('ST547-3 decided rows go after the short keep: fed dropped rows 7 days after feeding, held and unknown rows 7 days after the decision; open rows and younger rows stay', async () => {
+    const t = (days: number) => new Date(NOW - days * DAY);
+    await put('oldfed.com', { tag: 'dropped', final: true, attempts: 1, fed_at: t(8), rdap_checked_at: t(9) });
+    await put('newfed.com', { tag: 'dropped', final: true, attempts: 1, fed_at: t(3), rdap_checked_at: t(4) });
+    await put('unfed.com', { tag: 'dropped', final: true, attempts: 1, fed_at: null, rdap_checked_at: t(30) }); // not fed yet: never deleted
+    await put('oldheld.com', { tag: 'held', final: true, attempts: 1, rdap_checked_at: t(8) });
+    await put('newheld.com', { tag: 'held', final: true, attempts: 1, rdap_checked_at: t(2) });
+    await put('oldunknown.com', { tag: 'unknown', final: true, attempts: 3, rdap_checked_at: t(10) });
+    await put('openname.com', { attempts: 1, rdap_checked_at: t(40) });
+    const r = await run({});
+    expect(r.s.decided_deleted_n).toBe(3);
+    expect((await rows()).map((x) => x.domain)).toEqual(['newfed.com', 'newheld.com', 'openname.com', 'unfed.com']);
+  });
+
+  it('ST547-4 a fed name that is still in the pool is not collected again after its row was deleted (the keep is at least the pool keep + 1 day)', async () => {
+    const s = await db.selectFrom('settings').select(['closeout_expiry_keep_days', 'datasave_pool_keep_days']).executeTakeFirstOrThrow();
+    expect(s.closeout_expiry_keep_days).toBe(7);
+    expect(s.closeout_expiry_keep_days).toBeGreaterThan(s.datasave_pool_keep_days);
+    await pool('septicdrone.com');
+    await run({ 'septicdrone.com': free }, { now: NOW + 4 * DAY });
+    await db.updateTable('closeout_expiries').set({ fed_at: new Date(NOW - 8 * DAY) }).execute();
+    const again = await run({}, { now: NOW + 4 * DAY });
+    expect(again.s.decided_deleted_n).toBe(1);
+    await db.deleteFrom('datasave_pool').execute(); // the pool keeps only a few days: the name is gone from it when its row goes
+    expect((await run({}, { now: NOW + 5 * DAY })).s.collected_n).toBe(0);
   });
 });

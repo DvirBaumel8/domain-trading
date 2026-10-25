@@ -5,7 +5,8 @@
 //   registered in redemption period or pending delete (an unsold closeout) -> not_taken
 //   not registered (404)                  -> not_taken
 //   error or timeout                      -> unknown, tried again on later runs until D+40, then it stays unknown. Never read as not_taken.
-// Also prunes pickproof_pool rows older than settings.pickproof_pool_keep_days (the labels need only the arms).
+// Also shrinks pickproof_pool (v5.47.0, F18): a SEALED day older than settings.pickproof_pool_keep_days keeps only the rows of names that are in one of its arms; the labels and the
+// report need only the arms, and the pool's sha256 and every arm's sha256 stay in pickproof_days. One day per statement.
 import { sql, type Kysely } from 'kysely';
 import { chunks } from '../../core/chunks.js';
 import { addDays, dayNumber } from '../../core/dates.js';
@@ -109,8 +110,24 @@ export async function pickproofLabels(deps: LabelsDeps): Promise<LabelsSummary> 
   }
   if (out.eligible_n > 0) out.status = out.stopped_reason ? 'stopped' : 'ok';
 
-  const keepFrom = addDays(today, -st.poolKeepDays);
-  const del = await db.deleteFrom('pickproof_pool').where('day', '<', keepFrom).executeTakeFirst();
-  out.pool_rows_deleted_n = Number(del.numDeletedRows);
+  out.pool_rows_deleted_n = await shrinkPool(db, addDays(today, -st.poolKeepDays));
   return out;
+}
+
+/**
+ * v5.47.0 (F18): deletes, for every sealed day before `keepFrom`, the pool rows of names that are in no arm of that day. An unsealed day is never touched (its pool is
+ * still needed for the draw). Days that have nothing more to delete are skipped by one cheap lookup. Returns the number of rows deleted.
+ */
+export async function shrinkPool(db: Kysely<Database>, keepFrom: string): Promise<number> {
+  const days = (await sql<{ day: string }>`
+    select d.day::text as day from pickproof_days d
+    where d.sealed_at is not null and d.day < ${keepFrom}::date
+      and exists (select 1 from pickproof_pool p where p.day = d.day and not exists (select 1 from pickproof_arms a where a.day = p.day and a.domain = p.domain))
+    order by d.day`.execute(db)).rows;
+  let n = 0;
+  for (const d of days) {
+    const r = await sql`delete from pickproof_pool p where p.day = ${d.day}::date and not exists (select 1 from pickproof_arms a where a.day = p.day and a.domain = p.domain)`.execute(db);
+    n += Number(r.numAffectedRows ?? 0);
+  }
+  return n;
 }

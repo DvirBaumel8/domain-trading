@@ -22,7 +22,7 @@ import { rdapLookup, rdapStatus, type RdapFn } from './core/rdap.js';
 import { cachedRdapLookup } from './core/rdap-cache.js';
 import { registerDropLists, registerCohorts, registerCandidates, registerLessons, registerPatterns, IntakeScreeningJob, autoRebuildDailyList, BuildDailyListJob } from './modules/candidates/index.js';
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
-import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
+import { EndingsJob, EngineTrainer, LiftTrainJob, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
 import { registerData } from './modules/data/index.js';
 import { KbLoadJob, registerKnowledge } from './modules/knowledge/index.js';
 import { registerMarket } from './modules/market/index.js';
@@ -227,7 +227,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ ...base, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     ...base, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, kbLoad: new KbLoadJob({ db: deps.db, now, dir: deps.knowledgeDir, log: app.log }), retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, scorer: engineScorer, log: app.log, screening: screeningDeps, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer,
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, kbLoad: new KbLoadJob({ db: deps.db, now, dir: deps.knowledgeDir, log: app.log }), retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, scorer: engineScorer, log: app.log, screening: screeningDeps, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer, liftTrainJob: new LiftTrainJob({ db: deps.db, now, log: app.log }),
     outsideReview: async () => {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: now() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;

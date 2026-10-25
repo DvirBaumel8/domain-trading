@@ -1,20 +1,27 @@
+// v5.47.0 (F5): auction score v3 = v2 with the hand shape + endings part replaced by the engine's lift score (`lift` in the input, 0..100 from a trained lift table: length band, word count,
+// other endings registered, registered share); word quality stays the gate (the name part is quality x lift/100 and the uncommon-word cap stays). Without a lift table the score is v2.
 // v5.46.0: auction score v2 (word quality, graded shape, uncommon-word cap, SCORE_FULL_MAX 85); v5.45.0 (G-127): the auction score v1 (0-100) and the maximum-bid rule. Pure: no database, no clock, no network. Rules and test ids: docs/internal/auctions.md "Shortlist".
 //   name part 60   (v2) word quality x (shape and the other endings). Word quality (`word-quality.ts`) is 0..1: half the weakest word, half the mean; a name with a word that is not common
 //                  (level < 0.7) is capped at 50 in total. Shape is graded by letters (linear between the band anchors, not a step) per word count (hand bands until the engine's lift table
 //                  exists, round-2 research 3.3). The other endings registered (R, from engine_endings).
 //                  An ending nobody asked yet stays unknown: its weight leaves the part (the part is rescaled), it never counts as 0.
 //   headroom 20    how far the current price is under the maximum bid.
-//   bids 10        log-scaled; halved when the name looks like an SEO buy (domain age 10+ years and page views in the file): bids are reseller and SEO demand at our price.
+//   bids 10 (5 in v3) log-scaled; halved when the name looks like an SEO buy (domain age 10+ years and page views in the file): bids are reseller and SEO demand at our price.
 //   age 10         the .com's age in years, 10 or more is full. Unknown age leaves the part out (rescaled).
 // GoDaddy's own valuation is stored and shown, but never scored (research: appraisals are unreliable).
 import { formatUsd } from '../../../core/money.js';
+import type { LiftScore } from '../../engine/index.js';
 import { nameQuality } from './word-quality.js';
 
 export const AUCTION_SCORE_VERSION = 'auction-v2';
+/** v5.47.0: the version stored when a lift table scored the name part. */
+export const AUCTION_SCORE_VERSION_LIFT = 'auction-v3';
 /** A name with any word below the common level never scores above this. */
 export const UNCOMMON_CAP = 50;
 
 export const WEIGHTS = { name: 60, headroom: 20, bids: 10, age: 10 } as const;
+/** v3 (F8, investors-deep research): high bid counts are investors competing, not end users (bidder pairs inflate them), so the bids part is worth 5 points, not 10. */
+export const BIDS_WEIGHT_V3 = 5;
 /** Inside the name part, shape and the other endings weigh 25 : 30 (round-2 S and R weights); only the known share of the five endings counts. */
 const SHAPE_W = 25;
 const ENDINGS_W = 30;
@@ -54,13 +61,15 @@ export interface ScoreInput {
   domain_age: number | null;
   pageviews: number | null;
   endings: EndingsKnown;
+  /** v5.47.0: the lift score of the name (engine lift table); when given, it replaces the hand shape + endings part and the version is auction-v3 */
+  lift?: LiftScore | null;
 }
 
 export interface Part { points: number; max: number; known: boolean }
 export interface ScoreResult {
   score: number;
   version: string;
-  parts: { name: Part & { shape: number; word_quality: number; word_levels: number[]; all_common: boolean; endings_known: number; endings_registered: number; endings_value: number | null }; headroom: Part; bids: Part & { seo_flag: boolean }; age: Part };
+  parts: { name: Part & { shape: number; word_quality: number; word_levels: number[]; all_common: boolean; endings_known: number; endings_registered: number; endings_value: number | null; lift?: { sum: number; score: number; bins: Array<{ pattern: string; bin: string; lift: number }> } }; headroom: Part; bids: Part & { seo_flag: boolean }; age: Part };
   seo_flag: boolean;
   reasons: string[];
 }
@@ -82,12 +91,15 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
   const endingsValue = known.length === 0 ? null : registered.length === 0 ? 0 : registered.length === 1 ? 0.5 : 1;
   const endingsW = ENDINGS_W * (known.length / tlds.length);
   const shapeEndings = (SHAPE_W * shape + (endingsValue === null ? 0 : endingsW * endingsValue)) / (SHAPE_W + (endingsValue === null ? 0 : endingsW));
-  const nameRaw = q.quality * shapeEndings;
+  const shapePart = i.lift ? i.lift.score / 100 : shapeEndings;
+  const nameRaw = q.quality * shapePart;
   const name: ScoreResult['parts']['name'] = { points: r1(WEIGHTS.name * nameRaw), max: WEIGHTS.name, known: true, shape, word_quality: r1(q.quality * 100) / 100, word_levels: q.levels.map((x) => r1(x * 100) / 100), all_common: q.allCommon, endings_known: known.length, endings_registered: registered.length, endings_value: endingsValue };
+  if (i.lift) name.lift = { sum: i.lift.sum, score: i.lift.score, bins: i.lift.parts.map((p) => ({ pattern: p.pattern, bin: p.bin, lift: p.lift })) };
   const wc = Math.max(1, i.words.length);
   reasons.push(`${wc === 1 ? '1 word' : `${wc} words`} (${i.words.join(' + ') || 'unread'}), ${i.letters} letters`);
   if (!q.allCommon) reasons.push(`not every word is a common word (${i.words.filter((w, k) => q.levels[k]! < 0.7).join(', ') || 'unread'}): the score is capped at ${r1(UNCOMMON_CAP * (0.5 + 0.5 * q.quality))}`);
-  if (known.length === 0) reasons.push('other endings not checked yet (name part from the shape alone)');
+  if (i.lift) reasons.push(`lift ${i.lift.sum >= 0 ? '+' : ''}${i.lift.sum} (${i.lift.parts.map((p) => `${p.pattern} ${p.bin} ${p.lift >= 0 ? '+' : ''}${p.lift}`).join(', ') || 'no pattern known'}): ${i.lift.score} of 100 sold-like`);
+  if (known.length === 0) reasons.push(i.lift ? 'other endings not checked yet (the lift uses length and word count only)' : 'other endings not checked yet (name part from the shape alone)');
   else if (registered.length > 0) reasons.push(`also registered on ${registered.map((t) => `.${t}`).join(', ')}${known.length < tlds.length ? ` (${known.length} of 5 endings checked)` : ''}`);
   else reasons.push(`no other ending registered${known.length < tlds.length ? ` (${known.length} of 5 checked)` : ''}`);
 
@@ -97,7 +109,8 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
 
   const seo = seoFlag(i.domain_age, i.pageviews);
   const bidsRaw = clamp01(Math.log(1 + i.bids) / Math.log(1 + BIDS_FULL)) * (seo ? 0.5 : 1);
-  const bids: ScoreResult['parts']['bids'] = { points: r1(WEIGHTS.bids * bidsRaw), max: WEIGHTS.bids, known: true, seo_flag: seo };
+  const bidsW = i.lift ? BIDS_WEIGHT_V3 : WEIGHTS.bids;
+  const bids: ScoreResult['parts']['bids'] = { points: r1(bidsW * bidsRaw), max: bidsW, known: true, seo_flag: seo };
   reasons.push(`${i.bids} bid${i.bids === 1 ? '' : 's'}${seo ? ` (halved: ${i.domain_age} years old with page views looks like an SEO buy)` : ''}`);
 
   const ageKnown = i.domain_age !== null;
@@ -110,7 +123,7 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
   // a name with an uncommon word is capped at UNCOMMON_CAP x (0.5 + 0.5 x word quality): 50 at most, about 35 for a coined string, so the cap itself spreads
   const cap = r1(UNCOMMON_CAP * (0.5 + 0.5 * q.quality));
   const score = q.allCommon ? raw : Math.min(raw, cap);
-  return { score, version: AUCTION_SCORE_VERSION, parts: { name, headroom, bids, age }, seo_flag: seo, reasons };
+  return { score, version: i.lift ? AUCTION_SCORE_VERSION_LIFT : AUCTION_SCORE_VERSION, parts: { name, headroom, bids, age }, seo_flag: seo, reasons };
 }
 
 /**

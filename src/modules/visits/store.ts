@@ -3,8 +3,13 @@ import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { landerNameservers } from '../listing/index.js';
 
-/** Hits (human + bot) counted per name per UTC day; the rest only add to `capped`. */
+/** Hits (human + bot + suspect) counted per name per UTC day; the rest only add to `capped`. */
 export const VISIT_DAILY_CAP = 1000;
+/**
+ * v5.47.0 (F17): the most hits of one name in one UTC day that count as human. A for-sale name that Afternic shows 1-7 views a month for does not have more real visitors than
+ * this in a day; every human-class hit past it is counted as `suspect_hits` (repeats, scans the user-agent test did not catch). No IP is kept to decide it.
+ */
+export const HUMAN_DAILY_MAX = 10;
 /** Distinct referrer hosts kept per name per day (the first ten seen); every other host adds to "other". */
 export const REFERRER_HOSTS_PER_DAY = 10;
 export const WEEKLY_TOP_REFERRERS = 5;
@@ -66,23 +71,26 @@ export async function isCountable(db: Kysely<Database>, domain: string): Promise
  * REFERRER_HOSTS_PER_DAY hosts are stored (or it is already stored), else to "other". Once capped is above 0 every later hit of that day is capped too,
  * so `capped > 0` after the statement means this hit was capped.
  */
-export async function recordHit(db: Kysely<Database>, o: { domain: string; ua: 'human' | 'bot'; referrer: string | null; nowMs: number }): Promise<{ counted: boolean; capped: boolean }> {
+export async function recordHit(db: Kysely<Database>, o: { domain: string; ua: 'human' | 'bot' | 'suspect'; referrer: string | null; nowMs: number }): Promise<{ counted: boolean; capped: boolean }> {
   const h = o.ua === 'human' ? 1 : 0;
-  const b = 1 - h;
+  const b = o.ua === 'bot' ? 1 : 0;
+  const sus = o.ua === 'suspect' ? 1 : 0;
+  const humanMax = HUMAN_DAILY_MAX;
   const day = utcDay(o.nowMs);
   const cap = VISIT_DAILY_CAP;
   const maxHosts = REFERRER_HOSTS_PER_DAY;
   const ref = o.referrer;
-  const total = sql`(visit_daily.human_hits + visit_daily.bot_hits)`;
+  const total = sql`(visit_daily.human_hits + visit_daily.bot_hits + visit_daily.suspect_hits)`;
   const key = sql`(case when ${ref}::text is null then null
     when jsonb_exists(visit_daily.referrer_hosts, ${ref}::text) or (select count(*) from jsonb_object_keys(visit_daily.referrer_hosts) k where k <> 'other') < ${maxHosts} then ${ref}::text
     else 'other' end)`;
   const r = await sql<{ capped: number }>`
-    insert into visit_daily (domain, date_utc, source, human_hits, bot_hits, capped, referrer_hosts)
-    values (${o.domain}, ${day}::date, 'dom_redirect', ${h}, ${b}, 0, case when ${ref}::text is null then '{}'::jsonb else jsonb_build_object(${ref}::text, 1) end)
+    insert into visit_daily (domain, date_utc, source, human_hits, bot_hits, suspect_hits, capped, referrer_hosts)
+    values (${o.domain}, ${day}::date, 'dom_redirect', ${h}, ${b}, ${sus}, 0, case when ${ref}::text is null then '{}'::jsonb else jsonb_build_object(${ref}::text, 1) end)
     on conflict (domain, date_utc, source) do update set
-      human_hits = visit_daily.human_hits + case when ${total} < ${cap} then ${h} else 0 end,
+      human_hits = visit_daily.human_hits + case when ${total} < ${cap} and visit_daily.human_hits < ${humanMax} then ${h} else 0 end,
       bot_hits = visit_daily.bot_hits + case when ${total} < ${cap} then ${b} else 0 end,
+      suspect_hits = visit_daily.suspect_hits + case when ${total} < ${cap} then ${sus}::int + case when visit_daily.human_hits >= ${humanMax}::int then ${h}::int else 0 end else 0 end,
       capped = visit_daily.capped + case when ${total} >= ${cap} then 1 else 0 end,
       referrer_hosts = case when ${key} is null or ${total} >= ${cap} then visit_daily.referrer_hosts
         else jsonb_set(visit_daily.referrer_hosts, array[${key}], to_jsonb(coalesce((visit_daily.referrer_hosts ->> ${key})::int, 0) + 1)) end,
@@ -122,19 +130,19 @@ export async function requestVisitsToken(db: Kysely<Database>, now: Date): Promi
 }
 
 export interface VisitRow {
-  domain: string; date: string; source: 'dom_redirect' | 'afternic'; human_hits: number; bot_hits: number; capped: number;
+  domain: string; date: string; source: 'dom_redirect' | 'afternic'; human_hits: number; bot_hits: number; suspect_hits: number; capped: number;
   referrer_hosts: Record<string, number>; views_30d: number | null; leads_30d: number | null;
 }
 
 export async function readDaily(db: Kysely<Database>, from: string, to: string): Promise<VisitRow[]> {
   const rows = await db.selectFrom('visit_daily').selectAll().where('date_utc', '>=', from).where('date_utc', '<=', to).orderBy('date_utc').orderBy('domain').orderBy('source').execute();
   return rows.map((r) => ({
-    domain: r.domain, date: r.date_utc, source: r.source, human_hits: r.human_hits, bot_hits: r.bot_hits, capped: r.capped,
+    domain: r.domain, date: r.date_utc, source: r.source, human_hits: r.human_hits, bot_hits: r.bot_hits, suspect_hits: r.suspect_hits, capped: r.capped,
     referrer_hosts: r.referrer_hosts, views_30d: r.views_30d, leads_30d: r.leads_30d,
   }));
 }
 
-export interface WeeklyRow { domain: string; source: 'dom_redirect'; human_hits: number; bot_hits: number; capped: number; top_referrers: { host: string; n: number }[] }
+export interface WeeklyRow { domain: string; source: 'dom_redirect'; human_hits: number; bot_hits: number; suspect_hits: number; capped: number; top_referrers: { host: string; n: number }[] }
 export interface NotCountable { domain: string; reason: 'afternic_ns' | 'not_forwarded'; afternic_views_30d: number | null; afternic_leads_30d: number | null; afternic_read_date: string | null }
 
 /**
@@ -149,7 +157,7 @@ export async function weekly(db: Kysely<Database>, from: string, to: string, nsL
   const byDomain = new Map<string, WeeklyRow & { hosts: Map<string, number> }>();
   const ensure = (domain: string) => {
     let x = byDomain.get(domain);
-    if (!x) { x = { domain, source: 'dom_redirect', human_hits: 0, bot_hits: 0, capped: 0, top_referrers: [], hosts: new Map() }; byDomain.set(domain, x); }
+    if (!x) { x = { domain, source: 'dom_redirect', human_hits: 0, bot_hits: 0, suspect_hits: 0, capped: 0, top_referrers: [], hosts: new Map() }; byDomain.set(domain, x); }
     return x;
   };
   const notCountable: NotCountable[] = [];
@@ -164,7 +172,7 @@ export async function weekly(db: Kysely<Database>, from: string, to: string, nsL
   for (const r of data) {
     if (skip.has(r.domain)) continue;
     const x = ensure(r.domain);
-    x.human_hits += r.human_hits; x.bot_hits += r.bot_hits; x.capped += r.capped;
+    x.human_hits += r.human_hits; x.bot_hits += r.bot_hits; x.suspect_hits += r.suspect_hits; x.capped += r.capped;
     for (const [host, n] of Object.entries(r.referrer_hosts)) x.hosts.set(host, (x.hosts.get(host) ?? 0) + n);
   }
   const rows = [...byDomain.values()].sort((a, b) => a.domain.localeCompare(b.domain)).map(({ hosts, ...row }) => ({

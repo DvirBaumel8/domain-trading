@@ -13,7 +13,7 @@ import type { RegistrarAdapter } from '../../registrars/index.js';
 import { setForward } from '../forward.js';
 import { importAfternic, isCountable, normalizeReferrerHost, readDaily, recordHit, requestVisitsToken, setVisitsEnabled, utcDay, visitsEnabled, weekly } from '../store.js';
 
-const HitBody = z.object({ domain: z.string().min(1).max(253), ua_class: z.enum(['human', 'bot']), referrer_host: z.string().max(2048).nullable().optional() }).strict();
+const HitBody = z.object({ domain: z.string().min(1).max(253), ua_class: z.enum(['human', 'bot', 'suspect']), referrer_host: z.string().max(2048).nullable().optional() }).strict();
 const ImportBody = z.object({ domain: z.string().min(1).max(253), date: realYmd, views_30d: z.number().int().min(0).max(100_000_000), leads_30d: z.number().int().min(0).max(100_000_000) }).strict();
 const SettingsBody = z.object({ enabled: z.boolean().optional(), token: z.literal('request').optional(), approval_ref: approvalRef.optional() }).strict();
 const SettingsDoc = z.object({ enabled: z.boolean().optional(), token: z.literal('request').optional(), approval_ref: z.object({ text: z.string(), approved_at: z.string() }).optional() }).strict();

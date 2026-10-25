@@ -108,6 +108,8 @@ export interface JobRunnerDeps {
   engineEndingsJob?: Runnable;
   /** v5.5.0 (CR-056 part 2): `weekly()` is the daily step engineTrain (decides and queues a `train` run); `runById` is the `train` job's step trainModel. */
   engineTrainer?: { weekly(): Promise<unknown>; runById(id: string): Promise<unknown> };
+  /** v5.47.0 (F5): the lift table's daily step liftTrain (after engineTrain); retrains only when the sales or unsold rows grew. While undefined, that step reports skipped. */
+  liftTrainJob?: Runnable;
   /** v5.21.0 (CR-071): the datasave job's steps (twelve since v5.45.0: auctionShortlist after engineFeed; eleven since v5.41.0: engineFeed after buildPanel; ten since v5.35.0: pickproofSeal before snapshotRetention) (v5.23.0: episodes, dqMarket; v5.28.0: pickproofLabels last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
   datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; engineFeed(): Promise<unknown>; auctionShortlist(): Promise<unknown>; pickproofSeal(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown>; pickproofLabels(): Promise<unknown> };
   /** Secret values scrubbed from step error messages. */
@@ -190,6 +192,8 @@ export class JobRunner {
       optional('engineEndings', d.engineEndingsJob, 'engine endings not configured'),
       // v5.5.0: after the endings fill, so a retrain sees the newest answers; it only decides and queues the `train` job, which runs after this run ends.
       optionalFn('engineTrain', d.engineTrainer ? () => d.engineTrainer!.weekly() : undefined, 'engine trainer not configured'),
+      // v5.47.0: after engineTrain; a pure table from the sales and unsold rows plus the seed, so it never waits for the model
+      optional('liftTrain', d.liftTrainJob, 'lift trainer not configured'),
     ];
   }
 

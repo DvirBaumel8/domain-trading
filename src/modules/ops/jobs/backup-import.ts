@@ -88,6 +88,7 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'kb_source_links', file: 'tables/kb_source_links.json' },
   { table: 'kb_verdicts', file: 'tables/kb_verdicts.json' },
   { table: 'kb_loads', file: 'tables/kb_loads.json' },
+  { table: 'lift_models', file: 'tables/lift_models.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 

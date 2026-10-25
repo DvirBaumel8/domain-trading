@@ -486,7 +486,10 @@ export class DatasaveJob {
   async buildPanel(): Promise<unknown> {
     const { db } = this.deps;
     let regime: RegimeTest | undefined;
-    try { regime = await loadRegimeTest(db); } catch (e) { this.deps.log?.warn({ err: shortError(e) }, 'datasave: regime test not loaded, tags keep the plain order'); }
+    // v5.47.0: the expiry collector needs the regime test (no test = nothing collected), so a failed load is tried once more
+    for (let attempt = 0; attempt < 2 && !regime; attempt++) {
+      try { regime = await loadRegimeTest(db); } catch (e) { this.deps.log?.warn({ err: shortError(e), attempt }, 'datasave: regime test not loaded, tags keep the plain order'); }
+    }
     const tags = await tagDisappearances({ db, now: this.deps.now, rdap: this.deps.rdap, sleep: this.deps.sleep, regime });
     const expiries = await checkExpiries({ db, now: this.deps.now, rdap: this.deps.rdap, sleep: this.deps.sleep, regime, capLeft: Math.max(0, tags.cap - tags.lookups_n) });
     const dynadot = await this.dynadotPanel();

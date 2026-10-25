@@ -72,6 +72,10 @@ export async function proxy(request: Request, env: Env, fetcher: Fetcher = (r) =
 // human/bot class and the referrer HOST are sent; never an IP, the user agent, a path or a query.
 const COM_DOMAIN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.com$/;
 const BOT_UA = /bot|crawl|spider|slurp|preview|monitor|curl|wget|python|http-client|headless/i;
+// v5.47.0 (F17): scripted clients and scanners that the plain bot test lets through as people. They are sent as `suspect` and counted apart (`suspect_hits`), never as human.
+const SCANNER_UA = /headlesschrome|puppeteer|playwright|phantomjs|selenium|webdriver|go-http-client|java\/|okhttp|libwww|scrapy|axios|node-fetch|undici|aiohttp|httpx|requests|mechanize|apache-httpclient|postman|insomnia|nuclei|nmap|masscan|zgrab|censys|shodan|expanse|nessus|qualys|semrush|ahrefs|majestic|dataprovider|wappalyzer|builtwith|urlscan|virustotal|sucuri|uptime|pingdom|statuscake|check_http|gtmetrix|lighthouse|pagespeed/i;
+/** Hosting and cloud networks: a real visitor of a for-sale page does not come from a data center. Matched on Cloudflare's AS organisation name (request.cf), when it is present. */
+const DATACENTER_ORG = /amazon|aws|google cloud|google llc|microsoft|azure|digitalocean|ovh|hetzner|linode|akamai|oracle|alibaba|tencent|vultr|choopa|scaleway|leaseweb|contabo|m247|datacamp|cogent|packet|rackspace|ionos|hostinger|godaddy|namecheap|colocrossing|quadranet|psychz|stark industries|ipxo|zenlayer/i;
 
 /** The domain of a /r/<domain> path (lowercase, a leading www. dropped), or null when it is not a plain .com name. */
 export function redirectDomain(pathname: string): string | null {
@@ -87,9 +91,23 @@ export function redirectDomain(pathname: string): string | null {
   return COM_DOMAIN.test(d) ? d : null;
 }
 
-export function uaClass(ua: string | null): 'human' | 'bot' {
+/** What the Worker can see of the request without keeping anything: header names/values are tested and dropped, the AS organisation is read from request.cf. */
+export interface HitSignals { acceptLanguage: string | null; accept: string | null; asOrganization?: string | null }
+
+/**
+ * bot = no user agent or a crawler / preview / monitor name (as before). suspect (v5.47.0) = a scanner or scripted client name, a request with no Accept-Language, one that does not ask for
+ * HTML, or one from a hosting / cloud network. human = everything else. Without signals (older callers) only the user agent is tested.
+ */
+export function uaClass(ua: string | null, sig?: HitSignals): 'human' | 'bot' | 'suspect' {
   const u = (ua ?? '').trim();
-  return u === '' || BOT_UA.test(u) ? 'bot' : 'human';
+  if (u === '' || BOT_UA.test(u)) return 'bot';
+  if (SCANNER_UA.test(u)) return 'suspect';
+  if (sig) {
+    if (!sig.acceptLanguage || sig.acceptLanguage.trim() === '') return 'suspect';
+    if (sig.accept !== null && !/text\/html|\*\/\*/i.test(sig.accept)) return 'suspect';
+    if (sig.asOrganization && DATACENTER_ORG.test(sig.asOrganization)) return 'suspect';
+  }
+  return 'human';
 }
 
 export function refererHost(referer: string | null): string | null {
@@ -101,7 +119,7 @@ export function refererHost(referer: string | null): string | null {
   }
 }
 
-async function sendHit(origin: string, token: string, body: { domain: string; ua_class: 'human' | 'bot'; referrer_host: string | null }, fetcher: Fetcher): Promise<void> {
+async function sendHit(origin: string, token: string, body: { domain: string; ua_class: 'human' | 'bot' | 'suspect'; referrer_host: string | null }, fetcher: Fetcher): Promise<void> {
   try {
     await fetcher(new Request(`${origin}/visits/hit`, {
       method: 'POST',
@@ -120,7 +138,9 @@ export function countingRedirect(request: Request, env: Env, ctx: Ctx, fetcher: 
   const origin = parseOrigin(env.TUNNEL_URL);
   const token = (env.VISITS_TOKEN ?? '').trim();
   if (origin && token) {
-    ctx.waitUntil(sendHit(origin, token, { domain, ua_class: uaClass(request.headers.get('user-agent')), referrer_host: refererHost(request.headers.get('referer')) }, fetcher));
+    const cf = (request as Request & { cf?: { asOrganization?: string } }).cf;
+    const signals: HitSignals = { acceptLanguage: request.headers.get('accept-language'), accept: request.headers.get('accept'), asOrganization: cf?.asOrganization ?? null };
+    ctx.waitUntil(sendHit(origin, token, { domain, ua_class: uaClass(request.headers.get('user-agent'), signals), referrer_host: refererHost(request.headers.get('referer')) }, fetcher));
   }
   return new Response(null, { status: 302, headers: { location: `https://www.afternic.com/domain/${domain}`, 'cache-control': 'no-store' } });
 }

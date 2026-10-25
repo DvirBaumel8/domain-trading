@@ -69,6 +69,8 @@ export interface SettingsTable {
   closeout_expiry_wait_days: Generated<number>;
   closeout_expiry_recheck_days: Generated<number>;
   closeout_expiry_max_days: Generated<number>;
+  /** v5.47.0: days a decided closeout_expiries row is kept after it was fed or decided (never less than the pool keep + 1). Migration only. */
+  closeout_expiry_keep_days: Generated<number>;
   /** v5.37.0: days the in-range GoDaddy auctions with bids are kept (godaddy_auctions_live) and the fewest bids to keep one. Migration only. */
   datasave_auction_live_keep_days: Generated<number>;
   datasave_auction_live_min_bids: Generated<number>;
@@ -736,6 +738,8 @@ export interface VisitDailyTable {
   human_hits: Generated<number>;
   bot_hits: Generated<number>;
   capped: Generated<number>;
+  /** v5.47.0 (F17): hits read as scanners or repeats; not in human_hits or bot_hits */
+  suspect_hits: Generated<number>;
   referrer_hosts: ColumnType<Record<string, number>, string | undefined, string>;
   views_30d: number | null;
   leads_30d: number | null;
@@ -808,6 +812,23 @@ export interface OwnedEndingEventsTable {
   registrar: string | null;
   ending_id: number | null;
   created_at: TimestampDefault;
+}
+
+/** v5.47.0 (F5): a trained lift table (append-only); the newest row is current. `bins` is the LiftBins JSON of engine/lift.ts. */
+export interface LiftModelsTable {
+  id: Generated<string>;
+  version: string;
+  trained_at: Generated<Date>;
+  data_key: string;
+  source: 'seed' | 'blend';
+  sold_n: number;
+  unsold_n: number;
+  seed_sold_n: number;
+  seed_unsold_n: number;
+  seed_weight: number;
+  holdout_n: Generated<number>;
+  auc: number | null;
+  bins: ColumnType<Record<string, unknown>, string, string>;
 }
 
 export interface EngineModelsTable {
@@ -1949,6 +1970,7 @@ export interface Database {
   engine_endings: EngineEndingsTable;
   owned_ending_events: OwnedEndingEventsTable;
   engine_models: EngineModelsTable;
+  lift_models: LiftModelsTable;
   drop_lists: DropListsTable;
   drop_list_rows: DropListRowsTable;
   drop_list_checks: DropListChecksTable;

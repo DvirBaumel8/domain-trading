@@ -233,7 +233,7 @@ describe('engine endings fill', () => {
     app = await makeApp({ adapters: [new FakeAdapter('porkbun')], now: () => now, screening: { rdapLookup: (async (domain: string, o?: { baseUrl?: string }) => ({ outcome: domain.startsWith('alpha.') ? 'registered' : 'not_registered', reasonCode: null, httpStatus: domain.startsWith('alpha.') ? 200 : 404, url: `${o?.baseUrl}x`, retrievedAt: new Date(now), body: null, facts: domain.startsWith('alpha.') ? { registrar: null, created_at: '2018-05-05T00:00:00.000Z', expires_at: null, updated_at: null, statuses: [], nameservers: [] } : null })) as RdapLookupFn, fetch: (async () => new Response(BOOTSTRAP, { status: 200 })) as unknown as typeof globalThis.fetch, sleep: async () => {} } });
     const w = (await issueToken('write', 'gavriel')).auth;
     const plan = app.jobRunner.plan('daily').map((p) => p.name);
-    expect(plan.slice(-2)).toEqual(['engineEndings', 'engineTrain']);
+    expect(plan.slice(-3)).toEqual(['engineEndings', 'engineTrain', 'liftTrain']);
     const step = app.jobRunner.plan('daily').find((p) => p.name === 'engineEndings')!;
     expect(step.maxAttempts).toBe(1);
     expect(step.timeoutMs).toBe(25 * 60_000);

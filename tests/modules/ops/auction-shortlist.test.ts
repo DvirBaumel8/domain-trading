@@ -8,6 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { withDbScope } from '../../../src/core/db-stats.js';
 import type { RdapLookup } from '../../../src/core/rdap.js';
+import { LiftTrainJob } from '../../../src/modules/engine/index.js';
 import { runAuctionShortlist } from '../../../src/modules/ops/auctions/shortlist.js';
 import { DatasaveJob } from '../../../src/modules/ops/jobs/datasave/datasave.js';
 import type { ScreeningDeps } from '../../../src/modules/selection/index.js';
@@ -384,5 +385,51 @@ describe('AS545 routes', () => {
     const r = await withDbScope('as545-22', async () => get('/auctions/funnel', auth));
     expect(r.value.statusCode).toBe(200);
     expect(r.stats.queries).toBeLessThanOrEqual(14); // the funnel's 8 reads plus the auth lookups
+  });
+});
+
+describe('ST547 shortlist adult filter (v5.47.0, F20)', () => {
+  it('ST547-5: an adult word in the name (bestnaked) and a term of the company\'s forbidden list are refused before scoring; a retired term and a word that only contains letters of one are fine', async () => {
+    await live('bestnaked.com');
+    await live('brightwidgets.com');
+    await live('freshplanet.com');
+    await live('bluecoffee.com');
+    await live('smartessex.com'); // "sex" inside "essex" is not an adult word
+    const t = await db.insertInto('forbidden_terms').values([{ term: 'planet', created_by: 'test' }, { term: 'coffee', created_by: 'test' }]).returning(['id', 'term']).execute();
+    await db.insertInto('forbidden_term_retirements').values({ term_id: t.find((x) => x.term === 'coffee')!.id, by: 'test', audit_id: null }).execute();
+    const r = await runStep() as Record<string, any>;
+    const names = (await shortlist()).map((x) => x.domain).sort();
+    expect(names).toEqual(['bluecoffee.com', 'brightwidgets.com', 'smartessex.com']);
+    expect(r.dropped.name_rules).toMatchObject({ ADULT_TERM: 1, FORBIDDEN_TERM: 1 });
+  });
+});
+
+describe('LF547 shortlist with the lift table (auction-v3)', () => {
+  it('LF547-11: with a stored lift table the name part comes from the lift (auction-v3, parts.name.lift, a reason line); without one the v2 score is unchanged', async () => {
+    await live('brightstudio.com', { price: 3000, bids: 9, age: 8 });
+    await live('solidharborcoffeeplanet.com', { price: 3000, bids: 9, age: 8 });
+    const v2 = await runStep() as Record<string, any>;
+    expect(v2).toMatchObject({ score_version: 'auction-v2', lift_model: null });
+    const rows2 = await shortlist();
+    expect(rows2.every((x) => x.score_version === 'auction-v2')).toBe(true);
+    const trained = await new LiftTrainJob({ db, now: () => NOW }).runOnce();
+    expect(trained).toMatchObject({ trained: true, source: 'seed' });
+    const v3 = await runStep() as Record<string, any>;
+    expect(v3).toMatchObject({ score_version: 'auction-v3', lift_model: { source: 'seed' } });
+    const rows3 = await shortlist();
+    expect(rows3.map((x) => x.domain)).toEqual(['brightstudio.com', 'solidharborcoffeeplanet.com']); // the short two-word name still ranks above the long four-word one
+    for (const x of rows3) {
+      expect(x.score_version).toBe('auction-v3');
+      const lift = (x.parts as any).name.lift;
+      expect(lift.score).toBeGreaterThan(0); expect(lift.score).toBeLessThan(100);
+      expect(lift.bins.map((b: any) => b.pattern)).toEqual(['length', 'words']); // no endings asked in this test: those patterns are skipped
+      expect((x.reasons as string[]).some((l) => l.startsWith('lift '))).toBe(true);
+    }
+    expect((rows3[0]!.parts as any).name.lift.score).toBeGreaterThan((rows3[1]!.parts as any).name.lift.score);
+    app = await makeApp({ now: () => NOW });
+    const auth = (await issueToken('read')).auth;
+    const j = (await app.inject({ method: 'GET', url: '/auctions/shortlist', headers: auth })).json();
+    expect(j.settings.score_version).toBe('auction-v3');
+    expect(j.rows[0].score_version).toBe('auction-v3');
   });
 });

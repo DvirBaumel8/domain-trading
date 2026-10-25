@@ -128,7 +128,7 @@ describe('counting redirect /r/<domain>', () => {
     const fetcher = vi.fn().mockResolvedValue(new Response('{}', { status: 202 }));
     const { ctx, done } = ctxOf();
     const res = countingRedirect(new Request('https://p.example.workers.dev/r/x.com?utm=1', {
-      headers: { 'user-agent': 'Mozilla/5.0 (Macintosh) Safari', referer: 'https://News.example.org/a/b?q=1', cookie: 'a=b', 'cf-connecting-ip': '203.0.113.9' },
+      headers: { 'user-agent': 'Mozilla/5.0 (Macintosh) Safari', 'accept-language': 'en-US,en;q=0.9', accept: 'text/html,application/xhtml+xml', referer: 'https://News.example.org/a/b?q=1', cookie: 'a=b', 'cf-connecting-ip': '203.0.113.9' },
     }), venv, ctx, fetcher);
     expect(res.status).toBe(302);
     await done();
@@ -146,6 +146,22 @@ describe('counting redirect /r/<domain>', () => {
     expect(uaClass('Mozilla/5.0 Firefox/130')).toBe('human');
     expect(refererHost(null)).toBeNull();
     expect(refererHost('not a url')).toBeNull();
+  });
+
+  it('v5.47.0 classifies scanners, requests with no Accept-Language, non-HTML requests and data-center networks as suspect, not human', () => {
+    const real = { acceptLanguage: 'en-US,en;q=0.9', accept: 'text/html,application/xhtml+xml', asOrganization: 'Comcast Cable Communications, LLC' };
+    const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15';
+    expect(uaClass(ua, real)).toBe('human');
+    expect(uaClass(ua)).toBe('human'); // no signals (an older caller): the user agent alone
+    expect(uaClass(ua, { ...real, acceptLanguage: null })).toBe('suspect');
+    expect(uaClass(ua, { ...real, accept: 'application/json' })).toBe('suspect');
+    expect(uaClass(ua, { ...real, accept: '*/*' })).toBe('human');
+    expect(uaClass(ua, { ...real, asOrganization: 'Amazon.com, Inc.' })).toBe('suspect');
+    expect(uaClass(ua, { ...real, asOrganization: 'Hetzner Online GmbH' })).toBe('suspect');
+    expect(uaClass(ua, { ...real, asOrganization: 'Cloudflare, Inc.' })).toBe('human'); // WARP users are people
+    for (const s of ['Mozilla/5.0 HeadlessChrome/120', 'Go-http-client/2.0', 'python-requests/2.31', 'Mozilla/5.0 (compatible; Nmap Scripting Engine)', 'axios/1.6', 'Mozilla/5.0 Lighthouse']) expect(uaClass(s, real), s).not.toBe('human');
+    // a crawler stays bot
+    expect(uaClass('Googlebot/2.1', real)).toBe('bot');
   });
 
   it('still 302s when the API fetch throws, and counts nothing without VISITS_TOKEN or a tunnel URL', async () => {

@@ -11,6 +11,7 @@ import { approvalRef } from '../../../core/validation.js';
 import { AppError } from '../../../http/errors.js';
 import { ownedEndingsView } from '../endings.js';
 import { engineHealth } from '../health.js';
+import { liftView } from '../lift-train.js';
 import { SCORE_MAX_DOMAINS, type Scorer } from '../score.js';
 import type { EngineTrainer } from '../train.js';
 import { salesMaxDate, setSalesMaxDate, type DbSizeGuard } from '../holdout.js';
@@ -53,6 +54,9 @@ export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database
   });
 
   app.get('/engine/health', async () => engineHealth(deps.db, deps.now()));
+
+  // v5.47.0 (F5): the current lift table (bins, lifts, counts, AUC on the seeded holdout)
+  app.get('/engine/lift', async () => liftView(deps.db, deps.now()));
 
   // v5.7.0 (CR-058): the other endings of an owned name, current state and event history.
   app.get<{ Params: { domain: string } }>('/owned/:domain/endings', async (req) => {
