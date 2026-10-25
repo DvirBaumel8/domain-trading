@@ -16,7 +16,7 @@ async function setup() {
 }
 const post = (url: string, h: Record<string, string>, payload: unknown, key: string = randomUUID()) =>
   app.inject({ method: 'POST', url, headers: { ...h, 'idempotency-key': key }, payload: payload as object });
-const sale = (o: Record<string, unknown> = {}) => ({ domain: 'septicdrone.com', price_usd: 1500, sale_date: '2026-09-01', venue: 'namebio', source: 'unreported-sales', ...o });
+const sale = (o: Record<string, unknown> = {}) => ({ domain: 'septicdrone.com', price_usd: 1500, sale_date: '2026-09-01', venue: 'sedo', source: 'unreported-sales', ...o });
 const unsold = (o: Record<string, unknown> = {}) => ({ domain: 'septicdrone.com', type: 'dropped_after_held', observation_date: '2026-10-08', ...o });
 
 describe('engine uploads', () => {
@@ -43,6 +43,16 @@ describe('engine uploads', () => {
     const up = await db.selectFrom('engine_uploads').selectAll().executeTakeFirstOrThrow();
     expect(up).toMatchObject({ kind: 'sales', received_n: 15, accepted_n: 2, rejected_n: 13, by: 'gavriel', audit_id: b.audit_id });
     expect(rows.every((r) => r.upload_id === up.id)).toBe(true);
+  });
+
+  it('EN-1b (v5.41.0): a row whose venue, source or source_url names NameBio is refused SOURCE_NAMEBIO_FORBIDDEN (its terms forbid training models on its data)', async () => {
+    const { w } = await setup();
+    const res = await post('/engine/sales', w, { rows: [
+      sale(), sale({ domain: 'nb1.com', venue: 'NameBio' }), sale({ domain: 'nb2.com', source: 'namebio daily' }), sale({ domain: 'nb3.com', source_url: 'https://namebio.com/x' }),
+    ] });
+    expect(res.statusCode, res.body).toBe(201);
+    expect(res.json().rejects.map((r: { row: number; reason: string }) => [r.row, r.reason])).toEqual([[1, 'SOURCE_NAMEBIO_FORBIDDEN'], [2, 'SOURCE_NAMEBIO_FORBIDDEN'], [3, 'SOURCE_NAMEBIO_FORBIDDEN']]);
+    expect((await db.selectFrom('engine_sales').select('domain').execute()).map((r) => r.domain)).toEqual(['septicdrone.com']);
   });
 
   it('EN-2: a sale within 20 days of a stored sale of the same name is a duplicate (also inside one call and across calls); 21 days is not', async () => {

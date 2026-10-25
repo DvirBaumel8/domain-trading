@@ -26,6 +26,7 @@ const UnsoldBodyDoc = z.object({ rows: z.array(UnsoldDoc).min(1).max(ENGINE_MAX_
 const ScoreBody = z.object({ domains: z.array(z.string().min(1).max(253)).min(1).max(SCORE_MAX_DOMAINS), as_of: realYmd.optional() }).strict();
 const HoldoutBody = z.object({ date: realYmd, approval_ref: approvalRef }).strict();
 const HoldoutDoc = z.object({ date: realYmd, approval_ref: z.object({ text: z.string(), approved_at: z.string() }) }).strict();
+const HOLDOUT_EFFECT = 'none since 5.41.0';
 const EmptyBody = z.object({}).strict();
 
 export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; trainer: EngineTrainer; scorer: Scorer; dbSize: DbSizeGuard }): void {
@@ -41,13 +42,14 @@ export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database
   });
 
   // v5.10.0 (CR-061): the holdout guard date. WRITE only (a data token cannot reach it), Dvir's approval_ref must name the date.
-  app.get('/engine/holdout-date', async () => ({ sales_max_date: await salesMaxDate(deps.db) }));
+  // 5.41.0: deprecated, no effect (rows are never rejected for their date); the routes stay so no caller breaks.
+  app.get('/engine/holdout-date', async () => ({ sales_max_date: await salesMaxDate(deps.db), effect: HOLDOUT_EFFECT }));
 
   app.post('/engine/holdout-date', { config: { openapiBody: HoldoutDoc } }, async (req) => {
     const b = HoldoutBody.parse(req.body ?? {});
     const r = await setSalesMaxDate(deps.db, b.date, b.approval_ref, new Date(deps.now()));
     req.auditSummary = `engine holdout date ${r.previous} -> ${r.date}`;
-    return { sales_max_date: r.date, previous: r.previous, approved_at: r.approved_at, audit_id: req.auditId ?? null };
+    return { sales_max_date: r.date, previous: r.previous, approved_at: r.approved_at, effect: HOLDOUT_EFFECT, audit_id: req.auditId ?? null };
   });
 
   app.get('/engine/health', async () => engineHealth(deps.db, deps.now()));

@@ -127,7 +127,7 @@ describe('data tables (CR-063)', () => {
     expect((await get('/data/bigco-names?host=other', r)).json().count).toBe(0);
   });
 
-  it('DT-7: AC-5: sales_comps rejects HOLDOUT_SEALED (after 2026-10-14), DATE_INVALID and a missing date, links engine_sale_id on a domain+date+price match, and counts add up', async () => {
+  it('DT-7: AC-5: sales_comps (5.41.0: no HOLDOUT_SEALED any more, a row after 2026-10-14 is stored) rejects DATE_INVALID and a missing date, links engine_sale_id on a domain+date+price match, and counts add up', async () => {
     const { d, r } = await setup();
     const up = await db.insertInto('engine_uploads').values({ kind: 'sales', received_n: 0, accepted_n: 0, duplicate_n: 0, rejected_n: 0, rejects: '[]', by: 'test', audit_id: null, created_at: new Date(NOW) }).returning('id').executeTakeFirstOrThrow();
     const es = await db.insertInto('engine_sales').values({ domain: 'septicdrone.com', price_cents: 150_000, sale_date: '2026-09-01', venue: 'namebio', source: 'x', source_url: null, upload_id: up.id }).returning('id').executeTakeFirstOrThrow();
@@ -135,9 +135,9 @@ describe('data tables (CR-063)', () => {
       comp({ domain: 'edge.com', sale_date: '2026-10-14' }), comp({ domain: 'tier.com', tier: 'T9' }), comp({ domain: 'yr.com', sale_year: 2025 }), comp()];
     const res = await post('/data/sales-comps', d, { rows });
     const b = res.json();
-    expect(b).toMatchObject({ received_n: 8, accepted_n: 2, duplicate_n: 1, rejected_n: 5 });
+    expect(b).toMatchObject({ received_n: 8, accepted_n: 3, duplicate_n: 1, rejected_n: 4 });
     expect(b.accepted_n + b.duplicate_n + b.rejected_n).toBe(b.received_n);
-    expect(b.rejects.map((x: { row: number; reason: string }) => x.reason)).toEqual(['HOLDOUT_SEALED', 'DATE_INVALID', 'DATE_INVALID', 'TIER_INVALID', 'SALE_YEAR_INVALID']);
+    expect(b.rejects.map((x: { row: number; reason: string }) => x.reason)).toEqual(['DATE_INVALID', 'DATE_INVALID', 'TIER_INVALID', 'SALE_YEAR_INVALID']);
     const got = (await get('/data/sales-comps', r)).json().rows;
     expect(got.find((x: { domain: string }) => x.domain === 'septicdrone.com')).toMatchObject({ engine_sale_id: es.id, price_cents: 150_000, price: '$1,500.00', tier: 'T2' });
     expect(got.find((x: { domain: string }) => x.domain === 'edge.com').engine_sale_id).toBeNull();

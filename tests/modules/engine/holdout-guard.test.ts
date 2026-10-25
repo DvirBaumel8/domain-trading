@@ -1,4 +1,4 @@
-// v5.10.0 (CR-061): the holdout guard (HOLDOUT_SEALED), POST/GET /engine/holdout-date, db_bytes_*, DB_SIZE_HIGH.
+// v5.10.0 (CR-061): POST/GET /engine/holdout-date, db_bytes_*, DB_SIZE_HIGH. 5.41.0 (Dvir): the holdout date blocks nothing any more (no HOLDOUT_SEALED); HG-1, HG-2, HG-3, HG-4 and HG-9 now assert that.
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
@@ -18,43 +18,44 @@ async function setup(extra: Record<string, unknown> = {}) {
 }
 const post = (url: string, h: Record<string, string>, payload: unknown, key: string = randomUUID()) =>
   app.inject({ method: 'POST', url, headers: { ...h, 'idempotency-key': key }, payload: payload as object });
-const sale = (o: Record<string, unknown> = {}) => ({ domain: 'septicdrone.com', price_usd: 1500, sale_date: '2026-09-01', venue: 'namebio', source: 'x', ...o });
+const sale = (o: Record<string, unknown> = {}) => ({ domain: 'septicdrone.com', price_usd: 1500, sale_date: '2026-09-01', venue: 'sedo', source: 'x', ...o });
 const approval = (text: string, at = '2026-10-17T11:30:00+03:00') => ({ text, approved_at: at });
 
-describe('holdout guard', () => {
-  it('HG-1: AC-4: a sale dated 2026-10-15 is HOLDOUT_SEALED, 2026-10-14 is accepted; counts add up to rows sent', async () => {
+describe('holdout date (deprecated, no effect since 5.41.0) and size guard', () => {
+  it('HG-1: 5.41.0: a sale dated after the holdout date (2026-10-15, 2026-10-16) is stored, a future or invalid date is still rejected; counts add up to rows sent', async () => {
     const { d } = await setup();
-    const res = await post('/engine/sales', d, { rows: [sale({ domain: 'aaa.com', sale_date: '2026-10-15' }), sale({ domain: 'bbb.com', sale_date: '2026-10-14' }), sale({ domain: 'ccc.com', sale_date: 'nope' }), sale({ domain: 'ddd.com', sale_date: '2026-10-16' }), sale({ domain: 'bbb.com', sale_date: '2026-10-14' })] });
+    const res = await post('/engine/sales', d, { rows: [sale({ domain: 'aaa.com', sale_date: '2026-10-15' }), sale({ domain: 'bbb.com', sale_date: '2026-10-14' }), sale({ domain: 'ccc.com', sale_date: 'nope' }), sale({ domain: 'ddd.com', sale_date: '2026-10-16' }), sale({ domain: 'bbb.com', sale_date: '2026-10-14' }), sale({ domain: 'eee.com', sale_date: '2026-10-18' })] });
     expect(res.statusCode, res.body).toBe(201);
     const b = res.json();
-    expect(b).toMatchObject({ received_n: 5, accepted_n: 1, duplicate_n: 1, rejected_n: 3 });
+    expect(b).toMatchObject({ received_n: 6, accepted_n: 3, duplicate_n: 1, rejected_n: 2 });
     expect(b.accepted_n + b.duplicate_n + b.rejected_n).toBe(b.received_n);
-    expect(b.rejects.map((r: { row: number; reason: string }) => [r.row, r.reason])).toEqual([[0, 'HOLDOUT_SEALED'], [2, 'DATE_INVALID'], [3, 'HOLDOUT_SEALED']]);
-    expect((await db.selectFrom('engine_sales').select('domain').execute()).map((r) => r.domain)).toEqual(['bbb.com']);
+    expect(b.rejects.map((r: { row: number; reason: string }) => [r.row, r.reason])).toEqual([[2, 'DATE_INVALID'], [5, 'DATE_IN_FUTURE']]);
+    expect((await db.selectFrom('engine_sales').select('domain').orderBy('domain').execute()).map((r) => r.domain)).toEqual(['aaa.com', 'bbb.com', 'ddd.com']);
   });
 
-  it('HG-2: the guard applies to /engine/unsold by observation_date', async () => {
+  it('HG-2: 5.41.0: /engine/unsold stores an observation_date after the holdout date too', async () => {
     const { d } = await setup();
     const res = await post('/engine/unsold', d, { rows: [{ domain: 'aaa.com', type: 'dropped_after_held', observation_date: '2026-10-15' }, { domain: 'bbb.com', type: 'dropped_after_held', observation_date: '2026-10-14' }] });
-    expect(res.json()).toMatchObject({ accepted_n: 1, rejected_n: 1, rejects: [{ row: 0, domain: 'aaa.com', reason: 'HOLDOUT_SEALED' }] });
+    expect(res.json()).toMatchObject({ accepted_n: 2, rejected_n: 0, rejects: [] });
   });
 
-  it('HG-3: GET /engine/holdout-date defaults to 2026-10-14; a data token cannot read or change it', async () => {
+  it('HG-3: GET /engine/holdout-date still answers 2026-10-14, now with effect "none since 5.41.0"; a data token cannot read or change it', async () => {
     const { w, r, d } = await setup();
-    expect((await app.inject({ method: 'GET', url: '/engine/holdout-date', headers: r })).json()).toEqual({ sales_max_date: '2026-10-14' });
+    expect((await app.inject({ method: 'GET', url: '/engine/holdout-date', headers: r })).json()).toEqual({ sales_max_date: '2026-10-14', effect: 'none since 5.41.0' });
     expect((await app.inject({ method: 'GET', url: '/engine/holdout-date', headers: w })).statusCode).toBe(200);
     for (const h of [d, r]) expect((await post('/engine/holdout-date', h, { date: '2026-10-20', approval_ref: approval('Dvir: unseal to 2026-10-20') })).statusCode).toBe(403);
   });
 
-  it('HG-4: POST /engine/holdout-date with a valid approval moves the date, is audited, and then 10-15 rows are accepted', async () => {
+  it('HG-4: POST /engine/holdout-date with a valid approval still moves the stored date and is audited (effect none); 10-15 rows are accepted before and after', async () => {
     const { w, d } = await setup();
+    expect((await post('/engine/sales', d, { rows: [sale({ domain: 'early.com', sale_date: '2026-10-15' })] })).json()).toMatchObject({ accepted_n: 1, rejected_n: 0 });
     const res = await post('/engine/holdout-date', w, { date: '2026-10-20', approval_ref: approval('Dvir approves unseal up to 2026-10-20') });
     expect(res.statusCode, res.body).toBe(200);
-    expect(res.json()).toMatchObject({ sales_max_date: '2026-10-20', previous: '2026-10-14' });
+    expect(res.json()).toMatchObject({ sales_max_date: '2026-10-20', previous: '2026-10-14', effect: 'none since 5.41.0' });
     const a = await db.selectFrom('audit_log').select(['path', 'approval_text', 'scope']).where('path', '=', '/engine/holdout-date').executeTakeFirstOrThrow();
     expect(a).toMatchObject({ scope: 'write' });
     expect(a.approval_text).toContain('2026-10-20');
-    expect((await post('/engine/sales', d, { rows: [sale({ sale_date: '2026-10-15' })] })).json()).toMatchObject({ accepted_n: 1, rejected_n: 0 });
+    expect((await post('/engine/sales', d, { rows: [sale({ sale_date: '2026-10-16' })] })).json()).toMatchObject({ accepted_n: 1, rejected_n: 0 });
   });
 
   it('HG-5: the holdout-date approval must be present, name the date, not be in the future, not be older than 72 h; a bad date is a 422', async () => {
@@ -104,7 +105,7 @@ describe('holdout guard', () => {
     expect(res.json().db_bytes_before).toBe(limit * 0.7 - 100_000);
   });
 
-  it('HG-9: M4 the sealed date is read inside the upload lock: an upload waiting for the lock sees a date changed meanwhile; POST /engine/holdout-date waits for the lock', async () => {
+  it('HG-9: M4 uploads and POST /engine/holdout-date still serialise on the upload lock; since 5.41.0 the upload stores its 10-15 row whatever the date is', async () => {
     const { w, d } = await setup();
     let release!: () => void;
     const hold = new Promise<void>((r) => { release = r; });
@@ -117,7 +118,7 @@ describe('holdout guard', () => {
       await sql`update settings set engine_sales_max_date = '2026-10-20'`.execute(trx);
     });
     await holding;
-    // an upload dated 10-15 starts while the date is still 10-14 on disk: it must wait, then see 10-20
+    // an upload dated 10-15 starts while the lock is held: it must wait, then store the row
     let uploadDone = false;
     const upload = post('/engine/sales', d, { rows: [sale({ sale_date: '2026-10-15' })] }).then((r) => { uploadDone = true; return r; });
     let setDone = false;

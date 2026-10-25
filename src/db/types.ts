@@ -49,6 +49,8 @@ export interface SettingsTable {
   /** v5.22.0: days the bot-uploaded aftermarket / closed-auction rows and the ended GoDaddy auctions are kept. Migration only. */
   datasave_dynadot_keep_days: Generated<number>;
   datasave_auction_keep_days: Generated<number>;
+  /** v5.41.0: the least price (cents) an auction needs to be kept in godaddy_auctions and, when it ended with a bid, to become an engine_sales row. Migration only, >= 100. */
+  datasave_auction_min_cents: Generated<number>;
   /** v5.26.0 (CR-072): DIGITS_OR_HYPHEN filter of the closeout candidates (default on). */
   closeouts_filter_digits_hyphen: Generated<boolean>;
   /** v5.28.0 (CR-073): pick-proof settings. Migration only; k can only be raised (trigger) and is at most 300. */

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { ymd } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
-import { ENGINE_MAX_ROWS, registerBulkRoute, type DbSizeGuard, type SealedAfter } from '../../engine/index.js';
+import { ENGINE_MAX_ROWS, registerBulkRoute, type DbSizeGuard } from '../../engine/index.js';
 import { dataRowCounts, loadBigcoNames, loadLive, loadRdap, loadSalesComps, loadTmKills, readData, type DataLoadResult, type DataTable } from '../tables.js';
 
 const Doc = z.object({ rows: z.array(z.record(z.string(), z.unknown())).min(1).max(ENGINE_MAX_ROWS), dry_run: z.boolean().optional() }).strict();
@@ -16,7 +16,7 @@ const Query = z.object({
   limit: z.coerce.number().int().min(1).max(5000).default(1000),
 }).strict();
 
-type Loader = (db: Kysely<Database>, rows: unknown[], ctx: { by: string; auditId: string | null; now: number; dryRun: boolean; sealedAfter: SealedAfter }) => Promise<DataLoadResult>;
+type Loader = (db: Kysely<Database>, rows: unknown[], ctx: { by: string; auditId: string | null; now: number; dryRun: boolean }) => Promise<DataLoadResult>;
 const TABLES: { path: string; table: DataTable; load: Loader }[] = [
   { path: 'rdap', table: 'domain_rdap', load: loadRdap },
   { path: 'live-checks', table: 'live_checks', load: loadLive },

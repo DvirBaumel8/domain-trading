@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.41.0 (2026-10-25): Free data for the scoring engine: holdout block removed, engineFeed from GoDaddy closeouts and auctions
+Release note: `docs/releases/v5.41.0.md`.
+MINOR (migration `1766700000000_v5-41-0.sql`: `settings.datasave_auction_min_cents`).
+- `POST /engine/sales`, `POST /engine/unsold` and the `/data/*` loads no longer reject rows dated after the holdout date; `HOLDOUT_SEALED` is no longer returned. `GET`/`POST /engine/holdout-date` stay, deprecated; their answers add `effect: "none since 5.41.0"`.
+- `POST /engine/sales` refuses a row whose `venue`, `source` or `source_url` names NameBio (`SOURCE_NAMEBIO_FORBIDDEN`).
+- Job `datasave`: new step `engineFeed` (unsold names from deleted GoDaddy closeouts, sold names from GoDaddy auction endings with a bid, into the engine tables, `by: datasave`); `buildPanel` tags engine-regime names first (`tags.regime_due_n`); `godaddy_auctions` keeps auctions from `settings.datasave_auction_min_cents` (default $100, was $500).
+
 ## 5.40.0 (2026-10-25): DB query counter per request and per job step (G-125)
 Release note: `docs/releases/v5.40.0.md`.
 MINOR (additive; no migration).

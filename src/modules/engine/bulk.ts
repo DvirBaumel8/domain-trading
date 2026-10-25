@@ -8,7 +8,7 @@ import { advisoryXactLock } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { normalizeDomain } from '../../domain-name.js';
 import { AppError } from '../../http/errors.js';
-import { databaseBytes, guardDbSize, payloadBytesOf, salesMaxDate, type DbSizeGuard } from './holdout.js';
+import { databaseBytes, guardDbSize, payloadBytesOf, type DbSizeGuard } from './holdout.js';
 
 export const ENGINE_MAX_ROWS = 20_000;
 export const ENGINE_MAX_REJECTS = 200;
@@ -18,9 +18,6 @@ const BULK_BODY_LIMIT = 8 * 1024 * 1024;
 
 export interface Reject { row: number; domain: string | null; reason: string }
 export type Parsed<T> = { ok: true; value: T } | { ok: false; domain: string | null; reason: string };
-/** A fixed date, or a reader called inside the upload lock (M4: the date is read under the same lock `setSalesMaxDate` takes). */
-export type SealedAfter = string | ((trx: Kysely<Database>) => Promise<string>);
-const resolveSealed = (s: SealedAfter | undefined, trx: Kysely<Database>): Promise<string | undefined> => (typeof s === 'function' ? s(trx) : Promise.resolve(s));
 
 // ---- row validators ------------------------------------------------------------------------------------------------------------------------
 export const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -35,11 +32,10 @@ export function domainOf(r: Record<string, unknown>): { domain: string } | { rea
   }
 }
 
-/** A real calendar date from the earliest allowed one to today (IDT). */
-export function dateOf(v: unknown, today: string, sealedAfter?: string): { date: string } | { reason: string } {
+/** A real calendar date from the earliest allowed one to today (IDT). Since 5.41.0 there is no holdout date: a date is never rejected for being new. */
+export function dateOf(v: unknown, today: string): { date: string } | { reason: string } {
   if (typeof v !== 'string' || !isRealDate(v) || v < ENGINE_EARLIEST_DATE) return { reason: 'DATE_INVALID' };
   if (v > today) return { reason: 'DATE_IN_FUTURE' };
-  if (sealedAfter !== undefined && v > sealedAfter) return { reason: 'HOLDOUT_SEALED' };
   return { date: v };
 }
 
@@ -58,18 +54,16 @@ export const textOf = (v: unknown, max: number): string | null => (typeof v === 
  * uploads never race on the duplicate check. `apply` gets the valid rows and may add rejects of its own; the rejects come back sorted by row.
  */
 export async function bulkLoad<T, R>(db: Kysely<Database>, rows: unknown[], o: {
-  sealedAfter?: SealedAfter;
-  parse: (raw: unknown, sealedAfter: string | undefined) => Parsed<T>;
+  parse: (raw: unknown) => Parsed<T>;
   apply: (trx: Kysely<Database>, valid: { i: number; v: T }[], rejects: Reject[]) => Promise<R>;
 }): Promise<{ result: R; rejects: Reject[] }> {
   if (rows.length < 1 || rows.length > ENGINE_MAX_ROWS) throw new AppError(422, 'VALIDATION_ERROR', `rows must hold 1 to ${ENGINE_MAX_ROWS} rows`);
   return db.transaction().execute(async (trx) => {
     await advisoryXactLock(trx, 'engine_upload');
-    const sealedAfter = await resolveSealed(o.sealedAfter, trx);
     const rejects: Reject[] = [];
     const valid: { i: number; v: T }[] = [];
     rows.forEach((raw, i) => {
-      const p = o.parse(raw, sealedAfter);
+      const p = o.parse(raw);
       if (p.ok) valid.push({ i, v: p.value });
       else rejects.push({ row: i, domain: p.domain, reason: p.reason });
     });
@@ -85,7 +79,7 @@ export async function bulkLoad<T, R>(db: Kysely<Database>, rows: unknown[], o: {
  */
 export function registerBulkRoute<R extends object>(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; dbSize: DbSizeGuard }, o: {
   path: string; doc: z.ZodType; dryRun: boolean;
-  load: (rows: unknown[], ctx: { by: string; auditId: string | null; now: number; dryRun: boolean; sealedAfter: SealedAfter }) => Promise<R>;
+  load: (rows: unknown[], ctx: { by: string; auditId: string | null; now: number; dryRun: boolean }) => Promise<R>;
   summary: (r: R, before: number, after: number) => string;
   extend?: () => Promise<object>;
 }): void {
@@ -93,7 +87,7 @@ export function registerBulkRoute<R extends object>(app: FastifyInstance, deps: 
   app.post(o.path, { config: { openapiBody: o.doc }, bodyLimit: BULK_BODY_LIMIT }, async (req, reply) => {
     const b = body.parse(req.body ?? {}) as { rows: unknown[]; dry_run?: boolean };
     const before = await guardDbSize(deps.db, deps.dbSize, payloadBytesOf(req, b.rows));
-    const r = await o.load(b.rows, { by: req.auth?.name ?? 'unknown', auditId: req.auditId ?? null, now: deps.now(), dryRun: b.dry_run === true, sealedAfter: salesMaxDate });
+    const r = await o.load(b.rows, { by: req.auth?.name ?? 'unknown', auditId: req.auditId ?? null, now: deps.now(), dryRun: b.dry_run === true });
     const after = await (deps.dbSize.bytes ?? (() => databaseBytes(deps.db)))();
     const more = o.extend ? await o.extend() : {};
     req.auditSummary = o.summary(r, before, after);

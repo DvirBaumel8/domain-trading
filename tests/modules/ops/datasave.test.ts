@@ -46,7 +46,7 @@ describe('DS521 datasave job', () => {
     const run = await runJobToEnd(app!, 'datasave');
     expect(run.json().ok).toBe(true);
     const steps = run.json().steps;
-    expect(Object.keys(steps)).toEqual(['godaddyInventory', 'dynadotCloseouts', 'dynadotAftermarket', 'scorePool', 'buildPanel', 'pickproofSeal', 'snapshotRetention', 'episodes', 'dqMarket', 'pickproofLabels']);
+    expect(Object.keys(steps)).toEqual(['godaddyInventory', 'dynadotCloseouts', 'dynadotAftermarket', 'scorePool', 'buildPanel', 'engineFeed', 'pickproofSeal', 'snapshotRetention', 'episodes', 'dqMarket', 'pickproofLabels']);
     expect(steps.godaddyInventory.summary).toMatchObject({ data_date: '2026-10-20', complete_n: 5 });
     const res = (await get('/snapshots?date=2026-10-20&source=godaddy_inventory')).json();
     expect(res.snapshots).toHaveLength(5);
@@ -89,7 +89,7 @@ describe('DS521 datasave job', () => {
     expect(retries[1]).toMatchObject({ params: { retry: true }, trigger: 'scheduled', triggered_by: 'datasave-retry' });
     expect(retries[1]!.not_before!.getTime()).toBe(NOW + 3_600_000);
     // not run before its time, and a retry never retries again
-    expect((await db.selectFrom('job_steps').select('status').where('job', '=', 'datasave').execute()).filter((s) => s.status === 'queued')).toHaveLength(10);
+    expect((await db.selectFrom('job_steps').select('status').where('job', '=', 'datasave').execute()).filter((s) => s.status === 'queued')).toHaveLength(11);
   });
 
   it('DS521-7 the retry runs once the hour is up (asking for the job again starts the waiting run), saves the day and does not queue a third run', async () => {
@@ -169,7 +169,7 @@ describe('DS521 datasave job', () => {
     const runs = (await get('/jobs/runs?job=datasave')).json().runs;
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ job: 'datasave', status: 'finished', ok: true });
-    expect(Object.fromEntries(Object.entries(runs[0].steps as Record<string, { status: string }>).map(([k, v]) => [k, v.status]))).toEqual({ godaddyInventory: 'done', dynadotCloseouts: 'done', dynadotAftermarket: 'done', scorePool: 'done', buildPanel: 'done', pickproofSeal: 'done', snapshotRetention: 'done', episodes: 'done', dqMarket: 'done', pickproofLabels: 'done' });
+    expect(Object.fromEntries(Object.entries(runs[0].steps as Record<string, { status: string }>).map(([k, v]) => [k, v.status]))).toEqual({ godaddyInventory: 'done', dynadotCloseouts: 'done', dynadotAftermarket: 'done', scorePool: 'done', buildPanel: 'done', engineFeed: 'done', pickproofSeal: 'done', snapshotRetention: 'done', episodes: 'done', dqMarket: 'done', pickproofLabels: 'done' });
     expect(runs[0].steps.godaddyInventory.summary.data_date).toBe('2026-10-20');
   });
 
@@ -296,7 +296,7 @@ describe('DS537 in-range GoDaddy auctions with bids (godaddy_auctions_live)', ()
   };
   const live = () => db.selectFrom('godaddy_auctions_live').select(['data_date', 'domain', 'price_cents', 'bid_count', 'domain_age', 'valuation_cents', 'pageviews', 'auction_type', 'end_time']).orderBy('domain').execute();
 
-  it('DS537-1 a $40 auction with 3 bids and a $250 one with 1 bid are kept with age, valuation and pageviews; 0 bids, $250.01, .net and adult are not; the $500+ godaddy_auctions rows are unchanged', async () => {
+  it('DS537-1 a $40 auction with 3 bids and a $250 one with 1 bid are kept with age, valuation and pageviews; 0 bids, $250.01, .net and adult are not; godaddy_auctions follows the $100 floor of settings.datasave_auction_min_cents (5.41.0: the $250 and $250.01 rows are followed too)', async () => {
     await boot();
     day({ 'all_biddable_auctions.json.zip': [
       { domainName: 'Forty.com', price: '$40', auctionEndTime: END, numberOfBids: 3, domainAge: 7, valuation: '$1,234', pageviews: 55 },
@@ -309,12 +309,12 @@ describe('DS537 in-range GoDaddy auctions with bids (godaddy_auctions_live)', ()
     ] });
     const r = await runJobToEnd(app!, 'datasave');
     expect(r.json().ok).toBe(true);
-    expect(r.json().steps.godaddyInventory.summary).toMatchObject({ live_kept_n: 2, live_band_max_cents: 25000, tracked_n: 1 });
+    expect(r.json().steps.godaddyInventory.summary).toMatchObject({ live_kept_n: 2, live_band_max_cents: 25000, tracked_n: 3 });
     expect(await live()).toEqual([
       { data_date: '2026-10-20', domain: 'edge.com', price_cents: 25000, bid_count: 1, domain_age: 1, valuation_cents: 0, pageviews: 0, auction_type: 'Bid', end_time: new Date(END) },
       { data_date: '2026-10-20', domain: 'forty.com', price_cents: 4000, bid_count: 3, domain_age: 7, valuation_cents: 123400, pageviews: 55, auction_type: 'Bid', end_time: new Date(END) },
     ]);
-    expect((await db.selectFrom('godaddy_auctions').select('domain').execute()).map((x) => x.domain)).toEqual(['big.com']);
+    expect((await db.selectFrom('godaddy_auctions').select('domain').orderBy('domain').execute()).map((x) => x.domain)).toEqual(['big.com', 'edge.com', 'over.com']);
   });
 
   it('DS537-2 the same domain in two auction files merges (max bids and price); running the day again does not duplicate', async () => {

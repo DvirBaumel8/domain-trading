@@ -35,7 +35,7 @@ const STEP_ATTEMPTS: Record<string, number> = {
   registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1, engineEndings: 1, engineTrain: 1, trainModel: 1, godaddyInventory: 1,
 };
 const DEFAULT_TIMEOUT_MS = 5 * 60_000;
-const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000, godaddyInventory: 45 * 60_000, buildPanel: 25 * 60_000 };
+const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000, godaddyInventory: 45 * 60_000, buildPanel: 25 * 60_000, engineFeed: 10 * 60_000 };
 
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
 
@@ -106,8 +106,8 @@ export interface JobRunnerDeps {
   engineEndingsJob?: Runnable;
   /** v5.5.0 (CR-056 part 2): `weekly()` is the daily step engineTrain (decides and queues a `train` run); `runById` is the `train` job's step trainModel. */
   engineTrainer?: { weekly(): Promise<unknown>; runById(id: string): Promise<unknown> };
-  /** v5.21.0 (CR-071): the datasave job's steps (ten since v5.35.0: pickproofSeal before snapshotRetention) (v5.23.0: episodes, dqMarket; v5.28.0: pickproofLabels last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
-  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; pickproofSeal(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown>; pickproofLabels(): Promise<unknown> };
+  /** v5.21.0 (CR-071): the datasave job's steps (eleven since v5.41.0: engineFeed after buildPanel; ten since v5.35.0: pickproofSeal before snapshotRetention) (v5.23.0: episodes, dqMarket; v5.28.0: pickproofLabels last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
+  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; engineFeed(): Promise<unknown>; pickproofSeal(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown>; pickproofLabels(): Promise<unknown> };
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
   /** Takes the run lock (default: a database session lock). Tests of the step order pass a stub. */
@@ -161,9 +161,9 @@ export class JobRunner {
     // v5.21.0 (CR-071): POST /jobs/run {job:'datasave'}. Each step has its own status; a failed godaddyInventory does not stop the rest.
     if (job === 'datasave') {
       const ds = d.datasaveJob;
-      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'pickproofSeal' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels') =>
+      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'engineFeed' | 'pickproofSeal' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels') =>
         step(name, async () => (ds ? ds[name]() : { skipped: true, reason: 'datasave not configured' }));
-      return [dsStep('godaddyInventory'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels')];
+      return [dsStep('godaddyInventory'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels')];
     }
     if (job === 'tick') return [...tick, optionalFn('reviewRetry', d.reviewRetry, 'review retry not configured')];
     // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.

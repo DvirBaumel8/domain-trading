@@ -6,6 +6,8 @@
 // v5.22.0 (R-10): the four auction files are also parsed (godaddy_auctions): .com auctions that reached $500, followed until they leave the files.
 //   scorePool          (v5.26.0, CR-072) filters and scores the pool and the sealed Dynadot closeouts rows, offline; closeouts/score-pool.ts.
 //   buildPanel         the day diff of the closeouts pool (names gone before their end), split by RDAP tag bought / deleted / unknown (v5.34.0, BUG-052).
+//   engineFeed         (v5.41.0) free rows for the scoring engine: closeout names that left the list and were deleted (engine_unsold) and GoDaddy auctions that ended with
+//                      a bid (engine_sales). Reuses the engine's own upload code (storeUnsold / storeSales), one engine_uploads row per kind per run.
 //   snapshotRetention  deletes raw zips past their window (manifest stays) and pool rows past their days.
 // It reads only the public inventory host (official files, no scraping) and writes only its own tables and files. Files are keyed by the source's
 // Last-Modified date, never the run date. A failed fetch is a manifest with status error and the HTTP status, never rows 0.
@@ -18,6 +20,9 @@ import { Readable, Transform, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../../db/types.js';
+import { idtDay } from '../../../../core/dates.js';
+import { AppError } from '../../../../http/errors.js';
+import { guardDbSize, loadRegimeTest, storeSales, storeUnsold, type DbSizeGuard, type RegimeTest } from '../../../engine/index.js';
 import { runDqMarket, runEpisodes } from '../../../market/index.js';
 import { autoSeal, pickproofLabels } from '../../../pickproof/index.js';
 import type { RdapLookupFn } from '../../../../core/rdap.js';
@@ -33,8 +38,10 @@ export const POOL_SOURCE = 'godaddy_closeouts';
 export const CLOSEOUTS_FILE = 'closeout_listings.json.zip';
 /** v5.22.0 (CR-071 R-10): the auction files whose rows are followed in godaddy_auctions (when configured). */
 export const AUCTION_FILES: ReadonlySet<string> = new Set(['all_expiring_auctions.json.zip', 'all_biddable_auctions.json.zip', 'all_listings_ending_today.json.zip', 'auctions_ending_today.json.zip']);
-/** An auction is followed once its price reached $500. */
-export const AUCTION_TRACK_MIN_CENTS = 50_000;
+/** v5.41.0: where the official ended-auction rows of engineFeed point (the inventory host's file list). */
+export const AUCTION_SOURCE = 'godaddy_auctions_file';
+/** Rough size of one engine row for the database size guard. */
+const ENGINE_ROW_BYTES = 300;
 const MAX_FILE_BYTES = 200 * 1024 * 1024;
 const METADATA_TIMEOUT_MS = 60_000;
 const DOWNLOAD_TIMEOUT_MS = 15 * 60_000;
@@ -56,6 +63,8 @@ export interface DatasaveDeps {
   /** v5.34.0 (BUG-052): tests pass an RDAP stub and a no-op sleep for the disappearance tags; default the Verisign lookup. */
   rdap?: RdapLookupFn;
   sleep?: (ms: number) => Promise<void>;
+  /** v5.41.0: the database size guard for engineFeed (same limit as the engine uploads). Without it the step skips the guard. */
+  dbSize?: DbSizeGuard;
 }
 
 interface FileResult {
@@ -96,8 +105,8 @@ export class DatasaveJob {
   private get fetchFn(): typeof fetch { return this.deps.fetch ?? globalThis.fetch; }
 
   private async settings() {
-    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_auction_keep_days', 'datasave_auction_live_keep_days']).executeTakeFirstOrThrow();
-    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, auctionKeepDays: s.datasave_auction_keep_days, liveKeepDays: s.datasave_auction_live_keep_days };
+    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_auction_keep_days', 'datasave_auction_live_keep_days', 'datasave_auction_min_cents']).executeTakeFirstOrThrow();
+    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, auctionKeepDays: s.datasave_auction_keep_days, liveKeepDays: s.datasave_auction_live_keep_days, auctionMinCents: s.datasave_auction_min_cents };
   }
 
   // ---------- godaddyInventory ----------
@@ -127,7 +136,7 @@ export class DatasaveJob {
         results.push({ file, data_date: dataDate, status: 'complete', bytes: existing.bytes, sha256: existing.sha256, last_modified: existing.last_modified?.toISOString() ?? null, rows: existing.rows, http_status: existing.http_status, raw_available: existing.raw_available, code: 'SNAPSHOT_SEALED' });
         continue;
       }
-      results.push(await this.saveFile(file, dataDate, entry.lastModified, st.maxPriceCents));
+      results.push(await this.saveFile(file, dataDate, entry.lastModified, st.maxPriceCents, st.auctionMinCents));
     }
     const dataDate = results.map((r) => r.data_date).sort().at(-1) ?? runDate;
     return { ...this.summary(dataDate, results), ...(await this.auctionSummary(st.files, results)) };
@@ -178,7 +187,7 @@ export class DatasaveJob {
     return { file, data_date: dataDate, status: 'error', bytes: null, sha256: null, last_modified: lastModified, rows: null, http_status: httpStatus, raw_available: false, error };
   }
 
-  private async saveFile(file: string, dataDate: string, lastModified: string, maxPriceCents: number): Promise<FileResult> {
+  private async saveFile(file: string, dataDate: string, lastModified: string, maxPriceCents: number, auctionMinCents: number): Promise<FileResult> {
     const parseKind: 'closeouts' | 'auctions' | null = file === CLOSEOUTS_FILE ? 'closeouts' : AUCTION_FILES.has(file) ? 'auctions' : null;
     const parse = parseKind !== null;
     // where the raw zip goes; if the folder can't be written the job goes on without raw files
@@ -223,7 +232,7 @@ export class DatasaveJob {
       let error: string | null = null;
       if (parse && writePath) {
         try {
-          const r = parseKind === 'auctions' ? await this.parseAuctions(writePath, dataDate) : await this.parseCloseouts(writePath, dataDate, maxPriceCents);
+          const r = parseKind === 'auctions' ? await this.parseAuctions(writePath, dataDate, auctionMinCents) : await this.parseCloseouts(writePath, dataDate, maxPriceCents);
           rows = r.kept; rowsTotal = r.total;
         } catch (e) {
           status = 'partial';
@@ -278,12 +287,13 @@ export class DatasaveJob {
   // ---------- GoDaddy auctions (v5.22.0, CR-071 R-10) ----------
 
   /**
-   * Streams one auction file into godaddy_auctions: only .com, not adult, valid end time, and either a price of $500 or more now or a domain that is
+   * Streams one auction file into godaddy_auctions: only .com, not adult, valid end time, and either a price of settings.datasave_auction_min_cents or more now (default $100 since 5.41.0; was $500) or a domain that is
    * already followed (once a name reached $500 it is followed to its end). A domain in several files merges (max bid count, max price, latest end time).
    * Returns the rows kept (upserted) and the rows read.
    */
-  async parseAuctions(zipPath: string, dataDate: string): Promise<{ kept: number; total: number }> {
+  async parseAuctions(zipPath: string, dataDate: string, minCents?: number): Promise<{ kept: number; total: number }> {
     const { db } = this.deps;
+    const trackMin = minCents ?? (await this.settings()).auctionMinCents; // v5.41.0: settings.datasave_auction_min_cents (was the fixed $500)
     const tracked = new Set((await db.selectFrom('godaddy_auctions').select('domain').where('ended', '=', false).execute()).map((r) => r.domain));
     const entries = await listZipEntries(zipPath);
     const entry = entries.find((e) => /\.json$/i.test(e.name));
@@ -314,7 +324,7 @@ export class DatasaveJob {
         });
       }
       const isTracked = tracked.has(domain);
-      if (!isTracked && (price === null || price < AUCTION_TRACK_MIN_CENTS)) continue;
+      if (!isTracked && (price === null || price < trackMin)) continue;
       if (Number.isNaN(end)) continue;
       const prev = seen.get(domain);
       seen.set(domain, {
@@ -468,7 +478,9 @@ export class DatasaveJob {
    */
   async buildPanel(): Promise<unknown> {
     const { db } = this.deps;
-    const tags = await tagDisappearances({ db, now: this.deps.now, rdap: this.deps.rdap, sleep: this.deps.sleep });
+    let regime: RegimeTest | undefined;
+    try { regime = await loadRegimeTest(db); } catch (e) { this.deps.log?.warn({ err: shortError(e) }, 'datasave: regime test not loaded, tags keep the plain order'); }
+    const tags = await tagDisappearances({ db, now: this.deps.now, rdap: this.deps.rdap, sleep: this.deps.sleep, regime });
     const dynadot = await this.dynadotPanel();
     const latest = (await db.selectFrom('datasave_pool').select((eb) => eb.fn.max('data_date').as('d')).where('source', '=', POOL_SOURCE).executeTakeFirst())?.d;
     if (!latest) return { status: 'no_pool', data_date: null, previous_date: null, gone_before_end_n: null, reason: 'no parsed closeouts day yet', dynadot, tags };
@@ -500,6 +512,67 @@ export class DatasaveJob {
     const gone = await sql<{ n: string }>`select count(distinct p.domain)::text as n from dynadot_rows p where p.kind = 'closeouts' and p.data_date = ${prev}::date and p.ends_at > ${new Date(`${latest}T00:00:00Z`)}
       and not exists (select 1 from dynadot_rows t where t.kind = 'closeouts' and t.data_date = ${latest}::date and t.domain = p.domain)`.execute(db);
     return { data_date: latest, previous_date: prev, gone_before_end_n: Number(gone.rows[0]!.n), ...(await goneByTag(db, 'dynadot_closeouts', latest)) };
+  }
+
+  // ---------- engineFeed (v5.41.0) ----------
+
+  /**
+   * Free rows for the scoring engine. Rules: docs/internal/datasave.md "Engine feed".
+   *  unsold: godaddy_closeouts disappearances tagged `deleted` (the name left the list before its end and the registry says it is gone) -> engine_unsold,
+   *          type dropped_after_held, observation_date = gone_date, caught_by_catcher true when the tag is RE_REGISTERED, false when NOT_REGISTERED, else null.
+   *  sales:  GoDaddy auctions that ended with >= 1 bid and a final price >= settings.datasave_auction_min_cents, with no engine_sales row for the name within 20 days
+   *          of the end day -> engine_sales (venue godaddy, source godaddy_auctions_file). Mostly investor-to-investor sales: the source marks them.
+   * Both go through the engine's own upload code (one engine_uploads row per kind per run, by 'datasave', multi-row inserts, its duplicate rules).
+   */
+  async engineFeed(): Promise<unknown> {
+    const { db } = this.deps;
+    const nowMs = this.deps.now();
+    const out = { status: 'ok' as 'ok' | 'db_size_high', unsold_inserted_n: 0, sales_inserted_n: 0, skipped_dup_n: 0, regime_n: 0, unsold_candidates_n: 0, sales_candidates_n: 0, rejected_n: 0, unsold_upload_id: null as number | null, sales_upload_id: null as number | null, auction_min_cents: 0, db_bytes_before: null as number | null };
+    const minCents = (await this.settings()).auctionMinCents;
+    out.auction_min_cents = minCents;
+    const regime = await loadRegimeTest(db).catch(() => null);
+    const ctx = { by: 'datasave', auditId: null, now: nowMs };
+    const guard = async (n: number): Promise<boolean> => {
+      if (!this.deps.dbSize) return true;
+      try { out.db_bytes_before = await guardDbSize(db, this.deps.dbSize, n * ENGINE_ROW_BYTES); return true; } catch (e) {
+        if (e instanceof AppError && e.code === 'DB_SIZE_HIGH') { out.status = 'db_size_high'; return false; }
+        throw e;
+      }
+    };
+
+    // ---- unsold
+    const gone = (await sql<{ domain: string; gone_date: string; tag_reason: string }>`select d.domain, d.gone_date::text as gone_date, d.tag_reason from disappearances d
+      where d.source = 'godaddy_closeouts' and d.tag = 'deleted' and d.domain like '%.com'
+        and not exists (select 1 from engine_unsold u where u.domain = d.domain and u.observation_date = d.gone_date)
+      order by d.gone_date, d.domain limit 20000`.execute(db)).rows;
+    out.unsold_candidates_n = gone.length;
+    const deletedTotal = Number((await sql<{ n: string }>`select count(*)::text as n from disappearances where source = 'godaddy_closeouts' and tag = 'deleted' and domain like '%.com'`.execute(db)).rows[0]!.n);
+    out.skipped_dup_n += Math.max(0, deletedTotal - gone.length); // already in engine_unsold for that (domain, day)
+    if (gone.length > 0 && await guard(gone.length)) {
+      const rows = gone.map((g) => ({ domain: g.domain, type: 'dropped_after_held', observation_date: g.gone_date, caught_by_catcher: g.tag_reason === 'RE_REGISTERED' ? true : g.tag_reason === 'NOT_REGISTERED' ? false : null }));
+      const r = await storeUnsold(db, rows, ctx);
+      out.unsold_inserted_n = r.accepted_n; out.skipped_dup_n += r.duplicate_n; out.rejected_n += r.rejected_n; out.unsold_upload_id = r.upload_id;
+      if (regime) out.regime_n = gone.filter((g) => regime(g.domain)).length;
+    }
+
+    // ---- sales
+    if (out.status === 'ok') {
+      const ended = (await sql<{ domain: string; end_time: Date; price: number }>`select a.domain, a.end_time, a.last_price_cents as price from godaddy_auctions a
+        where a.ended and a.last_bid_count >= 1 and a.last_price_cents >= ${minCents} and a.domain like '%.com'
+          and not exists (select 1 from engine_sales s where s.domain = a.domain and abs(s.sale_date - (a.end_time at time zone 'Asia/Jerusalem')::date) <= 20)
+        order by a.end_time, a.domain limit 20000`.execute(db)).rows;
+      out.sales_candidates_n = ended.length;
+      const endedTotal = Number((await sql<{ n: string }>`select count(*)::text as n from godaddy_auctions where ended and last_bid_count >= 1 and last_price_cents >= ${minCents} and domain like '%.com'`.execute(db)).rows[0]!.n);
+      out.skipped_dup_n += Math.max(0, endedTotal - ended.length); // already in engine_sales within 20 days
+      if (ended.length > 0 && await guard(ended.length)) {
+        const url = `${GODADDY_INVENTORY_BASE}/metadata.json`;
+        const rows = ended.map((a) => ({ domain: a.domain, price_usd: a.price / 100, sale_date: idtDay(new Date(a.end_time).getTime()), venue: 'godaddy', source: AUCTION_SOURCE, source_url: url }));
+        const r = await storeSales(db, rows, ctx);
+        out.sales_inserted_n = r.accepted_n; out.skipped_dup_n += r.duplicate_n; out.rejected_n += r.rejected_n; out.sales_upload_id = r.upload_id;
+        if (regime) out.regime_n += ended.filter((a) => regime(a.domain)).length;
+      }
+    }
+    return out;
   }
 
   // ---------- snapshotRetention ----------

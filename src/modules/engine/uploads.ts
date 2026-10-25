@@ -4,7 +4,7 @@ import type { Kysely } from 'kysely';
 import { chunks } from '../../core/chunks.js';
 import { dayNumber, idtDay } from '../../core/dates.js';
 import type { Database } from '../../db/types.js';
-import { bulkLoad, centsOf, ENGINE_MAX_REJECTS, dateOf, domainOf, isObj, rawDomain, textOf, type Parsed, type Reject, type SealedAfter } from './bulk.js';
+import { bulkLoad, centsOf, ENGINE_MAX_REJECTS, dateOf, domainOf, isObj, rawDomain, textOf, type Parsed, type Reject } from './bulk.js';
 
 export { ENGINE_MAX_ROWS } from './bulk.js';
 /** Two sales of one name within this many days (either way) are the same sale reported twice. */
@@ -13,19 +13,19 @@ export const UNSOLD_TYPES = ['dropped_after_held', 'registered_unsold'] as const
 type UnsoldType = (typeof UNSOLD_TYPES)[number];
 
 export interface UploadResult { upload_id: number; received_n: number; accepted_n: number; duplicate_n: number; rejected_n: number; rejects: Reject[] }
-interface Ctx { by: string; auditId: string | null; now: number; /** v5.10.0: rows dated after this are HOLDOUT_SEALED (default: no guard). */ sealedAfter?: SealedAfter }
+interface Ctx { by: string; auditId: string | null; now: number }
 
 interface SaleRow { domain: string; price_cents: number; sale_date: string; venue: string; source: string; source_url: string | null }
 interface UnsoldRow { domain: string; type: UnsoldType; observation_date: string; caught_by_catcher: boolean | null }
 
-function parseSaleRow(raw: unknown, today: string, sealedAfter?: string): Parsed<SaleRow> {
+function parseSaleRow(raw: unknown, today: string): Parsed<SaleRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf(raw);
   if ('reason' in d) return { ok: false, domain: rawDomain(raw), reason: d.reason };
   const fail = (reason: string): Parsed<SaleRow> => ({ ok: false, domain: d.domain, reason });
   const cents = centsOf(raw.price_usd);
   if (cents === null) return fail('PRICE_INVALID');
-  const date = dateOf(raw.sale_date, today, sealedAfter);
+  const date = dateOf(raw.sale_date, today);
   if ('reason' in date) return fail(date.reason);
   const venue = textOf(raw.venue, 60);
   if (venue === null) return fail('VENUE_INVALID');
@@ -36,16 +36,18 @@ function parseSaleRow(raw: unknown, today: string, sealedAfter?: string): Parsed
     sourceUrl = textOf(raw.source_url, 500);
     if (sourceUrl === null) return fail('SOURCE_URL_INVALID');
   }
+  // v5.41.0: NameBio's terms forbid training models on its data without written permission (round-2 research, 25 Oct 2026); same rule as POST /data/sales
+  if ([venue, source, sourceUrl ?? ''].some((t) => /namebio/i.test(t))) return fail('SOURCE_NAMEBIO_FORBIDDEN');
   return { ok: true, value: { domain: d.domain, price_cents: cents, sale_date: date.date, venue, source, source_url: sourceUrl } };
 }
 
-function parseUnsoldRow(raw: unknown, today: string, sealedAfter?: string): Parsed<UnsoldRow> {
+function parseUnsoldRow(raw: unknown, today: string): Parsed<UnsoldRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf(raw);
   if ('reason' in d) return { ok: false, domain: rawDomain(raw), reason: d.reason };
   const fail = (reason: string): Parsed<UnsoldRow> => ({ ok: false, domain: d.domain, reason });
   if (typeof raw.type !== 'string' || !(UNSOLD_TYPES as readonly string[]).includes(raw.type)) return fail('TYPE_INVALID');
-  const date = dateOf(raw.observation_date, today, sealedAfter);
+  const date = dateOf(raw.observation_date, today);
   if ('reason' in date) return fail(date.reason);
   const c = raw.caught_by_catcher;
   if (c !== undefined && c !== null && typeof c !== 'boolean') return fail('CAUGHT_BY_CATCHER_INVALID');
@@ -56,14 +58,13 @@ const CHUNK = 2_000;
 
 async function store<T extends { domain: string }>(
   db: Kysely<Database>, kind: 'sales' | 'unsold', rows: unknown[], ctx: Ctx,
-  parse: (raw: unknown, today: string, sealedAfter?: string) => Parsed<T>,
+  parse: (raw: unknown, today: string) => Parsed<T>,
   isDuplicate: (trx: Kysely<Database>, valid: T[]) => Promise<(r: T) => boolean>,
   insert: (trx: Kysely<Database>, uploadId: number, accepted: T[]) => Promise<void>,
 ): Promise<UploadResult> {
   const today = idtDay(ctx.now);
   const { result, rejects } = await bulkLoad(db, rows, {
-    sealedAfter: ctx.sealedAfter,
-    parse: (raw, sealedAfter) => parse(raw, today, sealedAfter),
+    parse: (raw) => parse(raw, today),
     apply: async (trx, valid, rejected) => {
       const dup = await isDuplicate(trx, valid.map((x) => x.v));
       const accepted: T[] = [];

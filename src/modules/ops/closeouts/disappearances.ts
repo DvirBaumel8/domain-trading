@@ -45,12 +45,15 @@ export function tagOf(r: RdapLookup, base: Baseline, source: TagSource, prevDate
   return same ? { tag: 'unknown', reason: 'SAME_REGISTRAR' } : { tag: 'bought', reason: `REGISTRAR_CHANGED:${base.registrar} -> ${f.registrar}` };
 }
 
-export interface TagDeps { db: Kysely<Database>; now: () => number; rdap?: RdapLookupFn; sleep?: (ms: number) => Promise<void> }
+/** `regime` (v5.41.0): names it accepts are looked up first, so the daily cap yields rows the engine can train on. */
+export interface TagDeps { db: Kysely<Database>; now: () => number; rdap?: RdapLookupFn; sleep?: (ms: number) => Promise<void>; regime?: (domain: string) => boolean }
 export interface TagSummary {
   status: 'ok' | 'stopped' | 'nothing_due';
   inserted: Record<TagSource, number>;
   eligible_n: number; lookups_n: number; cache_hits_n: number; retagged_n: number; bought_n: number; deleted_n: number; unknown_n: number; not_com_n: number;
   cap: number; stopped_reason: string | null; pruned_n: number;
+  /** v5.41.0: how many of the due names are in the engine's regime (looked up first); 0 without a regime test. */
+  regime_due_n: number;
 }
 
 const dayStart = (d: string): Date => new Date(`${d}T00:00:00Z`);
@@ -104,7 +107,7 @@ export async function tagDisappearances(deps: TagDeps): Promise<TagSummary> {
   const out: TagSummary = {
     status: 'nothing_due', inserted: { godaddy_closeouts: 0, dynadot_closeouts: 0, market_episode: 0 },
     eligible_n: 0, lookups_n: 0, cache_hits_n: 0, retagged_n: 0, bought_n: 0, deleted_n: 0, unknown_n: 0, not_com_n: 0,
-    cap: st.disappearance_lookups_max_per_run, stopped_reason: null, pruned_n: 0,
+    cap: st.disappearance_lookups_max_per_run, stopped_reason: null, pruned_n: 0, regime_due_n: 0,
   };
 
   out.inserted.godaddy_closeouts = await collectCloseouts(db, 'godaddy_closeouts');
@@ -121,6 +124,13 @@ export async function tagDisappearances(deps: TagDeps): Promise<TagSummary> {
     from disappearances where not final and (rdap_checked_at is null or rdap_checked_at < ${dayStart(today)})
     order by (attempts > 0), (source = 'market_episode'), gone_date desc, source, domain`.execute(db)).rows;
   out.eligible_n = due.length;
+  if (deps.regime) {
+    // engine-regime names first (stable sort: the order above holds inside each group)
+    const flag = new Map<string, boolean>();
+    for (const d of due) if (!flag.has(d.domain)) flag.set(d.domain, deps.regime(d.domain));
+    out.regime_due_n = due.filter((d) => flag.get(d.domain)).length;
+    due.sort((a, b) => Number(flag.get(b.domain)) - Number(flag.get(a.domain)));
+  }
 
   for (const d of due) {
     // a stored answer counts only if it was read after the name left the feed

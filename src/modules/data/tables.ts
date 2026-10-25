@@ -7,7 +7,7 @@ import { formatUsd } from '../../core/money.js';
 import type { Database } from '../../db/types.js';
 import { chunks } from '../../core/chunks.js';
 import { candidatePoolHosts } from '../candidates/index.js';
-import { bulkLoad, centsOf, dateOf, domainOf, ENGINE_MAX_REJECTS, isObj, rawDomain, textOf, type Parsed, type Reject, type SealedAfter } from '../engine/index.js';
+import { bulkLoad, centsOf, dateOf, domainOf, ENGINE_MAX_REJECTS, isObj, rawDomain, textOf, type Parsed, type Reject } from '../engine/index.js';
 
 const DATA_TABLES = ['domain_rdap', 'live_checks', 'tm_kills', 'bigco_names', 'sales_comps'] as const;
 export type DataTable = (typeof DATA_TABLES)[number];
@@ -21,7 +21,7 @@ export interface DataLoadResult {
   table: DataTable; dry_run: boolean; received_n: number; accepted_n: number; duplicate_n: number; rejected_n: number;
   skipped_not_in_pool_n?: number; rejects: Reject[];
 }
-interface Ctx { by: string; auditId: string | null; now: number; dryRun: boolean; sealedAfter: SealedAfter }
+interface Ctx { by: string; auditId: string | null; now: number; dryRun: boolean }
 
 /** An instant from an ISO timestamp or a plain day; null when it does not read as a real one. */
 function instantOf(v: unknown): Date | null {
@@ -106,12 +106,12 @@ interface CompRow {
   domain: string; sale_date: string; price_cents: number; tier: 'T1' | 'T2' | 'T3' | 'T4'; year_flag: string | null; sale_year: number;
   reg_date_at_sale: string | null; net_reg_at_sale: string | null; org_reg_at_sale: string | null; source_url: string | null; dup_sources: string | null;
 }
-function parseCompRow(raw: unknown, today: string, sealedAfter: string): Parsed<CompRow> {
+function parseCompRow(raw: unknown, today: string): Parsed<CompRow> {
   if (!isObj(raw)) return { ok: false, domain: null, reason: 'ROW_INVALID' };
   const d = domainOf(raw);
   if ('reason' in d) return { ok: false, domain: rawDomain(raw), reason: d.reason };
   const fail = (reason: string): Parsed<CompRow> => ({ ok: false, domain: d.domain, reason });
-  const date = dateOf(raw.sale_date, today, sealedAfter);
+  const date = dateOf(raw.sale_date, today);
   if ('reason' in date) return fail(date.reason);
   const cents = centsOf(raw.price_usd);
   if (cents === null) return fail('PRICE_INVALID');
@@ -135,10 +135,10 @@ function parseCompRow(raw: unknown, today: string, sealedAfter: string): Parsed<
 // ---- loader skeleton -----------------------------------------------------------------------------------------------------------------------
 type Trx = Kysely<Database>;
 async function run<T>(
-  db: Kysely<Database>, table: DataTable, rows: unknown[], ctx: Ctx, parse: (raw: unknown, sealedAfter: string | undefined) => Parsed<T>,
+  db: Kysely<Database>, table: DataTable, rows: unknown[], ctx: Ctx, parse: (raw: unknown) => Parsed<T>,
   apply: (trx: Trx, valid: { i: number; v: T }[], rejects: Reject[]) => Promise<{ accepted: number; duplicate: number; skipped?: number }>,
 ): Promise<DataLoadResult> {
-  const { result: r, rejects } = await bulkLoad(db, rows, { sealedAfter: ctx.sealedAfter, parse, apply });
+  const { result: r, rejects } = await bulkLoad(db, rows, { parse, apply });
   return {
     table, dry_run: ctx.dryRun, received_n: rows.length, accepted_n: r.accepted, duplicate_n: r.duplicate, rejected_n: rejects.length,
     ...(r.skipped !== undefined && { skipped_not_in_pool_n: r.skipped }), rejects: rejects.slice(0, ENGINE_MAX_REJECTS),
@@ -225,7 +225,7 @@ export const loadBigcoNames = loadTerms('bigco_names');
 
 export function loadSalesComps(db: Kysely<Database>, rows: unknown[], ctx: Ctx): Promise<DataLoadResult> {
   const today = idtDay(ctx.now);
-  return run<CompRow>(db, 'sales_comps', rows, ctx, (raw, sealed) => parseCompRow(raw, today, sealed!), async (trx, valid) => {
+  return run<CompRow>(db, 'sales_comps', rows, ctx, (raw) => parseCompRow(raw, today), async (trx, valid) => {
     const domains = [...new Set(valid.map((x) => x.v.domain))];
     const seen = new Set<string>();
     const engine = new Map<string, number>();

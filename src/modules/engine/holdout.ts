@@ -1,11 +1,15 @@
-// v5.10.0 (CR-061): the holdout guard (engine.sales_max_date) and the database-size guard of the engine uploads.
+// v5.10.0 (CR-061): the holdout date (engine.sales_max_date) and the database-size guard of the engine uploads.
+// 5.41.0: the holdout date is deprecated and blocks nothing (the trainer keeps the newest full quarter as its test file); the date is only stored and shown.
 import { sql, type Kysely } from 'kysely';
 import { checkApproval } from '../../core/approval.js';
 import { advisoryXactLock } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 
-/** Rows dated after this IDT calendar date are rejected with HOLDOUT_SEALED (sales by sale_date, unsold by observation_date). */
+/** Reject reasons that are no longer returned but stay in the contract's code list (5.41.0: HOLDOUT_SEALED). */
+export const RETIRED_REJECT_CODES = ['HOLDOUT_SEALED'] as const;
+
+/** The stored holdout date (IDT day). Deprecated since 5.41.0: no row is rejected for it. */
 export async function salesMaxDate(db: Kysely<Database>): Promise<string> {
   const r = await db.selectFrom('settings').select('engine_sales_max_date').executeTakeFirstOrThrow();
   return r.engine_sales_max_date;
