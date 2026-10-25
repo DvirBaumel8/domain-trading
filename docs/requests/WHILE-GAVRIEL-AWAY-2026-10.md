@@ -76,6 +76,12 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - v5.36.0 (migration `1766400000000_v5-36-0.sql`): `settings.s8_max_price_cents` 5000 → 25000. `S8_PRICE_CAP` now answers only above $250. `CLAUDE.md` founder rule 5 and "Main buying line" updated.
 - Gavriel: confirm 5.36.0 on `/health`. Above $50, show Dvir why a name is worth more before he approves. Dvir did not set a new S8 test budget; the earlier plan (about $600 for 10 names, from 13 Nov) stands until he says otherwise.
 
+### 25 Oct 2026: auctions research (playbook)
+- Dvir: "Now we can use others experience for improve our knowledge about auctions domains. Go ahead please".
+- DOM wrote `docs/research/auctions-playbook.md`: how GoDaddy and Dynadot expired auctions work (proxy bids, 5-minute extension, redemption refund), how experienced investors bid (value first, fixed maximum set early, pay a third to a fifth of resale), what sells, and what it means for us.
+- Gavriel: read it before proposing any auction name. Every proposal should carry a written maximum bid with its reason; Dvir approves the name and the maximum and bids by hand.
+- Proposed next build (waiting for Dvir): keep GoDaddy auctions in our price range ($12–$250, with bids) from the daily files we already download. Today only auctions that reached $500 are kept.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
