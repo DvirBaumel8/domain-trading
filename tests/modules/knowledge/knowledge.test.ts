@@ -222,7 +222,9 @@ describe('knowledge repo load (CR-078 rule 9)', () => {
     const { r } = await setup();
     const res = await new KbLoadJob({ db, now: () => clock, dir: new URL('../../../data/knowledge/', import.meta.url).pathname }).runOnce();
     expect(res.failed).toEqual([]);
-    expect(res.loaded.map((l: { file: string }) => l.file)).toEqual(['0001-questions.jsonl', '0002-october-research.jsonl']);
+    const files = res.loaded.map((l: { file: string }) => l.file);
+    expect(files.slice(0, 2)).toEqual(['0001-questions.jsonl', '0002-october-research.jsonl']);
+    expect(files).toEqual([...files].sort()); // loaded in name order; later research rounds add files
     const qs = (await get('/kb/questions', r)).json().questions as { slug: string }[];
     expect(qs.length).toBeGreaterThanOrEqual(25);
     for (const q of qs) expect((await get(`/kb/questions/${q.slug}/verdict`, r)).statusCode).toBe(200);
