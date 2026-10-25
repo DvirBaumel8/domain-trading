@@ -9,6 +9,7 @@ import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
 import { V3_SET } from '../../helpers/pricing.js';
 import { newPricingSettings } from '../../../src/modules/ops/admin/pricing-settings.js';
+import { ensureBidPlan } from '../../helpers/bid-plans.js';
 import { issueToken } from '../../helpers/tokens.js';
 
 let app: FastifyInstance;
@@ -37,8 +38,13 @@ const body = (over: Record<string, unknown> = {}) => ({
   buy_date: '2026-10-05', expiry_date: '2027-10-05', category: 'trend', comps_value: 1200, ...over,
 });
 // a fresh WRITE token per call: the per-token rate limit is not what these tests are about
-const post = async (b: unknown, key: string = randomUUID(), headers?: Record<string, string>) =>
-  app.inject({ method: 'POST', url: '/portfolio/import', headers: { ...(headers ?? (await issueToken('write')).auth), 'idempotency-key': key }, payload: b as object });
+// v5.39.0 (CR-077): an S8 import runs under a bid plan; these tests are about the import rules, so each name gets a plan with a maximum bid at the S8 cap first
+const post = async (b: unknown, key: string = randomUUID(), headers?: Record<string, string>) => {
+  const d = (b as { domain?: unknown }).domain;
+  // a body without approval_ref has no plan either (S8-1: neither an approval nor a plan)
+  if (typeof d === 'string' && d.endsWith('.com') && (b as { approval_ref?: unknown }).approval_ref !== undefined) await ensureBidPlan(db, d.toLowerCase());
+  return app.inject({ method: 'POST', url: '/portfolio/import', headers: { ...(headers ?? (await issueToken('write')).auth), 'idempotency-key': key }, payload: b as object });
+};
 const count = async (t: 'domains' | 'ledger_entries' | 'pricing_evidence' | 'listing_history' | 'price_schedule') => (await db.selectFrom(t).selectAll().execute()).length;
 const dom = (d = D) => db.selectFrom('domains').selectAll().where('domain', '=', d).executeTakeFirstOrThrow();
 const seedLine = async (n: number, lane: 'S8' | null, prefix: string) => {

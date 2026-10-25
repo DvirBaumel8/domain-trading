@@ -16,6 +16,7 @@ import { isCategory, validateComps, validateListing, type Comp, type ListingPlan
 import { planView } from '../../listing/index.js';
 import { applyPlan, domainPlanColumns } from '../../listing/index.js';
 import { withDomainLock } from '../../../core/locks.js';
+import { markImported } from '../auctions/plans.js';
 
 /** Bad or missing arguments (the CLI exits 2). Business refusals are AppErrors (exit 1, code in the message). */
 export class ImportInputError extends Error {}
@@ -37,6 +38,8 @@ export interface ImportInput {
   binOverrideCents?: number; floorOverrideCents?: number;
   /** v5.8.0: the HTTP audit id; the import then writes no audit row of its own (the audit hook writes it). */
   auditId?: string;
+  /** v5.39.0 (CR-077): the API import of an S8 name needs a bid plan (open or won) and a price at or under its maximum bid. The admin command leaves `enforceBidPlan` off. */
+  enforceBidPlan?: boolean; bidPlan?: { id: number; status: 'open' | 'won'; maxBidCents: number } | null; actor?: string | null;
 }
 
 export interface ImportResult {
@@ -44,7 +47,7 @@ export interface ImportResult {
   listing: object | null; warnings: string[];
   /** v5.8.0 (S8 imports): the lane, the price-list rung chosen from the comps value, and what would refuse the import (a dry run reports it; a real import throws it). */
   lane?: 'S8'; s8?: { source: string; comps_value_cents: number | null; bin_cents: number | null; floor_cents: number | null; bin_source: 'override' | 'ladder' | 'grade_price' | null; floor_source: 'override' | 'formula' | null; s8_names: number; s8_reserved_slots: number; s8_max_price_cents: number };
-  would_be_blocked?: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | null;
+  would_be_blocked?: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | 'BID_PLAN_REQUIRED' | 'PRICE_ABOVE_PLAN' | null;
 }
 
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
@@ -167,7 +170,7 @@ export async function importDomain(
   const s = await currentSettings(db, now);
 
   // v5.8.0 (CR-059): S8 caps. The per-name price cap and the slot reservation come from the settings row (migration only).
-  let wouldBeBlocked: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | null = null;
+  let wouldBeBlocked: ImportResult['would_be_blocked'] = null;
   let s8Listing: ListingRequest | null = null;
   if (p.lane === 'S8') {
     if (p.costCents > settings.s8_max_price_cents) {
@@ -177,6 +180,17 @@ export async function importDomain(
     const counts = await activeLaneCounts(db);
     wouldBeBlocked = laneCapBlock('S8', counts, settings);
     if (wouldBeBlocked && !input.dryRun) throw s8CapError(wouldBeBlocked, counts, settings);
+    if (input.enforceBidPlan) {
+      if (!input.bidPlan) {
+        if (!input.dryRun) throw new AppError(409, 'BID_PLAN_REQUIRED', `${domain} has no open or won bid plan: POST /auctions/plans first (a plan whose auction ended more than 7 days ago is expired: record its result first)`, { domain });
+        wouldBeBlocked ??= 'BID_PLAN_REQUIRED';
+      } else if (p.costCents > input.bidPlan.maxBidCents) {
+        const e = new AppError(409, 'PRICE_ABOVE_PLAN', `price_paid ${formatUsd(p.costCents)} is above the bid plan's maximum bid ${formatUsd(input.bidPlan.maxBidCents)}`,
+          { plan_id: input.bidPlan.id, price_paid_cents: p.costCents, max_bid_cents: input.bidPlan.maxBidCents });
+        if (!input.dryRun) throw e;
+        wouldBeBlocked ??= 'PRICE_ABOVE_PLAN';
+      }
+    }
     if (!p.listing) {
       if (!isV3(s)) throw new AppError(409, 'PRICING_SETTINGS_NO_PRICE_LIST', 'The current pricing settings have no price list; an S8 BIN comes from the price list');
       if (p.category === 'geo') {
@@ -305,7 +319,7 @@ export async function importDomain(
     await trx.insertInto('ledger_entries').values({
       occurred_on: p.buyDate, domain_id: row.id, deal_id: input.deal ?? null, type: 'registration', amount_cents: -p.costCents,
       counterparty: p.registrar, receipt_ref: `${p.registrar}:${p.order}`,
-      note: ['import', p.lane === 'S8' ? `S8 ${input.s8Source ?? ''}`.trim() : undefined, input.costNote?.trim(), `approval ${auditId}`].filter(Boolean).join('; '), audit_id: auditId,
+      note: ['import', p.lane === 'S8' ? `S8 ${input.s8Source ?? ''}`.trim() : undefined, input.bidPlan ? `bid plan ${input.bidPlan.id}` : undefined, input.costNote?.trim(), `approval ${auditId}`].filter(Boolean).join('; '), audit_id: auditId,
     }).execute();
     await trx.insertInto('pricing_evidence').values({
       domain_id: row.id, comps: comps ? JSON.stringify(comps) : null, rationale, legacy_no_comps_reason: p.legacy, audit_id: auditId,
@@ -320,6 +334,9 @@ export async function importDomain(
         approvalText: p.approval?.text ?? null, approvalAt: p.approval?.at ?? null, auditId, anchor: p.today, dropDate, settings: s, now, lane: p.lane,
       })
       : [];
+    if (p.lane === 'S8' && input.enforceBidPlan && input.bidPlan) {
+      await markImported(trx, input.bidPlan.id, p.costCents, { tokenName: input.actor ?? null, auditId, nowMs: now.getTime(), domainId: row.id });
+    }
     // The domain cap counts the import. An import over it succeeds (the money is already spent) and says so.
     const n = await activeDomainCount(trx);
     if (n > settings.max_domains) warnings.push(`DOMAIN_CAP_EXCEEDED_BY_IMPORT: ${n}/${settings.max_domains} domains; /buy is refused until under the cap`);
@@ -337,7 +354,7 @@ function s8CapError(code: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED', c: { total: nu
 
 async function s8Fields(
   db: Kysely<Database>, lane: 'S8' | null, input: ImportInput, plan: ListingPlan | null,
-  settings: { s8_max_price_cents: number; s8_reserved_slots: number }, blocked: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | null,
+  settings: { s8_max_price_cents: number; s8_reserved_slots: number }, blocked: ImportResult['would_be_blocked'] | null,
 ): Promise<Pick<ImportResult, 'lane' | 's8' | 'would_be_blocked'>> {
   if (lane !== 'S8') return {};
   return {

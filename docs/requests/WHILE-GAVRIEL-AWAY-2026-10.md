@@ -135,6 +135,11 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - **Traffic read** (`docs/internal/loop/traffic-2026-10-25.md`): about 1 s per call, many bot 4xx retries (G-126), and the bulk fixes must come before any bulk load. `/health datasave: partial` is from the paused Dynadot uploads (G-120 explained).
 - Both research rounds were limited: the web-search budget ran out, and NamePros blocks automated reads (not bypassed). A second round follows.
 
+### 25 Oct 2026: v5.39.0, auction bid plans (CR-077)
+- Before every auction bid: `POST /auctions/prebid`, then Dvir's approved maximum as `POST /auctions/plans` (his line names the domain and the maximum in dollars), then the result `POST /auctions/plans/{id}/result`. An S8 import now needs the plan, and the price paid must be at or under its maximum. Closeouts are refused (`CLOSEOUTS_PAUSED`); Dvir confirmed he doesn't buy closeouts by hand either. Release note `docs/releases/v5.39.0.md`.
+- Dvir, 25 Oct: **free services only** (no paid data or tools).
+- Dvir, 25 Oct: the engine's 14 Oct holdout block is wrong: it throws away all new data. It will be replaced (store everything; the trainer's own newest-quarter test stays the fair test). The daily GoDaddy closeout names will feed the engine's unsold side, and auction results from $100 its sold side. Build approved by Dvir ("Build").
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.

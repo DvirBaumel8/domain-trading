@@ -207,8 +207,11 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /visits/forward/{domain}': 'allowed', // a URL forward at the registrar moves no money (CR-069 item 1 lists the visits routes)
   // write only (the job runner: the daily job applies prices and drops)
   'POST /jobs/run': 'write_only',
+  'POST /auctions/plans': 'write_only', // v5.39.0 (CR-077): Dvir's approved maximum bid; Gavriel (WRITE) only
+  'POST /auctions/plans/{id}/result': 'write_only', // v5.39.0 (CR-077): the real outcome of a bid plan
   // allowed
   'POST /tokens/bots/rotate': 'allowed',
+  'POST /auctions/prebid': 'allowed', // v5.39.0 (CR-077): stores a safety check (a fact about a public name); no money, price or listing
   'POST /listings/{domain}/observed': 'allowed', // v5.27.0 (CR-076 R-2): a public sighting, stored as observed_public; touches no listing, price or export
   'POST /portfolio/{domain}/display-name': 'allowed', // v5.27.0 (CR-076 R-5): capitalisation of the name only
   'POST /portfolio/{domain}/renewal-price': 'allowed',

@@ -11,6 +11,7 @@ import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
 import { AppError } from '../../../http/errors.js';
 import type { RegistrarAdapter } from '../../registrars/index.js';
+import { importPlanFor } from '../auctions/plans.js';
 import { ImportInputError, importDomain } from '../admin/import-domain.js';
 
 const S8_SOURCES = ['closeout', 'fixed', 'auction'] as const;
@@ -56,8 +57,17 @@ export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely
     const now = new Date(deps.now());
     const domain = normalizeDomain(b.domain);
     const cfg = await deps.db.selectFrom('settings').select('approval_max_age_hours').executeTakeFirstOrThrow();
-    const appr = checkApproval(b.approval_ref ?? null, domain, now, cfg.approval_max_age_hours);
-    if (!appr.ok) throw new AppError(422, appr.code, appr.reason);
+    // v5.39.0 (CR-077): a bid plan carries Dvir's approval of the name and the price (an auction can end later than the 72 h of an approval_ref), so approval_ref may be left out
+    // when a plan exists. One that is given is validated as before (before the plan is looked up).
+    const given = b.approval_ref !== undefined && b.approval_ref !== null;
+    if (given) {
+      const appr = checkApproval(b.approval_ref ?? null, domain, now, cfg.approval_max_age_hours);
+      if (!appr.ok) throw new AppError(422, appr.code, appr.reason);
+    }
+    const plan = await importPlanFor(deps.db, domain, now.getTime());
+    if (!given && !plan) throw new AppError(422, 'APPROVAL_INVALID', 'approval_ref is required unless the name has an open or won bid plan (POST /auctions/plans)');
+    const approvalText = given ? String(b.approval_ref?.text) : plan!.approvalText;
+    const approvalAt = given ? String(b.approval_ref?.approved_at) : plan!.approvalAt.toISOString();
 
     if (isBackorder(b.source) || isBackorder(b.registrar)) {
       throw new AppError(400, 'BACKORDER_SOURCE_REFUSED', 'NameJet, SnapNames and DropCatch (backorder and catch services) are not accepted as a registrar or a source');
@@ -68,7 +78,7 @@ export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely
     if (!domain.endsWith('.com') || domain.split('.').length !== 2) throw new AppError(422, 'VALIDATION_ERROR', 'Only .com names');
 
     // CR-060: an approved BIN / floor must be named in Dvir's approval line
-    const named = namedAmountsCents(String(b.approval_ref?.text));
+    const named = namedAmountsCents(approvalText);
     for (const [field, v] of [['bin_override', b.bin_override], ['floor_override', b.floor_override]] as const) {
       if (v !== undefined && !named.has(v)) {
         throw new AppError(422, 'APPROVAL_INVALID', `approval_ref.text must name the ${field} price ($${(v / 100).toLocaleString('en-US')}) as a dollar amount`, { override: field, [`${field}_cents`]: v });
@@ -86,7 +96,8 @@ export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely
       r = await importDomain(deps.db, {
         domain, registrar, buyDate: b.buy_date, costCents: apiCents(b.price_paid, 'price_paid'), order: b.order, deal: b.deal_id ?? undefined,
         category: b.category ?? undefined, grade: b.price_grade ?? undefined, evidence: b.pricing_evidence as { comps?: unknown; rationale?: unknown } | null | undefined,
-        approvalText: String(b.approval_ref?.text), approvalAt: String(b.approval_ref?.approved_at),
+        approvalText, approvalAt, enforceBidPlan: true,
+        bidPlan: plan ? { id: plan.id, status: plan.status, maxBidCents: plan.maxBidCents } : null, actor: req.auth?.name ?? null,
         manual, expiry: b.expiry_date, renewalPriceCents: optCents(b.renewal_price, 'renewal_price'),
         lane: 'S8', s8Source: b.source, compsValueCents: optCents(b.comps_value, 'comps_value'),
         binOverrideCents: b.bin_override, floorOverrideCents: b.floor_override,
@@ -96,6 +107,7 @@ export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely
       if (e instanceof ImportInputError) throw new AppError(422, 'VALIDATION_ERROR', e.message);
       throw e;
     }
-    return reply.code(b.dry_run === true ? 200 : 201).send({ ...r, audit_id: req.auditId ?? null });
+    if (b.dry_run !== true) req.auditSummary = `imported ${domain}${plan ? ` under bid plan ${plan.id}` : ''}${given ? '' : ' (approval taken from the plan)'}`;
+    return reply.code(b.dry_run === true ? 200 : 201).send({ ...r, bid_plan_id: plan?.id ?? null, approval_from_plan: !given && plan !== null, audit_id: req.auditId ?? null });
   });
 }

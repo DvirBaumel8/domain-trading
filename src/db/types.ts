@@ -33,6 +33,8 @@ export interface SettingsTable {
   /** v5.8.0 (CR-059): the most one S8 name may have cost, and the slots of max_domains reserved for S8. Migration only. */
   s8_max_price_cents: Generated<number>;
   s8_reserved_slots: Generated<number>;
+  /** v5.39.0 (CR-077): false = POST /auctions/plans refuses kind "closeout" (CLOSEOUTS_PAUSED). Migration only. */
+  s8_closeouts_allowed: Generated<boolean>;
   /** v5.9.0 (CR-060): the S8 default BIN ladder by name length: [{max_len, bin_cents}], last max_len null. Migration only. */
   s8_bin_ladder: Generated<unknown>;
   /** v5.10.0 (CR-061): engine.sales_max_date, the holdout guard. Sales and unsold rows dated after it are rejected. Changed only by POST /engine/holdout-date. */
@@ -1566,6 +1568,54 @@ export interface MarketMatchedSetsTable {
   created_at: TimestampDefault;
 }
 
+/** v5.39.0 (CR-077): one pre-bid safety answer (append-only). */
+export interface PrebidChecksTable {
+  id: Generated<number>;
+  domain: string;
+  venue: 'godaddy' | 'dynadot';
+  verdict: 'pass' | 'flag' | 'fail';
+  answer: Json;
+  token_name: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+/** v5.39.0 (CR-077): a bid plan approved by Dvir. Mutable status; every change is a bid_plan_events row. */
+export interface BidPlansTable {
+  id: Generated<number>;
+  domain: string;
+  venue: 'godaddy' | 'dynadot';
+  kind: 'auction' | 'fixed_price' | 'closeout';
+  auction_end_at: Date | string | null;
+  max_bid_cents: number;
+  prebid_id: number;
+  status: Generated<'open' | 'won' | 'lost' | 'withdrawn' | 'expired'>;
+  manual: Json;
+  reasons: Json;
+  approval_text: string;
+  approval_at: Date | string;
+  created_by: string | null;
+  audit_id: string | null;
+  final_price_cents: number | null;
+  ended_at: Date | string | null;
+  created_at: TimestampDefault;
+  updated_at: TimestampDefault;
+}
+
+export interface BidPlanEventsTable {
+  id: Generated<number>;
+  plan_id: number;
+  event: 'created' | 'won' | 'lost' | 'withdrawn' | 'expired' | 'imported';
+  from_status: string | null;
+  to_status: string;
+  final_price_cents: number | null;
+  ended_at: Date | string | null;
+  detail: Json | null;
+  actor: string | null;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
 export interface ForwardCostPlansTable {
   id: Generated<number>;
   domain_id: number;
@@ -1607,6 +1657,9 @@ export interface Database {
   rdap_cache: RdapCacheTable;
   lookup_usage: LookupUsageTable;
   disappearances: DisappearancesTable;
+  prebid_checks: PrebidChecksTable;
+  bid_plans: BidPlansTable;
+  bid_plan_events: BidPlanEventsTable;
   forward_cost_plans: ForwardCostPlansTable;
   forward_cost_lines: ForwardCostLinesTable;
   deals: DealsTable;

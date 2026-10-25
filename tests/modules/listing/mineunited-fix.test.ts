@@ -9,6 +9,7 @@ import { T0 } from '../../helpers/buy.js';
 import { testDb as db } from '../../helpers/db.js';
 import { FakeAdapter } from '../../helpers/fake-adapter.js';
 import { V3_SET } from '../../helpers/pricing.js';
+import { ensureBidPlan } from '../../helpers/bid-plans.js';
 import { issueToken } from '../../helpers/tokens.js';
 import { newPricingSettings } from '../../../src/modules/ops/admin/pricing-settings.js';
 import { pendingDomains } from '../../../src/modules/listing/export-state.js';
@@ -26,6 +27,7 @@ async function importMineunited() {
   await newPricingSettings(db, { set: { ...V3_SET, comps_min: '0' }, approvalText: 'Dvir 7 Oct 2026: pricing v3, comps optional', approvalAt: new Date(T0 - 3_600_000).toISOString(), now: new Date(T0 - 60_000) });
   app = await makeApp({ adapters: [new FakeAdapter('porkbun')], rdap: async () => 'not_registered', now: () => T0 });
   const auth = (await issueToken('write')).auth;
+  await ensureBidPlan(db, M); // v5.39.0 (CR-077): an S8 import runs under a bid plan
   const r = await app.inject({
     method: 'POST', url: '/portfolio/import', headers: { ...auth, 'idempotency-key': randomUUID() },
     payload: {

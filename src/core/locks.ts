@@ -11,7 +11,7 @@ export type LockKey =
   | 'intake_screening' | 'daily_rebuild' | 'holdout_suites' | 'test_sets_seal' | 'company_document' | 'selection_settings_activate' | 'engine_upload' | 'engine_train'
   | 'job:tick' | 'job:daily' | 'job:screen' | 'job:train' | 'job:datasave' | 'job_enqueue' | 'review_run' | 'market_episodes' | 'market_sales' | 'market_matched'
   | `job:${'price' | 'drop' | 'ns-verify' | 'registrar-check' | 'portfolio-check' | 'drop-watch' | 'cohort-outcomes' | 'reference-refresh' | 'portfolio-lifecycle' | 'listing-sync' | 'retention' | 'engine-endings'}`
-  | `dynadot_upload:${string}` | `selection_list:${string}` | `pack:${string}` | `domain:${string}`;
+  | `dynadot_upload:${string}` | `selection_list:${string}` | `pack:${string}` | `domain:${string}` | `bid_plan:${string}`;
 
 /** The text that is hashed. A domain key hashes the bare domain name: the same key /buy has always used. */
 export const lockText = (key: LockKey): string => (key.startsWith('domain:') ? key.slice('domain:'.length) : key);

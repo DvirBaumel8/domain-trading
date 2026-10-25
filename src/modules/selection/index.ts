@@ -31,3 +31,4 @@ export { freshUntil, isFresh, prefetchDomainRecords, recordKey, RECORD_FRESH_DAY
 export { geoMembers, openTrancheFor } from './tranche-members.js';
 export { type LookalikeCounts, rerunLookalikes, screenedNames, type ScreenedName } from './portfolio-support.js';
 export { closeoutNameChecker, termKey, type CloseoutNameChecker, type CloseoutNameCode, type CloseoutNameVerdict } from './closeout-name.js';
+export { PREBID_ENDINGS, runPrebidChecks, verdictOf as prebidVerdictOf, type EndingState, type PrebidCheck, type PrebidEnding, type PrebidOutput, type PrebidResult } from './prebid.js';

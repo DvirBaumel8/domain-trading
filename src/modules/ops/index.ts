@@ -6,6 +6,7 @@ export { registerPortfolioImport } from './api/portfolio-import.js';
 export { registerJobs } from './api/jobs.js';
 export { registerSnapshots } from './api/snapshots.js';
 export { registerLookups } from './api/lookups.js';
+export { registerAuctions } from './api/auctions.js';
 export { registerCloseouts } from './api/closeouts.js';
 export { DatasaveJob } from './jobs/datasave/datasave.js';
 export { BackupExporter } from './jobs/backup-export.js';

@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.39.0 (2026-10-25): Auction bid plans: pre-bid check, Dvir's approved maximum, results, S8 import needs a plan (CR-077)
+Release note: `docs/releases/v5.39.0.md`.
+MINOR (additive; migration `1766600000000_v5-39-0.sql`), with one tightened rule: an S8 import without a bid plan, accepted before, is now 409 `BID_PLAN_REQUIRED`.
+- **New `POST /auctions/prebid`** (WRITE or bots, idempotent, audited, stored in `prebid_checks`): the automatic safety checks of a registered auction name (SPELL-1, BRAND-1, BIGCO-1, TM_KILL, TYPO-1, SURBL-1, WEB-RISK-1, RDAP_STATUS, SAME_NAME_ENDINGS, UK_COMPANY), `verdict` pass/flag/fail, the manual checks still required, the other endings.
+- **New `POST /auctions/plans`** (WRITE): Dvir's approved maximum bid; the approval names the domain and the maximum; a prebid of the last 72 h that did not fail; both manual checks confirmed; above $50 a reason; closeouts 409 `CLOSEOUTS_PAUSED` (`settings.s8_closeouts_allowed` false). **New `POST /auctions/plans/{id}/result`**, **`GET /auctions/plans`**, **`GET /auctions/plans/{id}`**.
+- **`POST /portfolio/import` (S8):** needs an open or won plan and `price_paid` at or under its maximum (409 `BID_PLAN_REQUIRED` / `PRICE_ABOVE_PLAN`); with a plan, `approval_ref` may be left out (the plan's approval is used).
+- New codes: `CLOSEOUTS_PAUSED`, `PREBID_REQUIRED`, `PREBID_FAILED`, `BID_PLAN_EXISTS`, `BID_PLAN_NOT_FOUND`, `BID_PLAN_CLOSED`, `PRICE_ABOVE_PLAN`, `BID_PLAN_REQUIRED`.
+
 ## 5.38.0 (2026-10-25): /health db_size.tables: the 10 largest tables (G-119, DB growth)
 Release note: `docs/releases/v5.38.0.md`.
 MINOR (additive; no migration).
