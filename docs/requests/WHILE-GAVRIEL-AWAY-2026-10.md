@@ -108,6 +108,12 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - **Urgent finding:** the DB grows about 44 MB a day (87 MB on 19 Oct → 350 MB, 32.6%, on 25 Oct). It would reach 70% around 3 Nov. v5.38.0 adds `GET /health` `db_size.tables` (the 10 largest tables) so the cause can be seen. The cut follows (G-119).
 - Also open: `/health datasave: partial` with every 24 Oct file complete (G-120).
 
+### 25 Oct 2026: first per-table DB reading (v5.38.0 live, G-119)
+- DOM read `GET /health` (READ token, GET only) at 08:47 UTC: version 5.38.0, 349.7 MB (32.6%).
+- Largest tables: `datasave_pool` 139 MB (394k rows), `dynadot_rows` 56 MB, `screening_results` 42 MB, `market_names` 35 MB, `pickproof_pool` 30 MB, `screening_evidence` 15 MB; the rest under 8 MB each.
+- So DOM's first guess (`pickproof_pool`) was wrong. `datasave_pool` keeps only 3 days, so it may already be at its full size and the growth may slow by itself. `dynadot_rows` (kept 120 days) keeps growing.
+- Next: a second reading on 26 Oct gives each table's growth per day. The cut is planned from that, before about 3 Nov.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
