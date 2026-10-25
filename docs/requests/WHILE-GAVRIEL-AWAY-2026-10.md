@@ -146,6 +146,13 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - **Top-down findings** (`docs/internal/loop/top-down-2026-10-25.md`), all approved by Dvir as G-127..G-133. Selling research (G-134) is parked: buy side first.
 - **Backup:** Dvir will create the private repo `domain-trading-data` and the backup token himself (free).
 
+### 25 Oct 2026: v5.40.0, v5.41.0, v5.42.0; score backtest
+- **v5.40.0:** every API call logs its DB query count (`db_queries`, `db_ms`), and every job step record in `GET /jobs/runs` carries `db: {queries, ms, top?}`. Report: `npm run traffic -- <api.log>`.
+- **v5.41.0:** the engine's 14 Oct holdout block is gone (rows of any past date load). The new datasave step `engineFeed` feeds the engine daily, for free: unsold = deleted GoDaddy closeouts; sold = GoDaddy auctions that ended with a bid at $100 or more (source `godaddy_auctions_file`, mostly investor sales). `POST /engine/sales` refuses NameBio-derived rows (its terms forbid model training).
+- **v5.42.0:** bulk reads and writes everywhere (5,000 sales rows: 10,003 queries down to 9). The sibling scan checks 4 siblings at a time with per-host pacing; its budget is still the whole call, capped at 90 s (Cloudflare cuts a request at about 100 s).
+- **Score backtest** (`docs/research/backtest-score-methods-2026-10-25.md`): Dvir's lift method (sold share against unsold share per pattern) scores AUC 0.80 on the CR-002 set, against 0.79 for the score v2 proposal and 0.74 for today's Form part. The engine reached 0.85 on the same kind of data.
+- **26 Oct, after the data save:** DOM reads the first live numbers, then runs a full improvement pass (`/improvement-pass`), as Dvir asked.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
