@@ -39,6 +39,7 @@ const MAX_FILE_BYTES = 200 * 1024 * 1024;
 const METADATA_TIMEOUT_MS = 60_000;
 const DOWNLOAD_TIMEOUT_MS = 15 * 60_000;
 const INSERT_BATCH = 5_000;
+const INT4_MAX = 2_147_483_647;
 
 export interface DatasaveDeps {
   db: Kysely<Database>;
@@ -95,8 +96,8 @@ export class DatasaveJob {
   private get fetchFn(): typeof fetch { return this.deps.fetch ?? globalThis.fetch; }
 
   private async settings() {
-    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_auction_keep_days']).executeTakeFirstOrThrow();
-    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, auctionKeepDays: s.datasave_auction_keep_days };
+    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_auction_keep_days', 'datasave_auction_live_keep_days']).executeTakeFirstOrThrow();
+    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, auctionKeepDays: s.datasave_auction_keep_days, liveKeepDays: s.datasave_auction_live_keep_days };
   }
 
   // ---------- godaddyInventory ----------
@@ -104,6 +105,8 @@ export class DatasaveJob {
   async godaddyInventory(): Promise<unknown> {
     const st = await this.settings();
     this.auctionsRead = 0;
+    this.liveKept = 0;
+    this.liveBandMax = null;
     const runDate = utcDay(this.deps.now());
     let listing: Map<string, { lastModified: string; size: number | null }>;
     try {
@@ -286,19 +289,33 @@ export class DatasaveJob {
     const entry = entries.find((e) => /\.json$/i.test(e.name));
     if (!entry) throw new Error('the zip holds no .json file');
     const seen = new Map<string, { end: number; type: string | null; price: number; bids: number }>();
+    // v5.37.0: the in-range band (price <= the S8 cap, at least min bids) is read at run time, so it follows the cap
+    const band = await db.selectFrom('settings').select(['s8_max_price_cents', 'datasave_auction_live_min_bids']).executeTakeFirstOrThrow();
+    type Live = { end: number; type: string | null; price: number; bids: number; age: number | null; valuation: number | null; views: number | null };
+    const live = new Map<string, Live>();
+    const nonNegInt = (v: unknown): number | null => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= INT4_MAX ? v : null);
+    const cap4 = (v: number | null): number | null => (v !== null && v <= INT4_MAX ? v : null);
     let total = 0;
     for await (const raw of streamArrayItems(await openZipEntry(zipPath, entry), 'data')) {
       total++;
-      const r = raw as { domainName?: unknown; auctionType?: unknown; auctionEndTime?: unknown; price?: unknown; numberOfBids?: unknown; isAdult?: unknown };
+      const r = raw as { domainName?: unknown; auctionType?: unknown; auctionEndTime?: unknown; price?: unknown; numberOfBids?: unknown; isAdult?: unknown; domainAge?: unknown; valuation?: unknown; pageviews?: unknown };
       if (typeof r.domainName !== 'string' || r.isAdult === true) continue;
       const domain = r.domainName.trim().toLowerCase();
       if (!domain.endsWith('.com')) continue;
       const price = priceToCents(r.price);
+      const end = typeof r.auctionEndTime === 'string' ? Date.parse(r.auctionEndTime) : NaN;
+      const bids = nonNegInt(r.numberOfBids) ?? 0;
+      if (!Number.isNaN(end) && price !== null && bids >= band.datasave_auction_live_min_bids && price <= band.s8_max_price_cents) {
+        const pl = live.get(domain);
+        const type = typeof r.auctionType === 'string' ? r.auctionType.slice(0, 40) : null;
+        live.set(domain, {
+          end: pl ? Math.max(pl.end, end) : end, type: pl?.type ?? type, price: Math.max(pl?.price ?? 0, price), bids: Math.max(pl?.bids ?? 0, bids),
+          age: pl?.age ?? nonNegInt(r.domainAge), valuation: pl?.valuation ?? cap4(priceToCents(r.valuation)), views: pl?.views ?? nonNegInt(r.pageviews),
+        });
+      }
       const isTracked = tracked.has(domain);
       if (!isTracked && (price === null || price < AUCTION_TRACK_MIN_CENTS)) continue;
-      const end = typeof r.auctionEndTime === 'string' ? Date.parse(r.auctionEndTime) : NaN;
       if (Number.isNaN(end)) continue;
-      const bids = typeof r.numberOfBids === 'number' && Number.isInteger(r.numberOfBids) && r.numberOfBids >= 0 ? r.numberOfBids : 0;
       const prev = seen.get(domain);
       seen.set(domain, {
         end: prev ? Math.max(prev.end, end) : end, type: typeof r.auctionType === 'string' ? r.auctionType.slice(0, 40) : (prev?.type ?? null),
@@ -319,11 +336,31 @@ export class DatasaveJob {
           max_price_cents = greatest(godaddy_auctions.max_price_cents, excluded.max_price_cents),
           last_bid_count = case when godaddy_auctions.last_seen = excluded.last_seen then greatest(godaddy_auctions.last_bid_count, excluded.last_bid_count) else excluded.last_bid_count end`.execute(db);
     }
+    const liveAll = [...live.entries()];
+    for (let i = 0; i < liveAll.length; i += INSERT_BATCH) {
+      const b = liveAll.slice(i, i + INSERT_BATCH);
+      // the four files are parsed one after the other for the same data date: merge, never replace
+      await sql`insert into godaddy_auctions_live (data_date, domain, end_time, auction_type, price_cents, bid_count, domain_age, valuation_cents, pageviews)
+        select ${dataDate}::date, d, e::timestamptz, t, p, n, a, v, w
+        from unnest(${b.map(([d]) => d)}::text[], ${b.map(([, x]) => new Date(x.end).toISOString())}::text[], ${b.map(([, x]) => x.type)}::text[], ${b.map(([, x]) => x.price)}::int[], ${b.map(([, x]) => x.bids)}::int[], ${b.map(([, x]) => x.age)}::int[], ${b.map(([, x]) => x.valuation)}::int[], ${b.map(([, x]) => x.views)}::int[]) as u(d, e, t, p, n, a, v, w)
+        on conflict (data_date, domain) do update set
+          end_time = greatest(godaddy_auctions_live.end_time, excluded.end_time),
+          auction_type = coalesce(godaddy_auctions_live.auction_type, excluded.auction_type),
+          price_cents = greatest(godaddy_auctions_live.price_cents, excluded.price_cents),
+          bid_count = greatest(godaddy_auctions_live.bid_count, excluded.bid_count),
+          domain_age = coalesce(godaddy_auctions_live.domain_age, excluded.domain_age),
+          valuation_cents = coalesce(godaddy_auctions_live.valuation_cents, excluded.valuation_cents),
+          pageviews = coalesce(godaddy_auctions_live.pageviews, excluded.pageviews)`.execute(db);
+    }
+    this.liveKept += liveAll.length;
+    this.liveBandMax = band.s8_max_price_cents;
     this.auctionsRead += total;
     return { kept: all.length, total };
   }
 
   private auctionsRead = 0;
+  private liveKept = 0;
+  private liveBandMax: number | null = null;
 
   /**
    * When every configured auction file of the data date is saved (complete), a followed auction that was not seen on that date and whose end time has
@@ -337,6 +374,10 @@ export class DatasaveJob {
     const dataDate = results.filter((r) => AUCTION_FILES.has(r.file)).map((r) => r.data_date).sort().at(-1);
     const read = this.auctionsRead;
     this.auctionsRead = 0;
+    const liveKept = this.liveKept;
+    const liveBandMax = this.liveBandMax;
+    this.liveKept = 0;
+    this.liveBandMax = null;
     let detection: string;
     let endedNow = 0;
     if (!dataDate) {
@@ -356,7 +397,7 @@ export class DatasaveJob {
     const count = async (q: ReturnType<typeof db.selectFrom<'godaddy_auctions'>>) => Number((await q.select((eb) => eb.fn.countAll<string>().as('n')).executeTakeFirstOrThrow()).n);
     const trackedN = await count(db.selectFrom('godaddy_auctions').where('ended', '=', false));
     const endedToday = dataDate ? await count(db.selectFrom('godaddy_auctions').where('ended', '=', true).where('final_state_at', '=', dataDate)) : 0;
-    return { auctions_seen_n: read, tracked_n: trackedN, ended_today_n: endedToday, ended_now_n: endedNow, auction_end_detection: detection };
+    return { auctions_seen_n: read, live_kept_n: liveKept, live_band_max_cents: liveBandMax, tracked_n: trackedN, ended_today_n: endedToday, ended_now_n: endedNow, auction_end_detection: detection };
   }
 
   // ---------- Dynadot (the server has no key; the bots upload, v5.22.0) ----------
@@ -489,8 +530,11 @@ export class DatasaveJob {
     // ended GoDaddy auctions are kept datasave.auction_keep_days; an open one not seen for that long is dropped too
     const auctionCut = utcDay(nowMs - st.auctionKeepDays * 86_400_000);
     const auctions = await db.deleteFrom('godaddy_auctions').where((eb) => eb.or([eb.and([eb('ended', '=', true), eb('final_state_at', '<', auctionCut)]), eb.and([eb('ended', '=', false), eb('last_seen', '<', auctionCut)])])).executeTakeFirst();
+    // v5.37.0: in-range auctions with bids are kept datasave.auction_live_keep_days (today and the days before it); not append-only
+    const liveCut = utcDay(nowMs - st.liveKeepDays * 86_400_000);
+    const live = await db.deleteFrom('godaddy_auctions_live').where('data_date', '<', liveCut).executeTakeFirst();
     return {
-      today, raw_cutoff_date: rawCut, raw_deleted: rawDeleted, pool_cutoff_date: poolCut, pool_rows_deleted: Number(pool.numDeletedRows ?? 0),
+      today, auctions_live_cutoff_date: liveCut, auctions_live_deleted: Number(live.numDeletedRows ?? 0), raw_cutoff_date: rawCut, raw_deleted: rawDeleted, pool_cutoff_date: poolCut, pool_rows_deleted: Number(pool.numDeletedRows ?? 0),
       dynadot_closeouts_deleted: Number(closeoutRows.numDeletedRows ?? 0), dynadot_rows_deleted: Number(otherRows.numDeletedRows ?? 0), dynadot_cutoff_date: dynadotCut,
       auctions_cutoff_date: auctionCut, auctions_deleted: Number(auctions.numDeletedRows ?? 0),
     };

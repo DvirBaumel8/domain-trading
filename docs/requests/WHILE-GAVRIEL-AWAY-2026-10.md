@@ -82,6 +82,11 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - Gavriel: read it before proposing any auction name. Every proposal should carry a written maximum bid with its reason; Dvir approves the name and the maximum and bids by hand.
 - Proposed next build (waiting for Dvir): keep GoDaddy auctions in our price range ($12–$250, with bids) from the daily files we already download. Today only auctions that reached $500 are kept.
 
+### 25 Oct 2026: v5.37.0, live auctions in our range (`GET /auctions/live`)
+- Dvir: "Yes sounds good build it." The daily save now keeps GoDaddy auctions at or under the S8 cap ($250) with at least one bid, 7 days, and `GET /auctions/live` lists them (filters: ending soon, bids, price, type). Release note `docs/releases/v5.37.0.md`.
+- v5.36.0's CI run failed (the `doctor` test counts migrations); it was never deployed. v5.37.0 fixes the count, so both go live together.
+- Gavriel: from the 25 Oct 15:00 UTC run, use this list to find auction names. Every proposal carries a maximum bid and its reason (`docs/research/auctions-playbook.md`).
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.

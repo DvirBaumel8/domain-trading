@@ -1,11 +1,12 @@
 // CR-075 (v5.23.0). POST /data/sales (bots or WRITE or data, Idempotency-Key, add-only), PUT/PATCH/DELETE on it (405 APPEND_ONLY),
-// GET /market/episodes, /market/matched, /market/dq, /market/coverage (READ or bots).
+// GET /auctions/live (v5.37.0), GET /market/episodes, /market/matched, /market/dq, /market/coverage (READ or bots).
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import { isRealDate } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
+import { AuctionsLiveQuery, listAuctionsLive } from '../auctions-live.js';
 import { BANDS, utcDay } from '../common.js';
 import { coverage } from '../coverage.js';
 import { latestDq } from '../dq.js';
@@ -56,6 +57,12 @@ export function registerMarket(app: FastifyInstance, deps: { db: Kysely<Database
     if (!p.success) throw bad(p);
     if (p.data.from && p.data.to && p.data.from > p.data.to) throw new AppError(400, 'VALIDATION_ERROR', 'from must not be after to');
     return listEpisodes(db, p.data);
+  });
+
+  app.get('/auctions/live', async (req) => {
+    const p = AuctionsLiveQuery.safeParse(req.query ?? {});
+    if (!p.success) throw bad(p);
+    return listAuctionsLive(db, p.data, deps.now());
   });
 
   app.get('/market/matched', async (req) => {

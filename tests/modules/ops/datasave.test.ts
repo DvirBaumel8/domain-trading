@@ -8,7 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import { loadConfig } from '../../../src/config.js';
 import { DatasaveJob } from '../../../src/modules/ops/jobs/datasave/datasave.js';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
-import { closeoutsJson, FILES, inventoryHandlers, makeZip, sha256 } from '../../helpers/datasave.js';
+import { auctionsJson, closeoutsJson, FILES, inventoryHandlers, makeZip, sha256 } from '../../helpers/datasave.js';
 import { testDb as db } from '../../helpers/db.js';
 import { testEnv } from '../../helpers/env.js';
 import { issueToken } from '../../helpers/tokens.js';
@@ -282,5 +282,76 @@ describe('DS521 datasave job', () => {
     const s = await db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days']).executeTakeFirstOrThrow();
     expect(s).toEqual({ datasave_godaddy_files: FILES, datasave_pool_max_price_cents: 4000, datasave_pool_keep_days: 3, datasave_raw_keep_days: 7 });
     await sql`select 1`.execute(db);
+  });
+});
+
+describe('DS537 in-range GoDaddy auctions with bids (godaddy_auctions_live)', () => {
+  const AUCTION_FILES = ['all_expiring_auctions.json.zip', 'all_biddable_auctions.json.zip', 'all_listings_ending_today.json.zip', 'auctions_ending_today.json.zip'];
+  const END = '2026-10-21T09:00:00Z';
+  const day = (perFile: Record<string, Parameters<typeof auctionsJson>[0]>, lm?: string) => {
+    const bodies: Record<string, Buffer> = {};
+    for (const f of AUCTION_FILES) bodies[f] = makeZip(f.replace(/\.zip$/, ''), auctionsJson(perFile[f] ?? []));
+    mswServer.resetHandlers();
+    mswServer.use(...inventoryHandlers({ bodies, ...(lm ? { lastModified: Object.fromEntries(['closeout_listings.json.zip', ...AUCTION_FILES].map((f) => [f, lm])) } : {}) }));
+  };
+  const live = () => db.selectFrom('godaddy_auctions_live').select(['data_date', 'domain', 'price_cents', 'bid_count', 'domain_age', 'valuation_cents', 'pageviews', 'auction_type', 'end_time']).orderBy('domain').execute();
+
+  it('DS537-1 a $40 auction with 3 bids and a $250 one with 1 bid are kept with age, valuation and pageviews; 0 bids, $250.01, .net and adult are not; the $500+ godaddy_auctions rows are unchanged', async () => {
+    await boot();
+    day({ 'all_biddable_auctions.json.zip': [
+      { domainName: 'Forty.com', price: '$40', auctionEndTime: END, numberOfBids: 3, domainAge: 7, valuation: '$1,234', pageviews: 55 },
+      { domainName: 'edge.com', price: '$250', auctionEndTime: END, numberOfBids: 1 },
+      { domainName: 'nobids.com', price: '$40', auctionEndTime: END, numberOfBids: 0 },
+      { domainName: 'over.com', price: '$250.01', auctionEndTime: END, numberOfBids: 5 },
+      { domainName: 'x.net', price: '$40', auctionEndTime: END, numberOfBids: 5 },
+      { domainName: 'adult.com', price: '$40', auctionEndTime: END, numberOfBids: 5, isAdult: true },
+      { domainName: 'big.com', price: '$900', auctionEndTime: END, numberOfBids: 2 },
+    ] });
+    const r = await runJobToEnd(app!, 'datasave');
+    expect(r.json().ok).toBe(true);
+    expect(r.json().steps.godaddyInventory.summary).toMatchObject({ live_kept_n: 2, live_band_max_cents: 25000, tracked_n: 1 });
+    expect(await live()).toEqual([
+      { data_date: '2026-10-20', domain: 'edge.com', price_cents: 25000, bid_count: 1, domain_age: 1, valuation_cents: 0, pageviews: 0, auction_type: 'Bid', end_time: new Date(END) },
+      { data_date: '2026-10-20', domain: 'forty.com', price_cents: 4000, bid_count: 3, domain_age: 7, valuation_cents: 123400, pageviews: 55, auction_type: 'Bid', end_time: new Date(END) },
+    ]);
+    expect((await db.selectFrom('godaddy_auctions').select('domain').execute()).map((x) => x.domain)).toEqual(['big.com']);
+  });
+
+  it('DS537-2 the same domain in two auction files merges (max bids and price); running the day again does not duplicate', async () => {
+    await boot();
+    day({
+      'all_expiring_auctions.json.zip': [{ domainName: 'dup.com', price: '$40', auctionEndTime: END, numberOfBids: 2 }],
+      'all_biddable_auctions.json.zip': [{ domainName: 'dup.com', price: '$60', auctionEndTime: '2026-10-21T09:05:00Z', numberOfBids: 4, domainAge: 3 }, { domainName: 'dup.com', price: '$50', auctionEndTime: END, numberOfBids: 1 }],
+    });
+    await runJobToEnd(app!, 'datasave');
+    const once = await live();
+    expect(once).toHaveLength(1);
+    expect(once[0]).toMatchObject({ domain: 'dup.com', price_cents: 6000, bid_count: 4, domain_age: 1, end_time: new Date('2026-10-21T09:05:00Z') });
+    await runJobToEnd(app!, 'datasave');
+    expect(await live()).toEqual(once);
+  });
+
+  it('DS537-3 raising s8_max_price_cents widens the band on the next run (the band follows the cap)', async () => {
+    await boot();
+    const rows = [{ domainName: 'mid.com', price: '$300', auctionEndTime: END, numberOfBids: 2 }];
+    day({ 'all_biddable_auctions.json.zip': rows });
+    await runJobToEnd(app!, 'datasave');
+    expect(await live()).toEqual([]);
+    await sql`update settings set s8_max_price_cents = 40000`.execute(db);
+    try {
+      clock = NOW + DAY;
+      day({ 'all_biddable_auctions.json.zip': rows }, '2026-10-21T14:41:59Z');
+      const r = await runJobToEnd(app!, 'datasave');
+      expect(r.json().steps.godaddyInventory.summary).toMatchObject({ live_kept_n: 1, live_band_max_cents: 40000 });
+      expect((await live()).map((x) => x.domain)).toEqual(['mid.com']);
+    } finally { await sql`update settings set s8_max_price_cents = 25000`.execute(db); }
+  });
+
+  it('DS537-4 retention removes live rows older than datasave_auction_live_keep_days (7)', async () => {
+    const v = (data_date: string, domain: string) => ({ data_date, domain, end_time: new Date(END), price_cents: 1000, bid_count: 1 });
+    await db.insertInto('godaddy_auctions_live').values([v('2026-10-12', 'old.com'), v('2026-10-13', 'edge.com'), v('2026-10-20', 'today.com')]).execute();
+    const r = await job().snapshotRetention() as Record<string, unknown>;
+    expect(r).toMatchObject({ auctions_live_cutoff_date: '2026-10-13', auctions_live_deleted: 1 });
+    expect((await live()).map((x) => x.domain)).toEqual(['edge.com', 'today.com']);
   });
 });

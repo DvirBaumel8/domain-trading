@@ -22,8 +22,10 @@ Binding rules and test IDs for the `market` module. The interface is `docs/contr
 11. **dqMarket** (`dq.ts`): `duplicates`, `survivorship` (fails above 90% only after 30 sealed days), `leakage` (`feat_asof` > `first_seen` or > `sale_date`; rows excluded from matched), `price_sanity` (>10x day-to-day jump in the last 30 days; sale < $100; sale vs list >10x either way), `coverage` (dynadot_aftermarket and dynadot_closed_auctions; a sealed day of the last 7 under 50% of the median of the 7 days before, needing 3 prior days), `tier_present`. Any fail -> run status `alert` -> `/health.dq_market` and `DQ_MARKET_FAIL` (error). The step itself stays ok.
 12. **Coverage targets**: 1,000 `unsold_30d` (UNSOLD_30D + UNSOLD_60D) by 2026-11-25; 2,000 `unsold_60d_matched` (negatives of a matched set for today, ratio 4, seed 1, not stored) by 2026-12-20.
 
+13. **`GET /auctions/live`** (v5.37.0, `auctions-live.ts`, route in `api/market.ts`): read-only, READ or bots (a data token is 403, like `/market/episodes`). Reads `godaddy_auctions_live` (written by the datasave step `godaddyInventory`, rules 29a-29c in `datasave.md`) and `settings` (`s8_max_price_cents`, `datasave_auction_live_min_bids` = the `band`) through Kysely; imports no other module. Zod strict query: `date`, `max_price` (USD), `min_bids`, `ends_within_hours` (1..240), `type` (case-insensitive exact), `sort` (`end_time` | `bids` | `price`), `limit` (1..500), `offset`, `include_ended` (default false: `end_time` after the app clock). Default date = the latest stored data date; an empty table answers `data_date: null`.
+
 ## Tests
-`tests/modules/market/market.test.ts`.
+`tests/modules/market/market.test.ts`, `tests/modules/market/auctions-live.test.ts` (v5.37.0).
 | ID | What |
 |---|---|
 | MK523-1 | AT-1 D and D+61 -> UNSOLD_60D, days_listed 61 |
@@ -48,6 +50,13 @@ Binding rules and test IDs for the `market` module. The interface is `docs/contr
 | MK523-20 | price sanity flags |
 | MK523-21 | left the source: unknown until 90 days, then UNSOLD_60D |
 | MK523-22 | per-row reject reasons |
+
+## v5.37.0 tests (`auctions-live.test.ts`)
+| ID | What |
+|---|---|
+| MK537-1 | default call: latest day, future end times only, sorted by end_time, display price, band |
+| MK537-2 | filters max_price, min_bids, ends_within_hours, type, sort, limit, offset, include_ended, date |
+| MK537-3 | 400 VALIDATION_ERROR (unknown parameter, bad values); empty table; READ and bots read, unauthenticated 401 |
 
 ## v5.25.0 follow-up tests
 | ID | What |

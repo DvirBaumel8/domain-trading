@@ -82,6 +82,7 @@ const SUMMARIES: Record<string, string> = {
   'GET /pickproof/{date}/arms': 'Pick-proof arm names (A, B1, B2, C1) of a sealed day (409 PICKPROOF_NOT_SEALED before the seal); ?arm= for one arm',
   'GET /pickproof/report': 'Pick-proof report (proxy, not profit): per arm n, events, rate, unknown_n; A vs C1 (primary), B1, B2 with Fisher or permutation, CMH by price band, Holm; UNPOWERED under 10 events',
   'GET /market/episodes': 'Market episodes (name x venue x listing episode) with outcome labels; summary counts first, then rows (filters outcome, rule, band, from, to, venue, limit)',
+  'GET /auctions/live': 'GoDaddy auctions inside the buying range (price up to the S8 cap, with bids) from the latest daily save, with the stored band; filters date, max_price, min_bids, ends_within_hours, type, sort, limit, offset, include_ended',
   'GET /market/matched': 'Matched sold-vs-unsold set for (asof, ratio, seed): frozen and sealed with a sha256 on the first call',
   'GET /market/dq': 'Latest market data-quality checks (duplicates, survivorship, leakage, price sanity, coverage, tier)',
   'GET /market/coverage': 'Market data coverage: rows per source per day, counts per label and band, progress against the 1,000 / 2,000 targets, row counts',

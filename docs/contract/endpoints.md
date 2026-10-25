@@ -1,4 +1,4 @@
-# Endpoints (contract v5.36.0)
+# Endpoints (contract v5.37.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -67,6 +67,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | PATCH | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | DELETE | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | GET | `/market/episodes`, `/market/matched`, `/market/dq`, `/market/coverage` | READ or bots (a data token gets 403) | Market data (5.23.0, CR-075) |
+| GET | `/auctions/live` | READ or bots (a data token gets 403) | GoDaddy auctions inside the buying range, with bids (5.37.0) |
 | POST | `/pickproof/{date}/picks` | WRITE or bots (non-money; a READ or data token gets 403) | Pick-proof (5.28.0, CR-073) |
 | GET | `/pickproof/{date}/manifest`, `/pickproof/{date}/arms`, `/pickproof/{date}/pool`, `/pickproof/report` | READ or bots (a data token gets 403) | Pick-proof (5.28.0, CR-073; pool 5.30.0, CR-073a) |
 | POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
@@ -706,6 +707,17 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
             disappearance_tag, disappearance_tag_reason } ] }   // newest first_seen first
 ```
 **5.34.0 (BUG-052):** `disappearance_tag` is `bought` | `deleted` | `unknown` on a row with `outcome_rule: DISAPPEARED` (`unknown` with reason `NOT_CHECKED` until the datasave step `buildPanel` has looked it up; rules in `jobs.md` row `datasave`), and `null` on every other row. `disappearance_tag_reason`: `NOT_REGISTERED`, `STATUS:<the status>`, `RE_REGISTERED`, `REGISTRAR_CHANGED:<before> -> <now>`, `SAME_REGISTRAR`, `NO_BASELINE`, `NO_REGISTRAR`, `TLD_NOT_CHECKED`, `NOT_CHECKED`, or an RDAP error (`TIMEOUT`, `SOURCE_ERROR`, `RATE_LIMITED`). The tag never changes `outcome` or `outcome_rule`.
+
+### `GET /auctions/live`
+**5.37.0.** READ (or bots; a data token is 403). The GoDaddy public auctions that are **inside our buying range** and already have bids, from the latest daily save (datasave step `godaddyInventory`, `jobs.md` row `datasave`). **Stored rule (the `band`):** `.com`, not adult, price up to `settings.s8_max_price_cents` (the S8 per-name cap, 25000 = $250 now; the band follows the cap at each run) and at least `settings.datasave_auction_live_min_bids` (1) bids. Rows are kept 7 days. The list is a tip sheet: GoDaddy's price and bid count are as of the file (built about 14:40 UTC), not live. Query (all optional; an unknown parameter or a bad value → **400** `VALIDATION_ERROR`): `date` (`YYYY-MM-DD`, default the latest stored data date), `max_price` (USD number > 0), `min_bids` (integer >= 0), `ends_within_hours` (1..240), `type` (exact `auction_type`, any case), `sort` (`end_time` ascending, the default | `bids` descending | `price` ascending), `limit` (1..500, default 100), `offset` (>= 0, default 0), `include_ended` (`true` | `false`, default `false`: only auctions whose `end_time` is after now). **200:**
+```
+{ data_date,              // null when nothing is stored yet (then total 0, rows [])
+  as_of,
+  band: { max_price_cents, min_bids },
+  total,                  // rows that match the filters, before limit and offset
+  rows: [ { domain, end_time, auction_type, price_cents, price, bid_count,
+            domain_age, valuation_cents, pageviews } ] }   // domain_age, valuation_cents, pageviews: null when the file had none
+```
 
 ### `GET /market/matched`
 READ (or bots). Query: `asof` (`YYYY-MM-DD`, required), `ratio` (1..20, default 4), `seed` (integer 0..4294967295, default 1). A bad value → **400**. Each **positive** is a sold `.com` episode with `sale_date <= asof`; it gets up to `ratio` **negatives**: `UNSOLD_60D` `.com` episodes (first seen at least 60 days before `asof`) of the **same price band**, the **same letters-only flag** (the name before `.com` is only a-z or not) and whose listing overlaps the **60-day window** centred on the sale date (sale date -30 days .. +30 days). A negative is used for one positive only. The draw is seeded (a hash of `asof|ratio|seed|episode_id` feeds a mulberry32 shuffle), so it never depends on row order. Rows with a feature as-of date after `first_seen` or after the sale date (the leakage check) are **excluded**; `unknown` episodes are never in the set.

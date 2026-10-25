@@ -61,6 +61,9 @@ export interface SettingsTable {
   /** v5.34.0 (BUG-052): RDAP lookups per datasave run for the disappearance tags, and how long tag rows are kept. Migration only. */
   disappearance_lookups_max_per_run: Generated<number>;
   disappearance_keep_days: Generated<number>;
+  /** v5.37.0: days the in-range GoDaddy auctions with bids are kept (godaddy_auctions_live) and the fewest bids to keep one. Migration only. */
+  datasave_auction_live_keep_days: Generated<number>;
+  datasave_auction_live_min_bids: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;
@@ -149,6 +152,19 @@ export interface GodaddyAuctionsTable {
   last_bid_count: Generated<number>;
   final_state_at: DateString | null;
   ended: Generated<boolean>;
+}
+
+/** v5.37.0: GoDaddy auctions at or under the S8 cap with at least one bid, per data date. */
+export interface GodaddyAuctionsLiveTable {
+  data_date: DateString;
+  domain: string;
+  end_time: Timestamp;
+  auction_type: string | null;
+  price_cents: number;
+  bid_count: number;
+  domain_age: number | null;
+  valuation_cents: number | null;
+  pageviews: number | null;
 }
 
 export interface DealsTable {
@@ -1578,6 +1594,7 @@ export interface Database {
   datasave_pool: DatasavePoolTable;
   dynadot_rows: DynadotRowsTable;
   godaddy_auctions: GodaddyAuctionsTable;
+  godaddy_auctions_live: GodaddyAuctionsLiveTable;
   market_sales: MarketSalesTable;
   market_names: MarketNamesTable;
   market_dq_runs: MarketDqRunsTable;

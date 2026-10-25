@@ -38,6 +38,11 @@ Binding rules and test IDs for the `datasave` job. The interface is `docs/contra
 20. Retention: ended rows by `final_state_at`, open rows by `last_seen`, `datasave_auction_keep_days` (120).
 21. Step summary: `auctions_seen_n` (rows read this run), `tracked_n`, `ended_today_n`, `ended_now_n`, `auction_end_detection`.
 
+## In-range auctions with bids (v5.37.0)
+29a. `parseAuctions` also fills `godaddy_auctions_live` in the same stream pass: `.com`, not adult, valid end time, `numberOfBids >= settings.datasave_auction_live_min_bids` (1) and price not null and `<= settings.s8_max_price_cents` (read at run time, never hard-coded, so the band follows the cap). Per row: end time, type, price, bids, `domainAge`, `valuation` (price string to cents), `pageviews` (absent, negative or over int4 = null). It does not change `godaddy_auctions` (the $500+ followed rows), the closeouts pool, episodes or pick-proof.
+29b. Merge: a domain in several rows or files keeps the highest price and bid count, the latest end time and the first non-null type, age, valuation and pageviews. The four files are parsed one after the other for the same data date, so rows are upserted on (data_date, domain) with `greatest()`/`coalesce()`, never delete-then-insert; running a day again adds nothing. Batches of 5,000.
+29c. Step summary adds `live_kept_n` (rows upserted this run across the files) and `live_band_max_cents`. Retention (`snapshotRetention`): rows with `data_date < today(UTC) - datasave_auction_live_keep_days` (7) are deleted (not append-only); the summary adds `auctions_live_cutoff_date`, `auctions_live_deleted`. The table is not in the backup. Read by `GET /auctions/live` (`market.md`).
+
 ## scorePool (v5.26.0, CR-072)
 22. Step `scorePool` runs after `dynadotAftermarket` and before `buildPanel`. It processes the rows of `datasave_pool` and of sealed `dynadot_rows` (`kind closeouts`) with `scored_at` null: stores `filter_code` (first failed hard filter, null = passed), and for passed rows `score`, `model_version`, or `score_reason` (`NO_ACTIVE_MODEL`, `SCORE_FAILED`). Rules, order and tests: `docs/internal/closeouts.md`. Offline: the score uses `Scorer.scoreOffline` (no fetch, no registry ask). A Dynadot day is processed only when its `bot_upload` manifest is sealed, so a later upload is scored by the next run (the retry run or the next day).
 23. Measured (local, synthetic 125,000 rows, 40,000 of them passing the filters): about 3.6 s for the whole step (classify 0.65 s, scoring 2,000 names about 0.08 s), so every passing row is scored; no row is skipped for time.
@@ -107,5 +112,13 @@ v5.22.0 tests: `tests/modules/ops/datasave-dynadot.test.ts`.
 | DS524-1 | coverage stored on a sealed upload, frozen by the seal guard (AT-14) |
 | DS524-2 | invalid coverage 422, missing coverage null (AT-15) |
 | DS532-1 | BUG-051: 50,000 rows pass, 50,001 is `ROWS_LIMIT`, a price over the cap is `PRICE_CAP` with indexes, the cap is inclusive, nothing stored, OpenAPI shows both |
+
+v5.37.0 tests: `tests/modules/ops/datasave.test.ts`.
+| ID | What |
+|---|---|
+| DS537-1 | a $40 auction with 3 bids and a $250 one with 1 bid are kept with age, valuation, pageviews; 0 bids, $250.01, .net, adult are not; `godaddy_auctions` ($500+) unchanged |
+| DS537-2 | the same domain in two auction files merges (max bids and price); a second run does not duplicate |
+| DS537-3 | raising `settings.s8_max_price_cents` widens the band on the next run |
+| DS537-4 | retention removes live rows older than `datasave_auction_live_keep_days` |
 
 v5.26.0 tests: `tests/modules/ops/closeouts.test.ts` (CC526-*, table in `closeouts.md`).

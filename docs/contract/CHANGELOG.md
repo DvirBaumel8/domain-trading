@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.37.0 (2026-10-25): GoDaddy auctions in our buying range kept daily; GET /auctions/live
+Release note: `docs/releases/v5.37.0.md`.
+MINOR (additive; migration `1766500000000_v5-37-0.sql`).
+- **New `GET /auctions/live`** (READ or bots): GoDaddy public auctions inside our buying range (`.com`, price up to `settings.s8_max_price_cents`, at least `settings.datasave_auction_live_min_bids` bids) from the latest daily save, with end time, price, bid count, age, GoDaddy valuation and pageviews; filters `date`, `max_price`, `min_bids`, `ends_within_hours`, `type`, `sort`, `limit`, `offset`, `include_ended`.
+- **Datasave `godaddyInventory`** also keeps those rows (table `godaddy_auctions_live`, 7 days, `datasave_auction_live_keep_days`); its summary adds `live_kept_n` and `live_band_max_cents`, and `snapshotRetention` adds `auctions_live_cutoff_date` / `auctions_live_deleted`. `godaddy_auctions` ($500+) is unchanged.
+
 ## 5.36.0 (2026-10-25): S8 per-name price cap raised from $50 to $250 (Dvir, 25 Oct)
 Release note: `docs/releases/v5.36.0.md`.
 MINOR (a limit change; migration `1766400000000_v5-36-0.sql`).

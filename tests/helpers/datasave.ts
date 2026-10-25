@@ -60,6 +60,6 @@ export function inventoryHandlers(o: InventoryOpts = {}) {
   ];
 }
 
-export interface AuctionRow { domainName: string; price: string; auctionEndTime: string; numberOfBids?: number; auctionType?: string; isAdult?: boolean }
+export interface AuctionRow { domainName: string; price: string; auctionEndTime: string; numberOfBids?: number; auctionType?: string; isAdult?: boolean; domainAge?: number; valuation?: string; pageviews?: number }
 /** v5.22.0: an auction file in the real shape (same envelope as the closeouts file). */
 export const auctionsJson = (rows: AuctionRow[]): string => JSON.stringify({ meta: { lastBuildDate: '2026-10-20T14:06:12Z' }, data: rows.map((r) => ({ link: 'https://x.example', auctionType: 'Bid', numberOfBids: 0, domainAge: 1, pageviews: 0, valuation: '$0', isAdult: false, ...r })) });
