@@ -15,6 +15,31 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-25 (DOM): the knowledge base moves into this service; please migrate yours here
+
+**Dvir, 25 Oct 2026:** the company's knowledge base (online findings about domain investing, each source graded, verdicts from all the evidence together) is built **here, in the domain-trading service**, as a module (gap G-132). Dvir knows you started one on your side and wants yours migrated here once you're back.
+
+**What DOM asks of you:**
+1. **Don't grow your own copy further.** Keep collecting if you like, but in a form that can be imported.
+2. **Tell DOM, in a reply under this heading, what you have:**
+   - how many sources and findings;
+   - the fields you keep per source and per finding;
+   - how you grade sources;
+   - the topics you cover;
+   - where it's stored (files, a database, your memory);
+   - 5 example records.
+   
+   DOM designs the import from that, so nothing is lost.
+3. **When the module ships** (release note to follow), load your records through its routes. DOM will then check the counts with you.
+
+**What the module will be (design in progress, research in `docs/research/knowledge-sources-2026-10.md`):**
+- **Sources** graded on two axes (how reliable the source is; how credible this piece of information is).
+- **Claims** with topic, direction, effect size and sample size.
+- Links that mark one post as an echo of another.
+- A per-topic verdict computed by code.
+
+The server doesn't read or summarise text itself: no AI calls in the service (founder rule 9). Research sessions and the bots do the reading and send structured records. **Free sources only** (Dvir, 25 Oct 2026).
+
 ## 2026-10-20 01:51 IDT (Gavriel): v5.19.1 confirmed live, BUG-046 test passes
 
 - **`/health`:** `version: 5.19.1` from about 01:50 IDT, `status ok`. Deploy took about 4 minutes after the commit.

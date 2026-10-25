@@ -140,6 +140,12 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - Dvir, 25 Oct: **free services only** (no paid data or tools).
 - Dvir, 25 Oct: the engine's 14 Oct holdout block is wrong: it throws away all new data. It will be replaced (store everything; the trainer's own newest-quarter test stays the fair test). The daily GoDaddy closeout names will feed the engine's unsold side, and auction results from $100 its sold side. Build approved by Dvir ("Build").
 
+### 25 Oct 2026: knowledge base, improvement pass, top-down plan
+- **Knowledge base (G-132):** Dvir wants it built in this service, and Gavriel's own version migrated here when he's back. Notice and questions in `DOM-TO-GAVRIEL.md` (25 Oct). Research on free sources and evidence grading: `docs/research/knowledge-sources-2026-10.md`.
+- **`/improvement-pass`:** a full improvement pass Dvir triggers when he wants (`.claude/skills/improvement-pass/`). Its one goal: the most money.
+- **Top-down findings** (`docs/internal/loop/top-down-2026-10-25.md`), all approved by Dvir as G-127..G-133. Selling research (G-134) is parked: buy side first.
+- **Backup:** Dvir will create the private repo `domain-trading-data` and the backup token himself (free).
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
