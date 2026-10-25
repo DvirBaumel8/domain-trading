@@ -121,6 +121,20 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - **Bulk audit:** Dvir asked to check the whole system for work done one by one that could run in bulk (DOM's code and the routes you call). Findings go to gaps.md.
 - Dvir: "maybe we need more rounds of investigation so we will be able to base on more data": research gets more rounds, each with more sources.
 
+### 25 Oct 2026: score and historical-data research (round 1)
+- **Score** (`docs/research/score-research-2026-10.md`, 40 sources): the strongest predictor is the exact name already registered on other endings (an arXiv paper with 159k sales, our CR-002 backtest AUC 0.85, practitioners). Next: word count and length.
+  - Parts with evidence against them: D (retailstats count), B (bot-found buyers), C and E (bot opinion).
+  - Proposed v2: five measured parts (Shape, Registered elsewhere, Live businesses = part F from `sibling_scans`, Buyer pool, Keyword demand), near-equal weights, risk as a penalty, and a separate auction score.
+  - It becomes a selection-settings draft for Dvir to activate after a second research round and a backtest.
+- **Historical data** (`docs/research/historical-data-2026-10.md`):
+  - Unsold history: dns.coffee, $90 for one month. Dvir signs up himself if he approves.
+  - Sold history: only NameBio's paid API, with written permission.
+  - The free Kaggle sales file is a NameBio scrape: not used.
+  - The engine's holdout date (14 Oct) blocks any newer row until Dvir decides.
+  - These are Dvir's decisions, open.
+- **Traffic read** (`docs/internal/loop/traffic-2026-10-25.md`): about 1 s per call, many bot 4xx retries (G-126), and the bulk fixes must come before any bulk load. `/health datasave: partial` is from the paused Dynadot uploads (G-120 explained).
+- Both research rounds were limited: the web-search budget ran out, and NamePros blocks automated reads (not bypassed). A second round follows.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
