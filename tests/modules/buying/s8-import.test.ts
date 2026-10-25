@@ -81,15 +81,15 @@ describe('S8 import lane (CR-059)', () => {
     expect(await count('domains')).toBe(0);
   });
 
-  it('S8-3: the S8 per-name cap is $50: $50.01 is 400 S8_PRICE_CAP, $50.00 is accepted; the cap is in settings, not in the API', async () => {
-    const over = await post(body({ price_paid: 50.01 }));
+  it('S8-3: the S8 per-name cap is $250 (5.36.0; was $50): $250.01 is 400 S8_PRICE_CAP, $250.00 is accepted; the cap is in settings, not in the API', async () => {
+    const over = await post(body({ price_paid: 250.01 }));
     expect(over.statusCode, over.body).toBe(400);
-    expect(over.json().error).toMatchObject({ code: 'S8_PRICE_CAP', details: { price_paid_cents: 5001, s8_max_price_cents: 5000 } });
+    expect(over.json().error).toMatchObject({ code: 'S8_PRICE_CAP', details: { price_paid_cents: 25001, s8_max_price_cents: 25000 } });
     expect(await count('domains')).toBe(0);
-    const ok = await post(body({ price_paid: 50 }));
+    const ok = await post(body({ price_paid: 250 }));
     expect(ok.statusCode, ok.body).toBe(201);
     const cfg = await db.selectFrom('settings').select(['s8_max_price_cents', 's8_reserved_slots', 'max_domains']).executeTakeFirstOrThrow();
-    expect(cfg).toEqual({ s8_max_price_cents: 5000, s8_reserved_slots: 10, max_domains: 40 });
+    expect(cfg).toEqual({ s8_max_price_cents: 25000, s8_reserved_slots: 10, max_domains: 40 });
     const attempt = await post(body({ domain: 'capchange.com', s8_max_price_cents: 99999 }));
     expect(attempt.statusCode).toBe(422);
   });
@@ -322,8 +322,8 @@ describe('S8 import: approved price, ladder, expiry window, schedule (CR-060)', 
     expect(preview.json().priceJob.would_apply).toEqual([expect.objectContaining({ domain: 'abcdefgh.com', event: 'final_push', bin_cents: 317700 })]);
   });
 
-  it('S8-17: CR-059 guards stand with overrides: $50.01 is S8_PRICE_CAP, namejet is BACKORDER_SOURCE_REFUSED', async () => {
-    const cap = await post(mineBody({ price_paid: 50.01 }));
+  it('S8-17: CR-059 guards stand with overrides: $250.01 is S8_PRICE_CAP, namejet is BACKORDER_SOURCE_REFUSED', async () => {
+    const cap = await post(mineBody({ price_paid: 250.01 }));
     expect(cap.statusCode).toBe(400);
     expect(cap.json().error.code).toBe('S8_PRICE_CAP');
     const nj = await post(mineBody({ source: 'namejet' }));

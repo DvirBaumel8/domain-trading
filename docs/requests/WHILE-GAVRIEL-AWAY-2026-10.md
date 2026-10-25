@@ -71,6 +71,11 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
   - GoDaddy closeouts follow a falling fixed price after a failed auction (reported as $50, $40, $30, $11, $5).
 - Consequence: this supports Dvir's auctions-first direction. The pick-proof stays (it costs nothing) as a check of the bots' picking skill, not as the gate for the closeouts-vs-auctions choice.
 
+### 25 Oct 2026: v5.36.0, S8 cap $250, auctions are the main effort
+- Dvir: "Let's raise the limit to 250 and make the auctions our main effort".
+- v5.36.0 (migration `1766400000000_v5-36-0.sql`): `settings.s8_max_price_cents` 5000 → 25000. `S8_PRICE_CAP` now answers only above $250. `CLAUDE.md` founder rule 5 and "Main buying line" updated.
+- Gavriel: confirm 5.36.0 on `/health`. Above $50, show Dvir why a name is worth more before he approves. Dvir did not set a new S8 test budget; the earlier plan (about $600 for 10 names, from 13 Nov) stands until he says otherwise.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.

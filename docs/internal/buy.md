@@ -83,7 +83,7 @@ Comparison = first year + exactly one renewal. At purchase `renewals_used = 0`, 
 |---|---|
 | S8-1 | missing, wrong-domain, expired or future approval_ref refused; lane other than S8 refused; nothing written |
 | S8-2 | source not closeout/fixed/auction refused; NameJet/SnapNames/DropCatch refused as source or registrar |
-| S8-3 | $50.01 is `S8_PRICE_CAP`, $50.00 accepted; the cap is not settable through the API |
+| S8-3 | $250.01 is `S8_PRICE_CAP`, $250.00 accepted (cap $250 since 5.36.0, was $50); the cap is not settable through the API |
 | S8-4 | the import books lane S8, ledger row, evidence, hybrid plan; BIN from the S8 ladder (v5.9.0); comps optional; geo grade price; manual registrar needs expiry |
 | S8-5 | 30 Line 1 names close `/buy` (`DOMAIN_CAP_REACHED`, dry run `would_be_blocked`), S8 import still allowed; 10 S8 names give `S8_SLOTS_FULL` (dry run `would_be_blocked`) |
 | S8-6 | total cap 40 holds for an S8 import |

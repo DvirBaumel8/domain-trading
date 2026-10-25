@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.36.0 (2026-10-25): S8 per-name price cap raised from $50 to $250 (Dvir, 25 Oct)
+Release note: `docs/releases/v5.36.0.md`.
+MINOR (a limit change; migration `1766400000000_v5-36-0.sql`).
+- **`POST /portfolio/import` (S8):** the per-name price cap `settings.s8_max_price_cents` is now 25000 ($250; was 5000). `S8_PRICE_CAP` answers only above $250. Nothing else changes; the cap is still not settable through the API.
+
 ## 5.35.0 (2026-10-25): the daily save seals pick-proof days that no bot sealed
 Release note: `docs/releases/v5.35.0.md`.
 MINOR (additive; no migration).
