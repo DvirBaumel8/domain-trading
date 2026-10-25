@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.45.0 (2026-10-25): Daily auction shortlist with suggested maximum bids, auto pre-bid checks and the weekly buying funnel; first knowledge base load (G-127, CR-078)
+Release note: `docs/releases/v5.45.0.md`.
+MINOR (migration `1767000000000_v5-45-0.sql`).
+- New `GET /auctions/shortlist` (READ or bots): the daily shortlist of the best live GoDaddy auctions in our range, each with rank, auction score v1 and its parts, price, bids, end time, a suggested maximum bid (`max_bid_suggested`: 20% of a realistic net resale, $1,000 by default (`settings.shortlist_expected_resale_cents`), scaled by the score, at most the S8 cap, rounded down to $5), GoDaddy's valuation (shown, not scored), the automatic pre-bid (`prebid {id, verdict, checked_at, valid_until, flags}`) and plain-language reasons. New `GET /auctions/funnel` (READ or bots): plain counts over a date range (default 7 days): live auctions seen, shortlisted, auto pre-bid verdicts, pre-bids by bots, bid plans by status, imported, S8 names bought / listed / sold, views and leads of those names, sales. New datasave step `auctionShortlist` (after `engineFeed`; the job has twelve steps). New settings (migration only): `shortlist_horizon_hours` 72, `shortlist_size` 25, `shortlist_endings_n` 50, `shortlist_prebid_n` 10, `shortlist_keep_days` 90, `shortlist_expected_resale_cents` 100000. No existing route, field or code changes.
+- First knowledge base load: `data/knowledge/0001-questions.jsonl`, `0002-october-research.jsonl` (step `kbLoad`).
+
 ## 5.44.0 (2026-10-25): Safety upgrades for auction names: brand typo and combosquat, URIBL, visible gaps, exact search strings, after-auction transfer check
 Release note: `docs/releases/v5.44.0.md`.
 MINOR release (migration `1766900000000_v5-44-0.sql`: `domains.transfer_confirmed`, `domains.transfer_checked_at`).

@@ -1,6 +1,6 @@
 # data/
 
-Committed reference data for `src/screening/lexicon.ts`. Rebuilt only by DOM, with network, via `npx tsx scripts/build-wordlists.ts` (never run by tests or by `src/`). Source terms: `docs/internal/sources.md`.
+`knowledge/` (CR-078, 5.43.0): DOM's research as knowledge-base rows, loaded by the daily step `kbLoad` once per file hash (format: `docs/internal/knowledge.md`). Everything else here is committed reference data for `src/screening/lexicon.ts`. Rebuilt only by DOM, with network, via `npx tsx scripts/build-wordlists.ts` (never run by tests or by `src/`). Source terms: `docs/internal/sources.md`.
 
 | File | Source URL | Licence | Retrieved | Lines | Bytes | sha256 |
 |---|---|---|---|---|---|---|

@@ -15,7 +15,7 @@ export type FilterCode = (typeof FILTER_CODES)[number];
 export interface Classifier { classify(domain: string): { code: FilterCode | null; words: string[] } }
 
 /** Terms that are the target of a later row (`supersedes`) are replaced; the rest are current. */
-async function currentTerms(db: Kysely<Database>, table: 'tm_kills' | 'bigco_names'): Promise<string[]> {
+export async function currentTerms(db: Kysely<Database>, table: 'tm_kills' | 'bigco_names'): Promise<string[]> {
   const col = table === 'tm_kills' ? 'term' : 'name';
   const rows = await (db.selectFrom(table as 'tm_kills') as never as { select(c: string[]): { execute(): Promise<Record<string, unknown>[]> } }).select(['id', col, 'supersedes']).execute();
   const replaced = new Set(rows.map((r) => r.supersedes).filter((x) => x !== null).map(Number));

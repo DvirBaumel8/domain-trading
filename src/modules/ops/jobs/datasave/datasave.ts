@@ -8,6 +8,7 @@
 //   buildPanel         the day diff of the closeouts pool (names gone before their end), split by RDAP tag bought / deleted / unknown (v5.34.0, BUG-052).
 //   engineFeed         (v5.41.0) free rows for the scoring engine: closeout names that left the list and were deleted (engine_unsold) and GoDaddy auctions that ended with
 //                      a bid (engine_sales). Reuses the engine's own upload code (storeUnsold / storeSales), one engine_uploads row per kind per run.
+//   auctionShortlist   (v5.45.0, G-127) the daily shortlist of the best live GoDaddy auctions (ops/auctions/shortlist.ts): score, other endings, automatic pre-bid.
 //   snapshotRetention  deletes raw zips past their window (manifest stays) and pool rows past their days.
 // It reads only the public inventory host (official files, no scraping) and writes only its own tables and files. Files are keyed by the source's
 // Last-Modified date, never the run date. A failed fetch is a manifest with status error and the HTTP status, never rows 0.
@@ -28,6 +29,8 @@ import { autoSeal, pickproofLabels } from '../../../pickproof/index.js';
 import type { RdapLookupFn } from '../../../../core/rdap.js';
 import { goneByTag, tagDisappearances } from '../../closeouts/disappearances.js';
 import { scorePool, type PoolScorer } from '../../closeouts/score-pool.js';
+import { runAuctionShortlist } from '../../auctions/shortlist.js';
+import type { ScreeningDeps } from '../../../selection/index.js';
 import { listZipEntries, openZipEntry } from './zip.js';
 import { streamArrayItems } from './json-stream.js';
 
@@ -65,6 +68,8 @@ export interface DatasaveDeps {
   sleep?: (ms: number) => Promise<void>;
   /** v5.41.0: the database size guard for engineFeed (same limit as the engine uploads). Without it the step skips the guard. */
   dbSize?: DbSizeGuard;
+  /** v5.45.0 (G-127): the outside-call deps of the screening code (RDAP, DNS, site fetch) for the `auctionShortlist` endings and automatic pre-bid; without it both are skipped. */
+  screening?: ScreeningDeps;
 }
 
 interface FileResult {
@@ -105,8 +110,8 @@ export class DatasaveJob {
   private get fetchFn(): typeof fetch { return this.deps.fetch ?? globalThis.fetch; }
 
   private async settings() {
-    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_auction_keep_days', 'datasave_auction_live_keep_days', 'datasave_auction_min_cents']).executeTakeFirstOrThrow();
-    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, auctionKeepDays: s.datasave_auction_keep_days, liveKeepDays: s.datasave_auction_live_keep_days, auctionMinCents: s.datasave_auction_min_cents };
+    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_auction_keep_days', 'datasave_auction_live_keep_days', 'datasave_auction_min_cents', 'shortlist_keep_days']).executeTakeFirstOrThrow();
+    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, auctionKeepDays: s.datasave_auction_keep_days, liveKeepDays: s.datasave_auction_live_keep_days, auctionMinCents: s.datasave_auction_min_cents, shortlistKeepDays: s.shortlist_keep_days };
   }
 
   // ---------- godaddyInventory ----------
@@ -575,6 +580,13 @@ export class DatasaveJob {
     return out;
   }
 
+  // ---------- auctionShortlist (v5.45.0, G-127) ----------
+
+  /** The daily shortlist of the best live GoDaddy auctions in our range, with the other endings and an automatic pre-bid for the top names. Rules: docs/internal/auctions.md "Shortlist". */
+  async auctionShortlist(): Promise<unknown> {
+    return runAuctionShortlist({ db: this.deps.db, now: this.deps.now, screening: this.deps.screening, log: this.deps.log });
+  }
+
   // ---------- snapshotRetention ----------
 
   /** Raw zips older than datasave.raw_keep_days are deleted (manifest stays, raw_available false, raw_deleted_at set); pool rows older than datasave.pool_keep_days days go. */
@@ -606,7 +618,11 @@ export class DatasaveJob {
     // v5.37.0: in-range auctions with bids are kept datasave.auction_live_keep_days (today and the days before it); not append-only
     const liveCut = utcDay(nowMs - st.liveKeepDays * 86_400_000);
     const live = await db.deleteFrom('godaddy_auctions_live').where('data_date', '<', liveCut).executeTakeFirst();
+    // v5.45.0: the daily shortlists are kept settings.shortlist_keep_days (not append-only)
+    const shortlistCut = utcDay(nowMs - st.shortlistKeepDays * 86_400_000);
+    const shortlist = await db.deleteFrom('auction_shortlist').where('data_date', '<', shortlistCut).executeTakeFirst();
     return {
+      shortlist_cutoff_date: shortlistCut, shortlist_rows_deleted: Number(shortlist.numDeletedRows ?? 0),
       today, auctions_live_cutoff_date: liveCut, auctions_live_deleted: Number(live.numDeletedRows ?? 0), raw_cutoff_date: rawCut, raw_deleted: rawDeleted, pool_cutoff_date: poolCut, pool_rows_deleted: Number(pool.numDeletedRows ?? 0),
       dynadot_closeouts_deleted: Number(closeoutRows.numDeletedRows ?? 0), dynadot_rows_deleted: Number(otherRows.numDeletedRows ?? 0), dynadot_cutoff_date: dynadotCut,
       auctions_cutoff_date: auctionCut, auctions_deleted: Number(auctions.numDeletedRows ?? 0),

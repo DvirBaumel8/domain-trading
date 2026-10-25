@@ -1,4 +1,4 @@
-# Endpoints (contract v5.44.0)
+# Endpoints (contract v5.45.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -75,6 +75,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/auctions/prebid` | WRITE or bots (a normal POST: `Idempotency-Key`, audit row; a READ token gets 403) | Auction bid plans (5.39.0, CR-077) |
 | POST | `/auctions/plans`, `/auctions/plans/{id}/result` | WRITE only (a bots token gets 403 even with `dry_run`) | Auction bid plans (5.39.0, CR-077) |
 | GET | `/auctions/plans`, `/auctions/plans/{id}` | READ or bots | Auction bid plans (5.39.0, CR-077) |
+| GET | `/auctions/shortlist`, `/auctions/funnel` | READ or bots (a data token gets 403) | The daily auction shortlist and the weekly funnel (5.45.0, G-127) |
 | POST | `/pickproof/{date}/picks` | WRITE or bots (non-money; a READ or data token gets 403) | Pick-proof (5.28.0, CR-073) |
 | GET | `/pickproof/{date}/manifest`, `/pickproof/{date}/arms`, `/pickproof/{date}/pool`, `/pickproof/report` | READ or bots (a data token gets 403) | Pick-proof (5.28.0, CR-073; pool 5.30.0, CR-073a) |
 | POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
@@ -769,6 +770,44 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
   rows: [ { domain, end_time, auction_type, price_cents, price, bid_count,
             domain_age, valuation_cents, pageviews } ] }   // domain_age, valuation_cents, pageviews: null when the file had none
 ```
+
+### `GET /auctions/shortlist`
+**5.45.0 (G-127).** READ or bots (a data token is 403). The daily shortlist of the best live GoDaddy auctions in our range, built by the datasave step `auctionShortlist` (`jobs.md` row `datasave`), pre-checked, with a suggested maximum bid. **Gavriel's daily routine:** read this, show Dvir 3 to 5 names with the suggested maximum and the reasons, and after Dvir's line create the plan (`POST /auctions/plans`) with the `prebid.id`. Query (strict, a bad value is **400**): `date?` (`YYYY-MM-DD`, a data date; default the newest), `limit?` (1..100, default 25).
+```
+{ data_date,              // null when no shortlist is stored yet (then generated_at null, total 0, rows [])
+  as_of, generated_at,    // ISO with offset (Asia/Jerusalem)
+  settings: { shortlist_horizon_hours, shortlist_size, shortlist_endings_n, shortlist_prebid_n,
+              score_version: "auction-v1", s8_max_price_cents, s8_max_price },
+  total,                  // rows returned
+  rows: [ { rank, domain, score,            // 0..100
+            score_version, parts,           // parts: {name, headroom, bids, age}, each {points, max, known}; name also {shape, endings_known, endings_registered, endings_value}; bids also {seo_flag}
+            end_time, auction_type, price_cents, price, bids,
+            max_bid_suggested_cents, max_bid_suggested,   // the rule: 20% of a realistic net resale (settings.shortlist_expected_resale_cents, default $1,000, less the Afternic commission) scaled by the score (full from `SCORE_FULL_MAX` = 70), never above the S8 cap, rounded down to whole $5
+            valuation_cents, valuation,     // GoDaddy's own appraisal: shown, NOT scored
+            domain_age, pageviews,          // null when the file had none
+            prebid: null | { id, verdict: "pass" | "flag", checked_at, valid_until, flags: [ { id, reason } ] },
+            reasons: [string] } ] }         // plain-language lines for Dvir
+```
+**What is in the list.** The in-range auctions (`GET /auctions/live`: `.com`, price up to the S8 cap, at least 1 bid) of the newest data date that end within `settings.shortlist_horizon_hours` (72), minus: names we own, names with an open or won bid plan, the name rules (SPELL-1, BRAND-1, BIGCO-1, TM_KILL), a typo, look-alike or combosquat of a top brand (BRAND-TYPO-2, same rule as the pre-bid) and names whose maximum bid would not be above the current price. The best `settings.shortlist_size` (25) by the **auction score v1** are stored per data date; the route serves them in rank order, **leaving out** auctions that already ended and names whose automatic pre-bid failed (kept in the table with the reason, not served).
+**The automatic pre-bid.** For the top `settings.shortlist_prebid_n` (10) names that do not fail, the step runs the same checks as `POST /auctions/prebid` (venue `godaddy`) and stores each answer in `prebid_checks` (token name `datasave`, no audit row), so `prebid.id` is a fresh `prebid_id` valid for plans for 72 hours (`valid_until`). `prebid` is `null` for a name not reached (rank beyond the pre-bid count, the 8-minute step budget, or an error: the step never fails because of one name). A `flag` still needs a human read (`flags`). The manual items (exact-phrase business search, Wayback) stay manual and are part of the plan body as before.
+**Score (0-100, version `auction-v1`).** Name part 60 (word count and length cell; the other four endings registered, asked from the registry for the top names when unknown or older than 30 days; an ending nobody could check stays unknown and its weight leaves the part, it never counts as 0), price headroom 20, bids 10 (log-scaled, halved for an old name with page views), age 10. GoDaddy's valuation is not in the score. Rules: `docs/internal/auctions.md` "Shortlist".
+
+### `GET /auctions/funnel`
+**5.45.0 (G-127).** READ or bots (a data token is 403). The auction funnel counted over a range of days: plain counts, no rates. Query (strict, a bad value or `from` after `to` is **400**, the range is at most 366 days): `from?`, `to?` (`YYYY-MM-DD`, IDT days; default the last 7 days ending today).
+```
+{ from, to, as_of,
+  seen:            { live_auctions },                       // distinct names in the live table with a data date in the range
+  shortlisted:     { names, served },                       // served = not dropped by a failed pre-bid
+  auto_prebid:     { checked, pass, flag, fail },           // by the daily step
+  prebids_by_bots: { checks, names, pass, flag, fail },     // POST /auctions/prebid by callers, by IDT day
+  bid_plans:       { created, open, won, lost, withdrawn, expired, max_bid_total_cents, max_bid_total },   // plans created in the range, by status now
+  imported,                                                  // plans whose name was imported (S8) in the range
+  s8_names:        { bought, listed_of_bought, sold_of_bought, listed_now },   // domains lane S8 with buy_date in the range
+  traffic_of_bought: { views_30d, leads_30d, redirect_human_hits },            // latest Afternic views and leads of those names; all-time human hits on the redirect
+  sold:            { count, gross_cents, gross },            // sales of S8 names with sold_at in the range
+  note }
+```
+One database read per table. Nothing here changes data.
 
 ### `GET /market/matched`
 READ (or bots). Query: `asof` (`YYYY-MM-DD`, required), `ratio` (1..20, default 4), `seed` (integer 0..4294967295, default 1). A bad value → **400**. Each **positive** is a sold `.com` episode with `sale_date <= asof`; it gets up to `ratio` **negatives**: `UNSOLD_60D` `.com` episodes (first seen at least 60 days before `asof`) of the **same price band**, the **same letters-only flag** (the name before `.com` is only a-z or not) and whose listing overlaps the **60-day window** centred on the sale date (sale date -30 days .. +30 days). A negative is used for one positive only. The draw is seeded (a hash of `asof|ratio|seed|episode_id` feeds a mulberry32 shuffle), so it never depends on row order. Rows with a feature as-of date after `first_seen` or after the sale date (the leakage check) are **excluded**; `unknown` episodes are never in the set.

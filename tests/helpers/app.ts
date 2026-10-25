@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { Writable } from 'node:stream';
@@ -12,6 +15,8 @@ import type { AuditWriter } from '../../src/http/audit.js';
 import type { HoldoutCheck } from '../../src/modules/selection/settings.js';
 import { testDb } from './db.js';
 import { testEnv } from './env.js';
+
+const EMPTY_KNOWLEDGE_DIR = mkdtempSync(joinPath(tmpdir(), 'kb-empty-'));
 
 /** Counts handler executions, to prove side effects happen once. */
 export const sideEffects = { count: 0 };
@@ -115,7 +120,8 @@ export async function makeApp(
     engineTrain: opts.engineTrain,
     engineScore: opts.engineScore,
     engineDbSize: opts.engineDbSize,
-    knowledgeDir: opts.knowledgeDir,
+    // the real data/knowledge files are never loaded by tests unless a test asks for a folder (an empty folder by default)
+    knowledgeDir: opts.knowledgeDir ?? EMPTY_KNOWLEDGE_DIR,
     // No live DNS in tests: a test that needs name servers passes fakes.
     screening: {
       resolveNs: async () => { throw new Error('DNS blocked in tests'); },

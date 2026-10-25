@@ -337,6 +337,82 @@ export async function ownedEndingsView(db: Kysely<Database>, domain: string) {
   };
 }
 
+/** The five other endings (no .com), for callers outside the engine (v5.45.0). */
+export const OTHER_ENDINGS = ENDING_TLDS;
+export type OtherEnding = (typeof ENDING_TLDS)[number];
+/** v5.45.0: an answer older than this many days is asked again (same rule as the daily step). */
+export const ENDINGS_STALE_DAYS = ENDINGS_RECHECK_DAYS;
+
+export interface EndingRow { name: string; tld: OtherEnding; id: number | null; registered: boolean | null; checked_at: Date | null }
+
+/** v5.45.0 (G-127): the newest row of each of the five other endings for the given names, one statement; a pair never asked has id and checked_at null. */
+export async function endingsState(db: Kysely<Database>, names: readonly string[]): Promise<EndingRow[]> {
+  if (names.length === 0) return [];
+  const rows = (await sql<{ name: string; tld: OtherEnding; id: string | null; registered: boolean | null; checked_at: Date | null }>`
+    with n(name) as (select unnest(${[...names]}::text[])),
+    tlds(tld) as (values ('net'), ('co'), ('org'), ('io'), ('ai')),
+    cur as (select distinct on (e.name, e.tld) e.id, e.name, e.tld, e.registered, e.checked_at from engine_endings e where e.name = any(${[...names]}::text[]) and e.tld <> 'com' order by e.name, e.tld, e.checked_at desc, e.id desc)
+    select n.name, t.tld, c.id::text as id, c.registered, c.checked_at from n cross join tlds t left join cur c on c.name = n.name and c.tld = t.tld`.execute(db)).rows;
+  return rows.map((r) => ({ name: r.name, tld: r.tld, id: r.id === null ? null : Number(r.id), registered: r.registered, checked_at: r.checked_at }));
+}
+
+/** True when this pair needs a new ask: never asked, unanswered for 6 hours, or answered over ENDINGS_STALE_DAYS ago. */
+export function endingDue(r: EndingRow, nowMs: number): boolean {
+  if (r.checked_at === null) return true;
+  const age = nowMs - r.checked_at.getTime();
+  return age > ENDINGS_RECHECK_DAYS * DAY || (r.registered === null && age > ENDINGS_UNKNOWN_RETRY_HOURS * 3_600_000);
+}
+
+export interface AskSummary { asked: number; registered: number; not_registered: number; unknown: number; partial: boolean; skipped: boolean; skipped_tlds: string[] }
+
+/**
+ * v5.45.0 (G-127): asks the five other endings of the given names (RDAP only, the host pacers, 4 in flight per host) for the pairs that are due, inside `budgetMs`,
+ * and writes them with the same keep / update / append rule as the daily step (EndingsWriter). Used by the datasave step auctionShortlist. Never throws for an upstream
+ * failure: that pair stays unknown. Skipped (nothing asked) while the daily engineEndings job holds its lock.
+ */
+export async function askEndingsFor(db: Kysely<Database>, screening: ScreeningDeps, now: () => number, names: readonly string[], opts: { budgetMs: number; log?: { warn(o: object, m: string): void } }): Promise<AskSummary> {
+  const out: AskSummary = { asked: 0, registered: 0, not_registered: 0, unknown: 0, partial: false, skipped: false, skipped_tlds: [] };
+  const start = now();
+  const due = (await endingsState(db, names)).filter((r) => endingDue(r, start));
+  if (due.length === 0) return out;
+  const lock = await trySessionLock(db, 'job:engine-endings');
+  if (!lock) return { ...out, skipped: true };
+  try {
+    const deadline = start + opts.budgetMs;
+    const byTld = new Map<OtherEnding, Pair[]>();
+    for (const r of due) (byTld.get(r.tld) ?? byTld.set(r.tld, []).get(r.tld)!).push({ name: r.name, tld: r.tld, prevId: r.id, prevRegistered: r.registered });
+    const writer = new EndingsWriter(db);
+    let stopped = false;
+    try {
+      await Promise.all([...byTld.entries()].map(async ([tld, pairs]) => {
+        const base = await endingBase(db, screening, now, tld, opts.log);
+        if (!base) { out.skipped_tlds.push(tld); return; }
+        const pace = hostPacer(new URL(base).host, screening.sleep);
+        let next = 0;
+        const worker = async () => {
+          for (;;) {
+            if (now() > deadline || pace.breakerOpen) { stopped = true; return; }
+            const p = pairs[next++];
+            if (!p) return;
+            let a: Answer;
+            try { a = await askRdap(screening, `${p.name}.${tld}`, base, pace); } catch (e) { opts.log?.warn({ errMessage: (e as Error).message }, 'endings for the shortlist: ask failed'); a = { registered: null, createdAt: null, httpStatus: null, reason: 'SOURCE_ERROR', evidence: null }; }
+            out.asked += 1;
+            if (a.registered === true) out.registered += 1; else if (a.registered === false) out.not_registered += 1; else out.unknown += 1;
+            await writer.add(now(), p, a);
+          }
+        };
+        await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+      }));
+    } finally {
+      await writer.flush();
+    }
+    out.partial = stopped || out.skipped_tlds.length > 0;
+    return out;
+  } finally {
+    await lock.release();
+  }
+}
+
 export interface EndingsHealth {
   names_n: number; pairs_n: number; checked_n: number; unknown_n: number; pending_n: number;
   by_tld: Record<string, { checked_n: number; registered_n: number; unknown_n: number; pending_n: number }>;

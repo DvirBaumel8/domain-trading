@@ -430,7 +430,7 @@ describe('PP528 pick-proof: T30 labels', () => {
     const run = await runJobToEnd(app!, 'datasave');
     const steps = Object.keys(run.json().steps as Record<string, unknown>);
     expect(steps[steps.length - 1]).toBe('pickproofLabels');
-    expect(steps).toHaveLength(11); // 5.41.0: engineFeed
+    expect(steps).toHaveLength(12); // 5.41.0: engineFeed
   });
 });
 

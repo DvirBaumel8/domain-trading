@@ -68,6 +68,13 @@ export interface SettingsTable {
   /** v5.37.0: days the in-range GoDaddy auctions with bids are kept (godaddy_auctions_live) and the fewest bids to keep one. Migration only. */
   datasave_auction_live_keep_days: Generated<number>;
   datasave_auction_live_min_bids: Generated<number>;
+  /** v5.45.0 (G-127): the daily auction shortlist: auctions ending within the horizon, list size, names that get the endings check and the automatic pre-bid, days kept. Migration only. */
+  shortlist_horizon_hours: Generated<number>;
+  shortlist_size: Generated<number>;
+  shortlist_endings_n: Generated<number>;
+  shortlist_prebid_n: Generated<number>;
+  shortlist_expected_resale_cents: Generated<number>;
+  shortlist_keep_days: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;
@@ -169,6 +176,29 @@ export interface GodaddyAuctionsLiveTable {
   domain_age: number | null;
   valuation_cents: number | null;
   pageviews: number | null;
+}
+
+/** v5.45.0 (G-127): the best live GoDaddy auctions of a data date, replaced per date by the datasave step auctionShortlist. */
+export interface AuctionShortlistTable {
+  data_date: DateString;
+  domain: string;
+  rank: number;
+  score: number;
+  score_version: string;
+  parts: Json;
+  price_cents: number;
+  bids: number;
+  end_time: Timestamp;
+  auction_type: string | null;
+  valuation_cents: number | null;
+  domain_age: number | null;
+  pageviews: number | null;
+  max_bid_suggested_cents: number;
+  reasons: string[];
+  prebid_id: number | null;
+  prebid_verdict: 'pass' | 'flag' | 'fail' | null;
+  dropped_reason: string | null;
+  generated_at: Timestamp;
 }
 
 export interface DealsTable {
@@ -1797,6 +1827,7 @@ export interface Database {
   dynadot_rows: DynadotRowsTable;
   godaddy_auctions: GodaddyAuctionsTable;
   godaddy_auctions_live: GodaddyAuctionsLiveTable;
+  auction_shortlist: AuctionShortlistTable;
   market_sales: MarketSalesTable;
   kb_settings: KbSettingsTable;
   kb_authors: KbAuthorsTable;

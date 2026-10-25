@@ -218,6 +218,16 @@ describe('knowledge base routes (CR-078)', () => {
 describe('knowledge repo load (CR-078 rule 9)', () => {
   const FIXTURES = 'tests/fixtures/knowledge';
 
+  it('KB543-24 (v5.45.0): the shipped data/knowledge files load without a failed file, and every question gets a verdict', async () => {
+    const { r } = await setup();
+    const res = await new KbLoadJob({ db, now: () => clock, dir: new URL('../../../data/knowledge/', import.meta.url).pathname }).runOnce();
+    expect(res.failed).toEqual([]);
+    expect(res.loaded.map((l: { file: string }) => l.file)).toEqual(['0001-questions.jsonl', '0002-october-research.jsonl']);
+    const qs = (await get('/kb/questions', r)).json().questions as { slug: string }[];
+    expect(qs.length).toBeGreaterThanOrEqual(25);
+    for (const q of qs) expect((await get(`/kb/questions/${q.slug}/verdict`, r)).statusCode).toBe(200);
+  }, 60_000);
+
   it('KB543-20: kbLoad loads a fixture file once and skips it the second time; the loaded rows give a verdict', async () => {
     const { r } = await setup();
     const job = new KbLoadJob({ db, now: () => clock, dir: FIXTURES });

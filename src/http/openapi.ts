@@ -87,6 +87,8 @@ const SUMMARIES: Record<string, string> = {
   'POST /auctions/plans/{id}/result': 'Record the real outcome of a bid plan: won (with the final price, never above the maximum bid), lost or withdrawn; WRITE only',
   'GET /auctions/plans': 'Bid plans, newest first; filters status (open, won, lost, withdrawn, expired), domain, limit',
   'GET /auctions/plans/{id}': 'One bid plan with its event history',
+  'GET /auctions/shortlist': 'The daily shortlist of the best live GoDaddy auctions in our range (v5.45.0): rank, score and parts, price, bids, end time, suggested maximum bid, automatic pre-bid (id, verdict, flags), reasons; filters date, limit',
+  'GET /auctions/funnel': 'The auction funnel counted over a date range (default the last 7 days): auctions seen, shortlisted, pre-bid, bid plans, won, imported, listed, traffic, sold',
   'GET /auctions/live': 'GoDaddy auctions inside the buying range (price up to the S8 cap, with bids) from the latest daily save, with the stored band; filters date, max_price, min_bids, ends_within_hours, type, sort, limit, offset, include_ended',
   'GET /market/matched': 'Matched sold-vs-unsold set for (asof, ratio, seed): frozen and sealed with a sha256 on the first call',
   'GET /market/dq': 'Latest market data-quality checks (duplicates, survivorship, leakage, price sanity, coverage, tier)',

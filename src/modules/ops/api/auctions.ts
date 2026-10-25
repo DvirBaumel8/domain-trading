@@ -4,39 +4,17 @@
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
-import { toJerusalemIso } from '../../../core/dates.js';
-import { pair } from '../../../core/money.js';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
 import { AppError } from '../../../http/errors.js';
-import { prebidVerdictOf, runPrebidChecks, type ScreeningDeps } from '../../selection/index.js';
+import type { ScreeningDeps } from '../../selection/index.js';
+import { manualRequired, manualSearches, storePrebid } from '../auctions/prebid-store.js';
+import { FunnelQuery, getFunnel, getShortlist, ShortlistQuery } from '../auctions/shortlist.js';
 import { createPlan, getPlan, listPlans, PlanBody, PlansQuery, recordResult, ResultBody, VENUES } from '../auctions/plans.js';
 
+export { manualRequired, manualSearches };
+
 const PrebidBody = z.object({ domain: z.string().min(1).max(253), venue: z.enum(VENUES) }).strict();
-
-/** The exact strings of the manual checks (v5.44.0): the name as words, in quotes, its CamelCase form, and the company registers. No automation of Google: a human pastes them. */
-export function manualSearches(domain: string, words: readonly string[]): { words: string; camel_case: string; queries: string[]; wayback: string } {
-  const sld = domain.replace(/\.com$/, '');
-  const parts = words.length > 0 ? [...words] : [sld];
-  const spaced = parts.join(' ');
-  const camel = parts.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('');
-  return {
-    words: spaced, camel_case: camel, wayback: `https://web.archive.org/web/*/${domain}`,
-    queries: [
-      `"${spaced}"`, `"${camel}"`, `"${sld}"`,
-      `site:opencorporates.com "${spaced}"`, `site:find-and-update.company-information.service.gov.uk "${spaced}"`, `site:companieshouse.gov.uk "${spaced}"`,
-    ],
-  };
-}
-
-/** What no program can check: said in every pre-bid answer, confirmed by the caller in the plan's `manual` block. */
-export function manualRequired(domain: string, words: readonly string[]) {
-  const s = manualSearches(domain, words);
-  return [
-    { id: 'EXACT_STRING_BUSINESS', what: 'Google exact phrase + company registries: an operating business called exactly this name kills a coined name', search_strings: s.queries, name_as_words: s.words, camel_case: s.camel_case },
-    { id: 'HIST_WAYBACK', what: 'past harmful use, checked by hand', wayback_url: s.wayback },
-  ];
-}
 
 const bad = (p: { error: z.ZodError }) => new AppError(400, 'VALIDATION_ERROR', `Invalid query: ${p.error.issues.map((i) => `${i.path.join('.') || 'query'} ${i.message}`).join('; ')}`);
 const idOf = (raw: string): number => {
@@ -51,17 +29,10 @@ export function registerAuctions(app: FastifyInstance, deps: { db: Kysely<Databa
     const b = PrebidBody.parse(req.body ?? {});
     const domain = normalizeDomain(b.domain);
     if (!domain.endsWith('.com') || domain.split('.').length !== 2) throw new AppError(422, 'VALIDATION_ERROR', 'Only .com names');
-    const cfg = await db.selectFrom('settings').select('s8_max_price_cents').executeTakeFirstOrThrow();
-    const out = await runPrebidChecks(db, deps.screening, domain, deps.now);
-    const verdict = prebidVerdictOf(out.checks);
-    const answer = {
-      domain, venue: b.venue, checked_at: toJerusalemIso(new Date(deps.now())), verdict, checks: out.checks, manual_required: manualRequired(domain, out.words), endings: out.endings, ...pair('s8_max_price', cfg.s8_max_price_cents),
-    };
-    const row = await db.insertInto('prebid_checks').values({
-      domain, venue: b.venue, verdict, answer: JSON.stringify(answer), token_name: req.auth?.name ?? null, audit_id: req.auditId ?? null, created_at: new Date(deps.now()),
-    }).returning('id').executeTakeFirstOrThrow();
+    const stored = await storePrebid(db, deps.screening, domain, b.venue, deps.now, { tokenName: req.auth?.name ?? null, auditId: req.auditId ?? null });
+    const { verdict } = stored;
     req.auditSummary = `prebid ${domain} (${b.venue}): ${verdict}`;
-    return reply.code(201).send({ prebid_id: row.id, ...answer, audit_id: req.auditId ?? null });
+    return reply.code(201).send({ prebid_id: stored.id, ...stored.answer, audit_id: req.auditId ?? null });
   });
 
   app.post('/auctions/plans', { config: { openapiBody: PlanBody } }, async (req, reply) => {
@@ -77,6 +48,19 @@ export function registerAuctions(app: FastifyInstance, deps: { db: Kysely<Databa
     const plan = await recordResult(db, id, b, { tokenName: req.auth?.name ?? null, auditId: req.auditId ?? null, nowMs: deps.now() });
     req.auditSummary = `bid plan ${id} for ${plan.domain}: ${b.outcome}${plan.final_price ? ` at ${plan.final_price}` : ''}`;
     return reply.code(200).send({ ...plan, audit_id: req.auditId ?? null });
+  });
+
+  // v5.45.0 (G-127): the daily shortlist and the weekly funnel (READ or bots)
+  app.get('/auctions/shortlist', async (req) => {
+    const p = ShortlistQuery.safeParse(req.query ?? {});
+    if (!p.success) throw bad(p);
+    return getShortlist(db, p.data, deps.now());
+  });
+
+  app.get('/auctions/funnel', async (req) => {
+    const p = FunnelQuery.safeParse(req.query ?? {});
+    if (!p.success) throw bad(p);
+    return getFunnel(db, p.data, deps.now());
   });
 
   app.get('/auctions/plans', async (req) => {
