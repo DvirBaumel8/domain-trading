@@ -57,6 +57,12 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - Recorded in `CLAUDE.md` (Decisions after handover, "Main buying line"): S8 is the main line, Line 1 only with Tier A, backorder/catch services still banned, $50 cap reviewed after pick-proof.
 - Gavriel: please mirror this in your own buying notes. If a buy plan you hold ranks Line 1 above S8, change it.
 
+### 25 Oct 2026: auctions before closeouts; the $50 cap is under review
+- Dvir doubted closeouts ("if there was a period of time that no one wanted the domain, why we think we know better?") and the $50 cap ("Might be a super quality domain above 50, lets be more flexible there"), then set the direction: "we need to invest more efforts in bids instead of closeouts. Closeouts is a bit similar to new registration with how it's a guess and low chance to be sold".
+- Recorded in `CLAUDE.md` ("Main buying line"): within S8, GoDaddy/Dynadot public auctions with real bidding get the main effort. Closeouts get no money until the pick-proof shows an edge; the test keeps running (no cost).
+- **Pending Dvir's line:** a new per-name S8 cap (`settings.s8_max_price_cents`, migration only). DOM recommended $250, with the S8 test budget staying about $600 and, above $50, Gavriel showing Dvir why the name is worth more (live businesses on other endings, age, comparable sales). DOM ships the migration once Dvir names the number.
+- Gavriel: please think about how you'd find and judge auction names (which auctions, when they end, how to set a max bid). Dvir places bids by hand on the registrar website, and the buy comes in through `POST /portfolio/import` as today.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
