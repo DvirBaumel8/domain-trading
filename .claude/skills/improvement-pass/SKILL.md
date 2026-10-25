@@ -34,7 +34,7 @@ A finding with no path to money is dropped or parked. The bar is world class: sa
    - **E. Reliability and simplicity:** idle or switched-off features, warnings nobody acts on, dependence on the bots, the backup state, flaky tests, and machinery bigger than the business needs.
    - **F. Knowledge gaps:** the decisions resting on the weakest evidence. Run a research round on the top ones, to the research standard.
 4. **Verify every finding** by reading the code or the data yourself. Drop what can't be verified, or mark it unverified. Never pass on a reviewer's claim unchecked.
-5. **Rank** by expected money impact × confidence ÷ effort. Separate three lists:
+5. **Update `docs/internal/loop/findings-actions-*.md`** (one row per finding: action, the measure it moves, who decides, status; close a row only with a measured result), then **rank** by expected money impact × confidence ÷ effort. Separate three lists:
    - can start now (already approved);
    - needs Dvir's decision;
    - parked.

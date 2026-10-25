@@ -1,0 +1,22 @@
+# Findings → actions register (from 25 Oct 2026)
+
+Dvir, 25 Oct 2026: "decide the action item per finding. At the end it should impact our results and outputs." One row per finding. Each row names the action, the measurable result it should move, and who decides. The improvement pass (`/improvement-pass`) updates this file and closes rows only with a measured result.
+
+| # | Finding (source) | Action | Measure it moves | Decision | Status |
+|---|---|---|---|---|---|
+| F1 | The shortlist can't tell real phrases from invented strings; the top 25 all scored 84-94, so everything got the $160 maximum (first live run) | auction score v2: common-word check, real spread | spread of the top 25; share of real phrases in the top 10 | DOM | building (v5.46.0) |
+| F2 | The unsold feed gave 0 rows: closeouts that run to their end were never counted (first live run) | label ended closeouts by RDAP after the drop | `engine_unsold` rows per day | DOM | building (v5.46.0) |
+| F3 | GitHub starts the data save 3-4 h late daily (job runs) | the Mac starts it at 15:05 UTC itself | data-save start time; shortlist ready by 15:30 UTC | DOM | building (v5.46.0) |
+| F4 | Date leak: dropped names' .com age is a round number of years, so a model learns "round age = dropped" (engine lab) | age in whole years only | engine AUC without leaks; no feature tied to the label date | DOM | building (v5.46.0) |
+| F5 | Lift scoring (Dvir's idea) is the best method on history: AUC 0.80 vs v2 0.79, engine 0.74 (backtest, engine lab) | build lift scoring into the server and use it in the shortlist; retrain it as our own data grows | shortlist precision against auction outcomes | DOM builds; Dvir activates for selection | next |
+| F6 | Almost every knowledge verdict is "indirect": outside evidence is about other kinds of names. Only our own data is direct (knowledge base) | start real, small auction bidding from the shortlist, to get our own outcomes | won/lost/price per bid; later views, leads and sales of won names | **Dvir** (each bid, max $250) | waiting for the bots, or DOM brings names to Dvir |
+| F7 | Pricing: NameBio's tests on about 70k names found no fewer sales up to about $2,000-2,500; Atom found no difference between $1,499 and $1,999 (X round 1, grades B/C, indirect) | a price test: list part of the S8 names at a higher BIN (e.g. $2,488) and compare views, leads and offers | revenue per listed name; leads per name | **Dvir** (changes the price rule) | proposal |
+| F8 | Bid counts can be inflated by bidder pairs who don't pay (X round 1, C), and the bid-count signal is low (knowledge base) | weight bids lower in the auction score (bids 10 → 5); never read bids alone as demand | shortlist precision | DOM | with F5 |
+| F9 | 60-65% of sales come through the Afternic and Sedo networks (NameBio, X) | keep every name in Afternic's network; list mineunited.com (still unlisted) | listed share = 100% | Dvir (at the computer, Afternic sign-in) | open |
+| F10 | Backup off; the DB holds approvals and money records (top-down) | create the repo and token, add the two settings lines | nightly backup ok | **Dvir** (at the computer) | open |
+| F11 | 18 open warnings nobody acts on (top-down) | triage: fix, change the rule, or move to info | warnings = 0 | DOM | queued |
+| F12 | Bots fail many calls on input (27 of 41 `/buy`) and hit rate limits (traffic) | clearer errors; array routes (G-123) | 4xx share of bot calls | DOM | queued |
+| F13 | The company stops when the bots pause (top-down) | DOM operates (approved 25 Oct); move bot chores to the server | days without a data gap | DOM | partly done |
+| F14 | Storage: 1 GB free limit against a growing data plan (top-down, G-119) | storage budget per table, checked weekly | DB % per week | DOM | queued |
+| F15 | Sell-through for portfolios like ours is about 0.5-3.5% a year (knowledge base, X) | plan for few sales: buy volume (35 empty slots), keep costs at renewal-only, judge by leads and views first | names held; leads per name per month | Dvir (buy decisions) | ongoing |
+| F16 | X is useful only for leads and pricing tests; Reddit is closed to commercial use (X round, sources research) | a quarterly hand check of X, plus January for the yearly results posts; RSS feeds of the blogs into the knowledge base (CR-078 phase 2) | knowledge sources per month | DOM | phase 2 queued |
