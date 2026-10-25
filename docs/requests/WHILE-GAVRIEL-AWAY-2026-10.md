@@ -87,6 +87,10 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - v5.36.0's CI run failed (the `doctor` test counts migrations); it was never deployed. v5.37.0 fixes the count, so both go live together.
 - Gavriel: from the 25 Oct 15:00 UTC run, use this list to find auction names. Every proposal carries a maximum bid and its reason (`docs/research/auctions-playbook.md`).
 
+### 25 Oct 2026: three research tasks running; auction gap plan
+- Dvir asked for research held to a high standard (25+ sources each, every source graded A–D by reliability, agreement and conflict shown): (1) the best funnel for new registrations, (2) how to invent names more accurately, (3) the safety checks. Results go to `docs/research/`.
+- Dvir agreed the selection system was built for new registrations and needs adjusting now that auctions are the main effort. DOM's gap: `POST /portfolio/import` runs **after** the buy and checks only approval, price cap, source, slots and term. No safety or demand check runs before an auction bid. DOM's plan (built after the safety research is in): a read-only pre-bid check, a bid plan with Dvir's approved maximum before bidding, the import refusing a price above that maximum, and recording won/lost bids to learn from.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
