@@ -1,4 +1,5 @@
 // v2.5.0 (CR-007 §21): test sets. POST /selection/test-sets (purpose new | rescore), GET /selection/test-sets/{name}, POST .../seal.
+import { chunks } from '../../../core/chunks.js';
 import { advisoryXactLock } from '../../../core/locks.js';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
@@ -272,7 +273,7 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
         throw new AppError(409, 'LABELLED_NAME_CONFLICT', `${taken.length} name(s) of this set were registered since it was made; nothing was registered`, { domains: taken.slice(0, 20).map((t) => t.domain), count: taken.length });
       }
       const { byDomain } = await featuresOfRun(trx, run);
-      for (const r of rows) {
+      const values = rows.map((r) => {
         const f = byDomain.get(r.domain)!;
         const input_dates: Record<string, string> = {};
         if (f.registered_share !== null) input_dates.census = dayBefore(r.as_of);
@@ -280,14 +281,21 @@ export function registerTestSets(app: FastifyInstance, deps: TestSetsDeps): void
         const features: LabelledFeatures = {
           registered_share: f.registered_share, alt_tld_before_n: f.alt_tld_before_n, n_words: f.n_words, sld_chars: f.sld_chars, is_geo: f.is_geo, input_dates,
         };
+        return {
+          domain: r.domain, role: r.role!, label: r.label, source: r.source, slice: set.name, report_lane: r.report_lane,
+          price_cents: r.price_usd === null ? null : dollarsToCents(Number(r.price_usd)), as_of: r.as_of, features: JSON.stringify(features),
+          created_by: req.auth!.name, audit_id: req.auditId!,
+        };
+      });
+      // v5.42.0: multi-row inserts, 500 a statement
+      for (const part of chunks(values, 500)) {
         try {
-          await trx.insertInto('labelled_names').values({
-            domain: r.domain, role: r.role!, label: r.label, source: r.source, slice: set.name, report_lane: r.report_lane,
-            price_cents: r.price_usd === null ? null : dollarsToCents(Number(r.price_usd)), as_of: r.as_of, features: JSON.stringify(features),
-            created_by: req.auth!.name, audit_id: req.auditId!,
-          }).execute();
+          await trx.insertInto('labelled_names').values(part).execute();
         } catch (e) {
-          if ((e as { code?: string }).code === '23505') throw new AppError(409, 'LABELLED_NAME_CONFLICT', `${r.domain} was registered by a concurrent call; nothing was registered`, { domain: r.domain });
+          if ((e as { code?: string }).code === '23505') {
+            const domain = /\(domain\)=\(([^)]*)\)/.exec(String((e as { detail?: string }).detail ?? ''))?.[1];
+            throw new AppError(409, 'LABELLED_NAME_CONFLICT', `${domain ?? 'a name'} was registered by a concurrent call; nothing was registered`, { domain: domain ?? null });
+          }
           throw e;
         }
       }

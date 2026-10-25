@@ -64,22 +64,23 @@ export const sameNameCheck: Check = {
     const evidence: number[] = [];
     let calls = 0;
 
-    for (const tld of ctx.settings.ext.list) {
-      if (tld === 'com') continue;
+    // v5.42.0: the extensions run side by side (RDAP of one overlaps the page fetch of another). The page fetches still go through the one shared site pacer
+    // (one at a time, the configured gap, robots.txt honoured), and each RDAP host through its own pacer, so no host is asked faster than before.
+    const perTld = await Promise.all(ctx.settings.ext.list.filter((t) => t !== 'com').map(async (tld) => {
+      const myEvidence: number[] = [];
+      let myOperator: (typeof operators)[number] | null = null;
       // Registration is RDAP's; with rdap_other off it is unknown (the site is still read: a site in use is a fact).
       const reg: ExtRegistration = ctx.settings.sources.rdap_other
         ? await extRegistration(ctx, sld, tld)
         : { tld, status: 'unknown', created_at: null, reason_code: 'SOURCE_DISABLED', evidenceId: null, cached: false, upstream: false, checked_at: new Date(ctx.now()).toISOString(), reused: false, rate_limited: 0, source: null };
       if (!reg.cached && reg.upstream) calls++;
-      if (reg.evidenceId !== null) evidence.push(reg.evidenceId);
+      if (reg.evidenceId !== null) myEvidence.push(reg.evidenceId);
       const base = { tld, registered: reg.status === 'registered' ? 'yes' as const : reg.status === 'not_registered' ? 'no' as const : 'unknown' as const, created_at: reg.created_at, registration_reason_code: reg.reason_code ?? null };
       if (reg.status === 'not_registered') {
-        rows.push({ ...base, site_state: 'unregistered', final_url: null, business_use: null, business_name: null, reason_code: null, evidence_id: null });
-        continue;
+        return { row: { ...base, site_state: 'unregistered', final_url: null, business_use: null, business_name: null, reason_code: null, evidence_id: null } as ExtensionRow, evidence: myEvidence, operator: myOperator };
       }
       if (ctx.now() > ctx.deadline) {
-        rows.push({ ...base, site_state: 'unknown', final_url: null, business_use: null, business_name: null, reason_code: 'TIMEOUT', evidence_id: null });
-        continue;
+        return { row: { ...base, site_state: 'unknown', final_url: null, business_use: null, business_name: null, reason_code: 'TIMEOUT', evidence_id: null } as ExtensionRow, evidence: myEvidence, operator: myOperator };
       }
       const host = `${sld}.${tld}`;
       const page = await fetchPage({ fetch: ctx.deps.siteFetch, lookupHost: ctx.deps.lookupHost }, `https://${host}/`, { timeoutMs: s.timeout_ms, maxBytes: s.max_bytes, maxRedirects: s.max_redirects, pace, robots, neverFetchHosts: ctx.settings.lead.verify.never_fetch_hosts, deadline: ctx.deadline, now: ctx.now, onRequest: () => { calls++; } });
@@ -88,12 +89,17 @@ export const sameNameCheck: Check = {
       if (page.ok && page.html !== '') {
         const text = visibleText(page.html).text;
         evidenceId = await storeEvidence(ctx.db, { source: 'site', url: page.finalUrl, retrievedAt: new Date(ctx.now()), httpStatus: page.status, contentType: 'text/html', body: page.html, text, maxBytes: ctx.settings.evidence.max_text_bytes });
-        evidence.push(evidenceId);
+        myEvidence.push(evidenceId);
       }
-      rows.push({ ...base, site_state: c.site_state, final_url: c.final_url, business_use: c.business_use, business_name: c.business_name, reason_code: c.reason_code, evidence_id: evidenceId });
       if (c.site_state === 'in_use' && (c.business_use === 'business_name' || c.business_use === 'service_description') && c.final_url) {
-        operators.push({ url: c.final_url, tld, business_use: c.business_use, business_name: c.business_name });
+        myOperator = { url: c.final_url, tld, business_use: c.business_use, business_name: c.business_name };
       }
+      return { row: { ...base, site_state: c.site_state, final_url: c.final_url, business_use: c.business_use, business_name: c.business_name, reason_code: c.reason_code, evidence_id: evidenceId } as ExtensionRow, evidence: myEvidence, operator: myOperator };
+    }));
+    for (const r of perTld) {
+      rows.push(r.row);
+      evidence.push(...r.evidence);
+      if (r.operator) operators.push(r.operator);
     }
 
     // A name is taken when RDAP says registered, or when a live site (in use, parked, redirecting) proves it.

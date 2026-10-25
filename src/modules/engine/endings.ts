@@ -7,6 +7,7 @@
 // It does not go through lookupCached: that would write a screening_evidence row and an rdap_lookups row for each of ~160,000 asks (free-plan size);
 // the compact answer in engine_endings is the permanent record.
 import { sql, type Kysely } from 'kysely';
+import { chunks } from '../../core/chunks.js';
 import { toJerusalemIso } from '../../core/dates.js';
 import { trySessionLock } from '../../core/locks.js';
 import { RDAP_FALLBACK_BASES, type RdapLookup } from '../../core/rdap.js';
@@ -126,6 +127,71 @@ export async function saveAnswer(db: Kysely<Database>, nowMs: number, p: Pair, a
   return 'inserted';
 }
 
+/** v5.42.0 (G-124): how many answers wait in memory before one batch of statements writes them. */
+export const ENDINGS_FLUSH_EVERY = 500;
+
+/**
+ * Buffers answers and writes them in batches with the same keep / update / append rule as `saveAnswer` (v5.14.0): an unanswered row is updated in place;
+ * an unanswered ask keeps the known row (no write); an answer that says the same (registered, registry creation date, and not older) updates the row in place
+ * (guarded by `is not distinct from`, so a changed answer never overwrites); a changed answer or a never-asked pair appends a row. One `update ... from unnest` for each
+ * kind of update and one multi-row insert per batch instead of one to three statements per pair.
+ */
+export class EndingsWriter {
+  private buf: Array<{ p: Pair; row: ReturnType<typeof rowOf> }> = [];
+  inserted = 0;
+  updated = 0;
+  constructor(private readonly db: Kysely<Database>, private readonly everyN: number = ENDINGS_FLUSH_EVERY) {}
+
+  async add(nowMs: number, p: Pair, a: Answer): Promise<void> {
+    if (p.prevId !== null && p.prevRegistered !== null && a.registered === null) return; // keep the known answer; the pair stays due and is asked again on the next run
+    this.buf.push({ p, row: rowOf(nowMs, a) });
+    if (this.buf.length >= this.everyN) await this.flush();
+  }
+
+  async flush(): Promise<void> {
+    const items = this.buf;
+    this.buf = [];
+    if (items.length === 0) return;
+    const db = this.db;
+    const unanswered = items.filter((x) => x.p.prevId !== null && x.p.prevRegistered === null);
+    const answered = items.filter((x) => x.p.prevId !== null && x.p.prevRegistered !== null);
+    const appends = items.filter((x) => x.p.prevId === null);
+    const cols = (xs: typeof items) => ({
+      id: xs.map((x) => x.p.prevId), registered: xs.map((x) => x.row.registered), created: xs.map((x) => x.row.created_at_registry), checked: xs.map((x) => x.row.checked_at),
+      http: xs.map((x) => x.row.http_status), reason: xs.map((x) => x.row.reason_code), evidence: xs.map((x) => x.row.evidence), registrar: xs.map((x) => x.row.registrar),
+    });
+    if (unanswered.length > 0) {
+      const c = cols(unanswered);
+      const r = await sql`update engine_endings e set registered = u.registered, created_at_registry = u.created, checked_at = u.checked, http_status = u.http, reason_code = u.reason, evidence = u.evidence::jsonb, registrar = u.registrar
+        from unnest(${c.id}::bigint[], ${c.registered}::bool[], ${c.created}::timestamptz[], ${c.checked}::timestamptz[], ${c.http}::int[], ${c.reason}::text[], ${c.evidence}::text[], ${c.registrar}::text[])
+          as u(id, registered, created, checked, http, reason, evidence, registrar)
+        where e.id = u.id`.execute(db);
+      this.updated += Number(r.numAffectedRows ?? 0);
+    }
+    let toInsert = appends;
+    if (answered.length > 0) {
+      const c = cols(answered);
+      const done = await sql<{ id: string }>`update engine_endings e set checked_at = u.checked, http_status = u.http, reason_code = u.reason, evidence = u.evidence::jsonb, registrar = u.registrar
+        from unnest(${c.id}::bigint[], ${c.registered}::bool[], ${c.created}::timestamptz[], ${c.checked}::timestamptz[], ${c.http}::int[], ${c.reason}::text[], ${c.evidence}::text[], ${c.registrar}::text[])
+          as u(id, registered, created, checked, http, reason, evidence, registrar)
+        where e.id = u.id and e.registered is not distinct from u.registered and e.created_at_registry is not distinct from u.created and e.checked_at <= u.checked
+        returning e.id::text as id`.execute(db);
+      const same = new Set(done.rows.map((r) => Number(r.id)));
+      this.updated += same.size;
+      toInsert = [...answered.filter((x) => !same.has(x.p.prevId!)), ...appends];
+    }
+    for (const part of chunks(toInsert, 500)) {
+      await db.insertInto('engine_endings').values(part.map((x) => ({ name: x.p.name, tld: x.p.tld, ...x.row }))).execute();
+      this.inserted += part.length;
+    }
+  }
+}
+
+function rowOf(nowMs: number, a: Answer) {
+  const registrar = (a.evidence as { registrar?: string | null } | null)?.registrar ?? null;
+  return { registered: a.registered, created_at_registry: a.createdAt, checked_at: new Date(nowMs), http_status: a.httpStatus, reason_code: a.reason, evidence: a.evidence == null ? null : JSON.stringify(a.evidence), registrar };
+}
+
 export class EndingsJob {
   constructor(private readonly deps: { db: Kysely<Database>; screening: ScreeningDeps; now: () => number; maxPairs?: number; budgetMs?: number; log?: { warn(o: object, m: string): void } }) {}
 
@@ -162,6 +228,8 @@ export class EndingsJob {
       for (const p of ownedPairs) (byTld.get(p.tld) ?? byTld.set(p.tld, []).get(p.tld)!).push(p);
       for (const r of picked) (byTld.get(r.tld) ?? byTld.set(r.tld, []).get(r.tld)!).push({ name: r.name, tld: r.tld, prevId: r.id === null ? null : Number(r.id), prevRegistered: r.registered });
       let stopped = false;
+      const writer = new EndingsWriter(db);
+      try {
       await Promise.all([...byTld.entries()].map(async ([tld, pairs]) => {
         const base = await this.baseOf(tld);
         if (!base) { out.skipped_tlds.push(tld); return; }
@@ -176,12 +244,18 @@ export class EndingsJob {
             const a = await this.ask(`${p.name}.${tld}`, base, pace);
             stats.asked += 1; out.asked += 1;
             if (a.registered === true) { stats.registered += 1; out.registered += 1; } else if (a.registered === false) { stats.not_registered += 1; out.not_registered += 1; } else { stats.unknown += 1; out.unknown += 1; }
-            await this.save(p, a, out);
-            if (p.owned) await recordOwnedEvent(db, now(), p, a);
+            if (p.owned) {
+              await this.save(p, a, out); // the owned event reads the row just written, so owned pairs are written one by one (a few hundred a week at most)
+              await recordOwnedEvent(db, now(), p, a);
+            } else await writer.add(now(), p, a);
           }
         };
         await Promise.all(Array.from({ length: CONCURRENCY }, worker));
       }));
+      } finally {
+        await writer.flush();
+        out.inserted += writer.inserted; out.updated += writer.updated;
+      }
       out.left_for_next_run = Math.max(0, out.due - out.asked);
       out.partial = stopped || out.skipped_tlds.length > 0;
       if (out.asked > 0) await db.insertInto('audit_log').values({

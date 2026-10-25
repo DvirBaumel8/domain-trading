@@ -10,7 +10,7 @@ import { buildLexicon, loadDataLexicon, type Lexicon } from './lexicon.js';
 import { currentLists } from './lists.js';
 import { Pacer, prefetchStored } from './rdap-batch.js';
 import { activeSelectionSettings, type SelectionValuesT } from './settings.js';
-import type { PageFetch } from './site.js';
+import type { PageFetch, PagePace } from './site.js';
 import type { CheckContext, ScreeningDeps } from './types.js';
 
 export interface Sibling {
@@ -94,9 +94,32 @@ export const isDefaultPageTitle = (title: string): boolean => DEFAULT_PAGE_TITLE
 
 const statusOf = (p: PageFetch | null): number | null => (p === null ? null : p.status ?? null);
 
+/** v5.42.0 (G-122): the whole call never runs longer than this. The API is reached through Cloudflare, which ends a request after about 100 s (HTTP 524), so a longer call would be lost. */
+export const SCAN_CALL_MAX_SECONDS = 90;
+/** v5.42.0: page fetches in flight at once across all hosts. */
+export const SCAN_FETCHES_IN_FLIGHT = 4;
+
+/** One gap per host (a robots.txt and a page of the same host are `min_ms_between_fetches` apart), and at most `inFlight` fetches at once across all hosts. */
+export class HostPaces implements PagePace {
+  private readonly hosts = new Map<string, Pacer>();
+  private readonly gate: Pacer;
+  constructor(private readonly gapMs: number, inFlight: number, private readonly sleep: (ms: number) => Promise<void>, private readonly clock: () => number) {
+    this.gate = new Pacer(0, inFlight, sleep, clock);
+  }
+  run<T>(fn: () => Promise<T>, host = ''): Promise<T> {
+    let p = this.hosts.get(host);
+    if (!p) { p = new Pacer(this.gapMs, 1, this.sleep, this.clock); this.hosts.set(host, p); }
+    const pacer = p;
+    return this.gate.run(() => pacer.run(fn));
+  }
+}
+
 export interface ScanOpts { now: () => number; by: string; auditId: string | null }
 
-/** Scans each domain in turn under one time budget and appends one `sibling_scans` row per domain. */
+/**
+ * Scans each domain in turn and appends one `sibling_scans` row per domain. `time_budget_seconds` is the budget of the whole call (as before 5.42.0), capped at
+ * SCAN_CALL_MAX_SECONDS (90 s, under Cloudflare's ~100 s request limit). v5.42.0 (G-122): the siblings of a name run 4 at a time, paced per host, so far more names fit.
+ */
 export async function scanSiblings(db: Kysely<Database>, deps: ScreeningDeps, domains: string[], o: ScanOpts): Promise<SiblingScan[]> {
   const sel = await activeSelectionSettings(db);
   const values = sel.values;
@@ -104,14 +127,15 @@ export async function scanSiblings(db: Kysely<Database>, deps: ScreeningDeps, do
   const lists = await currentLists(db, ['sig_parked', 'sig_forsale']);
   const pageLists = lists.sig_parked && lists.sig_forsale ? { parked: lists.sig_parked.terms, forsale: lists.sig_forsale.terms } : null;
   const shared = new Map<string, unknown>();
-  const deadline = o.now() + cfg.time_budget_seconds * 1000;
+  const callDeadline = o.now() + Math.min(cfg.time_budget_seconds, SCAN_CALL_MAX_SECONDS) * 1000;
   const maxAgeHours = values.freshness_hours.lookalikes ?? values.freshness_hours.ext_dates ?? 0;
-  const pace = new Pacer(values.same_name.min_ms_between_fetches, 1, deps.sleep, o.now);
+  const pace = new HostPaces(values.same_name.min_ms_between_fetches, SCAN_FETCHES_IN_FLIGHT, deps.sleep, o.now);
   const robots = new Map<string, { text: string }>();
   const out: SiblingScan[] = [];
 
   for (const domain of domains) {
     const tokens = await tokensOf(db, domain, values);
+    const deadline = callDeadline;
     const ctx = {
       db, run: { id: 'sibling-scan', mode: 'live', backtest: false, buyHold: false, trancheId: null, createdAt: new Date(o.now()) }, item: { idx: 0, domain, lane: 'S3', leads_ab: 0 },
       settings: values, settingsLabel: sel.label, latest: () => undefined, ahead: () => [], lists,
@@ -125,8 +149,8 @@ export async function scanSiblings(db: Kysely<Database>, deps: ScreeningDeps, do
     const evidence: number[] = [];
     const siblings: Sibling[] = [];
     const prefetched = await prefetchStored(db, names.map((n) => n.domain), { maxAgeHours, now: o.now });
-    for (const n of names) {
-      const pr = await probeLookalike(ctx, n, { maxAgeHours, lists: pageLists, pace, robots, prefetched });
+    const probes = await inPool(names, SCAN_FETCHES_IN_FLIGHT, (n) => probeLookalike(ctx, n, { maxAgeHours, lists: pageLists, pace, robots, prefetched }));
+    for (const pr of probes) {
       calls += pr.calls;
       evidence.push(...pr.evidence);
       const it = pr.item;
@@ -158,6 +182,16 @@ export async function scanSiblings(db: Kysely<Database>, deps: ScreeningDeps, do
     }).execute();
     out.push({ domain, fetched_at: scanAt.toISOString(), settings_version: sel.label, complete, skipped_n, upstream_calls: calls, siblings, lead_points });
   }
+  return out;
+}
+
+/** Runs `fn` over `items` with at most `n` in flight; results keep the order of `items`. */
+async function inPool<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    for (;;) { const i = next++; if (i >= items.length) return; out[i] = await fn(items[i]!); }
+  }));
   return out;
 }
 

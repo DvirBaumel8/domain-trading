@@ -283,6 +283,20 @@ export async function rdapBaseFor(db: Kysely<Database>, deps: ScreeningDeps, tld
   return map.get(t) ?? null;
 }
 
+/**
+ * v5.42.0: `rdapBaseFor` once per run and ending, shared by the checks that look at the same name's other endings. The promise is shared, so endings asked
+ * side by side do not repeat the bootstrap read (or its refresh); a failure is not remembered.
+ */
+export function runRdapBase(ctx: CheckContext, tld: string, enabled: boolean): Promise<string | null> {
+  const key = `rdap_base:${tld}:${enabled}`;
+  const hit = ctx.shared.get(key) as Promise<string | null> | undefined;
+  if (hit) return hit;
+  const p = rdapBaseFor(ctx.db, ctx.deps, tld, { enabled, now: ctx.now });
+  ctx.shared.set(key, p);
+  p.catch(() => { if (ctx.shared.get(key) === p) ctx.shared.delete(key); });
+  return p;
+}
+
 /** What lookupCached needs from a pacer. */
 interface Pace {
   run<T>(fn: () => Promise<T>): Promise<T>;

@@ -68,3 +68,6 @@ How to rebuild `pool_sha256` of pick day D outside the server. All dates are UTC
 | PP528-41 | AT-6: 12% overlap uses the permutation test, reproducible |
 | PP528-42 | 2% overlap uses Fisher; CMH strata; date filter |
 | PP528-43 | Holm over the secondaries; unknown excluded |
+
+## Batching (v5.42.0)
+`pickproofLabels` reads the RDAP cache once for the names it can reach (the first `pickproof_labels_max_per_run`), asks the registry for the rest (the 250 ms pause only between live asks), and writes labels (200 a flush) and the new cache answers (once, at the end) in multi-row statements. `lookups_n` still counts every distinct name handled, cache hits included. Test BK542-2 (183 queries before, 7 after for 60 names).

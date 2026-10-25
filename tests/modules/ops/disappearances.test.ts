@@ -161,3 +161,32 @@ describe('BG052 disappearance tags', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('BK542 bulk writes: disappearance tags', () => {
+  it('BK542-3 120 due names: the cache is read once, tags are written in batches, at most 4 lookups are in flight and the cap of 100 is exact', async () => {
+    const names = Array.from({ length: 120 }, (_, i) => `bulk${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26))}.com`);
+    await goneGodaddy(names);
+    await sql`update settings set disappearance_lookups_max_per_run = 100`.execute(db);
+    // one name has a stored answer that is newer than the day it left: no lookup
+    await db.insertInto('rdap_cache').values({ domain: names[0]!, registered: false, created: null, expires: null, registrar: null, statuses: [], nameservers: [], updated_at: null, checked_at: new Date(NOW - 3_600_000), reason_code: null }).execute();
+    const calls: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const rdap: RdapLookupFn = async (d) => {
+      calls.push(d); inFlight++; maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, 2));
+      inFlight--;
+      return free;
+    };
+    const { collectAndTag } = await import('./disappearances-helpers.js');
+    const { value, stats } = await collectAndTag(rdap, NOW);
+    if (process.env.BK_LOG) (await import('node:fs')).appendFileSync(process.env.BK_LOG, `BK542-3: ${stats.queries}\n`);
+    expect(value).toMatchObject({ status: 'stopped', stopped_reason: 'CAP', lookups_n: 100, cache_hits_n: 1, eligible_n: 120 });
+    expect(calls).toHaveLength(100);
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(maxInFlight).toBeLessThanOrEqual(4);
+    expect(stats.queries).toBeLessThan(40); // before 5.42.0: 3 or more queries per name (cache read, tag update, cache write) = about 350
+    expect(await db.selectFrom('disappearances').select('domain').where('tag', '=', 'deleted').execute()).toHaveLength(101);
+    expect(await db.selectFrom('disappearances').select('domain').where('attempts', '=', 0).where('tag_reason', '=', 'NOT_CHECKED').execute()).toHaveLength(19);
+  });
+});

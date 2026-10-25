@@ -1,6 +1,7 @@
 // v5.25.0 (CR-070): the books in DOM. Non-money cost rows (POST /ledger/costs), the forward-cost plan (PUT /portfolio/{domain}/forward-costs),
 // the forward-cost view (GET /costs/forward) and the private books CSV (GET /books.csv). Money is integer cents; derived numbers are computed, never typed.
 import { sql, type Kysely } from 'kysely';
+import { chunks } from '../../core/chunks.js';
 import { addMonthsClamped, idtDay, isRealDate } from '../../core/dates.js';
 import { pair, usdSigned, usdStringToCents } from '../../core/money.js';
 import type { Database, LedgerType } from '../../db/types.js';
@@ -56,10 +57,11 @@ export async function postCosts(db: Kysely<Database>, body: unknown, ctx: { audi
   const total = parsed.reduce((s, p) => s + p.cents, 0);
   if (!dryRun) {
     await db.transaction().execute(async (trx) => {
-      for (const p of parsed) {
-        await trx.insertInto('ledger_entries').values({
+      // v5.42.0: multi-row inserts, 1,000 a statement (ids still follow the order of the body)
+      for (const part of chunks(parsed, 1_000)) {
+        await trx.insertInto('ledger_entries').values(part.map((p) => ({
           occurred_on: p.date, domain_id: p.domain ? ids.get(p.domain)! : null, type: p.type, amount_cents: p.cents, note: p.note, audit_id: ctx.auditId,
-        }).execute();
+        }))).execute();
       }
     });
   }

@@ -24,6 +24,9 @@ const DAY = 24 * HOUR;
 let app: FastifyInstance;
 let clock: { t: number };
 let rdapTable: Record<string, RdapLookup>;
+let rdapDelayMs = 0;
+let inFlight = 0;
+let maxInFlight = 0;
 
 const facts = (statuses: string[] = ['active']) => ({ registrar: 'Fake Registrar', created_at: '2019-01-01T00:00:00Z', expires_at: '2026-11-01T00:00:00Z', updated_at: null, statuses, nameservers: [] });
 const registered = (statuses?: string[]): RdapLookup => ({ outcome: 'registered', reasonCode: null, httpStatus: 200, url: 'https://rdap.example/x', retrievedAt: new Date(), body: '{}', facts: facts(statuses) });
@@ -32,11 +35,12 @@ const free = (): RdapLookup => ({ outcome: 'not_registered', reasonCode: null, h
 async function boot(): Promise<void> {
   clock = { t: T0 };
   rdapTable = { [D]: registered() };
+  rdapDelayMs = 0; inFlight = 0; maxInFlight = 0;
   mswServer.use(http.get('https://data.iana.org/rdap/dns.json', () => respond(fixture('iana-dns.json'))));
   app = await makeApp({
     now: () => clock.t,
     screening: {
-      rdapLookup: async (d: string) => rdapTable[d] ?? free(), dnsQuery: async () => ({ rcode: 3, answers: [] }),
+      rdapLookup: async (d: string) => { inFlight++; maxInFlight = Math.max(maxInFlight, inFlight); if (rdapDelayMs > 0) await new Promise((r) => setTimeout(r, rdapDelayMs)); inFlight--; return rdapTable[d] ?? free(); }, dnsQuery: async () => ({ rcode: 3, answers: [] }),
       siteFetch: ((i: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => globalThis.fetch(i, init)) as typeof fetch,
       lookupHost: async () => [{ address: '93.184.216.34', family: 4 }],
     },
@@ -101,6 +105,14 @@ describe('AB539 pre-bid check', () => {
     expect((row.answer as { checks: unknown[] }).checks).toHaveLength(10);
     const audit = await db.selectFrom('audit_log').select(['path', 'method']).where('id', '=', j.audit_id).executeTakeFirstOrThrow();
     expect(audit).toMatchObject({ path: '/auctions/prebid', method: 'POST' });
+  });
+
+  it('BK542-9 the five endings are probed side by side; the answer keeps the order net, org, co, io, ai', async () => {
+    rdapDelayMs = 15;
+    const r = await prebid();
+    expect(r.statusCode, r.body).toBe(201);
+    expect(Object.keys(r.json().endings)).toEqual(['net', 'org', 'co', 'io', 'ai']);
+    expect(maxInFlight).toBeGreaterThan(1);
   });
 
   it('AB539-2: a brand-list hit is FAIL BRAND-1, the later name rules are SKIP, the verdict is fail; prebid_checks is append-only', async () => {

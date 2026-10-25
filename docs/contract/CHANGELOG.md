@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.42.0 (2026-10-25): Bulk work everywhere: batched DB reads and writes, parallel registry checks, faster sibling scan (G-121, G-122, G-124)
+Release note: `docs/releases/v5.42.0.md`.
+MINOR release of PATCH-level changes (no response shape, route or code changes; no migration).
+- Internal bulk work: `POST /data/sales` (5,000 rows: 10,003 queries to 9), intake, T30 labels, disappearance tags, `engineEndings`, test-set seal, `POST /selection/labelled-names` and `POST /ledger/costs` read and write in batches; `ext_dates`, `same_name` and the pre-bid endings ask their registries side by side (each host keeps its pacer).
+- `POST /selection/sibling-scan`: a name's siblings are checked 4 at a time with per-host pacing; `siblings.time_budget_seconds` stays the whole-call budget, capped at 90 s (under Cloudflare's ~100 s request limit).
+
 ## 5.41.0 (2026-10-25): Free data for the scoring engine: holdout block removed, engineFeed from GoDaddy closeouts and auctions
 Release note: `docs/releases/v5.41.0.md`.
 MINOR (migration `1766700000000_v5-41-0.sql`: `settings.datasave_auction_min_cents`).

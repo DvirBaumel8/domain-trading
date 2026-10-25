@@ -112,10 +112,9 @@ export async function runPrebidChecks(db: Kysely<Database>, deps: ScreeningDeps,
   const maxAgeHours = values.freshness_hours.lookalikes ?? values.freshness_hours.ext_dates ?? 0;
   const pace = sharedPacer(ctx);
   const robots = sharedRobots(ctx);
-  for (const tld of PREBID_ENDINGS) {
-    const p = await probeLookalike(ctx, { domain: `${sld}.${tld}`, kind: 'ending' }, { maxAgeHours, lists: l, pace, robots });
-    endings[tld] = { registered: p.item.registered, in_use: p.item.in_use, reason_code: p.item.reason_code };
-  }
+  // v5.42.0: the five probes run side by side; the page fetches share the one site pacer (one at a time, robots.txt honoured) and each RDAP host its own pacer
+  const probes = await Promise.all(PREBID_ENDINGS.map((tld) => probeLookalike(ctx, { domain: `${sld}.${tld}`, kind: 'ending' }, { maxAgeHours, lists: l, pace, robots })));
+  PREBID_ENDINGS.forEach((tld, i) => { const p = probes[i]!; endings[tld] = { registered: p.item.registered, in_use: p.item.in_use, reason_code: p.item.reason_code }; });
   const inUse = PREBID_ENDINGS.filter((t) => endings[t].in_use === true);
   const unknown = PREBID_ENDINGS.filter((t) => endings[t].registered === null);
   const same = { endings, in_use: inUse, unknown };

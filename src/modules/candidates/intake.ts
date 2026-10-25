@@ -1,5 +1,6 @@
 // v2.14.0 (CR-012 part C): scouts send names (POST /candidates/intake); the daily step `intakeScreening` screens them (with the drop-list names that are about
 // to drop) in ONE full-plan run and records what it took. Nothing here calls a registrar or marketplace; the screening run does its own lookups.
+import { chunks } from '../../core/chunks.js';
 import { advisoryXactLock } from '../../core/locks.js';
 import { hasAtSign, piiError } from '../../core/validation.js';
 import { sql, type Kysely } from 'kysely';
@@ -11,7 +12,7 @@ import { newAuditId, writeJobAudit } from '../../http/audit.js';
 import { AppError } from '../../http/errors.js';
 import { CompSchema } from '../listing/index.js';
 import { createRun, currentLists, SellersList, type InputName, type ScreeningWorker } from '../selection/index.js';
-import { activeSelectionSettings, earlierWithTopic, laneFitter, methodApproval, normalizeTopic, TOPIC_MAX_CHARS, topicFor, type TopicEarlier } from '../selection/index.js';
+import { activeSelectionSettings, laneFitter, methodApproval, normalizeTopic, TOPIC_MAX_CHARS, topicFor, type TopicEarlier } from '../selection/index.js';
 
 /** A name sent again within this many days is a duplicate (its extra source is recorded, it is not screened twice). */
 export const INTAKE_DEDUPE_DAYS = 30;
@@ -118,39 +119,73 @@ export async function takeIntake(db: Kysely<Database>, body: IntakeBodyT, ctx: {
   const { values: sv } = await activeSelectionSettings(db);
   const maxSld = sv.form.max_sld_chars;
   const since = new Date(ctx.now.getTime() - INTAKE_DEDUPE_DAYS * DAY_MS);
+  // v5.42.0: decide every row in memory, read what the database must answer in a few queries (queued duplicates, rows that share a topic), insert in multi-row
+  // statements. TOPIC_REUSED still reads only earlier rows: the stored ones before this upload plus the rows above it in this upload (same upload order as before).
+  type Decided = { c: (typeof checked)[number]; row: { topic: string | null; lane: (typeof checked)[number]['n']['lane']; source: string; note: string | null; who_chases: string | null; sellers: string | null; words: string[] | null; comps: string | null; received_at: Date; token_name: string; audit_id: string | null }; reason: IntakeRemoval | null };
+  const seen = new Set<string>();
+  const decided: Decided[] = checked.map((c) => {
+    const row = { topic: null as string | null, lane: c.n.lane, source: c.n.source, note: c.n.note ?? null, who_chases: c.n.who_chases ?? null, sellers: c.n.sellers ? JSON.stringify(c.n.sellers) : null, words: c.n.words ?? null, comps: c.n.comps ? JSON.stringify(c.n.comps) : null, received_at: ctx.now, token_name: ctx.tokenName, audit_id: ctx.auditId };
+    let reason: IntakeRemoval | null = c.reason;
+    if (reason === null) {
+      if (seen.has(c.domain)) reason = 'DUPLICATE_IN_UPLOAD';
+      else {
+        seen.add(c.domain);
+        const w = wordReason(c.domain, c.n.words, regimeTerms);
+        // v3.10.0 (CR-043): form.max_sld_chars (null = off) removes a name longer than it; the form check of a screening run FAILs it the same way
+        const tooLong = maxSld != null && c.domain.length - '.com'.length > maxSld ? 'SLD_TOO_LONG' as const : null;
+        reason = w.reason ?? tooLong ?? (owned.has(c.domain) ? 'OWNED' : null);
+        row.topic = topicFor(c.n.lane, w.tokens, c.n.topic);
+      }
+    }
+    return { c, row, reason };
+  });
   await db.transaction().execute(async (trx) => {
-    const seen = new Set<string>();
-    for (const c of checked) {
-      const row = { topic: null as string | null, lane: c.n.lane, source: c.n.source, note: c.n.note ?? null, who_chases: c.n.who_chases ?? null, sellers: c.n.sellers ? JSON.stringify(c.n.sellers) : null, words: c.n.words ?? null, comps: c.n.comps ? JSON.stringify(c.n.comps) : null, received_at: ctx.now, token_name: ctx.tokenName, audit_id: ctx.auditId };
-      let reason: IntakeRemoval | null = c.reason;
-      if (reason === null) {
-        if (seen.has(c.domain)) reason = 'DUPLICATE_IN_UPLOAD';
-        else {
-          seen.add(c.domain);
-          const w = wordReason(c.domain, c.n.words, regimeTerms);
-          // v3.10.0 (CR-043): form.max_sld_chars (null = off) removes a name longer than it; the form check of a screening run FAILs it the same way
-          const tooLong = maxSld != null && c.domain.length - '.com'.length > maxSld ? 'SLD_TOO_LONG' as const : null;
-          reason = w.reason ?? tooLong ?? (owned.has(c.domain) ? 'OWNED' : null);
-          row.topic = topicFor(c.n.lane, w.tokens, c.n.topic);
+    const live = decided.filter((d) => d.reason === null);
+    // the first queued row of each name inside the dedupe window (rows of this upload do not exist yet, and a name is live once per upload)
+    const firstQueued = new Map<string, number>();
+    for (const part of chunks([...new Set(live.map((d) => d.c.domain))], 5_000)) {
+      const rows = await trx.selectFrom('candidate_intake').select(['domain', sql<string>`min(id)`.as('id')]).where('domain', 'in', part).where('status', '=', 'queued')
+        .where('received_at', '>', since).groupBy('domain').execute();
+      for (const r of rows) firstQueued.set(r.domain, Number(r.id));
+    }
+    const windowStart = new Date(ctx.now.getTime() - sv.intake.topic_window_days * DAY_MS);
+    const stored = new Map<string, { id: number; domain: string; received_at: Date }[]>();
+    for (const part of chunks([...new Set(live.map((d) => d.row.topic).filter((t): t is string => t !== null))], 5_000)) {
+      const rows = await trx.selectFrom('candidate_intake').select(['id', 'domain', 'topic', 'received_at']).where('topic', 'in', part).where('status', '!=', 'removed')
+        .where('received_at', '>=', windowStart).where('received_at', '<=', ctx.now).orderBy('id').execute();
+      for (const r of rows) (stored.get(r.topic!) ?? stored.set(r.topic!, []).get(r.topic!)!).push({ id: Number(r.id), domain: r.domain, received_at: r.received_at });
+    }
+    const inserts = decided.map((d) => {
+      const status = d.reason !== null ? 'removed' as const : firstQueued.has(d.c.domain) ? 'duplicate' as const : 'queued' as const;
+      return { status, values: { ...d.row, domain: d.c.domain, status, reason: d.reason } };
+    });
+    const ids: number[] = [];
+    for (const part of chunks(inserts, 1_000)) {
+      const got = await trx.insertInto('candidate_intake').values(part.map((x) => x.values)).returning(['id', 'domain']).execute();
+      // one multi-row INSERT hands out ids in VALUES order; the domain check makes a surprise loud
+      got.forEach((g, i) => { if (g.domain !== part[i]!.values.domain) throw new Error('intake insert: returned rows out of order'); ids.push(Number(g.id)); });
+    }
+    decided.forEach((d, i) => {
+      if (d.reason !== null) { out.removed.push({ domain: d.c.domain, reason: d.reason }); return; }
+      if (inserts[i]!.status === 'duplicate') { out.duplicates.push({ domain: d.c.domain, first_intake_id: firstQueued.get(d.c.domain)! }); return; }
+      let earlier: TopicEarlier[] = [];
+      if (d.row.topic) {
+        const seenDomain = new Set<string>();
+        const mine = d.c.domain;
+        const candidates = [
+          ...(stored.get(d.row.topic) ?? []),
+          // rows above this one in the upload (not removed) that carry the same topic
+          ...decided.slice(0, i).flatMap((e, j) => (inserts[j]!.status !== 'removed' && e.row.topic === d.row.topic ? [{ id: ids[j]!, domain: e.c.domain, received_at: ctx.now }] : [])),
+        ];
+        earlier = [];
+        for (const r of candidates) {
+          if (r.domain === mine || seenDomain.has(r.domain)) continue; // one entry per earlier name (its first row); a name never reuses its own topic
+          seenDomain.add(r.domain);
+          earlier.push({ intake_id: r.id, domain: r.domain, received_at: r.received_at.toISOString() });
         }
       }
-      if (reason !== null) {
-        await trx.insertInto('candidate_intake').values({ ...row, domain: c.domain, status: 'removed', reason }).execute();
-        out.removed.push({ domain: c.domain, reason });
-        continue;
-      }
-      const first = await trx.selectFrom('candidate_intake').select('id').where('domain', '=', c.domain).where('status', '=', 'queued')
-        .where('received_at', '>', since).orderBy('id').limit(1).executeTakeFirst();
-      if (first) {
-        await trx.insertInto('candidate_intake').values({ ...row, domain: c.domain, status: 'duplicate' }).execute();
-        out.duplicates.push({ domain: c.domain, first_intake_id: Number(first.id) });
-        continue;
-      }
-      // TOPIC_REUSED is read before this row exists, so a name never reuses its own topic
-      const earlier = row.topic ? await earlierWithTopic(trx, { topic: row.topic, domain: c.domain, at: ctx.now, windowDays: sv.intake.topic_window_days }) : [];
-      const r = await trx.insertInto('candidate_intake').values({ ...row, domain: c.domain, status: 'queued' }).returning('id').executeTakeFirstOrThrow();
-      out.accepted.push({ domain: c.domain, intake_id: Number(r.id), ...(c.n.topic && { topic: row.topic! }), ...(earlier.length > 0 && { flags: [{ code: 'TOPIC_REUSED' as const, topic: row.topic!, earlier }] }) });
-    }
+      out.accepted.push({ domain: d.c.domain, intake_id: ids[i]!, ...(d.c.n.topic && { topic: d.row.topic! }), ...(earlier.length > 0 && { flags: [{ code: 'TOPIC_REUSED' as const, topic: d.row.topic!, earlier }] }) });
+    });
   });
   return out;
 }
@@ -211,19 +246,36 @@ async function rescreenCandidates(db: Kysely<Database>, domains: string[], activ
   const take: [string, { lane: string; ids: string[]; words: string[] | null }][] = [];
   const skipped: RescreenSkip[] = [];
   const owned = await ownedDomains(db, domains);
+  // v5.42.0: the three per-name reads run once for all names that need them (intake rows, last screening, newer domain records)
+  const need = [...new Set(domains.filter((d) => !waiting.has(d)))];
+  const rowsOf = new Map<string, { id: string; lane: Database['candidate_intake']['lane']; words: string[] | null; received_at: Date }[]>();
+  const lastOf = new Map<string, { at: Date; settings_label: string }>();
+  const recordAt = new Map<string, Date>();
+  for (const part of chunks(need, 5_000)) {
+    for (const r of await db.selectFrom('candidate_intake').select(['id', 'domain', 'lane', 'words', 'received_at']).where('domain', 'in', part).where('status', 'in', ['queued', 'duplicate']).orderBy('id').execute()) {
+      (rowsOf.get(r.domain) ?? rowsOf.set(r.domain, []).get(r.domain)!).push(r);
+    }
+  }
+  const screened = need.filter((d) => (rowsOf.get(d)?.length ?? 0) > 0 && !owned.has(d));
+  for (const part of chunks(screened, 5_000)) {
+    for (const r of (await sql<{ domain: string; at: Date; settings_label: string }>`
+      select distinct on (s.domain) s.domain, s.at, r.settings_label from candidate_screenings s join screening_runs r on r.id = s.run_id
+      where s.domain = any(${part}) order by s.domain, s.at desc, s.id desc`.execute(db)).rows) lastOf.set(r.domain, r);
+    for (const r of (await sql<{ domain: string; at: Date }>`select domain, max(created_at) as at from domain_records where domain = any(${part}) group by domain`.execute(db)).rows) recordAt.set(r.domain, r.at);
+  }
   for (const domain of domains) {
     const queued = waiting.get(domain);
     if (queued) { take.push([domain, queued]); continue; }
-    const rows = await db.selectFrom('candidate_intake').select(['id', 'lane', 'words', 'received_at']).where('domain', '=', domain).where('status', 'in', ['queued', 'duplicate']).orderBy('id').execute();
+    const rows = rowsOf.get(domain) ?? [];
     if (rows.length === 0) { skipped.push({ domain, reason: 'NO_INTAKE' }); continue; }
     if (owned.has(domain)) { skipped.push({ domain, reason: 'OWNED' }); continue; }
-    const last = await db.selectFrom('candidate_screenings as s').innerJoin('screening_runs as r', 'r.id', 's.run_id').select(['s.at', 'r.settings_label']).where('s.domain', '=', domain).orderBy('s.at', 'desc').orderBy('s.id', 'desc').limit(1).executeTakeFirst();
+    const last = lastOf.get(domain);
     const newest = rows[rows.length - 1]!;
     let changed = !last; // never screened (all its rows were screened-less): goes in as usual
     if (last) {
       if (last.settings_label !== activeLabel) changed = true;
       else if (rows.some((r) => r.received_at.getTime() > last.at.getTime())) changed = true;
-      else changed = !!(await db.selectFrom('domain_records').select('id').where('domain', '=', domain).where('created_at', '>', last.at).limit(1).executeTakeFirst());
+      else changed = (recordAt.get(domain)?.getTime() ?? -Infinity) > last.at.getTime();
     }
     if (!changed && !force) { skipped.push({ domain, reason: 'NOT_CHANGED' }); continue; }
     take.push([domain, { lane: newest.lane, ids: [newest.id], words: [...rows].reverse().find((r) => r.words)?.words ?? null }]);
@@ -365,10 +417,12 @@ export class IntakeScreeningJob {
       });
       const run = await createRun(this.deps.db, { mode: 'full', names }, { createdBy: onDemand ? 'onDemandScreen' : 'intakeScreening', auditId, now }, worker.checks);
       started.runId = run.id;
-      for (const [domain, v] of takenIntake) {
-        for (const id of v.ids) await db.insertInto('candidate_screenings').values({ intake_id: id, domain, origin: 'intake', run_id: run.id, day: today, at: now, on_demand: !!onDemand }).execute();
-      }
-      for (const d of takenDrops) await db.insertInto('candidate_screenings').values({ intake_id: null, domain: d.w.domain, origin: 'drop_list', run_id: run.id, day: today, at: now, on_demand: !!onDemand }).execute();
+      // v5.42.0: multi-row inserts (the intake rows first, then the drop-list names, as before)
+      const screenRows = [
+        ...takenIntake.flatMap(([domain, v]) => v.ids.map((id) => ({ intake_id: id, domain, origin: 'intake' as const, run_id: run.id, day: today, at: now, on_demand: !!onDemand }))),
+        ...takenDrops.map((d) => ({ intake_id: null, domain: d.w.domain, origin: 'drop_list' as const, run_id: run.id, day: today, at: now, on_demand: !!onDemand })),
+      ];
+      for (const part of chunks(screenRows, 1_000)) await db.insertInto('candidate_screenings').values(part).execute();
       return {
         queued_before: queuedBefore, screened: names.length, from_intake: takenIntake.length, from_drop_lists: takenDrops.length,
         left_for_next_run: queuedBefore + drops.length - names.length, run_id: run.id, census_list: census, ...counts,

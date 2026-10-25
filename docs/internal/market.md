@@ -66,3 +66,6 @@ Binding rules and test IDs for the `market` module. The interface is `docs/contr
 | MK525-3 | the migration deletes only sets with 0 positives (readFileSync check) |
 
 Tests MK523-6 and MK523-7 now ask for `asof` on or before the newest sealed day (2026-12-01), not 2026-12-20.
+
+## Batching (v5.42.0)
+`loadSales` looks up the stored keys of a body with `unnest` arrays (5,000 a statement) and inserts the new rows 1,000 a statement, under the same `market_sales` lock and transaction; the 409 `APPEND_ONLY` rule, the in-body duplicate rule and the response are unchanged. Test BK542-1 (10,003 queries before, 9 after for 5,000 rows).

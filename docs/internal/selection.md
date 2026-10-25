@@ -423,3 +423,9 @@ Any fail → no live Gate A until fixed (or a documented Dvir waiver).
 12. Internal: v2, v3, R4–R8, R9, playbook, DR-001, DR-002, cfo-ledger (ARA = live registrar renewal as of v9.1)
 
 *End of v9.1 spec.*
+
+## Batching and pacing (v5.42.0)
+- The 7 endings of `ext_dates`, the extensions of `same_name`, the 5 endings of the pre-bid check and the siblings of the sibling scan are asked side by side. Pacing is unchanged where it matters: each RDAP host keeps its shared pacer (`pacerFor`, `hostPacer`), the page fetches of `same_name` and the pre-bid check still go through one site pacer (one at a time, `same_name.min_ms_between_fetches`), robots.txt is read per origin. `runRdapBase` reads the IANA base of an ending once per run. Tests BK542-5, BK542-9.
+- **Sibling scan (G-122):** page fetches are paced per host (`HostPaces`: `min_ms_between_fetches` between two fetches to the same host, robots.txt included), 4 fetches in flight overall, 4 siblings of a name at a time. `siblings.time_budget_seconds` stays the budget of the whole call, capped at `SCAN_CALL_MAX_SECONDS` (90 s: Cloudflare ends a request after about 100 s, HTTP 524); the 4-at-a-time checks fit far more names into it. Test BK542-6.
+- `labelled_names` (seal and `POST /selection/labelled-names`) insert 500 rows a statement; a unique violation still answers 409 `LABELLED_NAME_CONFLICT`, now naming the first clashing domain from the database detail.
+- `takeIntake` (candidates): every row is decided in memory, the dedupe and topic rows are read in one query each, rows are inserted in one multi-row statement per 1,000 and `TOPIC_REUSED` lists only earlier rows (stored ones, then rows above it in the upload). Test BK542-4 (90 queries before, 8 after for 30 names).

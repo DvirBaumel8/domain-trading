@@ -3,8 +3,8 @@
 // and for a registered one, is its home page in use (a paced, robots-aware, size-capped fetch through the outbound guard; parked or for-sale pages
 // are not in use). A feature check: it always answers PASS (or UNKNOWN when it cannot run); it never FAILs or FLAGs a name, so verdicts do not change.
 import { RDAP_FALLBACK_BASES } from '../../../core/rdap.js';
-import { fetchPage, classifySite, type PageFetch, type RobotsRule, type SiteClass } from '../site.js';
-import { lookupCached, pacerFor, prefetchStored, rdapBaseFor, type Pacer, type StoredLookup } from '../rdap-batch.js';
+import { fetchPage, classifySite, type PageFetch, type PagePace, type RobotsRule, type SiteClass } from '../site.js';
+import { lookupCached, pacerFor, prefetchStored, runRdapBase, type StoredLookup } from '../rdap-batch.js';
 import { sharedPacer, sharedRobots } from '../sellers.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 import { formFieldsOf } from './form.js';
@@ -65,7 +65,7 @@ export interface LookalikeProbe { item: LookalikeItem; calls: number; evidence: 
  */
 export async function probeLookalike(
   ctx: CheckContext, n: LookalikeName,
-  o: { maxAgeHours: number; lists: { parked: string[]; forsale: string[] } | null; pace: Pacer; robots: Map<string, RobotsRule>; /** Stored RDAP answers read in one query (`prefetchStored`) for every name of the scan: no per-name lookup query. */ prefetched?: Map<string, StoredLookup> },
+  o: { maxAgeHours: number; lists: { parked: string[]; forsale: string[] } | null; pace: PagePace; robots: Map<string, RobotsRule>; /** Stored RDAP answers read in one query (`prefetchStored`) for every name of the scan: no per-name lookup query. */ prefetched?: Map<string, StoredLookup> },
 ): Promise<LookalikeProbe> {
   const cfg = ctx.settings.lookalikes;
   const item: LookalikeItem = { domain: n.domain, kind: n.kind, registered: null, in_use: null, reason_code: null };
@@ -77,7 +77,7 @@ export async function probeLookalike(
   let base: string | null;
   try {
     // v4.2.1 (CR-052 S-2): co, us and io are missing from IANA's RDAP list; their registries' own servers are used instead.
-    base = (await rdapBaseFor(ctx.db, ctx.deps, tld, { enabled: ctx.settings.sources.iana_bootstrap || tld === 'com', now: ctx.now })) ?? RDAP_FALLBACK_BASES[tld] ?? null;
+    base = (await runRdapBase(ctx, tld, ctx.settings.sources.iana_bootstrap || tld === 'com')) ?? RDAP_FALLBACK_BASES[tld] ?? null;
   } catch {
     item.reason_code = 'SOURCE_ERROR';
     return out;

@@ -1,11 +1,13 @@
 // v5.28.0 (CR-073): pick-proof mechanics. The pool is the sealed CR-071 save of the evening before; picks (arm A), the seal, the drawn arms (B1, B2, C1),
 // T30 labels (RDAP mocked with MSW) and the report. Every outside call is mocked; the only network the code could make is Verisign RDAP, answered by MSW.
+import { appendFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { http, HttpResponse } from 'msw';
 import { autoSeal, pickproofLabels } from '../../../src/modules/pickproof/index.js';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
+import { withDbScope } from '../../../src/core/db-stats.js';
 import { testDb as db } from '../../helpers/db.js';
 import { inventoryHandlers } from '../../helpers/datasave.js';
 import { issueToken } from '../../helpers/tokens.js';
@@ -320,6 +322,25 @@ const fixtureDay = async (day: string, arms: Partial<Record<'A' | 'B1' | 'B2' | 
 const labelRow = (domain: string, day: string) => db.selectFrom('pickproof_labels').selectAll().where('domain', '=', domain).where('day', '=', day).executeTakeFirst();
 const noSleep = async () => undefined;
 const L = '2026-11-01'; // an old pick day for the label tests
+
+describe('BK542 bulk writes: T30 labels', () => {
+  it('BK542-2 60 due names take a handful of queries (cache read once, labels and cache written in batches), and the rows are the same as one by one', async () => {
+    const list = Array.from({ length: 60 }, (_, i) => `bulk${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26))}.com`);
+    await fixtureDay(L, { A: list });
+    const cached = list[0]!;
+    await db.insertInto('rdap_cache').values({ domain: cached, registered: true, created: new Date('2019-05-01T00:00:00Z'), expires: null, registrar: 'R', statuses: ['active'], nameservers: [], updated_at: null, checked_at: new Date(at('2026-12-10T10:00:00Z')), reason_code: null }).execute();
+    const hits: string[] = [];
+    rdap({}, hits); // every other name is free (404)
+    const { value: s, stats } = await withDbScope('bk542-2', () => pickproofLabels({ db, now: () => at('2026-12-10T15:00:00Z'), sleep: noSleep }));
+    if (process.env.BK_LOG) appendFileSync(process.env.BK_LOG, `BK542-2: ${stats.queries}\n`);
+    expect(s).toMatchObject({ status: 'ok', eligible_n: 60, lookups_n: 60, taken_n: 1, not_taken_n: 59 });
+    expect(hits).toHaveLength(59); // the cached name is not asked
+    expect(await labelRow(cached, L)).toMatchObject({ label: 'taken', attempts: 1 });
+    expect(await labelRow(list[1]!, L)).toMatchObject({ label: 'not_taken' });
+    expect((await db.selectFrom('rdap_cache').select('domain').execute()).length).toBe(60); // the 59 live answers were stored in one batch
+    expect(stats.queries).toBeLessThan(14); // before 5.42.0: about 3 queries per name (cache read, label upsert, cache write) = 180+
+  });
+});
 
 describe('PP528 pick-proof: T30 labels', () => {
   it('PP528-30 labels only the names of the sealed arms of days 30 or more days old, once per name, no arm attached; taken = registered and not in redemption period / pending delete', async () => {

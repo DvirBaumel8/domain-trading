@@ -1,5 +1,6 @@
 // Selection settings (CAP-00), versioned lists, and the pure tier + money evaluation (CAP-24, CAP-18).
 // Settings drafts and list edits are WRITE; activation and census-list freezing need Dvir's approval_ref.
+import { chunks } from '../../../core/chunks.js';
 import { advisoryXactLock } from '../../../core/locks.js';
 import { approvalRefObject } from '../../../core/validation.js';
 import { ymd } from '../../../core/dates.js';
@@ -331,6 +332,7 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
       let duplicates = 0;
       const conflicts: { domain: string; existing_role: string }[] = [];
       const seen = new Map<string, ReturnType<typeof toDb>>();
+      const fresh: ReturnType<typeof toDb>[] = [];
       const existing = new Map((await trx.selectFrom('labelled_names').selectAll().where('domain', 'in', parsed.map((p) => p.domain)).execute()).map((e) => [e.domain, e]));
       for (const p of parsed) {
         const v = toDb(p);
@@ -342,13 +344,20 @@ export function registerSelection(app: FastifyInstance, deps: SelectionDeps): vo
           continue;
         }
         seen.set(v.domain, v);
+        fresh.push(v);
+      }
+      // v5.42.0: multi-row inserts, 500 a statement
+      for (const part of chunks(fresh, 500)) {
         try {
-          await trx.insertInto('labelled_names').values({ ...v, features: JSON.stringify(v.features), created_by: req.auth!.name, audit_id: req.auditId! }).execute();
+          await trx.insertInto('labelled_names').values(part.map((v) => ({ ...v, features: JSON.stringify(v.features), created_by: req.auth!.name, audit_id: req.auditId! }))).execute();
         } catch (e) {
-          if ((e as { code?: string }).code === '23505') throw new AppError(409, 'LABELLED_NAME_CONFLICT', `${v.domain} was recorded by a concurrent upload; retry to see it as a duplicate or a conflict`, { domain: v.domain });
+          if ((e as { code?: string }).code === '23505') {
+            const domain = /\(domain\)=\(([^)]*)\)/.exec(String((e as { detail?: string }).detail ?? ''))?.[1];
+            throw new AppError(409, 'LABELLED_NAME_CONFLICT', `${domain ?? 'a name'} was recorded by a concurrent upload; retry to see it as a duplicate or a conflict`, { domain: domain ?? null });
+          }
           throw e;
         }
-        inserted++;
+        inserted += part.length;
       }
       return { inserted, duplicates, conflicts };
     });

@@ -1,13 +1,15 @@
 // v2.14.0 (CR-012 parts B and C): the intake scope and route, the daily intake screening, the daily candidate list.
 import { settleJob } from '../../helpers/app.js';
 import { randomUUID } from 'node:crypto';
+import { appendFileSync } from 'node:fs';
+import { withDbScope } from '../../../src/core/db-stats.js';
 import { http } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { BuildDailyListJob } from '../../../src/modules/candidates/daily-list.js';
 import { GATE_OF } from '../../../src/modules/selection/checks/index.js';
 import { planFor } from '../../../src/modules/selection/engine.js';
-import { INTAKE_DAILY_MAX, INTAKE_DEDUPE_DAYS, IntakeScreeningJob, intakeCensusList } from '../../../src/modules/candidates/intake.js';
+import { INTAKE_DAILY_MAX, INTAKE_DEDUPE_DAYS, IntakeScreeningJob, intakeCensusList, takeIntake } from '../../../src/modules/candidates/intake.js';
 import type { ScreeningWorker } from '../../../src/modules/selection/engine.js';
 import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { putList, screeningHarness, type ScreeningHarness } from '../../helpers/screening.js';
@@ -261,3 +263,38 @@ async function seedRun(x: ScreeningHarness, names: Seed[]): Promise<string> {
   return id;
 }
 const build = (x: ScreeningHarness) => new BuildDailyListJob({ db, worker: fakeWorker(x), now: () => x.clock.t }).runOnce();
+
+describe('BK542 bulk writes: intake', () => {
+  it('BK542-4 30 names take a handful of queries; the same results as one by one: duplicates of stored rows, removals, and TOPIC_REUSED over earlier rows (stored and above it in the upload) only', async () => {
+    const x = await h();
+    const now = new Date(x.clock.t);
+    const body = (names: Array<{ domain: string; topic?: string }>) => ({ names: names.map((n) => ({ domain: n.domain, lane: 'S2' as const, source: 'bk542', ...(n.topic && { topic: n.topic }) })) });
+    // a first upload stores superpro (topic "shared") and megapro (topic "other")
+    const one = await takeIntake(db, body([{ domain: nm(0), topic: 'shared' }, { domain: 'quickbox.com', topic: 'other' }]), { tokenName: 'bk', auditId: null, now: new Date(x.clock.t - HOUR) });
+    expect(one.accepted.map((a) => a.domain)).toEqual([nm(0), 'quickbox.com']);
+    const names = [
+      { domain: nm(0), topic: 'shared' }, // queued before: duplicate of the stored row
+      { domain: 'bad1.com' }, // digit: removed
+      { domain: nm(1), topic: 'shared' }, // reuses the stored superpro topic
+      { domain: nm(1), topic: 'shared' }, // twice in the upload: removed
+      { domain: nm(2), topic: 'shared' }, // reuses superpro (stored) and superbox (above)
+      { domain: nm(3), topic: 'fresh' },
+      ...Array.from({ length: 24 }, (_, i) => ({ domain: nm(4 + i), topic: `t${i % 6}` })),
+    ];
+    const { value: r, stats } = await withDbScope('bk542-4', () => takeIntake(db, body(names), { tokenName: 'bk', auditId: null, now }));
+    if (process.env.BK_LOG) appendFileSync(process.env.BK_LOG, `BK542-4: ${stats.queries}\n`);
+    expect(r.duplicates).toEqual([{ domain: nm(0), first_intake_id: Number(one.accepted[0]!.intake_id) }]);
+    expect(r.removed).toEqual([{ domain: 'bad1.com', reason: 'HAS_DIGIT' }, { domain: nm(1), reason: 'DUPLICATE_IN_UPLOAD' }]);
+    expect(r.accepted).toHaveLength(27);
+    const byDomain = new Map(r.accepted.map((a) => [a.domain, a]));
+    expect(byDomain.get(nm(1))!.flags![0]).toMatchObject({ code: 'TOPIC_REUSED', topic: 'shared', earlier: [{ domain: nm(0), intake_id: one.accepted[0]!.intake_id }] });
+    const third = byDomain.get(nm(2))!.flags![0]!;
+    expect(third.earlier.map((e) => e.domain)).toEqual([nm(0), nm(1)]); // stored first, then the row above it; never itself, never a removed row
+    expect(third.earlier[1]!.intake_id).toBe(byDomain.get(nm(1))!.intake_id);
+    expect(byDomain.get(nm(3))!.flags).toBeUndefined();
+    expect(byDomain.get(nm(4))!.flags).toBeUndefined(); // first of topic t0
+    expect(byDomain.get(nm(10))!.flags![0]!.earlier.map((e) => e.domain)).toEqual([nm(4)]); // t0 again
+    expect([...new Set(r.accepted.map((a) => a.intake_id))]).toHaveLength(27);
+    expect(stats.queries).toBeLessThan(14); // before 5.42.0: 3 queries per accepted name = about 90
+  });
+});

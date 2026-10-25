@@ -11,6 +11,7 @@ import { issueToken } from '../../helpers/tokens.js';
 import { fixture, respond } from '../../helpers/screening-fixtures.js';
 import { mswServer } from '../../setup/network.js';
 import { DEFAULT_SELECTION_VALUES } from '../../../src/modules/selection/settings.js';
+import { HostPaces, SCAN_CALL_MAX_SECONDS } from '../../../src/modules/selection/sibling-scan.js';
 
 let app: FastifyInstance | undefined;
 afterEach(async () => app?.close());
@@ -237,4 +238,48 @@ describe('CR-050 sibling scan (POST/GET /selection/sibling-scan)', () => {
     const looked = await db.selectFrom('rdap_lookups').select('domain').where('domain', '=', `${SLD}.net`).execute();
     expect(looked.length).toBeGreaterThan(0);
   });
+});
+
+describe('BK542 sibling scan: per-host pacing and the per-name budget (G-122)', () => {
+  it('BK542-6 HostPaces: one gap per host, different hosts do not wait for each other, at most 4 fetches in flight, a www host is the same host', async () => {
+    let t = 0;
+    const slept: number[] = [];
+    const pace = new HostPaces(1000, 4, async (ms) => { slept.push(ms); t += ms; }, () => t);
+    await pace.run(async () => 'a1', 'a.example');
+    await pace.run(async () => 'b1', 'b.example');
+    expect(slept).toEqual([]); // two different hosts: no wait
+    await pace.run(async () => 'a2', 'a.example');
+    expect(slept).toEqual([1000]); // the same host again: one gap
+    let inFlight = 0;
+    let max = 0;
+    await Promise.all(Array.from({ length: 12 }, (_, i) => pace.run(async () => { inFlight++; max = Math.max(max, inFlight); await new Promise((r) => setTimeout(r, 3)); inFlight--; }, `h${i}.example`)));
+    expect(max).toBeGreaterThan(1);
+    expect(max).toBeLessThanOrEqual(4);
+  });
+
+  it('BK542-6b the siblings of one name are checked side by side (more than one RDAP in flight, never more than 4)', async () => {
+    let inFlight = 0;
+    let max = 0;
+    const x = await h(async (d) => { inFlight++; max = Math.max(max, inFlight); await new Promise((r) => setTimeout(r, 5)); inFlight--; return fakeRdap({})(d); });
+    const s = scanOf(await x.post('/selection/sibling-scan', { domains: [NAME] }));
+    expect(s.complete).toBe(true);
+    expect(s.siblings.length).toBeGreaterThan(4);
+    expect(max).toBeGreaterThan(1);
+    expect(max).toBeLessThanOrEqual(4);
+  });
+
+  it('BK542-6c time_budget_seconds (80 s) is the budget of the whole call, capped at SCAN_CALL_MAX_SECONDS (90 s, under Cloudflare\'s ~100 s limit): names that each take 30 s: the first two complete, the third runs out, the rest get no time', async () => {
+    expect(SCAN_CALL_MAX_SECONDS).toBe(90);
+    const names = ['carpetalpha', 'carpetbeta', 'carpetgamma', 'carpetdelta', 'carpetomega', 'carpetsigma', 'carpetzeta'];
+    const slow = new Set<string>();
+    let x: ScreeningHarness;
+    x = await h(async (d) => {
+      const sld = d.split('.')[0]!;
+      if (d.endsWith('.net') && names.includes(sld) && !slow.has(sld)) { slow.add(sld); x.clock.t += 30_000; } // this name's first RDAP answer is slow
+      return free();
+    });
+    const res = await x.post('/selection/sibling-scan', { domains: names.map((n) => `${n}.com`) });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().scans.map((q: any) => q.complete)).toEqual([true, true, false, false, false, false, false]);
+  }, 30_000);
 });

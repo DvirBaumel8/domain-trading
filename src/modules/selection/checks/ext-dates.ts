@@ -1,7 +1,7 @@
 // G8 other-extension creation dates (CAP-12, CR-002): how many other extensions of the same name were created strictly before the
 // .com's creation date (re-registration / drop-catch signal; leakage rule: a later extension never counts). An extension whose RDAP
 // is missing or fails is UNKNOWN for that extension, never "not registered".
-import { answerPolicy, lookupCached, pacerFor, prefetchStored, rdapBaseFor, type CachedLookup, type StoredLookup } from '../rdap-batch.js';
+import { answerPolicy, lookupCached, pacerFor, prefetchStored, runRdapBase, type CachedLookup, type StoredLookup } from '../rdap-batch.js';
 import { outcome, type Check, type CheckContext } from '../types.js';
 import { asOfOf } from './census.js';
 
@@ -16,7 +16,7 @@ export async function extRegistration(ctx: CheckContext, sld: string, tld: strin
   if (ctx.now() > ctx.deadline || ctx.isCancelled?.()) return unk('TIMEOUT');
   let base: string | null;
   try {
-    base = await rdapBaseFor(ctx.db, ctx.deps, tld, { enabled: ctx.settings.sources.iana_bootstrap || tld === 'com', now: ctx.now });
+    base = await runRdapBase(ctx, tld, ctx.settings.sources.iana_bootstrap || tld === 'com'); // v5.42.0: read once per run, shared by the endings asked side by side
   } catch (e) {
     return unk('SOURCE_ERROR');
   }
@@ -59,14 +59,16 @@ export const extDatesCheck: Check = {
     const rows: ExtRow[] = [];
     // One query reads every stored answer of the extensions.
     const prefetched = await prefetchStored(ctx.db, list.map((t) => `${sld}.${t}`), { ...answerPolicy(ctx, 'ext_dates'), now: ctx.now });
-    for (const tld of list) {
-      const r = await extRegistration(ctx, sld, tld, prefetched);
+    // v5.42.0: the endings are asked side by side; each registry host has its own shared pacer (pacerFor), so no host is asked faster than before.
+    const results = await Promise.all(list.map((tld) => extRegistration(ctx, sld, tld, prefetched)));
+    results.forEach((r, i) => {
+      const tld = list[i]!;
       if (!r.cached && r.upstream) calls++;
       if (r.evidenceId !== null) evidence.push(r.evidenceId);
       rateLimited += r.rate_limited;
       const prov = { checked_at: r.checked_at, reused: r.reused, source: r.source };
       rows.push(r.status === 'unknown' ? { tld, status: 'unknown', created_at: null, reason_code: r.reason_code ?? 'SOURCE_ERROR', ...prov } : { tld, status: r.status, created_at: r.created_at, ...prov });
-    }
+    });
 
     let before = 0, undatedExcluded = 0;
     for (const r of rows) {

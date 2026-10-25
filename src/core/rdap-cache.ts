@@ -3,6 +3,7 @@
 // the internal daily steps never count against the bot limit. An error answer (TIMEOUT, RATE_LIMITED, SOURCE_ERROR) is never cached.
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
+import { chunks } from './chunks.js';
 import type { RdapFacts, RdapLookup, RdapLookupFn } from './rdap.js';
 
 export const USAGE_WINDOW_MS = 24 * 3_600_000;
@@ -17,8 +18,11 @@ const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 export async function cacheGetMany(db: Kysely<Database>, domains: string[], ttlMs: number, nowMs: number): Promise<Map<string, CachedAnswer>> {
   const out = new Map<string, CachedAnswer>();
   if (domains.length === 0 || !(ttlMs > 0)) return out;
-  const rows = await db.selectFrom('rdap_cache').selectAll().where('domain', 'in', domains).where('registered', 'is not', null)
-    .where('checked_at', '>=', new Date(nowMs - ttlMs)).execute();
+  const rows = [];
+  for (const part of chunks([...new Set(domains)], 5_000)) {
+    rows.push(...await db.selectFrom('rdap_cache').selectAll().where('domain', 'in', part).where('registered', 'is not', null)
+      .where('checked_at', '>=', new Date(nowMs - ttlMs)).execute());
+  }
   for (const r of rows) {
     out.set(r.domain, {
       domain: r.domain, registered: r.registered === true, checkedAt: r.checked_at,
@@ -42,6 +46,31 @@ export async function cachePut(db: Kysely<Database>, domain: string, r: RdapLook
       statuses: eb.ref('excluded.statuses'), nameservers: eb.ref('excluded.nameservers'), updated_at: eb.ref('excluded.updated_at'), checked_at: eb.ref('excluded.checked_at'), reason_code: eb.ref('excluded.reason_code'),
     }))).execute();
 }
+
+/** v5.42.0: stores many definite answers with multi-row upserts (500 a statement). Unknown answers are skipped; a repeated domain keeps its last answer. */
+export async function cachePutMany(db: Kysely<Database>, entries: Array<{ domain: string; r: RdapLookup }>, nowMs: number): Promise<void> {
+  const last = new Map<string, RdapLookup>();
+  for (const e of entries) if (e.r.outcome !== 'unknown') last.set(e.domain, e.r);
+  const rows = [...last.entries()].map(([domain, r]) => {
+    const f = r.outcome === 'registered' ? r.facts : null;
+    return {
+      domain, registered: r.outcome === 'registered', created: f?.created_at ?? null, expires: f?.expires_at ?? null, registrar: f?.registrar ?? null,
+      statuses: f?.statuses ?? [], nameservers: f?.nameservers ?? [], updated_at: f?.updated_at ?? null, checked_at: new Date(nowMs), reason_code: null,
+    };
+  });
+  for (const part of chunks(rows, 500)) {
+    await db.insertInto('rdap_cache').values(part)
+      .onConflict((oc) => oc.column('domain').doUpdateSet((eb) => ({
+        registered: eb.ref('excluded.registered'), created: eb.ref('excluded.created'), expires: eb.ref('excluded.expires'), registrar: eb.ref('excluded.registrar'),
+        statuses: eb.ref('excluded.statuses'), nameservers: eb.ref('excluded.nameservers'), updated_at: eb.ref('excluded.updated_at'), checked_at: eb.ref('excluded.checked_at'), reason_code: eb.ref('excluded.reason_code'),
+      }))).execute();
+  }
+}
+
+/** A stored answer as the lookup result the callers expect. */
+export const lookupFromCache = (c: CachedAnswer): RdapLookup => ({
+  outcome: c.registered ? 'registered' : 'not_registered', reasonCode: null, httpStatus: c.registered ? 200 : 404, url: '', retrievedAt: c.checkedAt, body: null, facts: c.facts,
+});
 
 const fromCache = (c: CachedAnswer): RdapLookup => ({
   outcome: c.registered ? 'registered' : 'not_registered', reasonCode: null, httpStatus: c.registered ? 200 : 404, url: '', retrievedAt: c.checkedAt, body: null, facts: c.facts,

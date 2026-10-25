@@ -7,9 +7,10 @@
 //   error or timeout                      -> unknown, tried again on later runs until D+40, then it stays unknown. Never read as not_taken.
 // Also prunes pickproof_pool rows older than settings.pickproof_pool_keep_days (the labels need only the arms).
 import { sql, type Kysely } from 'kysely';
+import { chunks } from '../../core/chunks.js';
 import { addDays, dayNumber } from '../../core/dates.js';
 import { dropStatusOf, rdapLookup as realRdap, type RdapLookupFn } from '../../core/rdap.js';
-import { cacheTtlMs, cachedRdapLookup } from '../../core/rdap-cache.js';
+import { type CachedAnswer, cacheGetMany, cachePutMany, cacheTtlMs, lookupFromCache } from '../../core/rdap-cache.js';
 import type { Database } from '../../db/types.js';
 import { pickproofSettings } from './pool.js';
 
@@ -26,7 +27,9 @@ export interface LabelsSummary {
 export async function pickproofLabels(deps: LabelsDeps): Promise<LabelsSummary> {
   const { db } = deps;
   // CR-074: through the shared RDAP cache (an answer up to lookups_rdap_ttl_hours old is fine for a T30 label); a live answer fills it. Never counts against the bot limit.
-  const rdap = cachedRdapLookup(db, deps.rdap ?? realRdap, { now: deps.now, ttlMs: await cacheTtlMs(db) });
+  // v5.42.0: the cache is read once for the names this run can reach and written once at the end (multi-row), not one query per name.
+  const live = deps.rdap ?? realRdap;
+  const ttlMs = await cacheTtlMs(db);
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const st = await pickproofSettings(db);
   const nowMs = deps.now();
@@ -44,38 +47,65 @@ export async function pickproofLabels(deps: LabelsDeps): Promise<LabelsSummary> 
     order by 3, 2, 1`.execute(db)).rows;
   out.eligible_n = due.length;
 
-  const seen = new Map<string, Awaited<ReturnType<RdapLookupFn>>>();
-  for (const e of due) {
-    let r = seen.get(e.domain);
-    if (!r) {
-      if (out.lookups_n >= st.labelsMaxPerRun) { out.stopped_reason = 'CAP'; break; }
-      if (out.lookups_n > 0) await sleep(LABEL_PAUSE_MS);
-      r = await rdap(e.domain);
-      out.lookups_n++;
-      seen.set(e.domain, r);
+  const reach = [...new Set(due.map((e) => e.domain))].slice(0, st.labelsMaxPerRun);
+  let hits = new Map<string, CachedAnswer>();
+  try { hits = await cacheGetMany(db, reach, ttlMs, nowMs); } catch { /* the cache is an optimisation */ }
+  const toCache: Array<{ domain: string; r: Awaited<ReturnType<RdapLookupFn>> }> = [];
+  type LabelRow = { domain: string; day: string; label: 'taken' | 'not_taken' | 'unknown'; checked_at: Date; attempts: number; created_at_rdap: string | null; created_unknown: boolean; created_after_d: boolean | null; statuses: string | null; reason: string | null };
+  let pending: LabelRow[] = [];
+  const flush = async (): Promise<void> => {
+    if (pending.length === 0) return;
+    const rows = pending; pending = [];
+    for (const part of chunks(rows, 500)) {
+      await db.insertInto('pickproof_labels').values(part).onConflict((oc) => oc.columns(['domain', 'day']).doUpdateSet((eb) => ({
+        label: eb.ref('excluded.label'), checked_at: eb.ref('excluded.checked_at'), attempts: sql`pickproof_labels.attempts + 1`,
+        created_at_rdap: eb.ref('excluded.created_at_rdap'), created_unknown: eb.ref('excluded.created_unknown'), created_after_d: eb.ref('excluded.created_after_d'), statuses: eb.ref('excluded.statuses'), reason: eb.ref('excluded.reason'),
+      }))).execute();
     }
-    let label: 'taken' | 'not_taken' | 'unknown';
-    let created: string | null = null;
-    let createdUnknown = false;
-    let reason: string | null = null;
-    let afterD: boolean | null = null;
-    let statuses: string[] | null = null;
-    if (r.outcome === 'registered') {
-      created = r.facts?.created_at ?? null;
-      statuses = r.facts?.statuses ?? [];
-      if (created === null) createdUnknown = true;
-      else afterD = dayNumber(created.slice(0, 10)) > dayNumber(e.day);
-      // an unsold closeout lingers in redemption period, then pending delete; any other registered state means someone holds the name
-      label = dropStatusOf(statuses) !== null ? 'not_taken' : 'taken';
-    } else if (r.outcome === 'not_registered') label = 'not_taken';
-    else { label = 'unknown'; reason = r.reasonCode ?? 'SOURCE_ERROR'; }
-    await sql`insert into pickproof_labels (domain, day, label, checked_at, attempts, created_at_rdap, created_unknown, created_after_d, statuses, reason)
-      values (${e.domain}, ${e.day}::date, ${label}, ${new Date(nowMs)}, 1, ${created}::timestamptz, ${createdUnknown}, ${afterD}, ${statuses ? JSON.stringify(statuses) : null}::jsonb, ${reason})
-      on conflict (domain, day) do update set label = excluded.label, checked_at = excluded.checked_at, attempts = pickproof_labels.attempts + 1,
-        created_at_rdap = excluded.created_at_rdap, created_unknown = excluded.created_unknown, created_after_d = excluded.created_after_d, statuses = excluded.statuses, reason = excluded.reason`.execute(db);
-    if (label === 'taken') out.taken_n++; else if (label === 'not_taken') out.not_taken_n++; else out.unknown_n++;
-    if (createdUnknown) out.created_unknown_n++;
-    if (r.reasonCode === 'RATE_LIMITED') { out.stopped_reason = 'RATE_LIMITED'; break; } // the registry asked us to slow down: the rest waits for the next run
+  };
+
+  const seen = new Map<string, Awaited<ReturnType<RdapLookupFn>>>();
+  let liveN = 0;
+  try {
+    for (const e of due) {
+      let r = seen.get(e.domain);
+      if (!r) {
+        if (out.lookups_n >= st.labelsMaxPerRun) { out.stopped_reason = 'CAP'; break; }
+        const hit = hits.get(e.domain);
+        if (hit) r = lookupFromCache(hit);
+        else {
+          if (liveN > 0) await sleep(LABEL_PAUSE_MS);
+          r = await live(e.domain);
+          liveN++;
+          toCache.push({ domain: e.domain, r });
+        }
+        out.lookups_n++;
+        seen.set(e.domain, r);
+      }
+      let label: 'taken' | 'not_taken' | 'unknown';
+      let created: string | null = null;
+      let createdUnknown = false;
+      let reason: string | null = null;
+      let afterD: boolean | null = null;
+      let statuses: string[] | null = null;
+      if (r.outcome === 'registered') {
+        created = r.facts?.created_at ?? null;
+        statuses = r.facts?.statuses ?? [];
+        if (created === null) createdUnknown = true;
+        else afterD = dayNumber(created.slice(0, 10)) > dayNumber(e.day);
+        // an unsold closeout lingers in redemption period, then pending delete; any other registered state means someone holds the name
+        label = dropStatusOf(statuses) !== null ? 'not_taken' : 'taken';
+      } else if (r.outcome === 'not_registered') label = 'not_taken';
+      else { label = 'unknown'; reason = r.reasonCode ?? 'SOURCE_ERROR'; }
+      pending.push({ domain: e.domain, day: e.day, label, checked_at: new Date(nowMs), attempts: 1, created_at_rdap: created, created_unknown: createdUnknown, created_after_d: afterD, statuses: statuses ? JSON.stringify(statuses) : null, reason });
+      if (pending.length >= 200) await flush();
+      if (label === 'taken') out.taken_n++; else if (label === 'not_taken') out.not_taken_n++; else out.unknown_n++;
+      if (createdUnknown) out.created_unknown_n++;
+      if (r.reasonCode === 'RATE_LIMITED') { out.stopped_reason = 'RATE_LIMITED'; break; } // the registry asked us to slow down: the rest waits for the next run
+    }
+  } finally {
+    await flush();
+    try { await cachePutMany(db, toCache, nowMs); } catch { /* the cache is an optimisation */ }
   }
   if (out.eligible_n > 0) out.status = out.stopped_reason ? 'stopped' : 'ok';
 

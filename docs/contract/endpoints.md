@@ -1,4 +1,4 @@
-# Endpoints (contract v5.41.0)
+# Endpoints (contract v5.42.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -923,7 +923,7 @@ WRITE (CR-050 part 1, 4.1.0). Body (strict): `{domains: [string]}`, 1 to 20 name
   - `url` and `http_status`: the page read (the final URL after same-site redirects; for a redirect off the site, the target); null when no page was fetched. `fetched_at`: when the page was read, else when RDAP answered.
   - `title`: the page `<title>`. `company`: `og:site_name`, else the title, trimmed to 120 characters. `contact_url`: for a live sibling, the first link on the home page, on the same site, whose path or text says "contact" (URL only, without query or fragment); null when none. **No email address and no person name is ever stored or returned**: a word containing `@` is dropped from `title` and `company`, `mailto:` links are ignored, and the scout opens the contact page itself.
   - `lead_points` = `{points, formula, live_n, parked_n}`. `points` = `min(max, points_live x min(live_n, live_counted_max) + points_parked x min(parked_n, parked_counted_max))` with the `siblings` settings (default 10 per live business sibling counted up to 3, 2 per registered-but-parked sibling counted up to 3, at most 30; 0 when nothing is registered). `parked_n` counts registered siblings that are parked, for sale or redirect off the site. `formula` states the mapping with the counts.
-  - `complete`: false when part of the scan hit the time budget (`siblings.time_budget_seconds`, default 80 s for the whole call; those siblings carry `reason_code: TIMEOUT`); scan again, cached RDAP answers make it quick.
+  - `complete`: false when part of the scan hit its time budget (those siblings carry `reason_code: TIMEOUT`); scan again, cached RDAP answers make it quick. **Budget:** `siblings.time_budget_seconds` (default 80 s) is the budget of the whole call, capped at 90 s (Cloudflare ends a request after about 100 s). A name's siblings are checked 4 at a time; page fetches are at least `same_name.min_ms_between_fetches` apart **per host** (robots.txt honoured), with at most 4 fetches in flight.
 - **Errors:** 422 `DOMAIN_INVALID` / `TLD_NOT_SUPPORTED` (a name that is not a valid second-level `.com`) · 422 `VALIDATION_ERROR` (no names, more than 20, an unknown key) · 400 `IDEMPOTENCY_KEY_REQUIRED` · 403 `SCOPE_FORBIDDEN` for a READ token.
 
 ### `GET /selection/sibling-scan/{domain}`

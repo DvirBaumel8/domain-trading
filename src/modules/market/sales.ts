@@ -1,6 +1,7 @@
 // CR-075 (v5.23.0) R-4, R-8: POST /data/sales rows. Add-only; the same (name, venue, sale_date, source) re-posted with a changed price is 409 APPEND_ONLY.
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { z } from 'zod';
+import { chunks } from '../../core/chunks.js';
 import { isRealDate } from '../../core/dates.js';
 import { advisoryXactLock } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
@@ -47,26 +48,32 @@ export async function loadSales(db: Kysely<Database>, rows: Record<string, unkno
   if (bad.length > 0) throw new AppError(422, 'VALIDATION_ERROR', `${bad.length} row(s) rejected; nothing was stored`, { rejects: bad.slice(0, 200), rejected_n: bad.length });
   return db.transaction().execute(async (trx) => {
     await advisoryXactLock(trx, 'market_sales');
-    const seen = new Map<string, number>();
     const conflicts: { row: number; name: string; venue: string; sale_date: string; source: string; stored_price_cents: number; sent_price_cents: number }[] = [];
     const fresh: ParsedSale[] = [];
     let duplicate = 0;
+    // v5.42.0: one lookup per 5,000 distinct keys (unnest arrays) instead of one select per row.
+    const keyOf = (v: ParsedSale) => `${v.name}|${v.venue}|${v.date}|${v.source}`;
+    const seen = new Map<string, number>();
+    const distinct = new Map<string, ParsedSale>();
+    for (const { v } of good) if (!distinct.has(keyOf(v))) distinct.set(keyOf(v), v);
+    for (const part of chunks([...distinct.values()], 5_000)) {
+      const found = await sql<{ name: string; venue: string; d: string; source: string; sale_price_cents: string | number }>`
+        select m.name, m.venue, to_char(m.sale_date, 'YYYY-MM-DD') as d, m.source, m.sale_price_cents
+        from market_sales m join unnest(${part.map((v) => v.name)}::text[], ${part.map((v) => v.venue)}::text[], ${part.map((v) => v.date)}::date[], ${part.map((v) => v.source)}::text[]) as k(name, venue, sale_date, source)
+        on m.name = k.name and m.venue = k.venue and m.sale_date = k.sale_date and m.source = k.source`.execute(trx);
+      for (const r of found.rows) seen.set(`${r.name}|${r.venue}|${r.d}|${r.source}`, Number(r.sale_price_cents));
+    }
     for (const { i, v } of good) {
-      const key = `${v.name}|${v.venue}|${v.date}|${v.source}`;
-      let stored = seen.get(key);
-      if (stored === undefined) {
-        const old = await trx.selectFrom('market_sales').select('sale_price_cents').where('name', '=', v.name).where('venue', '=', v.venue).where('sale_date', '=', v.date).where('source', '=', v.source).executeTakeFirst();
-        stored = old?.sale_price_cents;
-        if (stored === undefined) { seen.set(key, v.price); fresh.push(v); continue; }
-        seen.set(key, stored);
-      }
+      const key = keyOf(v);
+      const stored = seen.get(key);
+      if (stored === undefined) { seen.set(key, v.price); fresh.push(v); continue; }
       if (stored === v.price) duplicate++;
       else conflicts.push({ row: i, name: v.name, venue: v.venue, sale_date: v.date, source: v.source, stored_price_cents: stored, sent_price_cents: v.price });
     }
     if (conflicts.length > 0) throw new AppError(409, 'APPEND_ONLY', 'A sale report is add-only: the same name, venue, sale date and source was already stored with a different price; nothing was stored', { conflicts: conflicts.slice(0, 50), conflict_n: conflicts.length });
     if (!ctx.dryRun) {
-      for (const v of fresh) {
-        await trx.insertInto('market_sales').values({ name: v.name, venue: v.venue, sale_price_cents: v.price, sale_date: v.date, source: v.source, source_url: v.url, tier: v.tier, listing_type: v.type, by: ctx.by, audit_id: ctx.auditId }).execute();
+      for (const part of chunks(fresh, 1_000)) {
+        await trx.insertInto('market_sales').values(part.map((v) => ({ name: v.name, venue: v.venue, sale_price_cents: v.price, sale_date: v.date, source: v.source, source_url: v.url, tier: v.tier, listing_type: v.type, by: ctx.by, audit_id: ctx.auditId }))).execute();
       }
     }
     return { dry_run: ctx.dryRun, received_n: rows.length, accepted_n: fresh.length, duplicate_n: duplicate, rejected_n: 0, below_floor_n: fresh.filter((v) => v.price < MIN_CENTS).length };

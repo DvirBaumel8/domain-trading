@@ -8,12 +8,15 @@
 //   3. prune rows older than settings.disappearance_keep_days.
 import { sql, type Kysely } from 'kysely';
 import { addDays, dayNumber } from '../../../core/dates.js';
-import { dropStatusOf, rdapLookup as realRdap, type RdapLookup, type RdapLookupFn } from '../../../core/rdap.js';
-import { cacheGetMany, cachePut, cacheTtlMs } from '../../../core/rdap-cache.js';
+import { dropStatusOf, RDAP_COM_BASE, rdapLookup as realRdap, type RdapLookup, type RdapLookupFn } from '../../../core/rdap.js';
+import { type CachedAnswer, cacheGetMany, cachePutMany, cacheTtlMs, lookupFromCache } from '../../../core/rdap-cache.js';
+import { chunks } from '../../../core/chunks.js';
 import type { Database } from '../../../db/types.js';
+import { hostPacer } from '../../selection/index.js';
 
 export const TAG_RETRY_DAYS = 7;
 export const TAG_PAUSE_MS = 250;
+export const TAG_CONCURRENCY = 4;
 
 export type TagSource = 'godaddy_closeouts' | 'dynadot_closeouts' | 'market_episode';
 export type Tag = 'bought' | 'deleted' | 'unknown';
@@ -132,32 +135,70 @@ export async function tagDisappearances(deps: TagDeps): Promise<TagSummary> {
     due.sort((a, b) => Number(flag.get(b.domain)) - Number(flag.get(a.domain)));
   }
 
-  for (const d of due) {
-    // a stored answer counts only if it was read after the name left the feed
-    const ttl = Math.min(ttlSetting, nowMs - dayStart(d.gone_date).getTime());
-    let r: RdapLookup | undefined;
-    const hit = (await cacheGetMany(db, [d.domain], ttl, nowMs)).get(d.domain);
-    if (hit) {
-      r = { outcome: hit.registered ? 'registered' : 'not_registered', reasonCode: null, httpStatus: hit.registered ? 200 : 404, url: '', retrievedAt: hit.checkedAt, body: null, facts: hit.facts };
-      out.cache_hits_n++;
-    } else {
-      if (out.lookups_n >= out.cap) { out.stopped_reason = 'CAP'; break; }
-      if (out.lookups_n > 0) await sleep(TAG_PAUSE_MS);
-      r = await rdap(d.domain);
-      out.lookups_n++;
-      try { await cachePut(db, d.domain, r, nowMs); } catch { /* the cache is an optimisation */ }
+  // v5.42.0: the cache is read once for every due name (each row's own TTL is applied here), live lookups run 4 at a time through the shared Verisign host
+  // pacer (250 ms between starts, as before), and the tag updates and cache writes are flushed in batches instead of one query per row.
+  let hits = new Map<string, CachedAnswer>();
+  if (ttlSetting > 0) { try { hits = await cacheGetMany(db, [...new Set(due.map((d) => d.domain))], ttlSetting, nowMs); } catch { /* the cache is an optimisation */ } }
+  const pace = hostPacer(new URL(RDAP_COM_BASE).host, sleep);
+  type Upd = { source: TagSource; domain: string; gone_date: string; tag: Tag; reason: string; final: boolean; first: Date; registrar: string | null; statuses: string | null; created: string | null };
+  let pending: Upd[] = [];
+  let toCache: Array<{ domain: string; r: RdapLookup }> = [];
+  const flush = async (): Promise<void> => {
+    const rows = pending; pending = [];
+    const puts = toCache; toCache = [];
+    for (const part of chunks(rows, 300)) {
+      await sql`update disappearances t set tag = u.tag, tag_reason = u.reason, final = u.final, attempts = t.attempts + 1, first_checked_at = u.first, rdap_checked_at = ${now},
+        rdap_registrar = u.registrar, rdap_statuses = u.statuses::jsonb, rdap_created = u.created
+        from unnest(${part.map((x) => x.source)}::text[], ${part.map((x) => x.domain)}::text[], ${part.map((x) => x.gone_date)}::date[], ${part.map((x) => x.tag)}::text[], ${part.map((x) => x.reason)}::text[],
+          ${part.map((x) => x.final)}::bool[], ${part.map((x) => x.first)}::timestamptz[], ${part.map((x) => x.registrar)}::text[], ${part.map((x) => x.statuses)}::text[], ${part.map((x) => x.created)}::timestamptz[])
+          as u(source, domain, gone_date, tag, reason, final, first, registrar, statuses, created)
+        where t.source = u.source and t.domain = u.domain and t.gone_date = u.gone_date`.execute(db);
     }
-    const t = tagOf(r, { registrar: d.baseline_registrar, source: d.baseline_source }, d.source, d.prev_date);
-    const firstChecked = d.first_checked_at ?? now;
-    const final = t.tag !== 'unknown' || nowMs - firstChecked.getTime() >= TAG_RETRY_DAYS * 86_400_000;
-    const f = r.outcome === 'registered' ? r.facts : null;
-    await db.updateTable('disappearances').set({
-      tag: t.tag, tag_reason: t.reason, final, attempts: sql`attempts + 1`, first_checked_at: firstChecked, rdap_checked_at: now,
-      rdap_registrar: f?.registrar ?? null, rdap_statuses: f ? JSON.stringify(f.statuses) : null, rdap_created: f?.created_at ?? null,
-    }).where('source', '=', d.source).where('domain', '=', d.domain).where('gone_date', '=', d.gone_date).execute();
-    if (t.tag === 'bought') out.bought_n++; else if (t.tag === 'deleted') out.deleted_n++; else out.unknown_n++;
-    if (t.tag !== 'unknown' && d.tag === 'unknown') out.retagged_n++;
-    if (r.reasonCode === 'RATE_LIMITED') { out.stopped_reason = 'RATE_LIMITED'; break; } // the registry asked us to slow down: the rest waits for the next run
+    try { await cachePutMany(db, puts, nowMs); } catch { /* the cache is an optimisation */ }
+  };
+  let next = 0;
+  let halt = false;
+  let probe: Promise<void> | undefined;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      if (halt) return;
+      const d = due[next++];
+      if (!d) return;
+      // a stored answer counts only if it was read after the name left the feed
+      const ttl = Math.min(ttlSetting, nowMs - dayStart(d.gone_date).getTime());
+      let r: RdapLookup | undefined;
+      const hit = ttl > 0 ? hits.get(d.domain) : undefined;
+      if (hit && hit.checkedAt.getTime() >= nowMs - ttl) {
+        r = lookupFromCache(hit);
+        out.cache_hits_n++;
+      } else {
+        if (probe) { await probe; if (halt) return; } // the first live answer comes alone: a 429 on it stops the run before more are sent
+        if (out.lookups_n >= out.cap) { out.stopped_reason ??= 'CAP'; halt = true; return; }
+        if (pace.breakerOpen) { out.stopped_reason ??= 'RATE_LIMITED'; halt = true; return; }
+        out.lookups_n++; // claimed before the await, so the cap is exact with 4 in flight
+        let release: () => void = () => {};
+        if (!probe) probe = new Promise<void>((resolve) => { release = resolve; });
+        let res: RdapLookup;
+        try { res = await pace.run(() => rdap(d.domain)); } finally { release(); }
+        if (res.reasonCode === 'RATE_LIMITED' || res.httpStatus === 429 || res.httpStatus === 403) pace.slowDown(); else pace.noteNotRefused();
+        r = res;
+        toCache.push({ domain: d.domain, r });
+      }
+      const t = tagOf(r, { registrar: d.baseline_registrar, source: d.baseline_source }, d.source, d.prev_date);
+      const firstChecked = d.first_checked_at ?? now;
+      const final = t.tag !== 'unknown' || nowMs - firstChecked.getTime() >= TAG_RETRY_DAYS * 86_400_000;
+      const f = r.outcome === 'registered' ? r.facts : null;
+      pending.push({ source: d.source, domain: d.domain, gone_date: d.gone_date, tag: t.tag, reason: t.reason, final, first: firstChecked, registrar: f?.registrar ?? null, statuses: f ? JSON.stringify(f.statuses) : null, created: f?.created_at ?? null });
+      if (t.tag === 'bought') out.bought_n++; else if (t.tag === 'deleted') out.deleted_n++; else out.unknown_n++;
+      if (t.tag !== 'unknown' && d.tag === 'unknown') out.retagged_n++;
+      if (r.reasonCode === 'RATE_LIMITED') { out.stopped_reason ??= 'RATE_LIMITED'; halt = true; } // the registry asked us to slow down: the rest waits for the next run
+      if (pending.length >= 300) await flush();
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: TAG_CONCURRENCY }, worker));
+  } finally {
+    await flush();
   }
   if (out.eligible_n > 0) out.status = out.stopped_reason ? 'stopped' : 'ok';
 

@@ -131,3 +131,6 @@ v5.37.0 tests: `tests/modules/ops/datasave.test.ts`.
 | DS537-4 | retention removes live rows older than `datasave_auction_live_keep_days` |
 
 v5.26.0 tests: `tests/modules/ops/closeouts.test.ts` (CC526-*, table in `closeouts.md`).
+
+## Batching (v5.42.0)
+Disappearance tags: one cache read for all due names (each row's TTL applied in code), the first live lookup alone (a 429 stops the run before more are sent), then 4 at a time through the Verisign host pacer (250 ms between starts); tag updates go out in batches of 300 and cache answers in one multi-row upsert; the cap counts a lookup when it is claimed, so it is exact. Test BK542-3 (313 queries before, 13 after for 100 lookups).

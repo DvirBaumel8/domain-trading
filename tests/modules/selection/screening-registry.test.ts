@@ -597,6 +597,21 @@ describe('ext_dates (CAP-12, CR-002)', () => {
     expect(f.extensions.find((e: any) => e.tld === 'net')).toMatchObject({ status: 'registered', created_at: '2015-02-02T00:00:00.000Z'.replace('.000Z', 'Z'), counted: true });
   });
 
+  it('BK542-5 the endings of a name are asked side by side (more than one in flight, never more than the host pacer allows), and the extensions keep the order of the list', async () => {
+    ianaOk();
+    const inner = fakeRdap({ [COM]: registered('2023-05-01T00:00:00Z'), 'netextend.net': registered('2015-02-02T00:00:00Z') });
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const hh = await h({ rdapLookup: async (d, o) => { inFlight++; maxInFlight = Math.max(maxInFlight, inFlight); await new Promise((r) => setTimeout(r, 15)); inFlight--; return inner.fn(d, o); } });
+    const { body } = await hh.runDone({ checks: ['availability', 'ext_dates'], names: [item(COM)], mode: 'full' });
+    const f = res(byDomain(body, COM), 'ext_dates').fields;
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(maxInFlight).toBeLessThanOrEqual(8); // 7 endings at most; the .com and .net share the Verisign host pacer
+    expect(f.extensions.map((e: any) => e.tld)).toEqual(DEFAULT_SELECTION_VALUES.ext.alt_list ?? DEFAULT_SELECTION_VALUES.ext.list);
+    expect(f.extensions.find((e: any) => e.tld === 'net')).toMatchObject({ status: 'registered', counted: true });
+    expect(f.alt_tld_before_n).toBe(1);
+  });
+
   it('CAP-12: .net created after the .com (leakage rule) gives 0; an equal date does not count either', async () => {
     const a = await ext({ [COM]: registered('2023-05-01T00:00:00Z'), 'netextend.net': registered('2024-01-01T00:00:00Z') }, full);
     expect(a.f.alt_tld_before_n).toBe(0);

@@ -5,7 +5,6 @@
 import { BlockedError, safeFetch } from '../../core/safe-fetch.js';
 import { USER_AGENT } from '../../core/rdap.js';
 import { asciiFold, hiddenSignals, metaRefreshTarget, ogSiteName, titleOf, visibleText } from './html-text.js';
-import type { Pacer } from './rdap-batch.js';
 import type { SameNameSettings } from './settings.js';
 import type { ScreeningDeps } from './types.js';
 import { makeMatcher, readCapped } from './capped-read.js';
@@ -18,8 +17,10 @@ type SiteState = 'unregistered' | 'registered_no_site' | 'parked_or_for_sale' | 
 type BusinessUse = 'business_name' | 'service_description' | 'product_name' | 'none';
 export interface SiteClass { site_state: SiteState; business_use: BusinessUse | null; business_name: string | null; final_url: string | null; reason_code: string | null }
 export interface RobotsRule { text: string }
+/** What `fetchPage` needs from a pacer. v5.42.0: `host` is the (lower-case) host of the request, so a pacer may keep one gap per host. */
+export interface PagePace { run<T>(fn: () => Promise<T>, host?: string): Promise<T> }
 export interface FetchPageOpts {
-  timeoutMs: number; maxBytes: number; maxRedirects: number; pace: Pacer; robots: Map<string, RobotsRule>;
+  timeoutMs: number; maxBytes: number; maxRedirects: number; pace: PagePace; robots: Map<string, RobotsRule>;
   /** Hosts (and their subdomains) that are never fetched (`lead.verify.never_fetch_hosts`, includes linkedin.com). */
   neverFetchHosts: string[];
   /** ms epoch: past it no further request is sent (unknown TIMEOUT); checked between hops. */
@@ -135,7 +136,7 @@ async function once(deps: FetchDeps, url: string, o: FetchPageOpts, accept: stri
       if (late(o)) throw timeoutError(); // checked again after the wait in the pacer queue
       o.onRequest?.();
       return safeFetch(deps, url, { redirect: 'manual', headers: { 'user-agent': USER_AGENT, accept }, signal: AbortSignal.timeout(o.timeoutMs) }, { neverFetchHosts: o.neverFetchHosts, lookupTimeoutMs: o.deadline === undefined ? o.timeoutMs : Math.min(o.timeoutMs, (o.deadline - (o.now ?? Date.now)())) });
-    });
+    }, new URL(url).hostname.toLowerCase().replace(/^www\./, ''));
     return { res };
   } catch (e) {
     return { err: failOf(e) };
