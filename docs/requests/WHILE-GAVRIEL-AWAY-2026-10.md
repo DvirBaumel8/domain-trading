@@ -173,6 +173,11 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
   - **Your daily routine:** read the shortlist, show Dvir 3-5 names with the suggested maximum and the reasons. After his line, create the plan with that `prebid_id`.
 - **Found:** GitHub runs the datasave schedule 3-4 hours late (18:01-19:12 UTC this week, not 15:00).
 
+### 25 Oct 2026: DOM may operate production (Dvir)
+- **Dvir, 25 Oct 2026:** "You are allowed to operate production." DOM now runs jobs, loads data and knowledge, and runs checks and dry runs, with its own WRITE token `dom-write` (`scripts/local-host/dom-write-token.sh`). The old HARD RULE is replaced (CLAUDE.md, "DOM operating rule").
+- **Unchanged:** money actions (buy, S8 import, bid plans, listing, price changes, sell) still need Dvir's own chat line per action, for DOM as for you. DOM never uses your tokens.
+- What DOM runs is logged here while you're away, then in `DOM-TO-GAVRIEL.md`.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
