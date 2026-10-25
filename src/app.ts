@@ -158,7 +158,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerReport(app, base);
   registerPortfolioWrites(app, base);
   registerTokens(app, base);
-  registerPortfolioImport(app, { db: deps.db, adapters, now });
   registerOutcomes(app, base);
   registerReads(app, base);
   registerBooks(app, base);
@@ -179,6 +178,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     namebio: { ...(deps.config.namebio.retailstatsCsvUrl && { retailstatsCsvUrl: deps.config.namebio.retailstatsCsvUrl }), },
     ...deps.screening,
   };
+  registerPortfolioImport(app, { db: deps.db, adapters, now, rdapLookup: screeningDeps.rdapLookup });
   registerDemand(app, base);
   registerSiblingScan(app, { ...base, screening: screeningDeps });
   const screeningWorker = new ScreeningWorker({

@@ -30,7 +30,7 @@ These are **DOM's own** working documents: the binding business rules, internals
 | `knowledge.md` | The knowledge base (CR-078, 5.43.0): grading, clusters, the weight formula and certainty steps, versioned append-only rows, the repo load `kbLoad`; KB543-* |
 | `pickproof.md` | Pick-proof mechanics (CR-073, 5.28.0): the frozen daily pool, arms A/B1/B2/C1, the seal, T30 labels, the report; the exact draw recipe; PP528-* |
 | `lookups.md` | RDAP lookup service (CR-074, 5.29.0): the shared cache, the rolling 24 h bot limit, which internal steps read or fill the cache; RL529-*, BS529-1 |
-| `auctions.md` | Auction bid plans (CR-077, 5.39.0): the pre-bid check, the approved maximum bid, the result, the import rule; AB539-* |
+| `auctions.md` | Auction bid plans (CR-077, 5.39.0): the pre-bid check, the approved maximum bid, the result, the import rule; AB539-*; v5.44.0 safety checks (BRAND-TYPO-2, URIBL-1, Spamhaus/EUIPO SKIP, transfer check); SF544-* |
 | `sources.md` | Terms log of every outside data source |
 | `gaps.md` | Every gap between these docs and the code, with a decision |
 

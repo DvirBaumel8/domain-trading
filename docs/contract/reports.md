@@ -1,4 +1,4 @@
-# Reports (contract v5.43.0)
+# Reports (contract v5.44.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -39,6 +39,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 |---|---|---|---|
 | `PURCHASE_UNKNOWN` | error | A purchase is in the `unknown` state | `purchase_id` |
 | `PURCHASE_UNRESOLVED` | warn | (3.9.0) A real purchase has been `register_sent` or `unknown` for more than 30 minutes. The reconciler books it when the registrar shows the name and an invoice, but it never fails it (registrar lag can look like absence). Check the registrar account, then ask DOM to run the admin `resolve-purchase` command (an `unknown` purchase raises `PURCHASE_UNKNOWN` as well) | `purchase_id`, `state`, `age_minutes`, `created_at` |
+| `S8_TRANSFER_UNCONFIRMED` | warn | (5.44.0) A live S8 (aftermarket) name whose `transfer_confirmed` is not true: RDAP did not show the registrar the name was imported into (false), or could not be read (null). The old owner can still redeem a won auction name, so **do not list the name until the transfer is complete**; the server does not block listing. The daily `portfolioCheck` step re-checks the name and the warning clears when RDAP shows our registrar. A name imported before 5.44.0 shows it until its first check | `transfer_confirmed`, `registrar`, `checked_at` |
 | `ENDING_REGISTERED` | warn | (5.7.0, CR-058) Another ending (.net, .co, .org, .io or .ai) of an owned name was registered after our baseline check (`newly_registered`) or its registry creation date changed (`re_registered`). One warning per event for 30 days. The registrant is a lead; nothing is sent | `owned_domain`, `host` (e.g. `name.net`), `created`, `registrar`, `kind`, `detected_at` |
 | `DB_SIZE_HIGH` | warn | (3.9.0) The database is over 70% of Neon's free storage (1 GB since 5.13.0; 0.5 GB before); the free plan stops accepting writes at the limit. Tell DOM | `size_bytes`, `limit_bytes`, `percent`, `warn_percent` |
 | `PRICE_EVENT_FAILED` | error | A scheduled price event failed (the domain is unchanged) | `events[] {event, due_on, note}` |

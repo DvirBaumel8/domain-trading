@@ -17,6 +17,7 @@ import { planView } from '../../listing/index.js';
 import { applyPlan, domainPlanColumns } from '../../listing/index.js';
 import { withDomainLock } from '../../../core/locks.js';
 import { markImported } from '../auctions/plans.js';
+import { registrarMatches, type RdapLookupFn } from '../../../core/rdap.js';
 
 /** Bad or missing arguments (the CLI exits 2). Business refusals are AppErrors (exit 1, code in the message). */
 export class ImportInputError extends Error {}
@@ -46,6 +47,8 @@ export interface ImportResult {
   dry_run?: true; domain: string; status: 'owned' | 'listed'; registrar_api: string; expiry_date: string; drop_date: string;
   listing: object | null; warnings: string[];
   /** v5.8.0 (S8 imports): the lane, the price-list rung chosen from the comps value, and what would refuse the import (a dry run reports it; a real import throws it). */
+  /** v5.44.0 (S8): RDAP's registrar is the one imported into (true), another one or not registered (false), or RDAP could not be read / was not asked (null). */
+  transfer_confirmed?: boolean | null;
   lane?: 'S8'; s8?: { source: string; comps_value_cents: number | null; bin_cents: number | null; floor_cents: number | null; bin_source: 'override' | 'ladder' | 'grade_price' | null; floor_source: 'override' | 'formula' | null; s8_names: number; s8_reserved_slots: number; s8_max_price_cents: number };
   would_be_blocked?: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | 'BID_PLAN_REQUIRED' | 'PRICE_ABOVE_PLAN' | null;
 }
@@ -156,7 +159,7 @@ function parseInput(i: ImportInput, now: Date) {
 }
 
 export async function importDomain(
-  db: Kysely<Database>, input: ImportInput, deps: { adapters: RegistrarAdapter[]; now: Date },
+  db: Kysely<Database>, input: ImportInput, deps: { adapters: RegistrarAdapter[]; now: Date; /** v5.44.0: the S8 transfer check; the admin command passes none (null). */ rdapLookup?: RdapLookupFn },
 ): Promise<ImportResult> {
   const p = parseInput(input, deps.now);
   const now = deps.now;
@@ -283,10 +286,23 @@ export async function importDomain(
   if (expiryDate < p.today) warnings.push(`EXPIRY_IN_PAST: ${expiryDate} has passed; the daily job decides what happens next`);
   if (plan) warnings.push(...plan.warnings);
 
+  // v5.44.0: has the name arrived at the registrar it was imported into? (a won auction name can still be redeemed by the old owner; do not list it before the transfer is complete)
+  let transfer: boolean | null = null;
+  if (p.lane === 'S8' && deps.rdapLookup) {
+    try {
+      const r = await deps.rdapLookup(domain);
+      if (r.outcome === 'registered' && r.facts?.registrar) transfer = registrarMatches(p.registrar, r.facts.registrar);
+      else if (r.outcome === 'not_registered') transfer = false;
+    } catch { transfer = null; }
+  }
+  if (p.lane === 'S8' && transfer !== true) {
+    warnings.push(`S8_TRANSFER_UNCONFIRMED: ${transfer === false ? `RDAP does not show the name at ${p.registrar}` : 'RDAP could not be read'}; do not list ${domain} until the transfer is complete (re-checked daily)`);
+  }
+
   if (input.dryRun) {
     const events = plan ? buildSchedule({ plan, anchor: p.today, dropDate, settings: s, lane: p.lane }) : [];
     return { dry_run: true, domain, status: plan ? 'listed' : 'owned', registrar_api: registrarApi, expiry_date: expiryDate, drop_date: dropDate,
-      listing: plan ? planView(plan, events) : null, warnings, ...(await s8Fields(db, p.lane, input, plan, settings, wouldBeBlocked)) };
+      listing: plan ? planView(plan, events) : null, warnings, ...(p.lane === 'S8' ? { transfer_confirmed: transfer } : {}), ...(await s8Fields(db, p.lane, input, plan, settings, wouldBeBlocked)) };
   }
 
   const auditId = input.auditId ?? newAuditId();
@@ -314,6 +330,7 @@ export async function importDomain(
       domain, status: plan ? 'listed' : 'owned', registrar: p.registrar, registrar_api: registrarApi,
       buy_date: p.buyDate, cost_cents: p.costCents, expiry_date: expiryDate, renewal_price_cents: p.renewalCents, renewals_used: 0,
       drop_date: dropDate, category: p.category, price_grade: p.grade, deal_id: input.deal ?? null, lane: p.lane, updated_at: now,
+      ...(p.lane === 'S8' ? { transfer_confirmed: transfer, transfer_checked_at: now } : {}),
       ...(plan ? { ...domainPlanColumns(plan), first_listed_at: now, ...changedColumns({ export_pending_since: null }, now) } : {}),
     }).returning('id').executeTakeFirstOrThrow();
     await trx.insertInto('ledger_entries').values({
@@ -343,7 +360,7 @@ export async function importDomain(
     return written;
   }));
   return { domain, status: plan ? 'listed' : 'owned', registrar_api: registrarApi, expiry_date: expiryDate, drop_date: dropDate,
-    listing: plan ? planView(plan, events) : null, warnings, ...(await s8Fields(db, p.lane, input, plan, settings, null)) };
+    listing: plan ? planView(plan, events) : null, warnings, ...(p.lane === 'S8' ? { transfer_confirmed: transfer } : {}), ...(await s8Fields(db, p.lane, input, plan, settings, null)) };
 }
 
 function s8CapError(code: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED', c: { total: number; s8: number }, cfg: { max_domains: number; s8_reserved_slots: number }): AppError {

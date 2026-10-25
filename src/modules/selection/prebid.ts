@@ -5,12 +5,15 @@
 // The route, the stored answer and the bid plan are in the ops module (`ops/api/auctions.ts`).
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
+import { toJerusalemIso } from '../../core/dates.js';
 import { normalizeDomain } from '../../domain-name.js';
+import { brandMatches, commonWord } from './brand-typo.js';
+import { latestPopularity } from './popularity.js';
 import { currentLists } from './lists.js';
 import { closeoutNameChecker } from './closeout-name.js';
 import { companiesCheck } from './checks/companies.js';
 import { probeLookalike } from './checks/lookalikes.js';
-import { surblCheck } from './checks/surbl.js';
+import { surblCheck, uriblCheck } from './checks/surbl.js';
 import { typoCheck } from './checks/typo.js';
 import { sharedPacer, sharedRobots } from './sellers.js';
 import { activeSelectionSettings } from './settings.js';
@@ -20,9 +23,12 @@ import { webRiskLookup } from './web-risk.js';
 export const PREBID_ENDINGS = ['net', 'org', 'co', 'io', 'ai'] as const;
 export type PrebidEnding = (typeof PREBID_ENDINGS)[number];
 export type PrebidResult = 'PASS' | 'FLAG' | 'FAIL' | 'SKIP';
-export interface PrebidCheck { id: string; result: PrebidResult; reason: string | null; evidence: Record<string, unknown> }
+/** `checked_at` (v5.44.0): when this check ran, Asia/Jerusalem ISO: timestamped evidence for every check (WIPO Overview 3.0 §3.2.3, §3.9). */
+export interface PrebidCheck { id: string; result: PrebidResult; reason: string | null; evidence: Record<string, unknown>; checked_at: string }
+type NewCheck = Omit<PrebidCheck, 'checked_at'>
 export interface EndingState { registered: boolean | null; in_use: boolean | null; reason_code: string | null }
-export interface PrebidOutput { checks: PrebidCheck[]; endings: Record<PrebidEnding, EndingState> }
+/** `words`: the name split into its words by the form rule (empty when it has none), used for the exact search strings of the manual checks. */
+export interface PrebidOutput { checks: PrebidCheck[]; endings: Record<PrebidEnding, EndingState>; words: string[] }
 
 /** RDAP status values that mean a name is held or on its way out of the registry; each one is a FLAG for a human to read, never a silent pass. */
 const RDAP_FLAG_STATUSES: readonly [string, RegExp][] = [
@@ -38,7 +44,7 @@ async function currentTerms(db: Kysely<Database>, table: 'tm_kills' | 'bigco_nam
 }
 
 /** An automatic result as a pre-bid check: UNKNOWN is never clean (FLAG) unless the source is switched off by design (SKIP). */
-function fromOutcome(id: string, o: CheckOutcome): PrebidCheck {
+function fromOutcome(id: string, o: CheckOutcome): NewCheck {
   const evidence = { status: o.status, reason_code: o.reasonCode, ...o.fields };
   if (o.status === 'PASS' || o.status === 'PASS_WITH_NOTE') return { id, result: 'PASS', reason: o.reason, evidence };
   if (o.status === 'FAIL') return { id, result: 'FAIL', reason: o.reason ?? o.reasonCode, evidence };
@@ -51,6 +57,32 @@ export function verdictOf(checks: readonly PrebidCheck[]): 'pass' | 'flag' | 'fa
   if (checks.some((c) => c.result === 'FAIL')) return 'fail';
   if (checks.some((c) => c.result === 'FLAG')) return 'flag';
   return 'pass';
+}
+
+export const SPAMHAUS_REASON = 'not used: free Spamhaus access is non-commercial only';
+export const EUIPO_REASON = 'not automated: the EUIPO Trademark Search API needs an API key the founder must create himself (none is configured); search EU marks by hand (TMview)';
+
+/** BRAND-TYPO-2 (brand-typo.ts): the name's label against the brand labels of the stored popularity list. No list or an old one is a FLAG, a switched-off source is SKIP. */
+async function brandTypo(db: Kysely<Database>, ctx: CheckContext, domain: string, sld: string, now: () => number): Promise<NewCheck> {
+  const id = 'BRAND-TYPO-2';
+  if (!ctx.settings.sources.popularity) return { id, result: 'SKIP', reason: 'the popularity list is switched off (sources.popularity)', evidence: {} };
+  const list = await latestPopularity(db);
+  if (!list) return { id, result: 'FLAG', reason: 'could not be checked: no popularity list has been downloaded yet', evidence: {} };
+  const t = ctx.settings.typo;
+  const asOf = new Date(`${list.listDate}T00:00:00Z`);
+  const base = { list_id: list.listId, list_date: list.listDate, top_n: t.top_n, domain };
+  if (Math.floor((now() - asOf.getTime()) / 86_400_000) > t.max_list_age_days) {
+    return { id, result: 'FLAG', reason: `could not be checked: the popularity list is from ${list.listDate}, over ${t.max_list_age_days} days old`, evidence: base };
+  }
+  const brands = new Map<string, number>();
+  for (const [label, rank] of list.ranks) if (rank <= t.top_n) brands.set(label, rank);
+  const matches = brandMatches(sld, brands, commonWord);
+  const ev = { ...base, brands_compared: brands.size, matches };
+  const worst = matches[0];
+  if (!worst) return { id, result: 'PASS', reason: null, evidence: ev };
+  const what = worst.kind === 'exact' ? `is the brand "${worst.brand}"` : worst.kind === 'contains' ? `contains the brand "${worst.brand}"` : worst.kind === 'lookalike' ? `looks like the brand "${worst.brand}" (look-alike letters)` : `is within ${worst.distance} edit of the brand "${worst.brand}"`;
+  const reason = `"${sld}" ${what} (rank ${worst.rank})${worst.severity === 'FLAG' ? `: ${worst.kind === 'contains' ? 'the brand is also an ordinary word' : 'the name is itself an ordinary word'}, read it` : ''}`;
+  return { id, result: worst.severity, reason, evidence: ev };
 }
 
 /** Runs the automatic pre-bid checks for one registered .com name. Never throws for an upstream failure: that check is a FLAG with the reason. */
@@ -66,6 +98,7 @@ export async function runPrebidChecks(db: Kysely<Database>, deps: ScreeningDeps,
     latest: () => undefined, ahead: () => [], lists, lexicon: { types: new Map(), versions: {} }, deps, now, deadline: now() + budgetMs, shared,
   } as unknown as CheckContext;
   const checks: PrebidCheck[] = [];
+  const add = (c: NewCheck): void => { checks.push({ ...c, checked_at: toJerusalemIso(new Date(now())) }); };
 
   // 1. name rules: the first failing rule is reported, the later ones are not evaluated
   const names = await closeoutNameChecker(db, { bigcoNames: await currentTerms(db, 'bigco_names'), tmKills: await currentTerms(db, 'tm_kills') });
@@ -79,32 +112,37 @@ export async function runPrebidChecks(db: Kysely<Database>, deps: ScreeningDeps,
   };
   let failed = false;
   for (const id of order) {
-    if (failed) checks.push({ id, result: 'SKIP', reason: 'not evaluated: an earlier name rule already failed', evidence: {} });
-    else if (nv.code === id) { failed = true; checks.push({ id, result: 'FAIL', reason: what[id], evidence: { words: nv.words, settings: names.settings } }); }
-    else checks.push({ id, result: 'PASS', reason: null, evidence: { words: nv.words, settings: names.settings } });
+    if (failed) add({ id, result: 'SKIP', reason: 'not evaluated: an earlier name rule already failed', evidence: {} });
+    else if (nv.code === id) { failed = true; add({ id, result: 'FAIL', reason: what[id], evidence: { words: nv.words, settings: names.settings } }); }
+    else add({ id, result: 'PASS', reason: null, evidence: { words: nv.words, settings: names.settings } });
   }
 
   // 2. typo, SURBL, Web Risk
-  checks.push(fromOutcome('TYPO-1', await typoCheck.run(ctx)));
-  checks.push(fromOutcome('SURBL-1', await surblCheck.run(ctx)));
+  add(fromOutcome('TYPO-1', await typoCheck.run(ctx)));
+  add(await brandTypo(db, ctx, domain, sld, now));
+  add(fromOutcome('SURBL-1', await surblCheck.run(ctx)));
+  add(fromOutcome('URIBL-1', await uriblCheck.run(ctx)));
+  add({ id: 'SPAMHAUS-DBL', result: 'SKIP', reason: SPAMHAUS_REASON, evidence: { terms: 'https://www.spamhaus.org/faqs/domain-blocklist/', free_access: 'non-commercial only' } });
   if (deps.webRiskApiKey) {
     const w = await webRiskLookup({ db, fetch: deps.fetch, apiKey: deps.webRiskApiKey, now }, domain);
-    if (w.kind === 'match') checks.push({ id: 'WEB-RISK-1', result: 'FAIL', reason: `Google Web Risk lists ${domain}: ${w.threatTypes.join(', ')}`, evidence: { threat_types: w.threatTypes, expire_time: w.expireTime } });
-    else if (w.kind === 'clean') checks.push({ id: 'WEB-RISK-1', result: 'PASS', reason: null, evidence: { threat_types: [] } });
-    else checks.push({ id: 'WEB-RISK-1', result: 'FLAG', reason: `Web Risk could not be read (${w.reason})`, evidence: { reason_code: w.reason } });
-  } else checks.push({ id: 'WEB-RISK-1', result: 'SKIP', reason: 'no Google Web Risk key is configured', evidence: {} });
+    if (w.kind === 'match') add({ id: 'WEB-RISK-1', result: 'FAIL', reason: `Google Web Risk lists ${domain}: ${w.threatTypes.join(', ')}`, evidence: { threat_types: w.threatTypes, expire_time: w.expireTime } });
+    else if (w.kind === 'clean') add({ id: 'WEB-RISK-1', result: 'PASS', reason: null, evidence: { threat_types: [] } });
+    else add({ id: 'WEB-RISK-1', result: 'FLAG', reason: `Web Risk could not be read (${w.reason})`, evidence: { reason_code: w.reason } });
+  } else add({ id: 'WEB-RISK-1', result: 'SKIP', reason: 'no Google Web Risk key is configured', evidence: {} });
+
+  add({ id: 'EUIPO-1', result: 'SKIP', reason: EUIPO_REASON, evidence: { manual_search: 'https://www.tmdn.org/tmview/', register: 'euipo' } });
 
   // 3. RDAP status of the name itself
   const r = await deps.rdapLookup(domain);
   if (r.outcome === 'registered' && r.facts) {
     const hit = RDAP_FLAG_STATUSES.filter(([, re]) => r.facts!.statuses.some((s) => re.test(squash(s)))).map(([n]) => n);
     const ev = { registered: true, registrar: r.facts.registrar, created_at: r.facts.created_at, expires_at: r.facts.expires_at, statuses: r.facts.statuses, flagged_statuses: hit };
-    checks.push(hit.length > 0
+    add(hit.length > 0
       ? { id: 'RDAP_STATUS', result: 'FLAG', reason: `registry status ${hit.join(', ')}: read what it means for this auction before bidding`, evidence: ev }
       : { id: 'RDAP_STATUS', result: 'PASS', reason: null, evidence: ev });
   } else if (r.outcome === 'not_registered') {
-    checks.push({ id: 'RDAP_STATUS', result: 'FLAG', reason: 'the registry says the name is not registered: an auction name should be registered', evidence: { registered: false } });
-  } else checks.push({ id: 'RDAP_STATUS', result: 'FLAG', reason: `RDAP could not be read (${r.reasonCode ?? 'SOURCE_ERROR'})`, evidence: { registered: null, reason_code: r.reasonCode } });
+    add({ id: 'RDAP_STATUS', result: 'FLAG', reason: 'the registry says the name is not registered: an auction name should be registered', evidence: { registered: false } });
+  } else add({ id: 'RDAP_STATUS', result: 'FLAG', reason: `RDAP could not be read (${r.reasonCode ?? 'SOURCE_ERROR'})`, evidence: { registered: null, reason_code: r.reasonCode } });
 
   // 4. the same name on the other endings (RDAP + home page, the lookalike probe)
   const endings = {} as Record<PrebidEnding, EndingState>;
@@ -118,15 +156,15 @@ export async function runPrebidChecks(db: Kysely<Database>, deps: ScreeningDeps,
   const inUse = PREBID_ENDINGS.filter((t) => endings[t].in_use === true);
   const unknown = PREBID_ENDINGS.filter((t) => endings[t].registered === null);
   const same = { endings, in_use: inUse, unknown };
-  if (inUse.length > 0) checks.push({ id: 'SAME_NAME_ENDINGS', result: 'FLAG', reason: `the same name is in use on ${inUse.map((t) => `.${t}`).join(', ')}: either demand proof or a collision, read the sites`, evidence: same });
-  else if (unknown.length === PREBID_ENDINGS.length) checks.push({ id: 'SAME_NAME_ENDINGS', result: 'FLAG', reason: 'no other ending could be checked', evidence: same });
-  else checks.push({ id: 'SAME_NAME_ENDINGS', result: 'PASS', reason: null, evidence: same });
+  if (inUse.length > 0) add({ id: 'SAME_NAME_ENDINGS', result: 'FLAG', reason: `the same name is in use on ${inUse.map((t) => `.${t}`).join(', ')}: either demand proof or a collision, read the sites`, evidence: same });
+  else if (unknown.length === PREBID_ENDINGS.length) add({ id: 'SAME_NAME_ENDINGS', result: 'FLAG', reason: 'no other ending could be checked', evidence: same });
+  else add({ id: 'SAME_NAME_ENDINGS', result: 'PASS', reason: null, evidence: same });
 
   // 5. UK company names (informs; a match is a FLAG)
   const c = await companiesCheck.run(ctx);
   const comp = fromOutcome('UK_COMPANY', c);
   const n = (c.fields as { companies?: { uk_matches_n?: number | null } }).companies?.uk_matches_n;
-  checks.push(c.status === 'PASS' && typeof n === 'number' && n > 0 ? { ...comp, result: 'FLAG', reason: `${n} UK compan${n === 1 ? 'y' : 'ies'} with all the words of this name in the title` } : comp);
+  add(c.status === 'PASS' && typeof n === 'number' && n > 0 ? { ...comp, result: 'FLAG', reason: `${n} UK compan${n === 1 ? 'y' : 'ies'} with all the words of this name in the title` } : comp);
 
-  return { checks, endings };
+  return { checks, endings, words: nv.words };
 }

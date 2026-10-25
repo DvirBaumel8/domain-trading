@@ -1,6 +1,6 @@
 // Daily step `portfolioCheck` (CR-007 G-5): is each live name still ours at the registry, is its for-sale lander still up, is it on a blocklist.
 // Read-only toward the outside: RDAP, one guarded GET of the name's own site, SURBL and Web Risk lookups. It never calls a registrar API,
-// never changes nameservers, listings or domain rows, and sends nothing. It writes only its own append-only rows (portfolio_checks), the
+// never changes nameservers or listings, and sends nothing; its one domain-row write (v5.44.0) is `transfer_confirmed` / `transfer_checked_at` of an S8 name until the transfer is confirmed. It writes only its own append-only rows (portfolio_checks), the
 // Web Risk usage counter and one audit row. `/report` raises REGISTRY_MISMATCH, LANDER_DOWN and OWNED_NAME_BLOCKLISTED from those rows.
 import { trySessionLock } from '../../../core/locks.js';
 import type { Kysely } from 'kysely';
@@ -8,7 +8,7 @@ import type { Database } from '../../../db/types.js';
 import { idtDay } from '../../../core/dates.js';
 import { writeJobAudit } from '../../../http/audit.js';
 import { BlockedError, safeFetch } from '../../../core/safe-fetch.js';
-import { USER_AGENT, type RdapLookupFn } from '../../../core/rdap.js';
+import { USER_AGENT, registrarMatches, type RdapLookupFn } from '../../../core/rdap.js';
 import { surblCheck } from '../../selection/index.js';
 import { activeSelectionSettings } from '../../selection/index.js';
 import type { CheckContext, ScreeningDeps } from '../../selection/index.js';
@@ -18,8 +18,6 @@ import { webRiskLookup } from '../../selection/index.js';
 type Status = 'ok' | 'fail' | 'unknown';
 type Kind = 'registry' | 'web' | 'blocklist' | 'price';
 
-/** How our `domains.registrar` code appears in an RDAP registrar name. An unlisted code is compared as a case-insensitive substring. */
-const REGISTRAR_NAME_PATTERNS: Readonly<Record<string, RegExp>> = { godaddy: /godaddy/i, porkbun: /porkbun/i, dynadot: /dynadot/i };
 /** Statuses that mean the name is not freely ours (compared lowercase, without spaces, so `pendingDelete` and `pending delete` are the same). */
 const BAD_REGISTRY_STATUSES = ['client hold', 'server hold', 'pending delete', 'redemption period'] as const;
 /** What a working lander's front page (or its Location header) contains. A lander without an entry only has to answer 2xx or 3xx. */
@@ -74,14 +72,19 @@ export class PortfolioCheckJob {
     try {
       const { db } = this.deps;
       const doms = await db.selectFrom('domains')
-        .select(['id', 'domain', 'status', 'registrar', 'expiry_date', 'lander', 'lander_ns', 'ns_verified_at', 'lander_pending', 'bin_cents', 'listing_mode'])
+        .select(['id', 'domain', 'status', 'registrar', 'lane', 'transfer_confirmed', 'expiry_date', 'lander', 'lander_ns', 'ns_verified_at', 'lander_pending', 'bin_cents', 'listing_mode'])
         .where('status', 'in', ['owned', 'listed', 'delisted']).orderBy('domain').execute();
       const shared = new Map<string, unknown>([['surbl_no_evidence', true]]); // one SURBL proof per run, and no screening evidence rows
       for (const d of doms) {
         out.checked += 1;
         const row = { domain: d.domain, registry: 'unknown' as Status, web: 'skipped' as Status | 'skipped', blocklist: 'skipped' as Status | 'skipped' };
-        const reg = await this.registry(d).catch((e: Error) => ({ status: 'unknown' as Status, details: { reason: 'ERROR', message: e.message.slice(0, 120) } }));
+        const reg: { status: Status; details: Record<string, unknown>; transfer?: boolean | null } = await this.registry(d).catch((e: Error) => ({ status: 'unknown' as Status, details: { reason: 'ERROR', message: e.message.slice(0, 120) } }));
         row.registry = reg.status;
+        // v5.44.0: an S8 name whose transfer is not confirmed yet: RDAP's registrar is ours (true), another one (false) or unreadable (null); checked daily until true.
+        // The one domain-row write of this job: two columns, nothing else.
+        if (d.lane === 'S8' && d.transfer_confirmed !== true && !dryRun) {
+          await db.updateTable('domains').set({ transfer_confirmed: reg.transfer ?? null, transfer_checked_at: new Date(this.deps.now()) }).where('id', '=', d.id).execute();
+        }
         out.registry[reg.status] += 1;
         await this.write(d.id, 'registry', reg, dryRun);
 
@@ -120,18 +123,17 @@ export class PortfolioCheckJob {
     await this.deps.db.insertInto('portfolio_checks').values({ domain_id: domainId, at: new Date(this.deps.now()), kind, status: r.status, details: JSON.stringify(r.details) }).execute();
   }
 
-  private async registry(d: { domain: string; registrar: string | null; expiry_date: string | null }): Promise<{ status: Status; details: Record<string, unknown> }> {
+  private async registry(d: { domain: string; registrar: string | null; expiry_date: string | null }): Promise<{ status: Status; details: Record<string, unknown>; transfer?: boolean | null }> {
     const r = await this.deps.rdapLookup(d.domain);
     if (r.outcome === 'unknown' || (r.outcome === 'registered' && !r.facts)) return { status: 'unknown', details: { reason: r.reasonCode ?? 'SOURCE_ERROR', http_status: r.httpStatus } };
     if (r.outcome === 'not_registered') {
-      return { status: 'fail', details: { registered: false, differences: [{ field: 'registered', ours: true, registry: false }] } };
+      return { status: 'fail', details: { registered: false, differences: [{ field: 'registered', ours: true, registry: false }] }, transfer: false };
     }
     const f = r.facts!;
     const differences: { field: string; ours: unknown; registry: unknown }[] = [];
+    const transfer = d.registrar && f.registrar ? registrarMatches(d.registrar, f.registrar) : null;
     if (d.registrar && f.registrar) {
-      const pattern = REGISTRAR_NAME_PATTERNS[d.registrar];
-      const same = pattern ? pattern.test(f.registrar) : f.registrar.toLowerCase().includes(d.registrar.toLowerCase());
-      if (!same) differences.push({ field: 'registrar', ours: d.registrar, registry: f.registrar });
+      if (!registrarMatches(d.registrar, f.registrar)) differences.push({ field: 'registrar', ours: d.registrar, registry: f.registrar });
     }
     const expiry = f.expires_at ? f.expires_at.slice(0, 10) : null;
     if (d.expiry_date && expiry && expiry !== String(d.expiry_date).slice(0, 10)) differences.push({ field: 'expiry_date', ours: String(d.expiry_date).slice(0, 10), registry: expiry });
@@ -139,8 +141,8 @@ export class PortfolioCheckJob {
       const hit = f.statuses.find((s) => squash(s) === squash(bad));
       if (hit) differences.push({ field: 'status', ours: 'no hold or deletion status', registry: hit });
     }
-    if (differences.length > 0) return { status: 'fail', details: { differences } };
-    return { status: 'ok', details: { registrar: f.registrar, expiry_date: expiry, statuses: f.statuses } };
+    if (differences.length > 0) return { status: 'fail', details: { differences }, transfer };
+    return { status: 'ok', details: { registrar: f.registrar, expiry_date: expiry, statuses: f.statuses }, transfer };
   }
 
   /**

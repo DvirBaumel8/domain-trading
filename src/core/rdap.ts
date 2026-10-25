@@ -22,6 +22,14 @@ export interface RdapLookup {
 }
 export type RdapLookupFn = (domain: string, opts?: { baseUrl?: string; timeoutMs?: number; signal?: AbortSignal }) => Promise<RdapLookup>;
 
+/** How our registrar code (`domains.registrar`) appears in an RDAP registrar name. An unlisted code is compared as a case-insensitive substring. */
+const REGISTRAR_NAME_PATTERNS: Readonly<Record<string, RegExp>> = { godaddy: /godaddy/i, porkbun: /porkbun/i, dynadot: /dynadot/i };
+/** v5.44.0: does RDAP's registrar name match our registrar code (portfolioCheck's registry check and the S8 transfer check use this one rule)? */
+export function registrarMatches(ours: string, rdapRegistrar: string): boolean {
+  const pattern = REGISTRAR_NAME_PATTERNS[ours];
+  return pattern ? pattern.test(rdapRegistrar) : rdapRegistrar.toLowerCase().includes(ours.toLowerCase());
+}
+
 /** Honest identification for every outbound request of the screening sources (sources.md). */
 export const USER_AGENT = 'domain-trading-api/2.0.0 (+https://github.com/DvirBaumel8/domain-trading)';
 export const RDAP_COM_BASE = 'https://rdap.verisign.com/com/v1/';

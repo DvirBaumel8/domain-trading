@@ -91,9 +91,9 @@ describe('AB539 pre-bid check', () => {
     expect(r.statusCode, r.body).toBe(201);
     const j = r.json();
     expect(j.verdict).toBe('flag'); // .net is a live site: a human reads it
-    expect(j.checks.map((c: { id: string }) => c.id)).toEqual(['SPELL-1', 'BRAND-1', 'BIGCO-1', 'TM_KILL', 'TYPO-1', 'SURBL-1', 'WEB-RISK-1', 'RDAP_STATUS', 'SAME_NAME_ENDINGS', 'UK_COMPANY']);
+    expect(j.checks.map((c: { id: string }) => c.id)).toEqual(['SPELL-1', 'BRAND-1', 'BIGCO-1', 'TM_KILL', 'TYPO-1', 'BRAND-TYPO-2', 'SURBL-1', 'URIBL-1', 'SPAMHAUS-DBL', 'WEB-RISK-1', 'EUIPO-1', 'RDAP_STATUS', 'SAME_NAME_ENDINGS', 'UK_COMPANY']);
     const by = Object.fromEntries(j.checks.map((c: { id: string; result: string }) => [c.id, c.result]));
-    expect(by).toMatchObject({ 'SPELL-1': 'PASS', 'BRAND-1': 'PASS', 'BIGCO-1': 'PASS', TM_KILL: 'PASS', 'TYPO-1': 'SKIP', 'SURBL-1': 'SKIP', 'WEB-RISK-1': 'SKIP', RDAP_STATUS: 'PASS', SAME_NAME_ENDINGS: 'FLAG', UK_COMPANY: 'SKIP' });
+    expect(by).toMatchObject({ 'SPELL-1': 'PASS', 'BRAND-1': 'PASS', 'BIGCO-1': 'PASS', TM_KILL: 'PASS', 'TYPO-1': 'SKIP', 'BRAND-TYPO-2': 'SKIP', 'SURBL-1': 'SKIP', 'URIBL-1': 'SKIP', 'SPAMHAUS-DBL': 'SKIP', 'WEB-RISK-1': 'SKIP', 'EUIPO-1': 'SKIP', RDAP_STATUS: 'PASS', SAME_NAME_ENDINGS: 'FLAG', UK_COMPANY: 'SKIP' });
     expect(j.manual_required.map((m: { id: string }) => m.id)).toEqual(['EXACT_STRING_BUSINESS', 'HIST_WAYBACK']);
     expect(j.endings.net).toMatchObject({ registered: true, in_use: true });
     expect(j.endings.org).toMatchObject({ registered: false });
@@ -102,7 +102,7 @@ describe('AB539 pre-bid check', () => {
     expect(j.checked_at).toMatch(/\+0[23]:00$/); // Asia/Jerusalem offset
     const row = await db.selectFrom('prebid_checks').selectAll().where('id', '=', j.prebid_id).executeTakeFirstOrThrow();
     expect(row).toMatchObject({ domain: D, venue: 'godaddy', verdict: 'flag' });
-    expect((row.answer as { checks: unknown[] }).checks).toHaveLength(10);
+    expect((row.answer as { checks: unknown[] }).checks).toHaveLength(14);
     const audit = await db.selectFrom('audit_log').select(['path', 'method']).where('id', '=', j.audit_id).executeTakeFirstOrThrow();
     expect(audit).toMatchObject({ path: '/auctions/prebid', method: 'POST' });
   });

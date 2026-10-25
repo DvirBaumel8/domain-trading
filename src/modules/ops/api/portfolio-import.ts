@@ -6,6 +6,7 @@ import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import { checkApproval } from '../../../core/approval.js';
 import { apiCents } from '../../../core/money.js';
+import type { RdapLookupFn } from '../../../core/rdap.js';
 import { approvalRef } from '../../../core/validation.js';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
@@ -51,7 +52,7 @@ function namedAmountsCents(text: string): Set<number> {
 }
 
 
-export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely<Database>; adapters: RegistrarAdapter[]; now: () => number }): void {
+export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely<Database>; adapters: RegistrarAdapter[]; now: () => number; rdapLookup: RdapLookupFn }): void {
   app.post('/portfolio/import', { config: { openapiBody: ImportBody } }, async (req, reply) => {
     const b = ImportBody.parse(req.body ?? {});
     const now = new Date(deps.now());
@@ -102,7 +103,7 @@ export function registerPortfolioImport(app: FastifyInstance, deps: { db: Kysely
         lane: 'S8', s8Source: b.source, compsValueCents: optCents(b.comps_value, 'comps_value'),
         binOverrideCents: b.bin_override, floorOverrideCents: b.floor_override,
         dryRun: b.dry_run === true, auditId: req.auditId ?? undefined,
-      }, { adapters: deps.adapters, now });
+      }, { adapters: deps.adapters, now, rdapLookup: deps.rdapLookup });
     } catch (e) {
       if (e instanceof ImportInputError) throw new AppError(422, 'VALIDATION_ERROR', e.message);
       throw e;

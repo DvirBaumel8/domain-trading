@@ -109,6 +109,15 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   const registrarOf = new Map(domains.map((d) => [d.id, d.registrar]));
   const live = (s: string) => (LIVE as readonly string[]).includes(s);
 
+  // v5.44.0: an S8 name (an aftermarket buy) not yet seen at the registrar it was imported into. The old owner can still redeem a won auction name, so do not list it before RDAP shows it
+  // at our registrar. The daily portfolioCheck step re-checks it until transfer_confirmed is true.
+  for (const dm of domains) {
+    if (dm.lane !== 'S8' || dm.transfer_confirmed === true || !live(dm.status)) continue;
+    add('S8_TRANSFER_UNCONFIRMED', 'warn', `${dm.domain}: the transfer to ${dm.registrar ?? 'the registrar'} is not confirmed by RDAP yet; do not list it until the transfer is complete.`, dm.domain, {
+      transfer_confirmed: dm.transfer_confirmed ?? null, registrar: dm.registrar, checked_at: dm.transfer_checked_at ? toJerusalemIso(dm.transfer_checked_at) : null,
+    });
+  }
+
   // daily portfolio checks (CR-007 G-5): the latest row of each kind that is NOT unknown decides (an unknown never clears nor raises)
   const latestChecks = await sql<{ domain_id: number; kind: string; status: string; at: Date; details: Record<string, any> }>`
     select distinct on (domain_id, kind) domain_id, kind, status, at, details from portfolio_checks

@@ -14,11 +14,29 @@ import { createPlan, getPlan, listPlans, PlanBody, PlansQuery, recordResult, Res
 
 const PrebidBody = z.object({ domain: z.string().min(1).max(253), venue: z.enum(VENUES) }).strict();
 
+/** The exact strings of the manual checks (v5.44.0): the name as words, in quotes, its CamelCase form, and the company registers. No automation of Google: a human pastes them. */
+export function manualSearches(domain: string, words: readonly string[]): { words: string; camel_case: string; queries: string[]; wayback: string } {
+  const sld = domain.replace(/\.com$/, '');
+  const parts = words.length > 0 ? [...words] : [sld];
+  const spaced = parts.join(' ');
+  const camel = parts.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+  return {
+    words: spaced, camel_case: camel, wayback: `https://web.archive.org/web/*/${domain}`,
+    queries: [
+      `"${spaced}"`, `"${camel}"`, `"${sld}"`,
+      `site:opencorporates.com "${spaced}"`, `site:find-and-update.company-information.service.gov.uk "${spaced}"`, `site:companieshouse.gov.uk "${spaced}"`,
+    ],
+  };
+}
+
 /** What no program can check: said in every pre-bid answer, confirmed by the caller in the plan's `manual` block. */
-export const MANUAL_REQUIRED = [
-  { id: 'EXACT_STRING_BUSINESS', what: 'Google exact phrase + company registries: an operating business called exactly this name kills a coined name' },
-  { id: 'HIST_WAYBACK', what: 'past harmful use, checked by hand' },
-] as const;
+export function manualRequired(domain: string, words: readonly string[]) {
+  const s = manualSearches(domain, words);
+  return [
+    { id: 'EXACT_STRING_BUSINESS', what: 'Google exact phrase + company registries: an operating business called exactly this name kills a coined name', search_strings: s.queries, name_as_words: s.words, camel_case: s.camel_case },
+    { id: 'HIST_WAYBACK', what: 'past harmful use, checked by hand', wayback_url: s.wayback },
+  ];
+}
 
 const bad = (p: { error: z.ZodError }) => new AppError(400, 'VALIDATION_ERROR', `Invalid query: ${p.error.issues.map((i) => `${i.path.join('.') || 'query'} ${i.message}`).join('; ')}`);
 const idOf = (raw: string): number => {
@@ -37,7 +55,7 @@ export function registerAuctions(app: FastifyInstance, deps: { db: Kysely<Databa
     const out = await runPrebidChecks(db, deps.screening, domain, deps.now);
     const verdict = prebidVerdictOf(out.checks);
     const answer = {
-      domain, venue: b.venue, checked_at: toJerusalemIso(new Date(deps.now())), verdict, checks: out.checks, manual_required: MANUAL_REQUIRED, endings: out.endings, ...pair('s8_max_price', cfg.s8_max_price_cents),
+      domain, venue: b.venue, checked_at: toJerusalemIso(new Date(deps.now())), verdict, checks: out.checks, manual_required: manualRequired(domain, out.words), endings: out.endings, ...pair('s8_max_price', cfg.s8_max_price_cents),
     };
     const row = await db.insertInto('prebid_checks').values({
       domain, venue: b.venue, verdict, answer: JSON.stringify(answer), token_name: req.auth?.name ?? null, audit_id: req.auditId ?? null, created_at: new Date(deps.now()),

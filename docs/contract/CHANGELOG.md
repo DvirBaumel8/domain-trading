@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.44.0 (2026-10-25): Safety upgrades for auction names: brand typo and combosquat, URIBL, visible gaps, exact search strings, after-auction transfer check
+Release note: `docs/releases/v5.44.0.md`.
+MINOR release (migration `1766900000000_v5-44-0.sql`: `domains.transfer_confirmed`, `domains.transfer_checked_at`).
+- `POST /auctions/prebid`: new checks `BRAND-TYPO-2` (typo, look-alike letters or a contained brand against the Majestic top 10,000 brand labels; FAIL, FLAG when the brand or the name is an ordinary word), `URIBL-1` (black FAIL, grey or red FLAG, a refused or unprovable query a FLAG), `SPAMHAUS-DBL` (always SKIP: free access is non-commercial only), `EUIPO-1` (always SKIP until the founder creates an EUIPO key). Every check has `checked_at`. `manual_required[EXACT_STRING_BUSINESS]` adds `name_as_words`, `camel_case`, `search_strings`; `HIST_WAYBACK` adds `wayback_url`.
+- `POST /portfolio/import` (S8): the answer adds `transfer_confirmed` (RDAP's registrar is the one imported into: true / false / null) and a warning `S8_TRANSFER_UNCONFIRMED` when it is not true. `/report` warning `S8_TRANSFER_UNCONFIRMED` (warn) until the daily `portfolioCheck` step sees our registrar. Listing is not blocked.
+- New codes in evidence: `URIBL_BLACK`, `URIBL_GREY_RED`. New report warning `S8_TRANSFER_UNCONFIRMED`.
+
 ## 5.43.0 (2026-10-25): Knowledge base, phase 1 (CR-078, G-132)
 Release note: `docs/releases/v5.43.0.md`.
 MINOR release.

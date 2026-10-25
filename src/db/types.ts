@@ -196,6 +196,9 @@ export interface DomainsTable {
   renewals_used: Generated<number>;
   /** v5.8.0 (CR-059): NULL = Line 1 (hand registration), 'S8' = Line 2 (imported aftermarket name). */
   lane: 'S8' | null;
+  /** v5.44.0: S8 only. RDAP's registrar is the one we imported into (true), another one (false), or unreadable (null). Checked at import and daily until true. */
+  transfer_confirmed: boolean | null;
+  transfer_checked_at: Date | null;
   drop_date: DateString | null;
   category: Category | null;
   listing_mode: ListingMode | null;
