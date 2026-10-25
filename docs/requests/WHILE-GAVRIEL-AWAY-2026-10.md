@@ -91,6 +91,18 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - Dvir asked for research held to a high standard (25+ sources each, every source graded A–D by reliability, agreement and conflict shown): (1) the best funnel for new registrations, (2) how to invent names more accurately, (3) the safety checks. Results go to `docs/research/`.
 - Dvir agreed the selection system was built for new registrations and needs adjusting now that auctions are the main effort. DOM's gap: `POST /portfolio/import` runs **after** the buy and checks only approval, price cap, source, slots and term. No safety or demand check runs before an auction bid. DOM's plan (built after the safety research is in): a read-only pre-bid check, a bid plan with Dvir's approved maximum before bidding, the import refusing a price above that maximum, and recording won/lost bids to learn from.
 
+### 25 Oct 2026: research results (funnel, names, safety)
+- All three reports are combined in `docs/research/funnel-names-safety-2026-10.md` (about 130 sources, each graded A–D).
+- Main points:
+  - Auctions first still holds, because the binding limit is our 40 slots and the 2-year hold.
+  - New registrations: 1–2 words, present demand (Tier A, or a new Tier B), small-business buyer groups, no future-trend terms.
+  - Our four Line 1 names are the type that sells least: keep them, drop at renewal without interest, buy no more like them.
+  - AI invents names only for breadth; every claimed buyer business is verified by code.
+  - Safety adds Spamhaus DBL, URIBL, EUIPO for all names, a typo/combosquat check, a manual exact-string business check (the NexusMutual.com loss), the trademark check at bid time, and stored evidence.
+- Correction: some sources in DOM's first auctions research the same morning (`auctions-playbook.md`) are graded D (content farms). The playbook's bidding advice is also supported by B sources; its sell-through figures are replaced by §1 of the new file.
+- Rule for all research: never read a site through a proxy that gets around its bot protection.
+- Waiting for Dvir: go-ahead on the builds in §6 (auction pre-bid check and bid plan, safety upgrades, new-registration gate code). Gavriel: the new-registration rules in §3–4 become a selection settings draft for Dvir to activate.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
