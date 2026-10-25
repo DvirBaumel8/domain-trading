@@ -114,6 +114,13 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - So DOM's first guess (`pickproof_pool`) was wrong. `datasave_pool` keeps only 3 days, so it may already be at its full size and the growth may slow by itself. `dynadot_rows` (kept 120 days) keeps growing.
 - Next: a second reading on 26 Oct gives each table's growth per day. The cut is planned from that, before about 3 Nov.
 
+### 25 Oct 2026: Dvir said "build"; more research rounds
+- **Dvir approved all three builds** of `funnel-names-safety-2026-10.md` §6: (1) the auction pre-bid check and bid plan, (2) the safety upgrades, (3) the new-registration gate code. Built one after another, in that order: v5.39.0 = bid plans (CR-077), then safety, then the gate.
+- **Score research:** Dvir finds the 0-100 tiebreaker not good enough and asked for a deep study to improve it (`docs/research/score-research-2026-10.md`, in progress).
+- **Engine data:** Dvir asked whether historical sold/unsold data can be loaded in bulk instead of waiting for the daily jobs (`docs/research/historical-data-2026-10.md`, in progress).
+- **Bulk audit:** Dvir asked to check the whole system for work done one by one that could run in bulk (DOM's code and the routes you call). Findings go to gaps.md.
+- Dvir: "maybe we need more rounds of investigation so we will be able to base on more data": research gets more rounds, each with more sources.
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
