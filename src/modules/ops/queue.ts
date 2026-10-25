@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { writeJobAudit } from '../../http/audit.js';
+import { newDbScope, runInDbScope, stepDb } from '../../core/db-stats.js';
 import { advisoryXactLock, trySessionLock, type LockKey } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { stepView } from '../reporting/index.js';
@@ -199,16 +200,17 @@ export class JobQueue {
     const ms = () => Math.max(0, this.deps.now() - t0);
     let result: StepResult | null = null;
     let error = '';
+    const scope = newDbScope(`step:${entry?.name ?? 'unknown'}`); // v5.40.0 (G-125): DB queries of this step
     if (!entry) {
       error = 'unknown step';
     } else {
       let timer: NodeJS.Timeout | undefined;
-      const work = Promise.resolve().then(() => entry.exec());
+      const work = Promise.resolve().then(() => runInDbScope(scope, () => entry.exec()));
       work.catch(() => { /* a step abandoned by its timeout may still fail later */ });
       try {
         const out = await Promise.race([work, new Promise<typeof TIMEOUT>((res) => { timer = setTimeout(() => res(TIMEOUT), step.timeout_ms); })]);
         if (out === TIMEOUT) error = 'timeout';
-        else result = runner.classify(entry, out, ms());
+        else result = withStepDb(runner.classify(entry, out, ms()), stepDb(scope));
       } catch (e) {
         error = runner.errorText(e);
       } finally {
@@ -268,6 +270,16 @@ export class JobQueue {
       status: failed.length ? 500 : 200, summary: failed.length ? `${q.job}: failed ${failed.join(',')}` : `${q.job}: ok`,
     });
   }
+}
+
+/**
+ * job_steps has no column for it (no migration), so the count travels inside the stored summary as `_db` and `stepView` lifts it out next to `ms`.
+ * Only an object summary can carry it (a null or array summary loses it).
+ */
+function withStepDb(r: StepResult, db: StepResult['db']): StepResult {
+  const summary = r.summary;
+  if (typeof summary === 'object' && summary !== null && !Array.isArray(summary)) return { ...r, db, summary: { ...summary, _db: db } };
+  return { ...r, db };
 }
 
 /** The datasave retry is a second run 60 minutes after the first (CR-071 R-7); a retry run never retries again, so it happens once per data day. */

@@ -1,6 +1,7 @@
 import { scrubSecrets } from '../../../core/redact.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../../db/types.js';
+import { newDbScope, runInDbScope, stepDb } from '../../../core/db-stats.js';
 import { idtDay } from '../../../core/dates.js';
 import { trySessionLock, type LockKey, type SessionLock } from '../../../core/locks.js';
 export interface StepResult {
@@ -10,6 +11,8 @@ export interface StepResult {
   /** How long the step took, in milliseconds. */
   ms: number;
   summary: unknown;
+  /** v5.40.0 (G-125): DB queries the step made: count, DB milliseconds, errors, and from 50 queries its three most repeated query shapes (SQL text, never values). */
+  db?: { queries: number; ms: number; errors?: number; top?: Array<{ sql: string; n: number }> };
 }
 
 /** `screen` (v3.3.0, CR-021): one on-demand screening of the waiting intake names, then a rebuild of the day's list. */
@@ -207,10 +210,11 @@ export class JobRunner {
   async runStepOnce(entry: PlanStep): Promise<StepResult> {
     const t0 = this.deps.now();
     const ms = () => Math.max(0, this.deps.now() - t0);
+    const scope = newDbScope(`step:${entry.name}`); // v5.40.0 (G-125)
     try {
-      return this.classify(entry, await entry.exec(), ms());
+      return { ...this.classify(entry, await runInDbScope(scope, () => entry.exec()), ms()), db: stepDb(scope) };
     } catch (e) {
-      return { ok: false, error: this.errorText(e), ms: ms(), summary: null };
+      return { ok: false, error: this.errorText(e), ms: ms(), summary: null, db: stepDb(scope) };
     }
   }
 

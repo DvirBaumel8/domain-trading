@@ -23,6 +23,7 @@
     "record:screening": "tsx --env-file-if-exists=.env scripts/record-screening-fixtures.ts",
     "release": "tsx scripts/release.ts",
     "evidence": "tsx scripts/evidence.ts",
+    "traffic": "tsx scripts/traffic-report.ts",
     "contract:refresh-spec": "tsx scripts/refresh-porkbun-spec.ts",
     "admin:dev": "tsx --env-file-if-exists=.env src/modules/ops/admin.ts",
     "job:dev": "tsx --env-file-if-exists=.env src/modules/ops/job.ts"
