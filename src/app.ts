@@ -12,7 +12,7 @@ import { queryDns, queryNs, type NsLookup } from './core/ns-lookup.js';
 import type { Config } from './config.js';
 import type { Database } from './db/types.js';
 import { registerDbScope, registerDbStatsLog } from './http/db-stats.js';
-import { dbAuditWriter,auditFrameworkError, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
+import { dbAuditWriter, auditFrameworkError, registerAuditId, registerAuditWrite, type AuditWriter } from './http/audit.js';
 import { registerAuth, registerScope } from './http/auth.js';
 import { registerIdempotency } from './http/idempotency.js';
 import { registerRateLimit } from './http/rate-limit.js';

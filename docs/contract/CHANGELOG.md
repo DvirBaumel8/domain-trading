@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.40.0 (2026-10-25): DB query counter per request and per job step (G-125)
+Release note: `docs/releases/v5.40.0.md`.
+MINOR (additive; no migration).
+- **`GET /jobs/runs`:** each finished step gains `db: {queries, ms, errors?, top?}` next to `ms` (`jobs.md`). `top` (the three most repeated query shapes, SQL text only, never parameters) appears from 50 queries. Existing fields and `summary` are unchanged.
+- No route, response body or error code changes. The host log line "request completed" gains `db_queries`, `db_ms` and, from 20 queries, `db_top`; `npm run traffic -- <api.log>` summarises it per route.
+
 ## 5.39.0 (2026-10-25): Auction bid plans: pre-bid check, Dvir's approved maximum, results, S8 import needs a plan (CR-077)
 Release note: `docs/releases/v5.39.0.md`.
 MINOR (additive; migration `1766600000000_v5-39-0.sql`), with one tightened rule: an S8 import without a bid plan, accepted before, is now 409 `BID_PLAN_REQUIRED`.

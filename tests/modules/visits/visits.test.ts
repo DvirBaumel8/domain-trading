@@ -110,7 +110,8 @@ describe('visits: hit', () => {
     const row = await db.selectFrom('visit_daily').select('referrer_hosts').where('domain', '=', LISTED).executeTakeFirstOrThrow();
     expect(row.referrer_hosts).toEqual({ 'x.com': 2, other: 1 });
     const dump = JSON.stringify((await sql`select to_jsonb(t) as j from visit_daily t`.execute(db)).rows) + JSON.stringify((await sql`select to_jsonb(t) as j from audit_log t`.execute(db)).rows);
-    for (const leak of ['utm=1', '/abc', '8443', 'frag', 'Googlebot']) expect(dump).not.toContain(leak);
+    // ':8443', not '8443': random hex ids in audit_log can contain the four digits
+    for (const leak of ['utm=1', '/abc', ':8443', 'frag', 'Googlebot']) expect(dump).not.toContain(leak);
   });
 
   it('V518-5: AT-8: the 1,001st hit of a name in a UTC day adds to capped; human and bot counts stay', async () => {
