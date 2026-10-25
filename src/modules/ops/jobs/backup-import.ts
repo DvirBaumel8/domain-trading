@@ -79,6 +79,15 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'review_item_statuses', file: 'tables/review_item_statuses.json' },
   { table: 'review_settings_changes', file: 'tables/review_settings_changes.json' },
   { table: 'review_retries', file: 'tables/review_retries.json' },
+  { table: 'kb_settings', file: 'tables/kb_settings.json' },
+  { table: 'kb_authors', file: 'tables/kb_authors.json' },
+  { table: 'kb_sources', file: 'tables/kb_sources.json' },
+  { table: 'kb_questions', file: 'tables/kb_questions.json' },
+  { table: 'kb_claims', file: 'tables/kb_claims.json' },
+  { table: 'kb_evidence', file: 'tables/kb_evidence.json' },
+  { table: 'kb_source_links', file: 'tables/kb_source_links.json' },
+  { table: 'kb_verdicts', file: 'tables/kb_verdicts.json' },
+  { table: 'kb_loads', file: 'tables/kb_loads.json' },
   { table: 'audit_log', file: 'audit.jsonl', jsonl: true },
 ];
 
@@ -86,7 +95,7 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
 const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log', 'screening_runs', 'screening_evidence', 'manual_quotes', 'tranches'];
 
 /** Tables without a serial `id` column. */
-const NO_SERIAL = new Set(['settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts', 'labelled_names', 'replay_runs']);
+const NO_SERIAL = new Set(['settings', 'kb_settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts', 'labelled_names', 'replay_runs']);
 
 /** Tables whose identity column is not called `id`. */
 const SERIAL_COL: Record<string, string> = { company_documents: 'version' };
@@ -179,7 +188,7 @@ export async function importBackup(db: Kysely<Database>, dir: string): Promise<R
       // OVERRIDING SYSTEM VALUE keeps the original ids (the id columns are GENERATED ALWAYS); the sequences are reset below.
       // jsonb_populate_recordset maps JSON text/numbers/arrays to each column's own type, so timestamps keep full precision.
       // pricing_settings: the migrations already seeded the versions they ship; keep those and add the rest.
-      const conflict = table === 'pricing_settings' ? sql`on conflict (version) do nothing` : table === 'selection_settings' || table === 'selection_lists' ? sql`on conflict do nothing` : sql``;
+      const conflict = table === 'pricing_settings' ? sql`on conflict (version) do nothing` : table === 'selection_settings' || table === 'selection_lists' || table === 'kb_settings' ? sql`on conflict do nothing` : sql``;
       await sql`insert into ${sql.table(table)} overriding system value select * from jsonb_populate_recordset(null::${sql.table(table)}, ${JSON.stringify(rows)}::jsonb) ${conflict}`.execute(trx);
       if (NO_SERIAL.has(table)) continue;
       const col = SERIAL_COL[table] ?? 'id';

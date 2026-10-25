@@ -91,6 +91,7 @@ export async function makeApp(
     engineTrain?: AppDeps['engineTrain'];
     engineScore?: AppDeps['engineScore'];
     engineDbSize?: AppDeps['engineDbSize'];
+    knowledgeDir?: string;
     /** Extra routes registered after the test routes (e.g. a POST /data/x). */
     extraRoutes?: (app: FastifyInstance) => void;
   } = {},
@@ -114,6 +115,7 @@ export async function makeApp(
     engineTrain: opts.engineTrain,
     engineScore: opts.engineScore,
     engineDbSize: opts.engineDbSize,
+    knowledgeDir: opts.knowledgeDir,
     // No live DNS in tests: a test that needs name servers passes fakes.
     screening: {
       resolveNs: async () => { throw new Error('DNS blocked in tests'); },

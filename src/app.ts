@@ -24,6 +24,7 @@ import { registerDropLists, registerCohorts, registerCandidates, registerLessons
 import { registerEmails, registerCompany, registerReviews, retryReview, runReview } from './modules/outreach/index.js';
 import { EndingsJob, EngineTrainer, registerEngine, Scorer, type TrainDeps } from './modules/engine/index.js';
 import { registerData } from './modules/data/index.js';
+import { KbLoadJob, registerKnowledge } from './modules/knowledge/index.js';
 import { registerMarket } from './modules/market/index.js';
 import { registerPickproof } from './modules/pickproof/index.js';
 import { registerVisits } from './modules/visits/index.js';
@@ -52,6 +53,8 @@ declare module 'fastify' {
 }
 
 export interface AppDeps {
+  /** v5.43.0 (CR-078): the folder of the repo knowledge files the daily step kbLoad reads (default data/knowledge next to the build). Tests pass a fixture folder. */
+  knowledgeDir?: string;
   config: Config;
   db: Kysely<Database>;
   /** Clock in ms, for the rate limiter. */
@@ -224,7 +227,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ ...base, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     ...base, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, scorer: engineScorer, log: app.log, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer,
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, kbLoad: new KbLoadJob({ db: deps.db, now, dir: deps.knowledgeDir, log: app.log }), retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, scorer: engineScorer, log: app.log, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer,
     outsideReview: async () => {
       const r = await runReview({ ...reviewDeps, db: deps.db, secretValues: deps.config.secretValues, version: deps.config.version }, { trigger: 'scheduled', now: now() });
       return 'skipped' in r ? { skipped: true, reason: r.skipped, ...(r.category ? { category: r.category } : {}) } : r;
@@ -245,6 +248,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerCloseouts(app, { db: deps.db, now, scorer: engineScorer });
   registerAuctions(app, { db: deps.db, now, screening: screeningDeps });
   registerMarket(app, { db: deps.db, now });
+  registerKnowledge(app, { db: deps.db, now, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
   registerPickproof(app, { db: deps.db, now });
   registerJobs(app, app.jobQueue, { ...base, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   registerOpenApi(app, openApiRoutes, deps.config.version);

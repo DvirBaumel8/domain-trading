@@ -100,6 +100,8 @@ export interface JobRunnerDeps {
   backupExport?: BackupExport;
   /** Daily popularity list / IANA bootstrap / cache pruning (CAP-02); while undefined, that step reports skipped. */
   referenceRefresh?: Runnable;
+  /** v5.43.0 (CR-078): loads new repo knowledge files data/knowledge/*.jsonl into the knowledge base (once per file sha256); runs after referenceRefresh. While undefined, that step reports skipped. */
+  kbLoad?: Runnable;
   /** v5.1.0 (G-95): daily data retention (old unbought screening data, old job logs and checks); runs after outsideReview, before backupExport. While undefined, that step reports skipped. */
   retention?: Runnable;
   /** v5.4.0 (CR-056): fills the registry facts of the scoring engine's names on .net, .co, .org, .io, .ai (RDAP only), in chunks across nights; the last step of the day. While undefined, that step reports skipped. */
@@ -180,6 +182,7 @@ export class JobRunner {
       optional('buildDailyList', d.buildDailyListJob, 'daily list not configured'),
       optional('cohortOutcomes', d.cohortOutcomesJob, 'cohort outcomes not configured'),
       optional('referenceRefresh', d.referenceRefresh, 'reference refresh not configured', true),
+      optional('kbLoad', d.kbLoad, 'knowledge load not configured'),
       optionalFn('outsideReview', d.outsideReview, 'outside review not configured'),
       optional('retention', d.retention, 'retention not configured'),
       optional('backupExport', d.backupExport, 'backup export not configured'),

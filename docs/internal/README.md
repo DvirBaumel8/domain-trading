@@ -27,6 +27,7 @@ These are **DOM's own** working documents: the binding business rules, internals
 | `closeouts.md` | Ranked closeout and drop candidates (CR-072, 5.26.0): the eight hard filters and their order, the `scorePool` step, offline scoring, the route, CC526-* |
 | `books.md` | Ledger cost rows, forward-cost plans (versioned), `GET /costs/forward`, `GET /books.csv` (CR-070, 5.25.0): rules, files, BK525-* |
 | `market.md` | Market episodes, labels, sales reports, matched sets, data-quality checks (CR-075, 5.23.0): rules, files, MK523-* |
+| `knowledge.md` | The knowledge base (CR-078, 5.43.0): grading, clusters, the weight formula and certainty steps, versioned append-only rows, the repo load `kbLoad`; KB543-* |
 | `pickproof.md` | Pick-proof mechanics (CR-073, 5.28.0): the frozen daily pool, arms A/B1/B2/C1, the seal, T30 labels, the report; the exact draw recipe; PP528-* |
 | `lookups.md` | RDAP lookup service (CR-074, 5.29.0): the shared cache, the rolling 24 h bot limit, which internal steps read or fill the cache; RL529-*, BS529-1 |
 | `auctions.md` | Auction bid plans (CR-077, 5.39.0): the pre-bid check, the approved maximum bid, the result, the import rule; AB539-* |

@@ -170,9 +170,11 @@ const intakeForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'An intake to
 /** v5.10.0 (CR-061): the routes a `data` token may call (all POST): intake, the two engine uploads, and every route under `/data/` (CR-063). Everything else, GETs included, is 403 SCOPE_FORBIDDEN. */
 export const DATA_ROUTES: ReadonlySet<string> = new Set(['/candidates/intake', '/engine/sales', '/engine/unsold', '/visits/import']);
 export const DATA_PREFIX = '/data/';
-const isDataRoute = (routeUrl: string): boolean => DATA_ROUTES.has(routeUrl) || routeUrl.startsWith(DATA_PREFIX);
+/** v5.43.0 (CR-078): the knowledge base writes are data too (a data token may POST under /kb/, never GET). */
+export const KB_PREFIX = '/kb/';
+const isDataRoute = (routeUrl: string): boolean => DATA_ROUTES.has(routeUrl) || routeUrl.startsWith(DATA_PREFIX) || routeUrl.startsWith(KB_PREFIX);
 
-const dataForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A data token may only call POST /candidates/intake, POST /engine/sales, POST /engine/unsold, POST /visits/import and POST /data/*');
+const dataForbidden = () => new AppError(403, 'SCOPE_FORBIDDEN', 'A data token may only call POST /candidates/intake, POST /engine/sales, POST /engine/unsold, POST /visits/import, POST /data/* and POST /kb/*');
 
 /** v5.18.0 (CR-068): the one route a `visits` token may call, and the only scope that may call it (WRITE, READ and data tokens are 403). */
 export const VISITS_HIT_ROUTE = '/visits/hit';
@@ -238,6 +240,12 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'DELETE /data/sales/{id}': 'allowed', // answers 405 APPEND_ONLY
   'POST /data/sales-comps': 'allowed',
   'POST /data/tm-kills': 'allowed',
+  'POST /kb/sources': 'allowed', // v5.43.0 (CR-078): evidence base writes, no money
+  'POST /kb/authors': 'allowed',
+  'POST /kb/claims': 'allowed',
+  'POST /kb/evidence': 'allowed',
+  'POST /kb/links': 'allowed',
+  'POST /kb/questions': 'allowed',
   'POST /demand/keywords': 'allowed',
   'POST /engine/sales': 'allowed',
   'POST /engine/unsold': 'allowed',

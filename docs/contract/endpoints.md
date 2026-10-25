@@ -1,4 +1,4 @@
-# Endpoints (contract v5.42.0)
+# Endpoints (contract v5.43.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -69,6 +69,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | PATCH | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | DELETE | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | GET | `/market/episodes`, `/market/matched`, `/market/dq`, `/market/coverage` | READ or bots (a data token gets 403) | Market data (5.23.0, CR-075) |
+| POST | `/kb/sources`, `/kb/authors`, `/kb/claims`, `/kb/evidence`, `/kb/links`, `/kb/questions` | WRITE, bots or data | Knowledge base (5.43.0, CR-078) |
+| GET | `/kb/questions`, `/kb/questions/{id}/verdict`, `/kb/claims`, `/kb/sources`, `/kb/recheck`, `/kb/echo-candidates` | READ or bots (a data token gets 403) | Knowledge base (5.43.0, CR-078) |
 | GET | `/auctions/live` | READ or bots (a data token gets 403) | GoDaddy auctions inside the buying range, with bids (5.37.0) |
 | POST | `/auctions/prebid` | WRITE or bots (a normal POST: `Idempotency-Key`, audit row; a READ token gets 403) | Auction bid plans (5.39.0, CR-077) |
 | POST | `/auctions/plans`, `/auctions/plans/{id}/result` | WRITE only (a bots token gets 403 even with `dry_run`) | Auction bid plans (5.39.0, CR-077) |
@@ -784,6 +786,64 @@ READ (or bots). Query `days` (1..120, default 30). **200:** `{as_of, window, per
 
 **Retention:** `market_names` and `market_sales` are never pruned (small by design: only $500+ episodes; `db_rows.market_names_bytes` shows the size); the last 90 `dqMarket` runs are kept. Source rows (`dynadot_rows`, ended auctions) are pruned at 120 days as before; an episode whose oldest rows were pruned keeps its `first_seen` and first price.
 
+## Knowledge base (5.43.0, CR-078)
+An evidence base the decisions rest on: sources graded A-F, claims, the evidence that links them, independence clusters (echoes count once) and a **verdict per question computed in plain code** (no AI in the server; the weights are the versioned `kb_settings` row, current **v1** = research `knowledge-sources-2026-10` §2.3). Rules and test ids: `docs/internal/knowledge.md`.
+
+**Write shape (all six `POST /kb/*`).** Body `{rows: [..], dry_run?: boolean}`, 1 to 1,000 rows, body limit 4 MB, `Idempotency-Key` required, audited with the row count only (`[n rows]`). Scopes: WRITE, bots or data token (a READ token is 403). The size guard answers 409 `DB_SIZE_HIGH`. Rows name each other by **natural key**, so a batch needs no ids: an author by `name`, a source by its `url`, a claim by `claim_key` (or the triplet `claim {topic, variable, population}`), a question by `slug`. Post in this order: authors, questions, sources, claims, evidence, links (a row naming something not yet in the base is rejected).
+**All-or-nothing.** One rejected row rejects the call: **422 `KB_ROWS_REJECTED`**, nothing stored, `details = {kind, received_n, rejected_n, rejects: [{row, reason, message}]}` (200 rows at most). Row reasons: `ROW_INVALID` (strict schema: unknown field, bad value; `message` names the field), `URL_INVALID`, `TOPIC_UNKNOWN`, `AUTHOR_UNKNOWN`, `QUESTION_UNKNOWN`, `OPTION_UNKNOWN`, `SOURCE_UNKNOWN`, `CLAIM_UNKNOWN`, `CLAIM_GRADE_ABOVE_SOURCE`, `LINK_SELF`, `CONFLICTING_DUPLICATE_IN_BATCH` (the same key twice with other content), `EXISTS_DIFFERENT` (the key exists with other content and the row has no `"supersede": true`).
+**Idempotent and append-only.** The same row again is a counted duplicate and stores nothing; the same `Idempotency-Key` returns the stored answer. Every table refuses UPDATE and DELETE. A correction is the same key with `"supersede": true` and the new content: a new row with `version` + 1 and `supersedes` = the id of the replaced one (`superseded_n`); reads use the newest version. Evidence and links always point at the first version of the source and the claim, so a correction never breaks them. Questions cannot be corrected (use a new `slug`).
+**201** `{kind, dry_run, received_n, accepted_n, duplicate_n, superseded_n, rejected_n (0), rows: [{row, outcome: accepted | duplicate | superseded, id | null}], db_bytes_before, db_bytes_after, audit_id}`. `dry_run: true` runs every check and stores nothing (`id` is `null`).
+
+### `POST /kb/authors`
+Row `{name, handles?: {site: handle}, first_seen?: date, verified_sales_count?, verified_sales_source?, years_active?, track_score?: 0..1, grade?: A|B|C|D|F (default F), grade_reason?, supersede?}`. Key: the lowercased, space-collapsed `name`. `grade_reason` is required unless the grade is F.
+
+### `POST /kb/sources`
+Row `{url, publisher?, author? (a name already in the base), title?, published_at?, retrieved_at? (default now), type, access_method? (rss|api|session_web|manual, default manual), access_note?, reliability? (A..F, default F), reliability_reason?, conflict_of_interest? (none|sells_service|sells_names|marketplace|unknown, default unknown), excerpt? (300 characters at most), topics?: [topic], status? (lead|read|graded|rejected, default lead), rejected_reason?, supersede?}`; `type` is one of `official_data | paper | dataset | news | practitioner_blog | forum_post | video | comment | vendor | aggregator | own_analysis`. Dates are ISO 8601 with an offset.
+- **Canonical URL = the key:** the host is lowercased, the fragment and tracking parameters (`utm_*`, `fbclid`, `gclid`, ...) are dropped, the query is sorted and the trailing slash is removed; only `http(s)` without credentials is accepted (`URL_INVALID`). The same canonical URL is the same source.
+- `reliability_reason` is required unless the reliability is F (a new unknown source starts at F and weighs nothing). A **D** source is stored for the record and weighs 0. `status: graded` needs a reliability other than F; `status: rejected` needs `rejected_reason`. `topics` must be in the active `kb_settings` topic list (`TOPIC_UNKNOWN`).
+- The server stores the SHA-256 of the excerpt and its MinHash (64 hashes over word 5-gram shingles) for echo detection.
+
+### `POST /kb/questions`
+Row `{slug (lowercase letters, digits, _ . -), text, options?: [string] (distinct, default none), population?, decision_owner?}`. Key: `slug`. A question with options is "which of these"; with none it is "does the evidence support the claims".
+
+### `POST /kb/claims`
+Row `{topic, questions?: [slug], option? (one of the options of every linked question), statement, variable, direction (increases|decreases|no_effect|value), effect_value?, effect_unit?, effect_low?, effect_high?, population, date_range_start?, date_range_end?, half_life_days?, supersede?}`. The key is `claim_key` = `topic|variable|population`, lowercased and space-collapsed: one row per normalised statement, shared by every source that makes it. `date_range_*` is when the underlying data is from (the age of the evidence counts from `date_range_end`); `half_life_days` overrides the topic's half-life in `kb_settings`.
+
+### `POST /kb/evidence`
+Row `{source (url), claim_key | claim {topic, variable, population} (exactly one), stance (supports|contradicts|qualifies), credibility (1..5, judged on this item alone: 1 confirmed by an independent source ... 5 cannot be judged), sample_size?, evidence_kind (measured|reported_sale|experience|opinion), population_match? (direct|indirect, default direct: indirect when the data comes from another population than ours), survivorship? (default false: self-reported wins), claim_grade? (A..F, can only lower the source's grade for this claim type), effect_value? (the number this source reports, for numeric claims), quote? (15 words at most), locator? (default empty), extracted_by? (default the token name), extracted_at?, extraction_check? (single|double_agreed|double_conflict), supersede?}`. Key: `(source, claim, locator)`.
+
+### `POST /kb/links`
+Row `{from (url), to (url), kind (echo_of|syndicated|same_author|aggregator_of|cites), note?, retracted? (default false), supersede?}`. Key: `(from, to, kind)`. `echo_of`, `syndicated`, `same_author` and `aggregator_of` put the two sources in **one independence cluster** (only the strongest item of a cluster counts, per stance); `cites` does not. `same_author` needs a `note` naming the shared data (it clusters only when it is the same data). A wrong link is withdrawn by posting it again with `"retracted": true, "supersede": true`.
+
+### `GET /kb/questions`
+READ or bots. Query `limit` (1..500, default 100), `offset`. Answer `{questions: [{id, slug, text, options, population, decision_owner, created_at, latest_verdict: {id, certainty, computed_at, settings_version} | null}], limit, offset}`.
+
+### `GET /kb/questions/{id}/verdict`
+READ or bots; `{id}` is the numeric id or the slug (404 `KB_QUESTION_NOT_FOUND`). **Computes the verdict now** from the current rows and the active `kb_settings`, and **appends a `kb_verdicts` row only when the result differs from the latest stored one** (`appended`). Answer:
+```
+{ "question": {id, slug, text, options, population}, "verdict_id": 7, "appended": true, "computed_at": "...", "settings_version": 1,
+  "certainty": "high" | "moderate" | "low" | "very_low", "downgrades": ["indirect: 70% of the weight comes from a different population than ours", ...],
+  "verdict": { "leading_option": "auctions" | null, "direction": "supported" | "contradicted" | "unclear", "options": [{option, w_for, w_against, agreement, clusters}],
+               "numeric": {median, low, high, unit, clusters} | null, "clusters_n", "ab_clusters_n", "a_clusters_n", "agreement", "total_n" },
+  "clusters": [{cluster_id, grade, stance, w, evidence_id, kind, members, sources: [{id, url, type, reliability}]}],
+  "weight_for", "weight_against", "evidence_n" }
+```
+**How it is computed** (`docs/internal/knowledge.md`): each evidence item weighs `w = G x C x N x R x K` (grade, credibility, sample size, age by the claim's half-life, kind); a D, F or rejected source weighs 0; echoes, syndications, same-author-same-data and aggregators form one cluster and only the strongest item of a cluster counts per stance; per option `agreement = W_for / (W_for + W_against)`; numbers are the weighted median of one value per cluster. **Certainty** starts at moderate when an A cluster with measured data supports the option, else low, and steps down one level for each of: inconsistency (agreement below 0.75), indirectness (most weight from another population), imprecision (fewer than 3 independent clusters or small samples), bias (survivorship or conflicts of interest) and staleness (mean age weight below 0.5); it steps up one level for 2+ independent A clusters agreeing at 0.9+ or an `own_analysis` source that agrees. **Any verdict above `very_low` needs at least 3 independent clusters, 2 of them A or B**; `high` also needs 2 A clusters, agreement 0.9+ and no step down. `downgrades` states each reason in plain words so Gavriel can show Dvir why.
+
+### `GET /kb/claims`
+READ or bots. Query `topic`, `question` (id or slug; 404 `KB_QUESTION_NOT_FOUND`), `limit` (1..500, default 100), `offset`. Newest version of each claim with `evidence_n`. A bad topic format is 400 `VALIDATION_ERROR`.
+
+### `GET /kb/sources`
+READ or bots. Query `status` (`lead|read|graded|rejected`), `topic`, `limit`, `offset`. Newest version of each source (no excerpt hash or MinHash).
+
+### `GET /kb/recheck`
+READ or bots. Answer `{settings_version, threshold (0.5), claims: [{claim_key, topic, statement, weighted_r, age_days, half_life_days, evidence_n, date_range_end, question_ids}]}`: claims whose age weight (the mean `R` of their evidence, weighted by the weight without age; a claim without usable evidence uses its own date) has fallen below the threshold, oldest first. A session searches for newer evidence and adds rows; the old rows stay and simply weigh less.
+
+### `GET /kb/echo-candidates`
+READ or bots. Query `limit` (1..500, default 100). Answer `{settings_version, threshold (0.5), sources_checked, pairs: [{a: {id, url, title}, b: {id, url, title}, jaccard}]}`: source pairs whose excerpts have an estimated Jaccard similarity of 0.5 or more and that no link joins yet, strongest first. A session confirms with `POST /kb/links`.
+
+**Repo load.** DOM's own research reaches the base as files `data/knowledge/*.jsonl` shipped with a release and loaded by the daily step `kbLoad` (`jobs.md`); one JSON object per line with the same fields as the rows plus `"kind": author|source|question|claim|evidence|link` (a link line gives the link kind as `link_kind`).
+
 ## Pick-proof (5.28.0, CR-073)
 
 Mechanics of the test "do the Buyer's picks beat random names and a simple rule?", so that the picking bot neither draws the comparison arms nor grades itself. DOM freezes the pool, draws the random arms by code, seals the day and computes the statistics. Everything it reports is **a proxy, not profit**: a closeout name registered by someone else within 30 days is demand evidence, not a sale and not money. No money action, no LLM, no email. Rules, the exact recipe and the test IDs are in `docs/internal/pickproof.md`.
@@ -1377,6 +1437,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Offer and sale errors:** `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `HOLD_REASON_REQUIRED`, `EXTERNAL_REF_CONFLICT`, `OFFER_NOT_FOUND`, `APPROVAL_REQUIRED`, `OUTCOME_FINAL`, `OUTCOME_TRANSITION_INVALID`, `OFFER_SOLD_MISMATCH`, `OUTCOME_CHANGED_CONCURRENTLY`, `EVIDENCE_REQUIRED`, `SOLD_AT_IN_FUTURE`, `OFFER_MISMATCH`, `NOT_SELLABLE_STATE`, `SALE_ALREADY_RECORDED`, `DEAL_NOT_FOUND`.
 
 **Response warnings (strings):** `/buy`: the post-buy list under `POST /buy` (incl. `RECONSTRUCTED`). Listing: `FLOOR_AUTO_ACCEPT`, `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION`, `NO_BIN_LESS_EXPOSURE`, `BIN_OVER_FAST_TRANSFER_MAX`, `HIGH_VALUE_LOW_BIN`, `CATEGORY_OTHER`, `NS_PENDING`, `NS_SET_AFTER_AMBIGUOUS`. Offers: `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Sales: `COMMISSION_UNEXPECTED`. Exports (`X-Export-Warnings`): `MIN_OFFER_BELOW_20`, `DISPLAY_NAME_IGNORED`, `AFTERNIC_ROUNDS_DOWN`, `SEDO_ROUNDS_DOWN`, `DOMAIN_NOT_ASCII`; skip reason `NOT_LISTED`.
+
+**Knowledge base (5.43.0, CR-078):** `KB_ROWS_REJECTED` (422, any `POST /kb/*` with a rejected row; nothing stored; `details.rejects[].reason`: `ROW_INVALID`, `URL_INVALID`, `TOPIC_UNKNOWN`, `AUTHOR_UNKNOWN`, `QUESTION_UNKNOWN`, `OPTION_UNKNOWN`, `SOURCE_UNKNOWN`, `CLAIM_UNKNOWN`, `CLAIM_GRADE_ABOVE_SOURCE`, `LINK_SELF`, `CONFLICTING_DUPLICATE_IN_BATCH`, `EXISTS_DIFFERENT`), `KB_QUESTION_NOT_FOUND` (404, `GET /kb/questions/{id}/verdict`, `GET /kb/claims?question=`), `DB_SIZE_HIGH` (409, as for the other bulk loads).
 
 **Market data (5.23.0, CR-075):** `APPEND_ONLY` (**405** on PUT, PATCH or DELETE of `/data/sales`; **409** on `POST /data/sales` for a stored `(name, venue, sale_date, source)` sent again with a different price). The `rejects[].reason` of a 422 `POST /data/sales`: `SOURCE_REQUIRED`, `SOURCE_NAMEBIO_FORBIDDEN`, `TIER_REQUIRED`, `TIER_INVALID`, `NAME_INVALID`, `VENUE_INVALID`, `PRICE_NOT_INTEGER_CENTS`, `DATE_INVALID`, `DATE_IN_FUTURE`, `SOURCE_URL_INVALID`, `LISTING_TYPE_INVALID`, `UNKNOWN_FIELD`. Episode labels (`outcome_rule`, not errors): `SOLD_REPORTED`, `SOLD_BIDS`, `UNSOLD_60D`, `UNSOLD_30D`, `SEEN_ONCE`, `DISAPPEARED`, `TOO_SHORT`. `/report` warning `DQ_MARKET_FAIL` (`reports.md`).
 

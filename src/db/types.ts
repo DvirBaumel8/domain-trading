@@ -1469,6 +1469,153 @@ export interface MarketSalesTable {
   created_at: TimestampDefault;
 }
 
+// ---- v5.43.0 (CR-078): the knowledge base. Append-only except kb_loads; a correction is the next `version` with `supersedes` = the replaced row.
+export interface KbSettingsTable {
+  version: number;
+  created_at: TimestampDefault;
+  note: string | null;
+  values: unknown;
+}
+export interface KbAuthorsTable {
+  id: Generated<number>;
+  name_key: string;
+  version: Generated<number>;
+  supersedes: number | null;
+  name: string;
+  handles: Generated<unknown>;
+  first_seen: DateString | null;
+  verified_sales_count: number | null;
+  verified_sales_source: string | null;
+  years_active: number | null;
+  track_score: number | null;
+  grade: Generated<'A' | 'B' | 'C' | 'D' | 'F'>;
+  grade_reason: string | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+export interface KbSourcesTable {
+  id: Generated<number>;
+  url: string;
+  url_hash: string;
+  version: Generated<number>;
+  supersedes: number | null;
+  publisher: string | null;
+  author_id: number | null;
+  title: string | null;
+  published_at: Timestamp | null;
+  retrieved_at: Timestamp;
+  type: 'official_data' | 'paper' | 'dataset' | 'news' | 'practitioner_blog' | 'forum_post' | 'video' | 'comment' | 'vendor' | 'aggregator' | 'own_analysis';
+  access_method: Generated<'rss' | 'api' | 'session_web' | 'manual'>;
+  access_note: string | null;
+  reliability: Generated<'A' | 'B' | 'C' | 'D' | 'F'>;
+  reliability_reason: string | null;
+  conflict_of_interest: Generated<'none' | 'sells_service' | 'sells_names' | 'marketplace' | 'unknown'>;
+  excerpt: string | null;
+  content_hash: string | null;
+  minhash: string | null;
+  topics: Generated<string[]>;
+  status: Generated<'lead' | 'read' | 'graded' | 'rejected'>;
+  rejected_reason: string | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+export interface KbQuestionsTable {
+  id: Generated<number>;
+  slug: string;
+  text: string;
+  options: Generated<unknown>;
+  population: string | null;
+  decision_owner: string | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+export interface KbClaimsTable {
+  id: Generated<number>;
+  claim_key: string;
+  version: Generated<number>;
+  supersedes: number | null;
+  topic: string;
+  question_ids: Generated<number[]>;
+  option: string | null;
+  statement: string;
+  variable: string;
+  direction: 'increases' | 'decreases' | 'no_effect' | 'value';
+  effect_value: number | null;
+  effect_unit: string | null;
+  effect_low: number | null;
+  effect_high: number | null;
+  population: string;
+  date_range_start: DateString | null;
+  date_range_end: DateString | null;
+  half_life_days: number | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+export interface KbEvidenceTable {
+  id: Generated<number>;
+  source_id: number;
+  claim_id: number;
+  locator: Generated<string>;
+  version: Generated<number>;
+  supersedes: number | null;
+  stance: 'supports' | 'contradicts' | 'qualifies';
+  credibility: number;
+  sample_size: number | null;
+  evidence_kind: 'measured' | 'reported_sale' | 'experience' | 'opinion';
+  population_match: Generated<'direct' | 'indirect'>;
+  survivorship: Generated<boolean>;
+  claim_grade: 'A' | 'B' | 'C' | 'D' | 'F' | null;
+  effect_value: number | null;
+  quote: string | null;
+  extracted_by: string;
+  extracted_at: Timestamp;
+  extraction_check: Generated<'single' | 'double_agreed' | 'double_conflict'>;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+export interface KbSourceLinksTable {
+  id: Generated<number>;
+  from_source_id: number;
+  to_source_id: number;
+  kind: 'echo_of' | 'cites' | 'same_author' | 'syndicated' | 'aggregator_of';
+  version: Generated<number>;
+  supersedes: number | null;
+  retracted: Generated<boolean>;
+  note: string | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+export interface KbVerdictsTable {
+  id: Generated<number>;
+  question_id: number;
+  computed_at: Timestamp;
+  settings_version: number;
+  result_hash: string;
+  verdict: Json;
+  certainty: 'high' | 'moderate' | 'low' | 'very_low';
+  downgrades: Json;
+  clusters_used: Json;
+  weight_for: number;
+  weight_against: number;
+  inputs_snapshot: Json;
+  by: string;
+}
+export interface KbLoadsTable {
+  id: Generated<number>;
+  file_name: string;
+  sha256: string;
+  loaded_at: TimestampDefault;
+  ok: boolean;
+  counts: Json;
+  error: string | null;
+}
+
 /** v5.23.0 (CR-075): one row per name x venue x listing episode (only episodes that can be a positive or a matched negative).  */
 export interface MarketNamesTable {
   episode_id: string;
@@ -1648,6 +1795,15 @@ export interface Database {
   godaddy_auctions: GodaddyAuctionsTable;
   godaddy_auctions_live: GodaddyAuctionsLiveTable;
   market_sales: MarketSalesTable;
+  kb_settings: KbSettingsTable;
+  kb_authors: KbAuthorsTable;
+  kb_sources: KbSourcesTable;
+  kb_questions: KbQuestionsTable;
+  kb_claims: KbClaimsTable;
+  kb_evidence: KbEvidenceTable;
+  kb_source_links: KbSourceLinksTable;
+  kb_verdicts: KbVerdictsTable;
+  kb_loads: KbLoadsTable;
   market_names: MarketNamesTable;
   market_dq_runs: MarketDqRunsTable;
   market_matched_sets: MarketMatchedSetsTable;

@@ -73,6 +73,8 @@ function elideRows(b: Record<string, unknown> | null, url: string): Record<strin
   if (url.startsWith('/snapshots/dynadot')) return { ...b, rows: `[${b.rows.length} rows]` };
   // v5.23.0: sale reports (POST /data/sales) are always recorded by their row count too; the rows live in market_sales
   if (url === '/data/sales') return { ...b, rows: `[${b.rows.length} rows]` };
+  // v5.43.0 (CR-078): knowledge base writes (up to 1,000 rows) are always recorded by their row count; the rows live in the kb_* tables
+  if (url.startsWith('/kb/')) return { ...b, rows: `[${b.rows.length} rows]` };
   if (!(url.startsWith('/engine/') || url.startsWith('/data/')) || b.rows.length <= 20) return b;
   return { ...b, rows: `[${b.rows.length} rows]` };
 }

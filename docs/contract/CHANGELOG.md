@@ -2,6 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.43.0 (2026-10-25): Knowledge base, phase 1 (CR-078, G-132)
+Release note: `docs/releases/v5.43.0.md`.
+MINOR release.
+- **New routes** (WRITE, bots or data token for the POSTs; READ or bots for the GETs; the POSTs take `Idempotency-Key`, are audited with row counts only, accept `dry_run` and 1..1,000 rows, and are all-or-nothing: one bad row is 422 `KB_ROWS_REJECTED` with `details.rejects[]`, nothing stored): `POST /kb/sources`, `/kb/authors`, `/kb/claims`, `/kb/evidence`, `/kb/links`, `/kb/questions`; `GET /kb/questions`, `/kb/questions/{id}/verdict`, `/kb/claims`, `/kb/sources`, `/kb/recheck`, `/kb/echo-candidates`.
+- Rows name each other by natural key (source URL, author name, claim_key, question slug). Append-only with `supersede: true` corrections. Sources are deduplicated by canonical URL; excerpts get a MinHash for echo detection.
+- `GET /kb/questions/{id}/verdict` computes the verdict in plain code from the versioned `kb_settings` (v1 = research §2.3): weight G x C x N x R x K, independence clusters, certainty high / moderate / low / very_low with each step down in plain words; appends a `kb_verdicts` row only when the result changed. Anything above very_low needs 3 independent clusters, 2 of them A or B.
+- New daily step `kbLoad` (after `referenceRefresh`): loads DOM's repo files `data/knowledge/*.jsonl` once per file hash.
+- New codes `KB_ROWS_REJECTED` (422), `KB_QUESTION_NOT_FOUND` (404). Data tokens may POST under `/kb/`. Migration `1766800000000_v5-43-0.sql` (nine `kb_*` tables).
+
 ## 5.42.0 (2026-10-25): Bulk work everywhere: batched DB reads and writes, parallel registry checks, faster sibling scan (G-121, G-122, G-124)
 Release note: `docs/releases/v5.42.0.md`.
 MINOR release of PATCH-level changes (no response shape, route or code changes; no migration).

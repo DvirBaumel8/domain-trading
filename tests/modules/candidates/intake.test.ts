@@ -205,7 +205,7 @@ describe('intakeScreening (CR-012 T12-16, T12-17, T12-19)', () => {
     const res = await settleJob(x.app, 'daily', await x.post('/jobs/run', { job: 'daily' }));
     expect(res.statusCode, res.body).toBe(202);
     const steps = Object.keys(res.json().steps);
-    expect(steps.slice(steps.indexOf('dropWatch'))).toEqual(['dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'outsideReview', 'retention', 'backupExport', 'engineEndings', 'engineTrain']);
+    expect(steps.slice(steps.indexOf('dropWatch'))).toEqual(['dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'kbLoad', 'outsideReview', 'retention', 'backupExport', 'engineEndings', 'engineTrain']);
     expect(res.json().steps.intakeScreening).toMatchObject({ ok: true, summary: { queued_before: 1, screened: 1, left_for_next_run: 0, run_id: expect.stringMatching(/^run_/) } });
     expect(res.json().steps.buildDailyList).toMatchObject({ ok: true, summary: { day: '2026-10-06', entries_n: 0 } });
     const runs = (await x.get('/jobs/runs?job=daily')).json().runs;
