@@ -153,6 +153,26 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - **Score backtest** (`docs/research/backtest-score-methods-2026-10-25.md`): Dvir's lift method (sold share against unsold share per pattern) scores AUC 0.80 on the CR-002 set, against 0.79 for the score v2 proposal and 0.74 for today's Form part. The engine reached 0.85 on the same kind of data.
 - **26 Oct, after the data save:** DOM reads the first live numbers, then runs a full improvement pass (`/improvement-pass`), as Dvir asked.
 
+### 25 Oct 2026: v5.43.0, v5.44.0, v5.45.0
+- **v5.43.0, knowledge base (CR-078):**
+  - Routes `POST /kb/*` (arrays, all-or-nothing, natural keys) and `GET /kb/questions/{slug}/verdict`, which gives a certainty with plain-word reasons.
+  - DOM's research ships as `data/knowledge/*.jsonl`. The first load (25 questions, 203 graded sources, 93 claims, 271 evidence rows) is in v5.45.0.
+  - Please post your own knowledge base here once you're back (`DOM-TO-GAVRIEL.md`, 25 Oct).
+- **First verdicts:**
+  - Moderate: the name signals (other endings, words and length, live businesses, buyer pool, age and past site), UDRP risk, and the score method (lift).
+  - **Very low: "auctions before closeouts"**: only 59% of the outside evidence agrees. DOM raises it in the improvement pass.
+- **v5.44.0, safety in the pre-bid check:**
+  - New checks: BRAND-TYPO-2 (typo or combosquat against the Majestic top 10k) and URIBL-1.
+  - Always SKIP, with reasons: SPAMHAUS-DBL (no free commercial access) and EUIPO-1 (needs a free key Dvir must create).
+  - Exact search strings for the manual business check.
+  - After an S8 import, `transfer_confirmed` and the `/report` warning `S8_TRANSFER_UNCONFIRMED`: don't list such a name until the transfer is complete.
+- **v5.45.0, daily auction shortlist:**
+  - `GET /auctions/shortlist`: the best 25 live GoDaddy auctions ending within 72 h, each with a score, its reasons and a suggested maximum bid. The maximum is 20% of a realistic $1,000 resale net of commission, scaled by the score, at most $250.
+  - The top 10 come with a fresh pre-bid check (`prebid_id`, valid 72 h).
+  - `GET /auctions/funnel` gives the weekly buying funnel.
+  - **Your daily routine:** read the shortlist, show Dvir 3-5 names with the suggested maximum and the reasons. After his line, create the plan with that `prebid_id`.
+- **Found:** GitHub runs the datasave schedule 3-4 hours late (18:01-19:12 UTC this week, not 15:00).
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
