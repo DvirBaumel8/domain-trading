@@ -28,16 +28,13 @@ The pick-proof waits ~30 days per day and has had no Buyer picks since bots paus
 ## Rules
 - R-1 **Pick-proof daily OFF.** Datasave must **not** run new `pickproofSeal` / `pickproofLabels` work or grow pool storage for new days. Days already sealed (Oct 20–26 and any earlier) stay readable as archives (manifest/arms/labels as stored); no requirement to finish T30 labelling. New `POST /pickproof/{date}/picks` for an unsealed future day may 409 `PICKPROOF_STOPPED` (or equivalent documented code). Discovery stays shortlist-first (DISCOVERY-FLOW-V2); this CR does not change money gates.
 - R-2 **Compact daily archive continues.** Keep saving compact daily GoDaddy `.com` rows at **≤ $250** with every field (gzip JSON lines) on the Mac host disk (~26 MB/day), keyed by source data date — not only the 7-day raw zip window and not the Neon pool. Dynadot closeouts/aftermarket the same way once `DYNADOT_API_KEY` is nonempty. `/health` (or the replay report) shows `archive_days_n` / listed archived dates and any **missing** day in the expected range.
-- R-3 **One replay tool for saved day D.** Entry points (pick one primary; document the other as alias if useful):
-  - `GET /replay/{date}` (READ or bots) — report for data date D (or pick-day mapping documented in the release note);
-  - optional `POST /jobs/run {"job":"replay","params":{"date":D,...}}` or host `npm run replay` that writes the same report the GET reads.
-  For day D: run the **filters and scoring that applied as of D** on D's archived list; draw **N** random names (default N = shortlist size or 25; setting ok) from the **same filtered pool** with a **fixed seed** derived from the pool/archive sha (reproducible; MT19937 / Fisher-Yates as CR-008 / pick-proof). Report precision of our top N vs the randoms with **counts beside every rate**.
+- R-3 **One replay tool for saved day D.** **Primary interface (locked 2026-10-27 via Gavriel):** `GET /replay/{date}` (READ or bots) — report for data date D (or pick-day mapping documented in the release note). Host `npm run replay` is a **local helper only** (may write the same report the GET reads); optional `POST /jobs/run {"job":"replay",...}` is fine if documented, but ATs and bots use the GET. For day D: run the **filters and scoring frozen as they stood on D** on D's archived list; draw **N** random names (default N = shortlist size or 25; setting ok) from the **same filtered pool** with a **fixed seed** derived from the pool/archive sha (reproducible; MT19937 / Fisher-Yates as CR-008 / pick-proof). Report precision of our top N vs the randoms with **counts beside every rate**.
 - R-4 **Outcomes — side by side, never merged** (retail is the headline):
   1. Later **public retail** sale (UnreportedSales / DNJournal / DNW via `POST /data/sales` / market episodes / D2 `dev` rows only while tuning): flag **$500+** separately;
   2. Auction final price **≥ $100** (investor demand; engine / auction-end data);
   3. Auction final price **≥ our max** for that name/day (we could not have won; report, **not** a logic miss);
   4. Closeouts: taken vs dropped by RDAP ~30 days after D — **weak signal**, labelled as such; report next to D2, not merged.
-- R-5 **Point-in-time only.** On day D the logic may use **only** what existed on D: archived row fields, sealed snapshots/lists of that day, filters/score recipe (or model) frozen as of D, lift/features with `feat_asof` ≤ D. **Forbidden:** later RDAP state, later sales, live lookups, post-D model weights, or any feature dated after D. A test proves it (AT-2).
+- R-5 **Point-in-time only (scoring locked 2026-10-27 via Gavriel).** Freeze the **filters + score recipe/model as they stood on day D** — **not** today's recipe with features merely capped at D. On day D the logic may use **only** what existed on D: archived row fields, sealed snapshots/lists of that day, the D-day filter/score recipe (or model id active on D), lift/features with `feat_asof` ≤ D. **Forbidden:** later RDAP state, later sales, live lookups, post-D model weights, today's recipe re-run on D rows, or any feature dated after D. A test proves it (AT-2).
 - R-6 **Holdout sealed sales stay closed.** While tuning / iterating, replay must **refuse** to read D2 rows with `split=sealed` (and any other holdout-sealed sales set marked sealed). Use sealed rows **once** for a final check only (explicit `final_check: true` or dedicated route documented). Default reads that would open sealed rows → 403/409 with a stable code (e.g. `REPLAY_HOLDOUT_SEALED`).
 - R-7 **Honest numbers.** Every rate shows counts (`positives_n`, `denom_n`). If `positives_n` **< 20** for a reported comparison, mark `too_small: true` / status `too_small` — **too small to decide**; no keep/pass claim.
 - R-8 **Winners listed for investigation.** Every name that did well (our top-N hits **and** randoms our logic missed that hit an outcome in R-4) appears in the report with domain, arm (`ours`|`random`), outcome kind, price when known, and the as-of-D features/score used — enough for a person to investigate. No money action from this list.
@@ -68,12 +65,14 @@ The pick-proof waits ~30 days per day and has had no Buyer picks since bots paus
 - Replacing discovery flow v2 (shortlist-first stays).
 - Challenger grading UI; bots write investigation notes outside DOM.
 
-## Questions (max 3)
-1. Prefer primary route `GET /replay/{date}` with an optional `replay` job, or host-only `npm run replay` writing DB rows the GET reads? (Either is fine if documented and AT-1 hits it.)
-2. For "score as of that day": freeze the **auction-v4 / closeout filter recipe + model id active on D**, or re-run today's recipe on D's rows but with features capped at D? State the choice in the DOM response.
+## Decisions (locked — replace open questions; do not add Reply N)
+1. **Primary interface:** `GET /replay/{date}`. `npm run replay` = local helper only. (Gavriel 2026-10-27, matches Dvir-approved plan.)
+2. **Scoring:** freeze filters + score as they stood on day D — not today's recipe with features capped at D. (Gavriel 2026-10-27.)
+3. **Dynadot archive:** remains out of this CR until `DYNADOT_API_KEY` nonempty.
 
 ## DVIR items
 None remaining (Dvir already said yes to build; no money, no new paid service, no founder-rule change).
 
 ## Changes
 - 2026-10-27 ~01:00 IDT (DOM Architect): expanded thin common-decision note into full CR (Rules, ATs, R-STOP-FIRST max 3, concrete routes/jobs). Status remains `approved` per Dvir YES ~00:53 IDT.
+- 2026-10-27 ~00:56 IDT (DOM Architect): design lock from Gavriel — primary `GET /replay/{date}` (`npm run replay` helper only); freeze filters+score as of day D (not today's recipe with features capped at D). Questions section replaced by Decisions.
