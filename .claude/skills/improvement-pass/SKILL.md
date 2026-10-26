@@ -14,7 +14,8 @@ description: A full improvement pass over the whole company and system, run on D
 A finding with no path to money is dropped or parked. The bar is world class: say how the best domain investors, and well-run software companies, would do the same thing, and close the gap.
 
 ## Rules that bind the whole pass
-- **HARD RULE:** production is read-only: the `dom-read` token, GET only, never printed. No jobs, no money actions, no `prod.env`, no direct database access. Host logs may be read.
+- **Production (Dvir, 25 Oct 2026: "You are allowed to operate production"):** read with the `dom-read` token; DOM may run jobs, checks and dry runs with `dom-write` (CLAUDE.md, DOM operating rule). Tokens are never printed. **Money actions** (buy, S8 import, bid plans, listing, price changes, sell) still need Dvir's own chat line per action. Never `prod.env`, never direct database access. Host logs may be read.
+- **Reviewers** (subagents) never call production: give them read-only snapshots saved in the scratchpad.
 - **Free only** (Dvir, 25 Oct 2026). A paid option gets at most one line saying it exists.
 - **Research:** the `research-first` standard applies: many independent sources, each graded A–D, conflicts named, no single-post facts, no proxies around bot protection, no marketplace scraping. Store what the research finds in the knowledge base once it exists (CR for the knowledge module).
 - **Builds:** only what Dvir approves in chat, or what is already approved (gaps marked approved). Don't write approval sentences for him; say only what his line must name.

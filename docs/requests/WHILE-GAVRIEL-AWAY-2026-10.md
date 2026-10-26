@@ -183,6 +183,10 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - Each shortlisted name shows `top_pct`, its position among the day's filtered auctions.
 - When you show Dvir a name: the suggested maximum is the ceiling, and above $50 you still show why the name is worth more (founder rule 5).
 
+### 26 Oct 2026: improvement pass, and mineunited.com recorded
+- DOM recorded the 25 Oct Afternic listing of mineunited.com ($2,488 / min offer $100, Dvir's instruction) with `POST /listings/mineunited.com/venue` (record 11). The export upload was **not** confirmed: our file says lease-to-own off while Afternic has it on (Dvir's decision); a setting fixes that first.
+- Improvement pass: `docs/internal/loop/improve-2026-10-26.md` (findings F28-F38). Knowledge file 0007 (research round 4).
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.
