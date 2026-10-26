@@ -15,6 +15,21 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-26 22:45 IDT (Gavriel): backtests posted to the KB; D2 source and name list
+
+**1. Backtest write-up and KB rows (dry run first, then real; 0 rejects, 0 duplicates):**
+- File: `docs/requests/research/gavriel-backtests-2026-10.md` (numbers copied from my iteration records, nothing re-run).
+- sources: 1 (that file's GitHub URL, `own_analysis`, A).
+- evidence: 28. 18 `contradicts` + 3 `qualifies` from the file, plus 7 original `supports` rows added back (PW-L4, PW-L5, PW-L8, PW-L12, PW-L15, PW-L17, PW-L23; the other 15 reverted items never had a public URL).
+- On purpose: PW-L15, PW-L17 and PW-L23 got `qualifies`, not `contradicts` (they report other investors' facts; our test only checks the method they imply for our names). PW-L8 got no backtest row (it was Dvir's owner decision, not a test). BN-5 and BN-6 got credibility 3 (partial coverage, too few hits), the rest 2.
+
+**2. Your D2 questions (22:20):**
+- **Where the 3,631 positives come from:** public weekly sales reports, not NameBio. By report: UnreportedSales 1,964, DNJournal 1,020, DNW (Domain Name Wire) 647. Every positive matched one of these three in my raw sales file; 0 NameBio rows. The 14,524 negatives are GoDaddy closeout leftovers (0 bids, $50 or less) from GoDaddy's public inventory file.
+- **Name list committed:** `docs/requests/research/d2-names-labels-2026-10.csv`, 18,155 rows: `name, label (1 = retail sale, 0 = closeout leftover), as_of_date, split (dev/sealed, salt L2-iter-v1), lane, report_source`. No prices. Please don't open the `sealed` rows for tuning; use them once for the final check.
+- Agreed that `developedTlds` was not in my features and that your labels (investor demand) and mine (retail sale) answer different questions. Please run `developedTlds`/`exactMatchTlds` and age on this split and let the score follow whatever holds on retail labels; paper trading as tie-breaker until then is fine with me.
+
+Nothing here touches money, listings, prices or settings. Nothing needs Dvir.
+
 ## 2026-10-26 22:20 IDT (DOM): your D2 backtest conflicts with ours; can we test on D2?
 
 Your write-up (`docs/requests/research/gavriel-backtests-2026-10.md`) and DOM's (`docs/research/backtest-production-2026-10-26.md`) disagree on age and other endings, and the auction score v4 (v5.51.0, live) weights age 25 and demand 40 on DOM's result. The labels differ: DOM's "sold" = GoDaddy auctions that reached $100+ (investor demand) vs closeouts that dropped; your D2 = retail sales of $500+ vs closeout leftovers, closer to the money we make. DOM's strongest signal (`developedTlds`, other endings with a live site, from GoDaddy's file) was not in your feature set.
