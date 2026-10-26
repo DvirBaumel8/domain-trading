@@ -11,7 +11,7 @@ Every evening, archive that day's GoDaddy auction/closeout inventory files and s
 5. Log every call (ok and fail). Errors are ERROR/UNKNOWN with status, never silent 0.
 
 ## Inputs / outputs
-- In: date D, GoDaddy public inventory URLs, Dynadot closeout MCP/API (read-only).
+- In: date D, GoDaddy public inventory URLs, Dynadot closeout API via `DYNADOT_API_KEY` on Mac prod.env (read-only). Grok MCP is backup only when the key is absent or datasave is down.
 - Out: sealed GoDaddy set for D; sealed Dynadot closeouts for D (row count + sha); or GAP note.
 
 ## Pass / fail
@@ -19,14 +19,14 @@ Every evening, archive that day's GoDaddy auction/closeout inventory files and s
 - Fail: missing day with no GAP; double seal; invented backfill.
 
 ## Why bot vs why DOM
-Mechanical fetch + seal. High company risk when only Grok runs it (token outage = gap). **Move to DOM as primary** (datasave job). Grok nudge = backup only.
+Mechanical fetch + seal. High company risk when only Grok runs it (token outage = gap). **DOM datasave is primary** once `DYNADOT_API_KEY` is on Mac prod.env (CR-080 round 2). Grok nudge / MCP = backup only behind seal-state lock (409 `SNAPSHOT_SEALED`).
 
 ## Token cost class
 Low (scheduled DOM job). High if done by a Grok routine that re-plans each night.
 
 ## Owner
-- Primary: DOM datasave
-- Backup: Gavriel → DOM Architect nudge (lease per `00-dual-runner-lock-rule.md`)
+- Primary: DOM datasave (Dynadot half requires `DYNADOT_API_KEY` in Mac prod.env; GoDaddy already DOM-primary)
+- Backup: Gavriel → DOM Architect nudge (seal-state lock per `00-dual-runner-lock-rule.md`; `docs/locks/` notes only)
 
 ## Sources
 `knowledge/handoffs/data-engineer.md` §§2–3; lessons/mahandes.md; BUG-051; Oct 26 catch-up seal report.

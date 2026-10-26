@@ -11,7 +11,7 @@ Watch Dynadot aftermarket listing totals (sample pages) so we notice inventory-s
 5. R-8v2 freeze: only after **2 consecutive** observed small-total days (one day alone is not enough).
 
 ## Inputs / outputs
-- In: Dynadot aftermarket list API (read-only), prior day totals.
+- In: Dynadot aftermarket list API via `DYNADOT_API_KEY` on Mac prod.env (read-only), prior day totals. Grok MCP is backup only when the key is absent or datasave is down.
 - Out: sealed panel for date D, or GAP note; R-8v2 freeze flag when criteria met.
 
 ## Pass / fail
@@ -19,14 +19,14 @@ Watch Dynadot aftermarket listing totals (sample pages) so we notice inventory-s
 - Fail: uploading a collapsed total as if complete; freezing R-8v2 on a single observation day.
 
 ## Why bot vs why DOM
-Mechanical watch + GAP rule. **Move to DOM as primary** inside datasave. Grok backup only.
+Mechanical watch + GAP rule. **DOM datasave is primary** once `DYNADOT_API_KEY` is on Mac prod.env (CR-080 round 2). Grok backup only behind seal-state lock (409 `SNAPSHOT_SEALED`).
 
 ## Token cost class
 Low.
 
 ## Owner
-- Primary: DOM datasave (R-8 watch step)
-- Backup: Gavriel / DOM Architect with lock
+- Primary: DOM datasave (R-8 watch step; requires `DYNADOT_API_KEY` in Mac prod.env)
+- Backup: Gavriel / DOM Architect with seal-state lock (`docs/locks/` notes only)
 
 ## Sources
 Oct 22 GAP (5.73M → 470k); Oct 26 catch-up (panel GAP ~471k, one observation day); data-engineer handoff §2 R-8 pages; CR-071.

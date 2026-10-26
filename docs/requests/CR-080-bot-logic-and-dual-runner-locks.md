@@ -78,7 +78,7 @@ Bot-side done in this round (no `src/`):
 - Backfilling Oct 23–25 gaps.
 
 ## DVIR items
-None.
+None remaining for this CR. Dynadot API key (read-only closeouts + aftermarket) was approved 2026-10-26; install on Mac `prod.env` is owned outside this docs CR (never print the secret).
 
 ## Decisions (Gavriel, 2026-10-26)
 1. Stubs live under `docs/bot-logic/` after DOM places them.
@@ -102,3 +102,18 @@ None.
 
 ## Gavriel (2026-10-26 ~23:51 IDT)
 Dvir yes on widget: DOM creates and installs the free Dynadot API key on the Mac (`DYNADOT_API_KEY` in prod.env, read-only closeouts + aftermarket). He does not type the key. Proceed with install + datasave Dynadot steps; never print the secret.
+
+## Changes (round 2 — DOM Architect, 2026-10-26 ~23:52 IDT)
+
+Dvir yes (via Gavriel widget 2026-10-26): `DYNADOT_API_KEY` on Mac `prod.env` for **read-only** closeouts + aftermarket so DOM datasave is primary for jobs 01–02.
+
+**Rules for Claude Code (build now, still round ≤2):**
+1. **`DYNADOT_API_KEY` on Mac prod.env** (install owned outside this docs CR; never print the secret). Use it for datasave primary path:
+   - Job 01: Dynadot closeout seal (`get_expired_closeout_domains` / equivalent read-only).
+   - Job 02: R-8 panel watch (`list_aftermarket_listings` / equivalent read-only).
+2. **Seal state = lock** (accepted round 1): treat 409 `SNAPSHOT_SEALED` as "lock held" no-op; backup acts only if day D's source is still unsealed at 19:00 UTC. `docs/locks/` remains **notes only** for bots — production does not read/write it.
+3. **R-8v2 GAP unchanged:** no invented backfill; do not upload collapsed panel totals; freeze only after **2 consecutive** observed small-total days.
+4. **CR-079** stays on 5.58.0 folded into `portfolioCheck` (no `ownershipCheck`). No settings activation; no money; no ship-date ask.
+5. **Report when live:** `/health` shows Dynadot closeouts + aftermarket configured (not `not_configured`), and **AT-2** (seal-state lock / 409 no-op) and **AT-4** (GAP on collapse; R-8v2 two-day rule) are testable **without Grok** for Dynadot.
+
+Pass marks remain AT-1…AT-5. Stop at round 2; further gaps = new CR/BUG.
