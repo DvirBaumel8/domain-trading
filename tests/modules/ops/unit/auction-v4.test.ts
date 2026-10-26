@@ -98,3 +98,18 @@ describe('AS549 auction-v4 (pure)', () => {
     expect(scoreLift(rows, { ...NO_INPUT, words: 2 }, { emptyBinZero: true }).sum).toBe(rows.bins.words['2']!.lift);
   });
 });
+
+describe('AS557 auction-v4 without word quality (v5.57.0)', () => {
+  const v4 = { name_pct: null, field_n: null, developed_tlds: null, exact_match_tlds: null };
+  const lift = { sum: 1, score: 73.1, parts: [{ pattern: 'length' as const, bin: '8-9', lift: 1 }] };
+  const base = { letters: 8, price_cents: 1000, max_bid_cents: 6500, bids: 3, domain_age: 12, pageviews: null, endings: {}, lift };
+  it('AS557-1: in v4 the name raw value is the lift alone and an uncommon word neither lowers it nor caps the score; v3 still applies both', () => {
+    const common = scoreAuction({ ...base, words: ['gym', 'nest'], v4 });
+    const coined = scoreAuction({ ...base, words: ['ghostry'], v4 });
+    expect(coined.parts.name.raw).toBe(common.parts.name.raw);
+    expect(coined.score).toBeGreaterThan(50);
+    expect(coined.reasons.join(' ')).not.toContain('capped');
+    const v3 = scoreAuction({ ...base, words: ['ghostry'] });
+    expect(v3.score).toBeLessThanOrEqual(50);
+  });
+});

@@ -131,3 +131,6 @@ A name that splits into a first name on `data/wordlists/given-names-census1990.t
 |---|---|
 | AS556-1 | first + last name caught at any split; common-word first pieces and real phrases pass |
 | AS556-2 | the step refuses teresaperez.com and counts PERSON_NAME |
+
+## Word quality out of v4 (v5.57.0)
+From v5.57.0 the auction-v4 name part is the lift alone (word quality no longer multiplies it) and v4 has no uncommon-word cap: word quality had AUC 0.47 on 12,644 retail outcomes (Gavriel's D2 dev split) and 0.48 on our auction labels, and quality x lift scored 0.62 against 0.82 for the lift alone (`docs/research/backtest-retail-d2-2026-10-26.md`). `parts.name.word_quality` is still shown. v2/v3 keep both. Test AS557-1.

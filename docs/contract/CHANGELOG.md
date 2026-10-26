@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.57.0 (2026-10-26): auction-v4 name part is the lift alone (word quality removed after the retail backtest)
+Release note: `docs/releases/v5.57.0.md`.
+MINOR (no migration). `GET /auctions/shortlist` `auction-v4`: the name part is the lift alone (word quality no longer multiplies it) and there is no uncommon-word cap; `parts.name.word_quality` is still shown. Why: `docs/research/backtest-retail-d2-2026-10-26.md`.
+
 ## 5.56.0 (2026-10-26): personal-name filter in the auction shortlist (Census first names + surnames)
 Release note: `docs/releases/v5.56.0.md`.
 MINOR (no migration). `GET /auctions/shortlist`: a personal name (common US first name + common US surname, the first name not a common word) is refused before scoring; new `dropped.name_rules.PERSON_NAME` count in the step summary.

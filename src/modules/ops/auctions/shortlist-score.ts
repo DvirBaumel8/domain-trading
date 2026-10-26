@@ -130,7 +130,9 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
   const endingsW = ENDINGS_W * (known.length / tlds.length);
   const shapeEndings = (SHAPE_W * shape + (endingsValue === null ? 0 : endingsW * endingsValue)) / (SHAPE_W + (endingsValue === null ? 0 : endingsW));
   const shapePart = i.lift ? i.lift.score / 100 : shapeEndings;
-  const nameRaw = q.quality * shapePart;
+  // v5.57.0 (v4): word quality no longer multiplies the name part. On 12,644 retail outcomes (Gavriel's D2 dev split: retail sales $500+ vs closeout leftovers) word quality had
+  // AUC 0.47 and the lift alone 0.82, while quality x lift fell to 0.62; on our own auction labels word quality was 0.48 (backtest-production-2026-10-26.md). v2/v3 keep it.
+  const nameRaw = i.v4 ? shapePart : q.quality * shapePart;
   const v4 = i.v4;
   const nameValue = v4 && v4.name_pct !== null ? v4.name_pct : nameRaw;
   const nameW = v4 ? WEIGHTS_V4.name : WEIGHTS.name;
@@ -139,7 +141,7 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
   if (i.lift) name.lift = { sum: i.lift.sum, score: i.lift.score, bins: i.lift.parts.map((p) => ({ pattern: p.pattern, bin: p.bin, lift: p.lift })) };
   const wc = Math.max(1, i.words.length);
   reasons.push(`${wc === 1 ? '1 word' : `${wc} words`} (${i.words.join(' + ') || 'unread'}), ${i.letters} letters`);
-  if (!q.allCommon) reasons.push(`not every word is a common word (${i.words.filter((w, k) => q.levels[k]! < 0.7).join(', ') || 'unread'}): the score is capped at ${r1(UNCOMMON_CAP * (0.5 + 0.5 * q.quality))}`);
+  if (!q.allCommon && !i.v4) reasons.push(`not every word is a common word (${i.words.filter((w, k) => q.levels[k]! < 0.7).join(', ') || 'unread'}): the score is capped at ${r1(UNCOMMON_CAP * (0.5 + 0.5 * q.quality))}`);
   const liftText = i.lift ? `lift ${i.lift.sum >= 0 ? '+' : ''}${i.lift.sum} (${i.lift.parts.map((p) => `${p.pattern} ${p.bin} ${p.lift >= 0 ? '+' : ''}${p.lift}`).join(', ') || 'no pattern known'})` : '';
   // v4: the reason says where the name stands in the day's field, not a "sold-like" number that every top name shared
   if (i.lift && v4) reasons.push(v4.name_pct === null ? liftText : `${liftText}: name in the top ${Math.max(1, Math.round((1 - v4.name_pct) * 100))}% of today's field${v4.field_n ? ` (${v4.field_n} names)` : ''}`);
@@ -173,7 +175,8 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
   // a name with an uncommon word is capped at UNCOMMON_CAP x (0.5 + 0.5 x word quality): 50 at most, about 35 for a coined string, so the cap itself spreads
   const cap = r1(UNCOMMON_CAP * (0.5 + 0.5 * q.quality));
   // v5.51.0 (v4): the cap is skipped when another ending of the exact name has a live site: the word is real to someone (the backtest's sold names include foreign and brand words)
-  const capped = !q.allCommon && !(v4 && (v4.developed_tlds ?? 0) >= 1);
+  // v5.57.0: v4 has no uncommon-word cap (all-common had AUC 0.51 on D2: no signal; short brandables sell). v2/v3 keep it.
+  const capped = !v4 && !q.allCommon;
   const score = capped ? Math.min(raw, cap) : raw;
   const version = v4 ? AUCTION_SCORE_VERSION_V4 : i.lift ? AUCTION_SCORE_VERSION_LIFT : AUCTION_SCORE_VERSION;
   return { score, version, parts: v4 ? { name, bids, age, demand } : { name, headroom, bids, age }, seo_flag: seo, reasons };
