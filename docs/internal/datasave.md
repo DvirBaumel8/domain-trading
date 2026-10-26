@@ -15,6 +15,7 @@ Binding rules and test IDs for the `datasave` job. The interface is `docs/contra
 1. Reads only the official host `https://inventory.auctions.godaddy.com/` (`metadata.json` then each file). No scraping of any web page, no paid data, no write to any venue. It uses the global `fetch` (a fixed official host, not a caller-chosen URL), so MSW covers it in tests; size cap 200 MB per file, 15-minute download timeout.
 2. The data date of a file is the UTC date of its `LastModified` in `metadata.json`, never the run date. When `metadata.json` itself fails, the error manifests use the run's UTC date.
 3. A `complete` manifest is sealed (`sealed_at`) and cannot change, except retention setting `raw_available=false` + `raw_deleted_at` (trigger). A sealed (source, data date, file) is skipped without fetching: step result `code: "SNAPSHOT_SEALED"`. There is no HTTP 409 (no write route). `error` and `partial` rows are open and replaced by the next attempt (`ON CONFLICT ... WHERE sealed_at IS NULL`).
+3a. **Re-parse of a sealed auction day (v5.54.0):** when a sealed auction file's day has live rows but none with a demand field (`developed_tlds`, `exact_match_tlds`: the day was parsed before v5.49.0), the next run parses the kept raw zip again (same coalesce merge; the manifest is not touched) and reports `SNAPSHOT_SEALED_REPARSED` and `reparsed_n`. Test DS554-1.
 4. Errors are not zeros: a failed fetch is `status error`, `http_status`, `rows null`. A parse failure is `partial`, `rows null`, the raw file is kept.
 5. Only `closeout_listings.json.zip` is parsed (first `.json` entry if the name differs): `.com` only, price `<= datasave.pool_max_price_cents` (4000), not `isAdult`, valid `auctionEndTime`; price string to integer cents (`"$1,250"` = 125000). The other four files are fetched, hashed, kept raw only. Parsing deletes the day's existing pool rows first and inserts in batches of 5,000.
 6. Raw zips live under `SNAPSHOT_DIR/godaddy_inventory/<data_date>/<file>`. If the folder can't be created, the job continues: hash only (closeouts go through a temp file that is removed), `raw_available false`, `raw_note` says why.
@@ -87,6 +88,7 @@ No Dynadot key exists on the server (CR-003 left it out; DOM can't create one). 
 | DS521-7 | the waiting retry starts on a new request, saves the day, no third run |
 | DS521-8 | AT-4: nothing complete in 26 h = overdue, `DATASAVE_MISSED`; fresh database raises nothing in `/report` |
 | DS521-9 | AT-5: second run, `SNAPSHOT_SEALED`, sha unchanged, nothing refetched; the trigger refuses update and delete |
+| DS554-1 | a sealed auction day without demand fields is parsed again from the raw file; a day with them is not |
 | DS521-10 | AT-6: `GET /jobs/runs?job=datasave` per-step status and data_date |
 | DS521-11 | AT-7: `gone_before_end_n` on a fixture pair of days |
 | DS521-12 | AT-8: raw older than 7 days deleted, manifest stays, `raw_available false`, `raw_deleted_at` |

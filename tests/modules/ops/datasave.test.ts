@@ -344,6 +344,19 @@ describe('DS537 in-range GoDaddy auctions with bids (godaddy_auctions_live)', ()
     expect(Object.fromEntries(got.map(({ domain, ...rest }) => [domain, rest]))).toEqual(want);
   });
 
+  it('DS554-1 a sealed auction day whose live rows have no demand fields (parsed before v5.49.0) is parsed again from the kept raw file on the next run; a day that has them is not', async () => {
+    await boot();
+    day({ 'all_biddable_auctions.json.zip': [{ domainName: 'alpha.com', price: '$40', auctionEndTime: END, numberOfBids: 2, exactMatchTlds: 7, developedTlds: 3 }] });
+    await runJobToEnd(app!, 'datasave');
+    await sql`update godaddy_auctions_live set exact_match_tlds = null, developed_tlds = null`.execute(db); // as a day saved by v5.48.0 looks
+    const second = (await runJobToEnd(app!, 'datasave')).json().steps.godaddyInventory.summary;
+    expect(second.files.find((f: { file: string }) => f.file === 'all_biddable_auctions.json.zip')).toMatchObject({ code: 'SNAPSHOT_SEALED_REPARSED' });
+    expect(second.reparsed_n).toBeGreaterThanOrEqual(1);
+    expect(await db.selectFrom('godaddy_auctions_live').select(['exact_match_tlds', 'developed_tlds']).where('domain', '=', 'alpha.com').executeTakeFirst()).toEqual({ exact_match_tlds: 7, developed_tlds: 3 });
+    const third = (await runJobToEnd(app!, 'datasave')).json().steps.godaddyInventory.summary;
+    expect(third.reparsed_n).toBe(0);
+  });
+
   it('DS537-3 raising s8_max_price_cents widens the band on the next run (the band follows the cap)', async () => {
     await boot();
     const rows = [{ domainName: 'mid.com', price: '$300', auctionEndTime: END, numberOfBids: 2 }];

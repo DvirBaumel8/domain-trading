@@ -88,8 +88,8 @@ interface FileResult {
   rows: number | null;
   http_status: number | null;
   raw_available: boolean;
-  /** `SNAPSHOT_SEALED`: the day's file was already saved and sealed; nothing was fetched or changed. */
-  code?: 'SNAPSHOT_SEALED';
+  /** `SNAPSHOT_SEALED`: the day's file was already saved and sealed; nothing was fetched or changed. `SNAPSHOT_SEALED_REPARSED` (v5.54.0): sealed, and its auction rows were parsed again from the kept raw file to add fields the first parse did not have. */
+  code?: 'SNAPSHOT_SEALED' | 'SNAPSHOT_SEALED_REPARSED';
   error?: string;
 }
 
@@ -144,7 +144,13 @@ export class DatasaveJob {
       const dataDate = entry.lastModified.slice(0, 10);
       const existing = await this.deps.db.selectFrom('snapshot_manifests').selectAll().where('source', '=', GODADDY_SOURCE).where('data_date', '=', dataDate).where('file_name', '=', file).executeTakeFirst();
       if (existing?.sealed_at) {
-        results.push({ file, data_date: dataDate, status: 'complete', bytes: existing.bytes, sha256: existing.sha256, last_modified: existing.last_modified?.toISOString() ?? null, rows: existing.rows, http_status: existing.http_status, raw_available: existing.raw_available, code: 'SNAPSHOT_SEALED' });
+        // v5.54.0: a sealed auction file whose day has live rows but none with the demand fields (added in v5.49.0 after the day was saved) is parsed again from the kept raw
+        // zip, so the shortlist of that day gets them. The parse is the same merge as a first parse (coalesce keeps known values); the sealed manifest is not touched.
+        let code: 'SNAPSHOT_SEALED' | 'SNAPSHOT_SEALED_REPARSED' = 'SNAPSHOT_SEALED';
+        if (AUCTION_FILES.has(file) && existing.raw_available && existing.raw_path && await this.liveRowsLackDemand(dataDate)) {
+          try { await this.parseAuctions(existing.raw_path, dataDate, st.auctionMinCents); code = 'SNAPSHOT_SEALED_REPARSED'; } catch (e) { this.deps.log?.warn({ file, err: shortError(e) }, 'datasave: sealed auction file not parsed again'); }
+        }
+        results.push({ file, data_date: dataDate, status: 'complete', bytes: existing.bytes, sha256: existing.sha256, last_modified: existing.last_modified?.toISOString() ?? null, rows: existing.rows, http_status: existing.http_status, raw_available: existing.raw_available, code });
         continue;
       }
       results.push(await this.saveFile(file, dataDate, entry.lastModified, st.maxPriceCents, st.auctionMinCents));
@@ -153,11 +159,18 @@ export class DatasaveJob {
     return { ...this.summary(dataDate, results), ...(await this.auctionSummary(st.files, results)) };
   }
 
+  /** v5.54.0: true when the day has live auction rows and none of them carries a demand field (the day was parsed before v5.49.0). */
+  private async liveRowsLackDemand(dataDate: string): Promise<boolean> {
+    const r = await sql<{ n: string; k: string }>`select count(*) as n, count(*) filter (where developed_tlds is not null or exact_match_tlds is not null) as k from godaddy_auctions_live where data_date = ${dataDate}::date`.execute(this.deps.db);
+    const row = r.rows[0];
+    return row !== undefined && Number(row.n) > 0 && Number(row.k) === 0;
+  }
+
   private summary(dataDate: string, files: FileResult[]) {
     const failed = files.filter((f) => f.status !== 'complete').map((f) => ({ file: f.file, status: f.status, http_status: f.http_status, error: f.error ?? null }));
     return {
       data_date: dataDate, files, complete_n: files.filter((f) => f.status === 'complete' && !f.code).length,
-      sealed_n: files.filter((f) => f.code === 'SNAPSHOT_SEALED').length, ...(failed.length ? { failed } : {}),
+      sealed_n: files.filter((f) => f.code === 'SNAPSHOT_SEALED' || f.code === 'SNAPSHOT_SEALED_REPARSED').length, reparsed_n: files.filter((f) => f.code === 'SNAPSHOT_SEALED_REPARSED').length, ...(failed.length ? { failed } : {}),
     };
   }
 
