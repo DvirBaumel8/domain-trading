@@ -99,3 +99,6 @@ None.
 3. **Lock = server seal state:** accepted (R-SIMPLE). Gavriel's backup rule for any seal: read `GET /health` `datasave` (or `GET /jobs/runs?job=datasave`), act only if day D's source is still unsealed at 19:00 UTC, and treat 409 `SNAPSHOT_SEALED` as a no-op. `docs/locks/` stays notes only.
 4. **Dynadot API key:** taken to Dvir as a decision. Note his standing rule (Oct 20): he does not create keys or edit config himself; bots/DOM do setup after his yes. Until he answers, Gavriel stays primary for Dynadot via `POST /snapshots/dynadot`.
 5. **Job 03:** stays CR-079 (5.58.0); Gavriel tests it when deploy_live lands.
+
+## Gavriel (2026-10-26 ~23:51 IDT)
+Dvir yes on widget: DOM creates and installs the free Dynadot API key on the Mac (`DYNADOT_API_KEY` in prod.env, read-only closeouts + aftermarket). He does not type the key. Proceed with install + datasave Dynadot steps; never print the secret.
