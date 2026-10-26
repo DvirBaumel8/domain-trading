@@ -35,7 +35,6 @@ const EnvSchema = z.object({
   GOOGLE_WEB_RISK_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   COMPANIES_HOUSE_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   NAMEBIO_RETAILSTATS_CSV_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine(isNameBioFileUrl, 'NAMEBIO_RETAILSTATS_CSV_URL must be an https URL on namebio.com').optional()),
-  GEMINI_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   SPACESHIP_SELLERHUB_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   SPACESHIP_SELLERHUB_API_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   SPACESHIP_SELLERHUB_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().default('https://spaceship.dev/api')),
@@ -61,8 +60,6 @@ export interface Config {
   /** Bearer token for POST /jobs/run; undefined → the route answers 503 JOBS_DISABLED. */
   jobTriggerToken: string | undefined;
   databaseSsl: boolean;
-  /** Gemini API key for the one outside review (header `x-goog-api-key`). undefined → the review step is skipped (NO_KEY). */
-  geminiApiKey: string | undefined;
   /** Google Web Risk Lookup API key (header `x-goog-api-key`, never in a URL). undefined → the web_risk check stays MANUAL_REQUIRED. */
   webRiskApiKey: string | undefined;
   companiesHouseApiKey: string | undefined;
@@ -85,7 +82,7 @@ export interface Config {
   secretValues: string[];
 }
 
-const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'COMPANIES_HOUSE_API_KEY', 'GEMINI_API_KEY', 'SPACESHIP_SELLERHUB_API_KEY', 'SPACESHIP_SELLERHUB_API_SECRET', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
+const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'COMPANIES_HOUSE_API_KEY', 'SPACESHIP_SELLERHUB_API_KEY', 'SPACESHIP_SELLERHUB_API_SECRET', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
 
 function readVersion(): string {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -158,7 +155,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     dnsNsServer: e.DNS_NS_SERVER,
     jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
     databaseSsl: e.DATABASE_SSL === 'true',
-    geminiApiKey: e.GEMINI_API_KEY ? e.GEMINI_API_KEY : undefined,
     sellerhub: { apiKey: e.SPACESHIP_SELLERHUB_API_KEY, apiSecret: e.SPACESHIP_SELLERHUB_API_SECRET, baseUrl: e.SPACESHIP_SELLERHUB_BASE_URL.replace(/\/+$/, '') },
     publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
     onRender: Boolean(env.RENDER),

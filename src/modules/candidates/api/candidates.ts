@@ -60,7 +60,7 @@ export function registerCandidates(app: FastifyInstance, deps: CandidatesDeps): 
   });
 
   // v3.3.0 (CR-021): screen the waiting intake names now, under the on-demand allowance, then rebuild the day's list. A queue job `screen` (steps onDemandScreen, buildDailyList),
-  // so it shows on GET /jobs/runs. No outside review, no other daily step; nothing here buys, spends or touches the buy hold.
+  // so it shows on GET /jobs/runs. No other daily step; nothing here buys, spends or touches the buy hold.
   app.post('/candidates/screen', { config: { openapiBody: ScreenBody } }, async (req, reply) => {
     const b = ScreenBody.parse(req.body ?? {});
     const nowMs = deps.now();

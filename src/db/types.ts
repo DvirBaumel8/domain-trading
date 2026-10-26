@@ -1385,66 +1385,6 @@ export interface ForbiddenTermRetirementsTable {
   audit_id: string | null;
   reason: string | null;
 }
-export interface ReviewPacketsTable {
-  id: string;
-  created_at: TimestampDefault;
-  created_by: string;
-  kind: 'daily' | 'weekly';
-  document_version: number;
-  content: Json;
-  sha256: string;
-}
-export interface ReviewFeedbackTable {
-  id: Generated<number>;
-  packet_id: string;
-  created_at: TimestampDefault;
-  created_by: string;
-  status: 'ok' | 'unknown';
-  provider: string;
-  model: string | null;
-  cost_usd: ColumnType<string, number | string | undefined, never>;
-  reason: string | null;
-  attempts: number | null;
-}
-export interface ReviewItemsTable {
-  id: Generated<number>;
-  packet_id: string;
-  created_at: TimestampDefault;
-  category: string;
-  severity: 'low' | 'medium' | 'high';
-  text: string;
-  novelty: 'new' | 'repeat';
-  repeats_item_id: number | null;
-}
-export interface ReviewItemStatusesTable {
-  id: Generated<number>;
-  item_id: number;
-  status: 'acted' | 'rejected' | 'watching';
-  note: string;
-  created_at: TimestampDefault;
-  created_by: string;
-  audit_id: string | null;
-}
-
-export interface ReviewSettingsChangesTable {
-  id: Generated<number>;
-  at: TimestampDefault;
-  by: string;
-  audit_id: string | null;
-  enabled: boolean;
-  model: string;
-  tier: 'free' | 'paid';
-  note: string | null;
-  old: unknown;
-}
-
-export interface ReviewRetriesTable {
-  id: Generated<number>;
-  packet_id: string;
-  day: string;
-  created_at: TimestampDefault;
-}
-
 export interface ReplayRunsTable {
   id: string;
   suite: string;
@@ -2026,12 +1966,6 @@ export interface Database {
   company_documents: CompanyDocumentsTable;
   forbidden_terms: ForbiddenTermsTable;
   forbidden_term_retirements: ForbiddenTermRetirementsTable;
-  review_packets: ReviewPacketsTable;
-  review_feedback: ReviewFeedbackTable;
-  review_items: ReviewItemsTable;
-  review_item_statuses: ReviewItemStatusesTable;
-  review_settings_changes: ReviewSettingsChangesTable;
-  review_retries: ReviewRetriesTable;
 }
 
 export type AuditRowInsert = Insertable<AuditLogTable>;

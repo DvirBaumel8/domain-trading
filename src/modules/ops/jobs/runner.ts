@@ -29,10 +29,10 @@ export interface PlanStep {
   errorsFail?: boolean;
 }
 
-/** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the review steps 1 (they keep their own retry), the rest 2. */
+/** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the rest 2. */
 const DEFAULT_ATTEMPTS = 2;
 const STEP_ATTEMPTS: Record<string, number> = {
-  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, outsideReview: 1, reviewRetry: 1, engineEndings: 1, engineTrain: 1, trainModel: 1, godaddyInventory: 1,
+  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, engineEndings: 1, engineTrain: 1, trainModel: 1, godaddyInventory: 1,
 };
 const DEFAULT_TIMEOUT_MS = 5 * 60_000;
 const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000, godaddyInventory: 45 * 60_000, buildPanel: 25 * 60_000, engineFeed: 10 * 60_000, auctionShortlist: 15 * 60_000 };
@@ -93,16 +93,12 @@ export interface JobRunnerDeps {
   cohortOutcomesJob?: Runnable;
   /** Resumes stalled screening runs (CAP-20); its summary is {resumed[], finalized[]}. */
   screeningWorker: { resumeStalled(): Promise<unknown> };
-  /** The one outside review (founder rule 9, v2.11.0); runs after referenceRefresh and before backupExport so the backup includes it. While undefined, that step reports skipped. */
-  outsideReview?: () => Promise<unknown>;
-  /** The 10:30 IDT tick retries a review that got a 429 in the daily run (CR-011 addendum C); while undefined, that step reports skipped. */
-  reviewRetry?: () => Promise<unknown>;
   backupExport?: BackupExport;
   /** Daily popularity list / IANA bootstrap / cache pruning (CAP-02); while undefined, that step reports skipped. */
   referenceRefresh?: Runnable;
   /** v5.43.0 (CR-078): loads new repo knowledge files data/knowledge/*.jsonl into the knowledge base (once per file sha256); runs after referenceRefresh. While undefined, that step reports skipped. */
   kbLoad?: Runnable;
-  /** v5.1.0 (G-95): daily data retention (old unbought screening data, old job logs and checks); runs after outsideReview, before backupExport. While undefined, that step reports skipped. */
+  /** v5.1.0 (G-95): daily data retention (old unbought screening data, old job logs and checks); runs before backupExport. While undefined, that step reports skipped. */
   retention?: Runnable;
   /** v5.4.0 (CR-056): fills the registry facts of the scoring engine's names on .net, .co, .org, .io, .ai (RDAP only), in chunks across nights; the last step of the day. While undefined, that step reports skipped. */
   engineEndingsJob?: Runnable;
@@ -169,7 +165,7 @@ export class JobRunner {
         step(name, async () => (ds ? ds[name]() : { skipped: true, reason: 'datasave not configured' }));
       return [dsStep('godaddyInventory'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('auctionShortlist'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels')];
     }
-    if (job === 'tick') return [...tick, optionalFn('reviewRetry', d.reviewRetry, 'review retry not configured')];
+    if (job === 'tick') return tick;
     // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.
     return [
       ...tick,
@@ -185,7 +181,6 @@ export class JobRunner {
       optional('cohortOutcomes', d.cohortOutcomesJob, 'cohort outcomes not configured'),
       optional('referenceRefresh', d.referenceRefresh, 'reference refresh not configured', true),
       optional('kbLoad', d.kbLoad, 'knowledge load not configured'),
-      optionalFn('outsideReview', d.outsideReview, 'outside review not configured'),
       optional('retention', d.retention, 'retention not configured'),
       optional('backupExport', d.backupExport, 'backup export not configured'),
       // Last, so its up to 20 minutes of paced RDAP asks never hold up the steps above; one attempt (it works in chunks and the next night continues).

@@ -1,4 +1,4 @@
-# Endpoints (contract v5.52.0)
+# Endpoints (contract v5.53.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -105,10 +105,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/rdap/batch` | READ, bots or WRITE (a read-only POST like `/score`: no `Idempotency-Key`, no audit row) | RDAP lookup service (5.29.0, CR-074) |
 | GET | `/snapshots`, `/snapshots/missing` | READ | Daily data saves (`jobs.md`, 5.21.0) |
 | POST | `/snapshots/dynadot` | WRITE or bots | Dynadot rows uploaded by the bots (5.22.0, CR-071 R-8, R-9) |
-| POST | `/company/document`, `/company/forbidden-terms`, `/company/forbidden-terms/{id}/retire` | WRITE | Company and reviews |
-| GET | `/company/document/versions`, `/company/document/versions/{n}`, `/company/forbidden-terms` | READ | Company and reviews |
-| POST | `/reviews/packet`, `/reviews/run`, `/reviews/settings`, `/reviews/{packet_id}/feedback`, `/reviews/items/{id}/status` | WRITE | Company and reviews |
-| GET | `/reviews/packets/{id}`, `/reviews/items`, `/reviews/cost`, `/reviews/settings`, `/reviews/settings/history` | READ | Company and reviews |
+| POST | `/company/document`, `/company/forbidden-terms`, `/company/forbidden-terms/{id}/retire` | WRITE | Company |
+| GET | `/company/document/versions`, `/company/document/versions/{n}`, `/company/forbidden-terms` | READ | Company |
 | POST | `/candidates/{domain}/records` | WRITE | Candidates |
 | POST | `/candidates/intake` | WRITE or intake | Candidates |
 | GET | `/candidates/daily` | READ | Candidates |
@@ -133,11 +131,9 @@ Any valid bot token (READ or WRITE).
 - **200** `{status: "ok", db: "ok", db_size: {...} | null, jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
 - `db_size` (5.17.0): `{bytes, limit_bytes, percent, warn_percent}`, the database size against Neon's free 1 GB (`percent` to one decimal; `/report` warns `DB_SIZE_HIGH` above `warn_percent`, 70). `null` when the size can't be read (and in the 503 answer). Since 5.38.0 it also has `tables`: the 10 largest tables of the public schema, largest first, `[{table, bytes, rows_estimate}]` (`bytes` = table + indexes + TOAST; `rows_estimate` = Postgres's planner estimate, `null` before the table was first analysed).
 - Removed in 5.2.0 (CR-057): `posting` and `posting_reason` are no longer in the answer.
-- `review_reason` (3.1.0): present only when `review` is `failed`: Google's status and short reason from the latest review, never a key. 3.2.0 (CR-017 N-4): `CODE: text`, where CODE is Google's status (e.g. `UNAVAILABLE`) or `HTTP <n>`; at most **200 characters**, cut at a word and ending with `…` when longer.
 - `dq_market` (5.23.0, CR-075, additive): `ok` (the latest `dqMarket` run passed every check), `alert` (a check failed; `GET /market/dq` names it; `/report` has `DQ_MARKET_FAIL`) or `unknown` (no run yet). It does not change `status`.
 - `datasave` (5.21.0, CR-071, additive): `ok` (every configured GoDaddy inventory file has a complete save within the last 26 hours and the last `datasave` run did not fail), `partial` (some files saved, some not, or the last run failed for some), `error` (the last run's `godaddyInventory` step failed and no file is saved within 26 h), `overdue` (nothing complete within 26 h, also before the first run). It never changes the top-level `status`; the Dynadot steps (`not_configured`) never count. `/report` raises `DATASAVE_MISSED` for any value but `ok` once a save or a run exists.
 - `jobs` is also `overdue` (3.1.0) when `JOB_MISSED` or `JOB_RUN_INCOMPLETE` applies.
-- `review` (2.11.0, additive; `disabled` and `review_model` 2.11.2): `disabled` (the switch is off), `ok` (the latest Gemini feedback is ok), `failed` (it is unknown), `not_configured` (no key), `unknown` (no review yet).
 - `jobs_last` (5.20.0, BUG-047, additive): `{daily: ISO | null, tick: ISO | null}`, when each scheduled job last ran (a run counts from the moment it was created; `null` = never). `jobs` is also `overdue` when no `tick` run was created in the last 26 hours (a job that missed its schedule for more than 26 h fails `jobs`, so the next day shows it).
 - `jobs` (2.1.0, additive) is `overdue` when no `daily` run has finished in the last 26 hours (the same rule as the `/report` warning `JOB_OVERDUE`), else `ok`. A run started by hand counts. `GET /health/ping` is unchanged (no DB).
 - `version` is the service build version (`package.json`), not the contract version. The only scheduled job is the daily run at 00:05 UTC (`jobs.md`); its rows are in `GET /audit` (scope `job`). No secret, key prefix or balance is ever shown.
@@ -1343,10 +1339,10 @@ READ. Query: `from`, `to` (`YYYY-MM-DD`; default the 14 days up to the last due 
 
 ---
 
-## Company and reviews
-2.10.0, CR-011 part B. The daily outside review. **Since 2.11.0 DOM calls the reviewer itself** (founder rule 9 as changed by Dvir, 7 Oct 2026): Google Gemini, the model of `review.model` (2.11.2; default `gemini-3.8-flash` on the free tier; the env `GEMINI_MODEL` is gone), key `GEMINI_API_KEY` in the server environment only (from a Google project **without** billing while `review.tier` is `free`). The daily step `outsideReview` (`jobs.md`) builds the packet, calls the reviewer under a fixed instruction asking for at most 10 JSON items (category strategy / pricing / risk / operations / data / cost / other, severity, text), and stores the answer as feedback (provider `gemini`, the model, and the cost: 0 on the `free` tier, else Google's token counts at the model's list price in `allowed_models`). A bad key, a refusal, a timeout or an answer that is not the JSON asked for is stored as `unknown` feedback with Google's status and reason (never the key). Item texts that fail the block list are dropped and counted. `POST /reviews/{packet_id}/feedback` stays for a second opinion by hand. Request texts on these routes (`text`, `term`, `note`, `reason`) are stored in the audit row only as `[TEXT n chars]`.
+## Company
+2.10.0, CR-011 part B. The company document and the block list. *5.53.0: the outside review (the `/reviews*` routes, the `outsideReview` and `reviewRetry` steps, the `/health` `review*` fields and the `REVIEW_OVERDUE` warning) was removed (Dvir, 26 Oct 2026); only the company document and the block list remain.* Request texts on these routes (`text`, `term`, `note`, `reason`) are stored in the audit row only as `[TEXT n chars]`.
 
-**Block list.** Every text these routes take, and every packet, is checked first. A match is 422 `TEXT_BLOCKED` with `details.category` only (`secret`: a value DOM keeps as a secret, a DOM token shape, or a key shape: `pk1_` / `sk1_`, `AIza…`, `ghp_` / `github_pat_`, `sk-…` (incl. `sk-proj-`, `sk-ant-`), `xoxb-` / `xoxp-` / `xapp-`, `AKIA` + 16, `rnd_…`, and JWT-shaped `eyJ….….…` (2.15.0); `email`; `phone`: 9 or more digits, dates and money excepted; `listed_term`: a forbidden term, matched case-insensitively as a whole word, also with a trailing `s`, `es` or `'s` (2.15.0): `Shomer` blocks `shomer`, `Shomers`, `Shomer's`, `#Shomer`, `Shomer-bot`, but not `xshomerx`), **never the matched text**.
+**Block list.** Every text these routes take is checked first. A match is 422 `TEXT_BLOCKED` with `details.category` only (`secret`: a value DOM keeps as a secret, a DOM token shape, or a key shape: `pk1_` / `sk1_`, `AIza…`, `ghp_` / `github_pat_`, `sk-…` (incl. `sk-proj-`, `sk-ant-`), `xoxb-` / `xoxp-` / `xapp-`, `AKIA` + 16, `rnd_…`, and JWT-shaped `eyJ….….…` (2.15.0); `email`; `phone`: 9 or more digits, dates and money excepted; `listed_term`: a forbidden term, matched case-insensitively as a whole word, also with a trailing `s`, `es` or `'s` (2.15.0): `Shomer` blocks `shomer`, `Shomers`, `Shomer's`, `#Shomer`, `Shomer-bot`, but not `xshomerx`), **never the matched text**.
 
 ### `POST /company/document`
 WRITE. Body (strict) `{text}` (Markdown, 1 to 65,536 characters). A text equal to the latest version → **200** `{version, sha256, created_at, changed: false}`; otherwise a new version → **201** `{version, sha256, created_at, changed: true}`. Returning to an older text makes a new version. **Errors:** 422 `TEXT_BLOCKED` · 422 `VALIDATION_ERROR`.
@@ -1365,36 +1361,6 @@ WRITE (2.15.0, CR-013 F-2). Body `{reason?}`. A retired term no longer blocks; t
 
 ### `GET /company/forbidden-terms`
 READ. `{terms: [{id, category, created_at, retired_at}]}` (no term text).
-
-### `POST /reviews/packet`
-WRITE. `preview?` (query or body, boolean). Builds what the reviewer gets: `{kind: "daily" | "weekly", generated_at, document: {version, sha256, text (in full on a weekly packet or the first one, else null), diff_since: {from_version, diff} | null}, dom_changes: {since, service_version, settings_versions[], listing_changes[], offers[], sales[], failed_job_steps[]} (each list at most the newest 200), numbers (the /report object without any walk-away field)}`. **Weekly rule (2.15.0, CR-013 F-1; the one rule):** `kind` is `weekly`, and the document goes in full, on Sunday (IDT) or when no packet whose feedback is `ok` has carried the full document in the last 7 days; a packet whose feedback is `unknown`, or has none, never counts. **Actors (2.15.0, F-2):** every actor or token id DOM builds into a packet (`opened_by`, `created_by`, `triggered_by`, a token name …) is written as `operator`. The packet must pass the block list. `preview` → **200** `{preview: true, kind, content, sha256}`, nothing stored; otherwise **201** `{packet_id, kind, document_version, sha256, content}` and the packet is stored exactly as sent. **Errors:** 409 `DOCUMENT_MISSING` · 409 `REVIEW_COST_CAP` (`details.spent_usd`, `cap_usd`; a preview too) · 422 `TEXT_BLOCKED`.
-
-### `POST /reviews/run`
-WRITE (2.11.0). Runs a review now (for testing); only one review runs at a time (2.16.0: another call meanwhile → 409 `REVIEW_IN_PROGRESS`; the scheduled step skips with `IN_PROGRESS`): the same work as the daily step, but it never skips for "already done today". At most 3 calls per hour per WRITE token that **reach Google** (2.15.0: a refused call does not count; 429 `RATE_LIMITED`); each counts toward the monthly cap. **200:** `{packet_id, kind, status: "ok" | "unknown", items_n, new_n, repeat_n, cost_usd, dropped_n, attempts (3.1.0: tries made, 1–3), reason?}`. **Google 503 / UNAVAILABLE (3.1.0, CR-016):** retried inside the call, up to 3 tries (waits 20 s, then 40 s); never another key or model. A 429 is not retried in the call. **Errors:** 503 `REVIEWER_NOT_CONFIGURED` (no key) · 409 `REVIEW_DISABLED` (2.11.2, the switch is off) · 409 `REVIEW_COST_CAP` · 409 `DOCUMENT_MISSING` · 422 `TEXT_BLOCKED` (`details.category`).
-
-### `GET /reviews/settings`
-READ (2.11.2, CR-011 addendum C). `{enabled, model, tier: "free" | "paid", allowed_models: [{model, tier, input_usd_per_m, output_usd_per_m}], updated_at, updated_by}`. Defaults: `enabled: true`, `model: "gemini-3.8-flash"`, `tier: "free"`. Allowed: `gemini-3.8-flash` (free or paid; its paid prices are DOM's placeholders, $0.50 / $3.00 per million tokens), `gemini-3.1-pro-preview` (paid only, $2.00 / $12.00).
-
-### `POST /reviews/settings`
-WRITE (2.11.2). Body (strict, at least one of the first three): `{enabled?, model?, tier?, note? (1–300)}`. Every change is an append-only row with the old values (audited). `tier: "paid"` needs a `note` naming Dvir's approval (422 `VALIDATION_ERROR`). **200:** the new state plus `changed` (false, and no row, when nothing changed). **Errors:** 422 `REVIEW_MODEL_NOT_ALLOWED` (`details.allowed_models`) · 422 `REVIEW_MODEL_NEEDS_PAID` (a paid-only model on the free tier) · 422 `TEXT_BLOCKED` (note) · 400/422 `VALIDATION_ERROR`. A change takes effect from the next review; the feedback names the model used.
-
-### `GET /reviews/settings/history`
-READ (2.15.0, CR-013 F-10). `{changes: [{at, by, idempotency_key, old: {enabled, model, tier}, new: {enabled, model, tier}, note}]}`, newest first.
-
-### `GET /reviews/packets/{id}`
-READ. The stored packet. 404 `PACKET_NOT_FOUND`.
-
-### `POST /reviews/{packet_id}/feedback`
-WRITE. Once per packet. Body (strict), either `{status: "ok", provider, model, cost_usd (0–5 since 2.16.0; only `provider: gemini` feedback counts toward the monthly cap), items (0–50): [{category, severity: low|medium|high, text (1–2,000)}]}` or `{status: "unknown", provider, model?, cost_usd?, reason}` (the provider's status and reason, never a key). Texts pass the block list. Each item is `new` or `repeat`: compared with earlier items of the same category on their significant words (lower-case, common words dropped, numbers kept whole), a Jaccard overlap of at least 0.6 makes it a repeat of the closest (earliest on a tie) item's original. **201** `{feedback_id, items: [{id, category, severity, novelty, repeats_item_id}]}`. **Errors:** 404 `PACKET_NOT_FOUND` · 409 `FEEDBACK_EXISTS` · 422 `TEXT_BLOCKED` · 422 `VALIDATION_ERROR`.
-
-### `GET /reviews/items`
-READ. Query `view?` (`new` default: leaves out repeats of an item whose status is `rejected`; or `all`), `status?`, `limit?` (1–500, default 100). `{items: [{id, packet_id, created_at, kind, category, severity, text, novelty, repeats_item_id, status: {status, note, at} | null}]}`, newest first.
-
-### `POST /reviews/items/{id}/status`
-WRITE. Body (strict) `{status: acted|rejected|watching, note (1–500)}` (audited; the latest status counts). **201** `{item_id, status, note, at}`. 404 `REVIEW_ITEM_NOT_FOUND`.
-
-### `GET /reviews/cost`
-READ. `{month (UTC, YYYY-MM), spent_usd (the reported cost_usd summed), cap_usd (5, a constant), feedback_n, unknown_n, enabled, model, tier}` (the last three 2.11.2).
 
 ## Candidates
 2.13.0, CR-012 part E. Trademark and history checks belong to the **domain**, not only to one run.
@@ -1507,7 +1473,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Seller check reasons (3.3.0, CR-023 B; in `tier` `fields.sellers`, not errors):** `SELLERS_STALE`, `PARKED_OR_FOR_SALE`, `DUPLICATE_DOMAIN`, `REDIRECT_OFF_SITE`, plus the page fetch reasons of `same_name`.
 
-**Company and review errors (2.10.0):** `REVIEW_IN_PROGRESS` (2.16.0; skip reason `IN_PROGRESS` for the steps), `TERM_NOT_FOUND`, `TERM_ALREADY_RETIRED` (2.15.0), `REVIEWER_NOT_CONFIGURED` (2.11.0), `ALREADY_DONE_TODAY` (2.11.0; a skip reason of the daily step, mapped to 409 internally; `POST /reviews/run` never returns it), `REVIEW_DISABLED`, `REVIEW_MODEL_NOT_ALLOWED`, `REVIEW_MODEL_NEEDS_PAID` (2.11.2), skip reasons `DISABLED` and `NOTHING_PENDING` (2.11.2, steps only), `TEXT_BLOCKED`, `DOCUMENT_VERSION_NOT_FOUND`, `DOCUMENT_MISSING`, `REVIEW_COST_CAP`, `PACKET_NOT_FOUND`, `FEEDBACK_EXISTS`, `REVIEW_ITEM_NOT_FOUND`.
+**Company errors (2.10.0):** `TERM_NOT_FOUND`, `TERM_ALREADY_RETIRED` (2.15.0), `TEXT_BLOCKED`, `DOCUMENT_VERSION_NOT_FOUND`.
 
 **Selection errors:** `SETTINGS_NOT_FOUND`, `SIBLING_SCAN_NOT_FOUND`, `KEYWORD_CSV_INVALID` (422, `POST /demand/keywords`), `KEYWORD_NOT_FOUND` (404, `GET /demand/keywords`), `SETTINGS_KEY_UNKNOWN`, `SETTINGS_KEY_LOCKED`, `SETTINGS_INVALID`, `SETTINGS_NO_CHANGE`, `SETTINGS_LABEL_TAKEN`, `SETTINGS_ALREADY_ACTIVE`, `SETTINGS_ALREADY_ACTIVATED`, `HOLDOUT_NOT_PASSED`, `ROWS_INVALID`, `REPLAY_EMPTY`, `HOLDOUT_CONTAMINATED`, `AS_OF_REQUIRED`, `REPLAY_INVALID_NO_GATES`, `SUITE_NOT_DEFINED`, `SUITE_UNKNOWN`, `SUITE_ALREADY_SCORED`, `SUITE_OVERLAP`, `SUITE_EMPTY`, `SUITE_MEMBERSHIP_CHANGED`, `LABELLED_NAME_CONFLICT`, `VARIANT_NOT_PREREGISTERED`, `PROFIT_REPORT_INCOMPLETE`, `REPLAY_NOT_FOUND`, `SELECTION_SETTINGS_MISSING` (500), `SELECTION_SETTINGS_INVALID` (500), `LIST_NOT_FOUND`, `LIST_NAME_INVALID`, `LIST_TERM_INVALID`, `LIST_NO_CHANGE`, `CENSUS_LIST_SIZE`, `CENSUS_LIST_INVALID`, `FORBIDDEN_FEATURE`, `BIN_REQUIRED`, `SIBLING_METHOD_NOT_FOUND`, `SIBLING_METHOD_ALREADY_APPROVED` (2.4.0), `SIBLING_METHOD_NOT_APPROVED`, `TEST_SET_NAME_TAKEN`, `TEST_SET_EMPTY`, `TEST_SET_NOT_FOUND`, `TEST_SET_NOT_READY`, `TEST_SET_ALREADY_SEALED`, `TEST_SET_NOT_SEALABLE` (2.5.0), `DROP_LIST_NAME_TAKEN`, `DROP_LIST_NOT_FOUND`, `COHORT_NAME_TAKEN`, `COHORT_EMPTY`, `COHORT_NOT_FOUND` (2.8.0). Selection warnings: `PRICING_V3_MISSING`. `APPROVAL_REQUIRED` / `APPROVAL_INVALID` / `APPROVAL_EXPIRED` also apply to an activation, a census list and a sibling method approval.
 

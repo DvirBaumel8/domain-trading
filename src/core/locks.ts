@@ -1,6 +1,6 @@
 // Every cross-request or cross-instance lock of the service lives here, with a typed registry of key names (R1b).
 // Transaction locks (pg_advisory_xact_lock) serialise a short read-check-write; session locks (pg_try_advisory_lock on a dedicated connection)
-// guard a whole run (a job, a review call) so a second instance is skipped. Nothing in-process guards correctness across instances.
+// guard a whole run (a job) so a second instance is skipped. Nothing in-process guards correctness across instances.
 import { sql, type Kysely, type Transaction } from 'kysely';
 import { AppError } from '../http/errors.js';
 
@@ -9,7 +9,7 @@ type Conn = Kysely<any> | Transaction<any>; // eslint-disable-line @typescript-e
 /** The registry of lock keys. Parameterised keys carry their parameter after the colon. */
 export type LockKey =
   | 'intake_screening' | 'daily_rebuild' | 'holdout_suites' | 'test_sets_seal' | 'company_document' | 'selection_settings_activate' | 'engine_upload' | 'engine_train'
-  | 'job:tick' | 'job:daily' | 'job:screen' | 'job:train' | 'job:datasave' | 'job_enqueue' | 'review_run' | 'market_episodes' | 'market_sales' | 'market_matched' | 'kb_write'
+  | 'job:tick' | 'job:daily' | 'job:screen' | 'job:train' | 'job:datasave' | 'job_enqueue' | 'market_episodes' | 'market_sales' | 'market_matched' | 'kb_write'
   | `job:${'price' | 'drop' | 'ns-verify' | 'registrar-check' | 'portfolio-check' | 'drop-watch' | 'cohort-outcomes' | 'reference-refresh' | 'portfolio-lifecycle' | 'listing-sync' | 'retention' | 'engine-endings'}`
   | `dynadot_upload:${string}` | `selection_list:${string}` | `pack:${string}` | `domain:${string}` | `bid_plan:${string}`;
 

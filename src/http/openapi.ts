@@ -24,7 +24,7 @@ interface Entry { method: string; url: string; body?: z.ZodType; noBody?: boolea
 /** One line per route: what it does. Keyed `METHOD /fastify/path`. A route with no line here fails the test that keeps the document complete. */
 const SUMMARIES: Record<string, string> = {
   'GET /health/ping': 'Liveness (public, no database)',
-  'GET /health': 'Service health: version, database, jobs, review',
+  'GET /health': 'Service health: version, database, jobs',
   'GET /check': 'Price and availability check of a name across registrars',
   'POST /portfolio/import': 'Import an S8 (Line 2) aftermarket name Dvir bought on a registrar website (needs approval_ref; price cap and S8 slots); dry_run supported',
   'POST /buy': 'Buy a name (needs Dvir\'s approval_ref and a complete screening pack); dry_run supported',
@@ -192,22 +192,12 @@ const SUMMARIES: Record<string, string> = {
   'GET /company/forbidden-terms': 'Forbidden terms',
   'POST /company/forbidden-terms': 'Add a forbidden term',
   'POST /company/forbidden-terms/{id}/retire': 'Retire a forbidden term',
-  'POST /reviews/packet': 'Build a review packet',
-  'POST /reviews/run': 'Run the outside review',
-  'GET /reviews/packets/{id}': 'One review packet',
-  'GET /reviews/items': 'Review items',
-  'POST /reviews/items/{id}/status': 'Set the status of a review item',
-  'POST /reviews/{packet_id}/feedback': 'Record review feedback',
-  'GET /reviews/cost': 'Review cost this month',
   'POST /visits/hit': 'Count one visit (visits token only; sent by the api-proxy counting redirect)',
   'POST /visits/import': 'Load Afternic 30-day Views/Leads for a name (WRITE or data)',
   'POST /visits/settings': 'Switch the visitor counter on or off, or request the visit-counter token (WRITE; the approval_ref must name "visits")',
   'POST /visits/forward/{domain}': 'Point the Porkbun URL forward of a listed name at the counting redirect, or revert it (WRITE; approval_ref names the domain and "visits")',
   'GET /visits': 'Daily visitor counts',
   'GET /visits/weekly': 'Weekly visitor counts per name (Sunday to Saturday, UTC) and the names that cannot be counted',
-  'GET /reviews/settings': 'Review settings',
-  'POST /reviews/settings': 'Change review settings',
-  'GET /reviews/settings/history': 'Review settings history',
   [`GET ${OPENAPI_PATH}`]: 'This document',
 };
 

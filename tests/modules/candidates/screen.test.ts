@@ -88,11 +88,10 @@ async function seedRun(x: ScreeningHarness, names: { domain: string; lane?: stri
 }
 
 describe('CR-021 POST /candidates/screen', () => {
-  it('T21-1 T21-5 T21-6 screens the waiting names (own run, steps onDemandScreen + buildDailyList), rebuilds the list the same day, shows on /jobs/runs, uses no outside review', async () => {
+  it('T21-1 T21-5 T21-6 screens the waiting names (own run, steps onDemandScreen + buildDailyList), rebuilds the list the same day, shows on /jobs/runs', async () => {
     const x = await h({ screening: { rdapLookup: async () => T_TAKEN() } });
     await intakeN(x, 0, 3);
     const post = await writer(x);
-    const before = await db.selectFrom('review_packets').select('id').execute();
     const r = await post('/candidates/screen', {});
     expect(r.statusCode, r.body).toBe(202);
     const j = r.json();
@@ -109,8 +108,6 @@ describe('CR-021 POST /candidates/screen', () => {
     expect(Object.keys(runs[0].steps)).toEqual(['onDemandScreen', 'buildDailyList']);
     expect(runs[0].steps.onDemandScreen.summary).toMatchObject({ screened: 3, from_intake: 3, on_demand: true, allowance: { daily_max: 30, used_today: 3, remaining: 27 } });
     expect(runs[0].steps.buildDailyList.summary).toMatchObject({ day: today(x) });
-    expect(await db.selectFrom('review_packets').select('id').execute()).toEqual(before); // T21-6: no outside review packet, attempt or retry
-    expect(await db.selectFrom('review_retries').select('day').execute()).toEqual([]);
     expect((await db.selectFrom('candidate_screenings').select('on_demand').execute()).every((c) => c.on_demand)).toBe(true);
     // the daily list built by the screen job is 'auto' (does not count toward the 6 manual rebuilds)
     expect((await db.selectFrom('daily_candidate_lists').select('built_by').execute()).map((q) => q.built_by)).toContain('auto');

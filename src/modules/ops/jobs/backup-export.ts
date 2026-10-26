@@ -17,7 +17,7 @@ export const TABLE_FILES = [
   'tranches', 'tranche_members', 'test_sets', 'test_set_rows',
   'drop_lists', 'drop_list_rows', 'drop_list_checks', 'cohorts', 'cohort_names', 'cohort_decisions', 'cohort_outcomes',
   'labelled_names', 'holdout_suites', 'replay_runs',
-  'company_documents', 'forbidden_terms', 'forbidden_term_retirements', 'review_packets', 'review_feedback', 'review_items', 'review_item_statuses', 'review_settings_changes', 'review_retries',
+  'company_documents', 'forbidden_terms', 'forbidden_term_retirements',
   // v5.43.0 (CR-078): the knowledge base is company data that cannot be rebuilt (parents before children)
   'kb_settings', 'kb_authors', 'kb_sources', 'kb_questions', 'kb_claims', 'kb_evidence', 'kb_source_links', 'kb_verdicts', 'kb_loads',
   // v5.47.0 (F5): the trained lift tables (small, and the seed is not the whole of it once our own rows enter)

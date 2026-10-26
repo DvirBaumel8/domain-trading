@@ -7,8 +7,10 @@ import { z } from 'zod';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
 import { checkText } from '../blocklist.js';
-import { unifiedDiff } from '../review/diff.js';
-import { sha256 } from '../review/packet.js';
+import { createHash } from 'node:crypto';
+import { unifiedDiff } from '../diff.js';
+
+const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 
 export interface CompanyDeps { db: Kysely<Database>; now: () => number; secretValues: string[] }
 

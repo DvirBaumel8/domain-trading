@@ -12,21 +12,6 @@ const WRITE_JOB_RUNS_PER_HOUR = 4;
 /** v5.18.0 (CR-068): POST /visits/hit by the api-proxy Worker: its own limit per token (every redirected visitor is one call; a bot burst must not eat the general 10 a minute). */
 const VISIT_HITS_PER_MINUTE = 600;
 
-/** POST /reviews/run: calls per hour per WRITE token (the outside review costs money and counts toward the monthly cap). */
-const REVIEW_RUNS_PER_HOUR = 3;
-
-/**
- * POST /reviews/run counts toward its hourly limit only when the call reaches Google, and the slot is taken right BEFORE the Google call
- * (never given back), so two concurrent calls cannot both slip under the limit. The preHandler below registers the taker for the request.
- */
-const reviewSlotTakers = new WeakMap<object, () => void>();
-const reachedGoogle = new WeakSet<object>();
-export const markReviewReachedGoogle = (req: object): void => {
-  if (reachedGoogle.has(req)) return;
-  reachedGoogle.add(req);
-  reviewSlotTakers.get(req)?.();
-};
-
 /** In-memory sliding window. Fine for one Render instance; revisit if we ever scale out. */
 export class SlidingWindowLimiter {
   private readonly hits = new Map<string, number[]>();
@@ -88,27 +73,16 @@ export function registerRateLimit(app: FastifyInstance, now: () => number = Date
   const reads = new SlidingWindowLimiter(60, 60_000, now);
   const writes = new SlidingWindowLimiter(10, 60_000, now);
   const jobStarts = new SlidingWindowLimiter(WRITE_JOB_RUNS_PER_HOUR, 3_600_000, now);
-  const reviewRuns = new SlidingWindowLimiter(REVIEW_RUNS_PER_HOUR, 3_600_000, now);
   const visitHits = new SlidingWindowLimiter(VISIT_HITS_PER_MINUTE, 60_000, now);
-  app.addHook('onSend', async (req, reply, payload) => {
-    if (!req.auth || !reachedGoogle.has(req)) return payload;
-    const st = reviewRuns.state(String(req.auth.tokenId));
-    reply.header('ratelimit-remaining', String(st.remaining));
-    reply.header('ratelimit-reset', String(st.resetSeconds));
-    return payload;
-  });
   app.addHook('preHandler', async (req, reply) => {
     const key = req.auth ? String(req.auth.tokenId) : req.jobAuth && isJobRoute(req) ? 'job' : null;
     // v2.6.0 (N-4): POST /jobs/run by a token that is not WRITE is refused 401 by the scope hook; it never counts against (or reports) the WRITE limiter.
     if (req.auth && !req.jobAuth && isJobRoute(req) && req.auth.scope !== 'write') return;
     if (key === null) return; // public routes (/health) are not limited
     // CR-007 T-2: a WRITE token starting a job has its own, tighter limit (instead of the general write limit).
-    const reviewRun = req.auth && req.routeOptions?.url === '/reviews/run' && req.method === 'POST' && req.auth.scope === 'write';
-    const limiter = reviewRun ? reviewRuns : req.auth?.scope === 'visits' ? visitHits : req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method, req.routeOptions?.url) ? writes : reads;
-    // POST /reviews/run is counted only when the call reaches Google (the slot is taken just before the Google call); here it is only refused when the hour is already used up.
+    const limiter = req.auth?.scope === 'visits' ? visitHits : req.auth && isJobRoute(req) && isMutating(req.method) ? jobStarts : isMutating(req.method, req.routeOptions?.url) ? writes : reads;
     const replay = db !== undefined && isMutating(req.method, req.routeOptions?.url) && (await isIdempotentReplay(db, req));
-    if (reviewRun && !replay) reviewSlotTakers.set(req, () => { reviewRuns.take(key); });
-    const wait = replay ? 0 : reviewRun ? limiter.peek(key) : limiter.take(key);
+    const wait = replay ? 0 : limiter.take(key);
     // CR-005 N-8a: the caller's own limit for this method class (GET vs POST), on every authenticated response, a 429 included.
     const st = limiter.state(key);
     reply.header('ratelimit-limit', String(limiter.limit));

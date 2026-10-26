@@ -29,9 +29,9 @@ describe('daily-only schedule: the daily job runs the former tick steps first', 
     app = await makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: JOB } });
     const run = (job: string) => runJobToEnd(app, job, { headers: { authorization: `Bearer ${JOB}` }, key: randomUUID() });
     const daily = await run('daily');
-    expect(Object.keys(daily.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'listingSync', 'portfolioLifecycle', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'kbLoad', 'outsideReview', 'retention', 'backupExport', 'engineEndings', 'engineTrain', 'liftTrain']);
+    expect(Object.keys(daily.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'listingSync', 'portfolioLifecycle', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'kbLoad', 'retention', 'backupExport', 'engineEndings', 'engineTrain', 'liftTrain']);
     expect(daily.json().steps.reconciler.ok).toBe(true);
     const tick = await run('tick');
-    expect(Object.keys(tick.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'reviewRetry']);
+    expect(Object.keys(tick.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume']);
   });
 });

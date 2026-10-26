@@ -1,4 +1,4 @@
-# Reports (contract v5.52.0)
+# Reports (contract v5.53.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -69,7 +69,6 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `LANDER_PENDING` | info | The name was listed with `lander: "none"` and no lander has been chosen yet (2.1.0); no nameserver action is pending in the service | `lander` (null) |
 | `NS_UNVERIFIED` | warn | Public DNS doesn't show the lander nameservers yet. **5.50.0 (P8):** never raised for a name with an active visit forward | `lander`, `lander_ns` |
 | `DROP_FEED_STALE` | info (3.3.0; `warn` by setting) | (2.8.0) Drop lists exist, but the newest `list_date` is more than `intake.drop_feed_stale_days` (3.3.0: default 7; was 2) days before today. At `info` (the default, `intake.drop_feed_stale_level`) it counts toward no warning total. **5.50.0 (P8):** from 14 days without a list (the side line is idle) it is `info` whatever the setting says; a `warn` setting applies only between `drop_feed_stale_days` and 13 days | `newest_list`, `newest_list_date` |
-| `REVIEW_OVERDUE` | warn | (2.10.0) Review feedback exists, but none was recorded in the last 36 hours. **5.50.0 (P8):** only while the outside review is enabled (`GET /health` `review` is not `disabled`) | `last_feedback_at` |
 | `EXPORT_STALE` | warn | No confirmed Afternic upload in 7 days while listings changed | `pending[]` |
 | `HOLD_STALE` | warn | A pricing hold has been on for more than 30 days | `reason`, `since` |
 | `PAST_DROP_DATE` | warn | A live name is past its `drop_date` | `drop_date` |

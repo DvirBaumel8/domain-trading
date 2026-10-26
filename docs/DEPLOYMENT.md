@@ -85,7 +85,6 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `COMPANIES_HOUSE_API_KEY` | optional: the free UK Companies House API key (Dvir registers it); unset makes the `companies` screening input UNKNOWN `SOURCE_DISABLED` |
    | `GOOGLE_WEB_RISK_API_KEY` | optional: a key restricted to the Web Risk API, from a Google project **with** billing (Lookup API only; DOM caps itself at 10,000 a month) |
    | `NAMEBIO_RETAILSTATS_CSV_URL` | optional (v5.11.0, CR-062): `https://api.namebio.com/retailstats-download`, the free NameBio file, used only while `sources.namebio` is on (off by default). Empty = per-keyword RetailStats instead (5.15.0: the TLDStats and drop-order URLs are gone) |
-   | `GEMINI_API_KEY` | optional: the outside review; a Gemini key from a **new Google AI Studio project with no billing** (free tier) |
    | `SPACESHIP_SELLERHUB_API_KEY`, `SPACESHIP_SELLERHUB_API_SECRET` | optional: Spaceship SellerHub listing sync; an API Manager key pair with only the `sellerhub:read` and `sellerhub:write` scopes |
    | `PUBLIC_BASE_URL` | optional: the service's own public URL for the job queue's keep-alive ping (default `https://domain-trading-api.onrender.com`); the ping runs only when `RENDER` is set (5.13.0), so the Mac host never pings it |
 
@@ -110,7 +109,7 @@ The Worker calls `POST /jobs/run` once a day at 00:05 UTC with `daily` (since 2.
    - `JOB_TRIGGER_TOKEN`: the same value as in Render.
 2. **Variables** -> `API_BASE_URL` = the API URL, no trailing slash: today the api-proxy URL (`https://domain-trading-api-proxy.<subdomain>.workers.dev`); on Render, the URL from step 5 (`https://domain-trading-api.onrender.com`).
 3. (Since 3.9.0 the Worker waits up to 90 s for the wake and tries the POST 3 times; it is deployed by this workflow on push.) Actions -> `deploy-jobs-trigger` -> **Run workflow** (it only deploys on main and when `API_BASE_URL` is set).
-4. Verify: Cloudflare dashboard -> Workers -> `domain-trading-jobs` -> Triggers shows the one cron (`5 0 * * *`). The 08:30 UTC review-retry `tick` runs from GitHub Actions (`.github/workflows/review-retry-tick.yml`), which needs the repo variable `API_BASE_URL` and the repo secret `JOB_TRIGGER_TOKEN`; the account is at Cloudflare's free limit of 5 crons. After the next full hour,
+4. Verify: Cloudflare dashboard -> Workers -> `domain-trading-jobs` -> Triggers shows the one cron (`5 0 * * *`). The 08:30 UTC `tick` runs from GitHub Actions (`.github/workflows/tick.yml`), which needs the repo variable `API_BASE_URL` and the repo secret `JOB_TRIGGER_TOKEN`; the account is at Cloudflare's free limit of 5 crons. After the next full hour,
    `GET /audit` (READ token) has a row for `jobs/run` with scope `job`. A 401 there means the tokens differ.
 
 ## 7. API tokens for the bots

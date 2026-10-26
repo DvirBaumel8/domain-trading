@@ -1,4 +1,4 @@
-// v2.10.0 (CR-011 part B): the block list. Text that would leave the service (the company document, a review packet, feedback notes,
+// v2.10.0 (CR-011 part B): the block list. Text that would leave the service (the company document, feedback notes,
 // and any other outward text) is refused with a category, never with the matched text.
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';

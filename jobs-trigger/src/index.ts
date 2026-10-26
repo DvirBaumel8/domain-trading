@@ -26,8 +26,8 @@ export const RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 90_000];
 export const RETRY_DELAY_MS = RETRY_DELAYS_MS[0]!;
 
 // One cron trigger here: 00:05 UTC runs `daily` (it includes the former hourly steps: reconciler, nsVerifier, screeningResume).
-// The review-retry `tick` is NOT scheduled by this Worker (the Cloudflare account is at the Workers Free limit of cron triggers):
-// .github/workflows/review-retry-tick.yml runs it at 08:30 UTC, after Google's midnight-Pacific quota reset in both PDT (07:00 UTC) and PST (08:00 UTC).
+// The `tick` is NOT scheduled by this Worker (the Cloudflare account is at the Workers Free limit of cron triggers):
+// .github/workflows/tick.yml runs it at 08:30 UTC.
 export const DAILY_CRON = '5 0 * * *';
 export const CRONS: Record<string, Job> = { [DAILY_CRON]: 'daily' };
 

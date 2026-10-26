@@ -1,12 +1,10 @@
 // v3.2.0 part A (CR-017): triggered_by and the manual tick. MSW only; fake keys.
 import { randomUUID } from 'node:crypto';
-import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
 import { testDb as db } from '../../helpers/db.js';
 import { issueToken } from '../../helpers/tokens.js';
-import { mswServer } from '../../setup/network.js';
 
 const T0 = Date.parse('2026-10-20T10:00:00Z');
 const apps: FastifyInstance[] = [];
@@ -36,28 +34,10 @@ describe('N-3 triggered_by is never null', () => {
   });
 });
 
-describe('T17-8 a manual tick runs reviewRetry when one is pending', () => {
-  it('T17-8 POST /jobs/run tick (WRITE) retries the pending review once (one Google call); with nothing pending it does not call Google', async () => {
-    const GKEY = 'test-gemini-key';
-    let g = 0;
-    let mode: 'busy' | 'ok' = 'busy';
-    mswServer.use(http.post(/generativelanguage\.googleapis\.com\/v1beta\/models\/[^/]+:generateContent/, async () => {
-      g++;
-      return mode === 'busy'
-        ? HttpResponse.json({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Quota' } }, { status: 429 })
-        : HttpResponse.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ items: [{ category: 'pricing', severity: 'low', text: 'Keep the plan.' }] }) }] } }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 20 } });
-    }));
-    const t = await boot({ GEMINI_API_KEY: GKEY });
-    expect((await t.post('/company/document', { text: 'We buy short .com names and sell them at a fixed price.' })).statusCode).toBeLessThan(300);
-    await t.app.jobRunner.run('daily');
-    expect(await db.selectFrom('review_retries').selectAll().execute()).toHaveLength(1);
-    const callsBefore = g;
-    mode = 'ok';
+describe('T17-8 a manual tick has the tick steps only', () => {
+  it('T17-8 POST /jobs/run tick (WRITE) runs reconciler, nsVerifier and screeningResume; there is no review step', async () => {
+    const t = await boot({});
     const tick = await runJobToEnd(t.app, 'tick', { headers: t.w });
-    expect(tick.json().steps.reviewRetry.summary).toMatchObject({ status: 'ok' });
-    expect(g).toBe(callsBefore + 1);
-    const again = await runJobToEnd(t.app, 'tick', { headers: t.w });
-    expect(again.json().steps.reviewRetry.summary).toMatchObject({ skipped: true, reason: 'NOTHING_PENDING' });
-    expect(g).toBe(callsBefore + 1);
+    expect(Object.keys(tick.json().steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume']);
   });
 });

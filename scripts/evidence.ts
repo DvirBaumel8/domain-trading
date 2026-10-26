@@ -61,13 +61,13 @@ interface Guarantee { what: string; file: string; test: string; note?: string }
 /** Tables whose rows may never be changed or deleted (database triggers). */
 export const APPEND_ONLY_TABLES = [
   'audit_log', 'cohort_decisions', 'cohort_names', 'cohort_outcomes', 'company_documents', 'domain_records', 'drop_list_checks', 'drop_list_rows', 'drop_lists', 'export_uploads', 'forbidden_terms', 'holdout_suites', 'job_runs', 'labelled_names', 'ledger_entries', 'forward_cost_plans', 'forward_cost_lines', 'prebid_checks', 'bid_plan_events', 'listing_history', 'manual_quotes', 'pricing_evidence',
-  'pricing_settings', 'kb_authors', 'kb_sources', 'kb_questions', 'kb_claims', 'kb_evidence', 'kb_source_links', 'kb_verdicts', 'kb_settings', 'portfolio_checks', 'replay_runs', 'review_feedback', 'review_item_statuses', 'review_items', 'review_packets', 'review_retries', 'review_settings_changes', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings', 'sibling_method_approvals', 'test_set_rows', 'registrar_state_checks', 'venue_listings', 'portfolio_stats', 'sales_pattern_uploads', 'sales_pattern_rows', 'listing_sync_log',
+  'pricing_settings', 'kb_authors', 'kb_sources', 'kb_questions', 'kb_claims', 'kb_evidence', 'kb_source_links', 'kb_verdicts', 'kb_settings', 'portfolio_checks', 'replay_runs', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings', 'sibling_method_approvals', 'test_set_rows', 'registrar_state_checks', 'venue_listings', 'portfolio_stats', 'sales_pattern_uploads', 'sales_pattern_rows', 'listing_sync_log',
 ] as const;
 
 const GUARANTEES: Guarantee[] = [
   { what: 'No secret, key or token appears in a response, a log line or an audit row', file: 'tests/modules/http/secrets.test.ts', test: 'responses, logs and audit rows contain no env secret' },
   { what: 'Tests never reach the network (an unmocked outbound request fails)', file: 'tests/unit/network-block.test.ts', test: 'fails any unmocked outbound HTTP request' },
-  { what: 'One AI call only: the outside review (src/modules/outreach/review/gemini.ts); no AI SDK, no other provider host in src/', file: 'tests/unit/no-llm.test.ts', test: 'no LLM SDK dependency' },
+  { what: 'No AI calls inside the service: no AI SDK, no provider host in src/', file: 'tests/unit/no-llm.test.ts', test: 'no LLM SDK dependency' },
   { what: 'No registrar top-up call, ever (no top-up endpoint is referenced in `src/`)', file: 'tests/unit/no-topup.test.ts', test: 'no source file references a top-up endpoint' },
   { what: 'Web Risk uses only the free Lookup API (no Update API call in `src/`)', file: 'tests/unit/no-web-risk-update.test.ts', test: 'no source file calls the Web Risk Update API' },
 ];

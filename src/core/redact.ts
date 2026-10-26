@@ -14,7 +14,7 @@ export function redact(value: unknown, depth = 0): unknown {
 const FREE_TEXT_KEYS = new Set(['text', 'term', 'note', 'reason', 'alt']);
 
 /**
- * v2.10.0: bodies of /company/* and /reviews/* carry free text (a document, a forbidden term, review items) that the block list may
+ * v2.10.0: bodies of /company/* carry free text (a document, a forbidden term) that the block list may
  * refuse because it holds a secret, an address or a listed term. The audit row keeps the shape and the length, never the text.
  */
 export function redactFreeText(value: unknown, depth = 0): unknown {

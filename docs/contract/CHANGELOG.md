@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.53.0 (2026-10-26): the outside review (CR-011 part B, Gemini) is removed: no AI calls inside the service (Dvir 26 Oct 2026)
+Release note: `docs/releases/v5.53.0.md`.
+MINOR by usage, a removal by shape (migration `1767700000000_v5-53-0.sql`: the six review tables dropped). Dvir, 26 Oct 2026: "No need the outside review, remove it. We have it in another way." The `/reviews*` routes, the `outsideReview` and `reviewRetry` steps, `/health` `review`, `review_reason`, `review_model`, the `REVIEW_OVERDUE` warning and `GEMINI_API_KEY` are removed. No caller used them (traffic report: 0 calls; the review was off since about 9 Oct), so this is not released as MAJOR. `tick` keeps reconciler, nsVerifier and screeningResume (workflow renamed `tick.yml`, same schedule).
+
 ## 5.52.0 (2026-10-26): the 40 slots are shared by Line 1 and S8 (the 30/10 split is removed, Dvir 26 Oct 2026)
 Release note: `docs/releases/v5.52.0.md`.
 MINOR (migration `1767600000000_v5-52-0.sql`: `settings.s8_reserved_slots` dropped). Dvir, 26 Oct 2026: "No need to limit ourselves to 30 and 10 ... Remove this limitation please."

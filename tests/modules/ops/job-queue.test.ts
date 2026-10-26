@@ -8,7 +8,7 @@ import { issueToken } from '../../helpers/tokens.js';
 
 const JOB_TOKEN = 'job_token_fake_0123456789abcdef0123456789';
 const bearer = { authorization: `Bearer ${JOB_TOKEN}` };
-const TICK = ['reconciler', 'nsVerifier', 'screeningResume', 'reviewRetry'];
+const TICK = ['reconciler', 'nsVerifier', 'screeningResume'];
 const apps: FastifyInstance[] = [];
 afterEach(async () => { vi.restoreAllMocks(); while (apps.length) await apps.pop()!.close(); });
 const make = async (extra: Parameters<typeof makeApp>[0] = {}) => {
@@ -137,18 +137,17 @@ describe('attempts, timeouts, isolation', () => {
     expect(r.json().steps.reconciler).toMatchObject({ status: 'skipped', attempts: 1 });
   });
 
-  it('Q-8 the limits per step are stored with the step (defaults 2 attempts / 5 min; outside readers 3; review 1; intake and daily list 10 min)', async () => {
+  it('Q-8 the limits per step are stored with the step (defaults 2 attempts / 5 min; outside readers 3; intake and daily list 10 min)', async () => {
     const app = await make();
     const e = await app.jobQueue.enqueue('daily');
     const rows = Object.fromEntries((await stepRows(e.runId)).map((s) => [s.step, s]));
     expect(rows.reconciler).toMatchObject({ max_attempts: 2, timeout_ms: 300_000, position: 0 });
     expect(rows.registrarCheck).toMatchObject({ max_attempts: 3 });
-    expect(rows.outsideReview).toMatchObject({ max_attempts: 1 });
     expect(rows.intakeScreening).toMatchObject({ timeout_ms: 600_000 });
     expect(rows.buildDailyList).toMatchObject({ timeout_ms: 600_000 });
-    expect(rows.backupExport).toMatchObject({ position: 17 });
-    expect(rows.engineEndings).toMatchObject({ position: 18, max_attempts: 1, timeout_ms: 25 * 60_000 });
-    expect(rows.engineTrain).toMatchObject({ position: 19, max_attempts: 1 });
+    expect(rows.backupExport).toMatchObject({ position: 16 });
+    expect(rows.engineEndings).toMatchObject({ position: 17, max_attempts: 1, timeout_ms: 25 * 60_000 });
+    expect(rows.engineTrain).toMatchObject({ position: 18, max_attempts: 1 });
   });
 });
 

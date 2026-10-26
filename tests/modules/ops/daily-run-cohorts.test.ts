@@ -58,7 +58,7 @@ describe('daily run (G-1, G-2)', () => {
     const res = await runJobToEnd(a, 'daily', { key: 'dw-1' });
     expect(res.statusCode, res.body).toBe(202);
     const steps = Object.keys(res.json().steps);
-    expect(steps.slice(steps.indexOf('portfolioCheck'))).toEqual(['portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'kbLoad', 'outsideReview', 'retention', 'backupExport', 'engineEndings', 'engineTrain', 'liftTrain']);
+    expect(steps.slice(steps.indexOf('portfolioCheck'))).toEqual(['portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'kbLoad', 'retention', 'backupExport', 'engineEndings', 'engineTrain', 'liftTrain']);
     expect(res.json().steps.dropWatch).toMatchObject({ ok: true, summary: { checked: 2, pending_delete: 2, left_for_next_run: 0 } });
     expect(res.json().steps.cohortOutcomes).toMatchObject({ ok: true, summary: { frozen: 0, checked: 0 } });
     // v2.14.0: the intakeScreening run also screens the two pending-delete names, and its quote check asks the registrar for a read-only `quote`; dropWatch and cohortOutcomes still only use RDAP, and nothing is ever registered.

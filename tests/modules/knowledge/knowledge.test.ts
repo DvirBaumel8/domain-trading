@@ -276,7 +276,7 @@ describe('knowledge repo load (CR-078 rule 9)', () => {
   it('KB543-22: the daily job has the step kbLoad right after referenceRefresh; it reads the configured folder', async () => {
     await setup({ knowledgeDir: FIXTURES });
     const plan = app.jobRunner.plan('daily').map((s) => s.name);
-    expect(plan.slice(plan.indexOf('referenceRefresh'), plan.indexOf('referenceRefresh') + 3)).toEqual(['referenceRefresh', 'kbLoad', 'outsideReview']);
+    expect(plan.slice(plan.indexOf('referenceRefresh'), plan.indexOf('referenceRefresh') + 2)).toEqual(['referenceRefresh', 'kbLoad']);
     const step = app.jobRunner.plan('daily').find((s) => s.name === 'kbLoad')!;
     expect(await step.exec()).toMatchObject({ files_seen: 1, loaded: [{ file: '0000-example.jsonl' }] });
   });

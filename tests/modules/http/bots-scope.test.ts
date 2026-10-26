@@ -38,7 +38,7 @@ describe('bots token scope (CR-069)', () => {
     const money: [string, unknown][] = [
       ['/buy', { domain: 'x.com', max_price: 10 }], ['/buy', { domain: 'x.com', max_price: 10, dry_run: false }], ['/buy', { domain: 'x.com', max_price: 10, dry_run: 'strict' }],
       ['/list/x.com', { mode: 'bin' }], ['/listings/x.com/venue', {}], ['/portfolio/x.com/horizon', {}], ['/sold/x.com', {}], ['/offers', {}],
-      ['/portfolio/import', {}], ['/selection/settings/v1/activate', {}], ['/export/afternic/uploaded', {}], ['/offers/1/outcome', {}], ['/reviews/run', {}],
+      ['/portfolio/import', {}], ['/selection/settings/v1/activate', {}], ['/export/afternic/uploaded', {}], ['/offers/1/outcome', {}],
     ];
     for (const [url, body] of money) {
       clock += 10_000; // stay under the general write limit of 10 a minute

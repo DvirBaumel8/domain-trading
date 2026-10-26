@@ -1,8 +1,8 @@
-name: review-retry-tick
+name: tick
 
-# CR-011 addendum C (retimed in v2.16.0): one short `tick` a day at 08:30 UTC so `reviewRetry` can retry a review that got a 429 in
-# the daily run. Google's free-tier quota resets at midnight Pacific = 07:00 UTC in summer (PDT) and 08:00 UTC in winter (PST);
-# 08:30 UTC is after the reset in both seasons (07:30 UTC was before it in winter).
+# One short `tick` a day at 08:30 UTC (second daily pass of reconciler, nsVerifier, screeningResume; /health `jobs` is `overdue` when no tick run
+# was created in 26 hours). Until 5.53.0 this workflow was called review-retry-tick and its `tick` also retried a review; the outside review was
+# removed (Dvir, 26 Oct 2026), the workflow stays for the tick steps and the 08:30 UTC time is unchanged.
 # The Cloudflare account is at the Workers Free limit of cron triggers, so this schedule lives here (free).
 # It calls the API like the Worker does (wake-up ping, then POST). Since 3.0.0 the POST only enqueues the run and answers 202 with its run id;
 # the server works the steps, so this workflow checks the 202 and logs the run id (it has no READ token to poll GET /jobs/runs, and no secret is added).
@@ -24,7 +24,7 @@ jobs:
           API_BASE_URL: ${{ vars.API_BASE_URL }}
           JOB_TRIGGER_TOKEN: ${{ secrets.JOB_TRIGGER_TOKEN }}
         run: |
-          test -n "$API_BASE_URL" || { echo "::error::API_BASE_URL repository variable is empty; the review retry tick cannot run"; exit 1; }
+          test -n "$API_BASE_URL" || { echo "::error::API_BASE_URL repository variable is empty; the tick cannot run"; exit 1; }
           test -n "$JOB_TRIGGER_TOKEN" || { echo "::error::JOB_TRIGGER_TOKEN repo secret is empty"; exit 1; }
           # the schedule uses the fixed daily key (a retried run of the same day is deduplicated); a by-hand run gets a key from the current time, so it is a new run
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then

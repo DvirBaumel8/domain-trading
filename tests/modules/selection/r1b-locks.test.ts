@@ -46,8 +46,8 @@ describe('R1b-1 lock registry', () => {
   });
 
   it('a session lock is released when the work throws', async () => {
-    await expect(withSessionLock(testDb, 'review_run', async () => { throw new Error('boom'); })).rejects.toThrow('boom');
-    const l = await trySessionLock(testDb, 'review_run');
+    await expect(withSessionLock(testDb, 'job:screen', async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+    const l = await trySessionLock(testDb, 'job:screen');
     expect(l).not.toBeNull();
     await l!.release();
   });

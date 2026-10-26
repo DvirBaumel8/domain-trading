@@ -36,7 +36,7 @@ describe('job CLI tick and daily (the shared JobRunner)', () => {
     const { stdout } = await cli(['tick']);
     const r = JSON.parse(stdout);
     expect(r).toMatchObject({ job: 'tick', skipped: false });
-    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'reviewRetry']);
+    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume']);
   });
 
   it('daily runs every step; the unconfigured backup step is skipped, not failed', async () => {
@@ -49,7 +49,7 @@ describe('job CLI tick and daily (the shared JobRunner)', () => {
     await tdb.insertInto('selection_settings').values({ ...rest, label: 'v1off', values: JSON.stringify({ ...values, sources: off }), based_on_id: cur.id, activation_seq: (cur.activation_seq ?? 0) + 1 }).execute();
     const { stdout } = await cli(['daily']);
     const r = JSON.parse(stdout);
-    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'listingSync', 'portfolioLifecycle', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'kbLoad', 'outsideReview', 'retention', 'backupExport', 'engineEndings', 'engineTrain', 'liftTrain']);
+    expect(Object.keys(r.steps)).toEqual(['reconciler', 'nsVerifier', 'screeningResume', 'priceJob', 'dropJob', 'listingSync', 'portfolioLifecycle', 'registrarCheck', 'portfolioCheck', 'dropWatch', 'intakeScreening', 'buildDailyList', 'cohortOutcomes', 'referenceRefresh', 'kbLoad', 'retention', 'backupExport', 'engineEndings', 'engineTrain', 'liftTrain']);
     expect(r.steps.referenceRefresh).toMatchObject({ ok: true, summary: { popularity: { skipped: true, reason: 'SOURCE_DISABLED' }, iana: { skipped: true }, errors: [] } });
     expect(r.steps.backupExport).toMatchObject({ ok: true, skipped: true });
     const { testDb } = await import('../../helpers/db.js');

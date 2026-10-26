@@ -131,7 +131,6 @@ describe('CR-024: openapi', () => {
     expect(body('/selection/evaluate').properties.features.properties).toHaveProperty('sellers_verified_n');
     expect(body('/selection/evaluate').required).toEqual(expect.arrayContaining(['lane', 'features', 'leads_ab']));
     expect(JSON.stringify(body('/selection/labelled-names'))).toContain('"rows"');
-    expect(doc.paths['/reviews/run'].post['x-no-body']).toBe(true);
     expect(doc.paths['/candidates/daily/rebuild'].post).toMatchObject({ 'x-no-body': true, responses: { '201': { description: 'OK' } } });
     expect(doc.paths['/candidates/screen'].post.requestBody.content['application/json'].schema.properties).toHaveProperty('domains');
     for (const p of ['/selection/test-sets/{name}/cancel', '/screening/runs/{id}/cancel', '/selection/sibling-methods/{method}/approve']) expect(doc.paths[p].post.requestBody, p).toBeTruthy();

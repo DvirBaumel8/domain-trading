@@ -20,8 +20,6 @@ const LIVE = ['owned', 'listed', 'delisted'] as const;
 const DAY = 86_400_000;
 /** LANDER_DOWN turns from warn to error when the lander failed on this many different IDT days in a row (CR-007 G-5). */
 const LANDER_DOWN_ERROR_DAYS = 2;
-/** REVIEW_OVERDUE is raised when the newest review feedback is older than this (CR-011 part B). */
-const REVIEW_OVERDUE_HOURS = 36;
 /** v3.9.0: PURCHASE_UNRESOLVED is raised for a register_sent/unknown purchase open longer than this (the reconciler never fails one itself). */
 const PURCHASE_UNRESOLVED_MINUTES = 30;
 /** v3.9.0: Neon's free plan stores 1 GB per project (5.13.0; it was 0.5 GB); DB_SIZE_HIGH is raised above DB_SIZE_WARN_PERCENT of it. */
@@ -99,15 +97,6 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
     add('DB_SIZE_HIGH', 'warn', `The database is ${(size / 1024 ** 2).toFixed(0)} MB, over ${DB_SIZE_WARN_PERCENT}% of the ${(limit / 1024 ** 2).toFixed(0)} MB free-plan limit.`, undefined, {
       size_bytes: size, limit_bytes: limit, percent: Math.round(size * 1000 / limit) / 10, warn_percent: DB_SIZE_WARN_PERCENT,
     });
-  }
-  // CR-011 part B: once any review feedback exists, the newest must not be older than REVIEW_OVERDUE_HOURS.
-  // v5.50.0 (P8): only while the outside review is enabled (the same setting as /health `review`); a switched-off review is not overdue.
-  // (read from review_settings_changes directly: outreach imports reporting, so reporting cannot import outreach; no row = the default, enabled)
-  const reviewRow = await db.selectFrom('review_settings_changes').select('enabled').orderBy('id', 'desc').limit(1).executeTakeFirst();
-  const reviewOn = reviewRow ? reviewRow.enabled : true;
-  const lastFeedback = reviewOn ? await db.selectFrom('review_feedback').select('created_at').orderBy('created_at', 'desc').limit(1).executeTakeFirst() : undefined;
-  if (lastFeedback && now.getTime() - lastFeedback.created_at.getTime() > REVIEW_OVERDUE_HOURS * 3_600_000) {
-    add('REVIEW_OVERDUE', 'warn', `No review feedback has been recorded for over ${REVIEW_OVERDUE_HOURS} hours.`, undefined, { last_feedback_at: toJerusalemIso(lastFeedback.created_at) });
   }
   const domains = opts.domains ?? await db.selectFrom('domains').selectAll().where('status', '!=', 'pending_purchase').orderBy('domain').execute();
   const nameOf = new Map(domains.map((d) => [d.id, d.domain]));

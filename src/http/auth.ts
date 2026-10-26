@@ -202,8 +202,6 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /portfolio/{domain}/horizon': 'money',
   'POST /engine/holdout-date': 'money',
   'POST /quotes/manual': 'money',
-  'POST /reviews/run': 'money',
-  'POST /reviews/settings': 'money',
   'POST /selection/settings/{label}/activate': 'money',
   'POST /selection/sibling-methods/{method}/approve': 'money',
   'POST /visits/forward/{domain}': 'allowed', // a URL forward at the registrar moves no money (CR-069 item 1 lists the visits routes)
@@ -255,9 +253,6 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'PATCH /lessons/{id}': 'allowed',
   'POST /outreach/emails': 'allowed',
   'POST /patterns/sales': 'allowed',
-  'POST /reviews/{packet_id}/feedback': 'allowed',
-  'POST /reviews/items/{id}/status': 'allowed',
-  'POST /reviews/packet': 'allowed',
   'POST /screening/packs': 'allowed',
   'POST /screening/runs': 'allowed',
   'POST /screening/runs/{id}/cancel': 'allowed',

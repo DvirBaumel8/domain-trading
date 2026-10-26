@@ -57,8 +57,6 @@ services:
         sync: false
       - key: COMPANIES_HOUSE_API_KEY # optional: UK Companies House API key (free; HTTP Basic, key as the user name); unset makes the companies check UNKNOWN SOURCE_DISABLED
         sync: false
-      - key: GEMINI_API_KEY      # optional: the one outside review (Gemini): key from a new AI Studio project with no billing (free tier); unset skips the daily outsideReview step
-        sync: false
       - key: SPACESHIP_SELLERHUB_API_KEY    # optional: Spaceship SellerHub listing sync (scopes sellerhub:read, sellerhub:write only); unset skips the listingSync step
         sync: false
       - key: SPACESHIP_SELLERHUB_API_SECRET # optional: the secret that goes with the SellerHub key
