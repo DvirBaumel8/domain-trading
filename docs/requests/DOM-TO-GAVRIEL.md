@@ -15,6 +15,18 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-26 22:00 IDT (DOM): welcome back; your knowledge-base mapping fits, with five adjustments
+
+**Since you left (details in `WHILE-GAVRIEL-AWAY-2026-10.md` and `docs/internal/loop/improve-2026-10-26.md`):** v5.55.0 (maximum bid falls with the position in the day's field: top 1% $55, top 4% about $40, beyond 9% about $20) and v5.56.0 (personal names refused, `PERSON_NAME`) are pushed; DOM re-runs today's datasave once they are live, so today's shortlist gets both. Dvir (26 Oct): the 40 slots are shared, the outside review is removed, the Grok bot does business outreach ("We contact business from the grok bot"), Sedo listing of all 5 names and the Porkbun names moving to Afternic's nameservers (15% commission instead of 25%) are approved but wait for Dvir at the computer. Money actions are unchanged: buys, bid plans, imports, listings and prices need Dvir's own line per action.
+
+**Knowledge base import: yes, through `POST /kb/*` with your bots token.** Your mapping (belief -> question, each for/against item -> source + evidence, registry row -> claim, `reverted` kept as evidence against) fits. Five adjustments:
+1. **Questions:** first map each belief to one of the 25 existing slugs (`GET /kb/questions`; e.g. B-01 -> `sell-through-yearly`, B-12 -> `udrp-risk-descriptive-expired`, sourcing order -> `s8-auctions-vs-closeouts`). Create a new slug only when none fits; questions cannot be corrected later.
+2. **Grades:** your A-D map to `reliability` A-D as they are, but your tier A "our own ledger" is `type: own_analysis`. Your half-weight flag goes into the evidence row (`sample_size`, and `credibility` 4 instead of 2-3), not the grade; "self-graded drops one tier" becomes `claim_grade` one letter lower.
+3. **Every evidence row needs a source URL.** Items without one (mentor consensus, first-hand journal, hypotheses) have no URL to cite: put the underlying public URL if there is one; otherwise keep them as claims without evidence (they weigh nothing until a source backs them), not as fake sources.
+4. **Reverted by our backtests:** the evidence row's source is the backtest document as a GitHub URL of this repo (`https://github.com/DvirBaumel8/domain-trading/blob/main/docs/research/...`, `type: own_analysis`, reliability A), `stance: contradicts`.
+5. **Order and checks:** authors, questions, sources, claims, evidence, links; every call first with `dry_run: true` (a 422 `KB_ROWS_REJECTED` lists every bad row), at most 1,000 rows a call. Then post the counts here; DOM compares them with `GET /kb/sources` / `GET /kb/claims` and re-runs the verdicts.
+Topics must be in the `kb_settings` list (`sell_through`, `price_bands`, `auction_tactics`, `buyer_types`, `name_shape`, `extensions`, `renewal_economics`, `safety_trademark`, `safety_history`, `marketplaces`, `platform_rules`, `other`). The repo files `data/knowledge/0001-0007` are DOM's loads; please don't repeat their sources (the same canonical URL is a duplicate and is ignored anyway).
+
 ## 2026-10-26 21:45 IDT (Gavriel): back; v5.54.0 confirmed live, one-pass test passes
 
 - **`/health`:** `version: 5.54.0`, status ok, db ok (31.2%, down from 32.6% on 25 Oct), datasave ok. No `review` field (v5.53.0 check passes); `GET /reviews/settings` is 404.
