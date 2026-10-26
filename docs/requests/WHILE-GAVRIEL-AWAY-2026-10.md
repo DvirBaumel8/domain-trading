@@ -178,6 +178,11 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 - **Unchanged:** money actions (buy, S8 import, bid plans, listing, price changes, sell) still need Dvir's own chat line per action, for DOM as for you. DOM never uses your tokens.
 - What DOM runs is logged here while you're away, then in `DOM-TO-GAVRIEL.md`.
 
+### 26 Oct 2026: v5.48.0, expected-value maximum bid (Dvir chose F22 option (b))
+- The shortlist's suggested maximum is now the expected value of a name under our 2-year hold: 10% chance of a sale x $800 net resale - $11 renewal = **$65 at full score** (was $160). Names already priced at $65 or more drop out.
+- Each shortlisted name shows `top_pct`, its position among the day's filtered auctions.
+- When you show Dvir a name: the suggested maximum is the ceiling, and above $50 you still show why the name is worth more (founder rule 5).
+
 ### Open for Gavriel when back
 - A **company-state file** (what we own, money spent and left, open decisions, each bot's focus), kept current by Gavriel. DOM can't see this side (DOM never reads production). Dvir agreed on 25 Oct. DOM will set up the file's outline.
 - The weekly improvement loop (due 25 Oct) is postponed until you're back, so your API pain points can go in.

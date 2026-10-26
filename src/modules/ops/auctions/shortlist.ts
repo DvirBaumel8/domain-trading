@@ -56,7 +56,7 @@ function liftOf(model: { bins: LiftModel['bins'] }, table: SplitV2Table, sld: st
 export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<string, unknown>> {
   const { db, now } = deps;
   const nowMs = now();
-  const cfg = await db.selectFrom('settings').select(['s8_max_price_cents', 'shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 'shortlist_expected_resale_cents']).executeTakeFirstOrThrow();
+  const cfg = await db.selectFrom('settings').select(['s8_max_price_cents', 'shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents']).executeTakeFirstOrThrow();
   const latest = await db.selectFrom('godaddy_auctions_live').select((eb) => eb.fn.max('data_date').as('d')).executeTakeFirst();
   const dataDate = latest?.d ? String(latest.d).slice(0, 10) : null;
   // v5.47.0 (F5): the trained lift table scores the name part (auction-v3); without one the v2 hand shape + endings part stays
@@ -95,7 +95,7 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
     // v5.47.0 (F20): adult words and the company's forbidden terms, on the form tokens and on the engine's split
     const bad = adult.check(r.domain, [...v.words, ...(liftSplit && /^[a-z]+$/.test(sld) ? splitV2(sld, liftSplit) : [])]);
     if (bad) { dropped.name_rules[bad.code] = (dropped.name_rules[bad.code] ?? 0) + 1; continue; }
-    const maxBid = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, commission });
+    const maxBid = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, saleChanceBp: cfg.shortlist_sale_chance_bp, renewalCents: cfg.shortlist_renewal_cents, commission });
     if (maxBid <= r.price_cents) { dropped.no_headroom_n++; continue; }
     const pre = scoreAuction({ words: v.words.length > 0 ? v.words : [sld], letters: sld.length, price_cents: r.price_cents, max_bid_cents: maxBid, bids: r.bid_count, domain_age: r.domain_age, pageviews: r.pageviews, endings: {}, lift: liftFor(sld, {}) });
     cands.push({ domain: r.domain, sld, end_time: r.end_time, auction_type: r.auction_type, price_cents: r.price_cents, bids: r.bid_count, domain_age: r.domain_age, valuation_cents: r.valuation_cents, pageviews: r.pageviews, words: v.words, max_bid_cents: maxBid, pre, flags: [] });
@@ -159,7 +159,7 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
   const scored = pool.map((c) => ({ c, s: scoreAuction({ words: c.words.length > 0 ? c.words : [c.sld], letters: c.sld.length, price_cents: c.price_cents, max_bid_cents: c.max_bid_cents, bids: c.bids, domain_age: c.domain_age, pageviews: c.pageviews, endings: known.get(c.sld) ?? {}, lift: liftFor(c.sld, known.get(c.sld) ?? {}) }) }));
   scored.sort((a, b) => b.s.score - a.s.score || a.c.end_time.getTime() - b.c.end_time.getTime() || (a.c.domain < b.c.domain ? -1 : 1));
   // the suggested maximum follows the final score (weaker names get less); a name whose scaled maximum is not above its price has no room left
-  for (const x of scored) x.c.max_bid_cents = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, commission, score: x.s.score });
+  for (const x of scored) x.c.max_bid_cents = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, saleChanceBp: cfg.shortlist_sale_chance_bp, renewalCents: cfg.shortlist_renewal_cents, commission, score: x.s.score });
   for (let i = scored.length - 1; i >= 0; i--) if (scored[i]!.c.max_bid_cents <= scored[i]!.c.price_cents) { dropped.no_headroom_n++; scored.splice(i, 1); }
   const top = scored.slice(0, cfg.shortlist_size).map((x, i) => ({ ...x, rank: i + 1, prebid_id: null as number | null, verdict: null as 'pass' | 'flag' | 'fail' | null, dropped: null as string | null }));
 
@@ -200,10 +200,11 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
       await trx.insertInto('auction_shortlist').values(part.map((t) => ({
         data_date: dataDate, domain: t.c.domain, rank: t.rank, score: t.s.score, score_version: t.s.version, parts: JSON.stringify(t.s.parts), price_cents: t.c.price_cents, bids: t.c.bids, end_time: t.c.end_time,
         auction_type: t.c.auction_type, valuation_cents: t.c.valuation_cents, domain_age: t.c.domain_age, pageviews: t.c.pageviews, max_bid_suggested_cents: t.c.max_bid_cents,
-        reasons: [...t.s.reasons, ...t.c.flags], prebid_id: t.prebid_id, prebid_verdict: t.verdict, dropped_reason: t.dropped, generated_at: generated,
+        reasons: [...t.s.reasons, ...t.c.flags], prebid_id: t.prebid_id, prebid_verdict: t.verdict, dropped_reason: t.dropped, generated_at: generated, field_n: cands.length,
       }))).execute();
     }
   });
+  out.field_n = cands.length;
   out.shortlisted_n = top.length;
   out.served_n = top.filter((t) => t.dropped === null).length;
   return out;
@@ -217,10 +218,13 @@ export const ShortlistQuery = z.object({
 }).strict();
 
 export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof ShortlistQuery>, nowMs: number) {
-  const settings = await db.selectFrom('settings').select(['shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 's8_max_price_cents']).executeTakeFirstOrThrow();
+  const settings = await db.selectFrom('settings').select(['shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 's8_max_price_cents', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents']).executeTakeFirstOrThrow();
   const liftOn = (await db.selectFrom('lift_models').select('id').limit(1).executeTakeFirst()) !== undefined;
   const used = { ...settings, score_version: liftOn ? AUCTION_SCORE_VERSION_LIFT : AUCTION_SCORE_VERSION, ...pair('s8_max_price', settings.s8_max_price_cents) };
-  delete (used as Record<string, unknown>).s8_max_price_cents;
+  const u = used as Record<string, unknown>;
+  delete u.s8_max_price_cents; delete u.shortlist_expected_resale_cents; delete u.shortlist_renewal_cents;
+  // v5.48.0 (F22): the inputs of the expected-value maximum bid
+  Object.assign(u, pair('expected_resale', settings.shortlist_expected_resale_cents), pair('renewal', settings.shortlist_renewal_cents));
   const newest = q.date ? null : await db.selectFrom('auction_shortlist').select((eb) => eb.fn.max('data_date').as('d')).executeTakeFirst();
   const dataDate = q.date ?? (newest?.d ? String(newest.d).slice(0, 10) : null);
   const base = { data_date: dataDate, as_of: toJerusalemIso(new Date(nowMs)), settings: used };
@@ -238,7 +242,7 @@ export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof Short
       const checks = ((p?.answer as { checks?: PrebidCheck[] } | undefined)?.checks ?? []);
       const created = p ? new Date(p.created_at as Date) : null;
       return {
-        rank: r.rank, domain: r.domain, score: r.score, score_version: r.score_version, parts: r.parts, end_time: toJerusalemIso(new Date(r.end_time)), auction_type: r.auction_type,
+        rank: r.rank, field_n: r.field_n, top_pct: r.field_n ? Math.round((1000 * r.rank) / r.field_n) / 10 : null, domain: r.domain, score: r.score, score_version: r.score_version, parts: r.parts, end_time: toJerusalemIso(new Date(r.end_time)), auction_type: r.auction_type,
         ...pair('price', r.price_cents), bids: r.bids, ...pair('max_bid_suggested', r.max_bid_suggested_cents), ...pair('valuation', r.valuation_cents), domain_age: r.domain_age, pageviews: r.pageviews,
         prebid: p && created ? {
           id: Number(p.id), verdict: p.verdict, checked_at: toJerusalemIso(created), valid_until: toJerusalemIso(new Date(created.getTime() + 72 * 3_600_000)),

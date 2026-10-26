@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.48.0 (2026-10-26): expected-value maximum bid (F22 option b: 10% sale chance x net resale - renewal, $65 at full score), position in the day's field (field_n, top_pct)
+Release note: `docs/releases/v5.48.0.md`.
+MINOR (migration `1767300000000_v5-48-0.sql`: `settings.shortlist_sale_chance_bp` default 1000, `settings.shortlist_renewal_cents` default 1100, `auction_shortlist.field_n`).
+- `GET /auctions/shortlist`: `max_bid_suggested` is the expected value (F22, Dvir's choice (b)): sale chance x net resale - one renewal, scaled by the score; $65 at full score with the defaults (was 20% of the net resale, $160). Names priced at $65 or more drop out as no headroom.
+- `GET /auctions/shortlist`: new row fields `field_n` and `top_pct` (rank as a share of the day's filtered auctions); new `settings` fields `shortlist_sale_chance_bp`, `expected_resale_cents`/`expected_resale`, `renewal_cents`/`renewal`. The step summary has `field_n`.
+
 ## 5.47.0 (2026-10-25): Storage cut (pick-proof pool, closeout expiries), adult filter, lift scoring in the shortlist (auction-v3), bot-aware visit counter
 Release note: `docs/releases/v5.47.0.md`.
 MINOR (migration `1767200000000_v5-47-0.sql`: table `lift_models`, `visit_daily.suspect_hits`, `settings.closeout_expiry_keep_days`, `pickproof_pool_keep_days` 45 -> 1).

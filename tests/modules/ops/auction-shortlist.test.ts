@@ -64,8 +64,10 @@ beforeEach(async () => {
   await patchActiveSettings(['sources', 'popularity'], false);
   await putList('brand', ['zzbrand']);
   await putList('bigco', ['zzbigco']);
+  // v5.48.0: the fixtures were priced for a $160 base maximum; 20% chance and no renewal keep it (the default expected-value rule is AS548-1)
+  await db.updateTable('settings').set({ shortlist_sale_chance_bp: 2000, shortlist_renewal_cents: 0 }).execute();
 });
-afterEach(async () => { await app?.close(); app = null; });
+afterEach(async () => { await app?.close(); app = null; await db.updateTable('settings').set({ shortlist_sale_chance_bp: 1000, shortlist_renewal_cents: 1100 }).execute(); });
 
 describe('AS545 shortlist: filters and score', () => {
   it('AS545-5: only in-range live auctions that end inside the horizon, with bids, .com, not owned, no open bid plan, and passing the name rules, are listed (counts per filter in the step summary)', async () => {
@@ -100,9 +102,10 @@ describe('AS545 shortlist: filters and score', () => {
     expect(rows[0]!.rank).toBe(1);
     expect(rows[0]!.score).toBeGreaterThan(rows[1]!.score);
     expect(rows[0]).toMatchObject({ score_version: 'auction-v2', price_cents: 3000, bids: 9, valuation_cents: 90_000, domain_age: 8, dropped_reason: null, prebid_id: null });
-    // the suggested maximum: 20% of the expected net resale ($1,000 less 20% commission = $160), scaled by the score (full from 70), whole $5 (v5.45.0 review)
-    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: Number(rows[0]!.score) }));
+    // the suggested maximum: expected value (v5.48.0, F22), here 20% x ($1,000 less 20% commission) - $0 = $160 at full score (test settings), scaled by the score, whole $5
+    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 2000, renewalCents: 0, score: Number(rows[0]!.score) }));
     expect(rows[0]!.max_bid_suggested_cents).toBeLessThanOrEqual(16_000);
+    expect(rows[0]!.field_n).toBe(r.field_n);
     expect(rows[0]!.max_bid_suggested_cents % 500).toBe(0);
     expect(rows[1]!.valuation_cents).toBe(5_000_000); // shown, but does not lift the rank
     expect((rows[0]!.parts as { name: { points: number } }).name.points).toBeGreaterThan(0);
@@ -312,8 +315,10 @@ describe('AS545 routes', () => {
     expect(j).toMatchObject({ data_date: DATE, total: 4, settings: { shortlist_size: 25, shortlist_prebid_n: 10, shortlist_horizon_hours: 72, shortlist_endings_n: 50, score_version: 'auction-v2' } });
     expect(j.generated_at).toMatch(/\+0[23]:00$/);
     const top = j.rows[0];
+    expect(top).toMatchObject({ rank: 1, field_n: expect.any(Number), top_pct: expect.any(Number) });
+    expect(j.settings).toMatchObject({ shortlist_sale_chance_bp: 2000, renewal_cents: 0, expected_resale_cents: 100_000 });
     expect(top).toMatchObject({ rank: 1, domain: 'bluewidgets.com', price_cents: 5000, price: '$50.00', valuation_cents: 90_000, bids: 4 });
-    expect(top.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: Number(top.score) }));
+    expect(top.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 2000, renewalCents: 0, score: Number(top.score) }));
     expect(top.end_time).toMatch(/\+0[23]:00$/);
     expect(top.parts.name).toBeDefined();
     expect(top.reasons.length).toBeGreaterThan(2);
@@ -431,5 +436,20 @@ describe('LF547 shortlist with the lift table (auction-v3)', () => {
     const j = (await app.inject({ method: 'GET', url: '/auctions/shortlist', headers: auth })).json();
     expect(j.settings.score_version).toBe('auction-v3');
     expect(j.rows[0].score_version).toBe('auction-v3');
+  });
+});
+
+describe('AS548 expected-value maximum bid (v5.48.0, F22)', () => {
+  it('AS548-1: with the migration defaults (10% chance, $11 renewal) a top name gets at most $65, a name priced at $65 or more has no headroom, and every row carries its field size and top share', async () => {
+    await db.updateTable('settings').set({ shortlist_sale_chance_bp: 1000, shortlist_renewal_cents: 1100 }).execute();
+    await live('brightstudio.com', { price: 1000, bids: 9, age: 8 });
+    await live('bluewidgets.com', { price: 7000, bids: 4, age: 8 });
+    const r = await runStep() as Record<string, any>;
+    expect(r.field_n).toBe(1);
+    const rows = await shortlist();
+    expect(rows.map((x) => x.domain)).toEqual(['brightstudio.com']);
+    expect(rows[0]!.max_bid_suggested_cents).toBeLessThanOrEqual(6_500);
+    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100, score: Number(rows[0]!.score) }));
+    expect(rows[0]!.field_n).toBe(1);
   });
 });

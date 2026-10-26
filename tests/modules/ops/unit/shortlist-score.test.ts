@@ -66,16 +66,17 @@ describe('AS545 auction score (shape, endings, bids, age, maximum bid)', () => {
     expect(Object.keys(base)).not.toContain('valuation_cents');
   });
 
-  it('AS545-4: the maximum bid = min(S8 cap, 20% of the S8 ladder BIN less the commission), rounded down to $5, in integer cents', () => {
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2 })).toBe(16_000); // 20% of $800 = $160 (base, no score)
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 85 })).toBe(16_000); // full at 85 (was 70 in v1)
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 95 })).toBe(16_000); // never above the base
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 70 })).toBe(13_000); // $131.76 -> $130
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 42.5 })).toBe(8_000); // half the score, half the maximum
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: 10 })).toBe(1_500); // $18.8 -> $15
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 488_800, commission: 0.2 })).toBe(25_000); // a high resale stops at the cap
-    expect(maxBidRule({ capCents: 6_000, resaleCents: 100_000, commission: 0.2 })).toBe(6_000);
-    expect(Number.isInteger(maxBidRule({ capCents: 25_000, resaleCents: 99_999, commission: 0.175, score: 41.3 }))).toBe(true);
+  it('AS545-4 (v5.48.0, F22): the maximum bid = expected value: sale chance x net resale - renewal, scaled by score, capped, never below 0, rounded down to $5, integer cents', () => {
+    const ev = { capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100 };
+    expect(maxBidRule(ev)).toBe(6_500); // 10% of $800 = $80, less $11 renewal = $69 -> $65 (base, no score)
+    expect(maxBidRule({ ...ev, score: 85 })).toBe(6_500); // full at 85
+    expect(maxBidRule({ ...ev, score: 95 })).toBe(6_500); // never above the base
+    expect(maxBidRule({ ...ev, score: 42.5 })).toBe(3_000); // half the score: $34.5 -> $30
+    expect(maxBidRule({ ...ev, score: 10 })).toBe(500); // $8.1 -> $5
+    expect(maxBidRule({ ...ev, saleChanceBp: 100 })).toBe(0); // 1% of $800 = $8 < the $11 renewal: never negative
+    expect(maxBidRule({ ...ev, saleChanceBp: 5000, resaleCents: 488_800 })).toBe(25_000); // a high expected value stops at the cap
+    expect(maxBidRule({ ...ev, capCents: 6_000 })).toBe(6_000);
+    expect(Number.isInteger(maxBidRule({ ...ev, resaleCents: 99_999, commission: 0.175, score: 41.3 }))).toBe(true);
   });
 });
 
@@ -126,8 +127,8 @@ describe('AS546 auction score v2', () => {
 
   it('AS546-4: SCORE_FULL_MAX is 85: only a strong name gets the full maximum bid; a typical real phrase gets 90-95% of it, an uncommon-word name at most 59%', () => {
     expect(SCORE_FULL_MAX).toBe(85);
-    const full = maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2 });
-    const bid = (n: string) => maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, score: typical(n, SAMPLE.find((x) => x[0] === n)![1]).score });
+    const full = maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100 });
+    const bid = (n: string) => maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100, score: typical(n, SAMPLE.find((x) => x[0] === n)![1]).score });
     expect(bid('cozyfleece')).toBeLessThan(full);
     expect(bid('cozyfleece')).toBeGreaterThanOrEqual(full * 0.85);
     expect(bid('thrune')).toBeLessThanOrEqual(full * 0.59);
@@ -154,6 +155,6 @@ describe('LF547 auction-v3 (lift name part, bids worth 5)', () => {
     const v3 = scoreAuction({ ...base, bids: 20, lift });
     expect(v3.parts.bids).toMatchObject({ max: 5, points: 5 });
     expect(scoreAuction({ ...base, bids: 5, lift }).parts.bids.points).toBeCloseTo(5 * Math.log(6) / Math.log(21), 1);
-    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2 })).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2 }));
+    expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100 })).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100 }));
   });
 });

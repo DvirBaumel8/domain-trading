@@ -80,6 +80,9 @@ export interface SettingsTable {
   shortlist_endings_n: Generated<number>;
   shortlist_prebid_n: Generated<number>;
   shortlist_expected_resale_cents: Generated<number>;
+  /** v5.48.0 (F22): the expected-value maximum bid: chance of a sale within the hold (basis points) and the one renewal paid. Migration only. */
+  shortlist_sale_chance_bp: Generated<number>;
+  shortlist_renewal_cents: Generated<number>;
   shortlist_keep_days: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
@@ -205,6 +208,8 @@ export interface AuctionShortlistTable {
   prebid_verdict: 'pass' | 'flag' | 'fail' | null;
   dropped_reason: string | null;
   generated_at: Timestamp;
+  /** v5.48.0: auctions that passed the filters that day (the rank's field); null on rows before 5.48.0 */
+  field_n: number | null;
 }
 
 export interface DealsTable {

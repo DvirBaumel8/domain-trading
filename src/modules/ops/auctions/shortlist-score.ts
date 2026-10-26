@@ -127,16 +127,19 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
 }
 
 /**
- * The maximum bid we suggest: 20% of the expected net resale (`resaleCents`, a realistic end-user price, `settings.shortlist_expected_resale_cents`, less the marketplace
- * commission), scaled by the name's score (full at `SCORE_FULL_MAX` = 85 since v2, was 70, and above, proportionally less below), never above the S8 cap, rounded down to a whole $5.
+ * The maximum bid we suggest. v5.48.0 (F22, Dvir 26 Oct 2026: option (b), expected value): the chance that a name sells within our hold (`saleChanceBp`,
+ * `settings.shortlist_sale_chance_bp`, default 10%) times the expected net resale (`resaleCents`, `settings.shortlist_expected_resale_cents`, a realistic end-user price, less the
+ * marketplace commission), less the one renewal we pay while holding (`renewalCents`, `settings.shortlist_renewal_cents`). Defaults: 10% x $800 - $11 = $69 -> $65.
+ * The 10% is about 3x the published rate for a 2-year hold (sell-through about 1.7% a year, knowledge base `sell-through-yearly`): it assumes our picks sell better, and is raised
+ * only by our own results. Scaled by the name's score (full at `SCORE_FULL_MAX` = 85 and above, proportionally less below), never above the S8 cap, never below 0, rounded down to $5.
  * Integer cents; `commission` is a share (0.2 = 20%). Without `score` it is the base (used for the headroom part and the headroom filter).
- * v5.45.0 review (DOM): the first draft used the S8 ladder BIN (our list price, $2,488-$4,888), which put every name at the $250 cap; the list price is not what names sell for
- * (knowledge base `end-user-price-band`: median about $595-$1,300).
+ * History: v5.45.0-v5.47.0 used 20% of the net resale ($160 at full score); the round-3 research showed that loses money on average under the 2-year hold (F22).
+ * v5.45.0 review (DOM): the first draft used the S8 ladder BIN (our list price), which put every name at the $250 cap.
  */
 export const SCORE_FULL_MAX = 85;
-export function maxBidRule(o: { capCents: number; resaleCents: number; commission: number; score?: number }): number {
+export function maxBidRule(o: { capCents: number; resaleCents: number; commission: number; saleChanceBp: number; renewalCents: number; score?: number }): number {
   const bp = Math.round(o.commission * 10_000);
-  let raw = Math.floor((o.resaleCents * (10_000 - bp) * 20) / 1_000_000);
+  let raw = Math.floor((o.resaleCents * (10_000 - bp) * o.saleChanceBp) / 100_000_000) - o.renewalCents;
   if (o.score !== undefined) raw = Math.floor((raw * Math.min(SCORE_FULL_MAX, Math.max(0, o.score))) / SCORE_FULL_MAX);
-  return Math.floor(Math.min(o.capCents, raw) / 500) * 500;
+  return Math.floor(Math.max(0, Math.min(o.capCents, raw)) / 500) * 500;
 }

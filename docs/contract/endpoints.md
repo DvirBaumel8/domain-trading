@@ -1,4 +1,4 @@
-# Endpoints (contract v5.47.0)
+# Endpoints (contract v5.48.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -781,12 +781,14 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
 { data_date,              // null when no shortlist is stored yet (then generated_at null, total 0, rows [])
   as_of, generated_at,    // ISO with offset (Asia/Jerusalem)
   settings: { shortlist_horizon_hours, shortlist_size, shortlist_endings_n, shortlist_prebid_n,
-              score_version: "auction-v3" (5.47.0, when a lift table exists; else "auction-v2"), s8_max_price_cents, s8_max_price },
+              score_version: "auction-v3" (5.47.0, when a lift table exists; else "auction-v2"), s8_max_price_cents, s8_max_price,
+              shortlist_sale_chance_bp, expected_resale_cents, expected_resale, renewal_cents, renewal },   // 5.48.0: the inputs of the maximum bid
   total,                  // rows returned
-  rows: [ { rank, domain, score,            // 0..100
+  rows: [ { rank, field_n, top_pct,         // 5.48.0: field_n = auctions that passed the filters that day; top_pct = rank / field_n in % (1 decimal); both null on rows stored before 5.48.0
+            domain, score,                  // 0..100
             score_version, parts,           // parts: {name, headroom, bids, age}, each {points, max, known}; name also {shape, word_quality, word_levels, all_common, endings_known, endings_registered, endings_value} (5.46.0: the three word fields); bids also {seo_flag}
             end_time, auction_type, price_cents, price, bids,
-            max_bid_suggested_cents, max_bid_suggested,   // the rule: 20% of a realistic net resale (settings.shortlist_expected_resale_cents, default $1,000, less the Afternic commission) scaled by the score (full from `SCORE_FULL_MAX` = 85 since 5.46.0, was 70), never above the S8 cap, rounded down to whole $5
+            max_bid_suggested_cents, max_bid_suggested,   // the rule (5.48.0, expected value): sale chance within the hold (settings.shortlist_sale_chance_bp, default 10%) x a realistic net resale (settings.shortlist_expected_resale_cents, default $1,000, less the Afternic commission) - one renewal (settings.shortlist_renewal_cents, default $11) = $65 at full score; scaled by the score (full from `SCORE_FULL_MAX` = 85), never above the S8 cap, never below 0, rounded down to whole $5 (5.45.0-5.47.0: 20% of the net resale, $160)
             valuation_cents, valuation,     // GoDaddy's own appraisal: shown, NOT scored
             domain_age, pageviews,          // null when the file had none
             prebid: null | { id, verdict: "pass" | "flag", checked_at, valid_until, flags: [ { id, reason } ] },
