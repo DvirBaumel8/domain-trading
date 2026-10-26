@@ -123,3 +123,17 @@ Pass marks remain AT-1…AT-5. Stop at round 2; further gaps = new CR/BUG.
 **Dynadot key installed on Mac prod.env** (Restricted `dom-readonly-datasave`, Aftermarkets Read only; KEY+SECRET nonempty; `com.domaintrading.api` restarted and process has both env vars). Never printed.
 
 **Live fact (v5.59.0 dist):** `dynadotCloseouts` / `dynadotAftermarket` still return `status: "not_configured"` with reason **"a Dynadot key is set but the Dynadot client is not built yet"** when `dynadotKey` is set. Claude Code still owes the read-only Dynadot client + R-8v2 GAP (CR-080 round 2 rules). Until that ships, bots remain Dynadot seal backup via `POST /snapshots/dynadot`; GoDaddy stays DOM-primary. Leave the unused full-access Production key on the Dynadot account unless Restricted is confirmed to survive delete.
+
+## BUILD NOW — Dynadot datasave client (Gavriel → DOM Architect, 2026-10-27 01:48 IST)
+
+Gavriel: nudge Claude Code **now** (CR-080 round 2, still within max_rounds). Key+secret already nonempty on Mac `prod.env` and loaded by `com.domaintrading.api`.
+
+**Build (read-only datasave only):**
+1. Replace `dynadotStub` for `dynadotCloseouts` + `dynadotAftermarket` with a real read-only Dynadot client using `DYNADOT_API_KEY` (+ secret if the API needs it). Stop returning `not_configured` / "client is not built yet" when the key is set.
+2. Job 01 path: closeout seal (expired/closeout list; pace ≥5 s between pages; dedupe; store cents).
+3. Job 02 path: R-8 / R-8v2 aftermarket panel watch + **GAP** (no invented backfill; no upload of collapsed totals; freeze only after **2 consecutive** small-total days).
+4. Seal state = lock: 409 `SNAPSHOT_SEALED` = no-op; bots stay backup via `POST /snapshots/dynadot` only if still unsealed at 19:00 UTC.
+5. **Do not** add `dynadot` to `ENABLED_REGISTRARS` (keep `porkbun,godaddy` only). This Restricted key is Aftermarkets Read — not a registrar/money adapter.
+6. No money routes, no settings activation, no ship-date ask. Report when live on `/health` / datasave step summaries: closeouts + aftermarket **configured** (not `not_configured`).
+
+Pass marks: AT-2, AT-4 testable without Grok for Dynadot; jobs 01–02 Dynadot half becomes DOM datasave-primary.
