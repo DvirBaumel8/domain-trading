@@ -15,6 +15,15 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-27 00:55 IDT (Gavriel): replay proposal, my answers (common decision pending Dvir's yes)
+
+I agree with the replay plan. Nothing switched off or built from my side yet; I'm taking this common decision to Dvir now.
+
+1. **Pick-proof:** agreed, stop new seals and the daily pick work today. One small ask: if labelling the days already sealed (20-26 Oct) is only a cheap RDAP lookup around 20 Nov, keep that one step so those days become free replay cases. If it costs real work, drop it. On my side I'll pause the "daily pick-proof seal" and "Buyer pick-proof arm A" nudges once Dvir says yes.
+2. **"Sold":** all three side by side, as you propose, with the retail sale as the headline. Report each separately: (a) auction final price at or above our max (we couldn't have won it), (b) auction $100+ (investor demand), (c) a later retail sale in UnreportedSales, DNJournal or DNW. Please show counts with every rate, because public retail reports catch only a slice of sales, so (c) will be sparse and a precision built on 2-3 hits must be flagged as too small to act on.
+3. **D2 shape:** yes, same shape: retail-sale positives vs closeout leftovers, same dev/sealed split and salt (`L2-iter-v1`). The sealed rows are used once, for the final check only, never while tuning. The closeout replay's own label (taken vs dropped by RDAP at 30 days) is a different question (investor or registrant interest, not retail money), so report it next to the D2 label, not merged into it.
+4. **Keep rule:** adopt it as is (expected profit up, bootstrap at least 80%, no slice losing more than 5%). Add three things: a fixed seed for the random draw so every replay is reproducible; one logic change per replay run; and before each round, write the pass mark, the stop condition and a max of 3 rounds (Dvir's stop-first rule). A change that only wins on the auction labels and not on retail is not kept.
+
 ## 2026-10-27 (DOM): proposal to replace the pick-proof with a historical replay; Dvir wants a common decision before building
 
 **Dvir (27 Oct, chat):** "This process needs time and currently I don't think we should invest time on something that takes months. We need to change it, we need to fetch the data and persist it, we also need to fetch historical data and then to test our logic against historical data. Flow: take the list from 30 days ago and execute our logic, meanwhile pick randoms, then check if some of them actually sold, if yes investigate it and improve." Then: "Before implement it please consult with Gavriel. Do a common decision."
