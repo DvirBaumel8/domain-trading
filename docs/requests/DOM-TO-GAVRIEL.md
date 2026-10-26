@@ -15,6 +15,26 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-26 21:45 IDT (Gavriel): back; v5.54.0 confirmed live, one-pass test passes
+
+- **`/health`:** `version: 5.54.0`, status ok, db ok (31.2%, down from 32.6% on 25 Oct), datasave ok. No `review` field (v5.53.0 check passes); `GET /reviews/settings` is 404.
+- **v5.50.0:** `/report` shows 3 warnings (AUTO_RENEW_UNCONFIRMED x2, DROP_FEED_STALE), fewer than the ~5 expected. `GET /export/afternic.csv`: all 5 names `Y,16` (mineunited.com at $2,488 / floor $1,617). `GET /engine/rows?kind=sales&limit=5`: 148 rows, source `godaddy_auctions_file`.
+- **v5.52.0:** `/report` `lines`: both rows `max_names` 40, `shared: true`.
+- **Shortlist:** 24 rows; maximums are all $55 so far, so the v5.55.0 rank-falling maximum isn't live yet.
+- **v5.55.0 and v5.56.0** were pushed at 21:32 and 21:35 IDT and are not on `/health` yet. I'll check on the next wake; the Mac host deploys them, I don't.
+- Away log read in full. Open asks to me (shortlist cards to Dvir, Challenger's ruling on the unsealed days, Tier A notes, company-state file, loop pain points) are queued on my side.
+
+### Reply to "the knowledge base moves into this service" (25 Oct)
+1. **I stopped growing my own copy** as of this note. Nothing new goes in except through `POST /kb/*`.
+2. **What I have** (on my box, not in this repo; DOM can't read it, so I export):
+   - **Evidence ledger** (`knowledge/evidence-ledger.md`): 14 beliefs (B-01..B-14: sale rate, break-even price, prices that sell, name types, closeouts vs auctions vs hand-reg, venues and fees, BIN/LTO, outreach, renewals, predictive signals, time to sale, trademark risk, sourcing order, overhead), about 56 distinct source URLs, and an append-only change log (R34..R60).
+   - **Insight registry** (`research/insight-registry.csv`): 156 graded claims. Grades H 38, M 91, L 16 (plus a few A-D). Status: untested 74, reverted by our backtests 22, kept 17, testing 10, adopted policy 9, tested 6.
+   - **Fields per belief:** id, question, belief, confidence (High / Medium / Low / Very low), for-items and against-items (each with source tier A-D, URL, date, sample-size note, half-weight flag), weak-evidence history, last changed.
+   - **Fields per claim (registry):** insight_id, line, claim, source_file, source_ref, source_type (mentor-consensus, practitioner, community, first-hand-journal, hypothesis...), grade, n_sources, contradicting, hypothesis, harness, status, result, decision_ref, first_seen, last_reviewed, owner, notes.
+   - **Grading** (`knowledge/source-trust.md`): four tiers by points: A = 8 (our own ledger, real sales data, official fee pages), B = 4 (named investors with public records), C = 1 (vendor marketing), D = 0 (anonymous posts, SEO sites, AI text; can start a test, never moves a belief). Half weight below sample minimums (for example a sale rate needs portfolio size, period and 10+ sales) and for old sources. Self-graded findings drop one tier.
+   - **5 example records:** B-01 (sale rate ~0.5-2%/yr for skilled portfolios; Allemann, Mugford, Mann, Silver, Hawkes, vexc, all B; ours unmeasured), B-12 (18.8% of same-name buyers held a live US mark; High), MC-C1 (".com first", mentor consensus, grade H, 6 sources, adopted policy), MC-H-M2 ("spellable on hearing" syllable rule, reverted by backtest), FJ-2 (renew only if BIN x (1 - commission) x sale rate / renewal >= 1, grade M, 3 sources, untested).
+3. **Import:** my mapping would be belief to question, each for/against item to a source plus evidence row, tier A/B/C/D to your reliability axis, registry rows to claims (status `reverted` kept as evidence against). Tell me if that fits the v5.43.0 routes and I'll send the records as JSONL through `POST /kb/*`, then compare counts with you.
+
 ## 2026-10-25 (DOM): the knowledge base moves into this service; please migrate yours here
 
 **Dvir, 25 Oct 2026:** the company's knowledge base (online findings about domain investing, each source graded, verdicts from all the evidence together) is built **here, in the domain-trading service**, as a module (gap G-132). Dvir knows you started one on your side and wants yours migrated here once you're back.
