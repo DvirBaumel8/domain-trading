@@ -15,6 +15,7 @@ import { activeSelectionSettings, brandMatches, closeoutNameChecker, commonWord,
 import { currentTerms } from '../closeouts/filters.js';
 import { storePrebid } from './prebid-store.js';
 import { adultFilter } from './adult-terms.js';
+import { personName } from './person-names.js';
 import { AUCTION_SCORE_VERSION, AUCTION_SCORE_VERSION_V4, fieldPercentile, maxBidRule, positionFactor, scoreAuction, type EndingsKnown, type ScoreInput, type ScoreResult } from './shortlist-score.js';
 import { pickControl, recordOutcomes, updateOutcomes, type OutcomeRow } from './outcomes.js';
 
@@ -106,6 +107,8 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
     // v5.47.0 (F20): adult words and the company's forbidden terms, on the form tokens and on the engine's split
     const bad = adult.check(r.domain, [...v.words, ...(liftSplit && /^[a-z]+$/.test(sld) ? splitV2(sld, liftSplit) : [])]);
     if (bad) { dropped.name_rules[bad.code] = (dropped.name_rules[bad.code] ?? 0) + 1; continue; }
+    // v5.56.0: a first name + surname (person-names.ts) is not a resale name
+    if (personName(sld)) { dropped.name_rules.PERSON_NAME = (dropped.name_rules.PERSON_NAME ?? 0) + 1; continue; }
     const maxBid = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, saleChanceBp: cfg.shortlist_sale_chance_bp, renewalCents: cfg.shortlist_renewal_cents, commission });
     if (maxBid <= r.price_cents) { dropped.no_headroom_n++; continue; }
     const c: Cand = { domain: r.domain, sld, end_time: r.end_time, auction_type: r.auction_type, price_cents: r.price_cents, bids: r.bid_count, domain_age: r.domain_age, valuation_cents: r.valuation_cents, pageviews: r.pageviews, developed_tlds: r.developed_tlds, exact_match_tlds: r.exact_match_tlds, words: v.words, max_bid_cents: maxBid, pre: null as unknown as ScoreResult, flags: [] };

@@ -431,6 +431,16 @@ describe('ST547 shortlist adult filter (v5.47.0, F20)', () => {
   });
 });
 
+describe('AS556 shortlist person-name filter (v5.56.0)', () => {
+  it('AS556-2: a first name + surname (teresaperez) is refused before scoring and counted as PERSON_NAME; a real phrase is kept', async () => {
+    await live('teresaperez.com');
+    await live('brightwidgets.com');
+    const r = await runStep() as Record<string, any>;
+    expect((await shortlist()).map((x) => x.domain)).toEqual(['brightwidgets.com']);
+    expect(r.dropped.name_rules).toMatchObject({ PERSON_NAME: 1 });
+  });
+});
+
 describe('LF547 shortlist with the lift table (auction-v3, since 5.49.0 auction-v4)', () => {
   it('LF547-11: with a stored lift table the name part comes from the lift (auction-v3, parts.name.lift, a reason line); without one the v2 score is unchanged', async () => {
     await live('brightstudio.com', { price: 3000, bids: 9, age: 8 });

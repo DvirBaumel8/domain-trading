@@ -7,3 +7,11 @@ Government is not precluded from receiving and holding copyrights transferred to
 
 Only place names and USPS state codes are kept. Suffixes (city, town, village, CDP, borough, municipality, ...) are stripped,
 names are lowercased and reduced to letters (Los Angeles -> losangeles). The Census Bureau does not endorse this derived file.
+
+data/wordlists/given-names-census1990.txt (v5.56.0) is derived from the U.S. Census Bureau 1990 name files
+https://www2.census.gov/topics/genealogy/1990surnames/dist.male.first and dist.female.first (retrieved 2026-10-26): the 600 most
+frequent male and 600 most frequent female first names, lowercased, letters only, 3+ letters, merged.
+data/wordlists/surnames-census2010.txt (v5.56.0) is derived from the U.S. Census Bureau 2010 surnames file
+https://www2.census.gov/topics/genealogy/2010surnames/names.zip, Names_2010Census.csv (retrieved 2026-10-26): ranks 1-5,000,
+lowercased, letters only, 3+ letters. Works of the United States Government (17 U.S.C. section 105, above). Used only by the
+auction shortlist's PERSON_NAME filter (src/modules/ops/auctions/person-names.ts).

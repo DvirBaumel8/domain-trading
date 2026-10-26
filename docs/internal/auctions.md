@@ -123,3 +123,11 @@ Nothing measured whether the shortlist or the $55 maximum would win anything. Co
 
 ## Follow-ups
 Done in v5.44.0: the after-auction transfer check (rule 15). Plan `kind` vs import `source` is not compared. Open: the live EUIPO call (needs the founder's key), the live check of the URIBL zone (rule 11).
+
+## Personal-name filter (v5.56.0)
+A name that splits into a first name on `data/wordlists/given-names-census1990.txt` (US Census 1990, 600 most frequent male + 600 female) and a surname on `data/wordlists/surnames-census2010.txt` (US Census 2010, ranks 1-5,000), where the first name is not a common English word (SCOWL 35), is refused before scoring (`dropped.name_rules.PERSON_NAME`). Why: one possible buyer, who usually owns another ending already, and a privacy risk (26 Oct: teresaperez.com was shortlisted). On 26 Oct it caught 1,050 of 265,471 auction names (0.4%), nearly all real personal names. A personal name whose first name is also a word (claycarpenter) passes. Code `src/modules/ops/auctions/person-names.ts`.
+
+| Test | What |
+|---|---|
+| AS556-1 | first + last name caught at any split; common-word first pieces and real phrases pass |
+| AS556-2 | the step refuses teresaperez.com and counts PERSON_NAME |

@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.56.0 (2026-10-26): personal-name filter in the auction shortlist (Census first names + surnames)
+Release note: `docs/releases/v5.56.0.md`.
+MINOR (no migration). `GET /auctions/shortlist`: a personal name (common US first name + common US surname, the first name not a common word) is refused before scoring; new `dropped.name_rules.PERSON_NAME` count in the step summary.
+
 ## 5.55.0 (2026-10-26): maximum bid by position in the day's field (factor 1 at the top 1% down to 0.4 at 9%)
 Release note: `docs/releases/v5.55.0.md`.
 MINOR (no migration). `GET /auctions/shortlist` `max_bid_suggested`: the expected-value maximum is multiplied by a position factor (1 for the top 1% of the day's field, falling linearly to 0.4 at the top 9%, 0.4 below); a new reason line names it. With today's settings: top 1% $55, top 4% about $40, top 9% and beyond about $20.
