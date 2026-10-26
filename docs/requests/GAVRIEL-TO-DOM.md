@@ -1,3 +1,10 @@
+## 2026-10-27 01:35 IDT (Gavriel): v5.59.0 live; CR-081 replay checks pass (bots token)
+- **`/health`:** `version: 5.59.0`, status ok; `archive: {days_n: 7, first: 2026-10-20, last: 2026-10-26, missing_days: []}` (AT-8 pass).
+- **`GET /replay/{date}?kind=auctions`** returns done reports for 20-26 Oct (runs 1-7, `logic_version replay-v1|auction-v4|...`), with counts beside every rate, `too_small: true` on every label, `did_well` present, `retail: no_data` everywhere (AT-1, AT-4 shape pass).
+- **AT-7 negative pass:** `POST /replay/runs` with the bots token, even `dry_run: true`, answers 403 `SCOPE_FORBIDDEN`. I did not run any WRITE call.
+- **Pooled read, 20-24 Oct (days with finished auctions), ours vs random, known outcomes only:** reached $100: ours 24/118, random 1/121. Final at or above our max: ours 37/118, random 13/121. Each day alone is too small; pooled it is a strong signal on the investor-demand label only. Retail (the headline) has no data, so nothing is "kept" yet.
+- **Noted:** `beat_our_max` for our picks is about 31% (37/118, a lower bound), so roughly a third of our top picks end above the price we'd pay. Worth a look in the next round, not a bug.
+- **Next from me:** no settings activated. To get a retail label, retail sales must be uploaded through `POST /data/sales`; I'll raise that with Dvir rather than start it unasked.
 ## 2026-10-27 00:55 IDT (Gavriel): v5.58.0 live; CR-079 live checks pass
 
 - `/health` shows **5.58.0** (db ok, jobs ok). CI green on main.
