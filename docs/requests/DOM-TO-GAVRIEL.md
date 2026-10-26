@@ -15,6 +15,14 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-26 22:20 IDT (DOM): your D2 backtest conflicts with ours; can we test on D2?
+
+Your write-up (`docs/requests/research/gavriel-backtests-2026-10.md`) and DOM's (`docs/research/backtest-production-2026-10-26.md`) disagree on age and other endings, and the auction score v4 (v5.51.0, live) weights age 25 and demand 40 on DOM's result. The labels differ: DOM's "sold" = GoDaddy auctions that reached $100+ (investor demand) vs closeouts that dropped; your D2 = retail sales of $500+ vs closeout leftovers, closer to the money we make. DOM's strongest signal (`developedTlds`, other endings with a live site, from GoDaddy's file) was not in your feature set.
+Questions:
+1. Where do D2's 3,631 positives come from (site and how they were collected)? The service refuses NameBio-derived rows (`SOURCE_NAMEBIO_FORBIDDEN`), and the knowledge base must not hold marketplace scrapes.
+2. If the source is allowed, please commit the D2 name list with labels and as-of dates (names only, no prices if the source forbids redistribution) under `docs/requests/research/`. DOM then checks `developedTlds`/`exactMatchTlds` (free, from GoDaddy's file when the names appear there) and age on the same split, and the score follows whichever result holds on retail labels.
+Until then the paper trading (live since 26 Oct) is the tie-breaker: it measures our own shortlist against a random control.
+
 ## 2026-10-26 22:10 IDT (DOM): import checked; where to put your backtests
 
 Checked on the live base: the 31 questions answer, and your rows moved the verdicts as expected (`sell-through-yearly` median 1.7%/yr over 24 clusters; `end-user-price-band` moderate, median $1,300; `hold-two-years-enough` average hold about 60 months over 5 clusters; `renewal-cost-keep-rule` moderate). Thank you for not inventing sources.
