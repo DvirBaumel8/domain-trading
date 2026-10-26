@@ -94,8 +94,8 @@ describe('S8 import lane (CR-059)', () => {
     expect(await count('domains')).toBe(0);
     const ok = await post(body({ price_paid: 250 }));
     expect(ok.statusCode, ok.body).toBe(201);
-    const cfg = await db.selectFrom('settings').select(['s8_max_price_cents', 's8_reserved_slots', 'max_domains']).executeTakeFirstOrThrow();
-    expect(cfg).toEqual({ s8_max_price_cents: 25000, s8_reserved_slots: 10, max_domains: 40 });
+    const cfg = await db.selectFrom('settings').select(['s8_max_price_cents', 'max_domains']).executeTakeFirstOrThrow();
+    expect(cfg).toEqual({ s8_max_price_cents: 25000, max_domains: 40 });
     const attempt = await post(body({ domain: 'capchange.com', s8_max_price_cents: 99999 }));
     expect(attempt.statusCode).toBe(422);
   });
@@ -126,31 +126,36 @@ describe('S8 import lane (CR-059)', () => {
     expect(manual.json().error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('S8-5: S8 slots: Line 1 /buy is refused at 30 non-S8 names (dry run reports it), an S8 import is refused when the 10 slots are full, and the total cap of 40 still holds', async () => {
-    await seedLine(30, null, 'lineone');
+  it('S8-5 / CAP552-1: the 40 slots are shared (5.52.0): with 39 Line 1 names an S8 import is accepted; at 40 in total both a buy and an import get DOMAIN_CAP_REACHED', async () => {
+    await seedLine(39, null, 'lineone');
     await readyToBuy(DOMAIN);
     const dry = await postBuy(app, buyBody({ dry_run: true }), auth);
     expect(dry.statusCode, dry.body).toBe(200);
-    expect(dry.json().would_be_blocked).toBe('DOMAIN_CAP_REACHED');
-    const real = await postBuy(app, buyBody(), auth);
-    expect(real.statusCode).toBe(409);
-    expect(real.json().error).toMatchObject({ code: 'DOMAIN_CAP_REACHED', details: { domains: 30, max_domains: 40, line1_max: 30, s8_reserved_slots: 10 } });
-    // S8 can still take a slot with Line 1 at 30
+    expect(dry.json().would_be_blocked ?? null).toBeNull();
     const imp = await post(body());
     expect(imp.statusCode, imp.body).toBe(201);
-    // 29 Line 1 names leave a Line 1 slot
-    await db.deleteFrom('domains').where('domain', '=', 'lineone0.com').execute();
-    const dry2 = await postBuy(app, buyBody({ dry_run: true }), auth);
-    expect(dry2.json().would_be_blocked ?? null).toBeNull();
-    // fill the S8 slots
-    await seedLine(9, 'S8', 'eight');
-    const full = await post(body({ domain: 'eleventh.com' }));
+    // 40 in total: a buy and an import are both refused with the same code, and the details do not name a reserve
+    const dryBuy = await postBuy(app, buyBody({ dry_run: true }), auth);
+    expect(dryBuy.json().would_be_blocked).toBe('DOMAIN_CAP_REACHED');
+    const real = await postBuy(app, buyBody(), auth);
+    expect(real.statusCode).toBe(409);
+    expect(real.json().error).toMatchObject({ code: 'DOMAIN_CAP_REACHED', details: { domains: 40, max_domains: 40, line1_domains: 39, s8_domains: 1 } });
+    expect(real.json().error.details).not.toHaveProperty('s8_reserved_slots');
+    const full = await post(body({ domain: 'second.com' }));
     expect(full.statusCode, full.body).toBe(409);
-    expect(full.json().error).toMatchObject({ code: 'S8_SLOTS_FULL', details: { s8_names: 10, s8_reserved_slots: 10 } });
-    const fullDry = await post(body({ domain: 'eleventh.com', dry_run: true }));
+    expect(full.json().error).toMatchObject({ code: 'DOMAIN_CAP_REACHED', details: { domains: 40, max_domains: 40 } });
+    const fullDry = await post(body({ domain: 'second.com', dry_run: true }));
     expect(fullDry.statusCode).toBe(200);
-    expect(fullDry.json().would_be_blocked).toBe('S8_SLOTS_FULL');
-    expect(await db.selectFrom('domains').selectAll().where('domain', '=', 'eleventh.com').execute()).toHaveLength(0);
+    expect(fullDry.json().would_be_blocked).toBe('DOMAIN_CAP_REACHED');
+    expect(await db.selectFrom('domains').selectAll().where('domain', '=', 'second.com').execute()).toHaveLength(0);
+  });
+
+  it('CAP552-2: 31 Line 1 names no longer block a Line 1 buy (the old 30 limit is gone)', async () => {
+    await seedLine(31, null, 'lineone');
+    await readyToBuy(DOMAIN);
+    const dry = await postBuy(app, buyBody({ dry_run: true }), auth);
+    expect(dry.statusCode, dry.body).toBe(200);
+    expect(dry.json().would_be_blocked ?? null).toBeNull();
   });
 
   it('S8-6: the total cap holds for an S8 import (35 Line 1 names + 5 S8 names = 40)', async () => {
@@ -170,9 +175,9 @@ describe('S8 import lane (CR-059)', () => {
     expect(rep.statusCode, rep.body).toBe(200);
     const lines = rep.json().lines;
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatchObject({ line: 1, name: 'hand registration', names: 1, max_names: 30, spend: { spent_cents: 1108 }, sales: { count: 0 }, pnl_cents: -1108, committed_forward: { total_cents: 1108, complete: true } });
+    expect(lines[0]).toMatchObject({ line: 1, name: 'hand registration', names: 1, max_names: 40, shared: true, spend: { spent_cents: 1108 }, sales: { count: 0 }, pnl_cents: -1108, committed_forward: { total_cents: 1108, complete: true } });
     expect(lines[1]).toMatchObject({
-      line: 2, name: 'S8 aftermarket', names: 1, max_names: 10, spend: { spent_cents: 1250, spent: '$12.50' }, sales: { count: 0, gross_cents: 0 },
+      line: 2, name: 'S8 aftermarket', names: 1, max_names: 40, shared: true, spend: { spent_cents: 1250, spent: '$12.50' }, sales: { count: 0, gross_cents: 0 },
       pnl_cents: -1250, pnl: expect.any(String), committed_forward: { total_cents: 999, total: '$9.99', complete: true },
     });
     const pd = rep.json().per_domain as { domain: string; line: number }[];

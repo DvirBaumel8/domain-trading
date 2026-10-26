@@ -24,11 +24,9 @@ export async function activeLaneCounts(db: Kysely<Database>): Promise<LaneCounts
 }
 
 /**
- * The domain caps (founder rule 2, migration only). A Line 1 buy needs the total under max_domains AND Line 1 under max_domains - s8_reserved_slots;
- * an S8 import needs the total under max_domains AND S8 names under s8_reserved_slots. Returns the refusing code or null.
+ * The domain cap (founder rule 2, migration only). Since 5.52.0 both lines share the total: a Line 1 buy and an S8 import are each refused
+ * once the total reaches max_domains (no slots are reserved any more). Returns the refusing code or null.
  */
-export function laneCapBlock(lane: 'S8' | null, c: LaneCounts, cfg: { max_domains: number; s8_reserved_slots: number }): 'DOMAIN_CAP_REACHED' | 'S8_SLOTS_FULL' | null {
-  if (c.total >= cfg.max_domains) return 'DOMAIN_CAP_REACHED';
-  if (lane === 'S8') return c.s8 >= cfg.s8_reserved_slots ? 'S8_SLOTS_FULL' : null;
-  return c.line1 >= cfg.max_domains - cfg.s8_reserved_slots ? 'DOMAIN_CAP_REACHED' : null;
+export function laneCapBlock(c: LaneCounts, cfg: { max_domains: number }): 'DOMAIN_CAP_REACHED' | null {
+  return c.total >= cfg.max_domains ? 'DOMAIN_CAP_REACHED' : null;
 }

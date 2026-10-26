@@ -43,11 +43,11 @@ export async function assertNotOwned(db: Kysely<Database>, domain: string): Prom
   if (open) throw new AppError(409, 'ALREADY_OWNED_OR_PENDING', `A purchase of ${domain} is in progress`, { state: open.state });
 }
 
-/** The domain cap, with the S8 slots reserved (v5.8.0, CR-059): Line 1 may hold at most max_domains - s8_reserved_slots names. */
-export async function assertDomainCap(db: Kysely<Database>, cfg: { max_domains: number; s8_reserved_slots: number }): Promise<void> {
+/** The domain cap: the total of both lines under max_domains (since 5.52.0 no slots are reserved for S8). */
+export async function assertDomainCap(db: Kysely<Database>, cfg: { max_domains: number }): Promise<void> {
   const c = await activeLaneCounts(db);
-  if (laneCapBlock(null, c, cfg) !== null) {
-    throw new AppError(409, 'DOMAIN_CAP_REACHED', `Domain cap reached (${c.total}/${cfg.max_domains}; Line 1 ${c.line1}/${cfg.max_domains - cfg.s8_reserved_slots}, ${cfg.s8_reserved_slots} slots reserved for S8)`,
-      { domains: c.total, max_domains: cfg.max_domains, line1_domains: c.line1, line1_max: cfg.max_domains - cfg.s8_reserved_slots, s8_reserved_slots: cfg.s8_reserved_slots });
+  if (laneCapBlock(c, cfg) !== null) {
+    throw new AppError(409, 'DOMAIN_CAP_REACHED', `Domain cap reached (${c.total}/${cfg.max_domains}; Line 1 ${c.line1}, S8 ${c.s8})`,
+      { domains: c.total, max_domains: cfg.max_domains, line1_domains: c.line1, s8_domains: c.s8 });
   }
 }

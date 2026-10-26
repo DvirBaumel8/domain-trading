@@ -30,9 +30,8 @@ export interface ApiTokensTable {
 export interface SettingsTable {
   id: Generated<boolean>;
   max_domains: Generated<number>;
-  /** v5.8.0 (CR-059): the most one S8 name may have cost, and the slots of max_domains reserved for S8. Migration only. */
+  /** v5.8.0 (CR-059): the most one S8 name may have cost, (no slots are reserved for S8 since 5.52.0). Migration only. */
   s8_max_price_cents: Generated<number>;
-  s8_reserved_slots: Generated<number>;
   /** v5.39.0 (CR-077): false = POST /auctions/plans refuses kind "closeout" (CLOSEOUTS_PAUSED). Migration only. */
   s8_closeouts_allowed: Generated<boolean>;
   /** v5.9.0 (CR-060): the S8 default BIN ladder by name length: [{max_len, bin_cents}], last max_len null. Migration only. */

@@ -88,7 +88,7 @@ async function reserve(deps: BuyDeps, a: Approved): Promise<number> {
   try {
     return await db.transaction().execute(async (trx) => {
       await advisoryXactLock(trx, `domain:${a.input.domain}`);
-      const s = await trx.selectFrom('settings').select(['max_domains', 's8_reserved_slots']).forUpdate().executeTakeFirstOrThrow();
+      const s = await trx.selectFrom('settings').select(['max_domains']).forUpdate().executeTakeFirstOrThrow();
       await assertNotOwned(trx, a.input.domain);
       await assertDomainCap(trx, s);
       // v2.0.0: the hold and the pack, re-read under the global lock (a screening run started since the first checks changes both)

@@ -49,8 +49,8 @@ export interface ImportResult {
   /** v5.8.0 (S8 imports): the lane, the price-list rung chosen from the comps value, and what would refuse the import (a dry run reports it; a real import throws it). */
   /** v5.44.0 (S8): RDAP's registrar is the one imported into (true), another one or not registered (false), or RDAP could not be read / was not asked (null). */
   transfer_confirmed?: boolean | null;
-  lane?: 'S8'; s8?: { source: string; comps_value_cents: number | null; bin_cents: number | null; floor_cents: number | null; bin_source: 'override' | 'ladder' | 'grade_price' | null; floor_source: 'override' | 'formula' | null; s8_names: number; s8_reserved_slots: number; s8_max_price_cents: number };
-  would_be_blocked?: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED' | 'BID_PLAN_REQUIRED' | 'PRICE_ABOVE_PLAN' | null;
+  lane?: 'S8'; s8?: { source: string; comps_value_cents: number | null; bin_cents: number | null; floor_cents: number | null; bin_source: 'override' | 'ladder' | 'grade_price' | null; floor_source: 'override' | 'formula' | null; s8_names: number; s8_max_price_cents: number };
+  would_be_blocked?: 'DOMAIN_CAP_REACHED' | 'BID_PLAN_REQUIRED' | 'PRICE_ABOVE_PLAN' | null;
 }
 
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
@@ -172,7 +172,7 @@ export async function importDomain(
   const settings = await db.selectFrom('settings').selectAll().executeTakeFirstOrThrow();
   const s = await currentSettings(db, now);
 
-  // v5.8.0 (CR-059): S8 caps. The per-name price cap and the slot reservation come from the settings row (migration only).
+  // v5.8.0 (CR-059): S8 caps. The per-name price cap comes from the settings row (migration only).
   let wouldBeBlocked: ImportResult['would_be_blocked'] = null;
   let s8Listing: ListingRequest | null = null;
   if (p.lane === 'S8') {
@@ -181,8 +181,8 @@ export async function importDomain(
         { price_paid_cents: p.costCents, s8_max_price_cents: settings.s8_max_price_cents });
     }
     const counts = await activeLaneCounts(db);
-    wouldBeBlocked = laneCapBlock('S8', counts, settings);
-    if (wouldBeBlocked && !input.dryRun) throw s8CapError(wouldBeBlocked, counts, settings);
+    wouldBeBlocked = laneCapBlock(counts, settings);
+    if (wouldBeBlocked && !input.dryRun) throw s8CapError(counts, settings);
     if (input.enforceBidPlan) {
       if (!input.bidPlan) {
         if (!input.dryRun) throw new AppError(409, 'BID_PLAN_REQUIRED', `${domain} has no open or won bid plan: POST /auctions/plans first (a plan whose auction ended more than 7 days ago is expired: record its result first)`, { domain });
@@ -311,10 +311,10 @@ export async function importDomain(
     if (dup) throw new AppError(409, 'ALREADY_IN_PORTFOLIO', `${domain} is already in the portfolio as ${dup.status}`, { status: dup.status });
     if (p.lane === 'S8') {
       // authoritative re-check under the settings lock (two imports at once must not both take the last slot)
-      const cfg = await trx.selectFrom('settings').select(['max_domains', 's8_reserved_slots']).forUpdate().executeTakeFirstOrThrow();
+      const cfg = await trx.selectFrom('settings').select(['max_domains']).forUpdate().executeTakeFirstOrThrow();
       const counts = await activeLaneCounts(trx);
-      const block = laneCapBlock('S8', counts, cfg);
-      if (block) throw s8CapError(block, counts, cfg);
+      const block = laneCapBlock(counts, cfg);
+      if (block) throw s8CapError(counts, cfg);
     }
     if (!input.auditId) await trx.insertInto('audit_log').values({
       id: auditId, scope: 'admin', method: 'ADMIN', path: 'import-domain',
@@ -363,15 +363,14 @@ export async function importDomain(
     listing: plan ? planView(plan, events) : null, warnings, ...(p.lane === 'S8' ? { transfer_confirmed: transfer } : {}), ...(await s8Fields(db, p.lane, input, plan, settings, null)) };
 }
 
-function s8CapError(code: 'S8_SLOTS_FULL' | 'DOMAIN_CAP_REACHED', c: { total: number; s8: number }, cfg: { max_domains: number; s8_reserved_slots: number }): AppError {
-  return code === 'S8_SLOTS_FULL'
-    ? new AppError(409, 'S8_SLOTS_FULL', `All ${cfg.s8_reserved_slots} S8 slots are taken`, { s8_names: c.s8, s8_reserved_slots: cfg.s8_reserved_slots })
-    : new AppError(409, 'DOMAIN_CAP_REACHED', `Domain cap reached (${c.total}/${cfg.max_domains})`, { domains: c.total, max_domains: cfg.max_domains });
+function s8CapError(c: { total: number; line1: number; s8: number }, cfg: { max_domains: number }): AppError {
+  return new AppError(409, 'DOMAIN_CAP_REACHED', `Domain cap reached (${c.total}/${cfg.max_domains}; Line 1 ${c.line1}, S8 ${c.s8})`,
+    { domains: c.total, max_domains: cfg.max_domains, line1_domains: c.line1, s8_domains: c.s8 });
 }
 
 async function s8Fields(
   db: Kysely<Database>, lane: 'S8' | null, input: ImportInput, plan: ListingPlan | null,
-  settings: { s8_max_price_cents: number; s8_reserved_slots: number }, blocked: ImportResult['would_be_blocked'] | null,
+  settings: { s8_max_price_cents: number }, blocked: ImportResult['would_be_blocked'] | null,
 ): Promise<Pick<ImportResult, 'lane' | 's8' | 'would_be_blocked'>> {
   if (lane !== 'S8') return {};
   return {
@@ -379,6 +378,6 @@ async function s8Fields(
     s8: { source: input.s8Source ?? '', comps_value_cents: input.compsValueCents ?? null, bin_cents: plan?.binCents ?? null, floor_cents: plan?.floorCents ?? null,
       bin_source: !plan ? null : plan.category === 'geo' ? 'grade_price' : input.binOverrideCents !== undefined ? 'override' : 'ladder',
       floor_source: !plan || plan.category === 'geo' ? null : input.floorOverrideCents !== undefined ? 'override' : 'formula',
-      s8_names: (await activeLaneCounts(db)).s8, s8_reserved_slots: settings.s8_reserved_slots, s8_max_price_cents: settings.s8_max_price_cents },
+      s8_names: (await activeLaneCounts(db)).s8, s8_max_price_cents: settings.s8_max_price_cents },
   };
 }

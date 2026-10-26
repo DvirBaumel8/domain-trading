@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.52.0 (2026-10-26): the 40 slots are shared by Line 1 and S8 (the 30/10 split is removed, Dvir 26 Oct 2026)
+Release note: `docs/releases/v5.52.0.md`.
+MINOR (migration `1767600000000_v5-52-0.sql`: `settings.s8_reserved_slots` dropped). Dvir, 26 Oct 2026: "No need to limit ourselves to 30 and 10 ... Remove this limitation please."
+- `POST /buy` and `POST /portfolio/import`: only the total `settings.max_domains` (40) limits both lines; the S8 slots-full refusal is no longer raised (an import over the total gets `DOMAIN_CAP_REACHED`, as a buy does). 409 details `{domains, max_domains, line1_domains, s8_domains}`.
+- `/report` `lines[]`: `max_names` is the shared total (40) on both rows, new `shared: true`.
+- Removed (unused by the bots' routines): the reserve count in the `s8` block of the `POST /portfolio/import` answer.
+
 ## 5.51.0 (2026-10-26): auction-v4 reweighted after the backtest on our own labels: name 30, demand 40, age 25, bids 5; uncommon-word cap skipped when another ending has a live site
 Release note: `docs/releases/v5.51.0.md`.
 MINOR (no migration). `GET /auctions/shortlist` `auction-v4` weights: name 30 (was 70), demand 40 (was 15), age 25 (was 10), bids 5; the uncommon-word cap is skipped when `parts.demand.developed_tlds` >= 1. Shapes unchanged. Why: `docs/research/backtest-production-2026-10-26.md`.

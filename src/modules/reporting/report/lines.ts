@@ -27,12 +27,13 @@ export async function reportLines(db: Kysely<Database>) {
           and (d.drop_date is null or d.expiry_date is null or d.drop_date <> d.expiry_date) and d.renewal_price_cents is null) as missing
     from (values (1), (2)) as l(line)
     order by l.line`.execute(db);
-  const cfg = await db.selectFrom('settings').select(['max_domains', 's8_reserved_slots']).executeTakeFirstOrThrow();
+  const cfg = await db.selectFrom('settings').select(['max_domains']).executeTakeFirstOrThrow();
   const one = (row: (typeof r.rows)[number]) => ({
     line: Number(row.line),
     name: Number(row.line) === 1 ? 'hand registration' : 'S8 aftermarket',
     names: Number(row.names),
-    max_names: Number(row.line) === 1 ? cfg.max_domains - cfg.s8_reserved_slots : cfg.s8_reserved_slots,
+    max_names: cfg.max_domains,
+    shared: true,
     spend: pair('spent', Number(row.spent)),
     sales: { count: Number(row.sale_count), ...pair('gross', Number(row.gross)) },
     ...pair('pnl', Number(row.pnl)),
