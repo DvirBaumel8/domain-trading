@@ -1,0 +1,8 @@
+{
+  "who": "dom",
+  "action": "closeout-seal",
+  "date": "YYYY-MM-DD",
+  "until_idt": "YYYY-MM-DDT23:59:59+02:00",
+  "key": "dd-closeout-YYYY-MM-DD",
+  "_note": "FORMAT ONLY — not a live claim. Replace YYYY-MM-DD before any real claim. Same key must be the Idempotency-Key on the seal upload."
+}

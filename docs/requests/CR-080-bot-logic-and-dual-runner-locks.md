@@ -33,14 +33,29 @@ After the move, leave a one-line pointer in `docs/requests/bot-logic/README.md` 
 ## Changes
 1. **Place** the five files under `docs/bot-logic/` as above.
 2. **Implement dual-runner lock (file first):**
-   - Path: `docs/locks/<action>-<YYYY-MM-DD>.json` (or `data/locks/` if docs is read-only in prod — pick one place and document it in `00-dual-runner-lock-rule.md`).
-   - Schema: `{who, action, date, until_idt, key}` as in the stub.
-   - Helper or datasave step: claim / release / no-op-if-held. Same Idempotency-Key for same day+action.
+   - Path (**chosen**): `docs/locks/<action>-<YYYY-MM-DD>.json` (documented in `docs/bot-logic/00-dual-runner-lock-rule.md` + `docs/locks/README.md`).
+   - Schema: `{who, action, date, until_idt, key}` as in the stub / example.
+   - Datasave step (Claude Code): claim / release / no-op-if-held. Same Idempotency-Key for same day+action.
 3. **Make DOM primary for daily seals** (jobs 01 and 02):
    - Datasave (or equivalent) runs GoDaddy freeze + Dynadot closeout seal + R-8 panel watch with GAP rule, using the lock.
    - On success write lock for that day so Grok backup no-ops.
    - Do **not** invent backfill; write GAP for missing days.
 4. Job 03 stays CR-079 (`portfolioCheck`); this CR only places its bot-logic stub — no second ownership check.
+
+## Changes (round 1 — DOM Architect, 2026-10-26 ~23:45 IDT)
+
+Bot-side done in this round (no `src/`):
+1. Moved five stubs verbatim to `docs/bot-logic/` (pointer left at `docs/requests/bot-logic/README.md`).
+2. Chose lock store: `docs/locks/<action>-<YYYY-MM-DD>.json`. Documented claim/no-op/release + same Idempotency-Key per day+action in `docs/locks/README.md`; worked example format only at `docs/locks/EXAMPLE-closeout-seal-YYYY-MM-DD.json` (not a live claim).
+3. Job 03 remains documentation only; CR-079 stays folded into `portfolioCheck` (no `ownershipCheck`).
+4. Oct 23–25 stay GAP — no invented backfill.
+
+**Claude Code still owes (datasave-primary, still round ≤2):**
+- Enforce file lock in datasave for actions `closeout-seal` and `panel-r8-watch` (claim before work; no-op if held by other; release on failure; keep on success; reuse same Idempotency-Key for day+action).
+- Make DOM datasave **primary** for jobs 01 (GoDaddy freeze + Dynadot closeout seal) and 02 (R-8 panel watch + GAP). Grok is backup only behind the lock.
+- GAP rule unchanged: do not upload collapsed panel totals; do not invent backfill; R-8v2 still needs 2 consecutive small-total days.
+- Do **not** activate settings, money routes, prices, or listings. Do **not** ask for a ship date.
+- Pass marks: AT-1…AT-5. When `/health` (or equivalent) shows datasave can run 01–02 without Grok and AT-2 lock behavior is testable, tell Gavriel.
 
 ## R-STOP-FIRST
 | | |
