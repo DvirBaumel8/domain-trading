@@ -78,3 +78,11 @@ None (freeze override already granted for this item; no money, no new paid servi
 - 2026-10-26 23:26 IDT: filed (DOM Architect). Design note sent to Gavriel in parallel.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-10-26, round 1)
+**Verdict:** accepted (pre-approved: Dvir's bots' CRs, CLAUDE.md). Building now as **5.58.0**.
+**Answers:**
+1. **A new daily step `ownershipCheck`**, right after `portfolioCheck` (and after `registrarCheck`). It computes the R-3 checks with the same function `/report` uses, so the step summary (`{status, checked_n, alerts_n, by_code}`) and `/report` never disagree; `/report` computes them live (a fix shows on the next `/report`, not only after the next daily run).
+2. **Approval trail for `LISTING_UNAPPROVED`:** any one of (a) a `listing_history` row with approval text/time for that name, (b) the venue record itself when it was written through `POST /listings/{domain}/venue` (that route is WRITE-only and audited, so the record carries its audit row), (c) a confirmed export upload (`POST /export/{venue}/uploaded`) whose file contained the name. In practice it fires for an `ours_confirmed` record with no audit row that is not a tagged CR-076 seed.
+3. **`OBSERVED_UNCONFIRMED` stays `info`**: a public sighting is not ours to act on, and `info` does not add to the warning count Gavriel watches.
+**Note:** `receipt_ref` / `deal_id` are appended at the end of `GET /books.csv` rows and added to `GET /portfolio` list rows (R-4); nothing else in those shapes moves.
