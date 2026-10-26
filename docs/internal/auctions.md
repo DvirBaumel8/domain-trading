@@ -67,6 +67,7 @@ The daily datasave step `auctionShortlist` (after `engineFeed`) hands Gavriel a 
 
 | ID | What |
 |---|---|
+| AS555-1..3 | maximum bid by position (v5.55.0): `positionFactor` values; `maxBidRule` with the factor (`ops/unit/shortlist-score.test.ts`); the step gives different maximums along the list and the reason line (`ops/auction-shortlist.test.ts`) |
 | AS546-1..4 | auction-v2 (v5.46.0): word quality levels; real phrases above coined strings and the 50 cap; the spread of the sample; `SCORE_FULL_MAX` 85 |
 | AS549-1..5 | auction-v4 unit tests (v5.49.0): the demand-field parser on `tests/fixtures/datasave/godaddy-demand-fields.sample.json`; v4 weights, no headroom part, position in the field; demand value and field percentile; short split pieces (insare); empty lift bins count 0 (`tests/modules/ops/unit/auction-v4.test.ts`) |
 | AS549-6 | the demand fields are stored in `godaddy_auctions_live` (null when missing, a later file fills a null) (`ops/datasave.test.ts`) |

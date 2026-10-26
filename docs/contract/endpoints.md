@@ -1,4 +1,4 @@
-# Endpoints (contract v5.54.0)
+# Endpoints (contract v5.55.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -788,7 +788,7 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
             domain, score,                  // 0..100
             score_version, parts,           // parts: {name, bids, age, demand} in auction-v4 (5.49.0; auction-v3 and older: {name, headroom, bids, age}), each {points, max, known}; demand {developed_tlds, exact_match_tlds} (5.49.0: other endings with a live site and exact-match endings, from the GoDaddy file; null = not in the file); v4 name also {raw, field_pct} (quality x lift before the position, and the share of the day's field below it); name also {shape, word_quality, word_levels, all_common, endings_known, endings_registered, endings_value} (5.46.0: the three word fields); bids also {seo_flag}
             end_time, auction_type, price_cents, price, bids,
-            max_bid_suggested_cents, max_bid_suggested,   // the rule (5.48.0, expected value): sale chance within the hold (settings.shortlist_sale_chance_bp, default 10%) x a realistic net resale (settings.shortlist_expected_resale_cents, default $1,000, less the Afternic commission) - one renewal (settings.shortlist_renewal_cents, default $23 since 5.49.0, was $11) = $55 at full score (was $65); scaled by the score (full from `SCORE_FULL_MAX` = 85), never above the S8 cap, never below 0, rounded down to whole $5 (5.45.0-5.47.0: 20% of the net resale, $160)
+            max_bid_suggested_cents, max_bid_suggested,   // the rule (5.48.0, expected value): sale chance within the hold (settings.shortlist_sale_chance_bp, default 10%) x a realistic net resale (settings.shortlist_expected_resale_cents, default $1,000, less the Afternic commission) - one renewal (settings.shortlist_renewal_cents, default $23 since 5.49.0, was $11) = $55 at full score (was $65); scaled by the score (full from `SCORE_FULL_MAX` = 85), times a position factor (5.55.0: 1 up to top_pct 1, falling linearly to 0.4 at top_pct 9, 0.4 below; a reason line says it), never above the S8 cap, never below 0, rounded down to whole $5 (5.45.0-5.47.0: 20% of the net resale, $160)
             valuation_cents, valuation,     // GoDaddy's own appraisal: shown, NOT scored
             domain_age, pageviews,          // null when the file had none
             prebid: null | { id, verdict: "pass" | "flag", checked_at, valid_until, flags: [ { id, reason } ] },

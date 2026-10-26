@@ -1,6 +1,6 @@
 // v5.45.0 (G-127): the auction score and the maximum-bid rule. Pure functions; test ids AS545-1..4, v5.46.0 (auction-v2) AS546-1..4 (rules: docs/internal/auctions.md "Shortlist", "Auction score v2").
 import { describe, expect, it } from 'vitest';
-import { AUCTION_SCORE_VERSION, maxBidRule, SCORE_FULL_MAX, scoreAuction, seoFlag, shapeValue, UNCOMMON_CAP, type ScoreInput } from '../../../../src/modules/ops/auctions/shortlist-score.js';
+import { AUCTION_SCORE_VERSION, maxBidRule, positionFactor, SCORE_FULL_MAX, scoreAuction, seoFlag, shapeValue, UNCOMMON_CAP, type ScoreInput } from '../../../../src/modules/ops/auctions/shortlist-score.js';
 import { COMMON_LEVEL, nameQuality, wordLevel } from '../../../../src/modules/ops/auctions/word-quality.js';
 
 const base: ScoreInput = { words: ['cozy', 'fleece'], letters: 10, price_cents: 5000, max_bid_cents: 25_000, bids: 5, domain_age: 5, pageviews: null, endings: {} };
@@ -156,5 +156,26 @@ describe('LF547 auction-v3 (lift name part, bids worth 5)', () => {
     expect(v3.parts.bids).toMatchObject({ max: 5, points: 5 });
     expect(scoreAuction({ ...base, bids: 5, lift }).parts.bids.points).toBeCloseTo(5 * Math.log(6) / Math.log(21), 1);
     expect(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100 })).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100 }));
+  });
+});
+
+describe('AS555 maximum bid by position (pure)', () => {
+  const ev = { capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 2300 };
+  it('AS555-1: positionFactor is 1 up to the top 1% (and for null), falls linearly to 0.4 at the top 9%, 0.4 below', () => {
+    expect(positionFactor(null)).toBe(1);
+    expect(positionFactor(0.3)).toBe(1);
+    expect(positionFactor(1)).toBe(1);
+    expect(positionFactor(5)).toBeCloseTo(0.7, 10);
+    expect(positionFactor(9)).toBeCloseTo(0.4, 10);
+    expect(positionFactor(40)).toBe(0.4);
+    expect(positionFactor(3)).toBeGreaterThan(positionFactor(4));
+  });
+  it('AS555-2: maxBidRule multiplies the score-scaled amount by positionFactor before the cap and the $5 rounding; the default 1 keeps the old numbers', () => {
+    expect(maxBidRule({ ...ev, score: 90 })).toBe(5_500);
+    expect(maxBidRule({ ...ev, score: 90, positionFactor: 1 })).toBe(5_500);
+    expect(maxBidRule({ ...ev, score: 90, positionFactor: positionFactor(4) })).toBe(4_000); // 5700 x 0.775 = 4417 -> $40
+    expect(maxBidRule({ ...ev, score: 90, positionFactor: 0.4 })).toBe(2_000); // 5700 x 0.4 = 2280 -> $20
+    expect(maxBidRule({ ...ev, saleChanceBp: 5000, positionFactor: 0.4 })).toBe(15_000); // 37700 x 0.4 = 15080, under the cap: the factor comes first
+    expect(maxBidRule({ ...ev, saleChanceBp: 5000, resaleCents: 488_800, positionFactor: 0.9 })).toBe(25_000); // a large amount still stops at the cap
   });
 });

@@ -185,14 +185,25 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
  * marketplace commission), less the one renewal we pay while holding (`renewalCents`, `settings.shortlist_renewal_cents`). Defaults: 10% x $800 - $23 = $57 -> $55 (v5.49.0, P5; was $11 renewal and $65).
  * The 10% is about 3x the published rate for a 2-year hold (sell-through about 1.7% a year, knowledge base `sell-through-yearly`): it assumes our picks sell better, and is raised
  * only by our own results. Scaled by the name's score (full at `SCORE_FULL_MAX` = 85 and above, proportionally less below), never above the S8 cap, never below 0, rounded down to $5.
- * Integer cents; `commission` is a share (0.2 = 20%). Without `score` it is the base (used for the headroom part and the headroom filter).
+ * v5.55.0: `positionFactor` (default 1) multiplies the score-scaled amount before the cap and the rounding. Integer cents; `commission` is a share (0.2 = 20%). Without `score` it is the base (used for the headroom part and the headroom filter).
  * History: v5.45.0-v5.47.0 used 20% of the net resale ($160 at full score); the round-3 research showed that loses money on average under the 2-year hold (F22).
  * v5.45.0 review (DOM): the first draft used the S8 ladder BIN (our list price), which put every name at the $250 cap.
  */
 export const SCORE_FULL_MAX = 85;
-export function maxBidRule(o: { capCents: number; resaleCents: number; commission: number; saleChanceBp: number; renewalCents: number; score?: number }): number {
+/** v5.55.0 (AS555-1): the share of the score-scaled maximum a name gets by its position in the day's field: 1 up to the top 1%, falling linearly to 0.4 at the top 9%, 0.4 below. null (position unknown) = 1. */
+export const POSITION_FULL_PCT = 1;
+export const POSITION_FLOOR_PCT = 9;
+export const POSITION_FLOOR_FACTOR = 0.4;
+export function positionFactor(topPct: number | null): number {
+  if (topPct === null || !Number.isFinite(topPct) || topPct <= POSITION_FULL_PCT) return 1;
+  if (topPct >= POSITION_FLOOR_PCT) return POSITION_FLOOR_FACTOR;
+  return 1 - ((1 - POSITION_FLOOR_FACTOR) * (topPct - POSITION_FULL_PCT)) / (POSITION_FLOOR_PCT - POSITION_FULL_PCT);
+}
+
+export function maxBidRule(o: { capCents: number; resaleCents: number; commission: number; saleChanceBp: number; renewalCents: number; score?: number; positionFactor?: number }): number {
   const bp = Math.round(o.commission * 10_000);
   let raw = Math.floor((o.resaleCents * (10_000 - bp) * o.saleChanceBp) / 100_000_000) - o.renewalCents;
   if (o.score !== undefined) raw = Math.floor((raw * Math.min(SCORE_FULL_MAX, Math.max(0, o.score))) / SCORE_FULL_MAX);
+  if (o.positionFactor !== undefined) raw = Math.floor(raw * Math.max(0, Math.min(1, o.positionFactor)));
   return Math.floor(Math.max(0, Math.min(o.capCents, raw)) / 500) * 500;
 }

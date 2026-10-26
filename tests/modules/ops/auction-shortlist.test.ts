@@ -1,6 +1,6 @@
 // v5.45.0 (G-127): the datasave step auctionShortlist, GET /auctions/shortlist and GET /auctions/funnel. Test ids AS545-*; rules in docs/internal/auctions.md "Shortlist".
 // Outside calls: RDAP and DNS are fakes, the IANA bootstrap and the Web Risk lookup are MSW (unhandled requests fail).
-import { maxBidRule } from '../../../src/modules/ops/auctions/shortlist-score.js';
+import { maxBidRule, positionFactor } from '../../../src/modules/ops/auctions/shortlist-score.js';
 import { gzipSync } from 'node:zlib';
 import { http, HttpResponse } from 'msw';
 import { sql } from 'kysely';
@@ -56,8 +56,28 @@ const WORDS_A = ['bright', 'blue', 'smart', 'green', 'quiet', 'solid', 'happy', 
 const WORDS_B = ['widgets', 'garden', 'coffee', 'studio', 'market', 'bridge', 'harbor', 'planet'];
 const nameN = (i: number): string => `${WORDS_A[i % 8]}${WORDS_B[Math.floor(i / 8) % 8]}.com`;
 
+const pf = (rank: number, fieldN: number): number => positionFactor(Math.round((1000 * rank) / fieldN) / 10); // v5.55.0: the position factor of a stored row
 const runStep = (extra: Partial<Parameters<typeof runAuctionShortlist>[0]> = {}) => runAuctionShortlist({ db, now: () => clock.t, ...extra });
 const shortlist = (date = DATE) => db.selectFrom('auction_shortlist').selectAll().where('data_date', '=', date).orderBy('rank').execute();
+
+describe('AS555 maximum bid by position (v5.55.0)', () => {
+  it('AS555-3: the step gives different maximums along the list (top 1% full, falling to 0.4 from the top 9%), each equal to maxBidRule with the row\'s position factor, with a reason line', async () => {
+    for (let i = 0; i < 64; i++) await live(nameN(i), { price: 2000 });
+    const r = await runStep() as Record<string, any>;
+    expect(r.field_n).toBe(64);
+    const rows = await shortlist();
+    expect(rows.length).toBe(25);
+    for (const x of rows) {
+      const f = pf(x.rank, x.field_n!);
+      expect(x.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 5000, renewalCents: 0, score: Number(x.score), positionFactor: f }));
+      const line = x.reasons.find((l: string) => l.startsWith('maximum $'));
+      expect(line, x.domain).toBe(`maximum $${x.max_bid_suggested_cents / 100}: top ${Math.round((1000 * x.rank) / x.field_n!) / 10}% of today's field (position factor ${Math.round(f * 100) / 100})`);
+    }
+    expect(rows[rows.length - 1]!.max_bid_suggested_cents).toBeLessThan(rows[0]!.max_bid_suggested_cents);
+    expect(new Set(rows.map((x) => x.max_bid_suggested_cents)).size).toBeGreaterThanOrEqual(3);
+    expect(rows[0]!.max_bid_suggested_cents / pf(1, 64)).toBeGreaterThan(rows[0]!.max_bid_suggested_cents); // rank 1 of 64 is 1.6%: already below full
+  });
+});
 
 beforeEach(async () => {
   clock = { t: NOW }; rdapTable = {}; rdapCalls = []; rdapThrowFor = new Set();
@@ -67,7 +87,7 @@ beforeEach(async () => {
   await putList('brand', ['zzbrand']);
   await putList('bigco', ['zzbigco']);
   // v5.48.0: the fixtures were priced for a $160 base maximum; 20% chance and no renewal keep it (the default expected-value rule is AS548-1)
-  await db.updateTable('settings').set({ shortlist_sale_chance_bp: 2000, shortlist_renewal_cents: 0 }).execute();
+  await db.updateTable('settings').set({ shortlist_sale_chance_bp: 5000, shortlist_renewal_cents: 0 }).execute();
 });
 afterEach(async () => { await app?.close(); app = null; await db.updateTable('settings').set({ shortlist_sale_chance_bp: 1000, shortlist_renewal_cents: 2300 }).execute(); });
 
@@ -104,8 +124,8 @@ describe('AS545 shortlist: filters and score', () => {
     expect(rows[0]!.rank).toBe(1);
     expect(rows[0]!.score).toBeGreaterThan(rows[1]!.score);
     expect(rows[0]).toMatchObject({ score_version: 'auction-v2', price_cents: 3000, bids: 9, valuation_cents: 90_000, domain_age: 8, dropped_reason: null, prebid_id: null });
-    // the suggested maximum: expected value (v5.48.0, F22), here 20% x ($1,000 less 20% commission) - $0 = $160 at full score (test settings), scaled by the score, whole $5
-    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 2000, renewalCents: 0, score: Number(rows[0]!.score) }));
+    // the suggested maximum: expected value (v5.48.0, F22), here 50% x ($1,000 less 20% commission) - $0 = $400, capped at $250 (test settings; v5.55.0: times the position factor), scaled by the score, whole $5
+    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 5000, renewalCents: 0, score: Number(rows[0]!.score), positionFactor: pf(rows[0]!.rank, rows[0]!.field_n!) }));
     expect(rows[0]!.max_bid_suggested_cents).toBeLessThanOrEqual(16_000);
     expect(rows[0]!.field_n).toBe(r.field_n);
     expect(rows[0]!.max_bid_suggested_cents % 500).toBe(0);
@@ -318,9 +338,9 @@ describe('AS545 routes', () => {
     expect(j.generated_at).toMatch(/\+0[23]:00$/);
     const top = j.rows[0];
     expect(top).toMatchObject({ rank: 1, field_n: expect.any(Number), top_pct: expect.any(Number) });
-    expect(j.settings).toMatchObject({ shortlist_sale_chance_bp: 2000, renewal_cents: 0, expected_resale_cents: 100_000 });
+    expect(j.settings).toMatchObject({ shortlist_sale_chance_bp: 5000, renewal_cents: 0, expected_resale_cents: 100_000 });
     expect(top).toMatchObject({ rank: 1, domain: 'bluewidgets.com', price_cents: 5000, price: '$50.00', valuation_cents: 90_000, bids: 4 });
-    expect(top.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 2000, renewalCents: 0, score: Number(top.score) }));
+    expect(top.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 5000, renewalCents: 0, score: Number(top.score), positionFactor: pf(top.rank, top.field_n) }));
     expect(top.end_time).toMatch(/\+0[23]:00$/);
     expect(top.parts.name).toBeDefined();
     expect(top.reasons.length).toBeGreaterThan(2);
@@ -451,7 +471,7 @@ describe('AS548 expected-value maximum bid (v5.48.0, F22)', () => {
     const rows = await shortlist();
     expect(rows.map((x) => x.domain)).toEqual(['brightstudio.com']);
     expect(rows[0]!.max_bid_suggested_cents).toBeLessThanOrEqual(5_500);
-    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 2300, score: Number(rows[0]!.score) }));
+    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 2300, score: Number(rows[0]!.score), positionFactor: pf(rows[0]!.rank, rows[0]!.field_n!) }));
     expect(rows[0]!.field_n).toBe(1);
   });
 });
@@ -467,7 +487,7 @@ describe('AS549 auction-v4 and paper trading', () => {
     await mk('bluemarket.com', 0, 0); await mk('bluestudio.com', 3, 12);
     await mk('greenmarket.com', 1, 2); await mk('greenstudio.com', null, null);
     for (let i = 0; i < 8; i++) await mk(nameN(i * 5 + 1), i % 4, i);
-    await sql`update settings set shortlist_sale_chance_bp = 1000, shortlist_renewal_cents = 2300`.execute(db);
+    await sql`update settings set shortlist_sale_chance_bp = 2000, shortlist_renewal_cents = 2300`.execute(db);
     const r = await runStep() as Record<string, any>;
     expect(r).toMatchObject({ score_version: 'auction-v4', field_n: 12 });
     const rows = await shortlist();
@@ -509,7 +529,7 @@ describe('AS549 auction-v4 and paper trading', () => {
 
   it('AS549-12: the step records paper-trading rows: the served names (group shortlist, rank, score, suggested maximum) and a deterministic control of 25 names of the same field that are not in the list, the smallest md5(domain || data date); a second run gives the same rows', async () => {
     for (let i = 0; i < 64; i++) await live(nameN(i), { price: 2000, bids: 3 });
-    await sql`update settings set shortlist_sale_chance_bp = 1000, shortlist_renewal_cents = 2300`.execute(db);
+    await sql`update settings set shortlist_sale_chance_bp = 5000, shortlist_renewal_cents = 2300`.execute(db);
     const r = await runStep() as Record<string, any>;
     expect(r.outcomes).toEqual({ shortlist_n: 25, control_n: 25 });
     const rows = await db.selectFrom('auction_outcomes').selectAll().where('data_date', '=', DATE).execute();

@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.55.0 (2026-10-26): maximum bid by position in the day's field (factor 1 at the top 1% down to 0.4 at 9%)
+Release note: `docs/releases/v5.55.0.md`.
+MINOR (no migration). `GET /auctions/shortlist` `max_bid_suggested`: the expected-value maximum is multiplied by a position factor (1 for the top 1% of the day's field, falling linearly to 0.4 at the top 9%, 0.4 below); a new reason line names it. With today's settings: top 1% $55, top 4% about $40, top 9% and beyond about $20.
+
 ## 5.54.0 (2026-10-26): a sealed GoDaddy auction day is parsed again when its rows lack the demand fields (today's file was saved before v5.49.0)
 Release note: `docs/releases/v5.54.0.md`.
 MINOR (no migration). Datasave `godaddyInventory`: a sealed auction file whose day has live rows without the demand fields is parsed again from the kept raw file; file `code` `SNAPSHOT_SEALED_REPARSED`, summary `reparsed_n`.

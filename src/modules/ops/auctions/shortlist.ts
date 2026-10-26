@@ -15,7 +15,7 @@ import { activeSelectionSettings, brandMatches, closeoutNameChecker, commonWord,
 import { currentTerms } from '../closeouts/filters.js';
 import { storePrebid } from './prebid-store.js';
 import { adultFilter } from './adult-terms.js';
-import { AUCTION_SCORE_VERSION, AUCTION_SCORE_VERSION_V4, fieldPercentile, maxBidRule, scoreAuction, type EndingsKnown, type ScoreInput, type ScoreResult } from './shortlist-score.js';
+import { AUCTION_SCORE_VERSION, AUCTION_SCORE_VERSION_V4, fieldPercentile, maxBidRule, positionFactor, scoreAuction, type EndingsKnown, type ScoreInput, type ScoreResult } from './shortlist-score.js';
 import { pickControl, recordOutcomes, updateOutcomes, type OutcomeRow } from './outcomes.js';
 
 export const ENDINGS_BUDGET_MS = 2 * 60_000;
@@ -179,9 +179,20 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
     return { c, s: scoreAuction(inputOf(c, e, fieldPercentile(fieldRaw, raw), cands.length)) };
   });
   scored.sort((a, b) => b.s.score - a.s.score || a.c.end_time.getTime() - b.c.end_time.getTime() || (a.c.domain < b.c.domain ? -1 : 1));
-  // the suggested maximum follows the final score (weaker names get less); a name whose scaled maximum is not above its price has no room left
-  for (const x of scored) x.c.max_bid_cents = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, saleChanceBp: cfg.shortlist_sale_chance_bp, renewalCents: cfg.shortlist_renewal_cents, commission, score: x.s.score });
-  for (let i = scored.length - 1; i >= 0; i--) if (scored[i]!.c.max_bid_cents <= scored[i]!.c.price_cents) { dropped.no_headroom_n++; scored.splice(i, 1); }
+  // the suggested maximum follows the final score and (v5.55.0) the position in the day's field; walking down the ranking, a name whose maximum is not above its price has no room left and is dropped
+  // (the rank of the next name counts only the names kept, so the factor uses the rank the route shows)
+  const served: typeof scored = [];
+  for (const x of scored) {
+    const rank = served.length + 1;
+    const topPct = cands.length > 0 ? Math.round((1000 * rank) / cands.length) / 10 : null;
+    const f = positionFactor(topPct);
+    const base = { capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, saleChanceBp: cfg.shortlist_sale_chance_bp, renewalCents: cfg.shortlist_renewal_cents, commission, score: x.s.score };
+    x.c.max_bid_cents = maxBidRule({ ...base, positionFactor: f });
+    if (x.c.max_bid_cents <= x.c.price_cents) { dropped.no_headroom_n++; continue; }
+    if (topPct !== null) x.s.reasons.push(`maximum $${x.c.max_bid_cents / 100}: top ${topPct}% of today's field (position factor ${Math.round(f * 100) / 100})`);
+    served.push(x);
+  }
+  scored.splice(0, scored.length, ...served);
   const top = scored.slice(0, cfg.shortlist_size).map((x, i) => ({ ...x, rank: i + 1, prebid_id: null as number | null, verdict: null as 'pass' | 'flag' | 'fail' | null, dropped: null as string | null }));
 
   // ---- automatic pre-bid, walking down the list until prebid_n names did not fail
