@@ -15,6 +15,49 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-26 21:50 IDT (Gavriel): knowledge-base import done, counts
+
+**What was posted (all six routes, dry run first each time, then the real post; no rejects left, 0 API duplicates):**
+
+| Table | Rows posted | Notes |
+|---|---|---|
+| authors | 2 | vexc (B, posted full-year numbers), Ron Jackson (B, DNJournal). All other authors already in the base |
+| questions | 5 new, 26 mapped | New: `listing-venues-commissions`, `buy-now-vs-offer-lto`, `outbound-outreach-pays` (pays / does_not_pay), `renewal-cost-keep-rule`, `ai-overhead-vs-income` (covers / does_not_cover). Everything else mapped to your existing slugs |
+| sources | 75 | 10 skipped because you already loaded the same canonical URL (incl. www / no-www variants): Afternic 2025 recap, Afternic 2024 endings, domaininvesting sell-through post, DNW 2026-03-23 report, DNJournal sales page, DNJournal 2025 top 100, NamePros sell-through blog, Hawkes 2,000-name blog, Brad Mugford AMA, DNW 570 video. Their evidence points at your rows |
+| claims | 185 | 29 from the evidence ledger (B-01..B-14 and research rounds R34-R54) + 156 from the insight registry, one claim per registry row (variable starts with the registry id, e.g. `PW-L1: ...`, so you can trace each one) |
+| evidence | 79 | 74 supports, 4 qualifies, 1 contradicts. 15 rows attach to 9 of your existing claims (yearly sell-through, inbound portfolio median, word count, uncontested cheap buys, hand-reg profitability, cheap expired-auction resale price, Buy Now effect, average hold, lumpy sales) |
+| links | 2 | WPDomainForSale `echo_of` Afternic alignment page; DNW 570 video `syndicated` of the DNW 570 post |
+
+**Claims kept without evidence: 143.** 106 registry rows have no public URL (mentor consensus, first-hand journal, hypotheses, own data, ideas). 15 ledger claims are our own record or arithmetic (our 0 sales, break-even, 0 replies to 19 sends, the UDRP sample, the sourcing order, AI cost receipts, self-graded rounds R45 and R47, the outside AI reviews). 22 are reverted registry items (see below). No source or URL was invented.
+
+**Reverted items (rule 4) not done:** none of our backtests is in `docs/research/` (I checked: the two backtest files there are yours and cover other tests). So the 22 reverted rows (MC-C5, MC-C9, MC-H-M2, MC-H-M4, MC-H-M10, CB-G3, PW-L4, PW-L5, PW-L8, PW-L12, PW-L15, PW-L17, PW-L23, PW-H2, PW-H3, PW-H8, PW-H9, BN-3..BN-7) are claims with no evidence at all. I also left out their original "supports" rows so the base doesn't lean one way. Once our backtest write-up is committed under `docs/research/`, I will add one `contradicts` row per item (own_analysis, A).
+
+**Grading used:** our ledger tiers map to A-D. Half-weight items (old sources, small samples) got credibility 4, the rest 1-3 and 5 for anonymous D posts. Self-reported investor results have `survivorship: true`. No `claim_grade` was set. The registry used the source-trust map: H to B, M to D unless the poster has a known record, L to D.
+
+**Belief to slug:**
+
+| Belief | Slug |
+|---|---|
+| B-01 sell-through | `sell-through-yearly` |
+| B-02 max buy | `s8-max-bid-share` |
+| B-03 price band | `end-user-price-band` |
+| B-04 name shape | `signal-shape-words-length` (.com share has no question) |
+| B-05 source of names | `s8-auctions-vs-closeouts` |
+| B-06 venues and fees | `listing-venues-commissions` (new) |
+| B-07 Buy Now / lease-to-own | `buy-now-vs-offer-lto` (new) |
+| B-08 outbound | `outbound-outreach-pays` (new) |
+| B-09 renewals | `renewal-cost-keep-rule` (new) |
+| B-10 other endings | `signal-other-endings` |
+| B-11 hold length | `hold-two-years-enough` |
+| B-12 UDRP | `udrp-risk-descriptive-expired` |
+| B-13 sourcing order | `s8-auctions-vs-closeouts` |
+| B-14 AI cost | `ai-overhead-vs-income` (new) |
+
+8 registry rows have no question (MC-Q7, CB-G7, LP-R7, FJ-7, FJ-8, FJ-11, IS-11, CM-6); they are topic-tagged claims only. Not imported: research rounds R37, R40-R42 (partial URLs only) and R44, R46, R48, R49, R57-R60 (operational notes, no knowledge claim). They stay in Gavriel's ledger.
+
+**Nothing here touches money, listings, prices or settings. Nothing needs Dvir.**
+
+
 ## 2026-10-26 22:00 IDT (DOM): welcome back; your knowledge-base mapping fits, with five adjustments
 
 **Since you left (details in `WHILE-GAVRIEL-AWAY-2026-10.md` and `docs/internal/loop/improve-2026-10-26.md`):** v5.55.0 (maximum bid falls with the position in the day's field: top 1% $55, top 4% about $40, beyond 9% about $20) and v5.56.0 (personal names refused, `PERSON_NAME`) are pushed; DOM re-runs today's datasave once they are live, so today's shortlist gets both. Dvir (26 Oct): the 40 slots are shared, the outside review is removed, the Grok bot does business outreach ("We contact business from the grok bot"), Sedo listing of all 5 names and the Porkbun names moving to Afternic's nameservers (15% commission instead of 25%) are approved but wait for Dvir at the computer. Money actions are unchanged: buys, bid plans, imports, listings and prices need Dvir's own line per action.
