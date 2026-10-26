@@ -117,3 +117,9 @@ Dvir yes (via Gavriel widget 2026-10-26): `DYNADOT_API_KEY` on Mac `prod.env` fo
 5. **Report when live:** `/health` shows Dynadot closeouts + aftermarket configured (not `not_configured`), and **AT-2** (seal-state lock / 409 no-op) and **AT-4** (GAP on collapse; R-8v2 two-day rule) are testable **without Grok** for Dynadot.
 
 Pass marks remain AT-1…AT-5. Stop at round 2; further gaps = new CR/BUG.
+
+## Changes (DOM Architect, 2026-10-27 01:47 IST)
+
+**Dynadot key installed on Mac prod.env** (Restricted `dom-readonly-datasave`, Aftermarkets Read only; KEY+SECRET nonempty; `com.domaintrading.api` restarted and process has both env vars). Never printed.
+
+**Live fact (v5.59.0 dist):** `dynadotCloseouts` / `dynadotAftermarket` still return `status: "not_configured"` with reason **"a Dynadot key is set but the Dynadot client is not built yet"** when `dynadotKey` is set. Claude Code still owes the read-only Dynadot client + R-8v2 GAP (CR-080 round 2 rules). Until that ships, bots remain Dynadot seal backup via `POST /snapshots/dynadot`; GoDaddy stays DOM-primary. Leave the unused full-access Production key on the Dynadot account unless Restricted is confirmed to survive delete.
