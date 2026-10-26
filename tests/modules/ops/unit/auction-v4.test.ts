@@ -20,14 +20,14 @@ describe('AS549 auction-v4 (pure)', () => {
     expect(demandFields({ semrushCpc: Number.NaN, exactMatchTlds: Number.POSITIVE_INFINITY })).toEqual({ exact_match_tlds: null, developed_tlds: null, keyword_registrations: null, search_volume: null, cpc_cents: null });
   });
 
-  it('AS549-2: v4 weights name 70 / demand 15 / age 10 / bids 5; headroom is not a part; the name part is the position in the field; the reason says where the name stands', () => {
-    expect(WEIGHTS_V4).toEqual({ name: 70, bids: 5, age: 10, demand: 15 });
+  it('AS549-2: v4 weights name 30 / demand 40 / age 25 / bids 5 (v5.51.0 backtest); headroom is not a part; the name part is the position in the field; the reason says where the name stands', () => {
+    expect(WEIGHTS_V4).toEqual({ name: 30, bids: 5, age: 25, demand: 40 });
     const s = scoreAuction(v4in());
     expect(s.version).toBe(AUCTION_SCORE_VERSION_V4);
     expect(Object.keys(s.parts).sort()).toEqual(['age', 'bids', 'demand', 'name']);
     expect(s.parts.headroom).toBeUndefined();
-    expect(s.parts.name).toMatchObject({ max: 70, points: 63, field_pct: 0.9 }); // 70 x 0.9
-    expect(s.parts.demand).toMatchObject({ max: 15, known: true, developed_tlds: 2, exact_match_tlds: 5 });
+    expect(s.parts.name).toMatchObject({ max: 30, points: 27, field_pct: 0.9 }); // 30 x 0.9
+    expect(s.parts.demand).toMatchObject({ max: 40, known: true, developed_tlds: 2, exact_match_tlds: 5 });
     expect(s.reasons.join(' | ')).toContain("name in the top 10% of today's field");
     expect(s.reasons.join(' | ')).not.toContain('sold-like');
     // a $1 price and a $54 price score the same: headroom is a filter, not points

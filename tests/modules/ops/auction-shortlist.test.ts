@@ -475,10 +475,12 @@ describe('AS549 auction-v4 and paper trading', () => {
     const by = Object.fromEntries(rows.map((x) => [x.domain, x]));
     const parts = (d: string) => by[d]!.parts as any;
     expect(Object.keys(parts('bluestudio.com')).sort()).toEqual(['age', 'bids', 'demand', 'name']);
-    expect(parts('bluestudio.com').demand).toMatchObject({ known: true, developed_tlds: 3, exact_match_tlds: 12, max: 15, points: 15 });
+    expect(parts('bluestudio.com').demand).toMatchObject({ known: true, developed_tlds: 3, exact_match_tlds: 12, max: 40, points: 40 });
     expect(parts('greenstudio.com').demand).toMatchObject({ known: false, points: 0 });
-    expect(by['bluestudio.com']!.rank).toBeLessThan(by['bluemarket.com']!.rank); // same shape and words, more demand
-    expect(by['bluestudio.com']!.score).toBeGreaterThan(by['bluemarket.com']!.score);
+    // same shape and words, more demand: v5.51.0 weights (demand 40) put bluestudio first, and bluemarket (no demand) scores so low that its scaled maximum is under its $20 price: dropped
+    expect(by['bluestudio.com']!.rank).toBe(1);
+    expect(by['bluemarket.com']).toBeUndefined();
+    expect(r.dropped.no_headroom_n).toBeGreaterThanOrEqual(1);
     for (const x of rows) {
       const pct = parts(x.domain).name.field_pct;
       expect(pct).toBeGreaterThan(0); expect(pct).toBeLessThanOrEqual(1);

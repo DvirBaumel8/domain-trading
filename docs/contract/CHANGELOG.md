@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.51.0 (2026-10-26): auction-v4 reweighted after the backtest on our own labels: name 30, demand 40, age 25, bids 5; uncommon-word cap skipped when another ending has a live site
+Release note: `docs/releases/v5.51.0.md`.
+MINOR (no migration). `GET /auctions/shortlist` `auction-v4` weights: name 30 (was 70), demand 40 (was 15), age 25 (was 10), bids 5; the uncommon-word cap is skipped when `parts.demand.developed_tlds` >= 1. Shapes unchanged. Why: `docs/research/backtest-production-2026-10-26.md`.
+
 ## 5.50.0 (2026-10-26): warnings cleanup (forwarded names, floor auto-accept, review off, paused Dynadot, idle drop feed), lease-to-own in the Afternic export (on, 16 months), GET /engine/rows, auction-end labels
 Release note: `docs/releases/v5.50.0.md`.
 MINOR (migration `1767500000000_v5-50-0.sql`: `settings.afternic_lease_to_own` true, `settings.afternic_lease_months` 16, table `engine_auction_ends`).

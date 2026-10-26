@@ -28,8 +28,10 @@ export const UNCOMMON_CAP = 50;
 export const WEIGHTS = { name: 60, headroom: 20, bids: 10, age: 10 } as const;
 /** v3 (F8, investors-deep research): high bid counts are investors competing, not end users (bidder pairs inflate them), so the bids part is worth 5 points, not 10. */
 export const BIDS_WEIGHT_V3 = 5;
-/** v5.49.0: auction-v4 weights (sum 100; an unknown part is rescaled out). */
-export const WEIGHTS_V4 = { name: 70, bids: 5, age: 10, demand: 15 } as const;
+/** v5.49.0: auction-v4 weights (sum 100; an unknown part is rescaled out). v5.51.0 (backtest on our own 148 sold / 553 unsold names, docs/research/backtest-production-2026-10-26.md):
+ * demand 15 -> 40 and age 10 -> 25, name 70 -> 30. developedTlds alone reached AUC 0.78 (0.80 on names aged 5+), age + developed + exact-match together 0.84-0.88, while the name part
+ * (word quality x length/words lift) was near a coin toss (0.47-0.60) on these auction names. Set before any auction-v4 shortlist was stored, so the version stays auction-v4. */
+export const WEIGHTS_V4 = { name: 30, bids: 5, age: 25, demand: 40 } as const;
 /** Exact-match endings at which the log-scaled part is full. */
 export const EXACT_FULL = 10;
 const DEMAND_DEVELOPED_W = 0.6;
@@ -170,7 +172,9 @@ export function scoreAuction(i: ScoreInput): ScoreResult {
   const raw = r1(100 * parts.reduce((s, p) => s + p.points, 0) / max);
   // a name with an uncommon word is capped at UNCOMMON_CAP x (0.5 + 0.5 x word quality): 50 at most, about 35 for a coined string, so the cap itself spreads
   const cap = r1(UNCOMMON_CAP * (0.5 + 0.5 * q.quality));
-  const score = q.allCommon ? raw : Math.min(raw, cap);
+  // v5.51.0 (v4): the cap is skipped when another ending of the exact name has a live site: the word is real to someone (the backtest's sold names include foreign and brand words)
+  const capped = !q.allCommon && !(v4 && (v4.developed_tlds ?? 0) >= 1);
+  const score = capped ? Math.min(raw, cap) : raw;
   const version = v4 ? AUCTION_SCORE_VERSION_V4 : i.lift ? AUCTION_SCORE_VERSION_LIFT : AUCTION_SCORE_VERSION;
   return { score, version, parts: v4 ? { name, bids, age, demand } : { name, headroom, bids, age }, seo_flag: seo, reasons };
 }
