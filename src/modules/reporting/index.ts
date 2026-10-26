@@ -5,6 +5,7 @@ export { registerReport } from './api/report.js';
 export { buildReport } from './report/index.js';
 export { ledgerCsvRows, ledgerRows } from './report/portfolio.js';
 export { NEON_FREE_STORAGE_BYTES, DB_SIZE_WARN_PERCENT } from './report/warnings.js';
+export { ownershipSummary, type OwnershipSummary } from './report/ownership-summary.js';
 export { marketDqStatus, type MarketDqState } from './market-dq-state.js';
 export { datasaveStatus, missingDays, DATASAVE_OVERDUE_HOURS, type DatasaveState } from './datasave-state.js';
 export { jobRunsView, stepView, jobsOverdue, tickOverdue, lastJobRunAt, dailyScheduleState, triggerFromKey } from './job-runs.js';

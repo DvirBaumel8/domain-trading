@@ -45,7 +45,15 @@ export async function portfolioRows(db: Kysely<Database>, now: Date, status?: st
     union all
     select domain, venue, 'observed' as kind from (select distinct on (domain, venue) domain, venue, provenance from venue_listings order by domain, venue, id desc) l where provenance = 'observed_public'`.execute(db);
   const pick = (domain: string, kind: string) => venues.rows.filter((v) => v.domain === domain && v.kind === kind).map((v) => v.venue).sort();
-  return rows.map((r) => ({ ...r, listed_venues: pick(r.domain, 'listed'), observed_venues: pick(r.domain, 'observed') }));
+  // v5.58.0 (CR-079 R-4): the purchase receipt pointer = the first registration ledger row of the name (the ledger stays the source of truth)
+  const reg = await sql<{ domain: string; receipt_ref: string | null; deal_id: string | null }>`
+    select distinct on (d.domain) d.domain, l.receipt_ref, l.deal_id from ledger_entries l join domains d on d.id = l.domain_id
+    where l.type = 'registration' order by d.domain, l.id`.execute(db);
+  const regOf = new Map(reg.rows.map((x) => [x.domain, x]));
+  return rows.map((r) => ({
+    ...r, listed_venues: pick(r.domain, 'listed'), observed_venues: pick(r.domain, 'observed'),
+    receipt_ref: regOf.get(r.domain)?.receipt_ref ?? null, deal_id: regOf.get(r.domain)?.deal_id ?? null,
+  }));
 }
 
 /** The values in force at the newest confirmed file of the venue that contains the domain (never the walk-away). */

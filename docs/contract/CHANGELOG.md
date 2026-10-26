@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.58.0 (2026-10-26): CR-079 daily missing-name check folded into portfolioCheck (4 new warnings, receipt pointers on /portfolio and books.csv)
+Release note: `docs/releases/v5.58.0.md`.
+MINOR (migration `1767800000000_v5-58-0.sql`: `venue_listings.approval_source`, the CR-076 seed rows tagged `seed_cr076`). CR-079:
+- `/report` warnings: new `LISTING_RECORD_MISSING` (warn), `LISTING_UNAPPROVED` (warn), `OBSERVED_UNCONFIRMED` (info), `RECEIPT_POINTER_MISSING` (warn); `REGISTRY_MISMATCH` is warn when every difference is a hold, pending-delete or redemption status (error otherwise).
+- `portfolioCheck` step summary: `alerts_n`, `by_code`.
+- `GET /portfolio` rows: `receipt_ref`, `deal_id`. `GET /books.csv`: the same two columns appended at the end.
+
 ## 5.57.0 (2026-10-26): auction-v4 name part is the lift alone (word quality removed after the retail backtest)
 Release note: `docs/releases/v5.57.0.md`.
 MINOR (no migration). `GET /auctions/shortlist` `auction-v4`: the name part is the lift alone (word quality no longer multiplies it) and there is no uncommon-word cap; `parts.name.word_quality` is still shown. Why: `docs/research/backtest-retail-d2-2026-10-26.md`.

@@ -1,4 +1,4 @@
-# Reports (contract v5.57.0)
+# Reports (contract v5.58.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -56,7 +56,7 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `JOB_MISSED` | error | (3.1.0, CR-016) Today's scheduled slot (00:05 UTC) passed more than 30 minutes ago and no daily run was created at or after it (once any daily run exists) | `slot`, `last_run_at` |
 | `JOB_RUN_INCOMPLETE` | error | (3.1.0) A daily run has been queued or running for more than 2 hours | `run_id`, `started_at`, `open_steps[]` |
 | `JOB_OVERDUE` | error | No `daily` job run has finished in the last 26 hours (2.1.0); a run started by hand counts; a never-run service is overdue | `job` (`daily`), `last_run_at` (null if never), `expected_every` (`24h`) |
-| `REGISTRY_MISMATCH` | error | The daily registry check (`portfolioCheck`, 2.3.0) found the name not registered, at another registrar, with another expiry date, or on hold / pending delete / in redemption | `checked_at`, `differences[] {field, ours, registry}` |
+| `REGISTRY_MISMATCH` | error (5.58.0: **warn** when the only differences are hold / pending delete / redemption statuses) | The daily registry check (`portfolioCheck`, 2.3.0) found the name not registered, at another registrar, with another expiry date, or on hold / pending delete / in redemption while the ledger shows it live and not on hold | `checked_at`, `differences[] {field, ours, registry}` |
 | `OWNED_NAME_BLOCKLISTED` | error | The weekly blocklist check found the name on SURBL or Google Web Risk (2.3.0) | `checked_at`, `sources[]` |
 | `DOMAIN_LEFT_ACCOUNT` | error | The daily registrar check found the name gone and no sale is recorded (status unchanged) | `registrar`, `first_absent_at`, `last_checked_at` |
 | `LANDER_AWAITING_MARKETPLACE` | info | (3.7.0, CR-033 G-8) An `afternic`-lander name whose Afternic export was never confirmed uploaded; Afternic serves no page for it yet. `LANDER_DOWN` counts only from the first confirmed upload | `domain` |
@@ -72,6 +72,10 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `EXPORT_STALE` | warn | No confirmed Afternic upload in 7 days while listings changed | `pending[]` |
 | `HOLD_STALE` | warn | A pricing hold has been on for more than 30 days | `reason`, `since` |
 | `PAST_DROP_DATE` | warn | A live name is past its `drop_date` | `drop_date` |
+| `LISTING_RECORD_MISSING` | warn | (5.58.0, CR-079) A name with status `listed` has no `ours_confirmed` Afternic or Sedo record (`listed_venues` has neither). Clears once a record is made (`POST /listings/{domain}/venue`) | `domain`, `status`, `listed_venues` |
+| `LISTING_UNAPPROVED` | warn | (5.58.0, CR-079) A live name has an `ours_confirmed` Afternic or Sedo record, no recorded sale, and no approval trail for it: no `listing_history` row with `approval_text`, the record was not written through the audited `POST /listings/{domain}/venue`, and no **confirmed** upload (`POST /export/{venue}/uploaded`) of that venue contained the name. An export file that was never confirmed does not count. The CR-076 R-4 seed rows are tagged `approval_source: seed_cr076` by the 5.58.0 migration and are never flagged | `domain`, `venue`, `listed_by_hand_at`, `export_confirmed_at` (null) |
+| `OBSERVED_UNCONFIRMED` | info | (5.58.0, CR-079) The newest record of a venue for a live name is a public sighting (`POST /listings/{domain}/observed`) and the venue is not in `listed_venues` | `domain`, `venue` |
+| `RECEIPT_POINTER_MISSING` | warn | (5.58.0, CR-079) A live name has no registration ledger row, or its `receipt_ref` is blank. A stored placeholder such as `godaddy:none` counts as present. `RECEIPT_MISSING` stays for open purchases | `domain`, `deal_id` (when known) |
 | `RECEIPT_MISSING` | warn | A completed purchase has no registrar receipt | `purchase_id` |
 | `RENEWAL_PRICE_UNKNOWN` | warn | No renewal price on record (`committed_forward` is incomplete). Not raised for a name with `drop_date` = `expiry_date` (drop at first expiry, 2.1.0: no renewal is planned) | — |
 | `BIN_MISSING` | warn | Listed in `bin`/`hybrid` without a BIN | — |

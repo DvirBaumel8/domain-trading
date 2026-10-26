@@ -14,6 +14,7 @@ import { activeSelectionSettings } from '../../selection/index.js';
 import type { CheckContext, ScreeningDeps } from '../../selection/index.js';
 import { readCappedBytes } from '../../selection/index.js';
 import { webRiskLookup } from '../../selection/index.js';
+import { ownershipSummary } from '../../reporting/index.js';
 
 type Status = 'ok' | 'fail' | 'unknown';
 type Kind = 'registry' | 'web' | 'blocklist' | 'price';
@@ -56,6 +57,9 @@ export interface PortfolioCheckSummary {
   web: { ok: number; fail: number; unknown: number; skipped: number };
   blocklist: { ok: number; fail: number; unknown: number; skipped: number };
   names: { domain: string; registry: Status; web: Status | 'skipped'; blocklist: Status | 'skipped' }[];
+  /** v5.58.0 (CR-079): the missing-name check, read from the same list GET /report builds: warn and error rows of the ownership codes, and the count of each code (info rows included). */
+  alerts_n?: number;
+  by_code?: Record<string, number>;
 }
 
 export class PortfolioCheckJob {
@@ -106,6 +110,9 @@ export class PortfolioCheckJob {
         } else out.blocklist.skipped += 1;
         out.names.push(row);
       }
+      const own = await ownershipSummary(db, new Date(this.deps.now()));
+      out.alerts_n = own.alerts_n;
+      out.by_code = own.by_code;
       if (!dryRun) {
         await writeJobAudit(db, {
           path: 'portfolio-check', request: {}, at: new Date(this.deps.now()),

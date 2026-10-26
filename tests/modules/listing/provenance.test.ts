@@ -43,12 +43,12 @@ const books = async (h: H) => {
 const venueRows = (domain: string) => db.selectFrom('venue_listings').selectAll().where('domain', '=', domain).orderBy('id').execute();
 
 describe('CR-076 listing provenance', () => {
-  it('PV527-1 (AT-1) after the seed books.csv listed_venues = afternic for the four Line 1 names and empty for mineunited.com; observed_venues is the last column and shows afternic for mineunited.com', async () => {
+  it('PV527-1 (AT-1) after the seed books.csv listed_venues = afternic for the four Line 1 names and empty for mineunited.com; observed_venues is the third last column (receipt_ref, deal_id follow since 5.58.0) and shows afternic for mineunited.com', async () => {
     const { read } = await setup();
     await seedPortfolio();
     await applySeed();
     const b = await books(read);
-    expect(b.head[b.head.length - 1]).toBe('observed_venues');
+    expect(b.head[b.head.length - 3]).toBe('observed_venues'); // v5.58.0 (CR-079): receipt_ref and deal_id are appended after it
     for (const d of NAMES) { expect(b.row(d)('listed_venues'), d).toBe('afternic'); expect(b.row(d)('observed_venues'), d).toBe(''); }
     expect(b.row('mineunited.com')('listed_venues')).toBe('');
     expect(b.row('mineunited.com')('observed_venues')).toBe('afternic');

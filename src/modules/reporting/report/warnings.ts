@@ -12,6 +12,7 @@ import { daysBetween } from '../../candidates/index.js';
 import { activeSelectionSettings } from '../../selection/index.js';
 import { priceValues } from './money.js';
 import { lifecycleWarnings } from './lifecycle.js';
+import { ownershipWarnings } from './ownership.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
 export interface ReportWarning { code: string; level: WarningLevel; domain?: string; message: string; details: Record<string, unknown> }
@@ -137,7 +138,10 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
     }
     if (c.status !== 'fail') continue;
     if (c.kind === 'registry') {
-      add('REGISTRY_MISMATCH', 'error', `${d}: the registry does not agree with our record.`, d, { checked_at: checkedAt, differences: c.details.differences ?? [] });
+      // v5.58.0 (CR-079): a hold / redemption / pending-delete status alone (the ledger shows the name live and not on hold) is a warn; a missing registration, another registrar or another expiry stays an error
+      const diffs = (c.details.differences ?? []) as { field?: string }[];
+      const holdOnly = diffs.length > 0 && diffs.every((x) => x.field === 'status');
+      add('REGISTRY_MISMATCH', holdOnly ? 'warn' : 'error', `${d}: the registry does not agree with our record.`, d, { checked_at: checkedAt, differences: c.details.differences ?? [] });
     } else if (c.kind === 'blocklist') {
       add('OWNED_NAME_BLOCKLISTED', 'error', `${d} is listed on a blocklist.`, d, { checked_at: checkedAt, sources: c.details.sources ?? [] });
     } else if (c.kind === 'web' && st === 'listed') {
@@ -325,6 +329,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
       purchase_id: p.id, state: p.state, age_minutes: ageMinutes, created_at: toJerusalemIso(p.created_at),
     });
   }
+
+  // v5.58.0 (CR-079): the missing-name check (listing record, listing approval, unconfirmed sightings, receipt pointer); the daily step ownershipCheck reads this same list
+  await ownershipWarnings(db, domains, add);
 
   // v4.0.0: renewal drop check, horizon, delist after a sale
   await lifecycleWarnings(db, now, today, domains, add);

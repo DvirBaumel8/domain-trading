@@ -588,6 +588,8 @@ export interface VenueListingsTable {
   seen_price_cents: number | null;
   seen_url: string | null;
   seen_at: Timestamp | null;
+  /** v5.58.0 (CR-079): 'seed_cr076' on the CR-076 R-4 seed rows (set once by the migration); the API never writes it. */
+  approval_source: ColumnType<'seed_cr076' | null, undefined, never>;
 }
 
 export interface PortfolioStatsTable {

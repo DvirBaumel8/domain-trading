@@ -63,9 +63,9 @@ describe('GET /report core: money', () => {
     expect(r.spend.domains).toEqual({ count: 1, max: 40 });
     expect(r.sales).toMatchObject({ count: 1, net_cents: 169575, net: '$1,695.75', gross_cents: 199500, gross: '$1,995.00', commission_cents: 29925, fees_cents: 0, fees: '$0.00' });
     expect(r).toMatchObject({ profit_cents: 167468, profit: '$1,674.68', roi: 79.48, roi_pct: 7948 });
-    // beta-two.com has no renewal price (the fixture's committed_forward gap), which Task 2 reports
+    // beta-two.com has no renewal price (the fixture's committed_forward gap), which Task 2 reports; v5.58.0 (CR-079): the fixture has no registration receipt_ref for it either
     // v4.0.0: alpha-one.com is sold and still to be removed at the hand venues (DELIST_NEEDED)
-    expect(r.warnings.map((w: { code: string; domain: string }) => [w.code, w.domain])).toEqual([['DELIST_NEEDED', 'alpha-one.com'], ['RENEWAL_PRICE_UNKNOWN', 'beta-two.com']]);
+    expect(r.warnings.map((w: { code: string; domain: string }) => [w.code, w.domain])).toEqual([['DELIST_NEEDED', 'alpha-one.com'], ['RECEIPT_POINTER_MISSING', 'beta-two.com'], ['RENEWAL_PRICE_UNKNOWN', 'beta-two.com']]);
     expect(JSON.stringify(r.spend)).not.toContain('"cents"'); // flat pairs only
   });
 

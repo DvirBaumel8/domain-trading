@@ -78,13 +78,13 @@ describe('portfolioCheck: registry', () => {
     ['pendingDelete', registered({ statuses: ['pendingDelete'] }), { field: 'status', registry: 'pendingDelete' }],
     ['clientHold', registered({ statuses: ['clientHold'] }), { field: 'status', registry: 'clientHold' }],
     ['not registered', notRegistered, { field: 'registered', ours: true, registry: false }],
-  ])('%s: a fail row and REGISTRY_MISMATCH (error) with the differences; the next passing check clears it', async (_n, rdap, diff) => {
+  ])('%s: a fail row and REGISTRY_MISMATCH (warn for a hold status, error otherwise) with the differences; the next passing check clears it', async (_n, rdap, diff) => {
     await d001();
     state.rdap = rdap;
     await job().runOnce();
     const w = await warnings();
     expect(w).toHaveLength(1);
-    expect(w[0]).toMatchObject({ code: 'REGISTRY_MISMATCH', level: 'error', domain: D001 });
+    expect(w[0]).toMatchObject({ code: 'REGISTRY_MISMATCH', level: diff.field === 'status' ? 'warn' : 'error', domain: D001 });
     expect(w[0]!.details.differences).toEqual([expect.objectContaining(diff)]);
     expect(w[0]!.details.checked_at).toContain('+03:00');
     clock.t += DAY;

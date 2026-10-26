@@ -1,4 +1,4 @@
-# Data formats (contract v5.57.0)
+# Data formats (contract v5.58.0)
 
 All CSV files: UTF-8, **CRLF** line endings, RFC 4180 quoting (a cell with `,`, `"` or a line break is quoted, `"` doubled), a header row first.
 
@@ -51,9 +51,10 @@ date,type,domain,deal_id,amount_usd,counterparty,receipt_ref,note
 ## Books CSV (`GET /books.csv`)
 `text/csv; charset=utf-8`. **Private:** READ or bots token, never public, never one of the `/export/*` files, because it carries the **walk-away**. One row per live name (status `owned`, `listed` or `delisted`; sold, dropped and pending names are not in it), ordered by domain. **Header, exactly:**
 ```
-domain,display_name,line,category,status,buy_date,cost_usd,expiry_date,renewal_price_usd,renewal_price_source,drop_date,bin_usd,floor_usd,walkaway_usd,min_offer_usd,next_event,next_event_date,listed_venues,observed_venues
+domain,display_name,line,category,status,buy_date,cost_usd,expiry_date,renewal_price_usd,renewal_price_source,drop_date,bin_usd,floor_usd,walkaway_usd,min_offer_usd,next_event,next_event_date,listed_venues,observed_venues,receipt_ref,deal_id
 ```
 - Values are the ones of `GET /portfolio` for the same name: `line` 1 or 2 (S8); `cost_usd` = registration and renewal cost paid (positive, `0.00` when none); `renewal_price_usd` and `renewal_price_source` as recorded (empty when unknown, never `0`); `bin_usd`, `floor_usd`, `walkaway_usd`, `min_offer_usd` the current plan (empty when none); `next_event` / `next_event_date` the next planned price event (`event`, `due_on`); `listed_venues` = the venues whose latest `ours_confirmed` hand-listing record (`POST /listings/{domain}/venue`) is not a removal, sorted, joined with `;` (5.27.0: `unknown` and `observed_public` records never count); `observed_venues` (5.27.0, CR-076, **appended at the end** so an existing diff by column position keeps working) = the venues whose latest record is a public sighting (`POST /listings/{domain}/observed`), sorted, joined with `;`. Money is a plain number with 2 decimals (`715.00`); empty cells for missing values.
+- **Receipt pointer (5.58.0, CR-079 R-4):** `receipt_ref` and `deal_id` are the last two columns (appended; the earlier columns keep their positions): the first registration ledger row of the name (`receipt_ref` as stored, e.g. `porkbun:12047825` or `godaddy:none`; empty when none; `deal_id` empty when none).
 - **Formula guard:** a text cell (`domain`, `display_name`, `category`, `renewal_price_source`) that starts with `=`, `+`, `-`, `@`, a tab or a CR gets a leading apostrophe, as in the ledger CSV.
 
 ## Offers (JSON)

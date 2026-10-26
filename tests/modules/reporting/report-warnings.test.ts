@@ -40,8 +40,11 @@ async function saleFor(domainId: number, o: { confirmed?: boolean; ref: string; 
 }
 describe('GET /report warnings', () => {
   it('a clean fixture has none of the warnings', async () => {
-    await insertOwnedDomain(db, { domain: 'clean-one.com' });
-    await insertOwnedDomain(db, { domain: 'clean-geo.com', status: 'listed', category: 'geo', price_grade: 'weaker', listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, walkaway_cents: 39900, min_offer_cents: 39900, pricing_source: 'formula', pricing_settings_version: 2 });
+    const cleanOne = await insertOwnedDomain(db, { domain: 'clean-one.com' });
+    const cleanGeo = await insertOwnedDomain(db, { domain: 'clean-geo.com', status: 'listed', category: 'geo', price_grade: 'weaker', listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, walkaway_cents: 39900, min_offer_cents: 39900, pricing_source: 'formula', pricing_settings_version: 2 });
+    // v5.58.0 (CR-079): a live name carries a registration receipt pointer; a listed name has an ours_confirmed venue record with its audit row
+    for (const id of [cleanOne, cleanGeo]) await db.insertInto('ledger_entries').values({ occurred_on: '2026-10-04', domain_id: id, type: 'registration', amount_cents: -1108, receipt_ref: 'porkbun:1' }).execute();
+    await db.insertInto('venue_listings').values({ domain: 'clean-geo.com', venue: 'afternic', listed_at: ago(DAY), mode: 'bin', price_cents: 39900, evidence: null, note: null, provenance: 'ours_confirmed', token_name: 'gavriel', audit_id: 'audit-clean' }).execute();
     await seedDailyRun(db, NOW); // a recent daily run, so JOB_OVERDUE (v2.1.0) is not raised
     const t = await boot();
     expect(await t.warnings()).toEqual([]);

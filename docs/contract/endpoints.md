@@ -1,4 +1,4 @@
-# Endpoints (contract v5.57.0)
+# Endpoints (contract v5.58.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -414,6 +414,7 @@ See `reports.md`.
 READ. `{domains: [<per_domain row>]}` (the row shape is in `reports.md` §per_domain). Pending purchases are never listed.
 - **Query (strict):** `status` = `owned` | `listed` | `delisted` | `sold` | `dropped`. Anything else → 400 `VALIDATION_ERROR`.
 - **Venue fields (5.27.0, CR-076):** each row also carries `listed_venues` (sorted array: venues whose latest `ours_confirmed` record is not a removal) and `observed_venues` (venues whose latest record is a public sighting).
+- **Receipt pointer (5.58.0, CR-079 R-4):** each row also carries `receipt_ref` and `deal_id`: the first registration ledger row of the name (`null` when none). Same values as the last two `GET /books.csv` columns.
 
 ### `GET /portfolio/{domain}`
 READ. One domain: `registrar_state` (3.7.0, CR-033 G-6: `{auto_renew, privacy, ns, checked_at}` from the daily `registrarCheck`, read-only `domain/get` and `domain/getNs` at Porkbun; null for other registrars or before the first check), the `per_domain` row plus
