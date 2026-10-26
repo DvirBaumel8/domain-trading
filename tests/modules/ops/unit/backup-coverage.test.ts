@@ -44,6 +44,7 @@ const EXCLUDED: Record<string, string> = {
   engine_uploads: 'scoring-engine data (v5.4.0, CR-056): rebuilt from Gavriel\'s upload files; large, and the nightly export is off',
   engine_sales: 'scoring-engine data (v5.4.0, CR-056): rebuilt from Gavriel\'s upload files; large',
   engine_unsold: 'scoring-engine data (v5.4.0, CR-056): rebuilt from Gavriel\'s upload files; large',
+  engine_auction_ends: 'middle-class engine labels (v5.50.0, P6): ended in-range GoDaddy auctions under the sold line, derived by the datasave step engineFeed from godaddy_auctions_live; rebuilt only going forward; the nightly export is unconfigured',
   engine_endings: 'scoring-engine registry facts (v5.4.0, CR-056): refetched from RDAP by the daily engineEndings step; large',
   owned_ending_events: 'owned-name endings watch (v5.7.0, CR-058): append-only baseline and change log; the weekly check rebuilds the current state (a lost event is not re-raised); the nightly export is unconfigured',
   domain_rdap: 'loaded candidate-pool registry facts (v5.12.0, CR-063): reloaded from the bot\'s files; pruned daily',

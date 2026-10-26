@@ -327,6 +327,20 @@ describe('/report REVIEW_OVERDUE', () => {
     const w = (await codes()).find((x) => x.code === 'REVIEW_OVERDUE');
     expect(w).toMatchObject({ level: 'warn', details: { last_feedback_at: expect.stringMatching(/\+03:00$/) } });
   });
+
+  it('v5.50.0 (P8) RO-1 not raised while the outside review is disabled; raised again when it is switched back on', async () => {
+    const t = await boot();
+    const overdue = async () => ((await t.get('/report')).json().warnings as { code: string }[]).some((w) => w.code === 'REVIEW_OVERDUE');
+    await t.doc('Doc\n');
+    const id = (await t.post('/reviews/packet')).json().packet_id as string;
+    await t.post(`/reviews/${id}/feedback`, feedbackOk([]));
+    t.clock.t = T0 + 40 * HOUR;
+    expect(await overdue()).toBe(true);
+    await db.insertInto('review_settings_changes').values({ by: 'test', enabled: false, model: 'gemini-3.8-flash', tier: 'free', old: '{}' }).execute();
+    expect(await overdue()).toBe(false);
+    await db.insertInto('review_settings_changes').values({ by: 'test', enabled: true, model: 'gemini-3.8-flash', tier: 'free', old: '{}' }).execute();
+    expect(await overdue()).toBe(true);
+  });
 });
 
 describe('append-only (CR-011 part B tables)', () => {

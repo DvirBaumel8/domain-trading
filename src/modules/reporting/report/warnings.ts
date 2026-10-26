@@ -31,6 +31,8 @@ export const DB_SIZE_WARN_PERCENT = 70;
 const DAILY_JOB_MISSED_HOURS = 26;
 /** v5.7.0: ENDING_REGISTERED is raised for an event this recent. */
 const ENDING_REGISTERED_DAYS = 30;
+/** v5.50.0 (P8): DROP_FEED_STALE stays info from this many days without a drop list. */
+const DROP_FEED_IDLE_DAYS = 14;
 const RANK: Record<WarningLevel, number> = { error: 0, warn: 1, info: 2 };
 
 /** `opts.domains` / `opts.pendingAfternic`: rows the caller already loaded for the same report (loadReportDomains, pendingDomains(db, 'afternic')). */
@@ -99,7 +101,11 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
     });
   }
   // CR-011 part B: once any review feedback exists, the newest must not be older than REVIEW_OVERDUE_HOURS.
-  const lastFeedback = await db.selectFrom('review_feedback').select('created_at').orderBy('created_at', 'desc').limit(1).executeTakeFirst();
+  // v5.50.0 (P8): only while the outside review is enabled (the same setting as /health `review`); a switched-off review is not overdue.
+  // (read from review_settings_changes directly: outreach imports reporting, so reporting cannot import outreach; no row = the default, enabled)
+  const reviewRow = await db.selectFrom('review_settings_changes').select('enabled').orderBy('id', 'desc').limit(1).executeTakeFirst();
+  const reviewOn = reviewRow ? reviewRow.enabled : true;
+  const lastFeedback = reviewOn ? await db.selectFrom('review_feedback').select('created_at').orderBy('created_at', 'desc').limit(1).executeTakeFirst() : undefined;
   if (lastFeedback && now.getTime() - lastFeedback.created_at.getTime() > REVIEW_OVERDUE_HOURS * 3_600_000) {
     add('REVIEW_OVERDUE', 'warn', `No review feedback has been recorded for over ${REVIEW_OVERDUE_HOURS} hours.`, undefined, { last_feedback_at: toJerusalemIso(lastFeedback.created_at) });
   }
@@ -178,6 +184,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   const regState = await sql<{ domain: string; checked_at: Date; auto_renew: boolean | null; privacy: boolean | null; ns: string[] | null }>`
     select distinct on (domain) domain, checked_at, auto_renew, privacy, ns from registrar_state_checks order by domain, id desc`.execute(db);
   const byName = new Map(domains.map((d) => [d.domain, d]));
+  // v5.50.0 (P8): a name with an active visit forward (CR-068) reaches the lander through the forward, so its stored lander_ns is stale by design
+  // (visits/store.ts isCountable) and nothing is reported about its nameserver state (NS_UNVERIFIED, REGISTRAR_DRIFT `nameservers`). Privacy drift still counts.
+  const forwarded = new Set((await db.selectFrom('visit_forwards').select('domain').where('reverted_at', 'is', null).execute()).map((r) => r.domain));
   for (const r of regState.rows) {
     const d = byName.get(r.domain);
     if (!d || !live(d.status)) continue;
@@ -187,7 +196,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
     }
     const drift: string[] = [];
     if (r.privacy === false) drift.push('privacy_off');
-    if (r.ns !== null && d.lander_ns !== null && !sameNsSet(r.ns, d.lander_ns)) drift.push('nameservers');
+    if (!forwarded.has(d.domain) && r.ns !== null && d.lander_ns !== null && !sameNsSet(r.ns, d.lander_ns)) drift.push('nameservers');
     if (drift.length > 0) {
       add('REGISTRAR_DRIFT', 'warn', `${d.domain}: the registrar state differs from the plan (${drift.join(', ')}).`, d.domain, { drift, privacy: r.privacy, ns: r.ns, lander_ns: d.lander_ns, checked_at: checkedAt });
     }
@@ -200,7 +209,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   const feed = (await activeSelectionSettings(db)).values.intake;
   if (newestDate !== null && daysBetween(newestDate, today) > feed.drop_feed_stale_days) {
     const list = await db.selectFrom('drop_lists').select('name').where('list_date', '=', newestDate).orderBy('created_at', 'desc').limit(1).executeTakeFirst();
-    add('DROP_FEED_STALE', feed.drop_feed_stale_level, `The newest drop list is from ${newestDate}; upload today's list.`, undefined, { newest_list: list?.name ?? null, newest_list_date: newestDate });
+    // v5.50.0 (P8): 14 or more days without a list means the drop-list side line is idle, not broken: info whatever the setting says (a `warn` setting applies below 14 days)
+    const idle = daysBetween(newestDate, today) >= DROP_FEED_IDLE_DAYS;
+    add('DROP_FEED_STALE', idle ? 'info' : feed.drop_feed_stale_level, `The newest drop list is from ${newestDate}; upload today's list.`, undefined, { newest_list: list?.name ?? null, newest_list_date: newestDate });
   }
 
   // sales
@@ -234,7 +245,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   const settingsOf = new Map<number, Awaited<ReturnType<typeof settingsByVersion>>>();
   for (const v of exceptionVersions) settingsOf.set(v, await settingsByVersion(db, v));
   for (const d of domains) {
-    if (d.lander_ns && d.ns_verified_at === null && (d.status === 'owned' || d.status === 'listed')) {
+    if (d.lander_ns && d.ns_verified_at === null && !forwarded.has(d.domain) && (d.status === 'owned' || d.status === 'listed')) {
       add('NS_UNVERIFIED', 'warn', `${d.domain}: the nameservers are not verified as the lander's.`, d.domain, { lander: d.lander, lander_ns: d.lander_ns });
     }
     // unreachable under the domains_category_once_owned CHECK; kept as a defensive rule
@@ -249,9 +260,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
     if (d.renewals_used === 0 && d.renewal_price_cents === null && d.status !== 'sold' && d.status !== 'dropped' && !dropsAtFirstExpiry) {
       add('RENEWAL_PRICE_UNKNOWN', 'warn', `${d.domain} has no renewal price on record.`, d.domain);
     }
-    if (d.status === 'listed' && (d.listing_mode === 'hybrid' || d.listing_mode === 'offer') && d.floor_cents !== null && d.bin_cents !== null && d.floor_cents < d.bin_cents) {
-      add('FLOOR_AUTO_ACCEPT', 'info', `${d.domain}: Afternic auto-accepts any offer at or above the floor.`, d.domain, { ...pair('floor', d.floor_cents), ...pair('bin', d.bin_cents) });
-    }
+    // v5.50.0 (P8): FLOOR_AUTO_ACCEPT is no longer a /report warning (it fired for every hybrid name by design); POST /list and /pricing/preview still return it at plan time.
     if (d.status === 'listed' && (d.listing_mode === 'bin' || d.listing_mode === 'hybrid') && d.bin_cents === null) add('BIN_MISSING', 'warn', `${d.domain} is listed without a BIN.`, d.domain);
     if (live(d.status) && d.drop_date && d.drop_date < today) add('PAST_DROP_DATE', 'warn', `${d.domain} is past its drop date (${d.drop_date}); mark it dropped.`, d.domain, { drop_date: d.drop_date });
     if (live(d.status) && d.renewals_used === 0 && d.expiry_date && d.expiry_date < today) {

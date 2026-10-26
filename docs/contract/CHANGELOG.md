@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.50.0 (2026-10-26): warnings cleanup (forwarded names, floor auto-accept, review off, paused Dynadot, idle drop feed), lease-to-own in the Afternic export (on, 16 months), GET /engine/rows, auction-end labels
+Release note: `docs/releases/v5.50.0.md`.
+MINOR (migration `1767500000000_v5-50-0.sql`: `settings.afternic_lease_to_own` true, `settings.afternic_lease_months` 16, table `engine_auction_ends`).
+- `/report` warnings: NS_UNVERIFIED and the nameserver part of REGISTRAR_DRIFT are not raised for a name with an active forward; FLOOR_AUTO_ACCEPT is no longer a /report warning (still in `/list` and plan answers); REVIEW_OVERDUE only while the outside review is enabled; DATASAVE_MISSED expects a Dynadot source only when one was uploaded in the last 3 days; DROP_FEED_STALE is info after 14 idle days.
+- `GET /export/afternic.csv` (and the `/list` and pricing previews): Lease to Own `Y`, Max Lease Period `16`, Show Lease to Own Option `Y` for BIN and hybrid names with a BIN of $495 or more (Dvir, 25 Oct 2026); offer rows and lower BINs stay `N`.
+- New `GET /engine/rows` (READ or bots): labelled rows by `kind` (sales, unsold, auction_ends), cursor `after_id`.
+- Datasave `engineFeed`: ended in-range auctions under $100 with bids are stored in `engine_auction_ends` by band (opening, low, mid); `GET /engine/health` `data.auction_ends_n`. Training is unchanged.
+
 ## 5.49.0 (2026-10-26): improvement pass: storage cap on closeout expiries and the data-save pool, auction score v4 (position in the field, free GoDaddy demand fields, headroom as a filter), paper trading, $23 renewal ($55 maximum)
 Release note: `docs/releases/v5.49.0.md`.
 MINOR (migration `1767400000000_v5-49-0.sql`: `settings.closeout_expiry_collect_max` 1000, `datasave_pool_keep_days` 3 -> 2, index `datasave_pool_domain` dropped, `shortlist_renewal_cents` 1100 -> 2300, `godaddy_auctions_live` demand columns, table `auction_outcomes`).

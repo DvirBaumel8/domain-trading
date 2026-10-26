@@ -11,7 +11,7 @@ import { sellPlanLine } from '../pricing/present.js';
 import { pct } from '../pricing/round.js';
 import { buildSchedule } from '../pricing/schedule.js';
 import { currentSettings } from '../pricing/settings.js';
-import { afternicRow } from '../export.js';
+import { afternicRow, leaseOf } from '../export.js';
 import { isCategory } from '../listing-v2.js';
 import { scheduleView } from '../plan-view.js';
 
@@ -77,10 +77,11 @@ export function registerPricing(app: FastifyInstance, deps: { db: Kysely<Databas
     if (dropDate <= listedOn) throw new AppError(400, 'VALIDATION_ERROR', 'drop_date must be after listed_on');
     const schedule = buildSchedule({ plan, anchor: listedOn, dropDate, settings: s });
 
+    const st = await deps.db.selectFrom('settings').select(['afternic_lease_to_own', 'afternic_lease_months']).executeTakeFirstOrThrow();
     const a = afternicRow({
       domain: domainKey, display_name: name, listing_mode: plan.mode, bin_cents: plan.binCents,
       floor_cents: plan.floorCents, min_offer_cents: plan.minOfferCents, lto_max_months: null,
-    });
+    }, leaseOf(st));
 
     return {
       settings_version: plan.settingsVersion, category: plan.category, mode: plan.mode, pricing_source: plan.pricingSource, grade: plan.grade,

@@ -69,6 +69,11 @@ async function lastUpload(db: Kysely<Database>, kind: Kind) {
 export async function engineHealth(db: Kysely<Database>, nowMs: number) {
   const s = await db.selectFrom('engine_sales').select((eb) => [eb.fn.countAll<string>().as('n'), eb.fn.max('sale_date').as('newest')]).executeTakeFirstOrThrow();
   const u = await db.selectFrom('engine_unsold').select((eb) => [eb.fn.countAll<string>().as('n'), eb.fn.max('observation_date').as('newest')]).executeTakeFirstOrThrow();
+  // v5.50.0 (P6): the middle class, counted by band
+  const ae = await db.selectFrom('engine_auction_ends').select(['band', (eb) => eb.fn.countAll<string>().as('n'), (eb) => eb.fn.max('end_date').as('newest')]).groupBy('band').execute();
+  const auctionEnds = { opening: 0, low: 0, mid: 0 };
+  let aeNewest: string | null = null;
+  for (const r of ae) { auctionEnds[r.band] = Number(r.n); const d = r.newest as string | null; if (d && (aeNewest === null || d > aeNewest)) aeNewest = d; }
   const today = dayNumber(idtDay(nowMs));
   const age = (d: string | null) => (d === null ? null : Math.max(0, today - dayNumber(d)));
   const model = await db.selectFrom('engine_models').select(['id', 'finished_at', 'dataset', 'metrics', 'chosen_weighting']).where('status', '=', 'done').orderBy('n', 'desc').limit(1).executeTakeFirst();
@@ -96,7 +101,8 @@ export async function engineHealth(db: Kysely<Database>, nowMs: number) {
     bars_passed: bars.filter((b) => b.status === 'pass').map((b) => b.id),
     last_training: lastRun ? { train_id: lastRun.id, status: lastRun.status, at: toJerusalemIso(lastRun.created_at), error: lastRun.error } : null,
     data: {
-      sales_n: Number(s.n), unsold_n: Number(u.n), sales_newest: newestSale, unsold_newest: newestUnsold,
+      sales_n: Number(s.n), unsold_n: Number(u.n),
+      auction_ends_n: { ...auctionEnds, total: auctionEnds.opening + auctionEnds.low + auctionEnds.mid }, auction_ends_newest: aeNewest, sales_newest: newestSale, unsold_newest: newestUnsold,
       data_age_days: { sold: age(newestSale), unsold: age(newestUnsold) },
       last_upload: { sales: await lastUpload(db, 'sales'), unsold: await lastUpload(db, 'unsold') },
     },

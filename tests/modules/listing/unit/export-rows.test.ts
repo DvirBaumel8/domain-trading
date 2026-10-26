@@ -61,4 +61,18 @@ describe('Sedo rows (LX-5)', () => {
     expect(sedoRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 95000, min_offer_cents: 95000 }), T, 'buy_now')).toEqual(['example.com', 'FIXED', 'yes', '1995', '', 'USD', 'ADD', '']));
   it('hybrid make_offer → make offer + price expectation + min', () =>
     expect(sedoRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 95000, min_offer_cents: 95000 }), T, 'make_offer')).toEqual(['example.com', 'OFFER', 'yes', '1995', '950', 'USD', 'ADD', '']));
+
+  describe('v5.50.0 (P9) lease to own from the setting', () => {
+    const on = { on: true, months: 16 };
+    it('LX-10 hybrid and bin names print Y, the months and Show Lease to Own Y', () => {
+      expect(cells(afternicRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 129500, min_offer_cents: 10000 }), on))).toBe('example.com,1995,1295,100,Y,16,Custom Lander,Y,Y,Y,N');
+      expect(cells(afternicRow(d({ bin_cents: 49900, floor_cents: 49900, min_offer_cents: 49900 }), on))).toBe('example.com,499,499,499,Y,16,Buy It Now,Y,Y,N,N');
+    });
+    it('LX-11 a name\'s own LTO months win; a BIN under $495 and an offer row stay N; the setting off gives the old file', () => {
+      expect(cells(afternicRow(d({ listing_mode: 'hybrid', bin_cents: 499900, floor_cents: 250000, min_offer_cents: 100000, lto_max_months: 24 }), on))).toBe('example.com,4999,2500,1000,Y,24,Custom Lander,Y,Y,Y,N');
+      expect(cells(afternicRow(d({ bin_cents: 39900, floor_cents: 39900, min_offer_cents: 39900 }), on))).toBe('example.com,399,399,399,N,,Buy It Now,Y,N,N,N');
+      expect(cells(afternicRow(d({ listing_mode: 'offer', bin_cents: null, floor_cents: null, min_offer_cents: 50000 }), on))).toBe('example.com,0,,500,N,,Custom Lander,N,N,Y,N');
+      expect(cells(afternicRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 129500, min_offer_cents: 10000 }), { on: false, months: 16 }))).toBe('example.com,1995,1295,100,N,,Custom Lander,Y,N,Y,N');
+    });
+  });
 });

@@ -110,6 +110,15 @@ describe('CR-023 G: DROP_FEED_STALE settings', () => {
     expect(w[0]).toMatchObject({ level: 'info', details: { newest_list: 'dl-old' } });
   });
 
+  it('v5.50.0 (P8) DF-1 a warn setting stays warn up to 13 days and is info from 14 days (the side line is idle)', async () => {
+    const x = await h();
+    await patchActiveSettings(['intake'], { drop_list_max_share: 1, drop_feed_stale_days: 2, drop_feed_stale_level: 'warn' });
+    await listAged(x, 13);
+    expect(stale(await report(x))[0].level).toBe('warn');
+    x.clock.t += DAY; // a day later the same list is 14 days old
+    expect(stale(await report(x))[0].level).toBe('info');
+  });
+
   it('AC-10 days 2 + level warn restores the old behaviour: 3 days old is a warn', async () => {
     const x = await h();
     await patchActiveSettings(['intake'], { drop_list_max_share: 1, drop_feed_stale_days: 2, drop_feed_stale_level: 'warn' });

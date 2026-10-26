@@ -95,6 +95,9 @@ export interface SettingsTable {
   allowed_registrars: Generated<string[]>;
   high_value_min_bin_cents: Generated<number>;
   sedo_hybrid_as: Generated<'buy_now' | 'make_offer'>;
+  /** v5.50.0 (P9, Dvir 25 Oct 2026): the Afternic export prints Lease to Own Y with this many months max (BIN at least $495). Migration only. */
+  afternic_lease_to_own: Generated<boolean>;
+  afternic_lease_months: Generated<number>;
   updated_at: TimestampDefault;
 }
 
@@ -804,6 +807,17 @@ export interface SalesCompsTable {
   engine_sale_id: number | null;
   by: string;
   audit_id: string | null;
+  created_at: TimestampDefault;
+}
+
+/** v5.50.0 (P6): the middle class of the engine labels, one row per ended in-range GoDaddy auction under the sold line with at least one bid. Append-only. */
+export interface EngineAuctionEndsTable {
+  id: Generated<number>;
+  domain: string;
+  end_date: DateString;
+  final_price_cents: number;
+  bids: number;
+  band: 'opening' | 'low' | 'mid';
   created_at: TimestampDefault;
 }
 
@@ -1991,6 +2005,7 @@ export interface Database {
   engine_uploads: EngineUploadsTable;
   engine_sales: EngineSalesTable;
   engine_unsold: EngineUnsoldTable;
+  engine_auction_ends: EngineAuctionEndsTable;
   domain_rdap: DomainRdapTable;
   live_checks: LiveChecksTable;
   tm_kills: TmKillsTable;

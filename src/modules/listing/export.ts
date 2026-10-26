@@ -26,7 +26,13 @@ function usd(cents: number | null, round: { dropped: boolean }): string {
   return String(Math.floor(cents / 100));
 }
 
-export function afternicRow(d: ExportDomain): { row: { cells: string[] } | { skip: string }; warnings: string[] } {
+/** v5.50.0 (P9): the Afternic lease-to-own switch (settings `afternic_lease_to_own`, `afternic_lease_months`). Absent = off (the old file). */
+export interface AfternicLease { on: boolean; months: number }
+/** Afternic's own floor for a lease-to-own BIN (listing-strategy.md "LTO": $495). A cheaper name is exported without the lease, else Afternic may reject the row. */
+export const AFTERNIC_LTO_MIN_BIN_CENTS = 49_500;
+export const leaseOf = (s: { afternic_lease_to_own: boolean; afternic_lease_months: number }): AfternicLease => ({ on: s.afternic_lease_to_own, months: s.afternic_lease_months });
+
+export function afternicRow(d: ExportDomain, lease: AfternicLease = { on: false, months: 0 }): { row: { cells: string[] } | { skip: string }; warnings: string[] } {
   if (!d.listing_mode) return { row: { skip: 'NOT_LISTED' }, warnings: [] };
   const round = { dropped: false };
   const min = usd(d.min_offer_cents, round);
@@ -37,15 +43,22 @@ export function afternicRow(d: ExportDomain): { row: { cells: string[] } | { ski
     if (isValidDisplayName(d.domain, d.display_name)) name = d.display_name;
     else warnings.push(`DISPLAY_NAME_IGNORED:${d.domain}`);
   }
+  // v5.50.0 (P9): a name's own lease (override) wins; else the global setting, for bin and hybrid names whose BIN reaches Afternic's lease minimum ($495).
+  const leaseMonths = (): number | null => {
+    if (d.lto_max_months !== null) return d.lto_max_months;
+    return lease.on && d.bin_cents !== null && d.bin_cents >= AFTERNIC_LTO_MIN_BIN_CENTS ? lease.months : null;
+  };
   let cells: string[];
   if (d.listing_mode === 'bin') {
     const bin = usd(d.bin_cents, round);
-    cells = [name, bin, bin, bin, 'N', '', 'Buy It Now', 'Y', 'N', 'N', 'N'];
+    const m = leaseMonths();
+    cells = [name, bin, bin, bin, m !== null ? 'Y' : 'N', m !== null ? String(m) : '', 'Buy It Now', 'Y', m !== null ? 'Y' : 'N', 'N', 'N'];
   } else if (d.listing_mode === 'offer') {
     cells = [name, '0', usd(d.floor_cents, round), min, 'N', '', 'Custom Lander', 'N', 'N', 'Y', 'N'];
   } else {
-    const lto = d.lto_max_months !== null;
-    cells = [name, usd(d.bin_cents, round), usd(d.floor_cents, round), min, lto ? 'Y' : 'N', lto ? String(d.lto_max_months) : '', 'Custom Lander', 'Y', lto ? 'Y' : 'N', 'Y', 'N'];
+    const m = leaseMonths();
+    const lto = m !== null;
+    cells = [name, usd(d.bin_cents, round), usd(d.floor_cents, round), min, lto ? 'Y' : 'N', lto ? String(m) : '', 'Custom Lander', 'Y', lto ? 'Y' : 'N', 'Y', 'N'];
   }
   return { row: { cells }, warnings: round.dropped ? [...warnings, `${d.domain}:AFTERNIC_ROUNDS_DOWN`] : warnings };
 }
@@ -134,13 +147,13 @@ export class ExportService {
    */
   private async snapshot(
     venue: Venue,
-    build: (listed: ExportDomain[], warnings: string[], settings: { sedo_hybrid_as: 'buy_now' | 'make_offer' }) => { csv: string; exported: string[] },
+    build: (listed: ExportDomain[], warnings: string[], settings: { sedo_hybrid_as: 'buy_now' | 'make_offer'; afternic_lease_to_own: boolean; afternic_lease_months: number }) => { csv: string; exported: string[] },
   ): Promise<ExportResult> {
     const fileAt = new Date(this.deps.now());
     const exportId = `exp_${randomUUID()}`;
     const warnings: string[] = [];
     const out = await this.deps.db.transaction().setIsolationLevel('repeatable read').execute(async (trx) => {
-      const settings = await trx.selectFrom('settings').select('sedo_hybrid_as').executeTakeFirstOrThrow();
+      const settings = await trx.selectFrom('settings').select(['sedo_hybrid_as', 'afternic_lease_to_own', 'afternic_lease_months']).executeTakeFirstOrThrow();
       const pending = await pendingDomains(trx, venue);
       const gone = await manualDelist(trx, venue);
       const all = await trx.selectFrom('domains').select(EXPORT_COLS).where('status', '=', 'listed').orderBy('domain').execute();
@@ -165,11 +178,11 @@ export class ExportService {
   }
 
   afternic(): Promise<ExportResult> {
-    return this.snapshot('afternic', (listed, warnings) => {
+    return this.snapshot('afternic', (listed, warnings, s) => {
       const rows: string[][] = [[...AFTERNIC_HEADER]];
       const exported: string[] = [];
       for (const d of listed) {
-        const r = afternicRow(d);
+        const r = afternicRow(d, leaseOf(s));
         warnings.push(...r.warnings);
         if ('cells' in r.row) {
           rows.push(r.row.cells);

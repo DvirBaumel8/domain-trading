@@ -110,14 +110,28 @@ describe('GET /report warnings', () => {
     expect(w.map((x) => [x.domain, x.level])).toEqual([['ns-bad.com', 'warn']]);
   });
 
-  it('BIN_MISSING and FLOOR_AUTO_ACCEPT on listed names', async () => {
+  it('v5.50.0 (P8) NS-1 an active visit forward silences NS_UNVERIFIED and the REGISTRAR_DRIFT nameserver part; a reverted forward does not', async () => {
+    await insertOwnedDomain(db, { domain: 'fwd.com', lander: 'afternic', lander_ns: ['ns1.afternic.com', 'ns2.afternic.com'], ns_verified_at: null });
+    await insertOwnedDomain(db, { domain: 'nofwd.com', lander: 'afternic', lander_ns: ['ns1.afternic.com', 'ns2.afternic.com'], ns_verified_at: null });
+    await insertOwnedDomain(db, { domain: 'rev.com', lander: 'afternic', lander_ns: ['ns1.afternic.com', 'ns2.afternic.com'], ns_verified_at: null });
+    await db.insertInto('visit_forwards').values([
+      { domain: 'fwd.com', target: 'https://x.example/', set_at: ago(DAY) },
+      { domain: 'rev.com', target: 'https://x.example/', set_at: ago(2 * DAY), reverted_at: ago(DAY) },
+    ]).execute();
+    for (const d of ['fwd.com', 'nofwd.com']) {
+      await db.insertInto('registrar_state_checks').values({ domain: d, checked_at: ago(1000), auto_renew: false, privacy: true, ns: ['ns1.porkbun.com', 'ns2.porkbun.com'] } as never).execute();
+    }
+    const w = await (await boot()).warnings();
+    expect(w.filter((x) => x.code === 'NS_UNVERIFIED').map((x) => x.domain)).toEqual(['nofwd.com', 'rev.com']);
+    expect(w.filter((x) => x.code === 'REGISTRAR_DRIFT').map((x) => x.domain)).toEqual(['nofwd.com']);
+  });
+
+  it('BIN_MISSING on listed names; v5.50.0 (P8) FLOOR_AUTO_ACCEPT is no longer a report warning', async () => {
     await insertOwnedDomain(db, { domain: 'nobin.com', status: 'listed', category: 'trend', price_grade: null, listing_mode: 'hybrid', bin_cents: null });
     await listedDomain({ domain: 'hyb.com' });
     const w = await (await boot()).warnings();
     expect(w.filter((x) => x.code === 'BIN_MISSING').map((x) => [x.domain, x.level])).toEqual([['nobin.com', 'warn']]);
-    const f = w.filter((x) => x.code === 'FLOOR_AUTO_ACCEPT');
-    expect(f.map((x) => [x.domain, x.level])).toEqual([['hyb.com', 'info']]);
-    expect(f[0]!.details).toMatchObject({ floor_cents: 129500, bin_cents: 199500 });
+    expect(w.filter((x) => x.code === 'FLOOR_AUTO_ACCEPT')).toEqual([]);
   });
 
   it('RENEWAL_PRICE_UNKNOWN: renewals_used 0 and no price, not sold or dropped', async () => {

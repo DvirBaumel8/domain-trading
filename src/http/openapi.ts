@@ -109,6 +109,7 @@ const SUMMARIES: Record<string, string> = {
   'GET /data/sales-comps': 'Read graded comparable sales (filters host, since, limit)',
   'POST /engine/sales': 'Upload sold names for the scoring engine (1 to 20,000 rows; counts accepted, duplicate, rejected with reasons)',
   'POST /engine/unsold': 'Upload unsold names (dropped after held, registered unsold) for the scoring engine',
+  'GET /engine/rows': 'The stored engine labels (sales, unsold, auction ends) in id order, paged by after_id',
   'GET /engine/lift': 'The current lift table of the auction shortlist: patterns, bins, lifts, counts and the AUC on a seeded holdout',
   'GET /engine/health': 'Scoring engine data counts, age, last uploads, the endings fill progress and the active model',
   'GET /owned/{domain}/endings': 'Current state and event history of the other endings (.net .co .org .io .ai) of an owned name',

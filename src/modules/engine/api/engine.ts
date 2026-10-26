@@ -12,6 +12,7 @@ import { AppError } from '../../../http/errors.js';
 import { ownedEndingsView } from '../endings.js';
 import { engineHealth } from '../health.js';
 import { liftView } from '../lift-train.js';
+import { engineRows, RowsQuery } from '../rows.js';
 import { SCORE_MAX_DOMAINS, type Scorer } from '../score.js';
 import type { EngineTrainer } from '../train.js';
 import { salesMaxDate, setSalesMaxDate, type DbSizeGuard } from '../holdout.js';
@@ -54,6 +55,13 @@ export function registerEngine(app: FastifyInstance, deps: { db: Kysely<Database
   });
 
   app.get('/engine/health', async () => engineHealth(deps.db, deps.now()));
+
+  // v5.50.0 (P6): the stored labels, newest cursor last. READ or bots (a data token is 403 for every GET). A bad query is 400 VALIDATION_ERROR.
+  app.get('/engine/rows', async (req) => {
+    const q = RowsQuery.safeParse(req.query ?? {});
+    if (!q.success) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid query', { issues: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
+    return engineRows(deps.db, q.data);
+  });
 
   // v5.47.0 (F5): the current lift table (bins, lifts, counts, AUC on the seeded holdout)
   app.get('/engine/lift', async () => liftView(deps.db, deps.now()));

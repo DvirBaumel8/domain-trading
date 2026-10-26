@@ -22,13 +22,13 @@ Load the chrome-browser skill and tools first, then open a new tab.
 - **Read the current state first:** `https://www.afternic.com/domains` (All Domains) is a table with Domain, Status, Nameserver, Lease To Own, Buy Now Price, Floor Price, Minimum Offer, Sale Lander, Views (30 days) and Leads. Names already matching the export need nothing. Note Views and Leads for every company name (CR-037).
 - **New names: Add Domains** (`https://www.afternic.com/domains/add`):
   1. **Type the names.** "Upload a File" opens a native file picker the extension can't drive, so type the names instead. **Click inside the big text area by coordinates and type** them one per line. Typing into the element reference didn't register ("0 domains found"); a real click did ("2 domains found"). Then click **Next**.
-  2. **Fix Afternic's defaults on step 2 ("Update Pricing").** They differ from our plan: Lease to Own **On** (turn it Off), no Buy Now (type it into the `$` textbox), no floor, Minimum Offer **$20** (set ours, $100), Sale Lander **"Request Price"** (set ours, Custom Lander).
+  2. **Fix Afternic's defaults on step 2 ("Update Pricing").** They differ from our plan: Lease to Own **On** (keep it On, 16 months at most: Dvir, 25 Oct 2026; the export now prints `Y` and `16` for names with a BIN of $495 or more, and `N` below that), no Buy Now (type it into the `$` textbox), no floor, Minimum Offer **$20** (set ours, $100), Sale Lander **"Request Price"** (set ours, Custom Lander).
      - **Floor and min offer:** click the cell's pencil; an inline `$` box opens. For min offer, select all (cmd+a) first, then type the number and press Tab.
      - **Sale Lander:** click the cell; a dialog opens. Pick the **Custom Lander** card. Its "Custom Lander Options" dropdown defaults to "Buy It Now + Lease To Own"; set it to **"Buy It Now + Make Offer"** (form_input on the combobox), then **Yes, Update**.
-  3. **How the cells edit:** each cell edits through a **pencil icon that appears on hover**. Lease to Own opens an "Update Lease To Own" dialog: switch the toggle to Disabled, then **Save Changes**.
+  3. **How the cells edit:** each cell edits through a **pencil icon that appears on hover**. Lease to Own opens an "Update Lease To Own" dialog: set it to what the export row says (Enabled with the Max Lease Period for `Y`, Disabled for `N`), then **Save Changes**.
   4. **Check before Submit:** check every cell against the export with a screenshot before pressing **Submit**. Submit is the step that lists the names.
 - **Existing names:** edit the row's pencil on All Domains, or use "Download CSV to edit" if many change. Keep "Update" semantics: never anything that replaces or removes other listings.
-- **Verify:** after Submit, reload All Domains. Each name shows **Listed** with the export's prices, Lease to Own Off and Custom Lander. Save a screenshot (`save_to_disk`) for the receipt.
+- **Verify:** after Submit, reload All Domains. Each name shows **Listed** with the export's prices, Lease to Own and Max Lease Period as in the export, and Custom Lander. Save a screenshot (`save_to_disk`) for the receipt.
 - Close the tabs you opened.
 
 ## After the run (Gavriel operates the API, never you)

@@ -7,7 +7,7 @@ import { AppError } from '../../http/errors.js';
 import { nsPendingWarning, RegistrarError, type RegistrarAdapter } from '../registrars/index.js';
 import { checkApproval } from '../../core/approval.js';
 import { changedColumns } from './export-state.js';
-import { afternicRow, loadSedoTemplate, sedoRow, type ExportDomain } from './export.js';
+import { afternicRow, leaseOf, loadSedoTemplate, sedoRow, type ExportDomain } from './export.js';
 import { landerNameservers, sameNsSet } from './lander.js';
 import { addDays, idtDay } from '../../core/dates.js';
 import { buildSchedule, type ScheduleEvent } from './pricing/schedule.js';
@@ -174,7 +174,7 @@ export class ListService {
 
     // Dry run: validation + preview only
     if (body.dry_run) {
-      const a = exportDomain ? afternicRow(exportDomain) : null;
+      const a = exportDomain ? afternicRow(exportDomain, leaseOf(settings)) : null;
       const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath).catch(() => null);
       const previewEvents = plan ? buildSchedule({ plan, anchor, dropDate: row.drop_date!, settings: s, startAfter, lane: row.lane }) : await this.currentEvents(db, row.id, row.plan_id);
       return {

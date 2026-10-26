@@ -229,6 +229,20 @@ describe('DS522 Dynadot bot uploads', () => {
     expect(await codes()).not.toContain('DATASAVE_MISSED');
   });
 
+  it('v5.50.0 (P8) DS550-1 a Dynadot kind with no sealed upload for 3 days counts as paused: nothing is missing and the state stays ok; an upload within 3 days is still expected', async () => {
+    mswServer.use(...inventoryHandlers());
+    const { post, get } = await boot();
+    clock = Date.parse('2026-10-20T15:10:00Z');
+    await runJobToEnd(app!, 'datasave');
+    await post({ kind: 'aftermarket', data_date: '2026-10-17', final: true, rows: [AM('a.com', 'L1', 50000)] });
+    clock = Date.parse('2026-10-20T16:30:00Z'); // the 17th is 3 days back: still expected, the 20th is missing
+    expect((await get('/health')).json().datasave).toBe('partial');
+    clock = Date.parse('2026-10-21T16:30:00Z'); // 4 days since the last sealed upload: paused
+    await runJobToEnd(app!, 'datasave');
+    expect((await get('/health')).json().datasave).toBe('ok');
+    expect(((await get('/report')).json().warnings as { code: string }[]).map((w) => w.code)).not.toContain('DATASAVE_MISSED');
+  });
+
   it('DS522-10 the dynadotCloseouts / dynadotAftermarket steps stay not_configured and report whether a bot upload for today is sealed', async () => {
     mswServer.use(...inventoryHandlers());
     const { post } = await boot();

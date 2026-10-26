@@ -1,4 +1,4 @@
-# Data formats (contract v5.49.0)
+# Data formats (contract v5.50.0)
 
 All CSV files: UTF-8, **CRLF** line endings, RFC 4180 quoting (a cell with `,`, `"` or a line break is quoted, `"` doubled), a header row first.
 
@@ -12,11 +12,12 @@ Domain,Buy Now Price,Floor Price,Min Offer,Lease to Own,Max Lease Period,Sale La
 
 | Mode | Buy Now Price | Floor Price | Min Offer | Lease to Own | Max Lease Period | Sale Lander | Show Buy Now | Show LTO | Show Make Offer | Hidden |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `bin` (geo) | BIN | BIN | BIN | N | (blank) | `Buy It Now` | Y | N | N | N |
-| `hybrid` | BIN | floor | min offer ($100) | N (Y with an LTO override) | months or (blank) | `Custom Lander` | Y | N (Y with LTO) | Y | N |
+| `bin` (geo) | BIN | BIN | BIN | Y (N when lease-to-own is off or BIN < $495) | `afternic_lease_months` (blank when N) | `Buy It Now` | Y | Y (N with the lease) | N | N |
+| `hybrid` | BIN | floor | min offer ($100) | Y (N when lease-to-own is off or BIN < $495; the name's own LTO override months win) | `afternic_lease_months` (16), the override's months, or (blank) | `Custom Lander` | Y | Y with the lease, else N | Y | N |
 | `offer` (override only) | `0` | floor or (blank) | min offer | N | (blank) | `Custom Lander` | N | N | Y | N |
 
-- **The walk-away is never in the file.** Example (hybrid 1995): `PromptInjectionAudit.com,1995,1295,100,N,,Custom Lander,Y,N,Y,N`.
+- **Lease to own (5.50.0, P9; Dvir, 25 Oct 2026: stays on for all names, 16 months at most; it is on in Afternic):** the settings `afternic_lease_to_own` (default true) and `afternic_lease_months` (default 16, 1 to 60) are changed by a migration only. When on, `bin` and `hybrid` rows print `Lease to Own` `Y`, `Max Lease Period` = the months and `Show Lease to Own Option` `Y`. A name whose own `lto_max_months` is set (an LTO override) keeps its months. A name with a BIN under $495 (Afternic's lease minimum) is exported with `N` and a blank period. `offer` rows never carry the lease (no Buy Now). The file does not list allowed period values; 16 is Afternic's own current setting for these names.
+- **The walk-away is never in the file.** Example (hybrid 1995, lease on): `PromptInjectionAudit.com,1995,1295,100,Y,16,Custom Lander,Y,Y,Y,N`.
 - Response headers (`X-Export-Id`, `X-Pending-Changes`, `X-Manual-Delist`, `X-Export-Warnings`): `endpoints.md` §Exports.
 
 ## Sedo bulk upload (`GET /export/sedo.csv`)

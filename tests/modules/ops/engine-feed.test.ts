@@ -159,3 +159,54 @@ describe('EF541 engineFeed', () => {
     expect(await db.selectFrom('engine_unsold').select('domain').execute()).toEqual([{ domain: 'a.com' }]);
   });
 });
+
+describe('EN-110 engineFeed: the middle label class (engine_auction_ends, v5.50.0 P6)', () => {
+  const live = (domain: string, o: { date?: string; price?: number; bids?: number; end?: string } = {}) => db.insertInto('godaddy_auctions_live').values({
+    data_date: o.date ?? '2026-10-19', domain, end_time: new Date(o.end ?? '2026-10-20T09:00:00Z'), auction_type: 'Bid', price_cents: o.price ?? 500, bid_count: o.bids ?? 2,
+  }).execute();
+  const ends = () => db.selectFrom('engine_auction_ends').select(['domain', 'end_date', 'final_price_cents', 'bids', 'band']).orderBy('domain').execute();
+
+  it('EN-110 an ended in-range auction under the sold line with a bid is stored with its last snapshot price and band (opening <= $1, low < $25, mid up to $100); the newest snapshot of a name decides', async () => {
+    await live('open.com', { price: 100, bids: 1 });
+    await live('low.com', { price: 2_499 });
+    await live('mid.com', { price: 2_500 });
+    await live('top.com', { price: 9_999, bids: 7 });
+    await live('multi.com', { date: '2026-10-18', price: 300 });
+    await live('multi.com', { date: '2026-10-19', price: 1_200, bids: 4 });
+    const { job } = mkJob();
+    const r = await job.engineFeed() as Record<string, unknown>;
+    expect(r).toMatchObject({ status: 'ok', auction_ends_candidates_n: 5, auction_ends_inserted_n: 5 });
+    expect(await ends()).toEqual([
+      { domain: 'low.com', end_date: '2026-10-20', final_price_cents: 2_499, bids: 2, band: 'low' },
+      { domain: 'mid.com', end_date: '2026-10-20', final_price_cents: 2_500, bids: 2, band: 'mid' },
+      { domain: 'multi.com', end_date: '2026-10-20', final_price_cents: 1_200, bids: 4, band: 'low' },
+      { domain: 'open.com', end_date: '2026-10-20', final_price_cents: 100, bids: 1, band: 'opening' },
+      { domain: 'top.com', end_date: '2026-10-20', final_price_cents: 9_999, bids: 7, band: 'mid' },
+    ]);
+  });
+
+  it('EN-111 left out: not ended yet, no bid, at or over the sold line, not .com; a name that already has an engine_sales row or reached the sold line in godaddy_auctions; engine_sales and engine_unsold are not touched by this class', async () => {
+    await live('future.com', { end: '2026-10-21T09:00:00Z' });
+    await live('nobid.com', { bids: 0 });
+    await live('line.com', { price: 10_000 });
+    await live('thing.net');
+    await live('sold.com');
+    await live('reached.com');
+    await ended('reached.com', { price: 12_000 });
+    const up = await db.insertInto('engine_uploads').values({ kind: 'sales', received_n: 1, accepted_n: 1, duplicate_n: 0, rejected_n: 0, rejects: '[]', by: 'x', audit_id: null, created_at: new Date(NOW) }).returning('id').executeTakeFirstOrThrow();
+    await db.insertInto('engine_sales').values({ domain: 'sold.com', price_cents: 20_000, sale_date: '2026-10-15', venue: 'sedo', source: 's', source_url: null, upload_id: up.id }).execute();
+    await live('keep.com');
+    const { job } = mkJob();
+    await job.engineFeed();
+    expect((await ends()).map((e) => e.domain)).toEqual(['keep.com']);
+    expect((await sales()).map((x) => x.domain)).toEqual(['reached.com', 'sold.com']); // the uploaded sale and reached.com (fed by the sales rule); nothing from this class
+  });
+
+  it('EN-112 a second run adds nothing (conflict on name and end day does nothing, the candidate query skips stored rows)', async () => {
+    await live('a.com');
+    const { job } = mkJob();
+    expect(await job.engineFeed()).toMatchObject({ auction_ends_candidates_n: 1, auction_ends_inserted_n: 1 });
+    expect(await job.engineFeed()).toMatchObject({ auction_ends_candidates_n: 0, auction_ends_inserted_n: 0 });
+    expect(await ends()).toHaveLength(1);
+  });
+});

@@ -44,6 +44,9 @@ export const POOL_SOURCE = 'godaddy_closeouts';
 export const CLOSEOUTS_FILE = 'closeout_listings.json.zip';
 /** v5.22.0 (CR-071 R-10): the auction files whose rows are followed in godaddy_auctions (when configured). */
 export const AUCTION_FILES: ReadonlySet<string> = new Set(['all_expiring_auctions.json.zip', 'all_biddable_auctions.json.zip', 'all_listings_ending_today.json.zip', 'auctions_ending_today.json.zip']);
+/** v5.50.0 (P6): the bands of engine_auction_ends: opening = final price at most $1, low = under $25, mid = the rest up to the sold line. */
+export const AUCTION_END_OPENING_MAX_CENTS = 100;
+export const AUCTION_END_LOW_MAX_CENTS = 2500;
 /** v5.41.0: where the official ended-auction rows of engineFeed point (the inventory host's file list). */
 export const AUCTION_SOURCE = 'godaddy_auctions_file';
 /** Rough size of one engine row for the database size guard. */
@@ -544,7 +547,7 @@ export class DatasaveJob {
   async engineFeed(): Promise<unknown> {
     const { db } = this.deps;
     const nowMs = this.deps.now();
-    const out = { status: 'ok' as 'ok' | 'db_size_high', unsold_inserted_n: 0, expired_unsold_candidates_n: 0, expired_unsold_inserted_n: 0, sales_inserted_n: 0, skipped_dup_n: 0, regime_n: 0, unsold_candidates_n: 0, sales_candidates_n: 0, rejected_n: 0, unsold_upload_id: null as number | null, sales_upload_id: null as number | null, auction_min_cents: 0, db_bytes_before: null as number | null };
+    const out = { status: 'ok' as 'ok' | 'db_size_high', unsold_inserted_n: 0, expired_unsold_candidates_n: 0, expired_unsold_inserted_n: 0, sales_inserted_n: 0, skipped_dup_n: 0, regime_n: 0, unsold_candidates_n: 0, sales_candidates_n: 0, rejected_n: 0, unsold_upload_id: null as number | null, sales_upload_id: null as number | null, auction_ends_candidates_n: 0, auction_ends_inserted_n: 0, auction_min_cents: 0, db_bytes_before: null as number | null };
     const minCents = (await this.settings()).auctionMinCents;
     out.auction_min_cents = minCents;
     const regime = await loadRegimeTest(db).catch(() => null);
@@ -603,6 +606,29 @@ export class DatasaveJob {
         const r = await storeSales(db, rows, ctx);
         out.sales_inserted_n = r.accepted_n; out.skipped_dup_n += r.duplicate_n; out.rejected_n += r.rejected_n; out.sales_upload_id = r.upload_id;
         if (regime) out.regime_n += ended.filter((a) => regime(a.domain)).length;
+      }
+    }
+
+    // ---- auction ends (v5.50.0, P6): the middle class. An in-range GoDaddy auction that ended under the sold line (minCents) with >= 1 bid has no engine_sales row; its last
+    // godaddy_auctions_live snapshot (price, bids) is stored in engine_auction_ends by band. The price is the last one seen before the end (the final minutes can add a bid).
+    // A name that did reach the sold line (godaddy_auctions says so) or already has an engine_sales row within 20 days is left to engine_sales. engine_sales / engine_unsold are untouched.
+    if (out.status === 'ok') {
+      const ends = (await sql<{ domain: string; end_time: Date; price: number; bids: number }>`select l.domain, l.end_time, l.price_cents as price, l.bid_count as bids from (
+          select distinct on (domain) domain, end_time, price_cents, bid_count from godaddy_auctions_live
+          where end_time < ${new Date(nowMs)} and bid_count >= 1 and price_cents < ${minCents} and domain like '%.com' order by domain, data_date desc, end_time desc) l
+        where not exists (select 1 from godaddy_auctions a where a.domain = l.domain and a.ended and a.last_price_cents >= ${minCents})
+          and not exists (select 1 from engine_sales s where s.domain = l.domain and abs(s.sale_date - (l.end_time at time zone 'Asia/Jerusalem')::date) <= 20)
+          and not exists (select 1 from engine_auction_ends e where e.domain = l.domain and e.end_date = (l.end_time at time zone 'Asia/Jerusalem')::date)
+        order by l.end_time, l.domain limit 20000`.execute(db)).rows;
+      out.auction_ends_candidates_n = ends.length;
+      if (ends.length > 0 && await guard(ends.length)) {
+        for (const part of chunks(ends, 5_000)) {
+          const res = await sql`insert into engine_auction_ends (domain, end_date, final_price_cents, bids, band)
+            select d, e, p, n, case when p <= ${AUCTION_END_OPENING_MAX_CENTS} then 'opening' when p < ${AUCTION_END_LOW_MAX_CENTS} then 'low' else 'mid' end
+            from unnest(${part.map((x) => x.domain)}::text[], ${part.map((x) => idtDay(new Date(x.end_time).getTime()))}::date[], ${part.map((x) => x.price)}::int[], ${part.map((x) => x.bids)}::int[]) as u(d, e, p, n)
+            on conflict (domain, end_date) do nothing`.execute(db);
+          out.auction_ends_inserted_n += Number(res.numAffectedRows ?? 0);
+        }
       }
     }
     return out;

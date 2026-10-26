@@ -99,7 +99,7 @@ describe('exports v2', () => {
     const a3 = await appAt(LATER + HOUR);
     const changed = await get(a3, 'afternic', auth);
     expect(parseCsvStrict(changed.body).map((x) => x[0])).toEqual(['Domain', 'alpharoof.com', 'betaroof.com', 'gammaroof.com']);
-    expect(parseCsvStrict(changed.body).map((x) => x.join(','))[1]).toBe('alpharoof.com,1595,1035,100,N,,Custom Lander,Y,N,Y,N');
+    expect(parseCsvStrict(changed.body).map((x) => x.join(','))[1]).toBe('alpharoof.com,1595,1035,100,Y,16,Custom Lander,Y,Y,Y,N');
     expect(changed.headers['x-pending-changes']).toBe('1');
     expect((await row('alpharoof.com')).export_pending_since).not.toBeNull();
 

@@ -131,7 +131,7 @@ describe('POST /list/{domain}', () => {
     const res = await list({ mode: 'hybrid', bin: 1995, dry_run: true, approval_ref: approval() }, auth);
     expect(res.statusCode).toBe(200);
     const j = res.json();
-    expect(j).toMatchObject({ dry_run: true, valid: true, preview: { afternic: `${D},1995,1295,100,N,,Custom Lander,Y,N,Y,N`, sedo: null } });
+    expect(j).toMatchObject({ dry_run: true, valid: true, preview: { afternic: `${D},1995,1295,100,Y,16,Custom Lander,Y,Y,Y,N`, sedo: null } });
     expect(j.listing.schedule).toHaveLength(4);
     expect(await history()).toHaveLength(0);
     expect(await schedule()).toHaveLength(0);
