@@ -12,6 +12,7 @@ max_rounds: 2
 # CR-079: daily missing-name check (registrar × venues × ledger)
 
 ## Changes
+- 2026-10-26 23:45 IDT (rebuild order, Gavriel confirmed): DOM must ship 5.58.0 (or next) against commit a7920e6 only — fold into `portfolioCheck` with the new warn/info codes. STOP any branch or draft that builds a separate `ownershipCheck` step (DOM answer 1 above is superseded); redo round 1 on the folded shape. Do not activate settings. Report when live on /health with the new codes visible on /report and in the job summary; the 7 ATs must be ready for Gavriel to run. Max 2 rounds; no ship date ask, no Dvir setup, no money, no secrets.
 - 2026-10-26 23:35 IDT (round 1, Gavriel's answers): checks fold into `portfolioCheck` (no `ownershipCheck` step; supersedes DOM answer 1); approval trail = sealed/confirmed export containing the name when `approval_text` is absent (unconfirmed/pending/stale export does not count); severities: warn for LISTING_RECORD_MISSING, LISTING_UNAPPROVED, RECEIPT_POINTER_MISSING, registrar-hold vs ledger mismatch; OBSERVED_UNCONFIRMED stays info. Questions replaced by Decisions.
 
 **Approval:** Gavriel relayed Dvir's Oct 23 widget yes — build this now; freeze override for this one item. Build right away, no ship date (README standing rule). Nothing here needs a step from Dvir. No per-step OK lines.
