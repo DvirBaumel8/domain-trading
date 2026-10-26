@@ -15,6 +15,24 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-27 (DOM): proposal to replace the pick-proof with a historical replay; Dvir wants a common decision before building
+
+**Dvir (27 Oct, chat):** "This process needs time and currently I don't think we should invest time on something that takes months. We need to change it, we need to fetch the data and persist it, we also need to fetch historical data and then to test our logic against historical data. Flow: take the list from 30 days ago and execute our logic, meanwhile pick randoms, then check if some of them actually sold, if yes investigate it and improve." Then: "Before implement it please consult with Gavriel. Do a common decision."
+
+**DOM's proposal (nothing built yet):**
+1. **Pick-proof (CR-062/pickproof):** no new work. Switch off its daily `pickproofSeal` / `pickproofLabels` work and the pool storage; keep the data already sealed (first results would have come about 20 Nov). Your picks side has been empty since 23 Oct anyway.
+2. **Persist the daily lists:** the GoDaddy raw files are kept 7 days on the Mac. Keep a compact daily archive instead: `.com` rows at $250 or less with every field, gzip, on the Mac's disk (not the database). DOM already saved 20-26 Oct this way (186 MB, about 26 MB a day; the disk has 14 GB free). Dynadot lists the same way once the key is in.
+3. **Replay (Dvir's flow), one tool for any saved day D:** run the current filters and score on day D's list exactly as on that day; draw N random names from the same filtered field (seeded, reproducible); look up the outcome of both groups; report the precision of our top N against the randoms, and list every name that did well (ours and the randoms we missed) with its features for a person to investigate.
+   - **Outcomes:** auctions: the final price and bids (next snapshots; known in 1-3 days, so 20-26 Oct can be replayed today). Closeouts: taken vs dropped by RDAP 30 days after the list (from about 20 Nov on the archive). Retail sale: a name later appearing in the public weekly sales reports (your D2 sources: UnreportedSales, DNJournal, DNW).
+   - **Historical data now:** the 7 archived days; the engine rows (148 auction sales, 1,099 dropped closeouts, 994 auction ends); your D2 list (18,155 names, retail outcomes, Jan 2025 - Oct 2026; the sealed half stays closed).
+4. **Where it lives:** a datasave-independent server job (or `npm run replay` on the host) that writes the report to the database and `GET /replay/{date}`; DOM runs it after each change to the logic.
+
+**Questions for you (one round, then we tell Dvir the common decision):**
+1. Do you agree to switch off the pick-proof work, or do you want its sealed days kept running to their 30-day labels?
+2. What counts as "sold" for the replay: final auction price at or above our maximum (we could not have won it), $100+ (investor demand), a later retail sale, or all three reported side by side? DOM proposes all three side by side, with the retail sale as the one that matters most.
+3. Is your D2 method (retail positives vs closeout leftovers, dev/sealed split) the right shape for the closeout replay, so the two match?
+4. Anything from your own iteration harness (the keep rule: EP up, bootstrap 80%, no slice losing more than 5%) that the replay should apply before a logic change is kept? DOM proposes adopting it as is.
+
 ## 2026-10-26 22:45 IDT (Gavriel): backtests posted to the KB; D2 source and name list
 
 **1. Backtest write-up and KB rows (dry run first, then real; 0 rejects, 0 duplicates):**
