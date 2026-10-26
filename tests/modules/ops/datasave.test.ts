@@ -224,12 +224,12 @@ describe('DS521 datasave job', () => {
     expect((await get('/health')).json().datasave).toBe('ok');
   });
 
-  it('DS521-15 pool rows older than the keep days (3) are pruned; the manifest rows stay for good', async () => {
+  it('DS521-15 pool rows older than the keep days (2 since 5.49.0) are pruned; the manifest rows stay for good', async () => {
     const at = (d: string, domain: string) => ({ data_date: d, source: 'godaddy_closeouts', domain, price_cents: 1, ends_at: new Date(NOW) });
     await db.insertInto('datasave_pool').values([at('2026-10-17', 'd17.com'), at('2026-10-18', 'd18.com'), at('2026-10-20', 'd20.com')]).execute();
     await db.insertInto('snapshot_manifests').values({ source: 'godaddy_inventory', data_date: '2026-10-17', file_name: 'z.zip', rows: null, status: 'complete', sealed_at: new Date(NOW) }).execute();
-    expect(await job().snapshotRetention()).toMatchObject({ pool_cutoff_date: '2026-10-18', pool_rows_deleted: 1 });
-    expect((await db.selectFrom('datasave_pool').select('domain').orderBy('domain').execute()).map((r) => r.domain)).toEqual(['d18.com', 'd20.com']);
+    expect(await job().snapshotRetention()).toMatchObject({ pool_cutoff_date: '2026-10-19', pool_rows_deleted: 2 });
+    expect((await db.selectFrom('datasave_pool').select('domain').orderBy('domain').execute()).map((r) => r.domain)).toEqual(['d20.com']);
     expect(await db.selectFrom('snapshot_manifests').select('id').execute()).toHaveLength(1);
   });
 
@@ -280,7 +280,7 @@ describe('DS521 datasave job', () => {
 
   it('DS521-19 the datasave settings come from the settings row (default file list and caps)', async () => {
     const s = await db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days']).executeTakeFirstOrThrow();
-    expect(s).toEqual({ datasave_godaddy_files: FILES, datasave_pool_max_price_cents: 4000, datasave_pool_keep_days: 3, datasave_raw_keep_days: 7 });
+    expect(s).toEqual({ datasave_godaddy_files: FILES, datasave_pool_max_price_cents: 4000, datasave_pool_keep_days: 2, datasave_raw_keep_days: 7 });
     await sql`select 1`.execute(db);
   });
 });
@@ -329,6 +329,19 @@ describe('DS537 in-range GoDaddy auctions with bids (godaddy_auctions_live)', ()
     expect(once[0]).toMatchObject({ domain: 'dup.com', price_cents: 6000, bid_count: 4, domain_age: 1, end_time: new Date('2026-10-21T09:05:00Z') });
     await runJobToEnd(app!, 'datasave');
     expect(await live()).toEqual(once);
+  });
+
+  it('AS549-6 (P3) the free demand fields of the inventory rows (exact-match and developed endings, keyword registrations, search volume, CPC in cents) are stored in godaddy_auctions_live; missing or non-numeric is null; a later file fills a null, never overwrites a value', async () => {
+    await boot();
+    const fx = JSON.parse(readFileSync('tests/fixtures/datasave/godaddy-demand-fields.sample.json', 'utf8')) as { data: Array<Record<string, unknown>>; expected: Record<string, Record<string, number | null>> };
+    const one = fx.data.map((r) => ({ price: '$40', auctionEndTime: END, numberOfBids: 2, ...r })) as Parameters<typeof auctionsJson>[0];
+    day({ 'all_biddable_auctions.json.zip': one, 'all_expiring_auctions.json.zip': [{ domainName: 'charlie.com', price: '$40', auctionEndTime: END, numberOfBids: 2, exactMatchTlds: 4 }, { domainName: 'alpha.com', price: '$40', auctionEndTime: END, numberOfBids: 2, exactMatchTlds: 1 }] });
+    await runJobToEnd(app!, 'datasave');
+    const got = await db.selectFrom('godaddy_auctions_live').select(['domain', 'exact_match_tlds', 'developed_tlds', 'keyword_registrations', 'search_volume', 'cpc_cents']).orderBy('domain').execute();
+    // the files are parsed one after the other and merged by coalesce: the first known value stays, a null is filled by a later file. The expiring file (first) carries only exactMatchTlds for
+    // charlie.com (4: the fixture's own value is a string, so null) and alpha.com (1, kept against the later 8); the other alpha.com fields come from the biddable file.
+    const want = { ...fx.expected, 'alpha.com': { ...fx.expected['alpha.com']!, exact_match_tlds: 1 }, 'charlie.com': { ...fx.expected['charlie.com']!, exact_match_tlds: 4 } };
+    expect(Object.fromEntries(got.map(({ domain, ...rest }) => [domain, rest]))).toEqual(want);
   });
 
   it('DS537-3 raising s8_max_price_cents widens the band on the next run (the band follows the cap)', async () => {

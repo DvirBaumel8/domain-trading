@@ -35,6 +35,7 @@ import { runAuctionShortlist } from '../../auctions/shortlist.js';
 import type { ScreeningDeps } from '../../../selection/index.js';
 import { listZipEntries, openZipEntry } from './zip.js';
 import { streamArrayItems } from './json-stream.js';
+import { demandFields, mergeDemand, type DemandFields } from './auction-fields.js';
 
 export const GODADDY_INVENTORY_BASE = 'https://inventory.auctions.godaddy.com';
 export const GODADDY_SOURCE = 'godaddy_inventory' as const;
@@ -308,14 +309,14 @@ export class DatasaveJob {
     const seen = new Map<string, { end: number; type: string | null; price: number; bids: number }>();
     // v5.37.0: the in-range band (price <= the S8 cap, at least min bids) is read at run time, so it follows the cap
     const band = await db.selectFrom('settings').select(['s8_max_price_cents', 'datasave_auction_live_min_bids']).executeTakeFirstOrThrow();
-    type Live = { end: number; type: string | null; price: number; bids: number; age: number | null; valuation: number | null; views: number | null };
+    type Live = { end: number; type: string | null; price: number; bids: number; age: number | null; valuation: number | null; views: number | null; demand: DemandFields };
     const live = new Map<string, Live>();
     const nonNegInt = (v: unknown): number | null => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= INT4_MAX ? v : null);
     const cap4 = (v: number | null): number | null => (v !== null && v <= INT4_MAX ? v : null);
     let total = 0;
     for await (const raw of streamArrayItems(await openZipEntry(zipPath, entry), 'data')) {
       total++;
-      const r = raw as { domainName?: unknown; auctionType?: unknown; auctionEndTime?: unknown; price?: unknown; numberOfBids?: unknown; isAdult?: unknown; domainAge?: unknown; valuation?: unknown; pageviews?: unknown };
+      const r = raw as { domainName?: unknown; auctionType?: unknown; auctionEndTime?: unknown; price?: unknown; numberOfBids?: unknown; isAdult?: unknown; domainAge?: unknown; valuation?: unknown; pageviews?: unknown; exactMatchTlds?: unknown; developedTlds?: unknown; keywordRegistrations?: unknown; semrushSearchVolume?: unknown; semrushCpc?: unknown };
       if (typeof r.domainName !== 'string' || r.isAdult === true) continue;
       const domain = r.domainName.trim().toLowerCase();
       if (!domain.endsWith('.com')) continue;
@@ -327,7 +328,7 @@ export class DatasaveJob {
         const type = typeof r.auctionType === 'string' ? r.auctionType.slice(0, 40) : null;
         live.set(domain, {
           end: pl ? Math.max(pl.end, end) : end, type: pl?.type ?? type, price: Math.max(pl?.price ?? 0, price), bids: Math.max(pl?.bids ?? 0, bids),
-          age: pl?.age ?? nonNegInt(r.domainAge), valuation: pl?.valuation ?? cap4(priceToCents(r.valuation)), views: pl?.views ?? nonNegInt(r.pageviews),
+          age: pl?.age ?? nonNegInt(r.domainAge), valuation: pl?.valuation ?? cap4(priceToCents(r.valuation)), views: pl?.views ?? nonNegInt(r.pageviews), demand: mergeDemand(pl?.demand, demandFields(r)),
         });
       }
       const isTracked = tracked.has(domain);
@@ -357,9 +358,9 @@ export class DatasaveJob {
     for (let i = 0; i < liveAll.length; i += INSERT_BATCH) {
       const b = liveAll.slice(i, i + INSERT_BATCH);
       // the four files are parsed one after the other for the same data date: merge, never replace
-      await sql`insert into godaddy_auctions_live (data_date, domain, end_time, auction_type, price_cents, bid_count, domain_age, valuation_cents, pageviews)
-        select ${dataDate}::date, d, e::timestamptz, t, p, n, a, v, w
-        from unnest(${b.map(([d]) => d)}::text[], ${b.map(([, x]) => new Date(x.end).toISOString())}::text[], ${b.map(([, x]) => x.type)}::text[], ${b.map(([, x]) => x.price)}::int[], ${b.map(([, x]) => x.bids)}::int[], ${b.map(([, x]) => x.age)}::int[], ${b.map(([, x]) => x.valuation)}::int[], ${b.map(([, x]) => x.views)}::int[]) as u(d, e, t, p, n, a, v, w)
+      await sql`insert into godaddy_auctions_live (data_date, domain, end_time, auction_type, price_cents, bid_count, domain_age, valuation_cents, pageviews, exact_match_tlds, developed_tlds, keyword_registrations, search_volume, cpc_cents)
+        select ${dataDate}::date, d, e::timestamptz, t, p, n, a, v, w, x1, x2, x3, x4, x5
+        from unnest(${b.map(([d]) => d)}::text[], ${b.map(([, x]) => new Date(x.end).toISOString())}::text[], ${b.map(([, x]) => x.type)}::text[], ${b.map(([, x]) => x.price)}::int[], ${b.map(([, x]) => x.bids)}::int[], ${b.map(([, x]) => x.age)}::int[], ${b.map(([, x]) => x.valuation)}::int[], ${b.map(([, x]) => x.views)}::int[], ${b.map(([, x]) => x.demand.exact_match_tlds)}::int[], ${b.map(([, x]) => x.demand.developed_tlds)}::int[], ${b.map(([, x]) => x.demand.keyword_registrations)}::int[], ${b.map(([, x]) => x.demand.search_volume)}::int[], ${b.map(([, x]) => x.demand.cpc_cents)}::int[]) as u(d, e, t, p, n, a, v, w, x1, x2, x3, x4, x5)
         on conflict (data_date, domain) do update set
           end_time = greatest(godaddy_auctions_live.end_time, excluded.end_time),
           auction_type = coalesce(godaddy_auctions_live.auction_type, excluded.auction_type),
@@ -367,7 +368,12 @@ export class DatasaveJob {
           bid_count = greatest(godaddy_auctions_live.bid_count, excluded.bid_count),
           domain_age = coalesce(godaddy_auctions_live.domain_age, excluded.domain_age),
           valuation_cents = coalesce(godaddy_auctions_live.valuation_cents, excluded.valuation_cents),
-          pageviews = coalesce(godaddy_auctions_live.pageviews, excluded.pageviews)`.execute(db);
+          pageviews = coalesce(godaddy_auctions_live.pageviews, excluded.pageviews),
+          exact_match_tlds = coalesce(godaddy_auctions_live.exact_match_tlds, excluded.exact_match_tlds),
+          developed_tlds = coalesce(godaddy_auctions_live.developed_tlds, excluded.developed_tlds),
+          keyword_registrations = coalesce(godaddy_auctions_live.keyword_registrations, excluded.keyword_registrations),
+          search_volume = coalesce(godaddy_auctions_live.search_volume, excluded.search_volume),
+          cpc_cents = coalesce(godaddy_auctions_live.cpc_cents, excluded.cpc_cents)`.execute(db);
     }
     this.liveKept += liveAll.length;
     this.liveBandMax = band.s8_max_price_cents;

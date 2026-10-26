@@ -1,0 +1,17 @@
+{
+  "note": "v5.49.0 (P3): rows in the shape of GoDaddy's all_biddable_auctions.json (inventory host), reduced to the demand fields; invented names and numbers",
+  "data": [
+    { "domainName": "alpha.com", "exactMatchTlds": 8, "developedTlds": 3, "keywordRegistrations": 120, "semrushSearchVolume": 5400, "semrushCpc": 1.37 },
+    { "domainName": "bravo.com", "exactMatchTlds": 0, "developedTlds": 0, "keywordRegistrations": 0, "semrushSearchVolume": 0, "semrushCpc": 0 },
+    { "domainName": "charlie.com", "exactMatchTlds": "7", "developedTlds": null, "semrushSearchVolume": -5, "semrushCpc": "2.10" },
+    { "domainName": "delta.com" },
+    { "domainName": "echo.com", "exactMatchTlds": 1.0, "developedTlds": 1, "keywordRegistrations": 99999999999, "semrushSearchVolume": 12, "semrushCpc": 0.005 }
+  ],
+  "expected": {
+    "alpha.com": { "exact_match_tlds": 8, "developed_tlds": 3, "keyword_registrations": 120, "search_volume": 5400, "cpc_cents": 137 },
+    "bravo.com": { "exact_match_tlds": 0, "developed_tlds": 0, "keyword_registrations": 0, "search_volume": 0, "cpc_cents": 0 },
+    "charlie.com": { "exact_match_tlds": null, "developed_tlds": null, "keyword_registrations": null, "search_volume": null, "cpc_cents": null },
+    "delta.com": { "exact_match_tlds": null, "developed_tlds": null, "keyword_registrations": null, "search_volume": null, "cpc_cents": null },
+    "echo.com": { "exact_match_tlds": 1, "developed_tlds": 1, "keyword_registrations": null, "search_volume": 12, "cpc_cents": 1 }
+  }
+}

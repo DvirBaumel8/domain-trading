@@ -15,7 +15,8 @@ import { activeSelectionSettings, brandMatches, closeoutNameChecker, commonWord,
 import { currentTerms } from '../closeouts/filters.js';
 import { storePrebid } from './prebid-store.js';
 import { adultFilter } from './adult-terms.js';
-import { AUCTION_SCORE_VERSION, AUCTION_SCORE_VERSION_LIFT, maxBidRule, scoreAuction, type EndingsKnown, type ScoreResult } from './shortlist-score.js';
+import { AUCTION_SCORE_VERSION, AUCTION_SCORE_VERSION_V4, fieldPercentile, maxBidRule, scoreAuction, type EndingsKnown, type ScoreInput, type ScoreResult } from './shortlist-score.js';
+import { pickControl, recordOutcomes, updateOutcomes, type OutcomeRow } from './outcomes.js';
 
 export const ENDINGS_BUDGET_MS = 2 * 60_000;
 export const PREBID_BUDGET_MS = 8 * 60_000;
@@ -35,7 +36,7 @@ export interface ShortlistDeps {
 }
 
 interface Cand {
-  domain: string; sld: string; end_time: Date; auction_type: string | null; price_cents: number; bids: number; domain_age: number | null; valuation_cents: number | null; pageviews: number | null;
+  domain: string; sld: string; end_time: Date; auction_type: string | null; price_cents: number; bids: number; domain_age: number | null; valuation_cents: number | null; pageviews: number | null; developed_tlds: number | null; exact_match_tlds: number | null;
   words: string[]; max_bid_cents: number; pre: ScoreResult; flags: string[];
 }
 
@@ -49,8 +50,10 @@ function liftOf(model: { bins: LiftModel['bins'] }, table: SplitV2Table, sld: st
   const asked = (['net', 'co', 'org', 'io', 'ai'] as const).filter((t) => endings[t] === true || endings[t] === false);
   const reg = asked.filter((t) => endings[t] === true).length;
   const words = /^[a-z]+$/.test(sld) ? splitV2(sld, table).length : 0;
-  const input: LiftInput = { len: sld.length, words: words > 0 ? words : null, endings_before: asked.length > 0 ? reg : null, registered_share: asked.length > 0 ? reg / asked.length : null, past_site: null };
-  return scoreLift(model.bins, input);
+  // v5.49.0 (P2): registered_share is served as unknown. It was trained on the 20 sibling names of CR-002, not on the five own endings (both lift features came from the same five lookups,
+  // so one registered ending gave the capped +2 twice). A bin with no row at all (1 word, 4+ words outside the seed) counts 0, not the pattern's lowest lift.
+  const input: LiftInput = { len: sld.length, words: words > 0 ? words : null, endings_before: asked.length > 0 ? reg : null, registered_share: null, past_site: null };
+  return scoreLift(model.bins, input, { emptyBinZero: true });
 }
 
 export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<string, unknown>> {
@@ -59,16 +62,24 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
   const cfg = await db.selectFrom('settings').select(['s8_max_price_cents', 'shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents']).executeTakeFirstOrThrow();
   const latest = await db.selectFrom('godaddy_auctions_live').select((eb) => eb.fn.max('data_date').as('d')).executeTakeFirst();
   const dataDate = latest?.d ? String(latest.d).slice(0, 10) : null;
+  // v5.49.0 (P4): first the end states of the open paper-trading rows, from the snapshot the inventory step just stored (a failure here never stops the shortlist)
+  let outcomesUpdate: Record<string, unknown> | null = null;
+  try { outcomesUpdate = { ...(await updateOutcomes(db, nowMs)) }; } catch (e) { outcomesUpdate = { error: (e as Error).message }; deps.log?.warn({ err: (e as Error).message }, 'auction shortlist: outcomes update failed'); }
   // v5.47.0 (F5): the trained lift table scores the name part (auction-v3); without one the v2 hand shape + endings part stays
   let lift: LiftModel | null = null;
   let liftSplit: SplitV2Table | null = null;
   try { lift = await loadLiftModel(db); if (lift) liftSplit = await liftTable(db); } catch (e) { lift = null; deps.log?.warn({ err: (e as Error).message }, 'auction shortlist: lift table not loaded, using auction-v2'); }
   const liftFor = (sld: string, endings: EndingsKnown): LiftScore | null => (lift && liftSplit ? liftOf(lift, liftSplit, sld, endings) : null);
-  const out: Record<string, unknown> = { status: 'ok', data_date: dataDate, score_version: lift ? AUCTION_SCORE_VERSION_LIFT : AUCTION_SCORE_VERSION, lift_model: lift ? { id: Number(lift.id), auc: lift.auc, source: lift.source } : null, horizon_hours: cfg.shortlist_horizon_hours, size: cfg.shortlist_size };
+  const v4 = lift !== null && liftSplit !== null;
+  const inputOf = (c: Cand, endings: EndingsKnown, pct: number | null, fieldN: number | null): ScoreInput => ({
+    words: c.words.length > 0 ? c.words : [c.sld], letters: c.sld.length, price_cents: c.price_cents, max_bid_cents: c.max_bid_cents, bids: c.bids, domain_age: c.domain_age, pageviews: c.pageviews, endings, lift: liftFor(c.sld, endings),
+    ...(v4 ? { v4: { name_pct: pct, field_n: fieldN, developed_tlds: c.developed_tlds, exact_match_tlds: c.exact_match_tlds } } : {}),
+  });
+  const out: Record<string, unknown> = { status: 'ok', data_date: dataDate, score_version: lift ? AUCTION_SCORE_VERSION_V4 : AUCTION_SCORE_VERSION, lift_model: lift ? { id: Number(lift.id), auc: lift.auc, source: lift.source } : null, horizon_hours: cfg.shortlist_horizon_hours, size: cfg.shortlist_size, outcomes_update: outcomesUpdate };
   if (dataDate === null) return { ...out, status: 'no_data', shortlisted_n: 0 };
 
-  const rows = (await sql<{ domain: string; end_time: Date; auction_type: string | null; price_cents: number; bid_count: number; domain_age: number | null; valuation_cents: number | null; pageviews: number | null }>`
-    select domain, end_time, auction_type, price_cents, bid_count, domain_age, valuation_cents, pageviews from godaddy_auctions_live
+  const rows = (await sql<{ domain: string; end_time: Date; auction_type: string | null; price_cents: number; bid_count: number; domain_age: number | null; valuation_cents: number | null; pageviews: number | null; developed_tlds: number | null; exact_match_tlds: number | null }>`
+    select domain, end_time, auction_type, price_cents, bid_count, domain_age, valuation_cents, pageviews, developed_tlds, exact_match_tlds from godaddy_auctions_live
     where data_date = ${dataDate}::date and end_time > ${new Date(nowMs)} and end_time <= ${new Date(nowMs + cfg.shortlist_horizon_hours * 3_600_000)}
       and price_cents <= ${cfg.s8_max_price_cents} and bid_count >= 1 and domain ~ '^[a-z0-9-]+[.]com$'`.execute(db)).rows;
   out.candidates_n = rows.length;
@@ -97,9 +108,13 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
     if (bad) { dropped.name_rules[bad.code] = (dropped.name_rules[bad.code] ?? 0) + 1; continue; }
     const maxBid = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, saleChanceBp: cfg.shortlist_sale_chance_bp, renewalCents: cfg.shortlist_renewal_cents, commission });
     if (maxBid <= r.price_cents) { dropped.no_headroom_n++; continue; }
-    const pre = scoreAuction({ words: v.words.length > 0 ? v.words : [sld], letters: sld.length, price_cents: r.price_cents, max_bid_cents: maxBid, bids: r.bid_count, domain_age: r.domain_age, pageviews: r.pageviews, endings: {}, lift: liftFor(sld, {}) });
-    cands.push({ domain: r.domain, sld, end_time: r.end_time, auction_type: r.auction_type, price_cents: r.price_cents, bids: r.bid_count, domain_age: r.domain_age, valuation_cents: r.valuation_cents, pageviews: r.pageviews, words: v.words, max_bid_cents: maxBid, pre, flags: [] });
+    const c: Cand = { domain: r.domain, sld, end_time: r.end_time, auction_type: r.auction_type, price_cents: r.price_cents, bids: r.bid_count, domain_age: r.domain_age, valuation_cents: r.valuation_cents, pageviews: r.pageviews, developed_tlds: r.developed_tlds, exact_match_tlds: r.exact_match_tlds, words: v.words, max_bid_cents: maxBid, pre: null as unknown as ScoreResult, flags: [] };
+    c.pre = scoreAuction(inputOf(c, {}, null, null));
+    cands.push(c);
   }
+  // v5.49.0 (P2): auction-v4 name part = the name's position in the day's field. First pass above scored the raw value (quality x lift/100); now every candidate is placed in the sorted field and scored again.
+  const fieldRaw = v4 ? cands.map((c) => c.pre.parts.name.raw ?? 0).sort((a, b) => a - b) : [];
+  if (v4) for (const c of cands) c.pre = scoreAuction(inputOf(c, {}, fieldPercentile(fieldRaw, c.pre.parts.name.raw ?? 0), cands.length));
   const byPre = (a: Cand, b: Cand): number => b.pre.score - a.pre.score || a.end_time.getTime() - b.end_time.getTime() || (a.domain < b.domain ? -1 : 1);
   cands.sort(byPre);
 
@@ -156,7 +171,13 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
   }
 
   // ---- final score and rank
-  const scored = pool.map((c) => ({ c, s: scoreAuction({ words: c.words.length > 0 ? c.words : [c.sld], letters: c.sld.length, price_cents: c.price_cents, max_bid_cents: c.max_bid_cents, bids: c.bids, domain_age: c.domain_age, pageviews: c.pageviews, endings: known.get(c.sld) ?? {}, lift: liftFor(c.sld, known.get(c.sld) ?? {}) }) }));
+  // v4: the raw name value with the endings now known is placed among the field's raw values (the field was scored without endings)
+  const scored = pool.map((c) => {
+    const e = known.get(c.sld) ?? {};
+    if (!v4) return { c, s: scoreAuction(inputOf(c, e, null, null)) };
+    const raw = scoreAuction(inputOf(c, e, null, null)).parts.name.raw ?? 0;
+    return { c, s: scoreAuction(inputOf(c, e, fieldPercentile(fieldRaw, raw), cands.length)) };
+  });
   scored.sort((a, b) => b.s.score - a.s.score || a.c.end_time.getTime() - b.c.end_time.getTime() || (a.c.domain < b.c.domain ? -1 : 1));
   // the suggested maximum follows the final score (weaker names get less); a name whose scaled maximum is not above its price has no room left
   for (const x of scored) x.c.max_bid_cents = maxBidRule({ capCents: cfg.s8_max_price_cents, resaleCents: cfg.shortlist_expected_resale_cents, saleChanceBp: cfg.shortlist_sale_chance_bp, renewalCents: cfg.shortlist_renewal_cents, commission, score: x.s.score });
@@ -204,6 +225,15 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
       }))).execute();
     }
   });
+  // v5.49.0 (P4): paper trading rows of the day: the served names and a deterministic random control of 25 from the rest of the field
+  try {
+    const topNames = new Set(top.map((t) => t.c.domain));
+    const served: OutcomeRow[] = top.filter((t) => t.dropped === null).map((t) => ({ domain: t.c.domain, group: 'shortlist', rank: t.rank, score: t.s.score, max_bid_suggested_cents: t.c.max_bid_cents, first_price_cents: t.c.price_cents, end_time: t.c.end_time }));
+    const ctl = await pickControl(db, dataDate, cands, topNames);
+    const byName = new Map(cands.map((c) => [c.domain, c]));
+    const control: OutcomeRow[] = ctl.map((d) => { const c = byName.get(d)!; return { domain: d, group: 'control', rank: null, score: c.pre.score, max_bid_suggested_cents: null, first_price_cents: c.price_cents, end_time: c.end_time }; });
+    out.outcomes = await recordOutcomes(db, dataDate, [...served, ...control]);
+  } catch (e) { out.outcomes = { error: (e as Error).message }; deps.log?.warn({ err: (e as Error).message }, 'auction shortlist: outcomes not stored'); }
   out.field_n = cands.length;
   out.shortlisted_n = top.length;
   out.served_n = top.filter((t) => t.dropped === null).length;
@@ -220,7 +250,7 @@ export const ShortlistQuery = z.object({
 export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof ShortlistQuery>, nowMs: number) {
   const settings = await db.selectFrom('settings').select(['shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 's8_max_price_cents', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents']).executeTakeFirstOrThrow();
   const liftOn = (await db.selectFrom('lift_models').select('id').limit(1).executeTakeFirst()) !== undefined;
-  const used = { ...settings, score_version: liftOn ? AUCTION_SCORE_VERSION_LIFT : AUCTION_SCORE_VERSION, ...pair('s8_max_price', settings.s8_max_price_cents) };
+  const used = { ...settings, score_version: liftOn ? AUCTION_SCORE_VERSION_V4 : AUCTION_SCORE_VERSION, ...pair('s8_max_price', settings.s8_max_price_cents) };
   const u = used as Record<string, unknown>;
   delete u.s8_max_price_cents; delete u.shortlist_expected_resale_cents; delete u.shortlist_renewal_cents;
   // v5.48.0 (F22): the inputs of the expected-value maximum bid
@@ -302,6 +332,16 @@ export async function getFunnel(db: Kysely<Database>, q: z.infer<typeof FunnelQu
   const sales = await sql<{ n: string; gross: string }>`
     select count(*)::text as n, coalesce(sum(s.sale_price_cents), 0)::text as gross from sales s join domains d on d.id = s.domain_id
     where d.lane = 'S8' and ${idt('s.sold_at')} between ${from}::date and ${to}::date`.execute(db);
+  // v5.49.0 (P4): paper trading over the data dates of the range, one query
+  const pp = await sql<{ s_final: string; s_win: string; s_med: string | null; c_final: string; c_med: string | null; c_100: string }>`
+    select count(*) filter (where "group" = 'shortlist' and final)::text as s_final, count(*) filter (where "group" = 'shortlist' and final and would_win)::text as s_win,
+      (percentile_cont(0.5) within group (order by coalesce(last_seen_price_cents, first_price_cents)) filter (where "group" = 'shortlist' and final))::text as s_med,
+      count(*) filter (where "group" = 'control' and final)::text as c_final,
+      (percentile_cont(0.5) within group (order by coalesce(last_seen_price_cents, first_price_cents)) filter (where "group" = 'control' and final))::text as c_med,
+      count(*) filter (where "group" = 'control' and final and coalesce(last_seen_price_cents, first_price_cents) >= 10000)::text as c_100
+    from auction_outcomes where data_date between ${from}::date and ${to}::date`.execute(db);
+  const p0 = pp.rows[0]!;
+  const med = (x: string | null): number | null => (x === null ? null : Math.round(Number(x)));
   const n = (x: string | null | undefined): number => Number(x ?? 0);
   const d0 = dom.rows[0]!;
   return {
@@ -312,6 +352,7 @@ export async function getFunnel(db: Kysely<Database>, q: z.infer<typeof FunnelQu
     prebids_by_bots: { checks: n(pb.rows[0]!.n), names: n(pb.rows[0]!.names), pass: n(pb.rows[0]!.pass), flag: n(pb.rows[0]!.flag), fail: n(pb.rows[0]!.fail) },
     bid_plans: { created: n(plans.rows[0]!.created), open: n(plans.rows[0]!.open), won: n(plans.rows[0]!.won), lost: n(plans.rows[0]!.lost), withdrawn: n(plans.rows[0]!.withdrawn), expired: n(plans.rows[0]!.expired), ...pair('max_bid_total', n(plans.rows[0]!.max_total)) },
     imported: n(imp.rows[0]!.n),
+    paper: { shortlist: { final_n: n(p0.s_final), would_win_n: n(p0.s_win), median_final_price_cents: med(p0.s_med) }, control: { final_n: n(p0.c_final), median_final_price_cents: med(p0.c_med), reached_100_n: n(p0.c_100) } },
     s8_names: { bought: n(d0.bought), listed_of_bought: n(d0.listed), sold_of_bought: n(d0.sold), listed_now: n(d0.listed_now) },
     traffic_of_bought: vis ? { views_30d: n(vis.views), leads_30d: n(vis.leads), redirect_human_hits: n(vis.hits) } : { views_30d: 0, leads_30d: 0, redirect_human_hits: 0 },
     sold: { count: n(sales.rows[0]!.n), ...pair('gross', n(sales.rows[0]!.gross)) },

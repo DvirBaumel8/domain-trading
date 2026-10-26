@@ -9,8 +9,11 @@
 //   3. `expiryTagOf` is the rule. dropped (final) = 404, a redemption / pending-delete status, or a registration created after the end time (a catcher got it).
 //      held (final) = still registered and the expiry date moved more than 90 days past the end time (bought and renewed). Otherwise pending; unknown at the max day.
 //   4. prune rows older than settings.disappearance_keep_days after the end day.
+//   v5.49.0 (P1): collect keeps at most `closeout_expiry_collect_max` (1000) NEW names per run, the smallest md5(domain) first (deterministic, unbiased: the hash does not know the name's value);
+//      never-checked open rows whose end date is older than today - `closeout_expiry_max_days` are deleted (`stale_deleted_n`): they can no more be decided.
 //   5. v5.47.0 (F19): delete decided rows `closeout_expiry_keep_days` (7) after they were fed (dropped) or decided (held, unknown). A fed row is needed no more, and the pool
 //      no longer holds the name by then (the keep is at least the pool keep + 1 day), so it is not collected again.
+import { createHash } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { addDays, idtDay } from '../../../core/dates.js';
 import { dropStatusOf, RDAP_COM_BASE, rdapLookup as realRdap, type RdapLookup, type RdapLookupFn } from '../../../core/rdap.js';
@@ -47,15 +50,23 @@ export interface ExpirySummary {
   dropped_n: number; held_n: number; pending_n: number; unknown_n: number; caught_n: number; open_n: number; pruned_n: number;
   /** v5.47.0 */
   regime_loaded: boolean; out_of_regime_deleted_n: number; decided_deleted_n: number;
+  /** v5.49.0 (P1) */
+  stale_deleted_n: number; sample_max: number; eligible_new_n: number;
 }
 
-/** Step 1. Bulk: one select of the candidate rows, one multi-row insert per 5,000. */
-async function collect(db: Kysely<Database>, nowMs: number, keepDays: number, regime?: (d: string) => boolean): Promise<number> {
-  if (!regime) return 0; // v5.47.0: never collect without the regime test
+/** v5.49.0 (P1): the md5 of the name as lowercase hex; the sample order (the same as Postgres md5(domain)). */
+export const md5Of = (domain: string): string => createHash('md5').update(domain).digest('hex');
+
+/** Step 1. Bulk: one select of the candidate rows that are not stored yet, the regime filter, the md5 sample, one multi-row insert per 5,000. Returns the rows inserted and the new regime names seen. */
+async function collect(db: Kysely<Database>, nowMs: number, keepDays: number, sampleMax: number, regime?: (d: string) => boolean): Promise<{ inserted: number; eligible: number }> {
+  if (!regime) return { inserted: 0, eligible: 0 }; // v5.47.0: never collect without the regime test
   const horizon = new Date(nowMs + keepDays * DAY);
-  const rows = (await sql<{ domain: string; ends_at: Date }>`select distinct on (domain, ends_at) domain, ends_at from datasave_pool
-    where source = ${POOL_SOURCE} and domain like '%.com' and ends_at <= ${horizon}`.execute(db)).rows;
-  const keep = rows.filter((r) => regime(r.domain));
+  const rows = (await sql<{ domain: string; ends_at: Date }>`select distinct on (p.domain, p.ends_at) p.domain, p.ends_at from datasave_pool p
+    where p.source = ${POOL_SOURCE} and p.domain like '%.com' and p.ends_at <= ${horizon}
+      and not exists (select 1 from closeout_expiries e where e.domain = p.domain and e.ends_at = p.ends_at)`.execute(db)).rows;
+  const inRegime = rows.filter((r) => regime(r.domain));
+  // P1: at most `sampleMax` new names a run, the smallest md5 first (ties by name and end time)
+  const keep = inRegime.map((r) => ({ r, h: md5Of(r.domain) })).sort((a, b) => (a.h < b.h ? -1 : a.h > b.h ? 1 : a.r.domain < b.r.domain ? -1 : a.r.domain > b.r.domain ? 1 : a.r.ends_at.getTime() - b.r.ends_at.getTime())).slice(0, sampleMax).map((x) => x.r);
   const today = idtDay(nowMs);
   let n = 0;
   for (const part of chunks(keep, 5_000)) {
@@ -64,7 +75,7 @@ async function collect(db: Kysely<Database>, nowMs: number, keepDays: number, re
       from unnest(${part.map((x) => x.domain)}::text[], ${part.map((x) => x.ends_at)}::timestamptz[]) as u(domain, ends_at) on conflict do nothing`.execute(db);
     n += Number(res.numAffectedRows ?? 0);
   }
-  return n;
+  return { inserted: n, eligible: inRegime.length };
 }
 
 /** F19: rows that were never asked and are not in the engine's regime are junk (collected before v5.47.0); one select, one delete per 5,000. */
@@ -86,13 +97,19 @@ export async function checkExpiries(deps: ExpiryDeps): Promise<ExpirySummary> {
   const nowMs = deps.now();
   const now = new Date(nowMs);
   const today = idtDay(nowMs);
-  const st = await db.selectFrom('settings').select(['closeout_expiry_wait_days', 'closeout_expiry_recheck_days', 'closeout_expiry_max_days', 'datasave_pool_keep_days', 'disappearance_keep_days', 'closeout_expiry_keep_days']).executeTakeFirstOrThrow();
+  const st = await db.selectFrom('settings').select(['closeout_expiry_wait_days', 'closeout_expiry_recheck_days', 'closeout_expiry_max_days', 'datasave_pool_keep_days', 'disappearance_keep_days', 'closeout_expiry_keep_days', 'closeout_expiry_collect_max']).executeTakeFirstOrThrow();
   const out: ExpirySummary = {
     status: 'nothing_due', collected_n: 0, due_n: 0, regime_due_n: 0, lookups_n: 0, cache_hits_n: 0, cap_left: Math.max(0, deps.capLeft), stopped_reason: null,
     dropped_n: 0, held_n: 0, pending_n: 0, unknown_n: 0, caught_n: 0, open_n: 0, pruned_n: 0, regime_loaded: deps.regime !== undefined, out_of_regime_deleted_n: 0, decided_deleted_n: 0,
+    stale_deleted_n: 0, sample_max: st.closeout_expiry_collect_max, eligible_new_n: 0,
   };
   if (deps.regime) out.out_of_regime_deleted_n = await deleteOutOfRegime(db, deps.regime);
-  out.collected_n = await collect(db, nowMs, st.datasave_pool_keep_days, deps.regime);
+  // P1: a never-checked row whose end date is older than the max window can no more be decided
+  const stale = await sql`delete from closeout_expiries where attempts = 0 and not final and ends_on < ${addDays(today, -st.closeout_expiry_max_days)}::date`.execute(db);
+  out.stale_deleted_n = Number(stale.numAffectedRows ?? 0);
+  const col = await collect(db, nowMs, st.datasave_pool_keep_days, st.closeout_expiry_collect_max, deps.regime);
+  out.collected_n = col.inserted;
+  out.eligible_new_n = col.eligible;
 
   // due: open, the wait is over, and not checked within the recheck interval (IDT days); names that left the list early have their own tag
   const waitCut = addDays(today, -st.closeout_expiry_wait_days);

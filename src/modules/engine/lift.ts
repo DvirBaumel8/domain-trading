@@ -118,13 +118,18 @@ export interface LiftScore {
 
 export const logistic100 = (sum: number): number => Math.round((100 / (1 + Math.exp(-sum))) * 10) / 10;
 
-export function scoreLift(t: LiftBins, i: LiftInput): LiftScore {
+/**
+ * v5.49.0 (P2): `emptyBinZero` = a bin with no row at all on either side (sold + unsold = 0: a shape outside the seed's observed range, e.g. 1 word or 4+ words) counts 0, not the pattern's
+ * lowest lift; a thin bin with some rows keeps the rule above. Off by default (the engine's own scoring is unchanged); the auction shortlist (auction-v4) turns it on.
+ */
+export function scoreLift(t: LiftBins, i: LiftInput, opts: { emptyBinZero?: boolean } = {}): LiftScore {
   const parts: LiftScore['parts'] = [];
   let sum = 0;
   for (const p of PATTERNS) {
     const b = binOf(p, i);
     if (b === null) continue;
-    const lift = t.bins[p]?.[b]?.lift ?? 0;
+    const st = t.bins[p]?.[b];
+    const lift = opts.emptyBinZero && st && st.sold + st.unsold === 0 ? 0 : st?.lift ?? 0;
     parts.push({ pattern: p, bin: b, lift });
     sum += lift;
   }

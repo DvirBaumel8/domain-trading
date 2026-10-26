@@ -71,6 +71,8 @@ export interface SettingsTable {
   closeout_expiry_max_days: Generated<number>;
   /** v5.47.0: days a decided closeout_expiries row is kept after it was fed or decided (never less than the pool keep + 1). Migration only. */
   closeout_expiry_keep_days: Generated<number>;
+  /** v5.49.0 (P1): the most NEW names the collector adds per run, the smallest md5(domain) first. Migration only. */
+  closeout_expiry_collect_max: Generated<number>;
   /** v5.37.0: days the in-range GoDaddy auctions with bids are kept (godaddy_auctions_live) and the fewest bids to keep one. Migration only. */
   datasave_auction_live_keep_days: Generated<number>;
   datasave_auction_live_min_bids: Generated<number>;
@@ -185,6 +187,29 @@ export interface GodaddyAuctionsLiveTable {
   domain_age: number | null;
   valuation_cents: number | null;
   pageviews: number | null;
+  /** v5.49.0 (P3): the free demand fields of the inventory row; null = not in the row */
+  exact_match_tlds: number | null;
+  developed_tlds: number | null;
+  keyword_registrations: number | null;
+  search_volume: number | null;
+  cpc_cents: number | null;
+}
+
+/** v5.49.0 (P4): paper trading of the shortlist and a random control; the end state is filled by the shortlist step. */
+export interface AuctionOutcomesTable {
+  data_date: DateString;
+  domain: string;
+  group: 'shortlist' | 'control';
+  rank: number | null;
+  score: string | number | null;
+  max_bid_suggested_cents: number | null;
+  first_price_cents: number;
+  end_time: Timestamp;
+  last_seen_price_cents: number | null;
+  last_seen_bids: number | null;
+  last_seen_at: Timestamp | null;
+  final: Generated<boolean>;
+  would_win: boolean | null;
 }
 
 /** v5.45.0 (G-127): the best live GoDaddy auctions of a data date, replaced per date by the datasave step auctionShortlist. */
@@ -1877,6 +1902,7 @@ export interface Database {
   godaddy_auctions: GodaddyAuctionsTable;
   godaddy_auctions_live: GodaddyAuctionsLiveTable;
   auction_shortlist: AuctionShortlistTable;
+  auction_outcomes: AuctionOutcomesTable;
   market_sales: MarketSalesTable;
   kb_settings: KbSettingsTable;
   kb_authors: KbAuthorsTable;

@@ -191,7 +191,7 @@ describe('DS522 Dynadot bot uploads', () => {
     expect(a.result_summary).toContain('2 received');
   });
 
-  it('DS522-8 retention: bot-uploaded closeouts follow the pool days (3), aftermarket and closed-auction rows are kept 120 days, manifests stay', async () => {
+  it('DS522-8 retention: bot-uploaded closeouts follow the pool days (2 since 5.49.0), aftermarket and closed-auction rows are kept 120 days, manifests stay', async () => {
     const row = (kind: 'aftermarket' | 'closed_auctions' | 'closeouts', d: string, domain: string) => ({ data_date: d, kind, domain, listing_id: kind === 'aftermarket' ? domain : null, price_cents: 1 });
     await db.insertInto('dynadot_rows').values([
       row('closeouts', '2026-10-17', 'c17.com'), row('closeouts', '2026-10-18', 'c18.com'),
@@ -199,8 +199,8 @@ describe('DS522 Dynadot bot uploads', () => {
     ]).execute();
     await db.insertInto('snapshot_manifests').values({ source: 'dynadot_aftermarket', data_date: '2026-06-22', file_name: 'bot_upload', rows: 1, status: 'complete', sealed_at: new Date(NOW), origin: 'bot_upload' }).execute();
     const r = await new DatasaveJob({ db, now: () => clock, snapshotDir: SNAP }).snapshotRetention() as Record<string, unknown>;
-    expect(r).toMatchObject({ dynadot_closeouts_deleted: 1, dynadot_rows_deleted: 2, dynadot_cutoff_date: '2026-06-23' });
-    expect((await db.selectFrom('dynadot_rows').select('domain').orderBy('domain').execute()).map((x) => x.domain)).toEqual(['a-keep.com', 'c18.com', 'x-keep.com']);
+    expect(r).toMatchObject({ dynadot_closeouts_deleted: 2, dynadot_rows_deleted: 2, dynadot_cutoff_date: '2026-06-23' });
+    expect((await db.selectFrom('dynadot_rows').select('domain').orderBy('domain').execute()).map((x) => x.domain)).toEqual(['a-keep.com', 'x-keep.com']);
     expect(await db.selectFrom('snapshot_manifests').select('id').execute()).toHaveLength(1);
   });
 

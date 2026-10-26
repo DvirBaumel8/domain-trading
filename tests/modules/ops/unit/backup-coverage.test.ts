@@ -21,6 +21,7 @@ const EXCLUDED: Record<string, string> = {
   dynadot_rows: 'rows the bots upload from Dynadot (v5.22.0, CR-071); public market data the bots can upload again, sealed by the manifest sha256; operational',
   godaddy_auctions: 'GoDaddy auction final states (v5.22.0, CR-071 R-10); public market data, rebuilt going forward from the daily files; operational',
   godaddy_auctions_live: 'GoDaddy auctions at or under the S8 cap with bids (v5.37.0), kept 7 days; public market data rebuilt by the next daily files; operational',
+  auction_outcomes: 'paper trading of the shortlist and a random control (v5.49.0, P4): end states read from godaddy_auctions_live, kept 120 days; derived measurement data, rebuilt only going forward',
   auction_shortlist: 'daily auction shortlist (v5.45.0, G-127): derived by the datasave step auctionShortlist from godaddy_auctions_live, engine_endings and the stored pre-bid checks (which are in the backup), replaced per data date; rebuilt by the next daily run',
   market_names: 'market episodes (v5.23.0, CR-075): derived by the datasave `episodes` step from the sealed snapshots and market_sales, so a restore rebuilds them (only the rows whose Dynadot source rows were pruned after 120 days would be lost); small by design (only $500+ episodes); the nightly export is unconfigured',
   market_sales: 'bot-reported sales (v5.23.0, CR-075 R-4): add-only and re-uploadable from the bots\' weekly files (POST /data/sales is idempotent on name, venue, date and source); the nightly export is unconfigured',

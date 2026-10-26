@@ -1,10 +1,11 @@
 // v5.46.0: the unsold feed for closeout names that stayed to their end date (closeout_expiries, step buildPanel, engineFeed). RDAP is a stub; nothing calls the network.
 import { rm } from 'node:fs/promises';
+import { sql } from 'kysely';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { RdapLookup, RdapLookupFn } from '../../../src/core/rdap.js';
 import { loadConfig } from '../../../src/config.js';
 import { loadRegimeTest } from '../../../src/modules/engine/index.js';
-import { checkExpiries, expiryTagOf } from '../../../src/modules/ops/closeouts/expiries.js';
+import { checkExpiries, expiryTagOf, md5Of } from '../../../src/modules/ops/closeouts/expiries.js';
 import { DatasaveJob } from '../../../src/modules/ops/jobs/datasave/datasave.js';
 import { testDb as db } from '../../helpers/db.js';
 import { testEnv } from '../../helpers/env.js';
@@ -183,5 +184,44 @@ describe('ST547 closeout expiries storage (v5.47.0, F19)', () => {
     expect(again.s.decided_deleted_n).toBe(1);
     await db.deleteFrom('datasave_pool').execute(); // the pool keeps only a few days: the name is gone from it when its row goes
     expect((await run({}, { now: NOW + 5 * DAY })).s.collected_n).toBe(0);
+  });
+});
+
+describe('AS549 closeout expiries storage (v5.49.0, P1)', () => {
+  it('AS549-7: the migration state: collect_max 1000, pool keep 2 days, renewal default 2300 (column default and value), the unused datasave_pool (source, domain) index is gone', async () => {
+    const s = await db.selectFrom('settings').select(['closeout_expiry_collect_max', 'datasave_pool_keep_days']).executeTakeFirstOrThrow();
+    expect(s).toEqual({ closeout_expiry_collect_max: 1000, datasave_pool_keep_days: 2 });
+    const def = await sql<{ d: string; t: string }>`select column_default as d, table_name as t from information_schema.columns where table_name = 'settings' and column_name in ('shortlist_renewal_cents', 'datasave_pool_keep_days') order by column_name`.execute(db);
+    expect(def.rows.map((r) => r.d)).toEqual(['2', '2300']);
+    const idx = await sql<{ indexname: string }>`select indexname from pg_indexes where tablename = 'datasave_pool'`.execute(db);
+    expect(idx.rows.map((r) => r.indexname)).toEqual(['datasave_pool_pkey']);
+  });
+
+  it('AS549-8: collect adds at most closeout_expiry_collect_max NEW names a run, the smallest md5(domain) first; the next run takes the next ones (names already stored are not counted)', async () => {
+    const names = Array.from({ length: 12 }, (_, i) => `sample${i}name.com`);
+    for (const n of names) await pool(n);
+    await sql`update settings set closeout_expiry_collect_max = 3`.execute(db);
+    try {
+      const sorted = [...names].sort((a, b) => (md5Of(a) < md5Of(b) ? -1 : 1));
+      const a = await run({}, { all: true });
+      expect(a.s).toMatchObject({ collected_n: 3, sample_max: 3, eligible_new_n: 12 });
+      expect((await rows()).map((r) => r.domain).sort()).toEqual(sorted.slice(0, 3).sort());
+      const b = await run({}, { all: true });
+      expect(b.s).toMatchObject({ collected_n: 3, eligible_new_n: 9 });
+      expect((await rows()).map((r) => r.domain).sort()).toEqual(sorted.slice(0, 6).sort());
+      // the md5 of the code is the md5 of Postgres
+      const pg = (await sql<{ m: string }>`select md5(${names[0]!}) as m`.execute(db)).rows[0]!.m;
+      expect(md5Of(names[0]!)).toBe(pg);
+    } finally { await sql`update settings set closeout_expiry_collect_max = 1000`.execute(db); }
+  });
+
+  it('AS549-9: never-checked open rows whose end date is older than closeout_expiry_max_days are deleted (stale_deleted_n); a checked row and a recent row stay', async () => {
+    const ins = (domain: string, endsOn: string, attempts: number) => sql`insert into closeout_expiries (domain, ends_at, ends_on, first_seen_on, attempts) values (${domain}, ${new Date(`${endsOn}T10:00:00Z`)}, ${endsOn}::date, ${endsOn}::date, ${attempts})`.execute(db);
+    await ins('oldnever.com', '2026-07-01', 0); // 111 days before the 20 Oct "today": past the 80-day window
+    await ins('oldchecked.com', '2026-07-01', 2);
+    await ins('recent.com', '2026-10-10', 0);
+    const r = await run({}, { none: true });
+    expect(r.s.stale_deleted_n).toBe(1);
+    expect((await rows()).map((x) => x.domain).sort()).toEqual(['oldchecked.com', 'recent.com']);
   });
 });

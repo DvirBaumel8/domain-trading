@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.49.0 (2026-10-26): improvement pass: storage cap on closeout expiries and the data-save pool, auction score v4 (position in the field, free GoDaddy demand fields, headroom as a filter), paper trading, $23 renewal ($55 maximum)
+Release note: `docs/releases/v5.49.0.md`.
+MINOR (migration `1767400000000_v5-49-0.sql`: `settings.closeout_expiry_collect_max` 1000, `datasave_pool_keep_days` 3 -> 2, index `datasave_pool_domain` dropped, `shortlist_renewal_cents` 1100 -> 2300, `godaddy_auctions_live` demand columns, table `auction_outcomes`).
+- `GET /auctions/shortlist`: `score_version` `auction-v4` when a lift table exists: name part 70 = the name's position in the day's field (`parts.name.raw`, `parts.name.field_pct`), new `parts.demand` (15: other endings with a live site and exact-match registrations from GoDaddy's file), age 10, bids 5; no headroom points (still a filter). `max_bid_suggested` is $55 at full score (renewal $23).
+- `GET /auctions/funnel`: new `paper` block (shortlisted names' final prices and would-win count at our maximum, against a random control of 25 a day).
+- Datasave `buildPanel`: the closeout expiries collector keeps at most 1,000 new names a run (md5 sample) and deletes never-checked rows past the window (`stale_deleted_n`, `sample_max`, `eligible_new_n`).
+
 ## 5.48.0 (2026-10-26): expected-value maximum bid (F22 option b: 10% sale chance x net resale - renewal, $65 at full score), position in the day's field (field_n, top_pct)
 Release note: `docs/releases/v5.48.0.md`.
 MINOR (migration `1767300000000_v5-48-0.sql`: `settings.shortlist_sale_chance_bp` default 1000, `settings.shortlist_renewal_cents` default 1100, `auction_shortlist.field_n`).

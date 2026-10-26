@@ -10,6 +10,7 @@ import { withDbScope } from '../../../src/core/db-stats.js';
 import type { RdapLookup } from '../../../src/core/rdap.js';
 import { LiftTrainJob } from '../../../src/modules/engine/index.js';
 import { runAuctionShortlist } from '../../../src/modules/ops/auctions/shortlist.js';
+import { updateOutcomes } from '../../../src/modules/ops/auctions/outcomes.js';
 import { DatasaveJob } from '../../../src/modules/ops/jobs/datasave/datasave.js';
 import type { ScreeningDeps } from '../../../src/modules/selection/index.js';
 import { makeApp } from '../../helpers/app.js';
@@ -44,10 +45,11 @@ function screeningDeps(extra: Partial<ScreeningDeps> = {}): ScreeningDeps {
   };
 }
 
-interface Live { price?: number; bids?: number; inH?: number; age?: number | null; views?: number | null; valuation?: number | null; date?: string; type?: string }
+interface Live { dev?: number | null; exact?: number | null; price?: number; bids?: number; inH?: number; age?: number | null; views?: number | null; valuation?: number | null; date?: string; type?: string }
 const live = (domain: string, o: Live = {}) => db.insertInto('godaddy_auctions_live').values({
   data_date: o.date ?? DATE, domain, end_time: new Date(NOW + (o.inH ?? 30) * HOUR), auction_type: o.type ?? 'Bid', price_cents: o.price ?? 5000, bid_count: o.bids ?? 4,
   domain_age: o.age === undefined ? 6 : o.age, valuation_cents: o.valuation === undefined ? 90_000 : o.valuation, pageviews: o.views === undefined ? null : o.views,
+  developed_tlds: o.dev === undefined ? null : o.dev, exact_match_tlds: o.exact === undefined ? null : o.exact,
 }).execute();
 
 const WORDS_A = ['bright', 'blue', 'smart', 'green', 'quiet', 'solid', 'happy', 'fresh'];
@@ -67,7 +69,7 @@ beforeEach(async () => {
   // v5.48.0: the fixtures were priced for a $160 base maximum; 20% chance and no renewal keep it (the default expected-value rule is AS548-1)
   await db.updateTable('settings').set({ shortlist_sale_chance_bp: 2000, shortlist_renewal_cents: 0 }).execute();
 });
-afterEach(async () => { await app?.close(); app = null; await db.updateTable('settings').set({ shortlist_sale_chance_bp: 1000, shortlist_renewal_cents: 1100 }).execute(); });
+afterEach(async () => { await app?.close(); app = null; await db.updateTable('settings').set({ shortlist_sale_chance_bp: 1000, shortlist_renewal_cents: 2300 }).execute(); });
 
 describe('AS545 shortlist: filters and score', () => {
   it('AS545-5: only in-range live auctions that end inside the horizon, with bids, .com, not owned, no open bid plan, and passing the name rules, are listed (counts per filter in the step summary)', async () => {
@@ -409,7 +411,7 @@ describe('ST547 shortlist adult filter (v5.47.0, F20)', () => {
   });
 });
 
-describe('LF547 shortlist with the lift table (auction-v3)', () => {
+describe('LF547 shortlist with the lift table (auction-v3, since 5.49.0 auction-v4)', () => {
   it('LF547-11: with a stored lift table the name part comes from the lift (auction-v3, parts.name.lift, a reason line); without one the v2 score is unchanged', async () => {
     await live('brightstudio.com', { price: 3000, bids: 9, age: 8 });
     await live('solidharborcoffeeplanet.com', { price: 3000, bids: 9, age: 8 });
@@ -420,11 +422,11 @@ describe('LF547 shortlist with the lift table (auction-v3)', () => {
     const trained = await new LiftTrainJob({ db, now: () => NOW }).runOnce();
     expect(trained).toMatchObject({ trained: true, source: 'seed' });
     const v3 = await runStep() as Record<string, any>;
-    expect(v3).toMatchObject({ score_version: 'auction-v3', lift_model: { source: 'seed' } });
+    expect(v3).toMatchObject({ score_version: 'auction-v4', lift_model: { source: 'seed' } });
     const rows3 = await shortlist();
     expect(rows3.map((x) => x.domain)).toEqual(['brightstudio.com', 'solidharborcoffeeplanet.com']); // the short two-word name still ranks above the long four-word one
     for (const x of rows3) {
-      expect(x.score_version).toBe('auction-v3');
+      expect(x.score_version).toBe('auction-v4');
       const lift = (x.parts as any).name.lift;
       expect(lift.score).toBeGreaterThan(0); expect(lift.score).toBeLessThan(100);
       expect(lift.bins.map((b: any) => b.pattern)).toEqual(['length', 'words']); // no endings asked in this test: those patterns are skipped
@@ -434,22 +436,133 @@ describe('LF547 shortlist with the lift table (auction-v3)', () => {
     app = await makeApp({ now: () => NOW });
     const auth = (await issueToken('read')).auth;
     const j = (await app.inject({ method: 'GET', url: '/auctions/shortlist', headers: auth })).json();
-    expect(j.settings.score_version).toBe('auction-v3');
-    expect(j.rows[0].score_version).toBe('auction-v3');
+    expect(j.settings.score_version).toBe('auction-v4');
+    expect(j.rows[0].score_version).toBe('auction-v4');
   });
 });
 
 describe('AS548 expected-value maximum bid (v5.48.0, F22)', () => {
-  it('AS548-1: with the migration defaults (10% chance, $11 renewal) a top name gets at most $65, a name priced at $65 or more has no headroom, and every row carries its field size and top share', async () => {
-    await db.updateTable('settings').set({ shortlist_sale_chance_bp: 1000, shortlist_renewal_cents: 1100 }).execute();
+  it('AS548-1: with the migration defaults (10% chance, $23 renewal) a top name gets at most $55, a name priced at $65 or more has no headroom, and every row carries its field size and top share', async () => {
+    await db.updateTable('settings').set({ shortlist_sale_chance_bp: 1000, shortlist_renewal_cents: 2300 }).execute();
     await live('brightstudio.com', { price: 1000, bids: 9, age: 8 });
     await live('bluewidgets.com', { price: 7000, bids: 4, age: 8 });
     const r = await runStep() as Record<string, any>;
     expect(r.field_n).toBe(1);
     const rows = await shortlist();
     expect(rows.map((x) => x.domain)).toEqual(['brightstudio.com']);
-    expect(rows[0]!.max_bid_suggested_cents).toBeLessThanOrEqual(6_500);
-    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100, score: Number(rows[0]!.score) }));
+    expect(rows[0]!.max_bid_suggested_cents).toBeLessThanOrEqual(5_500);
+    expect(rows[0]!.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 2300, score: Number(rows[0]!.score) }));
     expect(rows[0]!.field_n).toBe(1);
+  });
+});
+
+// ---- v5.49.0: auction-v4 (P2, P3) and paper trading (P4)
+describe('AS549 auction-v4 and paper trading', () => {
+  const get = (url: string, auth: Record<string, string>) => app!.inject({ method: 'GET', url, headers: auth });
+  const trainLift = async () => { expect(await new LiftTrainJob({ db, now: () => NOW }).runOnce()).toMatchObject({ trained: true }); };
+
+  it('AS549-10: with a lift table the step stores auction-v4: no headroom part, a demand part from the free GoDaddy fields, the name part as the position in the day field, a reason that says where the name stands; more demand ranks first at equal name; the maximum bids differ', async () => {
+    await trainLift();
+    const mk = async (name: string, dev: number | null, exact: number | null) => live(name, { price: 2000, bids: 3, age: 6, dev, exact });
+    await mk('bluemarket.com', 0, 0); await mk('bluestudio.com', 3, 12);
+    await mk('greenmarket.com', 1, 2); await mk('greenstudio.com', null, null);
+    for (let i = 0; i < 8; i++) await mk(nameN(i * 5 + 1), i % 4, i);
+    await sql`update settings set shortlist_sale_chance_bp = 1000, shortlist_renewal_cents = 2300`.execute(db);
+    const r = await runStep() as Record<string, any>;
+    expect(r).toMatchObject({ score_version: 'auction-v4', field_n: 12 });
+    const rows = await shortlist();
+    expect(rows.every((x) => x.score_version === 'auction-v4')).toBe(true);
+    const by = Object.fromEntries(rows.map((x) => [x.domain, x]));
+    const parts = (d: string) => by[d]!.parts as any;
+    expect(Object.keys(parts('bluestudio.com')).sort()).toEqual(['age', 'bids', 'demand', 'name']);
+    expect(parts('bluestudio.com').demand).toMatchObject({ known: true, developed_tlds: 3, exact_match_tlds: 12, max: 15, points: 15 });
+    expect(parts('greenstudio.com').demand).toMatchObject({ known: false, points: 0 });
+    expect(by['bluestudio.com']!.rank).toBeLessThan(by['bluemarket.com']!.rank); // same shape and words, more demand
+    expect(by['bluestudio.com']!.score).toBeGreaterThan(by['bluemarket.com']!.score);
+    for (const x of rows) {
+      const pct = parts(x.domain).name.field_pct;
+      expect(pct).toBeGreaterThan(0); expect(pct).toBeLessThanOrEqual(1);
+      expect(x.reasons.some((l: string) => /name in the top \d+% of today's field/.test(l))).toBe(true);
+      expect(x.reasons.join(' ')).not.toContain('sold-like');
+    }
+    expect(new Set(rows.map((x) => x.max_bid_suggested_cents)).size).toBeGreaterThanOrEqual(3); // the ladder is no longer flat
+    // GET /auctions/shortlist serves parts.demand and the version
+    app = await makeApp({ now: () => NOW });
+    const j = (await app.inject({ method: 'GET', url: '/auctions/shortlist', headers: (await issueToken('read')).auth })).json();
+    expect(j.settings.score_version).toBe('auction-v4');
+    expect(j.rows[0].parts.demand).toBeDefined();
+  });
+
+  it('AS549-11: the registered share of the five endings is served as unknown (only endings_before enters the lift); an ending asked and registered does not give the lift twice', async () => {
+    await trainLift();
+    await live('bluemarket.com', { price: 2000, bids: 3 });
+    for (const tld of ['net', 'org', 'co', 'io', 'ai']) await sql`insert into engine_endings (name, tld, registered, checked_at) values ('bluemarket', ${tld}, true, ${new Date(NOW - DAY)})`.execute(db);
+    await runStep();
+    const row = (await shortlist())[0]!;
+    const bins = (row.parts as any).name.lift.bins.map((b: any) => b.pattern);
+    expect(bins).toContain('endings_before');
+    expect(bins).not.toContain('registered_share');
+    expect(row.reasons.some((l: string) => l.startsWith('lift '))).toBe(true);
+  });
+
+  it('AS549-12: the step records paper-trading rows: the served names (group shortlist, rank, score, suggested maximum) and a deterministic control of 25 names of the same field that are not in the list, the smallest md5(domain || data date); a second run gives the same rows', async () => {
+    for (let i = 0; i < 64; i++) await live(nameN(i), { price: 2000, bids: 3 });
+    await sql`update settings set shortlist_sale_chance_bp = 1000, shortlist_renewal_cents = 2300`.execute(db);
+    const r = await runStep() as Record<string, any>;
+    expect(r.outcomes).toEqual({ shortlist_n: 25, control_n: 25 });
+    const rows = await db.selectFrom('auction_outcomes').selectAll().where('data_date', '=', DATE).execute();
+    const sl = rows.filter((x) => x.group === 'shortlist'), ctl = rows.filter((x) => x.group === 'control');
+    expect(sl).toHaveLength(25); expect(ctl).toHaveLength(25);
+    const list = await shortlist();
+    expect(sl.map((x) => x.domain).sort()).toEqual(list.map((x) => x.domain).sort());
+    for (const x of sl) { const l = list.find((y) => y.domain === x.domain)!; expect(x).toMatchObject({ rank: l.rank, max_bid_suggested_cents: l.max_bid_suggested_cents, first_price_cents: 2000, final: false, would_win: null }); expect(Number(x.score)).toBe(l.score); }
+    for (const x of ctl) expect(x).toMatchObject({ rank: null, max_bid_suggested_cents: null, would_win: null, final: false });
+    expect(ctl.some((x) => list.some((y) => y.domain === x.domain))).toBe(false);
+    const expected = (await sql<{ domain: string }>`select domain from godaddy_auctions_live where data_date = ${DATE}::date and domain <> all(${list.map((y) => y.domain)}::text[]) order by md5(domain || ${DATE}), domain limit 25`.execute(db)).rows.map((x) => x.domain);
+    expect(ctl.map((x) => x.domain).sort()).toEqual(expected.sort());
+    await runStep();
+    const again = await db.selectFrom('auction_outcomes').select(['domain', 'group']).where('data_date', '=', DATE).orderBy('domain').execute();
+    expect(again).toEqual(rows.map((x) => ({ domain: x.domain, group: x.group })).sort((a, b) => (a.domain < b.domain ? -1 : 1)));
+  });
+
+  const outcome = (o: Partial<Record<string, unknown>> & { domain: string }) => db.insertInto('auction_outcomes').values({ data_date: '2026-10-22', group: 'shortlist', rank: 1, score: 50, max_bid_suggested_cents: 5500, first_price_cents: 2000, end_time: new Date('2026-10-23T10:00:00Z'), ...o } as never).execute();
+  const snap = (date: string, domain: string, price: number, bids: number, end: string) => db.insertInto('godaddy_auctions_live').values({ data_date: date, domain, end_time: new Date(end), auction_type: 'Bid', price_cents: price, bid_count: bids, domain_age: null, valuation_cents: null, pageviews: null }).execute();
+  async function paperSetup() {
+    await outcome({ domain: 'wonit.com' }); await snap('2026-10-22', 'wonit.com', 3000, 5, '2026-10-23T10:00:00Z');
+    await outcome({ domain: 'sameday.com', end_time: new Date('2026-10-25T10:00:00Z') }); await snap('2026-10-22', 'sameday.com', 2500, 2, '2026-10-25T10:00:00Z');
+    await outcome({ domain: 'toohigh.com', max_bid_suggested_cents: 2500 }); await snap('2026-10-22', 'toohigh.com', 3000, 5, '2026-10-23T10:00:00Z');
+    await outcome({ domain: 'tracked.com' }); await snap('2026-10-22', 'tracked.com', 3000, 5, '2026-10-23T10:00:00Z');
+    await sql`insert into godaddy_auctions (domain, end_time, auction_type, first_seen, last_seen, last_price_cents, max_price_cents, last_bid_count, final_state_at, ended) values ('tracked.com', ${new Date('2026-10-23T10:00:00Z')}, 'Bid', '2026-10-21', '2026-10-22', 12000, 12000, 14, '2026-10-24', true)`.execute(db);
+    await outcome({ domain: 'ctl.com', group: 'control', rank: null, score: 40, max_bid_suggested_cents: null }); await snap('2026-10-22', 'ctl.com', 3000, 5, '2026-10-23T10:00:00Z');
+    await outcome({ domain: 'open.com', end_time: new Date('2026-10-27T10:00:00Z') }); await snap('2026-10-25', 'open.com', 4100, 9, '2026-10-27T10:00:00Z');
+    await outcome({ domain: 'ancient.com', data_date: '2026-06-01', end_time: new Date('2026-06-02T10:00:00Z') });
+    await snap('2026-10-25', 'newest.com', 100, 1, '2026-10-26T10:00:00Z');
+  }
+
+  it('AS549-13: updateOutcomes in bulk: open rows take the newest snapshot (price, bids); an ended row is final only when a snapshot of a later UTC day than its end day exists; the ended-auction tracker gives the real final price; would_win = suggested maximum above the final price (shortlist rows only); rows older than 120 days go', async () => {
+    await paperSetup();
+    const u = await withDbScope('as549-13', async () => updateOutcomes(db, NOW));
+    expect(u.value).toEqual({ deleted_n: 1, seen_updated_n: expect.any(Number), finalized_n: 4 });
+    expect(u.stats.queries).toBeLessThanOrEqual(4); // delete, update last seen, finalise: no per-row queries
+    const got = Object.fromEntries((await db.selectFrom('auction_outcomes').selectAll().execute()).map((x) => [x.domain, x]));
+    expect(Object.keys(got).sort()).toEqual(['ctl.com', 'open.com', 'sameday.com', 'toohigh.com', 'tracked.com', 'wonit.com']);
+    expect(got['wonit.com']).toMatchObject({ final: true, last_seen_price_cents: 3000, last_seen_bids: 5, would_win: true });
+    expect(got['toohigh.com']).toMatchObject({ final: true, last_seen_price_cents: 3000, would_win: false });
+    expect(got['tracked.com']).toMatchObject({ final: true, last_seen_price_cents: 12000, last_seen_bids: 14, would_win: false });
+    expect(got['ctl.com']).toMatchObject({ final: true, last_seen_price_cents: 3000, would_win: null });
+    expect(got['sameday.com']).toMatchObject({ final: false, would_win: null, last_seen_price_cents: 2500 });
+    expect(got['open.com']).toMatchObject({ final: false, last_seen_price_cents: 4100, last_seen_bids: 9, would_win: null });
+    expect((await updateOutcomes(db, NOW)).finalized_n).toBe(0); // idempotent
+  });
+
+  it('AS549-14: GET /auctions/funnel carries paper {shortlist {final_n, would_win_n, median_final_price_cents}, control {final_n, median_final_price_cents, reached_100_n}} over the data dates of the range', async () => {
+    await paperSetup();
+    await updateOutcomes(db, NOW);
+    app = await makeApp({ now: () => NOW });
+    const auth = (await issueToken('read')).auth;
+    const j = (await get(`/auctions/funnel?from=2026-10-20&to=2026-10-25`, auth)).json();
+    expect(j.paper).toEqual({ shortlist: { final_n: 3, would_win_n: 1, median_final_price_cents: 3000 }, control: { final_n: 1, median_final_price_cents: 3000, reached_100_n: 0 } });
+    const none = (await get(`/auctions/funnel?from=2026-01-01&to=2026-01-07`, auth)).json();
+    expect(none.paper).toEqual({ shortlist: { final_n: 0, would_win_n: 0, median_final_price_cents: null }, control: { final_n: 0, median_final_price_cents: null, reached_100_n: 0 } });
   });
 });

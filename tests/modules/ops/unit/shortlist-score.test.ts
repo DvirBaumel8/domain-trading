@@ -61,21 +61,21 @@ describe('AS545 auction score (shape, endings, bids, age, maximum bid)', () => {
     expect(full.parts.age.points).toBe(10);
     // an unknown age is rescaled out, so it is not a 0-point penalty: all other parts equal, the score is not lower than with a young name
     expect(noAge.score).toBeGreaterThan(scoreAuction({ ...base, domain_age: 0 }).score);
-    expect(scoreAuction({ ...base, price_cents: 1000 }).parts.headroom.points).toBeGreaterThan(scoreAuction({ ...base, price_cents: 20_000 }).parts.headroom.points);
-    expect(scoreAuction({ ...base, price_cents: 25_000 }).parts.headroom.points).toBe(0);
+    expect(scoreAuction({ ...base, price_cents: 1000 }).parts.headroom!.points).toBeGreaterThan(scoreAuction({ ...base, price_cents: 20_000 }).parts.headroom!.points);
+    expect(scoreAuction({ ...base, price_cents: 25_000 }).parts.headroom!.points).toBe(0);
     expect(Object.keys(base)).not.toContain('valuation_cents');
   });
 
   it('AS545-4 (v5.48.0, F22): the maximum bid = expected value: sale chance x net resale - renewal, scaled by score, capped, never below 0, rounded down to $5, integer cents', () => {
-    const ev = { capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 1100 };
-    expect(maxBidRule(ev)).toBe(6_500); // 10% of $800 = $80, less $11 renewal = $69 -> $65 (base, no score)
-    expect(maxBidRule({ ...ev, score: 85 })).toBe(6_500); // full at 85
-    expect(maxBidRule({ ...ev, score: 95 })).toBe(6_500); // never above the base
-    expect(maxBidRule({ ...ev, score: 42.5 })).toBe(3_000); // half the score: $34.5 -> $30
-    expect(maxBidRule({ ...ev, score: 10 })).toBe(500); // $8.1 -> $5
-    expect(maxBidRule({ ...ev, saleChanceBp: 100 })).toBe(0); // 1% of $800 = $8 < the $11 renewal: never negative
+    const ev = { capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 1000, renewalCents: 2300 };
+    expect(maxBidRule(ev)).toBe(5_500); // 10% of $800 = $80, less $23 renewal = $57 -> $55 (base, no score; v5.49.0 P5: GoDaddy renews at about $23)
+    expect(maxBidRule({ ...ev, score: 85 })).toBe(5_500); // full at 85
+    expect(maxBidRule({ ...ev, score: 95 })).toBe(5_500); // never above the base
+    expect(maxBidRule({ ...ev, score: 42.5 })).toBe(2_500); // half the score: $28.5 -> $25
+    expect(maxBidRule({ ...ev, score: 10 })).toBe(500); // $6.7 -> $5
+    expect(maxBidRule({ ...ev, saleChanceBp: 100 })).toBe(0); // 1% of $800 = $8 < the $23 renewal: never negative
     expect(maxBidRule({ ...ev, saleChanceBp: 5000, resaleCents: 488_800 })).toBe(25_000); // a high expected value stops at the cap
-    expect(maxBidRule({ ...ev, capCents: 6_000 })).toBe(6_000);
+    expect(maxBidRule({ ...ev, capCents: 4_000 })).toBe(4_000);
     expect(Number.isInteger(maxBidRule({ ...ev, resaleCents: 99_999, commission: 0.175, score: 41.3 }))).toBe(true);
   });
 });
