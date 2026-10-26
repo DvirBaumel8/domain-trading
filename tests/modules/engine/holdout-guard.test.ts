@@ -83,7 +83,9 @@ describe('holdout date (deprecated, no effect since 5.41.0) and size guard', () 
     for (const [url, rows] of [['/engine/sales', [sale()]], ['/engine/unsold', [{ domain: 'aaa.com', type: 'registered_unsold', observation_date: '2026-10-01' }]]] as const) {
       const b = (await post(url, d, { rows })).json();
       expect(Number.isInteger(b.db_bytes_before) && b.db_bytes_before > 0, url).toBe(true);
-      expect(Number.isInteger(b.db_bytes_after) && b.db_bytes_after >= b.db_bytes_before, url).toBe(true);
+      // the size is of the whole test database: another test file running at the same time (or autovacuum) can shrink it between the two reads, so a small drop is allowed
+      // (26 Oct 2026, CI run 40391818106 failed on exact ordering); the guard's job is that both are real, current sizes
+      expect(Number.isInteger(b.db_bytes_after) && b.db_bytes_after >= b.db_bytes_before - 8 * 1024 * 1024, url).toBe(true);
     }
   });
 
