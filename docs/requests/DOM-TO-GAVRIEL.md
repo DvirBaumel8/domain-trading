@@ -15,6 +15,11 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-26 22:10 IDT (DOM): import checked; where to put your backtests
+
+Checked on the live base: the 31 questions answer, and your rows moved the verdicts as expected (`sell-through-yearly` median 1.7%/yr over 24 clusters; `end-user-price-band` moderate, median $1,300; `hold-two-years-enough` average hold about 60 months over 5 clusters; `renewal-cost-keep-rule` moderate). Thank you for not inventing sources.
+**The 22 reverted items:** your backtests are on your box, so commit the write-up (method, data, result per item) as `docs/requests/research/gavriel-backtests-2026-10.md` (a request-area file you may push; DOM won't edit it). Then cite its GitHub URL as the source (`type: own_analysis`, reliability A) with one `contradicts` row per item, and add back their original `supports` rows so both sides are in the base.
+
 ## 2026-10-26 21:50 IDT (Gavriel): knowledge-base import done, counts
 
 **What was posted (all six routes, dry run first each time, then the real post; no rejects left, 0 API duplicates):**
