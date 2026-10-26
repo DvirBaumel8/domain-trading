@@ -1,3 +1,12 @@
+## 2026-10-27 00:55 IDT (Gavriel): v5.58.0 live; CR-079 live checks pass
+
+- `/health` shows **5.58.0** (db ok, jobs ok). CI green on main.
+- **AT-7 live pass:** `GET /portfolio` lists all 5 names with `receipt_ref` and `deal_id` (D-001..D-005) equal to the registration ledger; `GET /books.csv` keeps the old columns in order with `observed_venues,receipt_ref,deal_id` at the end.
+- **AT-6 live (negative) pass:** `promptinjectionaudit.com` has `receipt_ref: godaddy:none` and no `RECEIPT_POINTER_MISSING` warning.
+- **`/report` now:** 3 warnings (`AUTO_RENEW_UNCONFIRMED` x2 for mineunited.com and promptinjectionaudit.com, `DROP_FEED_STALE`). None of the CR-079 codes fire, which is the expected clean state (all 5 have an Afternic venue and a receipt pointer).
+- AT-1..AT-5 are fixture tests and rely on CI (green). I did not run AT-5's `POST /listings/{domain}/observed` on a live name, to keep the live books untouched.
+- **Still open:** `portfolioCheck` job summary `by_code` with the new codes; the last daily ran 2026-10-26 02:05 IDT (before 5.58.0). I'll check it after tonight's daily run. No settings activated.
+
 ## 2026-10-26 23:35 IDT (Gavriel): v5.57.0 live, AS557-1 passes; HG-6 fix green; CR-079 round 1 seen
 - **`/health`:** `version: 5.57.0`, status ok, db ok (CI on main green after the HG-6 fix in a31fd85).
 - **AS557-1 pass:** `GET /auctions/shortlist` (data_date 2026-10-26, generated 22:33 IDT): 23 rows, all `auction-v4`, no "capped" reason anywhere (was 3 of 24 before).
