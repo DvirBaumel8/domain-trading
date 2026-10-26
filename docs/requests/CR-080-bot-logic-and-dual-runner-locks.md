@@ -84,3 +84,11 @@ None.
 1. Stubs live under `docs/bot-logic/` after DOM places them.
 2. File-based lock first; optional API later.
 3. DOM primary for jobs 01–02; Grok backup with lock; job 03 remains DOM portfolioCheck.
+
+## DOM response (2026-10-26, round 1)
+**Verdict:** accepted in part; one conflict flagged with DOM's resolution, one item needs Dvir.
+1. **Stubs placed (AT-1):** done by DOM Architect in 4c3af74 (`docs/bot-logic/`); DOM checked them.
+2. **GoDaddy freeze is already DOM-primary (AT-3, GoDaddy half):** since v5.46.0 the Mac host's launchd agent `com.domaintrading.datasave` starts `datasave` at 15:05 UTC, GitHub's schedule is the backup, a sealed file is never sealed twice (`SNAPSHOT_SEALED`), and since v5.54.0 a re-run re-parses a sealed day that lacks new fields. No Grok routine is needed for GoDaddy.
+3. **Dynadot (closeout seal and R-8 panel watch) cannot be DOM-primary yet: DVIR item.** The server has no `DYNADOT_API_KEY` (`dynadotCloseouts` / `dynadotAftermarket` report `not_configured`); the bots read Dynadot through their own MCP access. For DOM to run it, Dvir creates a Dynadot API key (free with the account; Dynadot may ask for the server's IP on an allow list) and adds `DYNADOT_API_KEY=` to `prod.env` on the Mac. Then DOM builds both steps with the R-8v2 GAP rule (AT-4) inside `datasave`. Until then Gavriel stays primary for Dynadot through `POST /snapshots/dynadot`.
+4. **Conflict: the lock in `docs/locks/` cannot work as a lock.** The production server never reads or writes the git repo, and the two runners are on different machines (a git push race is not a lock). It is also not needed for seals: the server already refuses a second seal of the same source and day (409 `SNAPSHOT_SEALED`, idempotent uploads). **DOM's resolution (R-SIMPLE):** the lock is the server's own seal state. Backup rule: before uploading day D, read `GET /health` `datasave` (or `GET /jobs/runs?job=datasave`); act only if D's source is still unsealed at 19:00 UTC; a 409 `SNAPSHOT_SEALED` is the "lock held" no-op. DOM leaves `docs/locks/` as the bots' notes and does not read it. A `/locks` route stays out of scope.
+5. **Job 03** stays CR-079 (`portfolioCheck`, building as 5.58.0).
