@@ -7,7 +7,7 @@ import type { Database } from '../../db/types.js';
 import { addDays } from '../../core/dates.js';
 import { AppError } from '../../http/errors.js';
 import { armSha, byteOrder, drawArm } from './draw.js';
-import { ensureDay, getDay, lockDay, type DayRow } from './pool.js';
+import { ensureDay, getDay, lockDay, pickproofEnabled, type DayRow } from './pool.js';
 import { ALL_ARMS, DRAWN_ARMS, RECIPES, type ArmName } from './recipe.js';
 
 type ArmSummary = { n: number; sha256: string; short: boolean };
@@ -18,6 +18,8 @@ const isClosed = (d: DayRow, now: number): boolean => d.sealed_at !== null || no
 export async function postPicks(db: Kysely<Database>, input: { day: string; names: string[]; by: string; auditId: string | null; now: number }) {
   return db.transaction().execute(async (tx) => {
     await lockDay(tx, input.day);
+    // v5.59.0 (CR-081): while the pick-proof is off, picks for a day that is not sealed are refused
+    if (!(await pickproofEnabled(tx)) && !(await getDay(tx, input.day))?.sealed_at) throw new AppError(409, 'PICKPROOF_STOPPED', 'The pick-proof was switched off by CR-081 (the historical replay replaced it); picks for an unsealed day are refused', { date: input.day });
     const d = await ensureDay(tx, input.day);
     if (isClosed(d, input.now)) throw new AppError(409, 'PICKPROOF_SEALED', `Picks for ${input.day} are closed (deadline ${d.deadline.toISOString()}${d.sealed_at ? ', sealed' : ''}); nothing changed`, { date: input.day, deadline: d.deadline.toISOString(), sealed_at: d.sealed_at?.toISOString() ?? null });
     const names = input.names.map(normalizePick);

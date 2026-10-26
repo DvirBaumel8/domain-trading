@@ -29,6 +29,7 @@ export function testEnv(overrides: Record<string, string> = {}): NodeJS.ProcessE
     PORKBUN_SANDBOX_API_KEY: 'pk1_sb_fake_test_key_0000000',
     PORKBUN_SANDBOX_SECRET_API_KEY: 'sk1_sb_fake_test_secret_00000',
     SNAPSHOT_DIR: join(tmpdir(), `dt-snapshots-test-${process.env.VITEST_POOL_ID ?? '0'}`),
+    ARCHIVE_DIR: join(tmpdir(), `dt-archive-test-${process.env.VITEST_POOL_ID ?? '0'}`),
     ...overrides,
   };
 }

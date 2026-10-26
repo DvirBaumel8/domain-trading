@@ -1,4 +1,4 @@
-# Endpoints (contract v5.58.0)
+# Endpoints (contract v5.59.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -76,6 +76,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/auctions/plans`, `/auctions/plans/{id}/result` | WRITE only (a bots token gets 403 even with `dry_run`) | Auction bid plans (5.39.0, CR-077) |
 | GET | `/auctions/plans`, `/auctions/plans/{id}` | READ or bots | Auction bid plans (5.39.0, CR-077) |
 | GET | `/auctions/shortlist`, `/auctions/funnel` | READ or bots (a data token gets 403) | The daily auction shortlist and the weekly funnel (5.45.0, G-127) |
+| POST | `/replay/runs` | WRITE only (a bots token gets 403) | Historical replay (5.59.0, CR-081) |
+| GET | `/replay/{date}`, `/replay/runs/{id}`, `/replay/runs` | READ or bots (a data token gets 403) | Historical replay (5.59.0, CR-081) |
 | POST | `/pickproof/{date}/picks` | WRITE or bots (non-money; a READ or data token gets 403) | Pick-proof (5.28.0, CR-073) |
 | GET | `/pickproof/{date}/manifest`, `/pickproof/{date}/arms`, `/pickproof/{date}/pool`, `/pickproof/report` | READ or bots (a data token gets 403) | Pick-proof (5.28.0, CR-073; pool 5.30.0, CR-073a) |
 | POST | `/engine/train` | WRITE | Scoring engine (5.5.0, 5.6.0) |
@@ -130,6 +132,7 @@ READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024
 Any valid bot token (READ or WRITE).
 - **200** `{status: "ok", db: "ok", db_size: {...} | null, jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
 - `db_size` (5.17.0): `{bytes, limit_bytes, percent, warn_percent}`, the database size against Neon's free 1 GB (`percent` to one decimal; `/report` warns `DB_SIZE_HIGH` above `warn_percent`, 70). `null` when the size can't be read (and in the 503 answer). Since 5.38.0 it also has `tables`: the 10 largest tables of the public schema, largest first, `[{table, bytes, rows_estimate}]` (`bytes` = table + indexes + TOAST; `rows_estimate` = Postgres's planner estimate, `null` before the table was first analysed).
+- `archive` (5.59.0, CR-081): `{days_n, first, last, missing_days: [..]}`, the daily GoDaddy archive on the host's disk: `days_n` = days with both files (biddable auctions and closeouts), `first` / `last` = the first and last day with any file, `missing_days` = calendar days between them without both files. `days_n: 0`, nulls and `[]` when nothing is archived.
 - Removed in 5.2.0 (CR-057): `posting` and `posting_reason` are no longer in the answer.
 - `dq_market` (5.23.0, CR-075, additive): `ok` (the latest `dqMarket` run passed every check), `alert` (a check failed; `GET /market/dq` names it; `/report` has `DQ_MARKET_FAIL`) or `unknown` (no run yet). It does not change `status`.
 - `datasave` (5.21.0, CR-071, additive): `ok` (every configured GoDaddy inventory file has a complete save within the last 26 hours and the last `datasave` run did not fail), `partial` (some files saved, some not, or the last run failed for some), `error` (the last run's `godaddyInventory` step failed and no file is saved within 26 h), `overdue` (nothing complete within 26 h, also before the first run). It never changes the top-level `status`; the Dynadot steps (`not_configured`) never count. `/report` raises `DATASAVE_MISSED` for any value but `ok` once a save or a run exists.
@@ -894,7 +897,27 @@ READ or bots. Query `limit` (1..500, default 100). Answer `{settings_version, th
 
 **Repo load.** DOM's own research reaches the base as files `data/knowledge/*.jsonl` shipped with a release and loaded by the daily step `kbLoad` (`jobs.md`); one JSON object per line with the same fields as the rows plus `"kind": author|source|question|claim|evidence|link` (a link line gives the link kind as `link_kind`).
 
+## Historical replay (5.59.0, CR-081)
+
+Replaces the pick-proof. It tests our **current** logic on a saved day: the auction shortlist's filters and score (`auction-v4`, the maximum bid with the position factor) are run on the archived list of day D using only that day's own fields, the frozen lists and a lift table trained on or before D; N names are drawn at random from the same filtered field (not among our top N); the outcomes are read from data stored later. Nothing here buys, bids, lists or prices. Rules and test ids: `docs/internal/replay.md`. The archive it reads is written by the datasave step `godaddyInventory` (`jobs.md`), listed in `GET /health` `archive`.
+
+### `POST /replay/runs`
+WRITE only (a bots token is 403 even with `dry_run`; audited; `Idempotency-Key` required). Body (strict): `date` (YYYY-MM-DD, an archived day), `kind` (`auctions` | `closeouts`), `n` (1..200, default 25), `seed` (string, default derived from the sha256 of the day's archive file plus the kind: `sha:<16 hex>`), `logic` (`"current"`, the only value in v1), `dry_run` (boolean). **202** `{id, status: "queued", audit_id}`; the run is worked in the background (one at a time). With `dry_run: true` it runs at once and answers **200** `{dry_run: true, logic_version, report, audit_id}` and stores nothing. Errors: 404 `ARCHIVE_DAY_MISSING` (no archived file of that kind for the day), 422 `VALIDATION_ERROR`, 422 `REPLAY_LOGIC_UNAVAILABLE` (an `as_of_date` field: the logic as it stood on day D is not stored, only the current logic is available).
+
+### `GET /replay/{date}`
+READ or bots. **The route bots use.** Query `kind` (default `auctions`), `n` (default 25), `seed` (default as above), `logic` (`current`). Returns the newest **finished** run of that date, kind, n and seed (`{id, date, kind, n, seed, status: "done", logic_version, created_at, finished_at, report}`), or **404** `REPLAY_NOT_RUN` (start one with `POST /replay/runs`; a day that is not archived is also `REPLAY_NOT_RUN`). A GET writes nothing. 422 `REPLAY_LOGIC_UNAVAILABLE` for `as_of_date`.
+
+### `GET /replay/runs/{id}`
+READ or bots. One run with its `status` (`queued` | `running` | `done` | `error`), `error`, `logic_version` and, when done, the `report`; the list (query `limit` 1..100, `status`) has the same fields without the report. A run left `running` by a dead process is queued again.
+
+### `GET /replay/runs`
+READ or bots. Runs newest first (query `limit` 1..100, default 20; `status`): the same fields as the one-run read, without the report.
+
+**Report** (`report`): `date`, `kind`, `n`, `seed`; `logic` (`version`, `lift` = the model id or `seed:<sha>`, `score_version`, `settings`, `now_utc`, what is not applied: brand typo, endings); `field` (`rows_read_n`, `candidates_n`, `field_n`, `dropped` by reason); `outcome_status` (`retail`: `ok` | `no_data` with `sales_after_d_n`; `rdap` for closeouts: `pending` until D+30 | `ready`, `stored_n`; `auctions`: archived days after D); `groups.ours` and `groups.random`: `n` and per label `{known_n, unknown_n, positives, rate}` (the counts always beside the rate); `labels.<label>`: `positives_total`, `too_small` (true under 20 positives in total: too small to decide) and `bootstrap` (`resamples` 1,000, `pairs_n`, `mean_diff`, `ours_win_share`, `tie_share`; paired by position, seeded); `names.ours` / `names.random` (every name with its rank, score and parts, price, bids, age, demand fields, our maximum, outcome fields and labels); `did_well` (every name of either group with a positive label, with the same features); `notes`. Labels, never merged: auctions `reached_100` (final price $100 or more), `beat_our_max` (final at or above our suggested maximum: reported, not a miss of the logic); closeouts `taken` (RDAP tag `held`, a weak signal); both `retail_sale` / `retail_500` ($500 or more) from the later reported sales (`POST /data/sales`, `market_sales`, and `engine_sales` rows not from the GoDaddy auction file), absent (`retail.status: "no_data"`) when none are stored after D. An auction final from the ended-auction tracker has `final_basis: "godaddy_auctions"`; otherwise it is the last archived price before the end (`last_archived`, a lower bound).
+
 ## Pick-proof (5.28.0, CR-073)
+
+**Off since 5.59.0 (CR-081):** the datasave steps `pickproofSeal` / `pickproofLabels` report `{status: "off", reason: "CR-081"}` and a day not yet frozen is never frozen; `POST /pickproof/{date}/picks` for an unsealed day is 409 `PICKPROOF_STOPPED`, and the manifest of a day that was never frozen is 409 `PICKPROOF_STOPPED` too. Sealed days stay readable. The text below is the history of the mechanics.
 
 Mechanics of the test "do the Buyer's picks beat random names and a simple rule?", so that the picking bot neither draws the comparison arms nor grades itself. DOM freezes the pool, draws the random arms by code, seals the day and computes the statistics. Everything it reports is **a proxy, not profit**: a closeout name registered by someone else within 30 days is demand evidence, not a sale and not money. No money action, no LLM, no email. Rules, the exact recipe and the test IDs are in `docs/internal/pickproof.md`.
 
@@ -1463,6 +1486,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Market data (5.23.0, CR-075):** `APPEND_ONLY` (**405** on PUT, PATCH or DELETE of `/data/sales`; **409** on `POST /data/sales` for a stored `(name, venue, sale_date, source)` sent again with a different price). The `rejects[].reason` of a 422 `POST /data/sales`: `SOURCE_REQUIRED`, `SOURCE_NAMEBIO_FORBIDDEN`, `TIER_REQUIRED`, `TIER_INVALID`, `NAME_INVALID`, `VENUE_INVALID`, `PRICE_NOT_INTEGER_CENTS`, `DATE_INVALID`, `DATE_IN_FUTURE`, `SOURCE_URL_INVALID`, `LISTING_TYPE_INVALID`, `UNKNOWN_FIELD`. Episode labels (`outcome_rule`, not errors): `SOLD_REPORTED`, `SOLD_BIDS`, `UNSOLD_60D`, `UNSOLD_30D`, `SEEN_ONCE`, `DISAPPEARED`, `TOO_SHORT`. `/report` warning `DQ_MARKET_FAIL` (`reports.md`).
 
 **RDAP lookup service (5.29.0, CR-074):** `LOOKUP_LIMIT` (429 on `GET /rdap/{domain}` and `POST /rdap/batch`, `details.retry_after_s` and a `Retry-After` header; also the `reason_code` of a batch row that the limit cut off). Row `reason_code` values (not errors, `registered` is `null`): `TIMEOUT`, `SOURCE_ERROR`, `RATE_LIMITED`, `LOOKUP_LIMIT`.
+
+**Historical replay (5.59.0, CR-081):** `ARCHIVE_DAY_MISSING` (404, `POST /replay/runs`: no archived list of that kind for the day), `REPLAY_NOT_RUN` (404, `GET /replay/{date}`: no finished run for that date, kind, n and seed), `REPLAY_LOGIC_UNAVAILABLE` (422, an `as_of_date` field: only the current logic is available), `PICKPROOF_STOPPED` (409, `POST /pickproof/{date}/picks` for an unsealed day, or the manifest of a never-frozen day, while the pick-proof is off).
 
 **Pick-proof (5.28.0, CR-073):** `PICKPROOF_SEALED` (409, `POST /pickproof/{date}/picks` from the deadline on or after the seal), `PICKPROOF_NOT_SEALED` (409, `GET /pickproof/{date}/arms` before the day is sealed), `NOT_IN_POOL` (422, picks outside the frozen pool; `details.names`); `PICKPROOF_POOL_PRUNED` (410, `GET /pickproof/{date}/pool` after the pool was shrunk: 1 day since 5.47.0, 45 before; 5.30.0); `POOL_NOT_READY` (409, any pick-proof call that would freeze a day while the closeout rows of D-1 are not yet through the daily filter step; `details.pending_n`; retry after the daily save, 5.31.0); `POOL_SOURCE_PRUNED` (410, a call that would freeze a day whose closeout rows of D-1 were already deleted by the 3-day retention; nothing is frozen, 5.35.0); `SNAPSHOT_MISSING` (409) is also returned when the evening-before snapshot of the pool is not sealed. The `UNPOWERED` status in the report is a result, not an error.
 

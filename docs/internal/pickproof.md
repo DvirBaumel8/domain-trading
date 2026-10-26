@@ -1,3 +1,5 @@
+> **Off since v5.59.0 (CR-081).** The historical replay replaced this test (`docs/internal/replay.md`). `settings.pickproof_enabled` is false: the datasave steps report `{status: "off", reason: "CR-081"}`, no new day is frozen (no new `pickproof_pool` rows), picks for an unsealed day are 409 `PICKPROOF_STOPPED`. Sealed days and their routes stay readable. The tests PP528-* switch the setting on. Test ids RPY81-5, RPY81-6, RPY81-21.
+
 # Pick-proof mechanics (CR-073, v5.28.0)
 
 Binding rules and test IDs. Interface: `docs/contract/endpoints.md` §Pick-proof, `jobs.md` row `datasave` (step `pickproofLabels`). Migration `1766000000000_v5-28-0.sql`. Everything the module reports is **a proxy, not profit**.

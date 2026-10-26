@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import { poolConfig } from './db/client.js';
 import { REGISTRAR_ENV } from './modules/registrars/index.js';
@@ -41,6 +42,8 @@ const EnvSchema = z.object({
   PUBLIC_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine((v) => /^https?:\/\//.test(v), 'PUBLIC_BASE_URL must be http(s)').default(DEFAULT_PUBLIC_BASE_URL)),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
   SNAPSHOT_DIR: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  /** v5.59.0 (CR-081): the root of the daily archive (`<root>/godaddy/`); default a sibling `archive` folder of SNAPSHOT_DIR. */
+  ARCHIVE_DIR: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string()
     .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/, 'GITHUB_BACKUP_REPO must be owner/name')
     .refine((v) => !v.split('/').some((x) => x === '.' || x === '..'), 'GITHUB_BACKUP_REPO must not contain . or .. segments')
@@ -73,6 +76,8 @@ export interface Config {
   onRender: boolean;
   /** v5.21.0 (CR-071): where the datasave job keeps raw GoDaddy zips for 7 days (default ~/Library/Application Support/domain-trading/snapshots). If it cannot be written, the job runs without raw files. */
   snapshotDir: string;
+  /** v5.59.0 (CR-081): ARCHIVE_DIR, the root of the daily GoDaddy archive. */
+  archiveDir: string;
   /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
   backup: { token: string | undefined; repo: string | undefined };
   version: string;
@@ -162,6 +167,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     companiesHouseApiKey: e.COMPANIES_HOUSE_API_KEY ? e.COMPANIES_HOUSE_API_KEY : undefined,
     namebio: { retailstatsCsvUrl: e.NAMEBIO_RETAILSTATS_CSV_URL },
     snapshotDir: expandHome(e.SNAPSHOT_DIR ?? '~/Library/Application Support/domain-trading/snapshots', env.HOME ?? homedir()),
+    archiveDir: e.ARCHIVE_DIR ? expandHome(e.ARCHIVE_DIR, env.HOME ?? homedir()) : join(dirname(expandHome(e.SNAPSHOT_DIR ?? '~/Library/Application Support/domain-trading/snapshots', env.HOME ?? homedir())), 'archive'),
     backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },
     version: readVersion(),
     env: Object.freeze(strings),

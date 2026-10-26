@@ -47,7 +47,7 @@ const failReason = (checks: readonly PrebidCheck[]): string => {
 };
 
 /** The lift score of a name from the stored table: length and word count always, the other endings only when some were asked (no endings = those patterns are skipped). */
-function liftOf(model: { bins: LiftModel['bins'] }, table: SplitV2Table, sld: string, endings: EndingsKnown): LiftScore {
+export function liftOf(model: { bins: LiftModel['bins'] }, table: SplitV2Table, sld: string, endings: EndingsKnown): LiftScore {
   const asked = (['net', 'co', 'org', 'io', 'ai'] as const).filter((t) => endings[t] === true || endings[t] === false);
   const reg = asked.filter((t) => endings[t] === true).length;
   const words = /^[a-z]+$/.test(sld) ? splitV2(sld, table).length : 0;

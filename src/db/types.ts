@@ -58,6 +58,8 @@ export interface SettingsTable {
   pickproof_pool_max_price_cents: Generated<number>;
   pickproof_labels_max_per_run: Generated<number>;
   pickproof_pool_keep_days: Generated<number>;
+  /** v5.59.0 (CR-081): the pick-proof is off (false) since the replay replaced it. */
+  pickproof_enabled: Generated<boolean>;
   /** v5.29.0 (CR-074): TTL of a cached RDAP answer (hours) and the live bot lookups allowed per rolling 24 h. Migration only. */
   lookups_rdap_ttl_hours: Generated<number>;
   lookups_rdap_daily_limit: Generated<number>;
@@ -1387,6 +1389,24 @@ export interface ForbiddenTermRetirementsTable {
   audit_id: string | null;
   reason: string | null;
 }
+/** v5.59.0 (CR-081): one replay of an archived day (POST /replay/runs). */
+export interface ReplayDayRunsTable {
+  id: Generated<string>;
+  date: DateString;
+  kind: 'auctions' | 'closeouts';
+  n: number;
+  seed: string;
+  status: Generated<'queued' | 'running' | 'done' | 'error'>;
+  report: ColumnType<unknown, string | null | undefined, string | null>;
+  error: ColumnType<string | null, string | null | undefined, string | null>;
+  logic_version: ColumnType<string | null, string | null | undefined, string | null>;
+  requested_by: string | null;
+  audit_id: string | null;
+  created_at: Generated<Date>;
+  started_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  finished_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+}
+
 export interface ReplayRunsTable {
   id: string;
   suite: string;
@@ -1915,6 +1935,7 @@ export interface Database {
   tranche_members: TrancheMembersTable;
   labelled_names: LabelledNamesTable;
   replay_runs: ReplayRunsTable;
+  replay_day_runs: ReplayDayRunsTable;
   holdout_suites: HoldoutSuitesTable;
   test_sets: TestSetsTable;
   test_set_rows: TestSetRowsTable;

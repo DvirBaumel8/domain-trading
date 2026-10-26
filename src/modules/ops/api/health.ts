@@ -4,6 +4,7 @@ import type { Config } from '../../../config.js';
 import { toJerusalemIso } from '../../../core/dates.js';
 import { pingDb } from '../../../db/client.js';
 import type { Database } from '../../../db/types.js';
+import { archiveStatus } from '../archive/godaddy-archive.js';
 import { adapterStatus } from '../../registrars/index.js';
 import { DB_SIZE_WARN_PERCENT, datasaveStatus, marketDqStatus, NEON_FREE_STORAGE_BYTES, dailyScheduleState, jobsOverdue, lastJobRunAt, tickOverdue } from '../../reporting/index.js';
 
@@ -17,12 +18,13 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
     const dbOk = await pingDb(db);
     if (dbOk) await kickQueue?.(); // resumes unfinished job steps when this process has no worker running (cheap check)
     // v5.14.0: the independent reads run together
-    const [jobs, jobsLast, datasave, dqMarket, size] = await Promise.all([
+    const [jobs, jobsLast, datasave, dqMarket, size, archive] = await Promise.all([
       dbOk ? jobsState(db, now()) : Promise.resolve('unknown'),
       dbOk ? jobsLastRun(db) : Promise.resolve({ daily: null, tick: null }),
       dbOk ? datasaveStatus(db, now()).then((d) => d.state).catch(() => 'unknown') : Promise.resolve('unknown'),
       dbOk ? marketDqStatus(db).then((d) => d.state).catch(() => 'unknown') : Promise.resolve('unknown'),
       dbOk ? dbSize(db, storageLimitBytes) : Promise.resolve(null),
+      archiveStatus(config.archiveDir).then(({ days_n, first, last, missing_days }) => ({ days_n, first, last, missing_days })),
     ]);
     return reply.code(dbOk ? 200 : 503).send({
       status: dbOk ? 'ok' : 'degraded',
@@ -34,6 +36,8 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       datasave,
       // v5.23.0 (CR-075 R-3): the market data-quality checks: ok | alert | unknown (before the first run); does not change the top-level status
       dq_market: dqMarket,
+      // v5.59.0 (CR-081): the daily archive on the host's disk: days with both files, first and last day, calendar days in between that lack a file
+      archive,
       // v5.17.0 (loop 2026-10-18, Gavriel): the database size against Neon's free 1 GB, so it can be reported with a READ token
       db_size: size,
       version: config.version,

@@ -25,7 +25,7 @@ import { idtDay } from '../../../../core/dates.js';
 import { AppError } from '../../../../http/errors.js';
 import { guardDbSize, loadRegimeTest, storeSales, storeUnsold, type DbSizeGuard, type RegimeTest } from '../../../engine/index.js';
 import { runDqMarket, runEpisodes } from '../../../market/index.js';
-import { autoSeal, pickproofLabels } from '../../../pickproof/index.js';
+import { autoSeal, pickproofEnabled, PICKPROOF_OFF, pickproofLabels } from '../../../pickproof/index.js';
 import type { RdapLookupFn } from '../../../../core/rdap.js';
 import { goneByTag, tagDisappearances } from '../../closeouts/disappearances.js';
 import { checkExpiries } from '../../closeouts/expiries.js';
@@ -36,6 +36,10 @@ import type { ScreeningDeps } from '../../../selection/index.js';
 import { listZipEntries, openZipEntry } from './zip.js';
 import { streamArrayItems } from './json-stream.js';
 import { demandFields, mergeDemand, type DemandFields } from './auction-fields.js';
+import { priceToCents } from './datasave-price.js';
+import { ARCHIVE_FILES, archiveExists, archiveZip, type ArchiveOutcome } from '../../archive/godaddy-archive.js';
+
+export { priceToCents };
 
 export const GODADDY_INVENTORY_BASE = 'https://inventory.auctions.godaddy.com';
 export const GODADDY_SOURCE = 'godaddy_inventory' as const;
@@ -62,6 +66,8 @@ export interface DatasaveDeps {
   now: () => number;
   /** SNAPSHOT_DIR (config). */
   snapshotDir: string;
+  /** v5.59.0 (CR-081): ARCHIVE_DIR (config), the root of the daily archive; without it nothing is archived. */
+  archiveDir?: string;
   /** DYNADOT_API_KEY when set; the Dynadot client is not built yet either way. */
   dynadotKey?: string;
   /** v5.26.0 (CR-072): the engine scorer for the `scorePool` step; without it every row gets score null, NO_ACTIVE_MODEL. */
@@ -96,16 +102,6 @@ interface FileResult {
 const utcDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 const shortError = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/\s+/g, ' ').slice(0, 300);
 
-/** "$1,250" -> 125000 (integer cents); null when it is not a dollar amount. */
-export function priceToCents(v: unknown): number | null {
-  if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? Math.round(v * 100) : null;
-  if (typeof v !== 'string') return null;
-  const m = /^\s*\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*$/.exec(v);
-  if (!m) return null;
-  const n = Number(m[1]!.replace(/,/g, ''));
-  return Number.isFinite(n) ? Math.round(n * 100) : null;
-}
-
 class HttpFail extends Error {
   constructor(readonly status: number | null, message: string) { super(message); }
 }
@@ -125,6 +121,7 @@ export class DatasaveJob {
   async godaddyInventory(): Promise<unknown> {
     const st = await this.settings();
     this.auctionsRead = 0;
+    this.archive = { written: [], skipped: [] };
     this.liveKept = 0;
     this.liveBandMax = null;
     const runDate = utcDay(this.deps.now());
@@ -150,13 +147,19 @@ export class DatasaveJob {
         if (AUCTION_FILES.has(file) && existing.raw_available && existing.raw_path && await this.liveRowsLackDemand(dataDate)) {
           try { await this.parseAuctions(existing.raw_path, dataDate, st.auctionMinCents); code = 'SNAPSHOT_SEALED_REPARSED'; } catch (e) { this.deps.log?.warn({ file, err: shortError(e) }, 'datasave: sealed auction file not parsed again'); }
         }
+        // v5.59.0 (CR-081): a sealed day whose raw zip is still on disk but has no archive file yet is archived from the raw zip
+        if (ARCHIVE_FILES[file] && this.deps.archiveDir && existing.raw_available && existing.raw_path) {
+          if (await archiveExists(this.deps.archiveDir, dataDate, ARCHIVE_FILES[file]!)) this.archive.skipped.push(`${dataDate}-${ARCHIVE_FILES[file]}.jsonl.gz`);
+          else await this.archiveFile(existing.raw_path, file, dataDate);
+        }
         results.push({ file, data_date: dataDate, status: 'complete', bytes: existing.bytes, sha256: existing.sha256, last_modified: existing.last_modified?.toISOString() ?? null, rows: existing.rows, http_status: existing.http_status, raw_available: existing.raw_available, code });
         continue;
       }
       results.push(await this.saveFile(file, dataDate, entry.lastModified, st.maxPriceCents, st.auctionMinCents));
     }
     const dataDate = results.map((r) => r.data_date).sort().at(-1) ?? runDate;
-    return { ...this.summary(dataDate, results), ...(await this.auctionSummary(st.files, results)) };
+    const archive = this.deps.archiveDir ? { archive: this.archive } : {};
+    return { ...this.summary(dataDate, results), ...archive, ...(await this.auctionSummary(st.files, results)) };
   }
 
   /** v5.54.0: true when the day has live auction rows and none of them carries a demand field (the day was parsed before v5.49.0). */
@@ -263,6 +266,8 @@ export class DatasaveJob {
           error = `parse failed: ${shortError(e)}`;
         }
       }
+      // v5.59.0 (CR-081): the compact archive copy, from the file just downloaded (a failure is reported, never fatal)
+      if (writePath && status === 'complete') await this.archiveFile(writePath, file, dataDate);
       let rawPath: string | null = null;
       if (rawOk && writePath) { await rename(writePath, finalPath); rawPath = finalPath; }
       await this.upsertManifest({ file, dataDate, status, bytes, sha256, lastModified, rows, rowsTotal, httpStatus: 200, error, rawPath, rawAvailable: rawPath !== null, rawNote });
@@ -398,6 +403,21 @@ export class DatasaveJob {
   }
 
   private auctionsRead = 0;
+  /** v5.59.0 (CR-081): what the archive did in this run (reset at the start of godaddyInventory). */
+  private archive: ArchiveOutcome = { written: [], skipped: [] };
+
+  /** Archives one saved zip (see archive/godaddy-archive.ts). A failure never fails the step: it is reported in the summary. */
+  private async archiveFile(zipPath: string, file: string, dataDate: string): Promise<void> {
+    if (!this.deps.archiveDir || !ARCHIVE_FILES[file]) return;
+    try {
+      const cap = (await this.deps.db.selectFrom('settings').select('s8_max_price_cents').executeTakeFirstOrThrow()).s8_max_price_cents;
+      const r = await archiveZip(this.deps.archiveDir, zipPath, file, dataDate, cap);
+      (r.written ? this.archive.written : this.archive.skipped).push(r.name);
+    } catch (e) {
+      this.archive.error = `${file}: ${shortError(e)}`.slice(0, 300);
+      this.deps.log?.warn({ file, err: shortError(e) }, 'datasave: archive failed');
+    }
+  }
   private liveKept = 0;
   private liveBandMax: number | null = null;
 
@@ -488,6 +508,7 @@ export class DatasaveJob {
 
   /** Freezes and seals every pick day before today that no bot sealed (pickproof/store.ts autoSeal). Runs before snapshotRetention, while the rows of D-1 exist. */
   async pickproofSeal(): Promise<unknown> {
+    if (!(await pickproofEnabled(this.deps.db))) return PICKPROOF_OFF; // v5.59.0 (CR-081): the pick-proof is off
     return autoSeal(this.deps.db, this.deps.now());
   }
 
@@ -495,6 +516,7 @@ export class DatasaveJob {
 
   /** T30 labels of the pick-proof arm names (30 days after the pick day), RDAP only, at most settings.pickproof_labels_max_per_run lookups; also prunes old pool rows. See pickproof/labels.ts. */
   async pickproofLabels(): Promise<unknown> {
+    if (!(await pickproofEnabled(this.deps.db))) return PICKPROOF_OFF; // v5.59.0 (CR-081)
     return pickproofLabels({ db: this.deps.db, now: this.deps.now, log: this.deps.log });
   }
 

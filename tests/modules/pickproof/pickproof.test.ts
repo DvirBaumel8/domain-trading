@@ -1,7 +1,7 @@
 // v5.28.0 (CR-073): pick-proof mechanics. The pool is the sealed CR-071 save of the evening before; picks (arm A), the seal, the drawn arms (B1, B2, C1),
 // T30 labels (RDAP mocked with MSW) and the report. Every outside call is mocked; the only network the code could make is Verisign RDAP, answered by MSW.
 import { appendFileSync } from 'node:fs';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { http, HttpResponse } from 'msw';
@@ -20,6 +20,8 @@ let clock = at(`${D}T10:00:00Z`);
 let app: FastifyInstance | undefined;
 let n = 0;
 afterEach(async () => { await app?.close(); app = undefined; });
+// CR-081: the pick-proof is off by default; these tests are of the mechanics, so they switch it on
+beforeEach(async () => { await sql`update settings set pickproof_enabled = true`.execute(db); });
 
 const WORDS = ['sun', 'red', 'big', 'top', 'fun', 'hot', 'sea', 'box', 'pet', 'car', 'bus', 'map'];
 const twoWord = WORDS.flatMap((a) => WORDS.filter((b) => b !== a).map((b) => `${a}${b}.com`)); // 132 names, 6 letters

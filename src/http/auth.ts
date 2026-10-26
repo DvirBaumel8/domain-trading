@@ -209,6 +209,7 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /jobs/run': 'write_only',
   'POST /auctions/plans': 'write_only', // v5.39.0 (CR-077): Dvir's approved maximum bid; Gavriel (WRITE) only
   'POST /auctions/plans/{id}/result': 'write_only', // v5.39.0 (CR-077): the real outcome of a bid plan
+  'POST /replay/runs': 'write_only', // v5.59.0 (CR-081): queues a replay of an archived day (WRITE only, as specified)
   // allowed
   'POST /tokens/bots/rotate': 'allowed',
   'POST /auctions/prebid': 'allowed', // v5.39.0 (CR-077): stores a safety check (a fact about a public name); no money, price or listing

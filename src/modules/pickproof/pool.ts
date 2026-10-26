@@ -28,6 +28,12 @@ export async function pickproofSettings(db: Db) {
   return { k: s.pickproof_k, deadlineHourUtc: s.pickproof_deadline_hour_utc, maxPriceCents: s.pickproof_pool_max_price_cents, labelsMaxPerRun: s.pickproof_labels_max_per_run, poolKeepDays: s.pickproof_pool_keep_days };
 }
 
+/** v5.59.0 (CR-081): `settings.pickproof_enabled`, off by default since the replay replaced the pick-proof. Off = no new day is frozen and the datasave steps do nothing. */
+export async function pickproofEnabled(db: Db): Promise<boolean> {
+  return (await db.selectFrom('settings').select('pickproof_enabled').executeTakeFirstOrThrow()).pickproof_enabled;
+}
+export const PICKPROOF_OFF = { status: 'off', reason: 'CR-081' } as const;
+
 export async function getDay(db: Db, day: string): Promise<DayRow | null> {
   const r = await db.selectFrom('pickproof_days').selectAll().where('day', '=', day).executeTakeFirst();
   if (!r) return null;
@@ -92,6 +98,7 @@ export const poolSha = (rows: readonly PoolRow[]): string => sha256Hex(JSON.stri
 export async function ensureDay(db: Transaction<Database>, day: string, frozenBy?: 'datasave'): Promise<DayRow> {
   const have = await getDay(db, day);
   if (have) return have;
+  if (!(await pickproofEnabled(db))) throw new AppError(409, 'PICKPROOF_STOPPED', `The pick-proof was switched off by CR-081 (the historical replay replaced it), so the pool of ${day} is not frozen; days already sealed stay readable`, { date: day });
   const st = await pickproofSettings(db);
   const built = await buildPool(db, day, st.maxPriceCents);
   const { rows, dataDate } = built;

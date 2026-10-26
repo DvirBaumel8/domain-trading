@@ -31,14 +31,14 @@ describe('GET /health jobs and jobs_last (BUG-047)', () => {
 });
 
 describe('GET /health (R-11)', () => {
-  it('needs a bot token (401 without, 200 with READ) and returns exactly status, datasave, dq_market, db, db_size, jobs, jobs_last, version, adapters', async () => {
+  it('needs a bot token (401 without, 200 with READ) and returns exactly status, datasave, dq_market, db, db_size, jobs, jobs_last, version, adapters, archive', async () => {
     app = await makeApp({ testRoutes: false });
     expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(401);
     const { auth } = await issueToken('read');
     const res = await app.inject({ method: 'GET', url: '/health', headers: auth });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(Object.keys(body).sort()).toEqual(['adapters', 'datasave', 'db', 'db_size', 'dq_market', 'jobs', 'jobs_last', 'status', 'version']);
+    expect(Object.keys(body).sort()).toEqual(['adapters', 'archive', 'datasave', 'db', 'db_size', 'dq_market', 'jobs', 'jobs_last', 'status', 'version']);
     expect(body).toMatchObject({ status: 'ok', db: 'ok' });
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
     for (const a of body.adapters) expect(Object.keys(a).sort()).toEqual(['enabled', 'name']);

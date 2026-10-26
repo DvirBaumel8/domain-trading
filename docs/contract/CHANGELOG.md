@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.59.0 (2026-10-27): CR-081 historical replay replaces the pick-proof; daily archive
+Release note: `docs/releases/v5.59.0.md`.
+MINOR (migration `1767900000000_v5-59-0.sql`: `settings.pickproof_enabled` default false, table `replay_day_runs`). New routes `POST /replay/runs`, `GET /replay/{date}`, `GET /replay/runs/{id}`, `GET /replay/runs`; codes `ARCHIVE_DAY_MISSING`, `REPLAY_NOT_RUN`, `REPLAY_LOGIC_UNAVAILABLE`, `PICKPROOF_STOPPED`. The datasave steps `pickproofSeal` / `pickproofLabels` report `{status: "off", reason: "CR-081"}` (behaviour change; no caller depends on their summary). `godaddyInventory` writes the daily archive (`archive` in its summary). `GET /health` gains `archive`. New env `ARCHIVE_DIR`.
+
 ## 5.58.0 (2026-10-26): CR-079 daily missing-name check folded into portfolioCheck (4 new warnings, receipt pointers on /portfolio and books.csv)
 Release note: `docs/releases/v5.58.0.md`.
 MINOR (migration `1767800000000_v5-58-0.sql`: `venue_listings.approval_source`, the CR-076 seed rows tagged `seed_cr076`). CR-079:

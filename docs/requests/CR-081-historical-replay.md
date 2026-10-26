@@ -76,3 +76,30 @@ None remaining (Dvir already said yes to build; no money, no new paid service, n
 ## Changes
 - 2026-10-27 ~01:00 IDT (DOM Architect): expanded thin common-decision note into full CR (Rules, ATs, R-STOP-FIRST max 3, concrete routes/jobs). Status remains `approved` per Dvir YES ~00:53 IDT.
 - 2026-10-27 ~00:56 IDT (DOM Architect): design lock from Gavriel — primary `GET /replay/{date}` (`npm run replay` helper only); freeze filters+score as of day D (not today's recipe with features capped at D). Questions section replaced by Decisions.
+
+## DOM response (27 Oct 2026, v5.59.0, built; not yet released)
+
+**Verdict:** accepted and built as v1. Rules and test ids: `docs/internal/replay.md` (RPY81-1..RPY81-21, `tests/modules/ops/replay.test.ts`).
+
+### Conflict with R-5 and Decision 2, and how DOM resolved it
+The CR says to freeze "the filters + score recipe/model as they stood on day D, not today's recipe". DOM does **not** implement that. **Resolution: the default is today's logic, run on day D's point-in-time data** (only D's archived fields, frozen lists, `settings`, and a lift table trained on or before D, else the CR-002 seed table). Reasons: Dvir's request is to test and improve our current logic; the recipe of past days was never stored (the shortlist logic changed six times on 26 Oct), so "as it stood on D" cannot be rebuilt honestly. Every report stores `logic_version` (`replay-v1|score version|lift id|settings hash`). The body and query field `logic` accepts only `"current"`; `as_of_date` answers 422 `REPLAY_LOGIC_UNAVAILABLE` until recipe versions are stored per day (v2).
+
+### What v1 does
+- **Archive:** datasave `godaddyInventory` writes `<ARCHIVE_DIR>/godaddy/<data_date>-<file base>.jsonl.gz` for `all_biddable_auctions` and `closeout_listings` (`.com`, price at most the S8 cap setting, all fields, gzip; skipped if present; failure only reported). `ARCHIVE_DIR` defaults to a sibling `archive` of `SNAPSHOT_DIR`. `/health.archive` = `{days_n, first, last, missing_days}`. Nothing deletes it. Dynadot is not archived (no key).
+- **Pick-proof off:** `settings.pickproof_enabled` (default false). The two datasave steps report `{status: "off", reason: "CR-081"}`; no new pick day is frozen; picks for an unsealed day are 409 `PICKPROOF_STOPPED`. Sealed days stay readable.
+- **Replay:** `GET /replay/{date}` (READ or bots; `kind`, `n` default 25, `seed`) is the route bots use: the newest finished report or 404 `REPLAY_NOT_RUN`. `POST /replay/runs` (WRITE only) queues a run (202 `{id}`; `dry_run` answers at once and stores nothing); `GET /replay/runs/{id}` and `GET /replay/runs` read status. Seed default = sha256 of the day's archive file plus the kind; the random group is shuffled with the pick-proof's MT19937 / Fisher-Yates from `src/core`. The report has counts beside every rate, `too_small` under 20 positives, a seeded paired bootstrap (1,000 resamples) per label, and `did_well` with the features of every positive name from both groups. Labels are side by side: `reached_100`, `beat_our_max`, `taken` (closeouts, pending until D+30, stored RDAP tags only), `retail_sale`, `retail_500`.
+- **Point in time:** test RPY81-13 proves picks, scores, parts and maximums of D are identical with and without the D+1 file (AT-2).
+- Migration `1767900000000_v5-59-0.sql`. The table is `replay_day_runs` (not `replay_runs`: that name is the selection replay's).
+
+### Where retail outcomes come from
+`market_sales` (the table behind `POST /data/sales`, listing type other than `closeout`) and `engine_sales` rows whose source is not `godaddy_auctions_file`. If none is stored after D the report says `retail: {status: "no_data"}` and has no retail label. **TODO (v2):** the D2 dev rows (`docs/requests/research/d2-names-labels-2026-10.csv`, `split=dev`) are not loaded by the server; until a bot uploads UnreportedSales / DNJournal / DNW through `POST /data/sales`, retail will be `no_data` on most days.
+
+### Left for v2
+- Logic as it stood on D (needs recipe versions stored per day).
+- R-6 and AT-3 (`REPLAY_HOLDOUT_SEALED`): v1 never reads D2 at all, so sealed rows cannot be opened; there is no `final_check` route yet.
+- R-9 keep rule is the bots' harness; DOM exposes `ours_win_share` only. No slice (price band) breakdown yet.
+- Brand-typo rule and the other-endings lookups are not applied in the replay (endings unknown by design).
+- Auction finals use the ended-auction tracker (from $100) or the last archived row (a lower bound); `beat_our_max` is a lower bound too.
+- `npm run replay` helper not built (skipped, as allowed). Dynadot archive waits for the key.
+- AT-8 is met by `/health.archive`; there is no `GET /replay` index.
+- `pickproofLabels` no longer shrinks old pool rows while off.

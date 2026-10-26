@@ -3,3 +3,4 @@
 export { registerPickproof } from './api/pickproof.js';
 export { pickproofLabels, type LabelsSummary } from './labels.js';
 export { autoSeal } from './store.js';
+export { pickproofEnabled, PICKPROOF_OFF } from './pool.js';
