@@ -263,7 +263,7 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 |---|---|
 | A | **Yes, broader:** one place per durable data piece = **DOM database**. Every component needing that data reads **only via DOM API**. All other persistence of those facts to be removed/refactored (company CSV mirrors included). |
 | B | **Sedo fully off:** remove Sedo scrapes **and** Sedo listings (no placeholders). Seek server-to-server marketplace alternatives (Afternic Portfolio API, Spaceship SellerHub, others with S2S APIs). |
-| C | **Reject three named READ tokens.** One shared password for DOM endpoints; DOM generates, Dvir passes it to Gavriel. |
+| C | **Reject three named READ tokens.** One shared password for DOM endpoints; **DOM Architect generates**; Dvir one-tap/passes to Gavriel; no invent+activate alone. |
 | D | **Yes** — archive ~267 bak / stale scout docs under `archive/` (no delete). |
 | E | **Skip** 90-day edge framing for now. |
 | F | Residual disagreements: **none**. |
@@ -271,7 +271,7 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 **Execute (DOM Architect, 2026-10-27 ~02:46 IDT):**
 - A → `CR-084-dom-sole-durable-store.md` (117779a)
 - B → `CR-085-sedo-full-off.md` + `SEDO-DELIST-PLAN-2026-10-27.md` (verify first; **no Sedo clicks** until Dvir one-tap if anything live)
-- C → named READ **rejected**; one shared token — **OPEN wording:** Gavriel relay said Dvir generates/passes to DOM Architect→Gavriel; this §10 table says DOM generates. Standing rule: Dvir does not create keys. **Waiting Gavriel one-line which generator**; do not invent a new token until clarified / handed.
+- C → named READ **rejected**; **one shared token: DOM Architect generates** → Dvir one-tap/pass to Gavriel → both sides use it. **Do not invent+activate alone**; no live token until Dvir confirms the handoff (Gavriel clarify 2026-10-27 ~02:48 IDT).
 - D → `CR-086-archive-bak-and-stale-scout-docs.md` + company-box archive pass (no delete)
 - E → skipped
 
