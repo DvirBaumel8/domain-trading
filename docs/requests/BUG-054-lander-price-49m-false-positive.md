@@ -103,3 +103,10 @@ Price/BIN changes; Sedo; browser automation; activating settings that spend mone
 - `aievalsconsulting.com`: **no** `$49,999,999` (warning cleared).
 - `roofingvoiceagent.com`: still **`$49,999,999.00`**, `checked_at` **2026-10-27T02:06:06+02:00** (stale; fresh price check did not produce a non-unknown pass — apex JS→`/lander` / GoDaddy 403 path).
 - AT-4 criterion (both names free of `$49,999,999` on `/report`): **FAIL**.
+
+## AT-4 live recheck (2026-10-27 ~20:51 IDT, DOM Architect) — **FAIL**
+
+- `/health` **5.70.0**. Daily `run_7bd3b4da-af37-454b-8188-79690649578c` → `portfolioCheck` finished **2026-10-27T20:48:30+02:00** (`web.ok=5`, `alerts_n=0`).
+- `aievalsconsulting.com`: **no** `$49,999,999` (still clear; price `ok` `$1,488`).
+- `roofingvoiceagent.com`: still **`$49,999,999.00`**, `checked_at` **2026-10-27T02:06:06+02:00** (stale). Fresh price row = `unknown`/`no_price_text` @ 20:48 — BUG-059 fallback did not run (null-only trigger).
+- AT-4 criterion (aievals + roofing free of `$49,999,999` on `/report`): **FAIL**.

@@ -88,3 +88,10 @@ Focus: Lander parser: never treat $100,000 (or similar non-BIN) as shown; prefer
 - `aievalsconsulting.com`: **no** `$100,000` (cleared — BUG-058 body cap).
 - `ukcbamcompliance.com`: still **`$100,000.00`**, `checked_at` **2026-10-27T16:21:00+02:00** (stale unknown path).
 - Gate (ukcbam + aievals free of `$100,000`): **FAIL**.
+
+## AT-3 live recheck (2026-10-27 ~20:51 IDT, DOM Architect) — **FAIL**
+
+- `/health` **5.70.0**. `portfolioCheck` **2026-10-27T20:48:30+02:00**.
+- `aievalsconsulting.com`: **no** `$100,000` (stays clear — BUG-058).
+- `ukcbamcompliance.com`: still **`$100,000.00`**, `checked_at` **2026-10-27T16:21:00+02:00** (stale). Fresh price row = `unknown`/`no_price_text` @ 20:48 — BUG-059 Afternic listing fallback not triggered.
+- Gate (ukcbam + aievals free of `$100,000`): **FAIL**.

@@ -69,3 +69,12 @@ All six rules shipped:
 - **R-6:** The fallback fires only when `price` is null (primary web check failed); an `unknown` price from a readable page is left as-is.
 
 Tests LP-13 (AT-1) and LP-14 (AT-2) added. `/health` shows `5.70.0` after deploy.
+
+## AT-3 live recheck (2026-10-27 ~20:51 IDT, DOM Architect) — **FAIL**
+
+- `/health` **5.70.0** (tag `v5.70.0` / `33e1284` deployed on Mac). Manual daily `run_7bd3b4da-…` → `portfolioCheck` **2026-10-27T20:48:30+02:00**.
+- `GET /report` (generated_at **2026-10-27T20:49:20+02:00**):
+  - `roofingvoiceagent.com`: still **`$49,999,999.00`** @ **02:06:06+02:00**
+  - `ukcbamcompliance.com`: still **`$100,000.00`** @ **16:21:00+02:00**
+- DB price rows at 20:48 IDT: both **`unknown` / `no_price_text`** (primary page matched lander signature but no Buy Now). Shipped code only calls `afternicListingPrice` when `priceResult === null` (DOM response R-6), **not** when status is `unknown` — so listing fallback never ran for these two.
+- Original R-1 wanted fallback on unknown/403; AT-3 still open until fallback covers `unknown` (or primary returns null) and writes `ok` with `source: afternic_listing`. No money.

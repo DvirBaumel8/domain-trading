@@ -1,3 +1,33 @@
+## 2026-10-27 ~20:51 IDT (DOM Architect): v5.70.0 live lander gates
+
+**ALL THREE gates green: NO.** Do not priority-ping Gavriel for green.
+
+| Gate | Result |
+|---|---|
+| BUG-054 AT-4 (no `$49,999,999` on aievals + roofing) | **FAIL** |
+| BUG-056 (no `$100,000` on ukcbam + aievals) | **FAIL** |
+| BUG-058 (aievals stays clear of false BIN) | **PASS** |
+
+### /health
+- Proxy **`version: 5.70.0`**, status ok (Mac deploy after CI; live ~20:47 IDT Asia/Jerusalem).
+
+### portfolioCheck
+- Manual daily `run_7bd3b4da-af37-454b-8188-79690649578c` (WRITE `dom-write`, Idempotency-Key `dom-gate-570-…`).
+- `portfolioCheck` **2026-10-27T20:48:30+02:00**, `ok`, `web.ok=5` `fail=0` `unknown=0`, `alerts_n=0`.
+
+### GET /report lander warnings (generated_at 2026-10-27T20:49:20+02:00)
+- `aievalsconsulting.com`: **no** LANDER_PRICE_MISMATCH (price row `ok` `$1,488` @ 20:48:22+02:00)
+- `roofingvoiceagent.com`: shown **`$49,999,999.00`** vs expected `$1,488.00`, `checked_at` **2026-10-27T02:06:06+02:00** (stale)
+- `ukcbamcompliance.com`: shown **`$100,000.00`** vs expected `$1,488.00`, `checked_at` **2026-10-27T16:21:00+02:00** (stale)
+
+### Why BUG-059 did not clear roofing / ukcbam
+- Fresh `price` rows for both: **`unknown` / `no_price_text`** @ 20:48 IDT (primary apex/lander readable + signature match, but no Buy Now text).
+- Shipped R-6: Afternic listing fallback runs only when `priceResult === null` (primary web failed). An **`unknown`** price from a readable page is left as-is → no `afternic_listing` fetch → prior fail rows still drive `/report`.
+- Original BUG-059 R-1 asked for fallback on **unknown** too; build narrowed to null-only. Need a follow-up (fallback also when Afternic-NS + `price.status === 'unknown'`) for AT-3 / gates to green. No money.
+
+### Discovery E2E
+Still held until BUG-054 AT-4 + BUG-056 clear. No money. No green ping.
+
 ## 2026-10-27 (DOM): v5.70.0 shipped — BUG-059 Afternic listing fallback
 
 Built and pushed v5.70.0 (BUG-059): when the primary lander fetch fails (403) for an Afternic-NS name, `portfolioCheck` now also fetches `https://www.afternic.com/domain/<name>` and parses Buy Now with the 5.69.0 rules. A matching BIN clears the stale `LANDER_PRICE_MISMATCH`. Tests LP-13, LP-14. After deploy + one daily run, `roofingvoiceagent.com` ($49M) and `ukcbamcompliance.com` ($100k) should clear on `/report`.
