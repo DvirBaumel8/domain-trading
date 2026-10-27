@@ -95,7 +95,7 @@ const SUMMARIES: Record<string, string> = {
   'GET /replay/{date}': 'The newest finished replay report of an archived day (CR-081; the one bots use): query kind (auctions|closeouts), n, seed (default derived from the archive file); 404 REPLAY_NOT_RUN; writes nothing',
   'GET /replay/runs/{id}': 'One replay run with its status and, when done, the report (per-group counts and rates, paired bootstrap, the names that did well)',
   'GET /replay/runs': 'Replay runs, newest first (status and logic version; the report is in GET /replay/runs/{id}); filters limit, status',
-  'GET /auctions/shortlist': 'The daily shortlist of the best live GoDaddy auctions in our range (v5.45.0): rank, score and parts, price, bids, end time, suggested maximum bid, automatic pre-bid (id, verdict, flags), reasons; filters date, limit',
+  'GET /auctions/shortlist': 'The daily shortlist of live GoDaddy auctions that pass hard filters (v5.72.0: full field, paginated): rank, score and parts, price, bids, end time, suggested maximum bid, automatic pre-bid (id, verdict, flags), reasons; filters date, limit, offset',
   'GET /auctions/funnel': 'The auction funnel counted over a date range (default the last 7 days): auctions seen, shortlisted, pre-bid, bid plans, won, imported, listed, traffic, sold',
   'GET /auctions/live': 'GoDaddy auctions inside the buying range (price up to the S8 cap, with bids) from the latest daily save, with the stored band; filters date, max_price, min_bids, ends_within_hours, type, sort, limit, offset, include_ended',
   'GET /market/matched': 'Matched sold-vs-unsold set for (asof, ratio, seed): frozen and sealed with a sha256 on the first call',

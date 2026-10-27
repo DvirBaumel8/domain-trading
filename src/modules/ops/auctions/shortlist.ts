@@ -121,8 +121,13 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
   const byPre = (a: Cand, b: Cand): number => b.pre.score - a.pre.score || a.end_time.getTime() - b.end_time.getTime() || (a.domain < b.domain ? -1 : 1);
   cands.sort(byPre);
 
-  // ---- BRAND-TYPO-2 against the stored list, walking the ranked names until the pool is full
-  const poolSize = cfg.shortlist_size + cfg.shortlist_endings_n;
+  // v5.72.0 (CR-088, R-2): if more than 10,000 names pass the hard filters, stop and warn (Dvir wants to talk before we store that many)
+  if (cands.length > 10_000) {
+    deps.log?.warn({ field_n: cands.length }, 'auction shortlist: hard-filter passers exceed 10,000; storing none (R-2: talk to Dvir)');
+    return { ...out, status: 'field_exceeds_10k', field_n: cands.length, shortlisted_n: 0, dropped, warning: `${cands.length} hard-filter passers exceed the 10,000 talk threshold (CR-088 R-2). No rows stored.` };
+  }
+
+  // ---- BRAND-TYPO-2 against the stored list, walking all ranked names (v5.72.0 CR-088: no pool size cap)
   let brands: Map<string, number> | null = null;
   let brandState: 'on' | 'off' | 'no_list' | 'old_list' = 'off';
   if (sel.values.sources.popularity) {
@@ -137,7 +142,6 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
   }
   const pool: Cand[] = [];
   for (const c of cands) {
-    if (pool.length >= poolSize) break;
     if (brands) {
       const m = brandMatches(c.sld, brands, commonWord, 1)[0];
       if (m?.severity === 'FAIL') { dropped.brand_typo_n++; continue; }
@@ -196,7 +200,9 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
     served.push(x);
   }
   scored.splice(0, scored.length, ...served);
-  const top = scored.slice(0, cfg.shortlist_size).map((x, i) => ({ ...x, rank: i + 1, prebid_id: null as number | null, verdict: null as 'pass' | 'flag' | 'fail' | null, dropped: null as string | null }));
+  // v5.72.0 (CR-088 R-1): store ALL hard-filter passers, not just shortlist_size; shortlist_size = 0 means "all"
+  const sliced = cfg.shortlist_size > 0 ? scored.slice(0, cfg.shortlist_size) : scored;
+  const top = sliced.map((x, i) => ({ ...x, rank: i + 1, prebid_id: null as number | null, verdict: null as 'pass' | 'flag' | 'fail' | null, dropped: null as string | null }));
 
   // ---- automatic pre-bid, walking down the list until prebid_n names did not fail
   const pre = { checked_n: 0, pass_n: 0, flag_n: 0, fail_n: 0, reused_n: 0, errors_n: 0, partial: false, status: 'ok' as 'ok' | 'not_configured' };
@@ -258,7 +264,8 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
 
 export const ShortlistQuery = z.object({
   date: z.string().refine(isRealDate, 'must be a real date (YYYY-MM-DD)').optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(25),
+  limit: z.coerce.number().int().min(1).max(10_000).default(25),
+  offset: z.coerce.number().int().min(0).default(0),
 }).strict();
 
 export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof ShortlistQuery>, nowMs: number) {
@@ -273,14 +280,17 @@ export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof Short
   const dataDate = q.date ?? (newest?.d ? String(newest.d).slice(0, 10) : null);
   const base = { data_date: dataDate, as_of: toJerusalemIso(new Date(nowMs)), settings: used };
   if (dataDate === null) return { ...base, generated_at: null, total: 0, rows: [] };
+  // v5.72.0 (CR-088 R-3): total = all eligible rows for the date (not dropped, not ended), for pagination
+  const totalRow = await db.selectFrom('auction_shortlist').select((eb) => eb.fn.countAll<string>().as('n')).where('data_date', '=', dataDate).where('dropped_reason', 'is', null).where('end_time', '>', new Date(nowMs)).executeTakeFirst();
+  const total = Number(totalRow?.n ?? 0);
   // served = not dropped by a failed pre-bid; names whose auction already ended are left out
-  const rows = await db.selectFrom('auction_shortlist').selectAll().where('data_date', '=', dataDate).where('dropped_reason', 'is', null).where('end_time', '>', new Date(nowMs)).orderBy('rank').limit(q.limit).execute();
+  const rows = await db.selectFrom('auction_shortlist').selectAll().where('data_date', '=', dataDate).where('dropped_reason', 'is', null).where('end_time', '>', new Date(nowMs)).orderBy('rank').limit(q.limit).offset(q.offset).execute();
   const ids = rows.map((r) => r.prebid_id).filter((x): x is number => x !== null);
   const pre = ids.length === 0 ? [] : await db.selectFrom('prebid_checks').select(['id', 'verdict', 'created_at', 'answer']).where('id', 'in', ids).execute();
   const preById = new Map(pre.map((p) => [Number(p.id), p]));
   const gen = await db.selectFrom('auction_shortlist').select((eb) => eb.fn.max('generated_at').as('g')).where('data_date', '=', dataDate).executeTakeFirst();
   return {
-    ...base, generated_at: gen?.g ? toJerusalemIso(new Date(gen.g as Date)) : null, total: rows.length,
+    ...base, generated_at: gen?.g ? toJerusalemIso(new Date(gen.g as Date)) : null, total,
     rows: rows.map((r) => {
       const p = r.prebid_id === null ? undefined : preById.get(Number(r.prebid_id));
       const checks = ((p?.answer as { checks?: PrebidCheck[] } | undefined)?.checks ?? []);

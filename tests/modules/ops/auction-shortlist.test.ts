@@ -66,7 +66,7 @@ describe('AS555 maximum bid by position (v5.55.0)', () => {
     const r = await runStep() as Record<string, any>;
     expect(r.field_n).toBe(64);
     const rows = await shortlist();
-    expect(rows.length).toBe(25);
+    expect(rows.length).toBeGreaterThan(25); // v5.72.0 (CR-088): all hard-filter passers are stored (some may be dropped by no-headroom at the tail)
     for (const x of rows) {
       const f = pf(x.rank, x.field_n!);
       expect(x.max_bid_suggested_cents).toBe(maxBidRule({ capCents: 25_000, resaleCents: 100_000, commission: 0.2, saleChanceBp: 5000, renewalCents: 0, score: Number(x.score), positionFactor: f }));
@@ -334,7 +334,7 @@ describe('AS545 routes', () => {
     const res = await get('/auctions/shortlist', (await issueToken('bots')).auth);
     expect(res.statusCode, res.body).toBe(200);
     const j = res.json();
-    expect(j).toMatchObject({ data_date: DATE, total: 4, settings: { shortlist_size: 25, shortlist_prebid_n: 10, shortlist_horizon_hours: 72, shortlist_endings_n: 50, score_version: 'auction-v2' } });
+    expect(j).toMatchObject({ data_date: DATE, total: 4, settings: { shortlist_size: 0, shortlist_prebid_n: 10, shortlist_horizon_hours: 72, shortlist_endings_n: 50, score_version: 'auction-v2' } });
     expect(j.generated_at).toMatch(/\+0[23]:00$/);
     const top = j.rows[0];
     expect(top).toMatchObject({ rank: 1, field_n: expect.any(Number), top_pct: expect.any(Number) });
@@ -538,6 +538,8 @@ describe('AS549 auction-v4 and paper trading', () => {
   });
 
   it('AS549-12: the step records paper-trading rows: the served names (group shortlist, rank, score, suggested maximum) and a deterministic control of 25 names of the same field that are not in the list, the smallest md5(domain || data date); a second run gives the same rows', async () => {
+    // v5.72.0 (CR-088): with shortlist_size = 0, use a nonzero shortlist_size to keep this test's contract: only 25 of 64 are stored, leaving room for a 25-name control
+    await sql`update settings set shortlist_size = 25`.execute(db);
     for (let i = 0; i < 64; i++) await live(nameN(i), { price: 2000, bids: 3 });
     await sql`update settings set shortlist_sale_chance_bp = 5000, shortlist_renewal_cents = 2300`.execute(db);
     const r = await runStep() as Record<string, any>;
@@ -652,5 +654,89 @@ describe('AS549 auction-v4 and paper trading', () => {
     await updateOutcomes(db, NOW);
     const r = await db.selectFrom('auction_outcomes').select(['last_seen_price_cents', 'prev_seen_price_cents']).where('domain', '=', 'moving.com').executeTakeFirstOrThrow();
     expect(r).toEqual({ last_seen_price_cents: 9000, prev_seen_price_cents: 2500 });
+  });
+});
+
+// ---- CR-088: full hard-filter auction field (no shortlist_size cut) ----
+
+describe('CR088 AT: full hard-filter auction field', () => {
+  const get = (url: string, auth: Record<string, string>) => app!.inject({ method: 'GET', url, headers: auth });
+
+  it('CR088-AT1: after a datasave day with field_n=40 hard-filter passers, auction_shortlist holds 40 ranked rows for that data_date (not 25)', async () => {
+    for (let i = 0; i < 40; i++) await live(nameN(i), { price: 2000 });
+    await sql`update settings set shortlist_prebid_n = 0`.execute(db);
+    const r = await runStep() as Record<string, any>;
+    expect(r.field_n).toBe(40);
+    const rows = await shortlist();
+    expect(rows).toHaveLength(40);
+    expect(rows[0]!.rank).toBe(1);
+    expect(rows[39]!.rank).toBe(40);
+    expect(r.shortlisted_n).toBe(40);
+  });
+
+  it('CR088-AT2: GET /auctions/shortlist with pagination (limit+offset) returns rows beyond the former top 25; total equals the full available count; a client can walk the whole field', async () => {
+    for (let i = 0; i < 40; i++) await live(nameN(i), { price: 2000 });
+    await sql`update settings set shortlist_prebid_n = 0`.execute(db);
+    await runStep();
+    app = await makeApp({ now: () => NOW });
+    const auth = (await issueToken('read')).auth;
+    // page 1: rows 1-25
+    const p1 = (await get('/auctions/shortlist?limit=25&offset=0', auth)).json();
+    expect(p1.rows).toHaveLength(25);
+    expect(p1.total).toBeGreaterThanOrEqual(40);
+    // page 2: rows 26-40
+    const p2 = (await get('/auctions/shortlist?limit=25&offset=25', auth)).json();
+    expect(p2.rows.length).toBeGreaterThanOrEqual(1);
+    expect(p2.rows[0].rank).toBeGreaterThan(25);
+    // all rows accessible
+    const all = (await get('/auctions/shortlist?limit=10000', auth)).json();
+    expect(all.rows).toHaveLength(40);
+    expect(all.total).toBe(40);
+  });
+
+  it('CR088-AT3: backward compatible: an old-style caller with limit=25 (no offset) still works and gets at most what exists', async () => {
+    for (let i = 0; i < 20; i++) await live(nameN(i), { price: 2000 });
+    await sql`update settings set shortlist_prebid_n = 0`.execute(db);
+    await runStep();
+    app = await makeApp({ now: () => NOW });
+    const auth = (await issueToken('read')).auth;
+    const res = (await get('/auctions/shortlist?limit=25', auth)).json();
+    expect(res.rows).toHaveLength(20);
+    expect(res.total).toBe(20);
+    // requesting beyond stored returns only what exists (no pad)
+    const beyond = (await get('/auctions/shortlist?limit=100&offset=15', auth)).json();
+    expect(beyond.rows).toHaveLength(5);
+  });
+
+  it('CR088-AT4: endings/prebid caps: with shortlist_prebid_n=5 and N=40, at most 5 non-fail auto-prebids are attempted; rows 6-40 still appear on GET with prebid null, not omitted', async () => {
+    for (let i = 0; i < 40; i++) { await live(nameN(i), { price: 2000 }); rdapTable[nameN(i)] = registered(); }
+    await sql`update settings set shortlist_prebid_n = 5`.execute(db);
+    const r = await runStep({ screening: screeningDeps() }) as Record<string, any>;
+    expect(r.prebid.checked_n).toBeLessThanOrEqual(5 * 3);
+    expect(r.prebid.pass_n).toBeLessThanOrEqual(5);
+    const rows = await shortlist();
+    expect(rows).toHaveLength(40);
+    const withPrebid = rows.filter((x) => x.prebid_id !== null);
+    const withoutPrebid = rows.filter((x) => x.prebid_id === null);
+    expect(withPrebid.length).toBeLessThanOrEqual(5 * 3);
+    expect(withoutPrebid.length).toBeGreaterThanOrEqual(35);
+    // the route serves all of them
+    app = await makeApp({ now: () => NOW });
+    const auth = (await issueToken('read')).auth;
+    const j = (await get('/auctions/shortlist?limit=10000', auth)).json();
+    expect(j.rows.length).toBe(40);
+    const nullPrebid = j.rows.filter((x: any) => x.prebid === null);
+    expect(nullPrebid.length).toBeGreaterThanOrEqual(35);
+  });
+
+  it('CR088-AT5: hard filters unchanged — a name that fails SPELL-1 is still not stored; only the size cut is removed', async () => {
+    await live('x1y2.com'); // SPELL-1
+    for (let i = 0; i < 5; i++) await live(nameN(i), { price: 2000 });
+    await sql`update settings set shortlist_prebid_n = 0`.execute(db);
+    const r = await runStep() as Record<string, any>;
+    expect(r.dropped.name_rules['SPELL-1']).toBe(1);
+    const rows = await shortlist();
+    expect(rows.map((x) => x.domain)).not.toContain('x1y2.com');
+    expect(rows).toHaveLength(5);
   });
 });
