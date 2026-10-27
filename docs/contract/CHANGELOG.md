@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.66.0 (2026-10-27): F47 hand-registration paper test; BUG-054 lander Buy Now parser
+Release note: `docs/releases/v5.66.0.md`.
+MINOR (migration `1768600000000_v5-66-0.sql`: tables `handreg_weeks`, `handreg_names`, `handreg_labels`; `settings.handreg_max_pool` 2000, `handreg_max_picks` 30, `handreg_labels_max_per_run` 200).
+- F47 (Dvir, 27 Oct 2026): `POST /handreg/weeks` (WRITE or bots): one sealed submission a week of a pool and picks; the server draws a same-size random control from the rest of the pool (crypto seed, MT19937 Fisher-Yates, `drawControl`) and RDAP-checks both arms. `GET /handreg/weeks`, `GET /handreg/weeks/{week}`, `GET /handreg/report` (taken and sold per arm at 6 and 12 months; proxy, not profit). New codes `HANDREG_WEEK_SEALED`, `HANDREG_POOL_TOO_SMALL`, `HANDREG_WEEK_NOT_FOUND`. Datasave step `handregLabels` after `pickproofLabels`.
+- BUG-054 (PATCH-level fix): the lander price check reads "Buy it now for $X" first and never takes Afternic's offer ceiling `$49,999,999` as the Buy Now price; the false `LANDER_PRICE_MISMATCH` on three names clears at the next `portfolioCheck`.
+
 ## 5.65.0 (2026-10-27): machine-competition measures in paper trading (F43), renew-or-drop signal per name (F44), Dynadot steps last in datasave
 Release note: `docs/releases/v5.65.0.md`.
 MINOR (migration `1768500000000_v5-65-0.sql`: `auction_outcomes.prev_seen_price_cents`, `settings.renew_views_min` 10).

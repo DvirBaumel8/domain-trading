@@ -356,4 +356,33 @@ describe('portfolioCheck: lander price and TLS (v4.0.0)', () => {
     expect(seen).toEqual(['https://lander-one.com/', 'https://www.afternic.com/forsale/lander-one.com']);
     expect(await price()).toMatchObject({ status: 'fail', details: { shown_cents: 99900 } });
   });
+
+  // 5.66.0 (BUG-054): Afternic's page carries the offer-form copy "Offer cannot exceed $49,999,999" next to "Buy it now for $1,488.00".
+  const afternic = (bin: string | null) =>
+    `<a href="/lander/lander-one.com">Afternic</a><script>{"buyNow":"Buy Now","domain.details.offers.error.limit":"Offer cannot exceed $49,999,999"}</script>` +
+    (bin === null ? '' : `<div>Buy it now for ${bin}</div>`) + '<button>Make an offer</button>';
+
+  it('LP-6 (BUG-054 AT-1): the buyer-visible "Buy it now for $1,488.00" beside the $49,999,999 offer limit is price ok, no warning', async () => {
+    state.page = { status: 200, body: afternic('$1,488.00'), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect(await price()).toMatchObject({ status: 'ok', details: { shown_cents: 148800 } });
+    expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
+
+  it('LP-7 (BUG-054 AT-2): the same page against plan BIN $2,488 is LANDER_PRICE_MISMATCH with shown $1,488, never $49,999,999', async () => {
+    state.page = { status: 200, body: afternic('$1,488.00'), location: null };
+    await verifiedLander({ bin_cents: 248800 });
+    await job().runOnce();
+    const w = (await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH');
+    expect(w).toMatchObject([{ details: { shown_cents: 148800, expected_cents: 248800 } }]);
+  });
+
+  it('LP-8 (BUG-054 AT-3): a page with only the $49,999,999 offer limit is unknown, never a mismatch', async () => {
+    state.page = { status: 200, body: afternic(null), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect(await price()).toMatchObject({ status: 'unknown', details: { reason: 'no_price_text' } });
+    expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
 });

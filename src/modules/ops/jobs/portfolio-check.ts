@@ -29,11 +29,30 @@ const LANDER_BODY_BYTES = 200_000;
 const LANDER_MAX_HOPS = 3;
 const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME|HOSTNAME_MISMATCH/i;
 
-/** The Buy Now amount a lander page shows (an amount within 80 characters after "buy now" / "buy it now"), in cents, or null when the page shows none. */
+const AMOUNT = String.raw`\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?`;
+/** 5.66.0 (BUG-054): an amount right after offer-form validation copy ("Offer cannot exceed $49,999,999") or a page-wide ceiling is never the Buy Now price. */
+const LIMIT_COPY = /(?:exceed|cannot|limit|minimum|maximum|at\s+least|less\s+than|more\s+than|between|offer\s+must)\W*(?:\w+\W+){0,2}$/i;
+const PLACEHOLDER_MIN_CENTS = 1_000_000_000; // $10,000,000: Afternic's offer ceiling $49,999,999 and similar
+/** The Buy Now amount a lander page shows, in cents, or null when the page shows none. 5.66.0 (BUG-054): "buy it now for $X" first; else
+ * every amount within 80 characters after "buy now" (or 40 before it), skipping amounts that follow limit copy and placeholder ceilings. */
 function shownBuyNowCents(text: string): number | null {
-  const m = /buy\s*(?:it\s*)?now[^$]{0,80}\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?/i.exec(text) ?? /\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?[^<]{0,40}buy\s*(?:it\s*)?now/i.exec(text);
-  if (!m) return null;
-  return Number(m[1]!.replace(/,/g, '')) * 100 + Number(m[2] ?? 0);
+  const cents = (m: RegExpExecArray) => Number(m[1]!.replace(/,/g, '')) * 100 + Number(m[2] ?? 0);
+  const usable = (m: RegExpExecArray, at: number) => {
+    const c = cents(m);
+    return c > 0 && c < PLACEHOLDER_MIN_CENTS && !LIMIT_COPY.test(text.slice(Math.max(0, at - 40), at)) ? c : null;
+  };
+  const patterns: Array<[RegExp, (m: RegExpExecArray) => number]> = [
+    [new RegExp(String.raw`buy\s*(?:it\s*)?now\s*(?:for|price)?\s*:?\s*(?:US)?${AMOUNT}`, 'gi'), (m) => m.index + m[0].indexOf('$')],
+    [new RegExp(String.raw`buy\s*(?:it\s*)?now[^$]{0,80}${AMOUNT}`, 'gi'), (m) => m.index + m[0].lastIndexOf('$')],
+    [new RegExp(String.raw`${AMOUNT}[^<]{0,40}buy\s*(?:it\s*)?now`, 'gi'), (m) => m.index],
+  ];
+  for (const [re, dollarAt] of patterns) {
+    for (const m of text.matchAll(re)) {
+      const c = usable(m, dollarAt(m));
+      if (c !== null) return c;
+    }
+  }
+  return null;
 }
 /** The price check of a readable lander page: shown Buy Now against the plan BIN; null shown = the page shows no amount (often script-rendered): unknown, never a mismatch. */
 function landerPriceCheck(text: string, d: { bin_cents: number | null; listing_mode: string | null }): { status: Status; details: Record<string, unknown> } | null {

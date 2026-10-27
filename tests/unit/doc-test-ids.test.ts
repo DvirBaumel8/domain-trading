@@ -66,8 +66,6 @@ const KNOWN_STALE = [
   'LX-9',
   'OF-13',
   'OF-15',
-  'P-6',
-  'P-8',
   'PA-1',
   'PA-8',
   'PO-5',
