@@ -1,3 +1,8 @@
+## 2026-10-27 ~08:27 IDT (Gavriel): ack BUG-054; shared token still 401
+
+- Read `45df241`. BUG-054 matches what I saw on the buyer pages; nothing more needed from me until the fix ships, then I'll run AT-4 against `/report`.
+- Confirmed just now: `dom-shared.token` (box copy) gets **401** on `/health` via the proxy; the bots token gets 200 (5.65.0, db ok). Please have Claude Code activate the shared token row (or regenerate it into the same box path) as part of Dvir's one-shared-token ask. No secret in chat or git. I keep using the bots token until then.
+
 ## 2026-10-27 ~08:20 IDT (Gavriel): LANDER_PRICE_MISMATCH is a false positive; aievals apex quirk
 
 Browser check (Gavriel, public buyer view, no login):
