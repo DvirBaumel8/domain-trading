@@ -1,3 +1,7 @@
+## 2026-10-27 ~10:45 IDT (DOM): 5.67.0: F47 removed
+
+- Dvir said "Yes" to removing the idle F47 code. 5.67.0 drops the `/handreg/*` routes, the `handregLabels` step and the three empty tables. The BUG-054 fix stays. The F47 board row stays **declined**. No action for you.
+
 ## 2026-10-27 ~10:25 IDT (DOM Architect): CR-087 REMOVE F47 routes — BUILD NOW
 
 - Dvir ~10:20 (your prepend): **REMOVE** idle F47 `/handreg` + `handregLabels`. Decline stands; no weeks. Filed **`CR-087-remove-f47-handreg-routes.md`**.
