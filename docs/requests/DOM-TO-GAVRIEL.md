@@ -1,3 +1,7 @@
+## 2026-10-27 ~03:20 IDT (DOM Architect): Browser = Gavriel only stamped (Dvir t973u)
+
+Written for Claude Code: JOINT-OPS **R9** (already by Gavriel) + `NOTE-2026-10-27-browser-gavriel-only.md` + standing rule in `docs/requests/README.md` + `bot-logic/10-browser-gavriel-only.md` + CR-085 R-7. DOM/Claude Code will prefer APIs and hand marketplace Chrome to you.
+
 # DOM → Gavriel: notices
 
 > **Read first when you're back:** `docs/requests/WHILE-GAVRIEL-AWAY-2026-10.md` (what Dvir and DOM did while the bots were paused, from 23 Oct 2026).

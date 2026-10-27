@@ -82,3 +82,8 @@ Dvir's line: "Keep it simple for me. I don't want to be on the computer. No keys
 - Dvir never creates keys or tokens, never configures anything (accounts, dashboards, settings screens), and never runs anything.
 - DOM and the bots do all setup. A CR must never give Dvir a setup step.
 - His only part is a yes or no on decisions, ideally one tap from his phone (for example an emailed approval link).
+
+## Standing rule: live browser = Gavriel only (Dvir t973u, 2026-10-27 ~03:19 IDT)
+- Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, registrars, dashboards) = **Gavriel (Grok Bot) ONLY**.
+- Claude Code, DOM, and other bots must **not** drive web UIs. Prefer APIs; when a human/browser click path is needed, hand it to Gavriel (write the ask in `GAVRIEL-TO-DOM.md` or the CR).
+- JOINT-OPS **R9**; detail: `NOTE-2026-10-27-browser-gavriel-only.md`.

@@ -10,6 +10,7 @@ Draft SOPs and inventories for mutual awareness (DOM ↔ Grok). **Prefer this fo
 | `07-challenger-grader.md` | T-GOLDEN grader + independent money/suite review | Challenger |
 | `08-judgment-vs-fixed-inventory.md` | FIXED vs JUDGMENT tables (Buyer / Risk Gate / Sales / Challenger) | Gavriel |
 | `09-company-day-timeline.md` | Day schedule after datasave → Dvir yes | Gavriel |
+| `10-browser-gavriel-only.md` | Live browser/Chrome = Gavriel only (Dvir t973u) | DOM Architect |
 
 Live mechanical stubs already placed under `docs/bot-logic/`: `00`–`03` (+ `04` copy).
 
