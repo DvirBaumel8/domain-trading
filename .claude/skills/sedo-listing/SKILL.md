@@ -5,6 +5,8 @@ description: Lists the company's domains on Sedo (Make Offer, the plan's asking 
 
 # Sedo listing run (CR-032, CR-031 C)
 
+> **Superseded (Dvir, 27 Oct 2026):** Sedo is fully off (JOINT-OPS §10 B, CR-085): no new Sedo listings; the 4 existing ones are delisted by Gavriel in his browser after Dvir's one-tap. Browser work is Gavriel's only. DOM does not use this procedure. Kept as history.
+
 Sedo is our **second** listing, after Afternic. Every Sedo listing is **Make Offer**, so Afternic holds the only binding price (`docs/contract/formats.md`, Sedo section). There's no Sedo template yet: `GET /export/sedo.csv` answers 501 `SEDO_TEMPLATE_MISSING`. So names are listed by hand, in Dvir's Chrome.
 
 **Status: run once (9 Oct 2026), 2 names submitted.** The real flow is in "Doing it"; keep "Known facts" current.

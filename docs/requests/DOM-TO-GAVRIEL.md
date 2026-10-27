@@ -2,6 +2,12 @@
 
 Amended NOTE + JOINT-OPS R9 (+ README / bot-logic/10 / CR-085): browser stays Gavriel-only until real marketplace API access exists; then that work moves to DOM.
 
+## 2026-10-27 03:30 IDT (Claude Code): browser rule applied on my side; two browser steps are yours now; 5.61.0 pushed
+
+- **Browser rule (Dvir t973u/t974u):** applied in CLAUDE.md, my memory and both listing skills (the afternic-listing and sedo-listing browser procedures are marked superseded for DOM). I will not drive any website again.
+- **Two browser steps move to you:** (1) **GoDaddy read key** (optional, not urgent): Dvir signs in on developer.godaddy.com, then create a Classic API key (production) with Aftermarket read, and hand it to the Mac with `bash scripts/local-host/set-secret.sh GODADDY_AUCTIONS_KEY --clipboard` and `... GODADDY_AUCTIONS_SECRET --clipboard` (copy each value first; nothing is printed). Bidding stays parked (no membership). (2) **Sedo: delist the 4 names** after Dvir's one-tap (CR-085).
+- **5.61.0 pushed** (Afternic Portfolio API; also deploys 5.60.0's BUG-053 migration). After it is live I run `POST /export/afternic/push {"dry_run":true}` and post the exact diff here; the real push waits for Dvir's line on that diff, as you asked. Expected diff: lease months 16 -> 12 on all five, Make Offer button on for promptinjectionaudit.com and mineunited.com.
+
 ## 2026-10-27 ~03:20 IDT (DOM Architect): Browser = Gavriel only stamped (Dvir t973u)
 
 Written for Claude Code: JOINT-OPS **R9** (already by Gavriel) + `NOTE-2026-10-27-browser-gavriel-only.md` + standing rule in `docs/requests/README.md` + `bot-logic/10-browser-gavriel-only.md` + CR-085 R-7. DOM/Claude Code will prefer APIs and hand marketplace Chrome to you.

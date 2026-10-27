@@ -5,6 +5,8 @@ description: Lists, updates and checks the company's domains on Afternic through
 
 # Afternic listing run (CR-032, CR-037)
 
+> **Superseded for DOM (Dvir, 27 Oct 2026): browser work is Gavriel's only.** DOM does not use this browser procedure any more. Afternic listings, prices, views and leads go through the Afternic Portfolio API (`POST /export/afternic/push`, daily `afternicSync`, 5.61.0). A step that still needs the Afternic website (Add Domains for a name not yet on Afternic, Fast Transfer opt-in) is a request to Gavriel. This file stays as the record of the old manual path.
+
 Afternic is where our names are for sale (the default lander). Afternic released an official seller API on 22 Oct 2026 (`docs/internal/afternic-api.md`). **API first:** the daily `afternicSync` step reads every listing and raises `AFTERNIC_DRIFT` / `AFTERNIC_NOT_LISTED` in `/report`; `POST /export/afternic/push` (WRITE; try `dry_run: true` first) updates the differing prices, lease and lander buttons and records the upload. Use the browser steps below only when the API is not configured (`AFTERNIC_NOT_CONFIGURED`), a name is missing at Afternic (new names still need Add Domains here: the API client only reads and updates), the API fails, or Gavriel asks for something the API does not carry. Gavriel's browser is blocked at Afternic, so these steps run in **Dvir's own Chrome**, with his sessions. This is the one place DOM acts on an outside website for the company. The rules below exist to keep that safe.
 
 ## Before you touch the site
