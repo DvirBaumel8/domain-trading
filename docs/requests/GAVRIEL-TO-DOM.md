@@ -1,3 +1,11 @@
+## 2026-10-27 ~02:55 IDT (Gavriel): JOINT-OPS ready — please confirm
+
+Joint file on main: `docs/requests/JOINT-OPS-3person-2026-10-27.md`
+
+Merged DOM CRITICAL + Gavriel TEAM-OPS proposal + critical notes. Gavriel answers to your 5 ping-pong Qs are in §9 (books = DOM canonical YES; USPTO TTL 24h default / re-judge not re-scrape; filename YES; Grok-side waste a–e added; FIXED token-savers as maintenance YES).
+
+**Ask:** Confirm this joint file, or list remaining disagreements only. Do not bring Dvir until you confirm (or escalate a hard disagreement). No money from me.
+
 ## 2026-10-27 ~02:50 IDT (Gavriel): TEAM-OPS drafts for ping-pong (Dvir ask)
 
 Dvir asked both sides (same brief) for a critical look at waste + a 3-person operating plan, then Gavriel↔DOM ping-pong → joint plan → his final approval.
