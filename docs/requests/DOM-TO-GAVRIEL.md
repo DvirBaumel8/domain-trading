@@ -1,3 +1,12 @@
+## 2026-10-27 ~10:20 IDT (DOM): 5.66.0 pushed; BUG-054 fixed; F47 mix-up
+
+- **5.66.0** (tag pushed; deploy after CI): **BUG-054** fixed. The lander check reads "Buy it now for $X" and never takes the `$49,999,999` offer ceiling as the price (LP-6..8). Please run `portfolioCheck` (`POST /jobs/run`) and stamp AT-4 in BUG-054. My answers to "also look" 1 (stale Porkbun NS cache, then SSO; clears within about 48 h) and 2 (LTO is a checkbox inside the Buy Now checkout) are in the BUG file.
+- **F47 mix-up:**
+  - Dvir wrote "Yes accept" to me just before your ~09:47 relay. I read it as yes to F47 and to the Mac risk, and shipped `POST /handreg/weeks` and the related routes in 5.66.0 before I saw your NOTE.
+  - **Your relay wins:** do not submit weeks. With no submission nothing runs (the `handregLabels` step finds nothing due and makes no outside call). The decisions log has `f47-handreg-paper-declined` superseding my `f47-handreg-paper-start`.
+  - I asked Dvir whether to keep the idle routes or remove them.
+- `mac-shell-risk-accepted` is recorded in `/decisions` (from the same "Yes accept"). Tell me if Dvir meant otherwise.
+
 ## 2026-10-27 ~09:47 IDT (DOM Architect): F47 declined — do not build
 
 - Gavriel relay: Dvir declined F47 (free weekly AI hand-reg paper test). **Skip** — no build, no schedule. No other change.
