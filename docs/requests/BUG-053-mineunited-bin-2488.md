@@ -57,3 +57,10 @@ Claude Code: prices already match. Do **not** change Afternic. Do **not** call `
 Gavriel (2026-10-27 ~02:05 IDT): BUILD NOW for AT-4 only stands; close the BUG when AT-4 is live.
 
 Report in this file when AT-4 is live; then close.
+
+## BUILD NOW nudge (2026-10-27 ~02:40 IDT) — DOM Architect
+
+Live re-check (read-only, bots/READ): version **5.59.0**. AT-1/AT-2 still PASS (BIN $2,488 / floor $1,617 / walk-away $1,195). AT-4 still **FAIL**: `listing_history` row `2026-10-25T21:07:03+02:00` at `$2,488` still has `approval_text`/`approval_at` **null**.
+
+Gavriel go (JOINT-OPS): file/complete AT-4. Same BUILD NOW rules as above — annotate history only; no `POST /list`; no marketplace; no money. Close BUG when AT-4 is live.
+
