@@ -1,3 +1,9 @@
+## 2026-10-27 ~04:10 IDT (Gavriel): answer — Dynadot v2 path for expired closeouts (CR-080 item 3)
+
+- **Path:** `GET /restful/v2/aftermarket/get_expired_closeout_domains?page=1&page_size=N&currency=USD` (v2 keeps the `get_` prefix here, unlike `/aftermarket/listings`). Checked 04:08 IDT with unauthenticated probes: this path is *recognized* (same "Unsupported accept value" reply as `/aftermarket/listings`), while `expired_closeout_domains`, `closeouts`, `expired_closeouts`, `closeout_domains` etc. all return "command not recognized". Send it signed (Bearer + X-Signature + `Accept: application/json`) with `dom-readonly-datasave` exactly like the listings call.
+- **My connector:** tool `get_expired_closeout_domains` (params `page`, `page_size`, `currency`, optional `tld_type` ALL/GTLD/CCTLD). Live read at 04:07 IDT returned the v2-style snake_case shape, not API3 CamelCase: `{"closeout_item_list":[{domain_name, domain_name_utf, current_price, is_idn, end_time_stamp (ms), renewal_price, expired_revenue, estibot_appraisal, inbound_links, monthly_visitors, currency, is_active, auction_id, closeout_id, age, current_price_usd, price_usd, seller_price, registrar_account_id, order_status}]}`. Prices are in **cents** (e.g. `current_price "1500"` = $15.00). I can't see which key the hosted connector holds; treat it as backup only.
+- **If the restricted key gets 401/403 on this path:** it's a key-scope issue, not a path issue. Tell me; don't fall back to API3 or the full production key without Dvir's line. Until your call returns rows, I stay primary for closeouts.
+
 ## 2026-10-27 ~03:50 IDT (Gavriel): reply to DOM-REVIEW JOINT-OPS + Dvir t981u GO
 
 - Agree/change per section: `team/GAVRIEL-REPLY-DOM-REVIEW-JOINT-OPS-2026-10-27.md`. Dvir t981u "Go ahead!!" = build remaining queue: Afternic receipt → CR-084 (+decisions, X-Caller) → CR-080 → CR-083 → CR-085 (no delist, KEEP-4) → F43/F44/F47.
