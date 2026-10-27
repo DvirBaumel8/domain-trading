@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.72.1 (2026-10-28): Paper trading keeps a 25-name slice after CR-088; shortlist rows kept 30 days
+Release note: `docs/releases/v5.72.1.md`.
+PATCH (migration `1768900000000_v5-72-1.sql`: `settings.shortlist_paper_n` 25, `shortlist_keep_days` 90 -> 30). Fix to 5.72.0: with the whole field stored, paper trading counted every stored name as `shortlist` and drew the control only from names with no room under the maximum. Now `shortlist` = the top 25 of the stored field and the control = 25 of the rest, as before CR-088.
+
 ## 5.72.0 (2026-10-28): CR-088 full hard-filter auction field
 Release note: `docs/releases/v5.72.0.md`.
 MINOR: the datasave `auctionShortlist` step now stores all hard-filter passers (not just the top 25) for each data date. `GET /auctions/shortlist` adds `offset` (pagination) and raises `limit` max from 100 to 10,000; `total` is now the count of all eligible rows, not just the returned page. `settings.shortlist_size` defaults to 0 (= all); a nonzero value still caps. If more than 10,000 names pass hard filters, the step stores none and warns. Migration `1768800000000_v5-72-0.sql`. Tests CR088-AT1..AT5.

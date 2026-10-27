@@ -89,6 +89,8 @@ export interface SettingsTable {
   shortlist_sale_chance_bp: Generated<number>;
   shortlist_renewal_cents: Generated<number>;
   shortlist_keep_days: Generated<number>;
+  /** v5.72.1: the paper-trading slice of the stored auction field (25). Migration only. */
+  shortlist_paper_n: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
   visits_token_request: Generated<'requested' | 'issued' | null>;
   visits_token_requested_at: Generated<Date | null>;

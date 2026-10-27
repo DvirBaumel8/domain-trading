@@ -140,3 +140,6 @@ A name that splits into a first name on `data/wordlists/given-names-census1990.t
 
 ## Word quality out of v4 (v5.57.0)
 From v5.57.0 the auction-v4 name part is the lift alone (word quality no longer multiplies it) and v4 has no uncommon-word cap: word quality had AUC 0.47 on 12,644 retail outcomes (Gavriel's D2 dev split) and 0.48 on our auction labels, and quality x lift scored 0.62 against 0.82 for the lift alone (`docs/research/backtest-retail-d2-2026-10-26.md`). `parts.name.word_quality` is still shown. v2/v3 keep both. Test AS557-1.
+
+## 5.72.1: paper slice after CR-088
+CR-088 (5.72.0) stores the whole hard-filter field (`shortlist_size` 0). Paper trading (`auction_outcomes`) keeps a fixed slice: group `shortlist` = the top `settings.shortlist_paper_n` (25) of the stored list; the control = 25 names of the rest of the field (smallest `md5(domain || date)`). Without it, every stored name was `shortlist` and the control could only come from names with no room under the maximum, so the comparison meant nothing. `shortlist_keep_days` 90 -> 30 (about 750 rows a day). Test AS549-12 runs with production settings.

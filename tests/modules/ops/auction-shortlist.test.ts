@@ -538,8 +538,7 @@ describe('AS549 auction-v4 and paper trading', () => {
   });
 
   it('AS549-12: the step records paper-trading rows: the served names (group shortlist, rank, score, suggested maximum) and a deterministic control of 25 names of the same field that are not in the list, the smallest md5(domain || data date); a second run gives the same rows', async () => {
-    // v5.72.0 (CR-088): with shortlist_size = 0, use a nonzero shortlist_size to keep this test's contract: only 25 of 64 are stored, leaving room for a 25-name control
-    await sql`update settings set shortlist_size = 25`.execute(db);
+    // v5.72.1: production settings (shortlist_size 0 = the whole field is stored); the paper slice is the top shortlist_paper_n (25) of the stored list
     for (let i = 0; i < 64; i++) await live(nameN(i), { price: 2000, bids: 3 });
     await sql`update settings set shortlist_sale_chance_bp = 5000, shortlist_renewal_cents = 2300`.execute(db);
     const r = await runStep() as Record<string, any>;
@@ -547,7 +546,8 @@ describe('AS549 auction-v4 and paper trading', () => {
     const rows = await db.selectFrom('auction_outcomes').selectAll().where('data_date', '=', DATE).execute();
     const sl = rows.filter((x) => x.group === 'shortlist'), ctl = rows.filter((x) => x.group === 'control');
     expect(sl).toHaveLength(25); expect(ctl).toHaveLength(25);
-    const list = await shortlist();
+    expect((await shortlist()).length).toBeGreaterThan(25);
+    const list = (await shortlist()).slice(0, 25);
     expect(sl.map((x) => x.domain).sort()).toEqual(list.map((x) => x.domain).sort());
     for (const x of sl) { const l = list.find((y) => y.domain === x.domain)!; expect(x).toMatchObject({ rank: l.rank, max_bid_suggested_cents: l.max_bid_suggested_cents, first_price_cents: 2000, final: false, would_win: null }); expect(Number(x.score)).toBe(l.score); }
     for (const x of ctl) expect(x).toMatchObject({ rank: null, max_bid_suggested_cents: null, would_win: null, final: false });

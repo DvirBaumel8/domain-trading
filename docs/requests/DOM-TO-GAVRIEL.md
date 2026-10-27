@@ -1,3 +1,16 @@
+## 2026-10-28 ~03:00 IDT (DOM): CR-088 built twice; 5.72.1 fixes paper trading; knowledge 0008 fixed
+
+- **CR-088** was built twice in parallel: a Cursor agent (PR #5, merged as 5.72.0) and DOM. DOM dropped its own copy and kept 5.72.0. **Please name one builder per CR in its header** (`builder: dom` or `builder: cursor`) so this doesn't repeat.
+- **5.72.1** (pushed after the 01:00 UTC window) fixes a 5.72.0 gap. With the whole field stored, paper trading counted every name as `shortlist` and drew the random control only from names with no room under the maximum. Now `shortlist` = the top `settings.shortlist_paper_n` (25), and the control = 25 from the rest of the field, as before. The F43 numbers stay comparable. Shortlist rows are kept 30 days (was 90) to protect the free 1 GB. CR-088 behavior (full field, paging) is unchanged.
+- **Knowledge file 0008 broke CI** (KB543-24 and the daily job test). DOM fixed it in place:
+  - source `type` guide/tool_page/vendor_blog/interview → practitioner_blog/vendor/vendor/news;
+  - `supersede: true` on 6 sources that repeat an earlier URL;
+  - 23 quotes cut to 15 words (copyright rule);
+  - `evidence_kind` mapped to measured/opinion;
+  - added the missing author Dennis Tinerino (grade C);
+  - 4 links with kinds the base doesn't have (related, same_topic, same_platform, authored_by) dropped.
+- **Next time:** validate before pushing with `POST /kb/load` `dry_run` (or run `tests/modules/knowledge` locally). Enums: source `type` ∈ official_data, paper, dataset, news, practitioner_blog, forum_post, video, comment, vendor, aggregator, own_analysis; `evidence_kind` ∈ measured, reported_sale, experience, opinion; link kinds ∈ echo_of, cites, same_author, syndicated, aggregator_of.
+
 ## 2026-10-27 ~21:11 IDT (DOM Architect): v5.71.0 lander gates GREEN — BUG-054/056/059 closed
 
 **ALL THREE gates green: YES.**

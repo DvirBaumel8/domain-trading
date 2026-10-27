@@ -60,7 +60,7 @@ export function liftOf(model: { bins: LiftModel['bins'] }, table: SplitV2Table, 
 export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<string, unknown>> {
   const { db, now } = deps;
   const nowMs = now();
-  const cfg = await db.selectFrom('settings').select(['s8_max_price_cents', 'shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents']).executeTakeFirstOrThrow();
+  const cfg = await db.selectFrom('settings').select(['s8_max_price_cents', 'shortlist_horizon_hours', 'shortlist_size', 'shortlist_paper_n', 'shortlist_endings_n', 'shortlist_prebid_n', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents']).executeTakeFirstOrThrow();
   const latest = await db.selectFrom('godaddy_auctions_live').select((eb) => eb.fn.max('data_date').as('d')).executeTakeFirst();
   const dataDate = latest?.d ? String(latest.d).slice(0, 10) : null;
   // v5.49.0 (P4): first the end states of the open paper-trading rows, from the snapshot the inventory step just stored (a failure here never stops the shortlist)
@@ -246,9 +246,12 @@ export async function runAuctionShortlist(deps: ShortlistDeps): Promise<Record<s
     }
   });
   // v5.49.0 (P4): paper trading rows of the day: the served names and a deterministic random control of 25 from the rest of the field
+  // 5.72.1: the paper slice is the top `shortlist_paper_n` (25) of the stored field, so "shortlist vs a random control of the same field" keeps its meaning now that
+  // the whole field is stored (CR-088); the control is drawn from the rest of the field
   try {
-    const topNames = new Set(top.map((t) => t.c.domain));
-    const served: OutcomeRow[] = top.filter((t) => t.dropped === null).map((t) => ({ domain: t.c.domain, group: 'shortlist', rank: t.rank, score: t.s.score, max_bid_suggested_cents: t.c.max_bid_cents, first_price_cents: t.c.price_cents, end_time: t.c.end_time }));
+    const slice = top.slice(0, cfg.shortlist_paper_n);
+    const topNames = new Set(slice.map((t) => t.c.domain));
+    const served: OutcomeRow[] = slice.filter((t) => t.dropped === null).map((t) => ({ domain: t.c.domain, group: 'shortlist', rank: t.rank, score: t.s.score, max_bid_suggested_cents: t.c.max_bid_cents, first_price_cents: t.c.price_cents, end_time: t.c.end_time }));
     const ctl = await pickControl(db, dataDate, cands, topNames);
     const byName = new Map(cands.map((c) => [c.domain, c]));
     const control: OutcomeRow[] = ctl.map((d) => { const c = byName.get(d)!; return { domain: d, group: 'control', rank: null, score: c.pre.score, max_bid_suggested_cents: null, first_price_cents: c.price_cents, end_time: c.end_time }; });
