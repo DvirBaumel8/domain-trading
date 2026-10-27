@@ -40,6 +40,11 @@ Apply in this order. Stop early on a hard fail. Do not spend firm-page or histor
 
 EU TMview / UK IPO / Common Crawl history often stay OPEN at first submit; close them when Risk Gate asks before CLEAR. Wayback is off. Common Crawl only via `system/tools/cc_cdx.py`.
 
+
+### CR-083 evidence cache (standing, Gavriel 2026-10-27)
+
+After shape/price/prior-kills/live-`.com`/meaning (steps 1–6), **only then** call `GET /data/card-evidence` for names that will USPTO or firm-screen. Do **not** evidence-GET names you will kill for coinage, fragment, salad, or nonsense. POST new `uspto_check` / `firm_screen` rows after those checks. Count CR-083 GETs/POSTs inside the ~20-call lean budget. Closeouts stay research-only while `CLOSEOUTS_PAUSED`.
+
 ---
 
 ## 2. Hard filters vs judgment
