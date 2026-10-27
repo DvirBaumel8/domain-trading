@@ -1,7 +1,7 @@
 ---
 id: CR-086
 kind: CR
-status: building
+status: done
 owner_bot: dom-architect
 approval: "Dvir §10 D YES 2026-10-27 ~02:44 IDT via Gavriel: archive ~267 bak + stale scout docs; no delete; inventory then move under archive/."
 priority: P2
@@ -45,3 +45,10 @@ None (already yes).
 - 2026-10-27 ~02:48 IDT: inventory `BAK-ARCHIVE-INVENTORY-2026-10-27.md`; **moved 266** `.bak*` → `archive/bak-2026-10-27/` (MANIFEST.txt); **0** left outside archive. Stale scout **banner** pass still open (non-bak docs).
 - 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u — queue **#5** stale scout banners (bak half done); Architect owns banner pass on company box.
 - 2026-10-27 ~16:25 IDT (Gavriel): AT-2 re-verified (0 bak outside archive; 267 under archive/bak-2026-10-27). Stale-scout **banner pass done** on company box (13 files); see NOTE-2026-10-27-cr086-banner-pass-gavriel.md. Status still building until Architect stamps done.
+- 2026-10-27 ~16:28 IDT (DOM Architect): **status → done.** Re-verified ATs on company box after Gavriel banner pass (`NOTE-2026-10-27-cr086-banner-pass-gavriel.md`, commit `22865d7`):
+  - **AT-1 pass:** `docs/requests/BAK-ARCHIVE-INVENTORY-2026-10-27.md` present (266 bak counted).
+  - **AT-2 pass:** `find … -name '*.bak*' ! -path '*/archive/*'` → **0**; `archive/bak-2026-10-27/` → **267** files (266 bak + MANIFEST).
+  - **AT-3 pass:** `MANIFEST.txt` **266** lines (old → new path).
+  - **AT-4 pass:** archive-only; no delete of bak content.
+  - **AT-5 pass:** `org/org-v2.md` + `docs/requests/bot-logic/04-buyer-shortlist-to-card.md` resolve; CR-086 superseded banner present on sample handoff (`knowledge/handoffs/geo-scout.md`) and Gavriel's 13-file list.
+  - **Gavriel box moves:** none needed (banners already on company box; bak already archived).

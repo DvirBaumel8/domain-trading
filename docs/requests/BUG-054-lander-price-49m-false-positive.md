@@ -54,6 +54,7 @@ Price/BIN changes; Sedo; browser automation; activating settings that spend mone
 
 ## Changes
 - 2026-10-27 ~08:25 IDT (DOM Architect): filed from Gavriel `GAVRIEL-TO-DOM` ~08:20 + live `/report` evidence + HTML confirmation of `$49,999,999` offer-limit string.
+- 2026-10-27 ~16:28 IDT (DOM Architect): AT-4 **FAIL** after manual daily `portfolioCheck` on 5.67.0 — two names still $49,999,999 @02:06 IDT; ukcbam now $100,000 → BUG-056.
 
 ## DOM response (2026-10-27, Claude Code)
 **Verdict: accepted, fixed in 5.66.0** (`src/modules/ops/jobs/portfolio-check.ts` `shownBuyNowCents`).
@@ -73,3 +74,10 @@ Price/BIN changes; Sedo; browser automation; activating settings that spend mone
 - Gavriel can confirm by opening Buy Now, without paying: the checkbox should appear enabled.
 - If it shows "Lease to Own is currently unsupported for this domain", that is Afternic's own eligibility rule. File it then; the API flag cannot override it.
 - No listing change made.
+
+## AT-4 live recheck (2026-10-27 ~16:28 IDT, DOM Architect) — **FAIL (not cleared)**
+- `/health` **5.67.0**. WRITE token ran `POST /jobs/run {"job":"daily"}` → `run_8e42f9b5-…` finished ok; `portfolioCheck` done, `web.ok=5` for all portfolio names, `alerts_n:0` in step summary.
+- `GET /report` **still** has `LANDER_PRICE_MISMATCH`:
+  - `aievalsconsulting.com` / `roofingvoiceagent.com`: shown **$49,999,999.00** (`shown_cents` 4999999900), `checked_at` still **2026-10-27T02:06:00+02:00** / **02:06:06+02:00** (stale; not refreshed this run).
+  - `ukcbamcompliance.com`: shown **$100,000.00** (`shown_cents` 10000000), `checked_at` **2026-10-27T16:21:00+02:00** vs expected $1,488 — **$49M gone on this name**, but new false amount. Filed **BUG-056**.
+- Contract `jobs.md`: lander price is on the same daily web page; a warning clears only when the next completed check of that kind **passes**; unknown neither raises nor clears. Likely aievals/roofing stayed on the old warning (no successful matching parse this run). AT-4 remains open until `/report` has no `$49,999,999` mismatches for these names.

@@ -44,3 +44,6 @@ If AT-2 + this banner pass satisfy R-3, set CR-086 `status: done` (or equivalent
   - ukcbamcompliance.com: shown **$100,000** (`checked_at` 16:21 IDT) vs expected $1,488
 - BUG-054 AT-4 **not cleared** yet (bots token cannot `POST /jobs/run`).
 - CR-080: code claimed live in 5.62.0 notes; latest datasave job steps still `dynadotCloseouts` / `dynadotAftermarket` **`not_configured`** with reason `DYNADOT_API_KEY is not set` (runs through 2026-10-26 ~22:33 IDT). 3-day server-primary ok window **not started** on observed runs. Purchase adapter `dynadot.enabled: false` (expected for buy adapter).
+
+## Architect stamp (2026-10-27 ~16:28 IDT)
+ATs 1–5 accepted. CR-086 `status: done`. No further company-box path moves required from Gavriel.

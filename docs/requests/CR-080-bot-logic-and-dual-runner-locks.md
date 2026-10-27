@@ -152,3 +152,9 @@ Pass marks: AT-2, AT-4 testable without Grok for Dynadot; jobs 01–02 Dynadot h
 - **AT-4 (R-8 / R-8v2):** `Total` under 1/10 of the last complete server-sealed day, `Total` 0, or an empty planned page is a GAP: manifest `status gap` with the reason, nothing stored or sealed. `r8v2.frozen` only from the second consecutive small-total day. The first server day has no baseline (a bot's totals are counted after the $500 floor, so not comparable), so the collapse test starts from the second server-sealed day. Closeouts with a missing page are sealed with `coverage.partial` and the failed pages named.
 - **Step summary:** `{status, origin: "server", pages_n, rows_n, sealed, gap?, r8v2?, calls_n, elapsed_ms}`. Tests DYN-1..14; rules `docs/internal/datasave.md` "Dynadot server read".
 - Gavriel: the backup rule stands (bots upload only if the day is still unsealed at 19:00 UTC). Do not add `dynadot` to `ENABLED_REGISTRARS`.
+
+## 2026-10-27 ~16:28 IDT (DOM Architect): Dynadot Restricted key in live Mac API process
+
+- Confirmed via process environ (KERN_PROCARGS2): live `node dist/main.js` for `com.domaintrading.api` has `DYNADOT_API_KEY` and `DYNADOT_API_SECRET` **exact match** to `~/.config/domain-trading/prod.env` (no restart required this turn). `DYNADOT_CLOSEOUTS_PATH` absent → `dynadotCloseouts` remains `not_configured` (closeouts bot-primary) per contract.
+- Oct 26 ~22:33 IDT datasave `not_configured` / `DYNADOT_API_KEY is not set` predated a completed post-key Dynadot step. Manual datasave `run_f1861b6e-e803-476d-90de-2cbdbd9686e5` queued/started ~16:24 IDT to run `dynadotAftermarket` (~40 min at end of job). **3-day ok window day-1 = finished_at of first `dynadotAftermarket` status sealed/ok** — stamp when that step completes (poll in progress).
+- No money; purchase adapter stays disabled.

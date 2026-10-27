@@ -1,3 +1,25 @@
+## 2026-10-27 17:45 IDT (DOM Architect): CR-080 day-1 stamp
+
+**Day-1 of 3-day server-primary ok window for aftermarket = NO.**
+
+- Run `run_f1861b6e-e803-476d-90de-2cbdbd9686e5` (datasave, manual) finished 17:29:49 IDT, run ok=true.
+- dynadotAftermarket: step done ok=true, summary status=`gap`, sealed=false, origin=server, data_date=2026-10-27, rows_n=0, pages_n=1, calls_n=474, gap.reason=`deep_pages_empty`, total_listings=473798, error=none, ~49 min.
+- Closeouts (same run): sealed partial, origin=server, data_date 2026-10-27, rows 53878, pages_failed 55–57.
+- Closeouts path still ABSENT → closeouts stay bot-primary; `DYNADOT_CLOSEOUTS_PATH` still unset.
+- Window not started. Aftermarket deep-page gap (474 calls → rows_n 0, not sealed) needs a fix/look before a day can count.
+
+## 2026-10-27 ~16:28 IDT (DOM Architect): JOINT-OPS leftovers — CR-086 done; BUG-054 AT-4 fail; BUG-056; CR-080 key live
+
+Facts (Mac-2 + company box). **No money. No secrets printed.**
+
+1. **CR-086 — done.** Architect re-verified ATs 1–5 after your banner pass (`22865d7` + NOTE). Bak outside archive = 0; archive 267; MANIFEST 266; org-v2 + shortlist SOP resolve; 13 banners accepted. **No further Gavriel box moves needed.** Status `done` on CR-086.
+
+2. **BUG-054 AT-4 — FAIL.** WRITE `dom-write.token` ran daily → `portfolioCheck` ok (web 5/5). `/report` still: aievals + roofing **$49,999,999** (`checked_at` still ~02:06 IDT). ukcbam no longer $49M.
+
+3. **BUG-056 filed** (`BUG-056-lander-price-100k-false-positive.md`): ukcbamcompliance shown **$100,000** vs $1,488 (`checked_at` 16:21 IDT) on 5.67.0 — likely separate parse bug after BUG-054 ceiling skip. BUILD NOW for Claude Code; no money.
+
+4. **CR-080 Dynadot key:** confirmed **in live API process** (PID that serves 3100 / datasave steps): `DYNADOT_API_KEY` + `DYNADOT_API_SECRET` exact-match `~/.config/domain-trading/prod.env` (lengths only; values not printed). `DYNADOT_CLOSEOUTS_PATH` unset → closeouts stay bot-primary (`not_configured` expected). Manual datasave `run_f1861b6e-…` started ~16:24 IDT to exercise `dynadotAftermarket`; **day-1 of 3-day server-primary ok window starts when that step seals/ok** (poll in progress — follow-up stamp when finished). Oct 26 `not_configured` was before key was in the live process / before a post-key datasave completed Dynadot steps.
+
 ## 2026-10-27 ~11:00 IDT (DOM): BUG-055 fixed; AT-4 tonight
 
 - BUG-055: DYN-10 now waits on the event loop instead of a fixed step count; test-only change (`7e5c799`).
