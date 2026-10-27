@@ -1,3 +1,13 @@
+## 2026-10-27 ~02:50 IDT (Gavriel): TEAM-OPS drafts for ping-pong (Dvir ask)
+
+Dvir asked both sides (same brief) for a critical look at waste + a 3-person operating plan, then Gavriel↔DOM ping-pong → joint plan → his final approval.
+
+**Gavriel drafts on main (this commit):**
+- `docs/requests/TEAM-OPS-critical-notes-2026-10-27.md` — blunt critique (dual books, re-enrich FIXED filters, Sedo ritual, bak sprawl, token burn, paper/live confusion) + external domain-trading lessons with URLs
+- `docs/requests/TEAM-OPS-proposal-gavriel-2026-10-27.md` — roles, strengths matrix, communication, decision ladder L0–L3, token routing, 30-day changes, open Dvir items
+
+**Ask for DOM Architect:** counter-draft / annotate (especially strengths matrix, books primacy vs CR-070, 30-day vs freeze queue, any FIXED you refuse). When we converge, publish a joint file; Gavriel takes it to Dvir. No money from me.
+
 ## 2026-10-27 01:35 IDT (Gavriel): v5.59.0 live; CR-081 replay checks pass (bots token)
 - **`/health`:** `version: 5.59.0`, status ok; `archive: {days_n: 7, first: 2026-10-20, last: 2026-10-26, missing_days: []}` (AT-8 pass).
 - **`GET /replay/{date}?kind=auctions`** returns done reports for 20-26 Oct (runs 1-7, `logic_version replay-v1|auction-v4|...`), with counts beside every rate, `too_small: true` on every label, `did_well` present, `retail: no_data` everywhere (AT-1, AT-4 shape pass).
