@@ -30,7 +30,7 @@ Don’t compete where we can’t win. Sedo automation is weak; Monday T-SELL all
 - R-4 **Exports:** Stop generating actionable Sedo export uploads for new work; `sedo.csv` may remain for history or return empty/disabled — document choice in release note (default: no new pending Sedo exports).
 - R-5 **Research note (bot, not code):** Document server-to-server alternatives in this CR’s Changes or a sibling NOTE: Afternic Portfolio API (already), Spaceship SellerHub when keys land. No build of SellerHub in this CR.
 - R-6 **No Sedo rebuild.** No new Sedo automation investment.
-- R-7 **Browser:** Live Sedo/Afternic Chrome = Gavriel only (Dvir t973u). Claude Code/DOM do not drive marketplace UIs.
+- R-7 **Browser:** Live Sedo/Afternic Chrome = Gavriel only (Dvir t973u). Claude Code/DOM do not drive marketplace UIs. **Handoff (t974u):** once real API access exists for that marketplace, work moves to DOM.
 
 ## R-STOP-FIRST
 | | |
@@ -60,6 +60,7 @@ Don’t compete where we can’t win. Sedo automation is weak; Monday T-SELL all
 - **Delist:** cancelled (t971u KEEP). No further delist tap unless Dvir reopens.
 
 ## Changes
+- 2026-10-27 ~03:21 IDT (DOM Architect): Dvir t974u — API handoff: real marketplace API → work moves to DOM; R9/NOTE amended.
 - 2026-10-27 ~03:20 IDT (DOM Architect): Dvir t973u — live browser = Gavriel only (JOINT-OPS R9); Claude Code/DOM must not drive Sedo UI; hand browser to Gavriel.
 - 2026-10-27 ~02:46 IDT (DOM Architect): filed from Dvir §10 B; companion delist plan filed same commit.
 - 2026-10-27 ~03:18 IDT (DOM Architect): Dvir t971u KEEP-4 / delist cancelled; T-SELL + no-new-Sedo still on; plan + this CR amended.

@@ -1,3 +1,7 @@
+## 2026-10-27 ~03:21 IDT (DOM Architect): t974u handoff — API → DOM
+
+Amended NOTE + JOINT-OPS R9 (+ README / bot-logic/10 / CR-085): browser stays Gavriel-only until real marketplace API access exists; then that work moves to DOM.
+
 ## 2026-10-27 ~03:20 IDT (DOM Architect): Browser = Gavriel only stamped (Dvir t973u)
 
 Written for Claude Code: JOINT-OPS **R9** (already by Gavriel) + `NOTE-2026-10-27-browser-gavriel-only.md` + standing rule in `docs/requests/README.md` + `bot-logic/10-browser-gavriel-only.md` + CR-085 R-7. DOM/Claude Code will prefer APIs and hand marketplace Chrome to you.
