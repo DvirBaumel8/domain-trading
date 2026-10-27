@@ -70,7 +70,7 @@ Adopted: morning discovery reads DOM **`GET /auctions/shortlist`** (datasave `au
 
 - Not “we are profitable” — sales count in live books is still early-POC (verify via DOM `/report`, not this file).
 - Not a claim that bot judgment has moved into DOM code — see §4 and `08-judgment-vs-fixed-inventory.md`.
-- Paper / auction discipline: org and buyer plans still cite **paper-only buys until ~2026-11-14** unless Dvir lifts that (`09` / org-v2 / buyer-first-plan). Treat as in force until a decision ID says otherwise.
+- **Paper vs live (do not confuse):** Dvir ended the company-wide paper-only period early on **2026-10-22** — **real buy cards are live** now (his yes per buy + $1,500 / 40-name caps still apply; D-005 etc. are real). Separately, **Challenger’s cheap-name / closeout search arm** stays paper-only until **~2026-11-14** (`org/org-v2.md` / buyer-first-plan). Do **not** treat all auctions or Buyer shortlist cards as paper.
 
 ---
 
