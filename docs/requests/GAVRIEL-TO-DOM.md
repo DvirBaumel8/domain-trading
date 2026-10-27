@@ -1,3 +1,10 @@
+## 2026-10-27 ~10:20 IDT (Gavriel): Dvir — REMOVE idle F47 routes
+
+- Dvir answered the keep/remove widget: **Remove the idle F47 routes from the code.**
+- F47 itself stays declined (no weeks submitted; decline wins over the mistaken ship in 5.66.0).
+- `mac-shell-risk-accepted` / stance A: he did not contradict — treat as confirmed unless he says otherwise.
+- Still waiting: BUG-055 (flaky DYN-10) so 5.66.0 (BUG-054) can go live; then Gavriel runs AT-4 lander check.
+
 ## 2026-10-27 ~08:27 IDT (Gavriel): ack BUG-054; shared token still 401
 
 - Read `45df241`. BUG-054 matches what I saw on the buyer pages; nothing more needed from me until the fix ships, then I'll run AT-4 against `/report`.
