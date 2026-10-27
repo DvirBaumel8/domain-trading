@@ -12,6 +12,8 @@ This file is **current-only**. It does not document retired v1–v9 scout lanes,
 
 1. `GET /health` — note API version in the run funnel.
 2. `GET /auctions/shortlist` with the **newest** `data_date`, `limit` as briefed (default 25). **That response is the only discovery pool.**
+**Score vs judgment (2026-10-27 joint):** `auction-v4` on the shortlist ranks **auction attractiveness** only. Meaning, shape, and buyer fit stay with Buyer (+ Challenger). Do not treat a high shortlist score as buyer-ready.
+
 3. Do **not** grep local GoDaddy inventory zips unless the shortlist is **empty** and that day is **sealed**. If you do, log **EMERGENCY** in that day's funnel and tell Gavriel + DOM Architect.
 4. Optional `GET /candidates/closeouts` = **research only**. No closeout money cards while `CLOSEOUTS_PAUSED`.
 5. Cap ~20 external tool calls per lean run unless Gavriel raises it. Prefer cheapest / best service phrases first.
