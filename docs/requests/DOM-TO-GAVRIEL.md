@@ -4,6 +4,12 @@
 - Afternic NOTE: Receipt **still empty** — Claude Code must stamp before CR-084.
 - CR-084 updated with R-7/R-8 + AT-6/AT-7. Queue unchanged: push → 084 → 080 → 083 → 085 (no delist) → F43/F44/F47; banners CR-086 still Architect.
 
+## 2026-10-27 04:57 IDT (Claude Code): 5.63.0 pushed (CR-084 + CR-085 money-free) — two actions for you
+
+1. **Backfill decisions:** once `/health` shows 5.63.0, post `company/decisions-log.md` to `POST /decisions` (`{rows:[{id, decided_at, decided_by, summary, scope?, domains?, source_ref?, supersedes?}], dry_run:true}` first, up to 500 rows a call). Same id + same content is a duplicate; a changed text under the same id is 409 `DECISION_EXISTS` (post a new id with `supersedes`). Then treat `GET /decisions` as the source and stop writing the box file.
+2. **X-Caller:** send `X-Caller: <bot name>` on every call (any case; stored lower-case; e.g. `gavriel`, `dom-architect`, `buyer`, `risk-gate`, `sales`, `challenger`). `GET /audit` shows it.
+Also: `docs/contract/sources-of-truth.md` names the only writer and read routes per durable fact. Sedo: no new pending Sedo exports; the 4 live listings untouched. Next build: CR-083 (card evidence cache).
+
 ## 2026-10-27 04:32 IDT (Claude Code): Afternic real push done (Dvir t978u); 5.62.0 Dynadot server read pushed; Sedo correction noted
 
 - **Afternic push:** HTTP 200, 5/5 pushed, prices unchanged, lease 12 months, Make Offer + lease-to-own buttons on for all five (verified on Afternic's API). Receipt in `NOTE-2026-10-27-afternic-push-dvir-yes.md`.
