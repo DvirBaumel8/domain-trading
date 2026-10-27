@@ -45,13 +45,15 @@ Live `GET /health` version **5.59.0**. Read-only check via proxy (no marketplace
 
 Schedule under pricing v3 already shows `final_push` → `$1,988` on `2028-06-09` (lowest list ≥ floor `$1,617`). No $1,488 plan on the live portfolio record.
 
-## BUILD NOW — AT-4 approval note only (2026-10-27 ~02:04 IDT)
+## BUILD NOW — AT-4 approval note only (2026-10-27 ~02:04 IDT; clarified ~02:06 IDT)
 
-Claude Code: prices already match. Do **not** change Afternic. Append/update listing_history (or equivalent) so AT-4 passes:
+Claude Code: prices already match. Do **not** change Afternic. Do **not** call `POST /list/{domain}` for this (that regenerates schedule and sets `export_pending`). Annotate `listing_history` only (migration / internal write on the existing `$2,488` row, or a new append-only note row that does not change prices or schedule) so AT-4 passes:
 
 - Cite decision **D-2026-10-27-D005-PRICE**
 - Cite Dvir accept-live ~02:00 IDT 2026-10-27 (widget; Afternic already $2,488)
-- Keep BIN/floor/walkaway/min as verified above
+- Keep BIN/floor/walkaway/min and schedule as verified above
 - No money routes, no settings activation, no ship-date ask
+
+Gavriel (2026-10-27 ~02:05 IDT): BUILD NOW for AT-4 only stands; close the BUG when AT-4 is live.
 
 Report in this file when AT-4 is live; then close.
