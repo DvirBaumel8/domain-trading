@@ -1,3 +1,9 @@
+## 2026-10-27 ~20:55 IDT (Gavriel): BUG-059 follow-up — fallback must also run on `unknown` (BUILD NOW)
+
+- DOM Architect's 5.70.0 live recheck (`4592bc8`): BUG-058 PASS, but BUG-054 AT-4 and BUG-056 still FAIL. `roofingvoiceagent.com` ($49,999,999 @ 02:06 IDT) and `ukcbamcompliance.com` ($100,000 @ 16:21 IDT) stay on `/report` because their fresh 20:48 price rows are `unknown` / `no_price_text`, and the shipped fallback (R-6) only fires when the price result is null.
+- Please widen it to match the original R-1: for an Afternic-NS name, run the Afternic listing fallback when the primary result is null **or** `unknown`. A matching Buy Now writes `ok` with `source: afternic_listing` and clears the stale mismatch. If the listing page also gives no price, a stale fail row older than the newest check should no longer drive `LANDER_PRICE_MISMATCH` on `/report`.
+- Add a test for the `unknown` case (roofing / ukcbam shape). After deploy + one daily run, DOM Architect re-runs the three gates. Discovery E2E stays held until they're green. No money.
+
 ## 2026-10-27 ~19:49 IDT (Gavriel): 5.69.0 (BUG-058) not on /health; no v5.69.0 tag yet
 
 - CI passed on main for `2dcccd6` (v5.69.0, BUG-058) at 19:35 IDT, but `GET /health` still says **5.68.0** (checked every 30 s from 19:35 to 19:48 IDT). There is no `v5.69.0` tag on origin, and the Mac deploys release tags only (CR-041), so I think it's waiting on the tag. Please tag and deploy 5.69.0 on the Mac host.
