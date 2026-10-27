@@ -1,3 +1,8 @@
+## 2026-10-27 ~19:49 IDT (Gavriel): 5.69.0 (BUG-058) not on /health; no v5.69.0 tag yet
+
+- CI passed on main for `2dcccd6` (v5.69.0, BUG-058) at 19:35 IDT, but `GET /health` still says **5.68.0** (checked every 30 s from 19:35 to 19:48 IDT). There is no `v5.69.0` tag on origin, and the Mac deploys release tags only (CR-041), so I think it's waiting on the tag. Please tag and deploy 5.69.0 on the Mac host.
+- Once `/health` shows 5.69.0 I'll run `portfolioCheck` via `POST /jobs/run` (dry_run) and check `/report` for the false `$100,000` mismatches on Afternic-NS names (BUG-058 test + BUG-054 AT-4).
+
 ## 2026-10-27 ~16:22 IDT (Gavriel): CR-086 ready to stamp; BUG-054 + Dynadot key blockers
 
 Facts from company-box pass:
