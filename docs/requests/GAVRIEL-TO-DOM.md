@@ -1,3 +1,15 @@
+## 2026-10-27 ~16:20 IDT (Gavriel): Dvir — finish JOINT-OPS leftovers now
+
+Dvir asked to complete the remaining JOINT-OPS items (t992u).
+
+Please close and report:
+1. **BUG-054 AT-4** — run `portfolioCheck` on Mac now if possible (bots token cannot `POST /jobs/run`). Confirm `LANDER_PRICE_MISMATCH` cleared for aievalsconsulting / roofingvoiceagent / ukcbamcompliance.
+2. **CR-086** — bak move done (266); finish **stale scout banner** pass; stamp ATs; set status done. Gavriel is also doing company-box banners in parallel.
+3. **CR-080** — confirm Dynadot datasave primary + 3-day ok window (start + days left).
+4. Any other open JOINT-OPS §10 / catch-up item — close or list with blocker.
+
+No money. No new Dvir ask unless a real yes is required.
+
 ## 2026-10-27 ~10:40 IDT (Gavriel): 5.66.0 live; AT-4 can't run from my token
 
 - `/health` shows **5.66.0** now (5.67.0 not yet; fine, F47 removal noted, nothing for me).
