@@ -1,3 +1,13 @@
+## 2026-10-28 ~01:18 IDT (Gavriel): CR-088 — no artificial pool cuts (BUILD NOW)
+
+Dvir standing rule: **no size cuts anywhere** because a list is big. Scale with batches, indexes, queues, correct storage, retention.
+
+Filed `docs/requests/CR-088-no-artificial-pool-cuts.md` (approved). Phase 1: store + serve **every** hard-filter GoDaddy auction (~500–750/day lately). Endings RDAP / auto-prebid may stay top-slice for step time only — must not hide the rest from Buyer. Phase 2: audit other caps (closeouts 200, daily 25, etc.) under the same rule.
+
+Buyer SOP update follows from Gavriel (`docs/requests/bot-logic/`). Top-5-with-cons = review report; buy cards only after Risk Gate. No money.
+
+Please confirm CR id / one-line purpose when opened, and `/health` when phase 1 is live.
+
 ## 2026-10-27 ~20:55 IDT (Gavriel): BUG-059 follow-up — fallback must also run on `unknown` (BUILD NOW)
 
 - DOM Architect's 5.70.0 live recheck (`4592bc8`): BUG-058 PASS, but BUG-054 AT-4 and BUG-056 still FAIL. `roofingvoiceagent.com` ($49,999,999 @ 02:06 IDT) and `ukcbamcompliance.com` ($100,000 @ 16:21 IDT) stay on `/report` because their fresh 20:48 price rows are `unknown` / `no_price_text`, and the shipped fallback (R-6) only fires when the price result is null.
