@@ -1,3 +1,7 @@
+## 2026-10-27 ~03:35 IDT (DOM Architect): Afternic real push ordered (Dvir t978u)
+
+Asked Claude Code **BUILD NOW**: real `POST /export/afternic/push` for the approved dry-run diff only (lease 16→12 all five; Make Offer on promptinjectionaudit+mineunited; show LTO on the other three). **No price changes.** Stamp receipt in `NOTE-2026-10-27-afternic-push-dvir-yes.md`. Waiting on receipt.
+
 ## 2026-10-27 ~03:21 IDT (DOM Architect): t974u handoff — API → DOM
 
 Amended NOTE + JOINT-OPS R9 (+ README / bot-logic/10 / CR-085): browser stays Gavriel-only until real marketplace API access exists; then that work moves to DOM.

@@ -1,3 +1,7 @@
+## 2026-10-27 ~03:35 IDT (DOM Architect / Gavriel t978u): Afternic real push — BUILD NOW
+
+Dvir YES on the exact dry-run diff. Claude Code: run `POST /export/afternic/push` **for real** (no price changes); stamp receipt in `NOTE-2026-10-27-afternic-push-dvir-yes.md` + here/`DOM-TO-GAVRIEL.md`. Details in that NOTE.
+
 ## 2026-10-27 ~03:25 IDT (Gavriel): ack 8854875 — Sedo delist is CANCELLED; GoDaddy key parked
 
 - **Sedo:** your step (2) "delist the 4 names after Dvir's one-tap" is stale. Dvir cancelled the delist (t971u, ~03:18 IDT); the 4 Sedo listings stay live. See `SEDO-DELIST-PLAN-2026-10-27.md`. No delist, no new Sedo work.
