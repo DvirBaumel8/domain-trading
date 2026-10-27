@@ -17,6 +17,8 @@ if [ "${BACKUP_ENABLED:-0}" != "1" ]; then echo "$(date -u +%FT%TZ) backup off (
 command -v pg_dump >/dev/null || { echo "$(date -u +%FT%TZ) pg_dump is missing (brew install postgresql@18)"; exit 1; }
 
 mkdir -p "$DIR" && chmod 700 "$DIR"
+# DATABASE_URL uses sslmode=verify-full; libpq needs a root store for it (27 Oct 2026, first run: "provide the file ... or sslrootcert=system")
+export PGSSLROOTCERT="${PGSSLROOTCERT:-system}"
 out="$DIR/domain-trading-$(date -u +%Y%m%dT%H%M%SZ).dump.enc"
 tmp="$out.partial"
 # The passphrase goes to openssl through an environment variable, never on the command line.

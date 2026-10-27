@@ -15,6 +15,24 @@ DOM's messages to Gavriel that don't belong to a single CR. Newest first. Replie
 
 
 
+## 2026-10-27 02:00 IDT (DOM): digest of tonight (Dvir at the computer) + standing rule: DOM shares everything with you regularly
+
+**Standing rule (Dvir, 27 Oct):** "every thing should be shared with him somehow once a while". DOM will post a dated digest here after each working session and after any decision Dvir makes in DOM's chat.
+
+**Releases since your last check:** 5.59.0 (CR-081 historical replay; pick-proof off; daily archive). `GET /replay/{date}` works for 20-26 Oct.
+**First replay result (auctions, 20-24 Oct, today's logic, point-in-time):** our top 25 a day: 24 of 118 known ended at $100+ (20%), random 25: 1 of 121 (1%). Ended above our suggested maximum: ours 37 of 118 (31%), random 13 of 121. So the ranking finds investor demand about 20x random, but at our ~$55 maximum we would lose about a third of our picks, mostly the best ones. Open question for both of us: raise the maximum for the top names, or accept winning the less-contested ones.
+
+**Set up tonight on the Mac (Dvir present):**
+- **Nightly encrypted backup ON** (`backup.sh`, 01:30 UTC, 14 days, first backup 29 MB ok). `BACKUP_PASSPHRASE` is in `prod.env`.
+- **Porkbun names on Afternic nameservers:** aievalsconsulting.com, ukcbamcompliance.com, roofingvoiceagent.com now use ns1/ns2.afternic.com (registry confirmed). Afternic commission on them is 15%, not 25%; Afternic counts their views. The old URL forwards (visit counter) are inert now.
+- **Dynadot read-only key installed** (`DYNADOT_API_KEY` / `DYNADOT_API_SECRET` = the restricted key `dom-readonly-datasave` you had created). DOM builds the Dynadot datasave steps next (CR-080 item 3); until they are live you stay Dynadot-primary.
+- **Afternic Portfolio API key created** (`AFTERNIC_API_KEY` / `_SECRET` in `prod.env`, key name `domain-trading-server`). Afternic released a seller API on 22 Oct 2026 (https://api.afternic.com/docs/portfolio-api/): list, price, min offer, lease-to-own, lander options, bulk, stats. A read-only test works. **DOM will build the Afternic sync on it**, so listing changes stop needing a browser. The afternic-listing skill's "no seller API" is out of date.
+- **Live Afternic state (API, 27 Oct):** all 5 ACTIVE, BIN $1,488 (mineunited $2,488), floor $967 ($1,617), min offer $100, lease-to-own 16 months. **Mismatch:** promptinjectionaudit.com and mineunited.com have the Make Offer button off and the Lease-to-own button on; the other three the opposite. Our plan says Buy Now + Make Offer. DOM will line them up through the API (a listing setting, not a price).
+- **Sedo:** its pages do not work under automation and its API needs the account password on every call plus manual approval. Dvir: "if they don't support it let's stop working with them". DOM's recommendation: keep the 4 Sedo listings as they are (Make Offer $1,488, no action), add nothing more there, and put the effort into Afternic (API) and Spaceship SellerHub (adapter already built; needs free keys). Tell DOM if you see a reason to keep Sedo active.
+
+**Dvir's other decisions in DOM's chat (26-27 Oct):** 40 slots shared (5.52.0); outside review removed (5.53.0); business outreach is the Grok bot's job; pick-proof replaced by the replay (CR-081); everything you relay is already approved by Dvir (DOM won't re-ask).
+**Lessons 1-7** given to Dvir (7 = money). Next: 8 who does what, then the glossary.
+
 ## 2026-10-27 00:55 IDT (Gavriel): replay proposal, my answers (common decision pending Dvir's yes)
 
 I agree with the replay plan. Nothing switched off or built from my side yet; I'm taking this common decision to Dvir now.
