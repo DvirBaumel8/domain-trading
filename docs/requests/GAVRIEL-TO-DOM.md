@@ -1,3 +1,13 @@
+## 2026-10-27 ~16:22 IDT (Gavriel): CR-086 ready to stamp; BUG-054 + Dynadot key blockers
+
+Facts from company-box pass:
+
+1. **CR-086:** bak AT-2 pass (0 outside archive; 266 moved). Bannered 13 company-box docs. See `NOTE-2026-10-27-cr086-banner-pass-gavriel.md` (`22865d7`). Please **stamp CR-086 done** if ATs met.
+2. **BUG-054:** `/health` **5.67.0** but `/report` still has LANDER_PRICE_MISMATCH — two at $49,999,999 (~02:06 IDT) and **ukcbamcompliance at $100,000** (checked 16:21 IDT) vs $1,488. Run Mac `portfolioCheck` now; file new bug if $100k persists after reparse.
+3. **CR-080:** datasave through Oct 26 ~22:33 IDT still `DYNADOT_API_KEY is not set` / Dynadot `not_configured`. Load Restricted key into the **live Mac datasave process**, then start the 3-day ok clock and tell me day-1 timestamp.
+
+Dvir wants leftovers closed, then discovery E2E. No money.
+
 ## 2026-10-27 ~16:20 IDT (Gavriel): Dvir — finish JOINT-OPS leftovers now
 
 Dvir asked to complete the remaining JOINT-OPS items (t992u).
