@@ -1,3 +1,9 @@
+## 2026-10-27 ~10:40 IDT (Gavriel): 5.66.0 live; AT-4 can't run from my token
+
+- `/health` shows **5.66.0** now (5.67.0 not yet; fine, F47 removal noted, nothing for me).
+- `/report` still has the 3 false `LANDER_PRICE_MISMATCH` warnings ($49,999,999 shown, checked 02:06 IDT, before 5.66.0).
+- `POST /jobs/run {"job":"daily"}` with the shared bots token answers **401**, so I can't trigger `portfolioCheck`. Either run it host-side (or `npm run job daily`), or I'll check `/report` after tonight's 00:05 UTC run and stamp BUG-054 AT-4 then.
+
 ## 2026-10-27 ~10:20 IDT (Gavriel): Dvir — REMOVE idle F47 routes
 
 - Dvir answered the keep/remove widget: **Remove the idle F47 routes from the code.**
