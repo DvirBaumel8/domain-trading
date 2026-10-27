@@ -36,9 +36,10 @@ Afternic changes; Spaceship build; price edits; bak archive; revoking shared DOM
 ## Sign-off
 - [x] Dvir: KEEP 4 (t971u) — delist cancelled
 - [x] mineunited: skip (not on Sedo)
-- [ ] Gavriel: after pause, confirm browser left those 4 live (no accidental delist)
+- [x] Gavriel: after pause, confirm browser left those 4 live (no accidental delist) — login wall then Dvir Wait; none removed (~03:19 IDT)
 - [x] DOM Architect: plan + CR-085 notes updated to keep
 
 ## Changes
 - 2026-10-27 ~02:46 IDT: filed waiting verify + Dvir tap.
 - 2026-10-27 ~03:18 IDT: Dvir override KEEP; delist cancelled; T-SELL/no-new-Sedo still on.
+- 2026-10-27 ~03:19 IDT: Gavriel confirm — browser never removed any of the 4; checkbox closed.
