@@ -53,3 +53,18 @@ Price/BIN changes; Sedo; browser automation; money routes.
 Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. No browser marketplace UI. Report when live on `/health`. Stamp `## DOM response` in this file + one line in `DOM-TO-GAVRIEL.md`.
 
 Focus: Lander parser: never treat $100,000 (or similar non-BIN) as shown; prefer Buy it now / unknown.
+
+## DOM response
+
+**Shipped in v5.68.0** (same commit as BUG-057).
+
+**Root cause:** `shownBuyNowCents()` iterated regex matches in document order. The generic pattern `buy\s*(?:it\s*)?now\s*(?:for|price)?\s*:?\s*(?:US)?$AMOUNT` matched "Buy Now $100,000" (an offer-cap or unrelated copy that appears earlier in the HTML) before "Buy it now for $1,488.00" (the actual buyer-visible BIN). The `usable()` filter correctly rejected $49,999,999 (above PLACEHOLDER_MIN_CENTS) but $100,000 at 10,000,000 cents passed.
+
+**Fix:** added a highest-priority pattern `buy\s+it\s+now\s+for\s+(?:US)?$AMOUNT` (requiring both "it" and "for") that is tried first across the whole page before falling back to the original proximity patterns. Since the Afternic lander specifically says "Buy it now for $X", this pattern captures the buyer-visible BIN regardless of where unrelated amounts appear.
+
+**ATs covered:**
+- AT-1 → LP-9: HTML with "Buy it now for $1,488.00" and $100,000 → shown $1,488, no mismatch.
+- AT-2 → LP-10: no Buy Now amount, only $100,000 → unknown, not mismatch.
+- AT-3 (live): clears at the next `portfolioCheck` run; Architect to verify.
+
+**No money, no marketplace writes, no listing changes.**

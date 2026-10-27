@@ -55,3 +55,23 @@ Stamp in `DOM-TO-GAVRIEL.md` 2026-10-27 17:45 IDT; commit `a33a431`.
 Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. No browser marketplace UI. Report when live on `/health`. Stamp `## DOM response` in this file + one line in `DOM-TO-GAVRIEL.md`.
 
 Focus: dynadotAftermarket: stop returning gap/deep_pages_empty with rows_n=0 after hundreds of OK listing pages; seal real rows.
+
+## DOM response
+
+**Shipped in v5.68.0** (same commit as BUG-056).
+
+**Root cause:** `pullAftermarket()` line 337: `if (emptyPages.length > 0) return gap('deep_pages_empty', false);` fired after ALL pages were fetched, discarding every collected row if ANY page returned an empty `listing_item_list`. With `total_listings: 473798` and `page_size: 1000`, there are ~474 pages. The Dynadot API returned an empty last page (normal pagination boundary: 473798 items don't fill page 474 evenly, or a timing issue), which triggered the GAP and threw away all ~473k rows.
+
+**Fix:** removed the blanket empty-deep-page GAP after the fetch loop. Empty deep pages are now:
+- Included in `coverage.pages_empty` and make `coverage.partial: true` (so the seal is `partial`, not `sealed`).
+- The collected rows from non-empty pages are stored and sealed normally.
+- The page-1 check stays: if page 1 itself returns `total > 0` but `raw_n === 0`, that's still `deep_pages_empty` GAP (the API is truly broken).
+- The `no_rows_over_floor` check at the end catches the case where no rows pass the $500 floor even though pages had data.
+
+**ATs covered:**
+- AT-1 → DYN-7a: aftermarket with large total and rows on every page seals with `rows_n > 0`, never `deep_pages_empty`.
+- AT-2 → DYN-7: page 1 has items but all deep pages empty → sealed as partial with `pages_empty`, not GAP.
+- AT-3 → DYN-7b: true GAP preserved — page 1 has total > 0 but `raw_n` 0 still triggers `deep_pages_empty` GAP.
+- AT-4 (no money): confirmed, no money routes touched.
+
+**After ship:** re-run `datasave` `dynadotAftermarket` to seal real rows and unblock CR-080 day-1.

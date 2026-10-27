@@ -33,8 +33,11 @@ const AMOUNT = String.raw`\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?`;
 /** 5.66.0 (BUG-054): an amount right after offer-form validation copy ("Offer cannot exceed $49,999,999") or a page-wide ceiling is never the Buy Now price. */
 const LIMIT_COPY = /(?:exceed|cannot|limit|minimum|maximum|at\s+least|less\s+than|more\s+than|between|offer\s+must)\W*(?:\w+\W+){0,2}$/i;
 const PLACEHOLDER_MIN_CENTS = 1_000_000_000; // $10,000,000: Afternic's offer ceiling $49,999,999 and similar
-/** The Buy Now amount a lander page shows, in cents, or null when the page shows none. 5.66.0 (BUG-054): "buy it now for $X" first; else
- * every amount within 80 characters after "buy now" (or 40 before it), skipping amounts that follow limit copy and placeholder ceilings. */
+/** The Buy Now amount a lander page shows, in cents, or null when the page shows none.
+ * 5.66.0 (BUG-054): "buy it now for $X" first; skipping amounts after limit copy and placeholder ceilings.
+ * 5.68.0 (BUG-056): the tight "buy it now for $X" pattern (with required "for") is tried first across the
+ * whole page before falling back to proximity patterns; this prevents a generic "Buy Now" near an unrelated
+ * amount ($100,000 offer cap, lease copy) from winning over the actual buyer-visible price. */
 function shownBuyNowCents(text: string): number | null {
   const cents = (m: RegExpExecArray) => Number(m[1]!.replace(/,/g, '')) * 100 + Number(m[2] ?? 0);
   const usable = (m: RegExpExecArray, at: number) => {
@@ -42,6 +45,8 @@ function shownBuyNowCents(text: string): number | null {
     return c > 0 && c < PLACEHOLDER_MIN_CENTS && !LIMIT_COPY.test(text.slice(Math.max(0, at - 40), at)) ? c : null;
   };
   const patterns: Array<[RegExp, (m: RegExpExecArray) => number]> = [
+    // Tight: "buy it now for $X" — the Afternic buyer-visible text; requires both "it" and "for"
+    [new RegExp(String.raw`buy\s+it\s+now\s+for\s+(?:US)?${AMOUNT}`, 'gi'), (m) => m.index + m[0].indexOf('$')],
     [new RegExp(String.raw`buy\s*(?:it\s*)?now\s*(?:for|price)?\s*:?\s*(?:US)?${AMOUNT}`, 'gi'), (m) => m.index + m[0].indexOf('$')],
     [new RegExp(String.raw`buy\s*(?:it\s*)?now[^$]{0,80}${AMOUNT}`, 'gi'), (m) => m.index + m[0].lastIndexOf('$')],
     [new RegExp(String.raw`${AMOUNT}[^<]{0,40}buy\s*(?:it\s*)?now`, 'gi'), (m) => m.index],
