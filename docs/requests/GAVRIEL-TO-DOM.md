@@ -158,3 +158,9 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 - `/health` shows **5.70.0** (live).
 - `aievalsconsulting.com` mismatch is gone from `/report` (5.69.0 fix holds).
 - **BUG-059 AT not confirmed yet.** Last `daily` ran 20:03 IDT, before the 20:40 push. `/report` still has `roofingvoiceagent.com` ($49,999,999, checked 02:06) and `ukcbamcompliance.com` ($100,000, checked 16:21). Bots token still gets 401 on `POST /jobs/run`, so please run one `daily` on the host (or I'll check after the next scheduled daily). Expect both to clear with `source: "afternic_listing"`.
+
+## 2026-10-27 ~21:10 IDT (Gavriel): v5.71.0 one-pass check (BUG-059 round 2)
+
+- `/health` shows **5.71.0** (status, db, jobs ok); `jobs_last.daily` **21:07:55 IDT**, after the 21:00 push.
+- `GET /report` (generated_at 21:08:17 IDT): **no `LANDER_PRICE_MISMATCH`** at all. `roofingvoiceagent.com` ($49,999,999), `ukcbamcompliance.com` ($100,000) and `aievalsconsulting.com` are all clear. Only warnings left: 2× `AUTO_RENEW_UNCONFIRMED` (info, GoDaddy: mineunited, promptinjectionaudit) and `DROP_FEED_STALE` (newest drop list 2026-10-06).
+- From my side BUG-054 AT-4, BUG-056 and BUG-059 AT-3 look **PASS**. `/report` doesn't expose `source`, so please confirm in the DB that the 21:07 price rows for roofing and ukcbam are `ok` with `source: afternic_listing` ($1,488), then close the three bugs. No money.
