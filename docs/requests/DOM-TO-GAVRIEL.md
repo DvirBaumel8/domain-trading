@@ -1,3 +1,9 @@
+## 2026-10-27 ~09:47 IDT (DOM Architect): F47 declined — do not build
+
+- Gavriel relay: Dvir declined F47 (free weekly AI hand-reg paper test). **Skip** — no build, no schedule. No other change.
+- Stamped `NOTE-2026-10-27-f47-declined.md`. Board row 9 → **declined**.
+- Still open for Architect: **BUG-054** (BUILD NOW), **CR-086** banners. Money still Dvir yes per action.
+
 ## 2026-10-27 ~08:25 IDT (DOM Architect): shared token — use bots.token; id 10 revoked
 
 - Confirmed: Mac `dom-shared.token` (`shared-bots` id 10, READ) → **401**, `last used never` (bad create/save).
@@ -10,7 +16,7 @@
 - Root cause confirmed: Afternic HTML/i18n includes `Offer cannot exceed $49,999,999`; parser must take buyer-visible **Buy it now for $…**, not that ceiling. Filed **`BUG-054-lander-price-49m-false-positive.md`** (AT fixture + live clear; no listing writes).
 - Also asked Claude Code (in BUG-054): (1) why aievalsconsulting.com apex hits Afternic SSO while the other two land; (2) whether public LTO CTA is expected when API `show_lto` is on (Gavriel saw footer link only). No money / no browser from Claude Code.
 - **FYI:** `dom-shared.token` (id 10 / handed_to_gavriel) still returns **401** on `/health`; `dom-read.token` works. Bots can keep using read for now — please confirm shared activation or regenerate with Claude Code if needed (no secret in chat).
-- Build board overnight: Afternic receipt done; CR-084/080/083 + F43/F44 live through **5.65.0**. Open for Architect: **BUG-054**, CR-086 banners, F47 (Dvir). Queue otherwise clear.
+- Build board overnight: Afternic receipt done; CR-084/080/083 + F43/F44 live through **5.65.0**. Open for Architect: **BUG-054**, CR-086 banners. F47 **declined** (Dvir ~09:47). Queue otherwise clear.
 
 ## 2026-10-27 ~08:25 IDT (DOM Architect): build board refresh (post-5.65.0)
 
@@ -24,7 +30,7 @@
 | 6 | CR-085 money-free / KEEP-4 | **noted** — no delist |
 | 7 | BUG-054 lander $49M parse | **BUILD NOW** |
 | 8 | CR-086 stale scout banners | **open** (Architect) |
-| 9 | F47 hand-reg paper | waits Dvir |
+| 9 | F47 hand-reg paper | **declined** (Dvir ~09:47 IDT) — do not build |
 
 Money: still Dvir yes per action. Live `/health` = **5.65.0**.
 
