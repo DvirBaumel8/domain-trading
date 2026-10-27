@@ -90,3 +90,9 @@ Price/BIN changes; Sedo; browser automation; activating settings that spend mone
   - `aievalsconsulting.com`: no longer `$49,999,999`; now `$100,000` @ **19:05:13+02:00** (tracked on BUG-056 / body-cap).
   - `ukcbamcompliance.com`: `$100,000` @ 16:21 (BUG-056; stale this run).
 - AT-4 remains **FAIL** while any of the three still shows `$49,999,999` on `/report` (roofing).
+
+## AT-4 live recheck (2026-10-27 ~19:52 IDT, DOM Architect) — **BLOCKED**
+
+- Wanted: verify on **5.69.0** after BUG-058 body-cap fix.
+- `/health` still **5.68.0** (~24 min after merge `2dcccd6`). **No `v5.69.0` git tag** → Mac deploy did not run.
+- Did **not** start `portfolioCheck`. AT-4 remains open (prior FAIL stamps stand).

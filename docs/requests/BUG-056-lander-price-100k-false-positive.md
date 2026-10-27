@@ -76,3 +76,8 @@ Focus: Lander parser: never treat $100,000 (or similar non-BIN) as shown; prefer
   - `ukcbamcompliance.com`: still **`$100,000.00`** @ **16:21:00+02:00** (stale; apex JS→`/lander` / GoDaddy 403 → unknown does not clear).
 - **Why the 5.68.0 tight pattern lost live:** `LANDER_BODY_BYTES=200_000`. Afternic HTML ~337KB; `Buy it now for $1,488.00` sits at ~byte 251111. Cap truncates before it; fallback matches `Buy Now price must be below $100,000` inside the first 200KB. Simulated: cap 200k → `$100,000`; cap ≥260k → `$1,488`. Fixtures still pass because they are short.
 - Follow-up needed (not shipped here): raise `LANDER_BODY_BYTES` (e.g. ≥300–512KB) and/or extend `LIMIT_COPY` for "must be below" / "Buy Now price must". No money.
+
+## AT-3 live recheck (2026-10-27 ~19:52 IDT, DOM Architect) — **BLOCKED**
+
+- Wanted: confirm `$100,000` false BIN cleared on 5.69.0 (LIMIT_COPY + 512k body).
+- `/health` still **5.68.0**; missing **`v5.69.0` tag**. No fresh `portfolioCheck`. Prior FAIL stamps stand.

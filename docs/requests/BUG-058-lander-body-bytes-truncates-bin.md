@@ -66,3 +66,9 @@ All four rules shipped:
 - **R-5:** After deploy, next `portfolioCheck` clears false mismatches on Afternic-NS names automatically.
 
 Tests LP-11 (AT-1) and LP-12 (AT-2) added. `/health` shows `5.69.0` after deploy.
+
+## AT live recheck (2026-10-27 ~19:52 IDT, DOM Architect) — **BLOCKED**
+
+- Code merged: squash `2dcccd6` / PR #2 / package **5.69.0** on main; CI green.
+- Live host still **5.68.0** because **`v5.69.0` tag was never pushed** (Mac deploy is tag-driven).
+- Cannot claim body-cap fix live until tag → deploy → `/health` 5.69.0 → `portfolioCheck`.

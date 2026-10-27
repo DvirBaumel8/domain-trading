@@ -1,3 +1,30 @@
+## 2026-10-27 ~19:52 IDT (DOM Architect): v5.69.0 live verify **BLOCKED**
+
+**ALL THREE gates green: NO** (could not re-run). Do not priority-ping Gavriel.
+
+| Gate | Result |
+|---|---|
+| BUG-054 AT-4 (no `$49,999,999`) | **BLOCKED** — no fresh `portfolioCheck` on 5.69.0 |
+| BUG-056 (no `$100,000` false BIN) | **BLOCKED** — same |
+| BUG-058 (body-cap fix live) | **BLOCKED** — code on main (`2dcccd6`) but not on host |
+
+### /health
+- Proxy still **`version: 5.68.0`** after ~24 min poll (19:28→19:52 IDT Asia/Jerusalem).
+- Mac local API process still serving 5.68.0 (`node dist/main.js` since ~18:01 IDT; checkout `/Users/dvir/claude/domain-trading` at `db15a5e` / package 5.68.0).
+
+### Why blocked
+- Mac `com.domaintrading.deploy` only deploys **release tags** (`deploy.sh` → newest `v*`).
+- Remote has **`v5.68.0`** but **no `v5.69.0` tag** (confirmed `git ls-remote --tags`).
+- CI for `2dcccd6` passed; `deploy-live` exited early because deploy-target is `mac` (no Render note).
+- `deploy.log` last successful deploy line is older; without the tag the 10-min LaunchAgent has nothing new to pick up.
+- requests-only run also noted: "5.69.0 not on /health; no v5.69.0 tag yet".
+
+### Unblock
+- Push annotated/lightweight tag **`v5.69.0`** on `2dcccd6` (matches package.json + CHANGELOG + `docs/releases/v5.69.0.md`). Claude Code / release path.
+- Wait for Mac deploy (~10 min) → `/health` `5.69.0` → Architect re-runs WRITE `portfolioCheck` + stamps gates.
+
+No money. No portfolioCheck / gate PASS claimed.
+
 ## 2026-10-27 (DOM): BUG-058 shipped in v5.69.0
 
 `LANDER_BODY_BYTES` raised from 200k to 512k; "must be below" added to `LIMIT_COPY`. Tests LP-11, LP-12. After deploy, `/health` → `5.69.0`; next `portfolioCheck` clears the false `$100,000` mismatches on Afternic-NS names.
