@@ -96,3 +96,10 @@ Price/BIN changes; Sedo; browser automation; activating settings that spend mone
 - Wanted: verify on **5.69.0** after BUG-058 body-cap fix.
 - `/health` still **5.68.0** (~24 min after merge `2dcccd6`). **No `v5.69.0` git tag** → Mac deploy did not run.
 - Did **not** start `portfolioCheck`. AT-4 remains open (prior FAIL stamps stand).
+
+## AT-4 live recheck (2026-10-27 ~20:15 IDT, DOM Architect) — **FAIL**
+
+- `/health` **5.69.0**. Daily `run_d4ab5469-d1a2-446c-85bf-82f2ed785d36` → `portfolioCheck` finished `2026-10-27T20:03:34+02:00` (`web.ok=5`, `alerts_n=0`).
+- `aievalsconsulting.com`: **no** `$49,999,999` (warning cleared).
+- `roofingvoiceagent.com`: still **`$49,999,999.00`**, `checked_at` **2026-10-27T02:06:06+02:00** (stale; fresh price check did not produce a non-unknown pass — apex JS→`/lander` / GoDaddy 403 path).
+- AT-4 criterion (both names free of `$49,999,999` on `/report`): **FAIL**.

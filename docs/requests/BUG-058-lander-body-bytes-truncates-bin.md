@@ -72,3 +72,9 @@ Tests LP-11 (AT-1) and LP-12 (AT-2) added. `/health` shows `5.69.0` after deploy
 - Code merged: squash `2dcccd6` / PR #2 / package **5.69.0** on main; CI green.
 - Live host still **5.68.0** because **`v5.69.0` tag was never pushed** (Mac deploy is tag-driven).
 - Cannot claim body-cap fix live until tag → deploy → `/health` 5.69.0 → `portfolioCheck`.
+
+## AT live recheck (2026-10-27 ~20:15 IDT, DOM Architect) — **PASS**
+
+- Tag `v5.69.0` → Mac deploy → `/health` **5.69.0** ~20:02 IDT.
+- Afternic-reachable **`aievalsconsulting.com`**: prior `$100,000` LANDER_PRICE_MISMATCH **cleared** after fresh `portfolioCheck` (`2026-10-27T20:03:34+02:00`). Body-cap + LIMIT_COPY fix is live.
+- `roofingvoiceagent.com` / `ukcbamcompliance.com` remain stale mismatches (unknown price; GoDaddy 403 / apex JS) — noted, out of this BUG's R-5 reachability scope.

@@ -1,3 +1,32 @@
+## 2026-10-27 ~20:15 IDT (DOM Architect): v5.69.0 live lander gates
+
+**ALL THREE gates green: NO.** Do not priority-ping for green.
+
+| Gate | Result |
+|---|---|
+| BUG-054 AT-4 (no `$49,999,999` on aievals + roofing) | **FAIL** |
+| BUG-056 (no `$100,000` on ukcbam + aievals) | **FAIL** |
+| BUG-058 (body-cap live; Afternic-reachable clears `$100,000`) | **PASS** |
+
+### /health
+- Proxy **`version: 5.69.0`**, status ok (live since ~20:02 IDT).
+
+### portfolioCheck
+- Manual daily `run_d4ab5469-d1a2-446c-85bf-82f2ed785d36` (WRITE `dom-write`, trigger manual).
+- `portfolioCheck` **2026-10-27T20:03:34+02:00**, `ok`, `web.ok=5` `fail=0` `unknown=0`, `alerts_n=0`.
+
+### GET /report lander warnings (generated_at 2026-10-27T20:14:31+02:00)
+- `aievalsconsulting.com`: **no** LANDER_PRICE_MISMATCH
+- `roofingvoiceagent.com`: shown **`$49,999,999.00`** vs expected `$1,488.00`, `checked_at` **2026-10-27T02:06:06+02:00** (stale vs portfolioCheck `2026-10-27T20:03:34+02:00`)
+- `ukcbamcompliance.com`: shown **`$100,000.00`** vs expected `$1,488.00`, `checked_at` **2026-10-27T16:21:00+02:00** (stale vs portfolioCheck `2026-10-27T20:03:34+02:00`)
+
+### Stale / unknown (do not clear mismatches)
+- `roofingvoiceagent.com` + `ukcbamcompliance.com`: latest **non-unknown** `price` rows are still the old fails; fresh run likely wrote `price=unknown` (no Buy Now text) after apex JS→`/lander` and/or GoDaddy forsale **403** to our UA — contract: unknown neither raises nor clears. Out of BUG-058 scope (release note). Needs GoDaddy UA / lander-fetch follow-up to clear AT-4 / BUG-056 fully.
+- Afternic listing HTML path for **aievalsconsulting.com** did clear on 5.69.0 (512k body + LIMIT_COPY) — BUG-058 live proof.
+
+### Discovery E2E
+Still held until BUG-054 AT-4 + BUG-056 clear (stale GoDaddy-403 names). No money.
+
 ## 2026-10-27 ~19:52 IDT (DOM Architect): v5.69.0 live verify **BLOCKED**
 
 **ALL THREE gates green: NO** (could not re-run). Do not priority-ping Gavriel.

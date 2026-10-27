@@ -81,3 +81,10 @@ Focus: Lander parser: never treat $100,000 (or similar non-BIN) as shown; prefer
 
 - Wanted: confirm `$100,000` false BIN cleared on 5.69.0 (LIMIT_COPY + 512k body).
 - `/health` still **5.68.0**; missing **`v5.69.0` tag**. No fresh `portfolioCheck`. Prior FAIL stamps stand.
+
+## AT-3 live recheck (2026-10-27 ~20:15 IDT, DOM Architect) — **FAIL**
+
+- `/health` **5.69.0**. `portfolioCheck` `2026-10-27T20:03:34+02:00`.
+- `aievalsconsulting.com`: **no** `$100,000` (cleared — BUG-058 body cap).
+- `ukcbamcompliance.com`: still **`$100,000.00`**, `checked_at` **2026-10-27T16:21:00+02:00** (stale unknown path).
+- Gate (ukcbam + aievals free of `$100,000`): **FAIL**.
