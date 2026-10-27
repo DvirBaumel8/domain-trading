@@ -125,7 +125,7 @@ describe('exports v2', () => {
     expect((await get(a2, 'afternic', auth)).headers['x-pending-changes']).toBe('1');
   });
 
-  it('venue independence: a confirmed Afternic upload does not clear Sedo pending', async () => {
+  it('CR085-AT4 venue independence: a new listing never makes a name pending at Sedo (Sedo is off for new work); GET /export/sedo.csv still answers and says 0 pending', async () => {
     const app = await appAt(NOW);
     const { auth } = await issueToken('write');
     await listVia(app, auth, NOW, 'alpharoof.com');
@@ -134,8 +134,8 @@ describe('exports v2', () => {
     expect((await get(app, 'afternic', auth)).headers['x-pending-changes']).toBe('0');
     const s = await get(app, 'sedo', auth);
     expect(s.statusCode).toBe(200);
-    expect(s.headers['x-pending-changes']).toBe('1');
-    expect(parseCsvStrict(s.body)).toHaveLength(2);
+    expect(s.headers['x-pending-changes']).toBe('0');
+    expect(parseCsvStrict(s.body)).toHaveLength(2); // the file itself is unchanged: it lists every listed name
     expect((await row('alpharoof.com')).export_pending_since).toBeNull(); // Afternic confirmation cleared the shared flag only for Afternic's view
   });
 

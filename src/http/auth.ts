@@ -218,6 +218,7 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'POST /portfolio/{domain}/display-name': 'allowed', // v5.27.0 (CR-076 R-5): capitalisation of the name only
   'POST /portfolio/{domain}/renewal-price': 'allowed',
   'POST /portfolio/{domain}/stats': 'allowed',
+  'POST /decisions': 'allowed', // v5.63.0 (CR-084 R-7): records a company decision id; a pure record, no money, price or listing
   'POST /ledger/costs': 'allowed', // v5.25.0 (CR-070 R-1): records tool, ai and adjustment costs only; no money moves
   'PUT /portfolio/{domain}/forward-costs': 'allowed', // v5.25.0 (CR-070 R-2): a planned-cost note, nothing is spent
   'POST /candidates/{domain}/records': 'allowed',

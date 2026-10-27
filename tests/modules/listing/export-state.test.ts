@@ -33,11 +33,12 @@ describe('pendingDomains (listing_changed_at > the snapshot time of the newest c
     await file('afternic', T(5));
     expect(await pendingDomains(db, 'afternic')).toEqual(['a.com']);
   });
-  it('4: venues are independent', async () => {
+  it('4: venues are independent; CR085-AT4: Sedo is off for new work, so a listed name is never pending there', async () => {
     await listed('a.com', T(0));
+    expect(await pendingDomains(db, 'afternic')).toEqual(['a.com']);
     await file('afternic', T(5));
     expect(await pendingDomains(db, 'afternic')).toEqual([]);
-    expect(await pendingDomains(db, 'sedo')).toEqual(['a.com']);
+    expect(await pendingDomains(db, 'sedo')).toEqual([]);
   });
   it('(a) a change between the file snapshot and its upload stays pending (the snapshot time, not uploaded_at, is the boundary)', async () => {
     await listed('a.com', T(7));

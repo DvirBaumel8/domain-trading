@@ -251,7 +251,6 @@ export class ListService {
 
     const checklist = [
       'Add/update at Afternic: download /export/afternic.csv and upload it at afternic.com/domains/add with **Update** (never Replace)',
-      'Sedo: download /export/sedo.csv and use the Sedo Bulk Uploader',
     ];
     if (row.buy_date) checklist.push(`Day 60 (${addDays(row.buy_date, 60)}): enable Afternic Fast Transfer opt-in at the registrar`);
     if (row.registrar === 'godaddy') checklist.push("GoDaddy-registered: GoDaddy's own List for Sale is an alternative to the Afternic upload");

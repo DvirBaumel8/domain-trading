@@ -60,7 +60,7 @@ interface Guarantee { what: string; file: string; test: string; note?: string }
 
 /** Tables whose rows may never be changed or deleted (database triggers). */
 export const APPEND_ONLY_TABLES = [
-  'audit_log', 'cohort_decisions', 'cohort_names', 'cohort_outcomes', 'company_documents', 'domain_records', 'drop_list_checks', 'drop_list_rows', 'drop_lists', 'export_uploads', 'forbidden_terms', 'holdout_suites', 'job_runs', 'labelled_names', 'ledger_entries', 'forward_cost_plans', 'forward_cost_lines', 'prebid_checks', 'bid_plan_events', 'listing_history', 'manual_quotes', 'pricing_evidence',
+  'audit_log', 'cohort_decisions', 'cohort_names', 'cohort_outcomes', 'company_documents', 'domain_records', 'drop_list_checks', 'drop_list_rows', 'drop_lists', 'export_uploads', 'forbidden_terms', 'holdout_suites', 'job_runs', 'labelled_names', 'ledger_entries', 'decisions', 'forward_cost_plans', 'forward_cost_lines', 'prebid_checks', 'bid_plan_events', 'listing_history', 'manual_quotes', 'pricing_evidence',
   'pricing_settings', 'kb_authors', 'kb_sources', 'kb_questions', 'kb_claims', 'kb_evidence', 'kb_source_links', 'kb_verdicts', 'kb_settings', 'portfolio_checks', 'replay_runs', 'sales', 'screening_evidence', 'screening_packs', 'screening_results', 'screening_verdicts', 'selection_lists', 'selection_settings', 'sibling_method_approvals', 'test_set_rows', 'registrar_state_checks', 'venue_listings', 'portfolio_stats', 'sales_pattern_uploads', 'sales_pattern_rows', 'listing_sync_log',
 ] as const;
 

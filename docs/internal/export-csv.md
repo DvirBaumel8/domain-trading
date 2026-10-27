@@ -31,3 +31,5 @@ Bulk-upload files in exactly the format each marketplace expects. A bot uploads 
 | E-12 | A name hits its `delist` event | Absent from both files; in `X-Manual-Delist` until a confirmed upload |
 | E-13 | Confirm without approval; `uploaded_at` future / before the file; `note` with `@`; with approval | 200, `approval_text` null, `uploaded_at` now or sent / 422 `UPLOADED_AT_INVALID` / 422 `NO_PII` / 200, approval stored, its time used |
 | E-14 | Any query parameter (`?changed_only=true`, `?foo=1`) | 422 `VALIDATION_ERROR`, no `export_runs` row |
+
+**Sedo off for new work (CR-085, 27 Oct 2026, v5.63.0):** `pendingDomains(db, 'sedo')` is always empty, so a new listing never makes a name pending for a Sedo export (`X-Pending-Changes` 0 on `GET /export/sedo.csv`); `POST /list/{domain}` has no Sedo checklist step. The route and existing Sedo records stay. Test CR085-AT4 (`docs/internal/decisions.md`).

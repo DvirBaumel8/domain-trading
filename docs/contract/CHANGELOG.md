@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.63.0 (2026-10-27): CR-084: decisions store (POST/GET /decisions), X-Caller attribution, sources-of-truth map; CR-085: no new Sedo export work
+Release note: `docs/releases/v5.63.0.md`.
+MINOR (migration `1768300000000_v5-63-0.sql`: table `decisions`, `audit_log.caller`). CR-084 (Dvir §10 A: one place per durable fact):
+- New `POST /decisions` (WRITE or bots; append-only; same id + same content = duplicate, other content = 409 `DECISION_EXISTS`; corrections are a new id with `supersedes`), `GET /decisions`, `GET /decisions/{id}` (404 `DECISION_NOT_FOUND`). A decision is a record only: it triggers nothing.
+- Optional request header `X-Caller` (any case, stored lower-case) recorded in the audit (`GET /audit` `caller`) and the request log.
+- New `docs/contract/sources-of-truth.md`: the only writer and the read routes per durable fact; company-box CSVs are not a source of truth.
+- CR-085: Sedo is off for new work: no new Sedo pending exports, no Sedo step in the `/list` checklist; `GET /export/sedo.csv` and existing Sedo records stay.
+
 ## 5.62.0 (2026-10-27): Dynadot read by the server (REST v2, signed, read-only key): aftermarket listings sealed daily with the GAP/R-8v2 rules; closeouts wait for the API path
 Release note: `docs/releases/v5.62.0.md`.
 MINOR (migration `1768200000000_v5-62-0.sql`: `snapshot_manifests.origin` adds `server`, `status` adds `gap`). CR-080 item 3: the datasave step `dynadotAftermarket` reads Dynadot's RESTful v2 API itself (signed, read-only key) and seals the day through the same path as `POST /snapshots/dynadot` (origin `server`); a collapsed total records a GAP instead of a panel (R-8/R-8v2). `dynadotCloseouts` reads `GET /restful/v2/aftermarket/get_expired_closeout_domains` (path from Gavriel's connector; `current_price` is in cents) the same way (`DYNADOT_CLOSEOUTS_PATH` overrides it). A day already sealed by either side is a no-op; a bot upload after a server seal gets 409 `SNAPSHOT_SEALED`. New code `EMPTY_RESULT`.

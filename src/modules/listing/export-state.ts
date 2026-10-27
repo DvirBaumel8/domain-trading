@@ -14,8 +14,11 @@ async function lastConfirmedFileAt(db: Kysely<Database>, venue: Venue): Promise<
 /**
  * Listed domains changed since the venue's last confirmed file: listing_changed_at is after that file's snapshot time
  * (every listed name is pending while the venue has no confirmed upload).
+ * Sedo is off for new work (CR-085, 27 Oct 2026): a new listing or a plan change never makes a name pending there, so the answer for Sedo is always empty.
+ * Existing Sedo records (venue_listings, export uploads, manualDelist) are untouched.
  */
 export async function pendingDomains(db: Kysely<Database>, venue: Venue): Promise<string[]> {
+  if (venue === 'sedo') return [];
   const last = await lastConfirmedFileAt(db, venue);
   const r = await sql<{ domain: string }>`
     select d.domain from domains d

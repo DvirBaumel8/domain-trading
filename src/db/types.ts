@@ -468,6 +468,8 @@ export interface AuditLogTable {
   client_ip: string | null;
   /** v5.20.0 (CR-069): the optional X-Bot-Name header; logged, not a security check. */
   bot_name: string | null;
+  /** v5.63.0 (CR-084): the optional X-Caller header (1..40 of [a-z0-9_-]); logged, not a security check. */
+  caller: string | null;
 }
 
 export interface IdempotencyKeysTable {
@@ -1879,6 +1881,21 @@ export interface ForwardCostPlansTable {
   created_at: TimestampDefault;
 }
 
+/** v5.63.0 (CR-084): one company decision (D-id). Append-only; a correction is a new id with `supersedes`. A pure record. */
+export interface DecisionsTable {
+  id: string;
+  decided_at: Timestamp;
+  decided_by: string;
+  summary: string;
+  scope: string | null;
+  domains: string[] | null;
+  source_ref: string | null;
+  supersedes: string | null;
+  recorded_by: string;
+  recorded_at: TimestampDefault;
+  audit_id: string | null;
+}
+
 export interface ForwardCostLinesTable {
   id: Generated<number>;
   plan_id: number;
@@ -1926,6 +1943,7 @@ export interface Database {
   bid_plans: BidPlansTable;
   bid_plan_events: BidPlanEventsTable;
   forward_cost_plans: ForwardCostPlansTable;
+  decisions: DecisionsTable;
   forward_cost_lines: ForwardCostLinesTable;
   deals: DealsTable;
   domains: DomainsTable;

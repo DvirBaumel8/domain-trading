@@ -302,6 +302,7 @@ Read-only reports: `/report`, portfolio, ledger, audit, job-run views.
 | Route | File |
 |---|---|
 | GET /report, GET /report/pricing-review | `reporting/api/report.ts` |
+| POST /decisions, GET /decisions, GET /decisions/:id (v5.63.0, CR-084; rules `docs/internal/decisions.md`) | `reporting/api/decisions.ts` (`registerDecisions`; logic `reporting/decisions.ts`: `postDecisions`, `listDecisions`, `getDecision`) |
 | GET /portfolio, GET /portfolio/:domain, GET /ledger, GET /deals/:id, GET /audit | `reporting/api/reads.ts` |
 | POST /ledger/costs, PUT/GET /portfolio/:domain/forward-costs, GET /costs/forward, GET /books.csv (v5.25.0, CR-070) | `reporting/api/books.ts` (`registerBooks`; logic `reporting/books.ts`; rules `docs/internal/books.md`) |
 
@@ -318,7 +319,7 @@ Read-only reports: `/report`, portfolio, ledger, audit, job-run views.
 | `books.ts` | v5.25.0 (v5.42.0: `postCosts` inserts in chunks of 1,000): `postCosts`, `parseForwardBody`, `putForwardCosts`, `forwardCostHistory`, `forwardCosts`, `booksRows`, `DERIVED_FIELDS`; the shared renewal rule is `unrenewedLiveNames` / `dropsAtFirstExpiry` in `report/money.ts` |
 | `job-runs.ts` | `jobRunsView`, `jobsOverdue`, `dailyScheduleState`, `stepView`, `triggerFromKey` |
 
-Tables: `forward_cost_plans`, `forward_cost_lines` (v5.25.0, append-only, versioned plan per domain, in the backup; migration `1765700000000_v5-25-0.sql`); otherwise reads all. Tests: `tests/modules/reporting/` (`books` (v5.25.0: BK525-1..13), `report-core`, `report-warnings`, `reads`, `pricing-review`, `forecast`, `drop-feed-stale`, `keyword-keep-signal` (v4.2.0), `ledger-csv-formula` (L516-1)); the schedule view is also in `tests/modules/ops/jobs.test.ts`, `missed-runs`.
+Tables: `decisions` (v5.63.0, CR-084, append-only, in the backup, migration `1768300000000_v5-63-0.sql` which also adds `audit_log.caller`; tests `reporting/decisions` DEC-1..10, `reporting/sole-store` CR084-AT1..5, `http/x-caller` XC-1..4; the per-fact writer/reader map is `docs/contract/sources-of-truth.md`), `forward_cost_plans`, `forward_cost_lines` (v5.25.0, append-only, versioned plan per domain, in the backup; migration `1765700000000_v5-25-0.sql`); otherwise reads all. Tests: `tests/modules/reporting/` (`books` (v5.25.0: BK525-1..13), `report-core`, `report-warnings`, `reads`, `pricing-review`, `forecast`, `drop-feed-stale`, `keyword-keep-signal` (v4.2.0), `ledger-csv-formula` (L516-1)); the schedule view is also in `tests/modules/ops/jobs.test.ts`, `missed-runs`.
 
 ### outreach
 Outreach email log, company documents, forbidden-term block list. (X posting through Buffer was removed in 5.2.0, CR-057.)
@@ -397,7 +398,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 |---|---|---|
 | `auth.ts` | `registerAuth` (bearer tokens, job token), `registerScope` (READ/WRITE/intake/data/visits/bots), `BOTS_ROUTES` (v5.20.0: every mutating route classified allowed / money / write_only; unlisted = money), `INTAKE_ROUTES`, `DATA_ROUTES`/`DATA_PREFIX` (v5.10.0), `PUBLIC_PATHS` | `http/auth`, `token-expiry`, `http/data-scope`, `http/bots-scope` (B520-1..8) (DS-1..DS-6) |
 | `idempotency.ts` | `registerIdempotency`, `requestHash`, `pruneIdempotencyKeys` | `http/idempotency`, `idempotency-hygiene`, `http/unit/canonical-json` |
-| `audit.ts` | `registerAuditId`, `registerAuditWrite`, `dbAuditWriter`, `writeJobAudit` (v5.15.0: the one writer of job, queue and CLI audit rows), `elideArrays` (v5.14.0, D2: an array over 50 items is stored as `[N items, sha256:<hex>]`; AL-4) | `http/audit`, `audit-token`, `timestamps` |
+| `audit.ts` | v5.63.0: `callerOf` (X-Caller, CR-084), `registerAuditId`, `registerAuditWrite`, `dbAuditWriter`, `writeJobAudit` (v5.15.0: the one writer of job, queue and CLI audit rows), `elideArrays` (v5.14.0, D2: an array over 50 items is stored as `[N items, sha256:<hex>]`; AL-4) | `http/audit`, `audit-token`, `timestamps` |
 | `db-stats.ts` | v5.40.0 (G-125): `registerDbScope` (onRequest, first) and `registerDbStatsLog` (onSend, last): `db_queries`, `db_ms`, `db_top` on the "request completed" log line; counter in `src/core/db-stats.ts` (`withDbScope`, `recordQuery`, `stepDb`), hooked in `src/db/client.ts`; step record `db` via `ops/queue.ts` and `reporting/job-runs.ts` `stepView`; report `scripts/traffic-report.ts` (`npm run traffic`) | `ops/db-stats` (DQ540-5..6), `ops/unit/db-stats` (DQ540-1..4), `unit/traffic-report` (TR540-1..3) |
 | `errors.ts` | `AppError`, `errorBody`, `registerErrorHandling` | `http/errors` |
 | `rate-limit.ts` | `registerRateLimit` | `http/rate-limit`, `rate-limit-replay`, `http/unit/rate-limit` |

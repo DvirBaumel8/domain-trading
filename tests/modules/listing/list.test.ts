@@ -256,8 +256,9 @@ describe('POST /list/{domain}', () => {
     await insertOwnedDomain(db, { domain: D, buy_date: '2026-10-04' });
     const res = await list({ mode: 'bin', bin: 399, approval_ref: approval() }, auth);
     expect(res.json().checklist).toEqual(expect.arrayContaining([
-      expect.stringMatching(/afternic\.csv.*Update/), expect.stringMatching(/sedo\.csv/), expect.stringMatching(/2026-12-03/),
+      expect.stringMatching(/afternic\.csv.*Update/), expect.stringMatching(/2026-12-03/),
     ]));
+    expect(res.json().checklist.join(' ')).not.toMatch(/sedo/i); // CR085-AT4: no Sedo step for a new listing
   });
 
   it('relabel guard: any non-geo -> geo needs override + reason + approval', async () => {

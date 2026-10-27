@@ -55,8 +55,11 @@ const UNAUDITED_POSTS: ReadonlySet<string> = new Set(['/visits/hit']);
 export function registerAuditId(app: FastifyInstance): void {
   app.decorateRequest('auditId', null);
   app.decorateRequest('auditSummary', null);
-  app.addHook('onRequest', async (req) => {
+  app.addHook('onRequest', async (req, reply) => {
     if (isMutating(req.method, req.routeOptions?.url) && !(req.method === 'POST' && UNAUDITED_POSTS.has(req.routeOptions?.url ?? ''))) req.auditId = newAuditId();
+    // v5.63.0 (CR-084 R-8): X-Caller goes into every log line of the request
+    const caller = callerOf(req);
+    if (caller) { req.log = req.log.child({ caller }); reply.log = req.log; } // reply.log writes the "request completed" line
   });
 }
 
@@ -116,6 +119,13 @@ export function botNameOf(req: FastifyRequest): string | null {
   return v.length >= 1 && v.length <= 40 && /^[A-Za-z0-9 _.-]+$/.test(v) ? v : null;
 }
 
+/** v5.63.0 (CR-084 R-8): the optional X-Caller header, 1..40 characters of [a-z0-9_-]; anything else is ignored (never an error). Names the bot or DOM behind a shared token; logged, not a security check. */
+export function callerOf(req: { headers: FastifyRequest['headers'] }): string | null {
+  const h = req.headers['x-caller'];
+  const v = typeof h === 'string' ? h.trim().toLowerCase() : ''; // any case is accepted and stored lower-case ("Gavriel" -> "gavriel")
+  return /^[a-z0-9_-]{1,40}$/.test(v) ? v : null;
+}
+
 function idempotencyKeyOf(req: FastifyRequest): string | null {
   const key = req.headers['idempotency-key'];
   return typeof key === 'string' ? key.slice(0, 255) : null;
@@ -155,6 +165,7 @@ export function registerAuditWrite(app: FastifyInstance, writer: AuditWriter): v
         result_summary: replayed ? `replayed:${summary}` : summary,
         client_ip: req.ip,
         bot_name: botNameOf(req),
+        caller: callerOf(req),
       });
       return payload;
     } catch (err) {

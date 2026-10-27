@@ -16,6 +16,7 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
   { table: 'pricing_settings', file: 'tables/pricing_settings.json' },
   { table: 'domains', file: 'tables/domains.json' },
   { table: 'ledger_entries', file: 'tables/ledger_entries.json' },
+  { table: 'decisions', file: 'tables/decisions.json' },
   { table: 'forward_cost_plans', file: 'tables/forward_cost_plans.json' },
   { table: 'forward_cost_lines', file: 'tables/forward_cost_lines.json' },
   { table: 'prebid_checks', file: 'tables/prebid_checks.json' },
@@ -90,7 +91,7 @@ export const ORDER: { table: string; file: string; jsonl?: true }[] = [
 const MUST_BE_EMPTY = ['domains', 'ledger_entries', 'deals', 'purchases', 'sales', 'offers', 'audit_log', 'screening_runs', 'screening_evidence', 'manual_quotes', 'tranches'];
 
 /** Tables without a serial `id` column. */
-const NO_SERIAL = new Set(['settings', 'kb_settings', 'deals', 'pricing_settings', 'registrar_presence', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts', 'labelled_names', 'replay_runs']);
+const NO_SERIAL = new Set(['settings', 'kb_settings', 'deals', 'pricing_settings', 'registrar_presence', 'decisions', 'audit_log', 'screening_runs', 'tranches', 'test_sets', 'drop_lists', 'cohorts', 'labelled_names', 'replay_runs']);
 
 /** Tables whose identity column is not called `id`. */
 const SERIAL_COL: Record<string, string> = { company_documents: 'version' };

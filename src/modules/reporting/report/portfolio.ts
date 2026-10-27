@@ -151,6 +151,6 @@ export async function auditRows(db: Kysely<Database>, o: { since?: Date; limit: 
   const rows = await q.orderBy('at', 'desc').orderBy('id', 'desc').limit(o.limit).execute();
   return rows.map((r) => ({
     id: r.id, at: iso(r.at), token_id: r.token_id, scope: r.scope, method: r.method, path: r.path, idempotency_key: r.idempotency_key,
-    approval_text: r.approval_text, approval_at: iso(r.approval_at), request: r.request, status_code: r.status_code, result_summary: r.result_summary, client_ip: r.client_ip, bot_name: r.bot_name,
+    approval_text: r.approval_text, approval_at: iso(r.approval_at), request: r.request, status_code: r.status_code, result_summary: r.result_summary, client_ip: r.client_ip, bot_name: r.bot_name, caller: r.caller,
   }));
 }

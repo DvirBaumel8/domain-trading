@@ -1,6 +1,7 @@
 // Public entry of the reporting module (report, portfolio, ledger, deals, audit).
 export { registerReads } from './api/reads.js';
 export { registerBooks } from './api/books.js';
+export { registerDecisions } from './api/decisions.js';
 export { registerReport } from './api/report.js';
 export { buildReport } from './report/index.js';
 export { ledgerCsvRows, ledgerRows } from './report/portfolio.js';

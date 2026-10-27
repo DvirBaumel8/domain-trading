@@ -9,7 +9,7 @@ import { toCsv } from '../../listing/index.js';
 
 /** Tables written in full (all columns, every row) under backup/tables/ so a restore is lossless. */
 export const TABLE_FILES = [
-  'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'forward_cost_plans', 'forward_cost_lines', 'prebid_checks', 'bid_plans', 'bid_plan_events', 'listing_history', 'quotes', 'price_schedule',
+  'settings', 'deals', 'pricing_settings', 'domains', 'ledger_entries', 'decisions', 'forward_cost_plans', 'forward_cost_lines', 'prebid_checks', 'bid_plans', 'bid_plan_events', 'listing_history', 'quotes', 'price_schedule',
   'pricing_evidence', 'offers', 'export_runs', 'export_uploads', 'registrar_presence', 'registrar_state_checks', 'venue_listings',
   'portfolio_stats', 'outreach_emails', 'holdout', 'sales_pattern_uploads', 'sales_pattern_rows', 'listing_sync_log', 'sibling_scans', 'keyword_demand_uploads', 'keyword_demand',
   'selection_settings', 'selection_lists', 'sibling_method_approvals', 'screening_evidence', 'screening_runs', 'screening_results', 'screening_verdicts', 'screening_packs', 'manual_quotes', 'domain_records',

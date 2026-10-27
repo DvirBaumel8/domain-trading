@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 5.62.0** (27 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
+**Version 5.63.0** (27 Oct 2026). This folder is the interface between **DOM** (the vendor that owns and runs the software) and its customer, **Dvir**, whose chief of staff **Gavriel** is the only API user. It describes the API exactly as built. What isn't written here isn't promised.
 
 | File | What |
 |---|---|
@@ -50,6 +50,11 @@ The base URL is given to Gavriel in the release notes and `docs/requests/`. Unti
 
 ## Audit
 Every authenticated POST writes exactly one `audit_log` row: success, refusal (including 403 and 4xx validation errors), dry run, replay (`replayed:` summary) and error. The row holds the token id and scope, method, path, idempotency key, the `approval_ref` text and time if sent, the redacted request, the status code and a result summary. `GET /audit` reads them. Audit rows are append-only.
+
+**`X-Caller` (5.63.0, CR-084 R-8).** Every bot shares a token, so the token name alone does not say who called. An **optional** request header `X-Caller: <name>` (1 to 40 characters of `a-z 0-9 _ -`, for example `gavriel`, `dom-architect`, `data-engineer`, `dom`) is stored in the audit row's `caller` field next to the token, shown by `GET /audit` (`caller`), and added to the request's log lines. It is never required: a missing header is fine for every route and the caller is `null`. Capital letters are accepted and stored lower-case (`Gavriel` -> `gavriel`). An invalid value (spaces, other symbols, over 40 characters, empty) is **ignored, never an error**. It is for attribution only, not a security check, and does not replace `X-Bot-Name` (5.20.0, a free-text label kept in `bot_name`). Do not mint per-bot tokens for it.
+
+## Sources of truth (5.63.0, CR-084)
+`sources-of-truth.md` lists, per durable fact, the only writer and the only read endpoints. The DOM database is the one place; company-box CSVs are not a source of truth.
 
 ## Errors
 ```json

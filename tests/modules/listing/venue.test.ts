@@ -40,7 +40,7 @@ describe('v3.7.0 CR-031 C: POST /listings/{domain}/venue', () => {
 
   it('T31-C1: a Sedo hand listing (make_offer, no price, min offer $100) shows in /portfolio and clears pending', async () => {
     const { w, r } = await setup();
-    expect((await exp(r, 'sedo')).pending).toBe(true);
+    expect((await exp(r, 'sedo')).pending).toBe(false); // CR-085: Sedo is off for new work, so nothing is pending there before a hand listing
     const res = await venue(w, sedo);
     expect(res.statusCode, res.body).toBe(201);
     expect(res.json()).toMatchObject({ venue: 'sedo', delisted: false, shown: { mode: 'make_offer', price_cents: null, min_offer_cents: 10000 } });

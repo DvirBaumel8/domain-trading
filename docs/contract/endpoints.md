@@ -1,4 +1,4 @@
-# Endpoints (contract v5.62.0)
+# Endpoints (contract v5.63.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -19,6 +19,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | Offers and sales | `POST /offers`, `POST /offers/{id}/outcome`, `GET /offers`, `POST /sold/{domain}` (evidence needed without approval) | WRITE (GETs READ) |
 | Reports and books | `GET /report`, `GET /report/pricing-review`, `GET /ledger`, `GET /portfolio`, `GET /portfolio/{domain}`, `GET /audit` | READ |
 | Costs and the private books (5.25.0, CR-070) | `POST /ledger/costs`, `PUT /portfolio/{domain}/forward-costs`, `GET /portfolio/{domain}/forward-costs`, `GET /costs/forward`, `GET /books.csv` | WRITE or bots for the writes; READ or bots for the GETs |
+| Record and read company decisions (5.63.0, CR-084); where each durable fact lives: `sources-of-truth.md` | `POST /decisions`, `GET /decisions`, `GET /decisions/{id}` | WRITE or bots for the POST; READ, bots or WRITE for the GETs |
 | Load data for the scoring engine and score names | `POST /engine/sales`, `POST /engine/unsold`, `POST /data/*` (rdap, live-checks, tm-kills, bigco-names, sales-comps), `POST /score`, `GET /engine/health` | WRITE or data token for the loads; READ for `GET` and `POST /score` |
 | Selection and screening | `GET /selection/settings`, `POST /selection/evaluate`, `POST /screening/runs`, `POST /screening/packs`, `GET /selection/buy-hold`, `POST /candidates/intake`, `GET /candidates/daily` | READ for `GET`, WRITE for `POST` (`/candidates/intake` also takes an intake or data token) |
 | Count visitors of the listed names (off until Dvir's line) | `POST /visits/forward/{domain}`, `POST /visits/settings`, `POST /visits/import`, `GET /visits`, `GET /visits/weekly` (the counting itself is `POST /visits/hit`, visits token only) | WRITE, WRITE, WRITE or data, READ, READ |
@@ -54,6 +55,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/ledger/costs` | WRITE or bots | Costs and books (5.25.0, CR-070) |
 | PUT | `/portfolio/{domain}/forward-costs` | WRITE or bots | Costs and books (5.25.0, CR-070) |
 | GET | `/portfolio/{domain}/forward-costs`, `/costs/forward`, `/books.csv` | READ or bots | Costs and books (5.25.0, CR-070) |
+| POST | `/decisions` | WRITE or bots | Decisions (5.63.0, CR-084) |
+| GET | `/decisions`, `/decisions/{id}` | READ, bots or WRITE | Decisions (5.63.0, CR-084) |
 | POST | `/tokens/bots/rotate` | WRITE or bots | Health (Shared bots token, 5.20.0, CR-069) |
 | POST | `/portfolio/import` | WRITE | S8 import lane (5.8.0, CR-059) |
 | POST | `/outreach/emails` | WRITE | Outreach log (4.0.0) |
@@ -325,6 +328,8 @@ The **full** Afternic bulk-upload file (every `listed` domain), for an **Update*
 - Writes one `export_runs` row (id, snapshot time, names). Excludes rows with min offer < 20 (`MIN_OFFER_BELOW_20`; only listed names are read, so `NOT_LISTED` never appears in `X-Export-Warnings`).
 
 ### `GET /export/sedo.csv`
+**Sedo is off for new work (27 Oct 2026, CR-085).** The route stays for the Sedo records that exist; no bot lists new names on Sedo from it. Since 5.63.0 a new listing or a plan change **never makes a name pending for Sedo**: `X-Pending-Changes` is always `0`, `export.sedo.pending` in `GET /portfolio/{domain}` is false unless a hand listing at Sedo no longer matches the plan, and `POST /list/{domain}` has no Sedo step in its `checklist`. `X-Manual-Delist` and the records of existing Sedo listings are unchanged.
+
 The full Sedo file, built from `templates/sedo_template.json`. Same query rule and headers as Afternic (warnings may include `name.com:SEDO_ROUNDS_DOWN`).
 - **501** `SEDO_TEMPLATE_MISSING` until the template exists; **501** `SEDO_TEMPLATE_INVALID` if it is malformed. The service never guesses Sedo's headers.
 
@@ -464,6 +469,22 @@ READ or bots. Query (strict): `from`, `to` (`YYYY-MM`; default `from` = the curr
 ### `GET /books.csv`
 READ or bots; never public (it carries the **private walk-away**, which no `/export/*` file ever has). `text/csv; charset=utf-8`, one row per live name (owned, listed or delisted; sold, dropped and pending names are left out), ordered by domain. Columns and cell rules: `formats.md` §Books CSV. Every value equals the same name's `GET /portfolio` row.
 
+## Decisions (5.63.0, CR-084)
+A decision is a **record**: the id the company cites (for example `D-2026-10-27-D005-PRICE`), who decided, when, and a one-paragraph summary. Nothing in the service reads a decision to act: recording one never changes a price, a listing or any money. The table is append-only and in the nightly backup. Where each durable fact lives: `sources-of-truth.md`.
+
+### `POST /decisions`
+WRITE or bots. `Idempotency-Key` required; audited. Body (strict): `{rows: [{id, decided_at, decided_by, summary, scope?, domains?, source_ref?, supersedes?}], dry_run?}`, 1..500 rows.
+- `id` 2..80 characters of letters, digits and `. _ : -`, starting with a letter or digit; `decided_at` ISO 8601 **with an offset**; `decided_by` 1..60 characters (for example `dvir`); `summary` 1..1000 characters; `scope` optional, 1..40 of `a-z 0-9 _ -` (for example `pricing`, `listing`, `strategy`, `org`); `domains` optional, 1..50 names (stored lowercase); `source_ref` optional, 1..200 characters (a message id, widget id or file); `supersedes` optional, the id of an earlier decision (already stored, or earlier in the same batch).
+- **Same id, same content** is a duplicate (counted in `duplicate_n`, nothing written, so a retry is safe). **Same id, other content** is **409** `DECISION_EXISTS` and the whole batch is refused: a correction is a **new id with `supersedes`**. The server adds `recorded_by` (the token name) and `recorded_at`.
+- **200** with `dry_run: true`, **201** otherwise: `{dry_run, received_n, accepted_n, duplicate_n, ids (the new ids), audit_id}`. A dry run stores nothing. Rows are written in one transaction.
+- **Errors:** 422 `VALIDATION_ERROR` (a bad field, an unknown field, `supersedes` naming itself or an unknown decision), 422 `NO_PII` (an `@` in `id`, `decided_by`, `summary`, `scope`, `source_ref` or `domains`), 409 `DECISION_EXISTS` (`details.ids`), 403 `SCOPE_FORBIDDEN` (READ, data, intake or visits token).
+
+### `GET /decisions`
+READ, bots or WRITE. Query (strict): `q?` (text search in the id and the summary, case-insensitive), `scope?`, `domain?` (the decision names that domain), `since?` (a date or an ISO time; `decided_at` on or after it), `limit` (1..500, default 100), `offset`. Newest `decided_at` first. **200:** `{decisions: [{id, decided_at (Asia/Jerusalem), decided_by, summary, scope, domains, source_ref, supersedes, superseded_by, recorded_by, recorded_at}], total_n, limit, offset}`. `superseded_by` is the id of the decision that corrects this one, else null. A bad query is 400 `VALIDATION_ERROR`.
+
+### `GET /decisions/{id}`
+READ, bots or WRITE. One decision, the shape of a row above. 404 `DECISION_NOT_FOUND`.
+
 ### `GET /deals/{id}`
 READ. `{id, domain, strategy, status_note, created_at, approvals: [{audit_id, at, method, path, approval_text, approval_at, status_code, dry_run}]}` (audit rows with an approval that cite the deal or its domain). `dry_run` (2.2.0, additive) is `true` when that call was a dry run (`dry_run: true` or `"strict"`), so one approval used for a dry run and then the real call shows as one dry run plus one real row.
 - **Errors:** 404 `DEAL_NOT_FOUND`.
@@ -471,7 +492,7 @@ READ. `{id, domain, strategy, status_note, created_at, approvals: [{audit_id, at
 ### `GET /audit`
 READ. Newest first.
 - **Query (strict):** `since` (ISO with offset), `limit` (1–500, default 100).
-- **200:** `{rows: [{id, at, token_id, token_name (2.16.0; the admin name of the token, never its secret; null for job and admin rows), scope: "read"|"write"|"intake"|"data"|"visits"|"bots"|"job"|"admin"|null, method, path, idempotency_key, approval_text, approval_at, request (the redacted request as a JSON object, or null; not a string), status_code, result_summary, client_ip, bot_name (5.20.0, CR-069: the optional X-Bot-Name header of the call, else null)}]}`. Job runs appear with scope `job` (`path` `/jobs/run`, or `job tick|daily` for a CLI run). **Large lists (5.14.0):** in `request`, any array of more than 50 items (at any depth; drop-list rows, test-set or labelled names, intake lists, document sections) is stored as the string `"[N items, sha256:<hex>]"`, N the count and the hash taken over the array's JSON, so a call can still be matched to what was sent; an upload to `/engine/*` or `/data/*` keeps its `"[N rows]"` form. Approval text and time are never elided.
+- **200:** `{rows: [{id, at, token_id, token_name (2.16.0; the admin name of the token, never its secret; null for job and admin rows), scope: "read"|"write"|"intake"|"data"|"visits"|"bots"|"job"|"admin"|null, method, path, idempotency_key, approval_text, approval_at, request (the redacted request as a JSON object, or null; not a string), status_code, result_summary, client_ip, bot_name (5.20.0, CR-069: the optional X-Bot-Name header of the call, else null), caller (5.63.0, CR-084: the optional X-Caller header of the call, else null)}]}`. Job runs appear with scope `job` (`path` `/jobs/run`, or `job tick|daily` for a CLI run). **Large lists (5.14.0):** in `request`, any array of more than 50 items (at any depth; drop-list rows, test-set or labelled names, intake lists, document sections) is stored as the string `"[N items, sha256:<hex>]"`, N the count and the hash taken over the array's JSON, so a call can still be matched to what was sent; an upload to `/engine/*` or `/data/*` keeps its `"[N rows]"` form. Approval text and time are never elided.
 - **Errors:** 400 `VALIDATION_ERROR`.
 
 ---
@@ -1468,6 +1489,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Afternic API errors (5.61.0):** `AFTERNIC_NOT_CONFIGURED` (503, `POST /export/afternic/push` without the Afternic key pair in the server env), `AFTERNIC_API_ERROR` (502, the listing read failed; `details.reason` is `AFTERNIC_AUTH`, `AFTERNIC_NOT_FOUND`, `AFTERNIC_RATE_LIMITED`, `AFTERNIC_REJECTED`, `AFTERNIC_UNAVAILABLE` or `AFTERNIC_BAD_RESPONSE`). Warnings in `/report`: `AFTERNIC_DRIFT`, `AFTERNIC_NOT_LISTED`.
 
 **Auction errors (5.39.0, CR-077):** `CLOSEOUTS_PAUSED` (409, `POST /auctions/plans`), `PREBID_REQUIRED` (409), `PREBID_FAILED` (409), `BID_PLAN_EXISTS` (409, `details.plan_id`), `BID_PLAN_NOT_FOUND` (404), `BID_PLAN_CLOSED` (409, the result route), `PRICE_ABOVE_PLAN` (409, the result route and `POST /portfolio/import`), `BID_PLAN_REQUIRED` (409, `POST /portfolio/import`); `S8_PRICE_CAP` and `APPROVAL_INVALID` also come from `POST /auctions/plans`.
+
+**Decisions (5.63.0, CR-084):** `DECISION_EXISTS` (409, `POST /decisions`: the id is stored with other content; `details.ids`), `DECISION_NOT_FOUND` (404, `GET /decisions/{id}`); also `VALIDATION_ERROR`, `NO_PII`, `SCOPE_FORBIDDEN`.
 
 **Tranche errors:** `TRANCHE_NOT_FOUND` (404; also on a screening run), `TRANCHE_ALREADY_OPEN`, `TRANCHE_NAME_TAKEN`, `TRANCHE_CLOSED`, `TRANCHE_FULL`, `GEO_CAP`, `TRANCHE_BELOW_TARGET`, `MAIN_LANE_QUOTA`, `NOT_SCREENED_OK`, `MEMBER_NOT_FOUND` (and `NAME_NOT_IN_RUN`, `RUN_NOT_FOUND`, `DOMAIN_INVALID`, `VALIDATION_ERROR`).
 

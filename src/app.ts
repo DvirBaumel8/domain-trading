@@ -3,7 +3,7 @@ import type { Kysely } from 'kysely';
 import { registerBuy, smallBuyView, registerTranches, BuyService, Reconciler } from './modules/buying/index.js';
 import { registerPricing, registerList, registerVenue, registerExport, registerAfternicPush, AfternicClient, AfternicPushService, ExportService, ListService } from './modules/listing/index.js';
 import { registerOffers, registerSold, SoldService, OffersService } from './modules/selling/index.js';
-import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerBooks, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
+import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerBooks, registerDecisions, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
 import { registerDemand, registerSelection, registerSiblingScan, registerScreening, registerTestSets, registerPacks, ScreeningWorker, type ScreeningDeps, type HoldoutCheck } from './modules/selection/index.js';
 import { registerCheck, createAdapters, type RegistrarAdapter, CheckService } from './modules/registrars/index.js';
 import { AfternicSyncJob, ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerCloseouts, registerAuctions, registerReplay, ReplayRunner, registerPortfolioImport, registerPortfolioWrites, registerTokens, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, registerSnapshots, registerLookups, DatasaveJob, DYNADOT_CLOSEOUTS_DEFAULT_PATH, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
@@ -168,6 +168,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerOutcomes(app, base);
   registerReads(app, base);
   registerBooks(app, base);
+  registerDecisions(app, base);
   const sellerhub = deps.config.sellerhub.apiKey && deps.config.sellerhub.apiSecret
     ? new SellerHubClient({ fetch: globalThis.fetch, baseUrl: deps.config.sellerhub.baseUrl, apiKey: deps.config.sellerhub.apiKey, apiSecret: deps.config.sellerhub.apiSecret })
     : null;
