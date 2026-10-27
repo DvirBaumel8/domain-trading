@@ -1,33 +1,34 @@
 # NOTE: one shared DOM endpoint token — handoff
 
-**Status:** **SECRET FILE READY** — pending Dvir confirm to pass to Gavriel (not yet distributed / not for bot use until confirm)  
-**Date:** 2026-10-27 ~02:58 Asia/Jerusalem (IDT)  
-**Decision:** JOINT-OPS §10 C; Dvir “Okay create it” (t963u) via Gavriel  
+**Status:** **HANDED TO GAVRIEL** — Dvir YES (t964s4459); bots may use for **READ**  
+**Date:** 2026-10-27 ~03:02 Asia/Jerusalem (IDT)  
+**Decision:** JOINT-OPS §10 C; Dvir “Okay create it” (t963u); handoff confirm t964s4459  
 **Standing rule:** Dvir never creates keys; bots/DOM do setup; his part is one-tap yes/no. **Never print the secret in chat, CRs, or git.**
 
-## What was generated (no value here)
+## What exists (no value here)
 | Field | Value |
 |---|---|
 | Mac path | `~/.config/domain-trading/dom-shared.token` (mode 600) |
-| Status file | `~/.config/domain-trading/dom-shared.token.STATUS` = `pending_dvir_handoff` |
+| Status file | `~/.config/domain-trading/dom-shared.token.STATUS` = `handed_to_gavriel` |
 | DOM admin name | `shared-bots` |
 | Scope | `read` |
-| Token list id | `10` |
-| Last used | never (do not start using until handoff confirm) |
+| Token list id | `10` (do **not** revoke) |
+| Use | READ only; Gavriel reads from Mac file and may instruct sibling bots |
 
-Existing WRITE / `bots-shared` / `dom-write` tokens are **unchanged**. This shared token is the §10 C replacement for “three named READ tokens,” not a money token.
+Existing WRITE / `bots-shared` / `dom-write` tokens are **unchanged**. This shared token replaces “three named READ tokens,” not a money token.
 
-## How Dvir confirms / passes to Gavriel
-1. **Gavriel** brings Dvir a one-tap card: “Shared DOM **read** token is ready on the Mac at `~/.config/domain-trading/dom-shared.token`. Confirm handoff to Gavriel so bots may use it for READ?”
-2. **Dvir** one-tap yes (or no → Architect revokes id 10 / deletes pending file).
-3. On yes: Gavriel reads the value **from that Mac file** (same machine; no chat paste). DOM Architect sets STATUS → `handed_to_gavriel` + timestamp.
-4. **Activate for bots** = after step 3 only: Gavriel may give sibling bots the path/use instruction; Architect does not paste the secret into SendToAgent or git.
+## Handoff complete
+1. ~~Generate~~ done ~02:58 IDT.
+2. ~~Dvir one-tap confirm~~ YES via Gavriel t964s4459.
+3. STATUS → `handed_to_gavriel` (confirmed_at 2026-10-27T03:02:00+02:00).
+4. Gavriel reads from Mac path (no chat paste); bots may use for READ.
 
-## Out of scope until confirm
-- Revoking other tokens.
+## Still out of scope
+- Revoking id 10 or other tokens without a new Dvir decision.
 - Switching WRITE/money paths to this token.
 - Committing or chatting the secret.
 
 ## Changes
 - 2026-10-27 ~02:50 IDT: procedure drafted (no generate).
-- 2026-10-27 ~02:58 IDT: generated after Dvir “Okay create it”; pending handoff confirm.
+- 2026-10-27 ~02:58 IDT: generated after Dvir “Okay create it”; pending handoff.
+- 2026-10-27 ~03:02 IDT: Dvir YES; STATUS handed_to_gavriel; READ use allowed.
