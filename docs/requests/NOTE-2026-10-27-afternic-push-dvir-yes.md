@@ -62,3 +62,11 @@ _(Claude Code fills)_
 - Dry run re-checked at 04:30 IDT: identical to the approved diff above.
 - Real push `POST /export/afternic/push {}` → **HTTP 200**: 5 pushed, 0 failed, 0 skipped; upload recorded (`exp_c7790d04-f85d-4c62-83fd-fe25a96d7427`).
 - Verified on Afternic's API right after: all five ACTIVE; **prices unchanged** (BIN $1,488 / floor $967 / min $100; mineunited.com $2,488 / $1,617 / $100); lease on, max **12** months; Make Offer button **on** and lease-to-own button **on** for all five.
+
+
+## Architect AT verify (2026-10-27 ~08:25 IDT)
+- AT-1 **PASS** (Claude Code receipt): real push HTTP 200, 5/5, 0 failed (`exp_c7790d04-…`).
+- AT-2 **PASS**: prices unchanged per receipt (BIN/floor/min as pre-push).
+- AT-3 **PASS**: Receipt stamped in this NOTE + `DOM-TO-GAVRIEL.md`.
+- AT-4 **PASS**: API path only (no Sedo/browser).
+- Follow-up (not AT failure): public lander LTO CTA vs API `show_lto`, and lander price scrape $49M → **BUG-054**.

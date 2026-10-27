@@ -1,3 +1,28 @@
+## 2026-10-27 ~08:25 IDT (DOM Architect): BUG-054 lander $49M false positive — BUILD NOW
+
+- Gavriel ~08:20: buyer pages show Buy Now **$1,488**; `/report` still has `LANDER_PRICE_MISMATCH` with `shown $49,999,999` on aievalsconsulting / roofingvoiceagent / ukcbamcompliance (live check 5.65.0; `checked_at` ~02:06 IDT).
+- Root cause confirmed: Afternic HTML/i18n includes `Offer cannot exceed $49,999,999`; parser must take buyer-visible **Buy it now for $…**, not that ceiling. Filed **`BUG-054-lander-price-49m-false-positive.md`** (AT fixture + live clear; no listing writes).
+- Also asked Claude Code (in BUG-054): (1) why aievalsconsulting.com apex hits Afternic SSO while the other two land; (2) whether public LTO CTA is expected when API `show_lto` is on (Gavriel saw footer link only). No money / no browser from Claude Code.
+- **FYI:** `dom-shared.token` (id 10 / handed_to_gavriel) still returns **401** on `/health`; `dom-read.token` works. Bots can keep using read for now — please confirm shared activation or regenerate with Claude Code if needed (no secret in chat).
+- Build board overnight: Afternic receipt done; CR-084/080/083 + F43/F44 live through **5.65.0**. Open for Architect: **BUG-054**, CR-086 banners, F47 (Dvir). Queue otherwise clear.
+
+## 2026-10-27 ~08:25 IDT (DOM Architect): build board refresh (post-5.65.0)
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Afternic real push (t978u) | **done** — receipt 04:31 IDT; HTTP 200; 5/5; prices unchanged |
+| 2 | CR-084 sole durable store | **live 5.63.0** — decisions backfilled; X-Caller on |
+| 3 | CR-080 Dynadot datasave client | **live 5.62.0** — server reads listings+closeouts |
+| 4 | CR-083 evidence cache | **live 5.64.0** — Gavriel tested |
+| 5 | F43/F44 | **live 5.65.0** |
+| 6 | CR-085 money-free / KEEP-4 | **noted** — no delist |
+| 7 | BUG-054 lander $49M parse | **BUILD NOW** |
+| 8 | CR-086 stale scout banners | **open** (Architect) |
+| 9 | F47 hand-reg paper | waits Dvir |
+
+Money: still Dvir yes per action. Live `/health` = **5.65.0**.
+
+
 ## 2026-10-27 ~03:50 IDT (DOM Architect): Gavriel JOINT-OPS reply folded; still chasing Afternic Receipt
 
 - Read `team/GAVRIEL-REPLY-DOM-REVIEW-JOINT-OPS-2026-10-27.md` (`9e92b3f`): Sedo **KEEP-4**; §2–§3 AGREED; **decisions store + X-Caller → CR-084**; §5 Security A **closed — do not re-ask Dvir**.
