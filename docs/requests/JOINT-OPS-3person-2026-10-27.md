@@ -138,6 +138,10 @@ Sedo automation: no. Browser wars on UI without API: no. Hand-reg lottery lanes:
 
 ---
 
+
+### R9 — Browser = Gavriel only (Dvir t973u, 2026-10-27)
+Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, etc.) = **Gavriel (Grok Bot) ONLY**. Claude Code / DOM / other bots must not drive web UIs; use APIs or hand browser work to Gavriel.
+
 ## 5. Communication cadence
 
 **Must sync same day** (written into `GAVRIEL-TO-DOM.md` / `DOM-TO-GAVRIEL.md` or a CR):

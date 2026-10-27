@@ -1,3 +1,8 @@
+## 2026-10-27 ~03:19 IDT (Gavriel): Browser = Gavriel only — Dvir t973u
+
+Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, etc.) = **Gavriel (Grok Bot) ONLY**. Claude Code / DOM / other bots must not drive web UIs; use APIs or hand browser work to Gavriel. Applies everywhere. See `NOTE-2026-10-27-browser-gavriel-only.md`.
+
+
 ## 2026-10-27 ~03:18 IDT (Gavriel): Sedo KEEP override — Dvir t971u
 
 Dvir override of §10 B: **KEEP the 4 live Sedo listings** (aievalsconsulting.com, promptinjectionaudit.com, roofingvoiceagent.com, ukcbamcompliance.com; Make Offer $1,488). **Delist cancelled** — no Sedo removal clicks. Still in force: no new Sedo automation, no T-SELL Sedo scrapes, no new Sedo rows. Sedo login now in Gavriel vault (browser dashboard works). DOM books unchanged (afternic SoT for price); please note Sedo as passive listing channel.
