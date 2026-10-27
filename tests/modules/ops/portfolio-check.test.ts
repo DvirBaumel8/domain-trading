@@ -432,4 +432,46 @@ describe('portfolioCheck: lander price and TLS (v4.0.0)', () => {
     expect(await price()).toMatchObject({ status: 'unknown', details: { reason: 'no_price_text' } });
     expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
   });
+
+  // 5.70.0 (BUG-059): Afternic-NS names whose apex/lander returns 403 — the Afternic listing URL is fetched as a fallback.
+  const AFTERNIC_LISTING_BASE = 'https://www.afternic.com/domain/';
+  const afternicListingHtml = (bin: string | null, limitCopy = '') =>
+    `<html>${limitCopy}` + (bin === null ? '' : `<div>Buy it now for ${bin}</div>`) + '<button>Make an offer</button></html>';
+
+  it('LP-13 (BUG-059 AT-1): primary fetch 403; Afternic listing has Buy it now for $1,488 + limit copy → shown $1,488; stale mismatch cleared', async () => {
+    // First run: create a stale LANDER_PRICE_MISMATCH (wrong price $1,988 vs plan $1,488)
+    state.page = { status: 200, body: page('$1,988'), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    let w = (await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH');
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatchObject({ details: { shown_cents: 198800 } });
+
+    // Second run: primary returns 403 (GoDaddy forsale); Afternic listing HTML has the real BIN
+    clock.t += DAY;
+    const afternicBody = afternicListingHtml('$1,488.00', '<span>Buy Now price must be below $100,000</span>');
+    const fetcher = (async (input: unknown) => {
+      const u = String(input);
+      if (u.startsWith(AFTERNIC_LISTING_BASE)) return new Response(afternicBody, { status: 200 });
+      return new Response('Forbidden', { status: 403 });
+    }) as typeof fetch;
+    await job({ siteFetch: fetcher }).runOnce();
+    const p = await price();
+    expect(p).toMatchObject({ status: 'ok', details: { shown_cents: 148800, source: 'afternic_listing' } });
+    w = (await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH');
+    expect(w).toHaveLength(0);
+  });
+
+  it('LP-14 (BUG-059 AT-2): primary fetch 403 and Afternic listing has no usable BIN → no new mismatch', async () => {
+    await verifiedLander({ bin_cents: 148800 });
+    const fetcher = (async (input: unknown) => {
+      const u = String(input);
+      if (u.startsWith(AFTERNIC_LISTING_BASE)) return new Response(afternicListingHtml(null), { status: 200 });
+      return new Response('Forbidden', { status: 403 });
+    }) as typeof fetch;
+    await job({ siteFetch: fetcher }).runOnce();
+    // Primary is 403 (web fail); Afternic listing has no BIN → no price row written
+    expect(await price()).toBeUndefined();
+    expect((await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
 });

@@ -27,6 +27,7 @@ const WEB_CHECK_TIMEOUT_MS = 10_000;
 /** v4.0.0 (CR-049 item 3): the lander page is read up to this many bytes per hop, through at most LANDER_MAX_HOPS redirects. */
 const LANDER_BODY_BYTES = 512_000;
 const LANDER_MAX_HOPS = 3;
+const AFTERNIC_LISTING_BASE = 'https://www.afternic.com/domain/';
 const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME|HOSTNAME_MISMATCH/i;
 
 const AMOUNT = String.raw`\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?`;
@@ -123,7 +124,12 @@ export class PortfolioCheckJob {
           row.web = both.web.status;
           out.web[both.web.status] += 1;
           await this.write(d.id, 'web', both.web, dryRun);
-          if (both.price) await this.write(d.id, 'price', both.price, dryRun);
+          let priceResult = both.price;
+          if (d.lander === 'afternic' && priceResult === null) {
+            const fallback = await this.afternicListingPrice(d).catch(() => null);
+            if (fallback) priceResult = fallback;
+          }
+          if (priceResult) await this.write(d.id, 'price', priceResult, dryRun);
         } else out.web.skipped += 1;
 
         if (await this.blocklistDue(d.id)) {
@@ -222,6 +228,25 @@ export class PortfolioCheckJob {
       ? { status: 'ok' as Status, details: { status_code: code, ...(location ? { location } : {}) } }
       : { status: 'fail' as Status, details: { status_code: code, ...(location ? { location } : {}), reason: 'no_lander_signature' } };
     return { web, price: matches ? landerPriceCheck(bodies.join('\n'), d) : null };
+  }
+
+  /** 5.70.0 (BUG-059): when the primary apex/lander fetch yields no usable price and the lander is Afternic,
+   * try the Afternic listing page as a fallback price source. */
+  private async afternicListingPrice(d: { domain: string; bin_cents: number | null; listing_mode: string | null }): Promise<{ status: Status; details: Record<string, unknown> } | null> {
+    if (d.bin_cents === null) return null;
+    const { screening } = this.deps;
+    const url = `${AFTERNIC_LISTING_BASE}${d.domain}`;
+    try {
+      const res = await safeFetch({ fetch: screening.siteFetch, lookupHost: screening.lookupHost }, url,
+        { headers: { 'user-agent': USER_AGENT, accept: 'text/html,*/*;q=0.5' }, signal: AbortSignal.timeout(WEB_CHECK_TIMEOUT_MS) });
+      if (res.status < 200 || res.status >= 400) return null;
+      const body = (await readCappedBytes(res, LANDER_BODY_BYTES)).bytes.toString('utf8');
+      const result = landerPriceCheck(body, d);
+      if (result && result.status !== 'unknown') {
+        return { ...result, details: { ...result.details, source: 'afternic_listing' } };
+      }
+    } catch { /* Afternic listing unreachable — no fallback */ }
+    return null;
   }
 
   private async blocklistDue(domainId: number): Promise<boolean> {

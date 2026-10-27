@@ -55,3 +55,17 @@ Changing BIN/prices; Sedo; browser automation; money routes; rewriting global â€
 Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. No browser marketplace UI. Report when live on `/health` (tag the release). Stamp `## DOM response` here + one line in `DOM-TO-GAVRIEL.md`.
 
 Focus: Afternic listing HTML fallback when apex/lander unknown/403; clear stale roofing + ukcbam mismatches.
+
+## DOM response
+
+**Verdict: accepted, built in v5.70.0.**
+
+All six rules shipped:
+- **R-1:** When the primary apex/lander fetch fails (HTTP 403, TLS error, network error) for an Afternic-NS name, `portfolioCheck` now also fetches `https://www.afternic.com/domain/<name>` (512k body, LIMIT_COPY, tight "buy it now for") as a fallback price source.
+- **R-2:** The Afternic listing parse is preferred over leaving unknown when it finds a usable BIN. A matching BIN writes `price: ok` with `source: "afternic_listing"`.
+- **R-3:** The same 5.69.0 rules apply: LIMIT_COPY skips "must be below $100,000"; amounts above $10M (including $49,999,999) are skipped as placeholders.
+- **R-4:** A successful matching BIN from the Afternic listing writes an `ok` price row, clearing prior `LANDER_PRICE_MISMATCH` on the next `/report` read.
+- **R-5:** No listing writes, no money, no browser UI.
+- **R-6:** The fallback fires only when `price` is null (primary web check failed); an `unknown` price from a readable page is left as-is.
+
+Tests LP-13 (AT-1) and LP-14 (AT-2) added. `/health` shows `5.70.0` after deploy.
