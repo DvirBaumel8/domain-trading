@@ -1,7 +1,8 @@
 ---
 id: BUG-056
 kind: BUG
-status: approved
+status: closed
+close_reason: "AT-3 PASS on 5.71.0: no $100,000 on ukcbamcompliance + aievalsconsulting; price rows ok $1,488 via afternic_listing (DOM Architect 2026-10-27 ~21:11 IDT)"
 owner_bot: dom-architect
 approval: "none-needed (parser false positive vs contract jobs.md lander price; no money / no listing change)"
 priority: P1
@@ -95,3 +96,12 @@ Focus: Lander parser: never treat $100,000 (or similar non-BIN) as shown; prefer
 - `aievalsconsulting.com`: **no** `$100,000` (stays clear — BUG-058).
 - `ukcbamcompliance.com`: still **`$100,000.00`**, `checked_at` **2026-10-27T16:21:00+02:00** (stale). Fresh price row = `unknown`/`no_price_text` @ 20:48 — BUG-059 Afternic listing fallback not triggered.
 - Gate (ukcbam + aievals free of `$100,000`): **FAIL**.
+
+## AT-3 live recheck (2026-10-27 ~21:11 IDT, DOM Architect) — **PASS** (closed)
+
+- `/health` **5.71.0**. Same daily/`portfolioCheck` as BUG-054 AT-4 stamp (`run_14b5b65c-…`, price checks ~21:08 IDT).
+- `GET /report`: **0** `LANDER_*` warnings (no `$100,000` on ukcbam or aievals).
+- DB `portfolio_checks` kind=`price`:
+  - `ukcbamcompliance.com` @ **21:08:23** — `ok`, `shown_cents=148800` ($1,488), `source=afternic_listing`
+  - `aievalsconsulting.com` @ **21:08:13** — `ok`, `shown_cents=148800` ($1,488), `source=afternic_listing`
+- **AT-3 PASS. BUG closed.** No money.

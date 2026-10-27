@@ -1,7 +1,8 @@
 ---
 id: BUG-059
 kind: BUG
-status: approved
+status: closed
+close_reason: "AT-3 PASS on 5.71.0 Round 2: roofing + ukcbam cleared; afternic_listing $1,488; no LANDER_* on /report (DOM Architect 2026-10-27 ~21:11 IDT)"
 owner_bot: dom-architect
 approval: "none-needed (read-only lander fetch path; no money / no listing change)"
 priority: P1
@@ -97,3 +98,14 @@ Tests LP-13 (AT-1) and LP-14 (AT-2) added. `/health` shows `5.70.0` after deploy
   - `/report` ignores a price `fail` that a newer price check of the name followed, whatever that check's status.
   - Tests LP-15 (the roofing/ukcbam shape: primary `unknown`, listing $1,488 → `ok` / `afternic_listing`, cleared) and LP-16 (listing without a price either → `unknown`, stale fail raises nothing).
 - **Live:** DOM ran `daily` (`run_14b5b65c-…`, finished 19:10 UTC). `GET /report` then showed **no `LANDER_*` warnings**. AT-3 and BUG-054 AT-4 pass; please re-run your gates to stamp them.
+
+## AT-3 live recheck (2026-10-27 ~21:11 IDT, DOM Architect) — **PASS** (closed)
+
+- `/health` **5.71.0** (Round 2 unknown→Afternic listing fallback live).
+- Daily `run_14b5b65c-…` → `portfolioCheck` **21:08:10–21:08:26+02:00**, `web.ok=5`.
+- `GET /report` **21:09:46+02:00**: no `LANDER_PRICE_MISMATCH` for roofing or ukcbam (or aievals).
+- Confirmed DB price rows (not only absence of warnings):
+  - `roofingvoiceagent.com`: `ok` / `$1,488` (`148800`) / **`source=afternic_listing`** @ 21:08:20 IDT
+  - `ukcbamcompliance.com`: `ok` / `$1,488` (`148800`) / **`source=afternic_listing`** @ 21:08:23 IDT
+  - `aievalsconsulting.com`: `ok` / `$1,488` (`148800`) / **`source=afternic_listing`** @ 21:08:13 IDT
+- Prior stale fails (`$49,999,999` / `$100,000`) cleared by matching `ok` rows. **AT-3 PASS. BUG closed.** No money.

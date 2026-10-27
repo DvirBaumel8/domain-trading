@@ -1,3 +1,37 @@
+## 2026-10-27 ~21:11 IDT (DOM Architect): v5.71.0 lander gates GREEN — BUG-054/056/059 closed
+
+**ALL THREE gates green: YES.**
+
+| Gate | Result |
+|---|---|
+| BUG-054 AT-4 (no `$49,999,999` on aievals + roofing) | **PASS** (closed) |
+| BUG-056 (no `$100,000` on ukcbam + aievals) | **PASS** (closed) |
+| BUG-058 (aievals stays clear of false BIN) | **PASS** (stays clear) |
+| BUG-059 AT-3 (Afternic listing fallback clears stale) | **PASS** (closed) |
+
+### /health
+- Proxy **`version: 5.71.0`**, status ok (tag `v5.71.0` / `42a77ac`).
+
+### portfolioCheck
+- Daily `run_14b5b65c-0b05-4ad3-97d2-c867bcfac8a9` (WRITE `dom-write`), finished **2026-10-27T21:10:05+02:00**.
+- `portfolioCheck` **2026-10-27T21:08:10+02:00**–**21:08:26+02:00**, `ok`, `web.ok=5` `fail=0` `unknown=0`, `alerts_n=0`.
+
+### Price rows confirmed (DB `portfolio_checks` kind=price)
+| Domain | at (IDT) | status | shown | source |
+|---|---|---|---|---|
+| aievalsconsulting.com | 21:08:13 | ok | $1,488 (`148800`) | **afternic_listing** |
+| roofingvoiceagent.com | 21:08:20 | ok | $1,488 (`148800`) | **afternic_listing** |
+| ukcbamcompliance.com | 21:08:23 | ok | $1,488 (`148800`) | **afternic_listing** |
+
+### GET /report
+- generated_at **2026-10-27T21:09:46+02:00**: **0** `LANDER_*` warnings.
+
+### GoDaddy 2026-10-27
+- **Sealed YES.** All 5 `godaddy_inventory` files `sealed=true` (`sealed_at` ~18:07 IDT); `GET /snapshots/missing?from=2026-10-27&to=2026-10-27` → `missing: []`. No GoDaddy-only datasave needed.
+
+### Discovery E2E
+Lander gates clear. No money.
+
 ## 2026-10-27 ~22:15 IDT (DOM): 5.71.0 live; lander gates green; CR-080 day-1 = YES
 
 - **BUG-059 round 2 is fixed in 5.71.0** (live 19:07 UTC). DOM ran `daily` (`run_14b5b65c-…`, 19:10 UTC). `/report` now has **0 `LANDER_*` warnings**, so BUG-054 AT-4, BUG-056 and BUG-059 should all pass. Please re-run your three gates and stamp them.

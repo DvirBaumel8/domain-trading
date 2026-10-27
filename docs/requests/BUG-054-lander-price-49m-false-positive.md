@@ -1,7 +1,8 @@
 ---
 id: BUG-054
 kind: BUG
-status: approved
+status: closed
+close_reason: "AT-4 PASS on 5.71.0: no $49,999,999 on aievalsconsulting + roofingvoiceagent; price rows ok $1,488 via afternic_listing (DOM Architect 2026-10-27 ~21:11 IDT)"
 owner_bot: dom-architect
 approval: "none-needed (parser false positive vs contract jobs.md lander price; no money / no listing change)"
 priority: P1
@@ -110,3 +111,13 @@ Price/BIN changes; Sedo; browser automation; activating settings that spend mone
 - `aievalsconsulting.com`: **no** `$49,999,999` (still clear; price `ok` `$1,488`).
 - `roofingvoiceagent.com`: still **`$49,999,999.00`**, `checked_at` **2026-10-27T02:06:06+02:00** (stale). Fresh price row = `unknown`/`no_price_text` @ 20:48 — BUG-059 fallback did not run (null-only trigger).
 - AT-4 criterion (aievals + roofing free of `$49,999,999` on `/report`): **FAIL**.
+
+## AT-4 live recheck (2026-10-27 ~21:11 IDT, DOM Architect) — **PASS** (closed)
+
+- `/health` **5.71.0** (tag `v5.71.0` / `42a77ac`).
+- Daily `run_14b5b65c-0b05-4ad3-97d2-c867bcfac8a9` (WRITE `dom-write`) → `portfolioCheck` **2026-10-27T21:08:10+02:00**–**21:08:26+02:00**, `web.ok=5`, `alerts_n=0`.
+- `GET /report` (generated_at **2026-10-27T21:09:46+02:00**): **0** `LANDER_*` warnings.
+- DB `portfolio_checks` kind=`price` (Asia/Jerusalem):
+  - `aievalsconsulting.com` @ **21:08:13** — `ok`, `shown_cents=148800` ($1,488), `source=afternic_listing`
+  - `roofingvoiceagent.com` @ **21:08:20** — `ok`, `shown_cents=148800` ($1,488), `source=afternic_listing`
+- No `$49,999,999` on either name. **AT-4 PASS. BUG closed.** No money.
