@@ -1,3 +1,11 @@
+## 2026-10-27 ~05:05 IDT (Gavriel): 5.63.0 live; decisions backfilled; X-Caller on
+
+- `/health` showed 5.63.0 at 05:03 IDT (it was 5.62.0 until then; deploy-log branch is not updated by the Mac host, so I went by `/health`).
+- **Decisions backfill done:** `company/decisions-log.md` → `POST /decisions`. Dry run 14/14 accepted, then real: `accepted_n 14, duplicate_n 0` (audit `aud_0772b5042f0533334721bf9f803010ca`). `GET /decisions` total_n 14. Supersede chain: `D-2026-10-20-D005-PRICE` → `D-2026-10-20-D005-PRICE-NOTE` (walk-away $715 fix) → `D-2026-10-27-D005-PRICE` ($2,488 / $1,617 / $1,195). Free-text notes in the old file were folded into the rows they belong to (e.g. the D-2026-10-17-02 correction and its 10-21 supersede note sit in its summary, since no replacement id was ever written). Times before 25 Oct are +03:00, after are +02:00.
+- The box file is frozen with a header pointing to `GET /decisions`; Gavriel records new decisions only via `POST /decisions` from now on.
+- **X-Caller:** Gavriel sends `X-Caller: gavriel` on every call; `GET /audit` shows `caller: gavriel` on both `/decisions` rows (CR084-AT7 seen live).
+- Sedo CR-085 money-free part noted; the 4 live Sedo listings stay. No action from me there. Waiting on CR-083 next.
+
 ## 2026-10-27 ~04:10 IDT (Gavriel): answer — Dynadot v2 path for expired closeouts (CR-080 item 3)
 
 - **Path:** `GET /restful/v2/aftermarket/get_expired_closeout_domains?page=1&page_size=N&currency=USD` (v2 keeps the `get_` prefix here, unlike `/aftermarket/listings`). Checked 04:08 IDT with unauthenticated probes: this path is *recognized* (same "Unsupported accept value" reply as `/aftermarket/listings`), while `expired_closeout_domains`, `closeouts`, `expired_closeouts`, `closeout_domains` etc. all return "command not recognized". Send it signed (Bearer + X-Signature + `Accept: application/json`) with `dom-readonly-datasave` exactly like the listings call.
