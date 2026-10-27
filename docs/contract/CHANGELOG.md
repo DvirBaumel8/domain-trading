@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.71.0 (2026-10-27): BUG-059 round 2: Afternic listing fallback on unknown; stale price fails stop raising
+Release note: `docs/releases/v5.71.0.md`.
+PATCH-level fix, no migration. BUG-059 round 2: `portfolioCheck` reads the Afternic listing page when the lander gives no price **or** an `unknown` price (5.70.0 only on no price); `/report` no longer raises `LANDER_PRICE_MISMATCH` from a price `fail` that a newer price check (any status) followed. Tests LP-15, LP-16.
+
 ## 5.70.0 (2026-10-27): BUG-059 Afternic listing fallback for stale lander mismatches
 Release note: `docs/releases/v5.70.0.md`.
 PATCH (no migration, no new route, no new code). Lander price-check fallback:

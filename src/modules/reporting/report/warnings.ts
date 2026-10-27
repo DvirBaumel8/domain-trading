@@ -120,6 +120,9 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   const latestChecks = await sql<{ domain_id: number; kind: string; status: string; at: Date; details: Record<string, any> }>`
     select distinct on (domain_id, kind) domain_id, kind, status, at, details from portfolio_checks
     where status <> 'unknown' order by domain_id, kind, id desc`.execute(db);
+  const newestPrice = await sql<{ domain_id: number; at: Date }>`
+    select domain_id, max(at) as at from portfolio_checks where kind = 'price' group by domain_id`.execute(db);
+  const newestPriceAt = new Map(newestPrice.rows.map((r) => [Number(r.domain_id), new Date(r.at)]));
   for (const c of latestChecks.rows) {
     const d = nameOf.get(Number(c.domain_id));
     const st = statusOf.get(Number(c.domain_id));
@@ -128,6 +131,8 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
     if (c.kind === 'price') {
       // v4.0.0 (CR-049 item 3): the Buy Now amount the lander shows against the plan's BIN, and the make-offer option
       if (st !== 'listed') continue;
+      // 5.71.0 (BUG-059 round 2): a price fail older than the newest price check (an unknown included) is stale and raises nothing
+      if (c.status === 'fail' && (newestPriceAt.get(Number(c.domain_id)) ?? c.at).getTime() > c.at.getTime()) continue;
       if (c.status === 'fail') {
         add('LANDER_PRICE_MISMATCH', 'warn', `${d}: the lander shows a Buy Now price that is not the plan's BIN.`, d, {
           checked_at: checkedAt, ...pair('shown', c.details.shown_cents ?? 0), ...pair('expected', c.details.expected_cents ?? 0),

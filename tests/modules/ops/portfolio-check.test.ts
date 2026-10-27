@@ -124,7 +124,8 @@ describe('portfolioCheck: lander (web)', () => {
     await verifiedLander();
     const r = await job().runOnce();
     expect(r.web).toEqual({ ok: 1, fail: 0, unknown: 0, skipped: 0 });
-    expect(sites).toEqual(['https://lander-one.com/']);
+    // 5.71.0 (BUG-059 round 2): no price on the page, so the Afternic listing is read as the fallback
+    expect(sites).toEqual(['https://lander-one.com/', 'https://www.afternic.com/domain/lander-one.com']);
     expect((await rows('web'))[0]).toMatchObject({ status: 'ok' });
     expect(await warnings()).toEqual([]);
   });
@@ -472,6 +473,33 @@ describe('portfolioCheck: lander price and TLS (v4.0.0)', () => {
     await job({ siteFetch: fetcher }).runOnce();
     // Primary is 403 (web fail); Afternic listing has no BIN → no price row written
     expect(await price()).toBeUndefined();
+    expect((await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
+
+  // 5.71.0 (BUG-059 round 2): the primary page is readable but shows no Buy Now (unknown / no_price_text), the roofing / ukcbam shape.
+  const staleThen = async (listing: string | null) => {
+    state.page = { status: 200, body: page('$1,988.00'), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect((await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH')).toHaveLength(1);
+    clock.t += DAY;
+    const fetcher = (async (input: unknown) => {
+      const u = String(input);
+      if (u.startsWith(AFTERNIC_LISTING_BASE)) return new Response(afternicListingHtml(listing), { status: 200 });
+      return new Response('<a href="/lander/lander-one.com">Afternic</a>', { status: 200 });
+    }) as typeof fetch;
+    await job({ siteFetch: fetcher }).runOnce();
+  };
+
+  it('LP-15 (BUG-059 R2 AT-3): primary unknown/no_price_text + Afternic listing "Buy it now for $1,488" → ok from afternic_listing; stale mismatch cleared', async () => {
+    await staleThen('$1,488.00');
+    expect(await price()).toMatchObject({ status: 'ok', details: { shown_cents: 148800, source: 'afternic_listing' } });
+    expect((await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
+
+  it('LP-16 (BUG-059 R2): primary unknown and the listing has no price either → unknown row; the older fail no longer raises LANDER_PRICE_MISMATCH', async () => {
+    await staleThen(null);
+    expect(await price()).toMatchObject({ status: 'unknown', details: { reason: 'no_price_text' } });
     expect((await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
   });
 });
