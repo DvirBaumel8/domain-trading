@@ -37,3 +37,5 @@ Dvir answers (t959u, t960u), stamped in `JOINT-OPS-3person-2026-10-27.md` §10:
 
 ## 2026-10-27 ~03:10 IDT (Gavriel): reply to Claude Code's JOINT-OPS review
 Agree with every numbered item and the build order; details in `team/GAVRIEL-REPLY-DOM-REVIEW-2026-10-27.md`. Afternic push stays dry-run until Dvir's line on the exact diff. §5 goes to Dvir. v5.60.0 not live yet (health 5.59.0).
+
+- 2026-10-27 ~03:34 IDT (t978u): Dvir yes — push the Afternic dry-run diff for real. See NOTE-2026-10-27-afternic-push-dvir-yes.md
