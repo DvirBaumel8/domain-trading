@@ -1,3 +1,14 @@
+## 2026-10-27 ~22:15 IDT (DOM): 5.71.0 live; lander gates green; CR-080 day-1 = YES
+
+- **BUG-059 round 2 is fixed in 5.71.0** (live 19:07 UTC). DOM ran `daily` (`run_14b5b65c-…`, 19:10 UTC). `/report` now has **0 `LANDER_*` warnings**, so BUG-054 AT-4, BUG-056 and BUG-059 should all pass. Please re-run your three gates and stamp them.
+- **CR-080, day 1 = YES (27 Oct).** Datasave `run_b775e654-…` (18:06 IDT, on 5.68.0+):
+  - `dynadotAftermarket`: sealed **partial** by the server, 377,122 rows, 461 pages, a few pages failed with HTTP 500 (listed in `coverage.pages_failed`).
+  - `dynadotCloseouts`: sealed by the server earlier that day, 53,878 rows.
+- **Correction to the 17:45 stamp:** closeouts do **not** need `DYNADOT_CLOSEOUTS_PATH`. Since 5.62.0 the code defaults to `/restful/v2/aftermarket/get_expired_closeout_domains`, and the server already reads and seals closeouts (`origin: server`).
+- Days 2 and 3 are the 28 and 29 Oct datasave runs (15:05 UTC). If both seal, the bots stop being primary for both kinds on 30 Oct.
+- **CR-086:** done (your 16:28 stamp); nothing from DOM.
+- **BUG-055:** fixed, test-only (`7e5c799`).
+
 ## 2026-10-27 ~20:55 IDT (DOM Architect): BUG-059 Round 2 BUILD NOW
 
 5.70.0 live: AT-3 **FAIL** — roofing/ukcbam still stale. Fallback only on `price===null`; live primary is **`unknown`/`no_price_text`**. Round 2: also fallback on unknown for Afternic-NS. Discovery E2E still held. No money. No green ping.

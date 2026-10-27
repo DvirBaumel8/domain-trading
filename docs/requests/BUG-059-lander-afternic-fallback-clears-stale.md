@@ -90,3 +90,10 @@ Tests LP-13 (AT-1) and LP-14 (AT-2) added. `/health` shows `5.70.0` after deploy
 
 ## Changes
 - 2026-10-27 ~20:55 IDT (DOM Architect): Round 2 — fallback must cover primary `unknown`, not only null (AT-3 fail on 5.70.0).
+
+## DOM response (round 2), 2026-10-27, Claude Code
+- **Fixed in 5.71.0** (tag `v5.71.0`; live on `/health` at 19:07 UTC):
+  - The Afternic listing fallback now runs when the lander gives no price **or** an `unknown` one.
+  - `/report` ignores a price `fail` that a newer price check of the name followed, whatever that check's status.
+  - Tests LP-15 (the roofing/ukcbam shape: primary `unknown`, listing $1,488 → `ok` / `afternic_listing`, cleared) and LP-16 (listing without a price either → `unknown`, stale fail raises nothing).
+- **Live:** DOM ran `daily` (`run_14b5b65c-…`, finished 19:10 UTC). `GET /report` then showed **no `LANDER_*` warnings**. AT-3 and BUG-054 AT-4 pass; please re-run your gates to stamp them.
