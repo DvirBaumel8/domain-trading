@@ -1,8 +1,8 @@
 // The `datasave` job (v5.21.0, CR-071): the daily data saves. Five steps, each with its own status:
 //   godaddyInventory   fetches GoDaddy's official inventory files (metadata.json lists them), records size / sha256 / Last-Modified per file in a
 //                      write-once manifest, keeps the raw zip on disk (SNAPSHOT_DIR) and parses ONLY closeout_listings.json into datasave_pool.
-//   dynadotCloseouts / dynadotAftermarket   not built: no Dynadot key exists, so they report `not_configured` (never an error, never zero rows). Since v5.22.0 they also
-//                      say whether a bot upload (POST /snapshots/dynadot, dynadot-upload.ts) for today is sealed.
+//   dynadotCloseouts / dynadotAftermarket   v5.62.0 (CR-080 item 3): with DYNADOT_API_KEY + DYNADOT_API_SECRET the server reads (REST v2) Dynadot itself (dynadot-pull.ts) and stores + seals through the
+//                      bot-upload code (origin `server`); without the key they report `not_configured` and whether a bot upload (POST /snapshots/dynadot) for today is sealed.
 // v5.22.0 (R-10): the four auction files are also parsed (godaddy_auctions): .com auctions that reached $500, followed until they leave the files.
 //   scorePool          (v5.26.0, CR-072) filters and scores the pool and the sealed Dynadot closeouts rows, offline; closeouts/score-pool.ts.
 //   buildPanel         the day diff of the closeouts pool (names gone before their end), split by RDAP tag bought / deleted / unknown (v5.34.0, BUG-052).
@@ -37,6 +37,7 @@ import { listZipEntries, openZipEntry } from './zip.js';
 import { streamArrayItems } from './json-stream.js';
 import { demandFields, mergeDemand, type DemandFields } from './auction-fields.js';
 import { priceToCents } from './datasave-price.js';
+import { pullAftermarket, pullCloseouts, type PullDeps } from './dynadot-pull.js';
 import { ARCHIVE_FILES, archiveExists, archiveZip, type ArchiveOutcome } from '../../archive/godaddy-archive.js';
 
 export { priceToCents };
@@ -68,13 +69,20 @@ export interface DatasaveDeps {
   snapshotDir: string;
   /** v5.59.0 (CR-081): ARCHIVE_DIR (config), the root of the daily archive; without it nothing is archived. */
   archiveDir?: string;
-  /** DYNADOT_API_KEY when set; the Dynadot client is not built yet either way. */
+  /** DYNADOT_API_KEY (the restricted read-only key) when set: the two Dynadot steps read Dynadot themselves (v5.62.0); unset = `not_configured`. */
   dynadotKey?: string;
+  /** DYNADOT_API_SECRET: signs every REST v2 call (X-Signature). Without it the Dynadot steps stay `not_configured`. */
+  dynadotSecret?: string;
+  /** DYNADOT_CLOSEOUTS_PATH: the REST v2 path of the expired closeouts (unknown on 27 Oct 2026); empty = closeouts `not_configured`. */
+  dynadotCloseoutsPath?: string;
+  /** Tests: the Dynadot REST v2 base URL (default https://api.dynadot.com) and the spacing between calls (default 5 s). */
+  dynadotBaseUrl?: string;
+  dynadotSpacingMs?: number;
   /** v5.26.0 (CR-072): the engine scorer for the `scorePool` step; without it every row gets score null, NO_ACTIVE_MODEL. */
   scorer?: PoolScorer;
   /** Tests may pass a fetch; default is the global one at call time (MSW patches it). */
   fetch?: typeof fetch;
-  log?: { warn: (obj: unknown, msg?: string) => void };
+  log?: { warn: (obj: unknown, msg?: string) => void; info?: (obj: unknown, msg?: string) => void };
   /** v5.34.0 (BUG-052): tests pass an RDAP stub and a no-op sleep for the disappearance tags; default the Verisign lookup. */
   rdap?: RdapLookupFn;
   sleep?: (ms: number) => Promise<void>;
@@ -461,12 +469,19 @@ export class DatasaveJob {
 
   // ---------- Dynadot (the server has no key; the bots upload, v5.22.0) ----------
 
+  /** v5.62.0 (CR-080 item 3): with DYNADOT_API_KEY + DYNADOT_API_SECRET the server reads (REST v2) Dynadot itself (`dynadot-pull.ts`); without it the old `not_configured` answer. */
   async dynadotCloseouts(): Promise<unknown> {
-    return this.dynadotStub('dynadot_closeouts');
+    if (!this.deps.dynadotKey || !this.deps.dynadotSecret) return this.dynadotStub('dynadot_closeouts');
+    if (!this.deps.dynadotCloseoutsPath) return { source: 'dynadot_closeouts', status: 'not_configured', reason: 'closeouts REST path unknown', bot_upload: await this.botUpload('dynadot_closeouts') };
+    return pullCloseouts(this.pullDeps(this.deps.dynadotKey, this.deps.dynadotSecret));
   }
 
   async dynadotAftermarket(): Promise<unknown> {
-    return this.dynadotStub('dynadot_aftermarket');
+    return this.deps.dynadotKey && this.deps.dynadotSecret ? pullAftermarket(this.pullDeps(this.deps.dynadotKey, this.deps.dynadotSecret)) : this.dynadotStub('dynadot_aftermarket');
+  }
+
+  private pullDeps(key: string, secret: string): PullDeps {
+    return { db: this.deps.db, now: this.deps.now, key, secret, closeoutsPath: this.deps.dynadotCloseoutsPath, fetch: this.fetchFn, sleep: this.deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), baseUrl: this.deps.dynadotBaseUrl, spacingMs: this.deps.dynadotSpacingMs, log: this.deps.log };
   }
 
   /** Is the bot upload of today's UTC data date sealed for this source? */
@@ -476,10 +491,9 @@ export class DatasaveJob {
     return { data_date: dataDate, sealed: Boolean(m?.sealed_at), status: m?.status ?? 'none', rows: m?.rows ?? null, sha256: m?.sha256 ?? null };
   }
 
-  // TODO(CR-071 follow-up): build the read-only Dynadot calls once a key exists (closeouts: all pages, 5 s apart, dedupe, price_cents as given; aftermarket: at most 5 calls, dollars to cents). No guessing at Dynadot's API before then.
   private async dynadotStub(source: string) {
     return {
-      source, status: 'not_configured', reason: this.deps.dynadotKey ? 'a Dynadot key is set but the Dynadot client is not built yet' : 'DYNADOT_API_KEY is not set (no Dynadot key exists)',
+      source, status: 'not_configured', reason: this.deps.dynadotKey ? 'DYNADOT_API_SECRET is not set' : 'DYNADOT_API_KEY is not set',
       bot_upload: await this.botUpload(source),
     };
   }

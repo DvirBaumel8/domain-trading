@@ -1,4 +1,4 @@
-# Endpoints (contract v5.61.0)
+# Endpoints (contract v5.62.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -1330,10 +1330,10 @@ The `datasave` job (`jobs.md`) saves GoDaddy's official inventory files every da
 READ (any `GET` token, bots included). Query (all optional; an unknown parameter or bad value → **400** `VALIDATION_ERROR`): `date` (`YYYY-MM-DD`, the **source's data date**, the UTC date of the file's `Last-Modified`, never the run date; default: the last 14 days), `source` (`godaddy_inventory` | `dynadot_closeouts` | `dynadot_aftermarket` | `dynadot_closed_auctions` | `godaddy_auction_end`), `rows` (5.22.0; 0..1000, with a Dynadot `source`: also return up to that many stored rows). **200:**
 ```
 { date: string | null, source: string | null,
-  snapshots: [ { source, data_date, file_name, status: "complete" | "partial" | "error" | "not_configured", bytes: int | null, sha256: string | null,
+  snapshots: [ { source, data_date, file_name, status: "complete" | "partial" | "error" | "not_configured" | "gap", bytes: int | null, sha256: string | null,
                  last_modified: ISO | null, rows: int | null, rows_total: int | null, price_unit: "cents" | null, http_status: int | null, error: string | null,
                  raw_available: bool, raw_deleted_at: ISO | null, raw_note: string | null, sealed: bool, sealed_at: ISO | null,
-                 origin: "fetch" | "bot_upload" } ],   // newest data_date first, at most 500 (5.22.0: origin)
+                 origin: "fetch" | "bot_upload" | "server" } ],   // newest data_date first, at most 500 (5.22.0: origin; 5.62.0: "server", status "gap")
   pool: [ { data_date, source: "godaddy_closeouts", rows: int } ],                                                                 // parsed rows still held (3 days)
   auctions?: [ { domain, end_time: ISO, auction_type, first_seen, last_seen, final_state_at, bid_count, final_price_cents, max_price_cents, price_unit: "cents" } ],   // only with source=godaddy_auction_end (5.22.0)
   rows?: [ ... ] }                                                                                                                  // only with a Dynadot source and rows=n; row shapes below
@@ -1343,7 +1343,7 @@ READ (any `GET` token, bots included). Query (all optional; an unknown parameter
 - `raw_available` is true only while the raw zip is on the server's disk (7 days at most; the folder `SNAPSHOT_DIR`); after that `raw_available: false` and `raw_deleted_at` is set, and the manifest (sha256, size, rows) stays for good. When the server has no writable disk, `raw_available` is `false` from the start and `raw_note` says why. No server path is ever shown.
 
 - **`source=godaddy_auction_end`** (5.22.0, CR-071 R-10): `snapshots` is empty and `auctions` lists the GoDaddy auctions whose **final state** was recorded on a data date in the range (`date`, else the last 14 days; at most 1,000): they were followed (a `.com` auction that reached $500, kept once it did) and left all the auction files after their end time. `bid_count` and `final_price_cents` are the last values seen (0 bids means unsold), `max_price_cents` the highest price seen. Nothing is stored for auctions that never reached $500.
-- `origin: "bot_upload"` marks a manifest made by `POST /snapshots/dynadot` (file name `bot_upload`, `bytes` null, no raw file). With `rows=n` and a Dynadot source the answer also has `rows`: aftermarket `{data_date, domain, listing_id, price_cents}`, closed auctions `{data_date, domain, end_time, bid_count, final_price_cents}`, closeouts `{data_date, domain, price_cents, ends_at}`.
+- `origin: "bot_upload"` marks a manifest made by `POST /snapshots/dynadot` (file name `bot_upload`, `bytes` null, no raw file). `origin: "server"` (5.62.0) marks the same kind of manifest written by the `datasave` job after it read Dynadot itself (file name `bot_upload`, so a later bot upload for a server-sealed day is 409 `SNAPSHOT_SEALED`); status `gap` (5.62.0) is an aftermarket day the server found collapsed: unsealed, no rows, `error` = `GAP: <reason>`, details in `coverage`. With `rows=n` and a Dynadot source the answer also has `rows`: aftermarket `{data_date, domain, listing_id, price_cents}`, closed auctions `{data_date, domain, end_time, bid_count, final_price_cents}`, closeouts `{data_date, domain, price_cents, ends_at}`.
 
 ### `POST /snapshots/dynadot`
 5.22.0, CR-071 R-8, R-9. **WRITE or bots token** (non-money; a READ token is 403 `SCOPE_FORBIDDEN`). `Idempotency-Key` required; audited (the audit row keeps `[n rows]`, never the rows). Body limit **8 MB**. **Limits (5.32.0, BUG-051):** at most **50,000 rows per call** (send several calls with the same `kind` and `data_date`); every price field (`price_cents`, `final_price_cents`) at most **2,000,000,000** cents (about $20M), inclusive. Over the row limit: **422 `ROWS_LIMIT`** `details: {max_rows, received_n}`. A price over the cap: **422 `PRICE_CAP`** `details: {max_cents, rows: [index, up to 20], over_n}` (leave such rows out; prices are never clamped). The row limit is checked first; either way the whole call is refused and nothing is stored. Every other problem stays 422 `VALIDATION_ERROR`. `GET /openapi.json` shows both (`maxItems`, `maximum`). The server has no Dynadot key: the bots pull the data and upload it here.

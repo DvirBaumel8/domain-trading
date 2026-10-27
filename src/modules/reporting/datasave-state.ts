@@ -42,10 +42,10 @@ const DYNADOT_PAUSED_DAYS = 3;
 /** Sources that have had a bot upload (any day) and have no sealed upload for the due date. Quiet until the first upload of a kind, and again once none was sealed for 3 days. */
 export async function dynadotMissing(db: Kysely<Database>, nowMs: number): Promise<{ due_date: string; started: boolean; missing: string[] }> {
   const due = dynadotDueDate(nowMs);
-  const ever = await db.selectFrom('snapshot_manifests').select('source').distinct().where('origin', '=', 'bot_upload').execute();
+  const ever = await db.selectFrom('snapshot_manifests').select('source').distinct().where('origin', 'in', ['bot_upload', 'server']).execute();
   const recentSince = new Date(nowMs - DYNADOT_PAUSED_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const active = new Set((await db.selectFrom('snapshot_manifests').select('source').distinct().where('origin', '=', 'bot_upload').where('status', '=', 'complete').where('data_date', '>=', recentSince).execute()).map((r) => r.source));
-  const sealed = new Set((await db.selectFrom('snapshot_manifests').select('source').where('origin', '=', 'bot_upload').where('data_date', '=', due).where('status', '=', 'complete').execute()).map((r) => r.source));
+  const active = new Set((await db.selectFrom('snapshot_manifests').select('source').distinct().where('origin', 'in', ['bot_upload', 'server']).where('status', '=', 'complete').where('data_date', '>=', recentSince).execute()).map((r) => r.source));
+  const sealed = new Set((await db.selectFrom('snapshot_manifests').select('source').where('origin', 'in', ['bot_upload', 'server']).where('data_date', '=', due).where('status', '=', 'complete').execute()).map((r) => r.source));
   const missing = DYNADOT_SOURCES.filter((s) => active.has(s) && !sealed.has(s));
   return { due_date: due, started: ever.length > 0, missing };
 }

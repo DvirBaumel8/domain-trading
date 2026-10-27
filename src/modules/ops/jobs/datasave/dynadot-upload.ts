@@ -98,7 +98,10 @@ async function canonicalSha(trx: Transaction<Database>, kind: DynadotKind, dataD
   return createHash('sha256').update(JSON.stringify(canon)).digest('hex');
 }
 
-export async function uploadDynadot(db: Kysely<Database>, b: DynadotBody, nowMs: number): Promise<DynadotResult> {
+/** v5.62.0 (CR-080 item 3): the datasave job stores what it read from Dynadot through this same function; `origin` 'server' and its own coverage (extra keys allowed). */
+export interface UploadOptions { origin?: 'bot_upload' | 'server'; coverage?: Record<string, unknown>; rawNote?: string }
+
+export async function uploadDynadot(db: Kysely<Database>, b: DynadotBody, nowMs: number, opts: UploadOptions = {}): Promise<DynadotResult> {
   const today = new Date(nowMs).toISOString().slice(0, 10);
   if (b.data_date > today) throw new AppError(422, 'VALIDATION_ERROR', 'data_date must not be in the future (UTC)', { data_date: b.data_date });
   const final = b.final === true;
@@ -123,8 +126,8 @@ export async function uploadDynadot(db: Kysely<Database>, b: DynadotBody, nowMs:
       const status = final ? 'complete' : 'partial';
       const values = {
         source, data_date: b.data_date, file_name: BOT_UPLOAD_FILE, bytes: null, sha256, last_modified: now, rows: stored, rows_total: b.rows.length,
-        status: status as 'complete' | 'partial', http_status: null, error: null, raw_path: null, raw_available: false, raw_note: 'rows uploaded by a bot; no raw file',
-        sealed_at: final ? now : null, created_at: now, updated_at: now, origin: 'bot_upload' as const, coverage: b.coverage ? JSON.stringify(b.coverage) : null,
+        status: status as 'complete' | 'partial', http_status: null, error: null, raw_path: null, raw_available: false, raw_note: opts.rawNote ?? 'rows uploaded by a bot; no raw file',
+        sealed_at: final ? now : null, created_at: now, updated_at: now, origin: opts.origin ?? ('bot_upload' as const), coverage: b.coverage || opts.coverage ? JSON.stringify({ ...b.coverage, ...opts.coverage }) : null,
       };
       await trx.insertInto('snapshot_manifests').values(values).onConflict((oc) => oc.columns(['source', 'data_date', 'file_name']).doUpdateSet({
         sha256: values.sha256, last_modified: now, rows: stored, status: values.status, sealed_at: values.sealed_at, updated_at: now,

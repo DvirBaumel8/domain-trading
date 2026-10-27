@@ -142,3 +142,13 @@ Gavriel: nudge Claude Code **now** (CR-080 round 2, still within max_rounds). Ke
 6. No money routes, no settings activation, no ship-date ask. Report when live on `/health` / datasave step summaries: closeouts + aftermarket **configured** (not `not_configured`).
 
 Pass marks: AT-2, AT-4 testable without Grok for Dynadot; jobs 01–02 Dynadot half becomes DOM datasave-primary.
+
+## DOM response addendum: item 3 built in 5.62.0 (DOM, 27 Oct 2026)
+
+`dynadotCloseouts` and `dynadotAftermarket` are real steps when `DYNADOT_API_KEY` is set (unset = `not_configured`, unchanged). Not released yet at the time of writing; the release note carries the date.
+- **What the server calls (changed the same day after DOM's live check):** the legacy API3 refuses the restricted key ("invalid key"), so the server uses the **RESTful v2** API with `Authorization: Bearer <key>` and an `X-Signature` HMAC made with `DYNADOT_API_SECRET`. **Aftermarket listings are live via REST v2:** `GET https://api.dynadot.com/restful/v2/aftermarket/listings?page=<n>&page_size=1000&currency=USD`. **Closeouts are pending the path:** the REST v2 path of the expired closeouts is not known (every guess is 400 "command not recognized"); set `DYNADOT_CLOSEOUTS_PATH` when found. Until then `dynadotCloseouts` reports `not_configured` ("closeouts REST path unknown") and the bots stay primary for closeouts; the bots' backup rule below still applies to both.
+- **Pacing:** one call at a time, at least 5 s apart (a constant; the documented limit for a regular account is 60 calls a minute), at most 500 pages (1,000 rows each) a run.
+- **Dual-runner lock:** a sealed day (bot or server) is a no-op `SNAPSHOT_SEALED` with no Dynadot call; after a server seal a bot upload gets the existing 409 `SNAPSHOT_SEALED`. Manifest `origin` is `server`.
+- **AT-4 (R-8 / R-8v2):** `Total` under 1/10 of the last complete server-sealed day, `Total` 0, or an empty planned page is a GAP: manifest `status gap` with the reason, nothing stored or sealed. `r8v2.frozen` only from the second consecutive small-total day. The first server day has no baseline (a bot's totals are counted after the $500 floor, so not comparable), so the collapse test starts from the second server-sealed day. Closeouts with a missing page are sealed with `coverage.partial` and the failed pages named.
+- **Step summary:** `{status, origin: "server", pages_n, rows_n, sealed, gap?, r8v2?, calls_n, elapsed_ms}`. Tests DYN-1..14; rules `docs/internal/datasave.md` "Dynadot server read".
+- Gavriel: the backup rule stands (bots upload only if the day is still unsealed at 19:00 UTC). Do not add `dynadot` to `ENABLED_REGISTRARS`.

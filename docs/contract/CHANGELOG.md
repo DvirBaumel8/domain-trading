@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.62.0 (2026-10-27): Dynadot read by the server (REST v2, signed, read-only key): aftermarket listings sealed daily with the GAP/R-8v2 rules; closeouts wait for the API path
+Release note: `docs/releases/v5.62.0.md`.
+MINOR (migration `1768200000000_v5-62-0.sql`: `snapshot_manifests.origin` adds `server`, `status` adds `gap`). CR-080 item 3: the datasave step `dynadotAftermarket` reads Dynadot's RESTful v2 API itself (signed, read-only key) and seals the day through the same path as `POST /snapshots/dynadot` (origin `server`); a collapsed total records a GAP instead of a panel (R-8/R-8v2). `dynadotCloseouts` reads `GET /restful/v2/aftermarket/get_expired_closeout_domains` (path from Gavriel's connector; `current_price` is in cents) the same way (`DYNADOT_CLOSEOUTS_PATH` overrides it). A day already sealed by either side is a no-op; a bot upload after a server seal gets 409 `SNAPSHOT_SEALED`. New code `EMPTY_RESULT`.
+
 ## 5.61.0 (2026-10-27): Afternic seller API: daily read of listings, views and leads, drift warnings, POST /export/afternic/push (dry run first); lease-to-own maximum 12 months
 Release note: `docs/releases/v5.61.0.md`.
 MINOR (migration `1768100000000_v5-61-0.sql`: table `afternic_listings_daily`, `settings.afternic_lease_months` 16 -> 12). Afternic released an official seller API on 22 Oct 2026.

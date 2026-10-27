@@ -115,7 +115,7 @@ export interface SnapshotManifestsTable {
   last_modified: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
   rows: ColumnType<number | null, number | null | undefined, number | null>;
   rows_total: ColumnType<number | null, number | null | undefined, number | null>;
-  status: 'complete' | 'partial' | 'error' | 'not_configured';
+  status: 'complete' | 'partial' | 'error' | 'not_configured' | 'gap';
   http_status: ColumnType<number | null, number | null | undefined, number | null>;
   error: ColumnType<string | null, string | null | undefined, string | null>;
   raw_path: ColumnType<string | null, string | null | undefined, string | null>;
@@ -125,8 +125,8 @@ export interface SnapshotManifestsTable {
   sealed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
   created_at: TimestampDefault;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
-  /** v5.22.0: 'fetch' (the job) or 'bot_upload' (POST /snapshots/dynadot). */
-  origin: ColumnType<'fetch' | 'bot_upload', 'fetch' | 'bot_upload' | undefined, 'fetch' | 'bot_upload'>;
+  /** v5.22.0: 'fetch' (the job) or 'bot_upload' (POST /snapshots/dynadot); v5.62.0: 'server' (the datasave job read Dynadot itself). */
+  origin: ColumnType<'fetch' | 'bot_upload' | 'server', 'fetch' | 'bot_upload' | 'server' | undefined, 'fetch' | 'bot_upload' | 'server'>;
   /** v5.24.0 (CR-071 R-8b): a bot upload's pull coverage (jsonb), null when not sent. */
   coverage: ColumnType<unknown | null, string | null | undefined, string | null>;
 }

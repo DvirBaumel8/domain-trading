@@ -12,6 +12,7 @@ export { registerReplay } from './api/replay.js';
 export { ReplayRunner } from './replay/run.js';
 export { archiveStatus } from './archive/godaddy-archive.js';
 export { DatasaveJob } from './jobs/datasave/datasave.js';
+export { DYNADOT_CLOSEOUTS_DEFAULT_PATH } from './jobs/datasave/dynadot-pull.js';
 export { BackupExporter } from './jobs/backup-export.js';
 export { CohortOutcomesJob } from './jobs/cohort-outcomes.js';
 export { DropWatchJob } from './jobs/drop-watch.js';
