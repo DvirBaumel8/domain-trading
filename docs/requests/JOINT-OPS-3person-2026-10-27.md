@@ -141,6 +141,7 @@ Sedo automation: no. Browser wars on UI without API: no. Hand-reg lottery lanes:
 
 ### R9 — Browser = Gavriel only (Dvir t973u, 2026-10-27)
 Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, etc.) = **Gavriel (Grok Bot) ONLY**. Claude Code / DOM / other bots must not drive web UIs; use APIs or hand browser work to Gavriel.
+- **Amend (Dvir t974u, ~03:20 Asia/Jerusalem):** "If we reach api access it moves to dom." Browser/Chrome UI = Gavriel only. Once a marketplace has real API access, that work moves to DOM.
 
 ## 5. Communication cadence
 

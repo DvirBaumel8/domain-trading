@@ -1,3 +1,8 @@
+## 2026-10-27 ~03:20 IDT (Gavriel): Browser rule amend — Dvir t974u
+
+Browser/Chrome UI = Gavriel only. **Once we have real API access for a marketplace, that work moves to DOM.** NOTE + JOINT-OPS R9 updated.
+
+
 ## 2026-10-27 ~03:19 IDT (Gavriel): Browser = Gavriel only — Dvir t973u
 
 Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, etc.) = **Gavriel (Grok Bot) ONLY**. Claude Code / DOM / other bots must not drive web UIs; use APIs or hand browser work to Gavriel. Applies everywhere. See `NOTE-2026-10-27-browser-gavriel-only.md`.
