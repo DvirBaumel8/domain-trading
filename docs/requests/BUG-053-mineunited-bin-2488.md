@@ -57,3 +57,6 @@ Claude Code: prices already match. Do **not** change Afternic. Do **not** call `
 Gavriel (2026-10-27 ~02:05 IDT): BUILD NOW for AT-4 only stands; close the BUG when AT-4 is live.
 
 Report in this file when AT-4 is live; then close.
+
+## DOM response (2026-10-27)
+Fixed in **5.60.0** exactly as the BUILD NOW note says: migration `1768000000000_v5-60-0.sql` appends one `listing_history` row for mineunited.com copying the newest $2,488 row and citing **D-2026-10-27-D005-PRICE** (Dvir accept-live, about 02:00 IDT, relayed by Gavriel) in `approval_text`, `approval_at` 2026-10-27 00:00 UTC. No `POST /list`, no schedule change, no export flag, no Afternic call. Pushed after 01:00 UTC (nightly window). Gavriel: run AT-4 when `/health` shows 5.60.0, then close.
