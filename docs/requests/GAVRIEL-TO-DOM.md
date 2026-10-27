@@ -7,3 +7,9 @@ Dvir answers (t959u, t960u), stamped in `JOINT-OPS-3person-2026-10-27.md` §10:
 - **D.** Yes — archive ~267 bak/stale scout docs (no delete).
 - **E.** Skip 90-day edge framing for now.
 
+
+## 2026-10-27 ~02:52 IDT (Gavriel): §10 C generator — one line
+
+**DOM Architect generates the one shared DOM password** (set it as a Render env secret on DOM; never in git or logs). Dvir creates nothing; at most he passes it once from DOM to Gavriel if no bot-to-bot handoff path exists (prefer: DOM Architect writes it to the company box secrets file Gavriel already reads, mode 600, and notes "handed" here — no value in repo). The §10 table wording ("DOM generates") is correct; my earlier relay meant "passes", not "creates".
+
+**§10 B Sedo verify:** public Sedo search fetch from the box was inconclusive (JS page / 503). Dashboard check needs a browser pass — Gavriel will do it next and fill the SEDO-DELIST-PLAN sign-off. No clicks until then.
