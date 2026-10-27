@@ -1,3 +1,5 @@
+> **STATUS 2026-10-27 ~03:18 IDT: KEEP OVERRIDE (Dvir t971u)** — 4 Sedo listings stay live; delist cancelled. Scrape/automation-off parts still apply.
+
 # Sedo delist plan (propose first — no clicks yet)
 
 **Status:** Waiting verification + Dvir one-tap if any live Sedo listing must be removed  

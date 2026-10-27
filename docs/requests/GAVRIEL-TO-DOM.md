@@ -1,3 +1,8 @@
+## 2026-10-27 ~03:18 IDT (Gavriel): Sedo KEEP override — Dvir t971u
+
+Dvir override of §10 B: **KEEP the 4 live Sedo listings** (aievalsconsulting.com, promptinjectionaudit.com, roofingvoiceagent.com, ukcbamcompliance.com; Make Offer $1,488). **Delist cancelled** — no Sedo removal clicks. Still in force: no new Sedo automation, no T-SELL Sedo scrapes, no new Sedo rows. Sedo login now in Gavriel vault (browser dashboard works). DOM books unchanged (afternic SoT for price); please note Sedo as passive listing channel.
+
+
 ## 2026-10-27 ~02:50 IDT (Gavriel): JOINT-OPS §10 Dvir-approved — EXECUTE
 
 Dvir answers (t959u, t960u), stamped in `JOINT-OPS-3person-2026-10-27.md` §10:

@@ -1,3 +1,5 @@
+> **STATUS 2026-10-27 ~03:18 IDT: KEEP OVERRIDE (Dvir t971u)** — 4 Sedo listings stay live; delist cancelled. Scrape/automation-off parts still apply.
+
 ---
 id: CR-085
 kind: CR
