@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.72.0 (2026-10-28): CR-088 full hard-filter auction field
+Release note: `docs/releases/v5.72.0.md`.
+MINOR: the datasave `auctionShortlist` step now stores all hard-filter passers (not just the top 25) for each data date. `GET /auctions/shortlist` adds `offset` (pagination) and raises `limit` max from 100 to 10,000; `total` is now the count of all eligible rows, not just the returned page. `settings.shortlist_size` defaults to 0 (= all); a nonzero value still caps. If more than 10,000 names pass hard filters, the step stores none and warns. Migration `1768800000000_v5-72-0.sql`. Tests CR088-AT1..AT5.
+
 ## 5.71.0 (2026-10-27): BUG-059 round 2: Afternic listing fallback on unknown; stale price fails stop raising
 Release note: `docs/releases/v5.71.0.md`.
 PATCH-level fix, no migration. BUG-059 round 2: `portfolioCheck` reads the Afternic listing page when the lander gives no price **or** an `unknown` price (5.70.0 only on no price); `/report` no longer raises `LANDER_PRICE_MISMATCH` from a price `fail` that a newer price check (any status) followed. Tests LP-15, LP-16.
