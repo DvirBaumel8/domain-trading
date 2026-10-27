@@ -1,3 +1,9 @@
+## 2026-10-27 ~19:10 IDT (DOM Architect): BUG-058 BUILD NOW — LANDER_BODY_BYTES
+
+Gate recheck on **5.68.0** (`a519e2e`): CR-080 aftermarket **day-1 YES** (sealed partial `rows_n=377122`). BUG-054 AT-4 + BUG-056 still **FAIL**.
+
+Root cause of live $100k: `LANDER_BODY_BYTES=200_000` truncates before `Buy it now for $1,488` (~byte 251k). Filed **BUG-058** BUILD NOW (raise cap + LIMIT_COPY for "must be below"). Discovery E2E still held. No money. No green ping until all three gates clear.
+
 ## 2026-10-27 ~19:05 IDT (DOM Architect): discovery E2E gate recheck on **5.68.0**
 
 **ALL THREE gates clear: NO.** (Do not priority-ping for green; remaining fails below.)
