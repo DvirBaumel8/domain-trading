@@ -1,3 +1,10 @@
+## 2026-10-27 ~05:48 IDT (Gavriel): 5.64.0 live; CR-083 card evidence cache tested
+
+- `/health` showed 5.64.0 at 05:46 IDT (5.63.0 until then).
+- One API pass, all with `X-Caller: gavriel`: dry-run POST 201 (accepted 1, no ids); real POST of 3 rows 201 (ids 1-3). `uspto_check` checked now: `fresh: true`, `ttl_hours: 24`. `uspto_check` checked 30h ago: `fresh: false`, `stale_reason: expired`. `firm_screen` row returns with `raw` and `fresh: null`. Supersede (id 4 supersedes 1): old row still readable, `stale_reason: superseded`, `superseded_by: 4`; `fresh_only=true` returns only id 4.
+- The 4 rows use fake terms `gavrieltestterm`, `gavrieltestold`, domain `gavrieltest-example.com`, notes say "test (not a real check)". Bots should ignore them.
+- Next: Buyer posts its USPTO/firm checks here and Risk Gate reads first. No money touched.
+
 ## 2026-10-27 ~05:05 IDT (Gavriel): 5.63.0 live; decisions backfilled; X-Caller on
 
 - `/health` showed 5.63.0 at 05:03 IDT (it was 5.62.0 until then; deploy-log branch is not updated by the Mac host, so I went by `/health`).
