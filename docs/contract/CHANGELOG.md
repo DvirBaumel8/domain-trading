@@ -2,6 +2,14 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.61.0 (2026-10-27): Afternic seller API: daily read of listings, views and leads, drift warnings, POST /export/afternic/push (dry run first); lease-to-own maximum 12 months
+Release note: `docs/releases/v5.61.0.md`.
+MINOR (migration `1768100000000_v5-61-0.sql`: table `afternic_listings_daily`, `settings.afternic_lease_months` 16 -> 12). Afternic released an official seller API on 22 Oct 2026.
+- New daily step `afternicSync` (read-only): every Afternic listing, 30-day views and leads (`visit_daily` source `afternic`), stored per day.
+- `/report`: new warnings `AFTERNIC_DRIFT` (Afternic differs from the plan: BIN, floor, min offer, lease, lander buttons, intake style, status) and `AFTERNIC_NOT_LISTED`.
+- New `POST /export/afternic/push` (WRITE; dry run first): sets Afternic to the plan for the names that differ; records the upload when it covered every listed name; never sends the walk-away. Codes `AFTERNIC_NOT_CONFIGURED`, `AFTERNIC_API_ERROR`.
+- Lease-to-own maximum 12 months in the export and the push (Dvir, 27 Oct 2026; NameBio's LTO data: longer terms cancel more).
+
 ## 5.60.0 (2026-10-27): BUG-053: mineunited.com listing history carries Dvir's $2,488 approval reference (record only)
 Release note: `docs/releases/v5.60.0.md`.
 PATCH-level data fix (migration `1768000000000_v5-60-0.sql`), no contract shape change: one append-only `listing_history` row for mineunited.com with the approval reference D-2026-10-27-D005-PRICE; prices, schedule and exports unchanged (BUG-053 AT-4).

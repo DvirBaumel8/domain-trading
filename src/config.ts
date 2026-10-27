@@ -39,6 +39,9 @@ const EnvSchema = z.object({
   SPACESHIP_SELLERHUB_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   SPACESHIP_SELLERHUB_API_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   SPACESHIP_SELLERHUB_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().default('https://spaceship.dev/api')),
+  AFTERNIC_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  AFTERNIC_API_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  AFTERNIC_API_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().default('https://api.afternic.com')),
   PUBLIC_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine((v) => /^https?:\/\//.test(v), 'PUBLIC_BASE_URL must be http(s)').default(DEFAULT_PUBLIC_BASE_URL)),
   DATABASE_SSL: z.enum(['true', 'false']).default('false'),
   SNAPSHOT_DIR: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
@@ -70,6 +73,8 @@ export interface Config {
   namebio: { retailstatsCsvUrl: string | undefined };
   /** v4.0.0 (CR-049): Spaceship SellerHub key and secret (scopes sellerhub:read, sellerhub:write only). Either missing -> the listingSync step is skipped. */
   sellerhub: { apiKey: string | undefined; apiSecret: string | undefined; baseUrl: string };
+  /** v5.61.0: Afternic's seller API key pair (`Authorization: sso-key KEY:SECRET`). Either missing -> afternicSync and POST /export/afternic/push report not_configured. */
+  afternic: { apiKey: string | undefined; apiSecret: string | undefined; baseUrl: string };
   /** Public base URL of this service, without a trailing slash (the job queue's keep-alive ping). */
   publicBaseUrl: string;
   /** True when the host sets RENDER (a Render service). The keep-alive ping only makes sense there (M8); on the Mac host it would ping a suspended Render URL. */
@@ -87,7 +92,7 @@ export interface Config {
   secretValues: string[];
 }
 
-const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'COMPANIES_HOUSE_API_KEY', 'SPACESHIP_SELLERHUB_API_KEY', 'SPACESHIP_SELLERHUB_API_SECRET', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
+const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'COMPANIES_HOUSE_API_KEY', 'SPACESHIP_SELLERHUB_API_KEY', 'SPACESHIP_SELLERHUB_API_SECRET', 'AFTERNIC_API_KEY', 'AFTERNIC_API_SECRET', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
 
 function readVersion(): string {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -161,6 +166,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
     databaseSsl: e.DATABASE_SSL === 'true',
     sellerhub: { apiKey: e.SPACESHIP_SELLERHUB_API_KEY, apiSecret: e.SPACESHIP_SELLERHUB_API_SECRET, baseUrl: e.SPACESHIP_SELLERHUB_BASE_URL.replace(/\/+$/, '') },
+    afternic: { apiKey: e.AFTERNIC_API_KEY, apiSecret: e.AFTERNIC_API_SECRET, baseUrl: e.AFTERNIC_API_BASE_URL.replace(/\/+$/, '') },
     publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
     onRender: Boolean(env.RENDER),
     webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,

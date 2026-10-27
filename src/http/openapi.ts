@@ -35,6 +35,7 @@ const SUMMARIES: Record<string, string> = {
   'GET /export/sedo.csv': 'Sedo full-file export',
   'POST /listings/{domain}/observed': 'Log a venue listing seen on a public page (observed_public: venue, price_usd, url, seen_at; dry_run supported). Never changes the listing, price, export or listed_venues; a provenance key is 422',
   'POST /portfolio/{domain}/display-name': 'Set the capitalised name used in the marketplace files (same letters only, else 422 DISPLAY_NAME_MISMATCH); takes effect in the next export',
+  'POST /export/afternic/push': 'Update Afternic to the plan through its API',
   'POST /export/{venue}/uploaded': 'Confirm a marketplace file was uploaded',
   'POST /offers': 'Log an offer',
   'POST /offers/{id}/outcome': 'Record the outcome of an offer',

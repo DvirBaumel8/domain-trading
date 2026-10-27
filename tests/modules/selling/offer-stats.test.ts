@@ -172,7 +172,7 @@ describe('walk-away and min-offer guards', () => {
     await t.list(D1, { ...d1Plan, display_name: 'PromptInjectionAudit.com' });
     const af = await t.get('/export/afternic.csv');
     expect(af.statusCode).toBe(200);
-    expect(af.body).toContain('PromptInjectionAudit.com,1995,1295,100,Y,16,Custom Lander,Y,Y,Y,N');
+    expect(af.body).toContain('PromptInjectionAudit.com,1995,1295,100,Y,12,Custom Lander,Y,Y,Y,N');
     const sedo = await t.get('/export/sedo.csv');
     expect(sedo.statusCode).toBe(200);
     expect(parseCsvStrict(sedo.body)[1]).toEqual([expect.stringMatching(/promptinjectionaudit/i), 'OFFER', 'yes', '1995', '100', 'USD', 'ADD']);

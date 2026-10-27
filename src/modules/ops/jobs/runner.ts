@@ -32,7 +32,7 @@ export interface PlanStep {
 /** Attempts and timeouts per step (v3.0.0). Steps that read outside services get 3 attempts, the rest 2. */
 const DEFAULT_ATTEMPTS = 2;
 const STEP_ATTEMPTS: Record<string, number> = {
-  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, dropWatch: 3, referenceRefresh: 3, engineEndings: 1, engineTrain: 1, trainModel: 1, godaddyInventory: 1,
+  registrarCheck: 3, portfolioCheck: 3, listingSync: 2, afternicSync: 2, dropWatch: 3, referenceRefresh: 3, engineEndings: 1, engineTrain: 1, trainModel: 1, godaddyInventory: 1,
 };
 const DEFAULT_TIMEOUT_MS = 5 * 60_000;
 const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000, godaddyInventory: 45 * 60_000, buildPanel: 25 * 60_000, engineFeed: 10 * 60_000, auctionShortlist: 15 * 60_000 };
@@ -79,6 +79,7 @@ export interface JobRunnerDeps {
   registrarCheckJob: Runnable;
   /** v4.0.0 (CR-049): pushes each listed name's BIN and public min offer to SellerHub and deletes the listings of names that are gone; while undefined, that step reports skipped. */
   listingSyncJob?: Runnable;
+  afternicSyncJob?: Runnable;
   /** v4.0.0: expired unrenewed names, lookalike re-checks for the renewal drop check, the monthly holdout; while undefined, that step reports skipped. */
   portfolioLifecycleJob?: Runnable;
   /** Daily registry, lander and blocklist checks of the live names (CR-007 G-5); while undefined, that step reports skipped. */
@@ -172,6 +173,7 @@ export class JobRunner {
       step('priceJob', () => d.priceJob.runOnce()),
       step('dropJob', () => d.dropJob.runOnce()),
       optional('listingSync', d.listingSyncJob, 'listing sync not configured'),
+      optional('afternicSync', d.afternicSyncJob, 'afternic sync not configured'),
       optional('portfolioLifecycle', d.portfolioLifecycleJob, 'portfolio lifecycle not configured'),
       step('registrarCheck', () => d.registrarCheckJob.runOnce()),
       optional('portfolioCheck', d.portfolioCheckJob, 'portfolio check not configured'),

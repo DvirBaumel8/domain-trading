@@ -26,7 +26,7 @@ describe('GET /pricing/preview (§10.6)', () => {
         { event: 'final_push', due_on: '2028-07-06', bin: '$895', floor: '$830', walkaway: '$615', status: 'planned' },
         { event: 'delist', due_on: '2028-09-27', status: 'planned' },
       ],
-      afternic_row: 'example.com,1995,1295,100,Y,16,Custom Lander,Y,Y,Y,N',
+      afternic_row: 'example.com,1995,1295,100,Y,12,Custom Lander,Y,Y,Y,N',
       sell_plan_line: 'hybrid · BIN $1,995 · floor (auto-accept) $1,295 · walk-away (private) $960 · min offer $100 · LTO off · M6 2027-04-12 $1,595/$1,035/$770 · M18 2028-04-12 $1,295/$830/$615 · final push 2028-07-06 $895/$830/$615 · delist 2028-09-27 · settings v2',
       warnings: ['FLOOR_AUTO_ACCEPT'],
     });
@@ -37,7 +37,7 @@ describe('GET /pricing/preview (§10.6)', () => {
     const { auth } = await issueToken('read');
     await insertOwnedDomain(db, { domain: 'promptinjectionaudit.com', display_name: 'PromptInjectionAudit.com', category: 'trend', expiry_date: '2027-10-04', drop_date: '2028-10-04' });
     const b = (await get('category=trend&bin=1995&floor=1295&walkaway=950&listed_on=2026-10-12&domain=promptinjectionaudit.com', auth)).json();
-    expect(b).toMatchObject({ pricing_source: 'approved_exception', walkaway_cents: 95000, afternic_row: 'PromptInjectionAudit.com,1995,1295,100,Y,16,Custom Lander,Y,Y,Y,N' });
+    expect(b).toMatchObject({ pricing_source: 'approved_exception', walkaway_cents: 95000, afternic_row: 'PromptInjectionAudit.com,1995,1295,100,Y,12,Custom Lander,Y,Y,Y,N' });
     expect(b.afternic_row).not.toContain('950');
     expect(b.warnings).toEqual(expect.arrayContaining(['PRICING_EXCEPTION', 'FLOOR_AUTO_ACCEPT']));
     expect(b.schedule[2]).toMatchObject({ event: 'final_push', due_on: '2028-07-06', bin: '$895', floor: '$830', walkaway: '$610' });
@@ -55,7 +55,7 @@ describe('GET /pricing/preview (§10.6)', () => {
     app = await makeApp();
     const { auth } = await issueToken('read');
     const b = (await get('category=geo&grade=strong&listed_on=2026-11-01&drop_date=2028-11-01', auth)).json();
-    expect(b).toMatchObject({ mode: 'bin', grade: 'strong', bin_cents: 49900, min_offer_cents: 49900, afternic_row: 'example.com,499,499,499,Y,16,Buy It Now,Y,Y,N,N' });
+    expect(b).toMatchObject({ mode: 'bin', grade: 'strong', bin_cents: 49900, min_offer_cents: 49900, afternic_row: 'example.com,499,499,499,Y,12,Buy It Now,Y,Y,N,N' });
     expect(b.schedule.map((e: { event: string }) => e.event)).toEqual(['geo_drop_m12', 'delist']);
     expect(b.sell_plan_line).toMatch(/^bin \(geo strong\) · BIN \$499 · no offers · M12 2027-11-01 \$399 · delist 2028-10-25 · settings v2$/);
   });

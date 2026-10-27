@@ -100,14 +100,14 @@ export async function recordHit(db: Kysely<Database>, o: { domain: string; ua: '
   return { counted: !capped, capped };
 }
 
-/** POST /visits/import: Afternic's 30-day Views/Leads read on `date`; a re-import of the same (domain, date) replaces the row. Returns false for a name we do not know. */
-export async function importAfternic(db: Kysely<Database>, o: { domain: string; date: string; views30d: number; leads30d: number; now: Date }): Promise<boolean> {
+/** POST /visits/import and the daily afternicSync step (v5.61.0, leads null = keep the stored leads): Afternic's 30-day Views/Leads read on `date`; a re-import of the same (domain, date) replaces the row. Returns false for a name we do not know. */
+export async function importAfternic(db: Kysely<Database>, o: { domain: string; date: string; views30d: number; leads30d: number | null; now: Date }): Promise<boolean> {
   const known = await db.selectFrom('domains').select('id').where('domain', '=', o.domain).executeTakeFirst();
   if (!known) return false;
   await sql`
     insert into visit_daily (domain, date_utc, source, views_30d, leads_30d, imported_at)
     values (${o.domain}, ${o.date}::date, 'afternic', ${o.views30d}, ${o.leads30d}, ${o.now})
-    on conflict (domain, date_utc, source) do update set views_30d = excluded.views_30d, leads_30d = excluded.leads_30d, imported_at = excluded.imported_at, updated_at = now()`.execute(db);
+    on conflict (domain, date_utc, source) do update set views_30d = excluded.views_30d, leads_30d = coalesce(excluded.leads_30d, visit_daily.leads_30d), imported_at = excluded.imported_at, updated_at = now()`.execute(db);
   return true;
 }
 

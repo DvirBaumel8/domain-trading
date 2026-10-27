@@ -13,6 +13,7 @@ import { activeSelectionSettings } from '../../selection/index.js';
 import { priceValues } from './money.js';
 import { lifecycleWarnings } from './lifecycle.js';
 import { ownershipWarnings } from './ownership.js';
+import { afternicWarnings } from './afternic.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
 export interface ReportWarning { code: string; level: WarningLevel; domain?: string; message: string; details: Record<string, unknown> }
@@ -332,6 +333,7 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
 
   // v5.58.0 (CR-079): the missing-name check (listing record, listing approval, unconfirmed sightings, receipt pointer); the daily step ownershipCheck reads this same list
   await ownershipWarnings(db, domains, add);
+  await afternicWarnings(db, domains, now, add);
 
   // v4.0.0: renewal drop check, horizon, delist after a sale
   await lifecycleWarnings(db, now, today, domains, add);

@@ -1,12 +1,12 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Kysely } from 'kysely';
 import { registerBuy, smallBuyView, registerTranches, BuyService, Reconciler } from './modules/buying/index.js';
-import { registerPricing, registerList, registerVenue, registerExport, ExportService, ListService } from './modules/listing/index.js';
+import { registerPricing, registerList, registerVenue, registerExport, registerAfternicPush, AfternicClient, AfternicPushService, ExportService, ListService } from './modules/listing/index.js';
 import { registerOffers, registerSold, SoldService, OffersService } from './modules/selling/index.js';
 import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerBooks, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
 import { registerDemand, registerSelection, registerSiblingScan, registerScreening, registerTestSets, registerPacks, ScreeningWorker, type ScreeningDeps, type HoldoutCheck } from './modules/selection/index.js';
 import { registerCheck, createAdapters, type RegistrarAdapter, CheckService } from './modules/registrars/index.js';
-import { ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerCloseouts, registerAuctions, registerReplay, ReplayRunner, registerPortfolioImport, registerPortfolioWrites, registerTokens, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, registerSnapshots, registerLookups, DatasaveJob, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
+import { AfternicSyncJob, ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerCloseouts, registerAuctions, registerReplay, ReplayRunner, registerPortfolioImport, registerPortfolioWrites, registerTokens, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, registerSnapshots, registerLookups, DatasaveJob, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
 import dns from 'node:dns';
 import { queryDns, queryNs, type NsLookup } from './core/ns-lookup.js';
 import type { Config } from './config.js';
@@ -27,7 +27,7 @@ import { registerData } from './modules/data/index.js';
 import { KbLoadJob, registerKnowledge } from './modules/knowledge/index.js';
 import { registerMarket } from './modules/market/index.js';
 import { registerPickproof } from './modules/pickproof/index.js';
-import { registerVisits } from './modules/visits/index.js';
+import { importAfternic, registerVisits } from './modules/visits/index.js';
 import { collectOpenApiRoutes, registerOpenApi } from './http/openapi.js';
 
 declare module 'fastify' {
@@ -44,6 +44,7 @@ declare module 'fastify' {
     buildDailyListJob: BuildDailyListJob;
     cohortOutcomesJob: CohortOutcomesJob;
     listingSyncJob: ListingSyncJob;
+    afternicSyncJob: AfternicSyncJob;
     portfolioLifecycleJob: PortfolioLifecycleJob;
     referenceRefreshJob: ReferenceRefreshJob;
     jobRunner: JobRunner;
@@ -150,7 +151,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     sleep: deps.sleep, log: app.log,
   });
   registerBuy(app, buyService);
-  registerExport(app, new ExportService({ db: deps.db, config: deps.config, now, lockTimeoutMs: deps.exportLockTimeoutMs }));
+  const exportService = new ExportService({ db: deps.db, config: deps.config, now, lockTimeoutMs: deps.exportLockTimeoutMs });
+  registerExport(app, exportService);
+  const afternicClient = deps.config.afternic.apiKey && deps.config.afternic.apiSecret
+    ? new AfternicClient({ fetch: globalThis.fetch, baseUrl: deps.config.afternic.baseUrl, apiKey: deps.config.afternic.apiKey, apiSecret: deps.config.afternic.apiSecret, sleep: deps.sleep })
+    : null;
+  registerAfternicPush(app, new AfternicPushService({ db: deps.db, client: afternicClient, exports: exportService, now }));
   registerPricing(app, base);
   const nsLookup: NsLookup = deps.nsLookup ?? ((d: string) => queryNs(d, { server: deps.config.dnsNsServer }));
   registerList(app, new ListService({ db: deps.db, adapters, config: deps.config, nsLookup, now }));
@@ -167,6 +173,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     : null;
   const listingSync = new ListingSyncJob({ db: deps.db, client: sellerhub, now, secretValues: deps.config.secretValues, log: app.log });
   app.decorate('listingSyncJob', listingSync);
+  app.decorate('afternicSyncJob', new AfternicSyncJob({ db: deps.db, client: afternicClient, now, recordViews: (o) => importAfternic(deps.db, o) }));
   registerSold(app, new SoldService({ ...base, afterSold: async (d) => { await listingSync.delist(d); } }));
   registerSelection(app, { ...base, holdoutCheck: deps.holdoutCheck, smallBuy: () => Promise.resolve(smallBuyView()) });
   const screeningDeps: ScreeningDeps = {
@@ -226,7 +233,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ ...base, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     ...base, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, kbLoad: new KbLoadJob({ db: deps.db, now, dir: deps.knowledgeDir, log: app.log }), retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, archiveDir: deps.config.archiveDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, scorer: engineScorer, log: app.log, screening: screeningDeps, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer, liftTrainJob: new LiftTrainJob({ db: deps.db, now, log: app.log }),
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, afternicSyncJob: app.afternicSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, kbLoad: new KbLoadJob({ db: deps.db, now, dir: deps.knowledgeDir, log: app.log }), retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, archiveDir: deps.config.archiveDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, scorer: engineScorer, log: app.log, screening: screeningDeps, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer, liftTrainJob: new LiftTrainJob({ db: deps.db, now, log: app.log }),
     secretValues: deps.config.secretValues,
   }));
   app.decorate('jobQueue', new JobQueue({ ...base, runner: app.jobRunner, log: app.log, overrides: deps.jobQueueOverrides,

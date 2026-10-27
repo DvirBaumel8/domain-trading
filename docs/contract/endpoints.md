@@ -1,4 +1,4 @@
-# Endpoints (contract v5.60.0)
+# Endpoints (contract v5.61.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -15,6 +15,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | Import a bought S8 name (aftermarket, lane S8; needs a bid plan since 5.39.0) | `POST /portfolio/import` | WRITE |
 | Set the listing plan, list, record a hand listing | `GET /pricing/preview`, `POST /list/{domain}`, `POST /listings/{domain}/venue` | READ, WRITE, WRITE |
 | Export marketplace files and confirm the upload | `GET /export/afternic.csv`, `GET /export/sedo.csv`, `POST /export/{venue}/uploaded` | READ, READ, WRITE |
+| Update Afternic to the plan through its API | `POST /export/afternic/push` | WRITE |
 | Offers and sales | `POST /offers`, `POST /offers/{id}/outcome`, `GET /offers`, `POST /sold/{domain}` (evidence needed without approval) | WRITE (GETs READ) |
 | Reports and books | `GET /report`, `GET /report/pricing-review`, `GET /ledger`, `GET /portfolio`, `GET /portfolio/{domain}`, `GET /audit` | READ |
 | Costs and the private books (5.25.0, CR-070) | `POST /ledger/costs`, `PUT /portfolio/{domain}/forward-costs`, `GET /portfolio/{domain}/forward-costs`, `GET /costs/forward`, `GET /books.csv` | WRITE or bots for the writes; READ or bots for the GETs |
@@ -41,6 +42,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/portfolio/{domain}/display-name` | WRITE or bots | Listing (5.27.0) |
 | GET | `/export/afternic.csv`, `/export/sedo.csv` | READ | Exports |
 | POST | `/export/{venue}/uploaded` | WRITE | Exports |
+| POST | `/export/afternic/push` | WRITE | Exports |
 | POST | `/offers`, `/offers/{id}/outcome` | WRITE | Offers |
 | GET | `/offers`, `/report/offers` | READ | Offers |
 | POST | `/sold/{domain}` | WRITE | Sales |
@@ -331,6 +333,14 @@ Records that a bot uploaded that file on the marketplace site. WRITE. `venue` = 
 - **Body:** `export_id: string` (required), `uploaded_at?: string` (ISO with offset; default now), `note?: string | null` (≤ 500 chars, no `@`), `approval_ref?: {text, approved_at} | null` (optional; when valid its time becomes `uploaded_at`; it need not name a domain).
 - **200:** `{venue, export_id, domains: int, uploaded_at: ISO, pending_after: int, still_pending: [domain]}`. Moves the venue's pending boundary to that file's snapshot time; for Afternic, clears `export_pending_since` for the file's names unchanged since the snapshot.
 - **Errors:** 404 `EXPORT_NOT_FOUND` (unknown id, or another venue's) · 409 `EXPORT_ALREADY_CONFIRMED` · 422 `UPLOADED_AT_INVALID` (malformed, in the future, or before the file) · 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED` (also an approval older than the file) · 422 `NO_PII` · 503 `DOMAIN_BUSY`.
+
+### `POST /export/afternic/push`
+5.61.0. WRITE only (a bots token is refused, `SCOPE_FORBIDDEN`), audited, `Idempotency-Key` required. Makes Afternic show the plan through its seller API (`PATCH https://api.afternic.com/v3/aftermarket/customers/my/domains/{name}`), after reading every listing (`GET .../domains?limit=100&offset=N&order=NAME_ASC`). The scheduled price job still never touches a marketplace: this is the deliberate action an operator takes after a plan change.
+- **Body:** `domains?: [string]` (1 to 100 names; default every listed name), `dry_run?: boolean` (returns the diff, changes nothing, records nothing).
+- **Values** are the ones `GET /export/afternic.csv` carries for the name (`formats.md`): BIN, floor, min offer, lease on and months, lander style and the three buttons, hidden. The private walk-away has no Afternic field and is never sent. Only the differing fields are sent.
+- **200:** `{dry_run, pushed: [{domain, fields: [{field, plan, afternic}]}], unchanged: [domain], failed: [{domain, code}], skipped: [{domain, reason}], upload: {recorded, export_id, reason}}`. With `dry_run: true`, `pushed` is the diff that would be sent. `failed.code`: `AFTERNIC_NOT_LISTED` (Afternic does not have the name; create it in Afternic's Add Domains), `DOMAIN_NOT_LISTED` (not a listed name here), or the API reason `AFTERNIC_AUTH` / `AFTERNIC_NOT_FOUND` / `AFTERNIC_RATE_LIMITED` / `AFTERNIC_REJECTED` / `AFTERNIC_UNAVAILABLE` / `AFTERNIC_BAD_RESPONSE`. `skipped` = names the CSV also leaves out (min offer under $20).
+- **Upload record:** when the run checked every listed name and none failed (and not a dry run), it records the upload exactly as `POST /export/afternic/uploaded` does (an `export_runs` row at the start of the run, then the confirmed upload), so `export_pending_since` and `EXPORT_PENDING` clear for names unchanged since. Otherwise `upload.recorded` is false with `reason` `PARTIAL_DOMAIN_LIST`, `SOME_FAILED`, `NOTHING_TO_RECORD` or `DRY_RUN`.
+- **Errors:** 503 `AFTERNIC_NOT_CONFIGURED` (no key pair on the server) · 502 `AFTERNIC_API_ERROR` (the listing read failed; `details: {reason, status}`) · 422 for a bad body or `DOMAIN_INVALID`.
 
 ---
 
@@ -1454,6 +1464,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Listing errors:** the listing rule codes under `POST /list/{domain}`, plus `NOT_IN_PORTFOLIO`, `API_ACCESS_DISABLED`, `REGISTRAR_UNAVAILABLE`, `LISTING_CHANGED_CONCURRENTLY`, `DOMAIN_NOT_FOUND`, `DISPLAY_NAME_MISMATCH`, `REPLAN_NOTHING_LISTED`, `OVERRIDE_NEEDS_APPROVAL`, `DROP_DATE_UNKNOWN`, `LANDER_RETIRED`, `LANDER_INVALID`, `NS_INVALID`.
 
 **Screening errors:** `RUN_NOT_RUNNING` (409, the cancel routes, 2.9.0), `RUN_RUNNING` (409, `POST /screening/packs`), `PACK_NOT_FOUND` (404, `GET /screening/packs/{id}`), `JUDGED_AT_INVALID` (422, `POST /screening/packs`), `MANUAL_REQUIRED` (409, `POST /tranches/{id}/members`), `DRAFT_NOT_ALLOWED_LIVE`, `AS_OF_LIVE_REFUSED`, `RUN_NOT_FOUND`, `NAME_NOT_IN_RUN`, `CHECK_NOT_MANUAL`, `EVIDENCE_NOT_FOUND`, `OBSERVED_AT_INVALID`, `CHECKED_AT_INVALID`, `VERDICT_RESULT_NOT_FLAG`, `VERDICT_RESULT_STALE`, `RESULT_NOT_FOUND`, `DECIDED_AT_INVALID` (1.2.0), `REGISTRAR_UNKNOWN` (and `REGISTRAR_NOT_ALLOWED`; and `SETTINGS_NOT_FOUND`, `VALIDATION_ERROR`). Result reason codes are in `selection.md` §Screening runs.
+
+**Afternic API errors (5.61.0):** `AFTERNIC_NOT_CONFIGURED` (503, `POST /export/afternic/push` without the Afternic key pair in the server env), `AFTERNIC_API_ERROR` (502, the listing read failed; `details.reason` is `AFTERNIC_AUTH`, `AFTERNIC_NOT_FOUND`, `AFTERNIC_RATE_LIMITED`, `AFTERNIC_REJECTED`, `AFTERNIC_UNAVAILABLE` or `AFTERNIC_BAD_RESPONSE`). Warnings in `/report`: `AFTERNIC_DRIFT`, `AFTERNIC_NOT_LISTED`.
 
 **Auction errors (5.39.0, CR-077):** `CLOSEOUTS_PAUSED` (409, `POST /auctions/plans`), `PREBID_REQUIRED` (409), `PREBID_FAILED` (409), `BID_PLAN_EXISTS` (409, `details.plan_id`), `BID_PLAN_NOT_FOUND` (404), `BID_PLAN_CLOSED` (409, the result route), `PRICE_ABOVE_PLAN` (409, the result route and `POST /portfolio/import`), `BID_PLAN_REQUIRED` (409, `POST /portfolio/import`); `S8_PRICE_CAP` and `APPROVAL_INVALID` also come from `POST /auctions/plans`.
 

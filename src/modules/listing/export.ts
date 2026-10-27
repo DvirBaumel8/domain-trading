@@ -210,6 +210,16 @@ export class ExportService {
     });
   }
 
+  /**
+   * v5.61.0: POST /export/afternic/push verified these names against Afternic's own read (updated or already equal). Records the same pair a file upload does
+   * (an export_runs row at `at`, then the confirmed upload), so export_pending_since and EXPORT_PENDING clear exactly as after POST /export/afternic/uploaded.
+   */
+  async recordApiPush(domains: string[], at: Date, ctx: { auditId: string }) {
+    const exportId = `exp_${randomUUID()}`;
+    await this.deps.db.insertInto('export_runs').values({ marketplace: 'afternic', at, domains, export_id: exportId }).execute();
+    return this.confirm('afternic', { export_id: exportId, note: 'pushed through the Afternic API' }, ctx);
+  }
+
   /** POST /export/{venue}/uploaded: record a confirmed upload; for Afternic also clear the pending flag (R1). */
   async confirm(venue: Venue, body: { export_id: string; approval_ref?: { text?: unknown; approved_at?: unknown } | null; uploaded_at?: unknown; note?: string | null }, ctx: { auditId: string }) {
     const { db } = this.deps;

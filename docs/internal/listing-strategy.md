@@ -26,6 +26,7 @@ DOM-internal rules: categories, modes, guards, the calculator, the drop schedule
 | `bin` | `bin` (geo grade). Floor, min offer and walk-away stored = BIN. No LTO | None |
 | `hybrid` | Client sends `bin`; server computes `floor`, `walkaway`, sets `min_offer = min(hybrid_min_offer, walkaway)`. **$20 ≤ min_offer ≤ walkaway ≤ floor ≤ bin** | ≥ floor pre-approved; walk-away..floor → Dvir; below → declined and logged |
 | `offer` | Override only. `min_offer` ≥ $20, `floor` optional, no BIN | Every offer → Dvir |
+- **Afternic lease-to-own, the global setting (Dvir, 27 Oct 2026, "implement all"):** `settings.afternic_lease_to_own` stays on and `afternic_lease_months` goes **16 -> 12** (migration `1768100000000_v5-61-0.sql`): NameBio's lease-to-own data shows 41% of finished deals cancelled and longer terms cancel more. The export and `POST /export/afternic/push` carry 12 for names with a BIN of $495 or more. Since 22 Oct 2026 Afternic has an official seller API; the daily `afternicSync` reads it and `POST /export/afternic/push` writes the plan to it (`docs/internal/afternic-api.md`); the browser path (afternic-listing skill) is the fallback.
 - **LTO** (`lto_max_months`): override + `approval_ref`, hybrid only, 2–60 months, BIN $495–$5M (Afternic rule), lease ends before `drop_date`. Always needs the override whatever `public_lto` says. Buyers who ask get a private ≤12-month lease via the Afternic Custom Checkout Link.
 - In hybrid the client never sends `min_offer`. All listing prices are whole USD (`LISTING_PRICE_INVALID` otherwise).
 

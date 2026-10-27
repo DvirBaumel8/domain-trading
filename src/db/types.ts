@@ -766,6 +766,28 @@ export interface BigcoNamesTable {
 }
 
 /** v5.18.0 (CR-068): daily visitor counts per domain and source; aggregates only. */
+/** v5.61.0: one read of an Afternic listing per UTC day (daily step afternicSync). Money in cents. */
+export interface AfternicListingsDailyTable {
+  id: Generated<number>;
+  domain: string;
+  day: DateString;
+  list_status: string | null;
+  bin_cents: number | null;
+  floor_cents: number | null;
+  min_offer_cents: number | null;
+  leasing_enabled: boolean | null;
+  max_lease_months: number | null;
+  show_buynow: boolean | null;
+  show_lto: boolean | null;
+  show_offer: boolean | null;
+  intake_style: string | null;
+  hidden: boolean | null;
+  views: number | null;
+  leads: number | null;
+  updated_at_afternic: Timestamp | null;
+  created_at: TimestampDefault;
+}
+
 export interface VisitDailyTable {
   id: Generated<number>;
   domain: string;
@@ -1975,6 +1997,7 @@ export interface Database {
   sales_comps: SalesCompsTable;
   visit_forwards: VisitForwardsTable;
   visit_daily: VisitDailyTable;
+  afternic_listings_daily: AfternicListingsDailyTable;
   engine_endings: EngineEndingsTable;
   owned_ending_events: OwnedEndingEventsTable;
   engine_models: EngineModelsTable;

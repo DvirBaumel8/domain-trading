@@ -24,6 +24,7 @@ export { ReferenceRefreshJob } from './jobs/reference-refresh.js';
 export { RegistrarCheckJob } from './jobs/registrar-check.js';
 export { type BackupExport, JobRunner } from './jobs/runner.js';
 export { JobQueue } from './queue.js';
+export { AfternicSyncJob } from './jobs/afternic-sync.js';
 export { ListingSyncJob } from './jobs/listing-sync.js';
 export { PortfolioLifecycleJob } from './jobs/portfolio-lifecycle.js';
 export { SellerHubClient } from './sellerhub.js';

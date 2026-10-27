@@ -1,4 +1,4 @@
-# Reports (contract v5.60.0)
+# Reports (contract v5.61.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 
@@ -64,6 +64,8 @@ READ. **Query (strict):** `format` = `json` (default) | `md`. Anything else → 
 | `REGISTRAR_DRIFT` | warn | (3.7.0) The registrar's privacy is off, or its nameservers differ from the lander's. **5.50.0 (P8):** the nameserver part is not checked for a name with an active visit forward (`POST /visits/forward/{domain}`): the forward is how it reaches the lander and the stored nameservers are stale by design | `domain`, `drift: [privacy_off, nameservers]`, `checked_at` |
 | `LANDER_DOWN` | warn; **error from the 2nd day running** | The daily web check of a listed name with verified lander nameservers did not get the lander's answer (2.3.0; 4.0.0: https, and a TLS failure counts, `reason: tls_error`) | `checked_at`, `since`, `status_code`, `reason` |
 | `EXPORT_PENDING` | warn; **error after 7 days** | A listed name changed since the last confirmed Afternic upload | `days_pending`, `export_pending_since` |
+| `AFTERNIC_DRIFT` | warn | (5.61.0) The newest daily `afternicSync` read of Afternic shows a value that is not the current plan's: BIN, floor, min offer, lease on or months, lander style, the three lander buttons, hidden, or a `listStatus` other than `ACTIVE`. Fix with `POST /export/afternic/push` | `domain`, `fields[{field, plan, afternic}]`, `read_day` |
+| `AFTERNIC_NOT_LISTED` | warn | (5.61.0) A listed name is missing in the newest daily `afternicSync` read (names listed after that read are not flagged). Silent when no read exists or the newest is over 3 days old | `read_day` |
 | `MANUAL_DELIST` | warn | A sold, delisted or dropped name must be removed by hand at a marketplace | `status`, `venues[]` |
 | `POST_BUY_INCOMPLETE` | warn | (3.9.0: was "no stored comps") A name bought with `POST /buy` has no screening pack on file. Comps are optional since pricing v3 and no longer matter here. Never raised for an imported name (`import-domain` makes no purchase) | `purchase_id` |
 | `LANDER_PENDING` | info | The name was listed with `lander: "none"` and no lander has been chosen yet (2.1.0); no nameserver action is pending in the service | `lander` (null) |

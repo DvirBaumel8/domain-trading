@@ -54,6 +54,7 @@ const EXCLUDED: Record<string, string> = {
   bigco_names: 'loaded big-company names (v5.12.0, CR-063): append-only, reloaded from the bot\'s file; the nightly export is unconfigured',
   sales_comps: 'loaded graded comparable sales (v5.12.0, CR-063): reloaded from the bot\'s file; the nightly export is unconfigured',
   engine_models: 'scoring-engine model versions (v5.5.0, CR-056): retrained from the engine data by the weekly engineTrain step; large (trees, test rows)',
+  afternic_listings_daily: 'one read of Afternic per UTC day (v5.61.0); Afternic holds the truth and the daily afternicSync re-reads it',
   visit_daily: 'daily visitor counts (v5.18.0, CR-068): aggregates only, kept 400 days, rebuilt by new hits; the afternic rows are reloaded from the CR-037 files',
   visit_forwards: 'registrar URL-forward state of POST /visits/forward (v5.18.0, CR-068): operational; the registrar holds the real forward',
   api_usage: 'rate and Web Risk usage counters; operational',

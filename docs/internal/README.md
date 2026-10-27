@@ -21,6 +21,7 @@ These are **DOM's own** working documents: the binding business rules, internals
 | `selection/` | Source READMEs for the census and NameBio data (`census-README.md`, `namebio-README.md`) |
 | `code-map.md` | Where every module, file, route, table and test is (start here for any change) |
 | `engine.md` | Scoring engine (CR-056): release plan, data model, endings fill and point-in-time rules; EN-* |
+| `afternic-api.md` | Afternic seller API (5.61.0): client, daily `afternicSync`, drift warnings, `POST /export/afternic/push`, lease 12 months; AFN-* |
 | `visits.md` | Visitor counter (CR-068, 5.18.0): privacy rules, scope, the forward, the token hand-off; V518-* |
 | `bots-token.md` | Shared `bots` token (CR-069, 5.20.0): scope rule, the route classification table, rotation, X-Bot-Name; B520-* |
 | `datasave.md` | Daily data save job (CR-071, 5.21.0): steps, sealing, retention, health rule, Dynadot TODO; DS521-* |
