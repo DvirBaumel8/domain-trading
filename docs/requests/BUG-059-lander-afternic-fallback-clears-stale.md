@@ -38,7 +38,7 @@ Apex is often a tiny JS stub → `/lander` → GoDaddy forsale **403** to our UA
 - R-3 Still never treat limit-copy / $49,999,999 / bare $100,000 as shown.
 - R-4 A successful matching BIN (or a deliberate clear rule you document) must **clear** prior `LANDER_PRICE_MISMATCH` on the next check — roofing + ukcbam must leave `/report`.
 - R-5 No listing writes / no money / no browser UI.
-- R-6 Do not weaken the contract for unrelated unknowns (e.g. random TLS failures) beyond what is needed for this Afternic fallback.
+- R-6 Fallback must run when primary yields **`price === null` OR `status === unknown` / `no_price_text`** for Afternic-NS names (readable page with no Buy Now still needs the listing fetch). Do not weaken unknown-clearing for non-Afternic landers.
 
 ## Acceptance tests
 - **AT-1 (fixture):** primary fetch unknown/403; Afternic listing HTML has `Buy it now for $1,488.00` + limit copy → `shown` $1,488; mismatch cleared.
@@ -78,3 +78,15 @@ Tests LP-13 (AT-1) and LP-14 (AT-2) added. `/health` shows `5.70.0` after deploy
   - `ukcbamcompliance.com`: still **`$100,000.00`** @ **16:21:00+02:00**
 - DB price rows at 20:48 IDT: both **`unknown` / `no_price_text`** (primary page matched lander signature but no Buy Now). Shipped code only calls `afternicListingPrice` when `priceResult === null` (DOM response R-6), **not** when status is `unknown` — so listing fallback never ran for these two.
 - Original R-1 wanted fallback on unknown/403; AT-3 still open until fallback covers `unknown` (or primary returns null) and writes `ok` with `source: afternic_listing`. No money.
+
+
+## Round 2 — BUILD NOW (2026-10-27 ~20:55 IDT, DOM Architect)
+
+**Correctness gap vs R-1 / AT-1 / AT-3:** v5.70.0 only falls back when `priceResult === null`. Live roofing + ukcbam return primary **`unknown` / `no_price_text`** (page readable, lander signature match, no Buy Now) → fallback never runs → stale `$49,999,999` / `$100,000` remain (`4592bc8`).
+
+**Replace DOM R-6:** fallback when Afternic-NS and (`price === null` **or** primary price status is `unknown` / no usable BIN). Prefer Afternic listing BIN over leaving unknown (R-2). Add regression test: primary returns unknown/no_price_text + Afternic listing has Buy it now $1,488 → `ok` / `afternic_listing` / mismatch cleared.
+
+**Build immediately** (round 2 of 2). PATCH release (5.71.0). Tag the release (`v5.71.0`) so Mac deploys. Stamp `## DOM response (round 2)` + DOM-TO-GAVRIEL. No money. No browser UI. Report when live on `/health`.
+
+## Changes
+- 2026-10-27 ~20:55 IDT (DOM Architect): Round 2 — fallback must cover primary `unknown`, not only null (AT-3 fail on 5.70.0).

@@ -1,3 +1,7 @@
+## 2026-10-27 ~20:55 IDT (DOM Architect): BUG-059 Round 2 BUILD NOW
+
+5.70.0 live: AT-3 **FAIL** — roofing/ukcbam still stale. Fallback only on `price===null`; live primary is **`unknown`/`no_price_text`**. Round 2: also fallback on unknown for Afternic-NS. Discovery E2E still held. No money. No green ping.
+
 ## 2026-10-27 ~20:51 IDT (DOM Architect): v5.70.0 live lander gates
 
 **ALL THREE gates green: NO.** Do not priority-ping Gavriel for green.
