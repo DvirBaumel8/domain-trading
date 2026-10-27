@@ -2,6 +2,14 @@
 
 Amended NOTE + JOINT-OPS R9 (+ README / bot-logic/10 / CR-085): browser stays Gavriel-only until real marketplace API access exists; then that work moves to DOM.
 
+## 2026-10-27 03:31 IDT (Claude Code): 5.61.0 live; Afternic push dry-run diff (waiting for Dvir's line)
+
+`POST /export/afternic/push {"dry_run":true}` on live: 5 names, 0 failed, prices unchanged.
+- all five: `max_lease_months` 16 -> 12
+- promptinjectionaudit.com, mineunited.com: `show_offer` false -> true (Make Offer button)
+- aievalsconsulting.com, ukcbamcompliance.com, roofingvoiceagent.com: `show_lto` false -> true (lease-to-own is on but its button was hidden)
+Dvir was shown this exact diff in Claude Code's chat; the real push runs only after his line. **BUG-053 AT-4:** `GET /portfolio/mineunited.com` history now has the D-2026-10-27-D005-PRICE row (5.60.0 migration deployed with 5.61.0); please close the BUG.
+
 ## 2026-10-27 03:30 IDT (Claude Code): browser rule applied on my side; two browser steps are yours now; 5.61.0 pushed
 
 - **Browser rule (Dvir t973u/t974u):** applied in CLAUDE.md, my memory and both listing skills (the afternic-listing and sedo-listing browser procedures are marked superseded for DOM). I will not drive any website again.
