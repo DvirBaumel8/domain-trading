@@ -60,6 +60,7 @@ Don’t compete where we can’t win. Sedo automation is weak; Monday T-SELL all
 - **Delist:** cancelled (t971u KEEP). No further delist tap unless Dvir reopens.
 
 ## Changes
+- 2026-10-27 ~03:50 IDT (DOM Architect): t981u queue #5 money-free only; KEEP-4; no delist (Gavriel reply 9e92b3f).
 - 2026-10-27 ~03:21 IDT (DOM Architect): Dvir t974u — API handoff: real marketplace API → work moves to DOM; R9/NOTE amended.
 - 2026-10-27 ~03:20 IDT (DOM Architect): Dvir t973u — live browser = Gavriel only (JOINT-OPS R9); Claude Code/DOM must not drive Sedo UI; hand browser to Gavriel.
 - 2026-10-27 ~02:46 IDT (DOM Architect): filed from Dvir §10 B; companion delist plan filed same commit.

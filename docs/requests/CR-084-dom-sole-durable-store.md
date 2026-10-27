@@ -14,7 +14,7 @@ max_rounds: 2
 **Approval:** Dvir §10 A FINAL 2026-10-27 ~02:44 IDT via Gavriel. Build right away. Maintenance under freeze. Max **2 rounds**. No Dvir setup. Report when live on `/health`.
 
 ## BUILD ORDER (Dvir t981u GO AHEAD ~03:48 IDT)
-**Queue position 2** (after Afternic real-push receipt). Claude Code: start immediately when Afternic NOTE `## Receipt` is filled and AT-1…AT-4 pass. Max 2 rounds. Report live on `/health`. Money still Dvir yes per action — this CR does not push prices.
+**Queue position 2** (after Afternic real-push receipt). Includes **decisions store + X-Caller** (Gavriel reply `9e92b3f`). Claude Code: start when Afternic NOTE `## Receipt` filled and push ATs pass. Max 2 rounds. Report live on `/health`. Money still Dvir yes per action — this CR does not push prices. **§5 Security A already decided — do not re-ask Dvir.**
 
 
 ## Why
@@ -27,11 +27,13 @@ Dual writers for prices and other durable facts (DOM books vs company `ledger/po
 - R-4 **Money unchanged.** Any price / list / buy / bid / renew spend still needs **Dvir’s own yes**; Gavriel executes; DOM records. This CR does not auto-change prices.
 - R-5 **No new dual store.** New durable fields land in DOM (CR) first; do not invent parallel box CSVs for the same fact.
 - R-6 **Document the map.** Release note / contract lists which endpoints are the sole read path for: prices, listing provenance, costs/receipts already in DOM.
+- R-7 **Decisions store (Gavriel AGREE §3.2, reply 9e92b3f):** `POST/GET /decisions` (or equivalent) so D-IDs from company decisions-log are readable in DOM; sole durable home for decision ids bots/Claude cite. No money auto-action.
+- R-8 **X-Caller (Gavriel AGREE §3.3):** shared-token requests should send `X-Caller: <bot-or-dom>` (or agreed header); DOM logs it for attribution. Do not mint per-bot tokens.
 
 ## R-STOP-FIRST
 | | |
 |---|---|
-| **Pass marks** | AT-1…AT-5; no money auto-action; dual-write paths for prices documented as removed or refused. |
+| **Pass marks** | AT-1…AT-7; no money auto-action; dual-write paths for prices documented as removed or refused; decisions + X-Caller. |
 | **Max rounds** | **2**. |
 
 ## Acceptance tests
@@ -40,9 +42,11 @@ Dual writers for prices and other durable facts (DOM books vs company `ledger/po
 - AT-3 **Negative — no silent dual write API:** There is no bots route that updates company-box files; bots that POST price changes use existing DOM money/list routes only (still gated by approval rules).
 - AT-4 **Export optional:** If a `GET` export of books/ledger snapshot exists or is added for offline mirror, it is clearly labeled export (not a second write API).
 - AT-5 **Negative — no price change without approval rules:** This CR’s release does not weaken existing approval gates on `/list` / price changes.
+- AT-6 **Decisions:** `POST /decisions` then `GET /decisions` (or by id) round-trips a sample D-id without touching prices.
+- AT-7 **X-Caller:** A shared-token call with `X-Caller` is accepted; missing header does not break READ (document default); logged when present.
 
 ## Out of scope
-- Sedo delist (CR-085).
+- Sedo delist (CR-085) — **KEEP-4**; scrapes-off only.
 - Named READ tokens (rejected; one shared token — separate handoff).
 - Bak archive (CR-086 / box).
 - Moving judgment SOPs into code.
@@ -56,5 +60,6 @@ Dual writers for prices and other durable facts (DOM books vs company `ledger/po
 None (already decided in §10 A).
 
 ## Changes
+- 2026-10-27 ~03:50 IDT (DOM Architect): folded decisions store + X-Caller per Gavriel JOINT-OPS reply (`9e92b3f`); §5 closed (Security A).
 - 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u — queue #2 after Afternic push; status building.
 - 2026-10-27 ~02:46 IDT (DOM Architect): filed from Dvir §10 A.
