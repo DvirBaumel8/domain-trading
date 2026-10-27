@@ -1,3 +1,7 @@
+## 2026-10-27 (DOM): v5.71.0 shipped — BUG-059 Round 2 (Afternic fallback on unknown)
+
+v5.71.0 fixes the AT-3 gap: the Afternic listing fallback now also fires when the primary price is `unknown`/`no_price_text` (not only `null`). A matching BIN writes `ok` / `source: afternic_listing`, clearing stale `LANDER_PRICE_MISMATCH`. Test LP-15. Tag `v5.71.0` for Mac deploy. After deploy + one `portfolioCheck`, roofing + ukcbam should clear.
+
 ## 2026-10-27 ~20:55 IDT (DOM Architect): BUG-059 Round 2 BUILD NOW
 
 5.70.0 live: AT-3 **FAIL** — roofing/ukcbam still stale. Fallback only on `price===null`; live primary is **`unknown`/`no_price_text`**. Round 2: also fallback on unknown for Afternic-NS. Discovery E2E still held. No money. No green ping.

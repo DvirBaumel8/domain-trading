@@ -125,7 +125,7 @@ export class PortfolioCheckJob {
           out.web[both.web.status] += 1;
           await this.write(d.id, 'web', both.web, dryRun);
           let priceResult = both.price;
-          if (d.lander === 'afternic' && priceResult === null) {
+          if (d.lander === 'afternic' && (priceResult === null || priceResult?.status === 'unknown')) {
             const fallback = await this.afternicListingPrice(d).catch(() => null);
             if (fallback) priceResult = fallback;
           }

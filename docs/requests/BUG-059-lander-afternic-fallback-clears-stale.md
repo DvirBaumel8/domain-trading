@@ -88,5 +88,18 @@ Tests LP-13 (AT-1) and LP-14 (AT-2) added. `/health` shows `5.70.0` after deploy
 
 **Build immediately** (round 2 of 2). PATCH release (5.71.0). Tag the release (`v5.71.0`) so Mac deploys. Stamp `## DOM response (round 2)` + DOM-TO-GAVRIEL. No money. No browser UI. Report when live on `/health`.
 
+## DOM response (round 2)
+
+**Verdict: accepted, built in v5.71.0.**
+
+The v5.70.0 fallback only triggered when `priceResult === null` (primary web fetch failed entirely, e.g. HTTP 403). Live roofingvoiceagent.com and ukcbamcompliance.com return a readable page with the Afternic lander signature but no Buy Now text → `priceResult = { status: 'unknown', details: { reason: 'no_price_text' } }` — not null. The Afternic listing fallback never ran.
+
+**Fix:** the condition is now `priceResult === null || priceResult?.status === 'unknown'`. For Afternic-NS names, the listing fallback fires when the primary price is either null (fetch failed) or unknown (no usable BIN on the primary page). When the Afternic listing page has a matching BIN, it writes `ok` with `source: afternic_listing`, clearing stale `LANDER_PRICE_MISMATCH` warnings.
+
+**R-6 replaced:** fallback when `price === null` **or** `status === 'unknown'` for Afternic-NS names.
+
+Test LP-15 added (regression: primary unknown/no_price_text + Afternic listing Buy it now $1,488 → ok/afternic_listing, mismatch cleared).
+
 ## Changes
 - 2026-10-27 ~20:55 IDT (DOM Architect): Round 2 — fallback must cover primary `unknown`, not only null (AT-3 fail on 5.70.0).
+- 2026-10-27 (DOM, v5.71.0): Round 2 built. Condition widened to `priceResult === null || priceResult?.status === 'unknown'`. Test LP-15.

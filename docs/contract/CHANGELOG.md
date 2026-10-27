@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.71.0 (2026-10-27): fix(BUG-059 R2): Afternic listing fallback on unknown/no_price_text
+Release note: `docs/releases/v5.71.0.md`.
+PATCH (no migration, no new route, no new code). Lander price-check fallback round 2:
+- BUG-059 R2: the Afternic listing fallback now also fires when the primary apex/lander price result is `unknown` (readable page, lander signature match, no Buy Now text), not only when the primary fetch failed entirely (`price === null`). A matching BIN from the listing page writes `ok` with `source: afternic_listing`, clearing stale `LANDER_PRICE_MISMATCH`. Test LP-15.
+
 ## 5.70.0 (2026-10-27): BUG-059 Afternic listing fallback for stale lander mismatches
 Release note: `docs/releases/v5.70.0.md`.
 PATCH (no migration, no new route, no new code). Lander price-check fallback:

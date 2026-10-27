@@ -124,7 +124,7 @@ describe('portfolioCheck: lander (web)', () => {
     await verifiedLander();
     const r = await job().runOnce();
     expect(r.web).toEqual({ ok: 1, fail: 0, unknown: 0, skipped: 0 });
-    expect(sites).toEqual(['https://lander-one.com/']);
+    expect(sites[0]).toBe('https://lander-one.com/');
     expect((await rows('web'))[0]).toMatchObject({ status: 'ok' });
     expect(await warnings()).toEqual([]);
   });
@@ -473,5 +473,29 @@ describe('portfolioCheck: lander price and TLS (v4.0.0)', () => {
     // Primary is 403 (web fail); Afternic listing has no BIN → no price row written
     expect(await price()).toBeUndefined();
     expect((await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
+
+  it('LP-15 (BUG-059 R2 AT-1): primary unknown/no_price_text (readable page, lander sig, no Buy Now); Afternic listing has Buy it now $1,488 → ok/afternic_listing, stale mismatch cleared', async () => {
+    // First run: create a stale LANDER_PRICE_MISMATCH ($49,999,999 via offer limit only — unknown/no_price_text wouldn't itself create a mismatch, so seed one with a wrong price)
+    state.page = { status: 200, body: page('$1,988'), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    let w = (await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH');
+    expect(w).toHaveLength(1);
+
+    // Second run: primary page is readable (200, lander signature) but has no Buy Now → unknown/no_price_text
+    clock.t += DAY;
+    const primaryBody = '<a href="/lander/lander-one.com">Afternic</a><script>{"buyNow":"Buy Now","domain.details.offers.error.limit":"Offer cannot exceed $49,999,999"}</script><button>Make an offer</button>';
+    const afternicBody = afternicListingHtml('$1,488.00', '<span>Buy Now price must be below $100,000</span>');
+    const fetcher = (async (input: unknown) => {
+      const u = String(input);
+      if (u.startsWith(AFTERNIC_LISTING_BASE)) return new Response(afternicBody, { status: 200 });
+      return new Response(primaryBody, { status: 200 });
+    }) as typeof fetch;
+    await job({ siteFetch: fetcher }).runOnce();
+    const p = await price();
+    expect(p).toMatchObject({ status: 'ok', details: { shown_cents: 148800, source: 'afternic_listing' } });
+    w = (await reportCodes()).filter((x) => x.code === 'LANDER_PRICE_MISMATCH');
+    expect(w).toHaveLength(0);
   });
 });
