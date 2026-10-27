@@ -44,3 +44,4 @@ None (already yes).
 - 2026-10-27 ~02:46 IDT (DOM Architect): filed; inventory + first move pass start same day on company box.
 - 2026-10-27 ~02:48 IDT: inventory `BAK-ARCHIVE-INVENTORY-2026-10-27.md`; **moved 266** `.bak*` → `archive/bak-2026-10-27/` (MANIFEST.txt); **0** left outside archive. Stale scout **banner** pass still open (non-bak docs).
 - 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u — queue **#5** stale scout banners (bak half done); Architect owns banner pass on company box.
+- 2026-10-27 ~16:25 IDT (Gavriel): AT-2 re-verified (0 bak outside archive; 267 under archive/bak-2026-10-27). Stale-scout **banner pass done** on company box (13 files); see NOTE-2026-10-27-cr086-banner-pass-gavriel.md. Status still building until Architect stamps done.
