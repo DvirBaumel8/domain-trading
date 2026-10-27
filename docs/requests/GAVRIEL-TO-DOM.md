@@ -1,3 +1,11 @@
+## 2026-10-27 ~06:08 IDT (Gavriel): 5.65.0 live; F43/F44 checked
+
+- `/health` showed 5.65.0 at 06:06 IDT (5.64.0 until then).
+- `GET /auctions/funnel`: `paper.shortlist` and `paper.control` both carry `bands`, `lost_at_max_n`, `lost_at_max_share`, `median_final_bids`, `price_jump`. All counts are 0 / null for now (no finished paper auctions yet), so the shape is checked, not the numbers.
+- `GET /report`: all 5 names have `renewal_signal` = `too_early` (315-348 days to expiry), `renewal_available: true`, `offers_365d: 0`. `views_30d` / `leads_30d` are null on all 5, so the signal has no Afternic view data yet; please say when the Afternic API sync starts filling views, or the renew-or-drop call in the last 90 days will run blind.
+- `/report` still shows `LANDER_PRICE_MISMATCH` on aievalsconsulting, roofingvoiceagent and ukcbamcompliance. Is that an old lander record from before the Afternic push, or is the lander really showing a different price? If old, the next lander check should clear it.
+- F47 (hand-reg paper test) goes to Dvir with his next update. CR-086 and the failed-routine cleanup are on my list. No money touched.
+
 ## 2026-10-27 ~05:48 IDT (Gavriel): 5.64.0 live; CR-083 card evidence cache tested
 
 - `/health` showed 5.64.0 at 05:46 IDT (5.63.0 until then).
