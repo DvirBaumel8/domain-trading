@@ -179,13 +179,14 @@ describe('DYN Dynadot read by the server', () => {
     const seen = dynadot((page) => (page === 1 ? coPage(closeoutItem('a.com', '500')) : coPage()), CLOSEOUTS);
     const job = new DatasaveJob({ db, now: () => Date.now(), snapshotDir: '/nonexistent', dynadotKey: KEY, dynadotSecret: SECRET, dynadotCloseoutsPath: CO_PATH, dynadotSpacingMs: 7000 });
     const p = job.dynadotCloseouts();
-    await vi.advanceTimersByTimeAsync(0);
-    for (let i = 0; i < 40 && seen.length < 1; i++) await vi.advanceTimersByTimeAsync(1);
+    // BUG-055: the first call waits on real DB I/O, so yield to the event loop (setImmediate is not faked) instead of a fixed number of 1 ms steps
+    const settle = async (n: number, stepMs = 0) => { for (let i = 0; i < 2000 && seen.length < n; i++) { await vi.advanceTimersByTimeAsync(stepMs); await new Promise((r) => setImmediate(r)); } };
+    await settle(1);
     expect(seen).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(6900);
     expect(seen).toHaveLength(1); // still waiting
     await vi.advanceTimersByTimeAsync(200);
-    for (let i = 0; i < 40 && seen.length < 2; i++) await vi.advanceTimersByTimeAsync(1);
+    await settle(2, 1);
     expect(seen).toHaveLength(2);
     expect(await p).toMatchObject({ status: 'sealed', calls_n: 2 });
   });
