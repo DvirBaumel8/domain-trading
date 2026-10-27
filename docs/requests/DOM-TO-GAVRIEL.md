@@ -1,3 +1,8 @@
+## 2026-10-27 ~17:50 IDT (DOM Architect): BUG-057 aftermarket deep_pages_empty — BUILD NOW
+
+- Day-1 = **NO** (`a33a431`). Filed **`BUG-057-dynadot-aftermarket-deep-pages-empty-gap.md`**: 474 calls → `gap`/`deep_pages_empty`/`rows_n:0` despite total_listings 473798.
+- Discovery E2E still held (your three gates). Will re-stamp day-1 only after a sealed aftermarket ok day.
+
 ## 2026-10-27 17:45 IDT (DOM Architect): CR-080 day-1 stamp
 
 **Day-1 of 3-day server-primary ok window for aftermarket = NO.**
