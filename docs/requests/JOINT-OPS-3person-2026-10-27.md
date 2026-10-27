@@ -1,6 +1,6 @@
 # JOINT OPS — 3-person team (Gavriel ↔ DOM Architect)
 
-**Status:** **DOM Architect confirmed** 2026-10-27 ~02:40 Asia/Jerusalem (IDT) — no remaining disagreements → **Dvir final approval** next (Gavriel brings §10)  
+**Status:** **Dvir-approved** 2026-10-27 ~02:44 Asia/Jerusalem (IDT) (t959u, t960u) — DOM Architect confirmed ~02:40 IDT; residual disagreements: **none**  
 **Authors:** Merged from DOM Architect `DOM-CRITICAL-ops-3person-2026-10-27.md` (c48f42d) + Gavriel `TEAM-OPS-proposal-gavriel-2026-10-27.md` (d0f6a7e) + `TEAM-OPS-critical-notes-2026-10-27.md`  
 **Date:** 2026-10-27 ~02:55 Asia/Jerusalem (IDT)  
 **Filename:** `docs/requests/JOINT-OPS-3person-2026-10-27.md` (agreed)  
@@ -15,7 +15,7 @@
 | Separate drafts | Done (both on main) |
 | Ping-pong answers | Done (this file §9) |
 | Joint draft | **DOM Architect confirmed** — no remaining disagreements |
-| Dvir final approval | **Not yet** — Gavriel brings §10 (at minimum A) |
+| Dvir final approval | **Done** 2026-10-27 ~02:44 IDT — see §10 answers |
 
 Residual hard disagreements after DOM confirm: **none**. §9 Q1–Q5 accepted as written (DOM books canonical; USPTO cache TTL 24h; filename; Grok-side waste list; FIXED token-savers as maintenance under freeze).
 
@@ -256,6 +256,17 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 | D | **Bak cleanup** | Approve archive pass on ~267 bak files / stale scout docs (paths may break old routines)? |
 | E | **90-day edge bet** | Double down on shortlist generic inventory + Afternic inbound, vs revive buyer-first broker test (outreach still paused — may need legal unblock)? Ask only if both sides still want this framed. |
 | F | **Any remaining disagreement after DOM confirm** | Especially: FIXED token-savers under freeze (Q5); USPTO TTL if DOM rejects 24h; anything else DOM lists. |
+
+### Dvir answers (2026-10-27 ~02:44 IDT, msgs t959u + t960u)
+
+| # | Answer |
+|---|---|
+| A | **Yes, broader:** one place per durable data piece = **DOM database**. Every component needing that data reads **only via DOM API**. All other persistence of those facts to be removed/refactored (company CSV mirrors included). |
+| B | **Sedo fully off:** remove Sedo scrapes **and** Sedo listings (no placeholders). Seek server-to-server marketplace alternatives (Afternic Portfolio API, Spaceship SellerHub, others with S2S APIs). |
+| C | **Reject three named READ tokens.** One shared password for DOM endpoints; DOM generates, Dvir passes it to Gavriel. |
+| D | **Yes** — archive ~267 bak / stale scout docs under `archive/` (no delete). |
+| E | **Skip** 90-day edge framing for now. |
+| F | Residual disagreements: **none**. |
 
 **Not for Dvir:** which CR round, AT wording, bak naming, digest formatting, FIXED filter code placement once classified in `08`.
 
