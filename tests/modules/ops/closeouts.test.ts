@@ -304,7 +304,7 @@ describe('CC526 closeout candidates', () => {
     expect((await poolRow(unsold(1))).scored_at).not.toBeNull();
   });
 
-  it('CC526-13 the datasave job has the scorePool step after the Dynadot steps and it reports', async () => {
+  it('CC526-13 the datasave job has the scorePool step right after godaddyInventory (the Dynadot steps run last since 5.65.0) and it reports', async () => {
     await boot();
     seed = await train();
     mswServer.use(...inventoryHandlers());
@@ -312,7 +312,8 @@ describe('CC526 closeout candidates', () => {
     const run = await runJobToEnd(app!, 'datasave');
     const steps = run.json().steps as Record<string, { status?: string; result?: Record<string, unknown> }>;
     const names = Object.keys(steps);
-    expect(names.indexOf('scorePool')).toBe(names.indexOf('dynadotAftermarket') + 1);
+    expect(names.indexOf('scorePool')).toBe(names.indexOf('godaddyInventory') + 1);
+    expect(names.slice(-2)).toEqual(['dynadotCloseouts', 'dynadotAftermarket']);
     expect(steps.scorePool).toBeDefined();
     expect((await poolRow(unsold(0))).scored_at).not.toBeNull();
   });

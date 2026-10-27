@@ -426,12 +426,12 @@ describe('PP528 pick-proof: T30 labels', () => {
     expect(pr.pool_rows_deleted_n).toBe(1);
   });
 
-  it('PP528-33 the datasave job has the pickproofLabels step last and it reports', async () => {
+  it('PP528-33 the datasave job has the pickproofLabels step right before the two Dynadot steps (last since 5.65.0) and it reports', async () => {
     await boot();
     mswServer.use(...inventoryHandlers());
     const run = await runJobToEnd(app!, 'datasave');
     const steps = Object.keys(run.json().steps as Record<string, unknown>);
-    expect(steps[steps.length - 1]).toBe('pickproofLabels');
+    expect(steps.slice(-3)).toEqual(['pickproofLabels', 'dynadotCloseouts', 'dynadotAftermarket']);
     expect(steps).toHaveLength(12); // 5.41.0: engineFeed
   });
 });

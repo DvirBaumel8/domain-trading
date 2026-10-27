@@ -4,6 +4,8 @@
 //   dynadotCloseouts / dynadotAftermarket   v5.62.0 (CR-080 item 3): with DYNADOT_API_KEY + DYNADOT_API_SECRET the server reads (REST v2) Dynadot itself (dynadot-pull.ts) and stores + seals through the
 //                      bot-upload code (origin `server`); without the key they report `not_configured` and whether a bot upload (POST /snapshots/dynadot) for today is sealed.
 // v5.22.0 (R-10): the four auction files are also parsed (godaddy_auctions): .com auctions that reached $500, followed until they leave the files.
+// v5.65.0: the plan runs dynadotCloseouts / dynadotAftermarket LAST (after pickproofLabels): the Dynadot read takes about 40 minutes and used to delay scorePool and auctionShortlist.
+//   Steps that read Dynadot rows (scorePool, buildPanel, episodes, dqMarket) work on the newest SEALED day, so they see a day's Dynadot seal one run later (next day or the retry run).
 //   scorePool          (v5.26.0, CR-072) filters and scores the pool and the sealed Dynadot closeouts rows, offline; closeouts/score-pool.ts.
 //   buildPanel         the day diff of the closeouts pool (names gone before their end), split by RDAP tag bought / deleted / unknown (v5.34.0, BUG-052).
 //   engineFeed         (v5.41.0) free rows for the scoring engine: closeout names that left the list and were deleted (engine_unsold) and GoDaddy auctions that ended with

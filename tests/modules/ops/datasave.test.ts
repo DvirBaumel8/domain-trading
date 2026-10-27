@@ -46,7 +46,7 @@ describe('DS521 datasave job', () => {
     const run = await runJobToEnd(app!, 'datasave');
     expect(run.json().ok).toBe(true);
     const steps = run.json().steps;
-    expect(Object.keys(steps)).toEqual(['godaddyInventory', 'dynadotCloseouts', 'dynadotAftermarket', 'scorePool', 'buildPanel', 'engineFeed', 'auctionShortlist', 'pickproofSeal', 'snapshotRetention', 'episodes', 'dqMarket', 'pickproofLabels']);
+    expect(Object.keys(steps)).toEqual(['godaddyInventory', 'scorePool', 'buildPanel', 'engineFeed', 'auctionShortlist', 'pickproofSeal', 'snapshotRetention', 'episodes', 'dqMarket', 'pickproofLabels', 'dynadotCloseouts', 'dynadotAftermarket']);
     expect(steps.godaddyInventory.summary).toMatchObject({ data_date: '2026-10-20', complete_n: 5 });
     const res = (await get('/snapshots?date=2026-10-20&source=godaddy_inventory')).json();
     expect(res.snapshots).toHaveLength(5);
@@ -169,7 +169,7 @@ describe('DS521 datasave job', () => {
     const runs = (await get('/jobs/runs?job=datasave')).json().runs;
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ job: 'datasave', status: 'finished', ok: true });
-    expect(Object.fromEntries(Object.entries(runs[0].steps as Record<string, { status: string }>).map(([k, v]) => [k, v.status]))).toEqual({ godaddyInventory: 'done', dynadotCloseouts: 'done', dynadotAftermarket: 'done', scorePool: 'done', buildPanel: 'done', engineFeed: 'done', auctionShortlist: 'done', pickproofSeal: 'done', snapshotRetention: 'done', episodes: 'done', dqMarket: 'done', pickproofLabels: 'done' });
+    expect(Object.fromEntries(Object.entries(runs[0].steps as Record<string, { status: string }>).map(([k, v]) => [k, v.status]))).toEqual({ godaddyInventory: 'done', scorePool: 'done', buildPanel: 'done', engineFeed: 'done', auctionShortlist: 'done', pickproofSeal: 'done', snapshotRetention: 'done', episodes: 'done', dqMarket: 'done', pickproofLabels: 'done', dynadotCloseouts: 'done', dynadotAftermarket: 'done' });
     expect(runs[0].steps.godaddyInventory.summary.data_date).toBe('2026-10-20');
   });
 

@@ -164,7 +164,8 @@ export class JobRunner {
       const ds = d.datasaveJob;
       const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'engineFeed' | 'auctionShortlist' | 'pickproofSeal' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels') =>
         step(name, async () => (ds ? ds[name]() : { skipped: true, reason: 'datasave not configured' }));
-      return [dsStep('godaddyInventory'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('auctionShortlist'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels')];
+      // v5.65.0: the two Dynadot reads (about 40 minutes) run last, so they no longer delay scorePool, auctionShortlist and the rest; their rows are used by the next run (scorePool, buildPanel, episodes, dqMarket read the newest sealed day)
+      return [dsStep('godaddyInventory'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('auctionShortlist'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket')];
     }
     if (job === 'tick') return tick;
     // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.

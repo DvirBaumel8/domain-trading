@@ -2,6 +2,9 @@
 
 Binding rules and test IDs for the `datasave` job. The interface is `docs/contract/jobs.md` (row `datasave`), `endpoints.md` (§Daily data saves) and `reports.md` (`DATASAVE_MISSED`).
 
+## Step order (v5.65.0)
+`dynadotCloseouts` and `dynadotAftermarket` run LAST (after `pickproofLabels`): the server's Dynadot read takes about 40 minutes and used to delay `scorePool` and `auctionShortlist`. Nothing before them needs that day's Dynadot seal: `scorePool` scores a Dynadot day only when sealed and takes every unscored sealed day; `buildPanel`'s Dynadot diff uses the two newest sealed days; `episodes` and `dqMarket` merge every sealed source and are idempotent; `engineFeed`, `auctionShortlist`, `pickproofSeal`, `snapshotRetention` and `pickproofLabels` do not read Dynadot rows (the pick-proof pool of a day is built from sealed rows on demand). Effect: a day's Dynadot rows are scored, diffed and merged by the next day's run (or the retry run), one run later than before. Step-order tests: `datasave.test.ts` (DS tests on the step list), `market.test.ts`.
+
 ## Where
 - Job code: `src/modules/ops/jobs/datasave/` (`datasave.ts` = the eight steps (v5.23.0: `episodes`, `dqMarket`, rules in `market.md`; v5.28.0: `pickproofLabels` last (ninth step), rules in `pickproof.md`; v5.26.0: `scorePool` after the Dynadot steps, `closeouts.md`); `zip.ts` = streaming zip reader, no dependency; `json-stream.ts` = streaming reader of `{meta, data:[...]}`, no dependency). Wired in `src/app.ts` (`datasaveJob` of the `JobRunner`); plan in `ops/jobs/runner.ts` (job kind `datasave`, lock `job:datasave`).
 - Retry: `ops/queue.ts` `retryDatasave` (run level `not_before`, set when the run is finalized and its `godaddyInventory` step failed; `claim()` skips a run whose `not_before` is in the future by the app clock; `enqueue` for an open waiting run clears `not_before`).

@@ -1,4 +1,4 @@
-# Endpoints (contract v5.64.0)
+# Endpoints (contract v5.65.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -882,6 +882,7 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
   bid_plans:       { created, open, won, lost, withdrawn, expired, max_bid_total_cents, max_bid_total },   // plans created in the range, by status now
   imported,                                                  // plans whose name was imported (S8) in the range
   paper:           { shortlist: { final_n, would_win_n, median_final_price_cents },     // 5.49.0 (P4): paper trading over the shortlist data dates of the range. final = the auction ended and a later snapshot exists; would_win = the suggested maximum was above the final price (an upper bound: an untracked auction may have risen after the last snapshot, up to under $100); median null when there is no final row
+  //   5.65.0 (F43) paper adds, per group, over the final rows: bands {opening (<= $1), low ($2-24), mid ($25-99), high ($100+)}, median_final_bids, price_jump {median_cents (final minus first price seen), jumped_50_last_window_n (last price seen >= $50 above the one before; null before = not counted)}; shortlist only: lost_at_max_n (ended above our suggested maximum), lost_at_max_share (lost_at_max_n / final_n or null)
                      control:   { final_n, median_final_price_cents, reached_100_n } },  // a deterministic random 25 names a day of the same field that were not shortlisted; reached_100_n = final price at $100 or more
   s8_names:        { bought, listed_of_bought, sold_of_bought, listed_now },   // domains lane S8 with buy_date in the range
   traffic_of_bought: { views_30d, leads_30d, redirect_human_hits },            // latest Afternic views and leads of those names; all-time human hits on the redirect

@@ -29,6 +29,8 @@ export interface ApiTokensTable {
 
 export interface SettingsTable {
   id: Generated<boolean>;
+  /** v5.65.0 (F44): 30-day Afternic views at or above which the renewal signal is "renew" (advice only). Migration only. */
+  renew_views_min: Generated<number>;
   max_domains: Generated<number>;
   /** v5.8.0 (CR-059): the most one S8 name may have cost, (no slots are reserved for S8 since 5.52.0). Migration only. */
   s8_max_price_cents: Generated<number>;
@@ -212,6 +214,8 @@ export interface AuctionOutcomesTable {
   last_seen_price_cents: number | null;
   last_seen_bids: number | null;
   last_seen_at: Timestamp | null;
+  /** v5.65.0 (F43): the price seen before last_seen_price_cents (null until two snapshots were seen). */
+  prev_seen_price_cents: number | null;
   final: Generated<boolean>;
   would_win: boolean | null;
 }

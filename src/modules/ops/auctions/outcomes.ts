@@ -22,7 +22,7 @@ export async function updateOutcomes(db: Kysely<Database>, nowMs: number): Promi
   const cut = addDays(idtDay(nowMs), -OUTCOME_KEEP_DAYS);
   const del = await sql`delete from auction_outcomes where data_date < ${cut}::date`.execute(db);
   // the newest snapshot row of every open name (one auction: it ended no more than 3 days after the end time we stored; an extended auction moves its end time)
-  const seen = await sql`update auction_outcomes o set last_seen_price_cents = greatest(coalesce(o.last_seen_price_cents, 0), s.price_cents), last_seen_bids = greatest(coalesce(o.last_seen_bids, 0), s.bid_count),
+  const seen = await sql`update auction_outcomes o set prev_seen_price_cents = case when o.last_seen_at is not null and s.data_date::timestamptz > o.last_seen_at then o.last_seen_price_cents else o.prev_seen_price_cents end, last_seen_price_cents = greatest(coalesce(o.last_seen_price_cents, 0), s.price_cents), last_seen_bids = greatest(coalesce(o.last_seen_bids, 0), s.bid_count),
       last_seen_at = s.data_date::timestamptz, end_time = greatest(o.end_time, s.end_time)
     from (select distinct on (l.domain) l.domain, l.data_date, l.price_cents, l.bid_count, l.end_time from godaddy_auctions_live l
           where l.domain in (select domain from auction_outcomes where not final) order by l.domain, l.data_date desc) s

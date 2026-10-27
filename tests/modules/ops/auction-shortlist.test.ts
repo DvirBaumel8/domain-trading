@@ -593,8 +593,64 @@ describe('AS549 auction-v4 and paper trading', () => {
     app = await makeApp({ now: () => NOW });
     const auth = (await issueToken('read')).auth;
     const j = (await get(`/auctions/funnel?from=2026-10-20&to=2026-10-25`, auth)).json();
-    expect(j.paper).toEqual({ shortlist: { final_n: 3, would_win_n: 1, median_final_price_cents: 3000 }, control: { final_n: 1, median_final_price_cents: 3000, reached_100_n: 0 } });
+    expect(j.paper).toMatchObject({ shortlist: { final_n: 3, would_win_n: 1, median_final_price_cents: 3000 }, control: { final_n: 1, median_final_price_cents: 3000, reached_100_n: 0 } });
     const none = (await get(`/auctions/funnel?from=2026-01-01&to=2026-01-07`, auth)).json();
-    expect(none.paper).toEqual({ shortlist: { final_n: 0, would_win_n: 0, median_final_price_cents: null }, control: { final_n: 0, median_final_price_cents: null, reached_100_n: 0 } });
+    expect(none.paper).toMatchObject({ shortlist: { final_n: 0, would_win_n: 0, median_final_price_cents: null }, control: { final_n: 0, median_final_price_cents: null, reached_100_n: 0 } });
+  });
+
+  // ---- v5.65.0 (F43): machine competition measured in the paper block
+  const fin = (o: { domain: string; group?: 'shortlist' | 'control'; first: number; last: number; bids: number; prev?: number | null; win?: boolean | null; final?: boolean; date?: string }) =>
+    outcome({ domain: o.domain, group: o.group ?? 'shortlist', data_date: o.date ?? '2026-10-22', first_price_cents: o.first, last_seen_price_cents: o.last, last_seen_bids: o.bids, prev_seen_price_cents: o.prev ?? null,
+      final: o.final ?? true, would_win: (o.group ?? 'shortlist') === 'control' ? null : (o.win ?? null), max_bid_suggested_cents: (o.group ?? 'shortlist') === 'control' ? null : 5500 });
+  async function paperBands() {
+    await fin({ domain: 'a.com', first: 100, last: 100, bids: 1, win: true });
+    await fin({ domain: 'b.com', first: 500, last: 1500, bids: 4, prev: 500, win: true });
+    await fin({ domain: 'c.com', first: 2000, last: 8000, bids: 9, prev: 2500, win: false });
+    await fin({ domain: 'd.com', first: 3000, last: 15000, bids: 20, prev: 3000, win: false });
+    await fin({ domain: 'e.com', group: 'control', first: 100, last: 2500, bids: 3 });
+    await fin({ domain: 'f.com', group: 'control', first: 100, last: 100, bids: 1 });
+    await fin({ domain: 'open.com', first: 100, last: 900, bids: 2, final: false }); // an open row counts nowhere
+  }
+  const funnel = async (qs = 'from=2026-10-20&to=2026-10-25') => {
+    app = await makeApp({ now: () => NOW });
+    return (await get(`/auctions/funnel?${qs}`, (await issueToken('read')).auth)).json();
+  };
+
+  it('PT43-1: paper counts final rows by final-price band (opening <= $1, low $2-24, mid $25-99, high $100+) for both groups; open rows are ignored', async () => {
+    await paperBands();
+    const j = await funnel();
+    expect(j.paper.shortlist.bands).toEqual({ opening: 1, low: 1, mid: 1, high: 1 });
+    expect(j.paper.control.bands).toEqual({ opening: 1, low: 0, mid: 1, high: 0 });
+    expect(j.paper.shortlist.final_n).toBe(4);
+  });
+
+  it('PT43-2: shortlist lost_at_max_n and lost_at_max_share (lost / final); control has none', async () => {
+    await paperBands();
+    const j = await funnel();
+    expect(j.paper.shortlist).toMatchObject({ would_win_n: 2, lost_at_max_n: 2, lost_at_max_share: 0.5 });
+    expect(j.paper.control.lost_at_max_n).toBeUndefined();
+  });
+
+  it('PT43-3: median final bid count and price_jump (final minus first price: median; count of jumps >= $50 between the last two snapshots)', async () => {
+    await paperBands();
+    const j = await funnel();
+    expect(j.paper.shortlist).toMatchObject({ median_final_bids: 7, median_final_price_cents: 4750, price_jump: { median_cents: 3500, jumped_50_last_window_n: 2 } });
+    expect(j.paper.control).toMatchObject({ median_final_bids: 2, median_final_price_cents: 1300, price_jump: { median_cents: 1200, jumped_50_last_window_n: 0 } });
+  });
+
+  it('PT43-4: an empty range gives zero bands, null medians and a null share', async () => {
+    const j = await funnel('from=2026-01-01&to=2026-01-07');
+    expect(j.paper.shortlist).toMatchObject({ final_n: 0, lost_at_max_n: 0, lost_at_max_share: null, median_final_bids: null, bands: { opening: 0, low: 0, mid: 0, high: 0 }, price_jump: { median_cents: null, jumped_50_last_window_n: 0 } });
+  });
+
+  it('PT43-5: updateOutcomes keeps the price seen before the last one (prev_seen_price_cents) when a later snapshot arrives, and not when the same snapshot is read again', async () => {
+    await outcome({ domain: 'moving.com', end_time: new Date('2026-10-28T10:00:00Z') });
+    await snap('2026-10-23', 'moving.com', 2500, 3, '2026-10-28T10:00:00Z');
+    await updateOutcomes(db, NOW);
+    await snap('2026-10-25', 'moving.com', 9000, 8, '2026-10-28T10:00:00Z');
+    await updateOutcomes(db, NOW);
+    await updateOutcomes(db, NOW);
+    const r = await db.selectFrom('auction_outcomes').select(['last_seen_price_cents', 'prev_seen_price_cents']).where('domain', '=', 'moving.com').executeTakeFirstOrThrow();
+    expect(r).toEqual({ last_seen_price_cents: 9000, prev_seen_price_cents: 2500 });
   });
 });

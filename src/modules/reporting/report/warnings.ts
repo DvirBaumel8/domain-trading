@@ -14,6 +14,7 @@ import { priceValues } from './money.js';
 import { lifecycleWarnings } from './lifecycle.js';
 import { ownershipWarnings } from './ownership.js';
 import { afternicWarnings } from './afternic.js';
+import { renewalSignals, RENEWAL_SIGNAL_WARN_DAYS } from './renewal-signal.js';
 
 export type WarningLevel = 'info' | 'warn' | 'error';
 export interface ReportWarning { code: string; level: WarningLevel; domain?: string; message: string; details: Record<string, unknown> }
@@ -334,6 +335,12 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
   // v5.58.0 (CR-079): the missing-name check (listing record, listing approval, unconfirmed sightings, receipt pointer); the daily step ownershipCheck reads this same list
   await ownershipWarnings(db, domains, add);
   await afternicWarnings(db, domains, now, add);
+  // v5.65.0 (F44): advice only; Dvir decides every renewal
+  for (const [name, sg] of await renewalSignals(db, now, domains)) {
+    if (sg.signal === 'drop' && sg.days_to_expiry !== null && sg.days_to_expiry >= 0 && sg.days_to_expiry <= RENEWAL_SIGNAL_WARN_DAYS) {
+      add('RENEWAL_SIGNAL_DROP', 'info', `${name} expires in ${sg.days_to_expiry} days and shows no buyer interest (${sg.reason}); the signal is to drop it. Dvir decides every renewal.`, name, { days_to_expiry: sg.days_to_expiry, views_30d: sg.views_30d, leads_30d: sg.leads_30d });
+    }
+  }
 
   // v4.0.0: renewal drop check, horizon, delist after a sale
   await lifecycleWarnings(db, now, today, domains, add);

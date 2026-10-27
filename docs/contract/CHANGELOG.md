@@ -2,6 +2,13 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.65.0 (2026-10-27): machine-competition measures in paper trading (F43), renew-or-drop signal per name (F44), Dynadot steps last in datasave
+Release note: `docs/releases/v5.65.0.md`.
+MINOR (migration `1768500000000_v5-65-0.sql`: `auction_outcomes.prev_seen_price_cents`, `settings.renew_views_min` 10).
+- `GET /auctions/funnel` `paper`: per group `bands {opening, low, mid, high}`, `median_final_bids`, `price_jump {median_cents, jumped_50_last_window_n}`; shortlist `lost_at_max_n`, `lost_at_max_share` (F43).
+- `GET /report` `per_domain[].renewal_signal` (also on `/portfolio`): `{views_30d, leads_30d, views_trend, offers_365d, days_to_expiry, renewal_available, signal: renew|reprice|drop|too_early|null, reason}`; info warning `RENEWAL_SIGNAL_DROP` within 60 days of expiry (F44). Advice only: Dvir decides every renewal.
+- Datasave: `dynadotCloseouts` and `dynadotAftermarket` run last, so the ~40-minute Dynadot read no longer delays the shortlist; a day's Dynadot rows are scored and merged by the next run.
+
 ## 5.64.0 (2026-10-27): CR-083: card evidence cache (POST/GET /data/card-evidence; USPTO checks fresh for 24 h)
 Release note: `docs/releases/v5.64.0.md`.
 MINOR (migration `1768400000000_v5-64-0.sql`: table `card_evidence`). CR-083: `POST /data/card-evidence` (WRITE, bots or data; append-only; corrections by `supersedes`) and `GET /data/card-evidence[/{id}]` (READ, bots, WRITE): bots post their own USPTO and firm-screen results once; a `uspto_check` is `fresh` for 24 hours unless a newer `/data/tm-kills` row exists; `fresh_only` hides superseded and stale rows. The service never looks up trademarks itself and nothing here touches money. New code `CARD_EVIDENCE_NOT_FOUND`.

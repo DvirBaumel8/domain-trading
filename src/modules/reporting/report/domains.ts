@@ -5,6 +5,7 @@ import type { Database, DomainRow } from '../../../db/types.js';
 import { pendingDomains } from '../../listing/index.js';
 import { perDomainOffers, type OfferRow } from '../../selling/index.js';
 import { priceValues, walkawayPair } from './money.js';
+import { renewalSignals } from './renewal-signal.js';
 
 const iso = (d: Date | null) => (d ? toJerusalemIso(d) : null);
 
@@ -31,6 +32,7 @@ export async function perDomain(db: Kysely<Database>, now: Date, o: { domains?: 
   let pq = db.selectFrom('price_schedule').selectAll().where('status', '=', 'planned');
   if (ids) pq = pq.where('domain_id', 'in', ids.length ? ids : [-1]);
   const planned = await pq.orderBy('due_on').orderBy('id').execute();
+  const signals = await renewalSignals(db, now, domains);
   return domains.map((d) => {
     const next = planned.find((p) => p.domain_id === d.id && p.plan_id === d.plan_id);
     // days held stop at the sale (sold) or the drop date (dropped); otherwise they run to today
@@ -46,6 +48,7 @@ export async function perDomain(db: Kysely<Database>, now: Date, o: { domains?: 
       expiry_date: d.expiry_date, drop_date: d.drop_date, lander: d.lander, ns_verified: d.ns_verified_at !== null,
       days_held: d.buy_date ? dayNumber(end) - dayNumber(d.buy_date) : null,
       sold_at: iso(d.sold_at), delisted_at: iso(d.delisted_at),
+      renewal_signal: signals.get(d.domain) ?? null,
     };
   });
 }

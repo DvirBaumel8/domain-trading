@@ -346,17 +346,36 @@ export async function getFunnel(db: Kysely<Database>, q: z.infer<typeof FunnelQu
   const sales = await sql<{ n: string; gross: string }>`
     select count(*)::text as n, coalesce(sum(s.sale_price_cents), 0)::text as gross from sales s join domains d on d.id = s.domain_id
     where d.lane = 'S8' and ${idt('s.sold_at')} between ${from}::date and ${to}::date`.execute(db);
-  // v5.49.0 (P4): paper trading over the data dates of the range, one query
-  const pp = await sql<{ s_final: string; s_win: string; s_med: string | null; c_final: string; c_med: string | null; c_100: string }>`
-    select count(*) filter (where "group" = 'shortlist' and final)::text as s_final, count(*) filter (where "group" = 'shortlist' and final and would_win)::text as s_win,
-      (percentile_cont(0.5) within group (order by coalesce(last_seen_price_cents, first_price_cents)) filter (where "group" = 'shortlist' and final))::text as s_med,
-      count(*) filter (where "group" = 'control' and final)::text as c_final,
-      (percentile_cont(0.5) within group (order by coalesce(last_seen_price_cents, first_price_cents)) filter (where "group" = 'control' and final))::text as c_med,
-      count(*) filter (where "group" = 'control' and final and coalesce(last_seen_price_cents, first_price_cents) >= 10000)::text as c_100
-    from auction_outcomes where data_date between ${from}::date and ${to}::date`.execute(db);
-  const p0 = pp.rows[0]!;
-  const med = (x: string | null): number | null => (x === null ? null : Math.round(Number(x)));
+  // v5.49.0 (P4) + v5.65.0 (F43): paper trading over the data dates of the range, one query grouped by group (final rows only)
+  const pp = await sql<{ grp: string; final_n: string; win_n: string; lost_n: string; med: string | null; b_open: string; b_low: string; b_mid: string; b_high: string; med_bids: string | null; med_jump: string | null; jump_n: string; reached_100: string }>`
+    with f as (select "group" as grp, would_win, coalesce(last_seen_price_cents, first_price_cents) as p, last_seen_bids, first_price_cents, prev_seen_price_cents
+      from auction_outcomes where final and data_date between ${from}::date and ${to}::date)
+    select grp, count(*)::text as final_n, count(*) filter (where would_win)::text as win_n, count(*) filter (where would_win is false)::text as lost_n,
+      (percentile_cont(0.5) within group (order by p))::text as med,
+      count(*) filter (where p <= 100)::text as b_open, count(*) filter (where p > 100 and p < 2500)::text as b_low,
+      count(*) filter (where p >= 2500 and p < 10000)::text as b_mid, count(*) filter (where p >= 10000)::text as b_high,
+      (percentile_cont(0.5) within group (order by last_seen_bids))::text as med_bids,
+      (percentile_cont(0.5) within group (order by p - first_price_cents))::text as med_jump,
+      count(*) filter (where prev_seen_price_cents is not null and p - prev_seen_price_cents >= 5000)::text as jump_n,
+      count(*) filter (where p >= 10000)::text as reached_100
+    from f group by grp`.execute(db);
+  const med = (x: string | null | undefined): number | null => (x === null || x === undefined ? null : Math.round(Number(x)));
   const n = (x: string | null | undefined): number => Number(x ?? 0);
+  const grp = (g: 'shortlist' | 'control') => {
+    const r = pp.rows.find((x) => x.grp === g);
+    const finalN = n(r?.final_n);
+    return {
+      final_n: finalN, r,
+      bands: { opening: n(r?.b_open), low: n(r?.b_low), mid: n(r?.b_mid), high: n(r?.b_high) },
+      median_final_price_cents: med(r?.med), median_final_bids: med(r?.med_bids),
+      price_jump: { median_cents: med(r?.med_jump), jumped_50_last_window_n: n(r?.jump_n) },
+    };
+  };
+  const sg = grp('shortlist'); const cg = grp('control');
+  const paper = {
+    shortlist: { final_n: sg.final_n, would_win_n: n(sg.r?.win_n), median_final_price_cents: sg.median_final_price_cents, lost_at_max_n: n(sg.r?.lost_n), lost_at_max_share: sg.final_n === 0 ? null : Math.round((n(sg.r?.lost_n) / sg.final_n) * 1000) / 1000, bands: sg.bands, median_final_bids: sg.median_final_bids, price_jump: sg.price_jump },
+    control: { final_n: cg.final_n, median_final_price_cents: cg.median_final_price_cents, reached_100_n: n(cg.r?.reached_100), bands: cg.bands, median_final_bids: cg.median_final_bids, price_jump: cg.price_jump },
+  };
   const d0 = dom.rows[0]!;
   return {
     from, to, as_of: toJerusalemIso(new Date(nowMs)),
@@ -366,7 +385,7 @@ export async function getFunnel(db: Kysely<Database>, q: z.infer<typeof FunnelQu
     prebids_by_bots: { checks: n(pb.rows[0]!.n), names: n(pb.rows[0]!.names), pass: n(pb.rows[0]!.pass), flag: n(pb.rows[0]!.flag), fail: n(pb.rows[0]!.fail) },
     bid_plans: { created: n(plans.rows[0]!.created), open: n(plans.rows[0]!.open), won: n(plans.rows[0]!.won), lost: n(plans.rows[0]!.lost), withdrawn: n(plans.rows[0]!.withdrawn), expired: n(plans.rows[0]!.expired), ...pair('max_bid_total', n(plans.rows[0]!.max_total)) },
     imported: n(imp.rows[0]!.n),
-    paper: { shortlist: { final_n: n(p0.s_final), would_win_n: n(p0.s_win), median_final_price_cents: med(p0.s_med) }, control: { final_n: n(p0.c_final), median_final_price_cents: med(p0.c_med), reached_100_n: n(p0.c_100) } },
+    paper,
     s8_names: { bought: n(d0.bought), listed_of_bought: n(d0.listed), sold_of_bought: n(d0.sold), listed_now: n(d0.listed_now) },
     traffic_of_bought: vis ? { views_30d: n(vis.views), leads_30d: n(vis.leads), redirect_human_hits: n(vis.hits) } : { views_30d: 0, leads_30d: 0, redirect_human_hits: 0 },
     sold: { count: n(sales.rows[0]!.n), ...pair('gross', n(sales.rows[0]!.gross)) },

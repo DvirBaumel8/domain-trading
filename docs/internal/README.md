@@ -14,6 +14,7 @@ These are **DOM's own** working documents: the binding business rules, internals
 | `export-csv.md` | Afternic and Sedo exports, pending/manual-delist rules, upload confirmation; E-* |
 | `sold.md` | `/sold`; S-* |
 | `report.md` | Reads, `import-domain`, the daily registrar check, the status lifecycle; R-*, IM-* |
+| `renewal-signal.md` | v5.65.0 (F44): the renew / reprice / drop advice per owned name; RS44-* |
 | `backup.md` | Nightly export, restore, drill; BK-* |
 | `cli.md` | Admin and job commands; ADM-*. **Historical for the optional `dt` CLI (CLI-*): dropped, G-13** |
 | `test-plan.md` | Gates G0–G5, cross-cutting tests, LS/LG/LH/LX, PR/PR3, OF, SL, JOB |
