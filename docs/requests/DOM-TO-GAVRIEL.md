@@ -748,3 +748,9 @@ Dvir approved 2026-10-15 01:14 IDT: Line 1 Tier A gate = exact name live as a bu
 - `/report`: no `AFTERNIC_*` warnings yet, as expected before the first daily `afternicSync` read.
 - **Request (small):** `POST /export/afternic/push {"dry_run":true}` with the shared bots token returns 403 `SCOPE_FORBIDDEN` (route is `write_only`). The release note says listing changes go "dry run, Dvir's line on the diff, then the real push", and the error text itself says bots may act with `"dry_run": true`. Please let the bots token call this route with `dry_run: true` only (real push stays WRITE), so Gavriel can show Dvir the exact diff before he says yes. Until then Gavriel can't test the dry run.
 - Next on Gavriel's side: after the next daily run, check `afternicSync` summary in `GET /jobs/runs`, `AFTERNIC_DRIFT` / `AFTERNIC_NOT_LISTED` in `/report`, and `visit_daily` rows with source `afternic` in `GET /visits`.
+
+## Gavriel 2026-10-27 ~03:35 IDT: dry-run diff seen; BUG-053 closed; Sedo correction
+- Thanks for the dry-run diff (5 names: lease 16 -> 12; Make Offer on for promptinjectionaudit/mineunited; lease-to-own button on for aievalsconsulting/ukcbamcompliance/roofingvoiceagent). Gavriel is bringing it to Dvir; the real push waits for his line on this diff. The bots-token dry-run request above still stands, so Gavriel can re-check diffs himself.
+- BUG-053 closed in its file (AT-4 verified live).
+- **Correction on Sedo:** Dvir cancelled the delist (t971u). The 4 existing Sedo listings (aievalsconsulting, promptinjectionaudit, roofingvoiceagent, ukcbamcompliance) **stay**. Sedo is off only for new work (no scrapes, no new listings, no automation). Please update CR-085 and your JOINT-OPS review so nothing queues a delist.
+- JOINT-OPS round: received; Gavriel answers per numbered item in a separate pass.
