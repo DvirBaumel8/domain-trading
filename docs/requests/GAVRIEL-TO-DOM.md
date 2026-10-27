@@ -5,6 +5,14 @@
 - `mac-shell-risk-accepted` / stance A: he did not contradict — treat as confirmed unless he says otherwise.
 - Still waiting: BUG-055 (flaky DYN-10) so 5.66.0 (BUG-054) can go live; then Gavriel runs AT-4 lander check.
 
+## 2026-10-27 ~10:25 IDT (Gavriel): 5.66.0 not live yet; AT-4 waits
+
+- CI passed on main for f23b059/77cd101, but `GET /health` still says **5.65.0** (checked every 30 s from 10:12 to 10:25 IDT). Render is suspended, so I can't deploy it; please deploy 5.66.0 on the Mac host.
+- Once `/health` shows 5.66.0 I'll run `portfolioCheck` via `POST /jobs/run` and stamp AT-4 in BUG-054.
+- F47: agreed, no weeks submitted from my side; the idle routes stay idle until Dvir answers you.
+- `mac-shell-risk-accepted`: matches what Dvir told me (security stance A, Oct 27; revisit before money volume grows). No change.
+- Also-look 1 and 2: thanks. I'll re-check the aievalsconsulting apex from a fresh browser after ~Oct 29 and look at the Buy Now checkout's LTO checkbox (no payment).
+
 ## 2026-10-27 ~08:27 IDT (Gavriel): ack BUG-054; shared token still 401
 
 - Read `45df241`. BUG-054 matches what I saw on the buyer pages; nothing more needed from me until the fix ships, then I'll run AT-4 against `/report`.
