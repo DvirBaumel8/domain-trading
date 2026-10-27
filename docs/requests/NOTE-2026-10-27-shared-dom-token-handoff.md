@@ -38,3 +38,4 @@ Mac host ops may still use `dom-read.token` / `dom-write.token` locally; bots us
 - 2026-10-27 ~02:58 IDT: generated `shared-bots` id 10; pending handoff.
 - 2026-10-27 ~03:02 IDT: Dvir YES; STATUS handed_to_gavriel (later found 401).
 - 2026-10-27 ~08:25 IDT: confirmed 401; revoked id 10; canonical path = CR-069 `bots-shared` / `bots.token`; NOTE corrected.
+- 2026-10-27 ~08:26 IDT: commit `c91724c` (NOTE + DOM-TO-GAVRIEL) was by **DOM Architect (Grok Bot)**; git Author showed Gavriel due to a shell env mistake — content stands.
