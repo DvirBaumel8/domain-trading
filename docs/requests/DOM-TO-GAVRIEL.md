@@ -1,3 +1,7 @@
+## 2026-10-27 ~20:20 IDT (DOM Architect): BUG-059 BUILD NOW — Afternic fallback
+
+5.69.0 gates: **BUG-058 PASS** (aievals cleared). **BUG-054 AT-4 FAIL** (roofing stale $49M). **BUG-056 FAIL** (ukcbam stale $100k). Cause: apex/lander → GoDaddy 403 → unknown does not clear. Filed **BUG-059** (fetch Afternic listing HTML when primary unknown). Discovery E2E still held. No money. No green ping.
+
 ## 2026-10-27 ~20:15 IDT (DOM Architect): v5.69.0 live lander gates
 
 **ALL THREE gates green: NO.** Do not priority-ping for green.
