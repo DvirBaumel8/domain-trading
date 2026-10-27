@@ -27,7 +27,7 @@ import { idtDay } from '../../../../core/dates.js';
 import { AppError } from '../../../../http/errors.js';
 import { guardDbSize, loadRegimeTest, storeSales, storeUnsold, type DbSizeGuard, type RegimeTest } from '../../../engine/index.js';
 import { runDqMarket, runEpisodes } from '../../../market/index.js';
-import { autoSeal, handregLabels, pickproofEnabled, PICKPROOF_OFF, pickproofLabels } from '../../../pickproof/index.js';
+import { autoSeal, pickproofEnabled, PICKPROOF_OFF, pickproofLabels } from '../../../pickproof/index.js';
 import type { RdapLookupFn } from '../../../../core/rdap.js';
 import { goneByTag, tagDisappearances } from '../../closeouts/disappearances.js';
 import { checkExpiries } from '../../closeouts/expiries.js';
@@ -534,13 +534,6 @@ export class DatasaveJob {
   async pickproofLabels(): Promise<unknown> {
     if (!(await pickproofEnabled(this.deps.db))) return PICKPROOF_OFF; // v5.59.0 (CR-081)
     return pickproofLabels({ db: this.deps.db, now: this.deps.now, log: this.deps.log });
-  }
-
-  // ---------- handregLabels (v5.66.0, F47) ----------
-
-  /** M6 / M12 labels of the hand-registration paper test (RDAP only, at most settings.handreg_labels_max_per_run lookups). Independent of pickproof_enabled. See pickproof/handreg-labels.ts. */
-  async handregLabels(): Promise<unknown> {
-    return handregLabels({ db: this.deps.db, now: this.deps.now, log: this.deps.log, rdap: this.deps.rdap, sleep: this.deps.sleep });
   }
 
   // ---------- buildPanel ----------

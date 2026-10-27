@@ -107,8 +107,8 @@ export interface JobRunnerDeps {
   engineTrainer?: { weekly(): Promise<unknown>; runById(id: string): Promise<unknown> };
   /** v5.47.0 (F5): the lift table's daily step liftTrain (after engineTrain); retrains only when the sales or unsold rows grew. While undefined, that step reports skipped. */
   liftTrainJob?: Runnable;
-  /** v5.21.0 (CR-071): the datasave job's steps (thirteen since v5.66.0: handregLabels after pickproofLabels; twelve since v5.45.0: auctionShortlist after engineFeed; eleven since v5.41.0: engineFeed after buildPanel; ten since v5.35.0: pickproofSeal before snapshotRetention) (v5.23.0: episodes, dqMarket; v5.28.0: pickproofLabels last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
-  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; engineFeed(): Promise<unknown>; auctionShortlist(): Promise<unknown>; pickproofSeal(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown>; pickproofLabels(): Promise<unknown>; handregLabels(): Promise<unknown> };
+  /** v5.21.0 (CR-071): the datasave job's steps (twelve since v5.45.0: auctionShortlist after engineFeed; eleven since v5.41.0: engineFeed after buildPanel; ten since v5.35.0: pickproofSeal before snapshotRetention) (v5.23.0: episodes, dqMarket; v5.28.0: pickproofLabels last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
+  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; engineFeed(): Promise<unknown>; auctionShortlist(): Promise<unknown>; pickproofSeal(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown>; pickproofLabels(): Promise<unknown> };
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
   /** Takes the run lock (default: a database session lock). Tests of the step order pass a stub. */
@@ -162,10 +162,10 @@ export class JobRunner {
     // v5.21.0 (CR-071): POST /jobs/run {job:'datasave'}. Each step has its own status; a failed godaddyInventory does not stop the rest.
     if (job === 'datasave') {
       const ds = d.datasaveJob;
-      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'engineFeed' | 'auctionShortlist' | 'pickproofSeal' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels' | 'handregLabels') =>
+      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'engineFeed' | 'auctionShortlist' | 'pickproofSeal' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels') =>
         step(name, async () => (ds ? ds[name]() : { skipped: true, reason: 'datasave not configured' }));
       // v5.65.0: the two Dynadot reads (about 40 minutes) run last, so they no longer delay scorePool, auctionShortlist and the rest; their rows are used by the next run (scorePool, buildPanel, episodes, dqMarket read the newest sealed day)
-      return [dsStep('godaddyInventory'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('auctionShortlist'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels'), dsStep('handregLabels'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket')];
+      return [dsStep('godaddyInventory'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('auctionShortlist'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket')];
     }
     if (job === 'tick') return tick;
     // Daily-only schedule (CR-005 Amendment A): the former hourly steps run first.

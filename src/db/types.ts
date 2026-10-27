@@ -60,10 +60,6 @@ export interface SettingsTable {
   pickproof_pool_max_price_cents: Generated<number>;
   pickproof_labels_max_per_run: Generated<number>;
   pickproof_pool_keep_days: Generated<number>;
-  /** v5.66.0 (F47): hand-registration paper test caps. Migration only. */
-  handreg_max_pool: Generated<number>;
-  handreg_max_picks: Generated<number>;
-  handreg_labels_max_per_run: Generated<number>;
   /** v5.59.0 (CR-081): the pick-proof is off (false) since the replay replaced it. */
   pickproof_enabled: Generated<boolean>;
   /** v5.29.0 (CR-074): TTL of a cached RDAP answer (hours) and the live bot lookups allowed per rolling 24 h. Migration only. */
@@ -1838,36 +1834,6 @@ export interface PickproofLabelsTable {
   reason: string | null;
 }
 
-/** v5.66.0 (F47): the hand-registration paper test. Weeks and names are immutable (triggers). */
-export interface HandregWeeksTable {
-  week: DateString;
-  pool_n: number;
-  pool_sha256: string;
-  picks_n: number;
-  seed: number | string;
-  control_sha256: string;
-  submitted_by: string;
-  sealed_at: Timestamp;
-  created_at: TimestampDefault;
-}
-export interface HandregNamesTable {
-  week: DateString;
-  domain: string;
-  arm: 'pick' | 'control';
-  rank: number;
-  rdap_at_seal: 'available' | 'registered' | 'unknown';
-}
-export interface HandregLabelsTable {
-  week: DateString;
-  domain: string;
-  horizon: 'm6' | 'm12';
-  label: 'taken' | 'not_taken' | 'unknown';
-  checked_at: Timestamp;
-  created_at_rdap: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
-  reason: string | null;
-  attempts: number;
-}
-
 export interface MarketMatchedSetsTable {
   asof: DateString;
   ratio: number;
@@ -1989,9 +1955,6 @@ export interface Database {
   pickproof_arms: PickproofArmsTable;
   pickproof_picks_history: PickproofPicksHistoryTable;
   pickproof_labels: PickproofLabelsTable;
-  handreg_weeks: HandregWeeksTable;
-  handreg_names: HandregNamesTable;
-  handreg_labels: HandregLabelsTable;
   rdap_cache: RdapCacheTable;
   lookup_usage: LookupUsageTable;
   disappearances: DisappearancesTable;

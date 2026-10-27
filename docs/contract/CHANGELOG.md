@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.67.0 (2026-10-27): F47 removed (Dvir declined); drops the idle hand-reg tables
+Release note: `docs/releases/v5.67.0.md`.
+MAJOR in form, no caller affected (migration `1768700000000_v5-67-0.sql` drops `handreg_weeks`, `handreg_names`, `handreg_labels` and the three `settings.handreg_*` columns). F47 removed: Dvir declined the paper test (Gavriel relay 27 Oct 2026, ~09:47 IDT), then approved removing it. `POST /handreg/weeks`, `GET /handreg/weeks[/{week}]`, `GET /handreg/report`, the codes `HANDREG_*` and the datasave step `handregLabels` are gone; they were never called. The BUG-054 lander fix of 5.66.0 stays.
+
 ## 5.66.0 (2026-10-27): F47 hand-registration paper test; BUG-054 lander Buy Now parser
 Release note: `docs/releases/v5.66.0.md`.
 MINOR (migration `1768600000000_v5-66-0.sql`: tables `handreg_weeks`, `handreg_names`, `handreg_labels`; `settings.handreg_max_pool` 2000, `handreg_max_picks` 30, `handreg_labels_max_per_run` 200).

@@ -431,8 +431,8 @@ describe('PP528 pick-proof: T30 labels', () => {
     mswServer.use(...inventoryHandlers());
     const run = await runJobToEnd(app!, 'datasave');
     const steps = Object.keys(run.json().steps as Record<string, unknown>);
-    expect(steps.slice(-4)).toEqual(['pickproofLabels', 'handregLabels', 'dynadotCloseouts', 'dynadotAftermarket']); // 5.66.0: handregLabels
-    expect(steps).toHaveLength(13);
+    expect(steps.slice(-3)).toEqual(['pickproofLabels', 'dynadotCloseouts', 'dynadotAftermarket']);
+    expect(steps).toHaveLength(12); // 5.41.0: engineFeed
   });
 });
 

@@ -26,7 +26,7 @@ import { EndingsJob, EngineTrainer, LiftTrainJob, registerEngine, Scorer, type T
 import { registerData } from './modules/data/index.js';
 import { KbLoadJob, registerKnowledge } from './modules/knowledge/index.js';
 import { registerMarket } from './modules/market/index.js';
-import { registerHandreg, registerPickproof } from './modules/pickproof/index.js';
+import { registerPickproof } from './modules/pickproof/index.js';
 import { importAfternic, registerVisits } from './modules/visits/index.js';
 import { collectOpenApiRoutes, registerOpenApi } from './http/openapi.js';
 
@@ -253,7 +253,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerMarket(app, { db: deps.db, now });
   registerKnowledge(app, { db: deps.db, now, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
   registerPickproof(app, { db: deps.db, now });
-  registerHandreg(app, { db: deps.db, now });
   registerJobs(app, app.jobQueue, { ...base, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   registerOpenApi(app, openApiRoutes, deps.config.version);
   deps.registerExtraRoutes?.(app);
