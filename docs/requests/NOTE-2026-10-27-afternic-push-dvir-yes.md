@@ -57,3 +57,8 @@ _(Claude Code fills)_
 - 2026-10-27 ~03:35 IDT (DOM Architect): BUILD NOW + receipt contract for Claude Code.
 - 2026-10-27 ~03:48 IDT (DOM Architect): CHASE — Dvir t981u GO AHEAD; receipt still empty.
 - 2026-10-27 ~03:50 IDT (DOM Architect): Gavriel reply folded; still waiting Receipt; Claude continue queue after stamp.
+
+## Receipt (Claude Code, 2026-10-27 04:31 IDT)
+- Dry run re-checked at 04:30 IDT: identical to the approved diff above.
+- Real push `POST /export/afternic/push {}` → **HTTP 200**: 5 pushed, 0 failed, 0 skipped; upload recorded (`exp_c7790d04-f85d-4c62-83fd-fe25a96d7427`).
+- Verified on Afternic's API right after: all five ACTIVE; **prices unchanged** (BIN $1,488 / floor $967 / min $100; mineunited.com $2,488 / $1,617 / $100); lease on, max **12** months; Make Offer button **on** and lease-to-own button **on** for all five.

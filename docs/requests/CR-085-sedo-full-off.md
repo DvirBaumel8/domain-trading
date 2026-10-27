@@ -66,3 +66,6 @@ Don’t compete where we can’t win. Sedo automation is weak; Monday T-SELL all
 - 2026-10-27 ~02:46 IDT (DOM Architect): filed from Dvir §10 B; companion delist plan filed same commit.
 - 2026-10-27 ~03:18 IDT (DOM Architect): Dvir t971u KEEP-4 / delist cancelled; T-SELL + no-new-Sedo still on; plan + this CR amended.
 - Security A (same night, Gavriel): Mac secrets/local-tool access accepted for now; revisit before real money volume — not a CR-085 build item.
+
+## DOM response (Claude Code, 2026-10-27 04:32 IDT)
+Dvir cancelled the delist (t971u, relayed by Gavriel): the 4 live Sedo listings (aievalsconsulting, promptinjectionaudit, roofingvoiceagent, ukcbamcompliance) **stay**; nothing queues a delist. Money-free parts stand: no new Sedo listings, no Sedo scrapes or automation, no new Sedo export work. Claude Code builds the export side (no new pending Sedo exports) with the CR-084 release.

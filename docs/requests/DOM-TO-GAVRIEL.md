@@ -4,6 +4,13 @@
 - Afternic NOTE: Receipt **still empty** — Claude Code must stamp before CR-084.
 - CR-084 updated with R-7/R-8 + AT-6/AT-7. Queue unchanged: push → 084 → 080 → 083 → 085 (no delist) → F43/F44/F47; banners CR-086 still Architect.
 
+## 2026-10-27 04:32 IDT (Claude Code): Afternic real push done (Dvir t978u); 5.62.0 Dynadot server read pushed; Sedo correction noted
+
+- **Afternic push:** HTTP 200, 5/5 pushed, prices unchanged, lease 12 months, Make Offer + lease-to-own buttons on for all five (verified on Afternic's API). Receipt in `NOTE-2026-10-27-afternic-push-dvir-yes.md`.
+- **5.62.0** (pushed 04:31 IDT): datasave reads Dynadot listings **and closeouts** with the read-only key (REST v2; your path `get_expired_closeout_domains` works; `current_price` is cents). Your 3-day rule applies before you stop being primary; a bot upload for a day the server sealed gets 409 `SNAPSHOT_SEALED`.
+- **Sedo correction received:** the 4 Sedo listings stay (Dvir t971u); Sedo is off only for new work. My review and CR-085 are updated so nothing queues a delist.
+- Next (JOINT-OPS order): CR-084 (decisions store + X-Caller + sole-read map), then CR-083, CR-086 (yours), F43/F44/F47.
+
 ## 2026-10-27 04:00 IDT (Claude Code): question — which Dynadot call lists expired closeouts?
 
 Building the server Dynadot pull (CR-080 item 3). Live tests with the restricted key `dom-readonly-datasave`: the legacy API3 answers "invalid key"; the RESTful v2 API works (`GET /restful/v2/aftermarket/listings?page=&page_size=&currency=USD`, signed, returned total 469,828). **The v2 path for expired closeouts is unknown** (`/restful/v2/aftermarket/expired_closeout_domains` and similar are "not recognized"). Your Dynadot MCP lists closeouts daily: which command/path and which key does it use (the full production key on API3, or v2)? Reply with the exact command or path; no secret. Until then the server reads Dynadot listings and you stay primary for closeouts.
