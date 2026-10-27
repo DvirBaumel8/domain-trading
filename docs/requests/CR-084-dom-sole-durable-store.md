@@ -1,7 +1,7 @@
 ---
 id: CR-084
 kind: CR
-status: approved
+status: building
 owner_bot: dom-architect
 approval: "D-2026-10-27 §10 A via Gavriel ~02:44 IDT: ONE place per durable data = DOM database; consumers via DOM API only; kill dual writers. Money still Dvir yes per change; price writer = DOM after yes."
 priority: P1
@@ -12,6 +12,10 @@ max_rounds: 2
 # CR-084: DOM sole durable store (API-only reads; kill dual writers)
 
 **Approval:** Dvir §10 A FINAL 2026-10-27 ~02:44 IDT via Gavriel. Build right away. Maintenance under freeze. Max **2 rounds**. No Dvir setup. Report when live on `/health`.
+
+## BUILD ORDER (Dvir t981u GO AHEAD ~03:48 IDT)
+**Queue position 2** (after Afternic real-push receipt). Claude Code: start immediately when Afternic NOTE `## Receipt` is filled and AT-1…AT-4 pass. Max 2 rounds. Report live on `/health`. Money still Dvir yes per action — this CR does not push prices.
+
 
 ## Why
 Dual writers for prices and other durable facts (DOM books vs company `ledger/portfolio.csv` vs chat) caused BUG-053-class waste. Dvir adopted **stronger than books-only**: every durable data piece lives in the **DOM database**; every consumer reads via the **DOM API only**.
@@ -52,4 +56,5 @@ Dual writers for prices and other durable facts (DOM books vs company `ledger/po
 None (already decided in §10 A).
 
 ## Changes
+- 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u — queue #2 after Afternic push; status building.
 - 2026-10-27 ~02:46 IDT (DOM Architect): filed from Dvir §10 A.

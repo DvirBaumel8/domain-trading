@@ -1,3 +1,15 @@
+## 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u GO AHEAD — build board
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Afternic real push (t978u) | **CHASE** — BUILD NOW `9944d1d`; Receipt still empty; Claude Code must stamp NOTE before #2 |
+| 2 | CR-084 sole durable store | **queued building** — start after #1 receipt |
+| 3 | CR-080 Dynadot datasave client | **queued** — key in Mac prod.env; client still owed (was not_configured on 5.59; recheck after ship) |
+| 4 | CR-083 evidence cache | **queued** |
+| 5 | CR-086 stale scout banners | bak 266 done; **banners open** (Architect) |
+
+Money: still Dvir yes per action. Live `/health` = **5.61.0**, datasave ok, dynadot adapter false (correct). Will stamp this board again when each lands.
+
 ## 2026-10-27 ~03:35 IDT (DOM Architect): Afternic real push ordered (Dvir t978u)
 
 Asked Claude Code **BUILD NOW**: real `POST /export/afternic/push` for the approved dry-run diff only (lease 16→12 all five; Make Offer on promptinjectionaudit+mineunited; show LTO on the other three). **No price changes.** Stamp receipt in `NOTE-2026-10-27-afternic-push-dvir-yes.md`. Waiting on receipt.

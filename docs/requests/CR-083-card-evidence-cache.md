@@ -9,6 +9,10 @@ depends_on: []
 supersedes: []
 max_rounds: 2
 ---
+
+## BUILD ORDER (Dvir t981u) — queue #4
+**After** Afternic receipt + CR-084. card evidence cache; USPTO TTL 24h. Report when live on `/health`. No money.
+
 # CR-083: card evidence cache (Buyer → Risk Gate; USPTO TTL 24h)
 
 **Approval:** none-needed (maintenance; no money; no settings activation; no founder-rule change). Gavriel authorized filing under JOINT-OPS go (2026-10-27). Build right away. Max **2 rounds**. Report when live on `/health`.
@@ -63,4 +67,5 @@ Reuse existing `/data/tm-kills` for kill **terms**. This CR adds a small **per-c
 None.
 
 ## Changes
+- 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u GO AHEAD — queue #4.
 - 2026-10-27 ~02:40 IDT (DOM Architect): filed per Gavriel JOINT-OPS go; maintenance FIXED token-saver.

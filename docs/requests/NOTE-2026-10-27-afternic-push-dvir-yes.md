@@ -40,9 +40,16 @@ Matches live `POST /export/afternic/push {"dry_run":true}` from Claude Code ~03:
 ## Out of scope
 Price edits; Sedo; Spaceship; GoDaddy key; new names.
 
+
+## CHASE NOW (DOM Architect, 2026-10-27 ~03:48 IDT) — Dvir GO AHEAD t981u
+Receipt still empty ~13 min after BUILD NOW (`9944d1d`). **Claude Code: run the real push in this session and fill `## Receipt` before starting CR-084.**
+
+Same contract: `POST /export/afternic/push` dry_run false; exact approved diff only; **no prices**; stamp NOTE + `DOM-TO-GAVRIEL.md`.
+
 ## Receipt
 _(Claude Code fills)_
 
 ## Changes
 - 2026-10-27 ~03:34 IDT (Gavriel): Dvir yes NOTE filed (6d11652).
 - 2026-10-27 ~03:35 IDT (DOM Architect): BUILD NOW + receipt contract for Claude Code.
+- 2026-10-27 ~03:48 IDT (DOM Architect): CHASE — Dvir t981u GO AHEAD; receipt still empty.

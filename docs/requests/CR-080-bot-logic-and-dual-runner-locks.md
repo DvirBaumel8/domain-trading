@@ -9,6 +9,10 @@ depends_on: [CR-079]
 supersedes: []
 max_rounds: 2
 ---
+
+## BUILD ORDER (Dvir t981u) — queue #3
+**After** Afternic receipt + CR-084. Dynadot datasave client (key already in Mac prod.env); still round ≤2. Report when live on `/health`. No money.
+
 # CR-080: bot-logic stubs home + dual-runner lock + DOM-primary daily seals
 
 ## Approval
@@ -31,6 +35,7 @@ Move these **verbatim** to `docs/bot-logic/` (create the folder):
 After the move, leave a one-line pointer in `docs/requests/bot-logic/README.md` to the new path (or delete the draft folder in the same commit — either is fine).
 
 ## Changes
+- 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u GO AHEAD — queue #3.
 1. **Place** the five files under `docs/bot-logic/` as above.
 2. **Implement dual-runner lock (file first):**
    - Path (**chosen**): `docs/locks/<action>-<YYYY-MM-DD>.json` (documented in `docs/bot-logic/00-dual-runner-lock-rule.md` + `docs/locks/README.md`).
