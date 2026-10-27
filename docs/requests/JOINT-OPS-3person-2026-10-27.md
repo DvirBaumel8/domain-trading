@@ -268,6 +268,13 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 | E | **Skip** 90-day edge framing for now. |
 | F | Residual disagreements: **none**. |
 
+**Execute (DOM Architect, 2026-10-27 ~02:46 IDT):**
+- A → `CR-084-dom-sole-durable-store.md` (117779a)
+- B → `CR-085-sedo-full-off.md` + `SEDO-DELIST-PLAN-2026-10-27.md` (verify first; **no Sedo clicks** until Dvir one-tap if anything live)
+- C → named READ **rejected**; one shared token — **OPEN wording:** Gavriel relay said Dvir generates/passes to DOM Architect→Gavriel; this §10 table says DOM generates. Standing rule: Dvir does not create keys. **Waiting Gavriel one-line which generator**; do not invent a new token until clarified / handed.
+- D → `CR-086-archive-bak-and-stale-scout-docs.md` + company-box archive pass (no delete)
+- E → skipped
+
 **Not for Dvir:** which CR round, AT wording, bak naming, digest formatting, FIXED filter code placement once classified in `08`.
 
 ---
@@ -279,7 +286,7 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 - Dvir final-approves §10 items he cares about (at minimum A; B–E as needed).
 - One writer per durable price field is named (DOM) and mirrored with lag note.
 - FIXED token-savers run as maintenance or are explicitly deferred by Dvir.
-- Sedo new-work stay shelved; T-SELL Sedo scrapes stopped or placeholder-only per Dvir.
+- Sedo **fully off** (T-SELL scrapes stopped; listings removed per §10 B — not placeholders).
 - CLEAR never becomes DOM auto-buy; Challenger stays bot; money stays Dvir yes → Gavriel.
 
 **Fail if:**
@@ -298,4 +305,4 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 - `docs/requests/TEAM-OPS-critical-notes-2026-10-27.md`
 - Course window: `docs/requests/DOM-COURSE-grok-side-2026-10-27.md` + `DOM-COURSE-index.md`
 
-*DOM Architect confirmed 2026-10-27 ~02:40 IDT. Not yet Dvir-approved.*
+*DOM Architect confirmed ~02:40 IDT. Dvir §10 FINAL ~02:44 IDT. CRs 084–086 + Sedo plan on main (117779a+).*
