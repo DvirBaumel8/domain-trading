@@ -82,8 +82,10 @@ export function registerBulkRoute<R extends object>(app: FastifyInstance, deps: 
   load: (rows: unknown[], ctx: { by: string; auditId: string | null; now: number; dryRun: boolean }) => Promise<R>;
   summary: (r: R, before: number, after: number) => string;
   extend?: () => Promise<object>;
+  /** Rows allowed per call (default ENGINE_MAX_ROWS); CR-083 card evidence allows 500. */
+  maxRows?: number;
 }): void {
-  const body = z.object({ rows: z.array(z.unknown()).min(1).max(ENGINE_MAX_ROWS), ...(o.dryRun ? { dry_run: z.boolean().optional() } : {}) }).strict();
+  const body = z.object({ rows: z.array(z.unknown()).min(1).max(o.maxRows ?? ENGINE_MAX_ROWS), ...(o.dryRun ? { dry_run: z.boolean().optional() } : {}) }).strict();
   app.post(o.path, { config: { openapiBody: o.doc }, bodyLimit: BULK_BODY_LIMIT }, async (req, reply) => {
     const b = body.parse(req.body ?? {}) as { rows: unknown[]; dry_run?: boolean };
     const before = await guardDbSize(deps.db, deps.dbSize, payloadBytesOf(req, b.rows));

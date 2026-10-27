@@ -34,6 +34,7 @@ These are **DOM's own** working documents: the binding business rules, internals
 | `lookups.md` | RDAP lookup service (CR-074, 5.29.0): the shared cache, the rolling 24 h bot limit, which internal steps read or fill the cache; RL529-*, BS529-1 |
 | `auctions.md` | Auction bid plans (CR-077, 5.39.0): the pre-bid check, the approved maximum bid, the result, the import rule; AB539-*; v5.44.0 safety checks (BRAND-TYPO-2, URIBL-1, Spamhaus/EUIPO SKIP, transfer check); SF544-* |
 | `decisions.md` | Decisions store and X-Caller (CR-084, 5.63.0): the append-only `decisions` table, duplicate and correction rules, `X-Caller`, the Sedo-off pending rule (CR-085); DEC-*, XC-*, CR084-AT*, CR085-AT4 |
+| `card-evidence.md` | Card evidence cache (CR-083, 5.64.0): bot-posted USPTO / firm-screen results, 24 h USPTO TTL, supersede, kill-list approximation; CR083-AT1..6, CEC-1..10 |
 | `sources.md` | Terms log of every outside data source |
 | `gaps.md` | Every gap between these docs and the code, with a decision |
 

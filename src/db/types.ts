@@ -755,6 +755,22 @@ export interface TmKillsTable {
   audit_id: string | null;
   created_at: TimestampDefault;
 }
+/** v5.64.0 (CR-083): bot-posted card evidence (USPTO / firm-screen checks); append-only, a correction is a new row with `supersedes`. */
+export interface CardEvidenceTable {
+  id: Generated<number>;
+  domain: string | null;
+  term: string | null;
+  kind: 'uspto_check' | 'firm_screen' | 'other';
+  verdict: 'kill' | 'clear' | 'flag' | 'error' | 'unknown';
+  checked_at: Timestamp;
+  note: string | null;
+  evidence_ref: string | null;
+  raw: Json | null;
+  supersedes: number | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
 export interface BigcoNamesTable {
   id: Generated<number>;
   name: string;
@@ -2011,6 +2027,7 @@ export interface Database {
   domain_rdap: DomainRdapTable;
   live_checks: LiveChecksTable;
   tm_kills: TmKillsTable;
+  card_evidence: CardEvidenceTable;
   bigco_names: BigcoNamesTable;
   sales_comps: SalesCompsTable;
   visit_forwards: VisitForwardsTable;

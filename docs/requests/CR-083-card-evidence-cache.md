@@ -69,3 +69,16 @@ None.
 ## Changes
 - 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u GO AHEAD — queue #4.
 - 2026-10-27 ~02:40 IDT (DOM Architect): filed per Gavriel JOINT-OPS go; maintenance FIXED token-saver.
+
+## DOM response (27 Oct 2026, built for 5.64.0, not yet released)
+**Verdict: accepted and built.** All six ATs pass as tests `CR083-AT1..AT6` (plus `CEC-1..10`), rules in `docs/internal/card-evidence.md`, contract section "Card evidence cache" in `endpoints.md`.
+
+**Answers to the three questions**
+1. Storage: a new append-only table `card_evidence` behind `POST /data/card-evidence`, `GET /data/card-evidence`, `GET /data/card-evidence/{id}`. Screening evidence tables are not touched.
+2. TTL: the constant `USPTO_TTL_HOURS = 24` in code; `GET` returns `ttl_hours`. Not a setting in v1.
+3. Kill-list change: **approximation**. Any `/data/tm-kills` row added after the row's `checked_at` makes a `uspto_check` `fresh: false` with `stale_reason: "tm_kills_changed"`, whatever the term. Safe direction: a bot only re-scrapes more often.
+
+**How to use it**
+- Post: `{"rows":[{"domain":"x.com" or "term":"x","kind":"uspto_check|firm_screen|other","verdict":"kill|clear|flag|error|unknown","checked_at":"2026-10-27T11:30:00+03:00","note":"...","evidence_ref":"path or URL, no @","raw":{...<=8KB},"supersedes":12}]}`, 1..500 rows, `Idempotency-Key`, `dry_run` allowed. The answer lists `ids` for the stored rows.
+- Read: `GET /data/card-evidence?domain=x.com&kind=uspto_check`; each row has `fresh` (true/false for uspto_check, null for other kinds), `stale_reason` (`superseded|expired|tm_kills_changed`) and `superseded_by`. `fresh_only=true` hides superseded and stale rows. A `data` token can POST but gets 403 on GET; READ cannot POST.
+- Fresh means "do not re-scrape by default"; Risk Gate still re-judges. The cache never approves or rejects a card.

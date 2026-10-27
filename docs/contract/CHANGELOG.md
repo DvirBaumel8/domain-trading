@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.64.0 (2026-10-27): CR-083: card evidence cache (POST/GET /data/card-evidence; USPTO checks fresh for 24 h)
+Release note: `docs/releases/v5.64.0.md`.
+MINOR (migration `1768400000000_v5-64-0.sql`: table `card_evidence`). CR-083: `POST /data/card-evidence` (WRITE, bots or data; append-only; corrections by `supersedes`) and `GET /data/card-evidence[/{id}]` (READ, bots, WRITE): bots post their own USPTO and firm-screen results once; a `uspto_check` is `fresh` for 24 hours unless a newer `/data/tm-kills` row exists; `fresh_only` hides superseded and stale rows. The service never looks up trademarks itself and nothing here touches money. New code `CARD_EVIDENCE_NOT_FOUND`.
+
 ## 5.63.0 (2026-10-27): CR-084: decisions store (POST/GET /decisions), X-Caller attribution, sources-of-truth map; CR-085: no new Sedo export work
 Release note: `docs/releases/v5.63.0.md`.
 MINOR (migration `1768300000000_v5-63-0.sql`: table `decisions`, `audit_log.caller`). CR-084 (Dvir §10 A: one place per durable fact):

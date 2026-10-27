@@ -1,4 +1,4 @@
-# Endpoints (contract v5.63.0)
+# Endpoints (contract v5.64.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -69,6 +69,8 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | POST | `/engine/sales`, `/engine/unsold` | WRITE or data (5.10.0) | Scoring engine (5.4.0, 5.10.0) |
 | POST | `/data/rdap`, `/data/live-checks`, `/data/tm-kills`, `/data/bigco-names`, `/data/sales-comps` | WRITE or data | Loaded data tables (5.12.0, CR-063) |
 | GET | `/data/rdap`, `/data/live-checks`, `/data/tm-kills`, `/data/bigco-names`, `/data/sales-comps` | READ (a data token gets 403) | Loaded data tables (5.12.0, CR-063) |
+| POST | `/data/card-evidence` | WRITE, bots or data | Card evidence cache (5.64.0, CR-083) |
+| GET | `/data/card-evidence`, `/data/card-evidence/{id}` | READ, bots or WRITE (a data token gets 403) | Card evidence cache (5.64.0, CR-083) |
 | POST | `/data/sales` | WRITE, bots or data | Market data (5.23.0, CR-075) |
 | PUT | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | PATCH | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
@@ -732,6 +734,42 @@ Read as described under `GET /data/rdap`.
 Read as described under `GET /data/rdap`.
 
 **Retention (daily step `retention`, `jobs.md`):** `live` and `livefail` rows older than 3 days, `cc` rows older than 14 days, and `domain_rdap` rows of names that left the pool are deleted. `tm_kills`, `bigco_names` and `sales_comps` are never pruned.
+
+## Card evidence cache (5.64.0, CR-083)
+
+The USPTO and firm-screen facts on one card are fetched **once** by a bot and read by the others (Buyer posts, Risk Gate reads and still **re-judges**). The service only stores what a bot posts: it calls no USPTO, TSDR or trademark site, never decides CLEAR or REJECT, and nothing here touches prices, listings, bids, buys, exports or the ledger. Live USPTO search stays manual on the bots (CR-074). Rules and test ids: `docs/internal/card-evidence.md`.
+
+**Scopes:** `POST` takes a WRITE, `bots` or `data` token (a READ token gets 403 `SCOPE_FORBIDDEN`); `GET` takes READ, `bots` or WRITE (a `data` token gets 403). **Append-only** in the database (no UPDATE, DELETE or TRUNCATE): a wrong row is corrected by a new row with `supersedes`, and the old row stays readable.
+
+### `POST /data/card-evidence`
+Body `{rows: [..], dry_run?: boolean}`, **1 to 500 rows** (more is 422 `VALIDATION_ERROR`). `Idempotency-Key` required (also with `dry_run`). Each row is checked on its own: a bad row is rejected with a reason, the rest are stored (one transaction). Row fields:
+
+| Field | Rule |
+|---|---|
+| `domain` and/or `term` | At least one. `domain` is a `.com` name (lowercased). `term` is 1 to 200 characters, stored **lowercase**, for a USPTO check of a mark. |
+| `kind` | `uspto_check`, `firm_screen` or `other` (the list can grow in a later release). |
+| `verdict` | `kill`, `clear`, `flag`, `error` or `unknown`. A fact the bot reports; the service never turns it into an approval. |
+| `checked_at` | ISO 8601 **with an offset** (Asia/Jerusalem preferred, `Z` accepted), a real date, not more than 60 seconds ahead of the server clock. |
+| `note` | Optional, up to 500 characters (for a firm screen, the operator count summary). No `@`. |
+| `evidence_ref` | Optional path or URL, up to 500 characters. **No `@`** (no email address or personal data). |
+| `raw` | Optional object, at most **8 KB** of JSON (8,192 bytes), no `@`. |
+| `supersedes` | Optional id of an earlier `card_evidence` row this row corrects. |
+
+**201:** `{table: "card_evidence", dry_run, received_n, accepted_n, duplicate_n, rejected_n, rejects: [{row, domain, reason}], ids: [{row, id}], db_bytes_before, db_bytes_after, audit_id}`. `ids` maps each stored row (by its index in `rows`) to its new id (empty with `dry_run`). `accepted_n + duplicate_n + rejected_n = received_n`. Duplicate = the same `(domain, term, kind, verdict, checked_at, note, evidence_ref, supersedes)` (`raw` is not compared). Reject reasons: `ROW_INVALID`, `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED`, `TERM_INVALID`, `TERM_PII`, `SUBJECT_REQUIRED`, `KIND_INVALID`, `VERDICT_INVALID`, `CHECKED_AT_INVALID`, `CHECKED_AT_IN_FUTURE`, `NOTE_INVALID`, `NOTE_PII`, `EVIDENCE_REF_INVALID`, `EVIDENCE_REF_PII`, `RAW_INVALID`, `RAW_TOO_LARGE`, `RAW_PII`, `SUPERSEDES_INVALID`, `SUPERSEDES_NOT_FOUND`. Also 409 `DB_SIZE_HIGH` (as the other loads).
+
+### `GET /data/card-evidence`
+Query `domain`, `term` (both exact, case-insensitive), `kind`, `fresh_only` (`true` or `false`, default `false`), `limit` (1 to 1,000, default 100), `offset` (default 0). Newest first. Answer `{table, ttl_hours: 24, total, count, limit, offset, rows}`. Each row: `{id, domain, term, kind, verdict, checked_at, note, evidence_ref, raw, fresh, stale_reason, supersedes, superseded_by, by, created_at}`.
+
+**`fresh` (Risk Gate may skip a re-scrape when `true`; it still re-judges):**
+- `uspto_check`: `true` when the row is not superseded, `checked_at` is within **24 hours** (`USPTO_TTL_HOURS`, a constant; exactly 24 h is still fresh) **and** no `/data/tm-kills` row was added after `checked_at`. Otherwise `false` with `stale_reason` `superseded`, `expired` or `tm_kills_changed`. **Approximation (CR-083 Q3):** *any* new `tm_kills` row counts, not only one that matches this row's domain or term, so a busy kill list makes uspto rows stale sooner; the bot then re-scrapes, which is safe.
+- Other kinds: `fresh` is `null` (no TTL); a superseded row has `stale_reason: "superseded"`.
+- `superseded_by` = id of the latest row that corrects this one, else `null`. A superseded row is always returned (the audit trail stays readable) unless `fresh_only=true`.
+- `fresh_only=true` hides superseded rows and stale `uspto_check` rows (rows of other kinds stay unless superseded).
+
+### `GET /data/card-evidence/{id}`
+READ, bots or WRITE. One row as above. 404 `CARD_EVIDENCE_NOT_FOUND`, 422 `VALIDATION_ERROR` for a bad id.
+
+Retention: never pruned. Not in the nightly backup export (bot evidence the bots can post again).
 
 ## Market data (5.23.0, CR-075)
 
@@ -1489,6 +1527,8 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 **Afternic API errors (5.61.0):** `AFTERNIC_NOT_CONFIGURED` (503, `POST /export/afternic/push` without the Afternic key pair in the server env), `AFTERNIC_API_ERROR` (502, the listing read failed; `details.reason` is `AFTERNIC_AUTH`, `AFTERNIC_NOT_FOUND`, `AFTERNIC_RATE_LIMITED`, `AFTERNIC_REJECTED`, `AFTERNIC_UNAVAILABLE` or `AFTERNIC_BAD_RESPONSE`). Warnings in `/report`: `AFTERNIC_DRIFT`, `AFTERNIC_NOT_LISTED`.
 
 **Auction errors (5.39.0, CR-077):** `CLOSEOUTS_PAUSED` (409, `POST /auctions/plans`), `PREBID_REQUIRED` (409), `PREBID_FAILED` (409), `BID_PLAN_EXISTS` (409, `details.plan_id`), `BID_PLAN_NOT_FOUND` (404), `BID_PLAN_CLOSED` (409, the result route), `PRICE_ABOVE_PLAN` (409, the result route and `POST /portfolio/import`), `BID_PLAN_REQUIRED` (409, `POST /portfolio/import`); `S8_PRICE_CAP` and `APPROVAL_INVALID` also come from `POST /auctions/plans`.
+
+**Card evidence (5.64.0, CR-083):** `CARD_EVIDENCE_NOT_FOUND` (404, `GET /data/card-evidence/{id}`); also `VALIDATION_ERROR`, `SCOPE_FORBIDDEN`, `DB_SIZE_HIGH`.
 
 **Decisions (5.63.0, CR-084):** `DECISION_EXISTS` (409, `POST /decisions`: the id is stored with other content; `details.ids`), `DECISION_NOT_FOUND` (404, `GET /decisions/{id}`); also `VALIDATION_ERROR`, `NO_PII`, `SCOPE_FORBIDDEN`.
 

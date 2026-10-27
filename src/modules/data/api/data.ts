@@ -7,6 +7,7 @@ import { ymd } from '../../../core/dates.js';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
 import { ENGINE_MAX_ROWS, registerBulkRoute, type DbSizeGuard } from '../../engine/index.js';
+import { registerCardEvidence } from './card-evidence.js';
 import { dataRowCounts, loadBigcoNames, loadLive, loadRdap, loadSalesComps, loadTmKills, readData, type DataLoadResult, type DataTable } from '../tables.js';
 
 const Doc = z.object({ rows: z.array(z.record(z.string(), z.unknown())).min(1).max(ENGINE_MAX_ROWS), dry_run: z.boolean().optional() }).strict();
@@ -26,6 +27,7 @@ const TABLES: { path: string; table: DataTable; load: Loader }[] = [
 ];
 
 export function registerData(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; dbSize: DbSizeGuard }): void {
+  registerCardEvidence(app, deps); // v5.64.0 (CR-083)
   for (const t of TABLES) {
     registerBulkRoute(app, deps, {
       path: `/data/${t.path}`, doc: Doc, dryRun: true,

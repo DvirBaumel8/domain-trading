@@ -241,6 +241,7 @@ export const BOTS_ROUTES: Readonly<Record<string, BotsClass>> = {
   'DELETE /data/sales/{id}': 'allowed', // answers 405 APPEND_ONLY
   'POST /data/sales-comps': 'allowed',
   'POST /data/tm-kills': 'allowed',
+  'POST /data/card-evidence': 'allowed', // v5.64.0 (CR-083): bot-posted USPTO / firm-screen results; a pure record, no money, price or listing
   'POST /kb/sources': 'allowed', // v5.43.0 (CR-078): evidence base writes, no money
   'POST /kb/authors': 'allowed',
   'POST /kb/claims': 'allowed',
