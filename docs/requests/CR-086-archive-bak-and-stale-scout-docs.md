@@ -1,7 +1,7 @@
 ---
 id: CR-086
 kind: CR
-status: approved
+status: building
 owner_bot: dom-architect
 approval: "Dvir §10 D YES 2026-10-27 ~02:44 IDT via Gavriel: archive ~267 bak + stale scout docs; no delete; inventory then move under archive/."
 priority: P2
@@ -42,3 +42,4 @@ None (already yes).
 
 ## Changes
 - 2026-10-27 ~02:46 IDT (DOM Architect): filed; inventory + first move pass start same day on company box.
+- 2026-10-27 ~02:48 IDT: inventory `BAK-ARCHIVE-INVENTORY-2026-10-27.md`; **moved 266** `.bak*` → `archive/bak-2026-10-27/` (MANIFEST.txt); **0** left outside archive. Stale scout **banner** pass still open (non-bak docs).
