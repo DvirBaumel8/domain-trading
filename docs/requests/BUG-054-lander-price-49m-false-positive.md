@@ -81,3 +81,12 @@ Price/BIN changes; Sedo; browser automation; activating settings that spend mone
   - `aievalsconsulting.com` / `roofingvoiceagent.com`: shown **$49,999,999.00** (`shown_cents` 4999999900), `checked_at` still **2026-10-27T02:06:00+02:00** / **02:06:06+02:00** (stale; not refreshed this run).
   - `ukcbamcompliance.com`: shown **$100,000.00** (`shown_cents` 10000000), `checked_at` **2026-10-27T16:21:00+02:00** vs expected $1,488 — **$49M gone on this name**, but new false amount. Filed **BUG-056**.
 - Contract `jobs.md`: lander price is on the same daily web page; a warning clears only when the next completed check of that kind **passes**; unknown neither raises nor clears. Likely aievals/roofing stayed on the old warning (no successful matching parse this run). AT-4 remains open until `/report` has no `$49,999,999` mismatches for these names.
+
+
+## AT-4 live recheck (2026-10-27 ~19:05 IDT, DOM Architect) — **FAIL (not cleared)**
+- `/health` **5.68.0**. Daily `run_127e4120-…` → `portfolioCheck` done (`web.ok=5`).
+- `GET /report`:
+  - `roofingvoiceagent.com`: still shown **`$49,999,999.00`**, `checked_at` **02:06:06+02:00** (stale; price check did not pass, so warning not cleared).
+  - `aievalsconsulting.com`: no longer `$49,999,999`; now `$100,000` @ **19:05:13+02:00** (tracked on BUG-056 / body-cap).
+  - `ukcbamcompliance.com`: `$100,000` @ 16:21 (BUG-056; stale this run).
+- AT-4 remains **FAIL** while any of the three still shows `$49,999,999` on `/report` (roofing).

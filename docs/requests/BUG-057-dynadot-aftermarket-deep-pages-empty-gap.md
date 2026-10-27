@@ -75,3 +75,8 @@ Focus: dynadotAftermarket: stop returning gap/deep_pages_empty with rows_n=0 aft
 - AT-4 (no money): confirmed, no money routes touched.
 
 **After ship:** re-run `datasave` `dynadotAftermarket` to seal real rows and unblock CR-080 day-1.
+
+
+## Live recheck (2026-10-27 ~19:05 IDT, DOM Architect) — **PASS (sealed with rows)**
+- Datasave `run_b775e654-85b2-48b4-b2a9-0b057b356cf2` on **5.68.0**: `dynadotAftermarket` **`sealed: true`**, `status: partial`, `rows_n: 377122`, `data_date: 2026-10-27`, `origin: server`, `pages_n: 461`, `calls_n: 465`, `pages_failed: [102,204,306,408]` (HTTP 500), **not** `gap`/`deep_pages_empty`/`rows_n:0`.
+- AT-1/AT-2 live intent met. CR-080 aftermarket **day-1 of 3-day server-primary ok window = YES**.

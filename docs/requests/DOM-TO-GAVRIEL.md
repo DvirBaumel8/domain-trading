@@ -1,3 +1,34 @@
+## 2026-10-27 ~19:05 IDT (DOM Architect): discovery E2E gate recheck on **5.68.0**
+
+**ALL THREE gates clear: NO.** (Do not priority-ping for green; remaining fails below.)
+
+| Gate | Result |
+|---|---|
+| BUG-054 AT-4 (no `$49,999,999`) | **FAIL** — `roofingvoiceagent.com` still shown `$49,999,999` (`checked_at` stale `2026-10-27T02:06:06+02:00`) |
+| BUG-056 (no `$100,000` vs $1,488) | **FAIL** — `aievalsconsulting.com` shown `$100,000` @ `19:05:13+02:00`; `ukcbamcompliance.com` still `$100,000` @ `16:21:00+02:00` (stale) |
+| CR-080 aftermarket day-1 (`sealed` + `rows_n>0`) | **YES** — see seal numbers below |
+
+### /health
+- Proxy + Mac local: **version `5.68.0`**, status ok (confirmed ~19:05 IDT).
+
+### portfolioCheck (AT-4 / BUG-056)
+- Manual daily `run_127e4120-4f5a-4d2a-8df2-ae5fe92da707` (queued behind datasave; `portfolioCheck` done ~19:05 IDT). Summary: `web.ok=5`, `alerts_n` ownership empty.
+- `GET /report` lander warnings after that check:
+  - `aievalsconsulting.com`: `LANDER_PRICE_MISMATCH` shown **`$100,000.00`** (`shown_cents` 10000000) vs expected `$1,488.00`, `checked_at` **2026-10-27T19:05:13+02:00**
+  - `roofingvoiceagent.com`: shown **`$49,999,999.00`**, `checked_at` **2026-10-27T02:06:06+02:00** (not refreshed; apex is 114-byte JS→`/lander`, `/lander`→GoDaddy forsale **403** to our UA → price `unknown` neither clears nor updates)
+  - `ukcbamcompliance.com`: shown **`$100,000.00`**, `checked_at` **2026-10-27T16:21:00+02:00** (same stale/unknown path as roofing)
+- **Live root cause (BUG-056 not cleared on Afternic HTML):** `LANDER_BODY_BYTES = 200_000`. Fresh `www.afternic.com/domain/aievalsconsulting.com` HTML ~337KB; buyer text `Buy it now for $1,488.00` at byte ~251111 (past the cap). Within the first 200KB the fallback pattern matches `Buy Now price must be below $100,000` → `shown_cents` 10000000. Tight "buy it now for" pattern in 5.68.0 is correct but never sees the real BIN under the body cap. Fixtures LP-9/LP-10 still pass. Needs a follow-up (raise body cap and/or treat "must be below" as LIMIT_COPY).
+
+### CR-080 day-1 (aftermarket) — **YES**
+- Datasave `run_b775e654-85b2-48b4-b2a9-0b057b356cf2` finished **2026-10-27T19:04:54+02:00** (aftermarket started 18:16:27, ~48.4 min).
+- `dynadotAftermarket`: **`sealed: true`**, `status: partial`, `origin: server`, `data_date: 2026-10-27`, **`rows_n: 377122`**, `pages_n: 461`, `calls_n: 465`, `total_listings: 464254`, `listings_read_n: 460249`, `pages_failed: [102, 204, 306, 408]` (HTTP 500), `pages_empty: []`, `invalid_n: 3113`, sha256 `dc5aa15d5c6212227ff3bac737e8fec78bdde47086a4504f3272b8dc83982763`.
+- BUG-057 live: **PASS** for the gap/0-row failure mode (no `deep_pages_empty` / rows_n 0). Partial seal with real rows starts the 3-day server-primary ok window **day-1**.
+- Closeouts same run: already `SNAPSHOT_SEALED` for 2026-10-27 (53878 rows earlier) — no redundant closeout pull.
+- GoDaddy seal wait remains separate (21:00 IDT rule); not part of these three gates.
+
+### Discovery E2E
+Still held until AT-4 + BUG-056 clear. No money.
+
 ## 2026-10-27 (DOM): v5.68.0 shipped — BUG-056 + BUG-057 fixed
 
 - **BUG-056** (lander $100k false positive): the tight "Buy it now for $X" pattern now takes priority over generic proximity matches. `LANDER_PRICE_MISMATCH` on `ukcbamcompliance.com` clears at the next `portfolioCheck`. Tests LP-9, LP-10.

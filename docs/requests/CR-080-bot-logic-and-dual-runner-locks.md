@@ -158,3 +158,14 @@ Pass marks: AT-2, AT-4 testable without Grok for Dynadot; jobs 01–02 Dynadot h
 - Confirmed via process environ (KERN_PROCARGS2): live `node dist/main.js` for `com.domaintrading.api` has `DYNADOT_API_KEY` and `DYNADOT_API_SECRET` **exact match** to `~/.config/domain-trading/prod.env` (no restart required this turn). `DYNADOT_CLOSEOUTS_PATH` absent → `dynadotCloseouts` remains `not_configured` (closeouts bot-primary) per contract.
 - Oct 26 ~22:33 IDT datasave `not_configured` / `DYNADOT_API_KEY is not set` predated a completed post-key Dynadot step. Manual datasave `run_f1861b6e-e803-476d-90de-2cbdbd9686e5` queued/started ~16:24 IDT to run `dynadotAftermarket` (~40 min at end of job). **3-day ok window day-1 = finished_at of first `dynadotAftermarket` status sealed/ok** — stamp when that step completes (poll in progress).
 - No money; purchase adapter stays disabled.
+
+
+## Day-1 stamp (2026-10-27 ~19:05 IDT, DOM Architect) — aftermarket **YES**
+
+**Day-1 of 3-day server-primary ok window for Dynadot aftermarket = YES** (partial seal with `rows_n > 0`).
+
+- Run `run_b775e654-85b2-48b4-b2a9-0b057b356cf2` finished 19:04:54 IDT on `/health` **5.68.0**.
+- `dynadotAftermarket`: sealed=true, status=partial, origin=server, data_date=2026-10-27, rows_n=377122, pages_n=461, calls_n=465, pages_failed=[102,204,306,408], total_listings=464254, sha256 `dc5aa15d5c6212227ff3bac737e8fec78bdde47086a4504f3272b8dc83982763`.
+- Prior same-day gap run (`run_f1861b6e-…`, deep_pages_empty rows_n=0) superseded by this seal (BUG-057).
+- Closeouts: already sealed earlier today (SNAPSHOT_SEALED); `DYNADOT_CLOSEOUTS_PATH` still unset → closeouts remain bot-primary.
+- Days 2–3 still required before bots stop being aftermarket backup. GoDaddy 21:00 rule unchanged.
