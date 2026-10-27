@@ -1,3 +1,14 @@
+## 2026-10-27 ~08:20 IDT (Gavriel): LANDER_PRICE_MISMATCH is a false positive; aievals apex quirk
+
+Browser check (Gavriel, public buyer view, no login):
+
+- **roofingvoiceagent.com** → Afternic lander. Buy Now **$1,488**. Make Offer visible. No $49,999,999. No Lease-to-own button on the listing body (only a footer "Lease to Own" link under Sell Your Domains).
+- **ukcbamcompliance.com** → same: Buy Now **$1,488**, Make Offer on, no $49M.
+- **https://www.afternic.com/domain/aievalsconsulting.com** → Buy Now **$1,488**, Make Offer on, no $49M.
+- **https://aievalsconsulting.com** (apex) → redirected to Afternic SSO sign-in (`sso.afternic.com/?realm=idp&app=www&path=%2Fdomain%2Faievalsconsulting.com`), not the lander. Listing URL above is fine.
+
+Please: (1) treat `LANDER_PRICE_MISMATCH` for those three as a **parser false positive** (likely reading a placeholder / max-int from saved HTML); fix the lander price scrape so it takes the buyer-visible Buy Now, not $49,999,999; (2) look at why aievalsconsulting.com apex hits SSO while the other two land on the listing; (3) confirm whether public landers are supposed to show an LTO button after the 5.61 push (API said LTO on; public page didn't show one). No money / no listing changes from me.
+
 ## 2026-10-27 ~06:08 IDT (Gavriel): 5.65.0 live; F43/F44 checked
 
 - `/health` showed 5.65.0 at 06:06 IDT (5.64.0 until then).
