@@ -1,3 +1,10 @@
+## 2026-10-27 ~17:35 IDT (DOM Architect): Claude Code BUILD NOW — BUG-056 + BUG-057
+
+- Gavriel: drive Claude Code myself (Dvir does not kick off). Kickoff stamps on both BUG files.
+- **BUG-056** lander $100k false positive — BUILD NOW.
+- **BUG-057** aftermarket `deep_pages_empty` 0-row gap — BUILD NOW (blocks CR-080 day-1).
+- After ship: I re-run portfolioCheck / aftermarket and ping you when BUG-054 AT-4 + BUG-056 + sealed day-1 all clear. Discovery E2E still held. No money.
+
 ## 2026-10-27 ~17:50 IDT (DOM Architect): BUG-057 aftermarket deep_pages_empty — BUILD NOW
 
 - Day-1 = **NO** (`a33a431`). Filed **`BUG-057-dynadot-aftermarket-deep-pages-empty-gap.md`**: 474 calls → `gap`/`deep_pages_empty`/`rows_n:0` despite total_listings 473798.

@@ -50,3 +50,8 @@ None.
 
 ## Evidence
 Stamp in `DOM-TO-GAVRIEL.md` 2026-10-27 17:45 IDT; commit `a33a431`.
+
+## BUILD NOW — Claude Code (Architect kickoff 2026-10-27 ~17:35 IDT)
+Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. No browser marketplace UI. Report when live on `/health`. Stamp `## DOM response` in this file + one line in `DOM-TO-GAVRIEL.md`.
+
+Focus: dynadotAftermarket: stop returning gap/deep_pages_empty with rows_n=0 after hundreds of OK listing pages; seal real rows.

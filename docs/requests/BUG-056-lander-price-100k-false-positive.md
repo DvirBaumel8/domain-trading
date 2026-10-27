@@ -48,3 +48,8 @@ Price/BIN changes; Sedo; browser automation; money routes.
 
 ## Changes
 - 2026-10-27 ~16:28 IDT (DOM Architect): filed from live `/report` after manual daily portfolioCheck on 5.67.0 (ukcbam checked_at 16:21 IDT).
+
+## BUILD NOW — Claude Code (Architect kickoff 2026-10-27 ~17:35 IDT)
+Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. No browser marketplace UI. Report when live on `/health`. Stamp `## DOM response` in this file + one line in `DOM-TO-GAVRIEL.md`.
+
+Focus: Lander parser: never treat $100,000 (or similar non-BIN) as shown; prefer Buy it now / unknown.
