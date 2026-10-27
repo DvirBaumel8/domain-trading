@@ -267,7 +267,7 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 | # | Answer |
 |---|---|
 | A | **Yes, broader:** one place per durable data piece = **DOM database**. Every component needing that data reads **only via DOM API**. All other persistence of those facts to be removed/refactored (company CSV mirrors included). |
-| B | **Sedo fully off:** remove Sedo scrapes **and** Sedo listings (no placeholders). Seek server-to-server marketplace alternatives (Afternic Portfolio API, Spaceship SellerHub, others with S2S APIs). |
+| B | **Sedo scrapes/automation off** (no T-SELL Sedo; no new Sedo investment). **KEEP override t971u:** keep 4 live Sedo listings (aievalsconsulting, promptinjectionaudit, roofingvoiceagent, ukcbamcompliance); browser never removed them. Seek S2S alternatives. |
 | C | **Reject three named READ tokens.** One shared password for DOM endpoints; **DOM Architect generates**; Dvir one-tap/passes to Gavriel; no invent+activate alone. |
 | D | **Yes** — archive ~267 bak / stale scout docs under `archive/` (no delete). |
 | E | **Skip** 90-day edge framing for now. |
@@ -275,8 +275,8 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 
 **Execute (DOM Architect, 2026-10-27 ~02:46 IDT):**
 - A → `CR-084-dom-sole-durable-store.md` (117779a)
-- B → `CR-085-sedo-full-off.md` + `SEDO-DELIST-PLAN-2026-10-27.md` (verify first; **no Sedo clicks** until Dvir one-tap if anything live)
-- C → named READ **rejected**; **one shared token: DOM Architect generates** → Dvir one-tap/pass to Gavriel → both sides use it. **Do not invent+activate alone**; no live token until Dvir confirms the handoff (Gavriel clarify 2026-10-27 ~02:48 IDT).
+- B → `CR-085` + `SEDO-DELIST-PLAN` — T-SELL/no-new off; **delist cancelled t971u KEEP-4** (Gavriel confirm none removed)
+- C → **DONE:** one shared READ token (`shared-bots` id 10); DOM generated → Dvir yes → `handed_to_gavriel`; Mac + box secrets; never print.
 - D → `CR-086-archive-bak-and-stale-scout-docs.md` + company-box archive pass (no delete)
 - E → skipped
 
@@ -291,7 +291,7 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 - Dvir final-approves §10 items he cares about (at minimum A; B–E as needed).
 - One writer per durable price field is named (DOM) and mirrored with lag note.
 - FIXED token-savers run as maintenance or are explicitly deferred by Dvir.
-- Sedo **fully off** (T-SELL scrapes stopped; listings removed per §10 B — not placeholders).
+- Sedo T-SELL/automation off; **KEEP-4 listings stay** (t971u); no Sedo rebuild.
 - CLEAR never becomes DOM auto-buy; Challenger stays bot; money stays Dvir yes → Gavriel.
 
 **Fail if:**
@@ -310,4 +310,4 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 - `docs/requests/TEAM-OPS-critical-notes-2026-10-27.md`
 - Course window: `docs/requests/DOM-COURSE-grok-side-2026-10-27.md` + `DOM-COURSE-index.md`
 
-*DOM Architect confirmed ~02:40 IDT. Dvir §10 FINAL ~02:44 IDT. CRs 084–086 + Sedo plan on main (117779a+).*
+*DOM Architect confirmed ~02:40 IDT. Dvir §10 FINAL ~02:44 IDT. Catch-up t977u ~03:23 IDT: KEEP-4 Sedo; shared token handed; bak 266 archived; Security A; browser R9+t974u API→DOM. See `NOTE-2026-10-27-tonight-catchup-t977u.md`.*
