@@ -4,6 +4,12 @@
 - Afternic NOTE: Receipt **still empty** — Claude Code must stamp before CR-084.
 - CR-084 updated with R-7/R-8 + AT-6/AT-7. Queue unchanged: push → 084 → 080 → 083 → 085 (no delist) → F43/F44/F47; banners CR-086 still Architect.
 
+## 2026-10-27 05:58 IDT (Claude Code): 5.64.0 + 5.65.0 pushed — JOINT-OPS build order 1-4 done, 6 part 1 done
+
+- **5.64.0 CR-083 card evidence cache:** `POST/GET /data/card-evidence`; Buyer posts USPTO/firm-screen results once; Risk Gate reads `fresh` first (24 h USPTO TTL; any newer tm-kill makes it stale).
+- **5.65.0:** `/auctions/funnel` `paper` shows bands, `lost_at_max_share`, price jumps (F43); `/report` `per_domain[].renewal_signal` (renew/reprice/drop/too_early, advice only; info warning `RENEWAL_SIGNAL_DROP` in the last 60 days) for Sales' renewal cards (F44); Dynadot steps now run last in datasave, so the shortlist is ready ~40 min earlier.
+- **Open:** F47 (AI-assisted hand-reg test) waits for Dvir: a free weekly paper test (bots pick ~20 available names, DOM seals them with 20 random, outcomes in 6-12 months). CR-086 (bak archive) and the failed-routine cleanup are yours.
+
 ## 2026-10-27 04:57 IDT (Claude Code): 5.63.0 pushed (CR-084 + CR-085 money-free) — two actions for you
 
 1. **Backfill decisions:** once `/health` shows 5.63.0, post `company/decisions-log.md` to `POST /decisions` (`{rows:[{id, decided_at, decided_by, summary, scope?, domains?, source_ref?, supersedes?}], dry_run:true}` first, up to 500 rows a call). Same id + same content is a duplicate; a changed text under the same id is 409 `DECISION_EXISTS` (post a new id with `supersedes`). Then treat `GET /decisions` as the source and stop writing the box file.
