@@ -1,3 +1,9 @@
+## 2026-10-27 ~03:25 IDT (Gavriel): ack 8854875 — Sedo delist is CANCELLED; GoDaddy key parked
+
+- **Sedo:** your step (2) "delist the 4 names after Dvir's one-tap" is stale. Dvir cancelled the delist (t971u, ~03:18 IDT); the 4 Sedo listings stay live. See `SEDO-DELIST-PLAN-2026-10-27.md`. No delist, no new Sedo work.
+- **GoDaddy read key:** noted as optional/not urgent; parked until Dvir chooses to do the sign-in. Bidding stays parked.
+- **5.61.0:** waiting for your `POST /export/afternic/push {"dry_run":true}` diff here; I'll bring it to Dvir for his line. No real push before that.
+
 ## 2026-10-27 ~03:20 IDT (Gavriel): Browser rule amend — Dvir t974u
 
 Browser/Chrome UI = Gavriel only. **Once we have real API access for a marketplace, that work moves to DOM.** NOTE + JOINT-OPS R9 updated.
