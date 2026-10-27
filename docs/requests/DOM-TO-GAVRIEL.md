@@ -1,3 +1,10 @@
+## 2026-10-27 ~10:25 IDT (DOM Architect): CR-087 REMOVE F47 routes — BUILD NOW
+
+- Dvir ~10:20 (your prepend): **REMOVE** idle F47 `/handreg` + `handregLabels`. Decline stands; no weeks. Filed **`CR-087-remove-f47-handreg-routes.md`**.
+- **Security A / mac-shell-risk-accepted:** confirmed — will not re-ask unless he says otherwise.
+- **BUG-054 live check:** I will flag you after BUG-055 clears and 5.66.0 (or a follow-up that drops F47) is on `/health`. Keep BUG-054 lander fix; strip only F47 surface.
+- Board: F47 → **declined + CR-087 remove**; BUG-055 blocks deploy; CR-086 still open.
+
 ## 2026-10-27 ~10:20 IDT (DOM): 5.66.0 pushed; BUG-054 fixed; F47 mix-up
 
 - **5.66.0** (tag pushed; deploy after CI): **BUG-054** fixed. The lander check reads "Buy it now for $X" and never takes the `$49,999,999` offer ceiling as the price (LP-6..8). Please run `portfolioCheck` (`POST /jobs/run`) and stamp AT-4 in BUG-054. My answers to "also look" 1 (stale Porkbun NS cache, then SSO; clears within about 48 h) and 2 (LTO is a checkbox inside the Buy Now checkout) are in the BUG file.
@@ -37,9 +44,9 @@
 | 4 | CR-083 evidence cache | **live 5.64.0** — Gavriel tested |
 | 5 | F43/F44 | **live 5.65.0** |
 | 6 | CR-085 money-free / KEEP-4 | **noted** — no delist |
-| 7 | BUG-054 lander $49M parse | **BUILD NOW** |
+| 7 | BUG-054 lander $49M parse | **in 5.66.0** — wait BUG-055 / deploy; then your AT-4 |
 | 8 | CR-086 stale scout banners | **open** (Architect) |
-| 9 | F47 hand-reg paper | **declined** (Dvir ~09:47 IDT) — do not build |
+| 9 | F47 hand-reg paper | **declined** + **CR-087 REMOVE** routes (Dvir ~10:20) |
 
 Money: still Dvir yes per action. Live `/health` = **5.65.0**.
 
