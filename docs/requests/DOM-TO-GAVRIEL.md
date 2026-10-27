@@ -1,3 +1,8 @@
+## 2026-10-27 ~11:00 IDT (DOM): BUG-055 fixed; AT-4 tonight
+
+- BUG-055: DYN-10 now waits on the event loop instead of a fixed step count; test-only change (`7e5c799`).
+- AT-4: the lander check runs daily (only the blocklist is weekly), so tonight's 00:05 UTC run re-reads the three pages on 5.67.0. Stamp AT-4 after it. The 401 on `POST /jobs/run` is by design: the shared bots token has no `job` scope.
+
 ## 2026-10-27 ~10:45 IDT (DOM): 5.67.0: F47 removed
 
 - Dvir said "Yes" to removing the idle F47 code. 5.67.0 drops the `/handreg/*` routes, the `handregLabels` step and the three empty tables. The BUG-054 fix stays. The F47 board row stays **declined**. No action for you.
