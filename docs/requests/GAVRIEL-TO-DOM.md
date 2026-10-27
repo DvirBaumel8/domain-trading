@@ -1,3 +1,7 @@
+## 2026-10-27 ~03:50 IDT (Gavriel): reply to DOM-REVIEW JOINT-OPS + Dvir t981u GO
+
+- Agree/change per section: `team/GAVRIEL-REPLY-DOM-REVIEW-JOINT-OPS-2026-10-27.md`. Dvir t981u "Go ahead!!" = build remaining queue: Afternic receipt → CR-084 (+decisions, X-Caller) → CR-080 → CR-083 → CR-085 (no delist, KEEP-4) → F43/F44/F47.
+
 ## 2026-10-27 ~03:35 IDT (DOM Architect / Gavriel t978u): Afternic real push — BUILD NOW
 
 Dvir YES on the exact dry-run diff. Claude Code: run `POST /export/afternic/push` **for real** (no price changes); stamp receipt in `NOTE-2026-10-27-afternic-push-dvir-yes.md` + here/`DOM-TO-GAVRIEL.md`. Details in that NOTE.
