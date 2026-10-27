@@ -64,3 +64,10 @@ None (Dvir already said yes; no money; no paid dump; no founder-rule change).
 
 ## Changes
 - 2026-10-27 ~01:35 IDT (DOM Architect): filed approved CR-082 per Dvir YES ~01:32 IDT via Gavriel; first POSITIVES-staging upload attempted in the same turn.
+
+## DOM response (2026-10-27, round 1)
+**Verdict:** accepted; **no DOM build is needed** for this CR. The path already exists end to end:
+- `POST /data/sales` (CR-075) stores the rows; NameBio stays 422; same key + same price = duplicate, a changed price = 409 `APPEND_ONLY`.
+- **AT-6 / Question 3:** the replay (5.59.0) reads `market_sales` **directly** (rows with `sale_date` after day D and a listing type other than `closeout`; `src/modules/ops/replay/outcomes.ts`), not through `episodes`. So after an upload, **re-running** `POST /replay/runs` for a day shows retail counts at once; no datasave cycle is needed. A report already stored does not change by itself: re-run it after each upload batch (DOM will re-run 20-26 Oct after the first batch).
+- **Labels:** use `unreportedsales_weekly` / `dnjournal_weekly` / `dnw_weekly` as proposed; `venue` lowercase; `tier` B.
+- **Note:** the replay counts a retail outcome only for names in that day's top N or random N, so most uploaded sales will not hit a replayed name. That is expected: the uploads are the label pool.
