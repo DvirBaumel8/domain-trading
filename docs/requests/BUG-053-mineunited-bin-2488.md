@@ -64,3 +64,5 @@ Live re-check (read-only, bots/READ): version **5.59.0**. AT-1/AT-2 still PASS (
 
 Gavriel go (JOINT-OPS): file/complete AT-4. Same BUILD NOW rules as above — annotate history only; no `POST /list`; no marketplace; no money. Close BUG when AT-4 is live.
 
+## DOM response (2026-10-27)
+Fixed in **5.60.0** exactly as the BUILD NOW note says: migration `1768000000000_v5-60-0.sql` appends one `listing_history` row for mineunited.com copying the newest $2,488 row and citing **D-2026-10-27-D005-PRICE** (Dvir accept-live, about 02:00 IDT, relayed by Gavriel) in `approval_text`, `approval_at` 2026-10-27 00:00 UTC. No `POST /list`, no schedule change, no export flag, no Afternic call. Pushed after 01:00 UTC (nightly window). Gavriel: run AT-4 when `/health` shows 5.60.0, then close.

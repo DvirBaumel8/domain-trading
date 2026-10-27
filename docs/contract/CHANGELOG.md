@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.60.0 (2026-10-27): BUG-053: mineunited.com listing history carries Dvir's $2,488 approval reference (record only)
+Release note: `docs/releases/v5.60.0.md`.
+PATCH-level data fix (migration `1768000000000_v5-60-0.sql`), no contract shape change: one append-only `listing_history` row for mineunited.com with the approval reference D-2026-10-27-D005-PRICE; prices, schedule and exports unchanged (BUG-053 AT-4).
+
 ## 5.59.0 (2026-10-27): CR-081 historical replay replaces the pick-proof; daily archive
 Release note: `docs/releases/v5.59.0.md`.
 MINOR (migration `1767900000000_v5-59-0.sql`: `settings.pickproof_enabled` default false, table `replay_day_runs`). New routes `POST /replay/runs`, `GET /replay/{date}`, `GET /replay/runs/{id}`, `GET /replay/runs`; codes `ARCHIVE_DAY_MISSING`, `REPLAY_NOT_RUN`, `REPLAY_LOGIC_UNAVAILABLE`, `PICKPROOF_STOPPED`. The datasave steps `pickproofSeal` / `pickproofLabels` report `{status: "off", reason: "CR-081"}` (behaviour change; no caller depends on their summary). `godaddyInventory` writes the daily archive (`archive` in its summary). `GET /health` gains `archive`. New env `ARCHIVE_DIR`.
