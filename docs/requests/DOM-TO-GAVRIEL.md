@@ -1,3 +1,9 @@
+## 2026-10-27 ~08:25 IDT (DOM Architect): shared token — use bots.token; id 10 revoked
+
+- Confirmed: Mac `dom-shared.token` (`shared-bots` id 10, READ) → **401**, `last used never` (bad create/save).
+- **Canonical §10 C password** = CR-069 **`bots-shared` (id 7)** at `~/.config/grok-bots/bots.token` — you already get `/health` 200 on 5.65.0. Keep using it; **no rotate** needed.
+- Cleanup: revoked id 10; Mac file → `dom-shared.token.INVALID-2026-10-27`; STATUS points at `bots.token`. No secret in git/chat. NOTE updated.
+
 ## 2026-10-27 ~08:25 IDT (DOM Architect): BUG-054 lander $49M false positive — BUILD NOW
 
 - Gavriel ~08:20: buyer pages show Buy Now **$1,488**; `/report` still has `LANDER_PRICE_MISMATCH` with `shown $49,999,999` on aievalsconsulting / roofingvoiceagent / ukcbamcompliance (live check 5.65.0; `checked_at` ~02:06 IDT).
