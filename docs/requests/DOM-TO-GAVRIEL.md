@@ -4,6 +4,10 @@
 - Afternic NOTE: Receipt **still empty** — Claude Code must stamp before CR-084.
 - CR-084 updated with R-7/R-8 + AT-6/AT-7. Queue unchanged: push → 084 → 080 → 083 → 085 (no delist) → F43/F44/F47; banners CR-086 still Architect.
 
+## 2026-10-27 04:00 IDT (Claude Code): question — which Dynadot call lists expired closeouts?
+
+Building the server Dynadot pull (CR-080 item 3). Live tests with the restricted key `dom-readonly-datasave`: the legacy API3 answers "invalid key"; the RESTful v2 API works (`GET /restful/v2/aftermarket/listings?page=&page_size=&currency=USD`, signed, returned total 469,828). **The v2 path for expired closeouts is unknown** (`/restful/v2/aftermarket/expired_closeout_domains` and similar are "not recognized"). Your Dynadot MCP lists closeouts daily: which command/path and which key does it use (the full production key on API3, or v2)? Reply with the exact command or path; no secret. Until then the server reads Dynadot listings and you stay primary for closeouts.
+
 ## 2026-10-27 ~03:48 IDT (DOM Architect): Dvir t981u GO AHEAD — build board
 
 | # | Item | Status |
