@@ -54,3 +54,22 @@ Price/BIN changes; Sedo; browser automation; activating settings that spend mone
 
 ## Changes
 - 2026-10-27 ~08:25 IDT (DOM Architect): filed from Gavriel `GAVRIEL-TO-DOM` ~08:20 + live `/report` evidence + HTML confirmation of `$49,999,999` offer-limit string.
+
+## DOM response (2026-10-27, Claude Code)
+**Verdict: accepted, fixed in 5.66.0** (`src/modules/ops/jobs/portfolio-check.ts` `shownBuyNowCents`).
+- **Cause confirmed:** the old rule took the first `$` amount within 80 characters after "buy now". Afternic's page carries an i18n bundle where a "Buy Now" label is followed by `"Offer cannot exceed $49,999,999"`, so that ceiling won.
+- **Fix (R-1..R-3):** "Buy it now for $X" is read first. Otherwise the server scans every amount near "buy now", skipping any amount that follows limit copy (exceed, cannot, limit, minimum, maximum, at least, less/more than, between, offer must). It also skips any amount of $10,000,000 or more. When no amount is left, the result is `unknown`, never a mismatch. No listing writes (R-4).
+- **Tests:** `tests/modules/ops/portfolio-check.test.ts` LP-6 (AT-1), LP-7 (AT-2), LP-8 (AT-3), on a fixture shaped like the real page: the i18n bundle plus "Buy it now for $1,488.00". Checked against the live page: `www.afternic.com/domain/roofingvoiceagent.com` contains both "cannot exceed $49,999,999" and "Buy it now for $1,488.00".
+- **AT-4 (R-5):** the next weekly `portfolioCheck` of each name clears the warning. To clear it sooner, run the job (`POST /jobs/run`), then check `/report` and stamp AT-4 here.
+
+**Also look 1: aievalsconsulting.com and Afternic SSO.** This is expected and needs no CR.
+- All three names show NS1/NS2.AFTERNIC.COM at the registry (Verisign RDAP).
+- All three apexes answer the same way from Afternic's servers: a JS stub that sends the browser to `/lander`, then to `forsale.godaddy.com`.
+- Resolvers that still cache the old Porkbun nameservers send the apex down the old path: Porkbun's URL forward, then our `/r/aievalsconsulting.com`, then `www.afternic.com/domain/aievalsconsulting.com`. On this Mac the system resolver still did this today. For a browser that holds a GoDaddy/Afternic session, that page bounces through `sso.afternic.com`. An anonymous fetch of the same page answers 200.
+- It clears when the old NS cache expires (up to 48 h after the 27 Oct change). Re-check from a fresh browser profile after that.
+
+**Also look 2: Lease to Own button.** Most likely expected.
+- Afternic's page offers Lease to Own as a checkbox inside the Buy Now checkout window, not as a separate button on the page. Its i18n bundle has `checkout.modal.lease.checkbox.text` "Lease To Own", plus two "disabled" texts for unsupported names.
+- Gavriel can confirm by opening Buy Now, without paying: the checkbox should appear enabled.
+- If it shows "Lease to Own is currently unsupported for this domain", that is Afternic's own eligibility rule. File it then; the API flag cannot override it.
+- No listing change made.
