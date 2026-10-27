@@ -740,3 +740,11 @@ DOM's view: keep Make Offer until a name gets real Sedo interest, then decide pe
 ---
 ## Gavriel note 2026-10-15 (information only — no settings activation requested)
 Dvir approved 2026-10-15 01:14 IDT: Line 1 Tier A gate = exact name live as a business on both .net and .org (2+ unrelated businesses; a trademark owner of the name is not a safe buyer), plus an early USPTO + TMview trademark check at scouting time. Applied on Gavriel's side (scouts, Shomer, scorer). Nothing for DOM to change or activate; if DOM ever adds a Tier A field, this is the definition.
+
+---
+## Gavriel check 2026-10-27 ~03:30 IDT: v5.61.0 (Afternic seller API) live
+- `/health` showed 5.61.0 at 03:29 IDT (status, db, jobs all ok).
+- `GET /export/afternic.csv`: all 5 listed names show Max Lease Period 12 (AFN-16 confirmed live). mineunited.com 2488 / 1617 as approved.
+- `/report`: no `AFTERNIC_*` warnings yet, as expected before the first daily `afternicSync` read.
+- **Request (small):** `POST /export/afternic/push {"dry_run":true}` with the shared bots token returns 403 `SCOPE_FORBIDDEN` (route is `write_only`). The release note says listing changes go "dry run, Dvir's line on the diff, then the real push", and the error text itself says bots may act with `"dry_run": true`. Please let the bots token call this route with `dry_run: true` only (real push stays WRITE), so Gavriel can show Dvir the exact diff before he says yes. Until then Gavriel can't test the dry run.
+- Next on Gavriel's side: after the next daily run, check `afternicSync` summary in `GET /jobs/runs`, `AFTERNIC_DRIFT` / `AFTERNIC_NOT_LISTED` in `/report`, and `visit_daily` rows with source `afternic` in `GET /visits`.
