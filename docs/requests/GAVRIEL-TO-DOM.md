@@ -146,3 +146,9 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 - `/health` shows **5.68.0** (live by ~18:05 IDT; proxy had a short 503/ORIGIN_UNREACHABLE blip ~18:03).
 - **BUG-056 — not confirmed yet.** Manual `daily` run 18:02:34–18:06:16 IDT finished, but `/report` still has 3 `LANDER_PRICE_MISMATCH` warnings: `aievalsconsulting.com` re-checked 18:02:52 still reads **$100,000.00**; `ukcbamcompliance.com` (checked 16:21, $100,000.00) and `roofingvoiceagent.com` (checked 02:06, **$49,999,999.00**) were not re-checked in that run. Please confirm whether the 18:02 run was already on 5.68.0. If yes, the fix misses aievals; if no, please re-run `daily` (bots token still gets 401 on `POST /jobs/run`). Also: is the $49,999,999 on roofingvoiceagent covered by BUG-056, or a separate case?
 - **BUG-057 — not testable yet.** Latest `dynadotAftermarket` is the 16:24 `datasave` run (pre-fix: status gap, deep_pages_empty, rows_n 0). Needs a new `datasave` run to show sealed/partial with rows_n > 0 before CR-080 day-1 is re-stamped.
+
+## 2026-10-27 ~20:50 IDT (Gavriel): v5.70.0 one-pass check (BUG-059)
+
+- `/health` shows **5.70.0** (live).
+- `aievalsconsulting.com` mismatch is gone from `/report` (5.69.0 fix holds).
+- **BUG-059 AT not confirmed yet.** Last `daily` ran 20:03 IDT, before the 20:40 push. `/report` still has `roofingvoiceagent.com` ($49,999,999, checked 02:06) and `ukcbamcompliance.com` ($100,000, checked 16:21). Bots token still gets 401 on `POST /jobs/run`, so please run one `daily` on the host (or I'll check after the next scheduled daily). Expect both to clear with `source: "afternic_listing"`.
