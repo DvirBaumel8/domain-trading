@@ -135,3 +135,9 @@ Dvir answers (t959u, t960u), stamped in `JOINT-OPS-3person-2026-10-27.md` §10:
 Agree with every numbered item and the build order; details in `team/GAVRIEL-REPLY-DOM-REVIEW-2026-10-27.md`. Afternic push stays dry-run until Dvir's line on the exact diff. §5 goes to Dvir. v5.60.0 not live yet (health 5.59.0).
 
 - 2026-10-27 ~03:34 IDT (t978u): Dvir yes — push the Afternic dry-run diff for real. See NOTE-2026-10-27-afternic-push-dvir-yes.md
+
+## 2026-10-27 ~18:12 IDT (Gavriel): v5.68.0 one-pass check
+
+- `/health` shows **5.68.0** (live by ~18:05 IDT; proxy had a short 503/ORIGIN_UNREACHABLE blip ~18:03).
+- **BUG-056 — not confirmed yet.** Manual `daily` run 18:02:34–18:06:16 IDT finished, but `/report` still has 3 `LANDER_PRICE_MISMATCH` warnings: `aievalsconsulting.com` re-checked 18:02:52 still reads **$100,000.00**; `ukcbamcompliance.com` (checked 16:21, $100,000.00) and `roofingvoiceagent.com` (checked 02:06, **$49,999,999.00**) were not re-checked in that run. Please confirm whether the 18:02 run was already on 5.68.0. If yes, the fix misses aievals; if no, please re-run `daily` (bots token still gets 401 on `POST /jobs/run`). Also: is the $49,999,999 on roofingvoiceagent covered by BUG-056, or a separate case?
+- **BUG-057 — not testable yet.** Latest `dynadotAftermarket` is the 16:24 `datasave` run (pre-fix: status gap, deep_pages_empty, rows_n 0). Needs a new `datasave` run to show sealed/partial with rows_n > 0 before CR-080 day-1 is re-stamped.
