@@ -1,0 +1,305 @@
+# Bak archive inventory (2026-10-27)
+
+**Count outside archive/:** 266
+
+## By top-level folder
+
+- `lanes/`: 38
+- `system/`: 37
+- `research/`: 34
+- `data/`: 23
+- `company/`: 22
+- `sales/`: 18
+- `knowledge/`: 14
+- `challenge/`: 13
+- `deals/`: 13
+- `scouts/`: 12
+- `ledger/`: 9
+- `lessons/`: 7
+- `rules/`: 6
+- `batches/`: 5
+- `sourcing/`: 5
+- `outreach/`: 3
+- `harness/`: 2
+- `org/`: 2
+- `daily/`: 1
+- `quarantine/`: 1
+- `risk/`: 1
+
+## Status
+- **Moved** 2026-10-27 ~02:48 IDT to `archive/bak-2026-10-27/` (see MANIFEST.txt there).
+- Outside-archive `.bak*` remaining: check after move.
+
+## Manifest policy
+- Move under `/workspace/domain-trading/archive/bak-2026-10-27/` preserving relative path.
+- No delete.
+- Blocked files (still referenced) listed after first `rg` pass.
+
+## Full path list
+
+- `/workspace/domain-trading/batches/sochen/2026-10-14/rounds-final.md.bak-rednexus`
+- `/workspace/domain-trading/batches/sochen/2026-10-17-round1/A18-outreach-drafts.md.bak-20261017-gate`
+- `/workspace/domain-trading/batches/sochen/2026-10-17-round5/offer_tests.py.bak-20261020-bug049`
+- `/workspace/domain-trading/batches/sochen/2026-10-17-round5/offer_tests.py.bak-20261020-d005price`
+- `/workspace/domain-trading/batches/sochen/2026-10-17-sale-rate-plan.md.bak-20261020-tdata`
+- `/workspace/domain-trading/challenge/answers/data-engineer-round1.md.bak-20261017-netcap`
+- `/workspace/domain-trading/challenge/answers/data-engineer-round2.md.bak-20261017-mahandes`
+- `/workspace/domain-trading/challenge/answers/data-engineer-round2.md.bak-20261019-mahandes`
+- `/workspace/domain-trading/challenge/answers/sales-round2.md.bak-v1`
+- `/workspace/domain-trading/challenge/bot-pick-proof-plan.md.bak-20261020-buyer`
+- `/workspace/domain-trading/challenge/bot-pick-proof-plan.md.bak-v1-20261020`
+- `/workspace/domain-trading/challenge/golden/responses/sales-r1.md.bak-20261020-bug049`
+- `/workspace/domain-trading/challenge/improvement-rounds/inventory.md.bak-20261017-sales`
+- `/workspace/domain-trading/challenge/improvement-rounds/inventory.md.bak-20261017-sales-v3`
+- `/workspace/domain-trading/challenge/work/a02r5/repo/ledger/ledger.csv.bak-20261016-d005`
+- `/workspace/domain-trading/challenge/work/a02r5/repo/ledger/ledger.csv.bak-20261017-capclass`
+- `/workspace/domain-trading/challenge/work/a02r5/repo/ledger/portfolio.csv.bak-20261016-d005`
+- `/workspace/domain-trading/challenge/work/a02r5/repo/ledger/portfolio.csv.bak-20261017-d005-expiry`
+- `/workspace/domain-trading/company/alignment/buyer.md.bak-20261022-b05`
+- `/workspace/domain-trading/company/alignment/madan.md.bak-20261017-v1`
+- `/workspace/domain-trading/company/brief/brief-core.md.bak-20261022-0116-r5`
+- `/workspace/domain-trading/company/brief/brief-core.md.bak-20261022-0400-tcost2`
+- `/workspace/domain-trading/company/brief/brief-core.md.bak-20261022-0800-hardneg`
+- `/workspace/domain-trading/company/brief/brief-core.md.bak-20261022-1210-prereg`
+- `/workspace/domain-trading/company/brief/brief-core.md.bak-20261022-1600-tsell`
+- `/workspace/domain-trading/company/brief/brief-core.md.bak-20261022-approvals`
+- `/workspace/domain-trading/company/brief/brief-core.md.bak-20261022-core`
+- `/workspace/domain-trading/company/brief/brief-core.md.bak-20261022-narrow-c`
+- `/workspace/domain-trading/company/company.md.bak-20261022-outreach`
+- `/workspace/domain-trading/company/decisions-log.md.bak-20261020-bug049`
+- `/workspace/domain-trading/company/decisions-log.md.bak-20261020-d005price`
+- `/workspace/domain-trading/company/decisions-log.md.bak-20261021-d001wa`
+- `/workspace/domain-trading/company/decisions-log.md.bak-20261027-d005-2488`
+- `/workspace/domain-trading/company/decisions-log.md.bak-20261027-sedo`
+- `/workspace/domain-trading/company/first-production-run-plan-2026-10-17.md.bak-20261022-b05`
+- `/workspace/domain-trading/company/forbidden-terms-local.md.bak-20261017-gate`
+- `/workspace/domain-trading/company/story-log.md.bak-20261022-0116-r5`
+- `/workspace/domain-trading/company/story-log.md.bak-20261022-0400-tcost2`
+- `/workspace/domain-trading/company/story-log.md.bak-20261022-1600-tsell`
+- `/workspace/domain-trading/company/story-log.md.bak-20261022-approvals`
+- `/workspace/domain-trading/daily/status-2026-10-19.json.bak-20261019-original`
+- `/workspace/domain-trading/data/README.md.bak-20261019-errnot0`
+- `/workspace/domain-trading/data/cost-log.csv.bak-20261017-cc`
+- `/workspace/domain-trading/data/cost-log.csv.bak-20261017-r2`
+- `/workspace/domain-trading/data/cost-log.csv.bak-20261017-total`
+- `/workspace/domain-trading/data/dq_check.py.bak-2026-10-17-legal-names`
+- `/workspace/domain-trading/data/dq_check.py.bak-20261017-suppression`
+- `/workspace/domain-trading/data/listing-panel/build_panel.py.bak-20261017-closeouts`
+- `/workspace/domain-trading/data/listing-panel/build_panel.py.bak-20261017-freshness`
+- `/workspace/domain-trading/data/listing-panel/build_panel.py.bak-20261020-cents`
+- `/workspace/domain-trading/data/listing-panel/dynadot_closeouts.py.bak-20261020-cents`
+- `/workspace/domain-trading/data/listing-panel/outcomes.csv.bak-20261017-freshness`
+- `/workspace/domain-trading/data/listing-panel/outcomes.csv.bak-20261017-mineunited`
+- `/workspace/domain-trading/data/listing-panel/publish_daily.py.bak-20261017-buyerview`
+- `/workspace/domain-trading/data/listing-panel/publish_daily.py.bak-20261017-freshness`
+- `/workspace/domain-trading/data/listing-panel/recheck_sold.py.bak-20261017-budget`
+- `/workspace/domain-trading/data/listing-panel/recheck_sold.py.bak-20261019-errnot0`
+- `/workspace/domain-trading/data/listing-panel/watch_unsold.py.bak-20261019-errnot0`
+- `/workspace/domain-trading/data/sales/build_nosale_v2.py.bak-20261019-wordcount`
+- `/workspace/domain-trading/data/sales/build_sales.py.bak-20261019-wordcount`
+- `/workspace/domain-trading/data/sales/rdap_budget.py.bak-20261017-lock`
+- `/workspace/domain-trading/data/sales/rdap_fill.py.bak-20261017-429`
+- `/workspace/domain-trading/data/sales/rdap_fill.py.bak-20261017-cap`
+- `/workspace/domain-trading/data/sales/rdap_fill.py.bak-20261017-costlog`
+- `/workspace/domain-trading/deals/D-001-promptinjectionaudit/approvals.md.bak-20261017-r4`
+- `/workspace/domain-trading/deals/D-001-promptinjectionaudit/approvals.md.bak-20261017-sales`
+- `/workspace/domain-trading/deals/D-002-ukcbamcompliance/approvals.md.bak-20261017-r4`
+- `/workspace/domain-trading/deals/D-003-aievalsconsulting/approvals.md.bak-20261017-r4`
+- `/workspace/domain-trading/deals/D-004-roofingvoiceagent/approvals.md.bak-20261017-r4`
+- `/workspace/domain-trading/deals/D-004-roofingvoiceagent/deal.md.bak-20261017-r4`
+- `/workspace/domain-trading/deals/D-005-mineunited/approvals.md.bak-20261020-d005price`
+- `/workspace/domain-trading/deals/D-005-mineunited/approvals.md.bak-20261027-d005-2488`
+- `/workspace/domain-trading/deals/D-005-mineunited/deal.md.bak-20261020-bug049`
+- `/workspace/domain-trading/deals/D-005-mineunited/deal.md.bak-20261020-expiry`
+- `/workspace/domain-trading/deals/D-005-mineunited/deal.md.bak-20261020-tdata`
+- `/workspace/domain-trading/deals/D-005-mineunited/deal.md.bak-20261027-d005-2488`
+- `/workspace/domain-trading/deals/index.csv.bak-20261016-d005`
+- `/workspace/domain-trading/harness/RESULTS.md.bak-20261016-0525`
+- `/workspace/domain-trading/harness/dnsq.py.bak-20261016-0530`
+- `/workspace/domain-trading/knowledge/evidence-ledger.md.bak-20261022-0116-r5`
+- `/workspace/domain-trading/knowledge/evidence-ledger.md.bak-20261022-0400-tcost2`
+- `/workspace/domain-trading/knowledge/evidence-ledger.md.bak-20261022-1600-tsell`
+- `/workspace/domain-trading/knowledge/evidence-ledger.md.bak-20261022-approvals`
+- `/workspace/domain-trading/knowledge/evidence-ledger.md.bak-20261022-b05`
+- `/workspace/domain-trading/knowledge/evidence-ledger.md.bak-20261022-principles`
+- `/workspace/domain-trading/knowledge/evidence-ledger.md.bak-20261023-0800-tecon`
+- `/workspace/domain-trading/knowledge/handoffs/cfo.md.bak-20261022-tcost`
+- `/workspace/domain-trading/knowledge/test-suite.md.bak-20261022-0116-r5`
+- `/workspace/domain-trading/knowledge/test-suite.md.bak-20261022-0400-tcost2`
+- `/workspace/domain-trading/knowledge/test-suite.md.bak-20261022-1600-tsell`
+- `/workspace/domain-trading/knowledge/test-suite.md.bak-20261022-tcost`
+- `/workspace/domain-trading/knowledge/test-suite.md.bak-20261023-0800-tecon`
+- `/workspace/domain-trading/knowledge/winners-study-2026-10-21.md.bak-20261022-0116-r5`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261015`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261015-pre-closeout`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261015-pre-closeoutgroup`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261015-pre-reorder`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261015-pre-round2`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261016-0525`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261016-0545`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261016-park`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261017-funnel`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261017-netcap`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261017-rdapcap`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261017-refdate`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261017-runlog-live`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261019-errs`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261019-rerun`
+- `/workspace/domain-trading/lanes/S8-aftermarket/daily_scorer.py.bak-20261020-unknown`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-scorecard.csv.bak-20261015-pre-closeoutgroup`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-scorecard.csv.bak-20261016-0910`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-scorecard.csv.bak-20261017-0915`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-scorecard.csv.bak-20261017-endprice`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-scorecard.csv.bak-20261017-fill5`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-scorecard.csv.bak-20261017-freshness`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-scorecard.csv.bak-20261017-mineunited`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-test.csv.bak-20261015-0915`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-test.csv.bak-20261015-pre-closeoutgroup`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-test.csv.bak-20261016-0910`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-test.csv.bak-20261016-d005`
+- `/workspace/domain-trading/lanes/S8-aftermarket/paper-test.csv.bak-20261017-0915`
+- `/workspace/domain-trading/lanes/S8-aftermarket/raw/panel/.sources.json.bak-20261017-freshness`
+- `/workspace/domain-trading/lanes/S8-aftermarket/raw/panel/2026-10-15.meta.json.bak-20261017-meta`
+- `/workspace/domain-trading/lanes/S8-aftermarket/raw/panel/2026-10-16.meta.json.bak-20261017-meta`
+- `/workspace/domain-trading/lanes/S8-aftermarket/raw/panel/duplicates/2026-10-17.meta.json.bak-20261017-meta`
+- `/workspace/domain-trading/lanes/S8-aftermarket/snapshot.py.bak-20261015-pre-round2`
+- `/workspace/domain-trading/lanes/S8-aftermarket/snapshot.py.bak-20261017-archive`
+- `/workspace/domain-trading/lanes/S8-aftermarket/snapshot.py.bak-20261017-freshness`
+- `/workspace/domain-trading/lanes/S8-aftermarket/snapshot.py.bak-20261017-meta`
+- `/workspace/domain-trading/lanes/S8-aftermarket/snapshot.py.bak-20261020-5files`
+- `/workspace/domain-trading/lanes/S8-aftermarket/track_prices.py.bak-20261015-pre-round2`
+- `/workspace/domain-trading/ledger/forward-costs.csv.bak-20261020-d005price`
+- `/workspace/domain-trading/ledger/forward-costs.csv.bak-20261022-0400-tcost2`
+- `/workspace/domain-trading/ledger/forward-costs.csv.bak-20261022-tcost`
+- `/workspace/domain-trading/ledger/ledger.csv.bak-20261016-d005`
+- `/workspace/domain-trading/ledger/ledger.csv.bak-20261017-capclass`
+- `/workspace/domain-trading/ledger/portfolio.csv.bak-20261016-d005`
+- `/workspace/domain-trading/ledger/portfolio.csv.bak-20261017-d005-expiry`
+- `/workspace/domain-trading/ledger/portfolio.csv.bak-20261020-tdata`
+- `/workspace/domain-trading/ledger/portfolio.csv.bak-20261027-d005-2488`
+- `/workspace/domain-trading/lessons/buyer.md.bak-20261022-0116-r5`
+- `/workspace/domain-trading/lessons/gavriel.md.bak-20261022-0116-r5`
+- `/workspace/domain-trading/lessons/madan.md.bak-20261020-fold`
+- `/workspace/domain-trading/lessons/mahandes.md.bak-20261019-fold`
+- `/workspace/domain-trading/lessons/mahandes.md.bak-20261020-fold`
+- `/workspace/domain-trading/lessons/mahandes.md.bak-20261020b-fold`
+- `/workspace/domain-trading/lessons/sochen.md.bak-20261020-bug049`
+- `/workspace/domain-trading/org/learning-loop.md.bak-20261019-errnot0`
+- `/workspace/domain-trading/org/team.md.bak-20261017-venue`
+- `/workspace/domain-trading/outreach/suppression-names.csv.bak-20261017-aliases`
+- `/workspace/domain-trading/outreach/suppression-names.csv.bak-20261017-g13`
+- `/workspace/domain-trading/outreach/suppression.csv.bak-20261017-pre-legal-merge`
+- `/workspace/domain-trading/quarantine/2026-10-17-stale/lanes-daily/2026-10-17.meta.json.bak-20261017-r2`
+- `/workspace/domain-trading/research/backtest-sold/iterations/round-11-12.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/iterations/round-13.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/iterations/shomer-attack-r12.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/iterations/summary.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/r11/report_head.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/r11/report_rest.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/r11/report_tail.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/r14/results.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/r9/wbq_r10.py.bak`
+- `/workspace/domain-trading/research/backtest-sold/results.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/backtest-sold/v10-delta.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/community/README.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/company-rounds/a1_plan.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/insight-registry.csv.bak-20261022-approvals`
+- `/workspace/domain-trading/research/insight-registry.csv.bak-20261022-ideas`
+- `/workspace/domain-trading/research/iterations.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/lessons.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/name-model-v1/report.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/sources.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/two-line-iterations-final.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/v11/PR-1-output-spec.md.bak-20261017-s1`
+- `/workspace/domain-trading/research/v11/PR-1-output-spec.md.bak-20261017-v1`
+- `/workspace/domain-trading/research/v11/daily/rank_daily_v2.py.bak-20261017-drops`
+- `/workspace/domain-trading/research/v11/daily/rank_daily_v2.py.bak-20261017-exit4`
+- `/workspace/domain-trading/research/v11/daily/rank_daily_v2.py.bak-20261017-prestale`
+- `/workspace/domain-trading/research/v11/daily/rank_daily_v2.py.bak-20261017-s1`
+- `/workspace/domain-trading/research/v11/daily/split_v2.py.bak-20261017-short`
+- `/workspace/domain-trading/research/v11/dev-report.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/v11/ev-c002.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/v11/picks/MANIFEST.md.bak-20261017-r2`
+- `/workspace/domain-trading/research/v11/poc-power.md.bak-20261017-v1`
+- `/workspace/domain-trading/research/v11/poc-power.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/research/v12/bigtest/PREREG.md.bak-20261020-pass2`
+- `/workspace/domain-trading/research/v9-test/name-gate-results.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/risk/legal/outreach-gaps.md.bak-20261017-gate`
+- `/workspace/domain-trading/rules/rulebook.md.bak-20261020-3b-p2`
+- `/workspace/domain-trading/rules/rulebook.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/rules/rulebook.md.bak-20261022-approvals`
+- `/workspace/domain-trading/rules/rulebook.md.bak-20261022-b05`
+- `/workspace/domain-trading/rules/rulebook.md.bak-20261022-core`
+- `/workspace/domain-trading/rules/rulebook.md.bak-20261022-outreach`
+- `/workspace/domain-trading/sales/offers.md.bak-20261017-r2`
+- `/workspace/domain-trading/sales/offers.md.bak-20261017-r4`
+- `/workspace/domain-trading/sales/offers.md.bak-20261017-r5`
+- `/workspace/domain-trading/sales/offers.md.bak-20261017-v2`
+- `/workspace/domain-trading/sales/offers.md.bak-20261017-v3`
+- `/workspace/domain-trading/sales/offers.md.bak-20261017-v4`
+- `/workspace/domain-trading/sales/offers.md.bak-20261020-bug049`
+- `/workspace/domain-trading/sales/offers.md.bak-20261020-d005price`
+- `/workspace/domain-trading/sales/offers.md.bak-20261020-tdata`
+- `/workspace/domain-trading/sales/offers.md.bak-20261027-d005-2488`
+- `/workspace/domain-trading/sales/outreach-log.csv.bak-20261017-rednexus-dup`
+- `/workspace/domain-trading/sales/outreach-safety.md.bak-20261017-g8`
+- `/workspace/domain-trading/sales/outreach-safety.md.bak-20261017-gate`
+- `/workspace/domain-trading/sales/playbook.md.bak-20261017-r4`
+- `/workspace/domain-trading/sales/playbook.md.bak-20261022-1600-tsell`
+- `/workspace/domain-trading/sales/sale-rate-weekly.csv.bak-20261020-restore`
+- `/workspace/domain-trading/sales/sale-rate-weekly.csv.bak-20261020-tdata`
+- `/workspace/domain-trading/sales/sale-rate-weekly.csv.bak-20261027-catchup`
+- `/workspace/domain-trading/scouts/card-rules-v2.md.bak-20261020-3b-p2`
+- `/workspace/domain-trading/scouts/card-rules-v2.md.bak-20261020-unmeasured`
+- `/workspace/domain-trading/scouts/rules/DIGEST-lanes.md.bak-20261016-0525`
+- `/workspace/domain-trading/scouts/rules/DIGEST.md.bak-20261015-pre-dropsource`
+- `/workspace/domain-trading/scouts/rules/DIGEST.md.bak-20261016-0457`
+- `/workspace/domain-trading/scouts/rules/DIGEST.md.bak-20261016-0458`
+- `/workspace/domain-trading/scouts/rules/DIGEST.md.bak-20261016-0525`
+- `/workspace/domain-trading/scouts/rules/DIGEST.md.bak-20261016-0545`
+- `/workspace/domain-trading/scouts/rules/DIGEST.md.bak-20261017-ready`
+- `/workspace/domain-trading/scouts/rules/DIGEST.md.bak-20261020-3b-p2`
+- `/workspace/domain-trading/scouts/rules/check-order.md.bak-20261015-pre-dropsource`
+- `/workspace/domain-trading/scouts/rules/line1-tierA-gate-v10.md.bak-20261016-0525`
+- `/workspace/domain-trading/sourcing/buyer-first-plan.md.bak-20261022-0105-b05cap`
+- `/workspace/domain-trading/sourcing/buyer-first/paper-log.md.bak-20261022-0105-b05cap`
+- `/workspace/domain-trading/sourcing/dry/card-easysheet.md.bak-20261017-r3`
+- `/workspace/domain-trading/sourcing/dry/card-easysheet.md.bak-20261017-rg`
+- `/workspace/domain-trading/sourcing/dry/round2-funnel.csv.bak-20261017-r3`
+- `/workspace/domain-trading/system/README.md.bak-20261017-overnight`
+- `/workspace/domain-trading/system/bot-team.md.bak-20261017-venue`
+- `/workspace/domain-trading/system/cfo-ledger.md.bak-20261017-r2`
+- `/workspace/domain-trading/system/cfo-ledger.md.bak-20261017-r3`
+- `/workspace/domain-trading/system/daily_guard.py.bak-20261017-runlog`
+- `/workspace/domain-trading/system/make_handoff.py.bak-20261016-0457`
+- `/workspace/domain-trading/system/make_handoff.py.bak-20261016-0458`
+- `/workspace/domain-trading/system/make_handoff.py.bak-20261016-0525`
+- `/workspace/domain-trading/system/make_handoff.py.bak-20261016-0545`
+- `/workspace/domain-trading/system/make_handoff.py.bak-20261017-rank`
+- `/workspace/domain-trading/system/make_handoff.py.bak-20261017-ready`
+- `/workspace/domain-trading/system/make_handoff.py.bak-20261019-digest`
+- `/workspace/domain-trading/system/netcache.py.bak-20261016-0458`
+- `/workspace/domain-trading/system/netcache.py.bak-20261016-park`
+- `/workspace/domain-trading/system/netcache.py.bak-20261017-cc`
+- `/workspace/domain-trading/system/panel_fresh.py.bak-20261017-neardup`
+- `/workspace/domain-trading/system/panel_fresh.py.bak-20261017-r3`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-c015`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-costline`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-freshness`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-guard`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-listingpanel`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-lock`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-netcap`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-publish`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-recheck`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261017-watch`
+- `/workspace/domain-trading/system/run_daily.sh.bak-20261020-freezeinv`
+- `/workspace/domain-trading/system/tools/presend_gate.py.bak-20261017-g13`
+- `/workspace/domain-trading/system/tools/presend_gate.py.bak-20261017-names`
+- `/workspace/domain-trading/system/tools/presend_gate.py.bak-20261017-r4`
+- `/workspace/domain-trading/system/tools/presend_gate.py.bak-20261017-r5`
+- `/workspace/domain-trading/system/tools/pricing_calc.py.bak-20261017-s8`
+- `/workspace/domain-trading/system/tools/pricing_calc.py.bak-20261017-venue`
+- `/workspace/domain-trading/system/tools/test_presend_gate.py.bak-20261017-g13`
+- `/workspace/domain-trading/system/tools/test_presend_gate.py.bak-20261017-r4`
+- `/workspace/domain-trading/system/tools/test_pricing_calc.py.bak-20261017-venue`
