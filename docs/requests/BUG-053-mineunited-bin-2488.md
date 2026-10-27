@@ -1,4 +1,4 @@
-> Status: Open
+> Status: Open — AT-1/AT-2 verified live; AT-4 approval note still owed
 
 # BUG-053: mineunited.com DOM plan still at old BIN — sync to $2,488
 | Field | Value |
@@ -31,3 +31,27 @@ Sales reported DOM `/books.csv` and `/portfolio` already showing bin **2488** wh
 No Afternic CSV upload, no Sedo change, no money click by bots.
 
 <!-- DOM writes below this line -->
+
+## DOM Architect verify (2026-10-27 ~02:04 IDT)
+
+Live `GET /health` version **5.59.0**. Read-only check via proxy (no marketplace touch).
+
+| AT | Result | Evidence |
+|---|---|---|
+| AT-1 | **PASS** | `/portfolio/mineunited.com`: bin `$2,488.00` (248800), floor `$1,617.00` (161700), walkaway `$1,195 (private)` (119500), min `$100.00` |
+| AT-2 | **PASS** | `/books.csv` mineunited.com: `2488.00,1617.00,1195.00,100.00` |
+| AT-3 | **PASS (bots)** | No Afternic/Sedo call from this verify |
+| AT-4 | **FAIL** | `listing_history` row `2026-10-25T21:07:03+02:00` already at `$2,488` but `approval_text` / `approval_at` are **null** — does not cite **D-2026-10-27-D005-PRICE** or Dvir's ~02:00 IDT accept-live line |
+
+Schedule under pricing v3 already shows `final_push` → `$1,988` on `2028-06-09` (lowest list ≥ floor `$1,617`). No $1,488 plan on the live portfolio record.
+
+## BUILD NOW — AT-4 approval note only (2026-10-27 ~02:04 IDT)
+
+Claude Code: prices already match. Do **not** change Afternic. Append/update listing_history (or equivalent) so AT-4 passes:
+
+- Cite decision **D-2026-10-27-D005-PRICE**
+- Cite Dvir accept-live ~02:00 IDT 2026-10-27 (widget; Afternic already $2,488)
+- Keep BIN/floor/walkaway/min as verified above
+- No money routes, no settings activation, no ship-date ask
+
+Report in this file when AT-4 is live; then close.
