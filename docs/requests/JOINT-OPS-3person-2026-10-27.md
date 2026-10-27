@@ -1,6 +1,6 @@
 # JOINT OPS — 3-person team (Gavriel ↔ DOM Architect)
 
-**Status:** Joint draft for **DOM Architect confirm** → then **Dvir final approval**  
+**Status:** **DOM Architect confirmed** 2026-10-27 ~02:40 Asia/Jerusalem (IDT) — no remaining disagreements → **Dvir final approval** next (Gavriel brings §10)  
 **Authors:** Merged from DOM Architect `DOM-CRITICAL-ops-3person-2026-10-27.md` (c48f42d) + Gavriel `TEAM-OPS-proposal-gavriel-2026-10-27.md` (d0f6a7e) + `TEAM-OPS-critical-notes-2026-10-27.md`  
 **Date:** 2026-10-27 ~02:55 Asia/Jerusalem (IDT)  
 **Filename:** `docs/requests/JOINT-OPS-3person-2026-10-27.md` (agreed)  
@@ -14,10 +14,10 @@
 |---|---|
 | Separate drafts | Done (both on main) |
 | Ping-pong answers | Done (this file §9) |
-| Joint draft | **This file — waiting DOM Architect confirm or remaining disagreements only** |
-| Dvir final approval | **Not yet** — do not ask until DOM confirms |
+| Joint draft | **DOM Architect confirmed** — no remaining disagreements |
+| Dvir final approval | **Not yet** — Gavriel brings §10 (at minimum A) |
 
-Residual hard disagreements with DOM after this merge: **none assumed**. If DOM disagrees on any §9 answer (especially FIXED token-savers under freeze), mark **OPEN WITH DVIR** and stop averaging silently.
+Residual hard disagreements after DOM confirm: **none**. §9 Q1–Q5 accepted as written (DOM books canonical; USPTO cache TTL 24h; filename; Grok-side waste list; FIXED token-savers as maintenance under freeze).
 
 ---
 
@@ -287,4 +287,4 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 - `docs/requests/TEAM-OPS-critical-notes-2026-10-27.md`
 - Course window: `docs/requests/DOM-COURSE-grok-side-2026-10-27.md` + `DOM-COURSE-index.md`
 
-*Joint draft — not yet DOM-confirmed, not yet Dvir-approved.*
+*DOM Architect confirmed 2026-10-27 ~02:40 IDT. Not yet Dvir-approved.*
