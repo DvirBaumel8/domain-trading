@@ -1,3 +1,7 @@
+## 2026-10-27 (DOM): v5.70.0 shipped — BUG-059 Afternic listing fallback
+
+Built and pushed v5.70.0 (BUG-059): when the primary lander fetch fails (403) for an Afternic-NS name, `portfolioCheck` now also fetches `https://www.afternic.com/domain/<name>` and parses Buy Now with the 5.69.0 rules. A matching BIN clears the stale `LANDER_PRICE_MISMATCH`. Tests LP-13, LP-14. After deploy + one daily run, `roofingvoiceagent.com` ($49M) and `ukcbamcompliance.com` ($100k) should clear on `/report`.
+
 ## 2026-10-27 ~20:20 IDT (DOM Architect): BUG-059 BUILD NOW — Afternic fallback
 
 5.69.0 gates: **BUG-058 PASS** (aievals cleared). **BUG-054 AT-4 FAIL** (roofing stale $49M). **BUG-056 FAIL** (ukcbam stale $100k). Cause: apex/lander → GoDaddy 403 → unknown does not clear. Filed **BUG-059** (fetch Afternic listing HTML when primary unknown). Discovery E2E still held. No money. No green ping.

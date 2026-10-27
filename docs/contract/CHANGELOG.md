@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.70.0 (2026-10-27): BUG-059 Afternic listing fallback for stale lander mismatches
+Release note: `docs/releases/v5.70.0.md`.
+PATCH (no migration, no new route, no new code). Lander price-check fallback:
+- BUG-059: when the primary apex/lander fetch fails (e.g. GoDaddy forsale 403) for an Afternic-NS name and no price check is possible, the `portfolioCheck` now also fetches `https://www.afternic.com/domain/<name>` and parses it with the same 5.69.0 rules (512k body, LIMIT_COPY, tight "buy it now for"). A matching BIN writes a price `ok` row that clears stale `LANDER_PRICE_MISMATCH` warnings. Test LP-13, LP-14.
+
 ## 5.69.0 (2026-10-27): BUG-058 raise LANDER_BODY_BYTES; treat "must be below" as limit copy
 Release note: `docs/releases/v5.69.0.md`.
 PATCH (no migration, no new route, no new code). Lander body-read window and parser fix:

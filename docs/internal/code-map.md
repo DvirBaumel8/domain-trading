@@ -458,7 +458,7 @@ Tables: `audit_log` (append-only) and `idempotency_keys`, written by the hooks b
 | Change the renewal drop check, SELL_BEFORE_DROP, HORIZON_DUE, DELIST_NEEDED | `reporting/report/lifecycle.ts`, settings `renewal.*` | `reporting/portfolio-lifecycle` |
 | Change the outcomes reports | `reporting/report/outcomes.ts` | `reporting/portfolio-lifecycle` (OC-1, OC-2, RN-5) |
 | Change the SellerHub sync | `ops/jobs/listing-sync.ts`, `ops/sellerhub.ts` | `ops/listing-sync` |
-| Change the lander check or its price check | `ops/jobs/portfolio-check.ts` (`web`, `landerPriceCheck`), `reporting/report/warnings.ts` | `ops/portfolio-check` (LP-1..LP-5) |
+| Change the lander check or its price check | `ops/jobs/portfolio-check.ts` (`web`, `landerPriceCheck`, `afternicListingPrice`), `reporting/report/warnings.ts` | `ops/portfolio-check` (LP-1..LP-5, LP-13..LP-14) |
 | Book a renewal | admin `record-renewal` (`ops/admin/record-renewal.ts`) | `reporting/portfolio-lifecycle` (RN-1..RN-4), `ops/admin-cli` |
 | Change the holdout or the expiry step | `ops/jobs/portfolio-lifecycle.ts`, `selection/portfolio-support.ts` | `ops/portfolio-lifecycle`, `selection/portfolio-support` |
 | Change pricing rules (65%, 48%, ladder, list) | new `pricing_settings` version by admin command (`ops/admin/pricing-settings.ts`) or migration; logic in `listing/pricing/plan.ts`, `schedule.ts`; never hard-code | `listing/unit/pricing-*`, `listing/pricing-*` (incl. `pricing-vectors`) |
