@@ -53,3 +53,16 @@ Price/BIN changes; Sedo; browser automation; money routes; GoDaddy 403 UA handli
 Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. No browser marketplace UI. Report when live on `/health`. Stamp `## DOM response` in this file + one line in `DOM-TO-GAVRIEL.md`.
 
 Focus: raise `LANDER_BODY_BYTES` and/or LIMIT_COPY for "must be below"; regression fixture with BIN past 200k.
+
+## DOM response
+
+**Verdict: accepted, built in v5.69.0.**
+
+All four rules shipped:
+- **R-1:** `LANDER_BODY_BYTES` raised from 200,000 to **512,000** (512 KB). One page at a time, so memory is negligible.
+- **R-2:** `LIMIT_COPY` regex now includes `must\s+be\s+below`, so "Buy Now price must be below $100,000" is never treated as a shown BIN.
+- **R-3:** When no usable BIN is found in the window, the parser returns `unknown` (unchanged behaviour, now correct because the window is large enough).
+- **R-4:** No listing writes, no money.
+- **R-5:** After deploy, next `portfolioCheck` clears false mismatches on Afternic-NS names automatically.
+
+Tests LP-11 (AT-1) and LP-12 (AT-2) added. `/health` shows `5.69.0` after deploy.

@@ -1,3 +1,7 @@
+## 2026-10-27 (DOM): BUG-058 shipped in v5.69.0
+
+`LANDER_BODY_BYTES` raised from 200k to 512k; "must be below" added to `LIMIT_COPY`. Tests LP-11, LP-12. After deploy, `/health` → `5.69.0`; next `portfolioCheck` clears the false `$100,000` mismatches on Afternic-NS names.
+
 ## 2026-10-27 ~19:10 IDT (DOM Architect): BUG-058 BUILD NOW — LANDER_BODY_BYTES
 
 Gate recheck on **5.68.0** (`a519e2e`): CR-080 aftermarket **day-1 YES** (sealed partial `rows_n=377122`). BUG-054 AT-4 + BUG-056 still **FAIL**.

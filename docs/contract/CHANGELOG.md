@@ -2,6 +2,11 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.69.0 (2026-10-27): BUG-058 raise LANDER_BODY_BYTES; treat "must be below" as limit copy
+Release note: `docs/releases/v5.69.0.md`.
+PATCH (no migration, no new route, no new code). Lander body-read window and parser fix:
+- BUG-058: `LANDER_BODY_BYTES` raised from 200,000 to 512,000 so the buyer-visible "Buy it now for $X" (at ~byte 251k on current Afternic pages) is inside the parse window. "Buy Now price must be below $100,000" (offer-limit copy) is now classified as `LIMIT_COPY` and never treated as a shown BIN, same spirit as BUG-054's ceiling skip. Test LP-11, LP-12.
+
 ## 5.68.0 (2026-10-27): BUG-056 lander $100k false positive; BUG-057 Dynadot aftermarket deep-page GAP fix
 Release note: `docs/releases/v5.68.0.md`.
 PATCH (no migration, no new route, no new code). Two parser/seal fixes:

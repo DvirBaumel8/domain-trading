@@ -25,13 +25,13 @@ const BAD_REGISTRY_STATUSES = ['client hold', 'server hold', 'pending delete', '
 const LANDER_SIGNATURES: Readonly<Record<string, RegExp[]>> = { afternic: [/\/lander/i, /afternic/i, /godaddy/i], sedo: [/sedo/i] };
 const WEB_CHECK_TIMEOUT_MS = 10_000;
 /** v4.0.0 (CR-049 item 3): the lander page is read up to this many bytes per hop, through at most LANDER_MAX_HOPS redirects. */
-const LANDER_BODY_BYTES = 200_000;
+const LANDER_BODY_BYTES = 512_000;
 const LANDER_MAX_HOPS = 3;
 const TLS_ERROR = /CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME|HOSTNAME_MISMATCH/i;
 
 const AMOUNT = String.raw`\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?`;
 /** 5.66.0 (BUG-054): an amount right after offer-form validation copy ("Offer cannot exceed $49,999,999") or a page-wide ceiling is never the Buy Now price. */
-const LIMIT_COPY = /(?:exceed|cannot|limit|minimum|maximum|at\s+least|less\s+than|more\s+than|between|offer\s+must)\W*(?:\w+\W+){0,2}$/i;
+const LIMIT_COPY = /(?:exceed|cannot|limit|minimum|maximum|at\s+least|less\s+than|more\s+than|between|offer\s+must|must\s+be\s+below)\W*(?:\w+\W+){0,2}$/i;
 const PLACEHOLDER_MIN_CENTS = 1_000_000_000; // $10,000,000: Afternic's offer ceiling $49,999,999 and similar
 /** The Buy Now amount a lander page shows, in cents, or null when the page shows none.
  * 5.66.0 (BUG-054): "buy it now for $X" first; skipping amounts after limit copy and placeholder ceilings.

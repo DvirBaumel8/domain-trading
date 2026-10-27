@@ -406,4 +406,30 @@ describe('portfolioCheck: lander price and TLS (v4.0.0)', () => {
     expect(await price()).toMatchObject({ status: 'unknown', details: { reason: 'no_price_text' } });
     expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
   });
+
+  // 5.69.0 (BUG-058): LANDER_BODY_BYTES=200k truncated Afternic HTML (~337KB) before the real BIN; "must be below $100,000" matched early.
+  const largePadding = 'x'.repeat(220_000);
+  const afternicLargeBody = (bin: string | null, limitCopy: string) =>
+    `<a href="/lander/lander-one.com">Afternic</a>${limitCopy}${largePadding}` +
+    (bin === null ? '' : `<div>Buy it now for ${bin}</div>`) + '<button>Make an offer</button>';
+
+  it('LP-11 (BUG-058 AT-1): BIN past byte 200k with early "must be below $100,000" limit copy → shown $1,488; no mismatch', async () => {
+    const body = afternicLargeBody('$1,488.00', '<span>Buy Now price must be below $100,000</span>');
+    expect(body.length).toBeGreaterThan(220_000);
+    expect(body.indexOf('Buy it now for $1,488.00')).toBeGreaterThan(200_000);
+    state.page = { status: 200, body, location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect(await price()).toMatchObject({ status: 'ok', details: { shown_cents: 148800 } });
+    expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
+
+  it('LP-12 (BUG-058 AT-2): only "must be below $100,000" limit copy, no Buy Now → unknown, not mismatch', async () => {
+    const body = afternicLargeBody(null, '<span>Buy Now price must be below $100,000</span>');
+    state.page = { status: 200, body, location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect(await price()).toMatchObject({ status: 'unknown', details: { reason: 'no_price_text' } });
+    expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
 });
