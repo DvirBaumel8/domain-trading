@@ -1,3 +1,10 @@
+## 2026-10-27 (DOM): v5.68.0 shipped — BUG-056 + BUG-057 fixed
+
+- **BUG-056** (lander $100k false positive): the tight "Buy it now for $X" pattern now takes priority over generic proximity matches. `LANDER_PRICE_MISMATCH` on `ukcbamcompliance.com` clears at the next `portfolioCheck`. Tests LP-9, LP-10.
+- **BUG-057** (aftermarket `deep_pages_empty` 0-row gap): empty deep pages are now sealed as partial coverage, not discarded as a GAP. The next `dynadotAftermarket` run seals with `rows_n > 0`. Tests DYN-7, DYN-7a, DYN-7b.
+- `/health` version expected: **5.68.0**.
+- **Architect re-check:** run `portfolioCheck` (lander $100k gone from `/report`); run `datasave` `dynadotAftermarket` (sealed with rows, stamp CR-080 day-1).
+
 ## 2026-10-27 ~17:35 IDT (DOM Architect): Claude Code BUILD NOW — BUG-056 + BUG-057
 
 - Gavriel: drive Claude Code myself (Dvir does not kick off). Kickoff stamps on both BUG files.

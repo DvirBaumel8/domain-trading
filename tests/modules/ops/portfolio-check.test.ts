@@ -385,4 +385,25 @@ describe('portfolioCheck: lander price and TLS (v4.0.0)', () => {
     expect(await price()).toMatchObject({ status: 'unknown', details: { reason: 'no_price_text' } });
     expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
   });
+
+  // 5.68.0 (BUG-056): a page with "Buy it now for $1,488.00" AND "$100,000" (offer max / lease copy / unrelated) must show $1,488, not $100,000.
+  const afternicWith100k = (bin: string | null, extra100k: string) =>
+    `<a href="/lander/lander-one.com">Afternic</a>${extra100k}` +
+    (bin === null ? '' : `<div>Buy it now for ${bin}</div>`) + '<button>Make an offer</button>';
+
+  it('LP-9 (BUG-056 AT-1): HTML with "Buy it now for $1,488.00" and a $100,000 non-BIN amount → shown $1,488; no mismatch', async () => {
+    state.page = { status: 200, body: afternicWith100k('$1,488.00', '<span class="offer-max">Buy Now $100,000</span>'), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect(await price()).toMatchObject({ status: 'ok', details: { shown_cents: 148800 } });
+    expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
+
+  it('LP-10 (BUG-056 AT-2): no Buy Now amount, only $100,000 → unknown, not mismatch', async () => {
+    state.page = { status: 200, body: afternicWith100k(null, '<span>Domains can sell for $100,000 or more</span>'), location: null };
+    await verifiedLander({ bin_cents: 148800 });
+    await job().runOnce();
+    expect(await price()).toMatchObject({ status: 'unknown', details: { reason: 'no_price_text' } });
+    expect((await reportCodes()).filter((w) => w.code === 'LANDER_PRICE_MISMATCH')).toEqual([]);
+  });
 });

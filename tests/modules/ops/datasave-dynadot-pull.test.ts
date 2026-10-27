@@ -135,13 +135,32 @@ describe('DYN Dynadot read by the server', () => {
     expect(await mk().dynadotAftermarket()).toMatchObject({ status: 'sealed', rows_n: 4 });
   });
 
-  it('DYN-7 (AT-4) empty deep pages: a GAP (not a small-total day), nothing stored', async () => {
+  it('DYN-7 (AT-4) page 1 has total and items but all deep pages are empty: rows from page 1 are sealed as partial (BUG-057: not a GAP)', async () => {
     reset();
     dynadot((page) => (page === 1 ? amPage(6, listing('a.com', 'L1', '900'), listing('b.com', 'L2', '900')) : amPage(6)));
     const s = await mk().dynadotAftermarket() as Record<string, unknown>;
-    expect(s).toMatchObject({ status: 'gap', sealed: false, gap: { reason: 'deep_pages_empty', small_total: false }, r8v2: { small_total_days: 0, frozen: false } });
+    expect(s).toMatchObject({ status: 'partial', sealed: true, rows_n: 2, pages_n: 3 });
+    expect(await rowsOf('aftermarket', '2026-10-27')).toHaveLength(2);
+    const m = await manifest('dynadot_aftermarket', '2026-10-27');
+    expect(m!.status).toBe('complete');
+    expect(m!.coverage).toMatchObject({ partial: true, pages_empty: [2, 3] });
+  });
+
+  it('DYN-7a (BUG-057 AT-1) aftermarket with a large total and rows on every page seals with rows_n > 0, never deep_pages_empty', async () => {
+    reset();
+    dynadot((page) => (page <= 3 ? amPage(3000, listing(`p${page}a.com`, `L${page}a`, '900'), listing(`p${page}b.com`, `L${page}b`, '600')) : amPage(3000)));
+    const s = await mk().dynadotAftermarket() as Record<string, unknown>;
+    expect(s).toMatchObject({ status: 'partial', sealed: true, total_listings: 3000 });
+    expect((s as { rows_n: number }).rows_n).toBeGreaterThan(0);
+    expect(s).not.toMatchObject({ status: 'gap' });
+  });
+
+  it('DYN-7b (BUG-057 AT-3) true GAP preserved: page 1 has total > 0 but raw_n 0 (API broken) still triggers deep_pages_empty GAP', async () => {
+    reset();
+    dynadot(() => amPage(500));
+    const s = await mk().dynadotAftermarket() as Record<string, unknown>;
+    expect(s).toMatchObject({ status: 'gap', sealed: false, gap: { reason: 'deep_pages_empty', small_total: false } });
     expect(await rowsOf('aftermarket', '2026-10-27')).toHaveLength(0);
-    expect((await manifest('dynadot_aftermarket', '2026-10-27'))!.status).toBe('gap');
   });
 
   it('DYN-8 closeouts with a missing page: sealed with coverage partial and the failed page named; no invented rows', async () => {

@@ -334,12 +334,11 @@ export async function pullAftermarket(d: PullDeps): Promise<PullSummary> {
       if (consecutive >= MAX_CONSECUTIVE_FAILURES) break;
     }
   }
-  if (emptyPages.length > 0) return gap('deep_pages_empty', false);
   const rows = all.filter((r) => r.price_cents >= AFTERMARKET_MIN_CENTS);
   const droppedUnderFloor = all.length - rows.length;
-  if (rows.length === 0) return gap('no_rows_over_floor', false);
+  if (rows.length === 0) return gap(emptyPages.length > 0 ? 'deep_pages_empty' : 'no_rows_over_floor', false);
   const unreached = planned.filter((p) => !ok.includes(p) && !failed.includes(p));
-  const coverage = { partial: failed.length > 0 || capHit || unreached.length > 0, calls_n: c.calls, pages_planned: planned, pages_ok: ok, pages_failed: [...failed, ...unreached], rows_received_n: rows.length, server: true, total_listings: total, listings_read_n: rawSeen, invalid_n: invalid.n };
+  const coverage = { partial: failed.length > 0 || capHit || unreached.length > 0 || emptyPages.length > 0, calls_n: c.calls, pages_planned: planned, pages_ok: ok, pages_failed: [...failed, ...unreached], pages_empty: emptyPages.length > 0 ? emptyPages : undefined, rows_received_n: rows.length, server: true, total_listings: total, listings_read_n: rawSeen, invalid_n: invalid.n };
   const r = await sealOrNoop(d, kind, dataDate, rows, coverage);
   if (r === 'sealed_meanwhile') return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true });
   return summary(kind, dataDate, started, d, c, {

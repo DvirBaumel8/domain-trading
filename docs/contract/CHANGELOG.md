@@ -2,6 +2,12 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.68.0 (2026-10-27): BUG-056 lander $100k false positive; BUG-057 Dynadot aftermarket deep-page GAP fix
+Release note: `docs/releases/v5.68.0.md`.
+PATCH (no migration, no new route, no new code). Two parser/seal fixes:
+- BUG-056: the lander price check's tight "Buy it now for $X" pattern (requiring both "it" and "for") is now tried first across the whole page before falling back to proximity patterns, so an unrelated $100,000 near a generic "Buy Now" never wins over the actual buyer-visible price. Test LP-9, LP-10.
+- BUG-057: the aftermarket `deep_pages_empty` GAP no longer fires when rows were successfully collected from other pages. Empty deep pages are sealed as partial coverage (`coverage.pages_empty`), not discarded. The page-1 check stays: a page 1 with a total but no items is still a GAP. Test DYN-7, DYN-7a, DYN-7b.
+
 ## 5.67.0 (2026-10-27): F47 removed (Dvir declined); drops the idle hand-reg tables
 Release note: `docs/releases/v5.67.0.md`.
 MAJOR in form, no caller affected (migration `1768700000000_v5-67-0.sql` drops `handreg_weeks`, `handreg_names`, `handreg_labels` and the three `settings.handreg_*` columns). F47 removed: Dvir declined the paper test (Gavriel relay 27 Oct 2026, ~09:47 IDT), then approved removing it. `POST /handreg/weeks`, `GET /handreg/weeks[/{week}]`, `GET /handreg/report`, the codes `HANDREG_*` and the datasave step `handregLabels` are gone; they were never called. The BUG-054 lander fix of 5.66.0 stays.
