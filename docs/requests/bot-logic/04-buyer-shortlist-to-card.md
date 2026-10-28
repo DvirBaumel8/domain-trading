@@ -1,8 +1,8 @@
 # Buyer: shortlist → card (current)
 
-**Status:** current SOP (discovery flow v2). Draft for Gavriel / Dvir awareness gap close, 2026-10-27.  
+**Status:** current SOP (discovery flow **v3**, locked by Dvir via Gavriel 2026-10-28; supersedes v2 of 2026-10-27).  
 **Owner:** Buyer. **Money:** Buyer never buys, bids, registers, lists, or messages Dvir. Cards go to Risk Gate; Gavriel asks Dvir.  
-**Sources:** Dvir via Gavriel discovery v2 (2026-10-27); post-fullfield standing (Gavriel 2026-10-28); sourcing-core-2026-10-20 recipe; lessons L-B1..L-B6; r-one §10 v2; ledger B-01/B-02/B-05.
+**Sources:** Dvir via Gavriel discovery v3 lock (2026-10-28; spec `sourcing/buyer-first/2026-10-28-fullfield/DISCOVERY-FLOW-RESEARCH.md`, cadence Option 1); Dvir via Gavriel discovery v2 (2026-10-27); post-fullfield standing (Gavriel 2026-10-28); sourcing-core-2026-10-20 recipe; lessons L-B1..L-B6; r-one §10 v2; ledger B-01/B-02/B-05.
 
 This file is **current-only**. It does not document retired v1–v9 scout lanes, buyer-first-as-source, or local GoDaddy-zip grepping as the normal path.
 
@@ -10,17 +10,28 @@ This file is **current-only**. It does not document retired v1–v9 scout lanes,
 
 ---
 
-## 0. Pool (before any judgment)
+## 0. Pool (before any judgment) — discovery v3
 
-1. `GET /health` — note API version in the run funnel.
-2. `GET /auctions/shortlist` with the **newest** `data_date`. **That response is the only discovery pool.** Paginate with `limit` ≤ **500** and `offset` (CR-088: `shortlist_size=0` stores all hard-filter passers; default lean brief may still ask for a small top slice). Do not invent a parallel pool.
-3. Do **not** grep local GoDaddy inventory zips unless the shortlist is **empty** and that day is **sealed**. If you do, log **EMERGENCY** in that day's funnel and tell Gavriel + DOM Architect.
-4. Optional `GET /candidates/closeouts` = **research only**. No closeout money cards while `CLOSEOUTS_PAUSED`.
-5. Cap ~20 external tool calls per lean run unless Gavriel raises it. Prefer cheapest / best service phrases first. Meaning/shape before CR-083 / USPTO / firm spend.
+**Cadence:** **1×/day**, after datasave + `auctionShortlist` seal for the newest `data_date`. Not a second intraday run.
+
+Every run runs directions **A + B + D**. **C** is parked.
+
+1. **Direction A — full auction field (required).** `GET /health` (note API version in the funnel), then `GET /auctions/shortlist` with the **newest** `data_date`. Paginate with `limit` ≤ **500** and `offset` (CR-088: `shortlist_size=0` stores all hard-filter passers). A is the only auction field; do not invent a parallel pool.
+2. **Direction B — cheap other-TLD / Exact Match signals (required every run).** On A's **meaning survivors** only: read shortlist `exactMatchTlds` / `developedTlds` when present; otherwise ≤ **20** HTTPS peeks per run (DoH/RDAP/page fetch, never box DNS) on the best survivors. B is a signal layer on survivors — **not** a second full field and not a second LLM pass.
+3. **Direction D — closeouts research scan (required every run, no money).** `GET /candidates/closeouts`; log the would-advance count + 0–3 paper examples. **No buy cards** while `CLOSEOUTS_PAUSED`.
+4. **Direction C — geo grids: parked.** No city×trade grids. Tagging/killing geo-shaped names inside A (shape/meaning rules) is OK.
+5. **Emergency only:** do **not** grep local GoDaddy inventory zips unless the shortlist is **empty** and that day is **sealed**. If you do, log **EMERGENCY** in that day's funnel and tell Gavriel + DOM Architect.
+6. Cap ~20 external tool calls per lean run unless Gavriel raises it (B peeks and CR-083 calls count). Prefer cheapest / best service phrases first. Meaning/shape before CR-083 / USPTO / firm spend.
 
 **Three report numbers (every discovery run):** (1) `field_n` stored at shortlist build, (2) GET `total` = live eligible served, (3) judged (+ unfinished). Served < `field_n` is **expected** (ended / prebid-fail left out of serve) — not a silent size cut. Example: 597 served of `field_n` 747 on 2026-10-28.
 
 Held names (resumedesign.com and the prior USPTO-clean hold list) stay held until Gavriel reopens, **unless** one appears on the shortlist with a fresh shortlist reason — then re-screen **only** via this shortlist path.
+
+### 0.1 Passers + report (v3)
+
+- **Full-stack passer** = cheap survivor (shape/price/meaning) + USPTO not exact-kill + firm §10 screen passed + time gate OK + card sent → Risk Gate not REJECT.
+- Deliver **all** full-stack passers to Gavriel. If **zero**, send top-5-with-cons labeled **FALLBACK (zero passers)** only. Never send cheap survivors as passers.
+- **Report skeleton:** directions run (A/B/D; C parked) · three numbers · passers (or zero-fallback) · B signals · D would-advance (+0–3 examples) · C parked · blockers. Buyer writes funnel + REVIEW/PASSERS files; Gavriel surfaces the L&L pack to Dvir after every run.
 
 ---
 
