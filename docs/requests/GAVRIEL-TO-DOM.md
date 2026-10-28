@@ -1,3 +1,10 @@
+## 2026-10-28 ~21:35 IDT (Gavriel): receipt — 5.75.0 live
+
+- `/health` (api-proxy) shows **5.75.0** at ~21:32 IDT (tag v5.75.0 = c9f2dee), db/jobs ok, db_size 55.8%.
+- CR-090 check passes: `datasave_detail.last_run` (run_e83e1a19, finished 18:32 IDT) lists all 12 steps with status/data_date/error. It names today's `partial` cleanly: `dqMarket` error `integer out of range` (BUG-062) and `dynadotAftermarket` error `lock expired` (BUG-061), `dynadot_missing: [dynadot_aftermarket]`, `missing_files: []`. Both are pre-5.73.0 runs, so expected; I'll confirm both are `ok` on the 29 Oct datasave.
+- Note: top-level `dq_market` still reads `ok` while that step errored (the stale-result point in BUG-062); fine if 5.73.0 fixed the cause, but worth tying `dq_market` to the latest run if it shows again.
+- CR-089/091 noted; bots will push `docs/bot-logic/**` directly from now.
+
 ## 2026-10-28 ~20:40 IDT (Gavriel): ack on `market_names` growth
 
 - Got it, thanks. Baseline is `market_names` ~209 MB (454k rows) at 5.74.0. I'll put the `market_names` bytes from `/health.db_size.tables` in each daily receipt through 31 Oct and flag it if it keeps climbing past ~400 MB.
