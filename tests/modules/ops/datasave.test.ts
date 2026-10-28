@@ -107,6 +107,35 @@ describe('DS521 datasave job', () => {
     expect((await db.selectFrom('snapshot_manifests').select('status').execute()).every((r) => r.status === 'complete')).toBe(true);
   });
 
+  it('DS573-1 (BUG-060) GoDaddy has not published the run day yet (newest files are yesterday): the step fails with GODADDY_NOT_PUBLISHED, a retry is queued, and the retry seals today', async () => {
+    mswServer.use(...inventoryHandlers({ lastModified: Object.fromEntries(FILES.map((f) => [f, '2026-10-19T14:41:59Z'])) }));
+    await boot();
+    const run = await runJobToEnd(app!, 'datasave');
+    expect(run.json().steps.godaddyInventory.ok).toBe(false);
+    expect(run.json().steps.godaddyInventory.summary).toMatchObject({ data_date: '2026-10-19', failed: [expect.objectContaining({ error: 'GODADDY_NOT_PUBLISHED: newest file day 2026-10-19, run day 2026-10-20' })] });
+    expect(await db.selectFrom('job_queue_runs').select('id').where('job', '=', 'datasave').execute()).toHaveLength(2);
+    mswServer.resetHandlers();
+    mswServer.use(...inventoryHandlers()); // published at last
+    await runJobToEnd(app!, 'datasave'); // starts the waiting retry
+    await app!.jobQueue.idle();
+    expect((await db.selectFrom('snapshot_manifests').select('status').where('source', '=', 'godaddy_inventory').where('data_date', '=', '2026-10-20').execute()).map((r) => r.status)).toEqual(Array(5).fill('complete'));
+  });
+
+  it('DS573-2 (BUG-061) a Dynadot pull step left running by a dead process is failed as lock expired and leaves an error manifest for its day', async () => {
+    mswServer.use(...inventoryHandlers());
+    await boot();
+    const { runId } = await app!.jobQueue.enqueue('datasave');
+    await db.updateTable('job_steps').set({ status: 'running', attempt: 1, locked_by: 'dead-instance', locked_until: new Date(NOW - 60_000), started_at: new Date(NOW - 600_000) })
+      .where('run_id', '=', runId).where('step', '=', 'dynadotAftermarket').execute();
+    app!.jobQueue.kick();
+    await app!.jobQueue.idle();
+    const step = await db.selectFrom('job_steps').select(['status', 'error']).where('run_id', '=', runId).where('step', '=', 'dynadotAftermarket').executeTakeFirstOrThrow();
+    expect(step).toEqual({ status: 'failed', error: 'lock expired' });
+    const m = await db.selectFrom('snapshot_manifests').select(['status', 'error', 'sealed_at']).where('source', '=', 'dynadot_aftermarket').where('data_date', '=', '2026-10-20').executeTakeFirstOrThrow();
+    expect(m).toEqual({ status: 'error', error: 'STEP_FAILED: lock expired', sealed_at: null });
+    expect((await db.selectFrom('snapshot_manifests').select('source').where('source', '=', 'dynadot_closeouts').execute())).toHaveLength(0); // that step did not fail
+  });
+
   it('DS521-8 (AT-4) nothing complete for 26 h: /health.datasave is overdue and /report carries DATASAVE_MISSED; a fresh database raises nothing in /report', async () => {
     const { get } = await boot();
     expect((await get('/health')).json().datasave).toBe('overdue'); // never ran

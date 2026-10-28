@@ -169,7 +169,11 @@ export class DatasaveJob {
     }
     const dataDate = results.map((r) => r.data_date).sort().at(-1) ?? runDate;
     const archive = this.deps.archiveDir ? { archive: this.archive } : {};
-    return { ...this.summary(dataDate, results), ...archive, ...(await this.auctionSummary(st.files, results)) };
+    const out = { ...this.summary(dataDate, results), ...archive, ...(await this.auctionSummary(st.files, results)) };
+    // v5.73.0 (BUG-060): GoDaddy has not published the run's UTC day yet (seen 28 Oct: files at 15:07 UTC, trigger at 15:05). The step fails, so the
+    // 60-minute retry run seals today; what was read (the older sealed day) is kept and the later steps use it as before.
+    if (dataDate < runDate) out.failed = [...(out.failed ?? []), { file: 'metadata.json', status: 'error' as const, http_status: null, error: `GODADDY_NOT_PUBLISHED: newest file day ${dataDate}, run day ${runDate}` }];
+    return out;
   }
 
   /** v5.54.0: true when the day has live auction rows and none of them carries a demand field (the day was parsed before v5.49.0). */

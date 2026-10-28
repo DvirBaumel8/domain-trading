@@ -406,6 +406,15 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
     expect(p.detail).toMatchObject({ jumps_over_10x_n: 1, sales_under_100_usd_n: 1 });
   });
 
+  it('MK562-1 (BUG-062) a Dynadot listing over $2.1M (its int4 cents times 10 overflow) runs the price check without integer out of range and is still compared', async () => {
+    await boot('2026-12-20');
+    await am('2026-12-18', [['huge.com', 2_000_000_000], ['tiny.com', 100]]);
+    await am('2026-12-19', [['huge.com', 2_100_000_000], ['tiny.com', 2_000_000_000]]);
+    const r = await runDqMarket(db, clock);
+    expect(r.id).not.toBeNull();
+    expect(r.results.find((x) => x.check === 'price_sanity')!.detail).toMatchObject({ jumps_over_10x_n: 1 });
+  });
+
   it('MK523-22 each bad sale row has its own reason: SOURCE_REQUIRED, UNKNOWN_FIELD, PRICE_NOT_INTEGER_CENTS, LISTING_TYPE_INVALID, NAME_INVALID, VENUE_INVALID, DATE_INVALID, SOURCE_URL_INVALID', async () => {
     const { post } = await boot();
     const reason = async (row: object) => (await post([row])).json().error.details.rejects[0].reason;

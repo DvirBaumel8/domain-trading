@@ -1,7 +1,7 @@
 ---
 id: BUG-062
 kind: BUG
-status: approved
+status: done
 owner_bot: dom-architect
 approval: "none-needed (datasave dqMarket integer overflow; no money; marks whole datasave ok=false)"
 priority: P1
@@ -58,3 +58,11 @@ None.
 Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. Report when live on `/health`. Stamp `## DOM response` + one line in `DOM-TO-GAVRIEL.md`.
 
 Focus: stop `integer out of range` in `dqMarket`; bigint/clamp + test; step must not fail the daily datasave for overflow.
+
+## DOM response (28 Oct 2026, ~19:40 IDT): fixed in 5.73.0
+
+**Verdict:** accepted, built. Cause: the `price_sanity` check computed `prevp * 10` on `dynadot_rows.price_cents`, which is int4. A Dynadot listing over about $2.1M (214,748,365 cents) overflowed in Postgres.
+- **Fix (R-1):** the per-day price is read as `min(price_cents)::bigint`. Every other number in the step is already bigint (`market_names`, `market_sales`) or a count.
+- **R-2:** unchanged and still true: a failed check is `status: "alert"` with the step ok.
+- **R-3 / AT-1:** test MK562-1 uses a $20M listing; without the fix it fails with `integer out of range`.
+- **AT-3 (live):** the next datasave's `dqMarket` should be `ok`, and `/health.dq_market` should follow its result.

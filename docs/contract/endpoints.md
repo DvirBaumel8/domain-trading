@@ -1,4 +1,4 @@
-# Endpoints (contract v5.72.1)
+# Endpoints (contract v5.73.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -1569,7 +1569,7 @@ Every code the service emits, by kind. Errors are `error.code`; warnings are str
 
 **Closeout candidates (5.26.0, CR-072):** `SNAPSHOT_MISSING` (409 from `GET /candidates/closeouts`: no sealed snapshot for that date and source). Filter codes in `summary.filtered_by` (not errors): `SPELL-1`, `BRAND-1`, `BIGCO-1`, `TM_KILL`, `FORBIDDEN_TERM`, `DIGITS_OR_HYPHEN`, `OWNED`, `SALES_GRADED`. Row `score_reason`: `NO_ACTIVE_MODEL`, `SCORE_FAILED`, `NOT_SCORED_YET`.
 
-**Daily data save (5.21.0, CR-071):** `ROWS_LIMIT` and `PRICE_CAP` (422, `POST /snapshots/dynadot`, 5.32.0, BUG-051); `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; since 5.22.0 also **HTTP 409** from `POST /snapshots/dynadot` for a sealed (kind, data_date)). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
+**Daily data save (5.21.0, CR-071):** `ROWS_LIMIT` and `PRICE_CAP` (422, `POST /snapshots/dynadot`, 5.32.0, BUG-051); `SNAPSHOT_SEALED` (a step result code in the `godaddyInventory` summary, per file: the data day's file was already saved and sealed, nothing was fetched or changed; since 5.22.0 also **HTTP 409** from `POST /snapshots/dynadot` for a sealed (kind, data_date)). Manifest `error` text prefixes: `FILE_NOT_LISTED` (the file is not in `metadata.json`), `SIZE_CAP` (a file over 200 MB is refused); since 5.73.0 (BUG-061) `STEP_FAILED` (a Dynadot manifest `error` row written when the `dynadotCloseouts` / `dynadotAftermarket` step itself failed: a crash, `lock expired`, a timeout; never over a sealed day or an open `gap` row; a later run can still seal the day). Since 5.73.0 (BUG-060) `GODADDY_NOT_PUBLISHED` (a `godaddyInventory` summary `failed` entry, file `metadata.json`: the newest GoDaddy file day is older than the run's UTC day, so the step fails and the 60-minute retry run is queued; the older sealed day stays as it was). Warning `DATASAVE_MISSED` (`reports.md`). RAW_EXPIRED (410) is reserved: no route re-parses or re-downloads, so it is not emitted.
 
 **Candidate screening errors (3.3.0, CR-021):** `ON_DEMAND_SCREEN_CAP` (409; also the `onDemandScreen` skip reason), `ALREADY_RUNNING` (409; also a skip reason of the daily steps). Skip reasons of `POST /candidates/screen` `domains` (3.4.0): `NOT_CHANGED`, `NO_INTAKE`, `OWNED`. Form note (3.4.0): `SCOUT_WORDS`.
 

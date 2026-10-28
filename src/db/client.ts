@@ -35,6 +35,15 @@ export function attachPoolErrorHandler(pool: pg.Pool, log?: { warn(o: object, m:
     if (log) log.warn(o, 'db pool: idle client error (connection dropped); the pool replaces it');
     else console.warn('db pool: idle client error (connection dropped); the pool replaces it', o);
   });
+  // v5.73.0 (BUG-061): a checked-out client has no pool listener, so a server-side termination (Neon 57P01) while it waits (the job lock's connection is held
+  // for the whole datasave) was an unhandled 'error' event that crashed the process. The client's own query (or lock release) still sees the failure.
+  pool.on('connect', (client) => {
+    client.on('error', (e) => {
+      const o = { errMessage: e.message };
+      if (log) log.warn(o, 'db pool: checked-out client error (connection dropped)');
+      else console.warn('db pool: checked-out client error (connection dropped)', o);
+    });
+  });
 }
 
 export function createDb(url: string, opts: { ssl?: boolean; log?: { warn(o: object, m: string): void } } = {}): Kysely<Database> {

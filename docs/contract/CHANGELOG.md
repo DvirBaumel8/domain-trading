@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.73.0 (2026-10-28): BUG-060/061/062: datasave retries until GoDaddy publishes today, no crash on a dropped DB connection and an error manifest for a failed Dynadot pull, dqMarket bigint
+Release note: `docs/releases/v5.73.0.md`.
+MINOR (no migration, no route change). BUG-060: `godaddyInventory` fails with `GODADDY_NOT_PUBLISHED` when the newest GoDaddy file day is older than the run's UTC day, so the 60-minute retry seals today. BUG-061: a failed Dynadot pull step leaves an `error` manifest `STEP_FAILED: ...` for its day; a dropped DB connection no longer crashes the server. BUG-062: `dqMarket` no longer fails with `integer out of range`.
+
 ## 5.72.1 (2026-10-28): Paper trading keeps a 25-name slice after CR-088; shortlist rows kept 30 days
 Release note: `docs/releases/v5.72.1.md`.
 PATCH (migration `1768900000000_v5-72-1.sql`: `settings.shortlist_paper_n` 25, `shortlist_keep_days` 90 -> 30). Fix to 5.72.0: with the whole field stored, paper trading counted every stored name as `shortlist` and drew the control only from names with no room under the maximum. Now `shortlist` = the top 25 of the stored field and the control = 25 of the rest, as before CR-088.

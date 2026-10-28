@@ -187,6 +187,14 @@ async function markManifest(db: Kysely<Database>, kind: DynadotKind, dataDate: s
   });
 }
 
+/**
+ * v5.73.0 (BUG-061): a pull step that ended failed without writing its own marker (crash, lock expired, timeout, a thrown error) leaves an `error` manifest
+ * for the day it started on, so GET /snapshots shows the hole. Never over a sealed day or an existing open row (a `gap` stays a gap); a later run can still seal.
+ */
+export async function markPullFailed(db: Kysely<Database>, kind: DynadotKind, startedAtMs: number, nowMs: number, error: string): Promise<void> {
+  await markManifest(db, kind, new Date(startedAtMs).toISOString().slice(0, 10), nowMs, { status: 'error', error: `STEP_FAILED: ${error}` });
+}
+
 /** Stores the rows in parts of at most DYNADOT_MAX_ROWS and seals with the last (same code as the bot upload route). */
 async function storeAndSeal(d: PullDeps, kind: DynadotKind, dataDate: string, rows: Array<Closeout | Listing>, coverage: Record<string, unknown>) {
   let result;

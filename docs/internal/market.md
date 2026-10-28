@@ -51,6 +51,10 @@ Binding rules and test IDs for the `market` module. The interface is `docs/contr
 | MK523-21 | left the source: unknown until 90 days, then UNSOLD_60D |
 | MK523-22 | per-row reject reasons |
 
+## v5.73.0 (BUG-062)
+
+- `dq.ts` price sanity reads `min(price_cents)::bigint`: `dynadot_rows.price_cents` is int4, and a price times 10 over 2^31 (a listing over $2.1M) overflowed (`integer out of range` failed `dqMarket`, 28 Oct 2026). Test MK562-1 in `market.test.ts`.
+
 ## v5.37.0 tests (`auctions-live.test.ts`)
 | ID | What |
 |---|---|

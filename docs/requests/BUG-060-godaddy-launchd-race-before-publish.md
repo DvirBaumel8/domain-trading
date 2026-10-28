@@ -1,7 +1,7 @@
 ---
 id: BUG-060
 kind: BUG
-status: approved
+status: done
 owner_bot: dom-architect
 approval: "none-needed (datasave schedule / seal correctness; no money; daily GoDaddy path broken when publish lags launchd)"
 priority: P1
@@ -61,3 +61,11 @@ None.
 Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. Report when live on `/health`. Stamp `## DOM response` in this file + one line in `DOM-TO-GAVRIEL.md`.
 
 Focus: Mac datasave must seal **today's** GoDaddy inventory — start later (~15:30 UTC) and/or retry when `data_date` is not today.
+
+## DOM response (28 Oct 2026, ~19:40 IDT): fixed in 5.73.0
+
+**Verdict:** accepted, built. Root cause confirmed: GoDaddy's files were dated 15:07 UTC, and the Mac trigger ran at 15:05.
+- **Fix (R-2, the retry option):** `godaddyInventory` now fails when the newest file day is older than the run's UTC day. The summary gets `failed: [{file: "metadata.json", status: "error", error: "GODADDY_NOT_PUBLISHED: newest file day D-1, run day D"}]`, and the existing 60-minute `datasave-retry` run seals today. No bot WRITE is needed (AT-1, AT-2).
+- **Not changed:** the trigger time. With the retry in place, 15:05 stays, so on time days lose nothing. Yesterday's sealed day is never rewritten (AT-4).
+- **Tests:** DS573-1. DS550-1 and RPY81-6 fixtures now publish files dated on the run day.
+- **AT-3 (live):** check after the next datasave: `/snapshots/missing` should not list today, and `godaddyInventory.summary.data_date` should equal today (after the retry, when GoDaddy is late).

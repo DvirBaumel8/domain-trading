@@ -10,6 +10,7 @@ import { newDbScope, runInDbScope, stepDb } from '../../core/db-stats.js';
 import { advisoryXactLock, trySessionLock, type LockKey } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { stepView } from '../reporting/index.js';
+import { markPullFailed } from './jobs/datasave/dynadot-pull.js';
 import { triggeredByOf, type JobKind, type JobRunner, type PlanStep, type RunOptions, type StepResult } from './jobs/runner.js';
 
 /** Extra time on a step's lock beyond its timeout, so the in-process timeout always fires before the lock counts as expired. */
@@ -248,6 +249,17 @@ export class JobQueue {
     }
   }
 
+  /** v5.73.0 (BUG-061): a failed Dynadot pull step (crash, lock expired, timeout) leaves an `error` manifest for its day, so the hole is visible in GET /snapshots. */
+  private async markFailedPulls(rows: Array<{ step: string; status: string; started_at: Date | null; error: string | null }>): Promise<void> {
+    for (const [step, kind] of [['dynadotCloseouts', 'closeouts'], ['dynadotAftermarket', 'aftermarket']] as const) {
+      const r = rows.find((x) => x.step === step);
+      if (r?.status !== 'failed' || !r.started_at) continue;
+      try { await markPullFailed(this.deps.db, kind, r.started_at.getTime(), this.deps.now(), r.error ?? 'failed'); } catch (e) {
+        this.deps.log?.warn({ step, err: e instanceof Error ? e.message : String(e) }, 'datasave: failed pull not marked');
+      }
+    }
+  }
+
   /** Writes the run to job_runs once every step is terminal. A second finisher is a no-op (queue_run_id is unique). */
   private async finalize(runId: string): Promise<void> {
     const { db } = this.deps;
@@ -262,7 +274,10 @@ export class JobQueue {
       triggered_by: q.triggered_by, queue_run_id: runId,
     }).onConflict((oc) => oc.doNothing()).returning('id').executeTakeFirst();
     if (!inserted) return;
-    if (q.job === 'datasave') await this.retryDatasave(q, rows);
+    if (q.job === 'datasave') {
+      await this.retryDatasave(q, rows);
+      await this.markFailedPulls(rows);
+    }
     // The run-level audit row POST /jobs/run used to get when it ran the job in the request (the CLI writes the same kind of row).
     const failed = rows.filter((r) => r.status === 'failed').map((r) => r.step);
     await writeJobAudit(db, {

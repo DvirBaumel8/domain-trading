@@ -156,7 +156,7 @@ describe('RP pick-proof off', () => {
     expect(p.json().error.code).toBe('PICKPROOF_STOPPED');
     expect(await db.selectFrom('pickproof_pool').selectAll().execute()).toEqual([]);
     expect(await db.selectFrom('pickproof_days').selectAll().execute()).toEqual([]);
-    mswServer.use(...inventoryHandlers());
+    mswServer.use(...inventoryHandlers({ lastModified: Object.fromEntries(FILES.map((f) => [f, '2026-10-26T11:41:59Z'])) })); // BUG-060: the run day is published
     const run = await runJobToEnd(app!, 'datasave');
     expect(run.json().ok).toBe(true);
     expect(run.json().steps.pickproofSeal.summary).toEqual({ status: 'off', reason: 'CR-081' });

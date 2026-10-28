@@ -151,4 +151,14 @@ describe('v3.9.0 pool', () => {
     expect(warns).toHaveLength(1);
     expect(warns[0]![0]).toEqual({ errMessage: 'Connection terminated unexpectedly' });
   });
+
+  it('DS573-3 (BUG-061) a checked-out client whose connection the server terminates (Neon 57P01) is logged, not an unhandled error event that kills the process', () => {
+    const pool = new EventEmitter();
+    const warns: [object, string][] = [];
+    attachPoolErrorHandler(pool as never, { warn: (o, m) => warns.push([o, m]) });
+    const client = new EventEmitter();
+    pool.emit('connect', client);
+    expect(() => client.emit('error', new Error('terminating connection due to administrator command'))).not.toThrow();
+    expect(warns).toEqual([[{ errMessage: 'terminating connection due to administrator command' }, 'db pool: checked-out client error (connection dropped)']]);
+  });
 });

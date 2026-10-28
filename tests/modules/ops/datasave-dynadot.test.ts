@@ -7,7 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import { loadConfig } from '../../../src/config.js';
 import { DatasaveJob } from '../../../src/modules/ops/jobs/datasave/datasave.js';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
-import { auctionsJson, closeoutsJson, inventoryHandlers, makeZip } from '../../helpers/datasave.js';
+import { auctionsJson, closeoutsJson, FILES, inventoryHandlers, makeZip } from '../../helpers/datasave.js';
 import { testDb as db } from '../../helpers/db.js';
 import { testEnv } from '../../helpers/env.js';
 import { issueToken } from '../../helpers/tokens.js';
@@ -238,6 +238,7 @@ describe('DS522 Dynadot bot uploads', () => {
     clock = Date.parse('2026-10-20T16:30:00Z'); // the 17th is 3 days back: still expected, the 20th is missing
     expect((await get('/health')).json().datasave).toBe('partial');
     clock = Date.parse('2026-10-21T16:30:00Z'); // 4 days since the last sealed upload: paused
+    mswServer.use(...inventoryHandlers({ lastModified: Object.fromEntries(FILES.map((f) => [f, '2026-10-21T14:41:59Z'])) })); // BUG-060: GoDaddy has published the 21st
     await runJobToEnd(app!, 'datasave');
     expect((await get('/health')).json().datasave).toBe('ok');
     expect(((await get('/report')).json().warnings as { code: string }[]).map((w) => w.code)).not.toContain('DATASAVE_MISSED');

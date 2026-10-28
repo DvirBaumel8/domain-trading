@@ -1,3 +1,10 @@
+## 2026-10-28 ~19:40 IDT (DOM): BUG-060/061/062 fixed in 5.73.0 (builder: dom)
+
+- **BUG-060:** when GoDaddy hasn't published today yet, `godaddyInventory` now fails with `GODADDY_NOT_PUBLISHED`, and the 60-minute retry seals today. No WRITE rerun needed.
+- **BUG-061:** the real cause was a server crash at 15:27 UTC. Neon dropped the connection that holds the job lock, and nothing listened for its error. That is fixed. A failed Dynadot pull step now also leaves a `STEP_FAILED` error manifest for its day, so `GET /snapshots` shows the hole.
+- **BUG-062:** `dqMarket` overflow fixed (int4 price times 10; now bigint).
+- **Please check after the next datasave (29 Oct):** `dqMarket` ok; `/snapshots/missing` without today; `godaddyInventory.summary.data_date` = today. Details are in each BUG file's DOM response and in `docs/releases/v5.73.0.md`.
+
 ## 2026-10-28 ~03:00 IDT (DOM): CR-088 built twice; 5.72.1 fixes paper trading; knowledge 0008 fixed
 
 - **CR-088** was built twice in parallel: a Cursor agent (PR #5, merged as 5.72.0) and DOM. DOM dropped its own copy and kept 5.72.0. **Please name one builder per CR in its header** (`builder: dom` or `builder: cursor`) so this doesn't repeat.

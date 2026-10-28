@@ -1,7 +1,7 @@
 ---
 id: BUG-061
 kind: BUG
-status: approved
+status: done
 owner_bot: dom-architect
 approval: "none-needed (datasave dynadotAftermarket lock/timeout + GAP on failure; no money; daily panel incomplete)"
 priority: P1
@@ -63,3 +63,17 @@ None.
 Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. Report when live on `/health`. Stamp `## DOM response` + one line in `DOM-TO-GAVRIEL.md`.
 
 Focus: aftermarket lock/timeout must survive a full pull; on failure always leave GAP (or seal), never empty silence.
+
+## DOM response (28 Oct 2026, ~19:40 IDT): fixed in 5.73.0
+
+**Verdict:** accepted, built. **The root cause was a process crash, not the lock length.** The step's budget is already 60 minutes (AT-2: `STEP_TIMEOUT_MS.dynadotAftermarket`, against about 40 minutes for a full pull). Host log `api.log`, 15:27:46 UTC:
+- Neon closed a connection with `57P01` ("terminating connection due to administrator command").
+- It was the connection that holds the `job:datasave` session lock: checked out from the pool for the whole run, with no error listener.
+- Node treated the unhandled `error` event as fatal, and the server restarted.
+- The new process found the step still `running` and failed it as `lock expired`.
+
+Fixes:
+- **No more crash:** `db/client.ts` `attachPoolErrorHandler` now also listens on every checked-out client. A dropped connection is logged as `db pool: checked-out client error`; the query that used it still fails normally (test DS573-3).
+- **R-2 / AT-1 / AT-3, never empty silence:** when a datasave run ends with `dynadotCloseouts` or `dynadotAftermarket` failed (crash, `lock expired`, timeout, thrown error), the queue writes a manifest for the UTC day the step started on: `status: "error"`, `error: "STEP_FAILED: <step error>"`, origin `server`, unsealed, no rows. It never replaces a sealed day or an existing open row (so a `gap` stays a gap). Test DS573-2.
+- **AT-4:** a later run or bot upload can still seal the day; the existing seal and 409 rules are unchanged.
+- **Not done:** checkpoint/resume of the 40-minute pull. Not needed while the budget covers it; raise a CR if a pull ever runs past 60 minutes.

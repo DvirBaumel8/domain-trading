@@ -47,11 +47,11 @@ export async function runDqMarket(db: Kysely<Database>, nowMs: number): Promise<
     select count(*)::int as n, (array_agg(episode_id order by episode_id))[1:5] as sample from market_names where not ${CLEAN_FEATURES}`.execute(db);
   results.push({ check: 'leakage', status: leak.rows[0]!.n === 0 ? 'pass' : 'fail', detail: { rows_n: leak.rows[0]!.n, sample_episode_ids: leak.rows[0]!.sample ?? [], action: 'excluded from /market/matched' } });
 
-  // price sanity: a >10x jump between consecutive snapshot days of one name, a sale that looks like dollars read as cents, a sale >10x or <1/10 of the listing price
+  // price sanity (BUG-062: prices in bigint, so a listing over $2.1M times 10 can't overflow int4): a >10x jump between consecutive snapshot days of one name, a sale that looks like dollars read as cents, a sale >10x or <1/10 of the listing price
   const since = addDays(today, -30);
   const jumps = await sql<{ n: number }>`
     with sealed as (select data_date from snapshot_manifests where source = 'dynadot_aftermarket' and status = 'complete' and data_date >= ${since}::date),
-    obs as (select r.domain, r.data_date, min(r.price_cents) as p from dynadot_rows r join sealed s on s.data_date = r.data_date where r.kind = 'aftermarket' group by 1, 2),
+    obs as (select r.domain, r.data_date, min(r.price_cents)::bigint as p from dynadot_rows r join sealed s on s.data_date = r.data_date where r.kind = 'aftermarket' group by 1, 2),
     lagged as (select p, lag(p) over (partition by domain order by data_date) as prevp from obs)
     select count(*)::int as n from lagged where prevp is not null and (p > prevp * ${PRICE_JUMP_FACTOR} or p * ${PRICE_JUMP_FACTOR} < prevp)`.execute(db);
   const cheap = await sql<{ n: number }>`select count(*)::int as n from market_sales where sale_price_cents < ${SALE_DOLLARS_SUSPECT_CENTS}`.execute(db);
