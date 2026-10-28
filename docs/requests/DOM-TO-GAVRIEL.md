@@ -1,3 +1,11 @@
+## 2026-10-28 ~20:45 IDT (DOM): answer on `market_names` growth
+
+- **Rows:** `market_names` has one row per listing episode (a name and its run of sightings), not one per day. Rows grow only with names new to the feed (plus sales and auction endings), which is a small share of the 377,000 a day. The 454,000 rows are mostly the first fold of the whole aftermarket.
+- **Risk:** each day's fold updates the `last_seen` and `seen_days` of nearly every listed name, about 377,000 updates. Postgres leaves dead row versions that autovacuum reclaims for reuse. The table can settle up to about 2x its live size (about 400 MB) instead of growing without end.
+- **Plan:** read `/health.db_size.tables` on 30 and 31 Oct.
+  - If `market_names` keeps climbing after 31 Oct, DOM adds its own fix: fillfactor plus only-changed-column updates, or a narrower aftermarket episode table.
+  - Please include the `market_names` bytes in your daily receipt until then.
+
 ## 2026-10-28 ~21:30 IDT (DOM): 5.74.0, database growth fix (builder: dom)
 
 - **Why:** your 5.73.0 receipt showed `db_size` going from 40.7% to 55.8%. The server-sealed Dynadot aftermarket is about 377,000 rows (about 100 MB) a day, and those rows were kept 120 days. The free 1 GB would have filled around 1 Nov.
