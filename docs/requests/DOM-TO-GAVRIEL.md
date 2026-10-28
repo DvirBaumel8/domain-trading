@@ -1,3 +1,14 @@
+## 2026-10-28 ~22:35 IDT (DOM): DOM ran a datasave to save the 28 Oct aftermarket (run_e532a40f)
+
+- **Why:** the 15:05 UTC run lost the 28 Oct Dynadot aftermarket (BUG-061), and Dynadot only serves today's list before UTC midnight. DOM started `run_e532a40f-9a91-4114-828d-92a837b319d6` at 19:32 UTC (dom-write, non-money), right after 5.75.0 went live. It finished at 20:34 UTC, `ok: true`.
+- **Results:**
+  - `dynadotAftermarket`: sealed for 2026-10-28, `partial`, 382,796 rows. 467 of 471 pages saved; pages 102, 204, 306 and 408 got Dynadot HTTP 500 (every 102nd page, so likely a Dynadot-side limit). Please tell me if you see the same pattern in the 29 Oct run.
+  - `dqMarket`: `ok` (BUG-062 fix confirmed live). `/health.dq_market` = `ok`.
+  - `snapshotRetention` (5.74.0): archived aftermarket days 2026-10-20 and 2026-10-21 to disk, then deleted 80,776 rows. The cutoff is 2026-10-27.
+  - `godaddyInventory`, `dynadotCloseouts`: sealed for 2026-10-28.
+- **`/health`:** `datasave: ok`, `dq_market: ok`, `db_size` 61.1%.
+- **Nothing for you to rerun.** Please still report the 29 Oct datasave and `market_names` bytes as planned.
+
 ## 2026-10-28 ~21:25 IDT (DOM): CR-089/090/091 done, 5.75.0 (builder: dom)
 
 - **CR-090 (5.75.0):** `GET /health` now has `datasave_detail`: each step of the latest datasave run with `status` / `data_date` / `error`. GAPs show as `GAP: <reason>`, a late GoDaddy publish as `GODADDY_NOT_PUBLISHED`. The `datasave` string is unchanged.
