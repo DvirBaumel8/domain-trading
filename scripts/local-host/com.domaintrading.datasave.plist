@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- v5.46.0: starts the daily data save from the Mac. launchd's calendar is local time (IST/IDT), so this runs at minute 5 of every hour and datasave-trigger.sh
-     decides by the UTC clock (from 15:00 UTC, once per UTC day; the 15:05 UTC run is the normal one, later hours are the catch-up). GitHub's schedule stays as the backup.
-     install.sh fills the __PLACEHOLDERS__ and loads it. -->
+<!-- v5.73.0 (BUG-060): starts the daily data save from the Mac. launchd's calendar is local time (IST/IDT), so this runs at minute 35 of every hour and datasave-trigger.sh
+     decides by the UTC clock (from 15:30 UTC, once per UTC day; the 15:35 UTC run is the normal one, later hours are the catch-up). GitHub's schedule stays as the backup.
+     Was minute 5 / 15:00 UTC before BUG-060 (GoDaddy publishes ~15:07 UTC, so 15:05 UTC sometimes beat it). install.sh fills the __PLACEHOLDERS__ and loads it. -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -10,7 +10,7 @@
   <array><string>/bin/bash</string><string>__HOST_DIR__/datasave-trigger.sh</string></array>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>__PATH__</string><key>HOME</key><string>__HOME__</string></dict>
-  <key>StartCalendarInterval</key><dict><key>Minute</key><integer>5</integer></dict>
+  <key>StartCalendarInterval</key><dict><key>Minute</key><integer>35</integer></dict>
   <key>StandardOutPath</key><string>__LOG_DIR__/datasave-trigger.log</string>
   <key>StandardErrorPath</key><string>__LOG_DIR__/datasave-trigger.log</string>
 </dict>

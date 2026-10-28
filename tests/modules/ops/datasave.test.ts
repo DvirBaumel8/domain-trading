@@ -285,6 +285,71 @@ describe('DS521 datasave job', () => {
   });
 });
 
+describe('BUG-060 stale GoDaddy inventory data_date triggers retry', () => {
+  it('BG060-1 (AT-1) at 15:05 UTC with all files still from D−1, godaddyInventory does not finalize as success: step is ok:false with DATA_DATE_STALE', async () => {
+    const YESTERDAY_LM = '2026-10-19T16:49:00Z';
+    mswServer.use(...inventoryHandlers({ lastModified: Object.fromEntries(FILES.map((f) => [f, YESTERDAY_LM])), bodies: { 'closeout_listings.json.zip': closeoutsZip } }));
+    const { get } = await boot();
+    await runJobToEnd(app!, 'datasave'); // first run: seals D−1
+    expect((await db.selectFrom('snapshot_manifests').select(['data_date', 'status']).execute()).every((r) => r.data_date === '2026-10-19' && r.status === 'complete')).toBe(true);
+    // advance to the next day, still 15:05 UTC; host returns same D−1 files
+    clock = Date.parse('2026-10-20T15:05:00Z');
+    const run = await runJobToEnd(app!, 'datasave');
+    const gd = run.json().steps.godaddyInventory;
+    expect(gd.ok).toBe(false);
+    expect(gd.summary.data_date).toBe('2026-10-19');
+    expect(gd.summary.failed).toEqual([expect.objectContaining({ reason: 'DATA_DATE_STALE', data_date: '2026-10-19', expected: '2026-10-20' })]);
+    // a retry is queued (same 60 min path)
+    const retries = await db.selectFrom('job_queue_runs').select(['not_before', 'params', 'triggered_by']).where('job', '=', 'datasave').orderBy('created_at').execute();
+    expect(retries.length).toBeGreaterThanOrEqual(3);
+    const retry = retries.at(-1)!;
+    expect(retry).toMatchObject({ params: { retry: true }, triggered_by: 'datasave-retry' });
+  });
+
+  it('BG060-2 (AT-2) the retry run seals today once GoDaddy publishes; /snapshots/missing no longer lists today', async () => {
+    const YESTERDAY_LM = '2026-10-19T16:49:00Z';
+    const TODAY_LM = '2026-10-20T15:07:00Z';
+    mswServer.use(...inventoryHandlers({ lastModified: Object.fromEntries(FILES.map((f) => [f, YESTERDAY_LM])), bodies: { 'closeout_listings.json.zip': closeoutsZip } }));
+    const { get } = await boot();
+    await runJobToEnd(app!, 'datasave'); // seals D−1
+
+    clock = Date.parse('2026-10-20T15:05:00Z');
+    await runJobToEnd(app!, 'datasave'); // stale, retry queued
+    const r2 = await db.selectFrom('job_runs').select('ok').where('job', '=', 'datasave').orderBy('id').execute();
+    expect(r2.at(-1)?.ok).toBe(false);
+
+    // GoDaddy publishes today's files
+    mswServer.resetHandlers();
+    mswServer.use(...inventoryHandlers({ lastModified: Object.fromEntries(FILES.map((f) => [f, TODAY_LM])), bodies: { 'closeout_listings.json.zip': closeoutsZip } }));
+    clock = Date.parse('2026-10-20T16:10:00Z');
+    const retry = await runJobToEnd(app!, 'datasave');
+    expect(retry.accepted.skipped).toBe(true); // starts the waiting retry
+    await app!.jobQueue.idle();
+
+    const runs = await db.selectFrom('job_runs').select(['ok', 'steps']).where('job', '=', 'datasave').orderBy('id').execute();
+    const lastRun = runs.at(-1)!;
+    expect(lastRun.ok).toBe(true);
+    const summary = (typeof lastRun.steps === 'string' ? JSON.parse(lastRun.steps) : lastRun.steps).godaddyInventory?.summary;
+    expect(summary.data_date).toBe('2026-10-20');
+
+    const missing = (await get('/snapshots/missing?from=2026-10-20&to=2026-10-20')).json();
+    expect(missing.missing).toEqual([]);
+  });
+
+  it('BG060-3 (AT-4) the stale-day detection never rewrites a sealed day; no money routes are involved', async () => {
+    const YESTERDAY_LM = '2026-10-19T16:49:00Z';
+    mswServer.use(...inventoryHandlers({ lastModified: Object.fromEntries(FILES.map((f) => [f, YESTERDAY_LM])), bodies: { 'closeout_listings.json.zip': closeoutsZip } }));
+    await boot();
+    await runJobToEnd(app!, 'datasave'); // seals D−1
+    const beforeSha = (await db.selectFrom('snapshot_manifests').select('sha256').where('data_date', '=', '2026-10-19').executeTakeFirst())!.sha256;
+
+    clock = Date.parse('2026-10-20T15:05:00Z');
+    await runJobToEnd(app!, 'datasave'); // stale
+    const afterSha = (await db.selectFrom('snapshot_manifests').select('sha256').where('data_date', '=', '2026-10-19').executeTakeFirst())!.sha256;
+    expect(afterSha).toBe(beforeSha);
+  });
+});
+
 describe('DS537 in-range GoDaddy auctions with bids (godaddy_auctions_live)', () => {
   const AUCTION_FILES = ['all_expiring_auctions.json.zip', 'all_biddable_auctions.json.zip', 'all_listings_ending_today.json.zip', 'auctions_ending_today.json.zip'];
   const END = '2026-10-21T09:00:00Z';

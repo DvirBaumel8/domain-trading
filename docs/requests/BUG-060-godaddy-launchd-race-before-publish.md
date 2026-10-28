@@ -61,3 +61,20 @@ None.
 Gavriel: Dvir does not kick off Claude Code; Architect drives this. **Build immediately.** Max 2 rounds. No money. Report when live on `/health`. Stamp `## DOM response` in this file + one line in `DOM-TO-GAVRIEL.md`.
 
 Focus: Mac datasave must seal **today's** GoDaddy inventory — start later (~15:30 UTC) and/or retry when `data_date` is not today.
+
+## DOM response
+
+**Verdict: confirmed and fixed in v5.73.0.** The timing hypothesis is correct: GoDaddy published today's files at ~15:07 UTC, after the 15:05 UTC trigger. When `godaddyInventory` found only yesterday's sealed files, it returned `ok: true` (all `SNAPSHOT_SEALED`) and no retry was queued.
+
+**Fix (both R-2 options applied):**
+
+1. **Schedule shift (R-2a):** LaunchAgent minute 35 (was 5), trigger script from 15:30 UTC (was 15:00). Normal trigger at 15:35 UTC.
+2. **Stale-day retry (R-2b):** `godaddyInventory` detects when every file is sealed from a previous UTC date and today is newer. Returns `ok: false` with `failed: [{reason: "DATA_DATE_STALE", ...}]`, triggering the existing 60-minute retry. The retry picks up today's files once published.
+
+**Rules satisfied:**
+- R-1 ✓ — the step never reports lasting `ok: true` for D−1 when D is the current UTC day.
+- R-2 ✓ — both: start at ~15:35 UTC, retry on stale data_date.
+- R-3 ✓ — no backfill for past days.
+- R-4 ✓ — no money, no registrar buy, no settings activation.
+
+**Tests:** BG060-1 (AT-1), BG060-2 (AT-2), BG060-3 (AT-4).

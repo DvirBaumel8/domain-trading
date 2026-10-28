@@ -169,7 +169,15 @@ export class DatasaveJob {
     }
     const dataDate = results.map((r) => r.data_date).sort().at(-1) ?? runDate;
     const archive = this.deps.archiveDir ? { archive: this.archive } : {};
-    return { ...this.summary(dataDate, results), ...archive, ...(await this.auctionSummary(st.files, results)) };
+    const base = { ...this.summary(dataDate, results), ...archive, ...(await this.auctionSummary(st.files, results)) };
+    // BUG-060: when every file is already sealed from an older data date and today's UTC date is
+    // newer, the host has not published today's inventory yet. Mark the step failed so the
+    // 60-minute retry picks up the new files once they appear.
+    const today = utcDay(this.deps.now());
+    if (dataDate < today && results.length > 0 && results.every((r) => r.code === 'SNAPSHOT_SEALED' || r.code === 'SNAPSHOT_SEALED_REPARSED')) {
+      return { ...base, failed: [{ reason: 'DATA_DATE_STALE', data_date: dataDate, expected: today, message: `inventory data_date ${dataDate} is before today ${today}; files not yet published` }] };
+    }
+    return base;
   }
 
   /** v5.54.0: true when the day has live auction rows and none of them carries a demand field (the day was parsed before v5.49.0). */

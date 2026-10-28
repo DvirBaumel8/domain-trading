@@ -6,7 +6,7 @@
 #   - an env file at ~/.config/domain-trading/prod.env (chmod 600) with every key and EMPTY values: Dvir pastes the Render values;
 #   - LaunchAgents: com.domaintrading.api (the server, restarted if it exits), com.domaintrading.deploy (every 10 min, deploys a new release tag),
 #     com.domaintrading.tunnel (cloudflared quick tunnel), com.domaintrading.tunnel-watch (every 60 s, publishes a changed tunnel URL to the api-proxy Worker) and
-#     com.domaintrading.datasave (v5.46.0: hourly at :05, starts the daily data save from 15:00 UTC on through datasave-trigger.sh; GitHub's schedule is the backup).
+#     com.domaintrading.datasave (v5.73.0 BUG-060: hourly at :35, starts the daily data save from 15:30 UTC on through datasave-trigger.sh; was :05 / 15:00 UTC; GitHub's schedule is the backup).
 # Then: fill the env file, run deploy.sh --first (docs/runbook.md, "Local host").
 set -euo pipefail
 

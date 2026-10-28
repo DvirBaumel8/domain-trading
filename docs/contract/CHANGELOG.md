@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.73.0 (2026-10-28): BUG-060 datasave stale-day retry and schedule shift
+Release note: `docs/releases/v5.73.0.md`.
+MINOR (no migration, no new route). BUG-060: the `godaddyInventory` step now detects when every file is already sealed from a previous data date and today's UTC date is newer (`DATA_DATE_STALE`); the step reports `ok: false` and the existing 60-minute retry queues a second run that picks up today's files once GoDaddy publishes them. The Mac LaunchAgent fires at minute 35 (was 5) and the trigger script starts from 15:30 UTC (was 15:00), giving GoDaddy's ~15:07 UTC publish a comfortable margin. Tests BG060-1..3.
+
 ## 5.72.1 (2026-10-28): Paper trading keeps a 25-name slice after CR-088; shortlist rows kept 30 days
 Release note: `docs/releases/v5.72.1.md`.
 PATCH (migration `1768900000000_v5-72-1.sql`: `settings.shortlist_paper_n` 25, `shortlist_keep_days` 90 -> 30). Fix to 5.72.0: with the whole field stored, paper trading counted every stored name as `shortlist` and drew the control only from names with no room under the maximum. Now `shortlist` = the top 25 of the stored field and the control = 25 of the rest, as before CR-088.

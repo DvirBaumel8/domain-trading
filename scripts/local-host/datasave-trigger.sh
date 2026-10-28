@@ -1,6 +1,6 @@
 #!/bin/bash
-# v5.46.0 (first live run, problem 4): the Mac starts the daily data save itself. GitHub starts the schedule 3-4 hours late; this agent starts it at 15:05 UTC.
-# What launchd runs (com.domaintrading.datasave, every hour at :05 local time). launchd uses local time, so the script decides by the UTC clock: from 15:00 UTC on, once a
+# v5.73.0 (BUG-060): the Mac starts the daily data save itself. GitHub starts the schedule 3-4 hours late; this agent starts it at ~15:35 UTC (was 15:05 UTC before BUG-060).
+# What launchd runs (com.domaintrading.datasave, every hour at :35 local time). launchd uses local time, so the script decides by the UTC clock: from 15:30 UTC on, once a
 # UTC day, it calls the local server POST /jobs/run {"job":"datasave"} with the job-trigger token read from prod.env (never printed, never in the process list, never logged).
 # It uses the same Idempotency-Key as the GitHub workflow (datasave-<15:00 UTC of the day in ms>), so a later GitHub run of the same day is a replay, and the server's
 # overlap rule (a still-open datasave run is returned, not started twice) and sealed files make a double trigger harmless. GitHub's schedule stays as the backup.
@@ -13,8 +13,9 @@ PAUSE_FLAG="$HOST_DIR/PAUSED"
 say() { echo "$(date -u +%FT%TZ) $*"; }
 [ -f "$PAUSE_FLAG" ] && { say "paused ($(cat "$PAUSE_FLAG")): no trigger"; exit 0; }
 hour=$((10#${DATASAVE_TEST_HOUR:-$(date -u +%H)}))   # DATASAVE_TEST_HOUR is for the manual check only
+min=$((10#${DATASAVE_TEST_MIN:-$(date -u +%M)}))
 day="$(date -u +%Y-%m-%d)"
-[ "$hour" -ge 15 ] || exit 0                      # before 15:00 UTC: nothing to do (stay silent)
+[ "$((hour * 60 + min))" -ge 930 ] || exit 0      # before 15:30 UTC: nothing to do (stay silent; BUG-060 moved from 15:00)
 [ "$(cat "$MARK" 2>/dev/null || true)" = "$day" ] && exit 0   # already started today
 [ -f "$ENV_FILE" ] || { say "missing $ENV_FILE"; exit 1; }
 # Read KEY=VALUE lines literally, like start.sh and backup.sh. Only the three keys this script needs are kept. Nothing is printed.

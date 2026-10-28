@@ -119,6 +119,9 @@ Code: `ops/jobs/datasave/dynadot-pull.ts` (`pullCloseouts`, `pullAftermarket`), 
 | BG052-7 | AT-7: split sums to gone_before_end_n (GoDaddy and Dynadot); `/market/episodes` disappearance_tag |
 | BG052-8 | RE_REGISTERED, NO_BASELINE, NO_REGISTRAR; a non-.com name is not looked up |
 | DS521-20 | FILE_NOT_LISTED and SIZE_CAP errors |
+| BG060-1 | BUG-060 AT-1: at 15:05 UTC with all files from D−1, step is `ok: false` with `DATA_DATE_STALE`; retry queued |
+| BG060-2 | BUG-060 AT-2: retry seals today once GoDaddy publishes; `/snapshots/missing` no longer lists today |
+| BG060-3 | BUG-060 AT-4: stale-day detection never rewrites a sealed day; no money routes |
 
 v5.22.0 tests: `tests/modules/ops/datasave-dynadot.test.ts`.
 | ID | What |
@@ -152,8 +155,10 @@ v5.37.0 tests: `tests/modules/ops/datasave.test.ts`.
 
 v5.26.0 tests: `tests/modules/ops/closeouts.test.ts` (CC526-*, table in `closeouts.md`).
 
-## Mac trigger (v5.46.0)
-`scripts/local-host/datasave-trigger.sh` (LaunchAgent `com.domaintrading.datasave`, `StartCalendarInterval` minute 5 of every hour, local time): exits at once before 15:00 UTC or when `~/.local/share/domain-trading-host/datasave-last-trigger` holds today's UTC date or the host is `PAUSED`; otherwise reads `JOB_TRIGGER_TOKEN` (and `LOCAL_HOST_PORT`, default 3100) from `prod.env` itself, checks `GET /health/ping`, and posts `{"job":"datasave"}` with `Idempotency-Key: datasave-<15:00 UTC in ms>` (the token travels in a private header file, not on the command line). Only a 202 writes the marker. Checked by hand against a local stub server (the repo has no shell-level test pattern); manual check in the runbook.
+## Mac trigger (v5.46.0; v5.73.0 BUG-060: moved to :35 / 15:30 UTC)
+`scripts/local-host/datasave-trigger.sh` (LaunchAgent `com.domaintrading.datasave`, `StartCalendarInterval` minute 35 of every hour, local time; **was minute 5 before BUG-060**): exits at once before 15:30 UTC (was 15:00) or when `~/.local/share/domain-trading-host/datasave-last-trigger` holds today's UTC date or the host is `PAUSED`; otherwise reads `JOB_TRIGGER_TOKEN` (and `LOCAL_HOST_PORT`, default 3100) from `prod.env` itself, checks `GET /health/ping`, and posts `{"job":"datasave"}` with `Idempotency-Key: datasave-<15:00 UTC in ms>` (the token travels in a private header file, not on the command line). Only a 202 writes the marker. Checked by hand against a local stub server (the repo has no shell-level test pattern); manual check in the runbook.
+
+**BUG-060 (v5.73.0): stale-day retry.** When `godaddyInventory` sees every configured file already sealed from a previous UTC day and today is newer, the step returns `ok: false` with `failed: [{reason: "DATA_DATE_STALE", data_date, expected, message}]`. This triggers the existing 60-minute retry path (`retryDatasave`), so the second run picks up today's files once GoDaddy publishes them, without a manual WRITE trigger. Combined with the 15:35 UTC start (25 minutes after the previous 15:05) the race is eliminated for normal publishes (~15:07 UTC) and the retry handles late publishes.
 
 ## Batching (v5.42.0)
 Disappearance tags: one cache read for all due names (each row's TTL applied in code), the first live lookup alone (a 429 stops the run before more are sent), then 4 at a time through the Verisign host pacer (250 ms between starts); tag updates go out in batches of 300 and cache answers in one multi-row upsert; the cap counts a lookup when it is claimed, so it is exact. Test BK542-3 (313 queries before, 13 after for 100 lookups). v5.46.0: the expiry check uses the same batches (BK-style: one cache read, one unnest update per 300, one insert per 5,000).
