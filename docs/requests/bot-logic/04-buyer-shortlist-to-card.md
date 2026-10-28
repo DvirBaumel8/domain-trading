@@ -127,12 +127,13 @@ Log every screened name in `sourcing/buyer-first/paper-log.md` with price and ve
 - DOM: token from `~/.config/grok-bots/bots.token`; header `X-Bot-Name: Buyer`; proxy `https://domain-trading-api-proxy.dvirbaumel9.workers.dev` with `Authorization: Bearer`. Never print the secret.
 - Dynadot connector: read-only; auctions blocked until API access. Closeouts research-only while paused.
 - Every answer file / card: model + prompt version at top.
-- Report to Gavriel each run: the **three numbers** (`field_n`, GET `total`/served, judged + unfinished) + `data_date`, cards sent to Risk Gate (or none / review-only + reason), call count, blockers. Call out time-gate and USPTO-FLAG names as review-only skips, not firm-screen candidates.
-- **Passers report (Gavriel/Dvir 2026-10-28):** list **all** names that pass the full filter stack (meaning → USPTO → firm screen → cardable). Do **not** force a top-5. Use top-5-with-cons **only when zero** names pass.
+- Report to Gavriel each run: directions (A/B/D; C parked) · the **three numbers** (`field_n`, GET `total`/served, judged + unfinished) · `data_date` · B signals · D would-advance · cards sent to Risk Gate (or none / review-only + reason) · call count · blockers (Dynadot aftermarket GAP = note only). Call out time-gate and USPTO-FLAG names as review-only skips, not firm-screen candidates.
+- **Passers (locked):** full-stack only — see §0.1. All full-stack passers; top-5-with-cons **only when zero**. Cheap survivors are not Dvir cards.
+- **L&L:** Buyer writes funnel + REVIEW/PASSERS; Gavriel surfaces the L&L pack to Dvir **every run**.
 
 ---
 
 ## Pass / fail for this doc
 
-- Pass: a new Buyer run can follow only this file + ledger IDs + `lessons/buyer.md` standing lessons without reading retired scout recipes.
-- Fail: inventing a parallel pool from local zips, treating B-01 as a hard reject again, or buying/bidding.
+- Pass: a new Buyer run can follow only this file + ledger IDs + `lessons/buyer.md`: Option 1 after seal, A+B+D, full-stack passers, L&L path.
+- Fail: inventing a parallel auction pool from local zips; skipping B/D; treating geo grids as live; dumping cheap survivors as passers; forcing top-5 when passers exist; treating B-01 as a hard reject; buying/bidding.

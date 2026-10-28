@@ -1,9 +1,9 @@
 # Company-day timeline (after datasave → Dvir yes)
 
-**Status:** draft for mutual-awareness gap (DOM Architect ask, 2026-10-27). Requests-only until a CR places it under `docs/bot-logic/`.  
-**Rule for this file:** cite existing docs / memory only. Clock times not stated in those sources → **UNKNOWN**. Times below are Asia/Jerusalem (IDT, UTC+2 in late Oct 2026) unless marked UTC.
+**Status:** discovery cadence **LOCKED** (Dvir via Gavriel, 2026-10-28 ~20:50 IDT) — Option 1. Requests-only until a CR places it under `docs/bot-logic/`.  
+**Rule for this file:** cite existing docs / memory / Dvir locks only. Clock times not stated in those sources → **UNKNOWN**. Times below are Asia/Jerusalem (IDT, UTC+2 in late Oct 2026) unless marked UTC.
 
-**Sources (primary):** `docs/requests/DISCOVERY-FLOW-V2-2026-10-27.md`; `docs/bot-logic/00`–`03`; `docs/requests/bot-logic/04-buyer-shortlist-to-card.md`; `docs/internal/{datasave,auctions,buy}.md`; `knowledge/handoffs/data-engineer.md`; `org/org-v2.md`; `company/reorg-org-design-2026-10-17.md` §8; CR-080 / CR-081; memory (Dvir discovery v2; pick-proof pause).
+**Sources (primary):** `sourcing/buyer-first/2026-10-28-fullfield/DISCOVERY-FLOW-RESEARCH.md` (v3 proposal; cadence/directions locked); `docs/requests/bot-logic/04-buyer-shortlist-to-card.md`; `docs/bot-logic/00`–`03`; `docs/internal/{datasave,auctions,buy}.md`; CR-080 / CR-081 / CR-088; memory (Dvir discovery v3 Option 1; pick-proof pause).
 
 ---
 
@@ -13,8 +13,11 @@
 [Mac datasave ~15:05 UTC]
         │  seals GD + Dynadot (when client live) → score → shortlist → portfolioCheck
         ▼
-[Morning / lean discovery — wall clock UNKNOWN under v2]
-        │  Buyer: GET /health + GET /auctions/shortlist → filters → judgment → cards
+[One full discovery — after shortlist seal for data_date]  ← Option 1 LOCKED
+        │  A required (shortlist) + B cheap signal + D closeouts research
+        │  C geo parked · Dynadot aftermarket GAP = blocker note only
+        │  Buyer → full-stack passers (or top-5-with-cons if zero) → Risk Gate
+        │  L&L pack to Dvir every run (mandatory)
         ▼
 [Risk Gate]  CLEAR / FLAG / REJECT
         ▼
@@ -38,39 +41,58 @@ Parallel / other tracks (not the buy spine): Sales owned-name sell-chance work; 
 | After seals | Dual-runner lock | Winner writes `docs/locks/<action>-<YYYY-MM-DD>.json`; loser skips | Same Idempotency-Key per day+action | Backup bot: **only if DOM missed**, typically **~19:00 UTC** (CR-080) | `00-dual-runner-lock-rule.md`; CR-080 |
 | Dynadot half until client ships | DOM Architect / bots | Bot-upload `POST /snapshots/dynadot` still allowed; stubs may return `not_configured` | Restricted Aftermarkets-Read key on Mac | Do **not** enable registrar `dynadot` for Restricted key | CR-080; memory 2026-10-27 |
 | Pick-proof daily seal / labels | — | **Paused** (Dvir yes → CR-081) | — | Archives of Oct 20–26 kept; historical replay replaces pick-proof | CR-081; memory |
-| CLOSEOUTS | Buyer / Risk | Research-only while `CLOSEOUTS_PAUSED` | — | No money cards from closeouts | DISCOVERY-FLOW-V2; auctions.md |
+| CLOSEOUTS | Buyer / Risk | Research-only while `CLOSEOUTS_PAUSED` | — | No money cards from closeouts | discovery v3; auctions.md |
 
 **Who reads after datasave**
-- **Buyer / Gavriel:** next morning discovery uses that day’s shortlist (`data_date`).
+- **Buyer / Gavriel:** **one full discovery after that day’s shortlist seal** (`data_date`) — Option 1 locked; not “next morning only”.
 - **DOM Architect:** `/health`, datasave status, GAP reasons.
 - **Challenger:** not on the datasave critical path (grades later / weekly).
 
 ---
 
-## 2. Discovery v2 lean path (Buyer → Risk Gate → Gavriel → Dvir)
+## 2. Discovery v3 — Option 1 locked (Buyer → Risk Gate → Gavriel → Dvir)
+
+**Cadence (Dvir 2026-10-28):** **one full discovery per day after shortlist seal** for that `data_date`. No second evening deep-pass unless Dvir reopens Option 2. Watch alerts (T−24h) and optional `min_hours_to_end` stay **parked** under freeze.
+
+**Directions (every run):**
+
+| Dir | What | Every run? | Money |
+|---|---|---|---|
+| **A** | Live GD expired auctions via `GET /auctions/shortlist` (CR-088 full hard-filter field) | **Required** | Paper → bid only after Dvir yes |
+| **B** | Cheap other-TLD / Exact Match / Developed signal on A survivors (`parts.demand` + ≤20 HTTPS peeks) | **Required (cheap)** | Paper only |
+| **C** | Geo city×trade grids | **Parked** | No hand-reg; geo-shape tag inside A OK |
+| **D** | `GET /candidates/closeouts` research scan + would-advance count | **Research-only** while `CLOSEOUTS_PAUSED` | No |
+
+**Passers:** only **full-stack** (cheap + USPTO not exact-kill + firm screen §10 + time gate OK + card → Risk Gate not REJECT) go to Dvir. **Top-5-with-cons only if zero** full-stack passers. Cheap survivors are backlog/kills, not Dvir cards.
+
+**L&L:** every run ends with a Dvir-facing L&L summary (Buyer funnel/REVIEW + Gavriel notes + DOM notes when infra mattered + shared AIs). Bot-only L&L is a miss.
 
 | Step | Who | Action | Depends on | Cap / timeout | Sources |
 |---|---|---|---|---|---|
 | 0a | Buyer (or Gavriel brief) | `GET /health` — note API version | DOM up | — | `04` §0 |
-| 0b | Buyer | `GET /auctions/shortlist` newest `data_date`, limit as briefed (default ~25) | Datasave shortlist for that date | ~20 external tool calls per lean run unless Gavriel raises | DISCOVERY-FLOW-V2; `04` §0; buyer-first-plan “~20 calls/day” |
-| 0c | Buyer | Optional closeouts research | CLOSEOUTS_PAUSED | Not a buy pool | DISCOVERY-FLOW-V2 |
+| 0b | Buyer | **A:** `GET /auctions/shortlist` newest `data_date`, paginate `limit`≤500 until `offset ≥ total` | Datasave shortlist for that date | Full field under CR-088; lean ~20 HTTP still soft unless raised | `04`; DISCOVERY-FLOW-RESEARCH; CR-088 |
+| 0c | Buyer | **B:** on meaning survivors, use shortlist `exactMatchTlds` / `developedTlds` / endings; ≤20 HTTPS other-TLD peeks | A survivors | No new WRITE / live-biz join under freeze | `04`; DOM §6 answers 2026-10-28 |
+| 0d | Buyer | **D:** `GET /candidates/closeouts` — log would-advance + 0–3 paper examples; note PARTIAL seal in blockers if any | CLOSEOUTS_PAUSED | Not a buy pool | `04`; research file §2 D |
 | 1–5 | Buyer | Hard filters (shape, price, age/extensions, prior kills, live `.com` kill) | Shortlist rows | Free/local first | `04` §1 |
-| 6–9 | Buyer | Judgment: meaning, USPTO, firm screen, R-PARENT | Survivors | Prefer cheapest phrases first | `04` |
-| 10–11 | Buyer | B-01 warning math; draft card; **send each card to Risk Gate immediately** | Survivors | Zero cards = valid | `04`; buyer alignment ≤5 cards/week to Risk Gate |
+| 6–9 | Buyer | Judgment: meaning, USPTO, firm screen, R-PARENT | Survivors | Prefer cheapest phrases first; time gate &lt;12h = review-only | `04` |
+| 10–11 | Buyer | B-01 warning math; draft card; **send each card to Risk Gate immediately** | Full-stack survivors | Zero cards = valid → top-5-with-cons fallback | `04` |
 | RG | Risk Gate | Independent CLEAR / FLAG / REJECT (+ Opinion) | Buyer card | ≤5 cards/week; ≤25 calls / 80k tokens per card (bot-team); FLAG incomplete at cap | `system/bot-team.md` §7.2; org-v2 |
 | Legal path (if doubtful) | Risk Gate (absorbed Legal) | CLEAR / KILL / NEEDS A LAWYER | Doubtful card | **Within 4 hours** and before any deadline; silence = no buy | `knowledge/handoffs/legal.md` §1 |
-| Card to Dvir | Gavriel | EU TMview line when required; pre-filled `Yes buy <domain> up to $X`; plain-language card | Risk Gate CLEAR (or CLEAR-with-conditions) | No EU line → card never reaches digest (buy runbook) | `company/runbooks/buy.md`; DISCOVERY-FLOW-V2 |
+| Card to Dvir | Gavriel | EU TMview line when required; pre-filled `Yes buy <domain> up to $X`; plain-language card | Risk Gate CLEAR (or CLEAR-with-conditions) | No EU line → card never reaches digest (buy runbook) | `company/runbooks/buy.md` |
+| L&L to Dvir | Gavriel (+ Buyer / DOM notes) | Fixed skeleton: directions · three field numbers · passers or zero-fallback top-5 · B/D footnotes · blockers · ≤15-line L&L | End of discovery | **Mandatory every run** | DISCOVERY-FLOW-RESEARCH §4 |
 | Decision | **Dvir** | Verbatim yes / no | Gavriel card | Approval form exact; age rules in buy_guard (48h line / 72h auction approval in auctions.md) | buy.md; auctions.md Flow |
 | Execute | Gavriel only | Re-check live price; `buy_guard`; `POST /auctions/plans` → bid → result | Verbatim yes | Money path; dual-runner money actions never dual-performed | buy.md; auctions.md; `00` |
 
-### Wall-clock for “lean buy” / morning discovery
+### Wall-clock for Option 1 discovery
 
 | Claim | Status | Sources |
 |---|---|---|
-| Exact cron / routine folder name for discovery v2 lean run | **UNKNOWN** | Not named as a live UpdateRoutine in cited docs after v2; Buyer runs on Gavriel brief / lean discovery |
-| Historical “Buyer run ~09:00 IDT” / S8 scout 09:00 IDT | Superseded / paper-phase history | `company/alignment/buyer.md`; `system/bot-team.md` S8 note — **not** the v2 shortlist clock |
-| Lean budget ~20 calls / day; ≤15 min in buyer-first-plan v1 | Soft budget; 15 min from older buyer-first-plan | `04`; `sourcing/buyer-first-plan.md` §9 |
+| Start after datasave + `auctionShortlist` seal for `data_date` | **LOCKED** | Dvir Option 1 via Gavriel 2026-10-28; research §3 Option 1 |
+| Exact routine folder / cron name | **UNKNOWN** (Buyer runs on Gavriel brief after seal) | No live UpdateRoutine named for discovery in cited docs |
+| Historical “Buyer run ~09:00 IDT” / S8 scout 09:00 IDT | Superseded | Not the v3 clock |
+| Soft HTTP budget ~20 on thin days; raise when unfinished would stay &gt;0 on full-field days | Soft | `04`; research §7 Q6 open to Dvir |
 | Paper-only buys until **2026-11-14** | Still in force unless Dvir lifts | buyer-first-plan STANDARD; org-v2; memory |
+| Keyword expose / shape features / watch alerts / min_hours_to_end | **Held** under freeze | DOM §6; Gavriel ack 2026-10-28 |
 
 ---
 
@@ -92,7 +114,7 @@ Parallel / other tracks (not the buy spine): Sales owned-name sell-chance work; 
 
 ## 4. Dependencies (must not invert)
 
-1. **No Buyer shortlist judgment before that day’s shortlist exists** (or emergency sealed zip path logged).  
+1. **No Buyer discovery before that day’s shortlist exists** (or emergency sealed zip path logged). One Option 1 run after seal — do not invent a second full field.  
 2. **No Gavriel Dvir card without Risk Gate path** (CLEAR / conditions). Legal silence on doubtful = no buy.  
 3. **No money without Dvir’s exact line** + buy_guard.  
 4. **No dual write** of the same seal/money action the same day (`00`).  
@@ -118,5 +140,5 @@ Parallel / other tracks (not the buy spine): Sales owned-name sell-chance work; 
 
 ## Pass / fail for this draft
 
-- Pass: a new bot can see **who reads what after datasave**, the discovery v2 shortlist path, Risk Gate → Gavriel → Dvir, and what is UNKNOWN (lean wall-clock).  
-- Fail: inventing a 09:00 routine name for v2; treating paused pick-proof or paused scout routines as live; skipping Risk Gate before Dvir.
+- Pass: a new bot can see **who reads what after datasave**, Option 1 cadence (A+B+D after seal), full-stack passers + L&L to Dvir, Risk Gate → Gavriel → Dvir, and what is UNKNOWN (exact cron name).  
+- Fail: inventing a second daily deep-pass without Dvir; treating paused geo/pick-proof/scouts as live; skipping Risk Gate or L&L before Dvir; dumping cheap survivors as “passers”.
