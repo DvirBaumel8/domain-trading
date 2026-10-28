@@ -14,6 +14,8 @@ This file is **current-only**. It does not document retired v1–v9 scout lanes,
 
 **Cadence:** **1×/day**, after datasave + `auctionShortlist` seal for the newest `data_date`. Not a second intraday run.
 
+**Run pack (Dvir t1067u):** after seal, commit that day's folder under `docs/requests/discovery-runs/YYYY-MM-DD-v3/` **before exit** (see `discovery-runs/README.md`). Box remounts wipe local copies.
+
 Every run runs directions **A + B + D**. **C** is parked.
 
 1. **Direction A — full auction field (required).** `GET /health` (note API version in the funnel), then `GET /auctions/shortlist` with the **newest** `data_date`. Paginate with `limit` ≤ **500** and `offset` (CR-088: `shortlist_size=0` stores all hard-filter passers). A is the only auction field; do not invent a parallel pool.

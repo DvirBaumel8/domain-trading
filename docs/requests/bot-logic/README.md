@@ -15,3 +15,5 @@ Draft SOPs and inventories for mutual awareness (DOM ↔ Grok). **Prefer this fo
 Live mechanical stubs already placed under `docs/bot-logic/`: `00`–`03` (+ `04` copy).
 
 **Set status (2026-10-28 ~20:55 IDT):** `04` (Buyer) + `09` (DOM Architect) stamped for discovery **v3 Option 1**. Keyword expose / shape features / watch alerts / `min_hours_to_end` held under freeze. Live `docs/bot-logic/04` still behind — needs Claude Code CR to copy (bots-edit-only blocks bot push there).
+
+**Run packs:** `docs/requests/discovery-runs/` — commit after every discovery seal (Dvir t1067u).

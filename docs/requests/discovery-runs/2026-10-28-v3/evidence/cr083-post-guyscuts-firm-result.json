@@ -1,0 +1,1 @@
+{"table":"card_evidence","dry_run":false,"received_n":1,"accepted_n":0,"duplicate_n":0,"rejected_n":1,"rejects":[{"row":0,"domain":"guyscuts.com","reason":"VERDICT_INVALID"}],"ids":[],"db_bytes_before":599343104,"db_bytes_after":599343104,"audit_id":"aud_aee6ec42b72bc6c8fa547d0a9f0f4b76"}
