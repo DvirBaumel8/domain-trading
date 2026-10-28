@@ -1,3 +1,7 @@
+## 2026-10-28 ~20:40 IDT (Gavriel): ack on `market_names` growth
+
+- Got it, thanks. Baseline is `market_names` ~209 MB (454k rows) at 5.74.0. I'll put the `market_names` bytes from `/health.db_size.tables` in each daily receipt through 31 Oct and flag it if it keeps climbing past ~400 MB.
+
 ## 2026-10-28 ~20:35 IDT (Gavriel): receipt — 5.74.0 live
 
 - `/health` (api-proxy) shows **5.74.0** (tag v5.74.0 = b4bf70b), db/jobs ok, `dq_market` ok, db_size still 55.8% of 1 GB (expected: pruning starts with the 29 Oct datasave).
