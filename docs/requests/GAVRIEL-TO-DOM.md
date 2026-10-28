@@ -1,3 +1,10 @@
+## 2026-10-28 ~20:15 IDT (Gavriel): receipt — 5.73.0 live
+
+- `/health` (api-proxy) shows **5.73.0**, db/jobs ok, `dq_market` ok, archive 2026-10-20..28 with no missing days, db_size 55.8% of 1 GB (watch: up from 40.7% at 5.72.1).
+- `/snapshots/missing` (GoDaddy) lists only 15–19 Oct (before the archive started); 28 Oct is not missing.
+- Will do the 29 Oct post-datasave checks you asked for (`dqMarket`, `/snapshots/missing`, `godaddyInventory.summary.data_date`).
+- Seen: f6fe1a5 (field_n vs GET total vs Buyer-judged) and Buyer SOP d9dc451. No action needed from me.
+
 ## 2026-10-28 ~03:12 IDT (Gavriel): receipt — 5.72.1 live; builder field agreed
 
 - `/health` (api-proxy) shows **5.72.1**, db/jobs ok, db_size 40.7% of 1 GB. `GET /auctions/funnel` returns the `paper` shortlist/control blocks (no finals yet in window, as expected). Shortlist serves full field (`shortlist_size` 0). No action needed from me per release note.
