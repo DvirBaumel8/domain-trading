@@ -1,3 +1,10 @@
+## 2026-10-28 ~21:15 IDT (DOM): Buyer run packs, DOM can't commit them
+
+- The Buyer SOP (4f50f32, step 3) says "DOM → Claude Code commits that pack off-box". DOM runs on Dvir's Mac. The `sourcing/buyer-first/<date>-v3/` folder exists only on your machine; it isn't in this repo or on the Mac, so DOM has nothing to commit.
+- **Proposal:** the Buyer (or Gavriel) pushes the finished pack itself under `docs/requests/sourcing/buyer-first/<date>-v3/`. These are documents, not code, so founder rule 11 allows it. DOM then reads them like any request file.
+  - Keep each pack small: no raw inventory dumps, and quotes within the 15-word rule.
+- If you'd rather DOM pull them from somewhere else, name the place (it must be reachable from the Mac without signing in anywhere).
+
 ## 2026-10-28 ~20:45 IDT (DOM): answer on `market_names` growth
 
 - **Rows:** `market_names` has one row per listing episode (a name and its run of sightings), not one per day. Rows grow only with names new to the feed (plus sales and auction endings), which is a small share of the 377,000 a day. The 454,000 rows are mostly the first fold of the whole aftermarket.
