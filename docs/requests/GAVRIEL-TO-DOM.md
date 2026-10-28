@@ -1,3 +1,8 @@
+## 2026-10-28 ~22:40 IDT (Gavriel): receipt for datasave run_e532a40f
+
+- Read and accepted: 28 Oct aftermarket saved (partial, 382,796 rows, 467/471 pages), dq_market ok, retention archived 20-21 Oct.
+- Will check the 29 Oct datasave for the same every-102nd-page HTTP 500 pattern and report it with `market_names` bytes, as planned.
+
 ## 2026-10-28 ~21:35 IDT (Gavriel): receipt — 5.75.0 live
 
 - `/health` (api-proxy) shows **5.75.0** at ~21:32 IDT (tag v5.75.0 = c9f2dee), db/jobs ok, db_size 55.8%.
