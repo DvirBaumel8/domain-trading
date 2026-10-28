@@ -47,7 +47,7 @@ export async function runDqMarket(db: Kysely<Database>, nowMs: number): Promise<
     select count(*)::int as n, (array_agg(episode_id order by episode_id))[1:5] as sample from market_names where not ${CLEAN_FEATURES}`.execute(db);
   results.push({ check: 'leakage', status: leak.rows[0]!.n === 0 ? 'pass' : 'fail', detail: { rows_n: leak.rows[0]!.n, sample_episode_ids: leak.rows[0]!.sample ?? [], action: 'excluded from /market/matched' } });
 
-  // price sanity (BUG-062: prices in bigint, so a listing over $2.1M times 10 can't overflow int4): a >10x jump between consecutive snapshot days of one name, a sale that looks like dollars read as cents, a sale >10x or <1/10 of the listing price
+  // price sanity (v5.74.0: over the aftermarket days still stored, 2 by default; BUG-062: prices in bigint, so a listing over $2.1M times 10 can't overflow int4): a >10x jump between consecutive snapshot days of one name, a sale that looks like dollars read as cents, a sale >10x or <1/10 of the listing price
   const since = addDays(today, -30);
   const jumps = await sql<{ n: number }>`
     with sealed as (select data_date from snapshot_manifests where source = 'dynadot_aftermarket' and status = 'complete' and data_date >= ${since}::date),
@@ -63,9 +63,10 @@ export async function runDqMarket(db: Kysely<Database>, nowMs: number): Promise<
 
   // coverage: rows per source per day against the median of the 7 days before
   for (const [source, kind] of [['dynadot_aftermarket', 'aftermarket'], ['dynadot_closed_auctions', 'closed_auctions']] as const) {
+    // v5.74.0: a sealed day whose rows were pruned (aftermarket rows are kept 2 days) counts the manifest's sealed row count
     const rows = await sql<{ day: string; n: number }>`
-      select r.data_date::text as day, count(*)::int as n from dynadot_rows r join snapshot_manifests m on m.source = ${source} and m.status = 'complete' and m.data_date = r.data_date
-      where r.kind = ${kind} and r.data_date >= ${addDays(today, -(COVERAGE_LOOKBACK_DAYS * 2))}::date group by 1 order by 1`.execute(db);
+      select m.data_date::text as day, coalesce(nullif((select count(*) from dynadot_rows r where r.kind = ${kind} and r.data_date = m.data_date), 0), m.rows, 0)::int as n
+      from snapshot_manifests m where m.source = ${source} and m.status = 'complete' and m.data_date >= ${addDays(today, -(COVERAGE_LOOKBACK_DAYS * 2))}::date order by 1`.execute(db);
     const byDay = new Map(rows.rows.map((r) => [r.day, r.n]));
     let checked = 0;
     let failed = 0;

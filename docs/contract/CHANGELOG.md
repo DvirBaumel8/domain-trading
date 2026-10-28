@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.74.0 (2026-10-28): Dynadot aftermarket rows kept 3 days (archived to disk first); episodes fold day by day; protects the free 1 GB
+Release note: `docs/releases/v5.74.0.md`.
+MINOR (migration `1769000000000_v5-74-0.sql`). Dynadot aftermarket rows are kept `settings.datasave_aftermarket_keep_days` = 2 days, and each older day is archived to the host's disk first (`<ARCHIVE_DIR>/dynadot/<date>-aftermarket.jsonl.gz`). `snapshotRetention` adds `aftermarket_cutoff_date`, `aftermarket_rows_deleted`, `aftermarket_archive`. `episodes` folds each sealed day into the stored episodes. Market coverage counts pruned sealed days from their manifests.
+
 ## 5.73.0 (2026-10-28): BUG-060/061/062: datasave retries until GoDaddy publishes today, no crash on a dropped DB connection and an error manifest for a failed Dynadot pull, dqMarket bigint
 Release note: `docs/releases/v5.73.0.md`.
 MINOR (no migration, no route change). BUG-060: `godaddyInventory` fails with `GODADDY_NOT_PUBLISHED` when the newest GoDaddy file day is older than the run's UTC day, so the 60-minute retry seals today. BUG-061: a failed Dynadot pull step leaves an `error` manifest `STEP_FAILED: ...` for its day; a dropped DB connection no longer crashes the server. BUG-062: `dqMarket` no longer fails with `integer out of range`.

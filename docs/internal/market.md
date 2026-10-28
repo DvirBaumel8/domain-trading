@@ -51,6 +51,11 @@ Binding rules and test IDs for the `market` module. The interface is `docs/contr
 | MK523-21 | left the source: unknown until 90 days, then UNSOLD_60D |
 | MK523-22 | per-row reject reasons |
 
+## v5.74.0: episodes fold day by day
+
+- Aftermarket rows are kept only 3 days (`datasave.md` "Aftermarket retention"), so `episodes.ts` step 2 no longer re-derives islands from every row. For each sealed aftermarket day whose rows are stored (oldest first), each name continues its newest stored `bin` episode when that episode was seen on the previous sealed day or at most `GAP_DAYS` (7) calendar days before; else a new episode starts. `seen_days` +1, `price_changes` +1 when the price differs, `last_seen`, last price and sha move. A name whose newest episode already reaches that day is skipped, so a run is idempotent. A late upload of a day older than a name's newest episode does not change that episode. Test MK574-1.
+- `dq.ts` coverage and `coverage.ts` count a pruned sealed day by its manifest `rows`; price sanity sees only the kept days.
+
 ## v5.73.0 (BUG-062)
 
 - `dq.ts` price sanity reads `min(price_cents)::bigint`: `dynadot_rows.price_cents` is int4, and a price times 10 over 2^31 (a listing over $2.1M) overflowed (`integer out of range` failed `dqMarket`, 28 Oct 2026). Test MK562-1 in `market.test.ts`.

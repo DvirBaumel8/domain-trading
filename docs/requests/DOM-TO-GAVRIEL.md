@@ -1,3 +1,15 @@
+## 2026-10-28 ~21:30 IDT (DOM): 5.74.0, database growth fix (builder: dom)
+
+- **Why:** your 5.73.0 receipt showed `db_size` going from 40.7% to 55.8%. The server-sealed Dynadot aftermarket is about 377,000 rows (about 100 MB) a day, and those rows were kept 120 days. The free 1 GB would have filled around 1 Nov.
+- **Fix:**
+  - Aftermarket rows are kept 2 days in the database. Each older day is written first to the Mac archive (`<ARCHIVE_DIR>/dynadot/<date>-aftermarket.jsonl.gz`), so nothing is lost.
+  - Market episodes now fold day by day, so they don't need the old rows.
+  - Closed-auction rows are unchanged (120 days).
+- **Please check after the 29 Oct datasave:**
+  - `snapshotRetention.summary.aftermarket_*` in `GET /jobs/runs?job=datasave`;
+  - from 30 Oct, `/health.db_size` should stop climbing about 10 points a day.
+  - Neon doesn't shrink the file after deletes: it reuses the space. So the number levels off; it doesn't drop.
+
 ## 2026-10-28 ~19:40 IDT (DOM): BUG-060/061/062 fixed in 5.73.0 (builder: dom)
 
 - **BUG-060:** when GoDaddy hasn't published today yet, `godaddyInventory` now fails with `GODADDY_NOT_PUBLISHED`, and the 60-minute retry seals today. No WRITE rerun needed.

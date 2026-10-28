@@ -16,7 +16,11 @@ export async function coverage(db: Kysely<Database>, nowMs: number, days = 30) {
     sql<{ source: string; day: string; rows: number; sealed: boolean }>`
       select t.source, t.day, t.rows, exists (select 1 from snapshot_manifests m where m.source = t.source and m.data_date = t.day::date and m.status = 'complete') as sealed
       from (select 'dynadot_' || r.kind as source, r.data_date::text as day, count(*)::int as rows
-            from dynadot_rows r where r.kind <> 'closeouts' and r.data_date >= ${from}::date group by 1, 2) t order by t.day, t.source`.execute(db),
+            from dynadot_rows r where r.kind <> 'closeouts' and r.data_date >= ${from}::date group by 1, 2
+            union all -- v5.74.0: sealed days whose rows were pruned (aftermarket rows are kept 2 days) show the manifest's row count
+            select m.source, m.data_date::text, coalesce(m.rows, 0)::int from snapshot_manifests m
+            where m.source in ('dynadot_aftermarket', 'dynadot_closed_auctions') and m.status = 'complete' and m.data_date >= ${from}::date
+              and not exists (select 1 from dynadot_rows r where 'dynadot_' || r.kind = m.source and r.data_date = m.data_date)) t order by t.day, t.source`.execute(db),
     sql<{ day: string; rows: number }>`select final_state_at::text as day, count(*)::int as rows from godaddy_auctions where ended and final_state_at >= ${from}::date group by 1 order by 1`.execute(db),
     sql<{ day: string; rows: number }>`select created_at::date::text as day, count(*)::int as rows from market_sales where created_at >= ${from}::date group by 1 order by 1`.execute(db),
     db.selectFrom('market_names').select(['outcome_rule', (eb) => eb.fn.countAll<number>().as('n')]).groupBy('outcome_rule').execute(),

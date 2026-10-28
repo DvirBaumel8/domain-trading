@@ -70,34 +70,32 @@ async function derive(db: Kysely<Database>, nowMs: number): Promise<EpisodesSumm
     eps.set(e.id, e); index(e);
   }
 
-  // 2. Dynadot Buy-Now listings: one episode per run of sightings on the source's sealed days
+  // 2. Dynadot Buy-Now listings: one episode per run of sightings on the source's sealed days. v5.74.0: each sealed day whose rows are still stored is folded into
+  // the stored episodes (the rows are kept only datasave_aftermarket_keep_days, so a full re-derive is no longer possible). A name continues its newest episode when
+  // that episode was seen on the previous sealed day or at most GAP_DAYS calendar days before; else a new episode starts (the same split rule as before). A day
+  // already folded for a name (its newest episode's last_seen is that day or later) changes nothing, so a second run writes nothing.
   const am = await db.selectFrom('snapshot_manifests').select(['data_date', 'sha256']).where('source', '=', 'dynadot_aftermarket').where('status', '=', 'complete').orderBy('data_date').execute();
   const amSha = new Map(am.map((m) => [m.data_date, m.sha256]));
   const lastAm = am.length ? am[am.length - 1]!.data_date : null;
-  const islands = await sql<{ domain: string; first_seen: string; last_seen: string; n: number; first_p: number; last_p: number; changes: number }>`
-    with sealed as (select data_date, row_number() over (order by data_date) as rn from snapshot_manifests where source = 'dynadot_aftermarket' and status = 'complete'),
-    obs as (select r.domain, r.data_date, s.rn, min(r.price_cents) as p from dynadot_rows r join sealed s on s.data_date = r.data_date
-            where r.kind = 'aftermarket' and r.price_cents >= ${MIN_CENTS} group by r.domain, r.data_date, s.rn),
-    flagged as (select domain, data_date, rn, p, lag(p) over w as prevp,
-                  case when lag(rn) over w is null or ((rn - lag(rn) over w) > 1 and (data_date - lag(data_date) over w) > ${GAP_DAYS}) then 1 else 0 end as brk
-                from obs window w as (partition by domain order by data_date)),
-    isl as (select *, sum(brk) over (partition by domain order by data_date rows unbounded preceding) as grp from flagged)
-    select domain, min(data_date)::text as first_seen, max(data_date)::text as last_seen, count(*)::int as n,
-           (array_agg(p order by data_date))[1] as first_p, (array_agg(p order by data_date desc))[1] as last_p,
-           (count(*) filter (where brk = 0 and prevp is not null and prevp <> p))::int as changes
-    from isl group by domain, grp`.execute(db);
-  for (const i of islands.rows) {
-    const name = i.domain;
-    const d: Ep = { id: episodeId(name, 'dynadot', i.first_seen, 'bin'), name, venue: 'dynadot', type: 'bin', first: i.first_seen, last: i.last_seen, seenDays: i.n, listFirst: i.first_p, listLast: i.last_p, changes: i.changes,
-      source: 'dynadot_aftermarket', sourceUrl: null, sha: amSha.get(i.last_seen) ?? null, tier: 'B', saleOnly: false, bid: null };
-    // the oldest days may be pruned (120 days): a derived run that starts later than a stored episode of the same name, within the gap rule, continues that episode
-    const prior = (byNameVenue.get(`${name}|dynadot|bin`) ?? []).find((p) => p.id !== d.id && p.first < d.first && dayNum(d.first) - dayNum(p.last) <= GAP_DAYS);
-    if (prior) {
-      d.id = prior.id; d.first = prior.first; d.listFirst = prior.listFirst; d.changes = prior.changes + d.changes;
-      d.seenDays = d.first <= prior.last && prior.last >= i.first_seen ? Math.max(prior.seenDays, d.seenDays) : prior.seenDays + d.seenDays;
+  const stored = new Set((await sql<{ d: string }>`select distinct data_date::text as d from dynadot_rows where kind = 'aftermarket'`.execute(db)).rows.map((r) => r.d));
+  for (let k = 0; k < am.length; k++) {
+    const day = am[k]!.data_date;
+    if (!stored.has(day)) continue;
+    const prevSealed = k > 0 ? am[k - 1]!.data_date : null;
+    const seen = await sql<{ domain: string; p: number }>`select domain, min(price_cents) as p from dynadot_rows where kind = 'aftermarket' and data_date = ${day}::date and price_cents >= ${MIN_CENTS} group by domain`.execute(db);
+    for (const { domain: name, p } of seen.rows) {
+      const latest = (byNameVenue.get(`${name}|dynadot|bin`) ?? []).filter((e) => !e.saleOnly).reduce<Ep | undefined>((a, e) => (!a || e.last > a.last ? e : a), undefined);
+      if (latest && latest.last >= day) continue;
+      if (latest && ((prevSealed !== null && latest.last >= prevSealed) || dayNum(day) - dayNum(latest.last) <= GAP_DAYS)) {
+        latest.seenDays += 1;
+        if (latest.listLast !== p) latest.changes += 1;
+        latest.listLast = p; latest.last = day; latest.sha = amSha.get(day) ?? null;
+        continue;
+      }
+      const d: Ep = { id: episodeId(name, 'dynadot', day, 'bin'), name, venue: 'dynadot', type: 'bin', first: day, last: day, seenDays: 1, listFirst: p, listLast: p, changes: 0,
+        source: 'dynadot_aftermarket', sourceUrl: null, sha: amSha.get(day) ?? null, tier: 'B', saleOnly: false, bid: null };
+      eps.set(d.id, d); index(d);
     }
-    const old = eps.get(d.id);
-    if (old) { Object.assign(old, d); } else { eps.set(d.id, d); index(d); }
   }
 
   // 3. Dynadot closed auctions (one episode per auction; a price of $500 or more at the end)

@@ -175,3 +175,7 @@ v5.62.0 tests: `tests/modules/ops/datasave-dynadot-pull.test.ts` (Dynadot mocked
 | DYN-12 | a server seal satisfies the health due check; no key (or no secret) stays not_configured |
 | DYN-13 | X-Signature against a vector computed in the test; Bearer, X-Request-ID (uuid v4), Accept and the REST v2 query on the wire |
 | DYN-14 | no `DYNADOT_CLOSEOUTS_PATH`: closeouts `not_configured` "closeouts REST path unknown", no call; aftermarket unaffected |
+
+## Aftermarket retention (v5.74.0)
+
+One sealed aftermarket day is about 377,000 rows and 100 MB; at 120 days the free 1 GB would fill in about four days (28 Oct 2026: 55.8%). `snapshotRetention` keeps `settings.datasave_aftermarket_keep_days` (2: the episodes step folds a day in the run after its seal, while it is still kept; migration `1769000000000_v5-74-0.sql`) days of `kind = 'aftermarket'` rows. Each older day is written to `<ARCHIVE_DIR>/dynadot/<date>-aftermarket.jsonl.gz` first (`ops/archive/dynadot-archive.ts` `archiveAftermarketDay`: id-ordered batches of 20,000, temp file then rename, an existing file is skipped) and kept in the database if the write fails. Without `ARCHIVE_DIR` (Render) the day is deleted without an archive. Closed-auction rows keep `datasave_dynadot_keep_days` (120). The episodes fold day by day (`market.md`), `dqMarket` coverage and `GET /market/coverage` use the manifest's row count for a pruned sealed day, and price sanity looks only at the kept days. Tests: DS522-8, DS574-1 (`ops/datasave-dynadot`), MK574-1 (`market`).

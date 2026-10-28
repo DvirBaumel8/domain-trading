@@ -41,6 +41,7 @@ import { demandFields, mergeDemand, type DemandFields } from './auction-fields.j
 import { priceToCents } from './datasave-price.js';
 import { pullAftermarket, pullCloseouts, type PullDeps } from './dynadot-pull.js';
 import { ARCHIVE_FILES, archiveExists, archiveZip, type ArchiveOutcome } from '../../archive/godaddy-archive.js';
+import { archiveAftermarketDay } from '../../archive/dynadot-archive.js';
 
 export { priceToCents };
 
@@ -122,8 +123,8 @@ export class DatasaveJob {
   private get fetchFn(): typeof fetch { return this.deps.fetch ?? globalThis.fetch; }
 
   private async settings() {
-    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_auction_keep_days', 'datasave_auction_live_keep_days', 'datasave_auction_min_cents', 'shortlist_keep_days']).executeTakeFirstOrThrow();
-    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, auctionKeepDays: s.datasave_auction_keep_days, liveKeepDays: s.datasave_auction_live_keep_days, auctionMinCents: s.datasave_auction_min_cents, shortlistKeepDays: s.shortlist_keep_days };
+    const s = await this.deps.db.selectFrom('settings').select(['datasave_godaddy_files', 'datasave_pool_max_price_cents', 'datasave_pool_keep_days', 'datasave_raw_keep_days', 'datasave_dynadot_keep_days', 'datasave_aftermarket_keep_days', 'datasave_auction_keep_days', 'datasave_auction_live_keep_days', 'datasave_auction_min_cents', 'shortlist_keep_days']).executeTakeFirstOrThrow();
+    return { files: s.datasave_godaddy_files, maxPriceCents: s.datasave_pool_max_price_cents, poolKeepDays: s.datasave_pool_keep_days, rawKeepDays: s.datasave_raw_keep_days, dynadotKeepDays: s.datasave_dynadot_keep_days, aftermarketKeepDays: s.datasave_aftermarket_keep_days, auctionKeepDays: s.datasave_auction_keep_days, liveKeepDays: s.datasave_auction_live_keep_days, auctionMinCents: s.datasave_auction_min_cents, shortlistKeepDays: s.shortlist_keep_days };
   }
 
   // ---------- godaddyInventory ----------
@@ -720,7 +721,23 @@ export class DatasaveJob {
     // v5.22.0: bot-uploaded closeouts follow the pool days; aftermarket and closed-auction rows are kept datasave.dynadot_keep_days (they feed CR-075); manifests stay
     const dynadotCut = utcDay(nowMs - (st.dynadotKeepDays - 1) * 86_400_000);
     const closeoutRows = await db.deleteFrom('dynadot_rows').where('kind', '=', 'closeouts').where('data_date', '<', poolCut).executeTakeFirst();
-    const otherRows = await db.deleteFrom('dynadot_rows').where('kind', '<>', 'closeouts').where('data_date', '<', dynadotCut).executeTakeFirst();
+    const otherRows = await db.deleteFrom('dynadot_rows').where('kind', '=', 'closed_auctions').where('data_date', '<', dynadotCut).executeTakeFirst();
+    // v5.74.0: aftermarket rows (about 100 MB a sealed day) are kept datasave_aftermarket_keep_days; an older day is archived to the host's disk first (kept if that fails).
+    // The market episodes are folded day by day (market/episodes.ts), so they do not need the old rows.
+    const amCut = utcDay(nowMs - (st.aftermarketKeepDays - 1) * 86_400_000);
+    const amDays = await sql<{ d: string }>`select distinct data_date::text as d from dynadot_rows where kind = 'aftermarket' and data_date < ${amCut}::date order by 1`.execute(db);
+    const amArchive: { written: string[]; skipped: string[]; kept: string[]; error?: string } = { written: [], skipped: [], kept: [] };
+    let amDeleted = 0;
+    for (const { d } of amDays.rows) {
+      if (this.deps.archiveDir) {
+        try {
+          const a = await archiveAftermarketDay(db, this.deps.archiveDir, d);
+          (a.written ? amArchive.written : amArchive.skipped).push(d);
+        } catch (e) { amArchive.kept.push(d); amArchive.error = shortError(e); continue; }
+      }
+      const del = await db.deleteFrom('dynadot_rows').where('kind', '=', 'aftermarket').where('data_date', '=', d).executeTakeFirst();
+      amDeleted += Number(del.numDeletedRows ?? 0);
+    }
     // ended GoDaddy auctions are kept datasave.auction_keep_days; an open one not seen for that long is dropped too
     const auctionCut = utcDay(nowMs - st.auctionKeepDays * 86_400_000);
     const auctions = await db.deleteFrom('godaddy_auctions').where((eb) => eb.or([eb.and([eb('ended', '=', true), eb('final_state_at', '<', auctionCut)]), eb.and([eb('ended', '=', false), eb('last_seen', '<', auctionCut)])])).executeTakeFirst();
@@ -734,6 +751,7 @@ export class DatasaveJob {
       shortlist_cutoff_date: shortlistCut, shortlist_rows_deleted: Number(shortlist.numDeletedRows ?? 0),
       today, auctions_live_cutoff_date: liveCut, auctions_live_deleted: Number(live.numDeletedRows ?? 0), raw_cutoff_date: rawCut, raw_deleted: rawDeleted, pool_cutoff_date: poolCut, pool_rows_deleted: Number(pool.numDeletedRows ?? 0),
       dynadot_closeouts_deleted: Number(closeoutRows.numDeletedRows ?? 0), dynadot_rows_deleted: Number(otherRows.numDeletedRows ?? 0), dynadot_cutoff_date: dynadotCut,
+      aftermarket_cutoff_date: amCut, aftermarket_rows_deleted: amDeleted, ...(this.deps.archiveDir ? { aftermarket_archive: amArchive } : {}),
       auctions_cutoff_date: auctionCut, auctions_deleted: Number(auctions.numDeletedRows ?? 0),
     };
   }

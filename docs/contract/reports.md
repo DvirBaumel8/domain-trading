@@ -1,4 +1,4 @@
-# Reports (contract v5.73.0)
+# Reports (contract v5.74.0)
 
 Every money figure is a SQL sum over the ledger; nothing is estimated. Money fields are pairs (`x_cents` + `x`). Times use the Asia/Jerusalem offset.
 

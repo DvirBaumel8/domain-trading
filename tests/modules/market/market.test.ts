@@ -352,6 +352,27 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
     expect(after[0]).toMatchObject({ episode_id: before.episode_id, first_seen: '2026-10-01', last_seen: '2026-10-08', list_price_first_cents: 100000, list_price_last_cents: 120000 });
   });
 
+  it('MK574-1 (v5.74.0) episodes fold each sealed day into the stored episodes: with every older day pruned, seen_days and price_changes keep counting; a second run writes nothing; a gap over 7 days with a sealed day between starts a new episode', async () => {
+    const { run, get } = await boot('2026-12-01');
+    await am('2026-10-01', [['fold.com', 100000]]);
+    await run();
+    await db.deleteFrom('dynadot_rows').execute();
+    await am('2026-10-02', [['fold.com', 100000]]);
+    await run();
+    await db.deleteFrom('dynadot_rows').execute();
+    await am('2026-10-03', [['fold.com', 120000]]);
+    await run();
+    await run();
+    const rows = (await eps(get)).rows as { first_seen: string; last_seen: string; seen_days: number; price_changes: number; list_price_first_cents: number; list_price_last_cents: number }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ first_seen: '2026-10-01', last_seen: '2026-10-03', seen_days: 3, price_changes: 1, list_price_first_cents: 100000, list_price_last_cents: 120000 });
+    await db.deleteFrom('dynadot_rows').execute();
+    await am('2026-10-08', [['other.com', 90000]]);
+    await am('2026-10-20', [['fold.com', 120000]]);
+    await run();
+    expect(((await eps(get)).rows as { name: string }[]).filter((r) => r.name === 'fold.com')).toHaveLength(2);
+  });
+
   it('MK523-17 POST /data/sales: bots, WRITE and data tokens can post, a READ token is 403; dry_run stores nothing; the audit row keeps only the row count', async () => {
     const { post, bots, write, data, read } = await boot();
     expect((await post([sale('a1.com', 90000, '2026-11-02')], bots.auth)).statusCode).toBe(201);

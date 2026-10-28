@@ -49,6 +49,8 @@ export interface SettingsTable {
   datasave_raw_keep_days: Generated<number>;
   /** v5.22.0: days the bot-uploaded aftermarket / closed-auction rows and the ended GoDaddy auctions are kept. Migration only. */
   datasave_dynadot_keep_days: Generated<number>;
+  /** v5.74.0: days of Dynadot aftermarket rows kept in the database (older days go to the host archive first). */
+  datasave_aftermarket_keep_days: Generated<number>;
   datasave_auction_keep_days: Generated<number>;
   /** v5.41.0: the least price (cents) an auction needs to be kept in godaddy_auctions and, when it ended with a bid, to become an engine_sales row. Migration only, >= 100. */
   datasave_auction_min_cents: Generated<number>;

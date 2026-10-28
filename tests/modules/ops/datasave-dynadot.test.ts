@@ -1,7 +1,10 @@
 // v5.22.0 (CR-071 R-8, R-9, R-10): POST /snapshots/dynadot (bot uploads, sealed like the GoDaddy files) and the GoDaddy auction endings (godaddy_auctions).
 // Every outside call is mocked (MSW); the fixtures are tiny and synthetic.
 import { createHash } from 'node:crypto';
-import { rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { loadConfig } from '../../../src/config.js';
@@ -191,17 +194,36 @@ describe('DS522 Dynadot bot uploads', () => {
     expect(a.result_summary).toContain('2 received');
   });
 
-  it('DS522-8 retention: bot-uploaded closeouts follow the pool days (2 since 5.49.0), aftermarket and closed-auction rows are kept 120 days, manifests stay', async () => {
+  it('DS522-8 retention: bot-uploaded closeouts follow the pool days (2 since 5.49.0), closed-auction rows are kept 120 days, aftermarket rows 2 days (v5.74.0), manifests stay', async () => {
     const row = (kind: 'aftermarket' | 'closed_auctions' | 'closeouts', d: string, domain: string) => ({ data_date: d, kind, domain, listing_id: kind === 'aftermarket' ? domain : null, price_cents: 1 });
     await db.insertInto('dynadot_rows').values([
       row('closeouts', '2026-10-17', 'c17.com'), row('closeouts', '2026-10-18', 'c18.com'),
-      row('aftermarket', '2026-06-22', 'a-old.com'), row('aftermarket', '2026-06-23', 'a-keep.com'), row('closed_auctions', '2026-06-20', 'x-old.com'), row('closed_auctions', '2026-10-01', 'x-keep.com'),
+      row('aftermarket', '2026-10-17', 'a-old.com'), row('aftermarket', '2026-10-19', 'a-keep.com'), row('closed_auctions', '2026-06-20', 'x-old.com'), row('closed_auctions', '2026-10-01', 'x-keep.com'),
     ]).execute();
-    await db.insertInto('snapshot_manifests').values({ source: 'dynadot_aftermarket', data_date: '2026-06-22', file_name: 'bot_upload', rows: 1, status: 'complete', sealed_at: new Date(NOW), origin: 'bot_upload' }).execute();
+    await db.insertInto('snapshot_manifests').values({ source: 'dynadot_aftermarket', data_date: '2026-10-17', file_name: 'bot_upload', rows: 1, status: 'complete', sealed_at: new Date(NOW), origin: 'bot_upload' }).execute();
     const r = await new DatasaveJob({ db, now: () => clock, snapshotDir: SNAP }).snapshotRetention() as Record<string, unknown>;
-    expect(r).toMatchObject({ dynadot_closeouts_deleted: 2, dynadot_rows_deleted: 2, dynadot_cutoff_date: '2026-06-23' });
+    expect(r).toMatchObject({ dynadot_closeouts_deleted: 2, dynadot_rows_deleted: 1, dynadot_cutoff_date: '2026-06-23', aftermarket_rows_deleted: 1, aftermarket_cutoff_date: '2026-10-19' });
     expect((await db.selectFrom('dynadot_rows').select('domain').orderBy('domain').execute()).map((x) => x.domain)).toEqual(['a-keep.com', 'x-keep.com']);
     expect(await db.selectFrom('snapshot_manifests').select('id').execute()).toHaveLength(1);
+  });
+
+  it('DS574-1 an aftermarket day past the 2 kept days is written to <ARCHIVE_DIR>/dynadot/<date>-aftermarket.jsonl.gz before its rows are deleted; a second run skips the file; a failed archive keeps the day', async () => {
+    const arch = await mkdtemp(join(tmpdir(), 'ds574-'));
+    await db.insertInto('dynadot_rows').values([
+      { data_date: '2026-10-16', kind: 'aftermarket', domain: 'one.com', listing_id: 'L1', price_cents: 50000 },
+      { data_date: '2026-10-16', kind: 'aftermarket', domain: 'two.com', listing_id: 'L2', price_cents: 70000 },
+    ]).execute();
+    const r = await new DatasaveJob({ db, now: () => clock, snapshotDir: SNAP, archiveDir: arch }).snapshotRetention() as Record<string, unknown>;
+    expect(r).toMatchObject({ aftermarket_rows_deleted: 2, aftermarket_archive: { written: ['2026-10-16'], skipped: [], kept: [] } });
+    const lines = gunzipSync(await readFile(join(arch, 'dynadot', '2026-10-16-aftermarket.jsonl.gz'))).toString().trim().split('\n').map((l) => JSON.parse(l));
+    expect(lines.map((l) => [l.data_date, l.domain, l.listing_id, l.price_cents])).toEqual([['2026-10-16', 'one.com', 'L1', 50000], ['2026-10-16', 'two.com', 'L2', 70000]]);
+    await db.insertInto('dynadot_rows').values({ data_date: '2026-10-16', kind: 'aftermarket', domain: 'late.com', listing_id: 'L3', price_cents: 50000 }).execute();
+    expect(await new DatasaveJob({ db, now: () => clock, snapshotDir: SNAP, archiveDir: arch }).snapshotRetention()).toMatchObject({ aftermarket_archive: { written: [], skipped: ['2026-10-16'] } });
+    await db.insertInto('dynadot_rows').values({ data_date: '2026-10-15', kind: 'aftermarket', domain: 'kept.com', listing_id: 'L4', price_cents: 50000 }).execute();
+    await writeFile(join(arch, 'not-a-dir'), 'x');
+    const bad = await new DatasaveJob({ db, now: () => clock, snapshotDir: SNAP, archiveDir: join(arch, 'not-a-dir') }).snapshotRetention() as Record<string, unknown>;
+    expect(bad).toMatchObject({ aftermarket_rows_deleted: 0, aftermarket_archive: { kept: ['2026-10-15'] } });
+    expect((await db.selectFrom('dynadot_rows').select('domain').where('kind', '=', 'aftermarket').execute()).map((x) => x.domain)).toEqual(['kept.com']);
   });
 
   it('DS522-9 /health.datasave and DATASAVE_MISSED stay quiet until a Dynadot kind has had an upload, then flag the due day only after 16:00 UTC', async () => {
