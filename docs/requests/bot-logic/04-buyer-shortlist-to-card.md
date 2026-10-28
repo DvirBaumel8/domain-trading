@@ -2,7 +2,7 @@
 
 **Status:** current SOP (discovery flow **v3**, locked by Dvir via Gavriel 2026-10-28; supersedes v2 of 2026-10-27).  
 **Owner:** Buyer. **Money:** Buyer never buys, bids, registers, lists, or messages Dvir. Cards go to Risk Gate; Gavriel asks Dvir.  
-**Sources:** Dvir via Gavriel discovery v3 lock (2026-10-28; spec `sourcing/buyer-first/2026-10-28-fullfield/DISCOVERY-FLOW-RESEARCH.md`, cadence Option 1); Dvir via Gavriel discovery v2 (2026-10-27); post-fullfield standing (Gavriel 2026-10-28); sourcing-core-2026-10-20 recipe; lessons L-B1..L-B6; r-one §10 v2; ledger B-01/B-02/B-05.
+**Sources:** Dvir via Gavriel L&L AI3 (2026-10-28 t1067u: same-`data_date` prior kills before meaning; leave run pack complete for DOM commit); Dvir via Gavriel discovery v3 lock (2026-10-28; spec `sourcing/buyer-first/2026-10-28-fullfield/DISCOVERY-FLOW-RESEARCH.md`, cadence Option 1); Dvir via Gavriel discovery v2 (2026-10-27); post-fullfield standing (Gavriel 2026-10-28); sourcing-core-2026-10-20 recipe; lessons L-B1..L-B6; r-one §10 v2; ledger B-01/B-02/B-05.
 
 This file is **current-only**. It does not document retired v1–v9 scout lanes, buyer-first-as-source, or local GoDaddy-zip grepping as the normal path.
 
@@ -27,6 +27,15 @@ Every run runs directions **A + B + D**. **C** is parked.
 
 Held names (resumedesign.com and the prior USPTO-clean hold list) stay held until Gavriel reopens, **unless** one appears on the shortlist with a fresh shortlist reason — then re-screen **only** via this shortlist path.
 
+
+### 0.0 Same-`data_date` re-runs + run pack (L&L AI3, Dvir via Gavriel 2026-10-28)
+
+Normal cadence is **1×/day** after seal. When a **same-`data_date` re-run** is ordered (e.g. flow lock mid-day, finish OPEN deep work):
+
+1. **Before any meaning LLM:** load that day's prior `kills.csv`, `prior-exclude.txt`, paper-log declines/rejects, holds, and already-escalated cards. Apply them as hard skips. Do **not** re-LLM salad / already-killed names.
+2. Prefer finishing **deepable OPEN** firm/USPTO only (+ B/D directions). Never treat review survivors as `prior_exclude` unless they were actually killed/declined/held/escalated.
+3. **Leave the run folder complete** under `sourcing/buyer-first/<date>-v3/` (funnel, REVIEW/PASSERS, kills, evidence, cards if any, MERGED-AIs when present) before you exit. **DOM → Claude Code** commits that pack off-box (Buyer does not need to git-push the pack). Seal → complete folder → exit; do not leave a half-written pack.
+
 ### 0.1 Passers + report (v3)
 
 - **Full-stack passer** = cheap survivor (shape/price/meaning) + USPTO not exact-kill + firm §10 screen passed + time gate OK + card sent → Risk Gate not REJECT.
@@ -44,7 +53,7 @@ Apply in this order. Stop early on a hard fail. Do not spend firm-page or histor
 | 1 | Shape | Hard filter | `.com` only; letters; two plain words (or one clear dictionary word if brief allows); easy to spell when heard; not a fragment/salad. |
 | 2 | Price | Hard filter | Prefer ≤$5 (B-05). Never above $40 without a clear, written case. Prefer lowest current bid / buy price on the shortlist first. |
 | 3 | Age / extensions | Hard filter | Prefer aged (≈5+ years). Same string on **2+ other extensions** (shortlist / GD fields `exactMatchTlds` / `developedTlds` when present; else DoH/RDAP over HTTPS — never box DNS). |
-| 4 | Prior kills | Hard filter | Drop anything already killed, declined, or rejected in `paper-log.md` / prior run folders (and held names unless shortlist reopens them). |
+| 4 | Prior kills | Hard filter | Drop anything already killed, declined, or rejected in `paper-log.md` / prior run folders (and held names unless shortlist reopens them). **Same-`data_date` re-runs:** load that day's kill/exclude/hold/escalated lists **before** step 6 meaning LLM (L&L AI3). |
 | 5 | Live `.com` probe | Hard filter | If the `.com` itself hosts a live same-name local business, **kill** (value rests on one firm / local-business match). Parking landers are OK. |
 | 6 | Meaning batch | Judgment | In cheap batches, classify as a sold service / category phrase vs brand, geo+generic, inverted phrase, or coinage. Keep only names that could be a **named paid service**. |
 | 7 | USPTO | Judgment → hard on kill | Exact / joined / plural forms. One OR query + a known live control mark (e.g. ISLAND BABY). **Live exact mark = KILL.** Near-marks = FLAG for Risk Gate (Buyer does not settle containment). |
