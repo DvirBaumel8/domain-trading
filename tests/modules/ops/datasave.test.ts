@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { loadConfig } from '../../../src/config.js';
 import { DatasaveJob } from '../../../src/modules/ops/jobs/datasave/datasave.js';
+import { datasaveStepState } from '../../../src/modules/reporting/index.js';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
 import { auctionsJson, closeoutsJson, FILES, inventoryHandlers, makeZip, sha256 } from '../../helpers/datasave.js';
 import { testDb as db } from '../../helpers/db.js';
@@ -134,6 +135,38 @@ describe('DS521 datasave job', () => {
     const m = await db.selectFrom('snapshot_manifests').select(['status', 'error', 'sealed_at']).where('source', '=', 'dynadot_aftermarket').where('data_date', '=', '2026-10-20').executeTakeFirstOrThrow();
     expect(m).toEqual({ status: 'error', error: 'STEP_FAILED: lock expired', sealed_at: null });
     expect((await db.selectFrom('snapshot_manifests').select('source').where('source', '=', 'dynadot_closeouts').execute())).toHaveLength(0); // that step did not fail
+  });
+
+  it('CR090-1 (AT-1, AT-3, AT-5) /health keeps the datasave string and adds datasave_detail: every step of the latest run, ok; the Dynadot steps without a key are not_configured and the top level stays ok', async () => {
+    mswServer.use(...inventoryHandlers());
+    const { get } = await boot();
+    const run = await runJobToEnd(app!, 'datasave');
+    const h = (await get('/health')).json();
+    expect(h.datasave).toBe('ok');
+    expect(h.datasave_detail.last_run.run_id).toBe(run.accepted.run_id);
+    expect(h.datasave_detail.last_run.steps.godaddyInventory).toEqual({ status: 'ok', data_date: '2026-10-20', error: null });
+    expect(h.datasave_detail.last_run.steps.dynadotAftermarket.status).toBe('not_configured');
+    expect(h.datasave_detail.last_run.steps.dynadotCloseouts.status).toBe('not_configured');
+    expect(h.datasave_detail).toMatchObject({ missing_files: [], dynadot_missing: [] });
+  });
+
+  it('CR090-2 (AT-2) one GoDaddy file failing makes datasave partial and datasave_detail names godaddyInventory with the reason', async () => {
+    mswServer.use(...inventoryHandlers({ status: { 'auctions_ending_today.json.zip': 503 } }));
+    const { get } = await boot();
+    await runJobToEnd(app!, 'datasave');
+    const h = (await get('/health')).json();
+    expect(h.datasave).toBe('partial');
+    expect(h.datasave_detail.last_run.steps.godaddyInventory).toMatchObject({ status: 'error', data_date: '2026-10-20' });
+    expect(h.datasave_detail.last_run.steps.godaddyInventory.error).toEqual(expect.any(String));
+    expect(h.datasave_detail.missing_files).toEqual(['auctions_ending_today.json.zip']);
+  });
+
+  it('CR090-3 the step state rule: a Dynadot pull that ended in a GAP or an error summary is error with its reason, a partial seal is partial, a skipped step is skipped', () => {
+    expect(datasaveStepState({ ok: true, summary: { status: 'gap', data_date: '2026-10-20', gap: { reason: 'total_collapsed' } } })).toEqual({ status: 'error', data_date: '2026-10-20', error: 'GAP: total_collapsed' });
+    expect(datasaveStepState({ ok: true, summary: { status: 'error', error: 'ERROR: HTTP 500' } })).toEqual({ status: 'error', data_date: null, error: 'ERROR: HTTP 500' });
+    expect(datasaveStepState({ ok: true, summary: { status: 'partial', data_date: '2026-10-20' } })).toMatchObject({ status: 'partial' });
+    expect(datasaveStepState({ ok: false, error: 'lock expired', summary: null })).toEqual({ status: 'error', data_date: null, error: 'lock expired' });
+    expect(datasaveStepState({ ok: true, skipped: true, summary: { skipped: true, reason: 'busy' } })).toEqual({ status: 'skipped', data_date: null, error: 'busy' });
   });
 
   it('DS521-8 (AT-4) nothing complete for 26 h: /health.datasave is overdue and /report carries DATASAVE_MISSED; a fresh database raises nothing in /report', async () => {

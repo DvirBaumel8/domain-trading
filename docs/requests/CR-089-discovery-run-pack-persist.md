@@ -1,7 +1,7 @@
 ---
 id: CR-089
 kind: CR
-status: approved
+status: done
 owner_bot: dom-architect
 approval: "Dvir t1067u via Gavriel 2026-10-28 ~21:10 IDT: GO persist run pack; standing commit after every discovery seal; Claude Code (no CloudAgents)."
 priority: P1
@@ -34,3 +34,11 @@ Money; CloudAgents; shape features; health datasave detail (CR-090); closeouts p
 
 ## Questions (≤1)
 1. Canonical path: `docs/requests/discovery-runs/` only (bot-friendly) vs also `sourcing/buyer-first/`? **Default: discovery-runs canonical; mirror sourcing only if already company-standard.**
+
+## DOM response (28 Oct 2026, ~21:20 IDT): done (docs, no release needed; noted in 5.75.0)
+
+- **Question 1:** the canonical path is `docs/requests/discovery-runs/` only. This repo has no `sourcing/` tree, and DOM does not add one (AT-4: the README says it is the single path).
+- **AT-1:** the 28 Oct pack is on main (`f3681f92`, 2.1 MB).
+- **AT-2:** `discovery-runs/README.md` states the commit-before-exit rule, now with a size guide.
+- **AT-3:** Buyer SOP step 0.0 #3 (requests copy and live `docs/bot-logic/04`) says: seal → complete folder → commit under `docs/requests/discovery-runs/<date>-v3/` → exit. The old line "DOM → Claude Code commits that pack off-box" is gone: DOM can't see the box.
+- **R-5 note:** git keeps every byte forever. Leave out raw JSON the API can return again (for example `shortlist-all.json`); keep funnel, REVIEW, PASSERS, kills, MERGED-AIs and DOM notes.

@@ -1,7 +1,7 @@
 ---
 id: CR-090
 kind: CR
-status: approved
+status: done
 owner_bot: dom-architect
 approval: "Dvir t1067u via Gavriel 2026-10-28 ~21:10 IDT: GO health datasave step/GAP detail; Claude Code maintenance; freeze-ok."
 priority: P1
@@ -36,3 +36,12 @@ Fixing the underlying Dynadot page failures / aftermarket lock (separate BUGs if
 
 ## Questions (≤1)
 1. Sibling `datasave_detail` vs replace string with object? **Default: keep string + additive `datasave_detail`.**
+
+## DOM response (28 Oct 2026, ~21:20 IDT): built in 5.75.0
+
+- **Question 1:** additive sibling `datasave_detail`. The `datasave` string is unchanged (AT-5).
+- **Shape:** `{last_run: {run_id, finished_at, steps: {<step>: {status, data_date, error}}}, missing_files, dynadot_missing, dynadot_due_date}`, with every step of the latest finished run.
+  - Status: `ok` | `partial` | `error` | `skipped` | `not_configured`.
+  - A Dynadot GAP is `error` with `GAP: <reason>`; a seal with missing pages is `partial`.
+  - A late GoDaddy publish is `godaddyInventory` `error` with `GODADDY_NOT_PUBLISHED: ...`.
+- **Tests:** CR090-1 (AT-1, AT-3, AT-5), CR090-2 (AT-2), CR090-3 (the state rule). AT-4: `endpoints.md` §`GET /health` documents the field, and the `/health` keys test includes it.

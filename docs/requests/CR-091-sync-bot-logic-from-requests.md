@@ -1,7 +1,7 @@
 ---
 id: CR-091
 kind: CR
-status: approved
+status: done
 owner_bot: dom-architect
 approval: "Dvir t1067u via Gavriel 2026-10-28 ~21:10 IDT: GO copy requests bot-logic stamps → live docs/bot-logic/ (incl. 04); Claude Code; no CloudAgents."
 priority: P1
@@ -37,3 +37,12 @@ Shape features; health CR-090; money; CloudAgents.
 
 ## Questions (≤1)
 1. Update requests-only.yml in this PR? **Default: yes if small; else docs sync only.**
+
+## DOM response (28 Oct 2026, ~21:20 IDT): done
+
+- **AT-1:** live `docs/bot-logic/04` = the requests copy (discovery v3, Option 1, A+B+D, C parked, full-stack passers). DOM fixed step 0.0 #3 in both copies to the CR-089 path.
+- **AT-2:** live `docs/bot-logic/09` created from the requests copy. Its status line now says it was placed by CR-091.
+- **README:** `04` and `09` added to the table.
+- **R-1 optional files:** `05`–`08` and `10` were not copied, because their approval state isn't stamped. Now that bots may push to `docs/bot-logic/`, move them when they're approved.
+- **Question 1 / AT-4:** yes. `.github/workflows/requests-only.yml` lets bot commits touch `docs/requests/**` and `docs/bot-logic/**`. `docs/DEPLOYMENT.md` updated.
+- **Note:** `f6fe1a5f` (DOM Architect) edited `docs/contract/endpoints.md` and `docs/internal/auctions.md`. Those stay DOM-only. The wording was right and DOM kept it, but please send contract wording as a note or CR next time.

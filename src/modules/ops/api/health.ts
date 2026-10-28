@@ -21,7 +21,7 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
     const [jobs, jobsLast, datasave, dqMarket, size, archive] = await Promise.all([
       dbOk ? jobsState(db, now()) : Promise.resolve('unknown'),
       dbOk ? jobsLastRun(db) : Promise.resolve({ daily: null, tick: null }),
-      dbOk ? datasaveStatus(db, now()).then((d) => d.state).catch(() => 'unknown') : Promise.resolve('unknown'),
+      dbOk ? datasaveStatus(db, now()).catch(() => null) : Promise.resolve(null),
       dbOk ? marketDqStatus(db).then((d) => d.state).catch(() => 'unknown') : Promise.resolve('unknown'),
       dbOk ? dbSize(db, storageLimitBytes) : Promise.resolve(null),
       archiveStatus(config.archiveDir).then(({ days_n, first, last, missing_days }) => ({ days_n, first, last, missing_days })),
@@ -33,7 +33,12 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       // v5.20.0 (BUG-047): when the daily and the tick job last ran (ISO, Asia/Jerusalem offset); null = never
       jobs_last: jobsLast,
       // v5.21.0 (CR-071): the daily data save: ok | overdue | partial | error (does not change the top-level status; Dynadot not_configured never counts)
-      datasave,
+      datasave: datasave?.state ?? 'unknown',
+      // v5.75.0 (CR-090): which step of the latest datasave run is not ok, and why (additive; `datasave` above is unchanged); null when unknown
+      datasave_detail: datasave ? {
+        last_run: datasave.last_run ? { run_id: datasave.last_run.run_id, finished_at: toJerusalemIso(datasave.last_run.finished_at), steps: datasave.last_run.steps } : null,
+        missing_files: datasave.missing_files, dynadot_missing: datasave.dynadot_missing, dynadot_due_date: datasave.dynadot_due_date,
+      } : null,
       // v5.23.0 (CR-075 R-3): the market data-quality checks: ok | alert | unknown (before the first run); does not change the top-level status
       dq_market: dqMarket,
       // v5.59.0 (CR-081): the daily archive on the host's disk: days with both files, first and last day, calendar days in between that lack a file

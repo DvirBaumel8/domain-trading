@@ -172,7 +172,7 @@ Check the `export` step in the reply, then that the `data-backup` branch has a n
 
 
 ## Bot permissions (Gavriel writes only `docs/requests/`)
-`.github/workflows/requests-only.yml` fails any push in which a commit authored or committed as "Gavriel"/"Grok" changes a file outside `docs/requests/`. It **detects** violations; it can't prevent them, and author names are self-declared. To **enforce** it:
+`.github/workflows/requests-only.yml` fails any push in which a commit authored or committed as "Gavriel"/"Grok" changes a file outside `docs/requests/` (and, since CR-091, `docs/bot-logic/`). It **detects** violations; it can't prevent them, and author names are self-declared. To **enforce** it:
 1. Give Gavriel its own GitHub identity: a separate account added as a collaborator with **Write**, or a fine-grained token on that account. Don't use Dvir's account.
 2. Settings → Rules → Rulesets → New branch ruleset on `main`:
    - **Restrict updates** with a bypass list that holds only Dvir's account;

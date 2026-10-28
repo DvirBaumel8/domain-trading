@@ -26,6 +26,30 @@ export interface DatasaveStatus {
   dynadot_missing: string[];
   /** The UTC data date those uploads are due for (today after 16:00 UTC, else yesterday). */
   dynadot_due_date: string;
+  /** v5.75.0 (CR-090): the latest finished datasave run, step by step (null before the first run). */
+  last_run: DatasaveRunDetail | null;
+}
+
+export type DatasaveStepState = 'ok' | 'partial' | 'error' | 'skipped' | 'not_configured';
+export interface DatasaveRunDetail {
+  run_id: string | null;
+  finished_at: Date;
+  steps: Record<string, { status: DatasaveStepState; data_date: string | null; error: string | null }>;
+}
+
+/** v5.75.0 (CR-090): one step's state from its stored view. A Dynadot pull that ends `gap`/`error` is a finished step (ok) whose summary says what failed. */
+export function datasaveStepState(v: { ok?: boolean | null; skipped?: boolean; error?: string; summary?: unknown }): { status: DatasaveStepState; data_date: string | null; error: string | null } {
+  const sum = (typeof v.summary === 'object' && v.summary !== null && !Array.isArray(v.summary) ? v.summary : {}) as { status?: unknown; data_date?: unknown; error?: unknown; reason?: unknown; gap?: { reason?: unknown }; failed?: Array<{ error?: unknown }> };
+  const dataDate = typeof sum.data_date === 'string' ? sum.data_date : null;
+  const text = (x: unknown): string | null => (typeof x === 'string' && x.length > 0 ? x.slice(0, 200) : null);
+  const failedText = Array.isArray(sum.failed) ? text(sum.failed.map((f) => f.error).filter((e) => typeof e === 'string').join('; ')) : null;
+  if (v.skipped) return { status: 'skipped', data_date: dataDate, error: text(sum.reason) };
+  if (sum.status === 'not_configured') return { status: 'not_configured', data_date: dataDate, error: text(sum.reason) };
+  if (v.ok === false) return { status: 'error', data_date: dataDate, error: text(v.error) ?? failedText ?? text(sum.error) };
+  if (sum.status === 'gap') return { status: 'error', data_date: dataDate, error: `GAP: ${text(sum.gap?.reason) ?? 'unknown'}` };
+  if (sum.status === 'error') return { status: 'error', data_date: dataDate, error: text(sum.error) };
+  if (sum.status === 'partial') return { status: 'partial', data_date: dataDate, error: text(sum.error) };
+  return { status: 'ok', data_date: dataDate, error: null };
 }
 
 const DYNADOT_SOURCES = ['dynadot_aftermarket', 'dynadot_closed_auctions', 'dynadot_closeouts'] as const;
@@ -62,7 +86,7 @@ export async function datasaveStatus(db: Kysely<Database>, nowMs: number): Promi
   const complete_files = files.filter((f) => completeSet.has(f));
   const missing_files = files.filter((f) => !completeSet.has(f));
   const lastComplete = recent.filter((r) => r.status === 'complete').map((r) => r.updated_at.getTime()).sort((a, b) => b - a)[0];
-  const lastRun = await db.selectFrom('job_runs').select(['started_at', 'finished_at', 'steps']).where('job', '=', 'datasave').where('skipped', '=', false).orderBy('finished_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+  const lastRun = await db.selectFrom('job_runs').select(['started_at', 'finished_at', 'steps', 'queue_run_id']).where('job', '=', 'datasave').where('skipped', '=', false).orderBy('finished_at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
   const everManifest = await db.selectFrom('snapshot_manifests').select('id').where('source', '=', SOURCE).limit(1).executeTakeFirst();
   const dyn = await dynadotMissing(db, nowMs);
   const started = Boolean(lastRun || everManifest || dyn.started);
@@ -80,7 +104,11 @@ export async function datasaveStatus(db: Kysely<Database>, nowMs: number): Promi
   }
   // a Dynadot upload that is due and missing turns an otherwise ok state into partial
   if (state === 'ok' && dyn.missing.length > 0) state = 'partial';
-  return { state, started, files, complete_files, missing_files, last_complete_at: lastComplete === undefined ? null : new Date(lastComplete), dynadot_missing: dyn.missing, dynadot_due_date: dyn.due_date };
+  const views = (lastRun?.steps ?? {}) as Record<string, Parameters<typeof datasaveStepState>[0]>;
+  const last_run: DatasaveRunDetail | null = lastRun
+    ? { run_id: lastRun.queue_run_id ?? null, finished_at: lastRun.finished_at, steps: Object.fromEntries(Object.entries(views).map(([k, v]) => [k, datasaveStepState(v)])) }
+    : null;
+  return { state, started, files, complete_files, missing_files, last_complete_at: lastComplete === undefined ? null : new Date(lastComplete), dynadot_missing: dyn.missing, dynadot_due_date: dyn.due_date, last_run };
 }
 
 /** The data dates in [from, to] (YYYY-MM-DD, UTC) that have no complete save of every configured file, with the files each lacks. */

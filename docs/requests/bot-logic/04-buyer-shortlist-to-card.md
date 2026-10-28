@@ -36,7 +36,7 @@ Normal cadence is **1×/day** after seal. When a **same-`data_date` re-run** is 
 
 1. **Before any meaning LLM:** load that day's prior `kills.csv`, `prior-exclude.txt`, paper-log declines/rejects, holds, and already-escalated cards. Apply them as hard skips. Do **not** re-LLM salad / already-killed names.
 2. Prefer finishing **deepable OPEN** firm/USPTO only (+ B/D directions). Never treat review survivors as `prior_exclude` unless they were actually killed/declined/held/escalated.
-3. **Leave the run folder complete** under `sourcing/buyer-first/<date>-v3/` (funnel, REVIEW/PASSERS, kills, evidence, cards if any, MERGED-AIs when present) before you exit. **DOM → Claude Code** commits that pack off-box (Buyer does not need to git-push the pack). Seal → complete folder → exit; do not leave a half-written pack.
+3. **Leave the run folder complete and commit it** under `docs/requests/discovery-runs/<date>-v3/` (funnel, REVIEW/PASSERS, kills, evidence, cards if any, MERGED-AIs when present) before you exit (CR-089: that path is the one canonical store; the box's `sourcing/buyer-first/` is a working copy only, and DOM cannot see the box). Seal → complete folder → commit → exit; do not leave a half-written pack.
 
 ### 0.1 Passers + report (v3)
 

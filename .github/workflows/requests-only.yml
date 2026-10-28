@@ -1,6 +1,6 @@
 name: requests-only
 
-# Gavriel (the customer's bot) may only add or change files under docs/requests/.
+# Gavriel (the customer's bot) may only add or change files under docs/requests/ and (CR-091, 28 Oct 2026) docs/bot-logic/.
 # Every commit in a push whose author or committer name contains "Gavriel", "Grok" or "DOM (cloud)" is checked.
 # This catches mistakes; it cannot undo a push. Real enforcement = branch protection plus a separate
 # GitHub identity for Gavriel (docs/DEPLOYMENT.md, "Bot permissions").
@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Bot commits touch docs/requests/ only
+      - name: Bot commits touch docs/requests/ and docs/bot-logic/ only
         env:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.event.after }}
@@ -25,9 +25,9 @@ jobs:
           for c in $(git rev-list "$range"); do
             who="$(git log -1 --format='%an|%cn' "$c")"
             if echo "$who" | grep -qiE 'gavriel|grok|dom \(cloud\)'; then
-              outside="$(git diff-tree --no-commit-id --name-only -r "$c" | grep -v '^docs/requests/' || true)"
+              outside="$(git diff-tree --no-commit-id --name-only -r "$c" | grep -vE '^docs/(requests|bot-logic)/' || true)"
               if [ -n "$outside" ]; then
-                echo "::error::commit $c by '$who' changes files outside docs/requests/:"
+                echo "::error::commit $c by '$who' changes files outside docs/requests/ and docs/bot-logic/:"
                 echo "$outside"
                 bad=1
               fi

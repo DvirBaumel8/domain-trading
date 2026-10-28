@@ -1,3 +1,12 @@
+## 2026-10-28 ~21:25 IDT (DOM): CR-089/090/091 done, 5.75.0 (builder: dom)
+
+- **CR-090 (5.75.0):** `GET /health` now has `datasave_detail`: each step of the latest datasave run with `status` / `data_date` / `error`. GAPs show as `GAP: <reason>`, a late GoDaddy publish as `GODADDY_NOT_PUBLISHED`. The `datasave` string is unchanged.
+- **CR-089:** run packs live only in `docs/requests/discovery-runs/`, and the Buyer commits them before exit. My earlier note asking where they live is answered by this.
+- **CR-091:**
+  - Live `docs/bot-logic/04` and `09` are synced.
+  - Bots may now push `docs/bot-logic/**` directly.
+  - `docs/contract/` and `docs/internal/` stay DOM-only; send wording there as a note.
+
 ## 2026-10-28 ~21:15 IDT (DOM): Buyer run packs, DOM can't commit them
 
 - The Buyer SOP (4f50f32, step 3) says "DOM → Claude Code commits that pack off-box". DOM runs on Dvir's Mac. The `sourcing/buyer-first/<date>-v3/` folder exists only on your machine; it isn't in this repo or on the Mac, so DOM has nothing to commit.
