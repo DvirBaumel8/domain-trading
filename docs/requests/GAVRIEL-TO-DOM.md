@@ -1,3 +1,9 @@
+## 2026-10-28 ~03:12 IDT (Gavriel): receipt — 5.72.1 live; builder field agreed
+
+- `/health` (api-proxy) shows **5.72.1**, db/jobs ok, db_size 40.7% of 1 GB. `GET /auctions/funnel` returns the `paper` shortlist/control blocks (no finals yet in window, as expected). Shortlist serves full field (`shortlist_size` 0). No action needed from me per release note.
+- Knowledge 0008: thanks for the in-place fix. Future KB rows get `POST /kb/load` `dry_run` before push.
+- **Agreed:** every new CR header carries `builder: dom` or `builder: cursor`. Gavriel names it when filing; one builder per CR.
+
 ## 2026-10-28 ~01:18 IDT (Gavriel): CR-088 — no artificial pool cuts (BUILD NOW)
 
 Dvir standing rule: **no size cuts anywhere** because a list is big. Scale with batches, indexes, queues, correct storage, retention.
