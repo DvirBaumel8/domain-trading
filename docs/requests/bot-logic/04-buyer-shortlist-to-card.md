@@ -2,7 +2,7 @@
 
 **Status:** current SOP (discovery flow v2). Draft for Gavriel / Dvir awareness gap close, 2026-10-27.  
 **Owner:** Buyer. **Money:** Buyer never buys, bids, registers, lists, or messages Dvir. Cards go to Risk Gate; Gavriel asks Dvir.  
-**Sources:** Dvir via Gavriel discovery v2 (2026-10-27); sourcing-core-2026-10-20 recipe; lessons L-B1..L-B6; r-one §10 v2; ledger B-01/B-02/B-05.
+**Sources:** Dvir via Gavriel discovery v2 (2026-10-27); post-fullfield standing (Gavriel 2026-10-28); sourcing-core-2026-10-20 recipe; lessons L-B1..L-B6; r-one §10 v2; ledger B-01/B-02/B-05.
 
 This file is **current-only**. It does not document retired v1–v9 scout lanes, buyer-first-as-source, or local GoDaddy-zip grepping as the normal path.
 
@@ -13,12 +13,12 @@ This file is **current-only**. It does not document retired v1–v9 scout lanes,
 ## 0. Pool (before any judgment)
 
 1. `GET /health` — note API version in the run funnel.
-2. `GET /auctions/shortlist` with the **newest** `data_date`, `limit` as briefed (default 25). **That response is the only discovery pool.**
-**Score vs judgment (2026-10-27 joint):** `auction-v4` on the shortlist ranks **auction attractiveness** only. Meaning, shape, and buyer fit stay with Buyer (+ Challenger). Do not treat a high shortlist score as buyer-ready.
-
+2. `GET /auctions/shortlist` with the **newest** `data_date`. **That response is the only discovery pool.** Paginate with `limit` ≤ **500** and `offset` (CR-088: `shortlist_size=0` stores all hard-filter passers; default lean brief may still ask for a small top slice). Do not invent a parallel pool.
 3. Do **not** grep local GoDaddy inventory zips unless the shortlist is **empty** and that day is **sealed**. If you do, log **EMERGENCY** in that day's funnel and tell Gavriel + DOM Architect.
 4. Optional `GET /candidates/closeouts` = **research only**. No closeout money cards while `CLOSEOUTS_PAUSED`.
-5. Cap ~20 external tool calls per lean run unless Gavriel raises it. Prefer cheapest / best service phrases first.
+5. Cap ~20 external tool calls per lean run unless Gavriel raises it. Prefer cheapest / best service phrases first. Meaning/shape before CR-083 / USPTO / firm spend.
+
+**Three report numbers (every discovery run):** (1) `field_n` stored at shortlist build, (2) GET `total` = live eligible served, (3) judged (+ unfinished). Served < `field_n` is **expected** (ended / prebid-fail left out of serve) — not a silent size cut. Example: 597 served of `field_n` 747 on 2026-10-28.
 
 Held names (resumedesign.com and the prior USPTO-clean hold list) stay held until Gavriel reopens, **unless** one appears on the shortlist with a fresh shortlist reason — then re-screen **only** via this shortlist path.
 
@@ -45,9 +45,9 @@ Apply in this order. Stop early on a hard fail. Do not spend firm-page or histor
 EU TMview / UK IPO / Common Crawl history often stay OPEN at first submit; close them when Risk Gate asks before CLEAR. Wayback is off. Common Crawl only via `system/tools/cc_cdx.py`.
 
 
-### CR-083 evidence cache (standing, Gavriel 2026-10-27)
+### CR-083 evidence cache (standing, Gavriel 2026-10-27; POST shape 2026-10-28)
 
-After shape/price/prior-kills/live-`.com`/meaning (steps 1–6), **only then** call `GET /data/card-evidence` for names that will USPTO or firm-screen. Do **not** evidence-GET names you will kill for coinage, fragment, salad, or nonsense. POST new `uspto_check` / `firm_screen` rows after those checks. Count CR-083 GETs/POSTs inside the ~20-call lean budget. Closeouts stay research-only while `CLOSEOUTS_PAUSED`.
+After shape/price/prior-kills/live-`.com`/meaning (steps 1–6), **only then** call `GET /data/card-evidence` for names that will USPTO or firm-screen. Do **not** evidence-GET names you will kill for coinage, fragment, salad, or nonsense. POST new `uspto_check` / `firm_screen` rows after those checks. Every POST must send **`Idempotency-Key`** and a JSON body with **`rows: []`** (array of row objects). A 429 then retry-with-key is the known OK path. Count CR-083 GETs/POSTs inside the ~20-call lean budget. Closeouts stay research-only while `CLOSEOUTS_PAUSED`.
 
 ---
 
@@ -80,6 +80,11 @@ After shape/price/prior-kills/live-`.com`/meaning (steps 1–6), **only then** c
 - Run on the short top-N only (after shape/price/extensions/meaning).
 - Exact live mark → kill. Near-mark → FLAG on the card; Risk Gate declares classes / containment.
 - Always run a control query so a broken API isn't mistaken for "clear".
+- **USPTO FLAG** may appear in a top-5 **review** list for transparency. **Never propose firm-screen / Risk Gate paper** for FLAG names (Gavriel 2026-10-28).
+
+### Time gate (<12h) — review only (Gavriel 2026-10-28)
+
+If the auction ends in **under 12 hours** and the firm screen is still **OPEN**, the name is **review-only**. Do **not** offer firm-screen or Risk Gate paper for it (no overnight firm work on names that end tonight). Still log it in the top-N review with cons when useful.
 
 ---
 
@@ -111,7 +116,8 @@ Log every screened name in `sourcing/buyer-first/paper-log.md` with price and ve
 - DOM: token from `~/.config/grok-bots/bots.token`; header `X-Bot-Name: Buyer`; proxy `https://domain-trading-api-proxy.dvirbaumel9.workers.dev` with `Authorization: Bearer`. Never print the secret.
 - Dynadot connector: read-only; auctions blocked until API access. Closeouts research-only while paused.
 - Every answer file / card: model + prompt version at top.
-- Report to Gavriel each run: shortlist count + `data_date`, how many judged, cards sent to Risk Gate (or none survived + reason), call count, blockers.
+- Report to Gavriel each run: the **three numbers** (`field_n`, GET `total`/served, judged + unfinished) + `data_date`, cards sent to Risk Gate (or none / review-only + reason), call count, blockers. Call out time-gate and USPTO-FLAG names as review-only skips, not firm-screen candidates.
+- **Passers report (Gavriel/Dvir 2026-10-28):** list **all** names that pass the full filter stack (meaning → USPTO → firm screen → cardable). Do **not** force a top-5. Use top-5-with-cons **only when zero** names pass.
 
 ---
 
