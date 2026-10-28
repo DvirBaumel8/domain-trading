@@ -6,6 +6,8 @@
 
 This file is **current-only**. It does not document retired v1–v9 scout lanes, buyer-first-as-source, or local GoDaddy-zip grepping as the normal path.
 
+**Score vs judgment (Gavriel 2026-10-28):** `auction-v4` ranks **auction attractiveness** only (price headroom, age, endings, bids, lift). Meaning, shape, and buyer-fit judgment stay with **Buyer** (+ Challenger). Do not treat shortlist rank as a service-phrase pass.
+
 ---
 
 ## 0. Pool (before any judgment)
