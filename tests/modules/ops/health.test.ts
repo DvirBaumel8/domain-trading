@@ -55,14 +55,17 @@ describe('GET /health (R-11)', () => {
     expect(body.db_size.warn_percent).toBe(70);
   });
 
-  it('L538-1: db_size.tables lists at most 10 public tables, largest first, with bytes and a row estimate (READ token)', async () => {
+  it('L538-1: db_size.tables lists at most 10 public tables, largest first, with bytes and a row estimate, and (CR-095) heap, index and dead-row parts (READ token)', async () => {
     app = await makeApp({ testRoutes: false });
     const { auth } = await issueToken('read');
     const t = (await app.inject({ method: 'GET', url: '/health', headers: auth })).json().db_size.tables as { table: string; bytes: number; rows_estimate: number | null }[];
     expect(t.length).toBeGreaterThan(0);
     expect(t.length).toBeLessThanOrEqual(10);
     for (const r of t) {
-      expect(Object.keys(r).sort()).toEqual(['bytes', 'rows_estimate', 'table']);
+      expect(Object.keys(r).sort()).toEqual(['bytes', 'dead_rows_estimate', 'heap_bytes', 'index_bytes', 'rows_estimate', 'table']);
+      // CR-095 (5.77.0): heap and index parts never exceed the total
+      const x = r as unknown as { heap_bytes: number; index_bytes: number };
+      expect(x.heap_bytes + x.index_bytes).toBeLessThanOrEqual(r.bytes);
       expect(r.bytes).toBeGreaterThan(0);
       expect(r.rows_estimate === null || r.rows_estimate >= 0).toBe(true);
     }

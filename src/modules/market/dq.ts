@@ -18,6 +18,10 @@ export const SURVIVORSHIP_MAX_SHARE = 0.9;
 export const PRICE_JUMP_FACTOR = 10;
 /** A reported sale under this many cents looks like dollars read as cents (the program only stores $500+). */
 export const SALE_DOLLARS_SUSPECT_CENTS = 10_000;
+/** CR-096 (5.77.0): sample rows per price_sanity sub-check. */
+export const PRICE_SAMPLES_N = 20;
+export interface PriceJumpSample { name: string; source: string; listing_type: string; day_before: string; price_before_cents: number; day_after: string; price_after_cents: number; ratio: number | null }
+export interface SaleSample { name: string; source: string; listing_type: string; sale_date: string; sale_price_cents: number; list_last_date?: string; list_price_cents_last?: number; ratio?: number | null }
 
 const median = (xs: number[]): number => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2; };
 
@@ -49,17 +53,33 @@ export async function runDqMarket(db: Kysely<Database>, nowMs: number): Promise<
 
   // price sanity (v5.74.0: over the aftermarket days still stored, 2 by default; BUG-062: prices in bigint, so a listing over $2.1M times 10 can't overflow int4): a >10x jump between consecutive snapshot days of one name, a sale that looks like dollars read as cents, a sale >10x or <1/10 of the listing price
   const since = addDays(today, -30);
-  const jumps = await sql<{ n: number }>`
+  // CR-096 (5.77.0): up to PRICE_SAMPLES_N sample rows per sub-check next to each count (largest ratio first)
+  const jumps = await sql<{ n: number; samples: PriceJumpSample[] | null }>`
     with sealed as (select data_date from snapshot_manifests where source = 'dynadot_aftermarket' and status = 'complete' and data_date >= ${since}::date),
     obs as (select r.domain, r.data_date, min(r.price_cents)::bigint as p from dynadot_rows r join sealed s on s.data_date = r.data_date where r.kind = 'aftermarket' group by 1, 2),
-    lagged as (select p, lag(p) over (partition by domain order by data_date) as prevp from obs)
-    select count(*)::int as n from lagged where prevp is not null and (p > prevp * ${PRICE_JUMP_FACTOR} or p * ${PRICE_JUMP_FACTOR} < prevp)`.execute(db);
-  const cheap = await sql<{ n: number }>`select count(*)::int as n from market_sales where sale_price_cents < ${SALE_DOLLARS_SUSPECT_CENTS}`.execute(db);
-  const mism = await sql<{ n: number }>`select count(*)::int as n from market_names where outcome = 'sold' and list_price_cents_last is not null
-    and (sale_price_cents > list_price_cents_last * ${PRICE_JUMP_FACTOR} or sale_price_cents * ${PRICE_JUMP_FACTOR} < list_price_cents_last)`.execute(db);
+    lagged as (select domain, data_date, p, lag(p) over (partition by domain order by data_date) as prevp, lag(data_date) over (partition by domain order by data_date) as prevd from obs),
+    hit as (select * from lagged where prevp is not null and (p > prevp * ${PRICE_JUMP_FACTOR} or p * ${PRICE_JUMP_FACTOR} < prevp)),
+    ranked as (select *, greatest(p::numeric / nullif(prevp, 0), prevp::numeric / nullif(p, 0)) as ratio from hit)
+    select (select count(*)::int from hit) as n,
+      (select json_agg(json_build_object('name', domain, 'source', 'dynadot_aftermarket', 'listing_type', 'bin', 'day_before', prevd::text, 'price_before_cents', prevp,
+        'day_after', data_date::text, 'price_after_cents', p, 'ratio', round(p::numeric / nullif(prevp, 0), 4)) order by ratio desc nulls first, domain)
+       from (select * from ranked order by ratio desc nulls first, domain limit ${PRICE_SAMPLES_N}) t) as samples`.execute(db);
+  const cheap = await sql<{ n: number; samples: SaleSample[] | null }>`
+    select (select count(*)::int from market_sales where sale_price_cents < ${SALE_DOLLARS_SUSPECT_CENTS}) as n,
+      (select json_agg(json_build_object('name', name, 'source', venue, 'listing_type', listing_type, 'sale_date', sale_date::text, 'sale_price_cents', sale_price_cents) order by sale_price_cents, name)
+       from (select * from market_sales where sale_price_cents < ${SALE_DOLLARS_SUSPECT_CENTS} order by sale_price_cents, name limit ${PRICE_SAMPLES_N}) t) as samples`.execute(db);
+  const mism = await sql<{ n: number; samples: SaleSample[] | null }>`
+    with hit as (select *, greatest(sale_price_cents::numeric / nullif(list_price_cents_last, 0), list_price_cents_last::numeric / nullif(sale_price_cents, 0)) as ratio from market_names
+      where outcome = 'sold' and list_price_cents_last is not null
+      and (sale_price_cents > list_price_cents_last * ${PRICE_JUMP_FACTOR} or sale_price_cents * ${PRICE_JUMP_FACTOR} < list_price_cents_last))
+    select (select count(*)::int from hit) as n,
+      (select json_agg(json_build_object('name', name, 'source', venue, 'listing_type', listing_type, 'sale_date', sale_date::text, 'sale_price_cents', sale_price_cents,
+        'list_last_date', last_seen::text, 'list_price_cents_last', list_price_cents_last, 'ratio', round(sale_price_cents::numeric / nullif(list_price_cents_last, 0), 4)) order by ratio desc nulls first, name)
+       from (select * from hit order by ratio desc nulls first, name limit ${PRICE_SAMPLES_N}) t) as samples`.execute(db);
   const flagged = jumps.rows[0]!.n + cheap.rows[0]!.n + mism.rows[0]!.n;
   results.push({ check: 'price_sanity', status: flagged === 0 ? 'pass' : 'fail',
-    detail: { jumps_over_10x_n: jumps.rows[0]!.n, sales_under_100_usd_n: cheap.rows[0]!.n, sale_vs_list_over_10x_n: mism.rows[0]!.n, window_from: since } });
+    detail: { jumps_over_10x_n: jumps.rows[0]!.n, sales_under_100_usd_n: cheap.rows[0]!.n, sale_vs_list_over_10x_n: mism.rows[0]!.n, window_from: since,
+      samples: { jumps_over_10x: jumps.rows[0]!.samples ?? [], sales_under_100_usd: cheap.rows[0]!.samples ?? [], sale_vs_list_over_10x: mism.rows[0]!.samples ?? [] } } });
 
   // coverage: rows per source per day against the median of the 7 days before
   for (const [source, kind] of [['dynadot_aftermarket', 'aftermarket'], ['dynadot_closed_auctions', 'closed_auctions']] as const) {

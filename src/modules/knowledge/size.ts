@@ -3,7 +3,8 @@ import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/types.js';
 import { AppError } from '../../http/errors.js';
 
-export interface DbSizeGuard { limitBytes: number; warnPercent: number; bytes?: () => Promise<number> }
+/** v5.77.0 (CR-097): a request of at most smallWriteBytes is refused only at hardStopPercent (both optional; without them every write stops at warnPercent, as bulk feeds do). */
+export interface DbSizeGuard { limitBytes: number; warnPercent: number; bytes?: () => Promise<number>; smallWriteBytes?: number; hardStopPercent?: number }
 
 export async function databaseBytes(db: Kysely<Database>): Promise<number> {
   return Number((await sql<{ n: string }>`select pg_database_size(current_database())::text as n`.execute(db)).rows[0]!.n);
@@ -18,10 +19,12 @@ export function payloadBytesOf(req: { headers: Record<string, unknown> }, rows: 
 /** Reads the size before a write; refuses (409 DB_SIZE_HIGH) when size + the payload would pass the ceiling. Returns the size read. */
 export async function guardDbSize(db: Kysely<Database>, g: DbSizeGuard, payloadBytes: number): Promise<number> {
   const before = await (g.bytes ?? (() => databaseBytes(db)))();
-  const ceiling = (g.limitBytes * g.warnPercent) / 100;
+  const small = g.smallWriteBytes !== undefined && g.hardStopPercent !== undefined && payloadBytes <= g.smallWriteBytes;
+  const percent = small ? g.hardStopPercent! : g.warnPercent;
+  const ceiling = (g.limitBytes * percent) / 100;
   if (before + payloadBytes > ceiling) {
-    throw new AppError(409, 'DB_SIZE_HIGH', `The database is ${(before / 1024 ** 2).toFixed(0)} MB; this load (about ${(payloadBytes / 1024 ** 2).toFixed(1)} MB) would pass ${g.warnPercent}% of the ${(g.limitBytes / 1024 ** 2).toFixed(0)} MB limit`, {
-      db_bytes_before: before, payload_bytes: payloadBytes, limit_bytes: g.limitBytes, warn_percent: g.warnPercent,
+    throw new AppError(409, 'DB_SIZE_HIGH', `The database is ${(before / 1024 ** 2).toFixed(0)} MB; this load (about ${(payloadBytes / 1024 ** 2).toFixed(1)} MB) would pass ${percent}% of the ${(g.limitBytes / 1024 ** 2).toFixed(0)} MB limit`, {
+      db_bytes_before: before, payload_bytes: payloadBytes, limit_bytes: g.limitBytes, warn_percent: g.warnPercent, stop_percent: percent,
     });
   }
   return before;

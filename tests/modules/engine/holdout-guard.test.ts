@@ -89,14 +89,21 @@ describe('holdout date (deprecated, no effect since 5.41.0) and size guard', () 
     }
   });
 
-  it('HG-7: when the size plus the payload would pass 70% of 1 GB the load is refused with 409 DB_SIZE_HIGH and nothing is stored', async () => {
+  it('HG-7: CR-097 (5.77.0): a bulk load (over 64 KB) that would pass 70% of 1 GB is refused with 409 DB_SIZE_HIGH and nothing is stored; a small one is refused only past 95%', async () => {
     const limit = 1024 ** 3; // 5.13.0: Neon free is 1 GB
-    const { d } = await setup({ engineDbSize: { bytes: async () => limit * 0.7 - 10 } });
-    const res = await post('/engine/sales', d, { rows: [sale()] });
+    let size = limit * 0.7 - 10;
+    const { d } = await setup({ engineDbSize: { bytes: async () => size } });
+    const bulk = Array.from({ length: 800 }, (_, i) => sale({ domain: `bulkname${i}.com` }));
+    const res = await post('/engine/sales', d, { rows: bulk });
     expect(res.statusCode).toBe(409);
-    expect(res.json().error).toMatchObject({ code: 'DB_SIZE_HIGH', details: { warn_percent: 70, limit_bytes: limit } });
+    expect(res.json().error).toMatchObject({ code: 'DB_SIZE_HIGH', details: { warn_percent: 70, stop_percent: 70, limit_bytes: limit } });
     expect(await db.selectFrom('engine_sales').select('id').execute()).toEqual([]);
     expect(await db.selectFrom('engine_uploads').select('id').execute()).toEqual([]);
+    expect((await post('/engine/sales', d, { rows: [sale()] })).statusCode).toBe(201);
+    size = limit * 0.95 - 10;
+    const hard = await post('/engine/sales', d, { rows: [sale({ domain: 'other.com' })] });
+    expect(hard.statusCode).toBe(409);
+    expect(hard.json().error).toMatchObject({ code: 'DB_SIZE_HIGH', details: { warn_percent: 70, stop_percent: 95 } });
   });
 
   it('HG-8: a size just under the ceiling still loads', async () => {

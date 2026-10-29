@@ -117,6 +117,9 @@ class HttpFail extends Error {
   constructor(readonly status: number | null, message: string) { super(message); }
 }
 
+/** CR-095 (5.77.0): the only tables the datasave job vacuums (a fixed list: the names go into SQL as text). */
+type VacuumTable = 'market_names' | 'dynadot_rows' | 'datasave_pool' | 'godaddy_auctions_live';
+
 export class DatasaveJob {
   constructor(private readonly deps: DatasaveDeps) {}
 
@@ -516,7 +519,20 @@ export class DatasaveJob {
 
   /** Merges every sealed source and the reported sales into market_names and labels the episodes (R-1, R-2). Idempotent: the retry run and the next day derive the same rows again. */
   async episodes(): Promise<unknown> {
-    return runEpisodes(this.deps.db, this.deps.now());
+    const r = await runEpisodes(this.deps.db, this.deps.now());
+    // CR-095 (5.77.0): the fold rewrites the row of nearly every listed name; a plain VACUUM right after makes the old versions reusable by tomorrow's fold
+    return { ...(r as object), vacuum: await this.vacuum(['market_names']) };
+  }
+
+  /** CR-095 (5.77.0): plain VACUUM (ANALYZE) of fixed tables (no lock that blocks reads or writes, outside any transaction), so space freed by deletes and updates is reused
+   * instead of growing the database. Best effort: an error is reported in the summary, never fails the step. */
+  private async vacuum(tables: readonly VacuumTable[]): Promise<{ tables: string[]; ms: number; error?: string }> {
+    const t0 = Date.now();
+    const done: string[] = [];
+    for (const t of tables) {
+      try { await sql.raw(`vacuum (analyze) ${t}`).execute(this.deps.db); done.push(t); } catch (e) { return { tables: done, ms: Date.now() - t0, error: shortError(e) }; }
+    }
+    return { tables: done, ms: Date.now() - t0 };
   }
 
   /** The market data-quality checks (R-3); a failed check sets /health.dq_market to alert and /report DQ_MARKET_FAIL. A failed check is data, not a failed step. */
@@ -747,7 +763,10 @@ export class DatasaveJob {
     // v5.45.0: the daily shortlists are kept settings.shortlist_keep_days (not append-only)
     const shortlistCut = utcDay(nowMs - st.shortlistKeepDays * 86_400_000);
     const shortlist = await db.deleteFrom('auction_shortlist').where('data_date', '<', shortlistCut).executeTakeFirst();
+    // CR-095 (5.77.0): make the space of today's deletes reusable before today's Dynadot and pool rows are written
+    const vacuum = await this.vacuum(['dynadot_rows', 'datasave_pool', 'godaddy_auctions_live']);
     return {
+      vacuum,
       shortlist_cutoff_date: shortlistCut, shortlist_rows_deleted: Number(shortlist.numDeletedRows ?? 0),
       today, auctions_live_cutoff_date: liveCut, auctions_live_deleted: Number(live.numDeletedRows ?? 0), raw_cutoff_date: rawCut, raw_deleted: rawDeleted, pool_cutoff_date: poolCut, pool_rows_deleted: Number(pool.numDeletedRows ?? 0),
       dynadot_closeouts_deleted: Number(closeoutRows.numDeletedRows ?? 0), dynadot_rows_deleted: Number(otherRows.numDeletedRows ?? 0), dynadot_cutoff_date: dynadotCut,

@@ -28,6 +28,9 @@ const PURCHASE_UNRESOLVED_MINUTES = 30;
 /** v3.9.0: Neon's free plan stores 1 GB per project (5.13.0; it was 0.5 GB); DB_SIZE_HIGH is raised above DB_SIZE_WARN_PERCENT of it. */
 export const NEON_FREE_STORAGE_BYTES = 1024 ** 3;
 export const DB_SIZE_WARN_PERCENT = 70;
+/** v5.77.0 (CR-097): a write route's request of at most DB_SIZE_SMALL_WRITE_BYTES passes until DB_SIZE_HARD_STOP_PERCENT; bulk loads and the datasave feed stop at the warn line. */
+export const DB_SIZE_HARD_STOP_PERCENT = 95;
+export const DB_SIZE_SMALL_WRITE_BYTES = 64 * 1024;
 /** v5.1.0: DAILY_JOB_MISSED is raised when no scheduled daily job run started in this many hours (once any job run exists). */
 const DAILY_JOB_MISSED_HOURS = 26;
 /** v5.7.0: ENDING_REGISTERED is raised for an event this recent. */

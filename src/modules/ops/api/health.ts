@@ -61,14 +61,17 @@ async function dbSize(db: Kysely<Database>, limitBytes: number): Promise<{ bytes
   }
 }
 
-interface DbTableSize { table: string; bytes: number; rows_estimate: number | null }
+interface DbTableSize { table: string; bytes: number; rows_estimate: number | null; heap_bytes: number; index_bytes: number; dead_rows_estimate: number | null }
 
-/** v5.38.0 (loop 2026-10-25, G-119): the 10 largest tables of the public schema (table + indexes + TOAST); rows from the planner estimate (null before the first ANALYZE). */
+/** v5.38.0 (loop 2026-10-25, G-119): the 10 largest tables of the public schema (table + indexes + TOAST); rows from the planner estimate (null before the first ANALYZE).
+ * v5.77.0 (CR-095): each also shows its heap (table only) and index bytes, and the dead row versions autovacuum has not yet reclaimed. */
 async function largestTables(db: Kysely<Database>): Promise<DbTableSize[]> {
-  const rs = await sql<{ table: string; bytes: string; rows: string }>`select c.relname as table, pg_total_relation_size(c.oid)::text as bytes, c.reltuples::bigint::text as rows
-    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  const rs = await sql<{ table: string; bytes: string; rows: string; heap: string; idx: string; dead: string | null }>`select c.relname as table, pg_total_relation_size(c.oid)::text as bytes, c.reltuples::bigint::text as rows,
+      pg_relation_size(c.oid)::text as heap, pg_indexes_size(c.oid)::text as idx, s.n_dead_tup::text as dead
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace left join pg_stat_user_tables s on s.relid = c.oid
     where n.nspname = 'public' and c.relkind in ('r', 'p') order by pg_total_relation_size(c.oid) desc, c.relname limit 10`.execute(db);
-  return rs.rows.map((r) => ({ table: r.table, bytes: Number(r.bytes), rows_estimate: Number(r.rows) >= 0 ? Number(r.rows) : null }));
+  return rs.rows.map((r) => ({ table: r.table, bytes: Number(r.bytes), rows_estimate: Number(r.rows) >= 0 ? Number(r.rows) : null,
+    heap_bytes: Number(r.heap), index_bytes: Number(r.idx), dead_rows_estimate: r.dead === null ? null : Number(r.dead) }));
 }
 
 async function jobsState(db: Kysely<Database>, nowMs: number): Promise<'ok' | 'overdue'> {

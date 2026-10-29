@@ -16,8 +16,8 @@ afterEach(async () => app?.close());
 const NOW = Date.parse('2026-10-27T09:00:00Z');
 const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
-async function setup() {
-  app = await makeApp({ adapters: [new FakeAdapter('porkbun')], now: () => NOW });
+async function setup(extra: Record<string, unknown> = {}) {
+  app = await makeApp({ adapters: [new FakeAdapter('porkbun')], now: () => NOW, ...extra });
   return {
     w: (await issueToken('write', 'gavriel')).auth, b: (await issueToken('bots', 'risk-gate')).auth,
     d: (await issueToken('data', 'data-engineer-upload')).auth, r: (await issueToken('read', 'reader')).auth,
@@ -38,6 +38,20 @@ const money = async () => ({
 });
 
 describe('card evidence cache (CR-083)', () => {
+  it('CR097-1: at 74% of 1 GB a 6-row card-evidence POST is stored (201); at 95% it is refused (409 DB_SIZE_HIGH)', async () => {
+    const limit = 1024 ** 3;
+    let size = limit * 0.742;
+    const { b } = await setup({ engineDbSize: { bytes: async () => size } });
+    const rows = Array.from({ length: 6 }, (_, i) => uspto({ domain: `brightwidgets${i}.com` }));
+    const ok = await post(b, { rows });
+    expect(ok.statusCode, ok.body).toBe(201);
+    expect(ok.json()).toMatchObject({ accepted_n: 6 });
+    size = limit * 0.95;
+    const no = await post(b, { rows: [uspto({ domain: 'other.com' })] });
+    expect(no.statusCode).toBe(409);
+    expect(no.json().error).toMatchObject({ code: 'DB_SIZE_HIGH', details: { stop_percent: 95 } });
+  });
+
   it('CR083-AT1: a bots or WRITE token posts a uspto_check (by domain or by term) -> 201; GET returns the row with fresh true within 24 h', async () => {
     const { w, b } = await setup();
     const a = await post(b, { rows: [uspto()] });

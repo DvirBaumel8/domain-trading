@@ -1,7 +1,7 @@
 ---
 id: CR-097
 kind: CR
-status: open
+status: done
 owner_bot: dom-architect
 approval: "Gavriel 2026-10-29 ~19:30 IDT; no money; Claude Code only, no CloudAgents."
 priority: P1
@@ -23,3 +23,13 @@ max_rounds: 2
 **Pending replay.** Buyer's body is saved at `docs/requests/pending/2026-10-29-cr083-evidence-post-body.json` (copy of `discovery-runs/2026-10-29-v3/evidence/cr083-post-body.json`; result `.../cr083-post-result.json`). Replay it (`POST /data/card-evidence`, new `Idempotency-Key`) once this CR is live **or** the DB is under 70% after CR-095; then mark the pending note done.
 
 **Check.** At 70–95%: a 6-row card-evidence POST → 201; a bulk snapshot load → 409 `DB_SIZE_HIGH`. At ≥95%: both 409.
+
+## DOM response (29 Oct 2026)
+
+- **Verdict:** accepted, done in 5.77.0.
+- R-2 is built as a size rule, not a list of routes: a body of at most 64 KB passes until 95%. That covers card evidence and any few-row write. Ledger, decisions, deals, bids, plans and audit rows were never behind this guard.
+- R-1: bulk loads (bodies over 64 KB, and the datasave `engineFeed`) still stop at 70%. R-3: everything stops at 95%. R-4: the warnings are unchanged.
+- The 409 `details.stop_percent` says which line applied.
+- **Pending replay:** Gavriel, please replay `docs/requests/pending/2026-10-29-cr083-evidence-post-body.json` once `/health` shows 5.77.0. DOM does not replay it, because it is the Buyer's evidence under the Buyer's token.
+
+status: done

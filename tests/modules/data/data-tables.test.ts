@@ -153,15 +153,18 @@ describe('data tables (CR-063)', () => {
     expect(JSON.stringify(a.request)).toContain('[25 rows]');
   });
 
-  it('DT-9: AC-6: when the size plus the payload would pass 70% of 1 GB the load is refused with 409 DB_SIZE_HIGH and nothing is stored', async () => {
+  it('DT-9: AC-6, CR-097 (5.77.0): past 70% of 1 GB a small load still stores; past 95% it is refused with 409 DB_SIZE_HIGH and nothing is stored', async () => {
     const limit = 1024 ** 3; // 5.13.0: Neon free is 1 GB
-    const { d } = await setup({ engineDbSize: { bytes: async () => limit * 0.7 - 10 } });
+    let size = limit * 0.7 - 10;
+    const { d } = await setup({ engineDbSize: { bytes: async () => size } });
+    expect((await post('/data/tm-kills', d, { rows: [{ term: 'y' }] })).statusCode).toBe(201);
+    size = limit * 0.95 - 10;
     for (const [p, row] of [['rdap', rdap('a.com')], ['live-checks', { host: 'a.com', source: 'live', checked_utc: iso(NOW) }], ['tm-kills', { term: 'x' }], ['bigco-names', { name: 'x' }], ['sales-comps', comp()]] as const) {
       const res = await post(`/data/${p}`, d, { rows: [row] });
       expect(res.statusCode, p).toBe(409);
-      expect(res.json().error).toMatchObject({ code: 'DB_SIZE_HIGH', details: { warn_percent: 70, limit_bytes: limit } });
+      expect(res.json().error).toMatchObject({ code: 'DB_SIZE_HIGH', details: { warn_percent: 70, stop_percent: 95, limit_bytes: limit } });
     }
-    expect(await db.selectFrom('tm_kills').select('id').execute()).toEqual([]);
+    expect((await db.selectFrom('tm_kills').select('term').execute()).map((r) => r.term)).toEqual(['y']);
   });
 
   it('DT-10: AC-7: a READ token gets every GET and 403 on every load; a data token loads (and a WRITE token too) but gets 403 on the GETs', async () => {

@@ -1,7 +1,7 @@
 ---
 id: CR-095
 kind: CR
-status: open
+status: in_progress
 owner_bot: dom-architect
 approval: "Gavriel confirmed 2026-10-29 ~19:25 IDT: retention/indexing/compaction only; no money; keep every row needed; no DB plan change. Claude Code only, no CloudAgents."
 priority: P1
@@ -31,3 +31,17 @@ max_rounds: 2
 - A skipped `engineFeed` day shows as pending until backfilled.
 
 **Add (29 Oct, Gavriel):** the guard also blocked Buyer's CR-083 evidence POST (6 rows, 1.6 KB). The exemption for small critical writes is **CR-097** (P1, depends on this CR). Pending replay: `docs/requests/pending/2026-10-29-cr083-evidence-post-body.json`.
+
+## DOM response (29 Oct 2026)
+
+- **Verdict:** accepted. Built in two parts: measure and stop the growth first (5.77.0), then compact from the numbers (part 2).
+- **Part 1 (5.77.0):**
+  - **Ask 5 (engineFeed):** nothing is lost on a skip. Every engineFeed source is re-read by the next run (by name and day, or `fed_at is null`), so the first run with room backfills. 29 Oct's 900 closeout expiries are still unfed and will load then. The skip is visible in `/health.datasave_detail` (`engineFeed` `db_size_high`). The one limit is that `godaddy_auctions_live` keeps 7 days, so auction ends older than that are not recovered.
+  - **Ask 2 (vacuum):** a plain VACUUM runs after `snapshotRetention`'s deletes and after the `episodes` fold. The space of deleted or rewritten rows is then reused the same day, instead of the files growing. A plain VACUUM does not shrink files, so it stops growth but does not by itself bring the size down.
+  - **Measurement:** `/health.db_size.tables[]` now has `heap_bytes`, `index_bytes` and `dead_rows_estimate`.
+- **Part 2 (next):** chosen from those numbers.
+  - Rebuild bloated indexes one at a time (`REINDEX ... CONCURRENTLY`, which needs only the index's own size free).
+  - Rewrite `market_names` with a lower fillfactor, so the daily fold updates rows in place.
+  - Check whether the second stored aftermarket day is still needed.
+  - DOM will not run a full-table rewrite while the free headroom is smaller than the table's live size, because the rewrite briefly needs both copies, and on 1 GB that could hit Neon's write block.
+- **Ask 1 (rules):** already in place. Aftermarket days are archived to disk before deletion (2 days kept), pools keep 3 data dates, and raw files are kept 7 days on disk.

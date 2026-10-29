@@ -15,7 +15,7 @@ Buyer and Risk Gate re-scraped the same USPTO and firm-screen facts on one card 
 4. **Append-only.** A correction is a new row with `supersedes`. The old row stays readable and shows `superseded_by` (the highest id that names it; two rows may supersede the same row, the later one wins). `supersedes` is checked against stored rows only (not a row of the same batch).
 5. **Duplicate** = same `(domain, term, kind, verdict, checked_at, note, evidence_ref, supersedes)`; `raw` is not compared. A duplicate is counted, not stored.
 6. **Freshness (`freshness()`):** only `uspto_check` has a clock. Fresh = not superseded AND age <= 24 h AND no `tm_kills` row with `created_at` after `checked_at`. Stale reasons: `superseded`, `expired`, `tm_kills_changed`. **The kill-list rule is an approximation (CR-083 Q3):** any new `tm_kills` row counts, whatever its term. Other kinds: `fresh: null`; `stale_reason: superseded` when replaced. `fresh_only=true` hides superseded rows and stale `uspto_check` rows.
-7. **Size:** 1..500 rows a call (422 above), the common 8 MB body limit and `DB_SIZE_HIGH` guard of the bulk loads.
+7. **Size:** 1..500 rows a call (422 above), the common 8 MB body limit and `DB_SIZE_HIGH` guard of the bulk loads (5.77.0, CR-097: a body of at most 64 KB passes until 95%).
 
 ## Tests
 `tests/modules/data/card-evidence.test.ts`; scope rows also in CEC-5.

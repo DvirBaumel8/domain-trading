@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.77.0 (2026-10-29): CR-097 small writes pass the size guard until 95%; CR-096 price_sanity samples; CR-095 part 1 vacuum after prunes, /health table detail
+Release note: `docs/releases/v5.77.0.md`.
+MINOR. `DB_SIZE_HIGH` on the write routes: a body of at most 64 KB is refused only past 95% (bulk loads still at 70%); `details.stop_percent` added (CR-097). `GET /market/dq` `price_sanity` `detail.samples` and `/report` `DQ_MARKET_FAIL.failures[].samples` (CR-096). `/health.db_size.tables[]` adds `heap_bytes`, `index_bytes`, `dead_rows_estimate`; the datasave `snapshotRetention` and `episodes` summaries add `vacuum` (CR-095 part 1).
+
 ## 5.76.0 (2026-10-29): CR-094 datasave starts 15:25 UTC (Mac) / 15:20 UTC (GitHub backup)
 Release note: `docs/releases/v5.76.0.md`.
 MINOR (schedule only, no route or field change). The daily `datasave` starts at 15:25 UTC on the Mac host (was 15:05) and 15:20 UTC on the GitHub backup schedule (was 15:00), because GoDaddy publishes its inventory files at about 15:10 UTC. The 60-minute `GODADDY_NOT_PUBLISHED` retry is unchanged.

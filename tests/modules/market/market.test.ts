@@ -1,5 +1,6 @@
 // v5.23.0 (CR-075, data program v1): market_names episodes and labels, POST /data/sales (add-only), GET /market/{episodes,matched,dq,coverage}, the dqMarket checks.
 // Fixtures are written straight into the sealed-snapshot tables (dynadot_rows, snapshot_manifests, godaddy_auctions); nothing calls the network.
+import { marketDqStatus } from '../../../src/modules/reporting/market-dq-state.js';
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
@@ -425,6 +426,25 @@ describe('MK523 market episodes, labels, sales, matched sets, data quality', () 
     const p = r.results.find((x) => x.check === 'price_sanity')!;
     expect(p.status).toBe('fail');
     expect(p.detail).toMatchObject({ jumps_over_10x_n: 1, sales_under_100_usd_n: 1 });
+  });
+
+  it('CR096-1 price sanity lists sample rows next to each count (name, days, prices, ratio over 10), at most 20 per sub-check', async () => {
+    const { post } = await boot('2026-12-20');
+    const names = Array.from({ length: 22 }, (_, i) => `jump${String(i).padStart(2, '0')}.com`);
+    await am('2026-12-18', [...names.map((n) => [n, 60000] as [string, number]), ['steady.com', 60000]]);
+    await am('2026-12-19', [...names.map((n, i) => [n, 700000 + i * 10000] as [string, number]), ['steady.com', 61000]]);
+    await post([sale('tiny.com', 5000, '2026-12-10')]);
+    const r = await runDqMarket(db, clock);
+    const d = r.results.find((x) => x.check === 'price_sanity')!.detail as { jumps_over_10x_n: number; samples: { jumps_over_10x: Array<Record<string, unknown>>; sales_under_100_usd: Array<Record<string, unknown>>; sale_vs_list_over_10x: unknown[] } };
+    expect(d.jumps_over_10x_n).toBe(22);
+    expect(d.samples.jumps_over_10x).toHaveLength(20);
+    expect(d.samples.jumps_over_10x[0]).toEqual({ name: 'jump21.com', source: 'dynadot_aftermarket', listing_type: 'bin', day_before: '2026-12-18', price_before_cents: 60000, day_after: '2026-12-19', price_after_cents: 910000, ratio: 15.1667 });
+    for (const x of d.samples.jumps_over_10x) expect(x.ratio as number).toBeGreaterThan(10);
+    expect(d.samples.sales_under_100_usd).toEqual([expect.objectContaining({ name: 'tiny.com', sale_date: '2026-12-10', sale_price_cents: 5000 })]);
+    expect(d.samples.sale_vs_list_over_10x).toEqual([]);
+    // /report DQ_MARKET_FAIL carries the same samples
+    const st = await marketDqStatus(db);
+    expect(st.failures.find((f) => f.check === 'price_sanity')!.samples).toEqual(d.samples);
   });
 
   it('MK562-1 (BUG-062) a Dynadot listing over $2.1M (its int4 cents times 10 overflow) runs the price check without integer out of range and is still compared', async () => {

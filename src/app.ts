@@ -3,7 +3,7 @@ import type { Kysely } from 'kysely';
 import { registerBuy, smallBuyView, registerTranches, BuyService, Reconciler } from './modules/buying/index.js';
 import { registerPricing, registerList, registerVenue, registerExport, registerAfternicPush, AfternicClient, AfternicPushService, ExportService, ListService } from './modules/listing/index.js';
 import { registerOffers, registerSold, SoldService, OffersService } from './modules/selling/index.js';
-import { DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerBooks, registerDecisions, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
+import { DB_SIZE_HARD_STOP_PERCENT, DB_SIZE_SMALL_WRITE_BYTES, DB_SIZE_WARN_PERCENT, NEON_FREE_STORAGE_BYTES, registerBooks, registerDecisions, registerOutcomes, registerReads, registerReport } from './modules/reporting/index.js';
 import { registerDemand, registerSelection, registerSiblingScan, registerScreening, registerTestSets, registerPacks, ScreeningWorker, type ScreeningDeps, type HoldoutCheck } from './modules/selection/index.js';
 import { registerCheck, createAdapters, type RegistrarAdapter, CheckService } from './modules/registrars/index.js';
 import { AfternicSyncJob, ListingSyncJob, PortfolioLifecycleJob, SellerHubClient, registerHealth, registerCloseouts, registerAuctions, registerReplay, ReplayRunner, registerPortfolioImport, registerPortfolioWrites, registerTokens, RegistrarCheckJob, PortfolioCheckJob, DropWatchJob, CohortOutcomesJob, NsVerifier, DropJob, ReferenceRefreshJob, RetentionJob, PriceScheduleJob, registerJobs, registerSnapshots, registerLookups, DatasaveJob, DYNADOT_CLOSEOUTS_DEFAULT_PATH, JobQueue, JobRunner, type BackupExport } from './modules/ops/index.js';
@@ -210,8 +210,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     enqueue: async (trainId, by) => { const r = await app.jobQueue.enqueue('train', { trigger: 'manual', triggeredBy: by, params: { train_id: trainId } }); app.jobQueue.kick(); return r; },
   });
   const engineScorer = new Scorer({ ...base, screening: screeningDeps, log: app.log, ...deps.engineScore });
-  registerEngine(app, { ...base, trainer: engineTrainer, scorer: engineScorer, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
-  registerData(app, { ...base, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
+  // v5.77.0 (CR-097): write routes let a small request through until the hard stop; the datasave feed (below) stops at the warn line
+  const routeDbSize = { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes, smallWriteBytes: DB_SIZE_SMALL_WRITE_BYTES, hardStopPercent: DB_SIZE_HARD_STOP_PERCENT };
+  registerEngine(app, { ...base, trainer: engineTrainer, scorer: engineScorer, dbSize: routeDbSize });
+  registerData(app, { ...base, dbSize: routeDbSize });
   registerVisits(app, { db: deps.db, now, adapters, publicBaseUrl: deps.config.publicBaseUrl, nsLookup });
   registerCandidates(app, { ...base, worker: screeningWorker, queue: () => app.jobQueue });
   registerEmails(app, base);
@@ -251,7 +253,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.addHook('onClose', async () => app.replayRunner.idle());
   registerReplay(app, { runner: app.replayRunner, run: replayDeps });
   registerMarket(app, { db: deps.db, now });
-  registerKnowledge(app, { db: deps.db, now, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } });
+  registerKnowledge(app, { db: deps.db, now, dbSize: routeDbSize });
   registerPickproof(app, { db: deps.db, now });
   registerJobs(app, app.jobQueue, { ...base, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   registerOpenApi(app, openApiRoutes, deps.config.version);

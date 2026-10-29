@@ -5,7 +5,7 @@ export { registerDecisions } from './api/decisions.js';
 export { registerReport } from './api/report.js';
 export { buildReport } from './report/index.js';
 export { ledgerCsvRows, ledgerRows } from './report/portfolio.js';
-export { NEON_FREE_STORAGE_BYTES, DB_SIZE_WARN_PERCENT } from './report/warnings.js';
+export { NEON_FREE_STORAGE_BYTES, DB_SIZE_WARN_PERCENT, DB_SIZE_HARD_STOP_PERCENT, DB_SIZE_SMALL_WRITE_BYTES } from './report/warnings.js';
 export { ownershipSummary, type OwnershipSummary } from './report/ownership-summary.js';
 export { marketDqStatus, type MarketDqState } from './market-dq-state.js';
 export { datasaveStatus, datasaveStepState, missingDays, DATASAVE_OVERDUE_HOURS, type DatasaveState, type DatasaveStepState } from './datasave-state.js';
