@@ -1,0 +1,241 @@
+{
+ "control ISLAND BABY": {
+  "took": 5,
+  "timedOut": false,
+  "shardsTotal": 5,
+  "shardsSuccessful": 5,
+  "shardsSkipped": 0,
+  "shardsFailed": 0,
+  "hits": {
+   "totalValue": 12,
+   "totalRelation": "eq",
+   "maxScore": 15.808296,
+   "hits": [
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "98809348",
+     "score": 15.808296,
+     "source": {
+      "wordmark": "ISLAND BABY",
+      "alive": true,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 025"
+      ],
+      "ownerName": [
+       "Restaino, Lauren (INDIVIDUAL; USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "87488918",
+     "score": 15.808296,
+     "source": {
+      "wordmark": "ISLAND BABY",
+      "alive": false,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 025",
+       "IC 028"
+      ],
+      "ownerName": [
+       "Joanna Stamoulis (INDIVIDUAL; POLAND)",
+       "Mary Kay Bishop (INDIVIDUAL; USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "88872044",
+     "score": 15.76962,
+     "source": {
+      "wordmark": "ISLAND BABY",
+      "alive": true,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 003"
+      ],
+      "ownerName": [
+       "Stacey Lawrence Johnson (INDIVIDUAL; USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "77003843",
+     "score": 15.718001,
+     "source": {
+      "wordmark": "ISLAND BABY",
+      "alive": false,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 024"
+      ],
+      "ownerName": [
+       "Rivera, Jodie L (INDIVIDUAL; USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "77191572",
+     "score": 13.570326,
+     "source": {
+      "wordmark": "NATURAL ISLAND BABY",
+      "alive": false,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 003"
+      ],
+      "ownerName": [
+       "Natural Island Baby, LLC (LIMITED LIABILITY COMPANY; HAWAII, USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "74703283",
+     "score": 13.533142,
+     "source": {
+      "wordmark": "BATH ISLAND BABY",
+      "alive": false,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 003"
+      ],
+      "ownerName": [
+       "Bath Island, Inc. (CORPORATION; NEW YORK, USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "85002662",
+     "score": 13.531635,
+     "source": {
+      "wordmark": "ALOHA ISLAND BABY",
+      "alive": false,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 041"
+      ],
+      "ownerName": [
+       "Smith, Darla K (PARTNERSHIP; HAWAII, USA)",
+       "Smith, Todd L (PARTNERSHIP; HAWAII, USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "85552052",
+     "score": 13.531635,
+     "source": {
+      "wordmark": "CONEY ISLAND BABY",
+      "alive": false,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 028"
+      ],
+      "ownerName": [
+       "Toy-Toon Creations (CORPORATION; MICHIGAN, USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "88158811",
+     "score": 11.909395,
+     "source": {
+      "wordmark": "ISLAND BABY CLOTHING COMPANY",
+      "alive": true,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 025"
+      ],
+      "ownerName": [
+       "Island Baby, LLC (LIMITED LIABILITY COMPANY; FLORIDA, USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "97157951",
+     "score": 11.879015,
+     "source": {
+      "wordmark": "LONG ISLAND BABY FENCE",
+      "alive": true,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 037"
+      ],
+      "ownerName": [
+       "CLEAR WATER & SUN, LLC (LIMITED LIABILITY COMPANY; NEW YORK, USA)",
+       "SPH OUTDOOR SERVICES CORPORATION (CORPORATION; NEW YORK, USA)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "79148892",
+     "score": 10.581192,
+     "source": {
+      "wordmark": "BABYISLAND - SEA ISLAND+BABY CASHMERE",
+      "alive": true,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 023",
+       "IC 024"
+      ],
+      "ownerName": [
+       "EMILCOTONI S.p.A. (Societa' Per Azioni; ITALY)"
+      ]
+     }
+    },
+    {
+     "index": "tmsearch-index",
+     "type": "_doc",
+     "id": "77284458",
+     "score": 8.741959,
+     "source": {
+      "wordmark": "THE ISLAND BABY COLLECTION KOKONUT KOAST WWW.KOKONUTKOAST.COM",
+      "alive": false,
+      "serialNumber": null,
+      "internationalClass": [
+       "IC 025"
+      ],
+      "ownerName": [
+       "Rivera, Jodie (INDIVIDUAL; USA)",
+       "MUDD, CHRISTINE (INDIVIDUAL; USA)"
+      ]
+     }
+    }
+   ]
+  }
+ },
+ "main": {
+  "took": 9,
+  "timedOut": false,
+  "shardsTotal": 5,
+  "shardsSuccessful": 5,
+  "shardsSkipped": 0,
+  "shardsFailed": 0,
+  "hits": {
+   "totalValue": 0,
+   "totalRelation": "eq",
+   "maxScore": null,
+   "hits": []
+  }
+ }
+}

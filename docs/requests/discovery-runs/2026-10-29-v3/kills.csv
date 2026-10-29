@@ -1,0 +1,563 @@
+domain,price,bids,age,end,kill_stage,kill_detail
+definegroup.com,$46.00,11,26,2026-10-29T20:47:00+02:00,prior_exclude,2026-10-28-fullfield:brand_corp_form
+axisprime.com,$30.00,8,14,2026-10-30T18:04:00+02:00,prior_exclude,2026-10-28-fullfield:prior_exclude
+snowglow.com,$26.00,7,30,2026-10-31T19:56:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+fitadvice.com,$21.00,7,25,2026-11-01T19:07:00+02:00,prior_exclude,2026-10-28-fullfield:prior_exclude
+adventuredeals.com,$21.00,6,23,2026-10-31T19:25:00+02:00,meaning_not_service,deals = category not named paid service; $21 6 bids
+startupatlas.com,$6.00,2,11,2026-10-30T21:31:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_coinage
+rcholdings.com,$1.00,1,12,2026-10-30T20:35:00+02:00,prior_exclude,2026-10-28-fullfield:brand_corp_form
+puravista.com,$1.00,1,20,2026-10-30T21:49:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+sdconnect.com,$1.00,1,30,2026-10-31T18:04:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+avtoto.com,$1.00,1,20,2026-10-31T21:46:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+polinfo.com,$1.00,1,30,2026-10-31T22:19:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+actionchurch.com,$1.00,1,21,2026-11-01T18:13:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+lifefield.com,$1.00,1,18,2026-11-01T18:16:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+minished.com,$40.00,10,17,2026-10-30T23:12:00+02:00,prior_exclude,declined_dvir
+rachelk.com,$1.00,1,20,2026-10-31T23:16:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+beschenkt.com,$1.00,1,11,2026-10-29T21:44:00+02:00,prior_exclude,2026-10-28-fullfield:prior_exclude
+maxbr.com,$1.00,1,23,2026-10-31T18:37:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+torrentfilm.com,$26.00,6,18,2026-10-29T21:23:00+02:00,prior_exclude,2026-10-28-fullfield:adult_piracy
+gtband.com,$1.00,1,26,2026-10-29T23:18:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+successstreet.com,$33.00,5,29,2026-10-30T19:40:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_slogan
+softcoded.com,$6.00,2,23,2026-10-31T19:13:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+risemail.com,$38.00,3,9,2026-10-30T18:44:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+redgig.com,$7.00,3,20,2026-10-30T19:49:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+lacorrection.com,$1.00,1,19,2026-10-29T21:02:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+smartessay.com,$1.00,1,24,2026-10-30T18:47:00+02:00,prior_exclude,2026-10-28-fullfield:adult_piracy
+peakagility.com,$1.00,1,12,2026-10-30T21:47:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+bonemasters.com,$1.00,1,16,2026-10-30T22:11:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal
+mamaplay.com,$1.00,1,19,2026-11-01T19:07:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+artback.com,$11.00,3,28,2026-10-29T21:42:00+02:00,prior_exclude,2026-10-28-fullfield:prior_exclude
+sendant.com,$37.00,9,21,2026-10-29T22:30:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+dealhappy.com,$6.00,2,20,2026-10-31T19:26:00+02:00,prior_exclude,2026-10-28-fullfield:prior_exclude
+thcinc.com,$1.00,1,27,2026-10-29T22:31:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_code
+arborcoin.com,$1.00,1,17,2026-10-29T22:54:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+biblesanctuary.com,$1.00,1,16,2026-10-30T19:01:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+brownstonehome.com,$1.00,1,13,2026-10-30T20:57:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+wealthkings.com,$1.00,1,25,2026-10-30T22:07:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+tisdaleplumbing.com,$11.00,3,21,2026-10-30T19:46:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+wonderus.com,$1.00,1,7,2026-10-30T21:15:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_pronoun
+ordeath.com,$1.00,1,22,2026-10-29T20:25:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+ncavi.com,$1.00,1,17,2026-10-29T21:24:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+mitcheltree.com,$1.00,1,25,2026-10-30T20:37:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal_or_brand
+ciderridge.com,$1.00,1,12,2026-10-31T18:17:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+ravenblade.com,$1.00,1,25,2026-10-31T18:33:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+unequally.com,$1.00,1,14,2026-10-31T21:52:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+ohventures.com,$1.00,1,17,2026-11-01T18:10:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+sohosuites.com,$6.00,2,24,2026-10-30T18:42:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+azequip.com,$11.00,3,12,2026-10-31T19:20:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+dcpros.com,$6.00,2,15,2026-10-31T23:10:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+clickbebe.com,$1.00,1,27,2026-10-29T23:19:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+grandlift.com,$1.00,1,15,2026-10-30T19:52:00+02:00,meaning_shape,local/geo business or person name
+cddisc.com,$1.00,1,25,2026-10-30T21:49:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+sushiworkshop.com,$1.00,1,11,2026-10-30T19:31:00+02:00,prior_exclude,hold_gavriel
+mytotalpro.com,$6.00,2,12,2026-10-30T18:08:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+passivelife.com,$6.00,2,20,2026-10-31T22:58:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+focusmfg.com,$1.00,1,10,2026-10-31T20:07:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+danielstable.com,$1.00,1,8,2026-10-30T19:22:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal_or_brand
+chateaucove.com,$1.00,1,8,2026-10-31T20:37:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+pickyourplan.com,$6.00,2,22,2026-10-29T22:13:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_slogan_pronoun
+displio.com,$1.00,1,12,2026-10-29T21:26:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+peterphipps.com,$1.00,1,6,2026-10-30T21:05:00+02:00,prior_exclude,2026-10-28-fullfield:personal_name
+techconsort.com,$1.00,1,12,2026-10-30T21:57:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+filerail.com,$1.00,1,16,2026-10-30T21:13:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+fruitluck.com,$1.00,1,20,2026-10-30T23:00:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+gamingrewards.com,$1.00,1,25,2026-10-31T20:24:00+02:00,prior_exclude,2026-10-28-fullfield:prior_exclude
+scopescientific.com,$1.00,1,12,2026-10-30T19:19:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+adanimate.com,$1.00,1,10,2026-10-30T18:17:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+rometoday.com,$1.00,1,27,2026-10-30T21:08:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_slogan
+biosns.com,$1.00,1,9,2026-10-29T22:26:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+starsgirl.com,$1.00,1,20,2026-10-30T18:46:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+kitmd.com,$1.00,1,17,2026-10-29T21:40:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+wikicasinos.com,$1.00,1,16,2026-10-29T23:02:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+gotula.com,$1.00,1,15,2026-10-31T23:13:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+cafeia.com,$1.00,1,3,2026-10-29T22:27:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+crescendofinancial.com,$1.00,1,17,2026-10-29T19:41:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+edsautorepair.com,$1.00,1,19,2026-10-31T19:06:00+02:00,meaning_shape,local/geo business or person name
+klairon.com,$1.00,1,12,2026-10-30T19:59:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+abenda.com,$1.00,1,20,2026-10-30T18:31:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+ultraheart.com,$6.00,2,20,2026-10-30T21:16:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_slogan_or_product
+paradisehide.com,$11.00,3,25,2026-10-29T23:24:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+turbosafe.com,$11.00,3,11,2026-10-29T23:01:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+dubish.com,$1.00,1,26,2026-10-29T21:26:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+harprefinance.com,$1.00,1,14,2026-10-29T20:04:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+dynamicrepublic.com,$1.00,1,14,2026-10-29T19:37:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+advantagesuite.com,$1.00,1,26,2026-10-30T19:46:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+homeownerclaims.com,$1.00,1,25,2026-10-31T22:01:00+02:00,firm_screen_0,§10 0 exact phrase on 2 fetched; 1 ERROR 403
+bodybuildo.com,$1.00,1,12,2026-10-31T23:15:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+collegelove.com,$1.00,1,26,2026-10-31T19:01:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+photoncloud.com,$1.00,1,26,2026-10-30T19:15:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_coinage
+codelug.com,$1.00,1,5,2026-10-30T22:00:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+deepfirm.com,$1.00,1,13,2026-10-31T21:05:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+hotelkral.com,$1.00,1,25,2026-10-29T19:42:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+hornblum.com,$1.00,1,14,2026-10-29T20:35:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+teleportin.com,$1.00,1,6,2026-10-29T22:21:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+grannysplace.com,$1.00,1,28,2026-10-29T22:37:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+acrosscapital.com,$6.00,2,18,2026-10-29T22:10:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+amopio.com,$1.00,1,9,2026-10-29T19:40:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+montowa.com,$1.00,1,20,2026-10-30T19:10:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+wisoca.com,$1.00,1,19,2026-10-30T22:00:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+himpom.com,$11.00,4,1,2026-10-29T21:11:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+drjimmychan.com,$1.00,1,9,2026-10-29T19:46:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+pangiaraks.com,$1.00,1,23,2026-10-29T21:36:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+techflavour.com,$1.00,1,17,2026-10-30T18:44:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+happyjay.com,$1.00,1,24,2026-10-29T21:22:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+guyscuts.com,$1.00,1,1,2026-10-29T22:44:00+02:00,prior_exclude,2026-10-28-v3:firm_screen_0
+mlpalace.com,$1.00,1,6,2026-10-29T19:31:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+arborchess.com,$1.00,1,17,2026-10-29T19:39:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+seorio.com,$1.00,1,2,2026-10-30T20:51:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_code
+yesshort.com,$1.00,1,2,2026-10-31T21:48:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+whiskstl.com,$1.00,1,14,2026-10-30T19:29:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+rotordoc.com,$1.00,1,30,2026-10-31T21:30:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+euappliances.com,$1.00,1,14,2026-10-29T20:18:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+biasedmemoirs.com,$1.00,1,12,2026-10-29T21:15:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+flabbyphysics.com,$1.00,1,16,2026-10-29T21:46:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+superiorinsights.com,$1.00,1,10,2026-10-30T19:08:00+02:00,meaning_shape,3+ words / phrase
+choosetechnology.com,$1.00,1,13,2026-10-31T20:14:00+02:00,meaning_shape,3+ words / phrase
+surgeryboard.com,$1.00,1,26,2026-10-31T22:19:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+onpointroofing.com,$6.00,3,8,2026-10-29T22:29:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+rvora.com,$1.00,1,1,2026-10-30T19:04:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_code
+omnihousing.com,$1.00,1,26,2026-10-31T18:53:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+tenprofit.com,$1.00,1,9,2026-10-29T21:49:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+heedfoods.com,$1.00,1,9,2026-10-30T23:08:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_product_retail
+wristto.com,$1.00,1,3,2026-10-30T21:30:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+gummymaker.com,$1.00,1,3,2026-10-29T21:25:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+richfy.com,$1.00,1,12,2026-10-30T21:26:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_coinage
+raidverse.com,$1.00,1,6,2026-10-30T23:04:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_coinage
+lisztrestoration.com,$1.00,1,24,2026-10-31T21:30:00+02:00,meaning_shape,3+ words / phrase
+snowplowsolutions.com,$1.00,1,17,2026-11-01T19:16:00+02:00,r_one_local_business,single same-name WI firm Snow Plow Solutions Inc
+northnil.com,$1.00,1,1,2026-10-30T19:00:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+divinelifecoach.com,$1.00,1,13,2026-10-30T21:40:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_local_or_brand
+medhairclinic.com,$1.00,1,9,2026-10-31T18:17:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+velocitysi.com,$1.00,1,1,2026-10-29T22:50:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+mythosnyc.com,$1.00,1,17,2026-10-31T18:39:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+whizenergy.com,$1.00,1,14,2026-10-29T22:22:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+wisegum.com,$1.00,1,14,2026-10-30T19:13:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+regalgifts.com,$1.00,1,21,2026-10-30T22:29:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_product_retail
+visaliadental.com,$1.00,1,22,2026-10-29T19:39:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+mailvouch.com,$1.00,1,12,2026-11-01T18:45:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+caaspre.com,$1.00,1,17,2026-10-29T22:54:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+sunenta.com,$1.00,1,17,2026-10-30T18:16:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+lumitac.com,$1.00,1,16,2026-10-31T18:23:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+sharefunnel.com,$1.00,1,13,2026-10-31T18:35:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+robotshapers.com,$1.00,1,8,2026-10-29T22:36:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+eyehealthplus.com,$1.00,1,20,2026-10-31T19:09:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+stoneandstem.com,$1.00,1,3,2026-10-29T19:43:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+whywhey.com,$1.00,1,26,2026-10-30T19:05:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+icelawsuit.com,$1.00,1,1,2026-10-29T22:58:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+artfromgod.com,$1.00,1,28,2026-10-29T22:38:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+lombokcare.com,$1.00,1,19,2026-10-29T23:06:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+solutionite.com,$1.00,1,18,2026-10-30T21:20:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+endersonelectric.com,$1.00,1,15,2026-10-29T21:47:00+02:00,meaning_shape,3+ words / phrase
+bayareaobserver.com,$1.00,1,17,2026-10-30T19:16:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+prlatest.com,$1.00,1,1,2026-10-31T20:57:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+explorics.com,$1.00,1,16,2026-10-29T22:58:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+frijolesca.com,$1.00,1,6,2026-10-30T21:05:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+getdirectmail.com,$1.00,1,25,2026-10-29T20:54:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+geramiacademy.com,$1.00,1,18,2026-10-31T18:49:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+vinanailspa.com,$1.00,1,,2026-10-29T20:41:00+02:00,meaning_shape,local/geo business or person name
+relogeek.com,$1.00,1,13,2026-10-30T18:41:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+cloudsbase.com,$1.00,1,14,2026-10-30T19:37:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+leadascend.com,$1.00,1,10,2026-10-30T20:09:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+seeperfect.com,$1.00,1,27,2026-10-30T22:46:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+realtysquad.com,$1.00,1,11,2026-10-31T18:36:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+naplesloan.com,$1.00,1,28,2026-10-31T21:14:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+nopolonews.com,$11.00,3,18,2026-10-30T19:25:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+dormclips.com,$1.00,1,16,2026-10-29T20:38:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+applelean.com,$1.00,1,11,2026-10-29T21:12:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+shootribe.com,$1.00,1,26,2026-10-30T18:26:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+buyscopes.com,$1.00,1,20,2026-10-30T23:17:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+cantfold.com,$1.00,1,4,2026-10-29T19:30:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+odaptos.com,$1.00,1,6,2026-11-01T18:22:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+petsbee.com,$1.00,1,7,2026-10-29T22:01:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+thisissoon.com,$1.00,1,13,2026-10-30T19:07:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+flomatonhs.com,$1.00,1,13,2026-10-31T21:24:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+gatewayion.com,$1.00,1,8,2026-10-31T23:11:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+destinationhaiti.com,$1.00,1,22,2026-10-29T21:08:00+02:00,meaning_shape,3+ words / phrase
+homeinawe.com,$1.00,1,9,2026-10-29T23:06:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+crystaldelivery.com,$1.00,1,18,2026-10-30T21:54:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_weak_not_review
+whatsapgroup.com,$1.00,1,6,2026-10-29T22:17:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+homeproducer.com,$1.00,1,24,2026-10-30T21:26:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+hopimarket.com,$1.00,1,29,2026-10-29T21:35:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+badwerewolf.com,$1.00,1,15,2026-10-29T22:37:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+goldenlooms.com,$1.00,1,26,2026-10-29T23:08:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+fallpoker.com,$1.00,1,9,2026-10-30T18:48:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_adult_gambling
+swervesalon.com,$1.00,1,20,2026-10-30T19:42:00+02:00,meaning_shape,local/geo business or person name
+browsercad.com,$1.00,1,14,2026-10-31T18:06:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+riddledata.com,$1.00,1,26,2026-10-31T22:14:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+ommpharmacy.com,$1.00,1,6,2026-10-29T22:32:00+02:00,meaning_shape,local/geo business or person name
+notaryseminars.com,$1.00,1,26,2026-10-29T20:44:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+orchardflowers.com,$1.00,1,6,2026-10-31T21:37:00+02:00,meaning_shape,local/geo business or person name
+motorcrave.com,$1.00,1,5,2026-10-29T20:26:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+casinoattitude.com,$1.00,1,7,2026-10-29T20:37:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+neilrushdmd.com,$1.00,1,9,2026-10-30T22:38:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+figoures.com,$1.00,1,7,2026-10-30T19:09:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+makingmenbook.com,$1.00,1,15,2026-10-29T21:45:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+stoutcyclery.com,$1.00,1,11,2026-10-29T21:49:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+bestiankelly.com,$1.00,1,18,2026-10-29T22:22:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+allcleartree.com,$1.00,1,10,2026-10-31T18:32:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+changeseed.com,$1.00,1,8,2026-10-29T19:58:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+phloxsoftware.com,$1.00,1,16,2026-10-29T21:08:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+incarnategame.com,$1.00,1,12,2026-10-29T21:20:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+lincolntourism.com,$1.00,1,23,2026-10-30T19:23:00+02:00,prior_exclude,2026-10-28-fullfield:prior_exclude
+bobblesolutions.com,$1.00,1,20,2026-10-30T22:35:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_coinage
+affordablelumber.com,$1.00,1,10,2026-10-31T19:34:00+02:00,review_only_budget,meaning OK (retail category); USPTO clear; firm screen not run (call budget)
+rewardmyself.com,$1.00,1,14,2026-11-01T19:14:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+agilecmo.com,$1.00,1,14,2026-11-01T19:19:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+thudtech.com,$1.00,1,2,2026-10-29T22:43:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+coveredvpn.com,$1.00,1,7,2026-10-29T23:09:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+elitebankruptcy.com,$1.00,1,5,2026-11-01T18:04:00+02:00,meaning_brand_modifier,elite+service = brand form; .com unreachable
+wannabelabs.com,$1.00,1,4,2026-10-31T22:13:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+ipprox.com,$1.00,1,1,2026-10-30T20:23:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+cloudsqale.com,$1.00,1,8,2026-10-30T20:53:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+gateseo.com,$1.00,1,2,2026-10-31T18:31:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+cldiner.com,$1.00,1,2,2026-10-31T19:56:00+02:00,meaning_shape,local/geo business or person name
+bucklecars.com,$1.00,1,8,2026-10-29T20:14:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+greerlawyer.com,$1.00,1,8,2026-10-31T19:29:00+02:00,meaning_shape,local/geo business or person name
+prospectworldwide.com,$1.00,1,10,2026-10-29T20:17:00+02:00,meaning_shape,3+ words / phrase
+alamedaoptometrist.com,$1.00,1,13,2026-10-29T20:20:00+02:00,meaning_shape,local/geo business or person name
+connollybraces.com,$1.00,1,14,2026-10-29T20:46:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+republicclaims.com,$1.00,1,14,2026-10-29T21:24:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+newyorklessons.com,$1.00,1,16,2026-10-29T21:37:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+uselessramblings.com,$1.00,1,11,2026-10-29T22:46:00+02:00,meaning_shape,3+ words / phrase
+qualityadditions.com,$1.00,1,19,2026-10-29T22:55:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+cyberforesight.com,$1.00,1,15,2026-10-29T23:05:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+trunkingnetwork.com,$1.00,1,10,2026-10-30T20:47:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+maturitymarketing.com,$1.00,1,29,2026-10-30T21:46:00+02:00,meaning_shape,3+ words / phrase
+orlandopodiatrist.com,$1.00,1,20,2026-10-30T22:51:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+denverswimming.com,$1.00,1,15,2026-10-31T19:02:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+rewardedefforts.com,$1.00,1,13,2026-10-31T19:40:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+prospectexperience.com,$1.00,1,21,2026-10-31T22:00:00+02:00,meaning_shape,3+ words / phrase
+fiduciarylawyers.com,$1.00,1,13,2026-10-31T22:18:00+02:00,firm_screen_open,exact phrase not on fetched pages; review-only
+wyomingventures.com,$1.00,1,17,2026-11-01T18:48:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+attorneydanville.com,$1.00,1,15,2026-11-01T18:51:00+02:00,meaning_shape,local/geo business or person name
+furnvest.com,$1.00,1,1,2026-10-29T20:29:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+triplesixstudios.com,$1.00,1,16,2026-10-29T22:14:00+02:00,meaning_shape,3+ words / phrase
+ipropertyclaims.com,$1.00,1,10,2026-10-30T18:22:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+fixallplumbing.com,$1.00,1,22,2026-10-30T20:22:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_local_or_brand
+planetairsports.com,$1.00,1,15,2026-10-31T19:52:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+lifetimeperspective.com,$1.00,1,5,2026-10-29T20:32:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+englewooddiner.com,$1.00,1,5,2026-10-31T21:36:00+02:00,meaning_shape,local/geo business or person name
+rankedreviews.com,$1.00,1,2,2026-10-30T22:18:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_weak_not_review
+forexjack.com,$1.00,1,19,2026-10-29T19:37:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+mamaspizzasubs.com,$1.00,1,6,2026-10-30T20:33:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+mrwolfspices.com,$1.00,1,8,2026-10-29T19:32:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+vinesandpints.com,$1.00,1,8,2026-10-30T20:44:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+okcseniorcare.com,$1.00,1,8,2026-10-31T19:25:00+02:00,meaning_shape,local/geo business or person name
+melanotans.com,$1.00,1,2,2026-10-29T19:28:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+kitchensbykenryan.com,$6.00,2,17,2026-10-29T22:47:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+calhounlawyer.com,$1.00,1,8,2026-10-31T18:32:00+02:00,meaning_shape,local/geo business or person name
+bamberglawyer.com,$1.00,1,8,2026-10-31T19:55:00+02:00,meaning_shape,local/geo business or person name
+indiegoods.com,$1.00,1,4,2026-10-29T19:48:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+redneckmade.com,$1.00,1,7,2026-10-30T18:24:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+youthincome.com,$1.00,1,1,2026-10-29T21:11:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+drdeansmith.com,$1.00,1,23,2026-10-29T23:12:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+bikesonthebayou.com,$1.00,1,12,2026-10-29T19:28:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+shishmahalcuisine.com,$1.00,1,19,2026-10-29T19:52:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+besocialgetsuccess.com,$1.00,1,15,2026-10-29T19:56:00+02:00,meaning_shape,3+ words / phrase
+washndrylubbock.com,$1.00,1,12,2026-10-29T20:03:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+hinichijourecords.com,$1.00,1,13,2026-10-29T21:23:00+02:00,meaning_shape,3+ words / phrase
+hautboisdormant.com,$1.00,1,25,2026-10-29T21:50:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+castleprophouse.com,$1.00,1,13,2026-10-29T21:53:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+segoautomation.com,$1.00,1,12,2026-10-29T22:01:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+akroninjurylawyers.com,$1.00,1,24,2026-10-30T18:04:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+thestrattoninn.com,$1.00,1,18,2026-10-31T22:49:00+02:00,meaning_shape,local/geo business or person name
+adorablepharma.com,$1.00,1,4,2026-10-29T21:25:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+sasoapies.com,$1.00,1,10,2026-10-29T20:06:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+saytreees.com,$1.00,1,10,2026-10-29T21:22:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+parential.com,$1.00,1,13,2026-10-29T21:33:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+gamesiyo.com,$1.00,1,20,2026-10-29T23:18:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+teeminder.com,$1.00,1,10,2026-10-30T18:18:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+runadata.com,$1.00,1,11,2026-10-30T19:59:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+hoozrite.com,$1.00,1,15,2026-10-30T20:52:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+ctntworld.com,$1.00,1,19,2026-10-30T23:02:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+avenirapt.com,$1.00,1,13,2026-10-31T18:16:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+shopsaltnow.com,$1.00,1,6,2026-10-29T20:38:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+playaztech.com,$1.00,1,6,2026-10-31T21:51:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+woohabrewing.com,$1.00,1,13,2026-10-29T22:46:00+02:00,meaning_shape,local/geo business or person name
+gogohood.com,$1.00,1,5,2026-10-29T21:42:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+meoniskitchen.com,$1.00,1,7,2026-10-31T20:45:00+02:00,meaning_shape,local/geo business or person name
+datefreely.com,$1.00,1,5,2026-10-30T18:12:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_adult_gambling
+halterproperties.com,$1.00,1,7,2026-10-29T20:00:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+getconversational.com,$1.00,1,7,2026-10-29T21:25:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_slogan_or_product
+chesterfieldlawyer.com,$1.00,1,8,2026-10-31T19:31:00+02:00,meaning_shape,local/geo business or person name
+oconeeattorney.com,$1.00,1,8,2026-10-31T19:39:00+02:00,meaning_shape,local/geo business or person name
+easleyattorney.com,$1.00,1,8,2026-10-31T19:50:00+02:00,meaning_shape,local/geo business or person name
+clarendonlawyer.com,$1.00,1,8,2026-10-31T19:53:00+02:00,meaning_shape,local/geo business or person name
+clarendonattorney.com,$1.00,1,8,2026-10-31T20:55:00+02:00,meaning_shape,local/geo business or person name
+winthropattorney.com,$1.00,1,8,2026-10-31T21:10:00+02:00,meaning_shape,local/geo business or person name
+bambergattorney.com,$1.00,1,8,2026-10-31T21:20:00+02:00,meaning_shape,local/geo business or person name
+kershawattorney.com,$1.00,1,8,2026-10-31T22:56:00+02:00,meaning_shape,local/geo business or person name
+aromacuisine.com,$1.00,1,1,2026-10-29T20:43:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+christopherlandau.com,$1.00,1,6,2026-10-30T22:07:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal_or_brand
+saymcintosh.com,$1.00,1,1,2026-10-31T18:11:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+maitregims.com,$1.00,1,15,2026-10-29T19:32:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+getfeetwet.com,$1.00,1,26,2026-10-29T20:36:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+cabermusic.com,$1.00,1,28,2026-10-29T20:52:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+brestrading.com,$1.00,1,25,2026-10-29T22:10:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+softwiseusa.com,$1.00,1,24,2026-10-30T19:00:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+terrosatech.com,$1.00,1,18,2026-10-30T19:53:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+kailuapreschool.com,$1.00,1,3,2026-10-30T23:22:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+betworm.com,$1.00,1,4,2026-10-31T20:27:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+montarctica.com,$1.00,1,13,2026-10-31T20:42:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+rodriguezreyes.com,$1.00,1,1,2026-10-29T19:58:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal
+santafelimo.com,$1.00,1,17,2026-10-31T22:37:00+02:00,meaning_shape,local/geo business or person name
+giramondobike.com,$1.00,1,5,2026-10-29T20:20:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+loreandleaf.com,$1.00,1,3,2026-10-29T23:08:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+swayhairsalon.com,$1.00,1,6,2026-10-29T20:28:00+02:00,meaning_shape,local/geo business or person name
+nagatadds.com,$1.00,1,4,2026-10-30T19:37:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+pragbet.com,$1.00,1,8,2026-10-30T19:50:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+proactivepursuits.com,$1.00,1,6,2026-10-30T18:44:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+felonyguys.com,$1.00,1,5,2026-10-29T22:22:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+opulentowls.com,$1.00,1,5,2026-10-30T22:36:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+creditheist.com,$1.00,1,5,2026-11-01T18:56:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+customparametric.com,$1.00,1,7,2026-10-29T20:29:00+02:00,meaning_shape,3+ words / phrase
+americafacilities.com,$1.00,1,7,2026-10-31T18:52:00+02:00,meaning_shape,3+ words / phrase
+gymscottsdale.com,$1.00,1,1,2026-10-30T18:41:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+bookartbookmarks.com,$1.00,1,8,2026-10-29T20:23:00+02:00,meaning_shape,3+ words / phrase
+happyeverydayenglish.com,$1.00,1,8,2026-10-29T23:06:00+02:00,meaning_shape,3+ words / phrase
+baankhunredbank.com,$1.00,1,8,2026-10-30T18:39:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+antoniettipizzeria.com,$1.00,1,8,2026-10-30T19:07:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+heliarcguitars.com,$1.00,1,8,2026-10-30T21:49:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+downtownbluescoffee.com,$1.00,1,8,2026-10-31T18:56:00+02:00,meaning_shape,local/geo business or person name
+newpekingpalace.com,$1.00,1,8,2026-10-31T19:46:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+thetimecure.com,$1.00,1,9,2026-10-29T22:04:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_slogan_pronoun
+lantanadumpster.com,$1.00,1,2,2026-10-31T20:20:00+02:00,meaning_shape,local/geo business or person name
+rvbuysmart.com,$1.00,1,9,2026-10-31T21:51:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+clueverse.com,$6.00,2,1,2026-10-30T19:31:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_coinage
+plushbuyus.com,$1.00,1,3,2026-10-30T18:58:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+richardsiken.com,$1.00,1,14,2026-10-29T20:54:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+genovesepizza.com,$1.00,1,13,2026-10-29T22:05:00+02:00,meaning_shape,local/geo business or person name
+guerillatree.com,$1.00,1,15,2026-10-29T22:24:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+worldcheckid.com,$1.00,1,10,2026-10-29T22:38:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+madopsmedia.com,$1.00,1,4,2026-10-29T22:03:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+codibank.com,$1.00,1,6,2026-10-29T19:55:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+traballi.com,$1.00,1,3,2026-10-31T19:53:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+criminalguys.com,$1.00,1,5,2026-10-29T19:33:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+chloemelbourne.com,$6.00,2,1,2026-10-29T22:38:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal_or_brand
+paintsolo.com,$1.00,1,3,2026-10-31T21:35:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+birdieelectric.com,$1.00,1,6,2026-10-29T21:43:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+scottsdaleequity.com,$1.00,1,6,2026-10-31T20:59:00+02:00,meaning_shape,3+ words / phrase
+myramacpherson.com,$1.00,1,7,2026-10-29T20:42:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+asiantasteofkenosha.com,$1.00,1,7,2026-10-29T22:10:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+footballtodaypodcast.com,$1.00,1,7,2026-10-29T22:10:00+02:00,meaning_shape,3+ words / phrase
+allstarpizzapasta.com,$1.00,1,7,2026-10-30T18:27:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+geliatnusantara.com,$1.00,1,7,2026-10-30T23:20:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+excellentroofer.com,$1.00,1,1,2026-10-30T19:43:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_local_trade_brand
+sandwichevolution.com,$1.00,1,1,2026-10-31T23:24:00+02:00,meaning_shape,local/geo business or person name
+shopjuneandco.com,$1.00,1,8,2026-10-29T23:11:00+02:00,meaning_shape,local/geo business or person name
+rvpricecheck.com,$1.00,1,9,2026-10-31T19:26:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+disinishop.com,$1.00,1,3,2026-10-30T19:19:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+stmelschool.com,$1.00,1,1,2026-10-30T22:03:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+mananmindcare.com,$1.00,1,4,2026-10-29T20:11:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+bakewithnari.com,$1.00,1,4,2026-10-29T21:37:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+spicysbar.com,$1.00,1,2,2026-10-30T23:25:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+rosapizzatogo.com,$1.00,1,4,2026-10-31T21:02:00+02:00,meaning_shape,local/geo business or person name
+thebrandblueprint.com,$1.00,1,3,2026-10-31T22:09:00+02:00,meaning_shape,local/geo business or person name
+luxurytravelinasia.com,$1.00,1,12,2026-10-29T20:17:00+02:00,meaning_shape,3+ words / phrase
+casinomorongoresort.com,$1.00,1,22,2026-10-29T20:40:00+02:00,meaning_shape,3+ words / phrase
+funnyrat.com,$1.00,1,1,2026-10-30T20:37:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+bowpointnursery.com,$1.00,1,22,2026-10-30T21:47:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+pharmaahead.com,$1.00,1,3,2026-10-29T19:49:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+cashlaundry.com,$1.00,1,3,2026-10-29T20:43:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_weak_not_review
+panthersound.com,$1.00,1,1,2026-10-29T23:21:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+vstavern.com,$1.00,1,2,2026-10-29T23:23:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_code
+fortypalms.com,$1.00,1,3,2026-10-30T18:21:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+curryprep.com,$1.00,1,2,2026-10-31T23:18:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+metaversegetaways.com,$1.00,1,5,2026-10-29T22:14:00+02:00,meaning_shape,3+ words / phrase
+urbannutrients.com,$1.00,1,5,2026-10-29T22:21:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+medleysmusings.com,$1.00,1,5,2026-10-29T22:27:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+infantinjuries.com,$1.00,1,5,2026-10-29T22:36:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+vegasneurologist.com,$1.00,1,5,2026-10-30T23:09:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+artemispsychotherapy.com,$1.00,1,5,2026-10-31T22:01:00+02:00,meaning_shape,3+ words / phrase
+negotiationisover.com,$1.00,1,5,2026-10-29T20:46:00+02:00,meaning_shape,3+ words / phrase
+voiceofamericas.com,$1.00,1,6,2026-10-29T21:53:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+ohanaautomotive.com,$1.00,1,6,2026-10-29T22:30:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+anlaothaicuisine.com,$1.00,1,6,2026-10-31T19:13:00+02:00,meaning_shape,local/geo business or person name
+rawandsauce.com,$1.00,1,7,2026-10-29T20:09:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+dotbye.com,$1.00,1,1,2026-10-31T19:35:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+cuppatosa.com,$1.00,1,6,2026-10-30T22:08:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+hanahanlawyer.com,$1.00,1,8,2026-10-31T18:01:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+networkrapp.com,$1.00,1,2,2026-10-29T21:49:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+tastybirria.com,$1.00,1,2,2026-10-30T23:17:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+botanaflowers.com,$1.00,1,3,2026-10-29T21:12:00+02:00,meaning_shape,local/geo business or person name
+memesrockwood.com,$1.00,1,3,2026-10-30T18:07:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+skinmedicalsd.com,$1.00,1,3,2026-10-31T22:22:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+vannamstudios.com,$1.00,1,3,2026-11-01T18:32:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+techstylus.com,$1.00,1,1,2026-10-29T21:05:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+tintedcasino.com,$1.00,1,3,2026-10-29T23:08:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+clicheatlanta.com,$1.00,1,3,2026-10-31T22:19:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+hampsteadroofing.com,$1.00,1,3,2026-10-31T23:00:00+02:00,meaning_shape,local/geo business or person name
+dallasallstars.com,$1.00,1,18,2026-10-29T19:50:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+rockymaids.com,$1.00,1,2,2026-10-29T19:54:00+02:00,meaning_shape,local/geo business or person name
+pawprintreminders.com,$1.00,1,23,2026-10-29T20:06:00+02:00,meaning_shape,3+ words / phrase
+softwaremadeart.com,$1.00,1,23,2026-10-29T20:46:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+romantictoursinc.com,$1.00,1,22,2026-10-29T20:53:00+02:00,meaning_shape,3+ words / phrase
+livecasinopartners.com,$1.00,1,18,2026-10-29T21:11:00+02:00,meaning_shape,3+ words / phrase
+camtriplehelix.com,$1.00,1,19,2026-10-29T21:17:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+shortpantspress.com,$1.00,1,22,2026-10-29T21:36:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+fincalosgigantes.com,$1.00,1,14,2026-10-29T21:58:00+02:00,meaning_shape,3+ words / phrase
+scamdeck.com,$1.00,1,1,2026-10-29T22:04:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_brand_coinage
+jedplumbingandgas.com,$1.00,1,14,2026-10-29T22:23:00+02:00,meaning_shape,local/geo business or person name
+highpointsoftware.com,$1.00,1,25,2026-10-29T22:49:00+02:00,meaning_shape,3+ words / phrase
+abilityinsofkaty.com,$1.00,1,14,2026-10-29T23:01:00+02:00,meaning_shape,3+ words / phrase
+centsiblechateau.com,$1.00,1,10,2026-10-29T23:17:00+02:00,meaning_shape,3+ words / phrase
+dentdoctorofnevada.com,$1.00,1,19,2026-10-29T23:25:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+crestviewwholesale.com,$1.00,1,19,2026-10-29T23:27:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+weblinksdirectory.com,$1.00,1,23,2026-10-30T18:26:00+02:00,meaning_shape,3+ words / phrase
+officialtechsource.com,$1.00,1,12,2026-10-30T18:47:00+02:00,meaning_shape,3+ words / phrase
+gaystaugustine.com,$1.00,1,14,2026-10-30T19:07:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+sciencebehindsweat.com,$1.00,1,15,2026-10-30T20:13:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+naturaloasisny.com,$1.00,1,21,2026-10-30T20:43:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+allenparkflorist.com,$1.00,1,17,2026-10-30T21:10:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+couponsandrewards.com,$1.00,1,10,2026-10-30T21:16:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+fresnoautobroker.com,$1.00,1,21,2026-10-30T21:39:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+sonnytheplumber.com,$1.00,1,17,2026-10-30T22:49:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal_local
+trustifiedemail.com,$1.00,1,17,2026-10-30T23:04:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+marktangoplumbing.com,$1.00,1,15,2026-10-30T23:12:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal_or_brand
+lungashabalala.com,$1.00,1,13,2026-10-30T23:24:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+northpittsburghhomes.com,$1.00,1,24,2026-10-30T23:28:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+ninasmarketinc.com,$1.00,1,10,2026-10-31T19:02:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+kawaasiankitchen.com,$1.00,1,14,2026-10-31T19:19:00+02:00,meaning_shape,local/geo business or person name
+creditbuildingtools.com,$1.00,1,17,2026-10-31T20:10:00+02:00,meaning_shape,3+ words / phrase
+southbendapartments.com,$1.00,1,24,2026-10-31T20:10:00+02:00,meaning_shape,local/geo business or person name
+brazilianwaxsb.com,$1.00,1,12,2026-10-31T20:56:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+visitcaptivaisland.com,$1.00,1,20,2026-10-31T23:00:00+02:00,meaning_shape,3+ words / phrase
+theburdonfamily.com,$1.00,1,20,2026-11-01T18:10:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+lifejacketstore.com,$1.00,1,28,2026-11-01T18:36:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+shoetara.com,$1.00,1,1,2026-11-01T18:39:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+infusionbarandgrill.com,$1.00,1,12,2026-11-01T19:08:00+02:00,meaning_shape,local/geo business or person name
+paydayhasloansmiry.com,$1.00,1,5,2026-10-29T21:16:00+02:00,meaning_shape,3+ words / phrase
+besthealthynow.com,$1.00,1,5,2026-10-29T21:18:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+sumitsiracademy.com,$1.00,1,5,2026-10-29T21:52:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+realworldballroom.com,$1.00,1,5,2026-10-30T20:25:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+burritoxpresstn.com,$1.00,1,5,2026-10-31T21:36:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+newyorkbudz.com,$1.00,1,6,2026-10-29T20:20:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+thenutritionhabit.com,$1.00,1,3,2026-10-29T19:40:00+02:00,meaning_shape,3+ words / phrase
+casinoderoyal.com,$1.00,1,7,2026-10-29T20:14:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+rawumate.com,$1.00,1,5,2026-10-29T21:56:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+happyhausbbq.com,$1.00,1,2,2026-10-30T19:25:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+thejunkamigos.com,$1.00,1,2,2026-10-30T22:10:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_slogan_pronoun
+theadvisorco.com,$1.00,1,2,2026-10-31T21:16:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+sweetsippinsc.com,$1.00,1,2,2026-10-31T22:04:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+cfwhamptonva.com,$1.00,1,2,2026-10-31T22:55:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+pepwarehouse.com,$1.00,1,1,2026-10-31T18:30:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+plentyofthings.com,$1.00,1,8,2026-10-29T20:18:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+bophago.com,$1.00,1,4,2026-10-30T23:24:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+northshades.com,$1.00,1,1,2026-10-29T20:31:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+brindamosporviajar.com,$1.00,1,9,2026-10-29T23:29:00+02:00,meaning_shape,3+ words / phrase
+nwdirtchurners.com,$1.00,1,9,2026-10-30T19:25:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+boardroomtyler.com,$1.00,1,3,2026-10-29T20:45:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+madhushalagroup.com,$1.00,1,4,2026-10-29T20:00:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+aheadfullofhorror.com,$1.00,1,4,2026-10-29T21:01:00+02:00,meaning_shape,3+ words / phrase
+majalahmandiripnb.com,$1.00,1,4,2026-10-29T22:07:00+02:00,meaning_shape,local/geo business or person name
+thebleukitchen.com,$1.00,1,4,2026-10-30T19:34:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+russellsstpaul.com,$1.00,1,4,2026-11-01T19:00:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+televiperde.com,$1.00,1,5,2026-10-29T22:20:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+cefepime.com,$1.00,1,3,2026-10-30T21:01:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+agneseyewear.com,$1.00,1,6,2026-10-29T20:54:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+homefastfood.com,$1.00,1,1,2026-10-29T22:11:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+casinosguias.com,$1.00,1,1,2026-10-29T22:43:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+javierslatincuisine.com,$1.00,1,7,2026-10-29T21:06:00+02:00,meaning_shape,local/geo business or person name
+meadvillelaw.com,$1.00,1,1,2026-10-29T21:49:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+lunatherapyservices.com,$1.00,1,8,2026-10-30T18:51:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_personal_or_brand
+onrampinsurance.com,$1.00,1,8,2026-10-30T21:05:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+allsystemsgoma.com,$1.00,1,8,2026-10-30T21:19:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+colletonlawyer.com,$1.00,1,8,2026-10-31T18:28:00+02:00,meaning_shape,local/geo business or person name
+ridgelandlawyer.com,$1.00,1,8,2026-10-31T20:22:00+02:00,meaning_shape,local/geo business or person name
+hanahanattorney.com,$1.00,1,8,2026-10-31T20:53:00+02:00,meaning_shape,local/geo business or person name
+northaugustaattorney.com,$1.00,1,8,2026-10-31T20:57:00+02:00,meaning_shape,local/geo business or person name
+northaugustalawyer.com,$1.00,1,8,2026-10-31T21:03:00+02:00,meaning_shape,local/geo business or person name
+darlingtonlawyer.com,$1.00,1,8,2026-10-31T21:16:00+02:00,meaning_shape,local/geo business or person name
+allendaleattorney.com,$1.00,1,8,2026-10-31T21:21:00+02:00,meaning_shape,local/geo business or person name
+colletonattorney.com,$1.00,1,8,2026-10-31T21:25:00+02:00,meaning_shape,local/geo business or person name
+orangeburgattorney.com,$1.00,1,8,2026-10-31T22:14:00+02:00,meaning_shape,local/geo business or person name
+mtpleasantattorney.com,$1.00,1,8,2026-10-31T22:52:00+02:00,meaning_shape,local/geo business or person name
+newberryattorney.com,$1.00,1,8,2026-10-31T23:13:00+02:00,meaning_shape,local/geo business or person name
+darlingtonattorney.com,$1.00,1,8,2026-10-31T23:26:00+02:00,meaning_shape,local/geo business or person name
+ridgelandattorney.com,$1.00,1,8,2026-10-31T23:27:00+02:00,meaning_shape,local/geo business or person name
+designperfects.com,$1.00,1,2,2026-10-29T22:39:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+thethaigardensd.com,$1.00,1,3,2026-10-30T22:05:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+clintonpharmacyms.com,$1.00,1,3,2026-10-30T22:08:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+nowyouglowmedspa.com,$1.00,1,3,2026-10-31T19:29:00+02:00,meaning_shape,local/geo business or person name
+farmersbarnpizzeria.com,$1.00,1,3,2026-10-31T19:57:00+02:00,meaning_shape,3+ words / phrase
+amasirestaurant.com,$1.00,1,3,2026-11-01T19:20:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+seopalmbay.com,$1.00,1,4,2026-10-29T23:19:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+thecaulkguy.com,$1.00,1,4,2026-10-30T19:59:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_slogan_pronoun
+sabairide.com,$1.00,1,2,2026-10-29T21:46:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+tacticalsupplyco.com,$1.00,1,1,2026-10-31T20:37:00+02:00,meaning_shape,3+ words / phrase
+easymoneyhack.com,$1.00,1,5,2026-10-29T23:03:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+texiapp.com,$1.00,1,2,2026-10-31T18:31:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+mrapplication.com,$1.00,1,0,2026-10-30T22:30:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+wildsharkcasino.com,$1.00,1,7,2026-10-29T20:21:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+monteverdebrewingco.com,$1.00,1,7,2026-10-29T20:45:00+02:00,meaning_shape,local/geo business or person name
+casinoderoyals.com,$1.00,1,7,2026-10-29T21:03:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+nashvillecustomglass.com,$1.00,1,7,2026-10-29T21:13:00+02:00,meaning_shape,3+ words / phrase
+casinoderoyale.com,$1.00,1,7,2026-10-29T22:58:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+tarponspringslawyer.com,$1.00,1,7,2026-10-30T21:52:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_geo_local
+homeinsanantonio.com,$1.00,1,7,2026-11-01T18:48:00+02:00,meaning_shape,3+ words / phrase
+cadencerobotics.com,$1.00,1,1,2026-10-31T18:20:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+childinjuryclaims.com,$1.00,1,5,2026-10-29T22:05:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+burnabyfoodequipment.com,$1.00,1,1,2026-10-31T18:31:00+02:00,meaning_shape,3+ words / phrase
+dontshutmeuppod.com,$1.00,1,2,2026-10-29T19:38:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+friperiegrandcoeur.com,$1.00,1,2,2026-10-29T20:43:00+02:00,meaning_shape,local/geo business or person name
+coffeeworldblog.com,$1.00,1,2,2026-10-29T22:15:00+02:00,meaning_shape,local/geo business or person name
+hotelacadiemorangis.com,$1.00,1,2,2026-10-29T22:25:00+02:00,meaning_shape,3+ words / phrase
+tattolasercanarias.com,$1.00,1,2,2026-10-29T22:41:00+02:00,meaning_shape,3+ words / phrase
+nemoseafoodrockport.com,$1.00,1,2,2026-10-30T23:15:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+loficasino.com,$1.00,1,3,2026-10-29T22:20:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+bobthebagel.com,$1.00,1,3,2026-10-29T22:34:00+02:00,prior_exclude,2026-10-28-fullfield:shape_3word_weak
+fanforreal.com,$1.00,1,3,2026-10-30T18:04:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+myfitbot.com,$1.00,1,2,2026-10-29T23:00:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+royaltcakery.com,$1.00,1,4,2026-10-31T20:48:00+02:00,meaning_shape,local/geo business or person name
+gametimeretro.com,$1.00,1,4,2026-10-31T21:41:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+lordcasinomobil.com,$1.00,1,5,2026-10-29T20:08:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+apertiq.com,$1.00,1,1,2026-10-30T19:15:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+clashcoffeeboba.com,$1.00,1,5,2026-10-30T23:09:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+traveltechsiam.com,$1.00,1,6,2026-10-29T20:13:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+metatraderindicators.com,$1.00,1,6,2026-10-29T20:25:00+02:00,meaning_shape,3+ words / phrase
+bluebayfinancial.com,$1.00,1,6,2026-10-29T21:45:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+onegrubcommunity.com,$1.00,1,6,2026-10-29T22:38:00+02:00,meaning_shape,3+ words / phrase
+meetyouatthepo.com,$1.00,1,6,2026-10-29T23:01:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+breakroombrewing.com,$1.00,1,6,2026-11-01T18:40:00+02:00,meaning_shape,local/geo business or person name
+shawnandbrenda.com,$1.00,1,1,2026-10-29T20:00:00+02:00,meaning_shape,local/geo business or person name
+globalbonercasino.com,$1.00,1,1,2026-10-29T20:52:00+02:00,meaning_shape,3+ words / phrase
+mexcalonwheels.com,$1.00,1,1,2026-10-30T22:21:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+apexmobilerepairs.com,$1.00,1,1,2026-10-31T20:11:00+02:00,meaning_shape,local/geo business or person name
+lemongrasskeaau.com,$1.00,1,1,2026-10-31T20:14:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+aminoxtide.com,$1.00,1,2,2026-10-29T20:15:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+alltopquote.com,$1.00,1,2,2026-10-29T23:01:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+thebrandgenie.com,$1.00,1,2,2026-10-31T21:04:00+02:00,meaning_shape,local/geo business or person name
+shamsiefarms.com,$1.00,1,2,2026-11-01T18:04:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+gymfitnessuk.com,$1.00,1,3,2026-10-29T19:56:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+loficasinoguy.com,$1.00,1,3,2026-10-29T21:42:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+valitcard.com,$1.00,1,1,2026-10-29T21:51:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+trylumiva.com,$1.00,1,1,2026-10-30T20:47:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+luckinos.com,$1.00,1,1,2026-10-31T18:40:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+persunalitea.com,$1.00,1,3,2026-10-31T19:16:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+altivaglobal.com,$1.00,1,1,2026-10-30T20:54:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+marketaccesspartners.com,$1.00,1,3,2026-10-31T21:40:00+02:00,meaning_shape,local/geo business or person name
+accuratetemphvac.com,$1.00,1,5,2026-10-29T20:03:00+02:00,meaning_shape,local/geo business or person name
+attorneysplanotx.com,$1.00,1,5,2026-10-29T21:14:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+childinjuryclaim.com,$1.00,1,5,2026-10-29T21:22:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+nightowldenver.com,$1.00,1,5,2026-10-29T21:51:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+planotxattorney.com,$1.00,1,5,2026-10-29T22:12:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+valormobiledetailing.com,$1.00,1,5,2026-10-29T22:49:00+02:00,meaning_shape,3+ words / phrase
+acherrycafelounge.com,$1.00,1,5,2026-10-30T21:56:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+josieandben.com,$1.00,1,1,2026-10-29T19:42:00+02:00,meaning_shape,local/geo business or person name
+shopjackman.com,$1.00,1,1,2026-10-29T20:59:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+nomadahogar.com,$1.00,1,1,2026-10-29T21:26:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+lumenaminos.com,$1.00,1,1,2026-10-29T22:14:00+02:00,prior_exclude,2026-10-28-fullfield:shape_fragment
+lizandrumi.com,$1.00,1,1,2026-10-29T23:15:00+02:00,meaning_shape,local/geo business or person name
+jpandamanda.com,$1.00,1,1,2026-10-29T23:27:00+02:00,meaning_shape,local/geo business or person name
+mylittlemango.com,$1.00,1,1,2026-10-31T19:44:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+logisticsnord.com,$1.00,1,2,2026-10-30T18:56:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_not_service
+lionaireoils.com,$1.00,1,2,2026-10-30T20:44:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+samispizzaandpasta.com,$1.00,1,4,2026-10-31T19:25:00+02:00,meaning_shape,local/geo business or person name
+angrypetespizza.com,$1.00,1,4,2026-11-01T18:46:00+02:00,meaning_shape,local/geo business or person name
+marcoandluisa.com,$1.00,1,1,2026-10-29T20:48:00+02:00,meaning_shape,local/geo business or person name
+thebinzstore.com,$1.00,1,1,2026-10-29T21:06:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+nhaxesonhien.com,$1.00,1,1,2026-10-29T21:45:00+02:00,meaning_shape,brand/coinage/fragment/not a named service
+fitlifeplace.com,$1.00,1,1,2026-10-29T23:22:00+02:00,prior_exclude,2026-10-28-fullfield:meaning_3word_slogan
+allidoismodel.com,$1.00,1,1,2026-10-30T20:15:00+02:00,prior_exclude,2026-10-28-fullfield:shape_salad
+allithelabel.com,$1.00,1,1,2026-10-31T19:29:00+02:00,meaning_shape,brand/coinage/fragment/not a named service

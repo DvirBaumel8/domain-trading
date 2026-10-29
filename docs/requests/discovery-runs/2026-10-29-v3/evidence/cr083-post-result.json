@@ -1,0 +1,1 @@
+{"error":{"code":"DB_SIZE_HIGH","message":"The database is 759 MB; this load (about 0.0 MB) would pass 70% of the 1024 MB limit","details":{"db_bytes_before":796254208,"payload_bytes":1624,"limit_bytes":1073741824,"warn_percent":70}}}
