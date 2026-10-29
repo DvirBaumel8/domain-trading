@@ -26,3 +26,10 @@ In `data/knowledge/0008-fertilize-2026-10-28.jsonl` line 5 add `"supersede": tru
 ## Check
 - Dry run done 2026-10-29 by DOM: the six author rows with that flag → 201, `accepted_n 5, superseded_n 1, rejected_n 0`.
 - Later kinds can only be fully checked by the load itself: after the edit, the next daily `kbLoad` must show 0008 loaded (`kb_loads` ok row for the new sha256) and the step ok. If another `EXISTS_DIFFERENT` appears, same fix for that row.
+
+## DOM response (29 Oct 2026)
+
+- **Verdict:** accepted and done in 5.75.1.
+- 0008 line 5 now has `"supersede": true`. The next daily `kbLoad` should show 0008 loaded.
+
+status: done

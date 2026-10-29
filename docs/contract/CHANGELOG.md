@@ -2,11 +2,15 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.75.1 (2026-10-29): CR-092 kbLoad 0008 supersede; CR-093 docs live API URL
+Release note: `docs/releases/v5.75.1.md`.
+PATCH, no API change. Data: the knowledge file `0008` marks its Ron Jackson author row `supersede: true`, so the daily `kbLoad` loads it (CR-092). Docs: runbook and DEPLOYMENT point at the live api-proxy URL instead of the suspended Render URL (CR-093). Also corrects this changelog's 5.74.0 heading (2 days, not 3).
+
 ## 5.75.0 (2026-10-28): CR-090 /health datasave_detail; CR-089 run packs in docs/requests/discovery-runs; CR-091 bot-logic sync and guard
 Release note: `docs/releases/v5.75.0.md`.
 MINOR. `GET /health` adds `datasave_detail` (CR-090): the latest datasave run step by step (`status`, `data_date`, `error`), `missing_files`, `dynadot_missing`, `dynadot_due_date`. `datasave` is unchanged.
 
-## 5.74.0 (2026-10-28): Dynadot aftermarket rows kept 3 days (archived to disk first); episodes fold day by day; protects the free 1 GB
+## 5.74.0 (2026-10-28): Dynadot aftermarket rows kept 2 days (archived to disk first); episodes fold day by day; protects the free 1 GB
 Release note: `docs/releases/v5.74.0.md`.
 MINOR (migration `1769000000000_v5-74-0.sql`). Dynadot aftermarket rows are kept `settings.datasave_aftermarket_keep_days` = 2 days, and each older day is archived to the host's disk first (`<ARCHIVE_DIR>/dynadot/<date>-aftermarket.jsonl.gz`). `snapshotRetention` adds `aftermarket_cutoff_date`, `aftermarket_rows_deleted`, `aftermarket_archive`. `episodes` folds each sealed day into the stored episodes. Market coverage counts pruned sealed days from their manifests.
 

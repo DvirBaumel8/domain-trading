@@ -86,12 +86,12 @@ You need the **same value** in Render (step 5) and in a GitHub repo secret (step
    | `GOOGLE_WEB_RISK_API_KEY` | optional: a key restricted to the Web Risk API, from a Google project **with** billing (Lookup API only; DOM caps itself at 10,000 a month) |
    | `NAMEBIO_RETAILSTATS_CSV_URL` | optional (v5.11.0, CR-062): `https://api.namebio.com/retailstats-download`, the free NameBio file, used only while `sources.namebio` is on (off by default). Empty = per-keyword RetailStats instead (5.15.0: the TLDStats and drop-order URLs are gone) |
    | `SPACESHIP_SELLERHUB_API_KEY`, `SPACESHIP_SELLERHUB_API_SECRET` | optional: Spaceship SellerHub listing sync; an API Manager key pair with only the `sellerhub:read` and `sellerhub:write` scopes |
-   | `PUBLIC_BASE_URL` | optional: the service's own public URL for the job queue's keep-alive ping (default `https://domain-trading-api.onrender.com`); the ping runs only when `RENDER` is set (5.13.0), so the Mac host never pings it |
+   | `PUBLIC_BASE_URL` | optional, Render only: the service's own public URL for the job queue's keep-alive ping (default `https://domain-trading-api.onrender.com`); the ping runs only when `RENDER` is set (5.13.0), so the Mac host never pings it |
 
    The blueprint already sets `APP_ENV=production`, `DATABASE_SSL=true` and
    `ENABLED_REGISTRARS=porkbun,godaddy` (the lander target is a DB setting, default `afternic`). Later pushes to `main` deploy by themselves once the `ci` workflow passes (`autoDeployTrigger: checksPass`, §Deploys below).
 3. The first start runs the migrations (`npm run migrate up`) and then boots. Watch the logs for `Migrations complete!` and `Server listening`.
-4. Check, replacing the URL with yours (the first request may take ~50 s):
+4. Check on Render, replacing the URL with yours (the first request may take ~50 s). While the Mac host runs production, use the api-proxy URL `https://domain-trading-api-proxy.dvirbaumel9.workers.dev` instead:
    ```bash
    curl -s https://domain-trading-api.onrender.com/health/ping   # {"status":"ok"}
    curl -s -H "Authorization: Bearer $READ_TOKEN" https://domain-trading-api.onrender.com/health        # "db":"ok", adapters listed
@@ -150,7 +150,7 @@ Use the READ and WRITE tokens (Gavriel runs these; see `docs/internal/test-plan.
 **Not required** (Dvir, 7 Oct 2026: the nightly export stays built but unconfigured; accepted risk: Neon free keeps about 6 hours of history). If the export is ever configured, the steps are in `docs/runbook.md` (Restore drill). The first nightly export runs in the `daily` job at 00:05 UTC. To force one now, call the daily job over HTTP (the backup PAT stays in Render only, so do not use the laptop job CLI):
 
 ```bash
-API=https://domain-trading-api.onrender.com
+API=https://domain-trading-api-proxy.dvirbaumel9.workers.dev   # live API (api-proxy); on Render: https://domain-trading-api.onrender.com
 read -rs JOB_TRIGGER_TOKEN
 curl -sS -X POST "$API/jobs/run" -H "Authorization: Bearer $JOB_TRIGGER_TOKEN" \
   -H "Idempotency-Key: manual-$(date +%s)" -H 'Content-Type: application/json' -d '{"job":"daily"}'

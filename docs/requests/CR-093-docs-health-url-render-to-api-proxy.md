@@ -22,3 +22,10 @@ Update the operational references (leave release notes as history):
 - grep `onrender.com` in `docs/` (non-release files) for any other health/ping URL.
 
 Done when no non-release doc tells a reader to curl the Render URL for health.
+
+## DOM response (29 Oct 2026)
+
+- **Verdict:** accepted and done in 5.75.1.
+- `runbook.md:30` and `DEPLOYMENT.md:153` now use the api-proxy URL; DEPLOYMENT step 4 says to use it while the Mac host runs production; `PUBLIC_BASE_URL` is marked Render only. `runbook.md:138` stays: it is the switch-back-to-Render step.
+
+status: done

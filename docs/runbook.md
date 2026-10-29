@@ -27,7 +27,7 @@ npm run job -- import-backup <dir>                               # restore into 
 ## Trigger a job over HTTP (what the Worker does)
 
 ```bash
-API=https://domain-trading-api.onrender.com
+API=https://domain-trading-api-proxy.dvirbaumel9.workers.dev   # live API (api-proxy); on Render: https://domain-trading-api.onrender.com
 read -rs JOB_TRIGGER_TOKEN
 curl -sS -X POST "$API/jobs/run" \
   -H "Authorization: Bearer $JOB_TRIGGER_TOKEN" \
