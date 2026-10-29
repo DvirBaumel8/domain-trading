@@ -29,3 +29,5 @@ max_rounds: 2
 - `db_size.percent` under 60% after the change, with no loss of rows the logic uses (episodes, sales, panels, shortlist inputs unchanged in counts).
 - `engineFeed` ok on the next datasave; 29 Oct candidates present (900, or the documented count).
 - A skipped `engineFeed` day shows as pending until backfilled.
+
+**Add (29 Oct, Gavriel):** the guard also blocked Buyer's CR-083 evidence POST (6 rows, 1.6 KB). The exemption for small critical writes is **CR-097** (P1, depends on this CR). Pending replay: `docs/requests/pending/2026-10-29-cr083-evidence-post-body.json`.

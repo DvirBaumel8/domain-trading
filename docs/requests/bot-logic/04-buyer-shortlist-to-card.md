@@ -18,7 +18,7 @@ This file is **current-only**. It does not document retired v1–v9 scout lanes,
 
 Every run runs directions **A + B + D**. **C** is parked.
 
-1. **Direction A — full auction field (required).** `GET /health` (note API version in the funnel), then `GET /auctions/shortlist` with the **newest** `data_date`. Paginate with `limit` ≤ **500** and `offset` (CR-088: `shortlist_size=0` stores all hard-filter passers). A is the only auction field; do not invent a parallel pool.
+1. **Direction A — full auction field (required).** `GET /health` (note API version in the funnel), then `GET /auctions/shortlist` with the **newest** data date: the query parameter is **`date=YYYY-MM-DD`** (`data_date` is only the response field; `?data_date=` is rejected 400; omit `date` for the newest). Paginate with `limit` ≤ **500** and `offset` (CR-088: `shortlist_size=0` stores all hard-filter passers). A is the only auction field; do not invent a parallel pool.
 2. **Direction B — cheap other-TLD / Exact Match signals (required every run).** On A's **meaning survivors** only: read shortlist `exactMatchTlds` / `developedTlds` when present; otherwise ≤ **20** HTTPS peeks per run (DoH/RDAP/page fetch, never box DNS) on the best survivors. B is a signal layer on survivors — **not** a second full field and not a second LLM pass.
 3. **Direction D — closeouts research scan (required every run, no money).** `GET /candidates/closeouts`; log the would-advance count + 0–3 paper examples. **No buy cards** while `CLOSEOUTS_PAUSED`.
 4. **Direction C — geo grids: parked.** No city×trade grids. Tagging/killing geo-shaped names inside A (shape/meaning rules) is OK.
