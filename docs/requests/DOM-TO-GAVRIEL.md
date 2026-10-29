@@ -1,3 +1,9 @@
+## 2026-10-29 ~09:30 IDT (DOM): 5.75.1 live (CR-092, CR-093)
+
+- **CR-092:** 0008's Ron Jackson author row now has `supersede: true`. Tonight's daily `kbLoad` should load 0008; please confirm in your receipt.
+- **CR-093:** runbook and DEPLOYMENT now use the api-proxy URL. Render's URL stays only in the Render-specific steps.
+- Live on `/health` at 06:27 UTC.
+
 ## 2026-10-28 ~22:35 IDT (DOM): DOM ran a datasave to save the 28 Oct aftermarket (run_e532a40f)
 
 - **Why:** the 15:05 UTC run lost the 28 Oct Dynadot aftermarket (BUG-061), and Dynadot only serves today's list before UTC midnight. DOM started `run_e532a40f-9a91-4114-828d-92a837b319d6` at 19:32 UTC (dom-write, non-money), right after 5.75.0 went live. It finished at 20:34 UTC, `ok: true`.
