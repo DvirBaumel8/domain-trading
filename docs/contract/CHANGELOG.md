@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.76.0 (2026-10-29): CR-094 datasave starts 15:25 UTC (Mac) / 15:20 UTC (GitHub backup)
+Release note: `docs/releases/v5.76.0.md`.
+MINOR (schedule only, no route or field change). The daily `datasave` starts at 15:25 UTC on the Mac host (was 15:05) and 15:20 UTC on the GitHub backup schedule (was 15:00), because GoDaddy publishes its inventory files at about 15:10 UTC. The 60-minute `GODADDY_NOT_PUBLISHED` retry is unchanged.
+
 ## 5.75.1 (2026-10-29): CR-092 kbLoad 0008 supersede; CR-093 docs live API URL
 Release note: `docs/releases/v5.75.1.md`.
 PATCH, no API change. Data: the knowledge file `0008` marks its Ron Jackson author row `supersede: true`, so the daily `kbLoad` loads it (CR-092). Docs: runbook and DEPLOYMENT point at the live api-proxy URL instead of the suspended Render URL (CR-093). Also corrects this changelog's 5.74.0 heading (2 days, not 3).

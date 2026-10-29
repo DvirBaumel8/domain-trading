@@ -1,14 +1,14 @@
 name: datasave
 
-# CR-071 (v5.21.0): the daily data save. One `datasave` job a day at 15:00 UTC (18:00 IDT in summer, 17:00 IST in winter), after GoDaddy's inventory
-# rebuild (about 14:40 UTC). GitHub often starts a schedule late; that is harmless because the job keys every file by the source's Last-Modified date,
+# CR-071 (v5.21.0): the daily data save. One `datasave` job a day at 15:20 UTC (CR-094, 5.76.0; was 15:00), after GoDaddy publishes its inventory
+# files (about 15:10 UTC). GitHub often starts a schedule late; that is harmless because the job keys every file by the source's Last-Modified date,
 # not by the run date. The retry after a failed GoDaddy step (+60 minutes) runs on the server, not as a second schedule.
 # The Cloudflare account is at the Workers Free limit of cron triggers, so this schedule lives here (free), like tick.
 # It calls the API like the Worker does (wake-up ping, then POST). The POST only enqueues the run and answers 202 with its run id; the server works the
 # steps, so this workflow checks the 202 and logs the run id (it has no READ token to poll GET /jobs/runs, and no secret is added).
 on:
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '20 15 * * *'
   workflow_dispatch:
 
 permissions: {}

@@ -1,6 +1,6 @@
 #!/bin/bash
-# v5.46.0 (first live run, problem 4): the Mac starts the daily data save itself. GitHub starts the schedule 3-4 hours late; this agent starts it at 15:05 UTC.
-# What launchd runs (com.domaintrading.datasave, every hour at :05 local time). launchd uses local time, so the script decides by the UTC clock: from 15:00 UTC on, once a
+# v5.46.0 (first live run, problem 4): the Mac starts the daily data save itself. GitHub starts the schedule 3-4 hours late; this agent starts it at 15:25 UTC (CR-094, 5.76.0: GoDaddy publishes about 15:10 UTC).
+# What launchd runs (com.domaintrading.datasave, every hour at :25 local time). launchd uses local time, so the script decides by the UTC clock: from 15:00 UTC on, once a
 # UTC day, it calls the local server POST /jobs/run {"job":"datasave"} with the job-trigger token read from prod.env (never printed, never in the process list, never logged).
 # It uses the same Idempotency-Key as the GitHub workflow (datasave-<15:00 UTC of the day in ms>), so a later GitHub run of the same day is a replay, and the server's
 # overlap rule (a still-open datasave run is returned, not started twice) and sealed files make a double trigger harmless. GitHub's schedule stays as the backup.

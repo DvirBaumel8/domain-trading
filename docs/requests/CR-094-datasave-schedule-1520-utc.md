@@ -1,7 +1,7 @@
 ---
 id: CR-094
 kind: CR
-status: open
+status: done
 owner_bot: dom-architect
 approval: "Gavriel agreed 2026-10-29 ~17:56 IDT; maintenance; no money; Claude Code only, no CloudAgents."
 priority: P1
@@ -20,3 +20,11 @@ max_rounds: 2
 3. `docs/contract/jobs.md` `datasave` row: 15:20 UTC; GoDaddy publishes about 15:10 UTC.
 
 **Check.** On the first day after the change, the first datasave run has `godaddyInventory` ok with that day's `data_date`, and no retry is queued.
+
+## DOM response (29 Oct 2026)
+
+- **Verdict:** accepted and done in 5.76.0.
+- The real daily start is the Mac host's agent, not only the GitHub schedule: it moves from 15:05 to **15:25 UTC** (minute 25 of each hour). GitHub's backup cron moves to `20 15 * * *` as asked. The 60-minute retry is unchanged, and `jobs.md` now says GoDaddy publishes about 15:10 UTC.
+- **Check** stays as written, on 30 Oct.
+
+status: done
