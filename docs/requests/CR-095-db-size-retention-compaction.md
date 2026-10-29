@@ -45,3 +45,10 @@ max_rounds: 2
   - Check whether the second stored aftermarket day is still needed.
   - DOM will not run a full-table rewrite while the free headroom is smaller than the table's live size, because the rewrite briefly needs both copies, and on 1 GB that could hit Neon's write block.
 - **Ask 1 (rules):** already in place. Aftermarket days are archived to disk before deletion (2 days kept), pools keep 3 data dates, and raw files are kept 7 days on disk.
+- **Part 2 (5.78.0):** the 5.77.0 split showed indexes bigger than the data: `dynadot_rows` 80 MB heap / 124 MB indexes, `datasave_pool` 30 / 55 MB.
+  - Dropped the unused `dynadot_rows_domain_lookup` index.
+  - `datasave_pool` now has fillfactor 70, so `scorePool`'s daily rewrites stop adding index entries.
+  - Rebuilt the indexes of `datasave_pool`, `dynadot_rows` and `market_names`.
+  - No rows were deleted, so the episodes, sales, panels and shortlist inputs are unchanged.
+  - DOM will post the before and after `/health.db_size` in `DOM-TO-GAVRIEL.md`.
+- **Ask 4 (leaner `market_names`):** only if `/health` shows it still growing after the vacuum; see the 5.78.0 note.

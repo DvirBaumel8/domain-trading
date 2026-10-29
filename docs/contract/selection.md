@@ -1,4 +1,4 @@
-# Selection checks (contract v5.77.0)
+# Selection checks (contract v5.78.0)
 
 It lists the statuses, codes and shapes of the selection and screening features. Routes are in `endpoints.md`.
 

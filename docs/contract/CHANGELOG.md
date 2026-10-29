@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.78.0 (2026-10-29): CR-095 part 2: drop an unused dynadot_rows index, datasave_pool fillfactor 70, rebuild bloated indexes
+Release note: `docs/releases/v5.78.0.md`.
+PATCH-level behaviour (labelled MINOR for the migration): no route, field or code change. Two migrations free index space (CR-095 part 2).
+
 ## 5.77.0 (2026-10-29): CR-097 small writes pass the size guard until 95%; CR-096 price_sanity samples; CR-095 part 1 vacuum after prunes, /health table detail
 Release note: `docs/releases/v5.77.0.md`.
 MINOR. `DB_SIZE_HIGH` on the write routes: a body of at most 64 KB is refused only past 95% (bulk loads still at 70%); `details.stop_percent` added (CR-097). `GET /market/dq` `price_sanity` `detail.samples` and `/report` `DQ_MARKET_FAIL.failures[].samples` (CR-096). `/health.db_size.tables[]` adds `heap_bytes`, `index_bytes`, `dead_rows_estimate`; the datasave `snapshotRetention` and `episodes` summaries add `vacuum` (CR-095 part 1).

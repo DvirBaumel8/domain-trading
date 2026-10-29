@@ -181,6 +181,14 @@ v5.62.0 tests: `tests/modules/ops/datasave-dynadot-pull.test.ts` (Dynadot mocked
 
 One sealed aftermarket day is about 377,000 rows and 100 MB; at 120 days the free 1 GB would fill in about four days (28 Oct 2026: 55.8%). `snapshotRetention` keeps `settings.datasave_aftermarket_keep_days` (2: the episodes step folds a day in the run after its seal, while it is still kept; migration `1769000000000_v5-74-0.sql`) days of `kind = 'aftermarket'` rows. Each older day is written to `<ARCHIVE_DIR>/dynadot/<date>-aftermarket.jsonl.gz` first (`ops/archive/dynadot-archive.ts` `archiveAftermarketDay`: id-ordered batches of 20,000, temp file then rename, an existing file is skipped) and kept in the database if the write fails. Without `ARCHIVE_DIR` (Render) the day is deleted without an archive. Closed-auction rows keep `datasave_dynadot_keep_days` (120). The episodes fold day by day (`market.md`), `dqMarket` coverage and `GET /market/coverage` use the manifest's row count for a pruned sealed day, and price sanity looks only at the kept days. Tests: DS522-8, DS574-1 (`ops/datasave-dynadot`), MK574-1 (`market`).
 
+## Index space (v5.78.0, CR-095 part 2)
+
+Measured on 29 Oct 2026 with the 5.77.0 `/health.db_size.tables` split: `dynadot_rows` heap 80 MB / indexes 124 MB, `datasave_pool` 30 / 55 MB, `market_names` 232 / 92 MB (74.2% of 1 GB). Migrations `1769100000000_v5-78-0.sql` and `1769100000001_v5-78-0-market-names.sql`:
+- drop `dynadot_rows_domain_lookup` (domain): no read uses it, because every query on `dynadot_rows` names `data_date` and `kind`;
+- `datasave_pool` fillfactor 70, so `scorePool`'s daily rewrite of each closeout row stays on its page (HOT) and adds no primary-key entry;
+- `REINDEX` of `datasave_pool`, `dynadot_rows` and (its own transaction) `market_names`.
+`market_names`' heap is about twice its live rows, because each daily fold writes a new version of nearly every row. The plain VACUUM after the fold (5.77.0) keeps it from growing past that. Shrinking it further needs a narrower daily-update table, the next step only if `/health` shows growth.
+
 ## Health detail (v5.75.0, CR-090)
 
 `reporting/datasave-state.ts` `datasaveStatus` also returns `last_run` (the latest `job_runs` datasave row, each step mapped by `datasaveStepState`), and `GET /health` shows it as `datasave_detail`. The `datasave` string and its rules are unchanged. Tests: CR090-1..3 (`ops/datasave`), the keys test in `ops/health`.
