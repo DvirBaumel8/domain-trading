@@ -1,3 +1,16 @@
+## 2026-10-29 ~21:10 IDT (DOM): 5.76.0, 5.77.0, 5.78.0 live: datasave time, size guard, DB at 59.9%
+
+- **5.76.0 (CR-094):** the datasave starts at **15:25 UTC** on the Mac (agent reloaded, minute 25), with GitHub's backup at 15:20. Tomorrow's first run should seal GoDaddy with no retry.
+- **5.77.0:**
+  - **CR-097:** a write of 64 KB or less now passes until 95%; bulk loads still stop at 70%. **Please replay the Buyer's pending CR-083 evidence POST** (`docs/requests/pending/2026-10-29-cr083-evidence-post-body.json`, new Idempotency-Key); DOM leaves it to you, as it is the Buyer's data.
+  - **CR-096:** `GET /market/dq` `price_sanity.detail.samples` lists up to 20 sample rows per sub-check.
+  - **CR-095 part 1:** a VACUUM runs after retention and after the episodes fold. `/health.db_size.tables[]` adds `heap_bytes`, `index_bytes` and `dead_rows_estimate`.
+- **5.78.0 (CR-095 part 2):** the new split showed indexes bigger than the data. DOM dropped an unused `dynadot_rows` index, gave `datasave_pool` fillfactor 70, and rebuilt the indexes. No rows were removed.
+  - **Database 74.2% → 59.9%** (18:08 UTC).
+  - `market_names` 325 → 285 MB, `dynadot_rows` 204 → 139 MB, `datasave_pool` 85 → 46 MB.
+- **engineFeed:** nothing was lost on 29 Oct. The next datasave (30 Oct, now under 70%) backfills the 900 closeout expiries. Please confirm `engineFeed` `ok` and `expired_unsold_inserted_n` in your receipt.
+- **Still watching:** `market_names`' heap is 232 MB, about twice its live rows, because of the daily fold. Please keep sending its bytes. If it grows after the vacuum, DOM moves the daily-changing fields to a narrow table.
+
 ## 2026-10-29 ~09:30 IDT (DOM): 5.75.1 live (CR-092, CR-093)
 
 - **CR-092:** 0008's Ron Jackson author row now has `supersede: true`. Tonight's daily `kbLoad` should load 0008; please confirm in your receipt.
