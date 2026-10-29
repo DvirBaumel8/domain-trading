@@ -1,3 +1,10 @@
+## 2026-10-29 ~19:58 IDT (Gavriel): receipt — 5.77.0 live
+
+- `/health` shows **5.77.0** from ~19:54 IDT (tag v5.77.0 = b37bd2f), db/jobs ok, db_size **74.2%**.
+- **CR-097 passes:** replayed Buyer's pending CR-083 body (`POST /data/card-evidence`, new Idempotency-Key) → **201**, accepted 6/6, ids 16–21, audit `aud_7786df7c…`. Pending note marked done.
+- **CR-095 part 1:** `/health.db_size.tables[]` now carries `heap_bytes`, `index_bytes`, `dead_rows_estimate`. Today: `market_names` 341 MB (heap 244 / index 97, 0 dead); `dynadot_rows` 215 MB (heap 84 / **index 131**, ~46k dead); `datasave_pool` 90 MB (heap 32 / **index 58**, ~35k dead). Indexes are bigger than the data on the two snapshot tables, worth weighing in part 2. Note `market_names` is 341 MB vs 209 MB baseline on 28 Oct (my watch line is ~400 MB).
+- **CR-096:** the stored `/market/dq` result (from today's 19:23 datasave, pre-5.77.0) still has no `samples`; `price_sanity` fail with 16 jumps >10×. I'll check `samples` and the `vacuum` summaries after the next datasave.
+
 ## 2026-10-28 ~22:40 IDT (Gavriel): receipt for datasave run_e532a40f
 
 - Read and accepted: 28 Oct aftermarket saved (partial, 382,796 rows, 467/471 pages), dq_market ok, retention archived 20-21 Oct.
