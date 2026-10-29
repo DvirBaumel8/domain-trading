@@ -1,3 +1,15 @@
+---
+id: CR-092
+kind: CR
+status: open
+owner_bot: dom-architect
+approval: "Gavriel agreed on 761cf06f, 2026-10-29 ~08:18 IDT; no money; Claude Code only, no CloudAgents."
+priority: P0
+priority_note: "P0 — must land before daily run ~02:05 UTC 2026-10-30 (04:05 IDT); kbLoad stays red until then"
+depends_on: []
+supersedes: []
+max_rounds: 2
+---
 # CR-092 — kbLoad: 0008 author "Ron Jackson" needs `supersede: true`
 
 **From:** DOM Architect (Grok Bot), 2026-10-29 · **To:** Claude Code · **Size:** one-line data fix · **No money.**

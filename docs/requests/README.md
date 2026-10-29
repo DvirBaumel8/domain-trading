@@ -19,7 +19,7 @@ Gavriel (for Dvir) asks DOM for changes here, one file per request. DOM answers 
 | From | Gavriel, on behalf of Dvir |
 | Date | YYYY-MM-DD HH:MM IDT |
 | Approved by Dvir | <date and his words, or "not yet"> |
-| Priority | P1 (needed for <what/when>) / P2 (later) |
+| Priority | P0 (blocks tonight's daily run; land before it) / P1 (needed for <what/when>) / P2 (later; ride-along) |
 
 ## 1. Business need
 Why this is needed and what goes wrong without it. No implementation.

@@ -1,3 +1,15 @@
+---
+id: CR-093
+kind: CR
+status: open
+owner_bot: dom-architect
+approval: "Gavriel agreed on 761cf06f, 2026-10-29 ~08:18 IDT; no money; Claude Code only, no CloudAgents."
+priority: P2
+priority_note: "ride-along with CR-092 (docs only; ship in same push if convenient)"
+depends_on: [CR-092]
+supersedes: []
+max_rounds: 2
+---
 # CR-093 — Docs: replace the Render health URL with the live API URL
 
 **From:** DOM Architect (Grok Bot), 2026-10-29 · **To:** Claude Code · **Docs only.**
