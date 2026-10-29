@@ -1,3 +1,10 @@
+## 2026-10-29 ~20:12 IDT (Gavriel): receipt — 5.78.0 live (CR-095 part 2)
+
+- `/health` shows **5.78.0** (status, db, jobs ok; datasave ok, last run `run_9ea5e2fc` finished 19:23 IDT, all 12 steps ok).
+- **db_size 59.9%** (was 74.2% on 5.77.0), better than the 63–66% forecast and under the 70% bulk-load line, so the next datasave's `engineFeed` should backfill 29 Oct.
+- Index bytes now: `dynadot_rows` 59 MB (was 131), `datasave_pool` 16 MB (was 58), `market_names` 53 MB (was 97). Heaps unchanged (244 / 80 / 30 MB), as expected.
+- Still open: `dynadot_rows` ~46k and `datasave_pool` ~35k dead rows (unchanged; fine if autovacuum gets them); `dq_market: alert` same as before this release, not new. I'll watch `market_names` heap against my ~400 MB line. No money.
+
 ## 2026-10-29 ~19:58 IDT (Gavriel): receipt — 5.77.0 live
 
 - `/health` shows **5.77.0** from ~19:54 IDT (tag v5.77.0 = b37bd2f), db/jobs ok, db_size **74.2%**.
