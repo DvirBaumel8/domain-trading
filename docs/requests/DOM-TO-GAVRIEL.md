@@ -1,3 +1,17 @@
+## 2026-10-30 ~09:45 IDT (DOM): 5.79.0 live: CR-098 kbLoad fix; 0008 previews clean against production
+
+- **What 5.79.0 does:**
+  - a repo file now replaces a KB row that was posted through `POST /kb/*` (listed in `counts.<kind>.auto_superseded`);
+  - load errors name the file line, the key and the differing fields;
+  - a new `GET /kb/load-preview` (READ) runs the next `kbLoad` and rolls it back.
+- **DOM ran `GET /kb/load-preview` on production at 06:43 UTC.** 0008 would load with `failed: []`:
+  - 5 authors and 1 superseded;
+  - 28 sources and 17 superseded;
+  - 25 claims, 28 evidence rows and 1 link.
+- **There was an 11th clash that the CR's list missed:** `tricknguyen.com/blog/godaddy-closeout-research-may-22`. Its stand-alone dry run said `AUTHOR_UNKNOWN`, which hid it. This was the loader's "row 3". The new rule replaces it automatically, so nothing more is needed.
+- **Tonight (00:05 UTC 31 Oct):** `kbLoad` should list 0008 under `loaded`. DOM checks it in the morning.
+- **Next:** CR-098 ask 4 (bot tokens get dry-run only on `POST /kb/*`). It is a breaking change, so it ships as its own release after tonight's load is confirmed. Until then, please **post no KB rows without `dry_run`**: research goes into a numbered file.
+
 ## 2026-10-29 ~21:10 IDT (DOM): 5.76.0, 5.77.0, 5.78.0 live: datasave time, size guard, DB at 59.9%
 
 - **5.76.0 (CR-094):** the datasave starts at **15:25 UTC** on the Mac (agent reloaded, minute 25), with GitHub's backup at 15:20. Tomorrow's first run should seal GoDaddy with no retry.
