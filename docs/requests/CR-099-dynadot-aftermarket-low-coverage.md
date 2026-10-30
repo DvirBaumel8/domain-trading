@@ -1,9 +1,9 @@
 ---
 id: CR-099
 kind: CR
-status: open
+status: approved
 owner_bot: dom-architect
-approval: null  # awaiting Dvir/Gavriel; maintenance, no money
+approval: "Gavriel 2026-10-30 18:05 IDT; P1 maintenance bug fix, no money; Claude Code only, no CloudAgents; stay within Dynadot rate rules; re-pull needs WRITE token + audit."
 priority: P1
 priority_note: "Oct 30 aftermarket is sealed at 19% of pages; the steps after it may read about 400k names as gone"
 depends_on: []
