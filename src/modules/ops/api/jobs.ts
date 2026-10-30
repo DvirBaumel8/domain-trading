@@ -3,12 +3,16 @@ import type { Kysely } from 'kysely';
 import { z } from 'zod';
 import type { Config } from '../../../config.js';
 import { idtDay, isIsoWithOffset, isRealDate } from '../../../core/dates.js';
+import { coverageRatio, isLowCoverage } from '../../../core/snapshot-coverage.js';
 import type { Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
 import type { JobQueue } from '../queue.js';
 import { jobRunsView, triggerFromKey } from '../../reporting/index.js';
 
-const Body = z.object({ job: z.enum(['tick', 'daily', 'datasave']) }).strict();
+// v5.80.0 (CR-099 c): `only` re-pulls one Dynadot source for today (WRITE token, datasave only): the day must be open or sealed LOW_COVERAGE
+const ONLY = { dynadot_aftermarket: 'dynadotAftermarket', dynadot_closeouts: 'dynadotCloseouts' } as const;
+const Body = z.object({ job: z.enum(['tick', 'daily', 'datasave']), only: z.enum(['dynadot_aftermarket', 'dynadot_closeouts']).optional() }).strict()
+  .refine((b) => b.only === undefined || b.job === 'datasave', { message: 'only is allowed with job datasave', path: ['only'] });
 const PreviewBody = z.object({ today: z.string().optional() }).strict();
 const RunsQuery = z.object({
   job: z.enum(['tick', 'daily', 'screen', 'train', 'datasave']).optional(),
@@ -42,8 +46,20 @@ function previewDay(v: string, today: string): string {
  */
 export function registerJobs(app: FastifyInstance, queue: JobQueue, deps: JobsDeps): void {
   app.post('/jobs/run', { config: { openapiBody: Body } }, async (req, reply) => {
-    const { job } = Body.parse(req.body);
+    const { job, only } = Body.parse(req.body);
     const key = req.headers['idempotency-key'];
+    if (only !== undefined) {
+      if (!req.auth) throw new AppError(403, 'SCOPE_FORBIDDEN', 'A Dynadot re-pull (only) needs a WRITE token');
+      const day = new Date(deps.now()).toISOString().slice(0, 10);
+      const m = await deps.db.selectFrom('snapshot_manifests').select(['sealed_at', 'origin', 'coverage', 'rows']).where('source', '=', only).where('data_date', '=', day).where('file_name', '=', 'bot_upload').executeTakeFirst();
+      if (m?.sealed_at && !(m.origin === 'server' && isLowCoverage(m.coverage as never))) {
+        throw new AppError(409, 'SNAPSHOT_SEALED', `${only} for ${day} is sealed with full coverage (or by a bot); a re-pull is only for an open or LOW_COVERAGE day`, { source: only, data_date: day, rows: m.rows, coverage_ratio: coverageRatio(m.coverage as never) });
+      }
+      const r = await queue.enqueue('datasave', { trigger: 'manual', scheduledFor: null, triggeredBy: req.auth.name, params: { only: [ONLY[only]] } });
+      queue.kick();
+      req.auditSummary = r.skipped ? `datasave ${only}: skipped (a datasave run is open)` : `datasave ${only}: queued`;
+      return reply.code(202).send({ run_id: r.runId, job: r.job, status: r.status, skipped: r.skipped, steps: r.steps });
+    }
     // A WRITE token's run is always `manual` (whatever its key looks like) and records the token's name; the job token keeps the key rule.
     const trigger = req.auth
       ? { trigger: 'manual' as const, scheduledFor: null, triggeredBy: req.auth.name }

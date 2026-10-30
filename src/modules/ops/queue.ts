@@ -11,7 +11,7 @@ import { advisoryXactLock, trySessionLock, type LockKey } from '../../core/locks
 import type { Database } from '../../db/types.js';
 import { stepView } from '../reporting/index.js';
 import { markPullFailed } from './jobs/datasave/dynadot-pull.js';
-import { triggeredByOf, type JobKind, type JobRunner, type PlanStep, type RunOptions, type StepResult } from './jobs/runner.js';
+import { DATASAVE_DYNADOT_STEPS, triggeredByOf, type JobKind, type JobRunner, type PlanStep, type RunOptions, type StepResult } from './jobs/runner.js';
 
 /** Extra time on a step's lock beyond its timeout, so the in-process timeout always fires before the lock counts as expired. */
 const LOCK_GRACE_MS = 5_000;
@@ -73,7 +73,7 @@ export class JobQueue {
         id: runId, job, trigger: opts.trigger ?? 'manual', scheduled_for: opts.scheduledFor ?? null, triggered_by: triggeredByOf(opts), created_at: new Date(this.deps.now()),
         params: opts.params === undefined ? null : JSON.stringify(opts.params), not_before: opts.notBefore ?? null,
       }).execute();
-      const plan = this.deps.runner.plan(job);
+      const plan = this.deps.runner.plan(job, { params: opts.params });
       await trx.insertInto('job_steps').values(plan.map((e, position) => ({
         run_id: runId, job, step: e.name, position,
         max_attempts: this.deps.overrides?.[e.name]?.maxAttempts ?? e.maxAttempts,
@@ -235,13 +235,17 @@ export class JobQueue {
   }
 
   /** v5.21.0 (CR-071 R-7): when the godaddyInventory step of a datasave run failed, queue one more run that starts 60 minutes later. */
-  private async retryDatasave(q: { params: unknown }, rows: Array<{ step: string; status: string }>): Promise<void> {
+  private async retryDatasave(q: { params: unknown }, rows: Array<{ step: string; status: string; summary?: unknown }>): Promise<void> {
     const params = typeof q.params === 'string' ? safeJson(q.params) : q.params;
     if ((params as { retry?: unknown } | null)?.retry === true) return;
-    if (rows.find((r) => r.step === 'godaddyInventory')?.status !== 'failed') return;
+    // a failed GoDaddy step retries the whole save; else (v5.80.0, CR-099 b) a Dynadot step that ended LOW_COVERAGE or in error retries just that step,
+    // which reads only the pages still missing and adds them to the same day
+    const full = rows.find((r) => r.step === 'godaddyInventory')?.status === 'failed';
+    const dynadot = rows.filter((r) => (DATASAVE_DYNADOT_STEPS as readonly string[]).includes(r.step) && dynadotNeedsRetry(r)).map((r) => r.step);
+    if (!full && dynadot.length === 0) return;
     const at = new Date(this.deps.now() + DATASAVE_RETRY_MS);
     try {
-      await this.enqueue('datasave', { trigger: 'scheduled', scheduledFor: at, triggeredBy: 'datasave-retry', params: { retry: true }, notBefore: at });
+      await this.enqueue('datasave', { trigger: 'scheduled', scheduledFor: at, triggeredBy: 'datasave-retry', params: full ? { retry: true } : { retry: true, only: dynadot }, notBefore: at });
       // the worker only wakes on a kick; wake it when the hour is up (GET /health and GET /jobs/runs also kick)
       setTimeout(() => this.kick(), DATASAVE_RETRY_MS + 1_000).unref();
     } catch (e) {
@@ -295,6 +299,13 @@ function withStepDb(r: StepResult, db: StepResult['db']): StepResult {
   const summary = r.summary;
   if (typeof summary === 'object' && summary !== null && !Array.isArray(summary)) return { ...r, db, summary: { ...summary, _db: db } };
   return { ...r, db };
+}
+
+/** v5.80.0 (CR-099): a Dynadot pull step worth a retry: it failed, ended `error`, or sealed its day LOW_COVERAGE. A not_configured, gap or full day is not retried. */
+export function dynadotNeedsRetry(r: { status: string; summary?: unknown }): boolean {
+  if (r.status === 'failed') return true;
+  const s = (typeof r.summary === 'string' ? safeJson(r.summary) : r.summary) as { status?: unknown; coverage_status?: unknown } | null;
+  return s?.status === 'error' || s?.coverage_status === 'LOW_COVERAGE';
 }
 
 /** The datasave retry is a second run 60 minutes after the first (CR-071 R-7); a retry run never retries again, so it happens once per data day. */

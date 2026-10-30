@@ -78,6 +78,12 @@ export async function buildWarnings(db: Kysely<Database>, now: Date, opts: { sto
       last_complete_at: ds.last_complete_at ? toJerusalemIso(ds.last_complete_at) : null,
     });
   }
+  // v5.80.0 (CR-099): a Dynadot day sealed with under 90% of its pages read; the market steps leave it out until a re-pull fills it
+  if (ds.dynadot_low_coverage.length > 0) {
+    add('DYNADOT_LOW_COVERAGE', 'warn', `Dynadot days with low coverage (under 90% of pages read): ${ds.dynadot_low_coverage.map((l) => `${l.source} ${l.data_date} ${l.pages_ok_n}/${l.pages_planned_n}`).join(', ')}. They are left out of the market steps; a same-day re-pull is POST /jobs/run {job: datasave, only}.`, undefined, {
+      days: ds.dynadot_low_coverage,
+    });
+  }
   // v5.23.0 (CR-075 R-3): a failed market data-quality check is never silent.
   const dq = await marketDqStatus(db);
   if (dq.state === 'alert') {

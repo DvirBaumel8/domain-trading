@@ -6,6 +6,7 @@
 // The Dynadot steps (not_configured) never count. Since v5.22.0 a bot-uploaded Dynadot kind counts once an upload of that kind has ever arrived: after 16:00 UTC
 // (the 15:00 run plus its 60-minute retry window) the day's sealed upload must exist, else the state is at best `partial` and the kind is in `dynadot_missing`.
 import { sql, type Kysely } from 'kysely';
+import { coverageRatio, lowCoverageSql } from '../../core/snapshot-coverage.js';
 import type { Database } from '../../db/types.js';
 
 export const DATASAVE_OVERDUE_HOURS = 26;
@@ -28,6 +29,19 @@ export interface DatasaveStatus {
   dynadot_due_date: string;
   /** v5.75.0 (CR-090): the latest finished datasave run, step by step (null before the first run). */
   last_run: DatasaveRunDetail | null;
+  /** v5.80.0 (CR-099): sealed Dynadot days of the last 3 days with under 90% of their planned pages read (LOW_COVERAGE), newest first. */
+  dynadot_low_coverage: DynadotLowCoverage[];
+}
+export interface DynadotLowCoverage { source: string; data_date: string; coverage_ratio: number; pages_ok_n: number; pages_planned_n: number }
+
+/** v5.80.0 (CR-099): the LOW_COVERAGE Dynadot days since `since` (YYYY-MM-DD). */
+export async function dynadotLowCoverage(db: Kysely<Database>, since: string): Promise<DynadotLowCoverage[]> {
+  const rows = await db.selectFrom('snapshot_manifests as m').select(['m.source', 'm.data_date', 'm.coverage']).where('m.source', 'in', [...DYNADOT_SOURCES]).where('m.status', '=', 'complete')
+    .where('m.data_date', '>=', since).where(lowCoverageSql('m')).orderBy('m.data_date', 'desc').orderBy('m.source').execute();
+  return rows.map((r) => {
+    const c = r.coverage as { pages_ok: unknown[]; pages_planned: unknown[] };
+    return { source: r.source, data_date: String(r.data_date), coverage_ratio: Math.round((coverageRatio(c) ?? 0) * 1000) / 1000, pages_ok_n: c.pages_ok.length, pages_planned_n: c.pages_planned.length };
+  });
 }
 
 export type DatasaveStepState = 'ok' | 'partial' | 'error' | 'skipped' | 'not_configured';
@@ -108,7 +122,8 @@ export async function datasaveStatus(db: Kysely<Database>, nowMs: number): Promi
   const last_run: DatasaveRunDetail | null = lastRun
     ? { run_id: lastRun.queue_run_id ?? null, finished_at: lastRun.finished_at, steps: Object.fromEntries(Object.entries(views).map(([k, v]) => [k, datasaveStepState(v)])) }
     : null;
-  return { state, started, files, complete_files, missing_files, last_complete_at: lastComplete === undefined ? null : new Date(lastComplete), dynadot_missing: dyn.missing, dynadot_due_date: dyn.due_date, last_run };
+  const dynadot_low_coverage = await dynadotLowCoverage(db, new Date(nowMs - 2 * 86_400_000).toISOString().slice(0, 10));
+  return { state, started, files, complete_files, missing_files, last_complete_at: lastComplete === undefined ? null : new Date(lastComplete), dynadot_missing: dyn.missing, dynadot_due_date: dyn.due_date, last_run, dynadot_low_coverage };
 }
 
 /** The data dates in [from, to] (YYYY-MM-DD, UTC) that have no complete save of every configured file, with the files each lacks. */

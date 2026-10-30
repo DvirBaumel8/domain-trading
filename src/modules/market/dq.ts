@@ -1,5 +1,6 @@
 // CR-075 (v5.23.0) R-3, R-7: the `dqMarket` step and GET /market/dq. Every check is stored (market_dq_runs); any failed check makes /health.dq_market "alert" and /report DQ_MARKET_FAIL.
 import { sql, type Kysely } from 'kysely';
+import { DYNADOT_MIN_COVERAGE, lowCoverageSql } from '../../core/snapshot-coverage.js';
 import type { Database } from '../../db/types.js';
 import { addDays, utcDay } from './common.js';
 import { CLEAN_FEATURES } from './read.js';
@@ -36,7 +37,7 @@ export async function runDqMarket(db: Kysely<Database>, nowMs: number): Promise<
   results.push({ check: 'duplicates', status: dup.rows[0]!.n === 0 ? 'pass' : 'fail', detail: { overlapping_pairs_n: dup.rows[0]!.n, sample_names: dup.rows[0]!.sample ?? [] } });
 
   // survivorship: the share of Dynadot Buy-Now episodes seen from the first snapshot day of the source
-  const days = await db.selectFrom('snapshot_manifests').select('data_date').where('source', '=', 'dynadot_aftermarket').where('status', '=', 'complete').orderBy('data_date').execute();
+  const days = await db.selectFrom('snapshot_manifests as m').select('m.data_date').where('m.source', '=', 'dynadot_aftermarket').where('m.status', '=', 'complete').where(sql<boolean>`not ${lowCoverageSql('m')}`).orderBy('m.data_date').execute();
   const eps = await sql<{ total: number; first_day: number }>`
     select count(*)::int as total, (count(*) filter (where first_seen = ${days[0]?.data_date ?? '1970-01-01'}::date))::int as first_day
     from market_names where venue = 'dynadot' and listing_type = 'bin'`.execute(db);
@@ -55,7 +56,7 @@ export async function runDqMarket(db: Kysely<Database>, nowMs: number): Promise<
   const since = addDays(today, -30);
   // CR-096 (5.77.0): up to PRICE_SAMPLES_N sample rows per sub-check next to each count (largest ratio first)
   const jumps = await sql<{ n: number; samples: PriceJumpSample[] | null }>`
-    with sealed as (select data_date from snapshot_manifests where source = 'dynadot_aftermarket' and status = 'complete' and data_date >= ${since}::date),
+    with sealed as (select data_date from snapshot_manifests m where source = 'dynadot_aftermarket' and status = 'complete' and data_date >= ${since}::date and not ${lowCoverageSql('m')}),
     obs as (select r.domain, r.data_date, min(r.price_cents)::bigint as p from dynadot_rows r join sealed s on s.data_date = r.data_date where r.kind = 'aftermarket' group by 1, 2),
     lagged as (select domain, data_date, p, lag(p) over (partition by domain order by data_date) as prevp, lag(data_date) over (partition by domain order by data_date) as prevd from obs),
     hit as (select * from lagged where prevp is not null and (p > prevp * ${PRICE_JUMP_FACTOR} or p * ${PRICE_JUMP_FACTOR} < prevp)),
@@ -87,9 +88,18 @@ export async function runDqMarket(db: Kysely<Database>, nowMs: number): Promise<
     const rows = await sql<{ day: string; n: number }>`
       select m.data_date::text as day, coalesce(nullif((select count(*) from dynadot_rows r where r.kind = ${kind} and r.data_date = m.data_date), 0), m.rows, 0)::int as n
       from snapshot_manifests m where m.source = ${source} and m.status = 'complete' and m.data_date >= ${addDays(today, -(COVERAGE_LOOKBACK_DAYS * 2))}::date order by 1`.execute(db);
-    const byDay = new Map(rows.rows.map((r) => [r.day, r.n]));
+    // v5.80.0 (CR-099): a LOW_COVERAGE day fails coverage by itself (under 90% of its planned pages read) and is left out of the other days' median
+    const low = new Map((await sql<{ day: string; ok: number; planned: number }>`
+      select m.data_date::text as day, jsonb_array_length(m.coverage->'pages_ok')::int as ok, jsonb_array_length(m.coverage->'pages_planned')::int as planned
+      from snapshot_manifests m where m.source = ${source} and m.status = 'complete' and m.data_date >= ${addDays(today, -(COVERAGE_LOOKBACK_DAYS * 2))}::date and ${lowCoverageSql('m')}`.execute(db)).rows.map((r) => [r.day, r]));
+    const byDay = new Map(rows.rows.filter((r) => !low.has(r.day)).map((r) => [r.day, r.n]));
     let checked = 0;
     let failed = 0;
+    for (const l of low.values()) {
+      if (l.day < addDays(today, -(COVERAGE_LOOKBACK_DAYS - 1))) continue;
+      checked++; failed++;
+      results.push({ check: 'coverage', status: 'fail', source, day: l.day, detail: { coverage_status: 'LOW_COVERAGE', pages_ok_n: l.ok, pages_planned_n: l.planned, share: Math.round((l.ok / l.planned) * 1000) / 1000, min_share: DYNADOT_MIN_COVERAGE } });
+    }
     for (let k = COVERAGE_LOOKBACK_DAYS - 1; k >= 0; k--) {
       const day = addDays(today, -k);
       const n = byDay.get(day);

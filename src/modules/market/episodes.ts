@@ -4,6 +4,7 @@
 import { sql, type Insertable, type Kysely } from 'kysely';
 import { chunks } from '../../core/chunks.js';
 import { advisoryXactLock } from '../../core/locks.js';
+import { lowCoverageSql } from '../../core/snapshot-coverage.js';
 import type { Database } from '../../db/types.js';
 import { addDays, bandOf, dayNum, episodeId, MIN_CENTS, sha1, sha256, splitName, tierRank, utcDay, type ListingType, type Tier } from './common.js';
 
@@ -74,7 +75,9 @@ async function derive(db: Kysely<Database>, nowMs: number): Promise<EpisodesSumm
   // the stored episodes (the rows are kept only datasave_aftermarket_keep_days, so a full re-derive is no longer possible). A name continues its newest episode when
   // that episode was seen on the previous sealed day or at most GAP_DAYS calendar days before; else a new episode starts (the same split rule as before). A day
   // already folded for a name (its newest episode's last_seen is that day or later) changes nothing, so a second run writes nothing.
-  const am = await db.selectFrom('snapshot_manifests').select(['data_date', 'sha256']).where('source', '=', 'dynadot_aftermarket').where('status', '=', 'complete').orderBy('data_date').execute();
+  // v5.80.0 (CR-099): a LOW_COVERAGE day (under 90% of its pages read) is left out, so a name missing from it never ends an episode or counts as gone
+  const am = await db.selectFrom('snapshot_manifests as m').select(['m.data_date', 'm.sha256']).where('m.source', '=', 'dynadot_aftermarket').where('m.status', '=', 'complete')
+    .where(sql<boolean>`not ${lowCoverageSql('m')}`).orderBy('m.data_date').execute();
   const amSha = new Map(am.map((m) => [m.data_date, m.sha256]));
   const lastAm = am.length ? am[am.length - 1]!.data_date : null;
   const stored = new Set((await sql<{ d: string }>`select distinct data_date::text as d from dynadot_rows where kind = 'aftermarket'`.execute(db)).rows.map((r) => r.d));

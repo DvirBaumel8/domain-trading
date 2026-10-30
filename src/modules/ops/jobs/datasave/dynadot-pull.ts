@@ -12,9 +12,10 @@ import type { Kysely } from 'kysely';
 import type { Database } from '../../../../db/types.js';
 import { addDays } from '../../../../core/dates.js';
 import { advisoryXactLock } from '../../../../core/locks.js';
+import { coverageRatio, DYNADOT_MIN_COVERAGE, isLowCoverage } from '../../../../core/snapshot-coverage.js';
 import { AppError } from '../../../../http/errors.js';
 import { priceToCents } from './datasave-price.js';
-import { AFTERMARKET_MIN_CENTS, BOT_UPLOAD_FILE, DYNADOT_MAX_PRICE_CENTS, DYNADOT_MAX_ROWS, dynadotSource, uploadDynadot, type DynadotBody, type DynadotKind } from './dynadot-upload.js';
+import { AFTERMARKET_MIN_CENTS, appendToSealedDay, BOT_UPLOAD_FILE, DYNADOT_MAX_PRICE_CENTS, DYNADOT_MAX_ROWS, dynadotSource, uploadDynadot, type DynadotBody, type DynadotKind } from './dynadot-upload.js';
 
 export const DYNADOT_API_URL = 'https://api.dynadot.com';
 export const DYNADOT_LISTINGS_PATH = '/restful/v2/aftermarket/listings';
@@ -27,7 +28,13 @@ export const DYNADOT_MAX_PAGES = 500;
 /** R-8: a total under 1/10 of the last complete day's total is a collapse. */
 export const AFTERMARKET_COLLAPSE_RATIO = 10;
 const CALL_TIMEOUT_MS = 120_000;
-const MAX_CONSECUTIVE_FAILURES = 3;
+/** v5.80.0 (CR-099): a sweep over the pages stops after this many failures in a row (with a growing pause between them); the pages left go to the retry sweep. */
+export const MAX_CONSECUTIVE_FAILURES = 5;
+/** Pause after the n-th failure in a row: 15 s, 30 s, 60 s, then 120 s, each with ±20% jitter; and 120 s before the retry sweep. */
+export const RETRY_BASE_MS = 15_000;
+export const RETRY_MAX_MS = 120_000;
+/** Time a pull may spend reading pages, from its start; the step timeouts are 60 min (aftermarket) and 30 min (closeouts), so storing always has time left. */
+export const PULL_BUDGET_MS: Record<'aftermarket' | 'closeouts', number> = { aftermarket: 50 * 60_000, closeouts: 25 * 60_000 };
 const FILE = BOT_UPLOAD_FILE;
 
 export interface PullDeps {
@@ -41,6 +48,8 @@ export interface PullDeps {
   sleep: (ms: number) => Promise<void>;
   baseUrl?: string;
   spacingMs?: number;
+  /** Jitter source (tests pass a constant). */
+  random?: () => number;
   log?: { warn: (obj: unknown, msg?: string) => void; info?: (obj: unknown, msg?: string) => void };
 }
 
@@ -133,7 +142,7 @@ class Client {
  * `data.closeout_item_list[]` with `domain_name`, `current_price` **in cents** (a string: "1500" = $15.00, unlike the listings' dollars) and
  * `end_time_stamp` in ms. */
 export const DYNADOT_CLOSEOUTS_DEFAULT_PATH = '/restful/v2/aftermarket/get_expired_closeout_domains';
-function parseCloseouts(data: Record<string, unknown>, invalid: { n: number }): Page<Closeout> {
+function parseCloseouts(data: Record<string, unknown>, invalid: { n: number }): Page<Closeout> & { raw_n: number } {
   const arr = Array.isArray(data.closeout_item_list) ? data.closeout_item_list : [];
   const items: Closeout[] = [];
   for (const raw of arr) {
@@ -146,7 +155,7 @@ function parseCloseouts(data: Record<string, unknown>, invalid: { n: number }): 
     items.push({ domain, price_cents: price, ...(Number.isFinite(end) && end > 0 ? { ends_at: new Date(end).toISOString() } : {}) });
   }
   const t = Number(data.total);
-  return { items, total: Number.isFinite(t) && t >= 0 ? Math.floor(t) : null };
+  return { items, total: Number.isFinite(t) && t >= 0 ? Math.floor(t) : null, raw_n: arr.length };
 }
 
 function parseListings(data: Record<string, unknown>, invalid: { n: number }): Page<Listing> & { raw_n: number } {
@@ -167,7 +176,7 @@ function parseListings(data: Record<string, unknown>, invalid: { n: number }): P
 const shortErr = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/\s+/g, ' ').slice(0, 300);
 
 async function existingManifest(db: Kysely<Database>, kind: DynadotKind, dataDate: string) {
-  return db.selectFrom('snapshot_manifests').select(['status', 'origin', 'sealed_at', 'sha256', 'rows']).where('source', '=', dynadotSource(kind)).where('data_date', '=', dataDate).where('file_name', '=', FILE).executeTakeFirst();
+  return db.selectFrom('snapshot_manifests').select(['status', 'origin', 'sealed_at', 'sha256', 'rows', 'coverage']).where('source', '=', dynadotSource(kind)).where('data_date', '=', dataDate).where('file_name', '=', FILE).executeTakeFirst();
 }
 
 /** Writes (or refreshes) an unsealed marker manifest (`gap` or `error`) unless the day is sealed. An `error` never replaces an existing open row. */
@@ -218,53 +227,159 @@ async function sealOrNoop(d: PullDeps, kind: DynadotKind, dataDate: string, rows
   }
 }
 
+type StopReason = 'time_cap' | 'consecutive_failures' | null;
+interface PageRead<T> { ok: number[]; failed: number[]; items: T[]; raw_n: number; empty: number[]; stopped_by: StopReason; retried: number[]; firstError: CallFail | null }
+
+/**
+ * v5.80.0 (CR-099): reads the named pages one at a time (the client keeps the spacing). A failed page waits a growing pause with jitter and the sweep goes on;
+ * MAX_CONSECUTIVE_FAILURES in a row end the sweep. The pages not read then get one retry sweep after RETRY_MAX_MS, while the time budget lasts.
+ * `failed` is every planned page not read (failed or never reached); `stopped_by` says why the reading ended early, if it did.
+ */
+async function readPages<T>(c: Client, d: PullDeps, label: string, path: string, pages: number[], parse: (data: Record<string, unknown>) => { items: T[]; raw_n: number }, deadline: number): Promise<PageRead<T>> {
+  const out: PageRead<T> = { ok: [], failed: [], items: [], raw_n: 0, empty: [], stopped_by: null, retried: [], firstError: null };
+  const rnd = d.random ?? Math.random;
+  const pause = (n: number) => Math.round(Math.min(RETRY_BASE_MS * 2 ** (n - 1), RETRY_MAX_MS) * (0.8 + 0.4 * rnd()));
+  const sweep = async (list: number[]): Promise<number[]> => {
+    const left: number[] = [];
+    let consecutive = 0;
+    for (let i = 0; i < list.length; i++) {
+      const page = list[i]!;
+      if (d.now() >= deadline) { out.stopped_by = 'time_cap'; left.push(...list.slice(i)); break; }
+      try {
+        const p = parse(await c.call(label, path, page));
+        consecutive = 0;
+        out.ok.push(page); out.raw_n += p.raw_n; out.items.push(...p.items);
+        if (p.raw_n === 0) out.empty.push(page);
+      } catch (e) {
+        out.firstError ??= e instanceof CallFail ? e : new CallFail('UNKNOWN', null, shortErr(e));
+        left.push(page);
+        consecutive++;
+        if (consecutive >= MAX_CONSECUTIVE_FAILURES) { out.stopped_by = 'consecutive_failures'; left.push(...list.slice(i + 1)); break; }
+        await d.sleep(pause(consecutive));
+      }
+    }
+    return left;
+  };
+  let left = await sweep(pages);
+  if (left.length > 0 && out.stopped_by !== 'time_cap') {
+    await d.sleep(RETRY_MAX_MS);
+    out.retried = [...left];
+    const first = out.stopped_by;
+    out.stopped_by = null;
+    left = await sweep(left);
+    if (left.length > 0 && out.stopped_by === null) out.stopped_by = first;
+  }
+  out.ok.sort((a, b) => a - b);
+  out.failed = left.sort((a, b) => a - b);
+  return out;
+}
+
+/** The coverage keys every server pull adds (CR-099): the share of planned pages read, LOW_COVERAGE under DYNADOT_MIN_COVERAGE, and why the reading stopped. */
+function coverageVerdict(planned: number[], ok: number[], stoppedBy: StopReason, retried: number[]) {
+  const ratio = coverageRatio({ pages_planned: planned, pages_ok: ok }) ?? 0;
+  return { coverage_ratio: Math.round(ratio * 1000) / 1000, coverage_status: ratio < DYNADOT_MIN_COVERAGE ? 'LOW_COVERAGE' as const : 'OK' as const, min_coverage: DYNADOT_MIN_COVERAGE, stopped_by: stoppedBy, retried_pages_n: retried.length };
+}
+
+type Existing = NonNullable<Awaited<ReturnType<typeof existingManifest>>>;
+
+/**
+ * v5.80.0 (CR-099): today's day was sealed by the server with LOW_COVERAGE. Read only the planned pages not read yet and add their rows to the same day
+ * (`appendToSealedDay`: new rows only, sha256 and coverage recomputed). A full-coverage day is never touched.
+ */
+async function topUp<T extends Closeout | Listing>(d: PullDeps, kind: DynadotKind, dataDate: string, started: number, c: Client, ex: Existing, label: string, path: string,
+  parse: (data: Record<string, unknown>) => { items: T[]; raw_n: number }): Promise<PullSummary> {
+  const prev = ex.coverage as Record<string, unknown>;
+  const planned = (prev.pages_planned as number[]).slice();
+  const prevOk = new Set(prev.pages_ok as number[]);
+  const want = planned.filter((p) => !prevOk.has(p));
+  const r = await readPages(c, d, label, path, want, parse, started + PULL_BUDGET_MS[kind === 'aftermarket' ? 'aftermarket' : 'closeouts']);
+  const rows = kind === 'aftermarket' ? (r.items as Listing[]).filter((x) => x.price_cents >= AFTERMARKET_MIN_CENTS) : r.items;
+  const ok = [...prevOk, ...r.ok].sort((a, b) => a - b);
+  const verdict = coverageVerdict(planned, ok, r.stopped_by, r.retried);
+  const num = (k: string) => (typeof prev[k] === 'number' ? (prev[k] as number) : 0);
+  const coverage: Record<string, unknown> = {
+    ...prev, ...verdict, partial: r.failed.length > 0, pages_ok: ok, pages_failed: r.failed, calls_n: num('calls_n') + c.calls, rows_received_n: num('rows_received_n') + rows.length,
+    ...(kind === 'aftermarket' ? { listings_read_n: num('listings_read_n') + r.raw_n } : {}),
+    top_ups: [...(Array.isArray(prev.top_ups) ? prev.top_ups : []), { at: new Date(d.now()).toISOString(), pages_tried_n: want.length, pages_ok_n: r.ok.length, stopped_by: r.stopped_by }],
+  };
+  const res = await appendToSealedDay(d.db, kind, dataDate, rows as never, coverage, d.now());
+  return summary(kind, dataDate, started, d, c, {
+    status: r.failed.length > 0 ? 'partial' : 'sealed', top_up: true, pages_n: r.ok.length, rows_n: res.rows_stored_n, added_n: res.accepted_n, sealed: true, sha256: res.sha256, coverage,
+    coverage_status: verdict.coverage_status, ...(r.firstError ? { error: `${r.firstError.code}: ${r.firstError.message}` } : {}),
+  });
+}
+
+/** A day the server sealed with LOW_COVERAGE and page lists can be topped up; any other sealed day is frozen. */
+const canTopUp = (ex: Existing | undefined): boolean => Boolean(ex?.sealed_at && ex.origin === 'server' && isLowCoverage(ex.coverage as never) && Array.isArray((ex.coverage as { pages_planned?: unknown } | null)?.pages_planned));
+
 export async function pullCloseouts(d: PullDeps): Promise<PullSummary> {
   const started = d.now();
   const dataDate = new Date(started).toISOString().slice(0, 10);
   const kind: DynadotKind = 'closeouts';
   if (!d.closeoutsPath) throw new Error('closeouts REST path unknown');
+  const path = d.closeoutsPath;
   const c = new Client(d);
-  const ex = await existingManifest(d.db, kind, dataDate);
-  if (ex?.sealed_at) return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true, sealed_origin: ex.origin, rows_n: ex.rows ?? 0 });
   const invalid = { n: 0 };
-  const seen = new Set<string>();
-  const rows: Closeout[] = [];
-  const planned: number[] = [];
-  const ok: number[] = [];
-  const failed: number[] = [];
-  let firstError: CallFail | null = null;
-  let consecutive = 0;
-  let capHit = false;
-  let dataPages = 0;
-  for (let page = 1; ; page++) {
-    if (page > DYNADOT_MAX_PAGES) { capHit = true; break; }
-    planned.push(page);
-    let items: Closeout[];
-    try {
-      items = parseCloseouts(await c.call('closeouts', d.closeoutsPath!, page), invalid).items;
-    } catch (e) {
-      const f = e instanceof CallFail ? e : new CallFail('UNKNOWN', null, shortErr(e));
-      failed.push(page); firstError ??= f; consecutive++;
-      if (consecutive >= MAX_CONSECUTIVE_FAILURES) break;
-      continue;
+  let total: number | null = null;
+  let perPage = 0;
+  const parse = (data: Record<string, unknown>) => { const p = parseCloseouts(data, invalid); return { items: p.items, raw_n: p.raw_n }; };
+  const ex = await existingManifest(d.db, kind, dataDate);
+  if (canTopUp(ex)) return topUp(d, kind, dataDate, started, c, ex!, 'closeouts', path, parse);
+  if (ex?.sealed_at) return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true, sealed_origin: ex.origin, rows_n: ex.rows ?? 0 });
+  const deadline = started + PULL_BUDGET_MS.closeouts;
+  const r1 = await readPages(c, d, 'closeouts', path, [1], (data) => { const p = parseCloseouts(data, invalid); total = p.total; perPage = p.raw_n; return { items: p.items, raw_n: p.raw_n }; }, deadline);
+  const all: Closeout[] = [...r1.items];
+  const ok = [...r1.ok];
+  const failed = [...r1.failed];
+  const retried = [...r1.retried];
+  let stoppedBy = r1.stopped_by;
+  let firstError = r1.firstError;
+  let dataPages = r1.items.length > 0 ? 1 : 0;
+  let planned: number[];
+  if (ok.length === 1 && total !== null) {
+    // v5.80.0 (CR-099 d): with a total the pages are planned from it, so the pages past the end (Dynadot answers them with HTTP 500, seen 29 and 30 Oct) are never asked
+    planned = Array.from({ length: Math.min(Math.max(Math.ceil(total / Math.max(perPage, 1)), 1), DYNADOT_MAX_PAGES) }, (_, i) => i + 1);
+    const r = await readPages(c, d, 'closeouts', path, planned.slice(1), parse, deadline);
+    ok.push(...r.ok); failed.push(...r.failed); retried.push(...r.retried); all.push(...r.items);
+    stoppedBy = r.stopped_by; firstError ??= r.firstError; dataPages += r.ok.length - r.empty.length;
+  } else {
+    // no total on the page (or page 1 never came back): read on until the first empty page, as before 5.80.0
+    planned = [1];
+    const seen = new Set(all.map((x) => x.domain));
+    let consecutive = failed.length;
+    for (let page = 2; page <= DYNADOT_MAX_PAGES; page++) {
+      if (d.now() >= deadline) { stoppedBy = 'time_cap'; break; }
+      planned.push(page);
+      let items: Closeout[];
+      try { items = parse(await c.call('closeouts', path, page)).items; } catch (e) {
+        failed.push(page); firstError ??= e instanceof CallFail ? e : new CallFail('UNKNOWN', null, shortErr(e)); consecutive++;
+        if (consecutive >= MAX_CONSECUTIVE_FAILURES) { stoppedBy = 'consecutive_failures'; break; }
+        continue;
+      }
+      consecutive = 0;
+      ok.push(page);
+      if (items.length === 0) break; // the first empty page is the end of the list
+      const fresh = items.filter((x) => !seen.has(x.domain));
+      if (fresh.length === 0) break; // Dynadot repeated a page: stop, never loop
+      dataPages++;
+      for (const x of fresh) { seen.add(x.domain); all.push(x); }
     }
-    consecutive = 0;
-    ok.push(page);
-    if (items.length > 0) dataPages++;
-    if (items.length === 0) break; // the first empty page is the end of the list
-    const fresh = items.filter((r) => !seen.has(r.domain));
-    if (fresh.length === 0) break; // Dynadot repeated a page: stop, never loop
-    for (const r of fresh) { seen.add(r.domain); rows.push(r); }
   }
+  const seen = new Set<string>();
+  const rows = all.filter((x) => (seen.has(x.domain) ? false : (seen.add(x.domain), true)));
   if (rows.length === 0) {
     const err = firstError ? `${firstError.code}: ${firstError.message}` : 'EMPTY_RESULT: Dynadot returned no closeout rows';
     await markManifest(d.db, kind, dataDate, d.now(), { status: 'error', error: err, httpStatus: firstError?.httpStatus ?? null });
     return summary(kind, dataDate, started, d, c, { status: 'error', pages_n: dataPages, error: err, code: firstError?.code ?? 'ERROR', http_status: firstError?.httpStatus ?? null });
   }
-  const coverage = { partial: failed.length > 0 || capHit || consecutive >= MAX_CONSECUTIVE_FAILURES, calls_n: c.calls, pages_planned: planned, pages_ok: ok, pages_failed: failed, rows_received_n: rows.length, server: true, invalid_n: invalid.n };
-  const r = await sealOrNoop(d, kind, dataDate, rows, coverage);
-  if (r === 'sealed_meanwhile') return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true });
-  return summary(kind, dataDate, started, d, c, { status: coverage.partial ? 'partial' : 'sealed', pages_n: dataPages, rows_n: r.rows_stored_n, sealed: r.sealed, sha256: r.sha256, coverage, invalid_n: invalid.n, duplicate_n: r.duplicate_n, ...(firstError ? { error: `${firstError.code}: ${firstError.message}` } : {}) });
+  ok.sort((a, b) => a - b);
+  failed.sort((a, b) => a - b);
+  const capHit = planned.length >= DYNADOT_MAX_PAGES && total === null;
+  const verdict = coverageVerdict(planned, ok, stoppedBy, retried);
+  const coverage = { partial: failed.length > 0 || capHit, calls_n: c.calls, pages_planned: planned, pages_ok: ok, pages_failed: failed, rows_received_n: rows.length, server: true, invalid_n: invalid.n, total_listings: total, ...verdict };
+  const stored = await sealOrNoop(d, kind, dataDate, rows, coverage);
+  if (stored === 'sealed_meanwhile') return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true });
+  return summary(kind, dataDate, started, d, c, { status: coverage.partial ? 'partial' : 'sealed', pages_n: dataPages, rows_n: stored.rows_stored_n, sealed: stored.sealed, sha256: stored.sha256, coverage, coverage_status: verdict.coverage_status, invalid_n: invalid.n, duplicate_n: stored.duplicate_n, ...(firstError ? { error: `${firstError.code}: ${firstError.message}` } : {}) });
 }
 
 /** Last complete aftermarket day before `dataDate` with a stored listing total (server-sealed days only: the bots' totals are counted after the $500 floor, not comparable). */
@@ -294,9 +409,11 @@ export async function pullAftermarket(d: PullDeps): Promise<PullSummary> {
   const dataDate = new Date(started).toISOString().slice(0, 10);
   const kind: DynadotKind = 'aftermarket';
   const c = new Client(d);
-  const ex = await existingManifest(d.db, kind, dataDate);
-  if (ex?.sealed_at) return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true, sealed_origin: ex.origin, rows_n: ex.rows ?? 0 });
   const invalid = { n: 0 };
+  const parse = (data: Record<string, unknown>) => parseListings(data, invalid);
+  const ex = await existingManifest(d.db, kind, dataDate);
+  if (canTopUp(ex)) return topUp(d, kind, dataDate, started, c, ex!, 'listings', DYNADOT_LISTINGS_PATH, parse);
+  if (ex?.sealed_at) return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true, sealed_origin: ex.origin, rows_n: ex.rows ?? 0 });
   const fail = async (e: unknown, pages: number) => {
     const f = e instanceof CallFail ? e : new CallFail('UNKNOWN', null, shortErr(e));
     const err = `${f.code}: ${f.message}`;
@@ -321,36 +438,20 @@ export async function pullAftermarket(d: PullDeps): Promise<PullSummary> {
   const plannedN = total !== null ? Math.max(Math.ceil(total / perPage), 1) : 1;
   const capHit = plannedN > DYNADOT_MAX_PAGES;
   const planned = Array.from({ length: Math.min(plannedN, DYNADOT_MAX_PAGES) }, (_, i) => i + 1);
-  const ok = [1];
-  const failed: number[] = [];
-  const emptyPages: number[] = [];
-  const all: Listing[] = [...first.items];
-  let rawSeen = first.raw_n;
-  let firstError: CallFail | null = null;
-  let consecutive = 0;
-  for (const page of planned.slice(1)) {
-    try {
-      const p = parseListings(await c.call('listings', DYNADOT_LISTINGS_PATH, page), invalid);
-      consecutive = 0;
-      ok.push(page);
-      rawSeen += p.raw_n;
-      if (p.raw_n === 0) emptyPages.push(page);
-      all.push(...p.items);
-    } catch (e) {
-      const f = e instanceof CallFail ? e : new CallFail('UNKNOWN', null, shortErr(e));
-      failed.push(page); firstError ??= f; consecutive++;
-      if (consecutive >= MAX_CONSECUTIVE_FAILURES) break;
-    }
-  }
-  const rows = all.filter((r) => r.price_cents >= AFTERMARKET_MIN_CENTS);
+  // v5.80.0 (CR-099 b): failed pages wait and are retried inside the step while the time budget lasts (readPages)
+  const r = await readPages(c, d, 'listings', DYNADOT_LISTINGS_PATH, planned.slice(1), parse, started + PULL_BUDGET_MS.aftermarket);
+  const ok = [1, ...r.ok];
+  const all: Listing[] = [...first.items, ...r.items];
+  const rawSeen = first.raw_n + r.raw_n;
+  const rows = all.filter((x) => x.price_cents >= AFTERMARKET_MIN_CENTS);
   const droppedUnderFloor = all.length - rows.length;
-  if (rows.length === 0) return gap(emptyPages.length > 0 ? 'deep_pages_empty' : 'no_rows_over_floor', false);
-  const unreached = planned.filter((p) => !ok.includes(p) && !failed.includes(p));
-  const coverage = { partial: failed.length > 0 || capHit || unreached.length > 0 || emptyPages.length > 0, calls_n: c.calls, pages_planned: planned, pages_ok: ok, pages_failed: [...failed, ...unreached], pages_empty: emptyPages.length > 0 ? emptyPages : undefined, rows_received_n: rows.length, server: true, total_listings: total, listings_read_n: rawSeen, invalid_n: invalid.n };
-  const r = await sealOrNoop(d, kind, dataDate, rows, coverage);
-  if (r === 'sealed_meanwhile') return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true });
+  if (rows.length === 0) return gap(r.empty.length > 0 ? 'deep_pages_empty' : 'no_rows_over_floor', false);
+  const verdict = coverageVerdict(planned, ok, r.stopped_by, r.retried);
+  const coverage = { partial: r.failed.length > 0 || capHit || r.empty.length > 0, calls_n: c.calls, pages_planned: planned, pages_ok: ok, pages_failed: r.failed, pages_empty: r.empty.length > 0 ? r.empty : undefined, rows_received_n: rows.length, server: true, total_listings: total, listings_read_n: rawSeen, invalid_n: invalid.n, ...verdict };
+  const stored = await sealOrNoop(d, kind, dataDate, rows, coverage);
+  if (stored === 'sealed_meanwhile') return summary(kind, dataDate, started, d, c, { status: 'SNAPSHOT_SEALED', sealed: true });
   return summary(kind, dataDate, started, d, c, {
-    status: coverage.partial ? 'partial' : 'sealed', pages_n: ok.length, rows_n: r.rows_stored_n, sealed: r.sealed, sha256: r.sha256, coverage, total_listings: total, baseline_total: baseline,
-    dropped_under_500_n: droppedUnderFloor, invalid_n: invalid.n, duplicate_n: r.duplicate_n, ...(firstError ? { error: `${firstError.code}: ${firstError.message}` } : {}),
+    status: coverage.partial ? 'partial' : 'sealed', pages_n: ok.length, rows_n: stored.rows_stored_n, sealed: stored.sealed, sha256: stored.sha256, coverage, coverage_status: verdict.coverage_status, total_listings: total, baseline_total: baseline,
+    dropped_under_500_n: droppedUnderFloor, invalid_n: invalid.n, duplicate_n: stored.duplicate_n, ...(r.firstError ? { error: `${r.firstError.code}: ${r.firstError.message}` } : {}),
   });
 }

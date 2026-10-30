@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.80.0 (2026-10-30): CR-099: Dynadot low-coverage days (retry, LOW_COVERAGE, same-day top-up, re-pull), closeouts pages from the total
+Release note: `docs/releases/v5.80.0.md`.
+MINOR. Dynadot reads retry failed pages with pauses and a time budget (`coverage.stopped_by`). A day under 90% of planned pages is `coverage_status: LOW_COVERAGE`: left out by `episodes`, `dqMarket` (which fails `coverage` for it) and the panel, retried once 60 min later, and listed in `/health.datasave_detail.dynadot_low_coverage` and the new `/report` warning `DYNADOT_LOW_COVERAGE`. A later read of such a day adds only the missing pages. `POST /jobs/run` adds `only` (WRITE; 409 `SNAPSHOT_SEALED` for a full-coverage day). Closeouts pages are planned from the total (CR-099).
+
 ## 5.79.0 (2026-10-30): CR-098: kbLoad file rows replace route rows; rejects name line, key and fields; GET /kb/load-preview
 Release note: `docs/releases/v5.79.0.md`.
 MINOR. `kbLoad`: a file row whose stored newest version came from a route call is appended as the next version without `supersede` (`counts.<kind>.auto_superseded`); a failed file's error names file line, reason, key and differing fields. `POST /kb/*` `KB_ROWS_REJECTED` rejects add `key` and `fields`. New `GET /kb/load-preview` (READ or bots): the next `kbLoad`, rolled back (CR-098).

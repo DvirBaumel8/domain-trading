@@ -383,6 +383,7 @@ Shared helpers, no module imports (`tests/unit/core-boundaries.test.ts`).
 
 | File | Inside | Test |
 |---|---|---|
+| `snapshot-coverage.ts` | v5.80.0 (CR-099): `DYNADOT_MIN_COVERAGE` (0.9), `coverageRatio`, `isLowCoverage`, `lowCoverageSql` (a sealed Dynadot day under 90% of its planned pages is LOW_COVERAGE); used by `ops` (dynadot pull, jobs route, datasave panel), `market` (episodes, dq) and `reporting` (datasave state); the seal guard migration `1769200000000_v5-80-0.sql` repeats the rule | `ops/dynadot-coverage` (CR099-1..6) |
 | `dates.ts` | IDT days, `idtDay`, `addDays`, `toJerusalemIso`, `jerusalemDeep`, zod `ymd`/`isoWithOffset` | `core/unit/dates`, `time`, `time-jerusalem-deep` |
 | `money.ts` | cents <-> USD, `pair('x', cents)` -> `x_cents` + `x`; 5.13.0: `apiCents(n, field, status?)` (the one request-amount to cents helper with its 422/400 VALIDATION_ERROR) and `usdSigned` | `core/unit/money` |
 | `approval.ts` | `checkApproval`, `checkTimedApproval`, `namesToken` (72 h rule) | `core/unit/approval` |

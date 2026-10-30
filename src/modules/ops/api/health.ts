@@ -38,6 +38,7 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       datasave_detail: datasave ? {
         last_run: datasave.last_run ? { run_id: datasave.last_run.run_id, finished_at: toJerusalemIso(datasave.last_run.finished_at), steps: datasave.last_run.steps } : null,
         missing_files: datasave.missing_files, dynadot_missing: datasave.dynadot_missing, dynadot_due_date: datasave.dynadot_due_date,
+        dynadot_low_coverage: datasave.dynadot_low_coverage, // v5.80.0 (CR-099)
       } : null,
       // v5.23.0 (CR-075 R-3): the market data-quality checks: ok | alert | unknown (before the first run); does not change the top-level status
       dq_market: dqMarket,

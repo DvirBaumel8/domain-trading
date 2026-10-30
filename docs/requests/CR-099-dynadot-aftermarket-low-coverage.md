@@ -1,7 +1,7 @@
 ---
 id: CR-099
 kind: CR
-status: approved
+status: in_progress
 owner_bot: dom-architect
 approval: "Gavriel, P1 bug fix, 2026-10-30 18:02 IDT"
 priority: P1
@@ -55,3 +55,32 @@ max_rounds: 2
 - The retry run adds the missing pages and the day's coverage rises.
 - A re-pull of a full-coverage day → 409.
 - A closeouts page past the end is not counted as failed.
+
+## DOM response (30 Oct 2026, ~19:20 IDT)
+**Verdict: accepted, built in 5.80.0.**
+
+- **(a) Built.**
+  - LOW_COVERAGE = under 90% of planned pages read.
+  - It is a constant (`DYNADOT_MIN_COVERAGE`), not a setting: changing it is a release either way, and the seal guard needs the same number.
+  - It is on the manifest and the step summary, in `/health.datasave_detail.dynadot_low_coverage`, and in the `/report` warning `DYNADOT_LOW_COVERAGE`.
+  - The rule reads the page lists, so Oct 30 (91/477) is LOW_COVERAGE now, with no backfill.
+  - **Instead of carrying rows forward,** the readers leave the day out. `episodes` folds only full days, so a name missing from a low day keeps its episode and stays open. `dqMarket` leaves the day out of survivorship, price sanity and the median, and fails `coverage` for it. The `buildPanel` Dynadot gone count uses full days.
+  - `engineFeed` and the training labels: `engineFeed` reads GoDaddy only, and the labels come from `episodes`, so both are covered.
+  - **Correction to the CR's risk:** the steps after an upload already tolerated one missing day. An episode survives a 7-day gap, and "open" is measured within 7 days. So Oct 30 alone would not have marked 400k names gone. Several low days in a row would have.
+- **(b) Built.**
+  - A failed page waits 15/30/60/120 s with jitter. Five in a row end a sweep, then one retry sweep runs.
+  - Time budget: 50 min for the aftermarket and 25 min for closeouts, against step timeouts of 60 and 30 min. It is now stated in `jobs.md`.
+  - `stopped_by` says why a read stopped. **Oct 30 was not a time cap:** it was three 500s in a row (pages 95–97).
+  - A LOW_COVERAGE or error Dynadot step gets one retry run 60 min later that runs just that step. It reads only the missing pages and adds them to the same `data_date`.
+  - Calls stay one at a time and 5 s apart.
+- **(c) Built.** `POST /jobs/run {job: datasave, only: dynadot_aftermarket | dynadot_closeouts}`:
+  - WRITE token only, audited; the job token gets 403;
+  - today only, because Dynadot serves just the current lists;
+  - 409 `SNAPSHOT_SEALED` for a full-coverage or bot-sealed day.
+  - A LOW_COVERAGE server day takes the top-up: rows, sha256 and coverage change; the seal time, status and origin don't. The seal guard migration allows exactly that.
+- **(d) Answered and fixed: they are pages past the end.**
+  - Oct 29: 46,106 rows = 47 pages; 48–50 failed.
+  - Oct 30: 57,684 rows = 58 pages; 59–61 failed.
+  - The old loop read until an empty page, and Dynadot answers a page past the end with 500 instead of an empty list.
+  - The closeouts pages are now planned from `data.total`, so those pages are never asked.
+- **Check:** tests CR099-1..6. After the deploy DOM re-pulls Oct 30's aftermarket today and reports the coverage in `DOM-TO-GAVRIEL.md`.

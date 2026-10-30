@@ -35,6 +35,8 @@ const STEP_ATTEMPTS: Record<string, number> = {
   registrarCheck: 3, portfolioCheck: 3, listingSync: 2, afternicSync: 2, dropWatch: 3, referenceRefresh: 3, engineEndings: 1, engineTrain: 1, trainModel: 1, godaddyInventory: 1, dynadotCloseouts: 1, dynadotAftermarket: 1,
 };
 const DEFAULT_TIMEOUT_MS = 5 * 60_000;
+/** v5.80.0 (CR-099): the Dynadot steps a re-pull (`POST /jobs/run {job: datasave, only}`) or the low-coverage retry may run alone. */
+export const DATASAVE_DYNADOT_STEPS = ['dynadotCloseouts', 'dynadotAftermarket'] as const;
 const STEP_TIMEOUT_MS: Record<string, number> = { intakeScreening: 10 * 60_000, onDemandScreen: 10 * 60_000, buildDailyList: 10 * 60_000, engineEndings: 25 * 60_000, trainModel: 30 * 60_000, godaddyInventory: 45 * 60_000, dynadotCloseouts: 30 * 60_000, dynadotAftermarket: 60 * 60_000, buildPanel: 25 * 60_000, engineFeed: 10 * 60_000, auctionShortlist: 15 * 60_000 };
 
 export type JobTrigger = 'scheduled' | 'manual' | 'cli';
@@ -165,6 +167,9 @@ export class JobRunner {
       const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'engineFeed' | 'auctionShortlist' | 'pickproofSeal' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels') =>
         step(name, async () => (ds ? ds[name]() : { skipped: true, reason: 'datasave not configured' }));
       // v5.65.0: the two Dynadot reads (about 40 minutes) run last, so they no longer delay scorePool, auctionShortlist and the rest; their rows are used by the next run (scorePool, buildPanel, episodes, dqMarket read the newest sealed day)
+      // v5.80.0 (CR-099): `params.only` (the Dynadot re-pull and its retry) runs just the named Dynadot steps; nothing else of the datasave
+      const only = (run?.params as { only?: unknown } | null | undefined)?.only;
+      if (Array.isArray(only)) return DATASAVE_DYNADOT_STEPS.filter((n) => only.includes(n)).map((n) => dsStep(n));
       return [dsStep('godaddyInventory'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('auctionShortlist'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket')];
     }
     if (job === 'tick') return tick;

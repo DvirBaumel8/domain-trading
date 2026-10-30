@@ -146,3 +146,28 @@ export async function uploadDynadot(db: Kysely<Database>, b: DynadotBody, nowMs:
     throw e;
   }
 }
+
+/**
+ * v5.80.0 (CR-099): adds the rows of a top-up to a day the server sealed with LOW_COVERAGE (only new rows, by the same keys and the same $500 drop as an upload),
+ * then recomputes the stored count and the sha256 and stores the merged coverage. The seal time stays. Refused (409 SNAPSHOT_SEALED) for any other day.
+ */
+export async function appendToSealedDay(db: Kysely<Database>, kind: DynadotKind, dataDate: string, rows: DynadotBody['rows'], coverage: Record<string, unknown>, nowMs: number): Promise<{ accepted_n: number; rows_stored_n: number; sha256: string }> {
+  const source = dynadotSource(kind);
+  const { inserts } = toInserts({ kind, data_date: dataDate, rows } as DynadotBody);
+  return db.transaction().execute(async (trx) => {
+    await advisoryXactLock(trx, `dynadot_upload:${source}:${dataDate}`);
+    const m = await trx.selectFrom('snapshot_manifests').select(['sealed_at', 'origin']).where('source', '=', source).where('data_date', '=', dataDate).where('file_name', '=', BOT_UPLOAD_FILE).executeTakeFirst();
+    if (!m?.sealed_at || m.origin !== 'server') throw new AppError(409, 'SNAPSHOT_SEALED', 'Only a day the server sealed with low coverage takes more rows', { kind, data_date: dataDate });
+    let accepted = 0;
+    for (let i = 0; i < inserts.length; i += BATCH) {
+      const res = await trx.insertInto('dynadot_rows').values(inserts.slice(i, i + BATCH)).onConflict((oc) => oc.doNothing()).executeTakeFirst();
+      accepted += Number(res.numInsertedOrUpdatedRows ?? 0);
+    }
+    const stored = Number((await trx.selectFrom('dynadot_rows').select((eb) => eb.fn.countAll<string>().as('n')).where('data_date', '=', dataDate).where('kind', '=', kind).executeTakeFirstOrThrow()).n);
+    const sha256 = await canonicalSha(trx, kind, dataDate);
+    const now = new Date(nowMs);
+    await trx.updateTable('snapshot_manifests').set({ rows: stored, sha256, coverage: JSON.stringify(coverage), last_modified: now, updated_at: now })
+      .where('source', '=', source).where('data_date', '=', dataDate).where('file_name', '=', BOT_UPLOAD_FILE).execute();
+    return { accepted_n: accepted, rows_stored_n: stored, sha256 };
+  });
+}

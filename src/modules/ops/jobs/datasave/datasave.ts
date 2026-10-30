@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Transform, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { lowCoverageSql } from '../../../../core/snapshot-coverage.js';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../../../db/types.js';
 import { idtDay } from '../../../../core/dates.js';
@@ -81,6 +82,8 @@ export interface DatasaveDeps {
   /** Tests: the Dynadot REST v2 base URL (default https://api.dynadot.com) and the spacing between calls (default 5 s). */
   dynadotBaseUrl?: string;
   dynadotSpacingMs?: number;
+  /** v5.80.0 (CR-099): jitter source of the Dynadot retry pauses (tests pass a constant). */
+  random?: () => number;
   /** v5.26.0 (CR-072): the engine scorer for the `scorePool` step; without it every row gets score null, NO_ACTIVE_MODEL. */
   scorer?: PoolScorer;
   /** Tests may pass a fetch; default is the global one at call time (MSW patches it). */
@@ -491,7 +494,7 @@ export class DatasaveJob {
   }
 
   private pullDeps(key: string, secret: string): PullDeps {
-    return { db: this.deps.db, now: this.deps.now, key, secret, closeoutsPath: this.deps.dynadotCloseoutsPath, fetch: this.fetchFn, sleep: this.deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), baseUrl: this.deps.dynadotBaseUrl, spacingMs: this.deps.dynadotSpacingMs, log: this.deps.log };
+    return { db: this.deps.db, now: this.deps.now, key, secret, closeoutsPath: this.deps.dynadotCloseoutsPath, fetch: this.fetchFn, sleep: this.deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), baseUrl: this.deps.dynadotBaseUrl, spacingMs: this.deps.dynadotSpacingMs, random: this.deps.random, log: this.deps.log };
   }
 
   /** Is the bot upload of today's UTC data date sealed for this source? */
@@ -597,7 +600,7 @@ export class DatasaveJob {
   private async dynadotPanel(): Promise<unknown> {
     const { db } = this.deps;
     const days = (await sql<{ d: string }>`select distinct r.data_date::text as d from dynadot_rows r
-      where r.kind = 'closeouts' and exists (select 1 from snapshot_manifests m where m.source = 'dynadot_closeouts' and m.file_name = 'bot_upload' and m.sealed_at is not null and m.data_date = r.data_date)
+      where r.kind = 'closeouts' and exists (select 1 from snapshot_manifests m where m.source = 'dynadot_closeouts' and m.file_name = 'bot_upload' and m.sealed_at is not null and m.data_date = r.data_date and not ${lowCoverageSql('m')})
       order by 1 desc limit 2`.execute(db)).rows.map((r) => r.d);
     if (days.length < 2) return null;
     const [latest, prev] = days as [string, string];
