@@ -1,11 +1,11 @@
 ---
 id: CR-098
 kind: CR
-status: open
+status: approved
 owner_bot: dom-architect
-approval: "Gavriel 2026-10-30 08:18 IDT; no money; Claude Code only, no CloudAgents."
+approval: "Gavriel for Dvir-path P0 bug fix, 2026-10-30 08:22 IDT"
 priority: P0
-priority_note: "must land before the daily run at 00:05 UTC 31 Oct (02:05 IDT); kbLoad has failed on 0008 for 3 nights"
+priority_note: "TOP OF QUEUE; must land before the daily run at 00:05 UTC 31 Oct (02:05 IDT); kbLoad has failed on 0008 for 3 nights"
 depends_on: []
 supersedes: []
 max_rounds: 2
