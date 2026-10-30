@@ -3,7 +3,7 @@
 Written 29 Oct 2026 ~20:45 IDT (Asia/Jerusalem). API 5.75.1. DB 74.2% (796 MB of 1 GB).
 
 ## What the datasave did
-- The 15:00 UTC run failed `GODADDY_NOT_PUBLISHED`. The retry `run_9ea5e2fc` (19:12–19:23 IDT) sealed GoDaddy with 134,092 closeouts. The Dynadot steps returned `SNAPSHOT_SEALED`.
+- The scheduled run `run_1cbce1d0` (17:05–18:12 IDT, i.e. 15:05 UTC) failed `GODADDY_NOT_PUBLISHED` (metadata newest file day 2026-10-28, run day 2026-10-29). The five GoDaddy files it saw were still the Oct 28 ones and answered `SNAPSHOT_SEALED`, which means already sealed and skipped. It was not a re-seal of Oct 28. The retry `run_9ea5e2fc` (19:12–19:23 IDT) sealed GoDaddy with 134,092 closeouts. The Dynadot steps returned `SNAPSHOT_SEALED`.
 - Dynadot aftermarket: 467 of 472 pages ok (107/108/210/312/414 failed). Dynadot closeouts: 47 of 50 pages ok (48–50 failed), 46,106 rows.
 - `engineFeed` skipped: `db_size_high`. CR-095 covers this (retention/compaction plus a backfill of 900 candidates).
 - CR-094 moves the cron to 15:20 UTC, because GoDaddy publishes late.
