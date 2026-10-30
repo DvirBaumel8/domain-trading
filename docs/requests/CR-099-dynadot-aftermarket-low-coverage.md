@@ -3,7 +3,7 @@ id: CR-099
 kind: CR
 status: open
 owner_bot: dom-architect
-approval: "Gavriel 2026-10-30 18:00 IDT; maintenance, no money; Claude Code only, no CloudAgents."
+approval: null  # awaiting Dvir/Gavriel; maintenance, no money
 priority: P1
 priority_note: "Oct 30 aftermarket is sealed at 19% of pages; the steps after it may read about 400k names as gone"
 depends_on: []
