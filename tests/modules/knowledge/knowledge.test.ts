@@ -280,4 +280,41 @@ describe('knowledge repo load (CR-078 rule 9)', () => {
     const step = app.jobRunner.plan('daily').find((s) => s.name === 'kbLoad')!;
     expect(await step.exec()).toMatchObject({ files_seen: 1, loaded: [{ file: '0000-example.jsonl' }] });
   });
+
+  it('KB-098-1 (v5.79.0, CR-098): a file row replaces a route row with the same key without "supersede" (logged per kind); a clash with an earlier file still fails and names the line, key and fields', async () => {
+    const { w } = await setup();
+    await post('/kb/sources', w, [src('a', { title: 'route title' })]);
+    const dir = await mkdtemp(join(tmpdir(), 'kb-'));
+    const line = (o: Record<string, unknown>) => JSON.stringify({ kind: 'source', ...src('a', o) });
+    await writeFile(join(dir, '0001-file.jsonl'), `// header\n${line({ title: 'file title' })}\n`);
+    const s = await new KbLoadJob({ db, now: () => clock, dir }).runOnce();
+    expect(s.failed).toEqual([]);
+    expect(s.loaded[0]!.counts.source).toEqual({ accepted: 0, duplicate: 0, superseded: 1, auto_superseded: ['https://example.test/a'] });
+    expect((await db.selectFrom('kb_loads').select('counts').executeTakeFirstOrThrow()).counts).toMatchObject({ source: { auto_superseded: ['https://example.test/a'] } });
+    const rows = await db.selectFrom('kb_sources').select(['version', 'title', 'by']).orderBy('id').execute();
+    expect(rows).toEqual([{ version: 1, title: 'route title', by: 'gavriel' }, { version: 2, title: 'file title', by: 'repo-load' }]);
+    // a later file that differs from an earlier file's row: an explicit supersede is still needed, and the error says where
+    await writeFile(join(dir, '0002-later.jsonl'), `// header\n\n${line({ title: 'later title' })}\n`);
+    const t = await new KbLoadJob({ db, now: () => clock, dir }).runOnce();
+    expect(t.failed).toHaveLength(1);
+    expect(t.failed[0]!.error).toBe('0002-later.jsonl: source: 1 rejected: line 3 EXISTS_DIFFERENT https://example.test/a [title]');
+    // the routes never auto-supersede, and their reject names the key and the fields too
+    const refused = (await post('/kb/sources', w, [src('a', { title: 'again' })])).json();
+    expect(refused.error.details.rejects[0]).toMatchObject({ reason: 'EXISTS_DIFFERENT', key: 'https://example.test/a', fields: ['title'] });
+  });
+
+  it('KB-098-2 (v5.79.0, CR-098): GET /kb/load-preview runs the files not yet loaded and keeps nothing; the shipped files preview clean', async () => {
+    const dir = new URL('../../../data/knowledge/', import.meta.url).pathname;
+    const { r, w } = await setup({ knowledgeDir: dir });
+    const res = await get('/kb/load-preview', r);
+    expect(res.statusCode).toBe(200);
+    const j = res.json();
+    expect(j).toMatchObject({ dry_run: true, unchanged: [], failed: [] });
+    expect(j.loaded.map((l: { file: string }) => l.file)).toContain('0008-fertilize-2026-10-28.jsonl');
+    expect(await db.selectFrom('kb_sources').select('id').execute()).toEqual([]);
+    expect(await db.selectFrom('kb_loads').select('id').execute()).toEqual([]);
+    expect((await get('/kb/load-preview?x=1', r)).statusCode).toBe(400);
+    expect((await app.inject({ method: 'GET', url: '/kb/load-preview' })).statusCode).toBe(401);
+    void w;
+  }, 60_000);
 });

@@ -72,7 +72,8 @@ export const normText = (s: string): string => s.toLowerCase().replace(/\s+/g, '
 export const claimKeyOf = (topic: string, variable: string, population: string): string => `${topic}|${normText(variable)}|${normText(population)}`;
 export const authorKeyOf = (name: string): string => name.toLowerCase().replace(/\s+/g, ' ').trim();
 
-export interface RowReject { row: number; reason: string; message: string }
+/** v5.79.0 (CR-098 ask 3): an EXISTS_DIFFERENT reject also names the row's natural key and the fields that differ from the stored newest version. */
+export interface RowReject { row: number; reason: string; message: string; key?: string; fields?: string[] }
 export const issueText = (e: z.ZodError): string => e.issues.slice(0, 3).map((i) => `${i.path.join('.') || 'row'}: ${i.message}`).join('; ').slice(0, 300);
 
 /** Source columns from a parsed source row: canonical URL and hash, the excerpt's content hash and MinHash. */

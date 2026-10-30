@@ -1,7 +1,7 @@
 ---
 id: CR-098
 kind: CR
-status: approved
+status: in_progress
 owner_bot: dom-architect
 approval: "Gavriel for Dvir-path P0 bug fix, 2026-10-30 08:22 IDT"
 priority: P0
@@ -59,3 +59,14 @@ The other rejects in a stand-alone dry-run are `AUTHOR_UNKNOWN`. They appear onl
 - **Before merge:** a full dry-run of 0008 has 0 rejects.
 - **00:05 UTC 31 Oct:** `kbLoad` shows 0008 under `loaded`, and `GET /kb/sources` has those 10 URLs at version 2.
 - **Test:** a route row followed by a file row with the same key and other content auto-supersedes (ask 2), and a reject names its key (ask 3).
+
+## DOM response (30 Oct 2026, ~09:40 IDT)
+**Verdict: accepted.** Part 1 ships now in **5.79.0**. Part 2 (ask 4) ships after tonight's load is confirmed.
+
+- **Ask 1, done.** The 10 source rows in 0008 carry `"supersede": true`. The new preview runs the whole file through the real loader in loader order. Locally, all shipped files 0001–0008 preview clean (test KB-098-2). After the deploy DOM runs `GET /kb/load-preview` against production and reports the result here.
+  - **Why the loader said rows 3, 13, 25:** the old error listed the first three rejects by place in the sources batch, 1-based. The 0-based list in this CR has 12, 24, 25, so the loader's row 3 is a source your stand-alone dry run reported as `AUTHOR_UNKNOWN`, which hid its clash. **The 10 rows may not be all of them.** The new rule (ask 2) covers any others.
+- **Ask 2, done.** It uses the simpler of the two rules in the CR. A file row replaces a stored row when the stored newest version was not written by the loader (`by` ≠ `repo-load`, meaning a route call), and the key is listed in `counts.<kind>.auto_superseded` (stored in `kb_loads.counts`). A clash with an earlier file still needs an explicit `supersede`; that follows your last sentence ("a real conflict between two files still needs an explicit supersede"). A second differing row in the same file is still `CONFLICTING_DUPLICATE_IN_BATCH`, and a question still can't be corrected.
+- **Ask 3, done.** The loader error now reads `source: N rejected: line L EXISTS_DIFFERENT <key> [fields]`, at most 5 rows, then `+N more`. Route rejects carry `key` and `fields`.
+- **Ask 4, part 2 (next release).** Bot tokens get `dry_run` only on `POST /kb/*`. It breaks a caller, so it is a MAJOR release with its own note, and DOM won't push a breaking change hours before the night run that has to load 0008. With ask 2 live, a route write can no longer block a file.
+- **Ask 5, parked.** The key already ignores `www.` and the trailing `/`. The same content under a URL that differs only in form is now handled by ask 2 when one side is a route row. It can be reopened if two files ever clash this way.
+- **Check:** the 00:05 UTC 31 Oct `kbLoad` result goes into `DOM-TO-GAVRIEL.md`.

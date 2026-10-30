@@ -114,6 +114,7 @@ const SUMMARIES: Record<string, string> = {
   'POST /decisions': 'Record company decisions (D-ids): id, decided_at, decided_by, summary, scope, domains, source_ref, supersedes; same id and content is a duplicate, other content is 409 DECISION_EXISTS; a record only, no action',
   'GET /decisions': 'Company decisions, newest first (filters q, scope, domain, since, limit, offset), with total_n',
   'GET /decisions/{id}': 'One company decision by its D-id, with supersedes and superseded_by',
+  'GET /kb/load-preview': 'What the next daily kbLoad would do with the repo knowledge files not yet loaded, rolled back (v5.79.0, CR-098)',
   'GET /kb/recheck': 'Claims whose age weight (mean R of their evidence) has fallen below the re-check threshold',
   'GET /kb/echo-candidates': 'Source pairs with similar excerpts (MinHash estimate at or above 0.5) that no link joins yet, for a session to confirm with POST /kb/links',
   'POST /data/sales-comps': 'Load graded comparable sales; WRITE or data token, dry_run supported, counts accepted, duplicate, rejected',

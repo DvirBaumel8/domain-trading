@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 5.79.0 (2026-10-30): CR-098: kbLoad file rows replace route rows; rejects name line, key and fields; GET /kb/load-preview
+Release note: `docs/releases/v5.79.0.md`.
+MINOR. `kbLoad`: a file row whose stored newest version came from a route call is appended as the next version without `supersede` (`counts.<kind>.auto_superseded`); a failed file's error names file line, reason, key and differing fields. `POST /kb/*` `KB_ROWS_REJECTED` rejects add `key` and `fields`. New `GET /kb/load-preview` (READ or bots): the next `kbLoad`, rolled back (CR-098).
+
 ## 5.78.0 (2026-10-29): CR-095 part 2: drop an unused dynadot_rows index, datasave_pool fillfactor 70, rebuild bloated indexes
 Release note: `docs/releases/v5.78.0.md`.
 PATCH-level behaviour (labelled MINOR for the migration): no route, field or code change. Two migrations free index space (CR-095 part 2).

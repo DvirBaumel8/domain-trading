@@ -223,6 +223,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const referenceRefresh = new ReferenceRefreshJob({ db: deps.db, screening: screeningDeps, now, log: app.log });
   app.decorate('referenceRefreshJob', referenceRefresh);
   const retention = new RetentionJob({ ...base, log: app.log });
+  const kbLoadJob = new KbLoadJob({ db: deps.db, now, dir: deps.knowledgeDir, log: app.log });
   app.decorate('registrarCheckJob', new RegistrarCheckJob({ db: deps.db, adapters, now, log: app.log }));
   app.decorate('portfolioCheckJob', new PortfolioCheckJob({ db: deps.db, rdapLookup: cachedRdapLookup(deps.db, screeningDeps.rdapLookup, { now, ttlMs: 0 }), screening: screeningDeps, now, log: app.log }));
   app.decorate('dropWatchJob', new DropWatchJob({ db: deps.db, screening: screeningDeps, now, log: app.log }));
@@ -236,7 +237,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.decorate('priceJob', new PriceScheduleJob({ ...base, log: app.log }));
   app.decorate('jobRunner', new JobRunner({
     ...base, reconciler: app.reconciler, nsVerifier: app.nsVerifier, priceJob: app.priceJob,
-    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, afternicSyncJob: app.afternicSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, kbLoad: new KbLoadJob({ db: deps.db, now, dir: deps.knowledgeDir, log: app.log }), retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, archiveDir: deps.config.archiveDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, dynadotSecret: deps.config.env.DYNADOT_API_SECRET || undefined, dynadotCloseoutsPath: deps.config.env.DYNADOT_CLOSEOUTS_PATH || DYNADOT_CLOSEOUTS_DEFAULT_PATH, scorer: engineScorer, log: app.log, screening: screeningDeps, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer, liftTrainJob: new LiftTrainJob({ db: deps.db, now, log: app.log }),
+    dropJob: app.dropJob, listingSyncJob: app.listingSyncJob, afternicSyncJob: app.afternicSyncJob, portfolioLifecycleJob: app.portfolioLifecycleJob, registrarCheckJob: app.registrarCheckJob, portfolioCheckJob: app.portfolioCheckJob, dropWatchJob: app.dropWatchJob, intakeScreeningJob: app.intakeScreeningJob, buildDailyListJob: app.buildDailyListJob, cohortOutcomesJob: app.cohortOutcomesJob, screeningWorker, backupExport: deps.backupExport, referenceRefresh, kbLoad: kbLoadJob, retention, datasaveJob: new DatasaveJob({ db: deps.db, now, snapshotDir: deps.config.snapshotDir, archiveDir: deps.config.archiveDir, dynadotKey: deps.config.env.DYNADOT_API_KEY || undefined, dynadotSecret: deps.config.env.DYNADOT_API_SECRET || undefined, dynadotCloseoutsPath: deps.config.env.DYNADOT_CLOSEOUTS_PATH || DYNADOT_CLOSEOUTS_DEFAULT_PATH, scorer: engineScorer, log: app.log, screening: screeningDeps, dbSize: { limitBytes: deps.engineDbSize?.limitBytes ?? NEON_FREE_STORAGE_BYTES, warnPercent: DB_SIZE_WARN_PERCENT, bytes: deps.engineDbSize?.bytes } }), engineEndingsJob: new EndingsJob({ db: deps.db, screening: screeningDeps, now, log: app.log }), engineTrainer, liftTrainJob: new LiftTrainJob({ db: deps.db, now, log: app.log }),
     secretValues: deps.config.secretValues,
   }));
   app.decorate('jobQueue', new JobQueue({ ...base, runner: app.jobRunner, log: app.log, overrides: deps.jobQueueOverrides,
@@ -253,7 +254,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.addHook('onClose', async () => app.replayRunner.idle());
   registerReplay(app, { runner: app.replayRunner, run: replayDeps });
   registerMarket(app, { db: deps.db, now });
-  registerKnowledge(app, { db: deps.db, now, dbSize: routeDbSize });
+  registerKnowledge(app, { db: deps.db, now, dbSize: routeDbSize, kbLoad: kbLoadJob });
   registerPickproof(app, { db: deps.db, now });
   registerJobs(app, app.jobQueue, { ...base, config: deps.config, priceJob: app.priceJob, dropJob: app.dropJob });
   registerOpenApi(app, openApiRoutes, deps.config.version);

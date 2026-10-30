@@ -1,4 +1,4 @@
-# Endpoints (contract v5.78.0)
+# Endpoints (contract v5.79.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -77,7 +77,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | DELETE | `/data/sales`, `/data/sales/{id}` | none: always 405 `APPEND_ONLY` | Market data (5.23.0, CR-075) |
 | GET | `/market/episodes`, `/market/matched`, `/market/dq`, `/market/coverage` | READ or bots (a data token gets 403) | Market data (5.23.0, CR-075) |
 | POST | `/kb/sources`, `/kb/authors`, `/kb/claims`, `/kb/evidence`, `/kb/links`, `/kb/questions` | WRITE, bots or data | Knowledge base (5.43.0, CR-078) |
-| GET | `/kb/questions`, `/kb/questions/{id}/verdict`, `/kb/claims`, `/kb/sources`, `/kb/recheck`, `/kb/echo-candidates` | READ or bots (a data token gets 403) | Knowledge base (5.43.0, CR-078) |
+| GET | `/kb/questions`, `/kb/questions/{id}/verdict`, `/kb/claims`, `/kb/sources`, `/kb/recheck`, `/kb/echo-candidates`, `/kb/load-preview` (5.79.0) | READ or bots (a data token gets 403) | Knowledge base (5.43.0, CR-078) |
 | GET | `/auctions/live` | READ or bots (a data token gets 403) | GoDaddy auctions inside the buying range, with bids (5.37.0) |
 | POST | `/auctions/prebid` | WRITE or bots (a normal POST: `Idempotency-Key`, audit row; a READ token gets 403) | Auction bid plans (5.39.0, CR-077) |
 | POST | `/auctions/plans`, `/auctions/plans/{id}/result` | WRITE only (a bots token gets 403 even with `dry_run`) | Auction bid plans (5.39.0, CR-077) |
@@ -915,7 +915,7 @@ READ (or bots). Query `days` (1..120, default 30). **200:** `{as_of, window, per
 An evidence base the decisions rest on: sources graded A-F, claims, the evidence that links them, independence clusters (echoes count once) and a **verdict per question computed in plain code** (no AI in the server; the weights are the versioned `kb_settings` row, current **v1** = research `knowledge-sources-2026-10` §2.3). Rules and test ids: `docs/internal/knowledge.md`.
 
 **Write shape (all six `POST /kb/*`).** Body `{rows: [..], dry_run?: boolean}`, 1 to 1,000 rows, body limit 4 MB, `Idempotency-Key` required, audited with the row count only (`[n rows]`). Scopes: WRITE, bots or data token (a READ token is 403). The size guard answers 409 `DB_SIZE_HIGH`. Rows name each other by **natural key**, so a batch needs no ids: an author by `name`, a source by its `url`, a claim by `claim_key` (or the triplet `claim {topic, variable, population}`), a question by `slug`. Post in this order: authors, questions, sources, claims, evidence, links (a row naming something not yet in the base is rejected).
-**All-or-nothing.** One rejected row rejects the call: **422 `KB_ROWS_REJECTED`**, nothing stored, `details = {kind, received_n, rejected_n, rejects: [{row, reason, message}]}` (200 rows at most). Row reasons: `ROW_INVALID` (strict schema: unknown field, bad value; `message` names the field), `URL_INVALID`, `TOPIC_UNKNOWN`, `AUTHOR_UNKNOWN`, `QUESTION_UNKNOWN`, `OPTION_UNKNOWN`, `SOURCE_UNKNOWN`, `CLAIM_UNKNOWN`, `CLAIM_GRADE_ABOVE_SOURCE`, `LINK_SELF`, `CONFLICTING_DUPLICATE_IN_BATCH` (the same key twice with other content), `EXISTS_DIFFERENT` (the key exists with other content and the row has no `"supersede": true`).
+**All-or-nothing.** One rejected row rejects the call: **422 `KB_ROWS_REJECTED`**, nothing stored, `details = {kind, received_n, rejected_n, rejects: [{row, reason, message, key?, fields?}]}` (200 rows at most; 5.79.0, CR-098: an `EXISTS_DIFFERENT` or `CONFLICTING_DUPLICATE_IN_BATCH` reject also has `key`, the row's natural key in readable form (the canonical URL, author name, question slug or claim_key; evidence and links name their root ids), and `fields`, the fields that differ from the stored newest version or the earlier row). Row reasons: `ROW_INVALID` (strict schema: unknown field, bad value; `message` names the field), `URL_INVALID`, `TOPIC_UNKNOWN`, `AUTHOR_UNKNOWN`, `QUESTION_UNKNOWN`, `OPTION_UNKNOWN`, `SOURCE_UNKNOWN`, `CLAIM_UNKNOWN`, `CLAIM_GRADE_ABOVE_SOURCE`, `LINK_SELF`, `CONFLICTING_DUPLICATE_IN_BATCH` (the same key twice with other content), `EXISTS_DIFFERENT` (the key exists with other content and the row has no `"supersede": true`).
 **Idempotent and append-only.** The same row again is a counted duplicate and stores nothing; the same `Idempotency-Key` returns the stored answer. Every table refuses UPDATE and DELETE. A correction is the same key with `"supersede": true` and the new content: a new row with `version` + 1 and `supersedes` = the id of the replaced one (`superseded_n`); reads use the newest version. Evidence and links always point at the first version of the source and the claim, so a correction never breaks them. Questions cannot be corrected (use a new `slug`).
 **201** `{kind, dry_run, received_n, accepted_n, duplicate_n, superseded_n, rejected_n (0), rows: [{row, outcome: accepted | duplicate | superseded, id | null}], db_bytes_before, db_bytes_after, audit_id}`. `dry_run: true` runs every check and stores nothing (`id` is `null`).
 
@@ -963,6 +963,9 @@ READ or bots. Query `status` (`lead|read|graded|rejected`), `topic`, `limit`, `o
 
 ### `GET /kb/recheck`
 READ or bots. Answer `{settings_version, threshold (0.5), claims: [{claim_key, topic, statement, weighted_r, age_days, half_life_days, evidence_n, date_range_end, question_ids}]}`: claims whose age weight (the mean `R` of their evidence, weighted by the weight without age; a claim without usable evidence uses its own date) has fallen below the threshold, oldest first. A session searches for newer evidence and adds rows; the old rows stay and simply weigh less.
+
+### `GET /kb/load-preview`
+5.79.0 (CR-098). READ or bots. No query parameters (any → 400 `VALIDATION_ERROR`). Runs what the next daily `kbLoad` would do with the repo files not yet loaded (`jobs.md` step `kbLoad`), in one transaction that is rolled back: nothing is stored and `kb_loads` is not touched. The answer is the step's summary plus `dry_run: true`: `{dry_run, files_seen, loaded: [{file, sha256, counts}], unchanged: [file], failed: [{file, sha256, error}]}`; a file listed under `failed` would fail tonight with that error.
 
 ### `GET /kb/echo-candidates`
 READ or bots. Query `limit` (1..500, default 100). Answer `{settings_version, threshold (0.5), sources_checked, pairs: [{a: {id, url, title}, b: {id, url, title}, jaccard}]}`: source pairs whose excerpts have an estimated Jaccard similarity of 0.5 or more and that no link joins yet, strongest first. A session confirms with `POST /kb/links`.

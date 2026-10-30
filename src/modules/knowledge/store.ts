@@ -13,9 +13,11 @@ import { canonicalUrl, urlHash } from './url.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = Kysely<any>;
 type Cols = Record<string, unknown>;
-export interface Ctx { by: string; auditId: string | null; now: Date; settings: KbSettings; dryRun: boolean }
+/** `fileBy` (v5.79.0, CR-098 ask 2): set by the repo load. A versioned row whose stored newest version was written by someone else (a route call) is appended as the next
+ * version without `supersede`: the repo file is the source of truth. A clash with an earlier file (stored `by` = `fileBy`) still needs an explicit `supersede`. */
+export interface Ctx { by: string; auditId: string | null; now: Date; settings: KbSettings; dryRun: boolean; fileBy?: string }
 export interface RowResult { row: number; outcome: 'accepted' | 'duplicate' | 'superseded'; id: number | null }
-export interface KindResult { kind: Kind; received_n: number; accepted_n: number; duplicate_n: number; superseded_n: number; rows: RowResult[] }
+export interface KindResult { kind: Kind; received_n: number; accepted_n: number; duplicate_n: number; superseded_n: number; rows: RowResult[]; auto_superseded: string[] }
 
 interface Prepared { i: number; keyVals: unknown[]; cols: Cols; supersede: boolean }
 interface Spec { table: string; keyCols: string[]; versioned: boolean }
@@ -36,7 +38,20 @@ function stable(v: unknown): string {
   if (typeof v === 'object') return `{${Object.keys(v as object).sort().map((k) => `${k}:${stable((v as Cols)[k])}`).join(',')}}`;
   return typeof v === 'number' ? `n:${v}` : JSON.stringify(v);
 }
-const same = (head: Cols, cols: Cols): boolean => Object.entries(cols).every(([k, v]) => v === undefined || stable(head[k]) === stable(v));
+const differing = (head: Cols, cols: Cols): string[] => Object.entries(cols).filter(([k, v]) => v !== undefined && stable(head[k]) !== stable(v)).map(([k]) => k);
+const same = (head: Cols, cols: Cols): boolean => differing(head, cols).length === 0;
+
+/** The readable natural key of a prepared row (CR-098 ask 3): the URL, name, slug or claim_key; evidence and links name their root ids. */
+function keyLabel(kind: Kind, cols: Cols): string {
+  switch (kind) {
+    case 'source': return String(cols.url);
+    case 'author': return String(cols.name);
+    case 'question': return String(cols.slug);
+    case 'claim': return String(cols.claim_key);
+    case 'evidence': return `source ${String(cols.source_id)} / claim ${String(cols.claim_id)} / locator "${String(cols.locator)}"`;
+    case 'link': return `${String(cols.kind)} ${String(cols.from_source_id)} -> ${String(cols.to_source_id)}`;
+  }
+}
 
 /** Parsed natural-key references: id of the first version of each named row. */
 async function rootIds(db: AnyDb, table: string, col: string, values: string[]): Promise<Map<string, number>> {
@@ -201,20 +216,29 @@ export async function applyKind(trx: AnyDb, kind: Kind, raw: unknown[], ctx: Ctx
   const results: RowResult[] = [];
   const toInsert: { p: Prepared; version: number; supersedes: number | null }[] = [];
   const seen = new Map<string, Prepared>();
+  const auto: string[] = [];
   for (const p of prepared) {
     const k = JSON.stringify(p.keyVals);
     const earlier = seen.get(k);
     if (earlier) {
       if (same(earlier.cols, p.cols) || stable(earlier.cols) === stable(p.cols)) results.push({ row: p.i, outcome: 'duplicate', id: null });
-      else rejects.push({ row: p.i, reason: 'CONFLICTING_DUPLICATE_IN_BATCH', message: `row ${earlier.i} has the same key with other content` });
+      else rejects.push({ row: p.i, reason: 'CONFLICTING_DUPLICATE_IN_BATCH', message: `row ${earlier.i} has the same key with other content`, key: keyLabel(kind, p.cols), fields: differing(earlier.cols, p.cols) });
       continue;
     }
     seen.set(k, p);
     const head = existing.get(k);
     if (!head) { toInsert.push({ p, version: 1, supersedes: null }); continue; }
     if (same(head, p.cols)) { results.push({ row: p.i, outcome: 'duplicate', id: head.id as number }); continue; }
-    if (p.supersede && spec.versioned) { toInsert.push({ p, version: (head.version as number) + 1, supersedes: head.id as number }); continue; }
-    rejects.push({ row: p.i, reason: 'EXISTS_DIFFERENT', message: spec.versioned ? 'a row with this key exists with other content; post it again with "supersede": true to correct it' : 'a question with this slug exists with other content; questions cannot be corrected, use a new slug' });
+    const fileWins = ctx.fileBy !== undefined && head.by !== ctx.fileBy;
+    if ((p.supersede || fileWins) && spec.versioned) {
+      if (!p.supersede) auto.push(keyLabel(kind, p.cols));
+      toInsert.push({ p, version: (head.version as number) + 1, supersedes: head.id as number });
+      continue;
+    }
+    rejects.push({
+      row: p.i, reason: 'EXISTS_DIFFERENT', key: keyLabel(kind, p.cols), fields: differing(head, p.cols),
+      message: spec.versioned ? 'a row with this key exists with other content; post it again with "supersede": true to correct it' : 'a question with this slug exists with other content; questions cannot be corrected, use a new slug',
+    });
   }
   if (rejects.length > 0) {
     rejects.sort((a, b) => a.row - b.row);
@@ -242,7 +266,7 @@ export async function applyKind(trx: AnyDb, kind: Kind, raw: unknown[], ctx: Ctx
   }
   results.sort((a, b) => a.row - b.row);
   const n = (o: RowResult['outcome']) => results.filter((r) => r.outcome === o).length;
-  return { kind, received_n: raw.length, accepted_n: n('accepted'), duplicate_n: n('duplicate'), superseded_n: n('superseded'), rows: results };
+  return { kind, received_n: raw.length, accepted_n: n('accepted'), duplicate_n: n('duplicate'), superseded_n: n('superseded'), rows: results, auto_superseded: auto };
 }
 
 /** One transaction under the `kb_write` lock: the rows of one kind (routes), or several kinds in parent-first order (files). */

@@ -10,6 +10,7 @@ import { echoCandidates, recheckList, verdictFor } from '../read.js';
 import { KB_MAX_ROWS, SCHEMAS, type Kind } from '../rows.js';
 import { activeKbSettings } from '../settings.js';
 import { databaseBytes, guardDbSize, payloadBytesOf, type DbSizeGuard } from '../size.js';
+import type { KbLoadJob } from '../load.js';
 import { writeKinds } from '../store.js';
 
 const BODY_LIMIT = 4 * 1024 * 1024;
@@ -22,7 +23,7 @@ const Page = z.object({ limit: z.coerce.number().int().min(1).max(500).default(1
 const bad = (e: z.ZodError) => new AppError(400, 'VALIDATION_ERROR', `Invalid query: ${e.issues.map((i) => `${i.path.join('.') || 'query'} ${i.message}`).join('; ')}`);
 const parse = <T extends z.ZodType>(schema: T, q: unknown): z.infer<T> => { const p = schema.safeParse(q ?? {}); if (!p.success) throw bad(p.error); return p.data; };
 
-export function registerKnowledge(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; dbSize: DbSizeGuard }): void {
+export function registerKnowledge(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; dbSize: DbSizeGuard; kbLoad: Pick<KbLoadJob, 'runOnce'> }): void {
   const { db } = deps;
 
   for (const r of ROUTES) {
@@ -35,7 +36,8 @@ export function registerKnowledge(app: FastifyInstance, deps: { db: Kysely<Datab
       const [res] = await writeKinds(db, [{ kind: r.kind, rows: b.rows }], { by, auditId: req.auditId ?? null, now: new Date(deps.now()), settings, dryRun: b.dry_run === true });
       const after = await (deps.dbSize.bytes ?? (() => databaseBytes(db)))();
       req.auditSummary = `kb ${r.path}${b.dry_run ? ' (dry run)' : ''}: ${res!.accepted_n} accepted, ${res!.duplicate_n} duplicate, ${res!.superseded_n} superseded of ${res!.received_n}; db ${before} -> ${after} bytes`;
-      return reply.code(201).send({ ...res!, kind: r.kind, dry_run: b.dry_run === true, rejected_n: 0, db_bytes_before: before, db_bytes_after: after, audit_id: req.auditId ?? null });
+      const { auto_superseded: _routesNeverAuto, ...out } = res!;
+      return reply.code(201).send({ ...out, kind: r.kind, dry_run: b.dry_run === true, rejected_n: 0, db_bytes_before: before, db_bytes_after: after, audit_id: req.auditId ?? null });
     });
   }
 
@@ -99,6 +101,12 @@ export function registerKnowledge(app: FastifyInstance, deps: { db: Kysely<Datab
   });
 
   app.get('/kb/recheck', async () => recheckList(db, deps.now()));
+
+  // v5.79.0 (CR-098): what the next kbLoad would do with the repo files not yet loaded, in loader order, rolled back; nothing is kept.
+  app.get('/kb/load-preview', async (req) => {
+    parse(z.object({}).strict(), req.query);
+    return deps.kbLoad.runOnce({ dryRun: true });
+  });
 
   const Echo = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) }).strict();
   app.get('/kb/echo-candidates', async (req) => echoCandidates(db, parse(Echo, req.query).limit));

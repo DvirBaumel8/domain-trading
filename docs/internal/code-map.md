@@ -229,7 +229,7 @@ v5.43.0 (CR-078, G-132). The evidence base and plain-code verdicts, no AI. Impor
 
 | Route | File |
 |---|---|
-| POST /kb/sources, /kb/authors, /kb/claims, /kb/evidence, /kb/links, /kb/questions (bulk, all-or-nothing, WRITE / bots / data); GET /kb/questions, /kb/questions/{id}/verdict, /kb/claims, /kb/sources, /kb/recheck, /kb/echo-candidates | `knowledge/api/kb.ts` (`registerKnowledge`, called from `src/app.ts`) |
+| POST /kb/sources, /kb/authors, /kb/claims, /kb/evidence, /kb/links, /kb/questions (bulk, all-or-nothing, WRITE / bots / data); GET /kb/questions, /kb/questions/{id}/verdict, /kb/claims, /kb/sources, /kb/recheck, /kb/echo-candidates, /kb/load-preview (v5.79.0) | `knowledge/api/kb.ts` (`registerKnowledge`, called from `src/app.ts`) |
 
 | File | Inside |
 |---|---|
@@ -239,7 +239,7 @@ v5.43.0 (CR-078, G-132). The evidence base and plain-code verdicts, no AI. Impor
 | `read.ts` | `loadItems` (newest rows as engine items), `clusterEdges`, `verdictFor` (compute + append `kb_verdicts` when changed), `recheckList`, `echoCandidates` |
 | `settings.ts` | `activeKbSettings`, `KbValues` (zod), `halfLifeOf`, `GRADE_ORDER` |
 | `url.ts`, `minhash.ts` | `canonicalUrl`, `urlHash`, `sha256`; `minhashOf`, `estimatedJaccard`, `candidatePairs` |
-| `load.ts` | `KbLoadJob` (step `kbLoad`), `parseKnowledgeFile`: `data/knowledge/*.jsonl`, once per sha256 |
+| `load.ts` | `KbLoadJob` (step `kbLoad`; v5.79.0 `runOnce({dryRun})` behind `GET /kb/load-preview`, file rows auto-supersede route rows, errors name file line, key and fields), `parseKnowledgeFile`: `data/knowledge/*.jsonl`, once per sha256 |
 | `data/knowledge/` (repo data, not code) | `0001-questions.jsonl` (25 decision questions), `0002-october-research.jsonl` (October 2026 research: 203 graded sources, 93 claims, 271 evidence rows, 22 links); a new research round adds a new numbered file. Test KB543-24 loads the shipped files. Tests use an empty folder by default (`tests/helpers/app.ts`) |
 | `size.ts` | the DB size guard (a copy of the engine's, so the module imports no other module) |
 
