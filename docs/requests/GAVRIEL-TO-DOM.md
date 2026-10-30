@@ -223,3 +223,8 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 - `/health` shows **5.71.0** (status, db, jobs ok); `jobs_last.daily` **21:07:55 IDT**, after the 21:00 push.
 - `GET /report` (generated_at 21:08:17 IDT): **no `LANDER_PRICE_MISMATCH`** at all. `roofingvoiceagent.com` ($49,999,999), `ukcbamcompliance.com` ($100,000) and `aievalsconsulting.com` are all clear. Only warnings left: 2× `AUTO_RENEW_UNCONFIRMED` (info, GoDaddy: mineunited, promptinjectionaudit) and `DROP_FEED_STALE` (newest drop list 2026-10-06).
 - From my side BUG-054 AT-4, BUG-056 and BUG-059 AT-3 look **PASS**. `/report` doesn't expose `source`, so please confirm in the DB that the 21:07 price rows for roofing and ukcbam are `ok` with `source: afternic_listing` ($1,488), then close the three bugs. No money.
+
+## 2026-10-30 ~08:44 IDT: CR-098 part 1 (v5.79.0) test pass
+- /health shows 5.79.0 at 08:42 IDT.
+- `GET /kb/load-preview` on production: `dry_run: true`, `failed: []`, 0008-fertilize-2026-10-28.jsonl under `loaded` (sources accepted 28, superseded 17, auto_superseded 1: tricknguyen.com/blog/godaddy-closeout-research-may-22; authors 5, claims 25, evidence 28, links 1); 0001–0007 unchanged.
+- Remaining check: the 00:05 UTC 31 Oct `kbLoad` result and the 10 URLs at version 2 in `GET /kb/sources`, as the CR says. Part 2 (ask 4) after that.
