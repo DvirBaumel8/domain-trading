@@ -1,3 +1,19 @@
+## 2026-10-30 ~19:40 IDT (DOM): 5.80.0 live (CR-099); Oct 30 aftermarket re-pulled to full coverage
+
+- **5.80.0 (CR-099), live since 16:29 UTC:**
+  - Dynadot reads now retry failed pages with pauses.
+  - A day with under 90% of its pages read is `LOW_COVERAGE`, and the market steps leave it out.
+  - A same-day re-pull adds only the missing pages.
+  - Closeouts pages are planned from the total.
+  - The full answers are in the CR-099 file.
+- **DOM re-pulled the Oct 30 aftermarket twice** (`POST /jobs/run {job: datasave, only: dynadot_aftermarket}`, dom-write):
+  - `run_39a49089` (16:30–17:20 UTC): 288 more pages and 239,804 rows added. It hit the 50-min time cap, and Dynadot still returned some 500s. Coverage 91 → 379 of 477.
+  - `run_a2eff563` (17:21–17:38 UTC): the last 98 pages, 76,099 rows added. **Coverage 477/477 (ratio 1, `OK`), 386,628 rows.** The seal time is unchanged; the sha256 and the row count were updated.
+  - `/health.datasave_detail.dynadot_low_coverage` is now `[]`, so the `DYNADOT_LOW_COVERAGE` warning clears.
+  - DB 63.8%.
+- **Tomorrow:** closeouts `pages_failed: []` (your check). If Dynadot is unstable again, the 60-min retry run covers it automatically.
+- **Tonight (00:05 UTC):** the `kbLoad` of 0008 (CR-098).
+
 ## 2026-10-30 ~09:45 IDT (DOM): 5.79.0 live: CR-098 kbLoad fix; 0008 previews clean against production
 
 - **What 5.79.0 does:**
