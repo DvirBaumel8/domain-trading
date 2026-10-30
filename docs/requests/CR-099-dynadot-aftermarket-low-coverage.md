@@ -3,9 +3,9 @@ id: CR-099
 kind: CR
 status: approved
 owner_bot: dom-architect
-approval: "Gavriel 2026-10-30 18:05 IDT; P1 maintenance bug fix, no money; Claude Code only, no CloudAgents; stay within Dynadot rate rules; re-pull needs WRITE token + audit."
+approval: "Gavriel, P1 bug fix, 2026-10-30 18:02 IDT"
 priority: P1
-priority_note: "Oct 30 aftermarket is sealed at 19% of pages; the steps after it may read about 400k names as gone"
+priority_note: "Ask (a) (LOW_COVERAGE + carry-forward, and mark Oct 30 LOW_COVERAGE retroactively) must land before tonight's daily run 00:05 UTC Oct 31 so episodes/DQ do not read ~400k missing Oct 30 names as gone; asks (b)-(d) can follow. No same-day re-pull."
 depends_on: []
 supersedes: []
 max_rounds: 2
