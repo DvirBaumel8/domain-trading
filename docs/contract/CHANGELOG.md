@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 6.0.0 (2026-10-31): CR-098 ask 4: bots and data tokens dry-run only on POST /kb/*
+Release note: `docs/releases/v6.0.0.md`.
+MAJOR. `POST /kb/*` (all six) from a bots or data token now needs `dry_run: true`; without it the answer is 403 `KB_DRY_RUN_ONLY` and nothing is stored. A WRITE token still commits. New rows reach the knowledge base through a numbered `data/knowledge/` file and the daily `kbLoad` (CR-098 ask 4, one writer). No migration.
+
 ## 5.80.0 (2026-10-30): CR-099: Dynadot low-coverage days (retry, LOW_COVERAGE, same-day top-up, re-pull), closeouts pages from the total
 Release note: `docs/releases/v5.80.0.md`.
 MINOR. Dynadot reads retry failed pages with pauses and a time budget (`coverage.stopped_by`). A day under 90% of planned pages is `coverage_status: LOW_COVERAGE`: left out by `episodes`, `dqMarket` (which fails `coverage` for it) and the panel, retried once 60 min later, and listed in `/health.datasave_detail.dynadot_low_coverage` and the new `/report` warning `DYNADOT_LOW_COVERAGE`. A later read of such a day adds only the missing pages. `POST /jobs/run` adds `only` (WRITE; 409 `SNAPSHOT_SEALED` for a full-coverage day). Closeouts pages are planned from the total (CR-099).

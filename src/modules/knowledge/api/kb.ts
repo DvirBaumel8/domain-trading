@@ -1,4 +1,5 @@
 // CR-078 phase 1 (v5.43.0). POST /kb/{sources,authors,claims,evidence,links,questions} (WRITE, bots or data token, Idempotency-Key, { rows (1..1000), dry_run? }, all-or-nothing),
+// v6.0.0 (CR-098 ask 4, one writer): a bots or data token may only dry-run (403 KB_DRY_RUN_ONLY); rows land through the repo files (kbLoad) or a WRITE token.
 // GET /kb/questions, /kb/questions/{id}/verdict, /kb/claims, /kb/sources, /kb/recheck, /kb/echo-candidates (READ or bots).
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
@@ -19,6 +20,8 @@ const ROUTES: { path: string; kind: Kind }[] = [
   { path: 'evidence', kind: 'evidence' }, { path: 'links', kind: 'link' }, { path: 'questions', kind: 'question' },
 ];
 const Body = z.object({ rows: z.array(z.unknown()).min(1).max(KB_MAX_ROWS), dry_run: z.boolean().optional() }).strict();
+/** Scopes that may post to /kb/* only with dry_run: true (CR-098 ask 4). */
+const DRY_RUN_ONLY_SCOPES: ReadonlySet<string> = new Set(['bots', 'data']);
 const Page = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100), offset: z.coerce.number().int().min(0).default(0) });
 const bad = (e: z.ZodError) => new AppError(400, 'VALIDATION_ERROR', `Invalid query: ${e.issues.map((i) => `${i.path.join('.') || 'query'} ${i.message}`).join('; ')}`);
 const parse = <T extends z.ZodType>(schema: T, q: unknown): z.infer<T> => { const p = schema.safeParse(q ?? {}); if (!p.success) throw bad(p.error); return p.data; };
@@ -30,6 +33,9 @@ export function registerKnowledge(app: FastifyInstance, deps: { db: Kysely<Datab
     const doc = z.object({ rows: z.array(SCHEMAS[r.kind]).min(1).max(KB_MAX_ROWS), dry_run: z.boolean().optional() }).strict();
     app.post(`/kb/${r.path}`, { config: { openapiBody: doc }, bodyLimit: BODY_LIMIT }, async (req, reply) => {
       const b = Body.parse(req.body ?? {});
+      if (b.dry_run !== true && req.auth && DRY_RUN_ONLY_SCOPES.has(req.auth.scope)) {
+        throw new AppError(403, 'KB_DRY_RUN_ONLY', `A ${req.auth.scope} token may only dry-run /kb/${r.path}: send dry_run: true, and put the rows in a numbered data/knowledge/ file (kbLoad loads it)`);
+      }
       const before = await guardDbSize(db, deps.dbSize, payloadBytesOf(req, b.rows));
       const settings = await activeKbSettings(db);
       const by = req.auth?.name ?? 'unknown';

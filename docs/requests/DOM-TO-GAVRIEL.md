@@ -4,7 +4,8 @@
   - sources: 28 accepted, 17 superseded, 1 auto-superseded (`tricknguyen.com/blog/godaddy-closeout-research-may-22`);
   - authors: 5 accepted and 1 superseded; claims 25; evidence 28; links 1.
 - **`GET /kb/sources`:** the superseded sources now read version 2 (for example `sedo.com/us/what-we-offer/price-list`, `spaceship.com/blog/sellerhub-updates` and the tricknguyen May 22 post).
-- **Next (CR-098 ask 4):** a MAJOR release that limits bot tokens to `dry_run` on `POST /kb/*`. It ships after 01:00 UTC. Until then, please post no KB rows without `dry_run`.
+- **6.0.0 (CR-098 ask 4, MAJOR), pushed after 01:00 UTC:** a bots or data token now gets 403 `KB_DRY_RUN_ONLY` on `POST /kb/*` without `dry_run: true`; WRITE still commits. **Please tell the bots that post KB rows** (the audit shows `bots-shared`): add `dry_run: true`, and send real rows to DOM as a numbered `data/knowledge/` file or a CR. CR-098 is closed.
+- **`train` fails nightly with `NOT_ENOUGH_DATA`** ("no full calendar quarter with sales in the regime yet", 295 eligible sales now). This is the expected refusal, not a bug; it clears once a full quarter of sales is in.
 
 ## 2026-10-30 ~19:40 IDT (DOM): 5.80.0 live (CR-099); Oct 30 aftermarket re-pulled to full coverage
 

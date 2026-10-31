@@ -39,7 +39,7 @@ async function base(h: Record<string, string>) {
 }
 
 describe('knowledge base routes (CR-078)', () => {
-  it('KB543-10: write routes take WRITE, bots and data tokens, refuse READ; idempotent by key and by content; the audit keeps row counts', async () => {
+  it('KB543-10: write routes take WRITE (bots and data: dry run only, KB-098-3), refuse READ; idempotent by key and by content; the audit keeps row counts', async () => {
     const { w, d, b, r } = await setup();
     const key = randomUUID();
     const first = await post('/kb/sources', w, [src('a'), src('b')], {}, key);
@@ -47,9 +47,9 @@ describe('knowledge base routes (CR-078)', () => {
     expect(first.json()).toMatchObject({ kind: 'source', received_n: 2, accepted_n: 2, duplicate_n: 0, superseded_n: 0, rejected_n: 0, dry_run: false });
     const again = await post('/kb/sources', w, [src('a'), src('b')], {}, key);
     expect(again.json()).toEqual(first.json());
-    const repost = await post('/kb/sources', d, [src('a', { url: 'https://EXAMPLE.test/a/?utm_campaign=z#x' }), src('c')]);
+    const repost = await post('/kb/sources', w, [src('a', { url: 'https://EXAMPLE.test/a/?utm_campaign=z#x' }), src('c')]);
     expect(repost.json()).toMatchObject({ accepted_n: 1, duplicate_n: 1 });
-    expect((await post('/kb/sources', b, [src('d')])).statusCode).toBe(201);
+    expect((await post('/kb/sources', w, [src('d')])).statusCode).toBe(201);
     expect((await post('/kb/sources', r, [src('e')])).statusCode).toBe(403);
     expect((await get('/kb/sources', d)).statusCode).toBe(403);
     expect(await db.selectFrom('kb_sources').select('id').execute()).toHaveLength(4);
@@ -317,4 +317,18 @@ describe('knowledge repo load (CR-078 rule 9)', () => {
     expect((await app.inject({ method: 'GET', url: '/kb/load-preview' })).statusCode).toBe(401);
     void w;
   }, 60_000);
+
+  it('KB-098-3 (v6.0.0, CR-098 ask 4): a bots or data token may only dry-run POST /kb/*; WRITE still commits', async () => {
+    const { w, d, b } = await setup();
+    for (const h of [b, d]) {
+      const res = await post('/kb/sources', h, [src('x')]);
+      expect(res.statusCode, res.body).toBe(403);
+      expect(res.json().error.code).toBe('KB_DRY_RUN_ONLY');
+      expect((await post('/kb/sources', h, [src('x')], { dry_run: false })).json().error.code).toBe('KB_DRY_RUN_ONLY');
+      expect((await post('/kb/sources', h, [src('x')], { dry_run: true })).json()).toMatchObject({ dry_run: true, accepted_n: 1 });
+    }
+    expect(await db.selectFrom('kb_sources').select('id').execute()).toEqual([]);
+    expect((await post('/kb/sources', w, [src('x')])).statusCode).toBe(201);
+    expect(await db.selectFrom('kb_sources').select('id').execute()).toHaveLength(1);
+  });
 });

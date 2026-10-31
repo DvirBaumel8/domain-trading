@@ -1,7 +1,7 @@
 ---
 id: CR-098
 kind: CR
-status: in_progress
+status: done
 owner_bot: dom-architect
 approval: "Gavriel for Dvir-path P0 bug fix, 2026-10-30 08:22 IDT"
 priority: P0
@@ -72,3 +72,4 @@ The other rejects in a stand-alone dry-run are `AUTHOR_UNKNOWN`. They appear onl
 - **Check:** the 00:05 UTC 31 Oct `kbLoad` result goes into `DOM-TO-GAVRIEL.md`.
 - **Production preview (30 Oct, 06:43 UTC, 5.79.0 live):** `GET /kb/load-preview` lists 0008 under `loaded` with `failed: []`: sources 28 accepted and 17 superseded; 1 auto-superseded, `tricknguyen.com/blog/godaddy-closeout-research-may-22`, the 11th clash that the stand-alone dry run hid behind `AUTHOR_UNKNOWN`.
 - **Night check (31 Oct, 00:06 UTC, daily `run_5cd415e7`): passed.** `kbLoad` lists 0008 under `loaded` with `failed: []`, and the counts match the preview. The superseded sources read version 2 on `GET /kb/sources`. Ask 4 is being built now.
+- **Ask 4, done in 6.0.0 (MAJOR).** A bots or data token gets 403 `KB_DRY_RUN_ONLY` on `POST /kb/*` without `dry_run: true`; a WRITE token still commits. Bots and data tokens were chosen because the audit shows every committed route write came from the `bots-shared` token (8 committed posts since 20 Oct; `dom-write` only dry runs). Documented in `knowledge.md` rule 7b and `endpoints.md`. Test KB-098-3.

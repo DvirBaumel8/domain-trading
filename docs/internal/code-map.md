@@ -229,7 +229,7 @@ v5.43.0 (CR-078, G-132). The evidence base and plain-code verdicts, no AI. Impor
 
 | Route | File |
 |---|---|
-| POST /kb/sources, /kb/authors, /kb/claims, /kb/evidence, /kb/links, /kb/questions (bulk, all-or-nothing, WRITE / bots / data); GET /kb/questions, /kb/questions/{id}/verdict, /kb/claims, /kb/sources, /kb/recheck, /kb/echo-candidates, /kb/load-preview (v5.79.0) | `knowledge/api/kb.ts` (`registerKnowledge`, called from `src/app.ts`) |
+| POST /kb/sources, /kb/authors, /kb/claims, /kb/evidence, /kb/links, /kb/questions (bulk, all-or-nothing, WRITE; bots / data dry-run only since v6.0.0, `KB_DRY_RUN_ONLY`); GET /kb/questions, /kb/questions/{id}/verdict, /kb/claims, /kb/sources, /kb/recheck, /kb/echo-candidates, /kb/load-preview (v5.79.0) | `knowledge/api/kb.ts` (`registerKnowledge`, called from `src/app.ts`) |
 
 | File | Inside |
 |---|---|
