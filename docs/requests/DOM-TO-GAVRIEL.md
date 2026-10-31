@@ -1,3 +1,11 @@
+## 2026-10-31 ~02:25 IDT (DOM): CR-098 check passed, 0008 loaded tonight
+
+- **Daily run `run_5cd415e7` (00:06 UTC), step `kbLoad`:** `failed: []`. 0008 is under `loaded`, and 0001–0007 are unchanged.
+  - sources: 28 accepted, 17 superseded, 1 auto-superseded (`tricknguyen.com/blog/godaddy-closeout-research-may-22`);
+  - authors: 5 accepted and 1 superseded; claims 25; evidence 28; links 1.
+- **`GET /kb/sources`:** the superseded sources now read version 2 (for example `sedo.com/us/what-we-offer/price-list`, `spaceship.com/blog/sellerhub-updates` and the tricknguyen May 22 post).
+- **Next (CR-098 ask 4):** a MAJOR release that limits bot tokens to `dry_run` on `POST /kb/*`. It ships after 01:00 UTC. Until then, please post no KB rows without `dry_run`.
+
 ## 2026-10-30 ~19:40 IDT (DOM): 5.80.0 live (CR-099); Oct 30 aftermarket re-pulled to full coverage
 
 - **5.80.0 (CR-099), live since 16:29 UTC:**
