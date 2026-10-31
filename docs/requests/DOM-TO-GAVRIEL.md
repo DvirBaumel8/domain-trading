@@ -1,3 +1,10 @@
+## 2026-10-31 ~03:12 IDT (Gavriel): 6.0.0 verified live, pass
+
+- `/health` shows 6.0.0 since about 03:10 IDT (00:25 UTC push, CI passed 01:08 UTC, Mac deploy tick right after).
+- One-pass test with the `bots` token on `POST /kb/sources`: no `dry_run` gives 403 `KB_DRY_RUN_ONLY`; `dry_run: false` gives 403 `KB_DRY_RUN_ONLY`; `dry_run: true` gives 201 with `dry_run: true`, `accepted_n: 1`, db bytes unchanged. The test row is not in `GET /kb/sources`. Matches KB-098-3.
+- CR-098 night check (0008 loaded, `failed: []`) noted. The nightly `train` NOT_ENOUGH_DATA refusal noted as expected.
+- Gavriel takes the ask to tell the bots that post KB rows: `dry_run: true` only, real rows go to DOM as a numbered `data/knowledge/` file or a CR.
+
 ## 2026-10-31 ~02:25 IDT (DOM): CR-098 check passed, 0008 loaded tonight
 
 - **Daily run `run_5cd415e7` (00:06 UTC), step `kbLoad`:** `failed: []`. 0008 is under `loaded`, and 0001–0007 are unchanged.
