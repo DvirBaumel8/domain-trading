@@ -1,7 +1,10 @@
 // CR-075 (v5.23.0) R-1, R-2: the `episodes` step. Merges the sealed snapshots (Dynadot Buy-Now listings, Dynadot closed auctions, GoDaddy auction endings)
 // and the reported sales (market_sales) into market_names (one row per name x venue x listing episode) and labels every episode. Rules and test ids: docs/internal/market.md.
 // Safe to run twice: the result is a pure function of the sealed sources, the sales and the clock date; an unchanged row is not rewritten.
-import { sql, type Insertable, type Kysely } from 'kysely';
+// G-139: set-based. The step used to read every market_names row (and every sealed aftermarket row) into Node and write the changed ones back; on Neon free
+// that was the biggest data-transfer-out cost. Now the fold, the closed-auction and GoDaddy rows and the labels run as SQL inside the one transaction. Only the
+// sales (a small table), the rows that sales can attach to (by name) and the keys of NEW episodes (their sha1 ids are computed in Node) cross the wire.
+import { sql, type Kysely, type RawBuilder } from 'kysely';
 import { chunks } from '../../core/chunks.js';
 import { advisoryXactLock } from '../../core/locks.js';
 import { lowCoverageSql } from '../../core/snapshot-coverage.js';
@@ -14,14 +17,7 @@ export const GAP_DAYS = 7;
 export const SALE_WINDOW_DAYS = 90;
 
 interface Sale { name: string; venue: string; price: number; date: string; id: number; source: string; url: string | null; tier: Tier; type: ListingType }
-interface Ep {
-  id: string; name: string; venue: string; type: ListingType; first: string; last: string; seenDays: number;
-  listFirst: number | null; listLast: number | null; changes: number;
-  source: string; sourceUrl: string | null; sha: string | null; tier: Tier; saleOnly: boolean;
-  bid: { price: number; date: string } | null;
-  // result
-  outcome?: 'sold' | 'unsold' | 'unknown'; rule?: string; salePrice?: number | null; saleDate?: string | null; saleId?: number | null; dupGroup?: string | null; dupSources?: string[] | null;
-}
+interface Cand { id: string; name: string; venue: string; first: string; last: string }
 
 export interface EpisodesSummary {
   episodes_n: number; sold_n: number; unsold_60d_n: number; unsold_30d_n: number; unknown_n: number; sale_only_n: number;
@@ -29,9 +25,7 @@ export interface EpisodesSummary {
   sealed_days: Record<string, string | null>;
 }
 
-const best = (a: Tier, b: Tier): Tier => (tierRank(a) <= tierRank(b) ? a : b);
-
-/** The label of an episode that has no sale (R-2). `open` = the name was still on the source's latest snapshot days. */
+/** The label of an episode that has no sale (R-2). `open` = the name was still on the source's latest snapshot days. The `episodes` step applies the same rule in SQL (the `ruled` CTE below). */
 export function labelUnsold(e: { first: string; last: string; seenDays: number }, open: boolean, today: string): { outcome: 'unsold' | 'unknown'; rule: string } {
   const span = dayNum(e.last) - dayNum(e.first);
   if (e.seenDays <= 1 || span === 0) return { outcome: 'unknown', rule: 'SEEN_ONCE' };
@@ -52,82 +46,128 @@ export async function runEpisodes(db: Kysely<Database>, nowMs: number): Promise<
   });
 }
 
+// Every column an upsert of a whole episode row replaces (feat_asof is never written here).
+const ROW_COLS = ['name', 'sld', 'tld', 'venue', 'listing_type', 'list_price_cents_first', 'list_price_cents_last', 'price_changes', 'first_seen', 'last_seen', 'days_listed', 'seen_days',
+  'sale_only', 'outcome', 'outcome_rule', 'sale_price_cents', 'sale_date', 'source', 'source_url', 'source_sha256', 'tier', 'dup_group', 'dup_sources', 'price_band', 'sale_id'] as const;
+const INSERT_COLS = sql.raw(`episode_id, ${ROW_COLS.join(', ')}, derived_at`);
+const SET_ALL = sql.raw([...ROW_COLS, 'derived_at'].map((c) => `${c} = excluded.${c}`).join(', '));
+/** Compare list for `ON CONFLICT ... WHERE`: derived_at is left out (a row that only differs by its stamp is not rewritten). */
+const DIFFERS = sql.raw(`(${ROW_COLS.map((c) => `market_names.${c}`).join(', ')}) is distinct from (${ROW_COLS.map((c) => `excluded.${c}`).join(', ')})`);
+
+/** bandOf() in SQL (R-1 bands, cents); null under the $500 floor. */
+const bandSql = (c: string): RawBuilder<string | null> => sql.raw(`(case when ${c} is null or ${c} < ${MIN_CENTS} then null when ${c} < 100000 then '500-999' when ${c} < 250000 then '1k-2.5k' when ${c} < 500000 then '2.5k-5k' when ${c} < 1000000 then '5k-10k' else '10k+' end)`);
+const WANT_PRICE = "(case when w.outcome = 'sold' then w.price else w.ll end)";
+
+/** Every statement that changes market_names reports the episode ids it touched into the temp table ep_touched (never to Node): `inserted` tells a new row from an updated one. */
+const TOUCH_UPDATE = sql`insert into ep_touched (episode_id, inserted) select episode_id, false from u on conflict (episode_id) do nothing`;
+const TOUCH_UPSERT = sql`insert into ep_touched (episode_id, inserted) select episode_id, ins from u on conflict (episode_id) do update set inserted = ep_touched.inserted or excluded.inserted`;
+
 async function derive(db: Kysely<Database>, nowMs: number): Promise<EpisodesSummary> {
   const today = utcDay(nowMs);
-  const eps = new Map<string, Ep>();
-  const existing = await db.selectFrom('market_names').selectAll().execute();
-  const before = new Map(existing.map((r) => [r.episode_id, r]));
-  const byNameVenue = new Map<string, Ep[]>();
-  const index = (e: Ep) => { const k = `${e.name}|${e.venue}|${e.type}`; (byNameVenue.get(k) ?? byNameVenue.set(k, []).get(k)!).push(e); };
+  const at = new Date(nowMs);
+  await sql`create temp table ep_touched (episode_id text primary key, inserted boolean not null) on commit drop`.execute(db);
 
-  // 1. what is stored already (sale-only episodes are rebuilt from the sales below)
-  for (const r of existing) {
-    if (r.sale_only) continue;
-    const e: Ep = {
-      id: r.episode_id, name: r.name, venue: r.venue, type: r.listing_type, first: r.first_seen, last: r.last_seen, seenDays: r.seen_days, listFirst: r.list_price_cents_first, listLast: r.list_price_cents_last,
-      changes: r.price_changes, source: r.source, sourceUrl: r.source_url, sha: r.source_sha256, tier: r.tier, saleOnly: false,
-      bid: r.outcome_rule === 'SOLD_BIDS' && r.sale_price_cents !== null && r.sale_date !== null ? { price: r.sale_price_cents, date: r.sale_date } : null,
-    };
-    eps.set(e.id, e); index(e);
-  }
-
-  // 2. Dynadot Buy-Now listings: one episode per run of sightings on the source's sealed days. v5.74.0: each sealed day whose rows are still stored is folded into
+  // 1. Dynadot Buy-Now listings: one episode per run of sightings on the source's sealed days. v5.74.0: each sealed day whose rows are still stored is folded into
   // the stored episodes (the rows are kept only datasave_aftermarket_keep_days, so a full re-derive is no longer possible). A name continues its newest episode when
   // that episode was seen on the previous sealed day or at most GAP_DAYS calendar days before; else a new episode starts (the same split rule as before). A day
   // already folded for a name (its newest episode's last_seen is that day or later) changes nothing, so a second run writes nothing.
-  // v5.80.0 (CR-099): a LOW_COVERAGE day (under 90% of its pages read) is left out, so a name missing from it never ends an episode or counts as gone
+  // v5.80.0 (CR-099): a LOW_COVERAGE day (under 90% of its pages read) is left out, so a name missing from it never ends an episode or counts as gone.
+  // G-139: one UPDATE (continue) and one INSERT (new episodes) per day, in SQL.
   const am = await db.selectFrom('snapshot_manifests as m').select(['m.data_date', 'm.sha256']).where('m.source', '=', 'dynadot_aftermarket').where('m.status', '=', 'complete')
     .where(sql<boolean>`not ${lowCoverageSql('m')}`).orderBy('m.data_date').execute();
   const amSha = new Map(am.map((m) => [m.data_date, m.sha256]));
   const lastAm = am.length ? am[am.length - 1]!.data_date : null;
   const stored = new Set((await sql<{ d: string }>`select distinct data_date::text as d from dynadot_rows where kind = 'aftermarket'`.execute(db)).rows.map((r) => r.d));
+  await sql`create temp table ep_seen (domain text primary key, p bigint not null) on commit drop`.execute(db);
   for (let k = 0; k < am.length; k++) {
     const day = am[k]!.data_date;
     if (!stored.has(day)) continue;
     const prevSealed = k > 0 ? am[k - 1]!.data_date : null;
-    const seen = await sql<{ domain: string; p: number }>`select domain, min(price_cents) as p from dynadot_rows where kind = 'aftermarket' and data_date = ${day}::date and price_cents >= ${MIN_CENTS} group by domain`.execute(db);
-    for (const { domain: name, p } of seen.rows) {
-      const latest = (byNameVenue.get(`${name}|dynadot|bin`) ?? []).filter((e) => !e.saleOnly).reduce<Ep | undefined>((a, e) => (!a || e.last > a.last ? e : a), undefined);
-      if (latest && latest.last >= day) continue;
-      if (latest && ((prevSealed !== null && latest.last >= prevSealed) || dayNum(day) - dayNum(latest.last) <= GAP_DAYS)) {
-        latest.seenDays += 1;
-        if (latest.listLast !== p) latest.changes += 1;
-        latest.listLast = p; latest.last = day; latest.sha = amSha.get(day) ?? null;
-        continue;
-      }
-      const d: Ep = { id: episodeId(name, 'dynadot', day, 'bin'), name, venue: 'dynadot', type: 'bin', first: day, last: day, seenDays: 1, listFirst: p, listLast: p, changes: 0,
-        source: 'dynadot_aftermarket', sourceUrl: null, sha: amSha.get(day) ?? null, tier: 'B', saleOnly: false, bid: null };
-      eps.set(d.id, d); index(d);
+    const sha = amSha.get(day) ?? null;
+    await sql`truncate ep_seen`.execute(db);
+    await sql`insert into ep_seen select domain, min(price_cents)::bigint from dynadot_rows where kind = 'aftermarket' and data_date = ${day}::date and price_cents >= ${MIN_CENTS} group by domain`.execute(db);
+    await sql`with latest as (
+        select distinct on (m.name) m.episode_id, m.last_seen, m.list_price_cents_last, s.p
+        from market_names m join ep_seen s on s.domain = m.name
+        where m.venue = 'dynadot' and m.listing_type = 'bin' and not m.sale_only
+        order by m.name, m.last_seen desc, m.first_seen desc, m.episode_id
+      ), u as (
+        update market_names m set seen_days = m.seen_days + 1, price_changes = m.price_changes + (case when m.list_price_cents_last is distinct from l.p then 1 else 0 end),
+          list_price_cents_last = l.p, last_seen = ${day}::date, days_listed = ${day}::date - m.first_seen, source_sha256 = ${sha}::text, derived_at = ${at}::timestamptz
+        from latest l
+        where m.episode_id = l.episode_id and l.last_seen < ${day}::date and ((${prevSealed}::date is not null and l.last_seen >= ${prevSealed}::date) or ${day}::date - l.last_seen <= ${GAP_DAYS}::int)
+        returning m.episode_id
+      ) ${TOUCH_UPDATE}`.execute(db);
+    // names with no episode reaching this day start a new episode (never seen, or the gap is too long); only their names come back, to get their sha1 ids
+    const fresh = (await sql<{ domain: string }>`select s.domain from ep_seen s where not exists (
+        select 1 from market_names m where m.name = s.domain and m.venue = 'dynadot' and m.listing_type = 'bin' and not m.sale_only and m.last_seen >= ${day}::date)`.execute(db)).rows.map((r) => r.domain);
+    for (const part of chunks(fresh, 5000)) {
+      const ids = part.map((n) => episodeId(n, 'dynadot', day, 'bin'));
+      await sql`with u as (
+          insert into market_names (${INSERT_COLS})
+          select t.id, s.domain, split_part(s.domain, '.', 1), substr(s.domain, strpos(s.domain, '.') + 1), 'dynadot', 'bin', s.p, s.p, 0, ${day}::date, ${day}::date, 0, 1, false, 'unknown', 'SEEN_ONCE',
+            null, null, 'dynadot_aftermarket', null, ${sha}::text, 'B', null, null, ${bandSql('s.p')}, null, ${at}::timestamptz
+          from unnest(${ids}::text[], ${part}::text[]) as t(id, name) join ep_seen s on s.domain = t.name
+          on conflict (episode_id) do update set ${SET_ALL}
+          returning episode_id, (xmax = 0) as ins
+        ) ${TOUCH_UPSERT}`.execute(db);
     }
   }
 
-  // 3. Dynadot closed auctions (one episode per auction; a price of $500 or more at the end)
-  const closed = await sql<{ domain: string; end_time: Date; bid_count: number; final_price_cents: number; first_day: string; sha: string | null }>`
-    select r.domain, r.end_time, max(r.bid_count) as bid_count, max(r.final_price_cents) as final_price_cents, min(r.data_date)::text as first_day, min(m.sha256) as sha
-    from dynadot_rows r join snapshot_manifests m on m.source = 'dynadot_closed_auctions' and m.status = 'complete' and m.data_date = r.data_date
-    where r.kind = 'closed_auctions' and r.final_price_cents >= ${MIN_CENTS} and r.end_time is not null
-    group by r.domain, r.end_time`.execute(db);
-  for (const c of closed.rows) {
-    const bids = c.bid_count ?? 0;
-    const e: Ep = { id: episodeId(c.domain, 'dynadot', c.first_day, 'auction'), name: c.domain, venue: 'dynadot', type: 'auction', first: c.first_day, last: c.first_day, seenDays: 1, listFirst: null, listLast: c.final_price_cents, changes: 0,
-      source: 'dynadot_closed_auctions', sourceUrl: null, sha: c.sha, tier: 'B', saleOnly: false, bid: bids >= 1 ? { price: c.final_price_cents, date: utcDay(c.end_time.getTime()) } : null };
-    const old = eps.get(e.id);
-    if (old) Object.assign(old, e); else { eps.set(e.id, e); index(e); }
+  // 2. Dynadot closed auctions (one episode per auction; a price of $500 or more at the end) and GoDaddy auction endings (official inventory files, tier A), staged in
+  // ep_src inside the database. A stored row is matched by name x venue x type x first_seen, which is what episode_id hashes; only the keys of rows with no match
+  // come back to Node for their ids. `bid` = the auction had a bid: its final price and end day are then the sale (SOLD_BIDS).
+  await sql`create temp table ep_src (name text not null, venue text not null, ltype text not null, first_seen date not null, last_seen date not null, seen_days integer not null,
+      list_last bigint not null, source text not null, sha text, tier text not null, bid_price bigint, bid_date date, primary key (name, venue, ltype, first_seen)) on commit drop`.execute(db);
+  await sql`insert into ep_src
+    select distinct on (c.domain, c.first_day) c.domain, 'dynadot', 'auction', c.first_day, c.first_day, 1, c.final, 'dynadot_closed_auctions', c.sha, 'B',
+      case when coalesce(c.bids, 0) >= 1 then c.final end, case when coalesce(c.bids, 0) >= 1 then (c.end_time at time zone 'UTC')::date end
+    from (
+      select r.domain, r.end_time, max(r.bid_count) as bids, max(r.final_price_cents)::bigint as final, min(r.data_date) as first_day, min(m.sha256) as sha
+      from dynadot_rows r join snapshot_manifests m on m.source = 'dynadot_closed_auctions' and m.status = 'complete' and m.data_date = r.data_date
+      where r.kind = 'closed_auctions' and r.final_price_cents >= ${MIN_CENTS} and r.end_time is not null
+      group by r.domain, r.end_time
+    ) c
+    order by c.domain, c.first_day, c.end_time desc`.execute(db);
+  // the hash input is JSON.stringify([domain, end_time ISO, last_price, last_bid_count, final_state_at]) exactly as the Node version wrote it (test EP-139-2 pins it)
+  await sql`insert into ep_src
+    select distinct on (a.domain, a.first_seen) a.domain, 'godaddy', 'auction', a.first_seen, a.last_seen, case when a.first_seen = a.last_seen then 1 else 2 end, a.last_price_cents, 'godaddy_auction_end',
+      encode(sha256(convert_to('[' || to_json(a.domain)::text || ',' || to_json(to_char(a.end_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))::text || ',' || a.last_price_cents || ',' || a.last_bid_count
+        || ',' || coalesce(to_json(a.final_state_at::text)::text, 'null') || ']', 'UTF8')), 'hex'), 'A',
+      case when a.last_bid_count >= 1 then a.last_price_cents end, case when a.last_bid_count >= 1 then (a.end_time at time zone 'UTC')::date end
+    from godaddy_auctions a where a.ended and a.last_price_cents >= ${MIN_CENTS}
+    order by a.domain, a.first_seen, a.id desc`.execute(db);
+  await sql`with u as (
+      update market_names m set list_price_cents_first = null, list_price_cents_last = s.list_last, price_changes = 0, last_seen = s.last_seen, days_listed = s.last_seen - m.first_seen,
+        seen_days = s.seen_days, sale_only = false, source = s.source, source_sha256 = s.sha, derived_at = ${at}::timestamptz
+      from ep_src s
+      where m.name = s.name and m.venue = s.venue and m.listing_type = s.ltype and m.first_seen = s.first_seen
+        and (m.list_price_cents_first, m.list_price_cents_last, m.price_changes, m.last_seen, m.seen_days, m.sale_only, m.source, m.source_sha256)
+          is distinct from (null::bigint, s.list_last, 0, s.last_seen, s.seen_days, false, s.source, s.sha)
+      returning m.episode_id
+    ) ${TOUCH_UPDATE}`.execute(db);
+  const missing = (await sql<{ name: string; venue: string; ltype: ListingType; first_seen: string }>`select s.name, s.venue, s.ltype, s.first_seen::text as first_seen from ep_src s
+    where not exists (select 1 from market_names m where m.name = s.name and m.venue = s.venue and m.listing_type = s.ltype and m.first_seen = s.first_seen)`.execute(db)).rows;
+  for (const part of chunks(missing, 3000)) {
+    const ids = part.map((r) => episodeId(r.name, r.venue, r.first_seen, r.ltype));
+    await sql`with u as (
+        insert into market_names (${INSERT_COLS})
+        select t.id, s.name, split_part(s.name, '.', 1), substr(s.name, strpos(s.name, '.') + 1), s.venue, s.ltype, null, s.list_last, 0, s.first_seen, s.last_seen, s.last_seen - s.first_seen, s.seen_days, false,
+          case when s.bid_price is not null then 'sold'
+            when s.seen_days > 1 and s.last_seen > s.first_seen and s.last_seen - s.first_seen >= 60 and ${today}::date >= s.first_seen + ${SALE_WINDOW_DAYS}::int then 'unsold' else 'unknown' end,
+          case when s.bid_price is not null then 'SOLD_BIDS' when s.seen_days <= 1 or s.last_seen = s.first_seen then 'SEEN_ONCE'
+            when s.last_seen - s.first_seen >= 60 and ${today}::date >= s.first_seen + ${SALE_WINDOW_DAYS}::int then 'UNSOLD_60D' else 'DISAPPEARED' end,
+          s.bid_price, s.bid_date, s.source, null, s.sha, s.tier, null, null, ${bandSql('s.list_last')}, null, ${at}::timestamptz
+        from unnest(${ids}::text[], ${part.map((r) => r.name)}::text[], ${part.map((r) => r.venue)}::text[], ${part.map((r) => r.ltype)}::text[], ${part.map((r) => r.first_seen)}::date[]) as t(id, name, venue, ltype, first_seen)
+          join ep_src s on s.name = t.name and s.venue = t.venue and s.ltype = t.ltype and s.first_seen = t.first_seen
+        on conflict (episode_id) do update set ${SET_ALL}
+        returning episode_id, (xmax = 0) as ins
+      ) ${TOUCH_UPSERT}`.execute(db);
   }
 
-  // 4. GoDaddy auction endings (official inventory files, tier A)
-  const gd = await db.selectFrom('godaddy_auctions').selectAll().where('ended', '=', true).where('last_price_cents', '>=', MIN_CENTS).execute();
-  for (const a of gd) {
-    const e: Ep = { id: episodeId(a.domain, 'godaddy', a.first_seen, 'auction'), name: a.domain, venue: 'godaddy', type: 'auction', first: a.first_seen, last: a.last_seen, seenDays: a.first_seen === a.last_seen ? 1 : 2,
-      listFirst: null, listLast: a.last_price_cents, changes: 0, source: 'godaddy_auction_end',
-      sourceUrl: null, sha: sha256(JSON.stringify([a.domain, a.end_time.toISOString(), a.last_price_cents, a.last_bid_count, a.final_state_at])), tier: 'A', saleOnly: false,
-      bid: a.last_bid_count >= 1 ? { price: a.last_price_cents, date: utcDay(a.end_time.getTime()) } : null };
-    const old = eps.get(e.id);
-    if (old) Object.assign(old, e); else { eps.set(e.id, e); index(e); }
-  }
-
-  // 5. sales: one winner per (name, venue, date) (highest tier), the others are recorded as dup_sources
-  const saleRows = await db.selectFrom('market_sales').selectAll().orderBy('sale_date').orderBy('id').execute();
+  // 3. sales: one winner per (name, venue, date) (highest tier), the others are recorded as dup_sources. The sales table is small; the episodes a sale can attach to are
+  // read by name (only the names that have a sale).
+  const saleRows = await db.selectFrom('market_sales').select(['id', 'name', 'venue', 'sale_price_cents', 'sale_date', 'source', 'source_url', 'tier', 'listing_type']).orderBy('sale_date').orderBy('id').execute();
   const belowFloor = saleRows.filter((s) => s.sale_price_cents < MIN_CENTS).length;
   const groups = new Map<string, { win: Sale; others: Set<string> }>();
   for (const s of saleRows) {
@@ -138,11 +178,14 @@ async function derive(db: Kysely<Database>, nowMs: number): Promise<EpisodesSumm
     if (!g) { groups.set(k, { win: sale, others: new Set() }); continue; }
     if (tierRank(sale.tier) < tierRank(g.win.tier)) { g.others.add(g.win.source); g.win = sale; } else g.others.add(sale.source);
   }
-  const byName = new Map<string, Ep[]>();
-  for (const e of eps.values()) (byName.get(e.name) ?? byName.set(e.name, []).get(e.name)!).push(e);
+  const byName = new Map<string, Cand[]>();
+  for (const part of chunks([...new Set([...groups.values()].map((g) => g.win.name))], 2000)) {
+    const rows = await db.selectFrom('market_names').select(['episode_id', 'name', 'venue', 'first_seen', 'last_seen']).where('name', 'in', part).where('sale_only', '=', false).orderBy('episode_id').execute();
+    for (const r of rows) (byName.get(r.name) ?? byName.set(r.name, []).get(r.name)!).push({ id: r.episode_id, name: r.name, venue: r.venue, first: r.first_seen, last: r.last_seen });
+  }
   const sold = new Map<string, { sale: Sale; others: string[]; dupGroup: string }>();
   let matched = 0;
-  const saleOnly: Ep[] = [];
+  const saleOnly: Array<{ id: string; sale: Sale; others: string[]; dupGroup: string }> = [];
   for (const g of [...groups.values()].sort((a, b) => (a.win.date < b.win.date ? -1 : a.win.date > b.win.date ? 1 : a.win.id - b.win.id))) {
     const s = g.win;
     const others = [...g.others].filter((o) => o !== s.source).sort();
@@ -151,67 +194,89 @@ async function derive(db: Kysely<Database>, nowMs: number): Promise<EpisodesSumm
     cands.sort((a, b) => Number(b.venue === s.venue) - Number(a.venue === s.venue) || (a.first < b.first ? 1 : a.first > b.first ? -1 : 0));
     const hit = cands[0];
     if (hit) { sold.set(hit.id, { sale: s, others, dupGroup }); matched++; continue; }
-    const e: Ep = { id: episodeId(s.name, s.venue, s.date, s.type), name: s.name, venue: s.venue, type: s.type, first: s.date, last: s.date, seenDays: 0, listFirst: null, listLast: null, changes: 0,
-      source: s.source, sourceUrl: s.url, sha: sha256(JSON.stringify([s.name, s.venue, s.price, s.date, s.source, s.tier])), tier: s.tier, saleOnly: true, bid: null };
-    sold.set(e.id, { sale: s, others, dupGroup }); saleOnly.push(e);
+    const id = episodeId(s.name, s.venue, s.date, s.type);
+    sold.set(id, { sale: s, others, dupGroup }); saleOnly.push({ id, sale: s, others, dupGroup });
   }
-  for (const e of saleOnly) eps.set(e.id, e);
+  const saleOnlyIds = saleOnly.map((e) => e.id);
 
-  // 6. labels and rows
-  const rows: Insertable<Database['market_names']>[] = [];
-  const counts = { sold: 0, u60: 0, u30: 0, unk: 0 };
-  for (const e of eps.values()) {
-    const sale = sold.get(e.id);
-    let tier = e.tier;
-    if (sale) {
-      e.outcome = 'sold'; e.rule = 'SOLD_REPORTED'; e.salePrice = sale.sale.price; e.saleDate = sale.sale.date; e.saleId = sale.sale.id;
-      e.dupGroup = sale.dupGroup; e.dupSources = sale.others.length ? sale.others : null;
-      tier = best(tier, sale.sale.tier);
-      if (!e.saleOnly && sale.sale.url) e.sourceUrl = sale.sale.url;
-    } else if (e.bid) {
-      e.outcome = 'sold'; e.rule = 'SOLD_BIDS'; e.salePrice = e.bid.price; e.saleDate = e.bid.date; e.saleId = null; e.dupGroup = null; e.dupSources = null;
-    } else {
-      const open = e.venue === 'dynadot' && e.type === 'bin' && lastAm !== null && dayNum(lastAm) - dayNum(e.last) <= GAP_DAYS;
-      const l = labelUnsold(e, open, today);
-      e.outcome = l.outcome; e.rule = l.rule; e.salePrice = null; e.saleDate = null; e.saleId = null; e.dupGroup = null; e.dupSources = null;
-    }
-    const band = bandOf(e.outcome === 'sold' ? e.salePrice : e.listLast);
-    if (band === null) continue;
-    if (e.outcome === 'sold') counts.sold++; else if (e.rule === 'UNSOLD_60D') counts.u60++; else if (e.rule === 'UNSOLD_30D') counts.u30++; else counts.unk++;
-    const { sld, tld } = splitName(e.name);
-    rows.push({
-      episode_id: e.id, name: e.name, sld, tld, venue: e.venue, listing_type: e.type, list_price_cents_first: e.listFirst, list_price_cents_last: e.listLast, price_changes: e.changes,
-      first_seen: e.first, last_seen: e.last, days_listed: dayNum(e.last) - dayNum(e.first), seen_days: e.seenDays, sale_only: e.saleOnly, outcome: e.outcome, outcome_rule: e.rule!,
-      sale_price_cents: e.salePrice ?? null, sale_date: e.saleDate ?? null, source: e.source, source_url: e.sourceUrl, source_sha256: e.sha, tier, feat_asof: null,
-      dup_group: e.dupGroup ?? null, dup_sources: e.dupSources ?? null, price_band: band, sale_id: e.saleId ?? null,
-    } as unknown as Insertable<Database['market_names']>);
+  // sale-only episodes (a reported sale no listing explains): upserted whole; a row that is already identical is left alone
+  for (const part of chunks(saleOnly, 1500)) {
+    const json = JSON.stringify(part.map((e) => {
+      const s = e.sale;
+      const { sld, tld } = splitName(s.name);
+      return { episode_id: e.id, name: s.name, sld, tld, venue: s.venue, listing_type: s.type, d: s.date, price: s.price, source: s.source, source_url: s.url,
+        sha: sha256(JSON.stringify([s.name, s.venue, s.price, s.date, s.source, s.tier])), tier: s.tier, band: bandOf(s.price), sale_id: s.id, dup_group: e.dupGroup, dup_sources: e.others.length ? e.others : null };
+    }));
+    await sql`with u as (
+        insert into market_names (${INSERT_COLS})
+        select x.episode_id, x.name, x.sld, x.tld, x.venue, x.listing_type, null, null, 0, x.d, x.d, 0, 0, true, 'sold', 'SOLD_REPORTED', x.price, x.d, x.source, x.source_url, x.sha, x.tier, x.dup_group, x.dup_sources, x.band, x.sale_id, ${at}::timestamptz
+        from jsonb_to_recordset(${json}::jsonb) as x(episode_id text, name text, sld text, tld text, venue text, listing_type text, d date, price bigint, source text, source_url text, sha text, tier text,
+          band text, sale_id bigint, dup_group text, dup_sources text[])
+        on conflict (episode_id) do update set ${SET_ALL} where ${DIFFERS}
+        returning episode_id, (xmax = 0) as ins
+      ) ${TOUCH_UPSERT}`.execute(db);
   }
+  // sale-only rows that are no longer derived (a listing now explains the sale) are removed
+  const gone = (await sql<{ n: number }>`with d as (delete from market_names where sale_only and episode_id <> all(${saleOnlyIds}::text[]) returning episode_id)
+    select count(*)::int as n from d where not exists (select 1 from ep_touched t where t.episode_id = d.episode_id and t.inserted)`.execute(db)).rows[0]!.n;
 
-  // 7. write: only the rows that changed; the rows that are no longer derived (a sale-only episode a listing now explains) are removed
-  const same = (a: Insertable<Database['market_names']>, b: Insertable<Database['market_names']>): boolean =>
-    (['name', 'venue', 'listing_type', 'list_price_cents_first', 'list_price_cents_last', 'price_changes', 'first_seen', 'last_seen', 'days_listed', 'seen_days', 'sale_only', 'outcome', 'outcome_rule', 'sale_price_cents', 'sale_date',
-      'source', 'source_url', 'source_sha256', 'tier', 'dup_group', 'price_band', 'sale_id'] as const).every((k) => a[k] === b[k]) &&
-    JSON.stringify(a.dup_sources ?? null) === JSON.stringify(b.dup_sources ?? null);
-  const keep = new Set(rows.map((r) => r.episode_id));
-  const changed = rows.filter((r) => { const o = before.get(r.episode_id); return !o || !same(o as unknown as Insertable<Database['market_names']>, r); });
-  const gone = existing.filter((r) => !keep.has(r.episode_id)).map((r) => r.episode_id);
-  const at = new Date(nowMs);
-  for (const part of chunks(changed, 500)) {
-    await db.insertInto('market_names').values(part.map((r) => ({ ...r, derived_at: at, dup_sources: r.dup_sources } as never)))
-      .onConflict((oc) => oc.column('episode_id').doUpdateSet((eb) => ({
-        name: eb.ref('excluded.name'), sld: eb.ref('excluded.sld'), tld: eb.ref('excluded.tld'), venue: eb.ref('excluded.venue'), listing_type: eb.ref('excluded.listing_type'),
-        list_price_cents_first: eb.ref('excluded.list_price_cents_first'), list_price_cents_last: eb.ref('excluded.list_price_cents_last'), price_changes: eb.ref('excluded.price_changes'),
-        first_seen: eb.ref('excluded.first_seen'), last_seen: eb.ref('excluded.last_seen'), days_listed: eb.ref('excluded.days_listed'), seen_days: eb.ref('excluded.seen_days'),
-        sale_only: eb.ref('excluded.sale_only'), outcome: eb.ref('excluded.outcome'), outcome_rule: eb.ref('excluded.outcome_rule'), sale_price_cents: eb.ref('excluded.sale_price_cents'),
-        sale_date: eb.ref('excluded.sale_date'), source: eb.ref('excluded.source'), source_url: eb.ref('excluded.source_url'), source_sha256: eb.ref('excluded.source_sha256'),
-        tier: eb.ref('excluded.tier'), dup_group: eb.ref('excluded.dup_group'), dup_sources: eb.ref('excluded.dup_sources'), price_band: eb.ref('excluded.price_band'),
-        sale_id: eb.ref('excluded.sale_id'), derived_at: eb.ref('excluded.derived_at'),
-      }))).execute();
+  // 4. labels: the matched sales go to a temp table, then ONE update sets sold / SOLD_BIDS / the unsold rules for every listing episode, only where something changes
+  await sql`create temp table ep_sale (episode_id text primary key, sale_id bigint not null, price bigint not null, sdate date not null, url text, tier text not null, dup_group text not null, dup_sources text[]) on commit drop`.execute(db);
+  const saleOnlySet = new Set(saleOnlyIds);
+  const matchedRows = [...sold].filter(([id]) => !saleOnlySet.has(id)).map(([id, v]) => ({ episode_id: id, sale_id: v.sale.id, price: v.sale.price, sdate: v.sale.date, url: v.sale.url, tier: v.sale.tier, dup_group: v.dupGroup, dup_sources: v.others.length ? v.others : null }));
+  for (const part of chunks(matchedRows, 3000)) {
+    await sql`insert into ep_sale select * from jsonb_to_recordset(${JSON.stringify(part)}::jsonb) as x(episode_id text, sale_id bigint, price bigint, sdate date, url text, tier text, dup_group text, dup_sources text[])`.execute(db);
   }
-  for (const part of chunks(gone, 1000)) await db.deleteFrom('market_names').where('episode_id', 'in', part).execute();
+  // sale > bid > unsold rule (labelUnsold in SQL); `open` = a dynadot bin episode seen on the source's latest sealed days; the bid comes from the staged source when the
+  // source row is still there, else from the stored SOLD_BIDS row
+  await sql`with base as (
+      select m.episode_id, m.first_seen, m.last_seen, m.seen_days, m.list_price_cents_last as ll, sa.episode_id is not null as has_sale, sa.sale_id as sid, sa.price as sap, sa.sdate as sad, sa.url as sau, sa.tier as sat,
+        sa.dup_group as dg, sa.dup_sources as ds, coalesce(s.tier, m.tier) as base_tier, s.name is not null as has_src, m.source_url as old_url,
+        case when s.name is not null then s.bid_price when m.outcome_rule = 'SOLD_BIDS' then m.sale_price_cents end as bp,
+        case when s.name is not null then s.bid_date when m.outcome_rule = 'SOLD_BIDS' then m.sale_date end as bd,
+        m.venue = 'dynadot' and m.listing_type = 'bin' and ${lastAm}::date - m.last_seen <= ${GAP_DAYS}::int as is_open
+      from market_names m
+        left join ep_sale sa on sa.episode_id = m.episode_id
+        left join ep_src s on s.name = m.name and s.venue = m.venue and s.ltype = m.listing_type and s.first_seen = m.first_seen
+      where not m.sale_only
+    ), ruled as (
+      select b.*, case
+          when has_sale then 'SOLD_REPORTED'
+          when bp is not null and bd is not null then 'SOLD_BIDS'
+          when seen_days <= 1 or last_seen = first_seen then 'SEEN_ONCE'
+          when is_open then case when last_seen - first_seen >= 60 then 'UNSOLD_60D' when last_seen - first_seen >= 30 then 'UNSOLD_30D' else 'TOO_SHORT' end
+          when last_seen - first_seen >= 60 and ${today}::date >= first_seen + ${SALE_WINDOW_DAYS}::int then 'UNSOLD_60D'
+          else 'DISAPPEARED' end as rule
+      from base b
+    ), want as (
+      select r.episode_id, r.rule,
+        case when r.rule like 'SOLD%' then 'sold' when r.rule like 'UNSOLD%' then 'unsold' else 'unknown' end as outcome,
+        case r.rule when 'SOLD_REPORTED' then r.sap when 'SOLD_BIDS' then r.bp end as price,
+        case r.rule when 'SOLD_REPORTED' then r.sad when 'SOLD_BIDS' then r.bd end as sdt,
+        case when r.rule = 'SOLD_REPORTED' then r.sid end as sid, case when r.rule = 'SOLD_REPORTED' then r.dg end as dg, case when r.rule = 'SOLD_REPORTED' then r.ds end as ds,
+        case when r.has_sale then least(r.base_tier, r.sat) else r.base_tier end as tier,
+        case when r.has_sale and r.sau is not null then r.sau when r.has_src then null else r.old_url end as url,
+        r.ll
+      from ruled r
+    ), u as (
+      update market_names m set outcome = w.outcome, outcome_rule = w.rule, sale_price_cents = w.price, sale_date = w.sdt, sale_id = w.sid, dup_group = w.dg, dup_sources = w.ds, tier = w.tier, source_url = w.url,
+        price_band = coalesce(${bandSql(WANT_PRICE)}, m.price_band), derived_at = ${at}::timestamptz
+      from want w
+      where m.episode_id = w.episode_id
+        and (m.outcome, m.outcome_rule, m.sale_price_cents, m.sale_date, m.sale_id, m.dup_group, m.dup_sources, m.tier, m.source_url, m.price_band)
+          is distinct from (w.outcome, w.rule, w.price, w.sdt, w.sid, w.dg, w.ds, w.tier, w.url, coalesce(${bandSql(WANT_PRICE)}, m.price_band))
+      returning m.episode_id
+    ) ${TOUCH_UPDATE}`.execute(db);
+
+  // 5. the summary, counted inside the database
+  const c = (await sql<{ episodes_n: number; sold_n: number; u60: number; u30: number; unk: number; sale_only_n: number }>`select count(*)::int as episodes_n,
+      count(*) filter (where outcome = 'sold')::int as sold_n, count(*) filter (where outcome <> 'sold' and outcome_rule = 'UNSOLD_60D')::int as u60,
+      count(*) filter (where outcome <> 'sold' and outcome_rule = 'UNSOLD_30D')::int as u30,
+      count(*) filter (where outcome <> 'sold' and outcome_rule not in ('UNSOLD_60D', 'UNSOLD_30D'))::int as unk, count(*) filter (where sale_only)::int as sale_only_n from market_names`.execute(db)).rows[0]!;
+  const t = (await sql<{ inserted: number; updated: number }>`select count(*) filter (where inserted)::int as inserted, count(*) filter (where not inserted)::int as updated from ep_touched`.execute(db)).rows[0]!;
   return {
-    episodes_n: rows.length, sold_n: counts.sold, unsold_60d_n: counts.u60, unsold_30d_n: counts.u30, unknown_n: counts.unk, sale_only_n: rows.filter((r) => r.sale_only).length,
-    inserted_n: changed.filter((r) => !before.has(r.episode_id)).length, updated_n: changed.filter((r) => before.has(r.episode_id)).length, deleted_n: gone.length,
+    episodes_n: c.episodes_n, sold_n: c.sold_n, unsold_60d_n: c.u60, unsold_30d_n: c.u30, unknown_n: c.unk, sale_only_n: c.sale_only_n,
+    inserted_n: t.inserted, updated_n: t.updated, deleted_n: gone,
     sales_matched_n: matched, sales_unmatched_n: saleOnly.length, sales_below_floor_n: belowFloor,
     sealed_days: { dynadot_aftermarket: lastAm },
   };

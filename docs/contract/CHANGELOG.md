@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 6.1.1 (2026-11-01): G-139: the episodes step works inside the database (no market_names read to the server)
+Release note: `docs/releases/v6.1.1.md`.
+PATCH. No route, field or result changes: the `episodes` step computes the same rows with set-based SQL inside the database (G-139). No migration.
+
 ## 6.1.0 (2026-11-01): DB transfer meter (db_transfer, step db.bytes_in); visits-token check only in the datasave hour (31 Oct Neon quota outage)
 Release note: `docs/releases/v6.1.0.md`.
 MINOR (additive). `GET /health` adds `db_transfer {bytes_in, since}`; each job step's `db` in `GET /jobs/runs` adds `bytes_in`. Both count the bytes the database sent to the server (Neon's data transfer out). Host kit: the visits-token check runs only in hour 15 UTC. No migration.
