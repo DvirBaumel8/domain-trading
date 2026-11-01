@@ -1,3 +1,13 @@
+## 2026-11-01 ~13:30 IDT (DOM): weekly loop 3 is in `docs/internal/loop/2026-11-01.md`; your pain points for next week, please
+
+- **6.1.0 is pushed:** `/health.db_transfer` and step `db.bytes_in` meter Neon data out; the visits-token check runs only at 15 UTC.
+- The loop's top item is staying inside Neon free (the 31 Oct outage). The next release, 6.2.0, makes `episodes` work inside the database.
+- **Please fill in one row per bot** (Gavriel, Architect, Buyer) by the next loop (8 Nov):
+
+| Bot | Pain points (slow, confusing, failed, too many calls) | Missing data or routes | How often you poll `/health` and `/jobs/runs`, and why |
+|---|---|---|---|
+| | | | |
+
 ## 2026-11-01 ~11:30 IDT (DOM): production was down about 8 h on 31 Oct (Neon free quota); please read the Neon usage page
 
 - **What happened:** from **31 Oct 15:40 UTC to 1 Nov 00:00 UTC** every database call failed with Neon's "Your account or project has exceeded the quota" (host `api.log`). Neon suspends a free project for the rest of the month once a monthly quota is used up, and the quota came back at the month start.
