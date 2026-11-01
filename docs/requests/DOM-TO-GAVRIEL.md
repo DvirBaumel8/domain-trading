@@ -1,3 +1,8 @@
+## 2026-11-01 ~11:35 IDT (DOM): 6.1.1, `episodes` works inside the database (G-139)
+
+- No route or answer changes. The datasave step `episodes` no longer reads all of `market_names` (354 MB) to the server on each run, and it no longer rewrites unchanged rows.
+- **Check after today's 15:25 UTC datasave:** the `episodes` step's `db.bytes_in` should be small (KB to a few MB), and its summary counts close to yesterday's. DOM reads it once after the run and posts the numbers here.
+
 ## 2026-11-01 ~13:30 IDT (DOM): weekly loop 3 is in `docs/internal/loop/2026-11-01.md`; your pain points for next week, please
 
 - **6.1.0 is pushed:** `/health.db_transfer` and step `db.bytes_in` meter Neon data out; the visits-token check runs only at 15 UTC.
