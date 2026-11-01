@@ -1,3 +1,23 @@
+## 2026-11-01 ~11:30 IDT (DOM): production was down about 8 h on 31 Oct (Neon free quota); please read the Neon usage page
+
+- **What happened:** from **31 Oct 15:40 UTC to 1 Nov 00:00 UTC** every database call failed with Neon's "Your account or project has exceeded the quota" (host `api.log`). Neon suspends a free project for the rest of the month once a monthly quota is used up, and the quota came back at the month start.
+  - The 31 Oct datasave stopped inside `dynadotCloseouts`. The 00:05 UTC daily run cleared the stuck step (`lock expired`), then ran `dynadotAftermarket` after midnight, so its rows are dated **1 Nov**. **31 Oct has no Dynadot day** and can't be re-read (Dynadot serves only the current lists). `episodes` tolerates a one-day gap.
+  - That is why `/health.datasave` reads `partial` (`dynadot_missing` for 31 Oct).
+  - The visit counter, `/report` and all other routes failed for the same 8 hours.
+- **Which quota, from the code (DOM's estimate; it needs your reading to confirm):** Neon free gives each project **100 CU-hours of compute** and **5 GB of data transfer out** a month ([Neon plans](https://neon.com/docs/introduction/plans)). Two things we do burn them:
+  - **Data out:** the `episodes` step reads all of `market_names` (468k rows, 354 MB) back to the Mac on every datasave, and a Dynadot top-up reads the whole day back. A month of that is several GB.
+  - **Compute:** the database sleeps only after 5 minutes without a query. The Mac's 10-minute visits-token check, frequent `/health` and `/jobs/runs` polls (DOM's own pollers too) and the datasave keep it awake about 9 hours a day.
+- **Ask (browser, yours):** on the Neon console, project usage page, please write here:
+  1. for October: compute CU-hours used of 100, and data transfer (egress) used of 5 GB. Which one hit its limit?
+  2. the same two numbers for November so far;
+  3. the compute's autoscaling range (min and max CU).
+- **What DOM is doing now:**
+  - 6.0.1 today: the visits-token check runs only in the datasave hour (15 UTC), and each job step's DB stats also count the rows it read;
+  - next: `episodes` and the top-up rebuilt to work inside the database, so no big read crosses to the Mac.
+  - DOM's own pollers now ask at most every 30 minutes.
+- **Please also:** poll `/health` only as often as you need it (every call wakes the database for at least 5 minutes); `/health/ping` doesn't touch the database.
+- **DB size is 72.1%** (774 MB of 1 GB), above the 70% warning. `market_names` alone is 354 MB. The rebuild above also slims that table.
+
 ## 2026-10-31 ~03:12 IDT (Gavriel): 6.0.0 verified live, pass
 
 - `/health` shows 6.0.0 since about 03:10 IDT (00:25 UTC push, CI passed 01:08 UTC, Mac deploy tick right after).
