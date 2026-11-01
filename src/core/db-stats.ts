@@ -66,7 +66,22 @@ export function dbStats(scope: DbScope, topN = 3): DbStats {
 }
 
 /** A step's `db` record: count, DB ms, errors (only when any), and from 50 queries its three most repeated shapes. */
-export function stepDb(scope: DbScope): { queries: number; ms: number; errors?: number; top?: Array<{ sql: string; n: number }> } {
+export function stepDb(scope: DbScope, bytesIn?: number): { queries: number; ms: number; bytes_in?: number; errors?: number; top?: Array<{ sql: string; n: number }> } {
   const s = dbStats(scope);
-  return { queries: s.queries, ms: s.ms, ...(s.errors ? { errors: s.errors } : {}), ...(s.queries >= 50 ? { top: s.top } : {}) };
+  return { queries: s.queries, ms: s.ms, ...(bytesIn !== undefined ? { bytes_in: bytesIn } : {}), ...(s.errors ? { errors: s.errors } : {}), ...(s.queries >= 50 ? { top: s.top } : {}) };
 }
+
+/**
+ * v6.1.0: bytes the database sent to this process (Neon counts them as data transfer out; the free plan allows 5 GB a month). Read from each pool client's
+ * socket (`bytesRead`, TLS framing included), so it is a close upper bound. Process-wide: `dbBytesIn()` is the total since the process started; a job step
+ * records the change across its run (other requests running at the same time add a little).
+ */
+interface Meterable { bytesRead: number }
+const liveSockets = new Set<Meterable>();
+let closedBytes = 0;
+const startedAt = new Date();
+
+export function meterDbSocket(sock: Meterable | undefined): void { if (sock) liveSockets.add(sock); }
+export function unmeterDbSocket(sock: Meterable | undefined): void { if (sock && liveSockets.delete(sock)) closedBytes += sock.bytesRead; }
+export function dbBytesIn(): number { let n = closedBytes; for (const s of liveSockets) n += s.bytesRead; return n; }
+export const dbMeterSince = (): Date => startedAt;

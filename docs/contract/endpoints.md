@@ -1,4 +1,4 @@
-# Endpoints (contract v6.0.0)
+# Endpoints (contract v6.1.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -138,6 +138,7 @@ READ (3.3.0, CR-023 F). An OpenAPI 3.1 description of every route (3.4.0, CR-024
 ### `GET /health`
 Any valid bot token (READ or WRITE).
 - **200** `{status: "ok", db: "ok", db_size: {...} | null, jobs: "ok" | "overdue", version: string, adapters: [{name: string, enabled: boolean}]}`; **503** with `status: "degraded"`, `db: "down"` (and `jobs: "unknown"`) when the DB can't be reached.
+- `db_transfer` (6.1.0): `{bytes_in, since}`, the bytes the database sent to this server process since it started (`since`, ISO with offset; a deploy restarts it). Neon's free plan allows 5 GB of data transfer out a month and suspends the database when it is used up (31 Oct 2026). Per job step the same count is `db.bytes_in` in `GET /jobs/runs`.
 - `db_size` (5.17.0): `{bytes, limit_bytes, percent, warn_percent}`, the database size against Neon's free 1 GB (`percent` to one decimal; `/report` warns `DB_SIZE_HIGH` above `warn_percent`, 70). `null` when the size can't be read (and in the 503 answer). Since 5.38.0 it also has `tables`: the 10 largest tables of the public schema, largest first, `[{table, bytes, rows_estimate}]` (`bytes` = table + indexes + TOAST; `rows_estimate` = Postgres's planner estimate, `null` before the table was first analysed). Since 5.77.0 (CR-095) each entry also has `heap_bytes` (the table alone), `index_bytes` (its indexes) and `dead_rows_estimate` (old row versions not yet reclaimed by vacuum; `null` when Postgres has no statistics yet).
 - `archive` (5.59.0, CR-081): `{days_n, first, last, missing_days: [..]}`, the daily GoDaddy archive on the host's disk: `days_n` = days with both files (biddable auctions and closeouts), `first` / `last` = the first and last day with any file, `missing_days` = calendar days between them without both files. `days_n: 0`, nulls and `[]` when nothing is archived.
 - Removed in 5.2.0 (CR-057): `posting` and `posting_reason` are no longer in the answer.

@@ -1,6 +1,6 @@
 #!/bin/bash
 # CR-068 (Dvir, 19 Oct 2026: "Allow it"): hands the visit-counter token from this Mac to the GitHub secret VISIT_COUNTER_TOKEN, so no person sees it.
-# Called by deploy.sh on every tick (every 10 min) after the pause check; non-fatal there (`|| true`). Run by launchd through deploy.sh, never by DOM.
+# Called by deploy.sh on every tick (every 10 min) after the pause check, and does its work only in hour 15 UTC (v6.1.0, below); non-fatal there (`|| true`). Run by launchd through deploy.sh, never by DOM.
 # Flow: POST /visits/settings {token: "request"} (Gavriel, after Dvir's line naming "visits token") sets the request in the database. This script then asks the
 # built release for the token (`admin visits-token-handoff` prints ONLY the raw token on stdout, or nothing and exits 3 when no token is requested),
 # pipes it into `gh secret set` (the token is never an argument, never echoed, never logged), starts deploy-api-proxy (which puts it on the Worker as VISITS_TOKEN),
@@ -9,6 +9,10 @@
 set -uo pipefail
 PAUSE_FLAG="${PAUSE_FLAG:-$HOME/.local/share/domain-trading-host/PAUSED}"
 [ -f "$PAUSE_FLAG" ] && exit 0
+# v6.1.0: every check opens a database connection, which wakes Neon for at least 5 minutes (free plan: 100 compute hours a month; on 31 Oct the project ran out
+# and production was down 8 hours). So the check runs only in the datasave hour (VISITS_TOKEN_HOUR, default 15 UTC), when the database is awake anyway:
+# a requested token is handed over within a day. VISITS_TOKEN_NOW=1 runs it at once (for a manual call).
+[ "${VISITS_TOKEN_NOW:-0}" = 1 ] || [ "$(date -u +%H)" = "${VISITS_TOKEN_HOUR:-15}" ] || exit 0
 PROD_DIR="${PROD_DIR:-$HOME/domain-trading-prod}"
 APP_DIR="${APP_DIR:-$PROD_DIR-current}"
 REPO="${GH_REPO:-DvirBaumel8/domain-trading}"

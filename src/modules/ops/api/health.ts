@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 import type { Config } from '../../../config.js';
 import { toJerusalemIso } from '../../../core/dates.js';
+import { dbBytesIn, dbMeterSince } from '../../../core/db-stats.js';
 import { pingDb } from '../../../db/client.js';
 import type { Database } from '../../../db/types.js';
 import { archiveStatus } from '../archive/godaddy-archive.js';
@@ -46,6 +47,8 @@ export function registerHealth(app: FastifyInstance, config: Config, db: Kysely<
       archive,
       // v5.17.0 (loop 2026-10-18, Gavriel): the database size against Neon's free 1 GB, so it can be reported with a READ token
       db_size: size,
+      // v6.1.0: bytes the database sent to this process since it started (Neon counts them as data transfer out, 5 GB a month on the free plan)
+      db_transfer: { bytes_in: dbBytesIn(), since: toJerusalemIso(dbMeterSince()) },
       version: config.version,
       adapters: adapterStatus(config).map(({ name, enabled }) => ({ name, enabled })),
     });

@@ -42,4 +42,21 @@ describe('v5.40.0 query counter in the API (G-125)', () => {
     expect(step.summary).toEqual({ resolved: [] });
     expect(JSON.stringify(step.summary)).not.toContain('_db');
   });
+
+  it('DT610-1 (v6.1.0) a job step record carries db.bytes_in (bytes the database sent during the step), and /health has db_transfer.bytes_in since the process start', async () => {
+    app = await makeApp({ testRoutes: false, env: { JOB_TRIGGER_TOKEN: JOB_TOKEN } });
+    vi.spyOn(app.reconciler, 'runOnce').mockImplementation(async () => {
+      await testDb.selectFrom('domains').select('id').execute();
+      return { resolved: [] } as never;
+    });
+    const res = await app.inject({ method: 'POST', url: '/jobs/run', headers: { authorization: `Bearer ${JOB_TOKEN}`, 'idempotency-key': 'dt610-1' }, payload: { job: 'tick' } });
+    expect(res.statusCode).toBe(202);
+    await app.jobQueue.idle();
+    const read = await issueToken('read');
+    const step = (await app.inject({ method: 'GET', url: '/jobs/runs?job=tick', headers: read.auth })).json().runs[0].steps.reconciler;
+    expect(step.db.bytes_in).toBeGreaterThan(0);
+    const h = (await app.inject({ method: 'GET', url: '/health', headers: read.auth })).json();
+    expect(h.db_transfer.bytes_in).toBeGreaterThanOrEqual(step.db.bytes_in);
+    expect(h.db_transfer.since).toMatch(/^\d{4}-\d{2}-\d{2}T.*[+-]\d{2}:\d{2}$/);
+  });
 });

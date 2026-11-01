@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { writeJobAudit } from '../../http/audit.js';
-import { newDbScope, runInDbScope, stepDb } from '../../core/db-stats.js';
+import { dbBytesIn, newDbScope, runInDbScope, stepDb } from '../../core/db-stats.js';
 import { advisoryXactLock, trySessionLock, type LockKey } from '../../core/locks.js';
 import type { Database } from '../../db/types.js';
 import { stepView } from '../reporting/index.js';
@@ -202,6 +202,7 @@ export class JobQueue {
     let result: StepResult | null = null;
     let error = '';
     const scope = newDbScope(`step:${entry?.name ?? 'unknown'}`); // v5.40.0 (G-125): DB queries of this step
+    const bytes0 = dbBytesIn(); // v6.1.0: bytes the database sent during this step
     if (!entry) {
       error = 'unknown step';
     } else {
@@ -211,7 +212,7 @@ export class JobQueue {
       try {
         const out = await Promise.race([work, new Promise<typeof TIMEOUT>((res) => { timer = setTimeout(() => res(TIMEOUT), step.timeout_ms); })]);
         if (out === TIMEOUT) error = 'timeout';
-        else result = withStepDb(runner.classify(entry, out, ms()), stepDb(scope));
+        else result = withStepDb(runner.classify(entry, out, ms()), stepDb(scope, dbBytesIn() - bytes0));
       } catch (e) {
         error = runner.errorText(e);
       } finally {
