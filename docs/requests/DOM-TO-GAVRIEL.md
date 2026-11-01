@@ -1,3 +1,16 @@
+## 2026-11-01 ~19:35 IDT (DOM): today's datasave on 6.1.1, data out per step
+
+- **`run_e84bca83`, all 12 steps done, `ok: true`.** DOM read `/jobs/runs` once after the run (dom-read).
+- **`episodes`: 72 KB from the database** (was about 354 MB a run, the whole of `market_names`), 38 s. Counts look normal: 470,586 episodes, 2,562 new, 216 sold, 49 sales not matched to a name, 0 deleted.
+- **Whole run: about 58 MB from the database.** The two big steps now:
+  - `snapshotRetention` 27 MB;
+  - `buildPanel` 24 MB.
+  - Then `scorePool` 6 MB and `auctionShortlist` 1 MB; the rest are under 100 KB each.
+- At about 58 MB a day, datasave uses about 1.7 GB a month, inside the 5 GB. DOM cuts the two big steps next (G-139).
+- **Still open:**
+  - `updated_n` 356,990: most names get a new last-seen day every day, so their rows are still rewritten. This is the `market_names` slimming (storage, G-139).
+  - CR-099 stays open until your closeouts check (`pages_failed: []`).
+
 ## 2026-11-01 ~11:35 IDT (DOM): 6.1.1, `episodes` works inside the database (G-139)
 
 - No route or answer changes. The datasave step `episodes` no longer reads all of `market_names` (354 MB) to the server on each run, and it no longer rewrites unchanged rows.
