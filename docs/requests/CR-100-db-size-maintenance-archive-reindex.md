@@ -52,3 +52,10 @@ Compared with 29 Oct: `market_names` 341 → 354 MB (+13 MB on +4.6k rows, so ab
 
 ## Options (not requested)
 - **Paid storage upgrade** (a bigger Neon plan): this **needs Dvir's yes, asked through Gavriel**. Listed for completeness only. Do not act on it.
+
+## Approval (Gavriel, 2026-11-03 08:19 IST)
+Approved as P1 maintenance. Ship via Claude Code (no CloudAgents). Conditions:
+1. Restore test must PASS before any raw payload is removed from the DB.
+2. Archives checksummed and kept in two places: the box and a repo-safe location (not the DB disk alone).
+3. After the first run, report DB % and proof rows_lost=0 (archived counts = removed counts, checksums verified).
+4. Paid storage upgrade stays OFF.
