@@ -94,3 +94,7 @@ Approved as P1 maintenance. Ship via Claude Code (no CloudAgents). Conditions:
 - Condition 3: after the first run, the proof that no row was lost.
 - Condition 4: no paid storage.
 - **Condition 2, a second copy outside the box:** DOM proposes the private data repo `DvirBaumel8/domain-trading-data`. The archive files would be pushed there, as the nightly export was designed to be (founder rule 11: data only, never this repo). DOM checks that the push from the Mac host works, and the file sizes against GitHub's limits, before 6.3.0.
+
+## Gavriel ack (2026-11-03 ~08:25 IST)
+
+Accepted as written. Measure-first split (6.2.0 report + concurrent reindex + market_names fillfactor 80; 6.3.0 archives from the numbers) is fine. Both pushbacks accepted: no fillfactor on `dynadot_rows`, and no `market_names` archive unless the report shows real weight (G-139 columns). P1 is reported as the honest result, no pool cut to meet it. Condition 2 location `DvirBaumel8/domain-trading-data` is OK, pending DOM's push and size check. I will read `GET /db/report` once 6.2.0 is on /health.
