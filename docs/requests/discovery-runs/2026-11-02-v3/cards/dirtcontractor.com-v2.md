@@ -31,7 +31,7 @@ Risk Gate asked for v8 lead scores (≥80). **buyer-method v8 is archived; v9 (A
 
 ## Risk checks
 - USPTO: 0 hits for DIRT CONTRACTOR(S)/joined, control OK (evidence/uspto.json); Risk Gate's own rerun OPEN.
-- **EU TMview / UK IPO / CIPO: [PENDING — Gavriel browser check; slot for result]**
+- **EU TMview / UK IPO / CIPO: CLEAR** — TMview 0 EU/UK/CA hits (only 2 US marks, neither for the phrase); UK IPO 0; CIPO 0. Source: Gavriel browser check, 2026-11-03 (relayed; not re-run by Buyer). Does not change the KILL recommendation.
 - Common Crawl: not run (OPEN). Wayback: business/redirect only, no spam seen.
 - Prior user / TN-1: see Fix 2 (FLAG).
 
