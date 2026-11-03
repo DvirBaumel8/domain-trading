@@ -1,7 +1,7 @@
 ---
 id: CR-100
 kind: CR
-status: open
+status: in_progress
 owner_bot: dom-architect
 approval: "Gavriel 2026-11-03: maintenance CR, archive old rows + index rebuild like 5.78.0, without shrinking data pools. No money, no DB plan change. Claude Code only, no CloudAgents."
 priority: P1
@@ -59,3 +59,38 @@ Approved as P1 maintenance. Ship via Claude Code (no CloudAgents). Conditions:
 2. Archives checksummed and kept in two places: the box and a repo-safe location (not the DB disk alone).
 3. After the first run, report DB % and proof rows_lost=0 (archived counts = removed counts, checksums verified).
 4. Paid storage upgrade stays OFF.
+---
+
+## DOM response (2026-11-03 ~08:40 IST)
+
+**Verdict: accepted. DOM builds it in two releases, measuring first as ask 1 says.** 6.2.0 brings the measurement, the safe index work and the first rebuild. 6.3.0 brings the archives and index drops, chosen from 6.2.0's numbers.
+
+**6.2.0 (building now):**
+1. **Ask 1:** a new READ route `GET /db/report`, kept for an hour so polls don't wake Neon. For each of the 10 largest tables it shows:
+   - heap, index and TOAST bytes, and the heap's free space (where Neon allows `pgstattuple_approx`, else null);
+   - each index's bytes and `idx_scan`, with the date the stats were last reset;
+   - for tables with a date column, rows and bytes by age: ≤ 3 d, 3–30 d, > 30 d.
+
+   DOM posts the numbers here before anything is deleted.
+2. **Ask 3 and the ask 4 trigger:** a new daily step `dbMaintenance` after `retention`.
+   - It runs `REINDEX INDEX CONCURRENTLY` one index at a time on `market_names`, `dynadot_rows`, `datasave_pool` and `pickproof_pool`, whenever a table's indexes are over 0.8 × its heap.
+   - It skips an index when free space is under twice that index's size, and has a 10-minute budget.
+   - The summary shows the bytes before and after.
+   - DOM can run it alone with `POST /jobs/run {job: "daily", only: "db_maintenance"}` (WRITE). DOM runs it once after the deploy.
+3. **Ask 4 fillfactor:** `market_names` gets fillfactor 80.
+   - The daily continue UPDATE changes only columns that no index uses (`last_seen`, `seen_days`, `days_listed`, `list_price_cents_last`, `price_changes`). With room left on each page those become HOT updates, so they add no index entries.
+   - It applies to pages written from now on, because a full rewrite is barred by the ask 5 headroom rule (354 MB table, about 280 MB free).
+   - **Pushback on `dynadot_rows`:** its rows are inserted and later deleted, never updated, so fillfactor would only waste space there. It is left as is.
+4. **Ask 5:** no VACUUM FULL or CLUSTER. Every rebuild runs concurrently, one index at a time, within the headroom check. CR-097's exemption is unchanged.
+
+**Ask 2, the archives, wait for the numbers (6.3.0). Pushback on `market_names`:** the table has no raw payload or JSON column. Every column is a typed field that `episodes`, `/market/*` or `dqMarket` reads, so there is nothing cold to move out while keeping "every name queryable". What could slim it is the 64-character `source_sha256` and the 40-character text `episode_id` in every row (G-139). The report shows how much they weigh, then DOM decides.
+- `dynadot_rows` closed auctions older than 30 days: archive plus a restore job, as asked, **if** the report shows they weigh enough. Most of the table is the 2 kept aftermarket days, about 390k rows each.
+- `screening_*`: retention already deletes them by age. Their size is checked in the report.
+
+**On P1 (< 60% after the first run): DOM can't promise it without shrinking a pool.** 60% means freeing about 150 MB. The rebuilds may give 50–100 MB (5.78.0 gave about 14 points). The rest depends on what the report finds. DOM reports the real result against P1 and does not cut any pool to meet it.
+
+**Gavriel's conditions (08:19) apply to 6.3.0, the release that deletes anything.** 6.2.0 deletes no row.
+- Condition 1: a restore test must pass before any row leaves the DB.
+- Condition 3: after the first run, the proof that no row was lost.
+- Condition 4: no paid storage.
+- **Condition 2, a second copy outside the box:** DOM proposes the private data repo `DvirBaumel8/domain-trading-data`. The archive files would be pushed there, as the nightly export was designed to be (founder rule 11: data only, never this repo). DOM checks that the push from the Mac host works, and the file sizes against GitHub's limits, before 6.3.0.
