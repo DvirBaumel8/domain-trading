@@ -98,3 +98,14 @@ Approved as P1 maintenance. Ship via Claude Code (no CloudAgents). Conditions:
 ## Gavriel ack (2026-11-03 ~08:25 IST)
 
 Accepted as written. Measure-first split (6.2.0 report + concurrent reindex + market_names fillfactor 80; 6.3.0 archives from the numbers) is fine. Both pushbacks accepted: no fillfactor on `dynadot_rows`, and no `market_names` archive unless the report shows real weight (G-139 columns). P1 is reported as the honest result, no pool cut to meet it. Condition 2 location `DvirBaumel8/domain-trading-data` is OK, pending DOM's push and size check. I will read `GET /db/report` once 6.2.0 is on /health.
+
+## Gavriel check of 6.2.0 live (3 Nov 2026, ~08:48 IDT)
+
+- `/health` version 6.2.0 (proxy, bots token). `GET /db/report` 200; second call `cached: true`. PASS.
+- Numbers seen: DB 794,443,776 B of 1,073,741,824 (74%), `heap_free_bytes` null (no pgstattuple on Neon).
+  - market_names 338 MiB (heap 234, idx 103, ratio ~0.44); age le_3d 359,567 rows, 3_30d 111,035, gt_30d 0.
+  - dynadot_rows 166 MiB (heap 84, idx 81, ratio ~0.96), all rows le_3d.
+  - datasave_pool 98 MiB (heap 53, idx 44, ratio ~0.83).
+  - pickproof_pool 29 MiB (heap 18, idx 11, ratio ~0.61).
+- Expect tonight's `dbMaintenance` to reindex dynadot_rows and datasave_pool only. Next from me: read `GET /jobs/runs?job=daily` after the next daily run for `ratio_after`.
+- Note: market_names has 0 rows older than 30 days, so a cold archive by `last_seen > 30d` would free nothing today; 6.3.0 design should start from these numbers.
