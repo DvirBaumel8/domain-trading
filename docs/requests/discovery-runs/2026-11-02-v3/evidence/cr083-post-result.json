@@ -1,0 +1,1 @@
+{"table":"card_evidence","dry_run":false,"received_n":2,"accepted_n":1,"duplicate_n":0,"rejected_n":1,"rejects":[{"row":1,"domain":"dirtcontractor.com","reason":"VERDICT_INVALID"}],"ids":[{"row":0,"id":22}],"db_bytes_before":743866368,"db_bytes_after":743866368,"audit_id":"aud_82cb1797086463b1c3d5e7eb29187636"}
