@@ -1,5 +1,6 @@
 // Public entry of the ops module.
 export { registerHealth } from './api/health.js';
+export { registerDbReport } from './api/db-report.js';
 export { registerPortfolioWrites } from './api/portfolio.js';
 export { registerTokens } from './api/tokens.js';
 export { registerPortfolioImport } from './api/portfolio-import.js';
@@ -20,6 +21,7 @@ export { DropJob } from './jobs/drop.js';
 export { NsVerifier } from './jobs/ns-verify.js';
 export { PortfolioCheckJob } from './jobs/portfolio-check.js';
 export { PriceScheduleJob } from './jobs/price-schedule.js';
+export { DbMaintenanceJob } from './jobs/db-maintenance.js';
 export { RetentionJob } from './jobs/retention.js';
 export { ReferenceRefreshJob } from './jobs/reference-refresh.js';
 export { RegistrarCheckJob } from './jobs/registrar-check.js';

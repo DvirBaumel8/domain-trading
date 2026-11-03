@@ -25,6 +25,7 @@ interface Entry { method: string; url: string; body?: z.ZodType; noBody?: boolea
 const SUMMARIES: Record<string, string> = {
   'GET /health/ping': 'Liveness (public, no database)',
   'GET /health': 'Service health: version, database, jobs',
+  'GET /db/report': 'Database size report (6.2.0): per table heap, index, TOAST and free bytes, per index bytes and idx_scan, rows and bytes by age; kept 60 minutes',
   'GET /check': 'Price and availability check of a name across registrars',
   'POST /portfolio/import': 'Import an S8 (Line 2) aftermarket name Dvir bought on a registrar website (needs approval_ref; price cap and S8 slots); dry_run supported',
   'POST /buy': 'Buy a name (needs Dvir\'s approval_ref and a complete screening pack); dry_run supported',

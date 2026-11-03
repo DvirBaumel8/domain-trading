@@ -1,4 +1,4 @@
-# Endpoints (contract v6.1.1)
+# Endpoints (contract v6.2.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -25,7 +25,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | Count visitors of the listed names (off until Dvir's line) | `POST /visits/forward/{domain}`, `POST /visits/settings`, `POST /visits/import`, `GET /visits`, `GET /visits/weekly` (the counting itself is `POST /visits/hit`, visits token only) | WRITE, WRITE, WRITE or data, READ, READ |
 | Look up RDAP facts of .com names with a cache and a daily limit (5.29.0, CR-074) | `GET /rdap/{domain}`, `POST /rdap/batch`, `GET /lookups/usage` | READ or bots (the batch is a read-only POST) |
 | Jobs | `POST /jobs/run` (`tick`, `daily`, `datasave`), `GET /jobs/runs` | job token or WRITE; READ |
-| Health | `GET /health/ping` (no token), `GET /health` | none, READ |
+| Health | `GET /health/ping` (no token), `GET /health`, `GET /db/report` (6.2.0) | none, READ |
 
 **Notation:** `field: type` · `?` = optional · `| null` = may be `null` · "USD number" = a JSON number with at most 2 decimals · "money pair" = `x_cents` + `x` (README §Conventions). Every POST needs `Idempotency-Key` (README §Idempotency). Every body schema is **strict**: an unknown field → 422 `VALIDATION_ERROR` (exception: `pricing_evidence` on `/buy` is checked by the comps rules, so an extra key or a bad comp → 422 `COMPS_INVALID`). The cross-cutting errors (401, 403, 429, `IDEMPOTENCY_KEY_*`, `INVALID_BODY`, `INTERNAL`, `AUDIT_WRITE_FAILED`) apply everywhere and aren't repeated per route.
 
@@ -33,6 +33,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 |---|---|---|---|
 | GET | `/health/ping` | none | Health |
 | GET | `/health` | READ/WRITE | Health |
+| GET | `/db/report` | READ/WRITE | Health (6.2.0, CR-100) |
 | GET | `/openapi.json` | READ | API description (3.3.0) |
 | GET | `/check` | READ | Buying |
 | POST | `/buy` | WRITE | Buying |
@@ -152,6 +153,13 @@ Any valid bot token (READ or WRITE).
 
 ### `POST /tokens/bots/rotate`
 WRITE or bots (5.20.0, CR-069). The only token-creation route: it can make only a `bots`-scope token named `bots-shared`, and only a WRITE token or a bots token (self-rotation) may call it; anyone else 403 `SCOPE_FORBIDDEN`. No body. Idempotency-Key required, audited, normal POST rate limit. **200** `{token, expires_old_at, audit_id}`: `token` is the new raw value, shown **once** (the audit row and the idempotency store never hold it); `expires_old_at` is when the previous `bots-shared` token stops working (10 minutes from now, so a bot that has not picked up the new value keeps working meanwhile) or `null` when there was none. A **replay** of the same Idempotency-Key answers **200** `{token: null, expires_old_at, note: "already rotated; ...", audit_id}`: rotate again with a new key for a new value. The scope table is in `README.md` (Who may call). DOM retires the older per-bot READ tokens and the `data-engineer-upload` token by a later migration, once Gavriel confirms the shared token works.
+
+
+### `GET /db/report` (6.2.0, CR-100)
+Any valid bot token (READ or WRITE or `bots`). Where the database bytes are, so a size cut is chosen from numbers. Read-only. The answer is **kept in the server for 60 minutes** (a poll within the hour does not touch the database; there is no way to force a refresh), so `generated_at` can be up to an hour old. The server's database work for one build is a few small queries plus one aggregate per table with a date column; no table rows cross to the server.
+- **200** `{generated_at (ISO, Asia/Jerusalem offset), cached (true when served from the 60-minute copy), db_bytes, limit_bytes (1 GB free plan), percent (one decimal), stats_reset_at (ISO | null: when Postgres last reset its statistics for this database; idx_scan counts are since then), tables: [{table, total_bytes, heap_bytes, index_bytes, toast_bytes, rows_estimate (planner estimate, null before the first ANALYZE), heap_free_bytes (number | null: free space inside the heap by pgstattuple_approx, null where that extension is not installed), indexes: [{index, bytes, idx_scan}] (largest first), age: null | {column, buckets: [{bucket: "le_3d" | "3_30d" | "gt_30d", rows, bytes}]}}]}`. All sizes are bytes as numbers.
+- `tables`: the 10 largest tables of the `public` schema, largest first (`total_bytes` = heap + indexes + TOAST).
+- `age`: only for `market_names` (`last_seen`), `dynadot_rows` (`data_date`), `datasave_pool` (`data_date`), `pickproof_pool` (`day`), `screening_results` (`checked_at`), `screening_evidence` (`created_at`) and `godaddy_auctions` (`last_seen`); `null` for every other table. The three buckets are always present (zero when empty): the date is at most 3 days old, 4 to 30 days old, or older than 30 days, counted from the database's current date. `bytes` is the sum of the rows' stored size.
 
 ---
 
@@ -1338,7 +1346,7 @@ A closed tranche is read-only in the database as well (an update of the tranche 
 ## Jobs
 
 ### `POST /jobs/run`
-The job token, or (2.3.0) a WRITE bot token, at most 4 calls per hour per WRITE token (see `jobs.md`). Body `{"job": "tick" | "daily" | "datasave", "only"?: "dynadot_aftermarket" | "dynadot_closeouts"}` (5.21.0: `datasave` added; strict; anything else → 422 `VALIDATION_ERROR`). **`only` (5.80.0, CR-099):** with `job: "datasave"` and a WRITE token, runs just that Dynadot read for today (the run's `steps` is one step); it reads only the pages still missing when today's day was sealed LOW_COVERAGE (`jobs.md`). **409** `SNAPSHOT_SEALED` (`details {source, data_date, rows, coverage_ratio}`) when today's day of that source is sealed with full coverage or by a bot upload; **403** `SCOPE_FORBIDDEN` for the job token; `only` with another job → 422. Needs `Idempotency-Key`. **202 (3.0.0)** `{run_id, job, status: "queued" | "running", skipped, steps: [name]}`: the steps run in the background from a queue (`jobs.md`); read the results in `GET /jobs/runs`. **503** `JOBS_DISABLED` when the job token isn't configured.
+The job token, or (2.3.0) a WRITE bot token, at most 4 calls per hour per WRITE token (see `jobs.md`). Body `{"job": "tick" | "daily" | "datasave", "only"?: "dynadot_aftermarket" | "dynadot_closeouts" | "db_maintenance"}` (5.21.0: `datasave` added; strict; anything else → 422 `VALIDATION_ERROR`). **`only` (5.80.0, CR-099):** with `job: "datasave"` and a WRITE token, runs just that Dynadot read for today (the run's `steps` is one step); it reads only the pages still missing when today's day was sealed LOW_COVERAGE (`jobs.md`). **409** `SNAPSHOT_SEALED` (`details {source, data_date, rows, coverage_ratio}`) when today's day of that source is sealed with full coverage or by a bot upload; **403** `SCOPE_FORBIDDEN` for the job token; `only` with another job → 422. **`only: "db_maintenance"` (6.2.0, CR-100):** with `job: "daily"` and a WRITE token, runs just the daily step `dbMaintenance` (the concurrent index rebuild, `jobs.md`); the run's `steps` is `["dbMaintenance"]`; the job token and a READ token are refused as for the Dynadot values (403 / 401), `datasave` with it is 422. Needs `Idempotency-Key`. **202 (3.0.0)** `{run_id, job, status: "queued" | "running", skipped, steps: [name]}`: the steps run in the background from a queue (`jobs.md`); read the results in `GET /jobs/runs`. **503** `JOBS_DISABLED` when the job token isn't configured.
 
 ---
 

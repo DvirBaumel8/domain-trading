@@ -11,8 +11,9 @@ import { jobRunsView, triggerFromKey } from '../../reporting/index.js';
 
 // v5.80.0 (CR-099 c): `only` re-pulls one Dynadot source for today (WRITE token, datasave only): the day must be open or sealed LOW_COVERAGE
 const ONLY = { dynadot_aftermarket: 'dynadotAftermarket', dynadot_closeouts: 'dynadotCloseouts' } as const;
-const Body = z.object({ job: z.enum(['tick', 'daily', 'datasave']), only: z.enum(['dynadot_aftermarket', 'dynadot_closeouts']).optional() }).strict()
-  .refine((b) => b.only === undefined || b.job === 'datasave', { message: 'only is allowed with job datasave', path: ['only'] });
+// v6.2.0 (CR-100): `only: db_maintenance` runs just the index rebuild step of the daily job (WRITE token, job daily only); the Dynadot values stay datasave-only
+const Body = z.object({ job: z.enum(['tick', 'daily', 'datasave']), only: z.enum(['dynadot_aftermarket', 'dynadot_closeouts', 'db_maintenance']).optional() }).strict()
+  .refine((b) => b.only === undefined || (b.only === 'db_maintenance' ? b.job === 'daily' : b.job === 'datasave'), { message: 'only db_maintenance is allowed with job daily; the Dynadot values with job datasave', path: ['only'] });
 const PreviewBody = z.object({ today: z.string().optional() }).strict();
 const RunsQuery = z.object({
   job: z.enum(['tick', 'daily', 'screen', 'train', 'datasave']).optional(),
@@ -48,6 +49,13 @@ export function registerJobs(app: FastifyInstance, queue: JobQueue, deps: JobsDe
   app.post('/jobs/run', { config: { openapiBody: Body } }, async (req, reply) => {
     const { job, only } = Body.parse(req.body);
     const key = req.headers['idempotency-key'];
+    if (only === 'db_maintenance') {
+      if (!req.auth) throw new AppError(403, 'SCOPE_FORBIDDEN', 'A db_maintenance run (only) needs a WRITE token');
+      const r = await queue.enqueue('daily', { trigger: 'manual', scheduledFor: null, triggeredBy: req.auth.name, params: { only: 'db_maintenance' } });
+      queue.kick();
+      req.auditSummary = r.skipped ? 'daily db_maintenance: skipped (a daily run is open)' : 'daily db_maintenance: queued';
+      return reply.code(202).send({ run_id: r.runId, job: r.job, status: r.status, skipped: r.skipped, steps: r.steps });
+    }
     if (only !== undefined) {
       if (!req.auth) throw new AppError(403, 'SCOPE_FORBIDDEN', 'A Dynadot re-pull (only) needs a WRITE token');
       const day = new Date(deps.now()).toISOString().slice(0, 10);
