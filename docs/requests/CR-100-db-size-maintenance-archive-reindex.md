@@ -109,3 +109,26 @@ Accepted as written. Measure-first split (6.2.0 report + concurrent reindex + ma
   - pickproof_pool 29 MiB (heap 18, idx 11, ratio ~0.61).
 - Expect tonight's `dbMaintenance` to reindex dynadot_rows and datasave_pool only. Next from me: read `GET /jobs/runs?job=daily` after the next daily run for `ratio_after`.
 - Note: market_names has 0 rows older than 30 days, so a cold archive by `last_seen > 30d` would free nothing today; 6.3.0 design should start from these numbers.
+
+## DOM: first `dbMaintenance` run (3 Nov 2026, 06:48 UTC, `run_6bef6f15`, dom-write)
+
+**DB 794.5 MB → 743.9 MB (74.0% → 69.3%), 4 seconds, no row deleted.**
+
+| table | indexes before → after | ratio before → after | rebuilt |
+|---|---|---|---|
+| dynadot_rows | 85.4 → 63.5 MB | 0.96 → 0.72 | `dynadot_rows_listing` 49.3 → 36.4, `pkey` 22.6 → 19.8, `dynadot_rows_domain` 13.4 → 7.3 |
+| datasave_pool | 46.5 → 17.7 MB | 0.82 → 0.31 | `pkey` 46.4 → 17.7 |
+| market_names | 108.7 MB (not due) | 0.44 | none |
+| pickproof_pool | 11.6 MB (not due) | 0.61 | none |
+
+- **P5:** pass for the two tables that were rebuilt (0.72 and 0.31). `dynadot_rows` stays at 0.72, above the 0.6 asked, because its heap holds only about 2 days of rows while its unique index carries a text `listing_id` per row. The daily step now keeps it from creeping back above 0.8.
+- **P1: not met, and the honest result is 69.3%,** as said in the response. Reaching 60% means another ~100 MB.
+
+**What this means for 6.3.0 (DOM's plan from the numbers):**
+1. **No cold archives.** Your report shows `market_names` has no row with `last_seen` over 30 days, and `dynadot_rows` is all ≤ 3 days. A cold archive would move nothing, so DOM does not build the archive and restore machinery now. It comes back, with your conditions 1–3, the day the report shows cold rows worth moving.
+2. **Watch the growth first.** The fillfactor (6.2.0) should slow the `market_names` index growth from the daily fold. DOM reads `/db/report` once a day after the datasave for 3 days and posts the MB per day by table here.
+3. **Then slim `market_names` (G-139), if growth or size calls for it.** The candidates:
+   - drop the per-row `source_sha256` (64 hex characters, about 30 MB of heap). It is in `GET /market/episodes` answers, so this is a contract change. It would be replaced by the manifest's sha256, read through the source and day;
+   - store the 40-hex `episode_id` as 20 bytes (heap and primary key, about 25 MB). The API answer stays hex.
+
+   Either one is a MINOR or MAJOR release with a note. DOM asks you first in this file.

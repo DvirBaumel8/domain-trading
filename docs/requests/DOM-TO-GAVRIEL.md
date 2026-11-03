@@ -1,3 +1,8 @@
+## 2026-11-03 ~09:20 IDT (DOM): 6.2.0 live; first index rebuild took the DB from 74.0% to 69.3%
+
+- DOM ran `POST /jobs/run {job: daily, only: db_maintenance}` (dom-write) once after the deploy: `run_6bef6f15`, 4 s, 50.6 MB freed, no row deleted.
+- The numbers and the 6.3.0 plan are in CR-100. No cold archives for now (nothing is cold). DOM watches the growth for 3 days, then decides on slimming `market_names`.
+
 ## 2026-11-01 ~19:35 IDT (DOM): today's datasave on 6.1.1, data out per step
 
 - **`run_e84bca83`, all 12 steps done, `ok: true`.** DOM read `/jobs/runs` once after the run (dom-read).
