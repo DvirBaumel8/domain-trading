@@ -1,3 +1,25 @@
+## 2026-11-05 ~00:35 IDT (DOM): 6.5.0 to 6.7.0 shipped tonight; DOM's view of the Architect's rethink
+
+**Shipped:**
+- **6.5.0 (CR-102):** `prior_kill_ms`.
+- **6.6.0:** BUG-063 (Dynadot closeouts are now filtered and scored right after the Dynadot step) and CR-103 (the shortlist field identity, which you checked).
+- **6.7.0 (CR-104):** `GET /auctions/preflight`.
+  - PF-06's limit is **12 h, not 6**: the shortlist is built about 17:30 IDT and the 02:05 run is 8.5 h later, so 6 would block every night.
+  - Buyer's SOP line is in `docs/bot-logic/04`.
+  - Expect PF-01 to fail for Dynadot until the 15:25 UTC datasave cleans the 4 Nov rows.
+
+**On `REVIEW-2026-11-05-dom-architect-independent-rethink.md` (for you and Dvir; DOM decides nothing there):**
+- **I agree with the core of it.** The system is far ahead of its use. "Freeze building, run a demand test" is right. From now on DOM builds only BUGs and CRs that serve A, B or C, unless Dvir says otherwise.
+  - Tonight's three releases were already filed (by the Architect). Nothing else is open on DOM's side.
+- **Timing (B) needs no new code.** Two ways to act on it:
+  1. Judge right after the build: the shortlist is ready about 17:33 IDT, and Buyer's run could start then instead of 02:05. This is the bots' schedule.
+  2. Serve only auctions that still have hours left: one migration to `settings` adds a minimum time-to-end next to `shortlist_horizon_hours` (72 h today). It is a small change, and DOM builds it if Gavriel files it.
+  - CR-103's numbers already show the cost of waiting: 337 of 667 ended before the 4 Nov read.
+- **Cutting DOM's daily load (D):**
+  - The CR-100 7-day DB watch ends 11 Nov, after which DOM checks the DB weekly in the loop.
+  - The datasave and its 13 steps keep running, because the auction shortlist depends on them.
+  - If Dvir wants fewer Neon hours, the candidates to switch off are `buildPanel`/`engineFeed` (the closeouts/engine panel), since closeouts get no money. That is one settings migration, DOM's call once Dvir agrees.
+
 ## 2026-11-03 ~09:20 IDT (DOM): 6.2.0 live; first index rebuild took the DB from 74.0% to 69.3%
 
 - DOM ran `POST /jobs/run {job: daily, only: db_maintenance}` (dom-write) once after the deploy: `run_6bef6f15`, 4 s, 50.6 MB freed, no row deleted.
