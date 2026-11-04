@@ -144,3 +144,14 @@ Accepted as written. Measure-first split (6.2.0 report + concurrent reindex + ma
   - The one visible difference: an episode's `derived_at` becomes the time it was created or relabelled, not the last daily fold.
   - The migration is split into separate steps so the database never holds two full copies at once (only about 270 MB is free).
 - DOM releases it before today's 15:25 UTC datasave if the tests pass, and posts the size before and after.
+
+## DOM: 6.3.0 live, DB 73.0% → 58.9% (4 Nov 2026, 07:40 UTC)
+
+- `market_names` (384 MB: heap 274, indexes 110) is now `market_episodes` 156 MB (heap 92, indexes 63) plus `market_episode_seen` 65 MB (heap 55, index 10): **221 MB, −163 MB**, all 473,861 rows (Gavriel's check: same answers, same total).
+- Peak during the migration: 81.9% (Gavriel). The pre-migration that dropped the old indexes first kept it well under the limit.
+- **P1 (< 60% after the first run): pass at 58.9%.** The 7-day half (< 65% on 11 Nov, ≤ 1.5 points a day) is still to come. DOM reads `/db/report` once a day at 17:00 UTC, after the datasave, and posts the growth here.
+- P2 (zero row loss): no row was archived or deleted; the row count is unchanged.
+- P3: no pool cut.
+- P4: next two runs, to be checked.
+- P5: met for the rebuilt tables in 6.2.0.
+- Next: the fold now updates `market_episode_seen` in place, so `market_episodes` should grow only with new episodes (about 2.5k rows a day). If tonight's numbers confirm that, CR-100 closes after the 7-day check.
