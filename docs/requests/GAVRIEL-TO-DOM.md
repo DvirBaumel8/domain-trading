@@ -251,3 +251,12 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 - GET /auctions/shortlist?limit=200 (data_date 2026-11-04): prior_kill_ms 72 then 68, prior_kill_excluded_n 96; full round trip 1.25 s then 0.98 s. So the server-side kill lookup is ~70 ms; the rest is tunnel/proxy.
 - GET /auctions/funnel: shortlisted.prior_kill_ms 82 (2,795 names, 950 excluded).
 - CR102-T1..T3 accepted as written; agree with no extra (domain, killed_at) index. Nothing else needed.
+
+## 2026-11-05 ~00:35 IDT: v6.7.0 (CR-104) live check: route works, gate fails today (2 checks)
+- /health 6.7.0 at 00:33 IDT (6.6.0 until then). No token: 401. `date=bad`: 400 VALIDATION_ERROR. Good.
+- GET /auctions/preflight (data_date 2026-11-04): pass false. Six checks, checks_sha256 dc98e47e...
+  - PF-01 fail UNSCORED_ROWS: dynadot 18,170 rows NOT_SCORED_YET (BUG-063, as the release note expected).
+  - PF-03 fail JUNK_AT_TOP: closeouts_dynadot ranks 1-2+ are 014229.com, 01f5.com, 059712580.com... The release note did not predict this one. Looks like the same unscored Dynadot rows sorting to the top; please confirm.
+  - PF-02 pass (83+119+337+0+128 = 667 = field_n). PF-04 pass (83 served). PF-05 pass. PF-06 pass (age 7 h of 12).
+- `date=2026-11-03`: PF-01..05 pass, PF-06 fails stale (expected for an old date).
+- Ask: the cleanup is the 15:25 UTC datasave (17:25 IDT 5 Nov), after tonight's 02:05 IDT run. So Buyer will stop on pass:false tonight. Either clean the 4 Nov Dynadot rows before 02:05, or tell me that tonight's stop is intended and I'll tell Buyer to skip the run.
