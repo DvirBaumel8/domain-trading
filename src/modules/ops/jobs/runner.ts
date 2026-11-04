@@ -111,8 +111,8 @@ export interface JobRunnerDeps {
   engineTrainer?: { weekly(): Promise<unknown>; runById(id: string): Promise<unknown> };
   /** v5.47.0 (F5): the lift table's daily step liftTrain (after engineTrain); retrains only when the sales or unsold rows grew. While undefined, that step reports skipped. */
   liftTrainJob?: Runnable;
-  /** v5.21.0 (CR-071): the datasave job's steps (twelve since v5.45.0: auctionShortlist after engineFeed; eleven since v5.41.0: engineFeed after buildPanel; ten since v5.35.0: pickproofSeal before snapshotRetention) (v5.23.0: episodes, dqMarket; v5.28.0: pickproofLabels last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
-  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; engineFeed(): Promise<unknown>; auctionShortlist(): Promise<unknown>; pickproofSeal(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown>; pickproofLabels(): Promise<unknown> };
+  /** v5.21.0 (CR-071): the datasave job's steps (thirteen since v6.7.0: preflight last, CR-104; twelve since v5.45.0: auctionShortlist after engineFeed; eleven since v5.41.0: engineFeed after buildPanel; ten since v5.35.0: pickproofSeal before snapshotRetention) (v5.23.0: episodes, dqMarket; v5.28.0: pickproofLabels last; v5.26.0: scorePool after the Dynadot steps); while undefined, each step reports skipped. */
+  datasaveJob?: { godaddyInventory(): Promise<unknown>; dynadotCloseouts(): Promise<unknown>; dynadotAftermarket(): Promise<unknown>; scorePool(): Promise<unknown>; buildPanel(): Promise<unknown>; engineFeed(): Promise<unknown>; auctionShortlist(): Promise<unknown>; pickproofSeal(): Promise<unknown>; snapshotRetention(): Promise<unknown>; episodes(): Promise<unknown>; dqMarket(): Promise<unknown>; pickproofLabels(): Promise<unknown>; preflight(): Promise<unknown> };
   /** Secret values scrubbed from step error messages. */
   secretValues?: string[];
   /** Takes the run lock (default: a database session lock). Tests of the step order pass a stub. */
@@ -166,13 +166,13 @@ export class JobRunner {
     // v5.21.0 (CR-071): POST /jobs/run {job:'datasave'}. Each step has its own status; a failed godaddyInventory does not stop the rest.
     if (job === 'datasave') {
       const ds = d.datasaveJob;
-      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'engineFeed' | 'auctionShortlist' | 'pickproofSeal' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels') =>
+      const dsStep = (name: 'godaddyInventory' | 'dynadotCloseouts' | 'dynadotAftermarket' | 'scorePool' | 'buildPanel' | 'engineFeed' | 'auctionShortlist' | 'pickproofSeal' | 'snapshotRetention' | 'episodes' | 'dqMarket' | 'pickproofLabels' | 'preflight') =>
         step(name, async () => (ds ? ds[name]() : { skipped: true, reason: 'datasave not configured' }));
       // v5.65.0: the two Dynadot reads (about 40 minutes) run last, so they no longer delay scorePool, auctionShortlist and the rest; their rows are used by the next run (scorePool, buildPanel, episodes, dqMarket read the newest sealed day)
       // v5.80.0 (CR-099): `params.only` (the Dynadot re-pull and its retry) runs just the named Dynadot steps; nothing else of the datasave
       const only = (run?.params as { only?: unknown } | null | undefined)?.only;
       if (Array.isArray(only)) return DATASAVE_DYNADOT_STEPS.filter((n) => only.includes(n)).map((n) => dsStep(n));
-      return [dsStep('godaddyInventory'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('auctionShortlist'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket')];
+      return [dsStep('godaddyInventory'), dsStep('scorePool'), dsStep('buildPanel'), dsStep('engineFeed'), dsStep('auctionShortlist'), dsStep('pickproofSeal'), dsStep('snapshotRetention'), dsStep('episodes'), dsStep('dqMarket'), dsStep('pickproofLabels'), dsStep('dynadotCloseouts'), dsStep('dynadotAftermarket'), dsStep('preflight')];
     }
     if (job === 'tick') return tick;
     // v6.2.0 (CR-100): `params.only = 'db_maintenance'` runs just the index rebuild step of the daily job (WRITE token, POST /jobs/run)

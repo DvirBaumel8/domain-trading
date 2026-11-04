@@ -93,6 +93,10 @@ export interface SettingsTable {
   shortlist_keep_days: Generated<number>;
   /** v6.4.0 (CR-101): a killed auction name may be shown again after this many days. Migration only. */
   shortlist_kill_ttl_days: Generated<number>;
+  /** v6.7.0 (CR-104): the limits of GET /auctions/preflight: most digits in a top-50 name (PF-03), least page coverage in basis points (PF-05), oldest shortlist in hours (PF-06). Migration only. */
+  preflight_max_digits: Generated<number>;
+  preflight_min_coverage_bp: Generated<number>;
+  preflight_max_age_hours: Generated<number>;
   /** v5.72.1: the paper-trading slice of the stored auction field (25). Migration only. */
   shortlist_paper_n: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */

@@ -1,4 +1,4 @@
-# Endpoints (contract v6.6.0)
+# Endpoints (contract v6.7.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -85,6 +85,7 @@ Scopes: READ = every `GET`; WRITE = every route (README §Who may call); intake 
 | GET | `/auctions/plans`, `/auctions/plans/{id}` | READ or bots | Auction bid plans (5.39.0, CR-077) |
 | POST | `/auctions/kills` | WRITE or bots (a data or READ token gets 403) | Auction kills: names a bot already judged (6.4.0, CR-101); normal 70% DB-size guard |
 | GET | `/auctions/kills` | READ, bots or WRITE (a data token gets 403) | The recorded auction kills (6.4.0, CR-101) |
+| GET | `/auctions/preflight` | READ or bots (a data token gets 403) | The pre-run gate PF-01..PF-06; writes nothing (6.7.0, CR-104) |
 | GET | `/auctions/shortlist`, `/auctions/funnel` | READ or bots (a data token gets 403) | The daily auction shortlist and the weekly funnel (5.45.0, G-127) |
 | POST | `/replay/runs` | WRITE only (a bots token gets 403) | Historical replay (5.59.0, CR-081) |
 | GET | `/replay/{date}`, `/replay/runs/{id}`, `/replay/runs` | READ or bots (a data token gets 403) | Historical replay (5.59.0, CR-081) |
@@ -859,6 +860,25 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
   rows: [ { domain, end_time, auction_type, price_cents, price, bid_count,
             domain_age, valuation_cents, pageviews } ] }   // domain_age, valuation_cents, pageviews: null when the file had none
 ```
+
+### `GET /auctions/preflight`
+**6.7.0 (CR-104).** READ, bots or WRITE (a data token is 403). The pre-run gate: a Buyer discovery run (or any bot-run pack build) calls it first and stops on `pass: false`. It **writes nothing** (no row, no log; the record of a run is the caller's `preflight.json`, which carries `checks_sha256`). Query (strict, a bad value is **400**): `date?` (`YYYY-MM-DD`; default the newest shortlist data date, as in `GET /auctions/shortlist`). Answer:
+```
+{ as_of, data_date,            // data_date null when no shortlist exists
+  pass,                        // true when every non-retired check passes
+  checks_sha256,               // sha256 hex of JSON.stringify(checks)
+  checks: [ { id, name, pass, reason_code: string | null, details } ] }   // always PF-01..PF-06 in this order
+```
+The checks (append-only: an id is never reused and a check is never removed; a retired check is reported `pass: true` with `details {retired: "<reason>"}`):
+| id | passes when | fail `reason_code` (details) |
+|---|---|---|
+| PF-01 | every served shortlist row (all pages) has a score; every closeouts row (GoDaddy and Dynadot, the date's sealed snapshot, after the hard filters) has a score or the by-design reason `NO_ACTIVE_MODEL`. A source with no sealed snapshot for the date is skipped (noted in `details`) | `UNSCORED_ROWS` (`sources: [{source: shortlist \| godaddy \| dynadot, n, by_reason?, sample (max 10 names)}]`; `NOT_SCORED_YET` and `SCORE_FAILED` fail) |
+| PF-02 | `total + prior_kill_excluded_n + ended_n + prebid_dropped_n + not_stored_n = field_n` (the `GET /auctions/shortlist` identity of 6.6.0) | `COUNTS_DONT_RECONCILE` (each term, `sum`, `field_n`, `diff`) |
+| PF-03 | none of the top 50 served shortlist rows (by rank) and the top 50 closeouts rows (both sources, the default order of `GET /candidates/closeouts`) has a name before `.com` that is all digits, hex-like (`^[0-9a-f]+$` with a digit) or has more than `settings.preflight_max_digits` digits (default 4, migration only) | `JUNK_AT_TOP` (`names: [{domain, source, rank}]`) |
+| PF-04 | no served shortlist name has an active (not `revoked`, not superseded) `auction_kills` row without the re-show marker `prior_kill` | `PRIOR_KILL_SERVED` (`n`, `names`) |
+| PF-05 | for the newest manifest of `godaddy_inventory`, `dynadot_closeouts` and `dynadot_aftermarket` on the date: failed pages (`coverage.pages_failed`) come with the flag `coverage.coverage_status`, and a known coverage ratio (`coverage.coverage_ratio`, else `pages_ok / pages_planned`) is at least `settings.preflight_min_coverage_bp` (default 9000 = 0.9, migration only). A source without a manifest is noted, not failed | `COVERAGE_UNFLAGGED` (pages failed, no `coverage_status`) or `COVERAGE_BELOW_MIN` (ratio under the minimum, flagged or not); `problems: [{source, code, pages_failed, coverage}]` |
+| PF-06 | the shortlist of the date was generated at most `settings.preflight_max_age_hours` (default 12, migration only) before `as_of` | `STALE_AS_OF` (`as_of`, `generated_at`, `newest_seal_at`, `age_h`, `max_age_h`; with no shortlist at all `{reason: "no shortlist"}`) |
+The datasave job also runs the suite as its last step `preflight` (`jobs.md`), so `GET /jobs/runs` shows the daily result; a failed check is data there, not a failed step.
 
 ### `GET /auctions/shortlist`
 **5.45.0 (G-127).** READ or bots (a data token is 403). The daily shortlist of live GoDaddy auctions that pass the hard filters, built by the datasave step `auctionShortlist` (`jobs.md` row `datasave`), pre-checked, with a suggested maximum bid. **5.72.0 (CR-088):** stores and serves the full hard-filter field (not just the top 25); pagination with `limit` + `offset`; `total` is the count of all eligible rows for the date. **Gavriel's daily routine:** read this, show Dvir 3 to 5 names with the suggested maximum and the reasons, and after Dvir's line create the plan (`POST /auctions/plans`) with the `prebid.id`. Query (strict, a bad value is **400**): `date?` (`YYYY-MM-DD`, a data date; default the newest), `limit?` (1..10000, default 25), `offset?` (>= 0, default 0).

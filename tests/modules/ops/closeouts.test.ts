@@ -314,7 +314,7 @@ describe('CC526 closeout candidates', () => {
     const steps = run.json().steps as Record<string, { status?: string; result?: Record<string, unknown> }>;
     const names = Object.keys(steps);
     expect(names.indexOf('scorePool')).toBe(names.indexOf('godaddyInventory') + 1);
-    expect(names.slice(-2)).toEqual(['dynadotCloseouts', 'dynadotAftermarket']);
+    expect(names.slice(-3)).toEqual(['dynadotCloseouts', 'dynadotAftermarket', 'preflight']); // 6.7.0: preflight last
     expect(steps.scorePool).toBeDefined();
     expect((await poolRow(unsold(0))).scored_at).not.toBeNull();
   });

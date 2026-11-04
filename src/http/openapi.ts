@@ -97,6 +97,7 @@ const SUMMARIES: Record<string, string> = {
   'GET /replay/runs/{id}': 'One replay run with its status and, when done, the report (per-group counts and rates, paired bootstrap, the names that did well)',
   'GET /replay/runs': 'Replay runs, newest first (status and logic version; the report is in GET /replay/runs/{id}); filters limit, status',
   'GET /auctions/shortlist': 'The daily shortlist of live GoDaddy auctions that pass hard filters (v5.72.0: full field, paginated): rank, score and parts, price, bids, end time, suggested maximum bid, automatic pre-bid (id, verdict, flags), reasons; filters date, limit, offset',
+  'GET /auctions/preflight': 'The pre-run gate (CR-104): checks PF-01..PF-06 on the day\'s shortlist and closeouts (unscored rows, counts, junk at the top, prior kills, source coverage, freshness) -> {as_of, data_date, pass, checks_sha256, checks}; filter date; writes nothing',
   'POST /auctions/kills': 'Record auction names a bot already judged and threw away (CR-101, 1 to 2,000 rows, append-only; a wrong kill is undone by a revoked row with supersedes); WRITE or bots, counts accepted, duplicate, rejected',
   'GET /auctions/kills': 'The recorded auction kills, newest first (filters domain, since, limit, offset), with total and revoked_by',
   'GET /auctions/funnel': 'The auction funnel counted over a date range (default the last 7 days): auctions seen, shortlisted, pre-bid, bid plans, won, imported, listed, traffic, sold',

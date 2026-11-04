@@ -11,6 +11,7 @@ import { registerBulkRoute, type DbSizeGuard } from '../../engine/index.js';
 import type { ScreeningDeps } from '../../selection/index.js';
 import { manualRequired, manualSearches, storePrebid } from '../auctions/prebid-store.js';
 import { KILLS_MAX_ROWS, KillsQuery, listKills, loadKills } from '../auctions/kills.js';
+import { PreflightQuery, runPreflight } from '../auctions/preflight.js';
 import { FunnelQuery, getFunnel, getShortlist, ShortlistQuery } from '../auctions/shortlist.js';
 import { createPlan, getPlan, listPlans, PlanBody, PlansQuery, recordResult, ResultBody, VENUES } from '../auctions/plans.js';
 
@@ -71,6 +72,13 @@ export function registerAuctions(app: FastifyInstance, deps: { db: Kysely<Databa
     const p = ShortlistQuery.safeParse(req.query ?? {});
     if (!p.success) throw bad(p);
     return getShortlist(db, p.data, deps.now());
+  });
+
+  // v6.7.0 (CR-104): the pre-run gate (READ or bots). Writes nothing.
+  app.get('/auctions/preflight', async (req) => {
+    const p = PreflightQuery.safeParse(req.query ?? {});
+    if (!p.success) throw bad(p);
+    return runPreflight(db, deps.now(), p.data);
   });
 
   app.get('/auctions/funnel', async (req) => {

@@ -21,13 +21,48 @@ const Query = z.object({
 
 const bad = (p: { error: z.ZodError }) => new AppError(400, 'VALIDATION_ERROR', `Invalid query: ${p.error.issues.map((i) => `${i.path.join('.') || 'query'} ${i.message}`).join('; ')}`);
 
-type Src = 'godaddy' | 'dynadot';
-interface Row { domain: string; source: 'godaddy' | 'dynadot' | 'drops'; price_cents: number | null; ends_at: Date | null; score: number | null; score_reason: string | null }
+export type Src = 'godaddy' | 'dynadot';
+export interface Row { domain: string; source: 'godaddy' | 'dynadot' | 'drops'; price_cents: number | null; ends_at: Date | null; score: number | null; score_reason: string | null }
 
 const MANIFEST: Record<Src, { source: 'godaddy_inventory' | 'dynadot_closeouts'; file: string }> = {
   godaddy: { source: 'godaddy_inventory', file: 'closeout_listings.json.zip' },
   dynadot: { source: 'dynadot_closeouts', file: 'bot_upload' },
 };
+
+/** The sealed manifest of one source and day (the closeouts snapshot GET /candidates/closeouts reads); undefined when none is sealed. v6.7.0 (CR-104): exported for the pre-run gate. */
+export const sealedManifest = (db: Kysely<Database>, s: Src, date: string) => db.selectFrom('snapshot_manifests').select(['sha256', 'data_date']).where('source', '=', MANIFEST[s].source).where('data_date', '=', date).where('file_name', '=', MANIFEST[s].file).where('status', '=', 'complete').where('sealed_at', 'is not', null).executeTakeFirst();
+const newestDate = async (db: Kysely<Database>, s: Src): Promise<string | null> => (await db.selectFrom('snapshot_manifests').select((eb) => eb.fn.max('data_date').as('d')).where('source', '=', MANIFEST[s].source).where('file_name', '=', MANIFEST[s].file).where('status', '=', 'complete').where('sealed_at', 'is not', null).executeTakeFirst())?.d ?? null;
+
+/** The default price cap of GET /candidates/closeouts ($40 in cents, the pool cap). */
+export const CLOSEOUTS_MAX_PRICE_CENTS = 4000;
+/** Table and where-clause of one source's pool for a day (the rows GET /candidates/closeouts ranks, before the filter_code test). */
+export function closeoutsPool(s: Src, date: string, maxPrice: number) {
+  const t = s === 'godaddy' ? 'datasave_pool' : 'dynadot_rows';
+  const base = s === 'godaddy' ? sql`data_date = ${date}::date and source = 'godaddy_closeouts'` : sql`data_date = ${date}::date and kind = 'closeouts'`;
+  return { t, pool: sql`${base} and domain like '%.com' and price_cents <= ${maxPrice}` };
+}
+
+/** The route's order: scored first, best score, cheaper, then name. */
+export function sortCloseoutRows<T extends { domain: string; score: number | null; price_cents: number | null }>(rows: T[]): T[] {
+  return rows.sort((a, b) => (a.score === null ? 1 : 0) - (b.score === null ? 1 : 0) || (b.score ?? 0) - (a.score ?? 0) || (a.price_cents ?? 0) - (b.price_cents ?? 0) || (a.domain < b.domain ? -1 : a.domain > b.domain ? 1 : 0));
+}
+
+/** pool_n, filtered_by and the ranked rows (best `limit`) of one source and day. */
+export async function closeoutsFromTable(db: Kysely<Database>, s: Src, date: string, maxPrice: number, limit: number) {
+  const { t, pool } = closeoutsPool(s, date, maxPrice);
+  const counts = (await sql<{ code: string | null; n: string }>`select filter_code as code, count(*)::text as n from ${sql.table(t)} where ${pool} group by 1`.execute(db)).rows;
+  const filtered: Record<string, number> = {};
+  let poolN = 0;
+  let rankedN = 0;
+  for (const c of counts) { poolN += Number(c.n); if (c.code) filtered[c.code] = Number(c.n); else rankedN += Number(c.n); }
+  const rows = (await sql<{ domain: string; price_cents: number; ends_at: Date | null; score: string | null; score_reason: string | null; scored_at: Date | null }>`
+    select domain, price_cents, ends_at, score::text as score, score_reason, scored_at from ${sql.table(t)} where ${pool} and filter_code is null
+    order by score desc nulls last, price_cents asc, domain asc limit ${limit}`.execute(db)).rows;
+  return {
+    poolN, rankedN, filtered,
+    rows: rows.map((r): Row => ({ domain: r.domain, source: s, price_cents: r.price_cents, ends_at: r.ends_at, score: r.score === null ? null : Number(r.score), score_reason: r.score === null ? (r.score_reason ?? 'NOT_SCORED_YET') : null })),
+  };
+}
 
 interface Deps { db: Kysely<Database>; now: () => number; scorer?: PoolScorer }
 
@@ -38,28 +73,6 @@ interface Deps { db: Kysely<Database>; now: () => number; scorer?: PoolScorer }
  */
 export function registerCloseouts(app: FastifyInstance, deps: Deps): void {
   const { db } = deps;
-  const sealedManifest = (s: Src, date: string) => db.selectFrom('snapshot_manifests').select(['sha256', 'data_date']).where('source', '=', MANIFEST[s].source).where('data_date', '=', date).where('file_name', '=', MANIFEST[s].file).where('status', '=', 'complete').where('sealed_at', 'is not', null).executeTakeFirst();
-  const newestDate = async (s: Src): Promise<string | null> => (await db.selectFrom('snapshot_manifests').select((eb) => eb.fn.max('data_date').as('d')).where('source', '=', MANIFEST[s].source).where('file_name', '=', MANIFEST[s].file).where('status', '=', 'complete').where('sealed_at', 'is not', null).executeTakeFirst())?.d ?? null;
-
-  /** pool_n, filtered_by and the ranked rows (best `limit`) of one source and day. */
-  async function fromTable(s: Src, date: string, maxPrice: number, limit: number) {
-    const t = s === 'godaddy' ? 'datasave_pool' : 'dynadot_rows';
-    const base = s === 'godaddy' ? sql`data_date = ${date}::date and source = 'godaddy_closeouts'` : sql`data_date = ${date}::date and kind = 'closeouts'`;
-    const pool = sql`${base} and domain like '%.com' and price_cents <= ${maxPrice}`;
-    const counts = (await sql<{ code: string | null; n: string }>`select filter_code as code, count(*)::text as n from ${sql.table(t)} where ${pool} group by 1`.execute(db)).rows;
-    const filtered: Record<string, number> = {};
-    let poolN = 0;
-    let rankedN = 0;
-    for (const c of counts) { poolN += Number(c.n); if (c.code) filtered[c.code] = Number(c.n); else rankedN += Number(c.n); }
-    const rows = (await sql<{ domain: string; price_cents: number; ends_at: Date | null; score: string | null; score_reason: string | null; scored_at: Date | null }>`
-      select domain, price_cents, ends_at, score::text as score, score_reason, scored_at from ${sql.table(t)} where ${pool} and filter_code is null
-      order by score desc nulls last, price_cents asc, domain asc limit ${limit}`.execute(db)).rows;
-    return {
-      poolN, rankedN, filtered,
-      rows: rows.map((r): Row => ({ domain: r.domain, source: s, price_cents: r.price_cents, ends_at: r.ends_at, score: r.score === null ? null : Number(r.score), score_reason: r.score === null ? (r.score_reason ?? 'NOT_SCORED_YET') : null })),
-    };
-  }
-
   async function fromDrops(date: string, limit: number) {
     const lists = await db.selectFrom('drop_lists').select('name').where('list_date', '=', date).execute();
     const kept = lists.length === 0 ? [] : await db.selectFrom('drop_list_rows').select('domain').distinct().where('list_name', 'in', lists.map((l) => l.name)).where('kept', '=', true).execute();
@@ -100,18 +113,18 @@ export function registerCloseouts(app: FastifyInstance, deps: Deps): void {
     } else {
       const wanted: Src[] = q.source === 'all' ? ['godaddy', 'dynadot'] : [q.source];
       if (!date) {
-        const newest = (await Promise.all(wanted.map(newestDate))).filter((d): d is string => d !== null).sort();
+        const newest = (await Promise.all(wanted.map((x) => newestDate(db, x)))).filter((d): d is string => d !== null).sort();
         date = newest[newest.length - 1];
         if (!date) throw missing(`${q.source} closeouts`);
       }
       for (const s of wanted) {
-        const m = await sealedManifest(s, date);
+        const m = await sealedManifest(db, s, date);
         if (!m) continue;
-        parts.push({ key: s, r: await fromTable(s, date, q.max_price, q.limit), sha: m.sha256 });
+        parts.push({ key: s, r: await closeoutsFromTable(db, s, date, q.max_price, q.limit), sha: m.sha256 });
       }
       if (parts.length === 0) throw missing(`${q.source} closeouts of ${date}`, { date });
     }
-    const merged = parts.flatMap((x) => x.r.rows).sort((a, b) => (a.score === null ? 1 : 0) - (b.score === null ? 1 : 0) || (b.score ?? 0) - (a.score ?? 0) || (a.price_cents ?? 0) - (b.price_cents ?? 0) || (a.domain < b.domain ? -1 : a.domain > b.domain ? 1 : 0));
+    const merged = sortCloseoutRows(parts.flatMap((x) => x.r.rows));
     const top = merged.slice(0, q.limit);
     // words: the selection split of each returned name (no outside call)
     const names = top.length ? await closeoutNameChecker(db, { bigcoNames: [], tmKills: [] }) : null;

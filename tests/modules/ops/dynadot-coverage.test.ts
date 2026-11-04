@@ -140,6 +140,6 @@ describe('CR-099 Dynadot low coverage', () => {
     for (const summary of [{ status: 'sealed', coverage_status: 'OK' }, { status: 'not_configured' }, { status: 'gap' }, { status: 'SNAPSHOT_SEALED' }]) expect(dynadotNeedsRetry({ status: 'done', summary })).toBe(false);
     app = await makeApp({ now: () => clock });
     expect(app.jobRunner.plan('datasave', { params: { retry: true, only: ['dynadotAftermarket'] } }).map((p) => p.name)).toEqual(['dynadotAftermarket']);
-    expect(app.jobRunner.plan('datasave').map((p) => p.name)).toHaveLength(12);
+    expect(app.jobRunner.plan('datasave').map((p) => p.name)).toHaveLength(13); // 6.7.0: preflight
   });
 });

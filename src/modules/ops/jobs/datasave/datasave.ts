@@ -37,6 +37,7 @@ import { scorePool, type PoolScorer } from '../../closeouts/score-pool.js';
 import { runAuctionShortlist } from '../../auctions/shortlist.js';
 import type { ScreeningDeps } from '../../../selection/index.js';
 import { listZipEntries, openZipEntry } from './zip.js';
+import { runPreflight } from '../../auctions/preflight.js';
 import { streamArrayItems } from './json-stream.js';
 import { demandFields, mergeDemand, type DemandFields } from './auction-fields.js';
 import { priceToCents } from './datasave-price.js';
@@ -557,6 +558,13 @@ export class DatasaveJob {
   async pickproofSeal(): Promise<unknown> {
     if (!(await pickproofEnabled(this.deps.db))) return PICKPROOF_OFF; // v5.59.0 (CR-081): the pick-proof is off
     return autoSeal(this.deps.db, this.deps.now());
+  }
+
+  // ---------- preflight (v6.7.0, CR-104) ----------
+
+  /** The pre-run gate suite (ops/auctions/preflight.ts) as the last, read-only step: the step result is the GET /auctions/preflight answer. A failed check is data, not a failed step. */
+  async preflight(): Promise<unknown> {
+    return runPreflight(this.deps.db, this.deps.now());
   }
 
   // ---------- pickproofLabels (v5.28.0, CR-073) ----------
