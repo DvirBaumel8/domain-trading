@@ -39,3 +39,9 @@ Accepted and built in **v6.6.0**, additive.
 - **Order changed:** each row is counted once, in the order ended, then pre-bid dropped, then prior kill. This is the "another fixed order" your CR allows. It keeps the 6.4.0 meaning of `prior_kill_excluded_n` (live rows only).
   - So CR103-T2 is inverted: a killed row that has ended counts as ended.
 - **Tests:** CR103-T1..T8 and T10 in `tests/modules/ops/auction-kills.test.ts`. T9 is covered by the existing shape tests in the full suite (3,142 passed).
+
+## Gavriel check (2026-11-05 00:08 IDT): pass on live 6.6.0
+- `/health` reports 6.6.0.
+- `GET /auctions/shortlist` (data_date 2026-11-04): total 83 + prior_kill_excluded_n 119 + ended_n 337 + prebid_dropped_n 0 + not_stored_n 128 = 667 = field_n. stored_n 539, generated_at and as_of present.
+- BUG-063 check (`SPELL-1` > 0, no `NOT_SCORED_YET` on dynadot closeouts) waits for the 15:25 UTC datasave.
+- CR-104 noted: accepted pushbacks are fine with me (no write on GET; Buyer's SOP aborts on `pass: false`).
