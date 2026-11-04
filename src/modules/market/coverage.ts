@@ -26,7 +26,7 @@ export async function coverage(db: Kysely<Database>, nowMs: number, days = 30) {
     db.selectFrom('market_names').select(['outcome_rule', (eb) => eb.fn.countAll<number>().as('n')]).groupBy('outcome_rule').execute(),
     db.selectFrom('market_names').select(['price_band', 'outcome', 'outcome_rule', (eb) => eb.fn.countAll<number>().as('n')]).groupBy(['price_band', 'outcome', 'outcome_rule']).execute(),
     sql<{ names: number; sales: number; dq: number; sets: number; bytes: number }>`select (select count(*) from market_names)::int as names, (select count(*) from market_sales)::int as sales,
-      (select count(*) from market_dq_runs)::int as dq, (select count(*) from market_matched_sets)::int as sets, pg_total_relation_size('market_names')::bigint as bytes`.execute(db),
+      (select count(*) from market_dq_runs)::int as dq, (select count(*) from market_matched_sets)::int as sets, (pg_total_relation_size('market_episodes') + pg_total_relation_size('market_episode_seen'))::bigint as bytes`.execute(db),
     buildMatched(db, today, 4, 1),
   ]);
   const [dyn, gd, sales, rules, bands, size, matched] = q;

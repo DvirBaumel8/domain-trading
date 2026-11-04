@@ -30,14 +30,16 @@ function columnsOf(iface: string): Map<string, boolean> {
 describe('src/db/types.ts matches the migrated schema', () => {
   it('DB-TYPES-1: same tables, same columns, same nullability', async () => {
     const rows = (
-      await sql<{ table_name: string; column_name: string; is_nullable: string }>`
-        SELECT c.table_name, c.column_name, c.is_nullable
+      await sql<{ table_name: string; column_name: string; is_nullable: string; table_type: string }>`
+        SELECT c.table_name, c.column_name, c.is_nullable, t.table_type
         FROM information_schema.columns c
-        JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type = 'BASE TABLE'
+        JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type IN ('BASE TABLE', 'VIEW')
         WHERE c.table_schema = 'public' AND c.table_name <> 'pgmigrations'`.execute(testDb)
     ).rows;
     const db = new Map<string, Map<string, boolean>>();
+    const views = new Set<string>(); // v6.3.0: market_names is a view; a view's columns are all reported nullable, so only its column names are compared
     for (const r of rows) {
+      if (r.table_type === 'VIEW') views.add(r.table_name);
       if (!db.has(r.table_name)) db.set(r.table_name, new Map());
       db.get(r.table_name)!.set(r.column_name, r.is_nullable === 'YES');
     }
@@ -49,7 +51,7 @@ describe('src/db/types.ts matches the migrated schema', () => {
       const typed = columnsOf(iface);
       for (const [c, nullable] of cols) {
         if (!typed.has(c)) problems.push(`${t}.${c} is missing from ${iface}`);
-        else if (typed.get(c) !== nullable) problems.push(`${t}.${c} is ${nullable ? 'nullable' : 'NOT NULL'} in the schema but typed the other way`);
+        else if (!views.has(t) && typed.get(c) !== nullable) problems.push(`${t}.${c} is ${nullable ? 'nullable' : 'NOT NULL'} in the schema but typed the other way`);
       }
       for (const c of typed.keys()) if (!cols.has(c)) problems.push(`${iface}.${c} has no column in the schema`);
     }

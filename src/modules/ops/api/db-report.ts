@@ -10,7 +10,8 @@ export const DB_REPORT_TTL_MS = 60 * 60_000;
 
 /** The date column of each table that gets age buckets. Identifiers come from this map only, never from a request. */
 export const AGE_COLUMNS: Readonly<Record<string, string>> = {
-  market_names: 'last_seen',
+  market_episode_seen: 'last_seen',
+  market_episodes: 'first_seen',
   dynadot_rows: 'data_date',
   datasave_pool: 'data_date',
   pickproof_pool: 'day',

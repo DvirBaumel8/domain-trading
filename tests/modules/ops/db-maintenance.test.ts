@@ -222,9 +222,9 @@ describe('POST /jobs/run {job: daily, only: db_maintenance} (CR-100)', () => {
 });
 
 describe('fillfactor (CR-100 ask 4)', () => {
-  it('DB100-13: market_names has fillfactor 80 (migration 1769300000000_v6-2-0); dynadot_rows is left as is', async () => {
+  it('DB100-13: since 6.3.0 the hot table market_episode_seen has fillfactor 50 (migration 1769400000000_v6-3-0; market_names is a view); dynadot_rows is left as is', async () => {
     const opts = async (t: string) => (await sql<{ o: string[] | null }>`select reloptions as o from pg_class where oid = ${`public.${t}`}::regclass`.execute(db)).rows[0]!.o;
-    expect(await opts('market_names')).toEqual(['fillfactor=80']);
+    expect(await opts('market_episode_seen')).toEqual(['fillfactor=50']);
     expect(await opts('dynadot_rows')).toBeNull();
   });
 });

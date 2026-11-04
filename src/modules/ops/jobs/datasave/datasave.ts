@@ -121,7 +121,7 @@ class HttpFail extends Error {
 }
 
 /** CR-095 (5.77.0): the only tables the datasave job vacuums (a fixed list: the names go into SQL as text). */
-type VacuumTable = 'market_names' | 'dynadot_rows' | 'datasave_pool' | 'godaddy_auctions_live';
+type VacuumTable = 'market_episodes' | 'market_episode_seen' | 'dynadot_rows' | 'datasave_pool' | 'godaddy_auctions_live';
 
 export class DatasaveJob {
   constructor(private readonly deps: DatasaveDeps) {}
@@ -523,8 +523,8 @@ export class DatasaveJob {
   /** Merges every sealed source and the reported sales into market_names and labels the episodes (R-1, R-2). Idempotent: the retry run and the next day derive the same rows again. */
   async episodes(): Promise<unknown> {
     const r = await runEpisodes(this.deps.db, this.deps.now());
-    // CR-095 (5.77.0): the fold rewrites the row of nearly every listed name; a plain VACUUM right after makes the old versions reusable by tomorrow's fold
-    return { ...(r as object), vacuum: await this.vacuum(['market_names']) };
+    // CR-095 (5.77.0): a plain VACUUM right after makes the old versions reusable by tomorrow's fold. v6.3.0: the daily fold now rewrites only the narrow market_episode_seen
+    return { ...(r as object), vacuum: await this.vacuum(['market_episode_seen', 'market_episodes']) };
   }
 
   /** CR-095 (5.77.0): plain VACUUM (ANALYZE) of fixed tables (no lock that blocks reads or writes, outside any transaction), so space freed by deletes and updates is reused

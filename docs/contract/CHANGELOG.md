@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 6.3.0 (2026-11-04): market_names split into a hot and a cold table behind a compatibility view (CR-100: stop the daily fold rewriting wide rows)
+Release note: `docs/releases/v6.3.0.md`.
+MINOR. No field or value of any route changes, except one meaning. `market_names` is split into a cold table `market_episodes` and a hot table `market_episode_seen` (fillfactor 50) behind a view with the old name and columns (migrations `1769350000000_v6-3-0-pre.sql`, `1769400000000_v6-3-0.sql`, `1769400000001_v6-3-0-indexes.sql`). Changes: a market episode's `derived_at` is now when the episode was created or its label or source last changed (the daily continue no longer bumps it); the `GET /db/report` age keys are `market_episode_seen` and `market_episodes`.
+
 ## 6.2.0 (2026-11-03): CR-100 part 1: GET /db/report (per-table, index and age sizes), daily step dbMaintenance (concurrent reindex), market_names fillfactor 80
 Release note: `docs/releases/v6.2.0.md`.
 MINOR (additive; migration `1769300000000_v6-2-0.sql`: `market_names` fillfactor 80). New READ route `GET /db/report` (sizes per table, index and row age; cached 60 minutes). New daily step `dbMaintenance` after `retention` (concurrent index rebuild when a big table's indexes exceed 0.8 x its heap; deletes no row). `POST /jobs/run` accepts `{job: "daily", only: "db_maintenance"}` (WRITE).

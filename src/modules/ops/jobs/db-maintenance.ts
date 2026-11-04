@@ -8,7 +8,7 @@ import type { Database } from '../../../db/types.js';
 import { NEON_FREE_STORAGE_BYTES } from '../../reporting/index.js';
 
 /** The tables the step looks at, in order. A table that does not exist is left out of the summary. */
-export const DB_MAINTENANCE_TABLES = ['market_names', 'dynadot_rows', 'datasave_pool', 'pickproof_pool'] as const;
+export const DB_MAINTENANCE_TABLES = ['market_episodes', 'market_episode_seen', 'dynadot_rows', 'datasave_pool', 'pickproof_pool'] as const;
 const RATIO_DUE = 0.8;
 const BUDGET_MS = 10 * 60_000;
 /** A table whose indexes are under 1 MiB is never worth a rebuild (an empty table's btree meta pages would otherwise count as "over 0.8 x heap"). */

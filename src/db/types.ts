@@ -1746,7 +1746,7 @@ export interface KbLoadsTable {
   error: string | null;
 }
 
-/** v5.23.0 (CR-075): one row per name x venue x listing episode (only episodes that can be a positive or a matched negative).  */
+/** v5.23.0 (CR-075): one row per name x venue x listing episode (only episodes that can be a positive or a matched negative). Since v6.3.0 `market_names` is a VIEW over MarketEpisodesTable (cold) and MarketEpisodeSeenTable (hot), with INSTEAD OF triggers; the datasave step writes the two tables. */
 export interface MarketNamesTable {
   episode_id: string;
   name: string;
@@ -1776,6 +1776,43 @@ export interface MarketNamesTable {
   price_band: '500-999' | '1k-2.5k' | '2.5k-5k' | '5k-10k' | '10k+';
   sale_id: number | null;
   derived_at: TimestampDefault;
+}
+
+/** v6.3.0: the cold, wide part of an episode (changes only when the episode is created or its label/source changes). `id` is the identity the hot table points at. */
+export interface MarketEpisodesTable {
+  id: Generated<number>;
+  episode_id: string;
+  name: string;
+  sld: string;
+  tld: string;
+  venue: string;
+  listing_type: 'bin' | 'offer' | 'auction' | 'closeout';
+  list_price_cents_first: number | null;
+  first_seen: DateString;
+  sale_only: boolean;
+  outcome: 'sold' | 'unsold' | 'unknown' | 'delisted';
+  outcome_rule: string;
+  sale_price_cents: number | null;
+  sale_date: DateString | null;
+  source: string;
+  source_url: string | null;
+  source_sha256: string | null;
+  tier: 'A' | 'B' | 'C' | 'D';
+  feat_asof: ColumnType<DateString | null, DateString | null | undefined, DateString | null>;
+  dup_group: string | null;
+  dup_sources: string[] | null;
+  price_band: '500-999' | '1k-2.5k' | '2.5k-5k' | '5k-10k' | '10k+';
+  sale_id: number | null;
+  derived_at: TimestampDefault;
+}
+
+/** v6.3.0: the hot, narrow part (fillfactor 50, only the primary key indexed, so the daily update is HOT). */
+export interface MarketEpisodeSeenTable {
+  id: number;
+  last_seen: DateString;
+  seen_days: number;
+  list_price_cents_last: number | null;
+  price_changes: number;
 }
 
 export interface MarketDqRunsTable {
@@ -1952,6 +1989,8 @@ export interface Database {
   kb_verdicts: KbVerdictsTable;
   kb_loads: KbLoadsTable;
   market_names: MarketNamesTable;
+  market_episodes: MarketEpisodesTable;
+  market_episode_seen: MarketEpisodeSeenTable;
   market_dq_runs: MarketDqRunsTable;
   market_matched_sets: MarketMatchedSetsTable;
   pickproof_days: PickproofDaysTable;
