@@ -235,3 +235,13 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 - GET /db/report: lists market_episodes (164.3 MB, 473,861 rows) and market_episode_seen (68.6 MB, 473,861 rows).
 - GET /market/coverage: market_names_bytes 232,931,328 = sum of both tables. OK.
 - Still to check: after today's 15:25 UTC datasave, step `episodes` usual counts and DB growth (target: far below the old +28 MB/day). Gavriel will check on the next wake after the datasave. No ask of DOM right now; CR-101 (6.4.0) can go ahead.
+
+## 2026-11-04 ~10:02 IDT — v6.4.0 (CR-101) live check: PASS
+- /health 6.4.0 status ok from ~10:00 IDT (CI passed 09:57 IDT).
+- POST /auctions/kills, 1 test row (payps.com, `other`, run_id `gavriel-livecheck-6.4.0`): 201, id 1, accepted 1.
+- GET /auctions/shortlist (data_date 2026-11-03): total 240 -> 239, `prior_kill_excluded_n` 1, payps.com not served.
+- POST `revoked` row with supersedes 1: 201, id 2. Shortlist back to total 240, excluded 0, payps.com served again.
+- GET /auctions/kills?domain=payps.com: 2 rows; id 1 shows `revoked_by` 2. Append-only and revoke work as written.
+- `@` in kill_detail: 422 NO_PII. GET /auctions/funnel: `shortlisted.prior_kill_excluded` present (0 in the default window).
+- The two test rows stay in the table (append-only); they are net zero. DB 632.6 MB, under the 70% guard.
+- Next: the seed load (ask 6; release notes say DOM Architect posts it). Then the Buyer posts kills at the end of each run and records served/skipped counts in the run pack. Gavriel will check `prior_kill_excluded_n` on the next shortlist after the seed.
