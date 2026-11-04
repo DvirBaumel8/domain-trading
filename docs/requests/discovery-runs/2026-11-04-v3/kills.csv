@@ -1,0 +1,111 @@
+domain,price,max_bid_suggested,end_time,age,reason
+rapti.com,$45.00,$55.00,2026-11-06T21:11:00+02:00,22,MEANING_BRAND_COINAGE_OR_FRAGMENT
+orbiit.com,$21.00,$55.00,2026-11-06T23:12:00+02:00,21,MEANING_BRAND_COINAGE_OR_FRAGMENT
+quicksol.com,$11.00,$55.00,2026-11-06T18:21:00+02:00,25,MEANING_BRAND_COINAGE_OR_FRAGMENT
+supranatural.com,$10.00,$55.00,2026-11-06T21:56:00+02:00,25,MEANING_BRAND_COINAGE_OR_FRAGMENT
+companet.com,$1.00,$50.00,2026-11-06T19:18:00+02:00,23,MEANING_BRAND_COINAGE_OR_FRAGMENT
+glowscience.com,$1.00,$45.00,2026-11-06T20:34:00+02:00,18,MEANING_BRAND_COINAGE_OR_FRAGMENT
+sweetcomfort.com,$10.00,$45.00,2026-11-06T21:22:00+02:00,26,MEANING_BRAND_COINAGE_OR_FRAGMENT
+alliancesales.com,$1.00,$45.00,2026-11-06T23:00:00+02:00,14,"MEANING_BRAND: company-name pattern, not a named paid service; only .net user is Alliance Sales Co, Troy MI (1-4 staff) = one small same-name firm (R-ONE/TN-1); alliancesalesinc.com food broker separate"
+lesautres.com,$1.00,$40.00,2026-11-06T20:47:00+02:00,17,MEANING_BRAND_COINAGE_OR_FRAGMENT
+mymascot.com,$17.00,$40.00,2026-11-06T20:13:00+02:00,9,MEANING_BRAND_COINAGE_OR_FRAGMENT
+brobbey.com,$1.00,$35.00,2026-11-06T22:48:00+02:00,26,MEANING_BRAND_COINAGE_OR_FRAGMENT
+clubtavern.com,$10.00,$35.00,2026-11-06T19:21:00+02:00,27,MEANING_BRAND_COINAGE_OR_FRAGMENT
+duncanrealty.com,$1.00,$35.00,2026-11-06T18:29:00+02:00,24,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+lifedate.com,$17.00,$30.00,2026-11-06T20:38:00+02:00,25,MEANING_BRAND_COINAGE_OR_FRAGMENT
+emailremind.com,$1.00,$30.00,2026-11-05T21:05:00+02:00,27,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+howdyhomes.com,$1.00,$30.00,2026-11-06T19:38:00+02:00,9,MEANING_BRAND_COINAGE_OR_FRAGMENT
+parcelar.com,$1.00,$25.00,2026-11-06T21:03:00+02:00,7,MEANING_BRAND_COINAGE_OR_FRAGMENT
+markcrosby.com,$1.00,$25.00,2026-11-05T18:17:00+02:00,23,STEP0_PERSON_NAME
+barido.com,$11.00,$20.00,2026-11-06T20:38:00+02:00,20,MEANING_BRAND_COINAGE_OR_FRAGMENT
+lagrangetn.com,$1.00,$20.00,2026-11-05T21:19:00+02:00,27,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+villaamore.com,$1.00,$20.00,2026-11-06T18:07:00+02:00,10,MEANING_BRAND_COINAGE_OR_FRAGMENT
+witnessplus.com,$1.00,$15.00,2026-11-05T21:15:00+02:00,23,MEANING_BRAND_COINAGE_OR_FRAGMENT
+nextonly.com,$1.00,$15.00,2026-11-06T23:14:00+02:00,14,MEANING_BRAND_COINAGE_OR_FRAGMENT
+astorianrc.com,$1.00,$15.00,2026-11-06T19:56:00+02:00,12,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+pumpkinsoftware.com,$1.00,$15.00,2026-11-05T21:09:00+02:00,29,MEANING_BRAND_COINAGE_OR_FRAGMENT
+vieqa.com,$11.00,$15.00,2026-11-06T20:23:00+02:00,7,MEANING_BRAND_COINAGE_OR_FRAGMENT
+havenhouston.com,$1.00,$15.00,2026-11-05T22:59:00+02:00,4,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+ardumpster.com,$1.00,$15.00,2026-11-06T20:47:00+02:00,4,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+deliciouslyplated.com,$11.00,$15.00,2026-11-05T19:03:00+02:00,10,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+lifeordebt.com,$11.00,$15.00,2026-11-06T20:44:00+02:00,22,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+wingsbowl.com,$1.00,$15.00,2026-11-06T23:00:00+02:00,7,MEANING_BRAND_COINAGE_OR_FRAGMENT
+transcribear.com,$1.00,$15.00,2026-11-06T20:04:00+02:00,9,MEANING_BRAND_COINAGE_OR_FRAGMENT
+missionviejoheating.com,$1.00,$15.00,2026-11-06T21:44:00+02:00,14,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+holtchiropractor.com,$1.00,$15.00,2026-11-06T19:38:00+02:00,14,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+cataractdvorak.com,$1.00,$15.00,2026-11-06T21:57:00+02:00,10,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+followdesk.com,$1.00,$15.00,2026-11-05T19:59:00+02:00,11,MEANING_BRAND_COINAGE_OR_FRAGMENT
+cashchief.com,$1.00,$15.00,2026-11-06T19:19:00+02:00,24,MEANING_BRAND_COINAGE_OR_FRAGMENT
+baumcapital.com,$1.00,$15.00,2026-11-06T18:49:00+02:00,17,MEANING_BRAND_COINAGE_OR_FRAGMENT
+singularcover.com,$1.00,$15.00,2026-11-06T20:43:00+02:00,8,MEANING_BRAND_COINAGE_OR_FRAGMENT
+sunnybump.com,$1.00,$15.00,2026-11-05T20:02:00+02:00,14,MEANING_BRAND_COINAGE_OR_FRAGMENT
+kobepost.com,$1.00,$15.00,2026-11-06T22:39:00+02:00,12,MEANING_BRAND_COINAGE_OR_FRAGMENT
+beanpuff.com,$1.00,$15.00,2026-11-06T21:25:00+02:00,5,MEANING_BRAND_COINAGE_OR_FRAGMENT
+milestonetechs.com,$1.00,$15.00,2026-11-06T22:01:00+02:00,8,MEANING_BRAND_COINAGE_OR_FRAGMENT
+itnwwe.com,$14.00,$15.00,2026-11-06T22:09:00+02:00,8,MEANING_BRAND_COINAGE_OR_FRAGMENT
+hessmachinery.com,$1.00,$10.00,2026-11-05T20:45:00+02:00,27,MEANING_BRAND_COINAGE_OR_FRAGMENT
+toolboxmail.com,$1.00,$10.00,2026-11-05T21:45:00+02:00,13,MEANING_BRAND_COINAGE_OR_FRAGMENT
+dailymusician.com,$1.00,$10.00,2026-11-06T18:32:00+02:00,12,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+cobblecapital.com,$1.00,$10.00,2026-11-05T21:15:00+02:00,9,MEANING_BRAND_COINAGE_OR_FRAGMENT
+partnerslogistics.com,$1.00,$10.00,2026-11-06T19:54:00+02:00,17,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+onewayimmigration.com,$1.00,$10.00,2026-11-05T22:40:00+02:00,8,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+karinaalvarez.com,$1.00,$10.00,2026-11-05T22:41:00+02:00,1,STEP0_PERSON_NAME
+earlybirdnews.com,$1.00,$10.00,2026-11-06T20:40:00+02:00,25,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+newmexicohotel.com,$6.00,$10.00,2026-11-06T20:22:00+02:00,25,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+dinodiners.com,$1.00,$10.00,2026-11-06T21:48:00+02:00,8,MEANING_BRAND_COINAGE_OR_FRAGMENT
+solterus.com,$1.00,$10.00,2026-11-06T19:58:00+02:00,10,MEANING_BRAND_COINAGE_OR_FRAGMENT
+brewcase.com,$1.00,$10.00,2026-11-05T19:32:00+02:00,6,MEANING_BRAND_COINAGE_OR_FRAGMENT
+kolbing.com,$1.00,$10.00,2026-11-06T22:56:00+02:00,1,MEANING_BRAND_COINAGE_OR_FRAGMENT
+lokalbet.com,$1.00,$10.00,2026-11-05T21:10:00+02:00,9,MEANING_BRAND_COINAGE_OR_FRAGMENT
+soltarus.com,$1.00,$10.00,2026-11-06T19:35:00+02:00,10,MEANING_BRAND_COINAGE_OR_FRAGMENT
+greenlandtrips.com,$7.00,$10.00,2026-11-06T22:09:00+02:00,12,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+melodymakersmovie.com,$1.00,$10.00,2026-11-06T20:14:00+02:00,15,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+albuquerquecomedy.com,$1.00,$10.00,2026-11-05T19:08:00+02:00,14,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+apartmentpromotions.com,$1.00,$10.00,2026-11-06T20:05:00+02:00,25,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+endotoxins.com,$1.00,$10.00,2026-11-06T18:18:00+02:00,17,"TIER_A_NONE: 0 other endings live (API); firms sell ""endotoxin testing"" (singular form dominant; plural check weak) - CMD/Charles River/NJ Labs are labs not buyers of the plural; no Tier A -> kill before USPTO"
+carvalle.com,$1.00,$10.00,2026-11-06T19:46:00+02:00,1,MEANING_BRAND_COINAGE_OR_FRAGMENT
+expertwitnessnews.com,$1.00,$10.00,2026-11-06T19:30:00+02:00,12,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+alessandrafaiella.com,$1.00,$10.00,2026-11-06T21:06:00+02:00,19,STEP0_PERSON_NAME
+thebellevuegazette.com,$1.00,$10.00,2026-11-06T23:19:00+02:00,18,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+danapointheating.com,$1.00,$10.00,2026-11-06T23:25:00+02:00,14,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+docodehere.com,$1.00,$10.00,2026-11-06T20:00:00+02:00,6,MEANING_BRAND_COINAGE_OR_FRAGMENT
+userstellar.com,$1.00,$10.00,2026-11-06T21:35:00+02:00,6,MEANING_BRAND_COINAGE_OR_FRAGMENT
+ohiohogbbq.com,$1.00,$10.00,2026-11-06T18:44:00+02:00,17,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+woodesmusic.com,$1.00,$10.00,2026-11-06T18:59:00+02:00,12,MEANING_BRAND_COINAGE_OR_FRAGMENT
+theoverseanetwork.com,$1.00,$10.00,2026-11-06T18:43:00+02:00,8,MEANING_BRAND_COINAGE_OR_FRAGMENT
+meisushinj.com,$1.00,$10.00,2026-11-06T21:23:00+02:00,9,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+servicemarshal.com,$1.00,$10.00,2026-11-06T21:19:00+02:00,2,MEANING_BRAND_COINAGE_OR_FRAGMENT
+theislayhotel.com,$1.00,$10.00,2026-11-05T20:16:00+02:00,17,MEANING_BRAND_COINAGE_OR_FRAGMENT
+ecofriendlyhouse.com,$1.00,$10.00,2026-11-06T21:03:00+02:00,21,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+listhomeforsale.com,$1.00,$10.00,2026-11-06T21:54:00+02:00,22,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+applecaredoctors.com,$1.00,$10.00,2026-11-05T21:10:00+02:00,17,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+oklongevity.com,$1.00,$10.00,2026-11-06T18:21:00+02:00,3,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+whataphoia.com,$1.00,$5.00,2026-11-06T18:12:00+02:00,2,MEANING_BRAND_COINAGE_OR_FRAGMENT
+drseemamodi.com,$1.00,$5.00,2026-11-06T19:26:00+02:00,2,STEP0_PERSON_NAME
+swirlandspoon.com,$1.00,$5.00,2026-11-05T21:26:00+02:00,1,MEANING_BRAND_COINAGE_OR_FRAGMENT
+betterthanjamnyc.com,$1.00,$5.00,2026-11-05T21:29:00+02:00,18,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+homeremodelexpert.com,$1.00,$5.00,2026-11-05T21:49:00+02:00,17,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+inversionesmodelo.com,$1.00,$5.00,2026-11-06T18:52:00+02:00,18,MEANING_BRAND_COINAGE_OR_FRAGMENT
+wherecanigetweed.com,$1.00,$5.00,2026-11-06T19:05:00+02:00,12,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+neworleansobstetrics.com,$1.00,$5.00,2026-11-06T19:46:00+02:00,19,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+neworleansgynecology.com,$1.00,$5.00,2026-11-06T20:44:00+02:00,19,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+sanpedroheating.com,$1.00,$5.00,2026-11-06T23:16:00+02:00,14,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+kernelerp.com,$1.00,$5.00,2026-11-05T18:26:00+02:00,1,MEANING_BRAND_COINAGE_OR_FRAGMENT
+goldchaincoin.com,$1.00,$5.00,2026-11-06T21:24:00+02:00,7,MEANING_BRAND_COINAGE_OR_FRAGMENT
+peptidekit.com,$1.00,$5.00,2026-11-06T21:52:00+02:00,3,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+sanadinvest.com,$1.00,$5.00,2026-11-06T21:25:00+02:00,4,MEANING_BRAND_COINAGE_OR_FRAGMENT
+emrapeptides.com,$1.00,$5.00,2026-11-06T21:38:00+02:00,1,MEANING_BRAND_COINAGE_OR_FRAGMENT
+hemphouseknoxville.com,$1.00,$5.00,2026-11-06T20:49:00+02:00,8,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+smashmerestaurant.com,$1.00,$5.00,2026-11-06T19:19:00+02:00,3,MEANING_BRAND_COINAGE_OR_FRAGMENT
+losportalesgrills.com,$1.00,$5.00,2026-11-06T22:17:00+02:00,3,MEANING_BRAND_COINAGE_OR_FRAGMENT
+onlyfellas.com,$1.00,$5.00,2026-11-06T22:21:00+02:00,4,MEANING_BRAND_COINAGE_OR_FRAGMENT
+napolipizzanj.com,$1.00,$5.00,2026-11-06T19:33:00+02:00,5,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+harveysdelitx.com,$1.00,$5.00,2026-11-06T19:33:00+02:00,4,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+prainamny.com,$1.00,$5.00,2026-11-06T20:23:00+02:00,2,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+saltlaketherapists.com,$1.00,$5.00,2026-11-06T20:49:00+02:00,8,STEP0_LOCAL_BUSINESS (+local-business-name filter kill)
+oneideaway.com,$1.00,$5.00,2026-11-05T21:53:00+02:00,2,MEANING_BRAND_COINAGE_OR_FRAGMENT
+caraudioguy.com,$1.00,$5.00,2026-11-06T22:55:00+02:00,2,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+cupsandcubs.com,$1.00,$5.00,2026-11-05T19:47:00+02:00,1,MEANING_BRAND_COINAGE_OR_FRAGMENT
+thedailyobjective.com,$1.00,$5.00,2026-11-05T20:17:00+02:00,3,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+jaliscotravel.com,$1.00,$5.00,2026-11-06T22:23:00+02:00,1,MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad)
+babahalalfood.com,$1.00,$5.00,2026-11-06T23:18:00+02:00,1,MEANING_BRAND_COINAGE_OR_FRAGMENT

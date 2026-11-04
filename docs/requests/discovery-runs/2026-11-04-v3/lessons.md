@@ -1,0 +1,4 @@
+- Server prior-kill exclude (92) worked: local pack check found 0 extra prior kills.
+- Step 0 tagged 27/110 (25%) up front; cheapest kill step this run.
+- /candidates/closeouts now rejects limit>200 (VALIDATION_ERROR); use limit=200. Closeouts still score=null.
+- 110 served of 667 field_n: thin day; no cheap two-word named service phrase with Tier A.
