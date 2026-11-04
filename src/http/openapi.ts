@@ -97,6 +97,8 @@ const SUMMARIES: Record<string, string> = {
   'GET /replay/runs/{id}': 'One replay run with its status and, when done, the report (per-group counts and rates, paired bootstrap, the names that did well)',
   'GET /replay/runs': 'Replay runs, newest first (status and logic version; the report is in GET /replay/runs/{id}); filters limit, status',
   'GET /auctions/shortlist': 'The daily shortlist of live GoDaddy auctions that pass hard filters (v5.72.0: full field, paginated): rank, score and parts, price, bids, end time, suggested maximum bid, automatic pre-bid (id, verdict, flags), reasons; filters date, limit, offset',
+  'POST /auctions/kills': 'Record auction names a bot already judged and threw away (CR-101, 1 to 2,000 rows, append-only; a wrong kill is undone by a revoked row with supersedes); WRITE or bots, counts accepted, duplicate, rejected',
+  'GET /auctions/kills': 'The recorded auction kills, newest first (filters domain, since, limit, offset), with total and revoked_by',
   'GET /auctions/funnel': 'The auction funnel counted over a date range (default the last 7 days): auctions seen, shortlisted, pre-bid, bid plans, won, imported, listed, traffic, sold',
   'GET /auctions/live': 'GoDaddy auctions inside the buying range (price up to the S8 cap, with bids) from the latest daily save, with the stored band; filters date, max_price, min_bids, ends_within_hours, type, sort, limit, offset, include_ended',
   'GET /market/matched': 'Matched sold-vs-unsold set for (asof, ratio, seed): frozen and sealed with a sha256 on the first call',

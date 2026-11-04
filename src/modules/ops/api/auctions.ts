@@ -7,8 +7,10 @@ import { z } from 'zod';
 import type { Database } from '../../../db/types.js';
 import { normalizeDomain } from '../../../domain-name.js';
 import { AppError } from '../../../http/errors.js';
+import { registerBulkRoute, type DbSizeGuard } from '../../engine/index.js';
 import type { ScreeningDeps } from '../../selection/index.js';
 import { manualRequired, manualSearches, storePrebid } from '../auctions/prebid-store.js';
+import { KILLS_MAX_ROWS, KillsQuery, listKills, loadKills } from '../auctions/kills.js';
 import { FunnelQuery, getFunnel, getShortlist, ShortlistQuery } from '../auctions/shortlist.js';
 import { createPlan, getPlan, listPlans, PlanBody, PlansQuery, recordResult, ResultBody, VENUES } from '../auctions/plans.js';
 
@@ -22,8 +24,22 @@ const idOf = (raw: string): number => {
   return Number(raw);
 };
 
-export function registerAuctions(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; screening: ScreeningDeps }): void {
+export function registerAuctions(app: FastifyInstance, deps: { db: Kysely<Database>; now: () => number; screening: ScreeningDeps; dbSize: DbSizeGuard }): void {
   const { db } = deps;
+
+  // v6.4.0 (CR-101): the kill store. A kill is a fact about a public name (no money, price or listing); WRITE or bots. The normal DB-size guard applies: the small-write
+  // exemption of CR-097 is switched off here (a kill can wait a day).
+  const KillsDoc = z.object({ rows: z.array(z.record(z.string(), z.unknown())).min(1).max(KILLS_MAX_ROWS) }).strict();
+  registerBulkRoute(app, { ...deps, dbSize: { ...deps.dbSize, smallWriteBytes: undefined, hardStopPercent: undefined } }, {
+    path: '/auctions/kills', doc: KillsDoc, dryRun: false, maxRows: KILLS_MAX_ROWS,
+    load: (rows, ctx) => loadKills(db, rows, ctx),
+    summary: (r, before, after) => `auction kills: ${r.accepted_n} accepted, ${r.duplicate_n} duplicate, ${r.rejected_n} rejected of ${r.received_n}; db ${before} -> ${after} bytes`,
+  });
+  app.get('/auctions/kills', async (req) => {
+    const p = KillsQuery.safeParse(req.query ?? {});
+    if (!p.success) throw bad(p);
+    return listKills(db, p.data, deps.now());
+  });
 
   app.post('/auctions/prebid', { config: { openapiBody: PrebidBody } }, async (req, reply) => {
     const b = PrebidBody.parse(req.body ?? {});

@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 6.4.0 (2026-11-04): CR-101: auction kills (POST/GET /auctions/kills); the shortlist leaves out names a bot already killed
+Release note: `docs/releases/v6.4.0.md`.
+MINOR (migration `1769500000000_v6-4-0.sql`: table `auction_kills`, `settings.shortlist_kill_ttl_days` 90). CR-101: `POST /auctions/kills` (WRITE or bots; 1..2,000 rows; append-only, a wrong kill is undone with a `revoked` row naming `supersedes`) and `GET /auctions/kills` (READ, bots, WRITE). `GET /auctions/shortlist` leaves out names with an active kill, unless the price halved since a `tier_a`/`tier_b`/`card` kill (`price_halved`) or the kill is older than the TTL (`ttl`); it adds `prior_kill_excluded_n` and `rows[].prior_kill` (null when never killed), and `total` counts after the exclusion. `GET /auctions/funnel` adds `shortlisted.prior_kill_excluded`. Stored shortlist rows are never deleted.
+
 ## 6.3.0 (2026-11-04): market_names split into a hot and a cold table behind a compatibility view (CR-100: stop the daily fold rewriting wide rows)
 Release note: `docs/releases/v6.3.0.md`.
 MINOR. No field or value of any route changes, except one meaning. `market_names` is split into a cold table `market_episodes` and a hot table `market_episode_seen` (fillfactor 50) behind a view with the old name and columns (migrations `1769350000000_v6-3-0-pre.sql`, `1769400000000_v6-3-0.sql`, `1769400000001_v6-3-0-indexes.sql`). Changes: a market episode's `derived_at` is now when the episode was created or its label or source last changed (the daily continue no longer bumps it); the `GET /db/report` age keys are `market_episode_seen` and `market_episodes`.

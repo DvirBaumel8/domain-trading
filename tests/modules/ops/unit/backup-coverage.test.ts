@@ -53,6 +53,7 @@ const EXCLUDED: Record<string, string> = {
   domain_rdap: 'loaded candidate-pool registry facts (v5.12.0, CR-063): reloaded from the bot\'s files; pruned daily',
   live_checks: 'loaded live/cc check rows (v5.12.0, CR-063): reloaded from the bot\'s files; pruned daily',
   tm_kills: 'loaded trademark kill terms (v5.12.0, CR-063): append-only, reloaded from the bot\'s file; the nightly export is unconfigured',
+  auction_kills: 'auction names a bot already judged (v6.4.0, CR-101): append-only, the bots can post the kills again from their own run packs; the nightly export is unconfigured',
   card_evidence: 'bot-posted USPTO / firm-screen results (v5.64.0, CR-083): append-only cache the bots can post again (a 24 h USPTO result is stale by the next day anyway); the nightly export is unconfigured',
   bigco_names: 'loaded big-company names (v5.12.0, CR-063): append-only, reloaded from the bot\'s file; the nightly export is unconfigured',
   sales_comps: 'loaded graded comparable sales (v5.12.0, CR-063): reloaded from the bot\'s file; the nightly export is unconfigured',

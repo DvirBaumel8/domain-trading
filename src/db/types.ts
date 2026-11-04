@@ -91,6 +91,8 @@ export interface SettingsTable {
   shortlist_sale_chance_bp: Generated<number>;
   shortlist_renewal_cents: Generated<number>;
   shortlist_keep_days: Generated<number>;
+  /** v6.4.0 (CR-101): a killed auction name may be shown again after this many days. Migration only. */
+  shortlist_kill_ttl_days: Generated<number>;
   /** v5.72.1: the paper-trading slice of the stored auction field (25). Migration only. */
   shortlist_paper_n: Generated<number>;
   /** v5.18.0: 'requested' (POST /visits/settings {token:'request'}) until the Mac host issues the visit-counter token ('issued'). */
@@ -758,6 +760,21 @@ export interface TmKillsTable {
   reason: string | null;
   source: string | null;
   raw: Json | null;
+  supersedes: number | null;
+  by: string;
+  audit_id: string | null;
+  created_at: TimestampDefault;
+}
+/** v6.4.0 (CR-101): auction names a bot already judged; append-only, a revoke is a row with kill_stage 'revoked' and `supersedes`. */
+export interface AuctionKillsTable {
+  id: Generated<number>;
+  domain: string;
+  kill_stage: 'meaning_shape' | 'tier_a' | 'tier_b' | 'card' | 'prior_exclude' | 'declined' | 'hold' | 'other' | 'revoked';
+  kill_detail: string | null;
+  price_cents_at_kill: number | null;
+  data_date_at_kill: DateString;
+  run_id: string;
+  killed_at: Timestamp;
   supersedes: number | null;
   by: string;
   audit_id: string | null;
@@ -1977,6 +1994,7 @@ export interface Database {
   godaddy_auctions: GodaddyAuctionsTable;
   godaddy_auctions_live: GodaddyAuctionsLiveTable;
   auction_shortlist: AuctionShortlistTable;
+  auction_kills: AuctionKillsTable;
   auction_outcomes: AuctionOutcomesTable;
   market_sales: MarketSalesTable;
   kb_settings: KbSettingsTable;

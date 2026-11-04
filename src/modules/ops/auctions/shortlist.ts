@@ -3,12 +3,12 @@
 // -> auction score v1 without the other endings -> brand typo filter (BRAND-TYPO-2 against the stored list) -> the top names get their five other endings asked (RDAP,
 // 2 minute budget) -> final score -> the top `shortlist_size` are stored for the data date -> an automatic pre-bid for the top `shortlist_prebid_n` that do not fail.
 // Rules, score and test ids: docs/internal/auctions.md "Shortlist". It calls no registrar or marketplace; the only outside calls are RDAP and the pre-bid checks' own sources.
-import { sql, type Kysely } from 'kysely';
+import { sql, type Kysely, type Selectable } from 'kysely';
 import { z } from 'zod';
 import { chunks } from '../../../core/chunks.js';
 import { addDays, idtDay, isRealDate, toJerusalemIso } from '../../../core/dates.js';
 import { pair } from '../../../core/money.js';
-import type { Database } from '../../../db/types.js';
+import type { AuctionShortlistTable, Database } from '../../../db/types.js';
 import { AppError } from '../../../http/errors.js';
 import { askEndingsFor, endingDue, endingsState, liftTable, loadLiftModel, scoreLift, type LiftInput, type LiftModel, type LiftScore, type OtherEnding } from '../../engine/index.js';
 import { activeSelectionSettings, brandMatches, closeoutNameChecker, commonWord, latestPopularity, splitV2, type PrebidCheck, type ScreeningDeps, type SplitV2Table } from '../../selection/index.js';
@@ -17,6 +17,7 @@ import { storePrebid } from './prebid-store.js';
 import { adultFilter } from './adult-terms.js';
 import { personName } from './person-names.js';
 import { AUCTION_SCORE_VERSION, AUCTION_SCORE_VERSION_V4, fieldPercentile, maxBidRule, positionFactor, scoreAuction, type EndingsKnown, type ScoreInput, type ScoreResult } from './shortlist-score.js';
+import { PRICE_RESHOW_STAGES } from './kills.js';
 import { pickControl, recordOutcomes, updateOutcomes, type OutcomeRow } from './outcomes.js';
 
 export const ENDINGS_BUDGET_MS = 2 * 60_000;
@@ -271,8 +272,35 @@ export const ShortlistQuery = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 }).strict();
 
+type ServedRow = Selectable<AuctionShortlistTable> & { kill_stage: string | null; killed_at: Date | null; price_cents_at_kill: number | null; reshow_reason: 'price_halved' | 'ttl' | null };
+const DAY_MS = 24 * 3_600_000;
+
+/**
+ * v6.4.0 (CR-101): `left join lateral` for a query over `auction_shortlist s`. Per name: the active kills (not 'revoked', not revoked by a later row); each one either
+ * blocks (no re-show reason) or lets the name through again: `price_halved` (a tier_a / tier_b / card kill with a stored price, today's price at most half of it) or
+ * `ttl` (killed more than shortlist_kill_ttl_days ago). The name is excluded when any active kill blocks. `kill_stage` ... `reshow_reason` describe the newest kill that let it through.
+ */
+function priorKillJoin(nowMs: number, ttlDays: number) {
+  const cutoff = new Date(nowMs - ttlDays * DAY_MS);
+  const stages = sql.join(PRICE_RESHOW_STAGES.map((x) => sql.lit(x)));
+  return sql`left join lateral (
+    select coalesce(bool_or(x.reshow is null), false) as excluded,
+      (array_agg(x.kill_stage order by x.killed_at desc, x.id desc) filter (where x.reshow is not null))[1] as kill_stage,
+      (array_agg(x.killed_at order by x.killed_at desc, x.id desc) filter (where x.reshow is not null))[1] as killed_at,
+      (array_agg(x.price_cents_at_kill order by x.killed_at desc, x.id desc) filter (where x.reshow is not null))[1] as price_cents_at_kill,
+      (array_agg(x.reshow order by x.killed_at desc, x.id desc) filter (where x.reshow is not null))[1] as reshow_reason
+    from (
+      select k.id, k.kill_stage, k.killed_at, k.price_cents_at_kill,
+        case when k.killed_at < ${cutoff} then 'ttl'
+             when k.kill_stage in (${stages}) and k.price_cents_at_kill is not null and s.price_cents * 2 <= k.price_cents_at_kill then 'price_halved' end as reshow
+      from auction_kills k
+      where k.domain = s.domain and k.kill_stage <> 'revoked' and not exists (select 1 from auction_kills r where r.supersedes = k.id)
+    ) x
+  ) pk on true`;
+}
+
 export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof ShortlistQuery>, nowMs: number) {
-  const settings = await db.selectFrom('settings').select(['shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 's8_max_price_cents', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents']).executeTakeFirstOrThrow();
+  const settings = await db.selectFrom('settings').select(['shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 's8_max_price_cents', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents', 'shortlist_kill_ttl_days']).executeTakeFirstOrThrow();
   const liftOn = (await db.selectFrom('lift_models').select('id').limit(1).executeTakeFirst()) !== undefined;
   const used = { ...settings, score_version: liftOn ? AUCTION_SCORE_VERSION_V4 : AUCTION_SCORE_VERSION, ...pair('s8_max_price', settings.s8_max_price_cents) };
   const u = used as Record<string, unknown>;
@@ -282,18 +310,25 @@ export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof Short
   const newest = q.date ? null : await db.selectFrom('auction_shortlist').select((eb) => eb.fn.max('data_date').as('d')).executeTakeFirst();
   const dataDate = q.date ?? (newest?.d ? String(newest.d).slice(0, 10) : null);
   const base = { data_date: dataDate, as_of: toJerusalemIso(new Date(nowMs)), settings: used };
-  if (dataDate === null) return { ...base, generated_at: null, total: 0, rows: [] };
-  // v5.72.0 (CR-088 R-3): total = all eligible rows for the date (not dropped, not ended), for pagination
-  const totalRow = await db.selectFrom('auction_shortlist').select((eb) => eb.fn.countAll<string>().as('n')).where('data_date', '=', dataDate).where('dropped_reason', 'is', null).where('end_time', '>', new Date(nowMs)).executeTakeFirst();
-  const total = Number(totalRow?.n ?? 0);
+  if (dataDate === null) return { ...base, generated_at: null, total: 0, prior_kill_excluded_n: 0, rows: [] };
+  // v6.4.0 (CR-101): one anti-join against auction_kills (index on domain). A name with an active kill is left out unless the re-show rule fires; the stored rows are never touched.
+  // v5.72.0 (CR-088 R-3): total = all eligible rows for the date (not dropped, not ended, not left out for a prior kill), for pagination
+  const now = new Date(nowMs);
+  const eligible = sql`select s.data_date, s.domain, s.rank, pk.excluded, pk.kill_stage, pk.killed_at, pk.price_cents_at_kill, pk.reshow_reason
+    from auction_shortlist s ${priorKillJoin(nowMs, settings.shortlist_kill_ttl_days)}
+    where s.data_date = ${dataDate} and s.dropped_reason is null and s.end_time > ${now}`;
+  const counts = (await sql<{ served: string; excluded: string }>`with e as (${eligible}) select count(*) filter (where not excluded)::text as served, count(*) filter (where excluded)::text as excluded from e`.execute(db)).rows[0]!;
+  const total = Number(counts.served);
+  const priorKillExcludedN = Number(counts.excluded);
   // served = not dropped by a failed pre-bid; names whose auction already ended are left out
-  const rows = await db.selectFrom('auction_shortlist').selectAll().where('data_date', '=', dataDate).where('dropped_reason', 'is', null).where('end_time', '>', new Date(nowMs)).orderBy('rank').limit(q.limit).offset(q.offset).execute();
+  const rows = (await sql<ServedRow>`with e as (${eligible}) select s.*, e.kill_stage, e.killed_at, e.price_cents_at_kill, e.reshow_reason
+    from e join auction_shortlist s on s.data_date = e.data_date and s.domain = e.domain where not e.excluded order by e.rank limit ${q.limit} offset ${q.offset}`.execute(db)).rows;
   const ids = rows.map((r) => r.prebid_id).filter((x): x is number => x !== null);
   const pre = ids.length === 0 ? [] : await db.selectFrom('prebid_checks').select(['id', 'verdict', 'created_at', 'answer']).where('id', 'in', ids).execute();
   const preById = new Map(pre.map((p) => [Number(p.id), p]));
   const gen = await db.selectFrom('auction_shortlist').select((eb) => eb.fn.max('generated_at').as('g')).where('data_date', '=', dataDate).executeTakeFirst();
   return {
-    ...base, generated_at: gen?.g ? toJerusalemIso(new Date(gen.g as Date)) : null, total,
+    ...base, generated_at: gen?.g ? toJerusalemIso(new Date(gen.g as Date)) : null, total, prior_kill_excluded_n: priorKillExcludedN,
     rows: rows.map((r) => {
       const p = r.prebid_id === null ? undefined : preById.get(Number(r.prebid_id));
       const checks = ((p?.answer as { checks?: PrebidCheck[] } | undefined)?.checks ?? []);
@@ -306,6 +341,7 @@ export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof Short
           flags: checks.filter((c) => c.result === 'FLAG').map((c) => ({ id: c.id, reason: c.reason })),
         } : null,
         reasons: r.reasons,
+        prior_kill: r.reshow_reason === null ? null : { kill_stage: r.kill_stage, killed_at: toJerusalemIso(new Date(r.killed_at!)), price_cents_at_kill: r.price_cents_at_kill, reshow_reason: r.reshow_reason },
       };
     }),
   };
@@ -333,6 +369,10 @@ export async function getFunnel(db: Kysely<Database>, q: z.infer<typeof FunnelQu
       count(distinct domain) filter (where prebid_verdict = 'pass')::text as pass, count(distinct domain) filter (where prebid_verdict = 'flag')::text as flag,
       count(distinct domain) filter (where prebid_verdict = 'fail')::text as fail, count(distinct domain) filter (where prebid_verdict is not null)::text as checked
     from auction_shortlist where data_date between ${from}::date and ${to}::date`.execute(db);
+  // v6.4.0 (CR-101): served names (not dropped) that the kill store would leave out today, counted the way GET /auctions/shortlist counts them
+  const ttl = (await db.selectFrom('settings').select('shortlist_kill_ttl_days').executeTakeFirstOrThrow()).shortlist_kill_ttl_days;
+  const pk = await sql<{ n: string }>`select count(distinct s.domain)::text as n from auction_shortlist s ${priorKillJoin(nowMs, ttl)}
+    where s.data_date between ${from}::date and ${to}::date and s.dropped_reason is null and pk.excluded`.execute(db);
   const pb = await sql<{ n: string; names: string; pass: string; flag: string; fail: string }>`
     select count(*)::text as n, count(distinct domain)::text as names, count(*) filter (where verdict = 'pass')::text as pass, count(*) filter (where verdict = 'flag')::text as flag, count(*) filter (where verdict = 'fail')::text as fail
     from prebid_checks where token_name is distinct from 'datasave' and ${idt('created_at')} between ${from}::date and ${to}::date`.execute(db);
@@ -393,7 +433,7 @@ export async function getFunnel(db: Kysely<Database>, q: z.infer<typeof FunnelQu
   return {
     from, to, as_of: toJerusalemIso(new Date(nowMs)),
     seen: { live_auctions: n(seen.rows[0]!.n) },
-    shortlisted: { names: n(sl.rows[0]!.shortlisted), served: n(sl.rows[0]!.served) },
+    shortlisted: { names: n(sl.rows[0]!.shortlisted), served: n(sl.rows[0]!.served), prior_kill_excluded: n(pk.rows[0]!.n) },
     auto_prebid: { checked: n(sl.rows[0]!.checked), pass: n(sl.rows[0]!.pass), flag: n(sl.rows[0]!.flag), fail: n(sl.rows[0]!.fail) },
     prebids_by_bots: { checks: n(pb.rows[0]!.n), names: n(pb.rows[0]!.names), pass: n(pb.rows[0]!.pass), flag: n(pb.rows[0]!.flag), fail: n(pb.rows[0]!.fail) },
     bid_plans: { created: n(plans.rows[0]!.created), open: n(plans.rows[0]!.open), won: n(plans.rows[0]!.won), lost: n(plans.rows[0]!.lost), withdrawn: n(plans.rows[0]!.withdrawn), expired: n(plans.rows[0]!.expired), ...pair('max_bid_total', n(plans.rows[0]!.max_total)) },

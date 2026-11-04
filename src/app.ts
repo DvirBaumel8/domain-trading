@@ -249,7 +249,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerSnapshots(app, { db: deps.db, now });
   registerLookups(app, { db: deps.db, now, rdapLookup: screeningDeps.rdapLookup });
   registerCloseouts(app, { db: deps.db, now, scorer: engineScorer });
-  registerAuctions(app, { db: deps.db, now, screening: screeningDeps });
+  registerAuctions(app, { db: deps.db, now, screening: screeningDeps, dbSize: routeDbSize });
   const replayDeps = { db: deps.db, now, archiveDir: deps.config.archiveDir, log: app.log };
   app.decorate('replayRunner', new ReplayRunner(replayDeps));
   app.addHook('onClose', async () => app.replayRunner.idle());

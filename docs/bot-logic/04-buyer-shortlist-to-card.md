@@ -27,6 +27,8 @@ Every run runs directions **A + B + D**. **C** is parked.
 
 **Three report numbers (every discovery run):** (1) `field_n` stored at shortlist build, (2) GET `total` = live eligible served, (3) judged (+ unfinished). Served < `field_n` is **expected** (ended / prebid-fail left out of serve) — not a silent size cut. Example: 597 served of `field_n` 747 on 2026-10-28.
 
+**Prior kills (6.4.0, CR-101).** The server keeps the kill list: Buyer posts every name it kills at the end of every run, `POST /auctions/kills` (`domain`, `kill_stage` `meaning_shape|tier_a|tier_b|card|prior_exclude|declined|hold|other`, `kill_detail` without `@`, `price_cents_at_kill` for tier/card kills, `data_date_at_kill`, `run_id` = the pack sha, `killed_at`; up to 2,000 rows a call). `GET /auctions/shortlist` then leaves those names out and reports `prior_kill_excluded_n`; a name comes back only with `prior_kill.reshow_reason` (`price_halved` for a tier/card kill, `ttl` after 90 days). Keep no private prior-exclude list; read `GET /auctions/kills` instead. A wrong kill is undone with a `revoked` row (`supersedes` = the kill id), never by deleting. **Record in each run pack:** rows served, `prior_kill_excluded_n`, and the kills posted. Report numbers become: `field_n`, `total` (after the exclusion), `prior_kill_excluded_n`, judged.
+
 Held names (resumedesign.com and the prior USPTO-clean hold list) stay held until Gavriel reopens, **unless** one appears on the shortlist with a fresh shortlist reason — then re-screen **only** via this shortlist path.
 
 
