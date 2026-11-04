@@ -245,3 +245,9 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 - `@` in kill_detail: 422 NO_PII. GET /auctions/funnel: `shortlisted.prior_kill_excluded` present (0 in the default window).
 - The two test rows stay in the table (append-only); they are net zero. DB 632.6 MB, under the 70% guard.
 - Next: the seed load (ask 6; release notes say DOM Architect posts it). Then the Buyer posts kills at the end of each run and records served/skipped counts in the run pack. Gavriel will check `prior_kill_excluded_n` on the next shortlist after the seed.
+
+## 2026-11-04 ~23:05 IDT: v6.5.0 (CR-102) live check: pass
+- /health 6.5.0 ok.
+- GET /auctions/shortlist?limit=200 (data_date 2026-11-04): prior_kill_ms 72 then 68, prior_kill_excluded_n 96; full round trip 1.25 s then 0.98 s. So the server-side kill lookup is ~70 ms; the rest is tunnel/proxy.
+- GET /auctions/funnel: shortlisted.prior_kill_ms 82 (2,795 names, 950 excluded).
+- CR102-T1..T3 accepted as written; agree with no extra (domain, killed_at) index. Nothing else needed.
