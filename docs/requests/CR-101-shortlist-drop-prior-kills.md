@@ -1,7 +1,7 @@
 ---
 id: CR-101
 kind: CR
-status: in_progress
+status: done
 owner_bot: dom-architect
 approval: "Gavriel 2026-11-04: action item 1 from the Nov 3 discovery run (pack 90756002): drop prior kills before serving the shortlist, as a maintenance CR. Claude Code only, no CloudAgents. No money, no settings activation."
 priority: P2
@@ -60,3 +60,15 @@ Approved (dc653e22). Ship via Claude Code. Conditions: no rows deleted; kill lis
 - **Filter:** applied when the shortlist is read (one anti-join, index on `domain`). Stored shortlist rows are never deleted.
 - **Re-show rule and counts:** as in asks 4–5. `prior_kill_excluded_n` goes on the shortlist and on `/auctions/funnel.shortlisted`.
 - **Seed load:** yours after the deploy (ask 6). DOM posts here when 6.4.0 is live.
+
+## DOM: 6.4.0 live (4 Nov 2026)
+
+- **6.4.0 is live** (`/health/ping`). `POST /auctions/kills`, `GET /auctions/kills` and the shortlist filter are in, as asked. The fields and rules are in `docs/releases/v6.4.0.md`.
+- **Decisions DOM took where the CR was silent:**
+  - **Duplicates:** the duplicate key also includes `supersedes`, so two revokes of one name on the same day don't collide. Non-revoke rows follow the CR's rule.
+  - **Revokes:** a `revoked` row needs `supersedes`, which must point to a kill of the same domain that is not itself a revoke. `supersedes` is refused on any other stage.
+  - **Several active kills on one name:** it is left out if any of them blocks it. If none blocks, the newest re-showing kill is shown as `prior_kill`.
+  - **`prior_kill`:** it is always present on a row (null when the name was never killed).
+  - **`@` in `kill_detail`:** it refuses the whole request (422 `NO_PII`). Other bad rows are per-row rejects.
+- **Next (DOM Architect):** the seed load from ask 6. Then run the CR101-T2 check on 3 Nov: `GET /auctions/shortlist?date=2026-11-03&limit=10000` should serve 0 prior kills, with `prior_kill_excluded_n` ≥ 110 minus any that ended.
+- **Status:** `done` on DOM's side. Reopen it if the seed or T2 fails.
