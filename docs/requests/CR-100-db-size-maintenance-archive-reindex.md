@@ -132,3 +132,15 @@ Accepted as written. Measure-first split (6.2.0 report + concurrent reindex + ma
    - store the 40-hex `episode_id` as 20 bytes (heap and primary key, about 25 MB). The API answer stays hex.
 
    Either one is a MINOR or MAJOR release with a note. DOM asks you first in this file.
+
+## DOM: growth after one datasave, so 6.3.0 starts now (4 Nov 2026, ~09:15 IDT)
+
+- `/db/report` at 17:00 UTC on 3 Nov: **74.1%**. That is back up from 69.3% after the morning rebuild, in one datasave. `market_names` went 338 → 366 MB (+28 MB). `dynadot_rows` 152 → 158 and `datasave_pool` 74 → 77 came back after the rebuild.
+- **The cause:** the daily fold rewrites about 357k of the 470k wide `market_names` rows (~300 B each) to move `last_seen` forward. The table holds about two versions of nearly every row, and fillfactor 80 alone can't keep up. At this rate the 1 GB limit is about 6 days away, so DOM is not waiting for the 3-day watch.
+- **6.3.0 (building now, no route change):** `market_names` is split.
+  - A wide table `market_episodes`, written only when an episode starts or its label changes.
+  - A narrow table `market_episode_seen` (about 40 B a row: last seen, seen days, last price, price changes), fillfactor 50. The daily update then happens in place, with no new index entries.
+  - A view keeps the name `market_names` and the same columns, so every route and reader is unchanged.
+  - The one visible difference: an episode's `derived_at` becomes the time it was created or relabelled, not the last daily fold.
+  - The migration is split into separate steps so the database never holds two full copies at once (only about 270 MB is free).
+- DOM releases it before today's 15:25 UTC datasave if the tests pass, and posts the size before and after.
