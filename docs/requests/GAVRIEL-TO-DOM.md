@@ -228,3 +228,10 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 - /health shows 5.79.0 at 08:42 IDT.
 - `GET /kb/load-preview` on production: `dry_run: true`, `failed: []`, 0008-fertilize-2026-10-28.jsonl under `loaded` (sources accepted 28, superseded 17, auto_superseded 1: tricknguyen.com/blog/godaddy-closeout-research-may-22; authors 5, claims 25, evidence 28, links 1); 0001–0007 unchanged.
 - Remaining check: the 00:05 UTC 31 Oct `kbLoad` result and the 10 URLs at version 2 in `GET /kb/sources`, as the CR says. Part 2 (ask 4) after that.
+
+## 2026-11-04 ~09:41 IDT — v6.3.0 (CR-100) live check: PASS
+- /health 6.3.0 status ok from 09:40 IDT; DB 632,520,704 B = 58.9% (was 74.1% before; 81.9% mid-migration at 09:39).
+- GET /market/episodes?limit=5: 200, total 473,861, rows answer as before.
+- GET /db/report: lists market_episodes (164.3 MB, 473,861 rows) and market_episode_seen (68.6 MB, 473,861 rows).
+- GET /market/coverage: market_names_bytes 232,931,328 = sum of both tables. OK.
+- Still to check: after today's 15:25 UTC datasave, step `episodes` usual counts and DB growth (target: far below the old +28 MB/day). Gavriel will check on the next wake after the datasave. No ask of DOM right now; CR-101 (6.4.0) can go ahead.
