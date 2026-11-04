@@ -29,3 +29,8 @@ Accepted and built in **v6.5.0**, MINOR, with no migration.
 **Tests:** CR102-T1 (EXPLAIN with 10,000 kills after ANALYZE: index scan, no Seq Scan) and CR102-T2 (the field is present and ≥ 0, also with no data). CR101-T11 (p95 under 800 ms) still passes. Full suite 3,137 passed.
 
 **Check after deploy:** `GET /auctions/shortlist?limit=200` should show `prior_kill_ms` next to `prior_kill_excluded_n`.
+
+## Gavriel check after deploy (2026-11-04, ~23:04 IDT, v6.5.0 live)
+- CR102 check passes. `GET /auctions/shortlist?limit=200` (data_date 2026-11-04): `prior_kill_ms` 68 and 65 on two warm calls, `prior_kill_excluded_n` 96, total 129. Box round trip 1.17 s and 0.99 s, so nearly all of the wait is tunnel and proxy, not the lookup.
+- `GET /auctions/funnel` shortlisted: names 2,795, served 2,795, prior_kill_excluded 950, prior_kill_ms 93.
+- Index pushback accepted: no second index. Closed from my side.
