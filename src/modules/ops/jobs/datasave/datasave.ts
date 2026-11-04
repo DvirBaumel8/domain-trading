@@ -484,9 +484,16 @@ export class DatasaveJob {
 
   /** v5.62.0 (CR-080 item 3): with DYNADOT_API_KEY + DYNADOT_API_SECRET the server reads (REST v2) Dynadot itself (`dynadot-pull.ts`); without it the old `not_configured` answer. */
   async dynadotCloseouts(): Promise<unknown> {
-    if (!this.deps.dynadotKey || !this.deps.dynadotSecret) return this.dynadotStub('dynadot_closeouts');
-    if (!this.deps.dynadotCloseoutsPath) return { source: 'dynadot_closeouts', status: 'not_configured', reason: 'closeouts REST path unknown', bot_upload: await this.botUpload('dynadot_closeouts') };
-    return pullCloseouts(this.pullDeps(this.deps.dynadotKey, this.deps.dynadotSecret));
+    let r: unknown;
+    if (!this.deps.dynadotKey || !this.deps.dynadotSecret) r = await this.dynadotStub('dynadot_closeouts');
+    else if (!this.deps.dynadotCloseoutsPath) r = { source: 'dynadot_closeouts', status: 'not_configured', reason: 'closeouts REST path unknown', bot_upload: await this.botUpload('dynadot_closeouts') };
+    else r = await pullCloseouts(this.pullDeps(this.deps.dynadotKey, this.deps.dynadotSecret));
+    // v6.6.0 (BUG-063): this step runs after scorePool (v5.65.0 order), so a day it seals (or tops up, CR-099), or a bot upload sealed earlier, was left unfiltered and
+    // unscored until the next day's run. Filter and score the sealed Dynadot closeouts rows now; processed rows are not touched again. A failure here does not fail the pull.
+    let scored: unknown;
+    try { scored = await scorePool({ db: this.deps.db, now: this.deps.now, scorer: this.deps.scorer, log: this.deps.log, only: 'dynadot' }); }
+    catch (e) { scored = { status: 'error', error: (e as Error).message }; this.deps.log?.warn({ err: (e as Error).message }, 'dynadotCloseouts: scorePool failed'); }
+    return { ...(r as object), score_pool: scored };
   }
 
   async dynadotAftermarket(): Promise<unknown> {

@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 6.6.0 (2026-11-04): BUG-063: Dynadot closeouts filtered and scored right after the Dynadot step; CR-103: shortlist field counts (ended_n, prebid_dropped_n, not_stored_n, field_n)
+Release note: `docs/releases/v6.6.0.md`.
+MINOR (no migration). **BUG-063:** the datasave step `dynadotCloseouts` now filters and scores the sealed Dynadot closeouts rows right after it seals or tops up a day (its answer adds `score_pool`). Before, the step ran after `scorePool` (5.65.0 order), so `GET /candidates/closeouts` served a sealed Dynadot day unfiltered (digit names, `filtered_by` all 0) with `NOT_SCORED_YET` until the next day. **CR-103:** `GET /auctions/shortlist` adds `field_n`, `stored_n`, `ended_n`, `prebid_dropped_n` and `not_stored_n` (identity `total + prior_kill_excluded_n + ended_n + prebid_dropped_n + not_stored_n = field_n`); `GET /auctions/funnel` `shortlisted` adds `ended` and `prebid_dropped`. Additive only.
+
 ## 6.5.0 (2026-11-04): CR-102: prior_kill_ms on GET /auctions/shortlist and the funnel; index-use proof of the prior-kill lookup
 Release note: `docs/releases/v6.5.0.md`.
 MINOR (no migration). CR-102: `GET /auctions/shortlist` adds `prior_kill_ms` (server milliseconds of the count query that applies the prior-kill exclusion; 0 when there is no data date) and `GET /auctions/funnel` adds `shortlisted.prior_kill_ms` (the same for the funnel's count). Additive only. Index proof: the lookup reads `auction_kills` through `auction_kills_domain_idx` and `auction_kills_supersedes_idx` (test CR102-T1); no new index.

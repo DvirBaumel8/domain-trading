@@ -242,4 +242,56 @@ describe('prior-kill lookup proof (CR-102)', () => {
   });
 });
 
+describe('shortlist field counts (CR-103)', () => {
+  type F = { total: number; prior_kill_excluded_n: number; ended_n: number; prebid_dropped_n: number; not_stored_n: number; stored_n: number; field_n: number; generated_at: string | null; as_of: string; data_date: string | null };
+  const identity = (j: F) => j.total + j.prior_kill_excluded_n + j.ended_n + j.prebid_dropped_n + j.not_stored_n;
+  // 20 stored rows of a field of 25: 0..3 ended, 4..6 dropped by a failed pre-bid, 3 (ended) and 6 (dropped) and 7..8 also killed
+  async function buckets() {
+    await seed(20);
+    await db.updateTable('auction_shortlist').set({ field_n: 25 }).where('data_date', '=', DATE).execute();
+    await db.updateTable('auction_shortlist').set({ end_time: new Date(NOW - HOUR) }).where('domain', 'in', [0, 1, 2, 3].map(name)).execute();
+    await db.updateTable('auction_shortlist').set({ dropped_reason: 'prebid fail: TM', prebid_verdict: 'fail' }).where('domain', 'in', [3, 4, 5, 6].map(name)).execute();
+  }
+
+  it('CR103-T1..T3: the identity holds with a row in each bucket; an ended row that is killed or failed pre-bid counts only as ended; a dropped row that is killed counts only as dropped', async () => {
+    const { b } = await setup();
+    await buckets();
+    await post(b, [kill(3), kill(6), kill(7), kill(8)]);
+    const j = (await get(`/auctions/shortlist?date=${DATE}&limit=500`, b)).json() as F;
+    expect(j).toMatchObject({ field_n: 25, stored_n: 20, not_stored_n: 5, ended_n: 4, prebid_dropped_n: 3, prior_kill_excluded_n: 2, total: 11 });
+    expect(identity(j)).toBe(j.field_n);
+  });
+
+  it('CR103-T4..T5: before any end time ended_n is 0; after all end times total is 0 and ended_n is every stored row', async () => {
+    const { b } = await setup();
+    await seed(5);
+    expect((await get(`/auctions/shortlist?date=${DATE}`, b)).json()).toMatchObject({ ended_n: 0, total: 5, field_n: 5, not_stored_n: 0 });
+    await app!.close();
+    app = await makeApp({ now: () => NOW + 31 * HOUR });
+    const j = (await get(`/auctions/shortlist?date=${DATE}`, b)).json() as F;
+    expect(j).toMatchObject({ total: 0, ended_n: 5, prebid_dropped_n: 0, prior_kill_excluded_n: 0 });
+    expect(identity(j)).toBe(j.field_n);
+  });
+
+  it('CR103-T6, T7, T10: no shortlist is 200 with every count 0 and null dates; paging does not change the counts; generated_at and as_of carry an offset and as_of >= generated_at', async () => {
+    const { b } = await setup();
+    expect((await get('/auctions/shortlist', b)).json()).toMatchObject({ data_date: null, generated_at: null, total: 0, field_n: 0, stored_n: 0, ended_n: 0, prebid_dropped_n: 0, not_stored_n: 0, prior_kill_excluded_n: 0 });
+    await buckets();
+    const pages = await Promise.all(['&limit=2', '&limit=3&offset=4', '&limit=500'].map(async (qs) => (await get(`/auctions/shortlist?date=${DATE}${qs}`, b)).json() as F));
+    for (const p of pages) expect([p.total, p.ended_n, p.prebid_dropped_n, p.not_stored_n, p.field_n]).toEqual([13, 4, 3, 5, 25]);
+    const p = pages[0]!;
+    expect(p.generated_at).toMatch(/[+-]\d\d:\d\d$/);
+    expect(p.as_of).toMatch(/[+-]\d\d:\d\d$/);
+    expect(Date.parse(p.as_of)).toBeGreaterThanOrEqual(Date.parse(p.generated_at!));
+  });
+
+  it('CR103-T8: the funnel shortlisted.ended and prebid_dropped match the shortlist for a one-day range', async () => {
+    const { b } = await setup();
+    await buckets();
+    const j = (await get(`/auctions/shortlist?date=${DATE}`, b)).json() as F;
+    const f = (await get(`/auctions/funnel?from=${DATE}&to=${DATE}`, b)).json();
+    expect(f.shortlisted).toMatchObject({ ended: j.ended_n, prebid_dropped: j.prebid_dropped_n });
+  });
+});
+
 function res0(ms: number[]): number { const s = [...ms].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.ceil(0.95 * s.length) - 1)]!; }

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { Scorer } from '../../../src/modules/engine/index.js';
 import { scorePool } from '../../../src/modules/ops/closeouts/score-pool.js';
+import { DatasaveJob } from '../../../src/modules/ops/jobs/datasave/datasave.js';
 import { makeApp, runJobToEnd } from '../../helpers/app.js';
 import { insertOwnedDomain, testDb as db } from '../../helpers/db.js';
 import { FAST_TRAIN, seedEngineData, type EngineSeed } from '../../helpers/engine-data.js';
@@ -316,5 +317,39 @@ describe('CC526 closeout candidates', () => {
     expect(names.slice(-2)).toEqual(['dynadotCloseouts', 'dynadotAftermarket']);
     expect(steps.scorePool).toBeDefined();
     expect((await poolRow(unsold(0))).scored_at).not.toBeNull();
+  });
+
+  it('BUG063-T1..T5: the dynadotCloseouts step filters and scores the sealed Dynadot day it runs after (digits and hyphens filtered, no NOT_SCORED_YET left), the invariant holds per source, the GoDaddy rows are not touched', async () => {
+    const { get } = await boot();
+    await pool([['septicdrone.com', 900], ['014229.com', 500]]);
+    await seal('godaddy_inventory');
+    await dyn([['059712580.com', 500], ['0yo-vy.com', 500], ['septicdrone.com', 700], ['quietharbor.com', 600]]);
+    await seal('dynadot_closeouts');
+    // T5: the step scores Dynadot only; the GoDaddy pool rows stay unprocessed for the scorePool step
+    const r = await new DatasaveJob({ db, now: () => NOW, snapshotDir: '/nonexistent' }).dynadotCloseouts() as { score_pool: { status: string; by_source: Record<string, { rows_processed_n: number }>; filtered_by: Record<string, number> } };
+    expect(r.score_pool).toMatchObject({ status: 'no_model', by_source: { dynadot: { rows_processed_n: 4 } } });
+    expect(r.score_pool.by_source.godaddy).toBeUndefined();
+    expect((await poolRow('014229.com')).scored_at).toBeNull();
+    // T1: digit and hyphen names fail SPELL-1 and are not served
+    expect(r.score_pool.filtered_by['SPELL-1']).toBe(2);
+    const dy = (await get(`/candidates/closeouts?date=${DAY}&source=dynadot&limit=200`)).json();
+    expect(dy.rows.map((x: { domain: string }) => x.domain).sort()).toEqual(['quietharbor.com', 'septicdrone.com']);
+    // T2: no NOT_SCORED_YET without a model, the reason is NO_ACTIVE_MODEL
+    expect(dy.rows.every((x: { score_reason: string }) => x.score_reason === 'NO_ACTIVE_MODEL')).toBe(true);
+    // T4: pool_n - sum(filtered_by) = ranked_n per source (godaddy rows still unprocessed count as ranked)
+    for (const src of ['dynadot', 'godaddy', 'all']) {
+      const b = (await get(`/candidates/closeouts?date=${DAY}&source=${src}&limit=200`)).json();
+      const sum = Object.values(b.summary.filtered_by as Record<string, number>).reduce((a, x) => a + x, 0);
+      expect(b.summary.pool_n - sum, src).toBe(b.summary.ranked_n);
+    }
+    // T3: a top-up after the step (new unprocessed rows on the sealed day) is processed by the next run of the step; processed rows are not touched again
+    await dyn([['1a2b.com', 500], ['bluecanyon.com', 800]]);
+    const again = await new DatasaveJob({ db, now: () => NOW, snapshotDir: '/nonexistent' }).dynadotCloseouts() as { score_pool: { by_source: Record<string, { rows_processed_n: number }> } };
+    expect(again.score_pool.by_source.dynadot!.rows_processed_n).toBe(2);
+    const after = (await get(`/candidates/closeouts?date=${DAY}&source=dynadot&limit=200`)).json();
+    expect(after.rows.map((x: { domain: string }) => x.domain)).not.toContain('1a2b.com');
+    expect(after.rows.some((x: { score_reason: string }) => x.score_reason === 'NOT_SCORED_YET')).toBe(false);
+    // the GoDaddy pool is scored by its own step, unchanged
+    expect(await scorePool({ db, now: () => NOW })).toMatchObject({ by_source: { godaddy: { rows_processed_n: 2 }, dynadot: { rows_processed_n: 0 } } });
   });
 });

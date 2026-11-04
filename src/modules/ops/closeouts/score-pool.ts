@@ -9,7 +9,11 @@ import { idtDay } from '../../../core/dates.js';
 import { buildClassifier, FILTER_CODES } from './filters.js';
 
 export interface PoolScorer { scoreOffline(domains: string[], asOf?: string): Promise<{ model_version: string; scores: Map<string, number> } | null>; activeModel(): Promise<{ id: string } | null> }
-export interface ScorePoolDeps { db: Kysely<Database>; now: () => number; scorer?: PoolScorer; log?: { warn: (obj: unknown, msg?: string) => void } }
+export interface ScorePoolDeps {
+  db: Kysely<Database>; now: () => number; scorer?: PoolScorer; log?: { warn: (obj: unknown, msg?: string) => void };
+  /** v6.6.0 (BUG-063): one source only; the Dynadot step uses 'dynadot' right after it seals a day. Default: both. */
+  only?: 'godaddy' | 'dynadot';
+}
 
 const PAGE = 5_000;
 const SCORE_BATCH = 2_000;
@@ -35,7 +39,7 @@ export async function scorePool(deps: ScorePoolDeps): Promise<ScorePoolSummary> 
   const pending = model
     ? sql`(scored_at is null or (score_reason = 'NO_ACTIVE_MODEL' and filter_code is null))`
     : sql`scored_at is null`;
-  for (const t of TARGETS) {
+  for (const t of TARGETS.filter((x) => !deps.only || x.sourceKey === deps.only)) {
     const days = (await sql<{ d: string }>`select distinct data_date::text as d from ${sql.table(t.table)} where ${pending} order by 1`.execute(db)).rows.map((r) => r.d);
     const done: string[] = [];
     let n = 0;
