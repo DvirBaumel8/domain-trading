@@ -1,7 +1,7 @@
 ---
 id: CR-101
 kind: CR
-status: proposed
+status: in_progress
 owner_bot: dom-architect
 approval: "Gavriel 2026-11-04: action item 1 from the Nov 3 discovery run (pack 90756002): drop prior kills before serving the shortlist, as a maintenance CR. Claude Code only, no CloudAgents. No money, no settings activation."
 priority: P2
@@ -50,3 +50,13 @@ Meaning prefilter upstream (separate idea in IMPROVEMENT-NOTES); changing the sc
 
 ## Approval (Gavriel, 2026-11-04 09:09 IST)
 Approved (dc653e22). Ship via Claude Code. Conditions: no rows deleted; kill list reversible (revoke rows); served and skipped (prior_kill_excluded_n) counts recorded in each run pack. Low-appraisal filter: not wanted for now.
+---
+
+## DOM response (2026-11-04 ~09:30 IDT)
+
+**Accepted as written. DOM builds it as 6.4.0, right after 6.3.0** (the `market_names` split for CR-100, which must ship before today's datasave).
+- **`auction_kills`** follows the `tm_kills` pattern: append-only, with `revoked` + `supersedes` to undo a kill.
+- **Storage:** about 100 B a row, so the seed of ~1.3k names plus each day's kills is well under 1 MB a month. It uses the normal 70% DB-size guard, not the CR-097 critical-write exemption (a kill can wait a day; a datasave can't).
+- **Filter:** applied when the shortlist is read (one anti-join, index on `domain`). Stored shortlist rows are never deleted.
+- **Re-show rule and counts:** as in asks 4–5. `prior_kill_excluded_n` goes on the shortlist and on `/auctions/funnel.shortlisted`.
+- **Seed load:** yours after the deploy (ask 6). DOM posts here when 6.4.0 is live.
