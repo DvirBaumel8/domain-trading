@@ -1,0 +1,241 @@
+domain,price,bids,age,end,kill_stage,kill_detail
+payps.com,$20.00,5,18,2026-11-05T22:17:00+02:00,meaning_shape,"meaning: coinage, not a service phrase. SAME_NAME_ENDINGS read: payps.net = PAYPS SAS Paris (pharmacy digital coupons, 2-10 staff, founded 2019) = demand proof not collision, but single-buyer coinage -> no card"
+chaosstudios.com,$6.00,3,23,2026-11-04T21:44:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+voltagex.com,$22.00,3,12,2026-11-04T18:16:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+spacearc.com,$11.00,3,21,2026-11-05T22:14:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+roomli.com,$1.00,1,11,2026-11-04T19:25:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+atint.com,$1.00,1,17,2026-11-04T20:37:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+solarno.com,$1.00,1,21,2026-11-05T20:31:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+filterexpress.com,$1.00,1,28,2026-11-05T23:19:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+ceito.com,$22.00,3,25,2026-11-05T18:03:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+algorithmen.com,$29.00,5,22,2026-11-04T22:20:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+matrixtest.com,$1.00,1,30,2026-11-05T18:23:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+elevationsolutions.com,$42.00,9,20,2026-11-04T18:43:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+craftchain.com,$6.00,2,21,2026-11-04T18:25:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+sament.com,$1.00,1,23,2026-11-04T20:56:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+harborinc.com,$16.00,3,25,2026-11-04T21:48:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+spherenetworks.com,$1.00,1,24,2026-11-05T18:09:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+stallionexpress.com,$1.00,1,15,2026-11-05T19:13:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+bcguitar.com,$11.00,4,29,2026-11-05T22:57:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+wewent.com,$1.00,1,26,2026-11-04T19:28:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+pawdays.com,$1.00,1,15,2026-11-04T22:00:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+guardianinspections.com,$16.00,4,23,2026-11-04T18:38:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+unicorncom.com,$1.00,1,20,2026-11-05T22:01:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+okrise.com,$1.00,1,12,2026-11-04T21:10:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+zengirl.com,$38.00,7,18,2026-11-05T20:18:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+bxchain.com,$1.00,1,10,2026-11-05T19:29:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+youduck.com,$1.00,1,15,2026-11-05T23:25:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+upwalk.com,$1.00,1,13,2026-11-04T18:24:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+pewtershop.com,$1.00,1,28,2026-11-04T19:02:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+karategroup.com,$1.00,1,19,2026-11-05T21:08:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+brushbet.com,$1.00,1,11,2026-11-05T21:38:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+termlease.com,$1.00,1,23,2026-11-05T23:16:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+globind.com,$1.00,1,31,2026-11-04T18:22:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+orgwide.com,$1.00,1,19,2026-11-05T21:13:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+weedconsulting.com,$1.00,1,16,2026-11-04T21:26:00+02:00,tier_a,"tier_a: no live firm under exact name on .net/.co/hyphen .com (sites 500 from box/fetcher; search shows only weedconsult.de and In the Weeds Consulting, not exact) -> no Tier A, no card"
+dontsweatit.com,$1.00,1,23,2026-11-05T20:54:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+dreammapping.com,$1.00,1,17,2026-11-04T19:07:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+euronatur.com,$1.00,1,12,2026-11-05T21:43:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+yenting.com,$6.00,2,6,2026-11-04T20:29:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+advantagefood.com,$1.00,1,24,2026-11-04T22:32:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+exsecret.com,$1.00,1,6,2026-11-05T21:16:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+harbourstone.com,$1.00,1,21,2026-11-05T23:23:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+razorvision.com,$1.00,1,26,2026-11-05T20:05:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+wyomingcabin.com,$1.00,1,22,2026-11-05T23:09:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+hipston.com,$1.00,1,7,2026-11-04T22:20:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+paluto.com,$1.00,1,12,2026-11-04T22:43:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+pestangel.com,$1.00,1,7,2026-11-04T22:04:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+ordinaryproducts.com,$1.00,1,10,2026-11-04T22:41:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+danerealty.com,$1.00,1,21,2026-11-05T19:01:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+mixeda.com,$1.00,1,9,2026-11-05T21:49:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+dobgroup.com,$1.00,1,19,2026-11-04T23:09:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+healthtell.com,$1.00,1,17,2026-11-05T23:12:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+backguides.com,$1.00,1,7,2026-11-04T22:42:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+codaxi.com,$1.00,1,10,2026-11-04T23:11:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+manolith.com,$1.00,1,18,2026-11-04T19:18:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+wearegay.com,$1.00,1,24,2026-11-05T19:54:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+tamilstudies.com,$1.00,1,15,2026-11-05T18:39:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+bogatic.com,$1.00,1,7,2026-11-04T19:13:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+optitrax.com,$1.00,1,23,2026-11-05T19:34:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+earthychic.com,$1.00,1,18,2026-11-04T18:24:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+unitechcomp.com,$1.00,1,29,2026-11-04T21:06:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+ravenmade.com,$1.00,1,3,2026-11-04T21:57:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+toolsforteachers.com,$1.00,1,28,2026-11-05T21:30:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+pitchden.com,$1.00,1,8,2026-11-04T18:25:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+capitalswift.com,$1.00,1,8,2026-11-04T18:00:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+rvseo.com,$1.00,1,1,2026-11-04T20:47:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+andironsteak.com,$1.00,1,12,2026-11-05T21:47:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+mpbconstruction.com,$1.00,1,24,2026-11-04T22:15:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+amanhayer.com,$1.00,1,24,2026-11-04T21:39:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+cutspam.com,$1.00,1,24,2026-11-04T21:30:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+staggersorthodontics.com,$1.00,1,22,2026-11-04T21:46:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+coratherapeutics.com,$1.00,1,7,2026-11-05T18:18:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+beantribe.com,$1.00,1,11,2026-11-04T18:26:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+mailanytime.com,$1.00,1,20,2026-11-04T23:15:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+stocksaim.com,$1.00,1,5,2026-11-04T22:11:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+scalablecss.com,$1.00,1,7,2026-11-05T18:18:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+fastvr.com,$1.00,1,20,2026-11-04T18:07:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+aiadgenerator.com,$1.00,1,4,2026-11-05T23:24:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+excelchart.com,$1.00,1,1,2026-11-04T23:08:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+elevatedepoxy.com,$1.00,1,3,2026-11-04T19:19:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+powerpeptide.com,$11.00,3,3,2026-11-04T19:38:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+govivigo.com,$1.00,1,14,2026-11-04T19:59:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+libertyproducts.com,$11.00,3,16,2026-11-04T19:38:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+safecontracts.com,$11.00,3,11,2026-11-04T22:53:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+mrmayhem.com,$1.00,1,20,2026-11-04T20:39:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+housepods.com,$1.00,1,15,2026-11-05T21:30:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+getrafael.com,$1.00,1,16,2026-11-05T22:42:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+alpadel.com,$1.00,1,2,2026-11-04T19:37:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+levelupladies.com,$1.00,1,10,2026-11-04T18:29:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+ureadyteddy.com,$1.00,1,10,2026-11-05T19:17:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+stevenlinmd.com,$1.00,1,13,2026-11-05T20:34:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+kenwoodfloors.com,$1.00,1,12,2026-11-05T22:15:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+privilegelab.com,$1.00,1,10,2026-11-04T23:19:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+searchjamaica.com,$1.00,1,11,2026-11-05T18:45:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+wickedalley.com,$1.00,1,9,2026-11-04T18:38:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+callsherman.com,$1.00,1,17,2026-11-04T21:08:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+normalrent.com,$1.00,1,18,2026-11-05T20:30:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+exchangelaw.com,$1.00,1,13,2026-11-05T21:36:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+brandedservers.com,$1.00,1,23,2026-11-04T19:52:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+betfate.com,$1.00,1,8,2026-11-04T23:01:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+iptvluxe.com,$1.00,1,7,2026-11-04T22:54:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+botdee.com,$1.00,1,6,2026-11-05T23:09:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+thenomadcafe.com,$1.00,1,15,2026-11-05T21:30:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+mobycode.com,$6.00,2,11,2026-11-04T21:30:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+jokerino.com,$1.00,1,8,2026-11-05T21:51:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+thymecapital.com,$1.00,1,9,2026-11-04T21:47:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+subletservice.com,$1.00,1,26,2026-11-04T19:31:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+lagunaprints.com,$1.00,1,20,2026-11-04T19:39:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+veteranexpert.com,$1.00,1,24,2026-11-04T19:39:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+softwarerewards.com,$1.00,1,23,2026-11-04T19:44:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+bedroomshops.com,$1.00,1,17,2026-11-04T22:50:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+arborfintech.com,$1.00,1,10,2026-11-05T18:41:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+totomario.com,$1.00,1,8,2026-11-05T22:19:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+rundigitalmarketing.com,$1.00,1,7,2026-11-04T22:33:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+expertautoparts.com,$1.00,1,17,2026-11-04T18:41:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+businessplansplus.com,$1.00,1,28,2026-11-04T18:54:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+urbanprovision.com,$1.00,1,14,2026-11-04T19:50:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+teenmotivation.com,$1.00,1,22,2026-11-04T20:08:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+excesscalories.com,$1.00,1,13,2026-11-04T21:30:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+specialtyboots.com,$1.00,1,20,2026-11-04T22:04:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+iowaforeclosures.com,$1.00,1,24,2026-11-05T22:02:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+perfectseduction.com,$1.00,1,19,2026-11-05T22:53:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+brooklynauthors.com,$1.00,1,8,2026-11-05T20:17:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+crazyattraction.com,$1.00,1,5,2026-11-04T22:58:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+englishsyllabus.com,$1.00,1,5,2026-11-05T19:20:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+sellarr.com,$1.00,1,1,2026-11-05T21:29:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+ofwaction.com,$1.00,1,6,2026-11-05T23:27:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+windrosewebdesign.com,$6.00,2,14,2026-11-05T18:48:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+palermorestaurantla.com,$1.00,1,13,2026-11-04T18:26:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+jillianospizza.com,$1.00,1,13,2026-11-04T19:32:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+arlingtonpizzanj.com,$1.00,1,11,2026-11-04T19:35:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+hawkeslawcenter.com,$1.00,1,21,2026-11-04T20:54:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+carlightingdistrict.com,$1.00,1,10,2026-11-04T21:12:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+geegeeclothing.com,$1.00,1,12,2026-11-04T21:19:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+dogchewsrawhide.com,$1.00,1,20,2026-11-05T21:26:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+porchpatches.com,$1.00,1,2,2026-11-05T22:00:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+theflooringuys.com,$1.00,1,10,2026-11-05T23:20:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+copenhagendiagnosis.com,$1.00,1,3,2026-11-04T19:59:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+thevapeguys.com,$1.00,1,9,2026-11-04T18:09:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+yaisthai.com,$1.00,1,12,2026-11-05T19:54:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+ehitennis.com,$1.00,1,18,2026-11-05T22:46:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+apaxhosting.com,$1.00,1,6,2026-11-04T20:23:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+fanramp.com,$1.00,1,3,2026-11-04T23:06:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+clarachat.com,$1.00,1,3,2026-11-05T22:34:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+lakescafeofperham.com,$1.00,1,9,2026-11-04T22:34:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+moneythewrightway.com,$1.00,1,9,2026-11-05T18:06:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+cowandpigbromley.com,$1.00,1,9,2026-11-05T20:05:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+toplocalranking.com,$1.00,1,9,2026-11-05T21:34:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+allnewroofing.com,$1.00,1,10,2026-11-04T21:04:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+gearupwindows.com,$6.00,2,6,2026-11-04T21:27:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+lastrigiana.com,$1.00,1,11,2026-11-04T22:09:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+ambiasolar.com,$1.00,1,4,2026-11-04T18:18:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+orderchristianspizza.com,$1.00,1,4,2026-11-04T18:57:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+toolcano.com,$1.00,1,4,2026-11-05T19:11:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+breathier.com,$1.00,1,3,2026-11-05T21:35:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+photobooknz.com,$6.00,2,9,2026-11-05T19:00:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+zebralending.com,$1.00,1,6,2026-11-04T18:28:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+quotesvalley.com,$1.00,1,6,2026-11-04T22:56:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+mailinserter.com,$1.00,1,15,2026-11-05T22:18:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+mintedmetals.com,$1.00,1,5,2026-11-04T18:25:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+celestrascience.com,$1.00,1,7,2026-11-04T19:07:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+trypharm.com,$1.00,1,7,2026-11-04T20:46:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+burninjuryguide.com,$6.00,2,13,2026-11-04T22:54:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+deltonahomesforsale.com,$1.00,1,22,2026-11-04T22:04:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+jerrycanfilter.com,$1.00,1,7,2026-11-04T18:23:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+earnflexibly.com,$1.00,1,4,2026-11-04T19:17:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+earnmodel.com,$1.00,1,1,2026-11-05T18:18:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+malabarpost.com,$1.00,1,3,2026-11-04T19:23:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+ccmedtransport.com,$1.00,1,6,2026-11-05T18:00:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+ellerbepharmacy.com,$1.00,1,6,2026-11-05T23:23:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+lanaranjamex.com,$1.00,1,8,2026-11-05T22:35:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+finsuresolution.com,$1.00,1,1,2026-11-04T21:53:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+mylifedashboard.com,$1.00,1,2,2026-11-04T23:28:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+srinidhim.com,$1.00,1,1,2026-11-05T21:29:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+soderdentistry.com,$1.00,1,22,2026-11-04T18:15:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+voiceofdjibouti.com,$1.00,1,12,2026-11-04T18:37:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+thecomputermanual.com,$1.00,1,16,2026-11-04T19:03:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+lynxsystemdevelopers.com,$1.00,1,26,2026-11-04T19:46:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+customvegashomes.com,$1.00,1,24,2026-11-04T20:29:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+communitychessclub.com,$1.00,1,18,2026-11-04T21:24:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+freeeskindernega.com,$1.00,1,15,2026-11-04T22:35:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+greatlakessurgery.com,$1.00,1,12,2026-11-04T22:48:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+kathleenhertel.com,$1.00,1,18,2026-11-04T22:56:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+avoidreadmissions.com,$1.00,1,16,2026-11-04T23:22:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+beltlinebrewtours.com,$1.00,1,17,2026-11-05T18:34:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+toastofcharleston.com,$1.00,1,18,2026-11-05T18:57:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+toptechhardware.com,$1.00,1,15,2026-11-05T19:18:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+bulesportvillage.com,$1.00,1,16,2026-11-05T19:27:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+snocreamcompany.com,$1.00,1,12,2026-11-05T20:01:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+josestreeservice.com,$1.00,1,20,2026-11-05T21:00:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+houstondiamondrings.com,$1.00,1,17,2026-11-05T21:58:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+customjewelryhouston.com,$1.00,1,17,2026-11-05T21:59:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+furryguide.com,$1.00,1,1,2026-11-04T20:44:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+clickwills.com,$1.00,1,1,2026-11-05T23:00:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+zippyzaps.com,$1.00,1,1,2026-11-05T18:27:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+clayhandibuffalony.com,$1.00,1,5,2026-11-04T18:48:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+bamboogardenva.com,$1.00,1,5,2026-11-05T23:00:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+jokerish.com,$1.00,1,5,2026-11-04T19:03:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+tacosbranson.com,$1.00,1,2,2026-11-04T20:26:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+themeatplate.com,$1.00,1,2,2026-11-05T21:32:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+modernlearninglabs.com,$1.00,1,9,2026-11-04T20:00:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+pentagramhousing.com,$1.00,1,5,2026-11-05T22:41:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+paranormalgeek.com,$1.00,1,2,2026-11-04T19:21:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+plutopeptides.com,$1.00,1,1,2026-11-05T22:35:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+edelweissbakeryfl.com,$1.00,1,8,2026-11-04T21:08:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+josewrodriguezmd.com,$1.00,1,8,2026-11-04T22:23:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+extractframes.com,$1.00,1,1,2026-11-04T18:44:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+predictionway.com,$1.00,1,1,2026-11-04T20:10:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+sipperscoffee.com,$1.00,1,1,2026-11-05T21:08:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+naplesauctions.com,$1.00,1,2,2026-11-05T22:09:00+02:00,tier_a,tier_a: no exact 'Naples Auctions' firm found; age 2y (not aged)
+sapphiresouthkitchen.com,$1.00,1,3,2026-11-05T20:51:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+teamnulegacy.com,$1.00,1,4,2026-11-05T22:29:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+phobargrill.com,$1.00,1,4,2026-11-05T22:55:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+delrayflorist.com,$1.00,1,5,2026-11-05T21:53:00+02:00,tier_a,tier_a: no exact 'Delray Florist' firm; locals use delraybeachflorist/delraybeachfloral etc.; age 5y
+casitacuratedplay.com,$1.00,1,7,2026-11-04T20:28:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+findstoragespace.com,$1.00,1,7,2026-11-04T21:54:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+jamaicansupreme.com,$1.00,1,3,2026-11-05T19:45:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+ogdenrentals.com,$1.00,1,0,2026-11-04T22:38:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+southcentralarchive.com,$1.00,1,5,2026-11-05T18:49:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+jessicamelbourne.com,$1.00,1,1,2026-11-04T19:40:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+voidinnovation.com,$1.00,1,1,2026-11-04T21:17:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+yourrecipester.com,$1.00,1,2,2026-11-04T19:49:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+bransonevergreeninn.com,$1.00,1,2,2026-11-04T21:42:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+chopchopfoodpod.com,$1.00,1,2,2026-11-05T20:46:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+salvatorespizzerianj.com,$1.00,1,2,2026-11-05T21:40:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+forsaletrucks.com,$1.00,1,4,2026-11-04T22:33:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+hebronparadisegrill.com,$1.00,1,1,2026-11-04T20:46:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+partnerpeptide.com,$1.00,1,1,2026-11-04T21:10:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+sarrisrestaurant.com,$1.00,1,1,2026-11-04T21:32:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+wooagentic.com,$1.00,1,1,2026-11-05T22:52:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+worldledpro.com,$1.00,1,2,2026-11-04T22:14:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+bobagotulsa.com,$1.00,1,2,2026-11-05T21:30:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+wiranagari.com,$1.00,1,2,2026-11-05T23:10:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+eastlandingri.com,$1.00,1,3,2026-11-04T20:27:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+uktaxrefunds.com,$1.00,1,1,2026-11-04T19:49:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+peptideflight.com,$1.00,1,2,2026-11-04T19:34:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+propfirmmedia.com,$1.00,1,2,2026-11-04T22:34:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+exodiarealty.com,$1.00,1,2,2026-11-04T22:42:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+juniorfishandchicken.com,$1.00,1,4,2026-11-04T22:26:00+02:00,prior_exclude,in Oct20-Nov2 kill/exclude/hold/declined list
+floridafloodpros.com,$1.00,1,4,2026-11-05T19:11:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
+oahusolarquotes.com,$1.00,1,1,2026-11-04T18:07:00+02:00,meaning_shape,meaning: brand/coinage/fragment/name/geo-local/slogan or non-service (Buyer read)
