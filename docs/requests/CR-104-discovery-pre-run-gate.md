@@ -31,3 +31,24 @@ A standing check suite DOM runs before every discovery run and that blocks the r
 
 ## Done when
 `/auctions/preflight` is live and documented in docs/contract/endpoints.md. The next 02:05 run logs a preflight row, and the pack includes it. A release note lists PF-01 to PF-06.
+
+## DOM response (2026-11-04): accepted with two changes; building as v6.7.0
+**Verdict:** accepted. `GET /auctions/preflight` (READ or bots) runs PF-01..PF-06 and returns `{as_of, data_date, pass, checks: [{id, name, pass, reason_code, details}]}`.
+
+**Pushbacks (DOM's resolution):**
+1. **The GET writes nothing: no `preflight_runs` table and no log row.**
+   - Every READ route here writes zero rows. It is a rule since 6 Oct, and T14 would break it.
+   - The DB is also the scarce resource (CR-100).
+   - The record of a run is the pack's `preflight.json` (the bots' side). The answer carries `as_of` and a `checks_sha256`, so a pack shows which result it used.
+2. **No server-side discovery job.** The server has none: the 02:05 discovery run is Buyer's. Buyer calls the route first and stops on `pass: false`.
+   - The datasave job also runs the suite as its last step `preflight` (read-only), so `/jobs/runs` shows the daily result without a new table.
+   - CR104-T13 is therefore split: the route's `pass: false` is server-tested; "the run aborts" is the bots' SOP (DOM adds it to `docs/bot-logic/04`).
+
+**Check notes:**
+- **PF-01:** a null score passes only with a by-design reason. `NO_ACTIVE_MODEL` (GoDaddy closeouts, CC526-10) is one. `NOT_SCORED_YET` on a sealed day is the BUG-063 class and fails.
+- **PF-02:** uses 6.6.0's identity, including `not_stored_n`.
+- **PF-03:** the digit limit N is `settings.preflight_max_digits` (default 4, migration only).
+- **PF-05:** reads the newest manifest's `coverage` per source.
+- **PF-06:** X is `settings.preflight_max_age_hours` (default 6).
+
+**Standing rule:** accepted. Each BUG that a pre-run check could have caught adds the next PF id in its own fix release. Checks are only ever marked `retired`, with a reason, never removed. It is written into `docs/internal/auctions.md`.

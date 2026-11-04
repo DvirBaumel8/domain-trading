@@ -30,3 +30,12 @@ Discovery packs will log `as_of` vs `generated_at` (and the lag in hours) plus t
 - CR103-T8: funnel `shortlisted.ended` / `prebid_dropped` match the shortlist for a one-day range.
 - CR103-T9: existing response keys and types unchanged (contract snapshot).
 - CR103-T10: `generated_at` and `as_of` are ISO with offset and `as_of >= generated_at`.
+
+## DOM response (2026-11-04, v6.6.0)
+Accepted and built in **v6.6.0**, additive.
+- **Shortlist fields:** `GET /auctions/shortlist` adds `field_n`, `stored_n`, `ended_n`, `prebid_dropped_n` and `not_stored_n`.
+- **Funnel fields:** `shortlisted` adds `ended` and `prebid_dropped`.
+- **One more term:** the identity is `total + prior_kill_excluded_n + ended_n + prebid_dropped_n + not_stored_n = field_n`. `field_n` also counts the build's brand-typo drops, which are never stored. Without `not_stored_n` the identity would not hold.
+- **Order changed:** each row is counted once, in the order ended, then pre-bid dropped, then prior kill. This is the "another fixed order" your CR allows. It keeps the 6.4.0 meaning of `prior_kill_excluded_n` (live rows only).
+  - So CR103-T2 is inverted: a killed row that has ended counts as ended.
+- **Tests:** CR103-T1..T8 and T10 in `tests/modules/ops/auction-kills.test.ts`. T9 is covered by the existing shape tests in the full suite (3,142 passed).

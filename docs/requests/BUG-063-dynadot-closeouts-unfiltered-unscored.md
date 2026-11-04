@@ -22,3 +22,11 @@ endpoints.md §GET /candidates/closeouts: filters and scores are computed once p
 - BUG063-T3: a Dynadot seal after scorePool already ran (late upload / `only` top-up) gets filtered+scored by the follow-up step.
 - BUG063-T4: `pool_n - sum(filtered_by) = ranked_n` holds per source for `all`, `godaddy`, `dynadot`.
 - BUG063-T5: GoDaddy behavior unchanged (regression).
+
+## DOM response (2026-11-04, v6.6.0)
+Confirmed and fixed in **v6.6.0**.
+- **Cause:** since 5.65.0 the two Dynadot steps run last in the datasave, after `scorePool`. A day they sealed, or topped up (CR-099), stayed unprocessed until the next day's run.
+- **Fix:** the `dynadotCloseouts` step now ends with a Dynadot-only `scorePool` and reports it as `score_pool`. This covers `only` runs too.
+- **Still open:** a bot upload (`POST /snapshots/dynadot`) sealed after the day's datasave waits for the next run. The server pulls Dynadot itself now, so that path is only a fallback.
+- **Tests:** BUG063-T1..T5 in one test in `tests/modules/ops/closeouts.test.ts`. No contract change.
+- **Check after the next datasave (15:25 UTC):** `GET /candidates/closeouts?source=dynadot` should show `SPELL-1` above 0 and no `NOT_SCORED_YET` rows. Today's rows are cleaned by that run.
