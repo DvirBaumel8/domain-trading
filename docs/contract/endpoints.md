@@ -1,4 +1,4 @@
-# Endpoints (contract v6.4.0)
+# Endpoints (contract v6.5.0)
 
 Derived from the route registrations in `src/app.ts` and the zod schemas in the route files under `src/modules/*/api/`. A test (`tests/contract/contract-doc.test.ts`) fails if a registered route is missing here, or if a route here isn't registered.
 
@@ -870,6 +870,7 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
               shortlist_sale_chance_bp, expected_resale_cents, expected_resale, renewal_cents, renewal },   // 5.48.0: the inputs of the maximum bid
   total,                  // 5.72.0: live-eligible rows for the date NOW (not auto-prebid-dropped, not ended) — for pagination; often < field_n; may be larger than rows.length on a page. 6.4.0: also minus the names left out for a prior kill
   prior_kill_excluded_n,  // 6.4.0 (CR-101): live-eligible rows left out because the name has an active kill in auction_kills (see GET /auctions/kills); for a same-day read: total + prior_kill_excluded_n + ended / prebid-dropped = field_n
+  prior_kill_ms,          // 6.5.0 (CR-102): server milliseconds of the count query that applies the prior-kill exclusion (0 when there is no data date); a timing, not a contract on speed
   rows: [ { rank, field_n, top_pct,         // 5.48.0: field_n = hard-filter passers STORED that day (build-time field size); top_pct = rank / field_n in % (1 decimal); both null on rows stored before 5.48.0. field_n is not the same as response.total.
             domain, score,                  // 0..100
             score_version, parts,           // parts: {name, bids, age, demand} in auction-v4 (5.49.0; auction-v3 and older: {name, headroom, bids, age}), each {points, max, known}; demand {developed_tlds, exact_match_tlds} (5.49.0: other endings with a live site and exact-match endings, from the GoDaddy file; null = not in the file); v4 name also {raw, field_pct} (quality x lift before the position, and the share of the day's field below it); name also {shape, word_quality, word_levels, all_common, endings_known, endings_registered, endings_value} (5.46.0: the three word fields); bids also {seo_flag}
@@ -898,7 +899,7 @@ READ (or bots; a data token is 403). Query (all optional; a bad value → **400*
 ```
 { from, to, as_of,
   seen:            { live_auctions },                       // distinct names in the live table with a data date in the range
-  shortlisted:     { names, served, prior_kill_excluded },  // served = not dropped by a failed pre-bid; 6.4.0: prior_kill_excluded = served names an active kill leaves out today (no re-show)
+  shortlisted:     { names, served, prior_kill_excluded, prior_kill_ms },  // served = not dropped by a failed pre-bid; 6.4.0: prior_kill_excluded = served names an active kill leaves out today (no re-show); 6.5.0: prior_kill_ms = server ms of that count
   auto_prebid:     { checked, pass, flag, fail },           // by the daily step
   prebids_by_bots: { checks, names, pass, flag, fail },     // POST /auctions/prebid by callers, by IDT day
   bid_plans:       { created, open, won, lost, withdrawn, expired, max_bid_total_cents, max_bid_total },   // plans created in the range, by status now

@@ -299,6 +299,13 @@ function priorKillJoin(nowMs: number, ttlDays: number) {
   ) pk on true`;
 }
 
+/** The served-row candidates of one data date with the prior-kill columns (CR-101); exported for the CR-102 EXPLAIN test. */
+export function eligibleRows(dataDate: string, nowMs: number, ttlDays: number) {
+  return sql`select s.data_date, s.domain, s.rank, pk.excluded, pk.kill_stage, pk.killed_at, pk.price_cents_at_kill, pk.reshow_reason
+    from auction_shortlist s ${priorKillJoin(nowMs, ttlDays)}
+    where s.data_date = ${dataDate} and s.dropped_reason is null and s.end_time > ${new Date(nowMs)}`;
+}
+
 export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof ShortlistQuery>, nowMs: number) {
   const settings = await db.selectFrom('settings').select(['shortlist_horizon_hours', 'shortlist_size', 'shortlist_endings_n', 'shortlist_prebid_n', 's8_max_price_cents', 'shortlist_expected_resale_cents', 'shortlist_sale_chance_bp', 'shortlist_renewal_cents', 'shortlist_kill_ttl_days']).executeTakeFirstOrThrow();
   const liftOn = (await db.selectFrom('lift_models').select('id').limit(1).executeTakeFirst()) !== undefined;
@@ -310,14 +317,14 @@ export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof Short
   const newest = q.date ? null : await db.selectFrom('auction_shortlist').select((eb) => eb.fn.max('data_date').as('d')).executeTakeFirst();
   const dataDate = q.date ?? (newest?.d ? String(newest.d).slice(0, 10) : null);
   const base = { data_date: dataDate, as_of: toJerusalemIso(new Date(nowMs)), settings: used };
-  if (dataDate === null) return { ...base, generated_at: null, total: 0, prior_kill_excluded_n: 0, rows: [] };
+  if (dataDate === null) return { ...base, generated_at: null, total: 0, prior_kill_excluded_n: 0, prior_kill_ms: 0, rows: [] };
   // v6.4.0 (CR-101): one anti-join against auction_kills (index on domain). A name with an active kill is left out unless the re-show rule fires; the stored rows are never touched.
   // v5.72.0 (CR-088 R-3): total = all eligible rows for the date (not dropped, not ended, not left out for a prior kill), for pagination
-  const now = new Date(nowMs);
-  const eligible = sql`select s.data_date, s.domain, s.rank, pk.excluded, pk.kill_stage, pk.killed_at, pk.price_cents_at_kill, pk.reshow_reason
-    from auction_shortlist s ${priorKillJoin(nowMs, settings.shortlist_kill_ttl_days)}
-    where s.data_date = ${dataDate} and s.dropped_reason is null and s.end_time > ${now}`;
+  const eligible = eligibleRows(dataDate, nowMs, settings.shortlist_kill_ttl_days);
+  // v6.4.1 (CR-102): prior_kill_ms = server time of the count query, the one step that applies the exclusion to every eligible row
+  const t0 = performance.now();
   const counts = (await sql<{ served: string; excluded: string }>`with e as (${eligible}) select count(*) filter (where not excluded)::text as served, count(*) filter (where excluded)::text as excluded from e`.execute(db)).rows[0]!;
+  const priorKillMs = Math.round(performance.now() - t0);
   const total = Number(counts.served);
   const priorKillExcludedN = Number(counts.excluded);
   // served = not dropped by a failed pre-bid; names whose auction already ended are left out
@@ -328,7 +335,7 @@ export async function getShortlist(db: Kysely<Database>, q: z.infer<typeof Short
   const preById = new Map(pre.map((p) => [Number(p.id), p]));
   const gen = await db.selectFrom('auction_shortlist').select((eb) => eb.fn.max('generated_at').as('g')).where('data_date', '=', dataDate).executeTakeFirst();
   return {
-    ...base, generated_at: gen?.g ? toJerusalemIso(new Date(gen.g as Date)) : null, total, prior_kill_excluded_n: priorKillExcludedN,
+    ...base, generated_at: gen?.g ? toJerusalemIso(new Date(gen.g as Date)) : null, total, prior_kill_excluded_n: priorKillExcludedN, prior_kill_ms: priorKillMs,
     rows: rows.map((r) => {
       const p = r.prebid_id === null ? undefined : preById.get(Number(r.prebid_id));
       const checks = ((p?.answer as { checks?: PrebidCheck[] } | undefined)?.checks ?? []);
@@ -371,8 +378,10 @@ export async function getFunnel(db: Kysely<Database>, q: z.infer<typeof FunnelQu
     from auction_shortlist where data_date between ${from}::date and ${to}::date`.execute(db);
   // v6.4.0 (CR-101): served names (not dropped) that the kill store would leave out today, counted the way GET /auctions/shortlist counts them
   const ttl = (await db.selectFrom('settings').select('shortlist_kill_ttl_days').executeTakeFirstOrThrow()).shortlist_kill_ttl_days;
+  const t0 = performance.now();
   const pk = await sql<{ n: string }>`select count(distinct s.domain)::text as n from auction_shortlist s ${priorKillJoin(nowMs, ttl)}
     where s.data_date between ${from}::date and ${to}::date and s.dropped_reason is null and pk.excluded`.execute(db);
+  const priorKillMs = Math.round(performance.now() - t0);
   const pb = await sql<{ n: string; names: string; pass: string; flag: string; fail: string }>`
     select count(*)::text as n, count(distinct domain)::text as names, count(*) filter (where verdict = 'pass')::text as pass, count(*) filter (where verdict = 'flag')::text as flag, count(*) filter (where verdict = 'fail')::text as fail
     from prebid_checks where token_name is distinct from 'datasave' and ${idt('created_at')} between ${from}::date and ${to}::date`.execute(db);
@@ -433,7 +442,7 @@ export async function getFunnel(db: Kysely<Database>, q: z.infer<typeof FunnelQu
   return {
     from, to, as_of: toJerusalemIso(new Date(nowMs)),
     seen: { live_auctions: n(seen.rows[0]!.n) },
-    shortlisted: { names: n(sl.rows[0]!.shortlisted), served: n(sl.rows[0]!.served), prior_kill_excluded: n(pk.rows[0]!.n) },
+    shortlisted: { names: n(sl.rows[0]!.shortlisted), served: n(sl.rows[0]!.served), prior_kill_excluded: n(pk.rows[0]!.n), prior_kill_ms: priorKillMs },
     auto_prebid: { checked: n(sl.rows[0]!.checked), pass: n(sl.rows[0]!.pass), flag: n(sl.rows[0]!.flag), fail: n(sl.rows[0]!.fail) },
     prebids_by_bots: { checks: n(pb.rows[0]!.n), names: n(pb.rows[0]!.names), pass: n(pb.rows[0]!.pass), flag: n(pb.rows[0]!.flag), fail: n(pb.rows[0]!.fail) },
     bid_plans: { created: n(plans.rows[0]!.created), open: n(plans.rows[0]!.open), won: n(plans.rows[0]!.won), lost: n(plans.rows[0]!.lost), withdrawn: n(plans.rows[0]!.withdrawn), expired: n(plans.rows[0]!.expired), ...pair('max_bid_total', n(plans.rows[0]!.max_total)) },

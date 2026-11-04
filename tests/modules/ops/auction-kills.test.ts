@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { makeApp } from '../../helpers/app.js';
 import { testDb as db } from '../../helpers/db.js';
 import { issueToken } from '../../helpers/tokens.js';
+import { eligibleRows } from '../../../src/modules/ops/auctions/shortlist.js';
 
 const NOW = Date.parse('2026-11-04T09:00:00Z');
 const DATE = '2026-11-03';
@@ -211,6 +212,33 @@ describe('auction kills (CR-101)', () => {
     const f = (await get(`/auctions/funnel?from=${DATE}&to=${DATE}`, b)).json();
     expect(f.shortlisted).toMatchObject({ names: 6, served: 6, prior_kill_excluded: 2 });
     expect((await get('/auctions/shortlist', b)).json()).toMatchObject({ data_date: DATE, total: 4, prior_kill_excluded_n: 2 });
+  });
+});
+
+describe('prior-kill lookup proof (CR-102)', () => {
+  it('CR102-T1: with 10,000 kills the shortlist query reads auction_kills by index (auction_kills_domain_idx, supersedes index), never a Seq Scan', async () => {
+    const { b } = await setup();
+    await seed(2000);
+    for (let i = 0; i < 10_000; i += 2000) await post(b, Array.from({ length: 2000 }, (_, k) => kill(i + k)));
+    await sql`analyze auction_kills`.execute(db);
+    await sql`analyze auction_shortlist`.execute(db);
+    const plan = (await sql<{ 'QUERY PLAN': string }>`explain with e as (${eligibleRows(DATE, NOW, 90)}) select count(*) filter (where not excluded) from e`.execute(db)).rows.map((r) => r['QUERY PLAN']).join('\n');
+    expect(plan).toMatch(/Index (Only )?Scan using auction_kills_domain_idx/);
+    expect(plan).not.toMatch(/Seq Scan on auction_kills/);
+  }, 60_000);
+
+  it('CR102-T2: prior_kill_ms is a number of 0 or more on GET /auctions/shortlist (also with no data) and GET /auctions/funnel', async () => {
+    const { b } = await setup();
+    const empty = (await get('/auctions/shortlist', b)).json();
+    expect(empty.prior_kill_ms).toBe(0);
+    await seed(5);
+    await post(b, [kill(0)]);
+    const j = (await get(`/auctions/shortlist?date=${DATE}`, b)).json();
+    expect(typeof j.prior_kill_ms).toBe('number');
+    expect(j.prior_kill_ms).toBeGreaterThanOrEqual(0);
+    const f = (await get(`/auctions/funnel?from=${DATE}&to=${DATE}`, b)).json();
+    expect(typeof f.shortlisted.prior_kill_ms).toBe('number');
+    expect(f.shortlisted.prior_kill_ms).toBeGreaterThanOrEqual(0);
   });
 });
 

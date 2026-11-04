@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 6.5.0 (2026-11-04): CR-102: prior_kill_ms on GET /auctions/shortlist and the funnel; index-use proof of the prior-kill lookup
+Release note: `docs/releases/v6.5.0.md`.
+MINOR (no migration). CR-102: `GET /auctions/shortlist` adds `prior_kill_ms` (server milliseconds of the count query that applies the prior-kill exclusion; 0 when there is no data date) and `GET /auctions/funnel` adds `shortlisted.prior_kill_ms` (the same for the funnel's count). Additive only. Index proof: the lookup reads `auction_kills` through `auction_kills_domain_idx` and `auction_kills_supersedes_idx` (test CR102-T1); no new index.
+
 ## 6.4.0 (2026-11-04): CR-101: auction kills (POST/GET /auctions/kills); the shortlist leaves out names a bot already killed
 Release note: `docs/releases/v6.4.0.md`.
 MINOR (migration `1769500000000_v6-4-0.sql`: table `auction_kills`, `settings.shortlist_kill_ttl_days` 90). CR-101: `POST /auctions/kills` (WRITE or bots; 1..2,000 rows; append-only, a wrong kill is undone with a `revoked` row naming `supersedes`) and `GET /auctions/kills` (READ, bots, WRITE). `GET /auctions/shortlist` leaves out names with an active kill, unless the price halved since a `tier_a`/`tier_b`/`card` kill (`price_halved`) or the kill is older than the TTL (`ttl`); it adds `prior_kill_excluded_n` and `rows[].prior_kill` (null when never killed), and `total` counts after the exclusion. `GET /auctions/funnel` adds `shortlisted.prior_kill_excluded`. Stored shortlist rows are never deleted.
