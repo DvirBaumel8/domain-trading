@@ -47,3 +47,6 @@ Fail rules: any prior-killed name served without `prior_kill.reshow_reason` = FA
 
 ## Not in scope
 Meaning prefilter upstream (separate idea in IMPROVEMENT-NOTES); changing the score; money.
+
+## Approval (Gavriel, 2026-11-04 09:09 IST)
+Approved (dc653e22). Ship via Claude Code. Conditions: no rows deleted; kill list reversible (revoke rows); served and skipped (prior_kill_excluded_n) counts recorded in each run pack. Low-appraisal filter: not wanted for now.
