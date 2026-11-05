@@ -1,0 +1,7124 @@
+{
+  "meta": {
+    "data_date": "2026-11-04",
+    "as_of": "2026-11-05T17:36:07+02:00",
+    "settings": {
+      "shortlist_horizon_hours": 72,
+      "shortlist_size": 0,
+      "shortlist_endings_n": 50,
+      "shortlist_prebid_n": 10,
+      "shortlist_sale_chance_bp": 1000,
+      "shortlist_kill_ttl_days": 90,
+      "score_version": "auction-v4",
+      "s8_max_price": "$250.00",
+      "expected_resale_cents": 100000,
+      "expected_resale": "$1,000.00",
+      "renewal_cents": 2300,
+      "renewal": "$23.00"
+    },
+    "generated_at": "2026-11-04T17:33:07+02:00",
+    "total": 83,
+    "prior_kill_excluded_n": 119,
+    "prior_kill_ms": 70,
+    "field_n": 667,
+    "stored_n": 539,
+    "ended_n": 337,
+    "prebid_dropped_n": 0,
+    "not_stored_n": 128
+  },
+  "rows": [
+    {
+      "rank": 1,
+      "field_n": 667,
+      "top_pct": 0.1,
+      "domain": "rapti.com",
+      "score": 98.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 3.8,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.968,
+          "lift": {
+            "sum": 3.407,
+            "bins": [
+              {
+                "bin": "<=7",
+                "lift": 0.57,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 96.8
+          },
+          "known": true,
+          "shape": 1,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            0.5,
+            0.3
+          ],
+          "word_quality": 0.35,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 3
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 40,
+          "developed_tlds": 375,
+          "exact_match_tlds": 10
+        }
+      },
+      "end_time": "2026-11-06T21:11:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 4500,
+      "price": "$45.00",
+      "bids": 9,
+      "max_bid_suggested_cents": 5500,
+      "max_bid_suggested": "$55.00",
+      "valuation_cents": 378200,
+      "valuation": "$3,782.00",
+      "domain_age": 22,
+      "pageviews": 0,
+      "prebid": {
+        "id": 142,
+        "verdict": "flag",
+        "checked_at": "2026-11-04T17:34:03+02:00",
+        "valid_until": "2026-11-07T17:34:03+02:00",
+        "flags": [
+          {
+            "id": "SAME_NAME_ENDINGS",
+            "reason": "the same name is in use on .net: either demand proof or a collision, read the sites"
+          },
+          {
+            "id": "UK_COMPANY",
+            "reason": "4 UK companies with all the words of this name in the title"
+          }
+        ]
+      },
+      "reasons": [
+        "2 words (rap + ti), 5 letters",
+        "lift +3.407 (length <=7 +0.57, words 2 +0.837, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .net, .co, .ai",
+        "9 bids",
+        "22 years old",
+        "375 other endings with a live site, 10 exact-match registered",
+        "maximum $55: top 0.1% of today's field (position factor 1)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 2,
+      "field_n": 667,
+      "top_pct": 0.3,
+      "domain": "orbiit.com",
+      "score": 98.4,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 3.4,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.862,
+          "lift": {
+            "sum": 1.834,
+            "bins": [
+              {
+                "bin": "<=7",
+                "lift": 0.57,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 86.2
+          },
+          "known": true,
+          "shape": 0.5,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.3,
+            0.3
+          ],
+          "word_quality": 0.3,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 5
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 40,
+          "developed_tlds": 7,
+          "exact_match_tlds": 27
+        }
+      },
+      "end_time": "2026-11-06T23:12:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 2100,
+      "price": "$21.00",
+      "bids": 7,
+      "max_bid_suggested_cents": 5500,
+      "max_bid_suggested": "$55.00",
+      "valuation_cents": 517300,
+      "valuation": "$5,173.00",
+      "domain_age": 21,
+      "pageviews": 0,
+      "prebid": {
+        "id": 143,
+        "verdict": "flag",
+        "checked_at": "2026-11-04T17:35:13+02:00",
+        "valid_until": "2026-11-07T17:35:13+02:00",
+        "flags": [
+          {
+            "id": "UK_COMPANY",
+            "reason": "1 UK company with all the words of this name in the title"
+          }
+        ]
+      },
+      "reasons": [
+        "3 words (or + bi + it), 6 letters",
+        "lift +1.834 (length <=7 +0.57, words 3 -0.736, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .net, .co, .org, .io, .ai",
+        "7 bids",
+        "21 years old",
+        "7 other endings with a live site, 27 exact-match registered",
+        "maximum $55: top 0.3% of today's field (position factor 1)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 6,
+      "field_n": 667,
+      "top_pct": 0.9,
+      "domain": "quicksol.com",
+      "score": 97.3,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.3,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.965,
+          "lift": {
+            "sum": 3.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 96.5
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5
+          ],
+          "word_quality": 0.625,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 2
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 40,
+          "developed_tlds": 98,
+          "exact_match_tlds": 13
+        }
+      },
+      "end_time": "2026-11-06T18:21:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1100,
+      "price": "$11.00",
+      "bids": 3,
+      "max_bid_suggested_cents": 5500,
+      "max_bid_suggested": "$55.00",
+      "valuation_cents": 508100,
+      "valuation": "$5,081.00",
+      "domain_age": 25,
+      "pageviews": 0,
+      "prebid": {
+        "id": 147,
+        "verdict": "flag",
+        "checked_at": "2026-11-04T17:36:11+02:00",
+        "valid_until": "2026-11-07T17:36:11+02:00",
+        "flags": [
+          {
+            "id": "UK_COMPANY",
+            "reason": "1 UK company with all the words of this name in the title"
+          }
+        ]
+      },
+      "reasons": [
+        "2 words (quick + sol), 8 letters",
+        "lift +3.319 (length 8-9 +0.482, words 2 +0.837, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .net, .org",
+        "3 bids",
+        "25 years old",
+        "98 other endings with a live site, 13 exact-match registered",
+        "maximum $55: top 0.9% of today's field (position factor 1)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 7,
+      "field_n": 667,
+      "top_pct": 1,
+      "domain": "supranatural.com",
+      "score": 97.3,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.3,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.935,
+          "lift": {
+            "sum": 2.66,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 93.5
+          },
+          "known": true,
+          "shape": 0.75,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            0.35,
+            1
+          ],
+          "word_quality": 0.512,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 2
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 40,
+          "developed_tlds": 11,
+          "exact_match_tlds": 12
+        }
+      },
+      "end_time": "2026-11-06T21:56:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1000,
+      "price": "$10.00",
+      "bids": 3,
+      "max_bid_suggested_cents": 5500,
+      "max_bid_suggested": "$55.00",
+      "valuation_cents": 685300,
+      "valuation": "$6,853.00",
+      "domain_age": 25,
+      "pageviews": 0,
+      "prebid": {
+        "id": 148,
+        "verdict": "flag",
+        "checked_at": "2026-11-04T17:36:23+02:00",
+        "valid_until": "2026-11-07T17:36:23+02:00",
+        "flags": [
+          {
+            "id": "SAME_NAME_ENDINGS",
+            "reason": "the same name is in use on .net: either demand proof or a collision, read the sites"
+          },
+          {
+            "id": "UK_COMPANY",
+            "reason": "2 UK companies with all the words of this name in the title"
+          }
+        ]
+      },
+      "reasons": [
+        "2 words (supra + natural), 12 letters",
+        "lift +2.66 (length 12-13 -0.177, words 2 +0.837, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .net, .co",
+        "3 bids",
+        "25 years old",
+        "11 other endings with a live site, 12 exact-match registered",
+        "maximum $55: top 1% of today's field (position factor 1)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 13,
+      "field_n": 667,
+      "top_pct": 1.9,
+      "domain": "companet.com",
+      "score": 96.1,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.851,
+          "lift": {
+            "sum": 1.746,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 85.1
+          },
+          "known": true,
+          "shape": 0.48,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            0.5,
+            0.3,
+            1
+          ],
+          "word_quality": 0.45,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 3
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 40,
+          "developed_tlds": 6,
+          "exact_match_tlds": 17
+        }
+      },
+      "end_time": "2026-11-06T19:18:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 5000,
+      "max_bid_suggested": "$50.00",
+      "valuation_cents": 253100,
+      "valuation": "$2,531.00",
+      "domain_age": 23,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (com + pa + net), 8 letters",
+        "lift +1.746 (length 8-9 +0.482, words 3 -0.736, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .net, .co, .org",
+        "1 bid",
+        "23 years old",
+        "6 other endings with a live site, 17 exact-match registered",
+        "maximum $50: top 1.9% of today's field (position factor 0.93)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 19,
+      "field_n": 667,
+      "top_pct": 2.8,
+      "domain": "glowscience.com",
+      "score": 95.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.955,
+          "lift": {
+            "sum": 3.054,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 95.5
+          },
+          "known": true,
+          "shape": 0.85,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 2
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 39.4,
+          "developed_tlds": 2,
+          "exact_match_tlds": 9
+        }
+      },
+      "end_time": "2026-11-06T20:34:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 4500,
+      "max_bid_suggested": "$45.00",
+      "valuation_cents": 162800,
+      "valuation": "$1,628.00",
+      "domain_age": 18,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (glow + science), 11 letters",
+        "lift +3.054 (length 10-11 +0.217, words 2 +0.837, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .net, .co",
+        "1 bid",
+        "18 years old",
+        "2 other endings with a live site, 9 exact-match registered",
+        "maximum $45: top 2.8% of today's field (position factor 0.87)",
+        "brand-like: contains of \"science\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 20,
+      "field_n": 667,
+      "top_pct": 3,
+      "domain": "sweetcomfort.com",
+      "score": 95.2,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.3,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.935,
+          "lift": {
+            "sum": 2.66,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 93.5
+          },
+          "known": true,
+          "shape": 0.75,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 2
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 37.9,
+          "developed_tlds": 7,
+          "exact_match_tlds": 7
+        }
+      },
+      "end_time": "2026-11-06T21:22:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1000,
+      "price": "$10.00",
+      "bids": 3,
+      "max_bid_suggested_cents": 4500,
+      "max_bid_suggested": "$45.00",
+      "valuation_cents": 190100,
+      "valuation": "$1,901.00",
+      "domain_age": 26,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (sweet + comfort), 12 letters",
+        "lift +2.66 (length 12-13 -0.177, words 2 +0.837, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .co, .org",
+        "3 bids",
+        "26 years old",
+        "7 other endings with a live site, 7 exact-match registered",
+        "maximum $45: top 3% of today's field (position factor 0.85)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 21,
+      "field_n": 667,
+      "top_pct": 3.1,
+      "domain": "alliancesales.com",
+      "score": 94,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.89,
+          "lift": {
+            "sum": 2.087,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "1",
+                "lift": 1.427,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 89
+          },
+          "known": true,
+          "shape": 0.65,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 5,
+          "endings_value": 0.5,
+          "endings_registered": 1
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 37.9,
+          "developed_tlds": 9,
+          "exact_match_tlds": 7
+        }
+      },
+      "end_time": "2026-11-06T23:00:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 4500,
+      "max_bid_suggested": "$45.00",
+      "valuation_cents": 490800,
+      "valuation": "$4,908.00",
+      "domain_age": 14,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (alliances + ales), 13 letters",
+        "lift +2.087 (length 12-13 -0.177, words 2 +0.837, endings_before 1 +1.427): name in the top 1% of today's field (667 names)",
+        "also registered on .net",
+        "1 bid",
+        "14 years old",
+        "9 other endings with a live site, 7 exact-match registered",
+        "maximum $45: top 3.1% of today's field (position factor 0.84)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 27,
+      "field_n": 667,
+      "top_pct": 4,
+      "domain": "lesautres.com",
+      "score": 92.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.764,
+          "lift": {
+            "sum": 1.173,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              },
+              {
+                "bin": "1",
+                "lift": 1.427,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 76.4
+          },
+          "known": true,
+          "shape": 0.47000000000000003,
+          "points": 26.4,
+          "field_pct": 0.88,
+          "all_common": false,
+          "word_levels": [
+            0.7,
+            0.3,
+            0.35
+          ],
+          "word_quality": 0.375,
+          "endings_known": 5,
+          "endings_value": 0.5,
+          "endings_registered": 1
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 40,
+          "developed_tlds": 55,
+          "exact_match_tlds": 10
+        }
+      },
+      "end_time": "2026-11-06T20:47:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 4000,
+      "max_bid_suggested": "$40.00",
+      "valuation_cents": 589500,
+      "valuation": "$5,895.00",
+      "domain_age": 17,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (lesa + ut + res), 9 letters",
+        "lift +1.173 (length 8-9 +0.482, words 3 -0.736, endings_before 1 +1.427): name in the top 12% of today's field (667 names)",
+        "also registered on .org",
+        "1 bid",
+        "17 years old",
+        "55 other endings with a live site, 10 exact-match registered",
+        "maximum $40: top 4% of today's field (position factor 0.78)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 30,
+      "field_n": 667,
+      "top_pct": 4.5,
+      "domain": "mymascot.com",
+      "score": 91.4,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 22.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.9,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.965,
+          "lift": {
+            "sum": 3.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 96.5
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            1
+          ],
+          "word_quality": 0.475,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 2
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 36,
+          "developed_tlds": 6,
+          "exact_match_tlds": 5
+        }
+      },
+      "end_time": "2026-11-06T20:13:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1700,
+      "price": "$17.00",
+      "bids": 5,
+      "max_bid_suggested_cents": 4000,
+      "max_bid_suggested": "$40.00",
+      "valuation_cents": 215000,
+      "valuation": "$2,150.00",
+      "domain_age": 9,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (my + mascot), 8 letters",
+        "lift +3.319 (length 8-9 +0.482, words 2 +0.837, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .org, .ai",
+        "5 bids",
+        "9 years old",
+        "6 other endings with a live site, 5 exact-match registered",
+        "maximum $40: top 4.5% of today's field (position factor 0.74)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 34,
+      "field_n": 667,
+      "top_pct": 5.1,
+      "domain": "brobbey.com",
+      "score": 90.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.862,
+          "lift": {
+            "sum": 1.834,
+            "bins": [
+              {
+                "bin": "<=7",
+                "lift": 0.57,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              },
+              {
+                "bin": "2+",
+                "lift": 2,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 86.2
+          },
+          "known": true,
+          "shape": 0.49,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.3,
+            0.35
+          ],
+          "word_quality": 0.308,
+          "endings_known": 5,
+          "endings_value": 1,
+          "endings_registered": 2
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 34.7,
+          "developed_tlds": 4,
+          "exact_match_tlds": 4
+        }
+      },
+      "end_time": "2026-11-06T22:48:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 3500,
+      "max_bid_suggested": "$35.00",
+      "valuation_cents": 160200,
+      "valuation": "$1,602.00",
+      "domain_age": 26,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (br + ob + bey), 7 letters",
+        "lift +1.834 (length <=7 +0.57, words 3 -0.736, endings_before 2+ +2): name in the top 1% of today's field (667 names)",
+        "also registered on .net, .org",
+        "1 bid",
+        "26 years old",
+        "4 other endings with a live site, 4 exact-match registered",
+        "maximum $35: top 5.1% of today's field (position factor 0.69)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 35,
+      "field_n": 667,
+      "top_pct": 5.2,
+      "domain": "clubtavern.com",
+      "score": 90.6,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.3,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.923,
+          "lift": {
+            "sum": 2.481,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "1",
+                "lift": 1.427,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 92.3
+          },
+          "known": true,
+          "shape": 0.88,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 5,
+          "endings_value": 0.5,
+          "endings_registered": 1
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 33.3,
+          "developed_tlds": 8,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T19:21:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1000,
+      "price": "$10.00",
+      "bids": 3,
+      "max_bid_suggested_cents": 3500,
+      "max_bid_suggested": "$35.00",
+      "valuation_cents": 289200,
+      "valuation": "$2,892.00",
+      "domain_age": 27,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (club + tavern), 10 letters",
+        "lift +2.481 (length 10-11 +0.217, words 2 +0.837, endings_before 1 +1.427): name in the top 1% of today's field (667 names)",
+        "also registered on .net",
+        "3 bids",
+        "27 years old",
+        "8 other endings with a live site, 3 exact-match registered",
+        "maximum $35: top 5.2% of today's field (position factor 0.69)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 43,
+      "field_n": 667,
+      "top_pct": 6.4,
+      "domain": "lifedate.com",
+      "score": 86.3,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.9,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.74,
+          "lift": {
+            "sum": 1.045,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "0",
+                "lift": -0.274,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 74
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 23.7,
+          "field_pct": 0.792,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 5,
+          "endings_value": 0,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 34.7,
+          "developed_tlds": 3,
+          "exact_match_tlds": 4
+        }
+      },
+      "end_time": "2026-11-06T20:38:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1700,
+      "price": "$17.00",
+      "bids": 5,
+      "max_bid_suggested_cents": 3000,
+      "max_bid_suggested": "$30.00",
+      "valuation_cents": 309800,
+      "valuation": "$3,098.00",
+      "domain_age": 25,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (life + date), 8 letters",
+        "lift +1.045 (length 8-9 +0.482, words 2 +0.837, endings_before 0 -0.274): name in the top 21% of today's field (667 names)",
+        "no other ending registered",
+        "5 bids",
+        "25 years old",
+        "3 other endings with a live site, 4 exact-match registered",
+        "maximum $30: top 6.4% of today's field (position factor 0.6)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 46,
+      "field_n": 667,
+      "top_pct": 6.9,
+      "domain": "emailremind.com",
+      "score": 83.1,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.686,
+          "lift": {
+            "sum": 0.78,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "0",
+                "lift": -0.274,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 68.6
+          },
+          "known": true,
+          "shape": 0.85,
+          "points": 23.7,
+          "field_pct": 0.792,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 5,
+          "endings_value": 0,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 33.3,
+          "developed_tlds": 2,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-05T21:05:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 3000,
+      "max_bid_suggested": "$30.00",
+      "valuation_cents": 151300,
+      "valuation": "$1,513.00",
+      "domain_age": 27,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (email + remind), 11 letters",
+        "lift +0.78 (length 10-11 +0.217, words 2 +0.837, endings_before 0 -0.274): name in the top 21% of today's field (667 names)",
+        "no other ending registered",
+        "1 bid",
+        "27 years old",
+        "2 other endings with a live site, 3 exact-match registered",
+        "maximum $30: top 6.9% of today's field (position factor 0.56)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 47,
+      "field_n": 667,
+      "top_pct": 7,
+      "domain": "howdyhomes.com",
+      "score": 82.2,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 22.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.923,
+          "lift": {
+            "sum": 2.481,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "1",
+                "lift": 1.427,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 92.3
+          },
+          "known": true,
+          "shape": 0.88,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            0.5,
+            1
+          ],
+          "word_quality": 0.625,
+          "endings_known": 5,
+          "endings_value": 0.5,
+          "endings_registered": 1
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 28.6,
+          "developed_tlds": 2,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T19:38:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 3000,
+      "max_bid_suggested": "$30.00",
+      "valuation_cents": 145000,
+      "valuation": "$1,450.00",
+      "domain_age": 9,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (howdy + homes), 10 letters",
+        "lift +2.481 (length 10-11 +0.217, words 2 +0.837, endings_before 1 +1.427): name in the top 1% of today's field (667 names)",
+        "also registered on .co",
+        "1 bid",
+        "9 years old",
+        "2 other endings with a live site, 1 exact-match registered",
+        "maximum $30: top 7% of today's field (position factor 0.55)",
+        "brand-like: contains of \"homes\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 48,
+      "field_n": 667,
+      "top_pct": 7.2,
+      "domain": "parcelar.com",
+      "score": 81.9,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 17.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.94,
+          "lift": {
+            "sum": 2.746,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              },
+              {
+                "bin": "1",
+                "lift": 1.427,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 94
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 30,
+          "field_pct": 1,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5
+          ],
+          "word_quality": 0.625,
+          "endings_known": 5,
+          "endings_value": 0.5,
+          "endings_registered": 1
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 33.3,
+          "developed_tlds": 14,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T21:03:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 2500,
+      "max_bid_suggested": "$25.00",
+      "valuation_cents": 373000,
+      "valuation": "$3,730.00",
+      "domain_age": 7,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (parcel + ar), 8 letters",
+        "lift +2.746 (length 8-9 +0.482, words 2 +0.837, endings_before 1 +1.427): name in the top 1% of today's field (667 names)",
+        "also registered on .net",
+        "1 bid",
+        "7 years old",
+        "14 other endings with a live site, 3 exact-match registered",
+        "maximum $25: top 7.2% of today's field (position factor 0.54)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 61,
+      "field_n": 667,
+      "top_pct": 9.1,
+      "domain": "barido.com",
+      "score": 78.9,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.3,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.392,
+          "lift": {
+            "sum": -0.44,
+            "bins": [
+              {
+                "bin": "<=7",
+                "lift": 0.57,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              },
+              {
+                "bin": "0",
+                "lift": -0.274,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 39.2
+          },
+          "known": true,
+          "shape": 0.5,
+          "points": 15.6,
+          "field_pct": 0.519,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.3,
+            0.3
+          ],
+          "word_quality": 0.3,
+          "endings_known": 5,
+          "endings_value": 0,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 36,
+          "developed_tlds": 30,
+          "exact_match_tlds": 5
+        }
+      },
+      "end_time": "2026-11-06T20:38:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1100,
+      "price": "$11.00",
+      "bids": 3,
+      "max_bid_suggested_cents": 2000,
+      "max_bid_suggested": "$20.00",
+      "valuation_cents": 243200,
+      "valuation": "$2,432.00",
+      "domain_age": 20,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (ba + ri + do), 6 letters",
+        "lift -0.44 (length <=7 +0.57, words 3 -0.736, endings_before 0 -0.274): name in the top 48% of today's field (667 names)",
+        "no other ending registered",
+        "3 bids",
+        "20 years old",
+        "30 other endings with a live site, 5 exact-match registered",
+        "maximum $20: top 9.1% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 68,
+      "field_n": 667,
+      "top_pct": 10.2,
+      "domain": "villaamore.com",
+      "score": 77,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.312,
+          "lift": {
+            "sum": -0.793,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              },
+              {
+                "bin": "0",
+                "lift": -0.274,
+                "pattern": "endings_before"
+              }
+            ],
+            "score": 31.2
+          },
+          "known": true,
+          "shape": 0.46,
+          "points": 13,
+          "field_pct": 0.435,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5,
+            0.3
+          ],
+          "word_quality": 0.45,
+          "endings_known": 5,
+          "endings_value": 0,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 37.9,
+          "developed_tlds": 9,
+          "exact_match_tlds": 7
+        }
+      },
+      "end_time": "2026-11-06T18:07:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 2000,
+      "max_bid_suggested": "$20.00",
+      "valuation_cents": 174600,
+      "valuation": "$1,746.00",
+      "domain_age": 10,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (villa + amo + re), 10 letters",
+        "lift -0.793 (length 10-11 +0.217, words 3 -0.736, endings_before 0 -0.274): name in the top 57% of today's field (667 names)",
+        "no other ending registered",
+        "1 bid",
+        "10 years old",
+        "9 other endings with a live site, 7 exact-match registered",
+        "maximum $20: top 10.2% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 91,
+      "field_n": 667,
+      "top_pct": 13.6,
+      "domain": "witnessplus.com",
+      "score": 70.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.742,
+          "lift": {
+            "sum": 1.054,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 74.2
+          },
+          "known": true,
+          "shape": 0.85,
+          "points": 25.1,
+          "field_pct": 0.836,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 19.3,
+          "developed_tlds": 1,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-05T21:15:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 162500,
+      "valuation": "$1,625.00",
+      "domain_age": 23,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (witness + plus), 11 letters",
+        "lift +1.054 (length 10-11 +0.217, words 2 +0.837): name in the top 16% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "23 years old",
+        "1 other ending with a live site, 2 exact-match registered",
+        "maximum $15: top 13.6% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 93,
+      "field_n": 667,
+      "top_pct": 13.9,
+      "domain": "nextonly.com",
+      "score": 70.2,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.789,
+          "lift": {
+            "sum": 1.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 78.9
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 27.5,
+          "field_pct": 0.915,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T23:14:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 184200,
+      "valuation": "$1,842.00",
+      "domain_age": 14,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (next + only), 8 letters",
+        "lift +1.319 (length 8-9 +0.482, words 2 +0.837): name in the top 8% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "14 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 13.9% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 103,
+      "field_n": 667,
+      "top_pct": 15.4,
+      "domain": "pumpkinsoftware.com",
+      "score": 67.1,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.629,
+          "lift": {
+            "sum": 0.53,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 62.9
+          },
+          "known": true,
+          "shape": 0.47500000000000003,
+          "points": 19.7,
+          "field_pct": 0.656,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 21.3,
+          "developed_tlds": 1,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-05T21:09:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 151900,
+      "valuation": "$1,519.00",
+      "domain_age": 29,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (pumpkin + software), 15 letters",
+        "lift +0.53 (length 14+ -0.307, words 2 +0.837): name in the top 34% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "29 years old",
+        "1 other ending with a live site, 3 exact-match registered",
+        "maximum $15: top 15.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 108,
+      "field_n": 667,
+      "top_pct": 16.2,
+      "domain": "vieqa.com",
+      "score": 65.7,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 17.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.3,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.803,
+          "lift": {
+            "sum": 1.407,
+            "bins": [
+              {
+                "bin": "<=7",
+                "lift": 0.57,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 80.3
+          },
+          "known": true,
+          "shape": 1,
+          "points": 29.3,
+          "field_pct": 0.975,
+          "all_common": false,
+          "word_levels": [
+            0.5,
+            0.3
+          ],
+          "word_quality": 0.35,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T20:23:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1100,
+      "price": "$11.00",
+      "bids": 3,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 150300,
+      "valuation": "$1,503.00",
+      "domain_age": 7,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (vie + qa), 5 letters",
+        "lift +1.407 (length <=7 +0.57, words 2 +0.837): name in the top 2% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "3 bids",
+        "7 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 16.2% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 117,
+      "field_n": 667,
+      "top_pct": 17.5,
+      "domain": "deliciouslyplated.com",
+      "score": 63.6,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.3,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.629,
+          "lift": {
+            "sum": 0.53,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 62.9
+          },
+          "known": true,
+          "shape": 0.325,
+          "points": 19.7,
+          "field_pct": 0.656,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T19:03:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1100,
+      "price": "$11.00",
+      "bids": 3,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 94400,
+      "valuation": "$944.00",
+      "domain_age": 10,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (deliciously + plated), 17 letters",
+        "lift +0.53 (length 14+ -0.307, words 2 +0.837): name in the top 34% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "3 bids",
+        "10 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 17.5% of today's field (position factor 0.4)",
+        "brand-like: contains of \"delicious\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 118,
+      "field_n": 667,
+      "top_pct": 17.7,
+      "domain": "lifeordebt.com",
+      "score": 63.2,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.6,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.46,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.3,
+            1
+          ],
+          "word_quality": 0.5329999999999999,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 21.3,
+          "developed_tlds": 1,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T20:44:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1100,
+      "price": "$11.00",
+      "bids": 4,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 307700,
+      "valuation": "$3,077.00",
+      "domain_age": 22,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (life + or + debt), 10 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "4 bids",
+        "22 years old",
+        "1 other ending with a live site, 3 exact-match registered",
+        "maximum $15: top 17.7% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 125,
+      "field_n": 667,
+      "top_pct": 18.7,
+      "domain": "wingsbowl.com",
+      "score": 62.7,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 17.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.789,
+          "lift": {
+            "sum": 1.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 78.9
+          },
+          "known": true,
+          "shape": 0.91,
+          "points": 27.5,
+          "field_pct": 0.915,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T23:00:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 134800,
+      "valuation": "$1,348.00",
+      "domain_age": 7,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (wings + bowl), 9 letters",
+        "lift +1.319 (length 8-9 +0.482, words 2 +0.837): name in the top 8% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "7 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 18.7% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 126,
+      "field_n": 667,
+      "top_pct": 18.9,
+      "domain": "transcribear.com",
+      "score": 62.6,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 22.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.659,
+          "lift": {
+            "sum": 0.66,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 65.9
+          },
+          "known": true,
+          "shape": 0.75,
+          "points": 22.4,
+          "field_pct": 0.748,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5
+          ],
+          "word_quality": 0.625,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T20:04:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 123900,
+      "valuation": "$1,239.00",
+      "domain_age": 9,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (transcribe + ar), 12 letters",
+        "lift +0.66 (length 12-13 -0.177, words 2 +0.837): name in the top 25% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "9 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 18.9% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 131,
+      "field_n": 667,
+      "top_pct": 19.6,
+      "domain": "cataractdvorak.com",
+      "score": 62.4,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.629,
+          "lift": {
+            "sum": 0.53,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 62.9
+          },
+          "known": true,
+          "shape": 0.55,
+          "points": 19.7,
+          "field_pct": 0.656,
+          "all_common": true,
+          "word_levels": [
+            1,
+            0.7
+          ],
+          "word_quality": 0.775,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T21:57:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 163600,
+      "valuation": "$1,636.00",
+      "domain_age": 10,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (cataract + dvorak), 14 letters",
+        "lift +0.53 (length 14+ -0.307, words 2 +0.837): name in the top 34% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "10 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 19.6% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 132,
+      "field_n": 667,
+      "top_pct": 19.8,
+      "domain": "followdesk.com",
+      "score": 61.9,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.742,
+          "lift": {
+            "sum": 1.054,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 74.2
+          },
+          "known": true,
+          "shape": 0.88,
+          "points": 25.1,
+          "field_pct": 0.836,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 10.7,
+          "developed_tlds": 0,
+          "exact_match_tlds": 4
+        }
+      },
+      "end_time": "2026-11-05T19:59:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 257800,
+      "valuation": "$2,578.00",
+      "domain_age": 11,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (follow + desk), 10 letters",
+        "lift +1.054 (length 10-11 +0.217, words 2 +0.837): name in the top 16% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "11 years old",
+        "0 other endings with a live site, 4 exact-match registered",
+        "maximum $15: top 19.8% of today's field (position factor 0.4)",
+        "brand-like: contains of \"follow\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 140,
+      "field_n": 667,
+      "top_pct": 21,
+      "domain": "cashchief.com",
+      "score": 60.9,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.789,
+          "lift": {
+            "sum": 1.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 78.9
+          },
+          "known": true,
+          "shape": 0.91,
+          "points": 27.5,
+          "field_pct": 0.915,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 7.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-06T19:19:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 211900,
+      "valuation": "$2,119.00",
+      "domain_age": 24,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (cash + chief), 9 letters",
+        "lift +1.319 (length 8-9 +0.482, words 2 +0.837): name in the top 8% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "24 years old",
+        "0 other endings with a live site, 2 exact-match registered",
+        "maximum $15: top 21% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 142,
+      "field_n": 667,
+      "top_pct": 21.3,
+      "domain": "baumcapital.com",
+      "score": 60.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.742,
+          "lift": {
+            "sum": 1.054,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 74.2
+          },
+          "known": true,
+          "shape": 0.85,
+          "points": 25.1,
+          "field_pct": 0.836,
+          "all_common": true,
+          "word_levels": [
+            0.7,
+            1
+          ],
+          "word_quality": 0.775,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 9.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T18:49:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 261900,
+      "valuation": "$2,619.00",
+      "domain_age": 17,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (baum + capital), 11 letters",
+        "lift +1.054 (length 10-11 +0.217, words 2 +0.837): name in the top 16% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "17 years old",
+        "0 other endings with a live site, 3 exact-match registered",
+        "maximum $15: top 21.3% of today's field (position factor 0.4)",
+        "brand-like: contains of \"capital\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 146,
+      "field_n": 667,
+      "top_pct": 21.9,
+      "domain": "singularcover.com",
+      "score": 60.1,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 20
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.659,
+          "lift": {
+            "sum": 0.66,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 65.9
+          },
+          "known": true,
+          "shape": 0.65,
+          "points": 22.4,
+          "field_pct": 0.748,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T20:43:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 257900,
+      "valuation": "$2,579.00",
+      "domain_age": 8,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (singular + cover), 13 letters",
+        "lift +0.66 (length 12-13 -0.177, words 2 +0.837): name in the top 25% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "8 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 21.9% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 154,
+      "field_n": 667,
+      "top_pct": 23.1,
+      "domain": "sunnybump.com",
+      "score": 58.2,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.789,
+          "lift": {
+            "sum": 1.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 78.9
+          },
+          "known": true,
+          "shape": 0.91,
+          "points": 27.5,
+          "field_pct": 0.915,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T20:02:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 135200,
+      "valuation": "$1,352.00",
+      "domain_age": 14,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (sunny + bump), 9 letters",
+        "lift +1.319 (length 8-9 +0.482, words 2 +0.837): name in the top 8% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "14 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $15: top 23.1% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 156,
+      "field_n": 667,
+      "top_pct": 23.4,
+      "domain": "kobepost.com",
+      "score": 58.2,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.789,
+          "lift": {
+            "sum": 1.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 78.9
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 27.5,
+          "field_pct": 0.915,
+          "all_common": true,
+          "word_levels": [
+            0.7,
+            1
+          ],
+          "word_quality": 0.775,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T22:39:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 159100,
+      "valuation": "$1,591.00",
+      "domain_age": 12,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (kobe + post), 8 letters",
+        "lift +1.319 (length 8-9 +0.482, words 2 +0.837): name in the top 8% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "12 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $15: top 23.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 157,
+      "field_n": 667,
+      "top_pct": 23.5,
+      "domain": "beanpuff.com",
+      "score": 57.7,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 12.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.789,
+          "lift": {
+            "sum": 1.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 78.9
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 27.5,
+          "field_pct": 0.915,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T21:25:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 148200,
+      "valuation": "$1,482.00",
+      "domain_age": 5,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (bean + puff), 8 letters",
+        "lift +1.319 (length 8-9 +0.482, words 2 +0.837): name in the top 8% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "5 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 23.5% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 159,
+      "field_n": 667,
+      "top_pct": 23.8,
+      "domain": "milestonetechs.com",
+      "score": 57.4,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 20
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.629,
+          "lift": {
+            "sum": 0.53,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 62.9
+          },
+          "known": true,
+          "shape": 0.55,
+          "points": 19.7,
+          "field_pct": 0.656,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.35
+          ],
+          "word_quality": 0.512,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T22:01:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 125800,
+      "valuation": "$1,258.00",
+      "domain_age": 8,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (milestone + techs), 14 letters",
+        "lift +0.53 (length 14+ -0.307, words 2 +0.837): name in the top 34% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "8 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 23.8% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 167,
+      "field_n": 667,
+      "top_pct": 25,
+      "domain": "itnwwe.com",
+      "score": 56.9,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 20
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 2.6,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.459,
+          "lift": {
+            "sum": -0.166,
+            "bins": [
+              {
+                "bin": "<=7",
+                "lift": 0.57,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 45.9
+          },
+          "known": true,
+          "shape": 0.5,
+          "points": 17.7,
+          "field_pct": 0.591,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.3,
+            0.3
+          ],
+          "word_quality": 0.3,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T22:09:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 1400,
+      "price": "$14.00",
+      "bids": 4,
+      "max_bid_suggested_cents": 1500,
+      "max_bid_suggested": "$15.00",
+      "valuation_cents": 130000,
+      "valuation": "$1,300.00",
+      "domain_age": 8,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (it + nw + we), 6 letters",
+        "lift -0.166 (length <=7 +0.57, words 3 -0.736): name in the top 41% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "4 bids",
+        "8 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $15: top 25% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 175,
+      "field_n": 667,
+      "top_pct": 26.2,
+      "domain": "hessmachinery.com",
+      "score": 55.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.659,
+          "lift": {
+            "sum": 0.66,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 65.9
+          },
+          "known": true,
+          "shape": 0.65,
+          "points": 22.4,
+          "field_pct": 0.748,
+          "all_common": true,
+          "word_levels": [
+            0.7,
+            1
+          ],
+          "word_quality": 0.775,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 7.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-05T20:45:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 119000,
+      "valuation": "$1,190.00",
+      "domain_age": 27,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (hess + machinery), 13 letters",
+        "lift +0.66 (length 12-13 -0.177, words 2 +0.837): name in the top 25% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "27 years old",
+        "0 other endings with a live site, 2 exact-match registered",
+        "maximum $10: top 26.2% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 177,
+      "field_n": 667,
+      "top_pct": 26.5,
+      "domain": "toolboxmail.com",
+      "score": 55.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.742,
+          "lift": {
+            "sum": 1.054,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 74.2
+          },
+          "known": true,
+          "shape": 0.85,
+          "points": 25.1,
+          "field_pct": 0.836,
+          "all_common": true,
+          "word_levels": [
+            0.7,
+            1
+          ],
+          "word_quality": 0.775,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T21:45:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 189300,
+      "valuation": "$1,893.00",
+      "domain_age": 13,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (toolbox + mail), 11 letters",
+        "lift +1.054 (length 10-11 +0.217, words 2 +0.837): name in the top 16% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "13 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $10: top 26.5% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 178,
+      "field_n": 667,
+      "top_pct": 26.7,
+      "domain": "dailymusician.com",
+      "score": 55.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.659,
+          "lift": {
+            "sum": 0.66,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 65.9
+          },
+          "known": true,
+          "shape": 0.65,
+          "points": 22.4,
+          "field_pct": 0.748,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 7.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-06T18:32:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 164800,
+      "valuation": "$1,648.00",
+      "domain_age": 12,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (daily + musician), 13 letters",
+        "lift +0.66 (length 12-13 -0.177, words 2 +0.837): name in the top 25% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "12 years old",
+        "0 other endings with a live site, 2 exact-match registered",
+        "maximum $10: top 26.7% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 180,
+      "field_n": 667,
+      "top_pct": 27,
+      "domain": "cobblecapital.com",
+      "score": 55.3,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 22.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.659,
+          "lift": {
+            "sum": 0.66,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 65.9
+          },
+          "known": true,
+          "shape": 0.65,
+          "points": 22.4,
+          "field_pct": 0.748,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 9.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-05T21:15:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 155400,
+      "valuation": "$1,554.00",
+      "domain_age": 9,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (cobble + capital), 13 letters",
+        "lift +0.66 (length 12-13 -0.177, words 2 +0.837): name in the top 25% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "9 years old",
+        "0 other endings with a live site, 3 exact-match registered",
+        "maximum $10: top 27% of today's field (position factor 0.4)",
+        "brand-like: contains of \"capital\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 182,
+      "field_n": 667,
+      "top_pct": 27.3,
+      "domain": "partnerslogistics.com",
+      "score": 55.1,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.629,
+          "lift": {
+            "sum": 0.53,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 62.9
+          },
+          "known": true,
+          "shape": 0.325,
+          "points": 19.7,
+          "field_pct": 0.656,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5
+          ],
+          "word_quality": 0.625,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 9.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T19:54:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 224900,
+      "valuation": "$2,249.00",
+      "domain_age": 17,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (partners + logistics), 17 letters",
+        "lift +0.53 (length 14+ -0.307, words 2 +0.837): name in the top 34% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "17 years old",
+        "0 other endings with a live site, 3 exact-match registered",
+        "maximum $10: top 27.3% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 184,
+      "field_n": 667,
+      "top_pct": 27.6,
+      "domain": "onewayimmigration.com",
+      "score": 54.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 20
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.15,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5,
+            1
+          ],
+          "word_quality": 0.667,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 28.6,
+          "developed_tlds": 2,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T22:40:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 118600,
+      "valuation": "$1,186.00",
+      "domain_age": 8,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (one + way + immigration), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 3 -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "8 years old",
+        "2 other endings with a live site, 1 exact-match registered",
+        "maximum $10: top 27.6% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 191,
+      "field_n": 667,
+      "top_pct": 28.6,
+      "domain": "earlybirdnews.com",
+      "score": 54.3,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.286,
+          "lift": {
+            "sum": -0.913,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 28.6
+          },
+          "known": true,
+          "shape": 0.35,
+          "points": 11.6,
+          "field_pct": 0.386,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T20:40:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 100100,
+      "valuation": "$1,001.00",
+      "domain_age": 25,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (early + bird + news), 13 letters",
+        "lift -0.913 (length 12-13 -0.177, words 3 -0.736): name in the top 61% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "25 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $10: top 28.6% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 198,
+      "field_n": 667,
+      "top_pct": 29.7,
+      "domain": "dinodiners.com",
+      "score": 53.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 20
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.742,
+          "lift": {
+            "sum": 1.054,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 74.2
+          },
+          "known": true,
+          "shape": 0.88,
+          "points": 25.1,
+          "field_pct": 0.836,
+          "all_common": true,
+          "word_levels": [
+            0.7,
+            1
+          ],
+          "word_quality": 0.775,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 7.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-06T21:48:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 137600,
+      "valuation": "$1,376.00",
+      "domain_age": 8,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (dino + diners), 10 letters",
+        "lift +1.054 (length 10-11 +0.217, words 2 +0.837): name in the top 16% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "8 years old",
+        "0 other endings with a live site, 2 exact-match registered",
+        "maximum $10: top 29.7% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 201,
+      "field_n": 667,
+      "top_pct": 30.1,
+      "domain": "solterus.com",
+      "score": 53.2,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.437,
+          "lift": {
+            "sum": -0.254,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 43.7
+          },
+          "known": true,
+          "shape": 0.18,
+          "points": 16.4,
+          "field_pct": 0.548,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.3,
+            0.3,
+            0.3
+          ],
+          "word_quality": 0.3,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 10.7,
+          "developed_tlds": 0,
+          "exact_match_tlds": 4
+        }
+      },
+      "end_time": "2026-11-06T19:58:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 283900,
+      "valuation": "$2,839.00",
+      "domain_age": 10,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "4 words (so + lt + er + us), 8 letters",
+        "lift -0.254 (length 8-9 +0.482, words 4+ -0.736): name in the top 45% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "10 years old",
+        "0 other endings with a live site, 4 exact-match registered",
+        "maximum $10: top 30.1% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 216,
+      "field_n": 667,
+      "top_pct": 32.4,
+      "domain": "brewcase.com",
+      "score": 52.9,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 15
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.789,
+          "lift": {
+            "sum": 1.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 78.9
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 27.5,
+          "field_pct": 0.915,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 9.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-05T19:32:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 154200,
+      "valuation": "$1,542.00",
+      "domain_age": 6,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (brew + case), 8 letters",
+        "lift +1.319 (length 8-9 +0.482, words 2 +0.837): name in the top 8% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "6 years old",
+        "0 other endings with a live site, 3 exact-match registered",
+        "maximum $10: top 32.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 220,
+      "field_n": 667,
+      "top_pct": 33,
+      "domain": "kolbing.com",
+      "score": 52.6,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 2.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.459,
+          "lift": {
+            "sum": -0.166,
+            "bins": [
+              {
+                "bin": "<=7",
+                "lift": 0.57,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 45.9
+          },
+          "known": true,
+          "shape": 0.49,
+          "points": 17.7,
+          "field_pct": 0.591,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.3,
+            0.5
+          ],
+          "word_quality": 0.33299999999999996,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 31.3,
+          "developed_tlds": 29,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-06T22:56:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 133100,
+      "valuation": "$1,331.00",
+      "domain_age": 1,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (ko + lb + ing), 7 letters",
+        "lift -0.166 (length <=7 +0.57, words 3 -0.736): name in the top 41% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "1 year old",
+        "29 other endings with a live site, 2 exact-match registered",
+        "maximum $10: top 33% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 221,
+      "field_n": 667,
+      "top_pct": 33.1,
+      "domain": "lokalbet.com",
+      "score": 52,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 22.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.437,
+          "lift": {
+            "sum": -0.254,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 43.7
+          },
+          "known": true,
+          "shape": 0.48,
+          "points": 16.4,
+          "field_pct": 0.548,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.7,
+            0.3
+          ],
+          "word_quality": 0.36700000000000005,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 12,
+          "developed_tlds": 0,
+          "exact_match_tlds": 5
+        }
+      },
+      "end_time": "2026-11-05T21:10:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 337200,
+      "valuation": "$3,372.00",
+      "domain_age": 9,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (lo + kalb + et), 8 letters",
+        "lift -0.254 (length 8-9 +0.482, words 3 -0.736): name in the top 45% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "9 years old",
+        "0 other endings with a live site, 5 exact-match registered",
+        "maximum $10: top 33.1% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 223,
+      "field_n": 667,
+      "top_pct": 33.4,
+      "domain": "soltarus.com",
+      "score": 51.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.437,
+          "lift": {
+            "sum": -0.254,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 43.7
+          },
+          "known": true,
+          "shape": 0.48,
+          "points": 16.4,
+          "field_pct": 0.548,
+          "all_common": false,
+          "word_levels": [
+            0.5,
+            0.5,
+            0.3
+          ],
+          "word_quality": 0.36700000000000005,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 9.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T19:35:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 219500,
+      "valuation": "$2,195.00",
+      "domain_age": 10,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (sol + tar + us), 8 letters",
+        "lift -0.254 (length 8-9 +0.482, words 3 -0.736): name in the top 45% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "10 years old",
+        "0 other endings with a live site, 3 exact-match registered",
+        "maximum $10: top 33.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 225,
+      "field_n": 667,
+      "top_pct": 33.7,
+      "domain": "greenlandtrips.com",
+      "score": 50.6,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.3,
+          "seo_flag": true
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.629,
+          "lift": {
+            "sum": 0.53,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 62.9
+          },
+          "known": true,
+          "shape": 0.55,
+          "points": 19.7,
+          "field_pct": 0.656,
+          "all_common": true,
+          "word_levels": [
+            0.7,
+            1
+          ],
+          "word_quality": 0.775,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T22:09:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 700,
+      "price": "$7.00",
+      "bids": 4,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 68000,
+      "valuation": "$680.00",
+      "domain_age": 12,
+      "pageviews": 3,
+      "prebid": null,
+      "reasons": [
+        "2 words (greenland + trips), 14 letters",
+        "lift +0.53 (length 14+ -0.307, words 2 +0.837): name in the top 34% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "4 bids (halved: 12 years old with page views looks like an SEO buy)",
+        "12 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $10: top 33.7% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 229,
+      "field_n": 667,
+      "top_pct": 34.3,
+      "domain": "melodymakersmovie.com",
+      "score": 50.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.15,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 19.3,
+          "developed_tlds": 1,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-06T20:14:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 33300,
+      "valuation": "$333.00",
+      "domain_age": 15,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (melody + makers + movie), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 3 -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "15 years old",
+        "1 other ending with a live site, 2 exact-match registered",
+        "maximum $10: top 34.3% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 240,
+      "field_n": 667,
+      "top_pct": 36,
+      "domain": "apartmentpromotions.com",
+      "score": 50.4,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.629,
+          "lift": {
+            "sum": 0.53,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 62.9
+          },
+          "known": true,
+          "shape": 0.25,
+          "points": 19.7,
+          "field_pct": 0.656,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T20:05:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 152900,
+      "valuation": "$1,529.00",
+      "domain_age": 25,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (apartment + promotions), 19 letters",
+        "lift +0.53 (length 14+ -0.307, words 2 +0.837): name in the top 34% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "25 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $10: top 36% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 249,
+      "field_n": 667,
+      "top_pct": 37.3,
+      "domain": "endotoxins.com",
+      "score": 49.7,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.46,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.3,
+            1
+          ],
+          "word_quality": 0.41700000000000004,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 9.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T18:18:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 226000,
+      "valuation": "$2,260.00",
+      "domain_age": 17,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (en + do + toxins), 10 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "17 years old",
+        "0 other endings with a live site, 3 exact-match registered",
+        "maximum $10: top 37.3% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 252,
+      "field_n": 667,
+      "top_pct": 37.8,
+      "domain": "carvalle.com",
+      "score": 48.6,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 2.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.437,
+          "lift": {
+            "sum": -0.254,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 43.7
+          },
+          "known": true,
+          "shape": 0.94,
+          "points": 16.4,
+          "field_pct": 0.548,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5
+          ],
+          "word_quality": 0.625,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 28.6,
+          "developed_tlds": 12,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T19:46:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 148800,
+      "valuation": "$1,488.00",
+      "domain_age": 1,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (car + valle), 8 letters",
+        "lift -0.254 (length 8-9 +0.482, words 3 -0.736): name in the top 45% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "1 year old",
+        "12 other endings with a live site, 1 exact-match registered",
+        "maximum $10: top 37.8% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 275,
+      "field_n": 667,
+      "top_pct": 41.2,
+      "domain": "expertwitnessnews.com",
+      "score": 47.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.15,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T19:30:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 271400,
+      "valuation": "$2,714.00",
+      "domain_age": 12,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (expert + witness + news), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 3 -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "12 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $10: top 41.2% of today's field (position factor 0.4)",
+        "brand-like: contains of \"expert\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 286,
+      "field_n": 667,
+      "top_pct": 42.9,
+      "domain": "docodehere.com",
+      "score": 47,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 15
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.46,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            1,
+            1
+          ],
+          "word_quality": 0.5329999999999999,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T20:00:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 136100,
+      "valuation": "$1,361.00",
+      "domain_age": 6,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (do + code + here), 10 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "6 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $10: top 42.9% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 291,
+      "field_n": 667,
+      "top_pct": 43.6,
+      "domain": "userstellar.com",
+      "score": 45.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 15
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.742,
+          "lift": {
+            "sum": 1.054,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 74.2
+          },
+          "known": true,
+          "shape": 0.85,
+          "points": 25.1,
+          "field_pct": 0.836,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T21:35:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 137300,
+      "valuation": "$1,373.00",
+      "domain_age": 6,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (user + stellar), 11 letters",
+        "lift +1.054 (length 10-11 +0.217, words 2 +0.837): name in the top 16% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "6 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $10: top 43.6% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 302,
+      "field_n": 667,
+      "top_pct": 45.3,
+      "domain": "woodesmusic.com",
+      "score": 45,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.45,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.3,
+            1
+          ],
+          "word_quality": 0.5329999999999999,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T18:59:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 108000,
+      "valuation": "$1,080.00",
+      "domain_age": 12,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (wood + es + music), 11 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "12 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $10: top 45.3% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 311,
+      "field_n": 667,
+      "top_pct": 46.6,
+      "domain": "theoverseanetwork.com",
+      "score": 42.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 20
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.15,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.35,
+            1
+          ],
+          "word_quality": 0.5670000000000001,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T18:43:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 68200,
+      "valuation": "$682.00",
+      "domain_age": 8,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (the + oversea + network), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 4+ -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "8 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $10: top 46.6% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 317,
+      "field_n": 667,
+      "top_pct": 47.5,
+      "domain": "servicemarshal.com",
+      "score": 42.4,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.629,
+          "lift": {
+            "sum": 0.53,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 62.9
+          },
+          "known": true,
+          "shape": 0.55,
+          "points": 19.7,
+          "field_pct": 0.656,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T21:19:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 7500,
+      "valuation": "$75.00",
+      "domain_age": 2,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (service + marshal), 14 letters",
+        "lift +0.53 (length 14+ -0.307, words 2 +0.837): name in the top 34% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "2 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $10: top 47.5% of today's field (position factor 0.4)",
+        "brand-like: contains of \"service\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 325,
+      "field_n": 667,
+      "top_pct": 48.7,
+      "domain": "theislayhotel.com",
+      "score": 42.3,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.286,
+          "lift": {
+            "sum": -0.913,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 28.6
+          },
+          "known": true,
+          "shape": 0.11666666666666667,
+          "points": 11.6,
+          "field_pct": 0.386,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.3,
+            0.5,
+            1
+          ],
+          "word_quality": 0.5,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T20:16:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 130800,
+      "valuation": "$1,308.00",
+      "domain_age": 17,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "4 words (the + is + lay + hotel), 13 letters",
+        "lift -0.913 (length 12-13 -0.177, words 4+ -0.736): name in the top 61% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "17 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $10: top 48.7% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 328,
+      "field_n": 667,
+      "top_pct": 49.2,
+      "domain": "ecofriendlyhouse.com",
+      "score": 40.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.2,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": true,
+          "word_levels": [
+            0.7,
+            1,
+            1
+          ],
+          "word_quality": 0.8,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 9.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T21:03:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 291500,
+      "valuation": "$2,915.00",
+      "domain_age": 21,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (eco + friendly + house), 16 letters",
+        "lift -1.043 (length 14+ -0.307, words 3 -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "21 years old",
+        "0 other endings with a live site, 3 exact-match registered",
+        "maximum $10: top 49.2% of today's field (position factor 0.4)",
+        "brand-like: contains of \"house\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 329,
+      "field_n": 667,
+      "top_pct": 49.3,
+      "domain": "listhomeforsale.com",
+      "score": 40.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.08750000000000001,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": false,
+          "word_levels": [
+            1,
+            1,
+            0.5,
+            1
+          ],
+          "word_quality": 0.688,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 9.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-06T21:54:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 114900,
+      "valuation": "$1,149.00",
+      "domain_age": 22,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "4 words (list + home + for + sale), 15 letters",
+        "lift -1.043 (length 14+ -0.307, words 4+ -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "22 years old",
+        "0 other endings with a live site, 3 exact-match registered",
+        "maximum $10: top 49.3% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 339,
+      "field_n": 667,
+      "top_pct": 50.8,
+      "domain": "applecaredoctors.com",
+      "score": 38.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.2,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 7.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-05T21:10:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 1000,
+      "max_bid_suggested": "$10.00",
+      "valuation_cents": 167400,
+      "valuation": "$1,674.00",
+      "domain_age": 17,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (apple + care + doctors), 16 letters",
+        "lift -1.043 (length 14+ -0.307, words 3 -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "17 years old",
+        "0 other endings with a live site, 2 exact-match registered",
+        "maximum $10: top 50.8% of today's field (position factor 0.4)",
+        "brand-like: contains of \"apple\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 358,
+      "field_n": 667,
+      "top_pct": 53.7,
+      "domain": "whataphoia.com",
+      "score": 37,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.16,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.3,
+            0.3,
+            0.3
+          ],
+          "word_quality": 0.38799999999999996,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T18:12:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 2800,
+      "valuation": "$28.00",
+      "domain_age": 2,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "4 words (what + ap + ho + ia), 10 letters",
+        "lift -0.519 (length 10-11 +0.217, words 4+ -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "2 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $5: top 53.7% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 363,
+      "field_n": 667,
+      "top_pct": 54.4,
+      "domain": "swirlandspoon.com",
+      "score": 36.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 2.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.286,
+          "lift": {
+            "sum": -0.913,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 28.6
+          },
+          "known": true,
+          "shape": 0.35,
+          "points": 11.6,
+          "field_pct": 0.386,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5,
+            1
+          ],
+          "word_quality": 0.667,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 21.3,
+          "developed_tlds": 1,
+          "exact_match_tlds": 3
+        }
+      },
+      "end_time": "2026-11-05T21:26:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 2800,
+      "valuation": "$28.00",
+      "domain_age": 1,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (swirl + and + spoon), 13 letters",
+        "lift -0.913 (length 12-13 -0.177, words 3 -0.736): name in the top 61% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "1 year old",
+        "1 other ending with a live site, 3 exact-match registered",
+        "maximum $5: top 54.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 389,
+      "field_n": 667,
+      "top_pct": 58.3,
+      "domain": "homeremodelexpert.com",
+      "score": 35.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.15,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T21:49:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 113000,
+      "valuation": "$1,130.00",
+      "domain_age": 17,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (home + remodel + expert), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 3 -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "17 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 58.3% of today's field (position factor 0.4)",
+        "brand-like: contains of \"expert\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 392,
+      "field_n": 667,
+      "top_pct": 58.8,
+      "domain": "inversionesmodelo.com",
+      "score": 35.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.0625,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.3,
+            1,
+            0.3
+          ],
+          "word_quality": 0.475,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T18:52:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 57500,
+      "valuation": "$575.00",
+      "domain_age": 18,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "4 words (inversion + es + mode + lo), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 4+ -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "18 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 58.8% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 393,
+      "field_n": 667,
+      "top_pct": 58.9,
+      "domain": "wherecanigetweed.com",
+      "score": 35.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 25
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.07500000000000001,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.3,
+            0.3,
+            1,
+            1
+          ],
+          "word_quality": 0.51,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T19:05:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 58700,
+      "valuation": "$587.00",
+      "domain_age": 12,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "5 words (where + ca + ni + get + weed), 16 letters",
+        "lift -1.043 (length 14+ -0.307, words 4+ -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "12 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 58.9% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 397,
+      "field_n": 667,
+      "top_pct": 59.5,
+      "domain": "kernelerp.com",
+      "score": 35.7,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 2.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.789,
+          "lift": {
+            "sum": 1.319,
+            "bins": [
+              {
+                "bin": "8-9",
+                "lift": 0.482,
+                "pattern": "length"
+              },
+              {
+                "bin": "2",
+                "lift": 0.837,
+                "pattern": "words"
+              }
+            ],
+            "score": 78.9
+          },
+          "known": true,
+          "shape": 0.91,
+          "points": 27.5,
+          "field_pct": 0.915,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5
+          ],
+          "word_quality": 0.625,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T18:26:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 7200,
+      "valuation": "$72.00",
+      "domain_age": 1,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (kernel + erp), 9 letters",
+        "lift +1.319 (length 8-9 +0.482, words 2 +0.837): name in the top 8% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "1 year old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 59.5% of today's field (position factor 0.4)",
+        "brand-like: contains of \"kernel\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 403,
+      "field_n": 667,
+      "top_pct": 60.4,
+      "domain": "goldchaincoin.com",
+      "score": 34.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 17.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.286,
+          "lift": {
+            "sum": -0.913,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 28.6
+          },
+          "known": true,
+          "shape": 0.35,
+          "points": 11.6,
+          "field_pct": 0.386,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T21:24:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 325800,
+      "valuation": "$3,258.00",
+      "domain_age": 7,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (gold + chain + coin), 13 letters",
+        "lift -0.913 (length 12-13 -0.177, words 3 -0.736): name in the top 61% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "7 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 60.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 408,
+      "field_n": 667,
+      "top_pct": 61.2,
+      "domain": "peptidekit.com",
+      "score": 33.6,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 7.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.88,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            0.35,
+            0.5
+          ],
+          "word_quality": 0.387,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 10.7,
+          "developed_tlds": 0,
+          "exact_match_tlds": 4
+        }
+      },
+      "end_time": "2026-11-06T21:52:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 12500,
+      "valuation": "$125.00",
+      "domain_age": 3,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (peptide + kit), 10 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "3 years old",
+        "0 other endings with a live site, 4 exact-match registered",
+        "maximum $5: top 61.2% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 423,
+      "field_n": 667,
+      "top_pct": 63.4,
+      "domain": "sanadinvest.com",
+      "score": 32.7,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 10
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.45,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            0.5,
+            0.5,
+            1
+          ],
+          "word_quality": 0.583,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 7.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-06T21:25:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 3800,
+      "valuation": "$38.00",
+      "domain_age": 4,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (san + adin + vest), 11 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "4 years old",
+        "0 other endings with a live site, 2 exact-match registered",
+        "maximum $5: top 63.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 430,
+      "field_n": 667,
+      "top_pct": 64.5,
+      "domain": "emrapeptides.com",
+      "score": 31.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 2.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.286,
+          "lift": {
+            "sum": -0.913,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 28.6
+          },
+          "known": true,
+          "shape": 0.4,
+          "points": 11.6,
+          "field_pct": 0.386,
+          "all_common": false,
+          "word_levels": [
+            0.3,
+            0.3,
+            0.35
+          ],
+          "word_quality": 0.308,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T21:38:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 4700,
+      "valuation": "$47.00",
+      "domain_age": 1,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (em + ra + peptides), 12 letters",
+        "lift -0.913 (length 12-13 -0.177, words 4+ -0.736): name in the top 61% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "1 year old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $5: top 64.5% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 445,
+      "field_n": 667,
+      "top_pct": 66.7,
+      "domain": "smashmerestaurant.com",
+      "score": 30.3,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 7.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.15,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.3,
+            1
+          ],
+          "word_quality": 0.5329999999999999,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T19:19:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 2900,
+      "valuation": "$29.00",
+      "domain_age": 3,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (smash + me + restaurant), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 3 -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "3 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $5: top 66.7% of today's field (position factor 0.4)",
+        "brand-like: contains of \"restaurant\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 446,
+      "field_n": 667,
+      "top_pct": 66.9,
+      "domain": "losportalesgrills.com",
+      "score": 30.3,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 7.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.15,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": false,
+          "word_levels": [
+            0.5,
+            0.5,
+            1
+          ],
+          "word_quality": 0.583,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 16.6,
+          "developed_tlds": 1,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T22:17:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 1300,
+      "valuation": "$13.00",
+      "domain_age": 3,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (los + portales + grills), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 4+ -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "3 years old",
+        "1 other ending with a live site, 1 exact-match registered",
+        "maximum $5: top 66.9% of today's field (position factor 0.4)",
+        "brand-like: contains of \"sport\" (an ordinary word, read it)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 451,
+      "field_n": 667,
+      "top_pct": 67.6,
+      "domain": "onlyfellas.com",
+      "score": 30,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 10
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.88,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.35
+          ],
+          "word_quality": 0.512,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T22:21:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 166400,
+      "valuation": "$1,664.00",
+      "domain_age": 4,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "2 words (only + fellas), 10 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "4 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 67.6% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 501,
+      "field_n": 667,
+      "top_pct": 75.1,
+      "domain": "oneideaway.com",
+      "score": 25,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.46,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5,
+            1
+          ],
+          "word_quality": 0.667,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T21:53:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 3500,
+      "valuation": "$35.00",
+      "domain_age": 2,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (one + ide + away), 10 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "2 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 75.1% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 503,
+      "field_n": 667,
+      "top_pct": 75.4,
+      "domain": "caraudioguy.com",
+      "score": 25,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.45,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            1,
+            1,
+            0.5
+          ],
+          "word_quality": 0.667,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T22:55:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 132100,
+      "valuation": "$1,321.00",
+      "domain_age": 2,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (car + audio + guy), 11 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "2 years old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 75.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 516,
+      "field_n": 667,
+      "top_pct": 77.4,
+      "domain": "cupsandcubs.com",
+      "score": 22.5,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 2.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.373,
+          "lift": {
+            "sum": -0.519,
+            "bins": [
+              {
+                "bin": "10-11",
+                "lift": 0.217,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 37.3
+          },
+          "known": true,
+          "shape": 0.45,
+          "points": 14.3,
+          "field_pct": 0.477,
+          "all_common": false,
+          "word_levels": [
+            1,
+            0.5,
+            1
+          ],
+          "word_quality": 0.667,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-05T19:47:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 1700,
+      "valuation": "$17.00",
+      "domain_age": 1,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (cups + and + cubs), 11 letters",
+        "lift -0.519 (length 10-11 +0.217, words 3 -0.736): name in the top 52% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "1 year old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 77.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 523,
+      "field_n": 667,
+      "top_pct": 78.4,
+      "domain": "thedailyobjective.com",
+      "score": 21,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 7.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.261,
+          "lift": {
+            "sum": -1.043,
+            "bins": [
+              {
+                "bin": "14+",
+                "lift": -0.307,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 26.1
+          },
+          "known": true,
+          "shape": 0.15,
+          "points": 5.1,
+          "field_pct": 0.169,
+          "all_common": true,
+          "word_levels": [
+            1,
+            1,
+            1
+          ],
+          "word_quality": 1,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 7.3,
+          "developed_tlds": 0,
+          "exact_match_tlds": 2
+        }
+      },
+      "end_time": "2026-11-05T20:17:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 1100,
+      "valuation": "$11.00",
+      "domain_age": 3,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (the + daily + objective), 17 letters",
+        "lift -1.043 (length 14+ -0.307, words 3 -0.736): name in the top 83% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "3 years old",
+        "0 other endings with a live site, 2 exact-match registered",
+        "maximum $5: top 78.4% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 538,
+      "field_n": 667,
+      "top_pct": 80.7,
+      "domain": "jaliscotravel.com",
+      "score": 19.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 2.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.286,
+          "lift": {
+            "sum": -0.913,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "4+",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 28.6
+          },
+          "known": true,
+          "shape": 0.11666666666666667,
+          "points": 11.6,
+          "field_pct": 0.386,
+          "all_common": false,
+          "word_levels": [
+            0.5,
+            0.3,
+            0.5,
+            1
+          ],
+          "word_quality": 0.43799999999999994,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T22:23:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 127500,
+      "valuation": "$1,275.00",
+      "domain_age": 1,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "4 words (jal + is + co + travel), 13 letters",
+        "lift -0.913 (length 12-13 -0.177, words 4+ -0.736): name in the top 61% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "1 year old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 80.7% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    },
+    {
+      "rank": 539,
+      "field_n": 667,
+      "top_pct": 80.8,
+      "domain": "babahalalfood.com",
+      "score": 19.8,
+      "score_version": "auction-v4",
+      "parts": {
+        "age": {
+          "max": 25,
+          "known": true,
+          "points": 2.5
+        },
+        "bids": {
+          "max": 5,
+          "known": true,
+          "points": 1.1,
+          "seo_flag": false
+        },
+        "name": {
+          "max": 30,
+          "raw": 0.286,
+          "lift": {
+            "sum": -0.913,
+            "bins": [
+              {
+                "bin": "12-13",
+                "lift": -0.177,
+                "pattern": "length"
+              },
+              {
+                "bin": "3",
+                "lift": -0.736,
+                "pattern": "words"
+              }
+            ],
+            "score": 28.6
+          },
+          "known": true,
+          "shape": 0.35,
+          "points": 11.6,
+          "field_pct": 0.386,
+          "all_common": false,
+          "word_levels": [
+            0.35,
+            0.35,
+            1
+          ],
+          "word_quality": 0.45799999999999996,
+          "endings_known": 0,
+          "endings_value": null,
+          "endings_registered": 0
+        },
+        "demand": {
+          "max": 40,
+          "known": true,
+          "points": 4.6,
+          "developed_tlds": 0,
+          "exact_match_tlds": 1
+        }
+      },
+      "end_time": "2026-11-06T23:18:00+02:00",
+      "auction_type": "Bid",
+      "price_cents": 100,
+      "price": "$1.00",
+      "bids": 1,
+      "max_bid_suggested_cents": 500,
+      "max_bid_suggested": "$5.00",
+      "valuation_cents": 2900,
+      "valuation": "$29.00",
+      "domain_age": 1,
+      "pageviews": 0,
+      "prebid": null,
+      "reasons": [
+        "3 words (baba + halal + food), 13 letters",
+        "lift -0.913 (length 12-13 -0.177, words 3 -0.736): name in the top 61% of today's field (667 names)",
+        "other endings not checked yet (the lift uses length and word count only)",
+        "1 bid",
+        "1 year old",
+        "0 other endings with a live site, 1 exact-match registered",
+        "maximum $5: top 80.8% of today's field (position factor 0.4)"
+      ],
+      "prior_kill": null
+    }
+  ]
+}

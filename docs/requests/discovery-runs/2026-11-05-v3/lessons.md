@@ -1,0 +1,4 @@
+- 2026-11-05-v3 (STALE/PF-06): same sealed 2026-11-04 shortlist re-check → 83/83 prior-kill skip; 0 new judgments. AI3 prior-kill-before-meaning worked.
+- Preflight PF-06 STALE_AS_OF alone (PF-01..05 green) still blocks treating the day as a fresh seal; paper A+B+D OK; no money cards.
+- Closeouts tip-200 can show date=2026-11-05 while auction shortlist still on 2026-11-04 — do not treat D date as proof A is sealed.
+- Process: when PF-06 fails, finish pack labeled STALE, empty HOLD-for-post-seal if zero passers, wait for Gavriel post-seal ping (no polling).

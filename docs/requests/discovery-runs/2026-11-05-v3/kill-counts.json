@@ -1,0 +1,10 @@
+{
+  "prior_kill_n": 83,
+  "step0_local_n": 0,
+  "step0_person_n": 0,
+  "by_reason": {
+    "prior:meaning_brand_coinage_fragment": 61,
+    "prior:meaning_not_named_service": 21,
+    "prior:TIER_A_NONE": 1
+  }
+}

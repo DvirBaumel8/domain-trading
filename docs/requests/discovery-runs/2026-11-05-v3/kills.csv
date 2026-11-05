@@ -1,0 +1,84 @@
+domain,price,max_bid_suggested,end_time,age,reason,stage
+rapti.com,$45.00,$55.00,2026-11-06T21:11:00+02:00,22,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+orbiit.com,$21.00,$55.00,2026-11-06T23:12:00+02:00,21,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+quicksol.com,$11.00,$55.00,2026-11-06T18:21:00+02:00,25,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+supranatural.com,$10.00,$55.00,2026-11-06T21:56:00+02:00,25,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+companet.com,$1.00,$50.00,2026-11-06T19:18:00+02:00,23,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+glowscience.com,$1.00,$45.00,2026-11-06T20:34:00+02:00,18,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+sweetcomfort.com,$10.00,$45.00,2026-11-06T21:22:00+02:00,26,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+alliancesales.com,$1.00,$45.00,2026-11-06T23:00:00+02:00,14,"prior_kill:MEANING_BRAND: company-name pattern, not a named paid service; only .net user is Alliance Sales Co, Troy MI (1-4 staff) = one small same-name firm (R-ONE/TN-1); alliancesalesinc.com food broker separate",prior
+lesautres.com,$1.00,$40.00,2026-11-06T20:47:00+02:00,17,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+mymascot.com,$17.00,$40.00,2026-11-06T20:13:00+02:00,9,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+brobbey.com,$1.00,$35.00,2026-11-06T22:48:00+02:00,26,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+clubtavern.com,$10.00,$35.00,2026-11-06T19:21:00+02:00,27,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+lifedate.com,$17.00,$30.00,2026-11-06T20:38:00+02:00,25,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+emailremind.com,$1.00,$30.00,2026-11-05T21:05:00+02:00,27,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+howdyhomes.com,$1.00,$30.00,2026-11-06T19:38:00+02:00,9,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+parcelar.com,$1.00,$25.00,2026-11-06T21:03:00+02:00,7,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+barido.com,$11.00,$20.00,2026-11-06T20:38:00+02:00,20,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+villaamore.com,$1.00,$20.00,2026-11-06T18:07:00+02:00,10,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+witnessplus.com,$1.00,$15.00,2026-11-05T21:15:00+02:00,23,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+nextonly.com,$1.00,$15.00,2026-11-06T23:14:00+02:00,14,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+pumpkinsoftware.com,$1.00,$15.00,2026-11-05T21:09:00+02:00,29,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+vieqa.com,$11.00,$15.00,2026-11-06T20:23:00+02:00,7,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+deliciouslyplated.com,$11.00,$15.00,2026-11-05T19:03:00+02:00,10,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+lifeordebt.com,$11.00,$15.00,2026-11-06T20:44:00+02:00,22,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+wingsbowl.com,$1.00,$15.00,2026-11-06T23:00:00+02:00,7,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+transcribear.com,$1.00,$15.00,2026-11-06T20:04:00+02:00,9,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+cataractdvorak.com,$1.00,$15.00,2026-11-06T21:57:00+02:00,10,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+followdesk.com,$1.00,$15.00,2026-11-05T19:59:00+02:00,11,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+cashchief.com,$1.00,$15.00,2026-11-06T19:19:00+02:00,24,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+baumcapital.com,$1.00,$15.00,2026-11-06T18:49:00+02:00,17,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+singularcover.com,$1.00,$15.00,2026-11-06T20:43:00+02:00,8,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+sunnybump.com,$1.00,$15.00,2026-11-05T20:02:00+02:00,14,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+kobepost.com,$1.00,$15.00,2026-11-06T22:39:00+02:00,12,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+beanpuff.com,$1.00,$15.00,2026-11-06T21:25:00+02:00,5,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+milestonetechs.com,$1.00,$15.00,2026-11-06T22:01:00+02:00,8,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+itnwwe.com,$14.00,$15.00,2026-11-06T22:09:00+02:00,8,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+hessmachinery.com,$1.00,$10.00,2026-11-05T20:45:00+02:00,27,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+toolboxmail.com,$1.00,$10.00,2026-11-05T21:45:00+02:00,13,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+dailymusician.com,$1.00,$10.00,2026-11-06T18:32:00+02:00,12,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+cobblecapital.com,$1.00,$10.00,2026-11-05T21:15:00+02:00,9,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+partnerslogistics.com,$1.00,$10.00,2026-11-06T19:54:00+02:00,17,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+onewayimmigration.com,$1.00,$10.00,2026-11-05T22:40:00+02:00,8,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+earlybirdnews.com,$1.00,$10.00,2026-11-06T20:40:00+02:00,25,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+dinodiners.com,$1.00,$10.00,2026-11-06T21:48:00+02:00,8,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+solterus.com,$1.00,$10.00,2026-11-06T19:58:00+02:00,10,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+brewcase.com,$1.00,$10.00,2026-11-05T19:32:00+02:00,6,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+kolbing.com,$1.00,$10.00,2026-11-06T22:56:00+02:00,1,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+lokalbet.com,$1.00,$10.00,2026-11-05T21:10:00+02:00,9,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+soltarus.com,$1.00,$10.00,2026-11-06T19:35:00+02:00,10,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+greenlandtrips.com,$7.00,$10.00,2026-11-06T22:09:00+02:00,12,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+melodymakersmovie.com,$1.00,$10.00,2026-11-06T20:14:00+02:00,15,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+apartmentpromotions.com,$1.00,$10.00,2026-11-06T20:05:00+02:00,25,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+endotoxins.com,$1.00,$10.00,2026-11-06T18:18:00+02:00,17,"prior_kill:TIER_A_NONE: 0 other endings live (API); firms sell ""endotoxin testing"" (singular form dominant; plural check weak) - CMD/Charles River/NJ Labs are labs not buyers of the plural; no Tier A -> kill before USPTO",prior
+carvalle.com,$1.00,$10.00,2026-11-06T19:46:00+02:00,1,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+expertwitnessnews.com,$1.00,$10.00,2026-11-06T19:30:00+02:00,12,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+docodehere.com,$1.00,$10.00,2026-11-06T20:00:00+02:00,6,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+userstellar.com,$1.00,$10.00,2026-11-06T21:35:00+02:00,6,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+woodesmusic.com,$1.00,$10.00,2026-11-06T18:59:00+02:00,12,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+theoverseanetwork.com,$1.00,$10.00,2026-11-06T18:43:00+02:00,8,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+servicemarshal.com,$1.00,$10.00,2026-11-06T21:19:00+02:00,2,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+theislayhotel.com,$1.00,$10.00,2026-11-05T20:16:00+02:00,17,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+ecofriendlyhouse.com,$1.00,$10.00,2026-11-06T21:03:00+02:00,21,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+listhomeforsale.com,$1.00,$10.00,2026-11-06T21:54:00+02:00,22,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+applecaredoctors.com,$1.00,$10.00,2026-11-05T21:10:00+02:00,17,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+whataphoia.com,$1.00,$5.00,2026-11-06T18:12:00+02:00,2,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+swirlandspoon.com,$1.00,$5.00,2026-11-05T21:26:00+02:00,1,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+homeremodelexpert.com,$1.00,$5.00,2026-11-05T21:49:00+02:00,17,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+inversionesmodelo.com,$1.00,$5.00,2026-11-06T18:52:00+02:00,18,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+wherecanigetweed.com,$1.00,$5.00,2026-11-06T19:05:00+02:00,12,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+kernelerp.com,$1.00,$5.00,2026-11-05T18:26:00+02:00,1,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+goldchaincoin.com,$1.00,$5.00,2026-11-06T21:24:00+02:00,7,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+peptidekit.com,$1.00,$5.00,2026-11-06T21:52:00+02:00,3,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+sanadinvest.com,$1.00,$5.00,2026-11-06T21:25:00+02:00,4,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+emrapeptides.com,$1.00,$5.00,2026-11-06T21:38:00+02:00,1,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+smashmerestaurant.com,$1.00,$5.00,2026-11-06T19:19:00+02:00,3,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+losportalesgrills.com,$1.00,$5.00,2026-11-06T22:17:00+02:00,3,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+onlyfellas.com,$1.00,$5.00,2026-11-06T22:21:00+02:00,4,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+oneideaway.com,$1.00,$5.00,2026-11-05T21:53:00+02:00,2,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+caraudioguy.com,$1.00,$5.00,2026-11-06T22:55:00+02:00,2,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+cupsandcubs.com,$1.00,$5.00,2026-11-05T19:47:00+02:00,1,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
+thedailyobjective.com,$1.00,$5.00,2026-11-05T20:17:00+02:00,3,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+jaliscotravel.com,$1.00,$5.00,2026-11-06T22:23:00+02:00,1,prior_kill:MEANING_NOT_NAMED_PAID_SERVICE (generic/media/3-word/inverted/salad),prior
+babahalalfood.com,$1.00,$5.00,2026-11-06T23:18:00+02:00,1,prior_kill:MEANING_BRAND_COINAGE_OR_FRAGMENT,prior
