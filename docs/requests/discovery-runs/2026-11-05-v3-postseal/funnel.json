@@ -1,0 +1,30 @@
+{
+  "data_date": "2026-11-05",
+  "label": "POST-SEAL",
+  "as_of_preflight": "2026-11-05T17:53:20+02:00",
+  "field_n": 662,
+  "served_n_at_start": 463,
+  "prior_kill_excluded_server_at_start": 83,
+  "served_n_after_kill_load": 391,
+  "prior_kill_excluded_server_after_kill_load": 155,
+  "prior_kill_skipped_this_run": 72,
+  "note_refresh": "Mid-run server loaded pack kills; served 463\u2192391 (exactly the 72 PRIOR_KILL rows dropped). Re-GET shortlist; judged set unchanged; no re-judge of names that moved into prior_kill.",
+  "judged_new": 391,
+  "step0_local_business": 70,
+  "step0_person_name": 64,
+  "step0_total": 134,
+  "tier_a_none": 10,
+  "time_gate_lt12h": 4,
+  "full_stack_passers": 0,
+  "FALLBACK": true,
+  "Test1_bid_plans": 0,
+  "kill_counts": {
+    "STEP0_LOCAL_BUSINESS": 70,
+    "TIER_A_NONE": 10,
+    "MEANING_BRAND_COINAGE_OR_FRAGMENT": 67,
+    "MEANING_NOT_NAMED_PAID_SERVICE": 170,
+    "STEP0_PERSON_NAME": 64,
+    "TIME_GATE_LT12H_FIRM_OPEN": 4,
+    "MEANING_BRAND": 6
+  }
+}

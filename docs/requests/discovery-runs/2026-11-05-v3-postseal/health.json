@@ -1,0 +1,5 @@
+{
+  "note": "GET /health returned 403 with bots token; preflight+shortlist used for seal proof instead",
+  "preflight_checks_sha256": "272c598b49aa6912e9bce40492a6c7c21dd4c92bcba1873aa5260a06c337d041",
+  "data_date": "2026-11-05"
+}
