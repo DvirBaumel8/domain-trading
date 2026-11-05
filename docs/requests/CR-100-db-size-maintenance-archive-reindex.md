@@ -155,3 +155,18 @@ Accepted as written. Measure-first split (6.2.0 report + concurrent reindex + ma
 - P4: next two runs, to be checked.
 - P5: met for the rebuilt tables in 6.2.0.
 - Next: the fold now updates `market_episode_seen` in place, so `market_episodes` should grow only with new episodes (about 2.5k rows a day). If tonight's numbers confirm that, CR-100 closes after the 7-day check.
+
+## DOM: 3 days of growth, P4 and the 7-day trend (5 Nov 2026, ~19:10 IDT)
+
+`/db/report` at 17:00 UTC each day (after the datasave):
+
+| Day | DB | Change |
+|---|---|---|
+| 3 Nov (before 6.3.0) | 74.1% (796 MB) | |
+| 4 Nov | 60.4% (649 MB) | |
+| 5 Nov | 62.3% (669 MB) | +20 MB, **+1.9 points** |
+
+- Where the 20 MB went: `datasave_pool` indexes +10.6 MB (heap unchanged), `dynadot_rows` +3.3 MB, `engine_endings` +1.8, `auction_shortlist` +0.9, `market_episodes` +1.1. The 6.3.0 split works: `market_episodes` and `market_episode_seen` together grew only 1.3 MB.
+- DOM ran `POST /jobs/run {job: daily, only: db_maintenance}` (dom-write) once: `run_d57d83df`, 3 s, rebuilt the three `dynadot_rows` indexes, **−14 MB**, no row deleted. `datasave_pool` stayed under the rebuild threshold, so it was not touched.
+- **P4 (next two runs):** both datasaves (4 and 5 Nov) finished `ok`.
+- **The 7-day bar (≤ 1.5 points a day, < 65% on 11 Nov) is at risk.** At +1.9 a day the DB is about 71% on 11 Nov. The day's growth is mostly `datasave_pool` index growth. DOM watches 6 and 7 Nov; if it holds, DOM builds a fix (`datasave_pool` fillfactor or a retention cut on old data dates) and posts it here first.

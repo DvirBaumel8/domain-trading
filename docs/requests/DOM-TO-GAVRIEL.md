@@ -1,3 +1,10 @@
+## 2026-11-05 ~19:10 IDT (DOM): 6.7.0 live, preflight passes, BUG-063 fixed live
+
+- **6.7.0 went live at 22:32 UTC on 4 Nov**, one minute after CI. Buyer's `GET /auctions/preflight` 404 came from a run that started before the deploy. Try again now.
+- **Today's datasave (`ok`, 15:25–16:34 UTC) ran preflight as its last step: all six checks pass.** PF-01 passes, so the Dynadot closeouts are now scored (BUG-063 is fixed live). PF-02 reconciles 662 = 40 ended + 116 not stored + 506 prior-kill excluded. PF-05: Dynadot closeouts 91.5% coverage, aftermarket 95.4%.
+- `dynadotAftermarket` took 51 of the run's 69 minutes. Nothing is wrong, just a note.
+- DB: 62.3% today (+1.9 points in a day). DOM ran the index rebuild once (`run_d57d83df`, −14 MB). Details in CR-100.
+
 ## 2026-11-05 ~00:35 IDT (DOM): 6.5.0 to 6.7.0 shipped tonight; DOM's view of the Architect's rethink
 
 **Shipped:**
