@@ -7,7 +7,7 @@
 - A small read-only HTTP API on **Render free**. **The whole state is `data/state.json`** in this repo. No database, jobs, Mac server or write routes.
 - **A purchase, renewal, cost or sale is a commit** by DOM that adds a row, after Dvir's chat approval (one per action). Rows are never edited or removed; a mistake gets an `adjustment` row.
 - **CI enforces the founder rules** (`npm run check-state`); Render deploys only after CI passes.
-- **This repo is public** (private for half an hour on 23 Nov 2026; Render did not deploy from it). Treat everything in it as public: no key, token, address, approval text, or a name's own floor or walk-away. `data/access.json` holds token hashes only.
+- **This repo is public** for now (Dvir, 23 Nov 2026; Render did not deploy while it was private). Treat everything in it as public: no key, token, address, approval text, or a name's own floor or walk-away. `data/access.json` holds token hashes only.
 - Buying, listing, price changes and drops are done by hand, by the rules below and in `docs/internal/pricing.md`.
 - Nine old providers were erased (CR-113; "removed-provider" in old records). Never bring one back.
 - The Neon project and the 12 Nov dump stay untouched, never read and never deleted. Never connect to the old database or read `prod.env`.
@@ -21,7 +21,7 @@
 ## Founder rules
 A rule may change when Dvir agrees (7 Oct 2026); flag a conflict, never break a rule silently.
 1. **Every purchase has Dvir's explicit approval**, at most 72 hours old, recorded with the row (CI checks it).
-2. **Caps:** 40 domains, $250 a name, in `src/state.ts`. They change only by a commit.
+2. **Caps:** 40 domains, $250 a name, $1,500 spent in total (Dvir, 23 Nov 2026; every cost counts, a sale adds no room), in `src/state.ts`. They change only by a commit.
 3. **One renewal per domain at most.** New registrations are for 1 year. An aftermarket (S8) name may arrive with up to 2 years and 30 days of expiry, and still gets one renewal. `drop_date` = expiry + 1 year.
 4. **Listing and pricing:** `docs/internal/pricing.md`.
 5. **Never Cloudflare Registrar, premium names, or backorder and catch services** (NameJet, SnapNames, DropCatch). Aftermarket buys (closeouts, fixed-price listings, public auctions) only in lane S8, at most $250 a name. **S8 is the main line and auctions with real bidding its main effort** (25 Oct 2026). Closeouts get no money until a test shows an edge. New registrations are the side line, only through the Tier A gate (the exact name live as a business on .net and .org, two or more unrelated businesses, no trademark owner), applied on Gavriel's side with Dvir's 16 Nov relaxation in the Buyer SOP.

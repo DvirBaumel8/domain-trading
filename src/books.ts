@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { pair } from './core/money.js';
 import { normalizeDomain } from './domain-name.js';
 import { AppError } from './http/errors.js';
-import { MAX_DOMAINS, type Domain, type LedgerEntry, type State } from './state.js';
+import { MAX_DOMAINS, spentCents, type Domain, type LedgerEntry, type State } from './state.js';
 
 const sum = (rows: readonly LedgerEntry[]): number => rows.reduce((n, r) => n + r.amount_cents, 0);
 
@@ -36,7 +36,7 @@ export function registerBooks(app: FastifyInstance, s: State): void {
       domains_owned: s.domains.filter((d) => d.status === 'owned').length,
       domains_sold: s.domains.filter((d) => d.status === 'sold').length,
       max_domains: MAX_DOMAINS,
-      ...pair('spent', sales - sum(s.ledger)),
+      ...pair('spent', spentCents(s)),
       ...pair('sales', sales),
       ...pair('net', sum(s.ledger)),
     };

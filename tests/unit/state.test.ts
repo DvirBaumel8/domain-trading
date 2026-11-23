@@ -38,6 +38,16 @@ describe('problems', () => {
     expect(problems({ ...base(), ledger: [buy(1, { amount_cents: -25_001 }), buy(2)] })).toEqual([expect.stringMatching(/\$250 cap/)]);
   });
 
+  it('founder rule 2: $1,500 spent in total; every cost counts, a sale makes no room, an adjustment corrects', () => {
+    const at = withRow({ type: 'cost', domain: null, amount_cents: -(150_000 - 2 * 1108), approval: null });
+    expect(problems(at)).toEqual([]);
+    const over = withRow({ type: 'cost', domain: null, amount_cents: -1, approval: null }, at);
+    expect(problems(over)).toEqual([expect.stringMatching(/\$1500\.01 is spent in total; the cap is \$1500/)]);
+    const sold = withRow({ type: 'sale', amount_cents: 148_800, approval: ok }, { ...over, domains: [dom(1, { status: 'sold' }), dom(2)] });
+    expect(problems(sold)).toEqual([expect.stringMatching(/spent in total/)]);
+    expect(problems(withRow({ type: 'adjustment', domain: null, amount_cents: 1, approval: null }, over))).toEqual([]);
+  });
+
   it('founder rule 3: one renewal', () => {
     const once = withRow({ type: 'renewal', approval: ok });
     expect(problems(once)).toEqual([]);

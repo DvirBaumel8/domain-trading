@@ -5,9 +5,10 @@ import { z } from 'zod';
 import { isRealDate } from './core/dates.js';
 import { isValidDisplayName, normalizeDomain } from './domain-name.js';
 
-/** Founder rule 2: 40 domains. Founder rule 5: $250 a name. They change only by a commit, never through the API. */
+/** Founder rule 2: 40 domains, $250 a name, $1,500 spent in total. They change only by a commit, never through the API. */
 export const MAX_DOMAINS = 40;
 export const MAX_PURCHASE_CENTS = 25_000;
+export const MAX_SPENT_CENTS = 150_000;
 /** Founder rule 1: Dvir's approval is at most 72 hours old at the purchase. */
 const APPROVAL_MAX_AGE_DAYS = 3;
 /** Founder rule 5: never Cloudflare, never a backorder or catch service. */
@@ -42,6 +43,9 @@ export type State = z.infer<typeof StateSchema>;
 export type Domain = State['domains'][number];
 export type LedgerEntry = State['ledger'][number];
 
+/** All money out, corrections included. A sale never lowers it. */
+export const spentCents = (s: State): number => -s.ledger.reduce((n, r) => (r.type === 'sale' ? n : n + r.amount_cents), 0);
+
 const daysBetween = (a: string, b: string): number => (Date.parse(b) - Date.parse(a)) / 86_400_000;
 const repeated = (xs: string[]): string[] => [...new Set(xs.filter((x, i) => xs.indexOf(x) !== i))];
 
@@ -54,6 +58,8 @@ export function problems(s: State): string[] {
 
   const held = s.domains.filter((d) => d.status === 'owned').length;
   if (held > MAX_DOMAINS) out.push(`${held} domains are owned; the cap is ${MAX_DOMAINS}`);
+  const spent = spentCents(s);
+  if (spent > MAX_SPENT_CENTS) out.push(`$${(spent / 100).toFixed(2)} is spent in total; the cap is $${MAX_SPENT_CENTS / 100}`);
   for (const d of s.domains) {
     if (!isValidDisplayName(d.domain, d.display_name)) out.push(`${d.domain}: the display name must be the same name`);
     if (REFUSED_REGISTRARS.includes(d.registrar)) out.push(`${d.domain}: ${d.registrar} is never used`);

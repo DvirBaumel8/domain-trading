@@ -6,7 +6,7 @@ About 850 lines. The app keeps nothing: it reads `data/state.json` at start and 
 |---|---|
 | `data/state.json` | **The whole state**: domains owned and the money ledger. No private price or approval text |
 | `data/access.json` | Who may read: name -> sha256 of the token |
-| `src/state.ts` | Its schema and rules (`problems`), what may never change (`rewrites`), the caps `MAX_DOMAINS`, `MAX_PURCHASE_CENTS` |
+| `src/state.ts` | Its schema and rules (`problems`), what may never change (`rewrites`), the caps `MAX_DOMAINS`, `MAX_PURCHASE_CENTS`, `MAX_SPENT_CENTS` |
 | `scripts/check-state.ts` | `npm run check-state`, run by CI: the rules, no future date, approval records exist, and the append-only check over git history |
 | `src/app.ts`, `src/main.ts`, `src/config.ts` | The app (`/health/ping`, `/health`), the start, the environment |
 | `src/books.ts` | `GET /portfolio`, `/portfolio/:domain`, `/ledger`, `/report` |

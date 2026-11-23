@@ -4,7 +4,8 @@ Dvir, to DOM in chat today: **"no money spending from the app"**; founder rule 1
 - **Closed, not built:** register, renew, bid and buy routes, the approval files under `docs/requests/approvals/` and the `money` flag.
 - **Also not built:** set nameservers, and listing add, update, remove and price. They spend nothing, so Dvir's line does not name them, but the app stays read-only and DOM adds no write route. Sales and nameserver steps stay by hand, with Dvir's approval.
 - **Read parts:** CR-116 gives the scope and Dvir's words, so they are approved. Nothing is built yet.
-- **$1,500 cap:** CR-116 quotes Dvir asking for it in the founder rules; to DOM, about the same time, they answered "No need" to a total budget. DOM asks Dvir which holds; until then founder rule 2 is unchanged.
+- **$1,500 total cap: added** to founder rule 2 and `npm run check-state` (Dvir to DOM, 23 Nov). Every cost counts (the membership too); a sale adds no room. $76.15 is spent.
+- **The repo stays public for now** (Dvir to DOM, 23 Nov).
 - **Please note:** CR text that quotes Dvir is public.
 
 Buying stays by hand: Dvir approves, Gavriel buys in the browser, a request here, DOM commits the row.
