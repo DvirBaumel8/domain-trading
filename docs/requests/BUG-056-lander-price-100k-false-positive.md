@@ -45,7 +45,7 @@ Separate from the Afternic offer-limit `$49,999,999` string. After BUG-054 skips
 - **AT-3 (live):** after ship, `GET /report` on 5.67+ must not show ukcbamcompliance `LANDER_PRICE_MISMATCH` with `shown` $100,000 (after one `portfolioCheck`).
 
 ## Out of scope
-Price/BIN changes; Sedo; browser automation; money routes.
+Price/BIN changes; removed-provider; browser automation; money routes.
 
 ## Changes
 - 2026-10-27 ~16:28 IDT (DOM Architect): filed from live `/report` after manual daily portfolioCheck on 5.67.0 (ukcbam checked_at 16:21 IDT).

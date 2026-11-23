@@ -65,7 +65,7 @@ Conclusions below rest on A/B sources unless marked.
 
 **Changes to today's checks:**
 - **Siblings ≥25%** becomes a ranking signal, not a gate. There's no outcome evidence for it, and it must count real businesses, not pages that merely resolve.
-- **"Keyword appears in sales"** becomes either the sales-to-listings ratio, or "at least one similar-pattern sale ≥ $1k in the last 3 years". A human looks that up in NameBio by hand; never automated.
+- **"Keyword appears in sales"** becomes either the sales-to-listings ratio, or "at least one similar-pattern sale ≥ $1k in the last 3 years". A human looks that up in removed-provider by hand; never automated.
 - **EV and renewal ratio** become sanity checks. Every .com costs the same to renew, and the break-even is about 1% a year at $1,488. The sell-through inputs are uncertain by ±100%.
 - **The 0–100 score** stays a tiebreaker. Its weights were set by hand, two of its seven parts are the bots' own opinion, and one part isn't built.
 
@@ -113,7 +113,7 @@ Conclusions below rest on A/B sources unless marked.
   - Harmful history mainly causes buyer friction and blocklist trouble.
 - **Blocklists show today only.** Spamhaus DBL listings expire once the abuse stops. A clean result doesn't prove a clean past; a listed result is a strong kill.
 - **Auction traps:**
-  - The old owner can redeem: at GoDaddy up to about 30 days after expiry, but not once a bid is placed; at Dynadot during the full 40-day grace period, with a refund. **Don't list a won name until RDAP shows the transfer complete.**
+  - The old owner can redeem: at GoDaddy up to about 30 days after expiry, but not once a bid is placed; at removed-provider during the full 40-day grace period, with a refund. **Don't list a won name until RDAP shows the transfer complete.**
   - A UDRP complaint locks a name within 2 business days.
   - A stolen name can be reversed for 12 months (ICANN TDRP).
 
@@ -186,6 +186,6 @@ Conclusions below rest on A/B sources unless marked.
 - ICANN UDRP Rules, ERRP, TDRP A: https://www.icann.org/resources/pages/udrp-rules-2015-03-11-en , https://www.icann.org/resources/pages/registrant-about-errp-2018-12-07-en , https://www.icann.org/resources/pages/tdrp-2016-06-01-en
 - Google Search Central spam policies; Web Risk Lookup API and pricing; Custom Search API end date A: https://developers.google.com/search/docs/essentials/spam-policies , https://docs.cloud.google.com/web-risk/docs/lookup-api , https://developers.google.com/custom-search/v1/overview
 - Spamhaus DBL FAQ A: https://www.spamhaus.org/faqs/domain-blocklist/ ; SURBL usage policy A: https://www.surbl.org/usage-policy ; URIBL A: http://uribl.com/about.shtml
-- GoDaddy and Dynadot help on redemption A (own policy): https://www.godaddy.com/help/listing-types-for-godaddy-auctions-1525 , https://www.dynadot.com/help/question/auction-cancelled-renewed
+- GoDaddy and removed-provider help on redemption A (own policy): https://www.godaddy.com/help/listing-types-for-godaddy-auctions-1525 , https://www.removed-provider.com/help/question/auction-cancelled-renewed
 - Szurdi et al., typosquatting (USENIX 2014) A; Kintis et al., combosquatting (CCS 2017) A; Tranco (NDSS 2019) A: https://tranco-list.eu/
 - USPTO bulk data / TSDR API A; EUIPO availability and API A: https://www.uspto.gov/trademarks/apply/check-status-view-documents/trademark-bulk-data , https://www.euipo.europa.eu/en/trade-marks/before-applying/availability

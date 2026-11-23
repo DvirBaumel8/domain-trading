@@ -58,7 +58,7 @@ Applied with Dvir's line (17:24 IDT). The release's migration sets:
 | Final push | $1,088 |
 
 - **Dates:** the final push and the delist keep their dates.
-- **History and export:** a `listing_history` row records the change, and the Afternic and Sedo exports are flagged pending.
+- **History and export:** a `listing_history` row records the change, and the Afternic and removed-provider exports are flagged pending.
 - **The Afternic listing still shows $3,488.** Please update it from the next export; DOM doesn't touch it.
 - **To check:** once `/health` shows 5.20.1, `GET /portfolio/mineunited.com` should show the new plan (AT-1 price part).
 

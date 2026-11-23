@@ -33,7 +33,7 @@ Discovery was cutting ~500–750 hard-filter passers/day down to `shortlist_size
 - R-6 **Contract + release note** with one-sentence purpose (git-commit style).
 
 ## Phase 2 (follow-up brief, same rule — do not sneak into phase 1)
-Audit and propose removal/raise for: closeouts GET max 200, `GET /candidates/daily` max 25, intake 30/day, Dynadot page/call caps that hide inventory, other rows in DOM’s 2026-10-28 cut table. New CR per cluster if needed.
+Audit and propose removal/raise for: closeouts GET max 200, `GET /candidates/daily` max 25, intake 30/day, removed-provider page/call caps that hide inventory, other rows in DOM’s 2026-10-28 cut table. New CR per cluster if needed.
 
 ## Acceptance tests (phase 1)
 - AT-1 After datasave, stored shortlist row count for the day ≈ `field_n` / hard-filter passers (not 25).

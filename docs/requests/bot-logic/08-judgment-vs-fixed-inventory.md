@@ -58,7 +58,7 @@
 | Major step | Tag | Notes | Sources |
 |---|---|---|---|
 | Hybrid / geo BIN–floor–walkaway formula + price list | FIXED → DOM | Server computes; mismatch → `PRICING_FORMULA_MISMATCH` | `docs/internal/listing-strategy.md`; `docs/internal/list.md`; `docs/internal/buy.md` |
-| Afternic/Sedo export CSV shape | FIXED → DOM | Bot/Dvir upload on marketplace UI | `docs/internal/list.md` checklist; memory Dvir Oct 3 weekly bulk CSV |
+| Afternic/removed-provider export CSV shape | FIXED → DOM | Bot/Dvir upload on marketplace UI | `docs/internal/list.md` checklist; memory Dvir Oct 3 weekly bulk CSV |
 | Offer band routing (≥ floor auto, mid → Dvir, below walkaway decline) | FIXED → DOM (with per-deal exceptions) | Standing yes / per-deal bands still need Sales care | `docs/internal/listing-strategy.md` offers; `company/company.md` §3; `lessons/sochen.md` |
 | Ledger append-only + receipt required | FIXED → stay bot/DOM books | Sales absorbed CFO; no pay/renew | `knowledge/handoffs/cfo.md`; CR-070 |
 | Rule 14 renew/drop math | FIXED math → DOM candidate; verdict JUDGMENT | Recommendation only; Dvir decides | `knowledge/handoffs/cfo.md`; rulebook Rule 14 cited there |

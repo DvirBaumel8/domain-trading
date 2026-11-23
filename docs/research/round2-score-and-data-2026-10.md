@@ -4,8 +4,8 @@
 
 **Method and limits:**
 - About 60 web searches plus direct reads of official pages, papers (arXiv HTML, PDFs read in the scratchpad) and GitHub repos through the `gh` API.
-- NamePros (blog and threads), namebio.com, domainsmoke.com and the ACM full-text page still return **HTTP 403**. Following the rule, I used **no proxy or mirror**. Bob Hawkes' NamePros articles and the NameBio terms are used only through **search-result snippets**, and they are marked that way. No conclusion rests on a snippet alone.
-- Nothing was scraped. No marketplace, NameBio page, Wayback or catch service was automated. No account was created. The DASH data file (non-commercial licence) was **not** downloaded; only its licence and file list were read.
+- NamePros (blog and threads), removed-provider.com, domainsmoke.com and the ACM full-text page still return **HTTP 403**. Following the rule, I used **no proxy or mirror**. Bob Hawkes' NamePros articles and the removed-provider terms are used only through **search-result snippets**, and they are marked that way. No conclusion rests on a snippet alone.
+- Nothing was scraped. No marketplace, removed-provider page, Wayback or catch service was automated. No account was created. The DASH data file (non-commercial licence) was **not** downloaded; only its licence and file list were read.
 - Grades: **A** official or large-sample data; **B** practitioner with a track record; **C** guide or small or unclear study; **D** vendor marketing, single anecdote or content farm. DNW (Allemann) still counts as one voice.
 - Our backtest numbers here are the coordinator's newer CR-002 counts (767 sold, 988 dropped), not round 1's 226/224.
 
@@ -20,8 +20,8 @@
 5. **Data, free only:**
    - **Historical unsold:** the free path is **ICANN CZDS** (free; Dvir signs up). Its agreement is the proof **OpenINTEL** requires before it shares its closed daily .com measurements, which go back to **Feb 2015**. From those, names that left the zone can be derived.
    - **Historical sold:** no free source exists that we may use without written permission.
-     - The **DASH dataset is public on GitHub** (159,047 domain sales, 2006–2022, Sedo and Flippa), but its licence is **non-commercial only** unless the author gives written permission.
-     - **NameBio's terms forbid using its data to train ML models** without written permission (search snippet of namebio.com/tos). This affects round 1's plan B1, and possibly the engine's NameBio-derived features.
+     - The **DASH dataset is public on GitHub** (159,047 domain sales, 2006–2022, removed-provider and Flippa), but its licence is **non-commercial only** unless the author gives written permission.
+     - **removed-provider's terms forbid using its data to train ML models** without written permission (search snippet of removed-provider.com/tos). This affects round 1's plan B1, and possibly the engine's removed-provider-derived features.
    - **Forward:** the GoDaddy files we already collect give same-population sold and unsold labels (auctions ending with bids vs closeouts ending unsold). This is the best free source for lift tables.
 
 ---
@@ -33,17 +33,17 @@
 | 1 | **Ending count is the strongest predictor** | **Confirmed** (stronger for price) | DASH paper Table 4, domain set: TLD count +0.330 MSLE vs length +0.026, tokens +0.009, vocabulary +0.007 (A). Miramirkhani et al. 2018, 28M dropped names: professional catchers' names had 0.8 other endings vs 0.3 for one-off buyers (A). Squadhelp 2021: "the more extensions … the higher the sell-through" (DNW summary; vendor data, A−/D). Silver: .com as the only ending registered is a sign the words are "not widely used" (B). Hawkes uses dotDB ending counts in his brand-term studies (B, snippet) | Agree on direction. **Caveat 1:** for *being caught* at all, other endings differed little (0.30 caught vs 0.23 uncaught), so ending count is a retail and expert signal more than a mass-demand signal. **Caveat 2:** DASH counts endings from a 2013 DNS census, so for sales before 2013 the count is partly *after* the sale (leakage). **Correction to round 1:** its +0.199 / +0.142 figures were cross-asset averages, not domain figures |
 | 2 | **1–2 words and short names sell better** | **Confirmed for sale chance; weakened for price** | NotRenewing (Sully, Aug 2026; 20,824 listings, 496–523 sales, $99 fixed): sell-through 1–5 chars 3.00%, 6–8 2.92%, 9–12 2.70%, 13–16 1.51%, 17+ 1.03% (B, two-sided). Drop study: caught 10±4 chars, 2.0±0.9 words; uncaught 12±5, 2.5±1.2 (A). Hawkes: 3–4 word names were about 3.9% of .com sales of $7,500+ (B, snippet). Squadhelp 2022: names of ≤12 chars were 91% of sales (B, vendor) | Agree on sale chance. Size: about a **3x** gap between the shortest and longest band, and almost flat up to 12 chars. **Conflict on price:** DASH length adds only +0.026 for domains; Bishopi (480,667 .com sales 2024–26) finds median prices flat at $181–$194 for every length above 3 chars (D, dominated by cheap drop-catch sales). NotRenewing buyers at $99 are mostly investors, not end users |
 | 3 | **Live businesses on other endings** | **Still thin** (direction supported) | Hawkes counts active companies using the term (OpenCorporates) as a sale-probability input, e.g. "care" in 556,602 active listings (B, snippet, Nov 2025). MediaOptions, 383 upgrades: 32.9% moved from a one-word alt-extension to the .com, 62.9% from a weaker .com (B; premium one-word names only) | Agree that real business use of the *term* matters. No study measures live sibling sites against later sales of 2–3 word .coms. Round 1's conflict stands: few DNW end-user buyers owned the same name elsewhere |
-| 4 | **Buyer pool (category) matters** | **Confirmed (medium)** | Sedo/InterNetX Global Domain Report 2026: .com 66% of sales, .com median $595, 76% Buy Now (A). Squadhelp: top industries Agency & Consulting, Tech, Health (B, vendor). NotRenewing: AI the largest category, but "AI isn't automatic success" (B) | Agree. **Caveat:** "how often a keyword appears in sales" counts popular keywords that are also listed far more often (no denominator). Category is safe only as a fixed list, not as a sales count (see #6) |
+| 4 | **Buyer pool (category) matters** | **Confirmed (medium)** | removed-provider/InterNetX Global Domain Report 2026: .com 66% of sales, .com median $595, 76% Buy Now (A). Squadhelp: top industries Agency & Consulting, Tech, Health (B, vendor). NotRenewing: AI the largest category, but "AI isn't automatic success" (B) | Agree. **Caveat:** "how often a keyword appears in sales" counts popular keywords that are also listed far more often (no denominator). Category is safe only as a fixed list, not as a sales count (see #6) |
 | 5 | **CPC / search volume weak or untested** | **Still thin for end users; partly contradicted for investor demand** | Drop study: average keyword search volume 833 for caught vs 130 for uncaught names; search results 215K vs 98K (A) | So search volume **does** predict that *investors and catchers* want a name. No new study links it to end-user sales of names like ours. It is a wholesale-demand signal, so it fits the auction score better than the end-user score |
-| 6 | **Keyword sales count (retailstats) is anti-predictive** | **Still thin externally** (mechanism explained) | No outside test found. Hawkes prefers the sales ÷ listings ratio (B, via Sully 2026). Sully: adding listings "just makes the denominator bigger" (B) | The internal AUC 0.25 stays the only test. The likely reason is the lift problem: a raw count rewards keywords with huge supply. **New reason to drop it:** NameBio's terms bar ML use of its data without permission (§4) |
+| 6 | **Keyword sales count (retailstats) is anti-predictive** | **Still thin externally** (mechanism explained) | No outside test found. Hawkes prefers the sales ÷ listings ratio (B, via Sully 2026). Sully: adding listings "just makes the denominator bigger" (B) | The internal AUC 0.25 stays the only test. The likely reason is the lift problem: a raw count rewards keywords with huge supply. **New reason to drop it:** removed-provider's terms bar ML use of its data without permission (§4) |
 | 7 | **Appraisal tools are unreliable** | **Confirmed** | DNW, best-tool verdict (Jun 2026): "no domain appraisal system will be accurate to the nearest dollar" … nor thousand; Atom ranked best; GoDaddy good for *relative* ranking (B). SVM paper (arXiv 1707.00906), full text read: 903 names, "valuable" = auction price ≥ $100, features mostly backlinks and PageRank; 93–97% accuracy on a hand-picked set (C) | Agree. The SVM paper measures SEO value, not name value, so it supports the "backlinks drive auction price" point rather than appraisal quality |
 | 8 | **Auction bid count is mixed (SEO and backlink bidders)** | **Confirmed, sharper** | DNW 2023 (Digiventures, 150 lost GoDaddy auctions): HugeDomains 47.3%, PerfectDomain 16.6%, 1 end user (B, n=150). Drop study: Wayback history 10.8% caught vs 3.2% uncaught; Alexa top-1M 3.3% vs 0.6%; fewer than 11% of caught names hosted content (A). Linton: bidders are hard to resell to; one bidder can fake demand (B, snippet). Silver 2013: good values come from names with "few bidders" (B). Hawkes, GoDaddy sales of $4,000+: ~40% investors, ~35%+ end users or developers (B, snippet) | Mostly agree: bids reflect investor, SEO and history demand. **Conflict at high prices:** end users take a real share of $4k+ auctions, which is above our $250 cap. At our price level, the winner is usually a reseller |
 | 9 | **Near-equal weights beat fitted weights at small scale** | **Confirmed** | Czerlinski, Gigerenzer & Goldstein 1999 (20 data sets): tallying beat regression on cross-validation on average; it works best when cues are correlated and n is small (A, via Gigerenzer & Brighton 2009). Graefe 2015: equal weights had 5% lower error than regression in 6 of 9 election models (A). Green & Armstrong 2015: simple beats complex across forecasting studies (A). Ng & Jordan 2001: naive Bayes beats logistic regression at small n (A) | Agree. With ~1,700 labelled names, a fitted GBM could beat equal weights; with our 40, never. Use the public sold/dropped data to *check* the weights, not to free-fit them |
 | + | **Age of the .com** (round 1: weak alone) | **Mixed** | Drop study: caught names 49 vs 32 months old; professional catchers favour age (A). NotRenewing sold names: median ~9 years, 46% 10+ years (B, sold side only). Practitioners: end users "will not care about age" for a quality name (C, forum) | Age predicts **investor** demand. For end users it is still unproven. Keep it only in the auction score |
 
-**Agreement across source types:** the A sources (DASH, drop study, Sedo report) and the B sources (Hawkes, Silver, Sully, Linton, DNW) point the same way on #1, #2, #7, #8 and #9. The main split is **who** a signal predicts: traffic, history, age, search volume and bids predict *investor and SEO* demand, while ending count, business use of the term and shape predict *retail* demand.
+**Agreement across source types:** the A sources (DASH, drop study, removed-provider report) and the B sources (Hawkes, Silver, Sully, Linton, DNW) point the same way on #1, #2, #7, #8 and #9. The main split is **who** a signal predicts: traffic, history, age, search volume and bids predict *investor and SEO* demand, while ending count, business use of the term and shape predict *retail* demand.
 
-**Selection bias:** every "sold" source is skewed. Reported sales skew high (DNJournal, Hawkes' $4k+ set). NotRenewing and Dynadot (89% of 54,000 sales under $50, Q2 2026) skew low. Our class ($1,488–$4,888 Buy Now on 2–3 word .coms) sits between them, and no source measures it directly.
+**Selection bias:** every "sold" source is skewed. Reported sales skew high (DNJournal, Hawkes' $4k+ set). NotRenewing and removed-provider (89% of 54,000 sales under $50, Q2 2026) skew low. Our class ($1,488–$4,888 Buy Now on 2–3 word .coms) sits between them, and no source measures it directly.
 
 ---
 
@@ -56,7 +56,7 @@
 | S Shape | 30 / 25 / 30 | **25 / 25 / 25** | Confirmed, but the gap is about 3x and nearly flat up to 12 chars. **Merge words and length into one joint cell** (§3.3) instead of 0.6 × words + 0.4 × length, because the two overlap |
 | R Registered elsewhere | 25 / 20 / 25 | **30 / 25 / 30** | Strongest measured signal (DASH domain ablation; expert catchers; backtest lift ~22). Cap the "before the .com" bonus (§3.2) because ~10 dropped names carry that lift |
 | F Live businesses | 25 / 25 / 25 | **20 / 20 / 20** | Still thin; mostly logic plus our backtest. **Nest F inside R** (one ordinal factor, §3.3) so a live sibling is not counted twice |
-| P Buyer pool | 10 / 15 / 10 | **15 / 15 / 15** | Confirmed (medium) by Sedo, Afternic and Squadhelp. Keep it a fixed list, never a sales count |
+| P Buyer pool | 10 / 15 / 10 | **15 / 15 / 15** | Confirmed (medium) by removed-provider, Afternic and Squadhelp. Keep it a fixed list, never a sales count |
 | K Keyword demand | 10 / 15 / 10 | **10 / 15 / 10** (unchanged) | Search volume predicts investor demand (drop study), so it stays higher in the auction lane only |
 
 - **Points inside each part:** derive them from smoothed lift on the engine's sold/dropped data (§3), not by hand. Keep round 1's hand bands only as the fallback until that table exists.
@@ -154,7 +154,7 @@
 ## 4. Historical data, free only (goal B)
 
 **Paid options exist** but are not recommended (founder rule, 25 Oct):
-- NameBio: Business membership about $100/month (2019 price) with 50k exports a month; paid API by quote;
+- removed-provider: Business membership about $100/month (2019 price) with 50k exports a month; paid API by quote;
 - DNPric.es: full download about $1,999 (snippet);
 - zone history: dns.coffee $90/month, AllZonefiles Pro $79/month;
 - dropped-domain feeds: WhoisFreaks from $84/month, WhoisXML from $129/month;
@@ -165,15 +165,15 @@
 | F1 | **ICANN CZDS .com zone** (Verisign) | Today's .com zone; daily diffs give removals going forward | Current file only | **Free** (*"provided to users at no cost"*, CZDS policy) | Lawful use; no marketing to non-customers; no *"high volume, automated"* queries to registry systems (ICANN CZDS policy, https://www.icann.org/resources/pages/czds-2014-03-03-en) | **Yes, Dvir signs up.** Mainly needed as the key to F2. Daily file is several GB |
 | F2 | **OpenINTEL closed .com measurements** (Univ. Twente) | Daily .com name set with DNS records since **2015-02-20**; dropped names can be derived from names that disappear | 2015 → now | Fee not stated | Access to gTLD data *"if and only if you demonstrate that you have zone file access"* (https://openintel.nl/data/access-to-closed-data/). Open data is CC BY-NC-SA | **Best free path to historical unsold**, if they agree after CZDS proof. Ask whether commercial internal use is allowed and whether a fee applies. Unverified: response time |
 | F3 | **GoDaddy auction inventory files** (already collected) | Auctions with bids at the end (sold, wholesale); closeouts that end unsold (**listed and unsold, same population**) | Forward only (no archive) | Free | Official public host | **Yes.** Lower the stored floor from $500 to $100 for engine rows. Gives same-population labels for lift tables. Rows after 2026-10-14 need Dvir to move the holdout date |
-| F4 | **DASH dataset** (Kai Sun, GitHub `kaisunresearch/dash`) | 159,047 domain sales (name, price, date; Sedo 79%, Flippa 21%), 2006–2022, all TLDs, with features | 16 years | Free | *"non-commercial research purposes only … unless prior written permission"* (LICENSE, https://github.com/kaisunresearch/dash) | **Only with the author's written permission.** Ask (free). Data likely gathered from public auction pages, so note provenance. Sold only; .com share not checked |
-| F5 | **NameBio free endpoints** (RetailStats, TLDStats, drop order) | Per-keyword aggregates; .com drop list | All-time aggregates / forward | Free | API docs: *"may incorporate … attribution is required"*. **But** the ToS (snippet, namebio.com/tos, 403 to us) bars using data *"to train … machine learning models"* without written permission | **Conflict to resolve:** the docs allow reuse with attribution; the ToS bars ML. Until NameBio confirms in writing, keep NameBio data **out of the learned engine**. A scored feature arguably is ML use too |
+| F4 | **DASH dataset** (Kai Sun, GitHub `kaisunresearch/dash`) | 159,047 domain sales (name, price, date; removed-provider 79%, Flippa 21%), 2006–2022, all TLDs, with features | 16 years | Free | *"non-commercial research purposes only … unless prior written permission"* (LICENSE, https://github.com/kaisunresearch/dash) | **Only with the author's written permission.** Ask (free). Data likely gathered from public auction pages, so note provenance. Sold only; .com share not checked |
+| F5 | **removed-provider free endpoints** (RetailStats, TLDStats, drop order) | Per-keyword aggregates; .com drop list | All-time aggregates / forward | Free | API docs: *"may incorporate … attribution is required"*. **But** the ToS (snippet, removed-provider.com/tos, 403 to us) bars using data *"to train … machine learning models"* without written permission | **Conflict to resolve:** the docs allow reuse with attribution; the ToS bars ML. Until removed-provider confirms in writing, keep removed-provider data **out of the learned engine**. A scored feature arguably is ML use too |
 | F6 | **DNJournal, DNW** sales reports | High-value sold names | DNJournal since late 2003 (archive confirmed) | Free to read | No copying without written consent (both sites) | Only with permission; skewed high; useful as a small check set |
-| F7 | **Dynadot `get_closed_auctions`** | Closed auctions | — | Free | Per Dynadot's docs (snippet): returns *"closed auctions of specified account"*, so **our own auctions only**. Our account is also barred from auction APIs (CR-071 R-9) | **No** as a market source. Correction to round 1, which hoped it gave market history |
+| F7 | **removed-provider `get_closed_auctions`** | Closed auctions | — | Free | Per removed-provider's docs (snippet): returns *"closed auctions of specified account"*, so **our own auctions only**. Our account is also barred from auction APIs (CR-071 R-9) | **No** as a market source. Correction to round 1, which hoped it gave market history |
 | F8 | **GoDaddy Auctions API** (opened to all members, Aug 2026) | Bid and buy | — | Free | Docs list no closed or sold history endpoint (https://developer.godaddy.com/en/docs/api-users/auctions) | No history source |
 | F9 | **dns.coffee Academic** | Zone history, ~1 year of removed-domain feeds | 2011 → now (per name); feeds ~1 year | Free for academics only | *"not resold or embedded in a commercial product"* (https://dns.coffee/pricing) | **No.** We are commercial, so the free plan doesn't honestly fit |
 | F10 | **WhoisFreaks free GitHub feed** | 10,000 expired/dropped names a day | Since Mar 2026 | Free | **No licence file** (all rights reserved by default) | **No** until they grant a licence |
 | F11 | **Common Crawl** | "Was there a live site at time T" feature | 2008 → now | Free | Limited non-exclusive licence (round 1) | Yes, for features only |
-| F12 | **Published aggregates** (Sedo report, Afternic monthly keywords and TLD sell-through, Escrow.com index, Dynadot quarterly, NotRenewing tables) | Base rates and two-sided rates by pattern | Yearly / monthly | Free | Read and cite; no bulk copying | **Yes**, to set priors and sanity-check the lift table |
+| F12 | **Published aggregates** (removed-provider report, Afternic monthly keywords and TLD sell-through, Escrow.com index, removed-provider quarterly, NotRenewing tables) | Base rates and two-sided rates by pattern | Yearly / monthly | Free | Read and cite; no bulk copying | **Yes**, to set priors and sanity-check the lift table |
 
 **Recommended free plan (cheapest legal path to ~10k sold and ~10k unsold .com):**
 1. **Now:** lower the GoDaddy engine floor to $100 (F3).
@@ -183,21 +183,21 @@
 2. **Dvir signs up for CZDS (free)**, then asks OpenINTEL for closed .com access (F2).
    - If granted, derive names that left the zone between 2024 and Oct 2026 and were held ≥ 1 year.
    - Confirm each with RDAP (as in round 1's Step A).
-   - This gives historical unsold with no NameBio and no payment.
+   - This gives historical unsold with no removed-provider and no payment.
 3. **Dvir writes three free permission requests:**
    - DASH author (F4: historical sold, 2006–2022);
-   - NameBio (F5: is ML use of free-endpoint data allowed?);
+   - removed-provider (F5: is ML use of free-endpoint data allowed?);
    - DNJournal (F6: small high-price check set).
    
-   Until DASH or NameBio says yes, **historical sold stays empty**, and the engine trains on forward GoDaddy rows only.
-4. **DOM check (code, not research):** see whether any NameBio-derived value feeds the learned engine today (e.g. retailstats features). If so, hold it out until NameBio confirms (F5).
+   Until DASH or removed-provider says yes, **historical sold stays empty**, and the engine trains on forward GoDaddy rows only.
+4. **DOM check (code, not research):** see whether any removed-provider-derived value feeds the learned engine today (e.g. retailstats features). If so, hold it out until removed-provider confirms (F5).
 
 **Round-1 corrections in one place:**
 - the DASH numbers (§1 #1);
 - the DASH data is public, but non-commercial;
 - OpenINTEL needs CZDS proof;
-- NameBio's ToS bars ML training;
-- Dynadot closed auctions cover the account's own auctions only;
+- removed-provider's ToS bars ML training;
+- removed-provider closed auctions cover the account's own auctions only;
 - zonefiles.io shut down on 15 Aug 2025 (its successor AllZonefiles.io is paid).
 
 ---
@@ -208,7 +208,7 @@
 3. **How much of the "ending before the .com" lift is real** vs leakage or sampling. It rests on ~10 dropped names, so the cap stays until F3 data tests it.
 4. **Search volume and CPC for end users:** shown only for investor demand.
 5. **Bid count at < $250:** no study links it to end-user resale; the evidence says reseller demand.
-6. **Terms not read first-hand:** the NameBio ToS (403), and whether CZDS terms restrict deriving training labels.
+6. **Terms not read first-hand:** the removed-provider ToS (403), and whether CZDS terms restrict deriving training labels.
 7. **Access not yet known:** OpenINTEL's fee and commercial position.
 8. **Unchecked counts and volumes:** the DASH .com share, and the daily GoDaddy volumes (estimates, not measured).
 9. **Whether WoE beats the hand weights** on our data. Pre-registered test in §3.3 step 5.
@@ -233,8 +233,8 @@
 13. DataGenetics, .com name length analysis (Verisign data, 2012). **C.** http://datagenetics.com/blog/march22012/
 
 **Official / platform data**
-14. Sedo and InterNetX Global Domain Report 2026, via DNW (Mar 2026). **A** (data) / B. https://domainnamewire.com/2026/03/23/new-report-contains-interesting-aftermarket-domain-name-data/
-15. Dynadot Q2 2026 sales data (54,000 sales), via DNW (Sep 2026). **A** / B. https://domainnamewire.com/2026/09/29/dynadot-shares-data-from-54000-domain-sales/
+14. removed-provider and InterNetX Global Domain Report 2026, via DNW (Mar 2026). **A** (data) / B. https://domainnamewire.com/2026/03/23/new-report-contains-interesting-aftermarket-domain-name-data/
+15. removed-provider Q2 2026 sales data (54,000 sales), via DNW (Sep 2026). **A** / B. https://domainnamewire.com/2026/09/29/removed-provider-shares-data-from-54000-domain-sales/
 16. Afternic, 2024 TLD rundown (sell-through ranking by TLD). **A.** https://blog.afternic.com/2024-tlds/
 17. Squadhelp 2021 data release, via DNW (ending count vs sell-through). **A−/D** (vendor). https://domainnamewire.com/2021/12/22/squadhelp-releases-treasure-trove-of-data/
 18. Escrow.com Domain Investment Index reports (context). **A.** https://www.escrow.com/domains/investment-index-reports
@@ -242,9 +242,9 @@
 20. OpenINTEL, access to closed data. **A.** https://openintel.nl/data/access-to-closed-data/
 21. dns.coffee pricing, terms and OpenAPI (feeds ~1 year), re-verified. **A/D** (re-read). https://dns.coffee/pricing, https://api.dns.coffee/openapi.json
 22. GoDaddy Auctions API docs (no history endpoint). **A.** https://developer.godaddy.com/en/docs/api-users/auctions
-23. Dynadot API commands (`get_closed_auctions`: own account; via search snippet). **A** (snippet). https://www.dynadot.com/domain/api-commands
-24. NameBio API docs, re-verified (credits; "past year" limit; no USD price). **A** (re-read). https://api.namebio.com/docs/
-25. NameBio Terms of Service, AI/ML training clause (search snippet only; 403). **A** (unverified first-hand). https://namebio.com/tos
+23. removed-provider API commands (`get_closed_auctions`: own account; via search snippet). **A** (snippet). https://www.removed-provider.com/domain/api-commands
+24. removed-provider API docs, re-verified (credits; "past year" limit; no USD price). **A** (re-read). https://api.removed-provider.com/docs/
+25. removed-provider Terms of Service, AI/ML training clause (search snippet only; 403). **A** (unverified first-hand). https://removed-provider.com/tos
 
 **Practitioners**
 26. Sully, *What Domain Names Actually Sell on NotRenewing?* (Aug 2026; length and extension tables). **B.** https://sullysblog.com/what-types-of-domain-names-actually-sell-on-notrenewing
@@ -262,8 +262,8 @@
 38. Morgan Linton on bidder counts in expired auctions (snippet; page 404 on fetch). **B** (snippet). https://www.morganlinton.com/the-truth-about-buying-and-selling-expired-domains-part-two/
 39. MediaOptions, *The Statistics Behind Domain Upgrades* (383 upgrades). **B.** https://mediaoptions.com/blog/the-statistics-behind-domain-upgrades/
 40. tldinvestors, domain length and sell-through (Squadhelp chart; no numbers). **C.** https://tldinvestors.com/2020/09/domain-length-and-sell-through.html
-41. NamePros thread, NameBio representative on bulk data ("four-figure range"; snippet). **B** (snippet). https://www.namepros.com/threads/is-it-possible-to-pay-for-all-domain-sales-history-2007-2021.1265348/
-42. DNW, NameBio paid accounts (2019; membership tiers). **B.** https://domainnamewire.com/2019/01/07/namebio-features/
+41. NamePros thread, removed-provider representative on bulk data ("four-figure range"; snippet). **B** (snippet). https://www.namepros.com/threads/is-it-possible-to-pay-for-all-domain-sales-history-2007-2021.1265348/
+42. DNW, removed-provider paid accounts (2019; membership tiers). **B.** https://domainnamewire.com/2019/01/07/removed-provider-features/
 43. OnlineDomain, Mike Mann monthly sales reports (context on reported-sales bias). **C.** https://onlinedomain.com/2026/10/06/domain-name-news/mike-mann-sells-8-domains-for-237216-in-july/
 
 **Vendors (D; context only, nothing rests on them)**

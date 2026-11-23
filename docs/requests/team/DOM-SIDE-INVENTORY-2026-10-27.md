@@ -9,7 +9,7 @@ For the team-process review. Repo files only (contract v5.59.0); nothing read fr
 - **Host:** production runs on Dvir's Mac mini with Neon until Render resumes (about 1 Nov; CR-041). DOM runs `install.sh`, `deploy.sh` and the `com.domaintrading.*` agents (api, tunnel, tunnel-watch, deploy, datasave, backup).
 - **Tokens:** own `dom-read` and `dom-write` since 25 Oct: may run jobs, load data, run dry runs.
 - **May not:** do money actions (buy, S8 import, bid plans, listing, prices, sell) without Dvir's chat line per action; write the approval sentence; use the bots' tokens; print secrets; touch the production DB directly.
-- **Browser:** Dvir's logged-in Chrome (skills `afternic-listing`, `sedo-listing`), no sign-ins, a chat confirmation before any submit or price step.
+- **Browser:** Dvir's logged-in Chrome (skills `afternic-listing`, `removed-provider-listing`), no sign-ins, a chat confirmation before any submit or price step.
 
 ## 2. The system DOM owns
 
@@ -18,7 +18,7 @@ For the team-process review. Repo files only (contract v5.59.0); nothing read fr
 | Module | One line |
 |---|---|
 | registrars | Porkbun (live) and GoDaddy (manage-only) adapters, quotes, `GET /check` |
-| listing | Plan (BIN, floor, walk-away, drops), pricing settings, Afternic/Sedo exports, venue records |
+| listing | Plan (BIN, floor, walk-away, drops), pricing settings, Afternic/removed-provider exports, venue records |
 | selection | Largest (~8,400 lines): selection settings, screening runs and checks, packs, test sets, replays, pre-bid checks |
 | buying | `/buy`, tranches, reconciler, ledger, domain cap |
 | candidates | Intake, on-demand screening, daily list, drop lists, cohorts, scout lessons, sales patterns |
@@ -51,13 +51,13 @@ For the team-process review. Repo files only (contract v5.59.0); nothing read fr
 | nsVerifier | Public DNS | nameserver state |
 | screeningResume | none | screening runs |
 | priceJob, dropJob | none | price_schedule, listing_history, domains |
-| listingSync | Spaceship SellerHub (skipped: no keys) | listing_sync_log |
+| listingSync | removed-provider ListingSync (skipped: no keys) | listing_sync_log |
 | portfolioLifecycle | RDAP/home page (lookalikes) | holdout, domains |
 | registrarCheck | Registrar APIs (read) | registrar_presence, registrar_state_checks |
 | portfolioCheck | Verisign RDAP, our own lander pages, SURBL, Google Web Risk | portfolio_checks; CR-079 ownership warnings |
 | dropWatch, cohortOutcomes | Verisign RDAP | drop_list_checks, cohort_outcomes |
 | intakeScreening, buildDailyList | Screening checks (RDAP, web, blocklists) | screening tables, daily lists |
-| referenceRefresh | Majestic popularity list, IANA RDAP bootstrap (NameBio off) | reference_files |
+| referenceRefresh | Majestic popularity list, IANA RDAP bootstrap (removed-provider off) | reference_files |
 | kbLoad | none (repo files `data/knowledge/*.jsonl`) | kb_* tables |
 | retention | none | deletes old rows |
 | backupExport | GitHub (skipped: no token or repo) | none |
@@ -69,7 +69,7 @@ For the team-process review. Repo files only (contract v5.59.0); nothing read fr
 | Step | Calls outside | Stores |
 |---|---|---|
 | godaddyInventory | `inventory.auctions.godaddy.com` (5 zip files) | raw zips 7 days, manifests (sealed), datasave_pool, GoDaddy auctions, godaddy_auctions_live, daily archive on Mac disk (kept for good) |
-| dynadotCloseouts / dynadotAftermarket | none yet (`not_configured`; client being built, CR-080) | reports the bots' upload status |
+| removedProviderCloseouts / removedProviderAftermarket | none yet (`not_configured`; client being built, CR-080) | reports the bots' upload status |
 | scorePool | none (offline score) | closeout filters and scores |
 | buildPanel | Verisign RDAP (up to 1,500 a run) | disappearance tags, closeout_expiries |
 | engineFeed | none | engine_sales, engine_unsold, engine_auction_ends |
@@ -101,14 +101,14 @@ The DB stood at 390 MB (36% of Neon's 1 GB) on 26 Oct (`improve-2026-10-26.md`).
 | GoDaddy | `GODADDY_PAT` | manage-only |
 | Jobs | `JOB_TRIGGER_TOKEN` | in use (Worker, Mac, GitHub) |
 | Google Web Risk | `GOOGLE_WEB_RISK_API_KEY` | Lookup API, 10,000 a month cap (`CLAUDE.md`) |
-| Companies House | `COMPANIES_HOUSE_API_KEY` | optional; repo doesn't say if set |
-| NameBio free files | `NAMEBIO_RETAILSTATS_CSV_URL` | off (`sources.namebio`) |
-| Spaceship SellerHub | `SPACESHIP_SELLERHUB_API_KEY/_SECRET` | not configured (needs free keys) |
+| removed-provider | `REMOVED_PROVIDER_API_KEY` | optional; repo doesn't say if set |
+| removed-provider free files | `REMOVED_PROVIDER_RETAILSTATS_CSV_URL` | off (`sources.removed-provider`) |
+| removed-provider ListingSync | `REMOVED_PROVIDER_LISTING_SYNC_API_KEY/_SECRET` | not configured (needs free keys) |
 | GitHub data backup | `GITHUB_BACKUP_TOKEN/_REPO` | not configured (repo doesn't exist, G-128) |
-| Dynadot | `DYNADOT_API_KEY/_SECRET` | read-only key installed 27 Oct; no code reads it yet |
+| removed-provider | `REMOVED_PROVIDER_API_KEY/_SECRET` | read-only key installed 27 Oct; no code reads it yet |
 | Afternic Portfolio API | `AFTERNIC_API_KEY/_SECRET` | key in `prod.env` 27 Oct; not in `.env.example` or `src/config.ts`; sync not built |
 | Paths | `SNAPSHOT_DIR`, `ARCHIVE_DIR`, `PUBLIC_BASE_URL` | Mac disk |
-| No adapter | Name.com, Namecheap, Spaceship registrar, NameSilo | commented out on purpose |
+| No adapter | removed providers registrar, removed-provider | commented out on purpose |
 | Free public | Verisign/IANA RDAP, public DNS, SURBL, URIBL, Majestic list, GoDaddy inventory host | no key |
 
 ## 5. Interfaces to the bots
@@ -130,14 +130,14 @@ The DB stood at 390 MB (36% of Neon's 1 GB) on 26 Oct (`improve-2026-10-26.md`).
 | Builds every CR (Gavriel's lines are pre-approved) | File CRs/BUGs with acceptance tests |
 | Runs datasave, the shortlist, pre-bid checks and portfolioCheck | Gavriel checks every release live on `/health` and runs the acceptance tests |
 | Posts digests and replay proposals, asks for pain points | Buyer, Risk Gate and Gavriel judge shortlist names, write cards, take them to Dvir |
-| Ran Dvir's at-computer setup on 27 Oct (backup, Afternic nameservers, keys) | Upload Dynadot rows; will load retail sales (CR-082); loaded the KB import (79 evidence rows, 185 claims) |
+| Ran Dvir's at-computer setup on 27 Oct (backup, Afternic nameservers, keys) | Upload removed-provider rows; will load retail sales (CR-082); loaded the KB import (79 evidence rows, 185 claims) |
 | | Gavriel does the money actions after Dvir's line; re-ran a failed CI job once |
 
 ## 6. Overlaps and duplicated work (all seen in repo)
 
 | # | Overlap | Reference |
 |---|---|---|
-| O-1 | Dynadot data: bots upload by hand via `POST /snapshots/dynadot`, and DOM is building its own client with the new key. Seal state is the lock; bots stay primary until it ships | `docs/bot-logic/00-02`; CR-080 "BUILD NOW"; DOM-TO-GAVRIEL 27 Oct |
+| O-1 | removed-provider data: bots upload by hand via `POST /snapshots/removed-provider`, and DOM is building its own client with the new key. Seal state is the lock; bots stay primary until it ships | `docs/bot-logic/00-02`; CR-080 "BUILD NOW"; DOM-TO-GAVRIEL 27 Oct |
 | O-2 | GoDaddy files: DOM saves and archives them daily; the Buyer may still grep local zips "in an emergency" | `jobs.md` datasave; `bot-logic/04` §0 |
 | O-3 | Sales data in four stores: `engine_sales` (`POST /engine/sales` plus datasave), `market_sales` (`POST /data/sales`), `sales_comps` (`POST /data/sales-comps`), `/patterns/sales`. The bots also keep `sales-graded.csv` (~16k) and `POSITIVES-staging.csv` | `endpoints.md`; CR-082 |
 | O-4 | Knowledge base: Gavriel's ledger and registry stay on his box. 106 registry rows and 15 ledger claims have no URL, so they are claims without evidence in DOM. Some research rounds were not imported | DOM-TO-GAVRIEL 26 Oct 21:50 |
@@ -151,7 +151,7 @@ The DB stood at 390 MB (36% of Neon's 1 GB) on 26 Oct (`improve-2026-10-26.md`).
 | O-12 | Visits: DOM's counter overcounted (F17) and is inert for the 3 names moved to Afternic nameservers; Afternic's own views are the other source | F17; DOM-TO-GAVRIEL 27 Oct |
 | O-13 | Lock notes: `00` says `docs/locks/` is notes only, `09` says the winner writes a lock file there. `09` also lists `portfolioCheck` inside datasave, but it runs in `daily` at 00:05 | `bot-logic/00`, `09`; `jobs.md` |
 | O-14 | `04-buyer-shortlist-to-card.md` exists twice, identical, in `docs/bot-logic/` and `docs/requests/bot-logic/` | both folders |
-| O-15 | Chores the server could do: retail-sales fetch (CR-082 keeps it bot-side), Dynadot pulls (O-1), Afternic listing changes (API key exists, sync not built), the GoDaddy auto-renew check (unchecked, F38) | CR-082 R-1; F38 |
+| O-15 | Chores the server could do: retail-sales fetch (CR-082 keeps it bot-side), removed-provider pulls (O-1), Afternic listing changes (API key exists, sync not built), the GoDaddy auto-renew check (unchecked, F38) | CR-082 R-1; F38 |
 | O-16 | The requests-only guard still blocks bot commits to `docs/bot-logic/` and `docs/locks/`, which CR-080 created | `NOTE-2026-10-26-requests-only-guard-bot-logic.md`; `requests-only.yml` |
 
 ## 7. Strengths and weaknesses seen in the files
@@ -164,7 +164,7 @@ The DB stood at 390 MB (36% of Neon's 1 GB) on 26 Oct (`improve-2026-10-26.md`).
 - Took over bot chores while the bots were paused (datasave, shortlist, portfolioCheck).
 
 **Weaknesses**
-- Browser work is fragile: Sedo pages "do not work under automation" (27 Oct), and the Afternic skill is out of date.
+- Browser work is fragile: removed-provider pages "do not work under automation" (27 Oct), and the Afternic skill is out of date.
 - Release mistakes recur (`release-mechanics-lessons.md`): v5.36.0 CI red on a migration count; v5.48.0 note committed after the tag; v5.57.0 flaky HG-6 test (Gavriel re-ran CI); builder logic errors that passed their own tests.
 - Fixes that didn't hold the first time: F19 storage (then F28), score bunching (P2).
 - Idle parts: the outside review (~2,700 lines) was removed after 17 days off; pick-proof stopped before its first result; `engineTrain` had no model for weeks; 15 of 18 warnings were noise until v5.50.0.

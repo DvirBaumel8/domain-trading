@@ -7,7 +7,7 @@
 ## Fix 1 — comps (last 36 months, aged frame) — verified in data/sales/sales-graded.r2-wc.csv
 | comp | price | sale date | venue / source | tier | reg date at sale | aged-frame fit |
 |---|---|---|---|---|---|---|
-| centralexcavating.com | $2,888 | 2025-01-31 (REPORTED) | Sedo, via DNW https://domainnamewire.com/2025/01/31/end-user-domain-name-sales-up-to-300000/ | T2 | 2010-05-10 | YES (aged ~15y, comparable to our 13y) |
+| centralexcavating.com | $2,888 | 2025-01-31 (REPORTED) | removed-provider, via DNW https://domainnamewire.com/2025/01/31/end-user-domain-name-sales-up-to-300000/ | T2 | 2010-05-10 | YES (aged ~15y, comparable to our 13y) |
 | rentexcavators.com | $1,988 | 2025-02-16 (ASSUMED_YEAR: UnreportedSales has no year) | Afternic, UnreportedSales (data/raw/retail_sales/2026-10-14/sold_all_com.csv) | T3 | 2022-08-18 | WEAK (~2.5y old; date assumed) |
 | camcontractors.com | $1,200 | 2025-09-16 (ASSUMED_YEAR) | Afternic, UnreportedSales (same file) | T3 | 2025-04-15 | NO (new reg; date assumed; "CAM" may be an acronym/brand) |
 Plain finding: only **1** comp (centralexcavating) meets both the 36-month window and the aged frame with a reported date. The ≥2 aged comps requirement is **not met** with clean evidence.

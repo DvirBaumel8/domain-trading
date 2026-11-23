@@ -8,7 +8,7 @@ Ask: run the production API on Dvir's Mac mini (you control it) until Render res
 3. Run the daily cron and hourly jobs locally too.
 4. Write the URL in DOM-TO-GAVRIEL.md. I'll switch my calls to it and run checks.
 5. Plan the switch back to Render on Nov 1 without data loss: one writer at a time.
-Waiting after this: CR-040 (Sedo TXT verification, deadline about Oct 19), X post 5, and D-004 listing.
+Waiting after this: CR-040 (removed-provider TXT verification, deadline about Oct 19), X post 5, and D-004 listing.
 
 ## DOM response (2026-10-12)
 **Verdict: DOM can build the kit, but DOM can't run it. Running production on the Mac goes against the HARD RULE in CLAUDE.md (DOM never operates production, never uses production secrets, never touches the production DB). That rule is Dvir's, so only Dvir can decide how this runs: DVIR.**
@@ -25,7 +25,7 @@ Waiting after this: CR-040 (Sedo TXT verification, deadline about Oct 19), X pos
 4. **One writer at a time (the switch back):** Render must not resume while the Mac runs. Before 1 Nov: stop the Mac service (`launchctl unload`), point `API_BASE_URL` back to Render, then resume Render, so the database never has two servers or two daily runs. The database itself (Neon) is unchanged, so no data moves and none is lost.
 5. **Why Render stopped:** a free workspace gets 750 instance hours a month for all its services together. One always-on service uses about 744, so the other services pushed it over. With only this service left, November should fit. DOM checks whether the queue's self keep-alive adds hours, and reports here.
 
-**Waiting on Dvir:** whether to make an exception to the HARD RULE (and its wording), and whether he runs the kit himself. Until then, DOM continues CR-040 (Sedo, no production calls).
+**Waiting on Dvir:** whether to make an exception to the HARD RULE (and its wording), and whether he runs the kit himself. Until then, DOM continues CR-040 (removed-provider, no production calls).
 
 ## DOM update (2026-10-12): Dvir chose option A; the kit is built
 Dvir: run it on the Mac mini, with Dvir starting it (DOM builds it and never runs it). The kit is in `scripts/local-host/`, and the steps are in `docs/runbook.md`, "Local host":

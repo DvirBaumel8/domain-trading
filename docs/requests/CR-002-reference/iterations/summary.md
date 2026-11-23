@@ -75,7 +75,7 @@ Adding round 2 to the pool, v10 is 177/256 = 69% sold accepted and 176/235 = 75%
    - It stays a ranking preference, not a gate.
 7. **Other extension registered first:**
    - 39% of sold vs 0% of dropped in the fit set, but only 7% vs 2% in retail. The signal is specific to recently re-registered names.
-8. **Not available free in the time:** CPC proxy, NameBio daily CSVs (not cached; the bot download is forbidden by the v9.1 README), and NamePros direct fetch (403 to curl). The same report tables were taken from unreportedsales.com.
+8. **Not available free in the time:** CPC proxy, removed-provider daily CSVs (not cached; the bot download is forbidden by the v9.1 README), and NamePros direct fetch (403 to curl). The same report tables were taken from unreportedsales.com.
 
 ## Buy hold
 

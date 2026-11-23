@@ -14,25 +14,25 @@ max_rounds: 2
 **Approval:** Dvir t1067u via Gavriel. **No money.** Maintenance under freeze. No CloudAgents — Claude Code only.
 
 ## Why
-Tonight discovery ran with `datasave: "partial"` but `/health` only returns that string. Buyer/Gavriel cannot see which step failed (e.g. Dynadot closeouts pages 46–48, aftermarket lock/GAP, GoDaddy race) without digging logs. Blocks clear L&L and dual-runner backup decisions.
+Tonight discovery ran with `datasave: "partial"` but `/health` only returns that string. Buyer/Gavriel cannot see which step failed (e.g. removed-provider closeouts pages 46–48, aftermarket lock/GAP, GoDaddy race) without digging logs. Blocks clear L&L and dual-runner backup decisions.
 
 ## Rules
 - R-1 Keep top-level `datasave` enum as today (`ok` | `partial` | `error` | `overdue`) — additive only.
 - R-2 Add a structured detail object on `GET /health` (name e.g. `datasave_detail` or expand under `datasave` if backward-compatible object form is chosen carefully — **prefer additive sibling field** so old string clients keep working: keep `datasave: "partial"` and add `datasave_detail: {…}`).
-- R-3 Detail must name, for the latest datasave run (or last 26h): per configured step (at least GoDaddy inventory / `auctionShortlist` / Dynadot closeouts / Dynadot aftermarket when configured) → `ok` | `partial` | `error` | `skipped` | `not_configured`, plus short `error` / GAP reason string when not ok, and `data_date` when known.
-- R-4 Dynadot `not_configured` must not flip top-level `datasave` by itself (existing rule).
+- R-3 Detail must name, for the latest datasave run (or last 26h): per configured step (at least GoDaddy inventory / `auctionShortlist` / removed-provider closeouts / removed-provider aftermarket when configured) → `ok` | `partial` | `error` | `skipped` | `not_configured`, plus short `error` / GAP reason string when not ok, and `data_date` when known.
+- R-4 removed-provider `not_configured` must not flip top-level `datasave` by itself (existing rule).
 - R-5 Document in `endpoints.md` §`GET /health` and `datasave.md` / gaps. Tests for ok vs partial with one step failing.
 - R-6 No money routes; no new WRITE; READ on health only.
 
 ## Acceptance tests
 - AT-1 With all configured steps ok → `datasave: "ok"` and detail every step `ok` (or equivalent).
 - AT-2 With one configured step failed/partial → `datasave: "partial"` (or `error` per existing rules) and detail names that step + reason.
-- AT-3 Dynadot-only `not_configured` does not alone force non-ok top-level when GoDaddy half ok.
+- AT-3 removed-provider-only `not_configured` does not alone force non-ok top-level when GoDaddy half ok.
 - AT-4 Contract docs list the new field; OpenAPI/route table stay in sync if required by repo tests.
 - AT-5 Old clients reading only string `datasave` still work.
 
 ## Out of scope
-Fixing the underlying Dynadot page failures / aftermarket lock (separate BUGs if still open); CloudAgents; run-pack persist (CR-089).
+Fixing the underlying removed-provider page failures / aftermarket lock (separate BUGs if still open); CloudAgents; run-pack persist (CR-089).
 
 ## Questions (≤1)
 1. Sibling `datasave_detail` vs replace string with object? **Default: keep string + additive `datasave_detail`.**
@@ -40,8 +40,8 @@ Fixing the underlying Dynadot page failures / aftermarket lock (separate BUGs if
 ## DOM response (28 Oct 2026, ~21:20 IDT): built in 5.75.0
 
 - **Question 1:** additive sibling `datasave_detail`. The `datasave` string is unchanged (AT-5).
-- **Shape:** `{last_run: {run_id, finished_at, steps: {<step>: {status, data_date, error}}}, missing_files, dynadot_missing, dynadot_due_date}`, with every step of the latest finished run.
+- **Shape:** `{last_run: {run_id, finished_at, steps: {<step>: {status, data_date, error}}}, missing_files, removed_provider_missing, removed_provider_due_date}`, with every step of the latest finished run.
   - Status: `ok` | `partial` | `error` | `skipped` | `not_configured`.
-  - A Dynadot GAP is `error` with `GAP: <reason>`; a seal with missing pages is `partial`.
+  - A removed-provider GAP is `error` with `GAP: <reason>`; a seal with missing pages is `partial`.
   - A late GoDaddy publish is `godaddyInventory` `error` with `GODADDY_NOT_PUBLISHED: ...`.
 - **Tests:** CR090-1 (AT-1, AT-3, AT-5), CR090-2 (AT-2), CR090-3 (the state rule). AT-4: `endpoints.md` §`GET /health` documents the field, and the `/health` keys test includes it.

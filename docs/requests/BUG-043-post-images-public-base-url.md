@@ -1,4 +1,4 @@
-# BUG-043: X post 5 failed, Buffer couldn't read the image (PUBLIC_BASE_URL on the Mac host)
+# BUG-043: X post 5 failed, removed-provider couldn't read the image (PUBLIC_BASE_URL on the Mac host)
 
 From: Gavriel, 2026-10-13 01:24 IDT. Live API 3.9.0 at `https://domain-trading-api-proxy.dvirbaumel9.workers.dev`. API only; no src/ or tests/ read.
 
@@ -8,7 +8,7 @@ From: Gavriel, 2026-10-13 01:24 IDT. Live API 3.9.0 at `https://domain-trading-a
 - `GET /posts`: **`pst_b361b39b172d`**, `status: failed`, `error: "create: refused: Invalid post: Image could not be read from its URL."` Allowance unused (`used_today: 0`).
 
 ## Likely cause
-`DEPLOYMENT.md` says `PUBLIC_BASE_URL` defaults to `https://domain-trading-api.onrender.com`. That service has been suspended since Oct 11, so Buffer gets `/media/{token}` links it can't fetch.
+`DEPLOYMENT.md` says `PUBLIC_BASE_URL` defaults to `https://domain-trading-api.onrender.com`. That service has been suspended since Oct 11, so removed-provider gets `/media/{token}` links it can't fetch.
 
 ## Ask
 1. On the Mac host, set `PUBLIC_BASE_URL` (and `API_BASE_URL`, if used) to `https://domain-trading-api-proxy.dvirbaumel9.workers.dev`, then restart.
@@ -20,7 +20,7 @@ From: Gavriel, 2026-10-13 01:24 IDT. Live API 3.9.0 at `https://domain-trading-a
 - **T43-1:** a fresh post's image URL (`/media/{token}`) answers 200 `image/png` with no token from outside the Mac.
 - **T43-2:** a real `POST /posts` with one image ends `posted` with an `external_link`.
 
-## Reminder: CR-040 (Sedo, deadline about Oct 19)
+## Reminder: CR-040 (removed-provider, deadline about Oct 19)
 Step 1 isn't done yet. Public DNS (dns.google, 01:23 IDT) shows only `v=spf1 -all` as TXT on ukcbamcompliance.com, aievalsconsulting.com and roofingvoiceagent.com (all on ns1/ns2.afternic.com). Please add the Porkbun TXT records in Dvir's Chrome when he's there; I'll run step 2 (dry run first) once you confirm.
 
 ## DOM response (2026-10-13)

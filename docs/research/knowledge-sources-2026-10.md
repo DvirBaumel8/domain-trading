@@ -6,8 +6,8 @@
 
 **Method and limits:**
 - About 45 web searches and fetches, plus direct `curl` reads of robots.txt files and RSS feeds (25 Oct 2026, 15:00–16:00 UTC). Every access claim was checked on the provider's own page where it would load.
-- Pages that refused us (HTTP 403 or a bot check) were **not** retried through any proxy or mirror: namepros.com HTML pages and its terms page, stackoverflow.com (its terms text loads only by script), namebio.com, support.reddithelp.com, techrepublic.com. Our web fetcher is also blocked from reddit.com and stackoverflow.com by those sites' own rules. Claims about them come from other official pages or secondary reports, and are marked that way.
-- No account was created and no API key was used. Nothing was scraped. No marketplace, NameBio page or Wayback was automated.
+- Pages that refused us (HTTP 403 or a bot check) were **not** retried through any proxy or mirror: namepros.com HTML pages and its terms page, stackoverflow.com (its terms text loads only by script), removed-provider.com, support.reddithelp.com, techrepublic.com. Our web fetcher is also blocked from reddit.com and stackoverflow.com by those sites' own rules. Claims about them come from other official pages or secondary reports, and are marked that way.
+- No account was created and no API key was used. Nothing was scraped. No marketplace, removed-provider page or Wayback was automated.
 - Grades as in our other files: **A** official or large-sample data; **B** experienced practitioner or established method body with a track record; **C** guide, small or unclear study, single-source article; **D** vendor marketing, single anecdote or content farm. Quotes are under 15 words.
 
 ---
@@ -60,7 +60,7 @@
 | 12 | **Papers**: arXiv, Crossref, OpenAlex, Semantic Scholar | APIs | arXiv: one request every 3 s. Crossref: no key, back off on 429. OpenAlex: free key, $1 a day of usage. S2: no key (shared pool) or a key at 1 request a second | Yes | arXiv metadata CC0. OpenAlex CC0. S2 data partly **CC BY-NC**, so used only to find papers | OpenAlex and S2 keys (Dvir, optional) | A, but few papers on domain resale (DASH and drop-catch studies were found this way) | **Usable** |
 | 13 | **Google Scholar** | No API | — | **No**: `robots.txt` has `Disallow: /scholar` | — | — | — | **Not usable by automation**; sessions may use WebSearch |
 | 14 | **Web search APIs** | Google CSE JSON, Bing, Brave | Google: 100 a day, but **closed to new customers**, ends 1 Jan 2027. Bing: **retired** 11 Aug 2025. Brave: $20 of credit a month | — | Brave: storing results needs a plan with storage rights | Brave needs a card | — | **Not usable for the server.** Research sessions use Claude Code's WebSearch (US results) |
-| 15 | **NameBio** (sales data) | Free endpoints (RetailStats, TLDStats) | See `historical-data-2026-10.md` S2 | Free endpoints only (founder rule) | Allowed with attribution (S2) | Already built (CR-062) | A for reported sales | **Unchanged**: free endpoints only |
+| 15 | **removed-provider** (sales data) | Free endpoints (RetailStats, TLDStats) | See `historical-data-2026-10.md` S2 | Free endpoints only (founder rule) | Allowed with attribution (S2) | Already built (CR-062) | A for reported sales | **Unchanged**: free endpoints only |
 
 ### 1.2 Key terms, quoted
 
@@ -97,7 +97,7 @@
 ### 1.3 Who reads what (founder rule 9)
 
 - **Server (no AI):** a daily job could pull the RSS feeds in §1.1 rows 4–7 and the HN API. It would store only item metadata (URL, title, author, date, feed, a 300-character excerpt) as **unread leads**, deduplicated by canonical URL. That is plain fetching, like a feed reader, polite (once a day, one request per feed), with no AI.
-  - It must never fetch marketplaces, NameBio pages beyond the free endpoints, Wayback or any page behind a challenge.
+  - It must never fetch marketplaces, removed-provider pages beyond the free endpoints, Wayback or any page behind a challenge.
   - YouTube API pulls also fit here if Dvir creates a key; they spend about 1 unit per call.
 - **Research sessions and bots (with AI):** read the leads and the full articles, extract claims in the fixed format of §2.3, grade them, and post them to the server. They decide nothing; the server computes verdicts deterministically from the stored rows.
 - **Expected volume:** the 12 feeds give about 150–250 new items a day, mostly news, sales lists and auction lists. From experience with these feeds, maybe 5–20 a day touch our topics. A session can triage that in minutes.
@@ -120,7 +120,7 @@
 | **Near-duplicate detection** | Broder's shingling and MinHash: the share of shared word 5-grams estimates text similarity (Jaccard) cheaply | The server can compute MinHash on excerpts and flag likely echoes (similarity ≥ 0.5) for the session to confirm. Plain code, no AI |
 | **AI content farms** | NewsGuard tracks 3,749 AI content-farm sites. Signs: chatbot error text, generic names, many posts a day, no disclosure. Google's spam policy: "many pages … without adding value". Hanley & Durumeric: synthetic articles on misinformation sites rose 474% (2022–23). AI-text detectors are unreliable: OpenAI withdrew its classifier for its "low rate of accuracy" | Grade by **site signals**, not by a detector: a named author with a history, an About page, original data, post rate, and no "As an AI" leftovers. Unknown listicle sites are D. Our known content-farm list (from `funnel-names-safety`) is kept as a blocklist |
 | **Analysis of Competing Hypotheses** (Heuer, CIA) | Test each piece of evidence against **all** hypotheses. Evidence consistent with every hypothesis has no diagnostic value | A question card lists the options (for example "bid on auctions" vs "closeouts"). A claim counts only where it separates them |
-| **Track record** (Tetlock, Good Judgment) | Forecasters scored by Brier score. The top 2% keep beating the crowd year after year. Track record beats credentials | **Author scores** come from checkable history: verified sales (in DNJournal charts or NameBio), years active, and later, how often their past claims in our base held up |
+| **Track record** (Tetlock, Good Judgment) | Forecasters scored by Brier score. The top 2% keep beating the crowd year after year. Track record beats credentials | **Author scores** come from checkable history: verified sales (in DNJournal charts or removed-provider), years active, and later, how often their past claims in our base held up |
 
 ### 2.2 Recommended data model
 
@@ -163,7 +163,7 @@ Five tables, append-only like `listing_history` and `audit_log`. The weights liv
 ### 2.3 Scoring rules
 
 **A. Source grade (axis 1: who).** Our A–D, applied **per claim type**:
-- **A:** official data or a large measured sample (registrar or marketplace statistics about their own platform, peer-reviewed papers, NameBio and DNJournal reported-sale aggregates, our own backtests).
+- **A:** official data or a large measured sample (registrar or marketplace statistics about their own platform, peer-reviewed papers, removed-provider and DNJournal reported-sale aggregates, our own backtests).
 - **B:** a named practitioner with a verified record: 50+ verified sales or 5+ years of published data posts, and no undisclosed conflict on this claim (for example Hawkes, Allemann, Sullivan, Silver); also established method bodies.
 - **C:** an unverified named author, forum threads, general guides, small studies.
 - **D:** vendor marketing about its own product, single anecdotes, anonymous posts, AI content farms.
@@ -288,6 +288,6 @@ Five tables, append-only like `listing_history` and `audit_log`. The weights liv
 48. Hennink & Kaiser, *Sample sizes for saturation in qualitative research* (Soc Sci Med 2022; 23 studies). **A.** https://ideas.repec.org/a/eee/socmed/v292y2022ics0277953621008558.html
 49. Good Judgment, *The Superforecasters' Track Record* (vendor of the method, but backed by the IARPA tournament). **B.** https://goodjudgment.com/resources/the-superforecasters-track-record/
 
-**Our own earlier files** (grades kept): `historical-data-2026-10.md` (NameBio terms), `funnel-names-safety-2026-10.md` (content-farm list), `round2-score-and-data-2026-10.md`.
+**Our own earlier files** (grades kept): `historical-data-2026-10.md` (removed-provider terms), `funnel-names-safety-2026-10.md` (content-farm list), `round2-score-and-data-2026-10.md`.
 
 **Not relied on:** third-party "Reddit/X API pricing 2026" blogs (octolens, prowlo, socialcrawl, twexapi and others): **D**, vendor SEO pages. They were used only to find the official pages above.

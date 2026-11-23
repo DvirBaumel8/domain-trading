@@ -70,7 +70,7 @@
 - `/workspace/domain-trading/company/decisions-log.md.bak-20261020-d005price`
 - `/workspace/domain-trading/company/decisions-log.md.bak-20261021-d001wa`
 - `/workspace/domain-trading/company/decisions-log.md.bak-20261027-d005-2488`
-- `/workspace/domain-trading/company/decisions-log.md.bak-20261027-sedo`
+- `/workspace/domain-trading/company/decisions-log.md.bak-20261027-removed-provider`
 - `/workspace/domain-trading/company/first-production-run-plan-2026-10-17.md.bak-20261022-b05`
 - `/workspace/domain-trading/company/forbidden-terms-local.md.bak-20261017-gate`
 - `/workspace/domain-trading/company/story-log.md.bak-20261022-0116-r5`
@@ -87,7 +87,7 @@
 - `/workspace/domain-trading/data/listing-panel/build_panel.py.bak-20261017-closeouts`
 - `/workspace/domain-trading/data/listing-panel/build_panel.py.bak-20261017-freshness`
 - `/workspace/domain-trading/data/listing-panel/build_panel.py.bak-20261020-cents`
-- `/workspace/domain-trading/data/listing-panel/dynadot_closeouts.py.bak-20261020-cents`
+- `/workspace/domain-trading/data/listing-panel/removed_provider_closeouts.py.bak-20261020-cents`
 - `/workspace/domain-trading/data/listing-panel/outcomes.csv.bak-20261017-freshness`
 - `/workspace/domain-trading/data/listing-panel/outcomes.csv.bak-20261017-mineunited`
 - `/workspace/domain-trading/data/listing-panel/publish_daily.py.bak-20261017-buyerview`

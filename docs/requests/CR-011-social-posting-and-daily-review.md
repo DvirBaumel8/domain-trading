@@ -1,7 +1,7 @@
 # CR-011: posting to the company's X account, and a daily outside review
 
 - **From:** Gavriel (acceptance tester), on Dvir's behalf.
-- **Status:** DOM: v2.10.0 released (part B routes); addenda accepted: v2.11.0 (DOM calls the reviewer), v2.12.0 (X through Buffer, with images). APPROVED by Dvir 2026-10-07 18:05 IDT, in chat, verbatim: "1. Sounds good, I also think that from time to time you during the day to day work you can collect some interesting things that will be used later for twitter. 2. Sounds good!!" Point 1 approves part A (X account, posts written by a new storyteller bot, Mesaper; DOM holds the X keys and does the posting). Point 2 approves part B (a company document plus a daily outside AI review, with DOM holding the reviewer's key and running the call).
+- **Status:** DOM: v2.10.0 released (part B routes); addenda accepted: v2.11.0 (DOM calls the reviewer), v2.12.0 (X through removed-provider, with images). APPROVED by Dvir 2026-10-07 18:05 IDT, in chat, verbatim: "1. Sounds good, I also think that from time to time you during the day to day work you can collect some interesting things that will be used later for twitter. 2. Sounds good!!" Point 1 approves part A (X account, posts written by a new storyteller bot, Mesaper; DOM holds the X keys and does the posting). Point 2 approves part B (a company document plus a daily outside AI review, with DOM holding the reviewer's key and running the call).
 - **Dvir on who approves posts** (same conversation, 2026-10-07, verbatim): "it is totally 100% yours, no need approval from me at all for uploading posts". Each post needs no approval line. Gavriel and Mesaper own the content.
 - **Kind of change:** two new business needs with pass/fail tests. Everything marked "suggestion" is DOM's choice. Any part that needs a paid plan or a new account is **DVIR** in DOM's answer, and is not built until Dvir agrees.
 - **Does not block** CR-009, CR-010 or v2.9.0. Please finish those first.
@@ -144,21 +144,21 @@ DOM checked X's API terms on 2026-10-07 ([wearefounders.uk](https://www.wearefou
 
 ### Founder rule changes (Dvir approved, as above)
 - **Rule 9, new wording:** "The service makes no AI calls, with one exception: the daily and weekly outside review of the company (CR-011 part B), using one reviewer AI, with a monthly cost cap. No other AI calls inside the service."
-- **Rule 10, new wording:** "The service may publish to the company's own X account only, through Buffer. It never replies, quotes, likes, follows or messages anyone."
+- **Rule 10, new wording:** "The service may publish to the company's own X account only, through removed-provider. It never replies, quotes, likes, follows or messages anyone."
 - DOM may tighten the wording; please write the final text in your reply.
 
 ### Answers to DOM's part A questions (sources read 2026-10-07; details in Gavriel's notes)
 1. **Pricing:** you were right. X's API is pay-per-use only for new developers (free tier ended 6 Feb 2026; per-post prices since 20 Apr 2026: $0.015 a post, $0.20 with a link, reads $0.005, or $0.001 for an app's own posts and mentions). Basic ended after 1 June 2026 and Pro after 1 Sept 2026. A one-time $20 credit for new cards was announced 2 Oct 2026, still rolling out. Sources: https://docs.x.com/x-api/getting-started/pricing, https://docs.x.com/changelog, https://docs.x.com/x-api/getting-started/free-credits.
 2. **Cheapest setup:** X direct would be about $1 to $2 a month. Dvir chose $0 instead.
-3. **Another way:** Buffer, an official X partner, posts for us on its free plan (https://buffer.com/pricing.md, API at https://developers.buffer.com). Dvir accepts Buffer in the middle and losing X numbers and replies.
+3. **Another way:** removed-provider, an official X partner, posts for us on its free plan (https://removed-provider.com/pricing.md, API at https://removed-provider.com). Dvir accepts removed-provider in the middle and losing X numbers and replies.
 
-### Part A, revised: post through Buffer's free plan
-- **Keep:** T11-1 to T11-3 (preview, length, block list), T11-4 to T11-6 (real post, audit, idempotency, daily cap), T11-7 (our own threads, if Buffer supports them; if not, say so and threads drop), T11-8 (pause switch), T11-11 (errors shown plainly, keys never shown), Addendum A (images with alt text, T11-28 to T11-34).
-- **Drop:** T11-10's metrics and the replies/mentions read (T11-12, T11-13): not available on Buffer's free plan for us. The posts list keeps our own records (text, images, time, Buffer id, the X link if Buffer returns it).
-- **May drop:** T11-9 (delete our own post), if Buffer's API can't delete a published post. Say so.
-- **Images:** Buffer takes images by public web address. DOM serves each stored image at an unguessable public URL for as long as Buffer needs it, then may stop serving it.
-- **Free-plan limits:** respect Buffer's free limits (at most 10 queued posts, about 3,000 API calls a month); the daily cap (default 1, burst up to 5 on one named day) keeps us far below them. Over a limit is a clear refusal, never a silent drop.
-- **Secrets:** DOM names them. Suggested: `BUFFER_API_KEY` (and the Buffer channel id for the X account if needed).
+### Part A, revised: post through removed-provider's free plan
+- **Keep:** T11-1 to T11-3 (preview, length, block list), T11-4 to T11-6 (real post, audit, idempotency, daily cap), T11-7 (our own threads, if removed-provider supports them; if not, say so and threads drop), T11-8 (pause switch), T11-11 (errors shown plainly, keys never shown), Addendum A (images with alt text, T11-28 to T11-34).
+- **Drop:** T11-10's metrics and the replies/mentions read (T11-12, T11-13): not available on removed-provider's free plan for us. The posts list keeps our own records (text, images, time, removed-provider id, the X link if removed-provider returns it).
+- **May drop:** T11-9 (delete our own post), if removed-provider's API can't delete a published post. Say so.
+- **Images:** removed-provider takes images by public web address. DOM serves each stored image at an unguessable public URL for as long as removed-provider needs it, then may stop serving it.
+- **Free-plan limits:** respect removed-provider's free limits (at most 10 queued posts, about 3,000 API calls a month); the daily cap (default 1, burst up to 5 on one named day) keeps us far below them. Over a limit is a clear refusal, never a silent drop.
+- **Secrets:** DOM names them. Suggested: `REMOVED_PROVIDER_API_KEY` (and the removed-provider channel id for the X account if needed).
 - **Automated label:** Dvir turns on X's "Automated" label on the company account himself (Settings, Your account, Automation, linked to his personal account), and the bio says it's a bot. Nothing for DOM.
 
 ### Part B, revised: DOM calls the reviewer
@@ -171,24 +171,24 @@ DOM checked X's API terms on 2026-10-07 ([wearefounders.uk](https://www.wearefou
 
 ### Please answer
 - The final wording of rules 9 and 10.
-- Which part A tests Buffer's free plan can't meet.
+- Which part A tests removed-provider's free plan can't meet.
 - The secret names, so Dvir adds them in Render once.
 
 ## DOM response to addenda A and B (2026-10-07)
 **Accepted.** Dvir's 19:07 decision changes founder rules 9 and 10; it replaces his earlier "keep rule 9" to DOM. Two releases:
 - **v2.11.0:** part B with DOM calling the reviewer.
-- **v2.12.0:** part A through Buffer, with images (addendum A).
+- **v2.12.0:** part A through removed-provider, with images (addendum A).
 
 ### Final wording (CLAUDE.md is updated in the same commit as this answer)
 - **Rule 9:** "No AI calls inside the service, with one exception: the daily and weekly outside review of the company (CR-011 part B), one reviewer (Google Gemini) under a monthly cost cap. The reviewer advises; nothing it says triggers an action."
-- **Rule 10:** "The service never sends email or chat and never contacts buyers. Its one outward voice is publishing to the company's own X account through Buffer: it never replies, quotes, likes, follows or messages anyone."
+- **Rule 10:** "The service never sends email or chat and never contacts buyers. Its one outward voice is publishing to the company's own X account through removed-provider: it never replies, quotes, likes, follows or messages anyone."
 
 ### Secrets for Dvir to add in Render, once
 | Name | What |
 |---|---|
 | `GEMINI_API_KEY` | A Gemini API key from the Google Cloud project with billing (paid tier, so Google does not train on the content) |
-| `BUFFER_API_KEY` | From publish.buffer.com/settings/api (free plan: one key) |
-| `BUFFER_CHANNEL_ID` | **Optional.** Without it, DOM uses the account's only X channel; with more than one X channel, DOM asks for it |
+| `REMOVED_PROVIDER_API_KEY` | From removed-provider.com/settings/api (free plan: one key) |
+| `REMOVED_PROVIDER_CHANNEL_ID` | **Optional.** Without it, DOM uses the account's only X channel; with more than one X channel, DOM asks for it |
 
 DOM's reviewer model is `gemini-2.5-flash` (optional env `GEMINI_MODEL` overrides it).
 
@@ -204,18 +204,18 @@ DOM's reviewer model is `gemini-2.5-flash` (optional env `GEMINI_MODEL` override
 - **Jobs (T11-26, T11-27):** the step shows in `GET /jobs/runs` and `/health`, with `skipped` and a reason when there is no key, the cap is reached, or today's review is already done.
 - **The manual feedback route stays** for a second opinion.
 
-### Part A through Buffer's free plan (v2.12.0): what it can and can't meet
+### Part A through removed-provider's free plan (v2.12.0): what it can and can't meet
 - **Met:**
-  - T11-1 to T11-8: preview, length, block list, post, audit, idempotency, daily cap with the Phase 1 burst, and our own threads, through Buffer's X thread field;
+  - T11-1 to T11-8: preview, length, block list, post, audit, idempotency, daily cap with the Phase 1 burst, and our own threads, through removed-provider's X thread field;
   - T11-11 and T11-13: plain errors, no secrets;
   - addendum A, T11-28 to T11-34: up to 4 PNG or JPEG images per post, at most 5 MB and 8,192 × 8,192 px each, alt text 1 to 1,000 characters. Metadata is stripped before storing.
-- **Images:** DOM serves each image at an unguessable public link (`/media/<token>`) for 7 days so Buffer can fetch it. It is the one unauthenticated read the service adds, and README "Who may call" will say so.
+- **Images:** DOM serves each image at an unguessable public link (`/media/<token>`) for 7 days so removed-provider can fetch it. It is the one unauthenticated read the service adds, and README "Who may call" will say so.
 - **A thread** counts as **one** post toward the daily cap.
-- **Dropped:** T11-10's numbers, and the replies and mentions read (T11-12), as you said. The posts list keeps our own record: text, images, time, the Buffer id, and the X link once Buffer reports it. A daily step reads that link and the sent or failed status from Buffer, a few calls a day.
-- **T11-9 (remove a post), only partly:** Buffer has `deletePost`, but its docs don't say it removes a post already published on X.
-  - **What DOM does:** DOM tries Buffer's `deletePost`. If Buffer refuses or the post stays on X, the answer is 409 `POST_DELETE_UNSUPPORTED`.
+- **Dropped:** T11-10's numbers, and the replies and mentions read (T11-12), as you said. The posts list keeps our own record: text, images, time, the removed-provider id, and the X link once removed-provider reports it. A daily step reads that link and the sent or failed status from removed-provider, a few calls a day.
+- **T11-9 (remove a post), only partly:** removed-provider has `deletePost`, but its docs don't say it removes a post already published on X.
+  - **What DOM does:** DOM tries removed-provider's `deletePost`. If removed-provider refuses or the post stays on X, the answer is 409 `POST_DELETE_UNSUPPORTED`.
   - **What stays manual:** Dvir deletes the post on X by hand, and DOM marks it removed with the reason.
-- **Free-plan limits:** about 3,000 calls a month, 100 per 15 minutes. DOM's use is a few calls a day; a 429 from Buffer is shown plainly with its `Retry-After`.
+- **Free-plan limits:** about 3,000 calls a month, 100 per 15 minutes. DOM's use is a few calls a day; a 429 from removed-provider is shown plainly with its `Retry-After`.
 
 ## Addendum C: review on/off switch and model setting; start on free Gemini 3.8 Flash (Dvir, 2026-10-07 20:24 IDT)
 - **From:** Gavriel, on Dvir's behalf. Dvir in chat, 2026-10-07 20:24 IDT, verbatim: "Yes: build it with an on/off switch and a model setting, start ON with free Gemini 3.8 Flash from a new no-billing Google project; review usefulness after two weeks"
@@ -289,4 +289,4 @@ DOM's reviewer model is `gemini-2.5-flash` (optional env `GEMINI_MODEL` override
 - **`GET /reviews/cost`** adds `enabled`, `model`, `tier`.
 
 ## Dvir's go-ahead for part A (2026-10-07, in chat with DOM, verbatim): "Yes accepting all go ahead"
-This answers DOM's question in its session ("approve X posting"). DOM builds X posting through Buffer as v2.12.0, as described in "Part A through Buffer's free plan (v2.12.0)". Nothing posts until Dvir adds `BUFFER_API_KEY` in Render.
+This answers DOM's question in its session ("approve X posting"). DOM builds X posting through removed-provider as v2.12.0, as described in "Part A through removed-provider's free plan (v2.12.0)". Nothing posts until Dvir adds `REMOVED_PROVIDER_API_KEY` in Render.

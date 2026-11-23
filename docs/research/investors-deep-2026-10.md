@@ -7,7 +7,7 @@ Founder's ask: "find the most quality information you can... compare it to our s
 - Repeats of the same data are linked (`echo_of`, or `same_author` with a note naming the data), so they count once.
 
 **Access.** WebSearch and WebFetch only, with no browser and no proxy.
-- NamePros blog and threads, the NameBio blog, Efty's blog and Namecheap's blog all return 403. NamePros content is used from search snippets only and is marked so.
+- NamePros blog and threads, the removed-provider blog, Efty's blog and removed-provider's blog all return 403. NamePros content is used from search snippets only and is marked so.
 - The DNW and DomainSherpa podcasts have their numbers only in the audio. Only the show-note pages, their comments and the DomainSherpa transcripts were used.
 - One older dotweekly.com page answered 410.
 
@@ -15,17 +15,17 @@ Founder's ask: "find the most quality information you can... compare it to our s
 
 | Investor | What was found (source grade) |
 |---|---|
-| Andrew Allemann (DNW) | His own yearly results for 2020, 2021, 2022 and H1 2024 (B; linked as one data set), BuyDomains economics (B), end-user rewinds 2020 and 2025 (B), weekly Sedo end-user lists (B), NameJet/SnapNames expired lists (B), the Afternic LTO terms (B), 404media (B) |
+| Andrew Allemann (DNW) | His own yearly results for 2020, 2021, 2022 and H1 2024 (B; linked as one data set), BuyDomains economics (B), end-user rewinds 2020 and 2025 (B), weekly removed-provider end-user lists (B), NameJet/SnapNames expired lists (B), the Afternic LTO terms (B), 404media (B) |
 | Doron Vermaat | 2016 DomainSherpa totals: 3.5 years of sales against acquisition cost (B); 2025 revenue per name from the X post that is already in the base |
 | Brad Mugford | 2020 interview: plans on 1-2% sell-through and needs "large margins" (B); a snippet of the AMA that is already in the base |
 | Elliot Silver | Sell-through 2021 and 2024, auction price inflation, the annualised sell-through method, a reader poll (B/C) |
 | Michael Cyger | Revenue per domain post (B); the $500 challenge is already in the base |
-| Michael Sumner / NameBio | The "don't shoot for the moon" analysis via DNW (B), a 2020 interview (C); the NameBio blog is blocked |
-| Bob Hawkes | NamePros snippets: NameBio covers about 25% of retail sales, H1 2026 dollar volume, Nikul's sales channels (B); the acquisition-source split from his reported-sales post (already in the base, new evidence row) |
+| Michael Sumner / removed-provider | The "don't shoot for the moon" analysis via DNW (B), a 2020 interview (C); the removed-provider blog is blocked |
+| Bob Hawkes | NamePros snippets: removed-provider covers about 25% of retail sales, H1 2026 dollar volume, Nikul's sales channels (B); the acquisition-source split from his reported-sales post (already in the base, new evidence row) |
 | Shane Cultra / DSAD | DomainSherpa interview (C), YourLogoHere.com bought for $2,005 and sold for $45,888 (C, via Raymond Hackney), a DSAD auction recap (C) |
 | Mike Mann | OnlineDomain (Konstantinos Zournas) analyses of his self-reported sales, 2019, 2025 and 2026 (C) |
 | Rick Schwartz | His list of 33 sales over 20 years (C, survivorship) |
-| Ron Jackson (DNJournal) | 2025 Top 100 chart (B, outlier end, claim graded C); InterNetX review of the Sedo report (C, echo) |
+| Ron Jackson (DNJournal) | 2025 Top 100 chart (B, outlier end, claim graded C); InterNetX review of the removed-provider report (C, echo) |
 | Joe Uddeme, Logan Flatt, Morgan Linton | DomainSherpa and Crunch.id interviews (B/C/C) |
 | Jamie Zoch, Raymond Hackney | Zoch: no data post reachable (his lists are tools, not outcomes). Hackney: reports others' wins (C) |
 
@@ -46,7 +46,7 @@ Verdicts below are an offline run of the server's own `computeVerdict` code with
 | Mike Mann, the $10k+ band only | 0.014-0.046% | C, qualifies |
 
 Two cautions:
-- Hawkes: NameBio holds only about 25% of retail sales, so sell-through estimates built on NameBio counts are too low.
+- Hawkes: removed-provider holds only about 25% of retail sales, so sell-through estimates built on removed-provider counts are too low.
 - Silver (Munjal's method): a portfolio that is still buying must annualise by days held. This applies to our first-year numbers.
 
 Still indirect (99% of the weight): every number comes from portfolios of thousands of names.
@@ -70,16 +70,16 @@ Certainty stays very low: the agreement is 46% because the opinions still point 
 
 Hawkes' acquisition split of NamePros-reported sales (hand-reg 62.5%, closeouts 11.8%, after-expiry registrations 8.3%, auctions 8.3%) is stored as its own claim, not tied to the question. It counts shares of sales without the number bought in each channel, so it gives no rate.
 
-**end-user-price-band** (moderate before → low after; clusters 4 → 12, A/B 4 → 9). **The median moved from $595 to $1,300.** The $595 was the market-wide Sedo/registrar figure. New investor-sale numbers sit higher:
+**end-user-price-band** (moderate before → low after; clusters 4 → 12, A/B 4 → 9). **The median moved from $595 to $1,300.** The $595 was the market-wide removed-provider/registrar figure. New investor-sale numbers sit higher:
 
 | Source | Sale prices | Grade |
 |---|---|---|
 | Allemann | median $2,300 (2020); most in $1k-5k (2021) | B |
 | Vermaat | average $2-3k (2016); median $4,995 (2025, X) | B |
 | Mugford | "Quality (2) Word .COM sell consistently in the $1K-$10K price range" | B |
-| DNW Sedo end-user lists (sales of $2,000 and up only) | $2,000-$12,500, about 60% under $5,000 | B |
+| DNW removed-provider end-user lists (sales of $2,000 and up only) | $2,000-$12,500, about 60% under $5,000 | B |
 
-The market figures stay lower: Sedo 2024 median $549, 69% of sales by Buy Now (B); NameBio H1 2026 mean about $1,140 (B snippet). Certainty fell one step because the new sources added self-reported and indirect weight. GoDaddy NameFind's controlled test (B, marketplace): **499/999 endings on $2,500-$10,000 names gave revenue +22%, units +8%**. It is stored untied (a revenue change, another unit).
+The market figures stay lower: removed-provider 2024 median $549, 69% of sales by Buy Now (B); removed-provider H1 2026 mean about $1,140 (B snippet). Certainty fell one step because the new sources added self-reported and indirect weight. GoDaddy NameFind's controlled test (B, marketplace): **499/999 endings on $2,500-$10,000 names gave revenue +22%, units +8%**. It is stored untied (a revenue change, another unit).
 
 **signal-auction-bid-count** (low, leaning weak_or_no_signal; clusters 6 → 8). Three sources say a high bid count shows investors competing, which is not end-user demand:
 - Cultra: "60, 70, 80 bidders" tell him a name will resell to investors.
@@ -98,7 +98,7 @@ The arithmetic matters more than the tie. At 2% a year, about 96% of names do no
 
 **Untied but stored:**
 - Revenue per domain: typical portfolios $20-60 a year (Cyger, B); Vermaat about $44 (2016) and $224 (2025).
-- Sales channels: Allemann had 58% (2021) and 78% (2022) of his sales through Afternic; Nikul 46% through the Afternic network and 48% from landers; Sedo 45% through its partner network (SedoMLS).
+- Sales channels: Allemann had 58% (2021) and 78% (2022) of his sales through Afternic; Nikul 46% through the Afternic network and 48% from landers; removed-provider 45% through its partner network (removed-provider).
 - Afternic lease-to-own terms (B): no outcome data anywhere.
 - Afternic says a Buy Now price raises the sale chance "by up to 65%" (C, vendor).
 - A broker needs 7-10 contacts per outbound sale (Uddeme, B). Not usable: founder rule 10 means we never contact buyers.
@@ -109,9 +109,9 @@ The arithmetic matters more than the tie. At 2% a year, about 96% of names do no
 |---|---|---|
 | **Auctions as the S8 main line** (CLAUDE.md, Dvir 25 Oct) | **Challenged (weak).** No source compares auction-bought with closeout-bought outcomes. The support for "auctions" came from guide-site opinions plus Silver's bidder-count remark. Three experienced voices now say contested auction prices have risen past the resale margin, and one B investor made money on sub-$60 closeouts. Bid counts measure investor liquidity more than end-user demand. | **Not enough to change the line.** Very low either way, and all of it is indirect. It is enough to say the choice is unproven. Only our own bid outcomes and the pick-proof can settle it. |
 | **Maximum bid rule** (20% of a $1,000 realistic net resale, scaled by score, $160 at full score, cap $250; `auctions.md` rule 18) | **Challenged (moderate weight, low certainty).** Investors who publish both cost and sales pay about 3-10% of their eventual sale price, and they explain it by 1-3% sell-through. The rule's 20% rests on the old 0.25 opinion. Our own knowledge base gives this arithmetic: P(sale within 2 years) ≈ 2 × 2% = 4%; net per sale about $1,040-1,190 (median end-user $1,300-1,488 less Afternic's 20%); **expected revenue per name ≈ $45**. A $160 bid breaks even only at about **7.5% sell-through a year**, 2-3x the best whole-portfolio rate anyone published (Silver 3.6%, Cultra 3.5%). | **Yes, enough to reconsider now.** 5 independent valued clusters (4 A/B) now point to about 0.10, against 1 opinion cluster at 0.25. The numbers are a Dvir decision (proposal below). |
-| **Shortlist score parts** (shape, other endings, headroom, bids 10, age 10; v2 word quality) | **Bids: challenged** (as above): supports F8 (bids 10 → 5). **Other endings: no change.** The new Sedo lists show only 4 of 39 end-user buyers already on the same name elsewhere; this supports the existing "the sibling owner is rarely the buyer" claim, while the census signal (backtest AUC 0.77) is untouched. **Age / past use: no new evidence** (Linton and the DNW expired lists qualify only for investor demand). | Bids: yes (DOM, already planned as F8). Others: no. |
-| **Buy Now levels** ($1,488 Line 1 default; S8 ladder $2,488-$4,888) | **Supported, with a lean upward.** End-user investor sales cluster at $2,000-5,000 (Allemann $2,300 median, Vermaat $4,995 median, Sedo end-user lists 60% under $5,000). Mike Mann sells many names at his $4,888 floor. NameBio/Atom found little price sensitivity below about $2,000-2,500. So the S8 ladder fits. $1,488 is at the low end and may leave revenue unused (F7). NameFind's +22% from 499/999 endings is in $2,500-$10,000; our endings are 88s. | F7 price test: yes, already a proposal for Dvir; add a 99-ending arm. No rule change without our own test. |
-| **Afternic + lease-to-own** | **Afternic supported:** most of Allemann's sales (58-78%) and about half of Nikul's come through Afternic's network; NameBio says 60-65% across the networks. **Lease-to-own: no new evidence** on outcomes (terms only; the "more sales" claims come from marketplace marketing). | No change. |
+| **Shortlist score parts** (shape, other endings, headroom, bids 10, age 10; v2 word quality) | **Bids: challenged** (as above): supports F8 (bids 10 → 5). **Other endings: no change.** The new removed-provider lists show only 4 of 39 end-user buyers already on the same name elsewhere; this supports the existing "the sibling owner is rarely the buyer" claim, while the census signal (backtest AUC 0.77) is untouched. **Age / past use: no new evidence** (Linton and the DNW expired lists qualify only for investor demand). | Bids: yes (DOM, already planned as F8). Others: no. |
+| **Buy Now levels** ($1,488 Line 1 default; S8 ladder $2,488-$4,888) | **Supported, with a lean upward.** End-user investor sales cluster at $2,000-5,000 (Allemann $2,300 median, Vermaat $4,995 median, removed-provider end-user lists 60% under $5,000). Mike Mann sells many names at his $4,888 floor. removed-provider/Atom found little price sensitivity below about $2,000-2,500. So the S8 ladder fits. $1,488 is at the low end and may leave revenue unused (F7). NameFind's +22% from 499/999 endings is in $2,500-$10,000; our endings are 88s. | F7 price test: yes, already a proposal for Dvir; add a 99-ending arm. No rule change without our own test. |
+| **Afternic + lease-to-own** | **Afternic supported:** most of Allemann's sales (58-78%) and about half of Nikul's come through Afternic's network; removed-provider says 60-65% across the networks. **Lease-to-own: no new evidence** on outcomes (terms only; the "more sales" claims come from marketplace marketing). | No change. |
 | **2-year hold** (founder rule 3; S8 about 3 years) | **No clear verdict** (near tie, very low). Reported-sale medians (11 months) say most sales that happen come early. Long-hold investors earn their big wins after 3-6+ years, which our hold gives up. | No change to the rule. It strengthens the max-bid case: a short hold lowers the value of each name. |
 
 ## 3. Proposed action items
@@ -136,4 +136,4 @@ The arithmetic matters more than the tie. At 2% a year, about 96% of names do no
 10. The other-endings and live-business score parts (no new evidence against them).
 11. The 2-year hold rule itself.
 
-**Lessons:** the best data (NamePros blog, the NameBio blog, podcasts) is behind 403 or only in audio. The next round should be a hand session in Dvir's browser for the NamePros posts by Hawkes, plus a once-a-year January pass for the investors' yearly results posts (Allemann, Vermaat, Silver).
+**Lessons:** the best data (NamePros blog, the removed-provider blog, podcasts) is behind 403 or only in audio. The next round should be a hand session in Dvir's browser for the NamePros posts by Hawkes, plus a once-a-year January pass for the investors' yearly results posts (Allemann, Vermaat, Silver).

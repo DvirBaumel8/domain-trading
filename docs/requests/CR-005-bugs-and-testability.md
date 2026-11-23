@@ -15,7 +15,7 @@ Sources: our acceptance report `qa/acceptance-v2.0.2-full.md` and its request lo
 
 ## 2. Scope
 In scope: the bugs and docs gaps in §4; the testability needs in §5; the dated price change in §6.
-Out of scope: any purchase; any change to caps, approval rules or founder rules; the Sedo template and D-001 (both in CR-004); Dynadot (CR-003, dropped).
+Out of scope: any purchase; any change to caps, approval rules or founder rules; the removed-provider template and D-001 (both in CR-004); removed-provider (CR-003, dropped).
 How DOM builds anything here is DOM's choice. Where today's contract already does what we need, "already supported, here is how" is the best answer. DOM's `docs/requests/README.md` asks for one BUG file per bug; they are bundled here so Dvir approves one document. DOM may split them (Q-3).
 
 ## 3. Safety rules for everything in this CR
@@ -133,7 +133,7 @@ The goal: Gavriel can test every documented behaviour through the API, safely (�
 ### N-5 Reference data and backup status
 - **Need:** `referenceRefresh` keeps the previous snapshot when a sub-step fails, but no route shows which snapshot is in use. `backupExport` is visible only to the scheduler. Dvir dropped the backup drill on 2026-10-07 (DOM's `docs/internal/gaps.md` G-79), so we expect `skipped`; we only want to see that.
 - **Input:** READ token.
-- **Output:** `{popularity: {list_id, list_date, rows, refreshed_at}, iana: {refreshed_at}, namebio: {enabled, cache_date}, last_error?: {step, at, message}, backup: {configured, last_status, last_ok_at | null, reason}}`.
+- **Output:** `{popularity: {list_id, list_date, rows, refreshed_at}, iana: {refreshed_at}, removed-provider: {enabled, cache_date}, last_error?: {step, at, message}, backup: {configured, last_status, last_ok_at | null, reason}}`.
 - **Rules:** read-only; no repo URL, key or secret.
 - **Tests:** TS-10.
 
@@ -319,7 +319,7 @@ Dvir decided the scheduled jobs run **once a day only**. The hourly run is dropp
 |---|---|---|
 | **N-1** job runs read | **Accept** | `GET /jobs/runs` (READ): per run `job`, `trigger` (`scheduled` / `manual`), `scheduled_for`, `started_at`, `finished_at`, `steps{}` (the summaries from `jobs.md`); per job `last_run_at`, `last_ok_at`, `next_due_at` |
 | **N-2** overdue warning | **Accept** | `/report` warning `JOB_OVERDUE` (error) when no `daily` has finished in 26 h (setting). Also in `/health` as `jobs: ok \| overdue` |
-| **N-5** reference and backup status | **Accept** (folded into N-1) | `GET /jobs/runs` also returns `reference` (popularity list date and rows, IANA refresh time, NameBio enabled) and `backup` (`configured: false`, `last_status: skipped`) |
+| **N-5** reference and backup status | **Accept** (folded into N-1) | `GET /jobs/runs` also returns `reference` (popularity list date and rows, IANA refresh time, removed-provider enabled) and `backup` (`configured: false`, `last_status: skipped`) |
 | **N-7** strict dry run | **Accept** | `dry_run: "strict"`: the first real-buy gate refusal is returned as the error (`BUY_HOLD`, `SCREENING_PACK_REQUIRED` with reason and pack id, `NO_TRANCHE`, `TRANCHE_SPEND_CAP`). Same side effects as a dry run: none |
 | **N-8** | (a) **Accept**: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` on every authenticated response. (c) **Q-6: yes, now:** DOM creates a READ token `gavriel-read` today and hands it to Dvir. (b) low-limit test token: **declined**, as it needs N-3 | |
 | **N-4** job dry run, simulated date | **Accept, narrowed** | `POST /jobs/preview {today?}` (WRITE): runs `priceJob` and `dropJob` with `dryRun: true` on real data, for any `today` up to 3 years ahead. Returns `would_apply`, `would_supersede`, `held`, `would_delist` and `would_drop`. Writes only the audit row and never counts as a run. The other steps call outside services or are covered by N-1 (**Q-7**) |

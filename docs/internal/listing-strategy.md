@@ -26,12 +26,12 @@ DOM-internal rules: categories, modes, guards, the calculator, the drop schedule
 | `bin` | `bin` (geo grade). Floor, min offer and walk-away stored = BIN. No LTO | None |
 | `hybrid` | Client sends `bin`; server computes `floor`, `walkaway`, sets `min_offer = min(hybrid_min_offer, walkaway)`. **$20 ≤ min_offer ≤ walkaway ≤ floor ≤ bin** | ≥ floor pre-approved; walk-away..floor → Dvir; below → declined and logged |
 | `offer` | Override only. `min_offer` ≥ $20, `floor` optional, no BIN | Every offer → Dvir |
-- **Afternic lease-to-own, the global setting (Dvir, 27 Oct 2026, "implement all"):** `settings.afternic_lease_to_own` stays on and `afternic_lease_months` goes **16 -> 12** (migration `1768100000000_v5-61-0.sql`): NameBio's lease-to-own data shows 41% of finished deals cancelled and longer terms cancel more. The export and `POST /export/afternic/push` carry 12 for names with a BIN of $495 or more. Since 22 Oct 2026 Afternic has an official seller API; the daily `afternicSync` reads it and `POST /export/afternic/push` writes the plan to it (`docs/internal/afternic-api.md`); the browser path (afternic-listing skill) is the fallback.
+- **Afternic lease-to-own, the global setting (Dvir, 27 Oct 2026, "implement all"):** `settings.afternic_lease_to_own` stays on and `afternic_lease_months` goes **16 -> 12** (migration `1768100000000_v5-61-0.sql`): removed-provider's lease-to-own data shows 41% of finished deals cancelled and longer terms cancel more. The export and `POST /export/afternic/push` carry 12 for names with a BIN of $495 or more. Since 22 Oct 2026 Afternic has an official seller API; the daily `afternicSync` reads it and `POST /export/afternic/push` writes the plan to it (`docs/internal/afternic-api.md`); the browser path (afternic-listing skill) is the fallback.
 - **LTO** (`lto_max_months`): override + `approval_ref`, hybrid only, 2–60 months, BIN $495–$5M (Afternic rule), lease ends before `drop_date`. Always needs the override whatever `public_lto` says. Buyers who ask get a private ≤12-month lease via the Afternic Custom Checkout Link.
 - In hybrid the client never sends `min_offer`. All listing prices are whole USD (`LISTING_PRICE_INVALID` otherwise).
 
 ## 3. Marketplace facts (3 Oct 2026; sources in `../research/marketplaces.md`)
-A1 Afternic Buy Now is binding, optional ("zero or blank" = not set), needed for the Buy It Now lander and LTO. A2 The floor is binding: brokers close any deal ≥ floor without asking. A3 Min Offer is non-binding, ≥ $20. A4 No BIN → Make Offer. A5 No BIN = less reach (Fast Transfer needs a BIN < $100k). A6 `Show … Option` applies only with Custom Lander. **A7 UNVERIFIED:** Afternic accepting min offer = BIN (LX-9). A8 No Afternic seller API. S1 Sedo Buy Now is binding, no minimum allowed. S2 Make Offer: non-binding price, a minimum auto-rejects. S3 No Sedo floor. S4 SedoMLS: Buy Now only. S5 Sedo API needs account credentials: unused. S6 Bulk header strings aren't public.
+A1 Afternic Buy Now is binding, optional ("zero or blank" = not set), needed for the Buy It Now lander and LTO. A2 The floor is binding: brokers close any deal ≥ floor without asking. A3 Min Offer is non-binding, ≥ $20. A4 No BIN → Make Offer. A5 No BIN = less reach (Fast Transfer needs a BIN < $100k). A6 `Show … Option` applies only with Custom Lander. **A7 UNVERIFIED:** Afternic accepting min offer = BIN (LX-9). A8 No Afternic seller API. S1 removed-provider Buy Now is binding, no minimum allowed. S2 Make Offer: non-binding price, a minimum auto-rejects. S3 No removed-provider floor. S4 removed-provider: Buy Now only. S5 removed-provider API needs account credentials: unused. S6 Bulk header strings aren't public.
 
 ## 4. `POST /list` body
 Dvir's `dt list … --bin/--offer/--hold/--replan/--lto/--override` wording maps to `POST /list/{domain}` fields as in `cli.md`. `mode` is required when any price is sent: `--bin` alone = `bin`, `--bin --offer` = `hybrid`, `--offer` alone = `offer` (override).
@@ -55,17 +55,17 @@ Dvir's `dt list … --bin/--offer/--hold/--replan/--lto/--override` wording maps
 **Hybrid (V5):** `bin` required, whole dollars ending in 95, ≥ `hybrid_bin_min` ($795, derived: the smallest x95 ≥ `floor_min`). Floor and walk-away omitted → computed; sent → must equal the computed values unless `pricing_exception: true` + reason + `approval_ref` (stored as `pricing_source = approved_exception`; may also waive the x95 rule). Always: `walkaway_min` ($500) ≤ walkaway ≤ floor ≤ bin and floor ≥ `floor_min` ($750). `min_offer` absent or = `min(hybrid_min_offer, walkaway)`, never overridable.
 
 **Warnings (200):** `FLOOR_AUTO_ACCEPT` (floor below BIN), `FLOOR_RAISED_TO_MIN`, `PRICING_EXCEPTION` (shows stored and formula values), `NO_BIN_LESS_EXPOSURE` (offer mode, A5), `BIN_OVER_FAST_TRANSFER_MAX` (BIN ≥ $100,000), `CATEGORY_OTHER`, `HIGH_VALUE_LOW_BIN`.
-**Retired:** `WALKAWAY_BELOW_500` (v2: refused as `WALKAWAY_BELOW_MIN`), `SEDO_NO_FLOOR` (v2: Sedo is Make Offer; only returns if an admin sets `sedo_hybrid_as = buy_now`), `HYBRID_BIN_BELOW_HIGH_VALUE_MIN` (5 Oct), `LEGACY_NO_COMPS` (still printed by `import-domain --legacy-no-comps` for D-001).
+**Retired:** `WALKAWAY_BELOW_500` (v2: refused as `WALKAWAY_BELOW_MIN`), `REMOVED_PROVIDER_NO_FLOOR` (v2: removed-provider is Make Offer; only returns if an admin sets `removed_provider_hybrid_as = buy_now`), `HYBRID_BIN_BELOW_HIGH_VALUE_MIN` (5 Oct), `LEGACY_NO_COMPS` (still printed by `import-domain --legacy-no-comps` for D-001).
 
 **Every accepted change** appends one `listing_history` row (append-only): mode, prices (incl. the private walk-away), category, grade, `pricing_source`, settings version, override + reason, approval text/time, `audit_id`, `source` (`buy`/`import`/`list`/`schedule`) and `schedule_event_id`.
 
-**Settings** (admin command or migration only, never the API): `settings` (caps, `high_value_min_bin_cents` 250000, `sedo_hybrid_as` default `make_offer`) and the versioned `pricing_settings` (§10.1).
+**Settings** (admin command or migration only, never the API): `settings` (caps, `high_value_min_bin_cents` 250000, `removed_provider_hybrid_as` default `make_offer`) and the versioned `pricing_settings` (§10.1).
 
 ## 6. Mode → export columns
-Binding tables: `docs/contract/formats.md` (Afternic per mode; Sedo per mode). Notes:
+Binding tables: `docs/contract/formats.md` (Afternic per mode; removed-provider per mode). Notes:
 - Offer mode writes BIN `0` (not blank), because an Afternic **Update** may keep an old value for a blank cell (UNVERIFIED); after any mode change the bot checks the Afternic dashboard (LX-8).
 - Drops never change the $100 min offer. The walk-away appears in no export, no `afternic_row`, no lander or buyer-facing text (OF-14).
-- Sedo: every mode is Make Offer (v2), so Afternic holds the only binding price. Geo minimum = BIN (no-negotiation rule); hybrid minimum = $100. Offers Sedo forwards are logged with `POST /offers`.
+- removed-provider: every mode is Make Offer (v2), so Afternic holds the only binding price. Geo minimum = BIN (no-negotiation rule); hybrid minimum = $100. Offers removed-provider forwards are logged with `POST /offers`.
 
 ## 7. Buy-time approval
 The scout proposes the BIN with 2–3 real comps (v2; v9.1 replaces them with the backend's `screening_pack`, CR-001 P1b). Gavriel pastes `GET /pricing/preview`'s `sell_plan_line` (with `settings_version`) into the card; Dvir approves buy + sell plan in one message; `/buy` sends `category` (+ grade), `proposed_listing` with the card's numbers, `pricing_evidence` and `expected_settings_version`; the server recomputes and refuses a mismatch **before any money is spent**. With `auto_list` the plan and schedule are stored, anchored on the first listing date.
@@ -137,13 +137,13 @@ Shape: `docs/contract/endpoints.md`. Query errors → 400; rule errors → 422; 
 Full file every time; the pending and manual-delist rules, the upload confirmation and `EXPORT_PENDING` are in `export-csv.md`. The weekly lander check compares the page with the **last uploaded** values (`/portfolio/{d}` export block).
 
 ### 10.8 Who decides each offer
-| Offer (hybrid) | Afternic | Sedo / DomainAgents | Email thread |
+| Offer (hybrid) | Afternic | removed-provider / DomainAgents | Email thread |
 |---|---|---|---|
 | ≥ BIN | Sells (binding) | Accept (pre-approved) | Dvir (Sochen drafts) |
 | floor ≤ x < BIN | Brokers close it (A2) | Accept (pre-approved) | Dvir |
 | walk-away ≤ x < floor | Reaches Dvir | Dvir (Gate D) | Dvir |
 | $100 ≤ x < walk-away | Declined automatically (no counter, no Gate D) | Declined (standard template) | Standard decline (pre-approved text) |
-| < $100 | Blocked by min offer | Blocked by Sedo minimum | As above |
+| < $100 | Blocked by min offer | Blocked by removed-provider minimum | As above |
 | Geo, any x < BIN | Impossible (min = BIN) | Declined | "The price is $X, fixed" |
 Every offer in every row is logged with `POST /offers`; the server classifies it against the prices in force at receipt.
 
@@ -154,7 +154,7 @@ First Monday of Jan/Apr/Jul/Oct (first 4 Jan 2027; April merges with the POC rev
 Columns and tables: `00-architecture.md` §4. The PR vectors were generated with `pricing_calc.py` (copy in `docs/requests/CR-001-reference/system/tools/`); the vectors are the contract.
 
 ### 10.11 Offers log (`POST /offers`, `/offers/{id}/outcome`, `GET /offers`, `/report` aggregates)
-- **Row:** `domain_id` (any owned status), `amount_cents` > 0 (non-USD converted by the recorder; original in `note`), `source` (`afternic`/`godaddy`/`sedo`/`domainagents`/`email_inbound`/`outbound_reply`/`other`), `received_at` (≤ 5 min future), `buyer_type` (`end_user`/`investor`/`broker`/`unknown`), `buyer_ref` (opaque; no `@`: `NO_PII`), `external_ref` (unique per source; may be a Message-ID), a snapshot of the prices in force at `received_at` (latest `listing_history` row ≤ it) + `listing_history_id`, server `band` and `routing`, outcome fields, `recorded_by`, `audit_id`. Facts immutable (trigger); only outcome fields change, through the API.
+- **Row:** `domain_id` (any owned status), `amount_cents` > 0 (non-USD converted by the recorder; original in `note`), `source` (`afternic`/`godaddy`/`removed-provider`/`domainagents`/`email_inbound`/`outbound_reply`/`other`), `received_at` (≤ 5 min future), `buyer_type` (`end_user`/`investor`/`broker`/`unknown`), `buyer_ref` (opaque; no `@`: `NO_PII`), `external_ref` (unique per source; may be a Message-ID), a snapshot of the prices in force at `received_at` (latest `listing_history` row ≤ it) + `listing_history_id`, server `band` and `routing`, outcome fields, `recorded_by`, `audit_id`. Facts immutable (trigger); only outcome fields change, through the API.
 - **Band:** `below_min` / `below_walkaway` / `mid_range` (walk-away ≤ x < floor) / `at_or_above_floor` / `at_or_above_bin`; geo `geo_below_bin` / `at_or_above_bin`; `unpriced` when there are no prices. Lower bounds inclusive.
 - **Routing:** `auto_decline` (below_min, below_walkaway, geo_below_bin; outcome `declined_auto` at record time) / `dvir` (mid_range, and every `email_inbound`/`outbound_reply` offer ≥ walk-away) / `auto_accept` (≥ floor on afternic/godaddy) / `accept_preapproved` (≥ floor elsewhere). Others start `open`.
 - **Record:** duplicate (source + external_ref, or domain + amount + source + time) → 200 `duplicate: true`, nothing written; an `external_ref` used on another domain → 409 `EXTERNAL_REF_CONFLICT`. Codes: 404 `DOMAIN_NOT_FOUND`; 422 `AMOUNT_INVALID`, `SOURCE_INVALID`, `BUYER_TYPE_INVALID`, `RECEIVED_AT_IN_FUTURE`, `NO_PII`; warnings `OFFER_ON_UNLISTED`, `OFFER_AT_OR_ABOVE_FLOOR`. Recording never calls anyone or changes a price; it may set a hold if asked (reason required, no approval).

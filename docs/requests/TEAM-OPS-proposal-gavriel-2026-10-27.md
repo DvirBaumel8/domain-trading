@@ -53,7 +53,7 @@ Think like a small engineering team: clear areas, consult on important changes, 
 - Contested drop-catch / registrar auction speed races.
 - Trademarked / distinctive brand targeting (UDRP/ACPA).
 - Volume hand-reg of clever three-word leftovers hoping for lottery sales.
-- Building a second Sedo automation stack (decision `D-2026-10-27-SEDO`).
+- Building a second removed-provider automation stack (decision `D-2026-10-27-removed-provider`).
 - Paying large SaaS stacks that cost ≈ renewals without proven sales lift (external lesson § critical notes).
 
 ---
@@ -92,7 +92,7 @@ Think like a small engineering team: clear areas, consult on important changes, 
 - Achievements that change capability (new API key live, replay signal, CR shipped).
 - Failures that burn money/time or break seals/datasave.
 - Price/listing MISMATCH between live marketplace and books.
-- Decisions that shelve a track (e.g. Sedo).
+- Decisions that shelve a track (e.g. removed-provider).
 
 **Cadence (proposed):**
 | Cadence | What | Owner |
@@ -137,7 +137,7 @@ Think like a small engineering team: clear areas, consult on important changes, 
 | Which BIN rung to propose | Sales LLM | Judgment |
 | Afternic price sync | DOM API (build) | World-class + tokens |
 | Afternic login / CSV until API proven | Gavriel/Dvir browser | Strengths matrix |
-| Sedo new listings | **Don’t** | D-2026-10-27-SEDO |
+| removed-provider new listings | **Don’t** | D-2026-10-27-removed-provider |
 | Replay report read | DOM GET + Challenger grade | Split |
 | Dvir conversation | Gavriel only | Org |
 
@@ -151,7 +151,7 @@ Think like a small engineering team: clear areas, consult on important changes, 
 **Week 1 — Truth & waste**
 1. Declare **DOM `/portfolio` + `/books.csv` = live books** when service up; company `ledger/portfolio.csv` becomes **export/mirror** updated by Sales/Gavriel after DOM write (or automated sync) — resolve dual-write in a short CR if needed (L2, then Dvir if money rows change).
 2. Wire **Afternic Portfolio API** read (prices, listing state) into DOM report/MISMATCH; stop treating public scrape as primary once AT passes.
-3. Sedo Monday rows: either **drop Sedo venue from T-SELL** or mark venue `shelved` per `D-2026-10-27-SEDO` (L1/L2 — no new scrape effort).
+3. removed-provider Monday rows: either **drop removed-provider venue from T-SELL** or mark venue `shelved` per `D-2026-10-27-removed-provider` (L1/L2 — no new scrape effort).
 4. Start cleanup inventory execution: archive bak clusters under `archive/` (no delete yet) — company box (L1 with Dvir note if paths break routines).
 
 **Week 2 — FIXED migrations (freeze permitting)**
@@ -165,7 +165,7 @@ Think like a small engineering team: clear areas, consult on important changes, 
 **Week 4 — Edge, not volume**
 9. Re-read `company/strategy-edge-research-2026-10-17.md` in Sunday review: kill or time-box any lane that is “hand-reg distinctive .com of a live business.”
 10. Prefer **one** discovery path (shortlist v2) + replay improvement loop; no new parallel proof tracks without L2+L3.
-11. Innovation watch: Spaceship SellerHub when keys land; any new marketplace API — same pattern as Afternic (notice → CR → wire → retire browser).
+11. Innovation watch: removed-provider ListingSync when keys land; any new marketplace API — same pattern as Afternic (notice → CR → wire → retire browser).
 
 ---
 
@@ -191,7 +191,7 @@ Escalate only these unless DOM’s counter-draft adds more:
 
 1. **Books primacy:** Confirm DOM books as sole live write for BIN/floor/walk-away; company CSV = mirror. (Money-adjacent; needs your yes.)
 2. **Named READ tokens:** Create READ tokens for DOM Architect / Challenger / Risk Gate? (Security + bottleneck.)
-3. **Sedo Monday:** Drop Sedo from weekly sale-rate entirely, or keep placeholder rows without scrapes?
+3. **removed-provider Monday:** Drop removed-provider from weekly sale-rate entirely, or keep placeholder rows without scrapes?
 4. **Edge bet for next 90 days:** Double down on shortlist generic inventory + Afternic inbound, vs revive buyer-first broker test from strategy research (outreach still paused — may need legal unblock first)?
 5. **Cleanup inventory:** Approve archive pass on ~267 bak files / stale scout docs (paths may break old routines)?
 6. **Anything DOM and Gavriel still disagree on after ping-pong** — we will list explicitly rather than average silently.

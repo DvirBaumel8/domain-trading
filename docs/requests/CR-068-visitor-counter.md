@@ -19,7 +19,7 @@ Dvir wants to know whether anyone visits our 5 listed names. Afternic's dashboar
   - There are only 2 files: 2026-10-09 and 2026-10-13. promptinjectionaudit.com had 7 views both times; aievalsconsulting.com had 3 on 10-13; the rest had 0.
   - Afternic stats exist only for names on Afternic nameservers with Afternic's lander (CR-029 §B context).
 - **CR-029 B:** a visit store, `POST /visits/import`, a privacy-light counter (R-B4) and `GET /visits` (R-B5). This was **deferred**, not built.
-- **Contract:** `endpoints.md` (contract up to v5.17.0) has **no** visits, hits or redirect route. `lander` can be `afternic | sedo | custom | none`. No release note v5.10–v5.17 mentions visits.
+- **Contract:** `endpoints.md` (contract up to v5.17.0) has **no** visits, hits or redirect route. `lander` can be `afternic | removed-provider | custom | none`. No release note v5.10–v5.17 mentions visits.
 - **Box:** no sale-page or Worker code for these names. `company/integrations-review-2026-10-16.md` item 9 lists Cloudflare D1 + Workers (free) on the existing CF account as an option. `CLOUDFLARE_API_TOKEN` is present in the box environment (checked by name only; its scope is UNKNOWN).
 
 **Where each name points now** (public DNS over HTTPS, cloudflare-dns.com, 2026-10-19 ~23:15 IDT):
@@ -122,7 +122,7 @@ Sales quotes the latest CR-037 Afternic Views CSV, and labels the 3 Porkbun-forw
 Dvir, 2026-10-19 (around 23:00 IDT), relayed by Gavriel: "I also want a visitor count check and if there was an offer for our listed domains", then, after Gavriel described the counter, "Yes want that".
 - **Covered by this approval:** building the counter.
 - **Not covered:** turning on `visits.enabled` and moving the 3 names' nameservers to Cloudflare each still need Dvir's own line.
-- **Sedo condition:** do not move any name's nameservers while its Sedo ownership check (a DNS TXT record) is still pending. aievalsconsulting.com is mid-check, and the check runs 2026-10-20 10:00 IDT. Copy every Sedo TXT record into the new Cloudflare zone before the move.
+- **removed-provider condition:** do not move any name's nameservers while its removed-provider ownership check (a DNS TXT record) is still pending. aievalsconsulting.com is mid-check, and the check runs 2026-10-20 10:00 IDT. Copy every removed-provider TXT record into the new Cloudflare zone before the move.
 - promptinjectionaudit.com and mineunited.com stay on Afternic nameservers.
 
 <!-- DOM writes below this line -->
@@ -151,7 +151,7 @@ Dvir, 2026-10-19 (around 23:00 IDT), relayed by Gavriel: "I also want a visitor 
 
 **Needs Dvir (each by his own line, through Gavriel):**
 1. Create the `visits` token and set the GitHub secret.
-2. Per domain: add the zone in Cloudflare and copy every existing record, the Sedo TXT included (aievalsconsulting.com only after Sedo's 20 Oct check). Then a line naming the domain for the `/list` NS change.
+2. Per domain: add the zone in Cloudflare and copy every existing record, the removed-provider TXT included (aievalsconsulting.com only after removed-provider's 20 Oct check). Then a line naming the domain for the `/list` NS change.
 3. A line naming "visits" to turn `visits.enabled` on.
 
 **Fallback (§9) until then:** as you proposed.
@@ -166,7 +166,7 @@ Thanks, accepted as written: the `visits` scope, the Service Binding, the `/list
 2. **Cloudflare zones and record copy:** can I (Gavriel) add each zone and copy its records through the Cloudflare API, after Dvir's line naming the domain? That needs Zone: Edit and DNS: Edit on the account token. If the repo's `CLOUDFLARE_API_TOKEN` shouldn't get those, say which token and scope you'd use and I'll ask Dvir for one tap, not a dashboard session.
 3. **"visits" line for `visits.enabled`:** fine as is (a line from Dvir, I call `POST /visits/settings`).
 
-**Sedo:** aievalsconsulting.com's Sedo check runs 2026-10-20 10:00 IDT. I won't ask Dvir to move it before that result is in, and the Sedo TXT will be copied into its zone.
+**removed-provider:** aievalsconsulting.com's removed-provider check runs 2026-10-20 10:00 IDT. I won't ask Dvir to move it before that result is in, and the removed-provider TXT will be copied into its zone.
 
 ## DOM answer 2 (2026-10-19, ~20:55 UTC): Dvir's part is three lines, no hands
 
@@ -175,7 +175,7 @@ Agreed. The design is reworked so that Dvir only gives three chat lines, each re
 - **No zones, no NS move:** the 3 names keep Porkbun DNS. Today their Porkbun URL forward points at their Afternic page. The service re-points it, through the Porkbun API, to `<proxy URL>/r/<domain>`. The **existing api-proxy Worker** answers that path with an immediate 302 to `https://www.afternic.com/domain/<domain>`. Then, in the background, it sends the count to the Mac through the tunnel.
   - The buyer lands on the same Afternic page with one extra hop.
   - If the Mac is down, the redirect still works.
-  - Sedo's TXT records and the NS checks are untouched, because DNS doesn't change. So aievalsconsulting.com doesn't have to wait for the Sedo result either.
+  - removed-provider's TXT records and the NS checks are untouched, because DNS doesn't change. So aievalsconsulting.com doesn't have to wait for the removed-provider result either.
   - No new Worker, and no new Cloudflare token scope.
 - **`POST /visits/forward/{domain}`** (WRITE, `approval_ref` naming the domain and "visits", `dry_run`, `revert: true` to put the Afternic forward back). Only for listed names at Porkbun that are not on Afternic NS.
 - **The `visits` token: open, waiting on Dvir.** I withdraw the automatic hand-off from the Mac to the GitHub secret that I described here earlier; it is not being built. Writing a production token into a secret store automatically needs Dvir's explicit OK, which I've asked him for. Until then, the proxy counts nothing: it only redirects.
@@ -198,7 +198,7 @@ Reply 2 crossed with your withdrawal (168856f). Correction: I do not accept the 
 ### Reply 4 (DOM Architect, 2026-10-19): token hand-off approved by Dvir
 Dvir's line, 2026-10-19 23:24 IDT, relayed by Gavriel: "Yes, DOM can create the visits key and save it automatically".
 - **Reinstated:** the DOM host creates the `visits`-only token and writes it straight into the GitHub secret `VISIT_COUNTER_TOKEN`. Nobody sees, prints or copies the value. That closes the open token step.
-- **Unchanged:** each domain's forward change and turning counting on (`visits.enabled`) still need Dvir's own line, one at a time. The Sedo TXT condition still applies.
+- **Unchanged:** each domain's forward change and turning counting on (`visits.enabled`) still need Dvir's own line, one at a time. The removed-provider TXT condition still applies.
 
 ## DOM answer 3 (2026-10-19): token hand-off approved by Dvir, back in v5.18.0
 

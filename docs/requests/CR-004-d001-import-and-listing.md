@@ -7,12 +7,12 @@
 ## 1. Business need
 D-001 (`promptinjectionaudit.com`) is our first and only domain. Dvir bought it by hand at GoDaddy, so DOM's software has never seen it: today `GET /portfolio` is empty. Dvir approved a sell plan on 2026-10-06 00:32 IDT, and the name has to be listed on Afternic by **2026-12-31**. Until DOM holds the name, nothing in the API can price it, export it, track its drop schedule, verify its nameservers or count its cost toward the $1,500 cap.
 
-This CR asks DOM to (a) take D-001 into the portfolio with the right facts, (b) make the approved price plan storable, (c) let Gavriel store the listing **before** the nameservers change, then switch the lander only once the Afternic listing is live, (d) finish the Sedo export, and (e) show the drop schedule in `/report`.
+This CR asks DOM to (a) take D-001 into the portfolio with the right facts, (b) make the approved price plan storable, (c) let Gavriel store the listing **before** the nameservers change, then switch the lander only once the Afternic listing is live, (d) finish the removed-provider export, and (e) show the drop schedule in `/report`.
 
 Sources for every fact below: our deal files `deals/D-001-promptinjectionaudit/deal.md`, `listing.md` and `approvals.md`; `system/selling-playbook.md` §4.3 and §5.6; `system/registrar-setup.md` (GoDaddy section); public RDAP read by Gavriel on 2026-10-07 09:40 IDT.
 
 ## 2. Scope
-In scope: D-001 only. Its import, its pricing version, its listing and exports (Afternic and Sedo), its nameserver switch to Afternic, its drop schedule and drop date, and how it appears in `/portfolio`, `/report` and `/ledger`.
+In scope: D-001 only. Its import, its pricing version, its listing and exports (Afternic and removed-provider), its nameserver switch to Afternic, its drop schedule and drop date, and how it appears in `/portfolio`, `/report` and `/ledger`.
 Out of scope: any purchase; a GoDaddy renewal; any other registrar; changes to the selection settings; a custom lander (never in the POC).
 How DOM builds anything here is DOM's choice. Where today's contract already does what we need, a reply of "already supported, here is how" is the best answer.
 
@@ -47,7 +47,7 @@ How DOM builds anything here is DOM's choice. Where today's contract already doe
 | Drop | Do not renew. Drop at the first expiry **2027-10-04**, unless a real inquiry or offer arrives |
 | Afternic | Listed by **2026-12-31**; hosted Custom Lander (Buy Now + Make Offer) on `ns1.afternic.com` / `ns2.afternic.com` |
 | Afternic CSV row | `PromptInjectionAudit.com,1488,967,100,N,,Custom Lander,Y,N,Y,N` |
-| Sedo | Asking price $1,488, Make Offer, min offer $100, no SedoMLS (GoDaddy names are not eligible) |
+| removed-provider | Asking price $1,488, Make Offer, min offer $100, no removed-provider (GoDaddy names are not eligible) |
 
 Our approvals file holds a recorded summary of the 00:32 decision, not Dvir's verbatim words. See Q-9 about `approval_ref`.
 
@@ -90,8 +90,8 @@ Our approvals file holds a recorded summary of the 00:32 decision, not Dvir's ve
 14. **R-14** If DOM's GoDaddy management adapter can set nameservers for Dvir's account, step (4) is done by DOM through the API. Our registrar notes say the GoDaddy management API needs at least 1 active domain and a personal access token with `domains.domain:read` and `domains.nameserver:update`, and that the token may still be refused with 403 `ACCOUNT_NOT_ELIGIBLE` (registrar-setup.md; GoDaddy help 42424). The name also carries GoDaddy's default lock (`client update prohibited` in RDAP), which may block a nameserver change until it is lifted (Q-11).
 15. **R-15** If the API can't do it, the fallback is Afternic's "Change NS" connector or Dvir changing the nameservers by hand in GoDaddy. Either way DOM still records the lander (`afternic`) and the target nameservers, returns `ns_status: "manual"` with `manual_steps` when it can't act itself, and the daily nameserver check confirms the change (`ns_verified: true`).
 
-### 4.6 Sedo export (R-16)
-16. **R-16** Today `GET /export/sedo.csv` returns 501 `SEDO_TEMPLATE_MISSING`. We want it to return 200 with D-001's row: lowercase domain, Make Offer, price 1488, minimum price 100, USD, for sale, action "add", no walk-away, no SedoMLS. Please tell us exactly what input DOM needs to finish the Sedo template (Sedo's bulk-upload format) and who must provide it (Q-12).
+### 4.6 removed-provider export (R-16)
+16. **R-16** Today `GET /export/removed-provider.csv` returns 501 `REMOVED_PROVIDER_TEMPLATE_MISSING`. We want it to return 200 with D-001's row: lowercase domain, Make Offer, price 1488, minimum price 100, USD, for sale, action "add", no walk-away, no removed-provider. Please tell us exactly what input DOM needs to finish the removed-provider template (removed-provider's bulk-upload format) and who must provide it (Q-12).
 
 ### 4.7 Price schedule (R-17, R-18)
 17. **R-17** The month-6 drop is anchored on the **first listing date**. Gavriel will make the price-only `POST /list` on the same day as the first Afternic upload, so the stored first listing date and the real Afternic start match. The import itself must not start the drop clock (Q-8).
@@ -130,7 +130,7 @@ No new public codes unless DOM needs one. Any new code goes in the code index wi
 | D1-11 | `/report` between D1-7 and the lander switch | no `NS_UNVERIFIED` at warn or error level for D-001 (R-11) |
 | D1-12 | Lander switch to `afternic` after the Afternic listing is live | 200; `ns` = `ns1.afternic.com`, `ns2.afternic.com`; `ns_status` `set`, `pending` or `manual` (with `manual_steps`); no price change, no new schedule rows |
 | D1-13 | Daily nameserver check after the switch (by hand at GoDaddy or by the API) | `/portfolio` shows `lander` `afternic` and `ns_verified: true`; `/report` has no `NS_UNVERIFIED` for D-001 |
-| D1-14 | `GET /export/sedo.csv` once the template exists | 200; one row for `promptinjectionaudit.com`: Make Offer, price 1488, minimum 100, USD, for sale, add; no walk-away |
+| D1-14 | `GET /export/removed-provider.csv` once the template exists | 200; one row for `promptinjectionaudit.com`: Make Offer, price 1488, minimum 100, USD, for sale, add; no walk-away |
 | D1-15 | Import attempted a second time | refused; no new rows |
 
 ## 8. Questions for DOM (please answer in the reply)
@@ -150,7 +150,7 @@ No new public codes unless DOM needs one. Any new code goes in the code index wi
 **Listing, lander and nameservers**
 10. **Q-10** For a name set to drop at its first expiry, will `committed_forward` stop expecting a renewal, or will D-001 always show `RENEWAL_PRICE_UNKNOWN`? Should Gavriel record a Dvir-entered GoDaddy renewal price instead?
 11. **Q-11** Can DOM's GoDaddy management adapter set nameservers for Dvir's account (personal access token, account eligibility)? Does GoDaddy's default lock (`client update prohibited`) need to be lifted first, and by whom? Will the daily registrar check (`DOMAIN_LEFT_ACCOUNT`) cover D-001, or is it skipped for a name without registrar access?
-12. **Q-12** Sedo: what does DOM need to finish the template (Sedo's bulk-upload example file from Dvir's Sedo account, the exact header strings and option values, anything else)? Who must provide it, and is a Sedo account a prerequisite?
+12. **Q-12** removed-provider: what does DOM need to finish the template (removed-provider's bulk-upload example file from Dvir's removed-provider account, the exact header strings and option values, anything else)? Who must provide it, and is a removed-provider account a prerequisite?
 13. **Q-13** If a real inquiry or offer arrives before 2027-10-04, how is the drop cancelled and the name kept, given there is no undo for the drop-date step and no renewal route yet? What must Gavriel and Dvir do, and by which date?
 14. **Q-14** D-001 has no comps (bought before the comps rule; recorded as `legacy_no_comps`) and no screening pack (open for Dvir: whether a hand-bought name needs one, gaps G-4, G-5, G-11). Will `/report` show `POST_BUY_INCOMPLETE` for D-001, and is that expected?
 
@@ -164,7 +164,7 @@ No new public codes unless DOM needs one. Any new code goes in the code index wi
 
 ## 10. DOM response (2026-10-07)
 
-**Verdict: accepted.** Most of it is already supported through DOM's admin steps. Three small changes ship in **v2.1.0** (§10.3). Sedo is not supported yet: DOM recommends skipping it for now (Q-12). DOM recommends the **v3 path** (Q-7).
+**Verdict: accepted.** Most of it is already supported through DOM's admin steps. Three small changes ship in **v2.1.0** (§10.3). removed-provider is not supported yet: DOM recommends skipping it for now (Q-12). DOM recommends the **v3 path** (Q-7).
 
 ### 10.1 Sequence (who does what)
 1. **DOM: import, no listing.** Admin step, already approved in §9:
@@ -208,9 +208,9 @@ The resulting schedule (R-18): M6 = L + 6 months, $1,088 / $750 / $520; M18 is s
   - **DOM recommends the manual path for D-001:** no GoDaddy key. One nameserver change by hand in GoDaddy is simpler and safer than adding a credential.
   - **GoDaddy's default lock:** in GoDaddy's dashboard, "Domain lock" blocks transfers. Nameserver changes from the dashboard are normally allowed with it on. If GoDaddy refuses, Dvir turns the lock off for the change and back on afterwards.
   - **Daily ownership check:** it skips names with no registrar access (`registrar_api: none`), so D-001 is **not** covered. That is an accepted gap for one hand-bought name.
-- **Q-12, Sedo:**
-  - **What's missing:** Sedo publishes no bulk-upload format. DOM needs the example file from **Dvir's Sedo account** (so a Sedo account is a prerequisite), which DOM copies into `templates/sedo_template.json`. Until then the endpoint stays 501.
-  - **DOM's recommendation:** skip Sedo for D-001. The name can't use SedoMLS (it's at GoDaddy), Afternic is the main channel, and the Afternic listing already reaches GoDaddy's network.
+- **Q-12, removed-provider:**
+  - **What's missing:** removed-provider publishes no bulk-upload format. DOM needs the example file from **Dvir's removed-provider account** (so a removed-provider account is a prerequisite), which DOM copies into `templates/removed_provider_template.json`. Until then the endpoint stays 501.
+  - **DOM's recommendation:** skip removed-provider for D-001. The name can't use removed-provider (it's at GoDaddy), Afternic is the main channel, and the Afternic listing already reaches GoDaddy's network.
   - **If you still want it:** send the file through a CR.
 - **Q-13:**
   - **Today:** there is no undo for `drop-at-first-expiry` and no renewal route.
@@ -240,7 +240,7 @@ Given by Dvir in chat with Gavriel at 2026-10-07 11:23 IDT, exactly as DOM worde
 
 **Verified by Gavriel via the API (2026-10-07 11:20 IDT):** step 1 import is correct: `owned`, `registrar_api: none`, cost $13.73, ledger row dated 2026-10-04 with the ILS note, expiry 2027-10-04. `drop_date` currently reads 2028-10-04; Gavriel expects 2027-10-04 after step 3.
 
-**Sedo (Q-12):** noted. Dvir already listed the name on Sedo by hand (Make Offer, $100 minimum, ownership check pending). It stays there as an extra channel, not tracked in DOM for now. No CR needed.
+**removed-provider (Q-12):** noted. Dvir already listed the name on removed-provider by hand (Make Offer, $100 minimum, ownership check pending). It stays there as an extra channel, not tracked in DOM for now. No CR needed.
 
 **DOM, 2026-10-07 11:40 IDT: steps 2 and 3 done.**
 - **Step 2:** `pricing_settings` **version 3** was created with Dvir's 11:23 approval text exactly as given in §11.

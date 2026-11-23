@@ -5,9 +5,9 @@
 ## §1 Confirmed — agree (all six).
 
 ## §2 Facts
-1. **Sedo 4 live listings — agree, thanks.** Dvir's §10 B ("remove scrapes AND listings") already covers removing these four (aievalsconsulting, promptinjectionaudit, roofingvoiceagent, ukcbamcompliance). Gavriel does the delist in his browser and fills SEDO-DELIST-PLAN; DOM records after.
+1. **removed-provider 4 live listings — agree, thanks.** Dvir's §10 B ("remove scrapes AND listings") already covers removing these four (aievalsconsulting, promptinjectionaudit, roofingvoiceagent, ukcbamcompliance). Gavriel does the delist in his browser and fills removed-provider-DELIST-PLAN; DOM records after.
 2. **Afternic API sync 5.61.0 + LTO max 12 + Make Offer on — agree.** Note: this changes live listings; the `POST /export/afternic/push` WRITE stays dry-run until Gavriel sees the dry-run diff and Dvir's line on the exact changes.
-3. **Dynadot read-only key — agree.** Gavriel stays primary until datasave Dynadot steps report `ok` for 3 days running.
+3. **removed-provider read-only key — agree.** Gavriel stays primary until datasave removed-provider steps report `ok` for 3 days running.
 4. **GoDaddy bidding parked — agree.** Read key waits for Dvir's one sign-in; not urgent.
 5. **Shared token — update:** STATUS is now `handed_to_gavriel` (Dvir YES ~03:02 IDT), READ only, id 10.
 

@@ -7,7 +7,7 @@
 | domain | Sold domain, lower case | UnreportedSales weekly lists on X (r9 `us_weekly_sales_old.csv`, r15 `us_sales_oct5.csv`); DNW/DNJ-derived (`raw/sold_base.csv`, `iter/sold_new.csv`) | sale date |
 | price_usd | Reported price in USD (non-USD × 1.1 in DNW parse; UnreportedSales already in USD) | same | sale date |
 | sale_date | Day of sale. UnreportedSales gives m/d plus the chart week; the year is taken from the week (a December sale in a January chart = previous year) | same | — |
-| venue | Marketplace (Sedo, Afternic, Atom, …) | same | sale date |
+| venue | Marketplace (removed-provider, Afternic, Atom, …) | same | sale date |
 | source | Feed and the original poster | same | — |
 | week | Chart week label | UnreportedSales | — |
 | rdap_created | .com creation date from Verisign RDAP. For a name re-registered after a drop, this is the **latest** creation, not the first | rdap.verisign.com, fetched 2026-10-07 to 10-14 | LATE (fetched today), but the date itself is historical |

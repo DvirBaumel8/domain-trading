@@ -14,7 +14,7 @@ Reads and dry runs only, through the Mac proxy. `/health` = 4.0.0, db ok, jobs o
 - **B-2 (cosmetic):** `POST /portfolio/{domain}/stats` with `@` in `source` → 422 `NO_PII` whose message says "note must not contain…"; the field is `source`.
 
 ## Not tested (real writes)
-Valid `POST /patterns/sales`, `/outreach/emails`, `/portfolio/{domain}/stats`, `/horizon` (needs Dvir's line), `listingSync` (needs SellerHub keys).
+Valid `POST /patterns/sales`, `/outreach/emails`, `/portfolio/{domain}/stats`, `/horizon` (needs Dvir's line), `listingSync` (needs ListingSync keys).
 
 ## Note
 `/health` shows `posting: failed` (old X image error); X posting is paused by Dvir, so no action, unless you can make it read `paused`.

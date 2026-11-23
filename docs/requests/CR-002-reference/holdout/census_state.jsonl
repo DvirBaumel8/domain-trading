@@ -257,7 +257,7 @@
 {"domain": "webislandhoney.com", "registered": false, "state": "unregistered", "at": "2026-10-06T02:48"}
 {"domain": "cryptobet.com", "registered": true, "state": "no_http", "at": "2026-10-06T02:48"}
 {"domain": "squarebet.com", "registered": true, "state": "thin", "at": "2026-10-06T02:48"}
-{"domain": "withbet.com", "registered": true, "state": "redirect_offdomain:forsale.dynadot.com", "at": "2026-10-06T02:48"}
+{"domain": "withbet.com", "registered": true, "state": "redirect_offdomain:forsale.removed-provider.com", "at": "2026-10-06T02:48"}
 {"domain": "bookbet.com", "registered": true, "state": "no_http", "at": "2026-10-06T02:48"}
 {"domain": "digitalbet.com", "registered": true, "state": "no_http", "at": "2026-10-06T02:48"}
 {"domain": "citybet.com", "registered": true, "state": "forsale_or_parked", "at": "2026-10-06T02:48"}
@@ -457,7 +457,7 @@
 {"domain": "magneticitsystems.com", "registered": false, "state": "unregistered", "at": "2026-10-06T02:49"}
 {"domain": "zeroitsystems.com", "registered": false, "state": "unregistered", "at": "2026-10-06T02:49"}
 {"domain": "stockitsystems.com", "registered": false, "state": "unregistered", "at": "2026-10-06T02:49"}
-{"domain": "zenitsystems.com", "registered": true, "state": "redirect_offdomain:forsale.dynadot.com", "at": "2026-10-06T02:49"}
+{"domain": "zenitsystems.com", "registered": true, "state": "redirect_offdomain:forsale.removed-provider.com", "at": "2026-10-06T02:49"}
 {"domain": "wetitsystems.com", "registered": false, "state": "unregistered", "at": "2026-10-06T02:49"}
 {"domain": "epicitsystems.com", "registered": false, "state": "unregistered", "at": "2026-10-06T02:49"}
 {"domain": "linkitmind.com", "registered": false, "state": "unregistered", "at": "2026-10-06T02:49"}

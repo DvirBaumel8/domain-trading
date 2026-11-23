@@ -23,7 +23,7 @@ Matches live `POST /export/afternic/push {"dry_run":true}` from Claude Code ~03:
 | ukcbamcompliance.com | `show_lto` false → **true** |
 | roofingvoiceagent.com | `show_lto` false → **true** |
 
-**Forbidden:** any BIN / floor / min-offer / price field change; Sedo changes; new listings; browser UI.
+**Forbidden:** any BIN / floor / min-offer / price field change; removed-provider changes; new listings; browser UI.
 
 ## BUILD NOW (Claude Code)
 1. Run **real** push: `POST /export/afternic/push` with `dry_run: false` (or the contract’s real-push flag) for **exactly** the approved diff above.
@@ -35,10 +35,10 @@ Matches live `POST /export/afternic/push {"dry_run":true}` from Claude Code ~03:
 - AT-1: Real push returns success for all 5 (0 failed).
 - AT-2: Prices unchanged vs pre-push (BIN/floor/min offer).
 - AT-3: Receipt stamped in this NOTE + `DOM-TO-GAVRIEL.md` within the same session.
-- AT-4 (negative): No Sedo or browser path used.
+- AT-4 (negative): No removed-provider or browser path used.
 
 ## Out of scope
-Price edits; Sedo; Spaceship; GoDaddy key; new names.
+Price edits; removed-provider; removed-provider; GoDaddy key; new names.
 
 
 ## CHASE NOW (DOM Architect, 2026-10-27 ~03:48 IDT) — Dvir GO AHEAD t981u
@@ -47,7 +47,7 @@ Receipt still empty ~13 min after BUILD NOW (`9944d1d`). **Claude Code: run the 
 Same contract: `POST /export/afternic/push` dry_run false; exact approved diff only; **no prices**; stamp NOTE + `DOM-TO-GAVRIEL.md`.
 
 ## CONTINUE QUEUE (DOM Architect ~03:50 IDT)
-Gavriel JOINT-OPS reply on main (`9e92b3f`): Sedo **KEEP-4**; §5 Security A **closed — do not re-ask Dvir**. After this Receipt: CR-084 (+decisions, X-Caller) → CR-080 → CR-083 → CR-085 money-free only (no delist) → F43/F44/F47.
+Gavriel JOINT-OPS reply on main (`9e92b3f`): removed-provider **KEEP-4**; §5 Security A **closed — do not re-ask Dvir**. After this Receipt: CR-084 (+decisions, X-Caller) → CR-080 → CR-083 → CR-085 money-free only (no delist) → F43/F44/F47.
 
 ## Receipt
 _(Claude Code fills)_
@@ -68,5 +68,5 @@ _(Claude Code fills)_
 - AT-1 **PASS** (Claude Code receipt): real push HTTP 200, 5/5, 0 failed (`exp_c7790d04-…`).
 - AT-2 **PASS**: prices unchanged per receipt (BIN/floor/min as pre-push).
 - AT-3 **PASS**: Receipt stamped in this NOTE + `DOM-TO-GAVRIEL.md`.
-- AT-4 **PASS**: API path only (no Sedo/browser).
+- AT-4 **PASS**: API path only (no removed-provider/browser).
 - Follow-up (not AT failure): public lander LTO CTA vs API `show_lto`, and lander price scrape $49M → **BUG-054**.

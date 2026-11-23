@@ -28,7 +28,7 @@ Sales reported DOM `/books.csv` and `/portfolio` already showing bin **2488** wh
 - **AT-4:** `listing_history` (or equivalent) notes D-2026-10-27-D005-PRICE / Dvir's 02:00 IDT accept-live line.
 
 ## Out of scope
-No Afternic CSV upload, no Sedo change, no money click by bots.
+No Afternic CSV upload, no removed-provider change, no money click by bots.
 
 <!-- DOM writes below this line -->
 
@@ -40,7 +40,7 @@ Live `GET /health` version **5.59.0**. Read-only check via proxy (no marketplace
 |---|---|---|
 | AT-1 | **PASS** | `/portfolio/mineunited.com`: bin `$2,488.00` (248800), floor `$1,617.00` (161700), walkaway `$1,195 (private)` (119500), min `$100.00` |
 | AT-2 | **PASS** | `/books.csv` mineunited.com: `2488.00,1617.00,1195.00,100.00` |
-| AT-3 | **PASS (bots)** | No Afternic/Sedo call from this verify |
+| AT-3 | **PASS (bots)** | No Afternic/removed-provider call from this verify |
 | AT-4 | **FAIL** | `listing_history` row `2026-10-25T21:07:03+02:00` already at `$2,488` but `approval_text` / `approval_at` are **null** — does not cite **D-2026-10-27-D005-PRICE** or Dvir's ~02:00 IDT accept-live line |
 
 Schedule under pricing v3 already shows `final_push` → `$1,988` on `2028-06-09` (lowest list ≥ floor `$1,617`). No $1,488 plan on the live portfolio record.

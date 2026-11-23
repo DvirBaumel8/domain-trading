@@ -18,7 +18,7 @@ Sales (sales/listings-evidence-2026-10-21.md) found that the books cannot tell "
 - R-1: every venue record carries `provenance`: `ours_confirmed` | `observed_public` | `unknown`. Existing rows migrate as `unknown`, except those listed in R-4.
 - R-2: new route (bots token, not a money route) to log an observation: domain, venue, price seen, URL, seen_at, provenance fixed to `observed_public`. It never changes the listing, the price, an export or `listed_venues`.
 - R-3: `listed_venues` in `GET /portfolio` and `GET /books.csv` counts only `ours_confirmed` records. A new column `observed_venues` lists `observed_public` records.
-- R-4 (seed, from the proven evidence): `ours_confirmed` Afternic $1,488 for promptinjectionaudit.com, ukcbamcompliance.com, aievalsconsulting.com and roofingvoiceagent.com. Nothing else is `ours_confirmed`. mineunited.com Afternic = `observed_public` (afternic.com 2026-10-20). Sedo for D-002/D-003 = `unknown` (submitted 2026-10-09, "in ownership review").
+- R-4 (seed, from the proven evidence): `ours_confirmed` Afternic $1,488 for promptinjectionaudit.com, ukcbamcompliance.com, aievalsconsulting.com and roofingvoiceagent.com. Nothing else is `ours_confirmed`. mineunited.com Afternic = `observed_public` (afternic.com 2026-10-20). removed-provider for D-002/D-003 = `unknown` (submitted 2026-10-09, "in ownership review").
 - R-5: `display_name` for mineunited.com = `MineUnited.com`, settable through a bots-token, non-money record route (same name, other capitalisation; 422 `DISPLAY_NAME_MISMATCH` otherwise). It takes effect in the next export only.
 
 ## ATs
@@ -29,7 +29,7 @@ Sales (sales/listings-evidence-2026-10-21.md) found that the books cannot tell "
 - AT-5: display_name `MineUnited.com` gives 200 and shows up in books.csv; `Mine-United.com` gives 422 `DISPLAY_NAME_MISMATCH`.
 
 ## Out of scope
-Signing in to Afternic or Sedo; any price, list, delist or export change; walk-away, drop dates (BUG-050).
+Signing in to Afternic or removed-provider; any price, list, delist or export change; walk-away, drop dates (BUG-050).
 
 ## Questions (max 3)
 1. Is a new route better than a `provenance` field on `POST /listings/{domain}/venue` plus a bots-only observed route? Your call; the ATs are the contract.
@@ -49,13 +49,13 @@ Signing in to Afternic or Sedo; any price, list, delist or export change; walk-a
 - **R-4:** the seed goes in by migration, exactly as listed:
   - `ours_confirmed` Afternic $1,488 for the four Line 1 names;
   - mineunited.com Afternic `observed_public`;
-  - Sedo for D-002 and D-003 `unknown`;
+  - removed-provider for D-002 and D-003 `unknown`;
   - every other existing row `unknown`.
 - **R-5:** `POST /portfolio/{domain}/display-name` (bots allowed; same letters, other capitalisation only, else 422 `DISPLAY_NAME_MISMATCH`). It takes effect in the next export.
 
 ## DOM release (2026-10-21): v5.27.0 tagged
 - **Provenance:** every venue row carries `provenance`. Old rows read `unknown` (set by a column default, so the append-only rule was never bypassed). The R-4 seed is new appended rows: `ours_confirmed` Afternic $1,488 for the four Line 1 names, and mineunited.com Afternic `observed_public`.
-- **No Sedo `unknown` row was appended for D-002/D-003.** A new row would have looked like a live hand listing in `export.sedo`. The existing Sedo rows already read `unknown`.
+- **No removed-provider `unknown` row was appended for D-002/D-003.** A new row would have looked like a live hand listing in `export.removed-provider`. The existing removed-provider rows already read `unknown`.
 - **`POST /listings/{domain}/observed`** (bots or WRITE, `dry_run`) records a sighting only. A `provenance` key is 422, and the venue route stays WRITE-only (a bots token gets 403 `SCOPE_FORBIDDEN`).
 - **Columns:** `listed_venues` counts only `ours_confirmed`, and the new `observed_venues` lists the sightings. Both are in `GET /portfolio`, and `observed_venues` is the **last** `books.csv` column.
 - **`POST /portfolio/{domain}/display-name`** (bots or WRITE): only the capitalisation may change, otherwise 422 `DISPLAY_NAME_MISMATCH`. For a listed name it marks the export pending, so the next export carries the new name. Please set `MineUnited.com` with it.
@@ -70,7 +70,7 @@ Signing in to Afternic or Sedo; any price, list, delist or export change; walk-a
 
 ## Gavriel check (2026-10-21 ~02:40 IDT): v5.27.0 live, pass
 - `/health` showed 5.27.0 at 02:36:02 IDT (5.26.0 until then; CI passed 23:30 UTC).
-- **Sighting:** `POST /listings/mineunited.com/observed` with `dry_run` 200, `id` null. Real call 201 (`id` 10, `observed_public`, $1,488.00). `GET /portfolio/mineunited.com` `export.afternic` and `export.sedo` identical before and after. Pass.
+- **Sighting:** `POST /listings/mineunited.com/observed` with `dry_run` 200, `id` null. Real call 201 (`id` 10, `observed_public`, $1,488.00). `GET /portfolio/mineunited.com` `export.afternic` and `export.removed-provider` identical before and after. Pass.
 - **`books.csv`:** `observed_venues` is the last column. The four Line 1 names read `listed_venues` = `afternic`, `observed_venues` empty; mineunited.com reads `listed_venues` empty, `observed_venues` = `afternic`. Pass.
 - **`provenance` key on `/observed`:** 422 `VALIDATION_ERROR` ("Unrecognized key"). Pass.
 - **Display name:** `Mine-United.com` 422 `DISPLAY_NAME_MISMATCH`; `MineUnited.com` 200, `changed: true`, `export_pending: true`. Done as asked, so the next Afternic export carries it.

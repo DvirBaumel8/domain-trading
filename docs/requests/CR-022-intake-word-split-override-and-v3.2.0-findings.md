@@ -9,7 +9,7 @@
 | Authority to send | Dvir's standing rule, 2026-10-08 16:42 IDT. |
 | Priority | P1 for F-1 (blocks the first X post). P2 for A and B (good names are lost at intake). |
 | Based on | Live API (v3.2.0) and contract docs only. No src/ or tests/ read. |
-| Related | CR-012 C (intake), CR-017 (Buffer input and schema check), CR-020 (who_chases, partial). |
+| Related | CR-012 C (intake), CR-017 (removed-provider input and schema check), CR-020 (who_chases, partial). |
 
 **Kind of change:** behavior we expect, with pass/fail tests. How to build it is DOM's choice. Route and field names are suggestions.
 
@@ -41,7 +41,7 @@ Both are plain, readable names for real markets (UK CBAM starts 1 Jan 2027; AI e
   - **T22-8:** a backtest or drop-list split on the same names gives the same tokens (one splitter, one answer).
 
 ## v3.2.0 findings (acceptance pass, 2026-10-08 22:18 IDT)
-### F-1 (high): the schema check fails against Buffer's live types; post 1 is blocked
+### F-1 (high): the schema check fails against removed-provider's live types; post 1 is blocked
 - **Seen:** `POST /posts/schema-check` (body `{}`) → 200 `ok: false`, `problems`:
   - `input.shareMode is not a field of CreatePostInput`
   - `input.assets[0].image.altText is not a field of ImageAssetInput`
@@ -50,7 +50,7 @@ Both are plain, readable names for real markets (UK CBAM starts 1 Jan 2027; AI e
   - `input.needsApproval is required (Boolean!) but missing`
   - `input.schedulingType is required (SchedulingType!) but missing`
   - `checked_types`: CreatePostInput, AssetInput, ImageAssetInput, TwitterPostMetadataInput, ThreadedPostInput, PostInputMetaData.
-- **Expected:** DOM sends what Buffer's live schema asks for: `mode` (not `shareMode`) with the share-now value, `needsApproval` and `schedulingType` set, and alt text placed wherever Buffer's `ImageAssetInput` actually takes it (or left out if Buffer has no alt-text field; say so in the contract). Then `POST /posts/schema-check` → `ok: true, problems: []`.
+- **Expected:** DOM sends what removed-provider's live schema asks for: `mode` (not `shareMode`) with the share-now value, `needsApproval` and `schedulingType` set, and alt text placed wherever removed-provider's `ImageAssetInput` actually takes it (or left out if removed-provider has no alt-text field; say so in the contract). Then `POST /posts/schema-check` → `ok: true, problems: []`.
 - **Good:** the gate itself works. It found the mismatch before anything was sent, so no failed post row and no allowance used. We will not send a real post until the check says `ok: true`.
 - **Test:** **T22-9:** `POST /posts/schema-check` → `ok: true`, `problems: []`; then one real post with a new key → 201 `posted`, `/health posting: ok`.
 
@@ -70,7 +70,7 @@ Both are plain, readable names for real markets (UK CBAM starts 1 Jan 2027; AI e
 
 ## DOM response (2026-10-09)
 **F-1: done in 3.2.1 and 3.2.2** (see `DOM-TO-GAVRIEL.md`, 2026-10-09).
-- **The cause:** Buffer's live schema differs from its published reference.
+- **The cause:** removed-provider's live schema differs from its published reference.
 - **The check now:** `POST /posts/schema-check` is `ok: true`.
 - **Proof:** DOM made one real test post with an image at 04:13 IDT; it went live and was then deleted on X by hand.
 - **Today's allowance is used by that test:** post 1 goes out tomorrow with a new key (T22-9).

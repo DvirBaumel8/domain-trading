@@ -31,7 +31,7 @@ max_rounds: 2
 - AT-5 Active discovery v2 / org-v2 paths still resolve (spot-check shortlist SOP + org-v2).
 
 ## Out of scope
-Deleting files; renaming live portfolio.csv; Sedo; token changes.
+Deleting files; renaming live portfolio.csv; removed-provider; token changes.
 
 ## Questions (≤3)
 1. If a bak is the only copy of a unique decision note, still archive (not delete) — **default yes**.

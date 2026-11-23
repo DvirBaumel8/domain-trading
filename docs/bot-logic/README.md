@@ -8,8 +8,7 @@ Dvir approved: write stubs for the top 3 recurring jobs + dual-runner lock rule 
 
 | File | Job | Token class | Primary → target |
 |---|---|---|---|
-| `01-godaddy-dynadot-daily-seal.md` | GoDaddy freeze + Dynadot closeout seal | low (fetch/seal) | DOM datasave primary once `DYNADOT_API_KEY` (Grok backup) |
-| `02-dynadot-panel-r8-watch.md` | R-8 / R-8v2 panel watch + GAP | low | DOM datasave primary once `DYNADOT_API_KEY` (Grok backup) |
+| `01-godaddy-daily-seal.md` | GoDaddy freeze + removed-provider closeout seal | low (fetch/seal) | DOM datasave primary once `REMOVED_PROVIDER_API_KEY` (Grok backup) |
 | `03-missing-name-portfolio-check.md` | Missing-name / portfolioCheck (CR-079) | low | DOM job (already) |
 | `00-dual-runner-lock-rule.md` | Lease/claim before dual-capable actions | n/a | both |
 | `04-buyer-shortlist-to-card.md` | Buyer discovery: shortlist → card (**discovery v3, Option 1 locked**: one run after the shortlist seal, directions A+B+D, C parked, full-stack passers; commit the run pack before exit, CR-089) | high (judgment) | keep as bot |

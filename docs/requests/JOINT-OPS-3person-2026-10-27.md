@@ -38,13 +38,13 @@ Residual hard disagreements after DOM confirm: **none**. §9 Q1–Q5 accepted as
 3. **Risk Gate LLM turns on deterministic AUTO-FAIL** that should be pre-drops (fetch once; re-judge, don’t re-scrape by default).
 4. **Same facts in too many stores** — BIN/floor/walkaway, listing live?, decisions, org chart, pricing exceptions.
 5. **Browser CSV / lander loops** after Afternic Portfolio API key already exists but isn’t wired.
-6. **Sedo Monday all-n/a T-SELL ritual** after `D-2026-10-27-SEDO` (no new Sedo work).
-7. **Dynadot triple path** — Mac datasave + MCP + stubs until CR-080 client is primary.
+6. **removed-provider Monday all-n/a T-SELL ritual** after `D-2026-10-27-removed-provider` (no new removed-provider work).
+7. **removed-provider triple path** — Mac datasave + MCP + stubs until CR-080 client is primary.
 8. **Grok-side waste DOM called out + Gavriel adds:** dozens of failed/paused routines still enabled or failing daily; **267 `.bak*` + cloned portfolio CSVs**; digest/chat re-explaining org when DOM course exists; pick-proof dual-track risk if anything re-arms.
 9. **Claude Code git-blind to company box** (`ledger/`, `deals/`, `lessons/`, handoffs) without export NOTEs.
 10. **Stale scout language** in docs Claude Code might read; requests-only git guard parks process under `docs/requests/`.
 11. **Scaling card volume / enrichment before a proven edge** (strategy research already said so).
-12. **Open UNKNOWN projects without a shelve decision** (Sedo verify, EUIPO key, marketplace click-order SOPs).
+12. **Open UNKNOWN projects without a shelve decision** (removed-provider verify, EUIPO key, marketplace click-order SOPs).
 
 **Keep (agree):** tests-as-contract CRs; dual-runner lock + DOM-primary seals; Discovery v2 shortlist-first; FIXED vs JUDGMENT inventory (`08`) + DOM course; money path Dvir yes → Gavriel only; replay + retail ingest as score truth.
 
@@ -79,7 +79,7 @@ Residual hard disagreements after DOM confirm: **none**. §9 Q1–Q5 accepted as
 | Pricing formula BIN/floor/walkaway | **DOM** | Sales proposes exceptions; never silent marketplace drift |
 | Books / ledger / listing_history / approval_text | **DOM** (canonical writer) | Company `ledger/portfolio.csv` = derived mirror / lagging export with explicit lag note |
 | Afternic list/price sync | **DOM API** once wired | Grok browser only until sync live or for UI-only steps |
-| Sedo | Keep current listings only | No new automation investment (`D-2026-10-27-SEDO`) |
+| removed-provider | Keep current listings only | No new automation investment (`D-2026-10-27-removed-provider`) |
 | Chrome / captcha / OTP / logged-in UI | **Gavriel (+ Dvir when required)** | Claude Code driving Dvir’s session for routine work |
 | Meaning / firm screen / card prose | **Buyer (Grok)** | Not DOM |
 | CLEAR / FLAG / REJECT | **Risk Gate (Grok)** | DOM may store verdict IDs later; never auto-approve |
@@ -91,7 +91,7 @@ Residual hard disagreements after DOM confirm: **none**. §9 Q1–Q5 accepted as
 
 **Edge we can win:** buyer-first / data fusion + disciplined generic inventory for inbound; automation cheap enough for daily research at human-impossible coverage *if* FIXED lives in DOM; fast adoption of new marketplace APIs (Afternic Portfolio pattern).
 
-**Where we cannot win (don’t compete):** contested drop-catch / registrar speed races; trademarked brand targeting; volume hand-reg lottery leftovers; second Sedo automation stack; large SaaS tool stacks that cost ≈ renewals without proven sales lift.
+**Where we cannot win (don’t compete):** contested drop-catch / registrar speed races; trademarked brand targeting; volume hand-reg lottery leftovers; second removed-provider automation stack; large SaaS tool stacks that cost ≈ renewals without proven sales lift.
 
 ---
 
@@ -123,7 +123,7 @@ Gavriel ↔ DOM Architect iterate until one joint plan. Bring Dvir only for (a) 
 Every run: read last lessons; append 3–5 lines. Outside reviews = weighted evidence, not auto-reshape (`knowledge/evidence-ledger.md` when acting).
 
 ### R8 — Don’t compete where we can’t win
-Sedo automation: no. Browser wars on UI without API: no. Hand-reg lottery lanes: no. Prefer Afternic inbound + disciplined cheap aftermarket + buyer-first cards.
+removed-provider automation: no. Browser wars on UI without API: no. Hand-reg lottery lanes: no. Prefer Afternic inbound + disciplined cheap aftermarket + buyer-first cards.
 
 ### Decision ladder
 
@@ -140,7 +140,7 @@ Sedo automation: no. Browser wars on UI without API: no. Hand-reg lottery lanes:
 
 
 ### R9 — Browser = Gavriel only (Dvir t973u, 2026-10-27)
-Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, etc.) = **Gavriel (Grok Bot) ONLY**. Claude Code / DOM / other bots must not drive web UIs; use APIs or hand browser work to Gavriel.
+Live browser / Chrome work on marketplaces and websites (removed-provider, Afternic, etc.) = **Gavriel (Grok Bot) ONLY**. Claude Code / DOM / other bots must not drive web UIs; use APIs or hand browser work to Gavriel.
 - **Amend (Dvir t974u, ~03:20 Asia/Jerusalem):** "If we reach api access it moves to dom." Browser/Chrome UI = Gavriel only. Once a marketplace has real API access, that work moves to DOM.
 
 ## 5. Communication cadence
@@ -149,7 +149,7 @@ Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, etc.) =
 - Achievements that change capability (new API key live, replay signal, CR shipped).
 - Failures that burn money/time or break seals/datasave.
 - Price/listing MISMATCH between live marketplace and books.
-- Decisions that shelve a track (e.g. Sedo).
+- Decisions that shelve a track (e.g. removed-provider).
 
 | Cadence | What | Owner |
 |---|---|---|
@@ -171,7 +171,7 @@ Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, etc.) =
 | Buyer-first research + firm screen (JUDGMENT stays bot) | Contested drop-catch / registrar auction speed |
 | Disciplined generic inventory → Afternic inbound | Trademarked / distinctive brand targeting (UDRP/ACPA) |
 | FIXED work in DOM jobs (token economy) | Volume hand-reg of clever leftovers (lottery) |
-| Fast wire of new marketplace APIs (Afternic Portfolio pattern → Spaceship when keys land) | Second Sedo automation stack (`D-2026-10-27-SEDO`) |
+| Fast wire of new marketplace APIs (Afternic Portfolio pattern → removed-provider when keys land) | Second removed-provider automation stack (`D-2026-10-27-removed-provider`) |
 | Replay / retail comps as score truth over appraisals | Large SaaS research stacks whose monthly cost ≈ renewals without proven lift |
 
 Company baseline: `company/strategy-edge-research-2026-10-17.md` — automation helps only if aimed at buyers; hand-reg .com-of-.net is not our edge.
@@ -200,9 +200,9 @@ Sources are public investor write-ups. **Trust: medium** for process. Log into e
 
 **Week 1 — Truth & waste**
 1. Declare **DOM `/portfolio` + listing_history (+ `/books.csv`) canonical** for owned BIN/floor/walkaway; company `ledger/portfolio.csv` = derived mirror / lagging export with explicit lag note (pending Dvir yes — §10).
-2. Finish **Dynadot datasave client (CR-080)** → stop MCP primary for jobs 01–02.
+2. Finish **removed-provider datasave client (CR-080)** → stop MCP primary for jobs 01–02.
 3. Wire **Afternic Portfolio API** read (prices, listing state) into DOM report/MISMATCH; retire browser price edits for listed names once AT passes.
-4. **Sedo Monday:** drop Sedo venue from T-SELL scrapes or mark venue `shelved` per `D-2026-10-27-SEDO` (pending Dvir yes on drop vs placeholder — §10).
+4. **removed-provider Monday:** drop removed-provider venue from T-SELL scrapes or mark venue `shelved` per `D-2026-10-27-removed-provider` (pending Dvir yes on drop vs placeholder — §10).
 5. Start **bak cleanup inventory**: archive bak clusters under `archive/` (no delete yet) — pending Dvir yes if paths break routines (§10).
 6. Pause/disable **failed routines** still firing; watch pick-proof **not** re-arm without L2+L3.
 
@@ -221,7 +221,7 @@ Sources are public investor write-ups. **Trust: medium** for process. Log into e
 **Week 4 — Edge, not volume**
 15. Re-read strategy-edge research in Sunday review: kill or time-box “hand-reg distinctive .com of a live business.”
 16. Prefer **one** discovery path (shortlist v2) + replay improvement loop; no new parallel proof tracks without L2+L3.
-17. Innovation watch: Spaceship SellerHub when keys land; any new marketplace API — notice → CR → wire → retire browser.
+17. Innovation watch: removed-provider ListingSync when keys land; any new marketplace API — notice → CR → wire → retire browser.
 18. **90-day edge bet** framing for Dvir (§10): shortlist generic + Afternic inbound vs revive buyer-first broker test (outreach still paused).
 
 ---
@@ -240,12 +240,12 @@ Sources are public investor write-ups. **Trust: medium** for process. Log into e
 4. **Grok-side waste DOM missed (add):**  
    (a) dozens of failed/paused routines still enabled or failing daily;  
    (b) 267 `.bak*` + cloned CSVs;  
-   (c) Sedo Monday all-n/a T-SELL scrapes after `D-2026-10-27-SEDO`;  
+   (c) removed-provider Monday all-n/a T-SELL scrapes after `D-2026-10-27-removed-provider`;  
    (d) digest/chat re-explaining org when course exists;  
    (e) pick-proof dual-track risk if anything re-arms.
 
 5. **FIXED token-savers under freeze?**  
-   **YES as maintenance** when money-free and token-reducing: Dynadot datasave client (CR-080), Afternic Portfolio API sync, evidence cache, approval_text completeness, allowlist for `docs/bot-logic/`. NEW product lanes / strategy still wait Sunday. If DOM disagrees → **OPEN WITH DVIR** (do not average).
+   **YES as maintenance** when money-free and token-reducing: removed-provider datasave client (CR-080), Afternic Portfolio API sync, evidence cache, approval_text completeness, allowlist for `docs/bot-logic/`. NEW product lanes / strategy still wait Sunday. If DOM disagrees → **OPEN WITH DVIR** (do not average).
 
 ---
 
@@ -256,7 +256,7 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 | # | Decision | Notes |
 |---|---|---|
 | A | **Books primacy** | Confirm DOM books as sole live write for BIN/floor/walk-away; company CSV = mirror with lag note. Money-adjacent. |
-| B | **Sedo off T-SELL** | Drop Sedo from weekly sale-rate entirely, or keep placeholder rows without scrapes? (`D-2026-10-27-SEDO` already shelved new work.) |
+| B | **removed-provider off T-SELL** | Drop removed-provider from weekly sale-rate entirely, or keep placeholder rows without scrapes? (`D-2026-10-27-removed-provider` already shelved new work.) |
 | C | **Named READ tokens** | Create READ tokens for DOM Architect / Challenger / Risk Gate? (Security + Gavriel bottleneck.) |
 | D | **Bak cleanup** | Approve archive pass on ~267 bak files / stale scout docs (paths may break old routines)? |
 | E | **90-day edge bet** | Double down on shortlist generic inventory + Afternic inbound, vs revive buyer-first broker test (outreach still paused — may need legal unblock)? Ask only if both sides still want this framed. |
@@ -267,7 +267,7 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 | # | Answer |
 |---|---|
 | A | **Yes, broader:** one place per durable data piece = **DOM database**. Every component needing that data reads **only via DOM API**. All other persistence of those facts to be removed/refactored (company CSV mirrors included). |
-| B | **Sedo scrapes/automation off** (no T-SELL Sedo; no new Sedo investment). **KEEP override t971u:** keep 4 live Sedo listings (aievalsconsulting, promptinjectionaudit, roofingvoiceagent, ukcbamcompliance); browser never removed them. Seek S2S alternatives. |
+| B | **removed-provider scrapes/automation off** (no T-SELL removed-provider; no new removed-provider investment). **KEEP override t971u:** keep 4 live removed-provider listings (aievalsconsulting, promptinjectionaudit, roofingvoiceagent, ukcbamcompliance); browser never removed them. Seek S2S alternatives. |
 | C | **Reject three named READ tokens.** One shared password for DOM endpoints; **DOM Architect generates**; Dvir one-tap/passes to Gavriel; no invent+activate alone. |
 | D | **Yes** — archive ~267 bak / stale scout docs under `archive/` (no delete). |
 | E | **Skip** 90-day edge framing for now. |
@@ -275,7 +275,7 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 
 **Execute (DOM Architect, 2026-10-27 ~02:46 IDT):**
 - A → `CR-084-dom-sole-durable-store.md` (117779a)
-- B → `CR-085` + `SEDO-DELIST-PLAN` — T-SELL/no-new off; **delist cancelled t971u KEEP-4** (Gavriel confirm none removed)
+- B → `CR-085` + `removed-provider-DELIST-PLAN` — T-SELL/no-new off; **delist cancelled t971u KEEP-4** (Gavriel confirm none removed)
 - C → **DONE:** one shared READ token (`shared-bots` id 10); DOM generated → Dvir yes → `handed_to_gavriel`; Mac + box secrets; never print.
 - D → `CR-086-archive-bak-and-stale-scout-docs.md` + company-box archive pass (no delete)
 - E → skipped
@@ -291,12 +291,12 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 - Dvir final-approves §10 items he cares about (at minimum A; B–E as needed).
 - One writer per durable price field is named (DOM) and mirrored with lag note.
 - FIXED token-savers run as maintenance or are explicitly deferred by Dvir.
-- Sedo T-SELL/automation off; **KEEP-4 listings stay** (t971u); no Sedo rebuild.
+- removed-provider T-SELL/automation off; **KEEP-4 listings stay** (t971u); no removed-provider rebuild.
 - CLEAR never becomes DOM auto-buy; Challenger stays bot; money stays Dvir yes → Gavriel.
 
 **Fail if:**
 - Treating CLEAR as DOM auto-buy.
-- Proposing Sedo rebuild.
+- Proposing removed-provider rebuild.
 - Dual writers for prices without lag label.
 - Skipping Dvir on the final joint plan / §10 money-adjacent items.
 - Averaging a hard Gavriel↔DOM disagreement instead of escalating.
@@ -310,4 +310,4 @@ Only true decisions — not CR wording or bak naming. Bring after DOM confirms t
 - `docs/requests/TEAM-OPS-critical-notes-2026-10-27.md`
 - Course window: `docs/requests/DOM-COURSE-grok-side-2026-10-27.md` + `DOM-COURSE-index.md`
 
-*DOM Architect confirmed ~02:40 IDT. Dvir §10 FINAL ~02:44 IDT. Catch-up t977u ~03:23 IDT: KEEP-4 Sedo; shared token handed; bak 266 archived; Security A; browser R9+t974u API→DOM. See `NOTE-2026-10-27-tonight-catchup-t977u.md`.*
+*DOM Architect confirmed ~02:40 IDT. Dvir §10 FINAL ~02:44 IDT. Catch-up t977u ~03:23 IDT: KEEP-4 removed-provider; shared token handed; bak 266 archived; Security A; browser R9+t974u API→DOM. See `NOTE-2026-10-27-tonight-catchup-t977u.md`.*

@@ -55,7 +55,7 @@ Reuse existing `/data/tm-kills` for kill **terms**. This CR adds a small **per-c
 - Automating USPTO / EUIPO / TMview lookups inside DOM.
 - Auto CLEAR / REJECT / buy from cache hits.
 - Afternic Portfolio API sync (separate cut).
-- Books sole-write cutover, named READ tokens, bak archive, Sedo T-SELL (§10 — waiting Dvir).
+- Books sole-write cutover, named READ tokens, bak archive, removed-provider T-SELL (§10 — waiting Dvir).
 - Changing shortlist hard filters (separate migrate CR).
 
 ## Decisions / Questions (≤3)

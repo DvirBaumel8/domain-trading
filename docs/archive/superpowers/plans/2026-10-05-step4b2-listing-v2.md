@@ -17,7 +17,7 @@ Gate G0/G1 for:
 - B-28;
 - PR-17 (parity for `/buy` and `/list`).
 
-**Not in this step:** the daily price job and LH-5/PR-20–PR-29 (4b-3); exports v2 and `sedo_hybrid_as = make_offer` (4b-3); offers (4c); `/sold`, `import-domain`, the drop job and drop-date moves (4d).
+**Not in this step:** the daily price job and LH-5/PR-20–PR-29 (4b-3); exports v2 and `removed_provider_hybrid_as = make_offer` (4b-3); offers (4c); `/sold`, `import-domain`, the drop job and drop-date moves (4d).
 
 **Architecture:**
 - **`src/services/listing-v2.ts`** is the pure rules engine. It takes a request plus a context (category, grade, phase, settings, override, approval, dates) and returns a `ListingPlan` or a coded failure, in the exact §5 order. Hybrid and geo price math goes through `computePlan` (4b-1), so the preview, `/list` and `/buy` can't drift. `validateComps` (V11) and `checkSettingsVersion` (V12) sit beside it.
@@ -338,7 +338,7 @@ describe('V6/V7 guards + V8 override', () => {
 });
 
 describe('V11 comps / V12 version', () => {
-  const c = (o: object = {}) => ({ domain: 'compa.com', price_usd: 1500, sold_on: '2026-09-01', venue: 'NameBio', source_url: 'https://namebio.com/compa.com', ...o });
+  const c = (o: object = {}) => ({ domain: 'compa.com', price_usd: 1500, sold_on: '2026-09-01', venue: 'removed-provider', source_url: 'https://removed-provider.com/compa.com', ...o });
   const vc = (e: unknown) => validateComps(e as never, V2, '2026-10-12');
   it('LG-20: 0/1 comp → COMPS_REQUIRED; 4 → COMPS_INVALID; missing source_url / http / future sold_on / price 0 → COMPS_INVALID', () => {
     expect(vc(null)).toMatchObject({ ok: false, code: 'COMPS_REQUIRED' });
@@ -690,7 +690,7 @@ The preview switches to it with no change in output (its tests must still pass u
 6. **Relabel guard (kept from 4a):** any non-geo → `geo` change needs override + reason + valid approval, else `OVERRIDE_NEEDS_APPROVAL`. The engine's guards then apply too.
 7. **V9/V10:** an invalid `approval_ref` → its code. `changing` without `approval_ref` → 422 `APPROVAL_REQUIRED`. An NS-only call needs none.
 8. **`display_name`:** unchanged here; Task 4 hardens it.
-9. **Dry run:** return `{ dry_run: true, valid: true, domain, category, listing: planView(plan, previewEvents), lander, ns, preview: { afternic, sedo }, warnings }`.
+9. **Dry run:** return `{ dry_run: true, valid: true, domain, category, listing: planView(plan, previewEvents), lander, ns, preview: { afternic, removed-provider }, warnings }`.
    - `previewEvents = buildSchedule(...)` with the same anchor/startAfter rules as step 11.
    - No writes beyond the audit row (LH-4).
 10. **NS:** as today (Task 4 replaces it).
@@ -775,7 +775,7 @@ The preview switches to it with no change in output (its tests must still pass u
    - `porkbun` → the current Opt-In text;
    - any other → `The registrar refused: API access is off for this domain at <registrar>. Enable API access for it, then call /list again.`
 4. **`display_name`:** must match `^[A-Za-z0-9.-]+$` **and** lowercase to the domain, else 422 `DISPLAY_NAME_MISMATCH`. This closes the Kelvin-sign bypass: `'K'.toLowerCase()` is `'k'`.
-5. **Export re-check:** in `afternicRow` and `sedoRow`, if `display_name` fails the same check, use the lowercase domain and add the warning `DISPLAY_NAME_IGNORED:<domain>`.
+5. **Export re-check:** in `afternicRow` and `removedProviderRow`, if `display_name` fails the same check, use the lowercase domain and add the warning `DISPLAY_NAME_IGNORED:<domain>`.
    - Put `isValidDisplayName(domain, name)` in `src/domain-name.ts` and use it in both places.
    - Unit test in `export-rows.test.ts`: a row with display name `'Kelvin.com'` for domain `kelvin.com` → cell `kelvin.com` + warning.
 
@@ -848,8 +848,8 @@ Keep `plan`, `comps`, `rationale` and `s` on the `Approved` object.
 **Test helper** (`tests/helpers/buy.ts`). This edit is required by the approved v2 spec, where every buy needs a grade for geo and comps:
 ```ts
 export const COMPS = [
-  { domain: 'compa.com', price_usd: 1500, sold_on: '2026-09-01', venue: 'NameBio', source_url: 'https://namebio.com/compa.com' },
-  { domain: 'compb.com', price_usd: 2200, sold_on: '2026-08-15', venue: 'NameBio', source_url: 'https://namebio.com/compb.com' },
+  { domain: 'compa.com', price_usd: 1500, sold_on: '2026-09-01', venue: 'removed-provider', source_url: 'https://removed-provider.com/compa.com' },
+  { domain: 'compb.com', price_usd: 2200, sold_on: '2026-08-15', venue: 'removed-provider', source_url: 'https://removed-provider.com/compb.com' },
 ];
 export function buyBody(over: Record<string, unknown> = {}) {
   const domain = (over.domain as string | undefined) ?? DOMAIN;
@@ -919,7 +919,7 @@ ALTER TABLE settings
   ADD CHECK (high_value_guard_modes <@ ARRAY['bin', 'offer', 'hybrid']),
   ADD CHECK (high_value_categories <@ ARRAY['geo', 'trend', 'b2b', 'collision', 'regulation', 'buzzword', 'other']);
 ```
-- [ ] **Step 1:** `grep -rn "listing-rules\|high_value_categories\|high_value_guard_modes\|SEDO_NO_FLOOR\|HYBRID_BIN_BELOW_HIGH_VALUE_MIN" src tests`. Each hit is removed or redirected. `geo_bin_min_cents` and `geo_bin_max_cents` stay in **`pricing_settings`**; only the `settings` columns go.
+- [ ] **Step 1:** `grep -rn "listing-rules\|high_value_categories\|high_value_guard_modes\|REMOVED_PROVIDER_NO_FLOOR\|HYBRID_BIN_BELOW_HIGH_VALUE_MIN" src tests`. Each hit is removed or redirected. `geo_bin_min_cents` and `geo_bin_max_cents` stay in **`pricing_settings`**; only the `settings` columns go.
 - [ ] **Step 2:** Write the migration, update the types and fix the importers. Schema test: the `settings` row has no `geo_bin_min_cents` key. `npm run migrate up` on the dev DB, and `npm run migrate down` then `up` once to prove the reversal.
 - [ ] **Step 3:** `npx vitest run && npx tsc --noEmit && npm run build`. All PASS.
 - [ ] **Step 4: Commit** `refactor: remove v1 listing rules and settings columns (geo range now in pricing_settings; high-value guard retired)`
@@ -946,7 +946,7 @@ ALTER TABLE settings
 
 - **Spec coverage:**
   - §5 V1–V8 → Task 1; V9/V10 → Task 3; V11/V12 → Tasks 1 and 5.
-  - The warnings list → Task 1. `SEDO_NO_FLOOR` and `HYBRID_BIN_BELOW_HIGH_VALUE_MIN` are retired in Task 6. `LEGACY_NO_COMPS` → 4d import.
+  - The warnings list → Task 1. `REMOVED_PROVIDER_NO_FLOOR` and `HYBRID_BIN_BELOW_HIGH_VALUE_MIN` are retired in Task 6. `LEGACY_NO_COMPS` → 4d import.
   - The §5 history-row fields → Task 2 `historyRow` (`schedule_event_id` stays null until the 4b-3 job).
   - §7 one approval (plan stored at buy, `plan_audit_id`) → Task 5.
   - §10.4: the first-listing rows and the regeneration on a manual change, replan or category change → Tasks 2 and 3. The hold flag → Task 3; the job's hold behaviour → 4b-3. `drop_date` moves and sold/delist/drop cancellation → 4b-3/4d.

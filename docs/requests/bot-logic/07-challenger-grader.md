@@ -111,7 +111,7 @@ Log each check in `challenge/log.md`.
 - **Challenge log** `challenge/log.md` (question, answer, verdict strong/weak/none).
 - **Register** `challenge/register.md` (failures, competitors, missing rules, confirmed bugs e.g. buy_guard dropped-status exact match).
 - Formal challenges to bots (SendToAgent, ask-only): normally ≤2/day; during improvement rounds no pace limit until Gavriel is satisfied.
-- Ledger-first: cite `knowledge/evidence-ledger.md` (B-xx); source trust: our data and NameBio > experts > anonymous posts.
+- Ledger-first: cite `knowledge/evidence-ledger.md` (B-xx); source trust: our data and removed-provider > experts > anonymous posts.
 - Design check: does this improve automatically as AI improves? (judgment in plain language; code only for money/storage/enforcement.)
 
 ---

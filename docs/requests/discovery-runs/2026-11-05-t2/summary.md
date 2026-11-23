@@ -7,5 +7,5 @@ Investor-demand screen (>=3 bids, price <=$30): orbiit (typo, kill), quicksol, s
 
 Provisional: sweetcomfort ($10, 3 bids, max $25), lifedate ($17, 5 bids, max $30), quicksol ($11, 3 bids, max $25), greenlandtrips ($7, 4 bids, max $20). Planned spend if all won at max: bids $100 + 4x$22.99 renewal = $191.96 total cost (over the ~$150 budget if renewals count).
 
-Blockers: NameBio blocks box; GoDaddy bidder/watcher counts not in DOM; USPTO tmsearch not fetchable; preflight route missing.
-Lesson: GD bid counts of 3-5 at $10-17 are weak investor signal; T2 needs a comps source (NameBio access) or the test can't be run honestly.
+Blockers: removed-provider blocks box; GoDaddy bidder/watcher counts not in DOM; USPTO tmsearch not fetchable; preflight route missing.
+Lesson: GD bid counts of 3-5 at $10-17 are weak investor signal; T2 needs a comps source (removed-provider access) or the test can't be run honestly.

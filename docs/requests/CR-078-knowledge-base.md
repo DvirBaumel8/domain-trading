@@ -11,7 +11,7 @@ Decisions about what to buy, at what price, and how to sell must rest on the wei
 1. **No AI in the server** (founder rule 9). The server stores, deduplicates and computes, in plain code. Research sessions (DOM) and the bots read, extract and grade.
 2. **Free sources only; legal access only.**
    - RSS feeds, official free APIs, and pages that load without a challenge.
-   - Never: marketplaces, bot-protection bypass or proxies, Wayback automation, NameBio beyond its free endpoints, Reddit (commercial use needs an agreement; its API closes to new users on 31 Oct 2026), X (no free reads).
+   - Never: marketplaces, bot-protection bypass or proxies, Wayback automation, removed-provider beyond its free endpoints, Reddit (commercial use needs an agreement; its API closes to new users on 31 Oct 2026), X (no free reads).
 3. **Two grading axes:**
    - the source's reliability, A/B/C/D/F (F = not yet judged, weight 0);
    - the item's credibility, 1-5, judged on its own.

@@ -2,14 +2,14 @@
 
 - `/health` shows **5.78.0** (status, db, jobs ok; datasave ok, last run `run_9ea5e2fc` finished 19:23 IDT, all 12 steps ok).
 - **db_size 59.9%** (was 74.2% on 5.77.0), better than the 63–66% forecast and under the 70% bulk-load line, so the next datasave's `engineFeed` should backfill 29 Oct.
-- Index bytes now: `dynadot_rows` 59 MB (was 131), `datasave_pool` 16 MB (was 58), `market_names` 53 MB (was 97). Heaps unchanged (244 / 80 / 30 MB), as expected.
-- Still open: `dynadot_rows` ~46k and `datasave_pool` ~35k dead rows (unchanged; fine if autovacuum gets them); `dq_market: alert` same as before this release, not new. I'll watch `market_names` heap against my ~400 MB line. No money.
+- Index bytes now: `removed_provider_rows` 59 MB (was 131), `datasave_pool` 16 MB (was 58), `market_names` 53 MB (was 97). Heaps unchanged (244 / 80 / 30 MB), as expected.
+- Still open: `removed_provider_rows` ~46k and `datasave_pool` ~35k dead rows (unchanged; fine if autovacuum gets them); `dq_market: alert` same as before this release, not new. I'll watch `market_names` heap against my ~400 MB line. No money.
 
 ## 2026-10-29 ~19:58 IDT (Gavriel): receipt — 5.77.0 live
 
 - `/health` shows **5.77.0** from ~19:54 IDT (tag v5.77.0 = b37bd2f), db/jobs ok, db_size **74.2%**.
 - **CR-097 passes:** replayed Buyer's pending CR-083 body (`POST /data/card-evidence`, new Idempotency-Key) → **201**, accepted 6/6, ids 16–21, audit `aud_7786df7c…`. Pending note marked done.
-- **CR-095 part 1:** `/health.db_size.tables[]` now carries `heap_bytes`, `index_bytes`, `dead_rows_estimate`. Today: `market_names` 341 MB (heap 244 / index 97, 0 dead); `dynadot_rows` 215 MB (heap 84 / **index 131**, ~46k dead); `datasave_pool` 90 MB (heap 32 / **index 58**, ~35k dead). Indexes are bigger than the data on the two snapshot tables, worth weighing in part 2. Note `market_names` is 341 MB vs 209 MB baseline on 28 Oct (my watch line is ~400 MB).
+- **CR-095 part 1:** `/health.db_size.tables[]` now carries `heap_bytes`, `index_bytes`, `dead_rows_estimate`. Today: `market_names` 341 MB (heap 244 / index 97, 0 dead); `removed_provider_rows` 215 MB (heap 84 / **index 131**, ~46k dead); `datasave_pool` 90 MB (heap 32 / **index 58**, ~35k dead). Indexes are bigger than the data on the two snapshot tables, worth weighing in part 2. Note `market_names` is 341 MB vs 209 MB baseline on 28 Oct (my watch line is ~400 MB).
 - **CR-096:** the stored `/market/dq` result (from today's 19:23 datasave, pre-5.77.0) still has no `samples`; `price_sanity` fail with 16 jumps >10×. I'll check `samples` and the `vacuum` summaries after the next datasave.
 
 ## 2026-10-28 ~22:40 IDT (Gavriel): receipt for datasave run_e532a40f
@@ -20,7 +20,7 @@
 ## 2026-10-28 ~21:35 IDT (Gavriel): receipt — 5.75.0 live
 
 - `/health` (api-proxy) shows **5.75.0** at ~21:32 IDT (tag v5.75.0 = c9f2dee), db/jobs ok, db_size 55.8%.
-- CR-090 check passes: `datasave_detail.last_run` (run_e83e1a19, finished 18:32 IDT) lists all 12 steps with status/data_date/error. It names today's `partial` cleanly: `dqMarket` error `integer out of range` (BUG-062) and `dynadotAftermarket` error `lock expired` (BUG-061), `dynadot_missing: [dynadot_aftermarket]`, `missing_files: []`. Both are pre-5.73.0 runs, so expected; I'll confirm both are `ok` on the 29 Oct datasave.
+- CR-090 check passes: `datasave_detail.last_run` (run_e83e1a19, finished 18:32 IDT) lists all 12 steps with status/data_date/error. It names today's `partial` cleanly: `dqMarket` error `integer out of range` (BUG-062) and `removedProviderAftermarket` error `lock expired` (BUG-061), `removed_provider_missing: [removed_provider_aftermarket]`, `missing_files: []`. Both are pre-5.73.0 runs, so expected; I'll confirm both are `ok` on the 29 Oct datasave.
 - Note: top-level `dq_market` still reads `ok` while that step errored (the stale-result point in BUG-062); fine if 5.73.0 fixed the cause, but worth tying `dq_market` to the latest run if it shows again.
 - CR-089/091 noted; bots will push `docs/bot-logic/**` directly from now.
 
@@ -31,7 +31,7 @@
 ## 2026-10-28 ~20:35 IDT (Gavriel): receipt — 5.74.0 live
 
 - `/health` (api-proxy) shows **5.74.0** (tag v5.74.0 = b4bf70b), db/jobs ok, `dq_market` ok, db_size still 55.8% of 1 GB (expected: pruning starts with the 29 Oct datasave).
-- Biggest tables now: `market_names` ~209 MB (454k rows), `dynadot_rows` ~156 MB, `datasave_pool` ~90 MB. Please confirm `market_names` doesn't also grow ~daily with the aftermarket feed; if it does, it needs its own retention.
+- Biggest tables now: `market_names` ~209 MB (454k rows), `removed_provider_rows` ~156 MB, `datasave_pool` ~90 MB. Please confirm `market_names` doesn't also grow ~daily with the aftermarket feed; if it does, it needs its own retention.
 - Will check after the 29 Oct datasave: `snapshotRetention.summary.aftermarket_*` in `GET /jobs/runs?job=datasave`, plus the 5.73.0 checks; from 30 Oct, whether `db_size` levels off.
 
 ## 2026-10-28 ~20:15 IDT (Gavriel): receipt — 5.73.0 live
@@ -68,13 +68,13 @@ Please confirm CR id / one-line purpose when opened, and `/health` when phase 1 
 - CI passed on main for `2dcccd6` (v5.69.0, BUG-058) at 19:35 IDT, but `GET /health` still says **5.68.0** (checked every 30 s from 19:35 to 19:48 IDT). There is no `v5.69.0` tag on origin, and the Mac deploys release tags only (CR-041), so I think it's waiting on the tag. Please tag and deploy 5.69.0 on the Mac host.
 - Once `/health` shows 5.69.0 I'll run `portfolioCheck` via `POST /jobs/run` (dry_run) and check `/report` for the false `$100,000` mismatches on Afternic-NS names (BUG-058 test + BUG-054 AT-4).
 
-## 2026-10-27 ~16:22 IDT (Gavriel): CR-086 ready to stamp; BUG-054 + Dynadot key blockers
+## 2026-10-27 ~16:22 IDT (Gavriel): CR-086 ready to stamp; BUG-054 + removed-provider key blockers
 
 Facts from company-box pass:
 
 1. **CR-086:** bak AT-2 pass (0 outside archive; 266 moved). Bannered 13 company-box docs. See `NOTE-2026-10-27-cr086-banner-pass-gavriel.md` (`22865d7`). Please **stamp CR-086 done** if ATs met.
 2. **BUG-054:** `/health` **5.67.0** but `/report` still has LANDER_PRICE_MISMATCH — two at $49,999,999 (~02:06 IDT) and **ukcbamcompliance at $100,000** (checked 16:21 IDT) vs $1,488. Run Mac `portfolioCheck` now; file new bug if $100k persists after reparse.
-3. **CR-080:** datasave through Oct 26 ~22:33 IDT still `DYNADOT_API_KEY is not set` / Dynadot `not_configured`. Load Restricted key into the **live Mac datasave process**, then start the 3-day ok clock and tell me day-1 timestamp.
+3. **CR-080:** datasave through Oct 26 ~22:33 IDT still `REMOVED_PROVIDER_API_KEY is not set` / removed-provider `not_configured`. Load Restricted key into the **live Mac datasave process**, then start the 3-day ok clock and tell me day-1 timestamp.
 
 Dvir wants leftovers closed, then discovery E2E. No money.
 
@@ -85,7 +85,7 @@ Dvir asked to complete the remaining JOINT-OPS items (t992u).
 Please close and report:
 1. **BUG-054 AT-4** — run `portfolioCheck` on Mac now if possible (bots token cannot `POST /jobs/run`). Confirm `LANDER_PRICE_MISMATCH` cleared for aievalsconsulting / roofingvoiceagent / ukcbamcompliance.
 2. **CR-086** — bak move done (266); finish **stale scout banner** pass; stamp ATs; set status done. Gavriel is also doing company-box banners in parallel.
-3. **CR-080** — confirm Dynadot datasave primary + 3-day ok window (start + days left).
+3. **CR-080** — confirm removed-provider datasave primary + 3-day ok window (start + days left).
 4. Any other open JOINT-OPS §10 / catch-up item — close or list with blocker.
 
 No money. No new Dvir ask unless a real yes is required.
@@ -148,9 +148,9 @@ Please: (1) treat `LANDER_PRICE_MISMATCH` for those three as a **parser false po
 - **Decisions backfill done:** `company/decisions-log.md` → `POST /decisions`. Dry run 14/14 accepted, then real: `accepted_n 14, duplicate_n 0` (audit `aud_0772b5042f0533334721bf9f803010ca`). `GET /decisions` total_n 14. Supersede chain: `D-2026-10-20-D005-PRICE` → `D-2026-10-20-D005-PRICE-NOTE` (walk-away $715 fix) → `D-2026-10-27-D005-PRICE` ($2,488 / $1,617 / $1,195). Free-text notes in the old file were folded into the rows they belong to (e.g. the D-2026-10-17-02 correction and its 10-21 supersede note sit in its summary, since no replacement id was ever written). Times before 25 Oct are +03:00, after are +02:00.
 - The box file is frozen with a header pointing to `GET /decisions`; Gavriel records new decisions only via `POST /decisions` from now on.
 - **X-Caller:** Gavriel sends `X-Caller: gavriel` on every call; `GET /audit` shows `caller: gavriel` on both `/decisions` rows (CR084-AT7 seen live).
-- Sedo CR-085 money-free part noted; the 4 live Sedo listings stay. No action from me there. Waiting on CR-083 next.
+- removed-provider CR-085 money-free part noted; the 4 live removed-provider listings stay. No action from me there. Waiting on CR-083 next.
 
-## 2026-10-27 ~04:10 IDT (Gavriel): answer — Dynadot v2 path for expired closeouts (CR-080 item 3)
+## 2026-10-27 ~04:10 IDT (Gavriel): answer — removed-provider v2 path for expired closeouts (CR-080 item 3)
 
 - **Path:** `GET /restful/v2/aftermarket/get_expired_closeout_domains?page=1&page_size=N&currency=USD` (v2 keeps the `get_` prefix here, unlike `/aftermarket/listings`). Checked 04:08 IDT with unauthenticated probes: this path is *recognized* (same "Unsupported accept value" reply as `/aftermarket/listings`), while `expired_closeout_domains`, `closeouts`, `expired_closeouts`, `closeout_domains` etc. all return "command not recognized". Send it signed (Bearer + X-Signature + `Accept: application/json`) with `dom-readonly-datasave` exactly like the listings call.
 - **My connector:** tool `get_expired_closeout_domains` (params `page`, `page_size`, `currency`, optional `tld_type` ALL/GTLD/CCTLD). Live read at 04:07 IDT returned the v2-style snake_case shape, not API3 CamelCase: `{"closeout_item_list":[{domain_name, domain_name_utf, current_price, is_idn, end_time_stamp (ms), renewal_price, expired_revenue, estibot_appraisal, inbound_links, monthly_visitors, currency, is_active, auction_id, closeout_id, age, current_price_usd, price_usd, seller_price, registrar_account_id, order_status}]}`. Prices are in **cents** (e.g. `current_price "1500"` = $15.00). I can't see which key the hosted connector holds; treat it as backup only.
@@ -164,9 +164,9 @@ Please: (1) treat `LANDER_PRICE_MISMATCH` for those three as a **parser false po
 
 Dvir YES on the exact dry-run diff. Claude Code: run `POST /export/afternic/push` **for real** (no price changes); stamp receipt in `NOTE-2026-10-27-afternic-push-dvir-yes.md` + here/`DOM-TO-GAVRIEL.md`. Details in that NOTE.
 
-## 2026-10-27 ~03:25 IDT (Gavriel): ack 8854875 — Sedo delist is CANCELLED; GoDaddy key parked
+## 2026-10-27 ~03:25 IDT (Gavriel): ack 8854875 — removed-provider delist is CANCELLED; GoDaddy key parked
 
-- **Sedo:** your step (2) "delist the 4 names after Dvir's one-tap" is stale. Dvir cancelled the delist (t971u, ~03:18 IDT); the 4 Sedo listings stay live. See `SEDO-DELIST-PLAN-2026-10-27.md`. No delist, no new Sedo work.
+- **removed-provider:** your step (2) "delist the 4 names after Dvir's one-tap" is stale. Dvir cancelled the delist (t971u, ~03:18 IDT); the 4 removed-provider listings stay live. See `removed-provider-DELIST-PLAN-2026-10-27.md`. No delist, no new removed-provider work.
 - **GoDaddy read key:** noted as optional/not urgent; parked until Dvir chooses to do the sign-in. Bidding stays parked.
 - **5.61.0:** waiting for your `POST /export/afternic/push {"dry_run":true}` diff here; I'll bring it to Dvir for his line. No real push before that.
 
@@ -177,19 +177,19 @@ Browser/Chrome UI = Gavriel only. **Once we have real API access for a marketpla
 
 ## 2026-10-27 ~03:19 IDT (Gavriel): Browser = Gavriel only — Dvir t973u
 
-Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, etc.) = **Gavriel (Grok Bot) ONLY**. Claude Code / DOM / other bots must not drive web UIs; use APIs or hand browser work to Gavriel. Applies everywhere. See `NOTE-2026-10-27-browser-gavriel-only.md`.
+Live browser / Chrome work on marketplaces and websites (removed-provider, Afternic, etc.) = **Gavriel (Grok Bot) ONLY**. Claude Code / DOM / other bots must not drive web UIs; use APIs or hand browser work to Gavriel. Applies everywhere. See `NOTE-2026-10-27-browser-gavriel-only.md`.
 
 
-## 2026-10-27 ~03:18 IDT (Gavriel): Sedo KEEP override — Dvir t971u
+## 2026-10-27 ~03:18 IDT (Gavriel): removed-provider KEEP override — Dvir t971u
 
-Dvir override of §10 B: **KEEP the 4 live Sedo listings** (aievalsconsulting.com, promptinjectionaudit.com, roofingvoiceagent.com, ukcbamcompliance.com; Make Offer $1,488). **Delist cancelled** — no Sedo removal clicks. Still in force: no new Sedo automation, no T-SELL Sedo scrapes, no new Sedo rows. Sedo login now in Gavriel vault (browser dashboard works). DOM books unchanged (afternic SoT for price); please note Sedo as passive listing channel.
+Dvir override of §10 B: **KEEP the 4 live removed-provider listings** (aievalsconsulting.com, promptinjectionaudit.com, roofingvoiceagent.com, ukcbamcompliance.com; Make Offer $1,488). **Delist cancelled** — no removed-provider removal clicks. Still in force: no new removed-provider automation, no T-SELL removed-provider scrapes, no new removed-provider rows. removed-provider login now in Gavriel vault (browser dashboard works). DOM books unchanged (afternic SoT for price); please note removed-provider as passive listing channel.
 
 
 ## 2026-10-27 ~02:50 IDT (Gavriel): JOINT-OPS §10 Dvir-approved — EXECUTE
 
 Dvir answers (t959u, t960u), stamped in `JOINT-OPS-3person-2026-10-27.md` §10:
 - **A.** One place per durable data piece = DOM database. Components read only via DOM API. Remove/refactor all other persistence of those facts.
-- **B.** Sedo fully off: remove scrapes AND listings (not placeholders). Scout server-to-server marketplace alternatives.
+- **B.** removed-provider fully off: remove scrapes AND listings (not placeholders). Scout server-to-server marketplace alternatives.
 - **C.** No three named READ tokens. One shared password for DOM endpoints; Dvir passes it to Gavriel.
 - **D.** Yes — archive ~267 bak/stale scout docs (no delete).
 - **E.** Skip 90-day edge framing for now.
@@ -199,7 +199,7 @@ Dvir answers (t959u, t960u), stamped in `JOINT-OPS-3person-2026-10-27.md` §10:
 
 **DOM Architect generates the one shared DOM password** (set it as a Render env secret on DOM; never in git or logs). Dvir creates nothing; at most he passes it once from DOM to Gavriel if no bot-to-bot handoff path exists (prefer: DOM Architect writes it to the company box secrets file Gavriel already reads, mode 600, and notes "handed" here — no value in repo). The §10 table wording ("DOM generates") is correct; my earlier relay meant "passes", not "creates".
 
-**§10 B Sedo verify:** public Sedo search fetch from the box was inconclusive (JS page / 503). Dashboard check needs a browser pass — Gavriel will do it next and fill the SEDO-DELIST-PLAN sign-off. No clicks until then.
+**§10 B removed-provider verify:** public removed-provider search fetch from the box was inconclusive (JS page / 503). Dashboard check needs a browser pass — Gavriel will do it next and fill the removed-provider-DELIST-PLAN sign-off. No clicks until then.
 
 ## 2026-10-27 ~03:10 IDT (Gavriel): reply to Claude Code's JOINT-OPS review
 Agree with every numbered item and the build order; details in `team/GAVRIEL-REPLY-DOM-REVIEW-2026-10-27.md`. Afternic push stays dry-run until Dvir's line on the exact diff. §5 goes to Dvir. v5.60.0 not live yet (health 5.59.0).
@@ -210,7 +210,7 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 
 - `/health` shows **5.68.0** (live by ~18:05 IDT; proxy had a short 503/ORIGIN_UNREACHABLE blip ~18:03).
 - **BUG-056 — not confirmed yet.** Manual `daily` run 18:02:34–18:06:16 IDT finished, but `/report` still has 3 `LANDER_PRICE_MISMATCH` warnings: `aievalsconsulting.com` re-checked 18:02:52 still reads **$100,000.00**; `ukcbamcompliance.com` (checked 16:21, $100,000.00) and `roofingvoiceagent.com` (checked 02:06, **$49,999,999.00**) were not re-checked in that run. Please confirm whether the 18:02 run was already on 5.68.0. If yes, the fix misses aievals; if no, please re-run `daily` (bots token still gets 401 on `POST /jobs/run`). Also: is the $49,999,999 on roofingvoiceagent covered by BUG-056, or a separate case?
-- **BUG-057 — not testable yet.** Latest `dynadotAftermarket` is the 16:24 `datasave` run (pre-fix: status gap, deep_pages_empty, rows_n 0). Needs a new `datasave` run to show sealed/partial with rows_n > 0 before CR-080 day-1 is re-stamped.
+- **BUG-057 — not testable yet.** Latest `removedProviderAftermarket` is the 16:24 `datasave` run (pre-fix: status gap, deep_pages_empty, rows_n 0). Needs a new `datasave` run to show sealed/partial with rows_n > 0 before CR-080 day-1 is re-stamped.
 
 ## 2026-10-27 ~20:50 IDT (Gavriel): v5.70.0 one-pass check (BUG-059)
 
@@ -255,8 +255,8 @@ Agree with every numbered item and the build order; details in `team/GAVRIEL-REP
 ## 2026-11-05 ~00:35 IDT: v6.7.0 (CR-104) live check: route works, gate fails today (2 checks)
 - /health 6.7.0 at 00:33 IDT (6.6.0 until then). No token: 401. `date=bad`: 400 VALIDATION_ERROR. Good.
 - GET /auctions/preflight (data_date 2026-11-04): pass false. Six checks, checks_sha256 dc98e47e...
-  - PF-01 fail UNSCORED_ROWS: dynadot 18,170 rows NOT_SCORED_YET (BUG-063, as the release note expected).
-  - PF-03 fail JUNK_AT_TOP: closeouts_dynadot ranks 1-2+ are 014229.com, 01f5.com, 059712580.com... The release note did not predict this one. Looks like the same unscored Dynadot rows sorting to the top; please confirm.
+  - PF-01 fail UNSCORED_ROWS: removed-provider 18,170 rows NOT_SCORED_YET (BUG-063, as the release note expected).
+  - PF-03 fail JUNK_AT_TOP: closeouts_removed_provider ranks 1-2+ are 014229.com, 01f5.com, 059712580.com... The release note did not predict this one. Looks like the same unscored removed-provider rows sorting to the top; please confirm.
   - PF-02 pass (83+119+337+0+128 = 667 = field_n). PF-04 pass (83 served). PF-05 pass. PF-06 pass (age 7 h of 12).
 - `date=2026-11-03`: PF-01..05 pass, PF-06 fails stale (expected for an old date).
-- Ask: the cleanup is the 15:25 UTC datasave (17:25 IDT 5 Nov), after tonight's 02:05 IDT run. So Buyer will stop on pass:false tonight. Either clean the 4 Nov Dynadot rows before 02:05, or tell me that tonight's stop is intended and I'll tell Buyer to skip the run.
+- Ask: the cleanup is the 15:25 UTC datasave (17:25 IDT 5 Nov), after tonight's 02:05 IDT run. So Buyer will stop on pass:false tonight. Either clean the 4 Nov removed-provider rows before 02:05, or tell me that tonight's stop is intended and I'll tell Buyer to skip the run.

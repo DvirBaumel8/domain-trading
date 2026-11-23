@@ -68,7 +68,7 @@ Nothing in `/buy`, `/list` or the exports changes in this step; that is 4b-2 and
 |---|---|---|
 | P1 | Only **version 2** is seeded. v1 is not recorded because no plan was ever computed with it (D-001's plan is an approved exception, stored under v2). The seed's `approval_text` is the v2 note and `approved_at` is 2026-10-05 09:17 IDT | The v1 numbers aren't fully specified; inventing them would be fake history |
 | P2 | The v2 seed lives in an SQL function `seed_pricing_settings_v2()` that the migration calls and the test reset reuses | Tests that create v3 need a clean v2 baseline |
-| P3 | **`sedo_hybrid_as` stays `buy_now` in this step**, and the old `settings` columns (`geo_bin_min/max`, `high_value_categories`, `high_value_guard_modes`) stay for now. They change or are dropped in 4b-3 and 4b-2, together with the code that reads them | Changing them now would half-break the v1 exporter and validator |
+| P3 | **`removed_provider_hybrid_as` stays `buy_now` in this step**, and the old `settings` columns (`geo_bin_min/max`, `high_value_categories`, `high_value_guard_modes`) stay for now. They change or are dropped in 4b-3 and 4b-2, together with the code that reads them | Changing them now would half-break the v1 exporter and validator |
 | P4 | A `delisted` domain counts toward the 50-domain cap (`activeDomainCount`) | It is still held until `drop_date` |
 | P5 | `GET /pricing/preview` gets `afternic_row` from `?domain=` (its `display_name`, else the domain), and uses `example.com` when no domain is given | The spec example shows a real name; a preview may have none |
 | P6 | Geo M12 due on or after the delist date → `superseded_by_final_push` (geo has no final push; the status name is reused) | Edge case; keeps the status set closed |
@@ -172,7 +172,7 @@ CREATE FUNCTION seed_pricing_settings_v2() RETURNS void LANGUAGE sql AS $$
     delist_days_before_drop, headsup_days_before, comps_min, comps_max, public_lto
   ) VALUES (
     2, '2026-10-05T09:17:00+03:00',
-    'v2: $500 walk-away floor, one geo drop, Sedo make-offer, final push to floor', '2026-10-05T09:17:00+03:00',
+    'v2: $500 walk-away floor, one geo drop, removed-provider make-offer, final push to floor', '2026-10-05T09:17:00+03:00',
     'pricing rules v2 (Gavriel spec commit 3488942, approved by Dvir)',
     49900, 39900, 29900, 49900,
     true, '[{"after_months":12,"from_cents":49900,"to_cents":39900}]'::jsonb,
@@ -1599,7 +1599,7 @@ git commit -m "feat: GET /pricing/preview (plan, schedule, display, net, afterni
 - **Deliberately not here:**
   - storing plans and schedules in the DB (4b-2);
   - V7/V8/V11/V12 request validation (4b-2);
-  - exports, `changed_only`, uploads and the Sedo default (4b-3);
+  - exports, `changed_only`, uploads and the removed-provider default (4b-3);
   - the price job (4b-3);
   - offers (4c);
   - PR-17's `/buy`/`/list`/import parity (4b-2/4d);

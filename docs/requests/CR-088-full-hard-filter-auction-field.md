@@ -34,7 +34,7 @@ Discovery only saw the top 25 of ~500–750 hard-filter passers/day (`field_n`),
 - AT-6 Contract/docs: `endpoints.md` §`GET /auctions/shortlist` and `auctions.md` Shortlist no longer say “best `shortlist_size` (25)” as a hard keep; they state full field + R-2 / R-4.
 
 ## Out of scope
-Raising endings/prebid to cover the whole field; closeouts `limit` max 200; `GET /candidates/daily` max 25; intake 30/day; Dynadot page caps; portfolio domain cap; money/buy routes; Buyer SOP text (Gavriel owns).
+Raising endings/prebid to cover the whole field; closeouts `limit` max 200; `GET /candidates/daily` max 25; intake 30/day; removed-provider page caps; portfolio domain cap; money/buy routes; Buyer SOP text (Gavriel owns).
 
 ## Questions (≤3)
 1. Prefer pagination (`limit`+`offset`, like `/auctions/live`) vs a single high `limit` max (e.g. 10000)? **Default: pagination + max limit ≥ 10000.**
@@ -49,7 +49,7 @@ Audit and propose removal/raise under the same standing rule (batches / indexes 
 - `GET /candidates/daily` max **25**
 - Intake screening **30**/day
 - `closeout_expiry_collect_max` **1000** sample
-- Dynadot aftermarket **500** pages
+- removed-provider aftermarket **500** pages
 - Disappearance lookups **1500**/run
 - Bots RDAP **200**/day
 - Buyer lean ~**20** calls (SOP — Gavriel)

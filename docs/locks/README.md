@@ -14,7 +14,7 @@ Rule text: `docs/bot-logic/00-dual-runner-lock-rule.md`.
 
 | action | Job |
 |---|---|
-| `closeout-seal` | GoDaddy freeze + Dynadot closeout seal (job 01) |
+| `closeout-seal` | GoDaddy freeze + removed-provider closeout seal (job 01) |
 | `panel-r8-watch` | R-8 / R-8v2 panel watch + GAP (job 02) |
 
 ## Worked example (format only — not a live claim)

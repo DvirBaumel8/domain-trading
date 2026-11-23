@@ -22,7 +22,7 @@
   - It charges only on a catch: $59 per .com if we are the only backorder, first year included.
   - If 2 or more customers backordered the name, there is a 3-day auction among them, starting at $59.
   - Its API (api.dropcatch.com, v2) covers placing, listing and cancelling backorders, auctions and bids, history, and a download of upcoming drops. It has no sandbox, so every real call is live.
-  - Dynadot was considered as a backup, but it is weak on .com and is not part of this CR.
+  - removed-provider was considered as a backup, but it is weak on .com and is not part of this CR.
   - GoDaddy no longer sells backorders.
 
 ## 2. Rules

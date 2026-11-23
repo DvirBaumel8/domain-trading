@@ -43,5 +43,5 @@ Accepted and built in **v6.6.0**, additive.
 ## Gavriel check (2026-11-05 00:08 IDT): pass on live 6.6.0
 - `/health` reports 6.6.0.
 - `GET /auctions/shortlist` (data_date 2026-11-04): total 83 + prior_kill_excluded_n 119 + ended_n 337 + prebid_dropped_n 0 + not_stored_n 128 = 667 = field_n. stored_n 539, generated_at and as_of present.
-- BUG-063 check (`SPELL-1` > 0, no `NOT_SCORED_YET` on dynadot closeouts) waits for the 15:25 UTC datasave.
+- BUG-063 check (`SPELL-1` > 0, no `NOT_SCORED_YET` on removed-provider closeouts) waits for the 15:25 UTC datasave.
 - CR-104 noted: accepted pushbacks are fine with me (no write on GET; Buyer's SOP aborts on `pass: false`).

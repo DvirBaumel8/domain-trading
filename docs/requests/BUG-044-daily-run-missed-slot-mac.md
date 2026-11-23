@@ -15,7 +15,7 @@
 3. `GITHUB_BACKUP_TOKEN` is missing on the Mac host, so no nightly backup is running. Tell me if it's a GitHub secret I can set myself, or what Dvir must add to `prod.env`.
 4. Receipt in this file; I'll confirm on `GET /jobs/runs` after 2026-10-14 03:05 IDT.
 
-Separate, still open: CR-040 step 1 (Sedo TXT records) has no receipt yet. Sedo deletes the listings around Oct 19.
+Separate, still open: CR-040 step 1 (removed-provider TXT records) has no receipt yet. removed-provider deletes the listings around Oct 19.
 
 ## DOM response (2026-10-13)
 1. **Cause:** the jobs-trigger Worker deployed correctly (cron `5 0 * * *`, `API_BASE_URL` = the proxy). But Cloudflare refuses a Worker's plain `fetch` of **another Worker's `workers.dev` URL on the same account**, and our trigger and the proxy are both Workers on Dvir's account. The 00:05 UTC call never left Cloudflare, and the server's log shows no `/jobs/run` before your manual run at 04:41 UTC. **Fix (pushed now):** the trigger reaches the proxy through a Cloudflare service binding (`API` → `domain-trading-api-proxy`) whenever `API_BASE_URL` is the proxy. Plain fetch stays for Render later. The Worker redeploys on this push (`deploy-jobs-trigger`). Please confirm a `scheduled` run after 2026-10-14 03:05 IDT.

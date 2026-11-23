@@ -7,7 +7,7 @@
 - `changed_only` exports with `X-Export-Id` and `X-Pending-Changes`;
 - `POST /export/{venue}/uploaded`, which records that Dvir uploaded a file;
 - `X-Manual-Delist` that lists sold, delisted or dropped names until an upload after the removal is confirmed;
-- Sedo Make Offer as the default.
+- removed-provider Make Offer as the default.
 
 Gate G1 for PR-20–PR-23, PR-27–PR-29 and PR-36, E-1–E-8 (as updated) and E-10–E-12, plus LH-5.
 
@@ -58,7 +58,7 @@ Gate G1 for PR-20–PR-23, PR-27–PR-29 and PR-36, E-1–E-8 (as updated) and E
 | R7 | **Several due price events for one domain** (missed days, or a hold just lifted): only the latest due row is applied; earlier due `planned` rows → `superseded`. A held domain keeps its due rows `planned` | §10.4 "when the hold is lifted, the next job run applies only the latest due event" (PR-23) |
 | R8 | **Before applying, the row is validated against its own settings version** (PR-28). Hybrid: `walkaway_min ≤ walk ≤ floor ≤ bin`, `floor ≥ floor_min`, `bin ≥ hybrid_bin_min`, whole dollars. Geo: bin within `[geo_bin_min, geo_bin_max]`. A failure sets the row to `failed` with a note and an audit row, and leaves the domain unchanged | §10.5 "never applies a row whose values break V5/V6" |
 | R9 | **Daily time:** at startup and then at 00:30 UTC every day (a timer chain that recomputes the delay after each run, `.unref()`). A run already in progress is skipped (`running` flag), as with `NsVerifier` | §10.5 |
-| R10 | `settings.sedo_hybrid_as` default → `make_offer` (migration), plus an update of the existing row | §5 Settings: "make_offer default since v2" |
+| R10 | `settings.removed_provider_hybrid_as` default → `make_offer` (migration), plus an update of the existing row | §5 Settings: "make_offer default since v2" |
 
 ---
 
@@ -66,7 +66,7 @@ Gate G1 for PR-20–PR-23, PR-27–PR-29 and PR-36, E-1–E-8 (as updated) and E
 
 ```
 migrations/1760100000000_exports-v2.sql   export_runs.export_id/changed_only, export_uploads (append-only), domains.listing_changed_at,
-                                           audit_log scope 'job', settings.sedo_hybrid_as default make_offer
+                                           audit_log scope 'job', settings.removed_provider_hybrid_as default make_offer
 src/services/export-state.ts              pendingDomains(db, venue), manualDelist(db, venue), markChanged(cur, now)
 src/services/export.ts                    (modify) per-venue, changed_only, snapshot, headers, confirmUpload
 src/api/export.ts                         (modify) query/headers; POST /export/:venue/uploaded
@@ -95,7 +95,7 @@ ALTER TABLE export_runs ALTER COLUMN export_id SET NOT NULL, ADD CONSTRAINT expo
 
 CREATE TABLE export_uploads (
   id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  venue         text NOT NULL CHECK (venue IN ('afternic', 'sedo')),
+  venue         text NOT NULL CHECK (venue IN ('afternic', 'removed-provider')),
   export_id     text NOT NULL UNIQUE REFERENCES export_runs (export_id),
   domains       text[] NOT NULL,
   uploaded_at   timestamptz NOT NULL,
@@ -113,26 +113,26 @@ UPDATE domains SET listing_changed_at = updated_at WHERE status = 'listed';
 ALTER TABLE audit_log DROP CONSTRAINT audit_log_scope_check;
 ALTER TABLE audit_log ADD CONSTRAINT audit_log_scope_check CHECK (scope IN ('read', 'write', 'admin', 'job'));
 
-ALTER TABLE settings ALTER COLUMN sedo_hybrid_as SET DEFAULT 'make_offer';
-UPDATE settings SET sedo_hybrid_as = 'make_offer', updated_at = now();
+ALTER TABLE settings ALTER COLUMN removed_provider_hybrid_as SET DEFAULT 'make_offer';
+UPDATE settings SET removed_provider_hybrid_as = 'make_offer', updated_at = now();
 
 -- Down Migration
-UPDATE settings SET sedo_hybrid_as = 'buy_now', updated_at = now();
-ALTER TABLE settings ALTER COLUMN sedo_hybrid_as SET DEFAULT 'buy_now';
+UPDATE settings SET removed_provider_hybrid_as = 'buy_now', updated_at = now();
+ALTER TABLE settings ALTER COLUMN removed_provider_hybrid_as SET DEFAULT 'buy_now';
 ALTER TABLE audit_log DROP CONSTRAINT audit_log_scope_check;
 ALTER TABLE audit_log ADD CONSTRAINT audit_log_scope_check CHECK (scope IN ('read', 'write', 'admin'));
 ALTER TABLE domains DROP COLUMN listing_changed_at;
 DROP TABLE export_uploads;
 ALTER TABLE export_runs DROP CONSTRAINT export_runs_export_id_key, DROP COLUMN changed_only, DROP COLUMN export_id;
 ```
-**Before writing it:** check the real constraint name for `audit_log.scope` (`\d audit_log`) and the current `sedo_hybrid_as` default. Use the real names. If the down migration's scope CHECK would fail because `job` rows exist, note it in the file as a forward-only data case (same as 4b-1's `delisted`).
+**Before writing it:** check the real constraint name for `audit_log.scope` (`\d audit_log`) and the current `removed_provider_hybrid_as` default. Use the real names. If the down migration's scope CHECK would fail because `job` rows exist, note it in the file as a forward-only data case (same as 4b-1's `delisted`).
 
 **Types:** `ExportRunsTable` gains `export_id: string` and `changed_only: Generated<boolean>`; add `ExportUploadsTable`; `DomainsTable` gains `listing_changed_at: Timestamp | null`; the audit scope union gains `'job'`.
 
 **`src/services/export-state.ts`:**
 ```ts
-export type Venue = 'afternic' | 'sedo';
-export const VENUES: readonly Venue[] = ['afternic', 'sedo'];
+export type Venue = 'afternic' | 'removed-provider';
+export const VENUES: readonly Venue[] = ['afternic', 'removed-provider'];
 /** Listed domains whose exported values changed after the newest confirmed file of this venue that contained them (R1). */
 export async function pendingDomains(db: Kysely<Database>, venue: Venue): Promise<string[]>;
 /** R3: sold/delisted/dropped domains that went live at this venue and whose removal no confirmed upload has followed. */
@@ -170,7 +170,7 @@ Keep the 4a `SAFE_DOMAIN` filter at the export layer.
     - `export_uploads` UPDATE/DELETE/TRUNCATE raise;
     - a duplicate `export_id` raises;
     - the audit scope `job` is accepted;
-    - the settings default is `sedo_hybrid_as = 'make_offer'`.
+    - the settings default is `removed_provider_hybrid_as = 'make_offer'`.
   - **`pendingDomains` / `manualDelist`** (DB tests in `tests/api/export-state.test.ts`, built from hand-inserted rows):
     1. a listed domain with no uploads is pending;
     2. after a confirmed upload whose file `created_at` is ≥ `listing_changed_at`, it isn't pending;
@@ -183,8 +183,8 @@ Keep the 4a `SAFE_DOMAIN` filter at the export layer.
   - **`/list` and `/buy`:** after a plan save, `listing_changed_at` = NOW (fixed clock), and `export_pending_since` keeps an earlier value when one was set.
 - [ ] **Step 2:** Run → fail.
 - [ ] **Step 3:** Implement. `npm run migrate up` on the dev DB, then `down` and `up`.
-- [ ] **Step 4:** `npx vitest run && npx tsc --noEmit` → all green. Some existing Sedo export tests assumed `buy_now`; update **only** their expectations of the default, as E-7 now specifies (make offer by default; `buy_now` only when set by an admin).
-- [ ] **Step 5: Commit** `feat: migration 6 (export file ids, export_uploads append-only, listing_changed_at, job audit scope, Sedo make_offer default) + per-venue pending/delist queries`
+- [ ] **Step 4:** `npx vitest run && npx tsc --noEmit` → all green. Some existing removed-provider export tests assumed `buy_now`; update **only** their expectations of the default, as E-7 now specifies (make offer by default; `buy_now` only when set by an admin).
+- [ ] **Step 5: Commit** `feat: migration 6 (export file ids, export_uploads append-only, listing_changed_at, job audit scope, removed-provider make_offer default) + per-venue pending/delist queries`
 
 ---
 
@@ -338,7 +338,7 @@ scheduleDailyUtc(runPriceJob, 0, 30);
 - Modify: `src/services/export.ts`, `src/api/export.ts`, `tests/api/export.test.ts`
 - Create: `tests/api/export-v2.test.ts`
 
-**`GET /export/{afternic|sedo}.csv`:**
+**`GET /export/{afternic|removed-provider}.csv`:**
 - **Query:** `changed_only` (`true`/`false`, default false; anything else → 400 `VALIDATION_ERROR`); unknown parameters → 400.
 - **Rows:**
   - `listed` domains (as now);
@@ -347,15 +347,15 @@ scheduleDailyUtc(runPriceJob, 0, 30);
 - **Headers:**
   - `X-Export-Id`;
   - `X-Pending-Changes` = `(await pendingDomains(db, venue)).length` (computed before the snapshot; the snapshot doesn't change it);
-  - `X-Manual-Delist` = `manualDelist(db, venue)` joined with `,` (for **both** venues; Sedo didn't send it before);
+  - `X-Manual-Delist` = `manualDelist(db, venue)` joined with `,` (for **both** venues; removed-provider didn't send it before);
   - `X-Export-Warnings`;
   - `Content-Disposition` as now.
 - **Delist rule:** remove the 4a interim rule (the `export_runs`-based delist query); `manualDelist` replaces it.
-- **Sedo:** reads `settings.sedo_hybrid_as`, which now defaults to `make_offer`. With no template → 501 as now.
+- **removed-provider:** reads `settings.removed_provider_hybrid_as`, which now defaults to `make_offer`. With no template → 501 as now.
 
 **`POST /export/:venue/uploaded`** (WRITE; idempotent and audited by the existing middleware):
 - **Body** (zod, strict): `{ export_id: string, approval_ref: { text, approved_at } }`.
-- **Venue:** not `afternic`/`sedo` → 404 `NOT_FOUND`.
+- **Venue:** not `afternic`/`removed-provider` → 404 `NOT_FOUND`.
 - **Approval (R4):**
   - `text` must be non-empty after trimming → else 422 `APPROVAL_INVALID`;
   - `approved_at` must be ISO with an offset, not more than 60 s in the future, and at most `approval_max_age_hours` old → else 422 `APPROVAL_INVALID` / `APPROVAL_EXPIRED`;
@@ -367,7 +367,7 @@ scheduleDailyUtc(runPriceJob, 0, 30);
   - **Afternic only:** for each domain in the file, under `withDomainLock` (sorted, one at a time), clear `export_pending_since` where `listing_changed_at <= run.at`.
 - **Response 200:** `{ venue, export_id, domains: n, uploaded_at, pending_after: (await pendingDomains(db, venue)).length, still_pending: [domains of this file that are still pending] }`.
 
-- [ ] **Step 1: Failing tests** (`export-v2.test.ts`; fixed app clock; domains created via `/list` so the plan and change columns are real; a Sedo test template as in the existing Sedo tests):
+- [ ] **Step 1: Failing tests** (`export-v2.test.ts`; fixed app clock; domains created via `/list` so the plan and change columns are real; a removed-provider test template as in the existing removed-provider tests):
   - **E-1/E-5:** unchanged; still green.
   - **E-2 (updated to the v2 rules):**
     - fixture: geo bin 399; trend hybrid 4995 + LTO 24 by override; buzzword offer min 500 by override; one sold domain that was in a **confirmed** Afternic upload before its `delisted_at`;
@@ -382,10 +382,10 @@ scheduleDailyUtc(runPriceJob, 0, 30);
     1. `GET` (id A);
     2. a `/list` price change on a domain in A (fixed clock later than A's `created_at`: use a second app with a later clock);
     3. confirm A → that domain is still pending and its `export_pending_since` is not cleared.
-  - **Venue independence:** a confirmed Afternic upload doesn't clear Sedo pending (`GET /export/sedo.csv?changed_only=true` still has the row).
+  - **Venue independence:** a confirmed Afternic upload doesn't clear removed-provider pending (`GET /export/removed-provider.csv?changed_only=true` still has the row).
   - **E-11:**
     - unknown `export_id` → 404 `EXPORT_NOT_FOUND`;
-    - an Afternic id posted to `/export/sedo/uploaded` → 404;
+    - an Afternic id posted to `/export/removed-provider/uploaded` → 404;
     - READ token → 403;
     - same key and body twice → the second is replayed (`Idempotent-Replayed: true`) with one `export_uploads` row;
     - a new key for an already-confirmed id → 409 `EXPORT_ALREADY_CONFIRMED`;
@@ -393,9 +393,9 @@ scheduleDailyUtc(runPriceJob, 0, 30);
     - a missing or stale approval → 422.
   - **E-12 / PR-27:**
     - a listed domain in a confirmed Afternic upload hits its delist (price job);
-    - the next `GET` excludes it from rows and lists it in `X-Manual-Delist` (Afternic and Sedo, given a confirmed Sedo upload too);
+    - the next `GET` excludes it from rows and lists it in `X-Manual-Delist` (Afternic and removed-provider, given a confirmed removed-provider upload too);
     - after a new upload is confirmed (approval time later than `delisted_at`), it's gone from `X-Manual-Delist`.
-  - **E-7:** with the default settings, the Sedo hybrid row is make-offer, with price 1995 and minimum 100. After an admin sets `sedo_hybrid_as='buy_now'` (direct DB update in the test), the row is fixed price with no minimum.
+  - **E-7:** with the default settings, the removed-provider hybrid row is make-offer, with price 1995 and minimum 100. After an admin sets `removed_provider_hybrid_as='buy_now'` (direct DB update in the test), the row is fixed price with no minimum.
   - **The walk-away never appears:** no file or header contains `960` (`grep` the CSV and the headers) for a 1995 formula domain.
   - **`changed_only=maybe`** → 400.
   - **GET writes only the snapshot:** row counts of `domains`, `listing_history`, `export_uploads` and `audit_log` are unchanged by a GET, and `export_runs` has +1.

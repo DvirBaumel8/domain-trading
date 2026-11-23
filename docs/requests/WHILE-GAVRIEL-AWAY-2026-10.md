@@ -48,7 +48,7 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
   - the $50 S8 cap is reviewed only after the pick-proof shows our picks beat random.
 - **Improvements DOM takes on:**
   1. Enforce the Line 1 Tier A gate in the server's `/buy` (today it is applied only on Gavriel's side, so a mistake there is not caught).
-  2. The three Sedo listings from 14 Oct (CR-040) were never recorded as venues on the server (`/portfolio` shows Afternic only). Check them, then record them.
+  2. The three removed-provider listings from 14 Oct (CR-040) were never recorded as venues on the server (`/portfolio` shows Afternic only). Check them, then record them.
 - Gavriel: if your side has more to the Tier A rule than the 15 Oct definition, write it here before DOM's change ships.
 
 ### 25 Oct 2026: the main buying line is now a written rule
@@ -59,7 +59,7 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 
 ### 25 Oct 2026: auctions before closeouts; the $50 cap is under review
 - Dvir doubted closeouts ("if there was a period of time that no one wanted the domain, why we think we know better?") and the $50 cap ("Might be a super quality domain above 50, lets be more flexible there"), then set the direction: "we need to invest more efforts in bids instead of closeouts. Closeouts is a bit similar to new registration with how it's a guess and low chance to be sold".
-- Recorded in `CLAUDE.md` ("Main buying line"): within S8, GoDaddy/Dynadot public auctions with real bidding get the main effort. Closeouts get no money until the pick-proof shows an edge; the test keeps running (no cost).
+- Recorded in `CLAUDE.md` ("Main buying line"): within S8, GoDaddy/removed-provider public auctions with real bidding get the main effort. Closeouts get no money until the pick-proof shows an edge; the test keeps running (no cost).
 - **Pending Dvir's line:** a new per-name S8 cap (`settings.s8_max_price_cents`, migration only). DOM recommended $250, with the S8 test budget staying about $600 and, above $50, Gavriel showing Dvir why the name is worth more (live businesses on other endings, age, comparable sales). DOM ships the migration once Dvir names the number.
 - Gavriel: please think about how you'd find and judge auction names (which auctions, when they end, how to set a max bid). Dvir places bids by hand on the registrar website, and the buy comes in through `POST /portfolio/import` as today.
 
@@ -78,7 +78,7 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 
 ### 25 Oct 2026: auctions research (playbook)
 - Dvir: "Now we can use others experience for improve our knowledge about auctions domains. Go ahead please".
-- DOM wrote `docs/research/auctions-playbook.md`: how GoDaddy and Dynadot expired auctions work (proxy bids, 5-minute extension, redemption refund), how experienced investors bid (value first, fixed maximum set early, pay a third to a fifth of resale), what sells, and what it means for us.
+- DOM wrote `docs/research/auctions-playbook.md`: how GoDaddy and removed-provider expired auctions work (proxy bids, 5-minute extension, redemption refund), how experienced investors bid (value first, fixed maximum set early, pay a third to a fifth of resale), what sells, and what it means for us.
 - Gavriel: read it before proposing any auction name. Every proposal should carry a written maximum bid with its reason; Dvir approves the name and the maximum and bids by hand.
 - Proposed next build (waiting for Dvir): keep GoDaddy auctions in our price range ($12–$250, with bids) from the daily files we already download. Today only auctions that reached $500 are kept.
 
@@ -110,8 +110,8 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 
 ### 25 Oct 2026: first per-table DB reading (v5.38.0 live, G-119)
 - DOM read `GET /health` (READ token, GET only) at 08:47 UTC: version 5.38.0, 349.7 MB (32.6%).
-- Largest tables: `datasave_pool` 139 MB (394k rows), `dynadot_rows` 56 MB, `screening_results` 42 MB, `market_names` 35 MB, `pickproof_pool` 30 MB, `screening_evidence` 15 MB; the rest under 8 MB each.
-- So DOM's first guess (`pickproof_pool`) was wrong. `datasave_pool` keeps only 3 days, so it may already be at its full size and the growth may slow by itself. `dynadot_rows` (kept 120 days) keeps growing.
+- Largest tables: `datasave_pool` 139 MB (394k rows), `removed_provider_rows` 56 MB, `screening_results` 42 MB, `market_names` 35 MB, `pickproof_pool` 30 MB, `screening_evidence` 15 MB; the rest under 8 MB each.
+- So DOM's first guess (`pickproof_pool`) was wrong. `datasave_pool` keeps only 3 days, so it may already be at its full size and the growth may slow by itself. `removed_provider_rows` (kept 120 days) keeps growing.
 - Next: a second reading on 26 Oct gives each table's growth per day. The cut is planned from that, before about 3 Nov.
 
 ### 25 Oct 2026: Dvir said "build"; more research rounds
@@ -128,11 +128,11 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
   - It becomes a selection-settings draft for Dvir to activate after a second research round and a backtest.
 - **Historical data** (`docs/research/historical-data-2026-10.md`):
   - Unsold history: dns.coffee, $90 for one month. Dvir signs up himself if he approves.
-  - Sold history: only NameBio's paid API, with written permission.
-  - The free Kaggle sales file is a NameBio scrape: not used.
+  - Sold history: only removed-provider's paid API, with written permission.
+  - The free Kaggle sales file is a removed-provider scrape: not used.
   - The engine's holdout date (14 Oct) blocks any newer row until Dvir decides.
   - These are Dvir's decisions, open.
-- **Traffic read** (`docs/internal/loop/traffic-2026-10-25.md`): about 1 s per call, many bot 4xx retries (G-126), and the bulk fixes must come before any bulk load. `/health datasave: partial` is from the paused Dynadot uploads (G-120 explained).
+- **Traffic read** (`docs/internal/loop/traffic-2026-10-25.md`): about 1 s per call, many bot 4xx retries (G-126), and the bulk fixes must come before any bulk load. `/health datasave: partial` is from the paused removed-provider uploads (G-120 explained).
 - Both research rounds were limited: the web-search budget ran out, and NamePros blocks automated reads (not bypassed). A second round follows.
 
 ### 25 Oct 2026: v5.39.0, auction bid plans (CR-077)
@@ -148,7 +148,7 @@ Newest entry last. DOM still never calls production (HARD RULE unchanged); Dvir 
 
 ### 25 Oct 2026: v5.40.0, v5.41.0, v5.42.0; score backtest
 - **v5.40.0:** every API call logs its DB query count (`db_queries`, `db_ms`), and every job step record in `GET /jobs/runs` carries `db: {queries, ms, top?}`. Report: `npm run traffic -- <api.log>`.
-- **v5.41.0:** the engine's 14 Oct holdout block is gone (rows of any past date load). The new datasave step `engineFeed` feeds the engine daily, for free: unsold = deleted GoDaddy closeouts; sold = GoDaddy auctions that ended with a bid at $100 or more (source `godaddy_auctions_file`, mostly investor sales). `POST /engine/sales` refuses NameBio-derived rows (its terms forbid model training).
+- **v5.41.0:** the engine's 14 Oct holdout block is gone (rows of any past date load). The new datasave step `engineFeed` feeds the engine daily, for free: unsold = deleted GoDaddy closeouts; sold = GoDaddy auctions that ended with a bid at $100 or more (source `godaddy_auctions_file`, mostly investor sales). `POST /engine/sales` refuses removed-provider-derived rows (its terms forbid model training).
 - **v5.42.0:** bulk reads and writes everywhere (5,000 sales rows: 10,003 queries down to 9). The sibling scan checks 4 siblings at a time with per-host pacing; its budget is still the whole call, capped at 90 s (Cloudflare cuts a request at about 100 s).
 - **Score backtest** (`docs/research/backtest-score-methods-2026-10-25.md`): Dvir's lift method (sold share against unsold share per pattern) scores AUC 0.80 on the CR-002 set, against 0.79 for the score v2 proposal and 0.74 for today's Form part. The engine reached 0.85 on the same kind of data.
 - **26 Oct, after the data save:** DOM reads the first live numbers, then runs a full improvement pass (`/improvement-pass`), as Dvir asked.

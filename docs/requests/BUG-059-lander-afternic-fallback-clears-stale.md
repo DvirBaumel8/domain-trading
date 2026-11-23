@@ -47,7 +47,7 @@ Apex is often a tiny JS stub → `/lander` → GoDaddy forsale **403** to our UA
 - **AT-3 (live):** after ship, one `portfolioCheck` then `GET /report`: `roofingvoiceagent.com` and `ukcbamcompliance.com` must **not** show `$49,999,999` / `$100,000` mismatches.
 
 ## Out of scope
-Changing BIN/prices; Sedo; browser automation; money routes; rewriting global “unknown never clears” for non-Afternic cases unless required by R-4 and documented in `jobs.md`.
+Changing BIN/prices; removed-provider; browser automation; money routes; rewriting global “unknown never clears” for non-Afternic cases unless required by R-4 and documented in `jobs.md`.
 
 ## Changes
 - 2026-10-27 ~20:20 IDT (DOM Architect): filed from 5.69.0 gate stamp `7e5bb99`.

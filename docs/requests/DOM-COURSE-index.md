@@ -24,8 +24,8 @@ Short table of contents for DOM Architect. Full course: **`DOM-COURSE-grok-side-
 | File | Topic |
 |---|---|
 | `docs/bot-logic/00-dual-runner-lock-rule.md` | Dual-runner lock |
-| `docs/bot-logic/01-godaddy-dynadot-daily-seal.md` | Daily seals |
-| `docs/bot-logic/02-dynadot-panel-r8-watch.md` | Dynadot panel |
+| `docs/bot-logic/01-godaddy-daily-seal.md` | Daily seals |
+| `docs/bot-logic/02-removed-provider-panel-r8-watch.md` | removed-provider panel |
 | `docs/bot-logic/03-missing-name-portfolio-check.md` | Missing-name check |
 
 ## Ongoing digests / decisions

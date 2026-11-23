@@ -47,7 +47,7 @@ repro_test: "Given GoDaddy inventory Last-Modified still yesterday at 15:05 UTC 
 
 ## Out of scope
 - Backfilling 2026-10-15..10-19 (still missing; leave as missing).
-- Dynadot aftermarket / dqMarket (BUG-061 / BUG-062).
+- removed-provider aftermarket / dqMarket (BUG-061 / BUG-062).
 
 ## DVIR items
 None.

@@ -1,6 +1,6 @@
 # Rounds 11–12: test-slice archive lookups, profit per rule, aged drops, three-word pattern (2026-10-06, 03:56–04:50 IDT)
 
-Nothing pushed, sent or bought. `system/selection-v10.md` and CR-002 untouched. Sources: Wayback CDX (one request at a time), Verisign/registry RDAP, SnapNames public deleting list (already on disk), UnreportedSales tables (already on disk). No NameBio bulk, no BBB, no undocumented backends.
+Nothing pushed, sent or bought. `system/selection-v10.md` and CR-002 untouched. Sources: Wayback CDX (one request at a time), Verisign/registry RDAP, SnapNames public deleting list (already on disk), UnreportedSales tables (already on disk). No removed-provider bulk, no BBB, no undocumented backends.
 
 ## 0. Bottom line (plain words)
 

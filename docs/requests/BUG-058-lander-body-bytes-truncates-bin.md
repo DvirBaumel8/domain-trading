@@ -44,7 +44,7 @@ Roofing / ukcbam: apex is JS→`/lander`; GoDaddy forsale **403** to our UA → 
 - **AT-3 (live):** after ship on `/health`, one `portfolioCheck` then `GET /report`: `aievalsconsulting.com` must not show `LANDER_PRICE_MISMATCH` with `$100,000` (or `$49,999,999`).
 
 ## Out of scope
-Price/BIN changes; Sedo; browser automation; money routes; GoDaddy 403 UA handling (optional follow-up).
+Price/BIN changes; removed-provider; browser automation; money routes; GoDaddy 403 UA handling (optional follow-up).
 
 ## Changes
 - 2026-10-27 ~19:10 IDT (DOM Architect): filed from live 5.68.0 fail + body-cap simulation (see BUG-056 AT-3 stamp).

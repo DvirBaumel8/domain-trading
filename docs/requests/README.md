@@ -84,7 +84,7 @@ Dvir's line: "Keep it simple for me. I don't want to be on the computer. No keys
 - His only part is a yes or no on decisions, ideally one tap from his phone (for example an emailed approval link).
 
 ## Standing rule: live browser = Gavriel only (Dvir t973u / t974u, 2026-10-27)
-- Live browser / Chrome work on marketplaces and websites (Sedo, Afternic, registrars, dashboards) = **Gavriel (Grok Bot) ONLY**.
+- Live browser / Chrome work on marketplaces and websites (removed-provider, Afternic, registrars, dashboards) = **Gavriel (Grok Bot) ONLY**.
 - Claude Code, DOM, and other bots must **not** drive web UIs. Prefer APIs; when a human/browser click path is needed, hand it to Gavriel (write the ask in `GAVRIEL-TO-DOM.md` or the CR).
 - **Handoff (Dvir t974u):** once we have real API access for a marketplace, that work moves to DOM.
 - JOINT-OPS **R9**; detail: `NOTE-2026-10-27-browser-gavriel-only.md`.

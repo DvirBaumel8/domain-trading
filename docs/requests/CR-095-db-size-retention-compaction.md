@@ -12,15 +12,15 @@ max_rounds: 2
 ---
 # CR-095 — DB at 74% of 1 GB: free space by retention/compaction, and stop engineFeed losing a day
 
-**Facts (2026-10-29).** `GET /health` `db_size`: 796,254,208 of 1,073,741,824 bytes (**74.2%**, warn 70%). Largest tables: `market_names` 341 MB (466k rows), `dynadot_rows` 215 MB (856k rows), `datasave_pool` 90 MB, `screening_results` 42 MB, `pickproof_pool` 31 MB. The datasave retry `run_9ea5e2fc` (19:12 IDT) step `engineFeed` returned `status: db_size_high` and stored nothing: **`expired_unsold_candidates_n: 900`** not saved for 29 Oct.
+**Facts (2026-10-29).** `GET /health` `db_size`: 796,254,208 of 1,073,741,824 bytes (**74.2%**, warn 70%). Largest tables: `market_names` 341 MB (466k rows), `removed_provider_rows` 215 MB (856k rows), `datasave_pool` 90 MB, `screening_results` 42 MB, `pickproof_pool` 31 MB. The datasave retry `run_9ea5e2fc` (19:12 IDT) step `engineFeed` returned `status: db_size_high` and stored nothing: **`expired_unsold_candidates_n: 900`** not saved for 29 Oct.
 
 **Dvir's standing rule:** no artificial size cuts on data paths (no caps or sampling to fit). Scale by removing rows that are not needed or are kept elsewhere.
 
 ## Asks
-1. **Retention of raw/duplicate rows that are archived elsewhere.** E.g. `dynadot_rows` days already written to the aftermarket archive (`snapshotRetention.aftermarket_archive.written`) and sealed with a sha256; superseded `datasave_pool` / `pickproof_pool` days; raw JSON duplicated in typed columns. Delete only what an archive or another table can rebuild; list each rule and its archive in the response.
+1. **Retention of raw/duplicate rows that are archived elsewhere.** E.g. `removed_provider_rows` days already written to the aftermarket archive (`snapshotRetention.aftermarket_archive.written`) and sealed with a sha256; superseded `datasave_pool` / `pickproof_pool` days; raw JSON duplicated in typed columns. Delete only what an archive or another table can rebuild; list each rule and its archive in the response.
 2. **Compaction.** VACUUM (and reclaim bloat after the large deletes, e.g. 80,776 aftermarket rows on 28 Oct, 133,237 pool rows on 29 Oct); report bytes before/after.
 3. **Indexes.** Drop unused or duplicate indexes on the big tables (index bytes count toward the limit); keep what queries need.
-4. **Leaner storage of bulk rows** (`market_names`, `dynadot_rows`): narrower columns, or moving raw payloads into the existing archive files with a pointer, keeping every row the logic needs.
+4. **Leaner storage of bulk rows** (`market_names`, `removed_provider_rows`): narrower columns, or moving raw payloads into the existing archive files with a pointer, keeping every row the logic needs.
 5. **engineFeed must not lose a day.** When it skips for `db_size_high`, record the skipped day as pending (visible in `/health` or `/report`), and backfill it on the first run with space. **Backfill 29 Oct (900 candidates)** once space allows.
 
 **Out of scope:** no DB plan change and no money.
@@ -45,10 +45,10 @@ max_rounds: 2
   - Check whether the second stored aftermarket day is still needed.
   - DOM will not run a full-table rewrite while the free headroom is smaller than the table's live size, because the rewrite briefly needs both copies, and on 1 GB that could hit Neon's write block.
 - **Ask 1 (rules):** already in place. Aftermarket days are archived to disk before deletion (2 days kept), pools keep 3 data dates, and raw files are kept 7 days on disk.
-- **Part 2 (5.78.0):** the 5.77.0 split showed indexes bigger than the data: `dynadot_rows` 80 MB heap / 124 MB indexes, `datasave_pool` 30 / 55 MB.
-  - Dropped the unused `dynadot_rows_domain_lookup` index.
+- **Part 2 (5.78.0):** the 5.77.0 split showed indexes bigger than the data: `removed_provider_rows` 80 MB heap / 124 MB indexes, `datasave_pool` 30 / 55 MB.
+  - Dropped the unused `removed_provider_rows_domain_lookup` index.
   - `datasave_pool` now has fillfactor 70, so `scorePool`'s daily rewrites stop adding index entries.
-  - Rebuilt the indexes of `datasave_pool`, `dynadot_rows` and `market_names`.
+  - Rebuilt the indexes of `datasave_pool`, `removed_provider_rows` and `market_names`.
   - No rows were deleted, so the episodes, sales, panels and shortlist inputs are unchanged.
   - DOM will post the before and after `/health.db_size` in `DOM-TO-GAVRIEL.md`.
 - **Ask 4 (leaner `market_names`):** only if `/health` shows it still growing after the vacuum; see the 5.78.0 note.

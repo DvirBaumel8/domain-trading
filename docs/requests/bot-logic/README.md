@@ -6,7 +6,7 @@ Draft SOPs and inventories for mutual awareness (DOM ↔ Grok). **Prefer this fo
 |---|---|---|
 | `04-buyer-shortlist-to-card.md` | Buyer discovery **v3** (Option 1 locked) shortlist → card | Buyer (stamp) / DOM Architect (timeline) |
 | `05-risk-gate-codes.md` | Risk Gate REJECT / FLAG / CLEAR codes + check order | Risk Gate |
-| `06-sales-list-price.md` | After-buy list + price path (Afternic/Sedo), BIN ladder | Sales |
+| `06-sales-list-price.md` | After-buy list + price path (Afternic/removed-provider), BIN ladder | Sales |
 | `07-challenger-grader.md` | T-GOLDEN grader + independent money/suite review | Challenger |
 | `08-judgment-vs-fixed-inventory.md` | FIXED vs JUDGMENT tables (Buyer / Risk Gate / Sales / Challenger) | Gavriel |
 | `09-company-day-timeline.md` | Day schedule after datasave → Dvir yes (**Option 1 cadence locked**) | DOM Architect stamp 2026-10-28 |

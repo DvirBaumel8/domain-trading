@@ -94,7 +94,7 @@ CREATE TABLE offers (
   id                     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   domain_id              bigint NOT NULL REFERENCES domains (id),
   amount_cents           integer NOT NULL CHECK (amount_cents > 0),
-  source                 text NOT NULL CHECK (source IN ('afternic','godaddy','sedo','domainagents','email_inbound','outbound_reply','other')),
+  source                 text NOT NULL CHECK (source IN ('afternic','godaddy','removed-provider','domainagents','email_inbound','outbound_reply','other')),
   received_at            timestamptz NOT NULL,
   buyer_type             text NOT NULL DEFAULT 'unknown' CHECK (buyer_type IN ('end_user','investor','broker','unknown')),
   buyer_ref              text CHECK (buyer_ref IS NULL OR position('@' in buyer_ref) = 0),
@@ -142,7 +142,7 @@ DROP TABLE offer_imports;
 
 **`src/services/offer-rules.ts`:**
 ```ts
-export type OfferSource = 'afternic' | 'godaddy' | 'sedo' | 'domainagents' | 'email_inbound' | 'outbound_reply' | 'other';
+export type OfferSource = 'afternic' | 'godaddy' | 'removed-provider' | 'domainagents' | 'email_inbound' | 'outbound_reply' | 'other';
 export const OFFER_SOURCES: readonly OfferSource[];
 export type BuyerType = 'end_user' | 'investor' | 'broker' | 'unknown';
 export const BUYER_TYPES: readonly BuyerType[];
@@ -174,7 +174,7 @@ export function classify(s: OfferSnapshot, amountCents: number, source: OfferSou
   - `OFFER_AT_OR_ABOVE_FLOOR` when the band is `at_or_above_floor` and the source is afternic/godaddy.
 - **`nextStep`** (plain text, one per routing and source family):
   - `auto_decline` + afternic/godaddy: "Below the walk-away: decline in the Afternic dashboard (or let it expire); no Gate D."
-  - `auto_decline` + sedo/domainagents/other: "Below the walk-away: Sochen's standard decline template; no Gate D."
+  - `auto_decline` + removed-provider/domainagents/other: "Below the walk-away: Sochen's standard decline template; no Gate D."
   - `auto_decline` + email: "Below the walk-away: Sochen's standard decline template; Dvir sends it (pre-approved text, no Gate D)."
   - `geo_below_bin`: "Geo price is fixed: reply 'The price is $X, fixed'." ($X = the BIN in whole dollars)
   - `dvir` + `mid_range`: "Mid-range: Sochen drafts; needs Dvir's Gate D line."
@@ -193,7 +193,7 @@ export function classify(s: OfferSnapshot, amountCents: number, source: OfferSou
     - OF-4 boundaries: 9900 `below_min`; 10000 `below_walkaway`; 94900 `below_walkaway`; 95000 `mid_range`; 129400 `mid_range`.
     - OF-5: 120000 `email_inbound` → `dvir`; 60000 `email_inbound` → `auto_decline`.
     - OF-6: geo 39900 snapshot, 35000 → `geo_below_bin`/`auto_decline`, `nextStep` includes "$399"; 39900 → `at_or_above_bin`.
-    - O1/O2 rows: offer mode min 50000 → 40000 `below_min`, 60000 `mid_range`; non-geo plain bin 99900 → `geo_below_bin` below; no mode → `unpriced`/`dvir`/`open`; sedo at or above the floor → `accept_preapproved`; email at or above the BIN → `dvir`.
+    - O1/O2 rows: offer mode min 50000 → 40000 `below_min`, 60000 `mid_range`; non-geo plain bin 99900 → `geo_below_bin` below; no mode → `unpriced`/`dvir`/`open`; removed-provider at or above the floor → `accept_preapproved`; email at or above the BIN → `dvir`.
     - `listedAtReceipt` false → `OFFER_ON_UNLISTED`.
   - **Schema:**
     - OF-11: raw `UPDATE offers SET amount_cents=…`, `band`, `received_at` → error; `UPDATE offers SET outcome='declined'` → OK; `DELETE` → error.
@@ -373,7 +373,7 @@ export async function reportOffers(db, o: { from: Date; to: Date; groupBy: 'doma
     - `GET /report/offers?group_by=source` totals equal the same counts.
   - **OF-14:**
     - for the D-001 setup, `GET /export/afternic.csv` contains `PromptInjectionAudit.com,1995,1295,100,N,,Custom Lander,Y,N,Y,N` (set `display_name` via `/list`);
-    - the Sedo row (test template) has minimum 100;
+    - the removed-provider row (test template) has minimum 100;
     - `GET /pricing/preview?...&domain=` gives an `afternic_row` without 950;
     - no export body or header contains `950`.
   - **OF-17:**

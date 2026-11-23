@@ -14,7 +14,7 @@
 1. **Token economy** → prefer DOM when cheaper (repeatable work belongs in code/jobs, not chat rounds).  
 2. **Improve automatically as AI improves** → judgment stays in plain-language instructions/lessons; code only for exact/fixed parts.  
 3. **World-class** → scale, automate, innovate where we can win.  
-4. **Don’t compete where we can’t win** → drop or de-emphasize arms we can’t beat (e.g. Sedo automation — D-2026-10-27-SEDO).  
+4. **Don’t compete where we can’t win** → drop or de-emphasize arms we can’t beat (e.g. removed-provider automation — D-2026-10-27-removed-provider).  
 5. **Real journey lessons** → pull outside domain-trading experience as weighted evidence, never auto-reshape.
 
 ---
@@ -39,7 +39,7 @@ Honest failure modes. Severity is about **token burn, wrong books, or slow learn
 - **Buyer then Risk Gate** re-fetch USPTO / firms / comps for the same card (correct for independence of *judgment*, expensive when the *fetch* is identical). FIXED fetches should land once in DOM (or a shared evidence blob); each bot re-*judges*, not re-*scrapes* by default.  
 - **Shortlist already dropped** SPELL/BRAND/BIGCO/TM — Buyer still re-applies hard filters (good as belt-and-suspenders; bad when it becomes a second full pipeline). Prefer: DOM hard filters are authoritative; Buyer only adds JUDGMENT layers.  
 - **Discovery before v2:** local GD zip grep + DOM shortlist + scout lanes = three enrichment graphs for one morning. v2 fixed the spine; leftover emergency zip path must stay rare.  
-- **Dynadot:** Restricted key on Mac + MCP connector + datasave stubs = three ways to read the same aftermarket until CR-080 client lands. Token/time tax with no extra truth.  
+- **removed-provider:** Restricted key on Mac + MCP connector + datasave stubs = three ways to read the same aftermarket until CR-080 client lands. Token/time tax with no extra truth.  
 - **Mutual awareness via chat** instead of files: long agent wakes re-explain org; course + `bot-logic/04`–`09` should cut that. Still regenerating digests that repeat `org-v2`.
 
 ### 1.3 Token waste patterns (prefer DOM)
@@ -47,7 +47,7 @@ Honest failure modes. Severity is about **token burn, wrong books, or slow learn
 | Pattern | Why expensive | Prefer |
 |---|---|---|
 | Grok browser for Afternic price/list when Portfolio API key is already in DOM settings | Browser sessions + retries | DOM sync job once wired; browser only for no-API UI |
-| Grok MCP Dynadot daily when Mac datasave should seal | Per-call LLM + MCP overhead | DOM datasave primary; Grok backup only behind dual-runner lock (`docs/bot-logic/00`) |
+| Grok MCP removed-provider daily when Mac datasave should seal | Per-call LLM + MCP overhead | DOM datasave primary; Grok backup only behind dual-runner lock (`docs/bot-logic/00`) |
 | Claude Code rounds inventing product from chat | Ambiguous CRs, Questions left open | Tests-as-contract; close Questions with defaults in Rules (lesson 2026-10-26) |
 | Re-reading whole company story into every CR | Context bloat | Cite decision IDs + course/index; link, don’t paste |
 | Six-bot fan-out for one sealed day | Idle scouts already absorbed | One Buyer read of shortlist; Challenger grades weekly, not every pull |
@@ -82,8 +82,8 @@ Sources are public investor write-ups (NamePros, GoDaddy Resources, Grit Brokera
 | Most names aren’t liquid; renewals kill you | Rule-14 renew/drop math → FIXED in DOM; drop verdict stays bot+Dvir |
 | Sales often take 8–12+ months; outbound weak early | Outreach paused is OK; Afternic inbound + Pricing discipline > spray email |
 | Start small, measure velocity/ROI, scale only proven lanes | POC 40 / $1,500; paper cheap-name arm until ~Nov 14; real buy cards live since 2026-10-22 |
-| One source of truth + API sync for listings at scale | Afternic Portfolio API path > browser; Sedo “no new work” (D-2026-10-27-SEDO) matches “don’t compete where we can’t win” |
-| Track sales comps (NameBio/DNJ) not appraisals | Retail ingest + sealed sales > model vanity scores |
+| One source of truth + API sync for listings at scale | Afternic Portfolio API path > browser; removed-provider “no new work” (D-2026-10-27-removed-provider) matches “don’t compete where we can’t win” |
+| Track sales comps (removed-provider/DNJ) not appraisals | Retail ingest + sealed sales > model vanity scores |
 
 ---
 
@@ -108,7 +108,7 @@ Sources are public investor write-ups (NamePros, GoDaddy Resources, Grit Brokera
 | Pricing formula BIN/floor/walkaway | **DOM** | Sales proposes exceptions; never silent marketplace drift |
 | Books / ledger / listing_history / approval_text | **DOM** | Company CSV = derived export or lagging mirror — label it |
 | Afternic list/price sync | **DOM API** once wired | Grok browser only until sync live or for UI-only steps |
-| Sedo | Keep current listings only | No new automation investment |
+| removed-provider | Keep current listings only | No new automation investment |
 | Meaning / firm screen / card prose | **Buyer (Grok)** | Not DOM |
 | CLEAR / FLAG / REJECT | **Risk Gate (Grok)** | DOM may store verdict IDs later; never auto-approve |
 | Golden tasks / why-we-fail | **Challenger (Grok)** | Not a DOM UI |
@@ -147,7 +147,7 @@ Gavriel ↔ DOM Architect iterate on this + Gavriel’s draft until one joint pl
 Every run: read last lessons; append 3–5 lines. Outside reviews = weighted evidence, not auto-reshape (`knowledge/evidence-ledger.md`).
 
 ### R8 — Don’t compete where we can’t win
-Sedo automation: no. Browser wars on UI without API: no. Hand-reg lottery lanes: no. Prefer Afternic inbound + disciplined cheap aftermarket + buyer-first cards.
+removed-provider automation: no. Browser wars on UI without API: no. Hand-reg lottery lanes: no. Prefer Afternic inbound + disciplined cheap aftermarket + buyer-first cards.
 
 ---
 
@@ -156,7 +156,7 @@ Sedo automation: no. Browser wars on UI without API: no. Hand-reg lottery lanes:
 Ordered by token/risk, not a CR list yet:
 
 1. **Declare DOM `/portfolio` (+ listing_history) canonical** for owned prices; company ledger becomes nightly export or explicit lag note.  
-2. **Finish Dynadot datasave client (CR-080)** → stop MCP primary for jobs 01–02.  
+2. **Finish removed-provider datasave client (CR-080)** → stop MCP primary for jobs 01–02.  
 3. **Wire Afternic Portfolio API sync** (key already in settings) → retire browser price edits for listed names.  
 4. **Evidence cache for Buyer→Risk Gate** (TM kill ids, last firm-screen fetch timestamp) so Risk Gate recheck is judgment-first.  
 5. **Export NOTE template** for company-box → git when Claude Code needs it.  
@@ -178,5 +178,5 @@ Ordered by token/risk, not a CR list yet:
 ## Pass / fail for this draft
 
 - **Pass:** Gavriel can mark agree/disagree per section and we produce one joint file without inventing money or JUDGMENT→code.  
-- **Fail:** treating CLEAR as DOM auto-buy; proposing Sedo rebuild; dual writers for prices; skipping Dvir on the final joint plan.
+- **Fail:** treating CLEAR as DOM auto-buy; proposing removed-provider rebuild; dual writers for prices; skipping Dvir on the final joint plan.
 

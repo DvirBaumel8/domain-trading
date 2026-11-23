@@ -86,7 +86,7 @@ Before writing it, check the real constraint text with `\d domains`.
 
 **`POST /sold/:domain`** (WRITE). The body (zod, strict) matches sold.md:
 ```
-{ venue: 'afternic'|'sedo'|'afternic_checkout'|'escrow'|'other', sale_price: number, commission: number, other_fees?: number,
+{ venue: 'afternic'|'removed-provider'|'afternic_checkout'|'escrow'|'other', sale_price: number, commission: number, other_fees?: number,
   sold_at: ISO-with-offset, payout?: { amount: number, method: string, fee?: number, received_on?: YYYY-MM-DD|null },
   transaction_ref?: string, approval_ref: { text, approved_at }, offer_id?: number }
 ```
@@ -109,14 +109,14 @@ Before writing it, check the real constraint text with `\d domains`.
 5. **D3:** if `offer_id` is given and valid, set that offer's `outcome = 'sold'`, `outcome_at = now`, `outcome_note = 'via /sold'`.
 6. **Commission check** (a warning, never a block). The expected rate:
    - Afternic: 15% if the domain's `lander` was `afternic` at `sold_at`, else 25%, with a $15 minimum. Use the current `lander` and `lander_set_at ≤ sold_at`.
-   - Sedo: one of 10%, 15% or 20% (warn only when none matches within $1).
+   - removed-provider: one of 10%, 15% or 20% (warn only when none matches within $1).
    - `afternic_checkout`: 5%.
    - `escrow`/`other`: no check.
 
    Warn `COMMISSION_UNEXPECTED: expected 15% ($299.25), got $199.50` when it's off by more than $1.
 7. **Response 200:**
    - `{ domain, status: 'sold', sale, commission, fees, net_proceeds, total_costs, profit }`, each as cents + display;
-   - `checklist`: the 3 sold.md lines plus, when the domain was in any confirmed upload, "Remove the listing at Afternic/Sedo (see X-Manual-Delist)";
+   - `checklist`: the 3 sold.md lines plus, when the domain was in any confirmed upload, "Remove the listing at Afternic/removed-provider (see X-Manual-Delist)";
    - `warnings`.
 
 - [ ] **Step 1: Failing tests:**

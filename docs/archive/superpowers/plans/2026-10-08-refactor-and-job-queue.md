@@ -20,7 +20,7 @@
    - **every in-memory mutex and `running` flag in jobs becomes a DB lock** (multi-instance safe);
    - a lock registry with named keys, so two jobs never share a key by accident.
 4. **`core/validation.ts`:** the shared zod pieces (`usd`, `domainParam`, `approvalRef`, `comps`), and the personal-data check (`NO_PII`) used by offers, sold, uploads and intake.
-5. **`core/redact.ts`:** one scrub helper (secret values and token names) used by audit, runner, Buffer, Gemini and the Worker logs. "Free-text route" becomes a route option instead of a path regex in `audit.ts`.
+5. **`core/redact.ts`:** one scrub helper (secret values and token names) used by audit, runner, removed-provider, Gemini and the Worker logs. "Free-text route" becomes a route option instead of a path regex in `audit.ts`.
 6. **Efficiency (Dvir asked, 8 Oct):**
    - **One shared pacer per registry host for the whole process,** so parallel work can never exceed our polite rate.
    - **Batched engine writes:** the heartbeat at most every 10 s, the cancel check at most every 5 s, manual-row lookups only for checks that can be manual. That cuts the database calls per check from about 4 to about 1.

@@ -19,7 +19,7 @@ Human approval stays only for buy and sell decisions, as today. DOM still sends 
 | Daily list for Dvir | Missing. No read lists today's buy-ready names across runs. |
 | Buy | Dry run only. Buy hold ON, `clearable: false`, no hold suite frozen. The only open tranche is a test probe (`accept-v2-probe-20261007`, $200 cap, 0 members). |
 | For-sale page | Built. The first real page check is the 03:05 IDT daily run on 2026-10-08. |
-| Marketplace listing | Afternic: DOM's file, uploaded on Afternic's site (no seller API). Sedo: 501 `SEDO_TEMPLATE_MISSING`. |
+| Marketplace listing | Afternic: DOM's file, uploaded on Afternic's site (no seller API). removed-provider: 501 `REMOVED_PROVIDER_TEMPLATE_MISSING`. |
 | Daily jobs | Built. No scheduled daily run has completed yet; the first is 2026-10-08 03:05 IDT. |
 
 ## 3. Required outcome (acceptance tests)
@@ -65,7 +65,7 @@ DOM returns the day's candidates; Gavriel turns them into Dvir's morning message
 - **T12-13 (no private data):** no walk-away, token, key or secret appears in the answer.
 
 ### Part C. Scouts feeding names automatically
-- **T12-14 (intake):** a WRITE route (for example `POST /candidates/intake`) takes 1 to N names from a scout bot, each with: domain, lane (S2, S3, S4, S6, S7), source label (the scout's id or the drop list), an optional note, and optional comparable sales (2 to 3, the same shape `/buy` needs, since NameBio is off). The answer lists what was accepted and what was removed, each removal with a reason (invalid name, digit, hyphen, too many words, owned, duplicate).
+- **T12-14 (intake):** a WRITE route (for example `POST /candidates/intake`) takes 1 to N names from a scout bot, each with: domain, lane (S2, S3, S4, S6, S7), source label (the scout's id or the drop list), an optional note, and optional comparable sales (2 to 3, the same shape `/buy` needs, since removed-provider is off). The answer lists what was accepted and what was removed, each removal with a reason (invalid name, digit, hyphen, too many words, owned, duplicate).
 - **T12-15 (dedupe):** a name sent again by the same or another scout within a documented window is not screened twice; the answer says `duplicate` and the extra source is added to the name's record. An owned or pending name is refused.
 - **T12-16 (screened in the daily run):** names taken in since the last daily run are screened in the next daily run with the **full** lane plan under the active settings, within a documented daily maximum, and the results feed part B. Names over the maximum wait for the next day in arrival order and are counted in the run summary.
 - **T12-17 (daily drop list):** a daily drop list reaches DOM every day (today `POST /selection/drop-lists` takes uploads, and DOM never fetches one). DOM says whether it can fetch a documented free source itself, within source terms (**DVIR** if it costs money or needs an account); otherwise a scout routine uploads it daily. `dropWatch` confirms the names, and those passing the form rules are screened in the daily run and feed part B (including its `upcoming` section). `DROP_FEED_STALE` keeps warning when no list came.
@@ -94,7 +94,7 @@ Today both are recorded per run with `POST /screening/runs/{id}/manual`, and a r
 
 ## 4. After a buy (for context, nothing asked of DOM)
 - **Afternic:** after each buy and each price change, Gavriel uploads DOM's file (`GET /export/afternic.csv`) on Afternic's site in the browser, then confirms with `POST /export/afternic/uploaded`. This is a bot task under Dvir's autonomy rule; Dvir isn't asked.
-- **Sedo:** stays 501 `SEDO_TEMPLATE_MISSING` until Dvir provides a sample upload file.
+- **removed-provider:** stays 501 `REMOVED_PROVIDER_TEMPLATE_MISSING` until Dvir provides a sample upload file.
 - **One approval** covers the buy and its sell plan (adopted 2026-10-05): Dvir's yes on a name from the daily list covers the nameserver change and the full sell plan shown with that name.
 
 ## 5. Suggestions (DOM chooses)

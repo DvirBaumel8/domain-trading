@@ -66,7 +66,7 @@
 - **Contract:** `secret` covers "a common key shape".
 - **Expected:**
   - **R-7:** the contract lists the key shapes the block list covers.
-  - The list includes at least `sk-…` style keys (and `sk-proj-…`), plus any others DOM considers common. Examples: `xoxb-`/`xoxp-` (Slack), `AKIA…` (AWS), `rnd_…` (Render), and the Buffer key shape if known.
+  - The list includes at least `sk-…` style keys (and `sk-proj-…`), plus any others DOM considers common. Examples: `xoxb-`/`xoxp-` (Slack), `AKIA…` (AWS), `rnd_…` (Render), and the removed-provider key shape if known.
 - **Tests:** **T13-9:** each listed shape, built with random characters, is refused as `TEXT_BLOCKED` `secret` on a `POST /posts` dry run and on `POST /company/document`.
 
 ### F-5 (low, doc): the cohort report shape differs from the contract

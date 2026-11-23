@@ -43,9 +43,9 @@ Each backtest finding (`research/backtest-sold/results.md`, 226 sold vs 284 drop
 | C4 | **Default non-geo BIN $1,495 → $1,488**; exception steps $1,988 / $2,488; banned price bands $800–$999 and $1,950–$1,999 | x88 endings convert best; $1,495 is the "worst" [A]. A 31%-of-portfolio-at-$1,988 seller had 8 of 22 sales there [A] [R9 §Q6] |
 | C5 | **Geo Ratio-stress floor $399 → $299** | Outbound geo deals close at $100–$500 (69% ≤$399 in the 2018 analysis) [R9 §Q3] |
 | C6 | **New gate FT-1**: Afternic Fast Transfer opt-in confirmed within 7 days of buying | Most hand-reg sales come via the registrar network, not the lander (>80%; 17 of 22) [A]; Porkbun requires manual opt-in [V] [R9 §Q6] |
-| C7 | **DEMAND-1 / `/comps/keyword`** reads a nightly NameBio retailstats **CSV cache** with attribution; API for spot checks only (≤4/min) | NameBio API docs [V] |
+| C7 | **DEMAND-1 / `/comps/keyword`** reads a nightly removed-provider retailstats **CSV cache** with attribution; API for spot checks only (≤4/min) | removed-provider API docs [V] |
 | C8 | **S7: no ExpiredDomains automation.** Candidates from the zone/RDAP route only. ED stays an optional manual tool for Dvir | ED has no API and bans bots/AI agents [V] [R9 §Q5] |
-| C9 | **Geo score:** D-Liquidity comes from NameBio trade-term counts; A-Form by length bands; **city + lawyer/attorney = FLAG** | NameBio CSV (hvac 11 vs roofing 95 sales); WTB ≤12 chars, no lawyer/attorney [A] [R9 §Q1] |
+| C9 | **Geo score:** D-Liquidity comes from removed-provider trade-term counts; A-Form by length bands; **city + lawyer/attorney = FLAG** | removed-provider CSV (hvac 11 vs roofing 95 sales); WTB ≤12 chars, no lawyer/attorney [A] [R9 §Q1] |
 | C10 | Leads: new `lead_priority` and `prospect_type` fields; `exact_sld_other_tld` recorded but **not counted** unless Dvir approves D1 | Best outbound buyers are exact-name owners on .net/.co [A] [R9 §Q3] |
 | C11 | Timing: tranche 1 listed and E1 lists verified **by 2026-12-31** (soft target). No passive-sale KPI before month 6 | Jan–Apr strongest [A]; median hold of sold names 11 months [V-analysis] [R9 §Q1, §Q6] |
 | C12 | No price A/B tests during the POC beyond the fixed endings | Too few names; randomized ≥3-month tests needed [R9 §Q6] |
@@ -63,7 +63,7 @@ Each backtest finding (`research/backtest-sold/results.md`, 226 sold vs 284 drop
 | C17 | **ARA = live registrar renewal** from `/check/quote` at the name's current registrar; Gate F also compares transfer-to-cheapest-FT-capable (incl. 1 yr) when eligible. No fixed $11.08 | DR-002 V9-05 |
 | C18 | **Price drops step the allowed BIN set** (non-geo 2488→1988→1488→1088→788; geo 499→399→299). Floor = 65% of new BIN (≥$750 non-geo / geo floor rule). Not −20% | DR-002 V9-10 |
 | C19 | **Sibling census:** frozen name lists in `system/census/` (`pattern_id@version`); `/census/run` refuses bot-supplied lists. Written `in_use` definition (HTTP 200, final host = sibling, not parking list, ≥200 chars visible text) | DR-002 V9-03, V9-04 |
-| C20 | **NameBio free CSV:** nightly cached under `system/data/namebio/retailstats-YYYYMMDD.csv` (+ tldstats); bots/agents forbidden to hit the download URL | DR-002 V9-07 (strengthens C7) |
+| C20 | **removed-provider free CSV:** nightly cached under `system/data/removed-provider/retailstats-YYYYMMDD.csv` (+ tldstats); bots/agents forbidden to hit the download URL | DR-002 V9-07 (strengthens C7) |
 | C21 | Tests **SEL9-9…SEL9-15** (and SEL10-1) added for C14–C20 | — |
 
 
@@ -72,7 +72,7 @@ Each backtest finding (`research/backtest-sold/results.md`, 226 sold vs 284 drop
 | # | Change | Why (evidence: `research/backtest-sold/results.md`) |
 |---|---|---|
 | C22 | **Main lane = expired/dropped names with clean history (S7)**. S3/S4/S6 fresh strings allowed only via rule tier B (§2.1a) | 93% of "recently registered" sold names were re-registered drops |
-| C23 | **DEMAND-1 → DEMAND-2:** sibling `registered_share ≥ 0.50` (20 frozen siblings) replaces `in_use_share ≥ 0.25`. `in_use_share` and NameBio counts become **score features only** | in_use ≥0.25 passed 10% of winners; registered ≥0.5 passes 81% of winners vs 23% of dropped (AUC 0.85) |
+| C23 | **DEMAND-1 → DEMAND-2:** sibling `registered_share ≥ 0.50` (20 frozen siblings) replaces `in_use_share ≥ 0.25`. `in_use_share` and removed-provider counts become **score features only** | in_use ≥0.25 passed 10% of winners; registered ≥0.5 passes 81% of winners vs 23% of dropped (AUC 0.85) |
 | C24 | **HIST-1 → HIST-2 (harmful history only):** REJECT only toxic history (SURBL/Web Risk listing, adult/pharma/gambling/malware/spam content) or a prior same-name business still operating; off-domain redirect → FLAG; plain prior content/parking → PASS + `prior_history = 1` | v9.1 HIST-1 rejected 38% of winners; prior history is the #2 separator (93% vs 42%) |
 | C25 | **New feature `alt_tld_before_n`:** exact SLD registered on another extension **before** our buy date (RDAP creation) | 39% of winners, 0% of dropped |
 | C26 | **LEAD-1 demoted:** no longer a buy gate. Leads are built after purchase for outreach only (E1 rules unchanged) | 0 of 38 measured geo names (sold or dropped) reach 8 A/B; no signal |
@@ -89,7 +89,7 @@ Each backtest finding (`research/backtest-sold/results.md`, 226 sold vs 284 drop
 | C32 | **Holdout tests widened:** BT10-9 retail multi-slice, BT10-10 price-band report, BT10-11 expired-lane gate, BT10-12 history-type report. BUY-HOLD needs BT10-1 + BT10-9 + BT10-11 | v10 passes the DNW-style holdout (76% / 78%) but is borderline on retail (71% / 74%) and fails in the expired lane (72% / 62%) |
 | C33 | **History type:** for-sale and parked prior pages confirmed positive. The "no for-sale history" idea was rejected | Round 1: excluding for-sale history cost 10 sold accepts to gain 1 dropped reject |
 | C34 | **G-FORM-1 tokenization fix:** a multi-word city (e.g. "los angeles", "san antonio") counts as one token; a compound trade word ("countertops", "roofers") is one trade word | The tokenizer split cities and trades, so G-FORM-1 accepted only 3 of 17 real geo sales. The ≤16-char cap is **unchanged and untested on the fix** (decision D-10.1-B) |
-| C35 | **Retail/sub-$1k evidence source** for backtests: UnreportedSales weekly reports [3P] (unreportedsales.com; same tables on NamePros). NameBio daily CSVs are still only via the backend nightly job | Only 3 sub-$1k names existed in the DNW/DNJ cache |
+| C35 | **Retail/sub-$1k evidence source** for backtests: UnreportedSales weekly reports [3P] (unreportedsales.com; same tables on NamePros). removed-provider daily CSVs are still only via the backend nightly job | Only 3 sub-$1k names existed in the DNW/DNJ cache |
 
 **v10 overrides v9.1 wherever the text below still describes v9.1 behaviour** (lines marked *v10*).
 
@@ -118,7 +118,7 @@ Leads are **outreach only**, not a gate. Tranche 1 = 15 names: **≥10 S7/S3 nam
 | HIST-2 (*v10*, replaces HIST-1) | **REJECT** only for harmful history: SURBL/Web Risk listing at any time, adult/pharma/gambling/malware/phishing/spam content, or a prior same-name business **still operating** elsewhere (TM-1 / never_pitch). Off-domain redirect → **FLAG** (bot judgment). Plain prior content or parked/for-sale → **PASS + `prior_history = 1`** (no −10). No captures → PASS, `prior_history = 0`. **Incomplete → cannot pass Gate A** | **C24** |
 | WEB-RISK-1 | Google Web Risk / Safe Browsing must be clean. **Until an API key exists:** PASS iff Transparency Report status ∈ {no unsafe content, no data} **and** HIST-1 is clean; record the raw status. With a key: Lookup API no-match = PASS | **v9.1 C16** |
 | SURBL-1 | Listed → REJECT | — |
-| DEMAND-2 (*v10*, non-geo; replaces DEMAND-1) | Census from **frozen** `system/census/<pattern_id>.csv` (20 siblings; `pattern_id@version` on card). PASS iff **rule tier ∈ {A, I, B}** (§2.1a): A = `registered_share ≥ 0.50` **and** `prior_history = 1`; I = A **or** `alt_tld_before_n ≥ 1`; B (fresh string) = `registered_share ≥ 0.60` **and** ≤2 words. `in_use_share` (≥0.10 +, ≥0.25 strong flag) and NameBio counts are **score features only**. Census `registered_share` uses **as-of-date** sibling RDAP creation where available | **C23, C25** |
+| DEMAND-2 (*v10*, non-geo; replaces DEMAND-1) | Census from **frozen** `system/census/<pattern_id>.csv` (20 siblings; `pattern_id@version` on card). PASS iff **rule tier ∈ {A, I, B}** (§2.1a): A = `registered_share ≥ 0.50` **and** `prior_history = 1`; I = A **or** `alt_tld_before_n ≥ 1`; B (fresh string) = `registered_share ≥ 0.60` **and** ≤2 words. `in_use_share` (≥0.10 +, ≥0.25 strong flag) and removed-provider counts are **score features only**. Census `registered_share` uses **as-of-date** sibling RDAP creation where available | **C23, C25** |
 | G-FORM-1 (*v10*, geo) | ≤2 tokens including the city (city + one trade word), SLD ≤16 chars; 3-word geo (city+trade+pros/co) → REJECT unless it is an S7 drop with clean history | **C28** |
 | ~~LEAD-1~~ (*v10*) | **Not a buy gate.** Lead lists (§1.2 definition unchanged) are built after purchase for outreach. `leads_AB` is logged for calibration | **C26** |
 | CAPACITY-1 | Applies to outreach planning only (*v10*): ≤20 E1/week | C26 |
@@ -263,7 +263,7 @@ Renormalise **every lane to weights summing to 100**. An UNKNOWN or null feature
 | A Form | 15 | *v10 FORM-2:* non-geo with ≤2 words AND SLD ≤12 chars → 15. Otherwise non-geo: mean(length, words, pronounceability); ≤8 letters and ≤3 syllables score best [V-marketplace]. **Geo (C9): SLD ≤12 chars → 10; 13–16 → 7; 17–20 → 4; >20 → 1** [est. bands] |
 | B Buyers | 25 | From leads_AB: 0 → 0; <gate → fail; at gate → 6; 1.5× gate → 8; ≥2× gate → 10 |
 | C Intent | 10 | CPC/volume from Planner export; null → 0 |
-| D Liquidity | 10 | Non-geo: retailstats counts + census in_use (**max 10% of score from retailstats alone**). **Geo (C9): trade term start+end retail count ≥30 → 9; 10–29 → 6; <10 → 2** [est. bands; NameBio CSV] |
+| D Liquidity | 10 | Non-geo: retailstats counts + census in_use (**max 10% of score from retailstats alone**). **Geo (C9): trade term start+end retail count ≥30 → 9; 10–29 → 6; <10 → 2** [est. bands; removed-provider CSV] |
 | E Timing | 15 | Lane signals; crowding velocity ≥3× → cap raw at 5 |
 | F ExtTaken | 10 | **business_use** on alt TLDs (not raw registration count). Raw TLDs-taken count is logged as a feature for calibration [R9 §Q2] |
 | G Risk | 15 | Clean 10; FLAG 5. **City + lawyer/attorney/law-firm = FLAG** (C9) |
@@ -327,7 +327,7 @@ GENERATE (bot)
 | `GET /tokenize?sld=` | → tokens, ambiguous | Keep |
 | `GET /census/siblings` | pattern → 20 names from `system/census/<pattern_id>.csv` | **Frozen lists only** (v9.1 C19); returns `pattern_id@version`; refuses bot-supplied lists |
 | `POST /census/run` | siblings → registered/in_use/forsale shares + evidence paths | `in_use` = HTTP 200, final host = sibling (no off-domain redirect), not on parking list, ≥200 chars visible text; also log `forsale_share` / `registered_share` |
-| `GET /comps/keyword` | kw → retailstats counts | **v9.1 C20:** nightly job writes `system/data/namebio/retailstats-YYYYMMDD.csv` (+ tldstats), never deleted; `cache_date` in every response. Bots/agents **forbidden** to call the NameBio download URL. Spot API ≤4/min server-side only; attribution "Data from NameBio" |
+| `GET /comps/keyword` | kw → retailstats counts | **v9.1 C20:** nightly job writes `system/data/removed-provider/retailstats-YYYYMMDD.csv` (+ tldstats), never deleted; `cache_date` in every response. Bots/agents **forbidden** to call the removed-provider download URL. Spot API ≤4/min server-side only; attribution "Data from removed-provider" |
 | `GET /exttaken?sld=` | → business_use counts + `tlds_taken_n` | + raw count logged |
 | `POST /leads/build` | domain, lane, geo params → leads.csv draft | + prospect_type, lead_priority |
 | `POST /leads/verify` | leads → tier, weaker enum, never_pitch | Keep |
@@ -342,7 +342,7 @@ GENERATE (bot)
 | `GET /regimes` | S6 table | Keep |
 | `GET /s7/candidates` | dropped-only filter | **Change:** sources = Verisign/CZDS zone diff + RDAP 404×2 (pending **D3**), or names Dvir pastes. **Never** requests to `expireddomains.net` member pages, from backend or bots |
 
-Everything here is mechanical. Bots do not call Verisign, CDX, NamePros, NameBio or ExpiredDomains directly (evidence hosts are allowlisted).
+Everything here is mechanical. Bots do not call Verisign, CDX, NamePros, removed-provider or ExpiredDomains directly (evidence hosts are allowlisted).
 
 **S7 manual recipe for Dvir (optional; human-only, ≤15 min/week)** [est. thresholds, R9 §Q5]:
 - ED "Deleted .com" list
@@ -362,7 +362,7 @@ Paste ≤10 names into `/s7/candidates`. Those names then go through the full pi
 - Confirm 3 random leads match the service on their site.
 - Interpret TN-1 / BIGCO edge cases.
 - One-line reason not to buy.
-- **No** comps search, **no** writing census lists, **no** STRe/p_lead edits, **no** raw RDAP loops, **no** ExpiredDomains or NameBio web access.
+- **No** comps search, **no** writing census lists, **no** STRe/p_lead edits, **no** raw RDAP loops, **no** ExpiredDomains or removed-provider web access.
 
 ### Token budgets (hard; unchanged)
 
@@ -420,7 +420,7 @@ Paste ≤10 names into `/s7/candidates`. Those names then go through the full pi
 | **SEL9-1** | Ratio uses STRe_eff_y1 | Fixtures: geo 8 A/B @ $499 / floor $299 → Ratio pass (1.69 / 1.01) but EV fail (−1.4); geo 10 A/B @ $499 → all pass; geo 0 leads → Ratio fail; S3/S4 5 A/B @ $1,488 → pass; S3/S4 4 A/B → EV fail. Values ±0.02 |
 | **SEL9-2** | Geo priors | `/score` uses p_passive 0.005 for S2; API rejects any 0.02 passive config |
 | **SEL9-3** | Allowed BIN set | BIN ∉ set (e.g. 1495, 999, 1999) → LANDER-1 fail |
-| **SEL9-4** | Retailstats cache | `/comps/keyword` serves from CSV with cache_date ≤48 h; no more than 4 API calls/min; card shows NameBio attribution |
+| **SEL9-4** | Retailstats cache | `/comps/keyword` serves from CSV with cache_date ≤48 h; no more than 4 API calls/min; card shows removed-provider attribution |
 | **SEL9-5** | No ED automation | Egress log/allowlist: 0 requests to `*.expireddomains.net` from backend or bot sandboxes over a 7-day run |
 | **SEL9-6** | FT-1 | Bought name without `/distribution/confirm` after 7 days → flagged + counted in pattern health |
 | **SEL9-7** | prospect_type gating (D1 ON) | `exact_sld_other_tld` / `prefix_suffix_variant` count toward LEAD-1 only when plainly descriptive + ≥3 business/service-description URLs + TM-clean + standard BIN; **product-name-only** URLs → count 0 |
@@ -429,7 +429,7 @@ Paste ≤10 names into `/s7/candidates`. Those names then go through the full pi
 | **SEL9-10** | ARA live renewal | `/score` and `/renewal/decision` use `/check/quote` renewal at the current registrar; a fixture with GoDaddy renewal ≠ $11.08 changes Ratio vs the old hard-coded ARA; transfer option considered when lock cleared |
 | **SEL9-11** | Frozen census lists | `/census/siblings` serves only `system/census/*.csv`; bot-supplied sibling list → rejected (SEL8-1 still holds); response includes `pattern_id@version` |
 | **SEL9-12** | `in_use` definition | Sibling with parking page or off-domain redirect → not in_use; HTTP 200 + on-domain + ≥200 chars visible + not parking list → in_use |
-| **SEL9-13** | NameBio nightly cache | `/comps/keyword` reads `system/data/namebio/retailstats-YYYYMMDD.csv` with `cache_date`; egress: 0 bot/agent calls to NameBio download URL |
+| **SEL9-13** | removed-provider nightly cache | `/comps/keyword` reads `system/data/removed-provider/retailstats-YYYYMMDD.csv` with `cache_date`; egress: 0 bot/agent calls to removed-provider download URL |
 | **SEL9-14** | WEB-RISK-1 interim | Without API key: status "no unsafe content" or "no data" + clean HIST-1 → PASS; unsafe status → FAIL; with key: Lookup no-match → PASS |
 | **SEL9-15** | D1 strict use | Three product-name URLs only → exact_sld lead count 0; three business/service-description URLs + descriptive SLD + TM clean → count toward LEAD-1 |
 | **SEL10-1** | Role inbox ≤10 → tier B | Fixture: `info@` / `contact@` at firm documented ≤10 people → tier B (medium); same inbox at >10 → tier C; rule flagged for re-check after 60 outreach sends |
@@ -463,7 +463,7 @@ Any fail → no live Gate A until fixed (or a documented Dvir waiver). **BT10-1,
 
 1. features_v1 + `/score` with **STRe_eff_y1, Ratio@BIN/floor, new priors** + SEL3-1, SEL9-1, SEL9-2
 2. `/check/history` blocking + Web Risk interim (SEL9-14)
-3. `/comps/keyword` nightly `system/data/namebio/` cache + attribution (SEL9-4, SEL9-13)
+3. `/comps/keyword` nightly `system/data/removed-provider/` cache + attribution (SEL9-4, SEL9-13)
 4. `/census/siblings` from `system/census/` + `/census/run` + `in_use` (SEL9-11, SEL9-12)
 5. `/leads/build` + verify + never_pitch + prospect_type/lead_priority + role-inbox≤10→B (SEL9-7, SEL9-15, SEL10-1)
 6. `screening_pack` + `/buy` enforcement + allowed BIN set + step-down drops (SEL9-3, SEL9-9) + `/distribution/confirm` (SEL9-6)
@@ -504,9 +504,9 @@ Any fail → no live Gate A until fixed (or a documented Dvir waiver). **BT10-1,
 
 1. Hawkes, NamePros reported-sales analysis H1 2024 (median $1,300; 62.5% hand-reg; 3.8:1 BIN; 124 inbound vs 9 outbound) [V-analysis]
 2. Hawkes portfolio Ratio, NamePros blog 2026 [V-method]; Hawkes STR 2019 [V-analysis]
-3. NameBio API docs + retailstats/tldstats CSVs [V, downloaded 2026-10-05]
+3. removed-provider API docs + retailstats/tldstats CSVs [V, downloaded 2026-10-05]
 4. Afternic: 2025 recap (priced 3–4× more likely), Sell Smarter, LTO +35%, top keywords [V-vendor]
-5. Sedo/InterNetX GDR 2025 (median $549, 69% BIN) via DNW [V]; Dynadot 54k sales (DNW 2026) [V]
+5. removed-provider/InterNetX GDR 2025 (median $549, 69% BIN) via DNW [V]; removed-provider 54k sales (DNW 2026) [V]
 6. NamePros outbound threads 1117029, 1204046, 1189675, 1271956, 1324821, 1391814 [3P]
 7. NamePros pricing threads 1252087, 1325539, 1374729, 1367745, 1292660 [3P]
 8. ExpiredDomains FAQ (no API; bots banned) [V]; Hawkes ED guide [V-tool]

@@ -15,7 +15,7 @@ max_rounds: 2
 `buildPanel.gone_before_end_n` and the `DISAPPEARED` episodes treat every closeout name that leaves the feed before its `ends_at` the same way. A name that left because it went to redemption or pending delete (an unsold closeout being dropped) is counted the same as one somebody bought. That inflates our "competition" numbers and skews buy decisions. The RDAP service from CR-074 (v5.29.0) and the RDAP status rule already used by `pickproofLabels` are enough to tell the two apart. This is a data fix with no new feature.
 
 ## Rules
-- R-1 **Tag on disappearance:** when a closeout name (GoDaddy closeouts or a sealed Dynadot closeouts upload) is in the previous parsed day and missing from the latest one before its `ends_at`, store `disappearance_tag` ∈ `bought | deleted | unknown`, `tag_reason`, `rdap_checked_at`, and the RDAP registrar/status read. Use the CR-074 RDAP lookup (cache + daily limit), not a new client.
+- R-1 **Tag on disappearance:** when a closeout name (GoDaddy closeouts or a sealed removed-provider closeouts upload) is in the previous parsed day and missing from the latest one before its `ends_at`, store `disappearance_tag` ∈ `bought | deleted | unknown`, `tag_reason`, `rdap_checked_at`, and the RDAP registrar/status read. Use the CR-074 RDAP lookup (cache + daily limit), not a new client.
 - R-2 **Rule** (status matching is case- and spacing-insensitive, as in `pickproofLabels`):
   - status has `redemption period` or `pending delete`, or the name is not registered (404) → `deleted`;
   - otherwise, the registrar differs from the registrar stored at first sight (or a registrant/owner change shows in RDAP, e.g. a newer `last changed`/transfer event than first sight) → `bought`;
@@ -68,7 +68,7 @@ No ship date asked. Please report when it's live on `/health` (version) with the
   - Expect `bought` to be rare. The split's real value is the `deleted` count.
 - **Q2 (no first-sight registrar):** both closeout feeds sell their own expired names, so the feed itself is the baseline.
   - GoDaddy: any GoDaddy-family registrar, Wild West Domains included, counts as the same.
-  - Dynadot: Dynadot.
+  - removed-provider: removed-provider.
   - If `rdap_cache` holds an answer read before the name left, that registrar is used instead (`baseline_source: "rdap_cache"`).
   - DISAPPEARED market episodes have no feed registrar. Without a cache answer they get `NO_BASELINE`, so they are only ever `deleted` or `unknown`.
 
@@ -89,7 +89,7 @@ No ship date asked. Please report when it's live on `/health` (version) with the
 - **R-5 (backfill):** the first run collects every stored day pair (the pool keeps 3 days) and every current DISAPPEARED episode. The insert is idempotent. The summary is in `GET /jobs/runs?job=datasave` → `buildPanel.summary.tags` (`eligible_n`, `retagged_n`, `bought_n`, `deleted_n`, `unknown_n`, …).
 - **R-6 (counts):**
   - `buildPanel` adds `gone_bought_n` / `gone_deleted_n` / `gone_unknown_n` (sum = `gone_before_end_n`).
-  - It also adds `dynadot` (the same split for the two latest sealed Dynadot closeouts uploads) and `tags`.
+  - It also adds `removed-provider` (the same split for the two latest sealed removed-provider closeouts uploads) and `tags`.
   - `GET /market/episodes` adds `disappearance_tag` and `disappearance_tag_reason` per row (null unless DISAPPEARED), and `summary.disappeared_by_tag`.
   - No new endpoint.
   - Episode tags follow the previous run's episodes (`episodes` runs after `buildPanel`), so they lag one day.

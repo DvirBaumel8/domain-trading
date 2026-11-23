@@ -63,7 +63,7 @@ Pass/fail checks. Automate as fixtures or a documented host-level rehearsal; eac
 
 - Asking Dvir to run `launchctl`, create a Cloudflare login, buy a domain or plan, or paste a key.
 - Changing DOM application settings, or any buy/sell/list path.
-- A full Dynadot redo, or any datasave backfill, as part of this fix.
+- A full removed-provider redo, or any datasave backfill, as part of this fix.
 - Re-architecting the stable proxy hostname unless the named tunnel lands under R-1 and the cutover is automatic.
 
 ## DVIR items

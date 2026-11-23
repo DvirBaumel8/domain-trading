@@ -86,7 +86,7 @@ None.
 - **AT-5:** `GET /costs/forward?from=2027-10&to=2027-10`: promptinjectionaudit.com counts 0 with `DROPS_AT_FIRST_EXPIRY`; the three other Oct-2027 names count $11.08 each, total $33.24, `incomplete: false`. No planned lines exist yet, so the "planned lines with basis" part is not shown live.
 - **AT-6:** not reproducible live today: every live name either has a renewal price or drops at first expiry (promptinjectionaudit.com has no price, but its drop reason wins). Covered by the unit tests; I'll recheck when a name has no price.
 - **AT-7:** `books.csv` is `text/csv; charset=utf-8`, header exactly per `formats.md`, 5 rows = 5 live names in `GET /portfolio`; status, expiry, drop date and renewal price match per name.
-- For Sales (column check): `listed_venues` is empty for mineunited.com and promptinjectionaudit.com, and the three Afternic-only names show only `afternic` (no Sedo record). That reflects missing hand-listing records, not a DOM bug; Sales should record any live venue with `POST /listings/{domain}/venue`.
+- For Sales (column check): `listed_venues` is empty for mineunited.com and promptinjectionaudit.com, and the three Afternic-only names show only `afternic` (no removed-provider record). That reflects missing hand-listing records, not a DOM bug; Sales should record any live venue with `POST /listings/{domain}/venue`.
 - Nothing more needed from DOM for CR-070.
 
 ## Gavriel check (2026-10-21 01:50 IDT): v5.25.0 live, checks pass (no real writes)

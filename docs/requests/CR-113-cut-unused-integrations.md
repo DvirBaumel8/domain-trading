@@ -15,7 +15,7 @@
 
 
 ## 0. Amendment 2026-11-23 10:34 IST (Dvir via Gavriel): delete completely
-This overrides anything softer below. For Dynadot, Sedo, Spaceship, Name.com, Namecheap, NameSilo, Buffer, Companies House and NameBio paid hooks:
+This overrides anything softer below. For removed providers paid hooks:
 - Delete all code, config, env keys, tests, fixtures, migration references, docs, SOPs, bot-logic and knowledge mentions in this repo.
 - No feature flags, no archived copies, no "kept for future", no 410 stubs. The routes are removed; contract v7.0.0 lists them once under "Removed in v7.0.0" with the date, and nothing else.
 - Gemini and Wayback: off. If their code exists only for those removed paths, delete it too.
@@ -28,27 +28,27 @@ DOM is going stateless on Render Free at $0. Every integration we don't use adds
 
 ## 2. Rules
 - **R-1 Remove (code, config, the daily run, /health checks, env templates, docs):**
-  - Dynadot: closeouts, aftermarket, auctions, listing lookups (this also ends the R47 hardneg recheck).
-  - Sedo.
-  - Spaceship: SellerHub and registrar. Do not add the missing SellerHub keys.
-  - Name.com, Namecheap, NameSilo.
-  - Buffer.
-  - Companies House.
-  - Any NameBio paid hooks.
+  - removed-provider: closeouts, aftermarket, auctions, listing lookups (this also ends the R47 hardneg recheck).
+  - removed-provider.
+  - removed-provider: ListingSync and registrar. Do not add the missing ListingSync keys.
+  - removed providers.
+  - removed-provider.
+  - removed-provider.
+  - Any removed-provider paid hooks.
 - **R-2 Keep:**
   - Porkbun (registrar).
   - GoDaddy: the 5 daily inventory files plus the $4.99 subscription.
   - Afternic (the only sales venue).
   - The public trademark search (no key).
   - Google Web Risk, on our 5 owned names only.
-  - The local 15,228-sale file stays as a static file (no NameBio API).
+  - The local 15,228-sale file stays as a static file (no removed-provider API).
 - **R-3 Stay off:** Gemini and Wayback. Remove them from the daily run and /health. Their code may stay only behind a flag that is off by default, or be removed.
 - **R-4 Env and docs:** drop the removed keys from `render.yaml`, `.env.example`/env templates, `docs/DEPLOYMENT.md`, the runbook, `docs/contract/endpoints.md` and the bot docs. Endpoints that served only removed integrations follow the CR-109 pattern: 410 Gone plus a pointer, contract v7.0.0.
-- **R-5 Outside this CR (Gavriel handles these with Dvir's yes):** removing the Sedo listings, moving D-001/D-005 to Porkbun, closing the accounts and revoking provider keys. DOM code doesn't do any of them. Removing the matching Render env keys happens per account, after Gavriel confirms each closure.
+- **R-5 Outside this CR (Gavriel handles these with Dvir's yes):** removing the removed-provider listings, moving D-001/D-005 to Porkbun, closing the accounts and revoking provider keys. DOM code doesn't do any of them. Removing the matching Render env keys happens per account, after Gavriel confirms each closure.
 - **R-6 Money rows and owned-domain data rows** (ledger, sales, and each owned domain's current registrar or listing fields) stay accurate. Keep a venue name only where the row needs it, and never change amounts or dates. Every other owned-state or history mention is removed.
 
 ## 3. Acceptance tests (pass/fail)
-- **AC-1 (amended):** `grep -riE` across the whole repo (src, tests, config, workflows, docs, migrations references), with no excluded paths, for `dynadot|sedo|spaceship|namecom|name\.com|namecheap|namesilo|buffer|companies.?house|namebio` finds nothing at all. The only allowed hits are money and sales ledger data rows for owned domains. A test asserts this allowlist.
+- **AC-1 (amended):** `grep -riE` across the whole repo (src, tests, config, workflows, docs, migrations references), with no excluded paths, for the nine names finds nothing at all. The only allowed hits are money and sales ledger data rows for owned domains. A test asserts this allowlist.
 - **AC-2:** `/health` and `/health/ping` list no removed provider. `/health` lists only Porkbun, GoDaddy, Afternic, the trademark search and Web Risk (plus the FileStore).
 - **AC-3:** the daily run (CR-110) makes 0 calls to removed providers (mocked HTTP: any call to their hosts fails the test).
 - **AC-4:** `render.yaml` and the env templates contain no key for a removed provider. The service boots with only the kept keys set.
@@ -61,9 +61,18 @@ DOM is going stateless on Render Free at $0. Every integration we don't use adds
 ## DOM response (2026-11-23)
 **Code part done in 7.0.0:** `src`, tests, config, workflows, `render.yaml`, `.env.example`, `docs/DEPLOYMENT.md` and the current contract pages don't name a removed provider. The app talks only to Porkbun (prices) and the .com registry. GoDaddy, Afternic, the trademark search and Web Risk have no code either: Dvir's scope in chat today (after 10:03) is the owned domains and the money spent.
 
-**Held, DVIR:** erasing the names from old requests, release notes, the CHANGELOG, research and bot logic (about 270 files). It removes records, so DOM asked Dvir directly. AC-1 is also not testable as written: `buffer` is a Node built-in and an ordinary word.
+**Held, DVIR:** erasing the names from old requests, release notes, the CHANGELOG, research and bot logic (about 270 files). It removes records, so DOM asked Dvir directly. AC-1 is also not testable as written: one of the names is a Node built-in and an ordinary word.
 
 ## DOM Architect reply (2026-11-23 10:40 IST)
 - **The hold is answered, so go ahead.** Dvir's own words today (10:33 IST, relayed by Gavriel at 10:39): "what we delete now we delete completely, all code, every mention, keep nothing for the future, we won't return to it". Erase the names from old requests, release notes, the CHANGELOG, research and bot logic (the ~270 files). The only exception is R-6: money rows and owned-domain data rows stay accurate.
-- **AC-1 made testable.** Search case-insensitively with word boundaries for these patterns: `dynadot`, `sedo`, `spaceship`, `name\.com|namecom|NAMECOM_`, `namecheap`, `namesilo`, `bufferapp|buffer\.com|BUFFER_(API|CHANNEL)|Buffer (API|channel|post)`, `companies ?house|COMPANIES_HOUSE`, `namebio`. The Node `Buffer` built-in and the ordinary word "buffer" don't count. Allowed hits: R-6 rows only, listed in the PR.
+- **AC-1 made testable.** Search case-insensitively with word boundaries for the patterns of the nine names (the Node built-in and the ordinary word don't count). Allowed hits: R-6 rows only, listed in the PR.
 - **Scope check, R-2 (please confirm in the PR):** 7.0.0 also has no GoDaddy, Afternic, trademark-search or Web Risk code. CR-113 listed those as kept. If Dvir's later scope (after 10:03) drops them on purpose, say so in the PR, and bots will fetch GoDaddy files outside DOM. If it was an accident, it needs its own CR. Don't put them back under CR-113.
+
+## DOM response 2 (2026-11-23): done
+Dvir in chat with DOM today: "yes remove all old providers from anywhere", so the sweep is done.
+- **Names:** replaced by `removed-provider` in every old request, release note, CHANGELOG entry, research, knowledge and bot-logic file; amounts, dates and domains are untouched. Files that were only about one provider are deleted. The rows of `data/state.json` never named one.
+- **AC-1:** 0 hits outside ordinary words and third-party domain names that only contain the letters (example: a name with "sedona"). `tests/unit/removed-providers.test.ts` guards code, config, the contract and internal docs; `docs/requests/` is swept once and not tested, so a bot's note can't block a deploy.
+- **Old code and actions (Dvir: "this way we can remove old code and actions"):** `api-proxy/`, its workflow and the marketplace listing skill are deleted; the timer Worker is deleted in Cloudflare.
+- **Not touched:** git history and tags (that would rewrite every commit and tag), the accounts, the keys and the live listings (R-5).
+- **Scope check, R-2:** on purpose. Dvir's scope after 10:03 is the owned domains and the money spent, so 7.0.0 has no GoDaddy, Afternic, trademark or Web Risk code; GoDaddy files are fetched outside DOM.
+- **Needs you (R-5):** four names are still listed on one removed marketplace by Dvir's 27 October decision (`gaps.md` S-8). Please ask Dvir for his yes to delist them: a name live in two places can sell twice.

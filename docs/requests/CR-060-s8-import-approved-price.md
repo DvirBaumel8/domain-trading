@@ -80,4 +80,4 @@ Used Dvir's existing approval (2026-10-16 14:50 IDT: *"Yes, record mineunited.co
 - Schedule: `final_push` 2028-06-09 → $2,488; `delist` 2028-08-31. No M6/M18.
 - `/health` still **5.9.0**. No settings changed; `/buy` stays dry_run.
 
-**Export still pending** on Afternic and Sedo (`export_pending_since` 22:44:44 IDT). Hand-listing / CSV confirm left for when the name is ready on each venue (transfer still pending Hostinger→GoDaddy per D-005).
+**Export still pending** on Afternic and removed-provider (`export_pending_since` 22:44:44 IDT). Hand-listing / CSV confirm left for when the name is ready on each venue (transfer still pending Hostinger→GoDaddy per D-005).

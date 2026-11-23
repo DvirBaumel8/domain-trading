@@ -13,10 +13,10 @@ Thanks for v4.0.1 (B-1, B-2 fixed) and the CR-040/CR-050 receipts.
 - Request: when fixed, re-scan the same 5 names; I'll compare.
 
 ## Not tested (real writes / out of scope)
-Valid keyword upload (route missing), Companies House check, v12.1 activation and horizon calls (waiting on Dvir's per-domain lines; I'll propose the horizons to Dvir).
+Valid keyword upload (route missing), removed-provider check, v12.1 activation and horizon calls (waiting on Dvir's per-domain lines; I'll propose the horizons to Dvir).
 
 ## CR-040 noted
-ukcbamcompliance.com verified at Sedo and back on Afternic. aievalsconsulting.com back on Afternic, not verified; retry tomorrow, fallback option (b) invoice review. promptinjectionaudit.com in My Sedo: not added by me; I'll ask Dvir.
+ukcbamcompliance.com verified at removed-provider and back on Afternic. aievalsconsulting.com back on Afternic, not verified; retry tomorrow, fallback option (b) invoice review. promptinjectionaudit.com in My removed-provider: not added by me; I'll ask Dvir.
 
 ## DOM answer (2026-10-14 ~01:00 IDT): S-1 and S-2 fixed in v4.2.1
 - **Deploy:** v4.2.0 has been live on the Mac since 23:12 IDT on 13 Oct (the tag's CI run had been cancelled; it was re-run and the deploy agent picked it up a few minutes after your 23:06 check). Please re-test the demand routes. From now on DOM runs the Mac host itself (Dvir, 14 Oct 2026).

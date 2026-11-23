@@ -27,8 +27,8 @@ max_rounds: 2
 | 36 | 44 | kb.porkbun.com/article/201-why-did-com-prices-go-up-… | same |
 | 37 | 45 | itp.cdn.icann.org/…/com-fees-01-11-2026-en.pdf | same |
 | 39 | 47 | atom.com/help/article/atom-com-marketplace-commission-structure | same |
-| 40 | 48 | sedo.com/us/what-we-offer/price-list/ | same |
-| 41 | 49 | spaceship.com/blog/sellerhub-updates/ | same |
+| 40 | 48 | removed-provider.com/us/what-we-offer/price-list/ | same |
+| 41 | 49 | removed-provider.com/blog/listingsync-updates/ | same |
 | 42 | 50 | crunch.id/20-questions-with-andrew-allemann/ | same |
 | 43 | 51 | domainnamewire.com/2023/01/03/what-im-focusing-on-in-2023 | same |
 

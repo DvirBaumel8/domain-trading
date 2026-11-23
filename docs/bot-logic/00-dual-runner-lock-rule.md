@@ -33,4 +33,4 @@ Buys, bids, listings priced changes, and spends stay Dvir one-tap only. Neither 
 If both claim the same lock, Gavriel asks Dvir. No auto-fight.
 
 ## Move to DOM?
-Seal state is the lock (service already enforces it). Rule text stays here. Datasave is **primary** for jobs 01–02 once `DYNADOT_API_KEY` is present; Grok backup checks seal state and no-ops when already sealed.
+Seal state is the lock (service already enforces it). Rule text stays here. Datasave is **primary** for jobs 01–02 once `REMOVED_PROVIDER_API_KEY` is present; Grok backup checks seal state and no-ops when already sealed.

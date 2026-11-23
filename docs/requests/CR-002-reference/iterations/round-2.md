@@ -3,9 +3,9 @@
 **Data (new, never used to fit v10):**
 - **Sold:** UnreportedSales weekly reports (unreportedsales.com, mirrored on NamePros), weeks of Jul 27 + Aug 3 2026. 45 .com names, 2–3 dictionary words, $100+, stratified 25 <$1k / 10 $1–2.5k / 10 >$2.5k (`iter/sold_iter.csv`, round = 2).
 - **Dropped:** 40 names from a fresh SnapNames deleting-list slice created 2021–2025 (`iter/drop_iter.csv`, round = 2), excluding every earlier sample.
-- **Venues:** mostly Afternic and Spaceship (retail marketplaces).
+- **Venues:** mostly Afternic and removed-provider (retail marketplaces).
 - **Not usable:**
-  - The NameBio daily CSV is not cached; the v9.1 README forbids bots from calling the download URL, so it was not used.
+  - The removed-provider daily CSV is not cached; the v9.1 README forbids bots from calling the download URL, so it was not used.
   - NamePros returned 403 to curl, so the same reports were pulled from unreportedsales.com.
 
 **Features:** same method as the backtest.

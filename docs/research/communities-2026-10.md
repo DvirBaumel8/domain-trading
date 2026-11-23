@@ -72,7 +72,7 @@ Twelve stated walk-aways with the ask named: $1,800, $2,600 (HugeDomains), $4,39
 Below about $2,000 the threads say "buy it". From about $5,000 they mostly say "pick another name" unless the business already makes money.
 
 ### 2.4 How they reach the owner (claim C22)
-- Founders' own reports: mostly **direct email through WHOIS** (Resend, Experiment.com, several Hacker News comments) or **a broker** (Sedo, GoDaddy's broker service, DomainAgents, an unnamed broker for SuperTokens).
+- Founders' own reports: mostly **direct email through WHOIS** (Resend, Experiment.com, several Hacker News comments) or **a broker** (removed-provider, GoDaddy's broker service, DomainAgents, an unnamed broker for SuperTokens).
 - Almost no founder names Afternic Buy Now as the route.
 - Investor data says the opposite for names listed with Buy Now. In a 9,390-name Afternic portfolio, 11 of 22 sales came through GoDaddy search and 6 through partner registrars, so **77% came through the network**. Only 5 came through the lander.
 
@@ -103,7 +103,7 @@ This is thin evidence: mostly C and D sources.
 | `s8-auction-win-finality` | Regular bidders say reversals within the post-expiry window are routine; a lawsuit is open (C). | Supports the current rule: import only after the transfer check (rule 15 of `auctions.md`). |
 | `signal-live-businesses` | Founders on .co, .io or a business name bought the .com for $1,600-$9,000 (C and D). Paul Graham's YC count (B, indirect). NameBuyer's strategy of buying names used by small growing companies (C). | **Supports useful_signal** with the buying mechanism, not only correlation. |
 | `signal-buyer-pool` | Two-word .coms sell when the words form "one natural commercial idea"; random stacks don't (C, Brad Mugford). | Supports. This matches auction score v2's word-quality step. |
-| `signal-shape-words-length` | 481 NameBio sales: average price $2,735 for one word, $1,221 for two, $882 for three or more (C, disputed method, qualifies). | Small support (price, not sale chance). |
+| `signal-shape-words-length` | 481 removed-provider sales: average price $2,735 for one word, $1,221 for two, $882 for three or more (C, disputed method, qualifies). | Small support (price, not sale chance). |
 | `sell-through-yearly` | NameBuyer about 1.0-1.5% a year at $1,450-$2,000 average prices (n about 7,000, C). One Afternic month annualised to about 2.8% (C). 9.3% for 300 premium new-gTLD names (C, indirect). | Supports the F15 range (0.5-3.5%). |
 | `line1-hand-regs-worth-buying` | Founders register a name per project and let most lapse; holders say renewals eat the profit (C and D). | Supports "small side line" or none. No change. |
 | `signal-trend-terms` | One newcomer's biggest sales were NFT and crypto names (D, contradicts). | Weight 0. No change. |
@@ -116,7 +116,7 @@ This is thin evidence: mostly C and D sources.
 | **Max bid = 20% of expected net resale ($1,000) less commission, scaled by score -> $160** (`auctions.md` rule 18) | HugeDomains, the biggest retail buyer at these auctions, pays a median of about 6% of its ask and rarely more than about $500 on a $2-3k ask. Investors' fair-wholesale mode is 10%. | **Supported** | No |
 | **Expected resale $1,000** (not the list price) | Bootstrapped founders anchor at about $1,000; founders' stated purchases have a median of about $5k with a high skew; asks of $1.8k-$4.4k drew walk-aways. | **Supported** (realistic, slightly conservative) | No |
 | **Line 1 / default Buy Now $1,488** | Inside the band where the threads say "buy it" ($1,000-$2,000). NameBuyer's $1,450-average segment sold best (1.5% a year). | **Supported** | No |
-| **S8 ladder Buy Now $2,488 / $3,488 / $4,888 by length** | $4,888 is above every bootstrapper anchor and above HugeDomains' $2-3k asks. NameBuyer's segment with about $4,700 averages sold 0.43% a year, about a third of the $1,450 segment. NameBio (0003) found no change in sales count below $2,000-2,500, which says nothing about $4,888. | **Challenged (weakly)** | **Not yet.** All C, indirect, and segment comparisons, not tests. But it changes the F7 price test design (section 5). |
+| **S8 ladder Buy Now $2,488 / $3,488 / $4,888 by length** | $4,888 is above every bootstrapper anchor and above HugeDomains' $2-3k asks. NameBuyer's segment with about $4,700 averages sold 0.43% a year, about a third of the $1,450 segment. removed-provider (0003) found no change in sales count below $2,000-2,500, which says nothing about $4,888. | **Challenged (weakly)** | **Not yet.** All C, indirect, and segment comparisons, not tests. But it changes the F7 price test design (section 5). |
 | **Floor 65% of Buy Now; private walk-away about 48%; min offer $100** | Founders report paying 10-100% of ask, typically a third to two thirds; negotiation is the norm. | **No conflict**: the walk-away near 48% sits inside the reported range | No (thin evidence) |
 | **Auctions get the main effort; closeouts paused until the pick-proof shows an edge** | Old data shows auctions are priced by investors (wholesale), not end users. One closeout success story (survivorship). Nothing compares end-user resale by source. | **No new evidence** | No |
 | **Bids weigh little in the auction score (F8: 10 -> 5)** | Shill run-ups and bot bids are confirmed again (236-reply thread; bots bidding up single-bid auctions). | **Supported** | No (already planned) |
@@ -133,7 +133,7 @@ This is thin evidence: mostly C and D sources.
 ## 5. Proposed action items
 
 ### Change now (DOM, no rule change)
-1. **F7 price test design:** test **both directions**. Besides "S8 names at a higher Buy Now", add a lower arm for the 8-letters-or-fewer rung, $2,488 against $4,888. NameBuyer's segments say sales may fall above about $2,500, and NameBio's test only covered prices below $2,500. Measures: leads, offers and sales per listed name. Dvir decides the price rule.
+1. **F7 price test design:** test **both directions**. Besides "S8 names at a higher Buy Now", add a lower arm for the 8-letters-or-fewer rung, $2,488 against $4,888. NameBuyer's segments say sales may fall above about $2,500, and removed-provider's test only covered prices below $2,500. Measures: leads, offers and sales per listed name. Dvir decides the price rule.
 2. **Knowledge sources note** (`knowledge-sources-2026-10.md` §1, NamePros row): NamePros thread pages loaded without a challenge on 25 Oct 2026, while blog and article pages did not. Readable threads may be read by a session at a polite rate. Hacker News through Algolia is the community source for end-user views. Reddit, Quora, Indie Hackers and Medium refused us.
 3. **F8 stays as planned** (bids weight 10 -> 5). The new evidence agrees.
 

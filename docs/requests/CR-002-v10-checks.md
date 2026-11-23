@@ -284,9 +284,9 @@ Requester note (2026-10-06 05:15 IDT): features.csv and census/ added to CR-002-
 ### A4. CAP-25 (new, future) forward test — P2
 - **Inputs:** weekly sample of .com names in `pendingDelete` from official/public sources only (CZDS zone-file differences, RDAP status checks).
 - **Outputs:** rows matching `research/forward-test/log.csv` (selection-v10.md §6a): v10 and frozen E3 arm scored as of the drop date with A1–A3 applied, drop outcome, 30/60/90-day recheck (re-registered via RDAP; listed via public marketplace pages). Report: re-registered-or-listed rate, accepted vs rejected, Wilson CIs, n per class.
-- **Business rules:** capability only; it does not measure sales. Until CAP-25 exists, Gavriel's research runs do this. No requests to ExpiredDomains or the NameBio download URL.
+- **Business rules:** capability only; it does not measure sales. Until CAP-25 exists, Gavriel's research runs do this. No requests to ExpiredDomains or the removed-provider download URL.
 - **Errors:** RDAP failure → row UNKNOWN/undecided, never accepted or rejected.
-- **Acceptance tests:** (1) replaying a recorded week reproduces the logged decisions; (2) RDAP failure → UNKNOWN; (3) 0 requests to ExpiredDomains or the NameBio download URL.
+- **Acceptance tests:** (1) replaying a recorded week reproduces the logged decisions; (2) RDAP failure → UNKNOWN; (3) 0 requests to ExpiredDomains or the removed-provider download URL.
 
 ### A5. Clarification — E3
 - E3 (archive span ≥3 yrs) is frozen and **not** a gate; DOM should not build it as a rule. `archive_span_yrs` (as of `as_of`) may be output as a feature for the forward-test comparison. Acceptance: no setting or gate named E3 changes any decision.

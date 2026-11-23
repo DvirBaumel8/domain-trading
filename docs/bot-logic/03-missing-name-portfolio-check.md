@@ -1,7 +1,7 @@
 # Job: daily missing-name / portfolio ownership check (CR-079)
 
 ## Purpose
-Each day, compare (1) registrar/registry hold, (2) Afternic/Sedo records we confirmed, (3) portfolio ledger. Warn Gavriel on `/report` if a name is missing, on hold, listed without approval trail, or missing a receipt pointer. Detects theft/mis-list risk without scraping marketplaces.
+Each day, compare (1) registrar/registry hold, (2) Afternic/removed-provider records we confirmed, (3) portfolio ledger. Warn Gavriel on `/report` if a name is missing, on hold, listed without approval trail, or missing a receipt pointer. Detects theft/mis-list risk without scraping marketplaces.
 
 ## Algorithm (plain words)
 1. For each live name (owned | listed | delisted): read registrar presence + RDAP state; read DOM `ours_confirmed` venues + confirmed export; read ledger `receipt_ref`.
@@ -19,7 +19,7 @@ Each day, compare (1) registrar/registry hold, (2) Afternic/Sedo records we conf
 
 ## Pass / fail
 - Pass: AT-1…AT-7 in CR-079; Gavriel sees warnings without a new bot.
-- Fail: scraping Afternic/Sedo; separate `ownershipCheck` step; money/list writes.
+- Fail: scraping Afternic/removed-provider; separate `ownershipCheck` step; money/list writes.
 
 ## Why bot vs why DOM
 Already specified as a **DOM daily job** (CR-079 → 5.58.0). Keep as DOM. No Grok primary.

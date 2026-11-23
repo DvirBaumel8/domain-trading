@@ -15,12 +15,12 @@ A standing check suite DOM runs before every discovery run and that blocks the r
 ## Checks (append-only list; ids never reused)
 | id | check | fail reason code |
 |---|---|---|
-| PF-01 | Every served shortlist and closeouts row (GoDaddy and Dynadot) has a score, or a documented by-design `score_null_reason` (BUG-063 class) | `UNSCORED_ROWS` (details: source, n, sample) |
+| PF-01 | Every served shortlist and closeouts row (GoDaddy and removed-provider) has a score, or a documented by-design `score_null_reason` (BUG-063 class) | `UNSCORED_ROWS` (details: source, n, sample) |
 | PF-02 | Counts reconcile: `total + prior_kill_excluded_n + ended_n + prebid_dropped_n = field_n` | `COUNTS_DONT_RECONCILE` (details: each term, diff) |
 | PF-03 | No junk in the top 50 served: no all-digit, hex-like (`^[0-9a-f]+$` with a digit), or more-than-N-digit SLDs (N configurable, default 4) | `JUNK_AT_TOP` (details: names, ranks) |
 | PF-04 | No served name has an active (not revoked) `auction_kills` row | `PRIOR_KILL_SERVED` (details: names) |
-| PF-05 | Each source's coverage is complete or explicitly flagged: when Dynadot pages fail (500), `dynadot_low_coverage` (or a flag) is present and coverage is at least 0.9 | `COVERAGE_UNFLAGGED` / `COVERAGE_BELOW_MIN` (details: source, pages_failed, coverage) |
-| PF-06 | The shortlist `as_of` is fresh: within X h (default 6) of the latest sealed GoDaddy/Dynadot save | `STALE_AS_OF` (details: as_of, seal_at, age_h) |
+| PF-05 | Each source's coverage is complete or explicitly flagged: when removed-provider pages fail (500), `removed_provider_low_coverage` (or a flag) is present and coverage is at least 0.9 | `COVERAGE_UNFLAGGED` / `COVERAGE_BELOW_MIN` (details: source, pages_failed, coverage) |
+| PF-06 | The shortlist `as_of` is fresh: within X h (default 6) of the latest sealed GoDaddy/removed-provider save | `STALE_AS_OF` (details: as_of, seal_at, age_h) |
 
 **Standing rule:** each new BUG adds a check here, with the next PF id, in the same release that fixes it. Checks are never removed. They may only be marked `retired` with a reason.
 

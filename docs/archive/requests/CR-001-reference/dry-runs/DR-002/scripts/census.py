@@ -2,7 +2,7 @@
 import json, urllib.request, ssl, time, re, socket
 ctx=ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE
 UA={"User-Agent":"Mozilla/5.0"}
-PARK=re.compile(r'(domain (is )?for sale|buy this domain|parked|this domain (is|has been) registered|afternic|sedo|dan\.com|hugedomains|namecheap.*parking|godaddy.*(parked|coming soon)|make an offer|is available for purchase|domain may be for sale|not yet connected|launching soon|coming soon|bodis|parkingcrew|above\.com)',re.I)
+PARK=re.compile(r'(domain (is )?for sale|buy this domain|parked|this domain (is|has been) registered|afternic|removed-provider|dan\.com|hugedomains|removed-provider.*parking|godaddy.*(parked|coming soon)|make an offer|is available for purchase|domain may be for sale|not yet connected|launching soon|coming soon|bodis|parkingcrew|above\.com)',re.I)
 S={
 "ai_sec_audit":["promptinjection","llmsecurity","aisecurity","airedteam","llmpentest","agentsecurity","ragsecurity","jailbreak","aimodel","chatbotsecurity","aigovernance","modelrisk","llmrisk","aisafety","aibias","aicompliance","genai","aiprivacy","mlsecurity","llmredteam"],
 "voiceagent_trade":["plumbing","hvac","roofing","dental","legal","restaurant","realestate","insurance","salon","clinic","autorepair","electrician","landscaping","pestcontrol","medspa","veterinary","hotel","lawfirm","mortgage","solar"],

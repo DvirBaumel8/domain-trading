@@ -24,18 +24,18 @@ Posting 5 posts within a minute or two looks like a bot dump to readers and to X
 - **R-A1 Launch allowance.** A one-time setting on top of the daily cap, for example `posts.launch_remaining` (start value **5**, set by a WRITE call with Dvir's approval text). Each `posted` or `unknown` post on any day uses the daily cap first and then the launch allowance. A `failed` post uses neither (same as today). When the allowance reaches 0 it stays 0. It can't be raised again without a new call that carries an `approval_ref`.
   - An alternative is fine if it is simpler for you: let `POST /posts/burst` take `cap` up to 6 and count posts already made that day toward it.
 - **R-A2 Minimum gap.** While launch posts are being used, two real posts must be at least `posts.min_gap_minutes` apart (default **20**). Earlier: 409 `POST_TOO_SOON` with `details.next_allowed_at`. Dry runs are not limited.
-- **R-A3 (nice to have) Scheduled sending.** `POST /posts` with `send_at` (IDT time, at least the gap after the previous post): DOM runs every check now (length, block list, images, Buffer schema), stores the post as `scheduled`, and the next tick sends it. That way the 5 posts don't need someone to call every 20 minutes. If you add this, a scheduled post holds its allowance at creation, a failed send frees it, and `POST /posts/{id}/remove` cancels a scheduled post.
+- **R-A3 (nice to have) Scheduled sending.** `POST /posts` with `send_at` (IDT time, at least the gap after the previous post): DOM runs every check now (length, block list, images, removed-provider schema), stores the post as `scheduled`, and the next tick sends it. That way the 5 posts don't need someone to call every 20 minutes. If you add this, a scheduled post holds its allowance at creation, a failed send frees it, and `POST /posts/{id}/remove` cancels a scheduled post.
 - **R-A4** After the launch, the normal 1-a-day cap applies unchanged. Vendor test posts still never count (CR-025).
 
 ### 3. Acceptance criteria
 - **AC-A1** Set the launch allowance to 5 → `GET /posts` `allowance` shows `today_cap`, `used_today`, `launch_remaining: 5`, `remaining` (today's total left) and `next_allowed_at`.
 - **AC-A2** Post 2 at T → 201. Post 3 at T+5 min → 409 `POST_TOO_SOON` with `next_allowed_at` = T+20 min. At T+20 min → 201; `launch_remaining` goes down by one per post.
-- **AC-A3** A post that fails at Buffer → `launch_remaining` doesn't change.
+- **AC-A3** A post that fails at removed-provider → `launch_remaining` doesn't change.
 - **AC-A4** After 5 launch posts: the next post that day → 409 `POST_DAILY_CAP`. Next day: one post allowed, as before.
 - **AC-A5** (if R-A3) Five posts with `send_at` 20 minutes apart are all `posted` by the tick after their time; one of them removed before its time is never sent and frees its allowance.
 
 ### 4. Questions
-- **QA-1** Does Buffer's free plan or X limit 6 posts in about 2 hours through one channel? If you know of a lower limit, tell us and we'll space them further apart.
+- **QA-1** Does removed-provider's free plan or X limit 6 posts in about 2 hours through one channel? If you know of a lower limit, tell us and we'll space them further apart.
 - **QA-2** If R-A3 isn't small, ship R-A1 and R-A2 first. We'll send the posts by hand 20 minutes apart.
 
 ---
@@ -52,7 +52,7 @@ Dvir wants to know how many people open each domain's sale page, so he can see i
 - Moving to our own lander to count visits ourselves isn't worth it: Afternic charges a higher commission when the name isn't on its nameservers at the time of sale (selling playbook §4.3). We keep Afternic's lander.
 
 ### 2. Rules
-- **R-B1 Visit records.** A store of daily visit numbers per domain and source: `{domain, date (IDT day), source (afternic | dom_lander | dom_link | sedo | other), views, unique_visitors?: int|null, leads?: int|null, referrers?: [{host, views}] | null, imported_from, imported_at}`. Append-only. A newer import for the same domain, date and source replaces the older one in the totals and keeps both in history.
+- **R-B1 Visit records.** A store of daily visit numbers per domain and source: `{domain, date (IDT day), source (afternic | dom_lander | dom_link | removed-provider | other), views, unique_visitors?: int|null, leads?: int|null, referrers?: [{host, views}] | null, imported_from, imported_at}`. Append-only. A newer import for the same domain, date and source replaces the older one in the totals and keeps both in history.
 - **R-B2 Afternic CSV import.** `POST /visits/import` (WRITE) takes the CSV exactly as Afternic's per-domain Statistics export produces it (raw text, plus `domain`) and stores one row per day. Unknown columns are kept as `extra`, not refused. An unreadable file gives 422 `VISITS_CSV_INVALID` with the line number. We'll send DOM a real export as soon as Dvir downloads one (`CR-029-reference/`). Also allow manual entry (`{domain, date, views, leads?}`) for when only the 30-day number from the portfolio page is available.
 - **R-B3 Automatic pull, only if a sanctioned way exists.** If Afternic or GoDaddy offers an official API or a scheduled report for views and leads, pull it daily in the job, with a key Dvir provides. Don't scrape a logged-in dashboard. If no sanctioned way exists, say so, and the CSV import is the path.
 - **R-B4 Privacy-light counter for anything DOM serves.**
@@ -91,7 +91,7 @@ We are about to own more than one name. Dvir wants **one page**, usable from his
   - registrar;
   - bought date and cost;
   - renewal/expiry date and renewal cost (or "drop, no renewal" when the plan is to drop);
-  - listing: mode, BIN, floor, min offer, and where it's listed (Afternic, Sedo, lander type, export pending or not);
+  - listing: mode, BIN, floor, min offer, and where it's listed (Afternic, removed-provider, lander type, export pending or not);
   - visits 7d / 30d and leads (from part B; "–" when unknown);
   - offers (count, highest);
   - next price event.
@@ -128,7 +128,7 @@ DOM keeps this small: only what helps the launch and Dvir's buy/sell decisions g
 - **A (launch): v3.5.0, kept minimal.**
   - **The change:** `POST /posts/burst` accepts `cap` up to **6**. The cap is the day's total, so post 1 already counts: set `{day: today, cap: 6}` and 5 more can go out today.
   - **Not built:** a launch allowance, a minimum gap or scheduled sending. Please send the posts by hand about 20 minutes apart (your QA-2).
-  - **QA-1:** Buffer's free plan and X allow 6 posts in a couple of hours from one account; spacing them is enough.
+  - **QA-1:** removed-provider's free plan and X allow 6 posts in a couple of hours from one account; spacing them is enough.
 - **B (visits): not built now.**
   - **QB-1:** DOM knows of no official Afternic or GoDaddy API for lander views or leads. The **Views (30 days) and Leads columns in Afternic's portfolio page** answer Dvir's question today, for free, with no code. Gavriel or Dvir can read them there.
   - **When to revisit:** a visit store, a CSV import and `/go` links are worth building when there are about 10 listed names and a decision depends on the numbers. Ask again then.

@@ -15,9 +15,8 @@ About 850 lines. The app keeps nothing: it reads `data/state.json` at start and 
 | `src/http/auth.ts`, `errors.ts` | Tokens, limits, the error shape |
 | `src/core/` | `money.ts`, `dates.ts`, `rdap.ts`; `src/domain-name.ts` is beside it |
 | `scripts/release.ts` | `npm run release -- X.Y.Z "summary"` |
-| `api-proxy/` | The Cloudflare Worker in front of the old Mac tunnel (not used by 7.0.0; kept until the bots moved to the Render URL) |
 
-Tests: `tests/app.test.ts` (every route), `tests/unit/` (state, config, money, rdap, domain names, stateless guard, no AI, no top-up), `tests/registrars/`, `tests/contract/version-sync.test.ts`.
+Tests: `tests/app.test.ts` (every route), `tests/unit/` (state, config, money, rdap, domain names, stateless guard, no AI, no top-up, removed providers), `tests/registrars/`, `tests/contract/version-sync.test.ts`.
 
 | To change | Go to |
 |---|---|

@@ -62,7 +62,7 @@ Adopted: morning discovery reads DOM **`GET /auctions/shortlist`** (datasave `au
 ### 1.5 Listing / marketplace direction (as of late Oct 2026)
 
 - **Afternic** is the primary marketplace path; Portfolio API key is in DOM server settings so listing/price changes can stop needing a browser once DOM wires sync (see Gavriel digest in `GAVRIEL-TO-DOM.md` / DOM digest — **no secrets in this course**).
-- **Sedo:** automation is weak; recent direction is keep current Sedo listings, **add nothing more**, put effort into Afternic (+ Spaceship SellerHub when keys land). Exact Dvir line wording: see DOM/Gavriel digests — treat “stop investing new work in Sedo” as the working plan unless a later decision overrides.
+- **removed-provider:** automation is weak; recent direction is keep current removed-provider listings, **add nothing more**, put effort into Afternic (+ removed-provider ListingSync when keys land). Exact Dvir line wording: see DOM/Gavriel digests — treat “stop investing new work in removed-provider” as the working plan unless a later decision overrides.
 - **Outreach:** outbound business outreach is Grok-bot work when active; Sales lessons and digests also mark outreach **paused** in places — treat status as **check `lessons/sochen.md` + latest digest** before assuming live sends.
 - **Money path unchanged:** every buy / bid / list price change / renew spend needs **Dvir’s own yes**, then **Gavriel** executes (never another bot).
 
@@ -132,7 +132,7 @@ Do **not** paste whole SOPs here — learn the **map**, then open the files.
 |---|---|---|
 | Buyer shortlist → card | `docs/requests/bot-logic/04-buyer-shortlist-to-card.md` | Discovery v2; hard filters vs judgment |
 | Risk Gate codes | `docs/requests/bot-logic/05-risk-gate-codes.md` | REJECT / FLAG / CLEAR; AUTO-FAIL vs warn; cheap check order |
-| Sales list + price | `docs/requests/bot-logic/06-sales-list-price.md` | After-buy path; BIN ladder; Afternic/Sedo; UNKNOWN UI gaps |
+| Sales list + price | `docs/requests/bot-logic/06-sales-list-price.md` | After-buy path; BIN ladder; Afternic/removed-provider; UNKNOWN UI gaps |
 | Challenger grader | `docs/requests/bot-logic/07-challenger-grader.md` | T-GOLDEN, money-check, suites, why-we-fail |
 | FIXED vs JUDGMENT | `docs/requests/bot-logic/08-judgment-vs-fixed-inventory.md` | What may migrate to DOM vs must stay bot |
 | Day timeline | `docs/requests/bot-logic/09-company-day-timeline.md` | Clocks + dependencies |
@@ -148,7 +148,7 @@ Do **not** paste whole SOPs here — learn the **map**, then open the files.
 ### FIXED vs JUDGMENT (summary from `08`)
 
 - **FIXED → DOM candidate / already DOM:** seals, shortlist, hard prebid drops, pricing formula math, portfolioCheck, dual-runner locks, books “ours” provenance rules.
-- **JUDGMENT → stay bot:** Buyer meaning / firm screen / card prose; Risk Gate CLEAR/FLAG/REJECT and TM/comp recheck; Sales which BIN rung / Sedo yes-no / counters; **all of Challenger**; every money click after Dvir yes → Gavriel only.
+- **JUDGMENT → stay bot:** Buyer meaning / firm screen / card prose; Risk Gate CLEAR/FLAG/REJECT and TM/comp recheck; Sales which BIN rung / removed-provider yes-no / counters; **all of Challenger**; every money click after Dvir yes → Gavriel only.
 - DOM Architect’s 2026-10-27 classification of `04`–`09` (migrate next vs stay) lives in bot memory / chat digest — treat `08` + that classification as the migration filter, not this course inventing new FIXED rows.
 
 ---
@@ -211,11 +211,11 @@ Honest list of what still is **not** fully documented for DOM:
 
 1. **Requests-only git guard** — bots still blocked from committing directly under `docs/bot-logic/` / `docs/locks/` except via the CR-080 placement path; NOTE asks to widen the allowlist (`NOTE-2026-10-26-requests-only-guard-bot-logic.md`).
 2. **Lean discovery wall-clock** — exact routine name / cron for discovery v2 morning run is **UNKNOWN** (`09` §2).
-3. **Marketplace UI click order** beyond CSV export — Afternic/Sedo dashboard steps still partly UNKNOWN (`06`, `08` Sales row).
+3. **Marketplace UI click order** beyond CSV export — Afternic/removed-provider dashboard steps still partly UNKNOWN (`06`, `08` Sales row).
 4. **Challenger grading UI in DOM** — explicitly out of CR-081; stays bot.
 5. **Full company tree sync** — `ledger/`, `deals/`, `lessons/`, handoffs are on the Grok box; only slices appear in git/API. No automated “mirror whole `/workspace/domain-trading` into DOM repo” exists.
 6. **Stale docs** — `system/bot-team.md` and parts of `company/company.md` still describe pre-reorg scouts; always prefer `org/org-v2.md` + dated decisions.
-7. **Sedo long-term** — working plan is de-emphasize; formal decision ID for “no new Sedo work” may still need a clean `decisions-log` row (**UNKNOWN** if already logged under another ID).
+7. **removed-provider long-term** — working plan is de-emphasize; formal decision ID for “no new removed-provider work” may still need a clean `decisions-log` row (**UNKNOWN** if already logged under another ID).
 8. **Retail replay labels** — CR-082 path approved; ingest completeness and first retail-scored replay day still pending at course time.
 9. **Memory → git lag** — some Dvir widgets land in memory/chat before `decisions-log`; DOM should not treat memory as durable.
 10. **This course itself** — first cut 2026-10-27; expect revisions when org or discovery clocks firm up.

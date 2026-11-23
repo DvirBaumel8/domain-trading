@@ -14,7 +14,7 @@ This file is **current-only**. It does not document retired v1–v9 scout lanes,
 
 **Cadence:** **1×/day**, after datasave + `auctionShortlist` seal for the newest `data_date`. Not a second intraday run.
 
-**Build check (Gavriel 2026-11-12/13):** Before preflight or the shortlist GET, confirm today's shortlist is built. `GET /jobs/runs?job=datasave&limit=5` — **not** `limit=1`, and **not** `/health`. Pick today's **scheduled ~17:25** run (typically `scheduled_for` around 17:00, started ~17:25), **not** a later queued retry (`triggered_by: datasave-retry`). A `limit=1` response can show only the retry and hide the finished 17:25 run. Wait until that run's `auctionShortlist` step is `done`. If the API returns **502 ORIGIN_UNREACHABLE** (Mac host tunnel 530), keep retrying on a ~10-minute cadence until **19:30 Asia/Jerusalem**, then STOP and report the exact blocker (HTTP status codes and times of every attempt); do not treat a 502 as a final stop before 19:30. A later **Dynadot closeouts** seal does **not** stale the auction shortlist — `auctionShortlist` reads GoDaddy data only — so do not treat that later seal as PF-06 `STALE_AS_OF`. Then `GET /auctions/preflight` for today's date.
+**Build check (Gavriel 2026-11-12/13):** Before preflight or the shortlist GET, confirm today's shortlist is built. `GET /jobs/runs?job=datasave&limit=5` — **not** `limit=1`, and **not** `/health`. Pick today's **scheduled ~17:25** run (typically `scheduled_for` around 17:00, started ~17:25), **not** a later queued retry (`triggered_by: datasave-retry`). A `limit=1` response can show only the retry and hide the finished 17:25 run. Wait until that run's `auctionShortlist` step is `done`. If the API returns **502 ORIGIN_UNREACHABLE** (Mac host tunnel 530), keep retrying on a ~10-minute cadence until **19:30 Asia/Jerusalem**, then STOP and report the exact blocker (HTTP status codes and times of every attempt); do not treat a 502 as a final stop before 19:30. A later **removed-provider closeouts** seal does **not** stale the auction shortlist — `auctionShortlist` reads GoDaddy data only — so do not treat that later seal as PF-06 `STALE_AS_OF`. Then `GET /auctions/preflight` for today's date.
 
 **Run pack (Dvir t1067u):** after seal, commit that day's folder under `docs/requests/discovery-runs/YYYY-MM-DD-v3/` **before exit** (see `discovery-runs/README.md`). Box remounts wipe local copies.
 
@@ -144,9 +144,9 @@ Log every screened name in `sourcing/buyer-first/paper-log.md` with price and ve
 ## 4. Auth and reporting (non-money)
 
 - DOM: token from `~/.config/grok-bots/bots.token`; header `X-Bot-Name: Buyer`; proxy `https://domain-trading-api-proxy.dvirbaumel9.workers.dev` with `Authorization: Bearer`. Never print the secret.
-- Dynadot connector: read-only; auctions blocked until API access. Closeouts research-only while paused.
+- removed-provider connector: read-only; auctions blocked until API access. Closeouts research-only while paused.
 - Every answer file / card: model + prompt version at top.
-- Report to Gavriel each run: directions (A/B/D; C parked) · the **three numbers** (`field_n`, GET `total`/served, judged + unfinished) · `data_date` · B signals · D would-advance · cards sent to Risk Gate (or none / review-only + reason) · call count · blockers (Dynadot aftermarket GAP = note only). Call out time-gate and USPTO-FLAG names as review-only skips, not firm-screen candidates.
+- Report to Gavriel each run: directions (A/B/D; C parked) · the **three numbers** (`field_n`, GET `total`/served, judged + unfinished) · `data_date` · B signals · D would-advance · cards sent to Risk Gate (or none / review-only + reason) · call count · blockers (removed-provider aftermarket GAP = note only). Call out time-gate and USPTO-FLAG names as review-only skips, not firm-screen candidates.
 - **Passers (locked):** full-stack only — see §0.1. All full-stack passers; top-5-with-cons **only when zero**. Cheap survivors are not Dvir cards.
 - **L&L:** Buyer writes funnel + REVIEW/PASSERS; Gavriel surfaces the L&L pack to Dvir **every run**.
 

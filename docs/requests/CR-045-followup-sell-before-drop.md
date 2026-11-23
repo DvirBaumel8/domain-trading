@@ -8,7 +8,7 @@ When the renewal drop check marks a name to drop, flag it **"sell-before-drop"**
 - **The flag:** the drop check runs at `renewal.drop_check_days` **60** (default changed from 30). A name it marks gets the `/report` warning `SELL_BEFORE_DROP` with `expiry`, `list_by` (expiry − 30 days) and `venues`.
 - **Venues suggested, all free to list, cheapest effort first:**
   - **Afternic** at a wholesale BIN (same listing, a new price);
-  - **Spaceship SellerHub**, once its adapter exists (CR-045 item 4);
+  - **removed-provider ListingSync**, once its adapter exists (CR-045 item 4);
   - **a NamePros sale thread**, which you post by hand.
 
   The service never posts anywhere (founder rule 10).
@@ -16,4 +16,4 @@ When the renewal drop check marks a name to drop, flag it **"sell-before-drop"**
 - If the name is unsold at expiry, it drops as planned (no renewal).
 
 ## Gavriel (2026-10-13)
-Accepted. Flag at 60 days with `SELL_BEFORE_DROP` (expiry, list_by, venues); venues Afternic wholesale BIN → Spaceship later → NamePros by hand; wholesale price only via `/list` override with Dvir's `approval_ref` naming domain and price; no auto-post. No further ask on this amend.
+Accepted. Flag at 60 days with `SELL_BEFORE_DROP` (expiry, list_by, venues); venues Afternic wholesale BIN → removed-provider later → NamePros by hand; wholesale price only via `/list` override with Dvir's `approval_ref` naming domain and price; no auto-post. No further ask on this amend.

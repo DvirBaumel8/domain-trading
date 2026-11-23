@@ -48,7 +48,7 @@
 | D2 | Replays, 401s and 429s on POST also write an audit row (`result_summary` `replayed:…`, `UNAUTHORIZED`, `RATE_LIMITED`) | AL-1: "exactly one audit row per request, including 4xx" |
 | D3 | New error codes: `UNAUTHORIZED` 401, `IDEMPOTENCY_KEY_IN_USE` 409, `RATE_LIMITED` 429, `VALIDATION_ERROR` 422, `INVALID_BODY` 400/413/415, `NOT_FOUND` 404, `INTERNAL` 500, `AUDIT_WRITE_FAILED` 500 | The spec doesn't name these |
 | D4 | `purchases` partial unique index covers `created`, `register_sent`, `succeeded`, **`unknown`** (approved by Dvir; spec updated) | An unknown purchase may have charged |
-| D5 | Settings row seeded by the migration with the spec defaults. The `POC_CAP_CENTS`, `MAX_DOMAINS`, `GEO_*`, `HIGH_VALUE_*`, `SEDO_HYBRID_AS`, `APPROVAL_MAX_AGE_HOURS` env vars are **not read** (recommend deleting them from `.env.example` later: two sources of truth). `allowed_registrars` defaults to `{porkbun}` | Caps change only via admin command or migration |
+| D5 | Settings row seeded by the migration with the spec defaults. The `POC_CAP_CENTS`, `MAX_DOMAINS`, `GEO_*`, `HIGH_VALUE_*`, `REMOVED_PROVIDER_HYBRID_AS`, `APPROVAL_MAX_AGE_HOURS` env vars are **not read** (recommend deleting them from `.env.example` later: two sources of truth). `allowed_registrars` defaults to `{porkbun}` | Caps change only via admin command or migration |
 | D6 | `/health` returns **503** with `status:"degraded", db:"down"` when the DB is unreachable | Render's health check then flags the instance |
 | D7 | Append-only tables also reject TRUNCATE; tests reset with `session_replication_role = replica` | Stronger than the spec; prod never truncates |
 | D8 | `domains` CHECKs beyond the spec: owned+ rows must have registrar, registrar_api, buy_date, cost, expiry, drop_date; `drop_date = expiry + 1y` while `renewals_used = 0`; `registrar <> 'cloudflare'` | Enforces founder rules 3 and 5 in the DB |
@@ -315,9 +315,9 @@ describe('loadConfig', () => {
   });
 
   it('lowercases and trims ENABLED_REGISTRARS', () => {
-    expect(loadConfig(testEnv({ ENABLED_REGISTRARS: ' Porkbun, NameCom ' })).enabledRegistrars).toEqual([
+    expect(loadConfig(testEnv({ ENABLED_REGISTRARS: ' Porkbun, removed-provider ' })).enabledRegistrars).toEqual([
       'porkbun',
-      'namecom',
+      'removed-provider',
     ]);
   });
 });
@@ -326,7 +326,7 @@ describe('adapterStatus', () => {
   it('lists every known registrar, all disabled in step 1 (no adapter implemented)', () => {
     const s = adapterStatus(loadConfig(testEnv()));
     expect(s.map((a) => a.name)).toEqual(
-      expect.arrayContaining(['porkbun', 'dynadot', 'namecom', 'namecheap', 'godaddy', 'spaceship', 'namesilo']),
+      expect.arrayContaining(['porkbun', 'removed-provider', 'removed-provider', 'removed-provider', 'godaddy', 'removed-provider', 'removed-provider']),
     );
     expect(s.every((a) => a.enabled === false)).toBe(true);
     expect(s.find((a) => a.name === 'porkbun')?.reason).toBe('not implemented');
@@ -343,7 +343,7 @@ describe('adapterStatus', () => {
 
   it('reports registrars not in ENABLED_REGISTRARS', () => {
     const s = adapterStatus(loadConfig(testEnv()));
-    expect(s.find((a) => a.name === 'dynadot')?.reason).toBe('not in ENABLED_REGISTRARS');
+    expect(s.find((a) => a.name === 'removed-provider')?.reason).toBe('not in ENABLED_REGISTRARS');
   });
 });
 ```
@@ -429,12 +429,12 @@ import type { Config } from '../config.js';
 /** Env vars each registrar adapter needs. Cloudflare is deliberately absent (founder rule 5). */
 export const REGISTRAR_ENV: Record<string, readonly string[]> = {
   porkbun: ['PORKBUN_API_KEY', 'PORKBUN_SECRET_API_KEY'],
-  dynadot: ['DYNADOT_API_KEY', 'DYNADOT_API_SECRET'],
-  namecom: ['NAMECOM_USERNAME', 'NAMECOM_API_TOKEN'],
-  namecheap: ['NAMECHEAP_API_USER', 'NAMECHEAP_API_KEY', 'NAMECHEAP_USERNAME', 'NAMECHEAP_CLIENT_IP'],
+  removed-provider: ['REMOVED_PROVIDER_API_KEY', 'REMOVED_PROVIDER_API_SECRET'],
+  removed-provider: ['REMOVED_PROVIDER_USERNAME', 'REMOVED_PROVIDER_API_TOKEN'],
+  removed-provider: ['REMOVED_PROVIDER_API_USER', 'REMOVED_PROVIDER_API_KEY', 'REMOVED_PROVIDER_USERNAME', 'REMOVED_PROVIDER_CLIENT_IP'],
   godaddy: ['GODADDY_PAT'],
-  spaceship: ['SPACESHIP_API_KEY', 'SPACESHIP_API_SECRET'],
-  namesilo: ['NAMESILO_API_KEY'],
+  removed-provider: ['REMOVED_PROVIDER_API_KEY', 'REMOVED_PROVIDER_API_SECRET'],
+  removed-provider: ['REMOVED_PROVIDER_API_KEY'],
 };
 
 /** Adapters with code behind them. Step 2 adds 'porkbun'. */
@@ -513,7 +513,7 @@ CREATE TABLE settings (
   poc_cap_cents             integer NOT NULL DEFAULT 50000 CHECK (poc_cap_cents > 0),
   max_domains               integer NOT NULL DEFAULT 10 CHECK (max_domains > 0),
   approval_max_age_hours    integer NOT NULL DEFAULT 72 CHECK (approval_max_age_hours > 0),
-  lander_target             text NOT NULL DEFAULT 'afternic' CHECK (lander_target IN ('afternic', 'sedo', 'custom')),
+  lander_target             text NOT NULL DEFAULT 'afternic' CHECK (lander_target IN ('afternic', 'removed-provider', 'custom')),
   allowed_registrars        text[] NOT NULL DEFAULT '{porkbun}'
                             CHECK (NOT ('cloudflare' = ANY (allowed_registrars))),
   geo_bin_min_cents         integer NOT NULL DEFAULT 29900,
@@ -521,7 +521,7 @@ CREATE TABLE settings (
   high_value_categories     text[] NOT NULL DEFAULT '{trend,b2b,collision,regulation,buzzword}',
   high_value_min_bin_cents  integer NOT NULL DEFAULT 250000 CHECK (high_value_min_bin_cents > 0),
   high_value_guard_modes    text[] NOT NULL DEFAULT '{bin}',
-  sedo_hybrid_as            text NOT NULL DEFAULT 'buy_now' CHECK (sedo_hybrid_as IN ('buy_now', 'make_offer')),
+  removed_provider_hybrid_as            text NOT NULL DEFAULT 'buy_now' CHECK (removed_provider_hybrid_as IN ('buy_now', 'make_offer')),
   updated_at                timestamptz NOT NULL DEFAULT now(),
   CHECK (geo_bin_min_cents > 0 AND geo_bin_min_cents <= geo_bin_max_cents),
   CHECK (high_value_guard_modes <@ ARRAY['bin', 'offer', 'hybrid']),
@@ -752,14 +752,14 @@ export interface SettingsTable {
   poc_cap_cents: Generated<number>;
   max_domains: Generated<number>;
   approval_max_age_hours: Generated<number>;
-  lander_target: Generated<'afternic' | 'sedo' | 'custom'>;
+  lander_target: Generated<'afternic' | 'removed-provider' | 'custom'>;
   allowed_registrars: Generated<string[]>;
   geo_bin_min_cents: Generated<number>;
   geo_bin_max_cents: Generated<number>;
   high_value_categories: Generated<Category[]>;
   high_value_min_bin_cents: Generated<number>;
   high_value_guard_modes: Generated<ListingMode[]>;
-  sedo_hybrid_as: Generated<'buy_now' | 'make_offer'>;
+  removed_provider_hybrid_as: Generated<'buy_now' | 'make_offer'>;
   updated_at: TimestampDefault;
 }
 
@@ -1228,7 +1228,7 @@ describe('schema: settings', () => {
       high_value_categories: ['trend', 'b2b', 'collision', 'regulation', 'buzzword'],
       high_value_min_bin_cents: 250000,
       high_value_guard_modes: ['bin'],
-      sedo_hybrid_as: 'buy_now',
+      removed_provider_hybrid_as: 'buy_now',
     });
   });
 

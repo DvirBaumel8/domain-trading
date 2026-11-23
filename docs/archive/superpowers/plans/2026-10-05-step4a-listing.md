@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship `POST /list/{domain}` (listing changes with V1–V10, lander nameservers through the registrar or a manual fallback, `listing_history`, dry-run export preview), `GET /export/afternic.csv` (byte-exact header, cells per mode) and `GET /export/sedo.csv` (template-driven; 501 without the template), and the public-DNS NS verification (an immediate check plus a daily job). Gate G1 for L-1–L-9, L-11, L-13, E-1–E-8, LX-1–LX-7, LH-1, LH-2, LH-4, and the endpoint-level LS/LG cases (LS-14, LG-4, LG-11–LG-14); the remaining LS/LG cases are covered by the step-3 validator tests.
+**Goal:** Ship `POST /list/{domain}` (listing changes with V1–V10, lander nameservers through the registrar or a manual fallback, `listing_history`, dry-run export preview), `GET /export/afternic.csv` (byte-exact header, cells per mode) and `GET /export/removed-provider.csv` (template-driven; 501 without the template), and the public-DNS NS verification (an immediate check plus a daily job). Gate G1 for L-1–L-9, L-11, L-13, E-1–E-8, LX-1–LX-7, LH-1, LH-2, LH-4, and the endpoint-level LS/LG cases (LS-14, LG-4, LG-11–LG-14); the remaining LS/LG cases are covered by the step-3 validator tests.
 
 **Architecture:**
 - **`ListService` (`src/services/list.ts`):** classify the request (listing change, category change, NS-only), enforce V9/V10 approval rules, run the step-3 validator, then dry-run preview **or** NS change (adapter, or manual for `registrar_api=none`), then save and append history.
-- **`ExportService` (`src/services/export.ts`):** builds pure Afternic and Sedo rows from domain rows. The CSV is written by a tiny RFC 4180 writer.
+- **`ExportService` (`src/services/export.ts`):** builds pure Afternic and removed-provider rows from domain rows. The CSV is written by a tiny RFC 4180 writer.
 - **Public DNS:** a small dependency-free NS query to `a.gtld-servers.net` (`src/dns/ns-lookup.ts`) that reads the referral's authority section, injected everywhere so tests never send UDP.
 - **NS verification:** `NsVerifier` runs at startup and every 24 h.
 
 **Tech Stack:** As before. `node:dgram` for the DNS query (no new dependency).
 
-**Spec:** `docs/specs/list.md`, `docs/specs/listing-strategy.md` §2, §4–§6, §9, `docs/specs/export-csv.md`, `CLAUDE.md` (Afternic header; Sedo headers only from `templates/sedo_template.json`, never guessed), `docs/specs/00-architecture.md` §4.
+**Spec:** `docs/specs/list.md`, `docs/specs/listing-strategy.md` §2, §4–§6, §9, `docs/specs/export-csv.md`, `CLAUDE.md` (Afternic header; removed-provider headers only from `templates/removed_provider_template.json`, never guessed), `docs/specs/00-architecture.md` §4.
 
 ## Global Constraints
 
@@ -24,10 +24,10 @@
   - hybrid: `BIN,floor,min,<Y if LTO else N>,<months or blank>,Custom Lander,Y,<Y if LTO else N>,Y,N`
   
   Prices are integer USD, rounded **down** from cents with an `AFTERNIC_ROUNDS_DOWN` warning. `Min Offer` < 20 is never exported: the row is skipped and reported in `X-Export-Warnings`.
-- **Sedo:** headers and values come only from `templates/sedo_template.json` (path override `SEDO_TEMPLATE_PATH`). Without the file → **501 `SEDO_TEMPLATE_MISSING`**. Fixed-price rows have no minimum price.
+- **removed-provider:** headers and values come only from `templates/removed_provider_template.json` (path override `REMOVED_PROVIDER_TEMPLATE_PATH`). Without the file → **501 `REMOVED_PROVIDER_TEMPLATE_MISSING`**. Fixed-price rows have no minimum price.
 - **`/list` approvals:** `approval_ref` is required when the mode, any price or the category changes (V10 / V9 → 422 `APPROVAL_REQUIRED`). If sent, it must be valid (`APPROVAL_INVALID`/`APPROVAL_EXPIRED`, the step-3 label-boundary rule). An NS-only request needs no approval. A high-value → `geo` category change needs `override` + reason + valid approval (`OVERRIDE_NEEDS_APPROVAL`).
 - **Strict schema:** unknown fields → 422 `VALIDATION_ERROR` (LS-14, LG-12).
-- **Landers:** `afternic` → `ns1/ns2.afternic.com`; `sedo` → `ns1/ns2.sedoparking.com`; `custom` → `ns` with 2–4 valid hostnames; `dan` → 422 `LANDER_RETIRED` ("Dan.com retired 2025-06-27; use afternic").
+- **Landers:** `afternic` → `ns1/ns2.afternic.com`; `removed-provider` → `ns1/ns2.removed-providerparking.com`; `custom` → `ns` with 2–4 valid hostnames; `dan` → 422 `LANDER_RETIRED` ("Dan.com retired 2025-06-27; use afternic").
 - **NS compare as sets** (order and case don't matter; trailing dot ignored).
 - **No UDP in tests:** every DNS lookup goes through the injected `NsLookup`. `makeApp` defaults it to a stub that returns `null`.
 - **Read-only GETs stay read-only except the export run log:** `GET /export/afternic.csv` records an `export_runs` row, so `X-Manual-Delist` can list what was sold or dropped since the previous export.
@@ -62,19 +62,19 @@
 migrations/1759800000000_listing.sql   export_runs table; domains.delisted_at
 src/
   dns/ns-lookup.ts          encodeNsQuery, parseNsResponse, queryNs, type NsLookup
-  services/export.ts        afternicRow, sedoRow, loadSedoTemplate, toCsv, AFTERNIC_HEADER
+  services/export.ts        afternicRow, removedProviderRow, loadRemovedProviderTemplate, toCsv, AFTERNIC_HEADER
   services/list.ts          ListService
   jobs/ns-verify.ts         NsVerifier
-  api/export.ts             GET /export/afternic.csv, GET /export/sedo.csv
+  api/export.ts             GET /export/afternic.csv, GET /export/removed-provider.csv
   api/list.ts               POST /list/:domain
   app.ts                    (modify) wire ExportService, ListService, NsVerifier (decorate app.nsVerifier), AppDeps.nsLookup
   main.ts                   (modify) NsVerifier at startup + every 24 h
-  config.ts                 (modify) SEDO_TEMPLATE_PATH, DNS_NS_SERVER
+  config.ts                 (modify) REMOVED_PROVIDER_TEMPLATE_PATH, DNS_NS_SERVER
   db/types.ts               (modify) ExportRunsTable, domains.delisted_at
 tests/
   unit/ns-lookup.test.ts, export-rows.test.ts
   api/export.test.ts, list.test.ts, ns-verify.test.ts
-  helpers/app.ts            (modify) nsLookup passthrough (default: async () => null), sedoTemplatePath
+  helpers/app.ts            (modify) nsLookup passthrough (default: async () => null), removedProviderTemplatePath
   helpers/listing.ts        listedDomain(db, over) fixture
   helpers/csv.ts            strict RFC 4180 parser (test-only)
 ```
@@ -93,8 +93,8 @@ tests/
   - `encodeNsQuery(domain: string, id: number): Buffer`
   - `parseNsResponse(buf: Buffer, domain: string, id: number): string[] | null`
   - `queryNs(domain: string, opts?: { server?: string; timeoutMs?: number }): Promise<string[] | null>` (never throws)
-  - `Config` gains `sedoTemplatePath: string` (default `templates/sedo_template.json`) and `dnsNsServer: string` (default `192.5.6.30`)
-  - `ExportRunsTable { id: Generated<number>; marketplace: 'afternic' | 'sedo'; at: TimestampDefault; domains: string[] }`; `DomainsTable.delisted_at: Timestamp | null`
+  - `Config` gains `removedProviderTemplatePath: string` (default `templates/removed_provider_template.json`) and `dnsNsServer: string` (default `192.5.6.30`)
+  - `ExportRunsTable { id: Generated<number>; marketplace: 'afternic' | 'removed-provider'; at: TimestampDefault; domains: string[] }`; `DomainsTable.delisted_at: Timestamp | null`
 
 - [ ] **Step 1: Migration + types + config**
 
@@ -104,7 +104,7 @@ tests/
 
 CREATE TABLE export_runs (
   id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  marketplace  text NOT NULL CHECK (marketplace IN ('afternic', 'sedo')),
+  marketplace  text NOT NULL CHECK (marketplace IN ('afternic', 'removed-provider')),
   at           timestamptz NOT NULL DEFAULT now(),
   domains      text[] NOT NULL DEFAULT '{}'
 );
@@ -116,7 +116,7 @@ ALTER TABLE domains ADD COLUMN delisted_at timestamptz;
 ALTER TABLE domains DROP COLUMN delisted_at;
 DROP TABLE export_runs;
 ```
-Add `export_runs` to `TABLES` in `tests/helpers/db.ts` (so `resetDb` truncates it). Add `ExportRunsTable` to `Database` and `delisted_at: Timestamp | null` to `DomainsTable` in `src/db/types.ts`. In `src/config.ts` read `SEDO_TEMPLATE_PATH` (default `templates/sedo_template.json`) and `DNS_NS_SERVER` (default `192.5.6.30`) into `sedoTemplatePath` / `dnsNsServer`, and add a config test that asserts both defaults. Change `/migrations: 2 applied/` to `/migrations: 3 applied/` in `tests/api/admin-cli.test.ts`. Run `npm run migrate up` for the dev DB.
+Add `export_runs` to `TABLES` in `tests/helpers/db.ts` (so `resetDb` truncates it). Add `ExportRunsTable` to `Database` and `delisted_at: Timestamp | null` to `DomainsTable` in `src/db/types.ts`. In `src/config.ts` read `REMOVED_PROVIDER_TEMPLATE_PATH` (default `templates/removed_provider_template.json`) and `DNS_NS_SERVER` (default `192.5.6.30`) into `removedProviderTemplatePath` / `dnsNsServer`, and add a config test that asserts both defaults. Change `/migrations: 2 applied/` to `/migrations: 3 applied/` in `tests/api/admin-cli.test.ts`. Run `npm run migrate up` for the dev DB.
 
 - [ ] **Step 2: Write the failing DNS tests**
 
@@ -168,8 +168,8 @@ describe('parseNsResponse', () => {
     expect(parseNsResponse(r, 'example.com', 7)?.sort()).toEqual(['ns1.afternic.com', 'ns2.afternic.com']);
   });
   it('reads NS from the answer section and handles name compression', () => {
-    const r = response(9, 'example.com', ['ns1.sedoparking.com', 'ns2.sedoparking.com'], 'answer', { compress: true });
-    expect(parseNsResponse(r, 'example.com', 9)?.sort()).toEqual(['ns1.sedoparking.com', 'ns2.sedoparking.com']);
+    const r = response(9, 'example.com', ['ns1.removed-providerparking.com', 'ns2.removed-providerparking.com'], 'answer', { compress: true });
+    expect(parseNsResponse(r, 'example.com', 9)?.sort()).toEqual(['ns1.removed-providerparking.com', 'ns2.removed-providerparking.com']);
   });
   it('Review Focus 5: wrong id, NXDOMAIN, truncated, or garbage → null (never a false match)', () => {
     expect(parseNsResponse(response(1, 'example.com', ['ns1.x.com'], 'authority'), 'example.com', 2)).toBeNull();
@@ -312,25 +312,25 @@ git commit -m "feat: migration 3 (export_runs, delisted_at); dependency-free pub
 
 ---
 
-### Task 2: Afternic and Sedo exports
+### Task 2: Afternic and removed-provider exports
 
 **Files:**
 - Create: `src/services/export.ts`, `src/api/export.ts`, `tests/helpers/csv.ts`, `tests/helpers/listing.ts`, `tests/unit/export-rows.test.ts`, `tests/api/export.test.ts`
 - Modify: `src/app.ts`, `tests/helpers/app.ts`
 
 **Interfaces:**
-- Consumes: `Config.sedoTemplatePath`, `jerusalemDate`, `Database`, `testDb`, `insertOwnedDomain`.
+- Consumes: `Config.removedProviderTemplatePath`, `jerusalemDate`, `Database`, `testDb`, `insertOwnedDomain`.
 - Produces:
   - `AFTERNIC_HEADER: readonly string[]` (11 columns)
   - `type ExportDomain = Pick<DomainRow, 'domain' | 'display_name' | 'listing_mode' | 'bin_cents' | 'floor_cents' | 'min_offer_cents' | 'lto_max_months'>`
   - `afternicRow(d: ExportDomain): { cells: string[] } | { skip: string }` plus a `warnings: string[]` array returned alongside (see code)
-  - `interface SedoTemplate { headers: string[]; map: Record<'domain'|'selling_option'|'for_sale'|'price'|'min_price'|'currency'|'action', string>; values: Record<'buy_now'|'make_offer'|'for_sale_yes'|'usd'|'action_add', string> }`
-  - `loadSedoTemplate(path: string): Promise<SedoTemplate | null>` (null if the file is missing; throws on an invalid file)
-  - `sedoRow(d: ExportDomain, t: SedoTemplate, hybridAs: 'buy_now' | 'make_offer'): string[]`
+  - `interface RemovedProviderTemplate { headers: string[]; map: Record<'domain'|'selling_option'|'for_sale'|'price'|'min_price'|'currency'|'action', string>; values: Record<'buy_now'|'make_offer'|'for_sale_yes'|'usd'|'action_add', string> }`
+  - `loadRemovedProviderTemplate(path: string): Promise<RemovedProviderTemplate | null>` (null if the file is missing; throws on an invalid file)
+  - `removedProviderRow(d: ExportDomain, t: RemovedProviderTemplate, hybridAs: 'buy_now' | 'make_offer'): string[]`
   - `toCsv(rows: string[][]): string` (RFC 4180, CRLF, trailing CRLF)
-  - `class ExportService { constructor(deps: { db; config: Config; now: () => number }); afternic(): Promise<{ csv: string; filename: string; delist: string[]; warnings: string[] }>; sedo(): Promise<{ csv: string; filename: string; warnings: string[] } | null> }`
+  - `class ExportService { constructor(deps: { db; config: Config; now: () => number }); afternic(): Promise<{ csv: string; filename: string; delist: string[]; warnings: string[] }>; removed-provider(): Promise<{ csv: string; filename: string; warnings: string[] } | null> }`
   - `registerExport(app, service: ExportService): void`
-  - Test helpers: `parseCsvStrict(text: string): string[][]`; `listedDomain(db, over: Partial<DomainInsert>): Promise<number>`; `makeApp({ sedoTemplatePath })` passthrough (env override)
+  - Test helpers: `parseCsvStrict(text: string): string[][]`; `listedDomain(db, over: Partial<DomainInsert>): Promise<number>`; `makeApp({ removedProviderTemplatePath })` passthrough (env override)
 
 - [ ] **Step 1: Test helpers and failing tests**
 
@@ -382,7 +382,7 @@ export function listedDomain(over: Partial<DomainInsert> = {}): Promise<number> 
 `tests/unit/export-rows.test.ts`:
 ```ts
 import { describe, expect, it } from 'vitest';
-import { AFTERNIC_HEADER, afternicRow, sedoRow, toCsv, type ExportDomain, type SedoTemplate } from '../../src/services/export.js';
+import { AFTERNIC_HEADER, afternicRow, removedProviderRow, toCsv, type ExportDomain, type RemovedProviderTemplate } from '../../src/services/export.js';
 
 const d = (over: Partial<ExportDomain>): ExportDomain => ({
   domain: 'example.com', display_name: null, listing_mode: 'bin', bin_cents: 39900, floor_cents: 39900, min_offer_cents: 39900, lto_max_months: null, ...over,
@@ -424,20 +424,20 @@ describe('toCsv (RFC 4180)', () => {
   });
 });
 
-const T: SedoTemplate = {
+const T: RemovedProviderTemplate = {
   headers: ['Domain Name', 'Option', 'Sale', 'Price', 'Min', 'Cur', 'Action', 'Notes'],
   map: { domain: 'Domain Name', selling_option: 'Option', for_sale: 'Sale', price: 'Price', min_price: 'Min', currency: 'Cur', action: 'Action' },
   values: { buy_now: 'FIXED', make_offer: 'OFFER', for_sale_yes: 'yes', usd: 'USD', action_add: 'ADD' },
 };
 
-describe('Sedo rows (LX-5)', () => {
-  it('bin → fixed + price + no min', () => expect(sedoRow(d({}), T, 'buy_now')).toEqual(['example.com', 'FIXED', 'yes', '399', '', 'USD', 'ADD', '']));
+describe('removed-provider rows (LX-5)', () => {
+  it('bin → fixed + price + no min', () => expect(removedProviderRow(d({}), T, 'buy_now')).toEqual(['example.com', 'FIXED', 'yes', '399', '', 'USD', 'ADD', '']));
   it('offer → make offer + min, no price', () =>
-    expect(sedoRow(d({ listing_mode: 'offer', bin_cents: null, floor_cents: null, min_offer_cents: 50000 }), T, 'buy_now')).toEqual(['example.com', 'OFFER', 'yes', '', '500', 'USD', 'ADD', '']));
+    expect(removedProviderRow(d({ listing_mode: 'offer', bin_cents: null, floor_cents: null, min_offer_cents: 50000 }), T, 'buy_now')).toEqual(['example.com', 'OFFER', 'yes', '', '500', 'USD', 'ADD', '']));
   it('hybrid default (buy_now) → fixed + BIN + no min', () =>
-    expect(sedoRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 95000, min_offer_cents: 95000 }), T, 'buy_now')).toEqual(['example.com', 'FIXED', 'yes', '1995', '', 'USD', 'ADD', '']));
+    expect(removedProviderRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 95000, min_offer_cents: 95000 }), T, 'buy_now')).toEqual(['example.com', 'FIXED', 'yes', '1995', '', 'USD', 'ADD', '']));
   it('hybrid make_offer → make offer + price expectation + min', () =>
-    expect(sedoRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 95000, min_offer_cents: 95000 }), T, 'make_offer')).toEqual(['example.com', 'OFFER', 'yes', '1995', '950', 'USD', 'ADD', '']));
+    expect(removedProviderRow(d({ listing_mode: 'hybrid', bin_cents: 199500, floor_cents: 95000, min_offer_cents: 95000 }), T, 'make_offer')).toEqual(['example.com', 'OFFER', 'yes', '1995', '950', 'USD', 'ADD', '']));
 });
 ```
 `tests/api/export.test.ts`:
@@ -519,27 +519,27 @@ describe('GET /export/afternic.csv', () => {
   });
 });
 
-describe('GET /export/sedo.csv', () => {
-  it('E-6: template missing → 501 SEDO_TEMPLATE_MISSING, never a guessed file', async () => {
-    app = await makeApp({ env: { SEDO_TEMPLATE_PATH: join(tmpdir(), 'definitely-missing-sedo.json') } });
+describe('GET /export/removed-provider.csv', () => {
+  it('E-6: template missing → 501 REMOVED_PROVIDER_TEMPLATE_MISSING, never a guessed file', async () => {
+    app = await makeApp({ env: { REMOVED_PROVIDER_TEMPLATE_PATH: join(tmpdir(), 'definitely-missing-removed-provider.json') } });
     const { auth } = await issueToken('read');
-    const res = await app.inject({ method: 'GET', url: '/export/sedo.csv', headers: auth });
+    const res = await app.inject({ method: 'GET', url: '/export/removed-provider.csv', headers: auth });
     expect(res.statusCode).toBe(501);
-    expect(res.json().error.code).toBe('SEDO_TEMPLATE_MISSING');
+    expect(res.json().error.code).toBe('REMOVED_PROVIDER_TEMPLATE_MISSING');
   });
 
   it('E-7: headers and values exactly as configured; no minimum on fixed-price rows', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'sedo-'));
-    const path = join(dir, 'sedo_template.json');
+    const dir = mkdtempSync(join(tmpdir(), 'removed-provider-'));
+    const path = join(dir, 'removed_provider_template.json');
     writeFileSync(path, JSON.stringify({
       headers: ['Domain Name', 'Option', 'Sale', 'Price', 'Min', 'Cur', 'Action'],
       map: { domain: 'Domain Name', selling_option: 'Option', for_sale: 'Sale', price: 'Price', min_price: 'Min', currency: 'Cur', action: 'Action' },
       values: { buy_now: 'FIXED', make_offer: 'OFFER', for_sale_yes: 'yes', usd: 'USD', action_add: 'ADD' },
     }));
-    app = await makeApp({ env: { SEDO_TEMPLATE_PATH: path } });
+    app = await makeApp({ env: { REMOVED_PROVIDER_TEMPLATE_PATH: path } });
     const { auth } = await issueToken('read');
     await fixture4();
-    const res = await app.inject({ method: 'GET', url: '/export/sedo.csv', headers: auth });
+    const res = await app.inject({ method: 'GET', url: '/export/removed-provider.csv', headers: auth });
     expect(res.statusCode).toBe(200);
     expect(parseCsvStrict(res.body).map((r) => r.join(','))).toEqual([
       'Domain Name,Option,Sale,Price,Min,Cur,Action',
@@ -549,19 +549,19 @@ describe('GET /export/sedo.csv', () => {
     ]);
   });
 
-  it('an invalid template file → 501 SEDO_TEMPLATE_INVALID, never a guessed file', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'sedo-'));
-    const path = join(dir, 'sedo_template.json');
+  it('an invalid template file → 501 REMOVED_PROVIDER_TEMPLATE_INVALID, never a guessed file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'removed-provider-'));
+    const path = join(dir, 'removed_provider_template.json');
     writeFileSync(path, '{"headers": []}');
-    app = await makeApp({ env: { SEDO_TEMPLATE_PATH: path } });
+    app = await makeApp({ env: { REMOVED_PROVIDER_TEMPLATE_PATH: path } });
     const { auth } = await issueToken('read');
-    const res = await app.inject({ method: 'GET', url: '/export/sedo.csv', headers: auth });
+    const res = await app.inject({ method: 'GET', url: '/export/removed-provider.csv', headers: auth });
     expect(res.statusCode).toBe(501);
-    expect(res.json().error.code).toBe('SEDO_TEMPLATE_INVALID');
+    expect(res.json().error.code).toBe('REMOVED_PROVIDER_TEMPLATE_INVALID');
   });
 });
 ```
-Note: the Sedo `Domain` cell uses the lowercase domain (Sedo isn't documented to take a display name); Afternic uses `display_name`.
+Note: the removed-provider `Domain` cell uses the lowercase domain (removed-provider isn't documented to take a display name); Afternic uses `display_name`.
 
 - [ ] **Step 2: Run to verify failure**
 
@@ -612,7 +612,7 @@ export function afternicRow(d: ExportDomain): { row: { cells: string[] } | { ski
   return { row: { cells }, warnings: round.dropped ? [`${d.domain}:AFTERNIC_ROUNDS_DOWN`] : [] };
 }
 
-const SedoTemplateSchema = z.object({
+const RemovedProviderTemplateSchema = z.object({
   headers: z.array(z.string().min(1)).min(1),
   map: z.object({
     domain: z.string(), selling_option: z.string(), for_sale: z.string(), price: z.string(),
@@ -620,11 +620,11 @@ const SedoTemplateSchema = z.object({
   }),
   values: z.object({ buy_now: z.string(), make_offer: z.string(), for_sale_yes: z.string(), usd: z.string(), action_add: z.string() }),
 }).refine((t) => Object.values(t.map).every((h) => t.headers.includes(h)), 'every mapped header must be in headers');
-export type SedoTemplate = z.infer<typeof SedoTemplateSchema>;
+export type RemovedProviderTemplate = z.infer<typeof RemovedProviderTemplateSchema>;
 
-export class SedoTemplateInvalid extends Error {}
+export class RemovedProviderTemplateInvalid extends Error {}
 
-export async function loadSedoTemplate(path: string): Promise<SedoTemplate | null> {
+export async function loadRemovedProviderTemplate(path: string): Promise<RemovedProviderTemplate | null> {
   let text: string;
   try {
     text = await readFile(path, 'utf8');
@@ -632,15 +632,15 @@ export async function loadSedoTemplate(path: string): Promise<SedoTemplate | nul
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw e;
   }
-  const parsed = SedoTemplateSchema.safeParse(JSON.parse(text));
-  if (!parsed.success) throw new SedoTemplateInvalid(parsed.error.issues.map((i) => i.message).join('; '));
+  const parsed = RemovedProviderTemplateSchema.safeParse(JSON.parse(text));
+  if (!parsed.success) throw new RemovedProviderTemplateInvalid(parsed.error.issues.map((i) => i.message).join('; '));
   return parsed.data;
 }
 
-export function sedoRow(d: ExportDomain, t: SedoTemplate, hybridAs: 'buy_now' | 'make_offer'): string[] {
+export function removedProviderRow(d: ExportDomain, t: RemovedProviderTemplate, hybridAs: 'buy_now' | 'make_offer'): string[] {
   const round = { dropped: false };
   const fixed = d.listing_mode === 'bin' || (d.listing_mode === 'hybrid' && hybridAs === 'buy_now');
-  const fields: Record<keyof SedoTemplate['map'], string> = {
+  const fields: Record<keyof RemovedProviderTemplate['map'], string> = {
     domain: d.domain,
     selling_option: fixed ? t.values.buy_now : t.values.make_offer,
     for_sale: t.values.for_sale_yes,
@@ -688,14 +688,14 @@ export class ExportService {
     return { csv: toCsv(rows), filename: `afternic-${jerusalemDate(new Date(this.deps.now()))}.csv`, delist, warnings };
   }
 
-  async sedo(): Promise<{ csv: string; filename: string; warnings: string[] } | null> {
-    const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath);
+  async removed-provider(): Promise<{ csv: string; filename: string; warnings: string[] } | null> {
+    const t = await loadRemovedProviderTemplate(this.deps.config.removedProviderTemplatePath);
     if (!t) return null;
-    const s = await this.deps.db.selectFrom('settings').select('sedo_hybrid_as').executeTakeFirstOrThrow();
+    const s = await this.deps.db.selectFrom('settings').select('removed_provider_hybrid_as').executeTakeFirstOrThrow();
     const rows: string[][] = [t.headers];
-    for (const d of await this.listed()) rows.push(sedoRow(d, t, s.sedo_hybrid_as));
-    await this.deps.db.insertInto('export_runs').values({ marketplace: 'sedo', domains: rows.slice(1).map((r) => r[t.headers.indexOf(t.map.domain)]!) }).execute();
-    return { csv: toCsv(rows), filename: `sedo-${jerusalemDate(new Date(this.deps.now()))}.csv`, warnings: [] };
+    for (const d of await this.listed()) rows.push(removedProviderRow(d, t, s.removed_provider_hybrid_as));
+    await this.deps.db.insertInto('export_runs').values({ marketplace: 'removed-provider', domains: rows.slice(1).map((r) => r[t.headers.indexOf(t.map.domain)]!) }).execute();
+    return { csv: toCsv(rows), filename: `removed-provider-${jerusalemDate(new Date(this.deps.now()))}.csv`, warnings: [] };
   }
 }
 ```
@@ -703,7 +703,7 @@ export class ExportService {
 ```ts
 import type { FastifyInstance } from 'fastify';
 import { AppError } from '../http/errors.js';
-import { SedoTemplateInvalid, type ExportService } from '../services/export.js';
+import { RemovedProviderTemplateInvalid, type ExportService } from '../services/export.js';
 
 export function registerExport(app: FastifyInstance, service: ExportService): void {
   app.get('/export/afternic.csv', async (_req, reply) => {
@@ -716,19 +716,19 @@ export function registerExport(app: FastifyInstance, service: ExportService): vo
       .send(r.csv);
   });
 
-  app.get('/export/sedo.csv', async (_req, reply) => {
+  app.get('/export/removed-provider.csv', async (_req, reply) => {
     let r;
     try {
-      r = await service.sedo();
+      r = await service.removed-provider();
     } catch (e) {
-      if (e instanceof SedoTemplateInvalid) {
-        throw new AppError(501, 'SEDO_TEMPLATE_INVALID', `templates/sedo_template.json is invalid: ${e.message}`);
+      if (e instanceof RemovedProviderTemplateInvalid) {
+        throw new AppError(501, 'REMOVED_PROVIDER_TEMPLATE_INVALID', `templates/removed_provider_template.json is invalid: ${e.message}`);
       }
       throw e;
     }
     if (!r) {
-      throw new AppError(501, 'SEDO_TEMPLATE_MISSING',
-        "Sedo's bulk-upload headers aren't public. Download Sedo's example file from your Sedo account and fill templates/sedo_template.json (see docs/specs/export-csv.md).");
+      throw new AppError(501, 'REMOVED_PROVIDER_TEMPLATE_MISSING',
+        "removed-provider's bulk-upload headers aren't public. Download removed-provider's example file from your removed-provider account and fill templates/removed_provider_template.json (see docs/specs/export-csv.md).");
     }
     return reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="${r.filename}"`).send(r.csv);
   });
@@ -746,7 +746,7 @@ Expected: all PASS.
 - [ ] **Step 5: Commit**
 ```bash
 git add src/ tests/
-git commit -m "feat: Afternic export (byte-exact header, per-mode cells, delist header) and template-driven Sedo export"
+git commit -m "feat: Afternic export (byte-exact header, per-mode cells, delist header) and template-driven removed-provider export"
 ```
 
 ---
@@ -758,7 +758,7 @@ git commit -m "feat: Afternic export (byte-exact header, per-mode cells, delist 
 - Modify: `src/app.ts`, `tests/helpers/app.ts` (`nsLookup` passthrough; default `async () => null`)
 
 **Interfaces:**
-- Consumes: `validateListing`, `listingSettings`, `presentListing`, `isCategory` (step 3), `checkApproval`, `landerNameservers`, `sameNsSet`, `afternicRow`, `sedoRow`, `loadSedoTemplate`, `normalizeDomain`, `RegistrarError`, `NsLookup`.
+- Consumes: `validateListing`, `listingSettings`, `presentListing`, `isCategory` (step 3), `checkApproval`, `landerNameservers`, `sameNsSet`, `afternicRow`, `removedProviderRow`, `loadRemovedProviderTemplate`, `normalizeDomain`, `RegistrarError`, `NsLookup`.
 - Produces:
   - `interface ListBody { mode?: string; bin?: number | null; floor?: number | null; min_offer?: number | null; lto_max_months?: number | null; category?: string | null; override?: boolean; override_reason?: string | null; lander?: string; ns?: string[] | null; display_name?: string | null; dry_run?: boolean; approval_ref?: { text?: unknown; approved_at?: unknown } | null }`
   - `class ListService { constructor(deps: { db; adapters: RegistrarAdapter[]; config: Config; nsLookup: NsLookup; now: () => number }); list(domain: string, body: ListBody, ctx: { auditId: string }): Promise<Record<string, unknown>> }`
@@ -889,12 +889,12 @@ describe('POST /list/{domain}', () => {
     expect(await dom()).toMatchObject({ status: 'listed', listing_mode: 'offer', bin_cents: null, min_offer_cents: 50000 });
   });
 
-  it('LH-4: dry_run → 0 history rows, no NS call, response previews the Afternic (and Sedo if configured) rows', async () => {
+  it('LH-4: dry_run → 0 history rows, no NS call, response previews the Afternic (and removed-provider if configured) rows', async () => {
     const { auth, pb } = await setup();
     await insertOwnedDomain(db, { domain: D });
     const res = await list({ mode: 'bin', bin: 399, dry_run: true, approval_ref: approval() }, auth);
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ dry_run: true, valid: true, preview: { afternic: `${D},399,399,399,N,,Buy It Now,Y,N,N,N`, sedo: null } });
+    expect(res.json()).toMatchObject({ dry_run: true, valid: true, preview: { afternic: `${D},399,399,399,N,,Buy It Now,Y,N,N,N`, removed-provider: null } });
     expect(await history()).toHaveLength(0);
     expect(pb.calls).toEqual([]);
     expect((await dom()).listing_mode).toBeNull();
@@ -997,7 +997,7 @@ describe('POST /list/{domain}', () => {
     await insertOwnedDomain(db, { domain: D, buy_date: '2026-10-04' });
     const res = await list({ mode: 'bin', bin: 399, approval_ref: approval() }, auth);
     expect(res.json().checklist).toEqual(expect.arrayContaining([
-      expect.stringMatching(/afternic\.csv.*Update/), expect.stringMatching(/sedo\.csv/), expect.stringMatching(/2026-12-03/),
+      expect.stringMatching(/afternic\.csv.*Update/), expect.stringMatching(/removed-provider\.csv/), expect.stringMatching(/2026-12-03/),
     ]));
   });
 });
@@ -1021,7 +1021,7 @@ import type { NsLookup } from '../dns/ns-lookup.js';
 import { AppError } from '../http/errors.js';
 import { RegistrarError, type RegistrarAdapter } from '../registrars/types.js';
 import { checkApproval } from './approval.js';
-import { afternicRow, loadSedoTemplate, sedoRow, type ExportDomain } from './export.js';
+import { afternicRow, loadRemovedProviderTemplate, removedProviderRow, type ExportDomain } from './export.js';
 import { landerNameservers, sameNsSet } from './lander.js';
 import { isCategory, listingSettings, presentListing, validateListing, type NormalizedListing } from './listing-rules.js';
 
@@ -1122,7 +1122,7 @@ export class ListService {
       ns = list;
     } else {
       const known = landerNameservers(lander);
-      if (!known) throw new AppError(422, 'LANDER_INVALID', 'lander must be afternic, sedo or custom');
+      if (!known) throw new AppError(422, 'LANDER_INVALID', 'lander must be afternic, removed-provider or custom');
       if (body.ns) throw new AppError(422, 'NS_INVALID', 'ns is only allowed with lander "custom"');
       ns = [...known];
     }
@@ -1142,12 +1142,12 @@ export class ListService {
     // Dry run: validation + preview only
     if (body.dry_run) {
       const a = effective ? afternicRow(exportDomain) : null;
-      const t = await loadSedoTemplate(this.deps.config.sedoTemplatePath).catch(() => null);
+      const t = await loadRemovedProviderTemplate(this.deps.config.removedProviderTemplatePath).catch(() => null);
       return {
         dry_run: true, valid: true, domain, category, listing: effective ? presentListing(effective) : null, lander, ns,
         preview: {
           afternic: a && 'cells' in a.row ? a.row.cells.join(',') : null,
-          sedo: t && effective ? sedoRow(exportDomain, t, settings.sedo_hybrid_as).join(',') : null,
+          removed-provider: t && effective ? removedProviderRow(exportDomain, t, settings.removed_provider_hybrid_as).join(',') : null,
         },
         warnings,
       };
@@ -1187,7 +1187,7 @@ export class ListService {
 
     const checklist = [
       'Add/update at Afternic: download /export/afternic.csv and upload it at afternic.com/domains/add with **Update** (never Replace)',
-      'Sedo: download /export/sedo.csv and use the Sedo Bulk Uploader',
+      'removed-provider: download /export/removed-provider.csv and use the removed-provider Bulk Uploader',
     ];
     if (row.buy_date) checklist.push(`Day 60 (${addDays(row.buy_date, 60)}): enable Afternic Fast Transfer opt-in at the registrar`);
     if (row.registrar === 'godaddy') checklist.push("GoDaddy-registered: GoDaddy's own List for Sale is an alternative to the Afternic upload");
@@ -1413,7 +1413,7 @@ git commit -m "feat: daily public-DNS NS verification job (L-13), startup + ever
 - [ ] Full suite, typecheck and build; record the counts.
 - [ ] Map spec IDs to tests: L-1–L-9, L-11, L-13, E-1–E-8, LX-1–LX-7, LH-1, LH-2, LH-4 (LH-3 from step 1), the endpoint LS/LG cases, and the step-3 validator LS/LG tests.
 - [ ] Final whole-change review; fix wave if needed.
-- [ ] After Dvir confirms L1–L9, update `list.md` (L2–L6), `export-csv.md` (L7, `SEDO_TEMPLATE_INVALID`), `00-architecture.md` §4 (`export_runs`, `delisted_at`) and §7 codes (`NOT_IN_PORTFOLIO`, `LANDER_RETIRED`, `LANDER_INVALID`, `NS_INVALID`, `DISPLAY_NAME_MISMATCH`, `APPROVAL_REQUIRED`, `API_ACCESS_DISABLED`, `SEDO_TEMPLATE_MISSING`, `SEDO_TEMPLATE_INVALID`).
+- [ ] After Dvir confirms L1–L9, update `list.md` (L2–L6), `export-csv.md` (L7, `REMOVED_PROVIDER_TEMPLATE_INVALID`), `00-architecture.md` §4 (`export_runs`, `delisted_at`) and §7 codes (`NOT_IN_PORTFOLIO`, `LANDER_RETIRED`, `LANDER_INVALID`, `NS_INVALID`, `DISPLAY_NAME_MISMATCH`, `APPROVAL_REQUIRED`, `API_ACCESS_DISABLED`, `REMOVED_PROVIDER_TEMPLATE_MISSING`, `REMOVED_PROVIDER_TEMPLATE_INVALID`).
 - [ ] Report; push to `main`.
 
 ---
@@ -1427,5 +1427,5 @@ git commit -m "feat: daily public-DNS NS verification job (L-13), startup + ever
   - Step 4 (NS: full adapter, `none` → manual; `manage`/GoDaddy → 4b per L1; public DNS + daily job) → Tasks 1, 3, 4.
   - Step 5 (save + history + listed) → Task 3.
   - Step 6 (checklist) → Task 3.
-- **export-csv.md:** Afternic → Task 2 (header, rows, delist header, warnings, CRLF, filename). Sedo → Task 2 (template, 501).
+- **export-csv.md:** Afternic → Task 2 (header, rows, delist header, warnings, CRLF, filename). removed-provider → Task 2 (template, 501).
 - **Deferred to 4b:** L-12 (GoDaddy NS polling), `/sold` setting `delisted_at`, the drop job, `/report` warnings ("NS not on lander", "export older than 7 days while listings changed").

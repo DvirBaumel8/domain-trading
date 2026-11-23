@@ -11,7 +11,7 @@
 | Priority | P1 |
 
 ## 1. Business need
-Auctions (GoDaddy and Dynadot public expired-name auctions, lane S8, at most `settings.s8_max_price_cents` = $250 a name) are the main buying line. Today the server sees an auction name only after it is bought (`POST /portfolio/import`). No safety or demand check runs before money is bid, nothing enforces the maximum bid, and what an auction name really cost is not recorded as a learning signal. Background: `docs/research/funnel-names-safety-2026-10.md` §5-6, `docs/research/auctions-playbook.md` §2 and §5.
+Auctions (GoDaddy and removed-provider public expired-name auctions, lane S8, at most `settings.s8_max_price_cents` = $250 a name) are the main buying line. Today the server sees an auction name only after it is bought (`POST /portfolio/import`). No safety or demand check runs before money is bid, nothing enforces the maximum bid, and what an auction name really cost is not recorded as a learning signal. Background: `docs/research/funnel-names-safety-2026-10.md` §5-6, `docs/research/auctions-playbook.md` §2 and §5.
 
 ## 2. Rules
 - R-1 **Pre-bid check.** `POST /auctions/prebid {domain, venue}` runs the existing automatic safety checks that make sense for an already registered .com (name rules SPELL-1, BRAND-1, BIGCO-1, TM_KILL; TYPO-1; SURBL-1; Google Web Risk when a key exists; the name's own RDAP status flags; the same name on .net .org .co .io .ai; UK company names), never availability, price or a quote. A source that cannot be read is a FLAG, never a pass. The answer carries `verdict` (pass, flag, fail), the checks, the endings, `manual_required` (EXACT_STRING_BUSINESS, HIST_WAYBACK) and the S8 cap. Every answer is stored (`prebid_checks`, append-only) and returned with `prebid_id`.

@@ -11,11 +11,11 @@
 
 ```
 [Mac datasave ~15:05 UTC]
-        │  seals GD + Dynadot (when client live) → score → shortlist → portfolioCheck
+        │  seals GD + removed-provider (when client live) → score → shortlist → portfolioCheck
         ▼
 [One full discovery — after shortlist seal for data_date]  ← Option 1 LOCKED
         │  A required (shortlist) + B cheap signal + D closeouts research
-        │  C geo parked · Dynadot aftermarket GAP = blocker note only
+        │  C geo parked · removed-provider aftermarket GAP = blocker note only
         │  Buyer → full-stack passers (or top-5-with-cons if zero) → Risk Gate
         │  L&L pack to Dvir every run (mandatory)
         ▼
@@ -36,10 +36,10 @@ Parallel / other tracks (not the buy spine): Sales owned-name sell-chance work; 
 
 | When | Who | Reads / does | Depends on | Timeout / notes | Sources |
 |---|---|---|---|---|---|
-| GoDaddy public zips rebuild ~17:40 IDT (~14:40 UTC) | Source (GoDaddy) | New inventory files | — | Overwrites daily; missed day → GAP, no invented backfill | `01-godaddy-dynadot-daily-seal.md`; data-engineer handoff |
-| **~15:05 UTC** Mac launchd (`com.domaintrading.datasave`) ≈ **17:05 IDT** | DOM | Full datasave: inventory freeze, Dynadot closeouts/aftermarket (when client built), auctions endingToday → outcomes, `scorePool`, **`auctionShortlist`**, `portfolioCheck` (CR-079), episodes, … | GoDaddy files present; Dynadot keys nonempty for Dynadot half | Per-step budgets in datasave.md (e.g. auctionShortlist 15 min, buildPanel 25 min, whole job soft ~90 min) | `docs/internal/datasave.md`; `01`; CR-080 |
+| GoDaddy public zips rebuild ~17:40 IDT (~14:40 UTC) | Source (GoDaddy) | New inventory files | — | Overwrites daily; missed day → GAP, no invented backfill | `01-godaddy-daily-seal.md`; data-engineer handoff |
+| **~15:05 UTC** Mac launchd (`com.domaintrading.datasave`) ≈ **17:05 IDT** | DOM | Full datasave: inventory freeze, removed-provider closeouts/aftermarket (when client built), auctions endingToday → outcomes, `scorePool`, **`auctionShortlist`**, `portfolioCheck` (CR-079), episodes, … | GoDaddy files present; removed-provider keys nonempty for removed-provider half | Per-step budgets in datasave.md (e.g. auctionShortlist 15 min, buildPanel 25 min, whole job soft ~90 min) | `docs/internal/datasave.md`; `01`; CR-080 |
 | After seals | Dual-runner lock | Winner writes `docs/locks/<action>-<YYYY-MM-DD>.json`; loser skips | Same Idempotency-Key per day+action | Backup bot: **only if DOM missed**, typically **~19:00 UTC** (CR-080) | `00-dual-runner-lock-rule.md`; CR-080 |
-| Dynadot half until client ships | DOM Architect / bots | Bot-upload `POST /snapshots/dynadot` still allowed; stubs may return `not_configured` | Restricted Aftermarkets-Read key on Mac | Do **not** enable registrar `dynadot` for Restricted key | CR-080; memory 2026-10-27 |
+| removed-provider half until client ships | DOM Architect / bots | Bot-upload `POST /snapshots/removed-provider` still allowed; stubs may return `not_configured` | Restricted Aftermarkets-Read key on Mac | Do **not** enable registrar `removed-provider` for Restricted key | CR-080; memory 2026-10-27 |
 | Pick-proof daily seal / labels | — | **Paused** (Dvir yes → CR-081) | — | Archives of Oct 20–26 kept; historical replay replaces pick-proof | CR-081; memory |
 | CLOSEOUTS | Buyer / Risk | Research-only while `CLOSEOUTS_PAUSED` | — | No money cards from closeouts | discovery v3; auctions.md |
 

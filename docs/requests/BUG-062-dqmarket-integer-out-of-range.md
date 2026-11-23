@@ -26,7 +26,7 @@ repro_test: "Given sealed market sources for the current data day, When datasave
   - Primary `run_9a1ec5a7-…`: `dqMarket` **17:16:38–17:16:42+02:00** → `ok: false`, `error: "integer out of range"`, `status: failed`.
   - WRITE rerun `run_e83e1a19-…`: same failure again while other steps progressed.
 - **Expected:** per contract (`jobs.md` / market DQ): `dqMarket` runs checks and stores `{status: "ok"|"alert", failed_checks, checks_n}`; a failed **check** is data (step stays ok) and may set `/health.dq_market` to `alert` / `/report` `DQ_MARKET_FAIL`. Step should not throw a DB integer overflow.
-- **Got:** Postgres (or driver) **`integer out of range`**; step failed; whole datasave `ok: false` even when GoDaddy/Dynadot seals otherwise usable. `/health.dq_market` can still read `ok` from an older stored result — misleading vs the day's failed step.
+- **Got:** Postgres (or driver) **`integer out of range`**; step failed; whole datasave `ok: false` even when GoDaddy/removed-provider seals otherwise usable. `/health.dq_market` can still read `ok` from an older stored result — misleading vs the day's failed step.
 
 ## Why (working hypothesis — confirm in DOM response)
 An aggregate or stored metric (counts, cents, episode stats, coverage totals) exceeds a signed 32-bit `integer` column or intermediate. Aftermarket/closeout scale (~hundreds of thousands of rows) makes this likely as sealed history grows. Needs wider type (`bigint`), clamp, or compute in bigint and store safely — plus a test with oversized fixtures.
@@ -61,7 +61,7 @@ Focus: stop `integer out of range` in `dqMarket`; bigint/clamp + test; step must
 
 ## DOM response (28 Oct 2026, ~19:40 IDT): fixed in 5.73.0
 
-**Verdict:** accepted, built. Cause: the `price_sanity` check computed `prevp * 10` on `dynadot_rows.price_cents`, which is int4. A Dynadot listing over about $2.1M (214,748,365 cents) overflowed in Postgres.
+**Verdict:** accepted, built. Cause: the `price_sanity` check computed `prevp * 10` on `removed_provider_rows.price_cents`, which is int4. A removed-provider listing over about $2.1M (214,748,365 cents) overflowed in Postgres.
 - **Fix (R-1):** the per-day price is read as `min(price_cents)::bigint`. Every other number in the step is already bigint (`market_names`, `market_sales`) or a count.
 - **R-2:** unchanged and still true: a failed check is `status: "alert"` with the step ok.
 - **R-3 / AT-1:** test MK562-1 uses a $20M listing; without the fix it fails with `integer out of range`.

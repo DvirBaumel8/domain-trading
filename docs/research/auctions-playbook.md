@@ -1,16 +1,16 @@
 # Expired-name auctions: what experienced investors do (research, 25 Oct 2026)
 
-Why: Dvir, 25 Oct 2026, made auctions the main effort of the S8 line ("Let's raise the limit to 250 and make the auctions our main effort") and asked us to learn from others' experience first. Public guides and articles only; no marketplace scraping, no Wayback, no NameBio automation (founder rules). Sources at the end.
+Why: Dvir, 25 Oct 2026, made auctions the main effort of the S8 line ("Let's raise the limit to 250 and make the auctions our main effort") and asked us to learn from others' experience first. Public guides and articles only; no marketplace scraping, no Wayback, no removed-provider automation (founder rules). Sources at the end.
 
 ## 1. How the two auctions we may use work
-| | GoDaddy expired auctions | Dynadot expired auctions |
+| | GoDaddy expired auctions | removed-provider expired auctions |
 |---|---|---|
 | When a name appears | about 26–29 days after it expired | after the renewal grace period |
 | Length | about 10 days | 7–11 days |
 | Bidding | proxy bid: you enter your maximum, the system bids the smallest step needed for you | proxy bid optional |
 | Bid step | $5 between $5 and $499 | — |
 | Late bids | a bid in the last 5 minutes adds 5 minutes, so "sniping" in the last second doesn't work | same, no limit on extensions |
-| After the end | pay; the name moves to your account | pay within 48 h; the name moves to your Dynadot account |
+| After the end | pay; the name moves to your account | pay within 48 h; the name moves to your removed-provider account |
 | If nobody bids (GoDaddy) | a closeout at a falling fixed price (reported $50, $40, $30, $11, $5) | — |
 | Membership | GoDaddy Auctions membership, about $5 a year | a funded account (at least $5) |
 
@@ -47,7 +47,7 @@ Not allowed for us: NameJet, SnapNames, DropCatch (catch services, founder rule 
 - GoDaddy help, bidding on GoDaddy Auctions: https://www.godaddy.com/help/bidding-on-godaddy-auctions-domains-893
 - GoDaddy auctions explained (Domain Name Lovers): https://domainnamelovers.com/learn/godaddy-auctions-explained
 - GoDaddy domain auction, expired and closeouts (DomainsDealer): https://domainsdealer.com/godaddy-domain-auction
-- Dynadot help, expired auctions: https://www.dynadot.com/help/question/bid-in-expired-auction and https://www.dynadot.com/hub/aftermarket/how-to-buy-expired-domains-tips-for-discovery
+- removed-provider help, expired auctions: https://www.removed-provider.com/help/question/bid-in-expired-auction and https://www.removed-provider.com/hub/aftermarket/how-to-buy-expired-domains-tips-for-discovery
 - Expired auctions walkthrough (seo.domains): https://seo.domains/seo-resources/auctions/expired-domain-auctions-walkthrough/
 - Auction pitfalls and bidding risk (MediaOptions): https://mediaoptions.com/blog/avoiding-common-pitfalls-in-domain-auctions/ and https://mediaoptions.com/blog/how-to-manage-domain-auction-bidding-risk/
 - Winning without overpaying (Namefi): https://namefi.io/r/en/blog/how-to-win-domain-auctions

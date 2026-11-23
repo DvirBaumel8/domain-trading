@@ -44,7 +44,7 @@ In both practice runs Gavriel's workers did every mechanical check by hand becau
 1. **What, not how.** This CR states inputs, outputs, business rules, error behaviour, performance/cost limits, evidence and acceptance tests. Language, storage, file layout, data model, libraries, endpoint naming and internal design are **DOM's choice**. Where this CR mentions an observed data-source behaviour (e.g. "the web archive often takes >12 s to answer"), that is information, not a design instruction.
 2. **Reference scripts (Appendix A) are non-binding.** They show what was done by hand, including mistakes. DOM must not treat them as a spec.
 3. **Free data only.** No paid data source or paid tier without Dvir's written approval. Any credential or account (API key, developer account) is Dvir's decision (§9).
-4. **Respect source terms.** Honour documented rate limits, robots.txt and terms of use; identify honestly; never bypass CAPTCHAs, bot protection or login walls; **no automated access at all** to sites that ban bots (known: ExpiredDomains; NameBio website/CSV download beyond the allowed cadence; EUIPO/WIPO/UK IPO/TMview web UIs; LinkedIn). See §9 Q1 about BBB.
+4. **Respect source terms.** Honour documented rate limits, robots.txt and terms of use; identify honestly; never bypass CAPTCHAs, bot protection or login walls; **no automated access at all** to sites that ban bots (known: ExpiredDomains; removed-provider website/CSV download beyond the allowed cadence; EUIPO/WIPO/UK IPO/TMview web UIs; LinkedIn). See §9 Q1 about BBB.
 5. **Only Gavriel calls the API.** Scout bots never hold a token; they go through Gavriel.
 6. **Read-only toward the outside world.** No capability in this CR buys, lists, sends or changes DNS.
 
@@ -54,7 +54,7 @@ In both practice runs Gavriel's workers did every mechanical check by hand becau
 
 | Stays with Gavriel / bots (judgment) | Moves to DOM (mechanical or rule-based) |
 |---|---|
-| **Inventing candidate names** for each lane brief (incl. avoiding hype strings, 3-word leftovers, city + lawyer — v9.1 §5) | Every check in §4: form, brand lists, typo screen, availability, blocklists, Web Risk, history, trademarks, census, NameBio counts, extensions, leads, tiers, quotes, scoring, screening pack |
+| **Inventing candidate names** for each lane brief (incl. avoiding hype strings, 3-word leftovers, city + lawyer — v9.1 §5) | Every check in §4: form, brand lists, typo screen, availability, blocklists, Web Risk, history, trademarks, census, removed-provider counts, extensions, leads, tiers, quotes, scoring, screening pack |
 | Choosing lanes, patterns and target markets (using DOM's market data, CAP-13) | Running checks in the agreed order, stop-at-first-failure or run-all (CAP-20) |
 | Authoring and approving **sibling census lists** as versioned pattern lists (Gavriel authors, Dvir approves, DOM freezes) — v9.1 C19 | Storing/versioning census lists, refusing ad-hoc lists, running the census |
 | **Judging finalists** (≤5 survivors per batch): van test, TN-1 / BIGCO edge cases, confirm 3 random leads sell the service, one-line reason not to buy, resolving FLAGs (ambiguous tokens, partial trademark hits, franchise/enterprise doubts) | Producing those FLAGs with evidence attached so judgment takes ≤8k tokens per name |
@@ -65,7 +65,7 @@ In both practice runs Gavriel's workers did every mechanical check by hand becau
 | Manual EUIPO/WIPO/UK IPO searches (Dvir) until CAP-09 automation exists | Requiring a recorded manual result in the screening pack and refusing the pack without it |
 | Buy/sell decisions (Dvir only) | Refusing a buy without a complete screening pack (existing buy action, SEL7-1) |
 
-**Bots must no longer:** call RDAP, the web archive, SURBL, USPTO, NameBio, BBB or registrar price pages directly; write census lists; edit priors; compute EV/Ratio by hand (v9.1 §5).
+**Bots must no longer:** call RDAP, the web archive, SURBL, USPTO, removed-provider, BBB or registrar price pages directly; write census lists; edit priors; compute EV/Ratio by hand (v9.1 §5).
 
 ---
 
@@ -89,7 +89,7 @@ Every non-PASS status carries a **reason code** (e.g. `TIMEOUT`, `RATE_LIMITED`,
 - domain, lane, check id, the v9.1 rule ids it decides, status, reason code / reason
 - the business fields listed in each capability
 - **evidence list**: source name, exact URL or query, retrieved-at timestamp, raw response or page snapshot kept by DOM (retrievable through the API), content fingerprint
-- `checked_at` (ISO 8601 with offset; displays in Asia/Jerusalem) and **`data_as_of`** (freshness of the source data, e.g. NameBio cache date, Tranco list date)
+- `checked_at` (ISO 8601 with offset; displays in Asia/Jerusalem) and **`data_as_of`** (freshness of the source data, e.g. removed-provider cache date, Tranco list date)
 - `settings_version` and the version of any frozen list used (e.g. `s6_regime_audit@v1`, BIGCO list version)
 - duration and number of upstream calls (for cost tracking)
 
@@ -127,7 +127,7 @@ Cheapest and most decisive first. In `live` mode a name stops at its first FAIL 
 | G5 | History | CAP-07 | HIST-1 | Slow (web archive) | All |
 | G6 | Web Risk | CAP-06 | WEB-RISK-1 (interim rule needs G5) | 1 call, throttled | All |
 | G7 | Trademarks | CAP-08 (+CAP-09) | TM-1 (+EU manual flag for S6) | 3–6 queries | All |
-| G8 | Demand | CAP-10 + CAP-11 | DEMAND-1 | ~20 site fetches per pattern, cached per pattern | Non-geo (S3/S4/S6); geo uses NameBio count only (score feature) |
+| G8 | Demand | CAP-10 + CAP-11 | DEMAND-1 | ~20 site fetches per pattern, cached per pattern | Non-geo (S3/S4/S6); geo uses removed-provider count only (score feature) |
 | G9 | Extensions / same name elsewhere | CAP-12 | D1 input, feature F, TN-1 input | ~10 lookups | All |
 | G10 | Leads | CAP-14 → CAP-15 → CAP-16 | LEAD-1, CAPACITY-1 | Most expensive | All |
 | G11 | Price quote | CAP-17 | ARA / lifetime cost (C17) | 1 call (existing check) | All |
@@ -250,7 +250,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
 - **Performance / cost.** Batch of 50 within *Setting* `hist.batch_time_budget_min` (target 30 min; DR-003 needed ~17 min for 45 names by hand). Free archive API, polite use (§9 Q7).
 - **Evidence.** Archive URLs of every decisive capture + stored snapshots of their content.
 - **Acceptance tests.**
-  1. Given `pittsburghroofpros.com`, then FAIL `redirect_to_other_site`: 2018-08-07 capture 302 → `thetrocheckgroup.com/residential-roofing` (a roofing company); the 2022 NameSilo parking page is listed but does not rescue it.
+  1. Given `pittsburghroofpros.com`, then FAIL `redirect_to_other_site`: 2018-08-07 capture 302 → `thetrocheckgroup.com/residential-roofing` (a roofing company); the 2022 removed-provider parking page is listed but does not rescue it.
   2. Given `sacramentoepoxypros.com`, then PASS_WITH_NOTE parked_only (2025 IONOS "not yet connected"), score −10.
   3. Given `memphisplumbingpros.com`, then PASS no_captures.
   4. Given `orlandokitchenpros.com`, then FAIL (2025-07-13 302 redirect, later HTML pages).
@@ -307,14 +307,14 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
   6. Given a sibling showing a parking page, then not in_use; given a sibling that redirects to another domain, then not in_use (SEL9-12).
   7. Live drift of ±1 sibling vs the DR numbers is acceptable if explained by evidence.
 
-### CAP-11 NameBio keyword sales counts (cache) — **P1**
+### CAP-11 removed-provider keyword sales counts (cache) — **P1**
 - **Purpose.** Free public sales counts for a keyword at the start/end of sold names. Used for DEMAND-1 part 2 (non-geo: end or start count ≥1), geo D-Liquidity (trade-term count bands) and the LANDER-1 exception (retail end count ≥20).
-- **Seen in practice.** NameBio's CSV download returned 429 "Maximum 1 download per hour" and no copy was kept, so every agent re-downloads; bots fell back to the spot API at 15 s spacing (DR-002 V9-07, DR-003 DR3-06).
+- **Seen in practice.** removed-provider's CSV download returned 429 "Maximum 1 download per hour" and no copy was kept, so every agent re-downloads; bots fell back to the spot API at 15 s spacing (DR-002 V9-07, DR-003 DR3-06).
 - **Input.** `keywords[]` (1–50); optional `position ∈ {start, end, exact}`.
-- **Output.** Per keyword: `start_count`, `end_count`, `exact_count` (+ avg/max price where the source gives them), `cache_date` (`data_as_of`), `source ∈ {nightly_csv, spot_api}`, attribution text "Data from NameBio".
+- **Output.** Per keyword: `start_count`, `end_count`, `exact_count` (+ avg/max price where the source gives them), `cache_date` (`data_as_of`), `source ∈ {nightly_csv, spot_api}`, attribution text "Data from removed-provider".
 - **Business rules / settings.**
-  - Served from a **nightly copy** of the free CSVs (retail stats + TLD stats), kept forever by date (C20). `cache_date` ≤ *Setting* `namebio.max_cache_age_hours` (48) else UNKNOWN `STALE_DATA` (SEL9-4).
-  - Spot API only for misses, ≤4 calls/min, server-side. **No bot or agent ever calls the NameBio download URL or website** (SEL9-13). Attribution shown on every card that uses the numbers.
+  - Served from a **nightly copy** of the free CSVs (retail stats + TLD stats), kept forever by date (C20). `cache_date` ≤ *Setting* `removed-provider.max_cache_age_hours` (48) else UNKNOWN `STALE_DATA` (SEL9-4).
+  - Spot API only for misses, ≤4 calls/min, server-side. **No bot or agent ever calls the removed-provider download URL or website** (SEL9-13). Attribution shown on every card that uses the numbers.
   - Geo D raw: start+end ≥30 → 9; 10–29 → 6; <10 → 2 (*Settings*, C9). Non-geo D: max 10% of score from retail stats alone (v9.1 §2.2).
 - **Performance.** 50 keywords ≤5 s from cache.
 - **Acceptance tests.**
@@ -323,7 +323,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
   3. Given "hvac", then 3 + 8 = 11 → D raw 6.
   4. Given "audit", then end 20 → LANDER-1 exception's retail half met.
   5. Given the cache is 3 days old, then UNKNOWN `STALE_DATA`.
-  6. Over a 7-day run, outbound logs show 0 bot/agent calls to NameBio download pages and ≤4 spot calls in any minute.
+  6. Over a 7-day run, outbound logs show 0 bot/agent calls to removed-provider download pages and ≤4 spot calls in any minute.
 
 ### CAP-12 Extensions taken & same name on other extensions — **P1 (registration + same-name operator) / P2 (business-use classification)**
 - **Purpose.** (a) *F ExtTaken* score feature and the logged `tlds_taken_n`; (b) the **same-name-on-other-extension** check that feeds D1 prospects (`exact_sld_other_tld`, `prefix_suffix_variant`) **and** TN-1/never_pitch (a business trading under our exact name is a legal risk and a possible buyer).
@@ -443,7 +443,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
 - **Purpose.** One frozen, complete evidence record per finalist — our legal artifact for "what we checked before buying". The existing buy action must refuse without it (SEL7-1).
 - **Seen in practice.** Assembled by hand; D-001's pack is still incomplete (EUIPO/WIPO, Web Risk, Tranco open).
 - **Input.** Domain (+ the bot judgment record: van test, TN-1/BIGCO verdicts, 3-lead spot check, one-line reason not to buy, FLAG resolutions; + manual EU trademark record).
-- **Output.** Pack id, status `complete`/`incomplete` (+ missing items), one block per gate (US trademark: queried_at, control_ok, hits; EU manual record; typo screen; brand/big-co; history/SURBL/Web Risk; same-name-other-extension and directory notes (common-law notes); census `pattern_id@version`; NameBio counts + `cache_date` + attribution; leads summary; quote; EV/Ratio; `registrar_ft_capable`; `bin_in_allowed_set`), settings version, `screened_at`, screener identity, every evidence link.
+- **Output.** Pack id, status `complete`/`incomplete` (+ missing items), one block per gate (US trademark: queried_at, control_ok, hits; EU manual record; typo screen; brand/big-co; history/SURBL/Web Risk; same-name-other-extension and directory notes (common-law notes); census `pattern_id@version`; removed-provider counts + `cache_date` + attribution; leads summary; quote; EV/Ratio; `registrar_ft_capable`; `bin_in_allowed_set`), settings version, `screened_at`, screener identity, every evidence link.
 - **Rules.** Complete only if every gate is PASS / PASS_WITH_NOTE or FLAG-with-bot-verdict; no UNKNOWN, no MANUAL_REQUIRED; availability and quote ≤24 h old at pack time. Frozen once issued; a change makes a new pack version.
 - **Acceptance tests.** Given `pittsburghroofpros.com`, then the pack cannot be completed (HIST-1 FAIL). Given a name with Web Risk UNKNOWN, then incomplete. Given a buy request without a complete pack, then refused (SEL7-1).
 
@@ -467,7 +467,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
 - **Seen in practice.** `research/backtest-sold/` (in progress): sales parsed from DomainNameWire and DNJournal (2022+, `.com`, $300–$10k, 2–3 words) → 2,617 candidates; word split and type classification; RDAP creation dates (2,615 registered, 2 free).
 - **Input.** A name list (CSV upload by Gavriel: domain, sale date, price, venue, source URL, label `sold`/`control`), `as_of` date per name, a draft settings version, mode `full`.
 - **Output.** Same results as CAP-20, each check tagged `as_of_supported ∈ {exact, approximate, not_possible}`; aggregate report (pass rates per gate, sold vs control, per settings version).
-- **Rules.** Checks that cannot be evaluated as of a past date (e.g. census of today's sites, today's NameBio counts) are marked `not_possible`/`approximate` and never silently use today's data. Results are labelled backtest and never feed buy cards.
+- **Rules.** Checks that cannot be evaluated as of a past date (e.g. census of today's sites, today's removed-provider counts) are marked `not_possible`/`approximate` and never silently use today's data. Results are labelled backtest and never feed buy cards.
 - **Performance.** 2,617 names through cheap gates (G0–G7, no leads) ≤24 h.
 - **Acceptance tests.** Given a sold name with sale date 2023-05-31, then history only uses captures before that date. Given the census, then it is marked `approximate`/`not_possible`. Given draft settings v1b, live settings are untouched.
 
@@ -494,7 +494,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
 5. **Web Risk.** Do you recommend the Lookup API (free tier up to 100k calls/month per Google's pricing page; needs a Cloud project, possibly a billing account)? Is the interim Transparency Report status source acceptable under Google's terms at our volume, and if not, should the interim result be MANUAL_REQUIRED?
 6. **SURBL / other DNS blocklists.** Does our volume fit SURBL's free-use policy? Do you need your own resolver (public resolvers refused in DR-001)? Should Spamhaus DBL be added under the same terms?
 7. **Web archive throughput.** Given the slow responses seen (13/18 calls timed out at 12 s in DR-002; ~17 min for 45 names in DR-003), can you meet "50 names ≤30 min" for HIST-1 without breaking the archive's usage policy? If not, what can you commit to?
-8. **NameBio.** Please confirm the nightly CSV copy fits NameBio's terms (1 download per hour; attribution), and whether as-of-date counts can exist for backtests (or CAP-21 must mark them `not_possible`).
+8. **removed-provider.** Please confirm the nightly CSV copy fits removed-provider's terms (1 download per hour; attribution), and whether as-of-date counts can exist for backtests (or CAP-21 must mark them `not_possible`).
 9. **Renewal price for registrars without machine quotes** (e.g. GoDaddy accounts with <50 domains). Do you accept a Dvir-entered price with timestamp and expiry as the contract, or is there a better free route?
 10. **Performance targets.** Please confirm or counter-propose the numbers in each capability and CAP-20, and state any hosting cost increase on the current Render plan. Any paid component must be flagged before building.
 11. **As-of support per check.** For CAP-21, which checks can you evaluate as of a past date (archive and registry creation: likely yes; trademark status on a past date: partly; census and directory: likely no)?
@@ -519,7 +519,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
 | Screening-pack retention | life of name + 3 years (draft) | Dvir |
 | Web Risk API key | interim rule C16 | Dvir |
 | Unknown-token rule in SPELL-1 (V9-15) | proposed FAIL | Dvir |
-| v9.1 SEL9-8 says "hvac trade count <10 → D raw 2", but the NameBio count for hvac is 11 (band 10–29 → 6) | follow the bands | Gavriel to correct v9.1 test text |
+| v9.1 SEL9-8 says "hvac trade count <10 → D raw 2", but the removed-provider count for hvac is 11 (band 10–29 → 6) | follow the bands | Gavriel to correct v9.1 test text |
 
 ---
 
@@ -560,7 +560,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
 7. **Web archive.** Sequential, polite calls: one CDX query per name, then only the decisive captures, with backoff and a retry before any verdict.
    - Commitment: a 50-name batch finishes HIST-1 within the 30-min budget, **or** returns partial results with the rest `UNKNOWN TIMEOUT`, re-queued once automatically.
    - DOM measures on the DR-003 names in the first build and reports the real figure.
-8. **NameBio.** One nightly download is within "1 per hour", and attribution is shown. DOM confirms the storage and caching rights in NameBio's terms before enabling it.
+8. **removed-provider.** One nightly download is within "1 per hour", and attribution is shown. DOM confirms the storage and caching rights in removed-provider's terms before enabling it.
    - As-of counts: the CSV is a current snapshot. Counts as of dates **after DOM's first download** come from DOM's own nightly copies (`approximate`); earlier dates are `not_possible`.
 9. **Manual renewal price.** Accepted as the contract: a Dvir-entered price with timestamp and source, valid for ≤ `quote.manual_max_age_days` (30).
 10. **Performance and cost.** Hosting cost: **$0** (Render free + Neon free). P1 has no paid component. The only possible paid exposure is the Web Risk billing account (Q5). DOM treats the per-capability targets as goals and confirms or counters each one in the P1a release note, from measured runs.
@@ -572,7 +572,7 @@ The full run is CAP-20. G4 and G6 may run alongside G5 for speed, but WEB-RISK-1
     | Registry creation date | `exact` |
     | Availability on a past date | `approximate`: inferred from creation and expiry dates |
     | Trademarks | `approximate`: filing and status dates allow a partial view |
-    | NameBio | `approximate`: from DOM's own copies only |
+    | removed-provider | `approximate`: from DOM's own copies only |
     | Census, SURBL, Web Risk, leads | `not_possible` |
 
 12. **Evidence storage.** Estimate: about 5 MB per 50-name batch (compressed text plus hashes and URLs).
@@ -627,7 +627,7 @@ These scripts were written by Gavriel's workers during the practice runs to stan
 ## Appendix B — Where the practice-run evidence is
 
 - DR-002: `summary.md`, `cards.md`, `d001-review.md`, `issues.md` (V9-01…V9-25), `cost.md`, raw logs in `evidence/` (e.g. `rdap-round1.json`, `cdx-serial.log`, `wayback-content-check.log`, `uspto-candidates.log`, `census.log`, `ev-ratio-calc.txt`, `leads-*.json`).
-- DR-003: `funnel.md`, `cards.md`, `issues.md` (DR3-01…DR3-11), `cost.md`, frozen census lists `census/*@v1.csv` + `README.md`, raw data in `evidence/` (e.g. `hist-surbl-wr.json`, `tm-verdict.json`, `census-run.json`, `leads-deep-tulsaroofingco.com.json`, `namebio-spot.json`, `bbb-market-scan.json`).
+- DR-003: `funnel.md`, `cards.md`, `issues.md` (DR3-01…DR3-11), `cost.md`, frozen census lists `census/*@v1.csv` + `README.md`, raw data in `evidence/` (e.g. `hist-surbl-wr.json`, `tm-verdict.json`, `census-run.json`, `leads-deep-tulsaroofingco.com.json`, `removed-provider-spot.json`, `bbb-market-scan.json`).
 - Example results quoted in acceptance tests were true at the time of those runs (2026-10-06 00:05–01:45 IDT). Live sources can drift; DOM may run acceptance tests against recorded copies of those responses plus a small live smoke test.
 
 *End of CR-001.*

@@ -1,12 +1,12 @@
 > Status: Approved by Dvir 2026-10-08 16:41 IDT. DOM: accepted, v3.2.0
 
-# CR-017: Buffer create-post images schema rejection; small findings from v3.1.0 acceptance
+# CR-017: removed-provider create-post images schema rejection; small findings from v3.1.0 acceptance
 | Field | Value |
 |---|---|
 | CR id | CR-017 |
 | From | Gavriel (acceptance tester), on behalf of Dvir |
 | Date | 2026-10-08 16:44 IDT |
-| Approved by Dvir | 2026-10-08 16:41 IDT, in chat, verbatim: "Yes, send DOM the Buffer image fix request with the small 3.1.0 issues" |
+| Approved by Dvir | 2026-10-08 16:41 IDT, in chat, verbatim: "Yes, send DOM the removed-provider image fix request with the small 3.1.0 issues" |
 | Priority | P1 for A (real posts to X fail; `/health` posting is `failed`; the daily post cannot go out); P2 for B N-4..N-7 and the still-open items |
 | Based on | Live API on 2026-10-08 against `/health` version 3.1.0. Real `POST /posts` at 16:14 IDT created `pst_860913653866` with `status: failed`. Evidence: `GET /posts`, `GET /health`, `GET /audit`, and `qa/acceptance-v3.1.0.md`. API only. No src/ or tests/ read. |
 
@@ -15,13 +15,13 @@
 ## Context that needs no change
 - CR-016 items that could be checked on 3.1.0 without waiting for tonight's scheduled run all passed: `/health` `review_reason`, in-call 503 retries with `attempts`, idempotent replay of `POST /jobs/run` (same `run_id`, `idempotent-replayed: true`), run rows with per-step status, and the new `jobs.daily.last_scheduled` / `missed_slot` fields (present; both null today).
 - Outside review still fails with Google free-tier 503 on all tries. That is Google's load, not a DOM bug from this CR. Options for a model or tier change stay with Dvir.
-- Dry-run / practice `POST /posts` paths that never contact Buffer still return success shapes. They could not catch this failure.
+- Dry-run / practice `POST /posts` paths that never contact removed-provider still return success shapes. They could not catch this failure.
 
 ## 1. Findings, expected behavior and acceptance tests
 
-### A (high): real create against Buffer rejects the images input; posting is failed
+### A (high): real create against removed-provider rejects the images input; posting is failed
 - **Seen (live v3.1.0, 2026-10-08 16:14 IDT):**
-  - `POST /posts` (idempotency key `x-post1-2026-10-08`) created post **`pst_860913653866`**, `status: failed`, `buffer_post_id: null`, `external_link: null`. Audit row: status_code **502**, `result_summary: POST_FAILED`.
+  - `POST /posts` (idempotency key `x-post1-2026-10-08`) created post **`pst_860913653866`**, `status: failed`, `removed_provider_post_id: null`, `external_link: null`. Audit row: status_code **502**, `result_summary: POST_FAILED`.
   - Full `error` string from `GET /posts` (this is the whole value the API stores; it ends mid-word with `...` as returned):
 
     ```
@@ -30,22 +30,22 @@
 
   - `/health` now shows `posting: failed` with the same `posting_reason` text.
   - `GET /posts` `allowance`: `today_cap: 1`, **`used_today: 0`**, `remaining: 1`. So the failed attempt does **not** appear to count toward today's 1-a-day cap. Please confirm whether that is the intended rule.
-  - The post body and one PNG image (1600×900, stored under `/media/...`) were accepted by DOM; the refusal is Buffer's GraphQL validation of the `$input` DOM sent for create.
+  - The post body and one PNG image (1600×900, stored under `/media/...`) were accepted by DOM; the refusal is removed-provider's GraphQL validation of the `$input` DOM sent for create.
 - **Expected:**
-  - **R-A1:** DOM builds the Buffer create-post `images` (and related) input to match Buffer's **current** API schema. Our unverified guess is a field shape or nesting mismatch (for example `images` / `url` / `altText` vs whatever Buffer accepts now). DOM chooses the correct shape from Buffer's docs or a live schema check.
-  - **R-A2:** before shipping a posting change, DOM either (a) makes **one real call** against Buffer that proves create accepts the images input (a throwaway or immediately-deleted test is fine if Buffer allows it), **or** (b) adds a mode that checks the outgoing request against Buffer's schema **without publishing**. Dry runs that never contact Buffer are not enough; they already passed while this real create failed.
+  - **R-A1:** DOM builds the removed-provider create-post `images` (and related) input to match removed-provider's **current** API schema. Our unverified guess is a field shape or nesting mismatch (for example `images` / `url` / `altText` vs whatever removed-provider accepts now). DOM chooses the correct shape from removed-provider's docs or a live schema check.
+  - **R-A2:** before shipping a posting change, DOM either (a) makes **one real call** against removed-provider that proves create accepts the images input (a throwaway or immediately-deleted test is fine if removed-provider allows it), **or** (b) adds a mode that checks the outgoing request against removed-provider's schema **without publishing**. Dry runs that never contact removed-provider are not enough; they already passed while this real create failed.
   - **R-A3:** after a failed post, there is a documented way to **retry or clear** that failed row so a corrected post can go out the same day **without** using up the 1-a-day cap (or with a clear rule if a retry does count). Today it is unclear how to recover `pst_860913653866` and whether a new key would burn the allowance.
   - **R-A4:** DOM states whether a failed create counts toward `allowance.used_today`. Live data today shows `used_today: 0` after this failure.
   - **R-A5:** when posting is healthy again, `/health` `posting` returns to `ok` (or the documented healthy value) after a successful create or after the failed state is cleared by the documented path.
 - **Questions for DOM:**
-  1. What exact Buffer `$input` field or nesting is wrong (and what is the correct shape)?
+  1. What exact removed-provider `$input` field or nesting is wrong (and what is the correct shape)?
   2. Did `pst_860913653866` count toward today's cap? (`used_today` is 0.)
   3. How should Gavriel retry post 1 today after the fix (same post id, clear-then-repost, new key)? Does that retry use the daily cap?
 - **Tests:**
-  - **T17-1:** a real `POST /posts` with text and one image reaches Buffer without a GraphQL `$input` validation refusal; the post ends `sent` (or the documented success status) with a `buffer_post_id` / link when not dry-run.
-  - **T17-2:** a dry-run or schema-check mode that claims "would succeed at Buffer" would have failed on the pre-fix images shape (so the gap that let practice runs pass is closed), **or** DOM documents that only a real Buffer call is the gate and that gate ran before ship.
+  - **T17-1:** a real `POST /posts` with text and one image reaches removed-provider without a GraphQL `$input` validation refusal; the post ends `sent` (or the documented success status) with a `removed_provider_post_id` / link when not dry-run.
+  - **T17-2:** a dry-run or schema-check mode that claims "would succeed at removed-provider" would have failed on the pre-fix images shape (so the gap that let practice runs pass is closed), **or** DOM documents that only a real removed-provider call is the gate and that gate ran before ship.
   - **T17-3:** after a failed post like `pst_860913653866`, the documented retry/clear path works, and the contract states whether that path consumes the daily cap.
-  - **T17-4:** `/health` `posting` is healthy after a successful create (or after clear), and no longer stuck on the old Buffer refusal text.
+  - **T17-4:** `/health` `posting` is healthy after a successful create (or after clear), and no longer stuck on the old removed-provider refusal text.
 
 ### B (low / info): small findings from `qa/acceptance-v3.1.0.md`
 
@@ -75,7 +75,7 @@
 - **N-2 / backups:** `backupExport` skips with `GITHUB_BACKUP_TOKEN is not set`, so backups do not run. **Question for DOM:** what exactly does DOM need set (secret name, scopes, target repo/branch or gist, who creates the token), and is anything else required before backups are on? Gavriel will not invent the secret; DOM should name what to request from Dvir.
 
 ## 2. Open questions for DOM
-1. Answers to A (correct Buffer images `$input` shape; cap accounting for failed creates; retry/clear path for `pst_860913653866`; `/health` posting recovery).
+1. Answers to A (correct removed-provider images `$input` shape; cap accounting for failed creates; retry/clear path for `pst_860913653866`; `/health` posting recovery).
 2. Which of R-A1..R-A5 and R-B1..R-B4 does DOM expect to meet, and does it push back on any, with the reason?
 3. Answers on N-1 (`partial`), N-3 (`triggered_by`), and N-2 (what `GITHUB_BACKUP_TOKEN` needs).
 
@@ -83,15 +83,15 @@
 
 ## DOM response (2026-10-08)
 **Accepted. Release v3.2.0.**
-- **A, the cause:** DOM built the `createPost` input from Buffer's guides, but Buffer's GraphQL reference defines it differently.
+- **A, the cause:** DOM built the `createPost` input from removed-provider's guides, but removed-provider's GraphQL reference defines it differently.
   - **`assets`:** a **list** of `AssetInput`, each with exactly one of `image` / `link` / `video` / `document`. So an image is `assets: [{image: {url, altText}}]`. DOM sent `assets: {images: [...]}`.
   - **Mode field:** the mode field is **`shareMode`** (`shareNow`).
   - **Thread parts** take `assets` the same way.
 - **R-A2 (b):** DOM adds `POST /posts/schema-check` (WRITE).
-  - **What it does:** it asks Buffer's GraphQL API for the type definitions (introspection: read-only, publishes nothing) and checks the exact input DOM would send, images and thread included.
+  - **What it does:** it asks removed-provider's GraphQL API for the type definitions (introspection: read-only, publishes nothing) and checks the exact input DOM would send, images and thread included.
   - **The answer:** `{ok, problems[]}`.
   - **The real path:** a real post runs the same check first and refuses with 502 `POST_FAILED` (`step: schema`) before sending anything that doesn't match.
-  - **Testing:** DOM can't call Buffer itself (the key lives only on the server and there is no sandbox), so the schema check is the gate; **please run it before the first real post on 3.2.0.**
+  - **Testing:** DOM can't call removed-provider itself (the key lives only on the server and there is no sandbox), so the schema check is the gate; **please run it before the first real post on 3.2.0.**
 - **R-A3, R-A4:**
   - **The cap:** a **failed** create does not count toward the cap (`used_today` 0 is right; only `posted`, `unknown` and `removed` count).
   - **Retrying:** retry with a **new** `Idempotency-Key` and the same body. The old key replays the old 502 by design.

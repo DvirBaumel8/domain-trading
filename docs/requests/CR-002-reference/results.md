@@ -31,7 +31,7 @@
 
 - **Acquisition evidence (T1).** RDAP creation ≤36 months before the sale means the seller registered it, or re-registered it after a drop, shortly before selling: cheap to acquire. Wayback before the creation date shows which: **211/226 (93%) had prior captures**, so they are re-registered expired names. **15 had none**, so they are plausibly fresh hand-regs. Whether a NamePros seller called a name "hand reg" is **UNVERIFIED** per name.
 - **Composition.** 183 DNJournal / 43 DNW. Sale years: 2022 71, 2023 59, 2024 35, 2025 49, 2026 12. Types: descriptive 183, tech/compliance 33, service keyword 8, geo-other 2. Price median **$3,710** (p25 $3,100, p75 $4,600). **0 below $1,000; 13 at $1,000–2,499.** DNJ charts rarely list <$2.5k, which biases the set upward.
-- **NamePros "hand reg sold" threads:** reachable via WebFetch, but I tested 2 pages and got 0 usable rows (name + price + reg date, 2022+). Too token-costly page by page, so not used. NameBio per-sale search is Cloudflare-blocked; the free NameBio API only gives keyword aggregates. **No Afternic per-sale public feed exists** (DNW's Atom/Afternic posts are included).
+- **NamePros "hand reg sold" threads:** reachable via WebFetch, but I tested 2 pages and got 0 usable rows (name + price + reg date, 2022+). Too token-costly page by page, so not used. removed-provider per-sale search is Cloudflare-blocked; the free removed-provider API only gives keyword aggregates. **No Afternic per-sale public feed exists** (DNW's Atom/Afternic posts are included).
 
 ### 1.2 Control set (`controls.csv`, 284 rows)
 
@@ -53,7 +53,7 @@
 |---|---|---|
 | SPELL-1 | No digits or hyphens (filter) | exact |
 | HIST-1 | Wayback CDX **before the RDAP creation date**. Latest 200/html capture classified content / parked / forsale; any 3xx without parking → REJECT_REDIRECT (DR-003 logic). `scripts/wb.py` | at reg time ✓. Content classification is regex-based [est.] |
-| DEMAND-1 (non-geo) | **Frozen** 20-sibling list per name, built deterministically (10 first-token swaps + 10 last-token swaps from type-matched token pools; `scripts/census_build.py` → `census/bt1_*@v1.csv`, written before scoring). Run with the v9.1 C19 `in_use` definition (`scripts/census_run.py`). NameBio retailstats end/start ≥1 via the **free API at ≤4/min** (not the CSV download URL, per C20) | Census measured **today**, not at reg time. Sibling lists are a generic method, not hand-made patterns |
+| DEMAND-1 (non-geo) | **Frozen** 20-sibling list per name, built deterministically (10 first-token swaps + 10 last-token swaps from type-matched token pools; `scripts/census_build.py` → `census/bt1_*@v1.csv`, written before scoring). Run with the v9.1 C19 `in_use` definition (`scripts/census_run.py`). removed-provider retailstats end/start ≥1 via the **free API at ≤4/min** (not the CSV download URL, per C20) | Census measured **today**, not at reg time. Sibling lists are a generic method, not hand-made patterns |
 | LEAD-1 geo | DR-003 `geo_leads.py` functions (BBB API + firm sites, C15 role-inbox≤10→B) via `scripts/bt_geo_leads.py`. Only change: Nominatim coords and BBB plural category queries | Same method, today's market. Run on 16 sold geo + 25 dropped geo city-level names |
 | LEAD-1 non-geo | **PROXY:** the exact SLD on 10 alt TLDs + the hyphen .com, live sites with `in_use` (D1 prospects only; generic_same_service not crawled). `scripts/exttaken.py` | weak proxy. Sold names may gain alt TLDs after the sale (leakage), so this **overstates** winners' leads |
 | EV-1 / RATIO-1 | §2.1 formulas with the estimated A/B count; S3/S4 priors @ $1,488 / floor $967; geo @ $499 / $299; ARA $11.08 | exact formula, est. inputs |
@@ -91,7 +91,7 @@ AUC = P(random sold value > random dropped value); 0.5 = no signal; <0.5 = lower
 | — | Census `in_use_share` | median 0.10; ≥0.25 in **10%** | median 0.00; ≥0.25 in 0.4% | 0.76 | Separates, but the v9.1 threshold sits far too high |
 | — | Census `forsale_share` | ≥0.05 in 62% | 23% | 0.71 | Investor crowding ≠ bad |
 | — | `tlds_taken_n` today (DNS) | median 2 | 0 | 0.86 | **Leakage** (buyers register alt TLDs after the sale). Not usable as-is |
-| — | NameBio retailstats end-count, own sale −1 | ≥1 in 98% (n=112 measured) | ≥1 in 100% (n=21 measured) | 0.25 | **No useful signal.** Dropped names use *more* popular keywords (median 175 vs 64). Coverage partial and dropped n small (see §5) |
+| — | removed-provider retailstats end-count, own sale −1 | ≥1 in 98% (n=112 measured) | ≥1 in 100% (n=21 measured) | 0.25 | **No useful signal.** Dropped names use *more* popular keywords (median 175 vs 64). Coverage partial and dropped n small (see §5) |
 | — | Geo A/B lead count (BBB method) | median **1** (n=15) | median **1** (n=23) | ~0.5 | **No signal.** 0 of 38 names reach 8 A/B |
 | — | Token commonness (zipf) | 4.28 min | 4.17 | 0.56 | weak |
 | — | CPC / search volume | — | — | — | Not available free; not measured |
@@ -148,13 +148,13 @@ Searched single thresholds and 2-condition conjunctions on 8 at-registration fea
 
 ## 5. Caveats (read before acting)
 
-1. **Selection bias in the sold set:** DNJ/DNW report end-user and Sedo-heavy sales, mostly ≥$2.5k. The $300–$1k tier and outbound geo sales are invisible, and v9.1's geo lane lives there.
+1. **Selection bias in the sold set:** DNJ/DNW report end-user and removed-provider-heavy sales, mostly ≥$2.5k. The $300–$1k tier and outbound geo sales are invisible, and v9.1's geo lane lives there.
 2. **"Hand-reg" ≈ re-registered drops:** 93% of T1 had a prior life. The data supports **buying dropped names with history**, the S7 lane. It does not support fresh-string invention, where n=15 is too small to model.
 3. **Controls are 1:1 sampled and skew to one-year 2025 regs** from a GoDaddy-heavy drop list. They are dropped names, not proof the name could never sell.
 4. **Census measured today** for both sets (siblings registered since). Sold names are older, so their siblings had more time to be registered. That inflates `registered_share` for sold somewhat; the length-band check suggests it doesn't explain the gap.
 5. **Generic sibling method** (token-pool swaps), not Dvir's hand-curated pattern lists. Thresholds must be re-checked on `system/census/` patterns.
 6. **Non-geo LEAD-1 is a PROXY**, so treat its 99% fail as directional. Geo LEAD-1 used the real DR-003 method but today's BBB data and n=15/23.
-7. **NameBio retailstats coverage partial:** 134 keywords fetched (free API, effective ~1–3/min with 429 back-off); sold 112/226 and dropped 21/224 names have a last-token count. Conclusion "≥1 end/start count passes nearly everything" is stable; exact AUC is not.
+7. **removed-provider retailstats coverage partial:** 134 keywords fetched (free API, effective ~1–3/min with 429 back-off); sold 112/226 and dropped 21/224 names have a last-token count. Conclusion "≥1 end/start count passes nearly everything" is stable; exact AUC is not.
 8. **HIST-1 content classification is regex** (parked/for-sale words, ≥200 chars). Some "content" may be thin pages.
 9. **TM-1 / Web Risk / SURBL not replayed.** Some winners would also fail those, so the true v9.1 reject rate is the same (100%) and a v10 accept rate would be a bit lower.
 10. Small samples everywhere: geo n=15/23 for leads, fresh hand-regs n=15. **No AUC ≥0.7 claims beyond this backtest** (spec §6 rule) until shadow outcomes exist.

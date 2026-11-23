@@ -46,7 +46,7 @@ Dual writers for prices and other durable facts (DOM books vs company `ledger/po
 - AT-7 **X-Caller:** A shared-token call with `X-Caller` is accepted; missing header does not break READ (document default); logged when present.
 
 ## Out of scope
-- Sedo delist (CR-085) — **KEEP-4**; scrapes-off only.
+- removed-provider delist (CR-085) — **KEEP-4**; scrapes-off only.
 - Named READ tokens (rejected; one shared token — separate handoff).
 - Bak archive (CR-086 / box).
 - Moving judgment SOPs into code.
@@ -73,5 +73,5 @@ Verdict: accepted and built as written. Money is untouched: no route added here 
 - **R-8 X-Caller (AT-7):** optional header `X-Caller` (1..40 of `a-z 0-9 _ -`); stored in `audit_log.caller` next to the token, shown by `GET /audit`, added to the request log lines. Missing or invalid is ignored, never an error. No per-bot tokens. Tests XC-1..4. It sits next to the older `X-Bot-Name` (`bot_name`), which is unchanged.
 - **AT-1:** `CR084-AT1` checks `/books.csv` against `/portfolio/{d}` and `/portfolio` for every owned name (BK525-7 already compared the list view).
 - **AT-5:** approval gates unchanged; `CR084-AT5` re-checks that a bots token cannot really list or buy and that a WRITE price change needs its approval.
-- **CR-085 money-free part:** `pendingDomains(.., 'sedo')` is always empty (a new listing never makes a name pending for Sedo), `POST /list/{domain}` has no Sedo checklist step, `GET /export/sedo.csv` stays and documents "Sedo is off for new work, 27 Oct 2026"; existing Sedo records untouched. Five old tests that expected Sedo pending were changed to the new rule (CR085-AT4).
+- **CR-085 money-free part:** `pendingDomains(.., 'removed-provider')` is always empty (a new listing never makes a name pending for removed-provider), `POST /list/{domain}` has no removed-provider checklist step, `GET /export/removed-provider.csv` stays and documents "removed-provider is off for new work, 27 Oct 2026"; existing removed-provider records untouched. Five old tests that expected removed-provider pending were changed to the new rule (CR085-AT4).
 - **Migration:** `1768300000000_v5-63-0.sql` (`decisions`, `audit_log.caller`). Release still to do (version bump, CHANGELOG, release note, tag).

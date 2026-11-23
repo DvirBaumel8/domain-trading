@@ -37,7 +37,7 @@ Afternic public HTML / i18n bundle includes the string **`Offer cannot exceed $4
 - R-1 **Buyer-visible Buy Now only:** parse the amount the buyer is asked to pay for Buy Now / Buy it now (e.g. text like `Buy it now for $1,488` or the primary BIN control). Do **not** treat offer-form max/min error copy, lease examples, or unrelated `$` amounts as `shown`.
 - R-2 **Ignore known placeholders:** amounts that only appear in offer-limit / validation strings (including `$49,999,999` / `49999999`) must never become `shown`. Prefer unknown over a false mismatch.
 - R-3 **Contract stays:** if no Buy Now amount is findable (script-only / empty after redirects the service already follows), result is **unknown**, not mismatch (`jobs.md`).
-- R-4 **No listing writes:** this BUG does not call Afternic push, change prices, or touch Sedo.
+- R-4 **No listing writes:** this BUG does not call Afternic push, change prices, or touch removed-provider.
 - R-5 **Clear on next check:** after the fix, the next successful `portfolioCheck` must clear `LANDER_PRICE_MISMATCH` for these three when buyer-visible BIN matches the plan (or leave unknown — never re-raise on $49,999,999).
 
 ## Acceptance tests
@@ -51,7 +51,7 @@ Afternic public HTML / i18n bundle includes the string **`Offer cannot exceed $4
 2. **Public LTO button after 5.61/5.62 push:** API readback said lease-to-own button **on** for all five; Gavriel’s public landers showed **no LTO button on the listing body** (only a footer “Lease to Own” link under Sell Your Domains). Confirm whether Afternic’s public lander is supposed to show an LTO CTA when `show_lto` is true, or if API `show_lto` ≠ public button. Do not change listings unless a separate Dvir line says so.
 
 ## Out of scope
-Price/BIN changes; Sedo; browser automation; activating settings that spend money; re-asking Dvir on §5 Security A.
+Price/BIN changes; removed-provider; browser automation; activating settings that spend money; re-asking Dvir on §5 Security A.
 
 ## Changes
 - 2026-10-27 ~08:25 IDT (DOM Architect): filed from Gavriel `GAVRIEL-TO-DOM` ~08:20 + live `/report` evidence + HTML confirmation of `$49,999,999` offer-limit string.

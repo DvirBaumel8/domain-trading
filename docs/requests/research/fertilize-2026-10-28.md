@@ -19,9 +19,9 @@
 | **C** Hard kills | Trick Jun 26 / May 22 tables (TM + medical); NamePros GEO/personal-name advice; DomainSmoke/Apify/Brannans TM workflows (C/D) |
 | **D** Signals | GoDaddy Auctions EstiBot/Semrush signals post; GoValue rebuild Oct 8 2026; Hawkes appraisal R² study; Inventory Protocol / FTP migration |
 | **E** Cheap-first funnel | Trick workflow posts; Cultra scan order; Brad “barely look once 1 bid” |
-| **F** New since Oct KB | Afternic Portfolio API 2026-10-22; GoValue rebuild 2026-10-08; DNJournal 2025 charts; NameBio status 2026-10-26 (IP-blocked full table); .si defensive end-user sales |
+| **F** New since Oct KB | Afternic Portfolio API 2026-10-22; GoValue rebuild 2026-10-08; DNJournal 2025 charts; removed-provider status 2026-10-26 (IP-blocked full table); .si defensive end-user sales |
 
-**Blocked / thin:** NameBio full pages blocked from hosting IP (status line only). DNW Allemann 2025 podcast landing has no transcript numbers — do not invent from audio. Inventory Protocol browser showed 0 files at fetch time (files rotate daily).
+**Blocked / thin:** removed-provider full pages blocked from hosting IP (status line only). DNW Allemann 2025 podcast landing has no transcript numbers — do not invent from audio. Inventory Protocol browser showed 0 files at fetch time (files rotate daily).
 
 ---
 
@@ -39,7 +39,7 @@
 4. **Holding math bites hard.** At ~$10 .com renew and 1% STR, **100** names need ~**$1,000 net per sale** just to cover renewals (acquisition excluded). .AI ~$70 renew is ~7× harder.  
    Brad holding-costs thread.
 
-5. **Do not hard-cut on GoDaddy appraisal.** Hawkes: R² ≈ **0.215** vs Sedo sales; rigid ≥$4k appraisal filter would drop **23.3%** of $2k+ sales. fka: under ~$1,600 appraisal ≈ noise; over ~$4k ≈ competition magnet. GoDaddy itself (Oct 2026): appraisal is **one input**, not a guarantee.  
+5. **Do not hard-cut on GoDaddy appraisal.** Hawkes: R² ≈ **0.215** vs removed-provider sales; rigid ≥$4k appraisal filter would drop **23.3%** of $2k+ sales. fka: under ~$1,600 appraisal ≈ noise; over ~$4k ≈ competition magnet. GoDaddy itself (Oct 2026): appraisal is **one input**, not a guarantee.  
    [Hawkes](https://www.namepros.com/blog/is-godaddy-appraisal-value-a-useful-filter.1297561/) (B) · [GoValue](https://www.godaddy.com/resources/news/godaddys-domain-value-appraisal) (A)
 
 6. **Platform now ships Exact Match TLDs / Developed TLDs / Keyword Registrations** as first-party Auctions columns — plus Semrush SEO columns. Over **50,000** expired domains added/day. Inventory Protocol replaces FTP (`metadata.json` ~7–8am PST).  
@@ -123,7 +123,7 @@ No High belief changed this round (change-rule not met). Proposed notes for next
 1. **Money/POC caps** ($250/name, ~40 names, Risk Gate before buy card) — budget rules, not “list too big” cuts.
 2. **Top-5-with-cons every run** (Dvir locked) — review report, not 5 forced buy cards.
 3. **Buy cards only after Risk Gate** — near-misses stay paper/review.
-4. **.com-first for S8 discovery** — other extensions are signals, not our buy pool (long .ai especially weak per Brad/NameBio cite).
+4. **.com-first for S8 discovery** — other extensions are signals, not our buy pool (long .ai especially weak per Brad/removed-provider cite).
 5. **Standing freeze on meaning/shape before CR-083** — fertilize informs the draft; does not sneak-ship CR-083.
 6. **Anonymous forum weight 0 for High beliefs** — fka throughput is process inspiration (C), not a High belief mover alone.
 
@@ -131,7 +131,7 @@ No High belief changed this round (change-rule not met). Proposed notes for next
 
 - Ingest Inventory Protocol / Auctions signals into candidate rows for ranking.
 - Buyer SOP: judge full hard-filter field cheap-first; raise lean tool-call budget so we do not artificially stop at 10.
-- When closeouts unpause / Dynadot auctions unlock, apply the **same** Layer A/B order — no new top-N habit.
+- When closeouts unpause / removed-provider auctions unlock, apply the **same** Layer A/B order — no new top-N habit.
 
 ---
 

@@ -35,7 +35,7 @@ This file is the **blunt critique**. The operating plan is the companion proposa
 |---|---|---|
 | **Buyer re-applies hard filters DOM already dropped** | `08-judgment-vs-fixed-inventory.md` Buyer row: hard filters partially in shortlist/prebid; “Buyer still re-applies before carding.” DOM Architect 2026-10-27 classification: migrate hard filters so Buyer never cards them. | Token + wall-clock on SPELL/BRAND/BIGCO/LEN/price band already decided. |
 | **Risk Gate re-runs USPTO / comps Buyer already ran** | `lessons/shomer.md`: “never trust a card TM line; always rerun…” — correct for independence, but **exact AUTO-FAIL assists** (CAP-40, LEN-6, SPELL-1, BRAND/BIGCO csv, HIST-BAD) are FIXED candidates DOM already listed to pre-drop. | Independence is good for judgment; **re-doing deterministic kills in LLM turns is waste**. |
-| **Monday sale-rate re-scrape of public pages** | `sales/sale-rate-weekly.csv`; Sales catch-up 2026-10-27: Sedo public **503** → all Sedo fields `n/a`; views/leads always `n/a` (no public counters). Afternic price + dns.google NS are the only reliable public signals. | Weekly bot turns for data that **Afternic Portfolio API** (key now in DOM settings) or DOM `/report` should own once wired. |
+| **Monday sale-rate re-scrape of public pages** | `sales/sale-rate-weekly.csv`; Sales catch-up 2026-10-27: removed-provider public **503** → all removed-provider fields `n/a`; views/leads always `n/a` (no public counters). Afternic price + dns.google NS are the only reliable public signals. | Weekly bot turns for data that **Afternic Portfolio API** (key now in DOM settings) or DOM `/report` should own once wired. |
 | **Datasave used to depend on bot nudge** | CR-071: daily saves “run by hand on a bot nudge… broke on Oct 20… Oct 15–16 lost for good.” Moving to DOM job was correct — pattern to copy everywhere else. | Missed days = permanent (sources overwrite). |
 | **Pick-proof vs replay overlap** | CR-081 supersedes CR-073: pick-proof waited ~30 days / no Buyer picks since pause; historical replay uses archives now. Gavriel paused pick-proof routines. | Weeks of dual mental models; seals still exist for Oct 20–26 as archives — fine — but **daily pick-proof cost with zero picks was pure waste**. |
 
@@ -48,7 +48,7 @@ This file is the **blunt critique**. The operating plan is the companion proposa
 | Fact | Where it appears (non-exhaustive) | Risk |
 |---|---|---|
 | Owned BIN / floor / walk-away | `ledger/portfolio.csv`, DOM `/portfolio` + `/books.csv`, `sales/offers.md` (+ bak), deal folders, buy cards, Sales Monday CSV `price_shown_usd` | Drift (D-005 proved it) |
-| Listing live? | Afternic UI, Sedo UI, DOM venues, `sale-rate-weekly.csv`, `listings-evidence-*.md` | Sedo UNKNOWN / 503 vs Afternic ACTIVE |
+| Listing live? | Afternic UI, removed-provider UI, DOM venues, `sale-rate-weekly.csv`, `listings-evidence-*.md` | removed-provider UNKNOWN / 503 vs Afternic ACTIVE |
 | Decision text | `company/decisions-log.md`, chat memory, CR approval lines, `GAVRIEL-TO-DOM` digests | Memory ≠ code truth unless copied |
 | Org chart | `org/org-v2.md` (live) vs stale `system/bot-team.md` / early `company/company.md` (still name scouts) | Wrong bot names in old SOPs |
 | Pricing formula | DOM server + `sales/playbook.md` + `06` + ledger exceptions (D-001 walk-away $950) | Exception rows must stay one place |
@@ -65,7 +65,7 @@ This file is the **blunt critique**. The operating plan is the companion proposa
 | B-01 warning math as prose | `08` / Dvir Oct 22: true 3yr cost vs ≤1%/yr = WARNING | Structured fields on card/API; Dvir still decides |
 | Comp *count* assist | DOM: flag only; frame stays bot | Count in DOM; validity judgment stays Risk Gate |
 | Browser Afternic CSV Update path | `06` Day-0 0.6; Dvir ~3 min per upload | **Afternic Portfolio API key is in** — wire sync; stop CSV-as-default once proven |
-| Sedo ownership TXT / Make Offer / public scrape | CR-040 history; Sales UNKNOWN for all 5 on Sedo; `D-2026-10-27-SEDO` stop new Sedo work | Already decided: **do not invest tokens here** |
+| removed-provider ownership TXT / Make Offer / public scrape | CR-040 history; Sales UNKNOWN for all 5 on removed-provider; `D-2026-10-27-removed-provider` stop new removed-provider work | Already decided: **do not invest tokens here** |
 | Multi-scout era leftovers | Scouts absorbed 2026-10-20; routines paused; handoffs under `knowledge/handoffs/` — but lessons/scouts files and old routines still exist | Archive dead routines; one Buyer path only |
 | Challenger grading in LLM for FIXED suite rows | Stay bot per `08` — OK — but fixture portfolio CSVs duplicated under `challenge/work/**` | Keep grades bot; stop cloning live ledger into work trees without a seal |
 
@@ -76,7 +76,7 @@ This file is the **blunt critique**. The operating plan is the companion proposa
 ## 5. Browser / marketplace process debt
 
 - **Afternic:** public Buy-it-now pages readable; Portfolio API now available — world-class move was noticing it (Dvir tip). Still defaulting to CSV upload + headless lander checks (`06` 1.1–1.2: curl gets JS stub/403).
-- **Sedo:** public 503; ownership UNKNOWN for portfolio; automation weak. Decision: keep current listings, **add nothing more** (`D-2026-10-27-SEDO`). Continuing Sedo Monday rows that are all `n/a` is **ritual, not signal**.
+- **removed-provider:** public 503; ownership UNKNOWN for portfolio; automation weak. Decision: keep current listings, **add nothing more** (`D-2026-10-27-removed-provider`). Continuing removed-provider Monday rows that are all `n/a` is **ritual, not signal**.
 - **NS gaps:** D-002/D-003/D-004 historically Porkbun NS + forward vs Afternic NS target (`06` 0.4) — Sales later reported all 5 Afternic NS on catch-up day; treat NS sync as DOM/API job, not weekly rediscovery.
 - **LTO inconsistency:** D-005 approval line said “LTO on” vs B-07 no-public-LTO — open conflict in `06`.
 
@@ -98,7 +98,7 @@ This file is the **blunt critique**. The operating plan is the companion proposa
 1. **Gavriel as bottleneck for every DOM read** — Oct 17 split already recommended named READ tokens; still mostly WRITE+READ with Gavriel in the middle for many bot needs.
 2. **Achievements/failures live in chat digests** — `GAVRIEL-TO-DOM.md` / `DOM-TO-GAVRIEL.md` help, but no standing “weekly ops sync” contract between the two sides beyond ad-hoc digests.
 3. **Overlap of pick-proof + replay + Challenger grades** — CR-081 fixed the product overlap; communication lag meant bots kept pick-proof mental model after pause.
-4. **UNKNOWN walls treated as ongoing projects** — Sedo verification, EUIPO without founder key, marketplace click-order beyond CSV — should be **explicitly shelved** with a decision id, not open tabs forever.
+4. **UNKNOWN walls treated as ongoing projects** — removed-provider verification, EUIPO without founder key, marketplace click-order beyond CSV — should be **explicitly shelved** with a decision id, not open tabs forever.
 5. **Scale theater before edge** — `strategy-edge-research-2026-10-17.md`: honest bottom line was **“no edge”** on hand-reg .com-of-.net; automation only helps if aimed at buyers. We still spend cycles as if volume of cards = progress.
 
 ---
@@ -108,7 +108,7 @@ This file is the **blunt critique**. The operating plan is the companion proposa
 - Six-bot reorg (D-2026-10-20-REORG); scouts absorbed.
 - Discovery v2 shortlist-first (2026-10-27).
 - CR-071 datasave → DOM job; CR-079 portfolioCheck; CR-080 dual-runner locks; CR-081 replay; mutual-awareness `04`–`09`; DOM course.
-- Sedo “no new work” decision logged.
+- removed-provider “no new work” decision logged.
 - Afternic Portfolio API key landed in DOM settings (wire remaining).
 
 These prove the team *can* migrate FIXED work. The critical notes are about **what still burns**.
@@ -158,7 +158,7 @@ Sources preferred: named blogs, NamePros veterans, DNJournal/DomainSherpa-adjace
 1. Dual write owners for prices (ledger vs DOM vs live Afternic).
 2. Bots re-apply FIXED filters DOM already computed.
 3. Risk Gate LLM turns on deterministic AUTO-FAIL that should be pre-drops.
-4. Sedo Monday ritual of all-`n/a` after we decided no new Sedo work.
+4. removed-provider Monday ritual of all-`n/a` after we decided no new removed-provider work.
 5. Browser CSV / lander loops after Afternic API key exists but isn’t wired.
 6. 267 bak files + cloned portfolio CSVs — cleanup inventory unfinished.
 7. Stale org/docs still naming retired scouts as if live.
@@ -166,7 +166,7 @@ Sources preferred: named blogs, NamePros veterans, DNJournal/DomainSherpa-adjace
 9. Chat/memory as pseudo-truth instead of decisions-log / request export.
 10. Scaling card volume / enrichment before a proven edge (strategy research already said so).
 11. Gavriel bottleneck on DOM reads (named READ tokens still thin).
-12. Open UNKNOWN projects without a shelve decision (Sedo verify, EUIPO key, click-order SOPs).
+12. Open UNKNOWN projects without a shelve decision (removed-provider verify, EUIPO key, click-order SOPs).
 
 ---
 

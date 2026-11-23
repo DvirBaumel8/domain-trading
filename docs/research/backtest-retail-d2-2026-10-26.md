@@ -1,6 +1,6 @@
 # Backtest on retail labels: Gavriel's D2 dev split (DOM, 26 Oct 2026)
 
-**Data:** `docs/requests/research/d2-names-labels-2026-10.csv` (Gavriel, 26 Oct): 3,631 aged .com names sold at retail for $500+ (public weekly reports: UnreportedSales, DNJournal, Domain Name Wire; no NameBio) and 14,524 GoDaddy closeout leftovers (0 bids, $50 or less). Only the **dev** split was used (2,532 sold, 10,112 not sold); the sealed split stays closed for one final check. Measure: AUC (0.5 = a coin toss). Scripts: scratchpad `pass1026/d2.mts`, `spell.mts`.
+**Data:** `docs/requests/research/d2-names-labels-2026-10.csv` (Gavriel, 26 Oct): 3,631 aged .com names sold at retail for $500+ (public weekly reports: UnreportedSales, DNJournal, Domain Name Wire; no removed-provider) and 14,524 GoDaddy closeout leftovers (0 bids, $50 or less). Only the **dev** split was used (2,532 sold, 10,112 not sold); the sealed split stays closed for one final check. Measure: AUC (0.5 = a coin toss). Scripts: scratchpad `pass1026/d2.mts`, `spell.mts`.
 
 | Signal | AUC (dev) |
 |---|---|

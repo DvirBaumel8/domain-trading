@@ -21,7 +21,7 @@ The top-priority test (do bot picks beat random and a simple rule?) must not be 
 Seeded MT19937 / Fisher-Yates recipe (CR-008), test-set seals, cohorts with 30/60/90-day re-registration checks (cohortOutcomes) and Wilson reports, holdout guard. Cohorts cap at 200 names, so a new structure is needed.
 
 ## Rules
-- R-1 Pool per day = the CR-071 snapshot at 06:00 IDT of Dynadot + GoDaddy closeouts at <= $40, minus sales-graded names; frozen pool sha256. Seed = first 8 hex of that sha256.
+- R-1 Pool per day = the CR-071 snapshot at 06:00 IDT of removed-provider + GoDaddy closeouts at <= $40, minus sales-graded names; frozen pool sha256. Seed = first 8 hex of that sha256.
 - R-2 Arms, k=100/day (setting, raise-only up to 300): A BOTS (`POST /pickproof/{date}/picks` from Buyer, scripted, before 16:00 UTC), B1 random from pool, B2 random from K1-passing, C1 random from 2-word <=10 letters, C2 .net-registered (reported only). DOM draws B1, B2, C1, C2.
 - R-3 Seal: `GET /pickproof/{date}/manifest` returns sha256 of pool, seed, each arm, and the frozen recipe shas. The bots append it to docs/requests/pick-proof-seals.md (plan §13: git commit timestamps are the witness). After seal, picks for that day are 409 `PICKPROOF_SEALED`.
 - R-4 Labels: daily step checks T30 ("taken in 30 days": registered at RDAP) for **every pool name**, blind to arms; unknown stays `unknown`, never "not taken". Labels are also read from `market_names` (CR-075): an arm name later seen listed and unsold there is a negative example; the seal format is shared with `GET /market/matched`.
@@ -66,7 +66,7 @@ None.
 
 ## DOM release (2026-10-22): v5.28.0 tagged
 - **Routes:** `GET /pickproof/{date}/manifest`, `POST /pickproof/{date}/picks` (bots or WRITE; picks close at 16:00 UTC of D), `GET /pickproof/{date}/arms?arm=` (only after the seal; before it, 409 `PICKPROOF_NOT_SEALED`) and `GET /pickproof/report?from=&to=`.
-- **Pool for D:** the sealed save of D-1, made of GoDaddy closeouts plus the Dynadot closeouts upload if one is sealed. It is `.com`, ≤ $40 and excludes sales-graded names. It is frozen with a sha256, and the seed is its first 8 hex.
+- **Pool for D:** the sealed save of D-1, made of GoDaddy closeouts plus the removed-provider closeouts upload if one is sealed. It is `.com`, ≤ $40 and excludes sales-graded names. It is frozen with a sha256, and the seed is its first 8 hex.
 - **Seal:** the first manifest call at or after 16:00 UTC of D seals the day. Please make that call and append the manifest line to `pick-proof-seals.md`. The random arms are readable only after it.
 - **Arms:** A, B1, B2 and C1 are built; C2 is `not_built`. The exact recipe and its sha256 values are in every manifest (`recipe`) and in `docs/internal/pickproof.md`.
 - **T30 labels:** checked by RDAP **status**, for the arm names only.
@@ -78,12 +78,12 @@ None.
 - **Please verify** AT-1..AT-7 from the first day after the next 15:00 UTC save.
 
 ## Gavriel (2026-10-21 04:09 IDT): v5.28.0 first look
-- `GET /pickproof/2026-10-21/manifest` (before the seal) gave 200: `data_date` 2026-10-20, `pool_n` 129,996 (GoDaddy 125,395 + Dynadot 4,601 sealed), `k` 100, arm A open with 0 picks, B1/B2/C1 `pending_seal`, C2 `not_built`, recipe hashes present.
+- `GET /pickproof/2026-10-21/manifest` (before the seal) gave 200: `data_date` 2026-10-20, `pool_n` 129,996 (GoDaddy 125,395 + removed-provider 4,601 sealed), `k` 100, arm A open with 0 picks, B1/B2/C1 `pending_seal`, C2 `not_built`, recipe hashes present.
 - `GET /pickproof/2026-10-21/arms?arm=A` before 16:00 UTC gave 409 `PICKPROOF_NOT_SEALED` with the 19:00 IDT deadline. Pass.
 - Gavriel will make the seal call at or after 16:00 UTC and append the line to `pick-proof-seals.md`; AT-1..AT-7 from the first day after the next 15:00 UTC save.
 
 ## Gavriel check (2026-10-21 ~04:10 IDT): v5.28.0 live, before-deadline checks pass
-- `GET /pickproof/2026-10-21/manifest` (before 16:00 UTC): pool 129,996 names from data date 2026-10-20 (GoDaddy 125,395 + Dynadot 4,601 sealed), seed 2160899977, k 100, A `open`, B1/B2/C1 `pending_seal`, C2 `not_built`, recipe hashes present. Pass.
+- `GET /pickproof/2026-10-21/manifest` (before 16:00 UTC): pool 129,996 names from data date 2026-10-20 (GoDaddy 125,395 + removed-provider 4,601 sealed), seed 2160899977, k 100, A `open`, B1/B2/C1 `pending_seal`, C2 `not_built`, recipe hashes present. Pass.
 - `GET /pickproof/2026-10-21/arms?arm=B1`: 409 `PICKPROOF_NOT_SEALED`. Pass.
 - `GET /pickproof/report`: no sealed days, every comparison `UNPOWERED`, labelled "proxy, not profit". Pass.
 - Not done by me: picks (Buyer), the 16:00 UTC seal and the seals file line (Challenger), AT checks after the seal.

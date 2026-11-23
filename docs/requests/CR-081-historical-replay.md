@@ -17,17 +17,17 @@ max_rounds: 3
 The pick-proof waits ~30 days per day and has had no Buyer picks since bots paused (23 Oct). Dvir: test our logic **now** on saved lists — run filters/score as of that day, draw randoms from the same filtered pool, check later public outcomes, list winners for investigation, improve. Waiting months for T30 labels is the cost of not doing this.
 
 ## What already exists (reference; reuse, don't rebuild)
-- Daily archive / seals: `datasave` job (`godaddyInventory`, `dynadotCloseouts` when key live, `scorePool`, `auctionShortlist`, `engineFeed`, `episodes`, `dqMarket`); compact GD ≤$250 .com gzip archives on Mac for 20–26 Oct (~26 MB/day).
+- Daily archive / seals: `datasave` job (`godaddyInventory`, `removedProviderCloseouts` when key live, `scorePool`, `auctionShortlist`, `engineFeed`, `episodes`, `dqMarket`); compact GD ≤$250 .com gzip archives on Mac for 20–26 Oct (~26 MB/day).
 - Filters + offline scores: `scorePool` + `GET /candidates/closeouts` (CR-072).
 - Auction shortlist + paper outcomes: `auctionShortlist` + `GET /auctions/shortlist` / `GET /auctions/funnel` (auction-v4).
 - Auction finals / ends: `godaddy_auction_end`, `engine_sales`, `engine_auction_ends`, `engine_unsold` (CR-071 R-10, CR-075, 5.50.0).
-- Market / retail uploads: `POST /data/sales`, `GET /market/episodes` (UnreportedSales / DNJournal / DNW via bots; NameBio forbidden).
+- Market / retail uploads: `POST /data/sales`, `GET /market/episodes` (UnreportedSales / DNJournal / DNW via bots; removed-provider forbidden).
 - D2 retail labels: `docs/requests/research/d2-names-labels-2026-10.csv` (18,155 rows; `split` = `dev`|`sealed`, salt `L2-iter-v1`). Sealed half stays closed until one final check.
 - Pick-proof (to stop daily): steps `pickproofSeal`, `pickproofLabels`; routes `GET|POST /pickproof/*`. Sealed days 20–26 Oct stay as ordinary archives (replay may score them when outcomes exist). Gavriel already paused pick-proof routines.
 
 ## Rules
 - R-1 **Pick-proof daily OFF.** Datasave must **not** run new `pickproofSeal` / `pickproofLabels` work or grow pool storage for new days. Days already sealed (Oct 20–26 and any earlier) stay readable as archives (manifest/arms/labels as stored); no requirement to finish T30 labelling. New `POST /pickproof/{date}/picks` for an unsealed future day may 409 `PICKPROOF_STOPPED` (or equivalent documented code). Discovery stays shortlist-first (DISCOVERY-FLOW-V2); this CR does not change money gates.
-- R-2 **Compact daily archive continues.** Keep saving compact daily GoDaddy `.com` rows at **≤ $250** with every field (gzip JSON lines) on the Mac host disk (~26 MB/day), keyed by source data date — not only the 7-day raw zip window and not the Neon pool. Dynadot closeouts/aftermarket the same way once `DYNADOT_API_KEY` is nonempty. `/health` (or the replay report) shows `archive_days_n` / listed archived dates and any **missing** day in the expected range.
+- R-2 **Compact daily archive continues.** Keep saving compact daily GoDaddy `.com` rows at **≤ $250** with every field (gzip JSON lines) on the Mac host disk (~26 MB/day), keyed by source data date — not only the 7-day raw zip window and not the Neon pool. removed-provider closeouts/aftermarket the same way once `REMOVED_PROVIDER_API_KEY` is nonempty. `/health` (or the replay report) shows `archive_days_n` / listed archived dates and any **missing** day in the expected range.
 - R-3 **One replay tool for saved day D.** **Primary interface (locked 2026-10-27 via Gavriel):** `GET /replay/{date}` (READ or bots) — report for data date D (or pick-day mapping documented in the release note). Host `npm run replay` is a **local helper only** (may write the same report the GET reads); optional `POST /jobs/run {"job":"replay",...}` is fine if documented, but ATs and bots use the GET. For day D: run the **filters and scoring frozen as they stood on D** on D's archived list; draw **N** random names (default N = shortlist size or 25; setting ok) from the **same filtered pool** with a **fixed seed** derived from the pool/archive sha (reproducible; MT19937 / Fisher-Yates as CR-008 / pick-proof). Report precision of our top N vs the randoms with **counts beside every rate**.
 - R-4 **Outcomes — side by side, never merged** (retail is the headline):
   1. Later **public retail** sale (UnreportedSales / DNJournal / DNW via `POST /data/sales` / market episodes / D2 `dev` rows only while tuning): flag **$500+** separately;
@@ -60,15 +60,15 @@ The pick-proof waits ~30 days per day and has had no Buyer picks since bots paus
 
 ## Out of scope
 - Resuming pick-proof daily seals or Buyer arm-A nudges.
-- Money actions, bid plans, listings, settings activation, Dynadot key creation (key install is outside this CR; Dynadot archive follows when key is nonempty).
-- Scraping NameBio or venue seller pages; opening D2 `sealed` rows during tuning.
+- Money actions, bid plans, listings, settings activation, removed-provider key creation (key install is outside this CR; removed-provider archive follows when key is nonempty).
+- Scraping removed-provider or venue seller pages; opening D2 `sealed` rows during tuning.
 - Replacing discovery flow v2 (shortlist-first stays).
 - Challenger grading UI; bots write investigation notes outside DOM.
 
 ## Decisions (locked — replace open questions; do not add Reply N)
 1. **Primary interface:** `GET /replay/{date}`. `npm run replay` = local helper only. (Gavriel 2026-10-27, matches Dvir-approved plan.)
 2. **Scoring:** freeze filters + score as they stood on day D — not today's recipe with features capped at D. (Gavriel 2026-10-27.)
-3. **Dynadot archive:** remains out of this CR until `DYNADOT_API_KEY` nonempty.
+3. **removed-provider archive:** remains out of this CR until `REMOVED_PROVIDER_API_KEY` nonempty.
 
 ## DVIR items
 None remaining (Dvir already said yes to build; no money, no new paid service, no founder-rule change).
@@ -85,7 +85,7 @@ None remaining (Dvir already said yes to build; no money, no new paid service, n
 The CR says to freeze "the filters + score recipe/model as they stood on day D, not today's recipe". DOM does **not** implement that. **Resolution: the default is today's logic, run on day D's point-in-time data** (only D's archived fields, frozen lists, `settings`, and a lift table trained on or before D, else the CR-002 seed table). Reasons: Dvir's request is to test and improve our current logic; the recipe of past days was never stored (the shortlist logic changed six times on 26 Oct), so "as it stood on D" cannot be rebuilt honestly. Every report stores `logic_version` (`replay-v1|score version|lift id|settings hash`). The body and query field `logic` accepts only `"current"`; `as_of_date` answers 422 `REPLAY_LOGIC_UNAVAILABLE` until recipe versions are stored per day (v2).
 
 ### What v1 does
-- **Archive:** datasave `godaddyInventory` writes `<ARCHIVE_DIR>/godaddy/<data_date>-<file base>.jsonl.gz` for `all_biddable_auctions` and `closeout_listings` (`.com`, price at most the S8 cap setting, all fields, gzip; skipped if present; failure only reported). `ARCHIVE_DIR` defaults to a sibling `archive` of `SNAPSHOT_DIR`. `/health.archive` = `{days_n, first, last, missing_days}`. Nothing deletes it. Dynadot is not archived (no key).
+- **Archive:** datasave `godaddyInventory` writes `<ARCHIVE_DIR>/godaddy/<data_date>-<file base>.jsonl.gz` for `all_biddable_auctions` and `closeout_listings` (`.com`, price at most the S8 cap setting, all fields, gzip; skipped if present; failure only reported). `ARCHIVE_DIR` defaults to a sibling `archive` of `SNAPSHOT_DIR`. `/health.archive` = `{days_n, first, last, missing_days}`. Nothing deletes it. removed-provider is not archived (no key).
 - **Pick-proof off:** `settings.pickproof_enabled` (default false). The two datasave steps report `{status: "off", reason: "CR-081"}`; no new pick day is frozen; picks for an unsealed day are 409 `PICKPROOF_STOPPED`. Sealed days stay readable.
 - **Replay:** `GET /replay/{date}` (READ or bots; `kind`, `n` default 25, `seed`) is the route bots use: the newest finished report or 404 `REPLAY_NOT_RUN`. `POST /replay/runs` (WRITE only) queues a run (202 `{id}`; `dry_run` answers at once and stores nothing); `GET /replay/runs/{id}` and `GET /replay/runs` read status. Seed default = sha256 of the day's archive file plus the kind; the random group is shuffled with the pick-proof's MT19937 / Fisher-Yates from `src/core`. The report has counts beside every rate, `too_small` under 20 positives, a seeded paired bootstrap (1,000 resamples) per label, and `did_well` with the features of every positive name from both groups. Labels are side by side: `reached_100`, `beat_our_max`, `taken` (closeouts, pending until D+30, stored RDAP tags only), `retail_sale`, `retail_500`.
 - **Point in time:** test RPY81-13 proves picks, scores, parts and maximums of D are identical with and without the D+1 file (AT-2).
@@ -100,6 +100,6 @@ The CR says to freeze "the filters + score recipe/model as they stood on day D, 
 - R-9 keep rule is the bots' harness; DOM exposes `ours_win_share` only. No slice (price band) breakdown yet.
 - Brand-typo rule and the other-endings lookups are not applied in the replay (endings unknown by design).
 - Auction finals use the ended-auction tracker (from $100) or the last archived row (a lower bound); `beat_our_max` is a lower bound too.
-- `npm run replay` helper not built (skipped, as allowed). Dynadot archive waits for the key.
+- `npm run replay` helper not built (skipped, as allowed). removed-provider archive waits for the key.
 - AT-8 is met by `/health.archive`; there is no `GET /replay` index.
 - `pickproofLabels` no longer shrinks old pool rows while off.

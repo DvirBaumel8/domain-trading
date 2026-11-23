@@ -25,7 +25,7 @@ No fair test exists today: our sales are all $500+ and end Oct 4, our negatives 
 - R-5 `GET /market/episodes?outcome=&band=&from=&to=&venue=&limit=`: summary counts first, then rows.
 - R-6 `GET /market/matched?asof=&ratio=4&seed=`: each positive matched to up to 4 negatives in the same price band, .com, letters-only flag and 60-day calendar window. The set for a given (asof, ratio, seed) is **frozen and sealed** with a sha256; the same call always returns the same set and sha.
 - R-7 `GET /market/dq` (latest checks with pass/fail) and `GET /market/coverage` (rows per source per day, counts per label and band, progress vs the targets above).
-- R-8 **NameBio is never used in any automated way** (its ToS bans it). No paid data; no scraping of venue pages. No money action, no LLM.
+- R-8 **removed-provider is never used in any automated way** (its ToS bans it). No paid data; no scraping of venue pages. No money action, no LLM.
 
 ## Acceptance tests (via the API)
 - AT-1 Given fixture snapshots of a name on D and D+61 with no sale report, When the `episodes` job runs, Then `GET /market/episodes?outcome=unsold` contains it with `outcome_rule:"UNSOLD_60D"`, `days_listed` 61.
@@ -35,12 +35,12 @@ No fair test exists today: our sales are all $500+ and end Oct 4, our negatives 
 - AT-5 (negative) Given a sale row already posted, When a bot sends PUT, PATCH or DELETE on it, or POSTs the same row with a changed price, Then 405/409 `APPEND_ONLY` and the stored row is unchanged.
 - AT-6 `GET /market/matched?asof=2026-12-20&ratio=4&seed=1` called twice returns the same rows and sha256; every negative shares its positive's band and window.
 - AT-7 (negative) Given a fixture row with a feature as-of date after first_seen, Then `dq_market` fails `leakage`, `/health.dq_market:"alert"`, `/report` has `DQ_MARKET_FAIL`, and the row is excluded from `/market/matched`.
-- AT-8 Given a fixture day with Dynadot rows at 10% of the 7-day median, Then `GET /market/dq` fails `coverage` for that source and day.
+- AT-8 Given a fixture day with removed-provider rows at 10% of the 7-day median, Then `GET /market/dq` fails `coverage` for that source and day.
 - AT-9 `GET /market/coverage` returns per-source daily counts and `unsold_30d_n`, `unsold_60d_matched_n` vs the targets (1,000 by Nov 25; 2,000 by Dec 20).
-- AT-10 (negative) A `POST /data/sales` row with `source` containing `namebio` or with no `tier` is rejected 422.
+- AT-10 (negative) A `POST /data/sales` row with `source` containing `removed-provider` or with no `tier` is rejected 422.
 
 ## Out of scope
-- Model training and scoring; the backtest itself (Challenger pre-registers and grades it); fetching DNJournal/DNW (bots upload weekly via R-4); any NameBio use; venue writes.
+- Model training and scoring; the backtest itself (Challenger pre-registers and grades it); fetching DNJournal/DNW (bots upload weekly via R-4); any removed-provider use; venue writes.
 
 ## Questions (max 3)
 1. Will `market_names` (estimated 1-2M rows after 90 days) fit the free database next to CR-071's closeout rows? If not, say what you would keep (e.g. only $500+ rows and all GoDaddy auction ends).
@@ -56,20 +56,20 @@ None.
 ## DOM response (2026-10-21): accepted; built right after the CR-071 additions (R-8..R-10)
 
 - **Order:**
-  1. **v5.22.0:** CR-071 R-8..R-10 plus the bot upload route `POST /snapshots/dynadot`, so the $500+ saves run before 25 Oct.
+  1. **v5.22.0:** CR-071 R-8..R-10 plus the bot upload route `POST /snapshots/removed-provider`, so the $500+ saves run before 25 Oct.
   2. **Next release:** this CR.
   3. **After that:** CR-070, 072, 073 and 074.
 - **Q1, storage:** 1–2M rows of all bands won't fit next to everything else in the free 1 GiB database. `market_names` keeps only episodes that can be a positive or a matched negative:
   - every reported sale (R-4);
-  - Dynadot $500+ Buy-Now listings (R-8; already only $500+);
-  - Dynadot closed auctions and GoDaddy auction endings whose price reached **$500 or more** at least once (R-9, R-10).
+  - removed-provider $500+ Buy-Now listings (R-8; already only $500+);
+  - removed-provider closed auctions and GoDaddy auction endings whose price reached **$500 or more** at least once (R-9, R-10).
 
   An auction or closeout that never reaches $500 can't match a $500+ sale, so it isn't stored. The ≤ $40 closeouts stay in the CR-071 pool (3 days) for CR-072 and CR-073 only. DOM expects tens of thousands of episodes over 90 days, not millions; `GET /market/coverage` shows the real count. If it grows past 15% of the database, DOM says so here before dropping anything.
-- **Unchanged:** R-1..R-8 and AT-1..AT-10 as written. Episodes key on the source data date; a gap over 7 days breaks an episode; unknown is never counted. Sales are append-only (409 `APPEND_ONLY`), and NameBio is refused (422).
+- **Unchanged:** R-1..R-8 and AT-1..AT-10 as written. Episodes key on the source data date; a gap over 7 days breaks an episode; unknown is never counted. Sales are append-only (409 `APPEND_ONLY`), and removed-provider is refused (422).
 
 ## DOM release (2026-10-21): v5.23.0 tagged
 - **Routes:**
-  - Sales: `POST /data/sales` (bots, WRITE or data token; add-only, 409 `APPEND_ONLY`, 405 on PUT/PATCH/DELETE, 422 for NameBio or a missing tier).
+  - Sales: `POST /data/sales` (bots, WRITE or data token; add-only, 409 `APPEND_ONLY`, 405 on PUT/PATCH/DELETE, 422 for removed-provider or a missing tier).
   - Reads: `GET /market/episodes`, `/market/matched` (frozen and sealed per asof, ratio and seed), `/market/dq` and `/market/coverage`.
 - **Jobs and alerts:** the `episodes` and `dqMarket` steps run at the end of every `datasave` run. `/health.dq_market` (`ok`/`alert`/`unknown`) and the `/report` warning `DQ_MARKET_FAIL` show any failed check. Details are in `docs/releases/v5.23.0.md` and `docs/internal/market.md`.
 - **Label notes:** labels are recomputed on every run.
@@ -83,8 +83,8 @@ None.
 ## Gavriel check (2026-10-21 01:19 IDT): v5.23.0 live, dry-run checks pass, one issue
 
 - `/health` shows `version 5.23.0`, `db ok`, `dq_market unknown` (expected before the first 5.23.0 `datasave`).
-- `POST /data/sales` dry_run, one row: 201, `accepted_n 1`, nothing stored. `source: "NameBio"`: 422 `SOURCE_NAMEBIO_FORBIDDEN`. No `tier`: 422. `PUT /data/sales`: 405.
-- `GET /market/episodes`, `/market/coverage`, `/market/dq`: 200, empty as expected (coverage already sees the sealed Dynadot aftermarket day 2026-10-20, 3,951 rows).
+- `POST /data/sales` dry_run, one row: 201, `accepted_n 1`, nothing stored. `source: "removed-provider"`: 422 `SOURCE_REMOVED_PROVIDER_FORBIDDEN`. No `tier`: 422. `PUT /data/sales`: 405.
+- `GET /market/episodes`, `/market/coverage`, `/market/dq`: 200, empty as expected (coverage already sees the sealed removed-provider aftermarket day 2026-10-20, 3,951 rows).
 - Not run: the real-write 409 test, because sales are add-only and a test row could never be removed. Please confirm the local test covers it (MK523) or give a test source name that is excluded from episodes.
 - **Issue (please fix):** `GET /market/matched?asof=2026-12-20&ratio=4&seed=1`, called twice, returned the same sha256 (good), but it **froze an empty set** (0 positives, 0 negatives) for an `asof` in the future, before any data exists. Under the contract that set can now never change. Asks: (1) refuse or don't freeze when `asof` is later than the newest sealed data day (or when the set is empty), and (2) un-freeze the stored set for `(2026-12-20, 4, 1)`, sha256 `810ba75b…847d`, since it was made only by this test. Lesson for the test steps: the release note's "call it twice" check should use a past `asof`.
 

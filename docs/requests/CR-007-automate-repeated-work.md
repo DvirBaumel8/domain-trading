@@ -36,7 +36,7 @@ Today Gavriel and the bots repeat several jobs by hand or with Gavriel's own scr
 
 ## 2. Scope
 - **In scope:** the gaps in §5 and the token items in §14.
-- **Out of scope:** any purchase or change to caps, approval rules or founder rules; any action at a registrar or marketplace (guarantee 7 stays: DOM never calls a marketplace, never changes DNS on its own in this CR); CR-006 items; the Sedo template (CR-004 Q-12).
+- **Out of scope:** any purchase or change to caps, approval rules or founder rules; any action at a registrar or marketplace (guarantee 7 stays: DOM never calls a marketplace, never changes DNS on its own in this CR); CR-006 items; the removed-provider template (CR-004 Q-12).
 - **What stays with Gavriel and the bots** is listed in §4 with the reason. In short: judgment (inventing names, card writing, FLAG verdicts, drafts), anything that needs Dvir's own logins, the Internet Archive history check (manual by Dvir's decision, CR-002 Amendment B1), and acceptance testing.
 - Where today's contract already does what we need, "already supported, here is how" is the best answer. DOM may split this CR.
 
@@ -44,7 +44,7 @@ Today Gavriel and the bots repeat several jobs by hand or with Gavriel's own scr
 1. **What, not how.** Inputs, outputs, business rules, errors and tests only. Language, storage, routes and field names are DOM's choice; names below are suggestions.
 2. **Reference scripts are non-binding.** Appendix A lists Gavriel's scripts for each item. They contain shortcuts and mistakes. They are not a specification.
 3. **Free data only, $0 hosting.** If an item can't be met at $0, mark it **DVIR** and say what it would cost.
-4. **Source terms.** Official or documented sources only, polite rates, honest identification. Never bypass bot protection, logins or CAPTCHAs. Never automate the Internet Archive, ExpiredDomains or the NameBio download URL.
+4. **Source terms.** Official or documented sources only, polite rates, honest identification. Never bypass bot protection, logins or CAPTCHAs. Never automate the Internet Archive, ExpiredDomains or the removed-provider download URL.
 5. **Read-only toward the outside world.** Nothing here buys, registers, backorders, lists, sends or changes DNS.
 6. **Fail closed.** A failed lookup is UNKNOWN, never "free", "clean", "not registered" or zero (CR-001 §3.1).
 7. **Append-only and audited**, like every other record.
@@ -63,10 +63,10 @@ Who: G = Gavriel (and its research executors), D = Dvir, bots by name.
 | 6 | Features for the test sets (sibling share, other extensions, as-of dates) | G scripts | Every round | Computed only in live screening; replays take uploaded features (CR-002 §5.1 P-3; CAP-21b is P2) | **G-4 (P1)** |
 | 7 | Score a rule on a frozen set, with the profit report | G scripts | Every round | Supported: `POST /selection/replays` (holdout, profit) | Covered once the sets live in DOM (G-4) |
 | 8 | "Look-alike names in use" signal (round 15) | G scripts | Every round that uses it | `same_name` exists but is not a tier feature; census `in_use_share` not built (`selection.md` §census) | **Gap G-7 (P2)**, only if Dvir adopts it |
-| 9 | Go-live watch: Sedo minimum offer, nameserver switch, for-sale page check | G routine, every 2 h this week | Each new listing | Nameservers for a hand-bought name: `manual_steps` from `POST /list` (CR-004 §10.1 step 6). Sedo: not tracked (CR-004 Q-12). Page: nothing | Sedo and the GoDaddy nameserver change stay manual (marketplace and registrar screens). Page check: **G-5** |
+| 9 | Go-live watch: removed-provider minimum offer, nameserver switch, for-sale page check | G routine, every 2 h this week | Each new listing | Nameservers for a hand-bought name: `manual_steps` from `POST /list` (CR-004 §10.1 step 6). removed-provider: not tracked (CR-004 Q-12). Page: nothing | removed-provider and the GoDaddy nameserver change stay manual (marketplace and registrar screens). Page check: **G-5** |
 | 10 | Weekly portfolio re-check: RDAP, nameservers, for-sale page shows the right price, blocklists (`follow-ups.md` §5) | G | Weekly (Monday) | `nsVerifier` daily; `registrarCheck` daily but it skips hand-bought names (CR-004 Q-11) | **Gap G-5 (P1)** |
 | 11 | For-sale page checks after listing (+24 h, +48 h; GoDaddy search on day 2, 4, 7) | G | Each new listing | Not covered | G-5 |
-| 12 | Marketplace listing state (Afternic "Listed", Sedo verified, minimum offer, offers button) | G, D | Each listing and each change | Only the export upload confirmation (`POST /export/{venue}/uploaded`) | **Gap G-8 (P2)** |
+| 12 | Marketplace listing state (Afternic "Listed", removed-provider verified, minimum offer, offers button) | G, D | Each listing and each change | Only the export upload confirmation (`POST /export/{venue}/uploaded`) | **Gap G-8 (P2)** |
 | 13 | Web Risk lookups | G by hand, then a manual record | Every screened name | MANUAL_REQUIRED until a key exists (README §Known limits; CR-001 §11.2 Q5) | **Gap G-6 (P1)**, key being created by D |
 | 14 | US trademark searches | G, Shomer by hand | Every screened name, plus monthly for owned names | MANUAL_REQUIRED; DOM prepares the phrases (`selection.md` `tm_us`) | **G-6**: depends on what the USPTO key allows (Q-8) |
 | 15 | History lookups (Internet Archive) | G by hand | Every screened name | Manual by Dvir's decision; DOM already gives `lookup_name` and `archive_url` per run | **Stays manual.** A cross-run to-do list is G-6b (P2) |
@@ -182,7 +182,7 @@ Only if round 15 shows the signal helps and Dvir approves a rule that uses it.
 - **Rules:** "in use" means the existing `same_name` / C19 definition. "In use today" can't be dated, so in replays it is labelled approximate. Usable in tier clauses and replays like the other features.
 
 ## 13. G-8 and G-9, P2
-- **G-8, listing state per venue.** Record, per name and venue (Afternic, Sedo, GoDaddy search, DomainAgents): state (listed, pending, verified, removed), mode, price shown, minimum offer, offers button shown, checked at, evidence reference. Gavriel or Dvir records it. `/report` warns when a listed name has no confirmed venue state, when a state is older than 30 days, or when a scheduled price change was not reconfirmed on that venue. Also say whether the forward test's 30/60/90-day "listed for sale" check can read public marketplace pages within their terms (Q-13).
+- **G-8, listing state per venue.** Record, per name and venue (Afternic, removed-provider, GoDaddy search, DomainAgents): state (listed, pending, verified, removed), mode, price shown, minimum offer, offers button shown, checked at, evidence reference. Gavriel or Dvir records it. `/report` warns when a listed name has no confirmed venue state, when a state is older than 30 days, or when a scheduled price change was not reconfirmed on that venue. Also say whether the forward test's 30/60/90-day "listed for sale" check can read public marketplace pages within their terms (Q-13).
 - **G-9, finance.** `/report` warnings at 80% and 100% of the $1,500 cap; monthly tool and AI caps as settings Dvir sets, with warnings; KPIs: yearly sell-through, average days to sale, cost per name ever bought, offers per listed name per month (`cfo-ledger.md` §7 definitions).
 
 ## 14. Tokens and manual runs
@@ -202,7 +202,7 @@ Live sources drift. As in CR-001 P-7, DOM may test against recorded answers, and
 - **AC-2** A decision for a name whose expected drop date has passed is refused (or labelled late and left out of the rates, as documented).
 - **AC-3** An RDAP error for a name gives `unknown`; it is retried on the next daily run and never counted as re-registered or free.
 - **AC-4** The cohort report's counts add up: accepted + rejected + undecided = names scored, per label; the rates and Wilson intervals match a hand calculation on 3 sample cohorts.
-- **AC-5** Over a week, DOM's outbound requests for G-1 go only to documented sources (0 to ExpiredDomains, the NameBio download URL or the Internet Archive), shown by DOM's sources list and test evidence.
+- **AC-5** Over a week, DOM's outbound requests for G-1 go only to documented sources (0 to ExpiredDomains, the removed-provider download URL or the Internet Archive), shown by DOM's sources list and test evidence.
 
 **G-2**
 - **AC-6** Source A: an uploaded list of 50 names returns each with its RDAP status and expected drop date; a name with a digit or hyphen, or more than 3 words, is filtered out with the reason.
@@ -300,7 +300,7 @@ USPTO key: Dvir is getting it now from the USPTO Open Data Portal and will store
 | **v2.4.0** | **G-3** sibling generator, as the method `bt1@v1` (CR-008 Option 1), with CR-008 C-1 | CR-008: the v11 rule needs it |
 | **v2.5.0** | **G-4a/b** test sets built, split, sealed and given features by DOM, **G-4c/d** suites and manual gates (after Dvir's answer, §19.4) | Unblocks the picking-rule rounds, which gate buying |
 | **v2.6.0** | **G-2 source A** (drop list from Gavriel's uploads, confirmed by RDAP), **G-1** forward-test cohorts and outcome tracking | Uses G-3 and G-4's machinery; the round-13 check on 2026-10-08 stays by hand, as the CR says |
-| **Later (P2)** | G-5 point 4 together with G-8 (one "venue state" record: lander price, offers button, Sedo, Afternic), G-6b, G-7, G-9, TM re-check of owned marks | Not on the buy or sell path while the portfolio is one name. Re-filed when buying restarts |
+| **Later (P2)** | G-5 point 4 together with G-8 (one "venue state" record: lander price, offers button, removed-provider, Afternic), G-6b, G-7, G-9, TM re-check of owned marks | Not on the buy or sell path while the portfolio is one name. Re-filed when buying restarts |
 
 ### 19.2 Declined, with the alternative
 - **T-1 / T-3, tokens through Render secrets: declined.**

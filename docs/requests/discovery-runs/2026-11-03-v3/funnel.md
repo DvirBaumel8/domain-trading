@@ -13,4 +13,4 @@ Run 2026-11-04 ~09:10 IDT · /health ok (db ok, jobs ok, datasave ok) · score a
 | singular/plural, local, USPTO, time gate | 0 (not reached) |
 | **survivor → card** | **0** |
 
-Directions: A done; B other-ending reads on top candidates; D closeouts SKIPPED (CLOSEOUTS_PAUSED); Dynadot blocked; C parked.
+Directions: A done; B other-ending reads on top candidates; D closeouts SKIPPED (CLOSEOUTS_PAUSED); removed-provider blocked; C parked.

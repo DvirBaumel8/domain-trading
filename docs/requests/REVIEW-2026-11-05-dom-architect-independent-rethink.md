@@ -100,6 +100,6 @@ On Nov 4, 61 of 110 served names were killed for "brand/coinage/fragment" and 21
 ## 6) What I would stop building
 - New discovery-pack features, L&L idea rounds and the CR-104 pre-run gate. The gate is good hygiene, but it's not on the path to a first sale.
 - DB-size work. It's at 60.9%, which is fine, and Dvir said no cleanup.
-- Dynadot closeouts scoring (BUG-063) until a closeout is actually going to be bought.
+- removed-provider closeouts scoring (BUG-063) until a closeout is actually going to be bought.
 - The visit counter and its redirect rework. Use Afternic views and lead emails instead.
 - New bot roles or org redesigns. Run 2–3 bots (buyer, seller/outreach, coordinator) until we have a first sale.

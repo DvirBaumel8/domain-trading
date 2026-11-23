@@ -212,7 +212,7 @@ tests/api/report-*.test.ts, reads.test.ts, payouts-received.test.ts, registrar-c
   - `listing_history` (all rows, newest first; walk-away "(private)");
   - `schedule` (rows of the current plan);
   - `sale` (the sales row view) and `payout` (`{amount, fee, method, received_on, status}` or null);
-  - `export: {afternic: {pending, last_confirmed_upload_at, last_uploaded: {bin, floor, min_offer} | null}, sedo: {…}}`. `last_uploaded` = the values in force at the newest confirmed file containing the domain (the latest `listing_history` row ≤ that file's `at`). **Never the walk-away.** This is the weekly lander check from §10.7.
+  - `export: {afternic: {pending, last_confirmed_upload_at, last_uploaded: {bin, floor, min_offer} | null}, removed-provider: {…}}`. `last_uploaded` = the values in force at the newest confirmed file containing the domain (the latest `listing_history` row ≤ that file's `at`). **Never the walk-away.** This is the weekly lander check from §10.7.
   - `offers` (the latest 50, newest first).
 - **`GET /ledger?type=&domain=&from=&to=&format=json|csv`:** filters validated (400 on bad input).
   - CSV header exactly `date,type,domain,deal_id,amount_usd,counterparty,receipt_ref,note` (R-12); `amount_usd` signed with 2 decimals (`-11.08`); RFC 4180 quoting with the existing `toCsv`; CRLF.

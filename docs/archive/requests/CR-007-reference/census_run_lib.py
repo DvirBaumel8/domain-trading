@@ -3,7 +3,7 @@ import json,sys,re,ssl,urllib.request,os,time,concurrent.futures as cf,socket
 socket.setdefaulttimeout(15)
 ctx=ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE
 UA={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) Chrome/124"}
-PARK=re.compile(r'(domain (is )?for sale|buy this domain|parked|this domain (is|has been) registered|afternic|sedo|dan\.com|hugedomains|namecheap.*parking|godaddy.*(parked|coming soon)|make an offer|is available for purchase|domain may be for sale|not yet connected|launching soon|coming soon|bodis|parkingcrew|above\.com|atom\.com|squadhelp|spaceship|lease to own|future home of|under construction)',re.I)
+PARK=re.compile(r'(domain (is )?for sale|buy this domain|parked|this domain (is|has been) registered|afternic|removed-provider|dan\.com|hugedomains|removed-provider.*parking|godaddy.*(parked|coming soon)|make an offer|is available for purchase|domain may be for sale|not yet connected|launching soon|coming soon|bodis|parkingcrew|above\.com|atom\.com|squadhelp|removed-provider|lease to own|future home of|under construction)',re.I)
 def rdap(d):
     for a in range(3):
         try: urllib.request.urlopen(urllib.request.Request(f"https://rdap.verisign.com/com/v1/domain/{d}",headers=UA),timeout=20); return True

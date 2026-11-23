@@ -2,7 +2,7 @@
 **From:** Gavriel (Grok Bot) · 2026-10-15 ~01:10 IDT · Follow-up to DRAFT of 2026-10-14 and DOM's early comments. Dvir decided tests 3 and 4 in DOM's chat (recorded 2026-10-15). **APPROVED by Dvir 2026-10-15 01:06 IDT — build.** No settings activation; /buy stays dry_run.
 
 ## Why
-The company has two lines: Line 1 hand-registration, Line 2 S8 (existing names Dvir buys on GoDaddy/Dynadot websites: closeouts, fixed-price, public auctions). `/buy` only registers unregistered names, so S8 needs an import path, slot and per-name caps, and per-line reporting. Paper phase needs nothing in the service; this CR is for the live test that starts no earlier than 2026-11-13 after 30 days of paper results.
+The company has two lines: Line 1 hand-registration, Line 2 S8 (existing names Dvir buys on GoDaddy/removed-provider websites: closeouts, fixed-price, public auctions). `/buy` only registers unregistered names, so S8 needs an import path, slot and per-name caps, and per-line reporting. Paper phase needs nothing in the service; this CR is for the live test that starts no earlier than 2026-11-13 after 30 days of paper results.
 
 ## Scope (build)
 1. **Import route** with Dvir's `approval_ref`, lane `S8`, price paid, source (`closeout` | `fixed` | `auction`), and registrar; ledger entry on success.
@@ -21,7 +21,7 @@ The company has two lines: Line 1 hand-registration, Line 2 S8 (existing names D
 6. Backorder/catch sources (NameJet, SnapNames, DropCatch) refused.
 
 ## Rule 5 wording (approved by Dvir 2026-10-15 01:06 IDT)
-*"Never premium names or backorder or catch services (NameJet, SnapNames, DropCatch). Aftermarket buys (closeouts, fixed-price listings, GoDaddy/Dynadot public auctions) only in lane S8, at most $50 per name, each with Dvir's approval."*
+*"Never premium names or backorder or catch services (NameJet, SnapNames, DropCatch). Aftermarket buys (closeouts, fixed-price listings, GoDaddy/removed-provider public auctions) only in lane S8, at most $50 per name, each with Dvir's approval."*
 
 ## What Dvir's approval line must name
 - This CR id (`CR-059`)
@@ -47,7 +47,7 @@ DOM: cleared to build CR-059 as scoped above, including the CLAUDE.md founder ru
 v5.8.0 is live on the Mac host. `GET /health` → version `5.8.0`, db/jobs ok.
 
 Dry-run acceptance (nothing written):
-1. `POST /portfolio/import` dry_run closeout/dynadot/$12.50 comps_value 1200 → 200, `s8.bin_cents` 148800 ($1,488), `would_be_blocked` null
+1. `POST /portfolio/import` dry_run closeout/removed-provider/$12.50 comps_value 1200 → 200, `s8.bin_cents` 148800 ($1,488), `would_be_blocked` null
 2. No `approval_ref` → 422 `APPROVAL_INVALID`
 3. `price_paid` 50.01 → 400 `S8_PRICE_CAP`
 4. `source` namejet → 400 `BACKORDER_SOURCE_REFUSED`

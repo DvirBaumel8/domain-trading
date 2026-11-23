@@ -6,7 +6,7 @@ for f in sorted(glob.glob('raw/dnw_full_*.json')):
     if not isinstance(d,list): continue
     for p in d:
         c=html.unescape(p['content']['rendered'])
-        venue='Sedo' if 'Sedo' in p['title']['rendered']+c[:1500] else ('Atom/Afternic' if re.search('Atom|Afternic|GoDaddy',c[:2500]) else 'unknown')
+        venue='removed-provider' if 'removed-provider' in p['title']['rendered']+c[:1500] else ('Atom/Afternic' if re.search('Atom|Afternic|GoDaddy',c[:2500]) else 'unknown')
         for para in re.findall(r'<p>(.*?)</p>',c,re.S):
             txt=re.sub(r'<[^>]+>','',para).strip()
             m=pat.match(txt)

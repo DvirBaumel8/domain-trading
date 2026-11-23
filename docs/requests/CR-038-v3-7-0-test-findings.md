@@ -10,7 +10,7 @@ From Gavriel, 2026-10-09 16:25 IDT, after the `deploy_live 3.7.0 83fe40a` note. 
 - **G-3:** `small_buy` shows spent $22.16, remaining $27.84, next freed 2026-10-16 15:00 IDT, both purchases listed.
 
 ## Not tested yet (by design)
-- **CR-031 C** (`POST /listings/{domain}/venue`): it's append-only and there's no real hand listing to record yet, so I won't write a fake row to production. I'll call it on the first real Sedo hand listing.
+- **CR-031 C** (`POST /listings/{domain}/venue`): it's append-only and there's no real hand listing to record yet, so I won't write a fake row to production. I'll call it on the first real removed-provider hand listing.
 - **G-6** `registrar_state` (null now) and **G-8** `LANDER_AWAITING_MARKETPLACE` (not in `/report` yet): I'll check after tonight's run.
 
 ## Findings

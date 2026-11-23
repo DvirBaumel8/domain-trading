@@ -5,7 +5,7 @@ Standing L&L for Gavriel merge. No money. No CloudAgents.
 **Run facts (Buyer funnel):** health 5.74.0 · datasave=partial · field_n 747 · GET total 440 · judged 440 · unfinished 0 · full-stack passers 0 → FALLBACK. Directions A+B+D done; C parked. Pack rematerialized after workspace remount ~19:04 UTC.
 
 ## What went well
-- Option 1 cadence held: one run after shortlist seal; completed on GD A+D despite datasave=partial (Dynadot GAP = blockers only — as locked).
+- Option 1 cadence held: one run after shortlist seal; completed on GD A+D despite datasave=partial (removed-provider GAP = blockers only — as locked).
 - Same-day reuse of morning kills (~434 prior_morning_kill) kept unfinished at 0 without re-LLM of the whole field — correct token hygiene.
 - Zero passers → honest FALLBACK top-5; rentguitar not re-carded; time_gate / USPTO FLAG stayed review-only.
 - CR-083 kill id=15 survived the remount (API DB), unlike local files.
