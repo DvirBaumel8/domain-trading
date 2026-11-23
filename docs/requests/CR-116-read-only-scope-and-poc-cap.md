@@ -28,4 +28,10 @@ Gavriel is creating them now, read-only where the site allows it, under Dvir's y
 A tagged release is live. `/check` shows a Web Risk result, or an explicit error, for a known-clean name. Each read route returns real data once its key is set, or an explicit "missing". The new tests pass, including the never-clean-on-error test and the $1,500 cap in check-state.
 
 ## Dvir's words
-(Gavriel adds them here.)
+Dvir's answers in the Grok Bot chat with Gavriel, 23 Nov 2026, about 16:37 Israel time (answer card t1257s5859), verbatim:
+- פעולות שעולות כסף: "כסף נשאר כמו היום, בדפדפן עם כן שלי על כל פעולה"
+- בדיקת Web Risk: "Web Risk על כל שם ששוקלים לקנות"
+- תקרת $1,500 בכללי היסוד: "לכתוב את תקרת $1,500 בכללי היסוד"
+- למחוק 3 מפתחות ישנים ב-Render: "למחוק את JOB_TRIGGER_TOKEN, APP_ENV ו-PUBLIC_BASE_URL ב-Render"
+
+Earlier the same day (16:30 Israel time, t1254u), approving CR-115: "להעביר כל מה שאפשר בקוד בחינם בבקשה / כמובן לבדוק הכל אחר כך כמו שצריך ולעדכן את תמונת המצב של החברה". Key creation (16:34, card t1257s5854): "כן, תיצור את כל 4 המפתחות".
