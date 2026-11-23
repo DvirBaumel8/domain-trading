@@ -4,7 +4,7 @@ name: ci
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/requests/**', 'docs/releases/**', 'docs/research/**', 'docs/archive/**', '.claude/**', 'CLAUDE.md']
+    paths-ignore: ['docs/requests/**', 'docs/releases/**', 'CLAUDE.md']
   workflow_call:
 
 concurrency:

@@ -3,7 +3,7 @@ name: release
 # Pushing a tag vX.Y.Z marks a release. Render deploys every push to main itself, once CI passes
 # (autoDeployTrigger: checksPass), so this workflow only verifies the tag:
 #   1. the tag commit must be on main (an ancestor of origin/main), equal package.json's version, have a CHANGELOG heading and a release note;
-#   2. the full test suite already ran on the push to main (ci.yml); the Mac deploy (deploy.sh) deploys a tag only when ci passed for it;
+#   2. the full test suite already ran on the push to main (ci.yml).
 on:
   push:
     tags: ['v*.*.*']

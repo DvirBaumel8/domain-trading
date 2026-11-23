@@ -21,8 +21,6 @@ services:
       - key: NODE_VERSION
         value: "26"
       # Values are entered in the Render dashboard only (sync: false). Never in git.
-      - key: API_TOKENS              # name:sha256 pairs, comma separated (hashes, never tokens)
-        sync: false
       - key: PORKBUN_API_KEY         # both or neither; used for GET /check only
         sync: false
       - key: PORKBUN_SECRET_API_KEY

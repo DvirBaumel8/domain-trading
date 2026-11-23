@@ -1,12 +1,13 @@
-# Code map (7.0.0)
+# Code map
 
 About 850 lines. The app keeps nothing: it reads `data/state.json` at start and asks Porkbun and the .com registry on demand.
 
 | File | Inside |
 |---|---|
 | `data/state.json` | **The whole state**: domains owned and the money ledger. Public, so no private price or approval text |
+| `data/access.json` | Who may read: name -> sha256 of the token |
 | `src/state.ts` | Its schema and rules (`problems`), what may never change (`rewrites`), the caps `MAX_DOMAINS`, `MAX_PURCHASE_CENTS` |
-| `scripts/check-state.ts` | `npm run check-state`, run by CI: the rules, no future date, and the append-only check over git history |
+| `scripts/check-state.ts` | `npm run check-state`, run by CI: the rules, no future date, approval records exist, and the append-only check over git history |
 | `src/app.ts`, `src/main.ts`, `src/config.ts` | The app (`/health/ping`, `/health`), the start, the environment |
 | `src/books.ts` | `GET /portfolio`, `/portfolio/:domain`, `/ledger`, `/report` |
 | `src/registrars/api.ts`, `check.ts` | `GET /check`: quotes, 60 s cache |
@@ -23,3 +24,6 @@ Tests: `tests/app.test.ts` (every route), `tests/unit/` (state, config, money, r
 | Record a purchase, cost, renewal or sale | `data/state.json` (docs/DEPLOYMENT.md "Record a change") |
 | A cap | `src/state.ts` |
 | A route | `src/books.ts` or `src/app.ts`, then `docs/contract/endpoints.md` |
+| Who may read | `data/access.json` |
+| The pricing rules (by hand) | `docs/internal/pricing.md` |
+| Open items | `docs/internal/gaps.md` |

@@ -7,8 +7,6 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),
   LOG_LEVEL: z.string().default('info'),
-  /** `name:sha256` pairs, comma separated. Hashes only: the server never holds a token. Empty = every request is 401. */
-  API_TOKENS: z.string().default(''),
   PORKBUN_API_KEY: optional(z.string()),
   PORKBUN_SECRET_API_KEY: optional(z.string()),
   /** The commit this build was made from (Render sets it). */
@@ -26,18 +24,24 @@ export interface Config {
   version: string;
 }
 
-function parseTokens(text: string): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const pair of text.split(',').map((s) => s.trim()).filter(Boolean)) {
-    const m = /^([a-z0-9_-]{1,40}):([0-9a-f]{64})$/.exec(pair);
-    // the value is never shown: a token pasted here by mistake must not reach the log
-    if (!m || out.has(m[2]!) || [...out.values()].includes(m[1]!)) throw new Error('Invalid environment: API_TOKENS must be unique name:sha256 pairs (64 lowercase hex characters), comma separated');
-    out.set(m[2]!, m[1]!);
-  }
+const Access = z.record(z.string().regex(/^[a-z0-9_-]{1,40}$/), z.string().regex(/^[0-9a-f]{64}$/));
+
+/** data/access.json: who may read, name -> sha256 of a long random token. Hashes only, so the file may be public. Returns hash -> name. */
+export function parseAccess(json: string): Map<string, string> {
+  // the content is never shown: a token put here by mistake must not reach the log
+  const bad = new Error('data/access.json must map names to sha256 hashes (64 lowercase hex characters), each used once');
+  let raw: unknown;
+  try { raw = JSON.parse(json); } catch { throw bad; }
+  const parsed = Access.safeParse(raw);
+  if (!parsed.success) throw bad;
+  const out = new Map(Object.entries(parsed.data).map(([name, hash]) => [hash, name]));
+  if (out.size !== Object.keys(parsed.data).length) throw bad;
   return out;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv): Config {
+const accessFile = (): string => readFileSync(new URL('../data/access.json', import.meta.url), 'utf8');
+
+export function loadConfig(env: NodeJS.ProcessEnv, access: string = accessFile()): Config {
   const parsed = EnvSchema.safeParse(env);
   if (!parsed.success) throw new Error(`Invalid environment: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
   const e = parsed.data;
@@ -46,7 +50,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     port: e.PORT,
     host: e.HOST,
     logLevel: e.LOG_LEVEL,
-    tokens: parseTokens(e.API_TOKENS),
+    tokens: parseAccess(access),
     porkbun: e.PORKBUN_API_KEY && e.PORKBUN_SECRET_API_KEY ? { apiKey: e.PORKBUN_API_KEY, secretKey: e.PORKBUN_SECRET_API_KEY } : null,
     commit: e.RENDER_GIT_COMMIT ?? null,
     version: (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version,

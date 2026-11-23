@@ -37,7 +37,7 @@ const adapter = (q: Partial<Quote> | Error = {}): RegistrarAdapter & { calls: nu
 let app: FastifyInstance;
 afterEach(() => app.close());
 const make = (o: Partial<AppDeps> = {}) => (app = buildApp({
-  config: loadConfig({ API_TOKENS: `tester:${hashToken(TOKEN)}`, RENDER_GIT_COMMIT: 'abc' }), state, logger: false, rdap: async () => 'not_registered', adapters: [adapter()], ...o,
+  config: loadConfig({ RENDER_GIT_COMMIT: 'abc' }, JSON.stringify({ tester: hashToken(TOKEN) })), state, logger: false, rdap: async () => 'not_registered', adapters: [adapter()], ...o,
 }));
 const get = (url: string, headers: Record<string, string> = auth) => app.inject({ method: 'GET', url, headers });
 

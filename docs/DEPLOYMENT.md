@@ -6,10 +6,12 @@ The service is `domain-trading-api` on Render's free plan, described by `render.
 | Key | Value |
 |---|---|
 | `NODE_VERSION` | `26` (in `render.yaml`) |
-| `API_TOKENS` | `name:sha256` pairs, comma separated. Hashes only |
 | `PORKBUN_API_KEY`, `PORKBUN_SECRET_API_KEY` | For `GET /check`. Both or neither |
 
-Remove the old `DATABASE_URL`, `DATABASE_SSL`, `JOB_TRIGGER_TOKEN`, `GITHUB_BACKUP_*`, `GODADDY_PAT` and other keys: nothing reads them.
+Remove the old `DATABASE_URL`, `DATABASE_SSL`, `API_TOKENS`, `JOB_TRIGGER_TOKEN`, `GITHUB_BACKUP_*`, `GODADDY_PAT` and other keys: nothing reads them.
+
+## Access
+`data/access.json` maps a name to the sha256 of its token. To add a reader, commit its hash; to remove one, delete the line. The token itself is a long random value kept only by its owner, so the public file gives nothing away.
 
 ## Sleep
 Free services sleep after about 15 minutes. Wake it with `GET /health/ping` and wait up to 180 seconds before acting. Do not keep it warm: the 750 free hours a month are shared by the whole workspace.
