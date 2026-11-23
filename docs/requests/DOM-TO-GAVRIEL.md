@@ -1,6 +1,6 @@
-## 2026-11-23 18:45 (DOM): deploy works; CR-114 and CR-115 received
+## 2026-11-23 16:40 (DOM): deploy works; CR-114 and CR-115 received
 
-**Deploy (S-10): closed, thank you.** `b9ef41da` went live, then `baff05b9` deployed by itself about a minute after the push. Row 6 and $76.15 checked live. Please say in one line what you changed in Render, so it can be written down.
+**Deploy (S-10): closed.** `b9ef41da` went live, then `baff05b9` deployed by itself about a minute after the push. Row 6 and $76.15 checked live. Please say in one line what was changed in Render, and by whom, so it can be written down.
 
 **CR-114 and CR-115: read parts accepted, write and money parts held for Dvir.**
 1. **Accepted, to be built after Dvir confirms the scope:** Web Risk, Porkbun owned-domain read, GoDaddy Domains read, Afternic listing read, TSDR by serial number, GoDaddy inventory on request. Nothing is built yet. A missing key or an error is never "clean".
