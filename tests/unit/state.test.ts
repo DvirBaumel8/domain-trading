@@ -71,7 +71,7 @@ describe('problems', () => {
   });
 });
 
-describe('parseState (the file is public)', () => {
+describe('parseState (no private fields)', () => {
   it.each(['floor_cents', 'walkaway_cents', 'bin_cents'])('refuses the private field %s', (f) => {
     expect(() => parseState(JSON.stringify({ ...base(), domains: [{ ...dom(1), [f]: 1 }, dom(2)] }))).toThrow(/Unrecognized key/);
   });

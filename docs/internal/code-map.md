@@ -4,7 +4,7 @@ About 850 lines. The app keeps nothing: it reads `data/state.json` at start and 
 
 | File | Inside |
 |---|---|
-| `data/state.json` | **The whole state**: domains owned and the money ledger. Public, so no private price or approval text |
+| `data/state.json` | **The whole state**: domains owned and the money ledger. No private price or approval text |
 | `data/access.json` | Who may read: name -> sha256 of the token |
 | `src/state.ts` | Its schema and rules (`problems`), what may never change (`rewrites`), the caps `MAX_DOMAINS`, `MAX_PURCHASE_CENTS` |
 | `scripts/check-state.ts` | `npm run check-state`, run by CI: the rules, no future date, approval records exist, and the append-only check over git history |

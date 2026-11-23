@@ -26,7 +26,7 @@ export interface Config {
 
 const Access = z.record(z.string().regex(/^[a-z0-9_-]{1,40}$/), z.string().regex(/^[0-9a-f]{64}$/));
 
-/** data/access.json: who may read, name -> sha256 of a long random token. Hashes only, so the file may be public. Returns hash -> name. */
+/** data/access.json: who may read, name -> sha256 of a long random token. Hashes only. Returns hash -> name. */
 export function parseAccess(json: string): Map<string, string> {
   // the content is never shown: a token put here by mistake must not reach the log
   const bad = new Error('data/access.json must map names to sha256 hashes (64 lowercase hex characters), each used once');

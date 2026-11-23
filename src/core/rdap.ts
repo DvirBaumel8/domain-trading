@@ -1,7 +1,7 @@
 export type RdapStatus = 'not_registered' | 'registered' | 'rdap_unknown';
 export type RdapFn = (domain: string, opts?: { timeoutMs?: number }) => Promise<RdapStatus>;
 
-const USER_AGENT = 'domain-trading-api (+https://github.com/DvirBaumel8/domain-trading)';
+const USER_AGENT = 'domain-trading-api';
 
 /** Asks the .com registry about one name. Never throws. Only a clear registry answer counts; a proxy or error page is `rdap_unknown`. */
 export const rdapStatus: RdapFn = async (domain, opts = {}) => {

@@ -11,6 +11,7 @@
     { "id": 2, "date": "2026-10-09", "type": "purchase", "domain": "ukcbamcompliance.com", "amount_cents": -1108, "note": "Porkbun order 12047825", "approval": { "approved_on": "2026-10-09", "ref": "docs/requests/CR-030-dvir-approved-small-buy-exception.md" } },
     { "id": 3, "date": "2026-10-09", "type": "purchase", "domain": "aievalsconsulting.com", "amount_cents": -1108, "note": "Porkbun order 12047828", "approval": { "approved_on": "2026-10-09", "ref": "docs/requests/CR-030-dvir-approved-small-buy-exception.md" } },
     { "id": 4, "date": "2026-10-10", "type": "purchase", "domain": "roofingvoiceagent.com", "amount_cents": -1108, "note": "Porkbun order 12061347", "approval": { "approved_on": "2026-10-10", "ref": "docs/requests/CR-032-marketplace-listing-by-dom.md" } },
-    { "id": 5, "date": "2026-10-16", "type": "purchase", "domain": "mineunited.com", "amount_cents": -2419, "note": "GoDaddy closeout, order 4197820559", "approval": { "approved_on": "2026-10-16", "ref": "docs/requests/CR-060-s8-import-approved-price.md" } }
+    { "id": 5, "date": "2026-10-16", "type": "purchase", "domain": "mineunited.com", "amount_cents": -2419, "note": "GoDaddy closeout, order 4197820559", "approval": { "approved_on": "2026-10-16", "ref": "docs/requests/CR-060-s8-import-approved-price.md" } },
+    { "id": 6, "date": "2026-10-28", "type": "cost", "domain": null, "amount_cents": -499, "note": "GoDaddy Auctions membership, 1 year, order 4205792951", "approval": null }
   ]
 }

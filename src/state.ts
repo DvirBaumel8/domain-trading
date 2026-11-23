@@ -16,7 +16,7 @@ const REFUSED_REGISTRARS: readonly string[] = ['cloudflare', 'namejet', 'snapnam
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isRealDate, 'not a calendar date');
 const domainName = z.string().refine((d) => { try { return normalizeDomain(d) === d; } catch { return false; } }, 'not a lowercase .com name');
 
-// strict: a field that is not listed here (a floor, a walk-away, an approval text) is refused, because this file is public
+// strict: a field that is not listed here (a floor, a walk-away, an approval text) is refused, because it does not belong in git
 const DomainRow = z.strictObject({
   domain: domainName,
   display_name: z.string(),

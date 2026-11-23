@@ -7,9 +7,9 @@ Facts for DOM or Claude Code to add a cost row. This note does not change `data/
 - **Purchase date:** 2026-10-28
 - **Renewal date:** auto-renews on 2027-10-28 for $4.99
 
-**Source (Gmail, account dvirbaumel9@gmail.com):**
+**Source (Gmail, account (Dvir's mailbox)):**
 - From: GoDaddy <donotreply@godaddy.com>
-- To: dvirbaumel9@gmail.com
+- To: (Dvir's mailbox)
 - Subject: Dvir Dvir, thank you for your order.
 - Date: 2026-10-28 20:38 Asia/Jerusalem (email Date header 2026-10-28T18:38:56Z)
 - Receipt / order number: 4205792951

@@ -7,7 +7,7 @@
 - A small read-only HTTP API on **Render free**. **The whole state is `data/state.json`** in this repo. No database, jobs, Mac server or write routes.
 - **A purchase, renewal, cost or sale is a commit** by DOM that adds a row, after Dvir's chat approval (one per action). Rows are never edited or removed; a mistake gets an `adjustment` row.
 - **CI enforces the founder rules** (`npm run check-state`); Render deploys only after CI passes.
-- **This repo is public:** no key, token, address, approval text, or a name's own floor or walk-away in it. `data/access.json` holds token hashes only.
+- **This repo is private** (Dvir, 23 Nov 2026; its older history was public). Still no key, token, address, approval text, or a name's own floor or walk-away in `data/`, `src/` or docs DOM writes. `data/access.json` holds token hashes only.
 - Buying, listing, price changes and drops are done by hand, by the rules below and in `docs/internal/pricing.md`.
 - Nine old providers were erased (CR-113; "removed-provider" in old records). Never bring one back.
 - The Neon project and the 12 Nov dump stay untouched, never read and never deleted. Never connect to the old database or read `prod.env`.
