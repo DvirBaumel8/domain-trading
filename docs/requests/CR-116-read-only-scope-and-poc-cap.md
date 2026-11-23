@@ -17,7 +17,7 @@
 - USPTO TSDR status by serial number (`USPTO_API_KEY`).
 - GoDaddy public inventory files on request: streamed and paged, never stored, with no size cut.
 
-Not now: GoDaddy Auctions calls. Reads were never in the confirmed list, so `GODADDY_API_KEY` and `GODADDY_API_SECRET` aren't needed yet.
+- GoDaddy Auctions **reads only** (`GODADDY_API_KEY`, `GODADDY_API_SECRET`, classic `sso-key`): auction lookups for buy search, as in CR-115 point 4, which Dvir approved at 16:30. No bid or buy call exists in the code.
 
 Rules for every route: GET only. A missing key, an error or a 403 eligibility code is shown as an error and is never "clean", "ok" or an empty result. Keys are never logged or returned. Update the contract, the code map and the tests in the same commit.
 
