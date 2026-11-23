@@ -15,3 +15,4 @@ One line per push to main that changed code (deploy-live workflow, CR-034): `<ti
 2026-10-13T00:33:05+0300 deploy_failed 3.9.0 fa9e7032d5acc038282785623a7047d4cdbc8b99
 2026-10-13T00:53:33+0300 deploy_failed 3.9.0 571a9491ab69f0e07c75f8b13316951e9b9655f3
 2026-11-23T11:40:18+0200 deploy_live 7.0.0 0b3eba6a44b51c25a335089ea154e4a122d4d13f
+2026-11-23T11:41:11+0200 deploy_live 7.0.0 4e4f5a313cdac1eaa74f463c0ea8355801cd209b
