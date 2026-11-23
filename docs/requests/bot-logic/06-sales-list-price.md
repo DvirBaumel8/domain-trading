@@ -6,7 +6,7 @@ Refreshed 2026-11-23 by DOM Architect, at Gavriel's request, to match 7.1.0. The
 
 ## Reads (wake first: `GET /health/ping`, wait up to 180 s)
 - `GET /portfolio` and `GET /portfolio/{domain}`: owned names, registrar, expiry, cost, ledger rows.
-- `GET /ledger` and `GET /report`: money in and out; `spent` today is $71.16 for 5 names.
+- `GET /ledger` and `GET /report`: money in and out; `spent` today is $76.15 for 5 names (source: `GET /report`; ledger row 6 is the $4.99 GoDaddy membership).
 - `GET /check?domain=`: today's registration price (Porkbun) and RDAP.
 - A token is needed for everything except `/health/ping` (hash in `data/access.json`).
 
