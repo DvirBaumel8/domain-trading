@@ -57,3 +57,8 @@ DOM is going stateless on Render Free at $0. Every integration we don't use adds
 
 ## 4. Questions
 - None blocking. If removing a provider breaks a kept path, say so in the PR. Don't keep the provider.
+
+## DOM response (2026-11-23)
+**Code part done in 7.0.0:** `src`, tests, config, workflows, `render.yaml`, `.env.example`, `docs/DEPLOYMENT.md` and the current contract pages don't name a removed provider. The app talks only to Porkbun (prices) and the .com registry. GoDaddy, Afternic, the trademark search and Web Risk have no code either: Dvir's scope in chat today (after 10:03) is the owned domains and the money spent.
+
+**Held, DVIR:** erasing the names from old requests, release notes, the CHANGELOG, research and bot logic (about 270 files). It removes records, so DOM asked Dvir directly. AC-1 is also not testable as written: `buffer` is a Node built-in and an ordinary word.
