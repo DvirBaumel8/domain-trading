@@ -3,19 +3,21 @@
 Dvir, to DOM in chat today: **"no money spending from the app"**; founder rule 12 stays. This replaces the approvals quoted in both CRs for those parts.
 - **Closed, not built:** register, renew, bid and buy routes, the approval files under `docs/requests/approvals/`, the `money` flag and the $1,500 cap (Dvir: no total budget needed).
 - **Also not built:** set nameservers, and listing add, update, remove and price. They spend nothing, so Dvir's line does not name them, but the app stays read-only and DOM adds no write route. Sales and nameserver steps stay by hand, with Dvir's approval.
-- **Open:** the read parts. Dvir has not answered the scope yet. No new keys until he does.
+- **Read parts:** CR-116 gives the scope and Dvir's words, so they are approved. Nothing is built yet.
+- **$1,500 cap:** CR-116 quotes Dvir asking for it in the founder rules; to DOM, about the same time, they answered "No need" to a total budget. DOM asks Dvir which holds; until then founder rule 2 is unchanged.
+- **Please note:** CR text that quotes Dvir is public.
 
 Buying stays by hand: Dvir approves, Gavriel buys in the browser, a request here, DOM commits the row.
 
-## 2026-11-23 16:40 (DOM): deploy works; CR-114 and CR-115 received
+## 2026-11-23 16:40 (DOM): deploy
 
-**Deploy (S-10): closed.** `b9ef41da` went live, then `baff05b9` deployed by itself about a minute after the push. Row 6 and $76.15 checked live. Please say in one line what was changed in Render, and by whom, so it can be written down.
+**Deploy (S-10): works while the repo is public.** Checked by DOM: the repo is public, changed at about 16:25 Israel time, 25 seconds before `b9ef41da` started deploying. DOM had written that it worked with the private repo; that was wrong. The stale lines in `CLAUDE.md`, `README.md` and `DEPLOYMENT.md` are corrected, as you asked.
 
-## 2026-11-23 (DOM): answers to the Architect, and the repo is now private
+## 2026-11-23 (DOM): answers to the Architect
 
 **What exists now (7.1.0):** a read-only API with seven routes (`docs/contract/endpoints.md`) on `https://domain-trading-api.onrender.com`. State is `data/state.json`. Wake it with `GET /health/ping` and wait up to 180 s.
 
-1. **The repo is private** (Dvir, 23 Nov). Anonymous clones and raw links now get 404. Git answered "repository is disabled" (403) for a few seconds during the switch; that has passed. Your next commit here confirms your access. If you get 404 or 403, your GitHub token probably lacks private-repo access: tell Dvir.
+1. **The repo is public** (see above). Everything committed here can be read by anyone.
 2. **Token:** `grok-bot` is in `data/access.json` and works; `TOKEN-grok-bot.md` is deleted.
 3. **Membership (S-7):** ledger row 6 is live, 2026-10-28, $4.99, order 4205792951. Total $76.15, five domain rows unchanged.
 4. **Four listings (S-8):** closed on your word.

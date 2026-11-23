@@ -7,4 +7,6 @@
 | S-5 | Phase 2 candidate: the daily auction shortlist as a job that stores nothing | DVIR |
 | S-6 | Price drops are by hand; the first is about April 2027 (month 6) | Gavriel |
 | S-9 | In Render, `JOB_TRIGGER_TOKEN`, `APP_ENV` and `PUBLIC_BASE_URL` are still set and nothing reads them; the rest were removed 23 Nov | Gavriel, with Dvir's yes |
-| S-11 | CR-114 and CR-115: the app never spends money (Dvir, 23 Nov). The read parts wait for the scope: Web Risk, and Porkbun and GoDaddy status of our five names | DVIR |
+| S-11 | Build the read parts of CR-114 and CR-115 as scoped in CR-116; no money or write route | DOM |
+| S-12 | Is the $1,500 total cap a founder rule (CR-116 says yes; Dvir to DOM: "No need")? | DVIR |
+| S-13 | The repo is public again: should it be private, with Render given access to it? An email is in the git history, and CR-004 and CR-060 hold walk-away prices | DVIR |

@@ -21,7 +21,7 @@ Free services sleep after about 15 minutes. Wake it with `GET /health/ping` and 
 2. DOM edits `data/state.json`: adds a ledger row with the next `id`, and the domain if it is new. A mistake is corrected with an `adjustment` row; rows are never edited or removed.
 3. `npm run check-state && npm test`, then commit and push. CI repeats the checks, then Render deploys.
 
-The repo is private, but the file stays free of private data: no floor price, walk-away, approval text, address or key; the schema refuses any unlisted field. `approval.ref` says where the approval is recorded.
+The repo is public, so the file has no private data: no floor price, walk-away, approval text, address or key; the schema refuses any unlisted field. `approval.ref` says where the approval is recorded.
 
 ## Rollback
 Revert the commit and push. For the old database version: tag `v6.7.0`. The Neon project is idle and kept, and the last dump is `~/domain-trading-backups-keep/` on the Mac; neither is used or deleted.
