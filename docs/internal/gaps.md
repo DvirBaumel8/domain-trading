@@ -8,4 +8,4 @@
 | S-6 | Price drops are by hand; the first is about April 2027 (month 6) | Gavriel |
 | S-7 | The GoDaddy Auctions membership ($4.99) has no date or receipt, so it is not in the ledger | Gavriel |
 | S-8 | Four names are still listed on a removed marketplace as well as Afternic. Dvir approved removing them (23 Nov) | Gavriel |
-| S-9 | `GET /check` is not checked live: the Porkbun keys in Render, and the old keys to delete there (Dvir: later) | DOM, with the Render key |
+| S-9 | Old environment keys are probably still set in Render (nothing reads them); delete them. `GET /check` works live (23 Nov) | DOM, with the Render key |
