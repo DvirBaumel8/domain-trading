@@ -1,8 +1,7 @@
 // npm run release -- <X.Y.Z> "<one-line summary>"
 // Moves every version spot of a release together, so nothing is edited by hand (Dvir, 9 Oct 2026: fewer manual steps):
 //   package.json + package-lock.json, the "**Version X.Y.Z** (<date>)" line of docs/contract/README.md, the "(contract vX.Y.Z)"
-//   labels in endpoints/formats/jobs/reports/selection.md, a CHANGELOG heading (stub when missing) and docs/releases/vX.Y.Z.md
-//   (stub when missing), then `npm run evidence`. It never commits, pushes, tags or calls production.
+//   labels in endpoints.md, a CHANGELOG heading (stub when missing) and docs/releases/vX.Y.Z.md (stub when missing). It never commits, pushes, tags or calls production.
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,7 +27,7 @@ const readme = 'docs/contract/README.md';
 const r = read(readme).replace(/\*\*Version \d+\.\d+\.\d+\*\* \([^)]*\)/, `**Version ${version}** (${human})`);
 write(readme, r);
 
-for (const f of ['endpoints', 'formats', 'jobs', 'reports', 'selection']) {
+for (const f of ['endpoints']) {
   const p = `docs/contract/${f}.md`;
   write(p, read(p).replace(/\(contract v\d+\.\d+\.\d+\)/g, `(contract v${version})`));
 }
@@ -44,5 +43,4 @@ if (!changelog.includes(`## ${version} (`)) {
 const note = `docs/releases/v${version}.md`;
 if (!existsSync(join(ROOT, note))) write(note, `# Release v${version} (${human})\n\n**Contract:** ${version}. ${summary}\n\n- **What changed:**\n- **How to test it:**\n`);
 
-execSync('npm run evidence', { cwd: ROOT, stdio: 'inherit' });
 console.log(`release ${old} -> ${version}: version spots updated; review the CHANGELOG entry and ${note}, then commit, push and tag v${version}`);

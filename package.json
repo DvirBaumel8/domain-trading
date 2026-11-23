@@ -1,6 +1,6 @@
 {
   "name": "domain-trading",
-  "version": "6.7.0",
+  "version": "7.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,36 +12,15 @@
     "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run --project unit",
-    "test:api": "vitest run --project api",
-    "test:contract:mock": "VITEST_CONTRACT=1 vitest run --project porkbun-mock",
-    "test:contract:sandbox": "VITEST_CONTRACT=1 vitest run --project porkbun-sandbox",
-    "migrate": "node-pg-migrate -m migrations -j sql",
-    "admin": "node --env-file-if-exists=.env dist/modules/ops/admin.js",
-    "job": "node --env-file-if-exists=.env dist/modules/ops/job.js",
-    "db:up": "docker compose up -d --wait db",
-    "record:screening": "tsx --env-file-if-exists=.env scripts/record-screening-fixtures.ts",
-    "release": "tsx scripts/release.ts",
-    "evidence": "tsx scripts/evidence.ts",
-    "traffic": "tsx scripts/traffic-report.ts",
-    "contract:refresh-spec": "tsx scripts/refresh-porkbun-spec.ts",
-    "admin:dev": "tsx --env-file-if-exists=.env src/modules/ops/admin.ts",
-    "job:dev": "tsx --env-file-if-exists=.env src/modules/ops/job.ts"
+    "check-state": "tsx scripts/check-state.ts",
+    "release": "tsx scripts/release.ts"
   },
   "dependencies": {
     "fastify": "^5.12.5",
-    "kysely": "^0.29.6",
-    "node-pg-migrate": "^9.0.0",
-    "pg": "^8.23.1",
-    "undici": "^8.11.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@apidevtools/swagger-parser": "^13.1.0",
     "@types/node": "^24.0.0",
-    "@types/pg": "^8.23.1",
-    "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1",
     "msw": "^2.15.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

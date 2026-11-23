@@ -42,3 +42,6 @@ DOM must keep owned state as versioned files in the private repo `DvirBaumel8/do
 - Q2: confirm branch name `state` (the old `data-backup` branch was the nightly DB export, which this series retires).
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-11-23)
+**Replaced, not built.** Dvir told DOM in chat today, after this was filed: stateless, no database, and only the money spent and the domains owned are kept, in this repo. Built as 7.0.0 (`docs/releases/v7.0.0.md`).

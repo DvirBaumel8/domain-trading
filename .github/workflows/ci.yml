@@ -1,18 +1,18 @@
 name: ci
 
-# Full test suite on every push to main (Postgres 16 service, same as docker compose).
-# Cost (private repo, 2,000 free minutes a month): typecheck and build run once, not per shard; pushes that change only
-# bot request files, release notes or research skip CI (a release commit always changes package.json, so it always runs);
-# a newer push to main cancels the older run (deploy.sh accepts a tag that is an ancestor of a later green main run).
+# Types, tests, build and the rules of data/state.json. Render deploys a push only after this passes (autoDeployTrigger: checksPass).
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/requests/**', 'docs/releases/**', 'docs/research/**', 'docs/superpowers/**', 'docs/archive/**', '.claude/**', 'CLAUDE.md']
+    paths-ignore: ['docs/requests/**', 'docs/releases/**', 'docs/research/**', 'docs/archive/**', '.claude/**', 'CLAUDE.md']
   workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   check:
@@ -20,47 +20,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # check-state compares data/state.json with every earlier version
       - uses: actions/setup-node@v4
         with:
           node-version: 26
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
+      - run: npm test
       - run: npm run build
-
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # The suite took ~20 min serially in one job (v5.9.0's run hit the timeout). Since the fast-suite change the API test files run in
-    # parallel inside a job (one database per vitest worker, tests/setup/global-db.ts; DT_TEST_WORKERS = the runner's 2 vCPUs), which cut
-    # the full suite to about a quarter of its serial time locally, so 2 shards (each with its own Postgres service) keep a run under ~8 min
-    # and use half the CI minutes of the old 4 shards.
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
-    services:
-      db:
-        image: postgres:16
-        env:
-          POSTGRES_USER: dt
-          POSTGRES_PASSWORD: dt
-          POSTGRES_DB: domain_trading
-        ports: ['5433:5432']
-        options: >-
-          --health-cmd "pg_isready -U dt -d domain_trading"
-          --health-interval 2s --health-timeout 3s --health-retries 30
-    env:
-      DATABASE_URL: postgres://dt:dt@localhost:5433/domain_trading
-      TEST_DATABASE_URL: postgres://dt:dt@localhost:5433/domain_trading_test
-      DT_TEST_WORKERS: 2
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 26
-          cache: npm
-      - run: npm ci
-      - name: Create the test database (docker/initdb does this locally)
-        run: PGPASSWORD=dt psql -h localhost -p 5433 -U dt -d domain_trading -c 'CREATE DATABASE domain_trading_test OWNER dt'
-      - run: npx vitest run --shard=${{ matrix.shard }}/2
+      - run: npm run check-state

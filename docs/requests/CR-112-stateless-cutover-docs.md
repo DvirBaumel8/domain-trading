@@ -94,3 +94,6 @@ Do not delete the `domain-trading-api-proxy` Worker, the `jobs-trigger` Worker, 
 - **AC-8 (CF-4):** if option 5b is taken, the 03:05 run is a GitHub Actions schedule that uses CR-111 wake-before-act, and the Worker cron is paused (not deleted). If 5b is not taken, the existing Worker cron uses the same wake-before-act rule against the chosen URL.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-11-23)
+**Replaced, not built.** Dvir told DOM in chat today, after this was filed: stateless, no database, and only the money spent and the domains owned are kept, in this repo. Built as 7.0.0 (`docs/releases/v7.0.0.md`).

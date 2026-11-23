@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 7.0.0 (2026-11-23): Phase 1: stateless, no database, read only, Render free (Dvir, 23 Nov 2026)
+Release note: `docs/releases/v7.0.0.md`.
+MAJOR. Kept, read only: `GET /health/ping`, `/health`, `/check`, `/portfolio`, `/portfolio/{domain}`, `/ledger`, `/report` (simpler shapes, see `endpoints.md`). Every other route of 6.x answers 404 `NOT_FOUND`, every write route included. Tokens come from `API_TOKENS` and can only read; the scopes, `Idempotency-Key` and `X-Caller` are gone. New base URL: the Render service.
+
 ## 6.7.0 (2026-11-05): CR-104: GET /auctions/preflight, the pre-run gate (PF-01..PF-06), also the datasave's last step
 Release note: `docs/releases/v6.7.0.md`.
 MINOR (migration `1769600000000_v6-7-0.sql`: `settings.preflight_max_digits` 4, `preflight_min_coverage_bp` 9000, `preflight_max_age_hours` 12; migration only). CR-104: `GET /auctions/preflight` (READ or bots, `date?`) runs the pre-run gate PF-01..PF-06 and answers `{as_of, data_date, pass, checks_sha256, checks: [{id, name, pass, reason_code, details}]}`; it writes nothing. Reason codes: `UNSCORED_ROWS`, `COUNTS_DONT_RECONCILE`, `JUNK_AT_TOP`, `PRIOR_KILL_SERVED`, `COVERAGE_UNFLAGGED`, `COVERAGE_BELOW_MIN`, `STALE_AS_OF`. The datasave job adds a 13th, last, read-only step `preflight` with the same answer. The check list is append-only (retired, never removed).

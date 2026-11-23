@@ -13,7 +13,7 @@ export function normalizeDomain(input: string): string {
     throw new AppError(422, 'TLD_NOT_SUPPORTED', 'Only .com names are supported in v1', { domain: d });
   }
   if (labels.length !== 2) {
-    throw new AppError(422, 'DOMAIN_INVALID', 'Only second-level names (name.com) can be registered', { domain: d });
+    throw new AppError(422, 'DOMAIN_INVALID', 'Only second-level names (example.com) can be registered', { domain: d });
   }
   return d;
 }

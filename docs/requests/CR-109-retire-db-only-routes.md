@@ -33,3 +33,6 @@ Dvir sees no present value in the research, knowledge-base, engine, market-histo
 - Q1: should `GET /selection/settings` and `GET /selection/lists/{name}` stay as file-backed reads (recommended, because `/buy` and preflight need the active lists) or also return 410? If you keep them, only the GET forms stay; all POSTs in `/selection/*` still return 410.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-11-23)
+**Replaced, not built.** Dvir told DOM in chat today, after this was filed: stateless, no database, and only the money spent and the domains owned are kept, in this repo. Built as 7.0.0 (`docs/releases/v7.0.0.md`).

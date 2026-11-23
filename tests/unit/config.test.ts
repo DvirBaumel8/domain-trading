@@ -1,141 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config.js';
-import { adapterStatus } from '../../src/modules/registrars/registry.js';
-import { testEnv } from '../helpers/env.js';
+
+const H = 'a'.repeat(64);
 
 describe('loadConfig', () => {
-  it('parses a valid env with defaults', () => {
-    const c = loadConfig(testEnv());
-    expect(c.appEnv).toBe('test');
-    expect(c.port).toBe(3000);
-    expect(c.enabledRegistrars).toEqual(['porkbun']);
-    expect(c.version).toMatch(/^\d+\.\d+\.\d+/);
+  it('starts with nothing set: no database, no keys, no tokens', () => {
+    expect(loadConfig({})).toMatchObject({ port: 3000, host: '0.0.0.0', porkbun: null, commit: null, tokens: new Map() });
+    expect(loadConfig({}).version).toMatch(/^\d+\.\d+\.\d+$/);
   });
-
-  it('defaults sedoTemplatePath and dnsNsServer', () => {
-    const c = loadConfig(testEnv());
-    expect(c.sedoTemplatePath).toBe('templates/sedo_template.json');
-    expect(c.dnsNsServer).toBe('192.5.6.30');
+  it('ignores a leftover DATABASE_URL', () => {
+    expect(JSON.stringify(loadConfig({ DATABASE_URL: 'postgres://u:p@h/db' }))).not.toContain('postgres');
   });
-
-  it('PORKBUN_BASE_URL must be https outside test', () => {
-    expect(() => loadConfig(testEnv({ APP_ENV: 'development', PORKBUN_BASE_URL: 'http://evil.example' }))).toThrow(
-      'Invalid environment: PORKBUN_BASE_URL must be https');
-    expect(() => loadConfig(testEnv({ APP_ENV: 'development', PORKBUN_BASE_URL: 'https://api.porkbun.com/api/json/v3' }))).not.toThrow();
-    expect(() => loadConfig(testEnv({ APP_ENV: 'development' }))).not.toThrow();
-    expect(() => loadConfig(testEnv({ APP_ENV: 'test', PORKBUN_BASE_URL: 'http://localhost:1' }))).not.toThrow();
+  it('reads tokens as hash -> name', () => {
+    expect(loadConfig({ API_TOKENS: `gavriel:${H}, dom-read:${'b'.repeat(64)}` }).tokens).toEqual(new Map([[H, 'gavriel'], ['b'.repeat(64), 'dom-read']]));
   });
-
-  it('M8: onRender follows the RENDER variable (the keep-alive ping runs only on Render, not on the Mac host)', () => {
-    expect(loadConfig(testEnv()).onRender).toBe(false);
-    const prod = { APP_ENV: 'production', DATABASE_SSL: 'true', DATABASE_URL: 'postgres://u:p@db.example.com/d?sslmode=verify-full' };
-    expect(loadConfig(testEnv({ ...prod, RENDER: 'true' })).onRender).toBe(true);
-    expect(loadConfig(testEnv(prod)).onRender).toBe(false);
+  it.each(['dt_a-real-token', `gavriel:${H.toUpperCase()}`, `gavriel:${H.slice(1)}`, `a:${H},b:${H}`, `a:${H},a:${'b'.repeat(64)}`])('refuses bad API_TOKENS without showing them: %s', (v) => {
+    expect(() => loadConfig({ API_TOKENS: v })).toThrow(/API_TOKENS must be/);
+    try { loadConfig({ API_TOKENS: v }); } catch (e) { expect((e as Error).message).not.toContain(v); }
   });
-
-  it('G-89: RENDER set with APP_ENV other than production refuses to start; production passes', () => {
-    expect(() => loadConfig(testEnv({ RENDER: 'true' }))).toThrow(/RENDER is set but APP_ENV is test/);
-    expect(() => loadConfig(testEnv({ RENDER: 'true', APP_ENV: 'development' }))).toThrow(/APP_ENV=production/);
-    expect(() => loadConfig(testEnv({ RENDER: 'true', APP_ENV: 'production', DATABASE_SSL: 'true', DATABASE_URL: 'postgres://u:p@db.example.com/d?sslmode=verify-full' }))).not.toThrow();
-    expect(() => loadConfig(testEnv({ APP_ENV: 'development' }))).not.toThrow();
-  });
-
-  it('rejects a missing DATABASE_URL', () => {
-    const env = testEnv();
-    delete env.DATABASE_URL;
-    expect(() => loadConfig(env)).toThrow(/DATABASE_URL/);
-  });
-
-  it('rejects a non-postgres DATABASE_URL', () => {
-    expect(() => loadConfig(testEnv({ DATABASE_URL: 'mysql://x' }))).toThrow(/DATABASE_URL/);
-  });
-
-  it('collects every non-empty secret value (registrar keys, backup token, DB password)', () => {
-    const c = loadConfig(testEnv());
-    expect(c.secretValues).toEqual(
-      expect.arrayContaining([
-        'pk1_fake_test_key_000000000000',
-        'sk1_fake_test_secret_00000000',
-        'fake_godaddy_pat_0000000000',
-        'github_pat_fake_000000000000',
-        'pk1_sb_fake_test_key_0000000',
-        'sk1_sb_fake_test_secret_00000',
-        'dt',
-      ]),
-    );
-  });
-
-  it('lowercases and trims ENABLED_REGISTRARS', () => {
-    expect(loadConfig(testEnv({ ENABLED_REGISTRARS: ' Porkbun, NameCom ' })).enabledRegistrars).toEqual([
-      'porkbun',
-      'namecom',
-    ]);
-  });
-});
-
-describe('adapterStatus', () => {
-  it('porkbun is enabled with keys; every other registrar is disabled', () => {
-    const s = adapterStatus(loadConfig(testEnv()));
-    expect(s.map((a) => a.name)).toEqual(
-      expect.arrayContaining(['porkbun', 'dynadot', 'namecom', 'namecheap', 'godaddy', 'spaceship', 'namesilo']),
-    );
-    expect(s.find((a) => a.name === 'porkbun')).toMatchObject({ enabled: true, reason: null });
-    expect(s.filter((a) => a.name !== 'porkbun').every((a) => a.enabled === false)).toBe(true);
-  });
-
-  it('never lists cloudflare', () => {
-    expect(adapterStatus(loadConfig(testEnv())).some((a) => a.name === 'cloudflare')).toBe(false);
-  });
-
-  it('reports porkbun keys missing', () => {
-    const s = adapterStatus(loadConfig(testEnv({ PORKBUN_API_KEY: '' })));
-    expect(s.find((a) => a.name === 'porkbun')?.reason).toBe('keys missing');
-  });
-
-  it('reports "not implemented" for an enabled registrar with keys but no adapter', () => {
-    const s = adapterStatus(
-      loadConfig(testEnv({ ENABLED_REGISTRARS: 'porkbun,dynadot', DYNADOT_API_KEY: 'fake_dyn_key_000000', DYNADOT_API_SECRET: 'fake_dyn_secret_0000' })),
-    );
-    expect(s.find((a) => a.name === 'dynadot')?.reason).toBe('not implemented');
-  });
-
-  it('reports registrars not in ENABLED_REGISTRARS', () => {
-    const s = adapterStatus(loadConfig(testEnv()));
-    expect(s.find((a) => a.name === 'dynadot')?.reason).toBe('not in ENABLED_REGISTRARS');
-  });
-});
-
-describe('ENABLED_REGISTRARS validation (S8)', () => {
-  it('rejects unknown registrar names', () => {
-    expect(() => loadConfig(testEnv({ ENABLED_REGISTRARS: 'porkbun,porkbunn' }))).toThrow(/ENABLED_REGISTRARS.*porkbunn/);
-  });
-  it('rejects prototype-chain names like constructor', () => {
-    expect(() => loadConfig(testEnv({ ENABLED_REGISTRARS: 'constructor' }))).toThrow(/unknown registrar/);
-  });
-  it('rejects cloudflare explicitly (founder rule 5)', () => {
-    expect(() => loadConfig(testEnv({ ENABLED_REGISTRARS: 'cloudflare' }))).toThrow(/cloudflare/i);
-  });
-  it('accepts an empty list', () => {
-    expect(loadConfig(testEnv({ ENABLED_REGISTRARS: '' })).enabledRegistrars).toEqual([]);
-  });
-});
-
-describe('SellerHub env (v4.0.0, CR-049)', () => {
-  it('SHC-1: the key pair is optional (both absent: sync off), read as separate variables, and both are secrets', () => {
-    expect(loadConfig(testEnv()).sellerhub).toEqual({ apiKey: undefined, apiSecret: undefined, baseUrl: 'https://spaceship.dev/api' });
-    const c = loadConfig(testEnv({ SPACESHIP_SELLERHUB_API_KEY: 'fake-key-1', SPACESHIP_SELLERHUB_API_SECRET: 'fake-secret-1', SPACESHIP_SELLERHUB_BASE_URL: 'https://spaceship.test/api/' }));
-    expect(c.sellerhub).toEqual({ apiKey: 'fake-key-1', apiSecret: 'fake-secret-1', baseUrl: 'https://spaceship.test/api' });
-    expect(c.secretValues).toEqual(expect.arrayContaining(['fake-key-1', 'fake-secret-1']));
-    expect(loadConfig(testEnv({ SPACESHIP_SELLERHUB_API_KEY: '' })).sellerhub.apiKey).toBeUndefined();
-  });
-});
-
-describe('Companies House env (v4.2.0, CR-046)', () => {
-  it('CHC-1: COMPANIES_HOUSE_API_KEY is optional, an empty value is unset, and a set value is a redacted secret', () => {
-    expect(loadConfig(testEnv()).companiesHouseApiKey).toBeUndefined();
-    expect(loadConfig(testEnv({ COMPANIES_HOUSE_API_KEY: '' })).companiesHouseApiKey).toBeUndefined();
-    const c = loadConfig(testEnv({ COMPANIES_HOUSE_API_KEY: 'fake-ch-key-1' }));
-    expect(c.companiesHouseApiKey).toBe('fake-ch-key-1');
-    expect(c.secretValues).toContain('fake-ch-key-1');
+  it('needs both Porkbun keys or neither', () => {
+    expect(() => loadConfig({ PORKBUN_API_KEY: 'pk1_fake' })).toThrow(/both/);
+    expect(loadConfig({ PORKBUN_API_KEY: 'pk1_fake', PORKBUN_SECRET_API_KEY: 'sk1_fake' }).porkbun).toEqual({ apiKey: 'pk1_fake', secretKey: 'sk1_fake' });
+    expect(loadConfig({ PORKBUN_API_KEY: '', PORKBUN_SECRET_API_KEY: '' }).porkbun).toBeNull();
   });
 });

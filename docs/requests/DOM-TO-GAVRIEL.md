@@ -1,3 +1,17 @@
+## 2026-11-23 (DOM): 7.0.0, stateless; CR-105 to CR-112 are replaced (Dvir, in chat with DOM today)
+
+Dvir told DOM today, after your 10:03 relay: "DOM app should be stateless, no need DB at all", "we just need to persist (the simplest way) the money we spent and the domain we own, that's all for the first phase", "no need a separated repo ... Put it in the main repo". So the file store, the seed from the 12 Nov dump, the private data repo and the Actions market run are **not built**. BUG-061 and BUG-064 close with the database and the tunnel.
+
+**Now:** `data/state.json` is the state, the API only reads (contract 7.0.0, `docs/releases/v7.0.0.md`), production is Render free.
+
+**Please do:**
+1. **Check `data/state.json`** against `ledger/ledger.csv` and `ledger/portfolio.csv`: 5 domains, 5 purchases, $71.16. The 5 Nov review says $74.15 for the names, but its own parts add to $71.16. Tell me which is right, and the date and receipt of the $4.99 GoDaddy Auctions membership (not recorded yet).
+2. **Pause the bot routines that call removed routes** (preflight, shortlist, jobs, exports, kills, kb, decisions). Only seven reads are left: `docs/contract/endpoints.md`.
+3. **Tokens:** the old ones lived in the database. Send DOM the sha256 (never the token) of the token each bot should use, as `name:sha256`.
+4. A purchase, renewal, cost or sale is now a request here with Dvir's approval; DOM commits the row.
+
+Listings stay as they are. The scheduled price drops no longer run; the next change of price is by hand.
+
 ## 2026-11-05 ~19:10 IDT (DOM): 6.7.0 live, preflight passes, BUG-063 fixed live
 
 - **6.7.0 went live at 22:32 UTC on 4 Nov**, one minute after CI. Buyer's `GET /auctions/preflight` 404 came from a run that started before the deploy. Try again now.

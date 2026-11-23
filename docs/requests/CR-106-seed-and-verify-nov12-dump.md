@@ -53,3 +53,7 @@ The encrypted Nov 12 dump that already sits on the box at `/workspace/domain-tra
 - Q1: none on the dump (dropped 2026-11-23 10:20 IST). If a source path is missing or a column map onto the CR-105 file layout is ambiguous, stop and list the gap as **DVIR**; do not invent rows or guess money figures.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-11-23)
+**Replaced, not built.** Dvir told DOM in chat today, after this was filed: stateless, no database, and only the money spent and the domains owned are kept, in this repo. Built as 7.0.0 (`docs/releases/v7.0.0.md`).
+The 12 Nov dump is not read, moved or deleted.

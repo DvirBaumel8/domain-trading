@@ -1,20 +1,6 @@
-# render.yaml: FREE hosting blueprint for the domain-trading API ($0/month).
-#
-# Free design (Dvir, 5 Oct 2026; same pattern as trader and sapako):
-#   - API: Render free web service. It sleeps after ~15 min idle and wakes on the next request (~50 s).
-#   - Postgres: Neon free (NOT declared here; DATABASE_URL is set by hand). Use the DIRECT (non-pooler)
-#     connection string: the per-domain lock is a session advisory lock. The server refuses a "-pooler." host
-#     when APP_ENV=production.
-#   - Scheduled work: a free Cloudflare Worker cron (jobs-trigger/) calls POST /jobs/run once a day (daily: reconciler, NS check,
-#     price job, drops, registrar check, backup export). The service itself runs no timers.
-#   - Render free allows 750 instance hours per WORKSPACE per month. trader and sapako each run a 24/7 keep-alive
-#     (~730 h each), so deploy this Blueprint in its OWN (new, free) workspace, or one with no always-on service.
-#     This service is NOT kept warm: the daily wake uses a few hours a month. Do not add a keep-warm ping.
-#   - LANDER_TARGET is not an env var the server reads (it is a DB setting, default afternic).
-#   - Render crons and Postgres are billed, so neither is used. Backups go to a private data repo (backup.md).
-# Setup steps: docs/DEPLOYMENT.md.
-# healthCheckPath is /health/ping (no auth, no DB) so Render's checks never wake Neon.
-
+# Render free plan ($0): one stateless web service. No database, no disk, no scheduled jobs, no keep-warm ping.
+# It sleeps after about 15 minutes idle and wakes on the next request (about a minute), so callers wake it with GET /health/ping and wait.
+# The state is data/state.json in this repo: a push that changes it passes CI first, then deploys. Setup: docs/DEPLOYMENT.md.
 services:
   - type: web
     name: domain-trading-api
@@ -22,44 +8,22 @@ services:
     plan: free
     region: frankfurt
     branch: main
-    # devDependencies are needed to compile (tsc), then pruned. node-pg-migrate, tsx and everything the
-    # runtime and `migrate` need are in "dependencies".
     buildCommand: npm ci --include=dev && npm run build && npm prune --omit=dev
-    # Migrations run from plain SQL files at start (no pre-deploy step on the free plan).
-    startCommand: npm run migrate up && node dist/main.js
+    startCommand: node dist/main.js
     healthCheckPath: /health/ping
-    autoDeployTrigger: checksPass   # deploy each push to main after GitHub CI passes
+    autoDeployTrigger: checksPass
+    buildFilter:
+      ignoredPaths:
+        - docs/**
+        - .claude/**
+        - CLAUDE.md
     envVars:
       - key: NODE_VERSION
-        value: "26"              # Node 26, the same major as the Mac host (LTS from late Oct 2026)
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_SSL
-        value: 'true'
-      - key: ENABLED_REGISTRARS
-        value: porkbun,godaddy   # godaddy = NS/details only (D-001); buying is Porkbun only
-      # Secrets: values entered in the Render Dashboard only (sync: false). Never in git.
-      - key: DATABASE_URL        # Neon DIRECT string, ?sslmode=verify-full (required in production; `require` is refused)
+        value: "26"
+      # Values are entered in the Render dashboard only (sync: false). Never in git.
+      - key: API_TOKENS              # name:sha256 pairs, comma separated (hashes, never tokens)
         sync: false
-      - key: PORKBUN_API_KEY
+      - key: PORKBUN_API_KEY         # both or neither; used for GET /check only
         sync: false
       - key: PORKBUN_SECRET_API_KEY
         sync: false
-      - key: GODADDY_PAT         # scopes: domains.domain:read, domains.nameserver:update
-        sync: false
-      - key: GITHUB_BACKUP_TOKEN # fine-grained PAT: the private DATA repo only, Contents read/write
-        sync: false
-      - key: GITHUB_BACKUP_REPO  # e.g. DvirBaumel8/domain-trading-data (never the code repo)
-        sync: false
-      - key: JOB_TRIGGER_TOKEN   # same value as the GitHub repo secret used by the Worker
-        sync: false
-      - key: GOOGLE_WEB_RISK_API_KEY # optional: Web Risk Lookup API key (free tier, 10,000 lookups a month cap in code); unset keeps web_risk manual
-        sync: false
-      - key: COMPANIES_HOUSE_API_KEY # optional: UK Companies House API key (free; HTTP Basic, key as the user name); unset makes the companies check UNKNOWN SOURCE_DISABLED
-        sync: false
-      - key: SPACESHIP_SELLERHUB_API_KEY    # optional: Spaceship SellerHub listing sync (scopes sellerhub:read, sellerhub:write only); unset skips the listingSync step
-        sync: false
-      - key: SPACESHIP_SELLERHUB_API_SECRET # optional: the secret that goes with the SellerHub key
-        sync: false
-      - key: PUBLIC_BASE_URL     # the service's own public URL (the job queue's keep-alive ping)
-        value: https://domain-trading-api.onrender.com

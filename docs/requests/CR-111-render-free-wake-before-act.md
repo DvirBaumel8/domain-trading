@@ -46,3 +46,7 @@ DOM runs on Render Free in the existing shared workspace and is allowed to sleep
 - R-add-1: Remove or disable the in-process self-ping keep-alive (docs/DEPLOYMENT.md, v5.13.0: pings itself when `RENDER` is set). On Render Free, DOM must be allowed to sleep after 15 min idle. AC-add-1: with no external calls for 20 min, the Render events/instances API shows the service scaled to 0 (sleeping).
 - R-add-2: A failed startup must not crash-loop and burn free hours. With no DATABASE_URL (or an unreachable DB), the process starts and serves /health/ping 200 (CR-107/CR-111). AC-add-2: a deploy with no DB reaches `live` and does not log repeated `server_failed`.
 - Context (read-only audit, Render API): on Nov 23 at 10:12 IST, the docs-only push 6be85a06 auto-deployed and `update_failed`; 2 instances crash-loop on `npm run migrate up` vs suspended Neon. The shared workspace's 750 h ran out in Oct 2026 (all 4 services auto-resumed Nov 1 by `Free Tier Usage Exceeded` removal). Other projects' 5-min keepalive Workers (pro-now, trader, sapako) are outside DOM scope; flagged to Dvir.
+
+## DOM response (2026-11-23)
+**Replaced, not built.** Dvir told DOM in chat today, after this was filed: stateless, no database, and only the money spent and the domains owned are kept, in this repo. Built as 7.0.0 (`docs/releases/v7.0.0.md`).
+Taken over from this CR: Render free, `autoDeployTrigger: checksPass`, `buildFilter` for docs, no migrate, no `DATABASE_URL`, no keep-warm.

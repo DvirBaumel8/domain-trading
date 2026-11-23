@@ -86,3 +86,6 @@ Focus: a dead quick tunnel with an unchanged URL must recover within 5 minutes w
 
 <!-- DOM writes below this line -->
 ## DOM response
+
+## DOM response (2026-11-23)
+Closed without a fix: 7.0.0 removes the database and the Mac tunnel (Dvir, 23 Nov 2026).

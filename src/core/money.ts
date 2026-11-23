@@ -1,5 +1,3 @@
-import { AppError } from '../http/errors.js';
-
 const USD = /^(\d+)(?:\.(\d{1,2}))?$/;
 
 /** "9.73" → 973. Exact string arithmetic; floats never touch money. */
@@ -19,47 +17,11 @@ export function formatUsd(cents: number): string {
   return `${cents < 0 ? '-' : ''}$${dollars}.${rest}`;
 }
 
-/** A USD request amount (e.g. max_price 11.5) → cents, exactly. Rejects ≤0, non-finite, >2 decimals. */
-export function dollarsToCents(n: number): number {
-  if (!Number.isFinite(n) || n <= 0) throw new Error(`Not a positive USD amount: ${n}`);
-  return usdStringToCents(String(n));
-}
-
-/** A USD amount from a request body (number, dollars) → cents, or an AppError (default 422 VALIDATION_ERROR) naming the field. One copy for every route. */
-export function apiCents(n: number, field: string, status: 400 | 422 = 422): number {
-  try {
-    return dollarsToCents(n);
-  } catch {
-    throw new AppError(status, 'VALIDATION_ERROR', `${field} must be a positive USD amount with at most 2 decimals`);
-  }
-}
-
-/** Signed cents as "-11.08" (no float, always 2 decimals). */
-export function usdSigned(cents: number): string {
-  const abs = Math.abs(cents);
-  return `${cents < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-}
-
-/** formatUsd without the cents when they are .00: $499 or $11.08. */
-export function wholeUsd(c: number): string {
-  const s = formatUsd(c);
-  return c % 100 === 0 && s.endsWith('.00') ? s.slice(0, -3) : s;
-}
-
 export type Pair<K extends string> = { [P in `${K}_cents`]: number | null } & { [P in K]: string | null };
 /** A money field as the flat pair `<key>_cents` + `<key>` (display string), e.g. spent_cents: 2107, spent: "$21.07". */
 export function pair<K extends string>(key: K, cents: number | null): Pair<K> {
   return { [`${key}_cents`]: cents, [key]: cents === null ? null : formatUsd(cents) } as Pair<K>;
 }
 
-/** Integer cents → dollars as a number, computed from the integer parts (never a float division of money). */
-function centsToDollars(c: number): number {
-  if (!Number.isSafeInteger(c)) return c / 100; // not integer cents: same arithmetic as before, nothing new to throw
-  const abs = Math.abs(c);
-  return Number(`${c < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`);
-}
-
 /** formatUsd that passes null through. */
 export const formatUsdOrNull = (c: number | null): string | null => (c === null ? null : formatUsd(c));
-/** centsToDollars that passes null through. */
-export const centsToDollarsOrNull = (c: number | null): number | null => (c === null ? null : centsToDollars(c));

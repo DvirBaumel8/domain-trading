@@ -36,3 +36,6 @@ The owned-state and pack read routes must work with no database: boot with no `D
 - Q1: if a v6.7.0 example field cannot be produced from the file map, list it and drop or replace it in the contract bump (CR-109 ships v7.0.0). Do not invent values.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-11-23)
+**Replaced, not built.** Dvir told DOM in chat today, after this was filed: stateless, no database, and only the money spent and the domains owned are kept, in this repo. Built as 7.0.0 (`docs/releases/v7.0.0.md`).

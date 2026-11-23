@@ -39,3 +39,6 @@ The daily GoDaddy / Dynadot / NameBio pull does not fit Render Free (512 MB). On
 - Q1: keep the 15:20 UTC schedule (CR-094) for the Actions job? Recommended yes, so it still starts after GoDaddy publishes.
 
 <!-- DOM writes below this line -->
+
+## DOM response (2026-11-23)
+**Replaced, not built.** Dvir told DOM in chat today, after this was filed: stateless, no database, and only the money spent and the domains owned are kept, in this repo. Built as 7.0.0 (`docs/releases/v7.0.0.md`).

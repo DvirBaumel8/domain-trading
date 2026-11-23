@@ -1,182 +1,54 @@
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
 import { z } from 'zod';
-import { poolConfig } from './db/client.js';
-import { REGISTRAR_ENV } from './modules/registrars/index.js';
 
-/** The code repo. The backup token must never be able to touch it. */
-const CODE_REPO = 'DvirBaumel8/domain-trading';
-
-/** The service's own public URL (the job queue's keep-alive ping). */
-export const DEFAULT_PUBLIC_BASE_URL = 'https://domain-trading-api.onrender.com';
-
-/** CR-062: a published NameBio file is fetched only from an https URL on namebio.com (the module re-checks before every request). */
-const isNameBioFileUrl = (v: string): boolean => {
-  const u = new URL(v);
-  if (u.protocol !== 'https:' || u.search !== '') return false;
-  if (u.hostname === 'api.namebio.com') return ['/retailstats-download'].includes(u.pathname);
-  return u.hostname === 'namebio.com' || u.hostname.endsWith('.namebio.com');
-};
-
-const expandHome = (p: string, home: string): string => (p === '~' ? home : p.startsWith('~/') ? `${home}/${p.slice(2)}` : p);
+const optional = (s: z.ZodString) => z.preprocess((v) => (v === '' ? undefined : v), s.optional());
 
 const EnvSchema = z.object({
-  DATABASE_URL: z
-    .string({ error: 'DATABASE_URL is required' })
-    .refine((v) => /^postgres(ql)?:\/\//.test(v), 'DATABASE_URL must be a postgres:// URL'),
-  APP_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),
   LOG_LEVEL: z.string().default('info'),
-  ENABLED_REGISTRARS: z.string().default(''),
-  SEDO_TEMPLATE_PATH: z.string().default('templates/sedo_template.json'),
-  DNS_NS_SERVER: z.string().default('192.5.6.30'),
-  JOB_TRIGGER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\S{32,}$/, 'JOB_TRIGGER_TOKEN must be at least 32 non-space characters (openssl rand -hex 32)').optional()),
-  GOOGLE_WEB_RISK_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  COMPANIES_HOUSE_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  NAMEBIO_RETAILSTATS_CSV_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine(isNameBioFileUrl, 'NAMEBIO_RETAILSTATS_CSV_URL must be an https URL on namebio.com').optional()),
-  SPACESHIP_SELLERHUB_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  SPACESHIP_SELLERHUB_API_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  SPACESHIP_SELLERHUB_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().default('https://spaceship.dev/api')),
-  AFTERNIC_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  AFTERNIC_API_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  AFTERNIC_API_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().default('https://api.afternic.com')),
-  PUBLIC_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().refine((v) => /^https?:\/\//.test(v), 'PUBLIC_BASE_URL must be http(s)').default(DEFAULT_PUBLIC_BASE_URL)),
-  DATABASE_SSL: z.enum(['true', 'false']).default('false'),
-  SNAPSHOT_DIR: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  /** v5.59.0 (CR-081): the root of the daily archive (`<root>/godaddy/`); default a sibling `archive` folder of SNAPSHOT_DIR. */
-  ARCHIVE_DIR: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
-  GITHUB_BACKUP_REPO: z.preprocess((v) => (v === '' ? undefined : v), z.string()
-    .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/, 'GITHUB_BACKUP_REPO must be owner/name')
-    .refine((v) => !v.split('/').some((x) => x === '.' || x === '..'), 'GITHUB_BACKUP_REPO must not contain . or .. segments')
-    .refine((v) => v.toLowerCase() !== CODE_REPO.toLowerCase(), `GITHUB_BACKUP_REPO must be a separate private data repo, never the code repo ${CODE_REPO} (founder rule 11)`)
-    .optional()),
+  /** `name:sha256` pairs, comma separated. Hashes only: the server never holds a token. Empty = every request is 401. */
+  API_TOKENS: z.string().default(''),
+  PORKBUN_API_KEY: optional(z.string()),
+  PORKBUN_SECRET_API_KEY: optional(z.string()),
+  /** The commit this build was made from (Render sets it). */
+  RENDER_GIT_COMMIT: optional(z.string()),
 });
 
 export interface Config {
-  databaseUrl: string;
-  appEnv: 'development' | 'test' | 'production';
   port: number;
   host: string;
   logLevel: string;
-  enabledRegistrars: string[];
-  sedoTemplatePath: string;
-  dnsNsServer: string;
-  /** Bearer token for POST /jobs/run; undefined → the route answers 503 JOBS_DISABLED. */
-  jobTriggerToken: string | undefined;
-  databaseSsl: boolean;
-  /** Google Web Risk Lookup API key (header `x-goog-api-key`, never in a URL). undefined → the web_risk check stays MANUAL_REQUIRED. */
-  webRiskApiKey: string | undefined;
-  companiesHouseApiKey: string | undefined;
-  /** v5.11.0 (CR-062): the published NameBio CSV file URLs; both undefined -> the daily step asks RetailStats per keyword. */
-  namebio: { retailstatsCsvUrl: string | undefined };
-  /** v4.0.0 (CR-049): Spaceship SellerHub key and secret (scopes sellerhub:read, sellerhub:write only). Either missing -> the listingSync step is skipped. */
-  sellerhub: { apiKey: string | undefined; apiSecret: string | undefined; baseUrl: string };
-  /** v5.61.0: Afternic's seller API key pair (`Authorization: sso-key KEY:SECRET`). Either missing -> afternicSync and POST /export/afternic/push report not_configured. */
-  afternic: { apiKey: string | undefined; apiSecret: string | undefined; baseUrl: string };
-  /** Public base URL of this service, without a trailing slash (the job queue's keep-alive ping). */
-  publicBaseUrl: string;
-  /** True when the host sets RENDER (a Render service). The keep-alive ping only makes sense there (M8); on the Mac host it would ping a suspended Render URL. */
-  onRender: boolean;
-  /** v5.21.0 (CR-071): where the datasave job keeps raw GoDaddy zips for 7 days (default ~/Library/Application Support/domain-trading/snapshots). If it cannot be written, the job runs without raw files. */
-  snapshotDir: string;
-  /** v5.59.0 (CR-081): ARCHIVE_DIR, the root of the daily GoDaddy archive. */
-  archiveDir: string;
-  /** Nightly data export target. token/repo undefined → the export is skipped with a warning (BK-4). */
-  backup: { token: string | undefined; repo: string | undefined };
+  tokens: ReadonlyMap<string, string>;
+  /** null = no keys: /check answers without quotes. */
+  porkbun: { apiKey: string; secretKey: string } | null;
+  commit: string | null;
   version: string;
-  /** Raw env (strings only). Read secrets from here; never log it. */
-  env: Readonly<Record<string, string>>;
-  /** Every non-empty secret value, for leak tests (AU-8) and log redaction. */
-  secretValues: string[];
 }
 
-const SECRET_ENV = ['GITHUB_BACKUP_TOKEN', 'JOB_TRIGGER_TOKEN', 'GOOGLE_WEB_RISK_API_KEY', 'COMPANIES_HOUSE_API_KEY', 'SPACESHIP_SELLERHUB_API_KEY', 'SPACESHIP_SELLERHUB_API_SECRET', 'AFTERNIC_API_KEY', 'AFTERNIC_API_SECRET', 'PORKBUN_SANDBOX_API_KEY', 'PORKBUN_SANDBOX_SECRET_API_KEY', ...Object.values(REGISTRAR_ENV).flat()];
-
-function readVersion(): string {
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
-  return pkg.version;
+function parseTokens(text: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const pair of text.split(',').map((s) => s.trim()).filter(Boolean)) {
+    const m = /^([a-z0-9_-]{1,40}):([0-9a-f]{64})$/.exec(pair);
+    // the value is never shown: a token pasted here by mistake must not reach the log
+    if (!m || out.has(m[2]!) || [...out.values()].includes(m[1]!)) throw new Error('Invalid environment: API_TOKENS must be unique name:sha256 pairs (64 lowercase hex characters), comma separated');
+    out.set(m[2]!, m[1]!);
+  }
+  return out;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const parsed = EnvSchema.safeParse(env);
-  if (!parsed.success) {
-    const msg = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
-    throw new Error(`Invalid environment: ${msg}`);
-  }
+  if (!parsed.success) throw new Error(`Invalid environment: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
   const e = parsed.data;
-  // v3.9.0 (G-89): Render sets RENDER on every service; a service there that is not APP_ENV=production would skip the production checks (verified TLS, direct DB URL)
-  if (env.RENDER && e.APP_ENV !== 'production') {
-    throw new Error(`Invalid environment: RENDER is set but APP_ENV is ${e.APP_ENV}; a Render service must run with APP_ENV=production`);
-  }
-  const pbUrl = env.PORKBUN_BASE_URL;
-  if (pbUrl && e.APP_ENV !== 'test' && !pbUrl.startsWith('https://')) {
-    throw new Error('Invalid environment: PORKBUN_BASE_URL must be https');
-  }
-  const gdUrl = env.GODADDY_BASE_URL;
-  if (gdUrl && e.APP_ENV !== 'test' && !gdUrl.startsWith('https://')) {
-    throw new Error('Invalid environment: GODADDY_BASE_URL must be https');
-  }
-  const strings: Record<string, string> = {};
-  for (const [k, v] of Object.entries(env)) if (typeof v === 'string') strings[k] = v;
-
-  const enabledRegistrars = e.ENABLED_REGISTRARS.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  if (enabledRegistrars.includes('cloudflare')) {
-    throw new Error('Invalid environment: ENABLED_REGISTRARS: cloudflare is never supported (no third-party nameservers)');
-  }
-  const unknown = enabledRegistrars.filter((n) => !Object.hasOwn(REGISTRAR_ENV, n));
-  if (unknown.length > 0) {
-    throw new Error(`Invalid environment: ENABLED_REGISTRARS: unknown registrar(s) ${unknown.join(', ')}`);
-  }
-
-  if (e.APP_ENV === 'production' && new URL(e.DATABASE_URL).hostname.includes('-pooler.')) {
-    throw new Error(
-      'Invalid environment: DATABASE_URL points at a pooled (-pooler) connection. The per-domain lock is a session advisory lock, '
-      + 'which breaks behind a transaction-mode pooler. Use the direct (non-pooler) connection string.',
-    );
-  }
-
-  if (e.APP_ENV === 'production') {
-    // Production verifies the server certificate and says so in the URL. node-pg-migrate reads the URL's sslmode itself
-    // (poolConfig strips it only for the app's pg pool), so verify-full here also makes migrations verify the certificate.
-    const mode = /[?&]sslmode=([^&]*)/i.exec(e.DATABASE_URL)?.[1]?.toLowerCase();
-    if (e.DATABASE_SSL !== 'true' || mode !== 'verify-full') {
-      throw new Error(
-        'Invalid environment: production requires DATABASE_SSL=true and sslmode=verify-full in DATABASE_URL '
-        + `(got DATABASE_SSL=${e.DATABASE_SSL}, sslmode=${mode ?? 'none'}); use the Neon direct string with ?sslmode=verify-full`,
-      );
-    }
-  }
-  if (e.DATABASE_SSL === 'true') poolConfig(e.DATABASE_URL, { ssl: true }); // throws on a conflicting sslmode
-
-  const secretValues = SECRET_ENV.map((k) => strings[k] ?? '').filter((v) => v.length > 0);
-  const dbPassword = decodeURIComponent(new URL(e.DATABASE_URL).password);
-  if (dbPassword) secretValues.push(dbPassword);
-
+  if (Boolean(e.PORKBUN_API_KEY) !== Boolean(e.PORKBUN_SECRET_API_KEY)) throw new Error('Invalid environment: set both PORKBUN_API_KEY and PORKBUN_SECRET_API_KEY, or neither');
   return {
-    databaseUrl: e.DATABASE_URL,
-    appEnv: e.APP_ENV,
     port: e.PORT,
     host: e.HOST,
     logLevel: e.LOG_LEVEL,
-    enabledRegistrars,
-    sedoTemplatePath: e.SEDO_TEMPLATE_PATH,
-    dnsNsServer: e.DNS_NS_SERVER,
-    jobTriggerToken: e.JOB_TRIGGER_TOKEN ? e.JOB_TRIGGER_TOKEN : undefined,
-    databaseSsl: e.DATABASE_SSL === 'true',
-    sellerhub: { apiKey: e.SPACESHIP_SELLERHUB_API_KEY, apiSecret: e.SPACESHIP_SELLERHUB_API_SECRET, baseUrl: e.SPACESHIP_SELLERHUB_BASE_URL.replace(/\/+$/, '') },
-    afternic: { apiKey: e.AFTERNIC_API_KEY, apiSecret: e.AFTERNIC_API_SECRET, baseUrl: e.AFTERNIC_API_BASE_URL.replace(/\/+$/, '') },
-    publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
-    onRender: Boolean(env.RENDER),
-    webRiskApiKey: e.GOOGLE_WEB_RISK_API_KEY ? e.GOOGLE_WEB_RISK_API_KEY : undefined,
-    companiesHouseApiKey: e.COMPANIES_HOUSE_API_KEY ? e.COMPANIES_HOUSE_API_KEY : undefined,
-    namebio: { retailstatsCsvUrl: e.NAMEBIO_RETAILSTATS_CSV_URL },
-    snapshotDir: expandHome(e.SNAPSHOT_DIR ?? '~/Library/Application Support/domain-trading/snapshots', env.HOME ?? homedir()),
-    archiveDir: e.ARCHIVE_DIR ? expandHome(e.ARCHIVE_DIR, env.HOME ?? homedir()) : join(dirname(expandHome(e.SNAPSHOT_DIR ?? '~/Library/Application Support/domain-trading/snapshots', env.HOME ?? homedir())), 'archive'),
-    backup: { token: strings.GITHUB_BACKUP_TOKEN || undefined, repo: e.GITHUB_BACKUP_REPO },
-    version: readVersion(),
-    env: Object.freeze(strings),
-    secretValues,
+    tokens: parseTokens(e.API_TOKENS),
+    porkbun: e.PORKBUN_API_KEY && e.PORKBUN_SECRET_API_KEY ? { apiKey: e.PORKBUN_API_KEY, secretKey: e.PORKBUN_SECRET_API_KEY } : null,
+    commit: e.RENDER_GIT_COMMIT ?? null,
+    version: (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version,
   };
 }
