@@ -24,3 +24,34 @@ Env note: on Render I removed the Buffer, Gemini, database and registrar-list ke
 6. **Web Risk.** Check both `http://<domain>/` and `https://<domain>/`. On any error or timeout, return `web_risk: {"status": "error"}` and never `clean`.
 7. **Porkbun setup is not code.** Each domain needs API access switched on in the Porkbun account. If the read route can't see a domain, put it in `DOM-TO-GAVRIEL.md` for Gavriel (by hand, in the browser). There are 3 Porkbun domains today: ukcbamcompliance.com, aievalsconsulting.com and roofingvoiceagent.com.
 8. **Done when:** as the CR says, plus a test for each refusal in points 1 to 4.
+
+---
+
+## 2026-11-23 16:50 Israel time (Architect): plan and key names for CR-115
+
+CR-115 (`docs/requests/CR-115-free-apis-in-dom.md`, Dvir approved 16:30) is yours to build after CR-114, or with it. Both use the same approval file. **No keys exist yet:** Gavriel creates them after Dvir gives a separate OK. Until a key is set, every route must say that its source is missing.
+
+### Final env names (please put them in the contract)
+
+| Source | Env names | Why |
+|---|---|---|
+| Afternic Portfolio API | `AFTERNIC_API_KEY`, `AFTERNIC_API_SECRET` | Its docs say it uses the `sso-key` header, which is key plus secret. The key comes from the Afternic account, not the GoDaddy one. |
+| GoDaddy Domains (read-only) | `GODADDY_DOMAINS_PAT` | GoDaddy's auth page says Domains v3 needs a Personal Access Token and the classic key is deprecated for Domains through 2026. Make the token with the `domains.domain:read` scope only, so it cannot buy or change anything. This is a new name, not the old `GODADDY_PAT`. |
+| GoDaddy Auctions | `GODADDY_API_KEY`, `GODADDY_API_SECRET` | GoDaddy says the classic `sso-key` is required for Auctions and a token is not accepted. Use it for Auctions only. |
+| USPTO TSDR | `USPTO_API_KEY` | Sent as the `USPTO-API-KEY` header. Lookup by serial number only. |
+| GoDaddy public inventory files | none | No login. |
+
+Leave `GOOGLE_WEB_RISK_API_KEY` (CR-114) and the Porkbun keys as they are.
+
+### Contract rules beyond CR-114
+
+1. **One approval file format** for every money or listing write, with an `action` field set to one of: `register`, `renew`, `afternic_list`, `afternic_unlist`, `afternic_set_bin`, `auction_bid` or `auction_buy`. Fields depend on the action: for a BIN change, the BIN in cents; for a bid or buy, the max price in cents.
+2. **Afternic writes are idempotent.** If the listing is already in the requested state, do nothing and return the current state. The 7-day expiry limits reuse. A sale's auth code and transaction-agent messages are out of scope. Reading our sales and their status is in scope, because it is free and read-only.
+3. **Auction bid caps count open bids.** When checking the 40-domain and $1,500 caps, count `spent_cents` plus every bid we are winning or that is still active (read from the Auctions API) plus the new bid. Single use: refuse when we already hold a bid at or above that approval's max on that domain. A bid makes no ledger row until we win, and the win row cites the approval file.
+4. **Inventory files on Render Free (512 MB):** stream the zip, never load it whole, and never write it to disk past the request. Page through results with a cursor rather than cutting the pool (Dvir's no-size-cuts rule). Return what was read and the file's `metadata.json` timestamp. If the download or the parse fails, return an error, not an empty list.
+5. **Eligibility errors are errors.** GoDaddy answers 403 with a `code` when an account isn't eligible. Show that code. Never treat it as zero results.
+
+### For Gavriel when making keys (not for code)
+- Use a read-only token scope for Domains, and keep its expiry short if GoDaddy lets you choose.
+- The USPTO key may require identity checks on Dvir's USPTO account. If it does, that step is Dvir's.
+- This file assumes, as CR-115 says, that Afternic's API is open to all sellers and the Auctions API to members. If the live docs say otherwise, DOM should write that in `DOM-TO-GAVRIEL.md`.
