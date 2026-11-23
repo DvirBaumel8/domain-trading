@@ -55,3 +55,42 @@ Leave `GOOGLE_WEB_RISK_API_KEY` (CR-114) and the Porkbun keys as they are.
 - Use a read-only token scope for Domains, and keep its expiry short if GoDaddy lets you choose.
 - The USPTO key may require identity checks on Dvir's USPTO account. If it does, that step is Dvir's.
 - This file assumes, as CR-115 says, that Afternic's API is open to all sellers and the Auctions API to members. If the live docs say otherwise, DOM should write that in `DOM-TO-GAVRIEL.md`.
+
+---
+
+## 2026-11-23 23:05 Israel time (Architect): CR-117 handoff (buy-flow v1 pre-filter, cap math, shadow log)
+
+CR-117 (`docs/requests/CR-117-buy-flow-v1-prefilter-money-shadow.md`, 715b67b0, Dvir decided 22:26) is yours to build. CR-116 stands: no bid, buy, register, renew or listing-write route. Tests in the CR are the contract, at most two review rounds. Below is how, where the CR leaves it open.
+
+### Where it runs and where data lives
+1. **Daily job runs in GitHub Actions, not on Render.** Render Free has no cron and loses its disk. Add a scheduled workflow (once a day, plus `workflow_dispatch`) that streams the public GoDaddy inventory files, runs the pre-filter, and writes results. Actions minutes are free for this public repo. Same code path must also be callable on request from the API (stateless, streamed, cursor paging, no size cuts, as in CR-115 rule 4).
+2. **Shadow log lives in git on a separate branch, `shadow-log`,** as append-only JSONL (for example `shadow/YYYY-MM-DD.jsonl` plus `shadow/closes/YYYY-MM-DD.jsonl`), committed by the workflow with `GITHUB_TOKEN`. Not on `main`: Render auto-deploys `main`, so a daily data commit there would redeploy every day, and `main` must stay limited to code, contract and `data/state.json`. The API reads the branch through the public raw URL, so reads survive a spin-down. If that read fails, say error, never an empty log.
+3. **This repo is public, so nothing secret goes in the shadow log before close.** Pre-filter passers are mechanical (public price plus fees), so they may be written the same day. Buyer's approval, our max, and planned BIN for a name are written **only after that auction has closed**. Never write any key or token there.
+4. **Ledger stays `data/state.json` on `main`** (deployed copy). If it can't be read, refuse the whole run, as the CR says.
+
+### Money math (please put the formulas in the contract)
+- `all_in = price_or_current_bid + listed_renewal_year1 + icann_and_fees` (whatever GoDaddy charges on top of the hammer price to get the name for one year).
+- `year2_reserve = listed renewal` for every owned name, open bid and candidate **not** marked do-not-renew. Zero for D-001..D-004.
+- `committed = spent_cents + sum(open_bid max all_in) + sum(year2_reserve) + candidate all_in + candidate year2_reserve`. Block over 150000 cents.
+- Per-name `$250` cap applies to the candidate's `all_in` (year 1).
+- Slots: owned names (D-001..D-004 included until expiry) + open bids + candidate; block over 40.
+- Closeout pilot: add a `source` field to ledger rows (`auction`, `closeout`, `registration`, `cost`; existing rows get their true value). Block a closeout when closeout spend + open closeout bids + candidate all_in would exceed 30000 cents, even if the `$1,500` cap has room.
+- **Unknown is never zero.** If an owned name's renewal price is unknown, or open bids can't be read, the name is "budget unknown", never "within budget". Open bids come from the GoDaddy Auctions read (`GODADDY_API_KEY` / `GODADDY_API_SECRET`, CR-116). Until those keys are in Render, every candidate is "budget unknown". That is correct, not a bug.
+- D-001..D-004: a `do_not_renew: true` flag (with reason "no inquiry", date 2026-11-23) in `data/state.json`. Exclude them from every new-method metric computed from the shadow log.
+
+### Checks in the pre-filter, with limits you should state in the contract
+- **Order:** `.com`, letters only, SLD `<= 13`, `>= 16h` left, prior kills and portfolio, money caps, then the outside checks below. Cheap gates first, so outside calls run only on survivors.
+- **Prior kills:** the old `auction_kills` table went with the DB. Use whatever kill list is in the repo today. If there is none, say in `DOM-TO-GAVRIEL.md` what file you read, so bots know where to add kills.
+- **Web Risk:** as CR-114/116 (http and https, error is never clean).
+- **Trademark exact string:** USPTO TSDR is by serial number only and has no free string search. If you find no free official string-search API, return `trademark: {"status": "not_checked"}` and leave it to Risk Gate. Never "clean".
+- **Spamhaus DBL:** Spamhaus refuses DNS queries that come through public resolvers and many cloud ranges, and answers with an error code (127.255.255.x). Treat those codes, and any timeout, as `error`. If it needs a free DQS key to work from Actions or Render, write that in `DOM-TO-GAVRIEL.md` with the env name you want. Don't create one.
+- **Wayback:** use the free CDX API. Flag past adult, pharma, gambling or spam with a fixed keyword list on snapshot titles and URLs, and return the evidence (snapshot dates and URLs). Previous-owner brand judgment stays with Buyer: code supplies the first and last snapshot dates and titles, and must not decide it.
+- **Close price:** take the final price and bid count from the public file or the Auctions read. If neither has it, write `close_price: null` with a reason. Never guess.
+
+### Tests to add beyond the CR list
+- The daily job never commits to `main`, and never writes market history into `data/state.json`.
+- A Buyer max or planned BIN for an open auction is never written to the shadow log before close.
+- Open bids unreadable means "budget unknown", not "within budget".
+- Spamhaus error codes and timeouts give `error`, and trademark without an API gives `not_checked`.
+
+Done when: as the CR says, with the workflow, the branch layout and the formulas in `docs/contract/`. A release ships only after Dvir's OK through Gavriel.
