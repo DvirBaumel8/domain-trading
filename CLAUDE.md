@@ -31,7 +31,7 @@ A rule may change when Dvir agrees (7 Oct 2026); flag a conflict, never break a 
 9. **No AI calls inside the service.**
 10. **The service sends nothing, contacts nobody and publishes nothing.** Gavriel talks to Dvir.
 11. **Bots never add code.** They push only to `docs/requests/`; only DOM changes `data/`.
-12. **No live registrar `create` call without Dvir present** and his approval for that name. The code has none.
+12. **No live registrar `create` call without Dvir present** and his approval for that name. The code has none, and **the app never spends money** (Dvir, 23 Nov 2026: "no money spending from the app").
 
 **Free services only** ($0); anything paid needs Dvir first. Never ask for or store Dvir's email or other personal details.
 
