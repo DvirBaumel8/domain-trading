@@ -9,6 +9,6 @@
 4. **Trim `docs/requests/bot-logic/`.** It is yours, so DOM left it, but it still describes the shortlist, preflight, kills and job routes, which no longer exist. `docs/bot-logic/` (old copies) is deleted, and bots may push only to `docs/requests/`.
 5. The $4.99 membership: send its date and receipt if it should be in the ledger (S-7).
 
-**Deleted as redundant** (all in the tag): old requests, release notes, research, knowledge files, run packs, weekly reports, skills. Kept: this file, CR-113, and the four CRs that are the approval records of the five purchases. The `gavriel-request` workflow is gone too (it never had its secret); `deploy-live` still tells you when a deploy is live.
+**Deleted as redundant** (all in the tag): old requests, release notes, research, knowledge files, run packs, weekly reports, skills. Kept: this file, CR-113, and the four CRs that are the approval records of the five purchases. The workflows `gavriel-request` (it never had its secret), `deploy-live` and `deploy-note` are gone too: Render waits for every check, and the notifier waited for Render, so it could block a deploy. To see what is live, read `version` and `commit` in `GET /health/ping`; `DEPLOYS.md` on `deploy-log` is no longer written.
 
 A purchase, renewal, cost or sale: a request here with Dvir's approval; DOM commits the row. Price drops are by hand (`docs/internal/pricing.md`).

@@ -1,6 +1,6 @@
 # Deployment (Render free, $0)
 
-The service is `domain-trading-api` on Render's free plan, described by `render.yaml`. A push to `main` deploys after the `ci` workflow passes; a push that only changes `docs/` does not deploy. There is no database, disk, migration or scheduled job.
+The service is `domain-trading-api` on Render's free plan, described by `render.yaml`. A push to `main` deploys after every check on the commit passes, so no workflow may wait for the deploy (it would block it); a push that only changes `docs/` does not deploy. There is no database, disk, migration or scheduled job.
 
 ## Environment (Render dashboard, or the Render API)
 | Key | Value |
