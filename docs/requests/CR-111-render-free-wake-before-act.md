@@ -41,3 +41,8 @@ DOM runs on Render Free in the existing shared workspace and is allowed to sleep
 - Q1: none on auto-deploy or the workspace (Dvir answered both on 2026-11-23 10:09 IST). If `ignoredPaths: [docs/**]` is not accepted by the Blueprint schema as written, use the documented equivalent and note it in the DOM response.
 
 <!-- DOM writes below this line -->
+
+## Addendum 2026-11-23 10:23 IST (Render audit)
+- R-add-1: Remove or disable the in-process self-ping keep-alive (docs/DEPLOYMENT.md, v5.13.0: pings itself when `RENDER` is set). On Render Free, DOM must be allowed to sleep after 15 min idle. AC-add-1: with no external calls for 20 min, the Render events/instances API shows the service scaled to 0 (sleeping).
+- R-add-2: A failed startup must not crash-loop and burn free hours. With no DATABASE_URL (or an unreachable DB), the process starts and serves /health/ping 200 (CR-107/CR-111). AC-add-2: a deploy with no DB reaches `live` and does not log repeated `server_failed`.
+- Context (read-only audit, Render API): on Nov 23 at 10:12 IST, the docs-only push 6be85a06 auto-deployed and `update_failed`; 2 instances crash-loop on `npm run migrate up` vs suspended Neon. The shared workspace's 750 h ran out in Oct 2026 (all 4 services auto-resumed Nov 1 by `Free Tier Usage Exceeded` removal). Other projects' 5-min keepalive Workers (pro-now, trader, sapako) are outside DOM scope; flagged to Dvir.
