@@ -1,4 +1,4 @@
-> Status: Approved by Dvir 2026-11-23 10:33 IST (via Gavriel)
+> Status: Approved by Dvir 2026-11-23 10:33 IST (via Gavriel). Amended 10:34 IST: DELETE COMPLETELY (see §0).
 
 # CR-113 — Cut unused integrations (stateless scope)
 | Field | Value |
@@ -12,6 +12,15 @@
 | Depends on | none; touches the same files as CR-107, CR-110, CR-111 |
 | Max Claude Code rounds | 2 |
 | Spend | $0 |
+
+
+## 0. Amendment 2026-11-23 10:34 IST (Dvir via Gavriel): delete completely
+This overrides anything softer below. For Dynadot, Sedo, Spaceship, Name.com, Namecheap, NameSilo, Buffer, Companies House and NameBio paid hooks:
+- Delete all code, config, env keys, tests, fixtures, migration references, docs, SOPs, bot-logic and knowledge mentions in this repo.
+- No feature flags, no archived copies, no "kept for future", no 410 stubs. The routes are removed; contract v7.0.0 lists them once under "Removed in v7.0.0" with the date, and nothing else.
+- Gemini and Wayback: off. If their code exists only for those removed paths, delete it too.
+- Only exception (zero loss on money records): owned-state DATA rows in the FileStore (CR-105/CR-106) that record past purchases, listings or sales at a removed venue stay as plain historical data (a venue name string). There's no code that talks to that venue.
+- Changelog and release notes of past versions stay as they are (history).
 
 ## 1. Business need
 DOM is going stateless on Render Free at $0. Every integration we don't use adds code, keys, checks and failure points. Dvir approved removing them. Claude Code only; no CloudAgents. No money actions, no settings activation.
@@ -38,7 +47,7 @@ DOM is going stateless on Render Free at $0. Every integration we don't use adds
 - **R-6 Money and owned-state records that mention a removed venue** (for example past Sedo listings or Dynadot purchases) stay as history in the FileStore (CR-105/CR-106). Never delete or rewrite them.
 
 ## 3. Acceptance tests (pass/fail)
-- **AC-1:** `grep -ri` across `src/`, config and workflows for `dynadot|sedo|spaceship|namecom|name\.com|namecheap|namesilo|buffer|companies.?house|namebio` finds only (a) R-6 history readers, (b) the 410 stubs, (c) changelog or release notes. A test asserts this allowlist.
+- **AC-1 (amended):** `grep -riE` across the whole repo (src, tests, config, workflows, docs, migrations references), excluding docs/releases, CHANGELOG and docs/requests, for `dynadot|sedo|spaceship|namecom|name\.com|namecheap|namesilo|buffer|companies.?house|namebio` finds nothing except the single contract v7.0.0 'Removed' line. A test asserts this allowlist.
 - **AC-2:** `/health` and `/health/ping` list no removed provider. `/health` lists only Porkbun, GoDaddy, Afternic, the trademark search and Web Risk (plus the FileStore).
 - **AC-3:** the daily run (CR-110) makes 0 calls to removed providers (mocked HTTP: any call to their hosts fails the test).
 - **AC-4:** `render.yaml` and the env templates contain no key for a removed provider. The service boots with only the kept keys set.
