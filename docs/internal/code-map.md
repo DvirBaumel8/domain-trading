@@ -1,6 +1,6 @@
 # Code map
 
-About 850 lines. The app keeps nothing: it reads `data/state.json` at start and asks Porkbun and the .com registry on demand.
+About 1,250 lines. The app keeps nothing: it reads `data/state.json` at start and asks the outside sources on demand.
 
 | File | Inside |
 |---|---|
@@ -13,6 +13,9 @@ About 850 lines. The app keeps nothing: it reads `data/state.json` at start and 
 | `src/registrars/api.ts`, `check.ts` | `GET /check`: quotes, 60 s cache |
 | `src/registrars/porkbun.ts` | The Porkbun price lookup (nothing that buys) |
 | `src/registrars/selection.ts`, `registry.ts`, `types.ts` | Which quote wins, the allowed registrars, types |
+| `src/sources/api.ts` | `GET /registrar-status`, `/listings`, `/sales`, `/auctions`, `/trademarks/:serial` |
+| `src/sources/client.ts` | One outside read and its errors (`SourceError`); micro-units to cents |
+| `src/sources/web-risk.ts`, `domain-status.ts`, `afternic.ts`, `auctions.ts`, `tsdr.ts` | One file per source, reads only |
 | `src/http/auth.ts`, `errors.ts` | Tokens, limits, the error shape |
 | `src/core/` | `money.ts`, `dates.ts`, `rdap.ts`; `src/domain-name.ts` is beside it |
 | `scripts/release.ts` | `npm run release -- X.Y.Z "summary"` |

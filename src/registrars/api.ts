@@ -32,6 +32,7 @@ function presentCheck(r: CheckResult) {
     checked_at: toJerusalemIso(r.checkedAt),
     availability: r.availability,
     rdap: r.rdap,
+    web_risk: { status: r.webRisk.status, threat_types: r.webRisk.threatTypes, checked_at: toJerusalemIso(r.webRisk.checkedAt), error_code: r.webRisk.errorCode },
     winner: r.winner && {
       registrar: r.winner.registrar,
       first_year: formatUsdOrNull(r.winner.firstYearCents), renewal: formatUsdOrNull(r.winner.renewalCents), two_year: formatUsdOrNull(r.winner.twoYearCents),

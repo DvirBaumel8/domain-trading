@@ -9,6 +9,13 @@ const EnvSchema = z.object({
   LOG_LEVEL: z.string().default('info'),
   PORKBUN_API_KEY: optional(z.string()),
   PORKBUN_SECRET_API_KEY: optional(z.string()),
+  GOOGLE_WEB_RISK_API_KEY: optional(z.string().trim()),
+  GODADDY_DOMAINS_PAT: optional(z.string().trim()),
+  GODADDY_API_KEY: optional(z.string().trim()),
+  GODADDY_API_SECRET: optional(z.string().trim()),
+  AFTERNIC_API_KEY: optional(z.string().trim()),
+  AFTERNIC_API_SECRET: optional(z.string().trim()),
+  USPTO_API_KEY: optional(z.string().trim()),
   /** The commit this build was made from (Render sets it). */
   RENDER_GIT_COMMIT: optional(z.string()),
 });
@@ -20,9 +27,16 @@ export interface Config {
   tokens: ReadonlyMap<string, string>;
   /** null = no keys: /check answers without quotes. */
   porkbun: { apiKey: string; secretKey: string } | null;
+  /** null = no key: the route says so. Half of a pair counts as no key, so keys can be added one at a time. */
+  sources: {
+    webRisk: string | null; godaddyPat: string | null; uspto: string | null;
+    godaddyAuctions: { key: string; secret: string } | null; afternic: { key: string; secret: string } | null;
+  };
   commit: string | null;
   version: string;
 }
+
+const ssoPair = (key?: string, secret?: string) => (key && secret ? { key, secret } : null);
 
 const Access = z.record(z.string().regex(/^[a-z0-9_-]{1,40}$/), z.string().regex(/^[0-9a-f]{64}$/));
 
@@ -52,6 +66,10 @@ export function loadConfig(env: NodeJS.ProcessEnv, access: string = accessFile()
     logLevel: e.LOG_LEVEL,
     tokens: parseAccess(access),
     porkbun: e.PORKBUN_API_KEY && e.PORKBUN_SECRET_API_KEY ? { apiKey: e.PORKBUN_API_KEY, secretKey: e.PORKBUN_SECRET_API_KEY } : null,
+    sources: {
+      webRisk: e.GOOGLE_WEB_RISK_API_KEY || null, godaddyPat: e.GODADDY_DOMAINS_PAT || null, uspto: e.USPTO_API_KEY || null,
+      godaddyAuctions: ssoPair(e.GODADDY_API_KEY, e.GODADDY_API_SECRET), afternic: ssoPair(e.AFTERNIC_API_KEY, e.AFTERNIC_API_SECRET),
+    },
     commit: e.RENDER_GIT_COMMIT ?? null,
     version: (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version,
   };

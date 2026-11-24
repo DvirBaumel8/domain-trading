@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { RdapFn, RdapStatus } from '../core/rdap.js';
+import type { WebRisk, WebRiskFn } from '../sources/web-risk.js';
 import { RegistrarError, type RegistrarAdapter } from './types.js';
 import {
   evaluateQuote, firstYearWarning, overallAvailability, pickWinner, shouldCall, sortByAdapterOrder,
@@ -8,7 +9,7 @@ import {
 
 export interface CheckResult {
   domain: string; checkId: string; checkedAt: Date;
-  availability: 'available' | 'taken' | 'unknown'; rdap: RdapStatus;
+  availability: 'available' | 'taken' | 'unknown'; rdap: RdapStatus; webRisk: WebRisk;
   winner: EvaluatedQuote | null; quotes: EvaluatedQuote[]; warnings: string[];
 }
 
@@ -19,7 +20,7 @@ export class CheckService {
 
   constructor(
     private readonly deps: {
-      allowed: readonly string[]; adapters: RegistrarAdapter[]; rdap: RdapFn; now: () => number;
+      allowed: readonly string[]; adapters: RegistrarAdapter[]; rdap: RdapFn; webRisk: WebRiskFn; now: () => number;
       quoteTimeoutMs?: number; log?: { warn(obj: object, msg: string): void };
     },
   ) {}
@@ -32,8 +33,9 @@ export class CheckService {
     const { allowed } = this.deps;
     const timeoutMs = this.deps.quoteTimeoutMs ?? 8000;
 
-    const [rdap, outcomes] = await Promise.all([
+    const [rdap, webRisk, outcomes] = await Promise.all([
       this.deps.rdap(domain, { timeoutMs }),
+      this.deps.webRisk(domain),
       Promise.all(this.deps.adapters.map((a) => this.quoteOne(a, domain, allowed, timeoutMs))),
     ]);
 
@@ -43,7 +45,7 @@ export class CheckService {
     const warning = firstYearWarning(quotes, winner);
     const result: CheckResult = {
       domain, checkId: `chk_${randomBytes(12).toString('hex')}`, checkedAt: new Date(now),
-      availability, rdap, winner, quotes, warnings: warning ? [warning] : [],
+      availability, rdap, webRisk, winner, quotes, warnings: warning ? [warning] : [],
     };
 
     for (const [k, v] of this.cache) if (v.expires <= now) this.cache.delete(k);

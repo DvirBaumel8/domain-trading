@@ -11,6 +11,10 @@ describe('the app is stateless (Dvir, 23 Nov 2026)', () => {
     const banned = /\b(kysely|pg|postgres|sqlite|DATABASE_URL)\b|writeFile|appendFile|createWriteStream/i;
     expect(files('src').filter((f) => banned.test(readFileSync(f, 'utf8')))).toEqual([]);
   });
+  it('CR-116: nothing in src/ can bid, buy at auction, or change a domain or a listing', () => {
+    const banned = /listings\/bids|auctions\/purchases|paymentProfiles|updateNs|updateAutoRenew|\/upsert|relist|method: '(PUT|PATCH|DELETE)'/i;
+    expect(files('src').filter((f) => banned.test(readFileSync(f, 'utf8')))).toEqual([]);
+  });
   it('founder rule 12: nothing in src/ can register, renew or pay', () => {
     const banned = /domain\/(create|renew)|\/account\/|agreeToTerms/i;
     expect(files('src').filter((f) => banned.test(readFileSync(f, 'utf8')))).toEqual([]);

@@ -1,8 +1,8 @@
 # domain-trading API contract
 
-**Version 7.1.0** (23 Nov 2026). The interface between **DOM** (the vendor) and its customers, Dvir's bots.
+**Version 7.2.0** (24 Nov 2026). The interface between **DOM** (the vendor) and its customers, Dvir's bots.
 
-Phase 1 (Dvir, 23 Nov 2026): the app is stateless, has no database and **only reads**. It knows the domains owned and the money spent (`data/state.json` in this repo), and it can look up a price. Everything else of 6.x is gone; the routes answer 404.
+Phase 1 (Dvir, 23 Nov 2026): the app is stateless, has no database and **only reads**. It knows the domains owned and the money spent (`data/state.json` in this repo), and it can look up a price, a name's safety, and the live state of our domains, listings and sales. Everything else of 6.x is gone; the routes answer 404.
 
 | File | What |
 |---|---|
@@ -27,7 +27,9 @@ Not through the API. File a request in `docs/requests/` with Dvir's approval; DO
 |---|---|---|
 | `UNAUTHORIZED` | 401 | No token, or a wrong one |
 | `RATE_LIMITED` | 429 | See Access |
-| `VALIDATION_ERROR` | 400 | `/check` without `domain` |
+| `VALIDATION_ERROR` | 400 | A missing or bad parameter |
+| `SOURCE_KEY_MISSING` | 503 | The server has no key for that source |
+| `SOURCE_ERROR` | 502 | The source failed or answered something unusable |
 | `DOMAIN_INVALID`, `TLD_NOT_SUPPORTED` | 422 | Not a second-level .com name |
 | `DOMAIN_NOT_FOUND` | 404 | Not in the portfolio |
 | `NOT_FOUND` | 404 | No such route (every 6.x write route included) |

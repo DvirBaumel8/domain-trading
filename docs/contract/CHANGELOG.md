@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 7.2.0 (2026-11-24): Read-only outside sources: Web Risk, registrar status, Afternic, auction lookup, trademark status
+Release note: `docs/releases/v7.2.0.md`.
+MINOR (CR-116). `/check` adds `web_risk`; `/health` adds `keys_set`; new reads `/registrar-status`, `/listings`, `/sales`, `/auctions`, `/trademarks/{serial}`; new errors `SOURCE_KEY_MISSING`, `SOURCE_ERROR`.
+
 ## 7.1.0 (2026-11-23): readers in data/access.json; redundant docs removed
 Release note: `docs/releases/v7.1.0.md`.
 MINOR. The readers come from `data/access.json` (name to sha256), not from `API_TOKENS`. No route changed.

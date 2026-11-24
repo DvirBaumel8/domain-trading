@@ -6,9 +6,10 @@ The service is `domain-trading-api` on Render's free plan, described by `render.
 | Key | Value |
 |---|---|
 | `NODE_VERSION` | `26` (in `render.yaml`) |
-| `PORKBUN_API_KEY`, `PORKBUN_SECRET_API_KEY` | For `GET /check`. Both or neither |
+| `PORKBUN_API_KEY`, `PORKBUN_SECRET_API_KEY` | Both or neither (with one only, the server does not start) |
+| The source keys | `docs/contract/endpoints.md`; each is optional |
 
-Remove the old `DATABASE_URL`, `DATABASE_SSL`, `API_TOKENS`, `JOB_TRIGGER_TOKEN`, `GITHUB_BACKUP_*`, `GODADDY_PAT` and other keys: nothing reads them.
+Remove the old `DATABASE_URL`, `DATABASE_SSL`, `API_TOKENS`, `JOB_TRIGGER_TOKEN`, `GITHUB_BACKUP_*`, `GODADDY_PAT`, `APP_ENV`, `PUBLIC_BASE_URL` and other keys: nothing reads them.
 
 ## Access
 `data/access.json` maps a name to the sha256 of its token. To add a reader, commit its hash; to remove one, delete the line. The token itself is a long random value kept only by its owner, so the file gives nothing away.
