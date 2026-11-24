@@ -1,0 +1,68 @@
+{
+  "date": "2026-11-24",
+  "kills": {
+    "read": 1660,
+    "unreadable_lines": 0
+  },
+  "files": {
+    "auction": {
+      "file_built_at": "2026-11-24T15:58:29+02:00",
+      "counts": {
+        "read": 115187,
+        "not_com": 76285,
+        "not_letters": 8038,
+        "too_long": 14671,
+        "unreadable": 0
+      },
+      "dropped": {
+        "no_bid": 15826,
+        "adult": 110,
+        "over_per_name": 8,
+        "over_total": 2
+      },
+      "checked": 247,
+      "logged": 246
+    },
+    "closeout": {
+      "file_built_at": "2026-11-24T16:02:17+02:00",
+      "counts": {
+        "read": 386152,
+        "not_com": 190652,
+        "not_letters": 45468,
+        "too_long": 73000,
+        "unreadable": 0
+      },
+      "dropped": {
+        "ended": 13235,
+        "price": 37125,
+        "no_demand_sign": 25816,
+        "adult": 453
+      },
+      "checked": 403,
+      "logged": 403
+    }
+  },
+  "killed": [
+    {
+      "domain": "vaporizor.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2014-07-10",
+          "url": "https://vaporizor.com/3-inch-got-vape-glass-poker.html"
+        },
+        {
+          "date": "2014-07-10",
+          "url": "https://vaporizor.com/5-inch-got-vape-glass-poker.html"
+        }
+      ]
+    }
+  ],
+  "closes": 0,
+  "totals": {
+    "auctions": 246,
+    "closeouts": 403,
+    "with_last_price": 0
+  }
+}
