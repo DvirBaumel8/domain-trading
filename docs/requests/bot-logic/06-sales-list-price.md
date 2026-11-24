@@ -11,7 +11,7 @@ Refreshed 2026-11-23 by DOM Architect, at Gavriel's request, to match 7.1.0. The
 - A token is needed for everything except `/health/ping` (hash in `data/access.json`).
 
 ## Order of work
-1. **Sales plans.** It drafts the list price, the floor and any price drop, with its evidence, and sends the plan to Gavriel. Price drops follow `docs/internal/pricing.md`. **Service-trade names** (plumbing, roofing, moving, towing and similar) get their own list price, below the $1,488 default. Sales proposes the number from comps (Gavriel's starting range is about $499 to $799). It and the floor rule wait on Dvir's yes (CR-119, 24 Nov 2026).
+1. **Sales plans.** It drafts the list price, the floor and any price drop, with its evidence, and sends the plan to Gavriel. Price drops follow `docs/internal/pricing.md`. **Service-trade names** (plumbing, roofing, moving, towing and similar) get their own list price, below the $1,488 default. Sales proposes the number from comps (Gavriel's starting range is about $499 to $799). The number waits on Dvir's yes. The floor is decided: 65% of the price with no $750 minimum (Dvir, 24 Nov 2026 09:56). The walk-away is still open (CR-119).
 2. **Gavriel asks Dvir.** One yes per action.
 3. **Gavriel acts by hand** at the venue (Afternic for listings; Porkbun or GoDaddy for the registrar side), with a screenshot as evidence.
 4. **Record it.** For a purchase, renewal, cost or sale, Gavriel (or Sales) files a request in `docs/requests/` with the facts (date, amount, domain, order or receipt id) and Dvir's approval (date and words). DOM commits the ledger row. Listing price changes don't go in the ledger; they're noted in the request thread.
