@@ -1,3 +1,5 @@
+> **PAUSED by Dvir 24 Nov 2026 23:17 IST, do not build.** Wait for a go from Dvir through Gavriel.
+
 # CR-122: eBay marketplace account-deletion webhook (dropshipping item #1)
 
 **Status:** Filed 24 Nov 2026. **From:** DOM Architect, for Gavriel. **To:** DOM (Claude Code).

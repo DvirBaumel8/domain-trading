@@ -1,3 +1,5 @@
+> **PAUSED by Dvir 24 Nov 2026 23:17 IST, do not build.** Wait for a go from Dvir through Gavriel.
+
 # CR-121: Dropshipping line in DOM, part 1: founder-rule exceptions and secret handling
 
 **Status:** Filed 24 Nov 2026. **From:** DOM Architect, for Gavriel. **To:** DOM (Claude Code).

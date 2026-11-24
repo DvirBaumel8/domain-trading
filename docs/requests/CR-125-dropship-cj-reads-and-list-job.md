@@ -1,3 +1,5 @@
+> **PAUSED by Dvir 24 Nov 2026 23:17 IST, do not build.** Wait for a go from Dvir through Gavriel.
+
 # CR-125: CJ freight and stock reads, and the approved-listing publish job (one listing)
 
 **Status:** Filed 24 Nov 2026. **From:** DOM Architect, for Gavriel. **To:** DOM (Claude Code).

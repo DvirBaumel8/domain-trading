@@ -1,3 +1,5 @@
+> **PAUSED by Dvir 24 Nov 2026 23:17 IST, do not build.** Wait for a go from Dvir through Gavriel.
+
 # CR-123: Dropshipping break-even, hard filters and budget reads
 
 **Status:** Filed 24 Nov 2026. **From:** DOM Architect, for Gavriel. **To:** DOM (Claude Code).
