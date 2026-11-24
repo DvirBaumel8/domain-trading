@@ -1,0 +1,49 @@
+name: prefilter
+
+# CR-117: the daily auction pre-filter. It reads public GoDaddy files and writes the shadow log to the branch shadow-log, never to main.
+# GoDaddy builds the files at about 14:00 UTC; auctions end 16:00-21:30 UTC.
+on:
+  schedule:
+    - cron: '25 15 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: prefilter
+
+permissions:
+  contents: write # only for the push to shadow-log below
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - name: Open the shadow log
+        run: |
+          if git ls-remote --exit-code --heads origin shadow-log >/dev/null; then
+            git fetch --depth 1 origin shadow-log
+            git worktree add --detach ../shadow-log FETCH_HEAD
+          else
+            git worktree add --orphan -b shadow-log ../shadow-log
+          fi
+      - name: Run the pre-filter
+        env:
+          GOOGLE_WEB_RISK_API_KEY: ${{ secrets.GOOGLE_WEB_RISK_API_KEY }}
+        run: npm run -s prefilter -- ../shadow-log
+      - name: Push the shadow log
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd ../shadow-log
+          git add -A
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git -c user.name='prefilter job' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -qm "shadow log $(date -u +%F)"
+          git -c credential.helper='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' push -q "https://github.com/$GITHUB_REPOSITORY.git" HEAD:refs/heads/shadow-log

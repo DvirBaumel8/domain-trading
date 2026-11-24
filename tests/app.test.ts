@@ -345,3 +345,49 @@ describe('outside sources (CR-116): an error or a missing key is never clean, ok
     expect((await get('/health')).json().keys_set).toEqual({ porkbun: true, web_risk: true, godaddy: true, godaddy_auctions: true, afternic: true, uspto_tsdr: true });
   });
 });
+
+describe('/budget (CR-117)', () => {
+  const ask = (o: Record<string, string> = {}) => get(`/budget?${new URLSearchParams({ price_cents: '2000', fee_cents: '20', renewal_cents: '2200', source: 'auction', open_bids: 'none', ...o })}`);
+  const known = (o: object = {}) => make({ state: { ...state, domains: state.domains.map((d) => (d.domain === 'kept.com' ? { ...d, renewal_cents: 2300, ...o } : d)) } });
+
+  it('counts everything: the price with its renewal and fees, the year-2 money, the open bids and the slots', async () => {
+    known();
+    expect((await ask({ open_bids: '5000:2100:auction,3000:2000:closeout' })).json()).toEqual({
+      status: 'within', over: [], unknown: [], all_in_cents: 4220, all_in: '$42.20', spent_cents: 4007, spent: '$40.07', year2_reserve_cents: 8600, year2_reserve: '$86.00',
+      open_bids_cents: 8000, open_bids: '$80.00', committed_cents: 24_827, committed: '$248.27', max_total_cents: 150_000, max_total: '$1,500.00', max_per_name_cents: 25_000, max_per_name: '$250.00',
+      closeout_pilot_cents: 3000, closeout_pilot: '$30.00', max_closeout_pilot_cents: 30_000, max_closeout_pilot: '$300.00', slots: 4, max_slots: 40,
+    });
+  });
+  it('no year-2 money for a name marked do not renew, sold, or renewed already', async () => {
+    known({ do_not_renew_since: '2026-11-23' });
+    expect((await ask()).json().year2_reserve_cents).toBe(2200);
+    await app.close();
+    make({ state: { ...state, ledger: [...state.ledger, { id: 6, date: '2026-11-03', type: 'renewal', domain: 'kept.com', amount_cents: -2300, note: 'n', approval }] } });
+    expect((await ask()).json()).toMatchObject({ status: 'within', year2_reserve_cents: 2200 });
+  });
+  it('what is not known is "unknown", never "within"; over on the known part is "over"', async () => {
+    make();
+    expect((await ask()).json()).toMatchObject({ status: 'unknown', unknown: ['renewal_price:kept.com'] });
+    expect((await ask({ open_bids: 'unknown' })).json()).toMatchObject({ status: 'unknown', unknown: ['open_bids', 'renewal_price:kept.com'] });
+    expect((await ask({ price_cents: '30000', open_bids: 'unknown' })).json()).toMatchObject({ status: 'over', over: ['per_name'] });
+  });
+  it('each cap, at its edge', async () => {
+    known();
+    expect((await ask({ price_cents: '22780' })).json()).toMatchObject({ status: 'within', all_in_cents: 25_000 });
+    expect((await ask({ price_cents: '22781' })).json()).toMatchObject({ status: 'over', over: ['per_name'] });
+    const room = 150_000 - 4007 - 2300 - 2200 - 4220;
+    expect((await ask({ open_bids: `${room}:0:auction` })).json()).toMatchObject({ status: 'within', committed_cents: 150_000 });
+    expect((await ask({ open_bids: `${room}:1:auction` })).json()).toMatchObject({ status: 'over', over: ['total'] });
+    const bids = (n: number) => Array.from({ length: n }, () => '1:1:auction').join(',');
+    expect((await ask({ open_bids: bids(38) })).json()).toMatchObject({ status: 'within', slots: 40 });
+    expect((await ask({ open_bids: bids(39) })).json()).toMatchObject({ status: 'over', over: ['slots'] });
+    expect((await ask({ source: 'closeout', open_bids: `${30_000 - 4220}:0:closeout` })).json()).toMatchObject({ status: 'within' });
+    expect((await ask({ source: 'closeout', open_bids: `${30_001 - 4220}:0:closeout` })).json()).toMatchObject({ status: 'over', over: ['closeout_pilot'] });
+    expect((await ask({ open_bids: `${30_001}:0:closeout` })).json()).toMatchObject({ status: 'within' });
+  });
+  it('a missing or odd parameter is 400, never a guess', async () => {
+    known();
+    for (const bad of [{ open_bids: '' }, { open_bids: '5' }, { open_bids: '5:6:auction:7' }, { open_bids: '5::auction' }, { open_bids: '5:6:x' }, { price_cents: '-1' }, { price_cents: '1.5' }, { renewal_cents: '' }, { source: 'other' }] as Record<string, string>[]) expect((await ask(bad)).statusCode, JSON.stringify(bad)).toBe(400);
+    for (const u of ['/budget', '/budget?price_cents=1&fee_cents=1&renewal_cents=1&source=auction']) expect((await get(u)).statusCode).toBe(400);
+  });
+});

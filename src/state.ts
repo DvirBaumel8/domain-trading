@@ -9,6 +9,13 @@ import { isValidDisplayName, normalizeDomain } from './domain-name.js';
 export const MAX_DOMAINS = 40;
 export const MAX_PURCHASE_CENTS = 25_000;
 export const MAX_SPENT_CENTS = 150_000;
+/** Founder rule 5: the closeout pilot, inside the total (Dvir, 24 Nov 2026). */
+export const MAX_CLOSEOUT_CENTS = 30_000;
+/** Where a name came from. A purchase row names it since 24 Nov 2026; rows are never edited, so the one earlier closeout is named here. */
+export const SOURCES = ['auction', 'closeout', 'fixed_price', 'registration'] as const;
+export type Source = (typeof SOURCES)[number];
+const SOURCE_SINCE = '2026-11-24';
+const EARLIER_CLOSEOUTS: readonly string[] = ['mineunited.com'];
 /** Founder rule 1: Dvir's approval is at most 72 hours old at the purchase. */
 const APPROVAL_MAX_AGE_DAYS = 3;
 /** Founder rule 5: never Cloudflare, never a backorder or catch service. */
@@ -25,6 +32,10 @@ const DomainRow = z.strictObject({
   registrar: z.string().regex(/^[a-z0-9]+$/),
   expiry_date: day,
   status: z.enum(['owned', 'sold', 'dropped']),
+  /** One renewal at the registrar's public price. Missing = not known, never zero. */
+  renewal_cents: z.int().positive().optional(),
+  /** Dvir's decision not to renew without an inquiry: no year-2 money is kept for it. */
+  do_not_renew_since: day.optional(),
 });
 const LedgerRow = z.strictObject({
   id: z.int().positive(),
@@ -35,6 +46,7 @@ const LedgerRow = z.strictObject({
   /** Negative = money out. */
   amount_cents: z.int(),
   note: z.string().min(1).max(200),
+  source: z.enum(SOURCES).optional(),
   approval: z.strictObject({ approved_on: day, ref: z.string().min(1).max(200) }).nullable(),
 });
 const StateSchema = z.strictObject({ domains: z.array(DomainRow), ledger: z.array(LedgerRow) });
@@ -45,6 +57,12 @@ export type LedgerEntry = State['ledger'][number];
 
 /** All money out, corrections included. A sale never lowers it. */
 export const spentCents = (s: State): number => -s.ledger.reduce((n, r) => (r.type === 'sale' ? n : n + r.amount_cents), 0);
+
+/** What the closeout pilot has used: the names bought as closeouts, with their costs and corrections. */
+export function closeoutSpentCents(s: State): number {
+  const names = new Set([...EARLIER_CLOSEOUTS, ...s.ledger.filter((r) => r.source === 'closeout').map((r) => r.domain)]);
+  return -s.ledger.filter((r) => names.has(r.domain ?? '') && ['purchase', 'cost', 'adjustment'].includes(r.type)).reduce((n, r) => n + r.amount_cents, 0);
+}
 
 const daysBetween = (a: string, b: string): number => (Date.parse(b) - Date.parse(a)) / 86_400_000;
 const repeated = (xs: string[]): string[] => [...new Set(xs.filter((x, i) => xs.indexOf(x) !== i))];
@@ -60,6 +78,8 @@ export function problems(s: State): string[] {
   if (held > MAX_DOMAINS) out.push(`${held} domains are owned; the cap is ${MAX_DOMAINS}`);
   const spent = spentCents(s);
   if (spent > MAX_SPENT_CENTS) out.push(`$${(spent / 100).toFixed(2)} is spent in total; the cap is $${MAX_SPENT_CENTS / 100}`);
+  const closeouts = closeoutSpentCents(s);
+  if (closeouts > MAX_CLOSEOUT_CENTS) out.push(`$${(closeouts / 100).toFixed(2)} is spent on closeouts; the pilot is $${MAX_CLOSEOUT_CENTS / 100}`);
   for (const d of s.domains) {
     if (!isValidDisplayName(d.domain, d.display_name)) out.push(`${d.domain}: the display name must be the same name`);
     if (REFUSED_REGISTRARS.includes(d.registrar)) out.push(`${d.domain}: ${d.registrar} is never used`);
@@ -76,7 +96,11 @@ export function problems(s: State): string[] {
     if (r.domain === null && ['purchase', 'renewal', 'sale'].includes(r.type)) out.push(`${at}: a ${r.type} names its domain`);
     if (r.amount_cents === 0 || (r.type !== 'adjustment' && r.amount_cents > 0 !== (r.type === 'sale'))) out.push(`${at}: a sale is money in, a purchase, renewal or cost is money out`);
     if (['purchase', 'renewal', 'sale'].includes(r.type) && !r.approval) out.push(`${at}: a ${r.type} needs Dvir's approval`);
+    if (r.type !== 'purchase' && r.source) out.push(`${at}: only a purchase has a source`);
+    const flagged = r.type === 'renewal' && s.domains.find((d) => d.domain === r.domain)?.do_not_renew_since;
+    if (flagged && r.date >= flagged) out.push(`${at}: ${r.domain} is marked do not renew`);
     if (r.type === 'purchase') {
+      if (r.date >= SOURCE_SINCE && !r.source) out.push(`${at}: a purchase names its source`);
       if (-r.amount_cents > MAX_PURCHASE_CENTS) out.push(`${at}: over the $${MAX_PURCHASE_CENTS / 100} cap for one name`);
       const age = r.approval ? daysBetween(r.approval.approved_on, r.date) : 0;
       if (age < 0 || age > APPROVAL_MAX_AGE_DAYS) out.push(`${at}: the approval must be from the ${APPROVAL_MAX_AGE_DAYS} days before the purchase`);

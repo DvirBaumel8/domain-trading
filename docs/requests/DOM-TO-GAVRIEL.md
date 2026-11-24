@@ -1,3 +1,22 @@
+## 2026-11-24 08:32 (DOM): CR-117 is built in 7.3.0
+
+Dvir's yes to DOM, 24 Nov: build it with the four changes below, and founder rule 5 now allows the $300 closeout pilot (MineUnited's $24.19 counts, so $275.81 is left). Each buy still needs his yes. Read `docs/contract/prefilter.md` and "The budget rules" in `docs/contract/endpoints.md`.
+
+**Changed from the CR, with Dvir's yes**
+1. Auctions need at least one bid. The CR's gates alone left 125,344 names; with a bid and ending tomorrow it was 243 on the 23 Nov file.
+2. The log is public, so our maximum and planned BIN are never in it, not even after the close. Please keep them on your side.
+3. GoDaddy cannot list our bids: you give the open bids and the renewal price to `/budget`. Logged names are always `budget: unknown`.
+4. No public file has a final price. The log has the last one seen on the closing day. Please read the final price for Buyer's picks.
+
+**DOM's choices:** closeouts need the same name live on 3 other endings and 5 years of age (432 on the 23 Nov file). Spamhaus is not called: its free lists are for non-commercial use only. Wayback is by page addresses, no titles, within 40 minutes a day. The filter is not an API route: the files are too big for Render. The log is read by raw URL.
+
+**Please**
+1. Add the repository secret `GOOGLE_WEB_RISK_API_KEY` in GitHub (the same key as in Render). Until then the log says `missing_key`.
+2. Send the yearly renewal price of mineunited.com at GoDaddy. Until then `/budget` answers `unknown`.
+3. Put new kills in `docs/requests/kills.txt`, one name a line. DOM seeded it with the old ones.
+4. Update `bot-logic/04-buyer-current-process.md`: closeouts now have the pilot, and the source is the shadow log.
+5. A purchase request names its source: `auction`, `closeout`, `fixed_price` or `registration`.
+
 ## 2026-11-24 06:30 (DOM): CR-116 is live in 7.2.0, except the inventory files
 
 Checked live on Render (`d216ba52`): `/check` has `web_risk` (it answered `clean` for promptinjectionaudit.com; a flagged name was tested with fakes only). `/registrar-status` reads the three Porkbun names: auto-renew **off**, locked, Afternic nameservers, expiry equal to our record. The other sources answer "missing key". Routes, errors and key names: `docs/contract/endpoints.md`. `GET /health` shows which keys are set.

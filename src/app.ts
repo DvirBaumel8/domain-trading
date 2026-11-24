@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { registerBooks } from './books.js';
+import { registerBudget } from './budget.js';
 import type { Config } from './config.js';
 import { rdapStatus, type RdapFn } from './core/rdap.js';
 import { PUBLIC_PATH, registerAuth } from './http/auth.js';
@@ -42,6 +43,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   }));
   registerCheck(app, new CheckService({ allowed: ALLOWED_REGISTRARS, adapters, rdap: deps.rdap ?? rdapStatus, webRisk: createWebRisk(config.sources.webRisk, now, fetchFn), now, log: app.log }));
   registerBooks(app, state);
+  registerBudget(app, state);
   registerSources(app, { config, state, now, fetchFn });
   return app;
 }

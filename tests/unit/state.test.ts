@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadState, MAX_DOMAINS, parseState, problems, rewrites, type Domain, type LedgerEntry, type State } from '../../src/state.js';
+import { closeoutSpentCents, loadState, MAX_DOMAINS, parseState, problems, rewrites, type Domain, type LedgerEntry, type State } from '../../src/state.js';
 
 const dom = (n: number, o: Partial<Domain> = {}): Domain => ({ domain: `name${n}.com`, display_name: `Name${n}.com`, deal_id: `D-${String(n).padStart(3, '0')}`, registrar: 'porkbun', expiry_date: '2027-10-04', status: 'owned', ...o });
 const buy = (n: number, o: Partial<LedgerEntry> = {}): LedgerEntry => ({ id: n, date: '2026-10-09', type: 'purchase', domain: `name${n}.com`, amount_cents: -1108, note: 'x', approval: { approved_on: '2026-10-09', ref: 'r' }, ...o });
@@ -46,6 +46,29 @@ describe('problems', () => {
     const sold = withRow({ type: 'sale', amount_cents: 148_800, approval: ok }, { ...over, domains: [dom(1, { status: 'sold' }), dom(2)] });
     expect(problems(sold)).toEqual([expect.stringMatching(/spent in total/)]);
     expect(problems(withRow({ type: 'adjustment', domain: null, amount_cents: 1, approval: null }, over))).toEqual([]);
+  });
+
+  it('founder rule 5: the closeout pilot is $300, with costs and corrections; other sources do not count', () => {
+    const late = (n: number, source: LedgerEntry['source'], amount_cents: number) => buy(n, { date: '2026-11-24', source, amount_cents, approval: { approved_on: '2026-11-24', ref: 'r' } });
+    const two = (a: number, b: number, source: LedgerEntry['source'] = 'closeout'): State => ({ ...base(), ledger: [late(1, 'closeout', a), late(2, source, b)] });
+    expect(problems(two(-25_000, -5000))).toEqual([]);
+    expect(problems(two(-25_000, -5001))).toEqual([expect.stringMatching(/\$300\.01 is spent on closeouts; the pilot is \$300/)]);
+    expect(problems(two(-25_000, -5001, 'auction'))).toEqual([]);
+    expect(problems(withRow({ type: 'adjustment', amount_cents: 1, approval: null }, two(-25_000, -5001)))).toEqual([]);
+    expect(problems(withRow({ type: 'cost', amount_cents: -1, approval: null }, two(-25_000, -5000)))).toEqual([expect.stringMatching(/closeouts/)]);
+    expect(closeoutSpentCents(loadState())).toBe(2419); // mineunited.com, bought before the pilot
+  });
+  it('a purchase names its source since 24 Nov 2026, and only a purchase has one', () => {
+    const at = (date: string) => ({ ...base(), ledger: [buy(1, { date, approval: { approved_on: date, ref: 'r' } }), buy(2)] });
+    expect(problems(at('2026-11-23'))).toEqual([]);
+    expect(problems(at('2026-11-24'))).toEqual([expect.stringMatching(/names its source/)]);
+    expect(problems(withRow({ type: 'cost', approval: null, source: 'auction' }))).toEqual([expect.stringMatching(/only a purchase/)]);
+  });
+  it('a name marked do not renew takes no renewal', () => {
+    const flagged = (date: string) => withRow({ type: 'renewal', date, approval: ok }, { ...base(), domains: [dom(1, { do_not_renew_since: '2026-11-23' }), dom(2)] });
+    expect(problems(flagged('2026-11-23'))).toEqual([expect.stringMatching(/do not renew/)]);
+    expect(problems(flagged('2026-11-22'))).toEqual([]);
+    expect(loadState().domains.filter((d) => d.do_not_renew_since).map((d) => d.deal_id)).toEqual(['D-001', 'D-002', 'D-003', 'D-004']);
   });
 
   it('founder rule 3: one renewal', () => {

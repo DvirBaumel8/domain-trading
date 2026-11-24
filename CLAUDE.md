@@ -4,10 +4,10 @@
 
 ## What this is (Dvir, 23 Nov 2026)
 "DOM app should be stateless, no need DB at all"; "we just need to persist (the simplest way) the money we spent and the domain we own"; "make things simple and clear".
-- A small read-only HTTP API on **Render free**. **The whole state is `data/state.json`** in this repo. No database, jobs, Mac server or write routes.
+- A small read-only HTTP API on **Render free**. **The whole state is `data/state.json`** in this repo. No database, Mac server or write routes. One job: the daily pre-filter in GitHub Actions writes only to the branch `shadow-log` (`docs/contract/prefilter.md`).
 - **A purchase, renewal, cost or sale is a commit** by DOM that adds a row, after Dvir's chat approval (one per action). Rows are never edited or removed; a mistake gets an `adjustment` row.
 - **CI enforces the founder rules** (`npm run check-state`); Render deploys only after CI passes.
-- **This repo is public** for now (Dvir, 23 Nov 2026; Render did not deploy while it was private). Treat everything in it as public: no key, token, address, approval text, or a name's own floor or walk-away. `data/access.json` holds token hashes only.
+- **This repo is public** for now (Dvir, 23 Nov 2026; Render did not deploy while it was private). Treat everything in it as public: no key, token, address, approval text, or a name's own floor, walk-away or maximum bid. `data/access.json` holds token hashes only.
 - Buying, listing, price changes and drops are done by hand, by the rules below and in `docs/internal/pricing.md`.
 - Nine old providers were erased (CR-113; "removed-provider" in old records). Never bring one back.
 - The Neon project and the 12 Nov dump stay untouched, never read and never deleted. Never connect to the old database or read `prod.env`.
@@ -24,7 +24,7 @@ A rule may change when Dvir agrees (7 Oct 2026); flag a conflict, never break a 
 2. **Caps:** 40 domains, $250 a name, $1,500 spent in total (Dvir, 23 Nov 2026; every cost counts, a sale adds no room), in `src/state.ts`. They change only by a commit.
 3. **One renewal per domain at most.** New registrations are for 1 year. An aftermarket (S8) name may arrive with up to 2 years and 30 days of expiry, and still gets one renewal. `drop_date` = expiry + 1 year.
 4. **Listing and pricing:** `docs/internal/pricing.md`.
-5. **Never Cloudflare Registrar, premium names, or backorder and catch services** (NameJet, SnapNames, DropCatch). Aftermarket buys (closeouts, fixed-price listings, public auctions) only in lane S8, at most $250 a name. **S8 is the main line and auctions with real bidding its main effort** (25 Oct 2026). Closeouts get no money until a test shows an edge. New registrations are the side line, only through the Tier A gate (the exact name live as a business on .net and .org, two or more unrelated businesses, no trademark owner), applied on Gavriel's side with Dvir's 16 Nov relaxation in the Buyer SOP.
+5. **Never Cloudflare Registrar, premium names, or backorder and catch services** (NameJet, SnapNames, DropCatch). Aftermarket buys (closeouts, fixed-price listings, public auctions) only in lane S8, at most $250 a name. **S8 is the main line and auctions with real bidding its main effort** (25 Oct 2026). Closeouts: a pilot of $300 in total, inside the $1,500 (Dvir, 24 Nov 2026), each buy with his yes; CI checks it. New registrations are the side line, only through the Tier A gate (the exact name live as a business on .net and .org, two or more unrelated businesses, no trademark owner), applied on Gavriel's side with Dvir's 16 Nov relaxation in the Buyer SOP.
 6. **Never top up a registrar balance** or call a top-up endpoint.
 7. **Keys live only as server environment secrets**: never logged, returned, in git or in tests.
 8. **The ledger is append-only**; git is the audit.
@@ -36,10 +36,10 @@ A rule may change when Dvir agrees (7 Oct 2026); flag a conflict, never break a 
 **Free services only** ($0); anything paid needs Dvir first. Never ask for or store Dvir's email or other personal details.
 
 ## How to work
-- Simple and fast: code map first, the smallest change, no scope beyond buy, sell and the money. No frontend, no write route, no marketplace scraping, no undocumented website endpoints.
+- Simple and fast: code map first, the smallest change, no scope beyond buy, sell and the money. No frontend, no write route, no marketplace scraping (public files are fine), no undocumented website endpoints.
 - Conventions: integer cents in USD with a display string; times ISO 8601 Asia/Jerusalem; errors `{"error":{code,message,details}}` with stable codes; two runtime dependencies (`fastify`, `zod`).
 - Before every push: `npm test && npx tsc --noEmit && npm run build && npm run check-state`. Check the last `ci` run first; fix a red one before pushing.
-- Work on `main`, no branches. No pushes 23:45–01:00 UTC. Don't edit a spec test to match the code without Dvir's OK.
+- Work on `main`, no branches (`shadow-log` holds data only). No pushes 23:45–01:00 UTC. Don't edit a spec test to match the code without Dvir's OK.
 - A change the bots can see updates `docs/contract/` in the same commit. Release: `npm run release -- X.Y.Z "summary"`, fill in the stubs (a **Lessons** line included), commit, push, tag `vX.Y.Z`.
 - A file, route or test added, moved or removed updates the code map in the same commit. Old text is deleted, not kept as history: git keeps it.
 - Every week: a short look at what worked, what didn't and what to cut, in chat with Dvir. DOM brings its own top-down ideas.

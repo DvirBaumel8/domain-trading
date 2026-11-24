@@ -1,6 +1,6 @@
 {
   "name": "domain-trading",
-  "version": "7.2.0",
+  "version": "7.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check-state": "tsx scripts/check-state.ts",
+    "prefilter": "tsx scripts/prefilter.ts",
     "release": "tsx scripts/release.ts"
   },
   "dependencies": {

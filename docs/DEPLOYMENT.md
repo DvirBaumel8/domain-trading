@@ -1,6 +1,6 @@
 # Deployment (Render free, $0)
 
-The service is `domain-trading-api` on Render's free plan, described by `render.yaml`. A push to `main` deploys after every check on the commit passes, so no workflow may wait for the deploy (it would block it); a push that only changes `docs/` does not deploy. There is no database, disk, migration or scheduled job.
+The service is `domain-trading-api` on Render's free plan, described by `render.yaml`. A push to `main` deploys after every check on the commit passes, so no workflow may wait for the deploy (it would block it); a push that only changes `docs/` does not deploy. There is no database, disk or migration. The one scheduled job runs in GitHub Actions (`prefilter`) and needs the repository secret `GOOGLE_WEB_RISK_API_KEY`; its check shows on the newest commit of `main`, so do not start it by hand while a deploy waits for checks.
 
 ## Environment (Render dashboard, or the Render API)
 | Key | Value |
@@ -19,7 +19,7 @@ Free services sleep after about 15 minutes. Wake it with `GET /health/ping` and 
 
 ## Record a change (a purchase, renewal, cost or sale)
 1. Dvir approves in chat (purchase, renewal, sale).
-2. DOM edits `data/state.json`: adds a ledger row with the next `id`, and the domain if it is new. A mistake is corrected with an `adjustment` row; rows are never edited or removed.
+2. DOM edits `data/state.json`: adds a ledger row with the next `id` (a purchase with its `source`), and the domain if it is new. A mistake is corrected with an `adjustment` row; rows are never edited or removed.
 3. `npm run check-state && npm test`, then commit and push. CI repeats the checks, then Render deploys.
 
 The repo is public, so the file has no private data: no floor price, walk-away, approval text, address or key; the schema refuses any unlisted field. `approval.ref` says where the approval is recorded.

@@ -11,5 +11,5 @@
     "outDir": "dist",
     "types": ["node"]
   },
-  "include": ["src", "tests", "scripts/check-state.ts", "scripts/release.ts", "vitest.config.ts"]
+  "include": ["src", "tests", "scripts/check-state.ts", "scripts/release.ts", "scripts/prefilter.ts", "vitest.config.ts"]
 }

@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 7.3.0 (2026-11-24): Daily auction pre-filter with a public shadow log; the budget rules in code
+Release note: `docs/releases/v7.3.0.md`.
+MINOR (CR-117). New read `/budget`. `/portfolio` rows may have `do_not_renew_since` and `renewal_cents`; purchase rows have `source` since 24 Nov 2026. New daily job and shadow log (`prefilter.md`). The closeout pilot of $300 is checked.
+
 ## 7.2.0 (2026-11-24): Read-only outside sources: Web Risk, registrar status, Afternic, auction lookup, trademark status
 Release note: `docs/releases/v7.2.0.md`.
 MINOR (CR-116). `/check` adds `web_risk`; `/health` adds `keys_set`; new reads `/registrar-status`, `/listings`, `/sales`, `/auctions`, `/trademarks/{serial}`; new errors `SOURCE_KEY_MISSING`, `SOURCE_ERROR`.

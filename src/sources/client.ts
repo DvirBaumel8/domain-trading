@@ -14,7 +14,7 @@ export class SourceError extends Error {
 }
 
 export type Fetch = typeof fetch;
-export interface Request { source: string; url: string; headers?: Record<string, string>; body?: unknown }
+export interface Request { source: string; url: string; headers?: Record<string, string>; body?: unknown; timeoutMs?: number }
 
 const USER_AGENT = 'dt-read-client/1.0';
 const TIMEOUT_MS = 10_000;
@@ -36,7 +36,7 @@ export async function readText(fetchFn: Fetch, r: Request): Promise<string> {
       headers: { accept: 'application/json', 'user-agent': USER_AGENT, ...(r.body === undefined ? {} : { 'content-type': 'application/json' }), ...r.headers },
       ...(r.body === undefined ? {} : { body: JSON.stringify(r.body) }),
       redirect: 'error',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(r.timeoutMs ?? TIMEOUT_MS),
     });
     status = res.status;
     text = await res.text();
