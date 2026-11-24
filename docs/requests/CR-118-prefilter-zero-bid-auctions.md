@@ -29,3 +29,17 @@ This request does not authorize spend, bids, listing changes, or any outside mes
 ## Done when
 
 The tests pass, `docs/contract/prefilter.md` is updated, the dry-run counts are in `DOM-TO-GAVRIEL.md`, and the change ships after Dvir's OK through Gavriel.
+
+## Update 24 Nov 2026, 19:40 IST: Dvir says go, with two additions
+
+Dvir (through Gavriel): "כן, תוסיפו מכירות בלי הצעות, ו-Web Risk רק על שמות שעברו את הסינון" ("Yes, add the no-bid auctions, and Web Risk only on names that passed the filter"). Build this CR now. The 24 Nov hand run (shadow-log `b26c8dbb`) dropped 15,826 auctions for having no bid, so expect volume around that size.
+
+6. **Check order.** Web Risk runs only on names that already passed every cheap gate: `.com`, letters only, length, adult mark, ours, `kills.txt`, 14-day repeat, price-alone cap, and any brand or word filter. It never runs on a name a cheap gate will drop. The purpose is to stay inside the free Web Risk quota (100k Lookup calls a month).
+7. **Monthly call counter.** In `runs/DATE.json`, add `web_risk_calls: { today, month_to_date, monthly_free_quota }`. Count `month_to_date` from the earlier `runs/*.json` files of the same calendar month on `shadow-log`, so no new storage is needed. When the next call would go over the quota, apply item 4 (leave the check open, never pay, never drop, never call a name clean).
+
+Extra tests:
+- Web Risk is never called for a name a cheap gate drops. Check it with a call counter in the test.
+- `web_risk_calls.month_to_date` adds up today's calls and the earlier same-month runs, and resets on the 1st.
+- Over quota, the name is logged with `web_risk` in `open_checks` and no Web Risk call is made.
+
+Dvir's go covers the build. Gavriel still relays the release OK as usual.
