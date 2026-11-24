@@ -4,7 +4,7 @@
     { "domain": "ukcbamcompliance.com", "display_name": "UKCBAMCompliance.com", "deal_id": "D-002", "registrar": "porkbun", "expiry_date": "2027-10-09", "status": "owned", "do_not_renew_since": "2026-11-23" },
     { "domain": "aievalsconsulting.com", "display_name": "AIEvalsConsulting.com", "deal_id": "D-003", "registrar": "porkbun", "expiry_date": "2027-10-09", "status": "owned", "do_not_renew_since": "2026-11-23" },
     { "domain": "roofingvoiceagent.com", "display_name": "RoofingVoiceAgent.com", "deal_id": "D-004", "registrar": "porkbun", "expiry_date": "2027-10-10", "status": "owned", "do_not_renew_since": "2026-11-23" },
-    { "domain": "mineunited.com", "display_name": "MineUnited.com", "deal_id": "D-005", "registrar": "godaddy", "expiry_date": "2027-09-07", "status": "owned" }
+    { "domain": "mineunited.com", "display_name": "MineUnited.com", "deal_id": "D-005", "registrar": "godaddy", "expiry_date": "2027-09-07", "status": "owned", "renewal_cents": 2393 }
   ],
   "ledger": [
     { "id": 1, "date": "2026-10-04", "type": "purchase", "domain": "promptinjectionaudit.com", "amount_cents": -1373, "note": "GoDaddy, bought by Dvir by hand (42 ILS at 0.3269), no order number", "approval": { "approved_on": "2026-10-04", "ref": "docs/requests/CR-004-d001-import-and-listing.md" } },

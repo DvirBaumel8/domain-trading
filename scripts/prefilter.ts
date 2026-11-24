@@ -20,6 +20,7 @@ const KILLS = 'docs/requests/kills.txt';
 const out = process.argv[2];
 if (!out || !existsSync(out)) throw new Error('usage: npm run prefilter -- <existing folder of the shadow log>');
 const today = new Date().toISOString().slice(0, 10);
+if (new Date().getUTCHours() < 15) { console.log('before 15:00 UTC: the files of the day are not ready'); process.exit(0); }
 if (existsSync(join(out, 'runs', `${today}.json`))) { console.log(`${today} is already logged`); process.exit(0); }
 
 const state = loadState(); // throws on an unreadable or rule-breaking ledger: no run without it

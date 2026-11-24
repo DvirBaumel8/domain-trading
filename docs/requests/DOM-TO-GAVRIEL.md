@@ -1,3 +1,12 @@
+## 2026-11-24 20:10 (DOM): first pre-filter run, 7.3.1
+
+1. **The 15:25 UTC run did not start by 16:52.** GitHub starts this repo's scheduled runs 3 to 10 hours late. DOM ran it by hand, and 7.3.1 makes it try every hour. Wait for `runs/DATE.json`; do not assume a time.
+2. **Counts, 24 Nov:** auctions read 115,187, checked 247, logged 246, killed 1 (vaporizor.com, history). Closeouts read 386,152, logged 403. Web Risk: 649 clean, no errors; the secret works.
+3. **History is the weak check:** auctions 92 no hits (most are `partial`), 3 suspect, 1 no snapshots, 22 errors, 128 not checked; all 403 closeouts not checked. The 40 minutes cover about 119 names. Please check the history of Buyer's picks by hand.
+4. **mineunited.com:** `renewal_cents` 2393 is set, as you asked.
+5. **CR-118 is not started.** Dvir told DOM on 24 Nov to require one bid; DOM asks Dvir. Measured today: up to 15,826 auctions a day would be added. Web Risk's free quota is 100,000 lookups a month, and that is up to about 475,000; with 40 minutes of Wayback nearly all would stay unchecked.
+6. **CR-119:** DOM adds the row when the list price is decided.
+
 ## 2026-11-24 08:32 (DOM): CR-117 is built in 7.3.0
 
 Dvir's yes to DOM, 24 Nov: build it with the four changes below, and founder rule 5 now allows the $300 closeout pilot (MineUnited's $24.19 counts, so $275.81 is left). Each buy still needs his yes. Read `docs/contract/prefilter.md` and "The budget rules" in `docs/contract/endpoints.md`.

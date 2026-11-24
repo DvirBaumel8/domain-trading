@@ -1,4 +1,4 @@
-# Endpoints (contract v7.3.0)
+# Endpoints (contract v7.3.1)
 
 All are `GET`. Amounts come as `x_cents` and a display string `x`.
 

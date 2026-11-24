@@ -1,6 +1,6 @@
 # domain-trading API contract
 
-**Version 7.3.0** (24 Nov 2026). The interface between **DOM** (the vendor) and its customers, Dvir's bots.
+**Version 7.3.1** (24 Nov 2026). The interface between **DOM** (the vendor) and its customers, Dvir's bots.
 
 Phase 1 (Dvir, 23 Nov 2026): the app is stateless, has no database and **only reads**. It knows the domains owned and the money spent (`data/state.json` in this repo), it says whether a candidate fits the budget, and it can look up a price, a name's safety, and the live state of our domains, listings and sales. Everything else of 6.x is gone; the routes answer 404.
 

@@ -8,4 +8,5 @@
 | S-9 | In Render, `JOB_TRIGGER_TOKEN`, `APP_ENV` and `PUBLIC_BASE_URL` are still set and nothing reads them; the rest were removed 23 Nov | Gavriel, with Dvir's yes |
 | S-13 | Public for now (Dvir, 23 Nov). To go private later: give Render's GitHub app access first, switch, test a deploy. Two walk-away prices are in CR-004 and CR-060, and an email is in the git history | DVIR |
 | S-11 | CR-116: built in 7.2.0. Left: the GoDaddy, Afternic and USPTO keys, then a live check of each (not tried live yet). The Auctions key can spend, so it waits for Dvir | Gavriel (keys), DOM (check) |
-| S-14 | CR-117: built in 7.3.0. Left: the GitHub secret `GOOGLE_WEB_RISK_API_KEY`, the renewal price of mineunited.com, and a check of the first scheduled run | Gavriel (key, price), DOM (check) |
+| S-14 | CR-117: first run worked (24 Nov, by hand). Left: a check that the hourly schedule starts it by itself (25 Nov) | DOM |
+| S-15 | CR-118 (log 0-bid auctions too): waits for Dvir. CR-119 (service-trade price row): waits for the list price and the walk-away | DVIR |

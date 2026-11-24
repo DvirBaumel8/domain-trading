@@ -1,6 +1,6 @@
 # The daily pre-filter and the shadow log (CR-117)
 
-A GitHub Actions job (`.github/workflows/prefilter.yml`, daily at 15:25 UTC, or by hand). It reads GoDaddy's public inventory files, drops what fails fixed rules, and logs the rest. It judges nothing and buys nothing. It is not a route: the files are too big for the Render server.
+A GitHub Actions job (`.github/workflows/prefilter.yml`, once a day after 15:00 UTC, or by hand after that hour; GitHub starts it hours late on some days, so wait for `runs/DATE.json`). It reads GoDaddy's public inventory files, drops what fails fixed rules, and logs the rest. It judges nothing and buys nothing. It is not a route: the files are too big for the Render server.
 
 ## Where the log is
 Branch `shadow-log` of this repo, one file a day (UTC date), read by raw URL, so it does not depend on Render:

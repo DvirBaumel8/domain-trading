@@ -2,6 +2,10 @@
 
 Semver for the API contract (`README.md` §Versioning). Newest first. Each entry links to its release note in `docs/releases/`.
 
+## 7.3.1 (2026-11-24): The pre-filter runs on time; mineunited.com renewal price
+Release note: `docs/releases/v7.3.1.md`.
+PATCH (CR-117). The daily job tries every hour and works once, after 15:00 UTC (`prefilter.md`). mineunited.com has `renewal_cents` 2393.
+
 ## 7.3.0 (2026-11-24): Daily auction pre-filter with a public shadow log; the budget rules in code
 Release note: `docs/releases/v7.3.0.md`.
 MINOR (CR-117). New read `/budget`. `/portfolio` rows may have `do_not_renew_since` and `renewal_cents`; purchase rows have `source` since 24 Nov 2026. New daily job and shadow log (`prefilter.md`). The closeout pilot of $300 is checked.
