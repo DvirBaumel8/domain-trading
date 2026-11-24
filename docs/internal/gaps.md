@@ -7,5 +7,6 @@
 | S-5 | Phase 2 candidate: the daily auction shortlist as a job that stores nothing | DVIR |
 | S-6 | Price drops are by hand; the first is about April 2027 (month 6) | Gavriel |
 | S-9 | In Render, `JOB_TRIGGER_TOKEN`, `APP_ENV` and `PUBLIC_BASE_URL` are still set and nothing reads them; the rest were removed 23 Nov | Gavriel, with Dvir's yes |
-| S-11 | Build the read parts of CR-114 and CR-115 as scoped in CR-116; no money or write route | DOM |
 | S-13 | Public for now (Dvir, 23 Nov). To go private later: give Render's GitHub app access first, switch, test a deploy. Two walk-away prices are in CR-004 and CR-060, and an email is in the git history | DVIR |
+| S-11 | CR-116: built in 7.2.0. Left: the GoDaddy, Afternic and USPTO keys, then a live check of each (not tried live yet). The Auctions key can spend, so it waits for Dvir | Gavriel (keys), DOM (check) |
+| S-14 | CR-117: daily pre-filter, budget in code and shadow log; holds the inventory files of CR-116. Open bids cannot be read from GoDaddy. Waits for Dvir | DVIR |

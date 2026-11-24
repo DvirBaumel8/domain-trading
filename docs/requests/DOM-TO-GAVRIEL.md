@@ -1,9 +1,21 @@
+## 2026-11-24 06:30 (DOM): CR-116 is live in 7.2.0, except the inventory files
+
+Checked live on Render (`d216ba52`): `/check` has `web_risk` (it answered `clean` for promptinjectionaudit.com; a flagged name was tested with fakes only). `/registrar-status` reads the three Porkbun names: auto-renew **off**, locked, Afternic nameservers, expiry equal to our record. The other sources answer "missing key". Routes, errors and key names: `docs/contract/endpoints.md`. `GET /health` shows which keys are set.
+
+1. **Keys still missing in Render:** `GODADDY_DOMAINS_PAT`, `AFTERNIC_API_KEY` + `AFTERNIC_API_SECRET`, `USPTO_API_KEY`. Their answers are built from the official docs and not tried live; tell DOM when each is set and DOM checks it. Until the PAT is set, auto-renew of mineunited.com and promptinjectionaudit.com is unknown.
+2. **Please hold `GODADDY_API_KEY` + `GODADDY_API_SECRET` (Auctions).** By GoDaddy's docs the same classic key can bid and buy with a saved payment method, and they show no read-only form. Dvir: no money spending from the app. DOM asks Dvir. Do not save a payment profile for it.
+3. **The Afternic key can change listings** (its docs show no read-only key). The app has no call that does. Dvir should know before it is made.
+4. **Porkbun:** its keys can be limited to the `read` permission. Please replace the key in Render with a read-only one, with Dvir's yes; then nothing there can buy.
+5. **GoDaddy has no call that lists our bids** (the Auctions API has availability, bid, payment profile and purchase only). The CR-117 plan to read open bids through it does not work.
+6. **Inventory files moved to CR-117's daily job.** The closeouts alone are 327 MB of JSON, and each page of an API answer would read the file again on Render's free server.
+7. **CR-117:** not started; Dvir wants CR-116 finished first. Its ledger baseline should be $76.15.
+
 ## 2026-11-23 16:42 (DOM): CR-114 and CR-115, Dvir's decision
 
 Dvir, to DOM in chat today: **"no money spending from the app"**; founder rule 12 stays. This replaces the approvals quoted in both CRs for those parts.
 - **Closed, not built:** register, renew, bid and buy routes, the approval files under `docs/requests/approvals/` and the `money` flag.
 - **Also not built:** set nameservers, and listing add, update, remove and price. They spend nothing, so Dvir's line does not name them, but the app stays read-only and DOM adds no write route. Sales and nameserver steps stay by hand, with Dvir's approval.
-- **Read parts:** CR-116 gives the scope and Dvir's words, so they are approved. Nothing is built yet.
+- **Read parts:** built, see the 24 November entry.
 - **$1,500 total cap: added** to founder rule 2 and `npm run check-state` (Dvir to DOM, 23 Nov). Every cost counts (the membership too); a sale adds no room. $76.15 is spent.
 - **The repo stays public for now** (Dvir to DOM, 23 Nov).
 - **Please note:** CR text that quotes Dvir is public.
