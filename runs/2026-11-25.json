@@ -1,0 +1,176 @@
+{
+  "date": "2026-11-25",
+  "kills": {
+    "read": 1660,
+    "unreadable_lines": 0
+  },
+  "files": {
+    "auction": {
+      "file_built_at": "2026-11-25T16:04:25+02:00",
+      "counts": {
+        "read": 68840,
+        "not_com": 31102,
+        "not_letters": 6845,
+        "too_long": 14917,
+        "unreadable": 0
+      },
+      "dropped": {
+        "no_bid": 15628,
+        "adult": 112,
+        "over_per_name": 9,
+        "over_total": 1
+      },
+      "checked": 226,
+      "logged": 221
+    },
+    "closeout": {
+      "file_built_at": "2026-11-25T16:07:44+02:00",
+      "counts": {
+        "read": 461446,
+        "not_com": 271076,
+        "not_letters": 45160,
+        "too_long": 70679,
+        "unreadable": 0
+      },
+      "dropped": {
+        "no_demand_sign": 29600,
+        "price": 43913,
+        "adult": 574,
+        "already_logged": 182
+      },
+      "checked": 262,
+      "logged": 262
+    }
+  },
+  "killed": [
+    {
+      "domain": "vstem.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2001-06-10",
+          "url": "http://www.vstem.com:80/Absolutly_Free_Porn_Nothing_Membership/"
+        },
+        {
+          "date": "2001-12-05",
+          "url": "http://www.vstem.com:80/Adult-Xxx-Free-Pic/"
+        },
+        {
+          "date": "2001-06-12",
+          "url": "http://www.vstem.com:80/Amateur_Nude_Couples_Home_Pages/"
+        },
+        {
+          "date": "2001-09-20",
+          "url": "http://www.vstem.com:80/Amature_Free_Adult_Sex_Web_Cams/"
+        },
+        {
+          "date": "2003-10-11",
+          "url": "http://www.vstem.com:80/Amature_Free_Adult_Sex_Web_Cams/index.htm"
+        }
+      ]
+    },
+    {
+      "domain": "xsanime.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2020-10-27",
+          "url": "https://www.xsanime.com/anime/hentai-ouji-to-warawanai-neko/"
+        },
+        {
+          "date": "2020-09-28",
+          "url": "https://www.xsanime.com/anime/hentai-ouji-to-warawanai-neko-henneko-bbs/"
+        }
+      ]
+    },
+    {
+      "domain": "ptape.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2021-11-19",
+          "url": "https://gasrem.ptape.com/2021/02/27/paypal-casino-on-google-caused-by-smallest-admiline-ru-first-deposit-both-step-two-step-3-four-ten/"
+        },
+        {
+          "date": "2021-11-22",
+          "url": "https://gasrem.ptape.com/2021/09/08/gold-nugget-online-bgo-casino-casino-sportsbook/"
+        },
+        {
+          "date": "2021-12-04",
+          "url": "https://gasrem.ptape.com/2021/11/13/payday-loan-edmond-fine-pay-day-loan-numbers-2/"
+        },
+        {
+          "date": "2021-11-19",
+          "url": "https://gasrem.ptape.com/2021/11/18/master-johnnie-gambling-establishment-review-2021/"
+        },
+        {
+          "date": "2021-11-20",
+          "url": "https://gasrem.ptape.com/2021/11/20/how-do-you-pay-my-personal-payday-loans/"
+        }
+      ]
+    },
+    {
+      "domain": "cihansemiz.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2022-08-17",
+          "url": "https://cihansemiz.com/5-fun-facts-about-baccarat/"
+        },
+        {
+          "date": "2025-03-22",
+          "url": "https://cihansemiz.com/?redirect_to=https%3A%2F%2Fcihansemiz.com%2F5-fun-facts-about-baccarat"
+        },
+        {
+          "date": "2024-10-03",
+          "url": "https://cihansemiz.com/?redirect_to=https%3A%2F%2Fcihansemiz.com%2Fhow-to-select-best-poker-guest-posting-sites"
+        },
+        {
+          "date": "2025-01-22",
+          "url": "https://cihansemiz.com/?redirect_to=https%3A%2F%2Fcihansemiz.com%2Fthe-best-bitcoin-casinos-how-to-choose-the-right-one-for-you"
+        },
+        {
+          "date": "2025-03-22",
+          "url": "https://cihansemiz.com/?redirect_to=https%3A%2F%2Fcihansemiz.com%2Fthe-most-important-aspects-of-online-casino-slots"
+        }
+      ]
+    },
+    {
+      "domain": "juicysprout.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2023-02-02",
+          "url": "https://juicysprout.com/pengaruh-situs-bandar-judi-4d-terpercaya-pada-bayaran-player/"
+        },
+        {
+          "date": "2023-02-03",
+          "url": "https://juicysprout.com/pengaruh-situs-bandar-judi-4d-terpercaya-pada-gaji-player/"
+        },
+        {
+          "date": "2023-02-05",
+          "url": "https://juicysprout.com/pengaruh-situs-bandar-judi-4d-terpercaya-pada-pendapatan-player/"
+        },
+        {
+          "date": "2023-02-02",
+          "url": "https://juicysprout.com/pengaruh-situs-bandar-judi-4d-terpercaya-pada-penghasilan-player/"
+        },
+        {
+          "date": "2023-02-08",
+          "url": "https://juicysprout.com/pengaruh-situs-bandar-judi-4d-terpercaya-pada-upah-player/"
+        }
+      ]
+    }
+  ],
+  "closes": 649,
+  "totals": {
+    "auctions": 467,
+    "closeouts": 665,
+    "with_last_price": 427
+  }
+}
