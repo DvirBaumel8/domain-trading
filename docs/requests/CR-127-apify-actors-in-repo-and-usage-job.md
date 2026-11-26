@@ -53,3 +53,14 @@ The source is `docs/requests/apify-import/usage-report.py`. It is read-only, GET
 ## Out of scope
 
 CR-128 has the code backlog from Gavriel's audit.
+
+## Update 26 Nov 2026, 11:30 IST
+
+**Text edits done (Gavriel, ~11:23 IST).** Live builds: dns 0.1.4, sitemap 0.1.4, availability 0.1.4, checkup 0.1.5. They include the README kit, SEO texts and input schemas. The main input is required on dns, sitemap and checkup. Availability needs Domains or Keywords. Sitemap `maxUrlsPerSite` defaults to 1000. The snapshot must match these builds.
+
+**Snapshot timing:** I import the source into `docs/requests/apify-import/` only after Dvir answers Q1. If he picks a private repo, the snapshot goes there and not into this public repo.
+
+**SEO drift (add to Part A, item 5):** the Store SEO fields (`seoTitle`, `seoDescription`) were set by API with `PUT /v2/actors/{id}`, because `apify push` does not apply them. A later push may reset them.
+- Add a small script, `apify-actors/tools/sync-store-meta.py`, run from Dvir's machine right after each `apify push`. It reads the text keys from each `.actor/actor.json` and does `PUT /v2/actors/{id}` with only those fields. Then it reads them back with GET and fails if any differ. It must never print the token.
+- Add an offline test with a recorded fixture: the script sends only the allowed text keys, and never touches prices, the pricing model or visibility.
+- The release checklist in each `CHANGELOG.md` says: push, then sync-store-meta, then check the Store page.
