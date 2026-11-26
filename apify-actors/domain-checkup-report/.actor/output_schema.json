@@ -1,6 +1,6 @@
 {
   "actorOutputSchemaVersion": 1,
-  "title": "Domain Checkup Report output",
+  "title": "Domain Due Diligence Report Before You Buy output",
   "properties": {
     "results": {
       "type": "string",

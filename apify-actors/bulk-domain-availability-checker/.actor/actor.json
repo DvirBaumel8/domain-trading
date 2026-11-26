@@ -1,8 +1,8 @@
 {
   "actorSpecification": 1,
   "name": "bulk-domain-availability-checker",
-  "title": "Bulk Domain Availability Checker (DNS + RDAP)",
-  "description": "Check thousands of domain names for availability in minutes. DNS pre-check plus official RDAP registry confirmation, names x TLDs, registrar, creation and expiry dates, and a parked or for-sale flag. Paste domains or keywords. Pay per domain returned. Export CSV, Excel or JSON, or run from the API.",
+  "title": "Startup Name Availability Checker (DNS + RDAP)",
+  "description": "Check 1,000 startup-name ideas at once (DNS pre-check + RDAP confirm). Paste names and TLDs, or finished domains, and get available or registered for every combination. Optional registrar, creation and expiry dates and a parked or for-sale flag. Up to 50,000 per run. Pay per domain returned.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {
@@ -20,6 +20,6 @@
   "defaultRunOptions": {
     "memoryMbytes": 256
   },
-  "seoTitle": "Bulk Domain Availability Checker (DNS + RDAP)",
-  "seoDescription": "Check thousands of domain names for availability. DNS plus official RDAP confirmation, names x TLDs, registrar, expiry and for-sale flags. No API keys."
+  "seoTitle": "Check 1,000 Startup Name Ideas: Domain Availability",
+  "seoDescription": "Check 1,000 startup-name ideas across TLDs at once. DNS pre-check, confirmed with the official RDAP registry. Registrar, expiry and for-sale flags."
 }

@@ -1,5 +1,5 @@
 {
-  "title": "Broken Link Auditor",
+  "title": "Site Migration QA & Broken Link Checker input",
   "type": "object",
   "schemaVersion": 1,
   "required": [
@@ -9,16 +9,20 @@
     "startUrls": {
       "title": "Start URLs",
       "type": "array",
-      "description": "A site, a sitemap URL, or a list of URLs.",
+      "description": "Required. One URL per line. In \"list\" mode these are the URLs to check (for a migration: your old URLs). In \"sitemap\" mode each line is a sitemap URL, or a site whose sitemap is found through robots.txt or /sitemap.xml. In \"crawl\" mode each line is the page where the crawl starts. https:// is added when missing; duplicates are removed. At most \"Max URLs\" unique URLs are checked.",
       "editor": "stringList",
       "prefill": [
         "https://example.com/"
+      ],
+      "example": [
+        "https://example.com/old-pricing",
+        "https://example.com/old-blog/"
       ]
     },
     "mode": {
       "title": "Mode",
       "type": "string",
-      "description": "list: check the given URLs. sitemap: expand sitemaps first. crawl: follow same-site links.",
+      "description": "How to use the start URLs. list (default): check exactly the URLs given. sitemap: read the sitemap(s) first and check every URL listed in them. crawl: open each start page and follow same-site links up to \"Max crawl depth\", recording the source page and anchor text of every link.",
       "enum": [
         "list",
         "sitemap",
@@ -29,7 +33,7 @@
     "maxPages": {
       "title": "Max URLs",
       "type": "integer",
-      "description": "Stop after this many unique URLs.",
+      "description": "Safety cap on how many unique URLs are checked in one run. Whole number from 1 to 100000, default 1000. URLs beyond the cap are not checked.",
       "default": 1000,
       "minimum": 1,
       "maximum": 100000
@@ -37,7 +41,7 @@
     "maxDepth": {
       "title": "Max crawl depth",
       "type": "integer",
-      "description": "Crawl mode only.",
+      "description": "Crawl mode only; ignored in the other modes. How many link levels to follow from the start page. Whole number from 0 to 10, default 3. 0 checks only the start page, 1 also checks the links found on it.",
       "default": 3,
       "minimum": 0,
       "maximum": 10
@@ -45,13 +49,13 @@
     "checkExternal": {
       "title": "Check external links",
       "type": "boolean",
-      "description": "Crawl mode: also check links that point to other sites (they are not crawled).",
+      "description": "Crawl mode only. When on, links that point to other sites are also checked for status, but those pages are not crawled. Default off.",
       "default": false
     },
     "maxConcurrency": {
       "title": "Concurrency",
       "type": "integer",
-      "description": "Parallel requests.",
+      "description": "How many requests run in parallel. Whole number from 1 to 20, default 5. Requests to the same host are still spaced out, so the Actor stays polite to the sites it checks.",
       "default": 5,
       "minimum": 1,
       "maximum": 20
@@ -59,14 +63,15 @@
     "respectRobots": {
       "title": "Respect robots.txt",
       "type": "boolean",
-      "description": "Skip URLs that robots.txt disallows.",
+      "description": "When on (default), URLs that the site's robots.txt disallows for this Actor are not requested; they appear with category robots_blocked. Turn off only for sites you own or may test.",
       "default": true
     },
     "debugNetwork": {
       "title": "Debug network",
       "type": "boolean",
-      "description": "Log connect details for failed requests (host, attempt, reason, error classes). No headers, bodies, paths or query strings.",
+      "description": "Optional, default off. Logs connect details of failed requests (host, attempt, reason, error classes) to the run log. Never logs headers, bodies, paths or query strings.",
       "default": false
     }
-  }
+  },
+  "description": "Paste the URLs to check (for a site migration, your old URLs), choose a mode and click Start. Each URL is requested and its redirects are followed one hop at a time, so every row shows the final status and the redirect chain."
 }

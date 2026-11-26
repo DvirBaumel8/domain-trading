@@ -1,18 +1,23 @@
 {
-  "title": "Domain Checkup Report input",
+  "title": "Domain Due Diligence Report Before You Buy input",
   "type": "object",
   "schemaVersion": 1,
-  "description": "Paste the domains you want a report for, then click Start. URLs and email addresses are turned into domains. Invalid lines are skipped and not charged. Each valid domain produces one due-diligence row.",
+  "description": "Paste the domains you are thinking of buying, then click Start. URLs and email addresses are turned into domains. Invalid lines are skipped and not charged. Each valid domain produces one due-diligence row.",
   "properties": {
     "domains": {
       "title": "Domains",
       "type": "array",
-      "description": "Required. Domain names (any TLD), website URLs, or email addresses, one per line. Invalid lines are saved to INVALID_INPUTS in the key-value store and are not charged.",
+      "description": "Required. The domains you are considering, one per line. Accepts domain names (any TLD), website URLs and email addresses; the domain is extracted from each. Duplicates are removed. Lines that are not valid domains are skipped, saved to INVALID_INPUTS in the key-value store and not charged. At most \"Max domains per run\" are reported.",
       "editor": "stringList",
       "prefill": [
         "google.com",
         "mineunited.com",
         "example.com"
+      ],
+      "example": [
+        "example.com",
+        "https://www.example.net/",
+        "someone@example.org"
       ]
     },
     "lookupRdap": {
@@ -20,20 +25,20 @@
       "sectionDescription": "Leave both options on for a full report. Turning one off makes the run faster but the row will have less detail.",
       "title": "Look up registration details (RDAP)",
       "type": "boolean",
-      "description": "Query official IANA-listed RDAP registries for creation date, age, registrar and expiry. Lookups are throttled to about 3 requests per second per registry.",
+      "description": "When on (default), queries the official RDAP registry of the TLD for creation date, age, registrar, expiry and status codes. Lookups are spaced to about 3 requests per second per registry. Off is faster, but the row has no registration details.",
       "default": true
     },
     "fetchLandingPage": {
       "title": "Inspect landing page (live status, for-sale & price)",
       "type": "boolean",
-      "description": "When the domain resolves, fetch its HTTP/HTTPS landing page to detect live HTTPS, marketplace redirects, parked pages, and a visible asking price.",
+      "description": "When on (default), fetches the HTTPS (or HTTP) landing page of a domain that resolves, to record HTTP status, HTTPS validity, page title, marketplace redirects or parked pages and a visible asking price. Off is faster, with less detail.",
       "default": true
     },
     "maxDomains": {
       "sectionCaption": "Limits",
       "title": "Max domains per run",
       "type": "integer",
-      "description": "Safety cap on how many valid domains are checked in one run.",
+      "description": "Safety cap on how many valid, unique domains are reported in one run. Whole number from 1 to 10000, default 500. Extra domains are not checked.",
       "default": 500,
       "minimum": 1,
       "maximum": 10000
@@ -41,7 +46,7 @@
     "concurrency": {
       "title": "Concurrency",
       "type": "integer",
-      "description": "Parallel DNS and HTTP checks. Registry RDAP queries stay throttled to about 3 per second per registry.",
+      "description": "How many domains are checked in parallel. Whole number from 1 to 30, default 15. Registry RDAP queries stay throttled to about 3 per second per registry regardless.",
       "default": 15,
       "minimum": 1,
       "maximum": 30

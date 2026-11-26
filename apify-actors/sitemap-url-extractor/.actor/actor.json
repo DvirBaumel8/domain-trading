@@ -1,8 +1,8 @@
 {
   "actorSpecification": 1,
   "name": "sitemap-url-extractor",
-  "title": "Sitemap URL Extractor - All Website URLs",
-  "description": "Extract every page URL from a website's XML sitemaps in seconds. Auto-discovers sitemaps from robots.txt, follows indexes and .gz files, and returns lastmod, priority, hreflang and optional HTTP status. Filter by regex or date. Pay per URL kept. Export CSV, Excel or JSON, or run from the API.",
+  "title": "Sitemap URL Extractor for SEO & AI Audits",
+  "description": "Get every URL of a site for an SEO or AI audit, or to feed a crawler. Finds sitemaps through robots.txt and common paths, follows indexes and .gz files, and returns lastmod, changefreq, priority, image count, hreflang and an optional HTTP status. Filter by regex or date. Pay per URL kept.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {
@@ -20,6 +20,6 @@
   "defaultRunOptions": {
     "memoryMbytes": 256
   },
-  "seoTitle": "XML Sitemap URL Extractor for Any Website",
-  "seoDescription": "Extract every page URL from XML sitemaps. Auto-discovers sitemaps, follows indexes and .gz files, filters by date or regex, optional HTTP status check."
+  "seoTitle": "Sitemap URL Extractor: All Website URLs for Audits",
+  "seoDescription": "Get every URL of a site from its XML sitemaps, for SEO or AI audits or to feed a crawler. Follows indexes and .gz files. Filter by regex or date."
 }

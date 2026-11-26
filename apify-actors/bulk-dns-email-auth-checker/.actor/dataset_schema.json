@@ -8,154 +8,154 @@
           "string",
           "null"
         ],
-        "description": "Domain checked"
+        "description": "The domain that was checked, lowercase, without www or path."
       },
       "resolves": {
         "type": [
           "boolean",
           "null"
         ],
-        "description": "Domain exists in DNS"
+        "description": "true if the domain exists in DNS, false if it does not (NXDOMAIN), null if the lookup failed."
       },
       "a": {
         "type": [
           "array",
           "null"
         ],
-        "description": "IPv4 addresses"
+        "description": "IPv4 addresses (A records). Empty unless \"Include A/AAAA/CAA records\" is on."
       },
       "aaaa": {
         "type": [
           "array",
           "null"
         ],
-        "description": "IPv6 addresses"
+        "description": "IPv6 addresses (AAAA records). Empty unless \"Include A/AAAA/CAA records\" is on."
       },
       "ns": {
         "type": [
           "array",
           "null"
         ],
-        "description": "Nameservers"
+        "description": "Nameservers, lowercase, sorted."
       },
       "mx": {
         "type": [
           "array",
           "null"
         ],
-        "description": "MX records {priority, host}"
+        "description": "MX records as {priority, host}, lowest priority number first. An empty list means no MX (or a null MX)."
       },
       "emailProvider": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Detected email provider (Google Workspace, Microsoft 365, ...)"
+        "description": "Mail provider guessed from the MX hosts (for example Google Workspace, Microsoft 365), \"Other / self-hosted\" for unknown hosts, or null when there is no MX."
       },
       "spf": {
         "type": [
           "string",
           "null"
         ],
-        "description": "SPF record"
+        "description": "The SPF record text (v=spf1 ...), or null if none is published."
       },
       "spfAll": {
         "type": [
           "string",
           "null"
         ],
-        "description": "SPF 'all' policy: -all, ~all, ?all, +all"
+        "description": "The SPF \"all\" qualifier: -all, ~all, ?all or +all. Null when there is no SPF record or no all mechanism."
       },
       "spfLookups": {
         "type": [
           "integer",
           "null"
         ],
-        "description": "Approximate DNS-lookup mechanisms in SPF (limit is 10)"
+        "description": "Approximate count of DNS-lookup mechanisms at the top level of the SPF record (include, a, mx, ptr, exists, redirect). SPF allows 10."
       },
       "dmarc": {
         "type": [
           "string",
           "null"
         ],
-        "description": "DMARC record"
+        "description": "The DMARC record text (v=DMARC1; ...), or null if none is published at _dmarc.<domain>."
       },
       "dmarcPolicy": {
         "type": [
           "string",
           "null"
         ],
-        "description": "DMARC p= policy (none/quarantine/reject)"
+        "description": "The DMARC p= policy: none, quarantine or reject. Null when there is no DMARC record or no valid p=."
       },
       "dmarcRua": {
         "type": [
           "string",
           "null"
         ],
-        "description": "DMARC aggregate report address"
+        "description": "The DMARC rua= aggregate report address, or null if not set."
       },
       "dkimSelectorsFound": {
         "type": [
           "array",
           "null"
         ],
-        "description": "DKIM selectors found among those tested"
+        "description": "The tested DKIM selectors that returned a key. Only the selectors you test are reported; empty if a wildcard DKIM record answers every selector."
       },
       "mtaSts": {
         "type": [
           "boolean",
           "null"
         ],
-        "description": "MTA-STS record present"
+        "description": "true if an MTA-STS record (_mta-sts.<domain>) is published."
       },
       "bimi": {
         "type": [
           "boolean",
           "null"
         ],
-        "description": "BIMI record present"
+        "description": "true if a BIMI record (default._bimi.<domain>) is published."
       },
       "caa": {
         "type": [
           "array",
           "null"
         ],
-        "description": "CAA records"
+        "description": "CAA records. Empty unless \"Include A/AAAA/CAA records\" is on."
       },
       "parkedOrForSale": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Parking/marketplace detected from nameservers"
+        "description": "Parking or marketplace service detected from the nameservers (for example Afternic, Sedo, Dan.com), or null."
       },
       "emailScore": {
         "type": [
           "integer",
           "null"
         ],
-        "description": "Email authentication score 0-100"
+        "description": "Email-authentication score 0-100 built from SPF, DMARC, DKIM, MTA-STS and BIMI. See \"How to read the score\" in the README. It reports DNS records; it does not predict inbox placement."
       },
       "issues": {
         "type": [
           "array",
           "null"
         ],
-        "description": "Plain-English problems found"
+        "description": "Plain-English problems found, for example \"No DMARC record\" or \"No SPF record\". Empty list when nothing was found."
       },
       "error": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Error detail"
+        "description": "Error detail when the lookup failed, otherwise null."
       },
       "checkedAt": {
         "type": [
           "string",
           "null"
         ],
-        "description": "UTC timestamp"
+        "description": "UTC timestamp of the check (ISO 8601)."
       }
     }
   },
@@ -165,45 +165,53 @@
       "transformation": {
         "fields": [
           "domain",
+          "emailScore",
+          "issues",
+          "resolves",
+          "mx",
           "emailProvider",
           "spfAll",
           "dmarcPolicy",
           "dkimSelectorsFound",
-          "emailScore",
-          "issues",
-          "mx",
-          "parkedOrForSale"
+          "parkedOrForSale",
+          "error"
         ]
       },
       "display": {
         "component": "table",
         "properties": {
           "domain": {
-            "label": "domain"
-          },
-          "emailProvider": {
-            "label": "emailProvider"
-          },
-          "spfAll": {
-            "label": "spfAll"
-          },
-          "dmarcPolicy": {
-            "label": "dmarcPolicy"
-          },
-          "dkimSelectorsFound": {
-            "label": "dkimSelectorsFound"
+            "label": "Domain"
           },
           "emailScore": {
-            "label": "emailScore"
+            "label": "Score (0-100)"
           },
           "issues": {
-            "label": "issues"
+            "label": "Issues"
+          },
+          "resolves": {
+            "label": "Resolves"
           },
           "mx": {
-            "label": "mx"
+            "label": "MX"
+          },
+          "emailProvider": {
+            "label": "Email provider"
+          },
+          "spfAll": {
+            "label": "SPF all"
+          },
+          "dmarcPolicy": {
+            "label": "DMARC policy"
+          },
+          "dkimSelectorsFound": {
+            "label": "DKIM selectors found"
           },
           "parkedOrForSale": {
-            "label": "parkedOrForSale"
+            "label": "Parked / for sale"
+          },
+          "error": {
+            "label": "Error"
           }
         }
       }

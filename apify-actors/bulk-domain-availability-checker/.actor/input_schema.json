@@ -1,18 +1,22 @@
 {
-  "title": "Bulk Domain Availability Checker input",
+  "title": "Startup Name Availability Checker (DNS + RDAP) input",
   "type": "object",
   "schemaVersion": 1,
-  "description": "Provide **Domains** and/or **Keywords**. At least one of the two is required. Paste full names (example.com), or type bare names and TLDs and the Actor will build every combination. You are charged only for rows returned.",
+  "description": "Add name ideas in Keywords with the TLDs you want, or paste finished domains. At least one of Domains and Keywords is required. Every combination is checked and returned as available or registered; with Return only available domains on, only free names are returned.",
   "properties": {
     "domains": {
       "title": "Domains",
       "type": "array",
-      "description": "Full domain names to check, one per line (for example example.com). URLs and emails are accepted and normalised. Leave this empty if you are using Keywords only.",
+      "description": "Optional if you use Keywords. Finished domain names to check, one per line (for example example.com). URLs and email addresses are accepted and reduced to the domain; international (IDN) names are converted. Duplicates are removed. Invalid lines are skipped, saved to INVALID_INPUTS in the key-value store and not charged.",
       "editor": "stringList",
       "prefill": [
         "apify.com",
         "quietbluefalcon.com",
         "example.org"
+      ],
+      "example": [
+        "example.com",
+        "example.net"
       ]
     },
     "keywords": {
@@ -20,13 +24,18 @@
       "sectionDescription": "Use this instead of, or as well as, a finished domain list. Each keyword is combined with every TLD, and with any prefixes or suffixes you add.",
       "title": "Keywords / names",
       "type": "array",
-      "description": "Names without a TLD (for example rentguitar). Each name is combined with every TLD below. Required if Domains is empty.",
-      "editor": "stringList"
+      "description": "Optional if you use Domains. Name ideas without a TLD, one per line (for example rentguitar). Each keyword is combined with every TLD below, and with any prefixes and suffixes. Spaces are removed and names are lowercased; ideas that are not valid names (or are longer than 63 characters) are skipped. At least one of Domains and Keywords is required.",
+      "editor": "stringList",
+      "example": [
+        "rentguitar",
+        "solarpet",
+        "brightloop"
+      ]
     },
     "tlds": {
       "title": "TLDs for keywords",
       "type": "array",
-      "description": "TLDs to combine with keywords, without the leading dot. Used only when Keywords are provided. Default if you leave this blank is com.",
+      "description": "TLDs to combine with Keywords, without the leading dot (for example com, io, ai). Used only for keywords. If you leave the list empty, com is used.",
       "editor": "stringList",
       "default": [
         "com"
@@ -43,32 +52,40 @@
     "prefixes": {
       "title": "Prefixes (optional)",
       "type": "array",
-      "description": "Optional words added before each keyword (for example get, try, my), producing names such as getrentguitar.com.",
-      "editor": "stringList"
+      "description": "Optional words placed before each keyword, one per line (for example get, try, my), giving names such as getrentguitar.com. The plain keyword is always checked too.",
+      "editor": "stringList",
+      "example": [
+        "get",
+        "try"
+      ]
     },
     "suffixes": {
       "title": "Suffixes (optional)",
       "type": "array",
-      "description": "Optional words added after each keyword (for example hq, app, online), producing names such as rentguitarhq.com.",
-      "editor": "stringList"
+      "description": "Optional words placed after each keyword, one per line (for example hq, app, online), giving names such as rentguitarhq.com. The plain keyword is always checked too.",
+      "editor": "stringList",
+      "example": [
+        "hq",
+        "app"
+      ]
     },
     "onlyAvailable": {
       "sectionCaption": "Results and limits",
       "title": "Return only available domains",
       "type": "boolean",
-      "description": "When on, registered names are omitted from the dataset. You are only charged for rows that are actually returned.",
+      "description": "When on, only rows with status available are returned and charged; registered and unknown rows are left out. Default off, so every checked domain is returned.",
       "default": false
     },
     "lookupRegistered": {
       "title": "Registration details for taken domains",
       "type": "boolean",
-      "description": "Also fetch registrar, creation date and expiry date for registered domains. This is slower because it queries the registry.",
+      "description": "When on, domains that DNS shows as registered also get a registry (RDAP) lookup for registrar, creation date, expiry date, domain age and status codes. Slower, because registry lookups are throttled. Default off.",
       "default": false
     },
     "maxDomains": {
       "title": "Max domains per run",
       "type": "integer",
-      "description": "Safety cap on how many generated or pasted domains are checked in this run.",
+      "description": "Safety cap on how many domains (pasted plus generated) are checked in one run. Whole number from 1 to 50000, default 5000. Extra domains are not checked.",
       "default": 5000,
       "minimum": 1,
       "maximum": 50000
@@ -76,7 +93,7 @@
     "concurrency": {
       "title": "Concurrency",
       "type": "integer",
-      "description": "Parallel DNS lookups. Registry (RDAP) lookups are always throttled politely, regardless of this value.",
+      "description": "How many DNS lookups run in parallel. Whole number from 1 to 50, default 20. Registry (RDAP) lookups are throttled to a few requests per second per registry regardless.",
       "default": 20,
       "minimum": 1,
       "maximum": 50

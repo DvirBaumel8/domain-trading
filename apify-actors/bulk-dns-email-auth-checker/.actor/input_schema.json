@@ -1,18 +1,23 @@
 {
-  "title": "Bulk DNS & Email Authentication Checker input",
+  "title": "Pre-Send Lead List Checker: DMARC, SPF & MX input",
   "type": "object",
   "schemaVersion": 1,
-  "description": "Paste the domains you want to check, then click Start. URLs and email addresses are turned into domains automatically. Each domain is looked up in public DNS only \u2014 the Actor never sends email and needs no API keys.",
+  "description": "Paste the prospect or client domains, then click Start. URLs and email addresses are turned into domains automatically. Each domain is looked up in public DNS only: the Actor never sends email and needs no API keys.",
   "properties": {
     "domains": {
       "title": "Domains, URLs or emails",
       "type": "array",
-      "description": "Required. One domain, website URL or email address per line (for example apify.com, https://apify.com or hello@apify.com). Duplicates are ignored.",
+      "description": "Required. The prospect or client domains to check, one per line. Accepts bare domains (acme-example.com), website URLs (https://www.acme-example.com/contact) and email addresses (jane@acme-example.com); the domain is extracted from each. Paste one spreadsheet or CSV column at a time (use Bulk edit in Console). Duplicates are removed and entries that are not valid domains are skipped. At most \"Max domains per run\" are checked.",
       "editor": "stringList",
       "prefill": [
         "apify.com",
         "google.com",
         "example.com"
+      ],
+      "example": [
+        "acme-example.com",
+        "https://www.northwind-example.com/contact",
+        "jane@brightside-example.org"
       ]
     },
     "dkimSelectors": {
@@ -20,7 +25,7 @@
       "sectionDescription": "Leave these at the defaults for a first run. Add selectors only if a domain uses a custom DKIM selector.",
       "title": "DKIM selectors to test",
       "type": "array",
-      "description": "Host prefixes to query as <selector>._domainkey.<domain>. Common selectors are already included (google, selector1, k1, sendgrid, and others). Add your email provider's selector if a known domain shows no DKIM key.",
+      "description": "Optional. DKIM selectors to look up as <selector>._domainkey.<domain>, one per line (letters, digits, hyphens). A selector counts as found when its TXT record, or the CNAME target, holds a non-empty p= key. The default is a list of 17 common selectors (google, selector1, selector2, k1, s1, sendgrid and others). Add your provider's selector if a known domain shows no DKIM key. If you clear the list, the Actor falls back to google, selector1, selector2 and default.",
       "editor": "stringList",
       "default": [
         "google",
@@ -40,12 +45,17 @@
         "zoho",
         "sendgrid",
         "sig1"
+      ],
+      "example": [
+        "google",
+        "selector1",
+        "k1"
       ]
     },
     "includeRecords": {
       "title": "Include A/AAAA/CAA records",
       "type": "boolean",
-      "description": "When on, the result also includes IPv4/IPv6 addresses and CAA records for each domain.",
+      "description": "Optional. When on (default), each row also includes the IPv4 (a) and IPv6 (aaaa) addresses and the CAA records. Turn off to skip those three lookups per domain; the email-auth fields and score are not affected.",
       "default": true
     },
     "concurrency": {
@@ -53,7 +63,7 @@
       "sectionDescription": "Safety caps for large lists. You can leave these unchanged.",
       "title": "Concurrency",
       "type": "integer",
-      "description": "How many domains to look up in parallel. Higher is faster; stay within your plan's limits.",
+      "description": "Optional. How many domains are looked up in parallel. Whole number from 1 to 30, default 10. Higher values finish large lists sooner.",
       "default": 10,
       "minimum": 1,
       "maximum": 30
@@ -64,7 +74,7 @@
       "default": 10000,
       "minimum": 1,
       "maximum": 100000,
-      "description": "Safety cap. If the list is longer, only the first N valid domains are checked."
+      "description": "Optional safety cap. Whole number from 1 to 100000, default 10000. If the list has more valid, unique domains, only the first N are checked."
     }
   },
   "required": [

@@ -1,8 +1,8 @@
 {
   "actorSpecification": 1,
   "name": "bulk-dns-email-auth-checker",
-  "title": "Bulk DNS & Email Auth Checker (SPF, DMARC)",
-  "description": "Check SPF, DKIM, DMARC, MX and email provider for thousands of domains in one run. Each domain gets a 0-100 email-auth score, plain-English issues, MTA-STS, BIMI and a parked or for-sale flag. Paste domains, URLs or emails. Public DNS, no API keys. Export CSV, Excel or JSON, or run from the API.",
+  "title": "Pre-Send Lead List Checker: DMARC, SPF & MX",
+  "description": "Pre-send check for cold-email lead lists: find which prospect domains have no DMARC or MX before you send. Also a bulk email-auth audit for agencies. Paste domains, URLs or emails; get SPF, DKIM, DMARC, MX, provider, a 0-100 score and plain-English issues. Public DNS, no API keys.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {
@@ -20,6 +20,6 @@
   "defaultRunOptions": {
     "memoryMbytes": 256
   },
-  "seoTitle": "Bulk DNS Email Auth Checker (SPF DKIM DMARC)",
-  "seoDescription": "Check SPF, DKIM, DMARC, MX and email provider for thousands of domains. Get a 0-100 email-auth score and plain-English issues. Public DNS, no API keys."
+  "seoTitle": "Bulk Email Auth Checker: DMARC, SPF, DKIM, MX",
+  "seoDescription": "Check a cold-email lead list before you send: find prospect domains with no DMARC or MX. Bulk SPF, DKIM, DMARC and MX audit for agencies. Public DNS."
 }

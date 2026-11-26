@@ -1,8 +1,8 @@
 {
   "actorSpecification": 1,
   "name": "bulk-pagespeed-checker",
-  "title": "Bulk PageSpeed & Core Web Vitals Checker",
-  "description": "Run Google PageSpeed Insights on many URLs. Returns category scores, lab metrics and real-user Core Web Vitals (field data) for mobile and desktop. Uses only the official PageSpeed Insights API v5.",
+  "title": "Bulk Core Web Vitals & PageSpeed Checker",
+  "description": "Core Web Vitals for every page in your sitemap, as CSV. Paste a list of URLs (Sitemap URL Extractor can list them) and get PageSpeed Insights category scores, lab metrics and real-user field data for mobile and desktop, one row per URL and strategy. Uses only the official PageSpeed Insights API v5.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {
@@ -20,6 +20,6 @@
   "defaultRunOptions": {
     "memoryMbytes": 256
   },
-  "seoTitle": "Bulk PageSpeed Insights and Core Web Vitals Checker",
-  "seoDescription": "Check PageSpeed scores and Core Web Vitals for many URLs on mobile and desktop with the official Google PageSpeed Insights API."
+  "seoTitle": "Bulk Core Web Vitals Checker (PageSpeed Insights)",
+  "seoDescription": "Core Web Vitals and PageSpeed scores for a list of pages, such as every page in your sitemap, mobile and desktop, as CSV. Uses the official PageSpeed API."
 }

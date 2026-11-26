@@ -8,70 +8,70 @@
           "string",
           "null"
         ],
-        "description": "Page URL listed in the sitemap"
+        "description": "Page URL listed in the sitemap."
       },
       "lastmod": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Last modification date from the sitemap"
+        "description": "The lastmod value from the sitemap (date or timestamp as published), or null."
       },
       "changefreq": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Change frequency hint"
+        "description": "The changefreq hint from the sitemap, or null."
       },
       "priority": {
         "type": [
           "number",
           "null"
         ],
-        "description": "Priority hint 0.0-1.0"
+        "description": "The priority hint from the sitemap (0.0 to 1.0), or null."
       },
       "imageCount": {
         "type": [
           "integer",
           "null"
         ],
-        "description": "Number of image entries for this URL"
+        "description": "Number of image entries listed for this URL in the sitemap."
       },
       "hreflang": {
         "type": [
           "array",
           "null"
         ],
-        "description": "Alternate language URLs (xhtml:link)"
+        "description": "Alternate-language links listed for this URL, each as {lang, url}. Empty if none."
       },
       "sitemapUrl": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Sitemap file the URL came from"
+        "description": "The sitemap file this URL came from."
       },
       "site": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Input site/start URL"
+        "description": "The start URL (website or sitemap) you gave, which this URL belongs to."
       },
       "statusCode": {
         "type": [
           "integer",
           "null"
         ],
-        "description": "HTTP status of the page (only if status check is on)"
+        "description": "HTTP status of the page. Null unless \"Check HTTP status\" is on, or if the request failed."
       },
       "finalUrl": {
         "type": [
           "string",
           "null"
         ],
-        "description": "URL after redirects (only if status check is on)"
+        "description": "URL after redirects. Null unless \"Check HTTP status\" is on, or if the request failed."
       }
     }
   },
@@ -85,6 +85,7 @@
           "changefreq",
           "priority",
           "statusCode",
+          "finalUrl",
           "sitemapUrl",
           "site"
         ]
@@ -93,25 +94,28 @@
         "component": "table",
         "properties": {
           "url": {
-            "label": "url"
+            "label": "URL"
           },
           "lastmod": {
-            "label": "lastmod"
+            "label": "Last modified"
           },
           "changefreq": {
-            "label": "changefreq"
+            "label": "Change frequency"
           },
           "priority": {
-            "label": "priority"
+            "label": "Priority"
           },
           "statusCode": {
-            "label": "statusCode"
+            "label": "Status"
+          },
+          "finalUrl": {
+            "label": "Final URL"
           },
           "sitemapUrl": {
-            "label": "sitemapUrl"
+            "label": "Sitemap"
           },
           "site": {
-            "label": "site"
+            "label": "Site"
           }
         }
       }

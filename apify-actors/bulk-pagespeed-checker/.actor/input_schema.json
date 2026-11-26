@@ -1,5 +1,5 @@
 {
-  "title": "Bulk PageSpeed Checker",
+  "title": "Bulk Core Web Vitals & PageSpeed Checker input",
   "type": "object",
   "schemaVersion": 1,
   "required": [
@@ -9,16 +9,20 @@
     "urls": {
       "title": "URLs",
       "type": "array",
-      "description": "Pages to test. https:// is added when missing.",
+      "description": "Required. The pages to test, one URL per line (for example every URL from your sitemap). https:// is added when it is missing; duplicates and invalid lines are dropped. Each URL is tested once per selected strategy, so rows = URLs x strategies.",
       "editor": "stringList",
       "prefill": [
         "https://example.com/"
+      ],
+      "example": [
+        "https://example.com/",
+        "https://example.com/pricing"
       ]
     },
     "strategies": {
       "title": "Strategies",
       "type": "array",
-      "description": "Mobile, desktop or both.",
+      "description": "Which device profiles to test: mobile, desktop or both. Default is both, which gives two rows per URL.",
       "editor": "select",
       "items": {
         "type": "string",
@@ -35,7 +39,7 @@
     "categories": {
       "title": "Categories",
       "type": "array",
-      "description": "Lighthouse categories to score. Performance is always useful; the others are optional.",
+      "description": "Lighthouse categories to score: performance, accessibility, best-practices, seo. Default is performance only. Each selected category is returned as a 0-100 score in \"scores\". Lab metrics and Core Web Vitals field data are returned regardless.",
       "editor": "select",
       "items": {
         "type": "string",
@@ -53,9 +57,10 @@
     "apiKey": {
       "title": "Google PageSpeed Insights API key",
       "type": "string",
-      "description": "Optional. Your own Google API key with the PageSpeed Insights API enabled. If left empty, a default key is used. It is never logged or written to the results.",
+      "description": "Optional. Your own Google API key with the PageSpeed Insights API enabled. If you leave it empty, the Actor uses a default key supplied on the server and tests at most 50 URL/strategy rows per run (the default limit); the run message says how many rows were not checked. With your own key there is no cap from this Actor (Google quota still applies). The key is never logged or written to the results.",
       "editor": "textfield",
       "isSecret": true
     }
-  }
+  },
+  "description": "Paste the page URLs to test, choose mobile, desktop or both, and click Start. Each URL and strategy is one test with the official PageSpeed Insights API. An API key is optional; if you leave it empty, a run is limited to 50 URL/strategy rows."
 }

@@ -1,35 +1,52 @@
-## Sitemap URL Extractor - All Website URLs
+# Sitemap URL Extractor for SEO & AI Audits
 
-Get **every page URL from a website's sitemaps** in seconds. The Actor auto-discovers sitemaps from `robots.txt` and common paths, follows sitemap indexes and `.gz` files, and returns `lastmod`, `priority`, `hreflang` and an optional HTTP status for each URL.
+Get every URL of a site for an SEO or AI audit, or to feed a crawler. The Actor finds a site's XML sitemaps, follows sitemap indexes and `.gz` files, and returns one row per page URL.
 
-You pay **per URL returned**. Current prices per 1,000 URLs, including any plan discounts, are on the **Pricing** tab. The default **Max URLs per site** is 1,000, so a first run on a huge site stays bounded. Raise that cap when you need a full list. The Apify Free plan includes monthly Store credit you can use for a first test — open the Pricing tab to see how far it goes at today's rates.
+**Returns** one row per URL: `url`, `lastmod`, `changefreq`, `priority`, `imageCount`, `hreflang`, `sitemapUrl`, `site`, and, if you turn on **Check HTTP status**, `statusCode` and `finalUrl`.
 
-![Sample output from Sitemap URL Extractor](https://api.apify.com/v2/key-value-stores/dNe1hFUAqsMnqLOYE/records/sitemap-output.png)
+**Cost:** pay per result, one result per URL kept. Filters run before results are saved, and **Max URLs per site** caps a run. See the Pricing tab for current prices.
+
+**Example input:**
+
+```json
+{
+  "startUrls": ["https://example.com"],
+  "maxUrlsPerSite": 1000
+}
+```
+
+## Step 1 of a site audit
+
+The URL list is the first step of a typical audit. Export it as CSV or JSON, then:
+
+- paste it into **Site Migration QA & Broken Link Checker** (another Actor by the same author) to check status codes and redirect chains, or
+- paste it into **Bulk Core Web Vitals & PageSpeed Checker** (another Actor by the same author) to test every page, or
+- feed it to your own crawler or an SEO or AI audit tool.
 
 ## Use cases
 
-- SEO teams building a complete URL list for an audit, crawl seed or migration.
-- Content and competitor research: watch a site's sitemap daily for new pages.
-- Developers who need a clean URL inventory, with lastmod and hreflang, without writing a crawler.
-- Finding broken pages by turning on **Check HTTP status**.
+- SEO teams building a complete URL list for an audit, a crawl seed or a migration.
+- Content and competitor research: schedule a run and look for new pages.
+- Developers who need a clean URL inventory, with `lastmod` and `hreflang`, without writing a crawler.
+- Quick 404 and redirect check: turn on **Check HTTP status**.
 
 ## Features
 
-- Auto-discovers sitemaps from `robots.txt` and common locations such as `/sitemap.xml`.
+- Finds sitemaps through `robots.txt` and common locations such as `/sitemap.xml`.
 - Follows sitemap indexes and compressed `.xml.gz` files.
 - Returns `lastmod`, `changefreq`, `priority`, image counts and `hreflang` alternates when the sitemap publishes them.
-- Optional include/exclude regex and "modified since" date filters — applied before results are saved, so you only pay for URLs you keep.
-- Optional HTTP status check (HEAD/GET) for 404s and redirects.
-- Safe XML parsing, protected against malformed and malicious XML.
-- Built against the official [Sitemaps XML protocol](https://www.sitemaps.org/protocol.html) and [Google sitemap documentation](https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview).
+- Optional include and exclude regular expressions and a "modified since" date, applied before results are saved.
+- Optional HTTP status check (HEAD, then GET if HEAD is refused) to see 404s and redirects.
+- Parses XML with a safe parser that rejects entity-expansion tricks.
+- Follows the [Sitemaps XML protocol](https://www.sitemaps.org/protocol.html).
 
 ## How to use it
 
 1. Add websites (for example `https://example.com`) or direct sitemap URLs to **Websites or sitemap URLs**.
-2. Optional: set **Max URLs per site** (default 1,000), include/exclude regex, **Only URLs modified since**, or **Check HTTP status**.
+2. Optional: set **Max URLs per site** (default 1,000), the include and exclude expressions, **Only URLs modified since**, or **Check HTTP status**.
 3. Click **Start**, then export the dataset or call the Actor from the API.
 
-### Input example
+### Input example with filters
 
 ```json
 {
@@ -58,34 +75,32 @@ You pay **per URL returned**. Current prices per 1,000 URLs, including any plan 
 }
 ```
 
-## How much does it cost?
+## Cost
 
-You pay **per URL returned** (the `result` event on the Pricing tab), plus a small start fee. Filters run before results are saved, so you only pay for the URLs you keep. Set **Max URLs per site** to cap spend on huge sites — the default is 1,000.
-
-Because prices can change, this page does not hard-code a per-1,000 figure. Open the **Pricing** tab for the live rate and any Bronze, Silver or Gold discounts. Apify's Free plan monthly credit is enough for a first test of a typical site at usual rates.
+You pay per result: one result per URL kept. Filters run before results are saved, so dropped URLs are not charged. If a site has no sitemap, the run log says so and nothing is charged for that site. The default **Max URLs per site** is 1,000. See the Pricing tab for current prices.
 
 ## API, scheduling and export
 
-Run this Actor from [Apify Console](https://console.apify.com), from the [API](https://docs.apify.com/api/v2#/reference/actors/run-collection/run-actor) (`looped_kite/sitemap-url-extractor`), or from a language client. Schedule runs in Apify Console, and export results as JSON, CSV, Excel or HTML. You can also connect a webhook, Slack, Make, Zapier, n8n or Google Sheets.
+Run this Actor from [Apify Console](https://console.apify.com), from the [API](https://docs.apify.com/api/v2#/reference/actors/run-collection/run-actor) (`looped_kite/sitemap-url-extractor`), or from a language client. Schedule runs in Apify Console and export results as JSON, CSV, Excel or HTML. You can also add an Apify webhook to a run.
 
 ## Notes and limits
 
-- The Actor reads only what a site publishes for search engines in its sitemaps. It does not crawl pages or log in.
+- The Actor reads only what a site publishes in its sitemaps. It does not crawl pages or log in.
 - Pages missing from a site's sitemap will not appear. Use a crawler for those.
-- If a site has no sitemap, the run log says so and nothing is charged for that site.
+- Up to 1,000,000 URLs per site per run (`maxUrlsPerSite`) and 500 sitemap files by default (`maxSitemaps`).
 
 ## FAQ
 
-**Can I monitor new pages on a competitor's site?** Yes. Schedule the Actor daily with **Only URLs modified since** set to a recent date, and connect a webhook, Slack or email integration.
-
-**Does it work with Shopify, WordPress, Wix, Squarespace and Webflow?** Yes. They all publish standard XML sitemaps.
-
-**How big can a site be?** Up to 1,000,000 URLs per site per run (`maxUrlsPerSite`), and 500 sitemap files by default (`maxSitemaps`). The default cap is 1,000 URLs per site so a first run stays inexpensive.
+**Can I watch a site for new pages?** Schedule the Actor with **Only URLs modified since** set to a recent date. Only URLs whose sitemap entry has a `lastmod` date are kept when that filter is on.
 
 **What happens if I leave the start URLs empty?** The run does not start. Add at least one website or sitemap URL.
 
 ## Other tools from this developer
 
-- [Bulk DNS & Email Auth Checker](https://apify.com/looped_kite/bulk-dns-email-auth-checker) — SPF, DKIM, DMARC, MX, and a 0–100 email-auth score.
-- [Bulk Domain Availability Checker](https://apify.com/looped_kite/bulk-domain-availability-checker) — DNS plus official RDAP registry checks.
-- [Domain Checkup Report](https://apify.com/looped_kite/domain-checkup-report) — registration, DNS, safety, for-sale signals, and a 0–100 score.
+- [Pre-Send Lead List Checker](https://apify.com/looped_kite/bulk-dns-email-auth-checker) - DMARC, SPF, DKIM and MX checks for lead lists.
+- [Startup Name Availability Checker](https://apify.com/looped_kite/bulk-domain-availability-checker) - DNS plus official RDAP registry checks.
+- [Domain Due Diligence Report](https://apify.com/looped_kite/domain-checkup-report) - registration, DNS, safety, for-sale signals, and a 0-100 score.
+
+## Permissions
+
+This Actor needs only limited permissions: it reads its input and writes to its own default dataset.

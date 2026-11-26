@@ -1,6 +1,6 @@
 {
   "actorOutputSchemaVersion": 1,
-  "title": "Sitemap URL Extractor - All Page URLs from Any Website output",
+  "title": "Sitemap URL Extractor for SEO & AI Audits output",
   "properties": {
     "results": {
       "type": "string",

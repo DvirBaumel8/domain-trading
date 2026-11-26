@@ -1,17 +1,21 @@
 {
-  "title": "Sitemap URL Extractor input",
+  "title": "Sitemap URL Extractor for SEO & AI Audits input",
   "type": "object",
   "schemaVersion": 1,
-  "description": "Add one or more website home pages or direct sitemap URLs, then click Start. The Actor discovers sitemaps, follows indexes, and returns page URLs. You are charged per URL kept, so set Max URLs per site if you only need a sample.",
+  "description": "Add one or more website addresses or direct sitemap URLs, then click Start. The Actor finds the sitemaps, follows indexes and returns one row per page URL. You are charged per URL kept, so set Max URLs per site if you only need a sample.",
   "properties": {
     "startUrls": {
       "title": "Websites or sitemap URLs",
       "type": "array",
-      "description": "Required. Home pages (sitemaps are discovered from robots.txt and common paths such as /sitemap.xml) or a direct sitemap.xml, sitemap index, or .xml.gz URL. One per line.",
+      "description": "Required. One per line: a website address (the sitemap is found through robots.txt, then common paths such as /sitemap.xml) or a direct sitemap, sitemap index or .xml.gz URL. Each line is processed as its own site. If a site has no sitemap, a warning is logged and nothing is charged for it.",
       "editor": "stringList",
       "prefill": [
         "https://apify.com",
         "https://docs.apify.com/sitemap.xml"
+      ],
+      "example": [
+        "https://example.com",
+        "https://example.com/sitemap.xml"
       ]
     },
     "maxUrlsPerSite": {
@@ -19,7 +23,7 @@
       "sectionDescription": "Use these to cap cost and keep only the URLs you need. Filters run before results are saved, so dropped URLs are not charged.",
       "title": "Max URLs per site",
       "type": "integer",
-      "description": "Stop after this many page URLs per start website. The default of 1,000 keeps a first run cheap on very large sites. Raise it if you need a full sitemap; the maximum is 1,000,000.",
+      "description": "Stop after this many page URLs per start URL. Whole number from 1 to 1,000,000, default 1,000. Raise it to get a full sitemap.",
       "default": 1000,
       "minimum": 1,
       "maximum": 1000000
@@ -27,31 +31,34 @@
     "includeRegex": {
       "title": "Include only URLs matching (regex)",
       "type": "string",
-      "description": "Optional. Keep only URLs that match this regular expression, for example /blog/ or /products/.",
-      "editor": "textfield"
+      "description": "Optional. A Python regular expression; only URLs that contain a match (re.search) are kept. Leave empty to keep all. An invalid expression stops the run with a message.",
+      "editor": "textfield",
+      "example": "/blog/"
     },
     "excludeRegex": {
       "title": "Exclude URLs matching (regex)",
       "type": "string",
-      "description": "Optional. Drop URLs that match this regular expression, for example /tag/|/author/.",
-      "editor": "textfield"
+      "description": "Optional. A Python regular expression; URLs that contain a match (re.search) are dropped. Applied together with the include filter. An invalid expression stops the run with a message.",
+      "editor": "textfield",
+      "example": "/tag/|/author/"
     },
     "modifiedSince": {
       "title": "Only URLs modified since (YYYY-MM-DD)",
       "type": "string",
-      "description": "Optional. Keeps URLs whose lastmod is on or after this date. URLs with no lastmod are dropped when this is set.",
-      "editor": "textfield"
+      "description": "Optional. A date as YYYY-MM-DD. Keeps URLs whose lastmod date is on or after it; URLs with no lastmod are dropped when this is set. Leave empty for no date filter.",
+      "editor": "textfield",
+      "example": "2024-01-01"
     },
     "checkStatus": {
       "title": "Check HTTP status of each URL",
       "type": "boolean",
-      "description": "Send a light HEAD/GET request to every kept URL to record status codes and redirects. This is slower and uses more compute; leave off unless you need it.",
+      "description": "When on, sends a light HEAD request (GET if HEAD is refused) to every kept URL and fills statusCode and finalUrl. Slower, so leave it off unless you need it. Default off.",
       "default": false
     },
     "maxSitemaps": {
       "title": "Max sitemap files per site",
       "type": "integer",
-      "description": "Safety cap on how many nested sitemap files are read for one start website.",
+      "description": "Safety cap on how many sitemap files are read for one start URL. Whole number from 1 to 10000, default 500.",
       "default": 500,
       "minimum": 1,
       "maximum": 10000

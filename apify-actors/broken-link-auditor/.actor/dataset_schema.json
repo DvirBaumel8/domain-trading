@@ -4,53 +4,63 @@
     "type": "object",
     "properties": {
       "url": {
-        "type": "string"
+        "type": "string",
+        "description": "The URL that was checked (the one you supplied, or the one found in the sitemap or crawl)."
       },
       "category": {
         "type": "string",
-        "description": "ok, redirect, 4xx, 5xx, error or robots_blocked"
+        "description": "Result class: ok (final answer below 400, no redirect), redirect (one or more redirects, final answer below 400), 4xx, 5xx, error (no answer, or a redirect loop) or robots_blocked (skipped because robots.txt disallows it)."
       },
       "statusCode": {
         "type": [
           "integer",
           "null"
-        ]
+        ],
+        "description": "HTTP status code of the final response, or null if there was no HTTP answer."
       },
       "finalUrl": {
         "type": [
           "string",
           "null"
-        ]
+        ],
+        "description": "The URL where the redirects ended (the URL itself if there was no redirect), or null if the check was skipped."
       },
       "redirectChain": {
-        "type": "array"
+        "type": "array",
+        "description": "One entry per redirect hop, in order, as {status, url}: url is the address that answered with the redirect status. Empty if there was no redirect."
       },
       "redirectLoop": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "true if the redirects loop or exceed 10 hops."
       },
       "error": {
         "type": [
           "string",
           "null"
-        ]
+        ],
+        "description": "Plain reason for a failed check: dns_failure, connection_refused, connection_reset, connect_timeout, tls_error, other, a redirect problem, or \"disallowed by robots.txt\". Null otherwise."
       },
       "responseTimeMs": {
         "type": [
           "integer",
           "null"
-        ]
+        ],
+        "description": "Time in milliseconds for the whole check, including every redirect hop. Null when skipped."
       },
       "contentType": {
         "type": [
           "string",
           "null"
-        ]
+        ],
+        "description": "Content-Type of the final response without parameters (for example text/html), or null."
       },
       "sources": {
-        "type": "array"
+        "type": "array",
+        "description": "Crawl mode only: up to 20 pages that link to this URL, each as {sourceUrl, anchorText}. Empty in list and sitemap mode."
       },
       "checkedAt": {
-        "type": "string"
+        "type": "string",
+        "description": "UTC timestamp of the check (ISO 8601)."
       }
     }
   },
@@ -63,30 +73,46 @@
           "category",
           "statusCode",
           "finalUrl",
+          "redirectChain",
+          "redirectLoop",
+          "error",
           "responseTimeMs",
-          "contentType"
+          "contentType",
+          "sources"
         ]
       },
       "display": {
         "component": "table",
         "properties": {
           "url": {
-            "label": "url"
+            "label": "URL"
           },
           "category": {
-            "label": "category"
+            "label": "Category"
           },
           "statusCode": {
-            "label": "statusCode"
+            "label": "Status"
           },
           "finalUrl": {
-            "label": "finalUrl"
+            "label": "Final URL"
+          },
+          "redirectChain": {
+            "label": "Redirect chain"
+          },
+          "redirectLoop": {
+            "label": "Loop"
+          },
+          "error": {
+            "label": "Error"
           },
           "responseTimeMs": {
-            "label": "responseTimeMs"
+            "label": "Time (ms)"
           },
           "contentType": {
-            "label": "contentType"
+            "label": "Content type"
+          },
+          "sources": {
+            "label": "Linked from"
           }
         }
       }

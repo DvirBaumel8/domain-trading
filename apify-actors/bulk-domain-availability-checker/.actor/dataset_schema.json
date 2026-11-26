@@ -8,119 +8,119 @@
           "string",
           "null"
         ],
-        "description": "Domain checked"
+        "description": "The domain that was checked, lowercase."
       },
       "available": {
         "type": [
           "boolean",
           "null"
         ],
-        "description": "true = not registered, false = registered, null = unknown"
+        "description": "true = not registered, false = registered, null = could not be determined."
       },
       "status": {
         "type": [
           "string",
           "null"
         ],
-        "description": "available | registered | unknown | invalid"
+        "description": "available, registered or unknown."
       },
       "method": {
         "type": [
           "string",
           "null"
         ],
-        "description": "dns or rdap - how the answer was reached"
+        "description": "How the answer was reached: dns (decided by nameservers, or DNS only when the TLD has no RDAP server) or rdap (confirmed by the registry)."
       },
       "hasDns": {
         "type": [
           "boolean",
           "null"
         ],
-        "description": "Domain has nameservers in DNS"
+        "description": "true if the domain has nameservers in DNS, false if not, null if the DNS lookup failed."
       },
       "nameservers": {
         "type": [
           "array",
           "null"
         ],
-        "description": "Nameservers if any"
+        "description": "Nameservers from DNS, lowercase. Empty if none."
       },
       "registrar": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Registrar name (RDAP)"
+        "description": "Registrar name from RDAP. Null unless an RDAP lookup was made for a registered domain."
       },
       "createdDate": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Registration date (RDAP)"
+        "description": "Registration date (YYYY-MM-DD) from RDAP, or null."
       },
       "expiryDate": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Expiry date (RDAP)"
+        "description": "Expiry date (YYYY-MM-DD) from RDAP, or null."
       },
       "domainAgeYears": {
         "type": [
           "number",
           "null"
         ],
-        "description": "Age in years (RDAP)"
+        "description": "Age in years since the registration date, from RDAP, or null."
       },
       "rdapStatus": {
         "type": [
           "array",
           "null"
         ],
-        "description": "EPP status codes (RDAP)"
+        "description": "EPP status codes from RDAP. Empty unless an RDAP lookup was made."
       },
       "keyword": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Source keyword when generated from keywords"
+        "description": "The keyword this name was built from, or null for names you pasted as Domains."
       },
       "tld": {
         "type": [
           "string",
           "null"
         ],
-        "description": "TLD"
+        "description": "The last label of the domain (for example com)."
       },
       "length": {
         "type": [
           "integer",
           "null"
         ],
-        "description": "Length of the name without TLD"
+        "description": "Length of the first label (the name without the TLD)."
       },
       "error": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Error detail when status is unknown/invalid"
+        "description": "Note when the answer is incomplete (for example RDAP inconclusive, or no RDAP server so the result is DNS-only). Null otherwise."
       },
       "checkedAt": {
         "type": [
           "string",
           "null"
         ],
-        "description": "UTC timestamp"
+        "description": "UTC timestamp of the check (ISO 8601)."
       },
       "parkedOrForSale": {
         "type": [
           "string",
           "null"
         ],
-        "description": "Marketplace/parking detected from nameservers (e.g. Afternic, Sedo, Dan.com)"
+        "description": "Parking or marketplace service detected from the nameservers (for example Afternic, Sedo, Dan.com), or null."
       }
     }
   },
@@ -134,10 +134,11 @@
           "status",
           "method",
           "registrar",
-          "parkedOrForSale",
           "createdDate",
           "expiryDate",
           "domainAgeYears",
+          "parkedOrForSale",
+          "keyword",
           "error"
         ]
       },
@@ -145,34 +146,37 @@
         "component": "table",
         "properties": {
           "domain": {
-            "label": "domain"
+            "label": "Domain"
           },
           "available": {
-            "label": "available"
+            "label": "Available"
           },
           "status": {
-            "label": "status"
+            "label": "Status"
           },
           "method": {
-            "label": "method"
+            "label": "Method"
           },
           "registrar": {
-            "label": "registrar"
+            "label": "Registrar"
           },
           "createdDate": {
-            "label": "createdDate"
+            "label": "Created"
           },
           "expiryDate": {
-            "label": "expiryDate"
+            "label": "Expires"
           },
           "domainAgeYears": {
-            "label": "domainAgeYears"
-          },
-          "error": {
-            "label": "error"
+            "label": "Age (yrs)"
           },
           "parkedOrForSale": {
-            "label": "parkedOrForSale"
+            "label": "Parked / for sale"
+          },
+          "keyword": {
+            "label": "Keyword"
+          },
+          "error": {
+            "label": "Note"
           }
         }
       }

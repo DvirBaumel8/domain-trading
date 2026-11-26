@@ -1,6 +1,6 @@
 {
   "actorOutputSchemaVersion": 1,
-  "title": "Bulk DNS & Email Authentication Checker (SPF, DKIM, DMARC, MX) output",
+  "title": "Pre-Send Lead List Checker: DMARC, SPF & MX output",
   "properties": {
     "results": {
       "type": "string",

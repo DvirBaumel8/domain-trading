@@ -4,44 +4,53 @@
     "type": "object",
     "properties": {
       "url": {
-        "type": "string"
+        "type": "string",
+        "description": "The tested page URL (with https:// added if you left it out)."
       },
       "strategy": {
-        "type": "string"
+        "type": "string",
+        "description": "mobile or desktop."
       },
       "status": {
         "type": "string",
-        "description": "ok or error"
+        "description": "ok if the test finished, error if it failed. Error rows are not charged."
       },
       "error": {
         "type": [
           "string",
           "null"
-        ]
+        ],
+        "description": "Plain reason when status is error (for example a bad API key or URL, API not enabled for the key, quota exceeded), otherwise null."
       },
       "scores": {
-        "type": "object"
+        "type": "object",
+        "description": "Lighthouse category scores 0-100 for the categories you selected, keyed by category name (for example {\"performance\": 87}). Empty object on error."
       },
       "labMetrics": {
-        "type": "object"
+        "type": "object",
+        "description": "Lab metrics from Lighthouse: lcpMs, cls, tbtMs, fcpMs, speedIndexMs, ttiMs. A value is null if Lighthouse did not report it. Empty object on error."
       },
       "fieldDataPresent": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "true if Google has real-user (field) data for this exact URL."
       },
       "fieldData": {
         "type": [
           "object",
           "null"
-        ]
+        ],
+        "description": "Real-user Core Web Vitals for this URL, from the Chrome UX Report via PageSpeed Insights: lcpMs, inpMs, cls (each {value, category}) and overallCategory. Null if Google has none for the URL."
       },
       "originFieldData": {
         "type": [
           "object",
           "null"
-        ]
+        ],
+        "description": "The same real-user Core Web Vitals for the whole origin (site), or null if Google has none."
       },
       "checkedAt": {
-        "type": "string"
+        "type": "string",
+        "description": "UTC timestamp of the check (ISO 8601)."
       }
     }
   },
@@ -55,29 +64,41 @@
           "status",
           "scores",
           "labMetrics",
-          "fieldDataPresent"
+          "fieldDataPresent",
+          "fieldData",
+          "originFieldData",
+          "error"
         ]
       },
       "display": {
         "component": "table",
         "properties": {
           "url": {
-            "label": "url"
+            "label": "URL"
           },
           "strategy": {
-            "label": "strategy"
+            "label": "Strategy"
           },
           "status": {
-            "label": "status"
+            "label": "Status"
           },
           "scores": {
-            "label": "scores"
+            "label": "Scores"
           },
           "labMetrics": {
-            "label": "labMetrics"
+            "label": "Lab metrics"
           },
           "fieldDataPresent": {
-            "label": "fieldDataPresent"
+            "label": "Field data"
+          },
+          "fieldData": {
+            "label": "Core Web Vitals (URL)"
+          },
+          "originFieldData": {
+            "label": "Core Web Vitals (origin)"
+          },
+          "error": {
+            "label": "Error"
           }
         }
       }
