@@ -55,6 +55,25 @@ class SiteWording(unittest.TestCase):
             if p.name not in {"site_config.py", "test_site_wording.py"} and "venv" not in p.parts:
                 self.assertNotIn("A.D Gordon", p.read_text(encoding="utf-8"), str(p))
 
+    def test_register_claim_is_qualified_and_no_email_promise(self):
+        import re as _re
+        qual = "where one exists (dentists, orthodontists, chiropractors)"
+        pages = served_pages()
+        for n in ("index.html", "agency.html"):
+            self.assertIn(qual, pages[n], n)
+        for n, text in pages.items():
+            for m in _re.finditer(r"checked against official registers", text):
+                self.assertIn(qual, text[m.start():m.start() + 120], n)
+        assets = {p.name: p.read_text(encoding="utf-8") for p in (SITE / "assets").glob("*.js")}
+        for n, text in {**pages, **assets}.items():
+            for banned in ("Email me my result", "we will send your free result", "will send your free result"):
+                self.assertNotIn(banned.lower(), text.lower(), n)
+        self.assertIn("your email to identify your order", pages["index.html"])
+        self.assertNotIn("your email to deliver it", pages["index.html"] + pages["privacy.html"])
+        from aivis.niches import NICHES
+        self.assertEqual(sorted(k for k, v in NICHES.items() if v.npi_taxonomy),
+                         ["chiropractor", "cosmetic_dentist", "dentist", "orthodontist"])
+
     def test_terms_and_refunds(self):
         pages = served_pages()
         self.assertIn("Tel Aviv have exclusive jurisdiction", pages["terms.html"])
