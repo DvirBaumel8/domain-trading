@@ -3,7 +3,7 @@
 Modes
 - 'free'  : Pollinations (no key, no cost, model memory only). For the free
             self-check and for dry runs. Report is labelled accordingly.
-- 'paid'  : OpenAI / Perplexity / Gemini / Claude with live web search.
+- 'paid'  : OpenAI / Gemini / Claude with live web search.
             NEVER runs unless ALL hold: env AIVIS_ALLOW_PAID=1, the engine's
             API key is in env, and the estimated cost <= the order's cap.
             Every call is charged against a BudgetGuard set to the cap, so a
@@ -24,14 +24,15 @@ from .audit import run_audit
 from . import signals as _signals
 from .niches import NICHES, get_niche
 from .parse import match_name
-from .providers import (REGISTRY, BudgetGuard, Business, MockProvider, PAID_COST_PER_CALL,
-                        PollinationsProvider, ProviderError)
+from . import config
+from .uscities import is_us_place
+from .providers import REGISTRY, BudgetGuard, Business, MockProvider, PollinationsProvider, ProviderError
+
+PAID_ENGINES = config.PAID_ENGINES
+ENV_KEYS = config.ENV_KEYS
+DEFAULT_CAP_USD = config.order_cap_usd()    # 12.00; AIVIS_ORDER_CAP_USD overrides
 
 MIN_ANSWER_SHARE = 0.8          # every engine must reach this share of its expected answers
-PAID_ENGINES = ("openai", "perplexity", "gemini", "claude")
-ENV_KEYS = {"openai": "OPENAI_API_KEY", "perplexity": "PERPLEXITY_API_KEY",
-            "gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
-DEFAULT_CAP_USD = 8.00          # per order; a $149 order leaves > $135 after the cap
 TIERS = {                        # prompts x repeats per engine
     "check": (30, 2),            # $149 report: 60 answers per engine
     "lean": (20, 1),             # cheapest useful run
@@ -42,7 +43,7 @@ TIERS = {                        # prompts x repeats per engine
 US_STATES = frozenset("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY "
                       "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split())   # 50 states + DC
 US_ONLY_MSG = ("This check covers US businesses only. Enter your city as 'City, XX' with a US state code "
-               "(or DC), for example 'Austin, TX'.")
+               "(or DC) for a real US city, for example 'Austin, TX'.")
 
 
 class OrderError(RuntimeError):
@@ -50,9 +51,10 @@ class OrderError(RuntimeError):
 
 
 def city_is_us(city: str) -> bool:
-    """True only for 'City, XX' where XX is one of the 50 US state codes or DC (upper case)."""
-    m = re.fullmatch(r"[^,]+,\s*([A-Z]{2})", (city or "").strip())
-    return bool(m) and m.group(1) in US_STATES
+    """True only for 'City, XX' where XX is a US state code or DC (upper case) and the city is a real
+    US place in that state (offline Census Gazetteer list, case-insensitive; St./Saint, Ft./Fort handled)."""
+    m = re.fullmatch(r"([^,]+),\s*([A-Z]{2})", (city or "").strip())
+    return bool(m) and m.group(2) in US_STATES and is_us_place(m.group(1), m.group(2))
 
 
 def normalize_website(raw) -> str:
@@ -95,7 +97,8 @@ class Order:
         if not self.business_name.strip():
             raise OrderError("business_name is required")
         if not city_is_us(self.city):
-            raise OrderError("city must look like 'Austin, TX' with a US state code or DC (US only)")
+            raise OrderError("city must be a real US place written like 'Austin, TX' (US only; "
+                             f"'{self.city}' is not a US city in that state)")
         try:
             self.website = normalize_website(self.website)
         except ValueError as e:
@@ -111,7 +114,7 @@ class Order:
 
 def estimate_cost(order: Order, engines=None) -> float:
     n, r = TIERS[order.plan]
-    return round(sum(PAID_COST_PER_CALL[e] * n * r for e in (engines or order.engines)), 4)
+    return round(sum(config.cost_per_call(e) * n * r for e in (engines or order.engines)), 4)
 
 
 def paid_readiness(engines) -> dict:
@@ -141,6 +144,25 @@ def build_providers(order: Order, mode: str, cap_usd: float, roster=None, seed=0
         raise OrderError(f"estimated cost ${est:.2f} exceeds the order cap ${cap_usd:.2f}; nothing was called")
     guard = BudgetGuard(cap_usd)
     return [REGISTRY[e](budget=guard, allow_paid=True) for e in order.engines], guard
+
+
+def usage_report(records) -> dict:
+    """Real vendor usage per call plus totals (per engine and overall). Counts and USD only."""
+    calls, per = [], {}
+    for a, _, _ in records:
+        u = a.usage
+        if not u:
+            continue
+        calls.append({"engine": a.provider, "model": a.model, "repeat": a.run, **u})
+        t = per.setdefault(a.provider, {"model": a.model, "calls": 0, "input_tokens": 0, "output_tokens": 0,
+                                        "searches": 0, "cost_usd": 0.0})
+        t["calls"] += 1
+        for k in ("input_tokens", "output_tokens", "searches"):
+            t[k] += u.get(k, 0)
+        t["cost_usd"] = round(t["cost_usd"] + u.get("cost_usd", 0.0), 6)
+    total = {k: sum(t[k] for t in per.values()) for k in ("calls", "input_tokens", "output_tokens", "searches")}
+    total["cost_usd"] = round(sum(t["cost_usd"] for t in per.values()), 6)
+    return {"calls": calls, "by_engine": per, "total": total}
 
 
 def _check_answers(res, order, expected, log):
@@ -193,6 +215,7 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
         names.append(c)
     res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
                     n_prompts=n, repeats=r, seed=seed, signals=site)
+    log["usage"] = usage_report(res.records)
     _check_answers(res, order, n * r, log)
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
@@ -204,7 +227,7 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
             f.write(render(res))
     raw = [{"provider": a.provider, "mode": a.mode, "prompt": a.prompt, "intent": i, "repeat": a.run,
             "text": a.text, "citations": a.citations,
-            "mentions": [[m.raw, m.position, m.roster_name] for m in ms]} for a, ms, i in res.records]
+            "usage": a.usage, "mentions": [[m.raw, m.position, m.roster_name] for m in ms]} for a, ms, i in res.records]
     with open(os.path.join(folder, "answers.json"), "w", encoding="utf-8") as f:
         json.dump(raw, f, indent=1)
     with open(os.path.join(folder, "order-log.json"), "w", encoding="utf-8") as f:

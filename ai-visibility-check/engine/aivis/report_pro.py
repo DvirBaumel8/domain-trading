@@ -89,6 +89,9 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
     date = date or _dt.date.today().isoformat()
     color = "#ef4444" if s.score < 20 else "#f59e0b" if s.score < 50 else "#10b981"
     engines = ", ".join(sorted({f"{p.provider} ({p.mode})" for p in s.providers}))
+    models = sorted({(a.provider, a.model) for a, _, _ in result.records if a.model})
+    models_txt = ("Engines and exact models: " + "; ".join(f"{E(p)} {E(m)}" for p, m in models) +
+                  f"; run date {E(date)}. ") if models else ""
     h = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
          f"<title>{E(brand)} — {E(tlabel)}</title><style>{CSS}</style></head><body><div class='page'>"]
     if sample:
@@ -151,6 +154,6 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
              "assistant; " + ("every business name is checked against official registers (e.g. the US NPI registry). " if reg else
              "business names are listed as named by the AI and are not verified for this trade. ") + "Identical AI "
              "lists repeat in under 1% of runs (SparkToro, Jan 2026), so we report rates, not ranks. We never promise a "
-             "ranking and never use fake reviews. Not affiliated with OpenAI, Google, Perplexity or Anthropic.</div>")
+             "ranking and never use fake reviews. " + models_txt + "Not affiliated with OpenAI, Google or Anthropic.</div>")
     h.append("</div></body></html>")
     return "".join(h)

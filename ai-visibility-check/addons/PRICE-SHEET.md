@@ -5,7 +5,7 @@
 ## A. One-off (pay once)
 | Product | What's in it | Price | Market evidence |
 |---|---|---|---|
-| **AI Visibility Check** (core) | Does ChatGPT, Gemini, Perplexity or Claude recommend you; who they recommend instead; why | **$149** | Rank Prompt $54k MRR; core plan (../05-30-day-plan.md) |
+| **AI Visibility Check** (core) | Does ChatGPT, Gemini or Claude recommend you; who they recommend instead; why | **$149** | Rank Prompt $54k MRR; core plan (../05-30-day-plan.md) |
 | Google Maps Audit | Name/address/phone check, categories, services, description, 4 posts, geo-grid baseline after access | **$149** | localseo.to $239+ one-off ($12k first month) |
 | Listings Audit | 17 directories AI reads: listed / wrong / missing + ordered checklist | **$99** | AI Directories $99–$199 ($181k all-time) |
 | Listings Audit + Done-for-you fixes | + we claim/fix the free listings, re-check after 30 days | **$249** | AI Directories Premium $199; Whitespark packages |
@@ -15,7 +15,7 @@
 ## B. Monthly (cancel anytime)
 | Plan | What's in it | Price | List if bought separately |
 |---|---|---|---|
-| **Visibility** (core) | Monthly AI re-check (same questions, 4 engines), small fixes, listings sync | **$249/mo** | – |
+| **Visibility** (core) | Monthly AI re-check (same questions, 3 engines), small fixes, listings sync | **$249/mo** | – |
 | **Growth** ⭐ | Visibility + Maps monthly (weekly geo-grid, 1 post/week, profile upkeep) + Honest Reviews (requests to every customer, reply drafts, alerts) | **$449/mo** | $249 + $199 + $129 = $577 |
 | **Dominate** | Growth + Content Refresh (4–8 pages or Q&A pages a month, published after your OK) | **$699/mo** | $577 + $299 = $876 |
 | Single add-ons | Maps monthly $199 · Reviews $129 · Content Refresh $299 · Listings sync $49 | – | LocalRank $57–$497; NiceJob $75–$125; GatherUp $99; Bazzly $199 |
@@ -38,7 +38,7 @@ Competing white-label: Ayzeo $149/mo for 3 projects, GeoBuddy $99/mo, Rank Promp
 ## D. Our cost per client (paid from the customer's money, after payment)
 | Item | Cost |
 |---|---|
-| AI check run (4 engines, 20 questions) | about $0.50 cheap mode, up to $8.82 full |
+| AI check run (3 engines, 20 questions) | about $0.50 cheap mode, up to about $9 full (3 engines, high case) |
 | Geo-grid 7×7 × 5 keywords × 4 scans/mo | $0 (Google Places IDs-only) or $0.59 (DataForSEO) |
 | LLM drafting (posts, replies, page copy) | about $1–$5/mo |
 | Email sending | $0 (customer's mailbox) to about $15/mo shared |

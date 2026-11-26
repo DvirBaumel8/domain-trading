@@ -20,7 +20,8 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "engine"))
 from aivis.parse import match_name          # noqa: E402
 from aivis.niches import NICHES, get_niche  # noqa: E402
-from aivis.order import US_STATES, US_ONLY_MSG, normalize_website  # noqa: E402
+from aivis.order import US_STATES, US_ONLY_MSG, normalize_website
+from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS    # noqa: E402
 import html as _html
 
@@ -270,7 +271,7 @@ def clean(d):
     if not biz or niche not in NICHES:
         raise ValueError("Please enter a business name, a US city like 'Austin, TX', and a business type.")
     m = re.fullmatch(r"([^,]{2,40}),\s*([A-Za-z]{2})", city)
-    if not m or m.group(2).upper() not in US_STATES:
+    if not m or m.group(2).upper() not in US_STATES or not is_us_place(m.group(1), m.group(2)):
         raise ValueError(US_ONLY_MSG)
     if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise ValueError("That email doesn't look right.")
