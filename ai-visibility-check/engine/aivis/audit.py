@@ -20,28 +20,33 @@ class AuditResult:
     findings: list
     errors: list
     cost_usd: float
-    has_register: bool = False   # True only if names were checked against an NPI taxonomy or a roster
+    has_register: bool = False   # True only if the niche has an NPI taxonomy (buyer competitors never count)
 
 
 def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeats=3, seed=0,
               signals=None, target_reviews=None, competitor_reviews=None, max_errors=10):
-    has_register = bool(niche.npi_taxonomy) or bool(roster_names)
+    has_register = bool(niche.npi_taxonomy)
     if target not in roster_names:
         roster_names = list(roster_names) + [target]
     prompts = generate_prompts(niche, city, n_prompts, seed)
     records, errors, cost = [], [], 0.0
     for prov in providers:
+        prov_errors, stopped = 0, False
         for p in prompts:
             for r in range(repeats):
                 try:
                     ans = prov.ask(p.text, city=city, run=r)
                 except ProviderError as e:
                     errors.append(f"{prov.name}: {e}")
-                    if len(errors) >= max_errors:
+                    prov_errors += 1
+                    if prov_errors >= max_errors:    # stop this provider entirely
+                        stopped = True
                         break
                     continue
                 cost += ans.cost_usd
                 records.append((ans, find_mentions(ans.text, roster_names, city=city), p.intent))
+            if stopped:
+                break
     sc = score_audit(target, records)
     findings = build_findings(sc, niche, signals, target_reviews, competitor_reviews)
     return AuditResult(niche, city, target, prompts, records, sc, findings, errors, cost, has_register)
@@ -52,7 +57,7 @@ def result_from_saved(niche, city, target, raw_answers, roster_names):
     from .providers.base import Answer
     from .prompts import Prompt
     names = list(roster_names)
-    has_register = bool(niche.npi_taxonomy) or bool(names)
+    has_register = bool(niche.npi_taxonomy)
     if target not in names:
         names.append(target)
     records = []

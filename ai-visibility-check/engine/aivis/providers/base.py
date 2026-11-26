@@ -40,3 +40,7 @@ class BudgetGuard:
             raise ProviderError(f"budget cap ${self.max_usd:.2f} would be exceeded "
                                 f"(spent ${self.spent:.4f}, next ${usd:.4f})")
         self.spent += usd
+
+    def refund(self, usd: float):
+        """Give back a charge for a call that failed."""
+        self.spent = max(0.0, self.spent - usd)
