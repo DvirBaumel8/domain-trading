@@ -1,9 +1,9 @@
 # AI Visibility Check: agency report bundles (CR-133)
 
-Contract for the bots. Behind the env flag **`AIVIS_AGENCY`**: only the exact value `1` turns it on (read at request time; unset or anything else = off). **Nothing is for sale**: no Polar product id is set, no Polar product exists, the flag is off. With the flag off every route below answers 404 and `agency.html` is unchanged. This does not touch the domain-trading API (`endpoints.md`): the contract version stays 7.3.1.
+Contract for the bots. Behind the env flag **`AIVIS_AGENCY`**: only the exact value `1` turns it on (read at request time; unset or anything else = off). **Nothing is for sale** until the product variables below are set and the flag is on. With the flag off every route below answers 404 and `agency.html` is unchanged. This does not touch the domain-trading API (`endpoints.md`): the contract version stays 7.3.1.
 
 ## Product map
-`ai-visibility-check/site/products.py`: `AGENCY_BUNDLE_PRICES_USD` = {1: 59, 5: 245, 10: 475, 25: 1075} (proposed list prices, whole USD) and `AGENCY_PRODUCT_IDS` = {1: "", 5: "", 10: "", 25: ""} (empty = not for sale). The product id decides how many reports a bundle holds; nothing in the payload (quantity, amount above the price) can raise it. The site's pricing section reads the prices from this map. Buy buttons appear only for a non-empty `AGENCY_PAY_LINKS` URL (config.js keys `payLinkAgency1|5|10|25`).
+`ai-visibility-check/site/products.py`: `AGENCY_BUNDLE_PRICES_USD` = {1: 59, 5: 245, 10: 475, 25: 1075} (proposed list prices, whole USD) (the one place prices live). Product ids and checkout links are not in the repo: they are read from the environment at request time (see Environment). A size with no valid id is not for sale. The product id decides how many reports a bundle holds; nothing in the payload (quantity, amount above the price) can raise it. The site's pricing section reads the prices from this map. Buy buttons appear only for a valid link, with the flag on (config.js keys `payLinkAgency1|5|10|25`).
 
 ## Payments (`site/polar_adapter.py`, `site/agency.py`)
 - Only the adapter knows Polar's shape (`verify`, `parse`): the rest sees `{kind, ref, email, product_ids, paid_cents, one_time}`. A second provider later = one new adapter file.
@@ -34,3 +34,10 @@ Two modes. **Agency-branded**: name, logo, colour, contact line, optional "Prepa
 ## Environment
 `AIVIS_AGENCY`, `AIVIS_PACK_DAILY_CAP_USD`; the existing `AIVIS_AUTORUN`, `AIVIS_ALLOW_PAID`, `AIVIS_ORDER_CAP_USD`, `POLAR_WEBHOOK_SECRET`. The agency feature needs `pillow` and `fpdf2` (`ai-visibility-check/requirements.txt`) installed by the build.
 The build installs `requirements.txt` (Pillow, fpdf2; pypdf is only for tests).
+
+| Variable | Meaning | Unset or invalid |
+|---|---|---|
+| `AIVIS_AGENCY_PRODUCT_1`, `_5`, `_10`, `_25` | Polar product id of that bundle size: a UUID (case-insensitive, trimmed) | that size is not for sale: the webhook ignores it, no buy button |
+| `AIVIS_AGENCY_LINK_1`, `_5`, `_10`, `_25` | Hosted checkout link: `https://buy.polar.sh/polar_cl_...` only | no buy button for that size |
+
+The webhook matches on the product id only; the amount check (one-time purchase, list price or more) stays. An id repeated for a later size, or equal to an existing product id, is ignored and only a count is logged. Ids and links are never logged or alerted; alerts carry the size only. "Checkout is not connected yet" shows while no product variable is valid.

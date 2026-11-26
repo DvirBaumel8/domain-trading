@@ -195,9 +195,9 @@ class FlagOff(ab.AgencyBase):
         self.assertEqual(body, server.render_page(raw))
         cfg = self.call("GET", "/assets/config.js")[1].decode()
         self.assertNotIn("payLinkAgency", cfg)
-        self.assertEqual({k: u for k, u in products.AGENCY_PRODUCT_IDS.items() if u}, {1: ab.BUNDLE1, 5: ab.BUNDLE5})   # test fixtures only
+        self.assertEqual(products.agency_product_ids(), {1: ab.BUNDLE1, 5: ab.BUNDLE5})   # test fixtures only
         self.assertEqual([p for p in products.PRODUCTS if p in (ab.BUNDLE1, ab.BUNDLE5)], [])
-        self.assertEqual(self.saved_ids, {1: "", 5: "", 10: "", 25: ""})           # shipped with no product ids
+        self.assertEqual({k: v for k, v in self.saved_env.items() if v}, {})       # nothing set in the shipped environment
 
 
 class FlagOn(ab.AgencyBase):
@@ -211,13 +211,13 @@ class FlagOn(ab.AgencyBase):
             self.assertNotIn(gone, html)
         self.assertEqual(html.count('class="amt"'), 4)
         self.assertNotIn('data-pay="payLinkAgency', html)                 # no URL, no button
-        with mock.patch.dict(products.AGENCY_PAY_LINKS, {"payLinkAgency5": "https://buy.polar.sh/test-link"}):
-            self.assertIn('data-pay="payLinkAgency5" href="https://buy.polar.sh/test-link"', self.call("GET", "/agency.html")[1].decode())
+        with mock.patch.dict(os.environ, {"AIVIS_AGENCY_LINK_5": "https://buy.polar.sh/polar_cl_testlink"}):
+            self.assertIn('data-pay="payLinkAgency5" href="https://buy.polar.sh/polar_cl_testlink"', self.call("GET", "/agency.html")[1].decode())
             self.assertIn('"payLinkAgency5"', self.call("GET", "/assets/config.js")[1].decode())
 
     def test_checkout_sentence_depends_on_product_ids(self):
         self.assertNotIn("Checkout is not connected yet", self.call("GET", "/agency.html")[1].decode())    # fixtures set ids
-        with mock.patch.dict(products.AGENCY_PRODUCT_IDS, {1: "", 5: "", 10: "", 25: ""}):
+        with mock.patch.dict(os.environ, {"AIVIS_AGENCY_PRODUCT_1": "", "AIVIS_AGENCY_PRODUCT_5": ""}):
             self.assertIn("Checkout is not connected yet", self.call("GET", "/agency.html")[1].decode())
 
     def test_3_banned_words_on_every_served_agency_page(self):

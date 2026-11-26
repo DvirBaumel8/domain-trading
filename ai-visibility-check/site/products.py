@@ -8,7 +8,7 @@ Order types: base | maps | listings_check | listings | content | bundle.
 Only `base` and `bundle` may reach the paid-run path (delivery.on_paid, behind its own gate).
 maps / listings_check / listings / content are delivered by hand: no engine is ever called for them.
 """
-import datetime, os, re
+import datetime, os, re, sys
 
 MANUAL_DELIVERY_BUSINESS_DAYS = 3        # Mon-Fri; inside the 5 business days promised in refunds.html
 
@@ -70,10 +70,10 @@ ADDON_PAY_KEYS = ("payLinkMaps", "payLinkListingsCheck", "payLinkListings", "pay
 # Agency report bundles (CR-133). Behind AIVIS_AGENCY: only the exact value '1' turns the feature on.
 # N reports -> proposed list price in whole USD (not live: no Polar product ids exist and the flag is off).
 AGENCY_BUNDLE_PRICES_USD = {1: 59, 5: 245, 10: 475, 25: 1075}
-# N reports -> Polar product id. EMPTY = not for sale. The four ids come later; none is invented here.
-AGENCY_PRODUCT_IDS = {1: "", 5: "", 10: "", 25: ""}
+AGENCY_SIZES = (1, 5, 10, 25)
 AGENCY_PAY_KEYS = {"payLinkAgency1": 1, "payLinkAgency5": 5, "payLinkAgency10": 10, "payLinkAgency25": 25}
-AGENCY_PAY_LINKS = {"payLinkAgency1": "", "payLinkAgency5": "", "payLinkAgency10": "", "payLinkAgency25": ""}
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+_LINK = re.compile(r"https://buy\.polar\.sh/polar_cl_[A-Za-z0-9_-]+")
 
 
 def agency_on():
@@ -81,21 +81,47 @@ def agency_on():
     return os.environ.get("AIVIS_AGENCY") == "1"
 
 
+def agency_product_ids():
+    """N -> product id, read from AIVIS_AGENCY_PRODUCT_<N> at request time. Only valid UUIDs count; an id used for an
+    earlier size or equal to a PRODUCTS id is ignored for the later size and only its count is logged (never a value)."""
+    out, ignored = {}, 0
+    for n in AGENCY_SIZES:
+        v = os.environ.get(f"AIVIS_AGENCY_PRODUCT_{n}", "").strip().lower()
+        if not _UUID.fullmatch(v):
+            continue
+        if v in out.values() or v in {k.lower() for k in PRODUCTS}:
+            ignored += 1
+            continue
+        out[n] = v
+    if ignored:
+        print(f"agency: {ignored} duplicate or clashing product setting(s) ignored", file=sys.stderr)
+    return out
+
+
 def agency_bundles():
-    """Product id -> {type: agency_bundle, reports: N, price_usd}, only for ids that are set (empty = not for sale)."""
+    """Product id -> {type: agency_bundle, reports: N, price_usd}, only for sizes whose id is set and valid."""
     return {pid: {"type": "agency_bundle", "name": "Agency report bundle", "reports": n,
                   "price_usd": AGENCY_BUNDLE_PRICES_USD[n], "autorun": False, "manual": ()}
-            for n, pid in AGENCY_PRODUCT_IDS.items() if pid and n in AGENCY_BUNDLE_PRICES_USD}
+            for n, pid in agency_product_ids().items()}
 
 
 def agency_info(product_id):
     """The bundle product for this id, or None (also None while the flag is off)."""
-    return agency_bundles().get(product_id) if agency_on() else None
+    if not agency_on() or not isinstance(product_id, str):
+        return None
+    return agency_bundles().get(product_id.strip().lower())
 
 
 def agency_pay_links():
-    """Bundle checkout URLs to show: only non-empty ones, only with the flag on."""
-    return {k: u for k, u in AGENCY_PAY_LINKS.items() if u} if agency_on() else {}
+    """Bundle checkout URLs to show, from AIVIS_AGENCY_LINK_<N>: only valid ones, only with the flag on."""
+    if not agency_on():
+        return {}
+    out = {}
+    for key, n in AGENCY_PAY_KEYS.items():
+        v = os.environ.get(f"AIVIS_AGENCY_LINK_{n}", "").strip()
+        if _LINK.fullmatch(v):
+            out[key] = v
+    return out
 
 
 def addons_checkout_on():

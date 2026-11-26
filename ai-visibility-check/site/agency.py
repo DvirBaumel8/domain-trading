@@ -95,7 +95,7 @@ def handle_paid(store, ev, info, ref, alert, notify):
     ok = (ev["one_time"] and ev["paid_cents"] is not None and ev["paid_cents"] >= info["price_usd"] * 100
           and bool(ev["email"]))
     if not ok:
-        alert(f"Payment {ref} for an agency bundle needs manual review (not a one-time purchase at list price, "
+        alert(f"Payment {ref} for an agency bundle of {info['reports']} reports needs manual review (not a one-time purchase at list price, "
               "or no purchase email); no bundle was created.")
         notify("held", ref=ref, ptype="agency_bundle")
         return {"status": "held"}

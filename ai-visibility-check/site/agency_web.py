@@ -189,7 +189,7 @@ def bundle_page(raw):
         price = products.AGENCY_BUNDLE_PRICES_USD[n]
         buy = f'<a class="btn" data-pay="{key}" href="{E(links[key])}">Buy</a>' if key in links else ""
         rows.append(f'<tr><td>{n} report{"s" if n != 1 else ""}</td><td class="amt">${price}</td><td>{buy}</td></tr>')
-    closed = "" if any(products.AGENCY_PRODUCT_IDS.values()) else " Checkout is not connected yet."
+    closed = "" if products.agency_product_ids() else " Checkout is not connected yet."
     section = ('<section id="pricing"><div class="wrap"><h2>Report bundles</h2>'
                '<p class="sub">Buy a bundle, then run each report for one of your clients, under your brand or unbranded. US clients only.</p>'
                '<table class="sheet"><tr><th>Bundle</th><th>You pay</th><th></th></tr>' + "".join(rows) + "</table>"

@@ -9,7 +9,8 @@ import server, delivery, products, agency  # noqa: E402
 from aivis.jobs import JobFailed  # noqa: E402
 
 fake_apis, sign = ta.fake_apis, ta.sign
-BUNDLE5, BUNDLE1 = "test-bundle-five-0001", "test-bundle-one-0001"      # test-only product ids
+BUNDLE5, BUNDLE1 = "00000000-0000-4000-8000-000000000005", "00000000-0000-4000-8000-000000000001"   # test-only product ids, set through the environment
+AGENCY_ENV = [f"AIVIS_AGENCY_{w}_{n}" for w in ("PRODUCT", "LINK") for n in (1, 5, 10, 25)]
 BUYER = "agency.buyer@example.com"
 AGENCY = {"name": "Northwind Digital", "accent": "#1D4ED8", "contact_line": "northwind.example"}
 CLIENT_A = {"business": "Austin Dental Spa", "city": "Austin, TX", "niche": "dentist", "website": "https://example.com"}
@@ -26,8 +27,8 @@ class AgencyBase(ta.Base):
         super().setUp()
         os.environ["AIVIS_AGENCY"] = "1"
         os.environ.pop("AIVIS_PACK_DAILY_CAP_USD", None)
-        self.saved_ids = dict(products.AGENCY_PRODUCT_IDS)
-        products.AGENCY_PRODUCT_IDS.update({1: BUNDLE1, 5: BUNDLE5})
+        self.saved_env = {k: os.environ.pop(k, None) for k in AGENCY_ENV}
+        os.environ["AIVIS_AGENCY_PRODUCT_1"], os.environ["AIVIS_AGENCY_PRODUCT_5"] = BUNDLE1, BUNDLE5
         self.saved_agency = (agency.now, agency.mono)
         agency.now = lambda: self.clock
         agency.reset_limits()
@@ -36,7 +37,10 @@ class AgencyBase(ta.Base):
     def tearDown(self):
         for p in reversed(self.patches):
             p.stop()
-        products.AGENCY_PRODUCT_IDS.clear(); products.AGENCY_PRODUCT_IDS.update(self.saved_ids)
+        for k, v in self.saved_env.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
         agency.now, agency.mono = self.saved_agency
         fake_apis.TARGET.clear(); fake_apis.TARGET.update(self.saved_fake[0])      # other test files rely on the defaults
         fake_apis.POOLS.clear(); fake_apis.POOLS.update(self.saved_fake[1])
