@@ -42,7 +42,7 @@ with the 4 real paid provider classes, talking to a local fake of the OpenAI / P
 12. **Payment email must equal intake email.** handle_polar (server.py:206-216) matches on the Polar customer email only (no custom field/metadata). If the buyer pays with another email the webhook is "unmatched" forever (alert goes to a log only).
 
 ## MINOR
-13. paid.py model names are unverified live (`gpt-5-mini`, `sonar`, `claude-haiku-4-5`; gemini-3.8-flash does exist in Google's pricing page today). First real call may 404. Do one 1-call smoke test per engine before the first real order.
+13. paid.py model ids now come from `engine/aivis/config.py` (consumer-matched plan). Still unverified live: run `python -m aivis smoke` once per engine before the first real order.
 14. Gemini 3.x Google-Search grounding is NOT available on Gemini's free tier through the API (pricing page, Nov 2026), so the gemini engine cannot be tested for free with search.
 15. Report shows "0 local competitors" / empty tables with only a header when nothing verified (report_pro.py:104-107): hide the section or print "none found".
 16. Numbers in the KPI "N of M business names" count every mention, not distinct names (1,190 "names" from 240 answers) - wording should say "mentions".

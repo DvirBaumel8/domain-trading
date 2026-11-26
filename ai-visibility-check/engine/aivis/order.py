@@ -19,16 +19,17 @@ import re
 import zlib
 from dataclasses import dataclass, field, asdict
 
+from . import config as _config
 from .audit import run_audit
 from . import signals as _signals
 from .niches import NICHES, get_niche
-from .providers import (REGISTRY, BudgetGuard, Business, MockProvider, PAID_COST_PER_CALL,
+from .providers import (REGISTRY, BudgetGuard, Business, MockProvider,
                         PollinationsProvider, ProviderError)
 
 PAID_ENGINES = ("openai", "perplexity", "gemini", "claude")
 ENV_KEYS = {"openai": "OPENAI_API_KEY", "perplexity": "PERPLEXITY_API_KEY",
             "gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
-DEFAULT_CAP_USD = 8.00          # per order; a $149 order leaves > $135 after the cap
+DEFAULT_CAP_USD = _config.default_cap_usd()   # 12.00 unless AIVIS_ORDER_CAP_USD; a $149 order leaves > $135
 TIERS = {                        # prompts x repeats per engine
     "check": (30, 2),            # $149 report: 60 answers per engine
     "lean": (20, 1),             # cheapest useful run
@@ -77,7 +78,25 @@ class Order:
 
 def estimate_cost(order: Order, engines=None) -> float:
     n, r = TIERS[order.plan]
-    return round(sum(PAID_COST_PER_CALL[e] * n * r for e in (engines or order.engines)), 4)
+    return round(sum(_config.cost_per_call(e) * n * r for e in (engines or order.engines)), 4)
+
+
+def usage_summary(records) -> dict:
+    """Real vendor usage per call and totals (overall and per engine). No keys, no headers."""
+    calls, by = [], {}
+    for a, _, _ in records:
+        if not a.usage:
+            continue
+        calls.append({"provider": a.provider, "repeat": a.run, **a.usage})
+        t = by.setdefault(a.provider, {"model": a.model, "calls": 0, "input_tokens": 0, "output_tokens": 0,
+                                       "searches": 0, "cost_usd": 0.0})
+        t["calls"] += 1
+        for k in ("input_tokens", "output_tokens", "searches"):
+            t[k] += a.usage.get(k, 0)
+        t["cost_usd"] = round(t["cost_usd"] + a.usage.get("cost_usd", 0.0), 6)
+    total = {k: sum(t[k] for t in by.values()) for k in ("calls", "input_tokens", "output_tokens", "searches")}
+    total["cost_usd"] = round(sum(t["cost_usd"] for t in by.values()), 6)
+    return {"calls": calls, "by_engine": by, "totals": total}
 
 
 def paid_readiness(engines) -> dict:
@@ -136,6 +155,8 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
                 "spent_usd": round(guard.spent if guard else res.cost_usd, 4), "score": res.score.score})
+    if any(a.usage for a, _, _ in res.records):
+        log["usage"] = usage_summary(res.records)
     folder = os.path.join(out_dir, order.order_id)
     os.makedirs(folder, exist_ok=True)
     if render:

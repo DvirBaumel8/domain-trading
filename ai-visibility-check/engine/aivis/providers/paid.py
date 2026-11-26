@@ -1,30 +1,22 @@
-"""Paid providers: written but DISABLED unless an API key is present AND the
-caller passes allow_paid=True with a BudgetGuard. Nothing here has been run.
+"""Paid providers: DISABLED unless an API key is present AND the caller passes
+allow_paid=True with a BudgetGuard. Model ids, thinking level, cost estimates and
+rates live in ../config.py (env overrides allowed); see its dated sources.
 
-Per-call cost estimates (USD), list prices checked Nov 2026; see sources.md:
-- OpenAI Responses API + web_search: measured $0.058/answer with chat-latest
-  (querying.ai, 4 Oct 2026); $10 per 1,000 search calls + tokens.
-- Perplexity Sonar (Agent API): $0.25/$2.50 per M tokens + $2.50 per 1,000
-  web_search calls -> ~ $0.004/answer at ~2k in / 500 out tokens.
-- Gemini 3.x Flash grounding: 5,000 free searches/month, then $14 per 1,000
-  search queries; Flash tokens $0.75/$3.75 per M -> ~ $0.016/answer after the
-  free quota, ~$0.003 inside it (tokens only). Needs a Google AI Studio key
-  (sign-up). Free tier data is used to improve Google products.
-- Claude web search: $10 per 1,000 searches + tokens (Haiku 4.5 $1/$5 per M)
-  -> ~ $0.02/answer.
+Each call records the vendor's real usage (tokens, search count when given, cost
+computed from the config rates) on Answer.usage. Keys and headers are never
+logged or echoed; errors carry only the exception type.
 """
 import json
 import os
 import urllib.request
 
+from .. import config
+from ..config import PAID_COST_PER_CALL  # noqa: F401  (re-exported defaults)
 from .base import Answer, BudgetGuard, Provider, ProviderError
 
-PAID_COST_PER_CALL = {
-    "openai": 0.058,
-    "perplexity": 0.004,
-    "gemini": 0.016,
-    "claude": 0.02,
-}
+
+def _int(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) else 0
 
 
 class _PaidBase(Provider):
@@ -41,9 +33,9 @@ class _PaidBase(Provider):
         if not os.environ.get(self.env_key):
             raise ProviderError(f"{self.name}: env {self.env_key} not set")
         self.budget = budget
-        self.model = model or self.default_model
+        self.model = model or config.model_for(self.name)
         self._open = opener or urllib.request.urlopen
-        self.est_cost_per_call = PAID_COST_PER_CALL[self.name]
+        self.est_cost_per_call = config.cost_per_call(self.name)
 
     def _post(self, url, payload, headers):
         self.budget.charge(self.est_cost_per_call)
@@ -54,57 +46,100 @@ class _PaidBase(Provider):
         except Exception as e:
             raise ProviderError(f"{self.name} call failed: {type(e).__name__}") from None  # never echo headers
 
+    def _usage(self, input_tokens, output_tokens, searches):
+        i, o, s = _int(input_tokens), _int(output_tokens), _int(searches)
+        return {"model": self.model, "input_tokens": i, "output_tokens": o, "searches": s,
+                "cost_usd": config.usage_cost(self.name, i, o, s)}
+
+    def _answer(self, prompt, text, cites, run, usage):
+        return Answer(self.name, self.model, prompt, text, cites, self.mode, self.est_cost_per_call, run, usage)
+
+
+def _output_text(data):
+    """Responses-style output (OpenAI, Perplexity Agent): text, citation urls, count of search items."""
+    text, cites, searches = "", [], 0
+    for item in data.get("output", []) or []:
+        t = item.get("type", "")
+        if t in ("web_search_call", "search_results"):
+            searches += 1
+            for r in item.get("results", []) or []:
+                if r.get("url"):
+                    cites.append(r["url"])
+        for c in item.get("content", []) or []:
+            if c.get("type") == "output_text":
+                text += c.get("text", "")
+                cites += [a.get("url") for a in c.get("annotations", []) or [] if a.get("url")]
+    return text, cites, searches
+
 
 class OpenAIWebSearchProvider(_PaidBase):
-    name, env_key, default_model = "openai", "OPENAI_API_KEY", "gpt-5-mini"
+    name, env_key = "openai", "OPENAI_API_KEY"
 
     def ask(self, prompt, city="", run=0):
         data = self._post("https://api.openai.com/v1/responses", {
             "model": self.model, "input": prompt,
             "tools": [{"type": "web_search", "user_location": {"type": "approximate", "country": "US", "city": city}}],
         }, {"Authorization": "Bearer " + os.environ[self.env_key], "Content-Type": "application/json"})
-        text, cites = "", []
-        for item in data.get("output", []):
-            for c in item.get("content", []) or []:
-                if c.get("type") == "output_text":
-                    text += c.get("text", "")
-                    cites += [a.get("url") for a in c.get("annotations", []) if a.get("url")]
-        return Answer(self.name, self.model, prompt, text, cites, self.mode, self.est_cost_per_call, run)
+        text, cites, searches = _output_text(data)
+        u = data.get("usage") or {}
+        return self._answer(prompt, text, cites, run,
+                            self._usage(u.get("input_tokens"), u.get("output_tokens"), searches))
 
 
 class PerplexityProvider(_PaidBase):
-    name, env_key, default_model = "perplexity", "PERPLEXITY_API_KEY", "sonar"
+    """Agent API (Chat Completions ended 27 Sep 2026). Always sends an explicit model."""
+    name, env_key = "perplexity", "PERPLEXITY_API_KEY"
 
     def ask(self, prompt, city="", run=0):
-        data = self._post("https://api.perplexity.ai/chat/completions", {
-            "model": self.model, "messages": [{"role": "user", "content": prompt}],
+        data = self._post("https://api.perplexity.ai/v1/agent", {
+            "model": self.model, "input": prompt, "tools": [{"type": "web_search"}],
         }, {"Authorization": "Bearer " + os.environ[self.env_key], "Content-Type": "application/json"})
-        text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return Answer(self.name, self.model, prompt, text, data.get("citations", []), self.mode,
-                      self.est_cost_per_call, run)
+        text, cites, searches = _output_text(data)
+        for r in data.get("search_results", []) or []:      # top-level list, when the API returns one
+            if isinstance(r, dict) and r.get("url"):
+                cites.append(r["url"])
+        cites = list(dict.fromkeys(cites))
+        if not text:
+            text = data.get("output_text", "") or ""
+        u = data.get("usage") or {}
+        return self._answer(prompt, text, cites, run,
+                            self._usage(u.get("input_tokens"), u.get("output_tokens"), searches))
 
 
 class GeminiGroundedProvider(_PaidBase):
-    name, env_key, default_model = "gemini", "GEMINI_API_KEY", "gemini-3.8-flash"
+    name, env_key = "gemini", "GEMINI_API_KEY"
 
     def ask(self, prompt, city="", run=0):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
-        data = self._post(url, {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}]},
-                          {"x-goog-api-key": os.environ[self.env_key], "Content-Type": "application/json"})
+        data = self._post(url, {
+            "contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}],
+            "generationConfig": {"thinkingConfig": {"thinkingLevel": config.gemini_thinking()}},
+        }, {"x-goog-api-key": os.environ[self.env_key], "Content-Type": "application/json"})
         cand = (data.get("candidates") or [{}])[0]
-        text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
-        chunks = cand.get("groundingMetadata", {}).get("groundingChunks", [])
+        meta = cand.get("groundingMetadata") or {}
+        chunks = meta.get("groundingChunks") or []
+        if not chunks and not meta.get("webSearchQueries"):
+            raise ProviderError("gemini: Google Search grounding did not run. Operator: use a paid-tier "
+                                "AI Studio key (free-tier keys get no grounding); answer discarded")
+        text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []) if not p.get("thought"))
         cites = [c.get("web", {}).get("uri") for c in chunks if c.get("web")]
-        return Answer(self.name, self.model, prompt, text, cites, self.mode, self.est_cost_per_call, run)
+        u = data.get("usageMetadata") or {}
+        out = _int(u.get("candidatesTokenCount")) + _int(u.get("thoughtsTokenCount"))   # thinking is billed as output
+        return self._answer(prompt, text, cites, run,
+                            self._usage(u.get("promptTokenCount"), out, len(meta.get("webSearchQueries") or [])))
 
 
 class ClaudeWebSearchProvider(_PaidBase):
-    name, env_key, default_model = "claude", "ANTHROPIC_API_KEY", "claude-haiku-4-5"
+    name, env_key = "claude", "ANTHROPIC_API_KEY"
 
     def ask(self, prompt, city="", run=0):
+        tool = {"type": "web_search_20250305", "name": "web_search", "max_uses": 2}
+        parts = [x.strip() for x in (city or "").split(",")]
+        if len(parts) == 2 and parts[0] and parts[1]:
+            tool["user_location"] = {"type": "approximate", "city": parts[0], "region": parts[1], "country": "US"}
         data = self._post("https://api.anthropic.com/v1/messages", {
             "model": self.model, "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}],
-            "tools": [{"type": "web_search_20250305", "name": "web_search", "max_uses": 2}],
+            "tools": [tool],
         }, {"x-api-key": os.environ[self.env_key], "anthropic-version": "2023-06-01",
             "content-type": "application/json"})
         text, cites = "", []
@@ -112,4 +147,7 @@ class ClaudeWebSearchProvider(_PaidBase):
             if block.get("type") == "text":
                 text += block.get("text", "")
                 cites += [c.get("url") for c in block.get("citations", []) or [] if c.get("url")]
-        return Answer(self.name, self.model, prompt, text, cites, self.mode, self.est_cost_per_call, run)
+        u = data.get("usage") or {}
+        searches = (u.get("server_tool_use") or {}).get("web_search_requests")
+        return self._answer(prompt, text, cites, run,
+                            self._usage(u.get("input_tokens"), u.get("output_tokens"), searches))

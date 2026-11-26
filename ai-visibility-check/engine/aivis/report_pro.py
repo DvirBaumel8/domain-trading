@@ -125,7 +125,9 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
         h.append(f"<li><b>{E(f.reason)}</b><br>{E(f.fix)}<br><span class='sub'>Evidence: {E(f.evidence)}</span><br><span class='{cls}'>{E(GRADE_LABEL[f.grade])}</span>"
                  f"<span class='tag'>effort: {E(f.effort)}</span></li>")
     h.append("</ol>")
-    h.append("<div class='foot'><b>Method.</b> Fixed set of real customer questions for this trade and city, asked to each "
+    models = sorted({(a.provider, a.model) for a, _, _ in result.records if a.model})
+    mline = ("Models: " + "; ".join(f"{p} {m}" for p, m in models) + f". Run date {date}. ") if models else ""
+    h.append("<div class='foot'><b>Method.</b> " + E(mline) + "Fixed set of real customer questions for this trade and city, asked to each "
              "assistant; " + ("every business name is checked against official registers (e.g. the US NPI registry). " if reg else
              "names are not checked against an official register for this trade. ") + "Identical AI "
              "lists repeat in under 1% of runs (SparkToro, Jan 2026), so we report rates, not ranks. We never promise a "
