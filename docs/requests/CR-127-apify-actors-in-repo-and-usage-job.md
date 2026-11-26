@@ -64,3 +64,13 @@ CR-128 has the code backlog from Gavriel's audit.
 - Add a small script, `apify-actors/tools/sync-store-meta.py`, run from Dvir's machine right after each `apify push`. It reads the text keys from each `.actor/actor.json` and does `PUT /v2/actors/{id}` with only those fields. Then it reads them back with GET and fails if any differ. It must never print the token.
 - Add an offline test with a recorded fixture: the script sends only the allowed text keys, and never touches prices, the pricing model or visibility.
 - The release checklist in each `CHANGELOG.md` says: push, then sync-store-meta, then check the Store page.
+
+## Update 26 Nov 2026, 11:30 IST
+
+**Repo visibility.** Dvir wants all his repos private (26 Nov, 11:26, via Gavriel). The source import into `docs/requests/apify-import/` waits until Gavriel confirms that `domain-trading` is private and Render still deploys. Do not import before then.
+
+**Prices change; never hard-code them** (Dvir is moving the actors to tiered prices now).
+1. No price, per-1,000 figure or tier value may appear in code, config, READMEs or tests, except as recorded-fixture input.
+2. `usage-report.py` reads prices live from the Apify API every run, including tiered prices (`eventTieredPricingUsd`, every tier).
+3. Today `price_map` takes the last `pricingInfos` entry. A scheduled price change can add an entry that starts in the future. The report must show the entry in effect now (latest `startedAt` at or before the run time) as the current price, and list any later entry separately as `pending` with its start time.
+4. Tests (offline, recorded fixtures): flat price; tiered price with all tiers; a future-dated entry is reported as pending, not as current; no prices are hard-coded in the source (a check that fails on a literal USD price).
