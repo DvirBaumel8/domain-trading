@@ -342,9 +342,19 @@ class IdempotencyTests(Base):
 class BuyButtonTests(unittest.TestCase):
     SITE = os.path.join(HERE, "..", "site")
 
+    def setUp(self):
+        self.saved_env = os.environ.get("ADDONS_CHECKOUT")
+        os.environ["ADDONS_CHECKOUT"] = "on"     # URL/button assertions below describe the flag-on site
+        self.addCleanup(self.restore_env)
+
+    def restore_env(self):
+        os.environ.pop("ADDONS_CHECKOUT", None)
+        if self.saved_env is not None:
+            os.environ["ADDONS_CHECKOUT"] = self.saved_env
+
     def config(self):
-        raw = open(os.path.join(self.SITE, "assets", "config.js"), encoding="utf-8").read()
-        return dict(re.findall(r'(payLink\w+):\s*"([^"]*)"', raw))
+        raw = server.config_js().decode()
+        return dict(re.findall(r'"(payLink\w+)":\s*"([^"]*)"', raw))
 
     def test_checkout_urls_exact(self):
         cfg = self.config()
