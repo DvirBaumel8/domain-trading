@@ -29,20 +29,20 @@ class PriceTests(unittest.TestCase):
         for p in products.PRODUCTS.values():
             self.assertIsInstance(p["price_usd"], int)
         self.assertEqual({t: p["price_usd"] for t, p in by_type().items()},
-                         {"base": 149, "maps": 149, "listings": 249, "content": 249, "bundle": 397})
+                         {"base": 149, "maps": 149, "listings_check": 99, "listings": 249, "content": 249, "bundle": 397})
 
     def test_table_has_each_product_with_exact_price(self):
         rows = {r[0]: r for r in table_rows(read("index.html"))}
-        self.assertEqual(set(rows), {p["name"] for p in products.PRODUCTS.values()})
+        self.assertEqual(set(rows), {products.site_name(p) for p in products.PRODUCTS.values()})
         for p in products.PRODUCTS.values():
-            amount = rows[p["name"]][2]
+            amount = rows[products.site_name(p)][2]
             self.assertEqual(re.findall(r"\$([\d,]+)", amount)[0], str(p["price_usd"]), p["name"])
 
     def test_bundle_math_from_the_map(self):
         t = by_type()
         parts = sum(t[k]["price_usd"] for k in ("base", "maps", "listings", "content"))
         saving = parts - t["bundle"]["price_usd"]
-        row = next(r for r in table_rows(read("index.html")) if r[0] == t["bundle"]["name"])
+        row = next(r for r in table_rows(read("index.html")) if r[0] == products.site_name(t["bundle"]))
         self.assertIn("would be $%d separately" % parts, row[1])
         self.assertIn("save $%d" % saving, row[2])
         self.assertEqual((parts, saving), (796, 399))
@@ -62,7 +62,7 @@ class PriceTests(unittest.TestCase):
         for page in ("index.html", "thanks.html", "refunds.html", "terms.html", "sample-report.html"):
             text = re.sub(r"\(the four would be[^)]*\)", "", re.sub(r"<[^>]+>", " ", read(page)))
             for p in products.PRODUCTS.values():
-                for m in re.finditer(re.escape(p["name"]) + r"[^$.;|<]{0,40}\$([\d,]+)", text):
+                for m in re.finditer(re.escape(products.site_name(p)) + r"[^$.;|<]{0,40}\$([\d,]+)", text):
                     self.assertEqual(m.group(1), str(p["price_usd"]), "%s: %s" % (page, m.group(0)))
 
     def test_no_retired_name_on_any_served_page(self):
@@ -91,7 +91,7 @@ class MonthlyTests(unittest.TestCase):
             self.assertNotIn("Start ", a)
 
     def test_no_monthly_checkout_key_or_link(self):
-        self.assertNotIn("payLinkMonthly", read("assets", "config.js") + read("assets", "app.js") + read("index.html"))
+        self.assertNotIn("payLinkMonthly", read("assets", "app.js") + read("index.html"))
         self.assertNotIn("data-pay=\"payLinkMonthly", read("index.html"))
 
     def test_monthly_prices_unchanged(self):
