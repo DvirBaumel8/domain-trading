@@ -44,8 +44,8 @@ class RegisterWording(unittest.TestCase):
         self.assertTrue(res.has_register)
         self.assertIn("official register", render(res))
 
-    def test_roster_counts_as_register(self):
-        self.assertTrue(_audit(NO_REG_NICHE, ["Alpha Group"]).has_register)
+    def test_roster_does_not_count_as_register(self):
+        self.assertFalse(_audit(NO_REG_NICHE, ["Alpha Group"]).has_register)
 
 
 class SiteFindings(unittest.TestCase):

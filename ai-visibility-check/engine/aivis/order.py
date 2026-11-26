@@ -16,15 +16,18 @@ import datetime as _dt
 import json
 import os
 import re
+import sys
 import zlib
 from dataclasses import dataclass, field, asdict
 
 from .audit import run_audit
 from . import signals as _signals
 from .niches import NICHES, get_niche
+from .parse import match_name
 from .providers import (REGISTRY, BudgetGuard, Business, MockProvider, PAID_COST_PER_CALL,
                         PollinationsProvider, ProviderError)
 
+MIN_ANSWER_SHARE = 0.8          # every engine must reach this share of its expected answers
 PAID_ENGINES = ("openai", "perplexity", "gemini", "claude")
 ENV_KEYS = {"openai": "OPENAI_API_KEY", "perplexity": "PERPLEXITY_API_KEY",
             "gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
@@ -140,6 +143,21 @@ def build_providers(order: Order, mode: str, cap_usd: float, roster=None, seed=0
     return [REGISTRY[e](budget=guard, allow_paid=True) for e in order.engines], guard
 
 
+def _check_answers(res, order, expected, log):
+    """No report from a subset: every engine must reach MIN_ANSWER_SHARE of its expected answers."""
+    got = {}
+    for ans, _, _ in res.records:
+        got[ans.provider] = got.get(ans.provider, 0) + 1
+    if res.score.total_answers == 0:
+        raise OrderError(f"order {order.order_id}: no AI answers at all ({len(res.errors)} errors); no report written")
+    if log["mode"] != "paid":
+        return
+    for e in order.engines:
+        if got.get(e, 0) < MIN_ANSWER_SHARE * expected:
+            raise OrderError(f"order {order.order_id}: engine {e} returned {got.get(e, 0)} of {expected} expected "
+                             f"answers (minimum {MIN_ANSWER_SHARE:.0%}); no report written")
+
+
 def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD, roster=None,
               out_dir="orders", seed=0, render=None, dry_run=False, providers=None,
               unpaid_override=False):
@@ -157,15 +175,25 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
     guard = None
     if providers is None:
         providers, guard = build_providers(order, mode, cap_usd, roster, seed)
-    site = _signals.fetch_and_analyze(order.website, order.city) if order.website.strip() else None
+    site = None
+    if order.website.strip():
+        url = order.website.strip()
+        if not re.match(r"https?://", url, re.I):
+            url = "https://" + url
+        site = _signals.fetch_and_analyze(url, order.city)
+        if getattr(site, "error", ""):
+            log["site_error"] = site.error
+            print(f"[operator] order {order.order_id}: website check failed ({site.error}); "
+                  f"site findings skipped", file=sys.stderr)
     names = list(roster or [])
-    low = {x.lower() for x in names}
     for c in order.competitors:         # competitors the buyer watches are tracked by name
-        if c.strip() and c.strip().lower() not in low:
-            names.append(c.strip())
-            low.add(c.strip().lower())
+        c = c.strip()
+        if not c or match_name(c, [order.business_name], city=order.city) or match_name(c, names, city=order.city):
+            continue                    # empty, the target itself, or already tracked
+        names.append(c)
     res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
                     n_prompts=n, repeats=r, seed=seed, signals=site)
+    _check_answers(res, order, n * r, log)
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
                 "spent_usd": round(guard.spent if guard else res.cost_usd, 4), "score": res.score.score})

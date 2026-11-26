@@ -68,7 +68,23 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
             if not m.verified:
                 unv.append(m.raw)
     total_named = sum(len(ms) for _, ms, _ in result.records)
-    alias = _alias_map(comp_names + unv, target) if anonymize else {}
+    reg = getattr(result, "has_register", False)
+    named = []                    # no-register trades: every name AI gave, unverified included
+    if not reg:
+        cnt, label = {}, {}
+        for ans, ms, _ in result.records:
+            seen = set()
+            for m in ms:
+                if m.roster_name == target:
+                    continue
+                label_name = m.roster_name or m.raw
+                seen.add(label_name.lower())
+                label.setdefault(label_name.lower(), label_name)
+            for k in seen:
+                cnt[k] = cnt.get(k, 0) + 1
+        named = [(label[k], c, c / s.total_answers if s.total_answers else 0.0)
+                 for k, c in sorted(cnt.items(), key=lambda kv: -kv[1])]
+    alias = _alias_map(comp_names + [n for n, _, _ in named] + unv, target) if anonymize else {}
     nm = lambda n: E(alias.get(n, tlabel if n == target else n))
     date = date or _dt.date.today().isoformat()
     color = "#ef4444" if s.score < 20 else "#f59e0b" if s.score < 50 else "#10b981"
@@ -85,15 +101,15 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
                  (" Business names are hidden on this public sample." if anonymize else "") +
                  " A paid report runs the AI assistants you "
                  "choose, on more questions and repeats; its numbers will differ from this sample.</div>")
-    reg = getattr(result, "has_register", False)
     vr = 1 - (len(unv) / total_named) if total_named else 0
-    kpi3 = (f"<div class='kpi'><b>{vr:.0%}</b><span>of named businesses matched an official register</span></div>" if reg else
-            "<div class='kpi'><b>n/a</b><span>no official register to check names against for this trade</span></div>")
+    kpi3 = (f"<div class='kpi'><b>{vr:.0%}</b><span>of business-name mentions matched an official register</span></div>" if reg else
+            "<div class='kpi'><b>n/a</b><span>names for this trade are listed as named by AI, not verified</span></div>")
+    kpi2 = (f"<div class='kpi'><b>{len(comp_names)}</b><span>local competitors named instead</span></div>" if reg else
+            f"<div class='kpi'><b>{len(named)}</b><span>business names named by AI instead (unverified)</span></div>")
     h.append(f"<div class='grid'><div class='gauge' style='--v:{max(s.score,1)};--c:{color}'><div><div>"
              f"<b>{s.score}</b><span>out of 100<br>AI visibility</span></div></div></div><div><div class='kpis'>"
              f"<div class='kpi'><b>{sum(p.target_hits for p in s.providers)}/{s.total_answers}</b><span>answers that named this business</span></div>"
-             f"<div class='kpi'><b>{len(comp_names)}</b><span>local competitors named instead</span></div>"
-             f"{kpi3}</div>"
+             f"{kpi2}{kpi3}</div>"
              f"<p class='sub' style='margin-top:10px'>Engines: {E(engines)}. We report how often you are named across many "
              f"questions, with a 95% range, because AI answers change every time.</p></div></div>")
     h.append("<h2>By AI assistant</h2><table><tr><th>Assistant</th><th>Mode</th><th>Named you</th><th>95% range</th></tr>")
@@ -101,22 +117,28 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
         h.append(f"<tr><td>{E(p.provider)}</td><td>{E(p.mode)}</td><td>{p.target_hits}/{p.answers} ({p.rate:.0%})</td>"
                  f"<td>{p.ci[0]:.0%}–{p.ci[1]:.0%}</td></tr>")
     h.append("</table>")
-    h.append("<h2>Who AI recommends instead</h2><table><tr><th>Business</th><th style='width:45%'>Share of answers</th><th></th></tr>")
-    for n, c, share in s.competitors[:6]:
-        h.append(f"<tr><td>{nm(n)}</td><td><div class='bar'><i style='width:{share*100:.0f}%'></i></div></td><td>{share:.0%}</td></tr>")
-    h.append("</table>")
+    rows = s.competitors if reg else named
+    h.append("<h2>Who AI recommends instead</h2>" if reg else
+             "<h2>Business names AI gave instead (named by AI, not verified)</h2>")
+    if rows:
+        h.append("<table><tr><th>Business</th><th style='width:45%'>Share of answers</th><th></th></tr>")
+        for n, c, share in rows[:6]:
+            h.append(f"<tr><td>{nm(n)}</td><td><div class='bar'><i style='width:{share*100:.0f}%'></i></div></td><td>{share:.0%}</td></tr>")
+        h.append("</table>")
+    else:
+        h.append("<p class='sub'>none found</p>")
     ex = next(((a.prompt, a.provider, [m.roster_name or m.raw for m in ms][:5]) for a, ms, _ in result.records
                if ms and target not in [m.roster_name for m in ms]), None)
     if ex:
         h.append(f"<h2>Example answer</h2><div class='q'>Asked <b>“{E(ex[0])}”</b>, {E(ex[1])} named: "
                  f"{', '.join(nm(n) for n in ex[2])}. <b>Not you.</b></div>")
     if unv and reg:
-        h.append(f"<h2>Names we could not verify</h2><div class='q warn'>{len(unv)} of {total_named} business names in "
+        h.append(f"<h2>Names we could not verify</h2><div class='q warn'>{len(unv)} of {total_named} business-name mentions in "
                  f"these answers did not match any practice in the official register for {E(result.city)}. Some may be "
                  f"real businesses listed under another legal name; others may not exist. Customers asking AI may be "
                  f"sent to them.</div>")
     elif unv:
-        h.append(f"<h2>Names we could not verify</h2><div class='q warn'>{len(unv)} of {total_named} business names in "
+        h.append(f"<h2>Names we could not verify</h2><div class='q warn'>{len(unv)} of {total_named} business-name mentions in "
                  f"these answers: we could not check these names against a register for this trade. Some may be real "
                  f"businesses, others may not exist.</div>")
     h.append("<h2>Likely reasons and what to fix</h2><ol>")
@@ -127,7 +149,7 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
     h.append("</ol>")
     h.append("<div class='foot'><b>Method.</b> Fixed set of real customer questions for this trade and city, asked to each "
              "assistant; " + ("every business name is checked against official registers (e.g. the US NPI registry). " if reg else
-             "names are not checked against an official register for this trade. ") + "Identical AI "
+             "business names are listed as named by the AI and are not verified for this trade. ") + "Identical AI "
              "lists repeat in under 1% of runs (SparkToro, Jan 2026), so we report rates, not ranks. We never promise a "
              "ranking and never use fake reviews. Not affiliated with OpenAI, Google, Perplexity or Anthropic.</div>")
     h.append("</div></body></html>")
