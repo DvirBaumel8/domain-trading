@@ -6,9 +6,9 @@
 <form id="intake" class="card">
  <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
   <div><label>Business name (as customers know it)</label><input name="business" required maxlength="120"></div>
-  <div><label>City, State</label><input name="city" required placeholder="Austin, TX"></div></div>
+  <div><label>City, State (US businesses only; IL is read as Illinois)</label><input name="city" required maxlength="60" pattern="[^,]+,\s*(AK|AL|AR|AZ|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)" title="US businesses only. Use City, XX with a US state code in capitals (or DC), e.g. Austin, TX." placeholder="Austin, TX"></div></div>
  <label>Type of business</label><select name="niche"><option value="dentist">Dentist</option><option value="orthodontist">Orthodontist</option><option value="cosmetic_dentist">Cosmetic dentist</option><option value="personal_injury_lawyer">Personal injury lawyer</option><option value="criminal_defense_lawyer">Criminal defense lawyer</option><option value="family_law_attorney">Family law attorney</option><option value="med_spa">Med spa</option><option value="chiropractor">Chiropractor</option><option value="veterinarian">Veterinarian</option><option value="hvac">HVAC</option><option value="roofing">Roofing</option><option value="plumber">Plumber</option><option value="electrician">Electrician</option><option value="garage_door">Garage door</option><option value="real_estate_agent">Real estate agent</option></select>
- <label>Website</label><input name="website" placeholder="https://">
+ <label>Website</label><input name="website" maxlength="200" placeholder="https://www.example.com">
  <label>Email for the report (use the one you paid with)</label><input name="email" type="email" required>
  <label>Up to 5 competitors you watch (optional, comma separated)</label><input name="competitors">
  <label>Payment reference (from your Polar receipt)</label><input name="paid_ref" maxlength="60">

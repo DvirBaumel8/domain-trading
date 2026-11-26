@@ -247,6 +247,77 @@ class OrderAndPolarTests(Base):
         self.assertEqual(json.loads(self.hook(body, mid="evt-other")[1])["status"], "ignored")
         self.assertEqual(self.sent, [])
 
+    def test_us_only_city_at_intake(self):
+        for city in ("London, UK", "Austin", "Austin, ZZ", "Toronto, ON"):
+            st, b = self.post("/api/intake", {**ORDER, "city": city})
+            self.assertEqual(st, 400, city)
+            self.assertIn("US businesses only", json.loads(b)["error"])
+        for city in ("Washington, DC", "Austin, tx", "Honolulu, HI"):
+            self.assertEqual(self.post("/api/intake", {**ORDER, "city": city})[0], 200, city)
+
+    def test_every_state_code_and_dc_accepted(self):
+        from aivis.order import US_STATES
+        self.assertEqual(len(US_STATES), 51); self.assertIn("DC", US_STATES)
+        for code in sorted(US_STATES):
+            self.assertEqual(server.clean({**ORDER, "city": f"Springfield, {code}"})["city"], f"Springfield, {code}")
+
+    def test_html_pattern_matches_whitelist(self):
+        import re as _re
+        from aivis.order import US_STATES
+        for page in ("index.html", "thanks.html"):
+            t = open(os.path.join(server.HERE, page), encoding="utf-8").read()
+            pat = _re.search(r'name="city"[^>]*pattern="([^"]+)"', t).group(1)
+            self.assertEqual(set(_re.search(r"\(([A-Z|]+)\)", pat).group(1).split("|")), set(US_STATES), page)
+            self.assertIn("maxlength", t)
+            self.assertIn("US businesses only", t)   # visible on the form; 'Tel Aviv, IL' reads as Illinois, US
+
+    def test_website_normalised_at_intake(self):
+        oid = self.order_with(website="drainmasterohio.com")
+        self.assertEqual(self.stored(oid)["website"], "https://drainmasterohio.com")
+        oid = self.order_with(website="http://x.example/a")
+        self.assertEqual(self.stored(oid)["website"], "http://x.example/a")
+        self.assertEqual(self.stored(self.order_with(website=""))["website"], "")
+
+    def test_invalid_website_rejected(self):
+        for w in ("not a url", "ftp://x.com", "localhost", "http://", "a b.com"):
+            st, b = self.post("/api/intake", {**ORDER, "website": w})
+            self.assertEqual(st, 400, w); self.assertIn("website", json.loads(b)["error"])
+
+    def order_with(self, **kw):
+        st, b = self.post("/api/intake", {**ORDER, **kw})
+        self.assertEqual(st, 200, b)
+        return json.loads(b)["order_id"]
+
+    def test_metadata_match_beats_email(self):
+        a = self.order("a@x.co"); b = self.order("b@x.co")
+        body = json.dumps({"type": "order.paid", "data": {"id": "pol_m", "metadata": {"order_id": b},
+                                                         "customer": {"email": "a@x.co"}}}).encode()
+        self.assertEqual(json.loads(self.hook(body, mid="evt-mb")[1])["order_id"], b)
+        self.assertTrue(self.stored(b)["paid"]); self.assertFalse(self.stored(a)["paid"])
+
+    def test_email_match_case_insensitive_and_trimmed(self):
+        oid = self.order("  Mixed@Case.CO ")
+        body = json.dumps({"type": "order.paid", "data": {"id": "pol_c", "customer": {"email": " MIXED@case.co  "}}}).encode()
+        self.assertEqual(json.loads(self.hook(body, mid="evt-ci")[1])["order_id"], oid)
+        self.assertTrue(self.stored(oid)["paid"])
+
+    def test_bad_metadata_falls_back_to_email(self):
+        oid = self.order("fb@x.co")
+        body = json.dumps({"type": "order.paid", "data": {"id": "pol_f", "metadata": {"order_id": "ORD-000000-aaaaaa"},
+                                                         "customer": {"email": "fb@x.co"}}}).encode()
+        self.assertEqual(json.loads(self.hook(body, mid="evt-fb")[1])["order_id"], oid)
+
+    def test_unmatched_payment_alerts_without_email(self):
+        self.sent.clear()
+        body = json.dumps({"type": "order.paid", "data": {"id": "pol_unm", "customer": {"email": "ghost@x.co", "name": "Ghost"},
+                                                         "description": "secret body"}}).encode()
+        self.assertEqual(json.loads(self.hook(body, mid="evt-unm")[1])["status"], "unmatched")
+        self.assertEqual(len(self.sent), 1)
+        txt = json.dumps(self.sent)
+        self.assertIn("pol_unm", txt); self.assertIn("UNMATCHED", txt)
+        for leak in ("ghost", "Ghost", "secret body"):
+            self.assertNotIn(leak, txt)
+
     def test_pages_say_polar_not_paypal(self):
         for p in ("thanks.html", "terms.html", "privacy.html", "index.html"):
             t = open(os.path.join(server.HERE, p), encoding="utf-8").read().lower()

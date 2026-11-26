@@ -36,7 +36,7 @@
  <h2>Free quick check</h2><p class="sub">Tell us your business and city. If we already have data for your trade and city you'll see a result right away; otherwise we run a short free test.</p>
  <form id="checkform">
   <div class="row"><div><label for="business">Business name</label><input id="business" name="business" required maxlength="120" placeholder="Example Family Dental"></div>
-  <div><label for="city">City, State</label><input id="city" name="city" required pattern="[^,]+,\s*[A-Za-z]{2}" placeholder="Austin, TX"></div></div>
+  <div><label for="city">City, State (US businesses only)</label><input id="city" name="city" required pattern="[^,]+,\s*(AK|AL|AR|AZ|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)" maxlength="60" title="US businesses only. Use City, XX with a US state code in capitals (or DC), e.g. Austin, TX." placeholder="Austin, TX"></div></div>
   <div class="row"><div><label for="niche">Type of business</label><select id="niche" name="niche">
    <option value="dentist">Dentist</option><option value="orthodontist">Orthodontist</option><option value="cosmetic_dentist">Cosmetic dentist</option>
    <option value="personal_injury_lawyer">Personal injury lawyer</option><option value="criminal_defense_lawyer">Criminal defense lawyer</option><option value="family_law_attorney">Family law attorney</option>

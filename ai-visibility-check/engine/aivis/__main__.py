@@ -138,6 +138,12 @@ def cmd_order(a):
     from .order import Order, run_order, estimate_cost, DEFAULT_CAP_USD, OrderError
     from .report_pro import render
     o = Order.from_dict(json.load(open(a.intake)))
+    if a.mode == "paid" and not a.dry_run and not o.paid:
+        if not a.allow_unpaid:
+            sys.exit(f"order refused: order {o.order_id} is not marked paid (paid:true). "
+                     "Wait for the Polar payment, or use --allow-unpaid (operator override, logged).")
+        print(f"WARNING: --allow-unpaid override used for order {o.order_id}: paid mode will run on an unpaid order",
+              file=sys.stderr)
     niche = get_niche(o.niche)
     names = []
     if a.roster:
@@ -147,6 +153,7 @@ def cmd_order(a):
         names = [e.name for e in from_nppes(niche.npi_taxonomy, city, state, limit=1000)]
     try:
         res, log = run_order(o, mode=a.mode, cap_usd=a.cap, roster=names, out_dir=a.out, dry_run=a.dry_run,
+                             unpaid_override=bool(a.allow_unpaid and not o.paid),
                              render=lambda r: render(r, sample=(a.mode != "paid"),
                                                      run_note=("Free quick check: one AI model answering from memory, "
                                                                "no web search." if a.mode == "free" else "Simulated data.")))
@@ -195,6 +202,8 @@ def main(argv=None):
     od.add_argument("--cap", type=float, default=8.0, help="max USD this order may spend (paid mode)")
     od.add_argument("--roster", default="", help="CSV of local business names (else NPPES if the niche has one)")
     od.add_argument("--dry-run", action="store_true", help="show plan, cost and key readiness; call nothing")
+    od.add_argument("--allow-unpaid", action="store_true",
+                    help="operator override: run paid mode although the order is not marked paid (logged)")
     od.add_argument("--out", default="orders"); od.set_defaults(fn=cmd_order)
     a = ap.parse_args(argv)
     a.fn(a)

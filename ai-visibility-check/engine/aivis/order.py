@@ -36,8 +36,33 @@ TIERS = {                        # prompts x repeats per engine
 }
 
 
+US_STATES = frozenset("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY "
+                      "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split())   # 50 states + DC
+US_ONLY_MSG = ("This check covers US businesses only. Enter your city as 'City, XX' with a US state code "
+               "(or DC), for example 'Austin, TX'.")
+
+
 class OrderError(RuntimeError):
     pass
+
+
+def city_is_us(city: str) -> bool:
+    """True only for 'City, XX' where XX is one of the 50 US state codes or DC (upper case)."""
+    m = re.fullmatch(r"[^,]+,\s*([A-Z]{2})", (city or "").strip())
+    return bool(m) and m.group(1) in US_STATES
+
+
+def normalize_website(raw) -> str:
+    """'' stays ''. Adds https:// when the scheme is missing. Raises ValueError for obviously invalid values."""
+    w = str(raw or "").strip()
+    if not w:
+        return ""
+    if not re.match(r"[A-Za-z][A-Za-z0-9+.-]*://", w):
+        w = "https://" + w
+    m = re.fullmatch(r"https?://([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)(?::\d{1,5})?(?:[/?#]\S*)?", w)
+    if not m or len(w) > 200:
+        raise ValueError("That website doesn't look right. Enter it like https://www.example.com (or leave it empty).")
+    return w
 
 
 @dataclass
@@ -52,6 +77,8 @@ class Order:
     engines: list = field(default_factory=lambda: list(PAID_ENGINES))
     paid_ref: str = ""           # payment reference (Polar order id), filled by the operator
     competitors: list = field(default_factory=list)
+    paid: bool = False           # set by the Polar webhook (site/server.py); paid mode refuses unless true
+    paid_at: str = ""
 
     @staticmethod
     def from_dict(d):
@@ -64,8 +91,12 @@ class Order:
             raise OrderError("order_id must be 3-40 letters, digits, - or _")
         if not self.business_name.strip():
             raise OrderError("business_name is required")
-        if not re.fullmatch(r"[^,]+,\s*[A-Z]{2}", self.city.strip()):
-            raise OrderError("city must look like 'Austin, TX' (US only)")
+        if not city_is_us(self.city):
+            raise OrderError("city must look like 'Austin, TX' with a US state code or DC (US only)")
+        try:
+            self.website = normalize_website(self.website)
+        except ValueError as e:
+            raise OrderError(str(e))
         if self.niche not in NICHES:
             raise OrderError(f"unknown niche {self.niche!r}; choose one of {sorted(NICHES)}")
         if self.plan not in TIERS:
@@ -110,14 +141,16 @@ def build_providers(order: Order, mode: str, cap_usd: float, roster=None, seed=0
 
 
 def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD, roster=None,
-              out_dir="orders", seed=0, render=None, dry_run=False, providers=None):
+              out_dir="orders", seed=0, render=None, dry_run=False, providers=None,
+              unpaid_override=False):
     """Run one order. Returns (result, log dict). `providers` lets tests inject fakes."""
     order.validate()
     n, r = TIERS["free"] if mode == "free" else TIERS[order.plan]
     est = 0.0 if mode in ("free", "mock") else estimate_cost(order)
     log = {"order_id": order.order_id, "mode": mode, "plan": order.plan, "prompts": n, "repeats": r,
            "engines": order.engines if mode == "paid" else [mode], "estimated_usd": est, "cap_usd": cap_usd,
-           "started": _dt.datetime.now().isoformat(timespec="seconds"), "dry_run": dry_run}
+           "started": _dt.datetime.now().isoformat(timespec="seconds"), "dry_run": dry_run,
+           "paid": bool(order.paid), "unpaid_override": bool(unpaid_override)}
     if dry_run:
         log["readiness"] = paid_readiness(order.engines)
         return None, log
