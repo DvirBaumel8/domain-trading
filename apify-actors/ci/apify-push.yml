@@ -1,0 +1,73 @@
+name: apify-push
+
+# Manual only. Pushes the 3 NEW actors to Apify as PRIVATE, unpublished, unpriced. Never publishes, never sets prices or Store listing.
+# The 4 existing live actors are not allowed here. Each run needs Dvir's OK through Gavriel.
+on:
+  workflow_dispatch:
+    inputs:
+      actor:
+        description: Which new actor to push (private)
+        required: true
+        type: choice
+        options:
+          - wayback-domain-history
+          - broken-link-auditor
+          - bulk-pagespeed-checker
+          - all-new
+
+permissions:
+  contents: read
+
+jobs:
+  push-private:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve actor list (allow-list)
+        env:
+          ACTOR: ${{ inputs.actor }}
+        run: |
+          case "$ACTOR" in
+            wayback-domain-history|broken-link-auditor|bulk-pagespeed-checker) echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
+            all-new) echo "ACTORS=wayback-domain-history broken-link-auditor bulk-pagespeed-checker" >> "$GITHUB_ENV" ;;
+            *) echo "actor not allowed"; exit 1 ;;
+          esac
+      - name: Pytest first (stop if red)
+        run: |
+          pip install pytest
+          for a in $ACTORS; do
+            pip install -r "apify-actors/$a/requirements.txt"
+            (cd "apify-actors/$a" && python -m pytest -q tests)
+          done
+          (cd apify-actors && python -m pytest -q tests)
+      - name: Install Apify CLI
+        run: npm install -g apify-cli
+      - name: apify push (private; the token stays in the environment)
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          for a in $ACTORS; do
+            # Show the CLI output (errors included); redact the token value in case it is ever echoed.
+            if ! out=$(cd "apify-actors/$a" && apify push 2>&1); then
+              printf '%s\n' "$out" | sed "s|$APIFY_TOKEN|***|g"
+              echo "push failed: $a"
+              exit 1
+            fi
+            printf '%s\n' "$out" | sed "s|$APIFY_TOKEN|***|g"
+            echo "pushed $a"
+          done
+      - name: Post-push check (fails if public or priced) and summary
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: python apify-actors/tools/apify_guard.py $ACTORS
+      - name: Keep the DOM-TO-GAVRIEL line
+        uses: actions/upload-artifact@v4
+        with:
+          name: dom-to-gavriel-line
+          path: dom-to-gavriel-line.md

@@ -99,3 +99,10 @@ def test_polite_copies_identical():
     ref = (ROOT / "shared" / "polite.py").read_text()
     for p in ROOT.glob("*/src/polite.py"):
         assert p.read_text() == ref, p
+
+
+@pytest.mark.parametrize("name", ACTORS)
+def test_actor_version_is_major_minor(name):
+    """Apify CLI rejects anything but MAJOR.MINOR (0-99 each), e.g. 0.1.0 fails the push."""
+    version = json.loads((ROOT / name / ".actor" / "actor.json").read_text())["version"]
+    assert re.fullmatch(r"(?:[0-9]|[1-9][0-9])\.(?:[0-9]|[1-9][0-9])", version), f"{name}: version {version!r} is not MAJOR.MINOR"
