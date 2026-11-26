@@ -1,0 +1,33 @@
+# Copy to .github/workflows/avc-tests.yml (see ai-visibility-check/ci/README.md).
+name: avc-tests
+
+on:
+  pull_request:
+    paths: ['ai-visibility-check/**', '.github/workflows/avc-tests.yml']
+  push:
+    branches: [main]
+    paths: ['ai-visibility-check/**', '.github/workflows/avc-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  avc-tests:
+    name: avc-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ai-visibility-check/requirements.txt pytest pytest-socket
+      # Run separately: both folders hold test modules with similar names.
+      # Outbound sockets are blocked; loopback stays open for the local-server tests.
+      - name: Tests (ai-visibility-check/tests)
+        run: python -m pytest -q --disable-socket --allow-hosts=127.0.0.1,localhost ai-visibility-check/tests
+      - name: Tests (ai-visibility-check/engine/tests)
+        run: python -m pytest -q --disable-socket --allow-hosts=127.0.0.1,localhost ai-visibility-check/engine/tests
