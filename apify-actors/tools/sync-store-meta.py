@@ -21,6 +21,7 @@ ACTOR_IDS = {
     "bulk-dns-email-auth-checker": "VnrYq91nbRYrRMmS1",
     "sitemap-url-extractor": "HcsxPAYrb95rOsOrQ",
     "bulk-domain-availability-checker": "mKqSGmlx8krmtqgpU",
+    # TODO(CR-134): add "ai-brand-mention-check" here only after its first private push gives an id. Not pushed yet.
 }
 
 

@@ -1,0 +1,100 @@
+{
+  "title": "AI Brand Mention Check input",
+  "type": "object",
+  "schemaVersion": 1,
+  "required": [
+    "brand"
+  ],
+  "properties": {
+    "brand": {
+      "title": "Brand",
+      "type": "string",
+      "description": "Required. The brand or product name to look for in the answers, 2 to 80 characters, for example Asana.",
+      "editor": "textfield",
+      "minLength": 2,
+      "maxLength": 80,
+      "prefill": "Asana"
+    },
+    "domain": {
+      "title": "Domain",
+      "type": "string",
+      "description": "Optional. The brand's website, for example asana.com. A scheme, www. and any path are removed. It helps to tell the brand from an everyday word and to check cited URLs.",
+      "editor": "textfield",
+      "prefill": "asana.com"
+    },
+    "aliases": {
+      "title": "Aliases",
+      "type": "array",
+      "description": "Optional. Other spellings of the brand, up to 5, each 2 to 80 characters, for example Mail Chimp for Mailchimp. Matched like the brand name.",
+      "editor": "stringList",
+      "default": []
+    },
+    "category": {
+      "title": "Category",
+      "type": "string",
+      "description": "What the brand sells, 3 to 80 characters, for example project management software. Needed unless you give your own questions in Questions.",
+      "editor": "textfield",
+      "minLength": 3,
+      "maxLength": 80,
+      "prefill": "project management software"
+    },
+    "prompts": {
+      "title": "Questions",
+      "type": "array",
+      "description": "Optional. Your own questions (up to 20, each 8 to 300 characters). When given, they are used instead of the generated ones and the question count is ignored.",
+      "editor": "stringList",
+      "default": []
+    },
+    "promptCount": {
+      "title": "Number of questions",
+      "type": "integer",
+      "description": "How many generated buyer-style questions to ask, from 1 to 8. Ignored when you give your own questions. Each question is asked of every engine.",
+      "editor": "number",
+      "minimum": 1,
+      "maximum": 8,
+      "default": 3,
+      "prefill": 3
+    },
+    "location": {
+      "title": "Location",
+      "type": "string",
+      "description": "Optional. City and country, for example Austin, US. Generated questions then ask for that place, and ChatGPT and Claude receive it as the approximate search location.",
+      "editor": "textfield",
+      "maxLength": 80,
+      "default": ""
+    },
+    "engines": {
+      "title": "Engines",
+      "type": "array",
+      "description": "Which AI engines to ask: chatgpt, gemini, claude. Choose at least one. Default: all three. Each question and engine gives one result row.",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": [
+          "chatgpt",
+          "gemini",
+          "claude"
+        ]
+      },
+      "default": [
+        "chatgpt",
+        "gemini",
+        "claude"
+      ],
+      "prefill": [
+        "chatgpt",
+        "gemini",
+        "claude"
+      ]
+    },
+    "includeAnswerText": {
+      "title": "Include answer text",
+      "type": "boolean",
+      "description": "Put the full answer of the engine in each result row (the answerText field). Turn it off for smaller exports. Default: on.",
+      "editor": "checkbox",
+      "default": true,
+      "prefill": true
+    }
+  },
+  "description": "Enter your brand, its website and what it sells, then click Start. The Actor asks ChatGPT, Gemini and Claude buyer-style questions with web search on and tells you where the brand is named. It is a sample on small, low-cost models, not a view of the consumer apps."
+}

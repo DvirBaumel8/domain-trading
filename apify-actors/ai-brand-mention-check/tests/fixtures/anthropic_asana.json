@@ -1,0 +1,10 @@
+{
+  "id": "msg_fixture_1",
+  "content": [
+    {"type": "server_tool_use", "name": "web_search", "input": {"query": "project management software"}},
+    {"type": "web_search_tool_result", "content": []},
+    {"type": "text", "text": "Popular choices are ", "citations": []},
+    {"type": "text", "text": "**Asana** and **Trello**.", "citations": [{"type": "web_search_result_location", "url": "https://asana.com/", "cited_text": "x"}]}
+  ],
+  "usage": {"input_tokens": 100, "output_tokens": 50, "server_tool_use": {"web_search_requests": 1}}
+}

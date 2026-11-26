@@ -1,6 +1,6 @@
 name: apify-push
 
-# Manual only. Pushes the 3 NEW actors to Apify as PRIVATE, unpublished, unpriced. Never publishes, never sets prices or Store listing.
+# Manual only. Pushes the 4 NEW actors to Apify as PRIVATE, unpublished, unpriced. Never publishes, never sets prices or Store listing.
 # The 4 existing live actors are not allowed here. Each run needs Dvir's OK through Gavriel.
 on:
   workflow_dispatch:
@@ -13,6 +13,7 @@ on:
           - wayback-domain-history
           - broken-link-auditor
           - bulk-pagespeed-checker
+          - ai-brand-mention-check
           - all-new
 
 permissions:
@@ -34,8 +35,8 @@ jobs:
           ACTOR: ${{ inputs.actor }}
         run: |
           case "$ACTOR" in
-            wayback-domain-history|broken-link-auditor|bulk-pagespeed-checker) echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
-            all-new) echo "ACTORS=wayback-domain-history broken-link-auditor bulk-pagespeed-checker" >> "$GITHUB_ENV" ;;
+            wayback-domain-history|broken-link-auditor|bulk-pagespeed-checker|ai-brand-mention-check) echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
+            all-new) echo "ACTORS=wayback-domain-history broken-link-auditor bulk-pagespeed-checker ai-brand-mention-check" >> "$GITHUB_ENV" ;;
             *) echo "actor not allowed"; exit 1 ;;
           esac
       - name: Pytest first (stop if red)
