@@ -1,6 +1,6 @@
 import json,os,sys
 def scaffold(name,title,desc,reqs,dataset_fields,view_fields,input_schema,sample_input):
-    root=f'/workspace/apify-actors/{name}'
+    root=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', name)
     for d in ['.actor','src','tests',f'storage/key_value_stores/default']: os.makedirs(f'{root}/{d}',exist_ok=True)
     actor={"actorSpecification":1,"name":name,"title":title,"description":desc,"version":"0.1","buildTag":"latest",
            "meta":{"templateId":"python-empty"},"input":"./input_schema.json","output":"./output_schema.json",
