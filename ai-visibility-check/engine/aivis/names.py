@@ -18,14 +18,16 @@ REGISTER_OK_NOTE = "Names are checked against the official register (NPI registr
 TOP = 10
 
 
-def aggregate(per_answer, target="", city="", register="none", top=TOP):
+def aggregate(per_answer, target="", city="", register="none", top=TOP, asked=None, min_answers=0):
     """per_answer: one list per answer of (name, matched) with matched True/False/None.
 
     register: 'ok' (a register was checked), 'none' (no register for this type), 'unavailable' (fetch failed).
     Returns the summary dict served to the page. Names are counted once per answer, case-insensitively;
     the user's own business is reported separately, never listed as a name.
     """
-    answers = len(per_answer)
+    answered = len(per_answer)
+    answers = max(asked or 0, answered)      # counts use the questions asked, not only the ones that answered
+    based_on = f"based on {answered} of {answers} answers" if asked and answered < min_answers else ""
     named_in, count, label, matched = 0, {}, {}, {}
     for items in per_answer:
         seen, own = set(), False
@@ -55,22 +57,26 @@ def aggregate(per_answer, target="", city="", register="none", top=TOP):
                      "match": MATCH_YES if m is True else MATCH_NO if m is False else
                      MATCH_UNKNOWN if register == "ok" else ""})
     note = {"ok": REGISTER_OK_NOTE, "none": NO_REGISTER_NOTE, "unavailable": UNAVAILABLE_NOTE}[register]
-    return {"heading": HEADING, "named_in": named_in, "answers": answers, "register": register,
+    return {"heading": HEADING, "named_in": named_in, "answers": answers, "answered": answered,
+            "based_on": based_on, "register": register,
             "register_note": note, "names": rows[:top], "distinct": len(rows),
             "matched_count": sum(1 for r in rows if r["matched"] is True),
             "empty_note": EMPTY_NOTE if not rows else ""}
 
 
-def from_records(records, target, city, register):
+def from_records(records, target, city, register, asked=None, min_answers=0):
     """Build the summary from audit records [(answer, mentions, intent)]."""
     return aggregate([[(m.raw, (m.roster_name is not None) if register == "ok" else None) for m in ms]
-                      for _, ms, _ in records], target, city, register)
+                      for _, ms, _ in records], target, city, register,
+                     asked=asked, min_answers=min_answers)
 
 
 def to_html(summary) -> str:
     """Server-side section (report page). Everything is escaped."""
     E = html.escape
     h = [f"<h2>{E(summary['heading'])}</h2>"]
+    if summary.get("based_on"):
+        h.append(f"<p class='sub'>{E(summary['based_on'])}</p>")
     if summary["answers"]:
         n = summary["named_in"]
         h.append(f"<p>Your business: {'named in %d of %d answers' % (n, summary['answers']) if n else 'not named'}.</p>")

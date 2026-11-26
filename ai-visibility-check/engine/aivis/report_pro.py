@@ -67,7 +67,7 @@ def _vendor(provider):
 
 
 def render(result, sample=False, anonymize=False, brand="AI Visibility Check", target_label=None,
-           run_note="", date=None, register=None, partial_note="") -> str:
+           run_note="", date=None, register=None, partial_note="", names_asked=None, names_min=0) -> str:
     s = result.score
     target = result.target
     tlabel = target_label or target
@@ -141,7 +141,7 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
     else:
         h.append("<p class='sub'>none found</p>")
     if register:                     # the free check lists the names the AI gave (never as competitors)
-        h.append(names_mod.to_html(names_mod.from_records(result.records, target, result.city, register)))
+        h.append(names_mod.to_html(names_mod.from_records(result.records, target, result.city, register, names_asked, names_min)))
     ex = next(((a.prompt, FREE_MODEL if a.provider == "pollinations" else a.provider,
                 [(m.roster_name or m.raw).strip() for m in ms][:5]) for a, ms, _ in result.records
                if ms and target not in [m.roster_name for m in ms]), None)

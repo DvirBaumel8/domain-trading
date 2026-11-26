@@ -6,8 +6,9 @@ without search surfaced 135 unique brands vs 845 in the ChatGPT UI). Use it
 only to smoke-test the pipeline and to show how often models invent
 businesses. Never sell its output as 'what ChatGPT says'.
 
-Failures carry a short reason code (rate_limited, timeout, http_error,
-connection_error, empty_answer, parse_error), never a URL, prompt or body.
+Failures carry a short reason code (rate_limited, timeout, http_<status> such as
+http_403, connection_error, empty_answer, parse_error), never a URL, prompt or body.
+HTTP codes also carry the family category http_error.
 Transient ones are retried a few times with bounded backoff.
 """
 import json
@@ -37,9 +38,10 @@ def pacing_from_env(default=DEFAULT_PACING_S) -> float:
 
 
 class _Transient(Exception):
-    def __init__(self, reason, retry_after=None):
+    def __init__(self, reason, retry_after=None, category=None):
         super().__init__(reason)
         self.reason, self.retry_after = reason, retry_after
+        self.category = category or reason
 
 
 def _retry_after(headers):
@@ -74,8 +76,8 @@ class PollinationsProvider(Provider):
             if e.code == 429:
                 raise _Transient("rate_limited", _retry_after(e.headers))
             if e.code in (408, 425) or e.code >= 500:
-                raise _Transient("http_error", _retry_after(e.headers))
-            raise ProviderError("pollinations: http_error", "http_error")       # permanent: no retry
+                raise _Transient(f"http_{e.code}", _retry_after(e.headers), "http_error")
+            raise ProviderError(f"pollinations: http_{e.code}", f"http_{e.code}", "http_error", permanent=True)  # no retry
         except (socket.timeout, TimeoutError):
             raise _Transient("timeout")
         except urllib.error.URLError as e:
@@ -100,7 +102,7 @@ class PollinationsProvider(Provider):
                 self._sleep(wait)
         q = urllib.parse.quote(prompt + SUFFIX)
         url = f"https://text.pollinations.ai/{q}?model={urllib.parse.quote(self.model)}&seed={run}"
-        start, reason = self._clock(), "error"
+        start, reason, category = self._clock(), "error", "error"
         try:
             for attempt in range(1, self.max_tries + 1):
                 left = self.budget_s - (self._clock() - start)
@@ -110,7 +112,7 @@ class PollinationsProvider(Provider):
                     text = self._once(url, min(self.timeout_s, left))
                     return Answer(self.name, self.model, prompt, text, [], self.mode, 0.0, run)
                 except _Transient as t:
-                    reason = t.reason
+                    reason, category = t.reason, t.category
                     if attempt == self.max_tries:
                         break
                     wait = min(t.retry_after, RETRY_AFTER_CAP_S) if t.retry_after is not None \
@@ -120,4 +122,4 @@ class PollinationsProvider(Provider):
                     self._sleep(wait)
         finally:
             self._last = self._clock()
-        raise ProviderError(f"pollinations: {reason}", reason)
+        raise ProviderError(f"pollinations: {reason}", reason, category)

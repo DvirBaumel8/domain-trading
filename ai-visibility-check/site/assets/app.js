@@ -42,6 +42,7 @@
   function namesHtml(n){
     if (!n) return "";
     let h = `<h4 style="margin:14px 0 4px">${esc(n.heading)}</h4>`;
+    if (n.based_on) h += `<p class="small">${esc(n.based_on)}</p>`;
     if (n.answers) h += `<p class="small">Your business: ${n.named_in ? "named in " + n.named_in + " of " + n.answers + " answers" : "not named"}.</p>`;
     if (n.names && n.names.length) {
       h += "<ul class='small' style='margin:4px 0 4px 18px'>" + n.names.map(x =>

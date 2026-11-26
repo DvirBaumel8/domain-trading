@@ -10,6 +10,9 @@ from .reasons import build_findings
 from .score import score_audit
 
 
+SKIPPED = "skipped_after_permanent_errors"
+
+
 class SpendCapExceeded(RuntimeError):
     """Real vendor usage so far went over the order cap; the run was stopped."""
     def __init__(self, spent, cap):
@@ -37,22 +40,31 @@ class AuditResult:
 
 
 def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeats=3, seed=0,
-              signals=None, target_reviews=None, competitor_reviews=None, max_errors=10, real_cap_usd=None):
+              signals=None, target_reviews=None, competitor_reviews=None, max_errors=10, real_cap_usd=None,
+              fail_fast_after=None):
+    """fail_fast_after: after this many permanent provider errors in the run, remaining questions are not asked
+    and are recorded as ok=False with reason SKIPPED."""
     has_register = bool(niche.npi_taxonomy)
     if target not in roster_names:
         roster_names = list(roster_names) + [target]
     prompts = generate_prompts(niche, city, n_prompts, seed)
     records, errors, cost, real, outcomes = [], [], 0.0, 0.0, []
     for prov in providers:
-        prov_errors, stopped = 0, False
+        prov_errors, stopped, permanent = 0, False, 0
         for pi, p in enumerate(prompts, 1):
             for r in range(repeats):
+                if fail_fast_after and permanent >= fail_fast_after:
+                    outcomes.append({"provider": prov.name, "prompt_no": pi, "run": r, "ok": False,
+                                     "reason": SKIPPED, "category": SKIPPED})
+                    continue
                 try:
                     ans = prov.ask(p.text, city=city, run=r)
                 except ProviderError as e:
                     errors.append(f"{prov.name}: {e}")
                     outcomes.append({"provider": prov.name, "prompt_no": pi, "run": r, "ok": False,
-                                     "reason": getattr(e, "reason", "error")})
+                                     "reason": getattr(e, "reason", "error"),
+                                     "category": getattr(e, "category", getattr(e, "reason", "error"))})
+                    permanent += bool(getattr(e, "permanent", False))
                     prov_errors += 1
                     if prov_errors >= max_errors:    # stop this provider entirely
                         stopped = True

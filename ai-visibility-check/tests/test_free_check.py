@@ -18,6 +18,8 @@ class ScriptedProvider:
     def ask(self, prompt, city="", run=0):
         o = self.outcomes[self.i % len(self.outcomes)]; self.i += 1
         if o.startswith("!"):
+            if o[1:].startswith("http_"):
+                raise ProviderError("pollinations: " + o[1:], o[1:], "http_error", permanent=o[1:] != "http_502")
             raise ProviderError("pollinations: " + o[1:], o[1:])
         return Answer(self.name, "openai", prompt, o, [], self.mode, 0.0, run)
 
@@ -81,6 +83,43 @@ class Degraded(Base):
         r, err = self.free([NAMES] + ["!rate_limited"] * 7)
         self.assertEqual((r["status"], r["answers"], r["reasons"]), ("partial", 1, {"rate_limited": 7}))
         self.assertIn("free_job answers=1/8 rate_limited=7", err)
+
+    def test_1_of_8_names_state_the_real_denominator(self):
+        r, err = self.free([NAMES] + ["!rate_limited"] * 7)
+        n = r["names"]
+        self.assertEqual((n["heading"], n["based_on"], n["answers"]), (HEADING, "based on 1 of 8 answers", 8))
+        self.assertTrue(all(x["answers"] <= 8 for x in n["names"]))
+        page = self.req("GET", r["report"])[1].decode()
+        self.assertIn(HEADING, page)
+        self.assertIn("based on 1 of 8 answers", page)
+        self.assertNotIn("1 of 1", page)
+        self.assertIn("based_on", open(os.path.join(os.path.dirname(HERE), "site", "assets", "app.js")).read())
+
+    def test_complete_run_has_no_based_on(self):
+        r, _ = self.free([NAMES] * 6 + ["!timeout"] * 2)
+        self.assertEqual(r["names"]["based_on"], "")
+        self.assertNotIn("based on", self.req("GET", r["report"])[1].decode())
+
+    def test_summary_line_counts_exact_codes(self):
+        r, err = self.free([NAMES] + ["!http_403"] * 2 + [NAMES] * 5)
+        self.assertIn("free_job answers=6/8 http_403=2", err)
+
+    def test_fail_fast_after_three_permanent_errors(self):
+        r, err = self.free([NAMES, "!http_403", "!http_403", "!http_403", NAMES, NAMES, NAMES, NAMES])
+        self.assertEqual((r["status"], r["answers"]), ("partial", 1))
+        self.assertEqual(r["reasons"], {"http_403": 3, "skipped_after_permanent_errors": 4})
+        self.assertIn("free_job answers=1/8 http_403=3 skipped_after_permanent_errors=4", err)
+
+    def test_fail_fast_all_failed(self):
+        order.PollinationsProvider = lambda: ScriptedProvider(["!http_403"])
+        r, err = self.free(["!http_403"], jid="abcdef12-0001")
+        self.assertEqual((r["status"], r["answers"]), ("failed", 0))
+        self.assertEqual(r["reasons"], {"http_403": 3, "skipped_after_permanent_errors": 5})
+        self.assertIn("free_job answers=0/8 http_403=3 skipped_after_permanent_errors=5", err)
+
+    def test_5xx_and_429_are_not_permanent(self):
+        r, err = self.free(["!rate_limited"] * 3 + ["!http_502"] * 3 + [NAMES] * 2)
+        self.assertEqual(r["reasons"], {"rate_limited": 3, "http_502": 3})
 
     def test_0_of_8_fails_clearly_and_request_is_saved(self):
         server.FREE_RUN = True
