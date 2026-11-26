@@ -256,3 +256,53 @@ def test_env_and_input_keys_never_leak(monkeypatch, caplog):
         raise httpx.ConnectError(f"failed {req.url}")
     _, pushed, statuses = drive(dict(URL_INP), h)
     assert ENV_KEY not in json.dumps(pushed) + " ".join(statuses) + caplog.text
+
+
+def rows_inp(n, **extra):
+    return {"urls": [f"https://ex{i}.com" for i in range(n)], "strategies": ["mobile"], **extra}
+
+
+def test_fallback_run_over_cap_processes_first_50_with_message(monkeypatch, caplog):
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, msg), pushed, statuses) = keys_sent(rows_inp(60))
+    assert ok and len(seen) == 50 and len(pushed) == 50
+    assert "Free runs check up to 50 URL/strategy rows" in msg and "apiKey field to check more" in msg
+    assert ENV_KEY not in msg + json.dumps(pushed) + " ".join(statuses) + caplog.text
+
+
+@pytest.mark.parametrize("n", [1, 50])
+def test_fallback_run_within_cap_has_no_message(monkeypatch, n):
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, msg), pushed, _) = keys_sent(rows_inp(n))
+    assert ok and len(pushed) == n and "Free runs" not in msg
+
+
+def test_blank_input_key_is_fallback_and_capped(monkeypatch):
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, msg), pushed, _) = keys_sent(rows_inp(60, apiKey="  "))
+    assert len(pushed) == 50 and "Free runs" in msg
+
+
+def test_own_key_has_no_cap(monkeypatch, caplog):
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, msg), pushed, statuses) = keys_sent(rows_inp(60, apiKey=SECRET))
+    assert ok and len(pushed) == 60 and set(seen) == {SECRET} and "Free runs" not in msg
+    assert SECRET not in msg + json.dumps(pushed) + " ".join(statuses) + caplog.text
+
+
+def test_cap_env_override_and_bad_values(monkeypatch):
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    monkeypatch.setenv("PAGESPEED_FALLBACK_ROW_CAP", "5")
+    _, ((ok, msg), pushed, _) = keys_sent(rows_inp(8))
+    assert len(pushed) == 5 and "up to 5 URL/strategy rows" in msg
+    monkeypatch.setenv("PAGESPEED_FALLBACK_ROW_CAP", "junk")
+    assert runner.fallback_row_cap() == 50
+    monkeypatch.setenv("PAGESPEED_FALLBACK_ROW_CAP", "0")
+    assert runner.fallback_row_cap() == 50
+
+
+def test_cap_is_not_an_input_field():
+    schema = json.loads((pathlib.Path(__file__).resolve().parents[1] / ".actor/input_schema.json").read_text())
+    assert not any("cap" in k.lower() for k in schema["properties"])

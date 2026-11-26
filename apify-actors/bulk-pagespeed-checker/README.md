@@ -4,7 +4,7 @@ First draft (the text owners rewrite it).
 
 Test many URLs with Google's official PageSpeed Insights API v5 (`runPagespeed`). No scraping.
 
-**Input:** `urls` (required), `strategies` (`mobile`, `desktop`; both by default), `categories` (`performance` by default; optionally `accessibility`, `best-practices`, `seo`), `apiKey` (optional: your own Google API key with the PageSpeed Insights API enabled, kept secret; a default key is used if left empty).
+**Input:** `urls` (required), `strategies` (`mobile`, `desktop`; both by default), `categories` (`performance` by default; optionally `accessibility`, `best-practices`, `seo`), `apiKey` (optional: your own Google API key with the PageSpeed Insights API enabled, kept secret; a default key is used if left empty, limited to 50 URL/strategy rows per run; your own key has no cap).
 
 **Output, one row per URL and strategy:** category scores, lab metrics (LCP, CLS, TBT, FCP, Speed Index, TTI), real-user Core Web Vitals for the page and its origin when Google has them, and whether field data was present.
 

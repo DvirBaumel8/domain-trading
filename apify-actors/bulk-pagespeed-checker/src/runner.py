@@ -12,6 +12,7 @@ from .polite import FetchError, HostLimiter, request
 UA = "BulkPageSpeedChecker/0.1 (Apify actor; polite)"
 INTERVAL, CONCURRENCY = 0.5, 3
 KEY_MISSING = "Add your Google PageSpeed Insights API key in the API key field. The actor needs it to run."
+DEFAULT_FALLBACK_ROW_CAP = 50
 QUOTA_MSG = "Quota exceeded for this API key"
 HTTP_REASONS = {400: "Bad API key or bad URL", 403: "PageSpeed Insights API is not enabled for this API key",
                 429: QUOTA_MSG}
@@ -19,6 +20,15 @@ HTTP_REASONS = {400: "Bad API key or bad URL", 403: "PageSpeed Insights API is n
 
 class QuotaExceeded(ValueError):
     pass
+
+
+def fallback_row_cap() -> int:
+    """Row cap for runs on the server-side key. Env only, never an input field."""
+    try:
+        n = int(os.environ.get("PAGESPEED_FALLBACK_ROW_CAP", "").strip())
+    except ValueError:
+        return DEFAULT_FALLBACK_ROW_CAP
+    return n if n >= 1 else DEFAULT_FALLBACK_ROW_CAP
 
 
 def silence_http_logs() -> None:
@@ -69,12 +79,21 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
         return False, "Add at least one valid URL in the URLs field."
     strategies = core.pick(inp.get("strategies"), ("mobile", "desktop"), ("mobile", "desktop"))
     categories = core.pick(inp.get("categories"), tuple(core.CATEGORY_PARAM), ("performance",))
-    key = (inp.get("apiKey") or "").strip() or os.environ.get("PAGESPEED_API_KEY", "").strip()
+    key = (inp.get("apiKey") or "").strip()
+    using_fallback = not key
+    if using_fallback:
+        key = os.environ.get("PAGESPEED_API_KEY", "").strip()
     if not key:
         return False, KEY_MISSING
+    pairs = [(u, s) for u in urls for s in strategies]
+    cap_note = ""
+    if using_fallback and len(pairs) > (cap := fallback_row_cap()):
+        cap_note = (f" Free runs check up to {cap} URL/strategy rows. {len(pairs) - cap} rows were not checked. "
+                    "Add your own Google PageSpeed API key in the apiKey field to check more.")
+        pairs = pairs[:cap]
     limiter = limiter or HostLimiter(INTERVAL)
     sem = asyncio.Semaphore(CONCURRENCY)
-    await set_status(f"Testing {len(urls) * len(strategies)} pages with your API key at a bounded rate.")
+    await set_status(f"Testing {len(pairs)} pages at a bounded rate.")
     state = {"done": 0, "errors": 0, "stop": False, "quota": False}
 
     async def one(url, strategy):
@@ -88,8 +107,8 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
             state["errors"] += row["status"] != "ok"
             if await push(row, chargeable(row)):
                 state["stop"] = True
-    await asyncio.gather(*(one(u, s) for u in urls for s in strategies))
+    await asyncio.gather(*(one(u, s) for u, s in pairs))
     if state["quota"]:
-        msg = f"Stopped: {QUOTA_MSG} (Google answered 429). {state['done'] - state['errors']} tests finished before it. Check your quota in Google Cloud, then run again."
+        msg = f"Stopped: {QUOTA_MSG} (Google answered 429). {state['done'] - state['errors']} tests finished before it. Check your quota in Google Cloud, then run again.{cap_note}"
         return state["done"] > state["errors"], msg
-    return True, f"Done: {state['done']} tests ({state['errors']} errors, not charged; {invalid} invalid URLs skipped)."
+    return True, f"Done: {state['done']} tests ({state['errors']} errors, not charged; {invalid} invalid URLs skipped).{cap_note}"
