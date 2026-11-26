@@ -24,6 +24,7 @@ from aivis.order import US_STATES, US_ONLY_MSG, normalize_website
 from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS    # noqa: E402
 import delivery                             # noqa: E402
+import cities                               # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -396,6 +397,12 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._json(200, {"ok": True})
         if path == "/robots.txt":
             return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\nDisallow: /r/\nDisallow: /status/\n")
+        r = cities.route(path, self.headers)
+        if r:
+            st, ctype, body = r
+            if st != 200:
+                return self._json(404, {"error": "not found"})
+            return self._send(200, ctype, render_page(body) if ctype.startswith("text/html") else body)
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             return self._json(200, JOBS.get(m.group(1), {"status": "unknown"}))

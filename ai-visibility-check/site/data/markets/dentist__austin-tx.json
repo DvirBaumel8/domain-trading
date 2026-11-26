@@ -334,5 +334,6 @@
  ],
  "competitors": 8,
  "unverified_pct": 88,
- "source_note": "one AI model answering from memory (no web search), 20 questions, 25 Nov 2026."
+ "source_note": "one AI model answering from memory (no web search), 20 questions, 25 Nov 2026.",
+ "data_date": "2026-11-25"
 }
