@@ -52,7 +52,15 @@ def test_guard_allow_list_is_the_three_new():
 
 
 # ---- push workflow (static)
-WF = (ROOT / "ci" / "apify-push.yml").read_text()
+def read_workflow(name):
+    """Installed copy in .github/workflows first, then apify-actors/ci; fail if neither exists."""
+    for p in (ROOT.parent / ".github" / "workflows" / name, ROOT / "ci" / name):
+        if p.is_file():
+            return p.read_text()
+    pytest.fail(f"workflow {name} not found in .github/workflows or apify-actors/ci")
+
+
+WF = read_workflow("apify-push.yml")
 
 
 def test_push_workflow_manual_only():
@@ -73,7 +81,7 @@ def test_push_workflow_never_publishes_or_prices():
 
 
 def test_usage_workflow_shape():
-    wf = (ROOT / "ci" / "apify-usage.yml").read_text()
+    wf = read_workflow("apify-usage.yml")
     assert "cron: '0 6 * * *'" in wf and "workflow_dispatch" in wf and "apify-usage" in wf
 
 
