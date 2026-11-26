@@ -345,7 +345,7 @@ class BuyButtonTests(unittest.TestCase):
         for k, url in URLS.items():
             self.assertEqual(cfg[k], url)
         self.assertEqual(cfg["payLinkCheck"], "https://buy.polar.sh/polar_cl_y4lp8S18BldD0ZyWWdevI07SSgM4eXEwJ6zOI4Fw8mv")
-        self.assertEqual(cfg["payLinkMonthly"], "")
+        self.assertNotIn("payLinkMonthly", cfg)
         for url in re.findall(r"https://buy\.polar\.sh/\S+", open(os.path.join(self.SITE, "index.html"), encoding="utf-8").read()):
             self.fail("hard-coded checkout URL in index.html: " + url)
 

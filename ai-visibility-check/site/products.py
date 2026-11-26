@@ -1,7 +1,8 @@
 """The one map of Polar products: product id -> order type, whether it autoruns, manual parts.
 
-Product ids are public identifiers, not secrets. Checkout URLs live only in site/assets/config.js
-and prices only where the site already shows them.
+Product ids are public identifiers, not secrets. Checkout URLs live only in site/assets/config.js.
+`price_usd` (integer dollars) is the one place prices live: the Dvir-approved Polar prices. The site's
+wording is checked against it in tests/test_addons.py.
 
 Order types: base | maps | listings | content | bundle.
 Only `base` and `bundle` may reach the paid-run path (delivery.on_paid, behind its own gate).
@@ -26,15 +27,15 @@ MANUAL_PARTS = {
 
 PRODUCTS = {
     "5a9d5f7a-72a6-4ea4-8ae7-e9d4ac498fde": {"type": "base", "name": "AI Visibility Check",
-                                             "autorun": True, "manual": ()},
+                                             "price_usd": 149, "autorun": True, "manual": ()},
     "5ee66135-2547-4885-81e3-f24bed392e29": {"type": "maps", "name": MANUAL_PARTS["maps"]["name"],
-                                             "autorun": False, "manual": ("maps",)},
+                                             "price_usd": 149, "autorun": False, "manual": ("maps",)},
     "f6e7aa8b-3886-4280-a584-b771c47f49ab": {"type": "listings", "name": MANUAL_PARTS["listings"]["name"],
-                                             "autorun": False, "manual": ("listings",)},
+                                             "price_usd": 249, "autorun": False, "manual": ("listings",)},
     "10ba0ce6-36ac-4bcf-ab98-8d15bdf22e49": {"type": "content", "name": MANUAL_PARTS["content"]["name"],
-                                             "autorun": False, "manual": ("content",)},
+                                             "price_usd": 249, "autorun": False, "manual": ("content",)},
     "46231531-e36e-4149-aa6c-2d8c59edba87": {"type": "bundle", "name": "AI Visibility Bundle",
-                                             "autorun": True, "manual": ("maps", "listings", "content")},
+                                             "price_usd": 397, "autorun": True, "manual": ("maps", "listings", "content")},
 }
 AUTORUN_TYPES = frozenset(p["type"] for p in PRODUCTS.values() if p["autorun"])
 TYPES = {p["type"]: p for p in PRODUCTS.values()}

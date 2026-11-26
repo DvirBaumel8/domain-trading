@@ -1,5 +1,7 @@
 # Price Sheet — APPROVED 2026-11-25 (25 Nov 2026)
 
+> **Update 26 Nov 2026:** the one-time rows in section A below (names and prices) were superseded by the Polar products: AI Visibility Check $149, Google Maps Visibility Check $149, Listings Consistency Audit $249, AI Content Pack $249, AI Visibility Bundle $397 (the four would be $796 separately; save $399). The old rows are kept below as history. Monthly and agency prices are unchanged.
+
 **Approved by Dvir on 25 Nov 2026** (reply to t1373s6663). These are the live prices for the site. Payment is still collected before any paid API runs ($0 upfront). The chat widget stays dropped (Dvir, t1371u). Checkout is not connected until PayPal links are added.
 
 ## A. One-off (pay once)
@@ -20,7 +22,7 @@
 | **Dominate** | Growth + Content Refresh (4–8 pages or Q&A pages a month, published after your OK) | **$699/mo** | $577 + $299 = $876 |
 | Single add-ons | Maps monthly $199 · Reviews $129 · Content Refresh $299 · Listings sync $49 | – | LocalRank $57–$497; NiceJob $75–$125; GatherUp $99; Bazzly $199 |
 
-First month of Growth or Dominate includes the Fix-It Bundle at no extra cost (cuts setup friction; costs us only compute).
+First month of Growth or Dominate includes the AI Visibility Bundle at no extra cost (cuts setup friction; costs us only compute).
 
 ## C. Agency white-label (wholesale; agency sets its own retail price)
 Reports carry the agency's logo and colors, with no mention of us. Agencies pay per client per month, with no minimum. Discount for 10+ active clients: −15%.

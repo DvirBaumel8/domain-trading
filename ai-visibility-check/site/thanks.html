@@ -19,7 +19,7 @@
 document.getElementById("intake").addEventListener("submit", async e => {
   e.preventDefault(); const f = e.target, m = document.getElementById("msg");
   try { const r = await fetch((window.AIVIS_CONFIG.apiBase||"") + "/api/intake", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(Object.fromEntries(new FormData(f).entries()))});
-    const j = await r.json(); if (!r.ok) throw new Error(j.error); m.innerHTML = "<b>Received.</b> Order " + j.order_id + ". Your report and the due dates of any add-ons appear on <a href='" + (window.AIVIS_CONFIG.apiBase||"") + j.status_url + "'>your private status page</a> Bookmark it.";
+    const j = await r.json(); if (!r.ok) throw new Error(j.error); m.innerHTML = "<b>Received.</b> Order " + j.order_id + ". Your report and the due dates of any add-ons appear on <a href='" + (window.AIVIS_CONFIG.apiBase||"") + j.status_url + "'>your private status page</a>. Bookmark it.";
   } catch(err) { m.textContent = "Preview mode: not connected (" + (err.message||err) + ")."; }
 });
 </script><footer><div class="wrap">
