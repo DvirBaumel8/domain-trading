@@ -1,0 +1,25 @@
+{
+  "actorSpecification": 1,
+  "name": "bulk-dns-email-auth-checker",
+  "title": "Bulk DNS & Email Auth Checker (SPF, DMARC)",
+  "description": "Check SPF, DKIM, DMARC, MX and email provider for thousands of domains in one run. Each domain gets a 0-100 email-auth score, plain-English issues, MTA-STS, BIMI and a parked or for-sale flag. Paste domains, URLs or emails. Public DNS, no API keys. Export CSV, Excel or JSON, or run from the API.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "meta": {
+    "templateId": "python-empty"
+  },
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile",
+  "readme": "../README.md",
+  "minMemoryMbytes": 256,
+  "maxMemoryMbytes": 1024,
+  "defaultRunOptions": {
+    "memoryMbytes": 256
+  },
+  "seoTitle": "Bulk DNS Email Auth Checker (SPF DKIM DMARC)",
+  "seoDescription": "Check SPF, DKIM, DMARC, MX and email provider for thousands of domains. Get a 0-100 email-auth score and plain-English issues. Public DNS, no API keys."
+}

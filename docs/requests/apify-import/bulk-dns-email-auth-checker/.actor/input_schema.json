@@ -1,0 +1,73 @@
+{
+  "title": "Bulk DNS & Email Authentication Checker input",
+  "type": "object",
+  "schemaVersion": 1,
+  "description": "Paste the domains you want to check, then click Start. URLs and email addresses are turned into domains automatically. Each domain is looked up in public DNS only \u2014 the Actor never sends email and needs no API keys.",
+  "properties": {
+    "domains": {
+      "title": "Domains, URLs or emails",
+      "type": "array",
+      "description": "Required. One domain, website URL or email address per line (for example apify.com, https://apify.com or hello@apify.com). Duplicates are ignored.",
+      "editor": "stringList",
+      "prefill": [
+        "apify.com",
+        "google.com",
+        "example.com"
+      ]
+    },
+    "dkimSelectors": {
+      "sectionCaption": "Optional DNS checks",
+      "sectionDescription": "Leave these at the defaults for a first run. Add selectors only if a domain uses a custom DKIM selector.",
+      "title": "DKIM selectors to test",
+      "type": "array",
+      "description": "Host prefixes to query as <selector>._domainkey.<domain>. Common selectors are already included (google, selector1, k1, sendgrid, and others). Add your email provider's selector if a known domain shows no DKIM key.",
+      "editor": "stringList",
+      "default": [
+        "google",
+        "selector1",
+        "selector2",
+        "default",
+        "k1",
+        "k2",
+        "s1",
+        "s2",
+        "mail",
+        "dkim",
+        "smtp",
+        "mandrill",
+        "mxvault",
+        "everlytickey1",
+        "zoho",
+        "sendgrid",
+        "sig1"
+      ]
+    },
+    "includeRecords": {
+      "title": "Include A/AAAA/CAA records",
+      "type": "boolean",
+      "description": "When on, the result also includes IPv4/IPv6 addresses and CAA records for each domain.",
+      "default": true
+    },
+    "concurrency": {
+      "sectionCaption": "Limits",
+      "sectionDescription": "Safety caps for large lists. You can leave these unchanged.",
+      "title": "Concurrency",
+      "type": "integer",
+      "description": "How many domains to look up in parallel. Higher is faster; stay within your plan's limits.",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 30
+    },
+    "maxDomains": {
+      "title": "Max domains per run",
+      "type": "integer",
+      "default": 10000,
+      "minimum": 1,
+      "maximum": 100000,
+      "description": "Safety cap. If the list is longer, only the first N valid domains are checked."
+    }
+  },
+  "required": [
+    "domains"
+  ]
+}

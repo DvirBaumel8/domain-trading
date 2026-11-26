@@ -1,0 +1,25 @@
+{
+  "actorSpecification": 1,
+  "name": "bulk-domain-availability-checker",
+  "title": "Bulk Domain Availability Checker (DNS + RDAP)",
+  "description": "Check thousands of domain names for availability in minutes. DNS pre-check plus official RDAP registry confirmation, names x TLDs, registrar, creation and expiry dates, and a parked or for-sale flag. Paste domains or keywords. Pay per domain returned. Export CSV, Excel or JSON, or run from the API.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "meta": {
+    "templateId": "python-empty"
+  },
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile",
+  "readme": "../README.md",
+  "minMemoryMbytes": 256,
+  "maxMemoryMbytes": 1024,
+  "defaultRunOptions": {
+    "memoryMbytes": 256
+  },
+  "seoTitle": "Bulk Domain Availability Checker (DNS + RDAP)",
+  "seoDescription": "Check thousands of domain names for availability. DNS plus official RDAP confirmation, names x TLDs, registrar, expiry and for-sale flags. No API keys."
+}

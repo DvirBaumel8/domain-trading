@@ -1,0 +1,63 @@
+{
+  "title": "Sitemap URL Extractor input",
+  "type": "object",
+  "schemaVersion": 1,
+  "description": "Add one or more website home pages or direct sitemap URLs, then click Start. The Actor discovers sitemaps, follows indexes, and returns page URLs. You are charged per URL kept, so set Max URLs per site if you only need a sample.",
+  "properties": {
+    "startUrls": {
+      "title": "Websites or sitemap URLs",
+      "type": "array",
+      "description": "Required. Home pages (sitemaps are discovered from robots.txt and common paths such as /sitemap.xml) or a direct sitemap.xml, sitemap index, or .xml.gz URL. One per line.",
+      "editor": "stringList",
+      "prefill": [
+        "https://apify.com",
+        "https://docs.apify.com/sitemap.xml"
+      ]
+    },
+    "maxUrlsPerSite": {
+      "sectionCaption": "Filters and limits",
+      "sectionDescription": "Use these to cap cost and keep only the URLs you need. Filters run before results are saved, so dropped URLs are not charged.",
+      "title": "Max URLs per site",
+      "type": "integer",
+      "description": "Stop after this many page URLs per start website. The default of 1,000 keeps a first run cheap on very large sites. Raise it if you need a full sitemap; the maximum is 1,000,000.",
+      "default": 1000,
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "includeRegex": {
+      "title": "Include only URLs matching (regex)",
+      "type": "string",
+      "description": "Optional. Keep only URLs that match this regular expression, for example /blog/ or /products/.",
+      "editor": "textfield"
+    },
+    "excludeRegex": {
+      "title": "Exclude URLs matching (regex)",
+      "type": "string",
+      "description": "Optional. Drop URLs that match this regular expression, for example /tag/|/author/.",
+      "editor": "textfield"
+    },
+    "modifiedSince": {
+      "title": "Only URLs modified since (YYYY-MM-DD)",
+      "type": "string",
+      "description": "Optional. Keeps URLs whose lastmod is on or after this date. URLs with no lastmod are dropped when this is set.",
+      "editor": "textfield"
+    },
+    "checkStatus": {
+      "title": "Check HTTP status of each URL",
+      "type": "boolean",
+      "description": "Send a light HEAD/GET request to every kept URL to record status codes and redirects. This is slower and uses more compute; leave off unless you need it.",
+      "default": false
+    },
+    "maxSitemaps": {
+      "title": "Max sitemap files per site",
+      "type": "integer",
+      "description": "Safety cap on how many nested sitemap files are read for one start website.",
+      "default": 500,
+      "minimum": 1,
+      "maximum": 10000
+    }
+  },
+  "required": [
+    "startUrls"
+  ]
+}

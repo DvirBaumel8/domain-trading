@@ -1,0 +1,25 @@
+{
+  "actorSpecification": 1,
+  "name": "domain-checkup-report",
+  "title": "Domain Checkup Report: DNS, Safety & Score",
+  "description": "Get a one-row due-diligence report for any domain: registration age, registrar and expiry (RDAP), DNS and provider, parked or for-sale with asking price, SPF/DMARC, Cloudflare Security DNS, a trademark-risk hint, and a 0-100 score. Paste domains, URLs or emails. Export JSON, CSV or Excel.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "meta": {
+    "templateId": "python-empty"
+  },
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile",
+  "readme": "../README.md",
+  "minMemoryMbytes": 256,
+  "maxMemoryMbytes": 1024,
+  "defaultRunOptions": {
+    "memoryMbytes": 256
+  },
+  "seoTitle": "Domain Checkup Report (RDAP, DNS & Score)",
+  "seoDescription": "Due-diligence report for any domain: RDAP registration, DNS, for-sale price, email auth, safety check and a 0-100 score. Public DNS, no API keys."
+}

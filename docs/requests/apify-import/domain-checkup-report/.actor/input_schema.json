@@ -1,0 +1,53 @@
+{
+  "title": "Domain Checkup Report input",
+  "type": "object",
+  "schemaVersion": 1,
+  "description": "Paste the domains you want a report for, then click Start. URLs and email addresses are turned into domains. Invalid lines are skipped and not charged. Each valid domain produces one due-diligence row.",
+  "properties": {
+    "domains": {
+      "title": "Domains",
+      "type": "array",
+      "description": "Required. Domain names (any TLD), website URLs, or email addresses, one per line. Invalid lines are saved to INVALID_INPUTS in the key-value store and are not charged.",
+      "editor": "stringList",
+      "prefill": [
+        "google.com",
+        "mineunited.com",
+        "example.com"
+      ]
+    },
+    "lookupRdap": {
+      "sectionCaption": "What to include",
+      "sectionDescription": "Leave both options on for a full report. Turning one off makes the run faster but the row will have less detail.",
+      "title": "Look up registration details (RDAP)",
+      "type": "boolean",
+      "description": "Query official IANA-listed RDAP registries for creation date, age, registrar and expiry. Lookups are throttled to about 3 requests per second per registry.",
+      "default": true
+    },
+    "fetchLandingPage": {
+      "title": "Inspect landing page (live status, for-sale & price)",
+      "type": "boolean",
+      "description": "When the domain resolves, fetch its HTTP/HTTPS landing page to detect live HTTPS, marketplace redirects, parked pages, and a visible asking price.",
+      "default": true
+    },
+    "maxDomains": {
+      "sectionCaption": "Limits",
+      "title": "Max domains per run",
+      "type": "integer",
+      "description": "Safety cap on how many valid domains are checked in one run.",
+      "default": 500,
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "concurrency": {
+      "title": "Concurrency",
+      "type": "integer",
+      "description": "Parallel DNS and HTTP checks. Registry RDAP queries stay throttled to about 3 per second per registry.",
+      "default": 15,
+      "minimum": 1,
+      "maximum": 30
+    }
+  },
+  "required": [
+    "domains"
+  ]
+}

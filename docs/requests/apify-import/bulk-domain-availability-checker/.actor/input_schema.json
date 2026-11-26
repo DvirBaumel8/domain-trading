@@ -1,0 +1,85 @@
+{
+  "title": "Bulk Domain Availability Checker input",
+  "type": "object",
+  "schemaVersion": 1,
+  "description": "Provide **Domains** and/or **Keywords**. At least one of the two is required. Paste full names (example.com), or type bare names and TLDs and the Actor will build every combination. You are charged only for rows returned.",
+  "properties": {
+    "domains": {
+      "title": "Domains",
+      "type": "array",
+      "description": "Full domain names to check, one per line (for example example.com). URLs and emails are accepted and normalised. Leave this empty if you are using Keywords only.",
+      "editor": "stringList",
+      "prefill": [
+        "apify.com",
+        "quietbluefalcon.com",
+        "example.org"
+      ]
+    },
+    "keywords": {
+      "sectionCaption": "Name generator (optional)",
+      "sectionDescription": "Use this instead of, or as well as, a finished domain list. Each keyword is combined with every TLD, and with any prefixes or suffixes you add.",
+      "title": "Keywords / names",
+      "type": "array",
+      "description": "Names without a TLD (for example rentguitar). Each name is combined with every TLD below. Required if Domains is empty.",
+      "editor": "stringList"
+    },
+    "tlds": {
+      "title": "TLDs for keywords",
+      "type": "array",
+      "description": "TLDs to combine with keywords, without the leading dot. Used only when Keywords are provided. Default if you leave this blank is com.",
+      "editor": "stringList",
+      "default": [
+        "com"
+      ],
+      "prefill": [
+        "com",
+        "net",
+        "org",
+        "io",
+        "ai",
+        "co"
+      ]
+    },
+    "prefixes": {
+      "title": "Prefixes (optional)",
+      "type": "array",
+      "description": "Optional words added before each keyword (for example get, try, my), producing names such as getrentguitar.com.",
+      "editor": "stringList"
+    },
+    "suffixes": {
+      "title": "Suffixes (optional)",
+      "type": "array",
+      "description": "Optional words added after each keyword (for example hq, app, online), producing names such as rentguitarhq.com.",
+      "editor": "stringList"
+    },
+    "onlyAvailable": {
+      "sectionCaption": "Results and limits",
+      "title": "Return only available domains",
+      "type": "boolean",
+      "description": "When on, registered names are omitted from the dataset. You are only charged for rows that are actually returned.",
+      "default": false
+    },
+    "lookupRegistered": {
+      "title": "Registration details for taken domains",
+      "type": "boolean",
+      "description": "Also fetch registrar, creation date and expiry date for registered domains. This is slower because it queries the registry.",
+      "default": false
+    },
+    "maxDomains": {
+      "title": "Max domains per run",
+      "type": "integer",
+      "description": "Safety cap on how many generated or pasted domains are checked in this run.",
+      "default": 5000,
+      "minimum": 1,
+      "maximum": 50000
+    },
+    "concurrency": {
+      "title": "Concurrency",
+      "type": "integer",
+      "description": "Parallel DNS lookups. Registry (RDAP) lookups are always throttled politely, regardless of this value.",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 50
+    }
+  }
+}

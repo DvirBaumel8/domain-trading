@@ -1,0 +1,181 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "domain": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Domain checked"
+      },
+      "available": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "true = not registered, false = registered, null = unknown"
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "available | registered | unknown | invalid"
+      },
+      "method": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "dns or rdap - how the answer was reached"
+      },
+      "hasDns": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Domain has nameservers in DNS"
+      },
+      "nameservers": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "Nameservers if any"
+      },
+      "registrar": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Registrar name (RDAP)"
+      },
+      "createdDate": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Registration date (RDAP)"
+      },
+      "expiryDate": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Expiry date (RDAP)"
+      },
+      "domainAgeYears": {
+        "type": [
+          "number",
+          "null"
+        ],
+        "description": "Age in years (RDAP)"
+      },
+      "rdapStatus": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "EPP status codes (RDAP)"
+      },
+      "keyword": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Source keyword when generated from keywords"
+      },
+      "tld": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "TLD"
+      },
+      "length": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Length of the name without TLD"
+      },
+      "error": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Error detail when status is unknown/invalid"
+      },
+      "checkedAt": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "UTC timestamp"
+      },
+      "parkedOrForSale": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Marketplace/parking detected from nameservers (e.g. Afternic, Sedo, Dan.com)"
+      }
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "domain",
+          "available",
+          "status",
+          "method",
+          "registrar",
+          "parkedOrForSale",
+          "createdDate",
+          "expiryDate",
+          "domainAgeYears",
+          "error"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "domain": {
+            "label": "domain"
+          },
+          "available": {
+            "label": "available"
+          },
+          "status": {
+            "label": "status"
+          },
+          "method": {
+            "label": "method"
+          },
+          "registrar": {
+            "label": "registrar"
+          },
+          "createdDate": {
+            "label": "createdDate"
+          },
+          "expiryDate": {
+            "label": "expiryDate"
+          },
+          "domainAgeYears": {
+            "label": "domainAgeYears"
+          },
+          "error": {
+            "label": "error"
+          },
+          "parkedOrForSale": {
+            "label": "parkedOrForSale"
+          }
+        }
+      }
+    }
+  }
+}

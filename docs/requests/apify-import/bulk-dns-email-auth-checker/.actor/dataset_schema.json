@@ -1,0 +1,212 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "domain": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Domain checked"
+      },
+      "resolves": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Domain exists in DNS"
+      },
+      "a": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "IPv4 addresses"
+      },
+      "aaaa": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "IPv6 addresses"
+      },
+      "ns": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "Nameservers"
+      },
+      "mx": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "MX records {priority, host}"
+      },
+      "emailProvider": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Detected email provider (Google Workspace, Microsoft 365, ...)"
+      },
+      "spf": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "SPF record"
+      },
+      "spfAll": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "SPF 'all' policy: -all, ~all, ?all, +all"
+      },
+      "spfLookups": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Approximate DNS-lookup mechanisms in SPF (limit is 10)"
+      },
+      "dmarc": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "DMARC record"
+      },
+      "dmarcPolicy": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "DMARC p= policy (none/quarantine/reject)"
+      },
+      "dmarcRua": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "DMARC aggregate report address"
+      },
+      "dkimSelectorsFound": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "DKIM selectors found among those tested"
+      },
+      "mtaSts": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "MTA-STS record present"
+      },
+      "bimi": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "BIMI record present"
+      },
+      "caa": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "CAA records"
+      },
+      "parkedOrForSale": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Parking/marketplace detected from nameservers"
+      },
+      "emailScore": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Email authentication score 0-100"
+      },
+      "issues": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "Plain-English problems found"
+      },
+      "error": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Error detail"
+      },
+      "checkedAt": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "UTC timestamp"
+      }
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "domain",
+          "emailProvider",
+          "spfAll",
+          "dmarcPolicy",
+          "dkimSelectorsFound",
+          "emailScore",
+          "issues",
+          "mx",
+          "parkedOrForSale"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "domain": {
+            "label": "domain"
+          },
+          "emailProvider": {
+            "label": "emailProvider"
+          },
+          "spfAll": {
+            "label": "spfAll"
+          },
+          "dmarcPolicy": {
+            "label": "dmarcPolicy"
+          },
+          "dkimSelectorsFound": {
+            "label": "dkimSelectorsFound"
+          },
+          "emailScore": {
+            "label": "emailScore"
+          },
+          "issues": {
+            "label": "issues"
+          },
+          "mx": {
+            "label": "mx"
+          },
+          "parkedOrForSale": {
+            "label": "parkedOrForSale"
+          }
+        }
+      }
+    }
+  }
+}

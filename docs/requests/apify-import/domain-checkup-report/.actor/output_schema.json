@@ -1,0 +1,12 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "Domain Checkup Report output",
+  "properties": {
+    "results": {
+      "type": "string",
+      "title": "Results",
+      "description": "All domain checkup reports in the default dataset",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    }
+  }
+}

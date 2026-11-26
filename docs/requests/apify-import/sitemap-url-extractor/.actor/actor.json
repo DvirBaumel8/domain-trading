@@ -1,0 +1,25 @@
+{
+  "actorSpecification": 1,
+  "name": "sitemap-url-extractor",
+  "title": "Sitemap URL Extractor - All Website URLs",
+  "description": "Extract every page URL from a website's XML sitemaps in seconds. Auto-discovers sitemaps from robots.txt, follows indexes and .gz files, and returns lastmod, priority, hreflang and optional HTTP status. Filter by regex or date. Pay per URL kept. Export CSV, Excel or JSON, or run from the API.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "meta": {
+    "templateId": "python-empty"
+  },
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile",
+  "readme": "../README.md",
+  "minMemoryMbytes": 256,
+  "maxMemoryMbytes": 1024,
+  "defaultRunOptions": {
+    "memoryMbytes": 256
+  },
+  "seoTitle": "XML Sitemap URL Extractor for Any Website",
+  "seoDescription": "Extract every page URL from XML sitemaps. Auto-discovers sitemaps, follows indexes and .gz files, filters by date or regex, optional HTTP status check."
+}

@@ -1,0 +1,120 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Page URL listed in the sitemap"
+      },
+      "lastmod": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Last modification date from the sitemap"
+      },
+      "changefreq": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Change frequency hint"
+      },
+      "priority": {
+        "type": [
+          "number",
+          "null"
+        ],
+        "description": "Priority hint 0.0-1.0"
+      },
+      "imageCount": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Number of image entries for this URL"
+      },
+      "hreflang": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "Alternate language URLs (xhtml:link)"
+      },
+      "sitemapUrl": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Sitemap file the URL came from"
+      },
+      "site": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Input site/start URL"
+      },
+      "statusCode": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "HTTP status of the page (only if status check is on)"
+      },
+      "finalUrl": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "URL after redirects (only if status check is on)"
+      }
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "url",
+          "lastmod",
+          "changefreq",
+          "priority",
+          "statusCode",
+          "sitemapUrl",
+          "site"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "url": {
+            "label": "url"
+          },
+          "lastmod": {
+            "label": "lastmod"
+          },
+          "changefreq": {
+            "label": "changefreq"
+          },
+          "priority": {
+            "label": "priority"
+          },
+          "statusCode": {
+            "label": "statusCode"
+          },
+          "sitemapUrl": {
+            "label": "sitemapUrl"
+          },
+          "site": {
+            "label": "site"
+          }
+        }
+      }
+    }
+  }
+}
