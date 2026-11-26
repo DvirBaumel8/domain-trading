@@ -67,3 +67,7 @@ Buying stays by hand: Dvir approves, Gavriel buys in the browser, a request here
 7. **Never Dvir's email in a file.** DOM took it out of the receipt note.
 
 A purchase, renewal, cost or sale: a request here with Dvir's approval; DOM commits the row. Price drops are by hand (`docs/internal/pricing.md`).
+
+## 2026-11-26 (DOM): CR-129 and CR-127 Part A built, PR #9
+
+PR https://github.com/DvirBaumel8/domain-trading/pull/9 (one commit per actor: wayback-domain-history, broken-link-auditor, bulk-pagespeed-checker, each 0.1.0). CI: GitHub ran no check on the PR; run locally: pytest green for every actor and for the repo-wide contract tests, and `npm test`, `tsc`, `build` green. `check-state` could not run in the shallow clone. **Left:** (1) Dvir installs the two workflow files from `apify-actors/ci/` (the App has no `workflows` permission), so the `apify-actors.yml` CI and the bot text guard are not live yet; (2) no Apify push: no token here and it needs Dvir's machine, so there are no Apify actor ids; (3) READMEs are first drafts for you to rewrite; (4) no prices set; (5) CR-127 Part B not built (waits on Q2). Note for the bots: wayback `totalSnapshots` counts one capture per day, not every raw capture.
