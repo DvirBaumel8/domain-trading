@@ -16,18 +16,22 @@ import datetime as _dt
 import json
 import os
 import re
+import sys
 import zlib
 from dataclasses import dataclass, field, asdict
 
 from .audit import run_audit
 from . import signals as _signals
 from .niches import NICHES, get_niche
+from .parse import match_name
 from . import config
 from .providers import REGISTRY, BudgetGuard, Business, MockProvider, PollinationsProvider, ProviderError
 
 PAID_ENGINES = config.PAID_ENGINES
 ENV_KEYS = config.ENV_KEYS
 DEFAULT_CAP_USD = config.order_cap_usd()    # 12.00; AIVIS_ORDER_CAP_USD overrides
+
+MIN_ANSWER_SHARE = 0.8          # every engine must reach this share of its expected answers
 TIERS = {                        # prompts x repeats per engine
     "check": (30, 2),            # $149 report: 60 answers per engine
     "lean": (20, 1),             # cheapest useful run
@@ -35,8 +39,33 @@ TIERS = {                        # prompts x repeats per engine
 }
 
 
+US_STATES = frozenset("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY "
+                      "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split())   # 50 states + DC
+US_ONLY_MSG = ("This check covers US businesses only. Enter your city as 'City, XX' with a US state code "
+               "(or DC), for example 'Austin, TX'.")
+
+
 class OrderError(RuntimeError):
     pass
+
+
+def city_is_us(city: str) -> bool:
+    """True only for 'City, XX' where XX is one of the 50 US state codes or DC (upper case)."""
+    m = re.fullmatch(r"[^,]+,\s*([A-Z]{2})", (city or "").strip())
+    return bool(m) and m.group(1) in US_STATES
+
+
+def normalize_website(raw) -> str:
+    """'' stays ''. Adds https:// when the scheme is missing. Raises ValueError for obviously invalid values."""
+    w = str(raw or "").strip()
+    if not w:
+        return ""
+    if not re.match(r"[A-Za-z][A-Za-z0-9+.-]*://", w):
+        w = "https://" + w
+    m = re.fullmatch(r"https?://([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)(?::\d{1,5})?(?:[/?#]\S*)?", w)
+    if not m or len(w) > 200:
+        raise ValueError("That website doesn't look right. Enter it like https://www.example.com (or leave it empty).")
+    return w
 
 
 @dataclass
@@ -51,6 +80,8 @@ class Order:
     engines: list = field(default_factory=lambda: list(PAID_ENGINES))
     paid_ref: str = ""           # payment reference (Polar order id), filled by the operator
     competitors: list = field(default_factory=list)
+    paid: bool = False           # set by the Polar webhook (site/server.py); paid mode refuses unless true
+    paid_at: str = ""
 
     @staticmethod
     def from_dict(d):
@@ -63,8 +94,12 @@ class Order:
             raise OrderError("order_id must be 3-40 letters, digits, - or _")
         if not self.business_name.strip():
             raise OrderError("business_name is required")
-        if not re.fullmatch(r"[^,]+,\s*[A-Z]{2}", self.city.strip()):
-            raise OrderError("city must look like 'Austin, TX' (US only)")
+        if not city_is_us(self.city):
+            raise OrderError("city must look like 'Austin, TX' with a US state code or DC (US only)")
+        try:
+            self.website = normalize_website(self.website)
+        except ValueError as e:
+            raise OrderError(str(e))
         if self.niche not in NICHES:
             raise OrderError(f"unknown niche {self.niche!r}; choose one of {sorted(NICHES)}")
         if self.plan not in TIERS:
@@ -127,31 +162,58 @@ def usage_report(records) -> dict:
     return {"calls": calls, "by_engine": per, "total": total}
 
 
+def _check_answers(res, order, expected, log):
+    """No report from a subset: every engine must reach MIN_ANSWER_SHARE of its expected answers."""
+    got = {}
+    for ans, _, _ in res.records:
+        got[ans.provider] = got.get(ans.provider, 0) + 1
+    if res.score.total_answers == 0:
+        raise OrderError(f"order {order.order_id}: no AI answers at all ({len(res.errors)} errors); no report written")
+    if log["mode"] != "paid":
+        return
+    for e in order.engines:
+        if got.get(e, 0) < MIN_ANSWER_SHARE * expected:
+            raise OrderError(f"order {order.order_id}: engine {e} returned {got.get(e, 0)} of {expected} expected "
+                             f"answers (minimum {MIN_ANSWER_SHARE:.0%}); no report written")
+
+
 def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD, roster=None,
-              out_dir="orders", seed=0, render=None, dry_run=False, providers=None):
+              out_dir="orders", seed=0, render=None, dry_run=False, providers=None,
+              unpaid_override=False):
     """Run one order. Returns (result, log dict). `providers` lets tests inject fakes."""
     order.validate()
     n, r = TIERS["free"] if mode == "free" else TIERS[order.plan]
     est = 0.0 if mode in ("free", "mock") else estimate_cost(order)
     log = {"order_id": order.order_id, "mode": mode, "plan": order.plan, "prompts": n, "repeats": r,
            "engines": order.engines if mode == "paid" else [mode], "estimated_usd": est, "cap_usd": cap_usd,
-           "started": _dt.datetime.now().isoformat(timespec="seconds"), "dry_run": dry_run}
+           "started": _dt.datetime.now().isoformat(timespec="seconds"), "dry_run": dry_run,
+           "paid": bool(order.paid), "unpaid_override": bool(unpaid_override)}
     if dry_run:
         log["readiness"] = paid_readiness(order.engines)
         return None, log
     guard = None
     if providers is None:
         providers, guard = build_providers(order, mode, cap_usd, roster, seed)
-    site = _signals.fetch_and_analyze(order.website, order.city) if order.website.strip() else None
+    site = None
+    if order.website.strip():
+        url = order.website.strip()
+        if not re.match(r"https?://", url, re.I):
+            url = "https://" + url
+        site = _signals.fetch_and_analyze(url, order.city)
+        if getattr(site, "error", ""):
+            log["site_error"] = site.error
+            print(f"[operator] order {order.order_id}: website check failed ({site.error}); "
+                  f"site findings skipped", file=sys.stderr)
     names = list(roster or [])
-    low = {x.lower() for x in names}
     for c in order.competitors:         # competitors the buyer watches are tracked by name
-        if c.strip() and c.strip().lower() not in low:
-            names.append(c.strip())
-            low.add(c.strip().lower())
+        c = c.strip()
+        if not c or match_name(c, [order.business_name], city=order.city) or match_name(c, names, city=order.city):
+            continue                    # empty, the target itself, or already tracked
+        names.append(c)
     res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
                     n_prompts=n, repeats=r, seed=seed, signals=site)
     log["usage"] = usage_report(res.records)
+    _check_answers(res, order, n * r, log)
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
                 "spent_usd": round(guard.spent if guard else res.cost_usd, 4), "score": res.score.score})
