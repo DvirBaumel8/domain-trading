@@ -1,0 +1,155 @@
+{
+ "A_no_scheme_website": {
+  "case": "A_no_scheme_website",
+  "outcome": "report produced",
+  "answers": 240,
+  "errors": 0,
+  "spent": 5.88,
+  "score": 26,
+  "engines_in_report": [
+   "claude",
+   "gemini",
+   "openai",
+   "perplexity"
+  ],
+  "first_errors": [],
+  "text_has_nan": false,
+  "report_len": 2173
+ },
+ "B_openai_always_401": {
+  "case": "B_openai_always_401",
+  "outcome": "report produced",
+  "answers": 180,
+  "errors": 35,
+  "spent": 4.43,
+  "score": 22,
+  "engines_in_report": [
+   "claude",
+   "gemini",
+   "perplexity"
+  ],
+  "first_errors": [
+   "openai: openai call failed: HTTPError",
+   "openai: openai call failed: HTTPError"
+  ],
+  "text_has_nan": false,
+  "report_len": 2107
+ },
+ "C_all_vendors_down": {
+  "case": "C_all_vendors_down",
+  "outcome": "report produced",
+  "answers": 0,
+  "errors": 125,
+  "spent": 3.23,
+  "score": 0,
+  "engines_in_report": [],
+  "first_errors": [
+   "openai: openai call failed: HTTPError",
+   "openai: openai call failed: HTTPError"
+  ],
+  "text_has_nan": false,
+  "report_len": 1831
+ },
+ "D_gemini_garbage_json": {
+  "case": "D_gemini_garbage_json",
+  "outcome": "report produced",
+  "answers": 180,
+  "errors": 35,
+  "spent": 5.48,
+  "score": 30,
+  "engines_in_report": [
+   "claude",
+   "openai",
+   "perplexity"
+  ],
+  "first_errors": [
+   "gemini: gemini call failed: JSONDecodeError",
+   "gemini: gemini call failed: JSONDecodeError"
+  ],
+  "text_has_nan": false,
+  "report_len": 2114
+ },
+ "E_allow_paid_unset": {
+  "case": "E_allow_paid_unset",
+  "outcome": "refused",
+  "msg": "paid mode is locked: set AIVIS_ALLOW_PAID=1 only after Dvir approves and the order is paid"
+ },
+ "F_missing_anthropic_key": {
+  "case": "F_missing_anthropic_key",
+  "outcome": "refused",
+  "msg": "missing API keys for: claude (names only; values never shown)"
+ },
+ "G_cap_too_low": {
+  "case": "G_cap_too_low",
+  "outcome": "refused",
+  "msg": "estimated cost $5.88 exceeds the order cap $3.00; nothing was called"
+ },
+ "H_unpaid_order_flag": {
+  "case": "H_unpaid_order_flag",
+  "outcome": "report produced",
+  "answers": 240,
+  "errors": 0,
+  "spent": 5.88,
+  "score": 26,
+  "engines_in_report": [
+   "claude",
+   "gemini",
+   "openai",
+   "perplexity"
+  ],
+  "first_errors": [],
+  "text_has_nan": false,
+  "report_len": 2173
+ },
+ "I_html_in_name": {
+  "case": "I_html_in_name",
+  "outcome": "report produced",
+  "answers": 240,
+  "errors": 0,
+  "spent": 5.88,
+  "score": 26,
+  "engines_in_report": [
+   "claude",
+   "gemini",
+   "openai",
+   "perplexity"
+  ],
+  "first_errors": [],
+  "text_has_nan": false,
+  "report_len": 2221
+ },
+ "J_no_competitors_plumber": {
+  "case": "J_no_competitors_plumber",
+  "outcome": "report produced",
+  "answers": 240,
+  "errors": 0,
+  "spent": 5.88,
+  "score": 26,
+  "engines_in_report": [
+   "claude",
+   "gemini",
+   "openai",
+   "perplexity"
+  ],
+  "first_errors": [],
+  "text_has_nan": false,
+  "report_len": 2173
+ },
+ "K_competitor_same_as_target_case": {
+  "case": "K_competitor_same_as_target_case",
+  "outcome": "report produced",
+  "answers": 240,
+  "errors": 0,
+  "spent": 5.88,
+  "score": 26,
+  "engines_in_report": [
+   "claude",
+   "gemini",
+   "openai",
+   "perplexity"
+  ],
+  "first_errors": [],
+  "text_has_nan": false,
+  "report_len": 2294
+ }
+}
