@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 IN_SCOPE = ["broken-link-auditor", "bulk-dns-email-auth-checker", "bulk-domain-availability-checker",
             "bulk-pagespeed-checker", "domain-checkup-report", "sitemap-url-extractor"]
 PERMISSION_SENTENCE = "This Actor needs only limited permissions: it reads its input and writes to its own default dataset."
-ALLOWED_ACTOR_CALLS = {"get_input", "push_data", "fail", "set_value", "set_status_message", "log"}
+ALLOWED_ACTOR_CALLS = {"get_input", "push_data", "fail", "set_value", "set_status_message", "log", "on"}
 ALLOWED_ENV = {"PAGESPEED_API_KEY", "PAGESPEED_FALLBACK_ROW_CAP"}
 
 

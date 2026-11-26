@@ -22,6 +22,7 @@ RETRY_ON = (httpx.TimeoutException, httpx.ConnectError)
 RETRY_REASONS = ("connect_timeout", "connection_reset")
 NO_GET_FALLBACK = ("dns_failure", "tls_error", "connection_refused")
 HTTP_RETRIES = 3
+BACKOFF_BUDGET = 5.0  # most seconds of back-off slept on one URL (all retries and any Retry-After together)
 DNS_HINTS = ("name or service not known", "nodename nor servname", "temporary failure in name resolution",
              "no address associated", "getaddrinfo", "name resolution")
 
@@ -60,7 +61,9 @@ class Auditor:
     def _worth_retry(exc: BaseException | None) -> bool:
         return isinstance(exc, httpx.TimeoutException) or error_reason(exc) in RETRY_REASONS
 
-    async def _req(self, method, url, retries: int = HTTP_RETRIES, **kw):
+    async def _req(self, method, url, retries: int = HTTP_RETRIES, budget: list | None = None, **kw):
+        """`budget` is a one-item list of seconds already slept backing off, shared by every request for one URL."""
+        budget = budget if budget is not None else [0.0]
         def on_error(attempt, exc):
             # Connect details only: host, attempt, reason, exception classes. No path, query, headers or bodies.
             if self.debug_log:
@@ -71,6 +74,17 @@ class Auditor:
                 self.debug_log(f"network debug: host={urlsplit(url).netloc} attempt={attempt + 1} "
                                f"reason={error_reason(exc)} chain={'>'.join(chain)}")
         attempt = 0
+
+        async def back_off(wanted: float) -> bool:
+            """Sleep at most what is left of the budget; False when nothing is left (the caller gives up)."""
+            left = BACKOFF_BUDGET - budget[0]
+            if left <= 0:
+                return False
+            wait = min(wanted, left)
+            budget[0] += wait
+            await self.sleep(wait)
+            return True
+
         while True:
             try:
                 # One attempt here; the retry decision below is ours (polite.request would retry any ConnectError).
@@ -79,11 +93,13 @@ class Auditor:
             except FetchError as e:
                 if attempt >= retries or not self._worth_retry(e.__cause__):
                     raise
-                await self.sleep(min(2.0 ** (attempt + 1), 30.0))
+                if not await back_off(2.0 ** (attempt + 1)):
+                    raise
                 attempt += 1
                 continue
             if r.status_code in RETRY_STATUS and attempt < retries:
-                await self.sleep(_retry_after(r, attempt))
+                if not await back_off(_retry_after(r, attempt)):
+                    return r
                 attempt += 1
                 continue
             return r
@@ -102,17 +118,17 @@ class Auditor:
             self._robots[o] = (parser, text)
         return self._robots[o]
 
-    async def _probe(self, url, want_body):
+    async def _probe(self, url, want_body, budget):
         if not want_body:
             try:
-                r = await self._req("HEAD", url)
+                r = await self._req("HEAD", url, budget=budget)
                 if r.status_code not in GET_FALLBACK:
                     return r
             except FetchError as e:
                 if error_reason(e.__cause__) in NO_GET_FALLBACK:
                     raise  # the host does not exist or refuses TLS: GET cannot do better
                 # empty or broken HEAD answer: try GET once
-        return await self._req("GET", url)
+        return await self._req("GET", url, budget=budget)
 
     async def check(self, url: str, want_body: bool = False) -> tuple[dict, str | None]:
         row = {"url": url, "category": "error", "statusCode": None, "finalUrl": None, "redirectChain": [],
@@ -122,10 +138,11 @@ class Auditor:
             if not core.robots_allows(parser, url):
                 row.update(category="robots_blocked", error="disallowed by robots.txt")
                 return self._stamp(row), None
+        budget = [0.0]  # one back-off budget for this URL, redirects and the GET fallback included
         start, cur, visited, chain, resp, body = self.clock(), url, {url}, row["redirectChain"], None, None
         try:
             while True:
-                resp = await self._probe(cur, want_body)
+                resp = await self._probe(cur, want_body, budget)
                 loc = resp.headers.get("location")
                 if resp.status_code in REDIRECT_CODES and loc:
                     if len(chain) >= core.MAX_REDIRECTS:
@@ -190,8 +207,9 @@ class Auditor:
 
 
 async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limiter=None, debug_log=None,
-              log=None, save_invalid=None) -> tuple[bool, str]:
-    """`log(text)` gets the warning and info lines; `save_invalid(list)` stores the INVALID_INPUTS record."""
+              log=None, save_invalid=None, stop_event=None) -> tuple[bool, str]:
+    """`log(text)` gets the warning and info lines; `save_invalid(list)` stores the INVALID_INPUTS record.
+    `stop_event` (asyncio.Event) is set on a platform abort or migration: no new URL is started, rows are already pushed."""
     inp = inp or {}
     log = log or (lambda _t: None)
     raw = inp.get("startUrls") or []
@@ -238,7 +256,8 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
 
     async def guarded(url, want_body):
         async with sem:
-            if state["stop"]:
+            if state["stop"] or (stop_event is not None and stop_event.is_set()):
+                state["stop"] = True
                 return None, None
             return await aud.check(url, want_body)
 
@@ -253,52 +272,41 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
         await asyncio.gather(*(one(u) for u in urls))
 
     async def crawl(start):
-        """Breadth-first. Rows are pushed level by level, one level behind the checks, so a row already lists the
-        links found on the next level. A stop (spending limit) or a run timeout keeps every row checked so far."""
+        """Breadth-first. Every row is pushed (and charged) as soon as its URL is checked, so a stop, an abort or a
+        run timeout keeps every row checked so far. A row lists the links found on earlier levels, not deeper ones."""
         if start in seen or len(seen) >= max_pages:
             return
         seen.add(start)
         sources: dict[str, list] = {}
         frontier, depth = [start], 0
-        prev: list[dict] = []   # checked, waiting for the next level's links
-        cur: list[tuple] = []   # (url, row, html) of the level being checked
+        while frontier and not state["stop"]:
+            cur: list[tuple] = []
 
-        async def flush(rows):
-            for row in rows:
-                row["sources"] = sources.get(row["url"], [])
+            async def one(u, want_body):
+                row, html = await guarded(u, want_body)
+                if row is None:
+                    return
+                row["sources"] = sources.get(u, [])
                 await emit(row)
+                cur.append((u, row, html))
 
-        try:
-            while frontier and not state["stop"]:
-                cur = []
-
-                async def one(u, want_body):
-                    row, html = await guarded(u, want_body)
-                    cur.append((u, row, html))  # kept as soon as it is ready, even if the level is cut short
-
-                await asyncio.gather(*(one(u, depth <= max_depth and core.same_site(u, start)) for u in frontier))
-                order = {u: i for i, u in enumerate(frontier)}
-                level = sorted((c for c in cur if c[1] is not None), key=lambda c: order[c[0]])
-                nxt = []
-                for u, row, html in level:
-                    if html is None or depth >= max_depth:
-                        continue
-                    for link, text in core.extract_links(html, row["finalUrl"] or u):
-                        internal = core.same_site(link, start)
-                        if not internal and not check_ext:
-                            continue
-                        lst = sources.setdefault(link, [])
-                        if len(lst) < core.MAX_SOURCES:
-                            lst.append({"sourceUrl": u, "anchorText": text})
-                        if link not in seen and len(seen) < max_pages:
-                            seen.add(link)
-                            nxt.append(link)
-                done_prev, prev, cur = prev, [c[1] for c in level], []
-                await flush(done_prev)
-                frontier, depth = nxt, depth + 1
-        finally:  # normal end, stop, or cancellation (run timeout)
+            await asyncio.gather(*(one(u, depth <= max_depth and core.same_site(u, start)) for u in frontier))
             order = {u: i for i, u in enumerate(frontier)}
-            await flush(prev + [r for _, r, _ in sorted(cur, key=lambda c: order.get(c[0], 0)) if r is not None])
+            nxt = []
+            for u, row, html in sorted(cur, key=lambda c: order[c[0]]):
+                if html is None or depth >= max_depth:
+                    continue
+                for link, text in core.extract_links(html, row["finalUrl"] or u):
+                    internal = core.same_site(link, start)
+                    if not internal and not check_ext:
+                        continue
+                    lst = sources.setdefault(link, [])
+                    if len(lst) < core.MAX_SOURCES:
+                        lst.append({"sourceUrl": u, "anchorText": text})
+                    if link not in seen and len(seen) < max_pages:
+                        seen.add(link)
+                        nxt.append(link)
+            frontier, depth = nxt, depth + 1
 
     if mode == "list":
         await check_list(starts)  # one call, so maxConcurrency applies across all start URLs
