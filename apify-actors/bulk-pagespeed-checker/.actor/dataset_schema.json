@@ -1,0 +1,86 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string"
+      },
+      "strategy": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "description": "ok or error"
+      },
+      "error": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "scores": {
+        "type": "object"
+      },
+      "labMetrics": {
+        "type": "object"
+      },
+      "fieldDataPresent": {
+        "type": "boolean"
+      },
+      "fieldData": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "originFieldData": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "checkedAt": {
+        "type": "string"
+      }
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "url",
+          "strategy",
+          "status",
+          "scores",
+          "labMetrics",
+          "fieldDataPresent"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "url": {
+            "label": "url"
+          },
+          "strategy": {
+            "label": "strategy"
+          },
+          "status": {
+            "label": "status"
+          },
+          "scores": {
+            "label": "scores"
+          },
+          "labMetrics": {
+            "label": "labMetrics"
+          },
+          "fieldDataPresent": {
+            "label": "fieldDataPresent"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "Bulk PageSpeed & Core Web Vitals Checker output",
+  "properties": {
+    "results": {
+      "type": "string",
+      "title": "Results",
+      "description": "All result rows in the default dataset",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    }
+  }
+}

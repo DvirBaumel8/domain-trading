@@ -1,0 +1,61 @@
+{
+  "title": "Bulk PageSpeed Checker",
+  "type": "object",
+  "schemaVersion": 1,
+  "required": [
+    "urls"
+  ],
+  "properties": {
+    "urls": {
+      "title": "URLs",
+      "type": "array",
+      "description": "Pages to test. https:// is added when missing.",
+      "editor": "stringList",
+      "prefill": [
+        "https://example.com/"
+      ]
+    },
+    "strategies": {
+      "title": "Strategies",
+      "type": "array",
+      "description": "Mobile, desktop or both.",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": [
+          "mobile",
+          "desktop"
+        ]
+      },
+      "default": [
+        "mobile",
+        "desktop"
+      ]
+    },
+    "categories": {
+      "title": "Categories",
+      "type": "array",
+      "description": "Lighthouse categories to score. Performance is always useful; the others are optional.",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": [
+          "performance",
+          "accessibility",
+          "best-practices",
+          "seo"
+        ]
+      },
+      "default": [
+        "performance"
+      ]
+    },
+    "apiKey": {
+      "title": "Google API key (optional)",
+      "type": "string",
+      "description": "Your own PageSpeed Insights API key. Without it the actor runs slowly within Google's keyless quota.",
+      "editor": "textfield",
+      "isSecret": true
+    }
+  }
+}
