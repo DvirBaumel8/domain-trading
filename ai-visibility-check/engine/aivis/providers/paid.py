@@ -45,7 +45,9 @@ class _PaidBase(Provider):
                 return json.loads(r.read().decode())
         except Exception as e:
             self.budget.refund(self.est_cost_per_call)    # failed calls do not count toward the cap
-            raise ProviderError(f"{self.name} call failed: {type(e).__name__}") from None  # never echo headers
+            code = getattr(e, "code", None)
+            raise ProviderError(f"{self.name} call failed: {type(e).__name__}"
+                                + (f" HTTP {code}" if isinstance(code, int) else "")) from None  # never echo headers
 
 
 class OpenAIWebSearchProvider(_PaidBase):

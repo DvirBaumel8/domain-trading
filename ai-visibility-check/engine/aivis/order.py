@@ -84,6 +84,8 @@ class Order:
     competitors: list = field(default_factory=list)
     paid: bool = False           # set by the Polar webhook (site/server.py); paid mode refuses unless true
     paid_at: str = ""
+    target_reviews: int = None         # Google review counts, when the buyer gave them
+    competitor_reviews: list = None
 
     @staticmethod
     def from_dict(d):
@@ -165,18 +167,23 @@ def usage_report(records) -> dict:
     return {"calls": calls, "by_engine": per, "total": total}
 
 
+class AnswerShortfall(OrderError):
+    """The run happened but too few answers came back (vendor outage); spent = what the run cost."""
+    spent = 0.0
+
+
 def _check_answers(res, order, expected, log):
     """No report from a subset: every engine must reach MIN_ANSWER_SHARE of its expected answers."""
     got = {}
     for ans, _, _ in res.records:
         got[ans.provider] = got.get(ans.provider, 0) + 1
     if res.score.total_answers == 0:
-        raise OrderError(f"order {order.order_id}: no AI answers at all ({len(res.errors)} errors); no report written")
+        raise AnswerShortfall(f"order {order.order_id}: no AI answers at all ({len(res.errors)} errors); no report written")
     if log["mode"] != "paid":
         return
     for e in order.engines:
         if got.get(e, 0) < MIN_ANSWER_SHARE * expected:
-            raise OrderError(f"order {order.order_id}: engine {e} returned {got.get(e, 0)} of {expected} expected "
+            raise AnswerShortfall(f"order {order.order_id}: engine {e} returned {got.get(e, 0)} of {expected} expected "
                              f"answers (minimum {MIN_ANSWER_SHARE:.0%}); no report written")
 
 
@@ -185,6 +192,8 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
               unpaid_override=False):
     """Run one order. Returns (result, log dict). `providers` lets tests inject fakes."""
     order.validate()
+    if mode == "paid" and not dry_run and order.paid is not True and not unpaid_override:
+        raise OrderError(f"order {order.order_id} is not marked paid (paid:true); paid mode refuses it")
     n, r = TIERS["free"] if mode == "free" else TIERS[order.plan]
     est = 0.0 if mode in ("free", "mock") else estimate_cost(order)
     log = {"order_id": order.order_id, "mode": mode, "plan": order.plan, "prompts": n, "repeats": r,
@@ -214,9 +223,14 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
             continue                    # empty, the target itself, or already tracked
         names.append(c)
     res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
-                    n_prompts=n, repeats=r, seed=seed, signals=site)
+                    n_prompts=n, repeats=r, seed=seed, signals=site,
+                    target_reviews=order.target_reviews, competitor_reviews=order.competitor_reviews)
     log["usage"] = usage_report(res.records)
-    _check_answers(res, order, n * r, log)
+    try:
+        _check_answers(res, order, n * r, log)
+    except AnswerShortfall as e:
+        e.spent = guard.spent if guard else res.cost_usd
+        raise
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
                 "spent_usd": round(guard.spent if guard else res.cost_usd, 4), "score": res.score.score})

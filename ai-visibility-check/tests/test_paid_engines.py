@@ -119,7 +119,7 @@ class Providers(unittest.TestCase):
 @mock.patch.dict(os.environ, KEYS)
 class OrderRun(unittest.TestCase):
     def run_it(self):
-        o = Order("t-100", "Target Plumbing", "Columbus, OH", "plumber", plan="lean")
+        o = Order("t-100", "Target Plumbing", "Columbus, OH", "plumber", plan="lean", paid=True)
         providers = [make(e) for e in o.engines]
         d = tempfile.mkdtemp()
         res, log = run_order(o, mode="paid", roster=POOL, out_dir=d, render=render, providers=providers)
