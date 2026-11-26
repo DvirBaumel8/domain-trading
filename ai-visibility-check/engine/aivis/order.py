@@ -33,6 +33,7 @@ PAID_ENGINES = config.PAID_ENGINES
 ENV_KEYS = config.ENV_KEYS
 DEFAULT_CAP_USD = config.order_cap_usd()    # 12.00; AIVIS_ORDER_CAP_USD overrides
 
+FREE_MIN_ANSWERS = 6            # the free check shows numbers only when at least this many of its 8 questions answered
 MIN_ANSWER_SHARE = 0.8          # every engine must reach this share of its expected answers
 TIERS = {                        # prompts x repeats per engine
     "check": (30, 2),            # $149 report: 60 answers per engine
@@ -192,6 +193,8 @@ def usage_report(records) -> dict:
 class AnswerShortfall(OrderError):
     """The run happened but too few answers came back (vendor outage); spent = what the run cost."""
     spent = 0.0
+    reasons: dict = {}
+    expected = 0
 
 
 class CapExceeded(OrderError):
@@ -261,11 +264,13 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
         err.spent = e.spent
         raise err from None
     log["usage"] = usage_report(res.records)
+    log["reasons"], log["expected"] = res.reason_counts(), n * r
     real_spent = log["usage"]["total"]["cost_usd"] if log["usage"]["calls"] else (guard.spent if guard else res.cost_usd)
     try:
         _check_answers(res, order, n * r, log)
     except AnswerShortfall as e:
         e.spent = real_spent
+        e.reasons, e.expected = res.reason_counts(), n * r
         raise
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),

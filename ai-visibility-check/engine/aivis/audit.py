@@ -1,5 +1,6 @@
 """Orchestrates one audit: prompts -> providers x repeats -> parse -> score -> findings."""
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 
 from .niches import Niche
 from .parse import find_mentions
@@ -28,6 +29,11 @@ class AuditResult:
     errors: list
     cost_usd: float
     has_register: bool = False   # True only if the niche has an NPI taxonomy (buyer competitors never count)
+    outcomes: list = field(default_factory=list)   # one dict per question: provider, prompt_no, run, ok, reason
+
+    def reason_counts(self) -> dict:
+        """{'ok': n, '<reason>': n, ...}: reason codes only, no text."""
+        return dict(Counter("ok" if o["ok"] else o["reason"] for o in self.outcomes))
 
 
 def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeats=3, seed=0,
@@ -36,15 +42,17 @@ def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeat
     if target not in roster_names:
         roster_names = list(roster_names) + [target]
     prompts = generate_prompts(niche, city, n_prompts, seed)
-    records, errors, cost, real = [], [], 0.0, 0.0
+    records, errors, cost, real, outcomes = [], [], 0.0, 0.0, []
     for prov in providers:
         prov_errors, stopped = 0, False
-        for p in prompts:
+        for pi, p in enumerate(prompts, 1):
             for r in range(repeats):
                 try:
                     ans = prov.ask(p.text, city=city, run=r)
                 except ProviderError as e:
                     errors.append(f"{prov.name}: {e}")
+                    outcomes.append({"provider": prov.name, "prompt_no": pi, "run": r, "ok": False,
+                                     "reason": getattr(e, "reason", "error")})
                     prov_errors += 1
                     if prov_errors >= max_errors:    # stop this provider entirely
                         stopped = True
@@ -54,12 +62,20 @@ def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeat
                 real += (ans.usage or {}).get("cost_usd", 0.0)
                 if real_cap_usd is not None and real > real_cap_usd + 1e-9:
                     raise SpendCapExceeded(real, real_cap_usd)
-                records.append((ans, find_mentions(ans.text, roster_names, city=city), p.intent))
+                try:
+                    mentions = find_mentions(ans.text, roster_names, city=city)
+                except Exception:       # a malformed answer must not stop the run
+                    errors.append(f"{prov.name}: parse_error")
+                    outcomes.append({"provider": prov.name, "prompt_no": pi, "run": r, "ok": False,
+                                     "reason": "parse_error"})
+                    continue
+                outcomes.append({"provider": prov.name, "prompt_no": pi, "run": r, "ok": True, "reason": ""})
+                records.append((ans, mentions, p.intent))
             if stopped:
                 break
     sc = score_audit(target, records)
     findings = build_findings(sc, niche, signals, target_reviews, competitor_reviews)
-    return AuditResult(niche, city, target, prompts, records, sc, findings, errors, cost, has_register)
+    return AuditResult(niche, city, target, prompts, records, sc, findings, errors, cost, has_register, outcomes)
 
 
 def result_from_saved(niche, city, target, raw_answers, roster_names):

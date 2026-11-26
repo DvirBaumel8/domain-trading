@@ -16,6 +16,10 @@ def fake_http(req, timeout=15):
     raise AssertionError("unexpected network call: " + req.full_url)
 server.http_call = fake_http
 
+def no_roster_network(url, timeout=0):
+    raise OSError("no network in tests")
+server.ROSTER_OPENER = no_roster_network      # the register lookup never reaches the network in tests
+
 BASE_PID = "5a9d5f7a-72a6-4ea4-8ae7-e9d4ac498fde"   # base product (site/products.py)
 ORDER = {"business": "Acme Dental", "city": "Austin, TX", "niche": "dentist", "email": "A@b.co"}
 

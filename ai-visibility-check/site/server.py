@@ -22,7 +22,8 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "engine"))
 from aivis.parse import match_name          # noqa: E402
 from aivis.niches import NICHES, get_niche  # noqa: E402
-from aivis.order import US_STATES, US_ONLY_MSG, normalize_website
+from aivis.order import US_STATES, US_ONLY_MSG, normalize_website, FREE_MIN_ANSWERS
+from aivis import names as names_mod
 from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS, SUPPORT_EMAIL    # noqa: E402
 import delivery                             # noqa: E402
@@ -39,6 +40,15 @@ BAD_FORM_MSG = "Please send the form again."
 BUSY_MSG = "Too many checks right now, try again in a few minutes."
 FREE_PER_HOUR = 5           # free checks per client address per hour
 FREE_CONCURRENT = 3         # free jobs running at once per client address
+FREE_QUESTIONS = 8          # questions in one free run
+FAIL_MSG = "We could not get answers from the AI model right now. Please try again in a few minutes."
+BYPASS_ENV = "AVC_TEST_BYPASS_TOKEN"
+BYPASS_HEADER = "X-AVC-Test-Token"
+BYPASS_MIN_LEN = 24
+ROSTER_TTL = 4 * 3600       # seconds a fetched register list is reused
+ROSTER_TIMEOUT = 8          # seconds per register request
+ROSTER_CACHE = {}           # (niche, city) -> (time, names)
+ROSTER_OPENER = None        # tests inject a fake
 JOB_KEEP_SECONDS = 3600     # finished JOBS entries are dropped after this
 JOB_META = {}               # job id -> {"ip", "started", "finished"}; never sent to the browser
 CHECK_LOG = {}              # client address -> start times of recent checks
@@ -119,6 +129,16 @@ def prune_jobs(t=None):
             ts[:] = [x for x in ts if t - x < 3600]
             if not ts:
                 CHECK_LOG.pop(ip, None)
+
+
+def bypass_ok(headers):
+    """True only when the test token is configured (24+ characters) and the request header matches it.
+    Header only (never form or query); compared in constant time. Off when the env var is unset or short."""
+    tok = os.environ.get(BYPASS_ENV, "")
+    if len(tok) < BYPASS_MIN_LEN:
+        return False
+    got = str((headers or {}).get(BYPASS_HEADER) or "")
+    return hmac.compare_digest(got.encode("utf-8"), tok.encode("utf-8"))
 
 
 def admit_check(ip, free_run):
@@ -324,7 +344,7 @@ def alert(text):
 
 
 ALERT_LOCK = threading.RLock()
-ALERT_TITLES = {"new": "new order", "failed": "failed run", "blocked": "blocked run", "stuck": "stuck order",
+ALERT_TITLES = {"free_check": "free check degraded", "new": "new order", "failed": "failed run", "blocked": "blocked run", "stuck": "stuck order",
                 "overdue": "overdue manual order", "unmatched": "unmatched payment", "held": "held payment",
                 "unknown_product": "unknown product payment", "webhook_failed": "webhook event failed"}
 
@@ -351,6 +371,10 @@ def alert_text(kind, oid="", status="", ptype="", ref=""):
     what = ALERT_TITLES.get(kind, "alert")
     subject = oid or ref
     title = f"[AVC] {what} {subject} ({ptype})".replace("  ", " ")
+    if kind == "free_check":
+        title = f"[AVC] {what}"
+    if kind == "free_check":
+        return title, "\n".join(([f"Status: {status}"] if status else []) + [f"Reason: {kind}"])
     lines = [f"Order: {oid}"] if oid else [f"Payment (opaque id): {ref}"]
     lines += ([f"Status: {status}"] if status else []) + [f"Product type: {ptype}", f"Reason: {kind}"]
     return title, "\n".join(lines)
@@ -905,31 +929,103 @@ def instant(req):
     for a in m["answers"]:
         if any(match_name(req["business"], [n], city=req["city"]) for n in a["names"] + a["raw"]):
             hits += 1
+    register = "ok" if get_niche(req["niche"]).npi_taxonomy else "none"
+    per_answer = []
+    for a in m["answers"]:
+        flags = a.get("matched")
+        items = []
+        for i, nm in enumerate(a["names"]):
+            raw = a["raw"][i] if i < len(a["raw"]) else nm
+            if flags is not None and i < len(flags):
+                ok = bool(flags[i])
+            else:       # older stored files: a name changed to the register's spelling matched; others are unconfirmed
+                ok = True if nm != raw else None
+            items.append((nm, ok))
+        per_answer.append(items)
+    summary = names_mod.aggregate(per_answer, req["business"], req["city"], register)
+    summary["named_in"] = hits
     return {"status": "instant", "named_in": hits, "answers": len(m["answers"]),
             "competitors": max(0, m["competitors"] - (1 if hits else 0)),
             "unverified_pct": m["unverified_pct"], "niche_label": m["niche_label"], "city": m["city"],
-            "source_note": m["source_note"]}
+            "source_note": m["source_note"], "names": summary}
+
+
+def fetch_roster(niche, city):
+    """-> (register status, names). Cached in memory for ROSTER_TTL. Never raises: any failure is 'unavailable'."""
+    if not niche.npi_taxonomy:
+        return "none", []
+    key = (niche.key if hasattr(niche, "key") else niche.label, city)
+    hit = ROSTER_CACHE.get(key)
+    if hit and clock() - hit[0] < ROSTER_TTL:
+        return "ok", hit[1]
+    try:
+        from aivis import roster as _roster
+        town, st = [x.strip() for x in city.split(",")]
+        op = ROSTER_OPENER or (lambda url, timeout=ROSTER_TIMEOUT: urllib.request.urlopen(url, timeout=ROSTER_TIMEOUT))
+        names = [e.name for e in _roster.from_nppes(niche.npi_taxonomy, town, st, opener=op)]
+    except Exception as e:
+        log("roster fetch failed: " + type(e).__name__)
+        return "unavailable", []
+    if not names:
+        return "unavailable", []
+    ROSTER_CACHE[key] = (clock(), names)
+    return "ok", names
+
+
+def free_summary_line(answers, expected, reasons):
+    """One line for the logs: counts only, no user text."""
+    bad = "".join(f" {k}={v}" for k, v in sorted(reasons.items()) if k != "ok")
+    return f"free_job answers={answers}/{expected}{bad}"
+
+
+def free_alert(status):
+    """One alert per hour for partial or failed free runs (deduped by the create-only alert key)."""
+    notify_event("free_check", ref="free-check", status=status, unique=now().strftime("%y%m%d%H"), webhook=True)
 
 
 def free_job(job_id, req):
-    from aivis.order import Order, run_order
+    from aivis.order import Order, run_order, AnswerShortfall
     from aivis.report_pro import render
     tmp = tempfile.mkdtemp(prefix="free-")
+    reasons, answers, expected = {}, 0, FREE_QUESTIONS
     try:
         o = Order(order_id="FREE-" + job_id[:8], business_name=req["business"], city=req["city"],
                   niche=req["niche"], plan="free")
-        res, log = run_order(o, mode="free", out_dir=tmp,
-                             render=lambda r: render(r, sample=True, run_note="Free quick check: one AI model "
-                                                     "answering from memory, no web search, 8 questions."))
+        register, roster = fetch_roster(get_niche(req["niche"]), req["city"])
+        note = "Free quick check: one AI model answering from memory, no web search, 8 questions."
+
+        def paint(r):
+            got = r.score.total_answers
+            part = f"Partial result: {got} of {expected} questions answered" if got < FREE_MIN_ANSWERS else ""
+            return render(r, sample=True, run_note=note, register=register, partial_note=part)
+        res, lg = run_order(o, mode="free", out_dir=tmp, render=paint, **({"roster": roster} if roster else {}))
+        answers = res.score.total_answers
+        reasons = (lg or {}).get("reasons") or (res.reason_counts() if hasattr(res, "reason_counts") else {})
         with open(os.path.join(tmp, o.order_id, "report.html"), encoding="utf-8") as fh:
             Store().put_text(free_report_path(o.order_id), fh.read())
-        finish_job(job_id, {"status": "done", "named_in": sum(p.target_hits for p in res.score.providers),
-                            "answers": res.score.total_answers, "report": f"/free/{o.order_id}"})
+        out = {"report": f"/free/{o.order_id}", "answers": answers, "expected": expected,
+               "reasons": {k: v for k, v in reasons.items() if k != "ok"}}
+        records = getattr(res, "records", None)
+        if records is not None:
+            out["names"] = names_mod.from_records(records, req["business"], req["city"], register)
+        if answers < FREE_MIN_ANSWERS:
+            out.update({"status": "partial", "message": f"Partial result: {answers} of {expected} questions answered"})
+        else:
+            out.update({"status": "done", "named_in": sum(p.target_hits for p in res.score.providers)})
+        finish_job(job_id, out)
     except Exception as e:  # never leak internals to the browser
-        finish_job(job_id, {"status": "failed"})
+        if isinstance(e, AnswerShortfall):
+            reasons = dict(e.reasons)
+        else:
+            reasons = {"error": 1}
+        finish_job(job_id, {"status": "failed", "message": FAIL_MSG, "answers": 0, "expected": expected,
+                            "reasons": {k: v for k, v in reasons.items() if k != "ok"}})
         print("free job failed:", type(e).__name__, file=sys.stderr)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    print(free_summary_line(answers, expected, reasons), file=sys.stderr)
+    if answers < FREE_MIN_ANSWERS:
+        free_alert("failed" if answers == 0 else "partial")
 
 
 def health():
@@ -1076,9 +1172,15 @@ class H(http.server.BaseHTTPRequestHandler):
                 req = clean(self._form())
                 ip = client_ip(self.headers, self.client_address[0])
                 r = instant(req)
-                if not admit_check(ip, FREE_RUN and not r):
+                bypass = bypass_ok(self.headers)
+                if bypass:
+                    ip = "bypass"               # never counted against a real visitor's address
+                elif not admit_check(ip, FREE_RUN and not r):
                     return self._json(429, {"error": BUSY_MSG})
                 rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": ip}
+                if bypass:
+                    rec["bypass"] = True
+                    log(f"bypass_used at={rec['at']} route=/api/check result={'instant' if r else 'free-run' if FREE_RUN else 'saved'}")
                 if r:
                     try:
                         save_lead({**rec, "result": "instant"})
