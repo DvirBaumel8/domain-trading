@@ -7,11 +7,13 @@ POST /api/check   free self-check. Instant answer from data/markets/*.json when 
                   (Pollinations, 8 questions, $0) in the background; else the
                   request is just saved. Requests go to data/requests.jsonl.
 GET  /api/check/<id>  status of a background free run.
-POST /api/intake  order intake after payment -> data/orders/<order_id>.json
-                  (the engine reads it: python3 -m aivis order --intake ...).
-Nothing here sends email or spends money.
+POST /api/intake  order intake -> orders store (private GitHub repo via ORDERS_REPO +
+                  ORDERS_GITHUB_TOKEN; else a local folder that is never served).
+POST /api/polar/webhook  Polar payment webhook (POLAR_WEBHOOK_SECRET) marks the order paid.
+New orders and payments alert ORDER_ALERT_WEBHOOK_URL (unset = logged no-op).
+Only the files in PUBLIC_FILES / PUBLIC_DIRS are served. Nothing here sends email or spends money.
 """
-import argparse, datetime, http.server, json, os, re, sys, threading, uuid
+import argparse, base64, datetime, hashlib, hmac, http.server, json, mimetypes, os, posixpath, re, sys, threading, time, urllib.parse, urllib.request, uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "engine"))
@@ -23,6 +25,208 @@ JOBS = {}
 LOCK = threading.Lock()
 FREE_RUN = False
 MAX_BODY = 4096
+MAX_HOOK_BODY = 65536
+PUBLIC_FILES = {"index.html", "agency.html", "privacy.html", "refunds.html", "sample-report.html",
+                "sample-report.pdf", "terms.html", "thanks.html"}
+PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, these extensions only
+LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")
+
+
+def log(msg):
+    print(msg, file=sys.stderr)
+
+
+def http_call(req, timeout=15):
+    """The only network entry point (tests replace it). Returns (status, body bytes)."""
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+
+
+def normalize_path(raw):
+    """Decode (repeatedly), unify separators and case, resolve dots. Returns None for unsafe input."""
+    p = urllib.parse.urlsplit(raw).path
+    for _ in range(6):
+        d = urllib.parse.unquote(p)
+        if d == p:
+            break
+        p = d
+    else:
+        return None
+    if "\x00" in p:
+        return None
+    p = p.replace("\\", "/").lower()
+    p = posixpath.normpath("/" + p).lstrip("/")
+    return p
+
+
+def public_file(raw):
+    """Absolute path of an allow-listed public file for this request path, else None."""
+    p = normalize_path(raw)
+    if p is None:
+        return None
+    if p == "":
+        p = "index.html"
+    if p in PUBLIC_FILES:
+        return os.path.join(HERE, p)
+    d, _, name = p.rpartition("/")
+    if d in PUBLIC_DIRS and name and not name.startswith(".") and os.path.splitext(name)[1] in PUBLIC_DIRS[d]:
+        f = os.path.join(HERE, d, name)
+        if os.path.isfile(f):
+            return f
+    return None
+
+
+class Store:
+    """Private order storage. GitHub contents API when configured, else a local folder."""
+    def __init__(self):
+        self.repo = os.environ.get("ORDERS_REPO", "").strip()
+        self.token = os.environ.get("ORDERS_GITHUB_TOKEN", "").strip()
+        self.remote = bool(self.repo and self.token)
+
+    def _url(self, path):
+        return f"https://api.github.com/repos/{self.repo}/contents/{urllib.parse.quote(path)}"
+
+    def _hdr(self):
+        return {"Authorization": "Bearer " + self.token, "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "aivis-orders"}
+
+    def get(self, path):
+        """-> (obj, sha) or (None, None)."""
+        if not self.remote:
+            f = os.path.join(LOCAL_ORDERS, path)
+            if not os.path.isfile(f):
+                return None, None
+            with open(f, encoding="utf-8") as fh:
+                return json.load(fh), None
+        st, body = http_call(urllib.request.Request(self._url(path), headers=self._hdr()))
+        if st == 404:
+            return None, None
+        if st != 200:
+            raise RuntimeError(f"orders store read failed ({st})")
+        j = json.loads(body)
+        return json.loads(base64.b64decode(j["content"])), j["sha"]
+
+    def put(self, path, obj, overwrite=False):
+        """Create (or replace if overwrite). Returns False if it exists and overwrite is False."""
+        if not self.remote:
+            f = os.path.join(LOCAL_ORDERS, path)
+            os.makedirs(os.path.dirname(f), exist_ok=True)
+            with LOCK:
+                if os.path.exists(f) and not overwrite:
+                    return False
+                with open(f, "w", encoding="utf-8") as fh:
+                    json.dump(obj, fh, indent=1)
+            return True
+        payload = {"message": "order data", "content": base64.b64encode(json.dumps(obj, indent=1).encode()).decode()}
+        if overwrite:
+            _, sha = self.get(path)
+            if sha:
+                payload["sha"] = sha
+        req = urllib.request.Request(self._url(path), data=json.dumps(payload).encode(), method="PUT",
+                                     headers={**self._hdr(), "Content-Type": "application/json"})
+        st, _ = http_call(req)
+        if st in (200, 201):
+            return True
+        if st in (409, 422) and not overwrite:
+            return False
+        raise RuntimeError(f"orders store write failed ({st})")
+
+
+def alert(text):
+    url = os.environ.get("ORDER_ALERT_WEBHOOK_URL", "").strip()
+    if not url:
+        log("alert (no target set): " + text)
+        return False
+    try:
+        req = urllib.request.Request(url, data=json.dumps({"text": text, "content": text}).encode(), method="POST",
+                                     headers={"Content-Type": "application/json", "User-Agent": "aivis-alert"})
+        st, _ = http_call(req)
+        return 200 <= st < 300
+    except Exception as e:
+        log("alert failed: " + type(e).__name__)
+        return False
+
+
+def email_key(email):
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32]
+
+
+def verify_polar(secret, headers, body):
+    """Standard Webhooks signature: HMAC-SHA256 over '<id>.<timestamp>.<body>', base64, 'v1,' prefix."""
+    if not secret:
+        return False
+    mid, ts, sig = headers.get("webhook-id", ""), headers.get("webhook-timestamp", ""), headers.get("webhook-signature", "")
+    try:
+        if abs(time.time() - int(ts)) > 300:
+            return False
+    except ValueError:
+        return False
+    mac = hmac.new(secret.encode(), f"{mid}.{ts}.".encode() + body, hashlib.sha256).digest()
+    want = base64.b64encode(mac).decode()
+    return any(hmac.compare_digest(want, c.split(",", 1)[1]) for c in sig.split() if c.startswith("v1,"))
+
+
+def mark_paid(store, oid, ref):
+    o, _ = store.get(f"orders/{oid}.json")
+    if o is None:
+        return False
+    if not o.get("paid"):
+        o.update({"paid": True, "paid_ref": ref or o.get("paid_ref", ""),
+                  "paid_at": datetime.datetime.now().isoformat(timespec="seconds")})
+        store.put(f"orders/{oid}.json", o, overwrite=True)
+    return True
+
+
+def handle_polar(headers, body):
+    """-> (http status, json). Verifies, dedupes, marks paid, alerts."""
+    if not verify_polar(os.environ.get("POLAR_WEBHOOK_SECRET", ""), headers, body):
+        return 401, {"error": "bad signature"}
+    store, eid = Store(), re.sub(r"[^A-Za-z0-9_-]", "", headers.get("webhook-id", ""))[:80]
+    if not eid:
+        return 400, {"error": "missing id"}
+    if store.get(f"events/{eid}.json")[0] is not None:
+        return 200, {"status": "duplicate"}
+    ev = json.loads(body or b"{}")
+    d = ev.get("data") or {}
+    if ev.get("type") == "order.paid":
+        ref = str(d.get("id", ""))[:60]
+        email = str((d.get("customer") or {}).get("email") or d.get("customer_email") or "").strip().lower()
+        oid = str((d.get("metadata") or {}).get("order_id", ""))
+        if not re.fullmatch(r"ORD-\d{6}-[a-f0-9]{6}", oid):
+            oid = (store.get(f"index/{email_key(email)}.json")[0] or {}).get("order_id", "") if email else ""
+        if oid and mark_paid(store, oid, ref):
+            alert(f"Order {oid} PAID (Polar {ref})")
+            res = {"status": "paid", "order_id": oid}
+        else:
+            if email:   # payment arrived before the intake form: remember it
+                store.put(f"payments/{email_key(email)}.json", {"ref": ref}, overwrite=True)
+            alert(f"Polar payment {ref} has no matching order yet")
+            res = {"status": "unmatched"}
+    else:
+        res = {"status": "ignored"}
+    if not store.put(f"events/{eid}.json", {"type": ev.get("type", "")}):
+        return 200, {"status": "duplicate"}
+    return 200, res
+
+
+def new_order(d, req):
+    store = Store()
+    oid = "ORD-" + datetime.date.today().strftime("%y%m%d") + "-" + uuid.uuid4().hex[:6]
+    intake = {"order_id": oid, "business_name": req["business"], "city": req["city"],
+              "niche": req["niche"], "email": req["email"], "website": str(d.get("website", ""))[:200],
+              "plan": "check", "paid_ref": str(d.get("paid_ref", ""))[:60], "paid": False,
+              "competitors": [c.strip()[:120] for c in str(d.get("competitors", "")).split(",") if c.strip()][:5]}
+    store.put(f"orders/{oid}.json", intake)
+    if req["email"]:
+        store.put(f"index/{email_key(req['email'])}.json", {"order_id": oid}, overwrite=True)
+        pay, _ = store.get(f"payments/{email_key(req['email'])}.json")
+        if pay:
+            mark_paid(store, oid, pay.get("ref", ""))
+    alert(f"New order {oid}")
+    return oid
 
 
 def slug(niche, city):
@@ -79,47 +283,65 @@ def free_job(job_id, req):
         print("free job failed:", type(e).__name__, file=sys.stderr)
 
 
-class H(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *a, **k):
-        super().__init__(*a, directory=HERE, **k)
-
+class H(http.server.BaseHTTPRequestHandler):
     def _json(self, code, obj):
         b = json.dumps(obj).encode()
         self.send_response(code); self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+        self.send_header("Content-Length", str(len(b))); self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(b)
 
-    def _body(self):
+    def _send(self, code, ctype, body):
+        self.send_response(code); self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body))); self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _body(self, limit=MAX_BODY):
         n = int(self.headers.get("Content-Length") or 0)
-        if n > MAX_BODY:
+        if n > limit:
             raise ValueError("Request too large.")
-        return json.loads(self.rfile.read(n) or b"{}")
+        return self.rfile.read(n)
+
+    def log_message(self, fmt, *args):   # request lines can carry data; log nothing
+        pass
+
+    def do_HEAD(self):
+        self.do_GET()
 
     def do_GET(self):
-        if self.path in ("/health", "/healthz"):
+        path = urllib.parse.urlsplit(self.path).path
+        if path in ("/health", "/healthz"):
             return self._json(200, {"ok": True})
-        if self.path == "/robots.txt":
-            body = b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\n"
-            self.send_response(200); self.send_header("Content-Type", "text/plain")
-            self.end_headers(); return self.wfile.write(body)
-        if self.path.startswith("/data/") or self.path.endswith(".py"):
-            return self.send_error(404)
-        m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", self.path)
+        if path == "/robots.txt":
+            return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\n")
+        m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             return self._json(200, JOBS.get(m.group(1), {"status": "unknown"}))
-        m = re.fullmatch(r"/free/(FREE-[a-f0-9]{8})", self.path)
+        m = re.fullmatch(r"/free/(FREE-[a-f0-9]{8})", path)
         if m:
             p = os.path.join(DATA, "free-checks", m.group(1), "report.html")
-            if os.path.exists(p):
-                b = open(p, "rb").read()
-                self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.end_headers(); return self.wfile.write(b)
-            return self.send_error(404)
-        return super().do_GET()
+            if os.path.isfile(p):
+                with open(p, "rb") as fh:
+                    return self._send(200, "text/html; charset=utf-8", fh.read())
+            return self._json(404, {"error": "not found"})
+        f = public_file(self.path)
+        if f is None:
+            return self._json(404, {"error": "not found"})
+        ctype = mimetypes.guess_type(f)[0] or "application/octet-stream"
+        if ctype.startswith("text/"):
+            ctype += "; charset=utf-8"
+        with open(f, "rb") as fh:
+            return self._send(200, ctype, fh.read())
 
     def do_POST(self):
         try:
+            if self.path == "/api/polar/webhook":
+                hdr = {k.lower(): v for k, v in self.headers.items()}
+                code, obj = handle_polar(hdr, self._body(MAX_HOOK_BODY))
+                return self._json(code, obj)
             if self.path == "/api/check":
-                req = clean(self._body())
+                req = clean(json.loads(self._body() or b"{}"))
                 rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": self.client_address[0]}
                 r = instant(req)
                 if r:
@@ -134,16 +356,8 @@ class H(http.server.SimpleHTTPRequestHandler):
                 save_line(os.path.join(DATA, "requests.jsonl"), {**rec, "result": "saved"})
                 return self._json(200, {"status": "saved"})
             if self.path == "/api/intake":
-                d = self._body()
-                req = clean(d)
-                oid = "ORD-" + datetime.date.today().strftime("%y%m%d") + "-" + uuid.uuid4().hex[:6]
-                intake = {"order_id": oid, "business_name": req["business"], "city": req["city"],
-                          "niche": req["niche"], "email": req["email"], "website": str(d.get("website", ""))[:200],
-                          "plan": "check", "paid_ref": str(d.get("paid_ref", ""))[:60],
-                          "competitors": [c.strip()[:120] for c in str(d.get("competitors", "")).split(",") if c.strip()][:5]}
-                os.makedirs(os.path.join(DATA, "orders"), exist_ok=True)
-                with open(os.path.join(DATA, "orders", oid + ".json"), "w", encoding="utf-8") as f:
-                    json.dump(intake, f, indent=1)
+                d = json.loads(self._body() or b"{}")
+                oid = new_order(d, clean(d))
                 return self._json(200, {"status": "received", "order_id": oid})
             return self._json(404, {"error": "not found"})
         except ValueError as e:
