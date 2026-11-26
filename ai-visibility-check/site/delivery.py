@@ -114,6 +114,8 @@ def run_job(store, oid, alert, roster_fn=None, providers_fn=None):
         o, _ = store.get(f"orders/{oid}.json")
         if o is None or o.get("order_type", "base") not in products.AUTORUN_TYPES:
             return
+        if attempt == 1 and not may_run(o):
+            return
         set_status(store, oid, "running", alert, f"attempt {attempt}", attempts=attempt, spent_usd=round(spent, 4))
         try:
             cap = order_cap_usd()
@@ -134,6 +136,22 @@ def run_job(store, oid, alert, roster_fn=None, providers_fn=None):
             return
         set_status(store, oid, "ready", alert, spent_usd=round(spent, 4))
         return
+
+
+RUNNING_FRESH_SECONDS = 2 * 3600
+
+
+def may_run(o):
+    """No second run: never for a ready order, nor for one still running with a fresh status time."""
+    if o.get("status") == "ready":
+        return False
+    if o.get("status") == "running":
+        try:
+            age = (datetime.datetime.now() - datetime.datetime.fromisoformat(o["status_at"])).total_seconds()
+        except (KeyError, ValueError, TypeError):
+            return False
+        return age >= RUNNING_FRESH_SECONDS
+    return True
 
 
 def cap_or_zero():

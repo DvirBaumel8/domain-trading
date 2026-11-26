@@ -69,7 +69,7 @@ class DeliveryTests(unittest.TestCase):
 
     def paid_order(self):
         oid, token = server.new_order(dict(ORDER), dict(ORDER, consent=True))
-        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "id": "pol_1", "metadata": {"order_id": oid},
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "billing_reason": "purchase", "net_amount": 14900, "id": "pol_1", "metadata": {"order_id": oid},
                                                          "customer": {"email": EMAIL}}}).encode()
         code, res = server.handle_polar(sign(body, "evt-" + oid), body)
         self.assertEqual((code, res["status"]), (200, "paid"))

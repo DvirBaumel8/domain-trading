@@ -8,7 +8,7 @@ Order types: base | maps | listings | content | bundle.
 Only `base` and `bundle` may reach the paid-run path (delivery.on_paid, behind its own gate).
 maps / listings / content are delivered by hand: no engine is ever called for them.
 """
-import datetime
+import datetime, re
 
 MANUAL_DELIVERY_BUSINESS_DAYS = 3        # Mon-Fri; inside the 5 business days promised in refunds.html
 
@@ -43,6 +43,46 @@ TYPES = {p["type"]: p for p in PRODUCTS.values()}
 # config.js key of each buy button -> order type (checked against the exact URLs in the tests)
 PAY_KEYS = {"payLinkCheck": "base", "payLinkMaps": "maps", "payLinkListings": "listings",
             "payLinkContent": "content", "payLinkBundle": "bundle"}
+
+
+BILLING_REASON_PURCHASE = "purchase"     # Polar's billing_reason of a one-time purchase
+AMOUNT_FIELDS = ("net_amount", "total_amount", "amount")
+
+
+def paid_cents(data):
+    """Paid amount in cents of an order.paid payload, or None when missing or not numeric.
+    Every amount field that is present must be numeric; the lowest one counts."""
+    vals = []
+    for k in AMOUNT_FIELDS:
+        if k not in data or data[k] is None:
+            continue
+        v = data[k]
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, str):
+            v = v.strip()
+            if not re.fullmatch(r"-?\d{1,12}", v):
+                return None
+            v = int(v)
+        elif isinstance(v, float):
+            if v != v or v in (float("inf"), float("-inf")):
+                return None
+        elif not isinstance(v, int):
+            return None
+        vals.append(v)
+    return min(vals) if vals else None
+
+
+def check_payment(data, info):
+    """-> (ok, reason). A payment may start anything only if it is a one-time purchase paid at list price or more."""
+    if data.get("billing_reason") != BILLING_REASON_PURCHASE:
+        return False, "billing reason is not a one-time purchase"
+    cents = paid_cents(data)
+    if cents is None:
+        return False, "paid amount missing or not a number"
+    if cents < info["price_usd"] * 100:
+        return False, "paid amount is below the list price"
+    return True, ""
 
 
 def delivery_kind(order_type):

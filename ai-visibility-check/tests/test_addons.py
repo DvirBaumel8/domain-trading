@@ -23,9 +23,15 @@ FRIDAY = datetime.datetime(2026, 11, 27, 10, 0)     # Friday
 SATURDAY = datetime.datetime(2026, 11, 28, 10, 0)
 
 
-def event(ptype, ref, email=EMAIL, shape="product_id", meta=None, pid=None):
+def event(ptype, ref, email=EMAIL, shape="product_id", meta=None, pid=None, amount="list", reason="purchase"):
     pid = PID[ptype] if pid is None else pid
     d = {"id": ref, "customer": {"email": email}}
+    if reason is not None:
+        d["billing_reason"] = reason
+    if amount == "list":
+        amount = products.TYPES[ptype]["price_usd"] * 100
+    if amount is not None:
+        d["net_amount"] = amount
     if meta:
         d["metadata"] = {"order_id": meta}
     if shape == "product_id" and pid:
@@ -287,7 +293,7 @@ class UnknownProductTests(Base):
         self.assertFalse(self.store().get(f"orders/{oid2}.json")[0]["paid"])
 
     def test_two_products_in_one_order_is_unknown(self):
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_two", "items": [{"product_id": PID["base"]}, {"product_id": PID["maps"]}]}}).encode()
+        body = json.dumps({"type": "order.paid", "data": {"id": "pol_two", "billing_reason": "purchase", "net_amount": 14900, "items": [{"product_id": PID["base"]}, {"product_id": PID["maps"]}]}}).encode()
         self.assertEqual(self.hook(body, "evt-two")[1]["status"], "unknown_product")
         self.assertEqual(self.runs(), 0)
 
@@ -324,7 +330,7 @@ class IdempotencyTests(Base):
         with mock.patch.object(server, "alert", boom):
             with self.assertRaises(RuntimeError):
                 self.hook(ev, "evt-crash")
-        self.assertIsNone(self.store().get("events/evt-crash.json")[0])     # marker not written: Polar retries
+        self.assertEqual(self.store().get("events/evt-crash.json")[0]["status"], "failed")   # Polar's retry can claim it
         self.assertEqual(len(self.manual_orders()), 1)
         self.hook(ev, "evt-crash")                                          # retry completes it
         self.assertEqual(len(self.manual_orders()), 1)
