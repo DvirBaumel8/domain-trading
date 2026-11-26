@@ -4,9 +4,9 @@ Product ids are public identifiers, not secrets. Checkout URLs live only in PAY_
 `price_usd` (integer dollars) is the one place prices live: the Dvir-approved Polar prices. The site's
 wording is checked against it in tests/test_addons.py.
 
-Order types: base | maps | listings | content | bundle.
+Order types: base | maps | listings_check | listings | content | bundle.
 Only `base` and `bundle` may reach the paid-run path (delivery.on_paid, behind its own gate).
-maps / listings / content are delivered by hand: no engine is ever called for them.
+maps / listings_check / listings / content are delivered by hand: no engine is ever called for them.
 """
 import datetime, os, re
 
@@ -17,9 +17,14 @@ MANUAL_PARTS = {
     "maps": {"name": "Google Maps Visibility Check",
              "owed": ["Google Maps profile check (name, address, phone, categories, services, description)",
                       "4 posts", "map-visibility baseline once access is given"]},
+    "listings_check": {"name": "Listings Consistency Check",
+                       "owed": ["17 directories AI assistants read: listed, wrong or missing (report)",
+                                "ordered checklist"]},
     "listings": {"name": "Listings Consistency Audit",
-                 "owed": ["17 directories AI assistants read: listed, wrong or missing",
-                          "ordered checklist"]},
+                 "owed": ["17 directories AI assistants read: listed, wrong or missing (report)",
+                          "ordered checklist",
+                          "ready-to-paste corrected-listing pack: fixed name, address, phone, hours and "
+                          "description texts per directory, plus a step list"]},
     "content": {"name": "AI Content Pack",
                 "owed": ["full-site crawl", "priority table", "rewrites for 5 pages",
                          "ready-to-paste structured data"]},
@@ -30,7 +35,11 @@ PRODUCTS = {
                                              "price_usd": 149, "autorun": True, "manual": ()},
     "5ee66135-2547-4885-81e3-f24bed392e29": {"type": "maps", "name": MANUAL_PARTS["maps"]["name"],
                                              "price_usd": 149, "autorun": False, "manual": ("maps",)},
+    "f6bd53b9-59db-4f91-ac76-078ec720fa0c": {"type": "listings_check", "name": MANUAL_PARTS["listings_check"]["name"],
+                                             "site_name": "Listings Consistency Check",
+                                             "price_usd": 99, "autorun": False, "manual": ("listings_check",)},
     "f6e7aa8b-3886-4280-a584-b771c47f49ab": {"type": "listings", "name": MANUAL_PARTS["listings"]["name"],
+                                             "site_name": "Listings with fix pack",
                                              "price_usd": 249, "autorun": False, "manual": ("listings",)},
     "10ba0ce6-36ac-4bcf-ab98-8d15bdf22e49": {"type": "content", "name": MANUAL_PARTS["content"]["name"],
                                              "price_usd": 249, "autorun": False, "manual": ("content",)},
@@ -41,24 +50,26 @@ AUTORUN_TYPES = frozenset(p["type"] for p in PRODUCTS.values() if p["autorun"])
 TYPES = {p["type"]: p for p in PRODUCTS.values()}
 
 # config.js key of each buy button -> order type (checked against the exact URLs in the tests)
-PAY_KEYS = {"payLinkCheck": "base", "payLinkMaps": "maps", "payLinkListings": "listings",
+PAY_KEYS = {"payLinkCheck": "base", "payLinkMaps": "maps", "payLinkListingsCheck": "listings_check",
+            "payLinkListings": "listings",
             "payLinkContent": "content", "payLinkBundle": "bundle"}
 
-# The one server-side map of Polar checkout URLs (public once shown, but the add-on ones are served only when
-# the ADDONS_CHECKOUT flag is on). The base check is always served.
+# The one server-side map of Polar checkout URLs (public once shown, but the add-on ones are served unless
+# the ADDONS_CHECKOUT flag is exactly 'off'). The base check is always served.
 PAY_LINKS = {
     "payLinkCheck": "https://buy.polar.sh/polar_cl_y4lp8S18BldD0ZyWWdevI07SSgM4eXEwJ6zOI4Fw8mv",
     "payLinkMaps": "https://buy.polar.sh/polar_cl_WLbIDFdoECel8rAZTJvC6UaexF6pSCNv9MpoY1vyfj2",
+    "payLinkListingsCheck": "https://buy.polar.sh/polar_cl_DrKvZJBKUGDt4puhZpW7sRsQTINuzc7QuXYyB3Q7geb",
     "payLinkListings": "https://buy.polar.sh/polar_cl_m2zedkpR2g1l5AFs08clQMdfhGWqRr94czipg06Tuhk",
     "payLinkContent": "https://buy.polar.sh/polar_cl_7Vku9OAnFyhBOiQTJtvGUXvSTSqJyV6B69tvV2UXXtw",
     "payLinkBundle": "https://buy.polar.sh/polar_cl_oYtWtZ6fV3CZgv4QbZnQtpAlOs0Vta35Gx3zx2z7sjw",
 }
-ADDON_PAY_KEYS = ("payLinkMaps", "payLinkListings", "payLinkContent", "payLinkBundle")
+ADDON_PAY_KEYS = ("payLinkMaps", "payLinkListingsCheck", "payLinkListings", "payLinkContent", "payLinkBundle")
 
 
 def addons_checkout_on():
-    """ADDONS_CHECKOUT, read at request time: only the exact string 'on' shows the add-on checkout buttons."""
-    return os.environ.get("ADDONS_CHECKOUT") == "on"
+    """ADDONS_CHECKOUT, read at request time: on by default; only the exact string 'off' hides the add-on buttons."""
+    return os.environ.get("ADDONS_CHECKOUT") != "off"
 
 
 def visible_pay_links():
@@ -105,6 +116,11 @@ def check_payment(data, info):
     if cents < info["price_usd"] * 100:
         return False, "paid amount is below the list price"
     return True, ""
+
+
+def site_name(p):
+    """The label the site shows for a product (the Polar name unless the map gives a display name)."""
+    return p.get("site_name", p["name"])
 
 
 def delivery_kind(order_type):

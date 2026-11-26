@@ -53,8 +53,9 @@ def render_page(raw):
     return render_addon_buttons(raw).replace(b"{{BUSINESS_ADDRESS}}", _html.escape(BUSINESS_ADDRESS).encode())
 
 
-ADDON_BUTTON = re.compile(r'<a class="btn ghost" data-pay="(payLinkMaps|payLinkListings|payLinkContent|payLinkBundle)" href="#pricing">[^<]*</a>')
-ADDON_NAMES = {"payLinkMaps": "Google Maps Visibility Check", "payLinkListings": "Listings Consistency Audit",
+ADDON_BUTTON = re.compile(r'<a class="btn ghost" data-pay="(payLinkMaps|payLinkListingsCheck|payLinkListings|payLinkContent|payLinkBundle)" href="#pricing">[^<]*</a>')
+ADDON_NAMES = {"payLinkMaps": "Google Maps Visibility Check", "payLinkListingsCheck": "Listings Consistency Check",
+               "payLinkListings": "Listings with fix pack",
                "payLinkContent": "AI Content Pack", "payLinkBundle": "AI Visibility Bundle"}
 
 
@@ -65,7 +66,7 @@ def waitlist_button(key):
 
 
 def render_addon_buttons(raw):
-    """With ADDONS_CHECKOUT off, the four add-on buy buttons become plain waitlist mailto links (no data-pay)."""
+    """With ADDONS_CHECKOUT off, the add-on buy buttons become plain waitlist mailto links (no data-pay)."""
     if products.addons_checkout_on():
         return raw
     return ADDON_BUTTON.sub(lambda m: waitlist_button(m.group(1)), raw.decode()).encode()
@@ -86,13 +87,22 @@ def clock():
 
 
 def client_ip(headers, peer):
-    """The client address: the entry the hosting proxy appended to X-Forwarded-For (the last one; earlier
-    entries can be written by the client), else the socket address. Only a valid IP address is used."""
-    xff = str((headers or {}).get("X-Forwarded-For") or "").split(",")[-1].strip()
-    try:
-        return str(ipaddress.ip_address(xff))
-    except ValueError:
-        return str(peer)
+    """The client address: CF-Connecting-IP if a valid IP, else the first valid X-Forwarded-For entry,
+    else the socket address. The last X-Forwarded-For entry is an internal address on this host."""
+    def valid(v):
+        try:
+            return str(ipaddress.ip_address(str(v).strip()))
+        except ValueError:
+            return None
+    h = headers or {}
+    ip = valid(h.get("CF-Connecting-IP") or "")
+    if ip:
+        return ip
+    for part in str(h.get("X-Forwarded-For") or "").split(","):
+        ip = valid(part)
+        if ip:
+            return ip
+    return str(peer)
 
 
 def prune_jobs(t=None):
@@ -868,6 +878,8 @@ def free_report_path(fid):
 
 
 def clean(d):
+    if not isinstance(d, dict):
+        raise ValueError(BAD_FORM_MSG)
     biz = str(d.get("business", "")).strip()[:120]
     city = str(d.get("city", "")).strip()[:60]
     niche = str(d.get("niche", "")).strip()

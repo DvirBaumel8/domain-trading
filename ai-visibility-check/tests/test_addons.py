@@ -9,16 +9,18 @@ import server, delivery, products  # noqa: E402
 
 fake_apis, sign, KEYS = td.fake_apis, td.sign, td.KEYS
 PID = {t: next(k for k, v in products.PRODUCTS.items() if v["type"] == t)
-       for t in ("base", "maps", "listings", "content", "bundle")}
+       for t in ("base", "maps", "listings_check", "listings", "content", "bundle")}
 EXPECT_PID = {"base": "5a9d5f7a-72a6-4ea4-8ae7-e9d4ac498fde", "maps": "5ee66135-2547-4885-81e3-f24bed392e29",
+              "listings_check": "f6bd53b9-59db-4f91-ac76-078ec720fa0c",
               "listings": "f6e7aa8b-3886-4280-a584-b771c47f49ab", "content": "10ba0ce6-36ac-4bcf-ab98-8d15bdf22e49",
               "bundle": "46231531-e36e-4149-aa6c-2d8c59edba87"}
 URLS = {"payLinkMaps": "https://buy.polar.sh/polar_cl_WLbIDFdoECel8rAZTJvC6UaexF6pSCNv9MpoY1vyfj2",
+        "payLinkListingsCheck": "https://buy.polar.sh/polar_cl_DrKvZJBKUGDt4puhZpW7sRsQTINuzc7QuXYyB3Q7geb",
         "payLinkListings": "https://buy.polar.sh/polar_cl_m2zedkpR2g1l5AFs08clQMdfhGWqRr94czipg06Tuhk",
         "payLinkContent": "https://buy.polar.sh/polar_cl_7Vku9OAnFyhBOiQTJtvGUXvSTSqJyV6B69tvV2UXXtw",
         "payLinkBundle": "https://buy.polar.sh/polar_cl_oYtWtZ6fV3CZgv4QbZnQtpAlOs0Vta35Gx3zx2z7sjw"}
 EMAIL, ORDER = td.EMAIL, td.ORDER
-ADDONS = ("maps", "listings", "content")
+ADDONS = ("maps", "listings_check", "listings", "content")
 FRIDAY = datetime.datetime(2026, 11, 27, 10, 0)     # Friday
 SATURDAY = datetime.datetime(2026, 11, 28, 10, 0)
 
@@ -113,7 +115,7 @@ class Base(unittest.TestCase):
 class RoutingTests(Base):
     def test_product_ids_are_the_approved_ones(self):
         self.assertEqual(PID, EXPECT_PID)
-        self.assertEqual(len(products.PRODUCTS), 5)
+        self.assertEqual(len(products.PRODUCTS), 6)
 
     def test_each_product_routes_to_its_type(self):
         for i, t in enumerate(PID):
@@ -131,7 +133,7 @@ class RoutingTests(Base):
         self.assertEqual(products.AUTORUN_TYPES, {"base", "bundle"})
 
     def test_only_base_and_bundle_start_a_run(self):
-        expect = {"base": 180, "bundle": 180, "maps": 0, "listings": 0, "content": 0}
+        expect = {"base": 180, "bundle": 180, "maps": 0, "listings_check": 0, "listings": 0, "content": 0}
         for t, calls in expect.items():
             fake_apis.CALLS.clear()
             self.intake(f"{t}@x.co")
@@ -379,14 +381,15 @@ class BuyButtonTests(unittest.TestCase):
                 for part in products.TYPES[otype]["manual"]:
                     self.assertIn(part, products.MANUAL_PARTS)
         self.assertEqual({k: products.delivery_kind(t) for k, t in products.PAY_KEYS.items()},
-                         {"payLinkCheck": "auto", "payLinkMaps": "manual", "payLinkListings": "manual",
+                         {"payLinkCheck": "auto", "payLinkMaps": "manual", "payLinkListingsCheck": "manual",
+                          "payLinkListings": "manual",
                           "payLinkContent": "manual", "payLinkBundle": "auto+manual"})
 
     def test_site_names_match_polar_products_and_honest_timing(self):
         html = open(os.path.join(self.SITE, "index.html"), encoding="utf-8").read()
-        for name in ("Google Maps Visibility Check", "Listings Consistency Audit", "AI Content Pack", "AI Visibility Bundle"):
+        for name in ("Google Maps Visibility Check", "Listings Consistency Check", "Listings with fix pack", "AI Content Pack", "AI Visibility Bundle"):
             self.assertIn(name, html)
-        self.assertEqual(html.count("within 3 business days"), 4)
+        self.assertEqual(html.count("within 3 business days"), 5)
         for banned in ("we claim and fix", "re-check after 30 days"):
             self.assertNotIn(banned, html)
         self.assertIn("3 business days", open(os.path.join(self.SITE, "thanks.html"), encoding="utf-8").read())
