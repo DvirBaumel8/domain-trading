@@ -1,91 +1,88 @@
-## Sitemap URL Extractor - All Website URLs
+# Sitemap URL Extractor: Every URL of a Site for Audits
 
-Get **every page URL from a website's sitemaps** in seconds. The Actor auto-discovers sitemaps from `robots.txt` and common paths, follows sitemap indexes and `.gz` files, and returns `lastmod`, `priority`, `hreflang` and an optional HTTP status for each URL.
+Get every URL of a site for an SEO or AI audit, or to feed a crawler. Give a website or a sitemap address and get the list of page URLs it publishes.
 
-You pay **per URL returned**. Current prices per 1,000 URLs, including any plan discounts, are on the **Pricing** tab. The default **Max URLs per site** is 1,000, so a first run on a huge site stays bounded. Raise that cap when you need a full list. The Apify Free plan includes monthly Store credit you can use for a first test — open the Pricing tab to see how far it goes at today's rates.
+**Returns** one row per URL: `url`, `lastmod`, `changefreq`, `priority`, `imageCount`, `hreflang`, `sitemapUrl` (the sitemap file it came from), `site`, and `statusCode` and `finalUrl` when **Check HTTP status** is on.
 
-![Sample output from Sitemap URL Extractor](https://api.apify.com/v2/key-value-stores/dNe1hFUAqsMnqLOYE/records/sitemap-output.png)
-
-## Use cases
-
-- SEO teams building a complete URL list for an audit, crawl seed or migration.
-- Content and competitor research: watch a site's sitemap daily for new pages.
-- Developers who need a clean URL inventory, with lastmod and hreflang, without writing a crawler.
-- Finding broken pages by turning on **Check HTTP status**.
-
-## Features
-
-- Auto-discovers sitemaps from `robots.txt` and common locations such as `/sitemap.xml`.
-- Follows sitemap indexes and compressed `.xml.gz` files.
-- Returns `lastmod`, `changefreq`, `priority`, image counts and `hreflang` alternates when the sitemap publishes them.
-- Optional include/exclude regex and "modified since" date filters — applied before results are saved, so you only pay for URLs you keep.
-- Optional HTTP status check (HEAD/GET) for 404s and redirects.
-- Safe XML parsing, protected against malformed and malicious XML.
-- Built against the official [Sitemaps XML protocol](https://www.sitemaps.org/protocol.html) and [Google sitemap documentation](https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview).
-
-## How to use it
-
-1. Add websites (for example `https://example.com`) or direct sitemap URLs to **Websites or sitemap URLs**.
-2. Optional: set **Max URLs per site** (default 1,000), include/exclude regex, **Only URLs modified since**, or **Check HTTP status**.
-3. Click **Start**, then export the dataset or call the Actor from the API.
-
-### Input example
+**Cost:** pay per result, one result per URL kept. Filters run before results are saved. See the Pricing tab for current prices.
 
 ```json
-{
-  "startUrls": ["https://wordpress.org/news/"],
-  "includeRegex": "/news/20",
-  "modifiedSince": "2024-01-01",
-  "maxUrlsPerSite": 5000,
-  "checkStatus": true
-}
+{ "startUrls": ["https://docs.apify.com/sitemap.xml"], "maxUrlsPerSite": 1000 }
 ```
 
-### Output example
+## Step 1 of a site audit
+
+This Actor is built to be the first step. Its output is a clean URL list that you can feed to other tools:
+
+- **Broken Link Auditor**, another Actor by the same author: check the status and redirects of every URL.
+- **Bulk PageSpeed Checker**, another Actor by the same author: Core Web Vitals for every page.
+- Your own crawler, or an SEO or AI audit that needs the full list of pages.
+
+Export the dataset as CSV, JSON or Excel, or read the `url` column through the API.
+
+### Example output (illustrative, abridged)
 
 ```json
 {
-  "url": "https://wordpress.org/news/2025/12/sotw-2025/",
-  "lastmod": "2025-12-03T17:45:05Z",
+  "url": "https://www.example.com/blog/first-post",
+  "lastmod": "2026-03-04",
   "changefreq": null,
-  "priority": null,
-  "imageCount": 0,
-  "hreflang": [],
-  "sitemapUrl": "https://wordpress.org/news/video-sitemap-1.xml",
-  "site": "https://wordpress.org/news/",
-  "statusCode": 200,
-  "finalUrl": "https://wordpress.org/news/2025/12/sotw-2025/"
+  "priority": 0.8,
+  "imageCount": 1,
+  "hreflang": [{ "lang": "de", "url": "https://www.example.com/de/blog/first-post" }],
+  "sitemapUrl": "https://www.example.com/sitemap.xml",
+  "site": "https://www.example.com",
+  "statusCode": null,
+  "finalUrl": null
 }
 ```
 
-## How much does it cost?
+## What it does
 
-You pay **per URL returned** (the `result` event on the Pricing tab), plus a small start fee. Filters run before results are saved, so you only pay for the URLs you keep. Set **Max URLs per site** to cap spend on huge sites — the default is 1,000.
+- Finds sitemaps from `robots.txt` and common paths (`/sitemap.xml`, `/sitemap_index.xml`, `/sitemap-index.xml`, `/wp-sitemap.xml`, `/sitemap/sitemap.xml`), or reads the sitemap URL you give.
+- Follows sitemap indexes, compressed `.xml.gz` files and plain-text sitemaps.
+- Returns `lastmod`, `changefreq`, `priority`, image counts and `hreflang` alternates when the sitemap publishes them.
+- Optional include and exclude regular expressions and a "modified since" date, applied before results are saved.
+- Optional HTTP status check (HEAD, GET if HEAD is refused) for 404s and redirects.
+- Parses XML with a safe parser (`defusedxml`).
 
-Because prices can change, this page does not hard-code a per-1,000 figure. Open the **Pricing** tab for the live rate and any Bronze, Silver or Gold discounts. Apify's Free plan monthly credit is enough for a first test of a typical site at usual rates.
+## Input
 
-## API, scheduling and export
+| Field | Meaning |
+|---|---|
+| `startUrls` (required) | Websites or sitemap URLs, one per line |
+| `maxUrlsPerSite` | Cap per start entry, 1-1000000 (default 1000) |
+| `includeRegex`, `excludeRegex` | Keep or drop URLs by pattern |
+| `modifiedSince` | `YYYY-MM-DD` or a full ISO date-time; URLs with no `lastmod` are dropped when set |
+| `checkStatus` | Add `statusCode` and `finalUrl` (default off) |
+| `maxSitemaps` | Cap on sitemap files per start entry, 1-10000 (default 500) |
 
-Run this Actor from [Apify Console](https://console.apify.com), from the [API](https://docs.apify.com/api/v2#/reference/actors/run-collection/run-actor) (`looped_kite/sitemap-url-extractor`), or from a language client. Schedule runs in Apify Console, and export results as JSON, CSV, Excel or HTML. You can also connect a webhook, Slack, Make, Zapier, n8n or Google Sheets.
+Input is checked before any request is made:
+
+- Entries that are not an http or https address (for example `not a url`, `mailto:` or `ftp:`) are saved to `INVALID_INPUTS` in the key-value store, logged once and not charged.
+- A `modifiedSince` that is not a date stops the run at once with "modifiedSince must look like 2026-01-31". Nothing is charged.
+- If a server cannot be reached the log says `could not connect (reason)`, for example `dns lookup failed`.
 
 ## Notes and limits
 
-- The Actor reads only what a site publishes for search engines in its sitemaps. It does not crawl pages or log in.
-- Pages missing from a site's sitemap will not appear. Use a crawler for those.
+- The Actor reads what a site publishes in its sitemaps. It does not crawl pages and does not log in. Pages missing from the sitemap will not appear.
 - If a site has no sitemap, the run log says so and nothing is charged for that site.
+- Without a `lastmod` in the sitemap, **modified since** cannot match the URL.
 
 ## FAQ
 
-**Can I monitor new pages on a competitor's site?** Yes. Schedule the Actor daily with **Only URLs modified since** set to a recent date, and connect a webhook, Slack or email integration.
+**Can I watch a site for new pages?** Yes. Schedule the Actor with Apify Schedules and set **modifiedSince** to a recent date.
 
-**Does it work with Shopify, WordPress, Wix, Squarespace and Webflow?** Yes. They all publish standard XML sitemaps.
+**How big can a site be?** Up to 1,000,000 URLs per start entry per run (`maxUrlsPerSite`); the default is 1,000.
 
-**How big can a site be?** Up to 1,000,000 URLs per site per run (`maxUrlsPerSite`), and 500 sitemap files by default (`maxSitemaps`). The default cap is 1,000 URLs per site so a first run stays inexpensive.
+**What if I leave the start URLs empty?** The run stops with a message. Add at least one website or sitemap URL.
 
-**What happens if I leave the start URLs empty?** The run does not start. Add at least one website or sitemap URL.
+## Other Actors by the same author
 
-## Other tools from this developer
+- Broken Link Auditor: status, redirects and 404s for many URLs.
+- Bulk PageSpeed Checker: Core Web Vitals for many pages.
+- Bulk DNS & Email Auth Checker: SPF, DKIM, DMARC and MX for many domains.
 
-- [Bulk DNS & Email Auth Checker](https://apify.com/looped_kite/bulk-dns-email-auth-checker) — SPF, DKIM, DMARC, MX, and a 0–100 email-auth score.
-- [Bulk Domain Availability Checker](https://apify.com/looped_kite/bulk-domain-availability-checker) — DNS plus official RDAP registry checks.
-- [Domain Checkup Report](https://apify.com/looped_kite/domain-checkup-report) — registration, DNS, safety, for-sale signals, and a 0–100 score.
+## Permissions
+
+This Actor needs only limited permissions: it reads its input and writes to its own default dataset. It also saves an `INVALID_INPUTS` record in its own default key-value store.

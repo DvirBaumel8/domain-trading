@@ -8,14 +8,14 @@
           "string",
           "null"
         ],
-        "description": "Domain checked"
+        "description": "Domain checked, in lower case (URLs and emails are reduced to their domain)"
       },
       "resolves": {
         "type": [
           "boolean",
           "null"
         ],
-        "description": "Domain exists in DNS"
+        "description": "true = the domain exists in DNS, false = NXDOMAIN (does not exist), null = DNS lookup failed"
       },
       "a": {
         "type": [
@@ -43,7 +43,7 @@
           "array",
           "null"
         ],
-        "description": "MX records {priority, host}"
+        "description": "MX records as {priority, host}, lowest priority first. An empty list means no MX record, or a null MX (see issues)"
       },
       "emailProvider": {
         "type": [
@@ -64,7 +64,7 @@
           "string",
           "null"
         ],
-        "description": "SPF 'all' policy: -all, ~all, ?all, +all"
+        "description": "How the SPF record ends: -all, ~all, ?all or +all. null = no SPF record, or no 'all' mechanism"
       },
       "spfLookups": {
         "type": [
@@ -78,7 +78,7 @@
           "string",
           "null"
         ],
-        "description": "DMARC record"
+        "description": "DMARC record text from _dmarc.<domain>. null = no DMARC record"
       },
       "dmarcPolicy": {
         "type": [
@@ -134,14 +134,14 @@
           "integer",
           "null"
         ],
-        "description": "Email authentication score 0-100"
+        "description": "Email-authentication score 0-100 (see the README, How to read the score). 0 for domains that do not exist"
       },
       "issues": {
         "type": [
           "array",
           "null"
         ],
-        "description": "Plain-English problems found"
+        "description": "Plain-English problems found, for example 'No DMARC record' or 'No MX records'. Empty list = nothing to report"
       },
       "error": {
         "type": [
@@ -157,53 +157,122 @@
         ],
         "description": "UTC timestamp"
       }
-    }
+    },
+    "required": [
+      "domain",
+      "issues",
+      "checkedAt"
+    ]
   },
   "views": {
     "overview": {
-      "title": "Overview",
+      "title": "Pre-send audit",
       "transformation": {
         "fields": [
           "domain",
+          "resolves",
+          "emailScore",
+          "mx",
           "emailProvider",
           "spfAll",
           "dmarcPolicy",
+          "dmarcRua",
           "dkimSelectorsFound",
-          "emailScore",
           "issues",
-          "mx",
-          "parkedOrForSale"
+          "error"
         ]
       },
       "display": {
         "component": "table",
         "properties": {
           "domain": {
-            "label": "domain"
+            "label": "Domain"
           },
-          "emailProvider": {
-            "label": "emailProvider"
-          },
-          "spfAll": {
-            "label": "spfAll"
-          },
-          "dmarcPolicy": {
-            "label": "dmarcPolicy"
-          },
-          "dkimSelectorsFound": {
-            "label": "dkimSelectorsFound"
+          "resolves": {
+            "label": "Exists in DNS"
           },
           "emailScore": {
-            "label": "emailScore"
-          },
-          "issues": {
-            "label": "issues"
+            "label": "Score (0-100)"
           },
           "mx": {
-            "label": "mx"
+            "label": "MX records"
+          },
+          "emailProvider": {
+            "label": "Email provider"
+          },
+          "spfAll": {
+            "label": "SPF all"
+          },
+          "dmarcPolicy": {
+            "label": "DMARC policy"
+          },
+          "dmarcRua": {
+            "label": "DMARC reports to"
+          },
+          "dkimSelectorsFound": {
+            "label": "DKIM selectors found"
+          },
+          "issues": {
+            "label": "Issues"
+          },
+          "error": {
+            "label": "Error"
+          }
+        }
+      }
+    },
+    "records": {
+      "title": "DNS records",
+      "transformation": {
+        "fields": [
+          "domain",
+          "ns",
+          "a",
+          "aaaa",
+          "caa",
+          "spf",
+          "dmarc",
+          "mtaSts",
+          "bimi",
+          "parkedOrForSale",
+          "checkedAt"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "domain": {
+            "label": "Domain"
+          },
+          "ns": {
+            "label": "Nameservers"
+          },
+          "a": {
+            "label": "A"
+          },
+          "aaaa": {
+            "label": "AAAA"
+          },
+          "caa": {
+            "label": "CAA"
+          },
+          "spf": {
+            "label": "SPF record"
+          },
+          "dmarc": {
+            "label": "DMARC record"
+          },
+          "mtaSts": {
+            "label": "MTA-STS"
+          },
+          "bimi": {
+            "label": "BIMI"
           },
           "parkedOrForSale": {
-            "label": "parkedOrForSale"
+            "label": "Parked / for sale"
+          },
+          "checkedAt": {
+            "label": "Checked at"
           }
         }
       }

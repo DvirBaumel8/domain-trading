@@ -1,8 +1,8 @@
 {
   "actorSpecification": 1,
   "name": "domain-checkup-report",
-  "title": "Domain Checkup Report: DNS, Safety & Score",
-  "description": "Get a one-row due-diligence report for any domain: registration age, registrar and expiry (RDAP), DNS and provider, parked or for-sale with asking price, SPF/DMARC, Cloudflare Security DNS, a trademark-risk hint, and a 0-100 score. Paste domains, URLs or emails. Export JSON, CSV or Excel.",
+  "title": "Domain Due Diligence Report: Check a Domain Before You Buy",
+  "description": "Due diligence before you buy a domain: a one-row report with registration age, registrar and expiry (RDAP), DNS and provider, parked or for-sale signals with a visible asking price, SPF/DMARC, a Cloudflare Security DNS safety check, a trademark-risk hint and a 0-100 score. Paste domains, URLs or emails. Public DNS and registries, no API keys. Export JSON, CSV or Excel.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {
@@ -20,6 +20,6 @@
   "defaultRunOptions": {
     "memoryMbytes": 256
   },
-  "seoTitle": "Domain Checkup Report (RDAP, DNS & Score)",
-  "seoDescription": "Due-diligence report for any domain: RDAP registration, DNS, for-sale price, email auth, safety check and a 0-100 score. Public DNS, no API keys."
+  "seoTitle": "Domain Due Diligence Report Before You Buy",
+  "seoDescription": "Due diligence before you buy a domain: age, registrar, expiry, DNS, for-sale signals, email auth, safety check and a 0-100 score. No API keys."
 }

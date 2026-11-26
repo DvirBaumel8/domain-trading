@@ -4,89 +4,124 @@
     "type": "object",
     "properties": {
       "url": {
-        "type": "string"
+        "type": "string",
+        "description": "The URL that was checked (normalised: lower-case host, no #fragment)"
       },
       "category": {
         "type": "string",
-        "description": "ok, redirect, 4xx, 5xx, error or robots_blocked"
+        "description": "ok (2xx/3xx without redirect), redirect (answered after one or more redirects), 4xx, 5xx, error (no answer, or a redirect loop) or robots_blocked (not requested)"
       },
       "statusCode": {
         "type": [
           "integer",
           "null"
-        ]
+        ],
+        "description": "Final HTTP status code; null when there was no HTTP answer"
       },
       "finalUrl": {
         "type": [
           "string",
           "null"
-        ]
+        ],
+        "description": "URL after following redirects; null when robots.txt blocked the check"
       },
       "redirectChain": {
-        "type": "array"
+        "type": "array",
+        "description": "Redirect hops in order, each {status, url}; empty if there was no redirect"
       },
       "redirectLoop": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "true for a redirect loop or more than 10 redirects"
       },
       "error": {
         "type": [
           "string",
           "null"
-        ]
+        ],
+        "description": "Plain reason when there was no answer: dns_failure, connection_refused, connection_reset, connect_timeout, tls_error or other; or 'redirect loop', 'more than 10 redirects', 'disallowed by robots.txt'; null otherwise"
       },
       "responseTimeMs": {
         "type": [
           "integer",
           "null"
-        ]
+        ],
+        "description": "Time for the whole check including redirects, in milliseconds; null when robots.txt blocked it"
       },
       "contentType": {
         "type": [
           "string",
           "null"
-        ]
+        ],
+        "description": "Content-Type of the final answer without parameters; null if none"
       },
       "sources": {
-        "type": "array"
+        "type": "array",
+        "description": "Crawl mode: pages that link to this URL, each {sourceUrl, anchorText} (up to 20). Empty in list and sitemap mode"
       },
       "checkedAt": {
-        "type": "string"
+        "type": "string",
+        "description": "UTC time of the check (ISO 8601)"
       }
-    }
+    },
+    "required": [
+      "url",
+      "category",
+      "statusCode",
+      "finalUrl",
+      "redirectChain",
+      "redirectLoop",
+      "error",
+      "responseTimeMs",
+      "contentType",
+      "sources",
+      "checkedAt"
+    ]
   },
   "views": {
     "overview": {
-      "title": "Overview",
+      "title": "Link report",
       "transformation": {
         "fields": [
           "url",
           "category",
           "statusCode",
           "finalUrl",
+          "redirectChain",
+          "redirectLoop",
+          "error",
           "responseTimeMs",
-          "contentType"
+          "sources"
         ]
       },
       "display": {
         "component": "table",
         "properties": {
           "url": {
-            "label": "url"
+            "label": "URL"
           },
           "category": {
-            "label": "category"
+            "label": "Category"
           },
           "statusCode": {
-            "label": "statusCode"
+            "label": "Status"
           },
           "finalUrl": {
-            "label": "finalUrl"
+            "label": "Final URL"
+          },
+          "redirectChain": {
+            "label": "Redirect chain"
+          },
+          "redirectLoop": {
+            "label": "Loop"
+          },
+          "error": {
+            "label": "Error"
           },
           "responseTimeMs": {
-            "label": "responseTimeMs"
+            "label": "Time (ms)"
           },
-          "contentType": {
-            "label": "contentType"
+          "sources": {
+            "label": "Linked from"
           }
         }
       }

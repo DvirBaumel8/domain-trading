@@ -1,6 +1,6 @@
 {
   "actorOutputSchemaVersion": 1,
-  "title": "Broken Link & URL Status Auditor output",
+  "title": "Site Migration QA output",
   "properties": {
     "results": {
       "type": "string",

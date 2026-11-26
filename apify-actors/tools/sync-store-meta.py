@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sync the Store text keys of each actor.json to Apify. Run from Dvir's machine right after `apify push`.
 
-Sends only TEXT_KEYS (never prices, pricing model or visibility), then reads them back and fails on any difference.
+Sends only TEXT_KEYS plus exampleRunInput (the input schema prefill; never prices, pricing model or visibility), then reads them back and fails on any difference.
 The token comes from the APIFY_TOKEN environment variable and is never printed.
 """
 from __future__ import annotations
@@ -27,6 +27,22 @@ def text_payload(actor_json: dict) -> dict:
     return {k: actor_json[k] for k in TEXT_KEYS if k in actor_json}
 
 
+def example_run_input(name: str) -> dict | None:
+    """Store "example run input": the input schema prefill, as Apify wants it ({body, contentType}). Text only."""
+    schema = json.loads((ROOT / name / ".actor" / "input_schema.json").read_text())
+    prefill = {k: v["prefill"] for k, v in schema.get("properties", {}).items() if "prefill" in v}
+    if not prefill:
+        return None
+    return {"body": json.dumps(prefill, indent=2), "contentType": "application/json; charset=utf-8"}
+
+
+def _same_example(want: dict, got) -> bool:
+    try:
+        return json.loads(want["body"]) == json.loads((got or {}).get("body", "null"))
+    except (TypeError, ValueError):
+        return False
+
+
 def _request(method: str, path: str, token: str, body: dict | None = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(BASE + path, data=data, method=method)
@@ -40,9 +56,14 @@ def _request(method: str, path: str, token: str, body: dict | None = None) -> di
 def sync(name: str, actor_id: str, token: str, http=_request) -> list[str]:
     """Returns the keys that differ after the PUT (empty list = ok)."""
     want = text_payload(json.loads((ROOT / name / ".actor" / "actor.json").read_text()))
-    http("PUT", f"/v2/actors/{actor_id}", token, want)
+    example = example_run_input(name)
+    body = dict(want, exampleRunInput=example) if example else want
+    http("PUT", f"/v2/actors/{actor_id}", token, body)
     got = http("GET", f"/v2/actors/{actor_id}", token)
-    return [k for k, v in want.items() if got.get(k) != v]
+    diff = [k for k, v in want.items() if got.get(k) != v]
+    if example and not _same_example(example, got.get("exampleRunInput")):
+        diff.append("exampleRunInput")
+    return diff
 
 
 def main() -> int:
