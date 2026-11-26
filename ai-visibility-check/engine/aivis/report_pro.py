@@ -8,6 +8,7 @@ render(result, sample=..., anonymize=..., brand=..., run_note=...)
 """
 import datetime as _dt
 import html
+import re
 import string
 
 from .niches import niche_label
@@ -56,6 +57,14 @@ def _alias_map(names, keep):
     return out
 
 
+FREE_MODEL = "a free AI model"
+
+
+def _vendor(provider):
+    """The free self-check shows 'a free AI model', not the vendor behind it."""
+    return FREE_MODEL if provider == "pollinations" else provider
+
+
 def render(result, sample=False, anonymize=False, brand="AI Visibility Check", target_label=None,
            run_note="", date=None) -> str:
     s = result.score
@@ -69,27 +78,26 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
                 unv.append(m.raw)
     total_named = sum(len(ms) for _, ms, _ in result.records)
     reg = getattr(result, "has_register", False)
-    named = []                    # no-register trades: every name AI gave, unverified included
-    if not reg:
-        cnt, label = {}, {}
-        for ans, ms, _ in result.records:
-            seen = set()
-            for m in ms:
-                if m.roster_name == target:
-                    continue
-                label_name = m.roster_name or m.raw
-                seen.add(label_name.lower())
-                label.setdefault(label_name.lower(), label_name)
-            for k in seen:
-                cnt[k] = cnt.get(k, 0) + 1
-        named = [(label[k], c, c / s.total_answers if s.total_answers else 0.0)
-                 for k, c in sorted(cnt.items(), key=lambda kv: -kv[1])]
+    cnt, label = {}, {}           # every distinct name AI gave instead of the business (verified or not)
+    for ans, ms, _ in result.records:
+        seen = set()
+        for m in ms:
+            if m.roster_name == target:
+                continue
+            label_name = (m.roster_name or m.raw).strip()
+            seen.add(label_name.lower())
+            label.setdefault(label_name.lower(), label_name)
+        for k in seen:
+            cnt[k] = cnt.get(k, 0) + 1
+    named = [(label[k], c, c / s.total_answers if s.total_answers else 0.0)      # no-register trades' table rows
+             for k, c in sorted(cnt.items(), key=lambda kv: -kv[1])]
+    distinct = len(cnt)
     alias = _alias_map(comp_names + [n for n, _, _ in named] + unv, target) if anonymize else {}
     nm = lambda n: E(alias.get(n, tlabel if n == target else n))
     date = date or _dt.date.today().isoformat()
     color = "#ef4444" if s.score < 20 else "#f59e0b" if s.score < 50 else "#10b981"
-    engines = ", ".join(sorted({f"{p.provider} ({p.mode})" for p in s.providers}))
-    models = sorted({(a.provider, a.model) for a, _, _ in result.records if a.model})
+    engines = ", ".join(sorted({f"{_vendor(p.provider)} ({p.mode})" for p in s.providers}))
+    models = sorted({(_vendor(a.provider), a.model) for a, _, _ in result.records if a.model and a.provider != "pollinations"})
     models_txt = ("Engines and exact models: " + "; ".join(f"{E(p)} {E(m)}" for p, m in models) +
                   f"; run date {E(date)}. ") if models else ""
     h = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -105,10 +113,9 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
                  " A paid report runs the AI assistants you "
                  "choose, on more questions and repeats; its numbers will differ from this sample.</div>")
     vr = 1 - (len(unv) / total_named) if total_named else 0
-    kpi3 = (f"<div class='kpi'><b>{vr:.0%}</b><span>of business-name mentions matched an official register</span></div>" if reg else
-            "<div class='kpi'><b>n/a</b><span>names for this trade are listed as named by AI, not verified</span></div>")
-    kpi2 = (f"<div class='kpi'><b>{len(comp_names)}</b><span>local competitors named instead</span></div>" if reg else
-            f"<div class='kpi'><b>{len(named)}</b><span>business names named by AI instead (unverified)</span></div>")
+    kpi3 = (f"<div class='kpi'><b>{vr:.0%}</b><span>of the {total_named} mentions matched an official register</span></div>" if reg else
+            f"<div class='kpi'><b>{total_named}</b><span>mentions in total; names for this trade are not register-checked</span></div>")
+    kpi2 = f"<div class='kpi'><b>{distinct}</b><span>names AI gave instead (distinct names)</span></div>"
     h.append(f"<div class='grid'><div class='gauge' style='--v:{max(s.score,1)};--c:{color}'><div><div>"
              f"<b>{s.score}</b><span>out of 100<br>AI visibility</span></div></div></div><div><div class='kpis'>"
              f"<div class='kpi'><b>{sum(p.target_hits for p in s.providers)}/{s.total_answers}</b><span>answers that named this business</span></div>"
@@ -117,7 +124,7 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
              f"questions, with a 95% range, because AI answers change every time.</p></div></div>")
     h.append("<h2>By AI assistant</h2><table><tr><th>Assistant</th><th>Mode</th><th>Named you</th><th>95% range</th></tr>")
     for p in s.providers:
-        h.append(f"<tr><td>{E(p.provider)}</td><td>{E(p.mode)}</td><td>{p.target_hits}/{p.answers} ({p.rate:.0%})</td>"
+        h.append(f"<tr><td>{E(_vendor(p.provider))}</td><td>{E(p.mode)}</td><td>{p.target_hits}/{p.answers} ({p.rate:.0%})</td>"
                  f"<td>{p.ci[0]:.0%}–{p.ci[1]:.0%}</td></tr>")
     h.append("</table>")
     rows = s.competitors if reg else named
@@ -130,11 +137,13 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
         h.append("</table>")
     else:
         h.append("<p class='sub'>none found</p>")
-    ex = next(((a.prompt, a.provider, [m.roster_name or m.raw for m in ms][:5]) for a, ms, _ in result.records
+    ex = next(((a.prompt, FREE_MODEL if a.provider == "pollinations" else a.provider,
+                [(m.roster_name or m.raw).strip() for m in ms][:5]) for a, ms, _ in result.records
                if ms and target not in [m.roster_name for m in ms]), None)
     if ex:
-        h.append(f"<h2>Example answer</h2><div class='q'>Asked <b>“{E(ex[0])}”</b>, {E(ex[1])} named: "
-                 f"{', '.join(nm(n) for n in ex[2])}. <b>Not you.</b></div>")
+        line = (f"Asked <b>“{E(ex[0])}”</b>, {E(ex[1])} named: {', '.join(nm(n) for n in ex[2])}. "
+                f"<b>Not you.</b>")
+        h.append("<h2>Example answer</h2><div class='q'>" + re.sub(r"\s+,", ",", line) + "</div>")
     if unv and reg:
         h.append(f"<h2>Names we could not verify</h2><div class='q warn'>{len(unv)} of {total_named} business-name mentions in "
                  f"these answers did not match any practice in the official register for {E(result.city)}. Some may be "

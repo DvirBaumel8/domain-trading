@@ -5,7 +5,8 @@ python3 server.py [--port 8080] [--free-run]
 POST /api/check   free self-check. Instant answer from data/markets/*.json when we
                   have that niche+city; else, with --free-run, a short free run
                   (Pollinations, 8 questions, $0) in the background; else the
-                  request is just saved. Requests go to data/requests.jsonl.
+                  request is just saved. Requests go to the private orders store (leads/).
+                  Limits per client address: 5 checks an hour, 3 free jobs at once (429 beyond).
 GET  /api/check/<id>  status of a background free run.
 POST /api/intake  order intake -> orders store (private GitHub repo via ORDERS_REPO +
                   ORDERS_GITHUB_TOKEN; else a local folder that is never served).
@@ -14,7 +15,7 @@ New orders, payments and failed runs alert: a GitHub issue in ORDERS_REPO (ids, 
 and/or ORDER_ALERT_WEBHOOK_URL. A background thread resumes lost runs and sweeps stuck orders every 10 minutes.
 Only the files in PUBLIC_FILES / PUBLIC_DIRS are served. Nothing here sends email or spends money.
 """
-import argparse, base64, queue, datetime, hashlib, hmac, http.server, json, mimetypes, os, posixpath, re, sys, threading, time, urllib.parse, urllib.request, uuid
+import argparse, base64, ipaddress, queue, shutil, tempfile, datetime, hashlib, hmac, http.server, json, mimetypes, os, posixpath, re, sys, threading, time, urllib.parse, urllib.request, uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -34,8 +35,15 @@ LOCK = threading.Lock()
 FREE_RUN = False
 MAX_BODY = 4096
 MAX_HOOK_BODY = 65536
+BAD_FORM_MSG = "Please send the form again."
+BUSY_MSG = "Too many checks right now, try again in a few minutes."
+FREE_PER_HOUR = 5           # free checks per client address per hour
+FREE_CONCURRENT = 3         # free jobs running at once per client address
+JOB_KEEP_SECONDS = 3600     # finished JOBS entries are dropped after this
+JOB_META = {}               # job id -> {"ip", "started", "finished"}; never sent to the browser
+CHECK_LOG = {}              # client address -> start times of recent checks
 PUBLIC_FILES = {"index.html", "agency.html", "privacy.html", "refunds.html", "sample-report.html",
-                "sample-report.pdf", "terms.html", "thanks.html"}
+                "sample-report.pdf", "terms.html", "thanks.html", "favicon.ico"}
 PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, these extensions only
 LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")
 
@@ -47,6 +55,56 @@ def render_page(raw):
 
 def log(msg):
     print(msg, file=sys.stderr)
+
+
+def clock():
+    return time.time()      # tests replace this
+
+
+def client_ip(headers, peer):
+    """The client address: the entry the hosting proxy appended to X-Forwarded-For (the last one; earlier
+    entries can be written by the client), else the socket address. Only a valid IP address is used."""
+    xff = str((headers or {}).get("X-Forwarded-For") or "").split(",")[-1].strip()
+    try:
+        return str(ipaddress.ip_address(xff))
+    except ValueError:
+        return str(peer)
+
+
+def prune_jobs(t=None):
+    """Drop finished JOBS entries (and their metadata) older than JOB_KEEP_SECONDS, and old check times."""
+    t = clock() if t is None else t
+    with LOCK:
+        for j, m in list(JOB_META.items()):
+            if m.get("finished") and t - m["finished"] > JOB_KEEP_SECONDS:
+                JOB_META.pop(j, None); JOBS.pop(j, None)
+        for j in list(JOBS):
+            if j not in JOB_META and JOBS[j].get("status") != "running":
+                JOBS.pop(j, None)       # no record of when it ended: do not keep it forever
+        for ip, ts in list(CHECK_LOG.items()):
+            ts[:] = [x for x in ts if t - x < 3600]
+            if not ts:
+                CHECK_LOG.pop(ip, None)
+
+
+def admit_check(ip, free_run):
+    """True and the check is counted, or False when this address is over its limits."""
+    t = clock()
+    prune_jobs(t)
+    with LOCK:
+        if len(CHECK_LOG.get(ip, [])) >= FREE_PER_HOUR:
+            return False
+        if free_run and sum(1 for j, m in JOB_META.items()
+                            if m.get("ip") == ip and not m.get("finished") and JOBS.get(j, {}).get("status") == "running") >= FREE_CONCURRENT:
+            return False
+        CHECK_LOG.setdefault(ip, []).append(t)
+        return True
+
+
+def finish_job(job_id, result):
+    with LOCK:
+        JOBS[job_id] = result
+        JOB_META.setdefault(job_id, {})["finished"] = clock()
 
 
 def http_call(req, timeout=15):
@@ -776,10 +834,13 @@ def slug(niche, city):
     return f"{niche}__{city.lower().replace(',', '').replace(' ', '-')}"
 
 
-def save_line(path, obj):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with LOCK, open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(obj) + "\n")
+def save_lead(obj):
+    """A saved request goes to the private orders store (one file per request)."""
+    return Store().put(f"leads/{now().strftime('%y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}.json", obj)
+
+
+def free_report_path(fid):
+    return f"free/{fid}/report.html"
 
 
 def clean(d):
@@ -817,17 +878,22 @@ def instant(req):
 def free_job(job_id, req):
     from aivis.order import Order, run_order
     from aivis.report_pro import render
+    tmp = tempfile.mkdtemp(prefix="free-")
     try:
         o = Order(order_id="FREE-" + job_id[:8], business_name=req["business"], city=req["city"],
                   niche=req["niche"], plan="free")
-        res, log = run_order(o, mode="free", out_dir=os.path.join(DATA, "free-checks"),
+        res, log = run_order(o, mode="free", out_dir=tmp,
                              render=lambda r: render(r, sample=True, run_note="Free quick check: one AI model "
                                                      "answering from memory, no web search, 8 questions."))
-        JOBS[job_id] = {"status": "done", "named_in": sum(p.target_hits for p in res.score.providers),
-                        "answers": res.score.total_answers, "report": f"/free/{o.order_id}"}
+        with open(os.path.join(tmp, o.order_id, "report.html"), encoding="utf-8") as fh:
+            Store().put_text(free_report_path(o.order_id), fh.read())
+        finish_job(job_id, {"status": "done", "named_in": sum(p.target_hits for p in res.score.providers),
+                            "answers": res.score.total_answers, "report": f"/free/{o.order_id}"})
     except Exception as e:  # never leak internals to the browser
-        JOBS[job_id] = {"status": "failed"}
+        finish_job(job_id, {"status": "failed"})
         print("free job failed:", type(e).__name__, file=sys.stderr)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def health():
@@ -870,10 +936,16 @@ class H(http.server.BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(b)
 
-    def _send(self, code, ctype, body, private=False):
+    def end_headers(self):      # every response, whatever route or error produced it
+        for k, v in (("Strict-Transport-Security", "max-age=31536000"), ("X-Content-Type-Options", "nosniff"),
+                     ("X-Frame-Options", "DENY")):
+            self.send_header(k, v)
+        super().end_headers()
+
+    def _send(self, code, ctype, body, private=False, robots="noindex, nofollow"):
         self.send_response(code); self.send_header("Content-Type", ctype)
         if private:
-            for k, v in (("X-Robots-Tag", "noindex, nofollow"), ("Cache-Control", "no-store"),
+            for k, v in (("X-Robots-Tag", robots), ("Cache-Control", "no-store"),
                          ("Referrer-Policy", "no-referrer")):
                 self.send_header(k, v)
         self.send_header("Content-Length", str(len(body))); self.end_headers()
@@ -881,10 +953,24 @@ class H(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def _body(self, limit=MAX_BODY):
-        n = int(self.headers.get("Content-Length") or 0)
+        raw = self.headers.get("Content-Length")
+        if raw is None or not re.fullmatch(r"[0-9]{1,9}", raw.strip()):
+            raise ValueError(BAD_FORM_MSG)     # missing, negative or non-numeric
+        n = int(raw)
         if n > limit:
             raise ValueError("Request too large.")
         return self.rfile.read(n)
+
+    def _form(self):
+        """The request body as a JSON object; anything else is a plain 400 that never quotes the parser."""
+        raw = self._body()
+        try:
+            d = json.loads(raw.decode("utf-8"))
+        except ValueError:
+            raise ValueError(BAD_FORM_MSG) from None
+        if not isinstance(d, dict):
+            raise ValueError(BAD_FORM_MSG)
+        return d
 
     def log_message(self, fmt, *args):   # request lines can carry data; log nothing
         pass
@@ -897,9 +983,10 @@ class H(http.server.BaseHTTPRequestHandler):
         if path in ("/health", "/healthz"):
             return self._json(200, health())
         if path == "/robots.txt":
-            return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\nDisallow: /r/\nDisallow: /status/\n")
+            return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\nDisallow: /r/\nDisallow: /status/\nDisallow: /free/\n")
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
+            prune_jobs()
             return self._json(200, JOBS.get(m.group(1), {"status": "unknown"}))
         m = re.fullmatch(r"/(r|status)/(.*)", path)
         if m:
@@ -914,11 +1001,19 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(200, "text/html; charset=utf-8", page.encode(), private=True)
         m = re.fullmatch(r"/free/(FREE-[a-f0-9]{8})", path)
         if m:
-            p = os.path.join(DATA, "free-checks", m.group(1), "report.html")
-            if os.path.isfile(p):
-                with open(p, "rb") as fh:
-                    return self._send(200, "text/html; charset=utf-8", fh.read())
-            return self._json(404, {"error": "not found"})
+            try:
+                text = Store().get_text(free_report_path(m.group(1)))
+            except Exception as e:
+                print("error:", type(e).__name__, file=sys.stderr)
+                text = None
+            if text is None:        # links made before the reports moved to the private store
+                p = os.path.join(DATA, "free-checks", m.group(1), "report.html")
+                if os.path.isfile(p):
+                    with open(p, encoding="utf-8") as fh:
+                        text = fh.read()
+            if text is None:
+                return self._json(404, {"error": "not found"})
+            return self._send(200, "text/html; charset=utf-8", text.encode(), private=True, robots="noindex")
         f = public_file(self.path)
         if f is None:
             return self._json(404, {"error": "not found"})
@@ -938,22 +1033,33 @@ class H(http.server.BaseHTTPRequestHandler):
                 code, obj = handle_polar(hdr, self._body(MAX_HOOK_BODY))
                 return self._json(code, obj)
             if self.path == "/api/check":
-                req = clean(json.loads(self._body() or b"{}"))
-                rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": self.client_address[0]}
+                req = clean(self._form())
+                ip = client_ip(self.headers, self.client_address[0])
                 r = instant(req)
+                if not admit_check(ip, FREE_RUN and not r):
+                    return self._json(429, {"error": BUSY_MSG})
+                rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": ip}
                 if r:
-                    save_line(os.path.join(DATA, "requests.jsonl"), {**rec, "result": "instant"})
+                    try:
+                        save_lead({**rec, "result": "instant"})
+                    except Exception as e:
+                        log("lead save failed: " + type(e).__name__)
                     return self._json(200, r)
                 if FREE_RUN:
-                    job = str(uuid.uuid4()); JOBS[job] = {"status": "running"}
+                    job = str(uuid.uuid4())
+                    with LOCK:
+                        JOBS[job] = {"status": "running"}; JOB_META[job] = {"ip": ip, "started": clock()}
                     threading.Thread(target=free_job, args=(job, req), daemon=True).start()
-                    save_line(os.path.join(DATA, "requests.jsonl"), {**rec, "result": "free-run", "job": job})
+                    try:
+                        save_lead({**rec, "result": "free-run", "job": job})
+                    except Exception as e:
+                        log("lead save failed: " + type(e).__name__)
                     return self._json(200, {"status": "queued", "id": job, "prompts": 8, "eta_min": 1,
                                             "niche_label": get_niche(req["niche"]).plural})
-                save_line(os.path.join(DATA, "requests.jsonl"), {**rec, "result": "saved"})
+                save_lead({**rec, "result": "saved"})
                 return self._json(200, {"status": "saved"})
             if self.path == "/api/intake":
-                d = json.loads(self._body() or b"{}")
+                d = self._form()
                 oid, token = new_order(d, clean(d))
                 return self._json(200, {"status": "received", "order_id": oid, "status_url": "/status/" + token})
             return self._json(404, {"error": "not found"})

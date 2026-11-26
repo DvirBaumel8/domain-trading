@@ -13,6 +13,7 @@ Modes
 No secret is ever printed: errors carry only the exception type.
 """
 import datetime as _dt
+import ipaddress
 import json
 import os
 import re
@@ -57,6 +58,27 @@ def city_is_us(city: str) -> bool:
     return bool(m) and m.group(2) in US_STATES and is_us_place(m.group(1), m.group(2))
 
 
+_LOCAL_SUFFIXES = ("localhost", "local", "localdomain", "internal", "intranet", "lan", "home", "corp", "private",
+                   "arpa")
+
+
+def _public_host(host: str) -> bool:
+    """A public host name: not an IP address (any spelling), not a localhost-style or internal name."""
+    h = host.lower()
+    try:
+        ipaddress.ip_address(h)
+        return False
+    except ValueError:
+        pass
+    labels = h.split(".")
+    tld = labels[-1]
+    if not (re.fullmatch(r"[a-z]{2,63}", tld) or re.fullmatch(r"xn--[a-z0-9-]{1,59}", tld)):
+        return False            # numeric or hex last label: 127.1, 0x7f.1, 10.0.0.1 and so on
+    if tld in _LOCAL_SUFFIXES:
+        return False
+    return all(0 < len(x) <= 63 and not x.startswith("-") and not x.endswith("-") for x in labels)
+
+
 def normalize_website(raw) -> str:
     """'' stays ''. Adds https:// when the scheme is missing. Raises ValueError for obviously invalid values."""
     w = str(raw or "").strip()
@@ -65,7 +87,7 @@ def normalize_website(raw) -> str:
     if not re.match(r"[A-Za-z][A-Za-z0-9+.-]*://", w):
         w = "https://" + w
     m = re.fullmatch(r"https?://([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)(?::\d{1,5})?(?:[/?#]\S*)?", w)
-    if not m or len(w) > 200:
+    if not m or len(w) > 200 or not _public_host(m.group(1)):
         raise ValueError("That website doesn't look right. Enter it like https://www.example.com (or leave it empty).")
     return w
 
