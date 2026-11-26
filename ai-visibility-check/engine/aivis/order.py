@@ -3,7 +3,7 @@
 Modes
 - 'free'  : Pollinations (no key, no cost, model memory only). For the free
             self-check and for dry runs. Report is labelled accordingly.
-- 'paid'  : OpenAI / Perplexity / Gemini / Claude with live web search.
+- 'paid'  : OpenAI / Gemini / Claude with live web search.
             NEVER runs unless ALL hold: env AIVIS_ALLOW_PAID=1, the engine's
             API key is in env, and the estimated cost <= the order's cap.
             Every call is charged against a BudgetGuard set to the cap, so a
@@ -22,13 +22,12 @@ from dataclasses import dataclass, field, asdict
 from .audit import run_audit
 from . import signals as _signals
 from .niches import NICHES, get_niche
-from .providers import (REGISTRY, BudgetGuard, Business, MockProvider, PAID_COST_PER_CALL,
-                        PollinationsProvider, ProviderError)
+from . import config
+from .providers import REGISTRY, BudgetGuard, Business, MockProvider, PollinationsProvider, ProviderError
 
-PAID_ENGINES = ("openai", "perplexity", "gemini", "claude")
-ENV_KEYS = {"openai": "OPENAI_API_KEY", "perplexity": "PERPLEXITY_API_KEY",
-            "gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
-DEFAULT_CAP_USD = 8.00          # per order; a $149 order leaves > $135 after the cap
+PAID_ENGINES = config.PAID_ENGINES
+ENV_KEYS = config.ENV_KEYS
+DEFAULT_CAP_USD = config.order_cap_usd()    # 12.00; AIVIS_ORDER_CAP_USD overrides
 TIERS = {                        # prompts x repeats per engine
     "check": (30, 2),            # $149 report: 60 answers per engine
     "lean": (20, 1),             # cheapest useful run
@@ -77,7 +76,7 @@ class Order:
 
 def estimate_cost(order: Order, engines=None) -> float:
     n, r = TIERS[order.plan]
-    return round(sum(PAID_COST_PER_CALL[e] * n * r for e in (engines or order.engines)), 4)
+    return round(sum(config.cost_per_call(e) * n * r for e in (engines or order.engines)), 4)
 
 
 def paid_readiness(engines) -> dict:
@@ -109,6 +108,25 @@ def build_providers(order: Order, mode: str, cap_usd: float, roster=None, seed=0
     return [REGISTRY[e](budget=guard, allow_paid=True) for e in order.engines], guard
 
 
+def usage_report(records) -> dict:
+    """Real vendor usage per call plus totals (per engine and overall). Counts and USD only."""
+    calls, per = [], {}
+    for a, _, _ in records:
+        u = a.usage
+        if not u:
+            continue
+        calls.append({"engine": a.provider, "model": a.model, "repeat": a.run, **u})
+        t = per.setdefault(a.provider, {"model": a.model, "calls": 0, "input_tokens": 0, "output_tokens": 0,
+                                        "searches": 0, "cost_usd": 0.0})
+        t["calls"] += 1
+        for k in ("input_tokens", "output_tokens", "searches"):
+            t[k] += u.get(k, 0)
+        t["cost_usd"] = round(t["cost_usd"] + u.get("cost_usd", 0.0), 6)
+    total = {k: sum(t[k] for t in per.values()) for k in ("calls", "input_tokens", "output_tokens", "searches")}
+    total["cost_usd"] = round(sum(t["cost_usd"] for t in per.values()), 6)
+    return {"calls": calls, "by_engine": per, "total": total}
+
+
 def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD, roster=None,
               out_dir="orders", seed=0, render=None, dry_run=False, providers=None):
     """Run one order. Returns (result, log dict). `providers` lets tests inject fakes."""
@@ -133,6 +151,7 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
             low.add(c.strip().lower())
     res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
                     n_prompts=n, repeats=r, seed=seed, signals=site)
+    log["usage"] = usage_report(res.records)
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
                 "spent_usd": round(guard.spent if guard else res.cost_usd, 4), "score": res.score.score})
@@ -143,7 +162,7 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
             f.write(render(res))
     raw = [{"provider": a.provider, "mode": a.mode, "prompt": a.prompt, "intent": i, "repeat": a.run,
             "text": a.text, "citations": a.citations,
-            "mentions": [[m.raw, m.position, m.roster_name] for m in ms]} for a, ms, i in res.records]
+            "usage": a.usage, "mentions": [[m.raw, m.position, m.roster_name] for m in ms]} for a, ms, i in res.records]
     with open(os.path.join(folder, "answers.json"), "w", encoding="utf-8") as f:
         json.dump(raw, f, indent=1)
     with open(os.path.join(folder, "order-log.json"), "w", encoding="utf-8") as f:

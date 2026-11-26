@@ -8,7 +8,8 @@ import zlib
 from .audit import run_audit
 from .niches import NICHES, get_niche
 from .prompts import generate_prompts
-from .providers import MockProvider, Business, PollinationsProvider, PAID_COST_PER_CALL
+from . import config
+from .providers import MockProvider, Business, PollinationsProvider
 from .report import to_html, to_markdown
 from .roster import from_csv, from_nppes
 from .signals import fetch_and_analyze
@@ -40,9 +41,9 @@ def cmd_cost(a):
     calls = a.prompts * a.repeats
     total = 0.0
     for prov in a.providers.split(","):
-        c = PAID_COST_PER_CALL[prov] * calls
+        c = config.cost_per_call(prov) * calls
         total += c
-        print(f"{prov:11s} {calls} calls x ${PAID_COST_PER_CALL[prov]:.3f} = ${c:.2f}")
+        print(f"{prov:11s} {calls} calls x ${config.cost_per_call(prov):.3f} = ${c:.2f}")
     print(f"TOTAL per audit: ${total:.2f}")
 
 
@@ -146,13 +147,23 @@ def cmd_order(a):
         city, state = [x.strip() for x in o.city.split(",")]
         names = [e.name for e in from_nppes(niche.npi_taxonomy, city, state, limit=1000)]
     try:
-        res, log = run_order(o, mode=a.mode, cap_usd=a.cap, roster=names, out_dir=a.out, dry_run=a.dry_run,
+        res, log = run_order(o, mode=a.mode, cap_usd=DEFAULT_CAP_USD if a.cap is None else a.cap, roster=names, out_dir=a.out, dry_run=a.dry_run,
                              render=lambda r: render(r, sample=(a.mode != "paid"),
                                                      run_note=("Free quick check: one AI model answering from memory, "
                                                                "no web search." if a.mode == "free" else "Simulated data.")))
     except OrderError as e:
         sys.exit(f"order refused: {e}")
     print(json.dumps(log, indent=1))
+
+
+def cmd_smoke(a):
+    if os.environ.get("CI"):
+        sys.exit("smoke refused: it makes real paid calls and never runs in CI")
+    from .smoke import run_smoke, format_smoke
+    rows = run_smoke(a.engines.split(","))
+    print(format_smoke(rows))
+    if any(not r["ok"] for r in rows):
+        sys.exit(1)
 
 
 def main(argv=None):
@@ -162,7 +173,7 @@ def main(argv=None):
     p.add_argument("--n", type=int, default=30); p.add_argument("--seed", type=int, default=0)
     p.set_defaults(fn=cmd_prompts)
     c = sub.add_parser("cost"); c.add_argument("--prompts", type=int, default=30)
-    c.add_argument("--repeats", type=int, default=3); c.add_argument("--providers", default="openai,perplexity,gemini,claude")
+    c.add_argument("--repeats", type=int, default=3); c.add_argument("--providers", default=",".join(config.PAID_ENGINES))
     c.set_defaults(fn=cmd_cost)
     au = sub.add_parser("audit")
     au.add_argument("--niche", required=True, choices=sorted(NICHES)); au.add_argument("--city", required=True)
@@ -192,10 +203,12 @@ def main(argv=None):
     od = sub.add_parser("order", help="run one customer order (free | paid | mock) with a cost cap")
     od.add_argument("--intake", required=True, help="intake JSON (see orders/example-intake.json)")
     od.add_argument("--mode", default="free", choices=["free", "paid", "mock"])
-    od.add_argument("--cap", type=float, default=8.0, help="max USD this order may spend (paid mode)")
+    od.add_argument("--cap", type=float, default=None, help="max USD this order may spend (paid mode; default 12, AIVIS_ORDER_CAP_USD overrides)")
     od.add_argument("--roster", default="", help="CSV of local business names (else NPPES if the niche has one)")
     od.add_argument("--dry-run", action="store_true", help="show plan, cost and key readiness; call nothing")
     od.add_argument("--out", default="orders"); od.set_defaults(fn=cmd_order)
+    sk = sub.add_parser("smoke", help="one minimal real call per paid engine; prints model, ok/error, usage (costs cents)")
+    sk.add_argument("--engines", default=",".join(config.PAID_ENGINES)); sk.set_defaults(fn=cmd_smoke)
     a = ap.parse_args(argv)
     a.fn(a)
 
