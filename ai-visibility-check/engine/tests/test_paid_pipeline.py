@@ -147,6 +147,50 @@ class FakeVendors(unittest.TestCase):
             prov.ask("q")
         self.assertEqual(g.spent, 0.0)
 
+    # real-usage spend (#47)
+    def test_spent_usd_is_real_usage_total_not_estimate(self):
+        o = _order("F-SP")
+        _, log = self.run_paid(o)
+        real = log["usage"]["total"]["cost_usd"]
+        self.assertGreater(real, 0)
+        self.assertAlmostEqual(log["spent_usd"], round(real, 4), places=4)
+        self.assertGreater(log["estimated_usd"], 0)
+        self.assertNotAlmostEqual(log["spent_usd"], log["estimated_usd"], places=3)
+
+    def test_mid_run_guard_stops_on_real_usage_over_cap_and_writes_no_report(self):
+        # the estimate passes the pre-check (patched low); real usage ($1.44 for the full run) goes over $1.00
+        from aivis.order import CapExceeded
+        # the per-call estimate guard is loosened so the real-usage guard is what stops the run
+        with mock.patch("aivis.order.estimate_cost", return_value=0.5), \
+                mock.patch("aivis.order.BudgetGuard", lambda cap: BudgetGuard(1000)), \
+                self.assertRaises(CapExceeded) as cm:
+            self.run_paid(_order("F-CAP"), cap=1.0)
+        self.assertGreater(cm.exception.spent, 1.0)
+        self.assertLess(cm.exception.spent, 1.44)       # stopped mid-run, not at the end
+        self.assertFalse(os.path.exists(self.folder("F-CAP")))
+
+    def test_precheck_still_refuses_when_estimate_over_cap(self):
+        from aivis.order import CapExceeded
+        with self.assertRaises(OrderError) as cm:
+            self.run_paid(_order("F-PRE"), cap=3.0)
+        self.assertNotIsInstance(cm.exception, CapExceeded)
+        self.assertIn("estimated cost", str(cm.exception))
+        self.assertEqual(len(fake_apis.CALLS), 0)
+
+    def test_harness_failure_cases_set_paid_only_false_for_H(self):
+        import ast, re
+        src = open(os.path.join(os.path.dirname(__file__), "..", "..", "..", "docs", "requests", "avc-mock-run",
+                                "run_failures.py"), encoding="utf-8").read()
+        self.assertIn("paid=True", re.search(r"^O = lambda.*$", src, re.M).group(0))
+        unpaid = []
+        for node in ast.walk(ast.parse(src)):
+            if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "go":
+                order_call = node.args[1]
+                if any(k.arg == "paid" and getattr(k.value, "value", None) is False for k in order_call.keywords):
+                    unpaid.append(node.args[0].value)
+        self.assertEqual(unpaid, ["H_unpaid_order_flag"])
+
+
     # item 7
     def test_item7_error_cutoff_stops_provider_entirely(self):
         calls = {"n": 0}

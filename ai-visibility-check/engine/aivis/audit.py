@@ -9,6 +9,13 @@ from .reasons import build_findings
 from .score import score_audit
 
 
+class SpendCapExceeded(RuntimeError):
+    """Real vendor usage so far went over the order cap; the run was stopped."""
+    def __init__(self, spent, cap):
+        super().__init__(f"real usage ${spent:.4f} exceeds the order cap ${cap:.2f}")
+        self.spent, self.cap = spent, cap
+
+
 @dataclass
 class AuditResult:
     niche: Niche
@@ -24,12 +31,12 @@ class AuditResult:
 
 
 def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeats=3, seed=0,
-              signals=None, target_reviews=None, competitor_reviews=None, max_errors=10):
+              signals=None, target_reviews=None, competitor_reviews=None, max_errors=10, real_cap_usd=None):
     has_register = bool(niche.npi_taxonomy)
     if target not in roster_names:
         roster_names = list(roster_names) + [target]
     prompts = generate_prompts(niche, city, n_prompts, seed)
-    records, errors, cost = [], [], 0.0
+    records, errors, cost, real = [], [], 0.0, 0.0
     for prov in providers:
         prov_errors, stopped = 0, False
         for p in prompts:
@@ -44,6 +51,9 @@ def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeat
                         break
                     continue
                 cost += ans.cost_usd
+                real += (ans.usage or {}).get("cost_usd", 0.0)
+                if real_cap_usd is not None and real > real_cap_usd + 1e-9:
+                    raise SpendCapExceeded(real, real_cap_usd)
                 records.append((ans, find_mentions(ans.text, roster_names, city=city), p.intent))
             if stopped:
                 break

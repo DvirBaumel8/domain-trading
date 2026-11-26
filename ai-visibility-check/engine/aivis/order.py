@@ -20,7 +20,7 @@ import sys
 import zlib
 from dataclasses import dataclass, field, asdict
 
-from .audit import run_audit
+from .audit import run_audit, SpendCapExceeded
 from . import signals as _signals
 from .niches import NICHES, get_niche
 from .parse import match_name
@@ -172,6 +172,11 @@ class AnswerShortfall(OrderError):
     spent = 0.0
 
 
+class CapExceeded(OrderError):
+    """Real usage went over the order cap mid-run; no report; spent = real usage so far."""
+    spent = 0.0
+
+
 def _check_answers(res, order, expected, log):
     """No report from a subset: every engine must reach MIN_ANSWER_SHARE of its expected answers."""
     got = {}
@@ -222,18 +227,27 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
         if not c or match_name(c, [order.business_name], city=order.city) or match_name(c, names, city=order.city):
             continue                    # empty, the target itself, or already tracked
         names.append(c)
-    res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
-                    n_prompts=n, repeats=r, seed=seed, signals=site,
-                    target_reviews=order.target_reviews, competitor_reviews=order.competitor_reviews)
+    try:
+        res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
+                        n_prompts=n, repeats=r, seed=seed, signals=site,
+                        target_reviews=order.target_reviews, competitor_reviews=order.competitor_reviews,
+                        real_cap_usd=cap_usd if mode == "paid" else None)
+    except SpendCapExceeded as e:       # same no-partial path as engine failures: nothing is written
+        print(f"[operator] ALERT order {order.order_id}: real usage ${e.spent:.4f} went over the order cap "
+              f"${e.cap:.2f}; run stopped, no report", file=sys.stderr)
+        err = CapExceeded(f"order {order.order_id}: {e}; run stopped, no report written")
+        err.spent = e.spent
+        raise err from None
     log["usage"] = usage_report(res.records)
+    real_spent = log["usage"]["total"]["cost_usd"] if log["usage"]["calls"] else (guard.spent if guard else res.cost_usd)
     try:
         _check_answers(res, order, n * r, log)
     except AnswerShortfall as e:
-        e.spent = guard.spent if guard else res.cost_usd
+        e.spent = real_spent
         raise
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
-                "spent_usd": round(guard.spent if guard else res.cost_usd, 4), "score": res.score.score})
+                "spent_usd": round(real_spent, 4), "score": res.score.score})
     folder = os.path.join(out_dir, order.order_id)
     os.makedirs(folder, exist_ok=True)
     if render:

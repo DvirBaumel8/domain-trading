@@ -9,7 +9,7 @@ import tempfile
 
 from . import config
 from .niches import get_niche
-from .order import TIERS, AnswerShortfall, Order, OrderError, run_order
+from .order import TIERS, AnswerShortfall, CapExceeded, Order, OrderError, run_order
 from .report_pro import render
 from .roster import from_nppes
 
@@ -71,6 +71,8 @@ def build_report(order_dict, cap_usd, roster_fn=None, providers=None):
         except AnswerShortfall as e:     # vendors answered too little: retryable, and it cost money
             raise JobFailed("engines under-answered: " + str(e)[:100], spent=e.spent,
                             retryable=e.spent < cap_usd - 1e-9) from None
+        except CapExceeded as e:         # real usage passed the cap mid-run: it cost money, never retried
+            raise JobFailed("spend cap exceeded: " + str(e)[:100], spent=e.spent, retryable=False) from None
         except OrderError as e:          # locked / missing keys / estimate over cap: nothing was called
             raise JobFailed("refused: " + str(e), retryable=False) from None
         except JobFailed:
