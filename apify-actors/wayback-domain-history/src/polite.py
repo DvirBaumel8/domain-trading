@@ -44,23 +44,31 @@ def _retry_after(r: httpx.Response, attempt: int) -> float:
 
 
 async def request(client: httpx.AsyncClient, method: str, url: str, *, limiter: HostLimiter | None = None,
-                  retries: int = 3, sleep=asyncio.sleep, **kw) -> httpx.Response:
-    """Returns the last response (which may still be 429/5xx after `retries`). Raises FetchError on transport errors."""
-    last_err = "request failed"
+                  retries: int = 3, sleep=asyncio.sleep, retry_on: tuple = (httpx.HTTPError,),
+                  retry_status: tuple = RETRY_STATUS, on_error=None, **kw) -> httpx.Response:
+    """Returns the last response (which may still be 429/5xx after `retries`). Raises FetchError on transport errors.
+
+    The retry policy: `retry_on` are the exception types worth another try (default: any httpx.HTTPError, as before),
+    `retry_status` the statuses worth another try (default: 429 and 5xx). Any other transport error raises at once, and
+    FetchError.__cause__ is the original exception. `on_error(attempt, exc)` is called for each transport error."""
+    last_err, last_exc = "request failed", None
     for attempt in range(retries + 1):
         if limiter:
             await limiter.wait(url)
         try:
             r = await client.request(method, url, **kw)
-        except httpx.TimeoutException:
-            last_err = "timeout"
         except httpx.HTTPError as e:
-            last_err = type(e).__name__
+            last_exc = e
+            last_err = "timeout" if isinstance(e, httpx.TimeoutException) else type(e).__name__
+            if on_error:
+                on_error(attempt, e)
+            if not isinstance(e, retry_on):
+                break
         else:
-            if r.status_code not in RETRY_STATUS or attempt == retries:
+            if r.status_code not in retry_status or attempt == retries:
                 return r
             await sleep(_retry_after(r, attempt))
             continue
         if attempt < retries:
             await sleep(min(2.0 ** (attempt + 1), MAX_RETRY_AFTER))
-    raise FetchError(last_err)
+    raise FetchError(last_err) from last_exc

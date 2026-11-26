@@ -61,6 +61,12 @@
       "type": "boolean",
       "description": "Skip URLs that robots.txt disallows.",
       "default": true
+    },
+    "debugNetwork": {
+      "title": "Debug network",
+      "type": "boolean",
+      "description": "Log connect details for failed requests (host, attempt, reason, error classes). No headers, bodies, paths or query strings.",
+      "default": false
     }
   }
 }
