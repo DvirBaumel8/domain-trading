@@ -74,3 +74,13 @@ CR-128 has the code backlog from Gavriel's audit.
 2. `usage-report.py` reads prices live from the Apify API every run, including tiered prices (`eventTieredPricingUsd`, every tier).
 3. Today `price_map` takes the last `pricingInfos` entry. A scheduled price change can add an entry that starts in the future. The report must show the entry in effect now (latest `startedAt` at or before the run time) as the current price, and list any later entry separately as `pending` with its start time.
 4. Tests (offline, recorded fixtures): flat price; tiered price with all tiers; a future-dated entry is reported as pending, not as current; no prices are hard-coded in the source (a check that fails on a literal USD price).
+
+## Update 26 Nov 2026, 11:35 IST: GO on Part A
+
+**Dvir, 26 Nov 11:22 (via Gavriel):** "מה שמתאים לקוד מתאים לקלוד קוד ולדום" ("work that fits code goes to Claude Code and DOM").
+
+- **Q1 is answered:** the repo is private (11:30 IST). The snapshot is in `docs/requests/apify-import/` (commit d6ef98ac).
+- **Build Part A now:** move the snapshot to `apify-actors/`, add the offline pytest contract, the CI guard (bots may change only README.md and `.actor/*.json` text keys) and `tools/sync-store-meta.py`, and apply the no-hard-coded-prices rules above.
+- **Still needs Dvir's OK on each release:** every `apify push` and every Apify release, run from Dvir's machine.
+- **Part B (daily usage job) waits on Q2** (`APIFY_TOKEN` secret). Do not build the scheduled job yet. Offline code and tests for `usage-report.py` pricing may land with Part A.
+- **CR-128 stays in the backlog.** Do not build it.
